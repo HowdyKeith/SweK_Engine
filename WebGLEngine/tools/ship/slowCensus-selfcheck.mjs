@@ -41,7 +41,7 @@ import path from "node:path";
 import { ENG } from "./slowCensus.mjs";
 import { redRegister, selectGates, readTimings, DEFAULTS } from "./quickSweep.mjs";
 import { enumerateGates } from "./gateSweep.mjs";
-import { UNCONFIRMED_SLOW, SLOW_PARTIAL, RED_AT_V4424, RECHECK_V4313, RECHECK_V4314, FIXED_SINCE_V4279 } from "./redCensus.mjs";
+import { UNCONFIRMED_SLOW, SLOW_PARTIAL, RED_AT_V4424, RECHECK_V4313, RECHECK_V4314, FIXED_SINCE_V4279, UNVERIFIED_LINE } from "./redCensus.mjs";
 import {
     MEASURED_V4424, PROTOCOL, DECIDED, V4279_CAP_MS, SERIAL_CAP_MS,
     EXEMPT_AT_V4424, UNMEASURED_AT_V4424, capRecordedAsTime, redsFound, ORPHAN_RATCHET, budgetSkip, RED_OUTSIDE_THE_BUCKET,
@@ -121,8 +121,13 @@ console.log("\n3. *** RE-MEASURED ONE AT A TIME, AND EVERY COMPARABLE VERDICT AG
     ok("*** THREE RED, and the first forty-three measured were all green ***", r.gates.length === 3,
         r.gates.map((x) => x.replace(/-selfcheck\.mjs$/, "").replace(/^tools\/ship\//, "")).join(", ") +
         " -- red and exempt from the ship gate for 145 rounds");
+    // v4482 -- `e.fails.length` THREW rather than failed when the register honestly answered null. The getter
+    // returns null for a gate with no completed run and no admission, which became reachable the moment the
+    // freezer stopped inventing a line for a killed one -- and a gate that CRASHES reports nothing at all,
+    // where a gate that fails names the entry to fix. The absence is a failed row now, not a dead run.
     ok("  every one of them is FILED, with its failure, not left in the bucket it came out of",
-        r.filed.length === r.gates.length && RED_AT_V4424.every((e) => e.fails.length > 40 && e.why.length > 60),
+        r.filed.length === r.gates.length &&
+        RED_AT_V4424.every((e) => (e.fails || "").length > 40 && e.why.length > 60),
         `${r.filed.length} of ${r.gates.length} in redCensus.RED_AT_V4424, each with the check that fails and why`);
     // *** v4471 -- THIS READ RED_AT_V4424's `ms` AND THAT FIELD IS null BY CONSTRUCTION FOR THESE THREE. ***
     // The v4430 census makes `ms` a getter over tools/ship/register-audit.mjs, which is right for a register
@@ -140,8 +145,24 @@ console.log("\n3. *** RE-MEASURED ONE AT A TIME, AND EVERY COMPARABLE VERDICT AG
     // true only because freezeRegisterAudit.mjs had never been told about a third register. The claim was a
     // description of a gap dressed as a property. Teaching the audit (v4471) ran them at a raised cap and the
     // readings became DERIVED, which falsified my own assertion by repairing the thing it described.
-    ok("  ...and the register DERIVES their readings from a run rather than from a typed literal",
-        RED_AT_V4424.every((e) => e.derived === true && e.ms > 60000),
+    // *** v4482 -- AND IT WAS FALSIFIED A SECOND TIME, BY THE REPAIR OF THE THING IT WAS CELEBRATING. ***
+    // doorKinds-selfcheck's reading was `derived` because freezeRegisterAudit stored whatever the child had
+    // printed BEFORE the 120s cap killed it -- one line out of however many it would have printed, frozen as
+    // though the run had finished. So this row was asserting that a PARTIAL READING was a derivation. The
+    // freezer records no lines for a killed run now, doorKinds joins shaderRefs in UNVERIFIED_LINE, and its
+    // `derived` is correctly false.
+    //
+    // WHAT THE ROW WAS ALWAYS FOR IS THAT NO READING HERE IS A TYPED LITERAL, and there are TWO honest ways to
+    // satisfy that: a completed run, or an explicit admission that none finished. Requiring the first made the
+    // second impossible to state, which is how a partial line got to look like the better answer. Both are
+    // accepted now and the row REPORTS which, so an admission cannot quietly become the normal case.
+    const derivedN = RED_AT_V4424.filter((e) => e.derived).length;
+    const admittedN = RED_AT_V4424.filter((e) => !e.derived && UNVERIFIED_LINE[e.gate]).length;
+    const neitherN = RED_AT_V4424.length - derivedN - admittedN;
+    ok("  ...and every reading is DERIVED from a run or ADMITTED as absent -- never a typed literal",
+        RED_AT_V4424.every((e) => (e.derived === true || !!UNVERIFIED_LINE[e.gate]) && e.ms > 60000),
+        `${derivedN} derived, ${admittedN} admitted` + (neitherN ? `, ${neitherN} NEITHER -- ` +
+            RED_AT_V4424.filter((e) => !e.derived && !UNVERIFIED_LINE[e.gate]).map((e) => e.gate).join(", ") : "") + "; " +
         RED_AT_V4424.map((e) => (e.ms / 1000).toFixed(0) + "s").join(", ") + " from the register audit at a " +
         "raised cap. Until v4471 this read null, because the audit covered two registers and there are three");
     ok("*** zero crash ***", !Object.values(MEASURED_V4424).some((m) => m.verdict === "CRASH"),

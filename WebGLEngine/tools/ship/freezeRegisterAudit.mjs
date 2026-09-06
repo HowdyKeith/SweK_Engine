@@ -26,7 +26,15 @@ function ENGINE_VERSION() {
 }
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const CAP_MS = Number(process.env.SWEK_AUDIT_CAP_MS || 120000);
+// *** v4482 -- 120s TO 200s, TO PAY A DEBT RATHER THAN ADMIT ONE. *** Dropping a killed run's partial output
+// (see run() below) left doorKinds-selfcheck with no reading at all, which would have made it the SECOND entry
+// in redCensus.UNVERIFIED_LINE -- and registerDrift ratchets that map at one, for the good reason that it is
+// "not a place to put a reading somebody could not be bothered to take". slowCensus.MEASURED_V4424 has the
+// number: doorKinds is 150,994 ms serially on an idle box, so the cap was the only thing between it and a real
+// line. 200s clears it with a third of headroom. shaderRefs stays admitted at 379,838 ms, which no plausible
+// cap reaches and which is a decision about the audit rather than a measurement anybody has declined to take.
+// The cost is bounded and paid once per freeze: only a gate that would have been killed anyway runs longer.
+const CAP_MS = Number(process.env.SWEK_AUDIT_CAP_MS || 200000);
 
 /** Run one gate and read its verdict. BOTH STREAMS: one gate of 29 prints its FAIL line to stderr (v4380). */
 const run = (rel) => new Promise((res) => {
