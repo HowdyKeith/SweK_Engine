@@ -149,6 +149,30 @@ export const POSTURE = Object.freeze({
  */
 export const REACHED_SOURCES = Object.freeze([
     // =========================================================================================================
+    // v4513 -- LIGHT PROBES FOR A SPLAT SCENE, FROM THE TECHNIQUE AND NOT THE SOURCE.
+    //
+    // isaac-mason/three-spark-light-probes bakes an order-2 spherical-harmonics irradiance volume from a splat
+    // scene so ordinary meshes take its ambient light. The repository has NO LICENSE FILE; its package.json says
+    // "license": "MIT", and a field in a manifest is a statement of intent, not a grant with the text beside it.
+    // The ZachSaucier rule applies: nothing read into the tree. render/splatProbes.mjs is written from the
+    // published technique (Ramamoorthi and Hanrahan's projection and cosine convolution, the cube-face solid
+    // angle) with its own packing layout.
+    // =========================================================================================================
+    {
+        repo: "isaac-mason/three-spark-light-probes", sourceUrl: "https://github.com/isaac-mason/three-spark-light-probes",
+        grantorHoldsRights: true, licenceExists: false, publisher: "Isaac Mason", year: 2026,
+        spdx: null, licence: null,
+        licenceNote: "NO LICENSE FILE, read first-hand at v4513 at commit 27cadd2 (2026-08-06): the tree has no LICENSE, " +
+             "LICENSE.md or COPYING; package.json carries license \"MIT\" and author Isaac Mason. A manifest field " +
+             "without the licence text is recorded as UNPAPERED, the same posture as ZachSaucier/Asset-Loading-Effects.",
+        redistributable: false, posture: POSTURE.REACHED,
+        taken: null, takenPaths: [], citedPaths: ["render/splatProbes.mjs", "tools/ship/splatProbes-selfcheck.mjs"],
+        why: "The idea is real and the tree lacked it: a splat scene lit nothing around it. But the idea is the " +
+             "published one -- a probe grid, six faces per probe, order-2 SH, a packed 3D texture -- and " +
+             "render/splatProbes.mjs derives it from the closed forms its gate holds it to, not from this " +
+             "repository's code. Read for what it names; nothing ported.",
+    },
+    // =========================================================================================================
     // v4511 -- A COLLIDER FOR A SPLAT SCENE, THE GAP THE SPLAT STACK HAD LEFT OPEN.
     //
     // physics/splat/gaussianSplat.js grades the projection math and says Spark stays a viewer; nothing in the

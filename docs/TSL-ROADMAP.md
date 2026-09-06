@@ -877,6 +877,25 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         so the gate's building is asymmetric in every axis now. Not drawn: accessories (a box per cell has no
         railing). The four rounds together: a seeded CityGen, a grammar held by hash, a facade stamper with party
         walls from adjacency, and a lab that draws the grammar on the device.
+    SPLAT LIGHT PROBES -- built at v4513 (task 59), from the technique and not the source. isaac-mason/three-spark-
+        light-probes bakes an order-2 spherical-harmonics irradiance volume over a splat scene so ordinary meshes take
+        its ambient light; the repository has NO LICENSE FILE (package.json says MIT; a manifest field is not a grant),
+        so it is recorded UNPAPERED in world/reachedLicences.mjs and nothing of it was read into the tree.
+        render/splatProbes.mjs derives the pieces from the published forms: the nine real SH basis functions in the
+        tree's order (splatParser's Y00 first), six cube faces per probe with the exact per-texel solid angle,
+        Ramamoorthi and Hanrahan's projection and clamped-cosine convolution (pi, 2 pi / 3, pi / 4), a probe grid at
+        a spacing with probes on the box corners, trilinear interpolation clamped to the grid, 27 coefficients packed
+        across seven RGBA planes with one spare slot, and a nearest-hit ray-versus-sphere radiance over a splat cloud
+        as the bake source. MEASURED (tools/ship/splatProbes-selfcheck.mjs): the faces cover 4 pi at every size; the
+        basis Gram matrix is the identity to 2.5e-5; a constant radiance projects to L sqrt(4 pi); one lit face to
+        (2 pi / 3) c0 exactly and to the reduced integrals of z and z^2 (the u integral in closed form, v by Simpson)
+        within 1e-6 at 512 texels a face; a gradient 1 + z / 2 to (c1 / 2)(4 pi / 3); a constant's irradiance is pi L
+        in six normals; the lit face's SH irradiance is 0.80 % from the direct cosine integral (order-2 truncation);
+        the round-trip is exact after Math.fround. THE FINDING: flipping the sign of the y basis left the
+        orthonormality and every z-only closed form green -- a sign is invisible to a symmetric radiance -- so the
+        gate projects an x and a y ramp on purpose, and those two are what go red. Not built: a device-side sampler
+        (the packed planes are the shape a 3D texture takes; the tree's lit pipeline reads no probe yet), an
+        occupancy-fit box (the grid takes cloudBounds plus a margin), and any page.
     TEXTURE BYTES BEFORE KTX2 / BASIS -- measured at v4495 (task 18), RIG-PENDING for the asset library.
         tools/ship/textureBytes.mjs walks a folder and records every raster texture's bytes on disk and, from the
         PNG and JPEG headers, its pixel size and GPU bytes (RGBA8 with mips); decide() derives the verdict from

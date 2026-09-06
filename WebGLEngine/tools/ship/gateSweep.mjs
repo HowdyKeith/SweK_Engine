@@ -2744,6 +2744,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "party walls, the stairs side and accessory percentages live, the counts and hash in the HUD. Sabotage A was blind on " +
                  "the symmetric default building until the gate's building was made asymmetric. Sabotages red at 1 / 1 / 3 / 3.",
     }),
+    since135: Object.freeze({
+        at: "v4513", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/splatProbes-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, headless. render/splatProbes.mjs: an order-2 SH irradiance probe volume from six cube faces per probe, from the " +
+                 "technique of isaac-mason/three-spark-light-probes and not its source (no LICENSE file; recorded UNPAPERED in " +
+                 "world/reachedLicences.mjs). The projection is held to the closed forms -- a constant radiance, one lit face " +
+                 "against the reduced integrals of z and z^2, a gradient -- at 1e-6; the irradiance of a constant is pi L; the " +
+                 "trilinear sample reads a probe's own coefficients at its position and the linear interpolation between; the " +
+                 "seven-plane packing round-trips exactly in Float32; a nearest-hit splat source bakes a two-tone shell into probes " +
+                 "that read its tones. Sabotages red at 20 / 1 / 4 / 5; the sign sabotage was caught only by the x and y ramps.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

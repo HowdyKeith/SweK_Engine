@@ -307,3 +307,37 @@ Euler characteristic 4 (two closed surfaces); the BVH raycasts the collider to w
 of the sphere. The finding: both meshers' first drafts started the stitching pass one voxel
 late and agreed on a mesh with 122 boundary edges. A twin written the same way round proves
 nothing about that step; the watertight hold caught it.
+
+### isaac-mason/three-spark-light-probes -- TECHNIQUE ONLY as `render/splatProbes.mjs` (v4513)
+
+**What it is.** NO LICENSE FILE. The tree at commit 27cadd2 (2026-08-06) has no LICENSE,
+LICENSE.md or COPYING; `package.json` says `"license": "MIT"` and names Isaac Mason. A
+manifest field without the text beside it is not a grant, so this is recorded UNPAPERED in
+`world/reachedLicences.mjs` under the same rule as ZachSaucier/Asset-Loading-Effects, and
+nothing of its source was read into the tree. What its README describes: a box fitted to the
+splat scene's occupancy, a dense probe grid through it at a fixed spacing, six cube-face
+renders per probe folded by three's LightProbeGenerator into order-2 spherical harmonics, the
+nine RGB coefficients packed across seven RGBA sub-volumes of one Data3DTexture, and a material
+that samples the volume per fragment by world position.
+
+**Why it matters here.** A splat scene could be looked at (the loader, scene, renderer and
+sorter) and, since v4511, walked into; it still lit nothing around it. An irradiance volume is
+how an ordinary mesh standing in a splat scene takes its ambient colour.
+
+**What was built and from what.** `render/splatProbes.mjs`, from the published forms only:
+the nine real SH basis functions in the tree's own order (splatParser puts Y00 first), the
+exact per-texel solid angle of a cube face, Ramamoorthi and Hanrahan's projection and their
+clamped-cosine convolution, a probe grid with probes on the box corners, trilinear
+interpolation clamped to the grid, a seven-plane packing whose layout is this file's own, and
+a nearest-hit ray-versus-sphere radiance over a splat cloud as the bake source. Not built:
+the device-side sampler (the packed planes are the shape a 3D texture takes; no lit pipeline
+reads one yet), the occupancy fit, any page.
+
+**Measured** (`tools/ship/splatProbes-selfcheck.mjs`): the faces cover 4 pi at every size and
+the basis is orthonormal under them; a constant radiance projects to L sqrt(4 pi); one lit
+face to (2 pi / 3) c0 exactly and to the reduced integrals of z and z^2 within 1e-6; a
+gradient to (c1 / 2)(4 pi / 3); a constant's irradiance is pi L in every normal; the lit
+face's irradiance by SH is 0.80 % from the direct cosine integral, which is order-2
+truncation and is said; the packing round-trips exactly in Float32. The finding: flipping
+the sign of one basis function left every symmetric closed form green. A sign is invisible
+to a symmetric radiance, so the gate projects an x ramp and a y ramp on purpose.
