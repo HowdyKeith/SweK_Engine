@@ -65,8 +65,10 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 <!-- *** TWO ROUNDS SHIPPED AS v4485 AND NEITHER IS RENUMBERED, WHICH IS A DEPARTURE FROM THE PRECEDENT
      ABOVE AND IS DELIBERATE. *** The EIGHTH collision on this pair of branches. This branch's v4485 is the
      POSIX-assumption round, below; main's is "the pinch threshold scales with the hand", written by the
-     orrery line and merged as PR #11, whose text lives in CHANGELOG-v4485.md at the repository root rather
-     than in this file. Both were verified, committed and pushed as v4485 before either could see the other,
+     orrery line and merged as PR #11, whose text lives in docs/CHANGELOG-v4485.md rather than in this file.
+     (That path is corrected: it read "at the repository root" when written, which was true at the time and is
+     the very placement rootLayout-selfcheck refused -- the file was moved to docs/ by the repair commit, and
+     the pointer would otherwise send a reader to a file that is no longer there.) Both were verified, committed and pushed as v4485 before either could see the other,
      and BOTH ARE ALREADY ON MAIN -- so a renumber now would rewrite a number the fleet has already been
      handed rather than prevent one being handed out, which is the opposite of what the v4333 and v4400
      renumbers were for. The rule those renumbers protect is that TWO BUILDS MUST NOT WEAR ONE NUMBER WITH

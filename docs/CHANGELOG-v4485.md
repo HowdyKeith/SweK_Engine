@@ -113,8 +113,37 @@ back to the absolute threshold and SAYS SO in `pinch.relative`, which the gate c
   * zeroRangeFull-selfcheck: ALL GREEN. It grades properties OF THE RECORDED SWEEP rather than re-running it, so
     the eighth mode does not invalidate it. NOTE FOR WHOEVER NEXT REGENERATES THAT RECORD: its `hands` entry
     reads `modes: 7, builds: 287` and is now stale by one mode. Named rather than silently left.
-  * plantedCoverage-selfcheck: RUN TO COMPLETION THIS TIME (484s; its budget says 143s, this box is slower).
-    Verdict below.
+  * *** AND THAT NOTE WAS INCOMPLETE, WHICH THE VERIFY CAUGHT AND THIS ROUND DID NOT. *** A SECOND derived
+    record went red on arrival: tools/roundhouse/zeroControl-selfcheck.mjs, whose coercion census this round's
+    handsBind.mjs moved -- 17759 -> 17800 swept points, 5612 -> 5619 coerced, 1225 -> 1228 collapsed ranges.
+    Repaired in a follow-up commit ("Repair the two reds main's v4485 brought with it"), which attributed it
+    properly rather than raising the bar: with handsBind.mjs alone reverted the census re-derives to the old
+    record EXACTLY, and the ratio it carries is unmoved at 31.6%.
+    *** THE METHOD ERROR IS WORTH MORE THAN THE MISS. *** This round DID go looking for derived records a new
+    mode would invalidate, found zeroRangeFull, and reported it -- by grepping the registers that mention
+    `hands` BY NAME. zeroControl names nothing; it sweeps everything. A SEARCH FOR MY OWN DEVICE'S NAME IS THE
+    WRONG INSTRUMENT FOR "WHAT RECORDS DOES A NEW MODE INVALIDATE", and it returns a confident, incomplete
+    answer -- which is worse than returning nothing, because it was written up as though it were the whole set.
+  * plantedCoverage-selfcheck: ALL CHECKS PASS, exit 0, RUN TO COMPLETION on the ported tree -- 935s against a
+    stated budget of 143s, this box being slower. `hands` is among the 124 binds with a live planted error
+    (floor 17). *** THIS BULLET WAS WRONG AS FIRST WRITTEN AND THE CORRECTION IS THE POINT OF SAYING SO: it
+    read "RUN TO COMPLETION THIS TIME (484s) ... Verdict below" AND THERE WAS NO VERDICT BELOW. *** 484s was a
+    DIFFERENT RUN ON A DIFFERENT TREE -- the stale v3849 build, where this gate FAILED 2 (pre-existing: the
+    identical two failures reproduce on a pristine v3849 with nothing applied). Quoting a failing run's timing
+    under the word "verdict" and then omitting the verdict is the shape this project keeps finding: reachable
+    and findable are two different things, in prose. The number above is the run this round actually rests on.
+
+### AND THE ONE IT DID REPEAT, ONE LAYER DOWN: THIS FILE WAS WRITTEN TO THE REPOSITORY ROOT
+
+*** THE SAME STALENESS THAT NEARLY REVERTED v3852 AND v4027 ALSO PUT THIS FILE IN THE WRONG DIRECTORY. *** It
+was written to the root because THAT IS WHERE THE v3849 EXTRACT KEEPS ITS CHANGELOGS -- and main had since moved
+them to docs/, where its four siblings already lived. tools/ship/rootLayout-selfcheck.mjs requires every root
+file to be justified by name, and docs/CHANGELOG.md's own opening paragraph states the rule this broke:
+"history goes in docs/". Moved there by the same follow-up commit that repaired zeroControl.
+
+THE PORT ONTO CURRENT main WAS DONE CAREFULLY FOR THE CODE AND NOT FOR THE CONVENTIONS AROUND IT. Re-deriving
+the calibration on main's fixture was the right instinct applied to one file; where the changelog goes, and
+which frozen records a new mode moves, are the same question about the rest of the tree, and neither was asked.
 
 ### THE HISTORY THIS ROUND ALMOST REPEATED, AND DID NOT
 
