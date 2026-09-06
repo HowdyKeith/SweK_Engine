@@ -56,6 +56,70 @@
  * Every `blocked` line below was probed and its message recorded verbatim. There are THREE distinct refusals
  * and they have three different remedies, which is why they are not collapsed into one "blocked".
  */
+// ---- *** v4481 -- THE REFUSALS WERE QUOTED EXACTLY AND ATTRIBUTED TO THE WRONG PARTY *** -------------------
+//
+// The header above says the GitHub API is shut. It is not: THIS RUNNER IS BOUND TO ONE REPOSITORY, and every
+// `blocked` line below is the Claude Code sandbox's own refusal, recorded verbatim -- which is why they say
+// "this session", "Use add_repo" and "sessions are bound to their configured repositories". One of them even
+// carries `documentation_url: docs.anthropic.com/en/docs/claude-code/github-actions`. *** THE EVIDENCE WAS
+// CAPTURED CORRECTLY AND NOBODY ASKED WHOSE VOICE IT WAS. ***
+//
+// Measured this round, unauthenticated curl from inside the sandbox:
+//
+//   users/but0n                                 403  "sessions are bound to their configured repositories"
+//   repos/but0n/vixel                           403  "not enabled for this session. Use add_repo"
+//   repos/howdykeith/swek_engine/contributors   200  real GitHub data, real ETag -- it IS the bound repo
+//   rate_limit                                  200  limit 15000, which is an AUTHENTICATED limit
+//
+// The first two are PUBLIC GitHub endpoints. What answered was the proxy in front of them.
+//
+// *** SO THE GATE'S RE-PROBE COULD ONLY EVER CONFIRM ITSELF. *** traderGraph-selfcheck re-probes all three
+// every run "so a stale claim cannot survive", and re-probing from inside the same sandbox reproduces the
+// same artefact every time -- a control that can only run where the defect is invisible. It went red only
+// when ONE of the three flipped to 200, and that flip is the tell: the repository got bound to the session.
+//
+// WHAT IS NOT CLAIMED: that GitHub would answer 200. It very likely would -- these are public paths -- but
+// nothing here can reach GitHub unproxied, so the honest statement is NARROWER AND STRONGER: the 403s are
+// not evidence about GitHub in either direction, and a premise resting on them is unsupported rather than
+// disproved. The MODULE'S CHOICE IS UNAFFECTED and remains well-founded on its other stated grounds: git
+// history is deterministic, needs no credentials, costs no rate limit, and answers a sharper question than
+// the API does -- how much of what a trader owns did they actually write. Only the reason was wrong.
+export const RUNNER = "the Claude Code session's repository binding";
+export const GITHUB = "GitHub";
+
+/** Whose refusal is this? Derived from the body, because a bare status code cannot say. */
+export function refusalSource(body) {
+    const t = String(body || "");
+    if (/not enabled for this session|bound to their configured repositories|use add_repo/i.test(t)) return RUNNER;
+    if (/docs\.anthropic\.com/i.test(t)) return RUNNER;
+    if (/rate limit|abuse detection|API rate limit exceeded/i.test(t)) return GITHUB;
+    if (t.trim() === "") return null;          // nothing to attribute -- not a guess
+    return GITHUB;                             // a JSON body from api.github.com with none of the runner's marks
+}
+
+export const REFUSAL_ATTRIBUTION_V4481 = Object.freeze({
+    at: "v4481",
+    was: "the three refusals were recorded as properties of the GitHub API",
+    is: "they are properties of the runner: a Claude Code session bound to one repository",
+    tell: "the recorded messages quote the runner verbatim -- 'this session', 'Use add_repo', 'sessions are " +
+          "bound to their configured repositories' -- and one carries a docs.anthropic.com documentation_url",
+    probed: Object.freeze([
+        Object.freeze({ path: "users/but0n", status: 403, source: "runner", publicOnGitHub: true }),
+        Object.freeze({ path: "repos/but0n/vixel", status: 403, source: "runner", publicOnGitHub: true }),
+        Object.freeze({ path: "repos/howdykeith/swek_engine/contributors", status: 200, source: "github",
+            note: "the bound repository, so the proxy lets it through -- this is the 200 that turned the gate red" }),
+        Object.freeze({ path: "rate_limit", status: 200, source: "github",
+            note: "limit 15000, an AUTHENTICATED limit: the control for 'the network is up' was measuring a " +
+                  "credentialed proxied connection, not an anonymous one" }),
+    ]),
+    notClaimed: "that GitHub would answer 200 for the first two. Nothing here can reach GitHub unproxied, so " +
+                "the 403s are not evidence about GitHub in either direction -- the premise is unsupported, " +
+                "not disproved.",
+    moduleChoiceUnaffected: "git history is deterministic, needs no credentials, costs no rate limit, and " +
+                            "answers a sharper question than the API: not just who contributed, but how much " +
+                            "of what they own they actually wrote. Only the stated reason was wrong.",
+});
+
 export const AXES = Object.freeze([
     Object.freeze({ axis: "commit authorship (name, date, count)", have: true, via: "git clone --filter=blob:none",
         note: "full history, no API, seconds per repo -- this is what the graph is built from" }),
@@ -63,16 +127,23 @@ export const AXES = Object.freeze([
     Object.freeze({ axis: "licence, language mix, file counts", have: true, via: "world/licenceSweep.mjs, already in the tree" }),
     Object.freeze({ axis: "fork-vs-original", have: true, via: "DERIVED: owner absent from the author list",
         note: "the API has a `fork` flag; history gives the same answer and a share as well" }),
-    Object.freeze({ axis: "contributor list as GitHub counts it", have: false,
+    // v4481: every one of these carries blockedBy: RUNNER. The message is unchanged -- it was always
+    // recorded verbatim and it was always the runner's -- and the ATTRIBUTION is now a field rather than an
+    // assumption in the header. "have: false" means THIS RUNNER cannot see it, which is not the same claim as
+    // "GitHub refuses it" and was being read as though it were.
+    Object.freeze({ axis: "contributor list as GitHub counts it", have: false, blockedBy: RUNNER,
         blocked: "GitHub access to this repository is not enabled for this session. Use add_repo",
         remedy: "attach the repository with add_repo, one at a time" }),
-    Object.freeze({ axis: "our own repo's contributors", have: false,
+    Object.freeze({ axis: "our own repo's contributors", have: false, blockedBy: RUNNER,
         blocked: "GitHub access is not enabled for this session. An org admin must connect",
-        remedy: "an org admin connects GitHub for the account" }),
-    Object.freeze({ axis: "a contributor's profile, their other repos, followers", have: false,
+        remedy: "an org admin connects GitHub for the account",
+        note: "v4481: this one now ANSWERS 200 from a session bound to this repository -- the axis is open " +
+              "for the runner that owns the repo and shut for every other, which is a fact about sessions" }),
+    Object.freeze({ axis: "a contributor's profile, their other repos, followers", have: false, blockedBy: RUNNER,
         blocked: "This GitHub API path is not available: sessions are bound to their configured repositories",
-        remedy: "NONE from here -- the whole /users path class is refused, not rate-limited" }),
-    Object.freeze({ axis: "user search (location, language)", have: false,
+        remedy: "NONE from here -- the whole /users path class is refused by the RUNNER, not rate-limited " +
+                "and not refused by GitHub, which serves this path publicly" }),
+    Object.freeze({ axis: "user search (location, language)", have: false, blockedBy: RUNNER,
         blocked: "This GitHub API path is not available: sessions are bound to their configured repositories",
         remedy: "NONE from here. It is also the axis most worth leaving alone: searching users by " +
                 "location to decorate a visualisation is profiling strangers, not mapping a project" }),
