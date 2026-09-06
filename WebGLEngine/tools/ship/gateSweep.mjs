@@ -2817,6 +2817,22 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "a frame keyed by the browser's own DDA through the world it drew. The raycaster's first draft left the slab when a " +
                  "ray started above it, so every camera ray missed. Sabotages red at 4 / 6 / 2 / 2.",
     }),
+    since140: Object.freeze({
+        at: "v4518", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/voxelEdit-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green on both backends. The sandbox on the device, round 2: render/voxelDeviceEdit.mjs gives every chunk a slot in the one " +
+                 "world mesh (its count with a quarter headroom, a multiple of 3, the tail zeroed so the draw's index count never moves); " +
+                 "an edit re-meshes the touched chunk and the neighbours within a voxel, interleaves them in packMeshes' own layout (held " +
+                 "float for float) and writes the slots through the scene's vertex buffer (gpuDriven now exposes vbuf, ibuf and stride per " +
+                 "fleet); a chunk that outgrows its slot repacks the world with that slot doubled. pickVoxel, digAt and buildAt are the " +
+                 "sandbox's two edits through a pixel; sandbox-gpu.html clicks to dig and shift-clicks to build. The dug and built frames are " +
+                 "0 pixels from full rebuilds on both backends. Sabotage D (the tail uncleared) was blind until an edit that SHRINKS a chunk " +
+                 "was added. Sabotages red at 8 / 3 / 1 / 3.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

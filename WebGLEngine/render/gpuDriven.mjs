@@ -883,7 +883,7 @@ export function makeGpuDrivenScene(device, { lods = null, thresholds, records, c
         return new Float32Array(await device.read(outBuf));
     }
     return { frame, pick, pickPicture, pickTo, readCounts, readCounts2, readCountsByFleet, readRecords, readPyramid, order: ranked, ranges, count, cap, lodCount, fleetCount, regionCount,
-             fleets: perFleet.map((f) => ({ name: f.name, index: f.index, layout: f.layout, topology: f.topology, order: f.ranked, ranges: f.packed.ranges, missing: f.packed.missing, pipe: f.pipe })),
+             fleets: perFleet.map((f) => ({ name: f.name, index: f.index, layout: f.layout, topology: f.topology, order: f.ranked, ranges: f.packed.ranges, missing: f.packed.missing, pipe: f.pipe, vbuf: f.vbuf, ibuf: f.ibuf, stride: f.packed.stride })),   // v4518 -- vbuf/ibuf/stride: a consumer that rewrites a RANGE of its mesh in place (the voxel world's per-chunk slots) writes through the device buffer it already owns
              occlusion: occ, twoPhase, path: gpuPath ? "compute+drawIndexedIndirect" : "cpu-twin+drawIndexed",
              destroy() { for (const b of [ubuf, ubuf2, (src.buffer ? null : inBuf), cmdBuf, cmdBuf2, outBuf, outBuf2, rejBuf, fleetBuf, extraBuf, hizBuf, occBuf, ...lvlBufs, ...perFleet.flatMap((f) => [f.vbuf, f.ibuf])]) { try { b && b.destroy && b.destroy(); } catch (e) {} } } };
 }

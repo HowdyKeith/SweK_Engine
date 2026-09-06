@@ -198,11 +198,14 @@ export const HOT_UNREGISTERED = Object.freeze([
  * v4517: 83 -> 84. The arrival is render/voxelDevice.mjs, whose colourOf() names the grey [0.5, 0.5, 0.5] the renderer
  * falls back to for an unknown material id (voxelrenderer.js's own fallback, restated); every other colour it draws is
  * the registry's or the mesher's PALETTE. Nothing additively (the sandbox world is lit, not blended); the overlap stays 0.
+ * v4518: 84 -> 85. The arrival is render/voxelDeviceEdit.mjs, whose splitMesh() restates the mesh's one colour [1, 1, 1, 1]
+ * (gpuDriven's own default) beside the per-vertex colours it unpacks; the edit path draws through the same lit pipeline,
+ * nothing additively; the overlap stays 0.
  */
 export const MEASURED_AT_V4424 = Object.freeze({
     namedRamps: 5,
     drawSiteFiles: 13,
-    literalColourFiles: 84,
+    literalColourFiles: 85,
     overlapDrawAndLiteral: 0,
     hotUnregistered: 24,   // v4505: ascii-shape.html arrived (see HOT_UNREGISTERED)   // v4500: slug-fire.html arrived; v4501: slug-morph.html's melt mode; v4502: slug-ticker.html's napalm mode (see HOT_UNREGISTERED)
     // The three Keith named, and what the old detector saw of them.

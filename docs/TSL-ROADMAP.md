@@ -1197,9 +1197,21 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         backends 13 pixels apart. THE CORRECTION: the raycaster's first draft left the slab the moment y stepped
         outside [0, height), so a ray starting above the world -- every camera ray -- returned nothing; it leaves only
         when heading away now. Not built: per-chunk updates, water as its own pass, the atlas and grain.
-     2. DIG / BUILD: a pick by the raycaster, a voxel set through world.setVoxel, the touched chunk (and a neighbour
-        when the voxel is on a seam) re-meshed and its range rewritten in the vertex buffer -- the per-chunk update
-        round 1 declined.
+     2. (v4518) DIG / BUILD. BUILT: render/voxelDeviceEdit.mjs gives every chunk a SLOT in the one world mesh -- its
+        vertex count with a quarter headroom, a multiple of 3, at least 256, the tail zeroed so a zero triangle draws
+        nothing and the draw's index count never moves. An edit re-meshes the touched chunk and every neighbour
+        within one voxel (a seam face and the corner AO both read the neighbour), interleaves them in packMeshes'
+        own layout (p3, colour4, n3, 40 bytes) and writes the slots through the scene's vertex buffer, which
+        gpuDriven now exposes per fleet with its index buffer and stride; a chunk that outgrows its slot repacks the
+        world with that slot doubled and says so. pickVoxel, digAt and buildAt are the sandbox's two edits through
+        a pixel; sandbox-gpu.html clicks to dig, shift-clicks or right-clicks to build the selected material, and
+        reports the chunks rewritten and the time. MEASURED (tools/ship/voxelEdit-selfcheck.mjs): the interleaved
+        buffer is float for float packMeshes' own; a corner dig rewrites four slots in 11 ms here and 7 to 15 ms in
+        the browser; a flood of 512 isolated voxels into one chunk repacks six times; on the real world an edit
+        rewrites one slot, a corner one four, in 11 ms; on both backends the dug and built frames are 0 pixels from
+        full rebuilds, and a sand voxel built on the slab and dug again returns the frame exactly. THE FINDING:
+        the sabotage that leaves a slot's tail uncleared was blind until an edit that SHRINKS a chunk was added --
+        digging the top of a column keeps the same five quads, so nothing had ever freed a vertex.
      3. THE BOX3D BODIES: the sandbox's bodies as gpuDriven records driven by physics/box3d, the world mesh as their
         static collider (the shape mesh/meshBVH.mjs takes), so the racing city's car has ground to drive on.
      4. WEAPONS AND DAMAGE: the sandbox's damage path (CityGen's hit points, world/voxelDebrisSystem.js) on the device
