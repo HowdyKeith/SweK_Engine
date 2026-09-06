@@ -75,6 +75,14 @@ export function buildPlugin({
     open = "",
 } = {}) {
     if (!engineRoot) throw new Error("engineRoot is required -- a menubar plugin has no working directory to fall back on");
+    // *** v4482 -- THIS WAS `"file://" + gauge`, WHICH IS CORRECT ONLY BY LUCK AND ONLY ON POSIX. ***
+    // Two ways it is wrong. A path containing a SPACE -- /Users/k/My SweK/WebGLEngine -- yields an import
+    // specifier with a raw space in it, which is not a URL and which the plugin fails to parse at the only
+    // moment nobody is watching: a menubar refresh. And on Windows path.join returns backslashes, so the
+    // specifier becomes file://\Users\... with no drive letter and no third slash. THIS MODULE ALREADY
+    // IMPORTS pathToFileURL, one screen up, for the CLI guard -- it percent-encodes and it emits the third
+    // slash, and on an ordinary POSIX path it produces the identical string this was concatenating by hand.
+    // Found because tools/ship/xbarPlugin-selfcheck went red nine ways on Keith's Windows rig and green here.
     const gauge = path.join(engineRoot, "ui", "runnerGauge.mjs");
     return `#!${nodePath}
 // <xbar.title>${xbarEscape(title)}</xbar.title>
@@ -84,7 +92,7 @@ export function buildPlugin({
 //
 // The shebang above is an ABSOLUTE interpreter path on purpose: a menubar app launched from Finder does not
 // inherit a login shell's PATH, and \`#!/usr/bin/env node\` is how these plugins silently show nothing.
-import { pickPath, rateFor, feedState, frameAt } from ${JSON.stringify("file://" + gauge)};
+import { pickPath, rateFor, feedState, frameAt } from ${JSON.stringify(pathToFileURL(gauge).href)};
 const FRAMES = ${JSON.stringify(MENUBAR_RUNNER)};
 
 const URL_ = ${JSON.stringify(url)};

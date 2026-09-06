@@ -15,7 +15,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { buildPlugin, pluginFilename, xbarEscape, describePlugin, MENUBAR_RUNNER } from "../mac/xbarPlugin.mjs";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -24,6 +24,7 @@ const run = promisify(execFile);
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
+const say = (m) => console.log("  ....  " + m);
 console.log("xbarPlugin-selfcheck -- a SweK readout in a menubar that provides nothing\n");
 
 // ---- 1. the filename IS the configuration -------------------------------------------------------------------
@@ -65,14 +66,42 @@ console.log("\n3. no PATH, no working directory");
     // found it in the COMMENT that explains why /usr/bin/env is wrong -- v3449's founding defect for the third
     // time in this session. A shebang is line one by definition, so that is the only line worth reading.
     const shebang = src.split("\n")[0];
+    // *** v4482 -- THIS ASSERTED A PROPERTY OF THE BOX RUNNING THE GATE, NOT A RULE OF THE GENERATOR. ***
+    // nodePath defaults to process.execPath, so `^#!\/` was really asking "is this machine POSIX". On Keith's
+    // Windows rig the default is C:\Program Files\nodejs\node.exe and the row went red about a generator
+    // that had done nothing wrong -- the same shape as the four arrangement-pinned gates this round repaired.
+    // buildPlugin ALREADY TAKES nodePath as a parameter, so the macOS rule is tested with a macOS interpreter
+    // and the answer no longer depends on where the gate runs. The default is asserted separately, for the
+    // thing that IS true everywhere: an interpreter path must be absolute, because there is no working
+    // directory to resolve a relative one against.
+    const macShebang = buildPlugin({ engineRoot: "/Users/k/SweK_Engine/WebGLEngine",
+                                     nodePath: "/opt/homebrew/bin/node" }).split("\n")[0];
     ok("!! *** the shebang is an ABSOLUTE interpreter path, not /usr/bin/env node ***",
-        /^#!\//.test(shebang) && !/\/usr\/bin\/env/.test(shebang),
+        /^#!\//.test(macShebang) && !/\/usr\/bin\/env/.test(macShebang),
         "a menubar app launched from Finder does not inherit a login shell's PATH -- the classic way these " +
-        "plugins work in a terminal and show NOTHING in the menubar");
+        "plugins work in a terminal and show NOTHING in the menubar. Driven with a macOS interpreter rather " +
+        "than this box's: " + JSON.stringify(macShebang));
+    ok("...and the DEFAULT interpreter is absolute too, on whatever box generated it",
+        path.isAbsolute(shebang.replace(/^#!/, "")) && !/\/usr\/bin\/env/.test(shebang),
+        "asked as isAbsolute rather than as a leading slash -- a Windows generator emits a drive letter and " +
+        "that is still an absolute path, which is the whole of what this rule needs: " + JSON.stringify(shebang));
     ok("!! no runner frame contains the parameter separator",
         MENUBAR_RUNNER.every((f) => !f.includes("|")),
         "the gauge's own frames start with '|', which IS the grammar -- the renderer brings menubar-safe ones");
-    ok("!! the gauge is imported by absolute file:// URL", /import \{[^}]*\} from "file:\/\/\/Users\/k\/SweK_Engine/.test(src));
+    // *** v4482 -- THIS GREPPED FOR ONE PERSON'S HOME DIRECTORY. *** The literal /Users/k/SweK_Engine is the
+    // FIXTURE root three lines up, so the check passed by matching the string the test itself supplied, and
+    // it could never have caught the defect it was aimed at. It is DERIVED now, which is what caught the real
+    // bug: buildPlugin was concatenating "file://" + a path, so a root with a space produced an invalid
+    // specifier and a Windows root produced file://\Users\... with no third slash. Both fixed at the source
+    // with pathToFileURL, and the expected specifier is computed the same way rather than typed.
+    const wantSpec = pathToFileURL(path.join("/Users/k/SweK_Engine/WebGLEngine", "ui", "runnerGauge.mjs")).href;
+    ok("!! the gauge is imported by absolute file:// URL", src.includes(JSON.stringify(wantSpec)), wantSpec);
+    const spaced = buildPlugin({ engineRoot: "/Users/k/My SweK/WebGLEngine" });
+    const spacedSpec = (spaced.match(/from "(file:[^"]+)"/) || [, ""])[1];
+    ok("...and a root with a SPACE in it still yields a parseable URL, not a broken specifier",
+        !!spacedSpec && !/\s/.test(spacedSpec) && (() => { try { return !!new URL(spacedSpec); } catch { return false; } })(),
+        "a Mac home directory with a space is ordinary, and the old concatenation put a raw space inside an " +
+        "import specifier -- which fails at a menubar refresh, where nobody is looking: " + spacedSpec);
     ok("!! the fetch is bounded, so a hung endpoint cannot freeze the slot",
         /AbortController/.test(src) && /setTimeout\(\(\) => ac\.abort\(\), \d+\)/.test(src),
         "a plugin that hangs holds its menubar slot until the host kills it");
@@ -94,8 +123,23 @@ console.log("\n4. generated, executed, and parsed back");
     // synchronous exec blocks this event loop -- so the server could never answer, the plugin's fetch timed
     // out, and the gate reported the plugin broken when the HARNESS was. A test that blocks the thing it is
     // testing against measures only itself.
+    // *** v4482 -- LAUNCHING THROUGH THE SHEBANG IS A POSIX-ONLY ACT, AND SIX CHECKS DEPENDED ON IT. ***
+    // Windows has no shebang, so execFile on a .mjs returns EFTYPE and every assertion below read the empty
+    // string: on Keith's rig this section reported the plugin printing nothing, greying out nothing and
+    // writing "spawn EFTYPE" to stderr -- six failures describing the HARNESS, in a gate whose own footer
+    // already says this box is not macOS. SKIPPING would lose the grammar checks, which are what this section
+    // is actually for and which are platform-independent. So the interpreter is supplied explicitly there and
+    // the substitution is NAMED, because a check that quietly ran a different thing than it says it ran is
+    // the defect this file already carries two notes about.
+    const viaShebang = process.platform !== "win32";
+    const launch = (f) => viaShebang ? run(f, { encoding: "utf8", timeout: 15000 })
+                                     : run(process.execPath, [f], { encoding: "utf8", timeout: 15000 });
+    if (!viaShebang) say("LAUNCHED AS `node <plugin>` rather than through the shebang, because it is not " +
+                         "honoured here (" + process.platform + "). The line-one rule is ASSERTED in section " +
+                         "3 and cannot be EXERCISED here; everything below is about the OUTPUT GRAMMAR, which " +
+                         "is the same on every platform.");
     let out = "", err = "";
-    try { const r0 = await run(file, { encoding: "utf8", timeout: 15000 }); out = r0.stdout; err = r0.stderr; }
+    try { const r0 = await launch(file); out = r0.stdout; err = r0.stderr; }
     catch (e) { out = (e.stdout || "").toString(); err = (e.stderr || e.message || "").toString(); }
     const lines = out.trim().split("\n");
     const sep = lines.indexOf("---");
@@ -114,7 +158,7 @@ console.log("\n4. generated, executed, and parsed back");
     srv.close();
     await new Promise((r) => setTimeout(r, 50));
     let out2 = "";
-    try { out2 = (await run(file, { encoding: "utf8", timeout: 15000 })).stdout; }
+    try { out2 = (await launch(file)).stdout; }
     catch (e) { out2 = (e.stdout || "").toString(); }
     const l2 = out2.trim().split("\n");
     ok("!! *** with the endpoint gone, the menubar line greys out and shows no number ***",

@@ -2600,6 +2600,8 @@ since116: Object.freeze({
             "tools/ship/winPathGuard-selfcheck.mjs (its own header's \"stripping comments is enough\" was false once a round note quoted the idiom in a STRING; detections read codeOnly() now, exemptions keep noComments())",
             "tools/ship/bfcache-selfcheck.mjs (a REAL defect: camera-effects.html tore down on pagehide with no event.persisted check -- fixed in the page)",
             "tools/ship/reportDoors.mjs (not a gate -- the real Windows bug winPathGuard was pointing at: new URL(import.meta.url).pathname builds C:\\C:\\... on Keith's rig, in a front door)",
+            "tools/ship/xbarPlugin-selfcheck.mjs (9 red on the rig, green here: it grepped ONE PERSON'S HOME DIRECTORY out of the source and matched the fixture root the test itself supplied; the shebang row asked whether the box was POSIX; and section 4 spawned through a shebang Windows does not honour)",
+            "tools/mac/xbarPlugin.mjs (the real bug deriving that check found: the import specifier was `\"file://\" + path`, so a root with a SPACE produced an unparseable specifier and a Windows root lost the third slash -- pathToFileURL now, which the module already imported)",
             "tools/ship/freezeRegisterAudit.mjs (found by re-freezing, not by a paste: a run KILLED at the 120s cap had its partial output frozen as the gate's failing line -- doorKinds filed one line of however many it would have printed)",
             "tools/ship/deferralCensus-selfcheck.mjs (my own v4479 row pinned reach === 1 and went red the first time the reach IMPROVED to 2 -- the same species as the four above, in the file that names the species)",
         ]),
