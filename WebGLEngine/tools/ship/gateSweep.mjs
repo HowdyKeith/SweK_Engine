@@ -2491,6 +2491,19 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The tarball cache went outside the tree after colourReach counted the cached build as an arrival. Sabotages red at " +
                  "1 / 3 / 1 / 1.",
     }),
+    since117: Object.freeze({
+        at: "v4495", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/textureBytes-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green here, RIG-PENDING for the asset library. tools/ship/textureBytes.mjs counts raster texture bytes on disk and " +
+                 "on the GPU from the PNG and JPEG headers and derives the KTX2 / Basis verdict from the totals. The tree: 16 files, " +
+                 "378 KiB on disk, 18.05 MiB on the GPU (13.8 MiB one JPEG), 70 procedural texture sources against 16 loaders -- " +
+                 "not-yet, recorded as wont (ktx2-basis). The header readers are held against a full PNG decoder and the browser's " +
+                 "JPEG decode; the census against an independent walk. Sabotages red at 2 / 6 / 3 / 1.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

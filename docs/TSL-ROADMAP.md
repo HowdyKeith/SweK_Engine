@@ -572,6 +572,19 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         tools/ship/todo.mjs (slug-ring-buffer): nothing it would save is left to save at this label count, and its
         reset-without-a-fence is the one thing the reuse write does not do.
     13. Flip the backendParity assertion and write the measured numbers here when step 1 lands.
+    TEXTURE BYTES BEFORE KTX2 / BASIS -- measured at v4495 (task 18), RIG-PENDING for the asset library.
+        tools/ship/textureBytes.mjs walks a folder and records every raster texture's bytes on disk and, from the
+        PNG and JPEG headers, its pixel size and GPU bytes (RGBA8 with mips); decide() derives the verdict from
+        the totals. THE TREE: 16 raster files, 378 KiB on disk, 18.05 MiB on the GPU, 13.8 MiB of it one 313 KB
+        JPEG in demos/resume_fx and the rest sprites under 3 KB; 70 source files make textures procedurally
+        against 16 that load an image. Verdict not-yet (under a 64 MiB GPU floor): a transcoder of a few hundred
+        KB would be the largest texture-shaped fetch in the build, serving the smaller population. Recorded as
+        wont in tools/ship/todo.mjs (ktx2-basis). The gate (tools/ship/textureBytes-selfcheck.mjs) holds the
+        header readers against twins with different inputs -- pngSize against pngCoverage's full decoder on
+        every tree PNG, jpegSize against the browser's own decode of the tree's JPEG and a constructed JPEG whose
+        APP0 precedes its SOF0 -- and the census against an independent walk. The rig's EXTERNAL asset library
+        is the population that could change the verdict: `node tools/ship/textureBytes.mjs <external>/asset_library
+        --write tools/ship/texture-bytes.json` there, and section 3 grades it and re-derives the verdict.
 
 8. **THE PHYSICS LAB ON THE DEVICE -- planned at v4464 after a survey of the lab's GPU paths.** The lab has one
    strong convention on the CPU side (every instrument an exact key, a gate and a registry row) and none on the GPU

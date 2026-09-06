@@ -301,6 +301,20 @@ export const TODO = [
                 "is one shared vertex buffer with a per-frame region and a fence, built then, against that number.",
         evidence: "node tools/ship/slugReupload-selfcheck.mjs",
     },
+    {
+        id: "ktx2-basis",
+        status: "wont",
+        title: "KTX2 / Basis Universal compressed textures (a transcoder, a build step, a loader) for the engine's textures",
+        why: "Sidebar task 18: measure the texture bytes before deciding on a compressed-texture pipeline.",
+        reason: "MEASURED at v4495 by tools/ship/textureBytes.mjs on the tree: 16 raster files, 378 KiB on disk, 18.05 MiB on the GPU as " +
+                "RGBA8 with mips -- 13.8 MiB of it one 313 KB JPEG in demos/resume_fx, the rest tree and torch sprites under 3 KB each. " +
+                "68 source files make textures procedurally (DataTexture, CanvasTexture, device.texture, texImage2D) against 15 that load " +
+                "an image, so the population a transcoder would serve is the smaller one, and a transcoder of a few hundred KB would be the " +
+                "largest texture-shaped fetch in the build. Verdict derived, not typed: not-yet, under a 64 MiB GPU floor. The rig's " +
+                "EXTERNAL asset library (user-accumulated, outside the tree) is the population that could change this: run " +
+                "`node tools/ship/textureBytes.mjs <external>/asset_library --write tools/ship/texture-bytes.json` there and the gate grades it.",
+        evidence: "node tools/ship/textureBytes-selfcheck.mjs",
+    },
 ];
 
 export const byStatus = (s) => TODO.filter((t) => t.status === s);
