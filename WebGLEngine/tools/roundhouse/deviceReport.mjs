@@ -95,21 +95,32 @@ export function nuisanceFor(device) {
 }
 
 /**
- * *** TWO TABLES ANSWER THIS QUESTION AND THEY DISAGREE. ***
- * tools/roundhouse/refinementKnobs.mjs is the canonical one: eleven files import it, every entry carries a
- * `why`, and it has a selfcheck of its own. tools/roundhouse/corroborationCensus.mjs exports a SECOND table
- * under the same name, in a different shape ({key, values, modes} against {mode, param, why}), and uses it for
- * exactly one thing -- the `refinable` flag on every row of the lab-wide census.
+ * *** TWO TABLES ANSWERED THIS QUESTION AND DISAGREED. v4483 DELETED THE SECOND ONE, AND THIS IS WHAT IS LEFT. ***
  *
- * They are not a stale copy of each other; they are two designs, and the census's predates the discipline that
- * makes a knob state its argument. The divergence is REPORTED rather than repaired here: migrating the census
- * changes what a slow, frozen baseline says, and that is a round with a re-freeze in it. What must not happen
- * is that it stays invisible, which is what the gate beside this file is for.
+ * tools/roundhouse/corroborationCensus.mjs used to export its own REFINEMENT_KNOBS under the same name and in a
+ * different shape ({key, values, modes} against {mode, param, why}), driving the `refinable` flag on every row
+ * of the lab-wide census. v4480 measured the divergence and declined to repair it, because the flag sits on a
+ * slow frozen baseline. v4483 did the migration -- and every one of that table's three entries turned out to be
+ * making a false claim, which is written up in the census's own header.
+ *
+ * SO THIS FUNCTION'S JOB HAS INVERTED. It used to report a divergence everybody knew about; it is now the
+ * DETECTOR THAT A SECOND TABLE HAS COME BACK, in either shape, which is the same job registerDrift's
+ * "redCensus.mjs stores NO typed failing line" row does for that register. It is kept, rather than deleted with
+ * the finding, precisely because the thing it watches for is a thing that happens: this tree grew this exact
+ * defect once already and nothing noticed for 447 versions.
  */
 function disagreementOf(censusTable, k) {
     const cName = censusTable[k].key || censusTable[k].param;
     if (cName !== REFINEMENT_KNOBS[k].param) return "knob: " + cName + " against " + REFINEMENT_KNOBS[k].param;
-    const cModes = censusTable[k].modes ? [...censusTable[k].modes].sort().join(",") : "(all)";
+    // *** v4483 -- THIS COULD NOT REPORT AGREEMENT, WHICH IS THE ANSWER IT NOW HAS TO GIVE. *** The line below
+    // read `.modes` and fell straight to "(all)" for anything without it -- fine while the two tables were
+    // guaranteed to be in different shapes, and wrong the moment they are not. Handed the canonical table on
+    // BOTH sides, it reported all eight devices as disagreeing, every one of them "(all) against <mode>":
+    // a comparator that cannot say "identical" is no use as the detector that a second table has come back,
+    // which is the only job it has left now that the migration is done. Modes are read from whichever field
+    // carries them, and "(all)" is reserved for an entry that declares neither.
+    const cm = censusTable[k].modes || (censusTable[k].mode ? [censusTable[k].mode] : null);
+    const cModes = cm ? [...cm].sort().join(",") : "(all)";
     const rModes = REFINEMENT_KNOBS[k].mode || "(none)";
     return cModes === rModes ? null : "modes: " + cModes + " against " + rModes;
 }

@@ -2619,6 +2619,29 @@ since116: Object.freeze({
                  "RIGHT. Two sabotages on the repaired stripper, both correct: real code reddens, the same " +
                  "text in a string does not",
     }),
+    since122: Object.freeze({
+        at: "v4483", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        repaired: Object.freeze([
+            "tools/roundhouse/corroborationCensus.mjs (its SECOND REFINEMENT_KNOBS deleted -- all three entries were making a false claim: lens.map refines nothing, ct declared a value the device clamps away, optics.slit was right and is lost to a one-mode-per-device shape)",
+            "tools/roundhouse/refinementKnobs.mjs (gains STRUCTURAL_RE, which the census had held privately since v4036, so `live` stops counting a grid size as a physical response; and ct at [32,64,128,240] rather than the census's unreachable 256)",
+            "tools/roundhouse/deviceReport.mjs (refinementTableDivergence could not report AGREEMENT: handed the canonical table on both sides it called all eight devices divergent, which makes it useless as the detector that a second table has returned)",
+            "tools/roundhouse/deviceReport-selfcheck.mjs (three pinned arrangements: a `length === 7` that reddened on the eighth knob, a divergence row whose finding is closed, and a row asserting the migration had NOT happened)",
+            "tools/roundhouse/refinementKnobs-selfcheck.mjs (fld() returned undefined and every caller read .verdict off it -- a sabotage that should have shouted died at 0 FAIL lines; an absent field is a named MISSING verdict now and the same sabotage reds 11)",
+            "tools/ship/deferralCensus-selfcheck.mjs (its class-by-class row pinned HISTORY, which counts phrase hits in SHIPPED ROUND NOTES and therefore grows every round that uses one of the six phrases -- v4482 repaired the reach count in the same file for the same reason, and both were mine)",
+        ]),
+        verdict: "*** A DECLARED REFINEMENT KNOB THAT REFINED NOTHING, FOR 447 VERSIONS. *** The census called " +
+                 "lens.map refinable; sweeping mapN 9..31 leaves mapPeak, mapPeakExact, mapPeakErrFrac, " +
+                 "mapSpan and sourceRho BIT-IDENTICAL and moves only mapCells = mapN^2. It read as live because " +
+                 "the refinement runner had no idea what a physical quantity is -- the rule that knows was a " +
+                 "module-private const in the file next door. Moving it kills lens.map and, measured across " +
+                 "all eight canonical knobs, removes not one field and moves not one verdict. Blast radius " +
+                 "RE-DERIVED: 9 of 484 device/modes, not the 10 v4482 stored, because promoting ct at mode " +
+                 "parallel kept a flag that plan had counted as lost. FOUR SABOTAGES; the 0-RED one was the " +
+                 "second-best finding -- widening the filter CRASHED the gate at its first call site instead " +
+                 "of reddening, the third crash-instead-of-a-failure this session",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

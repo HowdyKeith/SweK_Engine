@@ -105,11 +105,28 @@ sec("2. *** WHAT THE TREE DEFERS, COUNTED -- AND WHAT THIS REFUSES TO CALL IT **
 {
     Object.entries(C.counts).forEach(([k, v]) => say(`${k.padEnd(11)} ${String(v).padStart(4)}`));
     say(`undecided across ${C.undecidedFiles} files, out of ${C.total} phrase hits in total`);
-    const drift = Object.keys(C.counts).filter((k) => REC[k] !== undefined && REC[k] !== C.counts[k]);
+    // *** v4483 -- HISTORY GROWS EVERY ROUND WHOSE NOTE USES ONE OF THE SIX PHRASES, AND THIS ROW PINNED IT. ***
+    // HISTORY is the class for a phrase hit inside a SHIPPED ROUND NOTE -- the changelog is not a backlog, which
+    // is the distinction this census exists to draw. So it is an ARCHIVE: it accumulates by design, and a round
+    // that writes "a round of its own" into its own version comment reddens this row for doing exactly what the
+    // classifier says that text is. v4482 repaired the reach count in this same file for the same reason; this
+    // is the second instance, and both were mine.
+    //
+    // LOOSENING IT TO AN INEQUALITY WOULD THROW AWAY THE CLAIM. What is worth asserting is stronger and is
+    // still exact: every LIVE class re-derives to the frozen record unchanged, and the only thing that moved is
+    // the archive -- so the total may grow, BY EXACTLY THE HISTORY DELTA AND NOT A UNIT MORE. A hit that
+    // silently changed class would show up as a total that grew by the wrong amount even if both counts moved.
+    const ARCHIVE = "history";
+    const drift = Object.keys(C.counts).filter((k) => k !== ARCHIVE && REC[k] !== undefined && REC[k] !== C.counts[k]);
+    const dHist = C.counts[ARCHIVE] - REC[ARCHIVE], dTotal = C.total - REC.total;
     ok("!! the census re-derives to the frozen record, class by class -- a drifting class is NAMED",
-        drift.length === 0 && C.total === REC.total && C.undecidedFiles === REC.undecidedFiles,
+        drift.length === 0 && dHist >= 0 && dTotal === dHist && C.undecidedFiles === REC.undecidedFiles,
         drift.length ? `drifted: ${drift.map((k) => `${k} ${REC[k]} -> ${C.counts[k]}`).join(", ")}`
-                     : `${C.total} hits, ${C.counts.undecided} undecided across ${C.undecidedFiles} files. ` +
+                     : dTotal !== dHist
+                         ? `total moved by ${dTotal} while history moved by ${dHist} -- a hit changed CLASS, ` +
+                           "which is a reclassification and not an archive growing"
+                     : `${C.total} hits (${dHist} added to the archive since v4479), ${C.counts.undecided} ` +
+                       `undecided across ${C.undecidedFiles} files, every live class unmoved. ` +
                        "v4399's rule: a count baseline should name what arrived rather than show a number that moved");
     ok("!! *** UNDECIDED IS NOT A SYNONYM FOR OPEN, AND THIS FILE REFUSES TO SAY IT IS ***",
         C.counts.undecided > 100 && !("open" in C.counts),

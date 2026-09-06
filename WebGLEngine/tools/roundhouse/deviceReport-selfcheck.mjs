@@ -90,8 +90,11 @@ sec("2. *** c2's TOLERANCE IS DECLARED SIX TIMES OVER. c4's IS A FUNCTION DEFAUL
         declaredNu.length === Object.keys(nu).length && declaredNu.length >= 6,
         `${declaredNu.length} of ${Object.keys(nu).length}, from blackhole's 0 -- exact invariance demanded -- ` +
         "to ising's 0.02. corroborateFully reads `nuisance.tol ?? tol`, and the left side always answers");
+    // v4483 -- WAS `length === 7`, AND THE EIGHTH KNOB ARRIVED THIS ROUND. The claim is that NONE of them
+    // declares a portability tolerance; the size of the table was scaffolding beside it, and pinning it meant
+    // promoting a knob reddened a row about tolerances. A count is not a contract -- it is REPORTED below.
     ok("!! *** AND NOT ONE REFINEMENT KNOB DECLARES A PORTABILITY TOLERANCE ***",
-        declaredRe.length === 0 && Object.keys(REFINEMENT_KNOBS).length === 7,
+        declaredRe.length === 0 && Object.keys(REFINEMENT_KNOBS).length > 0,
         `0 of ${Object.keys(REFINEMENT_KNOBS).length}. criterion 4 uses \`tol\` directly, so it has been graded ` +
         "at the 1e-6 function default for every device since v2908. The number is in a parameter list, which " +
         "is the one place a tolerance cannot carry the argument for itself");
@@ -165,15 +168,31 @@ sec("5. *** TWO REFINEMENT TABLES, TWO NUISANCE TABLES, AND THE ELIGIBLE SET DEP
     const d = DR.refinementTableDivergence(CENSUS_REFINEMENT);
     say(`canonical (refinementKnobs.mjs): ${d.canonical.join(", ")}`);
     say(`second copy (corroborationCensus.mjs): ${d.census.join(", ")}`);
-    ok("!! *** REFINEMENT_KNOBS is declared TWICE, in different shapes, and the two disagree ***",
-        d.onlyCanonical.length === 5 && d.onlyCensus.length === 1 && d.onlyCensus[0] === "ct" &&
-        d.shared.length === 2 && d.sharedDisagree.length === 2 &&
-        /^knob: /.test(d.disagreementReasons.lens || "") && /^modes: /.test(d.disagreementReasons.optics || ""),
-        `only in refinementKnobs: ${d.onlyCanonical.join(", ")}. Only in the census: ${d.onlyCensus.join(", ")}. ` +
-        `Both name lens and optics and DISAGREE ABOUT BOTH, for DIFFERENT reasons -- lens ${d.disagreementReasons.lens}, ` +
-        `optics ${d.disagreementReasons.optics}. ` +
-        "The census's copy predates the discipline that makes a knob state its argument, and it drives the " +
-        "`refinable` flag on every row of the lab-wide census");
+    // *** v4483 -- THIS ROW'S FINDING IS CLOSED, SO THE ROW IS INVERTED RATHER THAN DELETED. *** It asserted
+    // the two tables disagreed, in the exact arrangement v4480 measured. The migration means there is one
+    // table, so what is worth watching is that a SECOND ONE HAS NOT COME BACK -- registerDrift's shape for
+    // redCensus's typed lines. Deleting the row with the finding would leave nothing looking, in a tree that
+    // grew this defect once and did not notice for 447 versions.
+    ok("!! *** there is ONE refinement table: the census's second declaration has not come back ***",
+        d.onlyCanonical.length === 0 && d.onlyCensus.length === 0 && d.sharedDisagree.length === 0 &&
+        Object.keys(d.disagreementReasons).length === 0 &&
+        CENSUS_REFINEMENT === REFINEMENT_KNOBS,
+        `${d.shared.length} devices, 0 divergent: ${d.shared.join(", ")}. The census re-exports the canonical ` +
+        "object rather than holding its own, so this is IDENTITY and not agreement -- two tables that happened " +
+        "to match today would pass a comparison and drift tomorrow");
+    // AND THE COMPARATOR MUST STILL BE ABLE TO SAY NO. A detector that reports agreement for everything is
+    // worth nothing, and this one could not report agreement AT ALL until v4483 -- handed two identical tables
+    // it called all eight devices divergent. Both directions are driven.
+    const planted = DR.refinementTableDivergence({
+        ...REFINEMENT_KNOBS,
+        lens: { key: "mapN", values: [9, 13, 21], modes: ["map"] },   // the entry v4483 deleted
+        newcomer: { key: "z", values: [1, 2], modes: ["m"] },
+    });
+    ok("...and a second table IS detected -- both a changed entry and an extra one",
+        planted.sharedDisagree.includes("lens") && /^knob: mapN against dphi/.test(planted.disagreementReasons.lens || "") &&
+        planted.onlyCensus.includes("newcomer") && planted.sharedDisagree.length === 1,
+        `planted the deleted lens entry back: ${planted.disagreementReasons.lens}; extra device ` +
+        `${planted.onlyCensus.join(", ")}. Exactly one divergence found, so the detector is not blanket-failing`);
     ok("!! *** and the NUISANCE knobs live in two modules, which is how the first draft of this file got the " +
        "eligible set wrong ***",
         Object.keys(NUISANCE_KNOBS).length === 6 && Object.keys(NEW_NUISANCE).length >= 1 &&
@@ -201,10 +220,15 @@ sec("6. *** THE LIMITS ***");
         "optics.converge does adaptive quadrature and quantum.bands diagonalises. The scoped set is 4.2 s and " +
         "is what every number above comes from; the wide figure is in tools/ship/nextRounds.mjs rather than " +
         "estimated here");
-    ok("the census's refinement table is NAMED, not migrated",
-        DR.refinementTableDivergence(CENSUS_REFINEMENT).onlyCensus.length > 0,
-        "migrating it changes the `refinable` flag on every row of a slow frozen baseline, which is a round " +
-        "with a re-freeze in it. What must not happen is that it stays invisible, which is what section 5 is for");
+    // v4483 -- WAS "NAMED, not migrated", asserting the divergence still existed. That was v4480's honest
+    // limit and it is spent: the migration happened, and this row would now be asserting that the work it
+    // asked for had NOT been done. Replaced by the measurement of what the migration actually cost.
+    ok("...and the census's refinement table IS migrated now, which this round's limit no longer is",
+        DR.refinementTableDivergence(CENSUS_REFINEMENT).onlyCensus.length === 0,
+        "9 of 484 device/modes changed their `refinable` flag: 6 gained (blackhole.escape, kepler.conserve, " +
+        "quantum.well, chaos.feigenbaum, splat.integral, lens.deflect) and 3 lost (lens.map, ct.fan, " +
+        "optics.slit). Only optics.slit is a real loss, and it is a shape limit -- one mode per device -- " +
+        "rather than a judgement about slit");
     say("");
     say("NOT DONE: no portability tolerance was earned, so c4 is ungraded lab-wide -- that is the point, but");
     say("  it means no device is CORROBORATED by this round either. `ct` appears only in the census's table");
