@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Splat Probes (an SH irradiance volume baked from a splat shell, drawn from inside)">
+<meta name="demo:desc" content="render/splatProbes.mjs baked over a two-tone shell of splats (render/probeFit.mjs fits the grid to occupancy and skips probes inside splats), drawn on gfx/device.js through render/probeLit.mjs: every probe a small sphere lit by its own coefficients, a mesh in the middle taking the volume's light, the splats as tone markers, the camera inside the shell. Spacing and face size live, the bake time, probe count and box in the HUD, both backends. From the technique of isaac-mason/three-spark-light-probes, which has no licence file; nothing ported.">
+<meta name="demo:category" content="fx">
+<title>Splat Probes</title>
+<style>
+  html,body { margin:0; height:100%; background:#050805; color:#9fb2d4; font:12px ui-monospace,Menlo,monospace; }
+  #c { display:block; width:100%; }
+  #hud { padding:10px 14px; }
+  #cap { color:#f6a623; letter-spacing:.14em; text-transform:uppercase; }
+  #be { color:#59d1ff; font-size:14px; margin-top:4px; }
+  #sub { color:#5f7aa0; font-size:11px; margin-top:2px; line-height:1.7; }
+  .bad { color:#ff9a9a; }
+  a { color:#59d1ff; }
+  input[type=number] { width:48px; background:#0c140f; color:#9fb2d4; border:1px solid #2a3a30; font:inherit; }
+  select { background:#0c140f; color:#9fb2d4; border:1px solid #2a3a30; font:inherit; }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div id="cap">Splat probes: an irradiance volume baked from a splat shell, seen from inside it</div>
+  <div id="be">requesting a device&hellip;</div>
+  <div id="sub">spacing <input id="spacing" type="number" value="0.5" min="0.25" max="1.5" step="0.05"> &middot; face size <select id="face"><option>4</option><option selected>8</option><option>16</option></select>
+    &middot; splats <input id="n" type="number" value="300" min="20" max="2000" step="10"> &middot; <a href="?webgl=1">force WebGL2</a><br>
+    <span id="tick">baking&hellip;</span> &middot; drag to look around</div>
+</div>
+<canvas id="c"></canvas>
+<script type="module" src="/ui/originNotice.js"></script>
+<script type="module">
+import { requestDevice } from "./gfx/device.js";
+import * as G from "./render/gpuDriven.mjs";
+import { probeLab, labFleets, labHud, LAB } from "./render/probeLab.mjs";
+
+const cvs = document.getElementById("c"), beEl = document.getElementById("be");
+const fail = (m) => { beEl.innerHTML = '<span class="bad">' + m + "</span>"; };
+let device, scene = null, lab = null, yaw = 0.4, pitch = 0.15, dragging = null, dirty = true;
+const $ = (id) => document.getElementById(id);
+
+function knobs() { return { spacing: Math.max(0.25, +$("spacing").value || LAB.spacing), faceSize: +$("face").value || LAB.faceSize, n: Math.max(20, +$("n").value || LAB.n) }; }
+function rebuild() {
+  lab = probeLab(knobs());
+  if (scene && scene.destroy) scene.destroy();
+  const { fleets } = labFleets(device, lab);
+  scene = G.makeGpuDrivenScene(device, { fleets, fleetOf: lab.fleetOf, thresholds: [], records: lab.records, headings: lab.extras });
+  $("tick").textContent = labHud(lab);
+  dirty = false;
+}
+async function init() {
+  const forceGl = new URLSearchParams(location.search).get("webgl") === "1";
+  try { device = await requestDevice(cvs, forceGl ? { backend: "webgl2" } : { prefer: "webgpu" }); }
+  catch (e) { return fail("requestDevice threw: " + e.message); }
+  if (!device || device.backend === "null") return fail("no GPU backend here (WebGPU needs a secure origin: localhost or https).");
+  try { rebuild(); } catch (e) { return fail("scene: " + e.message); }
+  beEl.textContent = "backend: " + device.backend + " · " + scene.path + " · two fleets: the splats as tone markers, the probes and the mesh through the probe-lit pipeline";
+  for (const id of ["spacing", "face", "n"]) $(id).addEventListener("change", () => { dirty = true; $("tick").textContent = "baking…"; });
+  cvs.addEventListener("pointerdown", (e) => { dragging = [e.clientX, e.clientY]; });
+  addEventListener("pointerup", () => { dragging = null; });
+  addEventListener("pointermove", (e) => { if (!dragging) return; yaw += (e.clientX - dragging[0]) * 0.006; pitch = Math.max(-1.2, Math.min(1.2, pitch + (e.clientY - dragging[1]) * 0.006)); dragging = [e.clientX, e.clientY]; });
+  requestAnimationFrame(frame);
+}
+function dpr() { return Math.min(2, devicePixelRatio || 1); }
+function frame() {
+  const d = dpr(), w = Math.round((cvs.clientWidth || 1200) * d), h = Math.round(w * 0.55);
+  if (cvs.width !== w || cvs.height !== h) { cvs.width = w; cvs.height = h; }
+  if (dirty) { try { rebuild(); } catch (e) { fail("scene: " + e.message); return; } }
+  if (!dragging) yaw += 0.002;
+  const R = LAB.eyeDist, eye = [Math.sin(yaw) * Math.cos(pitch) * R, Math.sin(pitch) * R, Math.cos(yaw) * Math.cos(pitch) * R];
+  const cam = { viewProj: G.multiply(G.perspective(1.0, w / h, 0.05, 50), G.lookAt(eye, [0, 0, 0])), eye };
+  scene.frame({ ...cam, clear: [0.02, 0.031, 0.024, 1] });
+  requestAnimationFrame(frame);
+}
+init();
+</script>
+</body>
+</html>

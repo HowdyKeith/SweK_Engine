@@ -21,7 +21,7 @@
   }
  },
  "counts": {
-  "page": 460,
+  "page": 461,
   "demo": 49,
   "builtin": 34
  },
@@ -3104,6 +3104,14 @@
    "display": "Splat Lab",
    "href": "/splat-lab.html",
    "section": "PL: Optics & Imaging",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "splat-probes.html",
+   "display": "Splat Probes",
+   "href": "/splat-probes.html",
+   "section": null,
    "collision": false
   },
   {

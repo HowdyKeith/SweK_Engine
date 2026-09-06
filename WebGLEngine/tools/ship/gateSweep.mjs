@@ -2787,6 +2787,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "probeGrid's two-probe minimum put an open probe AT each solid one; the gate's line is a 5 x 2 x 2 box now. " +
                  "Sabotages red at 4 / 2 / 2 / 1.",
     }),
+    since138: Object.freeze({
+        at: "v4516", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/probeLab-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green on both backends. splat-probes.html and render/probeLab.mjs: the v4513 volume fitted by probeFit, baked from the " +
+                 "two-tone shell and drawn from INSIDE it through two gpuDriven fleets -- the splats as emissive tone markers by the " +
+                 "lit chain, the probes and a centre mesh by the probe-lit pipeline, so each probe sphere is lit by its own coefficients. " +
+                 "The lab is data (records, extras, fleet map, HUD) and held headless; the frame's mesh pixels read warm above the horizon " +
+                 "and cool below on both backends, 1 pixel apart. Three gate-side corrections (a Float32 tone compare, a cull hold that " +
+                 "cannot be every record from inside a shell, a mirrored ray key) and one blind sabotage (the mesh dropped, the backdrop " +
+                 "carrying the same split) closed by a hold that every keyed mesh pixel is lit. Sabotages red at 1 / 3 / 3 / 1.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

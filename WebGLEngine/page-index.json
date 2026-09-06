@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 460,
+ "count": 461,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -2696,6 +2696,13 @@
    "t": "Splat Lab - Gaussian splatting, graded",
    "d": "",
    "g": "optics",
+   "p": 0
+  },
+  {
+   "f": "splat-probes.html",
+   "t": "Splat Probes",
+   "d": "render/splatProbes.mjs baked over a two-tone shell of splats (render/probeFit.mjs fits the grid to occupancy and skips probes inside splats), drawn on gfx/device.js through render/probeLit.mjs: every probe a small sphere lit by its own coefficients, a mesh in the middle taking the volume's light, the splats as tone markers, the camera inside the shell. Spacing and face size live, the bake time, probe count and box in the HUD, both backends. From the technique of isaac-mason/three-spark-light-probes, which has no licence file; nothing ported.",
+   "g": "",
    "p": 0
   },
   {

@@ -927,6 +927,26 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         at every solid probe's position, so the nearest open probe was at distance 0 -- the line is a 5 x 2 x 2 unit
         box now, and the tie rule (first index) is what the y and z neighbours exercise. Not built: cluster analysis
         (two rooms far apart share one box), the page (Probes 3).
+    PROBES 3, THE PAGE -- built at v4516 (task 62), the last of the three probe rounds. splat-probes.html puts the
+        camera INSIDE a two-tone shell of splats (warm above the horizon, cool below), fits the probe grid to the
+        shell's occupancy (render/probeFit.mjs), bakes it from the v4513 splat source, and draws through one
+        gpuDriven scene with two fleets: the splats as emissive tone markers by litSphere's tint chain, and the probes
+        plus a centre mesh by render/probeLit.mjs's pipeline -- a sphere at a probe's own position is lit by THAT
+        probe's coefficients, so the grid of small spheres is the volume's own picture of itself. Everything the page
+        draws is derived in render/probeLab.mjs as data (records, extras, fleet map, HUD line), so the gate holds it
+        headless and then on both backends. Spacing, face size and splat count live; the bake time, probe count,
+        solid count and box in the HUD. MEASURED (tools/ship/probeLab-selfcheck.mjs): 729 probes at 0.5 spacing, 176
+        solid, 553 baked in 0.4 s; the frame from inside the shell lights 12,603 of 24,000 pixels, the cull twin sees
+        293 of 1,030 records (what is behind the camera is culled), the mesh's 3,388 keyed pixels are all lit and read
+        r 227 b 54 above against r 61 b 220 below, the two backends 1 pixel apart. THREE GATE-SIDE CORRECTIONS: a
+        Float32 tone compared against Float64 constants; a cull hold that asked for every record from inside a shell;
+        a ray key whose right vector was negated and read the mesh upside down while the picture was right. AND A
+        BLIND SABOTAGE: with the mesh dropped, the shell behind it carries the same tonal split and the warm-above hold
+        stayed green; the hold that closed it counts dark pixels inside the mesh's silhouette (the shell has gaps, the
+        mesh has none). The three rounds together: the volume on the device (Probes 1), the box fitted to occupancy
+        (Probes 2), and a page that stands inside the result. Not built: a loaded splat scene on the page (the lab
+        bakes the shell; a PLY through the loader is the next step), the probe spheres coloured by anything but their
+        own light.
     TEXTURE BYTES BEFORE KTX2 / BASIS -- measured at v4495 (task 18), RIG-PENDING for the asset library.
         tools/ship/textureBytes.mjs walks a folder and records every raster texture's bytes on disk and, from the
         PNG and JPEG headers, its pixel size and GPU bytes (RGBA8 with mips); decide() derives the verdict from
