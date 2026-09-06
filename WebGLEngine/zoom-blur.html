@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Zoom Blur (a radial march beside the god rays)">
+<meta name="demo:desc" content="A zoom blur on gfx/device.js: every pixel averages the scene along the line toward a centre that follows the pointer, in both shader languages, with no luminance or depth gate and the output replacing the scene. Beside it, render/bloomPass.js's GODRAYS_FS run raw on the same scene toward the same centre. Held to a CPU twin by tools/ship/zoomBlur-selfcheck.mjs.">
+<meta name="demo:category" content="fx">
+<title>Zoom Blur</title>
+<style>
+  html,body { margin:0; height:100%; background:#050805; color:#9fb2d4; font:12px ui-monospace,Menlo,monospace; }
+  #row { display:flex; gap:8px; padding:0 8px; }
+  canvas { display:block; width:calc(50% - 4px); background:#000; }
+  #hud { padding:10px 14px; }
+  #cap { color:#f6a623; letter-spacing:.14em; text-transform:uppercase; }
+  #be { color:#59d1ff; font-size:14px; margin-top:4px; }
+  #sub { color:#5f7aa0; font-size:11px; margin-top:2px; }
+  .bad { color:#ff9a9a; }
+  a { color:#59d1ff; }
+  input[type=range] { vertical-align:middle; width:120px; }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div id="cap">Zoom blur: a radial march toward the pointer, beside GODRAYS_FS on the same scene</div>
+  <div id="be">requesting a device&hellip;</div>
+  <div id="sub">Left: the zoom blur through gfx/device.js (32 samples averaged, no gate, replaces the scene). Right: render/bloomPass.js's GODRAYS_FS raw on WebGL2 (luminance gate, far-plane gate, decay, its own output). The scene is procPlanet's equirectangular bake. <span id="notice"></span>
+    &middot; strength <input id="strength" type="range" min="0" max="1" step="0.01" value="0.35"> &middot; threshold <input id="threshold" type="range" min="0" max="1" step="0.01" value="0.3"> &middot; <a href="?webgl=1">force WebGL2</a> &middot; <span id="tick"></span></div>
+</div>
+<div id="row"><canvas id="c"></canvas><canvas id="g"></canvas></div>
+<script type="module" src="/ui/originNotice.js"></script>
+<script type="module">
+import { requestDevice } from "./gfx/device.js";
+import { planetSpec, bakeEquirect } from "./world/procPlanet.js";
+import { zoomBlurPipelineDesc, sceneTexture, drawZoomBlur } from "./render/zoomBlur.mjs";
+
+const cvs = document.getElementById("c"), gcv = document.getElementById("g"), beEl = document.getElementById("be");
+const BW = 512, BH = 256, SEED = 7;
+const fail = (m) => { beEl.innerHTML = '<span class="bad">' + m + "</span>"; };
+const knobs = { cx: 0.5, cy: 0.5, strength: 0.35 };
+let device, pipe, tex, gl, prog, frames = 0, scene;
+
+function raw() {
+  // GODRAYS_FS from bloomPass.js's own text, the way the gate takes it: PASSTHROUGH_VS's uv has y up, so the scene is flipped for it
+  return fetch("./render/bloomPass.js").then((r) => r.text()).then((src) => {
+    const between = (a, b) => { const i = src.indexOf(a), j = src.indexOf(b, i + a.length), s = src.slice(i, j); return s.slice(s.indexOf("`") + 1, s.lastIndexOf("`")); };
+    const VS = between("const PASSTHROUGH_VS", "const "), FS = between("const GODRAYS_FS", "const COMPOSITE_FS");
+    gl = gcv.getContext("webgl2"); if (!gl) throw new Error("no WebGL2 for the god rays");
+    const sh = (t, s) => { const x = gl.createShader(t); gl.shaderSource(x, s); gl.compileShader(x); if (!gl.getShaderParameter(x, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(x)); return x; };
+    prog = gl.createProgram(); gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+    const mk = (rgba) => { const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, BW, BH, 0, gl.RGBA, gl.UNSIGNED_BYTE, rgba); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE); return t; };
+    const flipped = new Uint8ClampedArray(scene.rgba.length); for (let j = 0; j < BH; j++) flipped.set(scene.rgba.subarray(j * BW * 4, (j + 1) * BW * 4), (BH - 1 - j) * BW * 4);
+    const depth = new Uint8ClampedArray(BW * BH * 4); for (let i = 0; i < BW * BH; i++) { depth[i * 4] = 255; depth[i * 4 + 3] = 255; }
+    const tScene = mk(flipped), tDepth = mk(depth);
+    const vb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vb); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0); gl.useProgram(prog);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tScene); gl.uniform1i(gl.getUniformLocation(prog, "uScene"), 0);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, tDepth); gl.uniform1i(gl.getUniformLocation(prog, "uSceneDepth"), 1);
+    gl.uniform1f(gl.getUniformLocation(prog, "uVisibility"), 1); gl.uniform1f(gl.getUniformLocation(prog, "uIntensity"), 1);
+  });
+}
+async function init() {
+  const forceGl = new URLSearchParams(location.search).get("webgl") === "1";
+  try { device = await requestDevice(cvs, forceGl ? { backend: "webgl2" } : { prefer: "webgpu" }); }
+  catch (e) { return fail("requestDevice threw: " + e.message); }
+  if (!device || device.backend === "null") return fail("no GPU backend here (WebGPU needs a secure origin: localhost or https).");
+  const bake = bakeEquirect(planetSpec(SEED), BW, BH); scene = { rgba: bake.rgba, w: BW, h: BH };
+  try { pipe = device.pipeline(zoomBlurPipelineDesc()); if (pipe.compiled) { const err = await pipe.compiled; if (err) throw new Error(err); } tex = sceneTexture(device, scene); }
+  catch (e) { return fail("zoom blur pipeline: " + e.message); }
+  try { await raw(); } catch (e) { return fail("god rays (raw WebGL2): " + e.message); }
+  beEl.textContent = "backend: " + device.backend + " (zoom blur) beside raw WebGL2 (god rays) · scene " + BW + "x" + BH + " · move the pointer over either picture";
+  for (const c of [cvs, gcv]) c.addEventListener("pointermove", (ev) => { const r = c.getBoundingClientRect(); knobs.cx = (ev.clientX - r.left) / r.width; knobs.cy = (ev.clientY - r.top) / r.height; });
+  requestAnimationFrame(frame);
+}
+function dpr() { return Math.min(2, devicePixelRatio || 1); }
+function frame() {
+  const d = dpr(), w = Math.round((cvs.clientWidth || 600) * d), h = Math.round(w * BH / BW);
+  for (const c of [cvs, gcv]) if (c.width !== w || c.height !== h) { c.width = w; c.height = h; c.style.height = (h / d) + "px"; }
+  knobs.strength = +document.getElementById("strength").value;
+  device.frame(({ pass }) => { pass.clear([0, 0, 0, 1]); drawZoomBlur(pass, pipe, tex, knobs); });
+  gl.viewport(0, 0, w, h); gl.useProgram(prog);
+  gl.uniform2f(gl.getUniformLocation(prog, "uSunPosUV"), knobs.cx, 1 - knobs.cy); gl.uniform1f(gl.getUniformLocation(prog, "uThreshold"), +document.getElementById("threshold").value);
+  gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT); gl.drawArrays(gl.TRIANGLES, 0, 3);
+  if (++frames % 15 === 0) document.getElementById("tick").textContent = "centre " + knobs.cx.toFixed(2) + ", " + knobs.cy.toFixed(2) + " · strength " + knobs.strength.toFixed(2);
+  requestAnimationFrame(frame);
+}
+init();
+</script>
+</body>
+</html>

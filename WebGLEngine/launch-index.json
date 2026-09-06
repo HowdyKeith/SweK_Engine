@@ -21,7 +21,7 @@
   }
  },
  "counts": {
-  "page": 456,
+  "page": 457,
   "demo": 49,
   "builtin": 34
  },
@@ -3671,6 +3671,14 @@
    "id": "youtube-export.html",
    "display": "Youtube Export",
    "href": "/youtube-export.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "zoom-blur.html",
+   "display": "Zoom Blur",
+   "href": "/zoom-blur.html",
    "section": null,
    "collision": false
   },

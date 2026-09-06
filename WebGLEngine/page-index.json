@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 456,
+ "count": 457,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -3192,6 +3192,13 @@
    "f": "youtube-export.html",
    "t": "YouTube Export",
    "d": "Record a narrated SweK Engine showcase and export it as a YouTube-ready mp4. The avatar narrates the engine in first person -- overview, the box3d/Jolt physics, Escape Velocity, the living box -- over a live scene of sprite-mesh ships flying an evade brain through a nebula. Everything (scene, avatar, title, captions) composites onto one canvas, records to webm, and the server transcodes to H.264 mp4 with a paste-ready description.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "zoom-blur.html",
+   "t": "Zoom Blur",
+   "d": "A zoom blur on gfx/device.js: every pixel averages the scene along the line toward a centre that follows the pointer, in both shader languages, with no luminance or depth gate and the output replacing the scene. Beside it, render/bloomPass.js's GODRAYS_FS run raw on the same scene toward the same centre. Held to a CPU twin by tools/ship/zoomBlur-selfcheck.mjs.",
    "g": "",
    "p": 0
   }

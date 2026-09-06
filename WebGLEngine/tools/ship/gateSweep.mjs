@@ -2621,6 +2621,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "fits the model per quad to 3.3e-6 em and is slugEval's coverage on 48,000 of 48,000 pixels on WebGPU. slug-ticker.html " +
                  "gained the shatter button. Sabotages red at 1 / 2 / 5 / 4.",
     }),
+    since126: Object.freeze({
+        at: "v4504", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/zoomBlur-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green on both backends. render/zoomBlur.mjs: a radial march toward an arbitrary centre in both languages, 32 bilinear " +
+                 "samples averaged and replacing the scene, clamped to the texel-centre range in the shader; within 1 of 255 of the CPU " +
+                 "twin on every pixel at three settings, the backends 0 apart. GODRAYS_FS run raw beside it on the same scene: black under " +
+                 "its luminance gate and its depth gate where the zoom blur is unchanged, and 31 for a grey of 128 where the zoom blur " +
+                 "returns 128. The 15th dual-language module: parity and census baselines raised by name, the WGSL in the corpus. " +
+                 "zoom-blur.html is the view. Sabotages red at 5 / 5 / 5 / 3 -- the clamp sabotage was blind twice (the bake's seam, then " +
+                 "one sample in 32) before the edges were painted and a strength-0 setting added.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

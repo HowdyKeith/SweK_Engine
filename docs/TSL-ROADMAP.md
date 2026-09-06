@@ -732,6 +732,24 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         7, the parked glyph absent. A first draft of the gate let the second shatter overwrite the first's recorded
         cells and read a 0.58-unit "jump" that was the conveyor's travel. slug-ticker.html gained a shatter button and
         an every-150-ticks default, in both modes (in napalm mode the shards burn with the glyph's own fill rectangle).
+    THE ZOOM BLUR BESIDE THE GOD RAYS -- built at v4504 (task 46). render/bloomPass.js's GODRAYS_FS was the tree's
+        one radial march, and it is a god-ray pass: toward the sun, samples gated by luminance and by the far plane,
+        decayed, added to the scene by the composite. render/zoomBlur.mjs is the other thing a radial march is for:
+        every fragment averages 32 bilinear samples along its line toward a centre given as a uniform, no gate, no
+        decay, the mean REPLACING the scene; both languages, a CPU twin, the sample clamped to the texel-centre range
+        in the shader itself because WebGL2's sampler clamps and WebGPU's repeats (the v4500 finding again).
+        MEASURED (tools/ship/zoomBlur-selfcheck.mjs, procPlanet's bake at 128 x 64 with its edges painted, a 160 x 96
+        frame): within 1 of 255 of the twin on every pixel at three settings on both backends, the backends 0 apart.
+        GODRAYS_FS run RAW from bloomPass.js's own text in the same page on the same scene toward the same centre: it
+        lights every pixel with the depth at the far plane and no threshold, none at threshold 0.99 (the bake's
+        brightest is 0.980), none at depth 0.5; on a constant grey of 128 it returns 31 (g * g * the decay sum / N,
+        31.3 by the formula) where the zoom blur returns 128 on every pixel; the two frames' luminance correlates at
+        0.992. Two corrections inside the round: the first gated threshold, 0.95, was NOT above the scene's brightest
+        pixel; and the clamp sabotage was blind twice -- the bake is continuous across its seam so the repeating
+        sampler read the clamp's own colour, and under the march the edge is one sample in 32 (0.8 of a level) --
+        until the edges were painted and a strength-0 setting made the pass a plain resample. The tree's 15th
+        dual-language module. zoom-blur.html: the blur following the pointer beside the god rays with their
+        threshold on a slider.
     TEXTURE BYTES BEFORE KTX2 / BASIS -- measured at v4495 (task 18), RIG-PENDING for the asset library.
         tools/ship/textureBytes.mjs walks a folder and records every raster texture's bytes on disk and, from the
         PNG and JPEG headers, its pixel size and GPU bytes (RGBA8 with mips); decide() derives the verdict from
