@@ -59,7 +59,7 @@
 //
 // An instrument that names what it measures becomes a sample of it -- eight rounds of that in backendParity
 // alone. Turn the instrument around and the same fact reappears wearing the other sign: A GATE THAT ASSERTS
-// SOMETHING ABOUT A SHADER MUST QUOTE THE SHADER. Eighteen files in this tree carry shader tokens for no
+// SOMETHING ABOUT A SHADER MUST QUOTE THE SHADER. Nineteen files in this tree carry shader tokens for no
 // reason but to test for them, describe them, or name them in a sentence, and to a scan reading text they
 // are indistinguishable from an emitter. They are not a defect in those files; they are the population a
 // body scan must reject, and naming them is most of this module:
@@ -87,22 +87,24 @@
 //
 // ---- *** THE PARAMETERS ARE FITTED, THE SCORE IS NOT HELD OUT, AND THE BEST SCORE WAS REFUSED. *** ----------
 //
-// All 32 candidate files were read by hand and labelled before any threshold was chosen; that table is
+// All 33 candidate files were read by hand and labelled before any threshold was chosen; that table is
 // HAND_VERIFIED below and it is the answer key. The three thresholds were then swept against it, which makes
 // any agreement a FIT rather than a measurement, and the sweep is reported instead of the winner:
 //
 //        floor:      2     3     4     5     6     7     8
-//        r= 80      31    31    28    27    27    26    24
-//        r=100      31    31    29    28    27    27    26
-//        r=140      31    31   *32*  30    28    27    26
-//        r=200      30   [31    31    31    31]  28    26
-//        r=300      29    29    30    30    31    30    30
+//        r= 80      32    32    29    28    28    27    25
+//        r=100      32    32    30    29    28    28    27
+//        r=140      32    32   *33*  31    29    28    27
+//        r=200      31   [32    32    32    32]  29    27
+//        r=300      30    30    31    31    32    31    31
 //
-// A radius of 140 with a floor of 4 agrees with all 32 rows. IT IS NOT SHIPPED. Its four immediate
-// neighbours score 31, 30, 29 and 31: it is a SPIKE, and a spike on a table of 32 hand-made labels is the
-// shape of a threshold fitted to its own answer key. Radius 200 holds 31 across floors 3, 4, 5 AND 6 -- four
-// wide, where every other radius manages at most two -- so the shipped setting is one of that run's two
-// interior floors and the shipped claim is 31 of 32, not 32 of 32. (The first draft of this paragraph said
+// A radius of 140 with a floor of 4 agrees with all 33 rows. IT IS NOT SHIPPED. Its four immediate
+// neighbours score 32, 31, 30 and 32: it is a SPIKE, and a spike on a table of hand-made labels is the shape
+// of a threshold fitted to its own answer key. Radius 200 holds 32 across floors 3, 4, 5 AND 6 -- four wide,
+// where every other radius manages at most two -- so the shipped setting is one of that run's two interior
+// floors and the shipped claim is 32 of 33, not 33 of 33. *** v4487 ADDED A ROW AND EVERY CELL OF THIS TABLE
+// MOVED BY EXACTLY ONE: *** the SHAPE -- one spike at r=140, one four-wide plateau at r=200 -- is what
+// survived a change of population, which is more than the peak's score could ever say for itself. (The first draft of this paragraph said
 // the run was three wide and called floor 5 its middle: it read the span from floor 4 and floor 3 scores 31
 // too. The gate derives the run rather than trusting the sentence, which is why the sentence is right now.)
 // The whole table is re-derived by the gate rather than quoted, so a change to any tell moves the numbers
@@ -268,6 +270,9 @@ export const HAND_VERIFIED = Object.freeze([
     Object.freeze({ file: "tools/ship/wgslLayout-selfcheck.mjs", kind: "emitter", why: REASONS.DISARMED }),
     Object.freeze({ file: "krbn-lyapunov.html", kind: "quoter", why: null }),
     Object.freeze({ file: "physics/render/microfacetWgsl-selfcheck.mjs", kind: "quoter", why: null }),
+    // v4487 -- the compile census. It NAMES the fourteen emitters and quotes none of their source, so it
+    // lands on the quoter side; its GATE carries the real shader text and is preamble-visible instead.
+    Object.freeze({ file: "render/emitterCompile.mjs", kind: "quoter", why: null }),
     Object.freeze({ file: "render/swiftShaderModel.mjs", kind: "quoter", why: null }),
     Object.freeze({ file: "tools/roundhouse/hmcGpu-selfcheck.mjs", kind: "quoter", why: null }),
     Object.freeze({ file: "tools/ship/brickShader-selfcheck.mjs", kind: "quoter", why: null }),
@@ -299,16 +304,16 @@ export const RESIDUAL = Object.freeze({
 export const TUNING = Object.freeze({
     floors: Object.freeze([2, 3, 4, 5, 6, 7, 8]),
     byRadius: Object.freeze({
-        80: Object.freeze([31, 31, 28, 27, 27, 26, 24]),
-        100: Object.freeze([31, 31, 29, 28, 27, 27, 26]),
-        140: Object.freeze([31, 31, 32, 30, 28, 27, 26]),
-        200: Object.freeze([30, 31, 31, 31, 31, 28, 26]),
-        300: Object.freeze([29, 29, 30, 30, 31, 30, 30]),
+        80: Object.freeze([32, 32, 29, 28, 28, 27, 25]),
+        100: Object.freeze([32, 32, 30, 29, 28, 28, 27]),
+        140: Object.freeze([32, 32, 33, 31, 29, 28, 27]),
+        200: Object.freeze([31, 32, 32, 32, 32, 29, 27]),
+        300: Object.freeze([30, 30, 31, 31, 32, 31, 31]),
     }),
-    peak: Object.freeze({ radius: 140, floor: 4, agreement: 32, shipped: false,
-        note: "a spike -- neighbours read 31, 30 and 28 -- which is what a threshold fitted to its own key looks like" }),
-    shipped: Object.freeze({ radius: 200, floor: 5, agreement: 31,
-        note: "inside the widest run at the best non-spike score: FOUR floors wide at 31 (3 through 6), where every other radius manages at most two" }),
+    peak: Object.freeze({ radius: 140, floor: 4, agreement: 33, shipped: false,
+        note: "a spike -- every neighbour reads lower -- which is what a threshold fitted to its own key looks like" }),
+    shipped: Object.freeze({ radius: 200, floor: 5, agreement: 32,
+        note: "inside the widest run at the best non-spike score: FOUR floors wide (3 through 6), where every other radius manages at most two" }),
     // Derived by the gate from byRadius, not typed: the length of each radius' longest run at its own best score.
     runAtBest: Object.freeze({ 80: 2, 100: 2, 140: 1, 200: 4, 300: 1 }),
 });
@@ -349,14 +354,14 @@ export const MEASURED_AT_V4486 = Object.freeze({
     scanned: 4344,
     // The count the round is about: files carrying shader body text that backendParity calls `none`.
     handVerifiedEmitters: 14,
-    handVerifiedQuoters: 18,
+    handVerifiedQuoters: 19,   // 19 at v4487: render/emitterCompile.mjs
     // The shipped thresholds report 15 emitters and 17 quoters -- one row over, and RESIDUAL names it.
     reportedEmitters: 15,
-    reportedQuoters: 17,
-    agreement: 31,
-    rows: 32,
+    reportedQuoters: 18,
+    agreement: 32,
+    rows: 33,
     // Against backendParity's own figures, unchanged and deliberately not widened.
-    preambleCensus: Object.freeze({ glslBearing: 147, wgslBearing: 71, both: 15 }),
+    preambleCensus: Object.freeze({ glslBearing: 148, wgslBearing: 72, both: 16 }),
     // Of the fourteen, how many are invisible for a reason a wider PATTERN could fix: the two whose only
     // problem is that the framework tell is a uniform declaration. The other twelve are structural.
     fixableByPattern: 2,

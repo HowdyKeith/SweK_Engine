@@ -2915,6 +2915,44 @@ since116: Object.freeze({
                  "and syntax alone cannot separate them, so a scalar return must now carry a shading-language " +
                  "type in its parameter list.",
     }),
+    since126: Object.freeze({
+        at: "v4487", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/emitterCompile-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, thirty-four checks in five sections, 5.99 s -- slow on " +
+                 "purpose, because it launches a browser. v4486 counted fourteen files carrying runnable " +
+                 "shader text the preamble census calls none, and ran NONE of them; a census of shader text " +
+                 "that never compiles a line is a census of STRINGS. *** EVERY EMITTER COMPILES: *** nine rows " +
+                 "carry text this gate can hand a driver itself -- eleven programs, since dither and vorton " +
+                 "each ship a pair -- nine GLSL through WebGL2 and two WGSL through WebGPU, no errors. Four " +
+                 "have a receipt elsewhere and one is a fixture for a pair DETECTOR and is not a shader; both " +
+                 "sets are named rather than counted as passes. *** AND fx/dither.js SHIPS A GLSL AND A WGSL " +
+                 "THAT ARE NOT THE SAME FUNCTION. *** Its header says the shader cannot drift from the JS " +
+                 "because the shader is a function of the JS -- true of the 64 CONSTANTS, false of the " +
+                 "ARITHMETIC around them, which is written once per language. The JS wraps explicitly, GLSL's " +
+                 "mod() floors, and WGSL's % keeps the DIVIDEND's sign. Measured over 256 probe points from " +
+                 "-7.5 to +7.5: non-negative coordinates gave WGSL-vs-JS EXACTLY 0 and GLSL-vs-JS 8.894e-8 " +
+                 "under a 2.38e-7 transport floor; at the 192 points where either coordinate was negative the " +
+                 "GLSL still tracked the JS and the WGSL was off by 0.984375 -- 63/64, THE WHOLE SPAN OF THE " +
+                 "OFFSET -- at every single one. *** LATENT, NOT LIVE, AND THE RECORD SAYS SO: *** both " +
+                 "shipped call sites pass a fragment coordinate, which is never negative, so nothing on screen " +
+                 "was wrong; what was wrong was a public function two backends may call with any coordinate. " +
+                 "The WGSL floor-wraps now, the disagreement is 0 at all 256 points, and the gate still DRIVES " +
+                 "the old expression beside the new one because a fix whose defect cannot be demonstrated is a " +
+                 "claim. THE CONTROL: fx/vorton, the other dual-language emitter, on the same harness and " +
+                 "packer, agrees at 4.439e-8 / 2.631e-7 / 2.439e-7, all under the floor -- so the dither " +
+                 "number is dither's, not the method's. *** THE HARNESS TRAP, WRITTEN DOWN SINCE v4284, WAS " +
+                 "SPRUNG ANYWAY: *** it draws attributelessly, so a vertex shader reading an attribute " +
+                 "collapses and the frame returns ok:true and BLACK. The first probe wrote `in vec2 aPos` and " +
+                 "spent three probes blaming the shader, until a CONSTANT-COLOUR shader read black too. Every " +
+                 "device row asserts distinctColours now. FIFTEEN SABOTAGES, ALL RED BY NAME. *** TWO COST " +
+                 "ZERO RED AND BOTH WERE THE RECORD BEING DECORATION: *** the control's three figures were " +
+                 "checked only against the floor, so quadrupling one passed, and the per-row distinct-colour " +
+                 "expectations were typed beside the record instead of read from it. Both are derived from the " +
+                 "record now. The arrival moved backendParity to 148/72/16 -- a gate that COMPILES both " +
+                 "languages is shader-bearing -- and it is the THIRD dual-language gate on a list whose own " +
+                 "row says a fourth without a reason goes red.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

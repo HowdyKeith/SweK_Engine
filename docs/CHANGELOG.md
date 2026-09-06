@@ -62,6 +62,68 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      collision on this pair of branches; the six before it are noted below, and every one was caught at a
      merge rather than by anything running. -->
 
+## v4487 -- the emitters compile, and two of them were not the same function
+
+v4486 found fourteen files carrying runnable shader text that render/backendParity.mjs's preamble census
+calls "none". It counted them and ran none of them, and a census of shader text that never compiles a line is
+a census of STRINGS. This round hands every one of the fourteen to a real driver.
+
+*** EVERY EMITTER COMPILES. *** Nine rows carry text this gate can give a driver itself -- eleven programs,
+because dither and vorton each ship a pair: nine GLSL through WebGL2 and two WGSL through WebGPU, no errors.
+Four more have a receipt in another gate and one is a fixture built for a pair DETECTOR and is not a shader at
+all; both sets are listed by name rather than counted as passes. The emitters are not broken.
+
+*** AND fx/dither.js SHIPS A GLSL AND A WGSL THAT ARE NOT THE SAME FUNCTION. *** Its header says "the shader
+cannot drift from the JS because the shader is a function of the JS". That is TRUE OF THE 64 CONSTANTS -- both
+are built by serialising one array and tools/ship/dither-selfcheck.mjs asserts it -- and FALSE OF THE
+ARITHMETIC around them, which is hand-written once per language. The JS writes ((y % N) + N) % N, an explicit
+non-negative wrap. GLSL's mod() floors, so it agrees. WGSL's % keeps the DIVIDEND's sign, so it did not.
+
+MEASURED ON THE DEVICE over 256 probe points on a 16x16 grid from -7.5 to +7.5: where both coordinates were
+non-negative the WGSL matched the JS EXACTLY (0.0) and the GLSL matched to 8.894e-8, under the pack24
+transport floor of 2.38e-7. Where either coordinate was negative -- 192 of the 256 -- the GLSL still matched
+to 8.894e-8 and the WGSL was off by up to 0.984375. That is 63/64: THE ENTIRE SPAN OF THE OFFSET the function
+returns. All 192 disagreed. The two shaders were as far apart as the function can be.
+
+*** AND IT WAS LATENT, NOT LIVE, WHICH IS THE HALF AN OVERCLAIM WOULD HAVE DROPPED. *** Both shipped call
+sites pass a fragment coordinate -- gl_FragCoord in the GLSL, @builtin(position) in the WGSL of
+fx/wormhole/wormholeNebula.js, the only consumer -- and neither is ever negative. Nothing on screen was wrong.
+What was wrong was a public function two backends were entitled to call with any coordinate. The WGSL now
+floor-wraps and the disagreement is 0 at all 256 points; the gate still DRIVES the old expression beside the
+new one, because a fix whose defect can no longer be demonstrated is a claim rather than a repair.
+
+*** THE CONTROL, BECAUSE ONE DISAGREEING PAIR IS ALSO WHAT A BROKEN INSTRUMENT LOOKS LIKE. ***
+fx/vorton/vortonNebula.js is the tree's other dual-language emitter of this shape. Same harness, same packer,
+same transcendental-free lattice: WGSL against JS 4.439e-8, GLSL against JS 2.631e-7, GLSL against WGSL
+2.439e-7, every one at or under the signed floor. So the dither number is dither's, not the method's.
+
+*** THE HARNESS HAS A TRAP, IT IS WRITTEN DOWN, AND THIS ROUND FELL IN ANYWAY. *** webgpuHarness binds an
+EMPTY vertex array and draws attributelessly, so a vertex shader reading an attribute collapses and the frame
+comes back ok:true and BLACK. Its own header has said so since v4284 and it returns distinctColours precisely
+so a caller can tell the two apart. The first probe wrote `in vec2 aPos`, read black, and spent three probes
+deciding the dither GLSL was broken -- until a CONSTANT-COLOUR shader read black too. Every device row asserts
+distinctColours now, and the rows that legitimately draw one colour say why.
+
+*** THE FIRST TELL SET MATCHED FIVE box3d RIG GATES, WHICH EMBED REAL C *** -- carried over from v4486 and
+re-earned here: GLSL is a C-family language and syntax alone cannot separate them.
+
+NEW render/emitterCompile.mjs holds the census as data, with a per-row distinction the round exists to keep:
+COMPILING IS NOT CORRECTNESS. Seven rows are compile receipts and say only that a driver accepted the text;
+two are graded by value here and four elsewhere. NEW tools/ship/emitterCompile-selfcheck.mjs, thirty-four
+checks in five sections, 5.99 s. tools/ship/dither-selfcheck.mjs gains two rows that catch the regression by
+SHAPE without a browser, so the cheap gate stays cheap and the device gate owns the value.
+
+FIFTEEN SABOTAGES, ALL RED BY NAME. *** TWO COST ZERO RED AND BOTH WERE THE RECORD BEING DECORATION: *** the
+control's three figures were checked only against the floor, so quadrupling one passed; and the per-row
+distinct-colour expectations were typed out beside the record instead of read from it, so faking a row's field
+passed. Both are derived from the record now, which is the thing being graded.
+
+The census's arrival moved backendParity's ratchets -- 148 GLSL-bearing, 72 WGSL-bearing, 16 both -- because a
+gate that COMPILES both languages is shader-bearing, and it is the THIRD dual-language gate, named in the list
+whose own row says a fourth arriving without a reason goes red. v4486's answer key gained a row and every cell
+of its threshold sweep moved by exactly one: the SHAPE -- one spike at r=140, one four-wide plateau at r=200 --
+is what survived a change of population, which is more than the peak's score could say for itself. The tree
+stands at 1526 gates.
 ## v4486 -- the shaders the census cannot see, and the two ways a body scan gets them wrong
 
 v4483 gave render/stereographic.js a WGSL emitter beside its GLSL one, found that render/backendParity.mjs's

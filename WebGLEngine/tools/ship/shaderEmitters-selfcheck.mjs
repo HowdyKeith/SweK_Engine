@@ -174,8 +174,12 @@ function M_files() {
         `${c.emitters.length} emitters and ${c.quoters.length} quoters among the rest`);
     ok("the answer key covers the whole hit population -- no file is classified without a hand-read label",
         unlisted.length === 0, unlisted.length ? unlisted.join(", ") : `all ${got.size} rows are in the key`);
-    ok("*** the shipped thresholds agree with 31 of the 32 hand-read rows, and the claim is 31, not 32 ***",
-        truth.size - disagree.length === M.agreement && M.agreement === 31 && M.rows === 32,
+    // v4487 -- STATED AS A SHAPE, NOT A PAIR OF LITERALS. This row read "31 of 32" until a round added one
+    // file to the tree, and the honest edit turned out to be a number rather than a rethink. What the claim
+    // actually is: the shipped thresholds miss exactly one row, whatever the key holds.
+    ok("*** the shipped thresholds agree with all but ONE hand-read row, and the claim is never a clean sweep ***",
+        truth.size - disagree.length === M.agreement && M.agreement === M.rows - 1 &&
+        M.rows === E.HAND_VERIFIED.length,
         `${truth.size - disagree.length}/${truth.size}`);
     ok("...and the ONE disagreement is the row RESIDUAL names, not some other row",
         disagree.length === 1 && disagree[0] === E.RESIDUAL.file,

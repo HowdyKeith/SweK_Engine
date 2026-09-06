@@ -140,8 +140,13 @@ const DITHER_WGSL = `
 const DITHER_N: f32 = ${N}.0;
 const DITHER_BAYER = array<i32, ${N * N}>(${BAYER8_LIST});
 fn ditherOffset(fragCoord: vec2f) -> f32 {
-  let x = i32(fragCoord.x % DITHER_N);
-  let y = i32(fragCoord.y % DITHER_N);
+  // *** FLOOR-WRAP, NOT \`%\`, AND v4487 MEASURED WHY. *** WGSL's remainder keeps the DIVIDEND's sign, so a
+  // negative coordinate indexed the matrix negatively; GLSL's mod() floors and the JS above writes
+  // ((v % N) + N) % N. Three spellings of one wrap, and the WGSL was the odd one out: on a device the two
+  // shaders disagreed by 0.984375 -- the full span of the offset -- at all 192 of 256 probe points where
+  // either coordinate was negative, while agreeing exactly everywhere else.
+  let x = i32(fragCoord.x - DITHER_N * floor(fragCoord.x / DITHER_N));
+  let y = i32(fragCoord.y - DITHER_N * floor(fragCoord.y / DITHER_N));
   return (f32(DITHER_BAYER[y * ${N} + x]) + 0.5) / ${N * N}.0 - 0.5;
 }
 fn ditherQuantize(c: vec3f, fragCoord: vec2f, levels: f32) -> vec3f {

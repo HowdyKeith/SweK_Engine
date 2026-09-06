@@ -215,13 +215,18 @@ export const PARITY_BASELINE = Object.freeze({
     // that hides its stage attribute ON PURPOSE. classify() is still not widened, for the reason above; the
     // two files answer two different questions and tools/ship/shaderEmitters-selfcheck.mjs asserts that the
     // preamble census's own inclusion-exclusion (147 + 71 - 15) equals what the body census sees pass by.
-    glslBearing: 147,
+    // v4487 -- 148: tools/ship/emitterCompile-selfcheck.mjs carries a complete GLSL program AND a complete
+    // WGSL one, because its job is to hand v4486's fourteen emitters to a real driver. A gate that COMPILES
+    // shaders is shader-bearing, and it is counted rather than exempted for the reason v4392 gave when the
+    // first probe gate arrived: "an exclusion for 'gates do not count' would have hidden every probe this
+    // tree has written". The same one file is why all three columns move; nothing else changed.
+    glslBearing: 148,
     // 130 at v4479: blendModes-selfcheck.mjs's GLSL twin writes its own version header, because it drives raw
     // WebGL2 through gfx/device.js rather than handing source to three. THE FIRST DRAFT OF THIS COMMENT SPELLED
     // THAT HEADER OUT and this file -- the one that CLASSIFIES shaders by looking for exactly that marker --
     // classified ITSELF as GLSL-bearing. The gate caught it by name. Same shape as v4462's census counting its
     // own PATTERNS table: an instrument that mentions what it measures becomes a sample of it.
-    glslDirective: 131,  // raw WebGL2 -- the file writes its own version header; 131 at v4483 (stereoDevice)
+    glslDirective: 132,  // raw WebGL2 -- the file writes its own version header; 132 at v4487 (emitterCompile)
     glslFramework: 16,   // three.js prepends it: badTvPass, aquarellePass, grassField, solidTexture, atmosphere, ...
     // v4392 -- 57 -> 58, and the file is a GATE rather than a shipping module. tools/ship/shipyard-selfcheck.mjs
     // section 8 embeds a WGSL compute shader to run the four float32 encodings on a real device, so it bears WGSL
@@ -255,10 +260,10 @@ export const PARITY_BASELINE = Object.freeze({
     // 61 on main, 67 on this branch, 68 on the merged tree at v4477. 69 at v4478: gpuTimer-selfcheck.mjs
     // carries the WGSL compute shader it times, so the gate that measures GPU time is itself WGSL-bearing.
     // 70 at v4479: blendModes-selfcheck.mjs carries the WGSL quad it draws through both backends.
-    wgslBearing: 71,   // 71 at v4483: stereoDevice-selfcheck's compute shader
+    wgslBearing: 72,   // 71 at v4483 (stereoDevice), 72 at v4487 (emitterCompile: the WGSL half of the pair)
     // 14 at v4479: blendModes-selfcheck.mjs carries BOTH a WGSL quad and its GLSL twin, because the
     // parity gate draws the same triangle through both backends in one launch.
-    both: 15,          // 15 at v4483, and see the glslBearing note: the emitter itself is invisible here
+    both: 16,          // 16 at v4487; and see the glslBearing note -- the emitters themselves stay invisible here
     glslOnly: 132,
     // 48 and 54 respectively -- re-measured for the same reason; 56 at v4478 for the same one file.
     wgslOnly: 56,
@@ -272,7 +277,12 @@ export const PARITY_BASELINE = Object.freeze({
         // v4483: the stereographic device gate carries a WGSL compute shader AND a GLSL fragment, because it
         // grades the same projection on both backends against the JS in one run. Listed for the same reason
         // blendModes-selfcheck is: the list is what "both" MEANS, and an exemption would hide it.
-        "tools/ship/stereoDevice-selfcheck.mjs"]),
+        "tools/ship/stereoDevice-selfcheck.mjs",
+        // v4487: the emitter compile census carries a GLSL program AND a WGSL one, because its job is to hand
+        // v4486's fourteen emitters to a real driver -- nine GLSL through WebGL2, two WGSL through WebGPU.
+        // Third gate on this list in nine rounds, listed for the reason the other two are: the list is what
+        // "both" MEANS, and a gate that compiles both languages is exactly the thing this count is counting.
+        "tools/ship/emitterCompile-selfcheck.mjs"]),
     bothPages: Object.freeze(["gfx-device.html", "nebula-device.html", "wormhole-jump.html"]),
     wgslRawVsCode: Object.freeze({ raw: 54, code: 51 }),
 });

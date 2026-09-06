@@ -117,10 +117,15 @@ console.log("\n3. THE MEASUREMENT");
         bothReach.length < N.glslBearing / 10 && bothReach.length + bothGates.length === N.both,
         `${bothReach.length} of ${N.glslBearing} -- ${(100 * bothReach.length / N.glslBearing).toFixed(1)}% ` +
         `(${N.both} raw, ${(100 * N.both / N.glslBearing).toFixed(1)}%, minus ${bothGates.length} parity gates)`);
+    // *** THE THIRD ARRIVED AT v4487 AND THIS ROW WENT RED, WHICH IS THE ROW WORKING. ***
+    // tools/ship/emitterCompile-selfcheck.mjs carries a GLSL program and a WGSL one because it hands v4486's
+    // fourteen emitters to a real driver. It is named here and in PARITY_BASELINE.bothShaderModules, so the
+    // exclusion still cannot grow by one file at a time without somebody typing the reason.
     ok("...and the gates taken out are named, so the exclusion cannot quietly grow",
-        bothGates.length === 2 && bothGates.every((f) => /(blendModes|stereoDevice)-selfcheck\.mjs$/.test(f)),
+        bothGates.length === 3 &&
+        bothGates.every((f) => /(blendModes|stereoDevice|emitterCompile)-selfcheck\.mjs$/.test(f)),
         bothGates.join(" ") + " -- each carries a WGSL shader and its GLSL twin to draw or compute the same " +
-        "thing through both backends in one run. A third arriving without a reason goes red here");
+        "thing through both backends in one run. A FOURTH arriving without a reason goes red here");
     // The distinction that stops the 5 from sounding better than it is.
     const pages = C.both.filter((f) => f.endsWith(".html"));
     const mods = C.both.filter((f) => !f.endsWith(".html"));

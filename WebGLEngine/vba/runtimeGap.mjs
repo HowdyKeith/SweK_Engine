@@ -209,8 +209,12 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // AND AN ELEVENTH, at v4486: render/shaderEmitters.mjs and its gate (3886 -> 3888), moving the same two
     // rows again -- ES modules +2, closures +2 -- and NOTHING ELSE. ELEVEN POPULATIONS, ELEVEN TABLES, AND
     // THREADS HAS READ 22 IN EVERY SINGLE ONE.
-    files: 3888,
-    esModules: 3597, closures: 3472, asyncAwait: 1340, typedArrays: 694, promises: 333,
+    // AND A TWELFTH, at v4487: render/emitterCompile.mjs and its gate (3888 -> 3890), moving THREE rows --
+    // ES modules +2, closures +1 and async/await +1, the last because the compile gate awaits a real device --
+    // while typed arrays, Promises, fetch/XHR, performance.now, rAF, WebGL, WebGPU, threads and WebAssembly
+    // ALL HELD. TWELVE POPULATIONS, TWELVE TABLES, THREADS 22 IN EVERY ONE.
+    files: 3890,
+    esModules: 3599, closures: 3473, asyncAwait: 1341, typedArrays: 694, promises: 333,
     fetchXhr: 224, performanceNow: 202, raf: 116, webgl: 105, webgpu: 46, threads: 22, wasm: 22,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
