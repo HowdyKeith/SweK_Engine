@@ -62,6 +62,75 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      collision on this pair of branches; the six before it are noted below, and every one was caught at a
      merge rather than by anything running. -->
 
+## v4486 -- the shaders the census cannot see, and the two ways a body scan gets them wrong
+
+v4483 gave render/stereographic.js a WGSL emitter beside its GLSL one, found that render/backendParity.mjs's
+census calls that file "none" in BOTH languages, and refused to generalise from one file: "how many other
+emitters this census cannot see is unknown and is its own round." This is that round, and the answer is
+FOURTEEN.
+
+*** classify() FINDS A SHADER BY ITS PREAMBLE, AND AN EMITTED FUNCTION BODY HAS NONE. *** Against the
+preamble census's 147 GLSL-bearing, 71 WGSL-bearing and 15 carrying both, fourteen more files hold shader
+source a device could run. They are invisible for four distinct reasons and only one is fixable by widening
+a pattern: TEN are emitted fragments handed to a host program that supplies the header (panini,
+parallaxOcclusion, stereographic, holoFoilShader, glslFloatPack, dither, vortonNebula, shaderPairs's fixture,
+NeuralRadianceCache which builds its GLSL line by line, and shaders/ashimaNoise.js which holds it as an ARRAY
+OF LINES so it is not even one contiguous literal). TWO are COMPLETE shaders the framework tell misses
+because that tell is a uniform declaration and neither file has one -- render/transitionPass.js carries a
+vertex shader driven by an attribute and a varying, and shaders/voxel.frag.js is a whole fragment shader in a
+file with a .js extension and NO JavaScript in it at all. ONE is a fixture built by concatenation.
+
+*** AND THE LAST ONE CLOSES A LOOP: THE DEFENCE AGAINST A FALSE POSITIVE CREATED A FALSE NEGATIVE. ***
+tools/ship/wgslLayout-selfcheck.mjs holds a complete, compilable module and is invisible because it
+INTERPOLATES its stage attribute from a fragment assembled one line above, under a comment naming exactly
+why: "earlier rounds where a check counted itself". That is the correct fix for self-counting and this tree
+has applied it six times -- v4462, v4479, v4483, v4484, v4485 and there. Every one of those disarmings also
+removed the file from the census meant to see it, and nobody noticed because the two effects live in
+different files.
+
+NEW render/shaderEmitters.mjs is a SECOND census beside the first, not a widening of it. Widening classify()
+would move six ratchets at once and hide what moved for a reason behind what moved because the definition
+changed; the two files answer two questions, which is the resolution v4485 reached for the two timing files.
+
+*** A BODY SCAN HAS ITS OWN FAILURE AND IT IS THE EXACT MIRROR OF SELF-CLASSIFICATION: A GATE THAT ASSERTS
+SOMETHING ABOUT A SHADER MUST QUOTE THE SHADER. *** Eighteen files carry shader tokens only to test for them,
+describe them, or name them in a sentence, and to a text scan they are indistinguishable from an emitter. So
+kindOf() returns THREE values and rejects per hit: a regex escape beside the tell, a matcher call within
+reach, or a low-vocabulary window. All 32 candidates were read by hand and labelled BEFORE any threshold was
+chosen.
+
+*** THE PARAMETERS ARE FITTED TO THAT KEY, SO THE BEST SCORE WAS REFUSED. *** The setting that agrees with
+all 32 rows (radius 140, floor 4) is NOT shipped: its four neighbours score 31, 30, 29 and 31, which is what
+a threshold fitted to its own answer key looks like. Radius 200 holds 31 across floors 3 through 6 -- four
+wide, where every other radius manages at most two -- so the shipped claim is 31 of 32, not 32 of 32, and the
+whole sweep table is re-derived by the gate rather than quoted. THE FIRST DRAFT CALLED THAT RUN THREE WIDE
+AND WENT RED: it had read the span from floor 4 and floor 3 scores 31 too.
+
+*** THE ONE ROW THAT STAYS WRONG IS ONE THE TREE DOCUMENTED AS IRREDUCIBLE FIVE ROUNDS AGO. ***
+tools/ship/swiftShaders-selfcheck.mjs is called an emitter and is a quoter. No threshold separates it,
+because a gate whose claim is that a generated shader is correct proves it BY QUOTING THE WHOLE THING -- which
+is what v4381 wrote about brainTsl-selfcheck. It is named in RESIDUAL rather than excluded, because an
+exclusion list is how a census stops describing the tree.
+
+NEW tools/ship/shaderEmitters-selfcheck.mjs, thirty-eight checks in six sections, 0.88 s. TWENTY SABOTAGES,
+ALL RED BY NAME. *** ONE COST ZERO RED AND IT WAS A REJECTION THAT DOES NOTHING: *** deleting the escape test
+outright changed no row. Counted over every tell in the tree the split is escape-only 0, call-only 16, both
+16, neither 58 -- every hit the escape test catches, the call test catches too. It is KEPT, because it is the
+more specific test and because a pattern stored far from its matcher would need it, and that case is now
+constructed in the gate so the rejection is proved to do something. The four-way count is REPORTED rather
+than pinned at zero: a row demanding escape-only == 0 would go red the day the rejection first earned its
+keep, which is v4485's defect of a check that fails for succeeding.
+
+*** AND A SECOND SABOTAGE THAT COST ZERO RED WAS THE SABOTAGE BEING WRONG. *** Spelling a stage marker into
+this module's COMMENTS changed nothing, and correctly: classify() strips comments before it counts, which is
+the rule settled at v4266. Written into CODE the same marker turns both censuses red by name.
+
+TWO MORE FINDINGS IN THE INSTRUMENT'S OWN DRAFTS. The first tell set accepted any C-shaped function
+definition and matched FIVE box3d rig gates, which embed real C: GLSL is a C-family language and syntax alone
+cannot separate them, so a scalar return must now carry a shading-language type in its parameter list. And
+the call rejection is a WINDOW, so it has a reach -- a shader body written within 120 characters of a matcher
+is swallowed. That cost is measured rather than hidden, and the gate derives that no file in the tree is
+paying it today rather than asserting it in prose. The tree stands at 1525 gates.
 ## v4485 -- twelve red first-runs, and they were two different things wearing one symptom
 
 tools/ship/budgetEvidence-selfcheck.mjs went red on the first verify of EVERY round in this session and green when re-run alone. Twelve times. Each round it was worked around by re-running it and moving on, and the reason was never diagnosed. This round diagnosed it, and the answer is that it was never one thing.

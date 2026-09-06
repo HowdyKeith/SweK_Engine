@@ -206,6 +206,15 @@ export const PARITY_BASELINE = Object.freeze({
     // MEASURED FOR ONE FILE, NOT CLAIMED FOR A POPULATION: how many other emitters this census cannot see is
     // unknown and is its own round. The number is recorded rather than the census widened, because widening it
     // would move every count in this file at once and hide what moved for a reason.
+    // *** v4486 RAN THAT ROUND AND THE ANSWER IS FOURTEEN, AND THESE NUMBERS STILL DO NOT MOVE. ***
+    // render/shaderEmitters.mjs is a second census that reads shader BODIES instead of preambles, and it finds
+    // fourteen files carrying runnable shader text that classify() calls none -- ten emitted fragments with no
+    // preamble to find, two COMPLETE shaders the framework tell misses because that tell is a uniform
+    // declaration and neither file has one (a vertex shader need not, and shaders/voxel.frag.js is a whole
+    // fragment shader in a .js file with no JavaScript in it), one fixture built by concatenation, and one
+    // that hides its stage attribute ON PURPOSE. classify() is still not widened, for the reason above; the
+    // two files answer two different questions and tools/ship/shaderEmitters-selfcheck.mjs asserts that the
+    // preamble census's own inclusion-exclusion (147 + 71 - 15) equals what the body census sees pass by.
     glslBearing: 147,
     // 130 at v4479: blendModes-selfcheck.mjs's GLSL twin writes its own version header, because it drives raw
     // WebGL2 through gfx/device.js rather than handing source to three. THE FIRST DRAFT OF THIS COMMENT SPELLED

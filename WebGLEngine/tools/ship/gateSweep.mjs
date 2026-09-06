@@ -2873,6 +2873,48 @@ since116: Object.freeze({
                  "the ledger's one-round lag is REPORTED rather than asserted to be zero, because a check " +
                  "demanding zero would go red every time a round added a gate, for succeeding.",
     }),
+    since125: Object.freeze({
+        at: "v4486", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/shaderEmitters-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, thirty-eight checks in six sections, 0.88 s. v4483 refused to " +
+                 "generalise from one file -- 'how many other emitters this census cannot see is unknown and " +
+                 "is its own round' -- and the answer is FOURTEEN. render/backendParity.mjs finds a shader by " +
+                 "its PREAMBLE and an emitted function body has none, so fourteen files carrying runnable " +
+                 "shader source are counted as bearing neither language. Ten are emitted fragments handed to a " +
+                 "host program; TWO are COMPLETE shaders the framework tell misses because that tell is a " +
+                 "uniform declaration and neither file has one (a vertex shader need not, and " +
+                 "shaders/voxel.frag.js is a whole fragment shader in a .js file with no JavaScript in it); " +
+                 "one is a fixture built by concatenation. *** AND THE FOURTEENTH CLOSES A LOOP: THE DEFENCE " +
+                 "AGAINST A FALSE POSITIVE CREATED A FALSE NEGATIVE. *** wgslLayout-selfcheck holds a " +
+                 "compilable module and interpolates its stage attribute from a fragment assembled one line " +
+                 "above, under a comment naming exactly why. Six rounds have disarmed markers that way and " +
+                 "every one also removed the file from the census meant to see it. NEW " +
+                 "render/shaderEmitters.mjs is a SECOND census beside the first, not a widening: widening " +
+                 "classify() would move six ratchets at once, and the two files answer two questions -- " +
+                 "v4485's resolution for the two timing files. *** THE BODY SCAN'S OWN FAILURE IS THE MIRROR " +
+                 "OF SELF-CLASSIFICATION: A GATE THAT ASSERTS SOMETHING ABOUT A SHADER MUST QUOTE THE " +
+                 "SHADER, *** and eighteen files do. All 32 candidates were hand-read and labelled BEFORE any " +
+                 "threshold was chosen, and the thresholds were then swept against that key, which makes " +
+                 "agreement a FIT. *** SO THE BEST SCORE WAS REFUSED: *** radius 140 / floor 4 agrees with all " +
+                 "32 and is NOT shipped, because its four neighbours read 31, 30, 29 and 31 -- a spike is what " +
+                 "a threshold fitted to its own key looks like. Radius 200 holds 31 across floors 3 through 6, " +
+                 "four wide against at most two anywhere else, so the shipped claim is 31 of 32. The first " +
+                 "draft called that run three wide and WENT RED: it had read the span from floor 4. The one " +
+                 "row that stays wrong, swiftShaders-selfcheck, is named rather than excluded, and it is " +
+                 "irreducible for the reason v4381 already wrote down about brainTsl-selfcheck. TWENTY " +
+                 "SABOTAGES, ALL RED BY NAME. *** ONE COST ZERO RED AND IT WAS A REJECTION THAT DOES " +
+                 "NOTHING: *** deleting the escape test changed no row -- escape-only 0, call-only 16, both " +
+                 "16, neither 58 over every tell in the tree. It is kept, proved non-vacuous on a constructed " +
+                 "stored-pattern case, and the four-way count is REPORTED rather than pinned at zero, because " +
+                 "a row demanding zero would go red the day the rejection first earned its keep. AND A SECOND " +
+                 "ZERO-RED SABOTAGE WAS THE SABOTAGE BEING WRONG: a marker spelled into this module's " +
+                 "COMMENTS changes nothing, correctly, because classify() strips comments -- the rule settled " +
+                 "at v4266; in CODE it turns both censuses red. The first tell set also accepted any C-shaped " +
+                 "definition and matched FIVE box3d rig gates, which embed real C: GLSL is a C-family language " +
+                 "and syntax alone cannot separate them, so a scalar return must now carry a shading-language " +
+                 "type in its parameter list.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
