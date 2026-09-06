@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="demo:title" content="Slug Ticker (Box3D glyph bodies)">
-<meta name="demo:desc" content="A 3-D ticker of Slug outline glyphs as Box3D rigid bodies: one box per glyph dropped onto a conveyor, tumbling and wrapping, each drawn through gfx/device.js with its own body matrix on either backend. The plumbing is gated by tools/ship/slugTicker-selfcheck.mjs.">
+<meta name="demo:desc" content="A 3-D ticker of Slug outline glyphs as Box3D rigid bodies: one box per glyph dropped onto a conveyor, tumbling and wrapping, each drawn through gfx/device.js with its own body matrix on either backend. The plumbing is gated by tools/ship/slugTicker-selfcheck.mjs. The napalm mode (?mode=napalm) draws the bodies through the Doom Fire fill and drops a trail of fire puddles on the floor behind each, fading by age, gated by tools/ship/slugNapalm-selfcheck.mjs.">
 <meta name="demo:category" content="physics">
 <title>Slug Ticker</title>
 <style>
@@ -23,7 +23,7 @@
   <div id="cap">Slug ticker: glyphs as Box3D bodies on a conveyor</div>
   <div id="be">requesting a device&hellip;</div>
   <div id="sub">Font: IBM Plex Serif &copy; 2017 IBM Corp., Reserved Font Name &ldquo;Plex&rdquo;, SIL OFL 1.1 (vendor/fonts/IBMPlexSerif-OFL.txt). <span id="notice"></span>
-    &middot; <a href="./slug-projective.html">the projective case it rests on</a> &middot; <a href="?webgl=1">force WebGL2</a> &middot; <span id="tick"></span></div>
+    &middot; <a href="./slug-projective.html">the projective case it rests on</a> &middot; <a href="?webgl=1">force WebGL2</a> &middot; mode <select id="mode"><option value="plain">plain</option><option value="napalm">napalm (fire fill + trail)</option></select> &middot; <span id="tick"></span></div>
 </div>
 <canvas id="c"></canvas>
 <script type="module" src="/ui/originNotice.js"></script>
@@ -33,6 +33,9 @@ import { parseFont } from "./text/slugFont.js";
 import { SlugFontDevice, SlugDeviceBatch } from "./render/slugDevice.mjs";
 import { TICKER, glyphBodies, worldFromModule, spawnTicker, tickTicker, cameraFor, bodyRows } from "./render/slugTicker.mjs";
 import { box3d } from "./physics/box3d/box3dLoader.js";
+import { NAPALM, puddleAtlas, floorRows, createTrail, dropTrail, trailGlyphs } from "./render/slugNapalm.mjs";
+import { buildVertices } from "./text/slugText.js";
+import { fireFill, fillTexture, glyphRect } from "./render/slugFill.mjs";
 
 const cvs = document.getElementById("c"), beEl = document.getElementById("be"), subEl = document.getElementById("sub");
 const FONT_URL = "./vendor/fonts/IBMPlexSerif-Regular.ttf";
@@ -47,6 +50,19 @@ function placeRows(W, H, px, py) {
 }
 
 let device, fontDevice, batches = [];
+// THE NAPALM MODE (v4502, task 49): a second font device with the fill pipeline, the bodies' streams reused on it (the same
+// vertex layout), each body drawn with the fire and its own glyph rectangle; the trail one batch over the puddle atlas, laid
+// flat by floorRows, rebuilt each frame from the trail's records (their colour is the fade).
+const FIRE = { width: 96, height: 72, seed: 7, steps: 60 };
+let fireDevice = null, puddleDevice = null, fireBatches = [], trail = null, trailBatch = null, fire = null, rgba = null, tex = null;
+function napalmOn() { return document.getElementById("mode").value === "napalm"; }
+function initNapalm(font) {
+  fireDevice = new SlugFontDevice(device, font, CHARS, { fill: true });
+  puddleDevice = SlugFontDevice.fromAtlas(device, font, puddleAtlas(fireDevice.logWidth), { pipeline: fireDevice.pipeline, desc: fireDevice.desc });
+  const f = fireFill(FIRE); fire = f.fire; rgba = f.rgba; tex = fillTexture(device, rgba, f.w, f.h);
+  fireBatches = bodies.map((b) => { const bt = new SlugDeviceBatch(fireDevice); bt.setBuilt(b.built); return { bt, rect: glyphRect(fireDevice.entryFor(b.glyphIndex)) }; });
+  trail = createTrail(); trailBatch = new SlugDeviceBatch(puddleDevice);
+}
 async function init() {
   const forceGl = new URLSearchParams(location.search).get("webgl") === "1";
   try { device = await requestDevice(cvs, forceGl ? { backend: "webgl2" } : { prefer: "webgpu" }); }
@@ -67,6 +83,9 @@ async function init() {
   world = worldFromModule(box3d._mod, TICKER.gravity);
   plan = gb.plan; bodies = gb.bodies; ids = spawnTicker(world, bodies, plan).ids;
   batches = bodies.map((b) => { const bt = new SlugDeviceBatch(fontDevice); bt.setBuilt(b.built); return bt; });
+  document.getElementById("mode").value = new URLSearchParams(location.search).get("mode") === "napalm" ? "napalm" : "plain";
+  try { initNapalm(font); if (fireDevice.pipeline.compiled) { const err = await fireDevice.pipeline.compiled; if (err) throw new Error(err); } }
+  catch (e) { return fail("napalm pipeline: " + e.message); }
   beEl.textContent = "backend: " + device.backend + " \u00b7 " + bodies.length + " glyph bodies on a " + plan.loop.toFixed(1) + "-unit loop \u00b7 box3d " + (box3d._mod ? "loaded" : "?");
   requestAnimationFrame(frame);
   addEventListener("resize", () => { sized = false; });
@@ -78,11 +97,24 @@ function frame() {
   if (cvs.width !== w || cvs.height !== h) { cvs.width = w; cvs.height = h; }
   const r = tickTicker(world, ids, plan); ticks++; wraps += r.wrapped;
   const PV = cameraFor(w, h);
-  device.frame(({ pass }) => {
-    pass.clear([0.02, 0.031, 0.024, 1]);
-    batches.forEach((b, k) => b.draw(pass, bodyRows(PV, r.xf, ids[k]), [w, h]));
-  });
-  if (ticks % 15 === 0) document.getElementById("tick").textContent = "tick " + ticks + ", " + wraps + " wraps, hash " + world.stateHash();
+  let puddles = 0;
+  if (napalmOn()) {
+    puddles = dropTrail(trail, ticks, r.xf, ids);
+    fire.step(); fire.toRGBA(rgba); tex.update({ data: rgba });
+    const pe = puddleDevice.entryFor(0), rect = glyphRect(pe), floor = floorRows(PV);
+    trailBatch.setBuilt(buildVertices(trailGlyphs(trail, ticks), () => pe));
+    device.frame(({ pass }) => {
+      pass.clear([0.02, 0.031, 0.024, 1]);
+      trailBatch.draw(pass, floor, [w, h], { texture: tex, rect });
+      fireBatches.forEach((fb, k) => fb.bt.draw(pass, bodyRows(PV, r.xf, ids[k]), [w, h], { texture: tex, rect: fb.rect }));
+    });
+  } else {
+    device.frame(({ pass }) => {
+      pass.clear([0.02, 0.031, 0.024, 1]);
+      batches.forEach((b, k) => b.draw(pass, bodyRows(PV, r.xf, ids[k]), [w, h]));
+    });
+  }
+  if (ticks % 15 === 0) document.getElementById("tick").textContent = "tick " + ticks + ", " + wraps + " wraps, hash " + world.stateHash() + (napalmOn() ? ", " + puddles + " puddles, heat " + fire.heat() : "");
   requestAnimationFrame(frame);
 }
 init();

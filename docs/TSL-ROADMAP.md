@@ -690,6 +690,28 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         rises from its puddle, rests, and melts back. Two a-priori holds were wrong and replaced by what was
         measured: the puddle is not "white" (14 of 329: only the source row is) and t = 0.5 does not have
         fewer lit pixels (the sag).
+    THE TICKER ON FIRE, WITH A NAPALM TRAIL -- built at v4502 (task 49). render/slugNapalm.mjs: the task 43
+        glyph bodies drawn through the task 47 fill (a second font device with the fill pipeline takes the same
+        vertex streams; each body's fill rectangle is its own glyph's em box) and, behind each body, a trail of
+        the task 48 puddle -- packed ONCE into an atlas of one glyph -- dropped flat on the floor at the body's
+        past positions every 10 ticks, fading by the square of its age over 150 ticks, twelve a body at most.
+        The trail is ONE vertex stream in a plane laid flat by P * V * F (world x = x, world y = a lift, world z
+        = y), and text/slugText.js buildVertices now takes a glyph's own `color` (opts.color remains the default,
+        every other stream unchanged), so the fade is in the stream. MEASURED (tools/ship/slugNapalm-selfcheck.mjs,
+        the ticker's tick-300 snapshot in node, 33 bodies over 396 puddles at 320 x 150): the perspective-correct
+        model per quad -- puddles and bodies alike -- reproduces the fragment's texcoord to 2.3e-7 em on both
+        backends; the bodies alone are their key on 48,000 of 48,000 pixels on WebGPU; the trail alone and the
+        two together are the composited key (colour x fire x coverage in draw order) with 0 unexplained pixels
+        and worst 1 outside the ties. THREE THINGS THE KEY HAD TO LEARN, EACH A MEASURED FINDING: (1) the two
+        backends agreed with each other and sat 5 to 10 levels off a key composited in f64, because the target is
+        rgba8unorm and stores every quad's blend as bytes before the next reads it -- the key rounds per layer
+        now, and WebGPU went from 47,802 exact to 47,996; (2) puddles of one size at nearly one z share edge
+        lines on screen, so 154 pixel centres (0.3%) sit ON a quad edge where the fill rule decides -- an
+        edgeDist per model triangle (render/slugProjective.mjs) counts them and the hold excludes them, WebGL2
+        off the key on 24 of them, WebGPU on 2; (3) the last two pixels were the trail's end puddles straddling
+        the viewport's left and right edges: a clipped quad's cut vertices are re-snapped, its edge lines move by
+        up to a snap unit, and one layer of a ten-deep stack goes in or out -- a clipped quad's tie band is 1/Q.
+        slug-ticker.html gained the napalm mode (?mode=napalm).
     TEXTURE BYTES BEFORE KTX2 / BASIS -- measured at v4495 (task 18), RIG-PENDING for the asset library.
         tools/ship/textureBytes.mjs walks a folder and records every raster texture's bytes on disk and, from the
         PNG and JPEG headers, its pixel size and GPU bytes (RGBA8 with mips); decide() derives the verdict from

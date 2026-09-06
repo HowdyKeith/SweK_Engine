@@ -165,6 +165,9 @@ export const HOT_UNREGISTERED = Object.freeze([
     // v4501: slug-morph.html -- its melt mode fills the glyph with the Doom Fire (the same HUD hexes as before; it was counted as a
     // literal-colour file at v4498 and now says "fire" enough to be a hot effect too).
     "slug-morph.html",
+    // v4502: slug-ticker.html -- its napalm mode: fire-filled glyph bodies and a trail of fire puddles (the same HUD hexes; counted
+    // as a literal-colour file at v4497 and now a hot effect by its words).
+    "slug-ticker.html",
 ]);
 
 /**
@@ -190,7 +193,7 @@ export const MEASURED_AT_V4424 = Object.freeze({
     drawSiteFiles: 13,
     literalColourFiles: 82,
     overlapDrawAndLiteral: 0,
-    hotUnregistered: 22,   // v4500: slug-fire.html arrived; v4501: slug-morph.html's melt mode (see HOT_UNREGISTERED)
+    hotUnregistered: 23,   // v4500: slug-fire.html arrived; v4501: slug-morph.html's melt mode; v4502: slug-ticker.html's napalm mode (see HOT_UNREGISTERED)
     // The three Keith named, and what the old detector saw of them.
     keithsThree: Object.freeze({
         "world/fireworkShell.mjs": Object.freeze({ blendFunc: 0, gate: "tools/ship/fireworkShell-selfcheck.mjs" }),

@@ -695,7 +695,9 @@ export async function runInEngineOrigin({ engineRoot, script, args = null, timeo
     if (skip) return { ok: false, skipped: true, reason: skip, result: null, pageErrors: [] };
     const pw = resolvePlaywright(requireFn);
     const root = path.resolve(engineRoot);
-    const MIME = { ".js": "text/javascript", ".mjs": "text/javascript", ".html": "text/html", ".json": "application/json", ".wgsl": "text/plain" };
+    // v4502: .wasm as application/wasm -- a page smoked here through an iframe loads vendor/box3d through the browser loader, whose
+    // streaming instantiation refuses the octet-stream default and reported the artifact as "not built"
+    const MIME = { ".js": "text/javascript", ".mjs": "text/javascript", ".html": "text/html", ".json": "application/json", ".wgsl": "text/plain", ".wasm": "application/wasm" };
     const srv = http.createServer((q, s) => {
         let u = decodeURIComponent(String(q.url).split("?")[0]);
         if (u === "/") { s.writeHead(200, { "Content-Type": "text/html" }); return s.end("<!doctype html><title>engine-origin</title>"); }

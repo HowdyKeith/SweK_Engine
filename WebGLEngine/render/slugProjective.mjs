@@ -99,7 +99,11 @@ export function quadTriangles(quad, rows, W, H, Q) {
         const at = (x, y) => { const iw = m.iw0 + m.iwdx * x + m.iwdy * y; return [(m.txw0 + m.txwdx * x + m.txwdy * y) / iw, (m.tyw0 + m.tywdx * x + m.tywdy * y) / iw]; };
         const inside = (x, y) => { const s1 = (B.sx - A.sx) * (y - A.sy) - (B.sy - A.sy) * (x - A.sx), s2 = (K.sx - B.sx) * (y - B.sy) - (K.sy - B.sy) * (x - B.sx), s3 = (A.sx - K.sx) * (y - K.sy) - (A.sy - K.sy) * (x - K.sx);
             return (s1 >= 0 && s2 >= 0 && s3 >= 0) || (s1 <= 0 && s2 <= 0 && s3 <= 0); };
-        tris.push({ at, inside, corners: C });
+        // v4502: how far (px) a point is from the nearest of the three edges -- a pixel centre ON an edge is a tie the rasteriser's
+        // fill rule decides (the napalm trail's puddles share edge lines on screen), which a model cannot hold and a gate should count
+        const len = (P, R) => Math.hypot(R.sx - P.sx, R.sy - P.sy) || 1;
+        const edgeDist = (x, y) => Math.min(Math.abs((B.sx - A.sx) * (y - A.sy) - (B.sy - A.sy) * (x - A.sx)) / len(A, B), Math.abs((K.sx - B.sx) * (y - B.sy) - (K.sy - B.sy) * (x - B.sx)) / len(B, K), Math.abs((A.sx - K.sx) * (y - K.sy) - (A.sy - K.sy) * (x - K.sx)) / len(K, A));
+        tris.push({ at, inside, edgeDist, corners: C });
     }
     return { tris, corners: C };
 }

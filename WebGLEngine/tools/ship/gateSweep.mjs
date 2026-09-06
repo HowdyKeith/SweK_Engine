@@ -2594,6 +2594,20 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "melts into nothing. The three frames are coverage x the fire's nearest texel on 9,216 of 9,216 pixels on both backends, " +
                  "0 apart, through one shared fill pipeline. slug-morph.html gained the melt mode. Sabotages red at 1 / 5 / 1 / 1.",
     }),
+    since124: Object.freeze({
+        at: "v4502", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/slugNapalm-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green on both backends. render/slugNapalm.mjs: the ticker's glyph bodies through the fire fill and a trail of puddles " +
+                 "laid flat on the floor, one stream with a colour per quad (buildVertices takes a glyph's own colour now, opts.color the " +
+                 "default). The tick-300 snapshot: bodies alone exact, trail alone and together the composited key with 0 unexplained " +
+                 "pixels -- after the key learned to round per layer as the rgba8 target does, to count pixel centres on shared quad " +
+                 "edges as the fill rule's, and to widen a clipped quad's tie band to a snap unit. slug-ticker.html gained the napalm " +
+                 "mode. Sabotages red at 5 / 1 / 2 / 1.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

@@ -187,6 +187,7 @@ export function orthoRows(width, height, yDown = true) {
  * skipped here rather than allowed to reach the shader.
  */
 export function buildVertices(glyphs, entryFor, opts = {}) {
+    // v4502 (task 49): a glyph may carry its own `color` (the napalm trail fades each puddle by age in one stream); opts.color is the default
     const color = opts.color || [1, 1, 1, 1];
     const evenOdd = !!opts.evenOdd;
 
@@ -209,7 +210,7 @@ export function buildVertices(glyphs, entryFor, opts = {}) {
     let v = 0, i = 0;
 
     for (const { g, e, bb } of quads) {
-        const s = g.size;
+        const s = g.size, col = g.color || color;
         const invS = 1 / s;
         const loc = packGlyphLoc(e.loc[0], e.loc[1]);
         const flags = packGlyphFlags(e.bandMax[0], e.bandMax[1], evenOdd);
@@ -231,8 +232,8 @@ export function buildVertices(glyphs, entryFor, opts = {}) {
             f32[o + 8] = invS; f32[o + 9] = 0; f32[o + 10] = 0; f32[o + 11] = invS;  // aJac
             f32[o + 12] = e.transform[0]; f32[o + 13] = e.transform[1];              // aBnd
             f32[o + 14] = e.transform[2]; f32[o + 15] = e.transform[3];
-            f32[o + 16] = color[0]; f32[o + 17] = color[1];                          // aCol
-            f32[o + 18] = color[2]; f32[o + 19] = color[3];
+            f32[o + 16] = col[0]; f32[o + 17] = col[1];                              // aCol
+            f32[o + 18] = col[2]; f32[o + 19] = col[3];
             v++;
         }
 
