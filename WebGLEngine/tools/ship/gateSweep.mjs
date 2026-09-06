@@ -2718,6 +2718,41 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "LITERALS -- v4409's rule (a fixture is not a gate) arriving through a string for the third " +
                  "time this session; the fixtures are built by concatenation now.",
     }),
+    since124: Object.freeze({
+        at: "v4485", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/posixAssumption-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/verify.mjs (its feature-marker grep and its unzip -l are Node walks now)",
+            "tools/ship/copiedOutsideVendor-selfcheck.mjs (find and grep -rl replaced by walks)",
+            "tools/ship/songHeightfield-selfcheck.mjs (pathToFileURL where a path was an import specifier)",
+            "tools/ship/absenceScope.mjs (toPosix at the record boundary)",
+            "tools/ship/changedPaths-selfcheck.mjs (asks for a repository, refuses by name)",
+            "tools/ship/moduleHistory.mjs (entryNames exported so a zip can be listed without unzip)",
+            "render/holoAgree-selfcheck.mjs (pkill behind a platform branch)",
+        ]),
+        verdict: "green, five sections. *** KEITH RAN THE SUITE ON THE RIG AND FOUR GATES FAILED FOR FOUR " +
+                 "DIFFERENT REASONS THAT ARE ONE REASON. *** copiedOutsideVendor met FIND.exe answering " +
+                 "`find`; songHeightfield handed node a Windows path where an import specifier belongs and " +
+                 "got ERR_UNSUPPORTED_ESM_URL_SCHEME; absenceScope compared accel\\sceneBvh.mjs against a " +
+                 "recorded accel/sceneBvh.mjs, ten checks, one separator; changedPaths ran git diff HEAD~1 " +
+                 "in an unzipped archive and CRASHED rather than refusing. A GATE WRITTEN ON A POSIX BOX " +
+                 "ENCODES THE BOX -- v4484's finding one layer out, where a single Linux path made 96 " +
+                 "device gates unrunnable on the rig. *** AND THE DETECTOR FOUND THE BIGGEST ONE, WHICH THE " +
+                 "RIG NEVER REACHED: verify.mjs's feature-marker check shelled out to grep, and its failure " +
+                 "fell the WRONG WAY -- a throw set hit = false and hit feeds check(), so with no POSIX grep " +
+                 "EVERY MARKER READS AS ABSENT AND THE SHIP VERIFY CANNOT PASS AT ALL. The rig could not " +
+                 "report it because the only thing that would have is that gate. *** WHAT IS ASSERTED IS " +
+                 "SMALL AND WHAT IS COUNTED IS SAID TO BE COUNTED: *** the shell-tool and " +
+                 "path-as-specifier classes are defect lists a detector's zero can be driven against; the " +
+                 "separator population -- 128 files calling path.relative, 90 never normalising -- is a " +
+                 "DENOMINATOR, because three static rules for 'compared against a stored form' gave 53, 74 " +
+                 "and 90 in one sitting and referenceKind-selfcheck's own words are that a number moving " +
+                 "that far under one author is not a measurement. SIX SABOTAGES: A 3, B 2, C 2, D 1, E 1, " +
+                 "F 0-THEN-1. *** F WENT ZERO BECAUSE THE GATE CRASHED INSTEAD OF FAILING: *** its detail " +
+                 "string read the deleted field eagerly, which is the very defect section 3 checks " +
+                 "changedPaths for, in the gate written to catch it.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

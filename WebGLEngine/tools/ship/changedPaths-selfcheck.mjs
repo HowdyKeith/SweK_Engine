@@ -51,6 +51,30 @@ const selected = (o) => { const m = /--affected: (\d+) of (\d+) gates/.exec(o); 
 
 console.log("changedPaths-selfcheck -- the pre-filter's own silent green lights\n");
 
+// ---- *** v4485 -- THE ARCHIVE IS NOT A CHECKOUT, AND THIS GATE DID NOT FAIL, IT CRASHED. ***
+//
+// Every section below reads `git diff HEAD~1 HEAD`, because the pre-filter it grades is built on git. Run
+// against the shipped zip on the rig, git answered "fatal: ambiguous argument 'HEAD~1': unknown revision"
+// and the unhandled throw took the process down with a stack trace and NO VERDICT AT ALL. That is v4424's
+// finding pointed the other way: there a runner read a RED as a CRASH; here a gate hands one out. A gate
+// that needs a repository must ASK FOR ONE and refuse by name, so the rig learns "this needs a checkout"
+// rather than reading a Node stack trace about revisions.
+const repo = (() => {
+    try {
+        execFileSync("git", ["rev-parse", "--git-dir"], { cwd: ROOT, stdio: "ignore" });
+        execFileSync("git", ["rev-parse", "--verify", "HEAD~1"], { cwd: ROOT, stdio: "ignore" });
+        return true;
+    } catch { return false; }
+})();
+if (!repo) {
+    console.log("  ----  NO GIT HISTORY HERE. This gate grades a git-based pre-filter and every section below\n" +
+                "  ----  reads `git diff HEAD~1 HEAD`. The shipped archive is a zip, not a checkout, so there is\n" +
+                "  ----  nothing to diff -- run this from a clone. REFUSED BY NAME, not crashed: a stack trace\n" +
+                "  ----  about an ambiguous revision is not a verdict anybody can act on.");
+    console.log("\nchangedPaths-selfcheck: SKIPPED -- no git repository (this is a refusal, not a pass)");
+    process.exit(2);
+}
+
 console.log("1. *** THE FORM git ACTUALLY PRINTS, WHICH IS NOT THE FORM THE SELECTOR MATCHED ***");
 {
     // Read off git rather than typed, so the check is about what the tool really emits.

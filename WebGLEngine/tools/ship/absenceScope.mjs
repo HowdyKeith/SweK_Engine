@@ -46,6 +46,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { codeOnly, noComments } from "./sourceScan.mjs";
+import { toPosix } from "./posixAssumption.mjs";
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -66,7 +67,10 @@ export function sourceFiles(root = ENG, { dirs = null, includeVendor = false } =
                 if (!includeVendor && e.name === "vendor") continue;
                 const p = path.join(d, e.name);
                 if (e.isDirectory()) walk(p);
-                else if (SOURCE_RE.test(e.name)) out.push(path.relative(root, p));
+                // v4485: toPosix at the boundary where a path stops being a filesystem argument and
+                // becomes a RECORD. On the rig this pushed accel\\sceneBvh.mjs and every comparison
+                // against the stored "/" form failed -- ten checks in this gate, all one cause.
+                else if (SOURCE_RE.test(e.name)) out.push(toPosix(path.relative(root, p)));
             }
         })(r);
     }
@@ -217,8 +221,13 @@ export const BVH_AT_V4435 = Object.freeze({
     // closing says the tree has no BVH -- so the record OF the finding became an instance of the finding,
     // and the gate went red on prose I had written twenty minutes earlier. A scan over the tree includes the
     // round's own note, because the note is in the tree.
+    // *** AND A FIFTH AT v4485, BY THE SAME ORDERING TRAP AGAIN. *** tools/ship/krbnPaint-selfcheck.mjs
+    // asserts "the connector owns no rasteriser, no ray-caster, no projection and no BVH of its own" -- a
+    // gate stating an absence, which is evidence FOR the claim and reads to a raw scan exactly like evidence
+    // against it. The list is RE-TAKEN, not raised: the file was read and the sentence is there at line 193.
     denial: Object.freeze([
         "brain/brain.js", "main.js", "physics/render/rtPipeline.mjs", "tools/ship/gateSweep.mjs",
+        "tools/ship/krbnPaint-selfcheck.mjs",
     ]),
     realImplementations: 12,
     why: "the tracer really has no BVH and rtPipeline.mjs says so itself, so the NARROW claim survives. What " +

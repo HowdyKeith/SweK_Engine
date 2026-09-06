@@ -135,7 +135,8 @@ try {
     // so it stays narrow and its failure is ignored either way.)
     try {
         const dir = SHELL ? path.basename(path.dirname(path.dirname(SHELL))) : "";
-        if (dir) execFileSync("pkill", ["-f", dir], { stdio: "ignore" });
+        // v4485: pkill is POSIX-only; on Windows there is nothing to clean up here and nothing to call.
+        if (dir && process.platform !== "win32") execFileSync("pkill", ["-f", dir], { stdio: "ignore" });
     } catch { /* none stray, or no pkill on this platform: either way there is nothing to clean up */ }
 }
 

@@ -172,6 +172,16 @@ export function indexArchives(dirs = defaultArchiveDirs()) {
  * A shipped zip holds exactly one root (the ship ritual's own verify gate enforces that), so the first path
  * component is dropped and what is left is root-relative: "WebGLEngine/main.js".
  */
+/**
+ * Every entry name in the zip, exactly as the central directory spells it -- v4485. `pathsIn` strips the
+ * project root, which is right for asking "does this build hold ui/PerfHUD.js" and wrong for asking "how
+ * many project roots are in here". verify.mjs was shelling out to `unzip -l` for the second question and
+ * there is no unzip on Windows, so the rig's own release check could not run.
+ */
+export function entryNames(zipFile) {
+    return readCentralDirectory(fs.readFileSync(zipFile)).map((e) => String(e.name || "").replace(/\\/g, "/"));
+}
+
 export function pathsIn(zipFile) {
     const buf = fs.readFileSync(zipFile);
     const entries = readCentralDirectory(buf);

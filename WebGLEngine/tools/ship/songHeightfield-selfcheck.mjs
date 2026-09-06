@@ -13,7 +13,7 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { stft, songHeightfield, binOfFrequency, frequencyOfBin, peakMagnitude, tone, sweep,
          centroidBin, windowFor, DEFAULTS } from "../../world/songHeightfield.mjs";
 import { repoHeightfield } from "../../world/repoHeightfield.js";
@@ -63,7 +63,12 @@ console.log("\n2. *** BIT-REPRODUCIBLE, CHECKED ACROSS SEPARATE PROCESSES ***");
     // physics/fft.js's header promises a spectrum you can publish and have somebody else recompute exactly.
     // Reading a value twice inside ONE process proves nothing about that -- it is the same memory. Two node
     // processes is the weakest test that is actually a test.
-    const prog = "import {stft,tone} from " + JSON.stringify(path.join(ENG, "world/songHeightfield.mjs")) + ";" +
+    // *** v4485 -- A FILESYSTEM PATH IS NOT AN IMPORT SPECIFIER. *** On the rig this produced
+    // "C:\\Intel\\...\\songHeightfield.mjs" and node refused it: ERR_UNSUPPORTED_ESM_URL_SCHEME,
+    // "Received protocol 'c:'". pathToFileURL is the only portable spelling of "import this file",
+    // and it is correct on POSIX too -- a path with a space or a hash in it needs the same escape.
+    const prog = "import {stft,tone} from " +
+        JSON.stringify(pathToFileURL(path.join(ENG, "world/songHeightfield.mjs")).href) + ";" +
         "import crypto from 'node:crypto';" +
         "const S=stft(tone(250,1.0,8000),{sampleRate:8000,frameSize:1024,window:'rect'});" +
         "const b=Buffer.concat(S.frames.map(f=>Buffer.from(Float64Array.from(f).buffer)));" +

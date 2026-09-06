@@ -54,8 +54,19 @@ console.log("1. *** THE GAP IS STRUCTURAL, and both halves of it are asserted ag
     // standing in for the fact -- and a proxy that makes the gate green or red depending on litter in
     // somebody's checkout. Counted by CONTENT now, and the message prints each one's file count so an empty
     // one is visibly empty rather than silently dropped.
-    const allNested = execSync("find . -type d -name vendor -not -path './node_modules/*'", { cwd: ROOT })
-        .toString().trim().split("\n").map((s) => s.replace(/^\.\//, "")).sort();
+    // *** v4485 -- THIS WAS POSIX `find`, AND ON THE RIG IT DID NOT FAIL, IT CRASHED. *** Windows resolves
+    // the name to FIND.exe, a different tool with different arguments, which answered "FIND: Parameter
+    // format not correct" and took the whole gate down with an unhandled throw. A directory walk needs no
+    // tool at all and was already being done four lines below to count the files.
+    const allNested = (function walkDirs(d, rel = "", out = []) {
+        for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+            if (!e.isDirectory() || e.name === "node_modules" || e.name === ".git") continue;
+            const r = rel ? rel + "/" + e.name : e.name;
+            if (e.name === "vendor") out.push(r);
+            walkDirs(path.join(d, e.name), r, out);
+        }
+        return out;
+    })(ROOT).sort();
     const fileCount = (rel) => {
         let n = 0;
         (function walk(d) {
@@ -114,9 +125,20 @@ console.log("\n2. *** THE POPULATION, and every entry's evidence is greppable in
 console.log("\n3. *** A POINTER IS NOT AN INCLUSION: what the copies carried before this round ***");
 {
     // The number that framed the round: where the permission notice actually lives in this tree.
-    const all = execSync("grep -rl 'Permission is hereby granted, free of charge' . " +
-        "--exclude-dir=node_modules || true", { cwd: ROOT, maxBuffer: 1 << 24 })
-        .toString().trim().split("\n").filter(Boolean).map((s) => s.replace(/^\.\//, "")).sort();
+    // v4485: POSIX grep, same reason and same repair as the walk above. `-l` is "name the file once",
+    // which is a break out of the read; the literal is compared with includes(), so no punctuation in it
+    // can be read as a pattern -- the -F that verify.mjs's own marker check needed.
+    const CLAUSE = "Permission is hereby granted, free of charge";
+    const all = (function walkFiles(d, rel = "", out = []) {
+        for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+            if (e.name === "node_modules" || e.name === ".git") continue;
+            const r = rel ? rel + "/" + e.name : e.name;
+            if (e.isDirectory()) { walkFiles(path.join(d, e.name), r, out); continue; }
+            try { if (fs.readFileSync(path.join(d, e.name), "utf8").includes(CLAUSE)) out.push(r); }
+            catch { /* binary or unreadable: grep -l would not have named it either */ }
+        }
+        return out;
+    })(ROOT).sort();
     const underVendor = all.filter((f) => f.startsWith("vendor/"));
     // *** AND THE COUNT MOVES AS THE TREE WRITES, so the QUOTERS are excluded by name rather than the
     // number quoted once. *** Files that carry the clause as DATA -- this register and its gate, the two

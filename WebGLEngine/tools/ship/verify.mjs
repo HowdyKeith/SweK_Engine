@@ -378,19 +378,50 @@ for (const f of ["BACKLOG.md", "TODO.md"]) {
 // landmark that is deliberately absent from half the places the tool runs is not a landmark. WebGLEngine/ is
 // the one directory this project is DEFINED by -- verify.mjs is run from inside it.
 const rootDir = path.dirname(findAtRoot("WebGLEngine"));
+
+// v4485: the extensions are the ones the grep named, kept exactly. A directory walk in Node is portable and
+// is what every other scanner in this tree already does.
+const MARKER_EXT = /\.(js|html|mjs|md|json|py|txt|sh|bat|command)$/;
+function markerInTree(dir, needle) {
+  let found = false;
+  (function walk(d) {
+    if (found) return;
+    let entries;
+    try { entries = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      if (found) return;
+      const p = path.join(d, e.name);
+      if (e.isDirectory()) { if (e.name !== "node_modules" && e.name !== ".git") walk(p); continue; }
+      if (!MARKER_EXT.test(e.name)) continue;
+      // -I skipped binaries; a read that throws or holds a NUL is not a text hit either way.
+      try { if (fs.readFileSync(p, "utf8").includes(needle)) found = true; } catch { /* unreadable */ }
+    }
+  })(dir);
+  return found;
+}
 for (const m of markers) {
   let hit = false;
   // v2204 -- `-F`. Without it a marker is a regex, so `iterCap: W * H` means "W, zero or more spaces" and a
   // marker that is present in the tree fails the gate. A gate that fires on a marker's punctuation is a gate
   // that teaches you to weaken your markers.
-  try { execSync(`grep -rFIl ${JSON.stringify(m)} ${JSON.stringify(rootDir)} --include=*.js --include=*.html --include=*.mjs --include=*.md --include=*.json --include=*.py --include=*.txt --include=*.sh --include=*.bat --include=*.command`, { stdio: "ignore" }); hit = true; } catch { hit = false; }
+  // *** v4485 -- THIS WAS `grep -rFIl`, AND ITS FAILURE FALLS THE WRONG WAY. *** A throw set hit = false, and
+  // hit feeds check() below -- so on a box with no POSIX grep EVERY FEATURE MARKER READS AS ABSENT and the
+  // ship verify cannot pass at all. Windows has no grep; the rig is Windows; the ship gate was unrunnable
+  // there and nothing said so, because the one thing that would have reported it is this gate. Walked in
+  // Node now, which needs no tool and finds the same files. -F is preserved by construction: a literal
+  // indexOf cannot read a marker's punctuation as a pattern, which is the whole of v2204's fix.
+  hit = markerInTree(rootDir, m);
   check(`feature marker present: ${JSON.stringify(m)}`, hit);
 }
 
 // 7. optional: verify a built zip's contents (version marker inside + no nested fork + size sanity)
 if (zipPath) {
   try {
-    const list = execSync(`unzip -l ${JSON.stringify(zipPath)}`, { encoding: "utf8" });
+    // v4485: `unzip -l` is a POSIX tool and the rig is Windows, so the one machine that BUILDS the release
+    // could not run the check that grades it. tools/ship/moduleHistory.mjs has read zip central directories
+    // in pure Node since v3208; entryNames exposes what this needs.
+    const { entryNames } = await import("./moduleHistory.mjs");
+    const list = entryNames(zipPath).join("\n");
     const P = "(?:SweK_Engine|EngineProject)";
     const nestedInZip = new RegExp(P + "_v\\d+\\/WebGLEngine\\/.*" + P + "_v\\d+\\/").test(list) ||
         (list.match(new RegExp(P + "_v\\d+\\/", "g")) ? new Set(list.match(new RegExp(P + "_v\\d+", "g"))).size > 1 : false);
