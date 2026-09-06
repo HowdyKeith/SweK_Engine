@@ -20,6 +20,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+// v4485 -- *** THE FIFTH EVIDENCE SOURCE, AND THE ONLY DURABLE ONE THE MACHINE WRITES. *** See below:
+// the sweep file this gate has read since v4304 is rewritten every run, so a gate killed at the cap
+// under load loses its evidence and this wall goes red about the machine rather than the tree.
+import { loadObserved, observedFinishes } from "./observedGates.mjs";
 import { MEASURED, UNRESOLVED, DEFAULT_BUDGET_MS } from "./gateBudget.mjs";
 
 const ENG = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -65,8 +69,20 @@ for (const [g, ms] of Object.entries(sweepFile.timings || {})) {
 }
 
 const gates = walk(ENG);
+// v4485 -- *** THE SWEEP FILE IS A SCRATCH FILE AND THIS WALL WAS RESTING ON IT. *** Its own note says so:
+// "Rewritten every run; used only to choose which gates are under the ship-time budget. Not a claim about the
+// tree -- the register is." A gate the sweep times to completion is evidence; a gate it KILLS at the cap
+// contributes nothing, by the correct rule two comments up that "a 124 is a kill and says nothing". Both go to
+// the same file and the second overwrites the first, so a gate measured cleanly last week and killed at the cap
+// today -- because another process was competing for the box -- LOSES ITS EVIDENCE AND TURNS THIS ROW RED.
+// Measured at v4485: 215 of the 1,356 gates the sweep timed had evidence from nowhere else, and this row went
+// red on the first verify of every round in the session that found it, green when re-run alone.
+// tools/ship/observed-gates.json is the monotone ledger of what the sweep has EVER seen finish. An observation
+// does not stop having been made.
+const observed = loadObserved();
 const evidence = (g) => typeof timings[g] === "number" ? "timed"
                       : typeof swept[g] === "number" ? "swept"
+                      : observedFinishes(observed, g) ? "observed"
                       : MEASURED[g] !== undefined ? "measured"
                       : UNRESOLVED[g] !== undefined ? "unresolved"
                       : typeof failingAt[g] === "number" ? "failing"
@@ -76,6 +92,7 @@ const noEvidence = gates.filter((g) => !evidence(g));
 // ---- 1. THE POPULATION, DERIVED ----------------------------------------------------------------------------
 say(gates.length + " gates: " + gates.filter((g) => evidence(g) === "timed").length + " with a recorded time, " +
     gates.filter((g) => evidence(g) === "swept").length + " timed to completion by the quick sweep, " +
+    gates.filter((g) => evidence(g) === "observed").length + " carried by the monotone ledger, " +
     MEASURED_COUNT() + " curated in MEASURED, " + Object.keys(UNRESOLVED).length + " admitted in UNRESOLVED, " +
     noEvidence.length + " with NO evidence at all");
 function MEASURED_COUNT() { return gates.filter((g) => evidence(g) === "measured").length; }

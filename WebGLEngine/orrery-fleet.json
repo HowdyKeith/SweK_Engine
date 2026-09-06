@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "3ac0f2dbf37e5532e26a41bcf9bed82a24e13e88",
+ "head": "30d633c4d405007e0dccaa90e97397e07ed5f1b4",
  "bodies": {
   "box3d": [
    {
@@ -499,8 +499,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3216813,
-    "sha": "3ac0f2dbf37e5532e26a41bcf9bed82a24e13e88"
+    "bytes": 3220709,
+    "sha": "30d633c4d405007e0dccaa90e97397e07ed5f1b4"
    },
    {
     "path": "mpm3d.html",
@@ -722,17 +722,17 @@
    {
     "path": "tools/ship/tslPhysics-selfcheck.mjs",
     "bytes": 126419,
-    "sha": "444f53e5362e7df021985e9d9fe6d2d54406188e"
+    "sha": "30d633c4d405007e0dccaa90e97397e07ed5f1b4"
    },
    {
     "path": "tools/ship/tslRace-selfcheck.mjs",
     "bytes": 79361,
-    "sha": "2776e510f13e8369eb45229a2b508a8beab0b696"
+    "sha": "30d633c4d405007e0dccaa90e97397e07ed5f1b4"
    },
    {
     "path": "tools/ship/tslSource-selfcheck.mjs",
     "bytes": 23604,
-    "sha": "f222fee5f8b49b3122d9d651078d156eb4b7a277"
+    "sha": "30d633c4d405007e0dccaa90e97397e07ed5f1b4"
    },
    {
     "path": "tsl-probe.html",

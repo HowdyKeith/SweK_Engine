@@ -62,6 +62,33 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      collision on this pair of branches; the six before it are noted below, and every one was caught at a
      merge rather than by anything running. -->
 
+## v4485 -- twelve red first-runs, and they were two different things wearing one symptom
+
+tools/ship/budgetEvidence-selfcheck.mjs went red on the first verify of EVERY round in this session and green when re-run alone. Twelve times. Each round it was worked around by re-running it and moving on, and the reason was never diagnosed. This round diagnosed it, and the answer is that it was never one thing.
+
+*** TWO CAUSES WEAR ONE SYMPTOM, AND THIS ROUND FIRST BLAMED ONE FOR BOTH. ***
+
+(a) A GATE ADDED THIS ROUND HAS NO EVIDENCE YET, because the quick sweep has not run it. That is CORRECT and it resolves itself: the verify's own sweep times the new gate, writes sweep-timings.json, and the second run is green. ELEVEN OF THE TWELVE WERE THIS, and nothing should "fix" it -- a gate nobody has run has not been measured, and saying so is the wall doing its job.
+
+(b) A GATE THAT ALREADY HAD EVIDENCE LOSES IT, because the sweep killed it at the cap on a busy box and the file holding the evidence was rewritten with the kill. Seen directly once, at v4482, on headlessGpu-selfcheck: 729 ms on a quiet box against 190,675 ms under a concurrent verify.
+
+*** AND THE ROUND'S OWN NEW GATE PROVED THE POINT BY GOING RED AS CASE (a) ON THE DAY IT WAS WRITTEN, *** while the module beside it still claimed all twelve for (b). An instrument whose two failure modes are indistinguishable from outside had, at that moment, exactly one data point and two explanations for it.
+
+MEASURED: 215 of the 1,356 gates the last sweep timed have runtime evidence from NOWHERE else than tools/ship/sweep-timings.json -- a file whose own note says what it is: "Rewritten every run; used only to choose which gates are under the ship-time budget. Not a claim about the tree -- the register is." A gate the sweep times to completion is evidence; a gate it KILLS contributes nothing, by that gate's own correct rule that "a 124 is a kill and says nothing". Both facts go to one file and the second overwrites the first. THE WALL WAS ASKING A DURABLE QUESTION OF A SCRATCH FILE.
+
+*** AND THE TREE ALREADY HAD THE DISCIPLINE, WRITTEN DOWN, APPLIED TO THE OTHER FILE. *** This round opened by asserting that gate-timings.json is hand-fed and that nothing merges machine output into it. BOTH HALVES WERE WRONG, and the new gate is where it was caught: tools/ship/selfchecks.mjs writes that file on every full-suite run and it MERGES, with the reason in its own comment one line above the write -- "MERGE rather than replace: a partial run must not delete the timings of gates it never reached." That is exactly this round's rule, already stated and already implemented, on the other file. The quick sweep writes its file by whole-file rewrite and is RIGHT to: its job is to say which gates are under budget ON THIS BOX RIGHT NOW, and merging stale entries would resurrect v4460's defect where an over-budget entry keeps whatever exit code it had when it was last cheap enough to run. TWO FILES WITH OPPOSED REQUIREMENTS, AND ONE WALL READING BOTH AS THE SAME KIND OF RECORD.
+
+NEW tools/ship/observedGates.mjs adds a third file with the third requirement: MONOTONE. Not a budget and not a snapshot -- a record of what has EVER been seen to finish. mergeObservations never removes an entry, and the gate asserts that rather than trusting the sentence. budgetEvidence consults it AFTER the two live sources, so a fresh observation still wins and the ledger only backstops; putting it first would hide a gate that has genuinely stopped finishing. gate-timings.json is left exactly alone. THE A/B IS RUN FOR REAL: five simulated cap-kills erase five gates' evidence without the ledger (exit 1, "4 with none") and none with it (exit 0, "4 carried by the monotone ledger").
+
+NEW tools/ship/observedGates-selfcheck.mjs, eighteen checks in six sections. The ship skill gains one line: observedGates.mjs --write, beside the other --write scans.
+
+FOURTEEN SABOTAGES, ALL RED BY NAME. *** ONE COST ZERO RED AND IT WAS VACUITY. *** Hard-wiring observedFinishes to return `true` passed every single row, because every row was a POSITIVE one and a predicate that always says yes satisfies all of them -- including "the ledger carries every one of them" and the A/B itself, which would then have been measuring nothing at all. That is vacuity.mjs's cause one, the shape this tree already has a word for, turning up in the last place it should have. The predicate is now asked to say NO: for an absent gate, an empty ledger, a null record and an entry with no millisecond.
+
+TWO MORE SELF-INFLICTED TRAPS ALONG THE WAY. The gate spelled out the token it searches for and MATCHED ITSELF TWICE on its first run -- one round after v4484 disarmed exactly that by building its markers from fragments, written by the same hands to check that kind of thing. And a first draft accused statedRuntime-selfcheck.mjs of writing gate-timings.json because a write appeared within 200 characters of the words; that file writes its OWN baseline and merely names the other one in the note beside it. PROXIMITY IS NOT A TARGET, and the destination is resolved now.
+
+AND A CHECK THAT WOULD HAVE GONE RED NEXT ROUND FOR SUCCEEDING. A row asserted that this gate is in neither the sweep nor the ledger, which was true the day it was written and false the moment the next sweep ran it. It grades the INVARIANT now, on a name that can never be swept, and the ledger's one-round lag -- the ritual writes it before verify, and verify's sweep then sees this round's additions -- is REPORTED rather than asserted to be zero. What is asserted is the half that matters: the merge may ADD and may never LOSE.
+
+The tree stands at 1524 gates.
 ## v4484 -- the emit is reproducible, and the survey that asked was counting three of four
 
 v4480 surveyed the TSL/WebGPU pipeline, found that "compile the TSL graphs at ship time and vendor the output" was ALREADY the tree's practice rather than new work, and wrote what was actually missing into gfx/pipelineGaps.mjs as data: freshEmitComparedToStored: false, marked there as "*** THE ACTUAL OPEN QUESTION ***". Three gates re-emit through three's node builders on every run, write the result over the stored artifact, and then assert the file exists and is over a thousand characters. A codegen step whose output changes when nothing changed is a diff nobody can review, and the only reason nobody had noticed is that nobody looked.

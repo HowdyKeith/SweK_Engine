@@ -2827,6 +2827,52 @@ since116: Object.freeze({
                  "assignment from snapshot() and the five uses now, and says outright that it checks wiring " +
                  "while section 4 checks behaviour.",
     }),
+    // v4485 -- the twenty-sixth closing, and the first about a defect in the SHIP RITUAL ITSELF rather than in
+    // anything the engine draws. It had been watched twelve times before anybody looked at it.
+    since124: Object.freeze({
+        at: "v4485", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/observedGates-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, eighteen checks in six sections, 0.12 s. " +
+                 "budgetEvidence-selfcheck went red on the first verify of EVERY round in this session and " +
+                 "green when re-run alone, twelve times, and the reason was never diagnosed until now. *** IT " +
+                 "IS TWO DIFFERENT CAUSES WEARING ONE SYMPTOM, AND THIS ROUND FIRST BLAMED ONE FOR BOTH. *** " +
+                 "(a) A GATE ADDED THIS ROUND HAS NO EVIDENCE YET, which is CORRECT and self-resolving: the " +
+                 "verify's own sweep times it and the next run is green. Eleven of the twelve were this, and " +
+                 "the fix must NOT touch it -- an observation never made cannot be invented. (b) A GATE THAT " +
+                 "ALREADY HAD EVIDENCE LOSES IT, because the sweep killed it at the cap on a busy box; seen " +
+                 "directly once, at v4482, on headlessGpu-selfcheck at 729 ms quiet against 190,675 ms under a " +
+                 "concurrent verify. *** THE ROUND'S OWN NEW GATE PROVED THE POINT BY GOING RED AS CASE (a) ON " +
+                 "THE DAY IT WAS WRITTEN, *** while the module beside it claimed all twelve for (b). " +
+                 "MEASURED: 215 of the 1,356 gates the sweep timed have runtime evidence from NOWHERE else " +
+                 "than tools/ship/sweep-timings.json, a file whose own note reads 'Rewritten every run ... Not " +
+                 "a claim about the tree'. The wall was asking a durable question of a scratch file. *** AND " +
+                 "THE TREE ALREADY HAD THE DISCIPLINE, WRITTEN DOWN, APPLIED TO THE OTHER FILE: *** " +
+                 "selfchecks.mjs writes gate-timings.json on every full run and MERGES, with the reason one " +
+                 "line above the call -- 'a partial run must not delete the timings of gates it never reached' " +
+                 "-- which is this round's own rule, already implemented. THE PREMISE THIS ROUND OPENED WITH, " +
+                 "that gate-timings.json is hand-fed and nothing merges into it, WAS WRONG ON BOTH COUNTS and " +
+                 "the new gate is where it was caught. The sweep file replaces and is RIGHT to: its job is to " +
+                 "say what is under budget on this box now, and merging stale entries would resurrect v4460's " +
+                 "defect. Two files, opposed requirements, one wall reading both as the same kind of record. " +
+                 "NEW tools/ship/observedGates.mjs writes a third file with the third requirement -- MONOTONE " +
+                 "-- and budgetEvidence consults it AFTER the two live sources, so a fresh observation still " +
+                 "wins and the ledger only backstops. The A/B is run for real: five simulated cap-kills erase " +
+                 "five gates' evidence without it (exit 1, '4 with none') and none with it (exit 0, '4 carried " +
+                 "by the monotone ledger'). FOURTEEN SABOTAGES, ALL RED BY NAME. *** ONE COST ZERO RED AND IT " +
+                 "WAS VACUITY: *** hard-wiring observedFinishes to `true` passed every row, because every row " +
+                 "was a POSITIVE one and a predicate that always says yes satisfies all of them -- including " +
+                 "the coverage claim and the A/B, which would then have been measuring nothing. That is " +
+                 "vacuity.mjs's cause one, in the last place it should have appeared. TWO MORE SELF-INFLICTED " +
+                 "TRAPS: the gate spelled out the token it searches for and matched ITSELF twice, one round " +
+                 "after v4484 disarmed exactly that by building its markers from fragments; and a first draft " +
+                 "accused statedRuntime-selfcheck of writing gate-timings.json because a write appeared within " +
+                 "200 characters of the words -- PROXIMITY IS NOT A TARGET, and the destination is resolved " +
+                 "now. And a row asserting that this file is in neither record was true the day it was written " +
+                 "and false at the next sweep: it grades the INVARIANT on a name that can never be swept, and " +
+                 "the ledger's one-round lag is REPORTED rather than asserted to be zero, because a check " +
+                 "demanding zero would go red every time a round added a gate, for succeeding.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

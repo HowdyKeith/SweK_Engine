@@ -50,6 +50,11 @@ or the `[knowledge]` line from step 3).
     node tools/ship/orreryFleetScan.mjs --write        # AFTER the version bump, not before -- see below
     node tools/ship/orreryReachedScan.mjs --write     # same rule, same reason
     node tools/ship/buildKnowledgeIndex.mjs --write    # prints "[knowledge] NNNN gates" -- this is the count
+    node tools/ship/observedGates.mjs --write          # v4485 -- merges the LAST sweep's completions into the
+                                                       # monotone evidence ledger. Only ever grows; a gate the
+                                                       # sweep killed at the cap keeps the time it was seen to
+                                                       # take. Without it budgetEvidence goes red about how busy
+                                                       # the box was rather than about the tree.
     node tools/ship/staleness.mjs --fix                # rewrites case-study.html's gate count
     node tools/ship/claimCheck-selfcheck.mjs           # must end "all checks pass"
 
