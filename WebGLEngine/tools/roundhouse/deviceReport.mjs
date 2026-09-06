@@ -344,6 +344,50 @@ export const CONDITIONING_AT_V4484 = Object.freeze({
     "splat.perspective.areaSlope": Object.freeze({"moved":false,"relMove":0,"amplification":0}),
 });
 
+/**
+ * *** v4485 -- THE WIDE SWEEP v4480 OWED, AND THE MODE THAT IS WHY IT WAS OWED. ***
+ *
+ * v4480 measured c4 over SCOPE (7 device/modes, 27 observables) and said the full six-device sweep "did not
+ * return inside seven minutes", naming optics.converge's adaptive quadrature and quantum.bands' diagonalisation
+ * as the suspects. That was a description of a failure rather than a measurement. This is the measurement.
+ *
+ * COVERED: 26 modes over FOUR of the six eligible devices -- chaos (4), kepler (6), lens (13) and three of
+ * optics' five. 81 observables, 21 of them movers, in 67086 ms of total work.
+ * NOT COVERED, AND SAID PLAINLY: optics.converge, optics.radiusconfusion, and quantum and splat ENTIRELY.
+ * So this is NOT a superset of SCOPE -- the scoped set includes splat's three modes and this run never reached
+ * them -- and the two tables answer overlapping rather than nested questions.
+ *
+ * *** ONE MODE COSTS ELEVEN TIMES EVERYTHING ELSE PUT TOGETHER, AND COUNTING. *** optics.converge burned
+ * 12 minutes 38 seconds of CPU without returning, against 67086 ms for all 26 completed modes. That is the
+ * whole reason the wide number was owed for five rounds, and it is a figure now rather than a suspicion.
+ *
+ * *** THE SCOPED WORST CASE SURVIVES TRIPLING THE POPULATION, AND IS AN OUTLIER. *** kepler.conserve.
+ * growthGapFrac still tops the table at 8.679e7 across 81 observables, and the next worst is 3.320e5 --
+ * TWO HUNDRED AND SIXTY-ONE TIMES SMALLER. A worst case that holds when the population triples is a fact about
+ * that quantity rather than about the sample. ONE NEW ENTRANT came from outside SCOPE: optics.slit.slitRms at
+ * 1.598e5, fourth overall, from a mode the scoped set excluded -- so widening did find something, and it found
+ * nothing that moves v4484's bound.
+ *
+ * *** AND THE BUDGET DID NOT WORK, FOR A REASON THIS TREE HAD ALREADY WRITTEN DOWN. *** The harness capped each
+ * mode at 120 s with a Promise.race against a setTimeout. A timer cannot interrupt SYNCHRONOUS work on the same
+ * thread, so the cap never fired while optics.converge held the event loop -- measured, 12m38s of solid CPU
+ * against a 120 s cap. corroborationCensus.mjs says exactly this beside its own budget: "a build already
+ * running cannot be interrupted, so one long build overruns any budget... a TEN-SECOND budget produced a 2m08s
+ * run". The only budgets that work are DEADLINE-BEFORE-START -- decline to begin the next unit -- or a child
+ * process that can be killed. Re-derived the expensive way, one round after reading the file that records it.
+ */
+export const WIDE_AT_V4485 = Object.freeze({
+    at: "v4485",
+    covered: Object.freeze({ devices: 4, modes: 26, observables: 81, movers: 21, totalMs: 67086 }),
+    notCovered: Object.freeze(["optics.converge", "optics.radiusconfusion", "quantum (all modes)", "splat (all modes)"]),
+    supersetOfScope: false,
+    maxAmplification: 86793846.76467527, maxAt: "kepler.conserve.growthGapFrac",
+    runnerUp: 331979.2130784743, runnerUpAt: "kepler.compare.rk4Growth",
+    newFromOutsideScope: "optics.slit.slitRms",
+    blockingMode: Object.freeze({ mode: "optics.converge", cpuMs: 758000, capMs: 120000,
+        why: "a setTimeout cannot interrupt synchronous work, so the cap never fired" }),
+});
+
 export const SCOPE = Object.freeze({
     splat: Object.freeze(["integral", "perspective", "compose"]),
     chaos: Object.freeze(["feigenbaum"]),

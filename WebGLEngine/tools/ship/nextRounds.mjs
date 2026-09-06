@@ -37,11 +37,11 @@ export const NEXT_ROUNDS = [
         why: "v4480 wrote 'earn a portability tolerance for each of the seven refinement knobs' as the next round. v4484 attempted it and found the task cannot be done as specified: a tolerance taken from relMove is compared against the number it came from, so the pass stops being contingent and the evidence string does not change. THE TOLERANCE IS NOT MISSING, THE CHECK IS MISNAMED. Closing this means either renaming c4 to what it measures, or wiring it to the submission ledger so it grades a real second machine -- and that second option is blocked on the same thing everything else here is: nothing has submitted.",
     },
     {
-        id: "corroboration-full-sweep",
+        id: "converge-and-quantum-unswept",
         blocker: "OPEN",
-        what: "Run the multi-observable battery over all six eligible devices, not the scoped four.",
-        how: "tools/roundhouse/deviceReport.reportLab() with no scope. It did not return inside seven minutes at v4480 -- optics.converge does adaptive quadrature and quantum.bands diagonalises -- so it needs either a budget and progressive output, the shape v4036 gave corroborationCensus, or a cheaper mode list.",
-        why: "Every figure v4480 states is from a four-device scope. The wide number is owed rather than estimated, and the two devices missing from it are exactly the two whose nuisance knobs live in the second table.",
+        what: "Two of the six eligible devices and two optics modes are still unmeasured by the corroboration battery, and one mode is why.",
+        how: "v4485 swept 26 modes over chaos, kepler, lens and three optics modes -- 81 observables, 21 movers, 67.1 s of total work. optics.converge then burned 12m38s of CPU WITHOUT RETURNING, so optics.radiusconfusion, quantum (6 modes) and splat (all modes) were never reached. Closing this needs the battery run per mode in a CHILD PROCESS that can be killed, or optics.converge's adaptive quadrature given a step budget of its own -- a setTimeout cap does not work and v4485 measured that it does not.",
+        why: "v4480 owed the wide number and described the blocker; v4485 measured it. The headline it can already state is that the scoped worst case SURVIVES tripling the population -- kepler.conserve.growthGapFrac at 8.679e7, still the maximum over 81 observables and 261x its runner-up -- so v4484's bound table is not threatened by the modes that ran. What is unknown is whether quantum or splat holds anything worse, and splat is in SCOPE, so the wide run is NOT a superset of the narrow one.",
     },
     {
         id: "rig-only-reds",

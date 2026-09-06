@@ -212,6 +212,57 @@ sec("5. *** TWO REFINEMENT TABLES, TWO NUISANCE TABLES, AND THE ELIGIBLE SET DEP
         "a fourth answer to 'who is eligible' is the last thing this apparatus needs");
 }
 
+// ---- 5b. THE WIDE SWEEP, AND WHAT IT COST TO FIND OUT WHY IT WAS OWED ----------------------------------------
+sec("5b. *** v4485: THE SIX-DEVICE SWEEP, MEASURED RATHER THAN DESCRIBED ***");
+{
+    const W = DR.WIDE_AT_V4485;
+    // The record is arithmetic about a run this gate cannot afford to repeat, so what IS checked is that it is
+    // internally consistent, that it does not overclaim its coverage, and that one cheap mode still reproduces.
+    ok("!! the wide record states its COVERAGE and refuses to call itself a superset of SCOPE",
+        W.covered.devices === 4 && W.covered.modes === 26 && W.supersetOfScope === false &&
+        W.notCovered.some((x) => /splat/.test(x)) && W.notCovered.some((x) => /quantum/.test(x)),
+        `${W.covered.observables} observables over ${W.covered.devices} of 6 eligible devices. SCOPE includes ` +
+        `splat's three modes and this run never reached them, so the two tables OVERLAP rather than nest -- ` +
+        "a wide number quoted as though it contained the narrow one would be the worse kind of wrong");
+
+    ok("!! *** the scoped worst case SURVIVES tripling the population, and is an outlier by 261x ***",
+        W.maxAt === "kepler.conserve.growthGapFrac" &&
+        Math.abs(W.maxAmplification - DR.LAB_AT_V4480.maxAmplification) < 1e-6 &&
+        W.maxAmplification / W.runnerUp > 200,
+        `${W.maxAmplification.toExponential(3)} still the maximum across ${W.covered.observables} observables, ` +
+        `against a runner-up of ${W.runnerUp.toExponential(3)} (${(W.maxAmplification / W.runnerUp).toFixed(0)}x). ` +
+        "It is the SAME number v4480 froze over 27 -- a worst case that holds when the population triples is a " +
+        "fact about the quantity rather than about the sample");
+
+    ok("...and widening DID find something, which is what stops this being a null result",
+        W.newFromOutsideScope === "optics.slit.slitRms",
+        "optics.slit.slitRms at 1.598e5 is fourth overall and comes from a mode SCOPE excluded. Widening found " +
+        "a new entrant and found nothing that moves v4484's bound -- both halves are the finding");
+
+    // *** THE COST, WHICH IS THE ANSWER TO 'WHY WAS THIS OWED FOR FIVE ROUNDS'. ***
+    ok("!! *** one mode costs ELEVEN TIMES every completed mode put together, and did not return ***",
+        W.blockingMode.mode === "optics.converge" && W.blockingMode.cpuMs > 10 * W.covered.totalMs,
+        `optics.converge burned ${(W.blockingMode.cpuMs / 1000).toFixed(0)} s of CPU without returning, against ` +
+        `${(W.covered.totalMs / 1000).toFixed(1)} s for all ${W.covered.modes} completed modes. v4480 said the ` +
+        "sweep 'did not return inside seven minutes' and named suspects; this is the figure");
+
+    ok("!! ...and the 120s CAP DID NOT FIRE, because a timer cannot interrupt synchronous work",
+        W.blockingMode.capMs === 120000 && W.blockingMode.cpuMs > W.blockingMode.capMs * 6 &&
+        /setTimeout cannot interrupt/.test(W.blockingMode.why),
+        "corroborationCensus.mjs records this beside its own budget -- 'a build already running cannot be " +
+        "interrupted, so one long build overruns any budget' -- and the harness re-derived it the expensive " +
+        "way one round after reading that file. Only a deadline-before-start, or a killable child, is a budget");
+
+    // ONE CHEAP MODE, RE-RUN LIVE, so the frozen record is tied to something this gate actually observed.
+    const live = await DR.reportDeviceMode("lens", "deflect");
+    const moved = live.rows.filter((r) => r.moved).length;
+    ok("...and a cheap mode from the wide run still reproduces, so the record describes THIS lab",
+        !live.error && live.rows.length === 7 && moved === 0,
+        `lens.deflect: ${live.rows.length} observables, ${moved} movers, re-run live. The wide table is too ` +
+        "expensive to re-derive here and is arithmetic rather than a claim about today, so one mode is driven " +
+        "to tie it to a real run rather than trusting all 81");
+}
+
 // ---- 6. WHAT THIS ROUND DID NOT DO ---------------------------------------------------------------------------
 sec("6. *** THE LIMITS ***");
 {

@@ -2664,6 +2664,26 @@ since116: Object.freeze({
                  "0-red one was a GENUINE no-op identified rather than chased -- NaN <= bound is already false, " +
                  "so the guard buys the REPORT and not the verdict, and the row now asserts that",
     }),
+    since124: Object.freeze({
+        at: "v4485", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        repaired: Object.freeze([
+            "vba/runtimeGap.mjs (its census had drifted one row, typed arrays 693 -> 694, and THREE round notes had already claimed a re-derivation that never happened -- the count incremented from the previous note rather than measured)",
+            "tools/roundhouse/deviceReport.mjs (the wide sweep v4480 owed is a measurement now rather than a description: 81 observables over 4 of 6 eligible devices, and the mode that blocks the other two is named with its cost)",
+        ]),
+        verdict: "*** THE WIDE SWEEP, MEASURED RATHER THAN DESCRIBED. *** v4480 said the six-device sweep 'did " +
+                 "not return inside seven minutes' and that sentence was quoted as a measurement for five " +
+                 "rounds. It is 26 modes, 81 observables, 21 movers, 67.1 s -- and then optics.converge burning " +
+                 "12m38s of CPU without returning, ELEVEN TIMES every completed mode together, leaving quantum " +
+                 "and splat unswept. THE SCOPED WORST CASE SURVIVES TRIPLING THE POPULATION: kepler.conserve." +
+                 "growthGapFrac still tops it at 8.679e7, 261x its runner-up, so v4484's bound is unthreatened " +
+                 "by anything that ran -- and the record refuses to call itself a superset of SCOPE, which " +
+                 "contains a device this run never reached. THE BUDGET DID NOT WORK and the tree already knew " +
+                 "why: a setTimeout cannot interrupt synchronous work, which corroborationCensus records beside " +
+                 "its own budget, and the harness re-derived it the expensive way one round after reading that " +
+                 "file. ALSO: three consecutive round notes claimed a census re-derivation that never happened",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
