@@ -588,6 +588,25 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         from a different push. slug-projective.html draws both cases with sliders. Rotation and projective
         placement are now measured properties of the shipped shader, which is what the Box3D ticker (task 43)
         needs before glyphs tumble.
+    THE 3-D TICKER: SLUG GLYPHS AS BOX3D BODIES -- built at v4497 (task 43). render/slugTicker.mjs turns a laid-out
+        string into one box3d box per inked glyph (half extents from the bbox at 0.22 units an em), drops them on a
+        conveyor that drives their x velocity every tick and wraps a body past the lane back by the loop length
+        (swk_body_set_transform), and draws each glyph -- one SlugDeviceBatch built with its quad centred at the
+        origin -- with rows = P * V * B from the body's [x, y, z, qx, qy, qz, qw], so a tumbling glyph is the
+        projective case task 42 held with a new matrix every frame and nothing new in the shader. MEASURED
+        (tools/ship/slugTicker-selfcheck.mjs): 33 bodies, 900 ticks in node hash the same twice (lockstep-safe),
+        every body at rest on the floor inside the lane, the conveyor holding 1.10 of 1.2 units a second (friction
+        takes its share inside the step); the tick-300 snapshot on both backends within 1 of 255 of slugEval
+        through the perspective-correct model per body, texcoords to 2.3e-7 em. slug-ticker.html runs it live.
+        TWO FINDINGS THAT WERE NOT THE TICKER'S: *** gfx/device.js's WebGPU pass applied only the LAST uniform
+        write of a frame to every draw in it *** -- queue.writeBuffer lands before the command buffer, so 33 bodies
+        drawn with 33 matrices all drew at the 33rd; ev/esShipLabels.js's device path had drawn every label at the
+        last label's rows on WebGPU since v4463 and its gate compared placements loosely enough not to see it.
+        Fixed with a CPU shadow and a per-pipeline pool of uniform buffers (a fresh one for the first uniform()
+        after a draw, reset per frame, held to four buffers over three frames), gated by
+        tools/ship/deviceUniformsPerDraw-selfcheck.mjs on both backends. And vertex streams built in node carried
+        the node atlas's glyph locs into the browser's atlas of a different logWidth: the browser builds its own
+        bodies now; only rows cross a process boundary.
     TEXTURE BYTES BEFORE KTX2 / BASIS -- measured at v4495 (task 18), RIG-PENDING for the asset library.
         tools/ship/textureBytes.mjs walks a folder and records every raster texture's bytes on disk and, from the
         PNG and JPEG headers, its pixel size and GPU bytes (RGBA8 with mips); decide() derives the verdict from

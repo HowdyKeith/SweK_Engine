@@ -2519,6 +2519,24 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "Sabotages red at 4 / 5 / 1 / 4 -- C (the rows builder) is headless-only by design, since the page draws the rows the " +
                  "builder made.",
     }),
+    since119: Object.freeze({
+        at: "v4497", swept: 2, green: 2, red: 0,
+        added: Object.freeze([
+            "tools/ship/slugTicker-selfcheck.mjs",
+            "tools/ship/deviceUniformsPerDraw-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green on both backends. render/slugTicker.mjs: one box3d box per glyph on a conveyor with a wrap, each drawn " +
+                 "through the projective path with rows = P * V * B; 900 ticks hash the same twice, bodies at rest in the lane, the " +
+                 "tick-300 snapshot within 1 of 255 of slugEval on both backends. FOUND AND FIXED IN THE DEVICE: the WebGPU pass " +
+                 "applied only the last uniform write of a frame to every draw (queue.writeBuffer precedes the command buffer); a " +
+                 "per-pipeline pool of uniform buffers with a CPU shadow, reset per frame, now gives each draw its own -- " +
+                 "deviceUniformsPerDraw holds four quads at four offsets in four colours in one pass, a colour set once reaching " +
+                 "four draws, and the pool at four buffers over three frames. Sabotages: ticker 3 / 6 / 1 / 6 (A first blind on " +
+                 "the quarter-turn row; an orthonormality hold added), device 3 / 1 / 1 (B and C first 0 red: a shadow copy no draw " +
+                 "relied on, a leak no pixel shows; a frame and a pool-length row added).",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

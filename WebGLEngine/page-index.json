@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 452,
+ "count": 453,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -2590,6 +2590,13 @@
    "f": "slug-text.html",
    "t": "SweK &middot; Slug text",
    "d": "The first on-GPU draw of the Slug outline-text renderer merged at v3823: one quadratic TrueType font is packed into a curve texture and a band texture once, then the same data is drawn at eight sizes from 8px to a wall-filling title with no atlas to rebuild and no size-dependent baking, because the fragment shader reads the actual Bezier control points and solves for coverage per pixel. The Cross-check button reads the framebuffer back and compares coverage against slugEval.slugRender at matching points -- the check the library's note left open. Font: IBM Plex Serif (SIL OFL 1.1). Slug (c) Eric Lengyel, MIT OR Apache-2.0.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "slug-ticker.html",
+   "t": "Slug Ticker",
+   "d": "A 3-D ticker of Slug outline glyphs as Box3D rigid bodies: one box per glyph dropped onto a conveyor, tumbling and wrapping, each drawn through gfx/device.js with its own body matrix on either backend. The plumbing is gated by tools/ship/slugTicker-selfcheck.mjs.",
    "g": "",
    "p": 0
   },

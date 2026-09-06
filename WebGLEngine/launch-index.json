@@ -21,7 +21,7 @@
   }
  },
  "counts": {
-  "page": 452,
+  "page": 453,
   "demo": 49,
   "builtin": 34
  },
@@ -2983,6 +2983,14 @@
    "id": "slug-text.html",
    "display": "Slug Text",
    "href": "/slug-text.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "slug-ticker.html",
+   "display": "Slug Ticker",
+   "href": "/slug-ticker.html",
    "section": null,
    "collision": false
   },

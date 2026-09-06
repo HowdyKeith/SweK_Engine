@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Slug Ticker (Box3D glyph bodies)">
+<meta name="demo:desc" content="A 3-D ticker of Slug outline glyphs as Box3D rigid bodies: one box per glyph dropped onto a conveyor, tumbling and wrapping, each drawn through gfx/device.js with its own body matrix on either backend. The plumbing is gated by tools/ship/slugTicker-selfcheck.mjs.">
+<meta name="demo:category" content="physics">
+<title>Slug Ticker</title>
+<style>
+  html,body { margin:0; height:100%; background:#050805; color:#9fb2d4; font:12px ui-monospace,Menlo,monospace; }
+  #c { display:block; width:100%; }
+  #hud { padding:10px 14px; }
+  #cap { color:#f6a623; letter-spacing:.14em; text-transform:uppercase; }
+  #be { color:#59d1ff; font-size:14px; margin-top:4px; }
+  #sub { color:#5f7aa0; font-size:11px; margin-top:2px; }
+  .bad { color:#ff9a9a; }
+  a { color:#59d1ff; }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div id="cap">Slug ticker: glyphs as Box3D bodies on a conveyor</div>
+  <div id="be">requesting a device&hellip;</div>
+  <div id="sub">Font: IBM Plex Serif &copy; 2017 IBM Corp., Reserved Font Name &ldquo;Plex&rdquo;, SIL OFL 1.1 (vendor/fonts/IBMPlexSerif-OFL.txt). <span id="notice"></span>
+    &middot; <a href="./slug-projective.html">the projective case it rests on</a> &middot; <a href="?webgl=1">force WebGL2</a> &middot; <span id="tick"></span></div>
+</div>
+<canvas id="c"></canvas>
+<script type="module" src="/ui/originNotice.js"></script>
+<script type="module">
+import { requestDevice } from "./gfx/device.js";
+import { parseFont } from "./text/slugFont.js";
+import { SlugFontDevice, SlugDeviceBatch } from "./render/slugDevice.mjs";
+import { TICKER, glyphBodies, worldFromModule, spawnTicker, tickTicker, cameraFor, bodyRows } from "./render/slugTicker.mjs";
+import { box3d } from "./physics/box3d/box3dLoader.js";
+
+const cvs = document.getElementById("c"), beEl = document.getElementById("be"), subEl = document.getElementById("sub");
+const FONT_URL = "./vendor/fonts/IBMPlexSerif-Regular.ttf";
+
+const CHARS = " " + TICKER.text + "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,'%";
+const fail = (m) => { beEl.innerHTML = '<span class="bad">' + m + "</span>"; };
+
+// Four rows read as (m.x, m.y, -, m.w): vertices arrive in PIXELS (em * size), y-up, baseline at Y = 0; this places the
+// baseline origin at screen pixel (px, py) with y down. The same rows slug-text.html uses.
+function placeRows(W, H, px, py) {
+  return new Float32Array([2 / W, 0, 0, (2 / W) * px - 1,  0, 2 / H, 0, 1 - (2 / H) * py,  0, 0, 0, 0,  0, 0, 0, 1]);
+}
+
+let device, fontDevice, batches = [];
+async function init() {
+  const forceGl = new URLSearchParams(location.search).get("webgl") === "1";
+  try { device = await requestDevice(cvs, forceGl ? { backend: "webgl2" } : { prefer: "webgpu" }); }
+  catch (e) { return fail("requestDevice threw: " + e.message); }
+  if (!device || device.backend === "null") return fail("no GPU backend here (WebGPU needs a secure origin: localhost or https).");
+  let ab;
+  try { const r = await fetch(FONT_URL); if (!r.ok) throw new Error("HTTP " + r.status); ab = await r.arrayBuffer(); }
+  catch (e) { return fail("could not load " + FONT_URL + " (" + e.message + ")"); }
+  let font;
+  try { font = parseFont(ab); fontDevice = new SlugFontDevice(device, font, CHARS); }
+  catch (e) { return fail("font/atlas/pipeline: " + e.message); }
+  document.getElementById("notice").textContent = fontDevice.notice;
+  const kb = (fontDevice.byteSize / 1024).toFixed(0);
+  beEl.textContent = "backend: " + device.backend + " · atlas " + kb + " KiB (rgba16float + rg16uint) · logWidth " + fontDevice.logWidth;
+  const st = await box3d.init();
+  if (!st || !st.ready) return fail("box3d did not load: " + (st && st.reason));
+  const gb = glyphBodies(font, (gi) => fontDevice.entryFor(gi), { color: [0.95, 0.97, 1, 1] });
+  world = worldFromModule(box3d._mod, TICKER.gravity);
+  plan = gb.plan; bodies = gb.bodies; ids = spawnTicker(world, bodies, plan).ids;
+  batches = bodies.map((b) => { const bt = new SlugDeviceBatch(fontDevice); bt.setBuilt(b.built); return bt; });
+  beEl.textContent = "backend: " + device.backend + " \u00b7 " + bodies.length + " glyph bodies on a " + plan.loop.toFixed(1) + "-unit loop \u00b7 box3d " + (box3d._mod ? "loaded" : "?");
+  requestAnimationFrame(frame);
+  addEventListener("resize", () => { sized = false; });
+}
+let world, plan, bodies, ids, sized = false, ticks = 0, wraps = 0;
+function dpr() { return Math.min(2, devicePixelRatio || 1); }
+function frame() {
+  const d = dpr(), w = Math.round((cvs.clientWidth || 1200) * d), h = Math.round(460 * d);
+  if (cvs.width !== w || cvs.height !== h) { cvs.width = w; cvs.height = h; }
+  const r = tickTicker(world, ids, plan); ticks++; wraps += r.wrapped;
+  const PV = cameraFor(w, h);
+  device.frame(({ pass }) => {
+    pass.clear([0.02, 0.031, 0.024, 1]);
+    batches.forEach((b, k) => b.draw(pass, bodyRows(PV, r.xf, ids[k]), [w, h]));
+  });
+  if (ticks % 15 === 0) document.getElementById("tick").textContent = "tick " + ticks + ", " + wraps + " wraps, hash " + world.stateHash();
+  requestAnimationFrame(frame);
+}
+init();
+</script>
+</body>
+</html>

@@ -567,6 +567,7 @@ struct VO { @builtin(position) pos: vec4f, @location(0) uv: vec2f };
         p._stor[n] = { buf, offset: o.offset || 0, size: o.size || 0 }; p._gen++;
     };
     // v4489 -- one query set per device for timed frames; the resolve and staging buffers are per frame (a mapped buffer is busy)
+    let frameSeq = 0;                                     // v4497 -- see pass.uniform
     let qset = null;
     const dev = {
         backend: "webgpu", gpu, ctx, fmt, offscreen, depth, adapterInfo, features,
@@ -698,6 +699,7 @@ struct VO { @builtin(position) pos: vec4f, @location(0) uv: vec2f };
             });
             const enc = gpu.createCommandEncoder(); const target = (o && o.target) ? o.target.gpu : (offscreen || (o && o.offscreen)) ? ownTarget() : ctx.getCurrentTexture(); const view = target.createView(); let rp = null, cur = null, idx = null;
             const usedPipes = new Set();                          // v4461 -- every pipeline this frame bound, for the read path's check below
+            const frameId = ++frameSeq;                            // v4497 -- per-draw uniform buffers reset lazily on the first uniform() of a frame
             // *** THE BIND GROUP'S OWN SCOPE IS NOT ENOUGH, MEASURED. *** A bind group created before its pipeline has finished
             // building is validated LATE, after the scope that created it has popped; the only report is then the encoder's
             // "[Invalid BindGroup] is invalid -- while encoding SetBindGroup", and THAT is raised when the pass ends or the
@@ -711,7 +713,7 @@ struct VO { @builtin(position) pos: vec4f, @location(0) uv: vec2f };
                 for (const p of usedPipes) if (!p.error) p.error = "gfx/device: a draw in a frame that used this pipeline was refused when the frame was encoded (the pipeline was still building when its bind group was made, so the layout check landed late): " +
                     String(e.message).split("\n")[0] + " -- this pipeline bound: " + p.all.filter((b) => b.used !== false).map((b) => "@binding(" + b.binding + ") " + b.name).join(", ") +
                     ". A texture bound under the wrong sample type (a uint texture to a texture_2d<f32>, a depth texture to a filterable one) is the usual cause."; }).catch(() => {}) : Promise.resolve();
-            const ready = () => { if (!rp) throw new Error("gfx/device: draw before pass.clear() -- the render pass begins at clear()"); setBind(rp, cur); };
+            const ready = () => { if (!rp) throw new Error("gfx/device: draw before pass.clear() -- the render pass begins at clear()"); setBind(rp, cur); if (cur) cur._udrawn = true; };
             const pass = {
                 // Compute runs on the SAME encoder, before the render pass, so a cull that fills an indirect buffer
                 // is ordered before the draw that reads it without the caller managing a fence.
@@ -741,7 +743,20 @@ struct VO { @builtin(position) pos: vec4f, @location(0) uv: vec2f };
                 vertices: (b, slot = 0) => rp.setVertexBuffer(slot, b.gpu),
                 instances: (b, byteOffset = 0) => rp.setVertexBuffer(1, b.gpu, byteOffset),
                 indices: (b) => { rp.setIndexBuffer(b.gpu, b.indexFormat || "uint32"); idx = b; },
-                uniform: (n, v) => { if (!cur || !cur.ubuf || !cur.uni || cur.uni.offsets[n] == null) return; const data = (v instanceof Float32Array) ? v : Float32Array.from(Array.isArray(v) ? v : [v]); gpu.queue.writeBuffer(cur.ubuf, cur.uni.offsets[n], data); },
+                // *** v4497 -- A UNIFORM WRITTEN BETWEEN TWO DRAWS OF ONE FRAME USED TO REACH BOTH DRAWS, MEASURED. *** queue.writeBuffer runs
+                // before the command buffer that follows it, so every draw in the frame read the LAST value written to the pipeline's one
+                // uniform buffer: 33 glyph bodies drawn with 33 matrices in one pass all landed at the 33rd (tools/ship/slugTicker-selfcheck.mjs
+                // found it; ev/esShipLabels.js's device path has drawn every label at the last label's rows on WebGPU since v4463 and its gate
+                // compared placements loosely enough not to see it). Now the pipeline keeps a CPU shadow of its uniforms and a pool of
+                // uniform buffers: the first uniform() after a draw in the same frame moves to the next buffer (created once, reused every
+                // frame), copies the shadow into it and rebinds (the bind group is keyed on _gen). WebGL2 sets uniforms immediately per
+                // draw and never had the fault; the null backend records the op.
+                uniform: (n, v) => { if (!cur || !cur.ubuf || !cur.uni || cur.uni.offsets[n] == null) return; const data = (v instanceof Float32Array) ? v : Float32Array.from(Array.isArray(v) ? v : [v]);
+                    if (!cur._ushadow) { cur._ushadow = new Float32Array(cur.uni.size / 4); cur._upool = [cur.ubuf]; cur._upos = 0; }
+                    if (cur._uframe !== frameId) { cur._uframe = frameId; if (cur._upos !== 0) { cur._upos = 0; cur.ubuf = cur._upool[0]; cur._gen++; gpu.queue.writeBuffer(cur.ubuf, 0, cur._ushadow); } cur._udrawn = false; }
+                    if (cur._udrawn) { cur._upos++; if (!cur._upool[cur._upos]) cur._upool[cur._upos] = gpu.createBuffer({ size: cur.uni.size, usage: BU().UNIFORM | BU().COPY_DST }); cur.ubuf = cur._upool[cur._upos]; cur._gen++; gpu.queue.writeBuffer(cur.ubuf, 0, cur._ushadow); cur._udrawn = false; }
+                    cur._ushadow.set(data.subarray ? data.subarray(0, Math.min(data.length, cur._ushadow.length - cur.uni.offsets[n] / 4)) : data, cur.uni.offsets[n] / 4);
+                    gpu.queue.writeBuffer(cur.ubuf, cur.uni.offsets[n], data); },
                 // Level 11: BOUND, AT LAST. The name is looked up in what the shader declared; an undeclared name is
                 // refused here rather than silently ignored, because "bound a texture the shader never reads" is
                 // the same picture-without-its-source failure v4273 found, arrived at from the other side.
