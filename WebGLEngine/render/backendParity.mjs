@@ -191,13 +191,28 @@ export const PARITY_BASELINE = Object.freeze({
     // and docs/TSL-ROADMAP.md step 4 states outright. So the number moves by one and the reach does not.
     // render/brainTsl.mjs itself carries NEITHER language, for exactly that reason: TSL is JavaScript.
     // 146 at v4479: gfx/blendModes.mjs is imported by device.js, which carries the GLSL programs.
-    glslBearing: 146,
+    // *** 147 at v4483, AND THE +1 IS THE GATE, NOT THE EMITTER -- WHICH IS THE FINDING. ***
+    // v4483 gave render/stereographic.js a stereoWGSL() beside its stereoGLSL(), so one module now emits BOTH
+    // languages. This census counts it as bearing NEITHER, and did before the WGSL arrived too: classify() finds
+    // shaders by their preamble -- a version header, three's framework markers, or WGSL's compute-stage and
+    // binding-group attributes -- and AN EMITTED FRAGMENT HAS NO PREAMBLE. Both emitters return bare function
+    // bodies, so both are invisible here.
+    // *** AND THE FIRST DRAFT OF THIS PARAGRAPH SPELLED THOSE WGSL ATTRIBUTES OUT AND MADE THIS FILE CLASSIFY
+    // ITSELF, *** which is the defect recorded twenty lines below about the version header, at v4479, and the
+    // one v4462 found in its own census counting its own patterns table. THIRD INSTANCE, written by the same
+    // hands, directly underneath the warning. An instrument that names what it measures becomes a sample of it,
+    // and knowing that is not the same as remembering it at the moment of typing. The three counts below moved
+    // only because tools/ship/stereoDevice-selfcheck.mjs carries a full shader of each to drive the device.
+    // MEASURED FOR ONE FILE, NOT CLAIMED FOR A POPULATION: how many other emitters this census cannot see is
+    // unknown and is its own round. The number is recorded rather than the census widened, because widening it
+    // would move every count in this file at once and hide what moved for a reason.
+    glslBearing: 147,
     // 130 at v4479: blendModes-selfcheck.mjs's GLSL twin writes its own version header, because it drives raw
     // WebGL2 through gfx/device.js rather than handing source to three. THE FIRST DRAFT OF THIS COMMENT SPELLED
     // THAT HEADER OUT and this file -- the one that CLASSIFIES shaders by looking for exactly that marker --
     // classified ITSELF as GLSL-bearing. The gate caught it by name. Same shape as v4462's census counting its
     // own PATTERNS table: an instrument that mentions what it measures becomes a sample of it.
-    glslDirective: 130,  // raw WebGL2 -- the file writes its own version header
+    glslDirective: 131,  // raw WebGL2 -- the file writes its own version header; 131 at v4483 (stereoDevice)
     glslFramework: 16,   // three.js prepends it: badTvPass, aquarellePass, grassField, solidTexture, atmosphere, ...
     // v4392 -- 57 -> 58, and the file is a GATE rather than a shipping module. tools/ship/shipyard-selfcheck.mjs
     // section 8 embeds a WGSL compute shader to run the four float32 encodings on a real device, so it bears WGSL
@@ -231,10 +246,10 @@ export const PARITY_BASELINE = Object.freeze({
     // 61 on main, 67 on this branch, 68 on the merged tree at v4477. 69 at v4478: gpuTimer-selfcheck.mjs
     // carries the WGSL compute shader it times, so the gate that measures GPU time is itself WGSL-bearing.
     // 70 at v4479: blendModes-selfcheck.mjs carries the WGSL quad it draws through both backends.
-    wgslBearing: 70,
+    wgslBearing: 71,   // 71 at v4483: stereoDevice-selfcheck's compute shader
     // 14 at v4479: blendModes-selfcheck.mjs carries BOTH a WGSL quad and its GLSL twin, because the
     // parity gate draws the same triangle through both backends in one launch.
-    both: 14,
+    both: 15,          // 15 at v4483, and see the glslBearing note: the emitter itself is invisible here
     glslOnly: 132,
     // 48 and 54 respectively -- re-measured for the same reason; 56 at v4478 for the same one file.
     wgslOnly: 56,
@@ -244,7 +259,11 @@ export const PARITY_BASELINE = Object.freeze({
         // v4479: the blend parity gate carries a WGSL quad AND its GLSL twin, because it draws the same
         // triangle through both backends in one launch. It is a gate rather than a render module, and it is
         // listed here rather than exempted, because the list is what "both" MEANS and an exemption would hide it.
-        "tools/ship/blendModes-selfcheck.mjs"]),
+        "tools/ship/blendModes-selfcheck.mjs",
+        // v4483: the stereographic device gate carries a WGSL compute shader AND a GLSL fragment, because it
+        // grades the same projection on both backends against the JS in one run. Listed for the same reason
+        // blendModes-selfcheck is: the list is what "both" MEANS, and an exemption would hide it.
+        "tools/ship/stereoDevice-selfcheck.mjs"]),
     bothPages: Object.freeze(["gfx-device.html", "nebula-device.html", "wormhole-jump.html"]),
     wgslRawVsCode: Object.freeze({ raw: 54, code: 51 }),
 });

@@ -197,8 +197,12 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // is what a derived number is supposed to do; a headline that never moves under a changing population is
     // either a law or a constant somebody typed, and only re-deriving tells you which. THREADS HAS READ 22
     // THROUGH ALL SEVEN.
-    files: 3880,
-    esModules: 3589, closures: 3465, asyncAwait: 1339, typedArrays: 694, promises: 333,
+    // AND AN EIGHTH, at v4483: render/glslFloatPack.mjs's home in tools/ship and stereoDevice-selfcheck.mjs
+    // (3880 -> 3882), moving three rows -- ES modules +2, closures +1, async/await +1 -- while typed arrays,
+    // Promises, fetch/XHR, performance.now, rAF, WebGL, WebGPU, threads and WebAssembly all held. EIGHT
+    // POPULATIONS, EIGHT TABLES, AND THREADS HAS READ 22 IN EVERY ONE.
+    files: 3882,
+    esModules: 3591, closures: 3466, asyncAwait: 1340, typedArrays: 694, promises: 333,
     fetchXhr: 224, performanceNow: 202, raf: 116, webgl: 105, webgpu: 46, threads: 22, wasm: 22,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

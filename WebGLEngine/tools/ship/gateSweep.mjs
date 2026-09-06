@@ -2725,6 +2725,58 @@ since116: Object.freeze({
                  "where the pixels came from. #174 stays open: nothing has compared the CPU pair to a GPU one " +
                  "by value.",
     }),
+    // v4483 -- the twenty-fourth closing, and the one that finally answers the limit v4463 declared about itself.
+    // It turned out to be a round about the INSTRUMENT: a screenshot is eight bits, and no GLSL result in this
+    // tree had ever been graded finer than 1/255.
+    since122: Object.freeze({
+        at: "v4483", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/stereoDevice-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, seventeen checks in six sections, 1.1 s. #174 asked whether " +
+                 "the CPU and GPU agree BY VALUE. They do, three ways, and the answer is only worth anything " +
+                 "because the instrument was calibrated first. *** A WebGL2 READBACK IS RGBA8, SO EVERY GLSL " +
+                 "GATE IN THIS TREE COMPARES AT 1/255 *** -- fine for a picture, useless for arithmetic, and " +
+                 "v4463's stated limit (the shader 'needs a screenshot') understated the problem rather than " +
+                 "naming it. NEW tools/ship/glslFloatPack.mjs packs a float across three channels: 24 bits held, " +
+                 "23 ACHIEVED on this device, worst error 2 steps of 2^-24 = 1.19e-7 against the 3.92e-3 of one " +
+                 "8-bit step -- 32,954x. *** AND THE OBVIOUS IDIOM FOR IT IS WRONG AT EXACTLY ONE INPUT, THE " +
+                 "MAXIMUM: *** floor(v * 16777215 + 0.5) at v = 1.0 rounds to 2^24 BEFORE floor runs, because " +
+                 "16777215.5 needs 25 mantissa bits, so the high byte computes as 256, saturates, and both low " +
+                 "bytes zero out. 255 of 256 test values were correct. The extremes are where a projection's " +
+                 "horizon and poles live, so it was the one value the packer could least afford, and the gate " +
+                 "drives the naive version on the device rather than arguing about it. NEW stereoWGSL() beside " +
+                 "v4463's stereoGLSL(), so the projection exists on the backend gfx/device.js is building " +
+                 "toward -- and because WGSL compute writes f32 to a storage buffer, it is the only path with " +
+                 "no 8-bit door. THE THREE-WAY: WGSL vs the JS agrees to 4.99e-8, UNDER HALF AN f32 ULP, and " +
+                 "the driver's unproject returns a unit vector to 5.2e-8 (v4463 named normalize() as a place a " +
+                 "real driver might differ; it does not, on this one). GLSL vs the JS reads 1.82e-7 against a " +
+                 "transport floor of 2.38e-7, WHICH IS NOT A CLAIM THAT GLSL IS 1.8e-7 WRONG -- a difference at " +
+                 "the instrument's own resolution measures the instrument, and the gate refuses to report " +
+                 "tighter. GLSL vs WGSL, 1.78e-7, also at the floor. Neither GPU is the answer key (v4479). " +
+                 "*** TWO MEASUREMENTS WERE THROWN AWAY BEFORE THESE WERE KEPT, AND BOTH ARE KEPT AS CONTROLS. " +
+                 "*** The first probe built its test points with sin and cos independently on each side and " +
+                 "read a WGSL-vs-CPU difference of 1.839e-4 -- fifteen hundred ulp, which it would have " +
+                 "reported as the projection disagreeing. It was the trig: the driver's sin/cos and V8's differ " +
+                 "by 8,316 ulp on the same spiral, measured, so the gate grades on a LATTICE with no " +
+                 "transcendental in it and checks that its own lattice has none. The second packed three " +
+                 "components into three ROWS and read 1.409 -- a whole unit, and a row-order mistake, the " +
+                 "harness flipping rows under a readback that assumed it did not. Fixed structurally: one row, " +
+                 "component chosen by column. FIFTEEN SABOTAGES, ALL RED BY NAME. *** ONE COST ZERO RED AND IT " +
+                 "WAS A SUBSTRING: *** renaming the WGSL entry point to stereoProjectXX passed a check that " +
+                 "asked whether the source includes 'stereoProject', because the longer name contains the " +
+                 "shorter one. The driver is asked instead -- a module that CALLS both entry points is compiled, " +
+                 "and a rename fails compilation. THREE FINDINGS IN OTHER FILES ALONG THE WAY. " +
+                 "render/backendParity.mjs classifies render/stereographic.js as bearing NEITHER language, " +
+                 "though it now emits both: the census finds shaders by their preamble and AN EMITTED FRAGMENT " +
+                 "HAS NO PREAMBLE, so all three +1s came from the gate, not the emitter. Measured for one file " +
+                 "and not claimed for a population. The comment recording that made backendParity.mjs CLASSIFY " +
+                 "ITSELF by spelling out the WGSL attributes -- the third instance of that shape, written " +
+                 "directly underneath the file's own warning about it at v4479. And the row asserting BOTH is " +
+                 "under a tenth of GLSL-bearing crossed its threshold, 14/146 to 15/147, 9.6% to 10.2%. The " +
+                 "divisor was NOT bumped: the claim is about dual-language REACH and a parity gate carrying " +
+                 "both languages in order to compare them is the instrument sitting in its own sample, so the " +
+                 "two gates are split out by name and reach reads 13 of 147, 8.8%.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

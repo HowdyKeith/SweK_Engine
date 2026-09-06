@@ -231,6 +231,36 @@ vec3 stereoUnproject(vec2 p) {
 }`;
 }
 
+/**
+ * *** THE SAME ARITHMETIC AS WGSL, SO THE PROJECTION EXISTS ON THE BACKEND gfx/device.js IS BUILDING TOWARD. ***
+ *
+ * v4463 emitted GLSL alone and closed by saying the shader's real output "needs a screenshot". v4483 took that
+ * seriously and found the screenshot is the problem: a WebGL2 readback is RGBA8, so the finest thing a GLSL
+ * result can be compared at is one 8-bit step -- 1/255 -- unless the float is PACKED across the channels first.
+ * WGSL has no such limit. A compute shader writes f32 to a storage buffer and the harness reads the bits back
+ * exactly, so this emitter is not a second copy for its own sake: it is the only path on which the arithmetic
+ * can be graded at full precision, and tools/ship/stereoDevice-selfcheck.mjs grades all three against each other.
+ *
+ * *** THE TWO TEXTS ARE NOT ASSERTED TO MATCH -- THEIR VALUES ARE. *** #118's rule for this tree, in its own
+ * words: "the JS and GLSL Ashima simplex are NOT the same function, and no gate has ever compared their VALUES".
+ * A regex over two shader strings tests the regex.
+ */
+export function stereoWGSL() {
+    return `// Stereographic projection -- the spherical member of the family render/panini.js is the cylindrical
+// member of. Same arithmetic as stereoGLSL(); graded against it and against the JS BY VALUE, not by text.
+fn stereoProject(dir: vec3<f32>) -> vec2<f32> {
+    let d = normalize(dir);
+    let k = 1.0 - d.z;
+    if (k <= 1e-12) { return vec2<f32>(1e9, 1e9); }   // straight behind: the one direction with no image
+    return vec2<f32>(2.0 * d.x / k, 2.0 * d.y / k);
+}
+fn stereoUnproject(p: vec2<f32>) -> vec3<f32> {
+    let s = dot(p, p);
+    let t = 4.0 / (s + 4.0);
+    return vec3<f32>(t * p.x, t * p.y, (s - 4.0) / (s + 4.0));
+}`;
+}
+
 /** What v4463 measured. Re-take with: node tools/ship/stereographic-selfcheck.mjs */
 export const MEASURED_AT_V4463 = Object.freeze({
     // The identity with panini.js, measured against the real paniniProject over the horizon.

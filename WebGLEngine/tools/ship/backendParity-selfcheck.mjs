@@ -101,8 +101,26 @@ console.log("\n3. THE MEASUREMENT");
         "this is the case v4269's marker missed sixteen times");
     ok("CONTROL: and the same declaration inside a comment is still not GLSL",
         classify("// " + TELL_SAMPLE + " is what a pass declares\nlet x=1;") === LANG.NONE);
-    ok("*** and BOTH is a tiny fraction of GLSL-bearing ***", N.both < N.glslBearing / 10,
-        `${N.both} of ${N.glslBearing} -- ${(100 * N.both / N.glslBearing).toFixed(1)}%`);
+    // *** THIS ROW CROSSED ITS OWN THRESHOLD AT v4483, AND THE FILE THAT CROSSED IT IS AN INSTRUMENT. ***
+    // The bound was both < glslBearing/10 and the count went 14 of 146 (9.6%) to 15 of 147 (10.2%) when
+    // tools/ship/stereoDevice-selfcheck.mjs arrived carrying a WGSL compute shader and a GLSL fragment -- not
+    // to render anything, but to grade the same projection on both backends against the JS. blendModes-selfcheck
+    // did the same at v4479. Bumping the divisor would have been the easy read and the wrong one: the claim
+    // this row exists to make is about dual-language REACH, and a gate that carries both languages IN ORDER TO
+    // COMPARE THEM is not reach, it is the measuring instrument sitting in its own sample. That is the same
+    // confusion this file already records twice -- v4462's census counting its own patterns table and v4479's
+    // comment classifying this very file -- so the split is made explicit rather than absorbed into a rounder
+    // threshold.
+    const bothGates = C.both.filter((f) => f.startsWith("tools/ship/"));
+    const bothReach = C.both.filter((f) => !f.startsWith("tools/ship/"));
+    ok("*** and BOTH-for-REACH is a tiny fraction of GLSL-bearing, with the parity gates taken out ***",
+        bothReach.length < N.glslBearing / 10 && bothReach.length + bothGates.length === N.both,
+        `${bothReach.length} of ${N.glslBearing} -- ${(100 * bothReach.length / N.glslBearing).toFixed(1)}% ` +
+        `(${N.both} raw, ${(100 * N.both / N.glslBearing).toFixed(1)}%, minus ${bothGates.length} parity gates)`);
+    ok("...and the gates taken out are named, so the exclusion cannot quietly grow",
+        bothGates.length === 2 && bothGates.every((f) => /(blendModes|stereoDevice)-selfcheck\.mjs$/.test(f)),
+        bothGates.join(" ") + " -- each carries a WGSL shader and its GLSL twin to draw or compute the same " +
+        "thing through both backends in one run. A third arriving without a reason goes red here");
     // The distinction that stops the 5 from sounding better than it is.
     const pages = C.both.filter((f) => f.endsWith(".html"));
     const mods = C.both.filter((f) => !f.endsWith(".html"));
