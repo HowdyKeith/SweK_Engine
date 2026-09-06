@@ -245,6 +245,112 @@ sec("6. *** THE LIMITS ***");
     say("  would let a phone or a Steam Deck answer does not exist yet, and neither does any UI for it.");
 }
 
+// ---- v4484: THE BOUND, AND WHY IT COULD NOT BE SPENT WHERE v4480 MEANT IT TO BE ------------------------------
+sec("8. *** A TOLERANCE CANNOT BE EARNED FOR A CHECK THAT GRADES ITS OWN ANSWER ***");
+{
+    // *** THE FINDING, READ OUT OF THE SOURCE RATHER THAN ARGUED. *** corroborateFully's criterion 4 builds the
+    // device, builds it again under withPerturbedLibm, diffs the two, and grades `relMove <= tol`. Both sides
+    // come from the SAME PROCESS and the SAME simulated perturbation, so a tolerance derived from that
+    // measurement makes the comparison reflexive: the pass stops being contingent and the evidence string does
+    // not change. v4480 wrote "earn a portability tolerance for each of the seven refinement knobs" as the next
+    // round; this is that round reporting that the task, as specified, produces a check that cannot fail.
+    const cfSrc = fs.readFileSync(new URL("./corroborateFully.mjs", import.meta.url), "utf8");
+    // ANCHORED ON THE SECTION MARKER, NOT ON THE WORDS. My first version matched /criterion 4/ and landed on
+    // the FILE HEADER's mention of v2905 fourteen hundred characters from the code -- so all three patterns
+    // read a comment and the row went red about source that was exactly as described. The banner is the only
+    // unambiguous start of that block.
+    const c4Body = (cfSrc.match(/---- criterion 4:[\s\S]{0,1400}/) || [""])[0];
+    ok("!! *** c4 grades relMove against tol, and MEASURES relMove in the same breath ***",
+        /pass: d\.relMove <= tol/.test(c4Body) &&
+        /withPerturbedLibm\(\(\) => dev\.build\(\{ mode \}\)\)/.test(c4Body) &&
+        /diffObservables\(base, pert\)/.test(c4Body),
+        "the perturbed build, the diff and the comparison are three consecutive statements. A tolerance taken " +
+        "from relMove would be compared against the number it came from -- reflexive, and green forever");
+
+    // DRIVEN, not only read: the comparison is reflexive AT EXACTLY the measured value and fails just below it.
+    const q = "kepler.conserve.growthGapFrac";
+    const bound = CS.predictedBound(q);
+    ok("...and the comparison really is reflexive at the measured value, and only just",
+        bound > 0 && bound <= bound && !(bound <= bound / 2),
+        `bound ${bound.toExponential(3)}: a tol equal to it passes BY CONSTRUCTION, a tol half of it fails. ` +
+        "That is the whole distance between a bar and a mirror");
+
+    ok("!! ...so the report still refuses to grade c4, and the refusal is UNCHANGED by this round",
+        DR.LAB_AT_V4480.ungradedC4 === 27 && DR.LAB_AT_V4480.observables === 27,
+        `${DR.LAB_AT_V4480.ungradedC4} of ${DR.LAB_AT_V4480.observables} ungraded. v4484 does NOT grade c4 -- ` +
+        "it moves the number to the one place it means something");
+}
+
+sec("9. *** WHERE THE BOUND IS SPENT: A DIFFERENCE THAT NOW HAS A SIZE ***");
+{
+    const C = DR.CONDITIONING_AT_V4484;
+    const keys = Object.keys(C);
+    ok("!! the conditioning table covers the scoped set and re-derives 8 movers of 27",
+        keys.length === 27 && keys.filter((k) => C[k].moved).length === 8 &&
+        keys.every((k) => C[k].moved ? C[k].relMove > 0 : C[k].relMove === 0),
+        `${keys.length} observables, ${keys.filter((k) => C[k].moved).length} moved. A non-mover's bound is ` +
+        "EXACTLY 0: the perturbation armed and this number did not notice, so bit identity is the prediction");
+
+    // *** THE TWO VERDICTS DIFFERS COULD NOT TELL APART, DRIVEN THROUGH THE REAL GRADER. ***
+    const q = "kepler.conserve.growthGapFrac", ours = 1, b = CS.predictedBound(q);
+    const ledgerWith = (val) => ({ kind: CS.LEDGER_KIND, devices: { d1: {
+        platform: "linux-x64", runs: [{ runHash: "h1", values: { [q]: { value: val, bits: CS.bitsOf(val) } } }] } } });
+
+    const within = CS.gradeSubmission(ledgerWith(ours * (1 + b / 2)), { [q]: ours });
+    const beyond = CS.gradeSubmission(ledgerWith(ours * (1 + b * 4)), { [q]: ours });
+    ok("!! *** a machine landing inside the bound is WITHIN PREDICTION, not merely 'differs' ***",
+        within.rows[0].verdict === CS.AGREE.WITHIN_PREDICTION && within.withinPrediction === 1 &&
+        within.beyondPrediction === 0 && within.disagreeing === 1,
+        `relDiff ${within.rows[0].reports[0].relDiff.toExponential(2)} against bound ${b.toExponential(2)}. ` +
+        "A libm rounding one call differently is the EXPECTED case for the 20 observables that make raw " +
+        "transcendental calls -- reporting it in the same word as a broken box is what this splits");
+    ok("!! *** ...and one landing outside it is BEYOND PREDICTION, which is a finding about that machine ***",
+        beyond.rows[0].verdict === CS.AGREE.BEYOND_PREDICTION && beyond.beyondPrediction === 1 &&
+        beyond.withinPrediction === 0,
+        `relDiff ${beyond.rows[0].reports[0].relDiff.toExponential(2)} against bound ${b.toExponential(2)}: ` +
+        "a disagreement bigger than a coherent one-ulp shift can produce");
+
+    // A QUANTITY PREDICTED BIT-IDENTICAL HAS BOUND 0, SO ONE ULP IS ALREADY BEYOND IT. The strongest claim in
+    // the table, and the one that would be silently weakened if a bound were ever invented for a non-mover.
+    const z = "lens.deflect.rMin";
+    const up = (x) => { const d = new DataView(new ArrayBuffer(8)); d.setFloat64(0, x);
+                        d.setBigUint64(0, d.getBigUint64(0) + 1n); return d.getFloat64(0); };
+    const zr = CS.classifyDifference(z, 1, up(1));
+    ok("!! a non-mover's bound is 0, so a SINGLE ULP from another machine is already beyond it",
+        CS.predictedBound(z) === 0 && zr.verdict === CS.AGREE.BEYOND_PREDICTION,
+        `${z}: bound 0, one ulp away reads ${zr.verdict}. Inventing any bound here would weaken the strongest ` +
+        "prediction in the table");
+
+    // AND AN UNKNOWN BOUND KEEPS THE OLD ANSWER RATHER THAN GUESSING ONE.
+    const u = CS.classifyDifference("no.such.device.field", 1, 2);
+    ok("...and a quantity with NO measured bound stays plain DIFFERS rather than being graded against a guess",
+        u.verdict === CS.AGREE.DIFFERS && u.bound === null,
+        "an unknown bound is not a bound. This is the fallback that stops the new axis quietly becoming a " +
+        "licence to grade everything");
+
+    // *** THE NON-FINITE GUARD IS A NO-OP ON THE VERDICT, AND A SABOTAGE ESTABLISHED THAT RATHER THAN AN
+    // ARGUMENT. *** Deleting it went 0 RED against the first version of this row, which asserted the verdict
+    // alone: NaN <= bound is already false, so a non-finite lands BEYOND by the ordinary comparison and the
+    // guard changes nothing about the answer. What it DOES change is the REPORT -- without it the row carries
+    // relDiff: NaN, and a number that is not a number printed where a magnitude belongs is how a reader learns
+    // to distrust the whole column. So the row asserts what the guard actually buys.
+    const nf = CS.classifyDifference(q, 1, NaN);
+    ok("!! ...and a non-finite submitted value is beyond ANY bound, and says so INSTEAD of reporting NaN",
+        nf.verdict === CS.AGREE.BEYOND_PREDICTION && nf.relDiff === null && /non-finite/.test(nf.note || ""),
+        `verdict ${nf.verdict}, relDiff ${nf.relDiff}, note ${JSON.stringify(nf.note)}. The VERDICT survives ` +
+        "without the guard (NaN <= bound is false either way, measured by sabotage); the reported magnitude " +
+        "does not, and a NaN in a magnitude column is worse than no column");
+
+    // *** AND NOTHING HAS SUBMITTED, WHICH THIS ROUND DOES NOT LET THE NEW COLUMNS IMPLY. ***
+    const empty = CS.gradeSubmission({ kind: CS.LEDGER_KIND, devices: {} }, { [q]: 1 });
+    ok("!! *** the real ledger is still EMPTY: every new column reads zero on it ***",
+        empty.rows[0].verdict === CS.AGREE.NOT_SUBMITTED && empty.withinPrediction === 0 &&
+        empty.beyondPrediction === 0 && empty.devices === 0,
+        "every number in section 9 comes from a FIXTURE. No machine has posted a corroboration report, so this " +
+        "round adds a verdict nothing has yet earned -- and says so here rather than letting a green gate imply " +
+        "otherwise");
+}
+
 console.log();
 if (fails) { console.log("corroborationSubmit-selfcheck: " + fails + " FAILURES"); process.exit(1); }
 console.log("corroborationSubmit-selfcheck: all checks pass");

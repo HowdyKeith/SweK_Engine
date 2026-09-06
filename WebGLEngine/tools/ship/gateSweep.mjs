@@ -2642,6 +2642,28 @@ since116: Object.freeze({
                  "second-best finding -- widening the filter CRASHED the gate at its first call site instead " +
                  "of reddening, the third crash-instead-of-a-failure this session",
     }),
+    since123: Object.freeze({
+        at: "v4484", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        repaired: Object.freeze([
+            "tools/roundhouse/corroborationSubmit.mjs (gradeSubmission returned DIFFERS -- one word for two opposite events: a libm rounding one call differently, which is the EXPECTED case for 20 of 27 observables, and a machine that is wrong)",
+            "tools/roundhouse/deviceReport.mjs (the per-observable conditioning bound is frozen so a submission can be graded when one arrives -- 27 observables, 8 movers, worst amplification 8.68e7)",
+        ]),
+        verdict: "*** THE TOLERANCE v4480 ASKED FOR CANNOT BE EARNED WHERE IT IS USED. *** corroborateFully's " +
+                 "c4 builds the device, builds it again under a simulated one-ulp libm shift, diffs the two and " +
+                 "grades `relMove <= tol` -- three consecutive statements in one process, so a tolerance taken " +
+                 "from that measurement is compared against the number it came from and the pass becomes " +
+                 "NECESSARY rather than contingent. THE TOLERANCE IS NOT MISSING; THE CHECK IS MISNAMED -- c4 " +
+                 "is called portability and measures conditioning. The round does not rename it and does not " +
+                 "grade it: 27 of 27 stay UNGRADED. It spends the measurement where it is NOT circular, on a " +
+                 "grader that was already built and already blind, using two legs neither taken for this " +
+                 "purpose -- real libms differ by at most one ulp (v3997, 200k inputs, sqrt as the IEEE " +
+                 "control) and the perturbation applies that coherently at every call site, which is the worst " +
+                 "case such a difference can produce, so no safety factor is invented. Four sabotages; the " +
+                 "0-red one was a GENUINE no-op identified rather than chased -- NaN <= bound is already false, " +
+                 "so the guard buys the REPORT and not the verdict, and the row now asserts that",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

@@ -30,11 +30,11 @@ export const NEXT_ROUNDS = [
     // The design was never wrong; nothing enumerated the prose, so nothing ever prompted an entry. That half
     // exists now, and these are what it turned up that this session can vouch for first-hand.
     {
-        id: "portability-tolerances",
+        id: "c4-is-a-conditioning-test",
         blocker: "OPEN",
-        what: "Earn a portability tolerance for each of the seven refinement knobs, so criterion 4 can be graded instead of ungraded.",
-        how: "tools/roundhouse/deviceReport.mjs measures the amplification -- relMove / 2^-52 -- for every keyless observable, so the numbers exist. Each tolerance is a claim about that device's conditioning and needs the argument written beside it, the way every nuisance knob already carries a `why`. PORTABILITY_TOL is deliberately empty until then.",
-        why: "v4480 measured that criterion 4 has been graded at corroborateFully's 1e-6 function default since v2908 and that NOTHING has ever come near it: the worst-conditioned quantity in the scoped lab, kepler.conserve.growthGapFrac, amplifies by 8.7e7 against a default that permits 4.5e9. A bar nothing approaches is not a bar, and seven invented numbers would be worse than an honest refusal.",
+        what: "corroborateFully's criterion 4 is named PORTABILITY and measures CONDITIONING. Rename it, or give it the second machine it claims.",
+        how: "c4 builds the device, builds it again under withPerturbedLibm, diffs the two and grades `relMove <= tol` -- all in one process. That is a real and useful number (how much would this quantity move IF a libm differed) and it is not the question the criterion's name asks (does a second machine reproduce the bits). v4484 spent the measurement where it is not circular -- gradeSubmission's WITHIN/BEYOND_PREDICTION axis -- and deliberately did NOT rename c4, because renaming a criterion touches every corroboration record and every frozen verdict in the lab.",
+        why: "v4480 wrote 'earn a portability tolerance for each of the seven refinement knobs' as the next round. v4484 attempted it and found the task cannot be done as specified: a tolerance taken from relMove is compared against the number it came from, so the pass stops being contingent and the evidence string does not change. THE TOLERANCE IS NOT MISSING, THE CHECK IS MISNAMED. Closing this means either renaming c4 to what it measures, or wiring it to the submission ledger so it grades a real second machine -- and that second option is blocked on the same thing everything else here is: nothing has submitted.",
     },
     {
         id: "corroboration-full-sweep",

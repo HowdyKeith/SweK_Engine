@@ -50,6 +50,7 @@
 
 import crypto from "node:crypto";
 import { deviceKey } from "./deviceLedger.mjs";
+import { CONDITIONING_AT_V4484 } from "./deviceReport.mjs";
 
 /** The submission kind. Must also appear in androidPeerBridge.js's KINDS allow-list to be accepted. */
 export const CORROBORATION_KIND = "swek-corroboration-observables";
@@ -114,9 +115,45 @@ export function foldSubmission(ledger, sub) {
 export const AGREE = Object.freeze({
     IDENTICAL: "bit-identical",
     DIFFERS: "differs",
+    // *** v4484 -- DIFFERS WAS ONE WORD FOR TWO OPPOSITE EVENTS. *** A submitted value whose bits differ was
+    // graded DIFFERS and that was the end of it, so a machine whose libm rounds one call differently -- the
+    // expected, uninteresting case, and the reason 20 of 27 observables need a second machine at all -- was
+    // reported in the same word as a machine that is wrong. The magnitude axis separates them against a bound
+    // MEASURED HERE and PREDICTED FOR THEM (see deviceReport.CONDITIONING_AT_V4484).
+    WITHIN_PREDICTION: "differs-within-prediction",
+    BEYOND_PREDICTION: "differs-BEYOND-prediction",
     ABSENT: "absent-here",
     NOT_SUBMITTED: "not-submitted",
 });
+
+/**
+ * The predicted bound for one quantity: how far a CONFORMING machine may land from this one, derived from the
+ * coherent all-sites one-ulp perturbation. null when this quantity is not in the frozen scope -- an unknown
+ * bound is not a bound, and grading against a missing one would be inventing the number this round refused to
+ * invent everywhere else.
+ */
+export function predictedBound(quantity, table = CONDITIONING_AT_V4484) {
+    const r = table[quantity];
+    return r ? r.relMove : null;
+}
+
+/**
+ * Classify a bit-difference by magnitude. Returns one of the two DIFFERS verdicts, or DIFFERS unchanged when
+ * no bound is known -- which keeps the old answer as the honest fallback rather than guessing.
+ *
+ * relDiff is taken against OUR value: the prediction is about how far they may land from us, and dividing by
+ * the other side would make the verdict depend on which machine ran the comparison.
+ */
+export function classifyDifference(quantity, ours, theirs, table = CONDITIONING_AT_V4484) {
+    const bound = predictedBound(quantity, table);
+    if (bound === null) return { verdict: AGREE.DIFFERS, bound: null, relDiff: null };
+    if (!Number.isFinite(ours) || !Number.isFinite(theirs)) {
+        return { verdict: AGREE.BEYOND_PREDICTION, bound, relDiff: null, note: "a non-finite value is beyond any bound" };
+    }
+    // ours === 0 has no relative scale; an absolute difference is the only thing left to ask about.
+    const relDiff = ours === 0 ? Math.abs(theirs) : Math.abs((theirs - ours) / ours);
+    return { verdict: relDiff <= bound ? AGREE.WITHIN_PREDICTION : AGREE.BEYOND_PREDICTION, bound, relDiff };
+}
 
 /**
  * *** THE HUB ADJUDICATES. *** For every observable this machine measured, say what the fleet reported.
@@ -132,19 +169,28 @@ export function gradeSubmission(ledger, local) {
             for (const run of dev.runs || []) {
                 const got = run.values && run.values[q];
                 if (!got) { seen.push({ key, platform: dev.platform, verdict: AGREE.ABSENT }); continue; }
+                // v4484 -- a bit difference is now asked HOW BIG, against the bound predicted for this quantity.
+                const same = got.bits === localBits;
+                const mag = same ? null : classifyDifference(q, v, got.value);
                 seen.push({
                     key, platform: dev.platform,
-                    verdict: got.bits === localBits ? AGREE.IDENTICAL : AGREE.DIFFERS,
+                    verdict: same ? AGREE.IDENTICAL : mag.verdict,
                     theirBits: got.bits, theirValue: got.value,
+                    ...(same ? {} : { bound: mag.bound, relDiff: mag.relDiff }),
                 });
             }
         }
         rows.push({
             quantity: q, localValue: v, localBits,
             reports: seen,
+            // *** THE WORST REPORT WINS, AND THE ORDER IS THE POINT. *** One machine landing BEYOND the bound is
+            // the finding however many others agreed, so it outranks everything. An ungraded difference (no
+            // bound known) outranks a graded one, because "we cannot say" must not be absorbed by "we can".
             verdict: seen.length === 0 ? AGREE.NOT_SUBMITTED
-                : seen.some((s) => s.verdict === AGREE.DIFFERS) ? AGREE.DIFFERS
-                : seen.every((s) => s.verdict === AGREE.IDENTICAL) ? AGREE.IDENTICAL
+                : seen.some((x) => x.verdict === AGREE.BEYOND_PREDICTION) ? AGREE.BEYOND_PREDICTION
+                : seen.some((x) => x.verdict === AGREE.DIFFERS) ? AGREE.DIFFERS
+                : seen.some((x) => x.verdict === AGREE.WITHIN_PREDICTION) ? AGREE.WITHIN_PREDICTION
+                : seen.every((x) => x.verdict === AGREE.IDENTICAL) ? AGREE.IDENTICAL
                 : AGREE.ABSENT,
         });
     }
@@ -153,7 +199,15 @@ export function gradeSubmission(ledger, local) {
         devices: devices.length,
         runs: devices.reduce((n, [, d]) => n + (d.runs || []).length, 0),
         settled: rows.filter((r) => r.verdict === AGREE.IDENTICAL).length,
-        disagreeing: rows.filter((r) => r.verdict === AGREE.DIFFERS).length,
+        disagreeing: rows.filter((r) => r.verdict === AGREE.DIFFERS ||
+                                        r.verdict === AGREE.WITHIN_PREDICTION ||
+                                        r.verdict === AGREE.BEYOND_PREDICTION).length,
+        // v4484 -- the two halves of "disagreeing", which is the distinction the summary could not draw:
+        // a libm rounding one call differently is expected and settles nothing; a value beyond the bound is a
+        // finding about that machine and is the only row here anybody needs to act on.
+        withinPrediction: rows.filter((r) => r.verdict === AGREE.WITHIN_PREDICTION).length,
+        beyondPrediction: rows.filter((r) => r.verdict === AGREE.BEYOND_PREDICTION).length,
+        ungradedDifference: rows.filter((r) => r.verdict === AGREE.DIFFERS).length,
         // The honest majority until a machine posts: nothing to compare against.
         unanswered: rows.filter((r) => r.verdict === AGREE.NOT_SUBMITTED).length,
     };

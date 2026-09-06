@@ -279,6 +279,71 @@ export function summarise(reports) {
  * seven minutes and is recorded as owed rather than guessed at -- a gate nobody can run is a gate that gets
  * skipped, which is why zeroRangeSweep-selfcheck has had a SCOPE since v2912.
  */
+/**
+ * *** v4484 -- THE CONDITIONING BOUND PER OBSERVABLE, WHICH IS A PREDICTION AND NOT A TOLERANCE. ***
+ *
+ * v4480 refused to grade criterion 4 and measured the amplifications so the round that earned tolerances would
+ * inherit a table. v4484 tried to earn them and found the task cannot be done WHERE THE TOLERANCE IS USED:
+ * corroborateFully's c4 reads `pass: d.relMove <= tol` and d.relMove is measured in the SAME PROCESS by the
+ * SAME simulated perturbation, so a tolerance derived from that measurement turns a contingent pass into a
+ * NECESSARY one and the evidence string reads identically either way. c4-as-implemented is a CONDITIONING test.
+ *
+ * The number is real; only its use was wrong. What it actually supports is a PREDICTION about a second machine,
+ * and that is where it is spent -- corroborationSubmit.gradeSubmission, which until now could only say a
+ * submitted value DIFFERS, with no way to tell one ulp of libm from a broken box.
+ *
+ * TWO INDEPENDENT LEGS, NEITHER TAKEN FOR THIS PURPOSE:
+ *   (1) HOW FAR REAL LIBMS DIFFER. runtimeBench (v3997) compared node against bun over 200,000 inputs per
+ *       function: cbrt, cos, sin, tan, atan, exp, log, pow, hypot and atan2 all differ somewhere, and always
+ *       BY ONE ULP. Math.sqrt was the only function that agreed everywhere -- which is the control rather than
+ *       a surprise, since IEEE-754 requires sqrt to be correctly rounded.
+ *   (2) HOW FAR THAT CARRIES. withPerturbedLibm applies +1 ulp to EVERY unspecified libm call, at EVERY call
+ *       site, ALWAYS IN THE SAME DIRECTION -- its own header calls that deliberately pessimistic. A real
+ *       disagreement has mixed signs across call sites and partially cancels, so the coherent all-up shift is
+ *       the WORST CASE a one-ulp libm difference can produce. That is what makes this a bound rather than an
+ *       estimate, and why no safety factor is invented on top of it.
+ *
+ * AND THE BOUND TRAVELS, WHICH IS THE PART THAT MAKES IT USABLE ON A MACHINE THIS BOX HAS NEVER SEEN.
+ * Amplification is a property of the ARITHMETIC -- how much a sequence of operations magnifies a perturbation
+ * -- and IEEE-754 specifies + - * / and sqrt exactly, so two conforming machines run the same amplifier. Only
+ * the libm calls differ, and those are the perturbation, not the multiplier.
+ *
+ * A quantity that did NOT move has bound 0: the perturbation demonstrably armed (libmControls proves that per
+ * device) and this number did not notice, so bit identity is the prediction and any difference is beyond it.
+ *
+ * MEASURED AT v4484 over SCOPE: 27 observables, 8 moved, worst amplification 8.68e7 on
+ * kepler.conserve.growthGapFrac. Re-derived by the gate rather than trusted.
+ */
+export const CONDITIONING_AT_V4484 = Object.freeze({
+    "chaos.feigenbaum.cascadePoints": Object.freeze({"moved":false,"relMove":0,"amplification":0}),
+    "kepler.compare.driftRatio": Object.freeze({"moved":true,"relMove":7.305234873885262e-11,"amplification":328998.5305588362}),
+    "kepler.compare.eccentricity": Object.freeze({"moved":false,"relMove":0,"amplification":0}),
+    "kepler.compare.orbits": Object.freeze({"moved":false,"relMove":0,"amplification":0}),
+    "kepler.compare.rk4Growth": Object.freeze({"moved":true,"relMove":7.371419321133261e-11,"amplification":331979.2130784743}),
+    "kepler.compare.verletGrowth": Object.freeze({"moved":true,"relMove":6.619149612437343e-13,"amplification":2980.999972808238}),
+    "kepler.conserve.eccentricity": Object.freeze({"moved":false,"relMove":0,"amplification":0}),
+    "kepler.conserve.energyGrowthRatio": Object.freeze({"moved":true,"relMove":6.619149612437343e-13,"amplification":2980.999972808238}),
+    "kepler.conserve.energyGrowthShared": Object.freeze({"moved":false,"relMove":0,"amplification":0}),
+    "kepler.conserve.energySamples": Object.freeze({"moved":false,"relMove":0,"amplification":0}),
+    "kepler.conserve.energyVerdictBounded": Object.freeze({"moved":false,"relMove":0,"amplification":0}),
+    "kepler.conserve.growthGapFrac": Object.freeze({"moved":true,"relMove":1.9272105414786028e-8,"amplification":86793846.76467527}),
+    "kepler.conserve.orbits": Object.freeze({"moved":false,"relMove":0,"amplification":0}),
+    "kepler.conserve.semiMajorDrift": Object.freeze({"moved":true,"relMove":6.659978193760644e-13,"amplification":2999.3875311716065}),
+    "lens.deflect.bCrit": Object.freeze({"moved":false,"relMove":0,"amplification":0}),
+    "lens.deflect.deflectionMeasured": Object.freeze({"moved":false,"relMove":0,"amplification":0}),
+    "lens.deflect.deflectionWeak": Object.freeze({"moved":false,"relMove":0,"amplification":0}),
+    "lens.deflect.impactParameter": Object.freeze({"moved":false,"relMove":0,"amplification":0}),
+    "lens.deflect.rMin": Object.freeze({"moved":false,"relMove":0,"amplification":0}),
+    "lens.deflect.rMinOverB": Object.freeze({"moved":false,"relMove":0,"amplification":0}),
+    "lens.deflect.relWeak": Object.freeze({"moved":false,"relMove":0,"amplification":0}),
+    "splat.compose.alphaMeasured": Object.freeze({"moved":false,"relMove":0,"amplification":0}),
+    "splat.integral.axisRatio": Object.freeze({"moved":false,"relMove":0,"amplification":0}),
+    "splat.integral.integralRatio": Object.freeze({"moved":false,"relMove":0,"amplification":0}),
+    "splat.perspective.areaAtUnitDepth": Object.freeze({"moved":true,"relMove":1.9895196601282823e-15,"amplification":8.960000000000008}),
+    "splat.perspective.areaIntercept": Object.freeze({"moved":true,"relMove":2.0268667759164022e-16,"amplification":0.9128196456746748}),
+    "splat.perspective.areaSlope": Object.freeze({"moved":false,"relMove":0,"amplification":0}),
+});
+
 export const SCOPE = Object.freeze({
     splat: Object.freeze(["integral", "perspective", "compose"]),
     chaos: Object.freeze(["feigenbaum"]),
