@@ -2753,6 +2753,35 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "string read the deleted field eagerly, which is the very defect section 3 checks " +
                  "changedPaths for, in the gate written to catch it.",
     }),
+    since125: Object.freeze({
+        at: "v4486", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/playwrightResolve.mjs (an installed playwright is asked when no known layout answers)",
+            "tools/ship/playwrightResolve-selfcheck.mjs (sections 4b and 4c)",
+        ]),
+        verdict: "green, seven sections, NO GATE ADDED -- which is why this closing sweeps nothing. v4484 " +
+                 "replaced a hardcoded browser path with a LAYOUT GUESSER when an installed playwright can be " +
+                 "asked which binary it will launch. This round set out to ask FIRST and A MEASUREMENT " +
+                 "REFUSED IT: the scan names the headless-shell build and playwright " +
+                 "names the full-browser build, TWO DIFFERENT FILES, and the full browser fetches a favicon " +
+                 "where the shell does not -- physics/xpbd/rigidCouple-selfcheck.mjs asserts the page logs no " +
+                 "errors and went GREEN TO RED on that 404. Ninety-six gates were calibrated against the " +
+                 "shell, so the scan goes first and asking is the FALLBACK, which is the opposite of the " +
+                 "intent and is what the evidence says. The value survives where it matters: a box with " +
+                 "playwright and a layout nobody here anticipated resolved NOTHING and resolves a browser " +
+                 "now, closing the half v4484 costed at 96 call sites, with none touched. *** THE FIRST DRAFT " +
+                 "ALSO SHIPPED A SILENT WRONG ANSWER: *** the resolution ran above resolvePlaywright, " +
+                 "PLAYWRIGHT_PATHS is a const in the temporal dead zone, the call threw, the catch swallowed " +
+                 "it and the scan returned A WORKING PATH. Which check catches that depends on the box, so " +
+                 "both are kept -- the exported constant against a fresh resolution where only playwright " +
+                 "answers, the SOURCE ORDER where the scan answers too; a live call catches it nowhere. " +
+                 "SIX SABOTAGES: A 3, B 3, C 1, D 3, E 1, F 1. E was a real gap: the injected `ask` seam was " +
+                 "unguarded. AND TWO READINGS WERE DISCARDED BEFORE BEING BELIEVED -- a patch naming a " +
+                 "variable that does not exist made the module fail to load, and a CRASHED GATE PRINTS NO " +
+                 "FAIL LINE, which a count of FAIL lines reads as a clean zero. Third time in three rounds.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

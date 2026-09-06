@@ -71,6 +71,18 @@ export const SHELL_LEAVES = Object.freeze([
     path.join("chrome-mac", "Chromium.app", "Contents", "MacOS", "Chromium"),
 ]);
 
+/**
+ * What the INSTALLED playwright says it will launch, or "" if there is no playwright or it has no browser
+ * downloaded. Separate from resolvePlaywright because that returns the module and this asks it a question.
+ */
+export function askPlaywright(requireFn) {
+    try {
+        const { chromium } = resolvePlaywright(requireFn);
+        if (!chromium || typeof chromium.executablePath !== "function") return "";
+        return chromium.executablePath() || "";
+    } catch { return ""; }        // a playwright with no browser downloaded throws rather than returning ""
+}
+
 /** A browser directory, with NO build number pinned -- 1194 was, and that is a date stamp on a constant. */
 export const SHELL_DIR = /^chromium(_headless_shell)?-\d+$/;
 
@@ -80,8 +92,29 @@ export const SHELL_DIR = /^chromium(_headless_shell)?-\d+$/;
  * a gate that cannot say where it got chromium cannot be re-diagnosed when the next box moves the install.
  */
 export function resolveHeadlessShell({ env = process.env, home = os.homedir(), exists = fs.existsSync,
-                                       readdir = fs.readdirSync } = {}) {
+                                       readdir = fs.readdirSync, ask = askPlaywright } = {}) {
     const tried = [];
+    // ---- *** v4486 -- THE AUTHORITY AND THE GUESS NAME DIFFERENT BINARIES, AND THAT DECIDES THE ORDER. ***
+    //
+    // An installed playwright knows exactly which browser it will launch and will say so --
+    // chromium.executablePath() -- which is an authority the layout scan below is only guessing at. The
+    // first draft of this round therefore asked FIRST, and it was wrong, measured:
+    //
+    //     the scan names   .../chromium_headless_shell-1194/chrome-linux/headless_shell
+    //     playwright names .../chromium-1194/chrome-linux/chrome
+    //
+    // TWO DIFFERENT FILES. The full browser fetches a favicon and the headless shell does not, so
+    // physics/xpbd/rigidCouple-selfcheck.mjs -- which asserts the page logs no errors -- went from green to
+    // red on a 404 the moment the binary changed. Ninety-six gates were written and calibrated against the
+    // shell; swapping what they launch is not a repair, it is an untested change to all of them at once.
+    // executablePath({channel:"chromium-headless-shell"}) does not help: this version returns the full
+    // browser whatever channel it is handed.
+    //
+    // SO THE SCAN GOES FIRST, and asking is the FALLBACK -- which is the opposite of this round's first
+    // draft and is what the measurement says. The value of asking is undiminished where it matters: a box
+    // with playwright installed the ordinary way and no layout this scan knows resolved NOTHING before, and
+    // ninety-six gates counted that skip as a failure. It now resolves the browser playwright itself would
+    // launch. What is bought is a box that had no browser at all, not a different browser on a box that had.
     for (const root of shellRoots(env, home)) {
         let dirs = [];
         try { dirs = readdir(root).filter((d) => SHELL_DIR.test(d)); } catch { continue; }
@@ -94,17 +127,15 @@ export function resolveHeadlessShell({ env = process.env, home = os.homedir(), e
             if (exists(p)) return { shell: p, from: root, tried };
         }
     }
+    // The fallback: no layout this scan knows, so ask whatever playwright is installed. A collaborator that
+    // throws must not take the resolver down -- a playwright with no browser downloaded throws rather than
+    // returning "" -- so the seam a caller injects at is guarded here and not only inside askPlaywright.
+    let asked = "";
+    try { asked = ask() || ""; } catch { asked = ""; }
+    if (asked) { tried.push(asked); if (exists(asked)) return { shell: asked, from: "playwright", tried }; }
     return { shell: "", from: "", tried };
 }
 
-const RESOLVED = resolveHeadlessShell();
-/**
- * The shell this box actually has, or "" when it has none. It is a RESOLUTION and no longer a claim: every
- * caller passes it to browserSkipReason first, which refuses on "" -- so an empty value can never reach a
- * launch.
- */
-export const HEADLESS_SHELL = RESOLVED.shell;
-export const HEADLESS_SHELL_TRIED = Object.freeze(RESOLVED.tried);
 
 export const PLAYWRIGHT_PATHS = [
     "playwright",
@@ -146,3 +177,19 @@ export function browserSkipReason(chromium, pwFrom, shell = HEADLESS_SHELL) {
     if (!shellThere) return "playwright resolved from " + pwFrom + " but no headless shell was found (" + where + ")";
     return "";
 }
+
+// *** v4486 -- THIS BLOCK SITS HERE, BELOW resolvePlaywright AND PLAYWRIGHT_PATHS, AND THE POSITION IS
+// LOAD-BEARING. *** It ran ABOVE them for one draft. Function declarations hoist, so resolvePlaywright was
+// callable -- but PLAYWRIGHT_PATHS is a `const`, which is in the TEMPORAL DEAD ZONE until its own line runs,
+// so the call threw a ReferenceError, askPlaywright's catch swallowed it, and the resolution fell through to
+// the layout scan AND RETURNED A WORKING PATH. A silent wrong answer that a passing test cannot tell from a
+// right one: the catch that makes "no playwright here" survivable also makes "playwright threw" invisible.
+// The gate asserts the ROUTE, not just the path, which is the only thing that would have caught this.
+const RESOLVED = resolveHeadlessShell();
+/**
+ * The shell this box actually has, or "" when it has none. It is a RESOLUTION and no longer a claim: every
+ * caller passes it to browserSkipReason first, which refuses on "" -- so an empty value can never reach a
+ * launch.
+ */
+export const HEADLESS_SHELL = RESOLVED.shell;
+export const HEADLESS_SHELL_TRIED = Object.freeze(RESOLVED.tried);

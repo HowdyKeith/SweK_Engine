@@ -31,7 +31,8 @@
 // files whose only test is those files -- v3202's sweep deleted 61 live modules. It is named here as owed.
 "use strict";
 import { shellRoots, resolveHeadlessShell, SHELL_LEAVES, SHELL_DIR, HEADLESS_SHELL,
-         HEADLESS_SHELL_TRIED, PLAYWRIGHT_PATHS, browserSkipReason } from "./playwrightResolve.mjs";
+         HEADLESS_SHELL_TRIED, PLAYWRIGHT_PATHS, browserSkipReason, askPlaywright,
+         resolvePlaywright } from "./playwrightResolve.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -165,6 +166,99 @@ console.log("\n4. one definition, counted rather than asked for");
         !NEEDLE.test(fs.readFileSync(HERE, "utf8")),
         "v4480 found five suspects in the gate that hunted them, for exactly this reason");
     ok("the walk really reaches the tree rather than a corner of it", walk(ENG).length > 3000);
+}
+
+// ---- 4b. *** v4486 -- THE AUTHORITY AND THE GUESS NAME DIFFERENT BINARIES *** ------------------------------------
+console.log("\n4b. asking playwright, and why it is the fallback rather than the answer");
+
+{
+    // An installed playwright KNOWS which browser it will launch, which the layout scan is only guessing at.
+    // This round's first draft therefore asked first -- and a measurement refused it: the two name DIFFERENT
+    // FILES, the full browser fetches a favicon where the shell does not, and rigidCouple-selfcheck (which
+    // asserts the page logs no errors) went green -> red on a 404 the moment the binary changed. Ninety-six
+    // gates were calibrated against the shell. So the scan goes first and asking is the fallback.
+    const SHELL = path.join("/pw", "chromium" + "_headless_shell-1194", "chrome-linux", "headless_shell");
+    const ASKED = "/from/playwright/chrome";
+    const io = fakeFs([SHELL, ASKED]);
+    const both = resolveHeadlessShell({ env: { PLAYWRIGHT_BROWSERS_PATH: "/pw" }, home: "",
+                                        ask: () => ASKED, ...io });
+    ok("!! *** THE CALIBRATED SHELL WINS WHERE BOTH ARE PRESENT -- the binary 96 gates were written against ***",
+        both.shell === SHELL && both.from === "/pw",
+        "sabotage A: asking first swaps what every one of those gates launches, which is not a repair but an " +
+        "untested change to all of them at once -- and one gate is measurably red under it");
+    const onlyAsk = resolveHeadlessShell({ env: {}, home: "", ask: () => ASKED,
+                                           exists: (p) => p === ASKED, readdir: () => { throw new Error("x"); } });
+    ok("!! *** ...and where the scan knows no layout, playwright is asked and answers ***",
+        onlyAsk.shell === ASKED && onlyAsk.from === "playwright",
+        "sabotage D: this is the whole value -- a box with playwright installed the ordinary way and a " +
+        "layout nobody here anticipated resolved NOTHING before, and 96 gates counted that skip as a failure");
+    ok("...and the ROUTE says which one answered, so asked and guessed cannot be read alike",
+        both.from !== "playwright" && onlyAsk.from === "playwright",
+        "sabotage B: one route name for both hides which binary a gate actually launched");
+    ok("...and a playwright naming a browser that is NOT on disk resolves to nothing rather than to it",
+        resolveHeadlessShell({ env: {}, home: "", ask: () => "/gone/chrome",
+                               exists: () => false, readdir: () => { throw new Error("x"); } }).shell === "",
+        "sabotage C: the authority is authoritative about intent, not about the filesystem");
+    ok("!! ...and a playwright with no browser downloaded THROWS, which must not be fatal",
+        (() => { try {
+            return resolveHeadlessShell({ env: {}, home: "", ask: () => { throw new Error("no browser"); },
+                                          exists: () => false, readdir: () => { throw new Error("x"); } }).shell === "";
+        } catch { return false; } })(),
+        "sabotage E: the catch inside askPlaywright protects askPlaywright; the seam a CALLER injects at is " +
+        "a second place, and the first draft left it unguarded");
+
+    ok("!! askPlaywright agrees with what playwright itself reports, or is empty on a box without one",
+        (() => { const r = resolvePlaywright();
+                 return !r.chromium ? askPlaywright() === "" : askPlaywright() === r.chromium.executablePath(); })(),
+        askPlaywright() || "no playwright here");
+    ok("!! *** and the two really do name DIFFERENT files here, which is the measurement the order rests on ***",
+        !resolvePlaywright().chromium || askPlaywright() !== HEADLESS_SHELL,
+        `scan: ${HEADLESS_SHELL}  vs  playwright: ${askPlaywright() || "n/a"} -- if these ever converge the ` +
+        "order stops mattering, and this row is how anybody would find out");
+
+    // *** THE CHECK THAT CATCHES A SILENT WRONG ANSWER, AND IT IS NOT THE OBVIOUS ONE. ***
+    ok("!! *** the exported constant AGREES with a live resolution -- load time against call time ***",
+        HEADLESS_SHELL === resolveHeadlessShell().shell,
+        "sabotage F: the resolution ran ABOVE resolvePlaywright for one draft. Function declarations hoist; " +
+        "PLAYWRIGHT_PATHS is a `const` in the temporal dead zone, so the call threw, askPlaywright's catch " +
+        "swallowed it, and the scan RETURNED A WORKING PATH. *** WHICH OF THE TWO ROWS BELOW CATCHES IT " +
+        "DEPENDS ON THE BOX, AND BOTH ARE HERE FOR THAT REASON. *** Where only playwright can answer, the " +
+        "TDZ empties the constant and THIS row fires. Where the scan answers too -- this container -- the " +
+        "constant is right either way and only the SOURCE-ORDER row below sees it. A live call to " +
+        "resolveHeadlessShell catches it on no box at all: by then the module is initialised. Measured, not " +
+        "reasoned: relocating the block reds the source-order row here and this one nowhere");
+    ok("...and the source really does define the resolution after what it depends on",
+        (() => { const src = fs.readFileSync(path.join(ENG, "tools/ship/playwrightResolve.mjs"), "utf8");
+                 return src.indexOf("export const PLAYWRIGHT_PATHS") < src.indexOf("const RESOLVED =") &&
+                        src.indexOf("export function resolvePlaywright") < src.indexOf("const RESOLVED ="); })(),
+        "the position is load-bearing, so it is checked rather than described in a comment");
+}
+
+// ---- 4c. *** THE HALF v4484 LEFT OWED, AND WHAT CLOSING IT COSTS *** ---------------------------------------------
+console.log("\n4c. the refusal that kept 96 gates from ever running on the rig");
+
+{
+    // v4484 named this and did not do it: browserSkipReason refused whenever no SEPARATE shell binary was
+    // found, even where playwright resolved and could launch its own. Closing it looked like 96 call sites
+    // passing `executablePath: HEADLESS_SHELL || undefined` -- a sweep across 96 files whose only test is
+    // those files, which is v3202's shape. IT IS ONE LINE IN THE RESOLVER INSTEAD: ask playwright, and
+    // HEADLESS_SHELL is a real path, so every one of those call sites launches unchanged.
+    const before = resolveHeadlessShell({ env: {}, home: "", ask: () => "",
+                                          exists: () => false, readdir: () => { throw new Error("x"); } });
+    ok("!! a box with NO layout the scan knows resolved to nothing before this round",
+        before.shell === "",
+        "which is every Windows box that installed playwright the ordinary way -- and 96 gates read that " +
+        "as 'no headless shell' and counted the skip as a failure");
+    // browserSkipReason stats the REAL filesystem, so the fixture names a file that is really there --
+    // this gate itself. A fixture path would make the row test the fixture rather than the refusal.
+    const REAL = fileURLToPath(import.meta.url);
+    const after = resolveHeadlessShell({ env: {}, home: "", ask: () => REAL,
+                                         exists: (p) => p === REAL, readdir: () => { throw new Error("x"); } });
+    ok("!! *** ...and the SAME box with playwright installed now resolves, with no call site touched ***",
+        after.shell === REAL && after.from === "playwright" && browserSkipReason({}, "x", after.shell) === "",
+        "the 96 call sites pass HEADLESS_SHELL to executablePath unchanged; what moved is what it holds");
+    ok("...and the refusal still fires when there is genuinely nothing, so it did not become a rubber stamp",
+        browserSkipReason(null, "", "") !== "" && /playwright/.test(browserSkipReason(null, "", "")));
 }
 
 // ---- 5. THIS BOX, REPORTED RATHER THAN ASSERTED ----------------------------------------------------------------
