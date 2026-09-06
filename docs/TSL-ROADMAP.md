@@ -841,6 +841,27 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         which is filled after placement now, so it placed 53 for a target of 20 (it counts placements). NOT STAMPED:
         the grammar's accessories and its main- and last-floor stairs pieces (nothing to put them in inside a
         footprint). The sandbox passes no seed or minGap yet.
+    SPLAT COLLISION -- built at v4511 (task 58), after isaac-mason/splatmesh (MIT, (c) 2026 Isaac Mason; read and
+        hand-written, nothing copied; world/reachedLicences.mjs and the sweep document). The splat stack could be
+        looked at and not walked into: physics/splat/gaussianSplat.js grades the projection math and says Spark
+        stays a viewer, and nothing in the loader, scene, renderer or sorter gave a scene a collision surface.
+        physics/splat/splatMesh.mjs: each splat's opacity stamped into the voxel under its centre or into every voxel
+        within its footprint (the largest of the tree's three scales), MAX-accumulated into a sparse volume; then
+        naive surface nets at an iso -- one vertex per straddling cell at the mean of its edge crossings, a quad
+        across every grid edge whose voxels differ, wound solid-to-empty -- handed back in the shape
+        mesh/meshBVH.mjs takes. MEASURED (tools/ship/splatMesh-selfcheck.mjs): an analytic ball meshes to 1,994
+        vertices and 3,984 triangles with no boundary or non-manifold edge, every directed edge with its reverse,
+        Euler characteristic 2, every triangle outward; a second mesher written the other way round gives the same
+        vertices and triangles on the ball, on a 3,000-splat cloud (4,140 and 7,856) and over a shifted grid; a
+        shell three cells thick is watertight at Euler 4 (two closed surfaces) and a shell under a cell thick has
+        221 non-manifold edges, said rather than hidden; a splat at opacity exactly the iso meshes to a 176-vertex
+        ball; the BVH hits the collider at t 2.048 where the sphere is at 2.025. THE FINDING: both meshers' first
+        drafts started the stitching pass at the bound instead of the apron voxel below it, and AGREED on a mesh
+        with 122 boundary edges -- a twin written the same way round proves nothing about the step it shares; the
+        watertight hold caught it. And sabotage C (a strict test at the iso) was blind until the gate put a density
+        exactly on the iso. NOT TAKEN: the 16-cubed chunking (a sparse map here, slower on a million-splat scene),
+        the editor and edit flags, the heightfield and greedy meshers, the glb export. No page: the collider is a
+        headless artefact for the BVH; a real capture is not a fixture in the repo.
     TEXTURE BYTES BEFORE KTX2 / BASIS -- measured at v4495 (task 18), RIG-PENDING for the asset library.
         tools/ship/textureBytes.mjs walks a folder and records every raster texture's bytes on disk and, from the
         PNG and JPEG headers, its pixel size and GPU bytes (RGBA8 with mips); decide() derives the verdict from

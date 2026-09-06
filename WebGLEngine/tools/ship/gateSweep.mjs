@@ -2717,6 +2717,20 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "all blank on both sides. A first draft's two-voxel cells left small buildings all corners and windowless. Sabotages " +
                  "red at (see the gate header).",
     }),
+    since133: Object.freeze({
+        at: "v4511", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/splatMesh-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, headless. physics/splat/splatMesh.mjs, after isaac-mason/splatmesh (MIT, read and hand-written): splat opacity " +
+                 "rasterised into a sparse voxel volume by centre or by footprint, max-accumulated, and naive surface nets out -- the " +
+                 "first collision surface the splat stack has had. Held watertight by edge count (Euler 2 on a ball, 4 on a thick shell), " +
+                 "vertex for vertex and triangle for triangle against a second mesher written the other way round, and raycast through " +
+                 "mesh/meshBVH.mjs. Both meshers' first drafts shared an off-by-one the watertight hold caught; sabotage C was blind " +
+                 "until a density sat exactly on the iso. Sabotages red at 5 / 4 / 1 / 2.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

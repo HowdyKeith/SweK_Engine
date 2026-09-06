@@ -276,3 +276,34 @@ the other sides; the accessory rate over 14,400 wall cells is 25.37% at 25 and 6
 Sabotages red at 3 / 2 / 1 / 6. The first sabotage said something about gating: the party-wall
 property holds trivially on the LAST side the loop visits, so a hold on one side would have
 been blind; the gate holds all four.
+
+### isaac-mason/splatmesh -- BUILT as `physics/splat/splatMesh.mjs` (v4511)
+
+**What it is.** MIT, (c) 2026 Isaac Mason (LICENSE read first-hand). A TypeScript library and a
+three.js/Spark editor: `rasterise.ts` stamps each splat's opacity into the voxel under its
+centre or into every voxel within its footprint radius, max-accumulated; `volume.ts` keeps the
+density in 16-cubed chunks with per-voxel edit flags; `mesh.ts` extracts the iso-surface by
+naive surface nets, plus a heightfield and a greedy mesher; the editor lets you cut and force
+voxels before exporting a collider glb.
+
+**Why it matters here.** The tree has a splat loader, scene, renderer and sorter, and a physics
+module that grades the projection math and says outright that Spark stays a viewer. Nothing
+gave a splat scene a collision surface. Now `physics/splat/splatMesh.mjs` does, and hands back
+the shape `mesh/meshBVH.mjs` takes, so a splat scene can be raycast.
+
+**What was taken and what was not.** The method, re-derived: centers and coverage
+rasterisation with the max, and naive surface nets with the same vertex rule and the same
+solid-to-empty winding. Not a byte; the volume is a sparse map rather than chunks (said in the
+header: exact, slower on a million-splat scene), the footprint is the largest of the tree's
+three scales per splat, and the editor, edit flags, heightfield, greedy mesher and glb export
+were left where they are.
+
+**Measured** (`tools/ship/splatMesh-selfcheck.mjs`): an analytic ball meshes watertight with
+Euler characteristic 2, one vertex per straddling cell, every vertex inside its cell and
+within 1.5 cells of the sphere, every triangle facing outward; a second mesher written the
+other way round gives the same 1,994 vertices and 3,984 triangles on the ball and the same
+4,140 and 7,856 on a rasterised cloud; a shell three cells thick meshes watertight with
+Euler characteristic 4 (two closed surfaces); the BVH raycasts the collider to within a cell
+of the sphere. The finding: both meshers' first drafts started the stitching pass one voxel
+late and agreed on a mesh with 122 boundary edges. A twin written the same way round proves
+nothing about that step; the watertight hold caught it.

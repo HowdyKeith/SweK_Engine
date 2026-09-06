@@ -149,6 +149,34 @@ export const POSTURE = Object.freeze({
  */
 export const REACHED_SOURCES = Object.freeze([
     // =========================================================================================================
+    // v4511 -- A COLLIDER FOR A SPLAT SCENE, THE GAP THE SPLAT STACK HAD LEFT OPEN.
+    //
+    // physics/splat/gaussianSplat.js grades the projection math and says Spark stays a viewer; nothing in the
+    // loader, scene, renderer or sorter gives a splat scene a collision surface. isaac-mason/splatmesh does exactly
+    // that: density into a sparse voxel volume, naive surface nets out. Read and hand-written as
+    // physics/splat/splatMesh.mjs; nothing copied, and Spark still not imported.
+    // =========================================================================================================
+    {
+        repo: "isaac-mason/splatmesh", sourceUrl: "https://github.com/isaac-mason/splatmesh",
+        grantorHoldsRights: true, licenceExists: true, publisher: "Isaac Mason", year: 2026,
+        spdx: "MIT", licence: null,
+        licenceNote: "MIT, (c) 2026 Isaac Mason. READ FIRST-HAND at v4511: LICENSE, 21 lines, sha256 0916e299b5f7, at commit 0e8e063 " +
+             "(2026-08-08); package.json's license field and author agree.",
+        redistributable: true, posture: POSTURE.REACHED,
+        taken: "The METHOD, re-derived: a splat's opacity stamped into the voxel under its centre or into every voxel " +
+             "within its footprint radius, MAX-accumulated so density stays in [0, 1]; then naive surface nets at an iso " +
+             "-- one vertex per straddling cell at the mean of its edge crossings, a quad across every grid edge whose " +
+             "voxels differ, wound solid-to-empty. No bytes: physics/splat/splatMesh.mjs keeps a sparse map instead of " +
+             "16-cubed chunks, reads the tree's three scales per splat and takes the largest, and hands back the shape " +
+             "mesh/meshBVH.mjs takes. Not taken: the chunking, the per-voxel edit flags, the editor, the heightfield " +
+             "and greedy meshers, the glb export.",
+        takenPaths: ["physics/splat/splatMesh.mjs"],
+        citedPaths: ["tools/ship/splatMesh-selfcheck.mjs", "physics/instruments.mjs", "tools/ship/gateSweep.mjs"],
+        why: "A splat scene could be looked at and not walked into; naive surface nets on a density field is " +
+             "deterministic, so the mesher is held vertex for vertex against a second one written the other way round, " +
+             "and watertight by edge count -- which is the hold that caught an off-by-one both meshers shared.",
+    },
+    // =========================================================================================================
     // v4509 -- THE PROCEDURAL-BUILDING RULES, READ FROM ONE UNREAL ACTOR AND WRITTEN AS DATA.
     //
     // world/CityGen.js stamps solid voxel columns and nothing else; VladimirKobranov/configurator-unreal-building
