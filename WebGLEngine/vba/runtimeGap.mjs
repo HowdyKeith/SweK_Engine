@@ -191,8 +191,12 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // HEADLINE -- threads have read 22 through every one of them, and so has WebAssembly. A row that survives
     // seven independent populations is a finding about the tree; a row read back from the first would have
     // been wrong seven times.
-    files: 3874,
-    esModules: 3583, closures: 3459, asyncAwait: 1335, typedArrays: 692, promises: 332,
+    // AN EIGHTH TIME: v4480's deviceReport.mjs and its gate, 3874 -> 3876. EIGHT RE-DERIVATIONS, EIGHT
+    // DIFFERENT TABLES, ONE UNCHANGED HEADLINE -- threads and WebAssembly have both read 22 through every one.
+    // This row has now moved for every round that added a file and never once for a reason about threads,
+    // which is the strongest thing a census can say about the number it exists to report.
+    files: 3876,
+    esModules: 3585, closures: 3461, asyncAwait: 1337, typedArrays: 692, promises: 332,
     fetchXhr: 224, performanceNow: 202, raf: 116, webgl: 102, webgpu: 45, threads: 22, wasm: 22,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

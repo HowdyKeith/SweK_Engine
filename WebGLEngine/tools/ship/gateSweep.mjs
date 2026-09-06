@@ -2547,6 +2547,26 @@ since116: Object.freeze({
                  "four were one shape: a check comparing against today's answer cannot see a constant equal " +
                  "to today's answer",
     }),
+    since119: Object.freeze({
+        at: "v4480", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/roundhouse/deviceReport-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        repaired: Object.freeze([
+            "tools/ship/deferralCensus-selfcheck.mjs (v4479's row pinned the backlog's entry count and went red the first time somebody added one -- a backlog is supposed to grow)",
+        ]),
+        verdict: "*** CRITERION 4'S TOLERANCE HAS NEVER REJECTED ANYTHING AND LIVES IN A PARAMETER LIST. *** " +
+                 "corroborateFully's tol = 1e-6 never reaches criterion 2, because all six nuisance knobs " +
+                 "declare their own with an argument beside it; it reaches criterion 4 for every device, and " +
+                 "NOT ONE of the seven refinement knobs declares one. Measured over 27 keyless observables: " +
+                 "8 move under a one-ulp libm shift and the worst amplifies by 8.7e7 against a default that " +
+                 "permits 4.5e9 -- fifty times under a bar nothing has ever approached. So c4 is REFUSED " +
+                 "rather than graded, and the amplifications are reported so the round that earns seven " +
+                 "tolerances starts from a table. ALSO FOUND: the apparatus declares REFINEMENT_KNOBS twice " +
+                 "in two shapes that disagree about lens and optics, and its nuisance knobs live in two " +
+                 "modules -- which is how this file's own first draft got the eligible set wrong, five " +
+                 "devices and the wrong five. Sixteen sabotages, sixteen red; two survived first and the " +
+                 "gate found two more defects in its own module before any sabotage ran",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

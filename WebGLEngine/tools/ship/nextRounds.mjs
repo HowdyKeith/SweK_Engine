@@ -30,6 +30,27 @@ export const NEXT_ROUNDS = [
     // The design was never wrong; nothing enumerated the prose, so nothing ever prompted an entry. That half
     // exists now, and these are what it turned up that this session can vouch for first-hand.
     {
+        id: "portability-tolerances",
+        blocker: "OPEN",
+        what: "Earn a portability tolerance for each of the seven refinement knobs, so criterion 4 can be graded instead of ungraded.",
+        how: "tools/roundhouse/deviceReport.mjs measures the amplification -- relMove / 2^-52 -- for every keyless observable, so the numbers exist. Each tolerance is a claim about that device's conditioning and needs the argument written beside it, the way every nuisance knob already carries a `why`. PORTABILITY_TOL is deliberately empty until then.",
+        why: "v4480 measured that criterion 4 has been graded at corroborateFully's 1e-6 function default since v2908 and that NOTHING has ever come near it: the worst-conditioned quantity in the scoped lab, kepler.conserve.growthGapFrac, amplifies by 8.7e7 against a default that permits 4.5e9. A bar nothing approaches is not a bar, and seven invented numbers would be worse than an honest refusal.",
+    },
+    {
+        id: "corroboration-full-sweep",
+        blocker: "OPEN",
+        what: "Run the multi-observable battery over all six eligible devices, not the scoped four.",
+        how: "tools/roundhouse/deviceReport.reportLab() with no scope. It did not return inside seven minutes at v4480 -- optics.converge does adaptive quadrature and quantum.bands diagonalises -- so it needs either a budget and progressive output, the shape v4036 gave corroborationCensus, or a cheaper mode list.",
+        why: "Every figure v4480 states is from a four-device scope. The wide number is owed rather than estimated, and the two devices missing from it are exactly the two whose nuisance knobs live in the second table.",
+    },
+    {
+        id: "census-refinement-table",
+        blocker: "OPEN",
+        what: "Migrate corroborationCensus.mjs's second REFINEMENT_KNOBS table to the canonical one in refinementKnobs.mjs.",
+        how: "The census uses its copy for exactly one thing, the `refinable` flag on every row. Migrating changes that flag for five devices it does not know about and for optics.slit, and drops ct -- so it needs a decision on whether ct is genuinely refinement-eligible, and a re-freeze of a slow baseline.",
+        why: "v4480 measured the divergence: the two tables share only lens and optics and disagree about both -- lens on the knob name, optics on the mode scoping. The census's copy predates the discipline that makes a knob state its argument. It is NAMED at v4480 rather than migrated, because a re-freeze of corroboration-reach-baseline.json is a round of its own.",
+    },
+    {
         id: "zoom-blur-wiring",
         blocker: "OPEN",
         what: "Wire render/zoomBlur.mjs's generated GLSL into bloomPass.js's post chain as a real pass.",

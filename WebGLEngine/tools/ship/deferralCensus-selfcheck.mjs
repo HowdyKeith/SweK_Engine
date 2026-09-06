@@ -143,10 +143,16 @@ sec("3. *** THE RECORD THAT STOPPED BEING RE-READ WAS THE ONE FOR RECORDS THAT S
         "nextRounds.mjs was written at v3340 and nothing was added to it for 925 versions, by a file whose " +
         "own header says the failure mode is a record nothing re-reads. That is not an argument against it -- " +
         "the design is right and this round did not replace it, it added the half that prompts an entry");
-    ok("!! and the backlog is current again: its newest entry names this round",
-        b.newestVersionNamed >= 4479 && b.entries === REC.backlogAfter.entries && b.open === REC.backlogAfter.open,
-        `${b.entries} entries, ${b.open} open, newest v${b.newestVersionNamed}. Four added, each one this ` +
-        "session can vouch for first-hand rather than having inferred from prose");
+    // *** v4480 -- THIS ROW PINNED THE ENTRY COUNT AND WENT RED THE FIRST TIME SOMEBODY ADDED AN ENTRY. ***
+    // That is the wrong way round: a backlog is SUPPOSED to grow, and a check that fails when it does teaches
+    // the next round to stop writing entries. What v4479 froze stays frozen as its own record; what is asserted
+    // live is CURRENCY and monotone growth -- the newest entry names a recent round, and nothing was quietly
+    // deleted. The count still cannot fall silently, which is the property that was actually wanted.
+    ok("!! and the backlog is current: its newest entry names a recent round, and it has not shrunk",
+        b.newestVersionNamed >= 4479 && b.entries >= REC.backlogAfter.entries && b.open >= REC.backlogAfter.open,
+        `${b.entries} entries, ${b.open} open, newest v${b.newestVersionNamed}, against the ` +
+        `${REC.backlogAfter.entries} v4479 left. Each addition is one the session that wrote it could vouch ` +
+        "for first-hand rather than having inferred from prose");
     // The reach must be shown to DISCRIMINATE, not merely to produce the expected number: a stub returning
     // one row satisfies a count and went 0 RED. So the matched file is named, and a file the backlog does not
     // mention is required to stay unmatched.
