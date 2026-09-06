@@ -195,8 +195,12 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // DIFFERENT TABLES, ONE UNCHANGED HEADLINE -- threads and WebAssembly have both read 22 through every one.
     // This row has now moved for every round that added a file and never once for a reason about threads,
     // which is the strongest thing a census can say about the number it exists to report.
-    files: 3876,
-    esModules: 3585, closures: 3461, asyncAwait: 1337, typedArrays: 692, promises: 332,
+    // A NINTH TIME: v4481's corroborationSubmit.mjs and its gate, 3876 -> 3878. NINE RE-DERIVATIONS, NINE
+    // DIFFERENT TABLES, ONE UNCHANGED HEADLINE. This row has moved for every round that added a file and never
+    // once for a reason about threads -- which is the strongest thing a census can say about the number it
+    // exists to report, and it is a stronger statement after nine independent populations than after one.
+    files: 3878,
+    esModules: 3587, closures: 3463, asyncAwait: 1338, typedArrays: 693, promises: 332,
     fetchXhr: 224, performanceNow: 202, raf: 116, webgl: 102, webgpu: 45, threads: 22, wasm: 22,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

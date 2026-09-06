@@ -2567,6 +2567,27 @@ since116: Object.freeze({
                  "devices and the wrong five. Sixteen sabotages, sixteen red; two survived first and the " +
                  "gate found two more defects in its own module before any sabotage ran",
     }),
+    since120: Object.freeze({
+        at: "v4481", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/roundhouse/corroborationSubmit-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        repaired: Object.freeze([
+            "tools/roundhouse/submit-selfcheck.mjs (its prose said THREE recognised kinds; there were six, and this round makes seven -- a count in a sentence nobody re-counted since v2949)",
+        ]),
+        verdict: "*** CRITERION 4 HAS AN UNANSWERABLE MAJORITY AND THE MAILBOX COULD NOT CARRY THE ANSWER. *** " +
+                 "v2889's argument settles portability for any quantity touching only IEEE-specified " +
+                 "operations, and measured against the libm tripwire it reaches SEVEN of 27 keyless " +
+                 "observables. The other TWENTY make 1 to 160,004 raw transcendental calls and can only be " +
+                 "settled by another machine reporting the same bits. The tree has had a fleet and a " +
+                 "submission endpoint since v2949 -- six kinds, all GPU benches and transcripts, not one " +
+                 "carrying the value of an observable. This adds the seventh and its grader, keeping every " +
+                 "rule the surface earned: the device sends values and NEVER a verdict, the ledger appends " +
+                 "under a content-addressed key IMPORTED from deviceLedger, and agreement is asked of the f64 " +
+                 "BITS -- -0 and 0 are equal as numbers and different as bits, which is the fixture that " +
+                 "separates a real comparison from ===. NOTHING HAS SUBMITTED, and section 5 asserts that " +
+                 "rather than letting a green gate imply otherwise. Sixteen sabotages, sixteen red; three " +
+                 "survived first and all three were a check looking at the wrong thing",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

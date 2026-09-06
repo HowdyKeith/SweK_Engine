@@ -22,7 +22,7 @@ const src = fs.readFileSync(path.resolve(here, "..", "..", "ai-bridge", "android
 {
     ok("!! the stored filename comes from a fixed allow-list of kinds, never from the request",
         /const KINDS = \{/.test(src) && /const name = KINDS\[j && j\.kind\]/.test(src) && !/j\.(filename|name|path)/.test(src),
-        "a device supplies CONTENT, never a destination. The three recognised kinds map to three fixed names; " +
+        "a device supplies CONTENT, never a destination. The SEVEN recognised kinds map to seven fixed names -- three when this was written at v2949, and the prose was never re-counted; " +
         "anything else is refused. A device cannot choose a path, traverse out of the directory, or overwrite an " +
         "arbitrary file -- the classic upload vulnerability, closed by construction");
 }
@@ -31,7 +31,7 @@ const src = fs.readFileSync(path.resolve(here, "..", "..", "ai-bridge", "android
 {
     ok("!! an unrecognised kind is a 400, not a write",
         /if \(!name\) return sendJson\(res, \{ ok: false/.test(src),
-        "the endpoint stores three known artefact kinds and rejects everything else, so it cannot become a " +
+        "the endpoint stores seven known artefact kinds and rejects everything else, so it cannot become a " +
         "general-purpose file drop on the hub");
 }
 
