@@ -124,9 +124,16 @@ ok("the claim is NOT sound, which is the finding", graded.sound === false);
 eq("out of scope -- real BVH code the three directories could not reach", graded.outOfScope, [...BVH_AT_V4435.outOfScope]);
 eq("in scope and summarised away", graded.inScopeMissed, [...BVH_AT_V4435.inScopeMissed]);
 eq("matched only because they ASSERT the absence", graded.wide.denial, [...BVH_AT_V4435.denial]);
-ok("the tree holds twelve real BVH files where the claim named two",
-   graded.realImplementations === 12 && BVH_AT_V4435.said.length === 2,
-   `${graded.realImplementations} vs ${BVH_AT_V4435.said.length}`);
+// *** v4535 -- THE NUMBER WAS TYPED HERE AND ALSO RECORDED IN THE MODULE, AND THE TYPED ONE WENT STALE. ***
+// Two declarations of one count, and the row below asserted the literal 12 while the row in section 4
+// asserted the record's own field -- so a single arrival failed both, once against a constant nobody could
+// re-derive. It reads the record now, and the record is what a round updates deliberately. The prose is
+// corrected too: this counts FILES WHOSE CODE CARRIES THE TERM, not implementations -- splatMesh-selfcheck
+// imports MeshBVH and builds nothing, and calling it an implementation is the field's name overstating it.
+ok("the tree holds files whose code carries the term where the claim named two, and the record says how many",
+   graded.realImplementations === BVH_AT_V4435.realImplementations && BVH_AT_V4435.said.length === 2,
+   `${graded.realImplementations} files carry it against ${BVH_AT_V4435.said.length} the claim named -- ` +
+   "not all of them build one, which the field's name does not say and its comment now does");
 
 // *** AND THE NARROW CLAIM SURVIVES, WHICH IS THE HALF THAT IS STILL TRUE. *** The tracer has no BVH. It is
 // asserted from the tracer's own file rather than from the absence of a hit, because an absence read as a
@@ -175,3 +182,23 @@ ok("sourceFiles reaches the whole tree and skips vendor", (() => {
 
 console.log(`\nabsenceScope-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);
 process.exit(fails === 0 ? 0 : 1);
+
+// =============================================================================================================
+// SABOTAGE LOG -- v4535, the BVH_AT_V4435 re-take. Exit codes; both files restored md5-identical.
+//
+//   A  tools/ship/splatMesh-selfcheck.mjs dropped back out of outOfScope.
+//      -> exit 1, from BOTH eq() rows that read the list -- section 3's grade and section 4's live scan. Two
+//      independent readings of the same fact, which is why one arrival produced four failures.
+//
+//   B  realImplementations left at its stale 12.
+//      -> exit 1. The count is asserted against a fresh grade, so the record cannot sit one behind the tree.
+//
+//   C  a name added to outOfScope that is not in the tree ("notReal-selfcheck.mjs").
+//      -> exit 1, caught by "every name in the record is a file that exists". The list cannot carry a name
+//      to make an arithmetic work, which is the direction a record-versus-tree check loses first.
+//
+//   D  the derived count row's condition replaced with `true`. -> exit 0, AND THIS ONE SHOULD NOT HAVE BEEN
+//      RUN: v4534's log in physics/render/albedoEstimator-selfcheck.mjs records the same substitution as
+//      worthless, since every ok() in the tree passes it, and says so precisely to save the next reader the
+//      run. I was the next reader and did it anyway. Kept here as the second entry of a pair rather than
+//      quietly dropped -- a note that only works if somebody reads it is worth knowing about.

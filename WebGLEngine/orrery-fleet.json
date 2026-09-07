@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "f5ab4c4de2c6ffb33c9fd990cbed82dee7e2d4b5",
+ "head": "0e231524eab1fea9c4248cde0f0c30bc74bbe1f9",
  "bodies": {
   "box3d": [
    {
@@ -166,7 +166,7 @@
    {
     "path": "orrery-gpu.html",
     "bytes": 49462,
-    "sha": "25bbf4add8c06b1a6ebf823c7fcdfc7c78dfd6b4"
+    "sha": "0e231524eab1fea9c4248cde0f0c30bc74bbe1f9"
    },
    {
     "path": "slug-curved.html",
@@ -630,8 +630,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3217262,
-    "sha": "f27d8a92b4a142d6810733192fca548a9c7dccde"
+    "bytes": 3227560,
+    "sha": "0e231524eab1fea9c4248cde0f0c30bc74bbe1f9"
    },
    {
     "path": "mpm3d.html",
@@ -813,7 +813,7 @@
    {
     "path": "orrery-gpu.html",
     "bytes": 49462,
-    "sha": "25bbf4add8c06b1a6ebf823c7fcdfc7c78dfd6b4"
+    "sha": "0e231524eab1fea9c4248cde0f0c30bc74bbe1f9"
    },
    {
     "path": "tools/ship/brainTsl-page.js",

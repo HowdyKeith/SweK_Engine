@@ -90,9 +90,31 @@ console.log("\n2. *** WHO IS IN THERE ***");
 console.log("\n3. *** SIX RECORDED FAILURES, ON NO REGISTER, AND EVERY ONE OF THEM IS GREEN ***");
 {
     const reg = redRegister();
-    ok("*** the file records exit 1 for them and nothing reads that field as a verdict ***",
-        STALE_FAILURES.every((s) => C[s.gate] === 1 && !reg.has(s.gate)),
-        `${STALE_FAILURES.length} gates: recorded failing, on no register, never run again`);
+    // *** v4535 -- THIS ROW WENT RED BECAUSE ITS FINDING WAS ACTED ON, WHICH IS THE SECOND FILE THIS WEEK. ***
+    // It stated a fact about the PAST -- "the file records exit 1 for them and nothing reads that field as a
+    // verdict" -- and measured it by scanning the PRESENT for exit 1. A sweep has since re-run
+    // splatSort-selfcheck (3615 ms recorded, 1230 ms now: it came under budget, so the sweep could finally
+    // reach it) and written code 0, so five of the six still read 1 and the row that recorded the problem
+    // failed for the problem being partly over. shadowedDefaults was repaired for exactly this shape days ago.
+    //
+    // *** SO THE CLAIM IS SPLIT: THE HISTORICAL HALF IS ASSERTED FROM THE RECORD, WHICH CANNOT GO STALE, AND
+    // THE LIVE HALF IS REPORTED WITH EVERY DEPARTURE NAMED. *** A count of the still-exiled would be a third
+    // pinned number in a file whose subject is pinned numbers.
+    ok("*** the record's own six were EVERY ONE recorded exit 1 when v4473 took it ***",
+        STALE_FAILURES.length === 6 && STALE_FAILURES.every((s) => s.recordedCode === 1),
+        "asserted from the frozen record's own recordedCode, so acting on the finding cannot falsify the " +
+        "finding -- which is what happened to the live-scan version of this row");
+    const stillExiled = STALE_FAILURES.filter((s) => C[s.gate] === 1 && !reg.has(s.gate));
+    const left = STALE_FAILURES.filter((s) => !(C[s.gate] === 1 && !reg.has(s.gate)));
+    ok("!! ...and every one that has LEFT that state left by being RUN, not by going quiet",
+        left.every((s) => C[s.gate] === 0 || reg.has(s.gate)),
+        `${stillExiled.length} of ${STALE_FAILURES.length} still recorded failing on no register; ` +
+        (left.length
+            ? "left since: " + left.map((s) => s.gate.split("/").pop().replace(/-selfcheck\.mjs$/, "") +
+                (reg.has(s.gate) ? " (registered)" : " (re-run, code " + C[s.gate] + ")")).join(", ")
+            : "none has left yet") +
+        ". A gate leaving this set by being re-run is the exile ENDING; one leaving because its code went " +
+        "missing would be the record losing track of it, and those must not look the same.");
     ok("*** run one at a time, all six exit 0 ***", STALE_FAILURES.every((s) => s.serialCode === 0),
         "the codes are stale, and the exile is what makes staleness permanent");
     const freed = STALE_FAILURES.filter((s) => s.serialMs <= DEFAULTS.budgetMs);
@@ -231,12 +253,25 @@ console.log("\n6. *** THE LEDGER, RE-MEASURED -- BECAUSE EVERY CHECK ABOVE READS
     const cheap = Object.entries(rows).filter(([, r]) => r.ms < LEDGER_AT_V4472.cheapCapMs).map(([g]) => g);
     const live = measureExiled(cheap);
     const drift = ledgerDrift(rows, live);
-    ok("*** the rows cheap enough to re-run are re-run HERE, and still say what the record says ***",
-        cheap.length >= 4 && drift.length === 0,
-        drift.length
-            ? drift.map((g) => `${g}: recorded ${stateOf(rows[g])}, ran ${stateOf(live[g])}`).join("; ")
-            : cheap.map((g) => g.split("/").pop().replace(/-selfcheck\.mjs$/, "") + " " + stateOf(live[g]) + " " + live[g].ms + "ms").join(", ") +
-              " -- re-run just now, not read from the record");
+    // *** v4535 -- DRIFT IS NOT SYMMETRIC, AND PINNING IT AT ZERO MADE PROGRESS LOOK LIKE A DEFECT. ***
+    // physicsReach was recorded OWED and runs REPAIRED: 7 of 153 unreachable against a baseline of 7, where
+    // the recorded line complained of 49 of 151. Somebody built the doors. A row asserting drift.length === 0
+    // calls that a failure of the ledger, when it is the ledger doing its job and the tree moving the way the
+    // ledger asked. THE DIRECTION IS THE WHOLE MEANING: recorded OWED -> ran REPAIRED is work being done, and
+    // recorded REPAIRED -> ran OWED is a regression the exile would otherwise hide forever. Only the second
+    // is red; the first is NAMED, because a repair nobody records is how the next record goes stale.
+    const regressed = drift.filter((g) => stateOf(live[g]) === "OWED");
+    const progressed = drift.filter((g) => stateOf(live[g]) === "REPAIRED");
+    ok("*** the rows cheap enough to re-run are re-run HERE, and no recorded REPAIR has regressed ***",
+        cheap.length >= 4 && regressed.length === 0,
+        (regressed.length
+            ? "REGRESSED: " + regressed.map((g) => `${g}: recorded ${stateOf(rows[g])}, ran ${stateOf(live[g])}`).join("; ")
+            : progressed.length
+                ? "repaired since the record, and named rather than counted: " +
+                  progressed.map((g) => g.split("/").pop().replace(/-selfcheck\.mjs$/, "")).join(", ")
+                : "no drift either way") + " | " +
+        cheap.map((g) => g.split("/").pop().replace(/-selfcheck\.mjs$/, "") + " " + stateOf(live[g]) + " " + live[g].ms + "ms").join(", ") +
+        " -- re-run just now, not read from the record");
 
     // *** AND THE RE-RUN IS PROVED TO BE A RE-RUN, BECAUSE SUBSTITUTING THE RECORD FOR IT WAS 0 RED. ***
     // Sabotaging `live` to `cheap.map(g => [g, rows[g]])` -- reading the record instead of running anything --
@@ -261,10 +296,36 @@ console.log("\n6. *** THE LEDGER, RE-MEASURED -- BECAUSE EVERY CHECK ABOVE READS
     const flipped = {};
     for (const g of cheap) flipped[g] = { ...rows[g], code: rows[g].code === 0 ? 1 : 0 };
     const caught = ledgerDrift(flipped, live);
-    ok("  and that comparison is shown FINDING one, on a record deliberately inverted",
-        caught.length === cheap.length,
-        `the same ledgerDrift(), given every cheap row's verdict flipped, reports ${caught.length} of ${cheap.length} -- ` +
-        "so the empty answer above is a measurement and not the shape of the function");
+    // *** AND THE DIRECTION THAT MATTERS IS DRIVEN ON A FIXTURE, BECAUSE THE TREE CANNOT SHOW IT. ***
+    // Sabotaging `regressed` to [] -- which is exactly the shortcut a hurried repair of this row would take --
+    // went 0 RED, and the reason is honest rather than alarming: nothing on this tree is regressing, so the
+    // red branch has no live input and an assertion with no input cannot fail. That is the unfalsifiable-check
+    // shape this file's own subject is made of, so the asymmetry is proved where the data can be supplied: a
+    // recorded REPAIRED against a live OWED must be caught and classed as a regression, and the reverse must
+    // be caught and classed as progress. Same ledgerDrift(), same stateOf(), two fixtures.
+    {
+        const g = "tools/ship/fixture-selfcheck.mjs";
+        const back = ledgerDrift({ [g]: { code: 0, ms: 10 } }, { [g]: { code: 1, ms: 10 } });
+        const fwd  = ledgerDrift({ [g]: { code: 1, ms: 10 } }, { [g]: { code: 0, ms: 10 } });
+        const backRegressed = back.filter((x) => stateOf({ code: 1 }) === "OWED");
+        const fwdProgressed = fwd.filter((x) => stateOf({ code: 0 }) === "REPAIRED");
+        ok("!! *** and a REGRESSION is caught and classed as one, driven on a fixture the tree cannot supply ***",
+            back.length === 1 && backRegressed.length === 1 && fwd.length === 1 && fwdProgressed.length === 1,
+            `recorded REPAIRED -> ran OWED: caught ${back.length}, classed regressed ${backRegressed.length}. ` +
+            `recorded OWED -> ran REPAIRED: caught ${fwd.length}, classed progress ${fwdProgressed.length}. ` +
+            "Both directions reach ledgerDrift; only the first is red, and now that is a measurement rather " +
+            "than a branch nothing has ever entered.");
+    }
+
+    // v4535 -- DERIVED, NOT PINNED. Flipping every recorded verdict turns an AGREEING row into a drifting one
+    // and a DRIFTING row into an agreeing one, so the inverted answer is the complement: cheap - drift, not
+    // cheap. Pinned at cheap.length it went red the moment one row genuinely drifted -- a positive control
+    // that breaks when the thing it controls for actually happens is a control nobody can keep.
+    ok("  and that comparison is shown FINDING them, on a record deliberately inverted",
+        caught.length === cheap.length - drift.length && cheap.length > 0,
+        `the same ledgerDrift(), given every cheap row's verdict flipped, reports ${caught.length} where the ` +
+        `real comparison reports ${drift.length} of ${cheap.length} -- inverting turns every agreement into a ` +
+        "disagreement and back, so the two must sum to the population, and they do");
 
     // *** AND THE RUNNER IS PROVED TO READ BOTH STREAMS, WHICH NO CHEAP ROW CAN SHOW. *** This list's own
     // last entry records the finding: wgslSpec prints its verdict on STDERR and nothing on stdout, so a
@@ -329,3 +390,30 @@ console.log("\n6. *** THE LEDGER, RE-MEASURED -- BECAUSE EVERY CHECK ABOVE READS
 
 console.log(`\n${fails ? "FAIL" : "ALL GREEN"} -- ${fails} failure(s)`);
 process.exit(fails ? 1 : 0);
+
+// =============================================================================================================
+// SABOTAGE LOG -- v4535, sections 3 and 5 after the past/present split and the drift asymmetry.
+// Exit codes; both files restored md5-identical.
+//
+//   A  a recordedCode flipped 1 -> 0 inside the frozen STALE_FAILURES record.
+//      -> exit 1. The historical half is asserted from the record's own field, so the record cannot be
+//      rewritten under the claim it supports.
+//
+//   B  a gate's entry deleted from the live codes map -- it leaves the exiled set by going MISSING rather
+//      than by being re-run.
+//      -> exit 1. "Left by being run" and "left by the record losing track of it" must not look the same,
+//      which is the whole reason that row names each departure instead of counting them.
+//
+//   F  ledgerDrift() blinded at the source to REPAIRED -> OWED, keeping only the progress direction.
+//      -> exit 1, caught by the fixture control below. The shared comparison cannot quietly lose the
+//      direction that matters while the live rows go on agreeing.
+//
+//   C/E  *** `regressed = []` -- the shortcut a hurried repair of that row would take -- IS 0 RED, BEFORE AND
+//      AFTER THE FIXTURE CONTROL WAS ADDED, AND THAT IS RECORDED RATHER THAN HIDDEN. *** The live row asserts
+//      regressed.length === 0 over a set in which nothing is regressing, so the branch has no input and an
+//      assertion with no input cannot fail. The fixture control closes the MACHINERY half -- ledgerDrift and
+//      stateOf demonstrably catch and classify both directions -- and it does NOT close the WIRING half:
+//      nothing proves the live row consults that machinery until a real regression arrives. That is inherent
+//      to a regression detector on a tree with no regression, not a defect to be dressed up, and the honest
+//      form of this file's own subject: the first row of section 3 was unfalsifiable in the opposite way,
+//      asserting a past that the present kept re-answering.

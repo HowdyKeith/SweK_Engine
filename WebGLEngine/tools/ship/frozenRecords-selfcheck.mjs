@@ -27,6 +27,7 @@
 import { census, reportLines, sources, RECORD_RE, PROBE_AT_V4487 as REC, ENG }
     from "./frozenRecords.mjs";
 import fs from "node:fs";
+import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -111,18 +112,54 @@ console.log("\n2. the observer effect, checked to be exactly one");
     // MEASURED_V4527), which is a count pinned to a moment -- the species this tree names most. A record whose stamp is
     // AFTER v4487 cannot have been in a sweep taken at v4487, so the reading the sweep was taken against is the census
     // WITHOUT those arrivals, and the arrivals are named beside it rather than counted into a number that cannot move.
+    // *** v4535 -- AND THE STAMP IS NOT THE ARRIVAL, WHICH v4534 PAID FOR AND WROTE DOWN AS OWED. ***
+    // PROBE_AT_V4487's own note: "A STAMP IN A NAME IS A CLAIM ABOUT THE SUBJECT, NOT ABOUT THE ARRIVAL, so
+    // a record written now about a past version lands in the past and is counted as having been in a sweep
+    // it could not have been in" -- corrected there by moving 74 to 76 and naming the two, with the debt
+    // stated: "the next record named for a version it merely DESCRIBES will land in the past silently
+    // again." THE NEXT ONE WAS THE NEXT ROUND. v4535 lifted KEY_DRIFT_V4460's growing ledger of key moves
+    // into KEY_MOVES_V4460 -- stamped for its subject, correctly, by that same rule -- and the count went to
+    // 77 within the hour.
+    //
+    // So the arrival is ASKED FOR rather than inferred from a name. The v4487 tree is a commit; the records
+    // that were in the sweep are the ones whose declarations appear in it, and git can be asked in one call.
+    // That dissolves BOTH hand-corrections: nothing is added to a list when a record lands in the past, and
+    // a record that vanishes from the census is caught the same way. If git cannot answer -- a shallow clone,
+    // no history -- the row says so and falls back to the stamp, because a check that cannot run is not a
+    // check that passes and it must not pretend the fallback is the measurement.
     const stampOf = (name) => { const m = /V(\d{3,4})/.exec(name); return m ? +m[1] : 0; };
     const sweepV = +REC.at.replace(/^v/, "");
-    const arrivals = without.records.filter((r) => stampOf(r.name) > sweepV);
+    let atSweepNames = null;
+    try {
+        const out = execFileSync("git", ["grep", "-h", "-E",
+            "export const [A-Z][A-Z0-9_]*V[0-9]{3,4}[A-Z0-9_]* = Object\\.freeze\\(", REC.commit],
+            { cwd: ENG, encoding: "utf8", maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"] });
+        const set = new Set();
+        for (const m of out.matchAll(/export const ([A-Z][A-Z0-9_]*V\d{3,4}[A-Z0-9_]*) = Object\.freeze\(/g)) set.add(m[1]);
+        if (set.size > 0) atSweepNames = set;
+    } catch { atSweepNames = null; }
+    const arrivals = atSweepNames
+        ? without.records.filter((r) => !atSweepNames.has(r.name))
+        : without.records.filter((r) => stampOf(r.name) > sweepV);
     const atSweep = { records: without.records.length - arrivals.length, fields: without.fields - arrivals.reduce((a, r) => a + r.fields.length, 0) };
     ok("...and the excluded reading, less the records stamped after the sweep, is the one the frozen sweep was taken against",
         atSweep.records === REC.records && atSweep.fields === REC.fields,
         `${atSweep.records} records and ${atSweep.fields} fields at or before ${REC.at} (${without.records.length} and ${without.fields} now), ` +
         `against ${REC.records} and ${REC.fields} at v4487` +
         (arrivals.length ? `; arrived since: ${arrivals.map((r) => r.name + " (" + r.fields.length + " fields)").join(", ")}` : ""));
-    ok("  every record stamped after the sweep is NAMED above, not folded into the count, and none carries a stamp from the future",
-        arrivals.every((r) => stampOf(r.name) <= 9999) && arrivals.every((r) => r.file.endsWith(".mjs")),
-        arrivals.length ? `${arrivals.length} arrival(s) since ${REC.at}` : "none yet");
+    ok("!! *** the arrivals are read out of the v4487 COMMIT, not out of the names ***",
+        !!atSweepNames && atSweepNames.size > 0 &&
+        // the derivation must actually disagree with the naive rule somewhere, or it is the naive rule
+        // wearing a git call: the two records v4534 had to name by hand are exactly the disagreement.
+        arrivals.some((r) => stampOf(r.name) <= sweepV) &&
+        arrivals.every((r) => r.file.endsWith(".mjs")),
+        atSweepNames
+          ? `${atSweepNames.size} record declarations in ${REC.commit}; ${arrivals.length} of the census are ` +
+            `not among them, and ${arrivals.filter((r) => stampOf(r.name) <= sweepV).length} of THOSE carry a ` +
+            "stamp at or before the sweep -- records named for the version they DESCRIBE, which the naive " +
+            "rule counts as having been present. That set is what v4534 had to name by hand."
+          : "*** GIT COULD NOT ANSWER, so this fell back to reading the stamp out of the name -- THE " +
+            "FALLBACK IS NOT THE MEASUREMENT and this row is red rather than quietly green on it.");
     say(reportLines(without).join("\n  ----  "));
 }
 

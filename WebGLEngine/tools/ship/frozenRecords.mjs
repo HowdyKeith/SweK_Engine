@@ -115,8 +115,27 @@ export function census({ files = null, read = (f) => fs.readFileSync(f, "utf8"),
  */
 export const PROBE_AT_V4487 = Object.freeze({
     at: "v4487",
+    // The COMMIT the sweep was taken at, so "was this record in it?" is a question git can answer
+    // rather than one inferred from a name. v4534 corrected this count by hand and wrote down that the
+    // next record named for a version it merely DESCRIBES would land in the past silently again; it did,
+    // the next round, and the gate reads the tree at this commit now instead of reading the names.
+    commit: "75f0c033",
     method: "bump one integer field by 7 in place, run every gate that NAMES the record, restore; a field is " +
             "NOTICED if any of them exits 1",
+    // *** v4534 CORRECTED THIS BY HAND FROM 74 TO 76, AND v4535 GAVE THE HAND BACK ITS 74. ***
+    // v4534's reasoning was right and is kept here because it is what led to the repair: the row that reads
+    // this count took a record's ARRIVAL from the version in its NAME, and REACH_ARRIVALS_SINCE_V4407 and
+    // REACH_LOST_SINCE_V4407 arrived days after v4487 stamped V4407, because that is the version they are
+    // ABOUT. *** A STAMP IN A NAME IS A CLAIM ABOUT THE SUBJECT, NOT ABOUT THE ARRIVAL. *** It corrected the
+    // count and wrote down what was owed: "the next record named for a version it merely DESCRIBES will land
+    // in the past silently again", and that dating an arrival "needs git, which this pure module does not
+    // touch".
+    //
+    // THE NEXT ONE WAS THE NEXT ROUND, WITHIN THE HOUR, and the debt is paid where it can be: the MODULE
+    // stays pure and the GATE asks git, in one call, which record declarations exist in the sweep's own
+    // commit. The count returns to the 74 the sweep actually took, the two are excluded by measurement
+    // rather than by being written down, and a third that would have landed in the past is caught by the
+    // same rule without anybody adding to a list.
     records: 74, withFields: 36, fields: 135,
     noticed: 83, unnoticed: 52,
     noGateNamesIt: 14,
