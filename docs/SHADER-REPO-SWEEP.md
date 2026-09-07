@@ -189,6 +189,55 @@ them whole if decode-level coverage of `GLBParser.js`'s edge-case handling is wa
 of this sweep — fixtures, not a technique to reimplement, and a licensing story simpler than the Khronos
 repo already vendored from.
 
+## The wider KhronosGroup org sweep
+
+`glTF-Asset-Generator`'s own page links to nothing else (only the glTF spec repo and its own issue
+tracker), so this widened to the full `KhronosGroup` org — 189 repositories as of this sweep. Most of it is
+out of scope by construction: Vulkan/OpenXR/OpenCL/SYCL/ANARI/OpenVX/COLLADA/MoltenVK/SPIR-V tooling is
+native-API or the wrong runtime for a browser engine, and a good third of the remainder is Blender/Unity/
+3ds-Max plugins, or pure spec/registry/documentation repos with no code to port. What's actually in-domain,
+checked against this tree:
+
+- **glTF-IBL-Sampler** — the strongest find. Khronos's reference tool for generating prefiltered
+  environment maps (diffuse irradiance + roughness-convolved specular) for image-based lighting. Grepped
+  for IBL/prefiltered-environment/irradiance-map code anywhere in this tree's own render path and found
+  nothing — confirmed absent. That absence sits right next to work that IS here: `physics/render/
+  microfacetVndf-selfcheck.mjs` (VNDF importance sampling), `physics/render/energyCompensation.mjs` /
+  `energyCompWgsl.mjs` (multi-scatter GGX energy compensation), `physics/render/roughDiffuse.mjs`,
+  `physics/render/dielectricWalk-selfcheck.mjs` — a genuinely research-grade microfacet BRDF stack, already
+  ahead of plain glTF PBR, with no environment lighting to feed it. Not built.
+- **glTF-Sample-Viewer** / **glTF-Sample-Renderer** — Khronos's own PBR reference renderer (WebGL),
+  implementing the glTF metallic-roughness spec exactly. Framed precisely: since this tree's microfacet
+  work is already past the base glTF spec, this isn't a technique upgrade — its value is as a
+  **conformance reference**, the same shape `img2threejs`'s hard-gate rule already gave
+  `render/perceptual.mjs` / `render/silhouette.mjs`: does glTF-spec content render the way Khronos's own
+  implementation says it should, through the vendored `GLTFLoader.js`. Not built.
+- **glTF-Validator** — validates glTF/GLB against the spec. SweK exports GLB from at least
+  `tools/export/sceneGlb.mjs` and `tools/export/voxelGlb.mjs` (both through `vendor/three/jsm/exporters/
+  GLTFExporter.js`), and no spec-conformance check on that output was found anywhere — only that the one
+  loader that made it can also read it back. Not built.
+- **gltf-asset-auditor** — checks glTF attributes (polycount, texture size, etc.) against practical
+  use-case limits. Relevant to the Kenney/Quaternius GLB pipeline (`ui/cityPack.js`, discussed earlier in
+  this sweep) as a QA pass before assets hit the city grid, rather than finding a problem at runtime. Not
+  built.
+- **WebGL** (the official Khronos repo) — includes the canonical WebGL conformance test suite. An obvious
+  resource for validating SweK's own WebGL2 backend, the same spirit as `gpu/khronosSamples.mjs` /
+  `gpu/fixtures/` validating against Khronos assets — never checked against here. Bigger lift than the
+  others above; flagged rather than sized.
+
+**Checked and set aside, lower confidence either way:**
+- `dfdutils` / `KTX-Specification` — only relevant if `gpu/gltfKtx2.js` parses KTX2's data-format
+  descriptor itself; at 96 lines it almost certainly just routes to `vendor/three/jsm/loaders/
+  KTX2Loader.js`, which already handles this, so likely no gap.
+- `basis_universal` — already vendored, via three's own `vendor/three/jsm/libs/basis/
+  basis_transcoder.{js,wasm}`. Not a new find.
+- `ToneMapping` (a collection of tone-mapping operators) — no tone-mapping code found in this tree's render
+  path to compare it against, so this is genuinely unconfirmed rather than a real gap.
+- `glTF-InteractivityGraph-AuthoringTool` / `glTF-Test-Assets-Interactivity` — an emerging KHR_interactivity
+  node-graph spec for embedding behaviour in glTF files. Interesting, speculative, no established want.
+- `MaterialX` — a real, actively-used standard, but a large XML shading-graph system. A bigger idea than a
+  quick candidate; noted rather than sized.
+
 ## The method, for next time
 
 Sixteen links in, the split that mattered every time was the one retroRaster already wrote
