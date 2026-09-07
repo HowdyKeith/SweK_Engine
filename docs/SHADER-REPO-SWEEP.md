@@ -279,6 +279,52 @@ samples with no engine code to check. What's actually in-domain, checked against
 - Set aside as wrong language/toolchain or an unneeded format: `tinygltf`, `collada-dom`, `COLLADA2GLTF`,
   `libjpeg-turbo`, `LAStools`, `glutess`, `libcitygml`, `zstr`, `xerces-c`, `webglreport`.
 
+## An individual profile sweep: github.com/visualbruno
+
+Different flavour from the org sweeps: a specialist in ComfyUI wrapper nodes for 3D-generation AI models,
+plus several from-scratch mesh-processing research tools. Checked against source, not just descriptions:
+
+- **AutoUV** — directly answers the xatlas gap named in the CesiumGS sweep above. MIT, Python, genuinely
+  from-scratch (not a wrapper): KD-tree topology welding, bounded-curvature segmentation with exact
+  normal-cone constraints, LSCM-validated chart merging, LSCM/ARAP flattening, skyline packing. Its own
+  pitch — "better UV than xatlas for low-poly mesh" — fits SweK's actual asset profile (Kenney/Quaternius
+  kits, procedurally-generated voxel meshes), with numbers to back it (810 disconnected components welded to
+  3 in one example; ARAP drops area distortion 0.84 to 0.09). Wrong language for a direct port; a
+  well-specified MIT algorithm worth reading and hand-writing if UV unwrapping becomes a real want. Not
+  built.
+- **Faithful Contouring (FaithC)** — a real, very recent alternative to what `physics/mesh/dualContour.mjs`
+  already does. Implements a genuine Nov-2025 arXiv paper (Imperial College London et al.): operates
+  directly on a raw mesh rather than converting to a distance field, to preserve sharp edges and handle
+  open/non-manifold input without the surface-thickening and jagged-isosurface artifacts SDF methods
+  (marching cubes, dual contouring included) are prone to — directly relevant to the exact problem
+  `dualContour.mjs`'s own header discusses. **CC BY-NC 4.0 — non-commercial only**, same hard block as
+  `SurceBeats/Atlas` earlier in this sweep. The published technique, not the NC-licensed code, is what's
+  reachable here (the keyhunt/mmacklin posture). Not built.
+- **CelloCut** — Apache 2.0, a real arXiv-published algorithm ("Constructive Watertight Remeshing via
+  Tetrahedral Cell Cuts") relevant to `physics/mesh/csg.mjs` / `manifoldCensus.mjs`'s watertightness
+  concerns: embeds a defective mesh into a tetrahedral cell complex and solves a graph-cut interior/exterior
+  labelling, guaranteeing a watertight boundary by construction rather than by boolean-op patching. C++/CUDA
+  plus CGAL/Eigen/libigl — heavy, wrong-toolchain dependency stack, clean licence, a genuinely different
+  approach than ad-hoc CSG repair. Read-the-technique candidate, not built.
+- **CuMesh** — MIT, but honestly a wrapper/aggregation layer (wraps `cubvh` for BVH, **wraps xatlas itself**
+  for UV, adapts an edge-collapse algorithm from elsewhere) rather than a novel algorithm — lower value than
+  the underlying pieces directly. Its remeshing path uses Dual Contouring, an independent confirmation that
+  this tree's own choice of algorithm there is sound and production-used.
+- **AutoRetopo** — PolyForm Noncommercial, same hard block as FaithC. A real, generic four-stage retopology
+  pipeline (occupancy-field voxelisation, curvature-adaptive isotropic remeshing, tangential relaxation +
+  closest-point snap-back) — relevant only if cleaning up AI-generated/scanned meshes becomes a real need,
+  given `ai-bridge/kaggle_templates/` already generates meshes via TripoSR/InstantMesh/etc.
+- **PartUV-Windows** — a Windows fork of `EricWang12/PartUV`, a SIGGRAPH Asia 2025 publication doing
+  part-aware UV unwrapping (segment into semantic parts first, then unwrap per part). License unclear on
+  this fork; a second data point that UV unwrapping is an active 2025 research area if ever prioritised.
+- **The ComfyUI-* wrapper repos** (Trellis2, Hunyuan3D-2.1, Direct3D-S2, HY-Motion, HunyuanVideo-Foley,
+  InvSR, Meshflow, Meshlib, QRemeshify, flux2fun-controlnet) — `ai-bridge/kaggle_templates/` already tracks
+  several of the same underlying models (`trellis2.js`, `hunyuan3d.js`, `direct3d_s2.js`, `rig_anything.js`
+  already exist) via a different orchestration path (Kaggle notebooks, not ComfyUI nodes). Confirms the
+  model roster is current; the wrapper code itself isn't portable (Python, ComfyUI-specific).
+- `AspNet.Security.OAuth.Providers` (C#) — unrelated to this author's graphics work, an old/separate repo.
+  Ignored.
+
 ## The method, for next time
 
 Sixteen links in, the split that mattered every time was the one retroRaster already wrote
