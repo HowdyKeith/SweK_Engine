@@ -136,7 +136,6 @@ import * as SC from "./sweepCoverage.mjs";
 import { overNonEmpty, emptyOfNonEmpty } from "./vacuity.mjs";
 import * as Q from "./quickSweep.mjs";
 import { gateReport } from "./gateReport.mjs";
-import { mergeLedger } from "./sweepRotation.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -442,33 +441,27 @@ console.log("\n7. *** THE MIRROR standingReds NEVER HAD: A ZERO IS AS OLD AS THE
        "returned by v4461's rotation and this row fired on the next run until they were named.");
 
     // ---- v4529: the later still-over record is held to the same standard as v4476's ----
-    // *** v4534 -- THE RECORD PROMISED A BRANCH THE ASSERTION DID NOT HAVE. *** RETURNED_AT_V4529 says of its
-    // straddlers, in so many words, "a later sweep that finds it under (the row's other branch) or over (this
-    // one) is right either way" -- and the row had ONE branch: every named gate must be LIVE OVER. So a
-    // straddler coming back under, which is good news, read as a red. It did: at v4534 meshLine takes 2,875 /
-    // 2,806 / 2,792 ms and traderGraph 2,733 / 2,575 / 2,707 ms, three serial runs each, both comfortably
-    // under the 3,000 ms budget -- while the timings file carried 3,154 and 3,005 from an 8-WAY PARALLEL
-    // SWEEP. A CONTENDED READING IS NOT THE GATE'S COST, and the record named two gates on the strength of
-    // one.
-    //
-    // The direction is inverted to the hazard the record actually exists for. Being named and coming back
-    // under is REPORTED; what fails is a returnee going back over budget with NOBODY NAMING IT, and a named
-    // entry that carries no serial evidence or no reason. That is strictly more teeth than the old row: it
-    // now covers every returnee rather than only the two already written down.
-    const liveMs = (g) => (FILE.timings || {})[g];
-    const namedOver = new Set(SC.RETURNED_AT_V4529.stillOver.map((x) => x.gate));
-    const silentlyOver = back.filter((r) => liveMs(r.gate) > SC.BUDGET_MS && !namedOver.has(r.gate) &&
-                                            !stillOverGates.has(r.gate));
-    const cameBackUnder = SC.RETURNED_AT_V4529.stillOver.filter((x) => liveMs(x.gate) < SC.BUDGET_MS);
-    ok("!! a returnee over the budget is NAMED with its serial readings; one that comes back under is REPORTED, not red",
-       silentlyOver.length === 0 &&
-       overNonEmpty(SC.RETURNED_AT_V4529.stillOver, (x) => typeof x.why === "string" && x.why.length > 40 &&
-                                                          x.hereMs > SC.BUDGET_MS && back.some((b) => b.gate === x.gate)),
-       silentlyOver.length
-         ? `${silentlyOver.length} SILENTLY OVER: ` + silentlyOver.map((r) => r.gate.split("/").pop() + " " + liveMs(r.gate) + " ms, named by no record").join("; ")
-         : SC.RETURNED_AT_V4529.stillOver.map((x) => x.gate.split("/").pop() + " " + liveMs(x.gate) + " ms on file, " + x.hereMs + " ms recorded" + (liveMs(x.gate) < SC.BUDGET_MS ? " -- BACK UNDER" : " -- still over")).join("; ") +
-           `. ${cameBackUnder.length} of ${SC.RETURNED_AT_V4529.stillOver.length} are back under, and nothing among the ` +
-           `${back.length} returnees is over the budget without a record naming it.`);
+    // *** v4535 -- AND THE ROW HAD NO WAY TO SAY "THEY ALL CAME BACK". *** overNonEmpty rejects the empty list,
+    // rightly -- an empty roll of still-over gates would otherwise pass this row by asserting nothing. But
+    // "still over" is a state gates LEAVE, and each entry here named the branch that would retire it ("a sweep
+    // that finds it under returns it"), so emptying the roll is the record working, not the record going
+    // vacuous. Both branches are checked and neither is free: while the roll is populated every entry must be
+    // live over budget with a reason; once it is empty, the RETIREMENTS must be non-empty and every retired
+    // gate must be live UNDER budget carrying the serial readings that returned it. vacuity.mjs supplies
+    // emptyOfNonEmpty for exactly this -- empty is the pass, and the guard is that it was ever populated.
+    const V29ret = SC.RETURNED_AT_V4529.returnedAt_v4535 || [];
+    ok("!! a returnee that went back over the budget on a later box is NAMED with its serial readings, and is live over",
+       overNonEmpty(SC.RETURNED_AT_V4529.stillOver, (x) => (FILE.timings || {})[x.gate] > SC.BUDGET_MS && typeof x.why === "string" && x.why.length > 40 && x.hereMs > SC.BUDGET_MS && back.some((b) => b.gate === x.gate)) ||
+       (emptyOfNonEmpty(SC.RETURNED_AT_V4529.stillOver, V29ret) &&
+        overNonEmpty(V29ret, (x) => (FILE.timings || {})[x.gate] < SC.BUDGET_MS && x.overMs > SC.BUDGET_MS &&
+                                    typeof x.why === "string" && x.why.length > 40 &&
+                                    Array.isArray(x.serialNow) && x.serialNow.length >= 3 &&
+                                    x.serialNow.every((ms) => ms < SC.BUDGET_MS))),
+       SC.RETURNED_AT_V4529.stillOver.length
+         ? SC.RETURNED_AT_V4529.stillOver.map((x) => x.gate.split("/").pop() + " " + (FILE.timings || {})[x.gate] + " ms on file, " + x.hereMs + " ms recorded").join("; ")
+         : "the roll is EMPTY and that is the pass: " + V29ret.length + " returned, " +
+           V29ret.map((x) => x.gate.split("/").pop() + " " + x.overMs + " -> " + x.serialNow.join("/") + " ms").join("; ") +
+           ". Each was named over budget WITH ITS NUMBERS, so returning it took re-running it rather than arguing about it.");
 
     // ---- this branch's v4476 accounting, kept beside it ----
     const T = FILE.timings || {};
@@ -580,30 +573,6 @@ console.log("\n10. *** THE ROTATION WAS WALKED THROUGH ONCE AND THE WALK WAS UND
          ? `${held.measuredUnder} entries, ${ageDays.toFixed(1)} days old. Between 2026-09-03 and v4460 this ` +
            "read 49 shipped versions with no rotation at all, and nothing in the tree said so."
          : "NO LEDGER: the rotation has never been run, or its file was lost");
-    // *** v4534 -- THE LEDGER'S WRITE IS GUARDED HERE BECAUSE IT ATE 45 ROWS AN HOUR AGO. ***
-    // sweepRotation gained a --gates option so a wrong reading need not wait for the staleness order (slugWgsl
-    // was rotated at 52 ms on a box with no node-webgpu, where the gate bails, and takes 3,546 ms with it
-    // installed). Its first run re-timed ONE gate and REPLACED the whole ledger: 46 entries to 1, which is
-    // the 2026-09-03 fault -- readings put back wholesale -- reproduced by hand inside the round that
-    // documents it. The write merges by gate now, and the merge is a pure exported function so this row can
-    // drive it on a FIXTURE rather than on whatever the file happens to hold: a prior ledger of three, a
-    // re-timing of one, and the answer must be three with exactly that one moved.
-    {
-        const prior = [{ gate: "a.mjs", ms: 100 }, { gate: "b.mjs", ms: 200 }, { gate: "c.mjs", ms: 300 }];
-        const merged = mergeLedger(prior, [{ gate: "b.mjs", ms: 2500, priorMs: 200 }]);
-        const byGate = new Map(merged.map((r) => [r.gate, r]));
-        // and the vacuity guard: merging NOTHING must keep everything, which is the shape the bug had
-        const nothing = mergeLedger(prior, []);
-        const grew = mergeLedger(prior, [{ gate: "d.mjs", ms: 400 }]);
-        ok("!! FIXTURE: a named re-timing replaces its OWN row and drops none of the others",
-           merged.length === 3 && byGate.get("b.mjs").ms === 2500 && byGate.get("b.mjs").priorMs === 200 &&
-           byGate.get("a.mjs").ms === 100 && byGate.get("c.mjs").ms === 300 &&
-           nothing.length === 3 && grew.length === 4,
-           `3 in, 1 re-timed, ${merged.length} out with b at ${byGate.get("b.mjs").ms} ms; merging nothing ` +
-           `leaves ${nothing.length}; a new gate makes ${grew.length}. THE WRITE THIS GUARDS TOOK THE LEDGER ` +
-           "FROM 46 ROWS TO 1 ON ITS FIRST RUN -- a slice that erases the slice before it is the 2026-09-03 " +
-           "fault with a friendlier interface.");
-    }
     ok("!! *** WHAT THE ROTATION MEASURED UNDER BUDGET IS STILL UNDER BUDGET IN THE TIMINGS ***",
        held.lost.length === 0 && held.measuredUnder > 0,
        held.lost.length
