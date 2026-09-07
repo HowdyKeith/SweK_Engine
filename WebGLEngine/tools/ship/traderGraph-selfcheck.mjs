@@ -57,7 +57,7 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import * as T from "../../world/traderGraph.mjs";
 import { SWEEP as LICENCE } from "../../world/licenceSweep.mjs";
-import { stack } from "./refusalStack.mjs";
+import { stack, GATES, isOwnRepoPath, ownRepoOf, ENG as ENGX } from "./refusalStack.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 let fails = 0;
@@ -190,12 +190,28 @@ console.log("\n2. *** WHOSE REFUSAL IS IT? RE-PROBED, AND THE BODY READ, NOT JUS
     for (const r of s.rows)
         report(`${r.path.padEnd(42)} ${r.code}  ${r.open ? "OPEN" : (r.gate || "*** UNNAMED REFUSAL ***")}`);
 
-    ok("!! *** THE RECORDED AXES ARE STILL SHUT -- and one OPENING is the red worth having ***",
-       s.open.length === 0,
-       s.open.length ? "OPEN: " + s.open.join(", ") + " -- GO AND USE IT: the graph can be built from richer "
-                     + "data than git history and world/traderGraph.mjs should be revisited"
-                     : `${s.refused.length} refused, ${s.distinctGates} distinct gates. This is the direction `
-                     + "the header states and the direction v4481 reversed by asserting a 200.");
+    // *** v4534 -- v4483's DIRECTION, WITH ITS OWN DISCRIMINATION PUT INTO THE ASSERTION. *** Its report line
+    // says "what is NOT an invitation is a 200 arriving because this session happens to be bound to the
+    // repository"; the assertion was `s.open.length === 0`, which cannot tell that apart and goes red on
+    // exactly the 200 the note excludes. The set asserted on is the one that does not depend on the box:
+    // paths OUTSIDE this tree's own repository, derived from the git remote rather than typed.
+    //
+    // MEASURED: the own-repo path answers 200 ten times of ten in this container and was 403 throughout
+    // v4483's, while users/but0n and repos/but0n/vixel are 403 in both. v4481 asserted it OPEN and went red
+    // when it shut; v4483 asserted it SHUT and goes red when it opens. THE SAME MISTAKE FROM BOTH SIDES, and
+    // neither reading is a fact about this tree.
+    ok("!! *** NO AXIS IS OPEN OUTSIDE THIS SESSION'S OWN REPOSITORY -- an opening THERE is the red worth having ***",
+       s.openElsewhere.length === 0,
+       s.openElsewhere.length
+         ? "OPEN: " + s.openElsewhere.join(", ") + " -- GO AND USE IT: the graph can be built from richer "
+           + "data than git history and world/traderGraph.mjs should be revisited"
+         : `${s.refused.length} refused, ${s.distinctGates} distinct gates, own repo ${s.ownRepo || "(no remote)"}. `
+           + "This is the direction the header states, and it no longer moves when the container does.");
+    if (s.openOwnRepo.length)
+        report(`${s.openOwnRepo.join(", ")} answers 200 -- THIS SESSION IS BOUND TO THAT REPOSITORY, so it is ` +
+               "the container talking and not an axis opening to anybody else. Reported, never asserted: it " +
+               "read 200 at v4481, 403 at v4483 and 200 again here, on a tree where nothing about the " +
+               "repository changed, and a gate was red both times for asserting a reading of its own box.");
     if (s.unreached.length)
         report(`*** ${s.unreached.length} PROBE(S) NEVER REACHED THE NETWORK: ${s.unreached.join(", ")} -- ` +
                "no curl on this box, or no route out. That is a fact about the runner and says nothing about " +
@@ -205,10 +221,44 @@ console.log("\n2. *** WHOSE REFUSAL IS IT? RE-PROBED, AND THE BODY READ, NOT JUS
        s.unnamed.length ? "UNNAMED: " + s.unnamed.join(", ") + " -- the proxy reworded and tools/ship/"
                         + "refusalStack.mjs must be re-taken"
                         : `all ${s.refused.length} attributed to the runner, each to its own gate`);
+    // *** THE TAXONOMY IS THE CLAIM; HOW MANY YOU HAPPEN TO HIT IS THE BOX. *** This asserted
+    // `s.distinctGates === 3` -- gates observed among THIS RUN'S refusals -- so it went red the moment one of
+    // the three paths answered, which is the third assertion in this file to move with the container. What
+    // v4483 established is that the refusals are three INDEPENDENT gates with three different holders, and
+    // that is a property of the record, checkable with no network at all.
+    // *** THE INVITATION RESTS ENTIRELY ON THIS DISCRIMINATOR, so it is pinned with literals. *** Sabotage FB
+    // made isOwnRepoPath answer true for every path: every open axis becomes "the container talking", the
+    // openElsewhere set is empty by construction and THE INVITATION CAN NEVER FIRE AGAIN -- 0 RED, because
+    // the only row that could have caught it is the one built on top of it. A discriminator that widens to
+    // swallow its own alarm is this session's fifth control-built-from-the-defect, so it is exercised on
+    // fixed strings rather than on whatever the remote says today.
+    {
+        const own = "howdykeith/swek_engine";
+        const cases = [
+            ["repos/howdykeith/swek_engine/contributors", own, true],
+            ["repos/HowdyKeith/SweK_Engine", own, true],          // the remote's own casing
+            ["repos/but0n/vixel", own, false],                     // another repository
+            ["users/but0n", own, false],                           // not a repo path at all
+            ["repos/howdykeith/other-repo/contributors", own, false],
+            ["repos/howdykeith/swek_engine/contributors", null, false],  // no remote: nothing is "ours"
+        ];
+        const wrong = cases.filter(([p0, o, want]) => isOwnRepoPath(p0, o) !== want);
+        ok("!! FIXTURE: the own-repo discriminator, on fixed strings rather than on today's remote",
+           wrong.length === 0 && !!ownRepoOf(ENGX),
+           `${cases.length} paths classified, ${cases.length - wrong.length} correct` +
+           (wrong.length ? ": WRONG on " + wrong.map((c) => c[0]).join(", ") : "") +
+           `; the live remote derives ${ownRepoOf(ENGX) || "(none)"}. A discriminator that answered true for ` +
+           "everything would empty openElsewhere and silence the invitation with no row left to notice.");
+    }
+
     ok("!! ...and they are THREE DIFFERENT GATES held by three different people, not one shut door",
-       s.distinctGates === 3,
+       GATES.length === 3 && new Set(GATES.map((g) => g.who)).size === 3 &&
+       GATES.every((g) => g.mark instanceof RegExp && g.who),
+       `${GATES.length} gates in the record, ${new Set(GATES.map((g) => g.who)).size} distinct holders: ` +
        "path-class (nobody here), repo-not-attached (this session, add_repo), org-not-connected (an org " +
-       "admin). Clearing one clears nothing about the other two, and 'the API is shut' hides all of that");
+       "admin). Clearing one clears nothing about the other two, and 'the API is shut' hides all of that.");
+    report(`${s.distinctGates} of the ${GATES.length} gates were exercised by this run's ${s.refused.length} ` +
+        "refusals -- a count of what this container happens to meet, which is why it is reported and not asserted.");
 
     ok("CONTROL: the network is up, so the refusals are refusals and not a dead link",
        lim.code === 200, "rate_limit answers 200 on the same connection -- and its limit is 15000, which is " +
