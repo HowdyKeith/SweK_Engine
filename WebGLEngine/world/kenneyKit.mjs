@@ -203,7 +203,7 @@ export function kitGrid(entries = MANIFEST, { pitch = 13, perRow = 7, size = 10 
  * static Float32Arrays (nothing here moves; a mover brings its own buffer, per round 4's finding). Returns the scene with `fleets`
  * (the file names in fleet order) and `fleetOf` beside it.
  */
-export function kitScene(device, loaded, placements, G, L, { light = [600, 1400, 400, 0.38], cull = "back", extraFleets = [] } = {}) {
+export function kitScene(device, loaded, placements, G, L, { light = [600, 1400, 400, 0.38], cull = "back", extraFleets = [], dynamic = false } = {}) {
     const files = []; for (const p of placements) if (!files.includes(p.file)) files.push(p.file);
     const missing = files.filter((f) => !loaded.ranges.has(f)); if (missing.length) throw new Error(`kenneyKit: placements name models the kit did not load: ${missing.join(", ")}`);
     // Racing city 1 -- `extraFleets` ride behind the kit's: [{ name, mesh, pipeline, bind, records (n x 4), extras (n x 4) }], the
@@ -222,8 +222,18 @@ export function kitScene(device, loaded, placements, G, L, { light = [600, 1400,
         for (let i = 0; i < n; i++) fleetOf[at + i] = idx;
         at += n;
     }
-    const scene = G.makeGpuDrivenScene(device, { fleets, fleetOf, thresholds: [], records, headings: extras });
-    scene.kitFleets = fleets.map((f) => f.name); scene.kitFleetOf = fleetOf;
+    // Racing city 2 -- `dynamic`: a placement that MOVES (the car) rewrites scene.kitRecords / scene.kitExtras in place each frame. On
+    // WebGPU a plain { count, cpu } source is uploaded once (gpuDriven's Level 12 contract, round 4's finding), so the scene owns a
+    // storage buffer for the records and writes it on every cpu() read; the extras are re-read every frame on both paths already.
+    // ...and the buffer is written from the EXTRAS' cpu(), not the records': on the GPU path gpuDriven culls from the buffer and never
+    // calls the records' cpu() again, which is where the first draft wrote it -- the truck stayed where it was born on WebGPU while
+    // WebGL2's twin route moved it. voxelBodies.sandboxScene writes from both for the same reason.
+    const buffer = dynamic && device.backend === "webgpu" ? device.buffer({ data: records, usage: "storage" }) : null;
+    const sync = () => { if (buffer) buffer.write(records); };
+    const recSrc = dynamic ? { count, cpu: () => { sync(); return records; }, ...(buffer ? { buffer } : {}) } : records;
+    const extSrc = dynamic ? { cpu: () => { sync(); return extras; } } : extras;
+    const scene = G.makeGpuDrivenScene(device, { fleets, fleetOf, thresholds: [], records: recSrc, headings: extSrc });
+    scene.kitFleets = fleets.map((f) => f.name); scene.kitFleetOf = fleetOf; scene.kitRecords = records; scene.kitExtras = extras;
     return scene;
 }
 

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Race car (Kenney's truck on box3d lapping the grid track, on gfx/device.js)">
+<meta name="demo:desc" content="Racing city 2: physics/raceCar.mjs drives Kenney's truck around the seeded grid track of race-track.html -- one box3d chassis body (the vendored wasm, in the page through box3dLoader) with four raycast wheels from physics/vehicle.mjs, suspension and tyre forces applied as impulses, the ground an analytic surface of the flat track (asphalt inside the kerbs, the kerb band raised, grass off the tiles, nothing beyond the grid), the buildings static boxes the chassis can hit. The controller contract is { throttle, steer, brake } in [-1, 1]; the pursuit driver here follows the centreline a lookahead ahead and slows for the corners it sees coming, and laps. The truck is drawn at the chassis pose through kitScene's quat mode beside the tiles and the greedy-meshed world, on WebGPU or WebGL2. The HUD names the speed, the lap, the checkpoints hit, the lap time and box3d's running fingerprint; the same seed and driver give the same fingerprint everywhere. Seed live; Reset restarts the car at the finish; drag to orbit, wheel to dolly.">
+<meta name="demo:category" content="world">
+<title>Race car on the GPU</title>
+<style>
+  html,body { margin:0; height:100%; background:#050805; color:#9fb2d4; font:12px ui-monospace,Menlo,monospace; }
+  #c { display:block; width:100%; }
+  #hud { padding:10px 14px; }
+  #cap { color:#f6a623; letter-spacing:.14em; text-transform:uppercase; }
+  #be { color:#59d1ff; font-size:14px; margin-top:4px; }
+  #sub { color:#5f7aa0; font-size:11px; margin-top:2px; line-height:1.7; }
+  .bad { color:#ff9a9a; }
+  a { color:#59d1ff; }
+  input[type=number] { width:48px; background:#0c140f; color:#9fb2d4; border:1px solid #2a3a30; font:inherit; }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div id="cap">Race car on the GPU: Kenney's truck on box3d, the pursuit driver lapping the grid track</div>
+  <div id="be">requesting a device&hellip;</div>
+  <div id="sub">seed <input id="seed" type="number" value="1" min="1"> &middot; <button id="reset">Reset</button> &middot; <label><input type="checkbox" id="follow" checked> camera follows the car</label>
+    &middot; <a href="?webgl=1">force WebGL2</a><br>
+    <span id="tick">loading the racing kit and box3d&hellip;</span><br><span id="car"></span> &middot; drag to orbit, wheel to dolly</div>
+</div>
+<canvas id="c"></canvas>
+<script type="module" src="/ui/originNotice.js"></script>
+<script type="module">
+import { requestDevice } from "./gfx/device.js";
+import * as G from "./render/gpuDriven.mjs";
+import * as L from "./render/litSphere.mjs";
+import { loadKit, kitScene, imageToColormap } from "./world/kenneyKit.mjs";
+import { generateTrack, tilePlacements, trackWorld, describeTrack, checkpoints, cityRects } from "./world/raceTrack.mjs";
+import { trackSurface, createCar, stepCar, carPose, pursuitDriver, lapTracker, truckPlacement, addBuildings, foldHash, CAR } from "./physics/raceCar.mjs";
+import { miniWorld, meshWorld, SUN } from "./render/voxelDevice.mjs";
+import { CityGen } from "./world/CityGen.js";
+import { box3d } from "./physics/box3d/box3dLoader.js";
+import { worldFromModule } from "./render/slugTicker.mjs";
+
+const cvs = document.getElementById("c"), beEl = document.getElementById("be");
+const fail = (m) => { beEl.innerHTML = '<span class="bad">' + m + "</span>"; };
+const $ = (id) => document.getElementById(id);
+let device, scene = null, kit = null, physMod = null, phys = null, car = null, surface = null, driver = null, tracker = null, placements = [], packed = null, truckRec = null, records = null, extras = null, recBuf = null;
+let yaw = 0.6, pitch = 0.7, dist = 190, dragging = null, dirty = true, camNow = null, centre = [0, 0, 0], hash = 0x811c9dc5, steps = 0, lapTime = null, acc = 0, lastT = 0;
+
+const readBytes = async (p) => { const r = await fetch("/" + p); if (!r.ok) throw new Error(`${p}: HTTP ${r.status}`); return r.arrayBuffer(); };
+const readImage = async (p) => { const r = await fetch("/" + p); if (!r.ok) throw new Error(`${p}: HTTP ${r.status}`); const bmp = await createImageBitmap(await r.blob(), { colorSpaceConversion: "none", premultiplyAlpha: "none" }); const oc = new OffscreenCanvas(bmp.width, bmp.height), ctx = oc.getContext("2d"); ctx.drawImage(bmp, 0, 0); return imageToColormap(ctx.getImageData(0, 0, bmp.width, bmp.height)); };
+
+function rebuild() {
+  if (!kit || !physMod) return;
+  const t0 = performance.now();
+  const track = generateTrack({ seed: Math.max(1, +$("seed").value | 0) });
+  placements = tilePlacements(track);
+  const world = miniWorld(), { rects } = trackWorld(track, world, CityGen);
+  packed = meshWorld(world);
+  surface = trackSurface(track); driver = pursuitDriver(surface); tracker = lapTracker(surface);
+  if (phys) phys.destroy();
+  phys = worldFromModule(physMod, [0, -9.81, 0]); addBuildings(phys, rects);
+  const cp = checkpoints(track)[0];
+  car = createCar(phys, { x: cp.x + 5, z: cp.z, yaw: Math.PI / 2 });
+  hash = 0x811c9dc5; steps = 0; lapTime = null; acc = 0;
+  // the truck is the LAST placement, its record and quaternion rewritten every frame (a moving record brings its own buffer on WebGPU)
+  truckRec = { file: "vehicle-truck-red.glb", ...truckPlacement(carPose(phys, car)) };
+  const all = [...placements, truckRec];
+  if (scene && scene.destroy) scene.destroy();
+  scene = kitScene(device, kit, all, G, L, { light: SUN, dynamic: true, extraFleets: [{ name: "world", mesh: packed.mesh, pipeline: L.litPipelineDesc({ cull: "none" }), bind: L.litBind(SUN), records: Float32Array.from([0, 0, 0, 1]), extras: new Float32Array(4) }] });
+  records = scene.kitRecords; extras = scene.kitExtras;
+  $("tick").textContent = `${describeTrack(track)}; ${rects.length} buildings as static boxes; built in ${(performance.now() - t0).toFixed(0)} ms on ${scene.path}`;
+  dirty = true;
+}
+
+async function main() {
+  const forceGl = new URLSearchParams(location.search).get("webgl") === "1";
+  try { device = await requestDevice(cvs, forceGl ? { backend: "webgl2" } : { prefer: "webgpu" }); }
+  catch (e) { return fail("requestDevice threw: " + e.message); }
+  beEl.textContent = `device: ${device.backend}`;
+  try {
+    const t0 = performance.now(), baseUrlOf = (p) => new URL("/" + p, location.href).href;
+    kit = await loadKit("racing", { readBytes, readImage, baseUrlOf });
+    const ps = await box3d.init(); if (!ps.ready) return fail("box3d: " + ps.reason);
+    physMod = box3d._mod;
+    beEl.textContent += ` -- ${kit.models.size} racing models and box3d's wasm loaded in ${(performance.now() - t0).toFixed(0)} ms`;
+  } catch (e) { return fail("loading threw: " + e.message); }
+  rebuild();
+  $("seed").addEventListener("change", rebuild); $("reset").addEventListener("click", rebuild);
+  cvs.addEventListener("pointerdown", (e) => { dragging = [e.clientX, e.clientY]; });
+  addEventListener("pointerup", () => { dragging = null; });
+  addEventListener("pointermove", (e) => { if (!dragging) return; yaw += (e.clientX - dragging[0]) * 0.006; pitch = Math.max(0.05, Math.min(1.5, pitch + (e.clientY - dragging[1]) * 0.006)); dragging = [e.clientX, e.clientY]; dirty = true; });
+  cvs.addEventListener("wheel", (e) => { e.preventDefault(); dist = Math.max(8, Math.min(600, dist * Math.exp(e.deltaY * 0.001))); dirty = true; }, { passive: false });
+  requestAnimationFrame(frame);
+}
+
+function frame(t) {
+  requestAnimationFrame(frame);
+  const w = cvs.clientWidth | 0, h = Math.max(200, (innerHeight - document.getElementById("hud").offsetHeight - 4) | 0);
+  if (cvs.width !== w || cvs.height !== h) { cvs.width = w; cvs.height = h; dirty = true; }
+  if (!scene || !car) return;
+  // fixed 60 Hz physics, at most 4 steps a frame, so a slow frame does not become a different simulation
+  const dt = Math.min(0.1, (t - (lastT || t)) / 1000); lastT = t; acc += dt; let n = 0;
+  while (acc >= CAR.dt && n < 4) { const pose = carPose(phys, car); const r = stepCar(phys, car, surface, driver(pose), CAR.dt); hash = foldHash(hash, phys.stateHash()); steps++; acc -= CAR.dt; n++; const tk = tracker.update(r.pose); if (tk.laps >= 1 && lapTime === null) lapTime = steps * CAR.dt; }
+  const pose = carPose(phys, car), tp = truckPlacement(pose), i = placements.length;
+  records.set([tp.pos[0], tp.pos[1], tp.pos[2], 1], i * 4); extras.set(tp.quat, i * 4);
+  $("car").textContent = `speed ${Math.max(0, pose.speed).toFixed(1)} m/s, checkpoints ${tracker.hit}, laps ${tracker.laps}${lapTime ? ", first lap " + lapTime.toFixed(1) + " s" : ""}, ${steps} steps, fingerprint ${(hash >>> 0).toString(16).padStart(8, "0")}`;
+  if ($("follow").checked) centre = [pose.pos[0], 0, pose.pos[2]];
+  const eye = [centre[0] + dist * Math.sin(yaw) * Math.cos(pitch), centre[1] + dist * Math.sin(pitch), centre[2] + dist * Math.cos(yaw) * Math.cos(pitch)];
+  camNow = { viewProj: G.multiply(G.perspective(0.9, w / h, 0.5, 2000), G.lookAt(eye, centre)), eye };
+  scene.frame({ ...camNow, clear: [0.03, 0.05, 0.08, 1] });
+}
+
+main();
+</script>
+</body>
+</html>

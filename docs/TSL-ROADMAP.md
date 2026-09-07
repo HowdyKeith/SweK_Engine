@@ -1363,6 +1363,35 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         seams), so there is no floor under the loop and the tile is the only thing there. Not built: crossings (the
         kit has no crossing tile and the loop never crosses itself), the kerb as a collider (round 2), tracks on other
         grid sizes (the generator takes cols and rows; only 12 x 12 is measured).
+     2. (v4525) THE CAR ON box3d. THE DECLINE, SAID FIRST: the wheel joints the plan named (jointDrive KIND.WHEEL, v4398)
+        are in physics/box3d/box3d_shim.c and NOT in vendor/box3d/box3d.wasm -- 45 exports, none of swk_wheel_spin,
+        swk_wheel_steer, swk_wheel_state, swk_body_sphere or swk_world_cast_ray; native-only until the wasm is rebuilt
+        with emsdk, which this box has not got. A car on them would run in a native probe and nowhere the brain, the
+        page or the fleet can reach. BUILT instead: physics/raceCar.mjs, the tree's other vehicle -- physics/vehicle.mjs's
+        raycast model (v4217, 56 checks) on one box3d chassis body: the wheels over Kenney's TRUCK_PARTS at the chassis
+        bottom, front steerable, rear driven; the ground an ANALYTIC surface of the flat track (asphalt inside HALF_WIDTH
+        of the centreline, the kerb band raised 0.15 to the tile edge, grass at the floor's height on every other cell,
+        void beyond the grid), so no physics raycast is needed either; each step the chassis transform and velocity are
+        read, the angular velocity derived by finite difference of the quaternion (no readback in the wasm), the
+        suspension force (suspensionAt with the compression rate) and tyre forces (tyreForces, saturated at grip x load)
+        summed into a linear impulse and an angular impulse, drag added, the world stepped; the buildings are static
+        boxes the chassis hits. The controller contract is { throttle, steer, brake } in [-1, 1]; the pursuit driver is
+        the reference (the centreline a lookahead ahead, the speed set by the path's heading change 14 m ahead); every
+        step folds box3d's state hash into a fingerprint. race-car.html drives it live on both backends: kitScene grew a
+        dynamic record (its buffer written from the extras' cpu(), the only read the GPU path repeats). MEASURED (tools/
+        ship/raceCar-selfcheck.mjs): the settle height 1.9346 against ROAD_Y + 1 - mg / 4k; 10.8 m/s in 3 s and 24 in 10
+        straight, rest from there inside 4 s of braking, 0.702 rad either way under steer +-1, upright through full
+        throttle with full steer, 5.2 m/s on grass against 10.8 on asphalt; the kerb leans it 0.148; a building stops
+        it on its face; the pursuit driver laps seed 1 in 51.3 s with every checkpoint in order and all 28,800 wheel
+        samples on asphalt, 120 s of car and box3d for 0.4 s of compute; the 30 s fingerprint f45fc963 in node AND in
+        the browser (99 ms there), another for a driver 1 m/s slower, another for full throttle; the red truck at its
+        pose on both backends, moved by rewriting its record. FOUR CORRECTIONS of the round's own drafts: rolling
+        resistance fed as a tyre slip cost a factor of thirty in acceleration (5.3 m/s in 3 s) -- it is a fraction of
+        the load; tyre forces at the attach point rolled the car onto its roof -- they act at the chassis height, the
+        suspension keeps its lever; the driver that slowed only with the steer it was using met every corner at 14 m/s
+        and left the grid; and the WebGPU record buffer written from a cpu() the GPU path never calls. Not built: the
+        wheel joints (a second car beside this one when the wasm is rebuilt), wheel spin and a slip curve, cars against
+        cars (round 3).
 
 ## The count that says when step 4 matters
 

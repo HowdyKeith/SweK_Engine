@@ -521,6 +521,13 @@ export const SECTIONS = [
           "blackhole.html", "wormhole.html", "wormhole-jump.html", "nebula.html", "gauges3000.html",
           "anime4k.html",
       ] },
+    // Racing city (rounds 0..7 of docs/TSL-ROADMAP.md item 12) -- its own drawer, because it is an ARC and not a render pass: Kenney's
+    // kits vendored and drawn (kenney-kit), the seeded grid track with CityGen's blocks (race-track), the car on box3d with the
+    // pursuit driver (race-car), and the rounds to come (the brain that drives, the lab scene and its replay, the ribbon roads over the
+    // git terrain, the destructible buildings). Filed the round the Arriving row crossed pageReach's 15 % cap (70 links of 465 pages):
+    // three racing anchors had gone into Arriving one per round, which is the pile that row exists to prevent.
+    { id: "racing", tab: "racing", label: "Racing City", note: "Kenney's kits, the grid track, the car on box3d, and the brains that will drive it",
+      pages: ["kenney-kit.html", "race-track.html", "race-car.html"] },
 ];
 
 /** Keith's rule. A drawer of 25 is the flat row again with a lid on it. */

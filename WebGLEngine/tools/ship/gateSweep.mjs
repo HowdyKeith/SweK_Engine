@@ -2929,6 +2929,23 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "a hairpin and a fact of the generator; and the first frame key sampled cell centres, which on a corner tile land among " +
                  "Kenney's trackside props, so the centreline is what the frame is held to. Sabotages red at A / B / C / D (the gate's header).",
     }),
+    since147: Object.freeze({
+        at: "v4525", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/raceCar-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green headless on the wasm and in the browser on both backends. Racing city 2: physics/raceCar.mjs is one box3d chassis body " +
+                 "on four raycast wheels from physics/vehicle.mjs over an analytic surface of the flat track (asphalt, the raised kerb band, " +
+                 "grass, void), the buildings static boxes, the controller contract { throttle, steer, brake }, a pursuit driver that laps " +
+                 "seed 1, and a lockstep fingerprint folded from box3d's state hash that the browser reproduces; race-car.html drives it live " +
+                 "through kitScene's new dynamic record. THE DECLINE, SAID FIRST: the wheel joints the plan named are not in the vendored wasm " +
+                 "(native-only since v4398, no emsdk here), so the raycast model is the car. THE CORRECTIONS: rolling resistance fed as a " +
+                 "tyre slip cost a factor of thirty in acceleration; tyre forces at the attach point rolled the car onto its roof; the " +
+                 "pursuit driver slowed only with the steer it was using and left the grid; and on WebGPU the dynamic record's buffer was " +
+                 "written from the records' cpu(), which the GPU path never calls. Sabotages red at A / B / C / D / E (the gate's header).",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
