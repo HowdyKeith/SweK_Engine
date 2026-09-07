@@ -117,6 +117,42 @@ these repos:
   expensive difference). Neither is recommended without a specific reason to want it; noted so
   a future round doesn't re-derive "is there a gap here" from scratch.
 
+## Named candidate, not built: Transvoxel (transvoxel.org / EricLengyel/Transvoxel)
+
+Checked, not vendored, not implemented — logged so a future round has this written down instead of
+re-deriving it. Confirmed by fetching the actual repo content (not just the README): `Transvoxel.cpp` is
+MIT (Copyright 2009 Eric Lengyel), and — its own README says so — it is "the data tables used in the
+Transvoxel Algorithm," not a working mesher. `transvoxel.org` itself (the dissertation-level writeup) is
+blocked by this session's egress proxy and was never read.
+
+**What it actually solves, precisely**: not marching cubes, and not heightmap-terrain LOD (already solved
+here — see below) — the seam between two octree cells of a volumetric isosurface meshed at *different
+resolutions*, via a special "transition cell" triangulation on the boundary face.
+
+**Checked against what's here**: `simulation/MarchingCubes.js` (classic MC, Paul Bourke's tables) and
+`physics/mesh/dualContour.mjs` (feature-preserving alternative) both mesh a scalar field at exactly one
+fixed resolution — confirmed by grep, neither function takes a resolution/LOD argument, and there is no
+`octree` anywhere in `world/*.js`. Every one of their ~15 callers (`world/chunkMarchingCubes.js`,
+`physics/soft/fleshSph.js`/`boneField.js`, `simulation/cosmo/zeldovich.js`, `simulation/tomo/volume.js`,
+`AquariumDemo.js`) runs single-resolution. `physics/mesh/manifoldCensus.mjs` already exists as a
+crack/non-manifold detector and is the tool that would grade a Transvoxel port's seams. LOD-crack avoidance
+*is* already solved in this tree, but only for 2.5D heightmap/planet patches — `render/screenSpaceError.js`
+cites Terrain3D's "succumb to your neighbour" edge-matching trick, and `world/planetSurface.js` separately
+guarantees seamless cube-sphere faces "by construction." Neither technique reaches a true 3D volumetric
+isosurface, which is what caves and an overhang-capable planet body actually need.
+
+**Aimed at, per Keith**: cave rendering (`world/terrainGenerator.js`'s `noise3D` cave-carving density field,
+today meshed by `world/chunkMarchingCubes.js` as a fixed-resolution cosmetic pass over the blocky grid, not
+rendered to any distance) and a planet body (a true volumetric/overhang-capable surface, as opposed to the
+heightmap `render/bodyTerrain.mjs` currently draws). Both would need octree-chunked LOD with seamless
+stitching to render at more than close range, which nothing here provides today.
+
+**Not built.** If taken up: the seven lookup tables (`regularCellClass`/`Data`/`VertexData`,
+`transitionCellClass`/`Data`/`CornerData`/`VertexData`) would be vendored as data — the same posture
+`simulation/MarchingCubes.js`'s own header already states for Paul Bourke's tables — with the stitching
+logic hand-written fresh in this tree's style and graded by `manifoldCensus.mjs` for actual watertightness
+across a fine/coarse boundary, not by a picture. Worth a full round of its own rather than a quick add.
+
 ## The method, for next time
 
 Sixteen links in, the split that mattered every time was the one retroRaster already wrote
