@@ -238,6 +238,47 @@ checked against this tree:
 - `MaterialX` — a real, actively-used standard, but a large XML shading-graph system. A bigger idea than a
   quick candidate; noted rather than sized.
 
+## The CesiumGS org sweep
+
+67 repositories as of this sweep. Same shape as the Khronos org: most is out of scope by construction —
+`cesium-native`/`cesium-unity`/`cesium-unreal`/`cesium-omniverse` and their samples are wrong platform, and
+a large fraction is dev infra, AWS/Terraform tooling, AI-assistant scaffolding, and workshop/sandcastle
+samples with no engine code to check. What's actually in-domain, checked against this tree:
+
+- **spz / spz-loader** — the strongest find. `.spz` is Cesium/Niantic's compressed Gaussian-splat format,
+  "about 10x smaller than the PLY equivalent with virtually no perceptible loss." Precise fit: `engine/
+  plyWriter.mjs`'s own header says this tree "WRITES the Gaussian-splat .ply and .splat formats this tree
+  has only ever READ" — real splat infrastructure already exists (`SplatRenderer`, `SplatLoader`,
+  `splatSort.mjs`, `gaussianSplat.js`, `splatParser.js`) built around exactly the content `.spz` compresses,
+  and grep confirmed no `.spz` support anywhere. `spz-loader` (TS/JS wrapping the reference C++ codec,
+  compiled to WASM via Emscripten) fits this tree's toolchain better than most things checked in this whole
+  sweep — SweK already vendors precompiled WASM artifacts (`box3d.wasm`, the terrain WASM stack), so this
+  isn't the usual C++/wrong-runtime mismatch. Unconfirmed: a LICENSE file exists on both `spz` (Niantic) and
+  `spz-loader` but the actual terms weren't readable from what was fetched — needs checking before anything
+  is decided, same posture as the meshwalk/light-probes situation earlier in this doc. Not built.
+- **meshoptimizer** (mesh simplification/LOD generation) — checked and ruled out: SweK already has this.
+  `engine/quadricDecimate.js` (+selfcheck) is its own quadric-error-metric mesh decimator, same algorithm
+  family. Not a gap.
+- **3d-tiles** (the streaming/LOD spec) — checked and ruled out as a technique gap: `render/
+  screenSpaceError.js` already drives LOD refinement by projected geometric error, the same core mechanism
+  3D Tiles' `geometricError` field expresses. The only open question is data-interop (consuming
+  externally-authored 3D Tiles content), not a missing capability.
+- **xatlas** (UV unwrapping / lightmap chart packing) — confirmed absent by grep, no established want. Would
+  matter if lightmap baking for procedural geometry (the procedural-buildings idea earlier in this
+  conversation) becomes a real goal.
+- **quantized-mesh** (the terrain-streaming quantization spec) — confirmed absent by grep, despite SweK
+  already ingesting real-world terrain (`world/realTerrainStamp.js`, `ai-bridge/terrainBuildBridge.js`). No
+  confirmed need to stream terrain over a network today.
+- **gltf-pipeline** / **obj2gltf** — the one pair in this whole sweep that actually matches SweK's own
+  toolchain exactly (Node.js, Apache-licensed). SweK's own GLB export already goes through three.js's
+  `GLTFExporter`, so these read as a validation reference rather than a gap.
+- **gdal** — the real-world geospatial library SweK's own terrain-ingestion work is conceptually adjacent
+  to, but C/C++ and enormous; not something to vendor, just worth knowing the domain exists.
+- **cesium-materials-pack** — old procedurally-shaded material shaders (brick/wood/noise); minor, could be
+  read for technique, no strong pull.
+- Set aside as wrong language/toolchain or an unneeded format: `tinygltf`, `collada-dom`, `COLLADA2GLTF`,
+  `libjpeg-turbo`, `LAStools`, `glutess`, `libcitygml`, `zstr`, `xerces-c`, `webglreport`.
+
 ## The method, for next time
 
 Sixteen links in, the split that mattered every time was the one retroRaster already wrote
