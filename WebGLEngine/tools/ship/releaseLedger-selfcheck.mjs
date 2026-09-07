@@ -110,6 +110,34 @@ const led = readLedger();
 const S = ledgerState();
 const LED = readLedger();
 
+// ---- 0. *** treeN IS THE LIVE DECLARATION, NOT THE FIRST ONE A REGEX FINDS *** -------------------------------
+//
+// v4531: this file read main.js with /ENGINE_VERSION\s*=\s*"(v\d+)"/ -- no anchor, not even a `const` -- and
+// main.js keeps its version history as COMMENTED copies of the declaration ABOVE the live one. So treeN was
+// the PREVIOUS shipped version, every run, and NOTHING HERE NOTICED: the gate exits 0 reading v4487 and exits
+// 0 reading v4531. That is not a cosmetic misread. treeN feeds `addsToMain`, and a treeN one version behind is
+// by construction already on main -- addsToMain false, budgetBinds false, the lag budget silently not binding.
+// *** THE ESCAPE HATCH v4453 TOOK CARE TO KEEP NARROW WAS BEING HELD OPEN BY A REGEX. ***
+//
+// So the version is read here a SECOND time, independently and anchored, and the module must agree with it.
+// The row also asserts the two readings DIFFER on this tree, which is what makes it a real test rather than a
+// tautology: while main.js carries commented history, an unanchored reader gets a different answer, and a
+// check that passed either way would be worth nothing.
+{
+    const mainSrc = fs.readFileSync(path.join(ENG, "main.js"), "utf8");
+    const live = (mainSrc.match(/^const ENGINE_VERSION = "v(\d+)"/m) || [])[1];
+    const firstMatch = (mainSrc.match(/ENGINE_VERSION\s*=\s*"v(\d+)"/) || [])[1];
+    ok("!! *** the tree version is the LIVE declaration, read independently and anchored ***",
+       !!live && S.treeN === +live,
+       `ledgerState says v${S.treeN}, main.js's live line says v${live}. treeN drives addsToMain, so reading ` +
+       "a stale one turns the lag budget off without a word.");
+    ok("!! ...and an unanchored read really does return something else here, so this is not a tautology",
+       !!firstMatch && firstMatch !== live,
+       `anchored v${live} against first-match v${firstMatch} -- main.js's commented history sits ABOVE the live ` +
+       "declaration, which is exactly why the old pattern never reached it. If these two ever agree, this row " +
+       "stops proving anything and should be re-examined rather than trusted.");
+}
+
 console.log("1. THE LEDGER IS A RECORD, NOT A BELIEF");
 {
     ok("releases.json exists and parses", !!led && Array.isArray(led.releases), LEDGER);
@@ -412,3 +440,22 @@ console.log("releaseLedger-selfcheck: all checks pass");
 //   main (v4111..v4444) and the same floor (v4000) are asked twice, differing only in what the ledger says
 //   was published. A fixture that could only demonstrate the forgiveness would be arguing for the change
 //   using the change.
+
+// =============================================================================================================
+// SABOTAGE LOG -- v4531, section 0's live-declaration check. Applied to tools/ship/releaseLedger.mjs, graded on
+// EXIT CODES, restored md5 640f5b5988da1a05d702af6790ed07e8.
+//
+//   A  the ORIGINAL unanchored pattern restored -- /ENGINE_VERSION\s*=\s*"(v\d+)"/, the one that shipped.
+//      -> exit 1, naming both numbers: "ledgerState says v4487, main.js's live line says v4531". This is the
+//      sabotage that matters, because it is not hypothetical: it is the code that was in the tree an hour
+//      before this row existed, and the row is here precisely because NOTHING caught it -- the gate exited 0
+//      reading v4487 and exited 0 reading v4531.
+//
+//   B  anchored, but on the wrong constant (^const BRAIN_BUILD instead of ^const ENGINE_VERSION).
+//      -> exit 1. Anchoring alone is not the property; reading THIS declaration is.
+//
+// *** WHAT THE SECOND ROW IS FOR, AND WHY IT WILL EVENTUALLY NEED REVISITING. *** The tautology guard asserts
+// that an unanchored read returns something DIFFERENT on this tree. That holds only while main.js carries
+// commented version history above its live line. If that convention is ever dropped the two readings converge,
+// the guard's premise disappears, and its failure message says so rather than leaving a green row that has
+// quietly stopped testing anything.

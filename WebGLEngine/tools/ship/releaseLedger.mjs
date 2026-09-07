@@ -52,7 +52,14 @@ export const LEDGER = path.join(ENG, "tools", "ship", "releases.json");
 /** The engine's own version marker -- the single spelling, matching githubBridge._parseEngineVersion. */
 export function engineVersion(root = ENG) {
     try {
-        const m = fs.readFileSync(path.join(root, "main.js"), "utf8").match(/ENGINE_VERSION\s*=\s*"(v\d+)"/);
+        // *** v4531 -- ANCHORED, AND THIS ONE WAS LOAD-BEARING. *** The pattern had no ^ and not even a `const`,
+        // so it matched main.js's commented version history -- which sits ABOVE the live declaration -- and
+        // returned the PREVIOUS version. `treeN` feeds `addsToMain`, the discriminator that decides whether
+        // the lag budget binds at all, and a treeN that is always one shipped version behind is always
+        // already on main: addsToMain false, budget never binds, gate green. The escape hatch v4453 was
+        // careful to keep narrow was being opened by a regex instead. Fourth instance of this defect in one
+        // round, after my own version ceiling, my own reading of ENGINE_VERSION, and verify.mjs's two markers.
+        const m = fs.readFileSync(path.join(root, "main.js"), "utf8").match(/^const ENGINE_VERSION = "(v\d+)"/m);
         return m ? m[1] : "";
     } catch { return ""; }
 }

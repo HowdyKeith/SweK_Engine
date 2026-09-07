@@ -50,7 +50,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as Q from "./quickSweep.mjs";
 import { VERDICT, SWEEP_V4297, REGRESSIONS_REPAIRED } from "./gateSweep.mjs";
-import { RED_AT_V4279, RED_AT_V4408, RED_AT_V4424, RED_AT_V4476, UNCONFIRMED_SLOW , RED_AT_V4484} from "./redCensus.mjs";
+import { RED_AT_V4279, RED_AT_V4408, RED_AT_V4424, RED_AT_V4476, UNCONFIRMED_SLOW , RED_AT_V4484, RED_AT_V4531} from "./redCensus.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -88,9 +88,12 @@ sec("2. THE REGISTER IS BUILT FROM THE RECORDS IT NAMES, AND THE SIX REGRESSIONS
     // v4476 -- A SEVENTH LIST JOINED, AND THIS ROW WENT RED THE MOMENT IT DID, EXACTLY AS THE NOTE ABOVE
     // PROMISES. RED_AT_V4424 (v4471) and RED_AT_V4476 are both here now. The union is derived rather than
     // typed precisely so a register that quietly grows cannot pass as one that did not.
+    // v4531 -- AND IT HAPPENED AGAIN, ON SCHEDULE. RED_AT_V4531 joined for tslSource and this row went red
+    // within the minute, before any sweep ran. Adding the list here is the deliberate act the row exists to
+    // demand: the register is 91 gates where it held 90 an hour earlier, and the diff is where that is said.
     ok(reg.size === new Set([...RED_AT_V4279.map((e) => e.gate), ...RED_AT_V4408.map((e) => e.gate),
                              ...RED_AT_V4424.map((e) => e.gate), ...RED_AT_V4476.map((e) => e.gate),
-                             ...RED_AT_V4484.map((e) => e.gate),
+                             ...RED_AT_V4484.map((e) => e.gate), ...RED_AT_V4531.map((e) => e.gate),
                              ...UNCONFIRMED_SLOW, ...SWEEP_V4297.fromSlowBucket, ...SWEEP_V4297.unmeasured]).size,
        "and the register's size is the union of those lists, nothing typed", `${reg.size} gates`);
     const repaired = Object.keys(REGRESSIONS_REPAIRED.gates).sort();
