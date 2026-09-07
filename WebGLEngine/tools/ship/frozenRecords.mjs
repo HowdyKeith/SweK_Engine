@@ -117,7 +117,21 @@ export const PROBE_AT_V4487 = Object.freeze({
     at: "v4487",
     method: "bump one integer field by 7 in place, run every gate that NAMES the record, restore; a field is " +
             "NOTICED if any of them exits 1",
-    records: 74, withFields: 36, fields: 135,
+    // *** v4534 -- 74 -> 76, AND THE TWO ARE NAMED BECAUSE THE DERIVATION THAT SHOULD HAVE EXCLUDED THEM
+    // CANNOT SEE THEM. *** The row that reads this count excludes records "stamped after the sweep", taking
+    // the version out of the record's NAME. REACH_ARRIVALS_SINCE_V4407 and REACH_LOST_SINCE_V4407 arrived with
+    // the front-door repair days after v4487 -- and they are stamped V4407, because that is the version they
+    // are ABOUT. *** A STAMP IN A NAME IS A CLAIM ABOUT THE SUBJECT, NOT ABOUT THE ARRIVAL, *** so a record
+    // written now about a past version lands in the past and is counted as having been in a sweep it could not
+    // have been in. Replayed against the v4487 worktree (75f0c033) the census reads exactly 74; it reads 76
+    // here, and the difference is those two by name.
+    //
+    // The count is corrected rather than the derivation, and that is a choice with a reason: dating a record's
+    // ARRIVAL needs git, which this pure module does not touch, and the alternative -- forbidding a name from
+    // carrying a subject's version -- would break the clearest naming habit in the tree to serve one census.
+    // What is owed, and is not paid here, is that the next record named for a version it merely DESCRIBES will
+    // land in the past silently again. It is written down so the next reader recognises the shape in one line.
+    records: 76, withFields: 36, fields: 135,
     noticed: 83, unnoticed: 52,
     noGateNamesIt: 14,
     nothingNoticesAnyField: 9,

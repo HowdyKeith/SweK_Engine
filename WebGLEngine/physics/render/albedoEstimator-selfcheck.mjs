@@ -40,7 +40,7 @@
 import {
     sampledAlbedo, gridError, gridIsUnsafe, trustworthy, NARROW_ALPHA, OBLIQUE_COS, RISK_AT_V4438,
 } from "./albedoEstimator.mjs";
-import { directionalAlbedo, ndfIntegral } from "./microfacet.mjs";
+import { directionalAlbedo, ndfIntegral, furnaceIntegral } from "./microfacet.mjs";
 import { directionalAlbedo as rdAlbedo } from "./roughDiffuse.mjs";
 import { sourceFiles, ENG } from "../../tools/ship/absenceScope.mjs";
 import { codeOnly } from "../../tools/ship/sourceScan.mjs";
@@ -203,9 +203,38 @@ console.log("\n8. nothing breaks only because no caller goes below cosO 0.2");
 // both of which DEFINE A FUNCTION OF THAT NAME and call their own. The detector matched the shape its author
 // pictured, inside the file written to make a safety explicit. What makes a file a caller of THIS grid is
 // that it imports it from microfacet.mjs, which is a mechanism rather than a spelling.
+// *** v4534 -- FOUR ARRIVED AT ONCE AND THE RATCHET DID EXACTLY WHAT IT WAS BUILT FOR: it went red, named
+// nothing by itself, and made somebody go and look. *** All four are the WGSL arc's gates. The list below is
+// not a list of names that were waved through -- each was opened and its ACTUAL call arguments measured
+// against a converged N=3000 grid, because "a new caller appeared" is a fact and "the new caller is safe" is
+// a claim, and only the second one keeps this row honest:
+//
+//   energyCompWgsl        alpha 0.05, MU_O 0.7, N 220..6400   rel 4.21e-6   converged
+//   microfacetVndf        alpha 0.05, cos 0.3,  N 600         rel 5.32e-6   converged
+//   microfacetWgsl        alpha 0.05, cos 0.25, N 200         rel 3.84e-4   see below
+//   microfacetSampleWgsl  alpha 0.001, cos 0.7, N 500         rel 4.88e-1   *** 49% LOW -- AND DELIBERATE ***
+//
+// *** THE LAST ROW IS THE ONE WORTH READING, AND IT IS NOT A DEFECT. *** microfacetSampleWgsl calls the
+// marched grid at alpha 0.001 where it reads 0.512111 against a converged 0.999929, and then ASSERTS that
+// shortfall as its own round's reason to exist: "v4408's QUADRATURE IS 49% LOW AT THE SAME POINT ... THE TWO
+// INSTRUMENTS ARE NOT INTERCHANGEABLE and this is which one to believe where". Its cross-check against the
+// sampler is restricted to alpha >= 0.25, where the quadrature IS converged. A caller that reaches the
+// failing regime ON PURPOSE, names the failure and refuses to compare there is the opposite of the accident
+// this ratchet hunts -- but it could only be told from the accident BY LOOKING, which is the whole argument
+// for a frozen list over a count.
+//
+// microfacetWgsl uses a 200x200 grid, coarser than the N=500 the safety row below is stated at. Also sound,
+// for a different reason: it compares the DEVICE against the CPU on the IDENTICAL grid and says so ("this is
+// the grid, and refining it moves both"), so the grid's error is common to both sides of the claim rather
+// than hidden in one; and it excludes alpha 0.02 from that sweep by MEASUREMENT -- WEAK_ALPHAS is
+// ALPHAS.slice(1) -- having shown the residual falls with the grid. At alpha 0.02, cos 0.25 the grid reads
+// 0.912466 at N=200 and 0.999717 at N=500, so that exclusion is load-bearing rather than tidy.
 const CALLERS = Object.freeze([
     "physics/render/albedoEstimator-selfcheck.mjs", "physics/render/albedoEstimator.mjs",
+    "physics/render/energyCompWgsl-selfcheck.mjs",
     "physics/render/energyCompensation.mjs", "physics/render/microfacet-selfcheck.mjs",
+    "physics/render/microfacetSampleWgsl-selfcheck.mjs", "physics/render/microfacetVndf-selfcheck.mjs",
+    "physics/render/microfacetWgsl-selfcheck.mjs",
     "physics/render/renderBsdf-selfcheck.mjs",
 ]);
 const importsFromMicrofacet = (src) =>
@@ -225,6 +254,21 @@ ok("...and the shallowest angle any gate grid uses is 0.2, where N=500 is sound"
    gridError(0.05, 0.2, { N: 500, M: 500, n: 120000, seed: 22 }).rel < 0.01 &&
    gridError(0.2, 0.2, { N: 500, M: 500, n: 120000, seed: 22 }).rel < 0.01,
    "which is WHY nothing is broken, stated rather than left to luck");
+// *** v4534 -- AND THE ANGLE IS NO LONGER THE ONLY AXIS, WHICH THE ROW ABOVE CANNOT SAY. *** It fixes cos at
+// 0.2 and N at 500 and asks whether the grid is sound there. Two of the four callers that arrived this round
+// use a DIFFERENT grid -- microfacetWgsl 200, microfacetSampleWgsl 500 at alpha 0.001 -- and soundness is a
+// property of the PAIR. So the second axis is asserted too, from the shallowest cell any caller actually
+// reaches, and it is asserted as a REFUTATION rather than a reassurance: the grid IS wrong there, by a
+// margin nothing could mistake for noise, which is why the callers that go there do not trust it.
+{
+    const coarse = furnaceIntegral(0.02, 0.25, { N: 200, M: 200 });
+    const fine   = furnaceIntegral(0.02, 0.25, { N: 500, M: 500 });
+    ok("!! *** and the OTHER axis is the grid: at the shallowest cell a caller reaches, N=200 is 8.7% wrong ***",
+       Math.abs(coarse - 1) > 0.05 && Math.abs(fine - 1) < 1e-3,
+       `alpha 0.02, cos 0.25: N=200 reads ${coarse.toFixed(6)} and N=500 reads ${fine.toFixed(6)}. A caller is ` +
+       "safe on the PAIR (angle, grid) or not at all -- microfacetWgsl excludes exactly this cell by " +
+       "measurement, and a row that only ever asked about the angle would have called it safe.");
+}
 
 // ---- 9. THE SAMPLER'S OWN NOISE, ON THIS INTEGRAND ------------------------------------------------------
 console.log("\n9. the number v4438 refused to carry over from v4437");
@@ -248,3 +292,24 @@ ok("...and it falls with the sample count, which says it is noise and not a seco
 
 console.log(`\nalbedoEstimator-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);
 process.exit(fails === 0 ? 0 : 1);
+
+// =============================================================================================================
+// SABOTAGE LOG -- v4534, section 8's caller review and the grid axis. Exit codes; restored md5 c7f7ce43.
+//
+//   A  physics/render/microfacetWgsl-selfcheck.mjs removed from CALLERS -- a real caller the list stops naming.
+//      -> exit 1. The direction the ratchet exists for.
+//
+//   B  a name added that calls nothing ("notACaller-selfcheck.mjs").
+//      -> exit 1. The other direction, and the one a list loses if it only checks a count: the frozen set must
+//      not carry names the tree cannot produce, or it becomes somewhere to park an excuse.
+//
+//   D  the grid-axis row's coarse call pointed at N=3000 instead of N=200.
+//      -> exit 1. The row measures the GRID rather than restating a constant: made converged, its refutation
+//      stops being true and it says so.
+//
+//   C  *** A BADLY DESIGNED SABOTAGE, RECORDED BECAUSE IT PROVES NOTHING AND LOOKED LIKE IT DID. *** The
+//      grid-axis condition was replaced with `true`. -> exit 0. That is not a finding about this row: EVERY
+//      ok() in every gate in this tree passes when its condition is replaced with `true`, so the run measured
+//      the shape of ok() and not the check. A sabotage has to break the SUBJECT, which is what D does by
+//      moving the grid. Kept in the log rather than deleted, because a reader who tries C next round should
+//      find out here that it is wasted rather than by running it.
