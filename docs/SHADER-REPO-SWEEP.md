@@ -325,20 +325,6 @@ plus several from-scratch mesh-processing research tools. Checked against source
 - `AspNet.Security.OAuth.Providers` (C#) — unrelated to this author's graphics work, an old/separate repo.
   Ignored.
 
-## The method, for next time
-
-Sixteen links in, the split that mattered every time was the one retroRaster already wrote
-down: does the technique have a right answer a gate can fail? Affine warp, vertex snap, and now
-2D-Water's parallax and foam threshold — yes. A vignette's noise pattern, a Shader Graph node's
-wire-routing convenience, a CRT's static texture — no, and no amount of source-reading changes
-that. The second split, just as decisive here, is what a repo actually *is* underneath its
-README: five of sixteen turned out to be Unity-Editor tooling with no shader in them at all,
-and three turned out to be languages/runtimes (Python, Rust+WASM, Rust+CUDA) this tree's
-browser toolchain can't run regardless of licence. Checking `world/reachedLicences.mjs` and
-`world/vendoredLicences.mjs` first would have saved nothing this round — only mmacklin/sandbox
-was ever there — but it's the first thing to check next time, before re-deriving from grep
-that nothing else has been looked at yet.
-
 ## Second pass: three more repos (v4505 onward)
 
 This file was written on the shader-porting branch (commit 8e131bd8) and carried onto the
@@ -549,3 +535,24 @@ face's irradiance by SH is 0.80 % from the direct cosine integral, which is orde
 truncation and is said; the packing round-trips exactly in Float32. The finding: flipping
 the sign of one basis function left every symmetric closed form green. A sign is invisible
 to a symmetric radiance, so the gate projects an x ramp and a y ramp on purpose.
+
+## The method, for next time
+
+Sixteen links in, the split that mattered every time was the one retroRaster already wrote
+down: does the technique have a right answer a gate can fail? Affine warp, vertex snap, and now
+2D-Water's parallax and foam threshold — yes. A vignette's noise pattern, a Shader Graph node's
+wire-routing convenience, a CRT's static texture — no, and no amount of source-reading changes
+that. The second split, just as decisive here, is what a repo actually *is* underneath its
+README: five of sixteen turned out to be Unity-Editor tooling with no shader in them at all,
+and three turned out to be languages/runtimes (Python, Rust+WASM, Rust+CUDA) this tree's
+browser toolchain can't run regardless of licence. Checking `world/reachedLicences.mjs` and
+`world/vendoredLicences.mjs` first would have saved nothing this round — only mmacklin/sandbox
+was ever there — but it's the first thing to check next time, before re-deriving from grep
+that nothing else has been looked at yet.
+
+Restated after the second pass and the org sweeps below it: the split held every time it was
+tried again. splatmesh, three-spark-light-probes, buildingGrammar and asciiShape all shipped
+because each had a right answer a gate could fail; kugiri, Faithful Contouring and AutoRetopo
+were read and not taken because a licence or a missing target stopped them, not because the
+technique was wrong. The registers (`world/reachedLicences.mjs`, `world/vendoredLicences.mjs`)
+are worth checking first now — they no longer come back empty.
