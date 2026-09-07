@@ -2913,6 +2913,22 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "binary GLB's external image against the page (only the .gltf path set _baseUrl), one 404 per model; fixed. Sabotages " +
                  "red at A / B / C / D (see the gate's header).",
     }),
+    since146: Object.freeze({
+        at: "v4524", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/raceTrack-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green on both backends and headless. Racing city 1, phase 1 on the flat: world/raceTrack.mjs lays a seeded simple cycle of " +
+                 "cells on a 12 x 12 grid (a rectangle ring grown by seeded bumps) and turns every cell into one of Kenney's tiles by a grammar " +
+                 "MEASURED on the vendored models (which edges the asphalt leaves through) and a turn derived through the shader's own rotateQ; " +
+                 "the centreline, kerbs, checkpoints and CityGen's blocks derive from the same cells; race-track.html draws tiles and the " +
+                 "greedy-meshed world in one gpuDriven scene on both backends (kitScene took extraFleets). THE CORRECTION: the first invariant, " +
+                 "no two cells adjacent unless consecutive, refused twenty of twenty seeds -- a bump leaves its two cells side by side, which is " +
+                 "a hairpin and a fact of the generator; and the first frame key sampled cell centres, which on a corner tile land among " +
+                 "Kenney's trackside props, so the centreline is what the frame is held to. Sabotages red at A / B / C / D (the gate's header).",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

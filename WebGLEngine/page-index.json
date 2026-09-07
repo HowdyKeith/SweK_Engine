@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 463,
+ "count": 464,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -2262,6 +2262,13 @@
    "t": "A boundary row is worth what the model can do with it (v3648)",
    "d": "The quadratic with the boundary row: it helps by a steady 40% and buys a constant factor, not an order. And the face midpoint is not on the wall - it sits inside by a(1-cos(pi/nt)), so the row states a true condition at a place where it is not quite true.",
    "g": "boundaries",
+   "p": 0
+  },
+  {
+   "f": "race-track.html",
+   "t": "Race track on the GPU",
+   "d": "Racing city 1, phase 1 on the flat: world/raceTrack.mjs lays a seeded closed loop of cells on a 12 x 12 grid of 10-unit cells -- a rectangle ring grown by seeded bumps (two consecutive cells pushed sideways, so the loop stays a simple cycle by construction) -- and turns every cell into one of Kenney's tiles: a straight where the cell's two ports are opposite, a corner where they are not, the first straight the finish gate, each turned by the quarter turns that make its measured asphalt edges meet its neighbours'. The centreline (edge midpoints and radius-5 arcs about the corners' tile corners), the kerb lines, one checkpoint per tile at its entry edge and CityGen's buildings (one per free block, facades on, stamped into a one-voxel grass floor through the sandbox's own generator) are all derived from the same cell list. Drawn on WebGPU or WebGL2 through gpuDriven: the tiles as instanced fleets in litSphere's quat mode, the floor and buildings as the sandbox's greedy-meshed world in the same scene. Seed, bumps and buildings live; the HUD names the tiles, corners, hairpins, lap length and hash; drag to orbit, wheel to dolly.",
+   "g": "",
    "p": 0
   },
   {

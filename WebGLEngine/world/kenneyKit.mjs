@@ -203,15 +203,27 @@ export function kitGrid(entries = MANIFEST, { pitch = 13, perRow = 7, size = 10 
  * static Float32Arrays (nothing here moves; a mover brings its own buffer, per round 4's finding). Returns the scene with `fleets`
  * (the file names in fleet order) and `fleetOf` beside it.
  */
-export function kitScene(device, loaded, placements, G, L, { light = [600, 1400, 400, 0.38], cull = "back" } = {}) {
+export function kitScene(device, loaded, placements, G, L, { light = [600, 1400, 400, 0.38], cull = "back", extraFleets = [] } = {}) {
     const files = []; for (const p of placements) if (!files.includes(p.file)) files.push(p.file);
     const missing = files.filter((f) => !loaded.ranges.has(f)); if (missing.length) throw new Error(`kenneyKit: placements name models the kit did not load: ${missing.join(", ")}`);
-    const count = placements.length, records = new Float32Array(count * RECORD_FLOATS), extras = new Float32Array(count * EXTRA_FLOATS), fleetOf = new Uint32Array(count);
+    // Racing city 1 -- `extraFleets` ride behind the kit's: [{ name, mesh, pipeline, bind, records (n x 4), extras (n x 4) }], the
+    // track's voxel world and its buildings drawn in the same scene as the tiles, each with its own pipeline (the world's is the
+    // plain lit one, the tiles' the quat mode), all under one cull and one camera
+    const extraCount = extraFleets.reduce((s, f) => s + f.records.length / RECORD_FLOATS, 0);
+    const count = placements.length + extraCount, records = new Float32Array(count * RECORD_FLOATS), extras = new Float32Array(count * EXTRA_FLOATS), fleetOf = new Uint32Array(count);
     placements.forEach((p, i) => { records.set([p.pos[0], p.pos[1], p.pos[2], p.scale == null ? 1 : p.scale], i * RECORD_FLOATS); extras.set(p.quat || [0, 0, 0, 1], i * EXTRA_FLOATS); fleetOf[i] = files.indexOf(p.file); });
     const pipeline = L.litPipelineDesc({ cull, extra: "quat" }), bind = L.litBind(light);
     const fleets = files.map((f) => { const m = loaded.models.get(f); return { name: f, lods: [{ name: "only", mesh: kitMesh(m, loaded.colours.get(f)) }], layout: G.LAYOUTS.lit, pipeline, bind }; });
+    let at = placements.length;
+    for (const f of extraFleets) {
+        const n = f.records.length / RECORD_FLOATS, idx = fleets.length;
+        fleets.push({ name: f.name, lods: [{ name: "only", mesh: f.mesh }], layout: G.LAYOUTS.lit, pipeline: f.pipeline || L.litPipelineDesc({ cull: "none" }), bind: f.bind || bind });
+        records.set(f.records, at * RECORD_FLOATS); if (f.extras) extras.set(f.extras, at * EXTRA_FLOATS);
+        for (let i = 0; i < n; i++) fleetOf[at + i] = idx;
+        at += n;
+    }
     const scene = G.makeGpuDrivenScene(device, { fleets, fleetOf, thresholds: [], records, headings: extras });
-    scene.kitFleets = files; scene.kitFleetOf = fleetOf;
+    scene.kitFleets = fleets.map((f) => f.name); scene.kitFleetOf = fleetOf;
     return scene;
 }
 

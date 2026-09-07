@@ -1335,6 +1335,34 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         sound) and UNMEASURED (no universe row, held to one and named), and the row a GitHub-reaching round owes
         for morphicons is recorded there. Not vendored, said plainly: the FBX collision hulls (no reader here; round 2 builds the collider from tile
         footprints), the kits' scripts (the arcade car controller is read for its numbers, not ported).
+     1. (v4524) THE FLAT GRID TRACK. BUILT: world/raceTrack.mjs. A track is a SIMPLE CYCLE of cells on a 12 x 12 grid of
+        10-unit cells: a rectangle ring two cells in from every edge, grown by seeded bumps (two consecutive cells pushed
+        sideways into two free cells, refused out of bounds, into the loop, or against another part of it), so every
+        seed is a valid loop by construction. Every cell becomes one of Kenney's tiles by a grammar MEASURED on the
+        vendored models -- which edges the asphalt (the dark [54, 54, 58] vertices) leaves through: the straight north
+        and south, the corner west and south -- and turned by the quarter turns whose effect on a port vector is
+        derived through the shader's own rotateQ on yawQuat, never typed; cell 0 is always a straight and carries the
+        finish gate. From the same cells: the centreline (edge midpoints and radius-5 arcs about the corners' tile
+        corners), the kerb lines at 4.5, one checkpoint per tile at its entry edge (index 0 the finish line), and
+        CityGen's buildings -- one rect per free block with probability 0.8, 3 to 7 a side, 4 to 12 tall, inside a
+        one-voxel margin -- stamped through the sandbox's own generator (facades on) into a one-voxel grass floor laid
+        on the free cells. race-track.html draws the tiles as instanced fleets and the greedy-meshed floor and buildings
+        as one more fleet in the same gpuDriven scene (kitScene took extraFleets), on both backends. MEASURED (tools/
+        ship/raceTrack-selfcheck.mjs): forty seeds valid and distinct; seed 1 is 44 tiles (16 straights, 28 corners,
+        8 hairpins from 8 bumps), a 379.3-unit lap against 379.9 from straights x 10 plus corners x a quarter circle
+        of radius 5, 79 buildings on 100 free blocks stamped in 25 ms and meshed in 159 ms (62 chunks, 8,432
+        triangles), the browser building the same hashes in 197 ms; every tile's port-edge midpoints rotated by the
+        quaternion the shader gets land on its cell's edge midpoints; on both backends all 184 centreline points are
+        asphalt-grey, every empty block grass-green, every built block not all green, the finish cell 36 to 38 % red,
+        the backends 326 pixels apart of 160,000. THREE CORRECTIONS, all the gate's or the module's own: the first
+        invariant, "no two cells adjacent unless consecutive", refused twenty of twenty seeds, because a bump leaves
+        its two cells side by side and that is a hairpin, a fact of the generator and not a crossing; the first frame
+        key sampled cell centres, which on a corner tile (1,976 vertices against the straight's 188) land among
+        Kenney's trackside props, so the road is sampled along the centreline; and the floor under the loop z-fought
+        the tiles' asphalt (both at y = 1: 44 to 46 of 184 centreline points read grass on both backends, along the
+        seams), so there is no floor under the loop and the tile is the only thing there. Not built: crossings (the
+        kit has no crossing tile and the loop never crosses itself), the kerb as a collider (round 2), tracks on other
+        grid sizes (the generator takes cols and rows; only 12 x 12 is measured).
 
 ## The count that says when step 4 matters
 

@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "25de7e4511f5c04f5259f7f33be05a0718555087",
+ "head": "13afafec91dfa5db867e6834811eab46a6c8e200",
  "bodies": {
   "box3d": [
    {
@@ -131,8 +131,8 @@
    },
    {
     "path": "tools/ship/orreryUniverse-selfcheck.mjs",
-    "bytes": 15954,
-    "sha": "7161cb59cb5459cf06b0b8b4b5ccca2c5a1e7a11"
+    "bytes": 17923,
+    "sha": "13afafec91dfa5db867e6834811eab46a6c8e200"
    },
    {
     "path": "tools/ship/ragdollSelfCollide-selfcheck.mjs",
@@ -333,8 +333,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 855763,
-    "sha": "25de7e4511f5c04f5259f7f33be05a0718555087"
+    "bytes": 856627,
+    "sha": "13afafec91dfa5db867e6834811eab46a6c8e200"
    },
    {
     "path": "tools/ship/artifactWeight.mjs",
@@ -360,22 +360,22 @@
    },
    {
     "path": "tools/ship/orreryUniverse-selfcheck.mjs",
-    "bytes": 15954,
-    "sha": "7161cb59cb5459cf06b0b8b4b5ccca2c5a1e7a11"
+    "bytes": 17923,
+    "sha": "13afafec91dfa5db867e6834811eab46a6c8e200"
    }
   ],
   "kenney-city": [
    {
     "path": "world/kenneyKit.mjs",
-    "bytes": 19648,
-    "sha": null
+    "bytes": 20652,
+    "sha": "13afafec91dfa5db867e6834811eab46a6c8e200"
    }
   ],
   "kenney-racing": [
    {
     "path": "world/kenneyKit.mjs",
-    "bytes": 19648,
-    "sha": null
+    "bytes": 20652,
+    "sha": "13afafec91dfa5db867e6834811eab46a6c8e200"
    }
   ],
   "keyhunt": [
@@ -437,8 +437,8 @@
   "slug": [
    {
     "path": "tools/ship/orreryUniverse-selfcheck.mjs",
-    "bytes": 15954,
-    "sha": "7161cb59cb5459cf06b0b8b4b5ccca2c5a1e7a11"
+    "bytes": 17923,
+    "sha": "13afafec91dfa5db867e6834811eab46a6c8e200"
    }
   ],
   "taichi-js": [
@@ -686,8 +686,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 855763,
-    "sha": "25de7e4511f5c04f5259f7f33be05a0718555087"
+    "bytes": 856627,
+    "sha": "13afafec91dfa5db867e6834811eab46a6c8e200"
    },
    {
     "path": "shipavatar.html",
@@ -915,8 +915,8 @@
    },
    {
     "path": "tools/ship/orreryUniverse-selfcheck.mjs",
-    "bytes": 15954,
-    "sha": "7161cb59cb5459cf06b0b8b4b5ccca2c5a1e7a11"
+    "bytes": 17923,
+    "sha": "13afafec91dfa5db867e6834811eab46a6c8e200"
    },
    {
     "path": "wasm-bench.html",

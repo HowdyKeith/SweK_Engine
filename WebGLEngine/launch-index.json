@@ -21,7 +21,7 @@
   }
  },
  "counts": {
-  "page": 463,
+  "page": 464,
   "demo": 49,
   "builtin": 34
  },
@@ -2608,6 +2608,14 @@
    "display": "Quadratic Wall",
    "href": "/quadratic-wall.html",
    "section": "PL: Boundaries & Reconstruction",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "race-track.html",
+   "display": "Race Track",
+   "href": "/race-track.html",
+   "section": null,
    "collision": false
   },
   {
