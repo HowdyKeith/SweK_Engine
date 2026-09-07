@@ -370,6 +370,16 @@ function drawLabels(cam) {
     const picked = lastHit ? lastHit.id : (orbit.follow != null ? orbit.follow : null);
     const list = labelsFor(source.cpu(), source.names, { proj: cam.proj, view: cam.view, eye: cam.eye, width: cv.width, height: cv.height, count: source.count, kinds: source.kinds,
                                                           threshold: lodTh.thresholds[1], picked, max: 24, px: LABEL_PX });
+    // *** v4534 -- WHERE THE LABELLED BODIES ARE, IN CSS PIXELS, BECAUSE A GATE MUST POINT AT ONE RATHER
+    // THAN SWEEP FOR IT. *** tools/ship/gitEconomy-selfcheck.mjs hovered a 40-pixel grid and passed for as
+    // long as a body happened to sit on one of its 240 points. The v4534 re-bake moved every orbit and it
+    // named NOTHING -- with picking working perfectly: a 12-pixel scan found traders at (440,288) and
+    // (488,312), three pixels wide, between the grid's lines. THE CHECK WAS MEASURING THE ORBITS' LUCK.
+    // Read-only, and it is arithmetic on the list the labels already computed: labelsFor lifts sy above the
+    // body by its projected radius plus a little, so adding that back gives the centre to aim at.
+    { const d = window.devicePixelRatio || 1, f = cam.proj[5] * cv.height / 2;
+      window.__labelled = list.map((L) => ({ id: L.id, name: L.name, rpx: L.metric * f,
+          x: L.sx / d, y: (L.sy + L.metric * f + LABEL_PX * 0.35) / d })); }
     const ready = [];
     list.forEach((L, i) => {
         if (!labelBatches[i]) labelBatches[i] = new SlugDeviceBatch(fontDevice);

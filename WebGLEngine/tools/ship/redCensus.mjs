@@ -559,6 +559,64 @@ export const RED_AT_V4531 = Object.freeze(RED_AT_V4531_GATES.map((gate) => Objec
     get derived() { return !!(auditRow(gate) && auditRow(gate).first); },
 })));
 
+// *** v4534 -- TWO CENSUS GATES, BOTH RED BEFORE THIS ROUND'S FIRST EDIT, AND THE PROOF IS A RUN RATHER
+// THAN AN ASSERTION. *** Both exit 1 at f5ab4c4d -- origin/main, checked out clean in this same container --
+// and both are census drift from the SIX UNVERSIONED ROUNDS that were merged to main after v4533's ship.
+// That is the shape of the finding: a round that merges without shipping never runs the quick sweep, so a
+// census it moves goes red with nothing looking. Six rounds, two censuses, and nobody was told.
+//
+// posixAssumption-selfcheck.mjs is the cheap one and it is registered rather than repaired ON PURPOSE. Its
+// row allows the population to move by four and it has moved by five: 128 path callers recorded, 133 now,
+// with the normalising count correctly UP (38 -> 40). Re-taking the recorded pair would clear it in one
+// edit -- and doing that inside a round about something else is how a reading gets re-taken without anybody
+// naming the five files that joined. The repair is to name them.
+//
+// frozenRecords-selfcheck.mjs is the one that matters, and this round MOVED IT while diagnosing it.
+// *** THE CENSUS READS A RECORD'S BODY AS THE NEXT 6,000 CHARACTERS OF THE FILE. *** frozenRecords.mjs:90
+// is `const body = src.slice(i, i + 6000)` with a `.slice(0, 12)` cap on the fields found in it, so a
+// record's "fields" are whichever `name: <digits>,` lines fall inside a fixed window -- which spills into
+// the code BELOW a short record and truncates a long one. Measured here: KEY_DRIFT_V4460 grew from about
+// 1,500 to 5,600 characters in this round and `staleFor` fell out of the window, taking the at-or-before-
+// v4487 field count from 135 (correct) to 134. The record count was ALREADY wrong at HEAD -- 76 against the
+// 74 the frozen sweep took -- because two records stamped v4487 or earlier were added after that sweep and
+// the exclusion list only knows about later stamps.
+//
+// It is not repaired here because a balanced-body extraction changes the LIVE census on both sides, and the
+// 74/36/135 it is compared against came from a physical sweep -- every numeric field of every record bumped
+// by seven with every naming gate executed. That number cannot be re-derived by reading; it has to be
+// re-run. CLEARED BY re-running the probe under a correct extraction, which is a round.
+const WHY_V4534 = Object.freeze({
+    "tools/ship/frozenRecords-selfcheck.mjs":
+        "the record census reads a fixed 6,000-character window as a record's body (frozenRecords.mjs, " +
+        "`src.slice(i, i + 6000)` with a 12-field cap), so fields leak in from the code below a short record " +
+        "and fall out of a long one -- this round grew KEY_DRIFT_V4460 past the window and `staleFor` " +
+        "vanished, 135 fields to 134. Red at f5ab4c4d already on the RECORD count (76 against 74): two " +
+        "records stamped at or before v4487 arrived after the frozen sweep and the exclusion list only " +
+        "matches later stamps. CLEARED BY extracting the body by balanced braces and RE-RUNNING the +7 " +
+        "probe that produced 74/36/135 -- the comparison's baseline is a measurement, so it cannot be " +
+        "re-derived by reading, and a new extraction with the old baseline would be two rules at once.",
+    "tools/ship/posixAssumption-selfcheck.mjs":
+        "POSIX_AT_V4485's separator population has drifted five past its tolerance of four -- recorded 38 of " +
+        "128 normalising, live 40 of 133 -- with the normalising count correctly UP, which is the direction " +
+        "the row says a round may move it. Red at f5ab4c4d, before this round's first edit; the drift is the " +
+        "six unversioned rounds merged to main since v4533. CLEARED BY naming the five path callers that " +
+        "joined and re-taking the pair with them listed, so the re-take is a derivation rather than a " +
+        "number typed over a number.",
+});
+
+export const RED_AT_V4534_GATES = Object.freeze([
+    "tools/ship/frozenRecords-selfcheck.mjs",
+    "tools/ship/posixAssumption-selfcheck.mjs",
+]);
+
+export const RED_AT_V4534 = Object.freeze(RED_AT_V4534_GATES.map((gate) => Object.freeze({
+    gate,
+    why: WHY_V4534[gate] || null,
+    get ms() { const r = auditRow(gate); return r ? r.ms : null; },
+    get fails() { const r = auditRow(gate); return r && r.first ? r.first : (UNVERIFIED_LINE[gate] || null); },
+    get derived() { return !!(auditRow(gate) && auditRow(gate).first); },
+})));
+
 export const FIXED_SINCE_V4408 = Object.freeze([
     { gate: "tools/ship/orreryEjecta-selfcheck.mjs", round: "v4410",
       why: "REGISTERED AT v4408 AND REPAIRED BY RE-DERIVING, NOT BY RAISING A NUMBER. It compared the fleet " +

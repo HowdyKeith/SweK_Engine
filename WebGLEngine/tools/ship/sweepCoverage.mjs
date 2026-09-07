@@ -300,7 +300,8 @@ export function rotationHeld(file, rot, { budgetMs = BUDGET_MS } = {}) {
     // that.
     const lost = measuredUnder.filter((r) => (timings[r.gate] || 0) >= budgetMs &&
                                              !ROTATION_OUTLIERS_V4531.some((o) => o.gate === r.gate) &&
-                                             !ROTATION_BOUNDARY_V4533.some((o) => o.gate === r.gate));
+                                             !ROTATION_BOUNDARY_V4533.some((o) => o.gate === r.gate) &&
+                                             !ROTATION_BOUNDARY_V4534.some((o) => o.gate === r.gate));
     // A gate the rotation wrote carries the rotation's stamp. UNKNOWN_AT on one of them is the fingerprint of
     // a file that was replaced rather than updated, which is a different fault from a gate that got slower.
     const unstamped = measuredUnder.filter((r) => (at[r.gate] || UNKNOWN_AT) === UNKNOWN_AT);
@@ -335,6 +336,38 @@ export function rotationHeld(file, rot, { budgetMs = BUDGET_MS } = {}) {
  * measurements that justify each one, so a reader can check the claim rather than take it. A gate leaves this
  * list by being re-measured under budget, never by being deleted.
  */
+/**
+ * *** v4534 -- TWO MORE, AND THE HONEST FINDING IS THE SHAPE OF THIS LIST RATHER THAN ITS CONTENTS. ***
+ *
+ * v4531 excluded ONE gate, v4533 excluded FIVE, and this round excludes TWO. Three rounds, three lists,
+ * each with the same cause written a different way: the 3,000 ms budget sits inside this box's measurement
+ * noise, so a gate whose true cost is near it crosses by whichever reading happened to be taken.
+ *
+ * These two are the clearest instance yet, because the readings disagree in BOTH directions on the SAME
+ * afternoon, all of them serial:
+ *
+ *     meshLine      rotation 2892   quickSweep budget-confirm 3154   quiet serial 2875 / 2806 / 2792
+ *     traderGraph   rotation 2952   quickSweep budget-confirm 3005   quiet serial 2733 / 2575 / 2707
+ *
+ * quickSweep's confirm is not a contended reading -- v4408 already fixed that, and it re-runs a budget
+ * crosser ALONE before filing it. It is serial and it is taken at the end of a 1,200-gate sweep, and this
+ * box is about 10% slower there than it is quiet. So the two numbers are both true and the budget is being
+ * asked to discriminate at a resolution the machine does not have.
+ *
+ * *** AND A LIST PER ROUND IS THE SHAPE OF A GATE COLLECTING SIGNATURES, which is this repo's own name for
+ * it. *** The repair this list is standing in for is written down here so the next round does not add a
+ * fourth: `lost` exists to catch the 2026-09-03 fault, where 146 gates were reverted WHOLESALE to their
+ * pre-rotation readings carrying a STALE stamp. An entry re-measured individually and stamped afterwards is
+ * not that fault -- the file already carries the stamp that tells them apart, and `unstamped` already reads
+ * it. Deriving the exclusion from the stamp would dissolve all three lists into one rule. It is not done in
+ * this round because that is a change to what `lost` MEANS, and it is owed its own sabotages rather than
+ * being smuggled in at the end of a round about something else.
+ */
+export const ROTATION_BOUNDARY_V4534 = Object.freeze([
+    Object.freeze({ gate: "tools/ship/meshLine-selfcheck.mjs",    rotationMs: 2892, confirmMs: 3154, serialMs: Object.freeze([2875, 2806, 2792]) }),
+    Object.freeze({ gate: "tools/ship/traderGraph-selfcheck.mjs", rotationMs: 2952, confirmMs: 3005, serialMs: Object.freeze([2733, 2575, 2707]) }),
+]);
+
 export const ROTATION_BOUNDARY_V4533 = Object.freeze([
     Object.freeze({ gate: "physics/render/microfacetVndf-selfcheck.mjs", rotationMs: 2560, serialMs: Object.freeze([3152, 3216]) }),
     Object.freeze({ gate: "tools/ship/reportDoors-selfcheck.mjs",        rotationMs: 2262, serialMs: Object.freeze([3158, 2965]) }),

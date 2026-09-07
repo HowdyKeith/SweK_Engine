@@ -102,8 +102,63 @@ export const KEY_DRIFT_V4460 = Object.freeze({
             cargoAdded: 6, cargoGood: "docs", attributionBytes: 4049,
             control: "adding one file entry to draco on today's tree gives deaa019b, WITH OR WITHOUT the " +
                      "body's `bytes` field updated -- so it is the file list, not the size" }),
+        // *** v4534 -- AND THEN IT MOVED TWICE MORE WITHOUT ANYBODY SEEING IT, PAST THE ROW BUILT TO CATCH
+        // EXACTLY THIS. *** v4460 fixed the write-then-check that had hidden the first two moves, and the
+        // fixed row DID go red -- on main, from 13afafec onward. Nothing read it: this gate runs 7.1s against
+        // the sweep's 3,000 ms budget, so it is not in the ship-time sweep, and the exit code beside its name
+        // in sweep-timings.json is a 0 captured "before v4408" -- a STALE GREEN of the species sweepCoverage
+        // counted 371 of at v4460. THE REPAIR AT v4460 WAS REAL AND THE DRIFT STILL SHIPPED SEVENTEEN ROUNDS,
+        // THREE OF THEM VERSIONED, BECAUSE A GATE THAT IS NOT RUN CANNOT FAIL.
+        Object.freeze({ version: "v4504", commit: "13afafec", hash: "3f8b285e", file: "orrery.json",
+            field: "bodies", bodiesTouched: 3,
+            cause: "Kenney's two starter kits and morphicons vendored -- kenney-city, kenney-racing and " +
+                   "morphicons arrived in vendor/ and were baked in as three new BODIES, each with its own " +
+                   "orbit, stock and prices. Landed on main out of version order through the racing-city " +
+                   "branch, which is why the version above is that branch's and not main's",
+            control: "on today's tree, dropping those three bodies gives 6516282c; dropping kenney-city " +
+                     "alone gives 54a993c9 -- so it is the bodies, and each of them" }),
+        Object.freeze({ version: "v4487", commit: "149ef33a", hash: "73e6ee41", file: "orrery.json",
+            field: "files", bodiesTouched: 1,
+            cause: "the v4526 merge brought v4484's EIGHT KTX2/basis files into `three`'s file list -- " +
+                   "basis_transcoder.js and .wasm, its PROVENANCE.txt and README.md, ktx-parse, zstddec, " +
+                   "KTX2Loader and WorkerPool. stockOfFiles turns each into cargo, WHICH IS v4416'S " +
+                   "MECHANISM ARRIVING A SECOND TIME, this round through a merge rather than a commit",
+            control: "on today's tree, removing those eight entries from `three`'s files gives d70cf6a5" }),
+        // *** v4534 -- THE MOVE THIS SHIP MADE ON PURPOSE, AND THE GATE MADE IT OWE THIS ENTRY FIRST. ***
+        // The ship ritual's step 3 says to re-bake orrery.json when vendor/ has changed and it had; the baked
+        // arrival dates had also drifted from git (box3d read 2026-08-31 where git says 2026-08-19), which is
+        // what orreryView-selfcheck was red about and what gpuGitTime-selfcheck's arrival ORDER follows from.
+        // `--write` refuses to bake a hash the record does not already name, so this entry existed before the
+        // key could move -- the one place in this file where the mechanism was tested by using it.
+        Object.freeze({ version: "v4534", commit: "v4534's own commit", hash: "6ab551e0", file: "orrery.json",
+            field: "arrived", bodiesTouched: 16,
+            cause: "the step-3 re-bake corrected every drifted arrival date against git, and a body's " +
+                   "ARRIVAL sets its orbit -- v4414's field, moving for the opposite reason: that round " +
+                   "flattened the dates to one day, this one restored them to what git says",
+            alsoFixed: "orreryView-selfcheck and gpuGitTime-selfcheck, both red on the stale bake",
+            control: "on today's tree, reverting `arrived` to the pre-bake values gives 73e6ee41, and " +
+                     "setting any single body's arrived to 2026-01-02 moves the hash -- 18 of 18 tried" }),
     ]),
-    current: "df581d2d",
+    current: "6ab551e0",
+    // *** MEASURED AND NEGATIVE, AND IT CORRECTS MY OWN FIRST WRITING OF THE ENTRY ABOVE. *** The re-bake's
+    // diff moved TWO fields on 16 bodies each, `arrived` and `sha`, and I wrote "arrived + sha" into this
+    // record straight off that diff -- the exact mistake bytesDoNotReachTheEconomy exists to record, made
+    // again in the same file four moves later. `sha` reaches NOTHING: each of the 18 bodies' sha set to
+    // forty zeros in turn, one at a time, and the hash never moved. A DIFF NAMES WHAT CHANGED, NOT WHAT
+    // COUNTED, and the only way to tell them apart is to run it.
+    shaDoesNotReachTheEconomy: Object.freeze({ bodiesTried: 18, movedTheHash: 0,
+        note: "against `arrived`, the same probe on the same 18 bodies: 18 of 18 moved the hash" }),
+    // WHY THE 2026-09-07 DRIFT SHIPPED ANYWAY, read from tools/ship/sweep-timings.json rather than argued:
+    // the gate is over the ship-time budget, so quickSweep does not run it, so its recorded verdict is a
+    // snapshot of a tree that no longer exists. The RELATION (gate slower than budget) is asserted live in
+    // universeWire-selfcheck; the readings below are the observation that prompted it, dated, not asserted.
+    unseenBecause: Object.freeze({
+        gate: "tools/ship/universeWire-selfcheck.mjs", observedMs: 7071, budgetMs: 3000,
+        recordedCode: 0, recordedAt: "unknown -- before v4408", capturedAt: "2026-09-07T16:57:55.695Z",
+        roundsShippedPast: 17, versionedShipsPast: 3,   // 13afafec..f5ab4c4d on main, first-parent; v4531-v4533
+        note: "v4460's repair made this gate ABLE to fail and it did fail; nothing ran it. The stale-green " +
+              "species sweepCoverage counted 371 of, arriving in the gate that documents key drift.",
+    }),
     // MEASURED AND NEGATIVE, kept because it is what corrected this record: `bytes` (and so `radius`) do not
     // reach the economy. 964 bytes added to each of the 15 bodies in turn, one at a time: the hash never moved.
     bytesDoNotReachTheEconomy: Object.freeze({ bodiesTried: 15, movedTheHash: 0,

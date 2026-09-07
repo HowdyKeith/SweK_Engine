@@ -41,6 +41,16 @@ export function classifyRows(rows, { budgetMs = BUDGET_MS, priorMs = {} } = {}) 
     return { returnees, reds, killed, slower };
 }
 
+/**
+ * The ledger's rows after a re-timing: every prior row kept, each re-timed gate's row REPLACED, and nothing
+ * dropped. Pure and exported so a gate can drive it, because the write it guards erased 45 serial
+ * measurements the first time it ran without it.
+ */
+export function mergeLedger(prior = [], fresh = []) {
+    const by = new Map(fresh.filter((r) => r && r.gate).map((r) => [r.gate, r]));
+    return [...(prior || []).filter((r) => r && r.gate && !by.has(r.gate)), ...by.values()];
+}
+
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     const arg = (n, d) => { const i = process.argv.indexOf(n); return i >= 0 ? process.argv[i + 1] : d; };
     const budgetMs = Number(arg("--budget-s", 180)) * 1000;
@@ -48,9 +58,19 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     const file = readFile();
     const gates = enumerateGates(ENG);
     const c = census(gates, file);
-    const rot = rotation(c, file, { slots, budgetMs });
-    console.log(`[rotation] over-budget pool ${rot.pool}, taking ${rot.picked.length} (est ${(rot.cost / 1000).toFixed(0)}s), ` +
-        `covers the pool in ${rot.roundsToCover} round(s) at this slice size`);
+    // *** v4534 -- A NAMED SLICE, BECAUSE A ROTATION READING CAN BE WRONG FOR A REASON THAT IS NOT LUCK. ***
+    // slugWgsl was rotated at 52 ms on a box with no node-webgpu -- the gate bailed out early -- and reads
+    // 3,506 ms once the package is there. The staleness order will get to it eventually and a wrong entry
+    // should not have to wait its turn, so a caller may name the gates to re-time. v4533's note asks for
+    // exactly this operation ("a re-run of step 3b on a quiet box") and had no way to spell it.
+    const named = arg("--gates", null);
+    const rot = named
+        ? { picked: named.split(",").map((x) => x.trim()).filter(Boolean), pool: null, cost: 0, roundsToCover: 1 }
+        : rotation(c, file, { slots, budgetMs });
+    console.log(named
+        ? `[rotation] NAMED slice of ${rot.picked.length}: ${rot.picked.join(", ")}`
+        : `[rotation] over-budget pool ${rot.pool}, taking ${rot.picked.length} (est ${(rot.cost / 1000).toFixed(0)}s), ` +
+          `covers the pool in ${rot.roundsToCover} round(s) at this slice size`);
     const rows = runSlice(rot.picked, { onProgress: (d, t, r) => process.stderr.write(`[rotation] ${d}/${t}  ${r.gate}  ${r.ms}ms exit ${r.code}\n`) });
     const k = classifyRows(rows, { priorMs: file.timings || {} });
     console.log(`[rotation] ran ${rows.length}: ${k.returnees.length} now UNDER budget, ${k.reds.length} red, ${k.killed.length} hit the cap, ${k.slower.length} materially slower`);
@@ -65,11 +85,24 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         fs.writeFileSync(path.join(ENG, "tools", "ship", "sweep-timings.json"),
             JSON.stringify({ ...file, timings, codes, at }, null, 1) + "\n");
         // Its OWN file: quickSweep builds a fresh object each write and erased this ledger the first time it ran.
-        fs.writeFileSync(path.join(ENG, "tools", "ship", "sweep-rotation.json"), JSON.stringify({
+        // *** v4534 -- THIS WRITE REPLACED THE LEDGER, AND --gates TURNED THAT INTO A ONE-LINE DISASTER. ***
+        // The first run of the new named slice re-timed ONE gate and the ledger went from 46 entries to 1 --
+        // 45 serial measurements erased by a convenience option, which is the 2026-09-03 fault (146 gates put
+        // back wholesale) reproduced by hand inside the round that documents it. sweepCoverage section 10
+        // reads this file to prove the rotation's work survived, so a write that shrinks it is the one thing
+        // it must not do. The rows are MERGED BY GATE now: a re-measurement replaces its own entry and leaves
+        // every other one alone, which is what "re-time these two" always meant.
+        const ledgerFile = path.join(ENG, "tools", "ship", "sweep-rotation.json");
+        let prior = [];
+        try { prior = (JSON.parse(fs.readFileSync(ledgerFile, "utf8")).rotated) || []; } catch { prior = []; }
+        const merged = mergeLedger(prior, rows.map((r) => ({ gate: r.gate, ms: r.ms, code: r.code, priorMs: priorMs[r.gate] })));
+        fs.writeFileSync(ledgerFile, JSON.stringify({
             note: "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. " +
-                  "Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner.",
-            at: stamp, budgetMs: BUDGET_MS,
-            rotated: rows.map((r) => ({ gate: r.gate, ms: r.ms, code: r.code, priorMs: priorMs[r.gate] })),
+                  "Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. " +
+                  "MERGED BY GATE (v4534): a re-timing replaces its own row and no other, so a named slice " +
+                  "cannot erase the slice before it.",
+            at: stamp, budgetMs: BUDGET_MS, reTimedThisRun: rows.length,
+            rotated: merged,
         }, null, 1) + "\n");
         console.log(`[rotation] wrote ${rows.length} entries with at=${stamp}`);
     } else console.log("[rotation] dry run -- pass --write to record");

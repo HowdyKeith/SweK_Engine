@@ -2,7 +2,7 @@
  "shapeAt": "v4316",
  "measuredAt": "v4533",
  "days": 60,
- "greedy": 15726.666666666666,
+ "greedy": 28489.333333333332,
  "runs": [
   {
    "name": "narrow, 14 iterations, seed 3 (Level 16's)",
@@ -13,8 +13,8 @@
    "iters": 14,
    "pop": 8,
    "seed": 3,
-   "ratio": -0.20559559135226793,
-   "heldReturn": -3233.3333333333335,
+   "ratio": 2.3474048766789912,
+   "heldReturn": 66876,
    "params": 145
   },
   {
@@ -26,8 +26,8 @@
    "iters": 30,
    "pop": 12,
    "seed": 5,
-   "ratio": 0.9811360746078848,
-   "heldReturn": 15430,
+   "ratio": 2.0021528525296017,
+   "heldReturn": 57040,
    "params": 145
   },
   {
@@ -39,8 +39,8 @@
    "iters": 30,
    "pop": 12,
    "seed": 5,
-   "ratio": 2.92414158541755,
-   "heldReturn": 45987,
+   "ratio": 0.9967590209201105,
+   "heldReturn": 28397,
    "params": 417
   }
  ],

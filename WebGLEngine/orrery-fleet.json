@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "44f479d9e3129506a4e723d522be425d5abc7cd6",
+ "head": "f5ab4c4de2c6ffb33c9fd990cbed82dee7e2d4b5",
  "bodies": {
   "box3d": [
    {
@@ -12,7 +12,7 @@
    {
     "path": "ai-bridge/server.js",
     "bytes": 1484887,
-    "sha": "8d4739838f05a92bdeac10bf9aa1db9960de937c"
+    "sha": "f27d8a92b4a142d6810733192fca548a9c7dccde"
    },
    {
     "path": "physics/backendRouting-selfcheck.mjs",
@@ -165,7 +165,7 @@
    },
    {
     "path": "orrery-gpu.html",
-    "bytes": 48481,
+    "bytes": 49462,
     "sha": "25bbf4add8c06b1a6ebf823c7fcdfc7c78dfd6b4"
    },
    {
@@ -319,7 +319,7 @@
    {
     "path": "ai-bridge/server.js",
     "bytes": 1484887,
-    "sha": "8d4739838f05a92bdeac10bf9aa1db9960de937c"
+    "sha": "f27d8a92b4a142d6810733192fca548a9c7dccde"
    },
    {
     "path": "clients.html",
@@ -456,7 +456,7 @@
    {
     "path": "ai-bridge/server.js",
     "bytes": 1484887,
-    "sha": "8d4739838f05a92bdeac10bf9aa1db9960de937c"
+    "sha": "f27d8a92b4a142d6810733192fca548a9c7dccde"
    },
    {
     "path": "aquarelle.html",
@@ -630,8 +630,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3204848,
-    "sha": "44f479d9e3129506a4e723d522be425d5abc7cd6"
+    "bytes": 3217262,
+    "sha": "f27d8a92b4a142d6810733192fca548a9c7dccde"
    },
    {
     "path": "mpm3d.html",
@@ -812,7 +812,7 @@
   "three-webgpu": [
    {
     "path": "orrery-gpu.html",
-    "bytes": 48481,
+    "bytes": 49462,
     "sha": "25bbf4add8c06b1a6ebf823c7fcdfc7c78dfd6b4"
    },
    {

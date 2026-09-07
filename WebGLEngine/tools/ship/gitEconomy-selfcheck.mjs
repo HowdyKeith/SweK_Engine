@@ -75,6 +75,37 @@ console.log("\n1. MARKETS FROM THE BODIES, PRICES FROM COVERAGE");
     ok("the crew is git's contributors plus a hauler per body", makeGitEconomy(system).ships.length === traders().length + system.bodies.length, `${traders().length} contributors + ${system.bodies.length} haulers`);
 }
 
+// *** ONE PASS, TWO ANSWERS, AND THE SAME CODE GIVES BOTH. *** bestRoute skips a market that is CLOSED and
+// one that CANNOT PAY ("a market that cannot pay is not a destination"); the departure scan below re-derives
+// those rules rather than borrowing them, because a checker that asks the thing it checks to define "best"
+// agrees with it by construction. `rules` turns the two skips off, so "what the scan says" and "what it
+// would say without them" come from ONE function -- a second loop for the counterfactual would be a copy
+// that can drift from the thing it is meant to be the counterfactual OF. The counters are taken before the
+// skip so a rule that removes nothing is visible as such.
+const scanChoice = (here, markets, best, t, rules) => {
+    const r = { violations: 0, closed: 0, cannotPay: 0, pairs: 0 };
+    for (const m of markets) for (const g of GOODS) {
+        if (m.id === here.id || here.stock[g] <= 0) continue;
+        r.pairs++;
+        const closed = !(t >= (m.opens || 0));                  // bestRoute: !isOpen(m)
+        const cannotPay = m.credits < m.trade[g];               // bestRoute: cannot pay
+        if (closed) r.closed++; else if (cannotPay) r.cannotPay++;
+        if (rules && (closed || cannotPay)) continue;
+        if (m.trade[g] - here.trade[g] > best.margin * 1.06) r.violations++;
+    }
+    return r;
+};
+// The fixture the rules are PROVED on: one market that is open and can pay at an ordinary margin, one that
+// cannot pay, one that is closed, and the last two priced far above the best route on offer. Nothing about
+// the tree, so the proof does not move when the tree does.
+const RULE_FIXTURE = Object.freeze({
+    here: { id: 0, stock: Object.fromEntries(GOODS.map((g, i) => [g, i === 0 ? 9 : 0])), trade: Object.fromEntries(GOODS.map((g) => [g, 10])) },
+    best: { margin: 20 },
+    markets: [{ id: 1, opens: 0, credits: 1e6, trade: Object.fromEntries(GOODS.map((g) => [g, 25])) },
+              { id: 2, opens: 0, credits: 1, trade: Object.fromEntries(GOODS.map((g) => [g, 500])) },
+              { id: 3, opens: 1e6, credits: 1e6, trade: Object.fromEntries(GOODS.map((g) => [g, 500])) }],
+});
+
 console.log("\n2. A HUNDRED DAYS OF LIFE, ACCOUNTED FOR TO THE UNIT");
 {
     const e = makeGitEconomy(system, { seed: 7 });
@@ -97,16 +128,10 @@ console.log("\n2. A HUNDRED DAYS OF LIFE, ACCOUNTED FOR TO THE UNIT");
         // why they are spelled out again, and why they must be kept in step -- the row below asserts the
         // populations match, so a rule added to bestRoute and not to this scan is a red rather than a drift.
         for (const s of e.ships) if (s.to == null) { const b = e.bestRoute(s); if (b) { routeChecks++; const here = e.uni.systemById[s.at];
-            for (const m of e.markets) for (const g of GOODS) {
-                if (m.id === here.id || here.stock[g] <= 0) continue;
-                if (!(e.t >= (m.opens || 0))) { skippedClosed++; continue; }          // bestRoute: !isOpen(m)
-                if (m.credits < m.trade[g]) { skippedCannotPay++; continue; }         // bestRoute: cannot pay
-                if (m.trade[g] - here.trade[g] > b.margin * 1.06) { routesOk = false; routeViolations++; } }
-            // What the OLD scan would have flagged: the same comparison with bestRoute's two rules left out.
-            // Counted so the repair's necessity is a number rather than a story about one.
-            for (const m of e.markets) for (const g of GOODS) {
-                if (m.id === here.id || here.stock[g] <= 0) continue;
-                if (m.trade[g] - here.trade[g] > b.margin * 1.06) wouldFlagWithoutRules++; } } }
+            const on = scanChoice(here, e.markets, b, e.t, true), off = scanChoice(here, e.markets, b, e.t, false);
+            if (on.violations) routesOk = false;
+            routeViolations += on.violations; skippedClosed += on.closed; skippedCannotPay += on.cannotPay;
+            wouldFlagWithoutRules += off.violations; } }
         e.step(0.25);
         for (const m of e.markets) {
             const k = m.name || m.id, cheapest = Math.min(...GOODS.map((g) => m.trade[g]));
@@ -159,11 +184,28 @@ console.log("\n2. A HUNDRED DAYS OF LIFE, ACCOUNTED FOR TO THE UNIT");
     // *** THE TWO RULES ARE LOAD-BEARING, MEASURED. *** An exclusion that removes nothing is indistinguishable
     // from no exclusion, so what the scan would have flagged without them is counted: those are the false
     // violations this row reported for as long as the rules were missing.
-    ok("!! *** WITHOUT bestRoute'S RULES THIS SCAN FLAGS CORRECT CHOICES -- the repair is a number, not a story ***",
-       wouldFlagWithoutRules > 0 && routeViolations === 0,
-       `${wouldFlagWithoutRules} false violations without them, ${routeViolations} with them. Every one is a ` +
-       "market whose treasury cannot cover the sale -- a ship is RIGHT to refuse a 480-credit sale to a " +
-       "market holding 159, and the scan was calling that a missed opportunity.");
+    // *** v4534, SECOND WRITING -- AND THE FIRST ONE ASSERTED A PROPERTY OF THE TREE AS A PROPERTY OF THE
+    // RULES. *** It required wouldFlagWithoutRules > 0 on the LIVE economy: "the repair is a number, not a
+    // story". The number was 26 of 430 choices the day it was written, and it is 0 of 287 today -- because
+    // the v4534 orrery re-bake changed the sim (three bodies arrived, every arrival date corrected, so every
+    // orbit and every flight time moved) and the tree stopped producing a market that both cannot pay AND
+    // undercuts the best route. THE RULES ARE STILL LOAD-BEARING; the live economy simply stopped
+    // demonstrating it, and a check that needs the world to keep supplying its own counterexample is a
+    // check that goes red on a correct tree. So the proof is a FIXTURE, run through the same scanChoice the
+    // live rows use, and the live count is REPORTED beside it as the observation it always was.
+    const fixOn = scanChoice(RULE_FIXTURE.here, RULE_FIXTURE.markets, RULE_FIXTURE.best, 0, true);
+    const fixOff = scanChoice(RULE_FIXTURE.here, RULE_FIXTURE.markets, RULE_FIXTURE.best, 0, false);
+    ok("!! *** WITHOUT bestRoute'S RULES THIS SCAN FLAGS CORRECT CHOICES -- proved on a fixture, not on the tree's mood ***",
+       fixOn.violations === 0 && fixOff.violations === 2 && fixOn.cannotPay === 1 && fixOn.closed === 1 &&
+       fixOn.pairs === 3 && routeViolations === 0,
+       `fixture: ${fixOff.violations} false violations with the rules OFF (the market holding 1 credit ` +
+       `against a price of 500, and the one that has not opened), ${fixOn.violations} with them ON. ` +
+       `Live tree today: ${wouldFlagWithoutRules} would be flagged without them, ${routeViolations} with ` +
+       `them, over ${routeChecks} departures -- it was 26 of 430 before the v4534 re-bake, WHICH IS WHY ` +
+       "THIS ROW NO LONGER ASSERTS IT. A ship is right to refuse a 480-credit sale to a market holding 159.");
+    report(`the two rules were exercised ${skippedCannotPay} times (cannot pay) and ${skippedClosed} times ` +
+        `(closed) on the live tree this run, and changed the verdict ${wouldFlagWithoutRules} times. ` +
+        "EXERCISED AND LOAD-BEARING ARE DIFFERENT QUESTIONS and only the second is asserted, on the fixture.");
     ok("  no trader was ever between bodies that do not exist", offSegment === 0);
     ok("*** the routes are many and they changed: trading moved the prices, and the prices moved the traders ***", routeChoices.size >= 20, `${routeChoices.size} distinct (from, to, good) routes over 100 days`);
     const first = e.ships[0].log.filter((l) => l.bought).map((l) => l.to), late = first.slice(-5), early = first.slice(0, 5);
@@ -197,11 +239,37 @@ console.log("\n3. THE PAGE: LIFE ON, THE LOG MOVES, AND THE POINTER NAMES A TRAD
         await pg.goto(`http://127.0.0.1:${srv.address().port}/`, { waitUntil: "load" }); await pg.waitForTimeout(2500);
         const log1 = await pg.evaluate(() => document.getElementById("trade").textContent); await pg.waitForTimeout(2500);
         const st = await pg.evaluate(() => ({ route: document.getElementById("route").textContent, log: document.getElementById("trade").textContent, drawn: document.getElementById("drawn").textContent }));
-        let named = null; for (let y = 120; y < 600 && !named; y += 40) for (let x = 40; x < 800 && !named; x += 40) { await pg.mouse.move(x, y); await pg.waitForTimeout(90); const t = await pg.evaluate(() => document.getElementById("pick").textContent); if (/ cr$| -- /.test(t)) named = t; }
+        // *** v4534 -- THIS SWEPT A 40-PIXEL GRID AND PASSED FOR AS LONG AS SOMETHING HAPPENED TO SIT ON ONE
+        // OF ITS 240 POINTS. *** The v4534 orrery re-bake moved every orbit and it named nothing -- with
+        // picking working perfectly. Measured before believing it: a 12-pixel in-page scan found traders at
+        // (440,288) and (488,312), three pixels wide, sitting between the grid's lines; 6 of 1053 samples at
+        // 20 pixels hit anything at all. THE ROW WAS MEASURING WHERE THE ORBITS HAPPENED TO BE. It aims now:
+        // the page publishes window.__labelled (id, name, and the body's centre in CSS pixels) from the list
+        // the labels already compute, and the pointer goes THERE. And because the bodies orbit while we are
+        // deciding -- aiming from a hook read 700 ms earlier missed by more than the body's 20-pixel radius
+        // -- it is a closed loop: re-read, re-aim, up to 25 times, which lands on the first pass in practice.
+        // The claim is stronger than the one it replaces: the HUD must name THE BODY WE AIMED AT, not merely
+        // something. If the page publishes no hook at all, aimed stays null and the row says so.
+        let named = null, aimed = null, aimTries = 0;
+        for (; aimTries < 25 && !named; aimTries++) {
+            const L = await pg.evaluate(() => window.__labelled || []);
+            if (!L.length) break;
+            const t = L.slice().sort((x, y) => y.rpx - x.rpx)[0]; aimed = t;
+            await pg.mouse.move(Math.round(t.x), Math.round(t.y)); await pg.waitForTimeout(80);
+            const txt = await pg.evaluate(() => document.getElementById("pick").textContent);
+            if (/ cr$| -- /.test(txt)) named = txt;
+        }
         await br.close(); srv.close();
         ok("the page loads with life on and reports the traders", /traders/.test(st.drawn), st.drawn);
         ok("*** the trade log fills and moves ***", st.log.length > 20 && st.log !== log1, st.log.slice(0, 120));
-        ok("*** the pointer names a trader with its cargo and credits, or a body with its prices ***", !!named, named || "nothing named");
+        ok("*** THE POINTER, AIMED AT A NAMED BODY, NAMES THAT BODY AND ITS PRICES ***",
+           !!named && !!aimed && named.startsWith(aimed.name + " -- "),
+           named ? `aimed at ${aimed.name} (radius ${aimed.rpx.toFixed(1)} px) on try ${aimTries}, and the HUD ` +
+                   `reads: ${named}`
+                 : aimed ? `aimed at ${aimed.name} at (${Math.round(aimed.x)}, ${Math.round(aimed.y)}) 25 times ` +
+                           "and the HUD never named it -- the pick and the projection disagree about where it is"
+                         : "the page published no window.__labelled: no labelled body to aim at, so nothing " +
+                           "here was pointed at. Not a pass and not a skip -- see #labelled on the HUD.");
         ok("  and the page threw nothing", errs.filter((e) => !/favicon/.test(e)).length === 0, errs.slice(0, 2).join(" | ") || "clean");
     }
 }
