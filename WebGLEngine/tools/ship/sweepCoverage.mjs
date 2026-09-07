@@ -121,21 +121,38 @@ export function verdictClasses(c, { codes = {} } = {}) {
 // policyPilot (2,617 ms) and traderGraph (2,933) came back under, and meshLine did not: 3,083 / 3,073 / 3,154 ms alone,
 // three runs, 2,929 at v4476. It is over by a few percent of the budget, not by a factor, and the honest record is the
 // reading and the box rather than a number rounded down to fit.
+/**
+ * *** v4535 -- BOTH ENTRIES RETURNED, AND THE RECORD SAID IN ADVANCE WHAT WOULD RETIRE THEM. ***
+ *
+ * meshLine's entry: "a sweep that finds it under returns it by the row's other branch." It has been found
+ * under, three times serially on a quiet box, and so has traderGraph. The readings, against the five and three
+ * serial samples that put each on this list:
+ *
+ *     meshLine      over at v4529/v4530: 3083 / 3073 / 3154        under now: 2515 / 2480 / 2757
+ *     traderGraph   over at v4529/v4530: 2933 3083 2719 3123 3152  under now: 2729 / 2344 / 2659
+ *
+ * *** THE STRADDLE WAS NEVER A PROPERTY OF EITHER GATE. *** Eight straddlers were named across v4529, v4531
+ * and v4533 -- these two and the six in ROTATION_BOUNDARY_RETIRED_V4535 -- each with serial evidence, each
+ * filed as "this gate genuinely sits just over on this box", and ALL EIGHT come back under on a quiet one.
+ * Eight independent gates do not improve by 15-30% in the same week; ONE BOX GOT QUIETER. The measurement was
+ * honest every time and the attribution was wrong every time, which is the difference between a reading and a
+ * conclusion -- and the only reason it could be caught is that every entry carried its gate name and its
+ * numbers, so eight claims could be re-run in ninety seconds.
+ */
 export const RETURNED_AT_V4529 = Object.freeze({
     at: "v4529",
-    stillOver: Object.freeze([
-        Object.freeze({ gate: "tools/ship/meshLine-selfcheck.mjs", recordedWas: 4404, v4476Ms: 2929, hereMs: 3154,
-            why: "over the 3,000 ms budget on this box by a few percent: 3,083 / 3,073 / 3,154 ms alone across three serial " +
-                 "runs at v4529, against 2,929 ms at v4476 on the same branch. A gate that straddles the budget is recorded " +
-                 "at the reading it gave, not at the one that would put it back in." }),
-        // v4530: the same straddle, one round on -- a v4461 returnee at 2,793 ms then, and here 2,933 / 3,083 / 2,719 / 3,123 /
-        // 3,152 ms across five serial runs. The v4530 sweep dropped it from budget again under parallel load; the serial reading
-        // that went into the file is the one it gave last, which is over. Named, so a later sweep that finds it under (the row's
-        // other branch) or over (this one) is right either way.
-        Object.freeze({ gate: "tools/ship/traderGraph-selfcheck.mjs", recordedWas: 3368, v4461Ms: 2793, hereMs: 3152,
-            why: "straddles the 3,000 ms budget on this box: 2,933 / 3,083 / 2,719 / 3,123 / 3,152 ms across five serial runs at " +
-                 "v4529 and v4530, against 2,793 ms at v4461's rotation. Recorded at the reading it gave last, which is over; a " +
-                 "sweep that finds it under returns it by the row's other branch." }),
+    stillOver: Object.freeze([]),
+    returnedAt_v4535: Object.freeze([
+        Object.freeze({ gate: "tools/ship/meshLine-selfcheck.mjs", overMs: 3154,
+            serialNow: Object.freeze([2515, 2480, 2757]),
+            why: "named still-over at v4529 on three serial readings of 3,083 / 3,073 / 3,154 ms; re-measured " +
+                 "serially at v4535 on a quiet box at 2,515 / 2,480 / 2,757 ms, and the timings file agrees at " +
+                 "2,546. Returned by the branch its own entry named: a sweep that finds it under returns it." }),
+        Object.freeze({ gate: "tools/ship/traderGraph-selfcheck.mjs", overMs: 3152,
+            serialNow: Object.freeze([2729, 2344, 2659]),
+            why: "named still-over at v4529/v4530 on five serial readings spanning 2,719 to 3,152 ms -- itself " +
+                 "a straddle wide enough to have been the answer -- and re-measured at v4535 at 2,729 / 2,344 / " +
+                 "2,659 ms with the timings file at 2,726. Under on every sample of the later run." }),
     ]),
 });
 
@@ -300,7 +317,8 @@ export function rotationHeld(file, rot, { budgetMs = BUDGET_MS } = {}) {
     // that.
     const lost = measuredUnder.filter((r) => (timings[r.gate] || 0) >= budgetMs &&
                                              !ROTATION_OUTLIERS_V4531.some((o) => o.gate === r.gate) &&
-                                             !ROTATION_BOUNDARY_V4533.some((o) => o.gate === r.gate));
+                                             !ROTATION_BOUNDARY_V4533.some((o) => o.gate === r.gate) &&
+                                             !ROTATION_BOUNDARY_V4535.some((o) => o.gate === r.gate));
     // A gate the rotation wrote carries the rotation's stamp. UNKNOWN_AT on one of them is the fingerprint of
     // a file that was replaced rather than updated, which is a different fault from a gate that got slower.
     const unstamped = measuredUnder.filter((r) => (at[r.gate] || UNKNOWN_AT) === UNKNOWN_AT);
@@ -335,25 +353,72 @@ export function rotationHeld(file, rot, { budgetMs = BUDGET_MS } = {}) {
  * measurements that justify each one, so a reader can check the claim rather than take it. A gate leaves this
  * list by being re-measured under budget, never by being deleted.
  */
-export const ROTATION_BOUNDARY_V4533 = Object.freeze([
-    Object.freeze({ gate: "physics/render/microfacetVndf-selfcheck.mjs", rotationMs: 2560, serialMs: Object.freeze([3152, 3216]) }),
-    Object.freeze({ gate: "tools/ship/reportDoors-selfcheck.mjs",        rotationMs: 2262, serialMs: Object.freeze([3158, 2965]) }),
-    Object.freeze({ gate: "tools/ship/slugReupload-selfcheck.mjs",       rotationMs: 2734, serialMs: Object.freeze([3133, 3124]) }),
-    Object.freeze({ gate: "tools/ship/water2d-selfcheck.mjs",            rotationMs: 2551, serialMs: Object.freeze([3132, 3153]) }),
-    Object.freeze({ gate: "tools/ship/probeLab-selfcheck.mjs",           rotationMs: 2870, serialMs: Object.freeze([3189, 3197]) }),
+/**
+ * *** v4535 -- EMPTY, AND THAT IS THE EXIT CONDITION BEING MET RATHER THAN THE LIST BEING TIDIED. ***
+ *
+ * v4533's own words: "the durable repair is a re-run of step 3b on a quiet box, which re-times serially and
+ * writes today's numbers back". Somebody did that. All six entries -- five here and v4531's one -- were
+ * re-measured THREE TIMES SERIALLY, the same instrument that put them on the list, and every one of the
+ * eighteen readings came back under budget:
+ *
+ *     misWgsl          serial then 3075/3102/3134   serial now 2638/2822/2809
+ *     microfacetVndf   serial then 3152/3216        serial now 2157/2136/2363
+ *     reportDoors      serial then 3158/2965        serial now 1848/2016/1883
+ *     slugReupload     serial then 3133/3124        serial now 2521/2441/2391
+ *     water2d          serial then 3132/3153        serial now 2400/2427/2369
+ *     probeLab         serial then 3189/3197        serial now 2523/2465/2503
+ *
+ * *** SO v4533 WAS RIGHT ABOUT THE CLUSTER AND v4531 WAS WRONG ABOUT THE OUTLIER, AND ONLY THE SECOND
+ * MEASUREMENT COULD TELL THEM APART. *** Five gates moving together said "one box measured at two different
+ * times"; the sixth was filed as a property of misWgsl -- "the gate genuinely sits just OVER budget on this
+ * box" -- and it moves with the other five. Three serial samples were enough to refute a single sub-budget
+ * rotation reading and NOT enough to establish a gate's cost, because the noise this budget sits in has a
+ * period longer than three consecutive runs of one gate.
+ *
+ * THE LIST IS WHAT MADE THAT CHECKABLE. Both entries carried the gate names and the numbers behind them, so
+ * the claim could be refuted by re-running six commands; a tolerance band -- the repair v4531 declined --
+ * would have forgiven all six silently and left nothing to re-run. Empty is the state a record like this is
+ * supposed to reach, and rotationHeld now runs with no exemptions at all.
+ */
+export const ROTATION_BOUNDARY_V4533 = Object.freeze([]);
+
+/** The retired entries, kept with BOTH measurements so the retirement is as checkable as the entry was. */
+export const ROTATION_BOUNDARY_RETIRED_V4535 = Object.freeze([
+    Object.freeze({ gate: "physics/render/misWgsl-selfcheck.mjs",        at: "v4531", rotationMs: 2966, serialThen: Object.freeze([3075, 3102, 3134]), serialNow: Object.freeze([2638, 2822, 2809]) }),
+    Object.freeze({ gate: "physics/render/microfacetVndf-selfcheck.mjs", at: "v4533", rotationMs: 2560, serialThen: Object.freeze([3152, 3216]),       serialNow: Object.freeze([2157, 2136, 2363]) }),
+    Object.freeze({ gate: "tools/ship/reportDoors-selfcheck.mjs",        at: "v4533", rotationMs: 2262, serialThen: Object.freeze([3158, 2965]),       serialNow: Object.freeze([1848, 2016, 1883]) }),
+    Object.freeze({ gate: "tools/ship/slugReupload-selfcheck.mjs",       at: "v4533", rotationMs: 2734, serialThen: Object.freeze([3133, 3124]),       serialNow: Object.freeze([2521, 2441, 2391]) }),
+    Object.freeze({ gate: "tools/ship/water2d-selfcheck.mjs",            at: "v4533", rotationMs: 2551, serialThen: Object.freeze([3132, 3153]),       serialNow: Object.freeze([2400, 2427, 2369]) }),
+    Object.freeze({ gate: "tools/ship/probeLab-selfcheck.mjs",           at: "v4533", rotationMs: 2870, serialThen: Object.freeze([3189, 3197]),       serialNow: Object.freeze([2523, 2465, 2503]) }),
 ]);
 
-export const ROTATION_OUTLIERS_V4531 = Object.freeze([
-    Object.freeze({
-        gate: "physics/render/misWgsl-selfcheck.mjs",
-        rotationMs: 2966,
-        serialMs: Object.freeze([3075, 3102, 3134]),
-        at: "v4531",
-        why: "rotation read 2966 against a 3000 ms budget; three serial re-runs read 3075, 3102 and 3134, so " +
-             "the gate genuinely sits just OVER budget on this box and the single sub-budget sample was the " +
-             "outlier. Recorded rather than restored, because restoring 2966 would write a number measured " +
-             "false three times in a row.",
-    }),
+export const ROTATION_OUTLIERS_V4531 = Object.freeze([]);   // retired at v4535 -- see the note above; misWgsl
+                                                            // re-measured 2638/2822/2809 serially, under budget.
+
+/**
+ * *** v4535 -- ONE GATE THAT REALLY DOES STRADDLE, AND IT TOOK EMPTYING THE LIST TO SEE IT. ***
+ *
+ * Eight entries were retired this round because a quiet box put all eight back under budget, and the same
+ * round's sweep produced exactly ONE new lost gate -- and this one does not move when the box quiets down:
+ * 3,065 / 2,823 / 3,208 / 3,269 / 3,000 ms across five serial runs, median 3,065 against a 3,000 ms budget.
+ * The rotation caught it at 2,991 and the sweep wrote 3,115; BOTH READINGS ARE HONEST AND THE GATE IS THE
+ * COIN, not the box. That is what the eight false straddlers were being confused with, and the difference is
+ * five samples rather than one.
+ *
+ * NOTHING IS FORGIVEN BY THIS ENTRY. The gate stays out of the quick sweep, because 3,065 ms IS over the
+ * budget and the budget is not the thing under negotiation here; what the entry says is that a 2,991 ms
+ * rotation reading followed by a 3,115 ms sweep reading is one gate sampled twice, not a measurement lost
+ * between them. It leaves this list the way the other eight did -- by being re-measured under budget, or by
+ * being made cheaper. winPathGuard was made cheaper in this same round (3,033 -> 1,675 ms, by deleting a
+ * second walk of the tree it did not need), which is the repair this one has not had yet.
+ */
+export const ROTATION_BOUNDARY_V4535 = Object.freeze([
+    Object.freeze({ gate: "physics/render/albedoEstimator-selfcheck.mjs", rotationMs: 2991, sweepMs: 3115,
+        serialMs: Object.freeze([3065, 2823, 3208, 3269, 3000]),
+        why: "straddles the 3,000 ms budget on a QUIET box, which is what distinguishes it from the eight " +
+             "entries retired this round: five serial runs read 3,065 / 2,823 / 3,208 / 3,269 / 3,000 ms, " +
+             "median 3,065 and over. The rotation's 2,991 and the sweep's 3,115 are two samples of that " +
+             "spread rather than a reading lost between two writers." }),
 ]);
 
 // *** THE MEASUREMENT OF THE LOSS, FROZEN BY NAME, because the ledger that proves it is REWRITTEN BY THE NEXT

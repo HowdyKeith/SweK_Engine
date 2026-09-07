@@ -19,7 +19,7 @@
 // The slash-stripping helper form `new URL(rel, import.meta.url).pathname` (report.js, brain.js _localPath)
 // is SAFE and is not flagged -- it has a rel argument and strips the leading slash itself. This gate greps the
 // tree for the two unsafe forms so they cannot come back. The sabotage below reintroduces one and this fails.
-import { noComments } from "./sourceScan.mjs";
+import { noComments, codeOnly } from "./sourceScan.mjs";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -62,14 +62,41 @@ const RE_NODE_SPECIFIER   = /from\s+"node:|require\("node:/;
 // leading "/" that makes an endsWith a basename comparison, and RE_DRIVE_STRIP for the /^\/[A-Za-z]:/ test.
 // Blank those and every correctly-guarded file reads as unguarded -- 22 hits became 14 NEW false ones. Two
 // strippers, two questions: noComments() for "what does this file SAY", codeOnly() for "what does it DO".
+//
+// *** v4535 -- AND THE ANSWER IS NOT ONE STRIPPER FOR THE FILE, IT IS ONE PER QUESTION. *** The paragraph
+// above is right that codeOnly() cannot be this gate's only stripper, and it drew the wrong conclusion from
+// it: that noComments() therefore has to serve every rule. It does not. THE OFFENCE AND THE EXEMPTION ARE
+// DIFFERENT QUESTIONS AND WANT DIFFERENT INSTRUMENTS -- "what does this file DO" for the thing being
+// forbidden, "what does it SAY" for the evidence that earns a pass. v4451's round note in gateSweep.mjs
+// QUOTES the pathname idiom, inside a STRING rather than a comment, to record that a new gate reintroduced
+// it; noComments keeps string bodies, so this gate read the sentence about the bug as the bug -- v3936's
+// trap in its third spelling, after raw source and after trailing comments.
+//
+// MEASURED over the whole tree, per rule, before changing anything (4 files differ at all):
+//   gateSweep.mjs      literal 1 -> 0, rel-form 1 -> 0   the v4451 round note; prose, in a string
+//   reportDoors.mjs    literal 1 -> 1, rel-form 1 -> 1   REAL code, and it stays caught
+//   brain/brain.js     drive-strip exemption 1 -> 0      *** and report.js the same ***
+// That last row is the whole reason the exemption keeps its old instrument: the strip is a REGEX LITERAL,
+// `/^\/[A-Za-z]:/`, and codeOnly blanks regex bodies exactly as it blanks strings. Run the exemption through
+// it and the two files that drive-strip CORRECTLY become two new false reds -- the same 22-became-14 shape
+// the paragraph above paid for, just narrowed to one rule. So: offence in code, exemption in text.
 const stripComments = (src) => noComments(src);
+const stripToCode   = (src) => codeOnly(src);
 const SKIP = new Set(["node_modules", ".git", "vendor", "rt", "__pycache__"]);
 
-function walk(dir, hits) {
+// *** v4535 -- ONE WALK, BECAUSE THE SECOND ONE ASKED A QUESTION THE FIRST ALREADY HAD THE ANSWER TO. ***
+// This gate read, stripped and regex-tested every file in the tree TWICE: once here for the offences, and
+// again below to count the basename guards that earned their exemption. 1,478 files, two full noComments
+// passes, and the second walk's only output was ONE INTEGER. Measured serially, that put the gate at
+// 3,122 / 3,055 / 3,204 / 3,285 ms -- OVER the 3,000 ms quick-sweep budget, which is why it ran at ship time
+// in none of the 112 versions between its v4423 repair and the rotation that re-timed it. A gate nobody runs
+// caught nothing: reportDoors reintroduced the pathname idiom in that window and stood.
+// The count is now taken during the walk that was already happening. Same files, same stripper, same number.
+function walk(dir, hits, tally) {
     for (const name of readdirSync(dir)) {
         if (SKIP.has(name)) continue;
         const p = path.join(dir, name), st = statSync(p);
-        if (st.isDirectory()) walk(p, hits);
+        if (st.isDirectory()) walk(p, hits, tally);
         else if (name === "winPathGuard-selfcheck.mjs") continue;   // this file holds the patterns as search literals
         else if (/\.(mjs|js)$/.test(name)) {
             const raw = readFileSync(p, "utf8"), rel = path.relative(ROOT, p);
@@ -84,8 +111,19 @@ function walk(dir, hits) {
             // Prose quotes the fragment; only code writes `import.meta.url === ...`. Measured when this changed:
             // 40 real guards, 0 prose, and the four surviving prose hits went to zero without a word being
             // reworded. The pathname form is a complete expression already, so stripping comments is enough.
-            const s = stripComments(raw);
-            if (s.includes(BAD_PATHNAME)) hits.push(rel + "  [new URL(import.meta.url).pathname]");
+            const s = stripComments(raw);   // what the file SAYS: comments gone, strings and regexes kept
+            // *** AND THE SECOND STRIPPER IS PAID FOR ONLY WHERE IT CAN CHANGE AN ANSWER. *** Running
+            // codeOnly over all 1,478 files unconditionally cost this gate 3,259 -> 3,937/4,120/3,956 ms
+            // serially, which is OVER THE 3,000 ms QUICK-SWEEP BUDGET -- and this gate came back into view
+            // in the first place only because a rotation brought it under. A repair that re-hides the gate
+            // it repairs is not a repair. noComments RETAINS EVERYTHING codeOnly RETAINS AND MORE (it keeps
+            // string and regex bodies; nothing else differs), so a file whose TEXT lacks the idiom cannot
+            // have it in its CODE, and the cheap read is a sound prefilter for the dear one. Measured over
+            // the whole tree before relying on it: 4 files match either way, and NOT ONE matches under
+            // codeOnly without matching under noComments. Cost after: back to ~2,800 ms.
+            const said = RE_PATHNAME_ANY.test(s) || s.includes(BAD_PATHNAME);
+            const c = said ? stripToCode(raw) : s;
+            if (c.includes(BAD_PATHNAME)) hits.push(rel + "  [new URL(import.meta.url).pathname]");
             if (BAD_GUARD_RE.test(s)) hits.push(rel + "  [file://${process.argv[1]} guard]");
             // *** v3937 -- AND THE REL-ARGUMENT FORM, WHICH THIS GATE'S OWN RULE COVERS AND ITS TEST DID NOT. ***
             // The header says the helper form is safe because "it has a rel argument AND STRIPS THE LEADING SLASH
@@ -99,9 +137,11 @@ function walk(dir, hits) {
             // brain/brain.js both do `if (/^\/[A-Za-z]:/.test(s)) s = s.slice(1)` inside _localPath and stay
             // correctly silent; a file that takes .pathname off import.meta.url and never drive-strips is
             // flagged whatever its first argument is.
-            if (RE_PATHNAME_ANY.test(s) && !RE_DRIVE_STRIP.test(s)) hits.push(rel + "  [rel .pathname, no drive-letter strip]");
+            // OFFENCE read from code, EXEMPTION read from text -- see the v4535 note by the strippers.
+            if (RE_PATHNAME_ANY.test(c) && !RE_DRIVE_STRIP.test(s)) hits.push(rel + "  [rel .pathname, no drive-letter strip]");
             // *** v3941 -- THE THIRD IDIOM. *** See the header: twenty files ran their main block on Linux
             // and nowhere else, and eighteen of them had no gate looking.
+            if (RE_ANCHORED_BASE.test(s)) tally.baseGuards++;   // the exemption census, in the walk that is already reading the file
             if (RE_ARGV_SPLIT_SLASH.test(s)) hits.push(rel + "  [argv[1].split(\"/\") -- a path is not slash-only]");
             else if (RE_ENDSWITH_ARGV.test(s)) {
                 if (!RE_ANCHORED_BASE.test(s)) hits.push(rel + "  [unanchored endsWith guard -- a suffix is not a basename]");
@@ -114,21 +154,11 @@ function walk(dir, hits) {
 let fails = 0;
 const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  ") + name + (detail ? "   " + detail : "")); if (!cond) fails++; };
 
-const hits = [];
-walk(ROOT, hits);
+const hits = [], tally = { baseGuards: 0 };
+walk(ROOT, hits, tally);
+const baseGuards = tally.baseGuards;
 // Counted rather than asserted at a number: this set SHRINKS when a file stops being browser-imported and
 // GROWS when a new page-side tool gains a CLI, and pinning it would make either one look like a regression.
-let baseGuards = 0;
-{
-    const count = (dir) => { for (const n of readdirSync(dir)) {
-        if (SKIP.has(n)) continue;
-        const q = path.join(dir, n);
-        if (statSync(q).isDirectory()) count(q);
-        else if (/\.(mjs|js)$/.test(n) && n !== "winPathGuard-selfcheck.mjs" &&
-                 RE_ANCHORED_BASE.test(stripComments(readFileSync(q, "utf8")))) baseGuards++;
-    } };
-    count(ROOT);
-}
 // v4423 -- *** THIS LINE SHOWED SIX OF TWENTY-TWO, AND THE OTHER SIXTEEN WERE REACHABLE ONLY BY EDITING THE
 // GATE. *** It read hits.slice(0, 6), so 144 rounds of readers saw six filenames and no way to know what else
 // was there. A list nobody can see is a list nobody acts on -- v4379's finding about RIG_ONLY -- and it is the

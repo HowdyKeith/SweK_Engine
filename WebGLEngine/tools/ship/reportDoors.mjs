@@ -38,7 +38,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const SIG = /^export (?:async )?function reportLines\s*\(([^)]*)\)/m;
 const SIG_CONST = /^export const reportLines = (?:async )?\(([^)]*)\)/m;
@@ -304,7 +304,13 @@ export const NO_GATE_ALL = Object.freeze([...NO_GATE_V4458, ...NO_GATE_V4531].so
 
 /** This module's own front door -- it is a member of the population it counts. */
 export function reportLines() {
-    const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..", "..");
+    // v4535 -- *** THE ONE WINDOWS-FRAGILE PATH LEFT IN THE TREE, AND IT WAS IN A GATE'S OWN FRONT DOOR. ***
+    // `new URL(import.meta.url).pathname` yields "/C:/dir/file" on Windows, so path.resolve prepends the
+    // current drive and root becomes "C:\\C:\\...": population(root) then walks a directory that does not
+    // exist and this census reports zero members with no error. winPathGuard-selfcheck records the idiom
+    // FIXED at v4423 across 16 files; this one arrived after, in a gate budgeted above the quick sweep's
+    // 3,000 ms cap, and was invisible until the rotation brought this gate under budget at 2,148 ms.
+    const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
     const pop = population(root);
     const L = [];
     L.push("[reportDoors] the reportLines convention, counted rather than assumed");

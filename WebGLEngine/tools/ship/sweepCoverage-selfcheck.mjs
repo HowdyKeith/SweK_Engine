@@ -441,9 +441,27 @@ console.log("\n7. *** THE MIRROR standingReds NEVER HAD: A ZERO IS AS OLD AS THE
        "returned by v4461's rotation and this row fired on the next run until they were named.");
 
     // ---- v4529: the later still-over record is held to the same standard as v4476's ----
+    // *** v4535 -- AND THE ROW HAD NO WAY TO SAY "THEY ALL CAME BACK". *** overNonEmpty rejects the empty list,
+    // rightly -- an empty roll of still-over gates would otherwise pass this row by asserting nothing. But
+    // "still over" is a state gates LEAVE, and each entry here named the branch that would retire it ("a sweep
+    // that finds it under returns it"), so emptying the roll is the record working, not the record going
+    // vacuous. Both branches are checked and neither is free: while the roll is populated every entry must be
+    // live over budget with a reason; once it is empty, the RETIREMENTS must be non-empty and every retired
+    // gate must be live UNDER budget carrying the serial readings that returned it. vacuity.mjs supplies
+    // emptyOfNonEmpty for exactly this -- empty is the pass, and the guard is that it was ever populated.
+    const V29ret = SC.RETURNED_AT_V4529.returnedAt_v4535 || [];
     ok("!! a returnee that went back over the budget on a later box is NAMED with its serial readings, and is live over",
-       overNonEmpty(SC.RETURNED_AT_V4529.stillOver, (x) => (FILE.timings || {})[x.gate] > SC.BUDGET_MS && typeof x.why === "string" && x.why.length > 40 && x.hereMs > SC.BUDGET_MS && back.some((b) => b.gate === x.gate)),
-       SC.RETURNED_AT_V4529.stillOver.map((x) => x.gate.split("/").pop() + " " + (FILE.timings || {})[x.gate] + " ms on file, " + x.hereMs + " ms recorded").join("; "));
+       overNonEmpty(SC.RETURNED_AT_V4529.stillOver, (x) => (FILE.timings || {})[x.gate] > SC.BUDGET_MS && typeof x.why === "string" && x.why.length > 40 && x.hereMs > SC.BUDGET_MS && back.some((b) => b.gate === x.gate)) ||
+       (emptyOfNonEmpty(SC.RETURNED_AT_V4529.stillOver, V29ret) &&
+        overNonEmpty(V29ret, (x) => (FILE.timings || {})[x.gate] < SC.BUDGET_MS && x.overMs > SC.BUDGET_MS &&
+                                    typeof x.why === "string" && x.why.length > 40 &&
+                                    Array.isArray(x.serialNow) && x.serialNow.length >= 3 &&
+                                    x.serialNow.every((ms) => ms < SC.BUDGET_MS))),
+       SC.RETURNED_AT_V4529.stillOver.length
+         ? SC.RETURNED_AT_V4529.stillOver.map((x) => x.gate.split("/").pop() + " " + (FILE.timings || {})[x.gate] + " ms on file, " + x.hereMs + " ms recorded").join("; ")
+         : "the roll is EMPTY and that is the pass: " + V29ret.length + " returned, " +
+           V29ret.map((x) => x.gate.split("/").pop() + " " + x.overMs + " -> " + x.serialNow.join("/") + " ms").join("; ") +
+           ". Each was named over budget WITH ITS NUMBERS, so returning it took re-running it rather than arguing about it.");
 
     // ---- this branch's v4476 accounting, kept beside it ----
     const T = FILE.timings || {};
