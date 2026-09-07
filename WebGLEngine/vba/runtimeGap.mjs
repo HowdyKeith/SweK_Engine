@@ -211,7 +211,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // the earlier reading was 3878. What survives is the rule the wrong explanation was reaching for: this
     // number is MEASURED every round, never incremented from the last one, and a reason invented to explain a
     // count is worth less than re-taking it. FIVE ROUNDS RUNNING this table has been re-taken by hand.
-    files: 4011,                  // v4526 merge: 3887 -> 4002, this branch's rounds; v4527: 4004; v4528: 4007; v4529: 4009; v4530: 4011
+    files: 4012,                  // v4526 merge: 3887 -> 4002, this branch's rounds; v4527: 4004; v4528: 4007; v4529: 4009; v4530: 4011; v4533: 4012 (ai-bridge/runBusy.js)
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
                           // RE-TAKEN TWICE IN TWO ROUNDS, and the second time only because the ship gate
                           // caught it: v4478's re-take was correct for v4478 and stale the moment v4479
@@ -234,7 +234,11 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // fetches its listing and draws on WebGL2; the module is typed arrays and closures), the other four not at all.
     // v4530 -- RE-TAKEN: three files (world/crashDamage.mjs, race-crash.html, the gate) moved seven rows by one or two, fetch and
     // the other four not at all (the page fetches nothing: its city is built in the page).
-    esModules: 3720, closures: 3597, asyncAwait: 1413, typedArrays: 788, promises: 343,
+    // v4533 -- RE-TAKEN: ONE file (ai-bridge/runBusy.js) moved ONE row by one, and none of the other eleven.
+    // It is a table of five module paths and five small arrow predicates -- closures as values, and nothing
+    // else: no fetch, no typed array, no timer. The narrowest re-take in this list, and it is here because
+    // the census re-derives every row every run rather than trusting the twelve numbers below it.
+    esModules: 3720, closures: 3598, asyncAwait: 1413, typedArrays: 788, promises: 343,
     fetchXhr: 243, performanceNow: 220, raf: 116, webgl: 154, webgpu: 48, threads: 22, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

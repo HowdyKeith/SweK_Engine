@@ -49,6 +49,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { codeOnly, noComments } from "./sourceScan.mjs";
 
@@ -58,7 +59,10 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
 
 const server = fs.readFileSync(path.join(ENG, "ai-bridge", "server.js"), "utf8");
 const gates = fs.readFileSync(path.join(ENG, "ai-bridge", "gatesBridge.js"), "utf8");
+const sysadmin = fs.readFileSync(path.join(ENG, "ai-bridge", "sysadminBridge.js"), "utf8");
+const runBusy = fs.readFileSync(path.join(ENG, "ai-bridge", "runBusy.js"), "utf8");
 const sCode = codeOnly(server), gCode = codeOnly(gates);
+const uCode = codeOnly(sysadmin), rCode = codeOnly(runBusy);
 
 // --- 1. the guard exists, and it is in the right place ---------------------------------------------------------
 {
@@ -74,13 +78,37 @@ const sCode = codeOnly(server), gCode = codeOnly(gates);
 
 // --- 2. it asks the runners rather than keeping a second flag --------------------------------------------------
 {
-    ok("_testRunActive asks renderQaBridge.status()", /renderQaBridge\.status\(\)/.test(sCode) && /s\.running/.test(sCode));
-    ok("...and gatesBridge.running()", /gatesBridge\.running\(\)/.test(sCode));
+    // *** v4533 -- THE PROBES MOVED TO ai-bridge/runBusy.js AND THIS SECTION FOLLOWED THEM, WHICH IS THE
+    // WHOLE POINT: a check that keeps asserting an old address goes red honestly instead of going quiet. ***
+    // RAW, NOT codeOnly: these are module PATHS, i.e. string literals, and codeOnly() blanks string contents.
+    // Asserting them against the stripped text is this file's own v4279 lesson met a THIRD time -- and it went
+    // red on correct code before this comment existed, which is why the comment is here.
+    ok("the probes live in runBusy.js: renderQaBridge.status()", /renderQaBridge\.js/.test(runBusy) && /status/.test(runBusy));
+    ok("...and gatesBridge.running(), rigRunner, sourceChain and githubBridge -- five runners, one list",
+        ["renderQaBridge", "gatesBridge", "rigRunner", "sourceChainBridge", "githubBridge"].every((m) => runBusy.includes(m + ".js")),
+        "one entry each, in a frozen table, so adding a runner is a row rather than a fifth copy of a try/catch");
     ok("!! every probe is guarded, so a bridge that does not answer cannot break the updater",
-        (sCode.match(/try \{[^}]*running[^}]*\} catch \{\}/g) || []).length >= 2 || /typeof gatesBridge !== "undefined"/.test(sCode),
+        /try \{/.test(rCode) && /\} catch \{\}/.test(rCode),
         "a missing running() must leave the update working, not throw inside the deferral check");
-    ok("it derives from the runners' OWN state rather than a duplicate flag", !/_testRunning\s*=/.test(sCode),
+    ok("it derives from the runners' OWN state rather than a duplicate flag",
+        !/_testRunning\s*=/.test(sCode) && !/_busyFlag\s*=/.test(rCode),
         "a second flag would one day disagree with the thing it describes");
+    // *** ONE QUESTION, NOT TWO COPIES OF IT. *** v4451 widened this predicate for _applyIncremental and the
+    // OTHER updater would have had to be remembered. The probes must therefore appear in runBusy.js and in
+    // NEITHER caller -- which is the same argument the duplicate-flag row above makes, one level up.
+    // *** SCOPED TO THE FUNCTION BODY, AND THE FIRST WRITING WAS NOT. *** Asserting the probe strings are
+    // absent from server.js ENTIRELY went red on correct code: server.js calls renderQaBridge.status() for its
+    // own /renderqa route, which has nothing to do with deferring an update. The claim is about the PREDICATE,
+    // so the predicate is what is read -- a whole-file search would have made every unrelated use of a bridge
+    // a failure, which is a check nobody could keep green honestly.
+    const body = (sCode.match(/function _testRunActive\(\) \{[\s\S]*?\n\}/) || [""])[0];
+    ok("!! *** the probes are in runBusy.js and in NEITHER updater's deferral ***",
+        !!body && !/renderQaBridge|gatesBridge|rigRunner|sourceChainBridge|githubBridge/.test(body) &&
+        !/renderQaBridge|sourceChainBridge|gatesBridge|rigRunner/.test(sysadmin),
+        "a copy in either caller is a copy that drifts the next time a runner is added -- v4451 widened one " +
+        "caller and the other would have had to be remembered, which is how this defect lasted");
+    ok("_testRunActive delegates rather than re-implementing", /require\("\.\/runBusy\.js"\)\.active\(\)/.test(server),
+        "the name and the { active, what } shape are kept, so every existing reader is untouched");
 }
 
 // --- 3. THE GAP BETWEEN TWO SERIAL GATES, which is where an updater would land ---------------------------------
@@ -194,7 +222,7 @@ const sCode = codeOnly(server), gCode = codeOnly(gates);
     const gh = noComments(fs.readFileSync(path.join(ENG, "ai-bridge", "githubBridge.js"), "utf8"));
 
     ok("!! *** the update deferral asks the SOURCE CHAIN, which it never did before v4451 ***",
-        /sourceChainBridge\.running\(\)/.test(sCode) && /githubBridge\.busy\(\)/.test(sCode),
+        /sourceChainBridge\.js/.test(runBusy) && /githubBridge\.js/.test(runBusy) && /busyWhat/.test(runBusy),
         "clone -> verify -> pack -> upload was invisible to _testRunActive() for its whole life; an update " +
         "restart inside the upload leaves a release whose asset never finished arriving, which the installer " +
         "then scans for and does not find");
@@ -202,9 +230,9 @@ const sCode = codeOnly(server), gCode = codeOnly(gates);
         // codeOnly BLANKS STRING LITERALS, so `!== "undefined"` reads `!== ""` here. Matching the literal
         // would have gone red on correct code -- which is this file's own v4279 lesson, met again one screen
         // later. The structure is what is asserted: a guarded typeof probe, once each.
-        (sCode.match(/try \{ if \(typeof sourceChainBridge !== /g) || []).length === 1 &&
-        (sCode.match(/try \{ if \(typeof githubBridge !== /g) || []).length === 1 &&
-        (sCode.match(/sourceChainBridge\.running\(\)/g) || []).length === 1,
+        (runBusy.match(/sourceChainBridge\.js"/g) || []).length === 1 &&
+        (runBusy.match(/githubBridge\.js"/g) || []).length === 1 &&
+        /try \{[\s\S]*require\(r\.mod\)[\s\S]*\} catch \{\}/.test(rCode),
         "the same rule the three original probes follow -- a missing bridge must not break the updater, and " +
         "ONE probe each, because a second copy is the duplicated-guard defect this file opens by warning about");
 
@@ -239,5 +267,85 @@ const sCode = codeOnly(server), gCode = codeOnly(gates);
         "not the other leaves half the window open");
 }
 
+// --- 8. *** THE SECOND UPDATER, WHICH THIS FILE NEVER OPENED *** ----------------------------------------------
+//
+// v4533. Every section above grades server.js's _applyIncremental -- the peer/Drive INCREMENTAL package. There
+// is a second updater, and it is the one a person SEES: sysadminBridge.js's updateCheck extracts a build,
+// spawns the launcher and calls process.exit(0). It had NO deferral in any version, and THIS FILE COULD NOT
+// HAVE NOTICED: until now it read server.js, gatesBridge.js, rigRunner.js and rig.html, and the string
+// "updateCheck" did not appear in it once. A gate can be green for years about the wrong subject.
+//
+// Keith found it from the outside, at a release: "it gets to about 1200 and then I see the swek launcher go to
+// start a new version. if it starts, the sweeps get canceled." The four refusals updateCheck did have are
+// about the CANDIDATE (too small, implausibly ahead, bad zip shape) and one is about PORT 8787; none is about
+// whether the machine is busy.
+//
+// *** AND THIS SECTION IS BEHAVIOURAL, NOT A STRING MATCH, BECAUSE A STRING MATCH IS WHAT MISSED IT. *** The
+// rows below CALL updateCheck with a stubbed-busy predicate and read what comes back.
+{
+    const { pathToFileURL } = await import("node:url");
+    const req = (await import("node:module")).createRequire(pathToFileURL(path.join(ENG, "ai-bridge", "x.js")).href);
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "swek-updpause-"));
+    fs.writeFileSync(path.join(dir, "SweK_Engine_v4600.zip"), Buffer.alloc(200 * 1024, 7));
+    const sys = req("./sysadminBridge.js"), rb = req("./runBusy.js");
+    const realActive = rb.active;
+    try {
+        rb.active = () => ({ active: true, what: "the source chain (verifying)" });
+        const auto = await sys.updateCheck(true, { silent: true, dir });
+        ok("!! *** an AUTOMATIC apply defers while the source chain runs -- the defect Keith hit ***",
+            auto && auto.deferred === true && /source chain/.test(String(auto.busy || "")),
+            `deferred=${auto && auto.deferred}, busy=${auto && auto.busy}. Nothing is extracted and nothing is ` +
+            "consumed: the zip stays in Downloads and the next check applies it once the work ends.");
+        ok("...and it says WHICH work, so the note is actionable rather than a bare refusal",
+            !!(auto && /deferred/.test(String(auto.note || "")) && /source chain/.test(String(auto.note || ""))),
+            String((auto && auto.note) || "").slice(0, 110));
+        const forced = await sys.updateCheck(true, { silent: true, dir, force: true });
+        ok("!! a MANUAL apply still proceeds -- force is the person, not a flag something sets itself",
+            !!forced && forced.deferred !== true,
+            "same rule the RustDesk pause has had since v1933; /sys/update/apply passes force:true and none of " +
+            "the three automatic triggers does");
+        const scan = await sys.updateCheck(false, { silent: true, dir });
+        ok("!! and a SCAN is never deferred -- reporting is not applying",
+            !!scan && scan.deferred !== true && scan.updateAvailable === true,
+            "the poller calls updateCheck(false) when autoApply is off; deferring the report would hide a " +
+            "waiting build behind unrelated work");
+        rb.active = realActive;
+        const idle = await sys.updateCheck(true, { silent: true, dir });
+        ok("!! *** and with NOTHING running it does not defer -- the guard has an off state ***",
+            !!idle && idle.deferred !== true,
+            "a deferral that never lifts is an updater that never runs, which is the same outage wearing a " +
+            "politer word");
+    } finally {
+        rb.active = realActive;
+        try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
+    }
+}
+
 console.log("updatePause-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));
 process.exit(fails ? 1 : 0);
+
+// =============================================================================================================
+// SABOTAGE LOG -- v4533, section 8 and the runBusy extraction. Graded on EXIT CODES; all three files restored
+// md5-identical (sysadminBridge 5981486b, runBusy 865f7657, server 6ed9208a... verified byte-for-byte).
+//
+//   A  *** THE DEFERRAL DELETED FROM updateCheck -- THE EXACT STATE THE TREE WAS IN BEFORE THIS ROUND. ***
+//      -> exit 1. This is the sabotage that justifies the section: it is not a hypothetical mutation, it is
+//      the code that shipped in every version up to v4532, and this file was GREEN over it for its whole life
+//      because it never opened sysadminBridge.js. A gate that cannot fail on the bug it miss.ed is a gate that
+//      will miss it again.
+//
+//   B  the deferral kept but `opts.force` ignored, so a person's click is blocked too.
+//      -> exit 1. The manual row holds. A guard that also stops the human is an outage, not a pause.
+//
+//   C  sourceChainBridge dropped from runBusy's table.
+//      -> exit 1, from the source-chain rows AND from section 8's behavioural row at once -- which is the
+//      argument for one shared table: a runner removed there is felt by both updaters in the same run.
+//
+//   D  _testRunActive stops delegating and returns a bare { active: false }.
+//      -> exit 1. Delegation is asserted, so the incremental path cannot quietly go back to answering for
+//      itself while the installer asks the shared question.
+//
+// *** WHAT IS STILL NOT COVERED, SAID PLAINLY. *** Section 8 drives updateCheck with rb.active stubbed; it does
+// NOT prove the real runners report busy during a real release -- that needs a live clone, which no gate can
+// afford. What it proves is that updateCheck ASKS and OBEYS. The runners' own reporting is covered by the
+// sections above, one bridge at a time.

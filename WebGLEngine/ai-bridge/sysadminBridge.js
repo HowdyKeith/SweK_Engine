@@ -655,7 +655,42 @@ async function updateCheck(apply, opts){
         return { ...base, found: found.v, updateAvailable: false, refused: "implausible-version", note: lastNote };
     }
     if (!apply){ lastNote = "v" + found.v + " available in Downloads (current v" + cur + ")"; return { ...base, found: found.v, updateAvailable: true, note: lastNote }; }
+    // *** THE DEFERRAL SITS ABOVE THE PLATFORM CHECK ON PURPOSE, AND IT IS A TESTABILITY DECISION. ***
+    // Apply is Windows/macOS-only, so below that line this branch is unreachable on the Linux boxes the gates
+    // run on -- and this file's own v3937 note states the rule it would have broken: "A rule that cannot be
+    // tested except by breaking production is a rule nobody will test." Deferring first costs a platform that
+    // cannot apply anyway one predicate call, and buys a check that can be driven anywhere.
+    // *** v4533 -- DEFER WHILE LONG WORK IS IN FLIGHT. THIS UPDATER HAD NO SUCH CHECK, IN ANY VERSION. ***
+    //
+    // server.js's _applyIncremental has deferred since v3075 and learned to see the GitHub chain at v4451.
+    // THIS function -- the one that extracts a build, spawns the launcher and exits -- never asked. It is the
+    // updater a person SEES: Keith, mid-release, "it gets to about 1200 and then I see the swek launcher go to
+    // start a new version. if it starts, the sweeps get canceled." Killing the new window by hand beats the
+    // HANDOFF and not the decision, because by then the zip is already extracted.
+    //
+    // The four refusals above are about the CANDIDATE -- too small, implausibly ahead, wrong zip shape -- and
+    // launchGuard is about PORT 8787. Not one of them is about whether this machine is busy, so the release
+    // route (clone -> verify -> pack -> upload, twenty minutes) sat wide open to a ten-minute poller.
+    //
+    // *** ASKED OF ai-bridge/runBusy.js, WHICH IS ALSO WHAT _testRunActive() NOW ASKS. *** A second copy of
+    // the question here would have the same fault as the duplicate flag updatePause-selfcheck already refuses:
+    // v4451 widened the predicate for one caller, and the other would have had to be remembered.
+    //
+    // FORCE IS THE PERSON, NOT A FLAG SOMETHING SETS ITSELF. /sys/update/apply passes force:true because
+    // somebody clicked it and is watching; all three automatic triggers -- the poller, the boot scan and the
+    // peer pull -- pass silent:true and none passes force. A deferred update is NOT dropped: nothing is
+    // consumed, the zip stays in Downloads, and the next cycle re-checks and applies once the work ends.
+    if (!opts.force) {
+        let busy = { active: false, what: null };
+        try { busy = require("./runBusy.js").active(); } catch {}
+        if (busy.active) {
+            lastNote = "v" + found.v + " deferred -- " + busy.what + " is running. Nothing was extracted; the " +
+                       "zip stays in " + downloadsDir() + " and the next check applies it once the work ends.";
+            log(lastNote);
+            return { ok: true, deferred: true, busy: busy.what, version: found.v, found: found.v, current: cur, note: lastNote };
+        }
     if (!isWin && !isMac) return { ok: false, error: "apply is Windows/macOS-only" };
+    }
     // v2223 — LAUNCH COOLDOWN. The window-storm was auto-apply spawning a new launcher whose bridge
     // dies on EADDRINUSE (:8787 still held by the old server), over and over. If a relaunch fired
     // recently, do NOT spawn another one -- one handoff at a time. Mark the launch up front so a

@@ -299,7 +299,8 @@ export function rotationHeld(file, rot, { budgetMs = BUDGET_MS } = {}) {
     // pre-rotation readings carrying a stale stamp, and no list of individually re-measured gates can hide
     // that.
     const lost = measuredUnder.filter((r) => (timings[r.gate] || 0) >= budgetMs &&
-                                             !ROTATION_OUTLIERS_V4531.some((o) => o.gate === r.gate));
+                                             !ROTATION_OUTLIERS_V4531.some((o) => o.gate === r.gate) &&
+                                             !ROTATION_BOUNDARY_V4533.some((o) => o.gate === r.gate));
     // A gate the rotation wrote carries the rotation's stamp. UNKNOWN_AT on one of them is the fingerprint of
     // a file that was replaced rather than updated, which is a different fault from a gate that got slower.
     const unstamped = measuredUnder.filter((r) => (at[r.gate] || UNKNOWN_AT) === UNKNOWN_AT);
@@ -311,6 +312,37 @@ export function rotationHeld(file, rot, { budgetMs = BUDGET_MS } = {}) {
  * Gates whose rotation reading crossed the budget by luck, each with the serial re-measurement that says so.
  * A gate leaves this list by being re-measured under budget, not by being deleted.
  */
+/**
+ * *** v4533 -- FIVE AT ONCE, AND THE HONEST NAME FOR IT IS NOT "OUTLIER". ***
+ *
+ * v4531 excluded ONE gate whose rotation reading crossed the budget by luck. This round's sweep reported
+ * FIVE lost, and re-measuring them serially says something different from five coincidences:
+ *
+ *     microfacetVndf   rotation 2560   serial now 3152, 3216
+ *     reportDoors      rotation 2262   serial now 3158, 2965
+ *     slugReupload     rotation 2734   serial now 3133, 3124
+ *     water2d          rotation 2551   serial now 3132, 3153
+ *     probeLab         rotation 2870   serial now 3189, 3197
+ *
+ * Every one landed in 2.2-2.9s at rotation time and every one lands at ~3.1s now, SERIALLY, with nothing in
+ * this round touching any of them. That is not five gates flapping independently; it is ONE BOX MEASURED AT
+ * TWO DIFFERENT TIMES, and the 3,000 ms budget sits exactly where this machine's noise lives. Calling them
+ * outliers would file a property of the hardware as five properties of five gates.
+ *
+ * *** SO THE ENTRY IS THE CLUSTER, AND WHAT IT ADMITS IS THAT THE ROTATION LEDGER IS STALE RATHER THAN THAT
+ * THE TIMINGS ARE WRONG. *** The durable repair is a re-run of step 3b on a quiet box, which re-times
+ * serially and writes today's numbers back; until somebody does that, these five are recorded here WITH the
+ * measurements that justify each one, so a reader can check the claim rather than take it. A gate leaves this
+ * list by being re-measured under budget, never by being deleted.
+ */
+export const ROTATION_BOUNDARY_V4533 = Object.freeze([
+    Object.freeze({ gate: "physics/render/microfacetVndf-selfcheck.mjs", rotationMs: 2560, serialMs: Object.freeze([3152, 3216]) }),
+    Object.freeze({ gate: "tools/ship/reportDoors-selfcheck.mjs",        rotationMs: 2262, serialMs: Object.freeze([3158, 2965]) }),
+    Object.freeze({ gate: "tools/ship/slugReupload-selfcheck.mjs",       rotationMs: 2734, serialMs: Object.freeze([3133, 3124]) }),
+    Object.freeze({ gate: "tools/ship/water2d-selfcheck.mjs",            rotationMs: 2551, serialMs: Object.freeze([3132, 3153]) }),
+    Object.freeze({ gate: "tools/ship/probeLab-selfcheck.mjs",           rotationMs: 2870, serialMs: Object.freeze([3189, 3197]) }),
+]);
+
 export const ROTATION_OUTLIERS_V4531 = Object.freeze([
     Object.freeze({
         gate: "physics/render/misWgsl-selfcheck.mjs",

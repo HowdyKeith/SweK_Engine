@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "1cc26124df53766f489523442ee3fca75e652ea9",
+ "head": "44f479d9e3129506a4e723d522be425d5abc7cd6",
  "bodies": {
   "box3d": [
    {
@@ -11,7 +11,7 @@
    },
    {
     "path": "ai-bridge/server.js",
-    "bytes": 1486291,
+    "bytes": 1484887,
     "sha": "8d4739838f05a92bdeac10bf9aa1db9960de937c"
    },
    {
@@ -318,7 +318,7 @@
    },
    {
     "path": "ai-bridge/server.js",
-    "bytes": 1486291,
+    "bytes": 1484887,
     "sha": "8d4739838f05a92bdeac10bf9aa1db9960de937c"
    },
    {
@@ -455,7 +455,7 @@
    },
    {
     "path": "ai-bridge/server.js",
-    "bytes": 1486291,
+    "bytes": 1484887,
     "sha": "8d4739838f05a92bdeac10bf9aa1db9960de937c"
    },
    {
@@ -630,8 +630,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3196444,
-    "sha": "1cc26124df53766f489523442ee3fca75e652ea9"
+    "bytes": 3204848,
+    "sha": "44f479d9e3129506a4e723d522be425d5abc7cd6"
    },
    {
     "path": "mpm3d.html",
