@@ -71,7 +71,7 @@ import { validateComposition } from "./composeValidate.mjs";
 import { overNonEmpty, emptyOfNonEmpty } from "./vacuity.mjs";
 import { population, classify, contractOf, FORMATTERS, STRICT_FORMATTERS, TOLERANT_FORMATTERS, NEVER_CALL,
          RETURNS_BARE_BECAUSE, CHEAP_STATES, CHEAP_STATES_WITH_SECONDS,
-         CALL_COST_V4459 as COST, NO_GATE_V4458 as NOGATE,
+         CALL_COST_V4459 as COST, NO_GATE_ALL as NOGATE, NO_GATE_V4458, NO_GATE_V4531,
          reportLines as doorsReport } from "./reportDoors.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -274,8 +274,12 @@ console.log("\n6. who provides the convention and cannot check it");
     say(`no sibling gate: ${noGate.join(", ") || "(none)"}`);
     ok("!! the modules providing this convention with no gate of their own are named, not counted",
        noGate.length === NOGATE.length && noGate.every((r) => NOGATE.includes(r)),
-       `${noGate.length} of ${rows.length}. They are LISTED so that adding a member without a gate fails here ` +
-       "rather than passing quietly under a number that moved by one.");
+       `${noGate.length} of ${rows.length}, over ${NO_GATE_V4458.length} frozen at v4458 and ` +
+       `${NO_GATE_V4531.length} at v4531. They are LISTED so that adding a member without a gate fails here ` +
+       "rather than passing quietly under a number that moved by one -- WHICH IS WHAT HAPPENED: the four at " +
+       "v4531 arrived with the Racing-city line and turned this row red, which is the row working. The two " +
+       "lists are kept apart because freezing by name AT A VERSION is what lets a later reader see WHEN each " +
+       "arrived; the assertion is over their union, so the ratchet loses no strength.");
 }
 
 // ---- 7. *** THE FRONT DOOR IS THE LAST COPY CORRECTED AND THE ONLY COPY ANYBODY RUNS *** -------------------
@@ -455,3 +459,23 @@ console.log("\n9. the MEASURED entries, re-measured");
 
 console.log(`\nreportDoors-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);
 process.exit(fails === 0 ? 0 : 1);
+
+// =============================================================================================================
+// SABOTAGE LOG -- v4531, section 6's union ratchet after four arrivals were dated into NO_GATE_V4531.
+// Applied to tools/ship/reportDoors.mjs, graded on EXIT CODES, restored md5 834b6e5e187dabaf6de039545b332258.
+//
+//   A  world/ribbonRoad.mjs dropped from NO_GATE_V4531 -- a real arrival the list stops naming.
+//      -> exit 1. The direction the row exists for: a provider with no gate that nobody wrote down.
+//
+//   B  a name added that no module provides ("world/phantomThatDoesNotExist.mjs").
+//      -> exit 1. The OTHER direction, and the one a list-based ratchet loses if it only checks length >=
+//      derived: a list may not carry names the tree cannot produce, or it becomes a place to park excuses.
+//
+//   C  NO_GATE_V4531 spread twice into NO_GATE_ALL, inflating the union's length without changing its members.
+//      -> exit 1. The assertion is `noGate.length === NOGATE.length && every member included`, so a duplicate
+//      breaks the count while every containment check still passes -- which is the shape that would let a
+//      later edit quietly widen the union.
+//
+// Clean tree: exit 0. *** THE ROW WENT RED ON ITS OWN BEFORE ANY OF THIS, WHICH IS WHY IT IS TRUSTED HERE. ***
+// Four providers arrived with the Racing-city line and section 6 refused; it was not made to fail on purpose
+// to prove it could.

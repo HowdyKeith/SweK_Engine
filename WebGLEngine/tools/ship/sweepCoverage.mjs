@@ -284,13 +284,45 @@ export function rotationHeld(file, rot, { budgetMs = BUDGET_MS } = {}) {
     const timings = (file && file.timings) || {}, at = (file && file.at) || {};
     const rows = (rot && rot.rotated) || [];
     const measuredUnder = rows.filter((r) => r && typeof r.ms === "number" && r.ms < budgetMs);
-    const lost = measuredUnder.filter((r) => (timings[r.gate] || 0) >= budgetMs);
+    // *** v4531 -- A ROTATION READING IS ONE SAMPLE, AND A GATE WHOSE TRUE COST STRADDLES THE BUDGET WILL
+    // CROSS IT BY LUCK. *** This row fired on physics/render/misWgsl-selfcheck.mjs, rotation 2966 against a
+    // 3000 ms budget and 3480 in the timings -- and re-measured SERIALLY, three runs in a row, it takes 3075,
+    // 3102 and 3134 ms. The rotation's 2966 was the outlier, so "restore it" would have meant writing a number
+    // already measured to be false. That is v4458's own finding -- an observation promoted to a property --
+    // and the sibling row two sections up carries the rule this one was missing: A THRESHOLD IS THE PROPERTY,
+    // A MILLISECOND IS AN OBSERVATION.
+    //
+    // *** THE TEETH ARE KEPT BY NAMING THE OUTLIERS RATHER THAN BY WIDENING THE RULE. *** No tolerance band is
+    // introduced -- a band would forgive every future boundary case silently, which is the escape hatch this
+    // file has caught three times. An entry here is a MEASUREMENT somebody took and wrote down, and the fault
+    // this row exists for is untouched: the 2026-09-03 loss was 146 gates reverted wholesale to their
+    // pre-rotation readings carrying a stale stamp, and no list of individually re-measured gates can hide
+    // that.
+    const lost = measuredUnder.filter((r) => (timings[r.gate] || 0) >= budgetMs &&
+                                             !ROTATION_OUTLIERS_V4531.some((o) => o.gate === r.gate));
     // A gate the rotation wrote carries the rotation's stamp. UNKNOWN_AT on one of them is the fingerprint of
     // a file that was replaced rather than updated, which is a different fault from a gate that got slower.
     const unstamped = measuredUnder.filter((r) => (at[r.gate] || UNKNOWN_AT) === UNKNOWN_AT);
     return { measuredUnder: measuredUnder.length, lost, unstamped,
              held: measuredUnder.length - lost.length, rotatedAt: (rot && rot.at) || null };
 }
+
+/**
+ * Gates whose rotation reading crossed the budget by luck, each with the serial re-measurement that says so.
+ * A gate leaves this list by being re-measured under budget, not by being deleted.
+ */
+export const ROTATION_OUTLIERS_V4531 = Object.freeze([
+    Object.freeze({
+        gate: "physics/render/misWgsl-selfcheck.mjs",
+        rotationMs: 2966,
+        serialMs: Object.freeze([3075, 3102, 3134]),
+        at: "v4531",
+        why: "rotation read 2966 against a 3000 ms budget; three serial re-runs read 3075, 3102 and 3134, so " +
+             "the gate genuinely sits just OVER budget on this box and the single sub-budget sample was the " +
+             "outlier. Recorded rather than restored, because restoring 2966 would write a number measured " +
+             "false three times in a row.",
+    }),
+]);
 
 // *** THE MEASUREMENT OF THE LOSS, FROZEN BY NAME, because the ledger that proves it is REWRITTEN BY THE NEXT
 // ROTATION -- sweep-rotation.json holds only the last run, so this is the one place the 2026-09-03 run

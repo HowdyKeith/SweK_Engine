@@ -522,6 +522,43 @@ export const RED_AT_V4484 = Object.freeze(RED_AT_V4484_GATES.map((gate) => Objec
     get derived() { return !!(auditRow(gate) && auditRow(gate).first); },
 })));
 
+// *** v4531 -- ONE GATE, AND IT IS REGISTERED WITH THE HALF THAT PASSES NAMED BESIDE THE HALF THAT FAILS. ***
+// tslSource-selfcheck surfaced as a NEW red in v4531's sweep at 2,070 ms. It is NOT this round's: it exits 1
+// identically at 524c536c, the commit before this round's first edit, and this round touched no TSL, no
+// renderer and no shader.
+//
+// The reason it is registered rather than repaired is that the failure is one row of five, and the four
+// around it are what make it a narrow finding instead of a broken transplant:
+//
+//   webgpu  transplant vs hand-written linear pass     PASS  4096/4096, worst 0
+//   webgpu  three's own render vs the device           PASS  4096/4096, worst 0
+//   webgl2  transplant vs hand-written linear pass     PASS  4096/4096, worst 0, 4095 blended
+//   webgl2  three's own render vs the device           FAIL  3971/4096 identical, worst 127
+//
+// *** SO THE GENERATED CODE AGREES WITH THE HAND-WRITTEN PASS ON BOTH BACKENDS, EXACTLY. *** What disagrees is
+// three.js's OWN WebGL2 linear render against this tree's device, on 125 pixels of 4096, worst delta 127 --
+// which is a question about two renderers' sampling on one backend, not about the transplant the gate is for.
+// Diagnosing it needs the line that built that transplant; naming it wrongly here would be worse than owing it.
+const WHY_V4531 = Object.freeze({
+    "tools/ship/tslSource-selfcheck.mjs":
+        "webgl2 only: three's own linear render disagrees with the device on 125 of 4096 pixels, worst delta " +
+        "127, while the SAME comparison on webgpu is 4096/4096 at worst 0 and the transplant-vs-hand-written " +
+        "rows pass 4096/4096 on BOTH backends. Red at 524c536c, before v4531's first edit. CLEARED BY finding " +
+        "which of the two WebGL2 sampling paths is wrong, which belongs to the line that built the transplant.",
+});
+
+export const RED_AT_V4531_GATES = Object.freeze([
+    "tools/ship/tslSource-selfcheck.mjs",
+]);
+
+export const RED_AT_V4531 = Object.freeze(RED_AT_V4531_GATES.map((gate) => Object.freeze({
+    gate,
+    why: WHY_V4531[gate] || null,
+    get ms() { const r = auditRow(gate); return r ? r.ms : null; },
+    get fails() { const r = auditRow(gate); return r && r.first ? r.first : (UNVERIFIED_LINE[gate] || null); },
+    get derived() { return !!(auditRow(gate) && auditRow(gate).first); },
+})));
+
 export const FIXED_SINCE_V4408 = Object.freeze([
     { gate: "tools/ship/orreryEjecta-selfcheck.mjs", round: "v4410",
       why: "REGISTERED AT v4408 AND REPAIRED BY RE-DERIVING, NOT BY RAISING A NUMBER. It compared the fleet " +

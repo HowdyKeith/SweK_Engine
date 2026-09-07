@@ -45,7 +45,14 @@ if (version) {
 // 1. version marker matches what we claim
 if (version) {
   let mv = null;
-  try { mv = (fs.readFileSync("main.js", "utf8").match(/const ENGINE_VERSION = "(v\d+)"/) || [])[1]; } catch {}
+  // *** v4531 -- ANCHORED, BECAUSE THIS CHECK WAS READING A COMMENTED-OUT LABEL. *** main.js keeps its version
+  // history as commented copies of the declaration ABOVE the live one, so an unanchored match returns line
+  // 6527's `// const ENGINE_VERSION = "v4487"` and never reaches the live line. The check whose whole purpose
+  // is v1603's "old code wearing a new label" was reading a label that is not the code's. Measured at
+  // 524c536c: the regex returns v4487 where the live declaration says v4504, so the two marker rows below
+  // failed on every ship that carried commented history -- v4504's own round recorded its DO NOT SHIP as
+  // "the release lag alone" and was wrong about two of its three failures. ^ with /m fixes it outright.
+  try { mv = (fs.readFileSync("main.js", "utf8").match(/^const ENGINE_VERSION = "(v\d+)"/m) || [])[1]; } catch {}
   check(`version marker: main.js says ${mv || "?"} , shipping ${version}`, mv === version, mv === version ? "" : "MISLABELED BUILD — bump main.js or fix --version");
 } else {
   check("version marker", false, "no --version given");
@@ -56,7 +63,9 @@ if (version) {
 // Nothing gated on it, which is exactly why it drifted: a number nobody checks is a number that quietly lies.
 if (version) {
   let bb = null;
-  try { bb = (fs.readFileSync("brain/brain.js", "utf8").match(/BRAIN_BUILD = "(v\d+)"/) || [])[1]; } catch {}
+  // v4531 -- anchored for the same reason as the engine marker above, and it was worse here: the pattern had
+  // no `const` either, so it also matched the word inside a comment sentence mentioning BRAIN_BUILD = "vNNNN".
+  try { bb = (fs.readFileSync("brain/brain.js", "utf8").match(/^const BRAIN_BUILD = "(v\d+)"/m) || [])[1]; } catch {}
   check(`brain build marker: brain.js says ${bb || "?"} , shipping ${version}`, bb === version,
         bb === version ? "" : "BRAIN_BUILD is stale — it will announce the wrong build in every log line");
 }

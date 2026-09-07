@@ -278,6 +278,30 @@ export const NO_GATE_V4458 = Object.freeze([
     "tools/ship/morphCounter.mjs",
 ]);
 
+// *** v4531 -- FOUR ARRIVED AT ONCE AND THE ROW DID ITS JOB: IT WENT RED RATHER THAN LETTING A COUNT MOVE. ***
+// They are the Racing-city line's, landed between 2026-09-06 and 2026-09-07 -- a driver knob, a road builder,
+// a replay bake and a damage model, each of which grew a reportLines() and no sibling gate.
+//
+// *** THE ARRIVALS GET THEIR OWN DATED LIST INSTEAD OF BEING APPENDED TO v4458's. *** Appending would silently
+// restate what "the three at v4458" meant, and this tree freezes by name AT A VERSION for exactly that reason
+// (redCensus carries RED_AT_V4279, _V4408 and _V4476 side by side rather than one growing array). The assertion
+// takes the union, so the ratchet is unchanged in strength: a fifth arrival still fails until somebody writes
+// it down on purpose.
+//
+// *** AND THIS ROUND DECLARES THE DEBT RATHER THAN PAYING IT, WHICH IS A DIFFERENT THING AND IS SAID SO. ***
+// Paying it means four gates that assert what each module's report is FOR, and that is the Racing-city round's
+// to write -- inventing assertions for four modules this round has not read would be the fabrication the
+// citedSources register refuses by name. What is fixed here is the record; what is owed is four gates.
+export const NO_GATE_V4531 = Object.freeze([
+    "physics/raceKnob.mjs",
+    "world/crashDamage.mjs",
+    "world/raceReplayBake.mjs",
+    "world/ribbonRoad.mjs",
+]);
+
+/** Every provider with no gate of its own, across both frozen lists. Derived, so neither list can drift. */
+export const NO_GATE_ALL = Object.freeze([...NO_GATE_V4458, ...NO_GATE_V4531].sort());
+
 /** This module's own front door -- it is a member of the population it counts. */
 export function reportLines() {
     const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..", "..");

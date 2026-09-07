@@ -635,3 +635,24 @@ say("WHAT THIS DOES NOT CLAIM. That the 22 are the whole of it -- section 7 re-r
 REPORT.write();
 console.log(`\nsweepCoverage-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);
 process.exit(fails === 0 ? 0 : 1);
+
+// =============================================================================================================
+// SABOTAGE LOG -- v4531, section 10's ROTATION_OUTLIERS_V4531 exclusion. Graded on EXIT CODES, restored
+// md5-identical (98211aa4f9de3594d706b2b815aeaaeb).
+//
+//   A  a genuinely held gate (physics/xpbd/smallSteps-selfcheck.mjs, rotation 2644) pushed to 9999 in the
+//      timings -- the real fault the row exists for.
+//      -> exit 1. The teeth are intact: naming one measured outlier did not buy silence for an eviction.
+//
+//   B  the named list swapped for a blanket `timings < budgetMs * 2` tolerance band.
+//      -> exit 1, and NOT for the reason the sabotage was aimed at: 3480 is still inside a 6000 band, so the
+//      band catches misWgsl too. It shows the band is not equivalent to the list; it does NOT show that a
+//      wider band would be caught, and that is said here rather than left as an implied claim.
+//
+//   C  the exclusion widened to forgive EVERY lost gate (`&& false`) -- the escape-hatch shape, aimed at the
+//      real question B could not answer.
+//      -> exit 1, *** AND THE ROW THAT CAUGHT IT IS THE HERMETIC FIXTURE, NOT THE LIVE ONE. *** The live row
+//      goes quiet when `lost` empties, exactly as an escape hatch would want; the fixture drives
+//      rotationHeld() over a synthetic tree where a gate put back over budget MUST be reported lost, and that
+//      is what refuses. The guard against widening this exclusion was already in the file before v4531 added
+//      anything to exclude -- which is the argument for keeping hermetic fixtures beside live rows.
