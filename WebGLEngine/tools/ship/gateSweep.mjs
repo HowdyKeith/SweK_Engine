@@ -3672,6 +3672,23 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "*** Both in the file built to count the things it is an instance of, which also carries " +
                  "its own record and moved the count by exactly one.",
     }),
+    since192: Object.freeze({
+        at: "v4527", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/raceKnob-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green headless on the wasm, through the bridge's own handler, and in the browser. Racing city 4: physics/raceKnob.mjs " +
+                 "registers the race as a lab scene in the lab's own contract -- the hand policy's speed gain is the knob, the score is " +
+                 "metres on the training track, the key is a lap inside 80 s with the wheels on the asphalt on two tracks the score " +
+                 "never sees -- and the score's favourite (0.3) is the key's first refusal for cutting the grass, the slow end is " +
+                 "refused for the clock, 0.5 is accepted at rank 2. registerProposer takes an optional replay() and ready(); the " +
+                 "lab-scene-run route stores the accepted driver's log where SWEK_LAB_REPLAY_DIR points (git-ignored by default), " +
+                 "lab-replay serves it, race-brain.html plays it back, and physics-lab.html's thirteenth scene steps the car as a " +
+                 "schematic that says NOT REAL TIME. The record replays to the same fingerprint in node and in the page's wasm. " +
+                 "Sabotages red at A / B / C / D / E / F (the gate's header).",
+    }),
 
 });
 

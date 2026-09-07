@@ -25,6 +25,7 @@ import { adjudicate as gyroAdjudicate, score as gyroScore, propose as gyroPropos
 import { adjudicate as pileAdjudicate, score as pileScore, propose as pilePropose } from "./pileKnob.mjs";
 import { adjudicate as vibAdjudicate, score as vibScore, propose as vibPropose } from "./vibrationKnob.mjs";
 import { adjudicate as cfgAdjudicate, score as cfgScore, propose as cfgPropose } from "./centrifugeKnob.mjs";
+import { adjudicate as raceAdjudicate, score as raceScore, propose as racePropose, replay as raceReplay, ready as raceReady } from "./raceKnob.mjs";
 import { yangMagnetisation } from "./statmech/ising.js";
 import { wellLevel, levels } from "./quantum/schrodinger1d.js";
 import { lzExact, lzSweep } from "./quantum/landauZener.js";
@@ -264,6 +265,25 @@ export function registerAll() {
                "chosen tolerance: past x = 1 the leading-order account the key rests on does not exist. The " +
                "score prefers a FAST spin because the doubling time falls as omega^-2 (19.50s at omega 20 " +
                "against 0.786s at 100, measured), which walks it straight past that boundary.",
+    });
+
+    // v4527 -- THE FIFTH lab-scene proposer, and THE FIRST WHOSE KNOB IS A DRIVER. Racing city 4: the v4526 hand
+    // policy's speed gain decides how hard the car goes, the score is metres on the TRAINING track (seed 1) and
+    // the key is 90 s on two tracks the score never sees (seeds 2 and 3): lap, lap inside 80 s, wheels on the
+    // asphalt. *** THE SCORE'S FAVOURITE IS THE KEY'S FIRST REFUSAL *** -- 0.3 travels furthest on seed 1 and
+    // leaves the asphalt on 1351 of 21,600 wheel samples on seed 3 -- and the slow end never laps, so the
+    // adjudicator refuses at both ends for two stated reasons and accepts 0.5 at rank 2. The adjudicator needs
+    // box3d's wasm: raceKnob.ready() in node, setModule() in a page; unready, every candidate is refused BY NAME,
+    // which knobRegistry-selfcheck's two-sidedness row would report rather than swallow. `replay` records the
+    // accepted driver's race as a log the bridge stores and race-brain.html plays back.
+    registerProposer({
+        id: "race-speed", instrument: "drive-policy", knobs: ["speedGain"],
+        propose: racePropose, score: raceScore, adjudicate: raceAdjudicate, replay: raceReplay, ready: raceReady,
+        notes: "drive = drive0 - turn |turn12| - speedGain (v / 20): a small gain is a fast driver. Score = lap " +
+               "progress in 30 s on seed 1 (275, 264, 263 m at 0.3, 0.15, 0.5, measured); key = 90 s on seeds 2 " +
+               "and 3, a lap inside 80 s with at most 1% of wheel samples off the asphalt. 0.3 and 0.15 cut the " +
+               "grass on seed 3 (6.3%, 9.6%), 2 laps seed 2 in 80.3 s, 4 and 8 never lap; 0.5 is accepted at " +
+               "rank 2 -- the fastest driver the tracks it never saw will stand behind.",
     });
 
 }

@@ -50,7 +50,11 @@ const REGISTRY = new Map();
 // v3286 -- `instrument` is the registry id this knob belongs to, carried EXPLICITLY rather than inferred from
 // the proposer's name. The first version of the knob-registry gate tried to match "lz-window" to "landau-zener"
 // by stem and reported a false orphan; a link that has to be guessed is not a link.
-export function registerProposer({ id, knobs, propose, score, adjudicate, defaultTier = "propose", notes = "", instrument = null, search = null }) {
+// v4527 -- `replay` is OPTIONAL: a proposer whose accepted candidate is worth keeping as the thing that was accepted
+// (a race, not a number) supplies replay(candidate) -> a record its own module can play back to the same fingerprint.
+// The registry stores it and reports nothing about it; the bridge's lab-scene-run route writes the record when a
+// candidate is accepted. It is not a fourth verb of the contract: propose, score and adjudicate decide, replay records.
+export function registerProposer({ id, knobs, propose, score, adjudicate, defaultTier = "propose", notes = "", instrument = null, search = null, replay = null, ready = null }) {
     if (!id || typeof propose !== "function" || typeof score !== "function" || typeof adjudicate !== "function")
         throw new Error("registerProposer(" + id + "): propose, score and adjudicate are all required");
     if (!TIERS.includes(defaultTier)) throw new Error("unknown tier " + defaultTier);
@@ -63,7 +67,12 @@ export function registerProposer({ id, knobs, propose, score, adjudicate, defaul
         if (typeof search.make !== "function") throw new Error("registerProposer(" + id + "): search.make(value) is required -- the search walks knob VALUES and needs to build a candidate from one");
         if (search.cheap === undefined || search.costly === undefined) throw new Error("registerProposer(" + id + "): search needs both cheap and costly ends -- the direction is declared, never inferred");
     }
-    REGISTRY.set(id, { id, knobs, propose, score, adjudicate, tier: defaultTier, notes, instrument, search, granted: [] });
+    if (replay !== null && typeof replay !== "function") throw new Error("registerProposer(" + id + "): replay, when given, is a function of the accepted candidate");
+    // v4527 -- `ready` is OPTIONAL too: an adjudicator that needs a wasm loaded (the race's box3d) exposes an async
+    // ready() the route awaits before runProposer; adjudicate() itself stays synchronous and refuses by name if it
+    // is called first. Neither of these is the registry's business beyond storing them.
+    if (ready !== null && typeof ready !== "function") throw new Error("registerProposer(" + id + "): ready, when given, is an async function");
+    REGISTRY.set(id, { id, knobs, propose, score, adjudicate, tier: defaultTier, notes, instrument, search, replay, ready, granted: [] });
     return REGISTRY.get(id);
 }
 export const getProposer = (id) => REGISTRY.get(id);

@@ -1447,6 +1447,39 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         a track it never saw; from zero it climbs for sixty candidates and never finds the first corner. Not built:
         the forward pass ON the device (the twin is the CPU one), cars that see each other (no other car in the
         features), a brain that laps from zero (the idle trainer's longer runs are unmeasured beyond section 3).
+     4. (v4527) THE RACE AS A LAB SCENE. physics/raceKnob.mjs registers the race in the lab's own contract
+        (physics/proposers.mjs: propose, score, adjudicate; the verdict a proposer cannot move) as race-speed on
+        the drive-policy instrument. THE KNOB IS A DRIVER: the v4526 hand policy's speed gain, the one number in
+        drive = drive0 - turn |turn12| - speedGain (v / 20) that decides how hard the car goes. THE SCORE is cheap
+        and optimisable, metres of lap progress in 30 s on the training track (seed 1). THE KEY is 90 s on two tracks
+        the score never sees (the held-out seed 2 and the audit seed 3): a lap, inside 80 s, with at most 1% of the
+        21,600 wheel samples off the asphalt. MEASURED (tools/ship/raceKnob-selfcheck.mjs): the score is highest at
+        0.3 (275 m), then 0.15 (264), then 0.5 (263), and falls monotonically with the gain from there; the
+        adjudicator refuses 0.3 and 0.15 for the asphalt on seed 3 (1351 and 2065 samples off, and 0.15 hits a
+        building and never laps there), refuses 2 for the clock (80.3 s on seed 2, three tenths over), refuses 4
+        and 8 for no lap, and accepts 0.5, 0.8 and 1.2 with lap times monotone in the gain (39.3 / 44.8 / 56.5 s on
+        seed 2). *** THE SCORE'S FAVOURITE IS THE KEY'S FIRST REFUSAL, *** so runProposer walks 0.3, 0.15, 0.5 and
+        accepts 0.5 at rank 2: the fastest driver the tracks it never saw will stand behind, which is not the driver
+        the score would have picked. Nothing is adopted (tier propose). THE REPLAY: registerProposer takes an
+        optional replay(candidate) and ready(); the accepted driver's race on seed 2 is a record -- the seed, the
+        seconds, the fleet fingerprint, the driver's weights and hash, one input per tick, the state fingerprint --
+        that replayRecord plays back with no policy to the same fingerprint (b69eb211, 5400 ticks, 394 KB) and not
+        with one input flipped; the bridge's lab-scene-run route awaits ready(), stores the record where
+        SWEK_LAB_REPLAY_DIR points (tools/roundhouse/lab-replays/ by default, git-ignored), and a new lab-replay
+        route serves it; race-brain.html's new button fetches it, replays it offline and plays it back tick for
+        tick. physics-lab.html gains its thirteenth scene, race: the held-out track's centreline, checkpoints, the
+        car and its trail as a schematic, the car stepped on box3d by the hand policy at the slider's gain, and the
+        status line says NOT REAL TIME (the frame steps at whatever rate the browser allows; the adjudication runs
+        in node through the bridge). The gate drives the bridge through its own handle(): 404 by name before a run,
+        the route accepting 0.5 and storing the replay in a temporary directory so the tree stays clean, the served
+        record replaying; and in the browser the lab scene steps through checkpoints and the stored record replays
+        in the page's own wasm to node's fingerprint. Two corrections while it was built: the first header said the
+        score's favourite was 0.15 (the 90 s number on seed 3), where the 30 s score on seed 1 prefers 0.3; and the
+        knob-registry gate ran every adjudicator without awaiting a wasm, so the race read as always-refusing until
+        ready() was awaited there too. Not built: the Initiate button pressed against a live bridge (no sidecar in
+        the harness), a trained brain as a candidate (a trained policy has no single knob), a search over the gain
+        (the static shortlist is enough to show the shape; a bisection would find the 1% boundary between 0.3 and
+        0.5).
 
 ## The count that says when step 4 matters
 

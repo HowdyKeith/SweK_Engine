@@ -92,6 +92,13 @@ import { lcg } from "./physics/blobThermal.js";
 import { strictJitterCentres } from "./physics/strictGaussian.js";
 import { strictGaussian } from "./physics/strictGaussian.js";
 import { warmthOfKelvin, SCENARIOS } from "./physics/blobKelvin.js";
+// v4527 -- Racing city 4: the race as a lab scene (physics/raceKnob.mjs is the proposer; this is the schematic view)
+import { generateTrack, centreline, checkpoints, cityRects } from "./world/raceTrack.mjs";
+import { trackSurface, createCar, stepCar, carPose, lapTracker, addBuildings, foldHash, CAR } from "./physics/raceCar.mjs";
+import * as DRIVE from "./brain/drivePolicy.mjs";
+import { box3d } from "./physics/box3d/box3dLoader.js";
+import { worldFromModule } from "./render/slugTicker.mjs";
+let raceWorld = null;   // the previous race scene's box3d world, destroyed when a new one is built
 import { measuredT } from "./physics/tempModulator.js";
 import { planarFallbackWorld } from "./physics/planarFallbackWorld.js";
 import { metaballField2d, ISO2D } from "./physics/metaball2d.js";
@@ -700,6 +707,49 @@ const SCENES = {
         return "fringe spacing " + s.scan.spacing.toFixed(1) + " (formula " + hoSpacing(s.lambda, s.D, s.sep).toFixed(1) + ")   " + s.scan.peaks.length + " bright fringes   reconstructed separation " + recovered.toFixed(1) + " (actual " + s.sep + ")";
       },
     },
+  race: {
+    label: "Race  (a driver as a knob)",
+    desc: "Racing city 4: Kenney's grid track (seed 2, the lab's held-out track) as a schematic -- the centreline, the checkpoints, the car and its trail -- with physics/raceCar.mjs's car on box3d driven by brain/drivePolicy.mjs's hand policy at the chosen speed gain. A small gain is a fast driver. NOT REAL TIME: the frame steps the car at whatever rate the browser allows, and the lab's adjudication (Initiate AI workers) runs in node through the bridge, on tracks this view never shows.",
+    params: [{ name: "speedGain", label: "Speed gain", min: 0.15, max: 8, default: 1.2, step: 0.05 }],
+    pointR: 3,
+    build() {
+      const seed = 2, track = generateTrack({ seed }), line = centreline(track), cps = checkpoints(track), rects = cityRects(track);
+      const K = 240, n = line.length + cps.length + 1 + K, cp0 = cps[0];
+      const s = { seed, track, line, cps, rects, K, trail: [], phys: null, car: null, driver: null, tracker: null, surface: trackSurface(track), gain: null,
+                  hash: 0x811c9dc5, ticks: 0, lapTime: null, loading: "box3d loading", n: 0, edges: [], colors: [], carIdx: line.length + cps.length };
+      s.state = { pos: new Float64Array(3 * n), vel: new Float64Array(3 * n), invMass: new Float64Array(n) };
+      let idx = 0;
+      for (let i = 0; i < line.length; i++) { s.state.pos[3 * idx] = line[i][0]; s.state.pos[3 * idx + 2] = line[i][1]; s.colors[idx] = "#3a5a9a"; s.edges.push([idx, (i + 1) % line.length]); idx++; }
+      for (const c of cps) { s.state.pos[3 * idx] = c.x; s.state.pos[3 * idx + 2] = c.z; s.colors[idx] = "#ffcc44"; idx++; }
+      s.state.pos[3 * idx] = cp0.x + 5; s.state.pos[3 * idx + 1] = 1; s.state.pos[3 * idx + 2] = cp0.z; s.colors[idx] = "#ff5533"; idx++;
+      s.n = idx;
+      s.reset = () => {
+        if (raceWorld) { try { raceWorld.destroy(); } catch {} }
+        raceWorld = s.phys = worldFromModule(box3d._mod, [0, -9.81, 0]); addBuildings(s.phys, rects);
+        s.car = createCar(s.phys, { x: cp0.x + 5, z: cp0.z, yaw: Math.PI / 2 }); s.tracker = lapTracker(s.surface);
+        s.gain = null; s.hash = 0x811c9dc5; s.ticks = 0; s.lapTime = null; s.trail = []; s.n = s.carIdx + 1;
+      };
+      box3d.init().then((st) => { if (!st.ready) s.loading = "box3d: " + st.reason; else s.reset(); }).catch((e) => { s.loading = "box3d: " + e.message; });
+      return s;
+    },
+    step(s, p) {
+      if (!s.phys) return;
+      if (p.speedGain !== s.gain) { s.gain = p.speedGain; s.driver = DRIVE.policyDriver(DRIVE.handWeights({ speed: s.gain }), s.surface, s.car); }
+      const r = stepCar(s.phys, s.car, s.surface, s.driver(carPose(s.phys, s.car)), CAR.dt);
+      s.hash = foldHash(s.hash, s.phys.stateHash()); s.ticks++;
+      const tk = s.tracker.update(r.pose); if (tk.laps >= 1 && s.lapTime === null) s.lapTime = s.ticks * CAR.dt;
+      const P = s.state.pos, c = s.carIdx, q = r.pose.pos;
+      P[3 * c] = q[0]; P[3 * c + 1] = q[1]; P[3 * c + 2] = q[2];
+      if (s.ticks % 4 === 0) { s.trail.push([q[0], q[1], q[2]]); if (s.trail.length > s.K) s.trail.shift(); }
+      for (let j = 0; j < s.trail.length; j++) { const t = s.trail[j], k = c + 1 + j; P[3 * k] = t[0]; P[3 * k + 1] = t[1]; P[3 * k + 2] = t[2]; s.colors[k] = j > s.trail.length - 40 ? "#cc4433" : "#5a2a22"; }
+      s.n = c + 1 + s.trail.length;
+    },
+    status(s) {
+      if (!s.phys) return s.loading;
+      const pose = carPose(s.phys, s.car);
+      return `speed ${Math.max(0, pose.speed).toFixed(1)} m/s  checkpoints ${s.tracker.hit}  laps ${s.tracker.laps}${s.lapTime ? "  first lap " + s.lapTime.toFixed(1) + " s" : ""}  ${(s.ticks * CAR.dt).toFixed(1)} s simulated  fingerprint ${(s.hash >>> 0).toString(16).padStart(8, "0")}  (not real time)`;
+    },
+  },
 };
 
 let scene, sceneDef, params = {}, playing = true, spin = true, spinAngle = 0;
@@ -714,6 +764,7 @@ const FORMULAS = {
   swirl:     { formula: "z = trilinear(field, position),  v += z\u00b7strength\u00b7dt", chain: ["sampled field", "trilinear", "force", "advection"] },
   diffusion: { formula: "D = k_B\u00b7T / (6\u03c0\u00b7\u03b7\u00b7r)  [Stokes\u2013Einstein],   \u03c3 = \u221a(2D\u00b7dt),   z = \u221a2\u00b7erfinv(2u\u22121)", chain: ["temperature T", "diffusion D", "Brownian step \u03c3", "measured T"] },
   aquarium:  { formula: "impulse = kick(T) \u2212 trap\u00b7x \u2212 damp\u00b7v,  box3d resolves overlaps", chain: ["temperature", "Brownian impulse", "box3d collision", "jostling cloud"] },
+  race:      { formula: "drive = drive\u2080 \u2212 turn\u00b7|turn\u2081\u2082| \u2212 speedGain\u00b7v/20;  a lap on a track the score never saw is the key", chain: ["speed gain", "hand policy", "box3d car", "lap on the held-out track"] },
   centrifuge:{ formula: "s = 2a\u00b2(\u03c1_p\u2212\u03c1_f)/9\u03b7  [Svedberg],   dr/dt = s\u00b7\u03c9\u00b2\u00b7r", chain: ["spin \u03c9", "centrifugal force", "Stokes drag", "sedimentation by s"] },
   gyroscope: { formula: "dL/dt = \u03c4 = \u2212mg\u2113(\u00e2 \u00d7 \u1e91),   \u03a9 = mg\u2113/|L|", chain: ["spin |L|", "gravity torque", "dL/dt \u22a5 axis", "precession"] },
   "pendulum-wave": { formula: "T_n = cycle/(k+n),   \u03b8_n\u2033 = \u2212\u03c9_n\u00b2\u03b8_n  (exact rotation)", chain: ["tuned lengths", "staggered periods", "travelling wave", "re-sync each cycle"] },

@@ -198,6 +198,11 @@ export const MEASURED_RUNS = Object.freeze({
         observedHere: true, at: "v4526",
         runs: Object.freeze([{ ms: 68119, code: 0 }, { ms: 66765, code: 0 }, { ms: 66201, code: 0 }]),
     }),
+    // Run here at v4527, three alone, `date +%s%3N` around the process, exit status captured per run.
+    "tools/ship/raceKnob-selfcheck.mjs": Object.freeze({
+        observedHere: true, at: "v4527",
+        runs: Object.freeze([{ ms: 35135, code: 0 }, { ms: 34781, code: 0 }, { ms: 34472, code: 0 }]),
+    }),
 });
 
 /**
@@ -290,6 +295,10 @@ export const MEASURED = {
     // two attempts, the races and one browser on both backends. Over the quick sweep's 20 s kill by construction (the sweep recorded
     // it at 20,021 ms with a 124, which says nothing). THREE RUNS ALONE, ALL EXIT 0, the rows in MEASURED_RUNS.
     "tools/ship/drivePolicy-selfcheck.mjs": slowestRun("tools/ship/drivePolicy-selfcheck.mjs"),
+    // *** v4527 -- MEASURED AT BIRTH. *** tools/ship/raceKnob-selfcheck.mjs adjudicates eight drivers at 2 x 90 s of box3d each, walks
+    // the registry, records and replays a 5400-tick race, drives the bridge's route, and opens one browser for the lab scene and the
+    // replay. Over the quick sweep's 20 s kill by construction. THREE RUNS ALONE, ALL EXIT 0, the rows in MEASURED_RUNS.
+    "tools/ship/raceKnob-selfcheck.mjs": slowestRun("tools/ship/raceKnob-selfcheck.mjs"),
     // *** v4173 -- MEASURED TO COMPLETION FOR THE FIRST TIME, WHICH UNRESOLVED'S OWN HEADER INSTRUCTS. ***
     // 1140363 ms, EXIT 0, all checks passing -- 87 devices, 306 modes, every one built. It had been listed
     // as "exceeded a 150s cap at v3924" ever since, on the 309 s DEFAULT.

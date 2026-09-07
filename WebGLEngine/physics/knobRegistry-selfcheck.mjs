@@ -28,8 +28,9 @@ const all = listProposers();
     const rows = [];
     for (const inst of all) {
         const p = getProposer(inst.id);
+        if (typeof p.ready === "function") await p.ready();   // v4527: the race's adjudicator needs box3d's wasm loaded first
         const verdicts = [];
-        for (const c of p.propose()) verdicts.push({ knob: Object.values(c)[0], pass: (await p.adjudicate(c)).pass });
+        for (const c of p.propose()) verdicts.push({ knob: (c !== null && typeof c === "object") ? Object.values(c)[0] : c, pass: (await p.adjudicate(c)).pass });   // v4527: a bare-number candidate is its own label
         rows.push({ id: inst.id, verdicts, canRefuse: verdicts.some((v) => !v.pass), canPass: verdicts.some((v) => v.pass) });
     }
     const noRefuse = rows.filter((r) => !r.canRefuse), noPass = rows.filter((r) => !r.canPass);

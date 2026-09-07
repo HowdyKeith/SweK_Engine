@@ -523,10 +523,30 @@ function handle(req, res) {
                                           : "this scene has no independent measurable a knob search could be right or wrong about" }, 400);
                 const runs = [];
                 for (const id of row.proposerIds) {
+                    const p = P.getProposer(id);
+                    // v4527 -- a proposer whose adjudicator needs a wasm (the race's box3d) declares ready(); awaited
+                    // here, once, so the synchronous adjudicate() below never refuses for want of it.
+                    if (typeof p.ready === "function") await p.ready();
                     const t0 = Date.now();
                     const r = P.runProposer(id);
-                    const p = P.getProposer(id);
+                    // v4527 -- THE ACCEPTED RESULT IS STORED AS THE THING THAT WAS ACCEPTED. A proposer that supplies
+                    // replay(candidate) gets its record written beside the lab's other state (or wherever
+                    // SWEK_LAB_REPLAY_DIR points, which is how the gate keeps the tree clean), and the route
+                    // reports where and what -- the fingerprint the page can hold a playback to. Still nothing
+                    // is APPLIED: a stored log is a record, not a knob value.
+                    let replay = null;
+                    if (typeof p.replay === "function" && r.accepted !== null) {
+                        try {
+                            const rec = p.replay(r.accepted);
+                            const dir = process.env.SWEK_LAB_REPLAY_DIR || path.join(__dirname, "..", "tools", "roundhouse", "lab-replays");
+                            fs.mkdirSync(dir, { recursive: true });
+                            const file = path.join(dir, scene + ".json"), text = JSON.stringify(rec);
+                            fs.writeFileSync(file, text);
+                            replay = { stored: file, bytes: text.length, fingerprint: rec.fingerprint, ticks: rec.ticks, seed: rec.seed, seconds: rec.seconds, knob: rec.knob };
+                        } catch (e) { replay = { error: String((e && e.message) || e) }; }
+                    }
                     runs.push({
+                        replay,
                         id, tier: r.tier, knobs: p.knobs, notes: p.notes, ms: Date.now() - t0,
                         tried: r.tried, adjudicated: r.adjudicated,
                         greedy: r.best, greedyScore: r.bestScore, greedyVerdict: r.verdict,
@@ -542,6 +562,19 @@ function handle(req, res) {
                                  "never needed to adjudicate, which is not the same as a refusal." });
             } catch (e) { sendJson({ ok: false, error: String((e && e.message) || e) }, 500); }
         })();
+        return true;
+    }
+    // v4527 -- the stored replay, read back for a page to play. 404 by name when nothing has been accepted yet.
+    if (req.method === "GET" && url.startsWith("/roundhouse/lab-replay")) {
+        try {
+            const scene = new URL(req.url, "http://x").searchParams.get("scene") || "";
+            if (!/^[a-z0-9-]+$/.test(scene)) return sendJson({ ok: false, error: "bad-scene", scene }, 400), true;
+            const dir = process.env.SWEK_LAB_REPLAY_DIR || path.join(__dirname, "..", "tools", "roundhouse", "lab-replays");
+            const file = path.join(dir, scene + ".json");
+            if (!fs.existsSync(file)) return sendJson({ ok: false, error: "no-replay", scene, message: "no accepted replay is stored for this scene: run Initiate AI workers on physics-lab.html first, and the bridge stores the accepted driver's log" }, 404), true;
+            const rec = JSON.parse(fs.readFileSync(file, "utf8"));
+            sendJson({ ok: true, scene, replay: rec, note: "NOT REAL TIME: a log of inputs per tick, played back into box3d with no policy; the fingerprint is the record's own" });
+        } catch (e) { sendJson({ ok: false, error: String((e && e.message) || e) }, 500); }
         return true;
     }
     if (req.method === "GET" && url.startsWith("/instruments/list")) {

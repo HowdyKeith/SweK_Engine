@@ -147,6 +147,21 @@ export const SCENE_TRIAGE = [
       key: "normal-mode frequencies of a discrete string are 2*sin(k*pi/2N) times a constant -- an exact " +
            "sequence, and the mode knob selects which one, so a wrong knob is a wrong FREQUENCY and not a " +
            "wrong-looking picture. " + "MEASURED v3589: frequency 0.2411, 0.4786, 0.7092, 1.3262, 1.9854 for modes 1, 2, 3, 6, 12 on a 12-mass chain -- monotone, spread 8.2x, and matching 2*sqrt(w02)*sin(j*pi/2(N+1)) exactly." },
+    // v4527 -- Racing city 4: the thirteenth scene, and the first whose knob is a DRIVER rather than a solver or scene
+    // parameter. The page's race scene steps physics/raceCar.mjs's car on box3d with brain/drivePolicy.mjs's hand policy
+    // at the chosen speed gain, drawn as a schematic (the centreline, the checkpoints, the car and its trail); the
+    // adjudication is physics/raceKnob.mjs's and runs in node through the bridge, NOT in real time.
+    { scene: "race", knob: "speedGain", instrument: "drive-policy", eligible: "candidate", provenance: PROVENANCE.MEASURED, responds: "yes",
+      key: "A LAP ON A TRACK THE SCORE NEVER SAW: the score is metres in 30 s on seed 1 and the key is 90 s on seeds 2 " +
+           "and 3 -- a lap inside 80 s with at most 1% of wheel samples off the asphalt -- so a driver that memorised " +
+           "one track's corners or that takes them across the grass is refused by a track it never trained on. " +
+           "MEASURED v4527: laps on seed 2 in 39.8, 37.8, 39.3, 44.8, 56.5, 80.3 s at speedGain 0.15, 0.3, 0.5, 0.8, " +
+           "1.2, 2 and no lap at 4 and 8; off-asphalt samples on seed 3 2065, 1351, 70, 0, 0, 0 of 21,600. THE KEY " +
+           "MOVES WITH THE KNOB, MONOTONE IN LAP TIME, AND REFUSES AT BOTH ENDS: 0.3 and 0.15 for the grass, 2, 4 and " +
+           "8 for the clock. 0.5 is accepted at rank 2, behind the two the score preferred.",
+      caution: "the bounds are the lab's, not the physics': 80 s and 1% name what a driver the lab wants looks like, " +
+               "and a different lap bound moves the slow-end refusal (2 laps seed 2 in 80.3 s, three tenths over). " +
+               "The key runs 2 x 90 s of box3d per candidate, about 0.7 s here; nothing on the page is real time." },
 ];
 
 export const bySceneId = () => new Map(SCENE_TRIAGE.map((r) => [r.scene, r]));

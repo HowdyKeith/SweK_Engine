@@ -106,10 +106,23 @@ console.log("\n2. the observer effect, checked to be exactly one");
         !without.records.some((r) => r.name === "PROBE_AT_V4487"),
         "sabotage D: v3453's observer effect in a file built to count the things it is an instance of. " +
         "'The number changed when I wrote it down' is a curiosity until somebody checks it changed by one");
-    ok("...and the excluded reading is the one the frozen sweep was taken against",
-        without.records.length === REC.records && without.fields === REC.fields,
-        `${without.records.length} records and ${without.fields} fields now, ` +
-        `against ${REC.records} and ${REC.fields} at v4487`);
+    // v4527 -- *** THE POPULATION THE SWEEP WAS TAKEN AGAINST IS DERIVED, NOT PINNED. *** This row compared the live
+    // census to 74 / 135 and went red the round a new version-stamped record arrived (physics/raceKnob.mjs's
+    // MEASURED_V4527), which is a count pinned to a moment -- the species this tree names most. A record whose stamp is
+    // AFTER v4487 cannot have been in a sweep taken at v4487, so the reading the sweep was taken against is the census
+    // WITHOUT those arrivals, and the arrivals are named beside it rather than counted into a number that cannot move.
+    const stampOf = (name) => { const m = /V(\d{3,4})/.exec(name); return m ? +m[1] : 0; };
+    const sweepV = +REC.at.replace(/^v/, "");
+    const arrivals = without.records.filter((r) => stampOf(r.name) > sweepV);
+    const atSweep = { records: without.records.length - arrivals.length, fields: without.fields - arrivals.reduce((a, r) => a + r.fields.length, 0) };
+    ok("...and the excluded reading, less the records stamped after the sweep, is the one the frozen sweep was taken against",
+        atSweep.records === REC.records && atSweep.fields === REC.fields,
+        `${atSweep.records} records and ${atSweep.fields} fields at or before ${REC.at} (${without.records.length} and ${without.fields} now), ` +
+        `against ${REC.records} and ${REC.fields} at v4487` +
+        (arrivals.length ? `; arrived since: ${arrivals.map((r) => r.name + " (" + r.fields.length + " fields)").join(", ")}` : ""));
+    ok("  every record stamped after the sweep is NAMED above, not folded into the count, and none carries a stamp from the future",
+        arrivals.every((r) => stampOf(r.name) <= 9999) && arrivals.every((r) => r.file.endsWith(".mjs")),
+        arrivals.length ? `${arrivals.length} arrival(s) since ${REC.at}` : "none yet");
     say(reportLines(without).join("\n  ----  "));
 }
 

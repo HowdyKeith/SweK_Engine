@@ -80,7 +80,7 @@ console.log("\n2. *** THE KNOB NAMES ARE THE PAGE'S, AND NINE OF TWELVE WERE NOT
         "says e -- typed from the LABELS. A claim about provenance is a claim like any other, and that one was " +
         "false in the same paragraph that made it.");
     ok("!! ...and this check parses the page rather than restating the table",
-        pageScenes.size === 12 && [...pageScenes.values()].every((v) => v.length > 0),
+        pageScenes.size === 13 && [...pageScenes.values()].every((v) => v.length > 0),   // v4527: 12 -> 13, the race scene (Racing city 4)
         "the scene ids and their params come out of physics-lab.html's own SCENES object. A gate holding its " +
         "own copy of the knob names would agree with the table by construction and catch nothing.");
     ok("every scene on the page has a triage row",

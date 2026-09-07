@@ -136,3 +136,6 @@ WebGLEngine/tools/ship/last-selfchecks-full.log
 # that is a decision to make on purpose for every package.json at once -- not one file at a time, and not as
 # the accidental residue of a gate run.
 WebGLEngine/ai-bridge/bun.lock
+
+# v4527 -- the lab-scene-run route stores the accepted driver's replay here at run time (see physics/raceKnob.mjs)
+WebGLEngine/tools/roundhouse/lab-replays/

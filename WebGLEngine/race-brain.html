@@ -25,7 +25,7 @@
   <div id="be">requesting a device&hellip;</div>
   <div id="sub">seed <input id="seed" type="number" value="1" min="1"> &middot; <button id="train">Train in idle time</button> <button id="stopTrain" disabled>Stop</button> &middot; <button id="race">Race</button> &middot; <button id="forget">Forget the stored brain</button>
     &middot; <a href="?webgl=1">force WebGL2</a><br>
-    <span id="tick">loading the racing kit and box3d&hellip;</span><br><span id="brain">no stored brain: the hand policy drives</span><br><span id="racing"></span> &middot; drag to orbit, wheel to dolly</div>
+    <span id="tick">loading the racing kit and box3d&hellip;</span><br><span id="brain">no stored brain: the hand policy drives</span><br><span id="racing"></span><br><button id="labReplay">Replay the lab's accepted driver</button> <span id="lab">the Physics Lab's race scene stores the driver its adjudicator accepted; this plays that log back, not real time</span> &middot; drag to orbit, wheel to dolly</div>
 </div>
 <canvas id="c"></canvas>
 <script type="module" src="/ui/originNotice.js"></script>
@@ -48,6 +48,7 @@ const $ = (id) => document.getElementById(id);
 const KEY = "swek.driveBrain.v1", FILES = ["vehicle-truck-red.glb", "vehicle-truck-green.glb", "vehicle-truck-yellow.glb", "vehicle-truck-purple.glb"];
 let device, scene = null, kit = null, physMod = null, worldFrom = null, store = null, trainer = null, training = false, fleet = "00000000";
 let phys = null, cars = [], drivers = [], trackers = [], surface = null, placements = [], packed = null, hash = 0x811c9dc5, ticks = 0, names = [];
+let replayRec = null;   // v4527: the lab's accepted driver's log, played back tick for tick with no policy
 let yaw = 0.6, pitch = 0.7, dist = 190, dragging = null, camNow = null, centre = [0, 0, 0], acc = 0, lastT = 0;
 
 const readBytes = async (p) => { const r = await fetch("/" + p); if (!r.ok) throw new Error(`${p}: HTTP ${r.status}`); return r.arrayBuffer(); };
@@ -68,8 +69,9 @@ function setupRace() {
   if (phys) phys.destroy();
   phys = worldFrom(); addBuildings(phys, rects);
   const cur = store.current(), rng = (() => { let a = 99; return () => { a = (Math.imul(a, 1664525) + 1013904223) >>> 0; return a / 4294967296; }; })();
-  const brains = cur ? [cur.weights, D.handWeights(), D.perturb(cur.weights, 0.05, rng), D.zeroWeights()] : [D.handWeights(), D.perturb(D.handWeights(), 0.05, rng), D.perturb(D.handWeights(), 0.1, rng), D.zeroWeights()];
+  let brains = cur ? [cur.weights, D.handWeights(), D.perturb(cur.weights, 0.05, rng), D.zeroWeights()] : [D.handWeights(), D.perturb(D.handWeights(), 0.05, rng), D.perturb(D.handWeights(), 0.1, rng), D.zeroWeights()];
   names = cur ? ["stored brain", "hand", "stored + noise", "zero"] : ["hand", "hand + noise 0.05", "hand + noise 0.1", "zero"];
+  if (replayRec) { brains = [Float32Array.from(replayRec.weights)]; names = [`the lab's accepted driver (speedGain ${replayRec.knob.speedGain}, replayed from its log)`]; }
   const cp = checkpoints(track)[0];
   cars = brains.map((w, i) => createCar(phys, { x: cp.x + 5 - 4 * i, z: cp.z, yaw: Math.PI / 2 }));
   drivers = brains.map((w, i) => D.policyDriver(w, surface, cars[i])); trackers = cars.map(() => lapTracker(surface));
@@ -83,10 +85,11 @@ function setupRace() {
 function stepRace() {
   if (!phys) return;
   const xf = phys.readTransforms(), vel = phys.readVelocities();
-  const inputs = cars.map((c, i) => clampInput(drivers[i](carPose(phys, c, xf, vel))));
+  const inputs = replayRec ? (replayRec.log[ticks] || cars.map(() => ({ throttle: 0, steer: 0, brake: 1 }))) : cars.map((c, i) => clampInput(drivers[i](carPose(phys, c, xf, vel))));
   const rs = stepCars(phys, cars, surface, inputs, CAR.dt);
   rs.forEach((r, i) => trackers[i].update(r.pose));
   hash = foldHash(hash, phys.stateHash()); ticks++;
+  if (replayRec && ticks === replayRec.ticks) { const fp = (hash >>> 0).toString(16).padStart(8, "0"); $("lab").textContent = `played back ${ticks} ticks: fingerprint ${fp} ${fp === replayRec.fingerprint ? "= the record's" : "DIFFERS from the record's " + replayRec.fingerprint} (offline replay ${replayRec.offline})`; }
 }
 
 function idleTrain(deadline) {
@@ -111,7 +114,21 @@ async function main() {
   } catch (e) { return fail("loading threw: " + e.message); }
   store = D.driveStore({ persist: (o) => { try { localStorage.setItem(KEY, JSON.stringify(o)); } catch {} }, restore: () => { try { const j = JSON.parse(localStorage.getItem(KEY) || "null"); return j && j.weights ? { ...j, weights: Float32Array.from(j.weights) } : null; } catch { return null; } } });
   brainLine(); setupRace();
-  $("seed").addEventListener("change", setupRace); $("race").addEventListener("click", setupRace);
+  $("seed").addEventListener("change", () => { replayRec = null; setupRace(); }); $("race").addEventListener("click", () => { replayRec = null; setupRace(); });
+  $("labReplay").addEventListener("click", async () => {
+    $("lab").textContent = "fetching the lab's accepted replay...";
+    try {
+      const r = await fetch("/roundhouse/lab-replay?scene=race", { cache: "no-store" });
+      const j = /json/.test(r.headers.get("content-type") || "") ? await r.json() : { ok: false, message: `the bridge did not answer (HTTP ${r.status}): this button needs the sidecar that serves /roundhouse/lab-replay, and a driver the lab's race scene has accepted` };
+      if (!j.ok) { $("lab").textContent = j.message || j.error || "no replay"; return; }
+      const rec = j.replay;
+      // the offline check first: the whole log back into box3d with no policy, the same fingerprint or it is not a replay
+      const t0 = performance.now(), back = D.replay(worldFrom, { seed: rec.seed, seconds: rec.seconds, fleet: rec.fleet, log: rec.log, ticks: rec.ticks });
+      rec.offline = `${back.fingerprint}${back.fingerprint === rec.fingerprint ? " = the record's" : " DIFFERS"} in ${(performance.now() - t0).toFixed(0)} ms`;
+      replayRec = rec; $("seed").value = rec.seed; setupRace();
+      $("lab").textContent = `playing back the lab's accepted driver (speedGain ${rec.knob.speedGain}, seed ${rec.seed}, ${rec.ticks} ticks, record ${rec.fingerprint}); offline replay ${rec.offline}`;
+    } catch (e) { $("lab").textContent = "replay failed: " + (e && e.message ? e.message : e); }
+  });
   $("forget").addEventListener("click", () => { try { localStorage.removeItem(KEY); } catch {} store = D.driveStore({ persist: (o) => { try { localStorage.setItem(KEY, JSON.stringify(o)); } catch {} } }); trainer = null; brainLine(); setupRace(); });
   $("train").addEventListener("click", () => {
     if (!store.current()) { const hand = D.handWeights(); store.offer({ weights: hand, score: D.evaluate(worldFrom, hand, D.HELD_OUT_SEEDS, { seconds: 45 }).score, by: "hand" }); }
