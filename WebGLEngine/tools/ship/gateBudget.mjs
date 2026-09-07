@@ -130,6 +130,12 @@ export const MEASURED = {
     // rasteriser-model key over 23,040 pixels twice. FIVE RUNS, ALL EXIT 0: 6507, 6249, 6063, 6194, 6172 ms; the
     // slowest is recorded, per the entries above.
     "tools/ship/slugDevice-selfcheck.mjs": 6507,
+    // *** v4526 -- MEASURED AT BIRTH. *** tools/ship/drivePolicy-selfcheck.mjs trains the driving policy: a (1+1)-ES of forty
+    // candidates from the hand rule and sixty from zero, every candidate a 30 s box3d episode on two seeds, then the auto-trainer's
+    // two attempts, the races and one browser on both backends. Over the quick sweep's 20 s kill by construction (the sweep recorded
+    // it at 20,021 ms with a 124, which says nothing). THREE RUNS ALONE, ALL EXIT 0: 68119, 66765, 66201 ms; the slowest is
+    // recorded, per the entries above.
+    "tools/ship/drivePolicy-selfcheck.mjs": 68119,
     // *** v4173 -- MEASURED TO COMPLETION FOR THE FIRST TIME, WHICH UNRESOLVED'S OWN HEADER INSTRUCTS. ***
     // 1140363 ms, EXIT 0, all checks passing -- 87 devices, 306 modes, every one built. It had been listed
     // as "exceeded a 150s cap at v3924" ever since, on the 309 s DEFAULT.

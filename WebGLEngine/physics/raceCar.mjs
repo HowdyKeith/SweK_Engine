@@ -153,7 +153,22 @@ export function carPose(world, car, xf = world.readTransforms(), vel = world.rea
  * per-wheel { grounded, kind, normal, long, lateral, compression }.
  */
 export function stepCar(world, car, surface, input, dt = car.spec.dt) {
-    const u = clampInput(input), spec = car.spec, pose = carPose(world, car);
+    const r = carForces(world, car, surface, input, dt);
+    world.step(dt, car.spec.substeps);
+    return r;
+}
+
+/** Several cars in one world (a race): every car's forces from the poses BEFORE the step, applied in array order, then one step. */
+export function stepCars(world, cars, surface, inputs, dt = cars[0].spec.dt) {
+    const xf = world.readTransforms(), vel = world.readVelocities();
+    const out = cars.map((car, i) => carForces(world, car, surface, inputs[i], dt, carPose(world, car, xf, vel)));
+    world.step(dt, cars[0].spec.substeps);
+    return out;
+}
+
+/** The wheel forces for one car from a pose (read here if not given), applied as impulses; the world is NOT stepped. */
+export function carForces(world, car, surface, input, dt = car.spec.dt, poseIn = null) {
+    const u = clampInput(input), spec = car.spec, pose = poseIn || carPose(world, car);
     const omega = car.steps === 0 ? [0, 0, 0] : angularVelocity(car.prevQ, pose.quat, dt);
     const up = [0, 1, 0];
     let F = [0, 0, 0], Tq = [0, 0, 0]; const info = [];
@@ -185,7 +200,6 @@ export function stepCar(world, car, surface, input, dt = car.spec.dt) {
     F = [F[0] - spec.drag * sp * pose.vel[0], F[1] - spec.drag * sp * pose.vel[1] * 0.2, F[2] - spec.drag * sp * pose.vel[2]];
     world.impulse(car.body, [F[0] * dt, F[1] * dt, F[2] * dt]);
     world.angularImpulse(car.body, [Tq[0] * dt, Tq[1] * dt, Tq[2] * dt]);
-    world.step(dt, spec.substeps);
     car.prevQ = pose.quat; car.steps++; car.last = { pose, input: u, wheels: info };
     return { pose, input: u, wheels: info };
 }

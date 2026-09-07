@@ -2946,6 +2946,25 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "pursuit driver slowed only with the steer it was using and left the grid; and on WebGPU the dynamic record's buffer was " +
                  "written from the records' cpu(), which the GPU path never calls. Sabotages red at A / B / C / D / E (the gate's header).",
     }),
+    since148: Object.freeze({
+        at: "v4526", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/drivePolicy-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green headless on the wasm and in the browser on both backends. Racing city 3: brain/drivePolicy.mjs is a 9 -> 8 -> 2 " +
+                 "relu MLP in brain/mlp.js's layer shape (forward through render/brainTsl.mjs's f32 twin) driving physics/raceCar.mjs, a " +
+                 "(1+1)-ES on metres + 200 per lap - 0.2 per off-asphalt wheel sample, blobAutoTrain's judgement (a held-out seed votes, " +
+                 "an audit seed never does, regret is a number), and race(): N policies in one box3d world in lockstep with the fleet " +
+                 "fingerprint folded into the tie-break, replayed from the input log alone. MEASURED: from the hand rule 40 candidates at " +
+                 "sigma 0.05 cut seed 1's lap from 57.6 to 30.6 s and lap the held-out seed in 31.0; from zero 60 candidates climb and " +
+                 "do not lap; 60 s of three cars in 0.7 s; the browser's 20 s race is node's fingerprint. THE CORRECTIONS: the first hand " +
+                 "rule stalled at the first corner; sigma 0.5 from a lapping policy accepted nothing; an off-track penalty of 0.05 made " +
+                 "the grass profitable; one training seed overfit (2 m on the held-out track); the gate's zero car 'never moves' hold was " +
+                 "red because the trained car shoves it coming round; blobTrainer's mulberry import carried node:url into the browser. " +
+                 "Sabotages red at A / B / C / D / E (the gate's header).",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

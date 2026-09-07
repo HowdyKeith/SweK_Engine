@@ -1392,6 +1392,41 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         and left the grid; and the WebGPU record buffer written from a cpu() the GPU path never calls. Not built: the
         wheel joints (a second car beside this one when the wasm is rebuilt), wheel spin and a slip curve, cars against
         cars (round 3).
+     3. (v4526) THE BRAIN THAT DRIVES. brain/drivePolicy.mjs is a policy in the GPU Brain's own shape: two MLP layers,
+        9 features -> 8 relu -> 2 (tanh steer, tanh drive), 98 weights, run through render/brainTsl.mjs's mlpLayerCpu --
+        the f32 twin brainKernels holds bit for bit to brain/mlp.js's WGSL -- so the same weights run on the device the
+        day a race needs them there. The features are the car's own view of the track: bias, speed / 20, signed
+        distance across the road, the heading error, the angle to a point a speed-scaled lookahead ahead, the path's
+        turn 6, 12 and 20 m on, and an off-road flag. A HAND POLICY is written into those weights (steer = heading +
+        3 x toLook, drive = 0.8 - 0.35 |turn12| - 1.2 speed, every signed input as a relu pair) and it laps seeds 1..4
+        in 56..59 s with no wheel off the asphalt. The trainer is blobTrainer's (1+1)-ES (mulberry32 restated in the
+        module, because blobTrainer imports node:url and this one runs in the browser) on metres + 200 per lap - 0.2 per
+        off-asphalt wheel sample over seeds 1 and 4; the judgement is blobAutoTrain's: a held-out seed (2) votes on the
+        ratchet, an audit seed (3) never does, and REGRET is best-audit-ever minus the held policy's audit, a number
+        from the first attempt because the held policy is audited at construction. race() puts N policies in ONE box3d
+        world in lockstep -- every input from the poses before the step, one stepCars, the state hash folded every
+        tick -- and orders them by laps, metres, then a FNV of the fleet fingerprint (machineFingerprint: a canonical
+        eight-box scene, 300 steps, 0df0f92e here) with the policy hash, and replay() reruns the input log with no
+        policies at all. race-brain.html trains in requestIdleCallback from localStorage's policy or the hand, and
+        races the stored brain, the hand, a perturbed brain and the zero policy with the trucks at their poses on both
+        backends. MEASURED (tools/ship/drivePolicy-selfcheck.mjs): forward against a float32 relu MLP written in the
+        gate; the zero policy 0.00 m in 45 s; 40 candidates from the hand at sigma 0.05 in 18.8 s, 10 accepted,
+        583 -> 1039, seed 1's lap 57.6 -> 30.6 s (two laps in 60 s), the HELD-OUT seed 2 lapped in 31.0 s (66 off-asphalt
+        samples of 14,400); from ZERO 60 candidates in 19.8 s climb monotone -0 -> 6 and travel 5 m, no lap; two
+        auto-trainer attempts of 12 in 10 s, regret 5.27; three cars for 60 s in 0.7 s: trained 752 m (first lap 30.8 s),
+        hand 389 m (58.1 s), zero 4 m -- the trained car's shove coming round, not driving -- fingerprint 38f5c837 twice
+        and again from the log alone; the tie between two still cars ordered 1 > 0 under this fleet and 0 > 1 under
+        deadbeef; in the browser the 20 s race is node's 16e78e5c in 0.26 s and the red, green and yellow trucks fill
+        53, 23 and 35 % of a 9 x 9 window at their poses on both backends. SIX CORRECTIONS of the round's own drafts:
+        the first hand rule stalled at the first corner (13 m); the ES from a lapping policy at sigma 0.5 accepted
+        nothing in forty (0.05 accepts a quarter); an off-track penalty of 0.05 let a policy earn 218 m across the
+        grass at a profit; one training seed overfit to 2 m on the held-out track; the gate's "the zero car never
+        moves" hold was red on a car that never drove, because the trained car comes round and pushes it; and the
+        browser camera at 230 m left the green truck 6 % of its window (120 m now). THE FINDING, SAID PLAINLY: the
+        trainer learns only from a lap that already happens -- from the hand it halves the lap and the gain holds on
+        a track it never saw; from zero it climbs for sixty candidates and never finds the first corner. Not built:
+        the forward pass ON the device (the twin is the CPU one), cars that see each other (no other car in the
+        features), a brain that laps from zero (the idle trainer's longer runs are unmeasured beyond section 3).
 
 ## The count that says when step 4 matters
 

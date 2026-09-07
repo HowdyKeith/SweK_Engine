@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 465,
+ "count": 466,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -2262,6 +2262,13 @@
    "t": "A boundary row is worth what the model can do with it (v3648)",
    "d": "The quadratic with the boundary row: it helps by a steady 40% and buys a constant factor, not an order. And the face midpoint is not on the wall - it sits inside by a(1-cos(pi/nt)), so the row states a true condition at a place where it is not quite true.",
    "g": "boundaries",
+   "p": 0
+  },
+  {
+   "f": "race-brain.html",
+   "t": "Race brain on the GPU",
+   "d": "Racing city 3: brain/drivePolicy.mjs is a driving policy in the GPU Brain's own shape -- two MLP layers (9 features, 8 relu, 2 outputs) run through the f32 twin of brain/mlp.js's kernel -- trained by the tree's (1+1)-ES against lap progress, a lap bonus and an off-asphalt penalty, judged the way brain/blobAutoTrain.mjs judges: a held-out track the store ratchets on, an audit track that never votes, and REGRET (the best audit ever seen less the held policy's audit) as the watchdog. Train runs attempts in the browser's idle time (requestIdleCallback) from the stored policy (localStorage) or the hand policy; Race puts the stored brain, the hand, a perturbed brain and the zero policy in ONE box3d world on the seeded grid track in lockstep -- every input from the poses before the step, one step, box3d's state hash folded into the race fingerprint every tick -- with the machine's box3d fingerprint breaking ties, the trucks drawn at their chassis poses on WebGPU or WebGL2. The HUD names the attempts, acceptances, held-out and audit scores, regret, the race order, laps and fingerprint. Not real time as a rule: the race runs at 60 Hz physics per frame, four steps a frame at most.",
+   "g": "racing",
    "p": 0
   },
   {

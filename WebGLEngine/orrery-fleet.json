@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "61af4639b046eb2358733d08bb556abb1528964c",
+ "head": "822cce6c5cb67f5cf6d5ad4eae573b3e7023ccb2",
  "bodies": {
   "box3d": [
    {
@@ -333,8 +333,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 857459,
-    "sha": "61af4639b046eb2358733d08bb556abb1528964c"
+    "bytes": 859045,
+    "sha": "822cce6c5cb67f5cf6d5ad4eae573b3e7023ccb2"
    },
    {
     "path": "tools/ship/artifactWeight.mjs",
@@ -368,14 +368,14 @@
    {
     "path": "world/kenneyKit.mjs",
     "bytes": 21884,
-    "sha": "61af4639b046eb2358733d08bb556abb1528964c"
+    "sha": "822cce6c5cb67f5cf6d5ad4eae573b3e7023ccb2"
    }
   ],
   "kenney-racing": [
    {
     "path": "world/kenneyKit.mjs",
     "bytes": 21884,
-    "sha": "61af4639b046eb2358733d08bb556abb1528964c"
+    "sha": "822cce6c5cb67f5cf6d5ad4eae573b3e7023ccb2"
    }
   ],
   "keyhunt": [
@@ -686,8 +686,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 857459,
-    "sha": "61af4639b046eb2358733d08bb556abb1528964c"
+    "bytes": 859045,
+    "sha": "822cce6c5cb67f5cf6d5ad4eae573b3e7023ccb2"
    },
    {
     "path": "shipavatar.html",
