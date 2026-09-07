@@ -128,7 +128,28 @@ export function ledgerState({ root = ROOT, eng = ENG, file = LEDGER, readMain = 
     const floor = led && led.baseline && +led.baseline.throughVersion || 0;
 
     // Versions that reached MAIN after the baseline, excluding the one being shipped right now, with no release.
-    const owed = onMain.versions.filter((v) => v > floor && v < treeN && !relN.includes(v)).sort((a, b) => b - a);
+    //
+    // *** v4461 -- A VERSION BELOW THE NEWEST PUBLISHED RELEASE IS SUPERSEDED, NOT OWED, AND COUNTING IT WAS
+    // THE THING THAT KEPT DEMANDING A BASELINE RAISE. *** `latest` was computed six lines up and never
+    // consulted here, so publishing v4460 -- which contains every line of v4452 through v4459 -- cleared
+    // exactly one name off the list and left seven, against a budget of three. The only reachable answer was
+    // the escape hatch, for the FOURTH round running, and the ritual's own text says what to do instead:
+    // "the next round that reaches for this line should fix the structure instead".
+    //
+    // The debt this file exists to measure is what the fleet CANNOT GET. A box that downloads releases/latest
+    // at v4460 is running v4459's code, and v4458's, and v4452's; no separate build for any of them will ever
+    // exist (the zip is not byte-reproducible, so one made today would carry bytes that version never had) and
+    // nobody would download one if it did. Counting them was counting version NUMBERS where the rule is about
+    // CODE IN SOMEBODY'S HANDS -- a proxy standing in for the fact, which is the defect this whole round is
+    // about, sitting in the gate that polices the round.
+    //
+    // *** AND IT IS STRICTLY TIGHTER WHERE IT MATTERS, WHICH IS WHY IT IS NOT AN ESCAPE HATCH. *** It forgives
+    // ONLY versions provably beneath a real, published, downloadable release. Publish nothing and `latest`
+    // stops moving while main does not, so the list grows without bound and the gate goes red exactly as
+    // before -- the do-nothing path is not made easier by one version. Unlike the baseline, which is a number
+    // a person types, this floor can only be raised BY PUBLISHING SOMETHING.
+    const supersededBy = Math.max(floor, latest);
+    const owed = onMain.versions.filter((v) => v > supersededBy && v < treeN && !relN.includes(v)).sort((a, b) => b - a);
 
     // *** v4453 -- A LAG BUDGET, BECAUSE THE HARD ZERO MADE A WRITE-OFF THE ONLY ANSWER. ***
     //
@@ -147,16 +168,39 @@ export function ledgerState({ root = ROOT, eng = ENG, file = LEDGER, readMain = 
     // the escape hatch would have swallowed the rule again one level up.
     const budget = led && led.lagBudget && +led.lagBudget.maxVersionsBehind;
     const budgetStated = Number.isFinite(budget) && budget >= 0;
+
+    // *** THE BUDGET BINDS ON ADDING TO MAIN, NOT ON PUBLISHING WHAT IS ALREADY THERE -- AND WITHOUT THIS IT
+    // WAS A DEADLOCK. *** v4453 put the budget in a gate that verify runs, and the publish route runs verify:
+    // `Clone -> verify` clones main and grades THAT tree, and `Publish the verified clone` refuses unless the
+    // verdict was green. So once the lag exceeded the budget, THE GATE THAT EXISTS TO FORCE A PUBLISH BLOCKED
+    // THE PUBLISH THAT WOULD CLEAR IT. Found at 7-of-3 with the fleet fourteen versions back and the one
+    // action that fixes it locked behind the complaint about it. That is the original hard ratchet's shape
+    // one level along, and it is worse: the ratchet could be answered by a write-off, this could be answered
+    // by nothing at all.
+    //
+    // The discriminator is derived, not a flag: IS THIS TREE'S VERSION ALREADY ON MAIN? A clone of main
+    // republishing v4460 adds nothing -- it is the catch-up the budget wants. A working tree bumped to v4461
+    // is about to push main one further, which is exactly what the budget bounds. Same number, same list,
+    // asked only of the party that can make the gap worse.
+    const addsToMain = !!(treeN && !onMain.versions.includes(treeN));
     return {
         tree, treeN, latest, latestTag: latest ? "v" + latest : "",
         behind: treeN && latest ? treeN - latest : null,
-        releaseCount: relN.length, shippedCount: shipped.length, floor, owed,
+        releaseCount: relN.length, shippedCount: shipped.length, floor, owed, supersededBy,
+        // Named separately from `floor` so the two cannot be confused in a report: `floor` is a declared
+        // write-off and `latest` is an observed publish. Only one of them can be raised by typing.
+        supersededByPublish: latest > floor ? latest : 0,
         mainCount: onMain.versions.length, owedSource: onMain.source, owedDegraded: onMain.degraded,
         owedDegradedWhy: onMain.why,
         budget: budgetStated ? budget : null, budgetStated,
         // An UNSTATED budget is not an infinite one. A ledger with no lagBudget fails the gate rather than
         // passing it -- the v4413 defect (a floor and no ceiling) wearing this file's clothes.
-        withinBudget: budgetStated ? owed.length <= budget : false,
+        addsToMain,
+        // NOT ASSERTED when this tree adds nothing to main -- and `budgetBinds` says so out loud, so the gate
+        // can print WHY it is not complaining rather than printing nothing. A check that quietly stops
+        // checking is the thing this file has caught three times.
+        budgetBinds: addsToMain,
+        withinBudget: !budgetStated ? false : (!addsToMain || owed.length <= budget),
         refreshedAt: led && led.refreshedAt || "",
         // The headline Keith's sentence is about: does releases/latest equal what the tree builds?
         fleetRunsWhatIsBuilt: !!(latest && treeN && latest === treeN),

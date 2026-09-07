@@ -220,10 +220,54 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "gpu/gltfDraco.js",
         "tools/ship/dracoWeld-selfcheck.mjs",
     ]),
+    // v4476 MERGE -- tools/ship/slugWgsl-selfcheck.mjs (main, v4457) reads
+    // vendor/fonts/IBMPlexSerif-Regular.ttf as its test corpus. IT IS A DEPENDANT, NOT A SCANNER: the
+    // NOT_IMPORTERS rows are files that ENUMERATE a vendor directory to assert facts about it, and this one
+    // consumes a specific font in order to grade glyph rasterisation against it. A font is data; readFileSync
+    // is how you depend on one.
     "fonts": Object.freeze([
         "ev/esShipLabels-selfcheck.mjs",
         "ev/esShipLabels.js",
+        // v4461 -- a REAL arrival, accepted rather than excluded, and the distinction is the point. It was
+        // found in the same red as tools/ship/orreryUniverse-selfcheck.mjs and got the OPPOSITE answer:
+        // that one names vendor paths while measuring the vendor tree and is now in NOT_IMPORTERS, this one
+        // reads vendor/fonts/IBMPlexSerif-Regular.ttf and parses it as the input its assertions run on. Eject
+        // vendor/fonts and this gate has nothing to test, which is precisely what a dependant is. Two arrivals
+        // in one gate's red, two different causes -- which is the argument for a ratchet frozen BY NAME:
+        // a count would have said "fonts went 3 -> 4" and left both of them indistinguishable.
+        "tools/ship/slugWgsl-selfcheck.mjs",
+        // v4477 -- THE MERGE PRODUCED THIS LINE TWICE. Both branches added slugWgsl-selfcheck to fonts in the
+        // same window and git kept both copies, so the baseline read 5 against a fleet of 4 and orreryFleet went
+        // red on a list that agreed with itself about which files it names. A ratchet frozen BY NAME catches a
+        // duplicate; a count would have read "fonts went 4 -> 5" and looked like an arrival.
         "slug-text.html",
+        // *** v4526 MERGE -- TWENTY-TWO ARRIVALS AT ONCE, AND EVERY ONE IS A READER OF vendor/fonts. *** main's v4461 rule
+        // (a font is data; readFileSync is how you depend on one) met this branch's Slug arc: every slug-* page and gate,
+        // the ASCII shape page and gate, the orrery-gpu labels and the per-draw uniforms gate parse a vendored face as the
+        // input their assertions run on. Under this branch's own scanner they were not counted; under main's they are
+        // dependants, and eject vendor/fonts and each has nothing to test -- which is precisely what a dependant is.
+        "ascii-shape.html",
+        "orrery-gpu.html",
+        "slug-curved.html",
+        "slug-device.html",
+        "slug-fire.html",
+        "slug-morph.html",
+        "slug-projective.html",
+        "slug-ticker.html",
+        "tools/ship/asciiShape-selfcheck.mjs",
+        "tools/ship/deviceUniformsPerDraw-selfcheck.mjs",
+        "tools/ship/gposKern-selfcheck.mjs",
+        "tools/ship/slugCurve-selfcheck.mjs",
+        "tools/ship/slugDevice-selfcheck.mjs",
+        "tools/ship/slugFill-selfcheck.mjs",
+        "tools/ship/slugMelt-selfcheck.mjs",
+        "tools/ship/slugMorph-selfcheck.mjs",
+        "tools/ship/slugNapalm-selfcheck.mjs",
+        "tools/ship/slugProjective-selfcheck.mjs",
+        "tools/ship/slugReupload-selfcheck.mjs",
+        "tools/ship/slugShatter-selfcheck.mjs",
+        "tools/ship/slugTicker-selfcheck.mjs",
+        "tools/ship/slugTsl-selfcheck.mjs",
     ]),
     "gifenc": Object.freeze([
         "render/gifRecorder-selfcheck.mjs",
@@ -312,6 +356,7 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "fpscontrol.html",
         "fpsmirror.html",
         "glb_viewer.html",
+        "gpu/gltfKtx2.js",
         "graph_viewer.html",
         "heerich-avatar.html",
         "krbn-avatar.html",
@@ -359,6 +404,8 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
     "three-webgpu": Object.freeze([
         "orrery-gpu.html",
         "tools/ship/brainTsl-page.js",
+        "tools/ship/carveGpu-selfcheck.mjs",
+        "tools/ship/tslIsing-selfcheck.mjs",
         "tools/ship/divineEye-selfcheck.mjs",
         "tools/ship/generatedLadder-selfcheck.mjs",
         "tools/ship/img2three-selfcheck.mjs",
@@ -368,6 +415,13 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "tools/ship/tslSource-selfcheck.mjs",
         "tsl-probe.html",
         "tsl-rig.html",
+        // v4526 MERGE -- four of this branch's gates really do `await import("/vendor/three-webgpu/three.webgpu.js")`
+        // (the Slug TSL graph, the three probe, the TSL loop bound and the widened transplant), the same shape v4472 recorded
+        // for carveGpu and tslIsing: genuine importers, recorded here as the ratchet instructs.
+        "tools/ship/slugTsl-selfcheck.mjs",
+        "tools/ship/threeProbe-selfcheck.mjs",
+        "tools/ship/tslLoopBound-selfcheck.mjs",
+        "tools/ship/tslWide-selfcheck.mjs",
     ]),
     "wasm": Object.freeze([
         "ai-bridge/wasmDemoBridge.js",

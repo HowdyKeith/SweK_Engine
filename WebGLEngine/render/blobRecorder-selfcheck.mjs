@@ -20,6 +20,7 @@
 import fs from "node:fs";
 import { createRequire } from "node:module";
 import { probeRecording, sniffContainer, sniffMp4Codec } from "./blobRecorder.js";
+import { HEADLESS_SHELL } from "../tools/ship/playwrightResolve.mjs";
 
 const require = createRequire(import.meta.url);
 let fails = 0;
@@ -66,7 +67,10 @@ const ok = (name, cond, detail) => {
 
 // ---- 3. A REAL BROWSER, OR AN HONEST SKIP -------------------------------------------------------------------------
 {
-    const SHELL = "/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell";
+    // v4484: hand-copied from tools/ship/playwrightResolve.mjs, which exists to hold this once.
+    // It named a Linux root, a Linux layout and a PINNED BUILD NUMBER, so it could never be
+    // true on the rig. Imported now, and resolved per platform.
+    const SHELL = HEADLESS_SHELL;
     let chromium = null;
     try { ({ chromium } = require("/home/claude/.npm-global/lib/node_modules/playwright/index.js")); } catch { /* absent */ }
 

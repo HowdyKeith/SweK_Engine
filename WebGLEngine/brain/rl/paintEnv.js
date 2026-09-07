@@ -65,11 +65,18 @@ export class PaintEnv {
         this.w = opts.width || 32; this.h = opts.height || 32;
         this.maxSteps = opts.maxSteps || 20;
         this.alpha = opts.alpha ?? 0.6;
+        // v4420 -- *** THE TARGET GENERATOR IS A PARAMETER, BECAUSE "HELD OUT" MEANT ONE THING AND WAS READ
+        // AS ANOTHER. *** This env's gate evaluates on twenty-four seeds it calls "held-out pictures", and
+        // every one of them is makeTarget: four flat quadrants and a disc, five flat regions. HELD-OUT SEEDS
+        // ARE NOT A HELD-OUT DISTRIBUTION -- varying the seed varies the colours and the split, and nothing
+        // else. Taking the generator as an argument is what lets a policy trained here be asked about a ramp,
+        // a rendered frame or a fire. The default IS makeTarget, so nothing that existed changes.
+        this.targetOf = typeof opts.targetOf === "function" ? opts.targetOf : makeTarget;
         this.reset(opts.seed || 1);
     }
 
     reset(seed = 1) {
-        this.target = makeTarget(this.w, this.h, seed);
+        this.target = this.targetOf(this.w, this.h, seed);
         this.canvas = blank(this.w, this.h, averageColour(this.target));
         this.pixels = this.w * this.h;
         this.diff = difference(this.target, this.canvas);

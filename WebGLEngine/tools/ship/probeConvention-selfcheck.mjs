@@ -33,7 +33,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { runWgslComputeNative, headlessGpuSkipReason } from "./headlessGpu.mjs";
 import { corpus } from "./wgslCorpus.mjs";
 
@@ -60,7 +60,7 @@ const mods = [];
     const doc = fs.readFileSync(path.join(ENG, "../docs/GPU-KERNEL-CONTRACT.md"), "utf8");
     ok("docs/GPU-KERNEL-CONTRACT.md exists and names the template and the five exports", /render\/lyapunovWgsl\.mjs/.test(doc) && /packProbeUniforms/.test(doc) && /probeCpu/.test(doc) && /keyCpu/.test(doc) && /PROBES/.test(doc) && /tol \| rel \| graded/.test(doc));
     for (const rel of PHYSICS_KERNEL_MODULES) {
-        const ns = await import(path.join(ENG, rel));
+        const ns = await import(pathToFileURL(path.join(ENG, rel)).href);   // v4526 merge: a file URL, not a raw path -- windowsImport-selfcheck's rule
         mods.push({ rel, ns });
         const P = ns.PROBES;
         const shape = Array.isArray(P) && P.length > 0 && P.every((p) => typeof p.id === "string" && typeof p.code === "function" && typeof p.pack === "function" && typeof p.key === "function" &&

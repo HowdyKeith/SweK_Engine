@@ -107,3 +107,49 @@ export const RISK_AT_V4438 = Object.freeze({
     shipped: Object.freeze({ alpha: 0.05, mu: 0.5 / 24, grid220: 0.705248, grid120: 0.554880, sampled: 0.926606 }),
     cost: Object.freeze({ sampledMs: 18, gridMs: 3456, gridN: 4800, note: "one cell, alpha 0.02, mu 0.0208" }),
 });
+
+// ---- *** THE DOOR (v3327's split: a reporting function beside the gate, so the bench can serve this) *** ---
+//
+// v4461 -- registered as an instrument at v4460 and left with nothing to render, which registryOrphans caught
+// as one of twenty modules in the mechanical remainder. It re-measures RISK_AT_V4438 LIVE rather than printing
+// it, because a frozen record beside a live measurement is the only arrangement where drift is visible.
+
+export function reportLines() {
+    const L = [];
+    L.push("[albedoEstimator] the grid against the sampler, at the rows the tree's own tables build");
+    L.push("");
+    const R = RISK_AT_V4438, mu = R.tableFirstMu;
+    L.push("  mu = " + mu.toFixed(4) + " (buildTable's first row at K = 24 -- the most oblique angle there is)");
+    L.push("  flagged when alpha < " + NARROW_ALPHA + " AND cos > " + OBLIQUE_COS + " is false; material at rel error >= " +
+           R.materialThreshold);
+    L.push("");
+    L.push("   alpha      grid       sampled    rel error   rule    material");
+    const flags = [], material = [];
+    for (const alpha of R.gateAlphas) {
+        const grid = trustworthy(alpha, mu, { force: "grid", N: 220, M: 220 }).value;
+        const samp = trustworthy(alpha, mu, { force: "sampled", n: 60000, seed: 1 }).value;
+        const rel = samp > 0 ? Math.abs(grid - samp) / samp : 0;
+        const flagged = gridIsUnsafe(alpha, mu), isMaterial = rel >= R.materialThreshold;
+        if (flagged) flags.push(alpha);
+        if (isMaterial) material.push(alpha);
+        L.push("   " + String(alpha).padStart(5) + "   " + grid.toFixed(6).padStart(9) + "   " +
+               samp.toFixed(6).padStart(9) + "   " + (rel * 100).toFixed(2).padStart(7) + "%   " +
+               (flagged ? "FLAG" : "  - ").padStart(5) + "   " + (isMaterial ? "YES" : " - ").padStart(6));
+    }
+    L.push("");
+    // *** THE POINT OF PRINTING BOTH LISTS IS THAT THEY DIFFER AND THAT IS THE RULE WORKING. *** A
+    // conservative rule flags more than is materially wrong; tuning the threshold until the two lists match
+    // would be fitting the rule to this measurement and calling that agreement.
+    L.push("  rule flags      " + (flags.join(", ") || "none") +
+           "        recorded at " + R.at + ": " + R.ruleFlags.join(", ") +
+           (flags.join() === R.ruleFlags.join() ? "   agrees" : "   *** MOVED ***"));
+    L.push("  materially wrong " + (material.join(", ") || "none") +
+           "             recorded at " + R.at + ": " + R.materiallyWrong.join(", ") +
+           (material.join() === R.materiallyWrong.join() ? "   agrees" : "   *** MOVED ***"));
+    L.push("  A conservative rule flagging MORE than it must is the rule working, not a miscalibration.");
+    L.push("");
+    L.push("  cost, recorded at " + R.at + ": sampled " + R.cost.sampledMs + " ms, grid " + R.cost.gridMs +
+           " ms at N = " + R.cost.gridN + " (" + R.cost.note + ")");
+    L.push("  which is why the fix is the other estimator and not a bigger grid -- a converged grid cannot ship.");
+    return L;
+}

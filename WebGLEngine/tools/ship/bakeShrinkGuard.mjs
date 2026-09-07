@@ -33,8 +33,27 @@
 // Gated in tools/ship/bakeShrinkGuard-selfcheck.mjs.
 
 // Every identity a bake carries: `name` and `path` strings at any depth, as a Set.
-export function identities(json) {
+/**
+ * *** v4476 -- `keyMaps` EXISTS BECAUSE THE ONE BAKE THAT ACTUALLY LOST DATA WAS INVISIBLE TO THIS FILE. ***
+ *
+ * The two bakes this guard was written for hold arrays of objects with `name` or `path` fields, so an identity
+ * is a VALUE. tools/roundhouse/device-cost-baseline.json is the other shape: `costs: { blackhole: 29509 }`,
+ * where the identity is the KEY. identities() returned an EMPTY SET for it, and an empty set loses nothing, so
+ * pointing the guard at that file unchanged would have installed a guard THAT COULD NEVER REFUSE -- the
+ * vacuity shape tools/ship/vacuity.mjs names as cause one, an empty collection under every().
+ *
+ * That is not hypothetical here. v4420 re-froze that record and captured ZERO: 484 entries and 116 sweep costs
+ * -- 4.79 hours of device measurement -- were overwritten with `{}`, in a round about comparing predicates
+ * whose message never mentions the file. The guard existed at the time and did not cover it.
+ *
+ * `keyMaps` names the properties whose KEYS are identities. Absent, behaviour is exactly as before.
+ */
+export function identities(json, { keyMaps = [] } = {}) {
     const out = new Set();
+    for (const m of keyMaps) {
+        const v = json && json[m];
+        if (v && typeof v === "object" && !Array.isArray(v)) for (const k of Object.keys(v)) out.add(m + ":" + k);
+    }
     const walk = (v) => {
         if (Array.isArray(v)) { for (const x of v) walk(x); return; }
         if (!v || typeof v !== "object") return;
@@ -53,7 +72,7 @@ export function identities(json) {
  */
 export function shrinkRefusal(before, after, opts = {}) {
     if (before == null) return null;
-    const had = identities(before), has = identities(after);
+    const had = identities(before, opts), has = identities(after, opts);
     const missing = [...had].filter((k) => !has.has(k));
     if (!missing.length) return null;
     const show = missing.slice(0, opts.show || 6).map((m) => m.replace(/^(name|path):/, ""));
@@ -68,10 +87,12 @@ export function shrinkRefusal(before, after, opts = {}) {
  * The write-path helper both bakers use. Returns { ok, refusal } and prints the refusal or the override.
  * `argv` is the process argv; the override is --allow-shrink.
  */
-export function guardWrite(beforeText, afterJson, argv = [], log = console.log) {
+export function guardWrite(beforeText, afterJson, argv = [], log = console.log, opts = {}) {
     let before = null;
     if (beforeText) { try { before = JSON.parse(beforeText); } catch { before = null; } }
-    const refusal = shrinkRefusal(before, afterJson);
+    // opts reaches shrinkRefusal so a caller whose identities are map KEYS can say so. Without this the
+    // parameter would be accepted and dropped, which is a guard that looks configured and is not.
+    const refusal = shrinkRefusal(before, afterJson, opts);
     if (!refusal) return { ok: true, refusal: null };
     if (argv.includes("--allow-shrink")) {
         log("  [bakeShrinkGuard] OVERRIDDEN with --allow-shrink: " + refusal);

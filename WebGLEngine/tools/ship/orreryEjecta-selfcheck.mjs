@@ -212,9 +212,29 @@ console.log("\n3. *** THE CITATION COUNT IS REFUSED, and the refusal is measured
 // =============================================================================================================
 console.log("\n4. *** THE SCANNER READS ONE DIRECTORY, AND THERE ARE TWO ***");
 {
-    const dirs = E.vendorDirs(ROOT, (d) => fs.readdirSync(d, { withFileTypes: true }), path.join);
-    ok("*** there are TWO directories named vendor and the orrery's scanner reads one ***",
-        dirs.length === 2 && dirs.includes("vendor") && dirs.includes("ui/vendor"), dirs.join(" and "));
+    // *** v4461: THE SECOND COPY OF THIS CHECK, AND IT HAD THE SAME DEFECT AS THE FIRST. ***
+    // tools/ship/copiedOutsideVendor-selfcheck.mjs asks the same question and counted directory ENTRIES; a
+    // stray EMPTY ai-bridge/vendor/ (untracked -- git cannot track an empty directory, so it exists in a
+    // working checkout and in no fresh clone) made both read three. The finding is "vendored CODE sits where
+    // the orrery's scanner does not look", and a directory holding nothing holds no code. `vendorDirs` stays
+    // an honest census of NAMES -- it is browser-safe and takes its readdir injected -- so the content filter
+    // lives here, in the gate, where the fs already is. Both copies print every candidate with its file count,
+    // so an empty one is visibly empty rather than silently dropped.
+    const allDirs = E.vendorDirs(ROOT, (d) => fs.readdirSync(d, { withFileTypes: true }), path.join);
+    const nFiles = (rel) => {
+        let n = 0;
+        (function w(d) {
+            for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+                if (e.isDirectory()) w(path.join(d, e.name)); else n++;
+            }
+        })(path.join(ROOT, rel));
+        return n;
+    };
+    const counts = new Map(allDirs.map((rel) => [rel, nFiles(rel)]));
+    const dirs = allDirs.filter((rel) => counts.get(rel) > 0);
+    ok("*** there are TWO directories named vendor THAT HOLD ANYTHING, and the orrery's scanner reads one ***",
+        dirs.length === 2 && dirs.includes("vendor") && dirs.includes("ui/vendor"),
+        allDirs.map((rel) => rel + " (" + counts.get(rel) + " files)").join(" and "));
     const scan = fs.readFileSync(path.join(ROOT, "tools/ship/orreryScan.mjs"), "utf8");
     ok("  orreryScan.mjs hardcodes path.join(engineRoot, \"vendor\")",
         /path\.join\(engineRoot, "vendor"\)/.test(scan),
@@ -288,3 +308,16 @@ console.log("unchecked here: WHETHER EJECTA IS THE RIGHT MASS. This counts files
     "and asserted, and orrery.json is still baked from total bytes -- rebaking it is a separate decision " +
     "because every recorded figure that cites a planet's size would move at once.");
 process.exit(fails ? 1 : 0);
+
+// =============================================================================================================
+// SABOTAGE LOG -- v4461, section 4 after the same repair as copiedOutsideVendor-selfcheck's. Exit codes.
+//
+//   D  a third vendor directory (ai-bridge/vendor/) given ONE file.
+//      -> exit 1 here AND exit 1 in copiedOutsideVendor-selfcheck. TWO COPIES OF ONE QUESTION, BOTH FIXED IN
+//      THE SAME ROUND AND BOTH SABOTAGED, because the v4410 note eight lines up says a second copy of an
+//      exclusion is a second chance to disagree -- and these two had been agreeing on the WRONG answer.
+//
+//   Clean tree: exit 0. The defect that produced this repair was an EMPTY untracked ai-bridge/vendor/ dated
+//   Aug 17: git cannot track an empty directory, so it exists in a working checkout and in no fresh clone,
+//   and both gates read three where the tree holds two. A check whose verdict depends on litter in one
+//   person's checkout is measuring the checkout.

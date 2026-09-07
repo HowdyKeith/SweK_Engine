@@ -25,8 +25,20 @@ export const TRI_VS_WGSL = `struct VSOut { @builtin(position) pos: vec4f, @locat
   var p = array<vec2f, 3>(vec2f(-1.0, -1.0), vec2f(3.0, -1.0), vec2f(-1.0, 3.0));
   var o: VSOut; o.pos = vec4f(p[vi], 0.0, 1.0); o.uv = vec2f((p[vi].x + 1.0) * 0.5, 1.0 - (p[vi].y + 1.0) * 0.5); return o;
 }`;
-const WGSL_TYPES = { "f32": "f32", "vec2<f32>": "vec2", "vec3<f32>": "vec3", "vec4<f32>": "vec4", "mat4x4<f32>": "mat4", "i32": "i32", "u32": "u32" };
-const GLSL_TYPES = { "float": "f32", "vec2": "vec2", "vec3": "vec3", "vec4": "vec4", "mat4": "mat4", "int": "i32", "uint": "u32" };
+// *** v4402 -- THE VOCABULARY WAS FLOAT-ONLY, AND A PURE-INTEGER KERNEL CANNOT BE TRANSPLANTED THROUGH IT. ***
+// Every uniform in this arc had been a float or a float vector, so nothing noticed that i32 and u32 were here as
+// SCALARS while their vectors were not. tools/roundhouse/isingGpu.mjs's Philox pass carries its seed and key in a
+// vec4<u32> and was refused by name -- "uniform cfg has type vec4<u32>, which the device's uniform list does not
+// carry" -- which is the guard working, and then the vocabulary is what has to grow. The reverse lookup below maps
+// the short name back to the WGSL type, so the short names must stay distinct; ivec/uvec are three's own names for
+// these and are what its GLSL builder emits.
+const WGSL_TYPES = { "f32": "f32", "vec2<f32>": "vec2", "vec3<f32>": "vec3", "vec4<f32>": "vec4", "mat4x4<f32>": "mat4",
+                     "i32": "i32", "u32": "u32",
+                     "vec2<i32>": "ivec2", "vec3<i32>": "ivec3", "vec4<i32>": "ivec4",
+                     "vec2<u32>": "uvec2", "vec3<u32>": "uvec3", "vec4<u32>": "uvec4" };
+const GLSL_TYPES = { "float": "f32", "vec2": "vec2", "vec3": "vec3", "vec4": "vec4", "mat4": "mat4", "int": "i32", "uint": "u32",
+                     "ivec2": "ivec2", "ivec3": "ivec3", "ivec4": "ivec4",
+                     "uvec2": "uvec2", "uvec3": "uvec3", "uvec4": "uvec4" };
 // v4325 -- the names a shell has for what three calls positionLocal, normalLocal, position and normal. A shell that
 // carries no normal (the sprite layout has p, color, uv and nothing else) simply leaves those out, and a displacement
 // that reads one is refused BY NAME rather than renamed into a variable the shell's vertex stage never declared.
@@ -438,7 +450,16 @@ export function transplantCompute(wgsl, shell) {
     const found = [...wgsl.matchAll(/var<storage,\s*read(?:_write)?>\s*(\w+)\s*:/g)].map((m) => m[1]);
     if (found.length !== shell.storage.length) throw new Error(`tslSource: the graph touches ${found.length} storage buffer(s) and the shell "${shell.name}" names ${shell.storage.length} (${shell.storage.map((b) => b.name).join(", ") || "none"})`);
     // v4336 -- BY ROLE, NOT BY ORDER: a generated buffer the body assigns to is a written one, the rest are read.
-    const written = found.filter((g) => new RegExp(`\\b${g}\\.value\\[[^\\]]*\\]\\s*=`).test(wgsl) || new RegExp(`atomic\\w+\\(\\s*&${g}\\.value\\[`).test(wgsl));
+    // *** v4372 -- AND FOR THIRTY-SIX ROUNDS IT READ `==` AS AN ASSIGNMENT. *** The pattern ended in `\]\s*=`, so
+    // a body that COMPARES a storage read -- `if ( masks.value[ p ] == 0u )` -- matched on the first `=` of the
+    // `==` and the buffer was classified as WRITTEN. render/carveTsl.mjs is the first pass in this arc to test a
+    // buffer's value inline instead of binding it to a var first, and it was refused by name: "the pass writes
+    // masks and the shell declares it read". NOTHING EVER SHIPPED WRONG FROM THIS -- it refuses, loudly, rather
+    // than mis-declaring a binding -- but it is the species versionPreflight's header names: a guard that fires
+    // on legitimate work, which is the kind people learn to route around. `=(?!=)` is the whole fix, and the
+    // optional [-+*/] catches a compound assignment the old pattern also missed. `>=`, `<=` and `!=` were never
+    // at risk: their operator sits between the `]` and the `=`, where the old pattern allowed only whitespace.
+    const written = found.filter((g) => new RegExp(`\\b${g}\\.value\\[[^\\]]*\\]\\s*[-+*/]?=(?!=)`).test(wgsl) || new RegExp(`atomic\\w+\\(\\s*&${g}\\.value\\[`).test(wgsl));
     const readOnly = found.filter((g) => !written.includes(g));
     const wantW = shell.storage.filter((b) => b.access !== "read"), wantR = shell.storage.filter((b) => b.access === "read");
     // v4363 -- BY NAME WHERE THE GRAPH GIVES ONE. A TSL storage node that was .label()ed is emitted under that label

@@ -397,6 +397,131 @@ export const RED_AT_V4408 = Object.freeze(RED_AT_V4408_GATES.map((gate) => Objec
 // filing the repair there inflated registerAtSweep() by one and took three arithmetic rows in
 // gateSweep-selfcheck red within the minute. A list is a claim about an instant, and a repair to a different
 // instant needs a different list -- which is the same rule RED_AT_V4408 was created under one round ago.
+// ================================================================================================
+// v4424 -- THREE MORE, OUT OF THE SAME BUCKET, FOUND BY MEASURING ALL SIXTY-THREE
+// ================================================================================================
+//
+// *** UNCONFIRMED_SLOW WAS NOT ONLY HIDING SUCCESSES. *** All 63 were run one at a time at a 180 s cap
+// (tools/ship/slowCensus.mjs holds the protocol and every verdict): 39 GREEN, 21 still unfinished, THREE RED.
+// They had been red and exempt from the ship gate for a hundred and forty-five rounds, because
+// quickSweep.redRegister() waves the whole bucket through on the grounds that nobody measured it.
+//
+// *** AND THE FIRST FORTY-THREE MEASURED WERE ALL GREEN, WHICH IS WHY THIS IS A RED SET AND NOT A REASSURANCE.
+// *** Partway through, the honest summary was "zero red -- the bucket has been hiding successes". Finishing the
+// measurement refuted it: an unmeasured gate is not a green one, however many of its neighbours turn out green.
+// Same shape as referenceKind at v4279, one bucket later.
+//
+// Written in v4430's idiom: THE NAMES ARE THE CLAIM and the reading comes from the audit run. The lines below
+// are what each gate printed on the v4424 serial run, kept in UNVERIFIED_LINE until the audit reaches them --
+// these three are over the audit's own budget, which is the reason they were unmeasured in the first place.
+export const RED_AT_V4424_GATES = Object.freeze([
+    "tools/ship/doorKinds-selfcheck.mjs",
+    "tools/ship/graveyard-selfcheck.mjs",
+    "tools/ship/orphanDisposition-selfcheck.mjs",
+]);
+
+const WHY_V4424 = Object.freeze({
+    "tools/ship/doorKinds-selfcheck.mjs":
+        "a partition over gate-only modules with three members in no part. NOT a timing failure: it exits 1 in " +
+        "151 s alone on an idle box, and would exit 1 at any cap that let it finish.",
+    "tools/ship/graveyard-selfcheck.mjs":
+        "*** A RATCHET THIS SESSION HAS BEEN BREAKING WHILE SHIPPING ALL GREEN OVER IT. *** Baseline 93 set at " +
+        "v4153; the count is 145. Twenty-seven of those were first committed in September, SIXTEEN on the day " +
+        "of v4408-v4426 -- fresnelWgsl, polyBrush, paintGenerators, paintTransforms, paintFields and the five " +
+        "microfacet WGSL modules among them, every one imported only by its own gate. The instrument that " +
+        "would have said so was in this bucket.",
+    "tools/ship/orphanDisposition-selfcheck.mjs":
+        "its own section 4 is titled 'A QUESTION WHOSE ANSWER IS STRUCTURALLY GUARANTEED, DRIVEN' and it is now " +
+        "24 of 26 rather than 26 of 26 -- the guarantee has two exceptions and the gate says so. Filed, not " +
+        "repaired: which way that check should read is the owning round's call.",
+});
+
+export const RED_AT_V4424 = Object.freeze(RED_AT_V4424_GATES.map((gate) => Object.freeze({
+    gate,
+    why: WHY_V4424[gate] || null,
+    get ms() { const r = auditRow(gate); return r ? r.ms : null; },
+    get fails() { const r = auditRow(gate); return r && r.first ? r.first : (UNVERIFIED_LINE[gate] || null); },
+    get derived() { const r = auditRow(gate); return !!(r && r.first); },
+})));
+
+/**
+ * *** v4476 -- TWO DEBTS THAT WERE NEVER REGISTERED BECAUSE THEY WERE HIDDEN, NOT BECAUSE THEY WERE ACCEPTED. ***
+ *
+ * Both gates carried an over-budget time with a stale exit code of 0, so the quick sweep skipped them and read
+ * them as green. sweepCoverage named that shape at v4460 -- "a stale green over an evicting time" -- and v4476
+ * put the true numbers back: physicsReach runs in 528 ms and wgslSpec in 2,592 ms, both well inside the cap,
+ * and both RED.
+ *
+ * *** REGISTERING THESE IS NOT THE WRITE-OFF THIS TREE REFUSES ELSEWHERE, AND THE DIFFERENCE IS WORTH STATING.
+ * *** gateSweep.SWEEP_V4297's rule is that a REGRESSION is a thing to repair and registering it would make its
+ * red acceptable again. Neither of these is a regression: both were measured, diagnosed and written down as
+ * OWED at v4472, in budgetExile, with the reason each is a round rather than a line. What changed at v4476 is
+ * only that they are now VISIBLE. A debt on the register is worse-looking and better than a debt behind a
+ * stale green, and the alternative -- leaving the evicting time in place -- is the concealment this round
+ * exists to end.
+ *
+ * WHAT WOULD CLEAR THEM is recorded with each, and neither is a number anybody may raise.
+ */
+export const RED_AT_V4476_GATES = Object.freeze([
+    // *** physicsReach-selfcheck.mjs LEFT THIS REGISTER AT v4484, MEASURED GREEN AND NOT ARGUED GREEN. ***
+    // It was registered for 49 of 151 graded physics modules reaching no door against a baseline of 35.
+    // Item B built the doors; the register was never updated, and registerDrift-selfcheck names exactly this
+    // -- "a red that has been repaired and left on the list is a check nobody is getting the benefit of".
+    // The audit row that proves it is a real run: exit 0 at 643 ms. Its `why` is kept below, struck through
+    // by this note rather than deleted, because the reason a debt existed outlives the debt.
+    "tools/ship/wgslSpec-selfcheck.mjs",
+]);
+
+const WHY_V4476 = Object.freeze({
+    "tools/ship/physicsReach-selfcheck.mjs":
+        "49 of 151 graded physics modules are named by no roundhouse device, no instruments row and no page, " +
+        "against a baseline of 35. NOT a timing failure -- it finishes in 528 ms. Seven of the unreachable are " +
+        "this arc's own WGSL modules under physics/render/, and being in the WGSL corpus is not a door. " +
+        "CLEARED BY building a door for them, which is a round; NOT by moving the baseline to 49, which " +
+        "budgetExile already refused at v4425 as 'the record of having given up'. *** AND IT GREW WHILE OWED: " +
+        "36 of 136 at v4425, 49 of 151 now, which no two-state OWED field could have shown.",
+    "tools/ship/wgslSpec-selfcheck.mjs":
+        "across 4,407 files requiredLimits appears 5 times, so every device in this tree runs at the defaults " +
+        "and a 1024-wide workgroup cannot be created here. Finishes in 2,592 ms. CLEARED BY asking for the " +
+        "limits at device creation, which changes what every device in the tree requests and is an engine " +
+        "decision rather than a line. *** IT ALSO BROKE AN INSTRUMENT ONCE: it prints its verdict on STDERR " +
+        "and nothing on stdout, so v4424's runner counted zero checks and called a RED a CRASH.",
+});
+
+export const RED_AT_V4476 = Object.freeze(RED_AT_V4476_GATES.map((gate) => Object.freeze({
+    gate,
+    why: WHY_V4476[gate] || null,
+    get ms() { const r = auditRow(gate); return r ? r.ms : null; },
+    get fails() { const r = auditRow(gate); return r && r.first ? r.first : (UNVERIFIED_LINE[gate] || null); },
+    get derived() { const r = auditRow(gate); return !!(r && r.first); },
+})));
+
+export const RED_AT_V4484_GATES = Object.freeze([
+    "ui/stageInfo-selfcheck.mjs",
+]);
+
+const WHY_V4484 = Object.freeze({
+    "ui/stageInfo-selfcheck.mjs":
+        "*** REVEALED BY v4484, NOT CAUSED BY IT. *** This gate hand-copied a playwright path -- " +
+        "/home/claude/.npm-global/lib/node_modules/playwright/index.js -- which does not exist on this box, " +
+        "while tools/ship/playwrightResolve.mjs's list has held the path that DOES resolve here all along. " +
+        "So its live browser section has been skipping silently, and the gate read green on 29 checks it " +
+        "could run and one it could not. v4484 makes it import the resolver; the live section runs; and the " +
+        "check it was skipping FAILS: server.html's panel box measures offsetWidth 460 at a 1280 viewport " +
+        "AND at 1920, so it does not grow with the window. That is KEITH'S THIRD ASK, recorded in the gate " +
+        "as satisfied and never once measured. CLEARED BY making the panel responsive in server.html, which " +
+        "is a layout change to a shipped page and a round of its own -- NOT by re-skipping the section, " +
+        "which is how it came to be green in the first place.",
+});
+
+export const RED_AT_V4484 = Object.freeze(RED_AT_V4484_GATES.map((gate) => Object.freeze({
+    gate,
+    why: WHY_V4484[gate] || null,
+    get ms() { const r = auditRow(gate); return r ? r.ms : null; },
+    get fails() { const r = auditRow(gate); return r && r.first ? r.first : (UNVERIFIED_LINE[gate] || null); },
+    get derived() { return !!(auditRow(gate) && auditRow(gate).first); },
+})));
+
 export const FIXED_SINCE_V4408 = Object.freeze([
     { gate: "tools/ship/orreryEjecta-selfcheck.mjs", round: "v4410",
       why: "REGISTERED AT v4408 AND REPAIRED BY RE-DERIVING, NOT BY RAISING A NUMBER. It compared the fleet " +

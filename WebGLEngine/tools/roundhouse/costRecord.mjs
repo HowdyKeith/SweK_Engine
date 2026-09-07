@@ -73,6 +73,7 @@ import { hostScale } from "../ship/hostScale.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { guardWrite } from "../ship/bakeShrinkGuard.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const COST_BASELINE = path.join(HERE, "device-cost-baseline.json");
@@ -134,7 +135,7 @@ export function scaledCostFor(device, mode, rec = null, scale = null) {
  * selfcheck's rule). This file's own convention is SWEK_FREEZE_DEVICE_COST=1, checked in
  * corroborationCensus-selfcheck.mjs beside the sweep that already produces the numbers to freeze.
  */
-export function writeCostRecord(pairs, { file = COST_BASELINE, note = "" } = {}) {
+export function writeCostRecord(pairs, { file = COST_BASELINE, note = "", argv = process.argv, log = console.log } = {}) {
     const costs = {};
     for (const p of pairs) {
         if (!p || typeof p.ms !== "number" || !Number.isFinite(p.ms)) continue;
@@ -146,6 +147,16 @@ export function writeCostRecord(pairs, { file = COST_BASELINE, note = "" } = {})
         entries: Object.keys(costs).length,
         costs,
     };
+    // *** v4476 -- GUARDED, BECAUSE THIS IS THE BAKE THAT ACTUALLY LOST DATA. *** v4420 re-froze this record
+    // and captured ZERO: 484 entries and 116 sweep costs, 4.79 hours of device measurement, overwritten with
+    // `{}` by a round about comparing predicates whose message never mentions this file. The stamps moved, so
+    // it was a re-freeze rather than a deletion -- A FREEZE THAT MEASURED NOTHING AND WROTE IT DOWN ANYWAY.
+    // bakeShrinkGuard existed and covered orrery.json and orrery-fleet.json; it did not cover this. The keys
+    // of these three maps are the identities, which is why guardWrite is given keyMaps -- without it the guard
+    // reads an empty identity set and can never refuse.
+    const beforeText = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : null;
+    const KEY_MAPS = { keyMaps: ["costs", "sweepCosts", "sweepAtLeast"] };
+    if (!guardWrite(beforeText, body, argv, log, KEY_MAPS).ok) return null;
     fs.writeFileSync(file, JSON.stringify(body, null, 1));
     return body;
 }
@@ -270,7 +281,7 @@ export function sweepBudgetOr(devices, floorMs, opts = {}) {
  * `atLeast` marks a device that did NOT complete inside the budget it was given: its true cost is unknown and
  * above this figure, which is a bound and must never be read as a measurement.
  */
-export function writeSweepCosts(entries, { file = COST_BASELINE } = {}) {
+export function writeSweepCosts(entries, { file = COST_BASELINE, argv = process.argv, log = console.log } = {}) {
     const rec = readCostRecord(file);
     rec.sweepCosts = rec.sweepCosts || {};
     rec.sweepAtLeast = rec.sweepAtLeast || {};
@@ -280,6 +291,16 @@ export function writeSweepCosts(entries, { file = COST_BASELINE } = {}) {
         else { rec.sweepAtLeast[e.device] = e.ms; delete rec.sweepCosts[e.device]; }
     }
     rec.sweepFrozenOn = new Date().toISOString();
+    // *** v4476 -- GUARDED, BECAUSE THIS IS THE BAKE THAT ACTUALLY LOST DATA. *** v4420 re-froze this record
+    // and captured ZERO: 484 entries and 116 sweep costs, 4.79 hours of device measurement, overwritten with
+    // `{}` by a round about comparing predicates whose message never mentions this file. The stamps moved, so
+    // it was a re-freeze rather than a deletion -- A FREEZE THAT MEASURED NOTHING AND WROTE IT DOWN ANYWAY.
+    // bakeShrinkGuard existed and covered orrery.json and orrery-fleet.json; it did not cover this. The keys
+    // of these three maps are the identities, which is why guardWrite is given keyMaps -- without it the guard
+    // reads an empty identity set and can never refuse.
+    const beforeText = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : null;
+    const KEY_MAPS = { keyMaps: ["costs", "sweepCosts", "sweepAtLeast"] };
+    if (!guardWrite(beforeText, rec, argv, log, KEY_MAPS).ok) return null;
     fs.writeFileSync(file, JSON.stringify(rec, null, 1));
     return rec;
 }

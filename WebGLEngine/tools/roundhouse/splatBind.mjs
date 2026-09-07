@@ -54,6 +54,14 @@ const DEF = { z: 5, f: 800, sigma: 0.1, gridN: 256, alpha: 0.3, count: 7, offAxi
 // is about the list having one home, not about changing what an unknown mode does.
 export const SPLAT_MODES = ["integral", "perspective", "compose", "shear", "precision", "detnotsqrt"];
 
+// v4477 -- THE THREE ROLL ANGLES ARE EXPORTED BECAUSE A CONTROL HAS TO READ THEM, NOT RETYPE THEM.
+// isoRollDeviation is the zero-range sweep's replacement positive control, and whether it reads exactly zero
+// depends on THESE ANGLES as much as on sigma: the deviation vanishes by construction only where
+// fl(cos^2 t + sin^2 t) === 1, which is true for all three of these and false for roughly one angle in six.
+// A control that hardcoded its own copy of [0.3, 1.1, 2.7] would keep predicting zero after this line changed,
+// which is the "the check and the thing under test are different objects" shape -- so there is one home.
+export const ISO_ROLL_ANGLES = [0.3, 1.1, 2.7];
+
 export function splatDefaults(hyp) {
     const h = { mode: "integral", ...(hyp || {}) };
     const c = { ...DEF, ...(h.config || {}) };
@@ -169,7 +177,7 @@ export async function buildSplat(hyp, base = {}) {
     const num = rasteriseIntegral(S2, { n: c.gridN, radius: 8 });
     const base2 = projectCovariance(iso, I3, [0, 0, c.z], c.f);
     let roll = 0;
-    for (const th of [0.3, 1.1, 2.7]) {
+    for (const th of ISO_ROLL_ANGLES) {
         const S = projectCovariance(iso, rotZ(th), [0, 0, c.z], c.f);
         roll = Math.max(roll, Math.abs(S.xx - base2.xx), Math.abs(S.yy - base2.yy), Math.abs(S.xy - base2.xy));
     }

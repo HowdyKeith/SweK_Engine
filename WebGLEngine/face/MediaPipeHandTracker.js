@@ -28,7 +28,25 @@ const DEFAULT_OPTS = {
     videoHeight: 480,
     targetHz:    30,        // detection throttle
     numHands:    2,         // 2 enables two-hand zoom/rotate gestures
-    pinchThreshold: 0.06,   // 3D thumb-tip↔index-tip distance for a pinch
+    // v4485 -- PINCH IS A FRACTION OF THE HAND NOW, NOT A CONSTANT. v3850 measured what the constant cost and
+    // declined to change it (v3679: a round must not move a verdict it is not about), recording the numbers so
+    // the call could be made: pinch.distance is homogeneous of degree 1 in apparent hand size, so an ABSOLUTE
+    // threshold has a critical scale s* = pinchThreshold/d(1) -- and A CLOSED FIST CROSSED IT AT 0.63x, reading
+    // as a pinch purely for being far from the camera. Keith called it. The fold family never had this problem
+    // because it is a RATIO test; this makes pinch one too.
+    pinchThreshold: 0.06,   // ABSOLUTE fallback: used when pinchRelative is false, or the span is unusable
+    pinchRelative: true,    // compare against pinchSpanFraction * palmSpan instead of pinchThreshold
+    // The span is dist(WRIST, MIDDLE_MCP) -- the palm, which is RIGID: it reads 0.160200 identically across
+    // open / fist / point / pinch on the device fixture, where wrist->MIDDLE_TIP collapses 0.278115 -> 0.131352
+    // on a curl. A span that shortens when you close your hand would make the pinch threshold depend on THE
+    // OTHER FINGERS, which is circular. It also excludes the thumb, one of the two points being measured.
+    // *** 0.375 IS DERIVED, NOT PICKED: it reproduces the shipped 0.06 at nominal fixture size to 0.125%
+    // (0.375 * 0.160200 = 0.060075), so this is a GENERALIZATION OF THE SHIPPED VERDICT AND NOT A RETUNE --
+    // every fixture pose classifies exactly as before at nominal, and now also at every other distance. Read
+    // anatomically it is a ~3.75cm thumb-index gap on a ~10cm palm. *** See handsBind.mjs: the fixture's palm
+    // LENGTH is anatomically close (ratio 1.483 vs ~1.389) which is what licenses this number; confirming it
+    // against real MediaPipe landmarks is NOT DONE and is named as required follow-up.
+    pinchSpanFraction: 0.375,
     minHandDetectionConfidence: 0.5,
     minHandPresenceConfidence:  0.5,
     minTrackingConfidence:      0.5,
@@ -343,6 +361,9 @@ export function computeHandMetrics(landmarksArray, result = null, opts = {}) {
     // on the same operand -- the discipline _dist3D's comment sets out, applied to an operand instead of an
     // argument count.
     const anchorOpt = opts.fixedAnchor ?? DEFAULT_OPTS.fixedAnchor;
+    // v4485 -- see DEFAULT_OPTS. `pinchRelative: false` restores the pre-v4485 absolute comparison EXACTLY.
+    const pinchRelative = opts.pinchRelative ?? DEFAULT_OPTS.pinchRelative;
+    const pinchSpanFraction = opts.pinchSpanFraction ?? DEFAULT_OPTS.pinchSpanFraction;
 
     const hands = [];
     for (let i = 0; i < landmarksArray.length && i < 2; i++) {
@@ -353,9 +374,18 @@ export function computeHandMetrics(landmarksArray, result = null, opts = {}) {
         const thumbTip = lm[IDX.THUMB_TIP];
         const indexTip = lm[IDX.INDEX_TIP];
 
-        // Pinch: 3D distance between thumb tip and index tip.
+        // Pinch: thumb-tip to index-tip, compared against a limit that SCALES WITH THE HAND (v4485).
+        // palmSpan is wrist->MIDDLE_MCP: rigid under finger curl, and thumb-free, so the reference cannot move
+        // with the gesture being measured. It goes through `dist` like everything else, so the declared defect
+        // knobs (flatDistance, manhattan) reach it too rather than it being a privileged second metric.
         const pinchDist = dist(thumbTip, indexTip);
-        const pinchActive = pinchDist < pinchThreshold;
+        const palmSpan = dist(wrist, lm[IDX.MIDDLE_MCP]);
+        // *** THE FALLBACK IS NOT DEFENSIVE PADDING, IT IS THE DEGENERATE CASE. *** A zero or non-finite span
+        // means the palm landmarks collapsed, and scaling by it would make the limit 0 so NOTHING would ever
+        // read as pinched -- silently, and hardest exactly where tracking is already worst.
+        const spanUsable = pinchRelative && Number.isFinite(palmSpan) && palmSpan > 0;
+        const pinchLimit = spanUsable ? pinchSpanFraction * palmSpan : pinchThreshold;
+        const pinchActive = pinchDist < pinchLimit;
 
         // Grab point: midpoint of thumb+index (mirrored X).
         const grabPoint = {
@@ -380,7 +410,15 @@ export function computeHandMetrics(landmarksArray, result = null, opts = {}) {
         hands.push({
             handedness,                  // raw MediaPipe label (mirror-flipped vs user; see notes)
             cursor: { x: mx(indexTip.x), y: indexTip.y },  // index-tip pointer, mirrored
-            pinch: { active: pinchActive, distance: pinchDist },
+            // v4485 -- `limit`, `span`, `ratio` and `relative` are ADDITIVE, so no existing reader breaks.
+            // `ratio` is the scale-free quantity: pinchDist expressed in palms, the number that means the same
+            // thing at any distance from the camera. `ratio < pinchSpanFraction` is exactly `active`.
+            pinch: {
+                active: pinchActive, distance: pinchDist,
+                limit: pinchLimit, span: palmSpan,
+                ratio: palmSpan > 0 ? pinchDist / palmSpan : Infinity,
+                relative: spanUsable,
+            },
             grab: { active: pinchActive, point: grabPoint },
             fist, openPalm, pointing,
             folded,

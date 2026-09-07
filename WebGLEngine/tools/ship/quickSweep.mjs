@@ -33,7 +33,7 @@ import { spawn } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { backfillStamps } from "./sweepCoverage.mjs";
 import { enumerateGates, classify, VERDICT, SWEEP_V4297, ENG } from "./gateSweep.mjs";
-import { RED_AT_V4279, RED_AT_V4408, UNCONFIRMED_SLOW } from "./redCensus.mjs";
+import { RED_AT_V4279, RED_AT_V4408, RED_AT_V4424, RED_AT_V4476, RED_AT_V4484, UNCONFIRMED_SLOW } from "./redCensus.mjs";
 
 export const DEFAULTS = Object.freeze({ budgetMs: 3000, workers: 8, capMs: 20000, timingsFile: "tools/ship/sweep-timings.json" });
 
@@ -41,7 +41,15 @@ export const DEFAULTS = Object.freeze({ budgetMs: 3000, workers: 8, capMs: 20000
 export function redRegister() {
     const reg = new Map();
     for (const e of RED_AT_V4279) reg.set(e.gate, "redCensus.RED_AT_V4279");
-    for (const e of RED_AT_V4408) reg.set(e.gate, "redCensus.RED_AT_V4408");   // v4408: reds the first rotation surfaced (named for the round that SHIPPED it -- v4407 was taken mid-verify)
+    // *** BOTH MEASURED SETS BEFORE THE BUCKET, BECAUSE A MEASURED RED OUTRANKS "NOBODY LOOKED". ***
+    // Two rounds on two branches each filed a set of reds the bucket had been hiding, and they name different
+    // gates: v4408 took the ones the first rotation surfaced, v4424 ran all 63 of UNCONFIRMED_SLOW one at a
+    // time and found three exiting 1. Neither round repaired its set -- they stay on the register, but under a
+    // reason that names the failure instead of the absence of a measurement.
+    for (const e of RED_AT_V4408) reg.set(e.gate, "redCensus.RED_AT_V4408");
+    for (const e of RED_AT_V4424) reg.set(e.gate, "redCensus.RED_AT_V4424");
+    for (const e of RED_AT_V4476) reg.set(e.gate, "redCensus.RED_AT_V4476");
+    for (const e of RED_AT_V4484) reg.set(e.gate, "redCensus.RED_AT_V4484");
     for (const g of UNCONFIRMED_SLOW) if (!reg.has(g)) reg.set(g, "redCensus.UNCONFIRMED_SLOW");
     for (const g of SWEEP_V4297.fromSlowBucket) if (!reg.has(g)) reg.set(g, "gateSweep.SWEEP_V4297.fromSlowBucket");
     for (const g of SWEEP_V4297.unmeasured) if (!reg.has(g)) reg.set(g, "gateSweep.SWEEP_V4297.unmeasured");
@@ -50,9 +58,9 @@ export function redRegister() {
     return reg;
 }
 
-/** Read a timings file: { captured, timings: { gate: ms }, codes: { gate: exitCode } }. Missing file -> empty. */
+/** Read a timings file: { captured, timings: {gate:ms}, codes: {gate:exitCode}, observed: {gate:iso|null} }. Missing -> empty. */
 export function readTimings(file = DEFAULTS.timingsFile, root = ENG) {
-    try { return JSON.parse(fs.readFileSync(path.join(root, file), "utf8")); } catch { return { captured: null, timings: {}, codes: {} }; }
+    try { return JSON.parse(fs.readFileSync(path.join(root, file), "utf8")); } catch { return { captured: null, timings: {}, codes: {}, observed: {} }; }
 }
 
 /**
@@ -148,6 +156,12 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
     // that has never had one gets UNKNOWN_AT rather than a fabricated date: an unknown age is a finding, not a
     // default. See tools/ship/sweepCoverage.mjs.
     const timings = { ...(prior.timings || {}) }, codes = { ...(prior.codes || {}) };
+    // *** v4470 MERGE -- TWO BRANCHES INVENTED THE SAME FIELD IN THE SAME WEEK, AND ONLY ONE SPELLING SURVIVES.
+    // *** v4408 called it `at` and v4425 called it `observed`, for the identical reason: a row is rewritten only
+    // when its gate RAN, so a whole-file `captured` date was being read as if it dated the rows. Two names for
+    // one fact is how a field quietly stops being found in one of the two places -- this file's own argument
+    // about ENGINE_VERSION, one level down -- so `at` is kept (it is what main ships and what backfillStamps
+    // already fills) and tools/ship/budgetExile.mjs was changed to read it.
     const at = { ...(prior.at || {}) };
     const stamp = out0.at;
     for (const r of rows) { timings[r.gate] = r.serialMs ?? r.parallelMs; codes[r.gate] = r.serialCode ?? 0; at[r.gate] = stamp; }

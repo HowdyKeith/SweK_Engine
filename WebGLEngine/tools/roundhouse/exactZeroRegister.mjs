@@ -264,7 +264,25 @@ export const EXACT_OK = {
     // The invariance is real at every sigma; whether it READS as exactly zero depends on whether sigma is dyadic.
     // Note the direction: the DEFAULT sigma of 0.1 is the one value that hides this, the opposite of the airy
     // case where the default hid a zero that appears at the clamp.
-    "splat.integral.isoRollDeviation": "isotropic covariance scaled by a dyadic sigma^2; rotation is an exact exponent shift, so the deviation is exactly zero for power-of-two sigma",
+    //
+    // *** v4477 -- THE SENTENCE ABOVE IS INCOMPLETE IN TWO WAYS, AND THIS ENTRY IS NOW THE SWEEP'S POSITIVE
+    // CONTROL, SO BOTH MATTER. *** See tools/roundhouse/zeroControl.mjs and its selfcheck.
+    //
+    //   (1) A SECOND CONDITION WAS SILENT. The exponent shift makes the camera-space (0,0) entry equal to
+    //       sigma^2 * fl(fl(cos^2 t) + fl(sin^2 t)), which is sigma^2 only when THAT sum is exactly 1. It is not
+    //       for about one angle in six. All three of the device's roll angles happen to satisfy it, which is why
+    //       nothing noticed for 1565 versions. Measured at v4477: 322 cells with a dyadic sigma and an angle
+    //       failing the unit-circle condition, and NOT ONE of them reads zero. The one-condition reading
+    //       mispredicts every one.
+    //
+    //   (2) THE "sigma 2" IN THE MEASUREMENT ABOVE IS THE sigma 1 ROW. splatDefaults clamps sigma to 1, and the
+    //       sweep recorded the value it ASKED FOR rather than the value the device used. Five distinct dyadic
+    //       sigmas were measured here, not five plus one. sweepDevice records both values as of v4477.
+    //
+    // The condition is SUFFICIENT AND NOT NECESSARY, which the original sentence also did not say: sigma 0.13 is
+    // not dyadic and reads exactly zero, because the camera-space product rounds back onto sigma^2 by
+    // coincidence. The register entry states what is derivable and the control claims only that direction.
+    "splat.integral.isoRollDeviation": "isotropic covariance scaled by a dyadic sigma^2 AND roll angles where fl(cos^2 t + sin^2 t) === 1: the scaling is an exact exponent shift and the rotation cancels, so the deviation is exactly zero. Sufficient, not necessary -- see zeroControl.mjs, which uses this as the sweep's positive control",
     // Kepler's exponent is fitted to data generated from the same power law with exactly-representable exponents.
     "discovery.kepler.exponentErr": "regression on data generated from the exact law recovers the exponent exactly",
     "discovery.visviva.coeffErr": "linear solve on an exactly-determined system",

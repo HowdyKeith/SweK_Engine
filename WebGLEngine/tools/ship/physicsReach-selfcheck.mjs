@@ -62,9 +62,21 @@ const walk = (d, o = []) => {
 //     `physics/heidler.js` out of the middle of it, then reported a ghost for a file that was never ours.
 // Measured: raw 34 unreachable and one ghost; stripped 35 unreachable and no ghosts. Stripping costs exactly
 // one module and it is a module that genuinely has no way in.
+// *** v4461 -- A GLOB IN PROSE OPENED A PHANTOM BLOCK COMMENT AND BLINDED THIS SCAN TO HALF THE FILE. ***
+//
+// The block-comment rule matched `/*` ANYWHERE, including inside a string. physics/instruments.mjs contains
+// the sentence "...\/*.js files and NOT ONE IMPORTS ANY PHYSICS MODULE..." -- a glob written in prose -- and
+// the non-greedy scan ran from there to the next `*\/` 147,036 characters later. THAT IS 45.8% OF THE FILE,
+// and 42 of its 133 gate paths were inside it. So the door could not see nearly half the instruments even
+// once it was asking the right question.
+//
+// ANCHORED TO THE LINE START, which is how this tree writes block comments and is something a mid-line glob
+// cannot do. MEASURED: 91 gate paths visible before, 130 of 133 after -- the three still hidden are inside
+// real block comments, which is correct. The same stripper feeds the roundhouse and page doors, so both were
+// losing whatever sat after a glob in those files too.
 const stripComments = (s) => s
     .replace(/<!--[\s\S]*?-->/g, "")
-    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^[ \t]*\/\*[\s\S]*?\*\//gm, "")
     .replace(/^\s*\/\/.*$/gm, "");
 const roundhouseSrc = stripComments(walk(path.join(ENG, "tools/roundhouse")).filter((p) => p.endsWith(".mjs")).map(rd).join("\n"));
 const instrumentsSrc = stripComments(rd(path.join(ENG, "physics/instruments.mjs")));
@@ -77,9 +89,32 @@ const graded = walk(path.join(ENG, "physics"))
     .map((p) => path.relative(ENG, p).replace(/\\/g, "/"))
     .sort();
 
+// *** v4461 -- THE INSTRUMENTS DOOR HAD NEVER OPENED FOR ANYTHING, AND THAT IS MEASURED. ***
+//
+// `instrumentsSrc.includes(rel)` asks whether physics/instruments.mjs names the MODULE. It never does: a row
+// names the module's GATE -- `gate: "physics/render/pathTracer-selfcheck.mjs"` -- and
+// "physics/render/pathTracer.mjs" is not a substring of that. MEASURED before this line was touched: of 144
+// graded modules, ZERO had an instruments row as their door, and instruments.mjs contains ZERO module paths
+// against 90 gate paths. So the gate's own sentence -- "named by NO roundhouse device, NO instruments row and
+// NO page" -- described a two-door test with a third that was decorative, and every module whose only way in
+// was the instruments page was counted as having no way in at all.
+//
+// THE ROW IS A REAL DOOR: instruments.html imports INSTRUMENTS and renders the rows, so a person can find the
+// module there. The fix derives the module from the gate a row already names, which is the same edge the row
+// always asserted -- nothing is added to instruments.mjs to make this true, and the direct-name form is kept
+// in the union so a row that ever does name a module still counts.
+//
+// EFFECT, MEASURED: 42 unreachable -> 37. The five it rescues -- controlMargins, controlStability,
+// knobRegistry, contactImpulse, rigidKeys -- were reachable the whole time and the count called them debt.
+// *** IT RESCUES NONE OF THE SEVEN ADDED SINCE v4438: *** those have no row, no device and no page, so they
+// are real debt and stay counted. A door that cannot open is worse than a missing one, because it makes the
+// number wrong in BOTH directions -- overstating the debt here, and understating how much of it is genuine.
+const instrumentedModules = new Set(
+    (instrumentsSrc.match(/physics\/[A-Za-z0-9/_-]+-selfcheck\.mjs/g) || []).map((g) => g.replace("-selfcheck.mjs", ".mjs")));
+
 const doorsFor = (rel) => ({
     device: roundhouseSrc.includes(rel),
-    instrument: instrumentsSrc.includes(rel),
+    instrument: instrumentsSrc.includes(rel) || instrumentedModules.has(rel),
     page: pagesSrc.includes(rel),
 });
 const unreachable = graded.filter((rel) => { const d = doorsFor(rel); return !d.device && !d.instrument && !d.page; });
@@ -90,7 +125,14 @@ console.log("1. HOW MUCH GRADED PHYSICS HAS NO DOOR AT ALL");
     // is 7 of them, leaving 35 once comment-only mentions stopped being counted as doors (see above). The number may only fall: a round that adds a graded module WITHOUT a door has to either
     // give it one or move this line, and moving it is a decision somebody makes on purpose rather than a
     // silent drift.
-    const BASELINE = 35;
+    // *** v4461 -- 35 BECOMES 7, AND THAT IS A CORRECTION RATHER THAN A CONCESSION. *** The old figure was
+    // measured through a stripComments that a glob in prose blinded to 45.8% of physics/instruments.mjs, and
+    // through an instruments door that never opened for anything. Most of the 35 was PHANTOM DEBT: modules
+    // that had a door the count could not see. With both defects fixed the true figure is 7, and leaving the
+    // line at 35 would hand this ratchet twenty-eight versions of slack -- a bound that cannot fire is the
+    // decorative door one level up. The seven that remain are real: backendLimits, crypto/secp256k1,
+    // render/pathTracerGpu, render/samplerCheck, render/transmission, sph/rigidFloat and wheelJoint.
+    const BASELINE = 7;
     ok("!! *** NO MORE THAN " + BASELINE + " GRADED PHYSICS MODULES ARE UNREACHABLE FROM EVERY DOOR ***",
         unreachable.length <= BASELINE,
         unreachable.length + " of " + graded.length + " graded modules are named by NO roundhouse device, NO " +

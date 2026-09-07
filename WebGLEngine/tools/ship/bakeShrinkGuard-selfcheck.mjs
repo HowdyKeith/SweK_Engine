@@ -24,7 +24,13 @@
 //
 // Run: node tools/ship/bakeShrinkGuard-selfcheck.mjs   (exit 0 all-pass, 1 on any fail)
 
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import os from "node:os";
 import { identities, shrinkRefusal, guardWrite } from "./bakeShrinkGuard.mjs";
+import * as CR from "../roundhouse/costRecord.mjs";
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 let pass = 0, fail = 0;
 const ok = (c, m, d) => { if (c) pass++; else { fail++; console.error("  FAIL  " + m + (d ? "   " + d : "")); } };
@@ -113,5 +119,86 @@ const ok = (c, m, d) => { if (c) pass++; else { fail++; console.error("  FAIL  "
     }
 }
 
+console.log("\n*** v4476 -- THE SHAPE THIS GUARD COULD NOT SEE, AND THE BAKE THAT LOST DATA BECAUSE OF IT ***");
+{
+    // The two bakes this file was written for hold ARRAYS OF OBJECTS with `name` or `path` fields, so an
+    // identity is a VALUE. device-cost-baseline.json is the other shape -- `costs: { blackhole: 29509 }` --
+    // where the identity is the KEY, and identities() returned an EMPTY SET for it. An empty set loses
+    // nothing, so pointing this guard at that file unchanged would have installed A GUARD THAT COULD NEVER
+    // REFUSE: vacuity.mjs's cause one, an empty collection under every().
+    const full = { costs: { "a.x": 1, "b.y": 2 }, sweepCosts: { dev: 3 }, sweepAtLeast: {} };
+    const empty = { costs: {}, sweepCosts: {}, sweepAtLeast: {} };
+    const KM = { keyMaps: ["costs", "sweepCosts", "sweepAtLeast"] };
+
+    ok(identities(full).size === 0 && shrinkRefusal(full, empty) === null,
+        "!! *** without keyMaps the guard sees NOTHING in a map-shaped bake, and would never refuse ***",
+        "identities(full) is empty and shrinkRefusal returns null -- a guard installed like this reports " +
+        "success on a write that drops every entry, which is what makes this a fixture and not a formality");
+
+    const r = shrinkRefusal(full, empty, KM);
+    ok(identities(full, KM).size === 3 && !!r && /DROP 3 of 3/.test(r) && /a\.x/.test(r),
+        "!! *** with keyMaps it sees all three and refuses, naming what would be lost ***",
+        (r || "no refusal").slice(0, 120));
+
+    ok(shrinkRefusal(full, { ...full, costs: { ...full.costs, "c.z": 9 } }, KM) === null,
+        "  and a write that loses nothing is still allowed, so the guard is not simply always-refusing",
+        "adding an entry is not a shrink -- the control that proves the refusal is discriminating");
+
+    // *** AND guardWrite IS EXERCISED WITH keyMaps, NOT JUST shrinkRefusal -- A SABOTAGE FOUND THAT GAP. ***
+    // Dropping `opts` from guardWrite's call to shrinkRefusal went 0 RED: every row above tests shrinkRefusal
+    // DIRECTLY, so the forwarding was never covered and a guardWrite that accepted keyMaps and ignored them
+    // would have looked configured while refusing nothing. The component was tested and the connection was not.
+    {
+        const quiet = () => {};
+        const gw = guardWrite(JSON.stringify(full), empty, [], quiet, KM);
+        const gwNoOpts = guardWrite(JSON.stringify(full), empty, [], quiet);
+        ok(gw.ok === false && !!gw.refusal && /DROP 3 of 3/.test(gw.refusal) && gwNoOpts.ok === true,
+            "!! *** guardWrite FORWARDS keyMaps: with them it refuses, without them it lets the same write through ***",
+            "the two calls differ only in opts and give opposite verdicts on identical data, so the parameter " +
+            "is proved to reach shrinkRefusal rather than merely being accepted");
+        ok(guardWrite(JSON.stringify(full), empty, ["--allow-shrink"], quiet, KM).ok === true,
+            "  and --allow-shrink still overrides, so the escape hatch survives the new mode",
+            "a deliberate shrink is a decision somebody makes at the command line, not one the guard forbids");
+    }
+
+    // *** AND THE WIRING INTO costRecord IS EXERCISED, WHICH ANOTHER SABOTAGE FOUND MISSING. *** Replacing
+    // costRecord's guardWrite call with `if (false)` went 0 RED too: this file tested the guard and never the
+    // caller that lost the data. The real writer is driven here against a real copy of the real record.
+    {
+        const tmp = path.join(os.tmpdir(), "costRecord-guard-" + process.pid + ".json");
+        fs.copyFileSync(path.join(ROOT, "tools/roundhouse/device-cost-baseline.json"), tmp);
+        const before = JSON.parse(fs.readFileSync(tmp, "utf8"));
+        const ret = CR.writeCostRecord([], { file: tmp, argv: [], log: () => {} });
+        const after = JSON.parse(fs.readFileSync(tmp, "utf8"));
+        ok(ret === null && after.entries === before.entries &&
+           Object.keys(after.costs).length === Object.keys(before.costs).length,
+            "!! *** writeCostRecord REFUSES an emptying write and leaves the record intact ***",
+            `${before.entries} entries before, ${after.entries} after, and the writer returned null. This is ` +
+            "the exact call shape that emptied the file at v4420, driven against a copy of the real record");
+        const grew = CR.writeCostRecord([{ device: "probe", mode: "m", ms: 1 }],
+                                        { file: tmp, argv: ["--allow-shrink"], log: () => {} });
+        ok(grew !== null && JSON.parse(fs.readFileSync(tmp, "utf8")).entries === 1,
+            "  and it still writes when told to, so the guard is a refusal and not a lock",
+            "with --allow-shrink the deliberate replacement goes through -- the control that keeps the row above honest");
+        fs.rmSync(tmp, { force: true });
+    }
+
+    // *** AND THE REAL FILE, AGAINST THE REAL WRITE THAT EMPTIED IT. *** v4420 re-froze
+    // tools/roundhouse/device-cost-baseline.json and captured zero: 484 entries and 116 sweep costs, 4.79
+    // hours of device measurement, replaced with {}. This guard existed then and did not cover that file.
+    const live = JSON.parse(fs.readFileSync(path.join(ROOT, "tools/roundhouse/device-cost-baseline.json"), "utf8"));
+    const wiped = { ...live, entries: 0, costs: {}, sweepCosts: {}, sweepAtLeast: {} };
+    const realRefusal = shrinkRefusal(live, wiped, KM);
+    ok(live.entries > 400 && Object.keys(live.sweepCosts).length > 100 &&
+       !!realRefusal && /DROP 600 of 600/.test(realRefusal),
+        "!! *** and it refuses THE ACTUAL WRITE that lost 4.79 hours of device measurement ***",
+        `${live.entries} entries and ${Object.keys(live.sweepCosts).length} sweep costs on file; the emptying ` +
+        "write is refused naming 600 identities. THE DATA WAS RECOVERABLE -- restored from 740dd6f^, the exact " +
+        "bytes -- and sweepBudget-selfcheck's own prose corroborates them: it claims 4.79 hours, and the " +
+        "restored record sums to 4.79 hours across 116 devices.");
+}
+
 if (fail) { console.error(`\nbakeShrinkGuard-selfcheck: ${pass} pass, ${fail} FAIL`); process.exit(1); }
+// =============================================================================================================
+
 console.log(`bakeShrinkGuard-selfcheck: all ${pass} pass`);

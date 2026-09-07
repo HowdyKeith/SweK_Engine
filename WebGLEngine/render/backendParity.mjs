@@ -166,6 +166,14 @@ export const PARITY_BASELINE = Object.freeze({
     // which no census scans -- the first shader pair in this tree that is data rather than source.
     // v4322, moved to render/fleetTsl.mjs at v4329 -- the fleet shells for the transplant carry a WGSL prefix and a GLSL
     // preamble (+1 GLSL, +1 WGSL, +1 both). tslRace-selfcheck's fixture is JSON, tsl-rig.html has no shader text.
+    // *** v4470 MERGE -- THIS BRANCH ADDED SEVEN WGSL-BEARING MODULES WHILE main ADDED THREE, AND THE BASELINE
+    // IS RE-MEASURED RATHER THAN ADDED UP. *** Both sides kept a running history here and both sides' arithmetic
+    // was right about its own half; summing two independent bumps is how a census stops describing the tree.
+    // From this branch, all shader-bearing MODULES rather than gate fixtures, so the baseline moves rather than
+    // the shader hiding: furnaceWgsl (v4407), microfacetWgsl (v4408), microfacetSampleWgsl (v4409),
+    // energyCompWgsl (v4411), microfacetAnisoWgsl (v4412), misWgsl (v4413), fresnelWgsl (v4416). v4416 also
+    // recovered three of those from commit messages, because a run of entries that stops mid-history reads
+    // like a complete record and is worse than one that admits a gap.
     // v4381 -- tools/ship/brainTsl-selfcheck.mjs carries WGSL and no GLSL (+1 WGSL-bearing, +1 WGSL-only).
     // It is a GATE rather than a shader module, and it holds the text for the reason this census is least
     // able to see: it asserts against brain/mlp.js's kernel BY QUOTING IT -- the compute entry point with its
@@ -239,7 +247,11 @@ export const PARITY_BASELINE = Object.freeze({
     // v4480 -- wgslBearing 66 -> 67, wgslOnly 51 -> 52: render/worleyWgsl.mjs, the Worley biome field as a compute pass
     // (WGSL-only by nature: no compute stage on WebGL2, where the f32 twin paints the same bytes -- the CPU_TWIN contract).
     // Held to world/worleyBiomes.js through one implementation with one rounding knob by tools/ship/worleyDevice-selfcheck.mjs.
-    wgslBearing: 73,     // v4520: see glslBearing; v4499: +1, render/stereographic.mjs; v4504: +1, render/zoomBlur.mjs; v4505: +1, render/asciiShape.mjs; v4506: +1, render/water2d.mjs; v4514: +1, render/probeLit.mjs
+    // *** v4526 MERGE -- RE-MEASURED ON THE MERGED TREE, NOT SUMMED, as the v4476 merge did and for the same reason. ***
+    // main brought seven WGSL-only producers this branch never had (its microfacet arc, v4408-v4425, and the KTX2 work),
+    // this branch brought its own; classify() on the tree that has both reports wgslBearing 80 and wgslOnly 59 where the
+    // two sides recorded 73 / 52 (here) and 68 / 55 (main). `both` and glslOnly did not move: the merge added no dual file.
+    wgslBearing: 80,     // v4520: see glslBearing; v4499: +1, render/stereographic.mjs; v4504: +1, render/zoomBlur.mjs; v4505: +1, render/asciiShape.mjs; v4506: +1, render/water2d.mjs; v4514: +1, render/probeLit.mjs
     both: 21,            // v4499: +1, render/stereographic.mjs -- both languages in one module, a CPU twin beside them
                          // v4504: +1, render/zoomBlur.mjs -- the radial march toward an arbitrary centre, both languages, a CPU twin, GODRAYS_FS graded beside it
                          // v4505: +1, render/asciiShape.mjs -- the six-point glyph search, both languages, a CPU argmin twin, the table derived from Plex
@@ -247,7 +259,7 @@ export const PARITY_BASELINE = Object.freeze({
                          // v4514: +1, render/probeLit.mjs -- the probe-lit pipeline: the SH volume read by integer texel and evaluated per fragment, both languages
                          // v4520: render/voxelBodies.mjs and render/voxelDamage.mjs DERIVE their pipelines from litSphere's generators (extra: quat, extra: colour) and author no shader text -- the twentieth dual module was one lit variant away, and a variant is a mode, not a module
     glslOnly: 133,
-    wgslOnly: 52,
+    wgslOnly: 59,        // v4526 merge: 52 here, 55 on main, 59 on the merged tree
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:
     // a page carrying both languages carries its own two shaders, and lends nothing to anybody else.
     bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleetMask.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/fleetTsl.mjs", "render/lyapunovWgsl.mjs", "render/tslSource.mjs", "render/stereographic.mjs", "render/texelProbe.mjs", "render/litSphere.mjs", "render/tslWide.mjs", "render/zoomBlur.mjs", "render/asciiShape.mjs", "render/water2d.mjs", "render/probeLit.mjs"]),

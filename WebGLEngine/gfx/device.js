@@ -555,8 +555,22 @@ struct VO { @builtin(position) pos: vec4f, @location(0) uv: vec2f };
     // WebGL2. (A struct field sharing a binding's name reads as a use; the safe direction, and rare.) And as the
     // backstop for whatever the text cannot see, createBindGroup runs inside a validation error scope whose message
     // becomes the pipeline's `error`, which the next use() or dispatch() refuses with, by name.
-    const classify = (wgsl, entryPoints = null) => {
-        const all = usedNames(wgsl, parseBindings(wgsl).filter((b) => b.group === 0), entryPoints);
+    // *** v4404 -- A MODULE MAY HAVE MORE THAN ONE ENTRY POINT, AND UNTIL NOW THIS ASSUMED IT DID NOT. ***
+    // WebGPU's layout:"auto" builds a bind group layout from what the CHOSEN entry point actually uses, not from
+    // what the module declares. simulation/lbm/lbmShader.js is the first module here with two -- collideStream
+    // touches all five bindings and stream touches three -- and both halves of the mismatch are errors: binding
+    // the extra two to `stream` is rejected by the device ("binding index 2 not present in the bind group
+    // layout") and NOT binding them is refused by the loop below ("nothing was bound to it"). There was no way
+    // to be right. `uses` lets a caller name the subset one entry point needs; omitted, every declared binding is
+    // required exactly as before, so nothing that already worked changes.
+    // *** v4526 MERGE -- BOTH, AND THEY ARE NOT THE SAME QUESTION. *** main's `uses` is the CALLER naming the subset one
+    // entry point needs (the LBM module's `stream` touches three of five); this branch's usedNames is the TEXT answering the
+    // same question for the entry points the pipeline is built with. `uses` is applied first as the caller's word, then the
+    // static read decides `used` for what remains -- so a caller that names a subset gets main's refusals by name, and one
+    // that does not gets the auto layout's own answer, as before on each side.
+    const classify = (wgsl, entryPoints = null, uses = null) => {
+        const keep = Array.isArray(uses) ? new Set(uses) : null;
+        const all = usedNames(wgsl, parseBindings(wgsl).filter((b) => b.group === 0).filter((b) => !keep || keep.has(b.name)), entryPoints);
         return { texBindings: all.filter((b) => /^texture_/.test(b.type)), samplerBindings: all.filter((b) => /^sampler/.test(b.type)),
                  storageBindings: all.filter((b) => b.addressSpace === "storage"), uniformBindings: all.filter((b) => b.addressSpace === "uniform"), all };
     };
@@ -643,7 +657,7 @@ struct VO { @builtin(position) pos: vec4f, @location(0) uv: vec2f };
             const mod = gpu.createShaderModule({ code: d.wgsl });
             const compiled = _watchCompile(mod, "compute pipeline");
             const pipe = gpu.createComputePipeline({ layout: "auto", compute: { module: mod, entryPoint: d.entryPoint || "main" } });
-            const c = { __compute: true, pipe, ubuf: null, uniformBinding: -1, ...classify(d.wgsl, [d.entryPoint || "main"]), _tex: {}, _stor: {}, _gen: 1, _bg: null, _bgGen: 0, error: null, compiled };
+            const c = { __compute: true, pipe, ubuf: null, uniformBinding: -1, ...classify(d.wgsl, [d.entryPoint || "main"], d.uses), _tex: {}, _stor: {}, _gen: 1, _bg: null, _bgGen: 0, error: null, compiled };
             compiled.then((e) => { c.error = e; });
             c.bind = (n, buf, o) => { bindByName(c, n, buf, o); return c; };
             // Level 12 -- a compute pass may read a texture (the Hi-Z build reads the frame's depth). Same rule as

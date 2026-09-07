@@ -19,7 +19,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { noComments } from "./sourceScan.mjs";
 import {
-    SLOWEST_GENERAL, HEADROOM, DEFAULT_BUDGET_MS, MEASURED, TAIL_HEADROOM, UNRESOLVED,
+    SLOWEST_GENERAL, HEADROOM, DEFAULT_BUDGET_MS, MEASURED, MEASURED_RUNS, TAIL_HEADROOM, UNRESOLVED,
     budgetFor, budgetReason, maxBudgetMs,
 } from "./gateBudget.mjs";
 
@@ -214,6 +214,61 @@ console.log("\n*** THE BUDGET BASIS AND THE OBSERVED RUNTIME ARE TWO RECORDINGS 
             " -- move each into MEASURED and DELETE the UNRESOLVED line, which is that table's own instruction"
           : Object.keys(UNRESOLVED).length + " still genuinely unmeasured; a SKIP (~0.05s) is excluded from " +
             "the record by selfchecks, so a time here is a real completion");
+}
+
+// ---- THE RUNS BEHIND THE BASIS ---------------------------------------------------------------------------
+// *** THIS SECTION EXISTS BECAUSE TWO SABOTAGES OF THIS FILE'S OWN NEW ENTRIES SURVIVED WITH ZERO REDS. ***
+// A basis of 1 ms for a 29 s gate passed everything; so did recording the fastest of three runs instead of the
+// slowest. The cross-check above cannot help: it compares against gate-timings.json, and a gate is IN MEASURED
+// precisely because gate-timings.json has never timed it, so THAT CHECK CAN ONLY VALIDATE THE ENTRIES THAT DID
+// NOT NEED IT. gateBudget.MEASURED_RUNS now carries the individual runs as data, and this section reads them.
+//
+// *** THE MAXIMUM IS RE-DERIVED HERE, NOT BORROWED. *** gateBudget exports `slowestRun`, and calling it would
+// make this check assert that a function equals itself -- the derivation and its verification would be one
+// object. So the reduction is written out again below. If somebody changes `slowestRun` to take the mean or
+// the fastest, these lines go red; if they were a call to it, they would not.
+{
+    const rows = Object.entries(MEASURED_RUNS);
+    const maxOf = (runs) => runs.reduce((m, r) => (r.ms > m ? r.ms : m), 0);
+
+    // A run that did not complete has not exercised the gate's full path -- the same rule that keeps failures
+    // out of gate-timings.json, applied to the rows this file curates by hand.
+    const nonZero = rows.filter(([, row]) => row.runs.some((r) => r.code !== 0));
+    ok("!! *** every recorded run behind a derived basis is a COMPLETION ***",
+        nonZero.length === 0,
+        nonZero.length ? nonZero.map(([g]) => g).join(", ") + " -- a budget derived from a run that died early is derived from how long the gate took to break"
+          : rows.length + " gate(s), " + rows.reduce((n, [, row]) => n + row.runs.length, 0) +
+            " runs, every one exit 0. THIS CHECK IS THE ONLY PLACE THAT REFUSES ONE, and that is deliberate: " +
+            "the first version of slowestRun threw on a bad row instead, which took the whole tree down at " +
+            "import and meant THIS LINE NEVER RAN in the one condition it exists for. Deriving is conservative " +
+            "(the max over all runs, so a kill can only raise a budget); refusing is here, where it is a red line and not a dead tree");
+
+    // The sabotage this catches: any basis that is not the slowest recorded run. Both surviving sabotages were
+    // exactly that -- 1 ms, and the fastest-of-three.
+    const wrong = rows.filter(([g, row]) => MEASURED[g] !== maxOf(row.runs));
+    ok("!! *** each derived basis IS the slowest run recorded for that gate, re-derived here ***",
+        wrong.length === 0,
+        wrong.length ? wrong.map(([g, row]) => g + " budgeted from " + MEASURED[g] + " against a slowest run of " + maxOf(row.runs)).join("; ")
+          : rows.map(([g, row]) => g.split("/").pop().replace("-selfcheck.mjs", "") + " " + maxOf(row.runs) + "ms of " + row.runs.length).join(", ") +
+            " -- the SLOWEST, never the mean, because a budget set to the average of a contended measurement re-creates the timeout it is meant to prevent");
+
+    // Evidence for a gate that is not budgeted is evidence nobody consults. This is the direction the two
+    // tables can drift that the check above cannot see, since it only walks rows that exist in both.
+    const orphan = rows.filter(([g]) => MEASURED[g] === undefined);
+    ok("...and no gate has recorded runs without a budget derived from them",
+        orphan.length === 0,
+        orphan.length ? orphan.map(([g]) => g).join(", ") + " -- runs recorded, basis not derived from them"
+          : "every MEASURED_RUNS row feeds a MEASURED entry");
+
+    // *** WHAT THIS ROUND DID NOT DO, NAMED RATHER THAN COUNTED. *** Most of MEASURED is older than
+    // MEASURED_RUNS and its readings live in prose. Those entries are NOT converted here and are not asserted
+    // over; the number is reported so the gap is visible and shrinking, and it is deliberately not a floor --
+    // a threshold here would turn "we converted five" into a contract nobody agreed to.
+    const transcribed = rows.filter(([, row]) => row.observedHere !== true).map(([g]) => g);
+    console.log("  ----  " + rows.length + " of " + Object.keys(MEASURED).length + " MEASURED entries derive their basis from recorded runs; " +
+        "the rest carry their measurement in a comment, where nothing can check it.");
+    console.log("  ----  Of the " + rows.length + ", " + transcribed.length + " is transcribed from an earlier round's note rather than run: " +
+        (transcribed.join(", ") || "none") + ". Its only corroboration is that the basis that note recorded already equals the maximum of the readings it listed.");
 }
 
 console.log("  ----  AND THE SUITE GETS LONGER: the v3211 run was 1719s with thirteen gates dying early.");

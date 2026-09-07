@@ -89,18 +89,59 @@ ok("!! pinch.distance is exactly homogeneous of degree 1, which makes the critic
     `worst departure from s*d(1) is ${scale.pinchHomogeneityErr.toExponential(3)} -- floating-point noise. So ` +
     `s* = pinchThreshold / d(1) is EXACT rather than fitted, and does not have to be searched for`);
 
-ok("!! ...and every pose actually flips on either side of its own derived s*, so the derivation is not just algebra",
-    scale.pinchFlipsAtCritical === scale.poses,
-    `${scale.pinchFlipsAtCritical}/${scale.poses} poses read pinched at 0.999*s* and not at 1.001*s*. ` +
-    `THE FIST'S IS s* = ${scale.pinchCriticalScale.toFixed(4)}: below ~63% of fixture size A CLOSED FIST READS ` +
-    `AS A PINCH, because thumb tip and index tip are 0.0954 apart and the threshold is a constant 0.06`);
+// *** THE v4485 FIX, AND THE CHECKS THAT WOULD CATCH IT BEING UNDONE ***
+ok("!! *** pinch.active IS SCALE-INVARIANT NOW TOO -- it compares against a FRACTION OF THE PALM ***",
+    scale.pinchScaleDisagreements === 0,
+    `${scale.pinchScaleDisagreements} disagreements over ${scale.scalesSwept} (pose, scale) pairs spanning ` +
+    `0.25x to 4x. limit = pinchSpanFraction * dist(WRIST, MIDDLE_MCP), so both sides of the comparison scale ` +
+    `together and the verdict cannot turn over -- the same reason the fold family was always safe`);
 
-report("*** THIS IS REPORTED AS A LIMITATION AND NOT FIXED, AND THE DISTINCTION MATTERS ***",
-    "An absolute threshold on a normalized coordinate is a legitimate design with an UNDOCUMENTED " +
-    "PRECONDITION -- it defines a working volume, and pinchThreshold is already a caller-visible option. The " +
-    "fix (scale the threshold by a hand-span landmark distance) changes shipped gesture behaviour for every " +
-    "existing consumer, and A ROUND MUST NOT MOVE A VERDICT IT IS NOT ABOUT (v3679). It is measured here so it " +
-    "can be DECIDED rather than discovered by a user leaning back in their chair.");
+ok("...and nothing flips at the OLD critical scale any more, which is the defect stated as its own absence",
+    scale.pinchFlipsAtCritical === 0,
+    `${scale.pinchFlipsAtCritical}/${scale.poses} poses flip at s* = ${scale.pinchCriticalScale.toFixed(4)}. ` +
+    `s* is still COMPUTED rather than deleted: the way to show a defect is fixed is to keep measuring the ` +
+    `thing that used to happen. It fires in the \`absolutethreshold\` arm and nowhere else`);
+
+ok("...and pinch.ratio, the distance measured in PALMS, is the scale-free quantity that makes that true",
+    scale.pinchRatioDrift < 1e-12,
+    `drift ${scale.pinchRatioDrift.toExponential(3)} across the whole sweep. ` +
+    `\`ratio < pinchSpanFraction\` IS \`active\`, so a caller reads the margin rather than re-deriving it`);
+
+ok("!! the span is POSE-STABLE, which is the load-bearing property and not merely that it scales",
+    (() => {
+        const spans = POSE_NAMES.map((n) => computeHandMetrics([place(handPose(POSES[n]))]).hands[0].pinch.span);
+        return spans.every((v) => Math.abs(v - spans[0]) < 1e-12);
+    })(),
+    `wrist->MIDDLE_MCP reads identically across open/fist/point/pinch (it is the rigid palm), where ` +
+    `wrist->MIDDLE_TIP collapses 0.278115 -> 0.131352 on a curl. *** A SPAN THAT SHORTENED WHEN YOU CLOSED ` +
+    `YOUR HAND WOULD MAKE THE PINCH THRESHOLD DEPEND ON THE OTHER FINGERS -- circular. *** It also excludes ` +
+    `the THUMB, one of the two points being measured`);
+
+ok("!! the default fraction is a GENERALIZATION of the shipped verdict, not a retune -- checked, not asserted",
+    (() => POSE_NAMES.every((n) => {
+        const lm = place(handPose(POSES[n]));
+        return computeHandMetrics([lm]).hands[0].pinch.active
+            === computeHandMetrics([lm], null, { pinchRelative: false }).hands[0].pinch.active;
+    }))(),
+    `all ${POSE_NAMES.length} poses classify identically at nominal size to the pre-v4485 absolute comparison. ` +
+    `0.375 * 0.160200 = 0.060075 against the shipped 0.06 -- a 0.125% difference. *** IF THIS GOES RED THE ` +
+    `FRACTION HAS BEEN RETUNED, WHICH IS A DIFFERENT DECISION FROM THE ONE THIS ROUND MADE. ***`);
+
+ok("!! a degenerate palm span FALLS BACK instead of scaling by it",
+    (() => {
+        const collapsed = Array.from({ length: 21 }, () => ({ x: 0.5, y: 0.5, z: 0 }));
+        const hh = computeHandMetrics([collapsed]).hands[0];
+        return hh.pinch.span === 0 && hh.pinch.relative === false && hh.pinch.limit === 0.06;
+    })(),
+    "a collapsed palm gives span 0; without the guard the limit would be 0 and NOTHING would ever read as " +
+    "pinched -- silently, and hardest exactly where tracking is already worst. It falls back to the absolute " +
+    "threshold and says so in `pinch.relative`");
+
+report("*** WHAT v3850 SAID ABOUT THIS, AND WHY IT IS NOT A CONTRADICTION ***",
+    "v3850 measured this defect and DECLINED to fix it -- 'a round must not move a verdict it is not about' " +
+    "(v3679) -- and put it to Keith with the numbers. Keith called it. THAT IS THE DIFFERENCE BETWEEN A ROUND " +
+    "REFUSING A CHANGE AND A ROUND BEING TOLD TO MAKE ONE, and the numbers v3850 recorded are what made the " +
+    "call decidable rather than a preference. The old behaviour is not gone, it is a MODE: see section 4.");
 
 // ---- 3. MIRROR ----------------------------------------------------------------------------------------------
 console.log("\n3. THE MIRROR INVOLUTION -- the webcam is a mirror and the module flips X to compensate");
@@ -184,8 +225,26 @@ console.log("\n4. THE PLANT -- _dist3D drops its z term, the most tempting real 
         "are not obliged to agree in the last ulp. Writing it as `Math.hypot(dx,dy, flat ? 0 : dz)` would put " +
         "the knob INSIDE the default's arithmetic. A KNOB THAT CHANGES THE DEFAULT IS NOT A KNOB. ***");
 
+    // *** THE FIFTH DECLARED MODE, AND IT IS A DIFFERENT ANIMAL FROM THE OTHER FOUR. *** flatdistance,
+    // fixedanchor, manhattan and mirrorhalf are TEMPTING EDITS nobody made -- hypotheticals, planted to prove
+    // the keys can see them. `absolutethreshold` is the behaviour THIS TREE ACTUALLY SHIPPED until v4485, kept
+    // as a mode so the fix has a regression guard rather than a changelog entry.
+    const absolute = await buildHands({ mode: "absolutethreshold" });
+    ok("!! `absolutethreshold` restores the pre-v4485 comparison and VIOLATES the scale claim",
+        scale.pinchScaleDisagreements === 0 && absolute.pinchScaleDisagreements > 0,
+        `pinchScaleDisagreements ${scale.pinchScaleDisagreements} -> ${absolute.pinchScaleDisagreements} of ` +
+        `${absolute.scalesSwept}, and flips at the derived s* ${scale.pinchFlipsAtCritical} -> ` +
+        `${absolute.pinchFlipsAtCritical} of ${absolute.poses}. *** A FIST READS AS A PINCH BELOW s* = ` +
+        `${absolute.pinchCriticalScale.toFixed(4)} UNDER THE OLD RULE AND AT NO SCALE UNDER THE NEW ONE ***`);
+
+    ok("...and the fold family is untouched by it, so the two halves of the scale mode stay separate claims",
+        absolute.foldScaleDisagreements === 0,
+        `fold ${absolute.foldScaleDisagreements} in both arms -- it was ALWAYS a ratio test, and a mode that ` +
+        `moved it too would not isolate what v4485 actually changed`);
+
     ok("...and the validator LISTS the plant mode, so it cannot silently revert",
         handsDefaults({ mode: "flatdistance" }).mode === "flatdistance" &&
+        handsDefaults({ mode: "absolutethreshold" }).mode === "absolutethreshold" &&
         handsDefaults({ mode: "nonsense-mode" }).mode === "rigid",
         "v3806 lost a round to a validator that reverted its plant in silence and v3845 nearly repeated it -- " +
         "both arms then read an IDENTICAL number and the plant fires at nothing. The DEFAULT is untouched: " +
@@ -215,11 +274,15 @@ console.log("\n5. THE DEVICE CONTRACT");
 
     ok("each mode carries its OWN claim rather than one claim with a mode label",
         handsDefaults({ mode: "rigid" }).claim.observable === "rigidDisagreements" &&
-        handsDefaults({ mode: "scale" }).claim.observable === "foldScaleDisagreements" &&
+        handsDefaults({ mode: "scale" }).claim.observable === "pinchScaleDisagreements" &&
+        handsDefaults({ mode: "absolutethreshold" }).claim.observable === "pinchScaleDisagreements" &&
         handsDefaults({ mode: "mirror" }).claim.observable === "mirrorMaxDelta" &&
         handsDefaults({ mode: "flatdistance" }).claim.observable === "rigidDisagreements",
-        "rigid/flatdistance -> rigidDisagreements <= 0 ; scale -> foldScaleDisagreements <= 0 ; " +
-        "mirror -> mirrorMaxDelta <= 0");
+        "rigid/flatdistance -> rigidDisagreements <= 0 ; scale AND absolutethreshold -> " +
+        "pinchScaleDisagreements <= 0 (which the second VIOLATES, by design) ; mirror -> mirrorMaxDelta <= 0. " +
+        "*** v4485 MOVED THE SCALE CLAIM OFF foldScaleDisagreements: that number has been 0 since the fold " +
+        "test was written and would stay 0 whatever happened to pinch, so claiming on it made the mode's " +
+        "headline the half that was never in doubt. ***");
 
     ok("the fixtures are EXPORTED, so this gate drives the same hand the device does",
         typeof handPose === "function" && typeof place === "function" && typeof rotate === "function" &&

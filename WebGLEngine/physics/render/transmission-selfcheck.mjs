@@ -29,7 +29,7 @@
 // quadrature, which is item 11's whole reason for existing. And that the lobe is coloured, dispersive, or
 // nested -- one interface, one index, grey.
 
-// ---- *** v4452 SABOTAGES, RESULTS BY NAME *** --------------------------------------------------------------
+// ---- *** SABOTAGES, RESULTS BY NAME *** --------------------------------------------------------------
 //
 //   G. chi+ also rejects grazing facets (|i.h| < 0.3)        -> 5 RED
 //   H. halfVectorT stops flipping the half-vector up         -> 6 RED
@@ -37,9 +37,9 @@
 //   J. chi+ drops the outgoing-side test                     -> 5 RED
 //   K. chi+ drops the incident-side test                     -> 4 RED
 //
-// J was the branch that went 0 RED at v4451 and is now reachable from two directions at once.
+// J was the branch that went 0 RED at v4458 and is now reachable from two directions at once.
 
-// ---- *** v4451 SABOTAGES, RESULTS BY NAME *** --------------------------------------------------------------
+// ---- *** SABOTAGES, RESULTS BY NAME *** --------------------------------------------------------------
 //
 //   A. chi+ drops the incident-side test                     -> 3 RED
 //   B. chi+ drops the outgoing-side test                     -> 4 RED
@@ -58,7 +58,7 @@
 
 import {
     refractCos, isTIR, split, halfVectorT, btdf, brdf, reciprocityPair, energySplit, dirFromCos,
-    LIMITS, criticalOf, validHalfT, g2Transmission, BTDF_VERDICT_V4451 as V,
+    LIMITS, criticalOf, validHalfT, g2Transmission, BTDF_VERDICT_V4458 as V,
 } from "./transmission.mjs";
 import { refract, split as walkSplit } from "./dielectricWalk.mjs";
 import { rng, sampleHeight, sampleVNDF } from "./microsurfaceWalk.mjs";
@@ -215,7 +215,7 @@ ok("!! the rough dielectric CREATES energy, and it is held to a range rather tha
    `${worstTotal.toFixed(5)} -- v4432 measured 1.0796 creating energy on the OPAQUE model; the transmission ` +
    "lobe more than triples that, and the mechanism is not derived here");
 
-// ---- 6. v4451 -- THE TWO CANDIDATES v4447 NAMED, TOLD APART -------------------------------------------------
+// ---- 6. v4458 -- THE TWO CANDIDATES v4447 NAMED, TOLD APART -------------------------------------------------
 //
 // v4447 left the lobe convicted and the mechanism open: "a question about Walter's Jacobian or the
 // height-correlated G2". Section 5 above still asserts the SHIPPED excess, because the defaults have not
@@ -244,7 +244,7 @@ const probe = (alpha, cosI, chiPlus) =>
        "vanishes with roughness, which is why the lobe looked correct where a renderer usually lives");
 }
 
-// *** THE ROW THAT STOOD HERE AT v4451 IS RETIRED, AND SECTION 7 IS WHY. *** It pinned "the chi+ is exact
+// *** THE ROW THIS ROUND FIRST WROTE HERE IS RETIRED, AND SECTION 7 IS WHY. *** It pinned "the chi+ is exact
 // INTO the denser medium and INCOMPLETE OUT OF IT" and said the gap would go red when the predicate was
 // completed. The predicate needed no completing: the TARGET was wrong. Section 7 carries the resolution and
 // the empty population that hid it, because a retired claim deleted without its reason is how a tree forgets
@@ -335,10 +335,10 @@ const probe = (alpha, cosI, chiPlus) =>
        "bounces are what supply the rest.");
 }
 
-// *** v4452 -- THE OPEN ROW ABOVE WAS THE CHECK, NOT THE PREDICATE, AND THE REASON IT HID IS AN EMPTY
+// *** v4458 -- THE OPEN ROW ABOVE WAS THE CHECK, NOT THE PREDICATE, AND THE REASON IT HID IS AN EMPTY
 // POPULATION ON ONE SIDE OF A BRANCH -- THE SAME SHAPE AS THE SABOTAGE THAT WENT 0 RED. ***
 //
-// v4451 pinned "the chi+ is exact INTO the denser medium and INCOMPLETE OUT OF IT": the probe read 0.393540
+// This round first pinned "the chi+ is exact INTO the denser medium and INCOMPLETE OUT OF IT": it read 0.393540
 // leaving glass against a target of 0.510957, and it did not move under refinement, so it was called the
 // predicate. IT WAS THE TARGET. `1 - P(TIR)` counts every visible normal that refracts -- INCLUDING THE ONES
 // WHOSE REFRACTED RAY LEAVES UPWARD, which an integral over the lower hemisphere cannot contain and a
@@ -377,7 +377,7 @@ console.log("\n7. the chi+ in the direction v4436 never measured, and the target
     ok("!! *** THE chi+ IS EXACT IN BOTH DIRECTIONS: the probe is the down-leaving fraction, not 1 - P(TIR) ***",
        worst < 2e-3,
        `worst departure ${worst.toExponential(2)} over twelve rows spanning both index directions, against a ` +
-       "sampler standard error near 1e-3. v4451 called this predicate incomplete on a target that counted " +
+       "sampler standard error near 1e-3. This round first called the predicate incomplete on a target that counted " +
        "refractions the lower hemisphere cannot hold.");
     ok("!! and the population that hid it is EMPTY going into the denser medium",
        upForward === 0 && upSeen > 0.1,
@@ -410,7 +410,7 @@ console.log("\n7. the chi+ in the direction v4436 never measured, and the target
        "removes only configurations that are not refractions, which is the property it is for.");
 }
 
-// *** AND THE SECOND SUSPECT, CHECKED IN THE DIRECTION IT WAS NEVER CHECKED IN. *** v4451 validated the Beta
+// *** AND THE SECOND SUSPECT, CHECKED IN THE DIRECTION IT WAS NEVER CHECKED IN. *** The first half of this round validated the Beta
 // G2 against the walk going INTO glass. Leaving glass the shipped lobe is worse -- TEN TIMES the truth at
 // grazing -- and the correction holds there too.
 console.log("\n8. leaving glass: the same two corrections, against the same ground truth");

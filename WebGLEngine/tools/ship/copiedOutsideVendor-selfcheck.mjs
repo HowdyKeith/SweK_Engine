@@ -47,11 +47,40 @@ console.log("1. *** THE GAP IS STRUCTURAL, and both halves of it are asserted ag
     ok("vendor/ holds " + dirs.length + " directories, which is the orrery's whole population",
         dirs.length >= 12, dirs.join(" "));
     // *** AND A SECOND DIRECTORY CALLED vendor EXISTS AND IS NOT IN IT. ***
-    const nested = execSync("find . -type d -name vendor -not -path './node_modules/*'", { cwd: ROOT })
-        .toString().trim().split("\n").map((s) => s.replace(/^\.\//, "")).sort();
-    ok("*** there are TWO directories named vendor, and the orrery scans one ***",
+    // *** v4461: THIS COUNTED DIRECTORY ENTRIES AND WENT RED OVER AN EMPTY ONE. *** A stray empty
+    // ai-bridge/vendor/ (Aug 17, untracked -- git cannot track an empty directory, so it exists in a working
+    // checkout and in no fresh clone) made this read three. The finding here is "vendored CODE sits where the
+    // orrery does not look"; a directory holding nothing holds no code, so counting entries was a proxy
+    // standing in for the fact -- and a proxy that makes the gate green or red depending on litter in
+    // somebody's checkout. Counted by CONTENT now, and the message prints each one's file count so an empty
+    // one is visibly empty rather than silently dropped.
+    // *** v4485 -- THIS WAS POSIX `find`, AND ON THE RIG IT DID NOT FAIL, IT CRASHED. *** Windows resolves
+    // the name to FIND.exe, a different tool with different arguments, which answered "FIND: Parameter
+    // format not correct" and took the whole gate down with an unhandled throw. A directory walk needs no
+    // tool at all and was already being done four lines below to count the files.
+    const allNested = (function walkDirs(d, rel = "", out = []) {
+        for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+            if (!e.isDirectory() || e.name === "node_modules" || e.name === ".git") continue;
+            const r = rel ? rel + "/" + e.name : e.name;
+            if (e.name === "vendor") out.push(r);
+            walkDirs(path.join(d, e.name), r, out);
+        }
+        return out;
+    })(ROOT).sort();
+    const fileCount = (rel) => {
+        let n = 0;
+        (function walk(d) {
+            for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+                if (e.isDirectory()) walk(path.join(d, e.name)); else n++;
+            }
+        })(path.join(ROOT, rel));
+        return n;
+    };
+    const counts = new Map(allNested.map((rel) => [rel, fileCount(rel)]));
+    const nested = allNested.filter((rel) => counts.get(rel) > 0);
+    ok("*** there are TWO directories named vendor THAT HOLD ANYTHING, and the orrery scans one ***",
         nested.length === 2 && nested.includes("vendor") && nested.includes("ui/vendor"),
-        nested.join(" and "));
+        allNested.map((rel) => rel + " (" + counts.get(rel) + " files)").join(" and "));
 
     // *** seenBy IS THE CLAIM THE WHOLE ROUND RESTS ON, AND NOTHING CHECKED IT. *** Sabotage D filled it in
     // with ["orrery"] for both copies and went 0 RED -- a register asserting its own central finding in a
@@ -96,9 +125,20 @@ console.log("\n2. *** THE POPULATION, and every entry's evidence is greppable in
 console.log("\n3. *** A POINTER IS NOT AN INCLUSION: what the copies carried before this round ***");
 {
     // The number that framed the round: where the permission notice actually lives in this tree.
-    const all = execSync("grep -rl 'Permission is hereby granted, free of charge' . " +
-        "--exclude-dir=node_modules || true", { cwd: ROOT, maxBuffer: 1 << 24 })
-        .toString().trim().split("\n").filter(Boolean).map((s) => s.replace(/^\.\//, "")).sort();
+    // v4485: POSIX grep, same reason and same repair as the walk above. `-l` is "name the file once",
+    // which is a break out of the read; the literal is compared with includes(), so no punctuation in it
+    // can be read as a pattern -- the -F that verify.mjs's own marker check needed.
+    const CLAUSE = "Permission is hereby granted, free of charge";
+    const all = (function walkFiles(d, rel = "", out = []) {
+        for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+            if (e.name === "node_modules" || e.name === ".git") continue;
+            const r = rel ? rel + "/" + e.name : e.name;
+            if (e.isDirectory()) { walkFiles(path.join(d, e.name), r, out); continue; }
+            try { if (fs.readFileSync(path.join(d, e.name), "utf8").includes(CLAUSE)) out.push(r); }
+            catch { /* binary or unreadable: grep -l would not have named it either */ }
+        }
+        return out;
+    })(ROOT).sort();
     const underVendor = all.filter((f) => f.startsWith("vendor/"));
     // *** AND THE COUNT MOVES AS THE TREE WRITES, so the QUOTERS are excluded by name rather than the
     // number quoted once. *** Files that carry the clause as DATA -- this register and its gate, the two
@@ -243,3 +283,18 @@ console.log("unchecked here: WHETHER THE REPRODUCED LICENCE TEXT MATCHES UPSTREA
     "notice at all would be invisible to it by definition; and the DENSO WAVE trademark notice in " +
     "ui/vendor/qrcode.mjs, which is reproduced but is not a licence term and has had no thought given to it.");
 process.exit(fails ? 1 : 0);
+
+// =============================================================================================================
+// SABOTAGE LOG -- v4461, the vendor-directory count after it stopped counting directory ENTRIES.
+// Graded on exit codes; the stray empty directory that started this was created and removed by the harness.
+//
+//   E  a third vendor directory (ai-bridge/vendor/) given ONE file.
+//      -> exit 1. Content is what the check is about, so a directory that gains code is a red where the same
+//      directory sitting empty is not.
+//
+//   F  ui/vendor emptied of its two files, then restored.
+//      -> exit 1 in the other direction: the check is an equality on the set that holds anything, so a
+//      vendor tree going away is as much a finding as one arriving. A `>= 2` would have slept through it.
+//
+//   Clean tree: exit 0, with all three candidates and their file counts printed -- ai-bridge/vendor (0 files)
+//   and ui/vendor (2 files) and vendor (340 files) -- so the excluded one is VISIBLE rather than dropped.

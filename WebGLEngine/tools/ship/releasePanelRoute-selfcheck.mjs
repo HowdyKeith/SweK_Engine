@@ -107,7 +107,16 @@ console.log("\n2. THE REFRESH REFUSES TO WRITE AWAY A RELEASE THE FLEET WAS RUNN
 {
     const src = fs.readFileSync(path.join(ROOT, "ai-bridge", "githubBridge.js"), "utf8");
     const fn = (src.match(/async function ledgerRefresh\([\s\S]*?\n\}/) || [""])[0];
-    ok("ledgerRefresh exists and is exported", !!fn && /module\.exports = \{ ledgerRefresh,/.test(src), fn ? fn.length + " chars" : "NOT FOUND");
+    // v4461 -- WAS /module\.exports = \{ ledgerRefresh,/ -- PINNING ledgerRefresh AS THE FIRST NAME IN THE
+    // LIST. v4452 prepended `busy, busyWhat` to that same line for the update-deferral work and the check went
+    // red on an export that is still exported, three rounds later and found by accident while fixing something
+    // else. THIRD TIME THIS SESSION for the same shape: an assertion about WHERE TEXT SITS rather than what is
+    // true (the disabled-but-present guard, the adjacent-statements regex, and now the position in a list).
+    // It asks whether the name is IN the export list.
+    const exportLine = (src.match(/^module\.exports = \{[^}]*\}/m) || [""])[0];
+    ok("ledgerRefresh exists and is exported",
+        !!fn && /\bledgerRefresh\b/.test(exportLine) && /\bledgerCheck\b/.test(exportLine),
+        fn ? fn.length + " chars, and both names are in the export list (order is not the check)" : "NOT FOUND");
 
     // *** DRIVEN, NOT GREPPED, AND SABOTAGE 4 IS THE REASON. *** The first draft asked whether the string
     // "up.gone.length" appeared before "fs.writeFileSync" in the source. `if (false && up.gone.length)`

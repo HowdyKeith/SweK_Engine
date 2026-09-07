@@ -317,5 +317,5 @@ console.log("unchecked here: A REAL PHOTOGRAPH, exactly as mesh/lathe.mjs's gate
     "and a shadow that is too small carves away real material, so the bound does not survive segmentation error and " +
     "nothing here says by how much. Also unwired: no page in this tree calls mesh/carve.mjs, so the judge and both " +
     "sculptors still meet only inside gates. And the carve is n^3 per view in JavaScript -- 262k voxels times 16 views " +
-    "here -- which is a compute pass wanting to happen and is not one yet.");
+    "here -- which was a compute pass wanting to happen and IS ONE at v4372 -- render/carveTsl.mjs, graded against this module voxel for voxel in tools/ship/carveGpu-selfcheck.mjs. What is still not measured is whether it is FASTER: the sandbox device is SwiftShader, so a timing here would clock a CPU pretending to be a GPU.");
 process.exit(fails ? 1 : 0);

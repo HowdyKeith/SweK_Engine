@@ -54,27 +54,55 @@ const { shaderCensus, pairShape } = await import(pathToFileURL(path.join(HERE, "
 const c = shaderCensus(ROOT);
 
 {
-    // v4383 -- MEASURED WITH classify(), against v1's 14 measured on raw text. It is not comparable to v3274's
-    // 3, which was measured with the discredited instrument; the honest v3274 figure cannot be recovered and is
-    // not guessed at here. THE THRESHOLD THAT MATTERS IS THE ONE v3274 NAMED, and it is asserted separately.
-    // v4459 -- 10 -> 11, read before raising, as the line below asks: render/texelProbe.mjs authors both halves BY
-    // DESIGN, because it is a device probe (a texel's bits written out as bytes) and the device's contract is a
-    // pair. That is the same reason render/gpuDriven.mjs and render/gpuTerrain.mjs are on this list, and it is
-    // not a translation an IR would have saved: the two fragments are eleven lines each. The trigger is still 20.
-    // v4473 -- 11 -> 12: render/litSphere.mjs, the lit sphere pair for the 3D orrery. Same shape as gpuTerrain's light:
-    // one Lambert term spelled twice, eleven lines each, so the twelfth is a module and not an inversion.
-    // v4483 -- 12 -> 13: render/tslWide.mjs, the quad shell and its hand twin for the widened TSL transplant. Read before raising,
-    // as the line asks: the twin exists BECAUSE the generated pair is graded against it -- the module authors both halves so that
-    // three's two builders can be held to them, which is the opposite of the inversion this line watches for.
-    const DUAL_BASELINE = 18;   // v4520: the sandbox's body and debris pipelines are litSphere modes, not modules -- the line below is the reason; v4499: render/stereographic.mjs; v4504: render/zoomBlur.mjs; v4505: render/asciiShape.mjs; v4506: render/water2d.mjs (the 2D water pass, WGSL and GLSL in one file); v4514: render/probeLit.mjs
-    const INVERSION = 20;   // v3274's own word: "if this count climbs toward twenty the arithmetic inverts"
+    // ==========================================================================================================
+    // *** v4414 -- THIS ASSERTION WAS RED FOR ~200 ROUNDS AND IT WAS MEASURING THE WRONG POPULATION. ***
+    //
+    // It gated `both.length <= 3` -- files whose TEXT contains markers of both languages -- as a proxy for
+    // "how many shader pairs would an IR replace". Those are different questions, and
+    // tools/ship/shaderPairs-selfcheck.mjs measures the gap: of the 14 files counted here, FIVE duplicate a
+    // computation, two share only an entry-point name, and SEVEN share nothing at all.
+    //
+    // WORSE, THE POPULATION INCLUDES THE MACHINERY THAT WOULD BE THE IR. render/tslSource.mjs holds eleven
+    // GLSL markers because it EMITS GLSL, so BUILDING THE IR RAISES THIS COUNT. A trigger that fires harder
+    // the more the problem is solved cannot be the thing anyone acts on, and this one never fired for that
+    // reason: v4380 watched it climb from 4 to 14 and correctly refused to draw the conclusion.
+    //
+    // SO THE INSTRUMENT IS REPLACED, NOT THE THRESHOLD WIDENED. The co-occurrence count is still REPORTED --
+    // it was never wrong about what it measured -- and what is GATED is the count that bears on the decision.
+    // ==========================================================================================================
+    const { classifyPairs } = await import(pathToFileURL(path.join(HERE, "shaderPairs.mjs")).href);
+    const pairs = classifyPairs(ROOT);
+    // v4526 MERGE -- 5 -> 8, read before raising as the line asks: classifyPairs on the merged tree names three more files
+    // that DUPLICATE a computation across the two languages, all this branch's -- render/litSphere.mjs (v4473, one Lambert term
+    // spelled twice), render/water2d.mjs (v4506, the water pass with a CPU twin) and render/probeLit.mjs (v4514, the SH
+    // irradiance read by integer texel). Each authors both halves BY DESIGN so a gate can hold the two backends to one twin,
+    // which is the shape this branch's DUAL_BASELINE note (dropped here, per main's v4470 merge note) had been recording;
+    // none is a translation an IR would have saved. The trigger below is still 20.
+    const DUPLICATION_BASELINE = 8;   // v4414 -- MEASURED, in the units the claim is actually about; v4526: 8 on the merged tree
+    ok("!! *** only " + pairs.duplication.length + " files DUPLICATE a computation across the two languages ***",
+        pairs.duplication.length <= DUPLICATION_BASELINE,
+        pairs.duplication.map((r) => r.file).join(", ") + " -- against " + c.both.length +
+        " that merely CO-OCCUR (" + pairs.disjoint.length + " of those share no function name at all, and two " +
+        "of them are the author-once machinery itself). AN IR FOR FIVE CONSUMERS WOULD STILL BE A THIRD THING " +
+        "TO MAINTAIN BESIDE THE TWO IT REPLACED. If THIS count climbs toward twenty the arithmetic inverts -- " +
+        "and note that the three-stage shape v3274 pointed at was re-opened anyway, at v4319-v4320, and has " +
+        "shipped ten rounds through render/tslSource.mjs since");
 
-    ok("!! *** only " + c.both.length + " files author a shader in BOTH languages ***",
-        c.both.length <= DUAL_BASELINE,
-        c.both.join(", ") + " -- against " + c.wgslOnly.length + " WGSL-only and " + c.glslOnly.length +
-        " GLSL-only, which never needed translating. AN IR FOR THESE WOULD BE A THIRD THING TO MAINTAIN " +
-        "BESIDE THE TWO IT REPLACED. A RISE MEANS A NEW MODULE IS AUTHORING BOTH HALVES BY HAND -- read it " +
-        "before raising this line");
+    ok("  ...and the co-occurrence count is still reported, because it was never wrong about what it measured",
+        c.both.length >= pairs.duplication.length,
+        c.both.length + " files carry text in both languages, against " + c.wgslOnly.length + " WGSL-only and " +
+        c.glslOnly.length + " GLSL-only. THE NUMBER IS TRUE AND IT IS NOT THE DECISION'S NUMBER, which is the " +
+        "whole finding of v4414 -- see tools/ship/shaderPairs-selfcheck.mjs");
+
+    // *** v4470 MERGE -- BOTH INSTRUMENTS KEPT, BECAUSE THEY ANSWER DIFFERENT QUESTIONS. ***
+    // The gate above is v4414's: what is GATED is the count that bears on the decision (files that actually
+    // DUPLICATE a computation), because co-occurrence rises when the IR is built and a trigger that fires
+    // harder the more the problem is solved cannot be acted on. What follows is main's v4383: v3274's OWN
+    // named inversion point, held as its own assertion, and the instrument check that keeps raw-text
+    // classification from creeping back. main's DUAL_BASELINE assertion is deliberately NOT carried over --
+    // gating co-occurrence is the thing v4414 measured to be the wrong population -- but the number it
+    // watched is still reported by the check above, so nothing is lost by dropping the threshold on it.
+    const INVERSION = 20;   // v3274's own word: "if this count climbs toward twenty the arithmetic inverts"
 
     // *** THE TRIGGER, STATED AS ITS OWN CHECK SO IT CANNOT BE CONFUSED WITH THE BASELINE ABOVE. *** The
     // baseline says "nothing new has been hand-written since"; THIS says "the argument still holds at all".

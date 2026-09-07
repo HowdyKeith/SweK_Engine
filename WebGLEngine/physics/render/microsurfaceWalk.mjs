@@ -165,3 +165,57 @@ export const KC_ERROR_AT_V4446 = Object.freeze({
           "over-compensating for very dark conductors -- so it cannot be repaired by one scale factor, and " +
           "a claim that Kulla-Conty is 'within a few per cent' owes the reader a WHERE.",
 });
+
+// ---- *** THE DOOR (v3327's split) *** ---------------------------------------------------------------------
+//
+// v4461 -- registered at v4460 with nothing to render. The report prints the ERROR WITH ITS SIGN, because
+// KC_ERROR_AT_V4446's whole finding is that the sign changes, and a table of magnitudes would hide exactly
+// the thing that makes "Kulla-Conty is within a few per cent" an unanswerable claim.
+
+export function reportLines() {
+    const L = [];
+    const R = KC_ERROR_AT_V4446;
+    L.push("[microsurfaceWalk] Heitz's random walk as ground truth, and what Kulla-Conty scaling is worth");
+    L.push("");
+    L.push("  " + R.where + ", walk n = 60000");
+    L.push("  `truth` is re-measured here; `kc` is the value recorded at " + R.at + " (this module does not");
+    L.push("  compute the compensation -- it is the instrument the compensation is graded against).");
+    L.push("");
+    L.push("     F0      truth (now)   truth (" + R.at + ")   kc (" + R.at + ")   kc - truth   signed error");
+    let worstUnder = 0, worstOver = 0;
+    for (const row of R.rows) {
+        const F = (c) => row.f0 + (1 - row.f0) * Math.pow(1 - c, 5);     // Schlick, conductor
+        const now = albedo(0.7, 1.0, F, { n: 60000, seed: 1 }).value;
+        const rel = row.truth > 0 ? (row.kc - row.truth) / row.truth : 0;
+        if (rel < worstUnder) worstUnder = rel;
+        if (rel > worstOver) worstOver = rel;
+        L.push("   " + row.f0.toFixed(2).padStart(5) + "     " + now.toFixed(6).padStart(9) + "     " +
+               row.truth.toFixed(6).padStart(9) + "     " + row.kc.toFixed(6).padStart(9) + "   " +
+               (row.kc - row.truth >= 0 ? "+" : "") + (row.kc - row.truth).toFixed(6).padStart(9) + "   " +
+               (rel >= 0 ? "+" : "") + (rel * 100).toFixed(1) + "%");
+    }
+    L.push("");
+    L.push("  *** THE ERROR CHANGES SIGN: worst under " + (worstUnder * 100).toFixed(1) + "%, worst over +" +
+           (worstOver * 100).toFixed(1) + "% ***   recorded at " + R.at + ": " +
+           (R.worstUnder * 100).toFixed(1) + "% and +" + (R.worstOver * 100).toFixed(1) + "%");
+    L.push("  " + R.note);
+    L.push("");
+    // The bounce census is what makes the walk a ground truth rather than another model: energy leaves by
+    // escaping, and where it escapes from is countable.
+    L.push("  where the energy goes, by bounce count (F0 = 0.5)");
+    const F5 = (c) => 0.5 + 0.5 * Math.pow(1 - c, 5);
+    const all = albedo(0.7, 1.0, F5, { n: 60000, seed: 1 });
+    L.push("     bounces    albedo contribution");
+    let acc = 0;
+    for (let b = 1; b <= 5; b++) {
+        const v = albedo(0.7, 1.0, F5, { n: 60000, seed: 1, onlyBounces: b }).value;
+        acc += v;
+        L.push("   " + String(b).padStart(8) + "    " + v.toFixed(6).padStart(9) +
+               "   (running " + acc.toFixed(6) + ")");
+    }
+    L.push("   " + "6+".padStart(8) + "    " + (all.value - acc).toFixed(6).padStart(9) +
+           "   (total " + all.value.toFixed(6) + ")");
+    L.push("  mean bounces " + all.meanBounces.toFixed(3) + ", escaped fraction " +
+           all.escapedFraction.toFixed(4) + " -- single-scatter alone would stop at the first row.");
+    return L;
+}

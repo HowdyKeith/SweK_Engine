@@ -283,3 +283,60 @@ export const OVERCOUNT_AT_V4455 = Object.freeze({
         separableG2: 0.483411, betaG2: 0.305984, walk: 0.306083,
     }),
 });
+
+// ---- *** THE DOOR (v3327's split) *** ---------------------------------------------------------------------
+//
+// v4461 -- registered at v4460 with nothing to render. The report leads with vndfMass, because that is the
+// instrument checking ITSELF before it is allowed to convict anything: if the half-vector density does not
+// integrate to one, every number below it is measuring the quadrature rather than the BTDF.
+
+export function reportLines() {
+    const L = [];
+    const R = OVERCOUNT_AT_V4455, A = R.at;
+    L.push("[btdfDomain] where the transmission lobe's excess energy comes from, split by whether the");
+    L.push("             direction is geometrically possible at all");
+    L.push("");
+    L.push("  at alpha " + A.alpha + ", cosI " + A.cosI + ", n " + A.nAbove + " -> " + A.nBelow);
+    L.push("");
+    const c = vndfCeiling(A.cosI, { alpha: A.alpha, nAbove: A.nAbove, nBelow: A.nBelow, N: 512, M: 256 });
+    L.push("  *** THE INSTRUMENT CHECKS ITSELF FIRST. *** VNDF mass in half-vector space, where no change of");
+    L.push("  variables has been applied, must be 1 -- otherwise nothing below is measuring the BTDF.");
+    L.push("     vndf mass    " + c.mass.toFixed(6) + "   (recorded " + R.vndfMass.toFixed(6) + ", error " +
+           Math.abs(c.mass - 1).toExponential(2) + ")");
+    L.push("     ceiling      " + c.weighted.toFixed(6) + "   (recorded " + R.ceiling.toFixed(6) +
+           ")  -- the MOST a masking-only transmission lobe may integrate to");
+    L.push("");
+    L.push("  and the lobe as shipped, integrated in outgoing space, split by domain (N 256 x M 128 here;");
+    L.push("  the recorded shares were taken at N 1024 x M 512, which is why they differ in the 3rd decimal)");
+    L.push("     g          total      honest    flipped   backfacing      both   impossible share");
+    for (const g of ["g2", "separable", "masking", "none"]) {
+        const s = domainSplit(A.cosI, { alpha: A.alpha, nAbove: A.nAbove, nBelow: A.nBelow, g, N: 256, M: 128 });
+        const share = s.all > 0 ? s.impossible / s.all : 0;
+        L.push("   " + g.padEnd(10) + " " + s.all.toFixed(6).padStart(9) + "  " + s.honest.toFixed(6).padStart(9) +
+               "  " + s.flipped.toFixed(6).padStart(9) + "  " + s.backfacing.toFixed(6).padStart(9) + "  " +
+               s.both.toFixed(6).padStart(9) + "   " + share.toFixed(4).padStart(7) +
+               "  (recorded " + R.impossibleShareByG[g].toFixed(4) + ")");
+    }
+    L.push("");
+    // *** "IMPOSSIBLE" IS A GEOMETRIC FACT, NOT A TUNING CHOICE. *** A half-vector that points away from the
+    // surface, or a refraction on the wrong side of the flip boundary, is not a dim contribution -- it is a
+    // direction the transport cannot produce, and integrating over it is where the excess is manufactured.
+    L.push("  nearly half the as-written lobe sits on directions the transport CANNOT PRODUCE. The flip");
+    L.push("  boundary here is |cosI| * n1/n2 = " + R.flipBoundaryHere.toFixed(6) +
+           "; beyond it the half-vector changes side.");
+    L.push("");
+    L.push("  the numbers this round is held to, at " + A.alpha + "/" + A.cosI + ":");
+    L.push("     masking, domain enforced   " + R.maskingEnforced.toFixed(6) + "   agrees with the ceiling above");
+    L.push("     masking, AS TRANSMISSION.MJS SHIPS IT   " + R.maskingAsWritten.toFixed(6) +
+           "   *** " + R.maskingAsWritten.toFixed(2) + "x WHAT A PROBABILITY MAY BE, AND " +
+           (R.maskingAsWritten / R.maskingEnforced).toFixed(2) + "x THE ENFORCED VALUE ***");
+    L.push("     g2 as written " + R.g2AsWritten.toFixed(6) + "   ->  enforced " + R.g2Enforced.toFixed(6));
+    L.push("     the walk's single scatter " + R.walkSingleScatter.toFixed(6) +
+           "   -- reached from a walk, not from this integral");
+    L.push("");
+    L.push("  *** THE CROSS-CHECK NEITHER LINE COULD HAVE RUN ALONE: *** an energy bound reached " +
+           R.corroboration.chiPlusTheirs.toFixed(6) + " where this reached " + R.corroboration.chiPlusHere.toFixed(6) +
+           ", and its betaG2 " + R.corroboration.betaG2.toFixed(6));
+    L.push("  lands on the walk's " + R.corroboration.walk.toFixed(6) + " to 1e-4. Two routes, one answer.");
+    return L;
+}

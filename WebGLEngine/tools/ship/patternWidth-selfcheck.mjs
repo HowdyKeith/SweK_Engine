@@ -129,6 +129,12 @@ const CENSUS = PW.census(SRCS, BASES);
         // other two rounds apart is the census working rather than a collision.
         "tools/ship/predicatePairs-selfcheck.mjs": "a deliberately narrow pattern, frozen as the KNOWN POSITIVE " +
             "that validates predicatePairs' method. It is a fixture of the defect, not an instance of it.",
+        // v4526 MERGE -- this branch's reached-licence note QUOTES the sweep's file list ("LICENSE/LICENSE.md/LICENSE.txt/
+        // COPYING") inside a string, to record that the sweep it describes had stopped looking; the census reads the quoted
+        // list as a matcher and reports it rejecting ASHIMA-LICENSE.txt. It matches nothing: it is prose in a `notes`
+        // field, and the file it describes was found by widening the sweep it names.
+        "world/reachedLicences.mjs": "prose, not a matcher: a note quoting the file list an earlier sweep used, kept to " +
+            "record that the sweep had stopped looking. No code reads it as a pattern.",
     });
     const rows = CENSUS.rows;
     const surprise = rows.filter((r) => !(r.path in ADJUDICATED));

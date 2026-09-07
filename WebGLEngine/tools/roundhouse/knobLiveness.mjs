@@ -338,7 +338,7 @@ export function wideValues(v) {
  * The whole register, one row per device/knob.
  * @returns rows of { device, knob, kind, modeSource, probed[], live[], still[], movedMost, note }
  */
-// *** v4454 -- THE BUDGET GUARDED THE DEVICE AND NOTHING GUARDED THE CENSUS, AND THIS FILE ALREADY KNEW THE
+// *** THE BUDGET GUARDED THE DEVICE AND NOTHING GUARDED THE CENSUS, AND THIS FILE ALREADY KNEW THE
 // RULE. *** Sixty lines up, v4044: "THE FIRST VERSION GUARDED THE WRONG THING. It timed only the BASE build
 // -- one build out of (modes x knobs x values + 1) -- so a device costing 20 s per build passed the guard and
 // then ran unbounded. THE COST OF A CENSUS IS WHAT THE CENSUS DOES, NOT WHAT ITS FIRST STEP COSTS."
@@ -864,7 +864,7 @@ export const STILL_OK = {
 /** v3327's split: this half PRINTS, and knobLiveness-selfcheck beside it is what exits nonzero. */
 // *** THE FRONT DOOR SETS A CENSUS BUDGET AND THE OTHER CALLERS DO NOT. *** Every caller in the tree narrows
 // with `only:`; this one does not, and it is the one the reportLines convention exposes. 25 s is chosen to be
-// the same order as the other slow members of that convention (37-74 s measured at v4453) rather than to be
+// the same order as the other slow members of that convention (37-74 s measured at v4458) rather than to be
 // generous -- a front door is opened by a page, and a page cannot wait forty-three minutes. Pass
 // totalBudgetMs explicitly for a longer look; pass Infinity for the full census this used to attempt.
 const FRONT_DOOR_CENSUS_MS = 25000;

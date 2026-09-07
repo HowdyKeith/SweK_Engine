@@ -13,6 +13,7 @@
 import { zeroRangeSweep, zeroLines, knobRange, ZERO_RANGE_REGISTRATION } from "./zeroRangeSweep.mjs";
 import { EXACT_OK } from "./exactZeroRegister.mjs";
 import { getDevice } from "./devices.mjs";
+import { dyadicSigmas, effectiveSigma, CONTROL_CLAIM } from "./zeroControl.mjs";   // v4477 -- the planted control
 
 let fails = 0;
 const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  ") + name + (detail ? "   " + detail : "")); if (!cond) fails++; };
@@ -76,6 +77,18 @@ const hit = (d, m, f) => z.rows.find((r) => r.device === d && r.mode === m && r.
         "fake zero on purpose. The control was watching for a symptom that has been cured. This sweep's ability " +
         "to find an exact zero is therefore UNPROVEN until a replacement control is planted -- it is not a " +
         "passing check, it is a recorded loss with a known cause");
+
+    // *** v4477 -- A REPLACEMENT IS PLANTED, AND THE SENTENCE ABOVE IS NO LONGER THE LAST WORD. ***
+    // The loss is left standing verbatim because it is still true about optics.airy. What changed is the clause
+    // after it: the sweep's detection power is no longer unproven. zeroControl-selfcheck runs THIS function over
+    // a sigma range carrying a derived exact zero and over one carrying none, and requires the verdict to track
+    // the device point for point. Eleven hundred versions is how long the debt stood.
+    ok("!! the replacement control exists, and it certifies the INSTRUMENT rather than restating the loss",
+        CONTROL_CLAIM.plantedAt === "v4477" && CONTROL_CLAIM.direction === "sufficient" &&
+        CONTROL_CLAIM.replaces.includes("airy"),
+        "splat.integral.isoRollDeviation, with both conditions derived and the second one -- fl(cos^2+sin^2) === 1 " +
+        "-- named for the first time since v2912. The arms live in zeroControl-selfcheck.mjs so this gate keeps " +
+        "asking its own question; what it no longer has to say is that nothing is watching");
 }
 
 // ---- 3. THE BET: A SECOND ONE, ELSEWHERE -------------------------------------------------------------------------------
@@ -87,20 +100,25 @@ const hit = (d, m, f) => z.rows.find((r) => r.device === d && r.mode === m && r.
         "was made of ordinary parts rather than being a one-off");
 
     // Mechanism, established rather than asserted -- and it makes this one LEGITIMATE.
+    // *** v4477 -- THIS BLOCK USED TO LIST sigma: 2 AMONG ITS DYADIC POINTS. IT IS THE sigma: 1 POINT. ***
+    // splatDefaults clamps sigma to 1, so the build at 2 is the build at 1 and the evidence had four independent
+    // dyadic points, not five. The list is now generated from the control's own predicate and every value is
+    // shown as requested->effective so a clamped point cannot be counted twice again.
     const dev = await getDevice("splat");
+    const DYADIC = dyadicSigmas();                       // powers of two inside splat's clamp, generated
+    const NONDYADIC = [0.1, 0.3, 0.7];
     const vals = {};
-    for (const sigma of [0.125, 0.25, 0.5, 1, 2, 0.1, 0.3, 0.7]) {
+    for (const sigma of [...DYADIC, ...NONDYADIC]) {
         vals[sigma] = (await dev.build({ mode: "integral", config: { sigma } })).isoRollDeviation;
     }
-    const dyadicZero = [0.125, 0.25, 0.5, 1, 2].every((s) => vals[s] === 0);
-    const nonDyadicNonZero = [0.1, 0.3, 0.7].every((s) => vals[s] > 0);
+    const dyadicZero = DYADIC.every((s) => vals[s] === 0);
+    const nonDyadicNonZero = NONDYADIC.every((s) => vals[s] > 0);
     ok("!! and it is a LEGITIMATE zero, for a reason the sweep alone could not have given",
-        dyadicZero && nonDyadicNonZero,
-        "dyadic sigma 0.125/0.25/0.5/1/2 -> exactly 0; non-dyadic 0.1/0.3/0.7 -> " +
-        [0.1, 0.3, 0.7].map((s) => vals[s].toExponential(1)).join(", ") + ". For an isotropic covariance " +
-        "sigma^2*I the rotation is sigma^2*R*R^T, and scaling by a power of two is an exact exponent shift, so " +
-        "rotated equals unrotated bit for bit. The invariance is real at every sigma; whether it READS as zero " +
-        "depends on whether sigma is dyadic");
+        dyadicZero && nonDyadicNonZero && DYADIC.length >= 6 && DYADIC.every((s) => s === effectiveSigma(s)),
+        "dyadic sigma " + DYADIC.join("/") + " -> exactly 0; non-dyadic 0.1/0.3/0.7 -> " +
+        NONDYADIC.map((s) => vals[s].toExponential(1)).join(", ") + ". Every listed sigma is its own effective " +
+        "value, so none of them is a duplicate of another. The mechanism -- and the SECOND condition this " +
+        "sentence used to omit -- is established in zeroControl.mjs, which turns it into the sweep's control");
 
     ok("...so it goes on the register with its sentence rather than into a bug list",
         !!EXACT_OK["splat.integral.isoRollDeviation"],

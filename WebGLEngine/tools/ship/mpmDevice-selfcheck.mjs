@@ -90,7 +90,7 @@ console.log("\n1. THE STAGES, THE BINDINGS PER STAGE, AND THE NULL BACKEND'S DIS
     ok("*** four stages, four dispatches per step, on the null backend ***", STAGES.join() === "clear,p2g,grid,g2p" && disp === 12, `${disp} dispatches for 3 steps`);
     ok("  the bindings are per ENTRY POINT: clear binds P and acc, grid binds P, acc, gv -- twelve binds, not twenty", binds.length === 12 && binds.join() === "P,acc,P,parts,acc,flags,P,acc,gv,P,parts,gv", binds.join(","));
     const dev = codeOf(read("gfx/device.js"));
-    ok("gfx/device.js answers `used` over the functions reachable from the entry point", /_reachableCode\(code, entryPoints\)/.test(dev) && /classify\(d\.wgsl, \[d\.entryPoint \|\| "main"\]\)/.test(dev));
+    ok("gfx/device.js answers `used` over the functions reachable from the entry point", /_reachableCode\(code, entryPoints\)/.test(dev) && /classify\(d\.wgsl, \[d\.entryPoint \|\| "main"\](, d\.uses)?\)/.test(dev));
     const page = codeOf(read("mpm-gpu-check.html"));
     // v4467 -- the page no longer builds bind groups at all: it runs the kernel through makeMpmDevice, whose per-stage
     // binding is the device's per-entry-point scan (the fix v4466 first applied to the page by hand).

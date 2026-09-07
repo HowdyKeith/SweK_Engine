@@ -5,7 +5,7 @@
 // ---- MEASURED IN A REAL CHROMIUM, NOT ASSERTED ------------------------------------------------------------------
 //
 // This was going to be labelled rig-only, because "the sandbox has no browser". IT HAS TWO:
-// /opt/pw-browsers/chromium_headless_shell-1194/ and a full Puppeteer Chrome at ~/.cache/puppeteer/. FIFTH
+// the resolved headless shell directory  and a full Puppeteer Chrome at ~/.cache/puppeteer/. FIFTH
 // EXPIRED BLOCKER THIS SESSION -- v2560 (emsdk), v2570 (box3d.wasm), v2576 (real terrain), v2582 (brain.js is
 // "Deno-only"), now this. A REASON THAT EXPIRED IS A HABIT.
 //

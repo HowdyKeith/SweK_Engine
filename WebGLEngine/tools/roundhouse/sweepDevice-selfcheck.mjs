@@ -27,7 +27,8 @@
 //   recorded a divergence as "a measurement of the envelope, not a failed attempt"; dropping it would turn a
 //   boundary into a gap in a table.
 
-import { sweepDevice, trend, directness } from "./sweepDevice.mjs";
+import { sweepDevice, trend, directness, effectiveKnob, sweptAtOf, coercionSummary } from "./sweepDevice.mjs";
+import { getDevice } from "./devices.mjs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -308,6 +309,71 @@ const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "
         `0.370 against 0.914. The low value was not noise -- it is a quantity pinned at 1.000 whose last bits ` +
         "wander. The instrument flagged the asymmetry; reading the device explained it. Same division of labour " +
         "as the landauzener correction, and this time the shape meant something new");
+}
+
+// ---- v4477: THE POINT'S COORDINATE ------------------------------------------------------------------------------------
+// A point recorded the value it was ASKED FOR. Every device clamps, so a third of the zero-range sweep's points
+// were labelled with a configuration that was never built -- and one of them manufactured a mechanism. The
+// recording is fixed; these are the checks that keep it fixed.
+{
+    const cl = await sweepDevice("splat", "integral", { knob: "gridN", values: [26, 64, 128, 256, 512, 1024, 2560] });
+    ok("!! a point carries the value the DEVICE used beside the value it was asked for",
+        cl.points.every((p) => p.sweptAt && p.sweptAt.knob === "gridN") &&
+        cl.points[0].sweptAt.requested === 26 && cl.points[0].sweptAt.effective === 32 &&
+        cl.points[6].sweptAt.requested === 2560 && cl.points[6].sweptAt.effective === 1024,
+        cl.points.map((p) => p.sweptAt.requested + "->" + p.sweptAt.effective).join("  ") + ". The last two " +
+        "requests build the SAME configuration, and before this the sweep reported them as two points at 1024 " +
+        "and 2560 -- a true label on a build that never happened");
+    ok("...and the sweep totals it, so nobody has to rediscover the clamp to read the table",
+        cl.coercion.points === 7 && cl.coercion.coerced === 2 &&
+        cl.coercion.distinctRequested === 7 && cl.coercion.distinctEffective === 6,
+        JSON.stringify(cl.coercion) + ". Seven requests, six configurations. Across the live device table the " +
+        "figures are 5612 coerced of 17759, with 1225 knob-ranges collapsing");
+    const clean = await sweepDevice("splat", "integral", { knob: "sigma", values: [0.01, 0.025, 0.05, 0.1, 0.2, 0.4, 1] });
+    ok("a range that is entirely inside the clamps reports zero coercion, so the count is not always-on",
+        clean.coercion.coerced === 0 && clean.coercion.distinctEffective === 7,
+        "the same instrument on splat's own sigma range: 0 of 7 coerced. A counter that fired on every sweep " +
+        "would say nothing about the sweep it fired on");
+    // THE UNANSWERABLE BRANCH, run rather than argued about. lbm is the one device in the live table with no
+    // defaults(), and one lbm build does not finish in two minutes -- so the branch is reached through
+    // effectiveKnob, which is the function sweepDevice itself calls, with devices that stand in for that shape.
+    const splat = await getDevice("splat");
+    ok("!! a device that cannot say what it used yields undefined, which callers must report as null",
+        effectiveKnob(null, "integral", {}, "sigma", 3) === undefined &&
+        effectiveKnob({}, "integral", {}, "sigma", 3) === undefined &&
+        effectiveKnob({ defaults: () => { throw new Error("boom"); } }, "integral", {}, "sigma", 3) === undefined &&
+        effectiveKnob({ defaults: () => ({ config: {} }) }, "integral", {}, "sigma", 3) === undefined &&
+        effectiveKnob(splat, "integral", {}, "sigma", 3) === 1,
+        "no device, no defaults(), a defaults() that throws, and a defaults() that drops the knob all give " +
+        "undefined; a real one gives the clamp. Reporting coerced:false for any of the first four would be a " +
+        "claim the instrument cannot support -- the same shape as a skipped gate recorded as a pass");
+    // The record-building and the totalling, run directly, because the device that exercises the unanswerable
+    // branch in production is lbm and lbm cannot be swept inside a gate's budget.
+    const unknownPt = sweptAtOf("sigma", 3, undefined);
+    const knownPt = sweptAtOf("sigma", 3, 1);
+    const samePt = sweptAtOf("sigma", 1, 1);
+    ok("!! an unanswerable point records coerced:null, and null is not false",
+        unknownPt.coerced === null && unknownPt.coerced !== false &&
+        knownPt.coerced === true && samePt.coerced === false,
+        JSON.stringify([unknownPt.coerced, knownPt.coerced, samePt.coerced]) + " for unanswerable / clamped / " +
+        "untouched. `effective !== requested` would report the unanswerable point as coerced:true, and " +
+        "`effective === requested` would report it as false -- both are claims the instrument cannot support");
+    const blindPts = [unknownPt, sweptAtOf("sigma", 2, undefined)].map((sa) => ({ sweptAt: sa }));
+    ok("...and distinctEffective is null when any point cannot answer, not a count over undefined",
+        coercionSummary(blindPts, [3, 2]).distinctEffective === null &&
+        coercionSummary(blindPts, [3, 2]).answerable === 0 &&
+        coercionSummary(blindPts, [3, 2]).coerced === 0 &&
+        cl.coercion.distinctEffective === 6,
+        "two unanswerable points give distinctEffective null; the gridN sweep above gives 6. new Set([undefined, " +
+        "undefined]).size is 1, so the naive count would report a seven-point sweep as ONE configuration -- a " +
+        "device that cannot say would read as maximally collapsed, which is the loudest possible wrong answer");
+    let refused = null;
+    try { await sweepDevice("splat", "integral", { knob: "out", values: [1, 2] }); }
+    catch (e) { refused = String(e.message); }
+    ok("a knob whose name collides with a point's own keys is REFUSED, not silently overwritten",
+        !!refused && refused.includes("collides"),
+        (refused || "NOT REFUSED") + ". `out` and `error` were already unprotected; adding `sweptAt` widened the " +
+        "door, so it is shut. A collision would have the knob's value read back as the device's output");
 }
 
 console.log();
