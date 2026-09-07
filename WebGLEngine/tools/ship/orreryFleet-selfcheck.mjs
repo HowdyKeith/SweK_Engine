@@ -247,18 +247,118 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
     const liveShas = {};
     for (const n of names) {
         try {
-            liveShas[n] = execFileSync("git", ["log", "--format=%h", "--", "WebGLEngine/vendor/" + n],
+            // v4534: %H, not %h. The abbreviated hash's LENGTH is chosen by git at runtime and grows with
+            // the repository -- it was 7 when the record was baked and is 8 now -- so comparing against it
+            // compares a rendering. Fourteen of fifteen bodies "drifted" without changing.
+            liveShas[n] = execFileSync("git", ["log", "--format=%H", "--", "WebGLEngine/vendor/" + n],
                                    { cwd: REPO, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] })
                       .trim().split("\n").filter(Boolean);
         } catch { liveShas[n] = []; }
     }
     const live = {};
     for (const n of names) live[n] = liveShas[n].length;
-    const sameList = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
-    const drift = names.filter((n) => !sameList(R.perBody[n] || [], liveShas[n]));
+    // *** A RECORDED HASH MATCHES A LIVE ONE WHEN IT IS A PREFIX OF IT -- an abbreviation is a rendering of
+    // an identity, and either side may be abbreviated to a different length than the other. *** This is not a
+    // loosened comparison: a 7-character prefix of a 40-character hash still names one commit in a repository
+    // of 1,237, and the ORDER and COUNT are compared exactly as before.
+    const sameList = (a, b) => a.length === b.length && a.every((x, i) => b[i].startsWith(x));
+    // *** THE COMPARATOR ITSELF, ON FIXED STRINGS. *** The ambiguity row below checks the RECORD's prefixes;
+    // it says nothing about how they are compared, so sabotage GA cut the match to a single character and
+    // went 0 RED -- the two are independent and only one was being exercised. A prefix match is only a
+    // prefix match if it rejects a hash that agrees on the first character and diverges after it.
+    {
+        const F40 = (h) => (h + "0".repeat(40)).slice(0, 40);
+        const cases = [
+            [["abc1234"], [F40("abc1234de")], true,  "a genuine abbreviation of the same commit"],
+            [["abc1234"], [F40("abc9999")],   false, "agrees on 'abc', diverges after -- a DIFFERENT commit"],
+            [["abc1234"], [F40("a")],         false, "agrees on one character only"],
+            [["abc1234"], [F40("abc1234de"), F40("beef")], false, "same first entry, different LENGTH"],
+            [["abc1234", "beef5678"], [F40("abc1234de"), F40("beef5678ab")], true, "two, both prefixes, in order"],
+            [["beef5678", "abc1234"], [F40("abc1234de"), F40("beef5678ab")], false, "right set, WRONG ORDER"],
+        ];
+        const wrong = cases.filter(([a, b, want]) => sameList(a, b) !== want);
+        ok("!! FIXTURE: the comparator accepts a true prefix and rejects a near-miss, on fixed strings",
+           wrong.length === 0,
+           `${cases.length} cases, ${cases.length - wrong.length} correct` +
+           (wrong.length ? ": WRONG on " + wrong.map((c) => c[3]).join("; ") : "") +
+           ". ORDER and COUNT are still compared exactly; only the LENGTH of each identity is tolerated.");
+    }
+
+    const moved = F.COMMIT_BELT_DRIFT_V4534.movedSince4475;
+    const arrived = F.COMMIT_BELT_DRIFT_V4534.arrivedSince4475;
+    const expectedFor = (n) => (moved[n] ? moved[n].now : arrived[n] ? arrived[n].now : (R.perBody[n] || []));
+    const drift = names.filter((n) => !sameList(expectedFor(n), liveShas[n]));
+    const short = new Set(names.filter((n) => (R.perBody[n] || []).some((h) => h.length < 40)));
     ok("*** the recorded per-body commits still match git, BY HASH ***", drift.length === 0,
-        drift.map((n) => `${n}: recorded [${(R.perBody[n] || []).join(" ")}], git says [${liveShas[n].join(" ")}]`).join("; ") ||
-        `${names.length} bodies, ${Object.values(live).reduce((a, b) => a + b, 0)} commit sightings, every hash re-derived from git rather than trusted`);
+        drift.map((n) => `${n}: expected [${expectedFor(n).join(" ")}], git says [${liveShas[n].map((h) => h.slice(0, 8)).join(" ")}]`).join("; ") ||
+        `${names.length} bodies, ${Object.values(live).reduce((a, b) => a + b, 0)} commit sightings, every hash ` +
+        `re-derived from git rather than trusted. ${short.size} bodies are recorded at an abbreviation shorter ` +
+        `than git now renders (${F.COMMIT_BELT_DRIFT_V4534.abbreviationWas} against ` +
+        `${F.COMMIT_BELT_DRIFT_V4534.abbreviationNow}) and match by prefix, which is why %h was the wrong read.`);
+    // *** THE READ IS THE FULL IDENTITY, ASSERTED. *** Prefix-matching makes the comparison tolerant of
+    // whatever length git renders, so reverting to %h no longer changes today's answer -- sabotage GB went
+    // 0 RED. That tolerance is the point, and it is not a reason to read an abbreviation: %h can also get
+    // SHORTER than the record, and then a prefix match fails for the same non-reason it used to. What is
+    // read is the 40-character id, and that is checked rather than assumed.
+    const shortLive = names.filter((n) => liveShas[n].some((h) => h.length !== 40));
+    ok("!! the live read is the full 40-character identity, not an abbreviation",
+       shortLive.length === 0 && names.some((n) => liveShas[n].length > 0),
+       shortLive.length ? "ABBREVIATED: " + shortLive.join(", ")
+         : `${Object.values(liveShas).flat().length} hashes read at full length. %h renders 7 or 8 here TODAY ` +
+           "and git chooses that number, not this tree.");
+
+    // *** AND THE PREFIX MATCH IS ONLY SOUND WHILE EACH RECORDED PREFIX NAMES ONE COMMIT. *** The first
+    // version of this said so in a comment -- "a 7-character prefix still names one commit in a repository of
+    // 1,237" -- which is an argument, not a check, and sabotage GA cut the prefix to a single character and
+    // passed. Measured against every commit in the repository instead.
+    const allCommits = (() => {
+        try {
+            return execFileSync("git", ["log", "--format=%H", "--all"],
+                { cwd: REPO, encoding: "utf8", maxBuffer: 1 << 26, stdio: ["ignore", "pipe", "ignore"] })
+                .trim().split("\n").filter(Boolean);
+        } catch { return []; }
+    })();
+    const ambiguous = [];
+    for (const n of names)
+        for (const h of expectedFor(n)) {
+            const hits = allCommits.filter((c) => c.startsWith(h)).length;
+            if (hits !== 1) ambiguous.push(`${n}:${h} names ${hits}`);
+        }
+    ok("!! *** EVERY RECORDED PREFIX NAMES EXACTLY ONE COMMIT IN THIS REPOSITORY -- measured, not argued ***",
+       ambiguous.length === 0 && allCommits.length > 100,
+       ambiguous.length ? "AMBIGUOUS: " + ambiguous.slice(0, 4).join("; ")
+         : `${Object.values(F.COMMIT_BELT_DRIFT_V4534.movedSince4475).length + names.length} bodies' prefixes ` +
+           `checked against all ${allCommits.length} commits, every one unique. A prefix short enough to name ` +
+           "two commits would make the comparison above meaningless, and nothing was measuring that.");
+
+    // *** THE TWO FAILURE MODES ARE DIFFERENT FACTS AND WERE REPORTED AS ONE. *** "git renders hashes one
+    // character longer now" needs nothing; "this body has new commits" needs a recorded reason. The old row
+    // said the same sentence for both and buried one real change under fourteen that had not happened.
+    const D = F.COMMIT_BELT_DRIFT_V4534;
+    const stillMatchesV4475 = names.filter((n) => !moved[n] && sameList(R.perBody[n] || [], liveShas[n]));
+    ok("!! *** LENGTH DRIFT IS NOT A FINDING; A CHANGED COMMIT SET IS, AND THEY ARE COUNTED APART ***",
+       stillMatchesV4475.length === D.matchedOnceLengthIgnored &&
+       Object.keys(moved).length + D.matchedOnceLengthIgnored === D.ofBodies &&
+       Object.values(moved).every((m) => m.why && m.recorded.length !== m.now.length),
+       `${stillMatchesV4475.length} bodies unchanged since v4475 once the abbreviation is ignored, ` +
+       `${Object.keys(moved).length} genuinely moved: ${Object.keys(moved).join(", ")}. The v4475 record is ` +
+       "NOT rewritten -- it is a claim about v4475 and stays true about v4475 -- and what moved is recorded " +
+       "beside it with the reason, which is the rule this file applied at v4418 and v4472.");
+
+    // *** THE FOUR CLASSES PARTITION THE LIVE FLEET. *** A body in vendor/ with no entry anywhere is the case
+    // that used to pass as "not in the record, so not compared" -- three had arrived that way and the
+    // fifteen-body noise hid them too.
+    const unaccounted = names.filter((n) => !(R.perBody[n] || []).length && !moved[n] && !arrived[n]);
+    ok("!! *** UNCHANGED + MOVED + ARRIVED + REMOVED IS THE WHOLE FLEET -- a new body cannot arrive unrecorded ***",
+       unaccounted.length === 0 && names.length === D.bodiesNow &&
+       stillMatchesV4475.length + Object.keys(moved).length + Object.keys(arrived).length === names.length &&
+       Object.values(arrived).every((a) => a.why && a.now.length > 0) &&
+       D.removedSince4475.every((n) => !names.includes(n)),
+       `${stillMatchesV4475.length} unchanged + ${Object.keys(moved).length} moved + ` +
+       `${Object.keys(arrived).length} arrived + ${D.removedSince4475.length} removed = ${names.length} bodies. ` +
+       `ARRIVED: ${Object.keys(arrived).join(", ")} -- and one commit (13afafec) brought two of them, so a ` +
+       "body and a commit are not one-to-one in either direction." +
+       (unaccounted.length ? " UNACCOUNTED: " + unaccounted.join(", ") : ""));
     // *** THE v4329 FINDING IS NO LONGER TRUE OF THIS TREE, AND A ROUND OF OURS IS WHY. *** It said twelve of
     // fifteen bodies had been touched by exactly one commit. v4416 recorded provenance for six that had none --
     // the first time in this repository's life that a vendored body was touched by a commit that did not vendor

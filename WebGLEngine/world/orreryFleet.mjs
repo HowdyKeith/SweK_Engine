@@ -426,6 +426,72 @@ export const COMMIT_BELT_V4472 = Object.freeze({
  *
  * The conclusion is unchanged and so is the reason: eleven of this repository's commits reach vendor/ at all.
  */
+// *** v4534 -- FOURTEEN OF THE FIFTEEN "DRIFTED" BODIES HAD NOT CHANGED AT ALL: THE GATE WAS COMPARING A
+// RENDERING. *** The live read used `git log --format=%h`, and %h is the ABBREVIATED hash, whose length git
+// chooses at runtime and grows with the repository. It picked 7 when COMMIT_BELT_V4475 was baked and picks 8
+// now, so every recorded hash stopped matching -- `b9ea45a` against `b9ea45a3`, a strict prefix, the same
+// commit. The record's own header says why hashes replaced counts: "git log either lists these commits for
+// this path or it does not." *** THAT IS AN IDENTITY, AND %h IS NOT IT. %H IS. ***
+//
+// The comparison is prefix-wise against full hashes now, so THE v4475 RECORD IS UNTOUCHED AND STILL VALIDATES
+// -- fourteen bodies needed no re-bake, because nothing about them had moved. Fixing a comparison that was
+// reading a rendering is not the same act as widening a threshold that failed, which is the distinction
+// v4472 drew when it deleted the `max(live) <= 2` ceiling rather than raise it.
+//
+// AND ONE BODY REALLY DID MOVE, which is the finding the other fourteen were burying.
+// v4534 SABOTAGES, RESULTS BY NAME:
+//   GA. the prefix match becomes "starts with one character" -> *** 0 RED, THEN 2 RED ***
+//   GB. back to %h -- reading a rendering again              -> *** 0 RED, THEN 2 RED ***
+//   GC. a moved body's recorded hashes are wrong             -> 3 RED
+//   GD. an arrived body is dropped from the record           -> 3 RED
+//   GE. the moved/unchanged split stops adding up            -> 2 RED
+//   GF. an arrived body is recorded with no reason           -> 2 RED
+//   GG. bodiesNow drifts from the live fleet                 -> 2 RED
+//
+// GA AND GB BOTH WENT 0 RED, AND BOTH WERE PLACES THIS ROUND ARGUED INSTEAD OF MEASURING. GA cut the
+// comparison to a single character and passed, because the row checking prefix uniqueness checks the
+// RECORD's prefixes and says nothing about how they are compared -- two independent things, one exercised.
+// The comment claiming "a 7-character prefix names one commit in a repository of 1,237" was an argument; it
+// is now counted against all 1,237, and the comparator is driven on fixed strings that agree on their first
+// character and diverge after it. GB reverted to %h and passed, because prefix-matching makes the comparison
+// tolerant of any length -- which is the point, and is not a reason to read an abbreviation, since %h can
+// also get SHORTER than the record. The read is asserted to be the 40-character identity.
+export const COMMIT_BELT_DRIFT_V4534 = Object.freeze({
+    at: "v4534",
+    against: "v4475",
+    abbreviationWas: 7, abbreviationNow: 8,
+    matchedOnceLengthIgnored: 14, ofBodies: 15,
+    // `fonts` gained three commits, and all three are ordinary vendoring: OFL families, packed atlases and a
+    // rig that measures the Slug fragment. Recorded rather than folded into perBody, because v4475's record
+    // is a claim about v4475 and stays true about v4475 -- the same rule this file applied at v4418 and v4472.
+    movedSince4475: Object.freeze({
+        fonts: Object.freeze({
+            recorded: Object.freeze(["66db97c"]),
+            now: Object.freeze(["75bf2c5f", "7f48df2b", "95190be0", "66db97c4"]),
+            why: "three OFL families vendored as static glyf instances with a registry, atlases packed at " +
+                 "ship time held byte for byte against the page, and slug-rig.html measuring the Slug " +
+                 "fragment's cost per face -- all three ordinary vendoring, none of it a defect",
+        }),
+    }),
+    // *** AND THREE BODIES ARRIVED THAT THE RECORD NEVER HELD, WHICH THE FIFTEEN-BODY NOISE ALSO HID. ***
+    // Each is one ordinary vendoring commit, and one commit brought two of them -- so "a body" and "a commit"
+    // are not one-to-one in either direction, which is the same point v4416 made from the other side when a
+    // commit touched a body without vendoring it.
+    arrivedSince4475: Object.freeze({
+        "kenney-city": Object.freeze({ now: Object.freeze(["13afafec"]), why: "Kenney's two starter kits vendored, one commit for both" }),
+        "kenney-racing": Object.freeze({ now: Object.freeze(["13afafec"]), why: "the same commit as kenney-city" }),
+        morphicons: Object.freeze({ now: Object.freeze(["891cc90f"]), why: "glyph-outline morphing, Task 44" }),
+    }),
+    removedSince4475: Object.freeze([]),
+    bodiesNow: 18,
+    // The four classes PARTITION the live fleet: unchanged, moved, arrived, removed. A body that appears in
+    // vendor/ without an entry here fails the gate rather than passing as "not in the record, so not checked".
+    notClaimed: "that %h was wrong to use when it was written -- it matched then. What is claimed is that its " +
+                "length is chosen by git and not by this tree, so a record compared against it goes stale " +
+                "without anything in the tree changing, and the fifteen-body failure it produced named one " +
+                "real change and fourteen that had not happened.",
+});
+
 export const COMMIT_BELT_V4475 = Object.freeze({
     at: "v4475",
     perBody: Object.freeze({ ...COMMIT_BELT_V4472.perBody, three: Object.freeze(["8421164", "7e680f9", "e08b1b6", "66db97c"]) }),
