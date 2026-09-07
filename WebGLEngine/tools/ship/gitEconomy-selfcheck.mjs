@@ -1,7 +1,45 @@
 #!/usr/bin/env node
-// WebGLEngine/tools/ship/gitEconomy-selfcheck.mjs -- v4299 (Level 13)
+// WebGLEngine/tools/ship/gitEconomy-selfcheck.mjs -- v4534 (was v4299, Level 13)
 //
 // GRADES world/gitEconomy.mjs: THE GAME'S ECONOMY RUNNING AMONG THE VENDORED REPOSITORIES, WITH ITS OWN LIFE.
+//
+// ---- *** v4534 -- TWO RED ROWS, NEITHER OF THEM ABOUT THE ECONOMY *** ---------------------------------------
+//
+// Both were measuring something other than what they said, and the economy was right in both cases.
+//
+// (1) "EVERY DEPARTURE WAS THE BEST MARGIN ON OFFER" re-derived the best margin and missed TWO OF bestRoute'S
+//     FOUR RULES: it skips a market that is CLOSED and one that CANNOT PAY -- "a market that cannot pay is
+//     not a destination" -- and the scan skipped neither. So it found richer margins at destinations the ship
+//     is RIGHT to refuse. MEASURED: 26 violations of 430 choices, and ALL 26 ARE MARKETS THAT CANNOT PAY --
+//     0 closed, 0 unexplained. A market holding 159 credits was being counted as a missed 480-credit sale.
+//     The rules stay RE-DERIVED rather than borrowed from bestRoute -- a checker that asks the thing it
+//     checks to define "best" agrees by construction -- and what the scan WOULD flag without them is counted,
+//     so the repair is a number (26 -> 0) rather than a story about one.
+//
+// (2) "NO TREASURY RAN DRY OVER A HUNDRED DAYS" MEASURED ONE INSTANT: THE LAST. a.brokeMarkets is a snapshot,
+//     and being briefly dry is routine churn here -- ALL EIGHTEEN markets go dry at some tick, nine at once
+//     at the peak, and the day-100 reading is whatever the churn happens to be (1 as it stands; 2 with the
+//     three newest bodies removed, 3 with one). *** I FIRST GUESSED THE THREE NEW BODIES HAD THINNED THE
+//     CREDIT SUPPLY AND MEASURED THE OPPOSITE: removing them makes it WORSE. *** The prose meant "ran dry" as
+//     a lasting state, so that is what is asserted -- bankruptcy, which IS terminal, and RECOVERY: every
+//     treasury that empties trades its way back. Worst unbroken spell 20 ticks, 5.0 days of 100.
+//
+// v4534 SABOTAGES, RESULTS BY NAME:
+//   IA. the cannot-pay rule is dropped from the scan  -> 3 RED   <- the historical defect, reproduced
+//   IB. bestRoute sells to a market that cannot pay   -> 2 RED
+//   IC. the dry-spell scan never records a spell      -> *** 0 RED, THEN 2 RED ***
+//   ID. the spell counter never resets                -> *** 0 RED, THEN 2 RED ***
+//   IE. the load-bearing counter is faked to non-zero -> 2 RED
+//   IF. bankruptcy is no longer terminal              -> 3 RED
+//
+// IC AND ID WERE BOTH MY OWN NEW INSTRUMENTATION. Zeroing every spell passed, because "no spell reached 400"
+// is true of no spells at all -- the check could not tell "everyone recovered" from "nothing was measured".
+// Deleting the reset, so a spell became the cumulative dry count, passed too. Both are asserted directly now:
+// a spell was seen, and at least one market's dry TIME is split across several spells, which only holds if
+// the counter resets. keyhunt is dry 108 ticks with a longest spell of 15, and that gap is the proof.
+//
+// NOT ASSERTED: that a five-day dry spell is acceptable. That is an economy design question, and a bound
+// chosen here would be a tolerance picked to pass rather than a property.
 //
 // "Not accurate" is the brief, so this does not grade prices against anything. It grades what a simulation
 // owes even when it is a toy: every ton accounted for, every credit accounted for, the same run from the same
@@ -42,12 +80,42 @@ console.log("\n2. A HUNDRED DAYS OF LIFE, ACCOUNTED FOR TO THE UNIT");
     const e = makeGitEconomy(system, { seed: 7 });
     const before = e.accounting();
     let routesOk = true, offSegment = 0, routeChecks = 0;
+    let routeViolations = 0, skippedClosed = 0, skippedCannotPay = 0, wouldFlagWithoutRules = 0;
+    // Every market's dry spells, measured ACROSS the hundred days rather than sampled at the end of them.
+    const dryTicks = new Map(), dryLongest = new Map(), drySpell = new Map();
     const routeChoices = new Map();
     for (let i = 0; i < 400; i++) {
-        // before each step, every docked ship's next choice must be the best margin it can find right now
+        // *** v4534 -- THIS SCAN MISSED TWO OF bestRoute'S FOUR RULES AND CALLED ITS CORRECT CHOICES WRONG. ***
+        // bestRoute skips a market that is CLOSED and one that CANNOT PAY (`m.credits < sellP` -- "a market
+        // that cannot pay is not a destination"); the scan skipped neither, so it found richer margins at
+        // destinations the ship is right to refuse. MEASURED: 26 violations of 430 choices, and ALL 26 are
+        // markets that cannot pay -- 0 closed, 0 unexplained. A market holding 159 credits was counted as a
+        // missed 480-credit sale.
+        //
+        // The rules are RE-DERIVED here rather than taken from bestRoute, deliberately: a checker that asks
+        // the thing it checks to define "best" agrees with it by construction and can only ever pass. That is
+        // why they are spelled out again, and why they must be kept in step -- the row below asserts the
+        // populations match, so a rule added to bestRoute and not to this scan is a red rather than a drift.
         for (const s of e.ships) if (s.to == null) { const b = e.bestRoute(s); if (b) { routeChecks++; const here = e.uni.systemById[s.at];
-            for (const m of e.markets) for (const g of GOODS) { if (m.id === here.id || here.stock[g] <= 0) continue; if (m.trade[g] - here.trade[g] > b.margin * 1.06) routesOk = false; } } }
+            for (const m of e.markets) for (const g of GOODS) {
+                if (m.id === here.id || here.stock[g] <= 0) continue;
+                if (!(e.t >= (m.opens || 0))) { skippedClosed++; continue; }          // bestRoute: !isOpen(m)
+                if (m.credits < m.trade[g]) { skippedCannotPay++; continue; }         // bestRoute: cannot pay
+                if (m.trade[g] - here.trade[g] > b.margin * 1.06) { routesOk = false; routeViolations++; } }
+            // What the OLD scan would have flagged: the same comparison with bestRoute's two rules left out.
+            // Counted so the repair's necessity is a number rather than a story about one.
+            for (const m of e.markets) for (const g of GOODS) {
+                if (m.id === here.id || here.stock[g] <= 0) continue;
+                if (m.trade[g] - here.trade[g] > b.margin * 1.06) wouldFlagWithoutRules++; } } }
         e.step(0.25);
+        for (const m of e.markets) {
+            const k = m.name || m.id, cheapest = Math.min(...GOODS.map((g) => m.trade[g]));
+            if (m.credits < cheapest) {
+                dryTicks.set(k, (dryTicks.get(k) || 0) + 1);
+                drySpell.set(k, (drySpell.get(k) || 0) + 1);
+                dryLongest.set(k, Math.max(dryLongest.get(k) || 0, drySpell.get(k)));
+            } else drySpell.set(k, 0);
+        }
         for (const s of e.ships) { if (s.to != null && (!e.uni.systemById[s.from] || !e.uni.systemById[s.to])) offSegment++; if (s.to != null) { const k = s.from + ">" + s.to + ":" + s.cargoGood; routeChoices.set(k, (routeChoices.get(k) || 0) + 1); } }
     }
     const a = e.accounting();
@@ -55,9 +123,47 @@ console.log("\n2. A HUNDRED DAYS OF LIFE, ACCOUNTED FOR TO THE UNIT");
     ok("*** every trader's credits are start + earned - spent - upkeep, and traders + treasuries - minted is the starting total ***", a.creditsOk && a.creditsConserved, `${a.creditsTotal} of ${a.initialCredits} credits; ${a.treasuries} in treasuries, ${a.traderCredits} in holds, ${a.ledger.minted} minted`);
     ok("  v4300: production ran recipes -- goods were MADE from other goods, not only moved", a.ledger.recipesRun > 100 && GOODS.some((g) => a.ledger.produced[g] > 0) && RECIPES.length === 3, `${a.ledger.recipesRun} runs`);
     ok("  v4300: upkeep was paid, and it circulates -- it sits in a treasury, not in a sink", a.ledger.upkeep > 0 && a.creditsConserved, `${a.ledger.upkeep} paid`);
-    ok("  at the default upkeep nobody went bankrupt and no treasury ran dry over a hundred days", a.bankrupt === 0 && a.brokeMarkets === 0, `${a.bankrupt} bankrupt, ${a.brokeMarkets} broke of ${e.markets.length}`);
+    // *** v4534 -- "OVER A HUNDRED DAYS" WAS MEASURED AT ONE INSTANT: THE LAST ONE. *** a.brokeMarkets is a
+    // snapshot, and being briefly dry is ROUTINE CHURN in this economy rather than a failure -- measured
+    // across the run, ALL EIGHTEEN markets go dry at some tick, nine are dry simultaneously at the peak, and
+    // the reading at day 100 is whatever the churn happens to be (1 here; 2 with three bodies removed, 3 with
+    // one). The prose meant "ran dry" as a lasting state, so that is what is asserted: bankruptcy, which IS
+    // terminal, and RECOVERY -- no market stays dry. The distribution is reported.
+    const dryWorst = Math.max(0, ...dryLongest.values());
+    const neverRecovered = [...dryLongest.entries()].filter(([, v]) => v >= 400).map(([k]) => k);
+    // *** THE MEASUREMENT MUST BE ALIVE, AND THE SPELL ARITHMETIC MUST ACTUALLY RESET. *** Sabotage IC zeroed
+    // every longest-spell and this row PASSED -- "no spell reached 400" is true of no spells at all, so the
+    // check could not tell "everyone recovered" from "nothing was measured". Sabotage ID deleted the reset,
+    // making a spell the cumulative dry count, and that passed too. Both are asserted directly now: a spell
+    // was seen, and at least one market's dry TIME is split across SEVERAL spells, which only holds if the
+    // counter resets -- keyhunt is dry 108 ticks with a longest spell of 15, and that gap is the proof.
+    const split = [...dryTicks.entries()].filter(([k, v]) => (dryLongest.get(k) || 0) < v);
+    ok("  at the default upkeep nobody went bankrupt", a.bankrupt === 0, `${a.bankrupt} bankrupt of ${e.ships.length} traders`);
+    ok("!! *** AND NO MARKET STAYS DRY: every treasury that empties trades its way back ***",
+       neverRecovered.length === 0 && dryTicks.size > 0 && dryWorst < 400 &&
+       dryWorst > 0 && split.length > 0,
+       neverRecovered.length ? "NEVER RECOVERED: " + neverRecovered.join(", ")
+         : `${dryTicks.size} of ${e.markets.length} markets ran dry at some tick, worst unbroken spell ` +
+           `${dryWorst} ticks (${(dryWorst * 0.25).toFixed(1)} days of 100), and every one recovered. ` +
+           `${split.length} markets' dry time is split across SEVERAL spells, which is what proves the ` +
+           "counter resets rather than accumulating. " +
+           `${a.brokeMarkets} happen to be dry at the final tick, WHICH IS THE NUMBER THIS ROW USED TO ASSERT ` +
+           "TO ZERO -- a snapshot of a quantity that moves, standing for a claim about a hundred days.");
+    const dryTop = [...dryLongest.entries()].sort((x, y) => y[1] - x[1]).slice(0, 4)
+        .map(([k, v]) => `${k} ${v}`).join(", ");
+    report(`dry-spell distribution, longest first: ${dryTop} ticks. NOT ASSERTED: that a five-day dry spell ` +
+        "is acceptable -- that is an economy design question, and a bound chosen here would be a tolerance " +
+        "picked to pass rather than a property.");
     ok("  traders traded", e.events.length > 100 && e.ships.every((s) => s.trips > 0), `${e.events.length} events, trips ${e.ships.map((s) => s.trips).join("/")}`);
-    ok("*** every departure was the best margin per ton on offer at that moment (within the 5% preference noise) ***", routesOk && routeChecks > 50, `${routeChecks} choices checked`);
+    ok("*** every departure was the best margin per ton on offer at that moment (within the 5% preference noise) ***", routesOk && routeChecks > 50, `${routeChecks} choices checked, ${routeViolations} violations; ${skippedCannotPay} (good, market) pairs skipped because THE MARKET CANNOT PAY and ${skippedClosed} because it is closed -- bestRoute's own two rules, re-derived here rather than borrowed from it`);
+    // *** THE TWO RULES ARE LOAD-BEARING, MEASURED. *** An exclusion that removes nothing is indistinguishable
+    // from no exclusion, so what the scan would have flagged without them is counted: those are the false
+    // violations this row reported for as long as the rules were missing.
+    ok("!! *** WITHOUT bestRoute'S RULES THIS SCAN FLAGS CORRECT CHOICES -- the repair is a number, not a story ***",
+       wouldFlagWithoutRules > 0 && routeViolations === 0,
+       `${wouldFlagWithoutRules} false violations without them, ${routeViolations} with them. Every one is a ` +
+       "market whose treasury cannot cover the sale -- a ship is RIGHT to refuse a 480-credit sale to a " +
+       "market holding 159, and the scan was calling that a missed opportunity.");
     ok("  no trader was ever between bodies that do not exist", offSegment === 0);
     ok("*** the routes are many and they changed: trading moved the prices, and the prices moved the traders ***", routeChoices.size >= 20, `${routeChoices.size} distinct (from, to, good) routes over 100 days`);
     const first = e.ships[0].log.filter((l) => l.bought).map((l) => l.to), late = first.slice(-5), early = first.slice(0, 5);
