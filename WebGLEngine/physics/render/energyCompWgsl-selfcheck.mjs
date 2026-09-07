@@ -69,16 +69,57 @@ console.log("\n1. THE CLOSURE IS BLIND TO ITS OWN TABLE, AND THAT IS A MEASUREME
     // deliberate constant.
     const a = 0.001;
     const good = buildTable(a, { K });
-    const bad = buildTable(a, { K, quadrature: true, N: 220, M: 220 });
+    // *** v4535 -- THE FIXTURE HAD STOPPED BUILDING ITS OWN SUBJECT, SILENTLY, AND THAT IS WHY THIS SECTION
+    // WENT RED. *** This line read `quadrature: true`. buildTable's signature is
+    // { K, N, M, plant, estimator } -- there is no `quadrature`, so the key was destructured into nothing and
+    // `bad` was the SAMPLED table, byte for byte identical to `good`. The selector is `estimator: "grid"`, and
+    // every other caller in the tree already uses it: three in albedoEstimator-selfcheck and one in
+    // energyCompensation-selfcheck. This one line was the only survivor of the rename.
+    //
+    // *** ONE ROW WENT RED AND TWO WENT ON PASSING, WHICH IS THE WORSE HALF. *** The closure row says it reads
+    // 1 on ALL THREE tables and was grading two distinct ones and a duplicate; the row below says every check
+    // passes "on the wrong table" while handing it the RIGHT one. An option name that no longer exists cost
+    // one visible failure and two silent inflations, and only the failure made anybody look.
+    const bad = buildTable(a, { K, estimator: "grid", N: 220, M: 220 });
     const junk = { alpha: a, K, mu: good.mu, E: good.E.map(() => 0.25), Eavg: 0.25 };
     const rows = [["truthful (sampled)", good], ["shipped quadrature 220", bad], ["a flat 0.25, not the albedo of anything", junk]];
     rows.forEach(([n, T]) => report(`  ${n.padEnd(40)} E(${MU_O}) ${albedoAt(T, MU_O).toFixed(6)}   closure ${compensatedAlbedo(T, MU_O).toFixed(7)}   adds ${((1 - albedoAt(T, MU_O)) * 100).toFixed(1)}% of the surface's energy`));
+    // *** AND "ALL THREE" IS ASSERTED TO BE THREE, WHICH IS THE ROW THAT WOULD HAVE CAUGHT THIS IN ONE RUN. ***
+    // For as long as `quadrature: true` was silently dropped, this section graded two distinct tables and a
+    // copy while saying THREE, and nothing anywhere checked that the fixtures differ. A row that counts its
+    // own inputs is cheaper than the failure it prevents: a duplicate fixture makes every claim about
+    // "different tables" true by vacuity, which is this file's own subject one level down.
+    const distinct = new Set(rows.map(([, T]) => T.E.join(","))).size;
+    ok("!! *** the three tables really are three -- a duplicate fixture would make every claim below vacuous ***",
+        distinct === rows.length,
+        `${distinct} distinct E vectors across ${rows.length} rows. This is the row that was missing while ` +
+        "`quadrature: true` -- an option buildTable does not have -- made the shipped-quadrature table a copy " +
+        "of the truthful one.");
     ok("*** the closure reads 1 on ALL THREE, including a table that is not the albedo of any surface ***",
         rows.every(([, T]) => Math.abs(compensatedAlbedo(T, MU_O) - 1) < 5e-4),
         `worst |closure - 1| = ${Math.max(...rows.map(([, T]) => Math.abs(compensatedAlbedo(T, MU_O) - 1))).toExponential(2)}. INT f_ms cos dw = 1 - E(mu_o) exactly, for any E, so E cancels out of the check meant to grade it`);
-    ok("!! *** ...while the energy they inject differs by a factor of 75, which the closure never sees ***",
-        Math.abs((1 - albedoAt(bad, MU_O)) / (1 - albedoAt(good, MU_O))) > 50,
-        `the truthful table adds ${((1 - albedoAt(good, MU_O)) * 100).toFixed(3)}% and the shipped quadrature adds ${((1 - albedoAt(bad, MU_O)) * 100).toFixed(1)}% -- to the SAME surface, at the SAME roughness, both closing at 1. energyCompensation.mjs's header called this out in prose at v3492: "AN EXACT CLOSURE IS PROOF OF CONSISTENCY, NEVER OF CORRECTNESS". This is that sentence with a number`);
+    // *** AND THE RATIO IS TAKEN ACROSS THE TABLE, NOT AT ONE ANGLE, BECAUSE ONE ANGLE IS WHERE THIS HID. ***
+    // At MU_O = 0.7 the two tables AGREE to six decimals -- the grid resolves a 0.001 lobe perfectly well away
+    // from grazing -- so a row probing only 0.7 could not tell the corrected fixture from the broken one, and
+    // would have gone on reporting a ratio of 1.000 whichever estimator it was handed. The divergence lives at
+    // low mu, where the grid misses the lobe entirely: sampled E stays near 1 and the grid reads 0.0008.
+    //
+    // *** THIS ROW DOES NOT ADJUDICATE WHICH ESTIMATOR IS RIGHT AT alpha 0.001, AND DOES NOT NEED TO. *** That
+    // is a real question -- microfacetSampleWgsl calls this roughness "where the mirror limit is the answer and
+    // the quadrature is not" -- and it is a different one. The claim here is that the closure cannot tell two
+    // tables apart when they inject energy differing by four orders of magnitude, which holds whichever of them
+    // is the better estimate.
+    const injected = (T, i) => 1 - T.E[i];
+    const ratios = good.mu.map((_, i) => injected(bad, i) / injected(good, i));
+    const worst = Math.max(...ratios), worstAt = good.mu[ratios.indexOf(worst)];
+    ok("!! *** ...while the energy they inject differs by up to four orders of magnitude, which the closure never sees ***",
+        worst > 50,
+        `worst injected-energy ratio ${worst.toFixed(0)}x at mu ${worstAt.toFixed(4)} (sampled E ${good.E[ratios.indexOf(worst)].toFixed(6)}, ` +
+        `grid E ${bad.E[ratios.indexOf(worst)].toFixed(6)}) -- to the SAME surface, at the SAME roughness, both closing at 1 to ` +
+        `${Math.max(...[good, bad, junk].map((T) => Math.abs(compensatedAlbedo(T, MU_O) - 1))).toExponential(2)}. ` +
+        `At MU_O ${MU_O} they agree to six decimals, which is why this is measured over the whole table. ` +
+        'energyCompensation.mjs\'s header called this out in prose at v3492: "AN EXACT CLOSURE IS PROOF OF ' +
+        'CONSISTENCY, NEVER OF CORRECTNESS". This is that sentence with a number.');
     ok("  and every check in the module's own gate passes on the wrong table, which is why this one exists",
         Math.abs(compensatedAlbedo(bad, 0.5) - 1) < 2.5e-4 && Math.abs(compensatedAlbedo(bad, 0.9) - 1) < 2.5e-4,
         "the closure at other angles, the reciprocity, the vanishing limit -- none of them reads E against anything external. A gate can be complete about a construction and say nothing about its inputs");
