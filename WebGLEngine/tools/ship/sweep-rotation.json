@@ -1,6 +1,6 @@
 {
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner.",
- "at": "2026-09-07T10:52:31.034Z",
+ "at": "2026-09-07T11:26:01.969Z",
  "budgetMs": 3000,
  "rotated": [
   {
@@ -467,9 +467,9 @@
   },
   {
    "gate": "tools/ship/traderGraph-selfcheck.mjs",
-   "ms": 2933,
+   "ms": 3152,
    "code": 0,
-   "priorMs": 3123
+   "priorMs": 3053
   }
  ]
 }

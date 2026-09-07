@@ -22,6 +22,7 @@ export const PALETTE = (() => {
     p[4]  = [0.92, 0.85, 0.55];   // SAND
     p[5]  = [0.95, 0.97, 1.00];   // SNOW
     p[6]  = [0.22, 0.18, 0.16];   // ASH
+    p[8]  = [0.38, 0.36, 0.34];   // REBAR -- the steel a cut reveals (v4530, world/crashDamage.mjs); 7 is the registry's RUBBLE
     p[10] = [0.20, 0.45, 0.85];   // WATER
     p[11] = [0.25, 0.55, 0.95];   // FLOWING_WATER
     p[12] = [1.00, 0.55, 0.15];   // LAVA — emissive

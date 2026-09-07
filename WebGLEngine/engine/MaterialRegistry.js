@@ -64,6 +64,7 @@ export class MaterialRegistry {
             [5,  [0.95, 0.97, 1.00], "SNOW"],
             [6,  [0.22, 0.18, 0.16], "ASH"],
             [7,  [0.38, 0.32, 0.28], "RUBBLE"],
+            [8,  [0.38, 0.36, 0.34], "REBAR"],      // v4530: the steel a cut reveals (world/crashDamage.mjs), mirrored in the mesher's PALETTE
             [10, [0.20, 0.45, 0.85], "WATER"],
             [11, [0.25, 0.55, 0.95], "FLOWING_WATER"],
             [12, [0.95, 0.40, 0.10], "LAVA"],

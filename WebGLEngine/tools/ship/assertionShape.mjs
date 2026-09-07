@@ -198,8 +198,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4527 -- RE-TAKEN: one gate (raceKnob) joined, and exactly the four rows a gate that uses ok(name, cond) moves, moved by one.
     // v4528 -- RE-TAKEN: one gate (raceReplayBake) joined, and the same four rows moved by one again.
     // v4529 -- RE-TAKEN: one gate (ribbonRoad) joined, the same four rows by one.
-    gates: 1593, usesOk: 1572, definesOk: 1564, importsOk: 0,
-    distinctDefinitions: 38, nameFirst: 1465, condFirst: 91, unknownSignature: 16,
+    // v4530 -- RE-TAKEN: one gate (crashDamage) joined, the same four rows by one.
+    gates: 1594, usesOk: 1573, definesOk: 1565, importsOk: 0,
+    distinctDefinitions: 38, nameFirst: 1466, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

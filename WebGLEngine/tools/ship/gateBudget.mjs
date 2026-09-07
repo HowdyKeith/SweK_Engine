@@ -213,6 +213,11 @@ export const MEASURED_RUNS = Object.freeze({
         observedHere: true, at: "v4529",
         runs: Object.freeze([{ ms: 33750, code: 0 }, { ms: 33771, code: 0 }, { ms: 33774, code: 0 }]),
     }),
+    // Run here at v4530, three alone, `date +%s%3N` around the process.
+    "tools/ship/crashDamage-selfcheck.mjs": Object.freeze({
+        observedHere: true, at: "v4530",
+        runs: Object.freeze([{ ms: 9114, code: 0 }, { ms: 9404, code: 0 }, { ms: 9009, code: 0 }]),
+    }),
 });
 
 /**
@@ -318,6 +323,10 @@ export const MEASURED = {
     // track and once on the flat one, then opens two browsers (both backends, then the page). Over the quick sweep's 20 s kill by
     // construction. THREE RUNS ALONE, ALL EXIT 0, the rows in MEASURED_RUNS.
     "tools/ship/ribbonRoad-selfcheck.mjs": slowestRun("tools/ship/ribbonRoad-selfcheck.mjs"),
+    // *** v4530 -- MEASURED AT BIRTH. *** tools/ship/crashDamage-selfcheck.mjs builds seed 1's city five times over, rams it at three
+    // speeds on box3d, and opens two browsers (both backends with five read-backs each, then the page). Over the quick sweep's 3 s
+    // budget by three times. THREE RUNS ALONE, ALL EXIT 0, the rows in MEASURED_RUNS.
+    "tools/ship/crashDamage-selfcheck.mjs": slowestRun("tools/ship/crashDamage-selfcheck.mjs"),
     // *** v4173 -- MEASURED TO COMPLETION FOR THE FIRST TIME, WHICH UNRESOLVED'S OWN HEADER INSTRUCTS. ***
     // 1140363 ms, EXIT 0, all checks passing -- 87 devices, 306 modes, every one built. It had been listed
     // as "exceeded a 150s cap at v3924" ever since, on the 309 s DEFAULT.

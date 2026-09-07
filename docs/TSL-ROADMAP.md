@@ -1571,6 +1571,53 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         on the draped track (the pursuit driver laps it; drivePolicy's features are the flat track's), a box3d
         heightfield collider (the surface is analytic, as the flat one was), the ribbon replacing tiles ONLY where
         the ground is not flat (it replaces them everywhere on this page; the flat tiles stay race-track.html's).
+     7. (v4530) DESTRUCTIBLE BUILDINGS. world/crashDamage.mjs lets the car of round 2 damage the city of round 1
+        through the sandbox's own damage of v4520 and nothing invented for it: an IMPACT is the horizontal speed the
+        car loses in ONE step against a building's static box, above CRASH.speedLoss (3 m/s in 1/60 s, a wall and
+        nothing else); the blast is voxelDamage's blastAt, centred on the first solid voxel along the car's heading
+        from its bumper (a first draft blasted at the footprint's face, and every ram after the first carved the
+        air of the first crater while the box still stopped the car), its radius growing with the speed lost; the
+        debris system bursts six cubes a voxel; CityGen's damageAt charges the building. Two rules of the module's
+        own, said plainly: CityGen's crumble passes remove voxels it never charges, so the building is charged for
+        EVERY voxel that left its footprint (the hit points are the standing voxels, v4510's own definition, and
+        they stay so); and a building whose ground floor stands on less than 30 % of its footprint is charged the
+        rest -- a car takes the ground floor and the floors above do not stay up on their own -- so CityGen topples
+        it (the footprint erased, rubble stamped in the fall direction) and the module PARKS its static box, so the
+        car drives the rubble. THE REBAR: render/rebar.mjs's cage at voxel scale, rods every three voxels along x
+        and up y, one voxel thick, placed on the building's own corner; a solid voxel the cut exposes that lies on
+        a rod becomes material 8, REBAR (in the registry and the mesher's palette alike), so the crater's faces show
+        the steel where the rods were -- dots where an x-rod is cut square-on, lines where a vertical rod runs down
+        the face. race-crash.html laps with the pursuit driver or rams the nearest standing building at full
+        throttle, the city, the car and the debris as three fleets of one gpuDriven scene. MEASURED
+        (tools/ship/crashDamage-selfcheck.mjs, seed 1's 79 buildings): every building's hit points are its standing
+        voxels at the start; at 15 m/s the car loses 13.8 m/s in one step, the blast (radius 2.5) takes 46 voxels
+        (30 the building's) and 276 debris cubes, hp 190 -> 160 = the standing count, 6 rebar voxels on the
+        crater's faces (4 on x-rods, 2 on vertical rods), every one on the cage and touching air, the device's slots
+        equal to a fresh pack of the carved world; at 2 m/s the most the car loses in a step is 0.93 m/s and the
+        building is whole -- hit points, every voxel, no debris, the box still in its way; at 25 m/s 94 voxels go
+        (60 charged, 24 by CityGen's crumble), the ground floor's support falls to 0, the building is charged the
+        rest and toppled with 23 rubble voxels stamped beside it, its box parked, and the same car relaunched
+        drives through where it stood; two fresh worlds give one fingerprint and one impact record; in the browser
+        the page's wasm rams to node's record on both backends, the frame after the impact is 21,727 pixels from
+        the one before and EXACTLY a fresh pack of the carved world once the debris has aged, and the steel is
+        3,451 pixels from the same world with its rebar turned back to stone. *** THE FINDING THAT MATTERS BEYOND
+        THIS ROUND: THE WORLD IS ONE RECORD, AND A RECORD IS A SPHERE THE CULL TESTS. *** voxelScene, editScene,
+        damageScene, and this branch's replayScene and terrainScene all draw the world as one record at the origin
+        with scale 1, and gpuDriven's cull reads that w as the sphere's RADIUS: a camera whose frustum does not
+        hold the origin culls the whole world. The gate's camera, looking at a crater 55 m from the origin, drew no
+        world on either backend, and two frames that should have differed by six steel voxels were identical
+        because neither held a building -- the check passed with 0 pixels apart until it was asked to see the
+        steel. crashScene records the world as gpuDriven's own contract reads it: a unit-space mesh (positions
+        less the world's centre, over its radius) at the world's centre with scale = radius, the slots' world-space
+        writes rescaled through a proxy buffer. The other scenes keep the origin record and are named here, not
+        touched: a sandbox or racing camera that leaves the origin behind loses the city. Two more found by the
+        numbers: the floor voxels under a building were charged to it (11 hit points the footprint never held)
+        until the charge started at the first building layer; and the steel took id 7 first, which the material
+        registry already calls RUBBLE and colours before the palette, so the steel drew as rubble and the topple's
+        rubble would have counted as steel. NOT BUILT, said plainly: the collider shrinking with the crater (the
+        box stands until the topple); debris that collides (the sandbox's does not either); the brain driving into
+        buildings (the ram is a launch); CityGen's crumble side-bite direction, which is Math.random and not the
+        seed's (the first impact is deterministic, a later bite's voxels are not); the other scenes' origin record.
 ## The count that says when step 4 matters
 
 tools/ship/shaderCensus-selfcheck.mjs has held, since v3274, that a hand-written pair is cheaper than an

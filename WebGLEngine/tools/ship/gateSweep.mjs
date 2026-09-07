@@ -3723,6 +3723,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "raceCar's unchanged car on the ribbon's plane. race-terrain.html puts terrain, ribbon and car in one gpuDriven " +
                  "scene. Sabotages red at A / B / C / D / E / F / G (the gate's header).",
     }),
+    since195: Object.freeze({
+        at: "v4530", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/crashDamage-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green headless and in the browser on both backends. Racing city 7: world/crashDamage.mjs turns the car's speed lost in " +
+                 "one step against a building into the sandbox's own blast (voxelDamage, v4520) at the first solid voxel along its " +
+                 "heading; CityGen is charged every voxel the footprint lost, so the hit points stay the standing voxels; rebar.mjs's " +
+                 "cage is revealed on the cut as material 8; a building whose ground floor falls under 30% support is charged the " +
+                 "rest, CityGen topples it and its static box is parked. race-crash.html laps or rams. The gate found the whole " +
+                 "world culled when the camera's frustum lost the origin (the world was one unit-radius record there), which " +
+                 "crashScene fixes for itself and the roadmap names for the other scenes. Sabotages red at A / B / C / D / E / F / G.",
+    }),
 
 });
 

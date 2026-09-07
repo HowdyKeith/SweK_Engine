@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 468,
+ "count": 469,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -2275,6 +2275,13 @@
    "f": "race-car.html",
    "t": "Race car on the GPU",
    "d": "Racing city 2: physics/raceCar.mjs drives Kenney's truck around the seeded grid track of race-track.html -- one box3d chassis body (the vendored wasm, in the page through box3dLoader) with four raycast wheels from physics/vehicle.mjs, suspension and tyre forces applied as impulses, the ground an analytic surface of the flat track (asphalt inside the kerbs, the kerb band raised, grass off the tiles, nothing beyond the grid), the buildings static boxes the chassis can hit. The controller contract is { throttle, steer, brake } in [-1, 1]; the pursuit driver here follows the centreline a lookahead ahead and slows for the corners it sees coming, and laps. The truck is drawn at the chassis pose through kitScene's quat mode beside the tiles and the greedy-meshed world, on WebGPU or WebGL2. The HUD names the speed, the lap, the checkpoints hit, the lap time and box3d's running fingerprint; the same seed and driver give the same fingerprint everywhere. Seed live; Reset restarts the car at the finish; drag to orbit, wheel to dolly.",
+   "g": "racing",
+   "p": 0
+  },
+  {
+   "f": "race-crash.html",
+   "t": "Race crash on the GPU",
+   "d": "Racing city 7: world/crashDamage.mjs lets the car of race-car.html damage the city of race-track.html. A car that loses more than 3 m/s of speed in one step against a building's static box is an impact: the sandbox's own blast (render/voxelDamage.mjs) carves a sphere centred on the first solid voxel along the car's heading, the debris system bursts six cubes per voxel, CityGen charges the building the voxels its footprint lost (its hit points are its standing voxels, v4510), the crater's faces show render/rebar.mjs's cage as steel where the rods were cut -- and a building whose ground floor falls under 30% support is charged the rest: CityGen topples it, its box is parked and the car drives the rubble. Lap with the pursuit driver, or Ram the nearest standing building at full throttle. On WebGPU or WebGL2. Drag to orbit, wheel to dolly.",
    "g": "racing",
    "p": 0
   },

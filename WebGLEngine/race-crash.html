@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Race crash (the car against CityGen's destructible buildings, with the rebar revealed, on gfx/device.js)">
+<meta name="demo:desc" content="Racing city 7: world/crashDamage.mjs lets the car of race-car.html damage the city of race-track.html. A car that loses more than 3 m/s of speed in one step against a building's static box is an impact: the sandbox's own blast (render/voxelDamage.mjs) carves a sphere centred on the first solid voxel along the car's heading, the debris system bursts six cubes per voxel, CityGen charges the building the voxels its footprint lost (its hit points are its standing voxels, v4510), the crater's faces show render/rebar.mjs's cage as steel where the rods were cut -- and a building whose ground floor falls under 30% support is charged the rest: CityGen topples it, its box is parked and the car drives the rubble. Lap with the pursuit driver, or Ram the nearest standing building at full throttle. On WebGPU or WebGL2. Drag to orbit, wheel to dolly.">
+<meta name="demo:category" content="world">
+<title>Race crash on the GPU</title>
+<style>
+  html,body { margin:0; height:100%; background:#050805; color:#9fb2d4; font:12px ui-monospace,Menlo,monospace; }
+  #c { display:block; width:100%; }
+  #hud { padding:10px 14px; }
+  #cap { color:#f6a623; letter-spacing:.14em; text-transform:uppercase; }
+  #be { color:#59d1ff; font-size:14px; margin-top:4px; }
+  #sub { color:#5f7aa0; font-size:11px; margin-top:2px; line-height:1.7; }
+  .bad { color:#ff9a9a; }
+  a { color:#59d1ff; }
+  input[type=number] { width:48px; background:#0c140f; color:#9fb2d4; border:1px solid #2a3a30; font:inherit; }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div id="cap">Race crash on the GPU: the car against the city's buildings, the rebar in the cut</div>
+  <div id="be">requesting a device&hellip;</div>
+  <div id="sub">seed <input id="seed" type="number" value="1" min="1"> &middot; <button id="reset">Reset</button> &middot; <button id="ram">Ram the nearest standing building</button> &middot; <button id="lap">Back to the lap</button>
+    &middot; <label><input type="checkbox" id="follow" checked> camera follows the car</label> &middot; <a href="?webgl=1">force WebGL2</a><br>
+    <span id="tick">loading box3d&hellip;</span><br><span id="city"></span><br><span id="car"></span> &middot; drag to orbit, wheel to dolly</div>
+</div>
+<canvas id="c"></canvas>
+<script type="module" src="/ui/originNotice.js"></script>
+<script type="module">
+import { requestDevice } from "./gfx/device.js";
+import * as G from "./render/gpuDriven.mjs";
+import * as L from "./render/litSphere.mjs";
+import * as D from "./world/crashDamage.mjs";
+import { generateTrack, describeTrack, checkpoints } from "./world/raceTrack.mjs";
+import { trackSurface, createCar, carPose, pursuitDriver, lapTracker, CAR } from "./physics/raceCar.mjs";
+import { CityGen } from "./world/CityGen.js";
+import { VoxelDebrisSystem } from "./world/voxelDebrisSystem.js";
+import { box3d } from "./physics/box3d/box3dLoader.js";
+import { worldFromModule } from "./render/slugTicker.mjs";
+
+const cvs = document.getElementById("c"), beEl = document.getElementById("be");
+const fail = (m) => { beEl.innerHTML = '<span class="bad">' + m + "</span>"; };
+const $ = (id) => document.getElementById(id);
+let device, physMod = null, g = null, car = null, surface = null, pursuit = null, driver = null, tracker = null, sc = null, debris = null, mode = "lap";
+let yaw = 0.6, pitch = 0.7, dist = 60, dragging = null, centre = [0, 0, 0], hash = 0x811c9dc5, steps = 0, acc = 0, lastT = 0, removed = 0, rebar = 0;
+const fold = (h, v) => { for (let k = 0; k < 4; k++) { h ^= (v >>> (k * 8)) & 0xff; h = Math.imul(h, 0x01000193); } return h; };
+
+function nearestStanding(pose) {
+  let best = -1, bd = Infinity;
+  g.rects.forEach((r, i) => { const b = g.city.buildingAt(r.x + 0.5, r.z + 0.5); if (!b || b.state === "toppled") return; const d = Math.hypot(r.x + r.w / 2 - pose.pos[0], r.z + r.d / 2 - pose.pos[2]); if (d < bd) { bd = d; best = i; } });
+  return best;
+}
+function ramMode() { const pose = carPose(g.phys, car), i = nearestStanding(pose); if (i < 0) return; const r = g.rects[i]; driver = D.ramDriver([r.x + r.w / 2, 0, r.z + r.d / 2]); mode = "ram " + i; }
+function lapMode() { driver = pursuit; mode = "lap"; }
+
+function rebuild() {
+  if (!physMod) return;
+  const t0 = performance.now();
+  const track = generateTrack({ seed: Math.max(1, +$("seed").value | 0) });
+  if (g && g.phys) g.phys.destroy();
+  g = D.crashWorld(track, CityGen); D.buildingColliders(g, worldFromModule(physMod, [0, -9.81, 0]));
+  surface = trackSurface(track); pursuit = pursuitDriver(surface); tracker = lapTracker(surface); debris = new VoxelDebrisSystem();
+  const cp = checkpoints(track)[0]; car = createCar(g.phys, { x: cp.x + 5, z: cp.z, yaw: Math.PI / 2 });
+  hash = 0x811c9dc5; steps = 0; acc = 0; removed = 0; rebar = 0;
+  if (sc && sc.scene.destroy) sc.scene.destroy();
+  sc = D.crashScene(device, g.state, debris, G, L); sc.setCar(carPose(g.phys, car));
+  lapMode();
+  $("tick").textContent = `${describeTrack(track)}; ${g.rects.length} buildings as static boxes; built in ${(performance.now() - t0).toFixed(0)} ms on ${sc.scene.path}`;
+  if (new URLSearchParams(location.search).get("ram") === "1") ramMode();
+}
+
+async function main() {
+  const forceGl = new URLSearchParams(location.search).get("webgl") === "1";
+  try { device = await requestDevice(cvs, forceGl ? { backend: "webgl2" } : { prefer: "webgpu" }); }
+  catch (e) { return fail("requestDevice threw: " + e.message); }
+  beEl.textContent = `device: ${device.backend}`;
+  try { const t0 = performance.now(); const ps = await box3d.init(); if (!ps.ready) return fail("box3d: " + ps.reason); physMod = box3d._mod; beEl.textContent += ` -- box3d's wasm loaded in ${(performance.now() - t0).toFixed(0)} ms`; }
+  catch (e) { return fail("loading threw: " + e.message); }
+  rebuild();
+  $("seed").addEventListener("change", rebuild); $("reset").addEventListener("click", rebuild);
+  $("ram").addEventListener("click", ramMode); $("lap").addEventListener("click", lapMode);
+  cvs.addEventListener("pointerdown", (e) => { dragging = [e.clientX, e.clientY]; });
+  addEventListener("pointerup", () => { dragging = null; });
+  addEventListener("pointermove", (e) => { if (!dragging) return; yaw += (e.clientX - dragging[0]) * 0.006; pitch = Math.max(0.05, Math.min(1.5, pitch + (e.clientY - dragging[1]) * 0.006)); dragging = [e.clientX, e.clientY]; });
+  cvs.addEventListener("wheel", (e) => { e.preventDefault(); dist = Math.max(8, Math.min(600, dist * Math.exp(e.deltaY * 0.001))); }, { passive: false });
+  requestAnimationFrame(frame);
+}
+
+function frame(t) {
+  requestAnimationFrame(frame);
+  const w = cvs.clientWidth | 0, h = Math.max(200, (innerHeight - document.getElementById("hud").offsetHeight - 4) | 0);
+  if (cvs.width !== w || cvs.height !== h) { cvs.width = w; cvs.height = h; }
+  if (!sc || !car) return;
+  const dt = Math.min(0.1, (t - (lastT || t)) / 1000); lastT = t; acc += dt; let n = 0;
+  while (acc >= CAR.dt && n < 4) {
+    const pose = carPose(g.phys, car), r = D.crashStep(g, car, surface, driver(pose), { debris }); hash = fold(hash, g.phys.stateHash()); steps++; acc -= CAR.dt; n++;
+    if (r.impact) { removed += r.impact.removed; rebar += r.impact.rebar; if (mode !== "lap") { const nx = nearestStanding(r.pose); if (nx >= 0) { const q = g.rects[nx]; driver = D.ramDriver([q.x + q.w / 2, 0, q.z + q.d / 2]); mode = "ram " + nx; } } }
+    if (mode === "lap") tracker.update(r.pose);
+    debris.update(CAR.dt);
+  }
+  const pose = carPose(g.phys, car); sc.setCar(pose);
+  let standing = 0, damaged = 0, toppled = 0; for (const b of g.city.buildings) { if (b.state === "toppled") toppled++; else if (b.hp < b.maxHp) damaged++; else standing++; }
+  $("city").textContent = `the city: ${g.rects.length} buildings, ${standing} standing whole, ${damaged} damaged, ${toppled} toppled; ${removed} voxels removed, ${rebar} rebar voxels revealed, ${debris.particles.length} debris live; impacts ${g.impacts.length}${g.impacts.length ? ` (last: ${g.impacts[g.impacts.length - 1].dv.toFixed(1)} m/s lost, ${g.impacts[g.impacts.length - 1].removed} voxels, hp ${g.impacts[g.impacts.length - 1].hp} of ${g.impacts[g.impacts.length - 1].maxHp}${g.impacts[g.impacts.length - 1].toppled ? ", TOPPLED" : ""})` : ""}`;
+  $("car").textContent = `the car (${mode}): speed ${Math.max(0, pose.speed).toFixed(1)} m/s, checkpoints ${tracker.hit}, laps ${tracker.laps}, ${steps} steps, fingerprint ${(hash >>> 0).toString(16).padStart(8, "0")}`;
+  if ($("follow").checked) centre = [pose.pos[0], 1, pose.pos[2]];
+  const eye = [centre[0] + dist * Math.sin(yaw) * Math.cos(pitch), centre[1] + dist * Math.sin(pitch), centre[2] + dist * Math.cos(yaw) * Math.cos(pitch)];
+  sc.scene.frame({ viewProj: G.multiply(G.perspective(0.9, w / h, 0.5, 2000), G.lookAt(eye, centre)), eye, clear: [0.03, 0.05, 0.08, 1] });
+}
+
+main();
+</script>
+</body>
+</html>

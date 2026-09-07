@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "f9e547462d2a505a53f52688dd940815cc9f003d",
+ "head": "b7477a7cfa2f67707a465f54d636d1c2079d0b0a",
  "bodies": {
   "box3d": [
    {
@@ -328,8 +328,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 860509,
-    "sha": "f9e547462d2a505a53f52688dd940815cc9f003d"
+    "bytes": 861306,
+    "sha": "b7477a7cfa2f67707a465f54d636d1c2079d0b0a"
    },
    {
     "path": "tools/ship/artifactWeight.mjs",
@@ -675,8 +675,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 860509,
-    "sha": "f9e547462d2a505a53f52688dd940815cc9f003d"
+    "bytes": 861306,
+    "sha": "b7477a7cfa2f67707a465f54d636d1c2079d0b0a"
    },
    {
     "path": "shipavatar.html",

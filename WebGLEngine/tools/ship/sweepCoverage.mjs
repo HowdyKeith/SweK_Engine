@@ -128,6 +128,14 @@ export const RETURNED_AT_V4529 = Object.freeze({
             why: "over the 3,000 ms budget on this box by a few percent: 3,083 / 3,073 / 3,154 ms alone across three serial " +
                  "runs at v4529, against 2,929 ms at v4476 on the same branch. A gate that straddles the budget is recorded " +
                  "at the reading it gave, not at the one that would put it back in." }),
+        // v4530: the same straddle, one round on -- a v4461 returnee at 2,793 ms then, and here 2,933 / 3,083 / 2,719 / 3,123 /
+        // 3,152 ms across five serial runs. The v4530 sweep dropped it from budget again under parallel load; the serial reading
+        // that went into the file is the one it gave last, which is over. Named, so a later sweep that finds it under (the row's
+        // other branch) or over (this one) is right either way.
+        Object.freeze({ gate: "tools/ship/traderGraph-selfcheck.mjs", recordedWas: 3368, v4461Ms: 2793, hereMs: 3152,
+            why: "straddles the 3,000 ms budget on this box: 2,933 / 3,083 / 2,719 / 3,123 / 3,152 ms across five serial runs at " +
+                 "v4529 and v4530, against 2,793 ms at v4461's rotation. Recorded at the reading it gave last, which is over; a " +
+                 "sweep that finds it under returns it by the row's other branch." }),
     ]),
 });
 
