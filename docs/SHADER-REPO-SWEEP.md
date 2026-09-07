@@ -153,6 +153,42 @@ stitching to render at more than close range, which nothing here provides today.
 logic hand-written fresh in this tree's style and graded by `manifoldCensus.mjs` for actual watertightness
 across a fine/coarse boundary, not by a picture. Worth a full round of its own rather than a quick add.
 
+## Named candidate, not built: glTF-Asset-Generator (KhronosGroup)
+
+Checked, not vendored, not implemented. Confirmed by fetching the actual repo (LICENSE, README, the
+`Output/` tree), not just the summary: it's a Khronos-official C# tool that generates synthetic glTF 2.0
+conformance assets — sparse accessors, interleaved vertex buffers, every primitive mode, skin/morph
+animation, the full material matrix (metallic-roughness, specular-glossiness, alpha blend/mask,
+double-sided), split into `Positive` (valid, should load) and `Negative` (deliberately invalid, should be
+rejected) categories. MIT, Copyright Khronos Group.
+
+**Two facts that matter, both confirmed rather than assumed:**
+- **The generated assets are not committed in the repo.** `Output/Positive/*` and `Output/Negative/*` hold
+  only per-category READMEs; the actual `.gltf`/`.glb` files ship solely as versioned release zips
+  (`GeneratedAssets-0.6.1.zip`, etc.), not files `raw.githubusercontent.com` serves.
+- **The licensing is materially cleaner than the other Khronos repo already vendored from here.**
+  `gpu/khronosSamples.mjs` exists because `glTF-Sample-Assets` mixes licenses per model (`BrainStem` is a
+  Poser EULA, `Duck` is Sony's SCEA license, `ABeautifulGame` is CC-BY-4.0 requiring attribution) and needs
+  a `mayVendor()` gate that fails closed per model. `glTF-Asset-Generator`'s output is entirely synthetic
+  geometry from Khronos's own MIT tool, not third-party art — one root LICENSE covers everything.
+
+**Checked against what's here.** `gpu/fixtures/` already holds exactly this shape of fixture — two
+header-only, BIN-chunk-stripped GLBs derived from Khronos's `ABeautifulGame` (22 KB/32 KB instead of
+12 MB/43 MB) — and its own `PROVENANCE.md` is explicit about the limit: they prove `gpu/glbLoad.js`'s
+Draco-vs-plain **routing**, and "do NOT prove decoding... the gate says so rather than letting a routing
+pass read as a decode pass." That's routing coverage for one real model's two variants. Grepped for any
+coverage of sparse accessors, interleaved buffers, or skin/morph edge cases in this tree's own code (not
+inside `vendor/three`'s `GLTFLoader.js`, which presumably handles the spec correctly as a mature loader) and
+found none. So the precise gap: nothing here exercises `gpu/GLBParser.js` / `gpu/glbLoad.js`'s own routing
+and parsing logic against the feature matrix this generator exists to test, or against the negative/malformed
+cases at all.
+
+**Not built.** If taken up: pull specific fixtures from a release zip (not raw file content, per above),
+strip them the same header-only way `gpu/fixtures/` already does if only routing needs exercising, or keep
+them whole if decode-level coverage of `GLBParser.js`'s edge-case handling is wanted. Lower-risk than most
+of this sweep — fixtures, not a technique to reimplement, and a licensing story simpler than the Khronos
+repo already vendored from.
+
 ## The method, for next time
 
 Sixteen links in, the split that mattered every time was the one retroRaster already wrote
