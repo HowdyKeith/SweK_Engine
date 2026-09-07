@@ -115,6 +115,22 @@ export function verdictClasses(c, { codes = {} } = {}) {
  * restoring the 4.79 hours of device measurement a v4420 re-freeze had overwritten with {}, and corpusFilters
  * by asserting its shortfall from the whole census instead of grepping a windowed table for a spelling.
  */
+// v4529 -- A RETURNEE THAT MEASURES OVER THE BUDGET ON THIS BOX, NAMED WITH ITS READINGS. The v4528 quick sweep recorded
+// meshLine, traderGraph and policyPilot over budget under 8-way parallel load ("3 dropped from budget"), and the
+// sweepCoverage gate named the file's own instrument as the lost one; re-timed SERIALLY with sweepRotation's runSlice,
+// policyPilot (2,617 ms) and traderGraph (2,933) came back under, and meshLine did not: 3,083 / 3,073 / 3,154 ms alone,
+// three runs, 2,929 at v4476. It is over by a few percent of the budget, not by a factor, and the honest record is the
+// reading and the box rather than a number rounded down to fit.
+export const RETURNED_AT_V4529 = Object.freeze({
+    at: "v4529",
+    stillOver: Object.freeze([
+        Object.freeze({ gate: "tools/ship/meshLine-selfcheck.mjs", recordedWas: 4404, v4476Ms: 2929, hereMs: 3154,
+            why: "over the 3,000 ms budget on this box by a few percent: 3,083 / 3,073 / 3,154 ms alone across three serial " +
+                 "runs at v4529, against 2,929 ms at v4476 on the same branch. A gate that straddles the budget is recorded " +
+                 "at the reading it gave, not at the one that would put it back in." }),
+    ]),
+});
+
 export const RETURNED_AT_V4476 = Object.freeze({
     at: "v4476",
     ofTwelve: 12,

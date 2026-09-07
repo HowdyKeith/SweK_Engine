@@ -1526,6 +1526,51 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         the page (the scene takes N, the record has one), blob-studio.html's composer (blobRecorder is the same
         MediaRecorder it uses; the composer adds nothing the codec refusal does not settle).
 
+     6. (v4529) RIBBON ROADS OVER THE GIT TERRAIN. world/ribbonRoad.mjs keeps phase 1's seeded loop, its centreline,
+        its checkpoints and its car, and puts them on the treemap terrain of v4149 / v4479: the 159 importers that
+        orrery-fleet.json names, with their bytes, through bodyTerrain.repoTerrainOf into gpuTerrain's field -- a
+        128^2 byte field over 160 m with a 10 m height scale, THE GROUND KEPT TO THE LOWER FOUR FIFTHS because a road
+        banked 15 degrees over 5 m stands 1.35 m above its own centreline and the first cut saturated at 255 under
+        every banked edge on the top plateau. THE DRAPE: the centreline resampled a metre apart by
+        render/sweptSpine.js's arc-length resample (379 samples, closed within a step), lifted to the shader's own
+        height model (the nearest texel times the scale), smoothed, relaxed downward until no step exceeds a 12%
+        grade, and BANKED by the design speed -- atan(v^2 kappa / g) at 12 m/s, capped at 15 degrees, the inside
+        edge low -- with a frame at every sample: the 3D tangent, the horizontal right, the banked right, the road's
+        up. It is not a rotation-minimising frame, and the gate measures why: sweptSpine's RMF round the same loop
+        carries 2.6 degrees of twist to the seam and tilts 17 degrees off vertical at worst, where the road's frames
+        meet at the seam within a sample's bank change and close by construction. THE CUT AND FILL: every texel
+        whose centre lies beside a cross-line within one texel past the kerb's outer edge takes the road's plane
+        (the nearest cross-line's), blended back to the ground over a 3 m shoulder; 648 m^3 cut, 3,037 m^3 filled
+        under 2,996 texels, nothing beyond the shoulder touched. THE RIBBON: six vertices a sample in packMeshes'
+        lit layout -- asphalt between the kerbs, the kerbs 0.15 m up and striped, a 0.25 m slab over the cut ground
+        so the terrain never pokes through the road it was cut for -- 2,274 vertices, 3,790 triangles, closed. THE
+        CAR: ribbonSurface answers raceCar's contract (at: the plane between the kerbs, the kerb a step up, the
+        terrain beyond; along: the lap parameter) so carForces climbs and banks UNCHANGED; the pursuit driver laps
+        the draped track in 52.8 s (the flat track: 52.9 -- the grades cost the speed-limited driver nothing
+        measurable), 100% of wheel samples on the asphalt, all four wheels grounded 95% of the time (crests lift
+        them), the chassis climbing 3.2 m and never over 0.3 m from its rest height over the plane, one fingerprint
+        twice. race-terrain.html puts terrain, ribbon and car in one gpuDriven scene as three fleets on WebGPU or
+        WebGL2 and names its ground, its road and its car. MEASURED (tools/ship/ribbonRoad-selfcheck.mjs): every
+        ribbon vertex on plain ground within 0.36 m of the terrain after the cut and fill against a bound derived
+        from the road's slope over a texel (0.88 m x (0.12 grade + 0.27 bank) + a byte = 0.38); the page's wasm
+        drapes the same files to node's spine hash and drives the car to node's fingerprint; on both backends the
+        asphalt reads dark under 378 of 379 projected spine points, the car's red at its pose, the terrain filling
+        the frame from 150 m up, the backends within 24 on 95% of pixels. *** THE FINDING THAT SHAPED THE CUT: THE
+        GROUND CANNOT HOLD A ROAD THAT FOLDS OVER ITSELF, AND A 5 m CORNER WITH A 5 m HALF-WIDTH FOLDS. *** On the
+        inside of every corner and at every hairpin two stretches of the loop a grade apart share one texel; the
+        terrain takes the LOWER road and the higher kerb stands on a wall (871 of 2,274 vertices over 214 fold
+        texels, named, none buried). Four drafts of the cut came before that statement held: the plane of the frame
+        the texel was nearest to (a grade and a bank off at the outer kerb of a corner: 1.5 m), the ribbon's own
+        quads rasterised (bow-ties on the inside of a corner leave pockets that older, lower frames fill), the fold
+        flag against the current lowest frame (a chain of neighbours walks it round the corner without tripping),
+        and the whole byte range given to the ground (above). Two more in the gate: a bank smoothed as widely as
+        the height lingered nine samples into an S-bend's next curve as an adverse camber (the bank is smoothed
+        narrower than the curvature now), and the bank's runoff before a corner is on samples with no raw turn and
+        no inside, so the camber test is geometric on the raw tangents, not on the smoothed curvature. NOT BUILT,
+        said plainly: buildings on the terrain (CityGen stamps a flat floor; the terrain page has none), the brain
+        on the draped track (the pursuit driver laps it; drivePolicy's features are the flat track's), a box3d
+        heightfield collider (the surface is analytic, as the flat one was), the ribbon replacing tiles ONLY where
+        the ground is not flat (it replaces them everywhere on this page; the flat tiles stay race-track.html's).
 ## The count that says when step 4 matters
 
 tools/ship/shaderCensus-selfcheck.mjs has held, since v3274, that a hand-written pair is cheaper than an

@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 467,
+ "count": 468,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -2282,6 +2282,13 @@
    "f": "race-replay.html",
    "t": "Race replay, pre-rendered",
    "d": "Racing city 5: world/raceReplayBake.mjs turns a race record -- the lab's accepted driver from physics-lab.html's race scene when the bridge serves it, otherwise one built here with the accepted speed gain -- into pictures without the driver running again: the held-out track and its city as voxels (ASH asphalt, STONE/SNOW kerb stripes, GRASS, stamped from the surface the car drives on), the car as a chassis-sized box in litSphere's quat mode, keyframes taken from the record's own input log played back through box3d (the playback's fingerprint must equal the record's), each keyframe drawn on WebGPU or WebGL2 and read back. NOT REAL TIME: the keyframes are computed ahead, every frame is rendered at the device's pace, and playback is a slideshow of what was rendered. Export the schematic (a JSON row per keyframe with every pose and each picture's pixel hash), the current keyframe as a PNG, or a WebM off the canvas through render/blobRecorder.js -- which a TV will not play; the H.264 MP4 is rig-pending, as blobRecorder measured. Drag to orbit, wheel to dolly.",
+   "g": "racing",
+   "p": 0
+  },
+  {
+   "f": "race-terrain.html",
+   "t": "Race terrain on the GPU",
+   "d": "Racing city 6: world/ribbonRoad.mjs drapes race-track.html's seeded loop over the treemap terrain of this repository's own files (world/repoHeightfield.js through render/bodyTerrain.mjs, drawn by render/gpuTerrain.mjs) -- a GitHub repo IS the landscape. The centreline is resampled a metre apart (render/sweptSpine.js), lifted to the ground, smoothed, graded no steeper than 12% and banked on the curves for 12 m/s; the terrain is cut and filled to the road's plane one texel past the kerbs and blended over a 3 m shoulder, taking the lower road where the loop folds over itself; the road is a swept ribbon with striped kerbs, replacing the tiles everywhere on this page. physics/raceCar.mjs's car drives the ribbon's plane through its own contract, unchanged, with the pursuit driver, on box3d's wasm in the page. Terrain, ribbon and car are three fleets of one gpuDriven scene on WebGPU or WebGL2. Drag to orbit, wheel to dolly.",
    "g": "racing",
    "p": 0
   },

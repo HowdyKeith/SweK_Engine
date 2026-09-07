@@ -1,6 +1,6 @@
 {
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner.",
- "at": "2026-09-05T20:33:03.972Z",
+ "at": "2026-09-07T10:52:31.034Z",
  "budgetMs": 3000,
  "rotated": [
   {
@@ -292,12 +292,6 @@
    "priorMs": 3745
   },
   {
-   "gate": "tools/roundhouse/policyPilot-selfcheck.mjs",
-   "ms": 2677,
-   "code": 0,
-   "priorMs": 3754
-  },
-  {
    "gate": "brain/rl/hunt-transfer-selfcheck.mjs",
    "ms": 3661,
    "code": 0,
@@ -458,6 +452,24 @@
    "ms": 916,
    "code": 0,
    "priorMs": 4089
+  },
+  {
+   "gate": "tools/roundhouse/policyPilot-selfcheck.mjs",
+   "ms": 2617,
+   "code": 0,
+   "priorMs": 3020
+  },
+  {
+   "gate": "tools/ship/meshLine-selfcheck.mjs",
+   "ms": 3154,
+   "code": 0,
+   "priorMs": 4779
+  },
+  {
+   "gate": "tools/ship/traderGraph-selfcheck.mjs",
+   "ms": 2933,
+   "code": 0,
+   "priorMs": 3123
   }
  ]
 }

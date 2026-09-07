@@ -400,11 +400,13 @@ console.log("\n7. *** THE MIRROR standingReds NEVER HAD: A ZERO IS AS OLD AS THE
     // RETURNED_AT_V4476 records a COUNT and the exceptions, not a roll, so the roll is DERIVED from the two --
     // the twelve, minus the ones it names as still over -- and the derivation is checked against the frozen
     // count rather than trusted. A list typed out beside a count is the second copy that never gets updated.
-    const V76 = SC.RETURNED_AT_V4476;
+    const V76 = SC.RETURNED_AT_V4476, V29 = SC.RETURNED_AT_V4529;
     const stillOverGates = new Set(V76.stillOver.map((x) => x.gate));
     const reTimedHere = back.filter((r) => !stillOverGates.has(r.gate));
+    // v4529: a returnee can go back OVER on a later box (meshLine, 2,929 at v4476, 3,154 here), and the property holds the
+    // same way crossBackend's did -- named, with a reason and a live reading that is genuinely over
     const stillOverNamed = (g) => {
-        const row = V76.stillOver.find((x) => x.gate === g);
+        const row = V76.stillOver.find((x) => x.gate === g) || V29.stillOver.find((x) => x.gate === g);
         return !!row && typeof row.why === "string" && row.why.length > 40 &&
                (FILE.timings || {})[g] > SC.BUDGET_MS;
     };
@@ -437,6 +439,11 @@ console.log("\n7. *** THE MIRROR standingReds NEVER HAD: A ZERO IS AS OLD AS THE
        "recorded time is checked against the live file here, so a re-timing that fixes it fails this row " +
        `rather than leaving a record nobody re-derives -- AND IT DID: ${REC.returnedAt_v4461.length} were ` +
        "returned by v4461's rotation and this row fired on the next run until they were named.");
+
+    // ---- v4529: the later still-over record is held to the same standard as v4476's ----
+    ok("!! a returnee that went back over the budget on a later box is NAMED with its serial readings, and is live over",
+       overNonEmpty(SC.RETURNED_AT_V4529.stillOver, (x) => (FILE.timings || {})[x.gate] > SC.BUDGET_MS && typeof x.why === "string" && x.why.length > 40 && x.hereMs > SC.BUDGET_MS && back.some((b) => b.gate === x.gate)),
+       SC.RETURNED_AT_V4529.stillOver.map((x) => x.gate.split("/").pop() + " " + (FILE.timings || {})[x.gate] + " ms on file, " + x.hereMs + " ms recorded").join("; "));
 
     // ---- this branch's v4476 accounting, kept beside it ----
     const T = FILE.timings || {};

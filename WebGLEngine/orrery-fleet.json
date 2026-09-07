@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "a7bcd245f18b695c2a756123bbd0b0f90a459dbd",
+ "head": "f9e547462d2a505a53f52688dd940815cc9f003d",
  "bodies": {
   "box3d": [
    {
@@ -328,8 +328,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 859778,
-    "sha": "423a8e091143263b5058fd44350f12d010295939"
+    "bytes": 860509,
+    "sha": "f9e547462d2a505a53f52688dd940815cc9f003d"
    },
    {
     "path": "tools/ship/artifactWeight.mjs",
@@ -675,8 +675,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 859778,
-    "sha": "423a8e091143263b5058fd44350f12d010295939"
+    "bytes": 860509,
+    "sha": "f9e547462d2a505a53f52688dd940815cc9f003d"
    },
    {
     "path": "shipavatar.html",
@@ -751,7 +751,7 @@
    {
     "path": "tools/ship/webgpuHarness.mjs",
     "bytes": 49522,
-    "sha": "b23c9f8ac2e7295851e1de3d6285aefbaef1d11b"
+    "sha": "f9e547462d2a505a53f52688dd940815cc9f003d"
    },
    {
     "path": "toroidal-wave.html",

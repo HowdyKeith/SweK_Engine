@@ -21,7 +21,7 @@
   }
  },
  "counts": {
-  "page": 467,
+  "page": 468,
   "demo": 49,
   "builtin": 34
  },
@@ -2631,6 +2631,14 @@
    "id": "race-replay.html",
    "display": "Race Replay",
    "href": "/race-replay.html",
+   "section": "Racing City",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "race-terrain.html",
+   "display": "Race Terrain",
+   "href": "/race-terrain.html",
    "section": "Racing City",
    "collision": false
   },

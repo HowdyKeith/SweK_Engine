@@ -208,6 +208,11 @@ export const MEASURED_RUNS = Object.freeze({
         observedHere: true, at: "v4528",
         runs: Object.freeze([{ ms: 6744, code: 0 }, { ms: 6761, code: 0 }, { ms: 6753, code: 0 }]),
     }),
+    // Run here at v4529, three alone, `date +%s%3N` around the process.
+    "tools/ship/ribbonRoad-selfcheck.mjs": Object.freeze({
+        observedHere: true, at: "v4529",
+        runs: Object.freeze([{ ms: 33750, code: 0 }, { ms: 33771, code: 0 }, { ms: 33774, code: 0 }]),
+    }),
 });
 
 /**
@@ -309,6 +314,10 @@ export const MEASURED = {
     // kill -- the first draft took ~26 s because the page's iframe crawled in the recorder's page, which the gate's header records.
     // THREE RUNS ALONE, ALL EXIT 0, the rows in MEASURED_RUNS.
     "tools/ship/raceReplayBake-selfcheck.mjs": slowestRun("tools/ship/raceReplayBake-selfcheck.mjs"),
+    // *** v4529 -- MEASURED AT BIRTH. *** tools/ship/ribbonRoad-selfcheck.mjs drives the car for 3 x 120 s of box3d on the draped
+    // track and once on the flat one, then opens two browsers (both backends, then the page). Over the quick sweep's 20 s kill by
+    // construction. THREE RUNS ALONE, ALL EXIT 0, the rows in MEASURED_RUNS.
+    "tools/ship/ribbonRoad-selfcheck.mjs": slowestRun("tools/ship/ribbonRoad-selfcheck.mjs"),
     // *** v4173 -- MEASURED TO COMPLETION FOR THE FIRST TIME, WHICH UNRESOLVED'S OWN HEADER INSTRUCTS. ***
     // 1140363 ms, EXIT 0, all checks passing -- 87 devices, 306 modes, every one built. It had been listed
     // as "exceeded a 150s cap at v3924" ever since, on the 309 s DEFAULT.

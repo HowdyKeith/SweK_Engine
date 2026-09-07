@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Race terrain (the grid track draped over the git terrain as a banked ribbon road, the car lapping it on gfx/device.js)">
+<meta name="demo:desc" content="Racing city 6: world/ribbonRoad.mjs drapes race-track.html's seeded loop over the treemap terrain of this repository's own files (world/repoHeightfield.js through render/bodyTerrain.mjs, drawn by render/gpuTerrain.mjs) -- a GitHub repo IS the landscape. The centreline is resampled a metre apart (render/sweptSpine.js), lifted to the ground, smoothed, graded no steeper than 12% and banked on the curves for 12 m/s; the terrain is cut and filled to the road's plane one texel past the kerbs and blended over a 3 m shoulder, taking the lower road where the loop folds over itself; the road is a swept ribbon with striped kerbs, replacing the tiles everywhere on this page. physics/raceCar.mjs's car drives the ribbon's plane through its own contract, unchanged, with the pursuit driver, on box3d's wasm in the page. Terrain, ribbon and car are three fleets of one gpuDriven scene on WebGPU or WebGL2. Drag to orbit, wheel to dolly.">
+<meta name="demo:category" content="world">
+<title>Race terrain on the GPU</title>
+<style>
+  html,body { margin:0; height:100%; background:#050805; color:#9fb2d4; font:12px ui-monospace,Menlo,monospace; }
+  #c { display:block; width:100%; }
+  #hud { padding:10px 14px; }
+  #cap { color:#f6a623; letter-spacing:.14em; text-transform:uppercase; }
+  #be { color:#59d1ff; font-size:14px; margin-top:4px; }
+  #sub { color:#5f7aa0; font-size:11px; margin-top:2px; line-height:1.7; }
+  .bad { color:#ff9a9a; }
+  a { color:#59d1ff; }
+  input[type=number] { width:48px; background:#0c140f; color:#9fb2d4; border:1px solid #2a3a30; font:inherit; }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div id="cap">Race terrain on the GPU: the grid track draped over the git terrain as a banked ribbon road</div>
+  <div id="be">requesting a device&hellip;</div>
+  <div id="sub">seed <input id="seed" type="number" value="1" min="1"> &middot; <button id="reset">Reset</button> &middot; <label><input type="checkbox" id="follow" checked> camera follows the car</label>
+    &middot; <a href="?webgl=1">force WebGL2</a> &middot; <a href="race-track.html">the flat tiles</a><br>
+    <span id="tick">loading the repository's files and box3d&hellip;</span><br><span id="road"></span><br><span id="car"></span> &middot; drag to orbit, wheel to dolly</div>
+</div>
+<canvas id="c"></canvas>
+<script type="module" src="/ui/originNotice.js"></script>
+<script type="module">
+import { requestDevice } from "./gfx/device.js";
+import * as G from "./render/gpuDriven.mjs";
+import * as R from "./world/ribbonRoad.mjs";
+import { generateTrack, describeTrack } from "./world/raceTrack.mjs";
+import { carPose, stepCar, pursuitDriver, lapTracker, foldHash, CAR } from "./physics/raceCar.mjs";
+import { box3d } from "./physics/box3d/box3dLoader.js";
+import { worldFromModule } from "./render/slugTicker.mjs";
+
+const cvs = document.getElementById("c"), beEl = document.getElementById("be");
+const fail = (m) => { beEl.innerHTML = '<span class="bad">' + m + "</span>"; };
+const $ = (id) => document.getElementById(id);
+let device, files = null, physMod = null, phys = null, car = null, surface = null, driver = null, tracker = null, sc = null, spine = null;
+let yaw = 0.6, pitch = 0.7, dist = 160, dragging = null, centre = [0, 0, 0], hash = 0x811c9dc5, steps = 0, lapTime = null, acc = 0, lastT = 0, kinds = { asphalt: 0, kerb: 0, grass: 0 };
+
+function rebuild() {
+  if (!files || !physMod) return;
+  const t0 = performance.now();
+  const track = generateTrack({ seed: Math.max(1, +$("seed").value | 0) });
+  const terrain = R.terrainOf(files); spine = R.drapeSpine(track, terrain);
+  const cf = R.cutFill(terrain, spine);
+  surface = R.ribbonSurface(spine, terrain); driver = pursuitDriver(surface, { vMax: 12 }); tracker = lapTracker(surface);
+  if (phys) phys.destroy();
+  phys = worldFromModule(physMod, [0, -9.81, 0]);
+  car = R.placeCar(phys, surface);
+  hash = 0x811c9dc5; steps = 0; lapTime = null; acc = 0; kinds = { asphalt: 0, kerb: 0, grass: 0 };
+  if (sc && sc.scene.destroy) sc.scene.destroy();
+  sc = R.terrainScene(device, G, terrain, spine); sc.setCar(carPose(phys, car));
+  const ms = performance.now() - t0;
+  $("tick").textContent = `${describeTrack(track)}; the ground: ${files.length} files of this repository from orrery-fleet.json as a ${terrain.field.width}^2 treemap over ${terrain.params.extent} m, relief ${(terrain.params.heightScale * (1 - terrain.headroom)).toFixed(1)} m; built in ${ms.toFixed(0)} ms on ${sc.scene.path}`;
+  $("road").textContent = `the road: ${spine.count} samples over ${spine.length.toFixed(0)} m, climbing ${spine.relief.toFixed(2)} m, max grade ${(spine.maxGrade * 100).toFixed(1)}%, max bank ${(spine.maxBank * 180 / Math.PI).toFixed(1)} deg for ${R.ROAD.designSpeed} m/s; cut ${cf.cut.toFixed(0)} m3 and filled ${cf.fill.toFixed(0)} m3 under ${cf.under} texels, ${cf.folds} fold texels where the loop crosses its own band and the ground takes the lower road; the ribbon replaces the tiles everywhere here (the flat tiles are race-track.html's)`;
+}
+
+async function main() {
+  const forceGl = new URLSearchParams(location.search).get("webgl") === "1";
+  try { device = await requestDevice(cvs, forceGl ? { backend: "webgl2" } : { prefer: "webgpu" }); }
+  catch (e) { return fail("requestDevice threw: " + e.message); }
+  beEl.textContent = `device: ${device.backend}`;
+  try {
+    const t0 = performance.now();
+    const r = await fetch("/orrery-fleet.json"); if (!r.ok) throw new Error(`orrery-fleet.json: HTTP ${r.status}`);
+    files = R.fleetFiles(await r.json());
+    const ps = await box3d.init(); if (!ps.ready) return fail("box3d: " + ps.reason);
+    physMod = box3d._mod;
+    beEl.textContent += ` -- ${files.length} files and box3d's wasm loaded in ${(performance.now() - t0).toFixed(0)} ms`;
+  } catch (e) { return fail("loading threw: " + e.message); }
+  rebuild();
+  $("seed").addEventListener("change", rebuild); $("reset").addEventListener("click", rebuild);
+  cvs.addEventListener("pointerdown", (e) => { dragging = [e.clientX, e.clientY]; });
+  addEventListener("pointerup", () => { dragging = null; });
+  addEventListener("pointermove", (e) => { if (!dragging) return; yaw += (e.clientX - dragging[0]) * 0.006; pitch = Math.max(0.05, Math.min(1.5, pitch + (e.clientY - dragging[1]) * 0.006)); dragging = [e.clientX, e.clientY]; });
+  cvs.addEventListener("wheel", (e) => { e.preventDefault(); dist = Math.max(8, Math.min(600, dist * Math.exp(e.deltaY * 0.001))); }, { passive: false });
+  requestAnimationFrame(frame);
+}
+
+function frame(t) {
+  requestAnimationFrame(frame);
+  const w = cvs.clientWidth | 0, h = Math.max(200, (innerHeight - document.getElementById("hud").offsetHeight - 4) | 0);
+  if (cvs.width !== w || cvs.height !== h) { cvs.width = w; cvs.height = h; }
+  if (!sc || !car) return;
+  // fixed 60 Hz physics, at most 4 steps a frame, so a slow frame does not become a different simulation
+  const dt = Math.min(0.1, (t - (lastT || t)) / 1000); lastT = t; acc += dt; let n = 0;
+  while (acc >= CAR.dt && n < 4) { const pose = carPose(phys, car); const r = stepCar(phys, car, surface, driver(pose), CAR.dt); hash = foldHash(hash, phys.stateHash()); steps++; acc -= CAR.dt; n++; for (const q of r.wheels) kinds[q.kind] = (kinds[q.kind] || 0) + 1; const tk = tracker.update(r.pose); if (tk.laps >= 1 && lapTime === null) lapTime = steps * CAR.dt; }
+  const pose = carPose(phys, car); sc.setCar(pose);
+  const tot = kinds.asphalt + kinds.kerb + kinds.grass || 1;
+  $("car").textContent = `the car: speed ${Math.max(0, pose.speed).toFixed(1)} m/s at y ${pose.pos[1].toFixed(2)} (${R.clearance(surface, pose).toFixed(2)} m off its rest height over the plane), checkpoints ${tracker.hit}, laps ${tracker.laps}${lapTime ? ", first lap " + lapTime.toFixed(1) + " s" : ""}, wheels on asphalt ${(kinds.asphalt / tot * 100).toFixed(0)}%, ${steps} steps, fingerprint ${(hash >>> 0).toString(16).padStart(8, "0")}`;
+  if ($("follow").checked) centre = [pose.pos[0], pose.pos[1], pose.pos[2]];
+  const eye = [centre[0] + dist * Math.sin(yaw) * Math.cos(pitch), centre[1] + dist * Math.sin(pitch), centre[2] + dist * Math.cos(yaw) * Math.cos(pitch)];
+  sc.scene.frame({ viewProj: G.multiply(G.perspective(0.9, w / h, 0.5, 2000), G.lookAt(eye, centre)), eye, clear: [0.03, 0.05, 0.08, 1] });
+}
+
+main();
+</script>
+</body>
+</html>

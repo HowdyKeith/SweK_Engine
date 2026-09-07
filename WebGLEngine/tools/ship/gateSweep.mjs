@@ -3708,6 +3708,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "froze the recorder's renderer 4 times in 16 runs and got its own browser (~26 s -> ~6.8 s), and the harness " +
                  "races page.evaluate against its timeout now. Sabotages red at A / B / C / D / E / F / G (the gate's header).",
     }),
+    since194: Object.freeze({
+        at: "v4529", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/ribbonRoad-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green headless and in the browser on both backends. Racing city 6: world/ribbonRoad.mjs drapes the grid track's " +
+                 "centreline over the treemap terrain of this repository's own files (orrery-fleet.json's importers through " +
+                 "bodyTerrain.repoTerrainOf), resampled a metre apart by sweptSpine, smoothed, graded to 12%, banked for 12 m/s " +
+                 "with the inside edge low; cuts and fills the field to the road's plane one texel past the kerbs, taking the " +
+                 "lower road where the loop folds over itself; draws the road as a swept ribbon with striped kerbs; and drives " +
+                 "raceCar's unchanged car on the ribbon's plane. race-terrain.html puts terrain, ribbon and car in one gpuDriven " +
+                 "scene. Sabotages red at A / B / C / D / E / F / G (the gate's header).",
+    }),
 
 });
 
