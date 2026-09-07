@@ -1,0 +1,49 @@
+{
+ "gate": "render/retroRaster-selfcheck.mjs",
+ "at": "2026-09-07",
+ "tables": [
+  {
+   "title": "perspective-correct warp against depth ratio",
+   "columns": [
+    "depth ratio",
+    "worst warp",
+    "at barycentric"
+   ],
+   "rows": [
+    [
+     "1",
+     "0.000000",
+     "0.000, 0.000, 1.000"
+    ],
+    [
+     "1.5",
+     "0.142857",
+     "0.000, 0.453, 0.547"
+    ],
+    [
+     "2",
+     "0.242582",
+     "0.000, 0.422, 0.578"
+    ],
+    [
+     "4",
+     "0.471347",
+     "0.000, 0.328, 0.672"
+    ],
+    [
+     "8",
+     "0.675350",
+     "0.000, 0.266, 0.734"
+    ],
+    [
+     "16",
+     "0.848477",
+     "0.000, 0.203, 0.797"
+    ]
+   ],
+   "note": "The warp is what a depth-unaware rasteriser gets wrong, and it grows with the depth ratio -- which is why a single flat-triangle fixture cannot tell a correct interpolator from a lucky one."
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

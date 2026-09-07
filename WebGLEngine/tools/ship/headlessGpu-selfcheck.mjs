@@ -31,7 +31,16 @@ const sec = (t) => console.log("\n" + t);
 
 const skip = HG.headlessGpuSkipReason();
 if (skip) {
+    // *** v4534 -- THIS FAILED WITHOUT SAYING SO IN THE ONE FORMAT THE TREE COUNTS. *** The ship skill's rule
+    // is "Count reds with `grep -c '^  FAIL'`, never `grep -c FAIL`" -- and this branch printed a summary
+    // line and no row, so every tally built on that rule read ZERO REDS FOR A GATE THAT WAS FAILING. It is
+    // the only gate in v4460's census that reported exit 1 with nothing to count, and it stayed classified as
+    // "environmental, nothing to do" for the whole of this session's sweep because of it.
+    //
+    // The doctrine below is UNCHANGED and correct: a missing device is a red, not a skip. What changes is
+    // that the red is legible to the counter the ritual actually uses.
     console.log("headlessGpu-selfcheck: NO NATIVE GPU -- " + skip);
+    console.log("  FAIL  *** NO NATIVE GPU: the device this gate measures is absent, so nothing was measured ***   " + skip);
     console.log("\nFAIL -- 1 check(s)");
     console.log("A GATE THAT SKIPS IS NOT A GATE THAT PASSES. Every number here came off a real Dawn instance.");
     process.exit(1);

@@ -1,0 +1,79 @@
+{
+ "gate": "tools/ship/runtimeGap-selfcheck.mjs",
+ "at": "2026-09-07",
+ "tables": [
+  {
+   "title": "what 4012 runtime source files actually use",
+   "columns": [
+    "capability",
+    "files",
+    "share"
+   ],
+   "rows": [
+    [
+     "ES modules",
+     "3720",
+     "92.7%"
+    ],
+    [
+     "closures as values",
+     "3598",
+     "89.7%"
+    ],
+    [
+     "async/await",
+     "1413",
+     "35.2%"
+    ],
+    [
+     "typed arrays",
+     "788",
+     "19.6%"
+    ],
+    [
+     "Promises",
+     "343",
+     "8.5%"
+    ],
+    [
+     "fetch/XHR",
+     "243",
+     "6.1%"
+    ],
+    [
+     "performance.now",
+     "220",
+     "5.5%"
+    ],
+    [
+     "WebGL",
+     "154",
+     "3.8%"
+    ],
+    [
+     "requestAnimationFrame",
+     "116",
+     "2.9%"
+    ],
+    [
+     "WebGPU",
+     "48",
+     "1.2%"
+    ],
+    [
+     "WebAssembly",
+     "23",
+     "0.6%"
+    ],
+    [
+     "workers/threads",
+     "22",
+     "0.5%"
+    ]
+   ],
+   "note": "The ORDERING is the finding: threads sit near the bottom of it, which is the premise #129 assumed the other way round. Vendor, node_modules and dist are excluded and the source is comment-stripped."
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

@@ -20,8 +20,10 @@ import { fileURLToPath } from "node:url";
 import * as R from "../../vba/runtimeGap.mjs";
 import { PARTS, PROVISIONAL, READ_AGAINST } from "../../vba/archiveManifest.mjs";
 import { sources, SOURCE_SKIP as SKIP } from "./recordDrift.mjs";
+import { gateReport } from "./gateReport.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+const REPORT = gateReport("tools/ship/runtimeGap-selfcheck.mjs");
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const say = (m) => console.log("  ----  " + m);
@@ -217,4 +219,11 @@ const rows = R.ranked(c);
 }
 
 console.log("runtimeGap-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));
+// v4534: these numbers used to die with the terminal -- gateReport-selfcheck named this gate for it.
+REPORT.table(`what ${c.files} runtime source files actually use`, ["capability", "files", "share"],
+    rows.map((r) => [r.capability, String(r.files), r.pct.toFixed(1) + "%"]),
+    "The ORDERING is the finding: threads sit near the bottom of it, which is the premise #129 assumed the " +
+    "other way round. Vendor, node_modules and dist are excluded and the source is comment-stripped.");
+REPORT.write();
+
 process.exit(fails ? 1 : 0);

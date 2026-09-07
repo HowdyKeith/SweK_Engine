@@ -1,0 +1,64 @@
+{
+ "gate": "tools/ship/closingCoverage-selfcheck.mjs",
+ "at": "2026-09-07",
+ "tables": [
+  {
+   "title": "the sweep ledger as a SET, not a sum",
+   "columns": [
+    "quantity",
+    "value",
+    "what it means"
+   ],
+   "rows": [
+    [
+     "gates on disk",
+     "1594",
+     "counted from the filesystem"
+    ],
+    [
+     "baseline swept at v4297",
+     "1366",
+     "BY COUNT, not by name"
+    ],
+    [
+     "swept since",
+     "14",
+     "outside any closing"
+    ],
+    [
+     "closings",
+     "194",
+     "rounds that claimed gates"
+    ],
+    [
+     "names claimed (summed)",
+     "213",
+     "with duplicates counted twice"
+    ],
+    [
+     "names claimed (distinct)",
+     "213",
+     "the set -- this is the honest one"
+    ],
+    [
+     "credit from duplicates",
+     "0",
+     "summed minus distinct: free coverage"
+    ],
+    [
+     "claimed but absent",
+     "0",
+     "names no file on disk answers to"
+    ],
+    [
+     "uncovered (distinct)",
+     "0",
+     "what nothing has swept"
+    ]
+   ],
+   "note": "A COUNT CANNOT TELL DOUBLE-COUNTING FROM COVERAGE. The ledger's arithmetic was a sum, so a gate claimed by two closings bought credit against a third that nothing had swept; the set cannot."
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

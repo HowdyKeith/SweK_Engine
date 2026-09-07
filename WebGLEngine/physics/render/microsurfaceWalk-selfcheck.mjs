@@ -29,7 +29,9 @@ import { directionalAlbedo as tableAlbedo, Lambda } from "./microfacet.mjs";
 import { directionalAlbedo as pAlbedo, alphaOf } from "./principled.mjs";
 import { buildTable } from "./energyCompensation.mjs";
 import { schlick } from "./fresnel.mjs";
+import { gateReport } from "../../tools/ship/gateReport.mjs";
 
+const REPORT = gateReport("physics/render/microsurfaceWalk-selfcheck.mjs");
 let fails = 0;
 const ok = (n, c, d = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${n}${d ? "   " + d : ""}`); };
 const say = (m) => console.log("  ----  " + m);
@@ -131,4 +133,13 @@ ok("the sampled visible normal always points up and is normalised", (() => {
 })());
 
 console.log(`\nmicrosurfaceWalk-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);
+// v4534: these numbers used to die with the terminal -- gateReport-selfcheck named this gate for it.
+REPORT.table("the walk against the analytic table, by roughness", ["alpha", "walk albedo", "table albedo", "diff"],
+    ss.map((x) => [String(x.a), x.walkE.toFixed(6), x.tableE.toFixed(6), (x.walkE - x.tableE).toExponential(2)]),
+    "With Fresnel identically one the walk conserves EXACTLY at every roughness -- energy that goes in has " +
+    "nowhere else to go. That is a law, not a tolerance.");
+REPORT.table("conservation and how far light travels", ["alpha", "albedo", "mean bounces"],
+    cons.map((c) => [String(c.a), c.r.value.toFixed(6), c.r.meanBounces.toFixed(3)]));
+REPORT.write();
+
 process.exit(fails === 0 ? 0 : 1);

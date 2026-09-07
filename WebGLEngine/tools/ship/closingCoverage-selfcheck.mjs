@@ -48,7 +48,9 @@ import {
     coverage, closingsOf, unclaimedOnDisk, withDuplicate, reportLines, ENG,
     COVERAGE_AT_V4456 as REC,
 } from "./closingCoverage.mjs";
+import { gateReport } from "./gateReport.mjs";
 
+const REPORT = gateReport("tools/ship/closingCoverage-selfcheck.mjs");
 let fails = 0;
 const ok = (n, c, d = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${n}${d ? "   " + d : ""}`); };
 const say = (m) => console.log("  ----  " + m);
@@ -226,4 +228,19 @@ ok("the record is frozen and so are its rows",
     Object.isFrozen(REC) && Object.isFrozen(REC.cancellation) && REC.cancellation.every(Object.isFrozen));
 
 console.log(`\nclosingCoverage-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);
+// v4534: these numbers used to die with the terminal -- gateReport-selfcheck named this gate for it.
+REPORT.table("the sweep ledger as a SET, not a sum", ["quantity", "value", "what it means"],
+    [["gates on disk", String(live.onDisk), "counted from the filesystem"],
+     ["baseline swept at v4297", String(live.baselineSwept), live.baselineByName ? "by name" : "BY COUNT, not by name"],
+     ["swept since", String(live.sinceSwept), "outside any closing"],
+     ["closings", String(live.closings), "rounds that claimed gates"],
+     ["names claimed (summed)", String(live.summed), "with duplicates counted twice"],
+     ["names claimed (distinct)", String(live.distinct), "the set -- this is the honest one"],
+     ["credit from duplicates", String(live.creditFromDuplicates), "summed minus distinct: free coverage"],
+     ["claimed but absent", String(live.phantom.length), "names no file on disk answers to"],
+     ["uncovered (distinct)", String(live.distinctUncovered), "what nothing has swept"]],
+    "A COUNT CANNOT TELL DOUBLE-COUNTING FROM COVERAGE. The ledger's arithmetic was a sum, so a gate claimed " +
+    "by two closings bought credit against a third that nothing had swept; the set cannot.");
+REPORT.write();
+
 process.exit(fails === 0 ? 0 : 1);

@@ -219,6 +219,22 @@ export const CLOSED_AT_V4407 = Object.freeze(["gfx/device.js"]);
 export const MAIN_REACH_BEFORE_V4407 = 692;
 export const MAIN_REACH_AFTER_V4407 = 695;
 
+// *** v4534 -- THE ROW BELOW ASSERTED THIS TOTAL EXACTLY, WHICH PINS THE WHOLE FRONT-DOOR CLOSURE TO A NUMBER
+// FROZEN AT v4407. *** Any round adding an import anywhere in main.js's reach breaks it, and the break says
+// nothing about what v4407 claimed. Three modules have arrived since, all by unrelated rounds, and NONE HAS
+// BEEN LOST -- measured by replaying the same walk against a v4407 worktree and diffing the two sets.
+//
+// Growth is ACCOUNTED rather than pinned or unbounded: each arrival is named with why it is on the path, and
+// the total is asserted to be the v4407 number plus exactly these. The membership claims that carry the
+// round's actual finding -- gfx/device.js is reached, exactly what CLOSED_AT_V4407 says is closed, nine are
+// still outside -- are untouched and are where the meaning lives.
+export const REACH_ARRIVALS_SINCE_V4407 = Object.freeze([
+    Object.freeze({ module: "ui/webgpuProbe.mjs", why: "the WebGPU capability probe the front door now consults" }),
+    Object.freeze({ module: "world/buildingFacade.mjs", why: "facade generation, pulled in by the building work" }),
+    Object.freeze({ module: "world/buildingGrammar.mjs", why: "its grammar, imported by the facade" }),
+]);
+export const REACH_LOST_SINCE_V4407 = Object.freeze([]);
+
 export const ADDED_AT_V4407 = Object.freeze([
     "BACKEND_STATE", "SECURE_ONLY", "originVerdict", "backendState", "webgpuDiagnosis", "open", "status",
 ]);

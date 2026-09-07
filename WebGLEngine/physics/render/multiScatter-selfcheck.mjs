@@ -30,7 +30,9 @@
 import { evaluate, directionalAlbedo, alphaOf } from "./principled.mjs";
 import { buildTable, msLobe, albedoAt } from "./energyCompensation.mjs";
 import { schlick } from "./fresnel.mjs";
+import { gateReport } from "../../tools/ship/gateReport.mjs";
 
+const REPORT = gateReport("physics/render/multiScatter-selfcheck.mjs");
 let fails = 0;
 const ok = (n, c, d = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${n}${d ? "   " + d : ""}`); };
 const say = (m) => console.log("  ----  " + m);
@@ -173,4 +175,12 @@ ok("the multi-scatter term is specular-only and never reaches the diffuse lobe",
 })(), "roughDiffuse.mjs answers the diffuse lobe's own energy question separately");
 
 console.log(`\nmultiScatter-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);
+// v4534: these numbers used to die with the terminal -- gateReport-selfcheck named this gate for it.
+REPORT.table("energy before and after compensation, by roughness", ["roughness", "uncompensated", "compensated"],
+    rows.map((x) => [String(x.r), x.un.toFixed(6), x.comp.toFixed(6)]),
+    "Compensation may never REMOVE energy and can never exceed F_avg, which is a hard ceiling because every " +
+    "bounce is a Fresnel reflection. The uncompensated column falling away from 1 as roughness rises is the " +
+    "energy a single-scatter lobe loses.");
+REPORT.write();
+
 process.exit(fails === 0 ? 0 : 1);

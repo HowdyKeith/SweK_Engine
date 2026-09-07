@@ -1,0 +1,54 @@
+{
+ "gate": "physics/render/bssrdfSample-selfcheck.mjs",
+ "at": "2026-09-07",
+ "tables": [
+  {
+   "title": "both estimators against the truth, in units of their OWN standard error",
+   "columns": [
+    "a",
+    "truth",
+    "importance",
+    "z (se)",
+    "uniform",
+    "z (se)"
+   ],
+   "rows": [
+    [
+     "1",
+     "0.529916",
+     "0.534112",
+     "2.06",
+     "0.541740",
+     "1.54"
+    ],
+    [
+     "3",
+     "0.834307",
+     "0.836638",
+     "1.82",
+     "0.865734",
+     "1.47"
+    ],
+    [
+     "10",
+     "0.977815",
+     "0.978035",
+     "0.85",
+     "1.055178",
+     "1.28"
+    ],
+    [
+     "100",
+     "0.999767",
+     "0.999769",
+     "0.66",
+     "1.027386",
+     "0.10"
+    ]
+   ],
+   "note": "The bound is the estimator's own standard error, not a number somebody liked: v4437 learned that when a hand-picked tolerance went red on 1.35 sd of ordinary noise."
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

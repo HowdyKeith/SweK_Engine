@@ -1,0 +1,44 @@
+{
+ "gate": "physics/render/multiScatter-selfcheck.mjs",
+ "at": "2026-09-07",
+ "tables": [
+  {
+   "title": "energy before and after compensation, by roughness",
+   "columns": [
+    "roughness",
+    "uncompensated",
+    "compensated"
+   ],
+   "rows": [
+    [
+     "0.2",
+     "0.997331",
+     "1.000006"
+    ],
+    [
+     "0.4",
+     "0.950621",
+     "1.000047"
+    ],
+    [
+     "0.6",
+     "0.794752",
+     "0.999948"
+    ],
+    [
+     "0.8",
+     "0.582111",
+     "0.999858"
+    ],
+    [
+     "1",
+     "0.378889",
+     "0.999817"
+    ]
+   ],
+   "note": "Compensation may never REMOVE energy and can never exceed F_avg, which is a hard ceiling because every bounce is a Fresnel reflection. The uncompensated column falling away from 1 as roughness rises is the energy a single-scatter lobe loses."
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

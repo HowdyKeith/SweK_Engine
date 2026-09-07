@@ -1,0 +1,95 @@
+{
+ "gate": "tools/ship/reportDoors-selfcheck.mjs",
+ "at": "2026-09-07",
+ "tables": [
+  {
+   "title": "the reportLines convention, by kind",
+   "columns": [
+    "kind",
+    "modules",
+    "what it means"
+   ],
+   "rows": [
+    [
+     "members",
+     "98",
+     "modules exporting reportLines"
+    ],
+    [
+     "self-reports",
+     "92",
+     "callable with nothing"
+    ],
+    [
+     "formatters",
+     "6",
+     "REQUIRE an argument (Function.length)"
+    ],
+    [
+     "  of those, refuse a bare call",
+     "4",
+     "an honest throw a consumer can catch"
+    ],
+    [
+     "  of those, return anyway",
+     "2",
+     "and neither fabricates -- see the header"
+    ],
+    [
+     "no sibling gate",
+     "7",
+     "provide the convention, cannot check it"
+    ]
+   ],
+   "note": "Three instruments give three answers: the source text says 20 take a parameter, Function.length says 6 REQUIRE one, and CALLING says 4 refuse and 2 return. The last is the only one a consumer feels."
+  },
+  {
+   "title": "what it costs to open a front door",
+   "columns": [
+    "module",
+    "bare (s)",
+    "cheap path"
+   ],
+   "rows": [
+    [
+     "physics/sph/levelClaim.mjs",
+     "38",
+     "{ live: false } -> 0s"
+    ],
+    [
+     "physics/thermal/stefan.mjs",
+     "70",
+     "no parameter -- nothing to pass"
+    ],
+    [
+     "tools/ship/doorKinds.mjs",
+     "71",
+     "no parameter -- nothing to pass"
+    ],
+    [
+     "tools/ship/orphanDisposition.mjs",
+     "74",
+     "no parameter -- nothing to pass"
+    ],
+    [
+     "tools/ship/orphanTriage.mjs",
+     "71.5",
+     "{ live: false } -> 0s"
+    ],
+    [
+     "tools/ship/shaderRefs.mjs",
+     "52",
+     "no parameter -- nothing to pass"
+    ],
+    [
+     "tools/roundhouse/knobLiveness.mjs",
+     "38",
+     "nobody has tried: totalBudgetMs -- buys a longer census, not a cheaper one"
+    ]
+   ],
+   "note": "Exercising the whole convention once costs about seven and a half minutes, which is why no gate did until this one, and why the sample here is bounded and says so."
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

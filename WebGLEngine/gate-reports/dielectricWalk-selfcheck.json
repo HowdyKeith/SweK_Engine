@@ -1,0 +1,62 @@
+{
+ "gate": "physics/render/dielectricWalk-selfcheck.mjs",
+ "at": "2026-09-07",
+ "tables": [
+  {
+   "title": "reflectance and transmittance across roughness",
+   "columns": [
+    "alpha",
+    "R",
+    "T",
+    "total",
+    "stuck",
+    "bounces"
+   ],
+   "rows": [
+    [
+     "0.002",
+     "0.049525",
+     "0.950475",
+     "1.000000",
+     "0",
+     "1.00"
+    ],
+    [
+     "0.02",
+     "0.050175",
+     "0.949825",
+     "1.000000",
+     "0",
+     "1.00"
+    ],
+    [
+     "0.1",
+     "0.052625",
+     "0.947375",
+     "1.000000",
+     "0",
+     "1.00"
+    ],
+    [
+     "0.4",
+     "0.041350",
+     "0.958650",
+     "1.000000",
+     "0",
+     "1.06"
+    ],
+    [
+     "1",
+     "0.020275",
+     "0.979725",
+     "1.000000",
+     "0",
+     "1.32"
+    ]
+   ],
+   "note": "In the smooth limit the walk reproduces the exact Fresnel equations -- a bounce simulation arriving at a closed form -- and departs from them meaningfully at high roughness, which is what makes the limit a limit rather than a constant."
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

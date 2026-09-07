@@ -69,6 +69,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { validateComposition } from "./composeValidate.mjs";
 import { overNonEmpty, emptyOfNonEmpty } from "./vacuity.mjs";
+import { gateReport } from "./gateReport.mjs";
 import { population, classify, contractOf, FORMATTERS, STRICT_FORMATTERS, TOLERANT_FORMATTERS, NEVER_CALL,
          RETURNS_BARE_BECAUSE, CHEAP_STATES, CHEAP_STATES_WITH_SECONDS,
          CALL_COST_V4459 as COST, NO_GATE_ALL as NOGATE, NO_GATE_V4458, NO_GATE_V4531,
@@ -77,6 +78,7 @@ import { population, classify, contractOf, FORMATTERS, STRICT_FORMATTERS, TOLERA
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const ALL = process.argv.includes("--all");
 
+const REPORT = gateReport("tools/ship/reportDoors-selfcheck.mjs");
 let fails = 0;
 const ok = (n, c, d = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${n}${d ? "   " + d : ""}`); };
 const say = (m) => console.log("  ----  " + m);
@@ -456,6 +458,27 @@ console.log("\n9. the MEASURED entries, re-measured");
        "the clock, because a flag that returns fast and returns THE SAME REPORT is a performance switch and " +
        "not the different question this record says it is.");
 }
+
+// *** v4534 -- THE NUMBERS ABOVE USED TO DIE WITH THE TERMINAL. *** gateReport-selfcheck names every gate
+// that argues in numbers and emits nothing, and this one arrived on that list. The tables below are the
+// census this gate computes anyway; writing them costs a walk it has already done.
+REPORT.table("the reportLines convention, by kind", ["kind", "modules", "what it means"],
+    [["members", String(rows.length), "modules exporting reportLines"],
+     ["self-reports", String(rows.filter((r) => r.kind === "self-report").length), "callable with nothing"],
+     ["formatters", String(FORMATTERS.length), "REQUIRE an argument (Function.length)"],
+     ["  of those, refuse a bare call", String(STRICT_FORMATTERS.length), "an honest throw a consumer can catch"],
+     ["  of those, return anyway", String(TOLERANT_FORMATTERS.length), "and neither fabricates -- see the header"],
+     ["no sibling gate", String(rows.filter((r) => !r.hasGate).length), "provide the convention, cannot check it"]],
+    "Three instruments give three answers: the source text says 20 take a parameter, Function.length says 6 " +
+    "REQUIRE one, and CALLING says 4 refuse and 2 return. The last is the only one a consumer feels.");
+REPORT.table("what it costs to open a front door", ["module", "bare (s)", "cheap path"],
+    COST.slow.map((c) => [c.rel, String(c.bare),
+        c.cheap === "IMPOSSIBLE" ? "no parameter -- nothing to pass"
+        : c.cheap === "UNMEASURED" ? "nobody has tried: " + c.cheapFlag
+        : `${c.cheapFlag} -> ${c.cheapSeconds}s`]),
+    "Exercising the whole convention once costs about seven and a half minutes, which is why no gate did " +
+    "until this one, and why the sample here is bounded and says so.");
+REPORT.write();
 
 console.log(`\nreportDoors-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);
 process.exit(fails === 0 ? 0 : 1);

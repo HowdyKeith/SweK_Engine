@@ -29,7 +29,9 @@ import { dielectricWalk, split, refract, BTDF_AT_V4447 as REC } from "./dielectr
 import { energySplit, LIMITS } from "./transmission.mjs";
 import { fresnel } from "./fresnel.mjs";
 import { rng } from "./microsurfaceWalk.mjs";
+import { gateReport } from "../../tools/ship/gateReport.mjs";
 
+const REPORT = gateReport("physics/render/dielectricWalk-selfcheck.mjs");
 let fails = 0;
 const ok = (n, c, d = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${n}${d ? "   " + d : ""}`); };
 const say = (m) => console.log("  ----  " + m);
@@ -142,4 +144,13 @@ ok("the walk counts the total-internal-reflection events it takes", (() => {
 })());
 
 console.log(`\ndielectricWalk-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);
+// v4534: these numbers used to die with the terminal -- gateReport-selfcheck named this gate for it.
+REPORT.table("reflectance and transmittance across roughness", ["alpha", "R", "T", "total", "stuck", "bounces"],
+    terms.map((t) => [String(t.a), t.s.R.toFixed(6), t.s.T.toFixed(6), t.s.total.toFixed(6),
+                      String(t.s.stuck), t.s.meanBounces === undefined ? "-" : t.s.meanBounces.toFixed(2)]),
+    "In the smooth limit the walk reproduces the exact Fresnel equations -- a bounce simulation arriving at " +
+    "a closed form -- and departs from them meaningfully at high roughness, which is what makes the limit a " +
+    "limit rather than a constant.");
+REPORT.write();
+
 process.exit(fails === 0 ? 0 : 1);

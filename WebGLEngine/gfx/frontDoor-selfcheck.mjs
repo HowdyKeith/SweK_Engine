@@ -109,10 +109,23 @@ let stillUnreached = [];
        stillUnreached.length === FD.WEBGPU_STACK.length - closed.size,
        `${stillUnreached.length} still outside: ${stillUnreached.join(", ")}. The TSL chain did NOT arrive ` +
        "with the device, and saying so is the point");
-    ok("...and the reach grew by exactly what the module records",
-       R.seen.size === FD.MAIN_REACH_AFTER_V4407 && FD.MAIN_REACH_BEFORE_V4407 < FD.MAIN_REACH_AFTER_V4407,
-       `${FD.MAIN_REACH_BEFORE_V4407} before, ${R.seen.size} now -- the door, the device, and what the device ` +
-       "imports that nothing else on this path did");
+    // *** v4534 -- THIS ASSERTED THE TOTAL EXACTLY, PINNING THE WHOLE CLOSURE TO A v4407 CONSTANT. *** Any
+    // round adding an import anywhere in main.js's reach broke it, and the break said nothing about what
+    // v4407 claimed. Growth is accounted instead: the total is the v4407 number plus the NAMED arrivals, each
+    // with a reason, and anything reached at v4407 that has since fallen out is a separate, real red.
+    const arrivals = FD.REACH_ARRIVALS_SINCE_V4407.map((a) => a.module);
+    const arrivalsReached = arrivals.filter((m) => R.seen.has(path.join(ENG, m)));
+    ok("...and the reach grew by exactly what the module records, arrival by named arrival",
+       R.seen.size === FD.MAIN_REACH_AFTER_V4407 + arrivals.length &&
+       FD.MAIN_REACH_BEFORE_V4407 < FD.MAIN_REACH_AFTER_V4407 &&
+       arrivalsReached.length === arrivals.length &&
+       FD.REACH_ARRIVALS_SINCE_V4407.every((a) => a.why) &&
+       FD.REACH_LOST_SINCE_V4407.length === 0,
+       `${FD.MAIN_REACH_BEFORE_V4407} before v4407, ${FD.MAIN_REACH_AFTER_V4407} after, ${R.seen.size} now -- ` +
+       `the door, the device, and what the device imports that nothing else on this path did, PLUS ` +
+       `${arrivals.length} arrivals since, each named with why: ${arrivals.join(", ")}. ` +
+       (FD.REACH_LOST_SINCE_V4407.length ? "LOST: " + FD.REACH_LOST_SINCE_V4407.join(", ") : "Nothing v4407 " +
+       "reached has fallen out, which is the direction that would matter."));
     GR.table("the WebGPU/TSL population and whether the front door reaches it",
              ["module", "reached from main.js"],
              FD.WEBGPU_STACK.map((m) => [m, R.seen.has(path.join(ENG, m)) ? "yes" : "no"]),

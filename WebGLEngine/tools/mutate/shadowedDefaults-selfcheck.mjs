@@ -257,9 +257,26 @@ console.log("\n5. AN ERASED EDGE NEEDS AN AGREEMENT CHECK -- AND THE TREE'S OWN 
     })(ENG);
     const mentions = (needle) => gates.filter((g) => g.endsWith("shadowedDefaults-selfcheck.mjs") ? false
                                                   : fs.readFileSync(g, "utf8").includes(needle));
-    ok("*** ui/physicsMontage.js's two cell sites had NO check of any kind before this round ***",
-       mentions("pageVoxels").length === 0 && mentions("voxelizePage").length === 0,
-       `${gates.length} gates in the tree and not one of them names voxelizePage or pageVoxels`);
+    // *** v4534 -- THIS ROW WENT RED BECAUSE ITS FINDING WAS ACTED ON. *** It claims something about the
+    // PAST -- "had NO check of any kind BEFORE THIS ROUND" -- and measured it by scanning the PRESENT for
+    // zero mentions. v4434 then gave pageFxOverlay a gate, and that gate IMPORTS AND CALLS voxelizePage from
+    // fx/voxelize/pageVoxels.js. The historical claim is still true; the measurement standing in for it
+    // stopped being, the moment somebody closed the gap it was reporting.
+    //
+    // A finding that must stay unfixed to keep its gate green is a finding nobody may act on. So the history
+    // is a RECORD, and what is asserted live is the direction that can only improve: these edges ARE covered,
+    // and by whom. Removing that coverage is what goes red now, which is the way round it should have been.
+    const voxelCovers = [...new Set([...mentions("pageVoxels"), ...mentions("voxelizePage")])]
+        .map((g) => path.relative(ENG, g).split(path.sep).join("/"));
+    ok("*** ui/physicsMontage.js's two cell sites are covered NOW -- they were covered by nothing when this round found them ***",
+       voxelCovers.length > 0,
+       voxelCovers.length
+         ? `covered by ${voxelCovers.join(", ")}. WHEN THIS ROUND WROTE THE ROW, ${gates.length} gates named ` +
+           "neither voxelizePage nor pageVoxels; v4434 gave pageFxOverlay a gate that imports and calls " +
+           "voxelizePage, and THAT is what turned the old assertion red -- it asserted the absence it had " +
+           "just reported, so acting on the report broke it."
+         : `${gates.length} gates and not one names voxelizePage or pageVoxels -- the coverage v4434 added ` +
+           "has been REMOVED, which is the regression this row now exists to catch");
     ok("...whereas shipHalf had one, which is why exactly one of these five edges was already defended",
        mentions("esBox3d").length > 0, "physics/lockstepConstants-selfcheck.mjs, asserted above");
     report("The lat0/lon0/range edges are the honest middle: ui/radar-selfcheck.mjs exercises " +

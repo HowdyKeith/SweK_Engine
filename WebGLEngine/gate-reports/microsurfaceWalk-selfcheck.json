@@ -1,0 +1,70 @@
+{
+ "gate": "physics/render/microsurfaceWalk-selfcheck.mjs",
+ "at": "2026-09-07",
+ "tables": [
+  {
+   "title": "the walk against the analytic table, by roughness",
+   "columns": [
+    "alpha",
+    "walk albedo",
+    "table albedo",
+    "diff"
+   ],
+   "rows": [
+    [
+     "0.16",
+     "0.950920",
+     "0.950620",
+     "3.00e-4"
+    ],
+    [
+     "0.36",
+     "0.795565",
+     "0.794751",
+     "8.14e-4"
+    ],
+    [
+     "0.64",
+     "0.582680",
+     "0.582111",
+     "5.69e-4"
+    ],
+    [
+     "1",
+     "0.378855",
+     "0.378889",
+     "-3.36e-5"
+    ]
+   ],
+   "note": "With Fresnel identically one the walk conserves EXACTLY at every roughness -- energy that goes in has nowhere else to go. That is a law, not a tolerance."
+  },
+  {
+   "title": "conservation and how far light travels",
+   "columns": [
+    "alpha",
+    "albedo",
+    "mean bounces"
+   ],
+   "rows": [
+    [
+     "0.16",
+     "1.000000",
+     "1.053"
+    ],
+    [
+     "0.49",
+     "1.000000",
+     "1.393"
+    ],
+    [
+     "1",
+     "1.000000",
+     "2.056"
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}
