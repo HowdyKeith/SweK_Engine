@@ -2897,6 +2897,22 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "the camera's ground sample blends only toward +x and +z, so a two-voxel wall is climbable one way and a wall the " +
                  "other, and a two-voxel ledge walked off toward +z sticks at its lip. Sabotages red at 5 / 12 / 13 / 4.",
     }),
+    since145: Object.freeze({
+        at: "v4523", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/kenneyKit-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green on both backends and headless. Racing city 0: Kenney's Starter-Kit-Racing and Starter-Kit-City-Builder vendored " +
+                 "as models and colormaps only (vendor/kenney-racing, vendor/kenney-city; MIT, (c) Kenney, the licence files read and hashed, " +
+                 "each PROVENANCE.md pinning the upstream commit and recording that each README's year is not the file's), registered in " +
+                 "world/vendoredLicences.mjs; world/kenneyKit.mjs the manifest of 28 models with bytes, sha256, counts and spans, the parse " +
+                 "through gpu/glbLoad.js and GLBParser, vertex colours baked from the kit's colormap at each uv, packMeshes' lit layout, one " +
+                 "fleet per model in litSphere's quat mode; kenney-kit.html the grid on both backends. THE FINDING: GLBParser resolved a " +
+                 "binary GLB's external image against the page (only the .gltf path set _baseUrl), one 404 per model; fixed. Sabotages " +
+                 "red at A / B / C / D (see the gate's header).",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

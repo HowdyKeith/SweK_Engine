@@ -201,11 +201,14 @@ export const HOT_UNREGISTERED = Object.freeze([
  * v4518: 84 -> 85. The arrival is render/voxelDeviceEdit.mjs, whose splitMesh() restates the mesh's one colour [1, 1, 1, 1]
  * (gpuDriven's own default) beside the per-vertex colours it unpacks; the edit path draws through the same lit pipeline,
  * nothing additively; the overlap stays 0.
+ * v4523 (Racing city 0): 85 -> 86. The arrival is world/kenneyKit.mjs, whose kitMesh() restates the same [1, 1, 1, 1] beside
+ * the colours it bakes from Kenney's colormap (every colour it draws is the kit's own texel, read at load time, not a literal);
+ * the kit draws through litSphere's lit pipeline in quat mode, nothing additively; the overlap stays 0.
  */
 export const MEASURED_AT_V4424 = Object.freeze({
     namedRamps: 5,
     drawSiteFiles: 13,
-    literalColourFiles: 85,
+    literalColourFiles: 86,
     overlapDrawAndLiteral: 0,
     hotUnregistered: 24,   // v4505: ascii-shape.html arrived (see HOT_UNREGISTERED)   // v4500: slug-fire.html arrived; v4501: slug-morph.html's melt mode; v4502: slug-ticker.html's napalm mode (see HOT_UNREGISTERED)
     // The three Keith named, and what the old detector saw of them.

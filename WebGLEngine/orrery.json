@@ -82,15 +82,63 @@
    "name": "fonts",
    "arrived": "2026-08-31",
    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20",
-   "bytes": 164836,
+   "bytes": 3216390,
    "files": [
+    {
+     "path": "cinzel/Cinzel-OFL.txt",
+     "bytes": 4486
+    },
+    {
+     "path": "cinzel/Cinzel-Regular.label.slug.bin",
+     "bytes": 97548
+    },
+    {
+     "path": "cinzel/Cinzel-Regular.ttf",
+     "bytes": 66996
+    },
     {
      "path": "IBMPlexSerif-OFL.txt",
      "bytes": 4456
     },
     {
+     "path": "IBMPlexSerif-Regular.label.slug.bin",
+     "bytes": 94052
+    },
+    {
      "path": "IBMPlexSerif-Regular.ttf",
      "bytes": 160380
+    },
+    {
+     "path": "jetbrains-mono/JetBrainsMono-OFL.txt",
+     "bytes": 4399
+    },
+    {
+     "path": "jetbrains-mono/JetBrainsMono-Regular.label.slug.bin",
+     "bytes": 80324
+    },
+    {
+     "path": "jetbrains-mono/JetBrainsMono-Regular.ttf",
+     "bytes": 270224
+    },
+    {
+     "path": "sawarabi-gothic/SawarabiGothic-OFL.txt",
+     "bytes": 4355
+    },
+    {
+     "path": "sawarabi-gothic/SawarabiGothic-Regular.ttf",
+     "bytes": 1902848
+    },
+    {
+     "path": "source-sans-3/SourceSans3-OFL.txt",
+     "bytes": 4486
+    },
+    {
+     "path": "source-sans-3/SourceSans3-Regular.label.slug.bin",
+     "bytes": 90640
+    },
+    {
+     "path": "source-sans-3/SourceSans3-Regular.ttf",
+     "bytes": 431196
     }
    ]
   },
@@ -219,6 +267,158 @@
     {
      "path": "PROVENANCE.txt",
      "bytes": 909
+    }
+   ]
+  },
+  {
+   "name": "kenney-city",
+   "arrived": null,
+   "sha": null,
+   "bytes": 396617,
+   "files": [
+    {
+     "path": "LICENSE.md",
+     "bytes": 1062
+    },
+    {
+     "path": "models/building-garage.glb",
+     "bytes": 19204
+    },
+    {
+     "path": "models/building-small-a.glb",
+     "bytes": 39660
+    },
+    {
+     "path": "models/building-small-b.glb",
+     "bytes": 49764
+    },
+    {
+     "path": "models/building-small-c.glb",
+     "bytes": 70088
+    },
+    {
+     "path": "models/building-small-d.glb",
+     "bytes": 39348
+    },
+    {
+     "path": "models/grass-trees-tall.glb",
+     "bytes": 47016
+    },
+    {
+     "path": "models/grass-trees.glb",
+     "bytes": 38160
+    },
+    {
+     "path": "models/grass.glb",
+     "bytes": 4604
+    },
+    {
+     "path": "models/pavement-fountain.glb",
+     "bytes": 14076
+    },
+    {
+     "path": "models/pavement.glb",
+     "bytes": 3620
+    },
+    {
+     "path": "models/road-corner.glb",
+     "bytes": 11096
+    },
+    {
+     "path": "models/road-intersection.glb",
+     "bytes": 13140
+    },
+    {
+     "path": "models/road-split.glb",
+     "bytes": 9400
+    },
+    {
+     "path": "models/road-straight-lightposts.glb",
+     "bytes": 18216
+    },
+    {
+     "path": "models/road-straight.glb",
+     "bytes": 6148
+    },
+    {
+     "path": "models/Textures/colormap.png",
+     "bytes": 10108
+    },
+    {
+     "path": "PROVENANCE.md",
+     "bytes": 1907
+    }
+   ]
+  },
+  {
+   "name": "kenney-racing",
+   "arrived": null,
+   "sha": null,
+   "bytes": 1217578,
+   "files": [
+    {
+     "path": "LICENSE",
+     "bytes": 1063
+    },
+    {
+     "path": "models/decoration-empty.glb",
+     "bytes": 55764
+    },
+    {
+     "path": "models/decoration-forest.glb",
+     "bytes": 189784
+    },
+    {
+     "path": "models/decoration-tents.glb",
+     "bytes": 168004
+    },
+    {
+     "path": "models/Textures/colormap.png",
+     "bytes": 10219
+    },
+    {
+     "path": "models/track-bump.glb",
+     "bytes": 17888
+    },
+    {
+     "path": "models/track-corner.glb",
+     "bytes": 103480
+    },
+    {
+     "path": "models/track-finish.glb",
+     "bytes": 24544
+    },
+    {
+     "path": "models/track-straight.glb",
+     "bytes": 11080
+    },
+    {
+     "path": "models/track-tents.glb",
+     "bytes": 167988
+    },
+    {
+     "path": "models/vehicle-motorcycle.glb",
+     "bytes": 97172
+    },
+    {
+     "path": "models/vehicle-truck-green.glb",
+     "bytes": 104228
+    },
+    {
+     "path": "models/vehicle-truck-purple.glb",
+     "bytes": 78552
+    },
+    {
+     "path": "models/vehicle-truck-red.glb",
+     "bytes": 92436
+    },
+    {
+     "path": "models/vehicle-truck-yellow.glb",
+     "bytes": 93480
+    },
+    {
+     "path": "PROVENANCE.md",
+     "bytes": 1896
     }
    ]
   },
@@ -1175,6 +1375,34 @@
     {
      "path": "shapes.js.map",
      "bytes": 226
+    }
+   ]
+  },
+  {
+   "name": "morphicons",
+   "arrived": "2026-09-06",
+   "sha": "891cc90f02dacc7263daa04a4864a84966342e1d",
+   "bytes": 34884,
+   "files": [
+    {
+     "path": "index.js",
+     "bytes": 458
+    },
+    {
+     "path": "LICENSE",
+     "bytes": 1066
+    },
+    {
+     "path": "normalize-CYnN3Npw.js",
+     "bytes": 13517
+    },
+    {
+     "path": "PROVENANCE.md",
+     "bytes": 1708
+    },
+    {
+     "path": "spring-CFHloqPP.js",
+     "bytes": 18135
     }
    ]
   },

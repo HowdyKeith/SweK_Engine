@@ -108,7 +108,20 @@ console.log("\n3. TWO PEERS, ONE OF THEM FLYING: the cockpit's interventions cro
     // ship" the moment the bake was refreshed, which is the whole shape of this round: a number that was right
     // once, against data that moved.
     const MANUAL = fresh(7).ships.length - 1;
-    const pair = runPair({ makeEconomy: () => fresh(7), ticks: 120, interventions: [{ atTick: 10, peer: "a", kind: "land", args: { ship: MANUAL, market: 1 } }, { atTick: 20, peer: "a", kind: "trade", args: { ship: MANUAL, good: "docs", tons: 3 } }, { atTick: 40, peer: "a", kind: "launch", args: { ship: MANUAL } }, { atTick: 60, peer: "a", kind: "land", args: { ship: MANUAL, market: 4 } }, { atTick: 70, peer: "a", kind: "trade", args: { ship: MANUAL, good: "docs", tons: -3 } }] });
+    // *** AND THE TWO MARKETS WERE TYPED AS 1 AND 4, WHICH IS THE SAME DEFECT ONE LINE DOWN FROM ITS OWN CORRECTION. *** Market ids
+    // follow orrery.json's body order, so the Racing city 0 re-bake (three bodies arrived: kenney-city, kenney-racing, morphicons)
+    // put kenney-city at id 1 -- two tons of docs in stock, so a buy of three bought nothing and the sale at id 4 earned 0 --
+    // exactly the "number that was right once, against data that moved". The ports are chosen by what the flight needs of them:
+    // the port holding the most docs to buy from, and among the others the one paying the most for them.
+    // ...and "docs" was typed too: measured at the re-bake, the port with the most docs at tick 0 (wasm, 33 t) had NONE by tick 20,
+    // because twenty-six haulers trade the same goods while the manual ship waits to land. So the GOOD is chosen with the port: the
+    // (port, good) pair with the deepest stock at tick 0 (hundreds of tons, which the haulers do not empty in twenty ticks), and
+    // the buyer is the other port paying the most for that good.
+    const probe = fresh(7); let BUY = null, GOOD = null, deepest = -1;
+    for (const m of probe.markets) for (const g of GOODS) if ((m.stock[g] || 0) > deepest) { deepest = m.stock[g] || 0; BUY = m; GOOD = g; }
+    const SELL = probe.markets.filter((m) => m !== BUY).reduce((b, m) => ((m.trade[GOOD] || 0) > (b.trade[GOOD] || 0) ? m : b), probe.markets.find((m) => m !== BUY));
+    report(`the flight buys ${GOOD} at ${BUY.name} (${deepest} t in stock at tick 0) and sells at ${SELL.name} (${SELL.trade[GOOD]} cr a ton)`);
+    const pair = runPair({ makeEconomy: () => fresh(7), ticks: 120, interventions: [{ atTick: 10, peer: "a", kind: "land", args: { ship: MANUAL, market: BUY.id } }, { atTick: 20, peer: "a", kind: "trade", args: { ship: MANUAL, good: GOOD, tons: 3 } }, { atTick: 40, peer: "a", kind: "launch", args: { ship: MANUAL } }, { atTick: 60, peer: "a", kind: "land", args: { ship: MANUAL, market: SELL.id } }, { atTick: 70, peer: "a", kind: "trade", args: { ship: MANUAL, good: GOOD, tons: -3 } }] });
     ok("*** peer a flies and trades; peer b sees the same universe at every tick -- the same hash, the same earned credits ***", pair.agree && pair.upTo >= 120 && pair.a.applied.length === 5 && pair.b.applied.length === 5 && pair.a.session.economy.ships[MANUAL].earned === pair.b.session.economy.ships[MANUAL].earned && pair.a.session.economy.ships[MANUAL].earned > 0, `earned ${pair.a.session.economy.ships[MANUAL].earned} on both`);
 }
 

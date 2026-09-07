@@ -92,7 +92,7 @@ const biomeOf = (p) => BIOME_ORDER[biomeIdFor(p)];
     ok("the correction moved exactly the record that was wrong and left the others alone",
         AUTH.bodies.filter((b) => b.upstream && b.upstream.owner === "justjakel").length === 0 &&
         AUTH.bodies.filter((b) => b.upstream && b.upstream.owner === "justjake").length === 1 &&
-        AUTH.counts.withUpstream === 11,
+        AUTH.counts.withUpstream === 14,   // 11 at v4432; 14 since Racing city 0 re-baked orrery-authors.json (morphicons at v4498, kenney-city and kenney-racing now, each with a PROVENANCE.md)
         "gifenc's git:// URL and htmx's LICENSE-blob URL say more about where the bytes came from than a repo " +
         "root does, so a canonical URL is synthesised ONLY when the vote overrides the first URL's owner");
     ok("and the vendored text was NOT edited -- the stray L is still in the file, as measured",
@@ -105,7 +105,7 @@ const biomeOf = (p) => BIOME_ORDER[biomeIdFor(p)];
 {
     say("");
     say("GitHub's language against world/repoHeightfield.js's LANGUAGE_BIOME, for the same bodies");
-    const tally = { agree: 0, built: 0, transpiled: 0, paperwork: 0, unexplained: 0 };
+    const tally = { agree: 0, built: 0, transpiled: 0, paperwork: 0, assets: 0, unmeasured: 0, unexplained: 0 };
     const verdicts = [];
     const rows = [];
     for (const b of AUTH.bodies) {
@@ -120,19 +120,32 @@ const biomeOf = (p) => BIOME_ORDER[biomeIdFor(p)];
         }
         const dominantExt = [...byExt.entries()].sort((x, y) => y[1] - x[1])[0][0];
         const codeFiles = files.filter((f) => !U.PAPERWORK.has(path.basename(f))).length;
+        const assetFiles = files.filter((f) => !U.PAPERWORK.has(path.basename(f)) && U.ASSET_EXT.has((f.split(".").pop() || "").toLowerCase())).length;
         const u = UNI.bodies.find((x) => x.owner === b.upstream.owner && x.repo === b.upstream.repo);
         const want = U.extsFor(u ? u.language : null);
         const upstreamLanguageFiles = files.filter((f) => want.includes((f.split(".").pop() || "").toLowerCase())).length;
         const c = U.classifyLanguage({ dominantExt, treeBiome: biomeOf("x." + dominantExt),
                                        ghLanguage: u ? u.language : null, biomeOf, codeFiles,
-                                       upstreamLanguageFiles });
+                                       upstreamLanguageFiles, assetFiles });
         tally[c.verdict]++;
         verdicts.push({ name: b.name, verdict: c.verdict, language: u ? u.language : null, byExt });
         rows.push(`${b.name} ${c.verdict}`);
     }
     say("  " + rows.join("   "));
     say(`  agree ${tally.agree}  built ${tally.built}  transpiled ${tally.transpiled}  ` +
-        `paperwork ${tally.paperwork}  unexplained ${tally.unexplained}`);
+        `paperwork ${tally.paperwork}  assets ${tally.assets}  unmeasured ${tally.unmeasured}  unexplained ${tally.unexplained}`);
+    // ...and the re-bake of orrery-authors.json (stale since v4416) brought vendor/morphicons into this tally for the first time, with
+    // a PROVENANCE.md naming its upstream and NO row for it in the universe file: a box with GitHub reach owes that row. Until then
+    // it is unmeasured, which is a different thing from unexplained, and the count is held so a second such body cannot hide in it.
+    ok("!! a body whose upstream has no universe row is UNMEASURED, held to one (morphicons), not filed as unexplained",
+        tally.unmeasured === U.MEASURED_AT_V4432.languageUnmeasured && verdicts.filter((v) => v.verdict === "unmeasured").every((v) => v.name === "morphicons"),
+        `${tally.unmeasured}: ${verdicts.filter((v) => v.verdict === "unmeasured").map((v) => v.name).join(", ") || "none"} -- the universe file has ${UNI.bodies.length} rows`);
+    // Racing city 0 -- a FOURTH mechanism: vendor/kenney-racing and vendor/kenney-city are models and textures only (.glb, .png),
+    // from Godot projects GitHub files under GDScript, which is not in the universe file and would not be in the tree's legend if
+    // it were. Without it both bodies read "unexplained" -- not a disagreement about a language but the absence of any code to have one.
+    ok("!! the asset kits are ASSETS, not an unexplained language: every non-paperwork file a model, texture or sound",
+        tally.assets === U.MEASURED_AT_V4432.languageAssets,
+        `${tally.assets} bodies: ${verdicts.filter((v) => v.verdict === "assets").map((v) => v.name).join(", ") || "none"}`);
     ok("the two answers agree on most bodies, which is what makes the exceptions worth reading",
         tally.agree === U.MEASURED_AT_V4432.languageAgree && tally.agree >= 6 &&
         tally.built === U.MEASURED_AT_V4432.languageBuilt &&

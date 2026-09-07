@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 462,
+ "count": 463,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -1582,6 +1582,13 @@
    "f": "kaggle-config.html",
    "t": "Kaggle Config",
    "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "kenney-kit.html",
+   "t": "Kenney kit on the GPU",
+   "d": "Racing city 0: every model vendored from Kenney's Starter-Kit-Racing and Starter-Kit-City-Builder (MIT, (c) Kenney; the models CC0 by each README) drawn through gfx/device.js on WebGPU or WebGL2 -- the 10-unit track tiles, finish gate, bump, tents and forest, the four trucks and the motorcycle, and the city kit's 1-unit roads, pavements, grass and small buildings drawn at 10 x beside them. Each model is parsed by gpu/GLBParser.js through gpu/glbLoad.js's router, its vertex colours baked from the kit's own 512 x 512 colormap at the uv each vertex names (the palette is flat cells sampled nearest, so nothing is lost), and packed into gpuDriven's lit layout; one fleet per model, one record per placement, the yaw as a quaternion in the extras through render/litSphere.mjs's quat mode. The manifest (world/kenneyKit.mjs) records every file's bytes and hash and tools/ship/kenneyKit-selfcheck.mjs holds it to the folder. Click a model to name it; the Yaw control turns every placement; drag to orbit, wheel to dolly.",
    "g": "",
    "p": 0
   },

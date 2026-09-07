@@ -108,6 +108,13 @@ export const GH_EXT = Object.freeze({
 /** Extensions that are BUILD OUTPUT, not source -- the mechanism behind three of the four disagreements. */
 export const BUILT_EXT = Object.freeze(new Set(["a", "o", "so", "dll", "dylib", "lib", "wasm", "min", "map", "bc"]));
 
+/**
+ * Racing city 0 -- extensions that are ASSETS rather than code: models, textures, sound. vendor/kenney-racing and vendor/kenney-city
+ * are .glb and .png and nothing else, and their upstreams are Godot projects GitHub files under GDScript, a language no file
+ * here carries -- the same shape as paperwork (nothing to be wrong about) rather than a disagreement to explain.
+ */
+export const ASSET_EXT = Object.freeze(new Set(["glb", "gltf", "obj", "fbx", "png", "jpg", "jpeg", "ktx2", "wav", "ogg", "mp3"]));
+
 /** Files that are paperwork rather than code. A body made only of these has no language to be wrong about. */
 export const PAPERWORK = Object.freeze(new Set(["LICENSE", "LICENCE", "LICENSE.txt", "LICENSE.md",
     "PROVENANCE.txt", "PROVENANCE.md", "NOTICE", "COPYING", "VERSIONS.txt", "README.md"]));
@@ -116,12 +123,20 @@ export const PAPERWORK = Object.freeze(new Set(["LICENSE", "LICENCE", "LICENSE.t
  * Why one body's two language answers differ, or that they do not.
  *
  * Returns one of: "agree", "built" (the vendored bytes are compiled output of the upstream source),
- * "paperwork" (the body carries no code), or "unexplained" -- and the last is the one a gate must hold at zero,
+ * "paperwork" (the body carries no code), "assets" (every file is a model, texture or sound), "unmeasured" (no universe row to
+ * compare against), or "unexplained" -- and the last is the one a gate must hold at zero,
  * because an unexplained disagreement is the only kind that is a defect rather than a fact.
  */
 export function classifyLanguage({ dominantExt, treeBiome, ghLanguage, biomeOf, codeFiles,
-                                   upstreamLanguageFiles }) {
+                                   upstreamLanguageFiles, assetFiles = 0 }) {
     if (!codeFiles) return { verdict: "paperwork", ghBiome: null };
+    // a body whose every non-paperwork file is a model, texture or sound has no code, so no language to disagree about; this runs
+    // before the GitHub lookup because such a body's upstream (a Godot project) is not in the universe file and need not be
+    if (assetFiles === codeFiles) return { verdict: "assets", ghBiome: null };
+    // a body whose upstream has NO ROW in orrery-universe.json has no second answer to disagree with: the file is fetched from
+    // GitHub by a round that can reach it, and vendor/morphicons (v4498) arrived on a box that could not. That is a measurement
+    // still owed, named as such, not a disagreement explained away
+    if (ghLanguage == null) return { verdict: "unmeasured", ghBiome: null, why: "the upstream has no row in orrery-universe.json" };
     const ext = GH_EXT[ghLanguage];
     const ghBiome = ext ? biomeOf("x." + ext) : null;
     if (ghBiome === null) return { verdict: "unexplained", ghBiome, why: "GitHub's language is not in the tree's legend" };
@@ -179,5 +194,7 @@ export const MEASURED_AT_V4432 = Object.freeze({
     languageBuilt: 2,
     languageTranspiled: 2,
     languagePaperwork: 1,
+    languageAssets: 2,       // Racing city 0: kenney-city and kenney-racing, .glb and .png only
+    languageUnmeasured: 1,   // Racing city 0: morphicons, whose upstream row a round with GitHub reach still owes the universe file
     languageUnexplained: 0,
 });

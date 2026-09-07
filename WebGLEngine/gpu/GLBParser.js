@@ -114,6 +114,10 @@ export class GLBParser {
             }
             if (!json) throw new Error("no JSON chunk in GLB");
             if (!bin)  throw new Error("no BIN chunk in GLB");
+            // Racing city 0 -- a binary GLB may still name an EXTERNAL image by relative uri (Kenney's UnityGLTF exports do:
+            // "Textures/colormap.png"), and only the multi-file branch below ever set _baseUrl, so the texture fetch resolved
+            // against the PAGE and 404'd once per model. Same rule as the .gltf path: resolve against the caller's baseUrl.
+            if (opts.baseUrl) json._baseUrl = opts.baseUrl;
         } else {
             // ---- v729 multi-file .gltf path ----
             // Treat the bytes as UTF-8 JSON. If parsing fails, fall through

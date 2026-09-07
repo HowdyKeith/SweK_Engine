@@ -1288,6 +1288,54 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         call. ALL SIX ROUNDS ARE IN: the world, dig/build, bodies, damage, save/load, the avatar, each with a gate on
         both backends, on one page.
 
+12. **THE RACING CITY -- planned after the sandbox rounds, as eight rounds.** Not a game a person drives: the GPU Brain
+    learns to drive, brains race brains, in the Physics Lab's own environment with its proposer and adjudicator composing
+    and judging drivers, the result a state replay handed to post-processing rather than a live frame. Phase 1 is a flat
+    grid track from Kenney's tiles with CityGen's buildings on the free blocks; phase 2 drapes the track over the git
+    terrain as ribbon roads and makes the buildings destructible with rebar. The rounds: 0 the assets vendored and
+    manifested; 1 the track grammar; 2 the car on box3d's wheel joints; 3 the driving policy and the lockstep race; 4 the
+    race as a lab scene with a replay; 5 the replay pre-rendered; 6 ribbon roads over the terrain; 7 destructible
+    buildings. Then the Physics Lab front door and the fleet brain routing, named.
+     0. (v4523) THE ASSETS. BUILT: vendor/kenney-racing and vendor/kenney-city hold the models and colormaps of
+        KenneyNL/Starter-Kit-Racing and KenneyNL/Starter-Kit-City-Builder and nothing else of either Godot project (no
+        scenes, scripts, MeshLibrary or FBX hulls): 13 racing models (track straight, corner, finish, bump, tents;
+        decoration empty, forest, tents; four trucks and a motorcycle) and 15 city models (roads straight, with
+        lightposts, corner, split, intersection; pavement and fountain; grass, trees, tall trees; a garage and four
+        small buildings). Each LICENSE was read off the file (MIT, Copyright (c) 2023 Kenney and (c) 2025 Kenney) and
+        hashed; each PROVENANCE.md pins the upstream commit and records that each README's License section says 2026
+        where its own file does not, and that the READMEs call the models CC0 while the MIT is what is carried.
+        world/vendoredLicences.mjs registers both. world/kenneyKit.mjs is the manifest -- every model with its bytes,
+        sha256, vertex and triangle counts, its span and role -- and the route from a .glb to a fleet: gpu/glbLoad.js's
+        router to gpu/GLBParser.js with post-processing off (the kit's flat normals kept, the palette's uv islands not
+        welded), the vertex colours baked from the kit's own 512 x 512 colormap at the uv each vertex names (the palette
+        is flat cells sampled nearest, so the bake IS the texture's answer and the models draw through litSphere's lit
+        pipeline in quat mode with no sampler and no shader text of their own), packMeshes' lit layout, one fleet per
+        model with the yaw as a quaternion in the extras. The trucks' six parts (body, underside, four wheels at
+        +-0.55, 0.3, -0.657 / 0.857) are kept for round 2's joints. kenney-kit.html draws all 28 in a grid on both
+        backends. MEASURED (tools/ship/kenneyKit-selfcheck.mjs): both kits load and bake in 154 ms here and about 300 ms
+        in the browser with the same hashes in both runtimes; the racing tiles are 10 units and the city tiles 1, the
+        finish gate 14 wide; the red truck is 27.9 % red-dominant vertices and the green truck 15.8 % green, each hue
+        under 3 % on the trucks not named for it; a bake with v flipped is ALL BLACK (the palette's lower half is
+        empty), so that sabotage cannot pass; on both backends every cell is lit, the truck cells are the colour of
+        their names, and the finish gate's pixel box turns with its quaternion. THE FINDING, FIXED: gpu/GLBParser.js
+        set the base URL only on the multi-file .gltf path, so a binary GLB naming an external image (every Kenney
+        model does) fetched it relative to the PAGE and logged a 404 per model; it resolves against the caller's
+        baseUrl now. THREE MORE, FOUND BY THE SWEEP when orrery.json was re-baked with the new bodies (it had sat at
+        v4416 while vendor/ moved): tools/ship/playerShip-selfcheck.mjs's lockstep flight had its two ports typed as
+        ids 1 and 4 one line below its own correction of the same defect, so kenney-city at id 1 (two tons of docs)
+        sold it nothing and it earned 0 -- the ports and the good are chosen by stock depth and price now; tools/
+        ship/predicatePairs-selfcheck.mjs held the vendored-licence count at a typed 17, which the fresh bake reads
+        as 24 (fonts' four OFLs, morphicons, the two kits) -- recorded; and tools/ship/importPosition.mjs saw NO
+        dependant of either kit because the first draft named the directory as data and joined "/models/" at
+        runtime, so the KITS table names each body's models directory and colormap as whole specifiers. And
+        tools/ship/orreryUniverse-selfcheck.mjs, which grades every vendored body's language against GitHub's,
+        read the two kits as an UNEXPLAINED disagreement (models and textures only, from Godot projects) and
+        morphicons too (its upstream has no row in the universe file, fetched from GitHub by a box that can reach
+        it): world/orreryUniverse.mjs gained two verdicts, ASSETS (every non-paperwork file a model, texture or
+        sound) and UNMEASURED (no universe row, held to one and named), and the row a GitHub-reaching round owes
+        for morphicons is recorded there. Not vendored, said plainly: the FBX collision hulls (no reader here; round 2 builds the collider from tile
+        footprints), the kits' scripts (the arcade car controller is read for its numbers, not ported).
+
 ## The count that says when step 4 matters
 
 tools/ship/shaderCensus-selfcheck.mjs has held, since v3274, that a hand-written pair is cheaper than an

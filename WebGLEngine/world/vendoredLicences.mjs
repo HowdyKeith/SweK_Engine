@@ -78,6 +78,16 @@ export const VENDORED = Object.freeze([
             "ten licence-word hits in htmx.2.0.10.min.js are all the substring 'submit'. Recovered from " +
             "upstream at the pinned tag at v4257. 0BSD drops even attribution, so nothing was at risk." },
     { path: "vendor/jolt",      kind: KIND.THIRD_PARTY, spdx: "MIT",       grant: GRANT.LICENCE_FILE, file: "LICENSE" },
+    // Racing city 0 (task 63) -- Kenney's two Godot starter kits, models and the colormap only: the road tiles the flat track is laid
+    // from, the cars a brain learns to drive, the small buildings CityGen's stand beside. Each LICENSE was read off the file in this
+    // tree (MIT, holder Kenney); the README of each says the models are CC0 and its License section carries a DIFFERENT YEAR from the
+    // file (2026 against 2023 and 2025), recorded in each PROVENANCE.md. world/kenneyKit.mjs holds the manifest with bytes and hashes.
+    { path: "vendor/kenney-city", kind: KIND.THIRD_PARTY, spdx: "MIT",     grant: GRANT.LICENCE_FILE, file: "LICENSE.md",
+      upstream: "https://github.com/KenneyNL/Starter-Kit-City-Builder", pin: "4535092b740b378b700efd9df9e27a631815b84a",
+      note: "LICENSE.md, Copyright (c) 2025 Kenney, MIT; 15 GLB models and models/Textures/colormap.png; PROVENANCE.md beside it." },
+    { path: "vendor/kenney-racing", kind: KIND.THIRD_PARTY, spdx: "MIT",   grant: GRANT.LICENCE_FILE, file: "LICENSE",
+      upstream: "https://github.com/KenneyNL/Starter-Kit-Racing", pin: "2f2e5f2646dda89cb21d4e8539bab60c6e955dc8",
+      note: "LICENSE, Copyright (c) 2023 Kenney, MIT; 13 GLB models and models/Textures/colormap.png; PROVENANCE.md beside it." },
     { path: "vendor/keyhunt",   kind: KIND.NOT_VENDORED, spdx: "MIT",      grant: GRANT.NAMED_OTHER,  file: "ATTRIBUTION.txt",
       note: "*** NOTHING IS VENDORED HERE. *** ATTRIBUTION.txt records gpu-keyhunt as a TECHNIQUE reference " +
             "for physics/crypto/secp256k1.mjs and states 'NO CODE WAS COPIED' -- that project is Python/GPU " +

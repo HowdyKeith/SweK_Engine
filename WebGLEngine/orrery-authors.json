@@ -1,6 +1,6 @@
 {
  "note": "WHO the bytes say wrote each vendored body, read from the copyright line in its licence and from a PROVENANCE.md where one records an upstream. Baked by tools/ship/orreryAuthorScan.mjs. A body whose author cannot be read is in `unattributed` -- never dropped, never given a placeholder.",
- "built": "2026-09-03",
+ "built": "2026-09-07",
  "bodies": [
   {
    "name": "box3d",
@@ -37,14 +37,19 @@
   {
    "name": "fonts",
    "kind": "collective",
-   "who": "IBM Corp",
-   "line": "Copyright © 2017 IBM Corp. with Reserved Font Name \"Plex\"",
-   "licenceFile": "IBMPlexSerif-OFL.txt",
-   "licences": 1,
+   "who": "The Cinzel Project Authors (https://github.com/NDISCOVER/Cinzel)",
+   "line": "Copyright 2020 The Cinzel Project Authors (https://github.com/NDISCOVER/Cinzel)",
+   "licenceFile": "cinzel/Cinzel-OFL.txt",
+   "licences": 5,
    "upstreamFile": null,
-   "alsoHolders": [],
+   "alsoHolders": [
+    "IBM Corp",
+    "The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono)",
+    "The Sawarabi Gothic Project Authors",
+    "Adobe (http://www.adobe.com/)"
+   ],
    "upstream": null,
-   "bytes": 164836
+   "bytes": 3216390
   },
   {
    "name": "gifenc",
@@ -123,6 +128,38 @@
    "bytes": 3224554
   },
   {
+   "name": "kenney-city",
+   "kind": "person",
+   "who": "Kenney",
+   "line": "Copyright (c) 2025 Kenney",
+   "licenceFile": "LICENSE.md",
+   "licences": 1,
+   "upstreamFile": "PROVENANCE.md",
+   "alsoHolders": [],
+   "upstream": {
+    "url": "https://github.com/KenneyNL/Starter-Kit-City-Builder",
+    "owner": "KenneyNL",
+    "repo": "Starter-Kit-City-Builder"
+   },
+   "bytes": 396617
+  },
+  {
+   "name": "kenney-racing",
+   "kind": "person",
+   "who": "Kenney",
+   "line": "Copyright (c) 2023 Kenney",
+   "licenceFile": "LICENSE",
+   "licences": 1,
+   "upstreamFile": "PROVENANCE.md",
+   "alsoHolders": [],
+   "upstream": {
+    "url": "https://github.com/KenneyNL/Starter-Kit-Racing",
+    "owner": "KenneyNL",
+    "repo": "Starter-Kit-Racing"
+   },
+   "bytes": 1217578
+  },
+  {
    "name": "keyhunt",
    "kind": "prose",
    "who": null,
@@ -145,6 +182,22 @@
    "alsoHolders": [],
    "upstream": null,
    "bytes": 940443
+  },
+  {
+   "name": "morphicons",
+   "kind": "person",
+   "who": "Guillermo",
+   "line": "Copyright (c) 2026 Guillermo",
+   "licenceFile": "LICENSE",
+   "licences": 1,
+   "upstreamFile": "PROVENANCE.md",
+   "alsoHolders": [],
+   "upstream": {
+    "url": "https://github.com/guillermolg00/morphicons",
+    "owner": "guillermolg00",
+    "repo": "morphicons"
+   },
+   "bytes": 34884
   },
   {
    "name": "slug",
@@ -266,6 +319,23 @@
    "bytes": 3224554
   },
   {
+   "author": "The Cinzel Project Authors (https://github.com/NDISCOVER/Cinzel)",
+   "kind": "collective",
+   "bodies": [
+    "fonts"
+   ],
+   "bytes": 3216390
+  },
+  {
+   "author": "Kenney",
+   "kind": "person",
+   "bodies": [
+    "kenney-city",
+    "kenney-racing"
+   ],
+   "bytes": 1614195
+  },
+  {
    "author": "Erin Catto",
    "kind": "person",
    "bodies": [
@@ -298,20 +368,20 @@
    "bytes": 258392
   },
   {
-   "author": "IBM Corp",
-   "kind": "collective",
-   "bodies": [
-    "fonts"
-   ],
-   "bytes": 164836
-  },
-  {
    "author": "meodai",
    "kind": "person",
    "bodies": [
     "heerich"
    ],
    "bytes": 119532
+  },
+  {
+   "author": "Guillermo",
+   "kind": "person",
+   "bodies": [
+    "morphicons"
+   ],
+   "bytes": 34884
   },
   {
    "author": "Matt DesLauriers",
@@ -351,13 +421,13 @@
   }
  ],
  "counts": {
-  "bodies": 15,
-  "attributed": 13,
-  "authors": 12,
-  "covered": 13,
+  "bodies": 18,
+  "attributed": 16,
+  "authors": 14,
+  "covered": 16,
   "missing": 2,
-  "withUpstream": 11,
-  "person": 9,
+  "withUpstream": 14,
+  "person": 12,
   "collective": 4,
   "disclaimed": 1,
   "prose": 1,

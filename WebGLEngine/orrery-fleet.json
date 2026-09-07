@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "4076be1f7e29889c481cf9c0a77d7c4725e973cd",
+ "head": "25de7e4511f5c04f5259f7f33be05a0718555087",
  "bodies": {
   "box3d": [
    {
@@ -154,6 +154,11 @@
   ],
   "fonts": [
    {
+    "path": "ascii-shape.html",
+    "bytes": 8556,
+    "sha": "e49a33248d21c7e5f198207d5aba0b9dea563bb7"
+   },
+   {
     "path": "ev/esShipLabels-selfcheck.mjs",
     "bytes": 8287,
     "sha": "aefc87ad6bbf6fedaf1dc91461ae0580c33b773c"
@@ -202,6 +207,11 @@
     "path": "slug-ticker.html",
     "bytes": 10411,
     "sha": "6db315acf8b50fe95fc8e91af66800c735272f17"
+   },
+   {
+    "path": "tools/ship/asciiShape-selfcheck.mjs",
+    "bytes": 15619,
+    "sha": "e49a33248d21c7e5f198207d5aba0b9dea563bb7"
    },
    {
     "path": "tools/ship/deviceUniformsPerDraw-selfcheck.mjs",
@@ -323,8 +333,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 851721,
-    "sha": "4076be1f7e29889c481cf9c0a77d7c4725e973cd"
+    "bytes": 855763,
+    "sha": "25de7e4511f5c04f5259f7f33be05a0718555087"
    },
    {
     "path": "tools/ship/artifactWeight.mjs",
@@ -352,6 +362,20 @@
     "path": "tools/ship/orreryUniverse-selfcheck.mjs",
     "bytes": 15954,
     "sha": "7161cb59cb5459cf06b0b8b4b5ccca2c5a1e7a11"
+   }
+  ],
+  "kenney-city": [
+   {
+    "path": "world/kenneyKit.mjs",
+    "bytes": 19648,
+    "sha": null
+   }
+  ],
+  "kenney-racing": [
+   {
+    "path": "world/kenneyKit.mjs",
+    "bytes": 19648,
+    "sha": null
    }
   ],
   "keyhunt": [
@@ -401,6 +425,13 @@
     "path": "tools/krbnVendor-selfcheck.mjs",
     "bytes": 6881,
     "sha": "aefc87ad6bbf6fedaf1dc91461ae0580c33b773c"
+   }
+  ],
+  "morphicons": [
+   {
+    "path": "render/slugMorph.mjs",
+    "bytes": 5386,
+    "sha": "891cc90f02dacc7263daa04a4864a84966342e1d"
    }
   ],
   "slug": [
@@ -611,7 +642,7 @@
    {
     "path": "main.js",
     "bytes": 2915273,
-    "sha": "4143c588476f5d5ec67d7406ed56347e47adae21"
+    "sha": "4c207f3c0736c091a28c927f44cd21f8ed41f617"
    },
    {
     "path": "mpm3d.html",
@@ -655,8 +686,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 851721,
-    "sha": "4076be1f7e29889c481cf9c0a77d7c4725e973cd"
+    "bytes": 855763,
+    "sha": "25de7e4511f5c04f5259f7f33be05a0718555087"
    },
    {
     "path": "shipavatar.html",

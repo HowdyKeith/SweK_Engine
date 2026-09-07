@@ -152,8 +152,11 @@ console.log("\n4. the widest rule in the tree, checked in the direction nobody c
     const J = JSON.parse(fs.readFileSync(path.join(ENG, "orrery.json"), "utf8"));
     let vendorLicences = 0;
     for (const b of J.bodies) for (const f of b.files || []) if (isLicenceFile(f.path.split("/").pop())) vendorLicences++;
+    // Racing city 0: 17 -> 24. orrery.json was re-baked (it had sat at v4416 while vendor/ moved): fonts' four per-family OFL.txt
+    // files (v4486) where the old bake listed two files, morphicons' LICENSE (v4498), and the two Kenney kits' LICENSE and
+    // LICENSE.md. Every one of the 24 is matched, which is what the row holds; the number is the bake's, read here, not typed there.
     ok("!! ...and the constraint costs the rule NOTHING: every vendored licence is still matched",
-        vendorLicences === 17, `${vendorLicences} of 17 -- measured before the change and after`);
+        vendorLicences === 24, `${vendorLicences} of 24 -- measured before the change and after, and again at the Racing city 0 re-bake`);
     ok("...and one owner holds the rule, so the two copies cannot drift",
         // NOT a source pattern -- the first version of this row matched the exact `export { x } from "y"` line
         // and went red the moment that had to become an import plus an export, which it did, because a

@@ -240,6 +240,16 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
     "morphicons": Object.freeze([
         "render/slugMorph.mjs",
     ]),
+    // Racing city 0 -- Kenney's two kits arrived with world/kenneyKit.mjs, whose KITS table names each body's models directory and
+    // colormap as whole specifiers (a `path` the tool handles); the page and the gate reach the bodies through that module. The
+    // first draft named the directory as `dir: "vendor/kenney-racing"` and joined "/models/" at runtime -- no `vendor/<name>/`
+    // substring anywhere, so the rule saw NO dependant at all: the same invisibility as path.join, one level up.
+    "kenney-city": Object.freeze([
+        "world/kenneyKit.mjs",
+    ]),
+    "kenney-racing": Object.freeze([
+        "world/kenneyKit.mjs",
+    ]),
     "htmx": Object.freeze([
         "ai-bridge/ensureHtmx.js",
         "ai-bridge/server.js",
