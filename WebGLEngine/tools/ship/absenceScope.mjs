@@ -202,10 +202,15 @@ export const BVH_AT_V4435 = Object.freeze({
     exclude: Object.freeze(["tools/ship/absenceScope-selfcheck.mjs", "tools/ship/absenceScope.mjs"]),
     // 1. REAL BVH CODE THE SEARCHED DIRECTORIES COULD NOT REACH. The first is the one that matters: a
     //    binned-SAH ray-triangle BVH with a green gate, shipped at v4221, sitting in top-level mesh/.
+    // *** v4535 -- ONE ARRIVAL, NAMED: tools/ship/splatMesh-selfcheck.mjs. *** It reaches the tree's
+    // ray-triangle BVH from top-level mesh/, which none of the three searched directories can see, so it
+    // lands here exactly as the eight before it did. Nothing left the list; the record grew by one and the
+    // four rows that read it all went red together, which is one drift wearing four failures.
     outOfScope: Object.freeze([
         "mesh/meshBVH.mjs", "multiplayer/wadLevelHost.js", "tools/krbn/krbnCompare.js",
         "tools/roundhouse/neighbourBenchBind-selfcheck.mjs", "tools/roundhouse/neighbourBenchBind.mjs",
-        "tools/ship/box3dRay-selfcheck.mjs", "tools/ship/meshBVH-selfcheck.mjs", "ui/webrtxBrowser.js",
+        "tools/ship/box3dRay-selfcheck.mjs", "tools/ship/meshBVH-selfcheck.mjs",
+        "tools/ship/splatMesh-selfcheck.mjs", "ui/webrtxBrowser.js",
     ]),
     // 2. IN THE SEARCHED DIRECTORIES AND SUMMARISED AWAY. bvhNeighbours is a Morton BVH; the bakeoff is the
     //    gate that already measured it against spatialGrid.js and concluded the GRID wins for per-step SPH.
@@ -229,7 +234,20 @@ export const BVH_AT_V4435 = Object.freeze({
         "brain/brain.js", "main.js", "physics/render/rtPipeline.mjs", "tools/ship/gateSweep.mjs",
         "tools/ship/krbnPaint-selfcheck.mjs",
     ]),
-    realImplementations: 12,
+    // *** v4535 -- 12 -> 13, AND GOING TO LOOK FOUND THE FIELD'S NAME OVERSTATES WHAT IT HOLDS. ***
+    // It is computed as keep(wide.code).length: the number of files whose CODE carries the term, which is not
+    // the same as the number of BVH implementations and never was. The arrival proves it -- splatMesh-selfcheck
+    // imports MeshBVH from mesh/meshBVH.mjs and calls raycastFirst on it, and builds nothing: a CONSUMER of
+    // the one implementation, counted here as though it were another. Others in the thirteen are gates and
+    // binds around the same two or three builders.
+    //
+    // *** THE NAME IS LEFT ALONE AND THE MEANING IS WRITTEN DOWN, WHICH IS THE NARROWER OF THE TWO REPAIRS. ***
+    // Splitting builders from consumers needs a rule for "builds one", and the rule this round reached for --
+    // a regex over class/build/morton names -- is the shape that has been wrong four times this session. What
+    // is certain is the count and what it counts; a split is a separate round with a rule somebody defends.
+    // The claim the number serves is unharmed either way: item 10 said the tree has no BVH, and thirteen files
+    // whose code carries the term refutes that whether five build one or all thirteen do.
+    realImplementations: 13,
     why: "the tracer really has no BVH and rtPipeline.mjs says so itself, so the NARROW claim survives. What " +
          "did not survive is the sentence supporting it: it named two files where the tree holds twelve, and " +
          "hid the two that change what the item should DO -- a binned-SAH ray-triangle BVH the tree already " +
