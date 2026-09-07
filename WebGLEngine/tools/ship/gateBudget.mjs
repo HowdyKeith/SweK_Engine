@@ -203,6 +203,11 @@ export const MEASURED_RUNS = Object.freeze({
         observedHere: true, at: "v4527",
         runs: Object.freeze([{ ms: 35135, code: 0 }, { ms: 34781, code: 0 }, { ms: 34472, code: 0 }]),
     }),
+    // Run here at v4528, three alone (of six, all exit 0), `date +%s%3N` around the process.
+    "tools/ship/raceReplayBake-selfcheck.mjs": Object.freeze({
+        observedHere: true, at: "v4528",
+        runs: Object.freeze([{ ms: 6744, code: 0 }, { ms: 6761, code: 0 }, { ms: 6753, code: 0 }]),
+    }),
 });
 
 /**
@@ -299,6 +304,11 @@ export const MEASURED = {
     // the registry, records and replays a 5400-tick race, drives the bridge's route, and opens one browser for the lab scene and the
     // replay. Over the quick sweep's 20 s kill by construction. THREE RUNS ALONE, ALL EXIT 0, the rows in MEASURED_RUNS.
     "tools/ship/raceKnob-selfcheck.mjs": slowestRun("tools/ship/raceKnob-selfcheck.mjs"),
+    // *** v4528 -- MEASURED AT BIRTH. *** tools/ship/raceReplayBake-selfcheck.mjs bakes and keyframes a 30 s record, opens one browser
+    // for both backends' keyframes and the WebM, and a second for the page. Over the quick sweep's 3 s budget (~6.8 s), inside its 20 s
+    // kill -- the first draft took ~26 s because the page's iframe crawled in the recorder's page, which the gate's header records.
+    // THREE RUNS ALONE, ALL EXIT 0, the rows in MEASURED_RUNS.
+    "tools/ship/raceReplayBake-selfcheck.mjs": slowestRun("tools/ship/raceReplayBake-selfcheck.mjs"),
     // *** v4173 -- MEASURED TO COMPLETION FOR THE FIRST TIME, WHICH UNRESOLVED'S OWN HEADER INSTRUCTS. ***
     // 1140363 ms, EXIT 0, all checks passing -- 87 devices, 306 modes, every one built. It had been listed
     // as "exceeded a 150s cap at v3924" ever since, on the 309 s DEFAULT.

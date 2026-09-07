@@ -230,7 +230,9 @@ export function machineFingerprint(m) {
  * for `seconds`, in lockstep. Returns { order, results, fingerprint, log, ticks } where results[i] = { laps, metres, lapTime, hash } and
  * order is car indices best first: laps, then metres, ties (within a metre) by the fleet fingerprint folded with the policy hash.
  */
-export function race(worldFrom, policies, { seed = 1, seconds = 60, fleet = "00000000", gap = 4, inputsLog = null } = {}) {
+// v4528 -- `onTick(t, poses)` is OPTIONAL and observes only: called after each step with the cars' poses, so a bake can take
+// keyframes from the same loop the fingerprint comes from. It cannot change an input, and the fingerprint does not see it.
+export function race(worldFrom, policies, { seed = 1, seconds = 60, fleet = "00000000", gap = 4, inputsLog = null, onTick = null } = {}) {
     const surface = surfaceFor(seed), world = worldFrom(), cp = T.checkpoints(surface.track)[0], rects = T.cityRects(surface.track); C.addBuildings(world, rects);
     const cars = policies.map((w, i) => C.createCar(world, { x: cp.x + 5 - gap * i, z: cp.z, yaw: Math.PI / 2 }));
     const drivers = policies.map((w, i) => policyDriver(w, surface, cars[i])), trackers = cars.map(() => C.lapTracker(surface));
@@ -243,6 +245,7 @@ export function race(worldFrom, policies, { seed = 1, seconds = 60, fleet = "000
         const rs = C.stepCars(world, cars, surface, inputs, C.CAR.dt);
         rs.forEach((r, i) => { const s1 = surface.along(r.pose.pos[0], r.pose.pos[2]).s; metres[i] += metresBetween(surface, s0[i], s1); s0[i] = s1; const tk = trackers[i].update(r.pose); if (tk.laps >= 1 && lapTimes[i] === null) lapTimes[i] = (t + 1) * C.CAR.dt; });
         h = C.foldHash(h, world.stateHash());
+        if (onTick) onTick(t, rs.map((r) => r.pose));
     }
     const poses = cars.map((c) => C.carPose(world, c)); world.destroy();
     const results = policies.map((w, i) => ({ car: i, laps: trackers[i].laps, metres: metres[i], lapTime: lapTimes[i], hash: weightsHash(w), pose: poses[i] }));
@@ -252,7 +255,7 @@ export function race(worldFrom, policies, { seed = 1, seconds = 60, fleet = "000
 }
 
 /** Replay a race from its log alone: the same seed and car count, the recorded inputs, no policies. Must reach the same fingerprint. */
-export function replay(worldFrom, raceResult, { seconds = null } = {}) {
+export function replay(worldFrom, raceResult, { seconds = null, onTick = null } = {}) {
     const n = raceResult.log[0].length, secs = seconds == null ? raceResult.ticks * C.CAR.dt : seconds;
-    return race(worldFrom, Array.from({ length: n }, () => zeroWeights()), { seed: raceResult.seed, seconds: secs, fleet: raceResult.fleet, inputsLog: raceResult.log });
+    return race(worldFrom, Array.from({ length: n }, () => zeroWeights()), { seed: raceResult.seed, seconds: secs, fleet: raceResult.fleet, inputsLog: raceResult.log, onTick });
 }

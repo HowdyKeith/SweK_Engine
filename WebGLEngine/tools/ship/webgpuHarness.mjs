@@ -713,16 +713,35 @@ export async function runInEngineOrigin({ engineRoot, script, args = null, timeo
         const page = await browser.newPage();
         const pageErrors = [];
         page.on("pageerror", (e) => pageErrors.push(String(e).slice(0, 300)));
-        page.on("console", (m) => { if (m.type() === "error") pageErrors.push("console: " + m.text().slice(0, 300)); });
+        let lastStep = null;   // v4528: a script that console.logs "[swek-step] <name>" is tracked here, so a page that freezes still names its last step
+        page.on("console", (m) => { const t = m.text(); if (t.startsWith("[swek-step] ")) lastStep = t.slice(12, 200); else if (m.type() === "error") pageErrors.push("console: " + t.slice(0, 300)); });
         page.setDefaultTimeout(timeoutMs);
         await page.goto(`http://${SECURE_HOST}:${srv.address().port}/`);
         // The script is compiled IN the page from its source text: page.evaluate with a string is an expression
         // in some Playwright versions and a callable in others, and a function that returns a function comes
         // back unserialisable as undefined. new Function makes the contract explicit.
-        const out = await page.evaluate(async ({ src, a }) => {
-            try { const fn = new Function("return (" + src + ")")(); return { ok: true, result: await fn(a) }; }
-            catch (e) { return { ok: false, reason: String(e && e.stack || e).slice(0, 600) }; }
-        }, { src: String(script), a: args });
+        // v4528: page.evaluate takes no timeout, so a script whose await never resolves (a mapAsync on a lost device, a
+        // MediaRecorder that never stops) held raceReplayBake's gate until the outer kill -- 500 s, then 300 s, with the
+        // kill's SIGTERM closing the browser and the error reading "Target page, context or browser has been closed",
+        // which named the symptom and not the wait. Raced against timeoutMs here, a hang is an error that says how long.
+        let timer = null;
+        const out = await Promise.race([
+            page.evaluate(async ({ src, a }) => {
+                try { const fn = new Function("return (" + src + ")")(); return { ok: true, result: await fn(a) }; }
+                catch (e) { return { ok: false, reason: String(e && e.stack || e).slice(0, 600) }; }
+            }, { src: String(script), a: args }),
+            new Promise((r) => { timer = setTimeout(() => r({ ok: false, timedOut: true, reason: `harness: the page script did not return within ${timeoutMs} ms` }), timeoutMs); }),
+        ]);
+        clearTimeout(timer);
+        if (out.timedOut) {
+            // which step, if the page can still answer: a script that sets globalThis.__swekStep as it goes is read back here,
+            // and a page that cannot answer a five-second probe is reported as such -- a frozen main thread or a gone renderer
+            // is a different finding from a promise that never settled
+            const probe = await Promise.race([page.evaluate(() => (globalThis.__swekStep == null ? null : String(globalThis.__swekStep))).catch((e) => "probe threw: " + String(e).slice(0, 120)),
+                                              new Promise((r) => setTimeout(() => r("the page did not answer a 5 s probe (main thread frozen or renderer gone)"), 5000))]);
+            out.reason += probe == null ? "; the page answered the probe but named no step (set globalThis.__swekStep to be told which)" : "; last step: " + probe;
+            if (lastStep != null) out.reason += "; last step logged before that: " + lastStep;
+        }
         return { skipped: false, ok: out.ok, result: out.ok ? out.result : null, reason: out.ok ? null : out.reason, pageErrors };
     } catch (e) {
         return { ok: false, skipped: false, reason: "harness error: " + String(e).slice(0, 300), result: null, pageErrors: [] };

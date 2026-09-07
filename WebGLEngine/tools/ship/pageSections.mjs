@@ -527,7 +527,7 @@ export const SECTIONS = [
     // git terrain, the destructible buildings). Filed the round the Arriving row crossed pageReach's 15 % cap (70 links of 465 pages):
     // three racing anchors had gone into Arriving one per round, which is the pile that row exists to prevent.
     { id: "racing", tab: "racing", label: "Racing City", note: "Kenney's kits, the grid track, the car on box3d, and the brains that will drive it",
-      pages: ["kenney-kit.html", "race-track.html", "race-car.html", "race-brain.html"] },
+      pages: ["kenney-kit.html", "race-track.html", "race-car.html", "race-brain.html", "race-replay.html"] },
 ];
 
 /** Keith's rule. A drawer of 25 is the flat row again with a lid on it. */

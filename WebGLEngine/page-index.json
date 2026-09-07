@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 466,
+ "count": 467,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -2275,6 +2275,13 @@
    "f": "race-car.html",
    "t": "Race car on the GPU",
    "d": "Racing city 2: physics/raceCar.mjs drives Kenney's truck around the seeded grid track of race-track.html -- one box3d chassis body (the vendored wasm, in the page through box3dLoader) with four raycast wheels from physics/vehicle.mjs, suspension and tyre forces applied as impulses, the ground an analytic surface of the flat track (asphalt inside the kerbs, the kerb band raised, grass off the tiles, nothing beyond the grid), the buildings static boxes the chassis can hit. The controller contract is { throttle, steer, brake } in [-1, 1]; the pursuit driver here follows the centreline a lookahead ahead and slows for the corners it sees coming, and laps. The truck is drawn at the chassis pose through kitScene's quat mode beside the tiles and the greedy-meshed world, on WebGPU or WebGL2. The HUD names the speed, the lap, the checkpoints hit, the lap time and box3d's running fingerprint; the same seed and driver give the same fingerprint everywhere. Seed live; Reset restarts the car at the finish; drag to orbit, wheel to dolly.",
+   "g": "racing",
+   "p": 0
+  },
+  {
+   "f": "race-replay.html",
+   "t": "Race replay, pre-rendered",
+   "d": "Racing city 5: world/raceReplayBake.mjs turns a race record -- the lab's accepted driver from physics-lab.html's race scene when the bridge serves it, otherwise one built here with the accepted speed gain -- into pictures without the driver running again: the held-out track and its city as voxels (ASH asphalt, STONE/SNOW kerb stripes, GRASS, stamped from the surface the car drives on), the car as a chassis-sized box in litSphere's quat mode, keyframes taken from the record's own input log played back through box3d (the playback's fingerprint must equal the record's), each keyframe drawn on WebGPU or WebGL2 and read back. NOT REAL TIME: the keyframes are computed ahead, every frame is rendered at the device's pace, and playback is a slideshow of what was rendered. Export the schematic (a JSON row per keyframe with every pose and each picture's pixel hash), the current keyframe as a PNG, or a WebM off the canvas through render/blobRecorder.js -- which a TV will not play; the H.264 MP4 is rig-pending, as blobRecorder measured. Drag to orbit, wheel to dolly.",
    "g": "racing",
    "p": 0
   },

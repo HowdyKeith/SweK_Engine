@@ -3689,6 +3689,25 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "schematic that says NOT REAL TIME. The record replays to the same fingerprint in node and in the page's wasm. " +
                  "Sabotages red at A / B / C / D / E / F (the gate's header).",
     }),
+    since193: Object.freeze({
+        at: "v4528", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/raceReplayBake-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green headless and in the browser on both backends. Racing city 5: world/raceReplayBake.mjs bakes a race record to " +
+                 "voxels (the loop cells stamped from the surface the car drives on: ASH asphalt, a STONE / SNOW kerb, grass), keyframes " +
+                 "it from its own log through drivePolicy.replay's new observing onTick to the record's fingerprint, draws the world and " +
+                 "the cars through gpuDriven on both backends and reads every keyframe back; tools/ship/pngWrite.mjs writes them as PNGs " +
+                 "that decodePNG reads back byte for byte, with a JSON schematic naming each file's pixel hash; race-replay.html plays the " +
+                 "slideshow, records a WebM off the canvas and says NOT REAL TIME. MEASURED: the WebM is VP9 (43 KB for 3 s) and the " +
+                 "H.264 MP4 a TV plays is refused by MediaRecorder here, so it is rig-pending by measurement. Sabotage A found the " +
+                 "asphalt check reading the sabotaged constant and the dark-pixel check counting the background, and sabotage D " +
+                 "found a PNG that does not decode crashing the gate instead of failing it; both re-aimed. The page's iframe " +
+                 "froze the recorder's renderer 4 times in 16 runs and got its own browser (~26 s -> ~6.8 s), and the harness " +
+                 "races page.evaluate against its timeout now. Sabotages red at A / B / C / D / E / F / G (the gate's header).",
+    }),
 
 });
 

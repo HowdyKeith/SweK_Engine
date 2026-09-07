@@ -211,7 +211,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // the earlier reading was 3878. What survives is the rule the wrong explanation was reaching for: this
     // number is MEASURED every round, never incremented from the last one, and a reason invented to explain a
     // count is worth less than re-taking it. FIVE ROUNDS RUNNING this table has been re-taken by hand.
-    files: 4004,                  // v4526 merge: 3887 -> 4002, this branch's rounds; v4527: 4004
+    files: 4007,                  // v4526 merge: 3887 -> 4002, this branch's rounds; v4527: 4004; v4528: 4007
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
                           // RE-TAKEN TWICE IN TWO ROUNDS, and the second time only because the ship gate
                           // caught it: v4478's re-take was correct for v4478 and stale the moment v4479
@@ -228,8 +228,10 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // moved, raf and threads did not, and wasm passed threads by one: 23 against 22. The census is measuring capabilities
     // and this branch added capabilities, which is the shape the v4478 note above says a discriminating census should show.
     // v4527 -- RE-TAKEN: two files (physics/raceKnob.mjs and its gate) moved five rows by one to three each, the other seven not at all.
-    esModules: 3713, closures: 3590, asyncAwait: 1409, typedArrays: 782, promises: 340,
-    fetchXhr: 242, performanceNow: 217, raf: 116, webgl: 151, webgpu: 48, threads: 22, wasm: 23,
+    // v4528 -- RE-TAKEN: three files (world/raceReplayBake.mjs, tools/ship/pngWrite.mjs, the gate) moved seven rows by one to three
+    // each (the gate reads a WebGL2 canvas and times its runs; the encoder is typed arrays and a Promise-free node module).
+    esModules: 3716, closures: 3593, asyncAwait: 1411, typedArrays: 784, promises: 341,
+    fetchXhr: 242, performanceNow: 218, raf: 116, webgl: 152, webgpu: 48, threads: 22, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.

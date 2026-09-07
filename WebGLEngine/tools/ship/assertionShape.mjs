@@ -196,8 +196,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4526 MERGE -- RE-TAKEN on the merged tree: this branch's sixty-five gates joined the population (1525 -> 1590) and
     // five rows moved with them; distinctDefinitions, unknownSignature and suspects did not, which is the discriminating shape.
     // v4527 -- RE-TAKEN: one gate (raceKnob) joined, and exactly the four rows a gate that uses ok(name, cond) moves, moved by one.
-    gates: 1591, usesOk: 1570, definesOk: 1562, importsOk: 0,
-    distinctDefinitions: 38, nameFirst: 1463, condFirst: 91, unknownSignature: 16,
+    // v4528 -- RE-TAKEN: one gate (raceReplayBake) joined, and the same four rows moved by one again.
+    gates: 1592, usesOk: 1571, definesOk: 1563, importsOk: 0,
+    distinctDefinitions: 38, nameFirst: 1464, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

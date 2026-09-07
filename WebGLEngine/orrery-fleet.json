@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "149ef33a078cf34de2e04bbf9fdd41b87bb35583",
+ "head": "a7bcd245f18b695c2a756123bbd0b0f90a459dbd",
  "bodies": {
   "box3d": [
    {
@@ -328,7 +328,7 @@
    },
    {
     "path": "server.html",
-    "bytes": 859045,
+    "bytes": 859778,
     "sha": "423a8e091143263b5058fd44350f12d010295939"
    },
    {
@@ -675,7 +675,7 @@
    },
    {
     "path": "server.html",
-    "bytes": 859045,
+    "bytes": 859778,
     "sha": "423a8e091143263b5058fd44350f12d010295939"
    },
    {
@@ -750,7 +750,7 @@
    },
    {
     "path": "tools/ship/webgpuHarness.mjs",
-    "bytes": 47522,
+    "bytes": 49522,
     "sha": "b23c9f8ac2e7295851e1de3d6285aefbaef1d11b"
    },
    {

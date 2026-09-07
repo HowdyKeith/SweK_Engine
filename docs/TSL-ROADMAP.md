@@ -1480,6 +1480,51 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         the harness), a trained brain as a candidate (a trained policy has no single knob), a search over the gain
         (the static shortlist is enough to show the shape; a bisection would find the 1% boundary between 0.3 and
         0.5).
+     5. (v4528) THE REPLAY PRE-RENDERED. Task 68 asked which of two routes this box can actually produce -- a
+        baked voxel scene with a schematic per keyframe, or a video through render/blobRecorder.js -- and to record
+        the other as rig-pending. MEASURED: BOTH, up to the codec. world/raceReplayBake.mjs takes a race record
+        (v4527's replay: seed, seconds, fleet, the input log, the fingerprint) and stamps the track into a voxel
+        world from the surface the car drives on (trackSurface.at per column: ASH under the asphalt, a STONE / SNOW
+        kerb striped by parity, grass outside; 4,400 voxels for the 44 loop cells, 3,470 / 300 / 630 by kind, the
+        floor under the free cells trackWorld's and untouched, CityGen's 86 buildings on top), meshes it through
+        voxelDevice.meshWorld (31,230 vertices, one hash for one seed), and keyframes the record from its own log:
+        brain/drivePolicy.mjs's race() and replay() take an observing onTick(t, poses) now, and keyframesOf keeps one
+        pose per 30 ticks plus the last -- 61 keyframes for the 30 s record -- while the playback's fingerprint stays
+        the record's (965b6698; one flipped input keyframes to bc3713d5 and is refused as frames; the observer
+        cannot move it). replayScene draws the world mesh and one box per car through gpuDriven in quat mode on
+        either backend, overheadCamera looks straight down from 120 m, and renderKeyframes draws each keyframe and
+        READS IT BACK with an FNV-1a hash per picture. tools/ship/pngWrite.mjs is the tree's first PNG encoder
+        (node zlib, filter 0), the twin of pngCoverage's decoder. race-replay.html loads the stored lab replay or
+        builds a 30 s record in its own wasm, bakes, keyframes, plays the slideshow at 60 / every keyframes per
+        second under an orbit camera, pre-renders a filmstrip, exports the PNG keyframes and the JSON schematic
+        (keyframeManifest: tick, second, every pose, file, pixel hash, the record's fingerprint, and the note NOT
+        REAL TIME), and records a WebM off the canvas through blobRecorder. MEASURED (tools/ship/raceReplayBake-
+        selfcheck.mjs, both backends through the headless Dawn harness): the page's wasm keyframes the record to
+        node's fingerprint; six keyframes rendered and read back in 199 ms on WebGPU and 98 ms on WebGL2 with the
+        car's red at its projected pose in every one (37..53% of a 7 x 7 window), consecutive pictures different,
+        the asphalt dark under the centreline and the stamp's grass green, the two backends within 24 on 65,133 of
+        65,536 pixels; the six PNGs (26.5 KB each, a tenth of the raw bytes) decode back byte for byte; a 3 s WebM
+        recorded off the WebGL2 canvas is 43 KB of VP9. THE OTHER ROUTE, BY MEASUREMENT: MediaRecorder here says
+        webm true, video/mp4 true (with VP9 inside, which a TV will not play) and video/mp4;codecs=avc1.42E01E
+        FALSE -- so the H.264 MP4 is RIG-PENDING on libx264, recorded in MEASURED_V4528.rigPending and on the page,
+        not assumed. NOT REAL TIME, and said so everywhere it appears: the keyframes exist before any picture, each
+        is drawn at the device's pace, and playback is a slideshow of what was rendered. FINDINGS WHILE IT WAS
+        BUILT: the device's read-back resolves to { pixels, width, height }, and two drafts of renderKeyframes
+        hashed the object (six identical hashes) and then an "ArrayBuffer" guess (six empty frames) before the gate
+        named both; a WebGPU pass that targets the canvas loses the device on this box (v4462's device-present
+        finding), so the WebGPU keyframes are offscreen and the WebM is recorded on the WebGL2 canvas; sabotage A
+        (grass everywhere, named as asphalt) went 1 red because the asphalt check compared against the sabotaged
+        constant and the dark-pixel check counted the clear colour over the whole frame -- both re-aimed at the
+        palette's numbers and at the centreline's projection; sabotage D (an IHDR lying about its colour type)
+        CRASHED the gate through decodePNG's throw with no FAIL line, so the decode is caught and red by name now; and
+        the page loaded in an iframe of the same page as the recorder and the two devices FROZE the renderer's main
+        thread 4 times in 16 runs (no timer fired, a 5 s probe went unanswered) and crawled to 20 s otherwise, while
+        the page alone loaded 20 of 20 times in about 1.2 s on either backend -- so the page smoke has its own
+        browser, the gate fell from about 26 s to 6.8 s, and tools/ship/webgpuHarness.mjs races page.evaluate
+        against its timeout (it had none) and reads back the page's last logged step, so a hang names where it
+        stopped. Not built: the WebM's frames as pictures (no decoder in node), the MP4 itself, a race of several cars on
+        the page (the scene takes N, the record has one), blob-studio.html's composer (blobRecorder is the same
+        MediaRecorder it uses; the composer adds nothing the codec refusal does not settle).
 
 ## The count that says when step 4 matters
 

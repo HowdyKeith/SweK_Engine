@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Race replay, pre-rendered (a race record baked to voxels and keyframed on gfx/device.js)">
+<meta name="demo:desc" content="Racing city 5: world/raceReplayBake.mjs turns a race record -- the lab's accepted driver from physics-lab.html's race scene when the bridge serves it, otherwise one built here with the accepted speed gain -- into pictures without the driver running again: the held-out track and its city as voxels (ASH asphalt, STONE/SNOW kerb stripes, GRASS, stamped from the surface the car drives on), the car as a chassis-sized box in litSphere's quat mode, keyframes taken from the record's own input log played back through box3d (the playback's fingerprint must equal the record's), each keyframe drawn on WebGPU or WebGL2 and read back. NOT REAL TIME: the keyframes are computed ahead, every frame is rendered at the device's pace, and playback is a slideshow of what was rendered. Export the schematic (a JSON row per keyframe with every pose and each picture's pixel hash), the current keyframe as a PNG, or a WebM off the canvas through render/blobRecorder.js -- which a TV will not play; the H.264 MP4 is rig-pending, as blobRecorder measured. Drag to orbit, wheel to dolly.">
+<meta name="demo:category" content="world">
+<title>Race replay, pre-rendered</title>
+<style>
+  html,body { margin:0; height:100%; background:#050805; color:#9fb2d4; font:12px ui-monospace,Menlo,monospace; }
+  #c { display:block; width:100%; }
+  #hud { padding:10px 14px; }
+  #cap { color:#f6a623; letter-spacing:.14em; text-transform:uppercase; }
+  #be { color:#59d1ff; font-size:14px; margin-top:4px; }
+  #sub { color:#5f7aa0; font-size:11px; margin-top:2px; line-height:1.7; }
+  .bad { color:#ff9a9a; }
+  a { color:#59d1ff; }
+  #strip { display:flex; gap:4px; margin-top:6px; flex-wrap:wrap; }
+  #strip canvas { width:96px; height:96px; border:1px solid #2a3a30; image-rendering:pixelated; }
+  input[type=range] { width:240px; vertical-align:middle; }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div id="cap">Race replay, pre-rendered: a record baked to voxels, keyframed from its own log, drawn ahead and shown as a slideshow</div>
+  <div id="be">requesting a device&hellip;</div>
+  <div id="sub">
+    <span id="src">loading box3d and looking for the lab's accepted replay&hellip;</span><br>
+    keyframe every <select id="every"><option value="10">10 ticks (6 per second)</option><option value="30" selected>30 ticks (2 per second)</option></select>
+    &middot; <button id="prerender">Pre-render the filmstrip</button> &middot; <button id="play">Play</button>
+    <input id="kf" type="range" min="0" max="0" value="0"> <span id="at"></span><br>
+    <button id="record">Record a WebM (4 s)</button> <button id="schematic">Export the schematic (JSON)</button> <button id="png">Export this keyframe (PNG)</button>
+    &middot; <a href="?webgl=1">force WebGL2</a> &middot; <span id="out">NOT REAL TIME: keyframes computed ahead, frames rendered at the device's pace, playback a slideshow. The H.264 MP4 a TV plays is rig-pending; this box records WebM.</span>
+    <div id="strip"></div>
+    &middot; drag to orbit, wheel to dolly
+  </div>
+</div>
+<canvas id="c"></canvas>
+<script type="module" src="/ui/originNotice.js"></script>
+<script type="module">
+import { requestDevice } from "./gfx/device.js";
+import * as G from "./render/gpuDriven.mjs";
+import * as L from "./render/litSphere.mjs";
+import * as D from "./brain/drivePolicy.mjs";
+import * as B from "./world/raceReplayBake.mjs";
+import { CityGen } from "./world/CityGen.js";
+import { box3d } from "./physics/box3d/box3dLoader.js";
+import { worldFromModule } from "./render/slugTicker.mjs";
+import { recordCanvas, probeRecording, sniffContainer } from "./render/blobRecorder.js";
+
+const cvs = document.getElementById("c"), beEl = document.getElementById("be"), $ = (id) => document.getElementById(id);
+const fail = (m) => { beEl.innerHTML = '<span class="bad">' + m + "</span>"; };
+let device, worldFrom, rec = null, baked = null, frames = [], sc = null, i = 0, playing = false, lastShown = 0;
+let yaw = 0.6, pitch = 0.9, dist = 150, dragging = null, centre = [0, 0, 0];
+const ACCEPTED_GAIN = 0.5;   // physics/raceKnob.mjs's accepted candidate at v4527
+
+async function loadRecord() {
+  try {
+    const r = await fetch("/roundhouse/lab-replay?scene=race", { cache: "no-store" });
+    if (/json/.test(r.headers.get("content-type") || "")) { const j = await r.json(); if (j.ok) { $("src").textContent = `the lab's accepted driver (speedGain ${j.replay.knob.speedGain}, seed ${j.replay.seed}, ${j.replay.seconds} s, record ${j.replay.fingerprint}) from the bridge`; return j.replay; } }
+  } catch {}
+  const t0 = performance.now(), w = D.handWeights({ speed: ACCEPTED_GAIN }), fleet = D.machineFingerprint(box3d._mod);
+  const r = D.race(worldFrom, [w], { seed: 2, seconds: 30, fleet });
+  $("src").textContent = `no bridge: a record built here -- the hand policy at the lab's accepted speed gain ${ACCEPTED_GAIN}, seed 2, 30 s, fingerprint ${r.fingerprint}, ${(performance.now() - t0).toFixed(0)} ms`;
+  return { kind: "swek-race-replay", seed: r.seed, seconds: 30, fleet, ticks: r.ticks, log: r.log, fingerprint: r.fingerprint, weightsHash: D.weightsHash(w), knob: { speedGain: ACCEPTED_GAIN } };
+}
+
+function rebuild() {
+  const t0 = performance.now(), every = +$("every").value;
+  baked = baked || B.bakeReplayWorld(rec, CityGen);
+  const k = B.keyframesOf(worldFrom, rec, { every });
+  frames = k.frames; i = 0; $("kf").max = frames.length - 1; $("kf").value = 0;
+  if (sc && sc.scene.destroy) sc.scene.destroy();
+  sc = B.replayScene(device, baked, G, L);
+  $("out").textContent = `${frames.length} keyframes every ${every} ticks from ${rec.ticks}; the playback's fingerprint ${k.fingerprint} ${k.same ? "= the record's" : "DIFFERS from the record's " + rec.fingerprint}; voxels ${baked.stamped.asphalt} asphalt, ${baked.stamped.kerb} kerb, ${baked.stamped.grass} grass in the loop; ${baked.rects.length} buildings; built in ${(performance.now() - t0).toFixed(0)} ms on ${sc.scene.path}. NOT REAL TIME.`;
+  $("strip").innerHTML = "";
+}
+
+async function prerender() {
+  const n = Math.min(12, frames.length), pick = Array.from({ length: n }, (_, j) => frames[Math.round(j * (frames.length - 1) / Math.max(1, n - 1))]);
+  const W = 128, H = 128, cam = B.overheadCamera(G, W, H), t0 = performance.now();
+  $("strip").innerHTML = "";
+  const rendered = await B.renderKeyframes(sc, pick, cam);
+  for (const f of rendered) {
+    const c = document.createElement("canvas"); c.width = W; c.height = H; c.title = `tick ${f.tick}, ${f.seconds.toFixed(2)} s, pixels ${f.hash}`;
+    const img = new ImageData(new Uint8ClampedArray(f.pixels.buffer, f.pixels.byteOffset, W * H * 4), W, H); c.getContext("2d").putImageData(img, 0, 0); $("strip").appendChild(c);
+  }
+  $("out").textContent = `${rendered.length} keyframes rendered ahead at ${W} x ${H} and read back in ${(performance.now() - t0).toFixed(0)} ms (${(1000 * rendered.length / (performance.now() - t0)).toFixed(1)} frames/s on ${sc.scene.path}); hover a frame for its tick and pixel hash. NOT REAL TIME.`;
+}
+
+async function record() {
+  const probe = probeRecording();
+  if (!probe.best) { $("out").textContent = "MediaRecorder supports nothing here"; return; }
+  const wasPlaying = playing; playing = true; $("play").textContent = "Pause";
+  $("out").textContent = `recording ${probe.best.mime} for 4 s while the slideshow plays...`;
+  const r = await recordCanvas(cvs, 4000, 30);
+  const bytes = new Uint8Array(await r.blob.arrayBuffer());
+  const url = URL.createObjectURL(r.blob), a = document.createElement("a"); a.href = url; a.download = `race-replay-${rec.fingerprint}.${r.container}`; a.textContent = `download ${r.container} (${bytes.length} bytes)`;
+  $("out").textContent = `${bytes.length} bytes of ${r.codec} in a ${r.container} container (sniffed ${sniffContainer(bytes)}); a TV ${r.playsOnTv ? "plays it" : "will not play it -- H.264 is rig-pending"}. `;
+  $("out").appendChild(a);
+  playing = wasPlaying; $("play").textContent = playing ? "Pause" : "Play";
+}
+
+function exportSchematic() {
+  const man = B.keyframeManifest(rec, frames, null, { every: +$("every").value, W: cvs.width, H: cvs.height });
+  const a = document.createElement("a"); a.href = "data:application/json;charset=utf-8," + encodeURIComponent(JSON.stringify(man)); a.download = `race-keyframes-${rec.fingerprint}.json`; a.textContent = `download the schematic (${man.keyframes.length} keyframes)`;
+  $("out").textContent = "the schematic: one row per keyframe with its tick, its second and every car's pose. "; $("out").appendChild(a);
+}
+
+async function main() {
+  const forceGl = new URLSearchParams(location.search).get("webgl") === "1";
+  try { device = await requestDevice(cvs, forceGl ? { backend: "webgl2" } : { prefer: "webgpu" }); } catch (e) { return fail("requestDevice threw: " + e.message); }
+  beEl.textContent = `device: ${device.backend}`;
+  const st = await box3d.init(); if (!st.ready) return fail("box3d: " + st.reason);
+  worldFrom = () => worldFromModule(box3d._mod, [0, -9.81, 0]);
+  rec = await loadRecord(); rebuild();
+  $("every").addEventListener("change", rebuild);
+  $("prerender").addEventListener("click", prerender);
+  $("play").addEventListener("click", () => { playing = !playing; $("play").textContent = playing ? "Pause" : "Play"; });
+  $("kf").addEventListener("input", () => { i = +$("kf").value; });
+  $("record").addEventListener("click", record);
+  $("schematic").addEventListener("click", exportSchematic);
+  $("png").addEventListener("click", () => { const a = document.createElement("a"); a.href = cvs.toDataURL("image/png"); a.download = `race-keyframe-${frames[i].tick}.png`; a.textContent = `download keyframe ${i} (tick ${frames[i].tick}) as PNG`; $("out").textContent = ""; $("out").appendChild(a); });
+  cvs.addEventListener("pointerdown", (e) => { dragging = [e.clientX, e.clientY]; });
+  addEventListener("pointerup", () => { dragging = null; });
+  addEventListener("pointermove", (e) => { if (!dragging) return; yaw += (e.clientX - dragging[0]) * 0.006; pitch = Math.max(0.05, Math.min(1.5, pitch + (e.clientY - dragging[1]) * 0.006)); dragging = [e.clientX, e.clientY]; });
+  cvs.addEventListener("wheel", (e) => { e.preventDefault(); dist = Math.max(8, Math.min(600, dist * Math.exp(e.deltaY * 0.001))); }, { passive: false });
+  requestAnimationFrame(frame);
+}
+
+function frame(t) {
+  requestAnimationFrame(frame);
+  const w = cvs.clientWidth | 0, h = Math.max(200, (innerHeight - document.getElementById("hud").offsetHeight - 4) | 0);
+  if (cvs.width !== w || cvs.height !== h) { cvs.width = w; cvs.height = h; }
+  if (!sc || !frames.length) return;
+  const perSecond = 60 / +$("every").value;
+  if (playing && t - lastShown > 1000 / perSecond) { i = (i + 1) % frames.length; $("kf").value = i; lastShown = t; }
+  const kf = frames[i]; sc.setKeyframe(kf);
+  $("at").textContent = `keyframe ${i + 1} of ${frames.length}: tick ${kf.tick}, ${kf.seconds.toFixed(2)} s of the race, car at ${kf.poses[0].pos.map((v) => v.toFixed(1)).join(", ")}`;
+  const eye = [centre[0] + dist * Math.sin(yaw) * Math.cos(pitch), dist * Math.sin(pitch), centre[2] + dist * Math.cos(yaw) * Math.cos(pitch)];
+  sc.scene.frame({ viewProj: G.multiply(G.perspective(0.9, w / h, 0.5, 2000), G.lookAt(eye, centre)), eye, clear: [0.03, 0.05, 0.08, 1] });
+}
+
+main();
+</script>
+</body>
+</html>
