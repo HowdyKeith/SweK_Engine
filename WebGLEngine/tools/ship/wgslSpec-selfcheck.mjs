@@ -108,20 +108,56 @@ const WGSL_FILES = [...walk(ENG)].filter((f) => f.endsWith(".wgsl")).sort();
     // those three was in render/wgslSpec.mjs, this gate, or tools/ship/wgslDeviceLimits.mjs -- as a variable
     // name, a regex literal and a template-literal comment, none of which codeOnly() strips. A checker that
     // counts itself measures the checker.
+    // *** v4534 -- THE CLAIM WAS TRUE AND THE COUNT WAS SOMEBODY ELSE'S CODE. *** This read 5 and went red.
+    // ALL FIVE ARE IN vendor/three-webgpu/three.webgpu.js -- three.js's own WebGPU backend, which SUPPORTS
+    // requiredLimits as an API (`requiredLimits: parameters.requiredLimits` at its one requestDevice call).
+    // That is a library offering a feature, not a device in this tree asking for raised limits. THIS TREE'S
+    // OWN CODE CONTAINS ZERO, so "every device in this tree runs at the defaults" was true the whole time.
+    //
+    // This gate's walk skips only node_modules and .git. EVERY OTHER SCANNER IN THE TREE SKIPS vendor TOO --
+    // assertionShape, reportDoors, canvasFill, changedPaths, bezierEasing, absenceScope -- because vendor/ is
+    // somebody else's commits, which is exactly why orreryFleet treats those directories as vendored BODIES.
+    // The file's own comment six lines up says "A checker that counts itself measures the checker" and
+    // excludes three SELF files for it; the same reasoning one level out excludes the dependency.
+    //
+    // *** AND THE WRONG NUMBER TRAVELLED. *** 5 is quoted as standing fact in redCensus, budgetExile (twice),
+    // register-audit (twice), gateSweep and sweepCoverage -- seven records describing three.js while reading
+    // as a fact about this tree. They are left as they are: each is a true record of what the gate SAID at
+    // the version that wrote it, and rewriting them would be editing history rather than correcting it.
     const SELF = ["render/wgslSpec.mjs", "tools/ship/wgslSpec-selfcheck.mjs", "tools/ship/wgslDeviceLimits.mjs"];
+    const isVendored = (rel) => /^vendor[\\/]/.test(rel);
     let requestDevice = 0, requiredLimits = 0, scanned = 0;
+    let vendorRequiredLimits = 0, vendorFiles = 0;
     for (const f of walk(ENG)) {
         if (!/\.(js|mjs|html)$/.test(f)) continue;
-        if (SELF.includes(path.relative(ENG, f))) continue;
-        scanned++;
+        const rel = path.relative(ENG, f);
+        if (SELF.includes(rel)) continue;
         const src = codeOnly(fs.readFileSync(f, "utf8"));
+        const hits = (src.match(/requiredLimits/g) || []).length;
+        // *** BOTH POPULATIONS ARE COUNTED, so the discrimination is visible rather than implied by an
+        // exclusion nobody can see the effect of. A vendor count of zero would be fine; what must not happen
+        // is the two being added together. ***
+        if (isVendored(rel)) { if (hits) { vendorRequiredLimits += hits; vendorFiles++; } continue; }
+        scanned++;
         requestDevice += (src.match(/requestDevice\s*\(/g) || []).length;
-        requiredLimits += (src.match(/requiredLimits/g) || []).length;
+        requiredLimits += hits;
     }
     ok(requestDevice >= 8, `${requestDevice} requestDevice() call sites in the tree`);
     ok(requiredLimits === 0,
-        `and across ${scanned} files requiredLimits appears ${requiredLimits} times -- every device in this tree ` +
-        `runs at the defaults, so a 1024-wide workgroup is not merely unportable, it cannot be created here`);
+        `and across ${scanned} of THIS TREE'S files requiredLimits appears ${requiredLimits} times -- every ` +
+        `device in this tree runs at the defaults, so a 1024-wide workgroup is not merely unportable, it ` +
+        `cannot be created here`);
+    // *** THE EXCLUSION IS ONLY MEANINGFUL IF IT EXCLUDES SOMETHING, so the vendored count is asserted
+    // NON-ZERO. *** An exclusion that removes nothing is indistinguishable from no exclusion at all, and this
+    // one would then be a line nobody could tell had stopped working -- which is how the count reached 5
+    // unnoticed in the first place.
+    ok(vendorRequiredLimits > 0 && vendorFiles > 0,
+        `THE VENDORED COPY IS NOT COUNTED SEPARATELY: ${vendorRequiredLimits} occurrence(s) in ${vendorFiles} ` +
+        `vendored file(s). Expected three.js's WebGPU backend to offer requiredLimits as an API; if it no ` +
+        `longer does, this exclusion has stopped excluding and the row above is passing for a new reason.`);
+    console.log(`  ----  vendored: ${vendorRequiredLimits} occurrence(s) of requiredLimits in ${vendorFiles} ` +
+        `file(s) under vendor/, counted apart. Reading them as this tree's put the number 5 into seven of ` +
+        `its records as a fact about this tree.`);
     note(`over-limit: ${over.map(([f]) => path.basename(f)).join(", ")}`);
 }
 
