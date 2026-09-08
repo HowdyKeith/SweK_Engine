@@ -132,6 +132,8 @@ export function transplantFragment(fragment, language) {
         const bodyAll = fragment.split("fn main(")[1]; const body = bodyAll.slice(bodyAll.indexOf("{") + 1, bodyAll.lastIndexOf("}"));
         let b = body.replace(/output\.color\s*=\s*([^;]+);\s*return output;/, "return $1;");
         if (!/return /.test(b)) throw new Error("tslSource: the WGSL main() does not end in output.color = ...; return output;");
+        // v4553 -- a fragment-local temporary (r185's hoisted "// vars") is used here but never declared in this slice; see that fix's own header.
+        const fDecls = _usedFragDecls(fragment, b, "wgsl"); if (fDecls.length) b = fDecls.join("\n") + "\n" + b;
         b = b.replace(new RegExp(`\\b${varying}\\b`, "g"), "uv").replace(/\bobject\.(\w+)/g, "u.$1");
         for (const t of textures) b = b.replace(new RegExp(`\\b${t}_sampler\\b`, "g"), "samp");
         const usesSampler = /\bsamp\b/.test(b) || /\bsamp\b/.test(codes);
@@ -150,6 +152,8 @@ export function transplantFragment(fragment, language) {
     const codes = afterCodes.slice(0, codesStop.length ? Math.min(...codesStop) : afterCodes.length).trim();
     const bodyAll = fragment.split("void main()")[1]; let b = bodyAll.slice(bodyAll.indexOf("{") + 1, bodyAll.lastIndexOf("}"));
     if (!/fragColor\s*=/.test(b)) throw new Error("tslSource: the GLSL main() does not write fragColor");
+    // v4553 -- see transplantFragment's WGSL branch above: a fragment-local temporary hoisted to "// vars" under r185.
+    const fDecls = _usedFragDecls(fragment, b, "glsl"); if (fDecls.length) b = fDecls.join("\n") + "\n" + b;
     b = b.replace(new RegExp(`\\b${varying}\\b`, "g"), "vUv");
     for (const u of uniforms) b = b.replace(new RegExp(`\\bf_${u.name}\\b`, "g"), u.name);
     const glslType = (t) => Object.keys(GLSL_TYPES).find((k) => GLSL_TYPES[k] === t);
@@ -243,6 +247,20 @@ function _declName(line, language) {
 function _dedupeDecls(lines, language) {
     const seen = new Set();
     return lines.filter((l) => { const n = _declName(l, language); if (!n || seen.has(n)) return false; seen.add(n); return true; });
+}
+// v4553 -- THE SAME HOISTING, ON THE FRAGMENT SIDE. A fragment that needs a local temporary across statements (the
+// Chaos race's Lyapunov loop: nodeVar0/1/2, an iterated bifurcation) had that temporary declared INSIDE main() under
+// r178, where the naive body-slice (bodyAll.indexOf("{")..lastIndexOf("}")) carried it along for free. r185 hoists it
+// to the same module-scope "// vars" section the vertex stage uses (measured: `var<private> nodeVar0 : f32;` WGSL, a
+// bare `float nodeVar0;` GLSL) -- OUTSIDE the slice every fragment-transplant site takes, so the assignment survived
+// and the declaration silently did not ("nodeVar0 undeclared", the same shape as the vertex-side v4551 bug, one layer
+// further down the graph than the ones already fixed). Every site that builds a fragment body must prepend whichever
+// of the fragment's own locals that body actually uses -- _localDeclLines() already finds both shapes; only the
+// caller-specific "is this name referenced" filter and the module-scope-qualifier strip are new here.
+function _usedFragDecls(fragment, body, language) {
+    return _dedupeDecls(_localDeclLines(fragment, language), language)
+        .filter((d) => { const name = _declName(d, language); return name && new RegExp(`\\b${name}\\b`).test(body); })
+        .map((d) => language === "wgsl" ? d.replace(/^var<\w+>\s*/, "var ") : d);
 }
 
 /** The vertex stage's inputs, by name: three's `@location(n) name : type` parameters (WGSL) or `layout(location = n) in type name;` (GLSL). */
@@ -447,6 +465,9 @@ export function transplantIntoShell({ wgsl, glsl }, shell) {
             const bodyAll = em.fragment.split("fn main(")[1]; let b = bodyAll.slice(bodyAll.indexOf("{") + 1, bodyAll.lastIndexOf("}"));
             b = b.replace(/output\.color\s*=\s*([^;]+);\s*return output;/, "return $1;");
             if (!/return /.test(b)) throw new Error("tslSource: the WGSL main() does not end in output.color = ...; return output;");
+            // v4553 -- a fragment-local temporary (r185's hoisted "// vars", e.g. the Chaos race's Lyapunov loop) is used
+            // here but never declared in this slice; see _usedFragDecls's own header.
+            const fDecls = _usedFragDecls(em.fragment, b, "wgsl"); if (fDecls.length) b = fDecls.join("\n") + "\n" + b;
             for (const p of params) { if (computedNames.includes(p.name)) { b = b.replace(new RegExp(`\\b${p.name}\\b`, "g"), `${S.varyingParam}.${p.name}`); continue; } const what = sem[p.name]; const to = what && S.varyings[what]; if (!to) throw new Error(`tslSource: the fragment reads varying ${p.name} (${what || "unknown"}), which the shell "${shell.name}" does not carry (it carries ${Object.keys(S.varyings).join(", ")})`); b = b.replace(new RegExp(`\\b${p.name}\\b`, "g"), to); }
             b = b.replace(/\bobject\.(\w+)/g, `${S.uniformVar}.$1`).replace(/\brender\.(\w+)/g, (_, m) => S.matrices[m]);
             for (const t of textures) if (new RegExp(`\\b${t}_sampler\\b`).test(b)) {   // a SAMPLED texture needs the shell's own sampler; a textureLoad does not
@@ -469,6 +490,8 @@ export function transplantIntoShell({ wgsl, glsl }, shell) {
             const codes = afterCodes.slice(0, codesStop.length ? Math.min(...codesStop) : afterCodes.length).trim();
             const bodyAll = em.fragment.split("void main()")[1]; let b = bodyAll.slice(bodyAll.indexOf("{") + 1, bodyAll.lastIndexOf("}"));
             if (!/fragColor\s*=/.test(b)) throw new Error("tslSource: the GLSL main() does not write fragColor");
+            // v4553 -- see the WGSL branch above: a fragment-local temporary hoisted to "// vars" under r185.
+            const fDecls = _usedFragDecls(em.fragment, b, "glsl"); if (fDecls.length) b = fDecls.join("\n") + "\n" + b;
             for (const n of ins) { const what = sem[n]; const to = what && S.varyings[what]; if (!to) throw new Error(`tslSource: the fragment reads varying ${n} (${what || "unknown"}), which the shell "${shell.name}" does not carry`); b = b.replace(new RegExp(`\\b${n}\\b`, "g"), to); }
             for (const u of uniforms) b = b.replace(new RegExp(`\\bf_${u.name}\\b`, "g"), u.name);
             // v4551 -- r185 drops the "f_" prefix here too (bare `cameraProjectionMatrix`); the optional group keeps
