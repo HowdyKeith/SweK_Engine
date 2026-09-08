@@ -3764,6 +3764,32 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since200: Object.freeze({
+        at: "v4544", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "physics/character/terrainWalk-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 0.21 s (237/201/191 ms over three serial runs). A slope-aware ground controller, built " +
+                 "because physics/character/kinematic.js is an AABB against axis-aligned unit voxels and a voxel " +
+                 "world has no slopes. MEASURED FIRST, which is what said a new file was owed rather than a patch: " +
+                 "on voxelised ramps that controller either cannot climb (0.31x the requested speed at 14 degrees, " +
+                 "0.01x and stuck at 45) or, with a step allowance, climbs while moving along the surface at exactly " +
+                 "sec(theta) -- 1.020x, 1.118x, 1.414x. *** THE ROUND'S CENTRAL CLAIM IS THAT A SLOPE LIMIT MUST BE " +
+                 "A PROPERTY OF THE GROUND AND NOT OF THE FRAME RATE, AND THE CONTROL IS IN THE GATE: *** the " +
+                 "tempting per-step height-difference test climbs a 76-degree wall at 60 and 240 fps and refuses the " +
+                 "SAME WALL at 15 and 30, and climbs 26 units up a 63-degree face at every timestep against a " +
+                 "45-degree limit. The normal-based limit refuses both at all four timesteps. Two oracles are " +
+                 "cross-checked rather than each trusted: a bilinear heightfield gradient and a meshBVH raycast plus " +
+                 "cross product agree to 4.8e-14 in height and EXACTLY in normal over 200 samples. *** TWO DEFECTS " +
+                 "IN MY OWN FIRST DRAFT, BOTH FOUND BY MEASURING RATHER THAN READING: *** an exact 45-degree plane " +
+                 "has n.y one ulp below Math.cos(45 * PI / 180), so a 45-degree ramp was refused to a character " +
+                 "whose limit is 45 degrees; and the airborne branch kept advancing horizontally at the old height, " +
+                 "which is a ground controller FLYING -- 143 substeps sailing over a deck 10 units below. Six " +
+                 "sabotages, all red by name, including a normal taken from a central difference of the samples " +
+                 "instead of the bilinear patch the height comes from.",
+    }),
     since199: Object.freeze({
         at: "v4543", swept: 1, green: 1, red: 0,
         added: Object.freeze([

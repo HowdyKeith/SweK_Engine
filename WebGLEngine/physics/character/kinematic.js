@@ -6,6 +6,16 @@
 // dynamic body's final position depends on an integrator, while this one depends on geometry, and geometry has
 // exact answers.
 //
+// *** AND IT CANNOT WALK ON A SLOPE, WHICH IS NOT A DEFECT HERE AND IS A LIMIT WORTH POINTING AT. *** A voxel
+// world has no slopes -- only staircases of unit lips -- so on a voxelised ramp this controller either cannot
+// climb at all (measured: 0.31x the requested speed at 14 degrees, 0.11x at 26.6, 0.01x and stuck at 45) or,
+// with a step allowance, climbs while moving along the surface at exactly sec(theta) of the speed it was
+// asked for: 1.020x, 1.118x and 1.414x at those same angles. That is the HORIZONTAL speed convention arrived
+// at by accident rather than chosen, and it means you sprint up hills faster than you run on the flat.
+// physics/character/terrainWalk.mjs (v4544) is the slope-aware half, over heightfields and triangle meshes,
+// with the convention named and a slope limit taken from the surface normal. Neither replaces the other:
+// this one is exact against the world it was written for, and that is the reason it exists.
+//
 // WHY AN AABB AND NOT A CAPSULE. The world is axis-aligned unit voxels. An axis-aligned box against axis-aligned
 // boxes has an exact overlap test and an exact resolution; a capsule needs closest-point-on-segment work that
 // buys nothing here except rounder corners. Choosing the shape the world is made of keeps every invariant below

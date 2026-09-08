@@ -211,7 +211,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // the earlier reading was 3878. What survives is the rule the wrong explanation was reaching for: this
     // number is MEASURED every round, never incremented from the last one, and a reason invented to explain a
     // count is worth less than re-taking it. FIVE ROUNDS RUNNING this table has been re-taken by hand.
-    files: 4020,                  // v4526 merge: 3887 -> 4002, this branch's rounds; v4527: 4004; v4528: 4007; v4529: 4009; v4530: 4011; v4533: 4012 (ai-bridge/runBusy.js); v4536: 4014 (physics/mesh/uvUnwrap.mjs and its gate); v4537: 4016 (physics/mesh/uvLscm.mjs and its gate); v4539: 4018 (physics/render/splitSum.mjs and its gate); v4543: 4020 (nav/navmesh.mjs and its gate)
+    files: 4022,                  // v4526 merge: 3887 -> 4002, this branch's rounds; v4527: 4004; v4528: 4007; v4529: 4009; v4530: 4011; v4533: 4012 (ai-bridge/runBusy.js); v4536: 4014 (physics/mesh/uvUnwrap.mjs and its gate); v4537: 4016 (physics/mesh/uvLscm.mjs and its gate); v4539: 4018 (physics/render/splitSum.mjs and its gate); v4543: 4020 (nav/navmesh.mjs and its gate); v4544: 4022 (physics/character/terrainWalk.mjs and its gate)
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
                           // RE-TAKEN TWICE IN TWO ROUNDS, and the second time only because the ship gate
                           // caught it: v4478's re-take was correct for v4478 and stale the moment v4479
@@ -270,7 +270,14 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // gate), and nothing else -- no async, no fetch, no timer, no GPU. Same shape as v4537's uvLscm re-take:
     // the typed-array row is what says the new code carries BUFFERS rather than plain arrays, which for a
     // distance transform over a quarter-million cells is the whole reason it finishes.
-    esModules: 3728, closures: 3606, asyncAwait: 1415, typedArrays: 794, promises: 344,
+    // v4544 -- RE-TAKEN: ES modules and closures by two (physics/character/terrainWalk.mjs and its gate) and
+    // typed arrays by ONE. *** THE NOTE HERE FIRST SAID TYPED ARRAYS DID NOT MOVE AT ALL, WRITTEN BEFORE THE
+    // RE-RUN AND WRONG. *** The split is the interesting part and it took running to see: the MODULE
+    // allocates none -- it reads a heightfield somebody else owns, takes a BVH somebody else built, and
+    // returns plain triples -- and its GATE allocates them, for the fixtures it constructs. v4543's navmesh
+    // moved this row by two because the algorithm itself carries a distance field. Two files either time,
+    // and the row distinguishes code that OWNS buffers from code that is merely handed them.
+    esModules: 3730, closures: 3608, asyncAwait: 1415, typedArrays: 795, promises: 344,
     fetchXhr: 243, performanceNow: 220, raf: 116, webgl: 154, webgpu: 48, threads: 22, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
