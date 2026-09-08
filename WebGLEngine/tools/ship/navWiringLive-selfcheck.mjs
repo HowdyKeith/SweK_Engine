@@ -143,11 +143,90 @@ console.log("\n3. simulation/BotManager.js's MODULE GRAPH LOADS IN A BROWSER, AN
         "syntax rather than the resolution.");
 }
 
+// =============================================================================================================
+console.log("\n4. *** THE BOT YOU CAN SEE STANDS ON THE GROUND YOU CAN SEE, TO THE PIXEL ***");
+{
+    // *** "IT LOOKS RIGHT" NEEDS A REFERENCE NOBODY HAS; AN AGREEMENT BETWEEN TWO PATHS DOES NOT. *** The
+    // harness draws a side elevation of the terrain STRAIGHT FROM THE HEIGHTMAP, then draws the bot from the
+    // CONTROLLER's y, then reads the pixels back. If the renderer and the controller disagree about where
+    // the ground is -- the float/sink bug every character controller can have -- the marker sits off the
+    // silhouette, in pixels, visibly. That is the one visual claim worth asserting here.
+    report("canvas " + R.render.W + "x" + R.render.H + ", " + R.render.samples + " samples along the walk, " +
+           "per-sample feet-minus-terrain in pixels: [" + R.render.gaps.join(", ") + "]");
+    ok("!! *** THE FEET LAND ON THE SILHOUETTE AT EVERY SAMPLE: worst |gap| " + R.render.worstGapPx + " px ***",
+        R.render.worstGapPx === 0 && R.render.samples >= 8,
+        "the terrain is drawn from world._heightAt and the marker from bot.y - 1, and they agree exactly at " +
+        "all " + R.render.samples + " samples, including after the bot stops at the wall. *** THE FIRST TWO " +
+        "READINGS WERE THE PROBE STANDING ON ITS OWN SUBJECT. *** Drawing the 3x3 marker BEFORE reading the " +
+        "column painted over the terrain's top row and every sample read a constant -2 px -- a systematic " +
+        "offset indistinguishable from a real float. Reading first fixed five of nine; the other four were " +
+        "the bot STOPPED at the wall, re-sampling a column an earlier marker already occupied. The " +
+        "silhouette is captured once from the clean render now, so neither ordering hazard exists.");
+    ok("   ...and something was actually drawn, rather than a blank canvas agreeing with itself",
+        R.render.dataUrlBytes > 1500,
+        R.render.dataUrlBytes + " bytes of PNG. A canvas that drew nothing has no silhouette to find and " +
+        "every column would read -1, but a row that only checks a DIFFERENCE cannot tell that apart from " +
+        "agreement, so the size is checked too.");
+}
+
+// =============================================================================================================
+console.log("\n5. *** THE POOL ABOVE TWO WORKERS, AND MORE OF THEM IS NOT FASTER HERE ***");
+{
+    for (const p of R.pools) report(`poolSize ${String(p.size).padStart(2)} -> ${p.workers} workers, ` +
+        `32 jobs in ${String(p.ms).padStart(6)} ms, ${p.found}/32 found`);
+    ok("!! every pool size answers every job -- 1, 2, 4 and 8 workers all return 32 of 32",
+        R.pools.every((p) => p.found === 32 && p.workers === p.size),
+        R.pools.map((p) => p.size + ":" + p.found).join(" ") + ". The pool's own default is " +
+        "Math.max(2, Math.min(4, hardwareConcurrency - 2)).");
+    const one = R.pools.find((p) => p.size === 1), eight = R.pools.find((p) => p.size === 8);
+    ok("!! *** AND MORE WORKERS IS SLOWER ON THIS BOX, WHICH IS A READING RATHER THAN A RULE ***",
+        eight.ms > one.ms,
+        "1 worker " + one.ms + " ms against 8 workers " + eight.ms + " ms for the same 32 jobs. Each worker " +
+        "is a module Worker that must fetch and parse botPathfinder.worker.js AND nav/navmesh.mjs before it " +
+        "answers anything, and on a box with few cores that spin-up is not repaid by 32 jobs. *** NOT " +
+        "ASSERTED AS A PROPERTY OF THE POOL: *** it is one box, and the row above -- that every size is " +
+        "CORRECT -- is the one that would still hold on a machine where eight workers win.");
+}
+
+// =============================================================================================================
+console.log("\n6. *** WHETHER HM_PADDING = 24 IS THE RIGHT WINDOW, WHICH IS NOW A NUMBER ***");
+{
+    for (const p of R.padding) report(`gap ${String(p.gapOffset).padStart(3)} units off the straight line -> ` +
+        `found ${p.found}, route "${p.route}"`);
+    const found = R.padding.filter((p) => p.found).map((p) => p.gapOffset);
+    const lost = R.padding.filter((p) => !p.found).map((p) => p.gapOffset);
+    // *** THE EXPECTED EDGE IS DERIVED FROM THE CONSTANT IN THE SOURCE, NOT PINNED AT 24. *** The first
+    // version of this row asserted only "reachable past 24", which cannot tell a 24-unit window from a
+    // 64-unit one: widening HM_PADDING to 64 left every probed offset reachable, `lost` empty, and the row
+    // GREEN. A row that passes whatever the constant is measures nothing about it.
+    const poolSrc = fs.readFileSync(path.join(ENG, "simulation", "BotPathfinderPool.js"), "utf8");
+    const PAD = Number((poolSrc.match(/const\s+HM_PADDING\s*=\s*(\d+)/) || [])[1]);
+    const GAP_HALF = 6;                       // the harness's gap reaches 6 units either side of its centre
+    const edge = PAD + GAP_HALF;
+    ok("!! *** THE WINDOW'S EDGE IS WHERE HM_PADDING = " + PAD + " PUTS IT: reachable to " + Math.max(...found) +
+        ", gone by " + Math.min(...lost) + ", against a derived " + edge + " ***",
+        Number.isFinite(PAD) && lost.length > 0 && Math.max(...found) <= edge && Math.min(...lost) > edge - 8,
+        "HM_PADDING is read out of simulation/BotPathfinderPool.js rather than typed here. Found at offsets " +
+        found.join(", ") + " and lost at " + lost.join(", ") + ". _heightmapForJob pads " +
+        "the start/goal bounding box by HM_PADDING = 24 and samples ONLY that, and this fixture's gap reaches " +
+        "6 units either side of its centre -- so a detour is reachable out to about 24 + 6 = 30 and not " +
+        "beyond. *** SO THE ANSWER TO 'IS 24 RIGHT' IS THAT IT IS A RANGE LIMIT ON DETOURS RATHER THAN A " +
+        "PERFORMANCE KNOB, *** and nothing in the tree had written down what it costs: a bot whose only way " +
+        "round is wider than the window does not get a long path, it gets NO path, and falls back to " +
+        "steering straight at the thing in its way.");
+    ok("   ...and beyond the window BOTH planners fail, so this is the pool's limit and not the navmesh's",
+        R.padding.filter((p) => !p.found).every((p) => p.route === "grid"),
+        "every lost case falls through to the grid and fails there too: the navmesh declines, the grid is " +
+        "asked, and neither can find a route that is not in the data it was given.");
+}
+
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
-    "\nstill unchecked, and narrower than before: what a bot LOOKS like walking a hill. Nothing in this gate " +
-    "renders a bot -- there is no scene, no camera and no ECS here, only the module graph and the numbers it " +
-    "produces. A visual claim needs a page that mounts BotManager against a real world, and that page does " +
-    "not exist. Also unchecked: the pool on a box with more than " + (R ? R.poolSize : "?") + " workers, and " +
-    "whether HM_PADDING = 24 is the right window -- section 2's finding is that a detour wider than it is " +
-    "simply not in the data either planner receives, which is a round of its own.");
+    "\nstill unchecked: a bot in THE ENGINE'S OWN SCENE. Section 4 renders a side elevation from a heightmap " +
+    "and shows the controller and the render agree on the ground to the pixel, which is the float/sink claim " +
+    "and is worth having -- but it is this gate's canvas, not main.js's world, and nothing here exercises " +
+    "the ECS, the camera, or the meshes a bot is actually drawn with. main.js is the only page that mounts " +
+    "BotManager for real, and booting it headlessly is a much larger surface than one gate should own. Also " +
+    "unchecked: any box but this one -- section 5's reading that more workers is SLOWER is one machine with " +
+    "few cores, and what is asserted there is that every pool size is CORRECT rather than that any size is " +
+    "fastest.");
 process.exit(fails ? 1 : 0);

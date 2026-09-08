@@ -89,6 +89,95 @@ try {
         worstOff = Math.max(worstOff, Math.abs(bot.y - (hillWorld._heightAt(bot.x, bot.z) + 1)));
     }
     results.bot = { x: +bot.x.toFixed(3), y: +bot.y.toFixed(3), worstOff: +worstOff.toExponential(2) };
+
+    // ---- 6. DOES THE BOT YOU CAN SEE STAND ON THE GROUND YOU CAN SEE? ------------------------------------
+    // *** THE ONLY VISUAL CLAIM WORTH ASSERTING IS AN AGREEMENT BETWEEN TWO INDEPENDENT PATHS. *** "It looks
+    // right" needs a reference nobody has. What a render CAN settle is whether the surface drawn from the
+    // heightmap and the height the controller computed are the same surface -- the float/sink bug, where a
+    // character hovers or sinks because the renderer and the collision read different ground. So: draw a side
+    // elevation of the terrain from the heightmap, draw the bot from the CONTROLLER's y, then READ THE PIXELS
+    // BACK and find the terrain's silhouette in the bot's own column. If the two paths agree the marker sits
+    // on the silhouette; if they disagree it floats above or sinks below, in pixels, visibly.
+    const W = 480, H = 200, X0 = 0, X1 = 48, Y0 = -1, Y1 = 17;
+    const cvs = document.createElement("canvas");
+    cvs.width = W; cvs.height = H;
+    const g2 = cvs.getContext("2d", { willReadFrequently: true });
+    const px = (wx) => Math.round((wx - X0) / (X1 - X0) * (W - 1));
+    const py = (wy) => Math.round(H - 1 - (wy - Y0) / (Y1 - Y0) * (H - 1));
+    const hillW = { _heightAt: (x, z) => (x < 40 ? 0.3 * Math.max(0, x - 10) : 52) };
+    g2.fillStyle = "#000"; g2.fillRect(0, 0, W, H);
+    g2.fillStyle = "#0a0";                                  // the terrain, straight from the heightmap
+    for (let c = 0; c < W; c++) {
+        const wx = X0 + c / (W - 1) * (X1 - X0);
+        const top = py(hillW._heightAt(wx, 0));
+        if (top < H) g2.fillRect(c, top, 1, H - top);
+    }
+    // *** THE SILHOUETTE IS CAPTURED ONCE, BEFORE ANY MARKER EXISTS. *** Reading it per sample put the probe
+    // in its own way twice: drawing the marker first painted over the terrain's top row in the column being
+    // read (a constant -2 px on every sample), and once the bot STOPS at the wall it re-samples the SAME
+    // column, so a marker from an earlier iteration occluded the later reads (-2 on the last four). One
+    // capture of the clean render has neither hazard, and the ordering cannot rot.
+    const silhouette = new Int16Array(W).fill(-1);
+    {
+        const all = g2.getImageData(0, 0, W, H).data;
+        for (let c = 0; c < W; c++)
+            for (let r = 0; r < H; r++) {
+                const i = (r * W + c) * 4;
+                if (all[i + 1] > 100 && all[i] < 100) { silhouette[c] = r; break; }
+            }
+    }
+    const b2 = { x: 0, y: 1, z: 0, yaw: 0, spec: { speed: 5 }, path: null, pathIdx: 0 };
+    const bm2 = Object.create(BotManager.prototype); bm2.world = hillW;
+    const samples = [];
+    for (let i = 0; i < 900; i++) {
+        bm2._followPathOrSteer(b2, 200, 0, 1 / 60, 1);
+        if (i % 100 !== 99) continue;
+        const c = px(b2.x);
+        if (c < 0 || c >= W) continue;
+        // the bot's FEET, which is bot.y minus the +1 eye offset BotManager adds
+        const feetRow = py(b2.y - 1);
+        const terrainRow = silhouette[c];
+        g2.fillStyle = "#f0f"; g2.fillRect(c - 1, feetRow - 1, 3, 3);
+        const wxCol = X0 + c / (W - 1) * (X1 - X0);
+        samples.push({ x: +b2.x.toFixed(2), wxCol: +wxCol.toFixed(3), feetY: +(b2.y - 1).toFixed(4),
+            groundAtBot: +hillW._heightAt(b2.x, 0).toFixed(4), groundAtCol: +hillW._heightAt(wxCol, 0).toFixed(4),
+            feetRow, terrainRow, pyGroundAtCol: py(hillW._heightAt(wxCol, 0)),
+            gapPx: terrainRow < 0 ? null : feetRow - terrainRow });
+    }
+    const gaps = samples.filter((s) => s.gapPx !== null).map((s) => s.gapPx);
+    results.render = { W, H, samples: samples.length, detail: samples,
+        worstGapPx: gaps.length ? Math.max(...gaps.map(Math.abs)) : null,
+        gaps, dataUrlBytes: cvs.toDataURL("image/png").length };
+
+    // ---- 7. THE POOL ABOVE TWO WORKERS -------------------------------------------------------------------
+    results.pools = [];
+    for (const size of [1, 2, 4, 8]) {
+        const p2 = new BotPathfinderPool({ world, poolSize: size, jobTimeoutMs: 1500 });
+        const jobs = []; const t0 = performance.now();
+        for (let i = 0; i < 32; i++) jobs.push(p2.plan(20 + (i % 17), 90 + (i % 23), 110, 100));
+        const got = await Promise.all(jobs);
+        results.pools.push({ size, ms: +(performance.now() - t0).toFixed(1), found: got.filter((g) => g.found).length,
+                             workers: p2.workers.length });
+        p2.dispose?.();
+    }
+
+    // ---- 8. IS HM_PADDING = 24 THE RIGHT WINDOW? ---------------------------------------------------------
+    // The pool samples only the start/goal bbox padded by 24. A route whose detour is wider than that is not
+    // in the data either planner receives. This walks the gap outward and finds where the answer changes.
+    results.padding = [];
+    // Swept wide enough to BRACKET the edge wherever it is, rather than at offsets chosen around the value
+    // HM_PADDING happens to have today -- the gate derives its expectation from the constant in the source,
+    // so a round that changes the window moves both sides together and the relationship still has to hold.
+    for (const off of [0, 8, 16, 22, 24, 26, 32, 48, 64, 72, 80, 96]) {
+        const w2 = { _heightAt(x, z) {
+            const inWall = x >= 60 && x <= 68 && !(z >= 100 + off - 6 && z <= 100 + off + 6);
+            return inWall ? 40 : 3;
+        } };
+        const p3 = new BotPathfinderPool({ world: w2, poolSize: 2, jobTimeoutMs: 1500 });
+        const r = await p3.plan(20, 100, 110, 100);
+        results.padding.push({ gapOffset: off, found: r.found, route: r.route });
+        p3.dispose?.();
+    }
 } catch (e) {
     results.errors.push(String(e && e.stack || e).slice(0, 400));
 }
