@@ -3764,6 +3764,33 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since198: Object.freeze({
+        at: "v4539", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "physics/render/splitSum-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 1.14 s. The SPECULAR half of image-based lighting: render/splatProbes.mjs and probeLit.mjs " +
+                 "shipped the diffuse half at v4513/v4514, leaving physics/render's VNDF sampling, multi-scatter " +
+                 "compensation and dielectric walk lit by a diffuse environment and nothing that reflects. " +
+                 "*** THE TABLE IS GRADED AGAINST A NUMBER THE TREE ALREADY HAD RATHER THAN A TOLERANCE: *** at F0 = 1 " +
+                 "Schlick's Fresnel is identically 1, so the split sum's second integral IS the directional albedo, and " +
+                 "energyCompensation.mjs computes that by a different route (marched grid or VNDF sampler, chosen by " +
+                 "albedoEstimator) for a different purpose. Median disagreement 4e-5 over alpha 0.1-1.0; the worst, " +
+                 "6.4e-3, sits at alpha 0.1 / mu 0.2 -- precisely where that reference's own header says it is weakest. " +
+                 "A cross-check whose largest disagreement lands on the reference's stated weak spot is telling you " +
+                 "something. *** AND THE FACTORISATION'S COST IS A NUMBER: *** exactly 0% on a constant environment (an " +
+                 "identity, since the two integrals coincide when L is constant over the lobe), 2.1-4.6% on a gradient, " +
+                 "13.8-32.8% on a small bright light, growing with both lobe width and contrast as a covariance does. " +
+                 "Energy: a LUT baked at 256 samples reads A+B = 1.00016 -- ABOVE ONE -- and at 16,384 reads 0.99889; " +
+                 "the excess shrinks with samples so it is noise and not bias, but an unclamped renderer would return " +
+                 "more light than it received from a table that looks fine. Sabotages A-E all exit 1. *** E'S LOG ENTRY " +
+                 "WAS WRITTEN BEFORE IT WAS RUN AND WAS WRONG: *** it claimed a second sample set would make the uniform " +
+                 "case read ~2%, and it does not -- a constant returns 1 whichever directions you sample. What a second " +
+                 "sample set actually destroys is the MONOTONICITY (spot 13.8 -> 32.8% shared, 15.9 -> 9.8% inverted), " +
+                 "which is why the row asserts an ordering rather than a value.",
+    }),
     since197: Object.freeze({
         at: "v4537", swept: 1, green: 1, red: 0,
         added: Object.freeze([
