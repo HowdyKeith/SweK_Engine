@@ -337,6 +337,243 @@ export function distortion(P, chartTris, uv) {
 }
 
 /**
+ * Rotate a chart's UVs so its bounding box is as small as possible, and return the rotated copy.
+ *
+ * *** A CHART IS PACKED BY ITS BOX AND SOLVED WITHOUT ONE. *** LSCM fixes the map up to a rotation and has no
+ * reason to prefer any particular one, so a long thin chart arrives at whatever diagonal angle the pins left
+ * it at -- and a diagonal strip's axis-aligned box is mostly empty. The rotation costs nothing that matters:
+ * a conformal map composed with a rotation is still conformal and still the same distortion, so this changes
+ * where the chart sits and nothing about how good it is.
+ *
+ * The minimum-area box of a convex hull always has a side flush with a hull edge (Freeman-Shapira), so the
+ * hull's edge directions are the only angles worth trying -- exact, and far fewer than sampling. Fewer than
+ * three hull points means the chart is a sliver or a point and any angle is as good as another.
+ */
+export function orientChart(uv) {
+    const pts = [...uv.values()];
+    if (pts.length < 3) return { uv, angle: 0 };
+    // convex hull, monotone chain
+    const P = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+    const half = (src) => { const h = [];
+        for (const p of src) { while (h.length >= 2 && cross(h[h.length - 2], h[h.length - 1], p) <= 0) h.pop(); h.push(p); }
+        return h; };
+    const hull = half(P).slice(0, -1).concat(half(P.slice().reverse()).slice(0, -1));
+    if (hull.length < 3) return { uv, angle: 0 };
+    let bestA = 0, bestArea = Infinity;
+    for (let i = 0; i < hull.length; i++) {
+        const a = hull[i], b = hull[(i + 1) % hull.length];
+        const th = Math.atan2(b[1] - a[1], b[0] - a[0]);
+        const c = Math.cos(-th), s2 = Math.sin(-th);
+        let lo = [Infinity, Infinity], hi = [-Infinity, -Infinity];
+        for (const [x, y] of hull) {
+            const rx = x * c - y * s2, ry = x * s2 + y * c;
+            if (rx < lo[0]) lo[0] = rx; if (rx > hi[0]) hi[0] = rx;
+            if (ry < lo[1]) lo[1] = ry; if (ry > hi[1]) hi[1] = ry;
+        }
+        const area = (hi[0] - lo[0]) * (hi[1] - lo[1]);
+        if (area < bestArea) { bestArea = area; bestA = th; }
+    }
+    const c = Math.cos(-bestA), s2 = Math.sin(-bestA);
+    const out = new Map();
+    for (const [k, [x, y]] of uv) out.set(k, [x * c - y * s2, x * s2 + y * c]);
+    out.residual = uv.residual;
+    return { uv: out, angle: bestA };
+}
+
+/**
+ * Split any chart that overlaps itself, until none does.
+ *
+ * *** DETECTION WITHOUT REPAIR IS HALF AN ANSWER, AND THE OVERLAPS ARE NOT THE MERGER'S FAULT. *** Two charts
+ * of RobotExpressive's ORIGINAL 735 already overlapped -- 20-triangle strips, conformal 1.0008, zero flips,
+ * residual 6.4e-13, so locally flawless and fully converged, with two triangles three hops apart in the chart
+ * landing on each other in the plane. They were there before any merging and nothing could see them. Rejecting
+ * merges is not enough when the input already contains the fault.
+ *
+ * A chart that overlaps is bisected by breadth-first order from its first triangle -- the halves are connected
+ * by construction, which a random split would not be -- and each half is re-checked. A chart that will not
+ * come clean is reduced to single triangles, which cannot overlap themselves; that is a worse atlas and it is
+ * a correct one, and the count of splits is returned so the cost is visible rather than absorbed.
+ */
+export function splitOverlapping(P, tris, chartList, { maxDepth = 8 } = {}) {
+    const out = [];
+    const stats = { split: 0, singles: 0 };
+    const clean = (members, depth) => {
+        if (members.length < 2) { out.push(members); return; }
+        const T = members.map((i) => tris[i]);
+        const uv = lscm(P, T);
+        if (uv && selfOverlaps(T, uv).pairs === 0) { out.push(members); return; }
+        if (depth >= maxDepth) { stats.singles += members.length; for (const m of members) out.push([m]); return; }
+        stats.split++;
+        // BFS from the first triangle so both halves stay connected
+        const set = new Set(members), order = [], seen = new Set([members[0]]);
+        const q = [members[0]];
+        const eT = new Map();
+        for (const t of members) for (const [a, b] of [[tris[t][0], tris[t][1]], [tris[t][1], tris[t][2]], [tris[t][2], tris[t][0]]]) {
+            const k = a < b ? a + "_" + b : b + "_" + a; if (!eT.has(k)) eT.set(k, []); eT.get(k).push(t);
+        }
+        while (q.length) {
+            const t = q.shift(); order.push(t);
+            for (const [a, b] of [[tris[t][0], tris[t][1]], [tris[t][1], tris[t][2]], [tris[t][2], tris[t][0]]]) {
+                const k = a < b ? a + "_" + b : b + "_" + a;
+                for (const u of eT.get(k)) if (set.has(u) && !seen.has(u)) { seen.add(u); q.push(u); }
+            }
+        }
+        for (const m of members) if (!seen.has(m)) order.push(m);
+        const half = Math.max(1, Math.floor(order.length / 2));
+        clean(order.slice(0, half), depth + 1);
+        clean(order.slice(half), depth + 1);
+    };
+    for (const m of chartList) clean(m, 0);
+    return { charts: out, stats };
+}
+
+/**
+ * *** MERGE CHARTS UNTIL THE MEASUREMENT SAYS STOP, RATHER THAN UNTIL AN ANGLE SAYS STOP. ***
+ *
+ * charts() grows regions on a fixed normal-deviation limit, and a fixed angle is a PROXY for distortion: it
+ * refuses merges that would have been fine and permits ones that are not. On RobotExpressive it produced 735
+ * charts for 3,234 triangles -- 4.4 triangles each, with 42.2% of the mesh's shared edges cut. Every one of
+ * those cuts is a seam a texture artist has to hide.
+ *
+ * This merges adjacent charts and asks the ACTUAL QUESTION of each candidate: flatten the union and look at
+ * it. A merge is accepted only if the union is still a disk, LSCM converges on it, its conformal distortion
+ * stays under the bound, NO triangle flips, and -- the check that only exists as of this round -- the chart
+ * does not overlap itself. That last one is why merging could not honestly be done before: an aggressive merge
+ * curls a chart until its far end lands on its near end, with every triangle still correctly oriented and
+ * every per-triangle metric still perfect.
+ *
+ * Pairs are tried longest-shared-boundary first, because that is the merge that removes the most seam per
+ * accepted solve. A rejected pair is never retried against the same partner, but both sides stay live for
+ * other partners -- so one bad neighbour does not freeze a chart.
+ */
+export function mergeCharts(P, tris, chartList, { maxConformal = 2.0, maxRounds = 12 } = {}) {
+    let cur = chartList.map((m) => m.slice());
+    const stats = { tried: 0, accepted: 0, rejectedDisk: 0, rejectedDistortion: 0, rejectedOverlap: 0, rounds: 0 };
+    const key = (a, b) => (a < b ? a + "_" + b : b + "_" + a);
+    for (let round = 0; round < maxRounds; round++) {
+        stats.rounds++;
+        const owner = new Map();
+        cur.forEach((m, ci) => m.forEach((t) => owner.set(t, ci)));
+        // shared boundary length between chart pairs, in 3D
+        const shared = new Map();
+        const eTris = new Map();
+        for (const t of owner.keys()) for (const [a, b] of [[tris[t][0], tris[t][1]], [tris[t][1], tris[t][2]], [tris[t][2], tris[t][0]]]) {
+            const k = key(a, b); if (!eTris.has(k)) eTris.set(k, []); eTris.get(k).push(t);
+        }
+        for (const [ek, ts] of eTris) {
+            if (ts.length !== 2) continue;
+            const ca = owner.get(ts[0]), cb = owner.get(ts[1]);
+            if (ca === cb) continue;
+            const [a, b] = ek.split("_").map(Number);
+            const L = len(sub(P, a, b));
+            const pk = key(ca, cb);
+            shared.set(pk, (shared.get(pk) || 0) + L);
+        }
+        const order = [...shared.entries()].sort((x, y) => y[1] - x[1]);
+        const dead = new Set();
+        let acceptedThisRound = 0;
+        for (const [pk] of order) {
+            const [ca, cb] = pk.split("_").map(Number);
+            if (dead.has(ca) || dead.has(cb)) continue;
+            stats.tried++;
+            const union = cur[ca].concat(cur[cb]);
+            const T = union.map((i) => tris[i]);
+            // Euler: the union must still be a disk
+            const V = new Set(), E = new Set();
+            for (const t of T) { for (const v of t) V.add(v);
+                for (const [a, b] of [[t[0], t[1]], [t[1], t[2]], [t[2], t[0]]]) E.add(key(a, b)); }
+            if (V.size - E.size + T.length !== 1) { stats.rejectedDisk++; continue; }
+            const uv = lscm(P, T);
+            if (!uv) { stats.rejectedDistortion++; continue; }
+            const d = distortion(P, T, uv);
+            if (d.flipped > 0 || d.conformal.max > maxConformal) { stats.rejectedDistortion++; continue; }
+            if (selfOverlaps(T, uv).pairs > 0) { stats.rejectedOverlap++; continue; }
+            cur[ca] = union; cur[cb] = [];
+            dead.add(ca); dead.add(cb);          // both settle for this round; they merge again in the next
+            stats.accepted++; acceptedThisRound++;
+        }
+        cur = cur.filter((m) => m.length);
+        if (!acceptedThisRound) break;
+    }
+    return { charts: cur, stats };
+}
+
+/**
+ * *** DOES THIS CHART OVERLAP ITSELF? -- the question the flip count cannot answer. ***
+ *
+ * distortion() reports `flipped`, the number of triangles whose Jacobian determinant went negative. That is a
+ * LOCAL test and self-overlap is a GLOBAL property: a chart can wrap around and land on top of itself with
+ * every triangle correctly oriented, and every per-triangle metric will call it perfect. v4537 said exactly
+ * that in its own "not claimed" and left it open. This closes it.
+ *
+ * Two UV triangles overlap if an edge of one crosses an edge of the other, OR if one contains a vertex of the
+ * other -- the second case is what catches containment, which no edge crossing shows. Triangles sharing a mesh
+ * vertex are skipped: they are adjacent in the chart and touch by construction.
+ *
+ * A uniform grid over the chart's UV bounds keeps this near-linear instead of quadratic; the cell is the mean
+ * triangle extent, so similar triangles give a few candidates per cell and one giant triangle degrades to the
+ * honest quadratic rather than to missed pairs.
+ */
+export function selfOverlaps(chartTris, uv, { maxPairs = 4e6 } = {}) {
+    const n = chartTris.length;
+    if (n < 2) return { pairs: 0, checked: 0, truncated: false };
+    const box = chartTris.map((T) => {
+        const a = uv.get(T[0]), b = uv.get(T[1]), c = uv.get(T[2]);
+        if (!a || !b || !c) return null;
+        return { lo: [Math.min(a[0], b[0], c[0]), Math.min(a[1], b[1], c[1])],
+                 hi: [Math.max(a[0], b[0], c[0]), Math.max(a[1], b[1], c[1])], a, b, c };
+    });
+    let lo = [Infinity, Infinity], hi = [-Infinity, -Infinity], ext = 0, live = 0;
+    for (const B of box) { if (!B) continue; live++;
+        lo[0] = Math.min(lo[0], B.lo[0]); lo[1] = Math.min(lo[1], B.lo[1]);
+        hi[0] = Math.max(hi[0], B.hi[0]); hi[1] = Math.max(hi[1], B.hi[1]); 
+        ext += Math.max(B.hi[0] - B.lo[0], B.hi[1] - B.lo[1]); }
+    if (live < 2) return { pairs: 0, checked: 0, truncated: false };
+    const cell = Math.max((ext / live) || 0, 1e-12);
+    const nx = Math.max(1, Math.min(512, Math.ceil((hi[0] - lo[0]) / cell)));
+    const ny = Math.max(1, Math.min(512, Math.ceil((hi[1] - lo[1]) / cell)));
+    const grid = new Map();
+    const cx = (x) => Math.max(0, Math.min(nx - 1, Math.floor((x - lo[0]) / ((hi[0] - lo[0]) || 1) * nx)));
+    const cy = (y) => Math.max(0, Math.min(ny - 1, Math.floor((y - lo[1]) / ((hi[1] - lo[1]) || 1) * ny)));
+    for (let i = 0; i < n; i++) { const B = box[i]; if (!B) continue;
+        for (let gx = cx(B.lo[0]); gx <= cx(B.hi[0]); gx++) for (let gy = cy(B.lo[1]); gy <= cy(B.hi[1]); gy++) {
+            const k = gx * ny + gy; if (!grid.has(k)) grid.set(k, []); grid.get(k).push(i);
+        } }
+    const seen = new Set();
+    let pairs = 0, checked = 0, truncated = false;
+    const cr = (o, p, q) => (p[0] - o[0]) * (q[1] - o[1]) - (p[1] - o[1]) * (q[0] - o[0]);
+    const segCross = (p1, p2, p3, p4) => {
+        const d1 = cr(p3, p4, p1), d2 = cr(p3, p4, p2), d3 = cr(p1, p2, p3), d4 = cr(p1, p2, p4);
+        return ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0));
+    };
+    const inside = (p, A) => {
+        const s = cr(A.a, A.b, p), t = cr(A.b, A.c, p), u = cr(A.c, A.a, p);
+        return (s > 0 && t > 0 && u > 0) || (s < 0 && t < 0 && u < 0);
+    };
+    outer:
+    for (const bucket of grid.values()) {
+        for (let x = 0; x < bucket.length; x++) for (let y = x + 1; y < bucket.length; y++) {
+            const i = bucket[x], j = bucket[y], key = i * n + j;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            if (++checked > maxPairs) { truncated = true; break outer; }
+            const Ti = chartTris[i], Tj = chartTris[j];
+            if (Ti.some((v) => Tj.includes(v))) continue;
+            const A = box[i], B = box[j];
+            if (!A || !B) continue;
+            if (A.hi[0] < B.lo[0] || B.hi[0] < A.lo[0] || A.hi[1] < B.lo[1] || B.hi[1] < A.lo[1]) continue;
+            const ea = [[A.a, A.b], [A.b, A.c], [A.c, A.a]], eb = [[B.a, B.b], [B.b, B.c], [B.c, B.a]];
+            let hit = false;
+            for (const [p1, p2] of ea) { for (const [p3, p4] of eb) if (segCross(p1, p2, p3, p4)) { hit = true; break; } if (hit) break; }
+            if (!hit) hit = inside(A.a, B) || inside(B.a, A);
+            if (hit) pairs++;
+        }
+    }
+    return { pairs, checked, truncated };
+}
+
+/**
  * Weld, segment, flatten each chart, pack them into [0,1]. The whole pipeline, on one mesh.
  *
  * *** PADDING IS IN TEXELS, AND THE FIRST VERSION'S ABSOLUTE 0.02 COST 96% OF THE TEXTURE. *** Charts come out
@@ -354,16 +591,25 @@ export function distortion(P, chartTris, uv) {
  * depends on it.
  */
 export function unwrapCurved(positions, indices,
-        { maxNormalDeg = 40, paddingTexels = 2, textureSize = 1024, relTol = 1e-6 } = {}) {
+        { maxNormalDeg = 40, paddingTexels = 2, textureSize = 1024, relTol = 1e-6,
+          merge = true, maxConformal = 2.0, orient = true } = {}) {
     const w = weld(positions, indices, { relTol });
-    const cs = charts(w.positions, w.tris, { maxNormalDeg });
+    let cs = charts(w.positions, w.tris, { maxNormalDeg });
+    const grown = cs.length;
+    let mergeStats = null, splitStats = null;
+    if (merge) {
+        const m = mergeCharts(w.positions, w.tris, cs, { maxConformal });
+        const sp = splitOverlapping(w.positions, w.tris, m.charts);
+        cs = sp.charts; mergeStats = m.stats; splitStats = sp.stats;
+    }
     const laid = [];
     let worstResidual = 0;
     for (const members of cs) {
         const T = members.map((i) => w.tris[i]);
-        const uv = lscm(w.positions, T);
+        let uv = lscm(w.positions, T);
         if (!uv) continue;
         worstResidual = Math.max(worstResidual, uv.residual || 0);
+        if (orient) uv = orientChart(uv).uv;
         let lo = [Infinity, Infinity], hi = [-Infinity, -Infinity];
         for (const [u, v] of uv.values()) {
             if (u < lo[0]) lo[0] = u; if (u > hi[0]) hi[0] = u;
@@ -387,7 +633,8 @@ export function unwrapCurved(positions, indices,
         for (const [v, [u, vv]] of c.uv) m.set(v, [(p.x + u - c.lo[0]) / span, (p.y + vv - c.lo[1]) / span]);
         out.push({ tris: c.tris, uv: m });
     }
-    return { weld: w, charts: out, atlas: { span }, chartCount: out.length, worstResidual };
+    return { weld: w, charts: out, atlas: { span }, chartCount: out.length, worstResidual,
+             grown, mergeStats, splitStats };
 }
 
 export function reportLines(mesh = null) {
@@ -395,7 +642,7 @@ export function reportLines(mesh = null) {
     if (!mesh) { out.push("  (no mesh given -- pass { positions, indices })"); return out; }
     const r = unwrapCurved(mesh.positions, mesh.indices);
     out.push(`  weld            ${r.weld.vertsBefore} -> ${r.weld.vertsAfter} vertices (${(100 * (1 - r.weld.vertsAfter / r.weld.vertsBefore)).toFixed(1)}% duplicates)`);
-    out.push(`  charts          ${r.chartCount}`);
+    out.push(`  charts          ${r.grown} grown -> ${r.chartCount} after merging on measured distortion`);
     let worstC = 0, flips = 0, tris = 0;
     for (const c of r.charts) { const d = distortion(r.weld.positions, c.tris, c.uv);
         worstC = Math.max(worstC, d.conformal.max); flips += d.flipped; tris += c.tris.length; }
@@ -403,5 +650,15 @@ export function reportLines(mesh = null) {
     out.push(`  conformal worst ${worstC.toFixed(4)}  (1 = angles preserved exactly)`);
     out.push(`  flipped         ${flips}`);
     out.push(`  solver residual ${r.worstResidual.toExponential(2)}  (relative, worst chart)`);
+    let ov = 0, tri = 0;
+    for (const c of r.charts) {
+        ov += selfOverlaps(c.tris, c.uv).pairs;
+        for (const T of c.tris) {
+            const a = c.uv.get(T[0]), b = c.uv.get(T[1]), d = c.uv.get(T[2]);
+            tri += Math.abs((b[0] - a[0]) * (d[1] - a[1]) - (b[1] - a[1]) * (d[0] - a[0])) / 2;
+        }
+    }
+    out.push(`  self-overlaps   ${ov}   (the fold a per-triangle flip count cannot see)`);
+    out.push(`  atlas coverage  ${(100 * tri).toFixed(1)}%  of the texture holds surface`);
     return out;
 }
