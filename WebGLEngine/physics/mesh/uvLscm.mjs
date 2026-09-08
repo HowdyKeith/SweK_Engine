@@ -883,6 +883,51 @@ export function unwrapCurved(positions, indices,
              nestFellBack };
 }
 
+/**
+ * *** THE SHAPE A CONSUMER CAN ACTUALLY TAKE, WHICH IS NOT THE SHAPE A CHART LIST IS. ***
+ *
+ * unwrapCurved returns charts: per-chart maps from a WELDED vertex index to a UV. That is the right form for
+ * measuring an unwrap and the wrong form for using one, and it is a fair part of why five rounds of this file
+ * had no consumer -- nothing could hand its output to an exporter without first solving the problem below.
+ *
+ * UVs ARE PER-CORNER AND A MESH IS PER-VERTEX. A vertex on a seam belongs to two charts and has a different UV
+ * in each, so it cannot survive as one vertex in a buffer that carries one UV per index. It has to be SPLIT --
+ * one copy per chart that uses it -- and that is the step every exporter needs and no measurement did.
+ *
+ * Measured on RobotExpressive: of 1,759 welded vertices, 853 (48.5%) sit on a seam and need 1,187 extra
+ * copies, giving 2,946. THAT IS STILL 59% FEWER THAN THE 7,214 THE FILE SHIPS WITH -- the weld removes far
+ * more duplication than the seams add back, so the mesh comes out smaller AND carries UVs it never had.
+ */
+export function unwrapToMesh(positions, indices, opts = {}) {
+    // `from` lets a caller that already has an unwrap reuse it. The gate needs both the chart form and the
+    // mesh form of the SAME unwrap, and paying for a second 500 ms solve to look at the same answer twice is
+    // how a gate ends up over the sweep budget.
+    const r = opts.from || unwrapCurved(positions, indices, opts);
+    const P = r.weld.positions;
+    const out = { positions: [], indices: [], uvs: [] };
+    const copyOf = new Map();                 // "vertex|chart" -> new index
+    r.charts.forEach((c, ci) => {
+        for (const T of c.tris) {
+            for (const v of T) {
+                const k = v + "|" + ci;
+                if (copyOf.has(k)) continue;
+                const uv = c.uv.get(v);
+                if (!uv) continue;
+                copyOf.set(k, out.positions.length / 3);
+                out.positions.push(P[3 * v], P[3 * v + 1], P[3 * v + 2]);
+                out.uvs.push(uv[0], uv[1]);
+            }
+            const a = copyOf.get(T[0] + "|" + ci), b = copyOf.get(T[1] + "|" + ci), d = copyOf.get(T[2] + "|" + ci);
+            if (a === undefined || b === undefined || d === undefined) continue;
+            out.indices.push(a, b, d);
+        }
+    });
+    return { positions: Float32Array.from(out.positions), indices: Uint32Array.from(out.indices),
+             uvs: Float32Array.from(out.uvs),
+             weldedVerts: r.weld.vertsAfter, seamCopies: (out.positions.length / 3) - r.weld.vertsAfter,
+             charts: r.chartCount, unwrap: r };
+}
+
 export function reportLines(mesh = null) {
     const out = ["[uvLscm] curved unwrap: weld, segment, conformal-flatten, pack"];
     if (!mesh) { out.push("  (no mesh given -- pass { positions, indices })"); return out; }

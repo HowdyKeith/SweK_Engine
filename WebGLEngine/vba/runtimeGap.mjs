@@ -250,7 +250,11 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // and closures again, and TYPED ARRAYS this time -- 788 -> 790 -- because a conformal solver carries
     // Float64Array coordinates and Int32Array index maps where the planar unwrapper carried plain arrays. The
     // row that moves says what the new code IS, which is the argument for re-deriving all twelve every run.
-    esModules: 3724, closures: 3602, asyncAwait: 1414, typedArrays: 790, promises: 343,
+    // v4538 -- RE-TAKEN: typed arrays ALONE moved, 790 -> 792, and no other row. The two files are
+    // physics/mesh/uvUnwrap.mjs and its gate, which gained Float32Array/Uint32Array when polysToMesh started
+    // returning a mesh an exporter can take; nothing else about them changed shape. The row that moves says
+    // what the new code IS, which is the argument for re-deriving all twelve every run.
+    esModules: 3724, closures: 3602, asyncAwait: 1414, typedArrays: 792, promises: 343,
     fetchXhr: 243, performanceNow: 220, raf: 116, webgl: 154, webgpu: 48, threads: 22, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

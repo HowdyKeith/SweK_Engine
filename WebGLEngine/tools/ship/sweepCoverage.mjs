@@ -154,6 +154,17 @@ export const RETURNED_AT_V4529 = Object.freeze({
                  "then 3,014 ms from the v4536 ship sweep -- one file, unchanged throughout. Retiring it on the " +
                  "quiet readings was right on the evidence available and wrong within a day, so it is recorded " +
                  "here with both rather than moved a third time." }),
+        // *** AND traderGraph, THE SECOND OF THE TWO RETIRED AT v4536, BACK BY THE SAME ROUTE TWO DAYS LATER. ***
+        // Both gates retired that day have now returned to this roll, which is the clearest statement yet that
+        // the roll is tracking the machine: 3,096 / 2,460 / 2,631 ms across three serial runs TAKEN TOGETHER --
+        // a 26% spread within one minute on one unchanged file, straddling the budget inside a single sample.
+        Object.freeze({ gate: "tools/ship/traderGraph-selfcheck.mjs", recordedWas: 3368, v4461Ms: 2793, hereMs: 3008,
+            quietMs: Object.freeze([2729, 2344, 2659]),
+            why: "straddles the 3,000 ms budget and cannot be pinned either side of it: 2,933 / 3,083 / 2,719 / " +
+                 "3,123 / 3,152 ms at v4529, 2,729 / 2,344 / 2,659 quiet at v4536, 3,008 from the v4538 sweep, " +
+                 "and 3,096 / 2,460 / 2,631 serially straight after -- a 26% spread inside ONE minute. Retiring " +
+                 "it on the quiet readings was right on the evidence and wrong within two days, exactly as " +
+                 "meshLine was, so it is recorded with both rather than moved a third time." }),
     ]),
     returnedAt_v4535: Object.freeze([
         Object.freeze({ gate: "tools/ship/traderGraph-selfcheck.mjs", overMs: 3152,

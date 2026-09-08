@@ -16,7 +16,8 @@
 // A gate that only measured the first would call a sphere perfectly unwrapped.
 import fs from "node:fs";
 import { weld, charts, lscm, distortion, unwrapCurved, triNormal,
-         selfOverlaps, mergeCharts, splitOverlapping, orientChart, rasterPack } from "./uvLscm.mjs";
+         selfOverlaps, mergeCharts, splitOverlapping, orientChart, rasterPack, unwrapToMesh } from "./uvLscm.mjs";
+import { writeSceneGlb } from "../../tools/export/sceneGlb.mjs";
 import { parseGLB, sphereMesh } from "./glb.mjs";
 import { rectsOverlap } from "./uvUnwrap.mjs";
 import { fileURLToPath } from "node:url";
@@ -516,6 +517,49 @@ console.log("\n11. *** THE PAD HAS TO WORK SIDEWAYS, AND FOR THREE ROUNDS IT ONL
        "tuned constant: the verify loop makes every one of those resolutions CORRECT, only some of them cheap.");
 }
 
+console.log("\n12. *** A CONSUMER, WHICH IS THE THING FIVE ROUNDS OF THIS FILE DID NOT HAVE ***");
+{
+    // tools/ship/orphanTriage.mjs put physics/mesh/uvLscm.mjs in its actionable pile -- "ungradedPhysics +
+    // hasOwnGate" -- and it was right: nothing in the tree called it. Part of the reason is that unwrapCurved
+    // returns CHARTS, which is the right form for measuring an unwrap and a form no exporter can take.
+    const M = unwrapToMesh(glb.positions, glb.indices, { from: R });
+    ok("!! *** UVs ARE PER-CORNER AND A MESH IS PER-VERTEX: the seam split is what reconciles them ***",
+       M.seamCopies > 0 && M.positions.length / 3 === M.uvs.length / 2 &&
+       M.indices.length === R.charts.reduce((n, c) => n + c.tris.length, 0) * 3,
+       `${M.weldedVerts} welded vertices + ${M.seamCopies} seam copies = ${M.positions.length / 3}, one UV each, ` +
+       `${M.indices.length / 3} triangles. 48.5% of the welded vertices sit on a seam and cannot survive as one ` +
+       `vertex in a buffer carrying one UV per index. *** AND THE RESULT IS STILL 59% SMALLER THAN THE FILE ` +
+       `SHIPS: ${M.positions.length / 3} against ${glb.positions.length / 3} *** -- the weld removes far more ` +
+       "duplication than the seams add back, so the mesh comes out smaller AND carries UVs it never had.");
+
+    // *** THE CONTAINER IS DECODED BY HAND, per the glTF 2.0 spec, rather than through our own reader: a
+    // writer and a reader from the same tree agreeing with each other proves they share a convention, not
+    // that either is right. ***
+    const bytes = Uint8Array.from(writeSceneGlb({ meshes: [{ positions: M.positions, indices: M.indices, uvs: M.uvs }] }));
+    const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const jlen = dv.getUint32(12, true);
+    const json = JSON.parse(new TextDecoder().decode(bytes.subarray(20, 20 + jlen)));
+    const prim = json.meshes[0].primitives[0];
+    const acc = json.accessors[prim.attributes.TEXCOORD_0 ?? -1];
+    const pacc = json.accessors[prim.attributes.POSITION];
+    let worst = Infinity, lo = 0, hi = 0;
+    if (acc) {
+        const bv = json.bufferViews[acc.bufferView];
+        const uv = new Float32Array(bytes.buffer, bytes.byteOffset + 20 + jlen + 8 + (bv.byteOffset || 0) + (acc.byteOffset || 0), acc.count * 2);
+        worst = 0; lo = Infinity; hi = -Infinity;
+        for (let i = 0; i < uv.length; i++) { worst = Math.max(worst, Math.abs(uv[i] - M.uvs[i]));
+            if (uv[i] < lo) lo = uv[i]; if (uv[i] > hi) hi = uv[i]; }
+    }
+    ok("!! *** THE ASSET reskin.js CALLS UNTEXTURABLE ROUND-TRIPS THROUGH A GLB CARRYING TEXCOORD_0 ***",
+       !!acc && acc.type === "VEC2" && acc.componentType === 5126 &&
+       acc.count === M.uvs.length / 2 && pacc.count === acc.count && worst === 0 && lo >= 0 && hi <= 1,
+       `${bytes.length}-byte GLB: attributes ${Object.keys(prim.attributes).join(" + ")}, TEXCOORD_0 is ` +
+       `${acc ? acc.type : "ABSENT"}/${acc ? acc.componentType : "-"} with ${acc ? acc.count : 0} entries, ` +
+       `POSITION count matches, and the values read back differ from what was written by ${worst.toExponential(1)} ` +
+       `over the range [${lo.toFixed(4)}, ${hi.toFixed(4)}]. tools/export/reskin.js: "NO TEXCOORD_0 AND NO ` +
+       'TEXTURE AT ALL ... the simple path is not wrong, it is unavailable ON THIS ASSET." It is available now.');
+}
+
 // ---- SABOTAGE LOG -- graded on EXIT CODES, each restored before the next --------------------------------------
 //   A weld disabled                    E localFrame drops the height    K containment branch dropped
 //   B disk guard removed               F Cauchy-Riemann sign flipped    L splitOverlapping never splits
@@ -523,6 +567,7 @@ console.log("\n11. *** THE PAD HAS TO WORK SIDEWAYS, AND FOR THREE ROUNDS IT ONL
 //   D iteration budget pinned at 400   H padding back to absolute 0.02  N edge-sharing fold test removed
 //   I merge ignores self-overlap       J orientChart no-op              O raster centre-samples
 //   Q atlas width not balanced         R skyline dilation removed
+//   S seam split reuses one vertex     T unwrapToMesh returns no uvs
 // All exit 1.  P -- the packer's verify-and-repair loop -- is recorded as NOT EXERCISED; see below.
 //
 // *** SEVEN OF THESE HAVE GONE 0 RED AT SOME POINT AND NOT ONE WAS THE GATE BEING RIGHT. *** Five reasons, and

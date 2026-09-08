@@ -205,6 +205,44 @@ export function defaultSubject() {
     return faces.map((f) => ({ vs: f.map(v) }));
 }
 
+/**
+ * *** THE CALLER THAT ASKED FOR THIS, ANSWERED. ***
+ *
+ * physics/mesh/meshCSG.mjs tags every polygon a boolean produces SKIN or CUT, and says why in its own header:
+ * the CUT faces are "freshly exposed interior that did not exist a moment ago and has no texture coordinates,
+ * because nothing unwrapped a surface that had not been made yet". It has carried that tag, and that
+ * sentence, waiting for something to be able to use it.
+ *
+ * This turns a boolean's output into a mesh with UVs. The polygons are convex and planar -- meshCSG guarantees
+ * both, and its `pl` field already carries each plane -- so a fan triangulation is exact and the planar
+ * unwrapper above is a complete answer rather than an approximation: projection into a polygon's own plane is
+ * an isometry, so these UVs carry no distortion at all.
+ *
+ * `only` selects which faces to unwrap. Passing "cut" gives exactly the surface meshCSG says has no
+ * coordinates, and leaves a caller's existing SKIN parameterisation alone.
+ */
+export function polysToMesh(polys, { only = null, ...opts } = {}) {
+    const chosen = only ? polys.filter((p) => p.src === only) : polys.slice();
+    if (!chosen.length) return { positions: new Float32Array(0), indices: new Uint32Array(0),
+                                 uvs: new Float32Array(0), polys: 0, triangles: 0 };
+    const r = unwrap(chosen, opts);
+    const positions = [], indices = [], uvs = [];
+    chosen.forEach((poly, i) => {
+        const uv = r.uvs[i];
+        if (!uv) return;
+        const base = positions.length / 3;
+        for (let k = 0; k < poly.vs.length; k++) {
+            positions.push(poly.vs[k][0], poly.vs[k][1], poly.vs[k][2]);
+            uvs.push(uv[k][0], uv[k][1]);
+        }
+        // fan from the first corner: exact for a convex polygon, which is what a BSP boolean emits
+        for (let k = 1; k + 1 < poly.vs.length; k++) indices.push(base, base + k, base + k + 1);
+    });
+    return { positions: Float32Array.from(positions), indices: Uint32Array.from(indices),
+             uvs: Float32Array.from(uvs), polys: chosen.length, triangles: indices.length / 3,
+             atlas: r.atlas, textureOccupancy: r.textureOccupancy };
+}
+
 export function reportLines(polys = null) {
     const out = ["[uvUnwrap] planar charts, one atlas, one scale"];
     let subject = "given";

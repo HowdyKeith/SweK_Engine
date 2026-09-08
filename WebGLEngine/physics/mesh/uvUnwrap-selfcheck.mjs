@@ -11,8 +11,9 @@
 // The headline is a number and not an adjective: UNIFORM TEXEL DENSITY, measured as the spread of (3D edge
 // length / UV edge length) across every edge. "Low distortion" is unfalsifiable; a spread at float epsilon is
 // not.
-import { planeBasis, projectPoly, shelfPack, unwrap, texelDensity, rectsOverlap } from "./uvUnwrap.mjs";
-import { subtract, planeOf } from "./meshCSG.mjs";
+import { planeBasis, projectPoly, shelfPack, unwrap, texelDensity, rectsOverlap, polysToMesh } from "./uvUnwrap.mjs";
+import { subtract, planeOf, SKIN, CUT } from "./meshCSG.mjs";
+import { writeSceneGlb } from "../../tools/export/sceneGlb.mjs";
 
 let fails = 0;
 const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  ") + name + (detail ? "   " + detail : "")); if (!cond) fails++; };
@@ -169,27 +170,91 @@ console.log("\n5. what this does NOT handle, shown failing rather than described
        empty.uvs.length === 0 && empty.scale === 0 && empty.atlas.w === 0);
 }
 
-// ---- SABOTAGE LOG -- graded on EXIT CODES, restored after each ------------------------------------------------
-//   A  basis seed fixed to [0,1,0], the textbook spelling      4 RED
-//   B  v scaled by 1/height instead of the shared span         1 RED  (see below -- it took three tries)
-//   C  the packer never starts a new shelf                     2 RED
-//   D  projectPoly does not re-origin a chart to its corner    1 RED
-//   E  the height-descending sort becomes a no-op              1 RED  (0 RED before the row went strict)
-//   F  the strip-width search is cut to a single candidate     1 RED
-//   G  3D edge length computed in xy only, ignoring z          2 RED
-//
-// *** B IS THE ENTRY WORTH READING, BECAUSE IT WENT 0 RED TWICE AND NEITHER TIME WAS THE CHECK'S FAULT. ***
-// The whole point of one shared scale is that u and v cannot drift apart, so scaling one axis by its own
-// dimension should be the loudest sabotage here. It changed NOTHING -- twice. `scale` is 1/max(width, height),
-// so whichever axis IS the maximum has 1/dimension and 1/span equal by arithmetic, and a sabotage aimed at
-// that axis is a no-op no matter how wrong it looks. First attempt hit the tall axis when the atlas was tall;
-// then fixing the packer made the atlas WIDE, and the second attempt hit the wide one. Only the non-dominant
-// axis is observable, and which axis that is changed underneath the sabotage when unrelated code improved.
-//
-// Chasing it is what found the letterbox: the reason `Math.max(width, height)` never took its first arm was
-// that the packer produced a taller-than-wide atlas on every input in existence, so a fifth of the texture was
-// empty and the occupancy number being reported could not see it. A SABOTAGE THAT WILL NOT FIRE IS A READING,
-// and the thing it reads is usually not the check.
+console.log("\n6. *** THE CALLER THAT ASKED, ANSWERED ***");
+{
+    // meshCSG.mjs has carried the SKIN/CUT tag, and the sentence explaining it, waiting for something able to
+    // use it: the CUT faces are "freshly exposed interior ... and ha[ve] no texture coordinates, because
+    // nothing unwrapped a surface that had not been made yet."
+    const cutOnly = polysToMesh(out, { only: CUT });
+    const all = polysToMesh(out);
+    const nCut = out.filter((p) => p.src === CUT).length;
+    ok("!! *** the faces a boolean CREATED come out with texture coordinates ***",
+       cutOnly.polys === nCut && nCut > 0 && cutOnly.uvs.length / 2 === cutOnly.positions.length / 3 &&
+       cutOnly.triangles > 0 && all.polys === out.length,
+       `${out.length} polygons out of subtract(), ${nCut} tagged CUT. only=CUT gives ${cutOnly.polys} polygons ` +
+       `-> ${cutOnly.positions.length / 3} vertices, ${cutOnly.triangles} triangles, one UV each; the whole ` +
+       `solid gives ${all.polys} polygons and ${all.triangles} triangles. The fan triangulation is EXACT here ` +
+       "rather than approximate, because a BSP boolean emits convex polygons -- meshCSG guarantees it and this " +
+       "is one of the places that guarantee earns its keep.");
 
+    // *** COUNTING TRIANGLES DOES NOT CHECK THEM. *** Sabotaging the fan to emit (base, base+k, base+k) --
+    // two identical corners, zero area -- produced the right NUMBER of triangles and went 0 red. The property
+    // that catches it is the one a fan of a CONVEX polygon must satisfy exactly: the triangles tile the
+    // polygon, so their areas sum to its own, and none of them is degenerate.
+    {
+        const cross3 = (a, b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
+        const sub3 = (a, b) => [a[0]-b[0], a[1]-b[1], a[2]-b[2]];
+        const norm = (v) => Math.hypot(v[0], v[1], v[2]);
+        const polyArea = (vs) => { let A = 0;
+            for (let k = 1; k + 1 < vs.length; k++) A += norm(cross3(sub3(vs[k], vs[0]), sub3(vs[k+1], vs[0]))) / 2;
+            return A; };
+        const want = out.reduce((a, p) => a + polyArea(p.vs), 0);
+        let got = 0, degenerate = 0;
+        for (let t = 0; t < all.indices.length; t += 3) {
+            const [i, j, k] = [all.indices[t], all.indices[t+1], all.indices[t+2]];
+            if (i === j || j === k || i === k) { degenerate++; continue; }
+            const P = (n) => [all.positions[3*n], all.positions[3*n+1], all.positions[3*n+2]];
+            const a = norm(cross3(sub3(P(j), P(i)), sub3(P(k), P(i)))) / 2;
+            if (a <= 0) degenerate++;
+            got += a;
+        }
+        ok("!! *** the triangles TILE the polygons: their area sums to the solid's, and none is degenerate ***",
+           degenerate === 0 && Math.abs(got - want) < 1e-12 * Math.max(1, want),
+           `${all.triangles} triangles totalling ${got.toFixed(12)} against the ${out.length} polygons' ` +
+           `${want.toFixed(12)} -- a difference of ${Math.abs(got - want).toExponential(2)} -- and ${degenerate} ` +
+           "degenerate. A fan over a convex polygon is an exact tiling, so this is an equality and not a bound.");
+    }
+
+    // the isometry has to survive triangulation and export, not just projection
+    const d = texelDensity(out.filter((p) => p.src === CUT).map((p) => ({ vs: p.vs })),
+                           unwrap(out.filter((p) => p.src === CUT)).uvs);
+    ok("!! and they carry NO distortion, because a cut face is planar by construction",
+       d.spread < 1e-12 && d.degenerate === 0,
+       `texel-density spread ${d.spread.toExponential(2)} across ${d.n} edges of the CUT faces. A boolean's cut ` +
+       "lies on one of B's planes, so the planar unwrapper is a complete answer for it and not an approximation.");
+
+    const bytes = Uint8Array.from(writeSceneGlb({ meshes: [{ positions: all.positions, indices: all.indices, uvs: all.uvs }] }));
+    const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const jlen = dv.getUint32(12, true);
+    const json = JSON.parse(new TextDecoder().decode(bytes.subarray(20, 20 + jlen)));
+    const prim = json.meshes[0].primitives[0];
+    const acc = json.accessors[prim.attributes.TEXCOORD_0 ?? -1];
+    ok("!! a CSG solid exports as a GLB that carries its UVs",
+       !!acc && acc.count === all.uvs.length / 2 && json.accessors[prim.attributes.POSITION].count === acc.count,
+       `${bytes.length}-byte GLB with ${Object.keys(prim.attributes).join(" + ")}, ${acc ? acc.count : 0} ` +
+       "texture coordinates. Decoded from the container by hand rather than through our own reader.");
+}
+
+// ---- SABOTAGE LOG -- graded on EXIT CODES, each restored before the next --------------------------------------
+//   A  basis seed fixed to [0,1,0], the textbook spelling      exit 1, 4 rows
+//   B  v scaled by 1/height instead of the shared span         exit 1, 1 row
+//   C  the packer never starts a new shelf                     exit 1, 2 rows
+//   D  projectPoly does not re-origin a chart to its corner    exit 1, 1 row
+//   E  the height-descending sort becomes a no-op              exit 1, 1 row
+//   F  the strip-width search is cut to a single candidate     exit 1, 1 row
+//   G  3D edge length computed in xy only, ignoring z          exit 1, 2 rows
+//   U  the fan emits (base, k, k) -- two identical corners     exit 1, 1 row
+//   V  the only=CUT filter is ignored                          exit 1, 1 row
+//
+// *** U WENT 0 RED FIRST, AND COUNTING IS WHY. *** A fan sabotaged to repeat a corner produces exactly the
+// RIGHT NUMBER of triangles and vertices, all of them zero-area, and the checks counted both. The property
+// that catches it is the one a fan over a CONVEX polygon satisfies exactly -- the triangles tile the polygon,
+// so their areas sum to its own -- which is an equality rather than a bound, and meshCSG's convexity guarantee
+// is what makes it one. A count is not a check.
+//
+// B is worth re-reading too: it took three attempts because `scale` is 1/max(w,h), so whichever axis IS the
+// maximum has 1/dimension and 1/span equal by arithmetic and a sabotage aimed at it is a no-op however wrong
+// it looks. Chasing that found the letterbox that made the atlas 1.2% surface.
+//
 console.log(fails ? "\nuvUnwrap-selfcheck: " + fails + " FAILED" : "\nuvUnwrap-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);
