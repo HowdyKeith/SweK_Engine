@@ -211,8 +211,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // if a gate turned up written in a different shape, and none of them has.
     // v4544 -- RE-TAKEN: one gate (terrainWalk) joined, the same four rows by one, TENTH arrival running.
     // v4545 -- RE-TAKEN: one gate (navWiring) joined, the same four rows by one, ELEVENTH arrival running.
-    gates: 1600, usesOk: 1579, definesOk: 1571, importsOk: 0,
-    distinctDefinitions: 38, nameFirst: 1472, condFirst: 91, unknownSignature: 16,
+    // v4546 -- RE-TAKEN: one gate (navWiringLive) joined, the same four rows by one, TWELFTH arrival running.
+    gates: 1601, usesOk: 1580, definesOk: 1572, importsOk: 0,
+    distinctDefinitions: 38, nameFirst: 1473, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

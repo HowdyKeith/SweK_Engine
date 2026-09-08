@@ -223,11 +223,14 @@ console.log("\n4. THE SLOPE REFUSAL IS A SLIDE, NOT A STICK -- WHICH IS THIS TRE
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
-    "\nunchecked here: anything in a BROWSER. This drives the worker's onmessage directly and constructs " +
-    "BotManager against a fake world, so it grades the logic and not the Worker plumbing, the ECS, or what a " +
-    "bot LOOKS like walking a hill. Also unchecked: whether the navmesh's 1.4-3.0 ms per query is affordable " +
-    "at the bot counts a real scene reaches -- it is affordable HERE because the work is on a worker thread " +
-    "and a bot re-plans every few seconds, and a caller that changes either should re-measure. And " +
+    "\nunchecked HERE and covered at v4546 by tools/ship/navWiringLive-selfcheck.mjs: anything in a BROWSER. " +
+    "This gate drives the worker's onmessage directly and constructs BotManager against a fake world, so it " +
+    "grades the logic and not the Worker plumbing. That live gate found three things this one structurally " +
+    "could not -- the pool swallowing `route`, plan() having no timeout so one unanswered job stranded its " +
+    "bot for the life of the page, and a route detouring past HM_PADDING simply not being in the snapshot -- " +
+    "and it took the per-query cost at real bot counts: a 48-bot burst is 44.1 ms of worker time across two " +
+    "workers, 48 of 48 answered, with per-job cost FALLING from 3.8 ms to 0.92 as warm-up amortises. What " +
+    "neither gate reaches is what a bot LOOKS like walking a hill: nothing renders one. And " +
     "nav/funnel.mjs is now wired only THROUGH the navmesh, which imports it: no caller pulls a grid corridor " +
     "through it, because funnel-selfcheck section 4 measured that as a net loss.");
 process.exit(fails ? 1 : 0);

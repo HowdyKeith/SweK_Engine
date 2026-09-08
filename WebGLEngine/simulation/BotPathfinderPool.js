@@ -22,7 +22,7 @@ const HM_PADDING = 24;          // voxels of padding around the start/goal bbox
 
 export class BotPathfinderPool {
     constructor({ world, poolSize = null, gridSize = 4, waterLevel = null,
-                  route = "navmesh", agentRadius = 1.5 } = {}) {
+                  route = "navmesh", agentRadius = 1.5, jobTimeoutMs = 2000 } = {}) {
         this.world = world;
         this.gridSize = gridSize;
         this.waterLevel = waterLevel;
@@ -36,6 +36,7 @@ export class BotPathfinderPool {
         // would not be on the main thread or per frame.
         this.route = route;
         this.agentRadius = agentRadius;
+        this.jobTimeoutMs = jobTimeoutMs;
 
         const hwc = (typeof navigator !== "undefined" && navigator.hardwareConcurrency) || 4;
         this.poolSize = poolSize ?? Math.max(2, Math.min(4, hwc - 2));
@@ -43,6 +44,8 @@ export class BotPathfinderPool {
         this._nextWorker = 0;
         this._jobs = 0;
         this._failures = 0;
+        this._byRoute = {};        // how many jobs each planner actually answered
+        this._timeouts = 0;        // jobs no worker ever answered -- see plan()
         this._totalMs = 0;
 
         this._workersReady = false;
@@ -77,15 +80,21 @@ export class BotPathfinderPool {
     }
 
     _onWorkerMessage(e) {
-        const { id, path, found, expanded } = e.data;
+        // *** `route` IS FORWARDED, AND IT WAS BEING SWALLOWED HERE. *** v4545 gave the worker two planners
+        // and made it report which one answered; this destructure took four fields and dropped it, so a
+        // caller could not tell a navmesh path from a grid one and the fallback was invisible from the
+        // outside. Found by driving the real pool in a browser rather than the worker's onmessage in Node.
+        const { id, path, found, expanded, route } = e.data;
         const job = this._pendingJobs.get(id);
         if (!job) return;
         this._pendingJobs.delete(id);
+        if (job.timer) clearTimeout(job.timer);
         const dt = performance.now() - job.t0;
         this._totalMs += dt;
         this._jobs++;
         if (!found) this._failures++;
-        job.resolve({ path, found, expanded, durationMs: dt });
+        if (route) this._byRoute[route] = (this._byRoute[route] || 0) + 1;
+        job.resolve({ path, found, expanded, route, durationMs: dt });
     }
 
     // Build a heightmap snapshot covering the bounding box of [start, goal]
@@ -118,8 +127,30 @@ export class BotPathfinderPool {
         const widx = this._nextWorker++ % this.workers.length;
         const { hm, hmStride, hmOriginX, hmOriginZ } = this._heightmapForJob(sx, sz, gx, gz);
 
+        // *** A JOB THAT NEVER COMES BACK USED TO STRAND ITS BOT FOR THE LIFE OF THE PAGE. ***
+        // plan() had no reject and no timeout, and simulation/BotManager.js sets bot.pathRequestPending =
+        // true before calling and clears it only in .then()/.catch() -- with new requests gated on
+        // !pathRequestPending. So one unanswered job meant that bot NEVER ASKED FOR A PATH AGAIN, silently
+        // degrading to direct steering with nothing to diagnose it by.
+        //
+        // Round 216 shipped it that way and nothing could reach it, because a worker either answered or was
+        // never spawned. v4545 gave the worker a static import of ../nav/navmesh.mjs, and a module Worker
+        // whose import fails to resolve CONSTRUCTS AND THEN DIES -- born alive enough to be posted to and
+        // never able to reply. Measured by mistyping that import: the browser harness hung until its own
+        // 60-second wait gave up, which is what a bot would do forever.
+        //
+        // The timeout resolves as not-found rather than rejecting, because that is the shape every caller
+        // already handles -- BotManager falls back to direct steering on !found -- and it counts as a
+        // failure so the pool's own numbers show it.
         return new Promise((resolve) => {
-            this._pendingJobs.set(id, { resolve, t0: performance.now() });
+            const timer = setTimeout(() => {
+                if (!this._pendingJobs.has(id)) return;
+                this._pendingJobs.delete(id);
+                this._failures++;
+                this._timeouts++;
+                resolve({ path: null, found: false, expanded: 0, route: "timeout", durationMs: this.jobTimeoutMs });
+            }, this.jobTimeoutMs);
+            this._pendingJobs.set(id, { resolve, t0: performance.now(), timer });
             this.workers[widx].postMessage({
                 cmd: "plan",
                 id,

@@ -3764,6 +3764,33 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since202: Object.freeze({
+        at: "v4546", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/navWiringLive-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 0.76 s. Closes what navWiring-selfcheck's own closing line said it could not reach: it " +
+                 "drives tools/ship/navWiringHarness.html in headless Chromium, building a REAL BotPathfinderPool " +
+                 "that plans through REAL module Workers. *** THAT WAS WHERE v4545'S ACTUAL RISK SAT: *** the round " +
+                 "gave the worker a static import of ../nav/navmesh.mjs and BotManager one of terrainWalk.mjs, and " +
+                 "in Node those prove syntax while in a browser they must RESOLVE OVER HTTP inside a module Worker. " +
+                 "*** THREE FINDINGS THE NODE GATE COULD NOT HAVE MADE. *** (1) The pool SWALLOWED `route`: " +
+                 "_onWorkerMessage destructured { id, path, found, expanded } and dropped the field v4545 had just " +
+                 "added, so no caller could tell a navmesh path from a grid one. (2) plan() had NO REJECT AND NO " +
+                 "TIMEOUT, and BotManager gates new requests on !pathRequestPending -- so one unanswered job " +
+                 "stranded that bot for the life of the page. Round 216 shipped that and nothing could reach it " +
+                 "because a worker either answered or was never spawned; v4545 made a third state reachable, a " +
+                 "module Worker whose import fails to resolve, which constructs and then dies. Mistyping the import " +
+                 "hung the harness until the driving gate gave up. jobTimeoutMs resolves as not-found now, the " +
+                 "shape every caller already handles. (3) A route detouring more than HM_PADDING = 24 off the " +
+                 "straight line is NOT IN THE SNAPSHOT the pool samples, so both planners correctly returned " +
+                 "found:false on the first harness -- a property of the pool rather than of either planner. THE " +
+                 "COST AT REAL BOT COUNTS, which was the other thing left unmeasured: a 48-bot burst is 44.1 ms of " +
+                 "worker time against the grid's 10.4, across 2 workers, off the main thread, with 48/48 answered " +
+                 "-- and the PER-JOB cost FALLS from 3.8 ms at one bot to 0.92 at forty-eight as warm-up amortises.",
+    }),
     since201: Object.freeze({
         at: "v4545", swept: 1, green: 1, red: 0,
         added: Object.freeze([

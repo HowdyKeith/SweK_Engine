@@ -1,0 +1,98 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>nav wiring harness</title>
+<!--
+  Drives the REAL simulation/BotPathfinderPool.js through REAL Web Workers, which is the half
+  tools/ship/navWiring-selfcheck.mjs cannot reach: that gate calls the worker's onmessage directly in Node,
+  so it never loads worker/botPathfinder.worker.js AS A MODULE WORKER and never transfers a buffer.
+
+  Both of those are things v4545 put at risk. The worker gained a static `import` of ../nav/navmesh.mjs, which
+  in a browser must resolve over HTTP with a JavaScript MIME type or the whole worker fails to construct --
+  and a worker that fails to construct is a bot that never gets a path, with nothing in Node to say so.
+
+  Publishes window.__navWiring when finished.
+-->
+<body>
+<pre id="out">running…</pre>
+<script type="module">
+import { BotPathfinderPool } from "/simulation/BotPathfinderPool.js";
+
+// A world with a wall and a gap, the shape the pool's own _heightmapForJob samples.
+// *** THE GAP HAS TO BE INSIDE THE SNAPSHOT, AND THE FIRST DRAFT PUT IT OUTSIDE. ***
+// BotPathfinderPool._heightmapForJob pads the start/goal bounding box by HM_PADDING = 24 and samples ONLY
+// that. With start and goal both at z=100 the window is z 76..124, so a gap at z 40..60 is not in the data
+// either planner is given, and both correctly returned found:false. That is a real property of the pool
+// rather than a bug in either planner: A ROUTE THAT DETOURS MORE THAN 24 UNITS OFF THE STRAIGHT LINE IS NOT
+// IN THE SNAPSHOT, and no planner can find what it was not sent. The gap sits at z 78..90 now -- inside the
+// window, and off the straight line, so it still forces a detour.
+const WALL_X0 = 60, WALL_X1 = 68, GAP_Z0 = 78, GAP_Z1 = 90;
+const world = {
+    _heightAt(x, z) {
+        const inWall = x >= WALL_X0 && x <= WALL_X1 && !(z >= GAP_Z0 && z <= GAP_Z1);
+        return inWall ? 40 : Math.round(3 + 2 * Math.sin(x * 0.08) * Math.cos(z * 0.11));
+    },
+};
+
+const results = { errors: [] };
+try {
+    // ---- 1. the plumbing: one plan, through a real Worker -------------------------------------------------
+    // jobTimeoutMs 1500: long enough that a healthy plan (single-digit ms) never trips it, short enough that
+    // a DEAD worker -- one whose module import failed, so it constructs and never replies -- is reported as a
+    // timeout instead of hanging this page until the driving gate gives up.
+    const pool = new BotPathfinderPool({ world, poolSize: 2, jobTimeoutMs: 1500 });
+    const one = await pool.plan(20, 100, 110, 100);
+    results.one = { found: one.found, route: one.route, waypoints: one.path ? one.path.length : 0 };
+
+    // ---- 2. the same job on the grid route, so the browser sees both ------------------------------------
+    const grid = await pool.plan(20, 100, 110, 100, { route: "grid" });
+    results.grid = { found: grid.found, route: grid.route, waypoints: grid.path ? grid.path.length : 0 };
+
+    // ---- 3. repeat plans, because the pool posts hm with [hm.buffer] and a transferred buffer detaches ---
+    const repeats = [];
+    for (let i = 0; i < 6; i++) {
+        const r = await pool.plan(20 + i, 100, 110, 100 + i);
+        repeats.push(r.found && r.route === "navmesh");
+    }
+    results.repeats = { total: repeats.length, ok: repeats.filter(Boolean).length };
+
+    // ---- 4. THE COST AT REAL BOT COUNTS, which is the number the Node gate could not take ----------------
+    // BotManager re-plans a bot every few seconds; a burst is what happens when many bots go stale together.
+    results.cost = [];
+    for (const n of [1, 8, 24, 48]) {
+        for (const route of ["navmesh", "grid"]) {
+            const jobs = [];
+            const t0 = performance.now();
+            for (let i = 0; i < n; i++) jobs.push(pool.plan(20 + (i % 17), 90 + (i % 23), 110, 100, { route }));
+            const got = await Promise.all(jobs);
+            const ms = performance.now() - t0;
+            results.cost.push({ n, route, ms: +ms.toFixed(1), perJob: +(ms / n).toFixed(2),
+                                found: got.filter((g) => g.found).length });
+        }
+    }
+    results.poolSize = pool.poolSize;
+    results.byRoute = pool._byRoute;
+    results.timeouts = pool._timeouts;
+    pool.dispose?.();
+
+    // ---- 5. BotManager IN A BROWSER, over a hill and into a wall ---------------------------------------
+    // Not for what it LOOKS like -- nothing here renders a bot -- but because v4545 gave BotManager a static
+    // import of physics/character/terrainWalk.mjs, and that module graph had never been loaded by a browser.
+    // A Node gate importing the same file proves the syntax and not the resolution.
+    const { BotManager } = await import("/simulation/BotManager.js");
+    const hillWorld = { _heightAt: (x, z) => (x < 40 ? 0.3 * Math.max(0, x - 10) : 12 + 40) };
+    const bm = Object.create(BotManager.prototype);
+    bm.world = hillWorld;
+    const bot = { x: 0, y: 1, z: 0, yaw: 0, spec: { speed: 5 }, path: null, pathIdx: 0 };
+    let worstOff = 0;
+    for (let i = 0; i < 900; i++) {
+        bm._followPathOrSteer(bot, 200, 0, 1 / 60, 1);
+        worstOff = Math.max(worstOff, Math.abs(bot.y - (hillWorld._heightAt(bot.x, bot.z) + 1)));
+    }
+    results.bot = { x: +bot.x.toFixed(3), y: +bot.y.toFixed(3), worstOff: +worstOff.toExponential(2) };
+} catch (e) {
+    results.errors.push(String(e && e.stack || e).slice(0, 400));
+}
+window.__navWiring = results;
+document.getElementById("out").textContent = JSON.stringify(results, null, 2);
+</script>
+</body>
