@@ -3764,6 +3764,35 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since199: Object.freeze({
+        at: "v4543", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/navmesh-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 1.59 s (1670/1587/1637 over three serial runs, so it is under the 3000 ms sweep budget " +
+                 "and a ship-time step actually runs it). A Recast-style convex-polygon navmesh, built because " +
+                 "tools/ship/funnel-selfcheck.mjs ended with 'unchecked here: a NAVMESH' and its section 4 said why " +
+                 "it mattered: on a wall with one gap, string-pulling a GRID corridor is 302.20 m and enters a wall at " +
+                 "18 of 616 samples, and insetting it until it is as safe as the 318.39 m staircase costs 319.59 m -- " +
+                 "LONGER than what it improved, because the whole saving was a safety margin the grid held by " +
+                 "accident. Eroding by the agent radius BEFORE the polygons exist puts the clearance in the mesh: " +
+                 "297.42 m on the same wall at the same radius, 0 of 605 in a wall, 0.27% off an optimum derived from " +
+                 "the fixture's own inequalities rather than from this code. *** THE ROUND'S REAL DEFECT WAS FOUND BY " +
+                 "CHANGING THE INSTRUMENT, NOT THE FIXTURE: *** eroding with Recast's chamfer 2/3 field passed 'in a " +
+                 "wall: 0 of 599' while DELIVERING 0.708 clearance where 1 was asked and 2.829 where 3 was -- both " +
+                 "exactly the diagonal a chamfer misprices at 3 against 2.828. Not entering a wall is a far weaker " +
+                 "property than standing clear of one. An exact Euclidean transform replaced it. *** AND TWO OF NINE " +
+                 "SABOTAGES WENT 0 RED FOR THE SAME REASON -- NO FIXTURE COULD SEE THEM -- ONE OF WHICH FOUND A REAL " +
+                 "BUG: *** deleting the maxStepDown test changed nothing because every fixture was flat, and building " +
+                 "a ledge showed the row sweep putting both sides of a one-way cliff in ONE rectangle, so the mesh " +
+                 "returned a 110.00 m path UP a 5-unit drop it cannot climb. Rectangles now break where the step is " +
+                 "not mutual and portals carry a direction each way. A third, replacing the A* cost with a flat g+1, " +
+                 "STILL will not fire: f = g + D(midpoint, goal) adds a polygon count to metres, so the heuristic " +
+                 "dominates and both models return identical paths on every fixture including a purpose-built trap " +
+                 "map. That is recorded in the gate as unguarded rather than papered over.",
+    }),
     since198: Object.freeze({
         at: "v4539", swept: 1, green: 1, red: 0,
         added: Object.freeze([

@@ -211,7 +211,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // the earlier reading was 3878. What survives is the rule the wrong explanation was reaching for: this
     // number is MEASURED every round, never incremented from the last one, and a reason invented to explain a
     // count is worth less than re-taking it. FIVE ROUNDS RUNNING this table has been re-taken by hand.
-    files: 4018,                  // v4526 merge: 3887 -> 4002, this branch's rounds; v4527: 4004; v4528: 4007; v4529: 4009; v4530: 4011; v4533: 4012 (ai-bridge/runBusy.js); v4536: 4014 (physics/mesh/uvUnwrap.mjs and its gate); v4537: 4016 (physics/mesh/uvLscm.mjs and its gate); v4539: 4018 (physics/render/splitSum.mjs and its gate)
+    files: 4020,                  // v4526 merge: 3887 -> 4002, this branch's rounds; v4527: 4004; v4528: 4007; v4529: 4009; v4530: 4011; v4533: 4012 (ai-bridge/runBusy.js); v4536: 4014 (physics/mesh/uvUnwrap.mjs and its gate); v4537: 4016 (physics/mesh/uvLscm.mjs and its gate); v4539: 4018 (physics/render/splitSum.mjs and its gate); v4543: 4020 (nav/navmesh.mjs and its gate)
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
                           // RE-TAKEN TWICE IN TWO ROUNDS, and the second time only because the ship gate
                           // caught it: v4478's re-take was correct for v4478 and stale the moment v4479
@@ -266,7 +266,11 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // runtime-shape census. The two rows that DID move are the ones that say the ship gate started actually
     // LOADING the commands the handoff points at instead of matching their names -- the only genuinely new
     // runtime behaviour in the round, and the census found it without being told.
-    esModules: 3726, closures: 3604, asyncAwait: 1415, typedArrays: 792, promises: 344,
+    // v4543 -- RE-TAKEN: ES modules and closures by two and TYPED ARRAYS by two (nav/navmesh.mjs and its
+    // gate), and nothing else -- no async, no fetch, no timer, no GPU. Same shape as v4537's uvLscm re-take:
+    // the typed-array row is what says the new code carries BUFFERS rather than plain arrays, which for a
+    // distance transform over a quarter-million cells is the whole reason it finishes.
+    esModules: 3728, closures: 3606, asyncAwait: 1415, typedArrays: 794, promises: 344,
     fetchXhr: 243, performanceNow: 220, raf: 116, webgl: 154, webgpu: 48, threads: 22, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

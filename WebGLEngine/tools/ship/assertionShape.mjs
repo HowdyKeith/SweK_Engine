@@ -205,8 +205,12 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // with a DIFFERENT shape, and they have now stayed still across six arrivals.
     // v4537 -- RE-TAKEN: one gate (uvLscm) joined, the same four rows by one, seventh arrival running.
     // v4539 -- RE-TAKEN: one gate (splitSum) joined, the same four rows by one, eighth arrival running.
-    gates: 1597, usesOk: 1576, definesOk: 1568, importsOk: 0,
-    distinctDefinitions: 38, nameFirst: 1469, condFirst: 91, unknownSignature: 16,
+    // v4543 -- RE-TAKEN: one gate (navmesh) joined, the same four rows by one, NINTH arrival running. The
+    // five rows that have now stayed still across nine consecutive arrivals are the ones carrying the
+    // information: distinctDefinitions, condFirst, unknownSignature, importsOk and suspects would each move
+    // if a gate turned up written in a different shape, and none of them has.
+    gates: 1598, usesOk: 1577, definesOk: 1569, importsOk: 0,
+    distinctDefinitions: 38, nameFirst: 1470, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

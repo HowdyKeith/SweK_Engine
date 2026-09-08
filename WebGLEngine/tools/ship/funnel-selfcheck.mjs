@@ -205,9 +205,13 @@ console.log("\n5. the bug a straight corridor could not have found");
 //      buys the margin back and therefore the only one that can notice it is unbuyable.
 //
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
-console.log("unchecked here: a NAVMESH. Everything above pulls a string through a corridor of grid cells, " +
+console.log("unchecked here WHEN THIS GATE WAS WRITTEN, and BUILT SINCE as nav/navmesh.mjs (v4543) with its " +
+    "own gate: a NAVMESH. Everything above pulls a string through a corridor of grid cells, " +
     "which is why it can only recover part of the excess and why the inset is needed at all -- a real " +
-    "navmesh of convex polygons carries its own clearance and has no staircase to undo. Also unchecked: " +
+    "navmesh of convex polygons carries its own clearance and has no staircase to undo. *** MEASURED NOW " +
+    "RATHER THAN PREDICTED, on this section's own wall at this section's own radius: 297.42 m against the " +
+    "319.59 m an inset grid corridor costs, at the same zero wall samples, and 0.27% off the analytic " +
+    "optimum. *** Also unchecked: " +
     "whether any of this is WIRED. simulation/BotPathfinderPool.js still receives the staircase and nothing " +
     "calls nav/funnel.mjs, so no bot in this tree walks a shorter path today; given section 4, wiring it " +
     "without an inset would be a regression rather than an improvement.");

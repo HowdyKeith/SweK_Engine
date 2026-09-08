@@ -20,6 +20,16 @@
 // all -- tools/ship has requestPathSync-selfcheck and winPathGuard-selfcheck, and neither is about paths
 // through a world.
 //
+// *** THAT GREP IS NO LONGER TRUE, AND THE ROUND IT ASKED FOR IS nav/navmesh.mjs (v4543). *** This file's
+// gate closed with "unchecked here: a NAVMESH", and section 4 below is the reason: on a wall with one gap,
+// insetting a grid corridor until it is as safe as the staircase costs 319.59 m against the staircase's
+// 318.39 -- the whole saving was a safety margin the grid held by accident. A navmesh erodes by the agent
+// radius BEFORE the polygons exist, and on that same wall at that same radius it walks 297.42 m with zero
+// wall samples and a measured clearance of 2.687. Nothing in this file changes: a corridor of grid cells is
+// still what expandDiagonals and insetPortals are for, and funnel(), triarea2(), pathLength() and
+// crossesAllPortals() are imported by the navmesh unchanged, because the string pulling was never the part
+// that needed replacing.
+//
 // ---- WHAT THE FUNNEL IS, AND THE ONE THING IT MUST NOT BE ----------------------------------------------------
 //
 // The Simple Stupid Funnel Algorithm walks a CORRIDOR -- an ordered list of portals, each a segment the path
