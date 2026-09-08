@@ -33,25 +33,21 @@ import { spawn } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { backfillStamps } from "./sweepCoverage.mjs";
 import { enumerateGates, classify, VERDICT, SWEEP_V4297, ENG } from "./gateSweep.mjs";
-import { RED_AT_V4279, RED_AT_V4408, RED_AT_V4424, RED_AT_V4476, RED_AT_V4484, RED_AT_V4531, RED_AT_V4535, UNCONFIRMED_SLOW } from "./redCensus.mjs";
+import { RED_AT_V4279, RED_AT_V4408, RED_AT_V4424, RED_AT_V4476, RED_AT_V4484, RED_AT_V4531, RED_AT_V4535, UNCONFIRMED_SLOW, ALL_REGISTERED } from "./redCensus.mjs";
 
 export const DEFAULTS = Object.freeze({ budgetMs: 3000, workers: 8, capMs: 20000, timingsFile: "tools/ship/sweep-timings.json" });
 
 /** The register: every gate whose red is already on record, with the record that names it. */
 export function redRegister() {
     const reg = new Map();
-    for (const e of RED_AT_V4279) reg.set(e.gate, "redCensus.RED_AT_V4279");
     // *** BOTH MEASURED SETS BEFORE THE BUCKET, BECAUSE A MEASURED RED OUTRANKS "NOBODY LOOKED". ***
     // Two rounds on two branches each filed a set of reds the bucket had been hiding, and they name different
     // gates: v4408 took the ones the first rotation surfaced, v4424 ran all 63 of UNCONFIRMED_SLOW one at a
     // time and found three exiting 1. Neither round repaired its set -- they stay on the register, but under a
     // reason that names the failure instead of the absence of a measurement.
-    for (const e of RED_AT_V4408) reg.set(e.gate, "redCensus.RED_AT_V4408");
-    for (const e of RED_AT_V4424) reg.set(e.gate, "redCensus.RED_AT_V4424");
-    for (const e of RED_AT_V4476) reg.set(e.gate, "redCensus.RED_AT_V4476");
-    for (const e of RED_AT_V4484) reg.set(e.gate, "redCensus.RED_AT_V4484");
-    for (const e of RED_AT_V4531) reg.set(e.gate, "redCensus.RED_AT_V4531");
-    for (const e of RED_AT_V4535) reg.set(e.gate, "redCensus.RED_AT_V4535");
+    // v4536: the seven loops this replaced were seven chances to forget one, and two of the three
+    // readers of this register had. The population is derived from redCensus.REGISTER_LISTS now.
+    for (const e of ALL_REGISTERED) reg.set(e.gate, "redCensus." + e.list);
     for (const g of UNCONFIRMED_SLOW) if (!reg.has(g)) reg.set(g, "redCensus.UNCONFIRMED_SLOW");
     for (const g of SWEEP_V4297.fromSlowBucket) if (!reg.has(g)) reg.set(g, "gateSweep.SWEEP_V4297.fromSlowBucket");
     for (const g of SWEEP_V4297.unmeasured) if (!reg.has(g)) reg.set(g, "gateSweep.SWEEP_V4297.unmeasured");

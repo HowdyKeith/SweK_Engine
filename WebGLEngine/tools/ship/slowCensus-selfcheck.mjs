@@ -48,6 +48,7 @@ import {
     agreementWith, scaleRatios, spearman, exemptedButMeasured, fitsUnderCap, summarise,
     stillUnmeasured, medianOf, runGateSerial,
 } from "./slowCensus.mjs";
+import { REGISTER_AUDIT } from "./register-audit.mjs";
 
 let fails = 0;
 const ok = (label, cond, detail) => { if (!cond) fails++; console.log(`  ${cond ? "PASS" : "FAIL"}  ${label}${detail ? "   " + detail : ""}`); };
@@ -121,9 +122,31 @@ console.log("\n3. *** RE-MEASURED ONE AT A TIME, AND EVERY COMPARABLE VERDICT AG
     ok("*** THREE RED, and the first forty-three measured were all green ***", r.gates.length === 3,
         r.gates.map((x) => x.replace(/-selfcheck\.mjs$/, "").replace(/^tools\/ship\//, "")).join(", ") +
         " -- red and exempt from the ship gate for 145 rounds");
-    ok("  every one of them is FILED, with its failure, not left in the bucket it came out of",
-        r.filed.length === r.gates.length && RED_AT_V4424.every((e) => e.fails.length > 40 && e.why.length > 60),
-        `${r.filed.length} of ${r.gates.length} in redCensus.RED_AT_V4424, each with the check that fails and why`);
+    // *** v4536 -- AND `fails` JOINED `ms` IN ANSWERING null HONESTLY, WHICH CRASHED THIS LINE. *** The note
+    // immediately below records the identical fault being repaired for `ms` at v4471: "the register honestly
+    // answers null and the check compared null to a number". `fails` was exempt only because the audit was
+    // FILING A FRAGMENT AS A VERDICT -- a gate killed at the audit's 120 s cap had still printed some of its
+    // output, and freezeRegisterAudit took the first FAIL line out of that partial run and recorded it as the
+    // failing line. v4536 stopped doing that, because a timeout is a bound and not a verdict, and doorKinds --
+    // which the audit cannot reach, WHICH IS WHY IT WAS UNMEASURED IN THE FIRST PLACE -- now answers null.
+    //
+    // So the row is split along the line the register actually draws. A `why` is owed by EVERY entry: it is
+    // written by a person and no cap can prevent it. A filed LINE is owed only where a run produced one, and
+    // where it did not, the gate is NAMED here rather than demanded of. Read defensively, because a detail
+    // string that assumes the field exists is how this file would report a crash as a clean zero.
+    const noLine = RED_AT_V4424.filter((e) => !e.fails);
+    const whyMissing = RED_AT_V4424.filter((e) => !e.why || String(e.why).length <= 60);
+    const shortLine = RED_AT_V4424.filter((e) => e.fails && String(e.fails).length <= 40);
+    ok("  every one of them is FILED, with its reason, and with its failing line where a run produced one",
+        r.filed.length === r.gates.length && whyMissing.length === 0 && shortLine.length === 0 &&
+        noLine.length < RED_AT_V4424.length,
+        `${r.filed.length} of ${r.gates.length} in redCensus.RED_AT_V4424, each with why it fails` +
+        (noLine.length
+            ? `. ${noLine.map((e) => e.gate.replace(/^tools\/ship\//, "").replace(/-selfcheck\.mjs$/, "")).join(", ")} ` +
+              "carries NO filed line and is not asked for one: the audit's cap does not reach it, which is the " +
+              "same reason it was in the unconfirmed bucket to begin with. A BOUND IS NOT A VERDICT, and " +
+              "before v4536 this field held a fragment printed before the kill"
+            : ", each with the check that fails"));
     // *** v4471 -- THIS READ RED_AT_V4424's `ms` AND THAT FIELD IS null BY CONSTRUCTION FOR THESE THREE. ***
     // The v4430 census makes `ms` a getter over tools/ship/register-audit.mjs, which is right for a register
     // whose readings should come from a run rather than from a typed literal -- and the audit's cap does not
@@ -140,10 +163,31 @@ console.log("\n3. *** RE-MEASURED ONE AT A TIME, AND EVERY COMPARABLE VERDICT AG
     // true only because freezeRegisterAudit.mjs had never been told about a third register. The claim was a
     // description of a gap dressed as a property. Teaching the audit (v4471) ran them at a raised cap and the
     // readings became DERIVED, which falsified my own assertion by repairing the thing it described.
-    ok("  ...and the register DERIVES their readings from a run rather than from a typed literal",
-        RED_AT_V4424.every((e) => e.derived === true && e.ms > 60000),
-        RED_AT_V4424.map((e) => (e.ms / 1000).toFixed(0) + "s").join(", ") + " from the register audit at a " +
-        "raised cap. Until v4471 this read null, because the audit covered two registers and there are three");
+    // *** v4536 -- AND `derived` MEANS TWO THINGS, WHICH ONLY SHOWED WHEN ONE OF THEM STOPPED BEING TRUE. ***
+    // redCensus defines it as "the audit produced a failing LINE for this gate", and this row read it as "the
+    // audit RAN this gate". Those came apart the moment freezeRegisterAudit stopped filing a fragment printed
+    // before a kill as the verdict: doorKinds is run by the audit, hits the 120 s cap, and now yields no line
+    // -- so it RAN and is not DERIVED, and asserting both of one flag turned a correct repair into a red.
+    // What is asserted is what the register can actually answer: every entry has an audit row, so no reading
+    // here is a typed literal; a gate that finished carries a line and a real time; a gate that hit the cap
+    // carries a BOUND, and is named as one rather than counted as a measurement.
+    const auditOf = (g) => REGISTER_AUDIT.rows.find((r) => r.gate === g);
+    const ran = RED_AT_V4424.filter((e) => !!auditOf(e.gate));
+    const capped = RED_AT_V4424.filter((e) => { const r = auditOf(e.gate); return r && r.exit === "timeout"; });
+    const finished = RED_AT_V4424.filter((e) => !capped.includes(e));
+    ok("  ...and every reading comes from a run rather than a typed literal -- with a CAP named as a bound",
+        ran.length === RED_AT_V4424.length &&
+        finished.every((e) => e.derived === true && e.ms > 60000) &&
+        capped.every((e) => { const r = auditOf(e.gate); return r.ms >= REGISTER_AUDIT.capMs && !r.first; }),
+        `${ran.length} of ${RED_AT_V4424.length} have an audit row. ` +
+        finished.map((e) => e.gate.replace(/^tools\/ship\//, "").replace(/-selfcheck\.mjs$/, "") +
+                            " " + (e.ms / 1000).toFixed(0) + "s").join(", ") +
+        (capped.length
+            ? `; ${capped.map((e) => e.gate.replace(/^tools\/ship\//, "").replace(/-selfcheck\.mjs$/, "")).join(", ")} ` +
+              `hit the ${REGISTER_AUDIT.capMs / 1000}s cap -- A BOUND, NOT A READING, and carries no failing ` +
+              "line for the same reason"
+            : "") +
+        ". Until v4471 this read null, because the audit covered two registers and there are three");
     ok("*** zero crash ***", !Object.values(MEASURED_V4424).some((m) => m.verdict === "CRASH"),
         "a non-zero exit with no checks printed is a crash and would be counted separately -- which also " +
         "means the check counter's undercount on the second house style changed no verdict here");

@@ -11,7 +11,7 @@ import { execFile } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { RED_AT_V4279, RED_AT_V4408_GATES, RED_AT_V4424_GATES, RED_AT_V4476_GATES , RED_AT_V4484_GATES} from "./redCensus.mjs";
+import { RED_AT_V4279, RED_AT_V4408_GATES, RED_AT_V4424_GATES, RED_AT_V4476_GATES , RED_AT_V4484_GATES, ALL_REGISTERED } from "./redCensus.mjs";
 
 // *** v4400 -- THE VERSION WAS A STRING LITERAL AND THE AUDIT LIED ABOUT ITS OWN AGE FOR TWENTY ROUNDS. ***
 // This tool wrote `at: "v4380"` as text, so every re-freeze since has produced a file claiming to have been
@@ -48,12 +48,24 @@ const rows = [];
 // "the admitted set may only SHRINK" went red: their lines had to be ADMITTED as unverified because nothing
 // ran them. THE FIX IS TO RUN THEM, not to admit them -- and their runtimes (75 s to 151 s) are why
 // SWEK_AUDIT_CAP_MS exists. A register that derives its readings needs every list it derives from in here.
-for (const e of [...RED_AT_V4279, ...RED_AT_V4408_GATES.map((gate) => ({ gate })),
-                 ...RED_AT_V4424_GATES.map((gate) => ({ gate })),
-                 ...RED_AT_V4476_GATES.map((gate) => ({ gate })),
-                 ...RED_AT_V4484_GATES.map((gate) => ({ gate }))]) {
+// v4536: one derived population -- see redCensus.ALL_REGISTERED and REGISTER_LISTS.
+for (const e of ALL_REGISTERED) {
     const r = await run(e.gate);
-    rows.push({ gate: e.gate, exit: r.exit, ms: r.ms, first: r.fails[0] || "", all: r.fails, count: r.fails.length, onStderr: r.onStderr });
+    // *** v4536 -- A TIMEOUT IS A BOUND, NOT A VERDICT, AND THIS LINE WAS FILING ONE AS THE OTHER. ***
+    // A gate killed at the cap has still printed whatever it got through, so `fails[0]` is a line from a run
+    // THAT NEVER FINISHED -- doorKinds-selfcheck was recorded as failing on "EVERY MEMBER IS EXPLAINED" when
+    // all that is known is that it did not finish in 120 s. registerDrift-selfcheck already asserts exactly
+    // this ("a gate too slow to finish inside the audit's cap is recorded as TIMEOUT rather than as a
+    // verdict") and went red the moment the audit was re-frozen over the whole register. The lines are still
+    // KEPT, under a name that says what they are, because what a gate managed to print before it was killed
+    // is evidence about the timeout even though it is not a verdict about the tree.
+    const timedOut = r.exit === "timeout";
+    rows.push({ gate: e.gate, exit: r.exit, ms: r.ms,
+                first: timedOut ? "" : (r.fails[0] || ""),
+                all: timedOut ? [] : r.fails,
+                count: timedOut ? 0 : r.fails.length,
+                ...(timedOut ? { printedBeforeTheCap: r.fails } : {}),
+                onStderr: r.onStderr });
     console.log(String(r.exit).padStart(8), String(r.ms).padStart(7) + "ms", String(r.fails.length).padStart(2) + " fail(s)", r.onStderr ? "[stderr]" : "        ", e.gate);
 }
 const body = `"use strict";

@@ -469,7 +469,16 @@ export const RED_AT_V4476_GATES = Object.freeze([
     // -- "a red that has been repaired and left on the list is a check nobody is getting the benefit of".
     // The audit row that proves it is a real run: exit 0 at 643 ms. Its `why` is kept below, struck through
     // by this note rather than deleted, because the reason a debt existed outlives the debt.
-    "tools/ship/wgslSpec-selfcheck.mjs",
+    //
+    // *** AND wgslSpec-selfcheck.mjs LEFT IT TOO, REPAIRED BY SOMEBODY AND ACCUSED EVER SINCE. *** Its
+    // registered reason was "across 4,407 files requiredLimits appears 5 times, so every device in this tree
+    // runs at the defaults". The repair is on main under its own round -- "the claim was true and the count
+    // was somebody else's code": all five occurrences are under vendor/, so the number was never about this
+    // tree, and the gate counts them apart and reports them now. IT HAS BEEN GREEN AND LISTED SINCE.
+    //
+    // NOBODY NOTICED BECAUSE THE ROW THAT EXISTS TO NOTICE RE-RAN ONE OF SEVEN LISTS. redCensus-selfcheck
+    // section 2 covered RED_AT_V4279 only; v4536 derived the population and it went red on this gate within
+    // the minute. Its `why` stays below, struck through by this note, under the same rule as physicsReach's.
 ]);
 
 const WHY_V4476 = Object.freeze({
@@ -599,9 +608,14 @@ const WHY_V4535 = Object.freeze({
         "+7 probe together, since noticed/unnoticed were measured field by field under the window.",
 });
 
-export const RED_AT_V4535_GATES = Object.freeze([
-    "tools/ship/frozenRecords-selfcheck.mjs",
-]);
+// *** frozenRecords-selfcheck.mjs LEFT THIS REGISTER AT v4536, ONE ROUND AFTER IT ARRIVED, AND BY THE REPAIR
+// THE ENTRY NAMED. *** v4535 registered it for reading 134 fields where the frozen sweep took 135, diagnosed
+// the cause as a 6,000-character window standing in for a record's body, and wrote what would clear it: "a
+// balanced extraction AND a re-run of the +7 probe together, since noticed/unnoticed were measured field by
+// field under the window". Both were done. The extractor is a lexer, the probe was re-run with a baseline,
+// and PROBE_AT_V4536 carries the result. THE LIST IS EMPTY RATHER THAN DELETED, because the shape of the
+// register is what the derived union above reads, and an entry that leaves is a fact worth keeping visible.
+export const RED_AT_V4535_GATES = Object.freeze([]);
 
 export const RED_AT_V4535 = Object.freeze(RED_AT_V4535_GATES.map((gate) => Object.freeze({
     gate,
@@ -611,7 +625,57 @@ export const RED_AT_V4535 = Object.freeze(RED_AT_V4535_GATES.map((gate) => Objec
     get derived() { return !!(auditRow(gate) && auditRow(gate).first); },
 })));
 
+// *** v4536 -- THE REGISTER HAS SEVEN LISTS AND ITS RE-RUN COVERED ONE. ***
+//
+// redCensus-selfcheck section 2 exists to catch the one failure a register cannot survive: a gate that has
+// been REPAIRED and is still listed, so the register goes on accusing working code. Its own note says it --
+// "appended-to-only, a register becomes a list of grievances; never appended to, a list of fiction. That one
+// managed both at once, which is only possible if nobody ever re-ran it." It re-ran RED_AT_V4279 and nothing
+// else. RED_AT_V4408, V4424, V4476, V4484, V4531 and V4535 -- SIX LISTS, EVERY ONE ADDED SINCE THAT ROW WAS
+// WRITTEN -- were never re-run at all, so a gate registered in any of them could be fixed and stay accused
+// for good.
+//
+// FOUND BY REPAIRING ONE. v4535 registered frozenRecords-selfcheck with a diagnosis and a named repair;
+// v4536 did the repair; and the row that exists to notice exactly that said "24 of 24 re-ran red just now"
+// and passed. The population is DERIVED from the pairs below now, and the gate checks those pairs against
+// this file's own source, so a list that arrives without being added here fails rather than being skipped.
+export const REGISTER_LISTS = Object.freeze([
+    Object.freeze(["RED_AT_V4279", RED_AT_V4279]),
+    Object.freeze(["RED_AT_V4408", RED_AT_V4408]),
+    Object.freeze(["RED_AT_V4424", RED_AT_V4424]),
+    Object.freeze(["RED_AT_V4476", RED_AT_V4476]),
+    Object.freeze(["RED_AT_V4484", RED_AT_V4484]),
+    Object.freeze(["RED_AT_V4531", RED_AT_V4531]),
+    Object.freeze(["RED_AT_V4535", RED_AT_V4535]),
+]);
+
+/** Every registered gate, once, with the list that named it. The `entry` is carried rather than spread, so
+ *  the lazy `ms` and `fails` getters are not evaluated by the act of enumerating. */
+export const ALL_REGISTERED = Object.freeze((() => {
+    const seen = new Map();
+    for (const [list, entries] of REGISTER_LISTS)
+        for (const e of entries) if (!seen.has(e.gate)) seen.set(e.gate, Object.freeze({ gate: e.gate, list, entry: e }));
+    return [...seen.values()];
+})());
+
 export const FIXED_SINCE_V4408 = Object.freeze([
+    { gate: "tools/ship/frozenRecords-selfcheck.mjs", round: "v4536",
+      why: "REGISTERED AT v4535 WITH THE REPAIR NAMED, AND REPAIRED BY DOING THAT. The census read a record's " +
+           "body as `src.slice(i, i + 6000)` capped at twelve fields -- wrong in four directions at once on " +
+           "this tree: six empty records credited with 7-10 fields belonging to their neighbours, an 11.4 KB " +
+           "record showing 1 of its 10, two records over the cap losing three and four, and two records " +
+           "double-counted. Replayed at the v4487 sweep's own commit the tree held 138 fields where that " +
+           "record says 135, so THREE FIELDS WERE NEVER PROBED. Body extraction is a lexer now and the +7 " +
+           "probe was re-run over the corrected 152-field set WITH A BASELINE, which the first sweep never " +
+           "took: 72 noticed, 55 unnoticed, 17 unmeasurable because every gate naming the record was already " +
+           "red, 8 with no guardian at all. Four classes where there were two." },
+    { gate: "tools/ship/wgslSpec-selfcheck.mjs", round: "v4536",
+      why: "REPAIRED BY SOMEBODY ELSE'S ROUND AND FOUND STILL ACCUSED BY THIS ONE. Registered at v4476 for " +
+           "requiredLimits appearing 5 times across 4,407 files; the repair -- on main, 'the claim was true " +
+           "and the count was somebody else's code' -- established all five are under vendor/, so the count " +
+           "was never about this tree. IT HAS BEEN GREEN AND LISTED SINCE, invisibly, because the row that " +
+           "re-runs the register covered RED_AT_V4279 and none of the six lists added after it was written. " +
+           "That row derives its population now and reddened on this gate immediately." },
     { gate: "tools/ship/orreryEjecta-selfcheck.mjs", round: "v4410",
       why: "REGISTERED AT v4408 AND REPAIRED BY RE-DERIVING, NOT BY RAISING A NUMBER. It compared the fleet " +
            "against a frozen count and the count had drifted -- but the two readings were not even taken by " +

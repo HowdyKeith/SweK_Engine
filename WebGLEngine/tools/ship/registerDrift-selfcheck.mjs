@@ -43,7 +43,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { RED_AT_V4279, RED_AT_V4408, RED_AT_V4424, RED_AT_V4476, UNVERIFIED_LINE , RED_AT_V4484} from "./redCensus.mjs";
+import { RED_AT_V4279, RED_AT_V4408, RED_AT_V4424, RED_AT_V4476, UNVERIFIED_LINE , RED_AT_V4484, ALL_REGISTERED } from "./redCensus.mjs";
 import { REGISTER_AUDIT } from "./register-audit.mjs";
 import { divergence, renderFor, auditAge } from "./registerRender.mjs";
 import { noComments } from "./sourceScan.mjs";
@@ -73,7 +73,14 @@ console.log("\n1. EVERY REGISTER ENTRY WAS ACTUALLY RUN, and the audit is not ol
     // registered" about gates that ARE registered. The same omission that left their lines admitted rather
     // than derived: a new register has to be added everywhere the old ones are read, and there are three
     // such places -- here, freezeRegisterAudit.mjs, and quickSweep.redRegister().
-    const REGISTERED = [...RED_AT_V4279, ...RED_AT_V4408, ...RED_AT_V4424, ...RED_AT_V4476, ...RED_AT_V4484];
+    // *** v4536 -- AND IT HAPPENED A THIRD TIME, WHICH IS WHY THIS IS NOW DERIVED. *** The note above records
+    // the same omission at v4430 (two registers) and v4471 (three), and names the remedy it did not take:
+    // "a new register has to be added everywhere the old ones are read, and there are three such places."
+    // RED_AT_V4531 and RED_AT_V4535 then arrived and this line was not told, for the third time. Measured at
+    // v4536: quickSweep.redRegister() read all seven lists, this read five, freezeRegisterAudit read five --
+    // and the complete one is the only one with a row that DERIVES its union. redCensus.ALL_REGISTERED is
+    // that one place now, and redCensus-selfcheck compares it against the lists the module declares.
+    const REGISTERED = ALL_REGISTERED;
     const missing = REGISTERED.filter((e) => !byGate.has(e.gate));
     const extra = REGISTER_AUDIT.rows.filter((r) => !REGISTERED.some((e) => e.gate === r.gate));
     ok(`!! *** every one of the ${REGISTERED.length} standing reds appears in the audit, and the audit carries nothing the register does not ***`,

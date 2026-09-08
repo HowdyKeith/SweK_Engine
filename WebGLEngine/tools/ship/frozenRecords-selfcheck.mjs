@@ -24,7 +24,8 @@
 // sweep would reproduce today -- it is a reading taken at v4487, and the two repairs this round shipped have
 // already moved it, which is why the frozen number is compared against nothing live.
 "use strict";
-import { census, reportLines, sources, RECORD_RE, PROBE_AT_V4487 as REC, ENG }
+import { census, reportLines, sources, RECORD_RE, recordBody, FIELD_RE,
+         PROBE_AT_V4487 as OLD, PROBE_AT_V4536 as REC, ENG }
     from "./frozenRecords.mjs";
 import fs from "node:fs";
 import { execFileSync } from "node:child_process";
@@ -95,18 +96,126 @@ console.log("1. what counts as a record, and who counts as its guardian");
         "by nothing at all");
 }
 
+// ---- 1b. *** THE EXTRACTOR ITSELF, ON A FIXTURE CARRYING EVERY WAY THE WINDOW WAS WRONG *** ---------------------
+// The 6,000-character window this replaced was wrong in four directions at once on this tree, and a census
+// cannot demonstrate that about itself -- it would be comparing a ruler with the ruler. So the four failures
+// are BUILT, in one string, and the extractor is required to get each of them right. Each line here is a real
+// record from the tree reduced to its shape: an empty record followed by a fat one, a record longer than the
+// old window, a record with more fields than the old cap, and a record with unbalanced parens inside a
+// string, a comment and a regex -- which is why this is a lexer and not a regex.
+{
+    // *** THE FIXTURE IS ASSEMBLED SO ITS OWN TEXT IS NOT A RECORD, AND THE FIRST DRAFT WAS NOT. ***
+    // Written as plain literals, these six lines ARE `export const NAME_VNNNN = Object.freeze(` in this
+    // file's source, so the live census read 98 records instead of 92 and reported TRICKY_V4005 unbalanced --
+    // a fixture inflating the very census it tests, which is a defect this file's own v4487 note already
+    // records ("the fixtures inflated the census they test, the fifth"). Splitting the keyword means the
+    // pattern never appears contiguously on disk, and the row below CHECKS that rather than trusting it.
+    const EXP = "export " + "const ";
+    const FILLER = "    // " + "x".repeat(120) + "\n";
+    const FIXTURE = [
+        EXP + 'EMPTY_V4001 = Object.freeze([]);',
+        '',
+        EXP + 'FAT_V4002 = Object.freeze({',
+        '    alpha: 1,',
+        '    beta: 22,',
+        '});',
+        '',
+        EXP + 'LONG_V4003 = Object.freeze({',
+        '    early: 5,',
+        FILLER.repeat(60),                                  // pushes `late` past the old 6,000-char window
+        '    late: 9,',
+        '});',
+        '',
+        EXP + 'MANY_V4004 = Object.freeze({',
+        ...Array.from({ length: 14 }, (_, i) => `    f${i}: ${i + 1},`),   // more than the old 12-field cap
+        '});',
+        '',
+        EXP + 'TRICKY_V4005 = Object.freeze({',
+        '    note: "a close paren ) inside a string",',
+        '    // a close paren ) inside a comment',
+        '    re: /[)]\\)/,',
+        '    tpl: `a ) in a template ${1 + (2)} and more`,',
+        '    kept: 3,',
+        '});',
+        '',
+        EXP + 'AFTER_V4006 = Object.freeze({',
+        '    trailing: 4,',
+        '});',
+    ].join("\n");
+    const fields = (name) => {
+        RECORD_RE.lastIndex = 0;
+        let m, at = -1;
+        while ((m = RECORD_RE.exec(FIXTURE))) if (m[1] === name) { at = m.index; break; }
+        if (at < 0) return null;
+        const { body, balanced } = recordBody(FIXTURE, at);
+        if (!balanced) return "UNBALANCED";
+        FIELD_RE.lastIndex = 0;
+        return [...body.matchAll(FIELD_RE)].map((x) => x[1]).join(",");
+    };
+    const got = { EMPTY: fields("EMPTY_V4001"), FAT: fields("FAT_V4002"), LONG: fields("LONG_V4003"),
+                  MANY: fields("MANY_V4004"), TRICKY: fields("TRICKY_V4005"), AFTER: fields("AFTER_V4006") };
+    const many = Array.from({ length: 14 }, (_, i) => "f" + i).join(",");
+    ok("!! *** CONTROL: an EMPTY record gets none of the next record's fields ***",
+        got.EMPTY === "" && got.FAT === "alpha,beta",
+        `EMPTY_V4001 -> [${got.EMPTY}], FAT_V4002 -> [${got.FAT}]. On this tree the window credited SIX empty ` +
+        "records with 7-10 fields each: ROTATION_BOUNDARY_V4533 is `Object.freeze([])`, fifty-six bytes, and " +
+        "was filed as carrying NINE numbers belonging to the record underneath it");
+    ok("!! *** CONTROL: a record longer than 6,000 characters keeps the fields past that line ***",
+        got.LONG === "early,late",
+        `LONG_V4003 -> [${got.LONG}]. MEASURED_AT_V4462 is 11.4 KB and the window saw ONE of its ten; ` +
+        "KEY_DRIFT_V4460 is 8 KB and it saw one of four, which is the red this round was registered under");
+    ok("!! *** CONTROL: a record with more than twelve fields keeps all of them ***",
+        got.MANY === many,
+        `MANY_V4004 -> ${got.MANY === many ? "all 14" : "[" + got.MANY + "]"}. The old \`.slice(0, 12)\` hid ` +
+        "three of MEASURED_AT_V4429's fifteen and four of MEASURED_AT_V4432's sixteen, silently, with " +
+        "nothing anywhere saying a cap had been reached");
+    ok("!! *** CONTROL: a close paren in a string, a comment, a regex or a template does not end the record ***",
+        got.TRICKY === "kept" && got.AFTER === "trailing",
+        `TRICKY_V4005 -> [${got.TRICKY}], and the record after it -> [${got.AFTER}]. THIS IS WHY IT IS A ` +
+        "LEXER AND NOT A REGEX: these records are mostly prose, and stopping at the first `)` inside it " +
+        "would truncate the body and hand the remainder to whatever comes next. (AFTER_V4006 was written " +
+        "on ONE line in the first draft of this fixture and read as zero fields -- correctly: FIELD_RE " +
+        "counts `name: <digits>,` on its OWN line, so a single-line record has none. That was the fixture " +
+        "being wrong about the field rule, not the lexer being wrong about the body.)");
+    // *** AND THE FIRST VERSION OF THIS ROW TESTED A SPELLING RATHER THAN THE PROPERTY. *** It asserted the
+    // string `"export " + "const EMPTY_V4001"` was absent from this file, so a sabotage that collapsed EXP
+    // back to one literal passed it -- correctly, as it happens, because the split is at `EXP + '...'` and
+    // not inside EXP. A row that can only fail on ONE WAY of writing the mistake is not a row about the
+    // mistake. THE PROPERTY IS ASKED OF THE CENSUS ITSELF: run it over this gate's own file and it must
+    // find none of the six.
+    const selfCensus = census({ files: [fileURLToPath(import.meta.url)] });
+    const leaked = selfCensus.records.map((r) => r.name).filter((n) => /_V400\d$/.test(n));
+    ok("!! ...and this fixture is NOT itself in the census it tests",
+        leaked.length === 0,
+        leaked.length
+          ? `LEAKED: ${leaked.join(", ")} -- the fixture is being counted as ${leaked.length} real record(s)`
+          : "the first draft of these six lines WAS six records: the live census read 98 where it reads " +
+            `${census().records.length}, and reported TRICKY_V4005 unbalanced, because a fixture written as ` +
+            "a plain literal is indistinguishable on disk from the thing it imitates. v4487's own note " +
+            "records the same defect one round earlier -- 'the fixtures inflated the census they test'");
+    ok("  ...and the live census closes every record it finds",
+        census().unbalanced.length === 0,
+        "an extraction that cannot find its closing paren is REPORTED rather than silently truncated at " +
+        "end-of-file, which is the failure mode a hand-rolled lexer actually has");
+}
+
 // ---- 2. *** THE FILE IS ITSELF A RECORD, SO IT MOVED THE COUNT IT MEASURES *** -----------------------------------
 console.log("\n2. the observer effect, checked to be exactly one");
 
 {
     const all = census();
     const without = census({ exclude: /frozenRecords/ });
-    ok("!! *** counting this module adds EXACTLY ONE record, which is PROBE_AT_V4487 ***",
-        all.records.length - without.records.length === 1 &&
-        all.records.some((r) => r.name === "PROBE_AT_V4487") &&
-        !without.records.some((r) => r.name === "PROBE_AT_V4487"),
-        "sabotage D: v3453's observer effect in a file built to count the things it is an instance of. " +
-        "'The number changed when I wrote it down' is a curiosity until somebody checks it changed by one");
+    // v4536: this module now carries TWO records -- the v4487 sweep and the v4536 re-run that supersedes it --
+    // so the delta is DERIVED from what the module actually declares rather than typed as a number. The row
+    // that mattered is unchanged: the count moves by exactly the records this file adds, and no more.
+    const MINE = ["PROBE_AT_V4487", "PROBE_AT_V4536"];
+    ok(`!! *** counting this module adds EXACTLY ${MINE.length} records, which are ${MINE.join(" and ")} ***`,
+        all.records.length - without.records.length === MINE.length &&
+        MINE.every((n) => all.records.some((r) => r.name === n)) &&
+        MINE.every((n) => !without.records.some((r) => r.name === n)),
+        `sabotage D: v3453's observer effect in a file built to count the things it is an instance of. ` +
+        `'The number changed when I wrote it down' is a curiosity until somebody checks it changed by ` +
+        `exactly what this file declares -- ${all.records.length} against ${without.records.length}`);
     // v4527 -- *** THE POPULATION THE SWEEP WAS TAKEN AGAINST IS DERIVED, NOT PINNED. *** This row compared the live
     // census to 74 / 135 and went red the round a new version-stamped record arrived (physics/raceKnob.mjs's
     // MEASURED_V4527), which is a count pinned to a moment -- the species this tree names most. A record whose stamp is
@@ -142,11 +251,36 @@ console.log("\n2. the observer effect, checked to be exactly one");
         ? without.records.filter((r) => !atSweepNames.has(r.name))
         : without.records.filter((r) => stampOf(r.name) > sweepV);
     const atSweep = { records: without.records.length - arrivals.length, fields: without.fields - arrivals.reduce((a, r) => a + r.fields.length, 0) };
-    ok("...and the excluded reading, less the records stamped after the sweep, is the one the frozen sweep was taken against",
-        atSweep.records === REC.records && atSweep.fields === REC.fields,
-        `${atSweep.records} records and ${atSweep.fields} fields at or before ${REC.at} (${without.records.length} and ${without.fields} now), ` +
-        `against ${REC.records} and ${REC.fields} at v4487` +
-        (arrivals.length ? `; arrived since: ${arrivals.map((r) => r.name + " (" + r.fields.length + " fields)").join(", ")}` : ""));
+    // *** v4536 -- THIS ROW WAS COMPARING TWO DIFFERENT POPULATIONS AND THE BROKEN WINDOW HID IT. ***
+    // It took today's census, removed the records that arrived after the sweep, and asserted the remainder
+    // equalled the sweep's frozen count -- for BOTH records and fields. The record half is sound: a record
+    // either existed at that commit or it did not, and git is asked. THE FIELD HALF NEVER WAS. A record that
+    // existed at v4487 and has GAINED a numeric field since moves that total without any record arriving, and
+    // editing a record is the ordinary thing this tree does all day. It read 135 = 135 only because the window
+    // was undercounting today by about as much as the tree had grown; replayed correctly the v4487 tree held
+    // 138 and those same 74 records carry 142 today. FOUR FIELDS WERE ADDED TO PRE-EXISTING RECORDS, which is
+    // not a finding -- and a row that calls it one is a row somebody will eventually switch off.
+    //
+    // So the ASSERTION is the identity that is stable under editing, and the drift is REPORTED beside it.
+    const fieldDrift = atSweep.fields - REC.v4487Recount.fields;
+    ok("!! the records that existed at the sweep's commit are still exactly the population it was taken over",
+        atSweep.records === REC.v4487Recount.records,
+        `${atSweep.records} of today's records existed at ${REC.commit}, against the ${REC.v4487Recount.records} ` +
+        `the replay counts there. Those same records carry ${atSweep.fields} numeric fields today against ` +
+        `${REC.v4487Recount.fields} then -- ${fieldDrift >= 0 ? "+" : ""}${fieldDrift} from ORDINARY EDITING of ` +
+        "records that already existed, REPORTED rather than asserted, because a record gaining a field is not " +
+        "a record arriving. " +
+        (arrivals.length ? `Arrived since: ${arrivals.map((r) => r.name + " (" + r.fields.length + " fields)").join(", ")}` : "Nothing has arrived since."));
+    // The whole-tree reading this round froze, checked as a pair so neither half can drift alone. It is
+    // deliberately NOT a ratchet: a round that adds a record re-takes it, which is one line and is the price
+    // of a number that means what it says.
+    ok("!! ...and this round's own reading of the whole census is what the tree still holds",
+        without.records.length === REC.excluding.records && without.fields === REC.excluding.fields &&
+        without.withFields === REC.excluding.withFields,
+        `${without.records.length} records, ${without.withFields} with fields, ${without.fields} fields ` +
+        `excluding this module, against the ${REC.excluding.records} / ${REC.excluding.withFields} / ` +
+        `${REC.excluding.fields} measured at ${REC.at}. A ROUND THAT ADDS A RECORD RE-TAKES THIS, and that is ` +
+        "the point: the alternative is a number nobody re-derives.");
     ok("!! *** the arrivals are read out of the v4487 COMMIT, not out of the names ***",
         !!atSweepNames && atSweepNames.size > 0 &&
         // the derivation must actually disagree with the naive rule somewhere, or it is the naive rule
@@ -166,34 +300,98 @@ console.log("\n2. the observer effect, checked to be exactly one");
 // ---- 3. THE FROZEN SWEEP'S OWN ARITHMETIC ------------------------------------------------------------------------
 console.log("\n3. the record the sweep left behind");
 
-ok("!! noticed and unnoticed account for every field probed",
-    REC.noticed + REC.unnoticed === REC.fields,
-    `sabotage E: ${REC.noticed} + ${REC.unnoticed} = ${REC.fields}. A headline beside a list that does not ` +
-    "add up is v4296's mistake, and it is the cheapest of all of these to check");
+// *** v4536 -- FOUR CLASSES, AND THE FOURTH AND THIRD ARE THE POINT. *** v4487 split 135 fields into
+// noticed and unnoticed and nothing else, so a field whose only guardian gate was ALREADY RED scored as
+// unnoticed, and so did a field whose record no gate names at all. A bump cannot redden what is already red
+// and there is nothing to run when nothing names the record; neither is evidence that nobody is watching.
+// v4408's rule, which this file keeps re-learning: 'never observed' and 'observed green' are different, and
+// one bucket for both is how the second becomes the first.
+ok("!! *** all FOUR classes account for every field in the population ***",
+    REC.noticed + REC.unnoticed + REC.unmeasurable + REC.noGuardianAtAll === REC.fields,
+    `sabotage E: ${REC.noticed} noticed + ${REC.unnoticed} unnoticed + ${REC.unmeasurable} unmeasurable + ` +
+    `${REC.noGuardianAtAll} with no guardian = ${REC.fields}. The unnoticed rate is ${REC.unnoticed} of the ` +
+    `${REC.noticed + REC.unnoticed} that COULD be measured, ` +
+    `${(100 * REC.unnoticed / (REC.noticed + REC.unnoticed)).toFixed(1)}%, against v4487's ${OLD.unnoticed} ` +
+    `of ${OLD.fields} = ${(100 * OLD.unnoticed / OLD.fields).toFixed(1)}%. A headline beside a list that ` +
+    "does not add up is v4296's mistake, and it is the cheapest of all of these to check");
+// *** THE PROBE RAN IN TWO PASSES AND BOTH ARE KEPT, SO THE MOVE IS CHECKABLE RATHER THAN ASSERTED. ***
+// The first pass could not measure seventeen fields: their only guardian gates were red before a bump, and
+// a bump cannot redden what is already red. Both blockers went green while the round ran -- one of them
+// BECAUSE of it -- and the seventeen were re-probed. Keeping only the final figures would leave "0
+// unmeasurable" looking like a property of the tree when it is the outcome of a repair, so the first pass,
+// the re-probe and the total are all recorded and required to reconcile.
+{
+    const U = REC.unmeasurableFirstPass || {};
+    const F1 = U.firstPass || {}, RP = U.reProbed || {};
+    ok("!! *** the first pass, the re-probe and the total reconcile -- and the seventeen did not vanish ***",
+        F1.noticed + F1.unnoticed + F1.unmeasurable + F1.noGuardianAtAll === REC.fields &&
+        RP.noticed + RP.unnoticed + RP.unmeasurable === F1.unmeasurable &&
+        F1.noticed + RP.noticed === REC.noticed && F1.unnoticed + RP.unnoticed === REC.unnoticed &&
+        REC.unmeasurable === 0 && Array.isArray(U.blockedBy) && U.blockedBy.length === 2,
+        `first pass ${F1.noticed}/${F1.unnoticed}/${F1.unmeasurable}/${F1.noGuardianAtAll}; the ` +
+        `${F1.unmeasurable} unmeasurable re-probed as ${RP.noticed} noticed and ${RP.unnoticed} unnoticed; ` +
+        `total ${REC.noticed}/${REC.unnoticed}/${REC.unmeasurable}/${REC.noGuardianAtAll} of ${REC.fields}. ` +
+        `Blocked by ${(U.blockedBy || []).map((g) => g.replace(/^tools\/ship\//, "")).join(" and ")} -- both ` +
+        "green now, so the class is EMPTY BECAUSE THE OBSTACLE WAS REMOVED, not because it never existed");
+}
+
+// *** AND THE OLD RECORD IS HELD TO THE REPLAY THAT RETIRED IT. *** Not a re-derivation and it says so: the
+// replay was run once, over 75f0c033's tree with the balanced extractor, and its result is recorded above.
+// What is checked here is that the recount and the record it corrects are consistent with each other and
+// with the count of fields the v4487 sweep therefore never probed.
+ok("!! the v4487 record is superseded by a REPLAY at its own commit, and the arithmetic of that is checked",
+    REC.v4487Recount.fields - OLD.fields === REC.v4487Recount.neverProbed &&
+    REC.v4487Recount.records === OLD.records && REC.v4487Recount.withFields !== OLD.withFields &&
+    REC.commit === OLD.commit,
+    `replayed at ${REC.commit} with a balanced extraction the v4487 tree held ${REC.v4487Recount.records} ` +
+    `records, ${REC.v4487Recount.withFields} with fields, ${REC.v4487Recount.fields} fields; the record ` +
+    `says ${REC.v4487Recount.recordSays}. SO ${REC.v4487Recount.neverProbed} FIELDS IN THAT TREE WERE NEVER ` +
+    "PROBED and one record was credited with fields it does not have. THIS IS A CONSISTENCY CHECK ON A " +
+    "REPLAY RECORDED HERE, NOT A RE-RUN OF IT -- re-walking a 1,500-file tree at another commit is not " +
+    "what a gate can afford, and a check pretending to be a re-derivation is the worse of the two failures");
 ok("...and the counted subsets do not exceed the population they are drawn from",
     REC.nothingNoticesAnyField <= REC.withFields && REC.fullyGuarded <= REC.withFields &&
-    REC.noGateNamesIt <= REC.records && REC.caughtByANonSiblingGate <= REC.noticed);
+    REC.noGateNamesIt <= REC.records && REC.caughtByANonSiblingGate <= REC.noticed &&
+    REC.unmeasurableRecords.length <= REC.withFields && REC.baselineRedGates.length <= REC.guardianGates &&
+    REC.excluding.fields <= REC.fields && REC.excluding.records <= REC.records);
 ok("!! *** the method is stated, so a later sweep can be compared rather than merely disagreed with ***",
-    /bump one integer field by 7/.test(REC.method) && /every gate that NAMES/.test(REC.method));
-ok("!! ...and the FIRST sweep is kept, with what was wrong with it",
-    REC.firstSweepUsedSiblingsOnly.unnoticedPct === 37.0 &&
-    /assumed/.test(REC.firstSweepUsedSiblingsOnly.wrong),
-    "37.0% against 38.5%: THE HEADLINE BARELY MOVED AND THE ATTRIBUTION MOVED ENORMOUSLY. A discarded " +
-    "reading is evidence about the method, and this one says a defensible number can rest on a guess");
+    /bump one integer field by 7/.test(String(REC.method)) && /every gate that NAMES/.test(String(REC.method)) &&
+    /ALREADY RED/.test(String(REC.method)),
+    "v4536 adds the baseline to the stated method, because a sweep that does not take one cannot tell " +
+    "UNMEASURABLE from UNNOTICED and will report the difference as debt");
+// *** v4536 -- AND THIS ROW ITSELF CRASHED THE GATE, WHICH IS THE FIFTH INSTANCE OF THE SHAPE IT WARNS
+// ABOUT TWELVE LINES DOWN. *** Pointing REC at the v4536 record left `REC.firstSweepUsedSiblingsOnly`
+// undefined and the row threw before `ok` was ever called -- no FAIL line, exit 1, and a count of FAIL lines
+// reading a crash as a clean zero. A CRASH IS NOT A VERDICT. The two records are named separately now, and
+// every field read off either one is guarded, so a missing field FAILS this row instead of taking the gate
+// down. There are now THREE readings kept, not two, and the trend across them is the evidence:
+//     first sweep, siblings assumed      37.0% unnoticed of 135, guardian set a GUESS
+//     v4487, guardians derived           38.5% unnoticed of 135, enumerated by a 6,000-character window
+//     v4536, window replaced, baselined  43.3% unnoticed of the 127 that COULD be measured
+const FIRST = (OLD && OLD.firstSweepUsedSiblingsOnly) || {};
+ok("!! ...and EVERY earlier sweep is kept, with what was wrong with each",
+    FIRST.unnoticedPct === 37.0 && /assumed/.test(String(FIRST.wrong)) &&
+    OLD.at === "v4487" && OLD.fields === 135 && REC.at === "v4536",
+    `${FIRST.unnoticedPct || "?"}% (siblings assumed) -> ${(100 * OLD.unnoticed / OLD.fields).toFixed(1)}% ` +
+    `(guardians derived, window enumerated) -> ${(100 * REC.unnoticed / (REC.noticed + REC.unnoticed)).toFixed(1)}% ` +
+    "(window replaced, baseline taken). THE HEADLINE BARELY MOVES AND WHAT IS UNDER IT MOVES ENORMOUSLY, " +
+    "every time. A discarded reading is evidence about the method, and these three say a defensible number " +
+    "can rest on a guess, then on a broken ruler, and still look like progress");
 // *** THE DETAIL IS COMPUTED DEFENSIVELY, AND THAT IS THE FOURTH TIME THIS SESSION. *** Reading the field
 // eagerly here means a sabotage that DELETES it throws before `ok` is called, no FAIL line prints, and a
 // count of FAIL lines reads the crash as a clean zero -- which is what sabotage F did on the first run.
 // v4485's gate had it, v4486's runner grew a load-check for it, changedPaths was repaired for it, and it
 // arrived again here. FOUR INSTANCES, ONE SHAPE: a detail string that assumes the thing the condition is
 // about to say may be missing.
-const LIMIT = REC.probeCatchesOneDirection || {};
-ok("!! *** and the limit is DEMONSTRATED on this round's own repair, not merely asserted ***",
-    !!REC.probeCatchesOneDirection && LIMIT.stillUnnoticed === true &&
+const LIMIT = (OLD && OLD.probeCatchesOneDirection) || {};
+ok("!! *** and the limit is DEMONSTRATED on a real repair, not merely asserted ***",
+    !!(OLD && OLD.probeCatchesOneDirection) && LIMIT.stillUnnoticed === true &&
     /TAINT_AT_V4479/.test(String(LIMIT.shown)),
     `sabotage F: ${LIMIT.why || "NO LIMIT RECORDED"}. The guard added to that record catches a DOWNWARD ` +
     "corruption; the probe applies an UPWARD one; so a real guard reads here as no guard, and the field " +
     "stays in the unnoticed count rather than being argued out of it");
-ok("the record is frozen", Object.isFrozen(REC) && Object.isFrozen(LIMIT));
+ok("both records are frozen", Object.isFrozen(REC) && Object.isFrozen(OLD) && Object.isFrozen(LIMIT) &&
+   Object.isFrozen(REC.excluding) && Object.isFrozen(REC.windowFailures) && Object.isFrozen(REC.v4487Recount));
 
 // ---- 4. THE TWO REPAIRS THIS ROUND SHIPPED ------------------------------------------------------------------------
 console.log("\n4. what was closed, checked against the files rather than claimed");
