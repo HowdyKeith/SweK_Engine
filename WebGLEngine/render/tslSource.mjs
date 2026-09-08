@@ -50,19 +50,75 @@ export async function emitShaders(renderer, { scene, camera, mesh }) {
     return { language: renderer.backend.isWebGPUBackend ? "wgsl" : "glsl", vertex: sh.vertexShader, fragment: sh.fragmentShader };
 }
 
-/** The fields of three's fragment uniform struct, in order: [{ name, type }] (type in the device's vocabulary). Refuses an unlabelled one. */
+/** The fragment with its struct DECLARATIONS removed: what is left is what actually reads a uniform. */
+export function fragmentBody(fragment) {
+    // Both spellings of a declaration: WGSL's `struct X { ... };` and GLSL's `uniform X { ... };`. Leaving the
+    // GLSL block in made its own declaration read as a USE, which is how a uniform nothing touches was
+    // reported as read on one backend and unread on the other for the same graph.
+    return String(fragment).replace(/struct \w+ \{[\s\S]*?\};/g, "").replace(/uniform \w+ \{[\s\S]*?\};/g, "");
+}
+
+// *** v4538 -- r184 RENAMED THE GLSL FRAGMENT UNIFORM BLOCK, AND THAT IS THE WHOLE OF THE SECOND SYMPTOM. ***
+// r178 emitted `uniform fragment_object { ... };` and r184 emits `uniform object { ... };`. The GLSL reader
+// matched the old spelling only, found nothing, and returned an EMPTY uniform list -- which surfaced not as
+// "the block moved" but as "the WGSL and GLSL builders emitted different uniform lists (seedLo,seedHi,rLo,rHi
+// vs )". One rename, two unrecognisable symptoms, on two different backends.
+const GLSL_UNIFORM_BLOCK = /uniform (?:fragment_object|object) \{([\s\S]*?)\};/;
+
+// ...AND r184 ALSO DROPPED THE `f_` PREFIX ON EVERY FIELD IN THAT BLOCK. r178 emitted `float f_seedLo;` and
+// r184 emits `float seedLo;`. The prefix was assumed in six places here -- two that PARSE the block and four
+// that REWRITE `f_name` to the device's `name` -- so the parse found nothing and the rewrites became no-ops.
+// Both spellings are accepted: the rewrite of a name that no longer carries a prefix is simply already done.
+const F_ = "(?:f_)?";
+
+/**
+ * *** v4538 -- THE UNLABELLED UNIFORMS THREE DECLARES AND THE EFFECT NEVER READS. ***
+ *
+ * three r184 emits the object's model matrix into `objectStruct` for a bare NodeMaterial with only a
+ * fragmentNode -- r178 did not. MEASURED on badTvTsl, the effect this module was built against:
+ *
+ *     struct objectStruct { time, speed, distortion, distortion2, rollSpeed, nodeUniform8 : mat4x4<f32> }
+ *
+ * All five of the effect's uniforms are LABELLED and correct; the sixth is three's, it is a matrix, and the
+ * fragment body NEVER READS IT. The rule below refused the whole emit on it, so the bump to 0.184 took the
+ * sixteen gates that import this build from 14 green to 4.
+ *
+ * *** AND THE MODULE ALREADY HELD BOTH HALVES OF THE ANSWER, DISAGREEING WITH ITSELF. *** The camera/object
+ * rule below (`/modelViewMatrix|\bobject\.nodeUniform\d+/`) refuses a fragment that READS an object matrix;
+ * this one refused a struct that DECLARES an unlabelled field. Two rules about one hazard -- one asking what
+ * is read and one what is written down -- and r184 is the first build to make them disagree.
+ *
+ * The transplant rewrites names for the uniforms it BINDS. A field nobody reads is bound to nothing, so it is
+ * dropped and NAMED rather than refused; a field that is read still has no stable name to bind under and is
+ * still refused, in the same words. The teeth stay exactly where the transplant can be wrong.
+ */
+export function unreadUnlabelledUniforms(fragment, language) {
+    const body = fragmentBody(fragment);
+    const decl = language === "wgsl" ? (fragment.match(/struct objectStruct \{([\s\S]*?)\};/) || [])[1]
+                                     : (fragment.match(GLSL_UNIFORM_BLOCK) || [])[1];
+    if (!decl) return [];
+    const names = language === "wgsl"
+        ? [...decl.matchAll(/^\s*(nodeUniform\d+)\s*:/gm)].map((m) => m[1])
+        : [...decl.matchAll(new RegExp("^\\s*\\w+\\s+" + F_ + "(nodeUniform\\d+)\\s*;?$", "gm"))].map((m) => m[1]);
+    return names.filter((n) => !new RegExp("\\b" + n + "\\b").test(body));
+}
+
+/** The fields of three's fragment uniform struct, in order: [{ name, type }] (type in the device's vocabulary). Refuses an unlabelled one THE FRAGMENT READS. */
 export function uniformFields(fragment, language) {
     const out = [];
+    const unread = new Set(unreadUnlabelledUniforms(fragment, language));
     if (language === "wgsl") {
         const m = fragment.match(/struct objectStruct \{([\s\S]*?)\};/);
         if (!m) return out;
-        for (const line of m[1].split("\n")) { const f = line.trim().replace(/,$/, "").match(/^(\w+)\s*:\s*(.+)$/); if (!f) continue; const t = WGSL_TYPES[f[2].trim()]; if (!t) throw new Error(`tslSource: uniform ${f[1]} has type ${f[2]}, which the device's uniform list does not carry`); out.push({ name: f[1], type: t }); }
+        for (const line of m[1].split("\n")) { const f = line.trim().replace(/,$/, "").match(/^(\w+)\s*:\s*(.+)$/); if (!f) continue; if (unread.has(f[1])) continue; const t = WGSL_TYPES[f[2].trim()]; if (!t) throw new Error(`tslSource: uniform ${f[1]} has type ${f[2]}, which the device's uniform list does not carry`); out.push({ name: f[1], type: t }); }
     } else {
-        const m = fragment.match(/uniform fragment_object \{([\s\S]*?)\};/);
+        const m = fragment.match(GLSL_UNIFORM_BLOCK);
         if (!m) return out;
-        for (const line of m[1].split("\n")) { const f = line.trim().replace(/;$/, "").match(/^(\w+)\s+f_(\w+)$/); if (!f) continue; const t = GLSL_TYPES[f[1]]; if (!t) throw new Error(`tslSource: uniform ${f[2]} has type ${f[1]}, which the device's uniform list does not carry`); out.push({ name: f[2], type: t }); }
+        for (const line of m[1].split("\n")) { const f = line.trim().replace(/;$/, "").match(new RegExp("^(\\w+)\\s+" + F_ + "(\\w+)$")); if (!f) continue; if (unread.has(f[2])) continue; const t = GLSL_TYPES[f[1]]; if (!t) throw new Error(`tslSource: uniform ${f[2]} has type ${f[1]}, which the device's uniform list does not carry`); out.push({ name: f[2], type: t }); }
     }
-    for (const u of out) if (/^nodeUniform\d+$/.test(u.name)) throw new Error(`tslSource: the emitted ${language.toUpperCase()} carries an UNLABELLED uniform (${u.name}); label every uniform node (uniform(x).label("name")) so the device can bind it by name`);
+    // Still refused -- and now only when the fragment READS it, which is when the transplant would have to
+    // bind it under a name that is not stable across builds.
+    for (const u of out) if (/^nodeUniform\d+$/.test(u.name)) throw new Error(`tslSource: the emitted ${language.toUpperCase()} carries an UNLABELLED uniform (${u.name}) THAT THE FRAGMENT READS; label every uniform node (uniform(x).label("name")) so the device can bind it by name`);
     return out;
 }
 /** The textures three declared: [name]. Refuses an unlabelled one. */
@@ -266,7 +322,7 @@ export function transplantIntoShell({ wgsl, glsl }, shell) {
         // v4483 -- a CAMERA matrix in the fragment crosses when the shell names its own for it (`matrices: { cameraProjectionMatrix: "cam.proj" }`);
         // the model matrix never does: three emits it as an unlabelled object uniform, which has no name to bind under.
         if (/modelViewMatrix|\bobject\.nodeUniform\d+/.test(em.fragment)) throw new Error("tslSource: the fragment reads the object's model matrix (modelViewMatrix), which three emits unlabelled; a shell transplant carries only what its vertex stage passes and what the shell names");
-        const S0 = shell[language] || {}, matricesRead = [...new Set([...em.fragment.matchAll(language === "wgsl" ? /\brender\.(\w+)/g : /\bf_(cameraProjectionMatrix|cameraViewMatrix)\b/g)].map((m) => m[1]))];
+        const S0 = shell[language] || {}, matricesRead = [...new Set([...em.fragment.matchAll(language === "wgsl" ? /\brender\.(\w+)/g : new RegExp("\\b" + F_ + "(cameraProjectionMatrix|cameraViewMatrix)\\b", "g"))].map((m) => m[1]))];
         for (const m of matricesRead) if (!(S0.matrices && S0.matrices[m])) throw new Error(`tslSource: the fragment reads three's ${m} and the shell "${shell.name}" names no matrix of its own for it (it names ${Object.keys(S0.matrices || {}).join(", ") || "none"})`);
         const uniforms = uniformFields(em.fragment, language), textures = textureNames(em.fragment, language);
         // v4326 -- a texture crosses when the SHELL declares it. The shell lists the names its own prefix binds
@@ -344,7 +400,7 @@ export function transplantIntoShell({ wgsl, glsl }, shell) {
             if (!/fragColor\s*=/.test(b)) throw new Error("tslSource: the GLSL main() does not write fragColor");
             for (const n of ins) { const what = sem[n]; const to = what && S.varyings[what]; if (!to) throw new Error(`tslSource: the fragment reads varying ${n} (${what || "unknown"}), which the shell "${shell.name}" does not carry`); b = b.replace(new RegExp(`\\b${n}\\b`, "g"), to); }
             for (const u of uniforms) b = b.replace(new RegExp(`\\bf_${u.name}\\b`, "g"), u.name);
-            b = b.replace(/\bf_(cameraProjectionMatrix|cameraViewMatrix)\b/g, (_, m) => S.matrices[m]);
+            b = b.replace(new RegExp("\\b" + F_ + "(cameraProjectionMatrix|cameraViewMatrix)\\b", "g"), (_, m) => S.matrices[m]);
             desc.glsl = { vertex: vertexText || S.vertex, fragment: `${S.fragmentPrefix.replace("{{VARYINGS}}", fragInText)}\n${codes}\nvoid main() {${b}}\n` };
         }
     }
