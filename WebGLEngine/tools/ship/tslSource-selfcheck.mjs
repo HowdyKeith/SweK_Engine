@@ -14,7 +14,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
 import { validateWgsl } from "../../render/wgslSpec.mjs";
-import { transplantFragment, uniformFields, textureNames, devicePipelineFromTsl, TRI_VS_WGSL } from "../../render/tslSource.mjs";
+import { transplantFragment, uniformFields, textureNames, devicePipelineFromTsl, unreadUnlabelledUniforms, TRI_VS_WGSL } from "../../render/tslSource.mjs";
 import { KNOB_ORDER } from "../../render/badTvWgsl.mjs";
 import { keyCpu } from "../../render/blackbodyTsl.mjs";
 
@@ -30,7 +30,7 @@ const throwsWith = (fn, re) => { try { fn(); return false; } catch (e) { return 
 const FIX = JSON.parse(fs.readFileSync(path.join(ENG, "tools/ship/tslSource-fixture.json"), "utf8"));
 const fill = (t, m) => t.replace(/\{\{(\w+)\}\}/g, (_, k) => m[k]);
 const W_FIX = (uni = "\ttime : f32,\n\tspeed : f32", tex = "tDiffuse", vary = "nodeVarying3", extra = "") => fill(FIX.wgsl, { UNI: uni, TEX: tex, VARY: vary, EXTRA: extra });
-const G_FIX = (uni = "\tfloat f_time;\n\tfloat f_speed;", tex = "tDiffuse") => fill(FIX.glsl, { UNI: uni, TEX: tex });
+const G_FIX = (uni = "\tfloat f_time;\n\tfloat f_speed;", tex = "tDiffuse", extra = "") => fill(FIX.glsl, { UNI: uni, TEX: tex, EXTRA: extra });
 const AT = "@";
 
 console.log("\n1. THE TRANSPLANT ON THE CPU: three's names become the device's, and the rules refuse by name");
@@ -41,7 +41,12 @@ console.log("\n1. THE TRANSPLANT ON THE CPU: three's names become the device's, 
     ok("GLSL: the std140 block becomes plain uniforms by name, the varying `vUv`, fragColor kept, the f_ prefixes gone", new RegExp("uni" + "form float time;\\s*uni" + "form float speed;").test(G.code) && new RegExp("uni" + "form sampler2D tDiffuse;").test(G.code) && /in vec2 vUv;/.test(G.code) && /texture\( tDiffuse, vec2\( helper\( vUv\.x \+ \( time \* speed \) \), vUv\.y \) \)/.test(G.code) && !/f_time|nodeVarying|fragment_object/.test(G.code));
     const desc = devicePipelineFromTsl({ wgsl: W_FIX(), glsl: G_FIX() });
     ok("  the descriptor carries the uniform list in three's order, typed, and the textures by name", desc.uniforms.map((u) => `${u.name}:${u.type}`).join() === "time:f32,speed:f32" && desc.textures.join() === "tDiffuse" && desc.attributes.length === 0 && desc.vs === "vs" && desc.fs === "fs");
-    ok("REFUSED: an unlabelled uniform (nodeUniform1 has no name to bind under)", throwsWith(() => uniformFields(W_FIX("\ttime : f32,\n\tnodeUniform1 : f32"), "wgsl"), /UNLABELLED uniform/) && throwsWith(() => uniformFields(G_FIX("\tfloat f_time;\n\tfloat f_nodeUniform1;"), "glsl"), /UNLABELLED uniform/));
+    // v4538 narrowed the refusal to an unlabelled uniform THE FRAGMENT READS -- and this row went on passing a
+    // fixture whose body reads nothing of the kind, so from v4538 to v4539 it exercised no refusal at all. The
+    // body now READS it, in both languages, and the unread case is asserted separately so the narrowing has a
+    // control of its own. (Writing this is what found the f_ hole in unreadUnlabelledUniforms.)
+    ok("REFUSED: an unlabelled uniform the fragment READS (nodeUniform1 has no name to bind under) -- in both languages, and in GLSL under three's f_ prefix too", throwsWith(() => uniformFields(W_FIX("\ttime : f32,\n\tnodeUniform1 : f32", undefined, undefined, "\n\tnodeVar0.x = object.nodeUniform1;"), "wgsl"), /UNLABELLED uniform/) && throwsWith(() => uniformFields(G_FIX("\tfloat f_time;\n\tfloat f_nodeUniform1;", undefined, "\n\tnodeVar0.x = f_nodeUniform1;"), "glsl"), /UNLABELLED uniform/) && throwsWith(() => uniformFields(G_FIX("\tfloat f_time;\n\tfloat nodeUniform1;", undefined, "\n\tnodeVar0.x = nodeUniform1;"), "glsl"), /UNLABELLED uniform/));
+    ok("  and NOT refused when nobody reads it (r184's object matrix): dropped from the bound list and named, not refused", uniformFields(W_FIX("\ttime : f32,\n\tnodeUniform8 : mat4x4<f32>"), "wgsl").map((u) => u.name).join() === "time" && uniformFields(G_FIX("\tfloat f_time;\n\tmat4 f_nodeUniform8;"), "glsl").map((u) => u.name).join() === "time" && unreadUnlabelledUniforms(W_FIX("\ttime : f32,\n\tnodeUniform8 : mat4x4<f32>"), "wgsl").join() === "nodeUniform8");
     ok("REFUSED: an unlabelled texture, a camera matrix in the fragment, a fragment with no varying, a text that is not three's", throwsWith(() => textureNames(W_FIX(undefined, "nodeUniform0"), "wgsl"), /UNLABELLED texture/) && throwsWith(() => transplantFragment(W_FIX(undefined, undefined, undefined, "\n\tnodeVar0 = render.cameraProjectionMatrix[0];"), "wgsl"), /camera or object matrices/) && throwsWith(() => transplantFragment(W_FIX().replace(AT + "location( 3 ) nodeVarying3 : vec2<f32>", ""), "wgsl"), /exactly one vec2 varying/) && throwsWith(() => transplantFragment(AT + "fragment fn fs() {}", "wgsl"), /not a three\.js/));
     ok("REFUSED: the two builders disagreeing about the uniforms or the textures", throwsWith(() => devicePipelineFromTsl({ wgsl: W_FIX("\ttime : f32"), glsl: G_FIX() }), /different uniform lists/) && throwsWith(() => devicePipelineFromTsl({ wgsl: W_FIX(undefined, "tOther"), glsl: G_FIX() }), /different textures/));
     ok("  a type the device does not carry is refused, not guessed", throwsWith(() => uniformFields(W_FIX("\ttime : mat3x3<f32>"), "wgsl"), /which the device's uniform list does not carry/));
@@ -156,6 +161,74 @@ else {
     }
 }
 
+console.log("\n4. THE SECOND OPINION (v4539): the same uniforms read from three's NodeBuilderState, not from the text three printed");
+// Going 0.178 -> 0.184 broke four SPELLINGS in render/tslSource.mjs at once, and each was repaired by teaching a
+// regex the new spelling -- a fix pinned to a spelling rather than to a mechanism. three's debug hook keeps two
+// strings out of a state with eleven fields; `bindings` is one of the nine it throws away, and it carries the same
+// uniforms already parsed. This section asserts the two readers AGREE, so the structural one arrives as a second
+// opinion rather than as a swap made on faith -- and NAMES the one case where they do not.
+if (skip) { console.log(`  SKIP  ${skip}`); fails++; }
+else {
+    const r = await runInEngineOrigin({ engineRoot: ENG, args: { N: 64 }, script: `async (a) => {
+        const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
+        const B = await import("/render/badTvTsl.mjs"); const S = await import("/render/tslSource.mjs"); const BB = await import("/render/blackbodyTsl.mjs");
+        const N = a.N, src = new Uint8Array(N * N * 4); for (let i = 0; i < N * N; i++) { src[i * 4] = i & 255; src[i * 4 + 3] = 255; }
+        const out = {};
+        for (const mode of ["webgpu", "webgl2"]) {
+            const canvas = document.createElement("canvas"); canvas.width = N; canvas.height = N;
+            const renderer = new THREE.WebGPURenderer({ canvas, forceWebGL: mode === "webgl2", antialias: false }); await renderer.init();
+            renderer.setRenderTarget(new THREE.RenderTarget(N, N));
+            const graphs = { badTv: B.makeBadTvTsl(THREE, T, { texture: B.sourceTexture(THREE, { pixels: src, width: N, height: N }) }),
+                             blackbody: BB.makeBlackbodyKeyTsl(THREE, T, {}) };
+            for (const [name, fx] of Object.entries(graphs)) {
+                const mesh = fx.scene.children[0], rec = {};
+                try {
+                    const em = await S.emitShaders(renderer, { scene: fx.scene, camera: fx.camera, mesh });
+                    rec.language = em.language;
+                    try { rec.text = S.uniformFields(em.fragment, em.language); } catch (e) { rec.textRefused = String(e.message); }
+                    try { rec.textTex = S.textureNames(em.fragment, em.language); } catch (e) { rec.textTexRefused = String(e.message); }
+                    const st = await S.nodeBuilderStateFor(renderer, { scene: fx.scene, camera: fx.camera, mesh });
+                    rec.stateFields = Object.keys(st);
+                    rec.keptByDebugHook = Object.keys(await renderer.debug.getShaderAsync(fx.scene, fx.camera, mesh));
+                    rec.all = S.bindingsFromState(st); rec.state = S.deviceUniformsFromState(st);
+                } catch (e) { rec.error = String(e && e.message || e).slice(0, 400); }
+                out[mode + ":" + name] = rec;
+            }
+        }
+        return out;
+    }` });
+    ok("the harness ran and three's NodeBuilderState was reachable for all four cases (renderer._renderLists / _renderContexts / _objects -- the same path three's own getShaderAsync walks)",
+       r.ok && r.result && Object.values(r.result).length === 4 && Object.values(r.result).every((v) => !v.error && v.all),
+       r.ok ? Object.entries(r.result || {}).map(([k, v]) => v.error && k + ": " + v.error).filter(Boolean).join(" | ") : (r.reason || (r.pageErrors || []).join("; ")));
+    if (r.ok && Object.values(r.result).every((v) => !v.error && v.all)) {
+        const R = r.result, K = Object.keys(R).sort(), j = (a) => (a || []).map((u) => u.name + ":" + u.type).join(",");
+        const one = R["webgpu:badTv"];
+        ok("the state carries eleven fields and three's debug hook keeps two of them -- `bindings` is one of the nine it throws away", one.stateFields.length === 11 && one.stateFields.includes("bindings") && one.keptByDebugHook.slice().sort().join() === "fragmentShader,vertexShader" && !one.keptByDebugHook.includes("bindings"), `state ${one.stateFields.length} fields; hook kept ${one.keptByDebugHook.join(",")}`);
+        // where the TEXT reader answers, the STATE reader answers identically -- name, type and order
+        const answered = K.filter((k) => !R[k].textRefused), agreed = answered.filter((k) => j(R[k].text) === j(R[k].state));
+        ok(`*** where the text reader answers, the state reader answers IDENTICALLY -- same names, same device types, same order (${agreed.length} of ${answered.length}: ${agreed.join(", ")}) ***`,
+           answered.length >= 3 && agreed.length === answered.length, answered.map((k) => `${k}: text[${j(R[k].text)}] state[${j(R[k].state)}]`).join(" | "));
+        ok("  and on the textures, in all four -- read from NodeSampledTexture rather than from a `var x : texture_2d<f32>;` line",
+           K.every((k) => !R[k].textTexRefused && R[k].textTex.join() === R[k].all.textures.join()), K.map((k) => `${k}: ${(R[k].textTex || []).join()}/${R[k].all.textures.join()}`).join(" | "));
+        ok("  the camera matrices are the `render` group's, and no camera matrix leaks into the object uniforms",
+           K.every((k) => R[k].all.cameraMatrices.join() === "cameraProjectionMatrix,cameraViewMatrix" && !R[k].all.uniforms.some((u) => /camera|modelView/i.test(u.name))), K.map((k) => R[k].all.cameraMatrices.join("+")).join(" | "));
+        // *** THE EQUIVALENCE THAT SAYS THE REGEX WAS STANDING IN FOR A PROPERTY ***
+        const spelt = (u) => !/^nodeUniform\d+$/.test(u.name);
+        const disagree = K.flatMap((k) => R[k].all.uniforms.filter((u) => spelt(u) !== u.labelled).map((u) => `${k}:${u.name}`));
+        ok("*** `nodeUniformN` is not a name three chose -- it is three's stringification of an EMPTY one: on every uniform of every case, the spelling the regexes match and the property (node.name !== \"\") agree ***",
+           disagree.length === 0 && K.some((k) => R[k].all.uniforms.some((u) => !u.labelled)), disagree.join(", ") || "no disagreement; " + K.flatMap((k) => R[k].all.uniforms.filter((u) => !u.labelled).map((u) => k.split(":")[1] + "/" + u.name)).join(","));
+        report("and the NUMBER in that stringification is not stable either: the same object matrix is " + R["webgpu:badTv"].all.uniforms.filter((u) => !u.labelled).map((u) => u.name).join("/") +
+               " in WGSL and " + R["webgl2:badTv"].all.uniforms.filter((u) => !u.labelled && u.nodeType === "mat4").map((u) => u.name).join("/") + " in GLSL");
+        // the one refusal, NAMED rather than glossed: the state says WHY, and "label your uniform" was the wrong advice
+        const refused = K.filter((k) => R[k].textRefused);
+        ok(`the one case the text reader refuses (${refused.join(", ") || "none"}) is refused for a reason the state can NAME: a uniform three allocated for ITSELF (unlabelled -- nobody can label it) whose node type gfx/device.js cannot pack`,
+           refused.length === 1 && refused[0] === "webgl2:badTv" && R[refused[0]].all.uniforms.some((u) => !u.labelled && u.type === null && u.nodeType === "uint"),
+           refused.length ? R[refused[0]].all.uniforms.filter((u) => !u.labelled).map((u) => `${u.name}:${u.nodeType}${u.type ? "" : " NOT-PACKABLE"}`).join(", ") : "");
+        ok("  and the device's uniform vocabulary is exactly five words -- an unpackable node type comes back as type null, not as a word gfx/device.js would silently pack into four bytes",
+           K.every((k) => R[k].all.uniforms.every((u) => u.type === null || ["f32", "vec2", "vec3", "vec4", "mat4"].includes(u.type))), K.flatMap((k) => R[k].all.uniforms.map((u) => u.type)).filter((t) => t && !["f32", "vec2", "vec3", "vec4", "mat4"].includes(t)).join(","));
+    }
+}
+
 // SABOTAGE LOG -- applied, gate run, exit code read, restored. MEASURED at v4320.
 //   A  the `object.` rewrite dropped (three's struct name left in the body) -> exit=1, 3 red: the CPU fixture line, and on WebGPU the
 //      generated WGSL no longer compiles, so the device draws the clear (1 of 4,096 pixels agree) and the blackbody finds nothing.
@@ -169,6 +242,30 @@ else {
 //   D  the transplant no longer renaming three's `<texture>_sampler` to the device's `samp` -> exit=1, 4 red: the fixture line, the
 //      declaration line, and on WebGPU the generated WGSL names a sampler nobody declared, so nothing draws (0 of 4,096 agree with
 //      the hand-written pass and with three's own render). WebGL2 stays green: the GLSL binds its sampler by texture name.
+//   MEASURED at v4539. Baseline 2 red, both the r184 GLSL flipY refusal in sections 2-3 (see render/tslSource.mjs's v4539
+//   banner); everything else green. Applied one at a time to render/tslSource.mjs, gate run, exit code and red count read,
+//   file restored and md5-verified, with a sentinel written before each mutation so a kill leaves a recoverable state.
+//   I  the `render` group no longer skipped in bindingsFromState (three's camera matrices land in the object list) -> +2:
+//      the identity row (0 of 3 agree -- the state now offers two matrices the text never saw) and the camera-leak row by name.
+//   J  `labelled` hard-wired true (the property stops distinguishing three's own uniforms from the graph's) -> +3: the identity
+//      row, the spelling-vs-property row (nodeUniform8 now claims a name), and the flipY refusal row that rests on it.
+//   K  `uint` put back into DEVICE_UNIFORM_TYPES -> +2: the flipY row (nodeUniform6 stops being unpackable) and the five-word
+//      row. This is the sabotage of the trap the table was written to avoid: gfx/device.js's _uniformLayout packs an unknown
+//      type as `SZ[u.type] || 4`, so `u32` would have come out right BY ACCIDENT and `uvec2` silently wrong.
+//   L  deviceUniformsFromState no longer filtering to the labelled -> +1: the identity row, three's own matrix offered to the
+//      device alongside the graph's five knobs.
+//   M  the f_ prefix taken back out of unreadUnlabelledUniforms' read-test -> +1: the refusal row, on its GLSL f_ case. This is
+//      the sabotage of the hole this round FOUND -- `\bnodeUniform1\b` does not match inside `f_nodeUniform1`, so an r178 GLSL
+//      that genuinely read an unlabelled uniform was called unread and the refusal silently skipped.
+//   N  unreadUnlabelledUniforms calling every unlabelled uniform unread (the refusal off wholesale) -> +6, and worth reading:
+//      the refusal row, and then BOTH backends failing to compile at all -- three's `nodeVar0` is declared inside the struct
+//      block the transplant strips, so dropping the wrong field takes the declaration with it. The teeth are not decorative.
+//   No 0-RED among the six. Restored and md5-verified after each.
+//   *** AND A FAULT IN THE SABOTAGE HARNESS ITSELF, RECORDED BECAUSE IT WAS MINE. *** The sentinel protected the file being
+//   sabotaged (render/tslSource.mjs) and nothing else -- but under N the transplant SUCCEEDED and only the compile failed,
+//   so this gate reached its own writer and rewrote tools/ship/tsl-emitted.json from sabotaged code. The source restored
+//   clean and the DERIVED file did not; `git status` after the run is what caught it, not the harness. A sabotage harness
+//   must restore everything the gate WRITES, not just what it is fed.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: a graph with MORE than one varying or with three's camera in it (refused, not transplanted -- a vertex-stage transplant is " +
     "the next rung); textures sampled with a linear filter through three's sampler (badTv's is nearest, which three reads with textureLoad; the fixture " +

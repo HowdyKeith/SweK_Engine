@@ -11,8 +11,9 @@
 // the gate holds to the hand-written pipeline's, to the byte, on both backends.
 //
 // THE RULES ARE NARROW AND SAID: the graph must be a fragment-only effect (no camera or object matrices in the
-// fragment), every uniform and texture must be LABELLED (an unlabelled nodeUniformN has no stable name to bind
-// under, and the transplant refuses it), and the material must be a bare NodeMaterial with fragmentNode set (a
+// fragment), every uniform and texture must be LABELLED (`nodeUniformN` is three's stringification of an EMPTY
+// name, not a name three chose -- see the v4539 banner below -- so there is nothing to bind under, and the
+// transplant refuses it; three may also allocate one for ITSELF, which nobody can label), and the material must be a bare NodeMaterial with fragmentNode set (a
 // MeshBasicNodeMaterial adds an opacity uniform and a clamp the effect did not ask for). Inside those rules the
 // rewrite is textual and shown to be exact; outside them it refuses by name rather than emitting something that
 // compiles and draws the wrong picture.
@@ -45,6 +46,122 @@ const GLSL_TYPES = { "float": "f32", "vec2": "vec2", "vec3": "vec3", "vec4": "ve
 export const DEFAULT_LOCALS = Object.freeze({ positionLocal: "pl", normalLocal: "nl", position: "p", normal: "n" });
 
 /** Ask three for the shaders of one mesh: { wgsl | glsl: { vertex, fragment }, language }. The renderer must be initialised. */
+// =========================================================================================================
+// *** v4539 -- "CAN THE TRANSPLANT BE MADE REVISION-AGNOSTIC?"  MEASURED ANSWER: 18 OF 162. ***
+//
+// This file parses the shader three PRINTED. COUNTED, not eyeballed: 162 match/replace/test/RegExp call sites
+// over three's emitted text (an earlier note in this file said 70, which was a line count, not a site count).
+// Going 0.178 -> 0.184 broke four of those spellings at once, and each was repaired by teaching the regex the
+// new spelling -- a fix pinned to a spelling rather than to a mechanism, the species this tree names most.
+//
+// So: read three STRUCTURALLY instead. three builds a NodeBuilderState of eleven fields and its debug hook
+// keeps two of them --
+//
+//     const { fragmentShader, vertexShader } = renderObject.getNodeBuilderState();
+//
+// -- throwing away `bindings`, which carries what the regexes are trying to recover, already parsed. MEASURED
+// on badTv and the blackbody key at r184, both backends:
+//
+//     BindGroup "render" -> NodeUniformsGroup "render" -> cameraProjectionMatrix (mat4), cameraViewMatrix (mat4)
+//     BindGroup "object" -> NodeSampledTexture "tDiffuse"
+//                        -> NodeUniformsGroup "object" -> time, speed, distortion, distortion2, rollSpeed (float)
+//
+// *** BUT THE ANSWER IS 18 OF 162, AND THAT IS THE POINT OF WRITING IT DOWN. *** Only three functions here ask
+// "what does this shader declare" -- unreadUnlabelledUniforms, uniformFields, textureNames, 18 sites between
+// them -- and the state answers all eighteen. The other 144 REWRITE three's body into the device's shell, and a
+// source-to-source transplant cannot escape those: it is editing text because its output is text. They can be
+// PARAMETERISED by structural facts (the group is named "object" in the state whether the GLSL block is spelled
+// `fragment_object` or `object`), which survives a rename -- but a rename was never the worst case. See the
+// flipY finding below: r184 added a uniform with new SEMANTICS, and no reader, structural or textual, tells the
+// transplant what to do about a branch that did not exist before.
+//
+// TWO THINGS THE STATE SETTLED THAT THE TEXT COULD ONLY GUESS AT:
+//
+//   1. *** `nodeUniform6` IS NOT A NAME THREE CHOSE. *** It is three's stringification of an EMPTY one:
+//      every uniform the graph labelled answers node.name === "time"; every uniform three allocated for itself
+//      answers node.name === "". The `^nodeUniform\d+$` regexes were testing the printout of that property.
+//      The number is not stable either -- the SAME object matrix is nodeUniform8 in WGSL and nodeUniform9 in
+//      GLSL. tslSource-selfcheck section 4 asserts spelling and property agree, so if a future three renames
+//      the stringification the gate says the spelling died while the property held, rather than going quiet.
+//
+//   2. *** THE r184 GLSL RED IS NOT A SPELLING AT ALL. *** three r184 emits, on the WebGL2 backend only, an
+//      unlabelled `uint` the fragment READS -- `nodeVar36 = bool( nodeUniform6 ); if ( nodeVar36 ) { flip v }`,
+//      a per-texture flipY flag, value false. The old refusal told the caller to "label every uniform node",
+//      which is advice nobody can take: it is three's uniform, not the graph's. The state names the real
+//      reason -- unlabelled AND a node type gfx/device.js cannot pack -- and that is what the message should
+//      say. Folding the dead branch on the strength of node.name === "" and node.value === false is the fix,
+//      and it is NOT DONE HERE.
+//
+// WHAT IS TRADED, SAID PLAINLY: the state is reached through renderer._renderLists, _renderContexts and
+// _objects, which are private. That is coupling of a different kind, not the absence of coupling -- but it is
+// the SAME path three's own getShaderAsync walks, so it cannot rot without three's debug hook rotting with it,
+// and a private field moves far more slowly than the formatting of emitted source. The text readers are KEPT
+// and NOTHING BELOW CALLS THE STRUCTURAL ONE YET: the gate asserts the two AGREE (3 of 3 where the text reader
+// answers; the 4th is the flipY refusal above), so this arrives as a second opinion, not a swap made on faith.
+// =========================================================================================================
+
+/** three's NodeBuilderState for one mesh: the whole of what getShaderAsync keeps two strings out of. */
+export async function nodeBuilderStateFor(renderer, { scene, camera, mesh }) {
+    await renderer.compileAsync(scene, camera);
+    const renderList = renderer._renderLists.get(scene, camera);
+    const ctx = renderer._renderContexts.get(renderer._renderTarget, renderer._mrt);
+    const material = scene.overrideMaterial || mesh.material;
+    const ro = renderer._objects.get(mesh, material, scene, camera, renderList.lightsNode, ctx, ctx.clippingContext);
+    return ro.getNodeBuilderState();
+}
+
+/**
+ * three's own type names -> the device's uniform vocabulary. *** THIS TABLE IS EXACTLY gfx/device.js's ***
+ * (_uniformLayout's SZ/AL): f32, vec2, vec3, vec4, mat4 and nothing else. A first draft of it also carried
+ * int/uint/ivecN/uvecN, copied from GLSL_TYPES above -- and that was a trap, MEASURED: _uniformLayout packs an
+ * unknown type as `SZ[u.type] || 4` with alignment 4, so a `u32` would have come out right BY ACCIDENT and a
+ * `uvec2` would have been packed into four bytes with no error anywhere. A reader must not offer the device a
+ * word the device does not know; the device's silent fallback would not have said so.
+ */
+const DEVICE_UNIFORM_TYPES = Object.freeze({ float: "f32", vec2: "vec2", vec3: "vec3", vec4: "vec4", mat4: "mat4" });
+
+/**
+ * The bindings three BUILT, read from the state rather than from the shader it printed.
+ * Returns { uniforms: [{ name, type, nodeType, labelled }], textures, cameraMatrices } -- or null when the
+ * state carries no bindings, which is a fact worth reporting rather than crashing on.
+ *
+ * `type` is null for a node type the device cannot pack (uint, ivec3, ...); `nodeType` keeps three's own word
+ * for it so the refusal can name the thing. This function REFUSES NOTHING -- it is a reader, and the rules
+ * that refuse live in uniformFields/textureNames where they already are. It arrives as a second opinion.
+ *
+ * *** `labelled` IS THE MECHANISM THE `nodeUniform\d+` SPELLING WAS STANDING IN FOR. *** MEASURED at r184 on
+ * badTv and the blackbody key, both backends: every uniform the graph labelled answers `node.name === "time"`,
+ * and every uniform three allocated for itself answers `node.name === ""`. `nodeUniform6` is not a name three
+ * chose -- it is three's STRINGIFICATION of the empty one, and the number in it moves between backends (the
+ * same flag is nodeUniform6 in GLSL and absent from WGSL; the object matrix is nodeUniform8 in WGSL and
+ * nodeUniform9 in GLSL). A regex on that spelling was testing the printout of the property, not the property.
+ */
+export function bindingsFromState(state) {
+    const groups = (state && state.bindings) || null;
+    if (!groups || !groups.length) return null;
+    const out = { uniforms: [], textures: [], cameraMatrices: [] };
+    for (const g of groups) {
+        for (const m of (g.bindings || [])) {
+            if (m.isSampledTexture) { out.textures.push(m.name); continue; }
+            if (!m.isUniformBuffer) continue;
+            for (const u of (m.uniforms || [])) {
+                if (g.name === "render") { out.cameraMatrices.push(u.name); continue; }
+                const nodeType = typeof u.getType === "function" ? u.getType() : null;
+                const node = u.nodeUniform && u.nodeUniform.node;
+                out.uniforms.push({ name: u.name, type: DEVICE_UNIFORM_TYPES[nodeType] || null, nodeType,
+                                    labelled: !!(node && node.name) });
+            }
+        }
+    }
+    return out;
+}
+
+/** The labelled, device-packable uniforms of the object group, in three's order -- the state's answer to uniformFields(). */
+export function deviceUniformsFromState(state) {
+    const b = bindingsFromState(state);
+    return b ? b.uniforms.filter((u) => u.labelled).map((u) => ({ name: u.name, type: u.type })) : null;
+}
+
 export async function emitShaders(renderer, { scene, camera, mesh }) {
     const sh = await renderer.debug.getShaderAsync(scene, camera, mesh);
     return { language: renderer.backend.isWebGPUBackend ? "wgsl" : "glsl", vertex: sh.vertexShader, fragment: sh.fragmentShader };
@@ -100,7 +217,13 @@ export function unreadUnlabelledUniforms(fragment, language) {
     const names = language === "wgsl"
         ? [...decl.matchAll(/^\s*(nodeUniform\d+)\s*:/gm)].map((m) => m[1])
         : [...decl.matchAll(new RegExp("^\\s*\\w+\\s+" + F_ + "(nodeUniform\\d+)\\s*;?$", "gm"))].map((m) => m[1]);
-    return names.filter((n) => !new RegExp("\\b" + n + "\\b").test(body));
+    // *** THE PREFIX AGAIN, AND THIS TIME ON THE SIDE THAT DECIDES WHETHER THERE ARE TEETH. *** r178 spells the
+    // field `f_nodeUniform1` in the body; `\bnodeUniform1\b` does NOT match inside it, because `_` is a word
+    // character. So an unlabelled uniform the r178 GLSL genuinely READS was reported as unread and silently
+    // dropped -- the refusal turned off by a spelling, in the one function written to stop that happening.
+    // Found at v4539 by writing the test that makes the fixture's body read it; the row above had stopped
+    // exercising the refusal at all when v4538 narrowed it to what the fragment reads.
+    return names.filter((n) => !new RegExp("\\b" + F_ + n + "\\b").test(body));
 }
 
 /** The fields of three's fragment uniform struct, in order: [{ name, type }] (type in the device's vocabulary). Refuses an unlabelled one THE FRAGMENT READS. */
@@ -118,7 +241,7 @@ export function uniformFields(fragment, language) {
     }
     // Still refused -- and now only when the fragment READS it, which is when the transplant would have to
     // bind it under a name that is not stable across builds.
-    for (const u of out) if (/^nodeUniform\d+$/.test(u.name)) throw new Error(`tslSource: the emitted ${language.toUpperCase()} carries an UNLABELLED uniform (${u.name}) THAT THE FRAGMENT READS; label every uniform node (uniform(x).label("name")) so the device can bind it by name`);
+    for (const u of out) if (/^nodeUniform\d+$/.test(u.name)) throw new Error(`tslSource: the emitted ${language.toUpperCase()} carries an UNLABELLED uniform (${u.name}) THAT THE FRAGMENT READS; label every uniform node (uniform(x).label("name")) so the device can bind it by name -- unless three allocated it for ITSELF (r184 emits an unlabelled uint flipY flag into the GLSL object block and branches the v on it), which nobody can label`);
     return out;
 }
 /** The textures three declared: [name]. Refuses an unlabelled one. */
