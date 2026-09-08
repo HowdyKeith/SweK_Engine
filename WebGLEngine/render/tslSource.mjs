@@ -122,6 +122,44 @@ function _stripGlslFlipFlag(fragment) {
     return out;
 }
 
+// *** v4556 -- three's .compute(N) ALWAYS ADDS ITS OWN DISPATCH BOUNDS GUARD NOW, EVEN WHEN THE GRAPH ALREADY HAS
+// ONE, MEASURED ACROSS EVERY COMPUTE PASS THIS ARC HAS. *** the very first statement of the compute body is always
+// `if ( instanceIndex >= object.nodeUniformN ) { return; }`, an unlabelled u32 -- workgroupSize invocations always
+// dispatch (three, and this transplant, round the dispatch count UP to a whole workgroup), so N is over-dispatch
+// past the count the graph asked for, and this is three's own safety net against it. It cannot be inlined the way
+// v4555's flip flag was: the flip flag is false for every texture this codebase uses, one fixed answer for every
+// caller, but a dispatch count is a different number for every compute pass and this transplant reads shader TEXT
+// alone, with no access to the JS-side count that built the graph.
+// *** SO IT IS REMOVED INSTEAD OF ANSWERED, AND THAT IS SAFE ONLY BECAUSE OF WHAT WAS ALREADY THERE BEFORE R185
+// ADDED IT: every compute pass in this codebase already guards its own real work, by name, without this uniform's
+// help. *** render/tslWide.mjs's planes pass reads `If(float(i).lessThan(info.x), ...)` -- info.x a graph-labelled
+// uniform, so an over-dispatched thread already writes nothing regardless of this check. render/isingTsl.mjs bakes
+// its own bound as a WGSL literal (`instanceIndex < 32u` for L=8) at graph-construction time, for the same reason.
+// Removing three's redundant, unlabelled copy changes nothing an over-dispatched thread does; it only removes a
+// binding nothing in this transplant pipeline has a value for. *** THIS IS A CODEBASE-WIDE OBSERVATION, NOT A LAW
+// OF TSL, AND IS ONLY AS SOUND AS THE NEXT GRAPH THAT USES .compute(). *** A future compute pass that leans on
+// three's own guard INSTEAD of writing its own would have this removed out from under it and over-dispatch into
+// whatever the body does past its real element count -- verify a NEW compute graph's tail behavior at exactly its
+// count before trusting this to have handled it, the same way every pass here was checked byte-exact against a
+// twin (tslWide-selfcheck's planes struct check, tslIsing-selfcheck's zero-tolerance sweep) with the guard gone.
+function _stripComputeDispatchGuard(wgsl) {
+    const m = wgsl.match(/struct objectStruct \{([\s\S]*?)\};/);
+    if (!m) return wgsl;
+    const before = wgsl.slice(0, wgsl.indexOf(m[0]));
+    const after = wgsl.slice(wgsl.indexOf(m[0]) + m[0].length);
+    let structInner = m[1], body = after, changed = false;
+    for (const fm of [...m[1].matchAll(/(nodeUniform\d+)\s*:\s*u32/g)]) {
+        const name = fm[1];
+        const uses = [...after.matchAll(new RegExp(`\\b${name}\\b`, "g"))];
+        const guardRe = new RegExp(`if\\s*\\(\\s*instanceIndex\\s*>=\\s*object\\.${name}\\s*\\)\\s*\\{\\s*return;\\s*\\}`);
+        if (uses.length !== 1 || !guardRe.test(after)) continue;
+        structInner = structInner.split(",").map((s) => s.trim()).filter(Boolean).filter((p) => !new RegExp(`^${name}\\b`).test(p)).join(",\n\t");
+        body = body.replace(guardRe, "");
+        changed = true;
+    }
+    return changed ? `${before}struct objectStruct {\n\t${structInner}\n};${body}` : wgsl;
+}
+
 /** The fields of three's fragment uniform struct, in order: [{ name, type }] (type in the device's vocabulary). Refuses an unlabelled one THAT THE FRAGMENT BODY ACTUALLY READS (measured, both languages) -- an auto-named field the body never touches is three's own cross-stage bookkeeping, not a binding failure, and stays in the returned list for other checks to read. */
 export function uniformFields(fragment, language) {
     const out = [];
@@ -647,6 +685,8 @@ export function readStructDecl(wgsl, name) {
  */
 export function transplantCompute(wgsl, shell) {
     if (typeof wgsl !== "string" || !wgsl.includes("Three.js")) throw new Error("tslSource: not a three.js node-system shader");
+    // v4556 -- see _stripComputeDispatchGuard's own header: before anything else reads this text.
+    wgsl = _stripComputeDispatchGuard(wgsl);
     const ENTRY = new RegExp("@" + "compute\\s+@workgroup_size\\(\\s*(\\d+)");
     const at = wgsl.match(ENTRY);
     if (!at) throw new Error("tslSource: that shader has no compute entry point (a fragment or vertex belongs in transplantIntoShell)");
@@ -757,6 +797,13 @@ export function transplantCompute(wgsl, shell) {
     sharedFound.forEach((f, i) => { b = b.replace(new RegExp(`\\b${f.name}\\b`, "g"), wantShared[i].name); });
     b = b.replace(/\bobject\.(\w+)/g, `${shell.uniformVar}.$1`);
     for (const a of memberUA) b = b.replace(new RegExp(`\\b${a.name}\\.value\\b`, "g"), `${shell.uniformVar}.${a.name}`);   // v4483: the array lives in the struct
+    // v4556 -- same hoisting as the vertex (v4551) and fragment (v4553) stages: a compute pass's own local temporary
+    // (the planes pass's running minimum, `nodeVar0`) sits in r185's module-scope "// vars", before "fn main(" --
+    // `entry`/`b` above only ever sliced from "fn main(" onward, so it was never carried. Spliced in right after the
+    // function's own opening brace, not prepended to `b` whole (b here is the FULL "fn main() { ... }", signature
+    // included, unlike the fragment sites where the equivalent b was already just the body).
+    const fDecls = _usedFragDecls(wgsl, b, "wgsl");
+    if (fDecls.length) { const braceAt = b.indexOf("{"); b = b.slice(0, braceAt + 1) + "\n" + fDecls.join("\n") + b.slice(braceAt + 1); }
     const code = `// transplanted from three's WGSL compute builder by render/tslSource.mjs\n${keepSubgroups ? "enable subgroups;\n" : ""}var<private> instanceIndex : u32;\n${shell.prefix}\n@` + `compute @workgroup_size(${shell.workgroupSize})\n${b}`;
     return { wgsl: code, shared: wantShared.map((w) => w.name), storage: shell.storage.map((b2) => b2.name), reads: wantR.map((b2) => b2.name), writes: wantW.map((b2) => b2.name), uniforms, uniformArrays: wantUA.map((a) => a.name), workgroupSize: shell.workgroupSize, shell: shell.name };
 }

@@ -153,7 +153,9 @@ else {
         r.ok ? (r.result.error || JSON.stringify([r.result.run && r.result.run.webgpu && r.result.run.webgpu.error, r.result.run && r.result.run.webgl2 && r.result.run.webgl2.error])) : r.reason);
     if (r.ok && r.result.run && !r.result.error && !r.result.run.webgpu.error && !r.result.run.webgl2.error) {
         const R = r.result;
-        ok("three's live emission has the shape the fixture holds (three named varyings, the band flat, the camera in the fragment)", /@interpolate\( flat \) vBand : i32/.test(R.emitted.webgpu.vertex) && /flat\s+out int vBand;/.test(R.emitted.webgl2.vertex) && /render\.cameraProjectionMatrix/.test(R.emitted.webgpu.fragment) && /f_cameraProjectionMatrix/.test(R.emitted.webgl2.fragment));
+        // v4556 -- r185 dropped the "f_" prefix GLSL used to read a camera matrix by (see tslSource.mjs's own v4551
+        // fix); the raw emission now says bare `cameraProjectionMatrix`, same as the struct's own field name.
+        ok("three's live emission has the shape the fixture holds (three named varyings, the band flat, the camera in the fragment)", /@interpolate\( flat \) vBand : i32/.test(R.emitted.webgpu.vertex) && /flat\s+out int vBand;/.test(R.emitted.webgl2.vertex) && /render\.cameraProjectionMatrix/.test(R.emitted.webgpu.fragment) && /(?:f_)?cameraProjectionMatrix/.test(R.emitted.webgl2.fragment));
         ok("  the transplanted WGSL validates", validateWgsl(R.transplanted.wgsl).length === 0 && validateWgsl(R.planesTransplanted).length === 0, validateWgsl(R.transplanted.wgsl).join("; "));
         for (const b of ["webgpu", "webgl2"]) { const o = R.run[b];
             ok(`*** ${b}: the quad drawn by the pipeline three GENERATED -- three computed varyings, one flat, the camera in the fragment -- is the hand-written twin's picture on EVERY pixel (${o.genVsHand.same} of ${o.genVsHand.total}, worst ${o.genVsHand.worst}) ***`, o.backend === b && o.genVsHand.same === o.genVsHand.total && o.errs.length === 0, o.errs.join(" | "));
