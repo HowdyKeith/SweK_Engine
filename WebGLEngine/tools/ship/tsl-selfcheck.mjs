@@ -29,7 +29,9 @@ console.log("\n1. THE VENDORED BUILD: three 0.178's WebGPU build and TSL, beside
     ok("vendor/three-webgpu carries the WebGPU build, its core, TSL, the MIT licence and a README", files.every((f) => fs.existsSync(path.join(V, f))), files.filter((f) => !fs.existsSync(path.join(V, f))).join(", ") || "all present");
     const webgpu = fs.readFileSync(path.join(V, "three.webgpu.js"), "utf8"), tsl = fs.readFileSync(path.join(V, "three.tsl.js"), "utf8"), readme = fs.readFileSync(path.join(V, "README.md"), "utf8");
     const rev = (webgpu.match(/REVISION = '(\d+)'/) || webgpu.match(/const REVISION = '(\d+)'/) || [null, null])[1] || (fs.readFileSync(path.join(V, "three.core.js"), "utf8").match(/REVISION = '(\d+)'/) || [])[1];
-    ok(`the build is r178 (the README names 0.178.0), not r160 -- the r160 module stays for main.js and every three.js page`, rev === "178" && /0\.178\.0/.test(readme) && fs.existsSync(path.join(ENG, "vendor/three/three.module.js")), `revision ${rev}`);
+    // v4556 -- re-vendored to three@0.185.1 (tools/ship/three-probe.json settled the pin question rig-side); the
+    // r160 module stays for main.js and every three.js page regardless of which WebGPU build sits beside it.
+    ok(`the build is r185 (the README names 0.185.1), not r160 -- the r160 module stays for main.js and every three.js page`, rev === "185" && /0\.185\.1/.test(readme) && fs.existsSync(path.join(ENG, "vendor/three/three.module.js")), `revision ${rev}`);
     ok("*** the ONE edit: three.tsl.js imports './three.webgpu.js' instead of the bare 'three/webgpu', and the README says so ***", /from '\.\/three\.webgpu\.js'/.test(tsl) && !/from 'three\/webgpu'/.test(tsl) && /ONE EDIT/.test(readme));
     ok("  three.webgpu.js imports its core by relative path as shipped (no edit)", /from '\.\/three\.core\.js'/.test(webgpu));
     ok("  the licence is three.js's MIT", /MIT License/.test(fs.readFileSync(path.join(V, "LICENSE"), "utf8")) && /three\.js authors/.test(fs.readFileSync(path.join(V, "LICENSE"), "utf8")));
@@ -77,7 +79,7 @@ else {
     ok("the harness ran both backends", r.ok && r.result && r.result.webgpu && r.result.webgl2 && !r.result.webgpu.error && !r.result.webgl2.error, r.ok ? JSON.stringify([r.result && r.result.webgpu && r.result.webgpu.error, r.result && r.result.webgl2 && r.result.webgl2.error]) : (r.reason || (r.pageErrors || []).join("; ")));
     if (r.ok && r.result.webgpu && r.result.webgl2) {
         const R = r.result;
-        ok(`three ${R.revision} loads with ${R.tslExports} TSL exports`, R.revision === "178" && R.tslExports > 400);
+        ok(`three ${R.revision} loads with ${R.tslExports} TSL exports`, R.revision === "185" && R.tslExports > 400);
         for (const b of ["webgpu", "webgl2"]) { const o = R[b];
             const gradientOk = o.row0 && o.row0[2] === 128 && o.row0right[2] === 128 && Math.abs(o.row0right[0] - 253) <= 2 && o.row0[0] <= 2;
             ok(`*** ${b}: the ${b === "webgpu" ? "WebGPU" : "WebGL2"} backend really is that backend, and a TSL colour node renders the uv gradient (x across, 0.5 in blue) ***`, o.backend === b && gradientOk && (o.errs || []).length === 0, `row 0: ${o.row0 && o.row0.join(",")} .. ${o.row0right && o.row0right.join(",")}; errors ${(o.errs || []).length}`); }
