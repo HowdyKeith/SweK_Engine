@@ -190,42 +190,22 @@ export const NEXT_ROUNDS = [
         upstream: "any mesher that consults physics/octree at all -- today none does, so a transition cell would have nothing to sit between. world/chunkMarchingCubes.js calls itself a near-camera cosmetic pass, so nothing is straining against this yet",
     },
     { id: "fbp-gain-normalisation", state: "CLOSED", note: "ANSWERED NO at v3378, and the measurement is in reconQuality.mjs. The gain is NOT a filter constant: it runs 0.4319 to 0.9340 across fixtures, nearly invariant in ANGLE COUNT but tracking N and nDet -- and gain*nDet/N collapses to 0.9456 with a spread of 0.0185. IT IS A SAMPLING RATIO. Correcting 0.649 in the filter would be right at N=96/nDet=140, this gate's own fixture, and wrong everywhere else." },
-    // ---- the rest of Keith's third-party sweep (continued across many further links), recorded the same way:
-    // a blocker rather than a priority, and the evidence for each in its own `why` rather than in a chat log.
-    // *** RECONCILED AGAINST MAIN BEFORE THIS LANDED: FIVE ENTRIES ORIGINALLY LOGGED HERE WERE ALREADY BUILT
-    // OR SUBSUMED BY THE TIME THIS BRANCH CAUGHT UP -- mesh-walking-controller shipped as terrain-controller
-    // (v4544), navmesh-for-funnel shipped as navmesh-recast (v4543), tet-mesh-cutting was already logged
-    // (in more depth) as tet-cut, bakedsdf-spherical-gaussians was already logged (and found partially
-    // shipped) as spherical-gaussian-view-dependence, and meshcsg-formal-audit's own work already ran and is
-    // recorded inside cellocut-watertight-remesh's `why` (the v4542 ray-parity audit). Not re-added here to
-    // avoid tracking the same work under two ids. ***
+    // ---- v4536: pmndrs org sweep, and one attempted repair that made things worse before it made them better.
     {
-        id: "glb-export-conformance",
-        blocker: "OPEN",
-        what: "Spec-semantics conformance checking for this tree's own exported GLBs, and an asset QA pass for GLBs coming IN from Kenney/Quaternius kits before ui/cityPack.js places them.",
-        how: "KhronosGroup/glTF-Validator (MIT) against tools/export/sceneGlb.mjs and voxelGlb.mjs output; CesiumGS/gltf-asset-auditor for the intake side; KhronosGroup/WebGL conformance test suite as a reference for what a browser is allowed to refuse.",
-        why: "gltf-conformance-fixtures (above) covers the IMPORT side -- gpu/GLBParser.js against the feature matrix, starting with sparse accessors. This is the export and asset-intake side, and it is a different failure mode: a GLB this tree writes could be container-valid (what tools/export already checks) and still spec-invalid in ways only glTF-Validator catches, and a GLB this tree reads from a third-party kit could carry the same problem before ui/cityPack.js ever places it. Also logged: KhronosGroup/glTF-Sample-Viewer as a PBR conformance reference, not a dependency.",
+        id: "pmndrs-upscaler-tsl",
+        blocker: "UPSTREAM",
+        what: "pmndrs/upscaler -- AMD FidelityFX Super Resolution ported to three.js WebGPU as composable TSL nodes (upscaleScene/upscale/upscaleSpatial) plus an imperative Upscaler class. MIT, confirmed by reading LICENSE directly (Dennis Smolek 2026 for the wrapper, AMD 2021-2023 for the underlying FSR WGSL).",
+        how: "Grepped and confirmed: no temporal upscaling anywhere in render/ or gfx/, genuinely absent. Requires three.js r184+; this tree's own vendor/three-webgpu was pinned at 0.178.0 because 0.185 was refused on the ORIGINAL build box's Chromium (a GPUTextureViewDescriptor swizzle field that box's WebGPU implementation did not know). tools/ship/three-probe.json (Keith's rig, Chrome 152, 2026-09-08) settled that the refusal was the build box's, not the fleet's -- the rig draws 0.185.1 on WebGPU cleanly.",
+        why: "A re-vendor to 0.185.1 was attempted the same day, on this evidence, and BROKE THE TSL TRANSPLANT PIPELINE: tsl-selfcheck.mjs crashes outright (a TypeError reading undefined[1] -- one backend's readback fails to produce a result at all under 0.185.1), and tslWide/tslPhysics/tslLoopBound/tslRace/tslIsing all fail the same new way -- uniforms tslSource.mjs accepted as labelled under 0.178 now read as unlabelled, consistent with three's TSL node system changing how it names/exposes uniforms between r178 and r185. The re-vendored files were committed to a branch and explicitly NOT pushed toward main. *** SO THE ITEM IS TWO THINGS NOW, NOT ONE: *** the upscaler port itself (blocked on three.js r184+, which the rig confirms is reachable), and underneath it a real, unstarted round -- diagnosing and fixing render/tslSource.mjs's uniform handling against three's newer TSL behaviour, starting with why the readback itself fails before the labelling errors. The upscaler cannot be ported until that round closes.",
+        upstream: "the tslSource.mjs uniform-handling round against three@0.185.1 -- not started, scope not yet measured beyond 'six gates fail, one crashes'",
     },
     {
-        id: "sharp-edge-isosurface-survey",
+        id: "pmndrs-glyph-shaping",
         blocker: "OPEN",
-        what: "Read two published alternatives to physics/mesh/dualContour.mjs's own sharp-feature-preservation approach, as a comparison, not a replacement. A third, CelloCut, is tracked separately under cellocut-watertight-remesh, for a different target (meshCSG.mjs's watertight crack, not dualContour's marching-cubes-family artifacts) -- not repeated here.",
-        how: "Faithful Contouring (arXiv:2511.04029, CC BY-NC 4.0, non-commercial licence blocks vendoring outright) -- read for the technique only. metalisai/Aviz.Cms (Apache-2.0, C#) implements Cubical Marching Squares (Ho et al. 2005) -- wrong language, read for the technique.",
-        why: "dualContour.mjs's own header already states its reason to exist: QEF-minimization for sharp-corner preservation where marching cubes rounds them off. This is not a gap, it is two more published answers to the identical problem (a third already tracked elsewhere), neither vendorable (licence or language disqualifies each), logged so the comparison read doesn't have to be re-derived if dualContour.mjs is ever revisited.",
-    },
-    {
-        id: "f82-tint-metal-fresnel",
-        blocker: "OPEN",
-        what: "The F82-tint model for metal Fresnel -- the standard OpenPBR/Standard Surface correction for Schlick's known inaccuracy on metals at grazing angles.",
-        how: "portsmouth/F82-tint-generator computes the model's parameters from tabulated IOR data per metal (licence not yet checked -- verify before vendoring, not before reading). physics/render/microfacet.mjs already has GGX and Smith G1/G2, and physics/render/energyCompensation.mjs already has the multi-scatter lobe this would sit next to.",
-        why: "Checked directly: no F82/edge-tint code anywhere in physics/ or render/, and it is not in world/licenceSweep.mjs's portsmouth entries (roughDiffuse.mjs's Oren-Nayar work is there, this is not).",
-    },
-    {
-        id: "compact-state-serialization",
-        blocker: "OPEN",
-        what: "Bit-packed, quantized serialization for whatever state gets synced over WebSocket (world/universeWire.mjs, world/economyLockstep.mjs, multiplayer/wadLevelHost.js) -- smallest-three quaternion compression, bounded-range float quantization, compressed unit vectors.",
-        how: "isaac-mason/packcat (MIT, pure TypeScript, no dependencies) has the exact feature set. nxrighthere/NetStack (C#, same feature set) was the first source found; packcat supersedes it by matching this tree's language.",
-        why: "Checked: net/, world/, multiplayer/ and ai-bridge/ contain no bit-packing, no quaternion compression, no quantization of any kind today -- everything synced goes over the wire at full precision. NO ESTABLISHED WANT: nothing in this tree has measured a bandwidth or bundle-size cost that this would fix. Logged so the read is not re-derived later, not because it is due now.",
+        what: "pmndrs/glyph -- a text shaping/layout engine (Rust/Wasm: kerning, ligatures, marks, bidi, Indic reordering) that sits AHEAD of rasterization and explicitly lists Slug as one of its three supported rasterization backends (alongside MSDF and Bitmap) -- the same technique text/slugShader.js already hand-ports. MIT.",
+        how: "Not a competitor to Slug -- a different layer. text/slugText.js's own rasterizer is more specifically credentialed here (hand-ported, gated against slug-selfcheck.mjs) and would stay; glyph's shaping stage would sit ahead of it if taken.",
+        why: "Confirmed by direct quote from text/slugText.js's own header, not inferred: \"Full shaping (GSUB ligatures, marks, bidi, Indic reordering) is a separate problem and is not pretended at here: this is Latin advance-width layout.\" A real, self-acknowledged gap, not a redundant read.",
+        upstream: "no established want yet -- nothing in this tree currently needs complex-script text (ligatures, bidi, Indic reordering); logged so the read is not re-derived later.",
     },
 ];
 
