@@ -16,7 +16,7 @@
 // A gate that only measured the first would call a sphere perfectly unwrapped.
 import fs from "node:fs";
 import { weld, charts, lscm, distortion, unwrapCurved, triNormal,
-         selfOverlaps, mergeCharts, splitOverlapping, orientChart } from "./uvLscm.mjs";
+         selfOverlaps, mergeCharts, splitOverlapping, orientChart, rasterPack } from "./uvLscm.mjs";
 import { parseGLB, sphereMesh } from "./glb.mjs";
 import { rectsOverlap } from "./uvUnwrap.mjs";
 import { fileURLToPath } from "node:url";
@@ -337,7 +337,23 @@ console.log("\n8. *** SELF-OVERLAP: the failure every per-triangle metric calls 
         const disjoint = selfOverlaps([big, far], uvm).pairs;
         const crossing = selfOverlaps([[0, 1, 2], [3, 4, 5]],
             new Map([[0, [0, 0]], [1, [10, 0]], [2, [5, 8]], [3, [5, -2]], [4, [6, 6]], [5, [-2, 4]]])).pairs;
-        ok("!! the overlap primitive catches CONTAINMENT and CROSSING, and leaves disjoint alone",
+            // *** AND THE FOLD ACROSS A SHARED EDGE, WHICH THIS ROUND'S OTHER FIX REMOVED THE SUBJECT OF. ***
+        // The edge-sharing test was caught red last round by the robot's 64 duplicate faces. weld() drops
+        // those now, so the mesh no longer contains the input that exercised it and deleting the test went
+        // 0 RED -- one repair quietly disarming another round's check. Two triangles hinged on an edge with
+        // their free vertices on the SAME side are a fold; on opposite sides they are ordinary adjacency, and
+        // both are built here so neither depends on an asset happening to be dirty.
+        {
+            const hinge = new Map([[0, [0, 0]], [1, [10, 0]], [2, [5, 6]], [3, [5, 4]], [4, [5, -6]]]);
+            const folded = selfOverlaps([[0, 1, 2], [0, 1, 3]], hinge).pairs;
+            const proper = selfOverlaps([[0, 1, 2], [0, 1, 4]], hinge).pairs;
+            ok("!! two triangles hinged on an edge: SAME side is a fold, opposite sides is adjacency",
+               folded === 1 && proper === 0,
+               `same side ${folded} overlapping, opposite sides ${proper}. Sharing an edge is not the same as ` +
+               "touching by construction, and the difference is which side the free vertices fall on.");
+        }
+
+    ok("!! the overlap primitive catches CONTAINMENT and CROSSING, and leaves disjoint alone",
            contained === 1 && crossing === 1 && disjoint === 0,
            `a triangle wholly inside another: ${contained} pair; two triangles crossing edges: ${crossing}; ` +
            `two far apart: ${disjoint}. The containment branch is the one no fixture in this file exercises, ` +
@@ -442,38 +458,94 @@ console.log("\n10. *** PACK THE CHART, NOT ITS BOX ***");
        "below the shelf packer's -- a knob whose best value is not its largest.");
 }
 
+console.log("\n11. *** THE PAD HAS TO WORK SIDEWAYS, AND FOR THREE ROUNDS IT ONLY WORKED UPWARDS ***");
+{
+    // Forty identical SOLID squares: no concavity, so any gap between two of them is the pad and nothing else.
+    // The skyline reserves space above a chart; padCells was only ever an offset in x, never a separation, so
+    // two charts landing in adjacent columns got whatever the rounding left them and not one cell more.
+    const sq = { w: 1, h: 1, cells: (mw, mh) => new Uint8Array(mw * mh).fill(1) };
+    const shapes = Array.from({ length: 40 }, () => sq);
+    const gaps = (pad) => {
+        const p = rasterPack(shapes, { cells: 64, padCells: pad });
+        let mh = Infinity, mv = Infinity;
+        for (let i = 0; i < p.placements.length; i++) for (let j = i + 1; j < p.placements.length; j++) {
+            const A = p.placements[i], B = p.placements[j];
+            const oy = A.y < B.y + B.h && B.y < A.y + A.h, ox = A.x < B.x + B.w && B.x < A.x + A.w;
+            if (oy && !ox) mh = Math.min(mh, Math.max(B.x - (A.x + A.w), A.x - (B.x + B.w)));
+            if (ox && !oy) mv = Math.min(mv, Math.max(B.y - (A.y + A.h), A.y - (B.y + B.h)));
+        }
+        return { h: mh / p.cell, v: mv / p.cell };
+    };
+    const g1 = gaps(1), g2 = gaps(2);
+    ok("!! *** BOTH DIRECTIONS RESPOND TO THE PAD, not just the one the skyline happens to model ***",
+       g1.h >= 1 && g2.h >= g1.h + 0.5 && g1.v >= 1 && g2.v >= g1.v + 0.5,
+       `pad 1: horizontal ${g1.h.toFixed(2)} cells, vertical ${g1.v.toFixed(2)}; pad 2: horizontal ` +
+       `${g2.h.toFixed(2)}, vertical ${g2.v.toFixed(2)}. WITHOUT the skyline dilation the horizontal gap is ` +
+       "0.54 cells at pad 1 and 0.72 at pad 2 -- it barely moves -- while the vertical runs 2.54 and 4.72. " +
+       "*** THAT ASYMMETRY IS WHAT THE VERIFY LOOP HAD BEEN PAYING FOR: *** it escalated the pad in BOTH " +
+       "directions to buy a margin missing in ONE, and the coverage it cost made 256-cell packs come out worse " +
+       "than the shelf packer they were meant to beat. Measured on the robot before the repair: across 3,287 " +
+       "side-by-side chart pairs the smallest horizontal gap was 0.00 cells against 0.67 vertically.");
+
+    // *** THE WIDTH BALANCER, DRIVEN FROM A DELIBERATELY BAD START. *** Deleting it went 0 RED at the new
+    // default, because at 384 cells the opening guess of sqrt(total) is already nearly square and there is
+    // nothing for the loop to correct. That is a property of one resolution and not of the mechanism, so the
+    // mechanism is driven directly: handed a start four times too wide, it must still converge to a square.
+    {
+        const sq2 = { w: 1, h: 1, cells: (mw, mh) => new Uint8Array(mw * mh).fill(1) };
+        const many = Array.from({ length: 60 }, () => sq2);
+        const forced = rasterPack(many, { cells: 64, padCells: 1, aspect: 40 });   // 40 wide by construction
+        const solved = rasterPack(many, { cells: 64, padCells: 1 });               // free to balance
+        ok("!! *** a width fixed by anything is a guess: the balancer recovers a square from a 4x-wide start ***",
+           Math.abs(forced.height / forced.width - 1) > 0.5 &&
+           Math.abs(solved.height / solved.width - 1) < 0.25,
+           `forced to 40 wide: ${forced.width.toFixed(2)} x ${forced.height.toFixed(2)} (ratio ` +
+           `${(forced.height / forced.width).toFixed(3)}); left to balance: ${solved.width.toFixed(2)} x ` +
+           `${solved.height.toFixed(2)} (ratio ${(solved.height / solved.width).toFixed(3)}). The UVs address a ` +
+           "SQUARE, so every unit the atlas is wider than tall is texture nothing can ever be drawn into -- and " +
+           "this number has been got wrong three times across two packers, twice by formula and once by a " +
+           "search over fixed multipliers.");
+    }
+
+    ok("!! and the default no longer needs the pad escalated at all",
+       R.padCells === 1 && !R.nestFellBack,
+       `the shipped configuration settles at pad ${R.padCells} with no fallback. Before the repair it reached ` +
+       "pad 3 at 256 and 384 cells. The escalation across resolutions is still not smooth -- 256 and 384 take " +
+       "pad 1, 320 and 512 take 2, 448 and 640 take 3 -- which says the residual collisions are a " +
+       "discretisation artefact rather than a margin, and is left as a stated open question rather than a " +
+       "tuned constant: the verify loop makes every one of those resolutions CORRECT, only some of them cheap.");
+}
+
 // ---- SABOTAGE LOG -- graded on EXIT CODES, each restored before the next --------------------------------------
-//   A  weld disabled (every vertex kept distinct)              exit 1
-//   B  the disk guard (chi === 1) removed                      exit 1
-//   C  pins forced to the chart's first two vertices           exit 1 (throws)
-//   D  CG iteration budget pinned back to 400                  exit 1
-//   E  localFrame drops the triangle's height (y3 -> 1)        exit 1
-//   F  the Cauchy-Riemann sign flipped (-b -> +b)              exit 1
-//   G  the flipped-triangle detector disabled                  exit 1
-//   H  padding back to the absolute 0.02 it shipped with       exit 1
-//   I  the merge stops refusing candidates for self-overlap    exit 1
-//   J  orientChart returns the chart unrotated                 exit 1
-//   K  the overlap test drops its CONTAINMENT branch           exit 1
-//   L  splitOverlapping never splits                           exit 1
-//   M  same-winding duplicate faces no longer dropped          exit 1
-//   N  the edge-sharing FOLD test removed from selfOverlaps    exit 1
-//   O  the raster mask falls back to centre sampling           exit 1, 2 rows
-//   Q  the atlas width is no longer driven toward balance      exit 1
+//   A weld disabled                    E localFrame drops the height    K containment branch dropped
+//   B disk guard removed               F Cauchy-Riemann sign flipped    L splitOverlapping never splits
+//   C pins forced to first two         G flip detector disabled         M duplicate faces kept
+//   D iteration budget pinned at 400   H padding back to absolute 0.02  N edge-sharing fold test removed
+//   I merge ignores self-overlap       J orientChart no-op              O raster centre-samples
+//   Q atlas width not balanced         R skyline dilation removed
+// All exit 1.  P -- the packer's verify-and-repair loop -- is recorded as NOT EXERCISED; see below.
 //
-// *** P IS RECORDED AS NOT EXERCISED, WHICH IS THE HONEST ENTRY. *** Deleting the packer's verify-and-repair
-// loop -- the one that re-packs with a wider pad until no triangles collide -- changes NOTHING at the default,
-// because at 192 cells with a one-cell pad nothing collides in the first place. Measured, the loop engages at
-// higher resolutions and settles there: 192 -> pad 1, 256 -> pad 3, 384 -> pad 3. Exercising it in this gate
-// would cost a fourth unwrap of the asset, about 600 ms, to prove a safety net catches something the shipped
-// configuration never throws at it -- and this gate already had to be cut from 2,800 ms to 1,750 ms to stay
-// clear of the 3,000 ms sweep budget. So the loop is kept (a sparser atlas beats a possibly corrupt one), the
-// measurement that says where it engages is written here, and the gate does not pay every ship for it.
-// A CHECK NOBODY EXERCISES IS WORTH LESS THAN ONE THAT IS, AND SAYING SO IS WORTH MORE THAN PRETENDING.
+// *** SEVEN OF THESE HAVE GONE 0 RED AT SOME POINT AND NOT ONE WAS THE GATE BEING RIGHT. *** Five reasons, and
+// the fifth is new this round:
+//   NO FIXTURE COULD SEE IT   B needed an annulus, D needed thousands of triangles in one chart.
+//   MASKED BY A LATER PASS    I: splitOverlapping repairs whatever the merge lets through.
+//   AN UNREACHED BRANCH       K: every overlap in every fixture was a CROSSING, never a containment.
+//   THE INSTRUMENT WAS WRONG  C: counting FAIL lines scores a module that THROWS as zero.
+//   *** ONE REPAIR DISARMED ANOTHER ROUND'S CHECK. ***  N was caught red last round BY the robot's 64
+//   duplicate faces. This round's weld() drops those, so the mesh no longer contains the input that exercised
+//   the fold test, and deleting the test changed nothing. Q went the same way for a different reason: the
+//   default moved from 192 to 384 cells and at 384 the opening width guess is already nearly square, so the
+//   balancer had nothing to correct. NEITHER WAS A CHECK GOING STALE ON ITS OWN -- both were disarmed by
+//   improvements elsewhere in the same file, which is the failure mode a passing suite cannot show you.
+// Both are driven directly now, on hand-built inputs that no asset and no default can take away: two triangles
+// hinged on an edge, and a packer handed a start four times too wide.
 //
-// The recurring lesson across four rounds of this file, now at sixteen sabotages: FIVE went 0 red at first and
-// none was the gate being right -- two had no fixture that could see them, one was masked by a later pass, one
-// was an unreached branch, and one was the instrument (counting FAIL lines scores a module that THROWS as
-// zero). A sabotage that will not fire is a reading, and what it reads is almost never the check.
+// P stays unexercised on purpose. Deleting the verify-and-repair loop changes nothing at the default, because
+// at 384 cells with a one-cell pad nothing collides for it to repair. Exercising it costs another unwrap of
+// the asset -- and this gate has been cut twice already to stay clear of the 3,000 ms sweep budget. The loop
+// is kept (a sparser atlas beats a possibly corrupt one), the measurement of where it engages is written here,
+// and the gate does not pay for it every ship. A CHECK NOBODY EXERCISES IS WORTH LESS THAN ONE THAT IS, AND
+// SAYING SO IS WORTH MORE THAN PRETENDING.
 //
 console.log(fails ? "\nuvLscm-selfcheck: " + fails + " FAILED" : "\nuvLscm-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);
