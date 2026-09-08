@@ -1,0 +1,383 @@
+// WebGLEngine/physics/mesh/uvLscm.mjs -- v4537
+// ---------------------------------------------------------------------------------------------------------------
+// THE CURVED HALF. physics/mesh/uvUnwrap.mjs closed two of the three callers blocked on missing UVs, and said
+// in as many words why it could not close the third: "a planar unwrapper is a complete answer for meshCSG and
+// a wall, and not for a robot." This is the robot.
+//
+// tools/export/reskin.js names it exactly: GPU_Assets/RobotExpressive.glb, "7,214 vertices ... and NO TEXCOORD_0
+// AND NO TEXTURE AT ALL", so "the simple path is not wrong, it is unavailable ON THIS ASSET". Its vertex-colour
+// route exists because of that sentence.
+//
+// ---- WHAT MEASURING THE ASSET FOUND, BEFORE ANY OF THIS WAS WRITTEN ---------------------------------------------
+//
+// *** THREE QUARTERS OF THAT VERTEX BUFFER IS DUPLICATION, AND THE MESH IS NOT ONE SURFACE. *** 7,214 vertices
+// carry only 3,237 triangles -- an average valence of 1.35, which is not a triangle mesh, it is a pile of
+// loose corners. The file has NINETEEN primitives and every one carries its own copy of the vertices along its
+// seams. Welded on position: 7,214 -> 1,758 vertices, 76% duplicates, valence 5.52, which IS a triangle mesh.
+//
+// LSCM IS A STATEMENT ABOUT NEIGHBOURS, SO WITHOUT THE WELD IT HAS NOTHING TO SAY. Run on the raw buffer every
+// triangle is its own island, each flattens perfectly on its own, and the result is a conformal map with a
+// seam down every single edge -- a number that looks perfect and means nothing. The weld is not a tidy-up
+// step; it is the step that makes the problem exist.
+//
+// And the welded mesh is 60 disconnected components, none larger than 138 vertices:
+//     37 are DISKS      (chi = 1, boundary present)     678 triangles     21%
+//     22 are CLOSED     (no boundary at all)          2,312 triangles     71%
+//      1 is non-manifold
+// *** SO "UNWRAP THE DISKS AND REPORT THE REST" WOULD LEAVE 71% OF THE ROBOT UNTEXTURED. *** A closed surface
+// has no boundary to flatten to and Gauss forbids flattening it without stretching, so the closed components
+// are the whole job rather than an edge case, and they are why this file segments rather than merely solves.
+//
+// ---- THE THREE PIECES, AND WHY EACH IS THE SHAPE IT IS -----------------------------------------------------------
+//
+//   weld()      position-quantised merge, because connectivity is the input LSCM actually needs.
+//   charts()    greedy growth by NORMAL DEVIATION with a DISK GUARD. Two jobs at once and they are not
+//               separable: bounding the normal spread bounds the distortion, and refusing any triangle that
+//               would close a loop keeps every chart a disk, which is the topology LSCM requires. A closed
+//               component becomes several charts and the seams between them are the cut -- no separate cutting
+//               pass, because the segmentation already has to make one.
+//   lscm()      Levy et al. 2002, least-squares conformal maps. One complex equation per triangle asserting
+//               Cauchy-Riemann in the triangle's own isometric frame; two pinned vertices to kill the
+//               translation, rotation and scale the energy cannot see; solved in least squares.
+//
+// THE SOLVER IS MATRIX-FREE CONJUGATE GRADIENT ON THE NORMAL EQUATIONS, and it is written here rather than
+// imported because THE TREE HAS NO GENERAL ONE: the CG in fluid/multigrid*.mjs is a grid Poisson solver whose
+// operator is a stencil, and physics/mesh/rankRepair and triReconstruct solve 2x2 and 3x3 systems per cell.
+// Neither takes an apply-A. A^T A is never formed -- only A and A^T are applied, six entries per row -- so the
+// cost is in the triangles rather than in the square of the vertices.
+"use strict";
+import { shelfPack } from "./uvUnwrap.mjs";      // one owner: the packer is the planar file's and stays there
+
+const sub = (P, i, j) => [P[3*i] - P[3*j], P[3*i+1] - P[3*j+1], P[3*i+2] - P[3*j+2]];
+const cross = (a, b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
+const dot = (a, b) => a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+const len = (a) => Math.hypot(a[0], a[1], a[2]);
+
+/**
+ * Merge vertices that share a position, and drop triangles that degenerate as a result.
+ *
+ * The quantum is a LENGTH and the mesh is scaled to its own bounding box first, so one number works on a
+ * 0.06-unit robot and a 100-unit building alike -- a fixed absolute epsilon silently welds nothing on the
+ * first and everything on the second.
+ */
+export function weld(positions, indices, { relTol = 1e-6 } = {}) {
+    const nv = positions.length / 3;
+    let lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+    for (let i = 0; i < nv; i++) for (let k = 0; k < 3; k++) {
+        const v = positions[3*i+k]; if (v < lo[k]) lo[k] = v; if (v > hi[k]) hi[k] = v;
+    }
+    const diag = Math.hypot(hi[0]-lo[0], hi[1]-lo[1], hi[2]-lo[2]) || 1;
+    const q = diag * relTol;
+    const map = new Map(), remap = new Int32Array(nv), keep = [];
+    for (let i = 0; i < nv; i++) {
+        const k = Math.round(positions[3*i]/q) + "," + Math.round(positions[3*i+1]/q) + "," + Math.round(positions[3*i+2]/q);
+        let id = map.get(k);
+        if (id === undefined) { id = keep.length; map.set(k, id); keep.push(i); }
+        remap[i] = id;
+    }
+    const P = new Float64Array(keep.length * 3);
+    for (let n = 0; n < keep.length; n++) for (let k = 0; k < 3; k++) P[3*n+k] = positions[3*keep[n]+k];
+    const tris = [];
+    let degenerate = 0;
+    for (let t = 0; t < indices.length; t += 3) {
+        const a = remap[indices[t]], b = remap[indices[t+1]], c = remap[indices[t+2]];
+        if (a === b || b === c || a === c) { degenerate++; continue; }
+        tris.push([a, b, c]);
+    }
+    return { positions: P, tris, vertsBefore: nv, vertsAfter: keep.length, degenerate };
+}
+
+/** Unit normal of a triangle, and twice its area. */
+export function triNormal(P, T) {
+    const n = cross(sub(P, T[1], T[0]), sub(P, T[2], T[0]));
+    const L = len(n);
+    return { n: L > 0 ? [n[0]/L, n[1]/L, n[2]/L] : [0, 0, 0], area2: L };
+}
+
+const edgeKey = (a, b) => (a < b ? a + "_" + b : b + "_" + a);
+
+/**
+ * Segment triangles into charts by normal deviation, refusing any triangle that would stop the chart being a
+ * disk.
+ *
+ * *** THE DISK GUARD IS THE HALF THAT IS EASY TO LEAVE OUT, AND LEAVING IT OUT IS SILENT. *** Growing purely
+ * on normals will happily wrap a chart around a cylinder until its two ends meet; the chart is then an annulus,
+ * LSCM still returns an answer, and the answer is folded over itself. The test is Euler's: a triangle joins
+ * only if it does not raise the chart's edge count without raising its vertex count to match -- i.e. it shares
+ * exactly one edge with the chart, or shares two while bringing no new vertex is refused. Checked as
+ * chi = V - E + F, which must stay 1.
+ */
+export function charts(P, tris, { maxNormalDeg = 40 } = {}) {
+    const nt = tris.length;
+    if (!nt) return [];
+    const norms = tris.map((T) => triNormal(P, T).n);
+    const cosLimit = Math.cos(maxNormalDeg * Math.PI / 180);
+    // edge -> the (at most two) triangles on it
+    const eTris = new Map();
+    tris.forEach((T, i) => { for (const [a, b] of [[T[0],T[1]],[T[1],T[2]],[T[2],T[0]]]) {
+        const k = edgeKey(a, b); if (!eTris.has(k)) eTris.set(k, []); eTris.get(k).push(i);
+    } });
+    const neighbours = (i) => {
+        const out = [];
+        for (const [a, b] of [[tris[i][0],tris[i][1]],[tris[i][1],tris[i][2]],[tris[i][2],tris[i][0]]])
+            for (const j of eTris.get(edgeKey(a, b))) if (j !== i) out.push(j);
+        return out;
+    };
+    const chartOf = new Int32Array(nt).fill(-1);
+    const out = [];
+    for (let seed = 0; seed < nt; seed++) {
+        if (chartOf[seed] >= 0) continue;
+        const members = [seed];
+        chartOf[seed] = out.length;
+        const V = new Set(tris[seed]), E = new Set();
+        for (const [a, b] of [[tris[seed][0],tris[seed][1]],[tris[seed][1],tris[seed][2]],[tris[seed][2],tris[seed][0]]]) E.add(edgeKey(a, b));
+        let axis = norms[seed].slice();
+        const queue = neighbours(seed).slice();
+        while (queue.length) {
+            const j = queue.shift();
+            if (chartOf[j] >= 0) continue;
+            if (dot(norms[j], axis) < cosLimit) continue;
+            // Euler test on the candidate, done on copies so a refusal costs nothing.
+            const nv0 = V.size, ne0 = E.size, nf0 = members.length;
+            const addV = tris[j].filter((v) => !V.has(v));
+            const addE = [[tris[j][0],tris[j][1]],[tris[j][1],tris[j][2]],[tris[j][2],tris[j][0]]]
+                .map(([a, b]) => edgeKey(a, b)).filter((k) => !E.has(k));
+            const chi = (nv0 + new Set(addV).size) - (ne0 + new Set(addE).size) + (nf0 + 1);
+            if (chi !== 1) continue;                       // would add a handle or close a loop: refuse
+            for (const v of addV) V.add(v);
+            for (const k of addE) E.add(k);
+            members.push(j);
+            chartOf[j] = out.length;
+            // the axis follows the chart, normalised, so a gently curving surface stays one chart
+            const w = members.length;
+            axis = [axis[0] + (norms[j][0] - axis[0]) / w, axis[1] + (norms[j][1] - axis[1]) / w, axis[2] + (norms[j][2] - axis[2]) / w];
+            const L = len(axis) || 1; axis = [axis[0]/L, axis[1]/L, axis[2]/L];
+            for (const k of neighbours(j)) if (chartOf[k] < 0) queue.push(k);
+        }
+        out.push(members);
+    }
+    return out;
+}
+
+/**
+ * The isometric 2D frame of one triangle: p0 at the origin, p1 on the +x axis, p2 above it. Distances and
+ * angles inside the triangle are exact here -- it is a rigid motion, not a projection -- which is what makes
+ * the conformal energy a statement about the MAP and not about this frame.
+ */
+export function localFrame(P, T) {
+    const e1 = sub(P, T[1], T[0]), e2 = sub(P, T[2], T[0]);
+    const x2 = len(e1);
+    if (x2 === 0) return null;
+    const u = [e1[0]/x2, e1[1]/x2, e1[2]/x2];
+    const x3 = dot(e2, u);
+    const y3 = len(cross(e1, e2)) / x2;
+    if (!(y3 > 0)) return null;
+    return [[0, 0], [x2, 0], [x3, y3]];
+}
+
+/**
+ * Matrix-free CG on the normal equations of the sparse rows in `rows`, solving min |A x - b|.
+ *
+ * *** THE ITERATION BUDGET SCALES WITH THE SYSTEM, AND THE FIRST DRAFT'S DID NOT -- WHICH IS A SILENTLY WRONG
+ * ANSWER RATHER THAN A SLOW ONE. *** Measured on a cylinder strip at a fixed 400 iterations, the conformal
+ * error GREW with refinement: 7.0e-7 at 96 triangles, 1.7e-6 at 384, 3.4e-6 at 1,536, and at 6,144 it reached
+ * 5.3e+1 -- an unwrap folded beyond recognition, returned with no error and no warning. CG needs iterations in
+ * proportion to the square root of the condition number and the normal equations SQUARE that condition number,
+ * so a budget that does not grow with n is a budget that quietly stops solving.
+ *
+ * AND THE BUDGET ALONE IS NOT THE FIX, BECAUSE ANY BUDGET CAN BE EXCEEDED. The relative residual is returned
+ * with the answer, so a caller that got a non-converged map can SEE that it did. Run to convergence on the
+ * same developable strip the conformal error is 4.7e-14 -- machine precision -- which is what says the error
+ * above was the solver stopping and never the mathematics.
+ */
+function solveLsqCG(rows, n, b, { iters = null, tol = 1e-18 } = {}) {
+    iters = iters ?? Math.max(400, 30 * n);
+    const applyA = (x) => rows.map((r) => { let s = 0; for (let k = 0; k < r.idx.length; k++) s += r.val[k] * x[r.idx[k]]; return s; });
+    const applyAt = (y) => { const out = new Float64Array(n);
+        for (let i = 0; i < rows.length; i++) { const r = rows[i], yi = y[i];
+            for (let k = 0; k < r.idx.length; k++) out[r.idx[k]] += r.val[k] * yi; } return out; };
+    const x = new Float64Array(n);
+    let r = applyAt(b.map((v, i) => v - 0));            // x0 = 0, so residual of normal eqs is A^T b
+    let p = Float64Array.from(r);
+    let rs = r.reduce((s, v) => s + v * v, 0);
+    const rs0 = rs;
+    for (let it = 0; it < iters && rs > tol * (rs0 || 1); it++) {
+        const Ap = applyA(p), AtAp = applyAt(Ap);
+        let pAp = 0; for (let i = 0; i < n; i++) pAp += p[i] * AtAp[i];
+        if (!(pAp > 0)) break;
+        const alpha = rs / pAp;
+        for (let i = 0; i < n; i++) { x[i] += alpha * p[i]; r[i] -= alpha * AtAp[i]; }
+        const rs1 = r.reduce((s, v) => s + v * v, 0);
+        const beta = rs1 / rs;
+        for (let i = 0; i < n; i++) p[i] = r[i] + beta * p[i];
+        rs = rs1;
+    }
+    return { x, residual: Math.sqrt(rs / (rs0 || 1)), iters };
+}
+
+/**
+ * Least-squares conformal map of one chart.
+ *
+ * One complex equation per triangle -- sum_j W_j U_j = 0 with W from the isometric frame -- is the discrete
+ * Cauchy-Riemann condition, and its real and imaginary parts are two real rows. The energy is invariant under
+ * translation, rotation and scale of the whole chart, so the system is rank-deficient by four until two
+ * vertices are PINNED.
+ *
+ * *** WHICH TWO MATTERS ONLY ON A CURVED CHART, AND MEASURING IT ON A FLAT ONE SAYS IT NEVER MATTERS. ***
+ * The pins are usually described as a gauge fix, and if they were only that the choice would be free. They are
+ * not: pinning two vertices fixes THE DISTANCE BETWEEN THEM as well as the similarity, and where no exactly
+ * conformal map exists the true minimiser generally wants some other distance. So the pins are a constraint
+ * the solution has to absorb, and the further apart they are the more of the chart there is to absorb it.
+ *
+ * That is invisible on a developable surface, because there the conformal map IS exact and the constraint
+ * costs nothing. Measured on a 1,536-triangle cylinder, taking the first pair beat searching for the furthest
+ * (5.5e-10 against 8.6e-9) and the obvious conclusion -- that the search is waste -- IS WRONG, drawn from the
+ * one surface class that cannot refute it. On a 741-triangle sphere cap, where no exact map exists:
+ *
+ *     longest edge        O(tris)    conformal 1.4249    area ratio 8.7674
+ *     two-pass farthest   O(n)       conformal 1.1839    area ratio 5.7311
+ *     furthest pair       O(n^2)     conformal 1.1673    area ratio 4.6126
+ *
+ * The two-pass farthest-point heuristic is used: pick any vertex, take the one furthest from it, then the one
+ * furthest from THAT. It lands within 2% of the exhaustive search on conformal distortion and is linear, so a
+ * single large chart cannot make the pinning cost quadratic in a mesh's vertices. On the robot all three agree
+ * to four figures (1.1838 / 1.1840 / 1.1840) because its charts average 4.4 triangles -- which is why the
+ * sphere cap is the fixture that decides this and the asset is not.
+ */
+export function lscm(P, chartTris) {
+    const verts = [...new Set(chartTris.flat())];
+    const idx = new Map(verts.map((v, i) => [v, i]));
+    const n = verts.length;
+    if (n < 3) return null;
+    let pa = 0, pb = 1, best = -1, seed = 0;
+    for (let pass = 0; pass < 2; pass++) {
+        best = -1;
+        for (let i = 0; i < n; i++) {
+            const d = len(sub(P, verts[i], verts[seed]));
+            if (d > best) { best = d; pa = seed; pb = i; }
+        }
+        seed = pb;
+    }
+    if (!(best > 0) || pa === pb) return null;
+    // unknown layout: u_0..u_{n-1}, v_0..v_{n-1}, with the two pins moved to the right-hand side
+    const free = [], slot = new Int32Array(2 * n).fill(-1);
+    for (let i = 0; i < n; i++) { if (i === pa || i === pb) continue; slot[i] = free.length; free.push(i); slot[n+i] = free.length; free.push(n + i); }
+    const pinned = new Float64Array(2 * n);
+    pinned[pa] = 0; pinned[n + pa] = 0; pinned[pb] = best; pinned[n + pb] = 0;
+    const rows = [], rhs = [];
+    for (const T of chartTris) {
+        const f = localFrame(P, T);
+        if (!f) continue;
+        const [[x1, y1], [x2, y2], [x3, y3]] = f;
+        const d = Math.sqrt(Math.abs((x2 - x1) * (y3 - y1) - (y2 - y1) * (x3 - x1))) || 1;
+        const W = [[(x3 - x2) / d, (y3 - y2) / d], [(x1 - x3) / d, (y1 - y3) / d], [(x2 - x1) / d, (y2 - y1) / d]];
+        for (const part of [0, 1]) {
+            const r = { idx: [], val: [] }; let bb = 0;
+            for (let j = 0; j < 3; j++) {
+                const vi = idx.get(T[j]), [a, b2] = W[j];
+                // real: a*u - b*v ; imag: b*u + a*v
+                const cu = part === 0 ? a : b2, cv = part === 0 ? -b2 : a;
+                for (const [col, coef] of [[vi, cu], [n + vi, cv]]) {
+                    if (slot[col] >= 0) { r.idx.push(slot[col]); r.val.push(coef); }
+                    else bb -= coef * pinned[col];
+                }
+            }
+            rows.push(r); rhs.push(bb);
+        }
+    }
+    if (!rows.length) return null;
+    const { x, residual } = solveLsqCG(rows, free.length, rhs);
+    const uv = new Map();
+    for (let i = 0; i < n; i++) {
+        const u = slot[i] >= 0 ? x[slot[i]] : pinned[i];
+        const v = slot[n + i] >= 0 ? x[slot[n + i]] : pinned[n + i];
+        uv.set(verts[i], [u, v]);
+    }
+    uv.residual = residual;          // rides with the answer: a map nobody could check is a map nobody should trust
+    return uv;
+}
+
+/**
+ * The grading measurement, and it is the one that says what LSCM does and does not promise.
+ *
+ * Per triangle, the map from its isometric 3D frame to its UVs is affine with a 2x2 Jacobian J. Its singular
+ * values s1 >= s2 are the stretch along the two principal directions, and everything worth knowing is in them:
+ *   CONFORMAL (angle) distortion   s1/s2   -- 1 exactly when angles are preserved. This is what LSCM minimises.
+ *   AREA distortion                s1*s2   -- what LSCM does NOT control, and cannot: Gauss's Theorema
+ *                                             Egregium says a sphere has no isometric plane map at all.
+ * A NEGATIVE determinant is a FLIPPED triangle: the map folded, and no amount of small distortion excuses it.
+ */
+export function distortion(P, chartTris, uv) {
+    const conf = [], area = [];
+    let flipped = 0, skipped = 0;
+    for (const T of chartTris) {
+        const f = localFrame(P, T);
+        const a = uv.get(T[0]), b = uv.get(T[1]), c = uv.get(T[2]);
+        if (!f || !a || !b || !c) { skipped++; continue; }
+        const [[x1, y1], [x2, y2], [x3, y3]] = f;
+        const det3 = (x2 - x1) * (y3 - y1) - (y2 - y1) * (x3 - x1);
+        if (det3 === 0) { skipped++; continue; }
+        // J maps the 3D-frame basis to the UV basis
+        const du = [b[0] - a[0], c[0] - a[0]], dv = [b[1] - a[1], c[1] - a[1]];
+        const e = [[x2 - x1, x3 - x1], [y2 - y1, y3 - y1]];
+        const inv = [[e[1][1] / det3, -e[0][1] / det3], [-e[1][0] / det3, e[0][0] / det3]];
+        const J = [[du[0]*inv[0][0] + du[1]*inv[1][0], du[0]*inv[0][1] + du[1]*inv[1][1]],
+                   [dv[0]*inv[0][0] + dv[1]*inv[1][0], dv[0]*inv[0][1] + dv[1]*inv[1][1]]];
+        const detJ = J[0][0]*J[1][1] - J[0][1]*J[1][0];
+        if (detJ < 0) flipped++;
+        const E = J[0][0]**2 + J[1][0]**2, G = J[0][1]**2 + J[1][1]**2, F = J[0][0]*J[0][1] + J[1][0]*J[1][1];
+        const disc = Math.sqrt(Math.max(0, (E - G) ** 2 + 4 * F * F));
+        const s1 = Math.sqrt(Math.max(0, (E + G + disc) / 2)), s2 = Math.sqrt(Math.max(0, (E + G - disc) / 2));
+        if (s2 > 0) conf.push(s1 / s2);
+        area.push(Math.abs(detJ));
+    }
+    const stat = (xs) => xs.length ? { min: Math.min(...xs), max: Math.max(...xs),
+        mean: xs.reduce((s, v) => s + v, 0) / xs.length } : { min: 0, max: 0, mean: 0 };
+    return { conformal: stat(conf), area: stat(area), flipped, skipped, n: conf.length };
+}
+
+/** Weld, segment, flatten each chart, pack them into [0,1]. The whole pipeline, on one mesh. */
+export function unwrapCurved(positions, indices, { maxNormalDeg = 40, padding = 0.02, relTol = 1e-6 } = {}) {
+    const w = weld(positions, indices, { relTol });
+    const cs = charts(w.positions, w.tris, { maxNormalDeg });
+    const laid = [];
+    let worstResidual = 0;
+    for (const members of cs) {
+        const T = members.map((i) => w.tris[i]);
+        const uv = lscm(w.positions, T);
+        if (!uv) continue;
+        worstResidual = Math.max(worstResidual, uv.residual || 0);
+        let lo = [Infinity, Infinity], hi = [-Infinity, -Infinity];
+        for (const [u, v] of uv.values()) {
+            if (u < lo[0]) lo[0] = u; if (u > hi[0]) hi[0] = u;
+            if (v < lo[1]) lo[1] = v; if (v > hi[1]) hi[1] = v;
+        }
+        laid.push({ tris: T, uv, w: hi[0] - lo[0], h: hi[1] - lo[1], lo });
+    }
+    const packed = shelfPack(laid.map((c) => ({ w: c.w, h: c.h })),
+        { width: Math.max(...laid.map((c) => c.w + padding), Math.sqrt(laid.reduce((s, c) => s + (c.w + padding) * (c.h + padding), 0))), padding });
+    const span = Math.max(...laid.map((c, i) => packed.placements[i].x + c.w), packed.height) || 1;
+    const out = [];
+    for (let i = 0; i < laid.length; i++) {
+        const c = laid[i], p = packed.placements[i], m = new Map();
+        for (const [v, [u, vv]] of c.uv) m.set(v, [(p.x + u - c.lo[0]) / span, (p.y + vv - c.lo[1]) / span]);
+        out.push({ tris: c.tris, uv: m });
+    }
+    return { weld: w, charts: out, atlas: { span }, chartCount: out.length, worstResidual };
+}
+
+export function reportLines(mesh = null) {
+    const out = ["[uvLscm] curved unwrap: weld, segment, conformal-flatten, pack"];
+    if (!mesh) { out.push("  (no mesh given -- pass { positions, indices })"); return out; }
+    const r = unwrapCurved(mesh.positions, mesh.indices);
+    out.push(`  weld            ${r.weld.vertsBefore} -> ${r.weld.vertsAfter} vertices (${(100 * (1 - r.weld.vertsAfter / r.weld.vertsBefore)).toFixed(1)}% duplicates)`);
+    out.push(`  charts          ${r.chartCount}`);
+    let worstC = 0, flips = 0, tris = 0;
+    for (const c of r.charts) { const d = distortion(r.weld.positions, c.tris, c.uv);
+        worstC = Math.max(worstC, d.conformal.max); flips += d.flipped; tris += c.tris.length; }
+    out.push(`  triangles       ${tris}`);
+    out.push(`  conformal worst ${worstC.toFixed(4)}  (1 = angles preserved exactly)`);
+    out.push(`  flipped         ${flips}`);
+    out.push(`  solver residual ${r.worstResidual.toExponential(2)}  (relative, worst chart)`);
+    return out;
+}

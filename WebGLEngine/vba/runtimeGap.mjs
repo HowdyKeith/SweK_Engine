@@ -211,7 +211,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // the earlier reading was 3878. What survives is the rule the wrong explanation was reaching for: this
     // number is MEASURED every round, never incremented from the last one, and a reason invented to explain a
     // count is worth less than re-taking it. FIVE ROUNDS RUNNING this table has been re-taken by hand.
-    files: 4014,                  // v4526 merge: 3887 -> 4002, this branch's rounds; v4527: 4004; v4528: 4007; v4529: 4009; v4530: 4011; v4533: 4012 (ai-bridge/runBusy.js); v4536: 4014 (physics/mesh/uvUnwrap.mjs and its gate)
+    files: 4016,                  // v4526 merge: 3887 -> 4002, this branch's rounds; v4527: 4004; v4528: 4007; v4529: 4009; v4530: 4011; v4533: 4012 (ai-bridge/runBusy.js); v4536: 4014 (physics/mesh/uvUnwrap.mjs and its gate); v4537: 4016 (physics/mesh/uvLscm.mjs and its gate)
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
                           // RE-TAKEN TWICE IN TWO ROUNDS, and the second time only because the ship gate
                           // caught it: v4478's re-take was correct for v4478 and stale the moment v4479
@@ -246,7 +246,11 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // moved, 1413 -> 1414, and the file total did not move at all. A census re-derived from the tree cannot be
     // merged; it has to be re-run on the merged tree, and the row that moved is the one that says which line's
     // work arrived rather than how much of it.
-    esModules: 3722, closures: 3600, asyncAwait: 1414, typedArrays: 788, promises: 343,
+    // v4537 -- RE-TAKEN: TWO files (physics/mesh/uvLscm.mjs and its gate) moved THREE rows by two. ES modules
+    // and closures again, and TYPED ARRAYS this time -- 788 -> 790 -- because a conformal solver carries
+    // Float64Array coordinates and Int32Array index maps where the planar unwrapper carried plain arrays. The
+    // row that moves says what the new code IS, which is the argument for re-deriving all twelve every run.
+    esModules: 3724, closures: 3602, asyncAwait: 1414, typedArrays: 790, promises: 343,
     fetchXhr: 243, performanceNow: 220, raf: 116, webgl: 154, webgpu: 48, threads: 22, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

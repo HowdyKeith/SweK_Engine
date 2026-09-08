@@ -3764,6 +3764,33 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since197: Object.freeze({
+        at: "v4537", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "physics/mesh/uvLscm-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 1.34 s. The curved half of UV unwrapping, graded on GPU_Assets/RobotExpressive.glb -- the asset " +
+                 "tools/export/reskin.js has long recorded as having no TEXCOORD_0 and no texture at all. physics/mesh/" +
+                 "uvLscm.mjs welds, segments into disk charts by normal deviation, flattens each with least-squares " +
+                 "conformal maps (Levy et al. 2002) and packs them: 3,234 of 3,234 triangles across 735 charts, 0 flipped, " +
+                 "0 UVs outside [0,1], 0 of 269,745 chart pairs overlapping, worst conformal 1.18, in 100 ms. " +
+                 "*** MEASURING THE ASSET FIRST IS WHAT SHAPED THE ROUND: three quarters of its shipped vertex buffer is " +
+                 "duplication (7,214 -> 1,759 vertices across 19 primitives, valence 1.35 -> 5.52), and 71% of the welded " +
+                 "mesh is CLOSED surface -- so LSCM without the weld would flatten every triangle alone and report a " +
+                 "perfect map that means nothing, and 'unwrap the disks, report the rest' would have left most of the robot " +
+                 "untextured. *** TWO NUMBERS CARRY THE GATE AND THEIR DIFFERENCE IS A THEOREM: conformal distortion " +
+                 "reaches 1 at MACHINE PRECISION (4.7e-14) on a cylinder and a cone, because a developable surface really " +
+                 "unrolls; on a sphere cap it stays near 1 while AREA distortion grows 1.15 -> 1.90 -> 4.61 as the cap " +
+                 "widens, which is Gauss's Theorema Egregium rather than a defect, and a gate measuring only the first " +
+                 "would call a sphere perfectly unwrapped. Sabotages A-G all exit 1. *** THREE WENT 0 RED FIRST AND NONE " +
+                 "WAS THE GATE BEING RIGHT: *** two had no fixture that could see them (the disk guard's failure needs an " +
+                 "annulus, which the robot has none of; the fixed 400-iteration budget's failure needs thousands of " +
+                 "triangles, and the largest fixture was 741), and the third was the INSTRUMENT -- counting FAIL lines " +
+                 "scores a module broken enough to THROW as zero, the same shape as reading $? after a command " +
+                 "substitution has reset it. Both fixtures were added and the grading moved to exit codes.",
+    }),
 
 });
 
