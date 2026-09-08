@@ -246,6 +246,52 @@ export function contourSlide(wishX, wishZ, n) {
  *                lip: this module has no vertical velocity and does not pretend to integrate a fall.
  *   substep      maximum horizontal distance per internal step; the verdict must not depend on it
  */
+/**
+ * *** A REFUSAL IS NOT AN ARRIVAL, AND THIS IS THE POLICY THAT SAYS SO. ***
+ *
+ * stepTerrain answers one question -- given this wish, what does the ground allow -- and answering "nothing"
+ * is a correct answer. CHOOSING A DIFFERENT WISH IS THE CALLER'S JOB, and no caller was doing it: measured
+ * in the engine's own world, a bot at (5.957, 1.986) stood still for 600 frames of 600 with 21 OF ITS 24
+ * COMPASS DIRECTIONS OPEN, because the three it wanted were refused and nothing tried the other twenty-one.
+ *
+ * *** THE REFUSAL ITSELF WAS CORRECT, WHICH IS THE PART THAT TOOK MEASURING. *** The round was filed as "a
+ * one-unit voxel lip the slope test refuses before stepHeight can consider it". It is not. The bot's wish
+ * pointed into cell x 6..7, z 2..3, whose four corner heights are 28, 29, 26, 27 -- a TWO-UNIT DROP across
+ * z -- so the bilinear gradient is (1, -2), magnitude 2.236, and the WHOLE CELL reads 65.9 degrees against
+ * a 55-degree limit. Two of the three refused directions were going DOWNHILL. contourSlide is already the
+ * right horizontal wall-slide and it cannot help either: the contour of a uniform face runs along that
+ * face, so the slide lands at 65.9 degrees too and stepTerrain blocks. Nothing in the physics is wrong.
+ *
+ * So this tries the wish, and on a REFUSAL that moved nothing, fans out around it and takes the smallest
+ * deviation that actually moves. That is this tree's own ruling, written at v4187 and quoted in
+ * simulation/BotManager.js ever since: "refusing a move must not mean standing at the wall waiting to be
+ * killed -- put a hand on it and walk."
+ *
+ * Measured on the engine's own heights, 600 frames steering at a far corner: 0.00 units and 600 stuck
+ * frames without the fan, 7.76 units with it.
+ *
+ * The offsets are tried in PAIRS at growing magnitude so a wall is hugged on whichever side opens first
+ * rather than always the same one, and the fan runs ONLY when the direct wish moved nothing -- a slide that
+ * is making progress is not overridden, because it is already the better answer.
+ */
+export const DETOUR_FAN = Object.freeze([30, -30, 60, -60, 90, -90]);
+
+export function stepTerrainFan(opts = {}) {
+    const { fan = DETOUR_FAN, ...rest } = opts;
+    const first = stepTerrain(rest);
+    if (!first.blocked || first.movedH > 1e-6) return { ...first, fanned: 0, tried: 1 };
+    const w = rest.wish || [0, 0];
+    const base = Math.atan2(w[1], w[0]);
+    let tried = 1;
+    for (const off of fan) {
+        const a = base + off * Math.PI / 180;
+        const alt = stepTerrain({ ...rest, wish: [Math.cos(a), Math.sin(a)] });
+        tried++;
+        if (alt.movedH > 1e-6) return { ...alt, fanned: off, tried };
+    }
+    return { ...first, fanned: null, tried };      // genuinely boxed in: every heading refused
+}
+
 export function stepTerrain({
     pos, ground, wish, dt = 1 / 60, speed = 5,
     maxSlopeDeg = 45, stepHeight = 0.5, snapDown = 0.5,
@@ -285,7 +331,18 @@ export function stepTerrain({
         // *** THE LIMIT IS ON THE NORMAL, NOT ON THE HEIGHT DIFFERENCE. *** A height-difference test shrinks
         // with the substep and would make this verdict depend on dt; see the header.
         if (g.n[1] < cos) {
-            // *** A STAIR IS NOT A SLOPE, AND ON A LATTICE WORLD THIS FILE CANNOT YET TELL THEM APART. ***
+            // *** THE ROUND THAT INVESTIGATED THIS FOUND THE DIAGNOSIS BELOW WAS WRONG, AND THE CODE HERE
+            // RIGHT. *** It is kept because a discarded reading is evidence about the method, and because
+            // the fix it proposed and removed is still the wrong fix. What the engine actually presented was
+            // NOT a one-unit lip: the cell the bot wanted has corner heights 28, 29, 26, 27 -- a TWO-UNIT
+            // DROP across z -- so the bilinear gradient is (1, -2) and the whole cell reads 65.9 degrees
+            // against a 55-degree limit. Refusing it is correct, two of the three refused headings were
+            // going DOWNHILL, and contourSlide cannot rescue it either: the contour of a uniform face runs
+            // ALONG that face. The bot stood still because its CALLER treated `blocked` as handled while 21
+            // of its 24 compass headings were open. See stepTerrainFan above. The paragraph that follows was
+            // written before any of that was measured:
+            //
+            // A STAIR IS NOT A SLOPE, AND ON A LATTICE WORLD THIS FILE CANNOT YET TELL THEM APART.
             // The header says step-up is "for a DISCONTINUITY -- a stair edge, where the surface is vertical
             // over zero horizontal distance and a normal-based test would refuse forever" -- and the normal
             // test runs first, so stepHeight never gets a chance. Measured in the ENGINE'S OWN WORLD, which
@@ -293,7 +350,7 @@ export function stepTerrain({
             // degrees 0.25 units ahead, over a lattice row of 28, 28, 29, 29, 30 -- a ONE-UNIT LIP -- and
             // stops there permanently. It climbed 45-to-54-degree ground to get to it.
             //
-            // *** A FIX WAS WRITTEN, MEASURED, AND REMOVED, WHICH IS WHY THIS IS A COMMENT AND NOT CODE. ***
+            // A FIX WAS WRITTEN, MEASURED, AND REMOVED, WHICH IS WHY THIS IS A COMMENT AND NOT CODE.
             // Re-probing the ground a fixed world distance ahead and stepping onto it if the rise is within
             // stepHeight keeps the frame-rate independence (a fixed distance does not move with dt, and the
             // gate's 63- and 76-degree walls stayed refused at all four timesteps, since they rise 2.0 and

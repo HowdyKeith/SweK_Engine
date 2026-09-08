@@ -245,6 +245,97 @@ console.log("\n5. TOO STEEP TO CLIMB IS NOT THE SAME AS STUCK");
         "that and reported 0 slides, which reads identically to a contourSlide that does not work.");
 }
 
+// =============================================================================================================
+console.log("\n*** A REFUSAL IS NOT AN ARRIVAL: T.stepTerrainFan, ON THE ENGINE'S OWN HEIGHTS ***");
+{
+    // These seven rows of integers are the ENGINE'S, read out of a running index.html around the point where
+    // a real bot stood still for 429 frames: x 4..10, z 0..4. They are here rather than a synthetic ramp
+    // because the whole finding is that the synthetic worlds in this file could not produce the shape --
+    // every one of them is smooth, and this is a lattice of unit voxels with a two-unit drop in it.
+    const REAL = [[28, 28, 29, 29, 30, 30, 30], [27, 28, 28, 29, 29, 30, 30], [27, 28, 28, 29, 29, 30, 30],
+                  [26, 27, 26, 27, 29, 29, 30], [25, 25, 26, 26, 28, 29, 30]];
+    const hAt = (x, z) => { const i = Math.round(x) - 4, j = Math.round(z);
+        return (i < 0 || i > 6 || j < 0 || j > 4) ? NaN : REAL[j][i]; };
+    const G = T.latticeGround(hAt);
+    const P = [5.957, 28, 1.986];                       // where the real bot stopped
+    const args = { pos: P, ground: G, dt: 1 / 60, speed: 4, maxSlopeDeg: 55,
+                   stepHeight: 1.2, snapDown: 1.2, convention: T.SURFACE };
+
+    // *** FIRST: THE REFUSAL IS CORRECT, WHICH IS WHY THE FIX IS NOT IN THE PHYSICS. ***
+    const cell = G(6.5, 2.5);
+    report("cell x 6..7, z 2..3 has corners 28, 29, 26, 27 and reads " + T.slopeDeg(cell.n).toFixed(1) + " degrees");
+    ok("!! *** THE GROUND THE BOT WANTED IS GENUINELY UNWALKABLE -- a two-unit drop, not a one-unit lip ***",
+        T.slopeDeg(cell.n) > 60,
+        T.slopeDeg(cell.n).toFixed(1) + " degrees against a 55-degree limit. The round was FILED as a lip that " +
+        "stepHeight should have cleared; it is a cliff, and refusing it is right. Two of the three refused " +
+        "headings were going DOWNHILL.");
+
+    let open = 0, blocked = 0;
+    for (let a = 0; a < 360; a += 15) {
+        const r = a * Math.PI / 180;
+        const res = T.stepTerrain({ ...args, wish: [Math.cos(r), Math.sin(r)] });
+        if (res.movedH > 1e-6) open++; else blocked++;
+    }
+    ok("!! ...and the bot was not boxed in: " + open + " of " + (open + blocked) + " compass headings were OPEN",
+        open > 15 && blocked > 0,
+        "which is what makes standing still a CALLER defect rather than a terrain one. Measured identically " +
+        "in the running engine before it was reproduced here.");
+
+    // *** SECOND: THE FAN, AND WHAT IT COSTS WHEN IT IS NOT NEEDED. ***
+    let fanned = 0, stillStuck = 0, untouched = 0;
+    for (let a = 0; a < 360; a += 15) {
+        const r = a * Math.PI / 180;
+        const res = T.stepTerrainFan({ ...args, wish: [Math.cos(r), Math.sin(r)] });
+        if (res.movedH < 1e-6) stillStuck++;
+        else if (res.fanned) fanned++;
+        else untouched++;
+    }
+    report(open + " headings moved directly, " + fanned + " needed a detour, " + stillStuck + " still refused");
+    ok("!! *** EVERY REFUSED HEADING NOW MOVES, AND NONE OF THE OPEN ONES WAS TOUCHED ***",
+        stillStuck === 0 && fanned === blocked && untouched === open,
+        fanned + " detoured, " + untouched + " direct, " + stillStuck + " stuck. The second clause is the one " +
+        "that matters: a fan that fired on headings which were already fine would be steering the body away " +
+        "from where it asked to go, every frame, for nothing.");
+    ok("!! ...and the detour is the SMALLEST that works, not the first that is tried",
+        [15, 30, 45].every((a) => {
+            const r = a * Math.PI / 180;
+            const res = T.stepTerrainFan({ ...args, wish: [Math.cos(r), Math.sin(r)] });
+            return Math.abs(res.fanned) <= 30;
+        }),
+        "all three refused headings clear at 30 degrees, and the fan is ordered 30, -30, 60, -60, 90, -90 so " +
+        "a body hugs an obstacle rather than turning away from it.");
+
+    // *** THIRD: IT DOES NOT INVENT A WAY OUT OF A PLACE THERE IS NONE. *** A fan that always found something
+    // would be a fan that had stopped reading the ground.
+    // *** THE FIRST DRAFT OF THIS PIT WAS NOT A PIT. *** It read `Math.abs(x) <= 1`, which puts the walls at
+    // the far corners of the bot's own cell -- every corner of x 0..1, z 0..1 is floor, so the cell is FLAT
+    // and the body walked straight out at 0.0667. The row failed and said so. Strict `< 1` puts a 40-unit
+    // corner on every cell touching the origin, which is what "no way out" actually requires on a lattice.
+    const pit = T.latticeGround((x, z) => (Math.abs(x) < 1 && Math.abs(z) < 1 ? 0 : 40));
+    const boxed = T.stepTerrainFan({ ...args, pos: [0, 0, 0], ground: pit, wish: [1, 0] });
+    ok("!! *** AND IN A PLACE WITH NO WAY OUT IT REPORTS ONE, RATHER THAN FINDING A FICTION ***",
+        boxed.movedH < 1e-6 && boxed.fanned === null && boxed.tried === 7,
+        "a one-cell floor inside 40-unit walls: fanned=" + boxed.fanned + ", tried " + boxed.tried +
+        " headings, moved " + boxed.movedH.toFixed(6) + ". `fanned: null` is the caller's signal that the " +
+        "body is genuinely stuck and something other than steering has to change.");
+
+    // Frame-rate independence survives the policy: the fan turns the WISH, and a wish does not carry dt.
+    const at = (dt) => {
+        let p = [5.957, 28, 1.986], total = 0;
+        for (let i = 0; i < Math.round(1 / dt); i++) {
+            const res = T.stepTerrainFan({ ...args, pos: p, dt, wish: [Math.cos(Math.PI / 6), Math.sin(Math.PI / 6)] });
+            total += res.movedH; p = res.pos;
+        }
+        return total;
+    };
+    const d60 = at(1 / 60), d15 = at(1 / 15), d240 = at(1 / 240);
+    report("one second of walking at 15, 60 and 240 fps: " + d15.toFixed(3) + ", " + d60.toFixed(3) + ", " + d240.toFixed(3));
+    ok("!! ...and the fan does not reintroduce a frame-rate dependence, which is what this module is FOR",
+        Math.abs(d15 - d60) / Math.max(d60, 1e-9) < 0.12 && Math.abs(d240 - d60) / Math.max(d60, 1e-9) < 0.12,
+        "the fan turns the WISH and a wish carries no dt; the refused-fixture round removed a candidate fix " +
+        "precisely because it moved the body by a fixed distance instead.");
+}
+
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nunchecked here: anything with a VERTICAL VELOCITY -- jumping, falling, ceilings -- which this module " +
     "does not own and says so; capsule-against-triangle depenetration, which is what overhangs, thin walls " +
