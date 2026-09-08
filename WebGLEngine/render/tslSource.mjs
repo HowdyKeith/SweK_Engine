@@ -50,19 +50,52 @@ export async function emitShaders(renderer, { scene, camera, mesh }) {
     return { language: renderer.backend.isWebGPUBackend ? "wgsl" : "glsl", vertex: sh.vertexShader, fragment: sh.fragmentShader };
 }
 
-/** The fields of three's fragment uniform struct, in order: [{ name, type }] (type in the device's vocabulary). Refuses an unlabelled one. */
+// *** v4550 -- three@0.185.1 PUTS AN EXTRA FIELD IN objectStruct THAT THE FRAGMENT NEVER READS, WGSL ONLY,
+// MEASURED. *** Printing the raw emission (fleetTsl's Lyapunov look, two labelled uniforms, `chaos` and
+// `light`) found a third field, `nodeUniform4 : mat4x4<f32>`, that appears nowhere in the fragment's own
+// executable code -- only in its own declaration line. Absent entirely under r178. It is a per-object matrix
+// three's VERTEX stage now needs for a varying this graph only CONSUMES (normalLocal); vertex and fragment
+// share one binding layout at @group(1), so it leaks into the fragment's copy of the struct even though only
+// the vertex stage -- which this module never transplants, the device supplies its own -- would read it.
+// *** THE FIRST FIX ATTEMPT DROPPED SUCH FIELDS FROM THE RETURNED LIST AND BROKE TWO OTHER CONSUMERS: *** the
+// vertex-displacement check three lines below reads THIS function's return value to confirm a displacement's
+// own uniform is "in the shell's struct" -- filtering the list here made a legitimately-needed field invisible
+// to a DIFFERENT check with a different question. So the list stays whole; only the THROW is narrowed, and
+// only for WGSL, where the reference token (`object.<name>`) is confirmed by measurement -- and only for the
+// exact type measured (mat4x4<f32>), so the existing "an unlabelled f32 always throws" fixture (tslSource-
+// selfcheck.mjs's nodeUniform1 : f32) stays exercised rather than accidentally swallowed by a same-shaped but
+// differently-typed field. GLSL's actual in-body access token was guessed wrong on the first attempt (the
+// WGSL side found both real uniforms correctly; the GLSL side found none), so GLSL keeps its original
+// behaviour -- throw on any auto-generated name -- until that token is confirmed the same way rather than
+// assumed symmetric with WGSL.
+function _wgslBodyReferences(fragment, structBlock, name) {
+    return fragment.slice(fragment.indexOf(structBlock) + structBlock.length).includes(`object.${name}`);
+}
+
+/** Is `u` three's own cross-stage bookkeeping (an unlabelled, unread, mat4x4<f32> field in objectStruct -- the v4550 case), rather than a real binding failure? WGSL only, and only that one measured shape -- an unlabelled field of any OTHER type, or one the body does read, is still a real refusal. Shared by uniformFields()'s own throw and by every later check that walks its (whole, unfiltered) return list against a shell's struct, so a field excused here does not need to be excused twice. */
+function _wgslUnreadBookkeeping(fragment, language, u) {
+    if (language !== "wgsl" || u.type !== "mat4" || !/^nodeUniform\d+$/.test(u.name)) return false;
+    const m = fragment.match(/struct objectStruct \{[\s\S]*?\};/);
+    return !!m && !_wgslBodyReferences(fragment, m[0], u.name);
+}
+
+/** The fields of three's fragment uniform struct, in order: [{ name, type }] (type in the device's vocabulary). Refuses an unlabelled one THAT THE FRAGMENT BODY ACTUALLY READS (WGSL only, measured) -- an auto-named field the body never touches is three's own cross-stage bookkeeping, not a binding failure, and stays in the returned list for other checks to read. */
 export function uniformFields(fragment, language) {
     const out = [];
     if (language === "wgsl") {
-        const m = fragment.match(/struct objectStruct \{([\s\S]*?)\};/);
+        const m = fragment.match(/struct objectStruct \{[\s\S]*?\};/);
         if (!m) return out;
-        for (const line of m[1].split("\n")) { const f = line.trim().replace(/,$/, "").match(/^(\w+)\s*:\s*(.+)$/); if (!f) continue; const t = WGSL_TYPES[f[2].trim()]; if (!t) throw new Error(`tslSource: uniform ${f[1]} has type ${f[2]}, which the device's uniform list does not carry`); out.push({ name: f[1], type: t }); }
+        for (const line of m[0].match(/\{([\s\S]*?)\};/)[1].split("\n")) { const f = line.trim().replace(/,$/, "").match(/^(\w+)\s*:\s*(.+)$/); if (!f) continue; const t = WGSL_TYPES[f[2].trim()]; if (!t) throw new Error(`tslSource: uniform ${f[1]} has type ${f[2]}, which the device's uniform list does not carry`); out.push({ name: f[1], type: t }); }
     } else {
         const m = fragment.match(/uniform fragment_object \{([\s\S]*?)\};/);
         if (!m) return out;
         for (const line of m[1].split("\n")) { const f = line.trim().replace(/;$/, "").match(/^(\w+)\s+f_(\w+)$/); if (!f) continue; const t = GLSL_TYPES[f[1]]; if (!t) throw new Error(`tslSource: uniform ${f[2]} has type ${f[1]}, which the device's uniform list does not carry`); out.push({ name: f[2], type: t }); }
     }
-    for (const u of out) if (/^nodeUniform\d+$/.test(u.name)) throw new Error(`tslSource: the emitted ${language.toUpperCase()} carries an UNLABELLED uniform (${u.name}); label every uniform node (uniform(x).label("name")) so the device can bind it by name`);
+    for (const u of out) {
+        if (!/^nodeUniform\d+$/.test(u.name)) continue;
+        if (_wgslUnreadBookkeeping(fragment, language, u)) continue;
+        throw new Error(`tslSource: the emitted ${language.toUpperCase()} carries an UNLABELLED uniform (${u.name}); label every uniform node (uniform(x).label("name")) so the device can bind it by name`);
+    }
     return out;
 }
 /** The textures three declared: [name]. Refuses an unlabelled one. */
@@ -275,7 +308,9 @@ export function transplantIntoShell({ wgsl, glsl }, shell) {
         // device reads the bindings out of the shader and would throw at draw with nothing bound to it.
         const carried = shell.textures || [];
         for (const t of textures) if (!carried.includes(t)) throw new Error(`tslSource: the fragment samples "${t}", which the shell "${shell.name}" does not bind (it binds ${carried.join(", ") || "no textures"})`);
-        for (const u of uniforms) { const h = shell.uniforms.find((x) => x.name === u.name); if (!h) throw new Error(`tslSource: the fragment's uniform "${u.name}" is not in the shell "${shell.name}"'s struct (${shell.uniforms.map((x) => x.name).join(", ")})`); if (h.type !== u.type) throw new Error(`tslSource: uniform "${u.name}" is ${u.type} in the fragment and ${h.type} in the shell`); }
+        // v4550 -- a bookkeeping field excused above by uniformFields() (unread, mat4x4<f32>, WGSL) is not something ANY
+        // shell was ever written to carry -- it crossed nothing, so it needs no seat in the shell's struct either.
+        for (const u of uniforms) { const h = shell.uniforms.find((x) => x.name === u.name); if (!h) { if (_wgslUnreadBookkeeping(em.fragment, language, u)) continue; throw new Error(`tslSource: the fragment's uniform "${u.name}" is not in the shell "${shell.name}"'s struct (${shell.uniforms.map((x) => x.name).join(", ")})`); } if (h.type !== u.type) throw new Error(`tslSource: uniform "${u.name}" is ${u.type} in the fragment and ${h.type} in the shell`); }
         const sem = varyingSemantics(em.vertex, language), S = shell[language];
         // the vertex stage: a displacement crosses only into a shell that says where ({{DISPLACE}} in its vertexTemplate)
         const disp = vertexDisplacement(em.vertex, language);
