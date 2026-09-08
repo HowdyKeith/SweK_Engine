@@ -189,35 +189,61 @@ console.log("\n5. *** THE POOL ABOVE TWO WORKERS, AND MORE OF THEM IS NOT FASTER
 }
 
 // =============================================================================================================
-console.log("\n6. *** WHETHER HM_PADDING = 24 IS THE RIGHT WINDOW, WHICH IS NOW A NUMBER ***");
+console.log("\n6. *** THE WINDOW, THE LADDER THAT EXTENDS IT, AND WHAT THE LADDER COSTS ***");
 {
-    for (const p of R.padding) report(`gap ${String(p.gapOffset).padStart(3)} units off the straight line -> ` +
-        `found ${p.found}, route "${p.route}"`);
-    const found = R.padding.filter((p) => p.found).map((p) => p.gapOffset);
-    const lost = R.padding.filter((p) => !p.found).map((p) => p.gapOffset);
-    // *** THE EXPECTED EDGE IS DERIVED FROM THE CONSTANT IN THE SOURCE, NOT PINNED AT 24. *** The first
-    // version of this row asserted only "reachable past 24", which cannot tell a 24-unit window from a
-    // 64-unit one: widening HM_PADDING to 64 left every probed offset reachable, `lost` empty, and the row
-    // GREEN. A row that passes whatever the constant is measures nothing about it.
-    const poolSrc = fs.readFileSync(path.join(ENG, "simulation", "BotPathfinderPool.js"), "utf8");
-    const PAD = Number((poolSrc.match(/const\s+HM_PADDING\s*=\s*(\d+)/) || [])[1]);
+    for (const p of R.padding) report(`gap ${String(p.gapOffset).padStart(3)} off the line -> first rung ` +
+        `${String(p.firstRung).padEnd(5)}  ladder ${String(p.ladder).padEnd(5)} in ${p.attempts} attempt(s), pad ${p.pad}`);
+    const PAD = Number((fs.readFileSync(path.join(ENG, "simulation", "BotPathfinderPool.js"), "utf8")
+        .match(/const\s+HM_PADDING\s*=\s*(\d+)/) || [])[1]);
     const GAP_HALF = 6;                       // the harness's gap reaches 6 units either side of its centre
-    const edge = PAD + GAP_HALF;
-    ok("!! *** THE WINDOW'S EDGE IS WHERE HM_PADDING = " + PAD + " PUTS IT: reachable to " + Math.max(...found) +
-        ", gone by " + Math.min(...lost) + ", against a derived " + edge + " ***",
-        Number.isFinite(PAD) && lost.length > 0 && Math.max(...found) <= edge && Math.min(...lost) > edge - 8,
-        "HM_PADDING is read out of simulation/BotPathfinderPool.js rather than typed here. Found at offsets " +
-        found.join(", ") + " and lost at " + lost.join(", ") + ". _heightmapForJob pads " +
-        "the start/goal bounding box by HM_PADDING = 24 and samples ONLY that, and this fixture's gap reaches " +
-        "6 units either side of its centre -- so a detour is reachable out to about 24 + 6 = 30 and not " +
-        "beyond. *** SO THE ANSWER TO 'IS 24 RIGHT' IS THAT IT IS A RANGE LIMIT ON DETOURS RATHER THAN A " +
-        "PERFORMANCE KNOB, *** and nothing in the tree had written down what it costs: a bot whose only way " +
-        "round is wider than the window does not get a long path, it gets NO path, and falls back to " +
-        "steering straight at the thing in its way.");
-    ok("   ...and beyond the window BOTH planners fail, so this is the pool's limit and not the navmesh's",
-        R.padding.filter((p) => !p.found).every((p) => p.route === "grid"),
-        "every lost case falls through to the grid and fails there too: the navmesh declines, the grid is " +
-        "asked, and neither can find a route that is not in the data it was given.");
+    const firstFound = R.padding.filter((p) => p.firstRung).map((p) => p.gapOffset);
+    const firstLost = R.padding.filter((p) => !p.firstRung).map((p) => p.gapOffset);
+    ok("!! *** THE FIRST RUNG STILL STOPS WHERE HM_PADDING = " + PAD + " PUTS IT: " + Math.max(...firstFound) +
+        " REACHED, " + Math.min(...firstLost) + " LOST, DERIVED " + (PAD + GAP_HALF) + " ***",
+        Number.isFinite(PAD) && Math.max(...firstFound) <= PAD + GAP_HALF && Math.min(...firstLost) > PAD + GAP_HALF - 8,
+        "HM_PADDING is read out of the source rather than typed here, so a round that changes the window " +
+        "moves both sides of this together. Pinning 24 instead would have measured nothing: the first draft " +
+        "asserted only \"reachable past 24\", and widening the constant to 64 left the row GREEN.");
+    const ladderFound = R.padding.filter((p) => p.ladder).map((p) => p.gapOffset);
+    ok("!! *** AND THE LADDER REACHES " + Math.max(...ladderFound) + " UNITS OF DETOUR AGAINST THE FIRST RUNG'S " +
+        Math.max(...firstFound) + " ***",
+        Math.max(...ladderFound) > Math.max(...firstFound) * 3,
+        "a " + (Math.max(...ladderFound) / Math.max(...firstFound)).toFixed(1) + "x extension. *** THE FAILURE " +
+        "MODE THIS FIXES IS NOT A SLOW BOT, IT IS A BOT THAT GIVES UP AND CHARGES THE WALL: *** both planners " +
+        "correctly returned found:false beyond the window, because neither can find a route that is not in " +
+        "the data it was given, and simulation/BotManager.js falls back to direct steering on !found.");
+    ok("!! ...and the rung that answered is the one the geometry predicts, not simply the last one",
+        R.padding.filter((p) => p.ladder).every((p) => p.gapOffset <= p.pad + GAP_HALF) &&
+        R.padding.some((p) => p.attempts === 2) && R.padding.some((p) => p.attempts === 3),
+        "every solved offset is within its own pad plus the gap's half-width, and both the second and third " +
+        "rungs are exercised. A ladder that always climbed to the top would look identical on the found/lost " +
+        "column and cost three times as much.");
+    ok("!! *** THE LADDER COSTS NOTHING WHEN IT IS NOT NEEDED: " + R.ladderCost.easyWidened + " WIDENINGS OVER 8 EASY PLANS ***",
+        R.ladderCost.easyWidened === 0,
+        "8 plans that succeed on the first rung took " + R.ladderCost.easyMs + " ms and widened " +
+        R.ladderCost.easyWidened + " times. Widening EVERY query would have been the obvious fix and the " +
+        "wrong one -- the snapshot is built by calling world._heightAt once per cell and TRANSFERRED per " +
+        "query, and its area grows quadratically: at a separation of 90, pad 24 is 6,811 cells, pad 64 is " +
+        "28,251 (4.2x) and pad 128 is 89,179 (13.1x).");
+    // *** THE EXPECTED COUNTS ARE DERIVED FROM THE PLAN COUNT AND THE LADDER'S OWN LENGTH, NOT TYPED. *** They
+    // were 8 and 16, and cutting the sealed run from 8 plans to 4 to get this gate back under the sweep budget
+    // would have quietly turned a measurement into a wrong constant. One widening per rung ABOVE the first,
+    // one vain ladder per plan: a schedule of a different length moves both sides of this together.
+    const n = R.ladderCost.sealedN;
+    const expectWiden = n * (R.ladderCost.schedule.length - 1);
+    ok("!! ...and the walled-off case, which fails at every rung and repeats forever, is BOUNDED and counted",
+        R.ladderCost.sealedInVain === n && R.ladderCost.sealedWidened === expectWiden &&
+        R.ladderCost.sealedMs / n < (R.ladderCost.easyMs / R.ladderCost.easyN) * 12,
+        n + " hopeless plans against a sealed wall: " + R.ladderCost.sealedMs + " ms, " + R.ladderCost.sealedWidened +
+        " widenings (" + (R.ladderCost.schedule.length - 1) + " per plan, the ladder's " +
+        R.ladderCost.schedule.join("/") + ") and " +
+        R.ladderCost.sealedInVain + " whole ladders climbed in vain. That is " +
+        ((R.ladderCost.sealedMs / n) / (R.ladderCost.easyMs / R.ladderCost.easyN)).toFixed(1) + "x the easy " +
+        "case per request, or about " +
+        (R.ladderCost.sealedMs / n).toFixed(0) + " ms per hopeless request, off the main thread, for a bot " +
+        "that re-plans every few seconds. *** THE SCHEDULE IS THREE RUNGS AND NOT A LOOP FOR EXACTLY THIS " +
+        "CASE: *** a goal that is genuinely walled off would otherwise climb forever. _widenedInVain is the " +
+        "counter that makes a world full of unreachable goals visible rather than merely slow.");
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
@@ -225,7 +251,13 @@ console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "and shows the controller and the render agree on the ground to the pixel, which is the float/sink claim " +
     "and is worth having -- but it is this gate's canvas, not main.js's world, and nothing here exercises " +
     "the ECS, the camera, or the meshes a bot is actually drawn with. main.js is the only page that mounts " +
-    "BotManager for real, and booting it headlessly is a much larger surface than one gate should own. Also " +
+    "BotManager for real, and booting it headlessly is a much larger surface than one gate should own. *** " +
+    "THAT LAST SENTENCE WAS WRONG, AND v4547 CLOSED IT: tools/ship/engineSceneBot-selfcheck.mjs BOOTS " +
+    "index.html IN 7.1 s WITH ZERO PAGE ERRORS *** and reaches the real BotManager at " +
+    "window.fpsShooter.botManager with nothing published to get it there -- and it immediately found a " +
+    "regression every gate here structurally could not, because every fake world in this file answers at any " +
+    "float and the engine's world answers only at integers. What stays true is the COST: that gate runs 7.8 s " +
+    "against a 3,000 ms sweep budget, so it does not run at ship time. Also " +
     "unchecked: any box but this one -- section 5's reading that more workers is SLOWER is one machine with " +
     "few cores, and what is asserted there is that every pool size is CORRECT rather than that any size is " +
     "fastest.");

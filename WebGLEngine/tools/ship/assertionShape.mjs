@@ -212,8 +212,12 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4544 -- RE-TAKEN: one gate (terrainWalk) joined, the same four rows by one, TENTH arrival running.
     // v4545 -- RE-TAKEN: one gate (navWiring) joined, the same four rows by one, ELEVENTH arrival running.
     // v4546 -- RE-TAKEN: one gate (navWiringLive) joined, the same four rows by one, TWELFTH arrival running.
-    gates: 1601, usesOk: 1580, definesOk: 1572, importsOk: 0,
-    distinctDefinitions: 38, nameFirst: 1473, condFirst: 91, unknownSignature: 16,
+    // v4547 -- RE-TAKEN: one gate (engineSceneBot) joined, the same four rows by one, THIRTEENTH arrival
+    // running -- and this one is the arrival most likely to have moved the OTHER five, because it is the
+    // first gate in the tree that boots index.html and reads its assertions out of a page rather than out of
+    // a fixture. It did not: it is written in the same shape as the other 1,473.
+    gates: 1602, usesOk: 1581, definesOk: 1573, importsOk: 0,
+    distinctDefinitions: 38, nameFirst: 1474, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

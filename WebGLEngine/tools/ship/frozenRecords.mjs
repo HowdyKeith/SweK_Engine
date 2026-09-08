@@ -235,7 +235,16 @@ export const PROBE_AT_V4536 = Object.freeze({
     // The population as probed, INCLUDING this module. `excluding` is what the gate compares, because this
     // module's own record count moves whenever a round like this one writes another.
     records: 91, withFields: 38, fields: 152,
-    excluding: Object.freeze({ records: 90, withFields: 37, fields: 146 }),
+    // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
+    // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
+    // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
+    // *** THE REASON IT SURVIVED NINE ROUNDS IS THE SUBJECT OF THE ROUND THAT BROKE IT. *** This gate takes
+    // 3,446 ms and the ship-time sweep budget is 3,000, so frozenRecords-selfcheck NEVER RUNS AT SHIP TIME --
+    // and neither does recordDrift-selfcheck, at 3,026 ms, 26 ms over. The tree's two stale-record detectors
+    // are both outside the budget, so the one check that would have caught a record added without a re-take
+    // was excluded by 446 ms, by the very round whose subject was that budget. Backlog item #14 counts 487
+    // gates in that position; this is the first one measured to have actually cost something.
+    excluding: Object.freeze({ records: 91, withFields: 38, fields: 147 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,

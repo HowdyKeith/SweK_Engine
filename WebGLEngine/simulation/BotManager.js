@@ -169,7 +169,7 @@ const BOT_KINDS = {
 // enemies. Each entry mirrors a KAIJU_KINDS entry's color + scale +
 // attack profile, so visual identity (tracer color, mesh size, themed
 // speech) comes from the shared kaiju config.
-import { stepTerrain, functionGround, SURFACE } from "../physics/character/terrainWalk.mjs";
+import { stepTerrain, autoGround, SURFACE } from "../physics/character/terrainWalk.mjs";
 
 /** Eye/centre offset above the feet -- the +1 this file has always added to the terrain height. */
 const BOT_EYE = 1;
@@ -1229,7 +1229,12 @@ export class BotManager {
         if (!w || typeof w._heightAt !== "function") return null;
         if (this._groundFor !== w) {
             this._groundFor = w;
-            this._ground = functionGround((x, z) => w._heightAt(x, z));
+            // *** autoGround ASKS THE WORLD WHETHER IT ANSWERS OFF-LATTICE RATHER THAN ASSUMING IT DOES. ***
+            // v4545 used functionGround here, which probes at x +/- eps -- and main.js's world._heightAt
+            // answers ONLY at integer coordinates, returning nothing in between. Every bot in the real
+            // engine was blocked at 0.0000 movement, and no gate saw it because every fixture's fake world
+            // answered at any float. Found by booting index.html headlessly and spawning a real bot.
+            this._ground = autoGround((x, z) => w._heightAt(x, z));
         }
         return this._ground;
     }

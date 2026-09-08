@@ -154,6 +154,61 @@ export function functionGround(hAt, { eps = 0.5 } = {}) {
     };
 }
 
+/**
+ * A ground oracle over a height function that only answers ON A LATTICE.
+ *
+ * *** THE ENGINE'S OWN WORLD IS THIS, AND functionGround() ABOVE RETURNS NULL ON IT. *** main.js's
+ * world._heightAt(x, z) answers at INTEGER coordinates and returns nothing in between -- sampled at
+ * quarter-unit spacing it reads 25, null, null, null, 26, null, null, null, 27. functionGround probes at
+ * x +/- eps, gets null, and hands stepTerrain no ground at all, so the body is blocked and does not move.
+ * Measured by booting index.html headlessly and spawning a real bot on the real world: movedH 0.0000,
+ * blocked true, at every one of 600 frames. *** THAT IS A REGRESSION v4545 SHIPPED INTO BotManager, and no
+ * gate could see it because every fake world in every fixture answered at any float. ***
+ *
+ * The fix is not to snap the probe: a lattice height function IS a heightfield that happens to be exposed as
+ * a call, so it gets exactly what heightfieldGround gives an array -- the bilinear patch through the four
+ * surrounding samples, and the gradient OF THAT PATCH. Bilinear interpolation reproduces a linear function
+ * exactly, so a planar world still reads its own slope to machine precision.
+ */
+export function latticeGround(hAt, { cell = 1, originX = 0, originZ = 0 } = {}) {
+    return (wx, wz) => {
+        const fx = (wx - originX) / cell, fz = (wz - originZ) / cell;
+        const i = Math.floor(fx), j = Math.floor(fz), u = fx - i, v = fz - j;
+        let h00, h10, h01, h11;
+        try {
+            h00 = hAt(originX + i * cell, originZ + j * cell);
+            h10 = hAt(originX + (i + 1) * cell, originZ + j * cell);
+            h01 = hAt(originX + i * cell, originZ + (j + 1) * cell);
+            h11 = hAt(originX + (i + 1) * cell, originZ + (j + 1) * cell);
+        } catch { return null; }
+        if (!Number.isFinite(h00) || !Number.isFinite(h10) || !Number.isFinite(h01) || !Number.isFinite(h11)) return null;
+        const y = h00 * (1 - u) * (1 - v) + h10 * u * (1 - v) + h01 * (1 - u) * v + h11 * u * v;
+        const dhdx = ((h10 - h00) * (1 - v) + (h11 - h01) * v) / cell;
+        const dhdz = ((h01 - h00) * (1 - u) + (h11 - h10) * u) / cell;
+        const len = Math.hypot(-dhdx, 1, -dhdz);
+        return { y, n: [-dhdx / len, 1 / len, -dhdz / len] };
+    };
+}
+
+/**
+ * Pick the right oracle for a height function by ASKING IT, rather than by guessing or by configuration.
+ *
+ * A world that answers off-lattice gets functionGround's symmetric difference, which is second order and
+ * needs no interpolation. A world that answers only on the lattice gets latticeGround. The probe is one call
+ * at a deliberately off-lattice point, done once, and the answer is a fact about that world rather than a
+ * setting somebody has to keep in sync with it.
+ */
+export function autoGround(hAt, opts = {}) {
+    let offLattice = false;
+    try {
+        const a = hAt(0.5, 0.5), b = hAt(0.25, 0.75);
+        offLattice = Number.isFinite(a) && Number.isFinite(b);
+    } catch { offLattice = false; }
+    const g = offLattice ? functionGround(hAt, opts) : latticeGround(hAt, opts);
+    g.offLattice = offLattice;
+    return g;
+}
+
 /** Project a vector onto the plane with normal n: v - (v.n)n, the same identity nav/funnel.mjs's slide uses. */
 export function projectOnPlane(v, n) {
     const d = v[0] * n[0] + v[1] * n[1] + v[2] * n[2];
@@ -230,6 +285,25 @@ export function stepTerrain({
         // *** THE LIMIT IS ON THE NORMAL, NOT ON THE HEIGHT DIFFERENCE. *** A height-difference test shrinks
         // with the substep and would make this verdict depend on dt; see the header.
         if (g.n[1] < cos) {
+            // *** A STAIR IS NOT A SLOPE, AND ON A LATTICE WORLD THIS FILE CANNOT YET TELL THEM APART. ***
+            // The header says step-up is "for a DISCONTINUITY -- a stair edge, where the surface is vertical
+            // over zero horizontal distance and a normal-based test would refuse forever" -- and the normal
+            // test runs first, so stepHeight never gets a chance. Measured in the ENGINE'S OWN WORLD, which
+            // is a lattice of unit voxel lips: a bot standing on a flat cell at (5.96, 1.99) reads 65.9
+            // degrees 0.25 units ahead, over a lattice row of 28, 28, 29, 29, 30 -- a ONE-UNIT LIP -- and
+            // stops there permanently. It climbed 45-to-54-degree ground to get to it.
+            //
+            // *** A FIX WAS WRITTEN, MEASURED, AND REMOVED, WHICH IS WHY THIS IS A COMMENT AND NOT CODE. ***
+            // Re-probing the ground a fixed world distance ahead and stepping onto it if the rise is within
+            // stepHeight keeps the frame-rate independence (a fixed distance does not move with dt, and the
+            // gate's 63- and 76-degree walls stayed refused at all four timesteps, since they rise 2.0 and
+            // 4.0 over one unit against a 1.2 allowance). It did not work: on a LATTICE the interpolated
+            // surface BETWEEN two cells is steep everywhere, so the probe has to reach past the whole
+            // inter-cell band -- measured, 1.0, 1.25 and 1.5 all still blocked, and 2.0 finally clears it.
+            // And at 2.0 the body MOVED 2.0 UNITS IN A STEP WHOSE BUDGET WAS 0.05, because the branch placed
+            // it at the probe rather than advancing it by the substep. That is "gains ground on contact",
+            // the exact defect this session repaired in physics/character/kinematic.js, and a teleporting
+            // bot is worse than a stalled one. Reverted rather than shipped; filed with its numbers.
             const t = contourSlide(dir[0], dir[1], g.n);
             const tl = Math.hypot(t[0], t[1]);
             if (tl < 1e-9) { blocked = true; break; }

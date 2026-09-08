@@ -70,7 +70,16 @@ const rows = R.ranked(c);
     ok("the census re-derives to what the module recorded, EVERY row of it -- a stale table is a red",
         c.files === R.MEASURED_AT_V4462.files && drift.length === 0 &&
         Object.keys(KEY).length === rows.length,
-        drift.length ? "drifted: " + drift.join(", ") : `${c.files} files, all 12 rows match`);
+        // *** THE DETAIL IS DERIVED FROM ALL THREE CONDITIONS, BECAUSE IT USED TO LIE ABOUT ONE. *** The
+        // condition tests the FILE COUNT as well as the twelve rows, and the detail only ever reported the
+        // rows -- so a round that added a file and moved no row printed "4025 files, all 12 rows match"
+        // underneath the word FAIL, which is a check telling a reader the opposite of why it went red.
+        [c.files !== R.MEASURED_AT_V4462.files
+            ? `files ${R.MEASURED_AT_V4462.files} -> ${c.files}` : null,
+         drift.length ? "drifted: " + drift.join(", ") : null,
+         Object.keys(KEY).length !== rows.length
+            ? `key map covers ${Object.keys(KEY).length} of ${rows.length} rows` : null,
+        ].filter(Boolean).join("; ") || `${c.files} files, all 12 rows match`);
     // v4526 MERGE -- the rank is READ from the record rather than asserted as 11: on the merged tree threads are the SMALLEST
     // gap (this branch's racing pages load box3d's wasm in the browser, one more WebAssembly file, 23 against 22), which is
     // v4462's finding made stronger, not weaker -- the item's scale inverts either way, and the check still refuses a rank

@@ -3764,6 +3764,46 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since203: Object.freeze({
+        at: "v4547", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/engineSceneBot-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 7.8 s -- AND THAT NUMBER IS OVER THE 3,000 ms SWEEP BUDGET, so this gate does not run " +
+                 "at ship time and is registered saying so. Three consecutive rounds recorded booting the " +
+                 "engine's own scene as \"a much larger surface than one gate should own\"; it is index.html in " +
+                 "headless Chromium, 7,168 ms, ZERO page errors, 15 canvases, and the real BotManager reachable " +
+                 "at window.fpsShooter.botManager with NOTHING published to get it there. *** AND IT FOUND A " +
+                 "REGRESSION v4545 SHIPPED THAT EVERY OTHER GATE IN THE TREE STRUCTURALLY COULD NOT. *** That " +
+                 "round wired terrainWalk into BotManager through functionGround, which probes at x +/- eps, and " +
+                 "main.js's world._heightAt ANSWERS ONLY AT INTEGERS -- sampled at quarter-unit spacing it reads " +
+                 "25, null, null, null, 26, null, null, null, 27, six of nine null. Every probe came back null " +
+                 "and every bot in the real engine was frozen at 0.00 movement. No fixture could see it because " +
+                 "every fake world in every gate answers at any float. autoGround ASKS the world which kind it " +
+                 "is, once, and a real spawned bot now walks 6.28 units. *** THE ROUND'S OWN SABOTAGE PASS FOUND " +
+                 "TWO PROXIES IN THIS GATE'S FIRST DRAFT. *** (1) The standing claim was scored over FRAMES, so " +
+                 "it stayed GREEN under the sabotage that froze the bot: 600 identical samples of the one height " +
+                 "it was placed at read as 600 confirmations. Scored over ground COVERED it reads 6 distinct " +
+                 "cells at 146 distinct heights, worst |y - (ground+1)| = 0, and goes red at 1 cell. (2) It " +
+                 "scored bot.y against terrainWalk's OWN ground function, which only proves BotManager and the " +
+                 "gate call the same code; against a bilinear of the world's four integer corners written out in " +
+                 "the page, breaking latticeGround's interpolation moves it 0 -> 0.999. (3) The offLattice row " +
+                 "asserted the DETECTION and not that anything HONOURED it -- forcing the functionGround branch " +
+                 "while leaving the flag alone left it green -- so it now probes the chosen ground at (0.5, 0.5), " +
+                 "where the world itself returns null, and reads 25.25 between corners 25 and 26. *** AND THE " +
+                 "SWEEP ITSELF PRODUCED TWO FINDINGS THE ROUND DID NOT GO LOOKING FOR. *** (1) The ladder work " +
+                 "pushed tools/ship/navWiringLive-selfcheck.mjs from 0.76 s to 3,454 ms, over budget -- the " +
+                 "round measuring what over-budget costs had evicted the gate that grades the WORKER PLUMBING. " +
+                 "Trimmed to 2,829 ms by dropping four redundant sample offsets and halving a per-request cost " +
+                 "measurement, NOT by weakening a claim, and the counts that were pinned at 8 and 16 are now " +
+                 "derived from the plan count and the schedule's own length so the trim could not silently " +
+                 "turn a measurement into a wrong constant. v4536's `crossings` probation rule then did " +
+                 "exactly what it was built for: one crossing is probation, not eviction, so the gate is " +
+                 "re-run next sweep rather than gone. FIRST REAL CASE THAT RULE HAS CAUGHT. (2) 0 NEW RED " +
+                 "across 1,136 gates, 17 known red, 4 false red, 466 over budget skipped.",
+    }),
     since202: Object.freeze({
         at: "v4546", swept: 1, green: 1, red: 0,
         added: Object.freeze([

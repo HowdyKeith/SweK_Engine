@@ -161,23 +161,56 @@ try {
         p2.dispose?.();
     }
 
-    // ---- 8. IS HM_PADDING = 24 THE RIGHT WINDOW? ---------------------------------------------------------
-    // The pool samples only the start/goal bbox padded by 24. A route whose detour is wider than that is not
-    // in the data either planner receives. This walks the gap outward and finds where the answer changes.
+    // ---- 8. THE WINDOW, THE LADDER THAT EXTENDS IT, AND WHAT THE LADDER COSTS ---------------------------
+    // The pool samples only the start/goal bbox padded by HM_PADDING, so a detour wider than that is not in
+    // the data either planner receives -- and the bot then gets NO path rather than a long one. v4548 makes
+    // the window ESCALATE ON FAILURE. Both rungs are measured here: the first alone, to show the limit is
+    // still exactly where the constant puts it, and the whole ladder, to show how much further it reaches.
+    const wallWorld = (off) => ({ _heightAt(x, z) {
+        const inWall = x >= 60 && x <= 68 && !(z >= 100 + off - 6 && z <= 100 + off + 6);
+        return inWall ? 40 : 3;
+    } });
+    // Nine offsets, not thirteen. Every claim section 6 makes still has its sample: the first rung's edge
+    // (26 reached, 32 lost), rung two (32, 48, 64), rung three (96, 128) and past the ceiling (160). The four
+    // dropped -- 8, 22, 24, 200 -- were each a second point inside a band another offset already establishes,
+    // and they cost about 450 ms of pad-144 snapshots. THE REASON THAT MATTERS: this gate measured 3,454 ms
+    // against a 3,000 ms ship-time budget, so the round that added the ladder had pushed the gate grading the
+    // WORKER PLUMBING out of the sweep entirely -- the same failure this round filed as a backlog item after
+    // finding it had hidden a stale record for nine ships. Redundant sample points are the right thing to
+    // spend; a claim is not.
+    const OFFS = [0, 16, 26, 32, 48, 64, 96, 128, 160];
     results.padding = [];
-    // Swept wide enough to BRACKET the edge wherever it is, rather than at offsets chosen around the value
-    // HM_PADDING happens to have today -- the gate derives its expectation from the constant in the source,
-    // so a round that changes the window moves both sides together and the relationship still has to hold.
-    for (const off of [0, 8, 16, 22, 24, 26, 32, 48, 64, 72, 80, 96]) {
-        const w2 = { _heightAt(x, z) {
-            const inWall = x >= 60 && x <= 68 && !(z >= 100 + off - 6 && z <= 100 + off + 6);
-            return inWall ? 40 : 3;
-        } };
-        const p3 = new BotPathfinderPool({ world: w2, poolSize: 2, jobTimeoutMs: 1500 });
-        const r = await p3.plan(20, 100, 110, 100);
-        results.padding.push({ gapOffset: off, found: r.found, route: r.route });
+    for (const off of OFFS) {
+        const p3 = new BotPathfinderPool({ world: wallWorld(off), poolSize: 2, jobTimeoutMs: 1500 });
+        const first = await p3.plan(20, 100, 110, 100, { pads: [24] });          // the first rung alone
+        const ladder = await p3.plan(20, 100, 110, 100);                          // the whole schedule
+        results.padding.push({ gapOffset: off, firstRung: first.found,
+                               ladder: ladder.found, attempts: ladder.attempts, pad: ladder.pad });
         p3.dispose?.();
     }
+    // what the ladder costs: a plan that succeeds on the first rung must not widen at all, and the
+    // walled-off case -- which fails at every rung and would repeat forever -- must be bounded.
+    const easy = new BotPathfinderPool({ world: wallWorld(0), poolSize: 2, jobTimeoutMs: 1500 });
+    const tEasy0 = performance.now();
+    const EASY_N = 8;
+    for (let i = 0; i < EASY_N; i++) await easy.plan(20, 100, 110, 100);
+    results.ladderCost = { easyMs: +(performance.now() - tEasy0).toFixed(1), easyWidened: easy._widened, easyN: EASY_N };
+    easy.dispose?.();
+    const sealed = new BotPathfinderPool({ world: { _heightAt: (x, z) => (x >= 60 && x <= 68 ? 40 : 3) },
+                                           poolSize: 2, jobTimeoutMs: 1500 });
+    const tSeal0 = performance.now();
+    // Four hopeless plans, not eight. The claim is a PER-REQUEST cost and a per-plan widening count, both of
+    // which four measure exactly as well as eight; the gate divides rather than quoting the total, so the
+    // number it asserts does not move. Worth 220 ms of a 3,000 ms budget this gate had just gone over.
+    const SEALED_N = 4;
+    for (let i = 0; i < SEALED_N; i++) await sealed.plan(20, 100, 110, 100);
+    results.ladderCost.sealedN = SEALED_N;
+    results.ladderCost.sealedMs = +(performance.now() - tSeal0).toFixed(1);
+    results.ladderCost.sealedWidened = sealed._widened;
+    results.ladderCost.sealedInVain = sealed._widenedInVain;
+    results.ladderCost.schedule = sealed.padSchedule;
+    sealed.dispose?.();
+
 } catch (e) {
     results.errors.push(String(e && e.stack || e).slice(0, 400));
 }

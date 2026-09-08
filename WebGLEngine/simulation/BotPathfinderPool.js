@@ -22,7 +22,8 @@ const HM_PADDING = 24;          // voxels of padding around the start/goal bbox
 
 export class BotPathfinderPool {
     constructor({ world, poolSize = null, gridSize = 4, waterLevel = null,
-                  route = "navmesh", agentRadius = 1.5, jobTimeoutMs = 2000 } = {}) {
+                  route = "navmesh", agentRadius = 1.5, jobTimeoutMs = 2000,
+                  padSchedule = [HM_PADDING, 60, 144] } = {}) {
         this.world = world;
         this.gridSize = gridSize;
         this.waterLevel = waterLevel;
@@ -37,6 +38,10 @@ export class BotPathfinderPool {
         this.route = route;
         this.agentRadius = agentRadius;
         this.jobTimeoutMs = jobTimeoutMs;
+        // Three rungs: the original window, and two widenings. 60 and 144 are 2.5x steps, so the third rung
+        // reaches a detour six times the first's and costs about 13x its cells -- paid only when the two
+        // cheaper ones have already failed.
+        this.padSchedule = padSchedule;
 
         const hwc = (typeof navigator !== "undefined" && navigator.hardwareConcurrency) || 4;
         this.poolSize = poolSize ?? Math.max(2, Math.min(4, hwc - 2));
@@ -46,6 +51,8 @@ export class BotPathfinderPool {
         this._failures = 0;
         this._byRoute = {};        // how many jobs each planner actually answered
         this._timeouts = 0;        // jobs no worker ever answered -- see plan()
+        this._widened = 0;         // snapshots built at a wider pad than the first rung
+        this._widenedInVain = 0;   // whole ladders climbed and still no path -- the walled-off case
         this._totalMs = 0;
 
         this._workersReady = false;
@@ -99,11 +106,11 @@ export class BotPathfinderPool {
 
     // Build a heightmap snapshot covering the bounding box of [start, goal]
     // padded by HM_PADDING. Returns { hm, hmStride, hmOriginX, hmOriginZ }.
-    _heightmapForJob(sx, sz, gx, gz) {
-        const minX = Math.min(sx, gx) - HM_PADDING;
-        const maxX = Math.max(sx, gx) + HM_PADDING;
-        const minZ = Math.min(sz, gz) - HM_PADDING;
-        const maxZ = Math.max(sz, gz) + HM_PADDING;
+    _heightmapForJob(sx, sz, gx, gz, pad = HM_PADDING) {
+        const minX = Math.min(sx, gx) - pad;
+        const maxX = Math.max(sx, gx) + pad;
+        const minZ = Math.min(sz, gz) - pad;
+        const maxZ = Math.max(sz, gz) + pad;
         const w = Math.ceil(maxX - minX) + 1;
         const d = Math.ceil(maxZ - minZ) + 1;
         const hm = new Int16Array(w * d);
@@ -120,12 +127,41 @@ export class BotPathfinderPool {
         return { hm, hmStride: w, hmOriginX: Math.floor(minX), hmOriginZ: Math.floor(minZ) };
     }
 
+    /**
+     * *** THE WINDOW IS A RANGE LIMIT ON DETOURS, AND WHEN IT IS TOO NARROW THE BOT DOES NOT GET A LONG PATH,
+     * IT GETS NO PATH. *** _heightmapForJob samples ONLY the start/goal bounding box padded by HM_PADDING,
+     * so a route whose detour is wider than that is not in the data either planner receives. Measured at
+     * v4547 by walking a wall's gap outward: found at 0, 8, 16, 22, 24 and 26 units off the straight line;
+     * LOST at 32 and beyond, with BOTH planners correctly returning found:false. BotManager then falls back
+     * to direct steering, which walks the bot straight at the thing in its way.
+     *
+     * Widening the window for every query is the obvious fix and the wrong one: the snapshot is built by
+     * calling world._heightAt once per cell AND TRANSFERRED per query, and its area grows quadratically --
+     * at a separation of 90, pad 24 is 6,811 cells, pad 64 is 28,251 (4.2x) and pad 128 is 89,179 (13.1x).
+     *
+     * So the window ESCALATES ON FAILURE, which pays the cost exactly when the narrow one did not work and
+     * nothing when it did. The ladder is bounded: a goal that is genuinely walled off fails at every rung and
+     * would otherwise pay the whole ladder on every request forever, which is why there are three rungs and
+     * not a loop.
+     */
     async plan(sx, sz, gx, gz, opts = {}) {
+        const pads = opts.pads ?? this.padSchedule;
+        let last = null;
+        for (let i = 0; i < pads.length; i++) {
+            last = await this._planOnce(sx, sz, gx, gz, opts, pads[i]);
+            if (last.found) return { ...last, pad: pads[i], attempts: i + 1 };
+        }
+        if (pads.length > 1) this._widenedInVain++;
+        return { ...last, pad: pads[pads.length - 1], attempts: pads.length };
+    }
+
+    async _planOnce(sx, sz, gx, gz, opts, pad) {
         this._spinup();
         if (this.workers.length === 0) return { path: null, found: false, expanded: 0 };
         const id = this._nextId++;
         const widx = this._nextWorker++ % this.workers.length;
-        const { hm, hmStride, hmOriginX, hmOriginZ } = this._heightmapForJob(sx, sz, gx, gz);
+        const { hm, hmStride, hmOriginX, hmOriginZ } = this._heightmapForJob(sx, sz, gx, gz, pad);
+        if (pad !== this.padSchedule[0]) this._widened++;
 
         // *** A JOB THAT NEVER COMES BACK USED TO STRAND ITS BOT FOR THE LIFE OF THE PAGE. ***
         // plan() had no reject and no timeout, and simulation/BotManager.js sets bot.pathRequestPending =
