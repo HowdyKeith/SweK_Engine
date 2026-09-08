@@ -68,6 +68,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import * as TR from "./treeRead.mjs";
+import { stripComments } from "../../vba/runtimeGap.mjs";
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const SKIP = /node_modules|[\\/]vendor[\\/]|[\\/]dist[\\/]/;
@@ -75,15 +77,11 @@ const SKIP = /node_modules|[\\/]vendor[\\/]|[\\/]dist[\\/]/;
 /** A record is a version-stamped, frozen, exported constant -- this tree's idiom for "measured at vNNNN". */
 export const RECORD_RE = /export const ([A-Z][A-Z0-9_]*V\d{3,4}[A-Z0-9_]*) = Object\.freeze\(/g;
 
-export function sources(dir = ENG, out = []) {
-    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-        const p = path.join(dir, e.name);
-        if (SKIP.test(p)) continue;
-        if (e.isDirectory()) sources(p, out);
-        else if (/\.(mjs|js)$/.test(e.name)) out.push(p);
-    }
-    return out;
-}
+// v4548 -- the walk moved to tools/ship/treeRead.mjs; see its header. This gate was reading the tree FOUR
+// times over (16,769 readFileSync for 4,025 files) and measured 3,446 ms against a 3,000 ms ship-time
+// budget, which is how a stale census survived nine ALL GREEN rounds. The default `read` below now comes
+// out of the same memo rather than off the disk, so census() costs one walk however many times it is called.
+export function sources(dir = ENG) { return TR.treePaths(dir); }
 
 const rel = (p) => path.relative(ENG, p).split(path.sep).join("/");
 
@@ -157,32 +155,78 @@ export const FIELD_RE = /\n\s+([A-Za-z_][A-Za-z0-9_]*):\s*\d+\s*,/g;
  * Every record, with the gates that NAME it. The guardian set is derived rather than assumed: the sibling
  * gate is a guess, and it is wrong for nineteen of them.
  */
-export function census({ files = null, read = (f) => fs.readFileSync(f, "utf8"), exclude = null } = {}) {
+// *** v4548 -- WHAT MADE THIS GATE COST 3.4 SECONDS WAS NOT THE READING, IT WAS THE GUARDIAN SEARCH. ***
+// `guardians` asks, for every record, which gates NAME it -- and did so by testing each of ~95 names against
+// each of 1,602 gate sources: about 152,000 substring searches over tens of megabytes. The gate calls
+// census() SIX times, so it paid for that product six times over, ~500 ms each. Nothing was wrong with the
+// answer; the shape was quadratic and recomputed.
+//
+// Both halves are memoised below, and the memo key is the EXCLUDE PATTERN rather than nothing: `exclude`
+// changes which files are in the population AND which gates can be guardians, so a cache that ignored it
+// would answer a different question than the one asked. A caller passing its own `files` or `read` -- which
+// is how the gate injects fixtures -- bypasses the memo entirely and gets the old path.
+const _scanCache = new Map();      // String(exclude) -> frozen census
+const _recCache = new Map();       // path -> the record rows in it, guardians not yet attached
+
+function recordsIn(f, read) {
+    const hit = _recCache.get(f);
+    if (hit) return hit;
+    const src = read(f);
+    const out = [];
+    RECORD_RE.lastIndex = 0;
+    let m;
+    while ((m = RECORD_RE.exec(src))) {
+        // v4536: m.index, not a fresh indexOf from the top of the file -- the match already knows where it
+        // is, and searching again for a name that appears earlier in prose would find the prose.
+        const { body, balanced } = recordBody(src, m.index);
+        FIELD_RE.lastIndex = 0;
+        out.push({ name: m[1], fields: [...body.matchAll(FIELD_RE)].map((x) => x[1]), bytes: body.length, balanced });
+    }
+    _recCache.set(f, out);
+    return out;
+}
+
+/** Drop both memos. The gate needs a cold scan to prove the warm one is not simply answering from a stale copy. */
+export function clearScanCache() { _scanCache.clear(); _recCache.clear(); }
+
+export function census({ files = null, read = null, exclude = null } = {}) {
+    const memoable = files === null && read === null;
+    const key = String(exclude);
+    if (memoable && _scanCache.has(key)) return _scanCache.get(key);
+    const rd = read || ((f) => TR.textOf(f));
     const list = (files || sources()).filter((f) => !exclude || !exclude.test(rel(f)));
     const gates = list.filter((f) => /-selfcheck\.mjs$/.test(f));
-    const gateSrc = gates.map((g) => [rel(g), read(g)]);
-    const rows = [];
-    for (const f of list.filter((f) => /\.mjs$/.test(f))) {
-        const src = read(f);
-        RECORD_RE.lastIndex = 0;
-        let m;
-        while ((m = RECORD_RE.exec(src))) {
-            const name = m[1];
-            // v4536: m.index, not a fresh indexOf from the top of the file -- the match already knows where it
-            // is, and searching again for a name that appears earlier in prose would find the prose.
-            const { body, balanced } = recordBody(src, m.index);
-            FIELD_RE.lastIndex = 0;
-            const fields = [...body.matchAll(FIELD_RE)].map((x) => x[1]);
-            const sib = rel(f).replace(/\.mjs$/, "-selfcheck.mjs");
-            const guardians = gateSrc.filter(([, s]) => s.includes(name)).map(([g]) => g);
-            rows.push(Object.freeze({
-                name, file: rel(f), fields: Object.freeze(fields), bytes: body.length, balanced,
-                guardians: Object.freeze(guardians),
-                siblingNamesIt: guardians.includes(sib),
-            }));
-        }
-    }
-    return Object.freeze({
+    // *** v4548 -- COMMENTS OUT BEFORE THE GUARDIAN SEARCH, AND IT CHANGED ELEVEN ROWS. *** `guardians` asks
+    // which gates NAME a record, and it asked with a raw substring test -- so a gate that MENTIONS a record
+    // in its header, narrating why it exists, was credited with guarding it. Found the moment this round's
+    // own tools/ship/recordReach-selfcheck.mjs told the story of BUDGET_DRIFT_V4536 in prose and the census
+    // promoted that record from unguarded to guarded WITHOUT ANYTHING CHECKING IT. Measured across the tree:
+    // 11 records lose a guardian once comments are stripped, and TWO of them lose their only one --
+    // MEASURED_V4527 and BUDGET_DRIFT_V4536, which is the record whose staleness started this whole round.
+    // Same defect vba/runtimeGap.mjs's own header records at v4462 ("eleven of the thirty-two threaded files
+    // were prose ABOUT threads"), in the column that decides whether a record is protected at all.
+    // Record DETECTION is left on the raw text and that is deliberate: a declaration only appears in code,
+    // and stripping first was measured to find the same 94 records, so it would be cost without effect.
+    const gateSrc = gates.map((g) => [rel(g), stripComments(rd(g))]);
+    const mjs = list.filter((f) => /\.mjs$/.test(f));
+    // ONE pass over the gates per census instead of one per record: collect every name first, then ask each
+    // gate source which of them it contains. Same answer, and the 152,000 searches happen once rather than
+    // once per record's turn through the loop.
+    const named = new Map();       // name -> [gate rel]
+    const all = [];
+    for (const f of mjs) for (const r of (memoable ? recordsIn(f, rd) : recordsIn.call(null, f, rd)))
+        { all.push({ r, f }); if (!named.has(r.name)) named.set(r.name, []); }
+    for (const [g, src] of gateSrc) for (const [name, list_] of named) if (src.includes(name)) list_.push(g);
+    const rows = all.map(({ r, f }) => {
+        const guardians = named.get(r.name);
+        const sib = rel(f).replace(/\.mjs$/, "-selfcheck.mjs");
+        return Object.freeze({
+            name: r.name, file: rel(f), fields: Object.freeze(r.fields.slice()), bytes: r.bytes, balanced: r.balanced,
+            guardians: Object.freeze(guardians.slice()),
+            siblingNamesIt: guardians.includes(sib),
+        });
+    });
+    const out = Object.freeze({
         records: Object.freeze(rows),
         withFields: rows.filter((r) => r.fields.length).length,
         fields: rows.reduce((a, r) => a + r.fields.length, 0),
@@ -190,6 +234,8 @@ export function census({ files = null, read = (f) => fs.readFileSync(f, "utf8"),
         unbalanced: Object.freeze(rows.filter((r) => !r.balanced).map((r) => r.name)),
         siblingWrong: rows.filter((r) => r.guardians.length && !r.siblingNamesIt).length,
     });
+    if (memoable) _scanCache.set(key, out);
+    return out;
 }
 
 /**
@@ -235,6 +281,15 @@ export const PROBE_AT_V4536 = Object.freeze({
     // The population as probed, INCLUDING this module. `excluding` is what the gate compares, because this
     // module's own record count moves whenever a round like this one writes another.
     records: 91, withFields: 38, fields: 152,
+    // *** v4548 -- THE THREE NUMBERS ABOVE ARE HISTORY AND THE `excluding` BLOCK BELOW IS RE-TAKEN EVERY
+    // ROUND, AND THE GATE WAS COMPARING THEM TO EACH OTHER. *** Its subset row asserted
+    // `excluding.records <= records`, which held only while the tree had not grown past this module's own
+    // two records; at v4548 excluding reached 92 against a frozen 91 and the row went red on ARITHMETIC
+    // rather than on anything being wrong. A frozen historical reading and a live one are not comparable and
+    // the invariant was never about that. `currentIncludingModule` is the live counterpart of `excluding` --
+    // both re-taken, both from the same census -- so the subset check compares like with like and the v4536
+    // probe's own numbers stay exactly as they were taken.
+    currentIncludingModule: Object.freeze({ records: 94, withFields: 41, fields: 170 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -244,7 +299,9 @@ export const PROBE_AT_V4536 = Object.freeze({
     // are both outside the budget, so the one check that would have caught a record added without a re-take
     // was excluded by 446 ms, by the very round whose subject was that budget. Backlog item #14 counts 487
     // gates in that position; this is the first one measured to have actually cost something.
-    excluding: Object.freeze({ records: 91, withFields: 38, fields: 147 }),
+    // v4548 -- RE-TAKEN: 91/38/147 -> 92/39/150. One record, REACH_AT_V4548 in tools/ship/recordReach.mjs,
+    // added by the round that asked how many records this ritual actually checks. The answer was 43 of 94.
+    excluding: Object.freeze({ records: 92, withFields: 39, fields: 150 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,

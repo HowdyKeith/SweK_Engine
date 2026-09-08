@@ -56,6 +56,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import * as TR from "./treeRead.mjs";
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -64,16 +65,15 @@ export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".
  * `sources()` and exported here so that gate can import it instead of defining it -- see the header on why it
  * could not move into runtimeGap.mjs itself.
  */
-export const SOURCE_SKIP = /node_modules|\/vendor\/|\/dist\//;
-export function sources(dir = ENG, out = []) {
-    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-        const p = path.join(dir, e.name);
-        if (SOURCE_SKIP.test(p)) continue;
-        if (e.isDirectory()) sources(p, out);
-        else if (/\.(mjs|js)$/.test(e.name)) out.push({ path: p, text: fs.readFileSync(p, "utf8") });
-    }
-    return out;
-}
+// *** v4548 -- THE WALK MOVED TO tools/ship/treeRead.mjs, AND THE REASON IS A MEASUREMENT. *** This gate read
+// every file in the tree SIX times and walked every directory EIGHTEEN times -- 23,429 readFileSync and
+// 12,397 readdirSync over 4,025 files -- because checks() calls four censuses that each re-derive the same
+// read, and the gate calls checks() six times over. 2,463 ms of that was 606 ms of actual work, and the
+// 3,026 ms it measured at put it OVER the 3,000 ms ship-time budget, so the tree's own drift detector was
+// the thing the ritual could not afford to run. treeRead memoises one read per process. The name and shape
+// here are unchanged, so nothing that imports sources() had to know.
+export const SOURCE_SKIP = TR.SKIP_AGREE.recordDrift;
+export function sources(dir = ENG) { return TR.treeFiles(dir); }
 
 /** What each record owes, and what makes a module owe it. Named, so a report says WHY not just WHAT. */
 export const OWES = Object.freeze({

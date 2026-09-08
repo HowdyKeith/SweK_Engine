@@ -3764,6 +3764,50 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since204: Object.freeze({
+        at: "v4548", swept: 2, green: 2, red: 0,
+        added: Object.freeze([
+            "tools/ship/treeRead-selfcheck.mjs",
+            "tools/ship/recordReach-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 1.4 s and 0.5 s. The round set out to bring two gates back under the ship-time " +
+                 "budget and found that the ritual does not check HALF ITS OWN RECORDS. *** THE STARTING " +
+                 "POINT: *** frozenRecords-selfcheck at 3,446 ms and recordDrift-selfcheck at 3,026 ms " +
+                 "against a 3,000 ms budget, so the tree's only two stale-record detectors never ran at ship " +
+                 "time -- which is how BUDGET_DRIFT_V4536 went unre-taken through nine ALL GREEN rounds. " +
+                 "*** THE CAUSE WAS NOT EXPENSIVE WORK, IT WAS THE SAME WORK DONE SIX TIMES. *** Wrapping " +
+                 "fs.readFileSync and fs.readdirSync and counting: recordDrift issued 23,429 reads and " +
+                 "12,397 readdirs over 4,025 files -- every file read SIX times, every directory walked " +
+                 "EIGHTEEN times -- for 606 ms of actual work. tools/ship/treeRead.mjs memoises one read per " +
+                 "process and four censuses share it. *** AND THE HEADLINE MOVED TWICE UNDER MEASUREMENT. *** " +
+                 "The walk turned out to be 42 ms, so eighteen walks is 750 ms and NOT the 2.5-3.5 s the " +
+                 "gates cost; the real weight was frozenRecords' guardian search, ~95 record names tested " +
+                 "against 1,602 gate sources, ~152,000 substring searches, recomputed on all six census() " +
+                 "calls. Memoising that took the gate 2,966 -> 1,384 ms and recordDrift 2,428 -> 1,766, and " +
+                 "the memoised census was proved byte-identical to the old one across three different " +
+                 "excludes before it was kept. *** THEN THE GENERAL QUESTION. *** Joining the record census " +
+                 "to the sweep timings -- two tables this tree already had and had never put side by side -- " +
+                 "says 43 of 94 frozen records are NOT checked at ship time: 23 guarded only by gates over " +
+                 "the budget, 20 guarded by nothing, and THREE guardians recorded AT the 20,000 ms cap, " +
+                 "meaning they do not finish at all. recordReach.mjs is a RATCHET on that number, not a " +
+                 "claim it is acceptable. *** THREE SELF-INFLICTED FINDINGS. *** (1) treeRead was written " +
+                 "with eager text and made assertionShape-selfcheck WORSE, 3,204 reads -> 4,026 and 392 -> " +
+                 "569 ms; the probe meant to confirm the win showed the loss, and the text is lazy now. (2) " +
+                 "The guardian search ran on RAW source, so a gate that merely MENTIONS a record in its " +
+                 "header counted as guarding it -- found when this round's own new gate narrated " +
+                 "BUDGET_DRIFT_V4536 and the census promoted it from unguarded to guarded. Stripping " +
+                 "comments first moves 11 records and demotes 2 to unguarded. (3) The strip does not reach " +
+                 "STRINGS, and the same gate's detail text then re-promoted a record the same way; the names " +
+                 "are now spelt out of the record rather than typed. Strings are deliberately NOT stripped, " +
+                 "because a real check reads r.name === \"SOME_RECORD\" and a regex-level stripper cannot " +
+                 "tell that from narration -- 2 records tree-wide rest on a string mention, and that is " +
+                 "stated as a limit. *** AND ONE OPTIMISATION DECLINED ON PURPOSE: *** enumerateGates is " +
+                 "still called 8 times per recordDrift run, ~320 ms, because gateSweep-selfcheck PLANTS a " +
+                 "transient fixture and re-enumerates to prove it is excluded -- a memo would have answered " +
+                 "from the pre-plant list and made that row green without the code under test doing anything.",
+    }),
     since203: Object.freeze({
         at: "v4547", swept: 1, green: 1, red: 0,
         added: Object.freeze([

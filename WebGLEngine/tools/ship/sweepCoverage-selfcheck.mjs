@@ -593,6 +593,30 @@ console.log("\n10. *** THE ROTATION WAS WALKED THROUGH ONCE AND THE WALK WAS UND
          ? `${held.lost.length} LOST: ${held.lost.slice(0, 4).map((r) => r.gate.split("/").pop() + " " + r.ms + " -> " + (FILE.timings || {})[r.gate]).join(", ")}`
          : `${held.held} of ${held.measuredUnder} held. At v4460 this row read 0 of 146 -- every gate the ` +
            "rotation freed had been put back, and no gate in the tree could say so.");
+    // *** v4548 -- EVERY LEDGER ROW CARRIES ITS OWN DATE, AND FOR THREE ROUNDS SEVENTY-EIGHT OF EIGHTY DID
+    // NOT. *** v4535's own comment in sweepRotation.mjs says "EVERY ROW NOW CARRIES ITS OWN `at`, for the
+    // reason v4408 gave the timings file one: a file-level stamp on rows a run did not touch is a date they
+    // did not earn" -- and it started stamping new rows without backfilling the ones already in the file.
+    // freshlyRetimed() falls back to the FILE-level date for a row with no date of its own, so a --gate run
+    // that re-times ONE gate re-dated all seventy-eight: at v4548 a two-gate rotation moved the file stamp
+    // from 2026-09-07T22:31 to 2026-09-08T18:47 and TEN UNTOUCHED GATES flipped to LOST, purely because
+    // their timings stamps fell between the two dates. Nothing about those gates had changed. This row is
+    // the one that would have said so.
+    {
+        const rows = (rot && rot.rotated) || [];
+        const unstampedRows = rows.filter((r) => !r.at);
+        ok("!! *** EVERY ROTATION LEDGER ROW CARRIES ITS OWN DATE, SO A ONE-GATE RE-TIME CANNOT RE-DATE THE REST ***",
+            rows.length > 0 && unstampedRows.length === 0,
+            unstampedRows.length
+                ? `${unstampedRows.length} of ${rows.length} rows rely on the FILE-level date: ` +
+                  unstampedRows.slice(0, 3).map((r) => r.gate).join(", ")
+                : `${rows.length} of ${rows.length} stamped. The fallback in freshlyRetimed() is a safety net ` +
+                  `now rather than the mechanism, which is what v4535 intended and did not finish.`);
+        ok("...and their dates are not all the file's date, which is what a wholesale re-stamp would look like",
+            new Set(rows.map((r) => r.at)).size > 1,
+            `${new Set(rows.map((r) => r.at)).size} distinct row dates across ${rows.length} rows -- the ` +
+            `legacy rows were backfilled with the ledger date they were actually written under, not today's.`);
+    }
     ok("...and none of them carries the pre-v4408 stamp, which is the fingerprint of a REPLACED file",
        held.unstamped.length === 0,
        held.unstamped.length

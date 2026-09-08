@@ -58,23 +58,24 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "node:url";
 
+import * as TR from "./treeRead.mjs";
+
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
-const SKIP = new Set(["node_modules", ".git", "vendor", ".claude"]);
+// (the old walker's SKIP set retired with it at v4548 -- see gateFiles below)
 
 /** Every gate in the tree, by the same rule gateSweep uses: `-selfcheck.mjs`, and never a `__` fixture. */
+// v4548 -- filtered out of tools/ship/treeRead.mjs's single cached walk instead of walking again. VERIFIED
+// BEFORE SWITCHING, not assumed: the old walker's 1,602 gates and the filtered tree's 1,602 are the same set
+// AND THE SAME ORDER, zero either way -- which matters because recordDrift-selfcheck picks gateFiles()[0] as
+// its sample gate, so a reordering would have silently changed what that fixture tests. treeRead-selfcheck
+// keeps asserting it. The old rule skipped .git and dot-directories and did NOT skip dist/; the new one is
+// the other way round, and the two agree because no gate lives in either place.
 export function gateFiles(root = ENG) {
-    const out = [];
-    (function walk(d) {
-        let ents; try { ents = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
-        for (const e of ents.sort((a, b) => a.name.localeCompare(b.name))) {
-            if (SKIP.has(e.name) || (e.name.startsWith(".") && e.name !== ".claude")) continue;
-            const p = path.join(d, e.name);
-            if (e.isDirectory()) walk(p);
-            else if (e.name.endsWith("-selfcheck.mjs") && !e.name.startsWith("__")) out.push(p);
-        }
-    })(root);
-    return out;
+    return TR.treePaths(root).filter((p) => {
+        const n = p.split(/[\\/]/).pop();
+        return n.endsWith("-selfcheck.mjs") && !n.startsWith("__");
+    });
 }
 
 export const SIG = Object.freeze({ nameFirst: "nameFirst", condFirst: "condFirst", unknown: "unknown", none: "none" });
@@ -158,7 +159,7 @@ export function census({ root = ENG, files = null } = {}) {
     const suspects = [];
     let usesOk = 0, definesOk = 0, importsOk = 0;
     for (const g of gates) {
-        const src = fs.readFileSync(g, "utf8");
+        const src = TR.textOf(g);   // v4548: out of the shared memo, not a fourth read of the same file
         if (/\bok\s*\(/.test(src)) usesOk++;
         const def = src.match(/^[ \t]*(?:const|let|function)\s+ok\b[^\n]*/m);
         if (def) { definesOk++; const k = def[0].trim().replace(/\s+/g, " "); definitions.set(k, (definitions.get(k) || 0) + 1); }
@@ -216,8 +217,11 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // running -- and this one is the arrival most likely to have moved the OTHER five, because it is the
     // first gate in the tree that boots index.html and reads its assertions out of a page rather than out of
     // a fixture. It did not: it is written in the same shape as the other 1,473.
-    gates: 1602, usesOk: 1581, definesOk: 1573, importsOk: 0,
-    distinctDefinitions: 38, nameFirst: 1474, condFirst: 91, unknownSignature: 16,
+    // v4548 -- RE-TAKEN: TWO gates (treeRead, recordReach) joined, the same four rows by TWO, FOURTEENTH
+    // arrival. The round's third new file is tools/ship/recordReach.mjs, a module rather than a gate, and it
+    // moves none of these -- which is the distinction these nine rows exist to make.
+    gates: 1604, usesOk: 1583, definesOk: 1575, importsOk: 0,
+    distinctDefinitions: 38, nameFirst: 1476, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

@@ -86,8 +86,24 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         // reading wins, so a re-run corrects its own entry and touches nothing else. EVERY ROW NOW CARRIES ITS
         // OWN `at`, for the reason v4408 gave the timings file one: a file-level stamp on rows a run did not
         // touch is a date they did not earn.
+        // *** v4548 -- THE LINE ABOVE SAYS "EVERY ROW NOW CARRIES ITS OWN at" AND SEVENTY-EIGHT OF EIGHTY DID
+        // NOT. *** v4535 started stamping rows and never backfilled the ones already in the file, so the
+        // ledger held 2 stamped rows and 78 relying on the file-level date -- and sweepCoverage's
+        // `freshlyRetimed` falls back to that file-level date for any row without its own. A --gate run that
+        // re-times ONE gate rewrites it, so a two-gate rotation at v4548 re-dated all seventy-eight and made
+        // TEN UNTOUCHED GATES read as LOST: their timings stamps sat between the old ledger date and the new
+        // one, so they went from "re-timed since the rotation" to "the rotation's reading is gone" without
+        // anything about them changing. Exactly the fault v4408 fixed in sweep-timings.json -- "a file-level
+        // stamp on rows a run did not touch is a date they did not earn" -- surviving in the file that
+        // quotes it. A legacy row is backfilled with the ledger's PREVIOUS date, which is its real
+        // provenance, before the file-level one moves.
         let priorLedger = {};
-        try { for (const r of JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "sweep-rotation.json"), "utf8")).rotated || []) priorLedger[r.gate] = r; } catch {}
+        let priorAt = null;
+        try {
+            const prev = JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "sweep-rotation.json"), "utf8"));
+            priorAt = prev.at || null;
+            for (const r of prev.rotated || []) priorLedger[r.gate] = r.at ? r : { ...r, at: priorAt };
+        } catch {}
         for (const r of rows) priorLedger[r.gate] = { gate: r.gate, ms: r.ms, code: r.code, priorMs: priorMs[r.gate], at: stamp };
         const merged = Object.values(priorLedger).sort((a, b) => a.gate < b.gate ? -1 : a.gate > b.gate ? 1 : 0);
         fs.writeFileSync(path.join(ENG, "tools", "ship", "sweep-rotation.json"), JSON.stringify({

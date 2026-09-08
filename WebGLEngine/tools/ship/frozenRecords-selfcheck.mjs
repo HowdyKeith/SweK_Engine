@@ -353,7 +353,23 @@ ok("...and the counted subsets do not exceed the population they are drawn from"
     REC.nothingNoticesAnyField <= REC.withFields && REC.fullyGuarded <= REC.withFields &&
     REC.noGateNamesIt <= REC.records && REC.caughtByANonSiblingGate <= REC.noticed &&
     REC.unmeasurableRecords.length <= REC.withFields && REC.baselineRedGates.length <= REC.guardianGates &&
-    REC.excluding.fields <= REC.fields && REC.excluding.records <= REC.records);
+    // v4548: against the LIVE counterpart, not against the frozen v4536 reading -- see the note beside
+    // currentIncludingModule. This row went red at v4548 because excluding (re-taken, 92) passed records
+    // (frozen at v4536, 91), which is the tree growing rather than a subset escaping its population.
+    REC.excluding.fields <= REC.currentIncludingModule.fields &&
+    REC.excluding.records <= REC.currentIncludingModule.records &&
+    REC.excluding.withFields <= REC.currentIncludingModule.withFields);
+// ...and the live counterpart is genuinely live: it must be exactly this module's own records ahead of the
+// excluding reading, which is the only difference between the two censuses that produced them.
+{
+    const F = REC;
+    ok("!! the with-module and without-module readings differ by exactly this module's own records",
+        F.currentIncludingModule.records - F.excluding.records === 2 &&
+        F.currentIncludingModule.withFields - F.excluding.withFields === 2,
+        `${F.currentIncludingModule.records} including against ${F.excluding.records} excluding -- ` +
+        "PROBE_AT_V4536 and PROBE_AT_V4487, the two records this file holds. A pair of numbers that drifted " +
+        "apart by anything else would mean the exclude pattern had stopped matching this module.");
+}
 ok("!! *** the method is stated, so a later sweep can be compared rather than merely disagreed with ***",
     /bump one integer field by 7/.test(String(REC.method)) && /every gate that NAMES/.test(String(REC.method)) &&
     /ALREADY RED/.test(String(REC.method)),
