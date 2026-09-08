@@ -45,14 +45,37 @@ export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".
 /** The sweep's own default, read rather than retyped -- see quickSweep.DEFAULTS.budgetMs. */
 export const TIMINGS = "tools/ship/sweep-timings.json";
 
+/**
+ * *** A TORN READ AND A CATASTROPHE LOOK IDENTICAL TO A RATCHET, AND THIS ONE RETURNED THE CATASTROPHE. ***
+ * The first draft caught a parse failure and returned an EMPTY timings map, so a read of this file WHILE
+ * tools/ship/quickSweep.mjs was rewriting it made every guardian gate look unmeasured, took `unchecked` from
+ * 43 to about 74, and reddened the ratchet. Measured symptom: recordReach-selfcheck went red twice inside a
+ * full sweep and passed on every one of 68 runs under 16-way CPU load afterwards -- because the load was
+ * never the trigger; the concurrent WRITE was. That is the "fails a ship at random and never reproduces
+ * alone" shape gateSweep.mjs's own header calls the worst thing a ship-time check can be.
+ *
+ * `ok` is now returned rather than assumed, so a caller can refuse to judge instead of judging on nothing.
+ */
 export function readTimings(root = ENG) {
-    try { return JSON.parse(fs.readFileSync(path.join(root, TIMINGS), "utf8")); }
-    catch { return { timings: {}, codes: {}, budgetMs: null, capMs: null }; }
+    try {
+        const j = JSON.parse(fs.readFileSync(path.join(root, TIMINGS), "utf8"));
+        const n = Object.keys(j.timings || {}).length;
+        return { ...j, ok: n > 0, entries: n };
+    } catch (e) {
+        return { timings: {}, codes: {}, budgetMs: null, capMs: null, ok: false, entries: 0,
+                 error: String(e && e.message).slice(0, 120) };
+    }
 }
 
 export const CLASS = Object.freeze({
     CHECKED: "checked",            // at least one guardian gate runs at ship time
-    OVER_BUDGET: "over-budget",    // guarded, but every guardian is too slow for the sweep
+    OVER_BUDGET: "over-budget",    // guarded, but every guardian was MEASURED and is too slow for the sweep
+    // *** SEPARATE FROM over-budget, BECAUSE "TOO SLOW" AND "NEVER TIMED" ARE DIFFERENT FACTS. *** A gate
+    // added this round has no entry in sweep-timings.json until a sweep writes one, and the first draft
+    // counted that as "does not run at ship time" -- so adding a guardian made the record it guards look
+    // WORSE until the next sweep. quickSweep already keeps `unmeasured` apart from `skippedOverBudget` for
+    // the same reason; this row was the only place in the tree that blurred them.
+    UNMEASURED: "unmeasured",      // guarded, but no guardian has a recorded timing at all
     UNGUARDED: "unguarded",        // no gate anywhere names it
 });
 
@@ -66,11 +89,13 @@ export function reach({ budgetMs = null, timings = null, census = null, root = E
     const t = timings || readTimings(root);
     const budget = budgetMs ?? t.budgetMs ?? 3000;
     const c = census || FR.census();
-    const runsAtShipTime = (g) => t.timings?.[g] != null && t.timings[g] <= budget;
+    const timed = (g) => t.timings?.[g] != null;
+    const runsAtShipTime = (g) => timed(g) && t.timings[g] <= budget;
     const rows = c.records.map((r) => {
         const cls = !r.guardians.length ? CLASS.UNGUARDED
             : r.guardians.some(runsAtShipTime) ? CLASS.CHECKED
-            : CLASS.OVER_BUDGET;
+            : r.guardians.some(timed) ? CLASS.OVER_BUDGET
+            : CLASS.UNMEASURED;
         return Object.freeze({
             name: r.name, file: r.file, guardians: r.guardians, cls,
             // the cheapest guardian, so a reader knows how far from the budget the record actually is
@@ -78,7 +103,7 @@ export function reach({ budgetMs = null, timings = null, census = null, root = E
         });
     });
     const by = (k) => rows.filter((r) => r.cls === k);
-    const overBudget = by(CLASS.OVER_BUDGET), unguarded = by(CLASS.UNGUARDED);
+    const overBudget = by(CLASS.OVER_BUDGET), unguarded = by(CLASS.UNGUARDED), unmeasured = by(CLASS.UNMEASURED);
     // Gates that are the ONLY thing standing between a record and nobody checking it, and are too slow to
     // stand there. Sorted slowest first, because the three at the cap are a different problem from the
     // three that are a few hundred milliseconds over.
@@ -88,11 +113,17 @@ export function reach({ budgetMs = null, timings = null, census = null, root = E
         blockers.get(g).records.push(r.name);
     }
     return Object.freeze({
+        // `judgeable` is false when the timings file could not be read or held nothing -- a caller must not
+        // ratchet on that, because it is an absence of evidence rather than a regression.
+        judgeable: t.ok !== false, timingEntries: t.entries ?? Object.keys(t.timings || {}).length,
         budgetMs: budget, capMs: t.capMs ?? null,
         total: rows.length,
         checked: by(CLASS.CHECKED).length,
         overBudget: overBudget.length,
+        unmeasured: unmeasured.length,
         unguarded: unguarded.length,
+        // A record whose only guardian has never been timed is NOT counted against the ratchet: it is a gate
+        // waiting for its first sweep, and counting it would make adding a guardian look like a regression.
         unchecked: overBudget.length + unguarded.length,
         rows: Object.freeze(rows),
         blockers: Object.freeze([...blockers.values()].sort((a, b) => (b.ms ?? 0) - (a.ms ?? 0))),
@@ -126,6 +157,10 @@ export const REACH_AT_V4548 = Object.freeze({
     //   stripping comments before the guardian search took TWO records OUT of "guarded" altogether, because
     //   they were credited to gates that only MENTION them in prose.
     checked: 51, overBudget: 23, unguarded: 20, unchecked: 43,
+    // v4550 -- the UNMEASURED class was split out of over-budget after this gate went red twice inside full
+    // sweeps and passed 68 times under load; the trigger was a concurrent REWRITE of sweep-timings.json, not
+    // contention. Zero records sit in it on a settled tree, which is the expected reading.
+    unmeasured: 0,
     // THREE, not four. The first draft of this list said four and put MEASURED_V4527 in BOTH -- rescued by
     // the faster gate AND demoted by the comment strip -- which cannot both be true of one record and was
     // caught by the gate rather than by re-reading. Its only guardian named it in a COMMENT, so the strip
@@ -142,10 +177,14 @@ export const REACH_AT_V4548 = Object.freeze({
 
 export function reportLines() {
     const r = reach();
+    if (!r.judgeable) return ["[recordReach] which frozen records the ship ritual actually checks",
+        `  CANNOT JUDGE: ${TIMINGS} held ${r.timingEntries} timing entries. quickSweep rewrites that file at ` +
+        "the end of a run, so a read landing mid-write parses to nothing and every guardian looks unmeasured. " +
+        "Reporting a percentage from that would be a catastrophic-looking number with no evidence behind it."];
     const out = [
         "[recordReach] which frozen records the ship ritual actually checks",
         `  ${r.total} records at a ${r.budgetMs} ms budget: ${r.checked} checked, ${r.overBudget} guarded only by ` +
-        `over-budget gates, ${r.unguarded} guarded by nothing`,
+        `over-budget gates, ${r.unmeasured} by never-timed gates, ${r.unguarded} guarded by nothing`,
         `  => ${r.unchecked} of ${r.total} (${(100 * r.unchecked / r.total).toFixed(0)}%) not checked at ship time`,
     ];
     for (const b of r.blockers.slice(0, 8))

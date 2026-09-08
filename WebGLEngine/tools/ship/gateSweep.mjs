@@ -3764,6 +3764,62 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since205: Object.freeze({
+        at: "v4550", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/export/glbConformance-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green. *** THE CONTAINER WAS CHECKED IN THIS TREE AND THE SPEC WAS NOT, AND THOSE ARE " +
+                 "DIFFERENT FAILURE MODES. *** voxelGlb-selfcheck already asserted the magic is 0x46546C67, " +
+                 "the version is 2, and that a FLOAT bufferView never lands at an odd offset; nothing asked " +
+                 "whether the bytes MEAN anything legal. tools/export/glbConformance.mjs implements the " +
+                 "subset of glTF 2.0 that applies to what this tree writes and reads, each finding carrying " +
+                 "the spec's own error code. NOT VENDORED: KhronosGroup/glTF-Validator is the reference " +
+                 "implementation and is named as such, but it is Dart compiled to JavaScript and would be " +
+                 "the only build-output dependency in a tree of hand-written checkable modules. *** THE " +
+                 "RESULT ON REAL FILES IS A NULL RESULT AND IS REPORTED AS ONE: *** all 31 GLBs on disk -- 29 " +
+                 "Kenney kit models, RobotExpressive, two header-only fixtures -- and both of this tree's " +
+                 "writers come back with zero errors and zero warnings. So the number that matters is not 31 " +
+                 "clean, it is that FIFTEEN of the spec's MUSTs are broken one at a time against a real " +
+                 "export and every one is caught by its own error code, with the unmutated file firing none. " +
+                 "THREE OF THE CHECKS NEED THE BUFFER AND NOT THE JSON, which is the difference between a " +
+                 "check and a restatement of the writer: POSITION min/max are RECOMPUTED from the vertices, " +
+                 "every index is range-tested against the real vertex count, and a NaN written into the BIN " +
+                 "with the JSON untouched is found. *** THE FIRST RUN BLURRED A DISTINCTION AND THE FIX IS " +
+                 "NOT AN EXEMPTION BY FILENAME: *** gpu/fixtures/ holds two GLBs that are a real Khronos " +
+                 "asset's JSON with the payload stripped, and reporting them as \"declares 42945692, BIN " +
+                 "chunk holds 0\" reads the tree's own PROVENANCE.md discipline as a defect. NO BIN CHUNK AT " +
+                 "ALL is header-only; a BIN chunk that EXISTS and is short is still an error, and a fixture " +
+                 "proves the second. WIRED, and the wiring proved by breaking the WRITERS rather than the " +
+                 "checker: a min off by one in voxelGlb and an index set to 60000 in sceneGlb each redden " +
+                 "that writer's OWN gate. The 28-entry kit manifest is validated HERE and not in " +
+                 "kenneyKit-selfcheck.mjs, because that gate is 11,003 ms against a 3,000 ms budget and does " +
+                 "not run at ship time -- the check would have been parked exactly where the previous round " +
+                 "found 43 of 94 records sitting. TWO WEAK ROWS IN THE GATE'S OWN FIRST DRAFT, both fixed: a " +
+                 "warning-channel row whose condition was true of every possible tree, and a coverage row " +
+                 "that tested for absent strings in a six-vertex export's stats -- it now measures the limit " +
+                 "on RobotExpressive, which has 2 skins and 14 animations across 283 accessors that this " +
+                 "module contains no rule for, so its clean result is narrower than it looks. And one lying " +
+                 "detail: the sceneGlb summary printed \"0 errors, 0 warnings\" as a constant, directly " +
+                 "under a FAIL row, until it was derived. *** AND THE ROUND'S SWEEP EXPOSED A RANDOM RED IN " +
+                 "LAST ROUND'S OWN GATE, WHICH IS THE WORST SHAPE A SHIP-TIME CHECK CAN HAVE. *** " +
+                 "recordReach-selfcheck went red inside two full sweeps and passed all 68 runs under 16-way " +
+                 "CPU load afterwards -- so the load was never the trigger. quickSweep REWRITES " +
+                 "sweep-timings.json at the end of a run, and a read landing mid-write parses to nothing: " +
+                 "readTimings then returned an EMPTY map, every guardian looked unmeasured, and `unchecked` " +
+                 "jumped from 43 to about 74, which the ratchet read as a catastrophic regression. Two real " +
+                 "defects behind one symptom: an absent timing was conflated with a slow one (quickSweep has " +
+                 "kept `unmeasured` apart from `skippedOverBudget` since it was written; this was the only " +
+                 "place in the tree that blurred them), and a ratchet judged on an absence of evidence. " +
+                 "There is an UNMEASURED class now, and reach() reports `judgeable` so a caller can refuse " +
+                 "to judge. THE FIRST FIX ALSO CRASHED: the gate's own detail string did a second raw " +
+                 "JSON.parse of the very file the fixture tears, so it died with an unhandled SyntaxError " +
+                 "BEFORE reaching the row written to detect that -- a guard that only works on well-formed " +
+                 "input is not a guard -- and the completeness row summed three classes where there are now " +
+                 "four, so the torn-read fixture failed on arithmetic rather than on the thing it tests.",
+    }),
     since204: Object.freeze({
         at: "v4548", swept: 2, green: 2, red: 0,
         added: Object.freeze([

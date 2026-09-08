@@ -220,8 +220,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4548 -- RE-TAKEN: TWO gates (treeRead, recordReach) joined, the same four rows by TWO, FOURTEENTH
     // arrival. The round's third new file is tools/ship/recordReach.mjs, a module rather than a gate, and it
     // moves none of these -- which is the distinction these nine rows exist to make.
-    gates: 1604, usesOk: 1583, definesOk: 1575, importsOk: 0,
-    distinctDefinitions: 38, nameFirst: 1476, condFirst: 91, unknownSignature: 16,
+    // v4550 -- RE-TAKEN: one gate (glbConformance) joined, the same four rows by one, FIFTEENTH arrival.
+    gates: 1605, usesOk: 1584, definesOk: 1576, importsOk: 0,
+    distinctDefinitions: 38, nameFirst: 1477, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

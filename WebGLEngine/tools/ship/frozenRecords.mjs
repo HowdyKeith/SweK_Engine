@@ -301,7 +301,10 @@ export const PROBE_AT_V4536 = Object.freeze({
     // gates in that position; this is the first one measured to have actually cost something.
     // v4548 -- RE-TAKEN: 91/38/147 -> 92/39/150. One record, REACH_AT_V4548 in tools/ship/recordReach.mjs,
     // added by the round that asked how many records this ritual actually checks. The answer was 43 of 94.
-    excluding: Object.freeze({ records: 92, withFields: 39, fields: 150 }),
+    // v4550 -- RE-TAKEN: fields 150 -> 151. One field, REACH_AT_V4548.unmeasured, added when a random red in
+    // recordReach-selfcheck turned out to be a torn read of the timings file and "never timed" had to be
+    // split from "too slow". Records and withFields did not move: a field added to an existing record.
+    excluding: Object.freeze({ records: 92, withFields: 39, fields: 151 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,

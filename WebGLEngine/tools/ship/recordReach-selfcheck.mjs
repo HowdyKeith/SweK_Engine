@@ -34,12 +34,19 @@ const R = RR.REACH_AT_V4548;
 console.log("1. *** THE CENSUS, DERIVED EVERY RUN -- A PINNED LIST WOULD BE THIS ROUND'S OWN DEFECT ***");
 {
     for (const l of RR.reportLines()) say(l.replace(/^\[recordReach\] ?/, ""));
+    // The sum must cover EVERY class. It read checked + overBudget + unguarded until v4550 split UNMEASURED
+    // out, and then a torn-timings fixture failed HERE -- 0 + 0 + 20 = 94 -- instead of on the judgeable row
+    // that exists to catch it. A completeness check that does not enumerate the classes is not one.
     ok("!! every record lands in exactly one class, and the classes add up to the population",
-        live.checked + live.overBudget + live.unguarded === live.total &&
+        live.checked + live.overBudget + live.unmeasured + live.unguarded === live.total &&
         live.unchecked === live.overBudget + live.unguarded,
-        `${live.checked} + ${live.overBudget} + ${live.unguarded} = ${live.total}`);
+        `${live.checked} checked + ${live.overBudget} over-budget + ${live.unmeasured} unmeasured + ` +
+        `${live.unguarded} unguarded = ${live.total}`);
+    // Through readTimings, NOT a second raw JSON.parse: the first draft did the latter, and on the very
+    // fixture that tears the timings file this gate CRASHED with an unhandled SyntaxError before reaching
+    // the row written to detect exactly that. A guard that only works on well-formed input is not a guard.
     ok("!! ...and the budget is READ from the sweep's own timings file, not retyped here",
-        live.budgetMs === (JSON.parse(fs.readFileSync(path.join(ENG, RR.TIMINGS), "utf8")).budgetMs),
+        live.budgetMs === (RR.readTimings(ENG).budgetMs ?? 3000),
         `${live.budgetMs} ms. A second declaration of the budget is a second thing to keep in sync, and this ` +
         `gate's whole subject is a number that went stale while being recorded.`);
 }
@@ -47,14 +54,35 @@ console.log("1. *** THE CENSUS, DERIVED EVERY RUN -- A PINNED LIST WOULD BE THIS
 // =============================================================================================================
 console.log("\n2. *** THE RATCHET: UNCHECKED MAY FALL AND MUST NOT RISE ***");
 {
+    // *** THE RATCHET REFUSES TO JUDGE ON AN UNREADABLE TIMINGS FILE, AND THAT IS WHY THIS GATE USED TO GO
+    // RED AT RANDOM. *** tools/ship/quickSweep.mjs REWRITES sweep-timings.json at the end of a run; a read
+    // that lands mid-write parses to nothing, every guardian then looks unmeasured, and `unchecked` jumps
+    // from 43 to about 74. Measured: this gate went red twice inside full sweeps and passed all 68 runs
+    // under 16-way CPU load afterwards -- the load was never the trigger, the concurrent WRITE was.
+    ok("!! the ratchet has evidence to judge on -- a torn read is not a regression",
+        live.judgeable && live.timingEntries > 100,
+        live.judgeable ? `${live.timingEntries} timing entries read`
+                       : `TIMINGS UNREADABLE (${live.timingEntries} entries). Reporting this rather than ` +
+                         `ratcheting on it: an empty map makes every guardian look unmeasured and would ` +
+                         `read as a catastrophic regression, which is the failure mode this row replaced.`);
     ok("!! *** THE NUMBER OF RECORDS THE RITUAL CANNOT CHECK HAS NOT GROWN SINCE v4548 ***",
-        live.unchecked <= R.unchecked,
+        !live.judgeable || live.unchecked <= R.unchecked,
         `${live.unchecked} unchecked now against ${R.unchecked} recorded (${R.beforeThisRound.unchecked} ` +
         `before this round). *** THIS IS A CEILING AND NOT A TARGET: *** 40 records still go unchecked and ` +
         `this round did not fix them. What it refuses is the specific way the tree got here -- a record whose ` +
         `last guardian drifts over the budget with nothing anywhere saying so.`);
     ok("...and the recorded total still matches the tree, so the ratchet is not measured against a stale population",
         live.total === R.total, `${live.total} records against ${R.total} recorded`);
+    // *** "NEVER TIMED" IS NOT "TOO SLOW", AND THE FIRST DRAFT COUNTED THEM AS ONE. *** A gate added this
+    // round has no entry in sweep-timings.json until a sweep writes one, so adding a guardian made the
+    // record it guards look WORSE until the next sweep -- the opposite of what a guardian does. quickSweep
+    // has kept `unmeasured` apart from `skippedOverBudget` since it was written; this was the only place in
+    // the tree that blurred them.
+    ok("!! a guardian that has never been TIMED is counted apart from one that is too SLOW",
+        live.unmeasured === 0 || live.unmeasured < live.overBudget,
+        `${live.unmeasured} record(s) guarded only by gates with no recorded timing, against ` +
+        `${live.overBudget} guarded only by gates measured over the budget. Removing one detector's timing ` +
+        `from the table moves a record into the first bucket, not the second.`);
     ok("!! the records this round rescued really are checked now, and the demoted ones really are unguarded",
         R.rescued.every((n) => live.rows.find((r) => r.name === n)?.cls === RR.CLASS.CHECKED) &&
         R.demotedByCommentStrip.every((n) => live.rows.find((r) => r.name === n)?.cls === RR.CLASS.UNGUARDED) &&
@@ -128,7 +156,7 @@ console.log("\n4. *** A GATE AT THE CAP IS NOT MERELY SLOW, AND IS COUNTED SEPAR
 // =============================================================================================================
 console.log("\n5. *** THE TWO GATES THIS ROUND WAS ABOUT ARE BACK INSIDE THE BUDGET, WITH MARGIN ***");
 {
-    const t = JSON.parse(fs.readFileSync(path.join(ENG, RR.TIMINGS), "utf8"));
+    const t = RR.readTimings(ENG);
     const pair = ["tools/ship/frozenRecords-selfcheck.mjs", "tools/ship/recordDrift-selfcheck.mjs"];
     for (const g of pair) say(`${g}: ${t.timings[g]} ms against a ${live.budgetMs} ms budget`);
     ok("!! *** BOTH STALE-RECORD DETECTORS RUN AT SHIP TIME AGAIN ***",
