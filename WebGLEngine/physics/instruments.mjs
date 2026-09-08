@@ -29,6 +29,12 @@ export const INSTRUMENTS = [
       measures: "A triangle mesh turned into a solid occupancy grid by RAY PARITY, so the tunnel can be pointed at a real model. Refuses an open mesh rather than filling half the domain.",
       key: "TWO convergences, and only one has a rate. meshVolume() is the divergence theorem over the triangles and its deficit against (4/3)pi r^3 falls SECOND ORDER as segments double -- ratios 3.80, 3.95, 3.99, approaching exactly 4 per doubling. voxelVolume() against meshVolume() does NOT converge monotonically and is reported as an agreement BOUND rather than a rate, because a cell-centre membership test has an O(h) signed error that oscillates.",
       gate: "tools/roundhouse/voxelizeBind-selfcheck.mjs" },
+    // v4536 -- the row IS the door: physicsReach counts a module unreachable when no roundhouse device, no
+    // instruments row and no page names it, and instruments.html renders these rows so a person can find it.
+    { id: "uv-unwrap", page: "instrument-bench.html", name: "Planar UV unwrap", area: "voxels",
+      measures: "An atlas for surfaces nothing ever unwrapped -- the polygons a CSG boolean creates, which meshCSG says \"ha[ve] no texture coordinates, because nothing unwrapped a surface that had not been made yet\". Charts are projected into their own plane, shelf-packed, and mapped into [0,1].",
+      key: "UNIFORM TEXEL DENSITY, as a number rather than an adjective: 3D edge length over UV edge length is ONE value for the whole mesh, spread 1.7e-15 across 60 edges of real subtract() output. Projection into a polygon's own plane is an ISOMETRY, so a planar unwrapper owes no stretch minimiser at all -- the distortion it would minimise does not exist. What it cannot do is a curved surface, and that limit announces itself in the same number: lift one corner of a quad off its plane and the spread goes from 0 to 1.1e-1.",
+      gate: "physics/mesh/uvUnwrap-selfcheck.mjs" },
     { id: "wind-tunnel", device: "windtunnel", page: "wind-tunnel.html", name: "Wind tunnel", area: "fluids",
       measures: "Drag and lift on a body by momentum exchange on its boundary links. Takes a .glb.",
       key: "At steady state the force on ALL solids equals the total applied body force -- matched to a ratio of 1.0000. Derived from momentum conservation and NOT what the measurement is built from, so it adjudicates independently; the first formula failed it by a NON-CONSTANT 2.6x-5.7x, which is why it was catchable.",

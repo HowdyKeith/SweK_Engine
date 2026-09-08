@@ -573,6 +573,20 @@ console.log("\n10. *** THE ROTATION WAS WALKED THROUGH ONCE AND THE WALK WAS UND
          ? `${held.measuredUnder} entries, ${ageDays.toFixed(1)} days old. Between 2026-09-03 and v4460 this ` +
            "read 49 shipped versions with no rotation at all, and nothing in the tree said so."
          : "NO LEDGER: the rotation has never been run, or its file was lost");
+    // *** v4536 -- THE THREE STRADDLER LISTS ARE ASSERTED TO BE DEAD WEIGHT, RATHER THAN QUIETLY LEFT IN. ***
+    // They were the mechanism for three rounds and the stamp test replaced them; a list that is still exported
+    // and no longer consulted is the shape that rots, so the claim "you do not need these any more" is checked
+    // on every run against the live ledger. If a future change makes any of them load-bearing again -- a gate
+    // over budget whose stamp says nobody looked -- this fires and somebody re-derives why.
+    ok("!! the straddler lists are a RECORD now, not an exemption: nothing needs naming to keep this green",
+       held.lost.length === 0 && held.reverted.length === 0 &&
+       (SC.ROTATION_OUTLIERS_V4531.length + SC.ROTATION_BOUNDARY_V4533.length + SC.ROTATION_BOUNDARY_V4535.length) > 0,
+       `${held.measuredUnder} measured under budget by the rotation, ${held.backOver} of them over budget in ` +
+       `the timings now, ${held.lost.length} lost and ${held.reverted.length} reverted -- with NO gate excluded ` +
+       `by name. The ${SC.ROTATION_BOUNDARY_V4535.length} entries in the v4535 list survive because they carry ` +
+       "the serial readings that show the same file taking 2,638 and 4,026 ms on the same box a day apart, " +
+       "which is the evidence the calibration round needs and not something to delete.");
+
     ok("!! *** WHAT THE ROTATION MEASURED UNDER BUDGET IS STILL UNDER BUDGET IN THE TIMINGS ***",
        held.lost.length === 0 && held.measuredUnder > 0,
        held.lost.length
@@ -619,19 +633,50 @@ console.log("\n10. *** THE ROTATION WAS WALKED THROUGH ONCE AND THE WALK WAS UND
     // above is asserted on a file that agrees with itself. The fault it guards is a PAST state, and a fixture
     // is the only way to exercise a guard whose defect has been repaired. ***
     {
-        const file = { timings: { "a.mjs": 900, "b.mjs": 3500, "c.mjs": 800 },
-                       at: { "a.mjs": "2026-09-05T00:00:00Z", "b.mjs": "2026-09-05T00:00:00Z", "c.mjs": SC.UNKNOWN_AT } };
+        // *** v4536 -- b.mjs's STAMP IS NOW OLDER THAN THE ROTATION, BECAUSE THAT IS WHAT A LOSS LOOKS LIKE. ***
+        // The fixture used to stamp it 2026-09-05 against a 09-04 rotation -- i.e. re-measured after the
+        // rotation, which is the innocent case -- and still expected LOST, so it conflated the two faults the
+        // way the rule did. e.mjs is the innocent case, added here so both are pinned rather than one.
+        const file = { timings: { "a.mjs": 900, "b.mjs": 3500, "c.mjs": 800, "e.mjs": 3100, "f.mjs": 3200, "g.mjs": 700 },
+                       at: { "a.mjs": "2026-09-05T00:00:00Z", "b.mjs": "2026-09-03T00:00:00Z",
+                             "c.mjs": SC.UNKNOWN_AT, "e.mjs": "2026-09-05T00:00:00Z",
+                             // stamped at EXACTLY the rotation's time: this is the rotation's OWN write, so
+                             // nobody has looked since and an over-budget reading here is a loss. It is the
+                             // one case that separates `>` from `>=`, and without it that choice is untested.
+                             "f.mjs": "2026-09-04T00:00:00Z", "g.mjs": "2026-09-05T00:00:00Z" } };
         const led = { at: "2026-09-04T00:00:00Z", rotated: [
             { gate: "a.mjs", ms: 900, code: 0, priorMs: 3100 },     // held
-            { gate: "b.mjs", ms: 1200, code: 0, priorMs: 3500 },    // LOST: back over budget
+            { gate: "b.mjs", ms: 1200, code: 0, priorMs: 3500 },    // LOST: back over, and NOT looked at since
             { gate: "c.mjs", ms: 800, code: 0, priorMs: 3200 },     // held, but the stamp was replaced
             { gate: "d.mjs", ms: 4000, code: 0, priorMs: 5000 },    // never came under: not this guard's business
+            { gate: "e.mjs", ms: 2900, code: 0, priorMs: 3400 },    // back over, but RE-MEASURED SINCE: not lost
+            { gate: "f.mjs", ms: 2800, code: 0, priorMs: 3300 },    // back over, stamp EQUALS the rotation: LOST
+            { gate: "g.mjs", ms: 700, code: 0, priorMs: 3600 },     // held, so the three crossings stay a MINORITY
         ] };
         const h = SC.rotationHeld(file, led);
         ok("!! FIXTURE: a gate put back over budget is LOST, one that never came under is not counted",
-           h.measuredUnder === 3 && h.lost.length === 1 && h.lost[0].gate === "b.mjs" && h.held === 2,
+           h.measuredUnder === 6 && h.lost.length === 2 &&
+           h.lost.map((r) => r.gate).sort().join(",") === "b.mjs,f.mjs" && h.held === 4,
            `measuredUnder ${h.measuredUnder} (d.mjs at 4000 ms is excluded -- it never returned, so losing it ` +
            `is not possible), lost ${h.lost.map((r) => r.gate).join(",")}, held ${h.held}`);
+        ok("!! FIXTURE: a gate that went back over budget but was RE-MEASURED SINCE is not a loss",
+           !h.lost.some((r) => r.gate === "e.mjs") && h.backOver === 3 &&
+           h.lost.some((r) => r.gate === "f.mjs"),
+           `e.mjs is 3100 ms against a 2900 ms rotation reading and is NOT lost: its stamp is newer than the ` +
+           `rotation's, so somebody looked and this is what they saw. b.mjs is over budget with a stamp from ` +
+           `BEFORE the rotation -- the reading is gone and nothing has looked since. ${h.backOver} back over, ` +
+           `1 of them lost. Told apart by provenance, which is the field v4408 added for this.`);
+        ok("!! FIXTURE: MOST of the rotation going back over budget is a REVERT, whatever the stamps say",
+           h.reverted.length === 0 &&
+           SC.rotationHeld({ timings: { "a.mjs": 3900, "b.mjs": 3500, "c.mjs": 3800, "e.mjs": 3100, "f.mjs": 3200, "g.mjs": 3400 },
+                             at: { "a.mjs": "2026-09-09T00:00:00Z", "b.mjs": "2026-09-09T00:00:00Z",
+                                   "c.mjs": "2026-09-09T00:00:00Z", "e.mjs": "2026-09-09T00:00:00Z",
+                                   "f.mjs": "2026-09-09T00:00:00Z", "g.mjs": "2026-09-09T00:00:00Z" } },
+                           led).reverted.length === 6,
+           "the stamp test cannot see a wholesale rewrite that stamps everything it touches, so the shape test " +
+           "is separate: 6 of 6 back over budget with FRESH stamps reads as a revert, while 3 of 6 does not. " +
+           "The 2026-09-03 fault was 146 of 150 (97%); the largest honest crossing this session produced was 4 " +
+           "of 44 (9%); half is the line and the gap between the two is stated rather than tuned.");
         ok("!! FIXTURE: the pre-v4408 stamp is caught even on a gate whose TIMING is still fine",
            h.unstamped.length === 1 && h.unstamped[0].gate === "c.mjs" && !h.lost.some((r) => r.gate === "c.mjs"),
            "c.mjs reads 800 ms -- under budget, held, and its stamp says nobody has observed it since before " +

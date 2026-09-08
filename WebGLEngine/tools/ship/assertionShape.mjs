@@ -199,8 +199,12 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4528 -- RE-TAKEN: one gate (raceReplayBake) joined, and the same four rows moved by one again.
     // v4529 -- RE-TAKEN: one gate (ribbonRoad) joined, the same four rows by one.
     // v4530 -- RE-TAKEN: one gate (crashDamage) joined, the same four rows by one.
-    gates: 1594, usesOk: 1573, definesOk: 1565, importsOk: 0,
-    distinctDefinitions: 38, nameFirst: 1466, condFirst: 91, unknownSignature: 16,
+    // v4536 -- RE-TAKEN: one gate (uvUnwrap) joined, and the same four rows moved by one. Fifth round running
+    // in which a single new gate moves gates/usesOk/definesOk/nameFirst by exactly one and moves nothing else,
+    // which is what makes the other five rows worth keeping: they are the ones that would say a gate arrived
+    // with a DIFFERENT shape, and they have now stayed still across six arrivals.
+    gates: 1595, usesOk: 1574, definesOk: 1566, importsOk: 0,
+    distinctDefinitions: 38, nameFirst: 1467, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

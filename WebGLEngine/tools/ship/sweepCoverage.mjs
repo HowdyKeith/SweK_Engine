@@ -141,13 +141,21 @@ export function verdictClasses(c, { codes = {} } = {}) {
  */
 export const RETURNED_AT_V4529 = Object.freeze({
     at: "v4529",
-    stillOver: Object.freeze([]),
+    // *** v4536 -- meshLine WAS RETIRED THIS MORNING AND IS BACK BY THE EVENING, WHICH IS THE ENTRY. *** Its
+    // v4535 retirement was honest -- three serial readings under budget on a quiet box, 2515/2480/2757 -- and
+    // the ship sweep hours later wrote 3,014 for the same unchanged file. A record that flips a gate on and off
+    // a roll every time the machine's load changes is recording the machine, so the roll keeps it with BOTH
+    // sets of numbers rather than picking whichever half was measured most recently.
+    stillOver: Object.freeze([
+        Object.freeze({ gate: "tools/ship/meshLine-selfcheck.mjs", recordedWas: 4404, v4476Ms: 2929, hereMs: 3014,
+            quietMs: Object.freeze([2515, 2480, 2757]),
+            why: "straddles the 3,000 ms budget, and which side it lands on is a fact about the hour: 3,083 / " +
+                 "3,073 / 3,154 ms at v4529, then 2,515 / 2,480 / 2,757 ms serially on a quiet box at v4535, " +
+                 "then 3,014 ms from the v4536 ship sweep -- one file, unchanged throughout. Retiring it on the " +
+                 "quiet readings was right on the evidence available and wrong within a day, so it is recorded " +
+                 "here with both rather than moved a third time." }),
+    ]),
     returnedAt_v4535: Object.freeze([
-        Object.freeze({ gate: "tools/ship/meshLine-selfcheck.mjs", overMs: 3154,
-            serialNow: Object.freeze([2515, 2480, 2757]),
-            why: "named still-over at v4529 on three serial readings of 3,083 / 3,073 / 3,154 ms; re-measured " +
-                 "serially at v4535 on a quiet box at 2,515 / 2,480 / 2,757 ms, and the timings file agrees at " +
-                 "2,546. Returned by the branch its own entry named: a sweep that finds it under returns it." }),
         Object.freeze({ gate: "tools/ship/traderGraph-selfcheck.mjs", overMs: 3152,
             serialNow: Object.freeze([2729, 2344, 2659]),
             why: "named still-over at v4529/v4530 on five serial readings spanning 2,719 to 3,152 ms -- itself " +
@@ -315,14 +323,54 @@ export function rotationHeld(file, rot, { budgetMs = BUDGET_MS } = {}) {
     // this row exists for is untouched: the 2026-09-03 loss was 146 gates reverted wholesale to their
     // pre-rotation readings carrying a stale stamp, and no list of individually re-measured gates can hide
     // that.
-    const lost = measuredUnder.filter((r) => (timings[r.gate] || 0) >= budgetMs &&
-                                             !ROTATION_OUTLIERS_V4531.some((o) => o.gate === r.gate) &&
-                                             !ROTATION_BOUNDARY_V4533.some((o) => o.gate === r.gate) &&
-                                             !ROTATION_BOUNDARY_V4535.some((o) => o.gate === r.gate));
+    // *** v4536 -- "LOST" IS A QUESTION ABOUT PROVENANCE, AND IT HAD BEEN ASKED IN MILLISECONDS. ***
+    //
+    // This row was named for a real fault: 146 gates put back at their pre-rotation readings, wholesale, by a
+    // writer that was not the thing that measured them. It was implemented as "the rotation said under and the
+    // timings say over", and that catches the fault -- along with every gate that was simply MEASURED AGAIN
+    // AND CAME OUT SLOWER, which is not a loss at all. In one day this session named eight straddlers, retired
+    // all eight on serial evidence, and watched four cross back; each crossing fired this row and each was
+    // answered by adding a name to a list. Three rounds of that is a treadmill, and the treadmill is what says
+    // the question was wrong rather than the answer.
+    //
+    // A LOSS AND A RE-MEASUREMENT ARE TOLD APART BY THE STAMP, WHICH v4408 PUT THERE FOR EXACTLY THIS. An entry
+    // re-timed AFTER the rotation carries a newer `at` and is a fresh observation, whoever it disagrees with.
+    // An entry sitting over budget with a stamp NO NEWER than the rotation's is the fault: the rotation's
+    // reading is gone and nothing has looked since. Measured on the 2026-09-03 loss, the 146 carried a stamp
+    // from before v4408 -- older, every one. Measured on this round's crossings, meshLine / microfacetVndf /
+    // slugReupload carry 2026-09-08T00:03 and 00:10 against a rotation at 2026-09-07T22:31 -- newer, every one.
+    // The two faults separate cleanly on the field that was already in the file.
+    //
+    // *** WHAT THIS DOES NOT CLAIM: that a wholesale revert carrying FRESH stamps would be caught here. *** It
+    // would not, and that is why `reverted` below exists rather than a wider version of this rule -- a revert
+    // is many gates at once and a re-measurement is a handful, so the second fault is caught by its SHAPE
+    // instead of by its stamp, and neither test is asked to do the other's job.
+    const rotAt = Date.parse((rot && rot.at) || "") || 0;
+    const freshlyRetimed = (g, rowAt) => {
+        const t = Date.parse(at[g] || "") || 0;
+        const since = Date.parse(rowAt || "") || rotAt;
+        return t > 0 && since > 0 && t > since;
+    };
+    // *** AND THE THREE NAME-LISTS COME OUT OF THE RULE ENTIRELY, WHICH IS THE POINT. *** v4531, v4533 and
+    // v4535 each answered a crossing by naming the gate that crossed; measured just now, with all three
+    // exclusions removed and only the stamp test left, this reads 43 measured under, 7 back over, ZERO LOST.
+    // Every name on those lists was a workaround for the wrong question, so none of them is load-bearing any
+    // more. They are kept as a RECORD -- they hold the serial readings that make the oscillation checkable,
+    // and they are the evidence for the calibration round in nextRounds.mjs -- and the selfcheck asserts they
+    // are no longer needed, so if a change ever makes them load-bearing again that fact is visible instead of
+    // silent. ONE MECHANISM, not one mechanism and a list of apologies.
+    const lost = measuredUnder.filter((r) => (timings[r.gate] || 0) >= budgetMs && !freshlyRetimed(r.gate, r.at));
+    // *** THE ORIGINAL FAULT, CAUGHT BY ITS SHAPE RATHER THAN BY ANY GATE'S NAME. *** 146 of 150 went back at
+    // once. A stamp cannot see that and a per-gate rule should not try: if MOST of what the rotation brought
+    // under budget is over budget again, that is a rewrite whatever any individual entry claims. Half is the
+    // line because the fault was 97% and the largest honest crossing this session has produced is 4 of 44 (9%);
+    // nothing observed lies between, and the gap is stated so a later reading inside it is visible as new.
+    const backOver = measuredUnder.filter((r) => (timings[r.gate] || 0) >= budgetMs);
+    const reverted = measuredUnder.length > 0 && backOver.length > measuredUnder.length / 2 ? backOver : [];
     // A gate the rotation wrote carries the rotation's stamp. UNKNOWN_AT on one of them is the fingerprint of
     // a file that was replaced rather than updated, which is a different fault from a gate that got slower.
     const unstamped = measuredUnder.filter((r) => (at[r.gate] || UNKNOWN_AT) === UNKNOWN_AT);
-    return { measuredUnder: measuredUnder.length, lost, unstamped,
+    return { measuredUnder: measuredUnder.length, lost, unstamped, reverted, backOver: backOver.length,
              held: measuredUnder.length - lost.length, rotatedAt: (rot && rot.at) || null };
 }
 
@@ -412,6 +460,32 @@ export const ROTATION_OUTLIERS_V4531 = Object.freeze([]);   // retired at v4535 
  * being made cheaper. winPathGuard was made cheaper in this same round (3,033 -> 1,675 ms, by deleting a
  * second walk of the tree it did not need), which is the repair this one has not had yet.
  */
+/**
+ * *** v4536 -- THREE OF THE EIGHT RETIRED ONE ROUND AGO ARE BACK, AND THAT IS THE MECHANISM'S OWN FINDING
+ * RATHER THAN A MISTAKE IN EITHER ROUND. ***
+ *
+ * v4535 emptied both boundary lists on the argument that eight straddlers moving together meant ONE BOX GOT
+ * QUIETER, with three serial readings each to prove it. The box got loud again inside a day, and the same
+ * three serial runs on the same unchanged code read:
+ *
+ *     misWgsl      v4535 quiet: 2638 / 2822 / 2809      v4536 loud: 4026 / 3992 / 4015
+ *     probeLab     v4535 quiet: 2523 / 2465 / 2503      v4536 loud: 3211 / 3157 / 3167
+ *     water2d      v4535 quiet: 2400 / 2427 / 2369      v4536 loud: 3048 / 3027 / 3042
+ *
+ * misWgsl is 43% slower than it was, with not one byte of it changed, and the sweep that surfaced this took
+ * 265 s against 197 s for the identical work. BOTH ROUNDS MEASURED HONESTLY AND BOTH ATTRIBUTED TO THE GATE.
+ *
+ * *** SO THIS LIST IS A LOG OF THE BOX'S WEATHER WEARING THE NAME OF A GATE PROPERTY, AND NO NUMBER OF
+ * RE-MEASUREMENTS FIXES THAT. *** rotationHeld compares a rotation reading against a timings reading taken at
+ * a different hour under different load; for anything within ~30% of the budget the comparison is decided by
+ * which hour, and this session has now watched eight gates cross in one direction and three cross back. A
+ * tolerance band is still the wrong repair (v4531's argument stands: it forgives every future case silently).
+ * The repair that would actually work is CALIBRATION -- time a fixed reference workload during the sweep and
+ * normalise every reading by it, so a slow hour moves all 1,595 numbers together instead of moving thirty of
+ * them across a line. That is a round of its own and is filed as one in tools/ship/nextRounds.mjs; until it
+ * exists, these three are named here WITH BOTH READINGS, so the next reader inherits the oscillation as
+ * evidence rather than re-deriving it from an empty list for the third time.
+ */
 export const ROTATION_BOUNDARY_V4535 = Object.freeze([
     Object.freeze({ gate: "physics/render/albedoEstimator-selfcheck.mjs", rotationMs: 2991, sweepMs: 3115,
         serialMs: Object.freeze([3065, 2823, 3208, 3269, 3000]),
@@ -419,6 +493,25 @@ export const ROTATION_BOUNDARY_V4535 = Object.freeze([
              "entries retired this round: five serial runs read 3,065 / 2,823 / 3,208 / 3,269 / 3,000 ms, " +
              "median 3,065 and over. The rotation's 2,991 and the sweep's 3,115 are two samples of that " +
              "spread rather than a reading lost between two writers." }),
+    Object.freeze({ gate: "physics/render/misWgsl-selfcheck.mjs", rotationMs: 2746, sweepMs: 3810,
+        serialMs: Object.freeze([4026, 3992, 4015]), quietMs: Object.freeze([2638, 2822, 2809]),
+        why: "retired at v4535 on three serial readings under budget and back over on three more the next " +
+             "day, unchanged: 2638/2822/2809 quiet against 4026/3992/4015 loud, a 43% swing with no code in " +
+             "between. Named with BOTH, because either set alone is a confident wrong answer." }),
+    Object.freeze({ gate: "tools/ship/probeLab-selfcheck.mjs", rotationMs: 2474, sweepMs: 3090,
+        serialMs: Object.freeze([3211, 3157, 3167]), quietMs: Object.freeze([2523, 2465, 2503]),
+        why: "the same swing on the same day as misWgsl and water2d -- 2523/2465/2503 quiet, 3211/3157/3167 " +
+             "loud. Three gates moving together is the box, which is exactly what v4533 said about five." }),
+    Object.freeze({ gate: "tools/ship/meshLine-selfcheck.mjs", rotationMs: 2457, sweepMs: 3014,
+        serialMs: Object.freeze([3014]), quietMs: Object.freeze([2515, 2480, 2757]),
+        why: "the fourth oscillator of the day, and the one that crossed DURING the ship sweep rather than " +
+             "before it: green while the sweep ran, red the moment the sweep's own write landed. The sweep " +
+             "rewrites the record this gate reads, so a verdict and the gate behind it can disagree by " +
+             "construction -- which is a property of the ordering, not a flake." }),
+    Object.freeze({ gate: "tools/ship/water2d-selfcheck.mjs", rotationMs: 2401, sweepMs: 3015,
+        serialMs: Object.freeze([3048, 3027, 3042]), quietMs: Object.freeze([2400, 2427, 2369]),
+        why: "2400/2427/2369 quiet against 3048/3027/3042 loud. The narrowest of the three and still a clean " +
+             "27% -- it straddles nothing; it is measured on two different machines that share a name." }),
 ]);
 
 // *** THE MEASUREMENT OF THE LOSS, FROZEN BY NAME, because the ledger that proves it is REWRITTEN BY THE NEXT

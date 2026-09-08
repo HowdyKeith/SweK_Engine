@@ -66,6 +66,46 @@ export const NEXT_ROUNDS = [
         why: "Deferred twice for the same reason: there was nothing to tune against. v3340 changed that -- the CT sweep gives labelled degradation against exact ground truth, and it already showed edge overlap is worth far more than pHash there (0.223 vs 4 bits of 63 at 8 angles). An equal average is currently wrong in a measurable direction.",
         upstream: "reconQuality gives the first labelled data; more would come from the browser floor",
     },
+    // ---- v4535: the first entries from the third-party repo sweep, WITH THE CORRECTIONS THAT SURVIVED
+    // CHECKING. *** THREE OF THE SWEEP'S LOAD-BEARING CLAIMS WERE WRONG, AND TWO OF THEM SAT UNDER ITS
+    // SECOND-RANKED ITEM. *** They are recorded in the `why` of each entry rather than in a conversation,
+    // which is this file's entire reason to exist: a candidate list that arrives with an unchecked premise
+    // costs the next reader the same afternoon it cost this one.
+    {
+        id: "sweep-budget-calibration",
+        blocker: "OPEN",
+        what: "Normalise gate timings by a reference workload measured during the sweep, so the 3,000 ms budget stops being a function of the hour.",
+        how: "Time a fixed, pure, allocation-light workload at the start and end of each quickSweep and each rotation, write it beside the readings, and compare gates in units of that reference rather than milliseconds. The two ledgers already carry per-entry stamps, so the normaliser has somewhere to live and old readings stay readable.",
+        why: "*** MEASURED ACROSS TWO DAYS ON UNCHANGED CODE: misWgsl 2638/2822/2809 then 4026/3992/4015, a 43% swing; probeLab 2523/2465/2503 then 3211/3157/3167; water2d 2400/2427/2369 then 3048/3027/3042; meshLine 2515/2480/2757 then 3014. *** The same sweep took 197 s and then 278 s for the same work. Eight gates were retired from the straddler lists at v4535 on honest serial evidence and four crossed back within a day, each crossing demanding an edit to a frozen record -- three separate rows of sweepCoverage-selfcheck fire on ONE gate moving. A tolerance band is still the wrong repair (v4531: it forgives every future case silently) and more bookkeeping is not a repair at all. What is wrong is the UNIT: a millisecond on a loaded box and a millisecond on a quiet one are being compared as if they were the same quantity, and roughly thirty gates sit close enough to the line for that to decide their fate. Normalising moves all 1,595 readings together when the box slows, instead of moving thirty of them across a threshold.",
+    },
+    {
+        id: "uv-unwrap",
+        blocker: "OPEN",
+        what: "UV unwrapping for CURVED surfaces -- the half the planar unwrapper does not attempt. RobotExpressive.glb (7,214 vertices, organic, no TEXCOORD_0) is the named caller.",
+        how: "A parameterisation (LSCM/ABF-family) per chart, plus chart SEGMENTATION, which planar geometry did not need because each polygon was already its own chart. physics/mesh/uvUnwrap.mjs supplies the packer, the [0,1] mapping and the grading properties, so what is owed is the parameterisation and a stretch metric -- the planar file's texelDensity spread is the right shape for it but reads zero by construction on flat input and cannot grade a curved chart.",
+        why: "*** THREE UNRELATED FILES ALREADY STOPPED WORK AT THIS ABSENCE, WHICH IS WHAT SEPARATES IT FROM A GAP SOMEBODY NOTICED. *** physics/mesh/meshCSG.mjs: a subtract()'s CUT polygons are \"freshly exposed interior ... and ha[ve] no texture coordinates, because nothing unwrapped a surface that had not been made yet\". tools/export/reskin.js: RobotExpressive.glb has 7,214 vertices and NO TEXCOORD_0, so \"the simple path is not wrong, it is unavailable ON THIS ASSET\" -- route 1, vertex colours, exists because of that. render/solidTexture.mjs: a wall \"that did not exist when the wall was authored, so no unwrap ever assigned it a coordinate\".\n\nTHE PLANAR HALF LANDED AT v4536 and closed two of those three. physics/mesh/uvUnwrap.mjs unwraps planar polygons -- which is the exact shape of meshCSG's output and of a wall, both already carrying their plane -- and projection into a polygon's OWN plane is an isometry, so that half owed no stretch minimiser at all. Measured on real subtract() output: texel-density spread 1.7e-15 across 60 edges, 0 chart overlaps, 62.0% texture occupancy. reskin.js is the one left, and it is left because a robot is curved, which is a different algorithm rather than more of the same one."    },
+    {
+        id: "ibl-specular-half",
+        blocker: "OPEN",
+        what: "The SPECULAR half of image-based lighting: a roughness-convolved prefiltered environment and its BRDF term.",
+        how: "glTF-IBL-Sampler is Khronos's reference for exactly this. The diffuse side is already built here and gated, so the new work attaches to a live probe volume rather than starting from nothing.",
+        why: "*** THE SWEEP THAT RAISED THIS RECORDED \"NO IBL/PREFILTERED-ENVIRONMENT/IRRADIANCE CODE -- CONFIRMED ABSENT\", AND THAT IS WRONG. *** render/splatProbes.mjs (v4513) bakes an order-2 SH IRRADIANCE volume from six rendered cube faces per probe, and render/probeLit.mjs (v4514) evaluates it per fragment on BOTH backends; both are gated, and three-spark is already registered in world/reachedLicences.mjs. The DIFFUSE half shipped. What is absent is the specular one -- no GGX convolution, no split-sum, no BRDF LUT anywhere in the tree (the convolv/splitSum/brdfLUT matches are audio, CT and cell-tracking). That makes the case STRONGER than the sweep argued and aims it differently: physics/render's VNDF, energy-compensation and rough-diffuse work is research-grade microfacet BRDF with a diffuse environment light and no specular one.",
+    },
+    {
+        id: "gltf-conformance-fixtures",
+        blocker: "OPEN",
+        what: "Conformance fixtures for gpu/GLBParser.js against the glTF feature matrix, starting with sparse accessors.",
+        how: "KhronosGroup/glTF-Asset-Generator (MIT, one root licence, synthetic geometry -- none of the per-model licence trouble gpu/khronosSamples.mjs exists to handle). Assets ship in release zips, not as raw repo files. Strip them header-only the way gpu/fixtures/ already does, with the same PROVENANCE.md discipline.",
+        why: "SPARSE ACCESSORS ARE GENUINELY UNSUPPORTED -- zero occurrences of `sparse` in gpu/GLBParser.js. Correcting the sweep on the other half: INTERLEAVED buffers ARE handled, via view.byteStride at GLBParser.js:1162 and 1236. And the exporters are not ungated: tools/ship/sceneGlb-selfcheck.mjs and voxelGlb-selfcheck.mjs check magic, version, chunk order, 4-byte alignment and space-padding -- the CONTAINER. Nothing checks spec SEMANTICS, which is the narrower and true form of \"no conformance check on the exported files\".",
+    },
+    {
+        id: "transvoxel-transition-cells",
+        blocker: "UPSTREAM",
+        what: "Crack-free seams between volumetric chunks meshed at different resolutions (Transvoxel transition cells).",
+        how: "Port the transition-cell table as data with citation -- the posture simulation/MarchingCubes.js already takes with the Bourke 256-case tables -- hand-write the stitching, and grade the seams with physics/mesh/manifoldCensus.mjs, which exists to catch exactly non-manifold and cracked output.",
+        why: "*** THE SWEEP READ \"ZERO OCTREE ANYWHERE IN world/*.js\" AND CONCLUDED THE TREE HAS NO OCTREE. IT HAS THREE. *** physics/octree/ carries a CPU sparse octree that merges uniform regions (octree.js), a GPU-packed Laine-Karras SVO (svoGenerator.js), a CPU raymarcher holding the GLSL one honest (svoMarch.mjs), and gates for each. The substrate exists, so this is a smaller job than the sweep sized. Its second claim is also wrong: dualContour takes `n` and marchScalarField takes dimX/dimY/dimZ -- BOTH TAKE A RESOLUTION. What neither takes is a NEIGHBOUR'S resolution, which is the actual precondition. The real gap, grepped rather than inferred: physics/mesh, simulation, world and render contain ZERO references to octree, svoMarch or svoGenerator -- no mesher has ever consulted the octree.",
+        upstream: "any mesher that consults physics/octree at all -- today none does, so a transition cell would have nothing to sit between. world/chunkMarchingCubes.js calls itself a near-camera cosmetic pass, so nothing is straining against this yet",
+    },
     { id: "fbp-gain-normalisation", state: "CLOSED", note: "ANSWERED NO at v3378, and the measurement is in reconQuality.mjs. The gain is NOT a filter constant: it runs 0.4319 to 0.9340 across fixtures, nearly invariant in ANGLE COUNT but tracking N and nDet -- and gain*nDet/N collapses to 0.9456 with a spread of 0.0185. IT IS A SAMPLING RATIO. Correcting 0.649 in the filter would be right at N=96/nDet=140, this gate's own fixture, and wrong everywhere else." },
 ];
 

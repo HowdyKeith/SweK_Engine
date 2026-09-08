@@ -3738,6 +3738,32 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "world culled when the camera's frustum lost the origin (the world was one unit-radius record there), which " +
                  "crashScene fixes for itself and the roadmap names for the other scenes. Sabotages red at A / B / C / D / E / F / G.",
     }),
+    since196: Object.freeze({
+        at: "v4536", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "physics/mesh/uvUnwrap-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 51 ms, and graded on the output of the caller that is blocked rather than on a square. physics/mesh/" +
+                 "uvUnwrap.mjs unwraps planar polygons -- meshCSG's booleans emit exactly those, already carrying their plane, and " +
+                 "meshCSG's own header says they \"ha[ve] no texture coordinates, because nothing unwrapped a surface that had not " +
+                 "been made yet\". Projection into a polygon's OWN plane is an ISOMETRY, so this round owes no stretch minimiser: " +
+                 "worst edge-length change 0.00e+0 over 24 edges. On real subtract() output -- 15 polygons, 3 tagged CUT -- every " +
+                 "polygon unwrapped exactly once, every UV inside [0,1], 0 of 105 chart pairs overlapping, and TEXEL DENSITY IS ONE " +
+                 "NUMBER: spread 1.7e-15 across 60 edges. The basis seeds on n's SMALLEST component, because crossing with a fixed " +
+                 "up-vector dies on every floor and ceiling in the tree; 206 normals including all six axes read worst |dot| 1.1e-16. " +
+                 "*** THE ROUND'S FINDING CAME FROM A SABOTAGE THAT WOULD NOT FIRE. *** Scaling u and v apart should be the loudest " +
+                 "break here and it changed nothing, TWICE: scale is 1/max(w,h), so whichever axis IS the max has 1/dimension and " +
+                 "1/span equal by arithmetic. Chasing that found the packer produced a TALLER-THAN-WIDE atlas on every input from 2 " +
+                 "charts to 21 -- so Math.max(width, height) never took its first arm, a fifth of the texture was empty, and the " +
+                 "occupancy being reported measured the strip rather than the square the UVs address. Searching the strip width for " +
+                 "the smallest square lifted texture occupancy 48.7% -> 62.0% on the real fixture and 50.0% -> 61.5% on 13 unit " +
+                 "squares. Sabotages red at A 4 / B 1 / C 2 / D 1 / E 1 / F 1 / G 2, E only after the sort row was made STRICT: " +
+                 "`sorted >= unsorted` passes when the sort is a no-op, so it verified that sorting helps and never that it happened. " +
+                 "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
+                 "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
+    }),
 
 });
 
