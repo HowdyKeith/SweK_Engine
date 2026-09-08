@@ -30,6 +30,12 @@
 // crossesAllPortals() are imported by the navmesh unchanged, because the string pulling was never the part
 // that needed replacing.
 //
+// *** AND SO THIS FILE IS WIRED AT v4545, THROUGH THE NAVMESH AND ONLY THROUGH IT. ***
+// worker/botPathfinder.worker.js calls nav/navmesh.mjs, which calls funnel() here. NOTHING pulls a GRID
+// corridor through it, and that is a measurement rather than an oversight: section 4 of this file's gate
+// shows a funnel over grid cells is a net LOSS once it is made as safe as the staircase it improves. The
+// funnel was never the wrong idea; the corridor was.
+//
 // ---- WHAT THE FUNNEL IS, AND THE ONE THING IT MUST NOT BE ----------------------------------------------------
 //
 // The Simple Stupid Funnel Algorithm walks a CORRIDOR -- an ordered list of portals, each a segment the path

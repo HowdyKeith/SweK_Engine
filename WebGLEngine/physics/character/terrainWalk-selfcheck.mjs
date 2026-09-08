@@ -250,6 +250,8 @@ console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "does not own and says so; capsule-against-triangle depenetration, which is what overhangs, thin walls " +
     "and moving platforms need and is a different problem built on meshBVH's trianglesInBox; multi-layer " +
     "ground, since the oracle is a function of (x, z) and an overhang has two surfaces over one point; and " +
-    "whether anything is WIRED -- nothing in the engine calls this file, exactly as nothing calls " +
-    "nav/funnel.mjs or nav/navmesh.mjs.");
+    "the BROWSER side of the wiring. *** THIS FILE IS WIRED AS OF v4545: *** simulation/BotManager.js " +
+    "follows the ground through it instead of writing bot.y = _heightAt(x, z) + 1, and " +
+    "tools/ship/navWiring-selfcheck.mjs drives the real BotManager against a ramp and a wall. What that " +
+    "gate does NOT reach is the Worker plumbing, the ECS, or what a bot looks like walking a hill.");
 process.exit(fails ? 1 : 0);

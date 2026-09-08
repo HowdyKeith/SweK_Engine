@@ -123,6 +123,37 @@ export function meshGround(bvh, { top = 1e4, maxT = Infinity } = {}) {
     };
 }
 
+/**
+ * A ground oracle over a height FUNCTION, which is the shape a live world exposes.
+ *
+ * simulation/BotManager.js reads its terrain through `world._heightAt(x, z)` -- a function, not an array --
+ * so neither adapter above fits it. *** AND THE CENTRAL DIFFERENCE THIS USES IS CORRECT HERE FOR THE EXACT
+ * REASON THE HEIGHTFIELD ADAPTER REFUSES IT. *** There, the height comes from a bilinear patch and a central
+ * difference of the raw samples describes a different, smoother surface than the one being stood on. Here
+ * the function IS the surface: there is no patch to disagree with, and a symmetric difference is the
+ * gradient of the thing itself, second-order accurate in `eps` wherever the function is smooth.
+ *
+ * What it cannot do is a DISCONTINUITY. Across a step the difference reports a slope of (jump / 2*eps),
+ * which grows without bound as eps shrinks -- so a cliff reads as unwalkable rather than as a step, and
+ * `stepHeight` never gets a chance to consider it. That is the safe direction and it is a real limit: on a
+ * world of hard voxel lips this adapter will refuse ledges that physics/character/kinematic.js can climb.
+ */
+export function functionGround(hAt, { eps = 0.5 } = {}) {
+    return (wx, wz) => {
+        let y, hx0, hx1, hz0, hz1;
+        try {
+            y = hAt(wx, wz);
+            hx0 = hAt(wx - eps, wz); hx1 = hAt(wx + eps, wz);
+            hz0 = hAt(wx, wz - eps); hz1 = hAt(wx, wz + eps);
+        } catch { return null; }
+        if (!Number.isFinite(y) || !Number.isFinite(hx0) || !Number.isFinite(hx1) ||
+            !Number.isFinite(hz0) || !Number.isFinite(hz1)) return null;
+        const dhdx = (hx1 - hx0) / (2 * eps), dhdz = (hz1 - hz0) / (2 * eps);
+        const len = Math.hypot(-dhdx, 1, -dhdz);
+        return { y, n: [-dhdx / len, 1 / len, -dhdz / len] };
+    };
+}
+
 /** Project a vector onto the plane with normal n: v - (v.n)n, the same identity nav/funnel.mjs's slide uses. */
 export function projectOnPlane(v, n) {
     const d = v[0] * n[0] + v[1] * n[1] + v[2] * n[2];

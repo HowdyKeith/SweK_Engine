@@ -255,6 +255,52 @@ console.log("\n5. *** THE BUG A LENGTH TEST AND A PORTAL-MEMBERSHIP TEST BOTH PA
 }
 
 // =============================================================================================================
+console.log("\n5b. *** A CORRIDOR THAT DOUBLES BACK, WHICH NOTHING ABOVE PRODUCES AND WIRING FOUND AT ONCE ***");
+{
+    // *** EVERY FIXTURE IN THIS GATE WALKED ITS CORRIDOR MONOTONICALLY UNTIL THIS ONE. *** The first realistic
+    // snapshot the module was ever given -- the shape BotPathfinderPool actually sends its worker, a
+    // heightmap padded 24 around the start/goal bbox -- decomposes into THREE rectangles, of which the gap
+    // strip spans the WHOLE WIDTH. A path enters it at x=56 and leaves at x=73, crossing two portals that lie
+    // on the SAME LINE, and between them the direction from one polygon's CENTRE to the next reverses from
+    // down-right to up-right. The centre-to-centre orientation flipped the pair and the funnel ran to x=129,
+    // the far edge of the map, to reach a goal at x=104.
+    const W = 129, D = 69, PAD = 24;
+    const hm = new Float32Array(W * D);
+    for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) {
+        let y = Math.round(3 + 2 * Math.sin(x * 0.08) * Math.cos(z * 0.11));
+        if (x > W * 0.45 && x < W * 0.55 && z < D - 12) y += 40;
+        hm[z * W + x] = y;
+    }
+    const S = { x: PAD, z: Math.floor(D / 2) }, G = { x: PAD + 80, z: Math.floor(D / 2) };
+    const mesh = NM.buildNavmesh(hm, { stride: W, seedX: S.x, seedZ: S.z, radius: 1.5, maxStepUp: 3, maxStepDown: 6 });
+    const p = NM.planPath(mesh, S, G);
+    // the taut path is derived from the three rectangles, not read off the result: both portals lie on
+    // z = 58.5, so the shortest route enters at the near end of one and leaves at the near end of the other
+    const gapStrip = mesh.rects.find((R) => R.z0 > D / 2), left = mesh.rects.find((R) => R.x0 === 0 && R.z0 === 0);
+    const right = mesh.rects.find((R) => R.x0 > W / 2);
+    const zLine = left.z1 + 0.5, xa = left.x1 + 0.5, xb = right.x0 - 0.5;
+    const d = (a, b) => Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const taut = d([S.x, S.z], [xa, zLine]) + (xb - xa) + d([xb, zLine], [G.x, G.z]);
+    report("three polygons: left x[" + left.x0 + "," + left.x1 + "], right x[" + right.x0 + "," + right.x1 +
+           "], gap strip x[" + gapStrip.x0 + "," + gapStrip.x1 + "] z[" + gapStrip.z0 + "," + gapStrip.z1 + "]");
+    ok("!! *** THE TAUT PATH THROUGH A DOUBLING-BACK CORRIDOR, " + p.length.toFixed(2) + " AGAINST " + taut.toFixed(2) + " ***",
+        Math.abs(p.length - taut) < 0.5 && p.points.length === 4,
+        "corners " + p.points.map((q) => "(" + q.x.toFixed(0) + "," + q.z.toFixed(0) + ")").join(" ") +
+        ", length " + p.length.toFixed(2) + " against a taut " + taut.toFixed(2) + " derived from the three " +
+        "rectangles rather than from this result. *** BEFORE THE FIX IT RETURNED 147.35 m THROUGH (129,59) -- " +
+        "THE FAR EDGE OF A MAP WHOSE GOAL IS AT x=104. *** Portals are oriented from the CROSSING AXIS AND " +
+        "SIGN now, which is what Detour gets free from the polygon winding, and is a property of the two " +
+        "rectangles rather than of where their centres happen to sit.");
+    ok("!! ...and it now BEATS the grid A* it replaces, on length AND on clearance",
+        p.length < 99.88 && p.points.length < 21,
+        "navmesh " + p.length.toFixed(2) + " over " + p.points.length + " corners, against the shipped worker's " +
+        "99.88 over 21 waypoints on this same snapshot, with minimum clearance 2.000 against the grid's 0.850. " +
+        "*** THE ROUND THAT BUILT THIS MODULE MEASURED IT ONLY ON MAPS IT HAD DESIGNED. *** The first map a " +
+        "CALLER handed it broke it, which is the argument for wiring a capability rather than shipping it " +
+        "beside its gate.");
+}
+
+// =============================================================================================================
 console.log("\n6. THE MESH AGREES WITH THE SOLVER IT IS REPLACING ABOUT WHAT IS WALKABLE");
 {
     const hm = gapMap();
@@ -397,9 +443,10 @@ console.log("\n8. TWO WAYS ROUND, AND WHAT THE SUPERSAMPLE KNOB IS ACTUALLY WORT
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nunchecked here: the A* COST MODEL, which no fixture above distinguishes -- see the control in section 8. " +
-    "Whether anything is WIRED -- simulation/BotPathfinderPool.js still receives the grid " +
-    "staircase and nothing in the engine calls nav/navmesh.mjs, exactly as funnel-selfcheck says of " +
-    "nav/funnel.mjs. Also unchecked: Recast's watershed partition and contour simplification, which section 3 " +
+    "*** WIRED AT v4545: *** worker/botPathfinder.worker.js tries this module first and falls back to its " +
+    "own grid A*, and tools/ship/navWiring-selfcheck.mjs grades that end to end on the snapshot shape " +
+    "BotPathfinderPool actually sends -- which is also what found section 5b's bug and a stride-0 hang no " +
+    "fixture here could reach. Also unchecked: Recast's watershed partition and contour simplification, which section 3 " +
     "measures the cost of skipping (729 polygons where a contour mesh would give a handful) and does not " +
     "measure the cost of HAVING, since neither is built; multi-storey worlds, since a heightmap has one " +
     "surface per column and real spans are what Recast carries; and off-mesh links, jumps and doors.");

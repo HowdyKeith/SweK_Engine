@@ -169,6 +169,11 @@ const BOT_KINDS = {
 // enemies. Each entry mirrors a KAIJU_KINDS entry's color + scale +
 // attack profile, so visual identity (tracer color, mesh size, themed
 // speech) comes from the shared kaiju config.
+import { stepTerrain, functionGround, SURFACE } from "../physics/character/terrainWalk.mjs";
+
+/** Eye/centre offset above the feet -- the +1 this file has always added to the terrain height. */
+const BOT_EYE = 1;
+
 import { KAIJU_BOT_KINDS, KAIJU_BOT_KIND_NAMES, isKaijuBotKind } from "./KaijuBotKinds.js";
 // Round 234 — king-tier kaiju bots (boss roster). 7 kings with promoted
 // attacks + multi-attack rotation. Merged into BOT_KINDS so spawn() and
@@ -1171,12 +1176,62 @@ export class BotManager {
         const dx = tx - bot.x, dz = tz - bot.z;
         const dist = Math.hypot(dx, dz);
         if (dist > 0.01) {
-            bot.x += (dx / dist) * speed * dt;
-            bot.z += (dz / dist) * speed * dt;
+            // *** v4545 -- GROUND-FOLLOWING INSTEAD OF A HORIZONTAL MOVE FOLLOWED BY A HARD Y SNAP. ***
+            //
+            // What this replaced moved the bot at `speed` HORIZONTALLY and then wrote
+            // bot.y = _heightAt(x, z) + 1, which has two consequences nobody chose. A slope was climbed at
+            // full horizontal speed, so the distance actually travelled along the ground ran to
+            // speed * sec(theta) -- 1.414x at 45 degrees, more than double at 63 -- and NO SLOPE WAS EVER
+            // TOO STEEP, because a vertical cliff and a flat floor are the same one-line snap.
+            //
+            // physics/character/terrainWalk.mjs holds the surface speed at `speed` instead and refuses
+            // ground steeper than the limit, sliding along the contour rather than sticking to it. THE
+            // SLIDE IS THE PART THAT MATTERS HERE and it is this tree's own ruling: v4187's dungeonWalls
+            // round faced the same trade and Keith's call was that refusing a move must not mean standing
+            // at the wall waiting to be killed -- put a hand on it and walk.
+            //
+            // The old snap is kept as the fallback for a world that exposes no _heightAt, because a bot
+            // that stops moving is worse than a bot that climbs a cliff.
+            const ground = this._groundOracle();
+            let handled = false;
+            if (ground) {
+                const r = stepTerrain({
+                    pos: [bot.x, bot.y - BOT_EYE, bot.z], ground, wish: [dx / dist, dz / dist],
+                    dt, speed, maxSlopeDeg: this.botMaxSlopeDeg ?? 55,
+                    stepHeight: 1.2, snapDown: 1.2, convention: SURFACE,
+                });
+                if (r.grounded || r.blocked) {
+                    bot.x = r.pos[0]; bot.z = r.pos[2]; bot.y = r.pos[1] + BOT_EYE;
+                    handled = true;
+                }
+            }
+            if (!handled) {
+                bot.x += (dx / dist) * speed * dt;
+                bot.z += (dz / dist) * speed * dt;
+                try { bot.y = (this.world?._heightAt?.(bot.x, bot.z) ?? bot.y) + BOT_EYE; } catch {}
+            }
             bot.yaw = Math.atan2(dx, dz);
+        } else {
+            // standing still: still sit on the surface rather than wherever the last move left us
+            try { bot.y = (this.world?._heightAt?.(bot.x, bot.z) ?? bot.y) + BOT_EYE; } catch {}
         }
-        // Snap Y to surface
-        try { bot.y = (this.world?._heightAt?.(bot.x, bot.z) ?? bot.y) + 1; } catch {}
+    }
+
+    /**
+     * The ground oracle terrainWalk needs, built ONCE per world rather than per bot per frame.
+     *
+     * functionGround samples _heightAt five times for one probe and stepTerrain probes once per substep, so
+     * rebuilding the closure every frame would be the expensive part of an otherwise cheap change. Cached
+     * against the world object identity, so a world swap rebuilds it and nothing else does.
+     */
+    _groundOracle() {
+        const w = this.world;
+        if (!w || typeof w._heightAt !== "function") return null;
+        if (this._groundFor !== w) {
+            this._groundFor = w;
+            this._ground = functionGround((x, z) => w._heightAt(x, z));
+        }
+        return this._ground;
     }
 
     _requestPath(bot, gx, gz) {

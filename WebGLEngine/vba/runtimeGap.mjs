@@ -211,7 +211,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // the earlier reading was 3878. What survives is the rule the wrong explanation was reaching for: this
     // number is MEASURED every round, never incremented from the last one, and a reason invented to explain a
     // count is worth less than re-taking it. FIVE ROUNDS RUNNING this table has been re-taken by hand.
-    files: 4022,                  // v4526 merge: 3887 -> 4002, this branch's rounds; v4527: 4004; v4528: 4007; v4529: 4009; v4530: 4011; v4533: 4012 (ai-bridge/runBusy.js); v4536: 4014 (physics/mesh/uvUnwrap.mjs and its gate); v4537: 4016 (physics/mesh/uvLscm.mjs and its gate); v4539: 4018 (physics/render/splitSum.mjs and its gate); v4543: 4020 (nav/navmesh.mjs and its gate); v4544: 4022 (physics/character/terrainWalk.mjs and its gate)
+    files: 4023,                  // v4526 merge: 3887 -> 4002, this branch's rounds; v4527: 4004; v4528: 4007; v4529: 4009; v4530: 4011; v4533: 4012 (ai-bridge/runBusy.js); v4536: 4014 (physics/mesh/uvUnwrap.mjs and its gate); v4537: 4016 (physics/mesh/uvLscm.mjs and its gate); v4539: 4018 (physics/render/splitSum.mjs and its gate); v4543: 4020 (nav/navmesh.mjs and its gate); v4544: 4022 (physics/character/terrainWalk.mjs and its gate); v4545: 4023 (tools/ship/navWiring-selfcheck.mjs)
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
                           // RE-TAKEN TWICE IN TWO ROUNDS, and the second time only because the ship gate
                           // caught it: v4478's re-take was correct for v4478 and stale the moment v4479
@@ -277,7 +277,15 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // returns plain triples -- and its GATE allocates them, for the fixtures it constructs. v4543's navmesh
     // moved this row by two because the algorithm itself carries a distance field. Two files either time,
     // and the row distinguishes code that OWNS buffers from code that is merely handed them.
-    esModules: 3730, closures: 3608, asyncAwait: 1415, typedArrays: 795, promises: 344,
+    // v4545 -- RE-TAKEN, and the numbers below were WRITTEN AS A GUESS FIRST AND WERE WRONG ON THREE ROWS.
+    // I predicted the wiring round's shape from the diff -- one new gate, four edited files -- and got ES
+    // modules, typed arrays and Promises each off by one, in BOTH directions. The gate caught all three at
+    // once. What actually moved: ES modules and closures by two (the new gate imports, and BotManager gained
+    // an import it did not have), asyncAwait by one (the gate's top-level await on the worker), and typed
+    // arrays and Promises NOT AT ALL -- BotManager already allocated neither, and the worker already
+    // returned a Promise. This is the second consecutive round in which a census note written before the
+    // re-run was wrong, which is the argument for re-running rather than reasoning about a diff.
+    esModules: 3732, closures: 3609, asyncAwait: 1416, typedArrays: 795, promises: 344,
     fetchXhr: 243, performanceNow: 220, raf: 116, webgl: 154, webgpu: 48, threads: 22, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

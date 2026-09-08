@@ -89,7 +89,28 @@ export const HALF_DIAG = Math.SQRT2 / 2;
  * The mask here is that rule and nothing more.
  */
 export function connectivity(hm, { stride, maxStepUp = 3, maxStepDown = 6 } = {}) {
+    // *** A MALFORMED STRIDE MUST THROW, NOT HANG, AND IT HUNG. *** Found by fuzzing the shipped worker's
+    // message rather than by this module's own gate, which hands itself arrays it built.
+    // worker/botPathfinder.worker.js wraps the navmesh route in try/catch and falls back to the grid A*, so a
+    // THROW costs a caller one fallback and a HANG kills that worker for the life of the page -- the bot it
+    // was planning for never gets another path.
+    //
+    // THE TWO LINES BELOW CATCH DIFFERENT FAILURES AND ONLY ONE OF THEM IS ABOUT THE HANG. Measured with
+    // both removed, over strides 0, -4, 2.5, 100 and NaN:
+    //
+    //     stride 0     hm.length / 0 is INFINITY, Math.floor leaves it Infinity, the row loop never ends
+    //     stride -4    throws already, on the negative typed-array length
+    //     stride 2.5   builds 1 polygon -- terminates, and the answer is nonsense
+    //     stride NaN   builds 0 polygons -- terminates, and the answer is nonsense
+    //
+    // So the ROWS line is what stops the hang, and the STRIDE line is what stops the silent garbage. They
+    // overlap on stride 0 and the gate cannot separate them there: removing EITHER alone leaves it green,
+    // and only removing BOTH brings the hang back. Recorded rather than tidied, because a guard whose
+    // sabotage changes no number is exactly what a defensive guard looks like -- see kinematic.js's
+    // maxRounds loop for this tree's precedent on labelling one.
+    if (!Number.isInteger(stride) || stride <= 0) throw new RangeError("navmesh: stride must be a positive integer, got " + stride);
     const rows = Math.floor(hm.length / stride);
+    if (!Number.isFinite(rows) || rows <= 0) throw new RangeError("navmesh: heightmap is shorter than one row");
     const conn = new Uint8Array(stride * rows);
     const H = (x, z) => (x < 0 || z < 0 || x >= stride || z >= rows) ? -Infinity : hm[z * stride + x];
     for (let z = 0; z < rows; z++) for (let x = 0; x < stride; x++) {
@@ -309,8 +330,10 @@ export function buildNavmesh(hm, {
             const seg = axis === 1
                 ? [{ x: wx(t) - h, z: line }, { x: wx(e) + h, z: line }]
                 : [{ x: line, z: wz(t) - h }, { x: line, z: wz(e) + h }];
-            if (p0.fwd) adj[i].push({ to: j, seg });
-            if (p0.bwd) adj[j].push({ to: i, seg });
+            // *** EACH DIRECTION CARRIES ITS PORTAL ALREADY ORIENTED, FROM THE CROSSING AXIS AND SIGN. ***
+            // See orientPortal below for why this is not the centre-to-centre test it replaces.
+            if (p0.fwd) adj[i].push({ to: j, seg, dir: axis === 1 ? (aFirst ? 1 : 3) : (aFirst ? 0 : 2) });
+            if (p0.bwd) adj[j].push({ to: i, seg, dir: axis === 1 ? (aFirst ? 3 : 1) : (aFirst ? 2 : 0) });
             t = e + 1;
         }
     }
@@ -350,13 +373,13 @@ export function corridor(mesh, s, g) {
             if (done.has(e.to)) continue;
             const m = mid(e.seg), ng = gS.get(i) + D(pt.get(i), m);
             if (gS.has(e.to) && gS.get(e.to) <= ng) continue;
-            gS.set(e.to, ng); prev.set(e.to, { from: i, seg: e.seg }); pt.set(e.to, m);
+            gS.set(e.to, ng); prev.set(e.to, { from: i, seg: e.seg, dir: e.dir }); pt.set(e.to, m);
             open.push([ng + D(m, g), e.to]);
         }
     }
     if (!gS.has(gi)) return null;
     const chain = [];
-    for (let c = gi; c !== si;) { const p = prev.get(c); chain.push({ seg: p.seg, from: p.from, to: c }); c = p.from; }
+    for (let c = gi; c !== si;) { const p = prev.get(c); chain.push({ seg: p.seg, dir: p.dir, from: p.from, to: c }); c = p.from; }
     chain.reverse();
     return { chain, si, gi };
 }
@@ -377,12 +400,38 @@ export function corridor(mesh, s, g) {
  */
 export function portalsFor(mesh, s, g, chain) {
     const out = [{ left: { ...s }, right: { ...s } }];
-    for (const { seg, from, to } of chain) {
-        const a = mesh.centre(mesh.rects[from]), b = mesh.centre(mesh.rects[to]);
-        out.push(triarea2(a, b, seg[0]) < 0 ? { left: seg[0], right: seg[1] } : { left: seg[1], right: seg[0] });
-    }
+    for (const link of chain) out.push(orientPortal(link.seg, link.dir));
     out.push({ left: { ...g }, right: { ...g } });
     return out;
+}
+
+/**
+ * Left and right for a portal crossed along `dir` (0:+x, 1:+z, 2:-x, 3:-z).
+ *
+ * *** THIS REPLACES A CENTRE-TO-CENTRE TEST THAT WAS WRONG WHENEVER A POLYGON WAS BIG. *** The rule is read
+ * off nav/funnel.mjs's own convention -- `left` is the end with NEGATIVE triarea2 about the direction of
+ * travel -- which for an axis crossing depends on the crossing ALONE:
+ *
+ *     crossing +z  ->  left is the larger-x end        crossing -z  ->  left is the smaller-x end
+ *     crossing +x  ->  left is the smaller-z end       crossing -x  ->  left is the larger-z end
+ *
+ * The version this replaces asked triarea2(centre(from), centre(to), seg[0]) instead, which is the same
+ * answer only while a polygon's centre lies roughly on the path through it. *** MEASURED FAILING ON THE
+ * FIRST REALISTIC SNAPSHOT IT WAS EVER GIVEN: *** a 129x69 heightmap with a wall and a gap decomposes into
+ * three rectangles, of which the gap strip spans the WHOLE WIDTH, so a path entering it at x=56 and leaving
+ * at x=72 crosses two portals lying on the SAME LINE while the centre-to-centre direction reverses from
+ * down-right to up-right. The pair flipped, and the funnel ran to x=129 -- the far edge of the map -- to
+ * reach a goal at x=104: 147.35 m against an optimum near 96. Every fixture in this module's own gate walked
+ * its corridor monotonically, so not one of them could see it.
+ */
+export function orientPortal(seg, dir) {
+    const [p, q] = seg;
+    const leftIsFirst =
+        dir === 1 ? p.x > q.x :
+        dir === 3 ? p.x < q.x :
+        dir === 0 ? p.z < q.z :
+                    p.z > q.z;
+    return leftIsFirst ? { left: p, right: q } : { left: q, right: p };
 }
 
 /** Plan a path: A* over polygons, then the funnel. Returns null when the agent does not fit. */

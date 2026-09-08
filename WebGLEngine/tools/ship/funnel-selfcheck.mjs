@@ -22,10 +22,17 @@ await import("../../worker/botPathfinder.worker.js");
 
 const N = 512, G = 4;
 const flat = () => new Float32Array(N * N);
+// *** route: "grid" IS NOT DECORATION HERE, IT IS THE SUBJECT. *** At v4545 the worker gained a navmesh
+// route and made it the DEFAULT, and this gate went red on four rows within the minute: its section 1
+// measures the octile constant sqrt(4 - 2*sqrt(2)) of an EIGHT-CONNECTED GRID, and a navmesh returns the
+// straight line on an empty floor, so every ratio read 1.000000 and the closed form missed by 8.2e-2. The
+// gate was not wrong and the worker was not wrong -- the gate names the grid A* in its own title and must
+// keep asking for it by name now that it is one of two. Recorded because a default that changes silently is
+// exactly what a gate is for, and this one caught it.
 const plan = (hm, sx, sz, gx, gz) => {
     globalThis.self.onmessage({ data: { cmd: "plan", id: 1, sx, sz, gx, gz, hm, hmStride: N,
         hmOriginX: 0, hmOriginZ: 0, gridSize: G, waterLevel: null, maxStepUp: 3, maxStepDown: 6,
-        maxSearch: 500000, slopePenalty: 0.35 } });
+        maxSearch: 500000, slopePenalty: 0.35, route: "grid" } });
     return globalThis.__out;
 };
 

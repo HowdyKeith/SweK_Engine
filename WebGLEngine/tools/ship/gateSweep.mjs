@@ -3764,6 +3764,32 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since201: Object.freeze({
+        at: "v4545", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/navWiring-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 0.17 s. Gates the WIRING of three capabilities that each shipped with a gate, a " +
+                 "measurement and no caller: nav/funnel.mjs (v4254), nav/navmesh.mjs (v4543) and " +
+                 "physics/character/terrainWalk.mjs (v4544). It drives the REAL worker's onmessage and the REAL " +
+                 "BotManager against a fake world, the way v4187's dungeonWalls-selfcheck drives DungeonAI. *** AND " +
+                 "WIRING FOUND THREE DEFECTS THAT THREE GATES OF DESIGNED FIXTURES HAD NOT. *** (1) The first " +
+                 "realistic snapshot the navmesh was ever handed returned 147.35 m against a taut 96.61, running to " +
+                 "the far edge of the map: its portals were oriented from polygon CENTRES, right only while a " +
+                 "centre lies near the path through it, and every fixture in its own gate walked its corridor " +
+                 "monotonically. Now oriented from the crossing axis and sign, which is what Detour gets free from " +
+                 "the winding. (2) A stride of 0 made hm.length/stride Infinity and HUNG the worker forever -- worse " +
+                 "than throwing, since the worker's fallback recovers from a throw and nothing recovers from a hang. " +
+                 "(3) Flipping the worker's default to the navmesh route turned funnel-selfcheck red within the " +
+                 "minute, because that gate measures the octile constant of an EIGHT-CONNECTED GRID and a navmesh " +
+                 "returns the straight line: it asks for route \"grid\" by name now. The payoff is measured on the " +
+                 "snapshot shape BotPathfinderPool actually builds: shorter (96.61 vs 99.88), further from the walls " +
+                 "(2.000 vs 0.850) and 4 waypoints against 21. BotManager follows the ground through terrainWalk " +
+                 "instead of writing bot.y = _heightAt + 1, so a bot moves at 5*cos(theta) horizontally rather than " +
+                 "sec(theta) along the ground, and stops at a wall it used to walk up.",
+    }),
     since200: Object.freeze({
         at: "v4544", swept: 1, green: 1, red: 0,
         added: Object.freeze([

@@ -21,10 +21,21 @@
 const HM_PADDING = 24;          // voxels of padding around the start/goal bbox
 
 export class BotPathfinderPool {
-    constructor({ world, poolSize = null, gridSize = 4, waterLevel = null } = {}) {
+    constructor({ world, poolSize = null, gridSize = 4, waterLevel = null,
+                  route = "navmesh", agentRadius = 1.5 } = {}) {
         this.world = world;
         this.gridSize = gridSize;
         this.waterLevel = waterLevel;
+        // *** v4545 -- WHICH PLANNER THE WORKER USES, AND HOW WIDE THE THING BEING PLANNED FOR IS. ***
+        // "navmesh" tries nav/navmesh.mjs first and falls back to this pool's original grid A* when it finds
+        // no path; "grid" skips it. Measured on the snapshot shape this file builds -- a heightmap padded 24
+        // around the start/goal bbox, with a wall and a gap -- the navmesh route is shorter (96.61 against
+        // 99.88 at a separation of 80), further from the walls (clearance 2.000 against 0.850) and carries
+        // five to twelve times fewer waypoints for BotManager to chase. It costs 1.4-3.0 ms against
+        // 0.25-0.90, which is affordable on a worker thread for a bot that re-plans every few seconds and
+        // would not be on the main thread or per frame.
+        this.route = route;
+        this.agentRadius = agentRadius;
 
         const hwc = (typeof navigator !== "undefined" && navigator.hardwareConcurrency) || 4;
         this.poolSize = poolSize ?? Math.max(2, Math.min(4, hwc - 2));
@@ -120,6 +131,8 @@ export class BotPathfinderPool {
                 maxStepDown: opts.maxStepDown ?? 6,
                 maxSearch:   opts.maxSearch   ?? 800,    // smaller than PathPlanner — bot tasks
                 slopePenalty: opts.slopePenalty ?? 0.5,
+                route:       opts.route       ?? this.route,
+                agentRadius: opts.agentRadius ?? this.agentRadius,
             }, [hm.buffer]);
         });
     }
