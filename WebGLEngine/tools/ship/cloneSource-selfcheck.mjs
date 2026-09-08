@@ -46,6 +46,20 @@ console.log("cloneSource-selfcheck -- the way IN, and what it must never overwri
         "and the installer picks builds by that name -- the mislabeled-build failure the ship ritual exists to stop.");
     ok("...and a tree with no main.js at all yields empty",
         gh._versionInTree(os.tmpdir()) === "");
+    // v4536 -- *** THE FIRST MATCH WAS ALWAYS A DEAD ONE. *** main.js keeps every past ENGINE_VERSION line as
+    // a commented-out historical marker ahead of the live declaration -- confirmed on the real tree: a fresh
+    // clone of a v4535 main.js named its destination folder SweK_Engine_v4487, because .match() with no /g/
+    // returns the FIRST occurrence, and the first occurrence in a tree with any history is a "// const
+    // ENGINE_VERSION = ..." line rather than the live one.
+    ok("!! a commented-out marker ahead of the live one does not win",
+        gh._parseEngineVersion('// const ENGINE_VERSION = "v4487";   // v4487 -- some old round\n' +
+            "some other line entirely\n" +
+            'const ENGINE_VERSION = "v4535";   // v4535 -- the live one') === "v4535",
+        "*** MEASURED ON THE REAL TREE, NOT HYPOTHETICAL: *** this exact shape (12 occurrences, first one dead) " +
+        "shipped mislabeled clone folders and mislabeled releases -- the tag pointed at current code, the " +
+        "release page said a version four dozen rounds stale.");
+    ok("...even with leading whitespace on the comment",
+        gh._parseEngineVersion('  // const ENGINE_VERSION = "v1";\nconst ENGINE_VERSION = "v2";') === "v2");
 }
 
 // ---- 2. IT REFUSES BEFORE IT TOUCHES ANYTHING -------------------------------------------------------------
