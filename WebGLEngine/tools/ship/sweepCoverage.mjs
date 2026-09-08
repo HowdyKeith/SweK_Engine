@@ -497,6 +497,78 @@ export const ROTATION_OUTLIERS_V4531 = Object.freeze([]);   // retired at v4535 
  * exists, these three are named here WITH BOTH READINGS, so the next reader inherits the oscillation as
  * evidence rather than re-deriving it from an empty list for the third time.
  */
+/**
+ * *** v4536 -- THE BACKLOG ASKED FOR A REFERENCE WORKLOAD. IT WAS BUILT, MEASURED, AND IT DOES NOT WORK. ***
+ *
+ * nextRounds' `sweep-budget-calibration` is right about the disease: "a millisecond on a loaded box and a
+ * millisecond on a quiet one are being compared as if they were the same quantity". It proposes normalising
+ * every reading by a fixed workload timed during the sweep. Two candidates were built and driven under a
+ * synthetic 8-hog load on this 4-core box:
+ *
+ *     refCompute   a pure integer loop over a 16 KB working set     moved 1.02x while gates moved 1.22-2.26x
+ *     refSpawn     `node -e 0`, the cost every gate pays first      moved 2.43x while gates moved 1.22-2.26x
+ *
+ * NEITHER TRACKS. A single-threaded ALU loop keeps its own core and barely notices; process spawn is far more
+ * contended than the gates are. Normalising by the first changes nothing and by the second overcorrects by
+ * about 2x. The residual spread after normalising is 1.15x and 1.9x respectively -- both larger than the
+ * margin that decides eviction, so the treadmill would continue with an extra number in the file.
+ *
+ * *** AND THE DRIFT IS NOT A COMMON FACTOR, WHICH IS THE DEEPER REASON. *** Serial against serial, on gates
+ * whose gate file and subject are BYTE-IDENTICAL since the earlier reading (checked with git, not assumed):
+ *
+ *     microfacetVndf   3184 -> 3613   1.13x        probeLab   3193 -> 4337   1.36x
+ *     water2d          3143 -> 3546   1.13x        meshLine   2792 -> 3804   1.36x
+ *     slugReupload     3129 -> 3507   1.12x
+ *
+ * Three at 1.12-1.13 and two at 1.36 is not one number the box is multiplied by; a scalar cannot carry it.
+ * AND AT LEAST ONE OF THE OUTLIERS IS NOT THE BOX AT ALL: meshLine WALKS THE TREE (three readdir sites), so
+ * its cost grows as the tree grows, and that growth is real work. *** A REFERENCE NORMALISER WOULD HAVE
+ * DIVIDED THAT AWAY AND FILED GENUINE GROWTH AS A SLOW HOUR, *** which is a worse fault than the one it was
+ * sent to fix.
+ *
+ * WHAT WAS DONE INSTEAD is in quickSweep.mjs: a crossing must be reproduced on a later sweep before it evicts.
+ * Within one hour these gates repeat to about 2% (probeLab 4398 / 4425 / 4337); across hours they move up to
+ * 36%. So one crossing is a reading and two are a property -- v4297's rule for reds, applied to time.
+ *
+ * ONE MORE READING, KEPT BECAUSE IT IS LARGER THAN EVERYTHING ABOVE: twelve gates from a single capture,
+ * unchanged code, re-measured serially, came in at 0.41x to 0.92x of their recorded time -- A 2.24x SPREAD --
+ * because the file mixes 8-way parallel readings with serial ones and compares both against one budget. That
+ * is not repaired here and is the next thing to look at.
+ */
+export const BUDGET_DRIFT_V4536 = Object.freeze({
+    at: "v4536", box: "4 cores", budgetMs: BUDGET_MS,
+    referenceWorkloadsTried: Object.freeze([
+        Object.freeze({ name: "refCompute", what: "pure integer loop, 16 KB working set", movedUnderLoad: 1.02 }),
+        Object.freeze({ name: "refSpawn", what: "node -e 0", movedUnderLoad: 2.43 }),
+    ]),
+    gatesMovedUnderLoadFrom: 1.22, gatesMovedUnderLoadTo: 2.26,
+    // serial-against-serial, code byte-identical, hours apart
+    hourDrift: Object.freeze([
+        Object.freeze({ gate: "physics/render/microfacetVndf-selfcheck.mjs", was: 3184, now: 3613 }),
+        Object.freeze({ gate: "tools/ship/water2d-selfcheck.mjs", was: 3143, now: 3546 }),
+        Object.freeze({ gate: "tools/ship/slugReupload-selfcheck.mjs", was: 3129, now: 3507 }),
+        Object.freeze({ gate: "tools/ship/probeLab-selfcheck.mjs", was: 3193, now: 4337 }),
+        Object.freeze({ gate: "tools/ship/meshLine-selfcheck.mjs", was: 2792, now: 3804 }),
+    ]),
+    withinHourSpreadPct: 2,        // probeLab 4398 / 4425 / 4337 across three consecutive runs
+    growthNotDrift: "tools/ship/meshLine-selfcheck.mjs walks the tree, so part of its 1.36x is the tree " +
+                    "growing rather than the box slowing. A scalar normaliser cannot tell those apart and " +
+                    "would file the first as the second.",
+    parallelToSerialSpread: 2.24,  // twelve unchanged gates, one capture, re-measured alone: 0.41x to 0.92x
+    repairShipped: "quickSweep.MIN_CROSSINGS_TO_EVICT -- a crossing must be reproduced on a later sweep",
+    // *** AND THE FIRST DRAFT OF THAT REPAIR WOULD HAVE RUN THE WHOLE OVER-BUDGET POOL AT SHIP TIME. ***
+    // It gave probation to any gate over budget whose crossing count was MISSING, and a missing count is the
+    // normal state of the ~300 gates evicted before this rule existed -- the expensive ones, twice over
+    // before the counts settled, which is exactly the cost sweepRotation exists to spread across rounds.
+    // budgetExile-selfcheck caught it inside the round by seeding a gate with a 999,999 ms lie and watching
+    // the sweep go and run it. Probation is for a gate that crossed UNDER this rule; a missing count means
+    // "evicted before it existed" and those stay out.
+    firstDraftFault: "probation on a MISSING count is probation for the entire over-budget pool",
+    notClaimed: "that two crossings prove a gate is over budget on a quiet box. They prove the reading " +
+                "reproduced. What this removes is the eviction that rests on ONE hour, which is the one the " +
+                "straddler lists have been undoing by hand for three rounds.",
+});
+
 export const ROTATION_BOUNDARY_V4535 = Object.freeze([
     Object.freeze({ gate: "physics/render/albedoEstimator-selfcheck.mjs", rotationMs: 2991, sweepMs: 3115,
         serialMs: Object.freeze([3065, 2823, 3208, 3269, 3000]),

@@ -65,15 +65,66 @@ export function readTimings(file = DEFAULTS.timingsFile, root = ENG) {
  * Which gates to run: every enumerated gate whose last observed time is under the budget, plus every gate
  * with no observation at all (new gates always earn one). Returns { run, skipped, dropped, unmeasured }.
  */
-export function selectGates(all, timings, budgetMs) {
-    const run = [], skipped = [], unmeasured = [];
+// *** v4536 -- ONE SLOW HOUR EVICTED A GATE, AND THE MEASUREMENT SAYS ONE CROSSING IS WEAK EVIDENCE. ***
+//
+// v4408 stopped a STARVED PARALLEL reading from evicting a gate: a green gate that crosses the budget 8-way is
+// re-run alone before its time is filed. That was right and it is not enough, because the serial confirm is
+// itself taken at the end of a 1,200-gate sweep and this box is not the same box from hour to hour. MEASURED
+// at v4536, serial against serial, on gates whose code has not changed since the earlier reading:
+//
+//     microfacetVndf  3184 -> 3613   1.13x        probeLab   3193 -> 4337   1.36x
+//     water2d         3143 -> 3546   1.13x        meshLine   2792 -> 3804   1.36x
+//     slugReupload    3129 -> 3507   1.12x
+//
+// Within one hour those gates repeat to about 2% (probeLab: 4398 / 4425 / 4337). Across hours they move up to
+// 36%. *** SO A SINGLE CROSSING IS A READING FROM ONE HOUR AND NOT A PROPERTY OF THE GATE, *** and roughly
+// thirty gates sit close enough to 3,000 ms for that to decide their fate -- which is the treadmill that has
+// fed a named straddler list in three consecutive rounds.
+//
+// THE REPAIR IS v4297'S OWN DISCIPLINE, APPLIED TO TIME. A red is not a red until it is confirmed alone; a
+// crossing is not an eviction until it is confirmed on a LATER SWEEP. Nothing is forgiven: a gate that is
+// genuinely over goes out one sweep later than it used to, and the count is visible in the timings file. This
+// is not a tolerance band -- v4531 refused one, rightly, because a band forgives every future boundary case
+// silently and this forgives nothing; it asks for the reading to be reproduced.
+//
+// AND IT IS NOT THE REPAIR THE BACKLOG PROPOSED, because that one was measured and does not work. See
+// BUDGET_DRIFT_V4536 in sweepCoverage.mjs for the reference-workload experiment and why a scalar normaliser
+// cannot carry this.
+export const MIN_CROSSINGS_TO_EVICT = 2;
+
+/**
+ * The crossing count after a sweep: incremented for a gate that came in over budget, and DELETED for one that
+ * came back under. Consecutive crossings, not a lifetime tally -- and that distinction is the whole rule. A
+ * gate that straddles crosses about half the time, so a tally that never resets evicts every straddler within
+ * a few sweeps while still calling itself corroboration. Pure and exported so the reset is driven on a
+ * fixture: the first draft kept it inside the writer, where the only sabotage that mattered went 0 red.
+ */
+export function countCrossings(prior, rows, budgetMs) {
+    const out = { ...(prior || {}) };
+    for (const r of rows) {
+        const ms = r.serialMs ?? r.parallelMs;
+        if (ms > budgetMs) out[r.gate] = (out[r.gate] || 0) + 1;
+        else delete out[r.gate];
+    }
+    return out;
+}
+
+export function selectGates(all, timings, budgetMs, { crossings = null, minCrossings = MIN_CROSSINGS_TO_EVICT } = {}) {
+    const run = [], skipped = [], unmeasured = [], onProbation = [];
     for (const g of all) {
         const ms = timings[g];
         if (ms == null) { unmeasured.push(g); run.push(g); }
         else if (ms <= budgetMs) run.push(g);
+        // *** PROBATION IS FOR A GATE THAT CROSSED, NOT FOR EVERY GATE ALREADY OUT. *** The first draft ran
+        // anything over budget whose count was missing, which is the ENTIRE over-budget pool -- about three
+        // hundred gates, the expensive ones, twice over before the counts settled. That is the cost the
+        // rotation exists to spread out, paid at ship time instead. A missing count means "evicted before
+        // v4536 and not by this rule", and those stay out: sweepRotation re-times them on its own schedule.
+        // budgetExile-selfcheck caught this within the round by seeding a lie and watching it get run.
+        else if (crossings && crossings[g] >= 1 && crossings[g] < minCrossings) { onProbation.push(g); run.push(g); }
         else skipped.push(g);
     }
-    return { run, skipped, unmeasured };
+    return { run, skipped, unmeasured, onProbation };
 }
 
 /** Reconcile serial reds against the register: known (with the record that names them) versus new. */
@@ -107,7 +158,7 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
     const t00 = Date.now();
     const all = gates || enumerateGates(root);
     const prior = readTimings(timingsFile, root);
-    const sel = selectGates(all, prior.timings || {}, budgetMs);
+    const sel = selectGates(all, prior.timings || {}, budgetMs, { crossings: prior.crossings || {} });
     const phase1 = new Map();
     let next = 0, done = 0;
     async function worker() {
@@ -162,7 +213,13 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
     // already fills) and tools/ship/budgetExile.mjs was changed to read it.
     const at = { ...(prior.at || {}) };
     const stamp = out0.at;
-    for (const r of rows) { timings[r.gate] = r.serialMs ?? r.parallelMs; codes[r.gate] = r.serialCode ?? 0; at[r.gate] = stamp; }
+    // v4536: a crossing is COUNTED rather than acted on -- see countCrossings, which is exported and pure so
+    // a gate can drive the reset on a fixture. It was NOT, in the first draft of this round, and the sabotage
+    // that deleted the reset went 0 red beside a comment warning that deleting the reset is the whole risk.
+    const crossings = countCrossings(prior.crossings, rows, budgetMs);
+    for (const r of rows) {
+        timings[r.gate] = r.serialMs ?? r.parallelMs; codes[r.gate] = r.serialCode ?? 0; at[r.gate] = stamp;
+    }
     backfillStamps(timings, at);
     const dropped = sel.run.filter((g) => (prior.timings || {})[g] != null && timings[g] > budgetMs);
     const out = {
@@ -173,14 +230,21 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
         // and how many of those the serial reading brought back under. The second number is the starvation.
         budgetConfirmed: rows.filter((r) => r.from === "budget-confirm").length,
         budgetRescued: rows.filter((r) => r.from === "budget-confirm" && r.serialMs <= budgetMs).length,
+        // v4536: gates over budget that were RUN ANYWAY because this is their first crossing, and how many
+        // crossed on this sweep. A first crossing is a reading from one hour; a second is a property.
+        onProbation: sel.onProbation, crossedOnce: Object.keys(crossings).filter((g) => crossings[g] === 1).length,
+        evictable: Object.keys(crossings).filter((g) => crossings[g] >= MIN_CROSSINGS_TO_EVICT).length,
     };
     if (write) {
         fs.writeFileSync(path.join(root, timingsFile), JSON.stringify({
             note: "OBSERVED at the last quickSweep run: ms per gate (serial where a serial re-run happened) and exit code. Rewritten every run; " +
                   "used only to choose which gates are under the ship-time budget. Not a claim about the tree -- the register is. " +
                   "`at` is PER ENTRY (v4408): the capture that actually observed that gate. `captured` is this run's stamp and " +
-                  "applies ONLY to entries whose `at` equals it -- the rest were not run and say so.",
-            captured: out.at, budgetMs, capMs, timings, codes, at,
+                  "applies ONLY to entries whose `at` equals it -- the rest were not run and say so. " +
+                  "`crossings` (v4536) counts CONSECUTIVE sweeps on which a gate came in over budget, and it takes " +
+                  "two to evict: one crossing is a reading from one hour, and this box moves 12-36% between hours " +
+                  "on unchanged code. A gate that comes back under loses its count entirely.",
+            captured: out.at, budgetMs, capMs, timings, codes, at, crossings,
         }, null, 1) + "\n");
     }
     return out;

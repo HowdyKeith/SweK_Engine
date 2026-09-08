@@ -71,6 +71,70 @@ sec("1. SELECTION: UNDER BUDGET RUNS, OVER BUDGET IS SKIPPED, NO TIMING ALWAYS R
 }
 
 // ---------------------------------------------------------------------------------------------------------
+sec("1b. EVICTION TAKES TWO CROSSINGS, BECAUSE ONE IS A READING FROM ONE HOUR");
+// ---------------------------------------------------------------------------------------------------------
+// v4536. Driven on FIXTURES, not on the live timings file: the property is about the rule, and a rule tested
+// against whatever the tree happens to hold today is tested against one sample of it.
+{
+    const all = ["over.mjs", "again.mjs", "under.mjs"];
+    const timings = { "over.mjs": 4000, "again.mjs": 4000, "under.mjs": 100 };
+    const first = Q.selectGates(all, timings, 3000, { crossings: { "over.mjs": 1, "again.mjs": 2 } });
+    ok(first.run.includes("over.mjs") && first.skipped.includes("again.mjs") &&
+       first.onProbation.join() === "over.mjs",
+       "*** a gate over budget on its FIRST crossing still runs; on its SECOND it is evicted ***",
+       `run ${first.run.join(",")}; skipped ${first.skipped.join(",")}; on probation ${first.onProbation.join(",")}`);
+    // *** AND A GATE ALREADY OUT OF THE SWEEP STAYS OUT: PROBATION IS FOR A GATE THAT CROSSED. ***
+    // The first draft ran anything over budget with no crossing count -- which is the whole over-budget pool,
+    // about three hundred of the most expensive gates, twice over before the counts settled. That is the cost
+    // sweepRotation exists to spread across rounds, and it would have been paid at ship time instead. A
+    // MISSING count means "evicted before this rule existed", not "never crossed", and those stay out.
+    // budgetExile-selfcheck found it inside the round by seeding a lie and watching the sweep go and run it.
+    const exiled = Q.selectGates(["old.mjs"], { "old.mjs": 999999 }, 3000, { crossings: { other: 1 } });
+    ok(exiled.skipped.join() === "old.mjs" && exiled.onProbation.length === 0,
+       "!! a gate with a big recorded time and NO crossing count stays skipped -- the pool is not re-run",
+       `skipped ${exiled.skipped.join(",")}, on probation ${exiled.onProbation.join(",") || "none"}. ` +
+       "The rotation re-times that pool on its own schedule; this rule only holds open a door for a gate " +
+       "that crossed under it");
+    // the old behaviour is still available and is what every other caller gets: no crossings, no probation
+    const old = Q.selectGates(all, timings, 3000);
+    ok(old.skipped.length === 2 && old.onProbation.length === 0,
+       "  without a crossings map the rule is exactly what it was, so no other caller changed",
+       `${old.skipped.length} skipped, ${old.onProbation.length} on probation`);
+    // *** AND THE COUNT MUST RESET, OR IT IS A LIFETIME TALLY AND EVERY STRADDLER EVICTS ITSELF EVENTUALLY. ***
+    // This is the difference between "crossed twice in a row" and "crossed twice since the beginning of time",
+    // and a straddler crosses about half the time, so the second rule evicts every one of them within a few
+    // sweeps while claiming to be corroboration.
+    //
+    // *** THIS PARAGRAPH SAT HERE WITH NOTHING UNDER IT CHECKING IT, AND THE SABOTAGE THAT DELETED THE RESET
+    // WENT 0 RED. *** The reset lived inside the writer where no fixture could reach it, and the row beside
+    // this comment asserted the THRESHOLD instead -- prose promising a check the assertion did not have,
+    // which is the defect v4536's own author found in RETURNED_AT_V4529 two rounds earlier. countCrossings is
+    // pure and exported now, and the straddler is walked through four sweeps here rather than described.
+    {
+        const over = [{ gate: "s.mjs", serialMs: 4000 }], under = [{ gate: "s.mjs", serialMs: 2000 }];
+        let c = {};
+        c = Q.countCrossings(c, over, 3000);     const afterOver1 = c["s.mjs"];
+        c = Q.countCrossings(c, under, 3000);    const afterUnder = c["s.mjs"];
+        c = Q.countCrossings(c, over, 3000);     const afterOver2 = c["s.mjs"];
+        c = Q.countCrossings(c, over, 3000);     const afterOver3 = c["s.mjs"];
+        ok(afterOver1 === 1 && afterUnder === undefined && afterOver2 === 1 && afterOver3 === 2,
+           "!! *** FIXTURE: a straddler that alternates over and under NEVER reaches two, and two in a row does ***",
+           `over -> ${afterOver1}, under -> ${afterUnder === undefined ? "cleared" : afterUnder}, over -> ` +
+           `${afterOver2}, over -> ${afterOver3}. A count that survived the under would read 3 by now and the ` +
+           "gate would be evicted for having straddled, which is precisely what it must not mean");
+        ok(Q.countCrossings({ "s.mjs": 5 }, under, 3000)["s.mjs"] === undefined,
+           "  ...and coming back under clears the count outright rather than decrementing it",
+           "a decrement would take five sweeps under budget to undo five crossings; the reading that matters " +
+           "is the most recent run of them");
+    }
+    ok(Q.MIN_CROSSINGS_TO_EVICT === 2,
+       "  the threshold is a named constant rather than a literal in the selection", `${Q.MIN_CROSSINGS_TO_EVICT}`);
+    ok(Q.selectGates(all, timings, 3000, { crossings: { "over.mjs": 1 }, minCrossings: 1 }).skipped.includes("over.mjs"),
+       "  ...and it is a PARAMETER, so the rule can be driven to its boundary here rather than argued about",
+       "at minCrossings 1 the first crossing evicts, which is the pre-v4536 behaviour exactly");
+}
+
+// ---------------------------------------------------------------------------------------------------------
 sec("2. THE REGISTER IS BUILT FROM THE RECORDS IT NAMES, AND THE SIX REGRESSIONS ARE DELIBERATELY NOT IN IT");
 // ---------------------------------------------------------------------------------------------------------
 {
