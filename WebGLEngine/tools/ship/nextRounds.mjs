@@ -160,7 +160,22 @@ export const NEXT_ROUNDS = [
     { id: "fbp-gain-normalisation", state: "CLOSED", note: "ANSWERED NO at v3378, and the measurement is in reconQuality.mjs. The gain is NOT a filter constant: it runs 0.4319 to 0.9340 across fixtures, nearly invariant in ANGLE COUNT but tracking N and nDet -- and gain*nDet/N collapses to 0.9456 with a spread of 0.0185. IT IS A SAMPLING RATIO. Correcting 0.649 in the filter would be right at N=96/nDet=140, this gate's own fixture, and wrong everywhere else." },
 ];
 
-export const byBlocker = (kind) => NEXT_ROUNDS.filter((r) => r.blocker === kind);
+// *** v4549 -- THIS REPORT WAS HIDING THREE OF ITS OWN OPEN ITEMS, AND HAD BEEN FOR SEVERAL ROUNDS. ***
+// Entries in this file carry their status in one of two fields: `blocker` on the ones written as forward
+// plans, `state` on the ones written as answers to a question (CLOSED, or DONE-in-part and still OPEN).
+// byBlocker filtered on `blocker` alone, so terrain-controller, pathfinder-snapshot-window and
+// navmesh-recast -- every one of them carrying an explicit "STILL OPEN" clause naming unbuilt work -- were
+// absent from the report entirely. It printed "OPEN (4)" where the honest number is 7.
+//
+// The fix is to read whichever field the entry has rather than to go and retype twenty-four entries into one
+// shape: a migration would make the report right today and leave the same trap for the next entry written in
+// the other style. `status()` is the single definition of "what state is this in", and reachable() below is
+// what refuses an entry the report cannot see.
+export const status = (r) => r.blocker || r.state || null;
+export const byBlocker = (kind) => NEXT_ROUNDS.filter((r) => status(r) === kind);
+
+/** Every entry, with the status the report will actually use -- so a gate can check nothing falls through. */
+export const reachable = () => NEXT_ROUNDS.map((r) => ({ id: r.id, status: status(r) }));
 
 export function lines() {
     // *** v3941 -- IT NAMES ITSELF, BECAUSE A REPORT WITH NO NAME ON IT IS UNATTRIBUTABLE THE MOMENT TWO OF

@@ -128,6 +128,34 @@ const read = (rel) => { try { return fs.readFileSync(path.join(ENG, rel), "utf8"
         try { await import(pathToFileURL(path.join(ENG, c)).href); return null; } catch (e) { return c + ": " + e.message; }
     }));
     const broke = loaded.filter(Boolean);
+    // *** v4549 -- AND PARSING IS NOT THE SAME AS REPORTING. *** nextRounds.mjs parsed perfectly while its own
+    // report was hiding three OPEN items: entries carry their status in `blocker` OR in `state`, byBlocker
+    // filtered on `blocker` alone, and terrain-controller, pathfinder-snapshot-window and navmesh-recast --
+    // each carrying an explicit "STILL OPEN" clause naming unbuilt work -- appeared in NO section. It printed
+    // "OPEN (4)" against a real 7, and every gate above was green throughout, because a file that loads is
+    // all any of them asked. So this row asks the harder question: does the report reach EVERY entry?
+    {
+        const NR = await import(pathToFileURL(path.join(ENG, "tools", "ship", "nextRounds.mjs")).href);
+        const all = NR.reachable();
+        const stateless = all.filter((r) => !r.status);
+        const printed = NR.lines().join("\n");
+        // Everything that is not CLOSED must appear in the printed report by name.
+        const live = all.filter((r) => r.status && r.status !== "CLOSED");
+        const missing = live.filter((r) => !printed.includes(r.id));
+        ok("!! *** EVERY LIVE ENTRY REACHES THE REPORT -- a backlog item nobody can see is worse than none ***",
+           stateless.length === 0 && missing.length === 0 && live.length > 0,
+           missing.length || stateless.length
+             ? `${missing.length} live entr(ies) absent from the report: ${missing.map((r) => r.id).join(", ")}` +
+               (stateless.length ? `; ${stateless.length} with no status at all: ${stateless.map((r) => r.id).join(", ")}` : "")
+             : `${live.length} live of ${all.length} entries, all named in the output. Statuses in use: ` +
+               [...new Set(all.map((r) => r.status))].join(", ") + ".");
+        // And the counts the report PRINTS are the counts it holds -- a header saying OPEN (4) over seven
+        // lines is the specific way this failed, so the number is compared to the section rather than trusted.
+        const headers = [...printed.matchAll(/^(OPEN|UPSTREAM|HARDWARE) \((\d+)\):$/gm)];
+        ok("...and each section's printed count equals the entries it actually holds",
+           headers.length === 3 && headers.every(([, kind, n]) => Number(n) === NR.byBlocker(kind).length),
+           headers.map(([, k, n]) => `${k} ${n}=${NR.byBlocker(k).length}`).join(", ") || "no section headers found");
+    }
     ok("!! *** ...AND EVERY ONE OF THEM PARSES AND LOADS, WHICH NOTHING UNDER THE SWEEP BUDGET ASKED BEFORE ***",
        broke.length === 0,
        (cmds.length - broke.length) + " of " + cmds.length + " import cleanly. A handoff that points at a command is only " +
