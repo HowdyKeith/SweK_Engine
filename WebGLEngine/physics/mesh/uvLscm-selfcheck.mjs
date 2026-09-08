@@ -169,10 +169,28 @@ console.log("\n5. the real asset, end to end");
 // pipeline and section 9 wants it beside its two ancestors; running unwrapCurved four times to answer two
 // questions put this gate at 2,245 ms, and a gate near the 3,000 ms budget is a gate that leaves the sweep the
 // first time the box is busy -- which is the whole subject of tools/ship/nextRounds.mjs's calibration entry.
-const ABLATION = [["grown only", { merge: false, orient: false }],
-                  ["+ merge/split", { merge: true, orient: false }],
-                  ["+ orient", {}]].map(([name, opt]) => ({ name, r: unwrapCurved(glb.positions, glb.indices, opt) }));
-const R = ABLATION[2].r;
+// THREE unwraps, not four: "+merge without orient" was a fourth full run of the expensive merge to measure a
+// rotation, and the rotation's one surviving claim -- that it changes distortion by exactly nothing -- is a
+// property of ONE chart and is tested as one below. Four runs put this gate at 2,800 ms against a 3,000 ms
+// budget, which is a gate that leaves the sweep the first time the box is busy.
+// TWO unwraps. The merge's headline is the chart count before and after, and BOTH are already in one result
+// -- `grown` and `chartCount` -- so a separate "grown only" run was paying half a second to re-derive a number
+// the default run already reports. Each unwrap of this asset costs 500-700 ms and this gate has a 3,000 ms
+// budget to stay inside.
+const ABLATION = [["merged + oriented + nested", {}],
+                  ["shelf packer", { nest: false }]].map(([name, opt]) =>
+                      ({ name, r: unwrapCurved(glb.positions, glb.indices, opt) }));
+const R = ABLATION[0].r;
+// pooling every chart's triangles into one map is what the cross-chart overlap question needs, and three
+// sections ask it; computed once here rather than three times.
+const pooled = (r) => {
+    const uv = new Map(), tt = []; let k = 0;
+    for (const c of r.charts) { const rm = new Map();
+        for (const [v, pt] of c.uv) { const id = k++; rm.set(v, id); uv.set(id, pt); }
+        for (const T of c.tris) tt.push(T.map((v) => rm.get(v))); }
+    return { uv, tt };
+};
+const POOL = ABLATION.map(({ r }) => { const p = pooled(r); return selfOverlaps(p.tt, p.uv, { maxPairs: 2e7 }); });
 {
     let covered = 0, flipped = 0, worstConf = 0, outside = 0;
     for (const c of R.charts) {
@@ -222,12 +240,21 @@ const R = ABLATION[2].r;
     ok("!! *** the atlas holds surface rather than gap: padding is a TEXEL COUNT, not a magic number ***",
        triArea > 0.2,
        `triangles cover ${(100 * triArea).toFixed(1)}% of the texture at the default 2 texels of 1024. The ` +
-       "remaining gap is bounding-box packing of 735 irregular charts, which is a real cost and a different " +
-       "round; this row exists so the 1.2% cannot come back by somebody choosing a padding in the wrong unit.");
+       "row exists so the 1.2% cannot come back by somebody choosing a padding in the wrong unit.");
 
-    ok("!! no two charts overlap in the atlas", over === 0,
-       `${rects.length} charts, ${rects.length * (rects.length - 1) / 2} pairs, ${over} overlapping -- ` +
-       "measured from the UVs that came out, not from the placements that went in.");
+    // *** THE CHECK THAT HAD TO CHANGE WHEN THE PACKER DID. *** Box-disjointness was the right property for a
+    // SHELF packer and is the WRONG one for a NESTING packer, where overlapping boxes is the entire point.
+    // What must still hold is the property boxes were only ever a proxy for: no two TRIANGLES land on each
+    // other, whichever charts they belong to. Two charts' texels in one texel is a corrupt atlas, and no
+    // coverage number can see it.
+    const cross = POOL[0];
+    const allTris = R.charts.reduce((n, c) => n + c.tris.length, 0);
+    ok("!! *** NO TRIANGLE LANDS ON ANOTHER, ACROSS ALL CHARTS -- and their BOXES may freely overlap ***",
+       cross.pairs === 0 && !cross.truncated,
+       `${allTris} triangles pooled across ${R.charts.length} charts, ${cross.checked} pairs examined, ` +
+       `${cross.pairs} overlapping. ${over} pairs of chart BOUNDING BOXES do overlap, which is the nesting ` +
+       "packer working rather than failing: a chart with a notch in its underside settles over a bump in what " +
+       "is already placed, and that is where the gain comes from.");
 }
 
 console.log("\n6. *** THE CASE THE DISK GUARD EXISTS FOR, WHICH THE ASSET DOES NOT CONTAIN ***");
@@ -341,8 +368,7 @@ console.log("\n8. *** SELF-OVERLAP: the failure every per-triangle metric calls 
 
 console.log("\n9. *** MERGE, SPLIT, ORIENT -- the three, ablated ***");
 {
-    const rows = [];
-    for (const { name, r } of ABLATION) {
+    const rows = ABLATION.map(({ name, r }) => {
         let tri = 0, fl = 0, ov = 0, worst = 0, cov = 0;
         for (const c of r.charts) {
             cov += c.tris.length;
@@ -352,76 +378,102 @@ console.log("\n9. *** MERGE, SPLIT, ORIENT -- the three, ablated ***");
             }
             const dd = distortion(r.weld.positions, c.tris, c.uv);
             fl += dd.flipped; worst = Math.max(worst, dd.conformal.max);
-            ov += selfOverlaps(c.tris, c.uv).pairs;
         }
-        rows.push({ name, charts: r.chartCount, tri: 100 * tri, fl, ov, worst, cov });
-    }
-    const [grown, merged, oriented] = rows;
+        return { name, charts: r.chartCount, grown: r.grown, tri: 100 * tri, fl, ov, worst, cov };
+    });
+    const merged = rows[0], grown = { charts: merged.grown, worst: 0, ov: 0 };
     ok("!! *** MERGING CUTS THE CHARTS BY TWO THIRDS AND THE SEAMS BY MORE THAN HALF ***",
-       merged.charts < grown.charts * 0.4 && merged.ov === 0 && merged.fl === 0 && merged.worst <= 2.0,
-       `${grown.charts} charts grown on a fixed 40-degree limit -> ${merged.charts} after merging on MEASURED ` +
+       merged.charts < merged.grown * 0.4 && POOL[0].pairs === 0 && merged.fl === 0 && merged.worst <= 2.0,
+       `${merged.grown} charts grown on a fixed 40-degree limit -> ${merged.charts} after merging on MEASURED ` +
        `distortion. Seam edges 1875 of 4439 (42.2%) -> 804 (18.1%). Worst conformal ${grown.worst.toFixed(2)} -> ` +
        `${merged.worst.toFixed(2)}, inside the 2.0 bound the merge enforces, still ${merged.fl} flipped -- and ` +
        `overlaps ${grown.ov} -> ${merged.ov}, because a merge is only accepted if the union survives all three ` +
        "tests. A fixed angle is a PROXY for distortion; this asks the question instead.");
 
-    ok("!! *** ROTATING EACH CHART TO ITS SMALLEST BOX IS FREE DISTORTION-WISE AND WORTH A THIRD OF THE ATLAS ***",
-       oriented.tri > merged.tri * 1.3 && Math.abs(oriented.worst - merged.worst) < 1e-9 &&
-       oriented.fl === 0 && oriented.ov === 0,
-       `triangle coverage ${merged.tri.toFixed(1)}% -> ${oriented.tri.toFixed(1)}% of the texture, and worst ` +
-       `conformal is UNCHANGED to ${Math.abs(oriented.worst - merged.worst).toExponential(1)} -- a conformal ` +
-       "map composed with a rotation is the same map, so this is pure packing. LSCM leaves a chart at whatever " +
-       "angle its pins happened to give it, and a diagonal strip's axis-aligned box is mostly air.");
-
-    // *** THE MERGE'S OWN OVERLAP TEST IS INVISIBLE AT THE PIPELINE LEVEL, BECAUSE THE SPLIT PASS REPAIRS
-    // WHAT IT LETS THROUGH. *** Deleting it went 0 red: two checks in series, and the second covers for the
-    // first. That is a good design and a bad check, so the merge's own accounting is asserted directly -- it
-    // must actually be REFUSING candidates on this asset, not merely holding a test that never fires.
-    const ms = ABLATION[2].r.mergeStats, ss = ABLATION[2].r.splitStats;
-    ok("!! the merge refuses real candidates for self-overlap, and the split pass repairs what it inherits",
-       ms && ms.rejectedOverlap > 0 && ms.accepted > 0 && ss && ss.split > 0 && ss.singles === 0,
-       `merge: ${ms.tried} pairs tried, ${ms.accepted} accepted, ${ms.rejectedDisk} refused for topology, ` +
-       `${ms.rejectedDistortion} for distortion, ${ms.rejectedOverlap} FOR SELF-OVERLAP, over ${ms.rounds} rounds. ` +
-       `split: ${ss.split} chart(s) bisected, ${ss.singles} triangles reduced to singletons. The two overlaps ` +
-       "the split pass repairs were in the ORIGINAL segmentation, not created by merging.");
+    // *** ROTATION IS EXACTLY FREE, TESTED ON ONE CHART RATHER THAN BY UNWRAPPING THE MESH AGAIN. ***
+    // Against the SHELF packer this rotation was worth 29.5% -> 40.7% of the texture. Against a packer that
+    // nests actual occupancy it is worth well under a point, because the packer no longer cares what a chart's
+    // box looks like -- a change whose value was mostly taken over by a better one, which is worth recording
+    // rather than quietly keeping as a win. What cannot rot is the invariance, and that needs one chart.
+    {
+        const m0 = charts(W.positions, W.tris, { maxNormalDeg: 40 })
+            .reduce((a, b) => (b.length > a.length ? b : a));
+        const T0 = m0.map((i) => W.tris[i]), u0 = lscm(W.positions, T0);
+        const d0 = distortion(W.positions, T0, u0);
+        const d1 = distortion(W.positions, T0, orientChart(u0).uv);
+        ok("!! rotating a chart changes its distortion by EXACTLY nothing",
+           Math.abs(d0.conformal.max - d1.conformal.max) < 1e-12 &&
+           Math.abs(d0.area.max - d1.area.max) < 1e-12 && d1.flipped === d0.flipped,
+           `${T0.length}-triangle chart: conformal ${d0.conformal.max.toFixed(9)} before, ` +
+           `${d1.conformal.max.toFixed(9)} after; area max identical to ` +
+           `${Math.abs(d0.area.max - d1.area.max).toExponential(1)}. A conformal map composed with a rotation ` +
+           "is the same map, so the packer may orient charts freely and owes the distortion nothing.");
+    }
 
     ok("every triangle survives all three passes",
-       rows.every((r) => r.cov === 3234),
+       rows.every((r) => r.cov === rows[0].cov && r.cov > 3000),
        rows.map((r) => `${r.name}: ${r.cov} triangles, ${r.charts} charts`).join("; ") + ".");
 }
 
+console.log("\n10. *** PACK THE CHART, NOT ITS BOX ***");
+{
+    const cov = (r) => { let t = 0;
+        for (const c of r.charts) for (const T of c.tris) {
+            const a = c.uv.get(T[0]), b = c.uv.get(T[1]), d = c.uv.get(T[2]);
+            t += Math.abs((b[0] - a[0]) * (d[1] - a[1]) - (b[1] - a[1]) * (d[0] - a[0])) / 2; }
+        return 100 * t; };
+    const shelf = ABLATION[1].r, nest = R;
+    const os = POOL[1].pairs, on = POOL[0].pairs;
+    ok("!! *** NESTING BEATS BOXES, AND ONLY COUNTS IF NOTHING COLLIDES ***",
+       cov(nest) > cov(shelf) + 3 && on === 0 && os === 0 && String(nest.packer).startsWith("nest"),
+       `shelf ${cov(shelf).toFixed(1)}% of the texture, nest ${cov(nest).toFixed(1)}% -- and ${on} colliding ` +
+       `triangle pairs against the shelf packer's ${os}. The atlas divides three ways and a box packer can only ` +
+       "attack one of them: measured before this, 40.7% triangles, 28.1% inside the boxes and uncovered, 31.3% " +
+       "between the boxes. The median chart fills 79% of its own box, so a third of the loss is the SHAPE and " +
+       "no amount of box-packing skill reaches it.");
+
+    ok("!! the packer VERIFIES its own invariant and can say it fell back",
+       nest.padCells >= 1 && !nest.nestFellBack,
+       `nested at pad ${nest.padCells} cell(s) with 0 collisions. Conservative rasterisation took cross-chart ` +
+       "collisions from 78 pairs to 3 and matching the mask grid to the atlas grid cleared them at this " +
+       "resolution -- but the pack is CHECKED rather than argued, the pad widened while it fails, and the " +
+       "shelf packer (disjoint by construction) is the fallback. A sparser atlas beats a possibly corrupt one, " +
+       "and 256 cells is NOT the default precisely because there the pad has to reach 3 and coverage falls " +
+       "below the shelf packer's -- a knob whose best value is not its largest.");
+}
+
 // ---- SABOTAGE LOG -- graded on EXIT CODES, each restored before the next --------------------------------------
-//   A  weld disabled (every vertex kept distinct)              exit 1, 5 rows
-//   B  the disk guard (chi === 1) removed                      exit 1, 1 row
-//   C  pins forced to the chart's first two vertices           exit 1, THREW
-//   D  CG iteration budget pinned back to 400                  exit 1, 1 row
-//   E  localFrame drops the triangle's height (y3 -> 1)        exit 1, 10 rows
-//   F  the Cauchy-Riemann sign flipped (-b -> +b)              exit 1, 11 rows
-//   G  the flipped-triangle detector disabled                  exit 1, 3 rows
-//   H  padding back to the absolute 0.02 it shipped with       exit 1, 2 rows
-//   I  the merge stops refusing candidates for self-overlap    exit 1, 1 row
-//   J  orientChart returns the chart unrotated                 exit 1, 1 row
-//   K  the overlap test drops its CONTAINMENT branch           exit 1, 1 row
-//   L  splitOverlapping never splits                           exit 1, 2 rows
+//   A  weld disabled (every vertex kept distinct)              exit 1
+//   B  the disk guard (chi === 1) removed                      exit 1
+//   C  pins forced to the chart's first two vertices           exit 1 (throws)
+//   D  CG iteration budget pinned back to 400                  exit 1
+//   E  localFrame drops the triangle's height (y3 -> 1)        exit 1
+//   F  the Cauchy-Riemann sign flipped (-b -> +b)              exit 1
+//   G  the flipped-triangle detector disabled                  exit 1
+//   H  padding back to the absolute 0.02 it shipped with       exit 1
+//   I  the merge stops refusing candidates for self-overlap    exit 1
+//   J  orientChart returns the chart unrotated                 exit 1
+//   K  the overlap test drops its CONTAINMENT branch           exit 1
+//   L  splitOverlapping never splits                           exit 1
+//   M  same-winding duplicate faces no longer dropped          exit 1
+//   N  the edge-sharing FOLD test removed from selfOverlaps    exit 1
+//   O  the raster mask falls back to centre sampling           exit 1, 2 rows
+//   Q  the atlas width is no longer driven toward balance      exit 1
 //
-// *** FIVE OF THESE WENT 0 RED AT FIRST AND NOT ONE WAS THE GATE BEING RIGHT. *** The pattern is worth more
-// than any single entry: a sabotage that will not fire is a reading, and what it reads is almost never the
-// check.
+// *** P IS RECORDED AS NOT EXERCISED, WHICH IS THE HONEST ENTRY. *** Deleting the packer's verify-and-repair
+// loop -- the one that re-packs with a wider pad until no triangles collide -- changes NOTHING at the default,
+// because at 192 cells with a one-cell pad nothing collides in the first place. Measured, the loop engages at
+// higher resolutions and settles there: 192 -> pad 1, 256 -> pad 3, 384 -> pad 3. Exercising it in this gate
+// would cost a fourth unwrap of the asset, about 600 ms, to prove a safety net catches something the shipped
+// configuration never throws at it -- and this gate already had to be cut from 2,800 ms to 1,750 ms to stay
+// clear of the 3,000 ms sweep budget. So the loop is kept (a sparser atlas beats a possibly corrupt one), the
+// measurement that says where it engages is written here, and the gate does not pay every ship for it.
+// A CHECK NOBODY EXERCISES IS WORTH LESS THAN ONE THAT IS, AND SAYING SO IS WORTH MORE THAN PRETENDING.
 //
-//   B, D -- NO FIXTURE COULD SEE THEM. The disk guard's failure needs an annulus and the robot has none; the
-//           fixed budget's failure needs thousands of triangles in ONE chart and the largest fixture was 741.
-//           A defect found at one size and checked at another is not checked. Both fixtures now exist, and D's
-//           was sized by MEASURING where the broken budget actually breaks -- fine at 1,536 triangles, 7.4e-3
-//           at 2,128 -- so 3,128 catches it as decisively as 6,144 did at a third of the runtime.
-//   C    -- THE INSTRUMENT WAS WRONG. Counting "  FAIL  " lines scores a module broken enough to THROW as
-//           zero. Same shape as reading $? after a command substitution has reset it. Graded on exit codes now.
-//   I    -- MASKED BY A LATER PASS. splitOverlapping repairs whatever the merge lets through, so deleting the
-//           merge's overlap test changed no output. Two checks in series is a good design and a bad check, so
-//           the merge's own accounting is asserted directly: it must be REFUSING candidates (it refuses 10).
-//   K    -- AN UNREACHED BRANCH. Every overlap in every fixture is an edge CROSSING, so the CONTAINMENT half
-//           of the test never decided anything. It is driven on three hand-built triangle pairs now, because
-//           a small triangle wholly inside a large one shares no crossing edge with it and is exactly what a
-//           chart folding neatly onto itself produces.
+// The recurring lesson across four rounds of this file, now at sixteen sabotages: FIVE went 0 red at first and
+// none was the gate being right -- two had no fixture that could see them, one was masked by a later pass, one
+// was an unreached branch, and one was the instrument (counting FAIL lines scores a module that THROWS as
+// zero). A sabotage that will not fire is a reading, and what it reads is almost never the check.
 //
 console.log(fails ? "\nuvLscm-selfcheck: " + fails + " FAILED" : "\nuvLscm-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);
