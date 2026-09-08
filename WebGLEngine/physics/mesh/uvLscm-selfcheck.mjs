@@ -194,6 +194,23 @@ const R = unwrapCurved(glb.positions, glb.indices);
     let over = 0;
     for (let i = 0; i < rects.length; i++) for (let j = i + 1; j < rects.length; j++)
         if (rectsOverlap(rects[i], rects[j])) over++;
+    // *** THE NUMBER THAT WAS 1.2% AN HOUR AFTER THIS FILE SHIPPED. *** Padding was an absolute 0.02 in a
+    // space whose scale is the caller's: RobotExpressive is 0.066 units across and its median chart spans
+    // 1.2e-2, so the gap around each chart was 1.6x the chart. Coverage against padding, measured:
+    // 0.02 -> 1.2%, 0.005 -> 9.1%, 0.001 -> 25.9%, 0 -> 31.2%. Expressed in TEXELS at a stated texture size
+    // it is 28.7% at the default and it tracks resolution -- 26.9% at 512, 29.9% at 2048 -- which is the
+    // behaviour a texel-sized gap should have and an absolute one cannot.
+    let triArea = 0;
+    for (const c of R.charts) for (const T of c.tris) {
+        const a = c.uv.get(T[0]), b = c.uv.get(T[1]), d = c.uv.get(T[2]);
+        triArea += Math.abs((b[0] - a[0]) * (d[1] - a[1]) - (b[1] - a[1]) * (d[0] - a[0])) / 2;
+    }
+    ok("!! *** the atlas holds surface rather than gap: padding is a TEXEL COUNT, not a magic number ***",
+       triArea > 0.2,
+       `triangles cover ${(100 * triArea).toFixed(1)}% of the texture at the default 2 texels of 1024. The ` +
+       "remaining gap is bounding-box packing of 735 irregular charts, which is a real cost and a different " +
+       "round; this row exists so the 1.2% cannot come back by somebody choosing a padding in the wrong unit.");
+
     ok("!! no two charts overlap in the atlas", over === 0,
        `${rects.length} charts, ${rects.length * (rects.length - 1) / 2} pairs, ${over} overlapping -- ` +
        "measured from the UVs that came out, not from the placements that went in.");
@@ -260,6 +277,7 @@ console.log("\n7. *** THE KNOB IS A CLIFF, NOT A DIAL, AND THE CLIFF IS WHERE LS
 //   E  localFrame drops the triangle's height (y3 -> 1)        exit 1, 7 rows
 //   F  the Cauchy-Riemann sign flipped (-b -> +b)              exit 1, 7 rows
 //   G  the flipped-triangle detector disabled                  exit 1, 2 rows
+//   H  padding back to the absolute 0.02 it shipped with       exit 1, 1 row
 //
 // *** THREE OF THESE WENT 0 RED ON THE FIRST PASS AND NONE OF THE THREE WAS THE GATE BEING RIGHT. ***
 //

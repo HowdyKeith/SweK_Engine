@@ -336,8 +336,25 @@ export function distortion(P, chartTris, uv) {
     return { conformal: stat(conf), area: stat(area), flipped, skipped, n: conf.length };
 }
 
-/** Weld, segment, flatten each chart, pack them into [0,1]. The whole pipeline, on one mesh. */
-export function unwrapCurved(positions, indices, { maxNormalDeg = 40, padding = 0.02, relTol = 1e-6 } = {}) {
+/**
+ * Weld, segment, flatten each chart, pack them into [0,1]. The whole pipeline, on one mesh.
+ *
+ * *** PADDING IS IN TEXELS, AND THE FIRST VERSION'S ABSOLUTE 0.02 COST 96% OF THE TEXTURE. *** Charts come out
+ * of LSCM in world units, so their UV extents depend on how big the mesh is; RobotExpressive is 0.066 units
+ * across and its median chart spans 1.2e-2, SO A PADDING OF 0.02 WAS 1.6 TIMES THE ENTIRE MEDIAN CHART. Every
+ * chart was placed in a box mostly made of gap. Measured, triangle coverage of the texture against padding:
+ *
+ *     0.02 -> 1.2%     0.005 -> 9.1%     0.001 -> 25.9%     0.0002 -> 29.4%     0 -> 31.2%
+ *
+ * It is the same defect weld() avoids two functions up by scaling its tolerance to the bounding diagonal: a
+ * constant with a unit, in a space whose scale is the caller's. And the honest unit here is neither world
+ * units nor a fraction -- padding exists to stop one chart's texels bleeding into another's when the atlas is
+ * sampled, so it is a TEXEL COUNT at a stated texture size. Two texels at 1024 is 0.00195 of the atlas,
+ * whatever the mesh measures. The span is solved for in two passes because it depends on the padding that
+ * depends on it.
+ */
+export function unwrapCurved(positions, indices,
+        { maxNormalDeg = 40, paddingTexels = 2, textureSize = 1024, relTol = 1e-6 } = {}) {
     const w = weld(positions, indices, { relTol });
     const cs = charts(w.positions, w.tris, { maxNormalDeg });
     const laid = [];
@@ -354,9 +371,16 @@ export function unwrapCurved(positions, indices, { maxNormalDeg = 40, padding = 
         }
         laid.push({ tris: T, uv, w: hi[0] - lo[0], h: hi[1] - lo[1], lo });
     }
-    const packed = shelfPack(laid.map((c) => ({ w: c.w, h: c.h })),
-        { width: Math.max(...laid.map((c) => c.w + padding), Math.sqrt(laid.reduce((s, c) => s + (c.w + padding) * (c.h + padding), 0))), padding });
-    const span = Math.max(...laid.map((c, i) => packed.placements[i].x + c.w), packed.height) || 1;
+    // pass 1: pack with no padding to learn the atlas span, which is what a texel is a fraction OF
+    const packOnce = (pad) => {
+        const w = Math.max(...laid.map((c) => c.w + pad),
+                           Math.sqrt(laid.reduce((s, c) => s + (c.w + pad) * (c.h + pad), 0)));
+        const p = shelfPack(laid.map((c) => ({ w: c.w, h: c.h })), { width: w, padding: pad });
+        return { p, span: Math.max(...laid.map((c, i) => p.placements[i].x + c.w), p.height) || 1 };
+    };
+    const first = packOnce(0);
+    const padding = (paddingTexels / Math.max(1, textureSize)) * first.span;
+    const { p: packed, span } = packOnce(padding);
     const out = [];
     for (let i = 0; i < laid.length; i++) {
         const c = laid[i], p = packed.placements[i], m = new Map();
