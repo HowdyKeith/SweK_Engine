@@ -65,7 +65,10 @@ console.log("1. THE ADDRESS IS COMPLETE: a half-filled address fails closed and 
 console.log("\n2. THE VERSION COMES FROM main.js AND NOWHERE ELSE");
 {
     const v = gh.engineVersion();
-    const m = fs.readFileSync(path.join(HERE, "..", "main.js"), "utf8").match(/ENGINE_VERSION\s*=\s*"(v\d+)"/);
+    // Anchored: the first ENGINE_VERSION in main.js is a COMMENTED changelog line, so an unanchored match
+    // read v4487 against githubBridge's correct v4535 and reported the bridge as wrong. 38 of 44 readers in
+    // the tree still have the unanchored form -- filed as engine-version-readers.
+    const m = fs.readFileSync(path.join(HERE, "..", "main.js"), "utf8").match(/^const ENGINE_VERSION\s*=\s*"(v\d+)"/m);
     ok("*** engineVersion() reads the shipped ENGINE_VERSION, not a copy of it ***", !!m && v === m[1],
        `engineVersion() -> ${v}, main.js -> ${m && m[1]}`);
     report("THE SECOND COPY IS NEVER THE ONE THAT GETS UPDATED", "a version.json or a package.json version beside " +

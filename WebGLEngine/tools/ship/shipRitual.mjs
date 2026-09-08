@@ -41,8 +41,19 @@ const read = (rel) => { try { return fs.readFileSync(path.join(ENG, rel), "utf8"
 
 /** Facts the tree already knows. Read, never declared -- this is the whole argument of the file. */
 export function currentState() {
-    const engine = (read("main.js").match(/const ENGINE_VERSION = "(v\d+)"/) || [])[1] || null;
-    const brain = (read("brain/brain.js").match(/const BRAIN_BUILD = "(v\d+)"/) || [])[1] || null;
+    // *** ANCHORED AT LINE START, BECAUSE THE FIRST OCCURRENCE IN main.js IS A DEAD ONE. *** The ritual's
+    // changelog step prepends a block ABOVE the ENGINE_VERSION line, and one of those blocks opens with a
+    // commented `// const ENGINE_VERSION = "v4487";`. An unanchored match takes that comment, so this
+    // function reported v4487 while the shipped constant read v4535 -- and the publish-release step then
+    // said "githubBridge reads v4535 but main.js says v4487", blaming the bridge for reading correctly.
+    // MEASURED ACROSS THE TREE: 38 of 44 places that parse this constant use a pattern that takes the
+    // comment; only 6 anchor or exclude comments. Filed as engine-version-readers.
+    const engine = (read("main.js").match(/^const ENGINE_VERSION = "(v\d+)"/m) || [])[1] || null;
+    // Same anchoring, same reason: brain/brain.js carries commented BRAIN_BUILD lines from v4487 and v4476
+    // above the live one, so an unanchored match read v4487 against a real v4535. The two markers AGREE and
+    // always did -- what disagreed was this file's reading of them, in both places, which is the exact shape
+    // this step exists to catch and could not see in itself.
+    const brain = (read("brain/brain.js").match(/^const BRAIN_BUILD = "(v\d+)"/m) || [])[1] || null;
     let gates = null, instruments = null;
     try { gates = JSON.parse(read("knowledge-index.json")).gates?.length ?? null; } catch {}
     return { engine, brain, gates, markersAgree: engine !== null && engine === brain };
