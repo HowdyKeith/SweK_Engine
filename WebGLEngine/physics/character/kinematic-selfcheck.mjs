@@ -47,19 +47,103 @@ const corner = (x, y, z) => y < 0 || x >= 4 || z >= 4;           // two walls me
 }
 
 // 3. NEVER FURTHER THAN REQUESTED, fuzzed
+//
+// *** THIS SWEEP PASSED NO stepHeight, SO IT DEFAULTED TO 0 AND COULD NOT REACH THE ONE PATH THAT BREAKS THE
+// INVARIANT IT DEFENDS. *** moveCharacter's step-up LIFTS the body by the allowance and settles it on top of
+// the lip, and that vertical gain was never in the requested delta. Measured on a one-voxel lip with
+// stepHeight 1.1: requested 0.800062, moved 1.360147 -- SEVENTY PER CENT FURTHER THAN ASKED -- and the same
+// at every approach distance tried. 400 random moves said "worst excess 8.88e-16" the whole time, because
+// every one of them had step-up switched off.
+//
+// *** AND THE INVARIANT IS THE THING THAT WAS WRONG, NOT THE CODE. *** The header's reason for it is "a
+// controller that gains ground on contact is how players get flung through walls", which is about gaining
+// ground ALONG the motion. A step-up gains height deliberately; that is its entire job, and a controller
+// forbidden to do it could not climb a stair. So the invariant is restated in the two halves that are
+// actually meant, and both are swept WITH the allowance on:
+//
+//   HORIZONTAL never exceeds the requested horizontal   -- the flung-through-walls case
+//   VERTICAL never gains more than stepHeight           -- the step-up's own bound
 {
-    let worst = -Infinity, n = 0;
+    let worstH = -Infinity, worstTotal = -Infinity, worstLift = -Infinity, n = 0, stepped = 0;
     let rng = 12345;
     const rand = () => { rng = (rng * 1664525 + 1013904223) >>> 0; return rng / 4294967296; };
+    const STEP = 1.1;
     for (let i = 0; i < 400; i++) {
         const pos = [rand() * 6, 0.9 + rand() * 2, rand() * 6];
         if (overlapsSolid(pos, HALF, corner)) continue;
         const delta = [(rand() - 0.5) * 4, (rand() - 0.5) * 2, (rand() - 0.5) * 4];
-        const r = moveCharacter({ pos, half: HALF, delta, isSolid: corner });
-        worst = Math.max(worst, r.movedDist - r.requestedDist);
+        const r = moveCharacter({ pos, half: HALF, delta, isSolid: corner, stepHeight: STEP });
+        const reqH = Math.hypot(delta[0], delta[2]), gotH = Math.hypot(r.moved[0], r.moved[2]);
+        const lift = r.moved[1] - delta[1];
+        worstH = Math.max(worstH, gotH - reqH);
+        worstLift = Math.max(worstLift, lift);
+        worstTotal = Math.max(worstTotal, r.movedDist - r.requestedDist);
+        if (lift > 1e-9) stepped++;
         n++;
     }
-    ok("displacement NEVER exceeds the request, over 400 random moves", worst <= 1e-9, `worst excess ${worst.toExponential(2)} over ${n} moves`);
+    ok("!! HORIZONTAL displacement never exceeds the requested horizontal, over 400 moves WITH step-up on",
+        worstH <= 1e-9,
+        `worst excess ${worstH.toExponential(2)} over ${n} moves, ${stepped} of which actually stepped up. ` +
+        `The old sweep passed no stepHeight at all, so this path was unreachable and the row was measuring ` +
+        `a controller with the feature switched off.`);
+    ok("!! ...and the VERTICAL gain never exceeds the step allowance itself",
+        worstLift <= STEP + 1e-9,
+        `worst lift ${worstLift.toFixed(6)} against an allowance of ${STEP}`);
+    // *** AND THE RANDOM SWEEP DOES NOT SHOW THE TOTAL-DISTANCE VIOLATION EITHER, WHICH IS WORTH SAYING
+    // RATHER THAN QUIETLY DROPPING. *** Its deltas carry a vertical component up to +/-1, big enough to
+    // absorb a lift of 0.598, so the total stays under the request at 8.9e-16 even across the 20 moves that
+    // really did step. The violation needs a request that is NEARLY HORIZONTAL -- which is what walking at a
+    // stair actually looks like -- so it is asserted on that fixture instead of this one. A row that says
+    // "this sweep is the wrong instrument for that claim" is worth more than one that reports its 8.9e-16.
+    const lip = (x, y, z) => (y < 1 && y >= -1 && x >= 4) || (y < 0 && y >= -1);
+    const walkAt = (dx) => moveCharacter({ pos: [3.0, 0.9, 0.5], half: HALF, delta: [dx, -0.01, 0], isSolid: lip, stepHeight: 1.1 });
+    const cases = [0.8, 1.0, 1.5].map(walkAt);
+    ok("!! *** TOTAL displacement DOES exceed the request when a step fires, and the header used to forbid it ***",
+        cases.every((r) => r.movedDist > r.requestedDist + 1e-9),
+        cases.map((r) => `requested ${r.requestedDist.toFixed(3)} moved ${r.movedDist.toFixed(3)}`).join("; ") +
+        ` -- up to 70% further than asked. This row asserts the OPPOSITE of the sentence it replaces, on ` +
+        `purpose: "never further" was true of the controller the old sweep exercised and false of the one ` +
+        `that ships. A step-up is a deliberate vertical gain, so the bound belongs on the two components ` +
+        `separately. If this row ever goes green, either step-up stopped working or somebody re-broke it to ` +
+        `satisfy a sentence.`);
+    // *** AND "IT LANDED ON TOP" IS ASKED WITH A SECOND, INDEPENDENT PROBE, BECAUSE THE FIRST ONE LIED. ***
+    // Comparing the reported y against 1.9 is a check on my arithmetic. Dropping the body again and seeing
+    // whether it MOVES is a check on the world: a body that is really resting cannot fall any further.
+    ok("!! *** a body that has stepped up is RESTING on the lip, not hovering above it ***",
+        cases.every((r) => {
+            const again = moveCharacter({ pos: r.pos, half: HALF, delta: [0, -0.5, 0], isSolid: lip });
+            return r.grounded && Math.abs(again.pos[1] - r.pos[1]) < 1e-5;
+        }),
+        cases.map((r) => r.pos[1].toFixed(6)).join(", ") + " against a lip top of 1 plus half-height 0.9, and " +
+        "each one refuses to fall when pushed down again. *** BEFORE v4544 EVERY ONE OF THESE HOVERED: *** " +
+        "2.000000, 1.996667, 1.995000 -- up to 0.1 in the air with grounded reporting TRUE, and a second " +
+        "drop moved them straight to 1.900001, which is how the hover was found at all.");
+}
+
+// 3b. *** THE PRECONDITION moveAxis HAS ALWAYS HAD AND NEVER STATED: ONE VOXEL PER MOVE ***
+{
+    // moveAxis snaps to the boundary nearest the TARGET rather than the first boundary CROSSED. That is
+    // exact while a move stays inside one voxel, which the substep cap guarantees for every caller that
+    // goes through moveCharacter -- and the step-up's settle drop used to bypass the cap, which is the
+    // whole reason the hover above existed. The threshold is sharp and is measured here rather than
+    // described, so that a future change to moveAxis has something to be wrong against.
+    const floor1 = (x, y, z) => y < 1 && y >= -3;            // top face y=1, resting centre 1.9
+    const START = 2.4;                                        // bottom face 1.5, a true fall of 0.5
+    const at = (d) => moveCharacter({ pos: [0.5, START, 0.5], half: HALF, delta: [0, -d, 0], isSolid: floor1, maxSubstep: 10 }).pos[1];
+    const inside = [0.5, 0.6, 1.0, 1.4].map(at);              // target of the bottom face stays >= 0.10
+    const past = [1.5, 1.6, 2.5, 3.4].map(at);                // target reaches or passes the next boundary
+    ok("!! *** UNSUBSTEPPED, moveAxis IS EXACT UP TO ONE VOXEL OF OVERSHOOT AND FREEZES BEYOND IT ***",
+        inside.every((y) => Math.abs(y - 1.9) < 1e-4) && past.every((y) => Math.abs(y - START) < 1e-9),
+        "targets 1.00/0.90/0.50/0.10 land at " + inside.map((y) => y.toFixed(6)).join("/") +
+        "; targets 0.00/-0.10/-1.00/-1.90 all stay at " + past[0].toFixed(6) + " -- half a unit in the air. " +
+        "The snap lands embedded, so the 'refuse to move rather than push through' branch fires and the body " +
+        "does not descend at all. It is not a rounding error, it is a cliff at exactly one voxel.");
+    ok("!! ...and every one of them is correct once the caller obeys the substep cap the header insists on",
+        [1.5, 1.6, 2.5, 3.4].every((d) =>
+            Math.abs(moveCharacter({ pos: [0.5, START, 0.5], half: HALF, delta: [0, -d, 0], isSolid: floor1 }).pos[1] - 1.9) < 1e-4),
+        "same four requests at the default maxSubstep of 0.4 all land at 1.900001. *** SO THE CAP IS LOAD " +
+        "BEARING FOR CORRECTNESS AND NOT ONLY FOR TUNNELLING, *** which the header did not say and which is " +
+        "why the one caller that bypassed it shipped a hovering character.");
 }
 
 // 4. NEVER INSIDE A SOLID, fuzzed against a world with a corner in it
