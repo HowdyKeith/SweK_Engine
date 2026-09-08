@@ -294,13 +294,33 @@ export function vertexVaryingBlock(vertex, language) {
     const reads = ATTRIBUTE_NAMES.filter((n) => new RegExp("(^|[^.\\w])" + n + "\\b").test(text.replace(/varyings\./g, "")));
     return { computed: computed.map((n) => ({ name: n, ...decls[n] })), statements, decls: used, uniforms, matrices, reads };
 }
+// v4552 -- names a raw vertex text's "object" uniform struct members, GLSL only: WGSL's object.<name> dot-access is
+// self-marking (uniformFields() needs no cross-reference for it), but r185's bare GLSL names read a vertex-stage
+// uniform identically to a local variable (see _unreadBookkeeping's own header on the dropped "f_" prefix) -- there
+// is no longer a textual marker distinguishing "amp" the uniform from "amp" a local, only the declaration itself.
+function _objectUniformNames(text) {
+    const m = text.match(/uniform (?:fragment_object|object) \{([\s\S]*?)\};/);
+    if (!m) return [];
+    return [...m[1].matchAll(/^\s*\w+\s+(?:f_)?(\w+);/gm)].map((x) => x[1]);
+}
+
 /**
  * v4324 -- THE VERTEX STAGE. A graph with a positionNode makes three's vertex shader compute `positionLocal = position;`
- * then reassign positionLocal from the graph (and normalLocal = normal beside it), BEFORE the varyings and the camera
- * matrices. Those statements -- the displacement -- are what a host shell can take: its own vertex stage keeps its own
- * transform (the fleet's record placement, its turn, the device's viewProj) and splices the displacement in where it
- * says `{{DISPLACE}}`, with three's names rewritten: positionLocal -> pl, normalLocal -> nl, position -> p, normal -> n,
- * object.<u> -> the shell's struct. Three's camera and model matrices never cross: they are the shell's.
+ * then reassign positionLocal from the graph (and normalLocal = normal beside it). Those statements -- the displacement --
+ * are what a host shell can take: its own vertex stage keeps its own transform (the fleet's record placement, its turn,
+ * the device's viewProj) and splices the displacement in where it says `{{DISPLACE}}`, with three's names rewritten:
+ * positionLocal -> pl, normalLocal -> nl, position -> p, normal -> n, object.<u> -> the shell's struct. Three's camera
+ * and model matrices never cross: they are the shell's.
+ * *** v4552 -- BY DEPENDENCY, NOT BY POSITION (measured, the same rule vertexVaryingBlock's own header names). ***
+ * The first draft took "everything between the first `positionLocal = position;` and the next varying/matrix line" as
+ * the displacement -- true under r178, where that bare copy always led the vertex body. Under r185 the bare copy can
+ * land AFTER the camera-transform chain has already started when a graph has NO displacement at all, and that window
+ * then swallowed the ordinary chain as a fake one ("the displacement's uniform \"positionView\" is not in the shell's
+ * struct" on a graph that never moves a vertex). A REAL displacement's actual signature, independent of where anything
+ * sits: positionLocal (or normalLocal) gets ASSIGNED A SECOND TIME, reading the value the bare copy just wrote. Only
+ * that second (and any later) assignment is taken, plus whatever nodeVarN temporaries it transitively reads -- found by
+ * the same backward dependency-closure walk vertexVaryingBlock uses for computed varyings, just run over the whole body
+ * instead of a positional slice, and rooted at "reassigned", not "assigned at all".
  * Returns { statements, decls, uniforms, reads } or null when the vertex only copies (no displacement); `reads` is
  * three's names for the attributes and locals the statements touch, which the shell must have a name for (v4325).
  */
@@ -308,18 +328,28 @@ export function vertexDisplacement(vertex, language) {
     const bodyAll = vertex.split(language === "wgsl" ? "fn main(" : "void main()")[1] || "";
     const body = bodyAll.slice(bodyAll.indexOf("{") + 1, bodyAll.lastIndexOf("}"));
     const lines = body.split("\n").map((l) => l.trim()).filter(Boolean);
-    const start = lines.findIndex((l) => /^positionLocal\s*=\s*position;/.test(l));
-    if (start < 0) return null;
-    // v4483 -- a NAMED varying (varying(node, "vLen")) is assigned by its label, so the stop must know the declared names, or the
-    // displacement window swallows the varying block (measured: vLen and vBand landed in {{DISPLACE}} AND in {{ASSIGN}} on WebGL2)
-    const varyingNames = Object.keys(varyingDecls(vertex, language));
-    const stop = lines.findIndex((l, i) => i > start && (/^varyings\.|^modelViewMatrix|^nodeVarying\d+\s*=|^gl_Position|^v_modelViewProjection/.test(l) || varyingNames.some((n) => new RegExp("^" + n + "\\s*=").test(l))));
-    const mid = lines.slice(start + 1, stop < 0 ? lines.length : stop).filter((l) => !/^normalLocal\s*=\s*normal;/.test(l));
-    const statements = mid.filter((l) => !/^(var |vec[234] |float |mat[234] |int |uint )/.test(l));
+    const assigns = (l) => (l.match(/^(\w+)\s*=/) || [])[1];
+    const firstIndex = {};
+    for (const name of ["positionLocal", "normalLocal"]) { const i = lines.findIndex((l) => assigns(l) === name); if (i >= 0) firstIndex[name] = i; }
+    const targets = ["positionLocal", "normalLocal"].filter((name) => lines.filter((l) => assigns(l) === name).length > 1);
+    if (!targets.length) return null;
+    const need = new Set(), taken = [];
+    for (let i = lines.length - 1; i >= 0; i--) {
+        const l = lines[i], lhs = assigns(l);
+        if (!lhs) continue;
+        const isRewrite = targets.includes(lhs) && i !== firstIndex[lhs];
+        if (!(isRewrite || need.has(lhs))) continue;
+        taken.unshift(l); need.delete(lhs);
+        for (const m of l.slice(l.indexOf("=") + 1).matchAll(/\b(nodeVar\d+)\b/g)) need.add(m[1]);
+    }
+    const statements = taken.filter((l) => !/^(var |vec[234] |float |mat[234] |int |uint )/.test(l));
     if (!statements.length) return null;
     const decls = _dedupeDecls([...lines.filter((l) => language === "wgsl" ? /^var(?:<\w+>)?\s+\w+\s*:\s*/.test(l) : /^(vec[234]|float|mat[234]|int|uint) \w+;$/.test(l)), ..._localDeclLines(vertex, language)].filter((l) => !/positionLocal|normalLocal|modelViewMatrix|v_positionView|v_modelViewProjection/.test(l)), language);
     const used = decls.filter((d) => { const name = _declName(d, language); return name && statements.some((st) => new RegExp("\\b" + name + "\\b").test(st)); }).map((d) => language === "wgsl" ? d.replace(/^var<\w+>\s*/, "var ") : d);
-    const uniforms = [...new Set([...statements.join(" ").matchAll(language === "wgsl" ? /\bobject\.(\w+)/g : /\bv_(\w+)/g)].map((m) => m[1]))];
+    const stText = statements.join(" ");
+    const uniforms = language === "wgsl"
+        ? [...new Set([...stText.matchAll(/\bobject\.(\w+)/g)].map((m) => m[1]))]
+        : _objectUniformNames(vertex).filter((n) => new RegExp(`\\b${n}\\b`).test(stText));
     const text = [...used, ...statements].join(" ");
     const reads = Object.keys(DEFAULT_LOCALS).filter((n) => new RegExp("\\b" + n + "\\b").test(text));
     return { statements, decls: used, uniforms, reads };
