@@ -40,6 +40,26 @@
 // prints the occupancy of each, so the sort is a number rather than folklore.
 "use strict";
 
+/**
+ * *** A SECOND DECLARED COPY, ON THE SAME GROUNDS AS THE PACKER ABOVE. *** physics/mesh/meshCSG.mjs exports
+ * `flatness` and `DEGENERATE_FLATNESS` with these exact definitions and the measurements that justify the
+ * constant. They are copied rather than imported because this module takes meshCSG's polygons STRUCTURALLY
+ * and imports nothing -- that is the whole reason it can also be handed a plain planar polygon from anywhere
+ * else -- and one filter is not worth converting a structural contract into a dependency. The address is
+ * written here so the two stay findable together; if the constant ever moves, it moves in both.
+ *
+ * Flatness is area over the longest edge squared: dimensionless, so it means the same thing at any model
+ * scale, where an absolute area threshold would call every triangle of a millimetre-scale model degenerate.
+ */
+const flatness = (a, b, c) => {
+    const e = (u, v) => [u[0] - v[0], u[1] - v[1], u[2] - v[2]];
+    const x = e(b, a), y = e(c, a);
+    const n = [x[1] * y[2] - x[2] * y[1], x[2] * y[0] - x[0] * y[2], x[0] * y[1] - x[1] * y[0]];
+    const L = Math.max(Math.hypot(...e(b, a)), Math.hypot(...e(c, b)), Math.hypot(...e(a, c)));
+    return L <= 0 ? 0 : Math.hypot(n[0], n[1], n[2]) / (2 * L * L);
+};
+const DEGENERATE_FLATNESS = 1e-11;
+
 /** A polygon's plane normal, taken from `pl` when meshCSG already computed it and derived otherwise. */
 function normalOf(poly) {
     if (poly.pl && poly.pl.n) return poly.pl.n;
@@ -235,8 +255,19 @@ export function polysToMesh(polys, { only = null, ...opts } = {}) {
             positions.push(poly.vs[k][0], poly.vs[k][1], poly.vs[k][2]);
             uvs.push(uv[k][0], uv[k][1]);
         }
-        // fan from the first corner: exact for a convex polygon, which is what a BSP boolean emits
-        for (let k = 1; k + 1 < poly.vs.length; k++) indices.push(base, base + k, base + k + 1);
+        // Fan from the first corner: exact for a convex polygon, which is what a BSP boolean emits -- minus
+        // the fan triangles that are not triangles. *** meshCSG's weld INSERTS COLLINEAR VERTICES INTO EVERY
+        // EDGE THAT HAS ONE LYING ON IT, and a fan whose apex sits on the same straight run then emits a
+        // triangle with no area. *** Measured on the settled one-blast wall: 136 of 596 (22.8%). It is zero
+        // on RAW subtract() output, which is what this module's own gate feeds it, so the filter is a no-op
+        // there and real for the caller who settles before texturing -- which is every caller who wants the
+        // T-junctions sewn. The test runs on the polygon's FLOAT64 coordinates, deliberately: rounding the
+        // same mesh into the Float32Array below leaves only 15 exactly degenerate and INFLATES the other 121
+        // into slivers around 1e-7, so a filter applied after the cast would measure the cast.
+        for (let k = 1; k + 1 < poly.vs.length; k++) {
+            if (flatness(poly.vs[0], poly.vs[k], poly.vs[k + 1]) <= DEGENERATE_FLATNESS) continue;
+            indices.push(base, base + k, base + k + 1);
+        }
     });
     return { positions: Float32Array.from(positions), indices: Uint32Array.from(indices),
              uvs: Float32Array.from(uvs), polys: chosen.length, triangles: indices.length / 3,

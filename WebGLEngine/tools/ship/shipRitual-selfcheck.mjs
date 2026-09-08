@@ -22,7 +22,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { STEPS, checkable, currentState, inspect, showLines } from "./shipRitual.mjs";
 
 let fails = 0;
@@ -103,6 +103,36 @@ const read = (rel) => { try { return fs.readFileSync(path.join(ENG, rel), "utf8"
        /shipRitual\.mjs/.test(h) && /nextRounds\.mjs/.test(h) && /deviceOwed\.mjs/.test(h),
        "three commands replacing four stale facts. The fix for a second declaration is not to synchronise it, it " +
        "is to delete it");
+    // *** AND THE ROW ABOVE TESTS THAT THE NAMES APPEAR, WHICH IS THIS GATE'S OWN DEFECT SPELLED OUT IN ITS OWN
+    // HEADER: "a fact the tree already knew, written down a second time somewhere nothing read." *** It matches
+    // a BASENAME, so it passed while `deviceOwed.mjs` sat in tools/render-qa/ and not the tools/ship/ its
+    // neighbours are in -- and it would pass over a command file that does not parse.
+    //
+    // *** WHICH IS NOT HYPOTHETICAL: tools/ship/nextRounds.mjs WENT UNPARSEABLE THREE TIMES IN ONE SESSION on
+    // an unescaped quote and a missing comma, and the full verify reported ALL GREEN on two of them. *** It IS
+    // guarded -- registerResidue-selfcheck exits 1 on it, measured -- but that gate is recorded at 4,713 ms
+    // against the 3,000 ms sweep budget so no ship-time step runs it (it takes 1,665/1,672/1,748 ms on a quiet
+    // box today, and is separately red on a docs-register judgement that is Keith's), and toolFrontDoor, which
+    // runs every registered reporting tool, caps out at 20,008 ms. Three gates that ARE under budget and DO
+    // name nextRounds -- this one, sweepCoverage-selfcheck and uvLscm-selfcheck -- all exit 0 with the file
+    // deliberately corrupted, because every one of them mentions it in prose or matches its name.
+    //
+    // So the rows below RUN the commands the handoff points at, resolved from the handoff's own text rather
+    // than typed here a fourth time. Cost measured at 62 ms for the three.
+    const cmds = [...h.matchAll(/^\s*node\s+(\S+\.mjs)/gm)].map((m) => m[1]);
+    ok("!! ...and every command the handoff names is a file that EXISTS, at the path it prints",
+       cmds.length >= 3 && cmds.every((c) => fs.existsSync(path.join(ENG, c))),
+       cmds.length + " commands: " + cmds.join(", ") + ". Read out of the handoff, not listed here -- a list " +
+       "here would be the fifth declaration this gate exists to refuse.");
+    const loaded = await Promise.all(cmds.map(async (c) => {
+        try { await import(pathToFileURL(path.join(ENG, c)).href); return null; } catch (e) { return c + ": " + e.message; }
+    }));
+    const broke = loaded.filter(Boolean);
+    ok("!! *** ...AND EVERY ONE OF THEM PARSES AND LOADS, WHICH NOTHING UNDER THE SWEEP BUDGET ASKED BEFORE ***",
+       broke.length === 0,
+       (cmds.length - broke.length) + " of " + cmds.length + " import cleanly. A handoff that points at a command is only " +
+       "pointing at anything if the command runs, and the row above this one could not tell the difference. " +
+       (broke.length ? "BROKEN: " + broke.join(" | ") : ""));
     // *** WRAPPED ACROSS LINES, AGAIN, AND THIS TIME prose() CANNOT HELP. *** The phrase in the handoff is
     // "is a PRE-FILTER,\nnever a ship", so a raw regex sees neither half -- the same defect the v3298 prose round
     // cured for JS comments and the v3527 provenance checks hit an hour ago. But sourceScan's prose() strips

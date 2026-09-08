@@ -258,7 +258,15 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // else -- no typed arrays this time, because the split sum accumulates into plain numbers and returns plain
     // arrays; the LUT is a texture on a GPU and a pair of Arrays here. The row that does NOT move is as
     // informative as the one that does.
-    esModules: 3726, closures: 3604, asyncAwait: 1414, typedArrays: 792, promises: 343,
+    // v4542 -- RE-TAKEN: asyncAwait 1414 -> 1415 and promises 343 -> 344, ONE file each and no other row --
+    // tools/ship/shipRitual-selfcheck.mjs, which gained a single `await Promise.all(...)`. The round's other
+    // three files (physics/mesh/meshCSG.mjs, its gate, and physics/mesh/uvUnwrap.mjs) moved NOTHING at all,
+    // which is the informative half: an audit that adds a degenerate-triangle filter, eight boolean fixtures
+    // and a ray-parity loop is arithmetic over arrays that were already there, so it changes no row of a
+    // runtime-shape census. The two rows that DID move are the ones that say the ship gate started actually
+    // LOADING the commands the handoff points at instead of matching their names -- the only genuinely new
+    // runtime behaviour in the round, and the census found it without being told.
+    esModules: 3726, closures: 3604, asyncAwait: 1415, typedArrays: 792, promises: 344,
     fetchXhr: 243, performanceNow: 220, raf: 116, webgl: 154, webgpu: 48, threads: 22, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

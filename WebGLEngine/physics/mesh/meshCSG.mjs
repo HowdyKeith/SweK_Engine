@@ -1,4 +1,4 @@
-// WebGLEngine/physics/mesh/meshCSG.mjs -- v4235
+// WebGLEngine/physics/mesh/meshCSG.mjs -- v4542
 //
 // BSP MESH BOOLEANS: AN EXACT HOLE IN A WALL, ON THE WALL'S OWN PLANE, AT ANY ANGLE, WITH NO GRID.
 //
@@ -48,6 +48,15 @@
 // which is the opposite end of the same convention csg.mjs states for its fields (negative inside). invert()
 // must reverse the vertex order AND negate the plane; doing only one of the two silently turns the solid
 // inside out, and the gate sabotages exactly that.
+//
+// *** WHAT AN AUDIT AGAINST A FORMAL CSG PROPERTY LIST FOUND, v4542. *** Eight cases the checklist names --
+// coplanar faces flush, a corner on an edge, an edge along an edge, a corner on a face interior, a through-cut
+// with both faces flush, a cutter that swallows the solid, and a cutter that IS the solid -- were all handled
+// EXACTLY (volume to the last digit, watertight after settle in 35 ms for the set) and NOT ONE of them had a
+// fixture. They have one now. The one real defect the audit found was in the other direction: the fan
+// triangulator was shipping 1,637 of 7,665 triangles (21.4%) that cover nothing, all of them made by the
+// weld, and the four instruments in this file that could have seen it each skip degenerate geometry by
+// construction. See DEGENERATE_FLATNESS and degenerateFan() below.
 //
 // EVERY POLYGON IN THIS SYSTEM IS CONVEX, and that is an invariant rather than an accident: box faces and
 // blob triangles start convex, and splitting a convex polygon by a plane yields two convex polygons. The
@@ -277,7 +286,15 @@ export function watertight(polys, quantum = 1e-6) {
     return { ok: unmatched.length === 0, unmatched: unmatched.length, edges: edges.size, worst: unmatched[0] || null };
 }
 
-/** Every polygon convex? The fan triangulator is only correct if this holds -- see the header. */
+/**
+ * Every polygon convex? The fan triangulator is only correct if this holds -- see the header.
+ *
+ * *** AND IT IS BLIND TO DEGENERACY, WHICH IS NOT A BUG IN IT BUT IS A TRAP FOR ANYONE READING IT AS
+ * "the polygons are fine". *** The test is dot(cross(v-u, w-v), n) < -eps. Three COLLINEAR vertices give
+ * exactly zero, and zero is not less than -eps, so a fully collinear triangle and a triangle with a repeated
+ * vertex both return {ok:true, reflex:0} -- measured directly in the gate rather than reasoned about here.
+ * "No reflex vertex" is the question this answers; "is this a triangle at all" is degenerateFan()'s.
+ */
 export function allConvex(polys, eps = 1e-9) {
     let reflex = 0;
     for (const p of polys) {
@@ -708,10 +725,86 @@ export function jaggedBlob(c, r, subdiv = 8, seed = 1, { rough = 0.9, floor = 0.
     return out;
 }
 
-/** Fan triangulation. Valid because every polygon here is convex -- allConvex() is what says so. */
-export function toTriangles(polys) {
+/**
+ * *** SCALE-FREE FLATNESS: AREA OVER THE LONGEST EDGE SQUARED, WHICH IS HALF THE HEIGHT-TO-BASE RATIO. ***
+ * An absolute area threshold is a lie about a mesh whose size it does not know -- every triangle of a
+ * millimetre-scale model is under 1e-13 and none of them is degenerate. This ratio is dimensionless: an
+ * equilateral triangle reads 0.433 at any size, and a needle reads its own slenderness.
+ */
+export const flatness = (a, b, c) => {
+    const L = Math.max(Math.hypot(...sub3(b, a)), Math.hypot(...sub3(c, b)), Math.hypot(...sub3(a, c)));
+    return L <= 0 ? 0 : Math.hypot(...cross3(sub3(b, a), sub3(c, a))) / (2 * L * L);
+};
+
+/**
+ * *** THE FAN'S DEGENERATE THRESHOLD IS NOT A TUNED CONSTANT -- IT SITS IN A MEASURED EMPTY BAND, AND THE
+ * BAND IS THE ONLY REASON TO BELIEVE THE NUMBER. *** On the twelve-blast settled wall the fan's 7,665
+ * triangles are BIMODAL in flatness: 1,637 of them sit at 2.35e-14 and below, the next one up is at 4.43e-11,
+ * and the remaining 6,027 run from there to 0.43. The threshold below falls inside that gap, which is a
+ * factor of 1,880 wide, so moving it anywhere between the two drops exactly the same 1,637 triangles. On one
+ * blast the same gap is 3.67e-15 to 8.99e-5 -- ten decades. For scale a clean box reads 2.5e-1, a clean blob
+ * 2.0e-2, and the twelve-blast mesh BEFORE the weld has nothing below 1.7e-6 after snap and merge, nor
+ * below 5.1e-5 straight out of the cut. The stage matters and is named: both are pre-weld and neither is the
+ * same mesh.
+ *
+ * The first draft of this comment said "three triangles in the six decades up to 1e-6", which came from
+ * reading a bucket histogram rather than the extremes. Those three exist and are all KEPT; the number that
+ * justifies the threshold is the 4.43e-11 above it, not them.
+ */
+export const DEGENERATE_FLATNESS = 1e-11;
+
+/**
+ * Count what the fan would throw away, so the gate can assert the population rather than trust the drop.
+ *
+ * *** THIS EXISTS BECAUSE FOUR INSTRUMENTS IN THIS FILE SKIP DEGENERATE GEOMETRY BY CONSTRUCTION AND ONE OF
+ * THEM SAYS SO IN ITS OWN NAME. *** allConvex() tests dot(cross(...), n) < -eps, and a collinear triple gives
+ * exactly zero, which is not less than -eps -- so a wholly degenerate polygon, and a polygon with a repeated
+ * vertex, both come back {ok:true, reflex:0}. volume() and surfaceArea() weight each triangle BY ITS AREA, so
+ * a zero-area one contributes exactly nothing to either. watertight() skips an edge whose two endpoints
+ * quantise the same. Every one of those is right for its own question and blind to this one, and before this
+ * counter existed nothing in the module or its gate could see 21.4% of the shipped triangle buffer.
+ */
+export function degenerateFan(polys, eps = DEGENERATE_FLATNESS) {
+    let tris = 0, degenerate = 0, area = 0, worstKept = Infinity, bestDropped = 0;
+    for (const p of polys) for (let i = 1; i + 1 < p.vs.length; i++) {
+        const a = p.vs[0], b = p.vs[i], c = p.vs[i + 1];
+        tris++;
+        const f = flatness(a, b, c);
+        if (f <= eps) {
+            degenerate++;
+            area += Math.hypot(...cross3(sub3(b, a), sub3(c, a))) / 2;
+            if (f > bestDropped) bestDropped = f;
+        } else if (f < worstKept) worstKept = f;
+    }
+    return { tris, degenerate, area, worstKept: worstKept === Infinity ? 0 : worstKept, bestDropped };
+}
+
+/**
+ * Fan triangulation, minus the triangles that are not triangles.
+ *
+ * *** THE WELD IS WHAT MAKES THEM AND THE FAN IS WHERE THEY LAND. *** weldTJunctions() inserts a vertex into
+ * every edge that has one lying on it -- 2,853 of them on the twelve-blast wall -- and every inserted vertex
+ * is COLLINEAR WITH THE EDGE IT WENT INTO, by definition. Where the fan's apex sits on that same straight
+ * run, the triangle (v0, vi, vi+1) has three collinear corners and covers nothing. Measured: 4,812 triangles
+ * before the weld with a minimum flatness of 5.1e-5, and 7,665 after, of which 1,637 (21.4%) are degenerate.
+ * On one blast -- the case this file's gate calls "100.0% matched, zero T-junctions, zero gaps" -- it is 136
+ * of 596 (22.8%), and again none before the weld.
+ *
+ * Dropping them is LOSSLESS and not merely cheap: they carry 1.7e-11 of a 120.06 surface, they cover a set of
+ * measure zero, and the remaining fan triangles still tile the polygon, so the union is unchanged. The
+ * T-junction the weld went in to sew is sewn by the VERTEX BEING ON THE BOUNDARY, which is a polygon
+ * property; nothing about it needed a triangle of zero width to represent it.
+ *
+ * volume() and surfaceArea() inline their own fans and do NOT come through here, deliberately -- the
+ * instrument that grades the drop must not be computed by the code that drops.
+ */
+export function toTriangles(polys, { eps = DEGENERATE_FLATNESS } = {}) {
     const out = [];
-    for (const p of polys) for (let i = 1; i + 1 < p.vs.length; i++) out.push([p.vs[0], p.vs[i], p.vs[i + 1]]);
+    for (const p of polys) for (let i = 1; i + 1 < p.vs.length; i++) {
+        const a = p.vs[0], b = p.vs[i], c = p.vs[i + 1];
+        if (flatness(a, b, c) <= eps) continue;
+        out.push([a, b, c]);
+    }
     return out;
 }
 
