@@ -157,7 +157,10 @@ else {
     ok("the harness ran both backends", r.ok && r.result && r.result.webgpu && r.result.webgl2 && !r.result.webgpu.error && !r.result.webgl2.error, r.ok ? JSON.stringify([r.result.webgpu && r.result.webgpu.error, r.result.webgl2 && r.result.webgl2.error]) : (r.reason || (r.pageErrors || []).join("; ")));
     if (r.ok && r.result.webgpu && !r.result.webgpu.error && !r.result.webgl2.error) {
         const R = r.result;
-        ok("three's vertex stage carried three varyings and said what each is: uv, normal, color", JSON.stringify(R.sem) === JSON.stringify({ nodeVarying3: "uv", nodeVarying4: "normal", nodeVarying5: "color" }), JSON.stringify(R.sem));
+        // v4554 -- the literal nodeVaryingN numbers are three's own internal node-id counter, not a stability
+        // guarantee (measured: r178 said nodeVarying3/4/5, r185 says nodeVarying4/5/6 for this same graph) -- the
+        // claim is what each varying MEANS, which lines 325 and 522 below already check by value for this reason.
+        ok("three's vertex stage carried three varyings and said what each is: uv, normal, color", JSON.stringify(Object.values(R.sem)) === JSON.stringify(["uv", "normal", "color"]), JSON.stringify(R.sem));
         for (const b of ["webgpu", "webgl2"]) { const o = R[b];
             ok(`*** ${b}: the Chaos race drawn by the pipeline three GENERATED is the hand-written Chaos race on EVERY pixel (${o.same} of ${o.total}, worst 0), lit and among the other races ***`, o.backend === b && o.same === o.total && o.worst === 0 && o.lit > 500 && o.errs.length === 0, `${o.same}/${o.total}, worst ${o.worst}, ${o.lit} lit; errors ${o.errs.length}`);
             ok(`  ${b}: the pick still names the Chaos ships (the pick pipeline is the fleet's own)`, o.chaosHits > 200, `${o.chaosHits} pixels name Chaos`); }
