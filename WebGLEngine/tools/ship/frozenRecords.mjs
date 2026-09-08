@@ -289,7 +289,7 @@ export const PROBE_AT_V4536 = Object.freeze({
     // the invariant was never about that. `currentIncludingModule` is the live counterpart of `excluding` --
     // both re-taken, both from the same census -- so the subset check compares like with like and the v4536
     // probe's own numbers stay exactly as they were taken.
-    currentIncludingModule: Object.freeze({ records: 94, withFields: 41, fields: 170 }),
+    currentIncludingModule: Object.freeze({ records: 95, withFields: 42, fields: 173 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -304,7 +304,10 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4550 -- RE-TAKEN: fields 150 -> 151. One field, REACH_AT_V4548.unmeasured, added when a random red in
     // recordReach-selfcheck turned out to be a torn read of the timings file and "never timed" had to be
     // split from "too slow". Records and withFields did not move: a field added to an existing record.
-    excluding: Object.freeze({ records: 92, withFields: 39, fields: 151 }),
+    // v4552 -- RE-TAKEN: 92/39/151 -> 93/40/153. One record, MEASURED_AT_V4552 in nav/detourScale.mjs,
+    // holding what the engine's own terrain says about detours. It arrives GUARDED, which is the shape a
+    // record should have and often does not: 20 of the 95 in this tree are named by no gate at all.
+    excluding: Object.freeze({ records: 93, withFields: 40, fields: 153 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,

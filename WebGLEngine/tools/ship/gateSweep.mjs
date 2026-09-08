@@ -3764,6 +3764,42 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since206: Object.freeze({
+        at: "v4552", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "nav/detourScale-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 242 ms. *** THE NUMBER nextRounds SAID NOBODY HAD TAKEN, TAKEN -- AND IT INVERTS THE " +
+                 "QUESTION. *** pathfinder-snapshot-window has been open on the premise that HM_PADDING = 24 " +
+                 "might be too NARROW: v4547 measured a detour wider than the window getting NO path rather " +
+                 "than a long one, built an escalating ladder to 60 and 144, and filed the rest saying " +
+                 "\"choosing between them still needs the number nobody has taken, which is what real detours " +
+                 "in real worlds look like\". Measured on 320x320 of main.js's own world._heightAt from a real " +
+                 "boot, walked with the worker's own rule and planned by Dijkstra over the WHOLE slab so the " +
+                 "route is the one a planner with no window would return: 240 routes, ZERO unreachable of 332 " +
+                 "tried, and the excursion outside the start/goal box reads median 0, p90 0, p99 1, MAX 3. A " +
+                 "pad of 4 covers 100%. *** 24 IS EIGHT TIMES THE WORST CASE AND THE LADDER IS INSURANCE " +
+                 "AGAINST A WORLD THIS TREE DOES NOT HAVE. *** The reason is the second measurement: at the " +
+                 "worker's own step rule the shipped heightfield is 0.18% blocked into ONE component covering " +
+                 "100.0% of the map -- an open field. Nothing to go round means nothing to detour for, and the " +
+                 "two unbuilt shapes (a window derived from obstacle scale, a persistent per-region navmesh) " +
+                 "answer a question this world does not pose. THE CONSTANT IS NOT CHANGED and the round says " +
+                 "why: it is generous, it costs little, and what it was missing was anything able to say so. " +
+                 "*** THE INSTRUMENT IS GRADED ON A WORLD THAT DOES HAVE AN OBSTACLE, WHICH IS WHAT STOPS " +
+                 "THIS BEING A COMFORTABLE STORY: *** a wall with one gap returns an excursion of 58 where the " +
+                 "geometry says 58, and moving the gap moves the answer to 28 and then 0 -- three gaps, three " +
+                 "answers, none typed into the gate -- and a census of that world asks for a pad of 184, well " +
+                 "over the shipped 24. nav/fixtures/engineTerrain96.json is 26 KB of the REAL terrain so the " +
+                 "claim re-derives without a browser. TWO DEFECTS IN THE GATE'S OWN FIRST DRAFT, both caught " +
+                 "by running it: a fragmentation row asserting >98% that failed at 97.7 (my threshold, not the " +
+                 "terrain -- the honest claim is the RATIO, blocked edges x19 against 2.2 points of component " +
+                 "loss), and a one-in-a-hundred fixture that put its outlier exactly AT p99, so the row " +
+                 "contrasting a percentile with a maximum had the two agreeing. Sabotages red at four of four, " +
+                 "including windowing the reference planner to the bounding box, which makes it measure its " +
+                 "own cap and reddens four rows.",
+    }),
     since205: Object.freeze({
         at: "v4550", swept: 1, green: 1, red: 0,
         added: Object.freeze([

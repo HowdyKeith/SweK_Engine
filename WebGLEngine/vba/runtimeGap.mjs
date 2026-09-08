@@ -218,7 +218,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // the earlier reading was 3878. What survives is the rule the wrong explanation was reaching for: this
     // number is MEASURED every round, never incremented from the last one, and a reason invented to explain a
     // count is worth less than re-taking it. FIVE ROUNDS RUNNING this table has been re-taken by hand.
-    files: 4031,                  // v4526 merge: 3887 -> 4002, this branch's rounds; v4527: 4004; v4528: 4007; v4529: 4009; v4530: 4011; v4533: 4012 (ai-bridge/runBusy.js); v4536: 4014 (physics/mesh/uvUnwrap.mjs and its gate); v4537: 4016 (physics/mesh/uvLscm.mjs and its gate); v4539: 4018 (physics/render/splitSum.mjs and its gate); v4543: 4020 (nav/navmesh.mjs and its gate); v4544: 4022 (physics/character/terrainWalk.mjs and its gate); v4545: 4023 (tools/ship/navWiring-selfcheck.mjs); v4546: 4024 (tools/ship/navWiringLive-selfcheck.mjs; the harness is HTML and not counted); v4547: 4025 (tools/ship/engineSceneBot-selfcheck.mjs); v4548: 4029 (tools/ship/treeRead.mjs, tools/ship/recordReach.mjs and their two gates); v4550: 4031 (tools/export/glbConformance.mjs and its gate)
+    files: 4033,                  // v4526 merge: 3887 -> 4002, this branch's rounds; v4527: 4004; v4528: 4007; v4529: 4009; v4530: 4011; v4533: 4012 (ai-bridge/runBusy.js); v4536: 4014 (physics/mesh/uvUnwrap.mjs and its gate); v4537: 4016 (physics/mesh/uvLscm.mjs and its gate); v4539: 4018 (physics/render/splitSum.mjs and its gate); v4543: 4020 (nav/navmesh.mjs and its gate); v4544: 4022 (physics/character/terrainWalk.mjs and its gate); v4545: 4023 (tools/ship/navWiring-selfcheck.mjs); v4546: 4024 (tools/ship/navWiringLive-selfcheck.mjs; the harness is HTML and not counted); v4547: 4025 (tools/ship/engineSceneBot-selfcheck.mjs); v4548: 4029 (tools/ship/treeRead.mjs, tools/ship/recordReach.mjs and their two gates); v4550: 4031 (tools/export/glbConformance.mjs and its gate); v4552: 4033 (nav/detourScale.mjs and its gate; the terrain fixture is JSON and not counted)
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
                           // RE-TAKEN TWICE IN TWO ROUNDS, and the second time only because the ship gate
                           // caught it: v4478's re-take was correct for v4478 and stale the moment v4479
@@ -292,6 +292,11 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // arrays and Promises NOT AT ALL -- BotManager already allocated neither, and the worker already
     // returned a Promise. This is the second consecutive round in which a census note written before the
     // re-run was wrong, which is the argument for re-running rather than reasoning about a diff.
+    // v4552 -- RE-TAKEN: TWO files (nav/detourScale.mjs and its gate) moved ES modules and closures by two
+    // and TYPED ARRAYS BY ONE, and nothing else -- no async, no fetch, no GPU. The typed-array row is the
+    // informative one again and it splits the pair exactly the way v4544 recorded: the MODULE owns buffers
+    // (Float64Array distances and an Int32Array predecessor map for a Dijkstra over 9,216 cells) and the
+    // GATE does not -- it builds Int16Array fixtures, which is being HANDED buffers rather than owning them.
     // v4550 -- RE-TAKEN: TWO files (tools/export/glbConformance.mjs and its gate) moved FOUR rows by two --
     // ES modules, closures, async/await and TYPED ARRAYS -- and nothing else. The typed-array row is the
     // informative one and it is the shape v4537 and v4543 recorded: a module that OWNS buffers moves it, one
@@ -319,7 +324,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // asyncAwait by one -- ONE new file, tools/ship/navWiringLive-selfcheck.mjs, which imports, closes over
     // its helpers and awaits a browser. The harness it drives is HTML and does not enter this census at all,
     // which is why the file count moves by one where a module-plus-gate round moves it by two.
-    esModules: 3740, closures: 3617, asyncAwait: 1420, typedArrays: 797, promises: 345,
+    esModules: 3742, closures: 3619, asyncAwait: 1420, typedArrays: 798, promises: 345,
     fetchXhr: 243, performanceNow: 220, raf: 116, webgl: 141, webgpu: 48, threads: 22, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
@@ -340,7 +345,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // second-smallest outright; WITH them the two tie at 22 and threads hold rank 11 on the stable sort only.
     wasmWithoutSelf: 21,          // v4526 merge: 20 -> 21
     threadsWithoutSelf: 21,
-    closuresOverThreads: 164,     // 3597 / 22, rounded at v4530 (163 at v4527: 3588 / 22; 158 at v4462: 3465 / 22)
+    closuresOverThreads: 165,     // 3619 / 22 at v4552 (164 at v4530: 3597 / 22; 163 at v4527: 3588 / 22; 158 at v4462: 3465 / 22) -- a DERIVED ratio, so it moves whenever either row does, which is why it is re-taken rather than pinned once
     // *** ONE, NOT TWO. *** The first draft filed fetch/XHR as an archive claim too; pointing the rows at
     // bytes found the HTTP client sitting in this tree's own VBA, so only WebGL still needs the archive.
     archiveRows: 1,
