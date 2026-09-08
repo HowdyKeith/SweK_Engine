@@ -376,8 +376,23 @@ async function _publishEngineBuildInner({ repo, notes, draft, prerelease } = {})
 // *** v3941 -- ONE SPELLING OF THE VERSION MARKER. *** engineVersion() reads THIS tree's main.js; the source
 // clone below has to read a DIFFERENT tree's. Two copies of the regex is how a marker quietly stops being found
 // in one of the two places, so the parse is a pure function both call and a gate can drive.
+//
+// *** v4536 -- THE REGEX MATCHED THE FIRST OCCURRENCE, AND THE FIRST OCCURRENCE IS ALWAYS A DEAD ONE. ***
+// main.js keeps every past ENGINE_VERSION line as a COMMENTED-OUT historical marker ("// const ENGINE_VERSION
+// = \"vNNNN\";") ahead of the one live declaration, the same convention BRAIN_BUILD in brain.js uses -- and
+// String.match() with no /g/ flag returns the FIRST match in the string, not the live one. Measured on the
+// real tree: 12 occurrences of the bare pattern, and the first is a dead v4487 marker while the actual current
+// version sits 11 matches later. Every caller of this function inherited the wrong answer -- cloneEngineSource
+// named its destination folder after a version four dozen rounds stale, and publishEngineBuild tagged a
+// release the same way, so the release page showed a tag pointing at current code labelled with an old
+// number. Confirmed live: a fresh clone of a v4535 main.js named itself SweK_Engine_v4487.
+//
+// THE FIX IS THE ANCHOR, NOT A SECOND FUNCTION. A commented-out line always starts with "//" (this tree
+// never indents past column 0 for a top-level const); a negative lookahead on the line start excludes exactly
+// that shape and nothing else, so a bare "ENGINE_VERSION = ..." with no "const" (the existing gate's own
+// spacing-tolerance case) still matches.
 function _parseEngineVersion(src) {
-    const x = String(src || "").match(/ENGINE_VERSION\s*=\s*"(v\d+)"/);
+    const x = String(src || "").match(/^(?!\s*\/\/).*ENGINE_VERSION\s*=\s*"(v\d+)"/m);
     return x ? x[1] : "";
 }
 function _versionInTree(root) {
