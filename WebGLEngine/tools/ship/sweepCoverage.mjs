@@ -165,6 +165,21 @@ export const RETURNED_AT_V4529 = Object.freeze({
                  "and 3,096 / 2,460 / 2,631 serially straight after -- a 26% spread inside ONE minute. Retiring " +
                  "it on the quiet readings was right on the evidence and wrong within two days, exactly as " +
                  "meshLine was, so it is recorded with both rather than moved a third time." }),
+        // *** v4541 -- TWO MORE, AND THESE ARE NOT STRADDLERS: THEY ARE GENUINELY SLOW AND GENUINELY FASTER. ***
+        // Both were v4460 returnees recorded at the time that evicted them, both have since been re-timed, and
+        // both improved a lot without reaching the budget -- which is the third state this roll exists for and
+        // the one that is easiest to confuse with the oscillation above. Three serial runs each, on the same
+        // loaded box that took 403 s over a sweep it usually finishes in 220:
+        Object.freeze({ gate: "tools/roundhouse/sweepBudget-selfcheck.mjs", recordedWas: 5526, hereMs: 3172,
+            serialMs: Object.freeze([3165, 3266, 3273]),
+            why: "re-timed from the 5,526 ms that evicted it to about 3,200 -- a 42% improvement that still does " +
+                 "not clear 3,000. Every one of three serial runs is over, none of them marginally, so this is " +
+                 "not the box: it is a gate that got much faster and is still too slow." }),
+        Object.freeze({ gate: "tools/ship/wgslSpec-selfcheck.mjs", recordedWas: 5162, hereMs: 4242,
+            serialMs: Object.freeze([3922, 3658, 3906]),
+            why: "re-timed from 5,162 ms to 3,658-3,922 across three serial runs -- 27% faster and 22% over the " +
+                 "budget. The widest margin on this roll, and the least ambiguous: no reading of it has ever " +
+                 "been under 3,000." }),
     ]),
     returnedAt_v4535: Object.freeze([
         Object.freeze({ gate: "tools/ship/traderGraph-selfcheck.mjs", overMs: 3152,
