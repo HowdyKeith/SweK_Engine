@@ -3764,6 +3764,36 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    // v4564 -- the 214th closing, and the round found the hole in the tree's own syntax guard rather than
+    // in the census it was filed against.
+    since214: Object.freeze({
+        at: "v4564", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/sourceExtensions-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, seven rows. *** TWO OF THIS TREE'S WALKS DISAGREED ABOUT WHAT A SOURCE FILE IS AND " +
+                 "BOTH WERE WRONG. *** tools/ship/treeRead.mjs matched .mjs and .js, and \".cjs\" matches " +
+                 "NEITHER -- the dot is part of the pattern, so it is not \".js\" with a c in front -- so " +
+                 "six CommonJS modules in ai-bridge/, 1,477 lines, every one required by server.js at " +
+                 "startup, were outside every census built on that walk. v4556 knew and wrote AROUND it: " +
+                 "versionMarker is \".js RATHER THAN .cjs on purpose\" because its first draft was " +
+                 "invisible. *** AND THE BIGGER HALF WAS THE SYNTAX GUARD. *** tools/check.mjs walked " +
+                 "`extname(p) === \".js\"`, so of 4,143 source files it checked 1,527 and reported that " +
+                 "as \"files checked\": the 2,608 .mjs files -- every module written since this project " +
+                 "moved to ES modules -- had never been parsed by the thing whose job is parsing them. Its " +
+                 "CommonJS split was by DIRECTORY, which was harmless only while the walk could not see the " +
+                 "56 .mjs files under ai-bridge/; widening the walk without fixing the split would have " +
+                 "handed real ES modules to a script parser. One rule now, in tools/ship/sourceKind.mjs, " +
+                 "and the guard takes both its walk and its split from it: 1,527 files checked before, " +
+                 "4,155 after, ALL GREEN -- a null result whose value is not the zero but that the number " +
+                 "it reports is the number it means, at 11 s to 31 s. The gate's own fixture then caught " +
+                 "the shared rule's default predicate reading a RELATIVE \"ai-bridge/...\" path as a " +
+                 "module, which no caller in the tree would have shown. FOUR SABOTAGES RED BY NAME. THE " +
+                 "ROUND'S LIMIT IS STATED IN THE GATE: a dozen other gates own PRIVATE walks with their " +
+                 "own extension rules, and a .cjs file is still invisible to most of them.",
+    }),
     // v4563 -- the 213th closing, and the first for a gate whose subject is a system that has never run a
     // single particle in the engine and still does not.
     since213: Object.freeze({

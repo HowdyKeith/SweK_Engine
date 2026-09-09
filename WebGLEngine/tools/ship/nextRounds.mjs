@@ -257,7 +257,7 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "cjs-outside-every-census",
-        blocker: "OPEN",
+        blocker: "CLOSED",
         what: "Ten .cjs files in ai-bridge/ are invisible to every corpus this tree censuses. SOURCE_EXT is "
             + "/\\.(js|mjs|html)$/ in tools/ship/moduleRefs.mjs and /\\.(mjs|js)$/ in tools/ship/treeRead.mjs, "
             + "and the walk runtimeGap-selfcheck and recordDrift share matches the same set -- so file counts, "
@@ -274,6 +274,29 @@ export const NEXT_ROUNDS = [
             + "ai-bridge/ are still outside. What makes this worth a round rather than a shrug is the shape: "
             + "a census that cannot see a file cannot report it as missing either, so the gap is silent in "
             + "both directions, which is the same property that let 31 stale version readers survive.",
+        done: "DONE at v4564, and the count in `what` above was wrong: there are SIX .cjs files in ai-bridge/, not "
+            + "ten, and they are 1,477 lines of production code -- a WAD geometry parser, a WAD texture decoder, an "
+            + "install checker, a tool prober, a Trellis source patcher and a mesh-generator readiness probe, every one "
+            + "`require`d by ai-bridge/server.js at startup. The judgement `upstream` asks for was taken: they ARE "
+            + "engine sources, because they run in production, and the corpus definitions now say so rather than "
+            + "omitting the extension silently. *** AND THE BIGGER HALF WAS NOT THE CENSUS AT ALL. *** tools/check.mjs, "
+            + "the tree's own syntax guard, walked `extname(p) === \".js\"` -- so of 4,143 source files it checked "
+            + "1,527 and reported that as \"files checked\". The 2,608 .mjs files, which is every module written "
+            + "since this project moved to ES modules, had NEVER been parsed by the thing whose job is parsing them. "
+            + "Its CommonJS split was by DIRECTORY (everything under ai-bridge/ is a script), harmless only while the "
+            + "walk could not see the 56 .mjs files there, and widening the walk without fixing the split would have "
+            + "handed real ES modules to a script parser. The rule is one rule now in tools/ship/sourceKind.mjs and "
+            + "the guard takes both its walk and its split from it: 1,527 files checked before and 4,155 after, ALL "
+            + "GREEN -- a null result whose value is that the number it reports is the number it means, at 11 s to "
+            + "31 s. Measured elsewhere: vba/runtimeGap.mjs's census moved files 4,044 -> 4,050, closures 3,629 -> "
+            + "3,633 and TYPED ARRAYS 1,032 -> 1,034 with no file written, and ES modules did NOT move, which is the "
+            + "control -- CommonJS files do not import or export. Nothing else moved: none of the six carries a frozen "
+            + "record and none names a vendor path. FOUR SABOTAGES RED BY NAME, and the gate's own fixture caught the "
+            + "shared predicate reading a RELATIVE \"ai-bridge/...\" path as a module, which no caller in the tree "
+            + "would have shown. *** THE LIMIT IS STATED RATHER THAN GLOSSED: *** a dozen gates own PRIVATE walks with "
+            + "their own extension rules -- orphanTriage, graveyard, shaderCensus, wgslCorpus, citedSources and more -- "
+            + "and a .cjs file is still invisible to most of them. This round changed the SHARED definitions and the "
+            + "vendor-dependant scan, because those are what other files build on.",
         upstream: "Nothing blocks it. The judgement it needs is whether .cjs SHOULD be in the corpus at all -- "
             + "these are bridge helpers rather than engine code, and a defensible answer is that the corpus is "
             + "deliberately the engine's own sources. If that is the answer then the definitions should SAY so "

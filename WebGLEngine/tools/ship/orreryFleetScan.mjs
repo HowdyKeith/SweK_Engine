@@ -112,7 +112,10 @@ export function engineSources(engineRoot) {
             if (/node_modules|^\.git$|^vendor$|GPU_Assets|demos_code/.test(e.name)) continue;
             const p = path.join(d, e.name);
             if (e.isDirectory()) { walk(p); continue; }
-            if (!/\.(mjs|js|html)$/.test(e.name)) continue;
+            // .cjs too, since v4563: six modules in ai-bridge/ are CommonJS and server.js requires all six.
+            // None of them names a vendor path today, so this changes no dependant -- what it changes is
+            // that a .cjs one WOULD be seen. The old rule could not have found it.
+            if (!/\.(mjs|cjs|js|html)$/.test(e.name)) continue;
             const rel = path.relative(engineRoot, p).split(path.sep).join("/");
             if (NOT_IMPORTERS.includes(rel)) continue;
             files.push({ path: rel, source: codeOnly(fs.readFileSync(p, "utf8")) });

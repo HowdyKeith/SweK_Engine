@@ -70,7 +70,26 @@ export const SKIP_AGREE = Object.freeze({
     recordDrift: /node_modules|\/vendor\/|\/dist\//,
 });
 
-export const SOURCE_EXT = /\.(mjs|js)$/;
+/**
+ * *** COMMONJS IS A RUNTIME SOURCE FILE AND THIS RULE DID NOT THINK SO. ***
+ *
+ * The extension list was mjs and js, and a file ending in .cjs matches NEITHER -- the dot is part of the
+ * pattern, so ".cjs" is not ".js". Six modules in ai-bridge/ are written that way, 1,471 lines of them, and
+ * every one is `require`d by ai-bridge/server.js at startup: a WAD geometry parser, a WAD texture decoder,
+ * an install checker, a tool prober, a Trellis source patcher and a mesh-generator readiness probe. They run
+ * in production and no census in this tree had ever counted a line of them.
+ *
+ * Measured: adding them moves vba/runtimeGap.mjs's capability census by files 4,044 -> 4,050, closures
+ * 3,629 -> 3,633 and TYPED ARRAYS 1,032 -> 1,034 -- two of the six own buffers, which is exactly the row
+ * that census uses to tell a module that carries data from one that is handed it. Nothing else moves: none
+ * of the six carries a frozen record, and none names a vendor path, so frozenRecords' and orreryEjecta's
+ * populations grow without their records changing.
+ *
+ * v4556 knew about this hole and wrote around it rather than through it -- tools/ship/versionMarker.js is
+ * ".js RATHER THAN .cjs on purpose: this walk matches .js/.mjs and NOT .cjs, so the first draft of that
+ * module was invisible here". A census you have to know the shape of to file into is a census.
+ */
+export const SOURCE_EXT = /\.(mjs|cjs|js)$/;
 
 const _cache = new Map();          // root -> {files, walkMs, bytes}
 let _walks = 0, _hits = 0, _reads = 0;
