@@ -24,13 +24,15 @@
 import { sphereCloud } from "../physics/splat/splatMesh.mjs";
 import { splatRadiance, packProbes } from "./splatProbes.mjs";
 import { fitProbeGrid, bakeFitted } from "./probeFit.mjs";
-import { LAYOUTS, EXTRA_FLOATS } from "./gpuDriven.mjs";
+import { LAYOUTS, EXTRA_FLOATS, makeGpuDrivenScene } from "./gpuDriven.mjs";
 import { sphereMesh, litPipelineDesc, litBind } from "./litSphere.mjs";
 import { probeLitPipelineDesc, probeBind, uploadProbes } from "./probeLit.mjs";
 import { bakeMipChain } from "../physics/render/specularProbeBake.mjs";
 import { packSpecularAtlas } from "../physics/render/specularIBLSample.mjs";
 import { specularProbeLitPipelineDesc, uploadSpecularAtlas, specularBind } from "../physics/render/specularProbeLit.mjs";
 import { brdfLut } from "../physics/render/splitSum.mjs";
+import { packCapturedAtlas } from "../physics/render/specularProbeCapture.mjs";
+import { captureLiveCubemap } from "./liveCubeCapture.mjs";
 
 export const LAB = Object.freeze({ n: 300, radius: 1.6, scale: 0.25, spacing: 0.5, faceSize: 8, probeRadius: 0.045, meshRadius: 0.35, splatMarker: 0.1, sky: [0.2, 0.2, 0.2], eyeDist: 1.1 });
 export const SPEC_ROW = Object.freeze({ count: 4, radius: 0.12, y: 1.0, spacing: 0.35, F0: [0.5, 0.4, 0.2],
@@ -106,6 +108,48 @@ function specularLabFleets(device, lab, eye) {
 export function labFleets(device, lab, { light = [0, 0, 0, 1], eye = [0, 0, 0] } = {}) {
     const d = diffuseLabFleets(device, lab, light), s = specularLabFleets(device, lab, eye);
     return { tex: d.tex, specTex: s.specTex, fleets: [...d.fleets, ...s.fleets] };
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// v4581 -- THE SPECULAR ROW'S ATLAS, CAPTURED FROM A REAL RENDER INSTEAD OF specLabRow'S ANALYTIC STAND-IN.
+//
+// specularProbeCapture.mjs named this precisely as what it did NOT attempt: "the captured scene is still
+// specularProbeBake's own splatRadiance-driven radianceOf, point-sampled through this tree's existing cube-bake
+// geometry -- not a real-time rasterised frame of the gpuDriven scene's actual fleets." These two functions are
+// that frame. diffuseCaptureScene builds a scene of JUST the splats, probes and mesh (fleets 0-1, records
+// [0, N+P+1)) -- what a specular probe REFLECTS -- deliberately WITHOUT the specular row itself: a probe
+// capturing its own reflective neighbours is a self-reference problem this file does not attempt to solve.
+// captureLiveSpecAtlas renders that scene through render/liveCubeCapture.mjs's captureLiveCubemap and packs the
+// result the SAME way specLabRow's analytic bake already is (specularIBLSample.packSpecularAtlas via
+// specularProbeCapture.packCapturedAtlas) -- so the resulting atlas is a drop-in alternative to lab.spec.atlas
+// for uploadSpecularAtlas/specularProbeLitPipelineDesc, not a second material or a second sampler.
+//
+// BOTH FUNCTIONS NEED A REAL `device` AND ARE ASYNC (captureLiveCubemap awaits a readback per face), so neither
+// can run inside probeLab()'s own headless CPU path -- a caller renders the base scene first (labFleets), then
+// calls captureLiveSpecAtlas on the SAME device to get a second atlas, on demand, once. Nothing here changes
+// labFleets or SPEC_ROW's analytic row: the existing four spheres and their already cross-backend-verified
+// pixels (tools/ship/probeLab-selfcheck.mjs) are untouched.
+
+/** A gpuDriven scene of just the diffuse half (splats, probes, the mesh) -- see this section's header for why the
+ *  specular row is deliberately excluded from its own captured environment. */
+export function diffuseCaptureScene(device, lab, light = [0, 0, 0, 1]) {
+    const { fleets } = diffuseLabFleets(device, lab, light);
+    const diffuseCount = lab.counts.splats + lab.counts.probes + 1;
+    return makeGpuDrivenScene(device, {
+        fleets, thresholds: [],
+        records: lab.records.slice(0, diffuseCount * 4),
+        headings: lab.extras.slice(0, diffuseCount * EXTRA_FLOATS),
+        fleetOf: lab.fleetOf.slice(0, diffuseCount),
+    });
+}
+
+/** The specular row's atlas, captured from a REAL RENDER of the diffuse half through `device` rather than
+ *  specLabRow's analytic splatRadiance stand-in. `opts` forwards to captureLiveCubemap (size, near, far,
+ *  background) and takes `light` for diffuseCaptureScene's own bind. */
+export async function captureLiveSpecAtlas(device, lab, eye, opts = {}) {
+    const scene = diffuseCaptureScene(device, lab, opts.light);
+    const capture = await captureLiveCubemap(device, scene, eye, opts);
+    return packCapturedAtlas(capture);
 }
 
 /** the HUD line, from the numbers and nothing else */

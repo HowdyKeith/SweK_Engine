@@ -161,7 +161,7 @@ async function main() {
     }
 
     console.log(fails ? "\nspecularProbeCapture-selfcheck: " + fails + " FAILED" : "\nspecularProbeCapture-selfcheck: all checks pass");
-    console.log("unchecked here: the captured scene is specularProbeBake's splatRadiance-driven radianceOf, point-sampled through this tree's existing cube-bake geometry -- not a real-time rasterised frame of the gpuDriven scene's actual fleets. Rendering the LIVE scene into six faces through gfx/device.js (a real camera per face) stays real-time/dynamic-capture territory, a distinct, larger piece of work this file does not attempt.");
+    console.log("unchecked here: render/liveCubeCapture.mjs and render/probeLab.mjs's captureLiveSpecAtlas are the ones that render a REAL gpuDriven scene into six faces through gfx/device.js and pack the readback into this same atlas shape (tools/ship/liveCubeCapture-selfcheck.mjs verifies the camera geometry against a known marker and feeds a live-captured atlas through this file's own CAPTURED_PREFILTER_WGSL on both backends). This file's own scope stays the analytic splatRadiance stand-in and the device-side sampling/convolution math, unchanged by where the atlas came from.");
     process.exitCode = fails ? 1 : 0;
 }
 
