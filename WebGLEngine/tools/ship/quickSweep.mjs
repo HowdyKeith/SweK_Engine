@@ -35,7 +35,50 @@ import { backfillStamps } from "./sweepCoverage.mjs";
 import { enumerateGates, classify, VERDICT, SWEEP_V4297, ENG } from "./gateSweep.mjs";
 import { RED_AT_V4279, RED_AT_V4408, RED_AT_V4424, RED_AT_V4476, RED_AT_V4484, RED_AT_V4531, RED_AT_V4535, UNCONFIRMED_SLOW, ALL_REGISTERED } from "./redCensus.mjs";
 
-export const DEFAULTS = Object.freeze({ budgetMs: 3000, workers: 8, capMs: 20000, timingsFile: "tools/ship/sweep-timings.json" });
+export const DEFAULTS = Object.freeze({ budgetMs: 3000, workers: 8, capMs: 20000, timingsFile: "tools/ship/sweep-timings.json",
+                                        serialSliceMs: 15000 });
+
+/**
+ * *** WHAT THIS FILE RECORDS IS A CONTENDED SAMPLE, AND THE TREE HAS BEEN READING IT AS A COST. ***
+ *
+ * The parallel phase runs 8 workers on a 4-core box, so every reading it files is taken while seven other
+ * gates fight it for the machine. Measured at v4562 by running the SAME sweep at 8 workers and at 1 and
+ * comparing 1,011 gates that ran in both:
+ *
+ *     parallel / serial     p10 1.25x    MEDIAN 2.41x    p90 3.44x    max 6.88x    min 0.55x
+ *     total filed time      685 s at 8 workers against 358 s at 1
+ *     wall time             230 s at 8 workers against 374 s at 1
+ *
+ * So the parallelism buys a 1.63x WALL-CLOCK speedup and costs a 2.41x median inflation of every number the
+ * tree then reads as "what this gate costs". v4408 and v4536 both repaired the EVICTION that rests on such a
+ * reading -- a crosser is confirmed alone, and a crossing must reproduce -- and neither made the recorded
+ * number honest, because nothing had measured how far off it was.
+ *
+ * `serial` holds uncontended readings: every phase-2 run is one (the box is quiet by then), and each sweep
+ * spends a stated slice of wall time re-running the gates whose serial reading is oldest or absent. costOf()
+ * is what a consumer should ask; timings[] remains the membership number it always was.
+ */
+export function costOf(t, gate) {
+    const serial = t && t.serial ? t.serial[gate] : undefined;
+    if (serial != null) return { ms: serial, source: "serial", at: (t.serialAt || {})[gate] || null };
+    const par = t && t.timings ? t.timings[gate] : undefined;
+    if (par != null) return { ms: par, source: "parallel", at: (t.at || {})[gate] || null };
+    return { ms: null, source: "none", at: null };
+}
+
+/**
+ * Which gates owe a serial reading, oldest first. Pure so a gate can drive it: an absent reading sorts
+ * before any present one, and ties keep enumeration order so the slice is deterministic.
+ */
+export function serialSliceOrder(gates, serialAt = {}) {
+    return gates.slice().sort((a, b) => {
+        const A = serialAt[a], B = serialAt[b];
+        if (!A && !B) return 0;
+        if (!A) return -1;
+        if (!B) return 1;
+        return A < B ? -1 : A > B ? 1 : 0;
+    });
+}
 
 /** The register: every gate whose red is already on record, with the record that names it. */
 export function redRegister() {
@@ -154,7 +197,8 @@ function runOneAsync(rel, capMs, root) {
  * the timings file rewritten with what was seen. `onProgress(done, total)` is optional.
  */
 export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DEFAULTS.workers, capMs = DEFAULTS.capMs,
-                                      timingsFile = DEFAULTS.timingsFile, root = ENG, gates = null, write = true, onProgress = null } = {}) {
+                                      timingsFile = DEFAULTS.timingsFile, root = ENG, gates = null, write = true, onProgress = null,
+                                      serialSliceMs = DEFAULTS.serialSliceMs } = {}) {
     const t00 = Date.now();
     const all = gates || enumerateGates(root);
     const prior = readTimings(timingsFile, root);
@@ -192,6 +236,25 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
         const serial = { code: p2.code, ms: p2.ms, timedOut: p2.timedOut };
         const c = classify(parallel, serial);   // { verdict, from, note } -- gateSweep's rule, not a copy of it
         rows.push({ gate: rel, verdict: c.verdict, from: c.from, parallelMs: p1.ms, serialMs: p2.ms, serialCode: p2.code });
+    }
+    // *** AND A SLICE OF THE TREE IS RE-RUN ALONE, SO THE FILE ACCUMULATES COSTS AND NOT ONLY SAMPLES. ***
+    // Phase 2 above already leaves an uncontended reading for every red and every budget crosser; this
+    // extends that to the rest, oldest-first, bounded by WALL TIME rather than by a gate count -- a count
+    // would need a per-gate estimate, which is the thing being measured. At the default 15 s against a
+    // 230 s sweep that is 6.5% of the run and about 40 gates, so a 1,150-gate tree turns over in roughly
+    // thirty sweeps. Set serialSliceMs to 0 to skip it entirely.
+    const serial = { ...(prior.serial || {}) }, serialAt = { ...(prior.serialAt || {}) };
+    const sliceStamp = new Date().toISOString();
+    for (const r of rows) if (r.serialMs != null) { serial[r.gate] = r.serialMs; serialAt[r.gate] = sliceStamp; }
+    let sliced = 0;
+    if (serialSliceMs > 0) {
+        const owed = serialSliceOrder(sel.run.filter((g) => serialAt[g] !== sliceStamp), serialAt);
+        const until = Date.now() + serialSliceMs;
+        for (const rel of owed) {
+            if (Date.now() >= until) break;
+            const one = await runOneAsync(rel, capMs, root);
+            serial[rel] = one.ms; serialAt[rel] = sliceStamp; sliced++;
+        }
     }
     const out0 = { at: new Date().toISOString() };
     const rec = reconcile(rows);
@@ -232,6 +295,7 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
         budgetRescued: rows.filter((r) => r.from === "budget-confirm" && r.serialMs <= budgetMs).length,
         // v4536: gates over budget that were RUN ANYWAY because this is their first crossing, and how many
         // crossed on this sweep. A first crossing is a reading from one hour; a second is a property.
+        serialSliced: sliced, serialKnown: Object.keys(serial).length,
         onProbation: sel.onProbation, crossedOnce: Object.keys(crossings).filter((g) => crossings[g] === 1).length,
         evictable: Object.keys(crossings).filter((g) => crossings[g] >= MIN_CROSSINGS_TO_EVICT).length,
     };
@@ -243,8 +307,11 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
                   "applies ONLY to entries whose `at` equals it -- the rest were not run and say so. " +
                   "`crossings` (v4536) counts CONSECUTIVE sweeps on which a gate came in over budget, and it takes " +
                   "two to evict: one crossing is a reading from one hour, and this box moves 12-36% between hours " +
-                  "on unchanged code. A gate that comes back under loses its count entirely.",
-            captured: out.at, budgetMs, capMs, timings, codes, at, crossings,
+                  "on unchanged code. A gate that comes back under loses its count entirely. " +
+                  "`serial` (v4562) is the UNCONTENDED cost -- from a phase-2 run or from this sweep's rotating " +
+                  "slice -- while `timings` is a sample taken while seven other gates fought for the box and " +
+                  "runs a MEDIAN 2.41x above it. Ask costOf(), not timings[], for what a gate costs.",
+            captured: out.at, budgetMs, capMs, timings, codes, at, crossings, serial, serialAt,
         }, null, 1) + "\n");
     }
     return out;

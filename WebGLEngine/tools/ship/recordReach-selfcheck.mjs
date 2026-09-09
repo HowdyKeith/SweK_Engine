@@ -19,6 +19,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as RR from "./recordReach.mjs";
 import * as FR from "./frozenRecords.mjs";
+import { costOf } from "./quickSweep.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -158,20 +159,31 @@ console.log("\n5. *** THE TWO GATES THIS ROUND WAS ABOUT ARE BACK INSIDE THE BUD
 {
     const t = RR.readTimings(ENG);
     const pair = ["tools/ship/frozenRecords-selfcheck.mjs", "tools/ship/recordDrift-selfcheck.mjs"];
-    for (const g of pair) say(`${g}: ${t.timings[g]} ms against a ${live.budgetMs} ms budget`);
+    const cost = Object.fromEntries(pair.map((g) => [g, costOf(t, g)]));
+    for (const g of pair) say(`${g}: ${cost[g].ms} ms (${cost[g].source}) against a ${live.budgetMs} ms budget, ` +
+        `filed at ${t.timings[g]} ms`);
     ok("!! *** BOTH STALE-RECORD DETECTORS RUN AT SHIP TIME AGAIN ***",
         pair.every((g) => t.timings[g] != null && t.timings[g] <= live.budgetMs),
         pair.map((g) => path.basename(g) + " " + t.timings[g] + " ms").join(", ") +
         ". They were 3,446 and 3,026, and the tree's ONLY two detectors for a stale record were both outside " +
-        "the ritual that writes records.");
-    // Margin, not merely under: a gate one millisecond inside the budget is a gate about to leave it, and
-    // these two are O(tree) walkers in a tree that grows every round.
-    const margin = Math.min(...pair.map((g) => live.budgetMs - t.timings[g]));
+        "the ritual that writes records. MEMBERSHIP is decided on the filed reading, so that is what this " +
+        "row asks about -- it is the number the sweep will use next time, contended or not.");
+    // *** THE MARGIN IS READ FROM THE UNCONTENDED COST, WHICH IS THE REPAIR v4562 EXISTS FOR. ***
+    // This row used to subtract the FILED reading from the budget, and a filed reading is a sample taken
+    // while seven other gates fought for a four-core box: measured across 1,011 gates, a median of 2.41x
+    // the serial cost, p90 3.44x. frozenRecords-selfcheck was filed at 1,185, 1,217 and 2,931 ms on three
+    // sweeps of byte-identical code while running 1,201 to 1,219 ms alone -- so this row went red on
+    // scheduling luck and said the gate had lost its margin. costOf() prefers the serial reading the sweep
+    // now accumulates, and falls back to the filed one while saying so.
+    const margin = Math.min(...pair.map((g) => live.budgetMs - cost[g].ms));
     ok("!! ...and with real margin, because both are O(tree) and the tree grows every round",
-        margin >= 800,
-        `worst margin ${margin} ms of ${live.budgetMs}. At the pre-round cost they were 446 ms and 26 ms ` +
-        `OVER; 26 ms is close enough that a warm cache and a cold one land on opposite sides, which is how ` +
-        `this drifted out unnoticed rather than failing loudly.`);
+        margin >= 800 && pair.every((g) => cost[g].source === "serial"),
+        `worst margin ${margin} ms of ${live.budgetMs}, from ` +
+        pair.map((g) => `${path.basename(g)} ${cost[g].ms} ms (${cost[g].source})`).join(" and ") +
+        `. At the pre-round cost they were 446 ms and 26 ms OVER; 26 ms is close enough that a warm cache ` +
+        `and a cold one land on opposite sides, which is how this drifted out unnoticed rather than failing ` +
+        `loudly. A serial reading is REQUIRED here rather than merely preferred: falling back to the ` +
+        `contended sample would put this row back on the luck it was just taken off.`);
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +

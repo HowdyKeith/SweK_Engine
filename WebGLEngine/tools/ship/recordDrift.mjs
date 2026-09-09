@@ -116,27 +116,44 @@ export async function readTimingsWithRetry(root = ENG, attempts = 3, waitMs = 40
     return { rec: null, tries, error };
 }
 
-export async function checks({ load = null, timings = null } = {}) {
+/**
+ * *** `only` EXISTS BECAUSE A FIXTURE FOR ONE RECORD WAS RE-DERIVING FOUR. ***
+ *
+ * Every check here is O(tree), and the gate drives eight fixtures through this function -- three that
+ * perturb the timings file and three that swap one module -- so a run cost ten full censuses to answer ten
+ * questions about one of them each. Measured: 213 to 317 ms per call, ten calls, and the gate reached
+ * 2,215 ms serial against a 3,000 ms budget with recordReach-selfcheck requiring 800 ms of margin. It is
+ * also MORE PRECISE than it was: a fixture that breaks the timings file should not be able to pass or fail
+ * on the assertion census, and until now it could.
+ */
+export async function checks({ load = null, timings = null, only = null } = {}) {
     const mod = load || ((p) => import(p));
     const out = [];
+    const wanted = (n) => !only || (Array.isArray(only) ? only.includes(n) : only === n);
 
+    // assertionShape is imported either way: two checks below need its gateFiles() walk, and the module
+    // import is cheap -- census() is the 147 ms.
     const A = await mod("./assertionShape.mjs");
-    const ac = A.census();
-    out.push({
-        name: "assertionShape census", owes: OWES.assertion,
-        recorded: A.SHAPE_AT_V4480.definesOk, actual: ac.definesOk,
-        stale: A.SHAPE_AT_V4480.definesOk !== ac.definesOk || A.SHAPE_AT_V4480.gates !== ac.gates,
-        detail: `gates ${A.SHAPE_AT_V4480.gates} vs ${ac.gates}, copies ${A.SHAPE_AT_V4480.definesOk} vs ${ac.definesOk}`,
-    });
+    if (wanted("assertionShape census")) {
+        const ac = A.census();
+        out.push({
+            name: "assertionShape census", owes: OWES.assertion,
+            recorded: A.SHAPE_AT_V4480.definesOk, actual: ac.definesOk,
+            stale: A.SHAPE_AT_V4480.definesOk !== ac.definesOk || A.SHAPE_AT_V4480.gates !== ac.gates,
+            detail: `gates ${A.SHAPE_AT_V4480.gates} vs ${ac.gates}, copies ${A.SHAPE_AT_V4480.definesOk} vs ${ac.definesOk}`,
+        });
+    }
 
-    const C = await mod("./closingCoverage.mjs");
-    const cc = C.coverage();
-    out.push({
-        name: "sweep closings", owes: OWES.closing,
-        recorded: 0, actual: cc.summedUncovered,
-        stale: cc.summedUncovered > 0 || cc.duplicates.length > 0,
-        detail: `${cc.summedUncovered} gate(s) no closing names, ${cc.duplicates.length} duplicate claim(s)`,
-    });
+    if (wanted("sweep closings")) {
+        const C = await mod("./closingCoverage.mjs");
+        const cc = C.coverage();
+        out.push({
+            name: "sweep closings", owes: OWES.closing,
+            recorded: 0, actual: cc.summedUncovered,
+            stale: cc.summedUncovered > 0 || cc.duplicates.length > 0,
+            detail: `${cc.summedUncovered} gate(s) no closing names, ${cc.duplicates.length} duplicate claim(s)`,
+        });
+    }
 
     // ---- *** v4483 -- THE KNOWLEDGE INDEX IS ITSELF A DERIVED RECORD, AND THE REGISTRY CHECK READS IT. ***
     //
@@ -147,10 +164,12 @@ export async function checks({ load = null, timings = null } = {}) {
     // it on the next round. The fix is not to re-derive the orphan rule here -- two definitions of one rule
     // is the defect this module avoided by exporting `sources` -- but to check the INPUT and say so, so the
     // registry answer is never read as clean when it was computed from yesterday's tree.
-    const onDisk = A.gateFiles(ENG).length;
+    const gateFiles = (wanted("knowledge index") || wanted("instrument registry") || wanted("sweep timings"))
+        ? A.gateFiles(ENG) : [];
+    const onDisk = gateFiles.length;
     const K = JSON.parse(fs.readFileSync(path.join(ENG, "knowledge-index.json"), "utf8"));
     const indexStale = K.gates.length !== onDisk;
-    out.push({
+    if (wanted("knowledge index")) out.push({
         name: "knowledge index", owes: OWES.index,
         recorded: K.gates.length, actual: onDisk,
         stale: indexStale,
@@ -158,6 +177,7 @@ export async function checks({ load = null, timings = null } = {}) {
                            : `${onDisk} gates, index agrees`,
     });
 
+    if (wanted("instrument registry")) {
     const R = await mod("./registryOrphans.mjs");
     const rs = R.scan();
     out.push({
@@ -172,6 +192,7 @@ export async function checks({ load = null, timings = null } = {}) {
                            + "it does not yet list every gate on disk"
               : "no module with reportLines lacks an entry",
     });
+    }
 
     // *** INJECTABLE, BECAUSE THE FIRST DRAFT'S CONTROL FOR THIS CHECK WAS VACUOUS. *** It asserted a fact
     // about its own fixture object and never called the code, so deleting the stamp requirement below cost
@@ -188,6 +209,7 @@ export async function checks({ load = null, timings = null } = {}) {
     // A torn read is a window of milliseconds, so it is RETRIED rather than either crashing or being passed
     // on nothing. A file still unparseable after three attempts is genuinely broken, and the check then
     // reports UNREADABLE -- stale, named, and not a silent green.
+    if (!wanted("sweep timings")) return out;
     const read = timings ? { rec: timings, tries: 0, error: null } : await readTimingsWithRetry(ENG);
     if (!read.rec) {
         out.push({
@@ -199,7 +221,7 @@ export async function checks({ load = null, timings = null } = {}) {
         return out;
     }
     const rec = read.rec;
-    const missing = A.gateFiles(ENG)
+    const missing = gateFiles
         .map((p) => path.relative(ENG, p).replace(/\\/g, "/"))
         .filter((g) => !(g in (rec.timings || {})) || !((rec.at || {})[g]));
     out.push({

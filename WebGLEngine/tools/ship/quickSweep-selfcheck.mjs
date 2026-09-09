@@ -292,6 +292,38 @@ sec("5. verify.mjs RUNS IT, AND FAILS ON NEW REDS ONLY");
 //   D  a serial timeout reported as a NEW red.
 //      -> exit=1, three lines: section 3, and section 4's hang test. A timeout alone is not a verdict --
 //      v4297's UNMEASURED bucket exists so that "did not finish" is never folded into "failed".
+// =============================================================================================================
+// *** ALL FOUR ROWS BELOW WERE WRITTEN NAME-FIRST AND THIS FILE'S ok() TAKES THE CONDITION FIRST, SO ALL
+// FOUR PASSED UNCONDITIONALLY -- a non-empty string is truthy. Nothing in the section could fail. It was
+// caught by tools/ship/assertionShape-selfcheck.mjs, which exists for exactly this and named all four in
+// one line ("78 gates in this tree take the condition first; a line pasted from the other 1,403 always
+// passes"). Written down here because the lesson is not "be careful": it is that the instrument works and
+// should be run before a gate is believed.
+console.log("\n6. *** THE FILED NUMBER IS A CONTENDED SAMPLE AND THE COST IS A DIFFERENT NUMBER (v4562) ***");
+{
+    // costOf: three sources, each named rather than blended into one figure
+    const fake = { timings: { a: 900, b: 500 }, at: { a: "T1", b: "T1" }, serial: { a: 400 }, serialAt: { a: "T2" } };
+    const A = Q.costOf(fake, "a"), B = Q.costOf(fake, "b"), C = Q.costOf(fake, "zzz");
+    ok(A.ms === 400 && A.source === "serial" && B.ms === 500 && B.source === "parallel" &&
+       C.ms === null && C.source === "none",
+       "!! costOf prefers the SERIAL reading, falls back to the filed one, and SAYS WHICH",
+       `a: ${A.ms} (${A.source}), b: ${B.ms} (${B.source}), unknown: ${C.ms} (${C.source}). A consumer that ` +
+       "cannot tell a cost from a sample will quote whichever it was handed, which is what put " +
+       "recordReach-selfcheck's margin row on scheduling luck.");
+
+    ok(Q.serialSliceOrder(["x", "y", "z"], { y: "2026-01-02", z: "2026-01-01" }).join(",") === "x,z,y" &&
+       Q.serialSliceOrder(["x", "y", "z"], { y: "2026-01-02", z: "2026-01-01" }).join(",") ===
+       Q.serialSliceOrder(["x", "y", "z"], { y: "2026-01-02", z: "2026-01-01" }).join(","),
+       "!! the slice order owes the never-measured first, then the oldest, and is deterministic",
+       "an absent reading sorts before any present one, ties keep enumeration order, and the same input " +
+       "gives the same slice -- a rotation that shuffles cannot say when the tree last turned over.");
+
+    // The two rows that grade SWEEP_CONTENTION_V4562 itself live in tools/ship/sweepCoverage-selfcheck.mjs,
+    // beside the record, and NOT here -- this gate is 9.1 s serially and stays outside the ship-time sweep,
+    // so a record guarded only from here is a record nothing checks at ship time. That is the population
+    // tools/ship/recordReach-selfcheck.mjs counts, and it went red the moment the record landed here.
+}
+
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the gates over the budget THE ROTATION HAS NOT REACHED YET. v4408 answered the older " +
     "version of this line -- that a regression in a 40-second gate is found by the full sweep and by nothing at " +

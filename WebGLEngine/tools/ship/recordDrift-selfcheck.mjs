@@ -65,7 +65,7 @@ console.log("\n2. handed a stale record, each check names it");
         ...real,
         SHAPE_AT_V4480: Object.freeze({ ...real.SHAPE_AT_V4480, definesOk: 1, gates: 1 }),
     };
-    const d = await checks({ load: async (p) => (p.includes("assertionShape") ? fake : import(p)) });
+    const d = await checks({ load: async (p) => (p.includes("assertionShape") ? fake : import(p)), only: "assertionShape census" });
     const row = d.find((c) => c.name === "assertionShape census");
     say(`fixture: a census record claiming 1 gate and 1 copy`);
     ok("!! a stale assertion census is found and both numbers are shown",
@@ -84,7 +84,7 @@ console.log("\n2. handed a stale record, each check names it");
     // closingCoverage: a gate no closing names
     const real = await import("./closingCoverage.mjs");
     const fake = { ...real, coverage: () => ({ summedUncovered: 2, duplicates: [{ gate: "x", by: ["a", "b"] }] }) };
-    const d = await checks({ load: async (p) => (p.includes("closingCoverage") ? fake : import(p)) });
+    const d = await checks({ load: async (p) => (p.includes("closingCoverage") ? fake : import(p)), only: "sweep closings" });
     const row = d.find((c) => c.name === "sweep closings");
     ok("!! an unswept gate and a duplicate claim are both found",
         row.stale === true && /2 gate\(s\)/.test(row.detail) && /1 duplicate/.test(row.detail));
@@ -95,7 +95,7 @@ console.log("\n2. handed a stale record, each check names it");
     // registryOrphans: a module with reportLines and no entry
     const real = await import("./registryOrphans.mjs");
     const fake = { ...real, scan: () => ({ narrow: [{ gate: "g", module: "physics/made-up.mjs" }] }) };
-    const d = await checks({ load: async (p) => (p.includes("registryOrphans") ? fake : import(p)) });
+    const d = await checks({ load: async (p) => (p.includes("registryOrphans") ? fake : import(p)), only: "instrument registry" });
     const row = d.find((c) => c.name === "instrument registry");
     ok("!! an unregistered instrument is found AND NAMED, not counted",
         row.stale === true && row.detail.includes("physics/made-up.mjs"),
@@ -158,7 +158,7 @@ console.log("\n2. handed a stale record, each check names it");
     }
     say(`the live timings hold ${Object.keys(t.timings).length} readings and ${Object.keys(t.at).length} stamps`);
     const noStamp = { ...t, at: Object.fromEntries(Object.entries(t.at).filter(([k]) => k !== rel)) };
-    const dStamp = await checks({ timings: noStamp });
+    const dStamp = await checks({ timings: noStamp, only: "sweep timings" });
     const rowStamp = dStamp.find((c) => c.name === "sweep timings");
     ok("!! a reading WITH a time but WITHOUT its own capture stamp counts as missing evidence",
         rowStamp.stale === true && rowStamp.detail.includes(rel),
@@ -166,9 +166,9 @@ console.log("\n2. handed a stale record, each check names it");
         "937 -- an entry carries its own stamp or it carries nothing");
     const noTime = { ...t, timings: Object.fromEntries(Object.entries(t.timings).filter(([k]) => k !== rel)) };
     ok("...and a missing reading is caught too, so the check is not only about stamps",
-        (await checks({ timings: noTime })).find((c) => c.name === "sweep timings").stale === true);
+        (await checks({ timings: noTime, only: "sweep timings" })).find((c) => c.name === "sweep timings").stale === true);
     ok("...while the untouched record is clean, so neither is simply always true",
-        (await checks({ timings: t })).find((c) => c.name === "sweep timings").stale === false);
+        (await checks({ timings: t, only: "sweep timings" })).find((c) => c.name === "sweep timings").stale === false);
 }
 
 // ---- 2b. THE TOP-LEVEL PARTITION, WHICH NOTHING GRADED IN THE FIRST DRAFT ---------------------------------------

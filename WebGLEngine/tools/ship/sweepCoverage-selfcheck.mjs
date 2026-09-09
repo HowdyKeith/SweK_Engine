@@ -134,6 +134,7 @@ import { fileURLToPath } from "node:url";
 import { enumerateGates } from "./gateSweep.mjs";
 import * as SC from "./sweepCoverage.mjs";
 import { overNonEmpty, emptyOfNonEmpty } from "./vacuity.mjs";
+import * as QS from "./quickSweep.mjs";
 import * as Q from "./quickSweep.mjs";
 import { gateReport } from "./gateReport.mjs";
 
@@ -718,6 +719,39 @@ say("WHAT THIS DOES NOT CLAIM. That the 22 are the whole of it -- section 7 re-r
     "argues for it, and the case for changing it would need the distribution this file now makes readable. And " +
     "it cannot see a gate that is red only under conditions the rotation does not reproduce, which is the same " +
     "limit every serial re-run in this tree has and the reason v4297 kept both timings rather than one.");
+
+// =============================================================================================================
+console.log("\n*** THE FILED READING IS A CONTENDED SAMPLE AND THE COST IS A DIFFERENT NUMBER (v4562) ***");
+{
+    // *** RE-DERIVED FROM THE LIVE FILE RATHER THAN QUOTED FROM THE RECORD. *** These two rows live HERE and
+    // not beside costOf() in tools/ship/quickSweep-selfcheck.mjs, because that gate is 9.1 s serially and
+    // stays outside the ship-time sweep -- a record whose only guardian is over budget is a record nothing
+    // checks, which is exactly the population tools/ship/recordReach-selfcheck.mjs counts.
+    const t = QS.readTimings(QS.DEFAULTS.timingsFile, ENG);
+    const pairs = Object.keys(t.serial || {})
+        .filter((g) => t.timings[g] > 50 && t.serial[g] > 50)
+        .map((g) => t.timings[g] / t.serial[g]).sort((a, b) => a - b);
+    const med = pairs.length ? pairs[pairs.length >> 1] : null;
+    const R = SC.SWEEP_CONTENTION_V4562;
+    ok("!! *** THE FILED READING RUNS WELL ABOVE THE COST, ON THE LIVE FILE, RIGHT NOW ***",
+       pairs.length > 500 && med > 1.2,
+       `${pairs.length} gates carry both a filed and a serial reading; filed/serial median ` +
+       `${med === null ? "n/a" : med.toFixed(2) + "x"} here against the ${R.ratio.median}x recorded at ` +
+       `v4562 from a full 8-worker against 1-worker pair (p10 ${R.ratio.p10}, p90 ${R.ratio.p90}, max ` +
+       `${R.ratio.max}). The two need not agree -- the record is one pair of sweeps and this is whatever the ` +
+       "last one saw -- and BOTH BEING ABOVE 1 is the claim. Eight workers on four cores is 2x " +
+       "oversubscription: it buys 1.63x of wall clock (230 s against 374 s) and costs this.");
+    ok("!! ...and the record's own arithmetic holds, so it cannot drift from itself",
+       Math.abs(R.wallMs.workers1 / R.wallMs.workers8 - R.speedup) < 0.01 &&
+       R.filedTotalMs.workers8 > R.filedTotalMs.workers1 && R.crossedInOneButNotTheOther === 0 &&
+       R.overBudgetSample.underBudgetWhenRunAlone > 0,
+       `speedup ${R.speedup} against ${(R.wallMs.workers1 / R.wallMs.workers8).toFixed(2)} derived from the ` +
+       `wall times; ${R.crossedInOneButNotTheOther} gates crossed the budget in one run and not the other, ` +
+       "so v4408's confirm and v4536's two-crossings rule are doing their job and this is NOT an eviction " +
+       `bug -- it is the number every consumer reads. And ${R.overBudgetSample.underBudgetWhenRunAlone} of ` +
+       `${R.overBudgetSample.n} sampled EXILED gates come in under the ${SC.BUDGET_MS} ms budget when run ` +
+       "alone, which is the best evidence the over-budget item has had.");
+}
 
 REPORT.write();
 console.log(`\nsweepCoverage-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);

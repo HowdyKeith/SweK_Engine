@@ -289,7 +289,10 @@ export const PROBE_AT_V4536 = Object.freeze({
     // the invariant was never about that. `currentIncludingModule` is the live counterpart of `excluding` --
     // both re-taken, both from the same census -- so the subset check compares like with like and the v4536
     // probe's own numbers stay exactly as they were taken.
-    currentIncludingModule: Object.freeze({ records: 96, withFields: 43, fields: 176 }),
+    // v4562 -- RE-TAKEN with `excluding` below: 96/43/176 -> 97/44/180. The two move together by
+    // construction, and the gate asserts the difference is exactly this module's own two records, so
+    // updating one and not the other reddens a row that is about the exclude pattern rather than the count.
+    currentIncludingModule: Object.freeze({ records: 97, withFields: 44, fields: 180 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -310,7 +313,11 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4554 -- RE-TAKEN: 93/40/153 -> 94/41/156. One record, MEASURED_AT_V4553 in world/surfaceProbe.mjs,
     // holding what the terrain model and the voxels say about each other. It arrives GUARDED and under
     // budget, so recordReach's unchecked ceiling of 43 did not move.
-    excluding: Object.freeze({ records: 94, withFields: 41, fields: 156 }),
+    // v4562 -- RE-TAKEN: 94/41/156 -> 95/42/160. One record, SWEEP_CONTENTION_V4562 in
+    // tools/ship/sweepCoverage.mjs, holding what an 8-worker sweep on a 4-core box does to the numbers it
+    // files. It arrived guarded by a gate that is 9.1 s SERIALLY and therefore outside the ship-time sweep,
+    // recordReach's ratchet went red for exactly that, and the rows were moved beside the record.
+    excluding: Object.freeze({ records: 95, withFields: 42, fields: 160 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,

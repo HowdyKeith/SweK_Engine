@@ -584,6 +584,62 @@ export const BUDGET_DRIFT_V4536 = Object.freeze({
                 "straddler lists have been undoing by hand for three rounds.",
 });
 
+/**
+ * *** WHAT THE SWEEP FILES IS A CONTENDED SAMPLE, AND THE WHOLE TREE HAS BEEN READING IT AS A COST. ***
+ *
+ * v4536 (BUDGET_DRIFT_V4536, above) established that this box moves 12-36% between hours and that a scalar
+ * reference workload cannot normalise it, and repaired the EVICTION that rested on one reading. It did not
+ * ask how far the recorded number is from the gate's actual cost, because nothing needed to know until a
+ * gate started going red on the answer: tools/ship/recordReach-selfcheck.mjs asserts a MARGIN below the
+ * budget, and frozenRecords-selfcheck was filed at 1,185 / 1,217 / 2,931 ms across three sweeps of
+ * byte-identical code while running 1,201 to 1,219 ms alone. A row that reddens on scheduling luck.
+ *
+ * MEASURED BY RUNNING THE SAME SWEEP TWICE, at 8 workers and at 1, and comparing the 1,011 gates that ran
+ * in both (four cores, so eight workers is 2x oversubscription):
+ *
+ *     parallel / serial     p10 1.25x    MEDIAN 2.41x    p90 3.44x    max 6.88x    min 0.55x
+ *     total filed time      685 s at 8 workers against 358 s at 1
+ *     wall time             230 s at 8 workers against 374 s at 1
+ *
+ * SO THE PARALLELISM BUYS 1.63x OF WALL CLOCK AND COSTS A 2.41x MEDIAN INFLATION OF EVERY NUMBER THE TREE
+ * THEN QUOTES. Neither run put a single gate over the budget that the other put under, which is v4408 and
+ * v4536 working: eviction is protected. What was not protected is the reading itself.
+ *
+ * *** AND IT IS THE BEST EVIDENCE THE OVER-BUDGET ITEM HAS EVER HAD. *** Twelve of the 464 exiled gates,
+ * sampled across the 3-to-20-second band and run ALONE: filed/serial median 1.86x, range 0.83x to 4.60x,
+ * and FIVE OF TWELVE COME IN UNDER THE 3,000 ms BUDGET. Most carry a stamp from before v4408, so they were
+ * exiled on exactly the kind of reading this record is about. One of the twelve (gateReport-selfcheck) is
+ * SLOWER alone and exits 1 -- a red that has been sitting in the exiled pool where nothing runs it.
+ *
+ * THE REPAIR IS NOT TO STOP PARALLELISING. It is to stop conflating two numbers: `timings` decides
+ * MEMBERSHIP next sweep and is a sample of the conditions membership will be decided under, while `serial`
+ * is what the gate costs. Every phase-2 run already produces one; each sweep now spends a stated slice of
+ * wall time (15 s, about 6.5% of the run) re-running the gates whose serial reading is oldest, so the file
+ * turns over in roughly thirty sweeps. quickSweep.costOf() is what a consumer asks.
+ */
+export const SWEEP_CONTENTION_V4562 = Object.freeze({
+    at: "v4562", cores: 4, workers: 8, budgetMs: BUDGET_MS,
+    comparedGates: 1011,
+    ratio: Object.freeze({ p10: 1.25, median: 2.41, p90: 3.44, max: 6.88, min: 0.55 }),
+    worst: Object.freeze({ gate: "tools/ship/installHistoryReadout-selfcheck.mjs", parallelMs: 358, serialMs: 52 }),
+    filedTotalMs: Object.freeze({ workers8: 685000, workers1: 358000 }),
+    wallMs: Object.freeze({ workers8: 230000, workers1: 374000 }),
+    speedup: 1.63,
+    crossedInOneButNotTheOther: 0,
+    // the exiled pool, sampled directly rather than by applying the median above to it
+    overBudgetSample: Object.freeze({
+        n: 12, band: "3,000 to 20,000 ms as filed", medianRatio: 1.86, minRatio: 0.83, maxRatio: 4.60,
+        underBudgetWhenRunAlone: 5,
+        slowerAloneAndRed: "tools/ship/gateReport-selfcheck.mjs -- 6,290 filed, 7,553 alone, exit 1",
+    }),
+    repairShipped: "quickSweep.costOf() plus a `serial` map the sweep accumulates on a wall-time-bounded " +
+                   "rotating slice; recordReach-selfcheck reads it and REQUIRES a serial source",
+    notClaimed: "that 2.41x is a constant of this box. It is one pair of sweeps an hour apart, and " +
+                "BUDGET_DRIFT_V4536 already measured 12-36% of hour-to-hour drift underneath it. What is " +
+                "claimed is the SHAPE -- that the filed number runs well above the cost, on nearly every " +
+                "gate, in a way no consumer of the file was accounting for.",
+});
+
 export const ROTATION_BOUNDARY_V4535 = Object.freeze([
     Object.freeze({ gate: "physics/render/albedoEstimator-selfcheck.mjs", rotationMs: 2991, sweepMs: 3115,
         serialMs: Object.freeze([3065, 2823, 3208, 3269, 3000]),
