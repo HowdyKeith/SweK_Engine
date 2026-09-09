@@ -229,8 +229,109 @@ async function main() {
     }
     if (r3 && r3.pageErrors && r3.pageErrors.length) report("page errors: " + r3.pageErrors.slice(0, 3).join(" | "));
 
+    sec("4. ON BOTH BACKENDS: ROUGHNESS ON THE LIVE SPHERE NOW MEASURABLY BLURS ITS REFLECTION -- NOT JUST WIRED, CHECKED");
+    // v4583 -- addLiveSpecSphere used to pack ONE raw mip (roughness a no-op, named as such in its own header);
+    // physics/render/specularProbeCapture.mjs's bakeCapturedMipChain now convolves that capture into a real chain.
+    // Section 3 above already draws the live sphere at roughness's own default (0) and stops there -- this section
+    // is the one that actually varies the argument, on the REAL RENDERED FRAME, not the CPU-only chain math
+    // specularProbeCapture-selfcheck.mjs's own section 5 already checks. Same lab, same sphere, same camera as
+    // section 3, so the only thing that changes across the three renders below is the `roughness` passed in.
+    const ROUGHNESSES = [0, 0.5, 1];
+    const r4 = await runInEngineOrigin({ engineRoot: ENG, args: {
+        records: Array.from(lab.records), extras: Array.from(lab.extras), fleetOf: Array.from(lab.fleetOf),
+        packed: { ...lab.packed, data: Array.from(lab.packed.data) }, counts: lab.counts, capSize: CAP_SIZE,
+        spec: { ...lab.spec, atlas: { ...lab.spec.atlas, data: Array.from(lab.spec.atlas.data) } },
+        spherePos: SPHERE_POS, sphereRadius: SPHERE_RADIUS, eye: CAM_EYE, roughnesses: ROUGHNESSES,
+    }, script: `async (a) => {
+        const { requestDevice } = await import("/gfx/device.js");
+        const G = await import("/render/gpuDriven.mjs");
+        const { labFleets, addLiveSpecSphere } = await import("/render/probeLab.mjs");
+        const out = {};
+        for (const backend of ["webgpu", "webgl2"]) {
+            const W = 160, H = 120;
+            const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+            const dev = await requestDevice(cv, { backend, offscreen: backend === "webgpu" });
+            const errs = []; if (dev.gpu && dev.gpu.addEventListener) dev.gpu.addEventListener("uncapturederror", (e) => errs.push(String(e.error && e.error.message).slice(0, 300)));
+            const lab = { packed: { ...a.packed, data: Float32Array.from(a.packed.data) }, records: Float32Array.from(a.records),
+                          extras: Float32Array.from(a.extras), fleetOf: Uint32Array.from(a.fleetOf), counts: a.counts,
+                          count: a.records.length / 4, spec: { ...a.spec, atlas: { ...a.spec.atlas, data: Float32Array.from(a.spec.atlas.data) } } };
+            const { fleets } = labFleets(dev, lab, { eye: (ctx) => ctx.eye });
+            const perRoughness = [];
+            for (const roughness of a.roughnesses) {
+                const live = await addLiveSpecSphere(dev, lab, a.spherePos, { radius: a.sphereRadius, size: a.capSize, roughness });
+                const allFleets = [...fleets, live.fleet];
+                const sc = G.makeGpuDrivenScene(dev, { fleets: allFleets, fleetOf: live.fleetOf, thresholds: [], records: live.records, headings: live.extras });
+                const cam = { viewProj: G.multiply(G.perspective(1.0, W / H, 0.05, 50), G.lookAt(a.eye, a.spherePos)), eye: a.eye };
+                const fr = sc.frame({ ...cam, read: true, clear: [0, 0, 0, 1] }), f = await fr.pixels;
+                perRoughness.push(Array.from(f.pixels));
+                if (sc.destroy) sc.destroy();
+            }
+            out[backend] = { errs, W, H, perRoughness };
+            dev.destroy();
+        }
+        return out;
+    }` });
+    ok("both backends drew the live sphere at every roughness with no device errors", r4.ok && r4.result && r4.result.webgpu && r4.result.webgl2 && r4.result.webgpu.errs.length === 0 && r4.result.webgl2.errs.length === 0,
+       r4.ok ? [...(r4.result.webgpu.errs || []), ...(r4.result.webgl2.errs || [])].join(" | ").slice(0, 300) : (r4.reason || r4.error || (r4.pageErrors || []).join(" | ")).slice(0, 400));
+
+    if (r4.ok && r4.result.webgpu && r4.result.webgl2) {
+        const W = r4.result.webgpu.W, H = r4.result.webgpu.H;
+        // the SAME ray-sphere test section 3 uses, against a SHRUNKEN radius (80%) so the sampled set stays well
+        // inside the silhouette -- the outer rim's antialiasing blends sphere and background at every roughness
+        // alike, which would dilute (not fake) the very difference this section measures, not invalidate it, but
+        // there is no reason to pay that noise when an interior-only set is one line away.
+        const fwd = [0, 0, -1], right = [1, 0, 0], up = [0, 1, 0], t = Math.tan(1.0 / 2), RIN = SPHERE_RADIUS * 0.8;
+        const rel = [CAM_EYE[0] - SPHERE_POS[0], CAM_EYE[1] - SPHERE_POS[1], CAM_EYE[2] - SPHERE_POS[2]];
+        const sphereIdx = [];
+        for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+            const sx = (x + 0.5 - W / 2) / (H / 2) * t, sy = -(y + 0.5 - H / 2) / (H / 2) * t;
+            const d = [fwd[0] + right[0] * sx + up[0] * sy, fwd[1] + right[1] * sx + up[1] * sy, fwd[2] + right[2] * sx + up[2] * sy], dl = Math.hypot(...d);
+            const dn = [d[0] / dl, d[1] / dl, d[2] / dl];
+            const b = 2 * (rel[0] * dn[0] + rel[1] * dn[1] + rel[2] * dn[2]), c = rel[0] ** 2 + rel[1] ** 2 + rel[2] ** 2 - RIN * RIN, disc = b * b - 4 * c;
+            if (disc >= 0) sphereIdx.push(y * W + x);
+        }
+        report(`${sphereIdx.length} of ${W * H} pixels keyed to the live sphere's own interior (${(RIN / SPHERE_RADIUS * 100).toFixed(0)}% radius, same camera and sphere as section 3)`);
+        // *** RAW LUMA stdDev WAS TRIED FIRST AND MEASURED WRONG, NOT ASSUMED RIGHT. *** [22.30, 19.04, 19.43] at
+        // roughness [0, 0.5, 1] on this exact scene: a real drop 0->0.5, then a small RISE 0.5->1, which reads
+        // like a bug. It is not one -- a CPU-only rerun of bakeCapturedMipChain's own faces (specularProbeCapture-
+        // selfcheck.mjs's own faceLumaStdDev, the pre-shading texture data) stayed monotonic at these exact chain
+        // parameters (0.0632/0.0526/0.0350/0.0302 across mips 0-3), so the chain itself was never the problem.
+        // The confound is specularProbeLitWgsl's own split-sum shading: F0 and the BRDF LUT's roughness-dependent
+        // Fresnel/energy term add a SMOOTH, roughness-dependent brightness gradient across the sphere (mean luma
+        // measured [13.29, 12.17, 10.23, 8.90, 8.46] over a finer roughness sweep of the same scene) that is real
+        // and expected, but has nothing to do with environment blur, and dilutes a raw value-spread statistic. A
+        // LOCAL GRADIENT (neighbouring-pixel luma difference, averaged over the interior) isolates high-spatial-
+        // frequency texture detail from that smooth shading gradient instead of mixing them: the same finer sweep
+        // gave a clean, near-monotonic [12.29, 5.61, 3.00, 2.54, 2.69] -- this is the one used below.
+        const meanGrad = (pixels, idx) => {
+            const luma = (p) => (pixels[p * 4] + pixels[p * 4 + 1] + pixels[p * 4 + 2]) / 3;
+            let sum = 0, n = 0;
+            for (const p of idx) {
+                const x = p % W, y = (p / W) | 0;
+                if (x + 1 < W) { sum += Math.abs(luma(p + 1) - luma(p)); n++; }
+                if (y + 1 < H) { sum += Math.abs(luma(p + W) - luma(p)); n++; }
+            }
+            return sum / n;
+        };
+        for (const bk of ["webgpu", "webgl2"]) {
+            const grads = r4.result[bk].perRoughness.map((px) => meanGrad(px, sphereIdx));
+            report(`${bk}: mean local luma gradient across the sphere's own interior, by roughness [${ROUGHNESSES.join(", ")}] = [${grads.map((v) => v.toFixed(2)).join(", ")}]`);
+            ok(`*** ${bk}: the SHARPEST (roughness 0) reflection shows measurably more local detail than the ROUGHEST (roughness 1) one ***`,
+               grads[0] > grads[grads.length - 1] * 2, `grad(0)=${grads[0].toFixed(2)} vs grad(1)=${grads[grads.length - 1].toFixed(2)}`);
+            ok(`${bk}: ...and the middle step (roughness 0.5) sits strictly between them`, grads[0] > grads[1] && grads[1] > grads[grads.length - 1],
+               `[${grads.map((v) => v.toFixed(2)).join(", ")}]`);
+            // the regression this section exists to catch: under the old single-raw-mip bug every roughness read
+            // the SAME level, so these three frames would be byte-identical -- they are asserted NOT to be.
+            const px = r4.result[bk].perRoughness;
+            let identical = true;
+            for (let p = 0; p < px[0].length && identical; p++) if (px[0][p] !== px[px.length - 1][p]) identical = false;
+            ok(`${bk}: roughness 0 and roughness 1 do NOT render byte-identical frames (the old single-mip bug's own signature)`, !identical);
+        }
+    }
+    if (r4 && r4.pageErrors && r4.pageErrors.length) report("page errors: " + r4.pageErrors.slice(0, 3).join(" | "));
+
     console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nall checks pass");
-    console.log("unchecked here: an HDR capture (device.texture({render:true}) is forced to the canvas's 8-bit format on both backends, named in render/liveCubeCapture.mjs's own header) -- a real bright light source would clip here exactly as it would on the screen the page shows. Also unchecked: a per-frame DYNAMIC recapture as the scene changes (this captures once per rebuild, as splat-probes.html now calls it, not every frame); a live-captured roughness-dependent BLUR (addLiveSpecSphere's own header names why roughness is currently inert -- one raw mip, no prefiltered chain built from a live capture yet); and any independent numeric ground truth for what the real-rendered shell's radiance SHOULD be at a given direction -- section 1's marker test establishes the geometry is right, sections 2 and 3 establish the pipeline accepts a live atlas (and a live SPHERE, drawn) and produces finite, cross-backend-agreeing output, but nothing here re-derives a rendered scene's radiance from first principles the way splatRadiance's analytic capture could be checked against directly.");
+    console.log("unchecked here: an HDR capture (device.texture({render:true}) is forced to the canvas's 8-bit format on both backends, named in render/liveCubeCapture.mjs's own header) -- a real bright light source would clip here exactly as it would on the screen the page shows. Also unchecked: a per-frame DYNAMIC recapture as the scene changes (this captures once per rebuild, as splat-probes.html calls it, not every frame); and any independent numeric ground truth for what the real-rendered shell's radiance SHOULD be at a given direction -- section 1's marker test establishes the geometry is right, sections 2-4 establish the pipeline accepts a live atlas, draws a live sphere, and (section 4) that the sphere's roughness now measurably changes its own rendered pixels in the expected direction, but nothing here re-derives a rendered scene's radiance from first principles the way splatRadiance's analytic capture could be checked against directly.");
     process.exitCode = fails ? 1 : 0;
 }
 

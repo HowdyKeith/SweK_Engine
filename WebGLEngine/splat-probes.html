@@ -41,7 +41,13 @@ const fail = (m) => { beEl.innerHTML = '<span class="bad">' + m + "</span>"; };
 // SPLATRADIANCE BAKE: render/liveCubeCapture.mjs renders the shell's OWN six-face view from this sphere's own
 // position through a real camera, so the reflection actually seen here is the shell as this point in space
 // sees it, not the analytic stand-in the row's four spheres share.
-const LIVE_SPHERE_POS = [0, SPEC_ROW.y, 0.6], LIVE_SPHERE_RADIUS = 0.14;
+// v4583 -- ROUGHNESS 2/3, NOT THE DEFAULT 0, SO THIS SPHERE VISIBLY SHOWS WHAT CHANGED: addLiveSpecSphere used
+// to pack a single raw mip, so any roughness rendered the same mirror-sharp reflection -- render/probeLab.mjs's
+// header and tools/ship/liveCubeCapture-selfcheck.mjs's section 4 now measure a real, roughness-dependent blur
+// on this exact sphere. 2/3 is the row's own third step (roughnesses 0, 1/3, 2/3, 1 for SPEC_ROW.count=4), so
+// this sphere sits directly comparable to the row's own third analytic sphere -- same nominal roughness, two
+// sources, side by side -- rather than picking a value the row itself does not also show.
+const LIVE_SPHERE_POS = [0, SPEC_ROW.y, 0.6], LIVE_SPHERE_RADIUS = 0.14, LIVE_SPHERE_ROUGHNESS = 2 / 3;
 let device, scene = null, lab = null, yaw = 0.4, pitch = 0.15, dragging = null, dirty = true, rebuilding = false, liveNote = "";
 const $ = (id) => document.getElementById(id);
 
@@ -62,7 +68,7 @@ async function rebuild() {
   // costs nothing and keeps the page working (the analytic row alone) rather than betting on an environment
   // this page cannot know it is running in.
   try {
-    const live = await addLiveSpecSphere(device, lab, LIVE_SPHERE_POS, { radius: LIVE_SPHERE_RADIUS });
+    const live = await addLiveSpecSphere(device, lab, LIVE_SPHERE_POS, { radius: LIVE_SPHERE_RADIUS, roughness: LIVE_SPHERE_ROUGHNESS });
     allFleets = [...fleets, live.fleet]; records = live.records; extras = live.extras; fleetOf = live.fleetOf;
     liveNote = "a live-captured sphere past the row";
   } catch (e) { console.warn("[splat-probes] live-captured sphere skipped: " + e.message); liveNote = "the live-captured sphere failed (" + e.message.slice(0, 80) + ") -- the analytic row still drew"; }

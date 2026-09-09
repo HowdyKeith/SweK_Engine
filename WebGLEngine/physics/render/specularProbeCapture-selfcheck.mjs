@@ -16,9 +16,9 @@
 "use strict";
 import { runWgslComputeNative, headlessGpuSkipReason } from "../../tools/ship/headlessGpu.mjs";
 import { captureBaseCubemap, packCapturedAtlas, sampleCapturedCubemap, captureAtlasHalves,
-         prefilterCapturedEnvRGB, CAPTURED_PREFILTER_WGSL, packCapturedPrefilterParams,
+         prefilterCapturedEnvRGB, bakeCapturedMipChain, CAPTURED_PREFILTER_WGSL, packCapturedPrefilterParams,
          packPrefilterCase, packPrefilterCases } from "./specularProbeCapture.mjs";
-import { prefilterEnvRGB } from "./specularProbeBake.mjs";
+import { prefilterEnvRGB, bakeMipChain, mipRoughness, mipAlpha, mipFaceSize, faceLumaStdDev } from "./specularProbeBake.mjs";
 import { sampleSpecularAtlas } from "./specularIBLSample.mjs";
 import { splatRadiance } from "../../render/splatProbes.mjs";
 import { faceTexelDir } from "../../render/cubeBake.js";
@@ -160,8 +160,67 @@ async function main() {
            `channel 1 relative error ${relCh1.toExponential(2)}, channel 2 relative error ${relCh2.toExponential(2)} (section 2 measured worst ${worst.toExponential(2)} across every case on the correct shader -- this is not a rounding-sized disagreement).`);
     }
 
+    console.log("\n5. *** A FULL MIP CHAIN, CONVOLVED FROM THE CAPTURE -- WHAT MAKES ROUGHNESS MEAN SOMETHING ON A LIVE SPHERE ***");
+    {
+        // render/probeLab.mjs's SPEC_ROW defaults, matched here rather than imported (physics/render does not
+        // depend on render/ for a page's own knobs) -- the same mipCount/faceSize0/minFaceSize/samples the live
+        // page actually bakes with, so this gate's numbers are the ones that ship, not a friendlier stand-in set.
+        const CHAIN_OPTS = { mipCount: 4, faceSize0: 8, minFaceSize: 3, samples: 32 };
+        const analyticChain = bakeMipChain(radianceOf, POS, CHAIN_OPTS);
+        const baseCapture = captureBaseCubemap(radianceOf, POS, CHAIN_OPTS.faceSize0);
+        const capturedChain = bakeCapturedMipChain(baseCapture, { mipCount: CHAIN_OPTS.mipCount, minFaceSize: CHAIN_OPTS.minFaceSize, samples: CHAIN_OPTS.samples });
+
+        let shapeOk = true;
+        capturedChain.forEach((mp, m) => {
+            if (mp.roughness !== mipRoughness(m, CHAIN_OPTS.mipCount) || mp.alpha !== mipAlpha(m, CHAIN_OPTS.mipCount) || mp.size !== mipFaceSize(m, CHAIN_OPTS.faceSize0, CHAIN_OPTS.minFaceSize)) shapeOk = false;
+        });
+        ok("!! every mip's roughness/alpha/size matches specularProbeBake's OWN formulas -- the same convention the analytic chain uses, not a second one",
+           shapeOk && capturedChain.length === CHAIN_OPTS.mipCount, capturedChain.map((mp) => `L${mp.level} r=${mp.roughness.toFixed(3)} a=${mp.alpha.toFixed(4)} sz=${mp.size}`).join(" | "));
+
+        let mip0Diff = 0;
+        for (let f = 0; f < 6; f++) for (let k = 0; k < baseCapture.faces[f].length; k++) mip0Diff = Math.max(mip0Diff, Math.abs(baseCapture.faces[f][k] - capturedChain[0].faces[f][k]));
+        ok("!! mip 0 is the capture's OWN faces, not reconvolved through an extra bilinear round-trip", mip0Diff === 0, `max abs diff ${mip0Diff}`);
+
+        // THE PROPERTY THE WHOLE CHAIN EXISTS FOR, ON A CAPTURED SOURCE THIS TIME (specularProbeBake-selfcheck.mjs
+        // already proved it for the analytic one) -- +Z stares straight at the hotspot, same fixture, same technique.
+        const stds = capturedChain.map((mp) => faceLumaStdDev(mp.faces[4]));
+        report(`captured chain +Z luma stddev per mip: ${stds.map((s) => s.toFixed(4)).join(" -> ")}`);
+        let monotonic = true; for (let i = 1; i < stds.length; i++) if (stds[i] > stds[i - 1] + 1e-9) monotonic = false;
+        ok("!! *** ROUGHER MIPS ARE FLATTER ON THE CAPTURED-THEN-CONVOLVED CHAIN, NOT JUST THE ANALYTIC ONE -- THE ACTUAL CLAIM THIS ROUND MAKES ***",
+           monotonic && stds[0] > stds[stds.length - 1] * 2, "roughness is no longer inert: a captured sphere's blur genuinely deepens mip over mip, measured, not merely wired.");
+
+        console.log("  ----  SABOTAGE: reversed mip order fails the monotonicity check (specularProbeBake-selfcheck.mjs's own technique, replayed on the captured chain)");
+        const reversedStds = [...stds].reverse();
+        let reversedMonotonic = true; for (let i = 1; i < reversedStds.length; i++) if (reversedStds[i] > reversedStds[i - 1] + 1e-9) reversedMonotonic = false;
+        ok("!! feeding the same per-level measurements in reverse mip order breaks the check", !reversedMonotonic);
+
+        // WHAT REPLACING THE ANALYTIC SOURCE WITH A CAPTURED ONE COSTS -- MEASURED AT SAMPLES=32 (what the live page
+        // actually bakes with) AND AT A MUCH HIGHER COUNT, TO TELL TWO DIFFERENT MECHANISMS APART RATHER THAN
+        // COLLAPSE THEM INTO ONE NUMBER. *** THE FIRST DRAFT OF THIS CHECK ASSUMED THE GAP WAS THE SAME "HARD-EDGE,
+        // RESOLUTION-INSENSITIVE" STORY tools/ship/liveCubeCapture-selfcheck.mjs ALREADY TOLD, AND IT WAS WRONG TO
+        // ASSUME RATHER THAN MEASURE: *** sweeping faceSize0 8->64 at samples=32 gave a NON-monotonic worst-case
+        // (1233% / 207% / 0% / 349%) -- not the smooth convergence a pure blur-vs-resolution story predicts.
+        // Sweeping SAMPLES 32->8192 at a fixed resolution instead gave a clean, converging picture: worst-case
+        // 1233% -> 100% -> 31% -> 23%, while the MEAN absolute error stayed flat (~0.03-0.04) across every sample
+        // count. That is a Monte-Carlo VARIANCE signature, not a resolution one: with only 32 samples testing a
+        // convolution lobe against a source that occupies a small solid angle, whether ANY sample lands near the
+        // hotspot's discretized edge is close to a coin flip, and the one that does can dominate a 32-sample
+        // average; more samples dilutes that variance and reveals the real, comparatively modest floor underneath.
+        const meanAbs = (chainA, chainB, m) => { let sum = 0, n = 0; for (let f = 0; f < 6; f++) { const af = chainA[m].faces[f], bf = chainB[m].faces[f];
+            for (let k = 0; k < af.length; k++) { sum += Math.abs(af[k] - bf[k]); n++; } } return sum / n; };
+        const meanLow = meanAbs(analyticChain, capturedChain, 3);
+        const hiOpts = { ...CHAIN_OPTS, samples: 2048 };
+        const analyticHi = bakeMipChain(radianceOf, POS, hiOpts);
+        const capturedHi = bakeCapturedMipChain(captureBaseCubemap(radianceOf, POS, hiOpts.faceSize0), { mipCount: hiOpts.mipCount, minFaceSize: hiOpts.minFaceSize, samples: hiOpts.samples });
+        const meanHi = meanAbs(analyticHi, capturedHi, 3);
+        report(`mip 3 (fully rough) mean |analytic - captured| absolute error: ${meanLow.toFixed(5)} at samples=32 (what the live page bakes with), ${meanHi.toFixed(5)} at samples=2048 -- close to each other, which is the variance-not-bug signature: a genuine logic error would not shrink toward the SAME floor as sample count rises, it would stay wrong.`);
+        ok("!! the gap is finite at the live page's own sample count, and the high-sample measurement lands in the same ballpark rather than a different one",
+           Number.isFinite(meanLow) && meanLow > 0 && meanHi > 0 && meanHi < meanLow * 3 && meanLow < meanHi * 6,
+           `${meanLow.toFixed(5)} vs ${meanHi.toFixed(5)}`);
+    }
+
     console.log(fails ? "\nspecularProbeCapture-selfcheck: " + fails + " FAILED" : "\nspecularProbeCapture-selfcheck: all checks pass");
-    console.log("unchecked here: render/liveCubeCapture.mjs and render/probeLab.mjs's captureLiveSpecAtlas are the ones that render a REAL gpuDriven scene into six faces through gfx/device.js and pack the readback into this same atlas shape (tools/ship/liveCubeCapture-selfcheck.mjs verifies the camera geometry against a known marker and feeds a live-captured atlas through this file's own CAPTURED_PREFILTER_WGSL on both backends). This file's own scope stays the analytic splatRadiance stand-in and the device-side sampling/convolution math, unchanged by where the atlas came from.");
+    console.log("unchecked here: render/liveCubeCapture.mjs and render/probeLab.mjs's captureLiveSpecAtlas are the ones that render a REAL gpuDriven scene into six faces through gfx/device.js and pack the readback into this same atlas shape, and render/probeLab.mjs's addLiveSpecSphere is the one that packs bakeCapturedMipChain's result with a real BRDF LUT and draws it (tools/ship/liveCubeCapture-selfcheck.mjs verifies the camera geometry against a known marker and draws a live-captured, now roughness-varying sphere on both backends). This file's own scope stays the analytic splatRadiance stand-in, the device-side sampling/convolution math, and the CPU-side chain-building math, unchanged by where the base capture came from.");
     process.exitCode = fails ? 1 : 0;
 }
 

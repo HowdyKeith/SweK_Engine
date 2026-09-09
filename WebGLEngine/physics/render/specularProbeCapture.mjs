@@ -37,8 +37,9 @@
 // one, not inside it -- this file closes "the prefilter can read a captured texture", not "the capture is a live
 // render".
 "use strict";
-import { bakeFace, prefilterEnvRGB } from "./specularProbeBake.mjs";
+import { bakeFace, prefilterEnvRGB, mipRoughness, mipAlpha, mipFaceSize } from "./specularProbeBake.mjs";
 import { packSpecularAtlas, sampleSpecularAtlas } from "./specularIBLSample.mjs";
+import { faceTexelDir } from "../../render/cubeBake.js";
 import { SPLIT_SUM_HELPERS_WGSL, prefilterCoreWgsl, packPrefilterCase, packPrefilterCases } from "./splitSumWgsl.mjs";
 import { SPECULAR_IBL_HELPERS_WGSL } from "./specularIBLWgsl.mjs";
 import { toHalf, fromHalf } from "../../text/slugAtlas.js";
@@ -84,6 +85,53 @@ export function captureAtlasHalves(atlas) {
  *  whether packing round-trips (that is specularProbeBake-selfcheck.mjs's and cubeBake-selfcheck.mjs's job). */
 export function prefilterCapturedEnvRGB(atlas, R, alpha, opts) {
     return prefilterEnvRGB((_pos, d) => sampleCapturedCubemap(atlas, d), null, R, alpha, opts);
+}
+
+/**
+ * v4583 -- A FULL MIP CHAIN, CONVOLVED FROM A CAPTURE INSTEAD OF AN ANALYTIC radianceOf. specularProbeBake.
+ * bakeMipChain's own shape ([{level, roughness, alpha, size, faces}, ...], mip 0 first), so packSpecularAtlas
+ * and everything downstream of a chain (sampleSpecularAtlas's mip blend, specularProbeLitWgsl's ROUGHNESS
+ * const) take this one exactly as they take the analytic one -- roughness was INERT on a live-captured sphere
+ * only because render/probeLab.mjs's addLiveSpecSphere packed a SINGLE level (mip 0 IS the raw capture, and a
+ * 1-mip atlas's mip blend always resolves to it regardless of roughness, proven in this file's own selfcheck);
+ * this is the chain that makes the other mips exist.
+ *
+ * REUSES, NOT REDERIVES: mipRoughness/mipAlpha/mipFaceSize are specularProbeBake.mjs's own formulas (roughness
+ * -> alpha through THIS ENGINE'S principled.alphaOf, the same convention every mip chain in this arc shares by
+ * construction, not by two conventions happening to agree today). The convolution itself is
+ * prefilterCapturedEnvRGB -- splitSum.prefilterEnv, unchanged, reading the CAPTURED texture instead of an
+ * analytic function -- called once per texel per channel, the SAME per-channel-scalar-function-reused-three-
+ * times shape specularProbeBake.bakeFace already uses and for the same reason (splitSum.mjs's own scalar
+ * prefilterEnv, not a fresh vector-valued variant needing its own proof).
+ *
+ * MIP 0 IS THE INPUT CAPTURE'S OWN FACES, NOT RECONVOLVED. Running the same per-texel loop at alpha=0 would
+ * reproduce it (prefilterCapturedEnvRGB's bilinear read at a texel's own centre reduces to that texel's stored
+ * value exactly, since faceTexelDir's u, v land exactly on an integer texel offset there) -- but it would do so
+ * through an extra bilinear round-trip this function has no reason to pay for, on what is usually the chain's
+ * largest, most expensive level. `baseCapture` is asserted to actually BE the raw (alpha=0) level rather than
+ * assumed, so a caller cannot silently hand this a pre-filtered level and get a mislabelled "mip 0".
+ */
+export function bakeCapturedMipChain(baseCapture, { mipCount = 4, minFaceSize = 3, samples = 32 } = {}) {
+    if (baseCapture.alpha !== 0) throw new Error("specularProbeCapture: bakeCapturedMipChain needs the RAW (alpha=0) capture as its base, not an already-filtered level");
+    const faceSize0 = baseCapture.size;
+    const baseAtlas = packCapturedAtlas(baseCapture);
+    const mips = [{ level: 0, roughness: mipRoughness(0, mipCount), alpha: 0, size: faceSize0, faces: baseCapture.faces }];
+    for (let m = 1; m < mipCount; m++) {
+        const alpha = mipAlpha(m, mipCount), size = mipFaceSize(m, faceSize0, minFaceSize);
+        const faces = [];
+        for (let f = 0; f < 6; f++) {
+            const out = new Float32Array(size * size * 3);
+            for (let j = 0; j < size; j++) for (let i = 0; i < size; i++) {
+                const dir = faceTexelDir(f, i, j, size);
+                const [r, g, b] = prefilterCapturedEnvRGB(baseAtlas, dir, alpha, { samples });
+                const o = (j * size + i) * 3;
+                out[o] = r; out[o + 1] = g; out[o + 2] = b;
+            }
+            faces.push(out);
+        }
+        mips.push({ level: m, roughness: mipRoughness(m, mipCount), alpha, size, faces });
+    }
+    return mips;
 }
 
 // ================================================================================================

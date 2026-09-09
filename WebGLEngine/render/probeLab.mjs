@@ -31,7 +31,7 @@ import { bakeMipChain } from "../physics/render/specularProbeBake.mjs";
 import { packSpecularAtlas } from "../physics/render/specularIBLSample.mjs";
 import { specularProbeLitPipelineDesc, uploadSpecularAtlas, specularBind } from "../physics/render/specularProbeLit.mjs";
 import { brdfLut } from "../physics/render/splitSum.mjs";
-import { packCapturedAtlas } from "../physics/render/specularProbeCapture.mjs";
+import { packCapturedAtlas, bakeCapturedMipChain } from "../physics/render/specularProbeCapture.mjs";
 import { captureLiveCubemap } from "./liveCubeCapture.mjs";
 
 export const LAB = Object.freeze({ n: 300, radius: 1.6, scale: 0.25, spacing: 0.5, faceSize: 8, probeRadius: 0.045, meshRadius: 0.35, splatMarker: 0.1, sky: [0.2, 0.2, 0.2], eyeDist: 1.1 });
@@ -175,18 +175,26 @@ export async function captureLiveSpecAtlas(device, lab, eye, opts = {}) {
  * K/R/samples SPEC_ROW's analytic row already uses -- the environment is captured live, the BRDF table is the
  * SAME closed-form table every material in this arc shares (it does not depend on the environment at all).
  *
- * ROUGHNESS IS CURRENTLY INERT HERE, NAMED RATHER THAN HIDDEN: a raw capture is ONE mip level (alpha 0, mirror-
- * sharp -- see render/liveCubeCapture.mjs), so sampleSpecularAtlasM's mip blend always resolves to that one
- * level regardless of the `roughness` argument (the same mipCount-1=0 invariance specularProbeCapture-
- * selfcheck.mjs proves on the CPU side). The default is 0 for that reason -- not "slightly rough", exactly as
- * sharp as any other value would render. A live-captured, roughness-dependent BLUR would mean prefiltering this
- * capture into several mips the way specularProbeBake.bakeMipChain does for the analytic source, which is a
- * further piece of work this function does not attempt. */
-export async function addLiveSpecSphere(device, lab, position, { radius = SPEC_ROW.radius, roughness = 0, F0 = SPEC_ROW.F0, size = 16, ...captureOpts } = {}) {
+ * v4583 -- ROUGHNESS IS NO LONGER INERT HERE. Until now this packed the ONE raw capture (alpha 0, mirror-sharp)
+ * as a 1-mip atlas, so sampleSpecularAtlasM's mip blend always resolved to that single level regardless of the
+ * `roughness` argument -- named honestly rather than hidden, and the invariance was proven (not just argued) by
+ * specularProbeCapture-selfcheck.mjs's mipCount-1=0 case. physics/render/specularProbeCapture.mjs's
+ * bakeCapturedMipChain now convolves that SAME raw capture into a full chain (specularProbeBake.bakeMipChain's
+ * own shape and mipRoughness/mipAlpha/mipFaceSize formulas -- the same ones specLabRow's analytic row already
+ * bakes through), so this packs a CHAIN, not a single level, and `roughness` now selects a genuinely different
+ * mip the same way it already does on the analytic row's four spheres (proven on a captured source, not just
+ * argued by analogy, in specularProbeCapture-selfcheck.mjs's own chain section: rougher mips measurably flatten,
+ * a reversed-order sabotage breaks that, and the remaining captured-vs-analytic gap is Monte-Carlo variance at
+ * this function's sample count, not a logic error). `mipCount`/`minFaceSize`/`samples` default from SPEC_ROW --
+ * the row's own knobs -- so the live sphere's chain is comparable to, not a second unrelated set of parameters
+ * from, the technique it stands beside. */
+export async function addLiveSpecSphere(device, lab, position, { radius = SPEC_ROW.radius, roughness = 0, F0 = SPEC_ROW.F0, size = 16,
+    mipCount = SPEC_ROW.mipCount, minFaceSize = SPEC_ROW.minFaceSize, samples = SPEC_ROW.samples, ...captureOpts } = {}) {
     const scene = diffuseCaptureScene(device, lab, captureOpts.light);
     const capture = await captureLiveCubemap(device, scene, position, { size, ...captureOpts });
+    const mips = bakeCapturedMipChain(capture, { mipCount, minFaceSize, samples });
     const lut = brdfLut({ K: SPEC_ROW.lutK, R: SPEC_ROW.lutR, samples: SPEC_ROW.lutSamples });
-    const atlas = packSpecularAtlas([capture], lut);
+    const atlas = packSpecularAtlas(mips, lut);
     const specTex = uploadSpecularAtlas(device, atlas);
     const fleetIndex = 2 + lab.spec.roughnesses.length;
     const fleet = {
