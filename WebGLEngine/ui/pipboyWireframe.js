@@ -13,21 +13,34 @@
 //
 // API: { group, update(dt), setLight(i,state), blink(i,color,ms), setLightColor(i,hex), setBattery(pct),
 //        setScreen1(fn), setScreen1Texture(tex|null), setScreen2(fn), setMainPage(i), ping(), dispose, canvases, lights }
+//
+// v4585 -- wireBox/wireCyl/the knob now build through ui/barycentricWireframe.js instead of EdgesGeometry or
+// WireframeGeometry + LineBasicMaterial + LineSegments. THAT WAS NEVER GOING TO BE THICK OR ANTI-ALIASED:
+// LineBasicMaterial's own linewidth is a documented no-op on nearly every desktop GPU (capped at 1px by the
+// native GL line rasterizer, a WebGL spec allowance every desktop driver takes) -- tools/ship/nextRounds.mjs's
+// own barycentric-stylized-wireframe entry measured this against the actual file rather than assuming it. The
+// new helpers render the SOLID box/cylinder mesh with a barycentric-coordinate edge shader instead (single
+// pass, resolution-independent thickness, real anti-aliasing), and are asked to reproduce this file's own two
+// PRE-EXISTING looks exactly rather than redesign them: wireBox keeps EdgesGeometry's dihedral-angle dedup (no
+// face diagonals) via hideDiagonals:true, and wireCyl keeps WireframeGeometry's every-triangle-edge look
+// (diagonals shown) via hideDiagonals:false -- both cross-checked against THREE.EdgesGeometry's own output, not
+// assumed, in tools/ship/pipboyWireframe-selfcheck.mjs.
+import { wireframeMesh } from "./barycentricWireframe.js";
 
 export function createPipboyWireframe(THREE, opts = {}) {
     const GREEN = 0x37e07a, DIM = 0x1c5a30, SCREEN_BG = "#04140b", INK = "#6effa0";
     const group = new THREE.Group(); group.name = "swek-pipboy-wireframe";
     const _disposables = [];
 
-    function wireBox(w, h, d, color = GREEN) {
-        const geo = new THREE.BoxGeometry(w, h, d), edges = new THREE.EdgesGeometry(geo);
-        const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.9 });
-        const seg = new THREE.LineSegments(edges, mat); _disposables.push(geo, edges, mat); return seg;
+    function wireBox(w, h, d, color = GREEN, opacity = 0.9, thickness = 2.0) {
+        const { mesh, geometry, material } = wireframeMesh(THREE, new THREE.BoxGeometry(w, h, d),
+            { hideDiagonals: true, color, opacity, thickness });
+        _disposables.push(geometry, material); return mesh;
     }
-    function wireCyl(r, len, color, radSegs = 14, hSegs = 3, op = 0.5) {
-        const g = new THREE.CylinderGeometry(r, r, len, radSegs, hSegs, true), w = new THREE.WireframeGeometry(g);
-        const m = new THREE.LineBasicMaterial({ color, transparent: true, opacity: op });
-        const seg = new THREE.LineSegments(w, m); _disposables.push(g, w, m); return seg;
+    function wireCyl(r, len, color, radSegs = 14, hSegs = 3, op = 0.5, thickness = 2.0) {
+        const { mesh, geometry, material } = wireframeMesh(THREE, new THREE.CylinderGeometry(r, r, len, radSegs, hSegs, true),
+            { hideDiagonals: false, color, opacity: op, thickness });
+        _disposables.push(geometry, material); return mesh;
     }
     function screenPlane(w, h, cv) {
         const tex = new THREE.CanvasTexture(cv); if ("colorSpace" in tex) tex.colorSpace = THREE.SRGBColorSpace;
@@ -43,10 +56,10 @@ export function createPipboyWireframe(THREE, opts = {}) {
     const radarBezel = wireBox(0.66, 0.66, 0.10); radarBezel.position.set(0.60, 0.18, 0.34); group.add(radarBezel);
     const sideHousing = wireBox(0.46, 0.36, 0.10); sideHousing.position.set(0.60, -0.40, 0.34); group.add(sideHousing);
     const knobGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.12, 18);
-    const knobMat = new THREE.LineBasicMaterial({ color: DIM, transparent: true, opacity: 0.85 });
-    const knob = new THREE.LineSegments(new THREE.EdgesGeometry(knobGeo), knobMat);
+    const { mesh: knob, geometry: knobBaryGeo, material: knobMat } = wireframeMesh(THREE, knobGeo,
+        { hideDiagonals: true, color: DIM, opacity: 0.85, thickness: 2.0 });
     knob.rotation.x = Math.PI / 2; knob.position.set(-0.78, -0.50, 0.34); group.add(knob);
-    _disposables.push(knobGeo, knobMat, knob.geometry);
+    _disposables.push(knobGeo, knobBaryGeo, knobMat);
 
     // ---- forearm sleeve + arm (the Pip-Boy is worn on the arm; a wireframe arm pokes through a tube) ----
     // v1839 — tube moved behind the body (z=-0.50) and enlarged: radius 0.46 -> 0.66 so the top of the
