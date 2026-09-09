@@ -3764,6 +3764,40 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since210: Object.freeze({
+        at: "v4557", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/ritualCoherence-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 61 ms, seven rows. *** THE BACKLOG ITEM THIS CAME FROM WAS WRONG AND THE MEASUREMENT " +
+                 "IS THE FINDING. *** It read: every ship-ritual step that WRITES a record is ungated, every " +
+                 "step that only READS one has a gate. NINE of the ten steps write -- two of them rebuild a " +
+                 "JSON file, which the first pass of this census itself misread as reading -- and nine of the " +
+                 "ten carry a verify() or a named gate. The real gaps were two and neither was the filed one: " +
+                 "ONE step with neither check (`package`, now named so a second goes red), and ONE step whose " +
+                 "command could not do what its description claimed. *** `derived-counts` SAID \"Refresh every " +
+                 "derived count\" AND RAN THE CHECKER: *** its command was staleness-selfcheck.mjs, which " +
+                 "contains no writeFileSync anywhere, so a ritual followed exactly reported the drift and " +
+                 "refreshed nothing -- and it named that same file as its GATE, so one run reported both a " +
+                 "step performed and a check passed for an action that did nothing. The writer is staleness.mjs " +
+                 "--fix, deliberately separate (that file's header: --fix \"is never part of a check run\"). " +
+                 "MEASURED CONSEQUENCE: case-study.html claimed 1,606 gates against 1,609 on disk, three " +
+                 "rounds of drift in a number a reader sees. *** AND THE GATE THAT WOULD HAVE SAID SO HAD BEEN " +
+                 "EXILED BY A STALE TIMING. *** staleness-selfcheck was recorded at 3,316 ms against a 3,000 ms " +
+                 "budget, so the sweep skipped it and its recorded exit code sat at a 0 frozen from before it " +
+                 "went red; re-timed through sweepRotation --gate it is 558 ms alone and 1,462 under eight-way " +
+                 "load. Its reading was stamped \"unknown -- before v4408\", and budget exile is a ONE-WAY " +
+                 "DOOR: over budget means skipped means never re-timed. 398 OF THE 465 OVER-BUDGET GATES CARRY " +
+                 "THAT STAMP and 164 sit under 8 s; sixteen sampled across the range were re-timed alone and " +
+                 "FOURTEEN came in under budget (asciify 4,257 -> 339, dracoWeld 5,443 -> 76). That is filed " +
+                 "against backlog #14 rather than fixed here, because a bulk re-time surfaces reds that need " +
+                 "triage. Four sabotages red by name, including restoring the original defect, which trips " +
+                 "both the write-claim row and the self-gate row. One exemption is named and EARNED: `verify` " +
+                 "may be its own gate because running a gate is its action, and the row requires it to be the " +
+                 "one step that does not write -- if it ever gains one the exemption expires with it.",
+    }),
     since209: Object.freeze({
         at: "v4556", swept: 1, green: 1, red: 0,
         added: Object.freeze([

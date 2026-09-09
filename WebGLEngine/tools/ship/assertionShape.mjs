@@ -225,8 +225,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4554 -- RE-TAKEN: one gate (surfaceProbe) joined, the same four rows by one, SEVENTEENTH arrival.
     // v4555 -- RE-TAKEN: one gate (chunk) joined, the same four rows by one, EIGHTEENTH arrival.
     // v4556 -- RE-TAKEN: one gate (versionMarker) joined, the same four rows by one, NINETEENTH arrival.
-    gates: 1609, usesOk: 1588, definesOk: 1580, importsOk: 0,
-    distinctDefinitions: 38, nameFirst: 1481, condFirst: 91, unknownSignature: 16,
+    // v4557 -- RE-TAKEN: one gate (ritualCoherence) joined, the same four rows by one, TWENTIETH arrival.
+    gates: 1610, usesOk: 1589, definesOk: 1581, importsOk: 0,
+    distinctDefinitions: 38, nameFirst: 1482, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

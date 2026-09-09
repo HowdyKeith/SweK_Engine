@@ -153,9 +153,15 @@ export const STEPS = [
     {
         id: "derived-counts",
         what: "Refresh every derived count that is baked into a page (case-study's gate count, promptCost's device count).",
-        command: "node tools/ship/staleness-selfcheck.mjs",
-        why: "these are numbers a READER sees. staleness-selfcheck exists precisely because they drift, and it has " +
-             "caught them on three consecutive patches.",
+        // *** THIS STEP SAID "REFRESH" AND RAN THE CHECKER. *** The command was staleness-selfcheck.mjs, which
+        // contains no writeFileSync at all: running it changes nothing. The writer is staleness.mjs --fix, and
+        // the two are deliberately separate -- that file's own header says --fix "is never part of a check run".
+        // So a ritual followed exactly never refreshed a single derived count; it reported the drift and moved
+        // on. MEASURED CONSEQUENCE AT v4557: case-study.html claimed 1,606 gates against 1,609 on disk, three
+        // rounds of drift on a number a reader sees, and the gate that says so is listed below.
+        command: "node tools/ship/staleness.mjs --fix",
+        why: "these are numbers a READER sees. The step REFRESHES with --fix and the gate beside it CHECKS; " +
+             "naming the checker in both places meant nothing ever did the refreshing.",
         verify: null,     // stated as a gate rather than duplicated here: see the note on second declarations
         gate: "tools/ship/staleness-selfcheck.mjs",
     },
