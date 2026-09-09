@@ -20175,6 +20175,18 @@ console.log(`[showcase] first-run creature showcase is ${_showcaseEnabled ? "ON"
         } catch (e) { console.warn("[audio/settings icons] mount failed:", e?.message); }
     })();
 
+    // AI-presence orb (tools/ship/nextRounds.mjs's ai-presence-orb-widget entry) -- a small, always-on glass-
+    // sphere widget above the bottom-left icon rail, reacting to real ui/wakeWord.js / ui/sttLayer.js events.
+    // A three.js TSL render, independent of this engine's own raw-WebGL2 pipeline -- see
+    // ui/aiPresenceOrbWidget.js's own header for why that is the boundary this round drew, not an oversight.
+    // Best-effort: a WebGPU/WebGL2 init failure here must never block the rest of boot.
+    (async () => {
+        try {
+            const { mountAiPresenceOrbWidget } = await import("./ui/aiPresenceOrbWidget.js");
+            await mountAiPresenceOrbWidget();
+        } catch (e) { console.warn("[aiPresenceOrbWidget] mount failed:", e?.message); }
+    })();
+
     // v1972 — clean boot: tuck away the auto-opening panels (Cameras / Status / Demos / Difficulty) so boot
     // shows just the world; a "▤ Panels" button (bottom-left) toggles them back. Opt out with
     // localStorage voxelengine.cleanBoot="0". Runs after the panels have mounted.
