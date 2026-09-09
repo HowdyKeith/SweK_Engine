@@ -82,12 +82,23 @@ export function rewriteImports(files, urls) {
 }
 
 /** The page's record: { page: "three-probe.html", at, ua, when, route, results: [{ label, version, revision, backend, ok, error, ms }] }. Refuses lies. */
-export function gradeProbe(j) {
+/**
+ * Grade a probe record. `controlLabel` names the vendored control the record was taken against; it defaults to the
+ * one this tree carries NOW.
+ *
+ * *** v4545 -- A RECORD OUTLIVES THE PIN IT WAS TAKEN AGAINST, AND THE GRADER HAD NO WAY TO SAY SO. *** A rig saved
+ * tools/ship/three-probe.json at v4494, when the vendored control was "vendored 0.178"; v4537 bumped the pin and
+ * PROBE_CONTROL.label became "vendored 0.184", so the record graded as "no vendored control" -- true as written and
+ * useless as a reading. It is not missing a control; it has one, for a build this tree no longer ships. The caller
+ * passes the label the record actually names, grades everything else exactly as before, and reports the staleness
+ * itself, which is a different fact from dishonesty and deserves its own words.
+ */
+export function gradeProbe(j, controlLabel = PROBE_CONTROL.label) {
     const problems = [];
     if (!j || j.page !== "three-probe.html") problems.push("not a three-probe record");
     const rs = Array.isArray(j && j.results) ? j.results : [];
     if (rs.length < 2) problems.push(`only ${rs.length} results (the control and at least one version)`);
-    if (!rs.some((r) => r.label === PROBE_CONTROL.label)) problems.push("no vendored control");
+    if (!rs.some((r) => r.label === controlLabel)) problems.push(`no vendored control (looked for ${JSON.stringify(controlLabel)})`);
     for (const r of rs) {
         if (typeof r.ok !== "boolean") { problems.push(`${r.label}: ok is not a boolean`); break; }
         if (r.ok && r.error) { problems.push(`${r.label}: ok with an error`); break; }
@@ -96,7 +107,7 @@ export function gradeProbe(j) {
         if (r.ok && !(r.backend === "webgpu" || r.backend === "webgl2")) { problems.push(`${r.label}: backend ${r.backend}`); break; }
         if (!(Number.isFinite(r.ms) && r.ms >= 0)) { problems.push(`${r.label}: ms not finite`); break; }
     }
-    const control = rs.find((r) => r.label === PROBE_CONTROL.label);
+    const control = rs.find((r) => r.label === controlLabel);
     if (control && !control.ok) problems.push("the vendored control failed: the box, not the version, is the finding");
-    return { ok: problems.length === 0, problems, route: j && j.route, newest: rs.filter((r) => r.label !== PROBE_CONTROL.label), control };
+    return { ok: problems.length === 0, problems, route: j && j.route, newest: rs.filter((r) => r.label !== controlLabel), control, controlLabel };
 }

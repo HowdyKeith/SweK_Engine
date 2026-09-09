@@ -2483,13 +2483,16 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         ]),
         redOnArrival: Object.freeze([]),
         widened: Object.freeze([]),
-        verdict: "green here, RIG-PENDING on the rig. three-probe.html fetches a named three version from the npm registry in the " +
-                 "browser, walks the tarball, blob-imports the build beside the vendored 0.178 and renders one TSL gradient with each; " +
-                 "render/threeProbe.mjs holds untar, pickBuild, rewriteImports and a grader that refuses eight lies. MEASURED on this " +
-                 "box: the control draws on both routes; three@0.185.1 draws on three's WebGL2 backend and is refused on WebGPU by the " +
-                 "browser's GPUTextureViewDescriptor lacking swizzle -- v4319's finding by name, so the pin is at least the build box's. " +
+        verdict: "green here, RIG-PENDING on the rig (and the record on disk is STALE -- taken against the 0.178 pin). three-probe.html " +
+                 "fetches named three versions from the npm registry in the browser, walks the tarballs, blob-imports each build beside the " +
+                 "vendored one and renders one TSL gradient with each; the gate probes BOTH SIDES of PROBE_BOUNDARY, not one version; " +
+                 "render/threeProbe.mjs holds untar, pickBuild, rewriteImports and a grader that refuses eight lies. MEASURED at v4545 on this " +
+                 "box: the control draws on both routes; BOTH sides draw on three's WebGL2 backend; on WebGPU 0.184.0 draws and 0.185.1 is " +
+                 "refused by the browser's GPUTextureViewDescriptor lacking swizzle -- v4319's finding by name, so the pin is at least the " +
+                 "build box's, and the swizzle is read on both sides so the line is a line and not an anecdote. The rig record on disk says " +
+                 "0.185.1 DREW on a rig's WebGPU, and is STALE (taken against the 0.178 pin), which the gate now says in those words. " +
                  "The tarball cache went outside the tree after colourReach counted the cached build as an arrival. Sabotages red at " +
-                 "1 / 3 / 1 / 1.",
+                 "1 / 3 / 1 / 1 (v4494) and 3 / 2 / 1 / 2 / 2 (v4545).",
     }),
     since117: Object.freeze({
         at: "v4495", swept: 1, green: 1, red: 0,
