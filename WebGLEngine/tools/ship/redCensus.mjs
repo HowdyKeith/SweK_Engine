@@ -645,6 +645,17 @@ export const RED_AT_V4535 = Object.freeze(RED_AT_V4535_GATES.map((gate) => Objec
 // tslWide-selfcheck fully green) say the code the swizzle wall is blocking is otherwise correct. THE SIXTH,
 // tslIsing, WAS NEVER THE SWIZZLE WALL AND IS NOW FIXED AND REMOVED, RATHER THAN LEFT HERE STALE -- see the
 // note just above RED_AT_V4557_GATES for what it was and how it cleared.
+//
+// RE-CHECKED after the tslIsing fix, not re-asserted: all five re-run with the SAME error text and the SAME
+// PASS/FAIL counts as recorded below (8/2, 66/2, 12/2, 67/1, 13/1) -- no drift, no second failure hiding behind
+// the first. And the mechanism is now cited rather than named: vendor/three-webgpu/three.webgpu.js's texture
+// view descriptor (~line 75405) sets `this.swizzle = 'rgba'` UNCONDITIONALLY -- the identity value, a no-op --
+// on every view it builds, with its own doc comment saying the field "Requires the 'texture-component-swizzle'
+// feature; ignored otherwise". Three's own authors expect a browser without that feature to ignore the field;
+// this sandbox's Chromium 141 instead throws a WebIDL TypeError on it. Nothing in SweK's code asks for a
+// swizzle, three sends the harmless default unasked, and the browser's strictness is the whole gap -- which is
+// exactly why "not a code fix" is not a shrug: there is no call site here to change, only a Chromium version to
+// wait for or a rig to run on instead.
 const WHY_V4557 = Object.freeze({
     "tools/ship/tslSource-selfcheck.mjs":
         "TypeError: The provided value is not of type 'GPUTextureComponentSwizzle'. Thrown inside three's own " +
