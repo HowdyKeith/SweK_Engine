@@ -3764,6 +3764,36 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since211: Object.freeze({
+        at: "v4559", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "ui/pipboyItems-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 185 ms, ten rows. *** THE ONE THING A PIP-BOY INVENTORY SCREEN IS RECOGNISED BY WAS " +
+                 "THE ONE THING THE INV PAGE DID NOT HAVE. *** ui/pipboyWireframe.js drew six item names and " +
+                 "a blinking cursor; the panel beside the list, where the selected item turns in green " +
+                 "wireframe, did not exist. ui/pipboyItems.mjs is six procedural models -- stimpak, RadAway, " +
+                 "Nuka-Cola, bobblehead, fusion core and the engine itself as a voxel cluster -- built by " +
+                 "joining boxes and tubes, plus a yaw/pitch projection that returns line segments in panel " +
+                 "pixels. *** IT IS PURE ON PURPOSE: no canvas, no DOM, no THREE. *** The failure this code " +
+                 "really has is a silhouette that fits at 0 degrees and crosses the bezel at 137, which is " +
+                 "invisible to anything that renders one frame -- a screenshot test included. Kept pure, the " +
+                 "question is arithmetic: every model at every degree of a full turn, 2,160 projections, " +
+                 "worst overflow -9.5 px (i.e. 9.5 px INSIDE the panel). *** AND THE FLOOR IS ASSERTED " +
+                 "BESIDE THE CEILING, which is what caught the plant. *** Scaling by a radius measured once " +
+                 "at angle 0 -- the classic version of this bug -- does not overflow, it SHRINKS: the " +
+                 "sabotage took the smallest long-axis fill from 0.900 to 0.512 and the containment row " +
+                 "stayed green while the fill row went red. A fit that passes containment by drawing a dot " +
+                 "is useless. The INV list is PARSED OUT OF THE PAGE rather than restated in the gate, so " +
+                 "renaming an entry goes red instead of quietly showing an empty panel; an unknown name " +
+                 "returns null and the page draws NO MODEL rather than the last model that worked, because " +
+                 "a stimpak under the word BOBBLEHEAD looks correct and is worse. Five sabotages red by " +
+                 "name. Rendered headlessly and LOOKED AT before shipping, which is the only way the " +
+                 "remaining question -- whether a barrel, a flange, a plunger and a needle read as a " +
+                 "stimpak at 190 pixels of green line -- can be answered at all; the gate does not claim to.",
+    }),
     since210: Object.freeze({
         at: "v4557", swept: 1, green: 1, red: 0,
         added: Object.freeze([

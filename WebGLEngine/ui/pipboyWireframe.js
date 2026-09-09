@@ -14,6 +14,12 @@
 // API: { group, update(dt), setLight(i,state), blink(i,color,ms), setLightColor(i,hex), setBattery(pct),
 //        setScreen1(fn), setScreen1Texture(tex|null), setScreen2(fn), setMainPage(i), ping(), dispose, canvases, lights }
 
+// RELATIVE, like every other sibling import in this directory (./draggable.js, ./springMotion.js, ...).
+// A browser-absolute "/ui/..." works in the page and makes this file UNIMPORTABLE IN NODE -- it was
+// importable before v4559 and the first draft of this line broke that, which nothing would have caught:
+// the gates that read this file read it as TEXT.
+import { modelFor as _itemModel, project as _itemProject } from "./pipboyItems.mjs";
+
 export function createPipboyWireframe(THREE, opts = {}) {
     const GREEN = 0x37e07a, DIM = 0x1c5a30, SCREEN_BG = "#04140b", INK = "#6effa0";
     const group = new THREE.Group(); group.name = "swek-pipboy-wireframe";
@@ -222,13 +228,43 @@ export function createPipboyWireframe(THREE, opts = {}) {
         ctx.fillStyle = "rgba(110,255,160,0.85)"; ctx.font = "bold 22px ui-monospace,monospace"; ctx.textAlign = "center";
         ctx.fillText("SweK \u00b7 Wireframe Pip-Boy", W / 2, H - 26);
     }
+    // *** THE ITEM PANEL: A PIP-BOY'S INVENTORY SCREEN IS THE ROTATING WIREFRAME, AND THIS PAGE WAS A LIST. ***
+    // The list keeps the left; the selected item turns in the panel on the right. Geometry and projection live
+    // in ui/pipboyItems.mjs and are PURE -- no canvas, no THREE -- so the thing that actually goes wrong here
+    // (a silhouette that fits at 0 degrees and crosses the bezel at 137) is a Node assertion over every model
+    // at every angle rather than something somebody has to sit and watch for.
+    const INV_ITEMS = [["RadAway", "x3"], ["Stimpak", "x5"], ["SweK Engine", "v" + (window.ENGINE_VERSION || "")],
+                       ["Nuka-Cola", "x12"], ["Bobblehead", "x1"], ["Fusion Core", "x2"]];
     function pageInv(ctx, W, H) {
         frame(ctx, W, H, "INV");
-        const items = [["RadAway", "x3"], ["Stimpak", "x5"], ["SweK Engine", "v" + (window.ENGINE_VERSION || "")], ["Nuka-Cola", "x12"], ["Bobblehead", "x1"], ["Fusion Core", "x2"]];
+        const items = INV_ITEMS;
+        const LIST_R = 262;                                     // the list's right edge; the panel owns the rest
+        const sel = Math.floor(performance.now() / 1400) % items.length;
         ctx.font = "20px ui-monospace,monospace"; let y = 96;
-        for (let i = 0; i < items.length; i++) { const sel = i === (Math.floor(performance.now() / 1400) % items.length);
-            ctx.fillStyle = sel ? INK : "rgba(110,255,160,0.5)"; ctx.textAlign = "left"; ctx.fillText((sel ? "> " : "  ") + items[i][0], 30, y);
-            ctx.textAlign = "right"; ctx.fillText(items[i][1], W - 30, y); y += 42; }
+        for (let i = 0; i < items.length; i++) {
+            ctx.fillStyle = i === sel ? INK : "rgba(110,255,160,0.5)"; ctx.textAlign = "left";
+            ctx.fillText((i === sel ? "> " : "  ") + items[i][0], 30, y);
+            ctx.textAlign = "right"; ctx.fillText(items[i][1], LIST_R, y); y += 42;
+        }
+        // divider + panel
+        const panel = { x: W - 214, y: 76, w: 190, h: H - 150 };
+        ctx.strokeStyle = "rgba(60,220,140,0.30)"; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(W - 232, 66); ctx.lineTo(W - 232, H - 40); ctx.stroke();
+        ctx.strokeRect(panel.x, panel.y, panel.w, panel.h);
+        const model = _itemModel(items[sel][0]);
+        if (model) {
+            const segs = _itemProject(model, performance.now() / 1400, panel);
+            ctx.strokeStyle = INK; ctx.lineWidth = 1.4; ctx.globalAlpha = 0.92;
+            ctx.beginPath();
+            for (const [x1, y1, x2, y2] of segs) { ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); }
+            ctx.stroke(); ctx.globalAlpha = 1;
+        } else {
+            // A renamed list entry shows an empty panel and SAYS so, rather than drawing the last item that worked.
+            ctx.fillStyle = "rgba(110,255,160,0.45)"; ctx.font = "15px ui-monospace,monospace"; ctx.textAlign = "center";
+            ctx.fillText("NO MODEL", panel.x + panel.w / 2, panel.y + panel.h / 2);
+        }
+        ctx.fillStyle = INK; ctx.font = "16px ui-monospace,monospace"; ctx.textAlign = "center";
+        ctx.fillText(items[sel][0].toUpperCase(), panel.x + panel.w / 2, H - 46);
     }
     function pageMap(ctx, W, H) {
         frame(ctx, W, H, "MAP");
