@@ -131,6 +131,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
 import { enumerateGates } from "./gateSweep.mjs";
 import * as SC from "./sweepCoverage.mjs";
 import { overNonEmpty, emptyOfNonEmpty } from "./vacuity.mjs";
@@ -806,12 +807,102 @@ console.log("\n*** THE FIRST BULK PASS AT THE EXILED POOL (v4565): HALF THE 3-8 
     // *** THE ROW THAT NAMES WHAT THE PASS CANNOT REACH. *** A record that only says what it fixed reads as
     // finished. rotation() walks c.over; c.killed is a separate bucket and no selection in this file touches it.
     const reachable = SC.rotation(c, t, { slots: 1e9, budgetMs: Infinity }).pool;
-    ok("!! *** AND THE ROTATION STILL CANNOT REACH A GATE THAT HIT THE CAP -- 39% OF WHAT IS OUTSIDE THE SWEEP ***",
-       reachable === c.over.length && c.killed.length > 0 && !c.killed.some((g) => c.over.includes(g)),
-       `the rotation's pool is ${reachable} gates, exactly the ${c.over.length} over budget, and the ` +
-       `${c.killed.length} killed ones are in none of it. That is ${(100 * c.killed.length / outside).toFixed(0)}% ` +
-       "of everything outside the sweep sitting behind a door with no handle, which is the SAME fault v4408 " +
-       "opened for the over-budget bucket, unopened for this one. Stated by a row rather than left in prose.");
+    // *** v4568 OPENED IT, so this row now asserts the door EXISTS rather than that it does not. The default
+    // is deliberately unchanged -- a rotation slice must not silently start running 90-second gates -- so
+    // both directions are checked: closed unless asked, and complete when asked.
+    const withKilled = SC.rotation(c, t, { slots: 1e9, budgetMs: Infinity, includeKilled: true }).pool;
+    ok("!! *** THE DOOR THE KILLED BUCKET DID NOT HAVE: includeKilled REACHES ALL 140, AND NOTHING ELSE DOES ***",
+       reachable === c.over.length && withKilled === c.over.length + c.killed.length && c.killed.length > 0,
+       `the default pool is ${reachable} gates, exactly the ${c.over.length} over budget -- so a rotation ` +
+       `slice does not start running 90-second gates by surprise. With includeKilled it is ${withKilled}, ` +
+       `which is those plus all ${c.killed.length} that hit the cap: ` +
+       `${(100 * c.killed.length / outside).toFixed(0)}% of everything outside the sweep, exiled until v4568 ` +
+       "by the same one-way door v4408 opened for the other bucket.");
+
+    // *** AND THE SPLIT THAT MATTERS MORE THAN THE DOOR: A CAP-HIT WAS A PROXY FOR "NO VERDICT". ***
+    // classify() files anything over CAP_MS as `killed`, and the tree reads that bucket as unjudged -- which
+    // is right for a process that was cut off and wrong for one that ran to completion in 50 s. `finished`
+    // is written by the runner from what the process DID, so the two are told apart by a recorded fact.
+    ok("!! *** `killed` SPLITS INTO GRADED AND NO-VERDICT, and the split is a recorded fact not a threshold ***",
+       (c.graded || []).length + (c.noVerdict || []).length === c.killed.length &&
+       (c.graded || []).every((g) => (t.finished || {})[g] === true) &&
+       (c.noVerdict || []).every((g) => (t.finished || {})[g] !== true),
+       `${c.killed.length} over the cap: ${(c.graded || []).length} FINISHED and therefore have a verdict, ` +
+       `${(c.noVerdict || []).length} were cut off and have none. Before v4568 the file could not tell those ` +
+       "apart, so a gate that ran green in 50 s and a gate killed at 20 s were the same entry -- and so was " +
+       "a gate that ran RED.");
+
+    // The reds that were hiding in it. Empty is a legitimate answer -- but only once something has run them.
+    const hidden = SC.gradedReds(c, t);
+    ok("!! ...and a RED that finished inside that bucket is now visible, where nothing could report it before",
+       (c.graded || []).length === 0 || hidden.length >= 0,
+       (c.graded || []).length === 0
+         ? "no gate in the killed bucket has been run to completion yet, so there is nothing to grade -- " +
+           "which is the state this row exists to stop being permanent"
+         : `${hidden.length} of ${(c.graded || []).length} graded cap-hitters are RED: ` +
+           (hidden.map((g) => g.split("/").pop()).join(", ") || "none"));
+}
+
+console.log("\n*** THE CAP KILLED THE GATE AND LEFT ITS CHILDREN RUNNING (v4568) ***");
+{
+    // *** THIS IS THE LOOP THAT GROWS THE KILLED BUCKET, AND IT WAS FOUND BY READING `ps`. ***
+    // quickSweep killed a capped gate with p.kill("SIGKILL"), which signals the direct child and nothing
+    // below it. A gate that spawned anything of its own is killed before it can clean up and its children
+    // are reparented to init, where they run for as long as they like.
+    //
+    // AND ONE OF THEM HOLDS A GPU. tools/ship/headlessGpu-selfcheck.mjs spawns a child that PINS a WebGPU
+    // device at module scope -- that is the trap it exists to gate -- and relies on spawnSync's own timeout
+    // to end it, which never fires if the parent dies first. An orphan of exactly that shape was found on
+    // this box holding a device for FORTY-FOUR MINUTES, competing with every GPU gate that ran meanwhile.
+    // A gate slowed past the cap is killed, orphaning more: the bucket feeds itself.
+    //
+    // Driven on a real capped run rather than on the source text, because "the code says detached" is the
+    // claim, and whether the orphan survives is the fact.
+    const fixture = path.join(ENG, "tools", "ship", "__sweepcov_leaker_fixture.mjs");
+    const MARK = "swek-orphan-probe-" + process.pid;
+    // *** THE FIXTURE IS BUILT WITH JSON.stringify AT EVERY LEVEL, AND ITS FIRST DRAFT WAS NOT. ***
+    // It interpolated a double-quoted mark INSIDE a double-quoted `-e` script inside a template literal, so
+    // the file it wrote was a SyntaxError, the fixture never spawned anything, and this row read "0 before,
+    // 0 after" and PASSED. Sabotage Q -- reverting quickSweep to the single-process kill -- then passed too,
+    // twice, which is the only reason it was found: a row that cannot fail is exactly what this gate's
+    // sibling assertionShape-selfcheck exists to catch, arriving in a row about leaks.
+    const childScript = `/*${MARK}*/setTimeout(()=>{},600000)`;
+    fs.writeFileSync(fixture, [
+        'import { spawn } from "node:child_process";',
+        `spawn(process.execPath, ["-e", ${JSON.stringify(childScript)}], { stdio: "ignore" });`,
+        "setTimeout(() => {}, 600000);",
+        "",
+    ].join("\n"));
+    // The fixture has to actually WORK, or every number below is about nothing. Checked by running it.
+    const dry = spawnSync(process.execPath, [fixture], { encoding: "utf8", timeout: 3000 });
+    ok("  the leak fixture parses and runs (a broken fixture is what made the row below unfailable once)",
+       !/SyntaxError/.test(dry.stderr || ""), (dry.stderr || "").split("\n")[0] || "no error output");
+    try { spawnSync("pkill", ["-f", MARK]); } catch {}
+    // *** COUNTED AS SURVIVORS, NOT AS ORPHANS, AND THE FIRST DRAFT GOT THAT WRONG. *** It filtered `ps` for
+    // a parent pid of 1, which is what an orphan eventually has -- but reparenting happens a moment after the
+    // parent dies, and this counts the instant runQuickSweep resolves. So the row read zero either way and
+    // SABOTAGE Q PASSED: reverting quickSweep to the single-process kill changed nothing it could see. The
+    // gate's own subject, arriving in the gate. A survivor is the fact regardless of who has adopted it: the
+    // capped run is over, so anything still carrying this run's mark was left behind.
+    const survivors = () => {
+        const r = spawnSync("ps", ["-eo", "args"], { encoding: "utf8" });
+        return (r.stdout || "").split("\n").filter((l) => l.includes(MARK)).length;
+    };
+    const before = survivors();
+    await QS.runQuickSweep({ gates: ["tools/ship/__sweepcov_leaker_fixture.mjs"], capMs: 2500, write: false,
+                             workers: 1, root: ENG });
+    await new Promise((r) => setTimeout(r, 400));   // let the kill land before asking
+    const after = survivors();
+    // Whatever the outcome, do not leave the probe's own children behind.
+    try { spawnSync("pkill", ["-f", MARK]); } catch {}
+    try { fs.unlinkSync(fixture); } catch {}
+    ok("!! *** A GATE KILLED AT THE CAP TAKES ITS CHILDREN WITH IT -- the group is signalled, not the process ***",
+       after === before,
+       `${before} survivor(s) before the capped run, ${after} after. With the old single-process kill this ` +
+       "reads 0 then 1: `p.kill(\"SIGKILL\")` reaches the gate and nothing it spawned. `detached: true` " +
+       "makes the gate a process-GROUP leader and a negative pid signals the whole group. The fallback to " +
+       "the old form is deliberate -- a group kill can fail if the child never formed one, and a cap that " +
+       "throws instead of killing is worse than one that leaks.");
 }
 
 REPORT.write();

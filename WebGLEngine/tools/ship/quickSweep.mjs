@@ -207,11 +207,29 @@ export function reconcile(rows, register = redRegister()) {
     return { known, newRed: fresh, unmeasured };
 }
 
+// *** v4568 -- THE CAP KILLED THE GATE AND LEFT ITS CHILDREN RUNNING, AND ONE OF THEM HOLDS A GPU. ***
+//
+// `p.kill("SIGKILL")` signals the direct child only. A gate that spawned anything of its own is SIGKILLed
+// before it can clean up, its children are reparented to init, and they keep running -- for as long as they
+// like. Measured on a fixture: zero orphans before, one after, from a single capped run.
+//
+// AND IT IS NOT A TIDINESS PROBLEM. tools/ship/headlessGpu-selfcheck.mjs deliberately spawns a child that
+// PINS A WEBGPU DEVICE at module scope -- that is the trap it exists to gate -- and relies on spawnSync's
+// own timeout to end it. If the PARENT is killed first that timeout never fires. One such orphan was found
+// holding a device for FORTY-FOUR MINUTES on this box, and every GPU gate that ran in that window was
+// competing with it. A gate slowed past the cap is then killed, orphaning more, which is a loop that grows
+// the killed bucket this round is about: 140 gates, of which the GPU ones are heavily represented.
+//
+// `detached: true` makes the child a process-GROUP leader, and a negative pid signals the whole group -- so
+// a gate's children die with it. The fallback is the old single-process kill, because a group kill can fail
+// if the child never got as far as forming a group, and a cap that throws instead of killing is worse.
 function runOneAsync(rel, capMs, root) {
     return new Promise((resolve) => {
         const t0 = Date.now();
-        const p = spawn(process.execPath, [rel], { cwd: root, stdio: "ignore" });
-        const timer = setTimeout(() => { try { p.kill("SIGKILL"); } catch {} }, capMs);
+        const p = spawn(process.execPath, [rel], { cwd: root, stdio: "ignore", detached: true });
+        const timer = setTimeout(() => {
+            try { process.kill(-p.pid, "SIGKILL"); } catch { try { p.kill("SIGKILL"); } catch {} }
+        }, capMs);
         p.on("exit", (code, sig) => { clearTimeout(timer); const ms = Date.now() - t0; resolve({ code: sig ? 124 : (code ?? 1), ms, timedOut: !!sig || ms >= capMs }); });
         p.on("error", () => { clearTimeout(timer); resolve({ code: 1, ms: Date.now() - t0, timedOut: false }); });
     });
@@ -258,14 +276,14 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
             // is filed, which is the same two-phase discipline reds have had since v4297, applied to timings.
             if (p1.ms > budgetMs) {
                 const conf = await runOneAsync(rel, capMs, root);
-                rows.push({ gate: rel, verdict: VERDICT.GREEN, parallelMs: p1.ms, serialMs: conf.ms, serialCode: conf.code, from: "budget-confirm" });
-            } else rows.push({ gate: rel, verdict: VERDICT.GREEN, parallelMs: p1.ms });
+                rows.push({ gate: rel, verdict: VERDICT.GREEN, parallelMs: p1.ms, serialMs: conf.ms, serialCode: conf.code, from: "budget-confirm", serialTimedOut: conf.timedOut, parallelTimedOut: p1.timedOut });
+            } else rows.push({ gate: rel, verdict: VERDICT.GREEN, parallelMs: p1.ms, parallelTimedOut: p1.timedOut });
             continue;
         }
         const p2 = await runOneAsync(rel, capMs, root);
         const serial = { code: p2.code, ms: p2.ms, timedOut: p2.timedOut };
         const c = classify(parallel, serial);   // { verdict, from, note } -- gateSweep's rule, not a copy of it
-        rows.push({ gate: rel, verdict: c.verdict, from: c.from, parallelMs: p1.ms, serialMs: p2.ms, serialCode: p2.code });
+        rows.push({ gate: rel, verdict: c.verdict, from: c.from, parallelMs: p1.ms, serialMs: p2.ms, serialCode: p2.code, serialTimedOut: p2.timedOut, parallelTimedOut: p1.timedOut });
     }
     // *** AND A SLICE OF THE TREE IS RE-RUN ALONE, SO THE FILE ACCUMULATES COSTS AND NOT ONLY SAMPLES. ***
     // Phase 2 above already leaves an uncontended reading for every red and every budget crosser; this
@@ -310,8 +328,15 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
     // a gate can drive the reset on a fixture. It was NOT, in the first draft of this round, and the sabotage
     // that deleted the reset went 0 red beside a comment warning that deleting the reset is the whole risk.
     const crossings = countCrossings(prior.crossings, rows, budgetMs);
+    // *** v4568 -- WHETHER THE PROCESS FINISHED IS WRITTEN HERE TOO, or the field only ever describes gates
+    // the rotation happened to touch. *** sweepCoverage.census splits the killed bucket on `finished`, and a
+    // split fed by one writer of two is a split that goes stale the moment the other writer runs. A sweep
+    // that caps a gate must be able to say so, and a sweep that runs one to completion must be able to
+    // clear a stale true -- so it is recorded in BOTH directions on every row, never only when it is false.
+    const finished = { ...(prior.finished || {}) };
     for (const r of rows) {
         timings[r.gate] = r.serialMs ?? r.parallelMs; codes[r.gate] = r.serialCode ?? 0; at[r.gate] = stamp;
+        finished[r.gate] = !(r.serialTimedOut ?? r.parallelTimedOut ?? false);
     }
     backfillStamps(timings, at);
     const dropped = sel.run.filter((g) => (prior.timings || {})[g] != null && timings[g] > budgetMs);

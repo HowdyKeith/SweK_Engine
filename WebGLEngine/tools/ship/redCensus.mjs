@@ -44,7 +44,7 @@
 // at its cause (the walk skips .claude now) rather than by moving a baseline.
 "use strict";
 import { REGISTER_AUDIT } from "./register-audit.mjs";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -854,13 +854,20 @@ export const SLOW_PARTIAL = Object.freeze({
 });
 
 /** Run one gate and report whether it is red. Nothing here interprets WHY -- only the exit code. */
+// *** v4568 -- THE SAME CHILD LEAK quickSweep HAD, in the runner the rotation uses. ***
+// execFileSync's `timeout` kills the direct child and nothing below it, so a gate that spawned anything of
+// its own leaves it running when the cap fires. tools/ship/headlessGpu-selfcheck.mjs pins a WebGPU device in
+// a child on purpose; one such orphan was found holding a device for forty-four minutes on this box, which
+// slows every GPU gate that runs afterwards -- and a gate slowed past the cap is killed, orphaning more.
+// spawnSync exposes the pid execFileSync does not, so the group can be signalled after a timeout.
 export function runGate(rel, { timeoutMs = 120000 } = {}) {
-    try {
-        execFileSync(process.execPath, [rel], { cwd: ENG, timeout: timeoutMs, stdio: "ignore" });
-        return { red: false, code: 0 };
-    } catch (e) {
-        return { red: true, code: e.status == null ? "timeout/signal" : e.status };
-    }
+    const r = spawnSync(process.execPath, [rel], { cwd: ENG, timeout: timeoutMs, stdio: "ignore", detached: true });
+    // The group is signalled whether or not this timed out: a gate that EXITS having left a child behind
+    // leaks exactly as much as one that was killed, and the exit code says nothing about its children.
+    if (r.pid) { try { process.kill(-r.pid, "SIGKILL"); } catch {} }
+    if (r.error) return { red: true, code: "timeout/signal" };
+    if (r.signal) return { red: true, code: "timeout/signal" };
+    return { red: r.status !== 0, code: r.status };
 }
 
 /** Total cost of re-verifying the whole census, in ms, from the recorded per-gate times. */

@@ -43,14 +43,42 @@ export function classify(ms, { budgetMs = BUDGET_MS, capMs = CAP_MS } = {}) {
 // gates: the enumerated tree. timings/codes/at: the file's three maps. Returns a PARTITION -- the four buckets
 // sum to the tree, and `ghosts` (entries naming no gate) are reported separately rather than folded in, because
 // a stale entry is a different problem from a stale reading and v4406 found one of each.
-export function census(gates, { timings = {}, codes = {}, at = {} } = {}, opts = {}) {
+/*
+ * *** v4568 -- "KILLED" WAS A PROXY FOR "OVER THE CAP" AND THE TREE READ IT AS "NO VERDICT". ***
+ *
+ * classify() puts any reading at or above CAP_MS in `killed`, and everything downstream treats that bucket as
+ * unjudged -- rightly, since v4392's rule is that a count of failures is not a verdict unless the process
+ * finished. But the FILE cannot tell the two apart: a gate cut off at 20,000 ms and a gate that ran happily
+ * to completion in 50,214 ms are the same entry. So a gate can be graded, green, and filed as though nothing
+ * were known about it -- or graded, RED, and filed the same way.
+ *
+ * MEASURED at v4568 on twelve of the 140, run serially with a 90 s cap: EIGHT FINISHED, three did not, and
+ * one of the eight is RED (tools/ship/commentFalsePass-selfcheck.mjs, exit 1 in 9.5 s -- it names a gate
+ * asserting against raw source that passes on a copyright comment). Three finished in UNDER the 20,000 ms
+ * cap that exiled them: 9.5 s, 13.0 s, 15.2 s. And 129 of the 140 carry a stamp older than per-entry
+ * stamping itself, which is the same staleness OVER_BUDGET_PASS_V4565 found in the other bucket.
+ *
+ * `finished` is a map the runner writes for a gate whose process EXITED rather than being killed, so the
+ * split is a recorded fact rather than an inference from the number. The four buckets are unchanged --
+ * `killed` still holds everything over the cap, so `partitions` and every existing consumer still hold --
+ * and the split lives INSIDE it as `noVerdict` and `graded`.
+ */
+export function census(gates, { timings = {}, codes = {}, at = {}, finished = {} } = {}, opts = {}) {
     const set = new Set(gates);
     const buckets = { under: [], over: [], killed: [], never: [] };
     for (const g of gates) buckets[classify(timings[g], opts)].push(g);
     const ghosts = Object.keys(timings).filter((k) => !set.has(k));
     const sum = buckets.under.length + buckets.over.length + buckets.killed.length + buckets.never.length;
-    return { ...buckets, ghosts, enumerated: gates.length, sum, partitions: sum === gates.length,
+    // The split inside `killed`: a gate whose process finished HAS a verdict, however expensive it was.
+    const graded = buckets.killed.filter((g) => finished[g] === true);
+    const noVerdict = buckets.killed.filter((g) => finished[g] !== true);
+    return { ...buckets, graded, noVerdict, ghosts, enumerated: gates.length, sum, partitions: sum === gates.length,
              ageOf: (g) => at[g] || UNKNOWN_AT, codeOf: (g) => codes[g], msOf: (g) => timings[g] };
+}
+
+/** A red hiding in the killed bucket: it FINISHED, and it finished nonzero. Empty until something runs them. */
+export function gradedReds(c, { codes = {} } = {}) {
+    return (c.graded || []).filter((g) => codes[g] !== 0 && codes[g] !== undefined);
 }
 
 // *** A KILLED PROCESS'S NONZERO CODE IS NOT A RED. *** 130 of the 143 nonzero over-budget entries hit the cap,
@@ -857,8 +885,16 @@ export function doorCandidates(c, { timings = {} } = {}, { lo = BUDGET_MS, hi = 
 // `filter` narrows the pool before the stalest-first sort -- v4565, for the bulk pass backlog item #14 asks
 // for. The ORDER within whatever is selected stays stalest-first, so a narrowed run is still the same
 // rotation on a smaller population rather than a different policy wearing its name.
-export function rotation(c, { at = {}, timings = {} } = {}, { slots = 24, budgetMs = 120000, filter = null } = {}) {
-    const pool = [...c.over].filter((g) => !filter || filter(g)).sort((a, b) => {
+// `includeKilled` -- v4568, and it is the door OVER_BUDGET_PASS_V4565 said this file did not have. The
+// rotation walked c.over only, so 140 gates that hit the cap were exiled by a mechanism with no way back:
+// 39% of everything outside the ship-time sweep, behind the same one-way door v4408 opened for the other
+// bucket. The selection is the only thing that changes, which is the rule --gate set at v4535 and --band
+// kept at v4565; the caller supplies a bigger cap, because re-running a capped gate at the cap it died on
+// can only ever reproduce the death.
+export function rotation(c, { at = {}, timings = {} } = {}, { slots = 24, budgetMs = 120000, filter = null,
+                                                              includeKilled = false } = {}) {
+    const source = includeKilled ? [...c.over, ...c.killed] : [...c.over];
+    const pool = source.filter((g) => !filter || filter(g)).sort((a, b) => {
         const aa = at[a] || "", bb = at[b] || "";
         if (aa !== bb) return aa < bb ? -1 : 1;
         return (timings[a] || 0) - (timings[b] || 0);

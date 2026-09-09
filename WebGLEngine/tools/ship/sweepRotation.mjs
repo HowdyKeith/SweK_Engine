@@ -26,17 +26,29 @@ export function runSlice(picked, { capMs = CAP_MS, onProgress = null } = {}) {
         const t0 = Date.now();
         let code = 1;
         try { code = runGate(g, { timeoutMs: capMs }).code; } catch { code = 1; }
-        rows.push({ gate: g, ms: Date.now() - t0, code });
+        const ms = Date.now() - t0;
+        // *** v4568 -- WHETHER THE PROCESS FINISHED IS RECORDED, NOT INFERRED FROM THE NUMBER. ***
+        // The whole defect in the killed bucket is that "at or over the cap" was read as "no verdict", so a
+        // gate that ran to completion in 50 s and a gate cut off at 20 s were the same entry. runGate returns
+        // "timeout/signal" as its code for a kill, which is the fact itself rather than a threshold test on
+        // the clock -- a gate finishing 3 ms under the cap is finished, and a slow box does not change that.
+        rows.push({ gate: g, ms, code, finished: code !== "timeout/signal" });
         if (onProgress) onProgress(i + 1, picked.length, rows[rows.length - 1]);
     }
     return rows;
 }
 
 // Returnees are the point: a gate whose fresh serial reading is UNDER the budget rejoins the ship-time sweep.
-export function classifyRows(rows, { budgetMs = BUDGET_MS, priorMs = {} } = {}) {
-    const returnees = rows.filter((r) => r.ms <= budgetMs);
-    const reds = rows.filter((r) => r.code !== 0 && r.ms < CAP_MS);
-    const killed = rows.filter((r) => r.ms >= CAP_MS);
+// `capMs` is a PARAMETER now, not the module constant: --killed runs at its own, larger cap, and a
+// classifier testing 20,000 ms against a 90 s run would call a gate that finished in 25 s "killed" and a
+// gate that really was cut off at 90 s a red. v4392's rule -- a count of failures is not a verdict unless
+// the process finished -- is only enforceable if the classifier knows what finishing meant for that run.
+// `finished` on the row is the fact itself and is preferred wherever it is present.
+export function classifyRows(rows, { budgetMs = BUDGET_MS, priorMs = {}, capMs = CAP_MS } = {}) {
+    const cut = (r) => (r.finished === undefined ? r.ms >= capMs : !r.finished);
+    const returnees = rows.filter((r) => r.ms <= budgetMs && !cut(r));
+    const reds = rows.filter((r) => r.code !== 0 && !cut(r));
+    const killed = rows.filter(cut);
     const slower = rows.filter((r) => priorMs[r.gate] != null && r.ms > priorMs[r.gate] * 1.5);
     return { returnees, reds, killed, slower };
 }
@@ -63,6 +75,13 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     // those are also the fastest to measure, so stalest-first spends an hour on 20-second gates that were
     // never going to come back before it reaches them. Same slice runner, same classifier, same writer, same
     // per-entry stamp; only the selection differs, which is the rule --gate established.
+    // *** v4568 -- --killed: THE BUCKET THE ROTATION COULD NEVER REACH. ***
+    // OVER_BUDGET_PASS_V4565 named 140 gates that hit the 20,000 ms cap as "39% of everything outside the
+    // sweep, behind a door with no handle", because rotation() walked c.over and c.killed is a different
+    // bucket. Re-running them AT the cap they died on can only reproduce the death, so this mode takes its
+    // own, larger cap. Everything else is the same slice runner, classifier, writer and per-entry stamp.
+    const killedMode = process.argv.includes("--killed");
+    const capMs = Number(arg("--cap-s", killedMode ? 90 : CAP_MS / 1000)) * 1000;
     const band = arg("--band", null);   // "3000-8000", in the units the timings file uses
     const inBand = (g) => {
         if (!band) return true;
@@ -70,29 +89,44 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         const ms = (file.timings || {})[g];
         return ms != null && ms > lo && ms <= hi;
     };
+    const pickOpts = { slots, budgetMs, filter: inBand, includeKilled: killedMode };
     const picked = only ? gates.filter((g) => g.includes(only))
-                        : rotation(c, file, { slots, budgetMs, filter: inBand }).picked;
+                        : killedMode ? c.killed.slice(0, slots)
+                        : rotation(c, file, pickOpts).picked;
+    if (killedMode) console.log(`[rotation] --killed: ${c.killed.length} gate(s) have hit the cap, taking ` +
+        `${picked.length} at a ${capMs / 1000} s cap. ${(c.noVerdict || []).length} of them have NO VERDICT AT ALL.`);
     if (only && !picked.length) { console.error("[rotation] --gate " + only + " matched no gate"); process.exit(2); }
     if (only) console.log(`[rotation] --gate ${only}: ${picked.length} gate(s), selection by name rather than by staleness`);
+    else if (killedMode) { /* its own line is printed above; the over-budget pool is not this run's subject */ }
     else {
         const rot = rotation(c, file, { slots, budgetMs, filter: inBand });
         if (band) console.log(`[rotation] --band ${band}: selection by recorded cost rather than by staleness`);
         console.log(`[rotation] over-budget pool ${rot.pool}, taking ${rot.picked.length} (est ${(rot.cost / 1000).toFixed(0)}s), ` +
             `covers the pool in ${rot.roundsToCover} round(s) at this slice size`);
     }
-    const rows = runSlice(picked, { onProgress: (d, t, r) => process.stderr.write(`[rotation] ${d}/${t}  ${r.gate}  ${r.ms}ms exit ${r.code}\n`) });
-    const k = classifyRows(rows, { priorMs: file.timings || {} });
+    const rows = runSlice(picked, { capMs, onProgress: (d, t, r) => process.stderr.write(`[rotation] ${d}/${t}  ${r.gate}  ${r.ms}ms exit ${r.code}\n`) });
+    const k = classifyRows(rows, { priorMs: file.timings || {}, capMs });
     console.log(`[rotation] ran ${rows.length}: ${k.returnees.length} now UNDER budget, ${k.reds.length} red, ${k.killed.length} hit the cap, ${k.slower.length} materially slower`);
     for (const r of k.returnees) console.log(`[rotation]   returnee  ${r.gate}  ${(file.timings || {})[r.gate]} -> ${r.ms} ms`);
     for (const r of k.reds) console.log(`[rotation]   RED       ${r.gate}  exit ${r.code} in ${r.ms} ms`);
+    if (killedMode) {
+        const fin = rows.filter((r) => r.finished);
+        console.log(`[rotation] ${fin.length} of ${rows.length} FINISHED and now have a verdict ` +
+            `(${fin.filter((r) => r.code === 0).length} green, ${fin.filter((r) => r.code !== 0).length} red); ` +
+            `${rows.length - fin.length} did not finish even at ${capMs / 1000} s`);
+        for (const r of fin.filter((x) => x.ms < CAP_MS)) console.log(`[rotation]   under the old cap  ${r.gate}  ${r.ms} ms exit ${r.code}`);
+    }
     if (process.argv.includes("--write")) {
         const stamp = new Date().toISOString();
         const timings = { ...(file.timings || {}) }, codes = { ...(file.codes || {}) }, at = { ...(file.at || {}) };
         const priorMs = {};
-        for (const r of rows) { priorMs[r.gate] = (file.timings || {})[r.gate]; timings[r.gate] = r.ms; codes[r.gate] = r.code; at[r.gate] = stamp; }
+        const finished = { ...(file.finished || {}) };
+        for (const r of rows) { priorMs[r.gate] = (file.timings || {})[r.gate]; timings[r.gate] = r.ms; codes[r.gate] = r.code; at[r.gate] = stamp;
+            // Recorded either way: a gate that STOPS finishing must lose its verdict, not keep an old true.
+            finished[r.gate] = !!r.finished; }
         backfillStamps(timings, at);
         fs.writeFileSync(path.join(ENG, "tools", "ship", "sweep-timings.json"),
-            JSON.stringify({ ...file, timings, codes, at }, null, 1) + "\n");
+            JSON.stringify({ ...file, timings, codes, at, finished }, null, 1) + "\n");
         // Its OWN file: quickSweep builds a fresh object each write and erased this ledger the first time it ran.
         // *** v4535 -- MERGED BY GATE, NOT REPLACED WHOLESALE. *** ROTATION_LOST_V4461 records that this ledger
         // "holds only the last run", and said so as a limitation it had to work around. A one-gate --write then
