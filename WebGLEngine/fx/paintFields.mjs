@@ -165,9 +165,22 @@ export function isGrey(img) {
 }
 
 /**
- * The nebula's hash at f64 and at f32, for the same inputs. tools/ship/webgpuHarness.mjs's header records
- * sin(i * 12.9898) * 43758.5453 returning 0.921690 on a CPU and 0.240234 on a GPU; this is the same
- * construction in the shipped nebula, and the f32 simulation is the cheapest way to say so without a device.
+ * The sin-hash at f64 and at f32, for the same inputs. tools/ship/webgpuHarness.mjs's header records
+ * sin(i * 12.9898) * 43758.5453 returning 0.921690 on a CPU and 0.240234 on a GPU, and the f32 simulation is
+ * the cheapest way to say so without a device.
+ *
+ * *** v4570 -- THIS USED TO SAY "the same construction in the shipped nebula", AND THE NEBULA NO LONGER USES
+ * IT. *** fx/nebula/nebula.js and fx/nebula/nebulaShaders.js computed this hash in float64 and float32
+ * respectively, so the CPU fallback and the GPU path drew different starfields -- 3,006 stars against 2,509
+ * with 378 in the same place, 12.6%, over 518,400 sampled pixels. Both now use render/exactHash.mjs's integer
+ * hash and agree exactly; tools/ship/exactHash-selfcheck.mjs re-derives that before-pair on every run rather
+ * than quoting it, which is what this function does for its own subject.
+ *
+ * SO THIS FUNCTION IS KEPT AND ITS SUBJECT IS NOW HISTORICAL. It is an INSTRUMENT: it computes the idiom at
+ * both precisions ON PURPOSE, to measure a gap. That is why the v4569/v4570 rounds excluded it by name from
+ * the census that replaced the idiom everywhere else -- rewriting it would have deleted the measurement
+ * rather than fixed anything. What it measures is the SHAPE, which is still true of the idiom wherever it
+ * survives; what it must no longer claim is that this tree's nebula is an instance of it.
  */
 export function hashPrecisionGap(samples = 64) {
     const f64 = (x, y) => { const v = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return v - Math.floor(v); };

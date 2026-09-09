@@ -3764,6 +3764,37 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    // v4570 -- the 218th closing: the third twin, and the one a viewer could actually see.
+    since218: Object.freeze({
+        at: "v4570", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/exactHash-selfcheck.mjs"]),
+        verdict: "green, twenty-three rows, no new gate. *** THE NEBULA'S CPU FALLBACK AND ITS GPU PATH DREW " +
+                 "DIFFERENT STARS, AND nebula.html USES BOTH. *** hash2 was fract(sin(p.x*127.1 + " +
+                 "p.y*311.7)*43758.5453) in float64 in fx/nebula/nebula.js and, transcribed, in float32 in " +
+                 "both the WGSL and the GLSL of fx/nebula/nebulaShaders.js. THE GAS SURVIVED IT AND THE " +
+                 "STARS DID NOT, which is why nobody saw it: fbm AVERAGES its noise, so a wisp drawn from a " +
+                 "different random field is still a wisp -- the shader file's header said so and was right " +
+                 "(\"f32 vs f64 differences are imperceptible for gas\"). But the same header claimed the " +
+                 "transcription keeps \"same hash/vnoise/fbm/palette/parallax/STARS\", and nebulaColorAt " +
+                 "draws a star with `if (sv > 0.994)`. A THRESHOLD DOES NOT AVERAGE. Measured over 518,400 " +
+                 "sampled pixels of a 1920x1080 frame: the CPU drew 3,006 stars, the GPU drew 2,509, and 378 " +
+                 "were in the same place -- 12.6%. Which sky a viewer saw depended on whether their browser " +
+                 "had WebGPU. All three halves now use render/exactHash.mjs's integer hash: noise worst " +
+                 "delta 0, and every star in the same place, 100.0%. *** AND THAT BEFORE-PAIR IS RE-DERIVED " +
+                 "RATHER THAN QUOTED: the gate computes the old idiom beside the new one over THE SAME " +
+                 "PIXELS every run, because a first reading of it under a different sampling said 3,070 " +
+                 "against 2,576, and two readings of one sampled quantity written down as a fixed fact is " +
+                 "the defect this session keeps finding in other people's records. *** AND FIXING IT MADE AN INSTRUMENT'S " +
+                 "PROSE STALE, WHICH IS THIS SESSION'S OWN RECURRING FAULT. *** fx/paintFields.mjs's " +
+                 "hashPrecisionGap said it measured \"the same construction in the shipped nebula\" -- true " +
+                 "when written and false now. It is KEPT, because it is an instrument that computes both " +
+                 "precisions on purpose and rewriting it would delete a measurement, and its subject is " +
+                 "recorded as historical. THE TWIN CENSUS IS NOW EMPTY of real twins: what matches the " +
+                 "pattern is two deliberate instruments, this gate's own control, and four CPU-only files " +
+                 "with no shader counterpart. Sabotages Y and Z red by name.",
+    }),
     // v4569 -- the 217th closing, and the first ENGINE round after five on the sweep itself.
     since217: Object.freeze({
         at: "v4569", swept: 1, green: 1, red: 0,

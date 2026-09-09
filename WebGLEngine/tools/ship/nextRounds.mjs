@@ -306,32 +306,48 @@ export const NEXT_ROUNDS = [
     {
         id: "sin-hash-everywhere-else",
         blocker: "OPEN",
-        what: "The sin-based hash that v4558 replaced in the BCS shader family is still in 29 other files -- "
-            + "nebula, paintFields, pageVoxels, the ant-colony and slime-mold demos, blackhole.html, "
-            + "predictions.html and others. Each is the same defect: fract(sin(dot(p, K)) * 43758.5453) "
-            + "amplifies the last bits of its input by four orders of magnitude, so a float32 GPU and a "
-            + "float64 CPU draw DIFFERENT RANDOM NUMBERS rather than rounding the same one differently.",
-        how: "The v4558 replacement is the pattern and it is already written twice, once in GLSL and once in "
-            + "JS: quantise to a fixed lattice, then run a 32-bit integer avalanche. Integer arithmetic is "
-            + "exact in both precisions. What it costs is a VISUAL CHANGE -- a different hash is a different "
-            + "noise field -- so each site needs somebody to look at the picture afterwards, which is why "
-            + "this is a round per subsystem rather than one sweep of the tree.",
+        what: "THE TWIN HALF IS DONE AND THE UNGATED HALF IS NOT. fract(sin(dot(p, K)) * 43758.5453) amplifies "
+            + "the last bits of its input by four orders of magnitude, so a float32 GPU and a float64 CPU draw "
+            + "DIFFERENT RANDOM NUMBERS rather than rounding the same one differently. The backlog filed this as "
+            + "29 files; the real shipped population is 16, and the round that read them split it: THREE HAD BOTH "
+            + "HALVES and they disagreed, three are CPU-only with no shader to disagree with, two are instruments "
+            + "that compute the idiom at both precisions ON PURPOSE, and TEN HAVE NO GATE AT ALL. The three twins "
+            + "are fixed at v4569-v4570 -- render/grassField.js against render/grassModel.mjs, "
+            + "fx/wormhole/wormholeNebula.js's three transcriptions of h2, and fx/nebula/nebula.js against "
+            + "fx/nebula/nebulaShaders.js. The ten are what is left.",
+        how: "For the ten, the hash is not the work -- render/exactHash.mjs is written, twinned and gated, so the "
+            + "substitution is three lines a file. The work is that a different hash is a DIFFERENT PICTURE and "
+            + "those ten have nothing that would notice: render-QA checks their pages for notAllBlack and "
+            + "notUniform, and a completely different noise field passes both identically. So the round is a "
+            + "verifiable pair per file BEFORE the substitution -- a CPU reference the shader is held to, the "
+            + "shape render/grassModel.mjs and fx/nebula/nebula.js already have -- and that is a round per page, "
+            + "not one sweep of the tree. Changing the hash first would be a visual change wearing a fix.",
         why: "*** THE TREE ALREADY KNEW, IN THREE PLACES, AND NEVER JOINED THEM UP. *** "
             + "tools/ship/webgpuHarness.mjs records that sin(i * 12.9898) * 43758.5453 returns 0.921690 on a "
             + "CPU and 0.240234 on a GPU for i = 1. fx/paintFields.mjs's header records the same shape for "
             + "the nebula hash, and paintFields-selfcheck MEASURES the f64-against-f32 gap every run. "
             + "swiftShaders-selfcheck drew a whole boundary around it -- fifteen shaders it declared could "
             + "never be verified. Three independent notes about one defect, each treated as a local limit. "
-            + "Re-measured at v4558 over 20,000 sample points: 79.4% of them diverge by more than 0.1 and the "
-            + "worst pair is 0.9960 against 0.0000. After the integer replacement, on real WebGL2: 0% diverge "
-            + "by more than 0.1, worst 2.98e-8, and seventeen of the twenty hash-reaching shaders went to "
-            + "ZERO levels over ZERO pixels against their CPU model.",
-        upstream: "Nothing blocks it. The judgement each site needs is whether anything DEPENDS on the "
-            + "current pattern -- a baked screenshot, a recorded verdict, a demo somebody has looked at and "
-            + "approved. paintFields-selfcheck is the interesting one: it MEASURES the divergence as a "
-            + "property of its subject, so replacing the hash there turns a gate that reports a gap into a "
-            + "gate that must assert there is none, which is a rewrite rather than a re-take."
-            .replace("PLACEHOLDER", ""),
+            + "*** AND THE THREE TWINS SHOW WHAT THE NOTES WERE MISSING: THE GAS SURVIVES THE DIVERGENCE AND "
+            + "THE THRESHOLD DOES NOT. *** fbm AVERAGES its noise, so a wisp drawn from an unrelated random "
+            + "field is still a wisp -- which is why nebulaShaders.js could say \"f32 vs f64 differences are "
+            + "imperceptible for gas\" and be RIGHT, and why nobody looking at the picture caught it. But "
+            + "render/grassField.js decides a blade EXISTS with a threshold on bladeHash, and "
+            + "fx/nebula/nebula.js draws a star with sv > 0.994, and A THRESHOLD DOES NOT AVERAGE. "
+            + "Measured: grass 65.4% of drawn decisions FLIPPED between the shader and the model whose stated "
+            + "job is to mirror it; wormhole h2 70.0% of 14,400 lattice points; nebula 3,006 CPU stars "
+            + "against 2,509 GPU ones with 378 in the same place -- 12.6% -- over 518,400 sampled pixels, on "
+            + "a page that imports renderNebulaCPU AND the shaders, so which sky a viewer saw depended on "
+            + "whether their browser had WebGPU. All three now read 0.0% and 100%, and "
+            + "tools/ship/exactHash-selfcheck.mjs section 6 is a RATCHET: no file may compute the sin-hash in "
+            + "float64 and emit it to a shader again.",
+        upstream: "Nothing blocks the ten. What blocks them being DONE rather than merely changed is that a "
+            + "verifiable pair has to exist first, and building one is the round. The judgement each site "
+            + "needs is whether anything DEPENDS on the current pattern -- a baked screenshot, a recorded "
+            + "verdict, a demo somebody has looked at and approved. The two instruments are the worked "
+            + "example of getting that judgement wrong: fx/paintFields.mjs's hashPrecisionGap and "
+            + "physics/kernelVerdict-selfcheck.mjs compute the idiom at both precisions to MEASURE the gap, "
+            + "and a mechanical pass over \"29 files\" would have deleted the measurement and called it a fix.",
     },
     {
         id: "fluid-has-no-sink",

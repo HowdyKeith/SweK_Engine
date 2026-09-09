@@ -381,7 +381,11 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // 4063 -> 4064 and three rows by one. async/await moves because the gate awaits a dynamic import of the
     // wormhole module -- it reads the EXPORTED shader strings rather than the file text, since codeOnly
     // deletes shader template literals and a scan through it would have passed on an empty string.
-    esModules: 3766, closures: 3644, asyncAwait: 1423, typedArrays: 1034, promises: 349,
+    // v4570 -- RE-TAKEN: closures 3644 -> 3645 and nothing else. No new FILE; fx/nebula/nebula.js's hash2
+    // went from a function DECLARATION to a const arrow bound to exactHash2, and this census counts a
+    // function stored as a value rather than declared. The narrowest kind of move it records, and it records
+    // it -- a row that only moved on new files would miss every refactor.
+    esModules: 3766, closures: 3645, asyncAwait: 1423, typedArrays: 1034, promises: 349,
     fetchXhr: 243, performanceNow: 220, raf: 116, webgl: 141, webgpu: 48, threads: 22, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

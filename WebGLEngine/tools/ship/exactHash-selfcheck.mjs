@@ -185,6 +185,65 @@ console.log("\n5. *** THE TWINS THAT USED TO DISAGREE ***");
        "no fract(sin( at all; the JS half calls exactHash2");
 }
 
+console.log("\n5b. *** THE NEBULA: THE CPU FALLBACK AND THE GPU PATH DREW DIFFERENT STARS ***");
+{
+    // *** THE GAS SURVIVED THE DIVERGENCE AND THE STARS DID NOT, WHICH IS WHY NOBODY SAW IT. ***
+    // nebulaShaders.js's header said the transcription was "correct-by-construction and visually equivalent
+    // (f32 vs f64 differences are imperceptible for gas)" -- true, because fbm AVERAGES its noise, so a wisp
+    // drawn from a different random field is still a wisp. The same header claimed the transcription keeps
+    // "same hash/vnoise/fbm/palette/parallax/STARS", and nebulaColorAt draws a star with `if (sv > 0.994)`.
+    // A THRESHOLD DOES NOT AVERAGE.
+    //
+    // nebula.html imports renderNebulaCPU AND these shaders, so which sky a viewer saw depended on whether
+    // their browser had WebGPU.
+    //
+    // *** THE "BEFORE" IS RE-DERIVED HERE RATHER THAN QUOTED. *** The first draft of this row carried the
+    // before-numbers as prose -- 3,070 stars against 2,576 with 411 shared -- and re-measuring them under a
+    // second sampling gave 3,006 against 2,509 with 378. Neither reading was wrong; they were taken over
+    // different pixels, and a fixed number standing in for a sampled one is this session's own defect class.
+    // So the old idiom is computed BESIDE the new one, over the same pixels, every run.
+    const NB = await import("../../fx/nebula/nebula.js");
+    const NS = await import("../../fx/nebula/nebulaShaders.js");
+    const gpuH = (x, y) => exactHash2(f(x), f(y));
+    let n = 0, worst = 0;
+    for (let ix = -50; ix < 50; ix++) for (let iy = -50; iy < 50; iy++) {
+        n++; worst = Math.max(worst, Math.abs(NB.hash2(ix, iy) - gpuH(ix, iy)));
+    }
+    ok("*** nebula: the CPU reference and the shader draw the same noise, exactly ***",
+       n > 8000 && worst === 0, `${n} lattice points, worst |delta| ${worst}`);
+    // THE STARFIELD IS THE ROW THAT MATTERS -- it is the one a viewer can see.
+    const oldF64 = (x, y) => { const h = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return h - Math.floor(h); };
+    const oldF32 = (x, y) => { const d = f(f(f(x) * f(127.1)) + f(f(y) * f(311.7)));
+        const v = f(f(Math.sin(d)) * f(43758.5453)); return f(v - f(Math.floor(v))); };
+    let px = 0, cpuStars = 0, gpuStars = 0, same = 0, oCpu = 0, oGpu = 0, oSame = 0;
+    for (let x = 0; x < 960; x++) for (let y = 0; y < 1080; y += 2) {
+        const sx = Math.floor(x * 0.9), sy = Math.floor(y * 0.9);
+        const a2 = NB.hash2(sx, sy) > 0.994, b2 = gpuH(sx, sy) > 0.994;
+        px++; if (a2) cpuStars++; if (b2) gpuStars++; if (a2 && b2) same++;
+        const a1 = oldF64(sx, sy) > 0.994, b1 = oldF32(sx, sy) > 0.994;
+        if (a1) oCpu++; if (b1) oGpu++; if (a1 && b1) oSame++;
+    }
+    const pct = (n, d) => (d ? (100 * n / d).toFixed(1) : "n/a") + "%";
+    ok("*** ...and EVERY STAR IS IN THE SAME PLACE, which is what a viewer without WebGPU used to lose ***",
+       cpuStars > 200 && cpuStars === gpuStars && same === cpuStars,
+       `${px} sampled pixels: CPU ${cpuStars} stars, GPU ${gpuStars}, ${same} in the same place ` +
+       `(${pct(same, cpuStars)}). The idiom it replaced, over THE SAME PIXELS in the same run: ` +
+       `${oCpu} against ${oGpu} with ${oSame} shared (${pct(oSame, oCpu)}).`);
+    // The control has to still SHOW the divergence, or the row above is comparing the fix to nothing.
+    ok("  ...and that control still diverges, so the comparison is to a measured gap and not to a memory",
+       oCpu > 200 && oSame / oCpu < 0.5,
+       `sin-hash f64 against f32: ${pct(oSame, oCpu)} of the CPU's stars survive to the GPU`);
+    ok("  ...and the nebula still PAINTS something -- a constant hash would agree perfectly and draw nothing",
+       (() => { const c = []; for (let i = 0; i < 40; i++) c.push(NB.nebulaColorAt(i * 47, i * 29, 1920, 1080, { x: 0, y: 0 }, 1.5)[0]);
+                return Math.max(...c) - Math.min(...c) > 0.02 && cpuStars > 200; })(),
+       "red-channel spread across 40 pixels, plus a starfield that is sparse rather than empty or full");
+    ok("  ...and BOTH shader halves really changed, read as the exported strings",
+       [NS.NEBULA_WGSL, NS.NEBULA_GLSL_FS].every((t) => /exact_hash\(p, 0u\)/.test(t) && !/fract\(sin\(/.test(t)),
+       `WGSL ${NS.NEBULA_WGSL.length} chars and GLSL ${NS.NEBULA_GLSL_FS.length} chars, both calling exact_hash`);
+    ok("  ...and the WGSL still validates, since a spliced function can break a shader that never runs here",
+       validateWgsl(NS.NEBULA_WGSL).length === 0, validateWgsl(NS.NEBULA_WGSL).join("; ") || "clean");
+}
+
 console.log("\n6. *** THE RATCHET: no CPU/GPU TWIN may reintroduce the idiom ***");
 {
     // A census rather than a list. A file is a TWIN when it computes the sin-hash in float64 (Math.sin(...)
