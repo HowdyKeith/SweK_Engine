@@ -235,9 +235,25 @@ export function storageWords(data) {
     return new Uint32Array(out.buffer);
 }
 
+/**
+ * v4580 -- `texture`: { width, height, data, binding, format = "rgba16float" }, so a compute shader can sample a
+ * REAL bound texture (a captured cubemap atlas, not a storage buffer read by hand) rather than only receiving
+ * numbers through `uniforms` or `inputs`. `data` is a flat f32 RGBA array (the same shape every atlas in this
+ * tree already produces, e.g. specularIBLSample.packSpecularAtlas's `.data`); the half-float upload conversion
+ * is done here, with THIS FILE'S OWN doubleToHalf, matching the codec its own texture-OUTPUT path already uses
+ * below rather than importing a second implementation for the input side. This is the exact capability
+ * specularProbeBake.mjs's and this file's own header named as missing ("headlessGpu.mjs to grow a cubemap-
+ * texture binding it does not have") -- physics/render/specularProbeCapture.mjs is the first caller.
+ * specularProbeLit-selfcheck.mjs's OWN hand-rolled texture-in/buffer-out shim predates this (neither this
+ * function nor runWgslComputeToTextureNative supported the shape when it was written) and is left as it is
+ * rather than retrofitted: its CPU reference is graded against text/slugAtlas.js's toHalf/fromHalf specifically,
+ * and swapping its upload path to this function's doubleToHalf would change which half-float codec the two
+ * sides of that gate share without a measured reason to -- a second real caller is worth more evidence of
+ * reusability than editing a passing gate for tidiness alone.
+ */
 export async function runWgslComputeNative({ code, entryPoint = "main", outCount, uniforms = null,
                                              workgroups = 1, compileOnly = false, requireFn = null,
-                                             inputs = null, outInit = null } = {}) {
+                                             inputs = null, outInit = null, texture = null } = {}) {
     const skip = headlessGpuSkipReason(requireFn);
     if (skip) return { ok: false, skipped: true, reason: skip, values: [], errors: [] };
     const icd = configureVulkanIcd();
@@ -263,6 +279,7 @@ export async function runWgslComputeNative({ code, entryPoint = "main", outCount
         const G = mod.globals || globalThis;
         const U = G.GPUBufferUsage || globalThis.GPUBufferUsage;
         const M = G.GPUMapMode || globalThis.GPUMapMode;
+        const TU = G.GPUTextureUsage || globalThis.GPUTextureUsage;
         const bytes = outCount * 4;
         const outBuf = dev.createBuffer({ size: bytes, usage: U.STORAGE | U.COPY_SRC | U.COPY_DST });
         // v4465 -- `outInit`: the out buffer's starting contents, for a kernel that works IN PLACE on binding 0 (the
@@ -287,6 +304,16 @@ export async function runWgslComputeNative({ code, entryPoint = "main", outCount
             entries.push({ binding: inp.binding, resource: { buffer: b } });
             inBufs.push(b);
         }
+        let tex = null;
+        if (texture) {
+            const { width, height, data, binding, format = "rgba16float" } = texture;
+            if (format !== "rgba16float") throw new Error("headlessGpu: runWgslComputeNative texture only supports rgba16float today (got " + format + ")");
+            const half = new Uint16Array(width * height * 4);
+            for (let i = 0; i < half.length; i++) half[i] = doubleToHalf(data[i] || 0);
+            tex = dev.createTexture({ size: [width, height], format, usage: TU.TEXTURE_BINDING | TU.COPY_DST });
+            dev.queue.writeTexture({ texture: tex }, half, { bytesPerRow: width * 8 }, [width, height]);
+            entries.push({ binding, resource: tex.createView() });
+        }
         const pipe = dev.createComputePipeline({ layout: "auto", compute: { module: shader, entryPoint } });
         const bind = dev.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries });
         const enc = dev.createCommandEncoder();
@@ -298,7 +325,7 @@ export async function runWgslComputeNative({ code, entryPoint = "main", outCount
         await readBuf.mapAsync(M.READ);
         const values = Array.from(new Float32Array(readBuf.getMappedRange()));
         readBuf.unmap();
-        outBuf.destroy(); readBuf.destroy(); uniBuf?.destroy();
+        outBuf.destroy(); readBuf.destroy(); uniBuf?.destroy(); tex?.destroy();
         for (const b of inBufs) b.destroy();
         return { ok: true, skipped: false, values, errors: [], ...meta };
     } catch (e) {

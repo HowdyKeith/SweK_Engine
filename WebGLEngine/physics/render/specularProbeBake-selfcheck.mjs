@@ -96,5 +96,5 @@ console.log("\n3. *** THE PHYSICAL PROPERTY THE WHOLE CHAIN EXISTS FOR: ROUGHER 
 }
 
 console.log(fails ? "\nspecularProbeBake-selfcheck: " + fails + " FAILED" : "\nspecularProbeBake-selfcheck: all checks pass");
-console.log("unchecked here: physics/render/specularProbeLit.mjs is the one that packs this chain into a real gfx/device.js texture and binds it to a real material, now drawn by render/probeLab.mjs's actual scene (tools/ship/probeLab-selfcheck.mjs renders it on both backends). A GPU-side BAKE from a real captured cubemap rather than an analytic/splat radianceOf remains unbuilt -- splitSumWgsl.mjs's PREFILTER_ENV_WGSL still takes an analytic env, not a texture.");
+console.log("unchecked here: physics/render/specularProbeLit.mjs is the one that packs this chain into a real gfx/device.js texture and binds it to a real material, now drawn by render/probeLab.mjs's actual scene (tools/ship/probeLab-selfcheck.mjs renders it on both backends). physics/render/specularProbeCapture.mjs now runs a GPU-side prefilter against a captured texture (this file's own alpha=0 mip 0, packed and uploaded) rather than only an analytic env -- but the scene it captures is still this file's splatRadiance-driven radianceOf, point-sampled through cube-bake geometry, not a real-time rasterised frame of the gpuDriven scene's actual fleets.");
 process.exit(fails ? 1 : 0);

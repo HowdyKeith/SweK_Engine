@@ -100,6 +100,12 @@ import { buildWgsl as buildMicrofacetWgsl } from "../../physics/render/microface
 // v4472 -- the two the same census named next, for the same reason it named the nine.
 import * as PTG from "../../physics/render/pathTracerGpu.mjs";
 import * as RTP from "../../physics/render/rtPipeline.mjs";
+// v4580 -- the specular-IBL arc's OWN nine-kernel moment: BRDF_LUT_WGSL and PREFILTER_ENV_WGSL have run on the
+// native backend since v4576 with a clean one-buffer signature the corpus already knows how to drive, and
+// CAPTURED_PREFILTER_WGSL (new this round) compiles on both even though its numeric grading -- a texture input --
+// stays native-only until this corpus's browser-side runner grows the same `texture` binding headlessGpu.mjs did.
+import { BRDF_LUT_WGSL, PREFILTER_ENV_WGSL, packLutParams, packPrefilterCases, ENV_KIND } from "../../physics/render/splitSumWgsl.mjs";
+import { CAPTURED_PREFILTER_WGSL } from "../../physics/render/specularProbeCapture.mjs";
 const EMITTED_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), "tsl-emitted.json");
 const EMITTED = fs.existsSync(EMITTED_PATH) ? JSON.parse(fs.readFileSync(EMITTED_PATH, "utf8")) : null;
 const EMITTED_PHYS_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), "tsl-emitted-physics.json");
@@ -497,6 +503,24 @@ export function corpus() {
         { id: "slugShaderWgsl.slugDilateProbeWgsl", from: "text/slugShaderWgsl.js",
           why: "SlugDilate under a matrix with a live perspective row: the half-pixel push whose per-axis error the v4457 note wrote down",
           opts: slugDilateCase() },
+        // *** v4580 -- THE SPECULAR-IBL ARC'S OWN NINE-KERNEL MOMENT: BRDF_LUT_WGSL AND PREFILTER_ENV_WGSL RAN
+        // ON A DEVICE SINCE v4576 AND WERE NEVER ENROLLED. *** Both fit the one-buffer signature exactly and
+        // already have real fixtures in splitSumWgsl-selfcheck.mjs; reused here rather than re-derived, so a
+        // case set drifting would show up as ONE gate disagreeing with itself, not two silently diverging.
+        { id: "splitSumWgsl.BRDF_LUT_WGSL", from: "physics/render/splitSumWgsl.mjs",
+          why: "the split-sum BRDF table, one thread per (mu, alpha) cell -- Hammersley, a GGX half-vector sample and height-correlated G2, over 256 cells; graded against splitSum.mjs's f64 table by splitSumWgsl-selfcheck.mjs on the native backend, here for the second backend's compiler AND numbers",
+          opts: { code: BRDF_LUT_WGSL, outCount: 16 * 16 * 2, uniforms: Array.from(packLutParams(16, 16, 512)), workgroups: [2, 2, 1] } },
+        { id: "splitSumWgsl.PREFILTER_ENV_WGSL", from: "physics/render/splitSumWgsl.mjs",
+          why: "the prefiltered environment over three analytic test patterns (uniform/gradient/spot) x four roughness levels x three directions -- the tangent frame and the NoL-weighted GGX convolution, graded against splitSum.prefilterEnv() by splitSumWgsl-selfcheck.mjs on the native backend",
+          opts: (() => {
+              const dirs = [[0, 0, 1], [1, 0, 0], [0.6, 0.6, 0.53]], alphas = [0.05, 0.3, 0.7, 1.0], samples = 512;
+              const cases = []; for (const a of alphas) for (const R of dirs) cases.push({ R, alpha: a, envKind: ENV_KIND.uniform, samples });
+              return { code: PREFILTER_ENV_WGSL, outCount: cases.length, uniforms: [cases.length, 0, 0, 0],
+                       inputs: [{ binding: 2, data: packPrefilterCases(cases) }], workgroups: [Math.ceil(cases.length / 64), 1, 1] };
+          })() },
+        { id: "specularProbeCapture.CAPTURED_PREFILTER_WGSL", from: "physics/render/specularProbeCapture.mjs", compileOnly: true,
+          why: "the SAME prefilter core reading a real bound texture instead of an analytic pattern -- the texture binding is native-only until this corpus's browser runner grows one too (headlessGpu.mjs's v4580 note), so what the corpus adds here is the second backend's COMPILER; the numbers are graded, texture and all, by specularProbeCapture-selfcheck.mjs on the native backend",
+          opts: { code: CAPTURED_PREFILTER_WGSL, compileOnly: true, outCount: 0 } },
         // *** v4295 -- THE TEXTURE ENTRIES, WHICH THE CORPUS HAD NONE OF. *** Seven shaders and 41,656 floats
         // of agreement, all of it through storage BUFFERS, while the only shader that writes a storage TEXTURE
         // was excluded for want of a native path. That was the worst place to have no evidence: v4287 measured
@@ -601,6 +625,36 @@ export const EXCLUDED = Object.freeze([
                     why: "renders the lit render pair with a tint if-chain baked in; litWgsl(null) is LIT_WGSL, which the corpus compiles on both backends, and a tinted rendering is painted and read back on both by tools/ship/litSphere-selfcheck.mjs" }),
     Object.freeze({ id: "physics/xpbd/cloth-collision.wgsl", kind: "superseded file, never loaded",
                     why: "the v2661 contact solver that did not accumulate lambda -- the disagreement with clothLoop.js that v4465 found by writing the mirror; xpbdWgsl.mjs solves contact with the same kernel as the fixed solve under a unilateral flag, and nothing loads this file" }),
+    // *** v4580 -- THE SPECULAR-IBL ARC'S OWN CENSUS GAP, ELEVEN SYMBOLS ACROSS THREE FILES AND FOUR ROUNDS
+    // (v4576-v4579) WITH NOBODY RUNNING crossBackend-selfcheck.mjs TO CATCH IT, PLUS ONE THIS ROUND ADDS. ***
+    // Confirmed against the LAST COMMITTED state before this round (git stash -u, not assumed): the census was
+    // already red on 11 of these 12 before this round touched anything. BRDF_LUT_WGSL and PREFILTER_ENV_WGSL --
+    // the two with real entry points and clean one-buffer signatures -- are now full corpus entries above, not
+    // excluded; everything below has no entry point of its own or needs a fixture this round did not build.
+    Object.freeze({ id: "specularIBLWgsl.SPECULAR_IBL_HELPERS_WGSL", kind: "source fragment",
+                    why: "the FaceUV struct and dirToFaceW() with no entry point -- SPECULAR_IBL_VERIFY_WGSL and specularProbeCapture.CAPTURED_PREFILTER_WGSL are its runnable compositions" }),
+    Object.freeze({ id: "specularIBLWgsl.storageFetchWgsl", kind: "source fragment",
+                    why: "a function returning fetchTexelW's storage-buffer body, no entry point -- SPECULAR_IBL_VERIFY_WGSL is its one composition" }),
+    Object.freeze({ id: "specularIBLWgsl.TEXTURE_FETCH_WGSL", kind: "source fragment",
+                    why: "fetchTexelW's texture-backed body, no entry point -- specularProbeLit.mjs's own SPECULAR_MATERIAL_CORE_WGSL writes its own inline copy rather than importing this one, so nothing in the tree composes it yet" }),
+    Object.freeze({ id: "specularIBLWgsl.specularIBLCoreWgsl", kind: "source fragment",
+                    why: "a function rendering the sampling core over a swapped-in fetch implementation, no entry point of its own -- SPECULAR_IBL_VERIFY_WGSL is its one composition" }),
+    Object.freeze({ id: "specularIBLWgsl.SPECULAR_IBL_VERIFY_WGSL", kind: "lives on its own gate",
+                    why: "a real compute entry point, already run on the native backend against a CPU reference by physics/render/specularIBLWgsl-selfcheck.mjs (worst 1.37e-7 relative, six cases); a full corpus entry would need the same baked-atlas fixture that gate already owns, not duplicated here" }),
+    Object.freeze({ id: "specularProbeLit.atlasConstsWgsl", kind: "source fragment",
+                    why: "a function rendering an atlas's layout as WGSL consts, no entry point of its own -- specularProbeLitWgsl is its one composition" }),
+    Object.freeze({ id: "specularProbeLit.SPECULAR_MATERIAL_CORE_WGSL", kind: "source fragment",
+                    why: "the const-baked sampling core, no entry point of its own -- specularProbeLitWgsl and its own verification shim (built inline in specularProbeLit-selfcheck.mjs) are its compositions" }),
+    Object.freeze({ id: "specularProbeLit.specularProbeLitWgsl", kind: "lives on its own gate",
+                    why: "a real vertex+fragment pair, compiled on the native backend by specularProbeLit-selfcheck.mjs and DRAWN on both real backends (through a full render pipeline, which this compute-only corpus cannot drive) by tools/ship/probeLab-selfcheck.mjs -- a corpus entry would need the same atlas fixture those gates already own" }),
+    Object.freeze({ id: "splitSumWgsl.SPLIT_SUM_HELPERS_WGSL", kind: "source fragment",
+                    why: "the shared GGX Lambda/G2 and Hammersley/half-vector helpers, no entry point -- BRDF_LUT_WGSL and PREFILTER_ENV_WGSL (both in the corpus) are its two runnable hosts" }),
+    Object.freeze({ id: "splitSumWgsl.prefilterCoreWgsl", kind: "source fragment",
+                    why: "a function rendering the prefilter's accumulation loop over a swapped-in envSample, no entry point of its own -- PREFILTER_ENV_WGSL and specularProbeCapture.CAPTURED_PREFILTER_WGSL (both in the corpus) are its two compositions" }),
+    Object.freeze({ id: "splitSumWgsl.ANALYTIC_ENV_WGSL", kind: "source fragment",
+                    why: "the three-pattern envSample(d, sel) body, no entry point -- PREFILTER_ENV_WGSL (in the corpus) is its one composition" }),
+    Object.freeze({ id: "specularProbeCapture.CAPTURED_ENV_WGSL", kind: "source fragment",
+                    why: "the texture-backed envSample(d, sel) body (dirToFaceW plus a manual bilinear tap), no entry point -- CAPTURED_PREFILTER_WGSL (in the corpus, compile-only) is its one composition" }),
 ]);
 
 /**

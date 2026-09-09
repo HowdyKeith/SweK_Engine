@@ -97,36 +97,24 @@ fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
 `;
 
 /**
- * The prefiltered environment, one thread per test case -- term for term with splitSum.mjs's prefilterEnv().
- * Cases arrive as a flat f32 input array, stride 8: [Rx, Ry, Rz, alpha, envKind, samples, pad, pad].
- * envKind matches splitSum-selfcheck.mjs's three fixtures exactly: 0 uniform (=1), 1 gradient (0.5+0.5*d.z),
- * 2 spot (d.z>0.98 ? 50 : 0.05) -- so the device is graded against the SAME environments the CPU gate already
- * uses, not a fresh set invented for this file.
- * Binding 0: output storage (one f32 per case). Binding 1: uniform { caseCount }. Binding 2: input cases.
+ * v4580 -- THE ACCUMULATION LOOP, PULLED OUT AND PARAMETERISED OVER WHERE A DIRECTION'S RADIANCE COMES FROM.
+ * `envImpl` is a complete WGSL function `fn envSample(d: vec3<f32>, sel: u32) -> f32`; `sel` is an opaque
+ * selector this core never interprets itself, only forwards -- the analytic implementation below reads it as
+ * "which of three test patterns" (unchanged from before this split), and physics/render/specularProbeCapture.mjs's
+ * texture-backed one reads the SAME slot as "which colour channel" of a captured atlas. specularIBLWgsl.mjs's
+ * specularIBLCoreWgsl(fetchImpl) split its sampler the identical way for the identical reason: one accumulation
+ * loop, two sources for the one function call inside it that differs.
+ *
+ * *** THIS MUST STAY TERM FOR TERM WITH THE INLINE VERSION splitSumWgsl-selfcheck.mjs's SABOTAGE TARGETS. ***
+ * That gate's section 3 string-replaces the exact line `let NoL = R.x * L.x + R.y * L.y + R.z * L.z;` inside
+ * PREFILTER_ENV_WGSL's assembled text to prove a wrong NoL weight is caught; this refactor keeps that line
+ * byte-identical rather than reformatting it away, and splitSumWgsl-selfcheck.mjs is re-run after this change
+ * (not just reasoned about) to confirm nothing moved.
  */
-export const PREFILTER_ENV_WGSL = /* wgsl */ `
-${SPLIT_SUM_HELPERS_WGSL}
-fn envFn(d : vec3<f32>, kind : u32) -> f32 {
-  if (kind == 0u) { return 1.0; }
-  if (kind == 1u) { return 0.5 + 0.5 * d.z; }
-  return select(0.05, 50.0, d.z > 0.98);
-}
-
-struct PfParams { caseCountPad : vec4<f32> };
-@group(0) @binding(0) var<storage, read_write> outBuf : array<f32>;
-@group(0) @binding(1) var<uniform> P : PfParams;
-@group(0) @binding(2) var<storage, read> cases : array<f32>;
-
-@compute @workgroup_size(64, 1, 1)
-fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
-  let caseCount = u32(P.caseCountPad.x);
-  if (gid.x >= caseCount) { return; }
-  let base = gid.x * 8u;
-  let R = normalize(vec3<f32>(cases[base], cases[base + 1u], cases[base + 2u]));
-  let alpha = cases[base + 3u];
-  let kind = u32(cases[base + 4u]);
-  let samples = u32(cases[base + 5u]);
-
+export function prefilterCoreWgsl(envImpl) {
+    return /* wgsl */ `
+${envImpl}
+fn prefilterChannel(R : vec3<f32>, alpha : f32, sel : u32, samples : u32) -> f32 {
   // splitSum.mjs's tangent frame: up = |R.z| < 0.999 ? +z : +x; tx = normalize(cross(up, R)); ty = cross(R, tx).
   var up = vec3<f32>(0.0, 0.0, 1.0);
   if (abs(R.z) >= 0.999) { up = vec3<f32>(1.0, 0.0, 0.0); }
@@ -144,10 +132,50 @@ fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
     let L = vec3<f32>(2.0 * RoH * H.x - R.x, 2.0 * RoH * H.y - R.y, 2.0 * RoH * H.z - R.z);
     let NoL = R.x * L.x + R.y * L.y + R.z * L.z;
     if (NoL <= 0.0) { continue; }
-    sum = sum + envFn(L, kind) * NoL;
+    sum = sum + envSample(L, sel) * NoL;
     wsum = wsum + NoL;
   }
-  outBuf[gid.x] = select(0.0, sum / wsum, wsum > 0.0);
+  return select(0.0, sum / wsum, wsum > 0.0);
+}
+`;
+}
+
+/** The three analytic test patterns PREFILTER_ENV_WGSL always graded against, extracted verbatim (renamed
+ *  envFn -> envSample, kind -> sel to match prefilterCoreWgsl's generic slot) rather than rewritten. */
+export const ANALYTIC_ENV_WGSL = /* wgsl */ `
+fn envSample(d : vec3<f32>, sel : u32) -> f32 {
+  if (sel == 0u) { return 1.0; }
+  if (sel == 1u) { return 0.5 + 0.5 * d.z; }
+  return select(0.05, 50.0, d.z > 0.98);
+}
+`;
+
+/**
+ * The prefiltered environment, one thread per test case -- term for term with splitSum.mjs's prefilterEnv().
+ * Cases arrive as a flat f32 input array, stride 8: [Rx, Ry, Rz, alpha, envKind, samples, pad, pad].
+ * envKind matches splitSum-selfcheck.mjs's three fixtures exactly: 0 uniform (=1), 1 gradient (0.5+0.5*d.z),
+ * 2 spot (d.z>0.98 ? 50 : 0.05) -- so the device is graded against the SAME environments the CPU gate already
+ * uses, not a fresh set invented for this file.
+ * Binding 0: output storage (one f32 per case). Binding 1: uniform { caseCount }. Binding 2: input cases.
+ */
+export const PREFILTER_ENV_WGSL = /* wgsl */ `
+${SPLIT_SUM_HELPERS_WGSL}
+${prefilterCoreWgsl(ANALYTIC_ENV_WGSL)}
+struct PfParams { caseCountPad : vec4<f32> };
+@group(0) @binding(0) var<storage, read_write> outBuf : array<f32>;
+@group(0) @binding(1) var<uniform> P : PfParams;
+@group(0) @binding(2) var<storage, read> cases : array<f32>;
+
+@compute @workgroup_size(64, 1, 1)
+fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
+  let caseCount = u32(P.caseCountPad.x);
+  if (gid.x >= caseCount) { return; }
+  let base = gid.x * 8u;
+  let R = normalize(vec3<f32>(cases[base], cases[base + 1u], cases[base + 2u]));
+  let alpha = cases[base + 3u];
+  let kind = u32(cases[base + 4u]);
+  let samples = u32(cases[base + 5u]);
+  outBuf[gid.x] = prefilterChannel(R, alpha, kind, samples);
 }
 `;
 
