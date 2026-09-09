@@ -3764,6 +3764,41 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    // v4563 -- the 213th closing, and the first for a gate whose subject is a system that has never run a
+    // single particle in the engine and still does not.
+    since213: Object.freeze({
+        at: "v4563", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "world/fluidSystem-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 112 ms, eight rows. *** world/fluidSystem.js WAS A BREADTH-FIRST FILL WEARING THE " +
+                 "WORD FLUID, AND THE DEFECT WAS THAT IT CREATED WATER. *** A settled particle handed each " +
+                 "of up to FOUR air neighbours a whole new particle, every one of which placed its own " +
+                 "voxel: one drop became four, then sixteen, and nothing removed anything behind the " +
+                 "frontier -- MAX_PARTICLES bounded the FRONTIER and not the wetted area, which is why the " +
+                 "cap that file's own v2 header added did not stop it. On a flat floor, ONE drop: 13 wet " +
+                 "cells by tick 10, 313 by 20, 2,113 by 40, 10,513 by 80 and 74,113 by 200, still " +
+                 "accelerating. TWO THINGS WERE MISSING AND THEY BOUND DIFFERENT QUANTITIES. Conservation " +
+                 "bounds ONE DROP: a particle carries a volume, a placed cell costs one unit of it, and " +
+                 "what is left is RATIONED to as many neighbours as it can fill rather than divided among " +
+                 "all of them -- cells wet <= volume, tight at 1, 2, 4 and 5 and slack above (8->5, 16->12, " +
+                 "32->20) because water blocks its own neighbours. A sink bounds THE SYSTEM: cells this " +
+                 "system placed are remembered and returned to AIR after dryTicks, which conservation alone " +
+                 "does not give -- rain adds cells for as long as it falls. Rain at one drop per tick went " +
+                 "160,684 cells by tick 200 and climbing BEFORE; AFTER it oscillates around 512 at dryTicks " +
+                 "600 and 143 at 50, against the 4,800 that 1,200 drops would leave with no sink. SIX " +
+                 "SABOTAGES RED BY NAME, and TWO OF THEM FOUND HOLES IN THIS ROUND'S OWN GATE FIRST: the " +
+                 "\"removes only what it placed\" row seeded its water in a far chunk, so a sink drying a " +
+                 "NEIGHBOURING cell went 0 RED until the seed moved to where the rain lands; and nothing " +
+                 "drove the sink's \"is it still water?\" guard until a fixture built STONE on a puddle. " +
+                 "*** AND THE ROW THAT ASKED FOR THE ROUND DID ITS JOB: *** world/chunk-selfcheck.mjs " +
+                 "asserted the defect was still present and said in its own text that it would go red when " +
+                 "somebody gave the system a sink. It did, on the day it landed. The wetting flag is STILL " +
+                 "OFF, for a new reason: not because it floods, but because no particle of this system has " +
+                 "ever run in the engine.",
+    }),
     // v4560 -- the 212th closing, and the first for a gate whose reference half is a C++ program compiled from
     // a vendored source tree. The gate never compiles it: the cold build is 5,166 ms against a 3,000 ms
     // sweep budget, so the reference is a hash-pinned record and the binary is used only when it is already

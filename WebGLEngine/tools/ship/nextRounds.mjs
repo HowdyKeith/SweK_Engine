@@ -312,7 +312,7 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "fluid-has-no-sink",
-        blocker: "OPEN",
+        blocker: "CLOSED",
         what: "world/fluidSystem.js is a breadth-first flood fill, not a fluid. A settled particle spreads "
             + "into up to four air neighbours, each of which places a water voxel and spreads again, and "
             + "nothing ever removes water. ONE drop wets 41 cells by tick 10, 421 by 20, 2,381 by 40 and "
@@ -335,6 +335,34 @@ export const NEXT_ROUNDS = [
             + "and the wetted area is unbounded behind it. Fixing the separate descent-trail bug (five voxels "
             + "of pillar per drop) took the thirty-second flood down only 23%, which is what says the spread "
             + "is the cause rather than the trail.",
+        done: "DONE at v4563, and the defect was that this code CREATED WATER rather than that it failed to remove it. "
+            + "The spread handed each of up to four air neighbours a WHOLE NEW PARTICLE, every one of which placed its own "
+            + "voxel: one drop became four, then sixteen. TWO things were missing and they bound different quantities. "
+            + "CONSERVATION bounds one drop -- a particle carries a volume, a placed cell costs one unit of it, and what is "
+            + "left is RATIONED to as many neighbours as it can actually fill rather than divided among all of them. Cells "
+            + "wet by a drop <= its volume, and the bound is TIGHT at volumes 1, 2, 4 and 5 on a flat floor (1, 2, 4, 5 "
+            + "cells) and slack above that (8->5, 16->12, 32->20) because water blocks its own neighbours and the stranded "
+            + "volume dies. Rationing rather than dividing is what makes it tight: the first version divided the remainder "
+            + "among EVERY air neighbour, which gives each less than a cell as soon as the volume is small, so at the "
+            + "default volume 4 a drop wet exactly ONE cell and the spread branch was dead code. A SINK bounds the system "
+            + "over time, which conservation alone does not: cells this system placed are remembered and returned to AIR "
+            + "after dryTicks. Measured on the same flat-floor fixture -- one drop: 13 wet by tick 10, 313 by 20, 2,113 by "
+            + "40, 10,513 by 80 and 74,113 by 200 BEFORE, exactly its volume AFTER; rain at one drop per tick: 160,684 "
+            + "cells by tick 200 and still climbing BEFORE, and AFTER an equilibrium that OSCILLATES rather than settling "
+            + "-- 512 standing at dryTicks 600, 143 at dryTicks 50, against the 4,800 that 1,200 drops would leave if "
+            + "nothing dried. SIX SABOTAGES RED BY NAME, and two of them found holes in this round's own gate first: the "
+            + "\"removes only what it placed\" row seeded its water in a far chunk, so a sink drying a NEIGHBOURING cell "
+            + "went 0 RED until the seed was moved to where the rain actually lands (and the first attempt at that seeded "
+            + "nine cells across a chunk boundary and wrote four, because v4555 correctly refuses an out-of-range set); and "
+            + "nothing at all drove the sink's \"is it still water?\" guard until a fixture built a STONE block on a "
+            + "puddle and watched the queue leave it alone. THE ROW THAT ASKED FOR THIS ROUND DID ITS JOB: "
+            + "world/chunk-selfcheck.mjs asserted `placed > 20` and said in its own text that it would go red when "
+            + "somebody gave the system a sink. It did, on the day the sink landed, and it now asserts the bound instead. "
+            + "*** STILL OFF, AND FOR A NEW REASON. *** Not because it floods -- that is fixed and gated. Because no "
+            + "particle of this system has ever run in the engine, so switching it on is a behaviour change nobody has "
+            + "looked at. That is Keith's call and the numbers for it are in world/fluidSystem-selfcheck.mjs. ALSO NOT "
+            + "CLAIMED: that this is a fluid. It has no pressure, no levelling and no flow rate -- a puddle wets outward "
+            + "from where a drop fell until its volume runs out rather than finding its own surface.",
         upstream: "Nothing blocks it, and it is not urgent while the flag is off -- but the flag is the thing "
             + "to be honest about: this system is dead code today, and it was dead code before v4555 too "
             + "without anybody knowing. The round should decide whether rain-driven wetting is wanted at all "

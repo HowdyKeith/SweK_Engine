@@ -201,16 +201,20 @@ console.log("\n6. *** AND WHAT LANDING TURNED ON: A FLUID SYSTEM THAT HAD NEVER 
         `it could fall, so the same drop left a PILLAR standing in open air -- measured against the ` +
         `unmodified file on this exact fixture, water at y = 2, 3, 4, 5 and 6 in the spawn column, five ` +
         `voxels of it. Fall first, and place water only where the particle comes to rest.`);
-    ok("!! *** AND THAT WAS NOT THE FLOOD. ONE DROP STILL WETS ELEVEN THOUSAND CELLS, BECAUSE THIS IS A " +
-       "FLOOD FILL AND NOT A FLUID ***",
-        placed > 20,
-        `${placed} voxels from ONE drop in ten ticks, none of them the trail. A settled particle spreads ` +
-        `into up to FOUR air neighbours, each of which places water and spreads again -- a breadth-first ` +
-        `fill of every reachable air cell at that level, with nothing removing water behind it. Measured on ` +
-        `a flat floor: 41 voxels at tick 10, 421 at 20, 2,381 at 40, 11,101 at 80, still accelerating. *** ` +
-        `MAX_PARTICLES BOUNDS THE FRONTIER, NOT THE WETTED AREA, *** which is why the cap in this file's own ` +
-        `v2 header did not stop it. This row asserts the defect is STILL HERE: it goes red when somebody ` +
-        `gives the system a sink, and that is the round to write.`);
+    // *** THIS ROW USED TO ASSERT THE DEFECT WAS STILL HERE, AND IT WENT RED THE DAY THE SINK LANDED. ***
+    // It read `placed > 20` and said so in its own text: "it goes red when somebody gives the system a
+    // sink, and that is the round to write." v4563 wrote it, this row failed, and that is the row working
+    // rather than the round breaking it. What it asserts now is the bound, on the same fixture.
+    ok("!! *** AND THAT WAS NOT THE FLOOD -- THE SPREAD WAS, AND ONE DROP NOW WETS ITS OWN VOLUME ***",
+        placed > 0 && placed <= 4,
+        `${placed} voxels from ONE drop of the default volume 4, none of them the trail. BEFORE v4563 a ` +
+        `settled particle handed each of up to FOUR air neighbours a whole new particle, every one of which ` +
+        `placed its own voxel -- a breadth-first fill of every reachable air cell at that level, with ` +
+        `nothing removing water behind it: 41 voxels at tick 10, 421 at 20, 2,381 at 40 and 11,101 at 80 on ` +
+        `a flat floor, still accelerating. *** MAX_PARTICLES BOUNDED THE FRONTIER, NOT THE WETTED AREA, *** ` +
+        `which is why the cap in that file's own v2 header did not stop it. A particle carries a VOLUME ` +
+        `now, a placed cell costs one unit of it, and the remainder is rationed rather than duplicated. The ` +
+        `equilibrium, the sink and the conservation bound are graded in world/fluidSystem-selfcheck.mjs.`);
 }
 
 // =============================================================================================================
