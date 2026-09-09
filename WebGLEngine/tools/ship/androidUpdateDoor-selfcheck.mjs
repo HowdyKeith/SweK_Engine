@@ -17,6 +17,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { readAndroidPolicy, localVersion, ANDROID_DEFAULT_POLICY } from "../roundhouse/androidUpdate.mjs";
+import VM from "../../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ENG = path.join(HERE, "..", "..");
@@ -42,7 +43,7 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
     const v = localVersion();
     ok("the local version is read from the tree", /^v\d+$/.test(String(v)), String(v));
     ok("...and matches main.js", (() => {
-        const m = fs.readFileSync(path.join(ENG, "main.js"), "utf8").match(/ENGINE_VERSION = "(v\d+)"/);
+        const m = fs.readFileSync(path.join(ENG, "main.js"), "utf8").match(VM.markerRe("ENGINE_VERSION"));
         return m && m[1] === String(v);
     })(), "a version read from somewhere else would drift the moment one of them moved");
 }

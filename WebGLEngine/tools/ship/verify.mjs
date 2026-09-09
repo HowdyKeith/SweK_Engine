@@ -16,6 +16,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execSync } from "node:child_process";
 import { withheldFromMirror } from "./withheld.mjs";
+import VM from "../../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
 
 function arg(name) { const i = process.argv.indexOf(name); return i >= 0 ? process.argv[i + 1] : null; }
 const version = arg("--version");
@@ -52,7 +53,7 @@ if (version) {
   // 524c536c: the regex returns v4487 where the live declaration says v4504, so the two marker rows below
   // failed on every ship that carried commented history -- v4504's own round recorded its DO NOT SHIP as
   // "the release lag alone" and was wrong about two of its three failures. ^ with /m fixes it outright.
-  try { mv = (fs.readFileSync("main.js", "utf8").match(/^const ENGINE_VERSION = "(v\d+)"/m) || [])[1]; } catch {}
+  try { mv = (fs.readFileSync("main.js", "utf8").match(VM.markerRe("ENGINE_VERSION")) || [])[1]; } catch {}
   check(`version marker: main.js says ${mv || "?"} , shipping ${version}`, mv === version, mv === version ? "" : "MISLABELED BUILD — bump main.js or fix --version");
 } else {
   check("version marker", false, "no --version given");
@@ -65,7 +66,7 @@ if (version) {
   let bb = null;
   // v4531 -- anchored for the same reason as the engine marker above, and it was worse here: the pattern had
   // no `const` either, so it also matched the word inside a comment sentence mentioning BRAIN_BUILD = "vNNNN".
-  try { bb = (fs.readFileSync("brain/brain.js", "utf8").match(/^const BRAIN_BUILD = "(v\d+)"/m) || [])[1]; } catch {}
+  try { bb = (fs.readFileSync("brain/brain.js", "utf8").match(VM.markerRe("BRAIN_BUILD")) || [])[1]; } catch {}
   check(`brain build marker: brain.js says ${bb || "?"} , shipping ${version}`, bb === version,
         bb === version ? "" : "BRAIN_BUILD is stale — it will announce the wrong build in every log line");
 }

@@ -37,6 +37,7 @@ const path = require("path");
 const net = require("net");
 const http = require("http");
 const { spawn } = require("child_process");
+const VM = require("../tools/ship/versionMarker.js");   // v4556 -- one definition of how to read a version marker
 
 const ENGINE_ROOT = path.resolve(__dirname, "..");
 const PREFIX = "/source-chain";
@@ -112,7 +113,7 @@ function canPublish(st) {
 function _versionInTree(root) {
     try {
         const src = fs.readFileSync(path.join(root, "WebGLEngine", "main.js"), "utf8");
-        const m = src.match(/ENGINE_VERSION\s*=\s*"(v\d+)"/);
+        const m = src.match(VM.markerRe("ENGINE_VERSION"));
         return m ? m[1] : "";
     } catch { return ""; }
 }

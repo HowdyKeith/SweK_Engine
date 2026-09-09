@@ -60,6 +60,7 @@ function writeArtifact(rel, shapeAt, body) {
     return doc;
 }
 import * as P from "../../world/traderPolicy.mjs";
+import VM from "../../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -71,7 +72,7 @@ const ENGINE_VERSION = (() => {
     let src;
     try { src = fs.readFileSync(path.join(ENG, "main.js"), "utf8"); }
     catch (e) { return null; }                       // genuinely absent: the only case this may hide
-    return (/^const ENGINE_VERSION = "(v\d+)"/m.exec(src) || [])[1] || null;
+    return (VM.markerRe("ENGINE_VERSION").exec(src) || [])[1] || null;
 })();
 let fails = 0;
 const ok = (label, cond, detail) => { if (!cond) fails++; console.log(`  ${cond ? "PASS" : "FAIL"}  ${label}${detail ? "   " + detail : ""}`); };

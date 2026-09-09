@@ -16,6 +16,7 @@
 "use strict";
 const fs = require("fs");
 const path = require("path");
+const VM = require("../tools/ship/versionMarker.js");   // v4556 -- one definition of how to read a version marker
 
 let ENGINE = path.join(__dirname, "..");
 const SKIP_DIRS = new Set(["node_modules", ".git", "vendor", ".venv", "__pycache__", "dist", "build-wasm", ".cache"]);
@@ -51,8 +52,8 @@ function configure({ engineDir } = {}) {
 // walk it guards.
 function shipVersion() {
     try {
-        const m = fs.readFileSync(path.join(ENGINE, "main.js"), "utf8").match(/ENGINE_VERSION = "v(\d+)"/);
-        return m ? parseInt(m[1], 10) : 9999;
+        const m = fs.readFileSync(path.join(ENGINE, "main.js"), "utf8").match(VM.markerRe("ENGINE_VERSION"));
+        return m ? parseInt(String(m[1]).replace(/^v/, ""), 10) : 9999;   // shared pattern captures the v
     } catch { return 9999; }
 }
 

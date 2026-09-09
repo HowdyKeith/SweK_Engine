@@ -3764,6 +3764,43 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since209: Object.freeze({
+        at: "v4556", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/versionMarker-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, thirteen rows. *** THIRTY-ONE FILES READ THE ENGINE'S VERSION MARKER WITH THEIR OWN " +
+                 "PATTERN AND GOT A COMMENTED-OUT LINE. *** The ship ritual PREPENDS a changelog block above " +
+                 "main.js's constant and each block opens with a commented copy of the previous one, so the " +
+                 "live declaration sits BELOW its own history and an unanchored reader takes the oldest " +
+                 "comment -- v4487, eight rounds stale. *** THE FILED COUNT WAS ITSELF INFLATED BY PROSE, " +
+                 "WHICH IS THE ROUND'S FIRST FINDING: *** the register said 44 readers and 35 files, and a " +
+                 "raw re-take agreed at 87/44/35 -- until COMMENTS WERE STRIPPED, giving 51/32/31, because " +
+                 "main.js's changelog QUOTES these patterns and the scan counted the narration. A second " +
+                 "over-count in the same pass compared captures as raw strings and called a digits-only " +
+                 "capture wrong when it is only a different convention. *** AND THE CENSUS STILL MISSED " +
+                 "THREE, BECAUSE IT ONLY EVER ASKED main.js: *** brain/brain.js has the same shape with " +
+                 "commented copies on BOTH sides of its live line, and three files read that marker " +
+                 "unanchored. Only the tree-wide ratchet found them. The fix is one definition, " +
+                 "tools/ship/versionMarker.js, shared by 43 call sites in 40 files -- CommonJS so the nine " +
+                 "bridge readers can require it and the thirty-one ESM ones can default-import it, and .js " +
+                 "rather than .cjs BECAUSE THIS TREE'S CENSUSES CANNOT SEE .cjs: the first draft was " +
+                 "invisible to its own file count. *** THE CONVERSION BROKE TWO THINGS AND BOTH ARE GATED. " +
+                 "*** Three call sites consume the NUMBER, so the shared capture's letter turned parseInt " +
+                 "into NaN silently; and releaseLedger-selfcheck EXISTS to contrast an anchored read with an " +
+                 "unanchored one, so pointing both at the shared pattern made its own row vacuous -- it is " +
+                 "the one named exemption and the ratchet proves the exemption EARNED by running its two " +
+                 "literals and requiring different answers. *** AND FIXING THE READERS EXPOSED A FRESHNESS " +
+                 "CHECK THAT COULD NOT FIRE: *** registerDrift-selfcheck holds the register's audit to 12 " +
+                 "rounds and was GREEN because its reader said v4487 and the audit was frozen at v4487 -- a " +
+                 "stale record against a stale clock reads as no drift. Corrected it said 48 rounds, which " +
+                 "had been true for months; the audit is re-frozen at v4535, 30 rows, and the gate passes " +
+                 "honestly. status.mjs, which writes the project's LIVE state page, now stamps v4535 where " +
+                 "that page said v3940. NOT DONE: artefacts already emitted under the wrong reading are not " +
+                 "retro-corrected -- they record what the tree said at the time.",
+    }),
     since208: Object.freeze({
         at: "v4555", swept: 1, green: 1, red: 0,
         added: Object.freeze([

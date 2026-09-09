@@ -16,6 +16,7 @@
 const path = require("path");
 const fs = require("fs");
 const { execFile } = require("child_process");
+const VM = require("../tools/ship/versionMarker.js");   // v4556 -- one definition of how to read a version marker
 
 const ENGINE = path.join(__dirname, "..");
 const PREFIX = "/ship";
@@ -28,8 +29,8 @@ function readMarkers() {
         try { const m = fs.readFileSync(path.join(ENGINE, rel), "utf8").match(re); return m ? m[1] : null; }
         catch { return null; }
     };
-    const engine = grab("main.js", /const ENGINE_VERSION\s*=\s*"(v\d+)"/);
-    const brain = grab("brain/brain.js", /const BRAIN_BUILD\s*=\s*"(v\d+)"/);
+    const engine = grab("main.js", VM.markerRe("ENGINE_VERSION"));
+    const brain = grab("brain/brain.js", VM.markerRe("BRAIN_BUILD"));
     return { engine, brain, agree: !!engine && engine === brain };
 }
 

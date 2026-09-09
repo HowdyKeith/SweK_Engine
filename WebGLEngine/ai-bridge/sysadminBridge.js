@@ -14,6 +14,7 @@ const { exec, spawn } = require("child_process");
 const fs = require("fs"), path = require("path"), os = require("os");
 const { robustRemove } = require("./robustRemove.js");   // v2222 — Windows-robust folder delete (clears read-only + retries + shell fallback)
 const launchGuard = require("./launchGuard.js");   // v2223 — machine-wide launch cooldown so relaunches can't storm/collide on :8787
+const VM = require("../tools/ship/versionMarker.js");   // v4556 -- one definition of how to read a version marker
 
 const isWin = process.platform === "win32";
 const isMac = process.platform === "darwin";
@@ -276,7 +277,7 @@ let lastFound = 0, lastNote = "", updTimer = null, _nextCheckAt = 0;   // v1578 
 // (a manual extract / rename), it read as 0 and EVERY same-version zip looked "newer than 0",
 // so auto-update re-installed forever. main.js is stamped per build, so it can't drift.
 function currentVersion(){
-    try { const m = fs.readFileSync(path.join(__dirname, "..", "main.js"), "utf8").match(/ENGINE_VERSION\s*=\s*"v(\d+)"/); if (m) return parseInt(m[1], 10); } catch {}
+    try { const m = fs.readFileSync(path.join(__dirname, "..", "main.js"), "utf8").match(VM.markerRe("ENGINE_VERSION")); if (m) return parseInt(String(m[1]).replace(/^v/, ""), 10); } catch {}   // shared pattern captures the v
     const name = path.basename(path.resolve(__dirname, "..", ".."));   // the version folder, any prefix
     const m2 = name.match(/[ _]v(\d+)$/i); return m2 ? parseInt(m2[1], 10) : 0;
 }

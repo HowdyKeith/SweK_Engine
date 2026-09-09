@@ -9,6 +9,7 @@
 
 import fs from "fs";
 import path from "path";
+import VM from "../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
 
 const SKIP = new Set(["node_modules", "vendor", "asset_library", "GPU_Assets", "apks", ".git", ".update-backups", "incoming-updates", "__pycache__", "doc-out", ".kpop-wav"]);
 const SKIP_FILE = /\.(zip|log)$|^sync-peers\.json$|\.swekupdate\.json/;
@@ -29,9 +30,9 @@ const [, , oldDir, newDir, outFile, toVerArg] = process.argv;
 if (!oldDir || !newDir || !outFile) { console.error("usage: make-incremental.mjs <oldDir> <newDir> <out.swekupdate.json> [toVersion]"); process.exit(2); }
 
 let toVersion = toVerArg;
-if (!toVersion) { try { toVersion = (fs.readFileSync(path.join(newDir, "WebGLEngine", "main.js"), "utf8").match(/ENGINE_VERSION\s*=\s*"(v\d+)"/) || [])[1]; } catch {} }
+if (!toVersion) { try { toVersion = (fs.readFileSync(path.join(newDir, "WebGLEngine", "main.js"), "utf8").match(VM.markerRe("ENGINE_VERSION")) || [])[1]; } catch {} }
 if (!toVersion) { console.error("could not determine toVersion (pass it as the 4th arg)"); process.exit(2); }
-let fromVersion = ""; try { fromVersion = (fs.readFileSync(path.join(oldDir, "WebGLEngine", "main.js"), "utf8").match(/ENGINE_VERSION\s*=\s*"(v\d+)"/) || [])[1] || ""; } catch {}
+let fromVersion = ""; try { fromVersion = (fs.readFileSync(path.join(oldDir, "WebGLEngine", "main.js"), "utf8").match(VM.markerRe("ENGINE_VERSION")) || [])[1] || ""; } catch {}
 
 const newFiles = walk(newDir), oldFiles = new Set(walk(oldDir));
 const files = [];

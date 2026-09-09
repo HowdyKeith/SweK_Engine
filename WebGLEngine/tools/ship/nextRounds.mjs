@@ -151,60 +151,45 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "engine-version-readers",
-        blocker: "OPEN",
-        what: "Thirty-eight of the forty-four places that parse ENGINE_VERSION out of main.js read a COMMENTED-OUT changelog line instead of the shipped constant, and return a version eight rounds stale.",
-        how: "One definition, exported, that every reader imports -- the shape this tree already uses for MAGIC/JSON_CHUNK/BIN_CHUNK in tools/export/voxelGlb.mjs, whose own header says a second spelling of a format is how a writer and a reader start disagreeing. Failing that, one anchored pattern applied everywhere. The correct forms already exist in the tree and both work: /^const ENGINE_VERSION = \"(v\\d+)\"/m (anchored) and /^(?!\\s*\\/\\/).*ENGINE_VERSION\\s*=\\s*\"(v\\d+)\"/m (comment-excluding).",
-        why: "*** MEASURED, NOT ESTIMATED: the tree holds 44 regex readers of this one constant, and 38 of them match the wrong line. *** main.js line 6538 is the live `const ENGINE_VERSION = \"v4535\"`; line 6527 is `// const ENGINE_VERSION = \"v4487\";`, a changelog block the ritual PREPENDS above the constant every round. An unanchored match takes the comment. Run against today\'s main.js: the two correct patterns return v4535 and the three loose ones all return v4487. brain/brain.js has the identical shape -- commented BRAIN_BUILD lines for v4487 and v4476 sitting above a live v4535. THIS IS NOT THEORETICAL AND IT HAS ALREADY COST SOMETHING: a parallel line fixed ai-bridge/githubBridge.js to skip comment lines, and the correct reading immediately turned tools/ship/shipRitual-selfcheck.mjs and ai-bridge/engineUpdateSource-selfcheck.mjs RED -- both reporting `githubBridge reads v4535 but main.js says v4487`, blaming the one reader that was right. Fixed in those three places at v4550; the other 35 are untouched. Several are user-facing (tools/ship/status.mjs, tools/ledger/ledger.mjs, tools/okf/emitOKF.mjs, ai-bridge/benchCollectBridge.js, ai-bridge/fingerprintBridge.js), so reports and fingerprints have been carrying a stale version number.",
-        upstream: "Nothing technical -- it is 35 one-line changes. What makes it a round rather than a sed is that some of those readers feed RECORDED artefacts (fingerprints, OKF emissions, ledger entries, bench collections) whose historical values were produced under the wrong reading, so correcting the reader changes what the next artefact says without correcting what past ones said. The round owes a decision about whether those records are re-taken, annotated, or left with the discrepancy stated -- and that is a judgement per artefact, which is why it is not a bulk edit.",
-    },
-    {
-        id: "planner-blind-to-solids",
         state: "CLOSED",
-        note: "DONE at v4554, AND THE ITEM ASKED ABOUT THE WRONG LAYER -- but the failure mode it described is "
-            + "real one layer down, and that is where it was found. As filed it asked whether PROPS, BUILDINGS "
-            + "OR KIT SCATTER stand on the terrain without being baked into world._heightAt. That question is "
-            + "STILL UNMEASURED and is not claimed here: main.js publishes no scene handle, and a probe that "
-            + "cannot find the scene returns a zero that means nothing. *** WHAT IS MEASURED IS THAT THE WORLD "
-            + "ITSELF IS THE UNBAKED SOLID. *** world/world.js is a VOXEL world -- voxelAt, isAir, chunkHeight "
-            + "64 -- and _heightAt is an ErosionCache projection over _baseHeightAt that never consults the "
-            + "voxel grid. Six boots of index.html, 1,681 columns on a 3-unit lattice over 120x120: the model "
-            + "reports a stand height INSIDE SOLID ROCK in 101 to 158 columns, 6.0% to 9.4%, with the error "
-            + "(topSolid + 1 - _heightAt) running to +17 one way and -13 the other and its median at 0. The "
-            + "affected box is x -54..30, z -60..24 -- the middle of the map, not its edge. A column at "
-            + "(-40, -38) reads SOLID 0..1 / air 2..4 / SOLID 5..13 / air 14 / SOLID 15..21 / air 22..63, and "
-            + "the model answers 9: inside the slab, thirteen voxels under the real surface, with three "
-            + "neighbours reading the same. *** AND THE GAP CANNOT BE CLOSED BY FIXING GENERATION, WHICH IS THE "
-            + "FINDING THAT DECIDED THE SHAPE OF THE FIX. *** Generation is exact -- generateChunk(0,0) twice "
-            + "in one boot gives 0 of 16,384 voxels different -- but across six boots from the same "
-            + "biomeSeed 1337 the model sums to 35708 EVERY TIME while the voxels sum to SIX DISTINCT VALUES, "
-            + "because fluid and erosion write chunk.set() all through the run at rain sites chosen by "
-            + "Math.random(), and _heightAt is noise over a fixed seed that sees none of it. A pure function "
-            + "cannot track a grid the simulation is rewriting. world/surfaceProbe.mjs asks the voxels instead, "
-            + "for the two consumers whose question is 'where does a body stand': BotPathfinderPool's snapshot "
-            + "and BotManager's ground oracle. IT IS A HYBRID BECAUSE THE SCAN IS NOT AFFORDABLE: _heightAt "
-            + "alone 0.4 ms per 1,681 columns, a full column scan 7.6 ms (19x), and trusting the cheap answer "
-            + "then VERIFYING it -- support below the feet and body cells of air above -- 1.8 ms (4.5x). "
-            + "Sixteen rows, seven sabotages red by name. *** THE FIRST TAKE OF THIS ROUND PUBLISHED ONE BOOT'S "
-            + "NUMBERS AS CONSTANTS *** (115 columns, 6.8%, error min -7) and the record now separates what was "
-            + "identical in all six boots from what was not, with a row that goes red if the interval is ever "
-            + "collapsed back to a single number -- a record stating a moving quantity as a fixed one is this "
-            + "session's recurring defect wearing different clothes. Two negatives also recorded: a bot with "
-            + "its feet in a solid voxel on 235 of 600 frames is NOT buried (depth always exactly 1, head "
-            + "blocked on zero frames -- that is a bilinear surface inside its own top voxel), and the bot's "
-            + "600 frames never reach an affected column, which is why every row in engineSceneBot-selfcheck "
-            + "stayed green through the defect and why that gate now takes a live census and looks one up. "
-            + "*** AND WIRING THE PROBE IN FOUND A LARGER DEFECT UNDERNEATH THE ONE IT WAS BUILT FOR. *** "
-            + "The line it replaced in BotPathfinderPool._heightmapForJob was `this.world?._heightAt || "
-            + "((x, z) => 5)`, and world._heightAt is a METHOD reading this._heightOverride and "
-            + "this._wasmTiles. Detached from its receiver it THROWS ON EVERY CALL -- measured in a real "
-            + "boot, a TypeError on _heightOverride -- into an empty catch that leaves the sample at 0. "
-            + "Over an 11x11 window the old loop returned 121 zeros of 121, so THE PATHFINDER'S SNAPSHOT "
-            + "WAS A FLAT PLANE AT y=0 for both the navmesh route and the grid fallback, since the pool "
-            + "was written -- _heightmapForJob runs on every job and its output is what the worker builds "
-            + "its navmesh from. No fixture could see it: every fake world in this tree supplies "
-            + "_heightAt as a plain function, which has no receiver to lose. Both branches are closures "
-            + "now, and a gate row holds the fixture AND the spelling. Spun out of this round and NOT "
-            + "fixed here: chunk-index-unbounded, below.",
+        note: "DONE at v4556, AND THE FILED COUNT WAS ITSELF INFLATED BY PROSE -- which is the round's first "
+            + "finding and its most familiar one. This entry said 38 of 44 readers, 35 remaining. Re-taken by "
+            + "running every marker regex in the tree against the real main.js: 87 readers, 44 wrong, 35 files "
+            + "-- until COMMENTS WERE STRIPPED, and then 51 readers, 32 wrong, 31 files. main.js's own "
+            + "changelog blocks QUOTE these patterns in prose, and a raw scan counted the narration as three "
+            + "readers in main.js and three more in brain/brain.js. Counting a pattern described in a comment "
+            + "as an instance of the pattern is this tree's most repeated census defect, made again by the "
+            + "round auditing it. A SECOND over-count was caught in the same pass: comparing what a reader "
+            + "returned against the literal string of the live version called a digits-only capture WRONG, "
+            + "because it yields the number without its letter -- a different capture convention, not a "
+            + "defect. Raw comparison said 45; normalised, 44. *** AND THE CENSUS STILL MISSED THREE, BECAUSE "
+            + "IT ONLY EVER ASKED main.js. *** brain/brain.js carries the same marker with the same "
+            + "prepended-changelog shape -- commented copies BOTH ABOVE AND BELOW the live line -- and three "
+            + "files read it unanchored and got v4487: ai-bridge/shipBridge.js, tools/ship/ship.mjs and "
+            + "tools/ship/staleness.mjs. A census that tests readers against one file cannot see the readers "
+            + "of the other, and only the tree-wide ratchet found them. THE FIX IS ONE DEFINITION: "
+            + "tools/ship/versionMarker.js, holding the pattern, a parse over a source string, and a reader "
+            + "per marker. It is CommonJS on purpose -- the readers split 26 ESM to 9 CommonJS, the latter all "
+            + "in a directory that already uses that extension for shared helpers, and one such module can be "
+            + "required by those nine AND default-imported by the twenty-six, where an ESM module would have "
+            + "forced dynamic import into synchronous functions and a second copy beside it would be the very "
+            + "duplicate markerSingleSource-selfcheck exists to forbid. Forty-two call sites across "
+            + "thirty-eight files now share it. *** THE CONVERSION BROKE TWO THINGS AND THE GATE CATCHES BOTH "
+            + "SHAPES. *** Three call sites consumed the number rather than the string, so the shared "
+            + "capture's letter turned parseInt into NaN -- silently, in a version stamped onto reports. And "
+            + "tools/ship/releaseLedger-selfcheck.mjs EXISTS to contrast an anchored read with an unanchored "
+            + "one; pointing both at the shared pattern made its own row pass vacuously, turning a gate about "
+            + "this defect into a gate that cannot see it. It keeps both spellings, is the ONE named "
+            + "exemption, and the ratchet proves the exemption is earned by running its two literals against "
+            + "the real file and requiring different answers. *** AND FIXING THE READERS EXPOSED A FRESHNESS "
+            + "CHECK THAT COULD NOT FIRE. *** tools/ship/registerDrift-selfcheck.mjs holds the register's "
+            + "audit to no more than 12 rounds old and was GREEN -- because its reader returned v4487 and the "
+            + "audit was frozen at v4487, so a stale record measured against a stale reading of the tree "
+            + "reported zero drift. Corrected, it said 48 rounds, which had been true for months. A clock as "
+            + "stale as the thing it times cannot ring. NOT DONE: the artefacts already emitted under the "
+            + "wrong reading -- OKF bundles, ledger entries, fingerprints, bench collections -- are NOT "
+            + "retro-corrected. They record what the tree said at the time, and rewriting them would invent a "
+            + "history in which this never happened.",
     },
     {
         id: "chunk-index-unbounded",
@@ -260,6 +245,31 @@ export const NEXT_ROUNDS = [
             + "rather than crashing, with both cases driven in the gate; the first retry BUSY-WAITED, which "
             + "blocks the event loop, and the test written to prove the heal is what caught it. Spun out: "
             + "fluid-has-no-sink, below.",
+    },
+    {
+        id: "cjs-outside-every-census",
+        blocker: "OPEN",
+        what: "Ten .cjs files in ai-bridge/ are invisible to every corpus this tree censuses. SOURCE_EXT is "
+            + "/\\.(js|mjs|html)$/ in tools/ship/moduleRefs.mjs and /\\.(mjs|js)$/ in tools/ship/treeRead.mjs, "
+            + "and the walk runtimeGap-selfcheck and recordDrift share matches the same set -- so file counts, "
+            + "the assertion-shape census, the runtime-capability census and the knowledge index all skip them.",
+        how: "Add the extension to the corpus definitions -- there are three and they should agree, which is "
+            + "its own small finding -- then RE-TAKE every census that moves, one at a time, recording what "
+            + "each one gains. The counts are frozen records, so this is not a one-line change: it is a "
+            + "one-line change plus the honest re-take of everything downstream of it.",
+        why: "*** FOUND BY WALKING INTO IT AT v4556. *** That round's shared version reader was first written "
+            + "as tools/ship/versionMarker.cjs, and the file count moved by ONE where a module-plus-gate round "
+            + "moves it by two: the module was there, imported by forty files, and no census could see it. "
+            + "Renaming it to .js fixed that instance -- no package.json in this tree declares type module, so "
+            + "a .js file is CommonJS here anyway and the extension bought nothing -- but the ten in "
+            + "ai-bridge/ are still outside. What makes this worth a round rather than a shrug is the shape: "
+            + "a census that cannot see a file cannot report it as missing either, so the gap is silent in "
+            + "both directions, which is the same property that let 31 stale version readers survive.",
+        upstream: "Nothing blocks it. The judgement it needs is whether .cjs SHOULD be in the corpus at all -- "
+            + "these are bridge helpers rather than engine code, and a defensible answer is that the corpus is "
+            + "deliberately the engine's own sources. If that is the answer then the definitions should SAY so "
+            + "rather than omit the extension silently, because today nothing distinguishes a deliberate "
+            + "exclusion from an oversight, and that is the actual defect.",
     },
     {
         id: "fluid-has-no-sink",

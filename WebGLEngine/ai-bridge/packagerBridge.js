@@ -15,6 +15,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const buildName = require("./buildName.js");
+const VM = require("../tools/ship/versionMarker.js");   // v4556 -- one definition of how to read a version marker
 
 const ENGINE_ROOT = path.resolve(__dirname, "..");      // WebGLEngine/
 const PROJECT_ROOT = path.resolve(ENGINE_ROOT, "..");   // EngineProject_vNNN/
@@ -39,7 +40,7 @@ function _skipFile(name) {
 }
 
 function engineVersion() {
-    try { const m = fs.readFileSync(path.join(ENGINE_ROOT, "main.js"), "utf8"); const x = m.match(/ENGINE_VERSION\s*=\s*"(v\d+)"/); if (x) return x[1]; } catch {}
+    try { const m = fs.readFileSync(path.join(ENGINE_ROOT, "main.js"), "utf8"); const x = m.match(VM.markerRe("ENGINE_VERSION")); if (x) return x[1]; } catch {}
     return "";
 }
 function externalAssetsDir() {  // mirror server.js resolution

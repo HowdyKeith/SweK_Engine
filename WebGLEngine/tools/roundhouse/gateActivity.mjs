@@ -62,6 +62,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import VM from "../../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ENG = path.resolve(HERE, "..", "..");
@@ -75,7 +76,7 @@ const rel = (p) => path.relative(ENG, p).split(path.sep).join("/");
 /** The engine's own version marker, read rather than passed, so the age cannot be stated by a caller. */
 export function engineVersion(src = null) {
     const s = src != null ? src : fs.readFileSync(path.join(ENG, "main.js"), "utf8");
-    const m = /const ENGINE_VERSION = "(v\d+)"/.exec(s);
+    const m = VM.markerRe("ENGINE_VERSION").exec(s);
     return m ? m[1] : null;
 }
 

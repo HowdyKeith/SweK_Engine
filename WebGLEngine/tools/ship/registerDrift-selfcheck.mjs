@@ -48,12 +48,13 @@ import { REGISTER_AUDIT } from "./register-audit.mjs";
 import { divergence, renderFor, auditAge } from "./registerRender.mjs";
 import { noComments } from "./sourceScan.mjs";
 import { gateReport } from "./gateReport.mjs";
+import VM from "../../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
 
 const REPORT = gateReport("tools/ship/registerDrift-selfcheck.mjs");
 // Read, not typed -- the same rule this section is about, applied to the section itself.
 const ENGINE_VERSION_NOW = () => {
     const ENG2 = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-    const m = fs.readFileSync(path.join(ENG2, "main.js"), "utf8").match(/const ENGINE_VERSION = "(v\d+)"/);
+    const m = fs.readFileSync(path.join(ENG2, "main.js"), "utf8").match(VM.markerRe("ENGINE_VERSION"));
     return m ? m[1] : null;
 };
 

@@ -34,6 +34,7 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
+import VM from "../../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
 const require_ = createRequire(import.meta.url);
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -48,12 +49,12 @@ export function currentState() {
     // said "githubBridge reads v4535 but main.js says v4487", blaming the bridge for reading correctly.
     // MEASURED ACROSS THE TREE: 38 of 44 places that parse this constant use a pattern that takes the
     // comment; only 6 anchor or exclude comments. Filed as engine-version-readers.
-    const engine = (read("main.js").match(/^const ENGINE_VERSION = "(v\d+)"/m) || [])[1] || null;
+    const engine = (read("main.js").match(VM.markerRe("ENGINE_VERSION")) || [])[1] || null;
     // Same anchoring, same reason: brain/brain.js carries commented BRAIN_BUILD lines from v4487 and v4476
     // above the live one, so an unanchored match read v4487 against a real v4535. The two markers AGREE and
     // always did -- what disagreed was this file's reading of them, in both places, which is the exact shape
     // this step exists to catch and could not see in itself.
-    const brain = (read("brain/brain.js").match(/^const BRAIN_BUILD = "(v\d+)"/m) || [])[1] || null;
+    const brain = (read("brain/brain.js").match(VM.markerRe("BRAIN_BUILD")) || [])[1] || null;
     let gates = null, instruments = null;
     try { gates = JSON.parse(read("knowledge-index.json")).gates?.length ?? null; } catch {}
     return { engine, brain, gates, markersAgree: engine !== null && engine === brain };

@@ -26,6 +26,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { extractClaims } from "../ship/claimsGate.mjs";
+import VM from "../../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..", "..");
@@ -260,7 +261,7 @@ export function emitOKF(outDir, opts = {}) {
 // CLI: node tools/okf/emitOKF.mjs [outDir]
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
     const out = process.argv[2] || path.join(ROOT, "okf");
-    const version = (fs.readFileSync(path.join(ROOT, "main.js"), "utf8").match(/ENGINE_VERSION = "(v\d+)"/) || [, "v0000"])[1];
+    const version = (fs.readFileSync(path.join(ROOT, "main.js"), "utf8").match(VM.markerRe("ENGINE_VERSION")) || [, "v0000"])[1];
     const r = emitOKF(out, { version });
     console.log("OKF bundle: " + r.claims + " claims + " + r.docs + " docs -> " + r.dir);
 }

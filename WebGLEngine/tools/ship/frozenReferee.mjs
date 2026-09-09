@@ -30,6 +30,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { gateFiles } from "./staleness.mjs";
+import VM from "../../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ENG = path.resolve(HERE, "..", "..");
@@ -127,7 +128,7 @@ export function pairedEdits(manifest, now) {
  * exactly the sentence a reader needs in order to tell a correction from a widening. ***
  */
 export function buildVersion() {
-    try { return (readFileSyncSafe(path.join(ENG, "main.js")).match(/ENGINE_VERSION = "(v\d+)"/) || [])[1] || null; }
+    try { return (readFileSyncSafe(path.join(ENG, "main.js")).match(VM.markerRe("ENGINE_VERSION")) || [])[1] || null; }
     catch { return null; }
 }
 function readFileSyncSafe(p) { return fs.readFileSync(p, "utf8"); }

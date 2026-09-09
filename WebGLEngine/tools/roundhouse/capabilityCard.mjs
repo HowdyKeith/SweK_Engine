@@ -37,6 +37,7 @@ import { INSTRUMENTS } from "../../physics/instruments.mjs";
 import { parseRegistry, readsPlantedKnob, declaredPlantMode } from "./plantedCoverage.mjs";
 
 import { fileURLToPath } from "node:url";
+import VM from "../../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
 /** The absences, first-class. A caller that reads only the positive fields would over-trust the card. */
 export const NOT_CLAIMED = [
     { field: "detectionFloor", why: "only clocks has one measured, and it is a RADIUS (invisible beyond ~1007M at a 1e-6 tolerance) rather than an epsilon. One numeric column would force every other device to look like it had a floor of zero." },
@@ -130,7 +131,7 @@ export async function capabilityCard(engRoot, registry) {
 /** The engine marker, read rather than typed -- a card stamped by hand would be the first thing to go stale. */
 export function readVersion(engRoot) {
     try {
-        const m = /ENGINE_VERSION\s*=\s*"(v\d+)"/.exec(fs.readFileSync(path.join(engRoot, "main.js"), "utf8"));
+        const m = VM.markerRe("ENGINE_VERSION").exec(fs.readFileSync(path.join(engRoot, "main.js"), "utf8"));
         return m ? m[1] : null;
     } catch { return null; }
 }

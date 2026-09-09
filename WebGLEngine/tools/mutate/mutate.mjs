@@ -39,6 +39,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import {fileURLToPath, pathToFileURL} from "node:url";
+import VM from "../../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const MARKER = path.join(ROOT, "tools", "mutate", ".stranded.json");
@@ -131,7 +132,7 @@ function runCheck(cmd, args, timeout = 200000) {
 // The gate, as a single yes/no. A mutation must turn this red. The version is read from the engine itself so the
 // gate never fails for the boring reason of a version string I invented.
 function engineVersion() {
-    const m = fs.readFileSync(path.join(ROOT, "main.js"), "utf8").match(/ENGINE_VERSION\s*=\s*"(v\d+)"/);
+    const m = fs.readFileSync(path.join(ROOT, "main.js"), "utf8").match(VM.markerRe("ENGINE_VERSION"));
     if (!m) throw new Error("cannot read ENGINE_VERSION from main.js");
     return m[1];
 }

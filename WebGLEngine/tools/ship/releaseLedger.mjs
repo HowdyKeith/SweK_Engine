@@ -44,6 +44,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import VM from "../../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const ROOT = path.resolve(ENG, "..");
@@ -59,7 +60,7 @@ export function engineVersion(root = ENG) {
         // already on main: addsToMain false, budget never binds, gate green. The escape hatch v4453 was
         // careful to keep narrow was being opened by a regex instead. Fourth instance of this defect in one
         // round, after my own version ceiling, my own reading of ENGINE_VERSION, and verify.mjs's two markers.
-        const m = fs.readFileSync(path.join(root, "main.js"), "utf8").match(/^const ENGINE_VERSION = "(v\d+)"/m);
+        const m = fs.readFileSync(path.join(root, "main.js"), "utf8").match(VM.markerRe("ENGINE_VERSION"));
         return m ? m[1] : "";
     } catch { return ""; }
 }

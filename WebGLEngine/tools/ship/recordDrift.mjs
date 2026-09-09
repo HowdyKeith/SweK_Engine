@@ -91,6 +91,31 @@ export const OWES = Object.freeze({
  * deliberately stale record and watch it be found -- a drift detector that cannot be given drift is a
  * detector nobody has run.
  */
+/**
+ * Read sweep-timings.json, retrying a TORN read.
+ *
+ * *** EXPORTED SO THE GATE CAN DRIVE IT WITHOUT RE-RUNNING checks(). *** The first version of the row that
+ * proves this behaviour called checks({}) twice more, and checks() is O(tree): recordDrift-selfcheck went from
+ * 1,870 ms to 2,376 ms against a 3,000 ms budget, eating the 800 ms margin recordReach-selfcheck requires of
+ * both stale-record detectors. That gate caught it, which is what it is for -- and the answer is to make the
+ * thing testable rather than to lower the bar it failed.
+ *
+ * The wait is a REAL timer. The first draft spun on Date.now(), which blocks this process's own event loop, so
+ * nothing it is awaiting can progress and it burns a core doing it -- caught by a test that broke the file,
+ * scheduled a restore 50 ms out, and watched all three attempts fail anyway.
+ */
+export async function readTimingsWithRetry(root = ENG, attempts = 3, waitMs = 40) {
+    let tries = 0, error = null;
+    while (tries < attempts) {
+        const t = RR.readTimings(root);
+        tries++;
+        if (t.ok) return { rec: t, tries, error: null };
+        error = t.error || "no timings";
+        if (tries < attempts) await new Promise((r) => setTimeout(r, waitMs));
+    }
+    return { rec: null, tries, error };
+}
+
 export async function checks({ load = null, timings = null } = {}) {
     const mod = load || ((p) => import(p));
     const out = [];
@@ -163,27 +188,17 @@ export async function checks({ load = null, timings = null } = {}) {
     // A torn read is a window of milliseconds, so it is RETRIED rather than either crashing or being passed
     // on nothing. A file still unparseable after three attempts is genuinely broken, and the check then
     // reports UNREADABLE -- stale, named, and not a silent green.
-    let rec = timings;
-    let tries = 0, readErr = null;
-    while (!rec && tries < 3) {
-        const t = RR.readTimings(ENG);
-        tries++;
-        if (t.ok) { rec = t; break; }
-        readErr = t.error || "no timings";
-        // A REAL timer, not a spin. The first draft busy-waited on Date.now(), which blocks this process's
-        // own event loop for the whole retry window -- so nothing it is awaiting can progress, and it burns
-        // a core doing it. Caught by a test that broke the file, scheduled a restore 50 ms out, and watched
-        // all three attempts fail anyway because the restore could never be dispatched.
-        if (tries < 3) await new Promise((r) => setTimeout(r, 40));
-    }
-    if (!rec) {
+    const read = timings ? { rec: timings, tries: 0, error: null } : await readTimingsWithRetry(ENG);
+    if (!read.rec) {
         out.push({
             name: "sweep timings", owes: OWES.timing, recorded: 0, actual: -1, stale: true,
-            detail: `sweep-timings.json UNREADABLE after ${tries} attempts (${readErr}) -- a torn read from a ` +
-                    `concurrent quickSweep heals on retry, so this means the file is broken rather than busy`,
+            detail: `sweep-timings.json UNREADABLE after ${read.tries} attempts (${read.error}) -- a torn read ` +
+                    `from a concurrent quickSweep heals on retry, so this means the file is broken rather ` +
+                    `than busy`,
         });
         return out;
     }
+    const rec = read.rec;
     const missing = A.gateFiles(ENG)
         .map((p) => path.relative(ENG, p).replace(/\\/g, "/"))
         .filter((g) => !(g in (rec.timings || {})) || !((rec.at || {})[g]));
