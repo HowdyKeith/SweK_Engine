@@ -221,8 +221,18 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // arrival. The round's third new file is tools/ship/recordReach.mjs, a module rather than a gate, and it
     // moves none of these -- which is the distinction these nine rows exist to make.
     // v4550 -- RE-TAKEN: one gate (glbConformance) joined, the same four rows by one, FIFTEENTH arrival.
-    gates: 1605, usesOk: 1584, definesOk: 1576, importsOk: 0,
-    distinctDefinitions: 38, nameFirst: 1477, condFirst: 91, unknownSignature: 16,
+    // v4551 -- RE-TAKEN, AND FIVE ARRIVALS LATE. *** THE RECORD WAS RED FOR FIVE CONSECUTIVE ROUNDS AND
+    // NOTHING RAN IT. *** The FSR arc (fsr, motionVectors, jitter, temporalAccumulate, temporalResolve) added
+    // one gate per round; each round ran gateSweep, instruments and sweepCoverage and called that the ritual,
+    // and this record is not in that set. So the drift did not announce itself once -- it accumulated to
+    // gates 1605 -> 1610 and was found only because v4551 went looking. That is the SAME fault v4548 recorded
+    // under the title "the ship ritual does not check half its own records"; finding it once did not stop it
+    // recurring, because the repair there was to re-take the records and not to make the ritual reach them.
+    // The four rows moved by FIVE, one per arrival, and the other five rows did not move at all -- across five
+    // gates in five different subsystems (a CPU upscaler, a matrix reprojection, a Halton sequence, a history
+    // blend, a resampling kernel), TWENTIETH arrival running with no gate written in a different shape.
+    gates: 1610, usesOk: 1589, definesOk: 1581, importsOk: 0,
+    distinctDefinitions: 38, nameFirst: 1482, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

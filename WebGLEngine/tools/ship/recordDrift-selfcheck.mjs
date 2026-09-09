@@ -31,7 +31,10 @@
 // ---- *** WHAT THIS GATE DOES NOT CLAIM *** ------------------------------------------------------------------
 //
 // That a clean report predicts a passing verify -- it checks derived records, not the subject of any gate.
-// That the five records are all of them; they are the ones this session was bitten by. And that this file
+// That the six records are all of them; they are the ones this session was bitten by -- and v4551 is the
+// proof that the set was NOT complete, since it added a sixth after the FSR arc drifted four records over
+// five rounds and this pre-flight, run on any of them, would have named only two. The seventh (redCensus's
+// registered reds) is named in reportLines as a gap with its reason, not quietly left out. And that this file
 // should re-take anything: it reads and reports, per v3698's refusal that a loop writing and grading the same
 // record can mark its own work passed.
 
@@ -53,7 +56,8 @@ say(reportLines ? (await reportLines()).join("\n  ----  ") : "");
 ok("every check returns a name, a verdict and what the record OWES",
     live.all.every((c) => c.name && typeof c.stale === "boolean" && typeof c.owes === "string" && c.owes.length > 20),
     "sabotage C: 'something drifted' is not a finding anybody can act on");
-ok("the checks cover the four re-derivable records", live.all.length === REC.checked);
+ok("the checks cover every re-derivable record the register counts", live.all.length === REC.checked,
+    `${live.all.length} checks, record says ${REC.checked} checked and ${REC.notChecked} not`);
 
 // ---- 2. *** EACH CHECK, DRIVEN AGAINST A RECORD THAT HAS ACTUALLY DRIFTED *** -------------------------------------
 console.log("\n2. handed a stale record, each check names it");
@@ -122,6 +126,59 @@ console.log("\n2. handed a stale record, each check names it");
         (await checks({ timings: t })).find((c) => c.name === "sweep timings").stale === false);
 }
 
+{
+    // ---- *** v4551 -- THE SIXTH CHECK, DRIVEN ON A ROW THAT IS NOT THE FILE COUNT. *** ----------------------
+    // The fixture corrupts ONE capability row and leaves `files` alone, because a check that reads only the
+    // file count would pass this and is exactly the check that would have been easy to write. The row is
+    // picked BY INDEX and its label comes from CENSUS_FIELDS -- no capability name is spelled in this file,
+    // since the census greps file text and a gate that names a row changes the row. That is not a
+    // hypothetical: writing those twelve labels into recordDrift.mjs moved two rows by one on the run that
+    // first exercised this check.
+    const real = await import("../../vba/runtimeGap.mjs");
+    const label = Object.keys(real.PATTERNS)[3];
+    const field = real.CENSUS_FIELDS[label];
+    const rowOnly = {
+        ...real,
+        MEASURED_AT_V4462: Object.freeze({ ...real.MEASURED_AT_V4462, [field]: real.MEASURED_AT_V4462[field] + 1000 }),
+    };
+    const dRow = await checks({ load: async (p) => (p.includes("runtimeGap") ? rowOnly : import(p)) });
+    const rRow = dRow.find((c) => c.name === "runtimeGap census");
+    say(`fixture: the '${label}' row overstated by 1000, files left correct`);
+    ok("!! a capability row that drifted is found, and the ROW is named -- not just 'the census moved'",
+        rRow.stale === true && rRow.detail.includes(label) && !rRow.detail.includes("files "),
+        "sabotage: a files-only check passes this fixture, and a files-only check is what v4550 and v4548 " +
+        "both show is not enough -- a two-file round moved four rows and a four-file round moved two");
+    const fileOnly = {
+        ...real,
+        MEASURED_AT_V4462: Object.freeze({ ...real.MEASURED_AT_V4462, files: real.MEASURED_AT_V4462.files + 7 }),
+    };
+    const dFile = await checks({ load: async (p) => (p.includes("runtimeGap") ? fileOnly : import(p)) });
+    const rFile = dFile.find((c) => c.name === "runtimeGap census");
+    ok("...and a drifted file count is found too, so the check is not only about the rows",
+        rFile.stale === true && rFile.detail.includes("files "));
+    ok("...while the untouched census is clean, so neither is simply always true",
+        (await checks()).find((c) => c.name === "runtimeGap census").stale === false,
+        "this is the record the FSR arc drifted for five rounds with nothing reading it");
+
+    // ---- *** THE MEMO'S KEY, WHICH WENT 0-RED AND IS THE REASON THIS ROW EXISTS. *** -----------------------
+    // The check caches the derived census so that eleven checks() calls pay for it once. recordDrift.mjs says
+    // in as many words that the key is the census FUNCTION and not a bare flag, "because a future fixture that
+    // injects a fake census would otherwise be handed the real answer and pass while measuring nothing" --
+    // and then NOTHING IN THIS GATE COULD TELL THE DIFFERENCE: swapping the key for the constant "one" left
+    // all five sabotages' worth of rows green. A comment asserting a property is not the property.
+    // The fixture injects a census that returns counts nothing on disk could produce. Order matters and is
+    // stated rather than assumed: the live drift() at the top of this file has already cached the real
+    // function's result, which is what a constant key would wrongly return here.
+    const fakeCensus = { ...real, census: () => ({ files: 1, counts: Object.fromEntries(
+        Object.keys(real.PATTERNS).map((k) => [k, 0])) }) };
+    const dFake = await checks({ load: async (p) => (p.includes("runtimeGap") ? fakeCensus : import(p)) });
+    const rFake = dFake.find((c) => c.name === "runtimeGap census");
+    ok("!! the memo is keyed on the census FUNCTION -- an injected census is measured, not served from cache",
+        rFake.stale === true && rFake.detail.includes("-> 1"),
+        "sabotage BN: keying the memo on a constant went 0-RED against every other row in this gate, which " +
+        "is what made this row necessary. A cache the fixtures cannot get past turns them all into decoration");
+}
+
 // ---- 2b. THE TOP-LEVEL PARTITION, WHICH NOTHING GRADED IN THE FIRST DRAFT ---------------------------------------
 console.log("\n2b. drift() splits what checks() returns, and that split is graded");
 
@@ -177,6 +234,32 @@ ok("!! re-deriving every checked record costs less than a second, against a five
     `${Object.values(REC.cost).reduce((a, b) => a + b, 0)} ms vs ${REC.verifyMs} ms`);
 ok("the record admits the one it does not check", REC.notChecked === 1);
 ok("the record is frozen", Object.isFrozen(REC) && REC.rounds.every(Object.isFrozen));
+
+// SABOTAGE LOG -- v4551, the sixth check. Applied to tools/ship/recordDrift.mjs and vba/runtimeGap.mjs, gate
+// run, red count read, all three files restored and md5-verified. Baseline 0 red.
+//   BI the per-row loop deleted, only `files` compared        -> 1 red. The fixture that catches it drifts ONE
+//      capability row and leaves the file count correct, which is the whole reason it is built that way: a
+//      files-only check is the easy thing to write and v4548 and v4550 both recorded rounds where the file
+//      count and the row count moved by different amounts.
+//   BJ the check hard-coded to `stale: false`                 -> 3 red.
+//   BK the detail reduced to "a row moved", no label          -> 1 red. "Something drifted" is not a finding
+//      anybody can act on, and this gate has held that line since v4482 for the other five checks.
+//   BL the whole check removed from the pre-flight            -> 1 red, on the count row against the register.
+//      That row is why the register carries `checked` and `notChecked` as numbers rather than as prose.
+//   BM CENSUS_FIELDS mismapped, "typed arrays" pointed at the promises field -> 1 red. The nastiest of the
+//      five, because it drifts nothing and breaks nothing: the check still runs, still compares twelve rows,
+//      and silently compares two of them against the wrong record.
+//   BN the memo keyed on the constant "one" instead of on the census function -> 1 red, AFTER this round
+//      added the row for it. *** IT WENT 0-RED FIRST AND THAT IS THE FINDING OF THIS SET. *** The memo was
+//      added because the check took this gate from 1,799 ms to 6,813 ms, past the sweep's 3,000 ms budget --
+//      and recordDrift.mjs states in as many words why the key is the FUNCTION: a fixture injecting a fake
+//      census would otherwise be served the real answer and pass while measuring nothing. Every other row in
+//      this gate stayed green under the constant key, including the five above, because all their fixtures
+//      override the recorded NUMBERS and share the real census function. So the file argued for a property
+//      that nothing tested, one round after this same session recorded two 0-REDs of exactly that shape in
+//      temporalAccumulate. A cache the fixtures cannot get past turns all of them into decoration; the row
+//      that catches it injects a census returning counts no tree could produce.
+//   No 0-RED among the six, once BN's row exists. Cost of the memo, measured: 6,813 -> 2,647 ms.
 
 console.log(`\nrecordDrift-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);
 process.exit(fails === 0 ? 0 : 1);

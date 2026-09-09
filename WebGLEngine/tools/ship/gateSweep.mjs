@@ -3767,6 +3767,70 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since210: Object.freeze({
+        at: "v4551", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/temporalResolve-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        // *** THE SECOND HALF OF THIS ROUND WAS NOT PLANNED AND IS THE MORE IMPORTANT HALF. ***
+        // Re-taking the records after the resolve rung found FOUR of them stale, all naming the same five
+        // gates: assertionShape's census (1605 -> 1610), runtimeGap's twelve rows (4031 -> 4045 files and
+        // four rows moved), sweep-timings.json (no reading or stamp for any of the five), and redCensus,
+        // which still parked tslSource-selfcheck as red EIGHT ROUNDS after v4543 turned it green. Every
+        // round of the FSR arc ran gateSweep, instruments and sweepCoverage and called that the ritual;
+        // none of those four is in that set. v4548 already shipped a round titled "the ship ritual does not
+        // check half its own records" -- and its repair re-took the records instead of making the ritual
+        // reach them, so the same fault recurred five rounds later at four times the size. THE REPAIR THIS
+        // TIME IS THE RITUAL: recordDrift's pre-flight gained a sixth check, over the runtimeGap census,
+        // whose obligation OWES.runtimeGap had DECLARED since v4482 with nothing behind it -- the one clause
+        // of six that named a duty and never enforced it. Its stated obstacle ("the walker cannot leave its
+        // gate without putting fs into a module with zero imports") did not hold: recordDrift.mjs imports fs
+        // and exports the walker. Of the four stale records, that pre-flight now catches three; the fourth
+        // is named in reportLines as a gap WITH ITS REASON rather than left out, because the only cheap
+        // signal for a registered red is sweep-timings' codes table and that table said tslSource exited 1
+        // while it had exited 0 since v4543 -- a check reading it would have confirmed the stale
+        // registration instead of finding it. Sabotages BI/BJ/BK/BL/BM/BN red at 1/3/1/1/1/1, BN 0-RED
+        // first: the memo that keeps the new check inside the sweep budget was documented as keyed on the
+        // census function "so an injected fake is not served from cache", and nothing tested that -- a
+        // constant key left every other row green. Two further findings fell out. The check's first draft
+        // spelled the twelve capability labels in recordDrift.mjs and MOVED TWO OF THE ROWS IT CHECKS
+        // (performance.now 220 -> 221, raf 116 -> 117), because the census greps file text: a drift detector
+        // that changes the number it detects is not a detector, and the map moved to runtimeGap.mjs, which
+        // owns both tables. That move then moved WebGL 141 -> 142 and exposed the second: runtimeGap.mjs's
+        // own headline, "THE MODULE THAT DEFINES THE CENSUS MATCHES EVERY SINGLE ONE OF ITS OWN TWELVE
+        // PATTERNS", was FALSE and had been since the WebGL lookbehind landed -- the module matched eleven,
+        // the twelfth hit came from its gate, and the row passes because it derives over both files while
+        // its headline names one. And the check nearly repeated the fault it was written to fix: eleven
+        // checks() calls at 554 ms each took recordDrift-selfcheck from 1,799 ms to 6,813 ms, past the
+        // 3,000 ms budget that is exactly why these detectors go unrun; the memo brought it to 2,647.
+        verdict: "green, 1.04 s (1102/1040/1043 over three serial runs, under the 3000 ms sweep budget). THE PIECE " +
+                 "THAT MAKES IT UPSCALING RATHER THAN ANTI-ALIASING: v4550 accumulated at ratio 1, where the samples " +
+                 "and the output share a grid; this is the one place a render-resolution sample has to land BETWEEN " +
+                 "display pixels, and the whole thing turns on subtracting the jitter from the source position -- " +
+                 "srcPos = uv*renderSize - 0.5 - jitter. MEASURED against the same 256-sample analytic ground truth " +
+                 "at ratio 2: temporal 0.05541 rms vs EASU's 0.09317, which is 1.68x better than the best SPATIAL " +
+                 "upscaler in this tree, and better than one resolve (0.09582) or bilinear (0.09699). THE JITTER " +
+                 "SUBTRACTION ALONE BUYS 28% OF IT: run jitter-BLIND -- same frames, same accumulation, same kernel, " +
+                 "only the subtraction removed -- and the same pipeline reads 0.07102. WHAT UPSCALING COSTS, stated " +
+                 "in the one number that can state it: v4550's ratio-1 accumulation reaches 0.01041 and this reaches " +
+                 "0.05541, so 2x upscaling is 5.3x worse than not upscaling and the comparison worth making is " +
+                 "against other upscalers, not against native. The kernel is checked at its own values (1 at 0, " +
+                 "2.5e-17 at 1, -0.063684 at 1.5, 0 at 2 and 3) and the resolve is BIT EXACT at ratio 1 with zero " +
+                 "jitter -- worst 0.00e+0 -- which is the row that covers weight normalisation and nothing else does. " +
+                 "The dering clamp is asserted on BOTH sides independently: CPU undered [-0.0336, 1.0691] vs dered " +
+                 "[0.0000, 1.0000], and the DEVICE's own output [0, 1] vs its own undered [-0.1478, 1.1478], so the " +
+                 "property is measured on the device rather than inherited from the CPU. Confidence at 2x with zero " +
+                 "jitter is 0.6464 on every pixel = 1 - hypot(0.25, 0.25), the distance to the base texel, derived " +
+                 "and not declared. Period holds: frames 32 and 64 agree to 3.78e-10. Device parity worst 1.73e-5 = " +
+                 "4.4e-3 of an 8-bit LSB, stated in LSBs because a nine-tap sin() kernel in f32 against f64 will not " +
+                 "be bit-identical and what matters is whether a viewer could see it. Seven sabotages red at " +
+                 "1/3/7/2/1/1/2, no 0-RED. One was deliberately WGSL-ONLY (the base texel floored instead of " +
+                 "rounded) because v4550's two 0-REDs were both changes made to BOTH sides that left the mirror " +
+                 "agreeing; it caught at 1.43e-1, 36 LSBs. The thin one is the weight normalisation at 1 red, which " +
+                 "survives only because the identity row is bit-exact -- loosen that row and it stops being covered.",
+    }),
     since209: Object.freeze({
         at: "v4550", swept: 1, green: 1, red: 0,
         added: Object.freeze([

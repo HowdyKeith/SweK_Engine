@@ -556,9 +556,20 @@ const WHY_V4531 = Object.freeze({
         "which of the two WebGL2 sampling paths is wrong, which belongs to the line that built the transplant.",
 });
 
-export const RED_AT_V4531_GATES = Object.freeze([
-    "tools/ship/tslSource-selfcheck.mjs",
-]);
+// *** tslSource-selfcheck LEFT THIS REGISTER AT v4543, AND BY EXACTLY THE REPAIR THE ENTRY NAMED. *** v4531
+// registered it for one row of five: three's own WebGL2 linear render disagreed with this tree's device on
+// 125 of 4096 pixels at worst delta 127, while the same comparison on WebGPU was 4096/4096 at worst 0. The
+// entry said what would clear it -- "finding which of the two WebGL2 sampling paths is wrong" -- and refused
+// to name one, because naming it wrongly would have been worse than owing it. It was the DEVICE's: gfx/
+// device.js sampled `repeat` on WebGPU and CLAMP_TO_EDGE on WebGL2, under a comment claiming the two matched,
+// and no caller could say which it wanted. v4543 made the address mode the caller's and the same on both
+// backends; this gate's row asks for `repeat`, because three's texture is RepeatWrapping, and now reads
+// 4096/4096 on both. *** AND IT SAT GREEN AND REGISTERED FOR EIGHT ROUNDS. *** The repair landed at v4543 and
+// this list was not emptied until v4551, because the round that fixed it ran the gate and not the census that
+// remembers the gate -- the same shape as the three other records this round found stale. THE LIST IS EMPTY
+// RATHER THAN DELETED, because the derived union above reads the register's shape and an entry that leaves is
+// a fact worth keeping visible.
+export const RED_AT_V4531_GATES = Object.freeze([]);
 
 export const RED_AT_V4531 = Object.freeze(RED_AT_V4531_GATES.map((gate) => Object.freeze({
     gate,

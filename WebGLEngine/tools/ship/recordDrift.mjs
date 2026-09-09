@@ -83,6 +83,7 @@ export const OWES = Object.freeze({
     assertion: "a gate defining its own ok() moves tools/ship/assertionShape.mjs's census",
     runtimeGap: "any new .mjs moves vba/runtimeGap.mjs's twelve-row capability census",
     index: "a new gate owes knowledge-index.json a rebuild, and every check reading it owes nothing until it has one",
+    redCensus: "a gate that goes green owes tools/ship/redCensus.mjs the removal of its registered-red entry",
 });
 
 /**
@@ -90,6 +91,8 @@ export const OWES = Object.freeze({
  * deliberately stale record and watch it be found -- a drift detector that cannot be given drift is a
  * detector nobody has run.
  */
+const CENSUS_MEMO = new Map();
+
 export async function checks({ load = null, timings = null } = {}) {
     const mod = load || ((p) => import(p));
     const out = [];
@@ -162,6 +165,56 @@ export async function checks({ load = null, timings = null } = {}) {
         detail: missing.length ? missing.join(", ") : "every gate has a timing and its own capture stamp",
     });
 
+    // ---- *** v4551 -- THE SIXTH CHECK, AND THE OBLIGATION IT READS HAD BEEN DECLARED HERE SINCE v4482 WITH
+    // NOTHING BEHIND IT. *** OWES.runtimeGap said "any new .mjs moves vba/runtimeGap.mjs's twelve-row
+    // capability census" and no check read that clause -- the one OWES entry of six that named a duty and
+    // then went unenforced. The exclusion note under reportLines gave the reason: the walker "cannot leave
+    // its gate without putting fs into a module that has zero imports on purpose". *** THAT REASON DOES NOT
+    // HOLD AND HAS NOT SINCE v4482. *** It conflates two things: runtimeGap.mjs must not import fs, which is
+    // true and is preserved here (census() is handed a file list and reads nothing), with THIS file being
+    // unable to call it, which is false -- recordDrift.mjs imports fs on line 56 and exports `sources`, the
+    // very walker, for other gates to use. Nothing was in the way. The cost of being wrong about that: the
+    // FSR arc added fourteen .mjs files over five rounds and this census drifted on four of its twelve rows
+    // unnoticed, because the only thing that read it was tools/ship/runtimeGap-selfcheck.mjs, one of the slow
+    // gates, which no round in that arc ran. MEASURED at 554 ms on this box (sources 28, census 526) against
+    // the five above at 291 ms combined -- it roughly triples this pre-flight, and it is worth it against a
+    // 300,000 ms verify.
+    // *** MEMOISED, AND ON THE FUNCTION RATHER THAN ON NOTHING, WHICH IS THE WHOLE CARE IN IT. *** This check
+    // costs 554 ms and the gate that grades this file calls checks() ELEVEN times -- once live and ten with
+    // fixtures -- so adding it took recordDrift-selfcheck from 1,799 ms to 6,813 ms, straight past the sweep's
+    // 3,000 ms budget. *** THAT WOULD HAVE BEEN THE SAME DEFECT ONE LEVEL UP: *** tools/ship/frozenRecords.mjs
+    // already records that the tree's stale-record detectors sit OUTSIDE the budget and so get skipped, which
+    // is why four records drifted through the FSR arc unnoticed. A sixth check that pushed its own gate out of
+    // the sweep would have been a control nobody runs, bought by writing a control.
+    // The census is a pure function of the tree and the tree does not change inside one process, so the ten
+    // fixture calls can share one result. The key is the census FUNCTION, not a bare flag: every fixture here
+    // spreads the real module and overrides only the recorded numbers, but a future fixture that injects a
+    // fake census would otherwise be handed the real answer and pass while measuring nothing.
+    const G = await mod("../../vba/runtimeGap.mjs");
+    let gc = CENSUS_MEMO.get(G.census);
+    if (!gc) { gc = G.census(sources()); CENSUS_MEMO.set(G.census, gc); }
+    const M = G.MEASURED_AT_V4462;
+    // *** THE LABEL->FIELD MAP IS IMPORTED, NOT WRITTEN HERE, AND THAT IS A MEASURED CORRECTION. *** The
+    // first draft of this check spelled the twelve labels out in this file and the check's own arrival moved
+    // two of the rows it checks -- performance.now 220 -> 221, requestAnimationFrame 116 -> 117 -- because
+    // the census greps file text and this file is in the walked set. runtimeGap.mjs already contains every
+    // one of those strings in its PATTERNS table, so the map costs nothing there and perturbs nothing.
+    const ROWS = G.CENSUS_FIELDS;
+    // *** ALL THIRTEEN ROWS, NOT THE FILE COUNT. *** A files-only check would have caught this round's drift
+    // and would miss the shape that census exists to show -- v4550 recorded a two-file round that moved four
+    // rows and v4548 a four-file round that moved two, and a check reading one number cannot tell those apart.
+    const gDrift = [];
+    if (M.files !== gc.files) gDrift.push(`files ${M.files} -> ${gc.files}`);
+    for (const [label, field] of Object.entries(ROWS)) {
+        if (M[field] !== gc.counts[label]) gDrift.push(`${label} ${M[field]} -> ${gc.counts[label]}`);
+    }
+    out.push({
+        name: "runtimeGap census", owes: OWES.runtimeGap,
+        recorded: M.files, actual: gc.files,
+        stale: gDrift.length > 0,
+        detail: gDrift.length ? gDrift.join(", ") : `all thirteen rows agree, ${gc.files} files`,
+    });
+
     return out;
 }
 
@@ -177,9 +230,15 @@ export async function reportLines() {
     L.push(d.stale.length
         ? `  ${d.stale.length} stale -- ${d.stale.map((c) => c.owes).join("; ")}`
         : "  nothing stale. NOT a prediction that the verify passes -- this checks records, not subjects.");
-    L.push("  NOT checked here: vba/runtimeGap.mjs's census, whose walker cannot leave its gate without " +
-           "putting fs into a module that has zero imports on purpose. `sources` is exported from this file " +
-           "for that gate to import instead.");
+    // v4551 -- runtimeGap left this line and became the sixth check; what replaced it is a record whose
+    // cheap signal is stale in the same direction as its subject, which is a worse thing to have than a gap.
+    L.push("  NOT checked here: tools/ship/redCensus.mjs's registered reds -- whether a gate parked as red " +
+           "is still red. The only cheap signal for it is sweep-timings.json's `codes` table, and that table " +
+           "is written by the same sweep that would have to re-run the gate: MEASURED at v4551, tslSource " +
+           "-selfcheck was recorded there as exit 1 while the gate had exited 0 since v4543, so a check " +
+           "reading it would have confirmed the stale registration instead of finding it. Re-verifying a " +
+           "registered red means RUNNING it, which is redCensus-selfcheck's two minutes and does not belong " +
+           "in a pre-flight.");
     return L;
 }
 
@@ -191,10 +250,19 @@ export const DRIFT_AT_V4482 = Object.freeze({
         Object.freeze({ round: "v4480", records: 4 }),
         Object.freeze({ round: "v4481", records: 4 }),
     ]),
-    checked: 5, notChecked: 1,
+    // v4551: 5 -> 6. runtimeGap joined, and OWES gained a seventh clause (redCensus) that is the new
+    // notChecked -- so the ratio did not improve by adding a check, it improved by adding a check AND
+    // admitting a duty that was not written down. See the note under reportLines for why that one is a gap
+    // rather than an omission: its only cheap input is a record stale in the same direction as its subject.
+    checked: 6, notChecked: 1,
     // milliseconds, measured on this box
+    // v4551 -- the sixth check's cost is IN this table, not left out of it. The gate asserts this sum is under
+    // a second against a 300,000 ms verify, and a cost record that omits the most expensive check would make
+    // that row pass on a total nobody pays. 291 -> 845 ms, so the margin under the second is now 155 ms and
+    // real rather than comfortable: the NEXT check added here has to justify itself against that, or the
+    // budget has to move on an argument instead of by drift.
     cost: Object.freeze({ assertionShape: 195, closingCoverage: 19, registryOrphans: 24, gateFiles: 12,
-                          knowledgeIndex: 41 }),
+                          knowledgeIndex: 41, runtimeGapCensus: 554 }),
     verifyMs: 300000,
     // *** THE FIFTH CHECK WAS ADDED AT v4483 BECAUSE THE THIRD ONE COULD NOT FAIL. *** The registry check
     // reads knowledge-index.json, which is a derived record rebuilt by a ship step, so on the round that

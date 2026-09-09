@@ -1444,7 +1444,7 @@
   "tools/ship/tslPhysics-selfcheck.mjs": 5471,
   "tools/ship/tslRace-selfcheck.mjs": 5996,
   "tools/ship/tslRig-selfcheck.mjs": 6717,
-  "tools/ship/tslSource-selfcheck.mjs": 1907,
+  "tools/ship/tslSource-selfcheck.mjs": 1948,
   "tools/ship/tunnelDrawer-selfcheck.mjs": 1761,
   "tools/ship/tunnelSpawn-selfcheck.mjs": 5928,
   "tools/ship/typecheck-selfcheck.mjs": 5292,
@@ -1526,7 +1526,7 @@
   "tools/roundhouse/observableTaint-selfcheck.mjs": 101,
   "tools/ship/assertionShape-selfcheck.mjs": 886,
   "tools/ship/budgetMargin-selfcheck.mjs": 141,
-  "tools/ship/recordDrift-selfcheck.mjs": 1799,
+  "tools/ship/recordDrift-selfcheck.mjs": 2739,
   "tools/ship/refusalStack-selfcheck.mjs": 170,
   "tools/ship/playwrightResolve-selfcheck.mjs": 1437,
   "tools/ship/posixAssumption-selfcheck.mjs": 1365,
@@ -1611,7 +1611,12 @@
   "tools/ship/recordReach-selfcheck.mjs": 1086,
   "tools/ship/treeRead-selfcheck.mjs": 1152,
   "tools/ship/glbConformance-selfcheck.mjs": 892,
-  "tools/export/glbConformance-selfcheck.mjs": 424
+  "tools/export/glbConformance-selfcheck.mjs": 424,
+  "fx/fsr/fsr-selfcheck.mjs": 1389,
+  "render/motionVectors-selfcheck.mjs": 740,
+  "render/jitter-selfcheck.mjs": 61,
+  "render/temporalAccumulate-selfcheck.mjs": 1329,
+  "render/temporalResolve-selfcheck.mjs": 1046
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -3054,7 +3059,7 @@
   "tools/ship/tslPhysics-selfcheck.mjs": 0,
   "tools/ship/tslRace-selfcheck.mjs": 0,
   "tools/ship/tslRig-selfcheck.mjs": 0,
-  "tools/ship/tslSource-selfcheck.mjs": 1,
+  "tools/ship/tslSource-selfcheck.mjs": 0,
   "tools/ship/tunnelDrawer-selfcheck.mjs": 0,
   "tools/ship/tunnelSpawn-selfcheck.mjs": 0,
   "tools/ship/typecheck-selfcheck.mjs": 1,
@@ -3221,7 +3226,12 @@
   "tools/ship/recordReach-selfcheck.mjs": 0,
   "tools/ship/treeRead-selfcheck.mjs": 0,
   "tools/ship/glbConformance-selfcheck.mjs": 0,
-  "tools/export/glbConformance-selfcheck.mjs": 0
+  "tools/export/glbConformance-selfcheck.mjs": 0,
+  "fx/fsr/fsr-selfcheck.mjs": 0,
+  "render/motionVectors-selfcheck.mjs": 0,
+  "render/jitter-selfcheck.mjs": 0,
+  "render/temporalAccumulate-selfcheck.mjs": 0,
+  "render/temporalResolve-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-08T20:46:53.412Z",
@@ -4664,7 +4674,7 @@
   "tools/ship/tslPhysics-selfcheck.mjs": "unknown -- before v4408",
   "tools/ship/tslRace-selfcheck.mjs": "unknown -- before v4408",
   "tools/ship/tslRig-selfcheck.mjs": "unknown -- before v4408",
-  "tools/ship/tslSource-selfcheck.mjs": "2026-09-08T20:46:53.412Z",
+  "tools/ship/tslSource-selfcheck.mjs": "2026-09-09T22:40:44.496190Z",
   "tools/ship/tunnelDrawer-selfcheck.mjs": "2026-09-08T20:46:53.412Z",
   "tools/ship/tunnelSpawn-selfcheck.mjs": "unknown -- before v4408",
   "tools/ship/typecheck-selfcheck.mjs": "unknown -- before v4408",
@@ -4746,7 +4756,7 @@
   "tools/roundhouse/observableTaint-selfcheck.mjs": "2026-09-08T20:46:53.412Z",
   "tools/ship/assertionShape-selfcheck.mjs": "2026-09-08T20:46:53.412Z",
   "tools/ship/budgetMargin-selfcheck.mjs": "2026-09-08T20:46:53.412Z",
-  "tools/ship/recordDrift-selfcheck.mjs": "2026-09-08T20:46:53.412Z",
+  "tools/ship/recordDrift-selfcheck.mjs": "2026-09-09T22:40:44.496190Z",
   "tools/ship/refusalStack-selfcheck.mjs": "2026-09-08T20:46:53.412Z",
   "tools/ship/playwrightResolve-selfcheck.mjs": "2026-09-08T20:46:53.412Z",
   "tools/ship/posixAssumption-selfcheck.mjs": "2026-09-08T20:46:53.412Z",
@@ -4831,7 +4841,12 @@
   "tools/ship/recordReach-selfcheck.mjs": "2026-09-08T20:46:53.412Z",
   "tools/ship/treeRead-selfcheck.mjs": "2026-09-08T20:46:53.412Z",
   "tools/ship/glbConformance-selfcheck.mjs": "2026-09-08T19:46:35.918Z",
-  "tools/export/glbConformance-selfcheck.mjs": "2026-09-08T20:46:53.412Z"
+  "tools/export/glbConformance-selfcheck.mjs": "2026-09-08T20:46:53.412Z",
+  "fx/fsr/fsr-selfcheck.mjs": "2026-09-09T22:06:31.110810Z",
+  "render/motionVectors-selfcheck.mjs": "2026-09-09T22:06:31.110810Z",
+  "render/jitter-selfcheck.mjs": "2026-09-09T22:06:31.110810Z",
+  "render/temporalAccumulate-selfcheck.mjs": "2026-09-09T22:06:31.110810Z",
+  "render/temporalResolve-selfcheck.mjs": "2026-09-09T22:06:31.110810Z"
  },
  "crossings": {
   "tools/roundhouse/knobPromotions-selfcheck.mjs": 2,

@@ -304,7 +304,16 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4550 -- RE-TAKEN: fields 150 -> 151. One field, REACH_AT_V4548.unmeasured, added when a random red in
     // recordReach-selfcheck turned out to be a torn read of the timings file and "never timed" had to be
     // split from "too slow". Records and withFields did not move: a field added to an existing record.
-    excluding: Object.freeze({ records: 92, withFields: 39, fields: 151 }),
+    // v4551 -- RE-TAKEN: fields 151 -> 152. One field, DRIFT_AT_V4482.cost.runtimeGapCensus, added when
+    // recordDrift gained a sixth check and its cost had to go into the table the gate sums. Records and
+    // withFields did not move: a field added to an existing record, the same shape as v4550. *** AND THE
+    // NOTE ABOVE IS THIS ROUND'S SUBJECT, NOT BACKGROUND. *** It says the tree's two stale-record detectors
+    // sit outside the sweep budget and so get skipped; the FSR arc then drifted FOUR records over five
+    // rounds with nothing reading them, which is that sentence collecting on its debt. The sixth check is
+    // the repair, and it very nearly repeated the fault: it took recordDrift-selfcheck from 1,799 ms to
+    // 6,813 ms and only a memo brought it back to 2,647, inside the 3,000 ms budget with 350 ms to spare.
+    // A control bought at the price of putting its own gate out of the sweep is not a control.
+    excluding: Object.freeze({ records: 92, withFields: 39, fields: 152 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,

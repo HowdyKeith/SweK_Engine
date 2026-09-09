@@ -66,11 +66,41 @@ export const PATTERNS = Object.freeze({
     // browser rather than code that touches a context. Same defect class as the comment strip above, one layer
     // further in: the strip removes prose ABOUT a capability, and this removes an ARGUMENT ASKING FOR one. A
     // file that asks Chromium to enable WebGL is not a file that uses WebGL, and the row said it was.
-    // The pattern still matches its own source text (`]webgl` is not `-webgl`), which the self-match row needs.
+    // *** v4551 -- THIS LINE WAS WRONG AND STOOD FOR TWENTY-FIVE ROUNDS. *** It claimed the pattern still
+    // matched its own source text, "which the self-match row needs". Measured: it did not. `webgl2?["')]`
+    // against the literal `webgl2?["')]` fails -- after `webgl` the next character is `2` and then `?`, and
+    // `?` is not one of the four the class allows. The self-match row kept passing because it derives over
+    // runtimeGap.mjs AND its gate, and the gate matched WebGL on its own; the module was 11 of 12, not 12.
+    // Found by adding CENSUS_FIELDS below, whose `"webgl"` value DOES match and took the module to 12 of 12.
     "WebGL":                 /((?<![-\w])webgl2?["')]|WebGL2?RenderingContext)/,
     "WebGPU":                /(navigator\.gpu|requestAdapter)/,
     "workers/threads":       /(new Worker|SharedArrayBuffer|Atomics\.|worker_threads)/,
     "WebAssembly":           /WebAssembly/,
+});
+
+/**
+ * PATTERN LABEL -> the field MEASURED_AT_V4462 records it under, in PATTERNS order.
+ *
+ * *** THIS LIVES HERE AND NOT IN THE CHECKER, AND THE REASON IS A MEASUREMENT. *** v4551 added a
+ * runtimeGap row to tools/ship/recordDrift.mjs's pre-flight and wrote the mapping there, as a literal
+ * table of label strings. Running it moved two of the rows it was checking -- performance.now 220 -> 221
+ * and requestAnimationFrame 116 -> 117 -- because the census greps FILE TEXT for those exact words and the
+ * checker had just written them into a .mjs in the walked set. *** A DRIFT DETECTOR THAT CHANGES THE NUMBER
+ * IT DETECTS IS NOT A DETECTOR. *** Moving it here is the right call for a second reason -- name the thing
+ * once, in the file that owns both tables -- but the first reason written down for it was WRONG, and the
+ * measurement is below. It said the strings cost nothing here because this file already matches all twelve
+ * of its own patterns. It matched ELEVEN. The WebGL row's lookbehind (added later, and worth 13 files)
+ * stopped the pattern matching its own source text, so the only WebGL hit in the pair came from the GATE,
+ * and the self-match row's headline names the module while its derivation covers both files. Writing
+ * `"WebGL": "webgl"` here made this file match too: WebGL 141 -> 142, selfCount 1 -> 2. So the label table
+ * DID cost a row, one, and the honest description of that is not "no effect" but "one row, in the module
+ * the row is about, which is where a self-inflicted count is least likely to be mistaken for the tree.
+ */
+export const CENSUS_FIELDS = Object.freeze({
+    "ES modules": "esModules", "closures as values": "closures", "async/await": "asyncAwait",
+    "typed arrays": "typedArrays", "Promises": "promises", "fetch/XHR": "fetchXhr",
+    "performance.now": "performanceNow", "requestAnimationFrame": "raf",
+    "WebGL": "webgl", "WebGPU": "webgpu", "workers/threads": "threads", "WebAssembly": "wasm",
 });
 
 /**
@@ -218,7 +248,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // the earlier reading was 3878. What survives is the rule the wrong explanation was reaching for: this
     // number is MEASURED every round, never incremented from the last one, and a reason invented to explain a
     // count is worth less than re-taking it. FIVE ROUNDS RUNNING this table has been re-taken by hand.
-    files: 4031,                  // v4526 merge: 3887 -> 4002, this branch's rounds; v4527: 4004; v4528: 4007; v4529: 4009; v4530: 4011; v4533: 4012 (ai-bridge/runBusy.js); v4536: 4014 (physics/mesh/uvUnwrap.mjs and its gate); v4537: 4016 (physics/mesh/uvLscm.mjs and its gate); v4539: 4018 (physics/render/splitSum.mjs and its gate); v4543: 4020 (nav/navmesh.mjs and its gate); v4544: 4022 (physics/character/terrainWalk.mjs and its gate); v4545: 4023 (tools/ship/navWiring-selfcheck.mjs); v4546: 4024 (tools/ship/navWiringLive-selfcheck.mjs; the harness is HTML and not counted); v4547: 4025 (tools/ship/engineSceneBot-selfcheck.mjs); v4548: 4029 (tools/ship/treeRead.mjs, tools/ship/recordReach.mjs and their two gates); v4550: 4031 (tools/export/glbConformance.mjs and its gate)
+    files: 4045,                  // v4526 merge: 3887 -> 4002, this branch's rounds; v4527: 4004; v4528: 4007; v4529: 4009; v4530: 4011; v4533: 4012 (ai-bridge/runBusy.js); v4536: 4014 (physics/mesh/uvUnwrap.mjs and its gate); v4537: 4016 (physics/mesh/uvLscm.mjs and its gate); v4539: 4018 (physics/render/splitSum.mjs and its gate); v4543: 4020 (nav/navmesh.mjs and its gate); v4544: 4022 (physics/character/terrainWalk.mjs and its gate); v4545: 4023 (tools/ship/navWiring-selfcheck.mjs); v4546: 4024 (tools/ship/navWiringLive-selfcheck.mjs; the harness is HTML and not counted); v4547: 4025 (tools/ship/engineSceneBot-selfcheck.mjs); v4548: 4029 (tools/ship/treeRead.mjs, tools/ship/recordReach.mjs and their two gates); v4550: 4031 (tools/export/glbConformance.mjs and its gate); v4551: 4045 -- FOURTEEN files at once, because this record was not re-taken for the five rounds of the FSR arc
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
                           // RE-TAKEN TWICE IN TWO ROUNDS, and the second time only because the ship gate
                           // caught it: v4478's re-take was correct for v4478 and stale the moment v4479
@@ -319,20 +349,45 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // asyncAwait by one -- ONE new file, tools/ship/navWiringLive-selfcheck.mjs, which imports, closes over
     // its helpers and awaits a browser. The harness it drives is HTML and does not enter this census at all,
     // which is why the file count moves by one where a module-plus-gate round moves it by two.
-    esModules: 3740, closures: 3617, asyncAwait: 1420, typedArrays: 797, promises: 345,
-    fetchXhr: 243, performanceNow: 220, raf: 116, webgl: 141, webgpu: 48, threads: 22, wasm: 23,
+    // v4551 -- RE-TAKEN, AND FIVE ROUNDS LATE. *** THE RECORD WAS RED FOR FIVE CONSECUTIVE ROUNDS AND NOTHING
+    // RAN IT. *** The FSR arc added fourteen files (fsr.js, fsrKernels.js, motionVectors.mjs, motionVectorsWgsl,
+    // jitter.mjs, temporalAccumulate.mjs + Wgsl, temporalResolve.mjs + Wgsl, five gates, and three-probe.json)
+    // and every one of those rounds ran gateSweep, instruments and sweepCoverage and called that the ritual.
+    // This record is not in that set and neither is assertionShape's, so both drifted silently and in step.
+    // v4548 already shipped a round titled "the ship ritual does not check half its own records"; the repair
+    // there re-took the records and did not make the ritual reach them, and here is the same fault again.
+    // FOUR of twelve rows moved and EIGHT did not, which is the discriminating shape this census exists for:
+    // ES modules +14 (every file imports), closures +8, async/await +4, typed arrays +11 -- an upscaler owns
+    // Float32Arrays, so the typed-array row nearly tracks the file count, the same signature v4537, v4543 and
+    // v4550 recorded for modules that OWN buffers rather than being handed them. *** AND WebGPU DID NOT MOVE,
+    // WHICH IS THE ROW I WOULD HAVE PREDICTED WRONG. *** Three of these files are WGSL kernels and three of the
+    // gates run on a real device -- but the pattern is /(navigator\.gpu|requestAdapter)/ and every one of them
+    // reaches the device through gfx/device.js or the ship harness. The census counts files that ASK FOR an
+    // adapter, not files that use one, and a round that added the tree's first real temporal upscaler moved
+    // that row by zero. Promises, fetch, performance.now, raf, WebGL, threads and wasm also held.
+    esModules: 3754, closures: 3625, asyncAwait: 1424, typedArrays: 808, promises: 345,
+    fetchXhr: 243, performanceNow: 220, raf: 116, webgl: 142, webgpu: 48, threads: 22, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.
     threadsRank: 12,              // of 12, biggest first -- SMALLEST at the v4526 merge (second-smallest at v4462: the merge added one WebAssembly user, and 23 passes 22)
     // *** THE MODULE THAT DEFINES THE CENSUS MATCHES EVERY SINGLE ONE OF ITS OWN TWELVE PATTERNS. ***
-    // Not five rows -- all twelve. runtimeGap.mjs holds the PATTERNS table, so the literal text of every
+    // Not five rows -- all twelve. *** AND THAT SENTENCE WAS FALSE OF THE MODULE FROM THE ROUND THE WebGL
+    // LOOKBEHIND LANDED UNTIL v4551, WHICH IS THE FINDING. *** This table is derived over TWO files --
+    // runtimeGap.mjs and its gate -- so a row the GATE alone inflates still shows a 1, and WebGL was exactly
+    // that: 1, from the gate, while the module missed its own pattern. The row's headline names one file and
+    // its arithmetic covers two, and nothing noticed because the number it compares against was recorded
+    // from the same two files. v4551's CENSUS_FIELDS made the module match as well, so WebGL is now 2 and
+    // the sentence is true for the first time -- by accident, while writing something else.
+    // *** WHAT WOULD HAVE CAUGHT IT: *** a row asserting the count PER FILE rather than for the pair. Not
+    // added here, because it is a different round's work and this one already grew past its rung; recorded
+    // so it is not rediscovered. runtimeGap.mjs holds the PATTERNS table, so the literal text of every
     // regex sits in it (`Float32Array`, `new Promise`, `fetch(`, `WebAssembly`, ...), and a regex source is a
     // string, which is prose the comment strip cannot reach. Its gate imports it and adds the names again.
     // So the census's own instrument is a maximal false positive for itself, and the counts above include it:
     selfCount: Object.freeze({
         "ES modules": 2, "closures as values": 2, "async/await": 1, "typed arrays": 1, "Promises": 1,
-        "fetch/XHR": 1, "performance.now": 2, "requestAnimationFrame": 2, "WebGL": 1, "WebGPU": 1,
+        "fetch/XHR": 1, "performance.now": 2, "requestAnimationFrame": 2, "WebGL": 2, "WebGPU": 1,
         "workers/threads": 1, "WebAssembly": 2,
     }),
     // The finding is unharmed -- it is a two-file distortion in rows of 22 to 3,506 -- but it must be stated,
@@ -340,7 +395,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // second-smallest outright; WITH them the two tie at 22 and threads hold rank 11 on the stable sort only.
     wasmWithoutSelf: 21,          // v4526 merge: 20 -> 21
     threadsWithoutSelf: 21,
-    closuresOverThreads: 164,     // 3597 / 22, rounded at v4530 (163 at v4527: 3588 / 22; 158 at v4462: 3465 / 22)
+    closuresOverThreads: 165,     // 3625 / 22, rounded at v4551 (164 at v4530: 3597 / 22; 163 at v4527: 3588 / 22; 158 at v4462: 3465 / 22)
     // *** ONE, NOT TWO. *** The first draft filed fetch/XHR as an archive claim too; pointing the rows at
     // bytes found the HTTP client sitting in this tree's own VBA, so only WebGL still needs the archive.
     archiveRows: 1,
