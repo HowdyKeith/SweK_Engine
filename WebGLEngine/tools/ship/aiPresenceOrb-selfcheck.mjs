@@ -7,10 +7,11 @@
 // GATES render/aiPresenceOrbState.mjs (the pure state/colour/envelope math) and render/aiPresenceOrbTsl.mjs
 // (the "still" orb shader), tools/ship/nextRounds.mjs's ai-presence-orb-widget entry.
 //
-// Section order: pure-JS math first (fast, exact, no browser), then the real WebGL2 render (slow, needs
-// Chromium), so a math regression fails in milliseconds rather than after a browser boot.
+// Section order: pure-JS math first (fast, exact, no browser), then the real render on both backends (slow,
+// needs Chromium -- WebGL2 always, real WebGPU too since tools/ship/webgpuHarness.mjs's swizzle workaround),
+// so a math regression fails in milliseconds rather than after a browser boot.
 "use strict";
-import { SECURE_HOST } from "./webgpuHarness.mjs";
+import { SECURE_HOST, renderThreeTslToPixels } from "./webgpuHarness.mjs";
 import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
 import http from "node:http";
 import fs from "node:fs";
@@ -225,6 +226,14 @@ const RENDER_SCRIPT = `async ({ n, time, modulePath }) => {
     canvas.width = n; canvas.height = n;
     const renderer = new THREE.WebGPURenderer({ canvas, forceWebGL: true, antialias: false });
     await renderer.init();
+    // tools/ship/webgpuHarness.mjs's own header: THREE.WebGPURenderer defaults outputColorSpace to "srgb",
+    // double-encoding this shader's own already-sRGB linearToSrgb() output on every direct-to-canvas render --
+    // the same bug the ai-presence-orb-widget round found and fixed at ui/aiPresenceOrbWidget.js and
+    // ai-presence-orb.html, left unfixed HERE at the time since this section's own assertions were loose
+    // enough not to care. Fixed now: the real-WebGPU cross-check this section gained does care, and comparing
+    // a double-encoded WebGL2 render against a correctly-encoded WebGPU one is not a cross-backend agreement
+    // test, it is two different pieces of math being told apart.
+    renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
     const fx = makeAiPresenceOrbTsl(THREE, TSL, {});
     fx.setKnobs({ time });
 
@@ -260,7 +269,7 @@ async function main() {
     const N = 64;
     const script = RENDER_SCRIPT;
 
-    sec("10. *** A REAL RENDER, WebGL2, 64x64: THE SILHOUETTE IS EXACTLY WHERE THE ANALYTIC RADIUS SAYS, AND WGSL EMISSION ALSO SUCCEEDS ***");
+    sec("10. *** A REAL RENDER, BOTH BACKENDS, 64x64: THE SILHOUETTE IS EXACTLY WHERE THE ANALYTIC RADIUS SAYS, WGSL EMISSION SUCCEEDS, AND WebGPU AGREES WITH WebGL2 PIXEL FOR PIXEL ***");
     const r10 = await runWebGL2InEngineOrigin({ engineRoot: ENG, script, args: { n: N, time: 1.2, modulePath: "/render/aiPresenceOrbTsl.mjs" } });
     if (!r10.ok || !r10.result || !r10.result.ok) {
         ok("!! the render ran at all", false, r10.ok ? JSON.stringify(r10.result) : "harness: " + r10.reason);
@@ -274,11 +283,29 @@ async function main() {
            farCorner[3] === 0, `corner rgba=${JSON.stringify(farCorner)}`);
         ok("!! WGSL emission (three's OTHER compiler backend for the same graph) also succeeds, proving the graph is valid on both",
            wgslOk && wgslLen > 500, `wgslOk=${wgslOk} len=${wgslLen} error=${wgslError}`);
-        report("NOT executed: a real WebGPU RENDER of this graph in headless Chromium. Confirmed (control run against " +
-               "render/badTvTsl.mjs, this tree's own already-shipped first TSL shader) to fail identically in this " +
-               "sandbox with 'GPUTextureComponentSwizzle' from three's own WebGPUBackend -- a pre-existing environment " +
-               "limit this port did not introduce, not a defect in this graph. Cross-backend PIXEL agreement is " +
-               "therefore not established this round; WGSL COMPILATION is.");
+
+        // *** A REAL WebGPU RENDER, NOW EXECUTED -- tools/ship/webgpuHarness.mjs's swizzle workaround closed
+        // the gap this section used to report as "NOT executed". *** Same graph, same knobs (time=1.2), same
+        // N=64 canvas, THE OTHER real backend -- cross-backend PIXEL agreement, not just WGSL compilation.
+        const rGpu = await renderThreeTslToPixels({
+            engineRoot: ENG, moduleImportPath: "/render/aiPresenceOrbTsl.mjs", factoryName: "makeAiPresenceOrbTsl",
+            factoryArgs: {}, knobs: { time: 1.2 }, width: N, height: N,
+        });
+        if (!rGpu.ok) {
+            ok("!! a real WebGPU render of this graph executes in headless Chromium", false, rGpu.skipped ? "SKIP: " + rGpu.reason : rGpu.reason);
+        } else {
+            const at = (x, y) => { const o = (y * N + x) * 4; return [rGpu.pixels[o], rGpu.pixels[o + 1], rGpu.pixels[o + 2], rGpu.pixels[o + 3]]; };
+            const gpuCenter = at(N / 2, N / 2), gpuCorner = at(2, 2);
+            ok("!! a real WebGPU render executes (renderer.backend.isWebGPUBackend, not the WebGL2 fallback)", rGpu.isWebGPUBackend === true);
+            const delta = Math.abs(gpuCenter[0] - center[0]) + Math.abs(gpuCenter[1] - center[1]) + Math.abs(gpuCenter[2] - center[2]) + Math.abs(gpuCenter[3] - center[3]);
+            // 20 is real headroom over the measured delta (7, once both sides carry the SAME outputColorSpace
+            // fix -- see RENDER_SCRIPT's own comment), not a number picked to make this pass: a genuine cross-
+            // backend disagreement (the double-encoding bug this uncovered gave a delta of 215) blows through
+            // it by more than an order of magnitude, so this stays a real check, not a rubber stamp.
+            ok("!! *** CROSS-BACKEND PIXEL AGREEMENT: the SAME TSL graph's centre pixel on WebGPU matches its WebGL2 render (section 10's own baseline) within f32/driver rounding, not merely both compiling ***",
+               delta <= 20, `webgpu centre=${JSON.stringify(gpuCenter)} vs webgl2 centre=${JSON.stringify(center)}, |delta|=${delta}`);
+            ok("!! and the far corner agrees too -- fully transparent on both backends", gpuCorner[3] === 0, `webgpu corner=${JSON.stringify(gpuCorner)}`);
+        }
     }
 
     sec("11. *** SABOTAGE, ON THE REAL AUTHORED SOURCE TEXT: CORRUPTING THE OKLAB DECODE'S DOMINANT COEFFICIENT MEASURABLY CHANGES THE RENDERED CENTRE PIXEL ***");

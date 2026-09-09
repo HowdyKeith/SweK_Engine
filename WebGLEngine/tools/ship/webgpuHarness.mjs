@@ -49,6 +49,50 @@ export const LAUNCH_ARGS = Object.freeze(["--enable-unsafe-webgpu"]);
 /** *** NOT about:blank. *** See the header -- this is the whole reason the harness has a server in it. */
 export const SECURE_HOST = "127.0.0.1";
 
+// ---------------------------------------------------------------------------------------------------------
+// *** THE SWIZZLE WORKAROUND. *** v4319 found real WebGPU rendering through THREE.WebGPURenderer (not
+// forceWebGL) refused on this box's headless Chromium: "Failed to execute 'createView' on 'GPUTexture':
+// Failed to read the 'swizzle' property from 'GPUTextureViewDescriptor': The provided value is not of type
+// 'GPUTextureComponentSwizzle'." tools/ship/threeProbe-selfcheck.mjs and tools/ship/three-probe.json (Keith's
+// rig, real Chrome 152) settled WHOSE bug it is: the rig draws three@0.185.1 on real WebGPU cleanly, so this
+// is this SANDBOX's headless-shell binary lagging the WebGPU spec's handling of the still-experimental
+// `texture-component-swizzle` feature -- not a defect in three.js, not a defect in any shader this tree
+// writes, and not something a real user's browser hits. Confirmed directly, not inferred: three.js's own
+// GPUTextureViewDescriptor class (vendor/three-webgpu/three.webgpu.js, three separate instances --
+// `_viewDescriptor`, `_viewDescriptor$1`, `_viewDescriptor$2`) sets `this.swizzle = 'rgba'` on EVERY texture
+// view it builds, unconditionally, with its own docstring saying the field is "ignored otherwise" when the
+// feature isn't present on the device -- this Chromium validates the field's TYPE before deciding whether to
+// ignore it, and a bare string is not a valid GPUTextureComponentSwizzle dictionary, so it throws instead.
+//
+// *** THE FIX LIVES HERE, NOT IN vendor/. *** vendor/three-webgpu/three.webgpu.js is not broken (the rig
+// proves it draws correctly on a real, current browser) -- patching a vendored file to work around one
+// outdated test-runner binary would be fixing the wrong thing, and would need re-applying on every re-vendor.
+// This is a narrow, provably safe monkey-patch of `GPUTexture.prototype.createView`, installed ONLY inside
+// gate/harness pages (this file, never main.js or any ui/*.js production path): it strips the `swizzle` field
+// ONLY when it is still the string default three.js always sets, passing every other descriptor field through
+// completely unchanged. On a browser that does NOT have this bug (the rig's Chrome 152 included), the
+// stripped field was going to be ignored anyway per three.js's own docstring, so the patch is behaviourally a
+// no-op there -- it only ever changes behaviour on the browsers that would otherwise refuse the call outright.
+// ---------------------------------------------------------------------------------------------------------
+
+/**
+ * Installed in-page, before any THREE.WebGPURenderer is constructed. Call this function's SOURCE (via
+ * `String(installSwizzleWorkaround) + ";installSwizzleWorkaround();"` or equivalent) inside a page.evaluate --
+ * it cannot be called from Node, it patches a page-global (GPUTexture) that only exists in a browser context.
+ * Idempotent: reinstalling over an already-patched createView is harmless (it just wraps twice, and the inner
+ * wrap's guard is already false the second time since the field it strips is gone by then).
+ */
+export function installSwizzleWorkaround() {
+    const orig = GPUTexture.prototype.createView;
+    GPUTexture.prototype.createView = function (descriptor) {
+        if (descriptor && typeof descriptor === "object" && typeof descriptor.swizzle === "string") {
+            const { swizzle, ...rest } = descriptor;
+            return orig.call(this, rest);
+        }
+        return orig.call(this, descriptor);
+    };
+}
+
 /**
  * Why a caller cannot run, or null when it can. Checked in the order a reader would want to act on.
  */
@@ -727,6 +771,21 @@ export async function runInEngineOrigin({ engineRoot, script, args = null, timeo
         let timer = null;
         const out = await Promise.race([
             page.evaluate(async ({ src, a }) => {
+                // installSwizzleWorkaround() (this file, above) inlined rather than referenced: page.evaluate
+                // serialises ONLY the function passed to it plus its args, so a Node-side sibling function
+                // cannot be called from inside here directly. Installed BEFORE the caller's own script runs
+                // and before any THREE.WebGPURenderer it constructs -- see this file's header for why this is
+                // safe on every browser, not just the ones that need it.
+                if (typeof GPUTexture !== "undefined") {
+                    const orig = GPUTexture.prototype.createView;
+                    GPUTexture.prototype.createView = function (descriptor) {
+                        if (descriptor && typeof descriptor === "object" && typeof descriptor.swizzle === "string") {
+                            const { swizzle, ...rest } = descriptor;
+                            return orig.call(this, rest);
+                        }
+                        return orig.call(this, descriptor);
+                    };
+                }
                 try { const fn = new Function("return (" + src + ")")(); return { ok: true, result: await fn(a) }; }
                 catch (e) { return { ok: false, reason: String(e && e.stack || e).slice(0, 600) }; }
             }, { src: String(script), a: args }),
@@ -746,4 +805,86 @@ export async function runInEngineOrigin({ engineRoot, script, args = null, timeo
     } catch (e) {
         return { ok: false, skipped: false, reason: "harness error: " + String(e).slice(0, 300), result: null, pageErrors: [] };
     } finally { try { await browser?.close(); } catch {} srv.close(); }
+}
+
+/**
+ * Render a SHIPPED TSL scene-factory module through the REAL WebGPU backend of THREE.WebGPURenderer (never
+ * forceWebGL) and read real pixels back -- the render/aiPresenceOrb-selfcheck.mjs-shaped gap this tree had
+ * named repeatedly ("a real WebGPU RENDER of this graph could not be executed in headless Chromium") until the
+ * swizzle workaround above made it possible. Built on runInEngineOrigin (so the swizzle fix and the engine-
+ * origin serving are exactly one implementation, not two that can drift) rather than launching its own browser.
+ *
+ * `factoryName` must export `(THREE, TSL, opts) -> { scene, camera, setKnobs? }` from `moduleImportPath` (the
+ * shape every render/*Tsl.mjs factory in this tree already has). `factoryArgs` is passed as that function's
+ * third argument (e.g. `{ knobs: {...} }` for the orb's own `{ knobs, linear }`).
+ *
+ * *** READBACK IS RAW copyTextureToBuffer, NOT renderer.readRenderTargetPixelsAsync. *** Measured directly:
+ * three.js's own convenience method throws `TypeError: Invalid value used as weak map key` inside
+ * WebGPUBackend.copyTextureToBuffer on this vendored build -- a second, separate bug from the swizzle one,
+ * unrelated to it, and out of this fix's scope (the render itself, the thing gates actually need to grade,
+ * already succeeds without it). Reading the underlying GPUTexture directly via `renderer.backend.get(rt.texture)
+ * .texture` and driving `copyTextureToBuffer`/`mapAsync` by hand -- exactly runWgslComputeToTexture's own
+ * pattern above, applied to a three.js RenderTarget instead of a hand-built WGSL compute shader -- sidesteps it.
+ *
+ * Returns { ok, skipped, reason, pixels, isWebGPUBackend, pageErrors }. `pixels` is a flat RGBA Uint8Array-like
+ * array, top-row-first (native to this readback path; no flip needed, unlike the WebGL2/readPixels harnesses
+ * above which read bottom-first).
+ */
+export async function renderThreeTslToPixels({ engineRoot, moduleImportPath, factoryName, factoryArgs = {},
+                                               knobs = {}, width = 64, height = 64 }) {
+    const SCRIPT = `async ({ moduleImportPath, factoryName, factoryArgs, knobs, width, height }) => {
+        const THREE = await import("/vendor/three-webgpu/three.webgpu.js");
+        const TSL = await import("/vendor/three-webgpu/three.tsl.js");
+        const mod = await import(moduleImportPath);
+        const make = mod[factoryName];
+        if (typeof make !== "function") return { ok: false, reason: factoryName + " is not exported by " + moduleImportPath };
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width; canvas.height = height;
+        const renderer = new THREE.WebGPURenderer({ canvas, antialias: false });   // REAL WebGPU -- no forceWebGL
+        await renderer.init();
+        // measured a no-op for THIS function's own render-to-RenderTarget readback shape (outputColorSpace
+        // conversion is a "present to the canvas" step three.js applies on the FINAL framebuffer write, and
+        // this never renders straight to the canvas) -- kept anyway so a caller reading pixels rendered
+        // straight to the canvas in the future gets the same non-double-encoded convention this file's other
+        // real-WebGPU renderer constructions already commit to (see this file's header and
+        // tools/ship/aiPresenceOrb-selfcheck.mjs's own RENDER_SCRIPT for where it is NOT a no-op).
+        renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+        const isWebGPUBackend = !!(renderer.backend && renderer.backend.isWebGPUBackend);
+        renderer.setSize(width, height, false);
+
+        const fx = make(THREE, TSL, factoryArgs);
+        if (typeof fx.setKnobs === "function") fx.setKnobs(knobs);
+
+        const rt = new THREE.RenderTarget(width, height);
+        let renderErr = null;
+        try {
+            renderer.setRenderTarget(rt);
+            renderer.render(fx.scene, fx.camera);
+            renderer.setRenderTarget(null);
+        } catch (e) { renderErr = String(e && e.stack || e).slice(0, 600); }
+        if (renderErr) return { ok: false, reason: renderErr, isWebGPUBackend };
+
+        const device = renderer.backend.device;
+        const gpuTexture = renderer.backend.get(rt.texture).texture;
+        const bpr = Math.ceil(width * 4 / 256) * 256;
+        const readBuf = device.createBuffer({ size: bpr * height, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+        const enc = device.createCommandEncoder();
+        enc.copyTextureToBuffer({ texture: gpuTexture }, { buffer: readBuf, bytesPerRow: bpr }, { width, height });
+        device.queue.submit([enc.finish()]);
+        await readBuf.mapAsync(GPUMapMode.READ);
+        const raw = new Uint8Array(readBuf.getMappedRange()).slice();
+        readBuf.unmap();
+
+        // strip the 256-byte row padding copyTextureToBuffer requires -- the same de-stride every readback in
+        // this file does, here done row by row rather than left as a caller footgun.
+        const pixels = new Uint8Array(width * height * 4);
+        for (let y = 0; y < height; y++) pixels.set(raw.slice(y * bpr, y * bpr + width * 4), y * width * 4);
+        return { ok: true, isWebGPUBackend, pixels: Array.from(pixels) };
+    }`;
+    const out = await runInEngineOrigin({ engineRoot, script: SCRIPT,
+        args: { moduleImportPath, factoryName, factoryArgs, knobs, width, height } });
+    if (out.skipped || !out.ok) return { ...out, pixels: null, isWebGPUBackend: null };
+    if (!out.result || !out.result.ok) return { ...out, ok: false, reason: out.result ? out.result.reason : "no result", pixels: null, isWebGPUBackend: out.result ? out.result.isWebGPUBackend : null };
+    return { skipped: false, ok: true, pixels: out.result.pixels, isWebGPUBackend: out.result.isWebGPUBackend, pageErrors: out.pageErrors };
 }

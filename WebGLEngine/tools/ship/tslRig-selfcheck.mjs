@@ -15,7 +15,7 @@ import http from "node:http";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
-import { webgpuSkipReason } from "./webgpuHarness.mjs";
+import { webgpuSkipReason, installSwizzleWorkaround } from "./webgpuHarness.mjs";
 import { LN2, PARAMS, truePeak } from "../../render/physicsTsl.mjs";
 import { probeCpu as heidlerGrid } from "../../render/heidlerWgsl.mjs";
 
@@ -64,6 +64,10 @@ else {
     await new Promise((r) => srv.listen(0, "127.0.0.1", r));
     const br = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader", "--enable-unsafe-webgpu", "--enable-features=Vulkan,WebGPU"] });
     const pg = await br.newPage({ viewport: { width: 640, height: 480 } }); const errs = []; pg.on("pageerror", (e) => errs.push(String(e).slice(0, 200)));
+    // webgpuHarness.mjs's header explains the bug and why the fix belongs here, not in vendor/. addInitScript
+    // (not page.evaluate) because tsl-rig.html's own script runs on navigation, outside this gate's control --
+    // it needs to be installed before THAT script constructs its THREE.WebGPURenderer, not after.
+    await pg.addInitScript(installSwizzleWorkaround);
     await pg.goto(`http://127.0.0.1:${srv.address().port}/?n=128`, { waitUntil: "load" });
     let json = null; for (let i = 0; i < 240 && !json; i++) { await pg.waitForTimeout(1000); const v = await pg.evaluate(() => document.getElementById("json").value); if (v) { try { const j = JSON.parse(v); if (j.timing || j.failed) json = j; } catch (e) {} } }
     const out = await pg.evaluate(() => document.getElementById("out").textContent);

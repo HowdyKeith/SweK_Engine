@@ -656,31 +656,89 @@ export const RED_AT_V4535 = Object.freeze(RED_AT_V4535_GATES.map((gate) => Objec
 // swizzle, three sends the harmless default unasked, and the browser's strictness is the whole gap -- which is
 // exactly why "not a code fix" is not a shrug: there is no call site here to change, only a Chromium version to
 // wait for or a rig to run on instead.
+// *** THE SWIZZLE WALL THIS REGISTER NAMED IS GONE -- A WORKAROUND, NOT THE "NOT A CODE FIX... WAIT FOR A
+// NEWER CHROMIUM" OUTCOME EVERY ENTRY BELOW ORIGINALLY PREDICTED. *** tools/ship/webgpuHarness.mjs's
+// installSwizzleWorkaround() (see its own header for the full measurement) strips the bare-string `swizzle`
+// field three.js's GPUTextureViewDescriptor always sets before it reaches the real createView() call, inside
+// gate/harness pages only -- never vendor/, never main.js or any ui/*.js production path, and provably inert
+// on a browser that never had the bug (the field was always "ignored otherwise" per three's own docstring).
+// runInEngineOrigin installs it automatically, and all four gates below already build their real-WebGPU
+// renderers through it -- so all four cleared with ZERO changes to their own files.
+//
+// FRESHLY RE-RUN, NOT ASSUMED -- BUT THE "X of Y" COUNTS BELOW ARE THIS RUN'S OWN, NOT A DELTA AGAINST THE
+// FIGURES THIS ENTRY ORIGINALLY RECORDED. tslPhysics-selfcheck's own file has plainly grown since this register
+// first measured it (67 of 68 then; 12 sections and a different total now) -- some rounds on this branch since
+// v4557 added sections unrelated to swizzle, and attributing that growth to this fix would be a lie the same
+// shape as the ones this file exists to refuse. What IS directly, freshly measured and attributable: real
+// byte-exact WebGPU pixel renders now pass across every shell tslRace-selfcheck builds (chaos race, vertex
+// displacement, sprite atlas, filtered sampler, line-list ink -- 36864/36864, worst 0, each); tsl-selfcheck's
+// badTv cross-backend byte-exact compare and its Wien's-root TSL Loop physics both now run and pass on real
+// WebGPU; tslPhysics-selfcheck's atomics, indirect dispatch, workgroup-shared-memory reduction and bit-exact
+// HMC leapfrog all now exercise real WebGPU and pass; slugTsl-selfcheck went FULLY GREEN (14 of 14) and is
+// REMOVED from this list below, the same "the list may only shrink, and only on purpose" rule RED_AT_V4535's
+// own closure already used.
+//
+// *** AND THE WALL COMING DOWN EXPOSED A SECOND, GENUINELY DIFFERENT PROBLEM IT HAD BEEN HIDING, NOT
+// INVENTED TO EXPLAIN AWAY A STILL-RED GATE. *** tslSource-selfcheck (still 2 red of its own), tslRace-
+// selfcheck's ONE remaining red, and tslPhysics-selfcheck's ONE remaining red all now fail on the SAME shape
+// of thing, and it is not swizzle: an internal, auto-numbered uniform node (nodeUniform1, nodeUniform6,
+// nodeUniform8...) that three's WGSL and GLSL builders either number differently for the identical graph
+// (tslSource: "time,speed,...,nodeUniform8" vs "...,nodeUniform9"; tslPhysics's transplant list carries the
+// same pattern) or leave genuinely unlabelled on one backend (tslRace section 6: "the emitted GLSL carries an
+// UNLABELLED uniform (nodeUniform1)"). NOT ROOT-CAUSED HERE -- this register exists to say what is red and
+// why, not to fix everything a cleared wall reveals, and three separate call sites (badTvTsl.mjs's texture-
+// sampling graph, twice, and a physics graph) sharing one failure SHAPE is a real lead for whoever picks it
+// up next, not a diagnosis.
+// *** A SIXTH GATE HIT THE SAME WALL AND WAS NEVER ON THIS LIST. *** tslRig-selfcheck.mjs throws the identical
+// swizzle TypeError, but through a code path none of the four above share: it navigates a real page
+// (tsl-rig.html) with page.goto, so runInEngineOrigin's automatic install (see its own comment) never runs
+// inside it -- the page's own script, not a caller-supplied one, builds the WebGPURenderer. Fixed separately,
+// in the gate itself: page.addInitScript(installSwizzleWorkaround) before the goto, which Playwright runs
+// ahead of any script the navigated page loads, including this one. Found via the SAME sweep this round used
+// to confirm nothing else broke (120 gates reachable from the changed webgpuHarness.mjs, re-run with and
+// without the fix as a control) -- not asserted; the swizzle error text matched exactly, and it is gone after
+// the addInitScript fix. What is red now, freshly counted: 3 PASS, 1 FAIL -- section 1's page run hits the
+// SAME uniform-list mismatch as tslSource-selfcheck below ('time,speed,distortion,distortion2,rollSpeed,
+// nodeUniform8 vs ...,nodeUniform9'), because tsl-rig.html's own page renders the identical badTv graph
+// tslSource does. ADDED here rather than left as a gap this census still had -- the whole point of section 5's
+// 'unmeasured' bucket is that a hole should be named, not inherited silently.
 const WHY_V4557 = Object.freeze({
     "tools/ship/tslSource-selfcheck.mjs":
-        "TypeError: The provided value is not of type 'GPUTextureComponentSwizzle'. Thrown inside three's own " +
-        "WebGPUBackend.createBindGroup when badTv's texture-sampling graph asks getShaderAsync for a WebGPU " +
-        "shader; this box's Chromium 141 does not implement the GPUTextureViewDescriptor.swizzle field three@" +
-        "0.185.1 passes. Section 1 (pure JS/logic, no browser) is fully green. CLEARS on any Chromium build " +
-        "new enough to carry GPUTextureComponentSwizzle -- not a code fix.",
+        "THE SWIZZLE WALL IS GONE (see the note above this object) -- what is red now is different and NOT " +
+        "reachable before: sections 2 and 3 both throw 'tslSource: the WGSL and GLSL builders emitted " +
+        "different uniform lists (time,speed,distortion,distortion2,rollSpeed,nodeUniform8 vs " +
+        "...,nodeUniform9)' out of devicePipelineFromTsl's own agreement check on badTv's graph. Freshly " +
+        "counted, not assumed: 8 PASS, 2 FAIL. Section 1 (pure JS/logic, no browser) is still fully green, " +
+        "unaffected either way.",
     "tools/ship/tslRace-selfcheck.mjs":
-        "Same TypeError, same cause, two sections: 'A TEXTURE ACROSS THE SHELL BOUNDARY' and 'AND A SAMPLER' " +
-        "both build a real WebGPU device to compare a generated pipeline against the fleets' own shipped one. " +
-        "66 of 68 checks pass, including the byte-exact Pixel-race comparison this arc's GLSL flip-flag fix " +
-        "was verified against (36864/36864, worst 0, both backends) -- the two swizzle failures are the only " +
-        "ones a real Chromium would not also see pass.",
+        "THE SWIZZLE WALL IS GONE. Freshly counted, not assumed: 73 PASS, 1 FAIL -- including real byte-exact " +
+        "WebGPU renders across five different generated shells (36864/36864, worst 0, each). The one " +
+        "remaining red is section 6, 'A TEXTURE ACROSS THE SHELL BOUNDARY': 'tslSource: the emitted GLSL " +
+        "carries an UNLABELLED uniform (nodeUniform1)' -- a GLSL-specific labelling gap in a graph this " +
+        "section builds, not swizzle, not WebGPU-specific (WGSL was never the problem here).",
     "tools/ship/tsl-selfcheck.mjs":
-        "Same TypeError, raised from WebGPUBackend._getRenderPassDescriptor during renderAsync() rather than " +
-        "getShaderAsync -- the wall is not only a texture-sampling-path problem, it is anywhere three's WebGPU " +
-        "backend builds a texture view on this Chromium, including an ordinary render target. One cascading " +
-        "failure follows directly (a 'row 0' read that never happened because the webgpu backend never drew).",
+        "THE SWIZZLE WALL IS GONE. Freshly counted, not assumed: 27 PASS, 1 FAIL -- including the badTv " +
+        "cross-backend byte-exact compare (4096/4096, worst 0, both backends) and a 24-step TSL Loop finding " +
+        "Wien's root on real WebGPU. The one remaining red is an explicitly-named CONTROL, not a regression: " +
+        "'three 0.178's WebGPU readback at 32 px (a 128-byte row, not 256-aligned) raises a validation error " +
+        "and reads nothing' -- this section's own point is that an intentionally-misaligned readback SHOULD " +
+        "fail, and on this box it currently does not (0 errors where the control expects one) -- unrelated to " +
+        "the swizzle field entirely.",
     "tools/ship/tslPhysics-selfcheck.mjs":
-        "Same TypeError, same renderAsync/render-target path as tsl-selfcheck, surfacing through devicePipelineFromTsl's " +
-        "own harness this time. 67 of 68 checks pass -- the compute-side fixes in this arc (the dispatch-guard " +
-        "strip, compute-local hoisting) took this gate from 11 PASS / 10 FAIL to 67 / 1 by themselves.",
-    "tools/ship/slugTsl-selfcheck.mjs":
-        "Same TypeError. 13 of 14 checks pass, including the two Slug-specific won't-do/roadmap checks this " +
-        "gate exists to hold.",
+        "THE SWIZZLE WALL IS GONE. Freshly counted, not assumed: 81 PASS, 1 FAIL across all twelve sections, " +
+        "including atomic operations, an indirect dispatch sized entirely on the GPU, workgroup-shared-memory " +
+        "reduction, and a bit-exact HMC leapfrog against the shipped kernel (256/256 exact). The one " +
+        "remaining red, section " +
+        "3's uniform transplant, carries the SAME auto-numbered-uniform shape tslSource and tslRace now show " +
+        "(nodeUniform6, nodeUniform8 in the emitted list) -- not swizzle, not the cullLodWgsl({occlusion:true}) " +
+        "gap this file's own closing note already names separately and correctly as pre-existing.",
+    "tools/ship/tslRig-selfcheck.mjs":
+        "NOT ON THIS LIST BEFORE -- found by the affected-gates sweep this round, hitting the identical " +
+        "swizzle TypeError through its own page.goto (not runInEngineOrigin), fixed separately with " +
+        "page.addInitScript(installSwizzleWorkaround) in the gate itself (see the note above this object). " +
+        "Freshly counted: 3 PASS, 1 FAIL -- section 1 hits the SAME uniform-list mismatch as tslSource-" +
+        "selfcheck above ('...,nodeUniform8 vs ...,nodeUniform9'), since tsl-rig.html renders the same badTv " +
+        "graph.",
 });
 
 // *** tslIsing-selfcheck.mjs LEFT THIS LIST AT v4559, BY THE REPAIR THE v4557 ENTRY ASKED FOR. *** v4557 named
@@ -708,7 +766,12 @@ export const RED_AT_V4557_GATES = Object.freeze([
     "tools/ship/tslRace-selfcheck.mjs",
     "tools/ship/tsl-selfcheck.mjs",
     "tools/ship/tslPhysics-selfcheck.mjs",
-    "tools/ship/slugTsl-selfcheck.mjs",
+    // slugTsl-selfcheck.mjs REMOVED: re-run after the swizzle workaround above, it is fully green (14/14) --
+    // the list may only shrink, and only on purpose. See the note above WHY_V4557 for what changed and why
+    // the other four are still here, for a different reason than the one this list originally named.
+    "tools/ship/tslRig-selfcheck.mjs",
+    // ADDED, not previously here: same swizzle wall, a code path this list's original sweep missed. See the
+    // note above WHY_V4557 ("A SIXTH GATE HIT THE SAME WALL...") for how it was found and fixed.
 ]);
 
 export const RED_AT_V4557 = Object.freeze(RED_AT_V4557_GATES.map((gate) => Object.freeze({

@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 469,
+ "count": 470,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -36,6 +36,13 @@
    "t": "Agent Arena -- a learner that beats its baselines",
    "d": "",
    "g": "brain",
+   "p": 0
+  },
+  {
+   "f": "ai-presence-orb.html",
+   "t": "- AI-presence orb (murmur-web port, \"still\" species)",
+   "d": "",
+   "g": "",
    "p": 0
   },
   {
@@ -2757,7 +2764,7 @@
   {
    "f": "splat-probes.html",
    "t": "Splat Probes",
-   "d": "render/splatProbes.mjs baked over a two-tone shell of splats (render/probeFit.mjs fits the grid to occupancy and skips probes inside splats), drawn on gfx/device.js through render/probeLit.mjs: every probe a small sphere lit by its own coefficients, a mesh in the middle taking the volume's light, the splats as tone markers, the camera inside the shell. Spacing and face size live, the bake time, probe count and box in the HUD, both backends. From the technique of isaac-mason/three-spark-light-probes, which has no licence file; nothing ported.",
+   "d": "render/splatProbes.mjs baked over a two-tone shell of splats (render/probeFit.mjs fits the grid to occupancy and skips probes inside splats), drawn on gfx/device.js through render/probeLit.mjs: every probe a small sphere lit by its own coefficients, a mesh in the middle taking the volume's light, the splats as tone markers, the camera inside the shell. A row of four spheres shows the specular half (physics/render/specularProbeLit.mjs) at roughness 0..1, baked analytically from the same shell; one more sphere carries the SAME material fed a REAL captured environment instead (render/liveCubeCapture.mjs renders six faces of the actual scene through a real camera and packs the readback), so the analytic and live-captured techniques sit side by side rather than one replacing the other. Spacing and face size live, the bake time, probe count and box in the HUD, both backends. From the technique of isaac-mason/three-spark-light-probes, which has no licence file; nothing ported.",
    "g": "",
    "p": 0
   },
