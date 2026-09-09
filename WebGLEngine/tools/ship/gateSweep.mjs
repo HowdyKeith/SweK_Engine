@@ -3764,6 +3764,53 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since208: Object.freeze({
+        at: "v4555", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "world/chunk-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 52 ms, thirteen rows. *** Chunk.index() HAD NO RANGE CHECK AND 36,754 OF 100,982 " +
+                 "VOXEL READS IN A NINE-SECOND BOOT WERE OUT OF RANGE -- 36.4%. *** Every one on Y and every " +
+                 "one off the end of the array, where a typed array answers `undefined`; x and z were in " +
+                 "range on all 100,982, so the aliasing case (x is the fastest axis, so an out-of-range x " +
+                 "lands on a NEIGHBOURING voxel INSIDE the array) is real in the arithmetic and does not " +
+                 "arise here. *** THE SAME undefined MET TWO COMPARISONS AND ONLY ONE WAS SAFE, WHICH IS WHY " +
+                 "IT SURVIVED: *** _proximityScan asks `v === VOXEL.WATER` and undefined fails it, so 34,722 " +
+                 "of the bad reads went somewhere harmless; getCaveFactor asks `v !== VOXEL.AIR` and " +
+                 "undefined PASSES, so every sample above the ceiling counted as SOLID. In an open-sky " +
+                 "column topping out at y=24 that read 0 / 0.286 / 0.571 / 0.857 at y = 54 / 59 / 62 / 64 -- " +
+                 "A LISTENER IN CLEAR AIR TOLD IT IS IN A CAVE, on a ramp that is exactly the fraction of " +
+                 "its 9x9x9 box past the ceiling -- and reads 0 at all four now, with the control at y=27 " +
+                 "over real terrain holding at 0.331 both ways. isAir also answered SOLID above the world, " +
+                 "so rain landed the instant it spawned: 335 spawned and 335 landed with none in flight " +
+                 "before, 345 spawned and 261 IN FLIGHT after. *** AND THE FIX WOKE A SYSTEM THAT HAD NEVER " +
+                 "RUN A SINGLE PARTICLE. *** FluidSystem's active count was 0 on every sample and the water " +
+                 "voxel count sat at exactly 46,223 forever; bounded, it went 46,223 -> 325,344 in thirty " +
+                 "seconds, linear, with simulate() at 0.03 ms becoming 0.7. Two separable faults: the " +
+                 "descent trail (water placed BEFORE testing whether the particle could fall, leaving a " +
+                 "five-voxel pillar in open air) is fixed and was worth only 23%; the flood is the LATERAL " +
+                 "SPREAD, a breadth-first fill where one drop wets 41 cells by tick 10 and 11,101 by tick " +
+                 "80, MAX_PARTICLES bounding the frontier and not the wetted area. The wetting path SHIPS " +
+                 "OFF with the numbers beside the flag, restoring exactly the behaviour this engine has " +
+                 "always had while the two real defects stay fixed; filed as fluid-has-no-sink. EIGHT " +
+                 "SABOTAGES RED BY NAME, and a NINTH went zero-red first -- guarding index() itself instead " +
+                 "of get/set broke nothing, because the gate asserted in PROSE that index() stays pure " +
+                 "arithmetic and checked it nowhere; the aliasing is proved on index() now. One claim was " +
+                 "dropped rather than softened: the out-of-range writes do NOT force a re-mesh, 0 dirty " +
+                 "transitions across all 1,891 of them. *** AND THE ROUND'S OWN SWEEP THEN FOUND A TENTH " +
+                 "THING, WHICH IS WHY THE SWEEP IS RUN: *** recordDrift-selfcheck went NEW RED inside it and " +
+                 "passed every time it was run alone -- recordDrift.mjs parsed sweep-timings.json bare, the " +
+                 "SAME torn read recordReach.mjs was repaired for at v4550, in a module that had its own " +
+                 "second reader and never used the shared readTimings(). That is the rule this very gate's " +
+                 "section 3 asserts about `sources` -- one walk, one definition -- turned on itself. It now " +
+                 "retries and reports UNREADABLE by name instead of crashing, and BOTH cases are driven: a " +
+                 "torn-then-restored file heals, a permanently truncated one goes stale. The first retry " +
+                 "spun on Date.now(), which blocks the event loop, so a restore scheduled 50 ms out could " +
+                 "never be dispatched and all three attempts failed -- caught by the test written to prove " +
+                 "the heal, and the row goes red again if the spin comes back.",
+    }),
     since207: Object.freeze({
         at: "v4554", swept: 1, green: 1, red: 0,
         added: Object.freeze([

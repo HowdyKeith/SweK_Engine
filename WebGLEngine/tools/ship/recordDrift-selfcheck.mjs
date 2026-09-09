@@ -106,7 +106,52 @@ console.log("\n2. handed a stale record, each check names it");
     const real = await import("./assertionShape.mjs");
     const one = real.gateFiles(ENG)[0];
     const rel = path.relative(ENG, one).replace(/\\/g, "/");
-    const t = JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "sweep-timings.json"), "utf8"));
+    // *** THIS WAS A BARE JSON.parse OF THE FILE quickSweep REWRITES AT RUN END, AND IT WENT RED INSIDE A
+    // SWEEP. *** Exactly the torn read tools/ship/recordReach.mjs was repaired for at v4550 -- red twice
+    // inside a full sweep, green on 68 runs under 16-way load afterwards, because the trigger was the
+    // concurrent WRITE and never the load. The repair there was readTimings(), which returns `ok` rather
+    // than assuming it; this gate had its own second reader and did not use it. THAT IS THE RULE THIS FILE'S
+    // OWN SECTION 3 ASSERTS ABOUT `sources` -- one definition of the walk, because a second walker can
+    // disagree with the first -- applied to itself. Shared reader now, and a torn read is RETRIED rather
+    // than either crashing the gate or passing it on nothing: the window is milliseconds, so a file that is
+    // still unreadable after three attempts is genuinely broken and the row below says so.
+    const { readTimings } = await import("./recordReach.mjs");
+    let t = readTimings(ENG), tries = 1;
+    while (!t.ok && tries < 3) { await new Promise((r) => setTimeout(r, 40)); t = readTimings(ENG); tries++; }
+    ok("!! the live sweep timings are readable, after at most three attempts",
+        t.ok === true && t.at && Object.keys(t.at).length > 0,
+        `read on attempt ${tries} of at most 3: ${t.entries} readings` +
+        (t.error ? `. last error: ${t.error}` : "") + ". A single unguarded parse here is a gate that fails a " +
+        "ship at random and never reproduces alone, which gateSweep.mjs's own header calls the worst thing a " +
+        "ship-time check can be.");
+    if (!t.ok) { console.log("\n" + "FAIL -- sweep timings unreadable after 3 attempts"); process.exit(1); }
+    // *** THE TORN READ IS DRIVEN, NOT DESCRIBED. *** Two cases, and they must land differently: a file that
+    // is briefly unparseable because quickSweep is rewriting it must HEAL on retry, and a file that stays
+    // unparseable must be reported by name rather than crashing the gate or passing it on an empty map.
+    {
+        const TP = path.join(ENG, "tools", "ship", "sweep-timings.json");
+        const good = fs.readFileSync(TP, "utf8");
+        const RD = await import("./recordDrift.mjs");
+        let healed = null, broken = null;
+        try {
+            fs.writeFileSync(TP, good.slice(0, 300));                    // torn
+            setTimeout(() => { try { fs.writeFileSync(TP, good); } catch {} }, 50);   // ...and healed
+            healed = (await RD.checks({})).find((c) => c.name === "sweep timings");
+            fs.writeFileSync(TP, good.slice(0, 300));                    // and one that never heals
+            broken = (await RD.checks({})).find((c) => c.name === "sweep timings");
+        } finally { fs.writeFileSync(TP, good); }
+        ok("!! *** A TORN READ HEALS ON RETRY, AND A BROKEN FILE IS NAMED RATHER THAN CRASHING ***",
+            healed && healed.stale === false && broken && broken.stale === true &&
+            /UNREADABLE after 3 attempts/.test(String(broken.detail)),
+            `torn-then-restored: stale=${healed && healed.stale}. permanently truncated: stale=` +
+            `${broken && broken.stale}, "${String(broken && broken.detail).slice(0, 60)}". *** THIS GATE WENT ` +
+            `NEW RED INSIDE A SWEEP AT v4555 AND PASSED EVERY TIME IT WAS RUN ALONE *** -- recordDrift.mjs ` +
+            `parsed sweep-timings.json bare, which is the same torn read recordReach.mjs was repaired for at ` +
+            `v4550, in a module that had its own second reader and did not use the shared one. The retry ` +
+            `AWAITS a timer: the first draft spun on Date.now(), which blocks this process's event loop, so ` +
+            `all three attempts failed on a file whose restore had been scheduled 50 ms out and could never ` +
+            `be dispatched. That is what this row's healed case would go red on again.`);
+    }
     say(`the live timings hold ${Object.keys(t.timings).length} readings and ${Object.keys(t.at).length} stamps`);
     const noStamp = { ...t, at: Object.fromEntries(Object.entries(t.at).filter(([k]) => k !== rel)) };
     const dStamp = await checks({ timings: noStamp });

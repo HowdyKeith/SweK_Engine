@@ -57,6 +57,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as TR from "./treeRead.mjs";
+import * as RR from "./recordReach.mjs";   // readTimings: the guarded, shared reader of sweep-timings.json
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -151,7 +152,38 @@ export async function checks({ load = null, timings = null } = {}) {
     // about its own fixture object and never called the code, so deleting the stamp requirement below cost
     // NOTHING -- the fourth check-that-cannot-fail this session. A timings record the caller supplies is what
     // makes "a reading without its own capture stamp is not evidence" a thing the gate can actually drive.
-    const rec = timings || JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "sweep-timings.json"), "utf8"));
+    // *** AND THE READ ITSELF WAS A BARE JSON.parse OF THE FILE quickSweep REWRITES AT RUN END. *** This gate
+    // went NEW RED inside a full sweep at v4555 and passed every time it was run alone -- the "fails a ship
+    // at random and never reproduces" shape gateSweep.mjs's header calls the worst thing a ship-time check
+    // can be. It is the SAME torn read tools/ship/recordReach.mjs was repaired for at v4550, and the repair
+    // there was readTimings(), which returns `ok` instead of assuming it. This module had its own second
+    // reader and did not use the shared one -- which is the rule recordDrift-selfcheck's own section 3
+    // asserts about `sources`, that one walk means one definition, turned on this file.
+    //
+    // A torn read is a window of milliseconds, so it is RETRIED rather than either crashing or being passed
+    // on nothing. A file still unparseable after three attempts is genuinely broken, and the check then
+    // reports UNREADABLE -- stale, named, and not a silent green.
+    let rec = timings;
+    let tries = 0, readErr = null;
+    while (!rec && tries < 3) {
+        const t = RR.readTimings(ENG);
+        tries++;
+        if (t.ok) { rec = t; break; }
+        readErr = t.error || "no timings";
+        // A REAL timer, not a spin. The first draft busy-waited on Date.now(), which blocks this process's
+        // own event loop for the whole retry window -- so nothing it is awaiting can progress, and it burns
+        // a core doing it. Caught by a test that broke the file, scheduled a restore 50 ms out, and watched
+        // all three attempts fail anyway because the restore could never be dispatched.
+        if (tries < 3) await new Promise((r) => setTimeout(r, 40));
+    }
+    if (!rec) {
+        out.push({
+            name: "sweep timings", owes: OWES.timing, recorded: 0, actual: -1, stale: true,
+            detail: `sweep-timings.json UNREADABLE after ${tries} attempts (${readErr}) -- a torn read from a ` +
+                    `concurrent quickSweep heals on retry, so this means the file is broken rather than busy`,
+        });
+        return out;
+    }
     const missing = A.gateFiles(ENG)
         .map((p) => path.relative(ENG, p).replace(/\\/g, "/"))
         .filter((g) => !(g in (rec.timings || {})) || !((rec.at || {})[g]));
