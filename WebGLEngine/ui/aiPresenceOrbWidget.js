@@ -59,15 +59,15 @@ export async function mountAiPresenceOrbWidget(opts = {}) {
     const {
         threePath = "../vendor/three-webgpu/three.webgpu.js",
         tslPath = "../vendor/three-webgpu/three.tsl.js",
-        orbPath = "../render/aiPresenceOrbTsl.mjs",
+        presentPath = "../render/aiPresenceOrbPresent.mjs",
         statePath = "../render/aiPresenceOrbState.mjs",
     } = opts;
 
-    let THREE, TSL, makeAiPresenceOrbTsl, createPresenceState;
+    let THREE, TSL, makeAiPresenceOrbHdrPipeline, createPresenceState;
     try {
-        [THREE, TSL, { makeAiPresenceOrbTsl }, { createPresenceState }] = await Promise.all([
+        [THREE, TSL, { makeAiPresenceOrbHdrPipeline }, { createPresenceState }] = await Promise.all([
             import(/* @vite-ignore */ threePath), import(/* @vite-ignore */ tslPath),
-            import(/* @vite-ignore */ orbPath), import(/* @vite-ignore */ statePath),
+            import(/* @vite-ignore */ presentPath), import(/* @vite-ignore */ statePath),
         ]);
     } catch (e) { console.warn("[aiPresenceOrbWidget] module load failed, not mounting:", e && e.message); return null; }
 
@@ -98,19 +98,26 @@ export async function mountAiPresenceOrbWidget(opts = {}) {
         }
         renderer = new THREE.WebGPURenderer(rendererOpts);
         await renderer.init();
+        // render/aiPresenceOrbPresent.mjs's own header: THREE.WebGPURenderer defaults outputColorSpace to
+        // "srgb", auto-encoding whatever a shader returns a SECOND time on top of this orb's own manual
+        // linearToSrgb() -- measured directly (a flat 0.3/0.1/0.5 linear fragment read back as the sRGB-encoded
+        // 149/89/188, not the raw 76/26/128 a passthrough gives). THREE.NoColorSpace does NOT turn this off
+        // (measured identical to the default); THREE.LinearSRGBColorSpace does. Fixes a real, pre-existing bug
+        // at the same call site this round already had to touch to wire the HDR pipeline in.
+        renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
     } catch (e) {
         console.warn("[aiPresenceOrbWidget] renderer init failed, removing:", e && e.message);
         canvas.remove();
         return null;
     }
 
-    const fx = makeAiPresenceOrbTsl(THREE, TSL, {});
+    const pipeline = makeAiPresenceOrbHdrPipeline(THREE, TSL, {});
     const state = createPresenceState("idle");
 
     function resize() {
         const dpr = Math.min(DPR_CAP, window.devicePixelRatio || 1);
         const px = Math.round(SIZE_CSS_PX * dpr);
-        if (canvas.width !== px || canvas.height !== px) { canvas.width = px; canvas.height = px; renderer.setSize(px, px, false); }
+        if (canvas.width !== px || canvas.height !== px) { canvas.width = px; canvas.height = px; renderer.setSize(px, px, false); pipeline.resize(px, px); }
     }
     resize();
     window.addEventListener("resize", resize);
@@ -182,19 +189,19 @@ export async function mountAiPresenceOrbWidget(opts = {}) {
         const paused = reducedMotion();
         if (!paused) state.tick(dt, {});
         const p = state.getParams();
-        fx.setKnobs({
+        pipeline.setKnobs({
             time: paused ? 0 : (now - t0) / 1000 * p.speed,
             glow: p.glow, depth: p.depth, hueShift: p.hueShift,
             presence: 0.5, clarity: 0.6, glintRate: 0.3, voice: p.voice,
             aspect: 1,   // the widget's own canvas is always square, unlike the standalone demo's full window
         });
-        renderer.render(fx.scene, fx.camera);
+        pipeline.render(renderer);
         rafHandle = requestAnimationFrame(frame);
     }
     rafHandle = requestAnimationFrame(frame);
 
     const handle = {
-        canvas, renderer, state,
+        canvas, renderer, state, pipeline,
         setState: (name) => state.setState(name),
         getState: () => state.state,
         remove() {

@@ -25,8 +25,11 @@
   "port the design, hold the render/verification to this tree's own conventions" shape
   render/swiftShaderPass.js used for this SAME author's other repo. Scope, named plainly: murmur-web has
   18 material "species"; this page shows exactly one, "still" -- described in its own source as
-  "the minimal hero: a quiet glass sphere, one slow internal glint". tools/ship/aiPresenceOrb-selfcheck.mjs
-  is the permanent gate (hand-proven envelope/colour math, a real WebGL2 render, a real sabotage).
+  "the minimal hero: a quiet glass sphere, one slow internal glint". render/aiPresenceOrbPresent.mjs is
+  the HDR present pass (exposure/bloom/the "house knee" tone curve/dither), a second pass sampling the
+  scene's own linear HDR render target -- murmur-web's own present.wgsl, hand-ported the same way.
+  tools/ship/aiPresenceOrb-selfcheck.mjs and tools/ship/aiPresenceOrbPresent-selfcheck.mjs are the
+  permanent gates (hand-proven envelope/colour math, a real WebGL2 render, a real sabotage, each).
 -->
 <canvas id="stage"></canvas>
 <div id="hud">
@@ -41,14 +44,16 @@
   <div class="row" style="color:#7c9385">
     Listens for real <code>engine:wakeState</code> / <code>engine:voiceTranscript</code> / <code>engine:voiceReply</code>
     window events if anything on the page dispatches them (idle/listening/thinking/responding); standalone here, the
-    buttons above drive it. success/error have no live event source yet in this tree -- trigger them by hand.
+    buttons above drive it. success/error are wired to real <code>/ai/chat</code> outcomes in the live HUD widget
+    (ui/aiPresenceOrbWidget.js -- a settle timer off <code>engine:voiceReply</code> plus a new <code>engine:voiceError</code>
+    event ui/sttLayer.js's failure branch dispatches); this standalone page still drives them by the buttons above.
     <a href="./tsl-probe.html">the TSL probe</a>
   </div>
 </div>
 <script type="module">
 import * as THREE from "./vendor/three-webgpu/three.webgpu.js";
 import * as TSL from "./vendor/three-webgpu/three.tsl.js";
-import { makeAiPresenceOrbTsl } from "./render/aiPresenceOrbTsl.mjs";
+import { makeAiPresenceOrbHdrPipeline } from "./render/aiPresenceOrbPresent.mjs";
 import { createPresenceState, STATE_NAMES } from "./render/aiPresenceOrbState.mjs";
 
 const say = (s, bad) => { const el = document.getElementById("route"); el.innerHTML = s; el.style.color = bad ? "#f08080" : ""; };
@@ -61,10 +66,15 @@ let renderer = null;
 try {
     renderer = new THREE.WebGPURenderer({ canvas: cv, forceWebGL: params.get("webgl") === "1", antialias: false });
     await renderer.init();
+    // render/aiPresenceOrbPresent.mjs's own header: THREE.WebGPURenderer defaults outputColorSpace to "srgb",
+    // auto-encoding a shader's output a SECOND time on top of this orb's own manual linearToSrgb() -- measured
+    // directly, not assumed. THREE.NoColorSpace does NOT turn it off (measured identical to the default);
+    // THREE.LinearSRGBColorSpace does.
+    renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
 } catch (e) { say("WebGPURenderer could not start: " + e.message, true); throw e; }
 const backend = renderer.backend.isWebGPUBackend ? "WebGPU (WGSL from the TSL graph)" : "WebGL2 backend (GLSL from the TSL graph)";
 
-const fx = makeAiPresenceOrbTsl(THREE, TSL, {});
+const pipeline = makeAiPresenceOrbHdrPipeline(THREE, TSL, {});
 const state = createPresenceState("idle");
 
 const stateButtons = document.getElementById("stateButtons");
@@ -91,7 +101,7 @@ window.addEventListener("engine:voiceReply", () => state.setState("responding"))
 const voiceSlider = document.getElementById("voice"), activitySlider = document.getElementById("activity");
 const stateLabel = document.getElementById("stateLabel"), glowLabel = document.getElementById("glowLabel"), speedLabel = document.getElementById("speedLabel");
 
-say(`three ${THREE.REVISION} &middot; ${backend} &middot; murmur-web's "still" orb as TSL nodes`);
+say(`three ${THREE.REVISION} &middot; ${backend} &middot; murmur-web's "still" orb as TSL nodes, HDR present pass (bloom/knee tonemap/dither)`);
 let last = performance.now(), t0 = last;
 function frame(now) {
     // *** MEASURED, NOT ASSUMED SAFE: THE VERY FIRST rAF CALLBACK'S timestamp CAN PRECEDE THE performance.now()
@@ -100,11 +110,11 @@ function frame(now) {
     // synchronous performance.now() call made moments before scheduling it. Clamped at 0, not removed upstream:
     // the guard itself stays strict (a genuinely negative dt from misuse elsewhere is still a bug worth throwing on).
     const dt = Math.max(0, Math.min(0.1, (now - last) / 1000)); last = now;
-    if (cv.width !== Math.round(innerWidth * (window.devicePixelRatio || 1))) { size(); renderer.setSize(cv.width, cv.height, false); }
+    if (cv.width !== Math.round(innerWidth * (window.devicePixelRatio || 1))) { size(); renderer.setSize(cv.width, cv.height, false); pipeline.resize(cv.width, cv.height); }
 
     state.tick(dt, { voice: Number(voiceSlider.value), activity: Number(activitySlider.value) });
     const p = state.getParams();
-    fx.setKnobs({
+    pipeline.setKnobs({
         time: (now - t0) / 1000 * p.speed,
         glow: p.glow, depth: p.depth, hueShift: p.hueShift,
         presence: 0.5, clarity: 0.6, glintRate: 0.3, voice: p.voice,
@@ -113,10 +123,11 @@ function frame(now) {
     for (const [name, b] of Object.entries(buttons)) b.classList.toggle("active", name === p.state);
     stateLabel.textContent = p.state; glowLabel.textContent = p.glow.toFixed(2); speedLabel.textContent = p.speed.toFixed(2);
 
-    renderer.render(fx.scene, fx.camera);
+    pipeline.render(renderer);
     requestAnimationFrame(frame);
 }
 renderer.setSize(cv.width, cv.height, false);
+pipeline.resize(cv.width, cv.height);
 requestAnimationFrame(frame);
 </script>
 <script type="module" src="/ui/originNotice.js"></script>

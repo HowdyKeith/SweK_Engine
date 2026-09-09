@@ -47,9 +47,16 @@ const BASE_L = 0.30, BASE_C = 0.09, BASE_H = 3.6;   // OKLab base tone: a delibe
  * Build the "still" orb from a TSL namespace (vendor/three-webgpu/three.tsl.js) and a THREE
  * (vendor/three-webgpu/three.webgpu.js), following render/badTvTsl.mjs's exact shape: a bare NodeMaterial whose
  * fragmentNode IS the effect, on a full-screen quad through an OrthographicCamera.
+ *
+ * `linear:true` (default false, so every existing direct-to-canvas caller -- ui/aiPresenceOrbWidget.js today
+ * without the HDR pipeline, ai-presence-orb.html, tools/ship/aiPresenceOrb-selfcheck.mjs -- is byte-for-byte
+ * unchanged) skips the final linearToSrgb() encode and returns the raw linear colour instead: the "scene" half
+ * of render/aiPresenceOrbPresent.mjs's two-pass HDR pipeline, meant to be rendered into an HDR (half-float)
+ * render target and gamma-encoded ONCE, in the present pass, rather than here.
+ *
  * Returns { material, scene, camera, uniforms, setKnobs, setTime }.
  */
-export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {} } = {}) {
+export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false } = {}) {
     const need = ["Fn", "float", "vec2", "vec3", "vec4", "uv", "dot", "length", "normalize", "max", "min",
                   "clamp", "pow", "exp", "cos", "sin", "sqrt", "abs", "mix", "smoothstep", "select", "uniform", "negate"];
     for (const n of need) if (typeof TSL[n] !== "function") throw new Error(`aiPresenceOrbTsl: the TSL namespace has no ${n}()`);
@@ -139,7 +146,7 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {} } = {}) {
 
         const surfaceGlow = rim.add(specTight).add(specBroad).mul(uniforms.glow);
         const colorLinear = max(bodyLinear.add(vec3(surfaceGlow)), vec3(0.0));
-        const colorSrgb = linearToSrgb(colorLinear);
+        const outColor = linear ? colorLinear : linearToSrgb(colorLinear);
 
         // *** smoothstep(edge0, edge1, x) NEEDS edge0 < edge1 -- "results are undefined" otherwise (GLSL spec,
         // and WGSL inherits the same contract). The mask wants to fall from 1 to 0 as rho RISES past R, which
@@ -153,7 +160,7 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {} } = {}) {
         // a rendering fix on THIS implementation: the guarantee spent is that some OTHER device is free to
         // implement smoothstep a different way when edge0 >= edge1, and this file does not ask any device to.
         const edgeMask = float(1.0).sub(smoothstep(R.sub(EDGE_FEATHER), R, rho));   // 1 inside the disk, 0 outside, antialiased
-        return vec4(colorSrgb, edgeMask);
+        return vec4(outColor, edgeMask);
     });
 
     const material = new THREE.NodeMaterial();
