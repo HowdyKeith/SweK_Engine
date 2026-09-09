@@ -252,6 +252,15 @@ export const NEXT_ROUNDS = [
         why: "Verified, not assumed: grepped ocean_ecosystem.js and simulation/AquaticLife.js for Lotka/predator/prey/energy/population and found none. So this is a real gap in demo AMBITION (decorative flocking vs. an actual simulated ecology), not a bug or a missing library. It fits this tree's general taste for emergent-over-scripted simulation (the whole physics/ tree, the Ising kernel this arc closed out) more than it fits any current, stated need.",
         upstream: "no established want yet -- nothing currently asks the ocean/aquarium demo to model real population dynamics rather than look alive; logged so the comparison (and the fact ocean_ecosystem.js's own header calls itself a v1 distillation with a PARKED list) is not re-derived later.",
     },
+    // ---- v4562: closing out the skeeto sweep -- a small, verified naming gap rather than another design idea.
+    {
+        id: "procedural-entity-naming",
+        blocker: "OPEN",
+        what: "This tree procedurally generates planets (world/procPlanet.js), cities (world/CityGen.js) and buildings, but names none of them individually -- procPlanet.js's `name` field is a BIOME/TYPE label ('terran', 'desert', 'gas', 'molten'), not a per-instance name, and grepping the tree for nameGen/generateName/randomName/markov outside multiplayer/remotePlayers.js and two unrelated geostats files turns up nothing.",
+        how: "skeeto/markov-chain-name-generator (public domain, github.com/skeeto/markov-chain-name-generator) is a simple 3-tuple (trigram) Markov chain trained on census name data, with one deliberate guarantee worth keeping if this is ever built: it only emits names ABSENT from its own training corpus, so it does not just replay real names back. Small enough to hand-write rather than vendor -- a trigram frequency table plus a seeded weighted walk, which fits this tree's existing seeded-RNG conventions (Philox, ?seed=N) directly: feed it the same per-body/per-city seed already used for everything else about that entity, and the name becomes reproducible along with the rest of it.",
+        why: "Verified rather than assumed: procPlanet.js and CityGen.js were read directly, not grepped for a keyword and declared absent. Logged because it is cheap and because reproducible naming (same seed -> same name, like every other property these generators already commit to) is a natural fit -- not because anything currently displays or needs a planet's or city's proper name.",
+        upstream: "no established want yet -- nothing in the UI or demos currently shows an individual planet, city, or building name; logged so the read is not re-derived if that ever changes.",
+    },
 ];
 
 // *** v4549 -- THIS REPORT WAS HIDING THREE OF ITS OWN OPEN ITEMS, AND HAD BEEN FOR SEVERAL ROUNDS. ***
