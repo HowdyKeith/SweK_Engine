@@ -24,11 +24,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Chunk } from "./chunk.js";
 import { FluidSystem } from "./fluidSystem.js";
+import { gateReport } from "../tools/ship/gateReport.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const say = (m) => console.log("  ----  " + m);
+const REPORT = gateReport("world/chunk-selfcheck.mjs");
 const AIR = 0, STONE = 1, WATER = 10;
 
 console.log("chunk-selfcheck -- the bounds check, and the two systems standing on the missing one\n");
@@ -104,6 +106,14 @@ console.log("\n3. *** getCaveFactor CALLED OPEN SKY A CAVE, ON A RAMP THAT IS PU
     const newRead = (y) => AIR;                              // bounded: air is air
     const rows = [54, 59, 62, 64].map((y) => [y, +caveFactor(y, oldRead).toFixed(3), +caveFactor(y, newRead).toFixed(3)]);
     for (const [y, o, n] of rows) say(`listener at y=${y} in EMPTY air: old ${o}, new ${n}`);
+    // The table above is this gate's argument and it died with the terminal until v4565, when re-timing the
+    // over-budget pool ran tools/ship/gateReport-selfcheck for the first time in a long while and it named
+    // this gate. One line, and the numbers a reader can open are the same numbers the row asserts on.
+    REPORT.table("what an unbounded read told a listener standing in open air",
+        ["listener y", "cave factor, unbounded read", "cave factor, bounded read"], rows,
+        "0 is open sky and 1 is fully enclosed, by getCaveFactor's own comment. The unbounded read counted " +
+        "every cell above the world's ceiling as solid, so the higher the listener stood the more enclosed " +
+        "it was told it was.");
     ok("!! *** A LISTENER IN CLEAR AIR WAS TOLD IT WAS IN A CAVE, AND THE NUMBERS ARE THE ENGINE'S OWN ***",
         rows[0][1] === 0 && rows[1][1] === 0.286 && rows[2][1] === 0.571 && rows[3][1] === 0.857 &&
         rows.every((r) => r[2] === 0),
@@ -240,6 +250,7 @@ console.log("\n7. *** THE INTERIOR DID NOT MOVE, WHICH IS THE HALF A BOUNDS CHEC
         "reads correctly now because get does; it would have returned true for every cell above the world.");
 }
 
+REPORT.write();
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\n*** WHAT THIS ROUND DID NOT DO, STATED BECAUSE THE SCOPE MOVED UNDER IT: *** it did not give " +
     "FluidSystem a sink, and that is why the wetting path ships OFF rather than on -- the bounds check is " +

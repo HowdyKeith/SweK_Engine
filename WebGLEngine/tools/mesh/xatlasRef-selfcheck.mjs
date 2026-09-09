@@ -28,6 +28,7 @@
 // re-derived and compared; when it does not, the hashes still say whether it can have gone stale.
 import fs from "node:fs";
 import * as X from "./xatlasRef.mjs";
+import { gateReport } from "../ship/gateReport.mjs";
 import { unwrapToMesh, halveChart, chartBox, cutWideCharts, nestShapes,
          equaliseChartScale } from "../../physics/mesh/uvLscm.mjs";
 
@@ -35,6 +36,7 @@ let fails = 0;
 const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  ") + name + (detail ? "   " + detail : "")); if (!cond) fails++; };
 
 const REC = JSON.parse(fs.readFileSync(X.RECORD_PATH, "utf8"));
+const REPORT = gateReport("tools/mesh/xatlasRef-selfcheck.mjs");
 
 console.log("1. *** THE RECORD IS ONLY WORTH ITS INPUTS, SO ITS INPUTS ARE HASHED ***");
 {
@@ -79,6 +81,16 @@ for (const [name, make] of Object.entries(X.FIXTURES)) {
         console.log(`      ${r.n.padEnd(15)} uvLscm ${String(r.ch).padStart(2)} charts  p90 ${r.mine.toFixed(4)}  ` +
             `densityP10 ${r.dm.toExponential(3)}   |   xatlas ${String(r.chr).padStart(2)} charts  ` +
             `p90 ${r.ref.toFixed(4)}  densityP10 ${r.dr.toExponential(3)}`);
+    // *** THE TABLE ABOVE IS THE ARGUMENT AND IT DIED WITH THE TERMINAL. *** tools/ship/gateReport-selfcheck
+    // holds that no gate written since v4394 may argue in numbers and emit nothing, and it named this one --
+    // found by re-timing the over-budget pool at v4565, because that gate had been outside the ship-time
+    // sweep and its complaint had nowhere to land.
+    REPORT.table("one metric over two unwrappers, per fixture",
+        ["mesh", "uvLscm charts", "uvLscm stretchP90", "uvLscm densityP10", "xatlas charts", "xatlas stretchP90", "xatlas densityP10"],
+        rows.map((r) => [r.n, r.ch, r.mine, r.dm, r.chr, r.ref, r.dr]),
+        "stretchP90 is scale-free and grades uniformity; densityP10 is the same ratio raw and grades how " +
+        "much texture the worst-served tenth of the mesh gets. The second is the one that says xatlas is " +
+        "ahead when the first says otherwise.");
 
     const wins = rows.filter((r) => r.mine <= r.ref + 1e-9);
     ok("!! *** ON UNIFORMITY THIS TREE'S UNWRAPPER MATCHES OR BEATS THE REFERENCE ON EVERY FIXTURE ***",
@@ -296,5 +308,6 @@ console.log("\n7. *** AND WHEN A BINARY IS ALREADY THERE, THE RECORD IS RE-DERIV
     }
 }
 
+REPORT.write();
 console.log(fails ? `\nxatlasRef-selfcheck: ${fails} FAILED` : "\nxatlasRef-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);

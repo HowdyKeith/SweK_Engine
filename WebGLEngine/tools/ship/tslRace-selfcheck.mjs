@@ -161,8 +161,31 @@ else {
         for (const b of ["webgpu", "webgl2"]) { const o = R[b];
             ok(`*** ${b}: the Chaos race drawn by the pipeline three GENERATED is the hand-written Chaos race on EVERY pixel (${o.same} of ${o.total}, worst 0), lit and among the other races ***`, o.backend === b && o.same === o.total && o.worst === 0 && o.lit > 500 && o.errs.length === 0, `${o.same}/${o.total}, worst ${o.worst}, ${o.lit} lit; errors ${o.errs.length}`);
             ok(`  ${b}: the pick still names the Chaos ships (the pick pipeline is the fleet's own)`, o.chaosHits > 200, `${o.chaosHits} pixels name Chaos`); }
-        fs.writeFileSync(EMITTED, JSON.stringify({ at: "v4322", three: "0.178.0", note: "the Lyapunov look as three's node builders emitted it from render/physicsTsl.mjs makeLyapunovLookTsl, and as render/tslSource.mjs transplanted it into the look's own shell; rewritten by tools/ship/tslRace-selfcheck.mjs on every run", ...R.emitted, transplanted: R.transplanted }, null, 1));
+        // *** v4566 -- MERGED, NOT REPLACED, FOR THE REASON SECTIONS 5 TO 8 ARE ALREADY MERGED. ***
+        // This section wrote the whole file and sections 5-8 then merged their keys back into what it left, so the
+        // file's contents were "section 1, plus whichever later sections reached their own write THIS RUN". That is
+        // fine on a green run and destructive on any other: a run that dies, is killed by the sweep's cap, or goes
+        // red before a later section PERMANENTLY DELETES that section's key, because section 1 already truncated it
+        // and the section that would rewrite it never ran.
+        //
+        // IT HAPPENED ON 2026-09-09. The v4565 over-budget pass ran this gate under contention; it took 23,750 ms
+        // against 5,996 filed and exited 1 somewhere after section 1. `atlas` -- section 6's key, 17 lines -- was
+        // gone from tsl-emitted-race.json afterwards, and tools/ship/wgslCorpus.mjs dropped tslSource.spriteAtlas
+        // from the corpus behind its `EMITTED_RACE.atlas &&` presence guard without a single row going red. The gate
+        // is GREEN when run alone (20 s, all eight sections), so nothing about the look had changed: a contended run
+        // deleted a record and the tree could not tell.
+        //
+        // The same shape as ROTATION_LOST_V4461 in sweepCoverage.mjs -- a whole-file writer erasing rows another
+        // writer paid for -- inside one process instead of across two. The repair is the one that file took: merge
+        // by key, so a section that did not run this time keeps what it wrote last time.
+        const prior = fs.existsSync(EMITTED) ? JSON.parse(fs.readFileSync(EMITTED, "utf8")) : {};
+        fs.writeFileSync(EMITTED, JSON.stringify({ ...prior, at: "v4322", three: "0.178.0", note: "the Lyapunov look as three's node builders emitted it from render/physicsTsl.mjs makeLyapunovLookTsl, and as render/tslSource.mjs transplanted it into the look's own shell; rewritten by tools/ship/tslRace-selfcheck.mjs on every run, MERGED BY KEY (v4566) so a section that does not reach its write keeps its last reading instead of losing it", ...R.emitted, transplanted: R.transplanted }, null, 1));
         ok("the emitted and transplanted look is written to tools/ship/tsl-emitted-race.json for the WGSL corpus", fs.existsSync(EMITTED));
+        // The merge is the fix, so it is the thing asserted: the keys the LATER sections own must survive this write.
+        // (On the very first run of a fresh tree there are none, which is why the row states what it found.)
+        const kept = ["sprite", "atlas", "sampled", "ink"].filter((k) => JSON.parse(fs.readFileSync(EMITTED, "utf8"))[k]);
+        ok(`  and this section MERGES rather than truncates: the ${kept.length} later section key(s) already in the file survived it (${kept.join(", ") || "none yet -- first run"})`,
+            kept.length === ["sprite", "atlas", "sampled", "ink"].filter((k) => prior[k]).length, `had ${Object.keys(prior).filter((k) => ["sprite", "atlas", "sampled", "ink"].includes(k)).join(",") || "none"}, kept ${kept.join(",") || "none"}`);
     }
 }
 

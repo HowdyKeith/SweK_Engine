@@ -57,11 +57,26 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     // written by something other than the thing that measured it, carrying a stamp it did not earn. Same
     // slice runner, same classifier, same writer, same per-entry stamp -- only the selection differs.
     const only = arg("--gate", null);
-    const picked = only ? gates.filter((g) => g.includes(only)) : rotation(c, file, { slots, budgetMs }).picked;
+    // *** v4565 -- --band: SELECT BY RECORDED COST, FOR THE SAME REASON v4535 ADDED --gate. ***
+    // The stalest-first pick is right for covering the pool and wrong for the bulk pass backlog item #14
+    // asks for. The returnees live at the CHEAP end -- a gate recorded at 4 s that really takes 1 s -- and
+    // those are also the fastest to measure, so stalest-first spends an hour on 20-second gates that were
+    // never going to come back before it reaches them. Same slice runner, same classifier, same writer, same
+    // per-entry stamp; only the selection differs, which is the rule --gate established.
+    const band = arg("--band", null);   // "3000-8000", in the units the timings file uses
+    const inBand = (g) => {
+        if (!band) return true;
+        const [lo, hi] = band.split("-").map(Number);
+        const ms = (file.timings || {})[g];
+        return ms != null && ms > lo && ms <= hi;
+    };
+    const picked = only ? gates.filter((g) => g.includes(only))
+                        : rotation(c, file, { slots, budgetMs, filter: inBand }).picked;
     if (only && !picked.length) { console.error("[rotation] --gate " + only + " matched no gate"); process.exit(2); }
     if (only) console.log(`[rotation] --gate ${only}: ${picked.length} gate(s), selection by name rather than by staleness`);
     else {
-        const rot = rotation(c, file, { slots, budgetMs });
+        const rot = rotation(c, file, { slots, budgetMs, filter: inBand });
+        if (band) console.log(`[rotation] --band ${band}: selection by recorded cost rather than by staleness`);
         console.log(`[rotation] over-budget pool ${rot.pool}, taking ${rot.picked.length} (est ${(rot.cost / 1000).toFixed(0)}s), ` +
             `covers the pool in ${rot.roundsToCover} round(s) at this slice size`);
     }

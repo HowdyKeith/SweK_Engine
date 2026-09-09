@@ -292,7 +292,9 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4562 -- RE-TAKEN with `excluding` below: 96/43/176 -> 97/44/180. The two move together by
     // construction, and the gate asserts the difference is exactly this module's own two records, so
     // updating one and not the other reddens a row that is about the exclude pattern rather than the count.
-    currentIncludingModule: Object.freeze({ records: 97, withFields: 44, fields: 180 }),
+    // v4565/v4566 -- RE-TAKEN with `excluding` below: 97/44/180 -> 101/45/186, the same four records and the
+    // same six fields, plus this module's own two records and their twenty fields.
+    currentIncludingModule: Object.freeze({ records: 101, withFields: 45, fields: 186 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -317,7 +319,14 @@ export const PROBE_AT_V4536 = Object.freeze({
     // tools/ship/sweepCoverage.mjs, holding what an 8-worker sweep on a 4-core box does to the numbers it
     // files. It arrived guarded by a gate that is 9.1 s SERIALLY and therefore outside the ship-time sweep,
     // recordReach's ratchet went red for exactly that, and the rows were moved beside the record.
-    excluding: Object.freeze({ records: 95, withFields: 42, fields: 160 }),
+    // v4565/v4566 -- RE-TAKEN: 95/42/160 -> 99/43/166. FOUR records, from the round that ran the first bulk
+    // pass at the over-budget pool (backlog #14) and triaged the eight new reds it surfaced: OVER_BUDGET_PASS_V4565
+    // in tools/ship/sweepCoverage.mjs (the pass itself, and the only one of the four carrying fields -- the +6),
+    // INSCOPE_ARRIVALS_SINCE_V4435 in tools/ship/absenceScope.mjs and NO_GATE_V4565 / UNGATED_ANYWHERE_V4565 in
+    // tools/ship/reportDoors.mjs, all three arrivals-by-name rolls the reds needed. wgslCorpus.GENERATED_CASES
+    // landed the same round and is NOT in this count: RECORD_RE matches `Object.freeze({`, and that one is a
+    // frozen ARRAY. Stated rather than left as a discrepancy for the next re-take to trip over.
+    excluding: Object.freeze({ records: 99, withFields: 43, fields: 166 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,

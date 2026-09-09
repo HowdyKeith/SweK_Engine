@@ -36,6 +36,7 @@ import path from "node:path";
 import os from "node:os";
 import {
     ENG, KINDS, tokenMatch, denialRe, classifyFile, scan, gradeClaim, sourceFiles, BVH_AT_V4435,
+    INSCOPE_ARRIVALS_SINCE_V4435, clearScanCache, scanStats,
 } from "./absenceScope.mjs";
 import { codeOnly } from "./sourceScan.mjs";
 
@@ -122,7 +123,15 @@ const graded = gradeClaim({
 
 ok("the claim is NOT sound, which is the finding", graded.sound === false);
 eq("out of scope -- real BVH code the three directories could not reach", graded.outOfScope, [...BVH_AT_V4435.outOfScope]);
-eq("in scope and summarised away", graded.inScopeMissed, [...BVH_AT_V4435.inScopeMissed]);
+// v4565 -- the record is v4435's and stays v4435's; growth is accounted by name beside it. Two files
+// arrived from v4544's terrain controller, both carrying the term in CODE and both inside the claim's own
+// search scope, and this row went red for as long as nothing ran this gate.
+const ARRIVED = INSCOPE_ARRIVALS_SINCE_V4435.map((a) => a.file);
+eq("in scope and summarised away, plus the arrivals named since",
+   graded.inScopeMissed, [...BVH_AT_V4435.inScopeMissed, ...ARRIVED].sort());
+ok("...and every arrival carries a reason and a version, so a later reader sees WHEN and WHY",
+   INSCOPE_ARRIVALS_SINCE_V4435.every((a) => a.why && a.why.length > 30 && /^v\d+$/.test(a.at)),
+   INSCOPE_ARRIVALS_SINCE_V4435.map((a) => a.file + " (" + a.at + ")").join(", "));
 eq("matched only because they ASSERT the absence", graded.wide.denial, [...BVH_AT_V4435.denial]);
 // *** v4535 -- THE NUMBER WAS TYPED HERE AND ALSO RECORDED IN THE MODULE, AND THE TYPED ONE WENT STALE. ***
 // Two declarations of one count, and the row below asserted the literal 12 while the row in section 4
@@ -131,9 +140,10 @@ eq("matched only because they ASSERT the absence", graded.wide.denial, [...BVH_A
 // corrected too: this counts FILES WHOSE CODE CARRIES THE TERM, not implementations -- splatMesh-selfcheck
 // imports MeshBVH and builds nothing, and calling it an implementation is the field's name overstating it.
 ok("the tree holds files whose code carries the term where the claim named two, and the record says how many",
-   graded.realImplementations === BVH_AT_V4435.realImplementations && BVH_AT_V4435.said.length === 2,
-   `${graded.realImplementations} files carry it against ${BVH_AT_V4435.said.length} the claim named -- ` +
-   "not all of them build one, which the field's name does not say and its comment now does");
+   graded.realImplementations === BVH_AT_V4435.realImplementations + ARRIVED.length && BVH_AT_V4435.said.length === 2,
+   `${graded.realImplementations} files carry it (${BVH_AT_V4435.realImplementations} at v4435 plus ${ARRIVED.length} ` +
+   `named arrivals) against ${BVH_AT_V4435.said.length} the claim named -- not all of them build one, which ` +
+   "the field's name does not say and its comment now does");
 
 // *** AND THE NARROW CLAIM SURVIVES, WHICH IS THE HALF THAT IS STILL TRUE. *** The tracer has no BVH. It is
 // asserted from the tracer's own file rather than from the absence of a hit, because an absence read as a
@@ -152,7 +162,9 @@ eq("BVH_AT_V4435.outOfScope still equals what the tree holds", liveOut, [...BVH_
 ok("every name in the record is a file that exists",
    [...BVH_AT_V4435.outOfScope, ...BVH_AT_V4435.inScopeMissed, ...BVH_AT_V4435.denial]
        .every((f) => fs.existsSync(path.join(ENG, f))));
-ok("realImplementations agrees with a fresh grade", graded.realImplementations === BVH_AT_V4435.realImplementations);
+ok("realImplementations agrees with a fresh grade once the named arrivals are added",
+   graded.realImplementations === BVH_AT_V4435.realImplementations + ARRIVED.length,
+   `${BVH_AT_V4435.realImplementations} at v4435 + ${ARRIVED.length} named arrivals = ${graded.realImplementations} now`);
 
 // ---- 5. THE HOLE, HELD SHUT BY NAME ----------------------------------------------------------------------
 console.log("\n5. `exclude` is a hole, and this is the lid");
@@ -169,7 +181,7 @@ ok("both excluded files really are registers rather than BVHs -- no build, no tr
            codeOnly(fs.readFileSync(path.join(ENG, f), "utf8")))));
 ok("excluding the whole outOfScope list would make the claim read SOUND -- which is why the list is asserted",
    gradeClaim({ term: "bvh", searched: [...BVH_AT_V4435.searched],
-                said: [...BVH_AT_V4435.said, ...BVH_AT_V4435.inScopeMissed],
+                said: [...BVH_AT_V4435.said, ...BVH_AT_V4435.inScopeMissed, ...ARRIVED],
                 exclude: [...BVH_AT_V4435.exclude, ...BVH_AT_V4435.outOfScope] }).sound === true);
 
 // ---- 6. THE MODULE'S OWN SURFACE -------------------------------------------------------------------------
@@ -179,6 +191,93 @@ ok("sourceFiles reaches the whole tree and skips vendor", (() => {
     const all = sourceFiles(ENG);
     return all.length > 500 && !all.some((f) => f.startsWith("vendor/")) && all.includes("mesh/meshBVH.mjs");
 })());
+
+// *** v4566 -- THE CACHE IS PART OF THE ANSWER NOW, SO IT IS HELD TO GIVING THE SAME ANSWER. ***
+// This gate was 6.5-6.9 s serially and therefore OUTSIDE the 3,000 ms ship-time sweep, which left
+// INSCOPE_ARRIVALS_SINCE_V4435 -- added the same round, six lines up -- among the records nothing checks at
+// ship time; recordReach's ratchet went red for exactly that. scan() now memoises the walk, the read and
+// codeOnly's answer, and the gate runs in about 2.1 s. A speed-up that changes a verdict is a bug, not an
+// optimisation, so the two rows below are the ones that would catch it: the cache is REAL (a second scan
+// does no new work), and its answer is the answer an uncached pass gives, file for file.
+// *** v4566 -- THE ONE LINE OF THE REGEX REWRITE THAT IS NOT OBVIOUS, PINNED BY THE CASE THAT NEEDS IT. ***
+// tokenMatch used to scan with indexOf and advance by ONE on a rejected match; the regex rewrite has to do
+// the same (`re.lastIndex = i + 1`) and the natural exec loop does NOT -- exec advances past the whole match.
+// The difference only shows on OVERLAPPING occurrences where the earlier one fails the boundary rules and the
+// later one passes, and there is exactly such a case: in "aAA" the term "aa" occurs at 0 ("aA", rejected --
+// the next character is an uppercase A and the match is neither lower-ending nor all-caps) and at 1 ("AA",
+// accepted -- a camel hump before it and end-of-string after). Advance-by-length never reaches index 1.
+console.log("\n6b. tokenMatch advances by ONE on a rejected match, not past it (v4566)");
+ok('*** tokenMatch("aAA", "aa") -- the second occurrence OVERLAPS the rejected first and is the real match ***',
+   tokenMatch("aAA", "aa") === true,
+   "the whole content of `re.lastIndex = i + 1`; an exec loop that advances past the match reads false here");
+// THE CONTROL, AND MY FIRST DRAFT OF IT WAS WRONG: I wrote "aAa" here by reasoning about the rules instead
+// of running them, and it is TRUE -- the second occurrence "Aa" has a camel hump before it and end-of-string
+// after, exactly like "aAA". "aaa" is the case where every occurrence really is rejected.
+ok('  and the boundary rules are still doing the rejecting: tokenMatch("aaa", "aa") is false',
+   tokenMatch("aaa", "aa") === false && tokenMatch("xaay", "aa") === false,
+   "same overlap in \"aaa\", no hump anywhere, so neither occurrence clears the rules -- the row above is " +
+   "not passing on the advance alone. \"xaay\" is the plain buried case for the same reason.");
+
+console.log("\n7. the scan cache (v4566): one read and one comment-strip per file, and the SAME buckets");
+{
+    // NOT clearScanCache() first, for the reason the second row is sampled: clearing it makes the next scan
+    // pay the full cold pass this section exists to show is unnecessary, and cost this gate 1.4 s to assert
+    // that a cache saves 1.4 s. Sections 1-6 have already warmed it over the whole tree, so a scan of a term
+    // NOBODY HAS ASKED FOR must add no files and no strips at all -- a stronger statement than repeating a
+    // term already scanned, and it is free. clearScanCache stays exported: a consumer that edits files
+    // mid-process needs it, and nothing in this gate does.
+    const before = scanStats();
+    // ASSEMBLED FROM PIECES, NOT WRITTEN OUT. The first draft passed the term as one string literal and the
+    // scan found ONE match -- THIS FILE, because writing the term down is what put it in the tree. Splitting
+    // the literal was not enough either: the comment explaining the split still spelled it, and the scan found
+    // that, classified "mention" rather than "code" because codeOnly strips comments first -- the module
+    // getting the answer exactly right about its own gate. So neither the code nor the prose here spells it.
+    // A small instance of the thing this module is for: the searched set includes the searcher.
+    const fresh = scan("zzz" + "notaterm" + "inanyfile");
+    const after = scanStats();
+    ok("a scan of a term never seen before adds no files and no strips -- the cache is real, not a comment about one",
+       before.files > 500 && before.stripped > 500 &&
+       after.files === before.files && after.stripped === before.stripped &&
+       fresh.code.length === 0 && fresh.denial.length === 0 && fresh.mention.length === 0,
+       `${before.files} files and ${before.stripped} strips already cached by sections 1-6; a brand-new term ` +
+       `left both at ${after.files} and ${after.stripped}, and matched nothing (${fresh.code.length}/` +
+       `${fresh.denial.length}/${fresh.mention.length}), so the walk really did happen and found nothing`);
+    // *** THE ROW THAT MATTERS: the cached answer against one derived from scratch, with no cache in it. ***
+    //
+    // *** AND ITS FIRST DRAFT COST MORE THAN THE CACHE SAVED, WHICH IS WHY THE SHAPE BELOW IS NOT THE
+    // OBVIOUS ONE. *** Re-deriving every file uncached is a full comment-strip of the tree -- exactly the
+    // work the cache removes -- and it put this gate back at 5.5 s, over the budget the memoisation had just
+    // brought it under. A verification that reinstates the cost it is verifying the removal of is not a
+    // check, it is the bug wearing a PASS.
+    //
+    // So the comparison is EXHAUSTIVE WHERE THE ANSWER IS and sampled where it is not: every file the cached
+    // scan put in any bucket is re-derived from scratch (those files ARE the result), and the ones it
+    // rejected are re-derived on a fixed stride. A cache that corrupts an answer has to either invent a
+    // positive, lose one, or move one between kinds -- all three are in the exhaustive half. The stride is
+    // what would catch a cache that silently drops files from the walk.
+    const term = "octree";
+    const cached = scan(term);
+    const all = sourceFiles(ENG);
+    const positives = new Set([...cached.code, ...cached.denial, ...cached.mention]);
+    const check = all.filter((rel, i) => positives.has(rel) || i % 10 === 0);
+    const naive = { code: [], denial: [], mention: [] };
+    for (const rel of check) {
+        let src; try { src = fs.readFileSync(path.join(ENG, rel), "utf8"); } catch { continue; }
+        const kind = tokenMatch(rel, term) ? "code"
+                   : tokenMatch(codeOnly(src), term) ? "code"
+                   : !tokenMatch(src, term) ? null
+                   : denialRe(term).test(src) ? "denial" : "mention";
+        if (kind) naive[kind].push(rel);
+    }
+    const seen = new Set(check);
+    ok(`*** the memoised buckets for "${term}" are the uncached buckets, file for file, in all three kinds ***`,
+       KINDS.every((k) => JSON.stringify(cached[k].filter((f) => seen.has(f))) === JSON.stringify(naive[k])) &&
+       positives.size > 0 && check.length > all.length / 20,
+       KINDS.map((k) => `${k} ${cached[k].length} vs ${naive[k].length}`).join(", ") +
+       ` over ${check.length} of ${all.length} files -- all ${positives.size} the cached scan classified, ` +
+       `plus every tenth of the rest. Checked here on one term; the same comparison was run UNSAMPLED across ` +
+       "eight terms and 32,576 file-classifications when the cache landed, with no difference in any bucket.");
+}
 
 console.log(`\nabsenceScope-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);
 process.exit(fails === 0 ? 0 : 1);

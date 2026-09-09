@@ -1,0 +1,59 @@
+{
+ "gate": "tools/mesh/xatlasRef-selfcheck.mjs",
+ "at": "2026-09-09",
+ "tables": [
+  {
+   "title": "one metric over two unwrappers, per fixture",
+   "columns": [
+    "mesh",
+    "uvLscm charts",
+    "uvLscm stretchP90",
+    "uvLscm densityP10",
+    "xatlas charts",
+    "xatlas stretchP90",
+    "xatlas densityP10"
+   ],
+   "rows": [
+    [
+     "cylinder 16x6",
+     2,
+     1,
+     0.06138914960005259,
+     3,
+     1,
+     0.090237
+    ],
+    [
+     "torus 16x10",
+     16,
+     1.0851,
+     0.026610716458241545,
+     10,
+     1.1891,
+     0.041823
+    ],
+    [
+     "sphere 12x8",
+     11,
+     1.0353,
+     0.03861300124667727,
+     6,
+     1.1697,
+     0.056621
+    ],
+    [
+     "sphere 24x16",
+     9,
+     1.0766,
+     0.04578034618992576,
+     6,
+     1.1305,
+     0.055682
+    ]
+   ],
+   "note": "stretchP90 is scale-free and grades uniformity; densityP10 is the same ratio raw and grades how much texture the worst-served tenth of the mesh gets. The second is the one that says xatlas is ahead when the first says otherwise."
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

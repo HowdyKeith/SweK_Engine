@@ -170,16 +170,31 @@ export const RETURNED_AT_V4529 = Object.freeze({
         // both improved a lot without reaching the budget -- which is the third state this roll exists for and
         // the one that is easiest to confuse with the oscillation above. Three serial runs each, on the same
         // loaded box that took 403 s over a sweep it usually finishes in 220:
-        Object.freeze({ gate: "tools/roundhouse/sweepBudget-selfcheck.mjs", recordedWas: 5526, hereMs: 3172,
-            serialMs: Object.freeze([3165, 3266, 3273]),
-            why: "re-timed from the 5,526 ms that evicted it to about 3,200 -- a 42% improvement that still does " +
-                 "not clear 3,000. Every one of three serial runs is over, none of them marginally, so this is " +
-                 "not the box: it is a gate that got much faster and is still too slow." }),
         Object.freeze({ gate: "tools/ship/wgslSpec-selfcheck.mjs", recordedWas: 5162, hereMs: 4242,
             serialMs: Object.freeze([3922, 3658, 3906]),
             why: "re-timed from 5,162 ms to 3,658-3,922 across three serial runs -- 27% faster and 22% over the " +
                  "budget. The widest margin on this roll, and the least ambiguous: no reading of it has ever " +
                  "been under 3,000." }),
+    ]),
+    // *** v4565 -- RETIRED BY THE BAND PASS, AND IT TAKES A SENTENCE OF THE v4541 ENTRY WITH IT. ***
+    // sweepBudget was named still-over at v4541 on three serial readings of 3,165 / 3,266 / 3,273 ms, with the
+    // reason: "Every one of three serial runs is over, none of them marginally, SO THIS IS NOT THE BOX: it is a
+    // gate that got much faster and is still too slow." The v4565 band pass read it at 2,746 and four more serial
+    // runs here read 2,770 / 2,589 / 2,750 / 2,651 -- five readings, all under, none marginal either.
+    //
+    // AND tools/roundhouse/sweepBudget-selfcheck.mjs HAS NOT BEEN TOUCHED SINCE v4361. So the whole journey --
+    // 5,526 ms when it was evicted, ~3,200 at v4541, ~2,700 now -- happened to a file nobody edited, and the
+    // v4541 entry's confident half ("this is not the box") was exactly backwards. IT IS ALL THE BOX. Three
+    // consistent serial readings felt like enough evidence to rule the box out and were not, which is the same
+    // mistake ROTATION_BOUNDARY_V4535 caught on five other gates the day after naming them. The rule that
+    // survives: consistency WITHIN one sitting says nothing about the next sitting, and only a re-run does.
+    returnedAt_v4565: Object.freeze([
+        Object.freeze({ gate: "tools/roundhouse/sweepBudget-selfcheck.mjs", overMs: 3172,
+            serialNow: Object.freeze([2746, 2770, 2589, 2750, 2651]),
+            why: "returned by the v4565 band pass at 2,746 ms and confirmed by four more serial runs here at " +
+                 "2,770 / 2,589 / 2,750 / 2,651 -- every one under, the highest 8% clear of the budget. Its v4541 " +
+                 "entry ruled the box out on three readings; the gate has not been edited since v4361, so the " +
+                 "5,526 -> 3,200 -> 2,700 it travelled is the box and nothing else." }),
     ]),
     returnedAt_v4535: Object.freeze([
         Object.freeze({ gate: "tools/ship/traderGraph-selfcheck.mjs", overMs: 3152,
@@ -640,6 +655,107 @@ export const SWEEP_CONTENTION_V4562 = Object.freeze({
                 "gate, in a way no consumer of the file was accounting for.",
 });
 
+/*
+ * *** v4565 -- THE FIRST BULK PASS AT THE EXILED POOL, AND WHAT COMES BACK IS HALF OF IT. ***
+ *
+ * Backlog item #14 has said since v4406 that a third of the tree never runs at ship time. Every round before this
+ * one measured the pool, sampled it, or opened a door in the mechanism; none of them emptied any of it, because the
+ * stalest-first rotation is the wrong selection for the job. Stalest-first covers the pool fairly and spends its
+ * budget on whatever happens to be oldest, which on this file means twenty-second gates that were never coming back.
+ * The RETURNEES live at the cheap end -- a gate filed at 4 s that really costs 1 s -- and those are also the fastest
+ * to measure, so a pass aimed at them buys back an order of magnitude more gates per minute. --band (v4565, this
+ * round) selects by recorded cost; everything else about the rotation is unchanged, which is the rule --gate set.
+ *
+ * THE PASS: every over-budget gate filed between 3,000 and 8,000 ms, run SERIALLY, one at a time, on this box.
+ *   ran                      210 gates (prior readings 3,008 to 7,922 ms) in one slice, stamp 2026-09-09T12:57:13Z
+ *   RETURNED UNDER BUDGET    105  -- fresh serial readings 65 ms to 2,958 ms, filed/serial median 2.43x
+ *   red                       12  -- 4 already registered, 8 NEW, each named below
+ *   hit the 20,000 ms cap      2  -- shippedLadder (4,906 filed) and tslRace (5,996 filed)
+ *   materially slower          9  -- over 1.5x their filed reading, the two cap-hitters among them
+ *
+ * THE POOL, before and after, from census() on the live file:
+ *   over budget    326 -> 219        killed  138 -> 140        under  1,150 -> 1,255
+ *   (326 - 105 returned - 2 that hit the cap = 219, and the 2 are what moved killed from 138 to 140: the pass
+ *   walks c.over, so a cap-hit does not leave the exiled population, it changes which bucket exiles it.)
+ *   OUTSIDE THE SHIP-TIME SWEEP  464 of 1,614 (28.7%)  ->  359 of 1,614 (22.2%)
+ *
+ * So one pass of thirty-odd minutes moved 6.5 points of the tree back inside the sweep, and the mechanism v4408
+ * built is the whole reason it could: the readings that evicted these 105 were contended samples, and 89 of them
+ * carried a stamp saying so. The biggest single correction was 89.5x.
+ *
+ * *** WHAT IS LEFT IS THE HARD HALF, AND THE SHAPE OF IT IS THE POINT. *** 219 over budget: 91 still in the 3-8 s
+ * band (the ones that really are slow, plus the 12 reds and 9 slower) and 128 in 8-20 s, which is another ~24
+ * minutes of serial time and a far worse rate of return. AND 140 KILLED GATES THE ROTATION CANNOT REACH AT ALL:
+ * rotation() walks c.over, and c.killed is a different bucket. A gate that hit the cap is exiled by a mechanism
+ * with no door in it whatsoever -- the one-way door this file exists to open, still shut for 39% of what is
+ * outside the sweep. That is the next round's item, not this one's, and it is stated rather than left to be
+ * rediscovered.
+ *
+ * *** THE EIGHT NEW REDS. *** All eight were green in the register and red the moment something ran them; none is a
+ * regression this round caused. Each is fixed in this commit, cause first:
+ *   absenceScope      the gate's own scope list had drifted from the module's -- ARRIVALS RECORDED BY NAME now
+ *                     (INSCOPE_ARRIVALS_SINCE_V4435), the idiom frontDoor and orreryFleet already use
+ *   reportDoors      a door with no gate anywhere, which the population() census could not express until it grew
+ *                     gateAnywhere (NO_GATE_V4565, UNGATED_ANYWHERE_V4565)
+ *   brainTrail        asserted a brain page that no longer exists; re-taken against what is there
+ *   frontDoor         four reaches arrived since v4407 and were never recorded by name
+ *   mpmGpuPage        the detector matched `initial-scale=1` in a viewport META TAG -- prose counted as code. It
+ *                     now extracts <script> bodies before looking, and says so as a prohibition
+ *   gateReport        three gates emitted no report at all (xatlasRef, chunk, detourScale); each now writes one
+ *   scoreDirection    an exhausted-adjudication row that could not fail; re-taken to assert the exhaustion
+ *   crtToggle         a FLAKE, and named as one rather than fixed: green alone twice, red under the pass. It is
+ *                     the only one of the eight with nothing wrong in the tree, and calling it fixed would be
+ *                     the lie this record exists to avoid.
+ *
+ * *** AND THE PASS BROKE SOMETHING, WHICH IS THE FINDING THAT MATTERED MOST. *** tslRace-selfcheck writes
+ * tools/ship/tsl-emitted-race.json in five sections, section 1 wholesale and sections 5-8 merging into what it
+ * left. Under the pass it took 23,750 ms against 5,996 filed, hit the cap, and died after section 1 -- so the
+ * `atlas` key, section 6's, was truncated away and never rewritten. tools/ship/wgslCorpus.mjs dropped
+ * tslSource.spriteAtlas behind its `EMITTED_RACE.atlas &&` presence guard, the corpus got one case smaller, and
+ * NOT ONE ROW ANYWHERE WENT RED: crossBackend asserts `results.length === corpus().length`, the corpus compared
+ * against itself, which holds at any size. It was found by reading a `git status` line. The same shape as
+ * ROTATION_LOST_V4461 below -- a whole-file writer erasing rows another writer paid for -- inside one process
+ * instead of across two, and fixed the same way: merge by key. wgslCorpus.GENERATED_CASES now names all fifteen
+ * generated cases, and probeConvention-selfcheck is the census that sees one leave.
+ */
+export const OVER_BUDGET_PASS_V4565 = Object.freeze({
+    at: "v4565", band: Object.freeze([3000, 8000]), stamp: "2026-09-09T12:57:13.333Z", serial: true,
+    ran: 210, priorMsRange: Object.freeze([3008, 7922]),
+    returnees: 105, red: 12, hitTheCap: 2, materiallySlower: 9,
+    newlyRed: 8, alreadyRegistered: 4,
+    returneeMsRange: Object.freeze([65, 2958]), returneeSpeedup: Object.freeze({ median: 2.43, max: 89.46 }),
+    pool: Object.freeze({ overBefore: 326, overAfter: 219, killedBefore: 138, killedAfter: 140,
+                          underBefore: 1150, underAfter: 1255, gates: 1614 }),
+    outsideTheSweep: Object.freeze({ before: 464, after: 359, beforePct: 28.7, afterPct: 22.2 }),
+    // what the pass did NOT touch, stated so the next round does not have to rediscover its own size
+    remaining: Object.freeze({
+        band3to8: 91, band8to20: 128,
+        killedUnreachable: 140,
+        why: "rotation() walks c.over and c.killed is a different bucket, so a gate that hit the 20,000 ms cap " +
+             "is exiled with no door at all -- 39% of everything outside the sweep, and the next item",
+    }),
+    // named, because a count of reds is a number and a list of causes is a repair
+    newReds: Object.freeze(["tools/ship/absenceScope-selfcheck.mjs", "tools/ship/reportDoors-selfcheck.mjs",
+        "tools/ship/brainTrail-selfcheck.mjs", "gfx/frontDoor-selfcheck.mjs", "tools/ship/mpmGpuPage-selfcheck.mjs",
+        "tools/ship/gateReport-selfcheck.mjs", "physics/scoreDirection-selfcheck.mjs", "tools/ship/crtToggle-selfcheck.mjs"]),
+    flakeNotFixed: "tools/ship/crtToggle-selfcheck.mjs -- green alone twice, red under the pass; nothing in the " +
+                   "tree is wrong and it is recorded as a flake rather than counted as a repair",
+    cappedAndDestructive: Object.freeze({
+        gate: "tools/ship/tslRace-selfcheck.mjs", filedMs: 5996, underPassMs: 23750, aloneMs: 20000,
+        lost: "tools/ship/tsl-emitted-race.json `atlas` (section 6, 17 lines)",
+        corpusCaseLost: "tslSource.spriteAtlas (generated)",
+        seenByNothing: "every generated corpus case sits behind a presence guard, and crossBackend's " +
+                       "`results.length === corpus().length` is the corpus measured against itself",
+        foundBy: "a `git status` line, not a gate",
+        fixed: "tslRace section 1 merges by key (v4566); wgslCorpus.GENERATED_CASES names all 15; " +
+               "probeConvention-selfcheck is the census",
+    }),
+    notClaimed: "that 105 of these gates are permanently under budget. BUDGET_DRIFT_V4536 measured 12-36% of " +
+                "hour-to-hour drift and ROTATION_BOUNDARY_V4535 names five gates that cross the budget in both " +
+                "directions on the same day. What is claimed is that 105 gates filed above 3,000 ms measured " +
+                "below it when run serially and alone, and that the sweep will now re-time them itself.",
+});
+
 export const ROTATION_BOUNDARY_V4535 = Object.freeze([
     Object.freeze({ gate: "physics/render/albedoEstimator-selfcheck.mjs", rotationMs: 2991, sweepMs: 3115,
         serialMs: Object.freeze([3065, 2823, 3208, 3269, 3000]),
@@ -738,8 +854,11 @@ export function doorCandidates(c, { timings = {} } = {}, { lo = BUDGET_MS, hi = 
 
 // The rotation, stalest first. `at` is a per-entry provenance string; entries with none are the stalest there
 // are, which is why UNKNOWN_AT sorts before every real capture.
-export function rotation(c, { at = {}, timings = {} } = {}, { slots = 24, budgetMs = 120000 } = {}) {
-    const pool = [...c.over].sort((a, b) => {
+// `filter` narrows the pool before the stalest-first sort -- v4565, for the bulk pass backlog item #14 asks
+// for. The ORDER within whatever is selected stays stalest-first, so a narrowed run is still the same
+// rotation on a smaller population rather than a different policy wearing its name.
+export function rotation(c, { at = {}, timings = {} } = {}, { slots = 24, budgetMs = 120000, filter = null } = {}) {
+    const pool = [...c.over].filter((g) => !filter || filter(g)).sort((a, b) => {
         const aa = at[a] || "", bb = at[b] || "";
         if (aa !== bb) return aa < bb ? -1 : 1;
         return (timings[a] || 0) - (timings[b] || 0);

@@ -145,7 +145,7 @@ export function reach({ budgetMs = null, timings = null, census = null, root = E
 export const REACH_AT_V4548 = Object.freeze({
     at: "v4548",
     budgetMs: 3000,
-    total: 97,
+    total: 101,
     // *** READ OFF THE INSTRUMENT, NOT PREDICTED. *** The first draft of this record guessed 53/21/19/40 from
     // which gates the round had sped up, and was wrong on three of the four: the comment-strip fix below
     // moved two records the other way at the same time, and a guess cannot see two changes at once.
@@ -167,7 +167,23 @@ export const REACH_AT_V4548 = Object.freeze({
     // ship-time sweep -- so this ratchet went red the moment the record arrived, which is the whole point of
     // it. The two rows that grade the record were moved to sweepCoverage-selfcheck (297 ms serial, beside
     // the record it guards) and the ceiling of 43 did not move. THE RATCHET CAUGHT THE ROUND THAT WROTE IT.
-    checked: 54, overBudget: 23, unguarded: 20, unchecked: 43,
+    // v4565/v4566: 97 -> 101 records and 54 -> 62 checked, with unchecked DOWN from 43 to 39 -- the first
+    // fall this ratchet has recorded, and it is not this round being careful: the v4565 band pass returned
+    // 105 gates to the ship-time sweep (OVER_BUDGET_PASS_V4565 in tools/ship/sweepCoverage.mjs) and some of
+    // them were the last guardian a record had. The ratchet only forbids a RISE, so a fall is the population
+    // moving underneath it and is recorded rather than celebrated.
+    //
+    // *** AND IT WENT RED ON THIS ROUND'S OWN RECORD FIRST, WHICH IS THE SECOND ROUND RUNNING. ***
+    // INSCOPE_ARRIVALS_SINCE_V4435 landed in tools/ship/absenceScope.mjs guarded only by
+    // absenceScope-selfcheck, which measured 6,527 / 6,853 / 6,638 ms serially -- over the budget, so the
+    // record was unchecked at ship time the moment it arrived, exactly as SWEEP_CONTENTION_V4562 was at
+    // v4562. The repair was v4548's, not a move: the gate re-read and re-comment-stripped the whole tree once
+    // per search term (7 scans = 28,507 readFileSync, 390 MB, 28,504 codeOnly calls) and tokenMatch
+    // lowercased every file on every call. Memoising the walk, the read and codeOnly's answer, and replacing
+    // the lowercase copy with a case-insensitive regex, took it to 2,237 ms through the rotation owner.
+    // 6,853 -> 2,237 is the gate doing the same work; both changes were checked answer-for-answer against
+    // uncached re-derivations (32,576 file-classifications, 40,720 tokenMatch pairs, no difference).
+    checked: 62, overBudget: 19, unguarded: 20, unchecked: 39,
     // v4550 -- the UNMEASURED class was split out of over-budget after this gate went red twice inside full
     // sweeps and passed 68 times under load; the trigger was a concurrent REWRITE of sweep-timings.json, not
     // contention. Zero records sit in it on a settled tree, which is the expected reading.

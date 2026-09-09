@@ -1,0 +1,34 @@
+{
+ "gate": "nav/detourScale-selfcheck.mjs",
+ "at": "2026-09-09",
+ "tables": [
+  {
+   "title": "moving the gap moves the excursion, and by exactly the geometry",
+   "columns": [
+    "gap starts at column",
+    "measured excursion",
+    "geometry says"
+   ],
+   "rows": [
+    [
+     68,
+     58,
+     58
+    ],
+    [
+     38,
+     28,
+     28
+    ],
+    [
+     8,
+     0,
+     0
+    ]
+   ],
+   "note": "The route must reach the gap's near edge, so the bulge outside the start/goal box is gapLo minus the wall's column -- three gaps, three answers, none of them typed into the gate."
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

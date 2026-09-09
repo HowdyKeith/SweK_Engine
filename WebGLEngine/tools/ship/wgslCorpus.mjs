@@ -120,6 +120,46 @@ const EMITTED_SLUG_PATH = path.join(path.dirname(fileURLToPath(import.meta.url))
 const EMITTED_SLUG = fs.existsSync(EMITTED_SLUG_PATH) ? JSON.parse(fs.readFileSync(EMITTED_SLUG_PATH, "utf8")) : null;
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+
+// *** v4566 -- THE GENERATED CASES, BY NAME, BECAUSE EVERY ONE OF THEM IS BEHIND A PRESENCE GUARD. ***
+// Each `...(EMITTED_X && EMITTED_X.key ? [...] : [])` above is there for a real reason: the record is written by a
+// gate, and until that gate has run once the case genuinely does not exist, which is better said than faked. But a
+// guard that covers "not written yet" covers "written and then LOST" identically, and the corpus has no size anybody
+// pinned -- crossBackend asserts `results.length === corpus().length`, which is the corpus compared against itself
+// and passes at any size. So a case can fall out of the corpus and every gate that reads it stays green.
+//
+// IT HAPPENED, on 2026-09-09, and this session did it: tools/ship/tslRace-selfcheck.mjs writes this file in FIVE
+// sections, section 1 wholesale and sections 5-8 merging into what section 1 left. The v4565 over-budget pass ran
+// that gate under contention, it failed part-way at 23,750 ms (5,996 filed; it is green alone in 20 s), and the
+// `atlas` key -- section 6's -- never got written back. tsl-emitted-race.json lost 17 lines, the corpus lost
+// tslSource.spriteAtlas, and the whole tree still reported ALL GREEN. The loss was found by reading a `git status`
+// line, not by a gate.
+//
+// So the cases are declared here BY NAME with the record and the key each comes from, the way gfx/frontDoor.mjs and
+// world/orreryFleet.mjs record arrivals by name rather than by bumping a count: a name that stops appearing in
+// corpus() is a red with a gate to re-run beside it. probeConvention-selfcheck.mjs is the census.
+export const GENERATED_CASES = Object.freeze([
+    Object.freeze({ id: "tslWide.quad (generated)", record: "tsl-emitted-wide.json", key: "quad", writer: "tools/ship/tslWide-selfcheck.mjs" }),
+    Object.freeze({ id: "tslWide.planes (generated)", record: "tsl-emitted-wide.json", key: "planes", writer: "tools/ship/tslWide-selfcheck.mjs" }),
+    Object.freeze({ id: "slugTsl.slug (generated)", record: "tsl-emitted-slug.json", key: "slug", writer: "tools/ship/slugTsl-selfcheck.mjs" }),
+    Object.freeze({ id: "tslSource.badTv (generated)", record: "tsl-emitted.json", key: "badTv", writer: "tools/ship/tslSource-selfcheck.mjs" }),
+    Object.freeze({ id: "tslSource.blackbody (generated)", record: "tsl-emitted.json", key: "blackbody", writer: "tools/ship/tslSource-selfcheck.mjs" }),
+    Object.freeze({ id: "tslSource.lyapunov (generated)", record: "tsl-emitted-physics.json", key: "lyapunov", writer: "tools/ship/tslPhysics-selfcheck.mjs" }),
+    Object.freeze({ id: "tslSource.heidler (generated)", record: "tsl-emitted-physics.json", key: "heidler", writer: "tools/ship/tslPhysics-selfcheck.mjs" }),
+    // the five sections of tslRace-selfcheck, and the reason this list exists: `atlas` is section 6's
+    Object.freeze({ id: "tslSource.lyapunovLook (generated)", record: "tsl-emitted-race.json", key: "transplanted", writer: "tools/ship/tslRace-selfcheck.mjs" }),
+    Object.freeze({ id: "tslSource.heidlerSprite (generated)", record: "tsl-emitted-race.json", key: "sprite", writer: "tools/ship/tslRace-selfcheck.mjs" }),
+    Object.freeze({ id: "tslSource.spriteAtlas (generated)", record: "tsl-emitted-race.json", key: "atlas", writer: "tools/ship/tslRace-selfcheck.mjs" }),
+    Object.freeze({ id: "tslSource.spriteSampled (generated)", record: "tsl-emitted-race.json", key: "sampled", writer: "tools/ship/tslRace-selfcheck.mjs" }),
+    Object.freeze({ id: "tslSource.inkWash (generated)", record: "tsl-emitted-race.json", key: "ink", writer: "tools/ship/tslRace-selfcheck.mjs" }),
+    Object.freeze({ id: "tslSource.lyapunovCompute (generated)", record: "tsl-emitted-compute.json", key: "transplanted", writer: "tools/ship/tslPhysics-selfcheck.mjs" }),
+    Object.freeze({ id: "tslSource.logisticStepperUniform (generated)", record: "tsl-emitted-loop.json", key: "transplanted", writer: "tools/ship/tslLoopBound-selfcheck.mjs" }),
+    // GUARDED BY THE WRONG KEY, and named that way rather than quietly corrected: the pair above is behind
+    // `EMITTED_LOOP && EMITTED_LOOP.transplanted`, and this one reads `transplantedStorage`. A record with the first
+    // key and not the second passes the guard and throws on the read, which is the opposite failure from the one
+    // this list is about -- loud instead of silent, so it is left as it is and written down.
+    Object.freeze({ id: "tslSource.logisticStepperStorage (generated)", record: "tsl-emitted-loop.json", key: "transplantedStorage", writer: "tools/ship/tslLoopBound-selfcheck.mjs", guardedBy: "transplanted" }),
+]);
 /** The brain's transport passes, by file: the census lists every .wgsl under its roots and each must be here or EXCLUDED. */
 export const TRANSPORT_FILES = Object.freeze(["filter.wgsl", "filter-packed.wgsl", "fused-single-workgroup.wgsl",
                                               "mb-scan-block.wgsl", "mb-scan-blocks.wgsl", "mb-scatter.wgsl", "scan.wgsl", "scatter.wgsl"]);

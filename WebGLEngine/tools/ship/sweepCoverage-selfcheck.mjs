@@ -450,7 +450,10 @@ console.log("\n7. *** THE MIRROR standingReds NEVER HAD: A ZERO IS AS OLD AS THE
     // live over budget with a reason; once it is empty, the RETIREMENTS must be non-empty and every retired
     // gate must be live UNDER budget carrying the serial readings that returned it. vacuity.mjs supplies
     // emptyOfNonEmpty for exactly this -- empty is the pass, and the guard is that it was ever populated.
-    const V29ret = SC.RETURNED_AT_V4529.returnedAt_v4535 || [];
+    // The returned rolls accumulate by round -- v4565 added its own rather than appending to v4535's, so a
+    // retirement carries the round that measured it. The row checks the union: what matters is that every gate
+    // that LEFT the still-over roll left it with readings, whichever round took them.
+    const V29ret = [...(SC.RETURNED_AT_V4529.returnedAt_v4535 || []), ...(SC.RETURNED_AT_V4529.returnedAt_v4565 || [])];
     ok("!! a returnee that went back over the budget on a later box is NAMED with its serial readings, and is live over",
        overNonEmpty(SC.RETURNED_AT_V4529.stillOver, (x) => (FILE.timings || {})[x.gate] > SC.BUDGET_MS && typeof x.why === "string" && x.why.length > 40 && x.hereMs > SC.BUDGET_MS && back.some((b) => b.gate === x.gate)) ||
        (emptyOfNonEmpty(SC.RETURNED_AT_V4529.stillOver, V29ret) &&
@@ -751,6 +754,64 @@ console.log("\n*** THE FILED READING IS A CONTENDED SAMPLE AND THE COST IS A DIF
        `bug -- it is the number every consumer reads. And ${R.overBudgetSample.underBudgetWhenRunAlone} of ` +
        `${R.overBudgetSample.n} sampled EXILED gates come in under the ${SC.BUDGET_MS} ms budget when run ` +
        "alone, which is the best evidence the over-budget item has had.");
+}
+
+console.log("\n*** THE FIRST BULK PASS AT THE EXILED POOL (v4565): HALF THE 3-8 s BAND CAME BACK ***");
+{
+    const R = SC.OVER_BUDGET_PASS_V4565;
+    // *** RE-DERIVED FROM THE LIVE FILES, not quoted. *** The ledger is the pass's own receipt and the timings are
+    // what the tree reads, so the claim "105 came back" has to survive being recomputed from both.
+    const led = JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "sweep-rotation.json"), "utf8"));
+    const pass = (led.rotated || []).filter((r) => r.at === R.stamp);
+    const back = pass.filter((r) => r.ms <= SC.BUDGET_MS);
+    // *** THE STAMP GROUP ERODES BY DESIGN AND THE FIRST DRAFT OF THIS ROW FORBADE IT. ***
+    // I wrote `pass.length === R.ran` and it went red within the hour, on my own --gate re-time of
+    // absenceScope-selfcheck: the ledger merges BY GATE and the newest reading wins, so re-timing any gate
+    // the pass touched rewrites that row with a new stamp and takes it out of this group. That is v4535's
+    // merge working exactly as intended, and a row that reddens on it is asserting the ledger must never be
+    // used again. The group is a CEILING that only falls, so that is what is checked -- plus every row still
+    // in it being in-band, which is the claim about --band that a shrinking count cannot weaken.
+    const leftTheGroup = R.ran - pass.length;
+    ok("!! *** THE PASS'S OWN LEDGER STILL SHOWS THE RETURNEES, GATE BY GATE ***",
+       pass.length <= R.ran && pass.length >= R.ran * 0.9 &&
+       back.length <= R.returnees && back.length >= R.returnees * 0.9 &&
+       pass.every((r) => r.priorMs > R.band[0] && r.priorMs <= R.band[1]),
+       `${pass.length} of the ${R.ran} rows still carry the pass stamp ${R.stamp} and ${back.length} of them ` +
+       `read at or under the ${SC.BUDGET_MS} ms budget, against ${R.returnees} returnees recorded. ` +
+       `${leftTheGroup} row(s) have since been re-timed by name and carry a later stamp, which is the ledger's ` +
+       "merge-by-gate rule and not a loss -- the group can only shrink, never grow, and a COLLAPSE of it would " +
+       `mean the ledger had been rewritten wholesale. Every row still in it has a PRIOR reading inside the ` +
+       `${R.band[0]}-${R.band[1]} ms band the pass selected, which is --band doing what it says.`);
+    // The point of a returnee is that it is back IN the sweep, so that is the thing checked -- in the file the
+    // sweep actually reads, not in the ledger that recorded the measurement.
+    const t = SC.readFile();
+    const stillIn = back.filter((r) => (t.timings || {})[r.gate] <= SC.BUDGET_MS);
+    ok("!! ...and they are under budget in sweep-timings.json TOO, which is the file that decides membership",
+       stillIn.length >= R.returnees * 0.9,
+       `${stillIn.length} of ${back.length} returnees are still filed under budget. These need not be equal: ` +
+       "every sweep since re-times them under contention, and a returnee that crosses back is the file working, " +
+       "not the pass being wrong -- ROTATION_BOUNDARY_V4535 names five gates that do exactly that. A COLLAPSE " +
+       "here would mean the pass bought nothing.");
+    const gates = enumerateGates(ENG), c = SC.census(gates, t);
+    const outside = c.over.length + c.killed.length;
+    ok("!! ...and the population outside the ship-time sweep is down by roughly what the pass moved",
+       outside <= R.outsideTheSweep.before && c.killed.length === R.remaining.killedUnreachable &&
+       R.pool.overBefore - R.returnees - R.hitTheCap === R.pool.overAfter &&
+       R.pool.killedBefore + R.hitTheCap === R.pool.killedAfter,
+       `${outside} of ${gates.length} gates (${(100 * outside / gates.length).toFixed(1)}%) are outside it now, ` +
+       `against ${R.outsideTheSweep.before} (${R.outsideTheSweep.beforePct}%) before the pass. The record's own ` +
+       `arithmetic closes: ${R.pool.overBefore} over - ${R.returnees} returned - ${R.hitTheCap} capped = ` +
+       `${R.pool.overAfter}, and the ${R.hitTheCap} capped are what took killed from ${R.pool.killedBefore} to ` +
+       `${R.pool.killedAfter}.`);
+    // *** THE ROW THAT NAMES WHAT THE PASS CANNOT REACH. *** A record that only says what it fixed reads as
+    // finished. rotation() walks c.over; c.killed is a separate bucket and no selection in this file touches it.
+    const reachable = SC.rotation(c, t, { slots: 1e9, budgetMs: Infinity }).pool;
+    ok("!! *** AND THE ROTATION STILL CANNOT REACH A GATE THAT HIT THE CAP -- 39% OF WHAT IS OUTSIDE THE SWEEP ***",
+       reachable === c.over.length && c.killed.length > 0 && !c.killed.some((g) => c.over.includes(g)),
+       `the rotation's pool is ${reachable} gates, exactly the ${c.over.length} over budget, and the ` +
+       `${c.killed.length} killed ones are in none of it. That is ${(100 * c.killed.length / outside).toFixed(0)}% ` +
+       "of everything outside the sweep sitting behind a door with no handle, which is the SAME fault v4408 " +
+       "opened for the over-budget bucket, unopened for this one. Stated by a row rather than left in prose.");
 }
 
 REPORT.write();

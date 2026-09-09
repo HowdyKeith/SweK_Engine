@@ -72,7 +72,7 @@ import { overNonEmpty, emptyOfNonEmpty } from "./vacuity.mjs";
 import { gateReport } from "./gateReport.mjs";
 import { population, classify, contractOf, FORMATTERS, STRICT_FORMATTERS, TOLERANT_FORMATTERS, NEVER_CALL,
          RETURNS_BARE_BECAUSE, CHEAP_STATES, CHEAP_STATES_WITH_SECONDS,
-         CALL_COST_V4459 as COST, NO_GATE_ALL as NOGATE, NO_GATE_V4458, NO_GATE_V4531,
+         CALL_COST_V4459 as COST, NO_GATE_ALL as NOGATE, NO_GATE_V4458, NO_GATE_V4531, NO_GATE_V4565, UNGATED_ANYWHERE_V4565,
          reportLines as doorsReport } from "./reportDoors.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -274,10 +274,23 @@ console.log("\n6. who provides the convention and cannot check it");
 {
     const noGate = rows.filter((r) => !r.hasGate).map((r) => r.rel).sort();
     say(`no sibling gate: ${noGate.join(", ") || "(none)"}`);
-    ok("!! the modules providing this convention with no gate of their own are named, not counted",
+    // *** AND THE SECOND ROW IS THE ONE THAT MEANS SOMETHING, WHICH THIS SECTION DID NOT HAVE. *** The list
+    // above is modules with no gate BESIDE them; the row called it "no gate of their own" and ratcheted on
+    // it. Six of the seven recorded at v4565 have a gate in tools/ship/, which is where this tree keeps most
+    // of them. The debt is the two that have none anywhere, and it was hidden inside a number eight times
+    // its size. Found by re-timing the over-budget pool: this gate had been outside the ship-time sweep.
+    const ungated = rows.filter((r) => !r.gateAnywhere).map((r) => r.rel).sort();
+    ok("!! *** AND OF THOSE, THE ONES WITH NO GATE ANYWHERE -- WHICH IS THE ACTUAL DEBT ***",
+       ungated.length === UNGATED_ANYWHERE_V4565.length && ungated.every((r) => UNGATED_ANYWHERE_V4565.includes(r)),
+       `${ungated.length} of the ${noGate.length} without a sibling gate have none anywhere: ` +
+       `${ungated.join(", ") || "(none)"}. The other ${noGate.length - ungated.length} are gated from ` +
+       "tools/ship/ -- a fact about where this tree puts gates, not about coverage, and the row below " +
+       "ratcheted on it for as long as nobody could tell the two apart.");
+    ok("!! the modules providing this convention with no gate BESIDE them are named, not counted",
        noGate.length === NOGATE.length && noGate.every((r) => NOGATE.includes(r)),
-       `${noGate.length} of ${rows.length}, over ${NO_GATE_V4458.length} frozen at v4458 and ` +
-       `${NO_GATE_V4531.length} at v4531. They are LISTED so that adding a member without a gate fails here ` +
+       `${noGate.length} of ${rows.length}, over ${NO_GATE_V4458.length} frozen at v4458, ` +
+       `${NO_GATE_V4531.length} at v4531 and ${NO_GATE_V4565.length} at v4565. They are LISTED so that ` +
+       "adding a member without a gate fails here " +
        "rather than passing quietly under a number that moved by one -- WHICH IS WHAT HAPPENED: the four at " +
        "v4531 arrived with the Racing-city line and turned this row red, which is the row working. The two " +
        "lists are kept apart because freezing by name AT A VERSION is what lets a later reader see WHEN each " +

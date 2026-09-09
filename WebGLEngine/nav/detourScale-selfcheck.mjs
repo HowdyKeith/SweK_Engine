@@ -20,11 +20,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as DS from "./detourScale.mjs";
+import { gateReport } from "../tools/ship/gateReport.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const say = (m) => console.log("  ----  " + m);
+const REPORT = gateReport("nav/detourScale-selfcheck.mjs");
 
 console.log("detourScale-selfcheck -- what a world's real detours are, and what window they imply\n");
 
@@ -83,6 +85,15 @@ console.log("\n2. *** POINTED AT A WORLD THAT DOES HAVE AN OBSTACLE, IT REPORTS 
         rows.push({ lo, want: Math.max(0, lo - COL), got: r ? r.excursion : null });
     }
     for (const r of rows) say(`gap starting at i=${r.lo}: excursion ${r.got}, geometry says ${r.want}`);
+    // Emitted as well as printed since v4565: tools/ship/gateReport-selfcheck holds that a gate arguing in
+    // numbers must leave them somewhere a second reader can open, and it named this one -- which nothing had
+    // noticed because that gate was itself outside the ship-time sweep until the over-budget pool was
+    // re-timed.
+    REPORT.table("moving the gap moves the excursion, and by exactly the geometry",
+        ["gap starts at column", "measured excursion", "geometry says"],
+        rows.map((r) => [r.lo, r.got, r.want]),
+        "The route must reach the gap's near edge, so the bulge outside the start/goal box is gapLo minus " +
+        "the wall's column -- three gaps, three answers, none of them typed into the gate.");
     ok("!! *** THE EXCURSION IS THE DISTANCE TO THE GAP, AND MOVING THE GAP MOVES IT ***",
         rows.every((r) => r.got === r.want) && new Set(rows.map((r) => r.got)).size === 3,
         rows.map((r) => `${r.got}=${r.want}`).join(", ") + ". A route from column " + COL + " to the far side " +
@@ -187,4 +198,5 @@ console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "that returns zero because it looked in the wrong place is not a finding. Filed rather than answered. " +
     "\nAlso not claimed: that these 40 routes speak for worlds this engine has not loaded. The census is the " +
     "instrument; the engine's numbers are one reading with it.");
+REPORT.write();
 process.exit(fails ? 1 : 0);
