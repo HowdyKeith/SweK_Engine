@@ -100,11 +100,19 @@ else {
             // ---- philox alone -------------------------------------------------------------------------------
             const { Fn, uint, uvec4, uniform, instanceIndex, instancedArray } = T;
             const pbuf = instancedArray(a.NP, "uvec4").label("out");
-            const pcfg = uniform(uvec4(a.SEED, a.K1, 0, 0)).label("cfg");
+            const pcfg = uniform(uvec4(a.SEED, a.K1, 0, 0), "uvec4").label("cfg");
             const { philox } = I.philoxNodes(T);
             const pnode = Fn(() => { const r = philox(instanceIndex, uint(7), uint(1), uint(0), pcfg.x, pcfg.y);
                 pbuf.element(instanceIndex).assign(uvec4(r.x0, r.x1, r.x2, r.x3)); })().compute(a.NP);
             await renderer.computeAsync(pnode);
+            // NO REGEX HERE ON PURPOSE: this script is a template literal, so a pattern needs FOUR backslashes to
+            // reach the page with one (out.noFloat below shows the shape), and two drafts of this line miscounted
+            // and matched nothing. A split and a trim cannot be miscounted.
+            const cfgLine = (t) => (t.split("\\n").map((l) => l.trim()).find((l) => l.startsWith("cfg")) || "<none>");
+            // ...and read BEFORE the transplant, which refuses on this very disagreement: a row that only runs when
+            // the transplant already agreed cannot fail, and the first placement of it (after both transplants) was
+            // exactly that -- both sabotages went red on the refusal and never reached the row meant to catch them.
+            out.cfgDecl = { philox: cfgLine(S.emitCompute(renderer, pnode).wgsl) };
             const pgen = S.transplantCompute(S.emitCompute(renderer, pnode).wgsl, a.pshell);
             const pob = dev.buffer({ data: new Uint32Array(a.NP * 4), usage: ["storage"] });
             const pub = dev.buffer({ data: new Uint32Array([a.SEED, a.K1, 0, 0]), usage: "uniform" });
@@ -114,6 +122,7 @@ else {
 
             // ---- the sweep ----------------------------------------------------------------------------------
             const g = I.makeIsingPassTsl(T, { L: a.L }); await renderer.computeAsync(g.node);
+            out.cfgDecl.ising = cfgLine(S.emitCompute(renderer, g.node).wgsl);
             const gen = S.transplantCompute(S.emitCompute(renderer, g.node).wgsl, a.shell);
             out.wgsl = gen.wgsl; out.reads = gen.reads; out.writes = gen.writes;
             out.noFloat = !(new RegExp("\\\\bf32\\\\b|\\\\b(exp|log|sin|cos|sqrt|pow)\\\\s*\\\\(").test(gen.wgsl));
@@ -142,6 +151,17 @@ else {
     ok("the harness built the graph, transplanted it and ran both kernels on one device",
         r.ok && r.result && !r.result.error && r.result.gen,
         r.ok ? (r.result && r.result.error) : (r.reason || (r.pageErrors || []).join("; ")));
+    // *** v4544 -- r184 STOPPED INFERRING A UNIFORM'S TYPE FROM ITS NODE, AND THE FAILURE IS SILENT. ***
+        // `uniform(uvec4(0,0,0,0))` used to carry uvec4 from the node; MEASURED at r184 the UniformNode comes back
+        // with nodeType null and the type is settled later from the JS value -- a Vector4 -- so three prints
+        // `cfg : vec4<f32>` and philox reads its seeds as floats. Nothing in the graph says so. What said so was the
+        // transplant refusing "uniform cfg is vec4 in the pass and uvec4 in the shell", and the bit-exactness rows
+        // below would have gone red too -- but only for a graph that HAS a shell to disagree with, which a fragment
+        // graph does not. So the emitted declaration is graded directly, in three's own words, on both kernels.
+    const D = r.ok && r.result && r.result.cfgDecl;
+    ok("*** three PRINTS the config uniform as vec4<u32>, unsigned, on both kernels -- r184 no longer infers that from uvec4(...) and the graph has to name the type; a graph that does not gets floats where it meant seeds, silently ***",
+       !!D && /vec4<u32>/.test(D.ising || "") && /vec4<u32>/.test(D.philox || "") && !/f32/.test((D.ising || "") + (D.philox || "")),
+           D ? `ising: ${D.ising} | philox: ${D.philox}` : "no declaration read");
     if (r.ok && r.result && !r.result.error) {
         const F = r.result;
         let pbad = 0; for (let i = 0; i < NP * 4; i++) if ((F.philox[i] >>> 0) !== PHI[i]) pbad++;
@@ -189,6 +209,19 @@ else {
 //   AND THE SABOTAGES ARE WHAT PROVED THE DEVICE PATH IS LIVE. This gate runs in 0.9 s, which read as impossible
 //   for a WebGPU gate until the sabotages moved its numbers: node-webgpu (the SessionStart hook's install) serves
 //   it in-process through Dawn rather than launching a browser. A suspiciously fast green is worth one check.
+// MEASURED at v4544 (the uniform's declared type). Applied, gate run, red count read, both files restored and
+// md5-verified. Baseline 0 red.
+//   MM the sweep graph's `uniform(uvec4(0,0,0,0), "uvec4")` written as it was before r184, without the type -> 2 red.
+//   NN the same in the gate's own philox graph -> 2 red.
+//   Both red on the transplant's shell refusal AND on the row that grades three's printed declaration.
+//   *** THE FIRST PLACEMENT OF THAT ROW COULD NOT FAIL, AND THE SABOTAGE IS WHAT SHOWED IT. *** It read the emitted
+//   struct AFTER both transplants, so the refusal fired first and the row never ran: MM and NN each went red 1, on
+//   the refusal alone, with the row that exists to catch exactly this never reached. It reads the declaration BEFORE
+//   the transplant now, and both sabotages hit it. A row downstream of a guard that catches the same fault is not a
+//   second opinion; it is unreachable.
+//   Two earlier drafts of that row reported "<none>" for both kernels: the page script is a template literal, so a
+//   regex needs FOUR backslashes to arrive with one, and two and then three were miscounted. It uses a split and a
+//   trim now -- no backslashes to miscount.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: A REAL GPU. Philox is integer arithmetic, which is exact on any conforming device, so " +
     "this is the one kernel in the arc whose bit claim should NOT be hardware-dependent -- but that is an argument and " +
