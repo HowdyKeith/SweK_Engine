@@ -3767,6 +3767,34 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since208: Object.freeze({
+        at: "v4549", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/jitter-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 0.06 s (63/57/62 over three serial runs -- CPU only, no browser). THE THIRD AND LAST " +
+                 "PREREQUISITE the temporal path was missing: render/jitter.mjs holds the Halton(2,3) sub-pixel " +
+                 "sequence FSR2/3 offsets each frame by, and the PAIR of matrices that offset produces -- jittered " +
+                 "for rendering, unjittered for motion vectors. MEASURED: the radical inverse is exact against " +
+                 "hand-checkable values; the phase count is FSR's own 8*ratio^2 (8/32/72/128 at 1x/2x/3x/4x); a " +
+                 "(+0.5, +0.25) pixel jitter moves the projected point by exactly that at EVERY depth from 0.5 to 95 " +
+                 "units, to 3.6e-15 of a pixel, because it is applied as a CLIP-space translation and so works on a " +
+                 "view-projection and not only on a bare projection. *** THE PROPOSED PROPERTY 'the jitter cancels " +
+                 "exactly over a full period' IS FALSE AND THE GATE SAYS SO: *** a centred Halton mean vanishes " +
+                 "exactly at n = base^k - 1 (1,3,7,15,31,63,127,255 for base 2; 2,8,26,80,242 for base 3), those " +
+                 "sets never meet, no n up to 300 zeroes both axes, and FSR's 8*ratio^2 is not one of them -- at 32 " +
+                 "phases the sequence sits 1.5% of a pixel off-centre in x and 1.9% in y. Low discrepancy is measured " +
+                 "against 2,000 random draws rather than one: Halton's 4x4 occupancy spread is 2, random's median 5, " +
+                 "and random was better in 0 of 2,000. The coupling row is the point of the rung: with a STATIC " +
+                 "camera the unjittered pair reports 1.3e-7 of a pixel and the jittered pair 0.083 of a pixel of " +
+                 "motion that never happened, which is exactly the jitter difference between the two phases. Eight " +
+                 "sabotages, seven red at 2/3/5/3/2/1/1 -- and one 0-RED recorded as a finding: the sequence's " +
+                 "1-based start was asserted nowhere, because every row either called halton() directly or compared " +
+                 "the sequence against itself, so a row was added that pins the first element and refuses the " +
+                 "index-0 pixel corner, after which it goes red too.",
+    }),
     since207: Object.freeze({
         at: "v4548", swept: 1, green: 1, red: 0,
         added: Object.freeze([
