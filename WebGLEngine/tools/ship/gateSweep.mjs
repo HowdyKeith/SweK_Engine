@@ -3764,6 +3764,43 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since207: Object.freeze({
+        at: "v4554", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "world/surfaceProbe-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 110 ms, seventeen rows. *** THE TERRAIN MODEL AND THE VOXELS ARE TWO INDEPENDENTLY " +
+                 "DERIVED ANSWERS AND NOTHING HAD PUT THEM SIDE BY SIDE. *** world._heightAt is an " +
+                 "ErosionCache projection over noise; world.voxelAt is what a chunk actually holds. Six boots " +
+                 "of index.html, 1,681 columns on a 3-unit lattice: the model reports a stand height INSIDE " +
+                 "SOLID ROCK in 101 to 158 of them (6.0% to 9.4%), error running +17 one way and -13 the " +
+                 "other with its median at 0, in a box x -54..30 z -60..24 -- the middle of the map. A column " +
+                 "at (-40, -38) is SOLID 0..1 / air 2..4 / SOLID 5..13 / air 14 / SOLID 15..21 / air 22..63 " +
+                 "and the model answers 9, thirteen voxels under the real surface, with three neighbours the " +
+                 "same. *** THE GAP CANNOT BE CLOSED BY FIXING GENERATION, which is what decided the shape " +
+                 "of the fix: *** generateChunk(0,0) twice in one boot gives 0 of 16,384 voxels different, " +
+                 "but across six boots from the same seed the MODEL sums to 35708 every time while the " +
+                 "VOXELS sum to SIX DISTINCT VALUES, because fluid and erosion write into chunks all run " +
+                 "long at rain sites chosen at random. A pure function of the seed cannot track a grid the " +
+                 "simulation is rewriting, so the answer is to ask the voxels -- as a HYBRID, because the " +
+                 "scan is not affordable: 0.4 ms for the model, 7.6 for a full column scan (19x), 1.8 for " +
+                 "trusting the model and verifying it (4.5x). *** AND WIRING IT IN FOUND THE LARGER DEFECT " +
+                 "UNDERNEATH THE ONE IT WAS BUILT FOR. *** The line it replaced in BotPathfinderPool was " +
+                 "`this.world?._heightAt || ((x, z) => 5)`, and _heightAt is a METHOD reading " +
+                 "this._heightOverride; detached from its object it THREW ON EVERY CALL into an empty catch, " +
+                 "so the snapshot was 121 zeros of 121 -- A FLAT PLANE AT y=0 for both the navmesh route and " +
+                 "the grid fallback, since the pool was written. No fixture could see it: every fake world " +
+                 "in this tree supplies _heightAt as a plain function with no receiver to lose. Measured " +
+                 "through the pool's own shipped method after the fix: 7,921 cells, ZERO zeros, heights 2 to " +
+                 "52. Eight sabotages red by name, including restoring that spelling. *** THE FIRST TAKE OF " +
+                 "THE RECORD PUBLISHED ONE BOOT'S NUMBERS AS CONSTANTS *** and a row now goes red if the " +
+                 "interval is collapsed back to a single number. Spun out and NOT fixed: Chunk.index() has " +
+                 "no range check, so the world calls everything above its own ceiling SOLID -- which is why " +
+                 "rain never falls (210 spawned, 210 landed at spawn height, 0 in flight) and hydraulic " +
+                 "erosion made 1,674 discarded carves at y=65 in one boot. Filed as chunk-index-unbounded.",
+    }),
     since206: Object.freeze({
         at: "v4552", swept: 1, green: 1, red: 0,
         added: Object.freeze([

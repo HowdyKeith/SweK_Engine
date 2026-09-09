@@ -170,6 +170,7 @@ const BOT_KINDS = {
 // attack profile, so visual identity (tracer color, mesh size, themed
 // speech) comes from the shared kaiju config.
 import { stepTerrain, stepTerrainFan, autoGround, SURFACE } from "../physics/character/terrainWalk.mjs";
+import { standHeightAt, hasVoxels } from "../world/surfaceProbe.mjs";
 
 /** Eye/centre offset above the feet -- the +1 this file has always added to the terrain height. */
 const BOT_EYE = 1;
@@ -1244,7 +1245,13 @@ export class BotManager {
             // answers ONLY at integer coordinates, returning nothing in between. Every bot in the real
             // engine was blocked at 0.0000 movement, and no gate saw it because every fixture's fake world
             // answered at any float. Found by booting index.html headlessly and spawning a real bot.
-            this._ground = autoGround((x, z) => w._heightAt(x, z));
+            // *** THE SAME BLINDNESS, ONE FILE OVER: the controller reads the terrain MODEL, and the model
+            // reports a stand height inside solid rock in 6 to 9% of this world's columns -- by up to 17
+            // voxels. standHeightAt trusts it and verifies it against the voxels, scanning only where it
+            // fails. A world with no voxel grid gets exactly the old function, so every fixture in every
+            // gate that supplies a bare _heightAt is unaffected.
+            const surf = hasVoxels(w) ? ((x, z) => standHeightAt(w, x, z)) : ((x, z) => w._heightAt(x, z));
+            this._ground = autoGround(surf);
         }
         return this._ground;
     }

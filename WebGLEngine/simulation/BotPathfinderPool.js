@@ -18,6 +18,8 @@
 //   pool.dispose();
 // =============================================================================
 
+import { standHeightAt, hasVoxels } from "../world/surfaceProbe.mjs";
+
 const HM_PADDING = 24;          // voxels of padding around the start/goal bbox
 
 export class BotPathfinderPool {
@@ -114,13 +116,28 @@ export class BotPathfinderPool {
         const w = Math.ceil(maxX - minX) + 1;
         const d = Math.ceil(maxZ - minZ) + 1;
         const hm = new Int16Array(w * d);
-        const hAt = this.world?._heightAt || ((x, z) => 5);
+        // *** THE SNAPSHOT ASKS THE VOXELS WHERE THEY EXIST, NOT ONLY THE TERRAIN MODEL. *** world._heightAt
+        // is the model's column height out of an erosion cache; world.voxelAt is what is actually solid, and
+        // measured over six boots they disagree in 6.0 to 9.4% of columns -- by up to 17 voxels, with the model
+        // landing INSIDE rock. A planner given that column routes a bot through a mountain. standHeightAt
+        // trusts the model and VERIFIES it, scanning only where it fails: 1.8 ms per 1,681 columns against
+        // the model's 0.4 and a full scan's 7.6. A world with no voxel grid keeps exactly the old answer.
+        // *** AND THE OLD LINE WAS `this.world?._heightAt || ((x, z) => 5)`, WHICH THREW ON EVERY CALL. ***
+        // world._heightAt is a METHOD reading this._heightOverride and this._wasmTiles; taken off its object
+        // it loses its receiver. Measured in a real boot: TypeError on every call, into the empty catch
+        // below, leaving y at 0 -- 121 zeros of 121 over an 11x11 window. THE SNAPSHOT WAS A FLAT PLANE AT
+        // ZERO for both routes, and no fixture could see it because every fake world in this tree supplies
+        // _heightAt as a plain function, which has no `this` to lose. Both branches are closures now.
+        const w0 = this.world;
+        const hAt = hasVoxels(w0) ? ((x, z) => standHeightAt(w0, x, z))
+                  : (typeof w0?._heightAt === "function" ? ((x, z) => w0._heightAt(x, z))
+                                                         : ((x, z) => 5));
         for (let dz = 0; dz < d; dz++) {
             for (let dx = 0; dx < w; dx++) {
                 const wx = Math.floor(minX) + dx;
                 const wz = Math.floor(minZ) + dz;
                 let y = 0;
-                try { y = hAt(wx, wz) | 0; } catch {}
+                try { const v = hAt(wx, wz); y = Number.isFinite(v) ? v | 0 : 0; } catch {}
                 hm[dz * w + dx] = y;
             }
         }

@@ -117,7 +117,22 @@ try {
         // Does the ground autoGround CHOSE actually answer between lattice points? offLattice alone is the
         // detection, and a detection that nothing honours reads exactly the same as one that everything does.
         let mid = null; try { const m = G(0.5, 0.5); mid = m ? +m.y.toFixed(4) : null; } catch { mid = null; }
-        return { rawQuarterUnit: raw, offLattice: G.offLattice, midY: mid, spawnH, botCount: bm.bots.size,
+        // *** THE TERRAIN MODEL AGAINST THE VOXELS, IN THE RUNNING ENGINE. *** world._heightAt is the model's
+        // column height out of an erosion cache; world.voxelAt is what is solid. v4553 measured them
+        // disagreeing in 6 to 9% of columns by up to 17 voxels, a different count every boot. Re-derived
+        // live here rather than quoted, which is why this row states a SHAPE and not a number.
+        const SP = await import("/world/surfaceProbe.mjs");
+        const census = SP.surfaceCensus(w, { x0: -60, x1: 60, z0: -60, z1: 60, step: 3 });
+        // and a body placed in one of the columns the model gets wrong
+        let affected = null;
+        for (let z = -60; z <= 60 && !affected; z += 3) for (let x = -60; x <= 60 && !affected; x += 3) {
+            const h = w._heightAt(x, z);
+            if (!Number.isFinite(h) || w.isAir(x, h, z)) continue;
+            affected = { x, z, model: h, probe: SP.standHeightAt(w, x, z), topSolid: SP.topSolidAt(w, x, z),
+                         modelInsideRock: !w.isAir(x, h, z) };
+        }
+        return { rawQuarterUnit: raw, offLattice: G.offLattice, midY: mid, spawnH, census, affected,
+                 botCount: bm.bots.size,
                  start: { x: +start.x.toFixed(2), y: +start.y.toFixed(2) },
                  end: { x: +bot.x.toFixed(2), z: +bot.z.toFixed(2), y: +bot.y.toFixed(2) },
                  moved: +moved.toFixed(2), worstOff: +worstOff.toExponential(2), sampled,
@@ -195,6 +210,24 @@ console.log("\n2. *** A REAL BOT, SPAWNED BY THE REAL BotManager, WALKING THE RE
         R.detours > 0 && R.detours < 600,
         R.detours + " of 600 frames took a fanned heading. A run that reported zero detours and more distance " +
         "would mean the fan was never exercised and something else had changed.");
+    // =========================================================================================================
+    report("terrain model vs voxels, live: " + R.census.insideSolid + " of " + R.census.sampled +
+           " columns (" + R.census.insideSolidPct + "%) report a stand height INSIDE solid rock; error median " +
+           R.census.error.median + ", p90 " + R.census.error.p90 + ", max " + R.census.error.max +
+           ", min " + R.census.error.min);
+    ok("!! *** THE TERRAIN MODEL AND THE VOXELS DISAGREE, AND THE DISAGREEMENT IS NOT AT THE EDGE ***",
+        R.census.insideSolid > 0 && R.census.insideSolidPct < 25 && R.census.error.max >= 8,
+        "box " + JSON.stringify(R.census.box) + ". world._heightAt is the terrain MODEL out of an erosion " +
+        "cache; world.voxelAt is what is actually solid. The median error is 0 -- the model is right for most " +
+        "of the map and its convention is sound -- and the TAIL is the defect.");
+    ok("!! *** AND IN ONE OF THOSE COLUMNS THE PROBE PUTS A BODY ON THE REAL SURFACE, NOT INSIDE THE ROCK ***",
+        !!R.affected && R.affected.modelInsideRock && R.affected.probe === R.affected.topSolid + 1 &&
+        R.affected.probe !== R.affected.model,
+        R.affected ? `at (${R.affected.x}, ${R.affected.z}) the model says ${R.affected.model}, which is inside ` +
+            `a solid voxel; the topmost solid is ${R.affected.topSolid} so a body stands at ` +
+            `${R.affected.probe}. THE BOT'S OWN 600 FRAMES NEVER REACH ONE OF THESE COLUMNS, which is why ` +
+            `every row above stayed green through the defect and why this row exists.`
+            : "no affected column found -- if the world stopped producing them this row is the one to re-derive");
     ok("   ...and the engine's own pathfinder pool is on the navmesh route",
         R.poolRoute === "navmesh",
         "\"" + R.poolRoute + "\" -- v4545's wiring, observed in the running engine rather than in a fixture.");

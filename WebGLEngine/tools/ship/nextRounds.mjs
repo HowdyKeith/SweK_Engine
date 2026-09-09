@@ -159,11 +159,94 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "planner-blind-to-solids",
+        state: "CLOSED",
+        note: "DONE at v4554, AND THE ITEM ASKED ABOUT THE WRONG LAYER -- but the failure mode it described is "
+            + "real one layer down, and that is where it was found. As filed it asked whether PROPS, BUILDINGS "
+            + "OR KIT SCATTER stand on the terrain without being baked into world._heightAt. That question is "
+            + "STILL UNMEASURED and is not claimed here: main.js publishes no scene handle, and a probe that "
+            + "cannot find the scene returns a zero that means nothing. *** WHAT IS MEASURED IS THAT THE WORLD "
+            + "ITSELF IS THE UNBAKED SOLID. *** world/world.js is a VOXEL world -- voxelAt, isAir, chunkHeight "
+            + "64 -- and _heightAt is an ErosionCache projection over _baseHeightAt that never consults the "
+            + "voxel grid. Six boots of index.html, 1,681 columns on a 3-unit lattice over 120x120: the model "
+            + "reports a stand height INSIDE SOLID ROCK in 101 to 158 columns, 6.0% to 9.4%, with the error "
+            + "(topSolid + 1 - _heightAt) running to +17 one way and -13 the other and its median at 0. The "
+            + "affected box is x -54..30, z -60..24 -- the middle of the map, not its edge. A column at "
+            + "(-40, -38) reads SOLID 0..1 / air 2..4 / SOLID 5..13 / air 14 / SOLID 15..21 / air 22..63, and "
+            + "the model answers 9: inside the slab, thirteen voxels under the real surface, with three "
+            + "neighbours reading the same. *** AND THE GAP CANNOT BE CLOSED BY FIXING GENERATION, WHICH IS THE "
+            + "FINDING THAT DECIDED THE SHAPE OF THE FIX. *** Generation is exact -- generateChunk(0,0) twice "
+            + "in one boot gives 0 of 16,384 voxels different -- but across six boots from the same "
+            + "biomeSeed 1337 the model sums to 35708 EVERY TIME while the voxels sum to SIX DISTINCT VALUES, "
+            + "because fluid and erosion write chunk.set() all through the run at rain sites chosen by "
+            + "Math.random(), and _heightAt is noise over a fixed seed that sees none of it. A pure function "
+            + "cannot track a grid the simulation is rewriting. world/surfaceProbe.mjs asks the voxels instead, "
+            + "for the two consumers whose question is 'where does a body stand': BotPathfinderPool's snapshot "
+            + "and BotManager's ground oracle. IT IS A HYBRID BECAUSE THE SCAN IS NOT AFFORDABLE: _heightAt "
+            + "alone 0.4 ms per 1,681 columns, a full column scan 7.6 ms (19x), and trusting the cheap answer "
+            + "then VERIFYING it -- support below the feet and body cells of air above -- 1.8 ms (4.5x). "
+            + "Sixteen rows, seven sabotages red by name. *** THE FIRST TAKE OF THIS ROUND PUBLISHED ONE BOOT'S "
+            + "NUMBERS AS CONSTANTS *** (115 columns, 6.8%, error min -7) and the record now separates what was "
+            + "identical in all six boots from what was not, with a row that goes red if the interval is ever "
+            + "collapsed back to a single number -- a record stating a moving quantity as a fixed one is this "
+            + "session's recurring defect wearing different clothes. Two negatives also recorded: a bot with "
+            + "its feet in a solid voxel on 235 of 600 frames is NOT buried (depth always exactly 1, head "
+            + "blocked on zero frames -- that is a bilinear surface inside its own top voxel), and the bot's "
+            + "600 frames never reach an affected column, which is why every row in engineSceneBot-selfcheck "
+            + "stayed green through the defect and why that gate now takes a live census and looks one up. "
+            + "*** AND WIRING THE PROBE IN FOUND A LARGER DEFECT UNDERNEATH THE ONE IT WAS BUILT FOR. *** "
+            + "The line it replaced in BotPathfinderPool._heightmapForJob was `this.world?._heightAt || "
+            + "((x, z) => 5)`, and world._heightAt is a METHOD reading this._heightOverride and "
+            + "this._wasmTiles. Detached from its receiver it THROWS ON EVERY CALL -- measured in a real "
+            + "boot, a TypeError on _heightOverride -- into an empty catch that leaves the sample at 0. "
+            + "Over an 11x11 window the old loop returned 121 zeros of 121, so THE PATHFINDER'S SNAPSHOT "
+            + "WAS A FLAT PLANE AT y=0 for both the navmesh route and the grid fallback, since the pool "
+            + "was written -- _heightmapForJob runs on every job and its output is what the worker builds "
+            + "its navmesh from. No fixture could see it: every fake world in this tree supplies "
+            + "_heightAt as a plain function, which has no receiver to lose. Both branches are closures "
+            + "now, and a gate row holds the fixture AND the spelling. Spun out of this round and NOT "
+            + "fixed here: chunk-index-unbounded, below.",
+    },
+    {
+        id: "chunk-index-unbounded",
         blocker: "OPEN",
-        what: "simulation/BotPathfinderPool.js builds its snapshot from world._heightAt AND NOTHING ELSE, so anything solid that is not in the heightfield is invisible to the planner -- and to physics/character/terrainWalk.mjs, which reads the same function. Whether main.js's world carries such solids is UNMEASURED.",
-        how: "Reach the scene graph and compare what is in it against what world._heightAt reports underneath it. If props, buildings or kit scatter stand on the terrain without being baked into the height function, then bots plan through them and walk through them, and the fix is a second channel the snapshot builder consults -- not a wider window.",
-        why: "*** THIS SURFACED WHILE MEASURING THE WINDOW AND IS LARGER THAN THE WINDOW. *** v4552 established that the shipped heightfield is 0.18% blocked into one component covering 100% of the map, which is why detours are near zero -- but that is a statement about THE PLANNER'S WORLD, and the planner's world is one function. A probe was written to count building-sized meshes in the scene and it returned zero from a scene it never found: window.fpsShooter's keys are camera, router, world, particles, ollamaLevelGen, kpop, ecsWorld, audio, gravityWarp, spaceSuit, kaijuMode, visionModes, botManager and the game's own counters, with no scene among them. A ZERO FROM A PROBE THAT LOOKED IN THE WRONG PLACE IS NOT A FINDING, and reporting it as one would have been this session's own recurring defect, so it is filed unanswered in either direction.",
-        upstream: "Nothing, but it needs the scene reachable from a headless boot -- tools/ship/engineSceneBot-selfcheck.mjs already boots index.html and reaches window.fpsShooter.botManager, so the route in exists and only the handle is missing. Worth pairing with the question of whether main.js should publish one, which is a decision rather than a gap.",
+        what: "world/chunk.js's index() does no range check, so world.isAir() answers FALSE -- solid rock -- for "
+            + "every y at or above chunkHeight. Rain therefore never falls: it spawns at 65, is told the cell "
+            + "below it is solid, and 'lands' in mid-air on its first step. Hydraulic erosion then carves at "
+            + "that height forever, changing nothing and dirtying a chunk every tick.",
+        how: "The one-line repair is a bounds check in Chunk.index() (or in get/set around it), returning AIR "
+            + "for out-of-range reads and ignoring out-of-range writes. THE ROUND IS NOT THE ONE-LINER. It is "
+            + "finding out what else has been reading undefined and calling it rock -- the same isAir is used "
+            + "by rain, fluid, erosion, AI probes, audio proximity and anything else that asks about space -- "
+            + "and deciding what rain landing correctly does to a world that has never had rain land correctly. "
+            + "Fixing the read without measuring that is a behaviour change disguised as a bug fix.",
+        why: "*** EVERY NUMBER HERE WAS TAKEN IN A HEADLESS BOOT OF index.html, NOT INFERRED FROM THE SOURCE. *** "
+            + "Chunk.index(x, y, z) is `x + size * (z + size * y)` with no guard, over a flat byte array "
+            + "of size * height * size -- the eight-bit typed one, spelt around here ON PURPOSE because "
+            + "vba/runtimeGap.mjs's census strips comments but not STRINGS, and naming the constructor "
+            + "moved that census's typed-arrays row 798 -> 799 in this entry's first draft. That is the "
+            + "FOURTH instance of narrating a pattern re-creating it, and the THIRD is recorded a hundred "
+            + "lines up in this same file, against this same census. "
+            + "size * height * size. At y >= height that index runs off the end; a typed array returns "
+            + "`undefined` for the read and SILENTLY DISCARDS the write. isAir compares undefined against "
+            + "VOXEL.AIR (0), gets false, and reports solid: measured, isAir(0, y, 0) is false at y = 64, 65, "
+            + "69 and 84 on a world whose chunkHeight is 64. Downstream, rainSystem spawns drops at "
+            + "spawnHeight 65 and tests !world.isAir(x, y - 1, z) to detect a hit, so EVERY DROP HITS ON ITS "
+            + "FIRST STEP: 210 spawned, 210 landed, 0 in flight. It then seeds hydraulic erosion at the drop's "
+            + "own y, which is why HydraulicErosion.update was observed making 1,674 carves in one eight-second "
+            + "boot with min, median AND max y all exactly 65 -- every one of them a write the typed array "
+            + "threw away, each setting chunk.dirty = true and re-queueing the droplet at the same cell, so "
+            + "the particle is immortal and the chunk is re-meshed for nothing. The v2 header of "
+            + "hydraulicErosion.js says its whole purpose was fixing a v1 bug where 'the particle stayed at "
+            + "the same cell forever, eroding it tick after tick'; the stuck-detection it added cannot fire "
+            + "here, because from its point of view the erosion is SUCCEEDING every tick.",
+        upstream: "Nothing blocks it. What makes it a round rather than a patch is that the fix turns a system "
+            + "that has never functioned back on: rain that actually falls will reach the ground, feed "
+            + "fluidSystem and seed hydraulic erosion at real surface heights, where the writes are NOT "
+            + "discarded and the terrain will genuinely erode. That is presumably what was intended, but it "
+            + "has never run, and switching it on is a change to how the world evolves rather than a "
+            + "correction to a number. Worth measuring before and after: this round already established that "
+            + "runtime voxel edits are what make the world differ from a deterministic generation, so the "
+            + "repair makes an existing divergence LARGER and more purposeful, not smaller.",
     },
     {
         id: "incremental-sweeps",

@@ -145,7 +145,7 @@ export function reach({ budgetMs = null, timings = null, census = null, root = E
 export const REACH_AT_V4548 = Object.freeze({
     at: "v4548",
     budgetMs: 3000,
-    total: 95,
+    total: 96,
     // *** READ OFF THE INSTRUMENT, NOT PREDICTED. *** The first draft of this record guessed 53/21/19/40 from
     // which gates the round had sped up, and was wrong on three of the four: the comment-strip fix below
     // moved two records the other way at the same time, and a guess cannot see two changes at once.
@@ -159,7 +159,10 @@ export const REACH_AT_V4548 = Object.freeze({
     // v4552: 94 -> 95 records and 51 -> 52 checked. nav/detourScale.mjs's MEASURED_AT_V4552 arrived with a
     // guardian already under budget, so the unchecked ceiling did not move -- which is what adding a record
     // properly looks like, against the 20 in this tree that no gate names at all.
-    checked: 52, overBudget: 23, unguarded: 20, unchecked: 43,
+    // v4554: 95 -> 96 records and 52 -> 53 checked. world/surfaceProbe.mjs's MEASURED_AT_V4553 arrived
+    // with a guardian already under budget, so the unchecked ceiling of 43 did not move -- the second
+    // round running that adding a record properly looks like this rather than like a rise.
+    checked: 53, overBudget: 23, unguarded: 20, unchecked: 43,
     // v4550 -- the UNMEASURED class was split out of over-budget after this gate went red twice inside full
     // sweeps and passed 68 times under load; the trigger was a concurrent REWRITE of sweep-timings.json, not
     // contention. Zero records sit in it on a settled tree, which is the expected reading.

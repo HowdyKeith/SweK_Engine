@@ -289,7 +289,7 @@ export const PROBE_AT_V4536 = Object.freeze({
     // the invariant was never about that. `currentIncludingModule` is the live counterpart of `excluding` --
     // both re-taken, both from the same census -- so the subset check compares like with like and the v4536
     // probe's own numbers stay exactly as they were taken.
-    currentIncludingModule: Object.freeze({ records: 95, withFields: 42, fields: 173 }),
+    currentIncludingModule: Object.freeze({ records: 96, withFields: 43, fields: 176 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -307,7 +307,10 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4552 -- RE-TAKEN: 92/39/151 -> 93/40/153. One record, MEASURED_AT_V4552 in nav/detourScale.mjs,
     // holding what the engine's own terrain says about detours. It arrives GUARDED, which is the shape a
     // record should have and often does not: 20 of the 95 in this tree are named by no gate at all.
-    excluding: Object.freeze({ records: 93, withFields: 40, fields: 153 }),
+    // v4554 -- RE-TAKEN: 93/40/153 -> 94/41/156. One record, MEASURED_AT_V4553 in world/surfaceProbe.mjs,
+    // holding what the terrain model and the voxels say about each other. It arrives GUARDED and under
+    // budget, so recordReach's unchecked ceiling of 43 did not move.
+    excluding: Object.freeze({ records: 94, withFields: 41, fields: 156 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,

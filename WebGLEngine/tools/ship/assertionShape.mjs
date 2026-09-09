@@ -222,8 +222,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // moves none of these -- which is the distinction these nine rows exist to make.
     // v4550 -- RE-TAKEN: one gate (glbConformance) joined, the same four rows by one, FIFTEENTH arrival.
     // v4552 -- RE-TAKEN: one gate (detourScale) joined, the same four rows by one, SIXTEENTH arrival.
-    gates: 1606, usesOk: 1585, definesOk: 1577, importsOk: 0,
-    distinctDefinitions: 38, nameFirst: 1478, condFirst: 91, unknownSignature: 16,
+    // v4554 -- RE-TAKEN: one gate (surfaceProbe) joined, the same four rows by one, SEVENTEENTH arrival.
+    gates: 1607, usesOk: 1586, definesOk: 1578, importsOk: 0,
+    distinctDefinitions: 38, nameFirst: 1479, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([
