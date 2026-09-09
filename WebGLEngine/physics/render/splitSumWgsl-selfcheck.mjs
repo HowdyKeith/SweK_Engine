@@ -164,7 +164,7 @@ async function main() {
     }
 
     console.log(fails ? "\nsplitSumWgsl-selfcheck: " + fails + " FAILED" : "\nsplitSumWgsl-selfcheck: all checks pass");
-    console.log("unchecked here: a real cubemap capture and a baked mip chain -- this grades the SHADER's numbers against the CPU reference, not a scene rendered through it. Nothing in the live renderer calls this yet.");
+    console.log("unchecked here: this file grades the SHADER's numbers against the CPU reference, not a baked cubemap -- physics/render/specularProbeBake-selfcheck.mjs is the one that bakes and verifies a real mip chain (CPU-side). Nothing in the live renderer calls either yet.");
     process.exit(fails ? 1 : 0);
 }
 
