@@ -236,8 +236,13 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // is a thirty-ninth distinct text rather than a thirty-eighth copy. Worth a line: this row is the one
     // that would notice a tree drifting toward everybody inventing their own assertion helper, and every
     // previous arrival had reused one.
-    gates: 1615, usesOk: 1594, definesOk: 1586, importsOk: 0,
-    distinctDefinitions: 39, nameFirst: 1487, condFirst: 91, unknownSignature: 16,
+    // v4569 -- RE-TAKEN: one gate (exactHash) joined, the same four rows by one, TWENTY-SIXTH arrival --
+    // and distinctDefinitions moved AGAIN, 39 -> 40, for the second round running after ten that did not.
+    // The new gate spells `ok(n, c, d = "")` where v4566's spelled `(name, cond, detail = "")`: same shape,
+    // different parameter names, so it is a fortieth distinct text. Two in a row is worth watching -- this
+    // row exists to notice a tree drifting toward everybody inventing their own assertion helper.
+    gates: 1616, usesOk: 1595, definesOk: 1587, importsOk: 0,
+    distinctDefinitions: 40, nameFirst: 1488, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

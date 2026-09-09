@@ -3764,6 +3764,39 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    // v4569 -- the 217th closing, and the first ENGINE round after five on the sweep itself.
+    since217: Object.freeze({
+        at: "v4569", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/exactHash-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/grassField-selfcheck.mjs"]),
+        verdict: "green, seventeen rows. *** fract(sin(dot(p,K))*43758.5453) IS NOT AN APPROXIMATION OF A " +
+                 "RANDOM NUMBER, IT IS A DIFFERENT ONE IN float32 THAN IN float64 *** -- sin(x)*43758 " +
+                 "amplifies the last bits of x by four orders of magnitude. The backlog filed this as 29 " +
+                 "files; the real population is 16 shipped ones, and the census that found them was itself " +
+                 "wrong twice first (codeOnly said 2, because a shader in a template literal is not " +
+                 "JavaScript to a JS comment stripper -- the exemption commentFalsePass documents). *** AND " +
+                 "10 OF THE 16 HAVE NO GATE AT ALL, so replacing the hash there would change what they draw " +
+                 "with nothing to verify it. *** The round is therefore NOT the filed one: it is the files " +
+                 "where BOTH halves exist and disagree. TWO FIXED. render/grassField.js against " +
+                 "render/grassModel.mjs, whose bladeHash decides `if (bladeHash < slopeSuppress) drawn = " +
+                 "false` -- 65.0% of 32,000 blade origins differed by more than 0.1, worst 1.0000, and THE " +
+                 "DRAWN DECISION FLIPPED ON 65.4%: a model wrong about two thirds of the grass, unnoticed " +
+                 "because its gate checked a different hash. fx/wormhole/wormholeNebula.js carried h2 THREE " +
+                 "TIMES in one file -- JS, GLSL and WGSL, two of them float32 -- at 70.0% of 14,400 lattice " +
+                 "points. Both read 0.0% after, worst delta exactly 0. THREE MORE ARE CPU-ONLY (no shader " +
+                 "counterpart, so no divergence) and TWO ARE INSTRUMENTS that compute both precisions ON " +
+                 "PURPOSE to measure the gap -- fx/paintFields.mjs and physics/kernelVerdict-selfcheck.mjs " +
+                 "-- and rewriting those would have deleted the measurement. The grass fix reuses windHash, " +
+                 "already in scope and already twinned, rather than adding a hash; render/exactHash.mjs is " +
+                 "the shared home for the rest and is tied to v4558's proven bcsHash by a row (seed 0 is " +
+                 "bit-identical on 6,000 points). FOUR OF MY OWN ROWS COULD NOT FAIL AND SABOTAGE FOUND " +
+                 "EACH: one compared windHash to windHash instead of going through bladeVisibility, so " +
+                 "reverting the model left it green; one claimed exactness for ANY input when the honest " +
+                 "claim is exact on the lattice and 0.95% at quantise boundaries; one demanded three " +
+                 "languages share a constant ORDER; and one would have passed VACUOUSLY through codeOnly, " +
+                 "which deletes shader text. Sabotages U/V/W/X and R/S/T red by name.",
+    }),
     // v4567 -- the 216th closing, and it adds NO gate: it widens the one v4566 added, so the register grows
     // by a verdict rather than by a name. Kept as its own entry because the round is a separate measurement.
     since216: Object.freeze({

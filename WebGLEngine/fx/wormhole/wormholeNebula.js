@@ -21,9 +21,24 @@ import { swirlOffset } from "../vorton/vortonNebula.js";
 // shader whose output is under test.
 import { DITHER_GLSL, DITHER_WGSL } from "../dither.js";
 
+import { exactHash2, EXACT_HASH_GLSL, EXACT_HASH_WGSL } from "../../render/exactHash.mjs";
+
 const STEPS = 160, DS = 0.14;
 // --- compact nebula sky (shared math) ---
-function h2(x, y) { const h = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return h - Math.floor(h); }
+// *** v4569 -- THE SAME FUNCTION EXISTED THREE TIMES HERE AND TWO OF THEM DREW A DIFFERENT NUMBER. ***
+// h2 was fract(sin(p.x*127.1 + p.y*311.7) * 43758.5453) in JS, in the GLSL below and in the WGSL below that
+// -- one function, three languages, and the JS one runs in float64 while both shaders run in float32.
+// sin(x) * 43758 amplifies the last bits of x by four orders of magnitude, so those are not the same number
+// rounded differently, they are unrelated numbers. v4558 measured the identical construction at 79.4% of
+// 20,000 samples diverging by more than 0.1, worst pair 0.9960 against 0.0000.
+//
+// h2 feeds vn, which feeds fbm3, which IS the nebula -- so the CPU path and either GPU path painted
+// different skies from the same seed, and nothing compared them.
+//
+// exactHash2 quantises to a 1/256 lattice and runs an integer avalanche; integer arithmetic is exact in both
+// precisions. render/exactHash.mjs holds the one definition and the two shader texts, so the three cannot
+// drift apart again by being edited separately.
+const h2 = (x, y) => exactHash2(x, y);
 function vn(x, y) { const ix = Math.floor(x), iy = Math.floor(y), fx = x - ix, fy = y - iy, ux = fx * fx * (3 - 2 * fx), uy = fy * fy * (3 - 2 * fy);
     const a = h2(ix, iy), b = h2(ix + 1, iy), c = h2(ix, iy + 1), d = h2(ix + 1, iy + 1); return a * (1 - ux) * (1 - uy) + b * ux * (1 - uy) + c * (1 - ux) * uy + d * ux * uy; }
 function fbm3(x, y) { return 0.5 * vn(x, y) + 0.25 * vn(x * 2 + 1.3, y * 2 + 7.1) + 0.125 * vn(x * 4 + 2.7, y * 4 - 3.3); }
@@ -85,7 +100,8 @@ out vec4 o; uniform vec2 uRes; uniform float uK,uA,uCamL,uMaxPsi,uSig2,uGain,uCa
 // stage transform is not the place to do that silently.
 uniform float uDitherLevels;${DITHER_GLSL}
 const int STEPS=${STEPS}; const float DS=${DS};
-float h2(vec2 p){ return fract(sin(p.x*127.1+p.y*311.7)*43758.5453); }
+${EXACT_HASH_GLSL}
+float h2(vec2 p){ return exact_hash(p, 0u); }
 float vn(vec2 p){ vec2 ip=floor(p),f=p-ip,u=f*f*(3.0-2.0*f); float a=h2(ip),b=h2(ip+vec2(1,0)),c=h2(ip+vec2(0,1)),d=h2(ip+vec2(1,1));
   return a*(1.0-u.x)*(1.0-u.y)+b*u.x*(1.0-u.y)+c*(1.0-u.x)*u.y+d*u.x*u.y; }
 float fbm3(vec2 p){ return 0.5*vn(p)+0.25*vn(p*2.0+vec2(1.3,7.1))+0.125*vn(p*4.0+vec2(2.7,-3.3)); }
@@ -119,7 +135,8 @@ struct U { res:vec2f, k:f32, a:f32, camL:f32, maxPsi:f32, sig2:f32, gain:f32, ca
 // (No backticks in this comment on purpose -- it lives INSIDE a template literal, and a stray one ends it.)
 ${DITHER_WGSL}
 const STEPS:i32=${STEPS}; const DS:f32=${DS};
-fn h2(p:vec2f)->f32{ return fract(sin(p.x*127.1+p.y*311.7)*43758.5453); }
+${EXACT_HASH_WGSL}
+fn h2(p:vec2f)->f32{ return exact_hash(p, 0u); }
 fn vn(p:vec2f)->f32{ let ip=floor(p); let f=p-ip; let uu=f*f*(3.0-2.0*f);
   let a=h2(ip); let b=h2(ip+vec2f(1,0)); let c=h2(ip+vec2f(0,1)); let d=h2(ip+vec2f(1,1));
   return a*(1.0-uu.x)*(1.0-uu.y)+b*uu.x*(1.0-uu.y)+c*(1.0-uu.x)*uu.y+d*uu.x*uu.y; }
