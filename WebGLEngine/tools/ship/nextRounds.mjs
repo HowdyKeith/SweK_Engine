@@ -207,6 +207,15 @@ export const NEXT_ROUNDS = [
         why: "Confirmed by direct quote from text/slugText.js's own header, not inferred: \"Full shaping (GSUB ligatures, marks, bidi, Indic reordering) is a separate problem and is not pretended at here: this is Latin advance-width layout.\" A real, self-acknowledged gap, not a redundant read.",
         upstream: "no established want yet -- nothing in this tree currently needs complex-script text (ligatures, bidi, Indic reordering); logged so the read is not re-derived later.",
     },
+    // ---- v4558: a BinomialLLC org sweep landed on the tree's own basis/KTX2 vendor rather than on a new dependency.
+    {
+        id: "basis-transcoder-r160-stale",
+        blocker: "OPEN",
+        what: "vendor/three/jsm/libs/basis/{basis_transcoder.js,wasm} -- the BinomialLLC/basis_universal WASM transcoder KTX2Loader.js needs, vendored from three.js r160 (recorded at v4475) -- is internally consistent with the rest of vendor/three (also r160, verified byte-identical by tools/ship/gltfKtx2-selfcheck.mjs) but stale against three.js's OWN current build of the same file.",
+        how: "Diffed the vendored pair directly against https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/jsm/libs/basis/: NOT a no-op reformat. basis_transcoder.js shrank 62,337 -> 57,529 bytes and switched to a newer Emscripten output style (`function(moduleArg = {})` against the vendored `function(BASIS) { BASIS = BASIS || {} }`); basis_transcoder.wasm grew 499,935 -> 527,333 bytes. Three.js has rebuilt this transcoder from a newer Basis Universal snapshot at least once since r160.",
+        why: "Same shape as the three-webgpu pin this arc already moved (r178 -> 0.185.1, tools/ship/three-probe.json), one repo over: vendor/three's r160 pin is old enough that even a bundled, opaque BUILD ARTIFACT beside it has since been rebuilt upstream. NOT MEASURED YET: whether the older transcoder still correctly decodes every KTX2/.basis variant this tree's assets use -- gltfKtx2-selfcheck.mjs verifies wiring (transcoder fetched only when needed, backend detection, base-path resolution) and byte-identity to the r160 snapshot, not WASM-level decode correctness against a current file, so nothing here says the old build is actually BROKEN, only older than what upstream ships today.",
+        upstream: "a decision on vendor/three's own r160 pin (main.js's WebGL2 three.js, separate from vendor/three-webgpu) -- moving just the basis transcoder without moving vendor/three itself would recreate the exact kind of undeclared internal mismatch world/vendoredLicences.mjs and gltfKtx2-selfcheck.mjs both exist to catch. Nothing currently forces this: no gate is red over it and no asset has failed to load.",
+    },
 ];
 
 // *** v4549 -- THIS REPORT WAS HIDING THREE OF ITS OWN OPEN ITEMS, AND HAD BEEN FOR SEVERAL ROUNDS. ***
