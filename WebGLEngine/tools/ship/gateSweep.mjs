@@ -3767,6 +3767,36 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since209: Object.freeze({
+        at: "v4550", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/temporalAccumulate-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 1.38 s (1387/1356/1389 over three serial runs, under the 3000 ms sweep budget). THE FIRST " +
+                 "RUNG OF THIS ARC THAT MAKES A PICTURE, and the first that can test the claim the others rest on: " +
+                 "render/jitter-selfcheck.mjs can say the Halton sequence is low-discrepancy, but that the " +
+                 "accumulation CONVERGES TO A SUPER-SAMPLED RESULT is a claim about an image and nothing here blended " +
+                 "a history buffer. MEASURED against a 256-sample-per-pixel analytic ground truth: rms falls 0.05819 " +
+                 "-> 0.01653 (8 frames) -> 0.01041 (32), which is 5.4x better than the single point-sampled frame's " +
+                 "0.05675 -- and with the JITTER OFF the same accumulation reads 0.05675 at every one of 64 frames, " +
+                 "identical to one frame, so the jitter does the work and not the blend. The period is the phase " +
+                 "count (frames 32 and 64 agree to 2.8e-7 of the error). The anti-ghosting clamp costs 1.2% of " +
+                 "convergence on a static scene, and stops a ghost on 2,304 of 2,304 pixels down to 322 -- the edge " +
+                 "pixels, where the current frame's own 3x3 spans the range and the ghost is a value that could " +
+                 "legitimately be there. A HYPOTHESIS THAT DID NOT SURVIVE, recorded so it is not guessed again: the " +
+                 "residual is NOT v4549's off-centre bias -- 63 phases reaches 0.00489 at an offset of 1.4e-2 while " +
+                 "127 reaches 0.00553 at half that offset, so it is QMC sampling error on a hard edge and a phase " +
+                 "count picked by the offset would be picked wrong. TEMPORAL ANTI-ALIASING, NOT UPSCALING, and said " +
+                 "so: at ratio 1 the samples and the output share a grid; above 1 the jitter-aware Lanczos2 upsample " +
+                 "is its own piece. Seven sabotages red at 2/3/2/1/2/6/1 -- TWO OF THEM 0-RED FIRST and recorded as " +
+                 "findings: a nearest-instead-of-bilinear history fetch was invisible because every convergence row " +
+                 "holds the camera still (so the reprojection lands on a texel centre) and a change made to both " +
+                 "sides leaves the parity row agreeing; and a WGSL-only swap of the clamp's source was invisible " +
+                 "because the parity history was nearly the current frame. Both gaps were the same shape -- a " +
+                 "property that only shows under conditions no row arranged -- and both now have a row.",
+    }),
     since208: Object.freeze({
         at: "v4549", swept: 1, green: 1, red: 0,
         added: Object.freeze([
