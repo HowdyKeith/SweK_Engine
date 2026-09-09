@@ -3767,6 +3767,35 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since207: Object.freeze({
+        at: "v4548", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/motionVectors-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 0.75 s (750/747/741 over three serial runs, well under the 3000 ms sweep budget). PER-PIXEL " +
+                 "MOTION VECTORS and the previous-frame view-projection to make them from -- the prerequisite rung " +
+                 "fx/fsr's gate named when it said the temporal path cannot start here, and useful without it, since " +
+                 "a velocity buffer is what temporal AA, motion blur and any reprojection want. render/motionVectors.mjs " +
+                 "holds the history and the CPU reference, render/motionVectorsWgsl.mjs the WGSL, and it runs on a real " +
+                 "WebGPU device through gfx/device.js. MEASURED: a STATIC camera gives zero on every pixel to 8.1e-9 on " +
+                 "the CPU and 2.4e-5 of a PIXEL on the device, under BOTH clip conventions (GL's z in [-1,1] and " +
+                 "WebGPU's [0,1]), which is what makes the module's claim to be agnostic in z a measurement rather than " +
+                 "prose; a known camera move gives what an INDEPENDENT projection of the same point computes, to six " +
+                 "decimals, by a different path; PARALLAX goes as 1/distance with |velocity| * distance constant to " +
+                 "9.8e-4% across a 64x range; and a surface behind the previous eye comes back INVALID rather than " +
+                 "plausibly zero. The device parity bound is stated in PIXELS (2.4e-4 px) and not in fx/fsr's 1e-6: an " +
+                 "unprojection through an inverse matrix followed by a difference of nearly-equal uv values is " +
+                 "catastrophic cancellation by construction, and 1e-6 was a number copied from a better-conditioned " +
+                 "problem. The first frame has NO history and says so -- advance() returns null, because zero velocity " +
+                 "and no velocity are different answers and a temporal pass believes the first. Seven sabotages red at " +
+                 "5/2/2/6/1/1/2, none 0-RED; ignoring depth leaves both static-camera rows GREEN and is caught only by " +
+                 "the parallax row, which is why that row exists. Unchecked: a MOVING OBJECT (every row moves the camera " +
+                 "and holds the world still, so a per-object previous model matrix is its own rung), reading the depth " +
+                 "through dev.depthTexture() rather than handing it in, the JITTERED projection which is the third " +
+                 "prerequisite, and DISOCCLUSION, which `valid` does not catch.",
+    }),
     since206: Object.freeze({
         at: "v4546", swept: 1, green: 1, red: 0,
         added: Object.freeze([
