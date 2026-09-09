@@ -16,7 +16,8 @@
 // A gate that only measured the first would call a sphere perfectly unwrapped.
 import fs from "node:fs";
 import { weld, charts, lscm, distortion, unwrapCurved, triNormal,
-         selfOverlaps, mergeCharts, splitOverlapping, orientChart, rasterPack, unwrapToMesh } from "./uvLscm.mjs";
+         selfOverlaps, mergeCharts, splitOverlapping, orientChart, rasterPack, unwrapToMesh,
+         chartArea, equaliseChartScale, chartBox, halveChart, cutWideCharts, nestShapes } from "./uvLscm.mjs";
 import { writeSceneGlb } from "../../tools/export/sceneGlb.mjs";
 import { parseGLB, sphereMesh } from "./glb.mjs";
 import { rectsOverlap } from "./uvUnwrap.mjs";
@@ -499,6 +500,59 @@ console.log("\n10. *** PACK THE CHART, NOT ITS BOX ***");
             if (!o) { shape = false; break; }
             worstDelta = Math.max(worstDelta, Math.abs(uv[0] - o[0]), Math.abs(uv[1] - o[1])); compared++; }
     }
+    // *** EVERY CHART ARRIVED AT WHATEVER SCALE ITS OWN SOLVE LEFT IT AT, AND SIX ROUNDS OF THIS FILE DID
+    // NOT ASK. *** LSCM fixes a chart up to a SIMILARITY, so the scale that comes out belongs to the two
+    // vertices the solver pinned and not to the surface. Both numbers below are free: the spread is
+    // measured inside unwrapCurved before it corrects anything, and the corrected state is read off the
+    // charts this section already holds.
+    {
+        const sp = R.scaleSpread;
+        ok("!! *** THE SOLVE HANDS OUT TEXTURE IN A 34x RANGE, AND THE FIX IS A SCALE PER CHART ***",
+           sp && sp.ratio > 20 && sp.p90 / sp.p10 > 1.4,
+           `UV area per unit surface across the ${R.chartCount} charts as SOLVED: ${sp.min.toExponential(2)} ` +
+           `to ${sp.max.toExponential(2)}, a factor of ${sp.ratio.toFixed(1)}, p90/p10 ${(sp.p90 / sp.p10).toFixed(2)}. ` +
+           "The small fixtures hide this entirely -- their charts are near-copies and span 1.2x to 1.4x -- " +
+           "which is why nothing here saw it until the reference oracle asked what the worst-served tenth of " +
+           "the mesh gets. Measured through tools/mesh/xatlasRef.mjs on this asset: densityP10 3.94e+1 -> " +
+           "7.20e+1 (+83%), p10/median 0.631 -> 0.980, stretchP90 1.178 -> 1.018, and coverage 37.2% -> 41.1%.");
+        let lo = Infinity, hi = 0, counted = 0;
+        for (const c of R.charts) { const d = chartArea(R.weld.positions, c).density;
+            if (d > 0) { lo = Math.min(lo, d); hi = Math.max(hi, d); counted++; } }
+        // *** THE POPULATION IS ASSERTED BESIDE THE SPREAD. *** Written first as `hi / lo < 1.0001` alone,
+        // which is TRUE OF NO CHARTS AT ALL: a sabotage that emptied the atlas passed this row while
+        // reddening seven others. A ratio over an empty set is the same vacuity a containment check has
+        // when nothing is drawn.
+        ok("!! ...and after the correction every chart is at ONE density, which is what makes it a fix",
+           counted === R.chartCount && counted > 100 && hi / lo < 1.0001,
+           `${lo.toExponential(4)} to ${hi.toExponential(4)}, a spread of ${(hi / lo).toFixed(6)}x across ` +
+           `${counted} charts of ${R.chartCount}. A uniform scale of a conformal map is still conformal, so this costs ` +
+           "nothing any distortion number can measure -- it changes only who gets the texture.");
+    }
+
+    // *** AND THE SAME QUESTION ASKED OF THE NESTING PACKER ON THE REAL ASSET, WHERE THE ANSWER WAS NO. ***
+    // The row below tests the SHELF packer on a sphere, and v4560 wrote a module comment claiming repack
+    // equivalence in general. It was not true of the nest packer: repacking RobotExpressive's own charts
+    // moved the pad 1 -> 2 and lost 14.1% of the atlas (40.8% -> 35.1%), because the occupancy mask was
+    // built on a cell of W/mw while the skyline reserved a cell of `cell` -- conservativeMask takes a
+    // cellSize for exactly this reason, rasterPack passes it, and the closure that built the shapes took two
+    // parameters and dropped it. The whole of v4536's fix existed in its own comment. Costs 3 ms: the point
+    // of `from` is that a repack is not a re-solve.
+    {
+        const again = unwrapCurved(glb.positions, glb.indices, { from: R });
+        const area = (r) => { let a = 0;
+            for (const c of r.charts) for (const T of c.tris) {
+                const p = c.uv.get(T[0]), q = c.uv.get(T[1]), d = c.uv.get(T[2]);
+                a += Math.abs((q[0] - p[0]) * (d[1] - p[1]) - (q[1] - p[1]) * (d[0] - p[0])) / 2; }
+            return a; };
+        const a0 = area(R), a1 = area(again);
+        ok("!! *** REPACKING THE ROBOT'S OWN CHARTS REPRODUCES THE ATLAS, PAD AND ALL ***",
+           again.padCells === R.padCells && again.chartCount === R.chartCount && Math.abs(a1 - a0) < 1e-12,
+           `pad ${R.padCells} -> ${again.padCells}, ${R.chartCount} charts both times, atlas area ` +
+           `${a0.toFixed(6)} -> ${a1.toFixed(6)}. Before v4561 this was pad 1 -> 2 and 40.8% -> 35.1% of the ` +
+           "square, and NOTHING in the tree asked -- the packer is verified for collisions and its result " +
+           "was never compared with itself.");
+    }
+
     ok("!! *** REPACKING A SOLVE AGREES WITH SOLVING AGAIN TO ONE ULP, WHICH IS NOT THE SAME AS EXACTLY ***",
        shape && compared > 0 && worstDelta < 1e-15,
        `${full.charts.length} charts, ${compared} UVs compared, worst coordinate difference ` +

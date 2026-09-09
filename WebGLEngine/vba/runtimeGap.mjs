@@ -340,7 +340,11 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // two these use was among them. Widened above; the row goes 798 -> 1031 on the same tree, 233 files it had
     // never counted. THE OTHER ELEVEN ROWS ARE UNAFFECTED by that widening, which is what says it is this row's
     // definition rather than the census's population that moved, and threads still rank 12 of 12.
-    esModules: 3751, closures: 3628, asyncAwait: 1420, typedArrays: 1031, promises: 347,
+    // v4561 -- RE-TAKEN: no new files, ONE row moved by one. tools/mesh/xatlasRef-selfcheck.mjs gained a
+    // fixture built on a 64-bit float array, and that row now counts the 64-bit float array because v4560
+    // widened it. A census that had been re-taken for ninety rounds moving for a NEW reason one round after
+    // the definition was corrected is the definition doing its job.
+    esModules: 3751, closures: 3628, asyncAwait: 1420, typedArrays: 1032, promises: 347,
     fetchXhr: 243, performanceNow: 220, raf: 116, webgl: 141, webgpu: 48, threads: 22, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
