@@ -14,7 +14,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
 import { validateWgsl } from "../../render/wgslSpec.mjs";
-import { transplantFragment, uniformFields, textureNames, devicePipelineFromTsl, unreadUnlabelledUniforms, TRI_VS_WGSL } from "../../render/tslSource.mjs";
+import { transplantFragment, uniformFields, textureNames, devicePipelineFromTsl, unreadUnlabelledUniforms, foldableConstants, TRI_VS_WGSL } from "../../render/tslSource.mjs";
 import { KNOB_ORDER } from "../../render/badTvWgsl.mjs";
 import { keyCpu } from "../../render/blackbodyTsl.mjs";
 
@@ -50,6 +50,15 @@ console.log("\n1. THE TRANSPLANT ON THE CPU: three's names become the device's, 
     ok("REFUSED: an unlabelled texture, a camera matrix in the fragment, a fragment with no varying, a text that is not three's", throwsWith(() => textureNames(W_FIX(undefined, "nodeUniform0"), "wgsl"), /UNLABELLED texture/) && throwsWith(() => transplantFragment(W_FIX(undefined, undefined, undefined, "\n\tnodeVar0 = render.cameraProjectionMatrix[0];"), "wgsl"), /camera or object matrices/) && throwsWith(() => transplantFragment(W_FIX().replace(AT + "location( 3 ) nodeVarying3 : vec2<f32>", ""), "wgsl"), /exactly one vec2 varying/) && throwsWith(() => transplantFragment(AT + "fragment fn fs() {}", "wgsl"), /not a three\.js/));
     ok("REFUSED: the two builders disagreeing about the uniforms or the textures", throwsWith(() => devicePipelineFromTsl({ wgsl: W_FIX("\ttime : f32"), glsl: G_FIX() }), /different uniform lists/) && throwsWith(() => devicePipelineFromTsl({ wgsl: W_FIX(undefined, "tOther"), glsl: G_FIX() }), /different textures/));
     ok("  a type the device does not carry is refused, not guessed", throwsWith(() => uniformFields(W_FIX("\ttime : mat3x3<f32>"), "wgsl"), /which the device's uniform list does not carry/));
+    // v4540: the fold's `labelled` guard, given teeth of its own. Sabotage P -- dropping that guard -- went 0-RED
+    // through the whole gate, because CONST_LITERAL carries only bool/int/uint and every knob in every graph here is
+    // a float, so nothing the guard protects was reachable. It is redundant TODAY and load-bearing the moment a float
+    // joins that table, which is exactly the kind of protection that quietly stops working. So it is checked directly,
+    // against a state built here rather than one three happened to emit.
+    const fakeState = (rows) => ({ bindings: [{ name: "object", bindings: [{ isUniformBuffer: true, uniforms: rows.map((r) => ({ name: r.name, getType: () => r.nodeType, nodeUniform: { node: { name: r.label || "", value: r.value } } })) }] }] });
+    const folds = foldableConstants(fakeState([{ name: "mine", nodeType: "uint", label: "mine", value: true }, { name: "nodeUniform6", nodeType: "uint", value: true }, { name: "nodeUniform7", nodeType: "float", value: 0.5 }]));
+    ok("  the fold takes ONLY what three allocated for itself: a LABELLED uint is left alone (the caller drives it), an unlabelled uint is folded, an unlabelled float is not (bool/int/uint only, on purpose)", folds.map((f) => f.name + "=" + f.literal).join() === "nodeUniform6=1u", folds.map((f) => f.name + "=" + f.literal).join() || "nothing folded");
+    ok("  and a value that is not a whole number is refused a literal rather than rounded into one", foldableConstants(fakeState([{ name: "nodeUniform6", nodeType: "uint", value: 1.5 }])).length === 0);
 }
 
 console.log("\n2. ON BOTH BACKENDS: emitted by three, transplanted, run by gfx/device.js -- and the picture is the hand-written pair's, to the byte");
@@ -105,9 +114,12 @@ else {
             const k = keyCpu(5);
             ok(`  ${b}: the blackbody graph transplants too -- the brightest column is Wien's x_lambda within a column (${o.bin.toFixed(3)}), the root in the blue byte (${k.blueByte})`, Math.abs(o.bbPeakX - k.root) <= o.bin && o.bbPeak > 0.995 && Math.abs(o.bbBlue - k.blueByte) <= 1, `peak x ${o.bbPeakX.toFixed(4)}, blue ${o.bbBlue}`); }
         // write the emitted pair down for the corpus
-        const rec = { at: "v4320", three: "0.178.0", note: "emitted by three's node builders from render/badTvTsl.mjs and render/blackbodyTsl.mjs, transplanted by render/tslSource.mjs; rewritten by tools/ship/tslSource-selfcheck.mjs on every run", ...R.emitted };
+        // v4540: the version was DECLARED here as "0.178.0" and went on being written into an r184 artifact. It is read
+        // out of the emitted text instead -- three prints its own revision at the top of every shader it builds.
+        const three = (R.emitted.badTv.wgsl.match(/Three\.js (r\d+)/) || [])[1] || "unknown";
+        const rec = { at: "v4540", three, note: "emitted by three's node builders from render/badTvTsl.mjs and render/blackbodyTsl.mjs, transplanted by render/tslSource.mjs; rewritten by tools/ship/tslSource-selfcheck.mjs on every run", ...R.emitted };
         fs.writeFileSync(EMITTED, JSON.stringify(rec, null, 1));
-        ok("the emitted and transplanted pair is written to tools/ship/tsl-emitted.json, for the WGSL corpus to compile as generated code", fs.existsSync(EMITTED) && JSON.parse(fs.readFileSync(EMITTED, "utf8")).badTv.transplanted.wgsl.length > 1000);
+        ok(`the emitted and transplanted pair is written to tools/ship/tsl-emitted.json, for the WGSL corpus to compile as generated code -- stamped with the revision READ OUT of the shader three printed (${three}), not one typed here`, fs.existsSync(EMITTED) && JSON.parse(fs.readFileSync(EMITTED, "utf8")).badTv.transplanted.wgsl.length > 1000 && /^r\d+$/.test(three) && JSON.parse(fs.readFileSync(EMITTED, "utf8")).three === three);
         report(`emitted WGSL ${R.emitted.badTv.wgsl.length} chars -> transplanted ${R.emitted.badTv.transplanted.wgsl.length}; GLSL ${R.emitted.badTv.glsl.length} -> ${R.emitted.badTv.transplanted.glsl.length}`);
     }
 }
@@ -123,7 +135,8 @@ else {
         for (const mode of ["webgpu", "webgl2"]) {
             const canvas = document.createElement("canvas"); canvas.width = N; canvas.height = N;
             const renderer = new THREE.WebGPURenderer({ canvas, forceWebGL: mode === "webgl2", antialias: false }); await renderer.init();
-            const tex = B.sourceTexture(THREE, { pixels: src, width: N, height: N }); tex.magFilter = THREE.LinearFilter; tex.minFilter = THREE.LinearFilter; tex.needsUpdate = true;
+            const tex = B.sourceTexture(THREE, { pixels: src, width: N, height: N }); tex.magFilter = THREE.LinearFilter; tex.minFilter = THREE.LinearFilter;
+            tex.needsUpdate = true;
             const fx = B.makeBadTvTsl(THREE, T, { texture: tex }); fx.setKnobs({ time: a.TIME });
             const rt = new THREE.RenderTarget(N, N, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter }); renderer.setRenderTarget(rt);
             emitted[mode] = await S.emitShaders(renderer, { scene: fx.scene, camera: fx.camera, mesh: fx.scene.children[0] });
@@ -157,7 +170,22 @@ else {
         ok("with a LinearFilter texture three emits textureSample through a sampler (nearest it read with textureLoad), and the transplant declares the device's `samp` for it", R.samplerInWgsl && R.usesSampler && R.declaresSamp);
         for (const b of ["webgpu", "webgl2"]) { const o = R.run[b]; if (o.error) { ok(`${b} ran`, false, o.error); continue; }
             ok(`*** ${b}: linear sampling through the generated pipeline is the hand-written linear pass on EVERY pixel (${o.same} of ${o.total}, worst 0) -- and the picture really is blended (a checkerboard's blue lands between its two values) ***`, o.backend === b && o.same === o.total && o.worst === 0 && o.blended > o.total * 0.2 && o.errs.length === 0, `${o.same}/${o.total}, worst ${o.worst}, ${o.blended} blended`);
-            ok(`  ${b}: and three's own linear render, row-mirrored, agrees with the device to a byte or so (two samplers, one filter)`, o.worstThree <= 2 && o.sameThree > o.total * 0.9, `${o.sameThree}/${o.total} identical, worst ${o.worstThree}`); }
+            // *** THIS ROW IS RED ON WEBGL2 AT v4540 AND THE FAULT IS gfx/device.js's, NOT THE TRANSPLANT'S. ***
+            // MEASURED, three vs three, no device involved: three's two backends agree with EACH OTHER on every pixel
+            // for the same wrap mode (repeat vs repeat 4096/4096 worst 0; clamp vs clamp 4096/4096 worst 0). three is
+            // consistent. The device is not -- gfx/device.js hard-codes OPPOSITE address modes on its two backends,
+            // with no way for a caller to say which:
+            //     gfx/device.js:482  (WebGPU)  createSampler({ ..., addressModeU: "repeat", addressModeV: "repeat" })
+            //     gfx/device.js:275  (WebGL2)  texParameteri(TEXTURE_WRAP_S/T, CLAMP_TO_EDGE)
+            // so the same dev.texture() samples differently on the two backends at every seam. The difference is
+            // exactly the seam and nothing else: row 9 entire (64 pixels, the v where the effect's fract() wraps) plus
+            // one pixel in each of 55 other rows (the u seam), worst 127 of 255.
+            // THERE IS NO WRAP SETTING THAT MAKES BOTH BACKENDS GREEN -- three at Repeat matches the WebGPU device and
+            // fails WebGL2; three at ClampToEdge matches WebGL2 and fails WebGPU. Measured both ways. So the row asserts
+            // what is TRUE (every pixel, both backends) and stays red until gfx/device.js picks one address mode or
+            // lets the caller name it. Choosing a wrap here to get green would have hidden an engine defect behind a
+            // fixture setting, which is the opposite of what this gate is for.
+            ok(`  ${b}: and three's own linear render, row-mirrored, agrees with the device on EVERY pixel (two samplers, one filter -- and, when gfx/device.js stops contradicting itself, one address mode)`, o.worstThree === 0 && o.sameThree === o.total, `${o.sameThree}/${o.total} identical, worst ${o.worstThree}`); }
     }
 }
 
@@ -191,6 +219,15 @@ else {
                     rec.stateFields = Object.keys(st);
                     rec.keptByDebugHook = Object.keys(await renderer.debug.getShaderAsync(fx.scene, fx.camera, mesh));
                     rec.all = S.bindingsFromState(st); rec.state = S.deviceUniformsFromState(st);
+                    rec.folded = em.folded; rec.foldError = em.foldError; rec.fragment = em.fragment;
+                    // the independent check: parse the TRANSPLANTED shader and confirm nothing it assigns is undeclared.
+                    // transplantFragment asserts this against the SOURCE's declarations; this asserts it against what
+                    // actually came out, so a declaration that was found and then not emitted is caught too.
+                    const code = S.transplantFragment(em.fragment, em.language).code;
+                    const entry = em.language === "wgsl" ? code.split("fn fs(")[1] : code.split("void main()")[1];
+                    const declared = new Set([...code.matchAll(em.language === "wgsl" ? /\b(?:var<private>|var)\s+(\w+)\s*:/g : /^\s*(?:uniform\s+|in\s+|out\s+)?\w+\s+(\w+)\s*(?:;|=)/gm)].map((m) => m[1]));
+                    rec.undeclared = [...new Set([...entry.matchAll(/^\s*(\w+)\s*=[^=]/gm)].map((m) => m[1]))].filter((n) => !declared.has(n));
+                    rec.carried = S.carriedDeclarations(em.fragment, em.language, entry).length;
                 } catch (e) { rec.error = String(e && e.message || e).slice(0, 400); }
                 out[mode + ":" + name] = rec;
             }
@@ -219,11 +256,20 @@ else {
            disagree.length === 0 && K.some((k) => R[k].all.uniforms.some((u) => !u.labelled)), disagree.join(", ") || "no disagreement; " + K.flatMap((k) => R[k].all.uniforms.filter((u) => !u.labelled).map((u) => k.split(":")[1] + "/" + u.name)).join(","));
         report("and the NUMBER in that stringification is not stable either: the same object matrix is " + R["webgpu:badTv"].all.uniforms.filter((u) => !u.labelled).map((u) => u.name).join("/") +
                " in WGSL and " + R["webgl2:badTv"].all.uniforms.filter((u) => !u.labelled && u.nodeType === "mat4").map((u) => u.name).join("/") + " in GLSL");
-        // the one refusal, NAMED rather than glossed: the state says WHY, and "label your uniform" was the wrong advice
-        const refused = K.filter((k) => R[k].textRefused);
-        ok(`the one case the text reader refuses (${refused.join(", ") || "none"}) is refused for a reason the state can NAME: a uniform three allocated for ITSELF (unlabelled -- nobody can label it) whose node type gfx/device.js cannot pack`,
-           refused.length === 1 && refused[0] === "webgl2:badTv" && R[refused[0]].all.uniforms.some((u) => !u.labelled && u.type === null && u.nodeType === "uint"),
-           refused.length ? R[refused[0]].all.uniforms.filter((u) => !u.labelled).map((u) => `${u.name}:${u.nodeType}${u.type ? "" : " NOT-PACKABLE"}`).join(", ") : "");
+        // v4539 recorded ONE case the text reader refused -- r184's unlabelled `uint` flipY switch, which no caller can
+        // label because it is three's. v4540 folds it from the state instead, so nothing refuses now; this row asserts
+        // the FOLD, and that the constant burned in is three's own value rather than a guess.
+        ok("nothing refuses any more, because the one uniform nobody could label is FOLDED from the state: r184's unlabelled `uint` flipY switch, burned in at three's own value",
+           K.every((k) => !R[k].textRefused) && R["webgl2:badTv"].folded.length === 1 && R["webgl2:badTv"].folded[0].nodeType === "uint" && R["webgl2:badTv"].folded[0].value === false && R["webgl2:badTv"].folded[0].literal === "0u",
+           K.map((k) => `${k}: ${(R[k].folded || []).map((f) => `${f.name}=${f.literal}`).join(",") || "nothing"}`).join(" | "));
+        ok("  and only there -- the other three emit no scalar of three's own, and the fold reached the state on every one of the four (a silent fall back to the old refusal would say so here)",
+           K.every((k) => R[k].foldError === null) && K.filter((k) => R[k].folded.length).join() === "webgl2:badTv",
+           K.map((k) => `${k}: ${R[k].foldError || "state ok"}`).join(" | "));
+        ok("  the folded fragment names that uniform NOWHERE -- declaration deleted, every reading replaced, so the rules below see a fragment with no unlabelled uniform in it at all",
+           !/nodeUniform6/.test(R["webgl2:badTv"].fragment) && /bool\( 0u \)/.test(R["webgl2:badTv"].fragment), (R["webgl2:badTv"].fragment.match(/^.*0u.*$/m) || [""])[0].trim().slice(0, 80));
+        ok("  and three's temporaries, which r184 moved OUT of main() to file scope, are carried -- checked on the OUTPUT: every name the transplanted body assigns is declared somewhere in the transplanted shader, and there is something to carry in all four",
+           K.every((k) => R[k].undeclared && R[k].undeclared.length === 0 && R[k].carried > 0),
+           K.map((k) => `${k}: ${R[k].carried} carried${R[k].undeclared && R[k].undeclared.length ? ", UNDECLARED " + R[k].undeclared.join(",") : ""}`).join(" | "));
         ok("  and the device's uniform vocabulary is exactly five words -- an unpackable node type comes back as type null, not as a word gfx/device.js would silently pack into four bytes",
            K.every((k) => R[k].all.uniforms.every((u) => u.type === null || ["f32", "vec2", "vec3", "vec4", "mat4"].includes(u.type))), K.flatMap((k) => R[k].all.uniforms.map((u) => u.type)).filter((t) => t && !["f32", "vec2", "vec3", "vec4", "mat4"].includes(t)).join(","));
     }
@@ -261,12 +307,43 @@ else {
 //      the refusal row, and then BOTH backends failing to compile at all -- three's `nodeVar0` is declared inside the struct
 //      block the transplant strips, so dropping the wrong field takes the declaration with it. The teeth are not decorative.
 //   No 0-RED among the six. Restored and md5-verified after each.
+//   MEASURED at v4540 (the flipY fold, the carried declarations, the codes region). Baseline 1 red -- gfx/device.js's own
+//   address-mode contradiction, named at the section-3 row above and NOT the transplant's. Sentinel now covers what the
+//   gate WRITES as well as what it is fed, which is the v4539 fault this log records.
+//   O  the flipY constant folded to the WRONG literal (1u for three's false) -> +5: on WebGL2 the generated pipeline
+//      draws 0 of 4,096 pixels of the hand-written picture, both in section 2 and section 3, plus the two fold rows.
+//      The v is flipped, exactly as three would have flipped it had the flag been true. The fold is load-bearing.
+//   P  the fold no longer restricted to the unlabelled -> +1, AND ONLY BECAUSE THIS ROUND ADDED THE ROW THAT CATCHES IT.
+//      *** THE FIRST ATTEMPT AT P WENT 0-RED THROUGH THE WHOLE GATE. *** CONST_LITERAL carries bool/int/uint and every
+//      knob in every graph here is a float, so the `labelled` guard protected nothing reachable -- redundant today and
+//      load-bearing the day a float joins that table, which is how a protection quietly stops working. It is now
+//      checked directly against a state built in section 1, and the sabotage bites.
+//   Q  the declaration left in place, only the readings replaced (`uint 0u;`) -> +3: the two builders emit different
+//      uniform lists, so devicePipelineFromTsl refuses before any draw, and the state/text agreement row goes with it.
+//   R  carriedDeclarations returning nothing (the state before this round) -> +3, and by the NAMED refusal:
+//      "the fragment assigns nodeVar0, which nothing in the transplanted shader declares".
+//   S' the carry dropped AND that refusal removed -> +7, and this is what the refusal buys: the same fault arrives as
+//      "gfx/device: the WGSL ... did not compile: unresolved value" and "shader: ERROR: 0:19: 'nodeVar0' : undeclared
+//      identifier" -- a driver's error about a symbol, instead of a sentence naming what this file failed to carry.
+//   T  the carry no longer narrowed to what the body names -> +5: `var<private> output : OutputStruct;` rides along into
+//      a shell that declares no OutputStruct, and render/wgslSpec.mjs's scanner calls that clean, so only the WebGPU
+//      driver says so. The scanner is weaker than the compiler here, which is worth knowing.
+//   U  the GLSL codes region split back on `// structs` -> +4: r184 moved that marker above the uniforms, so the region
+//      runs to the end of the file and main() is emitted twice; WebGL2 fails on the first undeclared temporary.
+//   No 0-RED among the seven. Restored and verified after each, source and derived file both.
 //   *** AND A FAULT IN THE SABOTAGE HARNESS ITSELF, RECORDED BECAUSE IT WAS MINE. *** The sentinel protected the file being
 //   sabotaged (render/tslSource.mjs) and nothing else -- but under N the transplant SUCCEEDED and only the compile failed,
 //   so this gate reached its own writer and rewrote tools/ship/tsl-emitted.json from sabotaged code. The source restored
 //   clean and the DERIVED file did not; `git status` after the run is what caught it, not the harness. A sabotage harness
 //   must restore everything the gate WRITES, not just what it is fed.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
+console.log("*** gfx/device.js CONTRADICTS ITSELF ON ADDRESS MODE (v4540, the one red above): line 482 creates every WebGPU sampler " +
+    "with addressModeU/V \"repeat\", line 275 sets every WebGL2 texture to CLAMP_TO_EDGE, and no caller can say which -- so the same " +
+    "dev.texture() samples differently on the two backends at every seam. MEASURED three against three, with no device in it: three's " +
+    "two backends agree with each other on every pixel for the same wrap mode (4096/4096, worst 0, both ways), so the inconsistency is " +
+    "ours. There is NO wrap setting that makes both backends green here, measured both ways, which is why the row stays red rather than " +
+    "being tuned green. Until the device picks one or lets a caller name it, a TSL graph that relies on sampler-level repeat cannot be " +
+    "transplanted and compared across backends. ***");
 console.log("unchecked here: a graph with MORE than one varying or with three's camera in it (refused, not transplanted -- a vertex-stage transplant is " +
     "the next rung); textures sampled with a linear filter through three's sampler (badTv's is nearest, which three reads with textureLoad; the fixture " +
     "covers the sampler path on the CPU only); and whether the generated code is as FAST as the hand-written -- three's nodeVar chain is longer, and nobody timed it.");

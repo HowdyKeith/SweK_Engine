@@ -148,8 +148,9 @@ export function bindingsFromState(state) {
                 if (g.name === "render") { out.cameraMatrices.push(u.name); continue; }
                 const nodeType = typeof u.getType === "function" ? u.getType() : null;
                 const node = u.nodeUniform && u.nodeUniform.node;
+                let value = null; try { const v = node && node.value; if (v === null || typeof v !== "object") value = v; } catch { /* a node whose value throws is simply not foldable */ }
                 out.uniforms.push({ name: u.name, type: DEVICE_UNIFORM_TYPES[nodeType] || null, nodeType,
-                                    labelled: !!(node && node.name) });
+                                    labelled: !!(node && node.name), value });
             }
         }
     }
@@ -162,9 +163,84 @@ export function deviceUniformsFromState(state) {
     return b ? b.uniforms.filter((u) => u.labelled).map((u) => ({ name: u.name, type: u.type })) : null;
 }
 
+// ---- v4540: THE CONSTANTS THREE FOLDS IN FOR ITSELF -----------------------------------------------------
+// r184's WebGL2 backend emits, into the object block, an unlabelled `uint` the fragment READS:
+//
+//     uint nodeUniform6;                       // ... and, in main():
+//     nodeVar36 = bool( nodeUniform6 );
+//     if ( nodeVar36 ) { nodeVar35 = vec2( nodeVar34.x, 1.0 - nodeVar34.y ); } else { nodeVar35 = nodeVar34; }
+//
+// -- a per-texture flipY switch, MEASURED value false. The transplant refused the whole emit on it and told the
+// caller to "label every uniform node", which is advice NOBODY CAN TAKE: it is three's uniform, not the graph's.
+//
+// *** THIS IS NOT A SPELLING, SO IT IS NOT FIXED BY TEACHING A REGEX ONE. *** It is folded, from the state:
+// the uniform is unlabelled (node.name === ""), its node type is one three uses for a switch, and node.value is
+// a constant -- so its declaration is deleted and its every reading replaced by the literal, leaving the driver
+// to fold the branch. The transplant then sees a fragment that reads no unlabelled uniform, and every rule below
+// applies unchanged. WHY A CONSTANT IS SAFE TO BURN IN: MEASURED, every object-group uniform answers
+// updateType "none", so three never writes this one per frame; it is fixed when the material compiles, and the
+// transplant's output is fixed then too. If the caller changes flipY, three rebuilds the material and re-emits,
+// which is exactly when the transplant runs again.
+//
+// NARROW ON PURPOSE: bool/int/uint only. A float three allocated for itself has not been seen here, and burning
+// in a number the caller might reasonably want to drive is a bigger claim than this measurement supports -- an
+// unlabelled float that is read still refuses, by name, and that refusal is the thing that would tell us.
+const CONST_LITERAL = Object.freeze({
+    bool: (v) => (v ? "true" : "false"),
+    uint: (v) => (Number.isInteger(Number(v)) || typeof v === "boolean" ? `${Math.max(0, Math.trunc(Number(v)))}u` : null),
+    int: (v) => (Number.isInteger(Number(v)) || typeof v === "boolean" ? `${Math.trunc(Number(v))}` : null),
+});
+
+/** The scalar switches three allocated for ITSELF, from the state: [{ name, nodeType, value, literal }]. */
+export function foldableConstants(state) {
+    const b = bindingsFromState(state);
+    if (!b) return [];
+    const out = [];
+    for (const u of b.uniforms) {
+        if (u.labelled || !CONST_LITERAL[u.nodeType]) continue;
+        const literal = CONST_LITERAL[u.nodeType](u.value);
+        if (literal != null) out.push({ name: u.name, nodeType: u.nodeType, value: u.value, literal });
+    }
+    return out;
+}
+
+/**
+ * Delete each constant's declaration and replace its every reading with the literal. Returns { fragment, folded }.
+ * A constant this language did not emit, or that the body never reads, is LEFT ALONE -- an unread unlabelled
+ * uniform is already dropped and named by unreadUnlabelledUniforms, and two rules for one hazard is how the
+ * r184 disagreement happened in the first place.
+ */
+export function foldConstants(fragment, language, constants) {
+    let out = String(fragment); const folded = [];
+    for (const c of constants || []) {
+        const decl = language === "wgsl" ? new RegExp(`^[ \\t]*${c.name}[ \\t]*:[^\\n]*\\n`, "m")
+                                         : new RegExp(`^[ \\t]*\\w+[ \\t]+${F_}${c.name}[ \\t]*;[ \\t]*\\n`, "m");
+        if (!decl.test(out)) continue;
+        // the `object.` / `f_` prefix is part of the reading and must go WITH it -- replacing the bare name
+        // inside `object.nodeUniform6` would leave `object.0u`, which compiles nowhere
+        const ref = () => new RegExp(`\\b(?:object\\.)?${F_}${c.name}\\b`, "g");
+        if (!ref().test(fragmentBody(out))) continue;
+        out = out.replace(decl, "").replace(ref(), c.literal);
+        folded.push({ ...c });
+    }
+    return { fragment: out, folded };
+}
+
+/**
+ * Ask three for the shaders of one mesh, with three's own constants folded in: { language, vertex, fragment, folded }.
+ * The strings still come from the PUBLIC debug hook; only the constants come from the state behind it, and if that
+ * state is unreachable the fold is skipped and `foldError` says so -- the transplant then refuses exactly as it did
+ * before, rather than this file's private-field coupling taking every TSL gate down at once. The gate asserts
+ * foldError is null, so a silent fall back to the old behaviour is caught by a check rather than by a picture.
+ */
 export async function emitShaders(renderer, { scene, camera, mesh }) {
     const sh = await renderer.debug.getShaderAsync(scene, camera, mesh);
-    return { language: renderer.backend.isWebGPUBackend ? "wgsl" : "glsl", vertex: sh.vertexShader, fragment: sh.fragmentShader };
+    const language = renderer.backend.isWebGPUBackend ? "wgsl" : "glsl";
+    let constants = [], foldError = null;
+    try { constants = foldableConstants(await nodeBuilderStateFor(renderer, { scene, camera, mesh })); }
+    catch (e) { foldError = String((e && e.message) || e); }
+    const f = foldConstants(sh.fragmentShader, language, constants);
+    return { language, vertex: sh.vertexShader, fragment: f.fragment, folded: f.folded, foldError };
 }
 
 /** The fragment with its struct DECLARATIONS removed: what is left is what actually reads a uniform. */
@@ -251,11 +327,50 @@ export function textureNames(fragment, language) {
     for (const n of names) if (/^nodeUniform\d+$/.test(n)) throw new Error(`tslSource: the emitted ${language.toUpperCase()} carries an UNLABELLED texture (${n}); label the texture node (texture(t, uv).label("tDiffuse"))`);
     return names;
 }
+// ---- v4540: THE `// vars` BLOCK LEFT main() -------------------------------------------------------------
+// r178 declared three's temporaries INSIDE main(), under a `// vars` comment, so extracting main's body brought
+// them along. r184 declares them at FILE SCOPE and main() only assigns them. MEASURED on badTv at r184: 39 such
+// declarations in the GLSL, 36 in the WGSL (`var<private> nodeVar0 : f32;`), every one of them dropped by the
+// transplant -- which is why both backends stopped compiling the moment the flipY fold let them get that far.
+//
+// Carried by SHAPE, not by the `// vars` marker: a file-scope declaration is one that stands before the entry
+// point and declares a name with nothing else on the line. And then -- because that IS a pattern, and a pattern
+// is what keeps breaking here -- transplantFragment CHECKS the result: every name the body assigns must be
+// declared somewhere the output carries, or it refuses by name. A future three that relocates or renames these
+// gets a sentence about the name it dropped, not an "undeclared identifier" from a driver.
+const CARRIED_DECL = { wgsl: /^var<private>[ \t]+\w+[ \t]*:[^;]+;$/gm, glsl: /^\w+[ \t]+\w+;$/gm };
+const CARRIED_NAME = { wgsl: /^var<private>[ \t]+(\w+)/, glsl: /^\w+[ \t]+(\w+);/ };
+/**
+ * three's file-scope temporaries: the declaration lines standing between the shader's head and its entry point,
+ * narrowed to those `body` actually names. The narrowing is not tidiness -- MEASURED, the unnarrowed set carried
+ * `var<private> output : OutputStruct;` into a shell that declares no OutputStruct (the transplant having already
+ * rewritten `output.color = x; return output;` into `return x;`), and render/wgslSpec.mjs's scanner called that
+ * clean, so only the driver would have said so. Carry what is USED; a declaration nobody names is not a temporary.
+ */
+export function carriedDeclarations(fragment, language, body = null) {
+    const head = String(fragment).split(language === "wgsl" ? "@fragment" : "void main()")[0];
+    const all = head.match(CARRIED_DECL[language]) || [];
+    if (body == null) return all;
+    return all.filter((d) => { const n = (d.match(CARRIED_NAME[language]) || [])[1]; return n && new RegExp(`\\b${n}\\b`).test(body); });
+}
+
+/** Names the device's own shell provides, which a body may assign without declaring. */
+const SHELL_NAMES = new Set(["fragColor", "output", "uv", "vUv"]);
+
 /**
  * The transplant: three's fragment -> the device's fragment, in the same language. Returns { code, uniforms, textures, varying }.
  * WGSL: the device shell is struct U at binding 0, one sampler `samp` at 1, textures from 2; entry `fs`, input uv at location 0.
  * GLSL: plain uniforms by name, `in vec2 vUv`, `out vec4 fragColor`, entry main.
  */
+function assertDeclared(body, decls, language) {
+    const names = new Set(decls.map((d) => (d.match(CARRIED_NAME[language]) || [])[1]).filter(Boolean));
+    const local = language === "wgsl" ? [...body.matchAll(/\bvar\s+(\w+)\s*:/g)] : [...body.matchAll(/^\s*\w+\s+(\w+)\s*(?:;|=)/gm)];
+    for (const m of local) names.add(m[1]);
+    for (const m of body.matchAll(/^\s*(\w+)\s*=[^=]/gm))
+        if (!names.has(m[1]) && !SHELL_NAMES.has(m[1]))
+            throw new Error(`tslSource: the fragment assigns ${m[1]}, which nothing in the transplanted shader declares; three declares its temporaries somewhere this file does not carry from (see carriedDeclarations)`);
+}
+
 export function transplantFragment(fragment, language) {
     if (typeof fragment !== "string" || !fragment.includes("Three.js")) throw new Error("tslSource: not a three.js node-system shader");
     if (/\brender\./.test(fragment) || /cameraProjectionMatrix|modelViewMatrix/.test(fragment)) throw new Error("tslSource: the fragment reads camera or object matrices; only a fragment-only effect (uv in, colour out) can be transplanted");
@@ -271,21 +386,29 @@ export function transplantFragment(fragment, language) {
         b = b.replace(new RegExp(`\\b${varying}\\b`, "g"), "uv").replace(/\bobject\.(\w+)/g, "u.$1");
         for (const t of textures) b = b.replace(new RegExp(`\\b${t}_sampler\\b`, "g"), "samp");
         const usesSampler = /\bsamp\b/.test(b) || /\bsamp\b/.test(codes);
+        const decls = carriedDeclarations(fragment, "wgsl", b); assertDeclared(b, decls, "wgsl");
         const U = uniforms.length ? `struct U { ${uniforms.map((u) => `${u.name}: ${Object.keys(WGSL_TYPES).find((k) => WGSL_TYPES[k] === u.type)}`).join(", ")} };\n@group(0) @binding(0) var<uniform> u: U;\n` : "";
         const tex = textures.map((t, i) => `@group(0) @binding(${2 + i}) var ${t}: texture_2d<f32>;`).join("\n");
-        const code = `// transplanted from three's WGSL node builder by render/tslSource.mjs\n${U}${usesSampler ? "@group(0) @binding(1) var samp: sampler;\n" : ""}${tex}\n${TRI_VS_WGSL}\n${codes}\n@fragment fn fs(@location(0) uv: vec2f) -> @location(0) vec4f {${b}}\n`;
+        const code = `// transplanted from three's WGSL node builder by render/tslSource.mjs\n${U}${usesSampler ? "@group(0) @binding(1) var samp: sampler;\n" : ""}${tex}\n${TRI_VS_WGSL}\n${codes}\n${decls.join("\n")}\n@fragment fn fs(@location(0) uv: vec2f) -> @location(0) vec4f {${b}}\n`;
         return { code, uniforms, textures, varying, usesSampler };
     }
     const varying = (fragment.match(/in vec2 (\w+);/) || [])[1];
     if (!varying) throw new Error("tslSource: the GLSL fragment does not take a vec2 varying (the uv)");
     if ((fragment.match(/^in /gm) || []).length > 1) throw new Error("tslSource: the GLSL fragment takes more than one varying");
-    const codes = (fragment.split("// codes")[1] || "").split("// structs")[0].trim();
+    // r178 put `// structs` AFTER `// codes`; r184 puts it above the uniforms, so splitting on it swallowed the
+    // whole of main() -- MEASURED: two `void main` in the transplanted GLSL. The region ends where main BEGINS,
+    // which is the thing that actually delimits it; the shell declares its own output, so any fragment-output
+    // declaration that rides along in the region is dropped by what it IS rather than by where it sat.
+    const codes = (fragment.split("// codes")[1] || "").split("void main()")[0]
+        .replace(/^\s*(?:layout\([^)]*\)\s*)?out\s+\w+\s+\w+\s*;\s*$/gm, "")
+        .replace(CARRIED_DECL.glsl, "").trim();
     const bodyAll = fragment.split("void main()")[1]; let b = bodyAll.slice(bodyAll.indexOf("{") + 1, bodyAll.lastIndexOf("}"));
     if (!/fragColor\s*=/.test(b)) throw new Error("tslSource: the GLSL main() does not write fragColor");
     b = b.replace(new RegExp(`\\b${varying}\\b`, "g"), "vUv");
     for (const u of uniforms) b = b.replace(new RegExp(`\\bf_${u.name}\\b`, "g"), u.name);
+    const decls = carriedDeclarations(fragment, "glsl", b); assertDeclared(b, decls, "glsl");
     const glslType = (t) => Object.keys(GLSL_TYPES).find((k) => GLSL_TYPES[k] === t);
-    const code = `#version 300 es\n// transplanted from three's GLSL node builder by render/tslSource.mjs\nprecision highp float;\nprecision highp int;\nprecision highp sampler2D;\n${uniforms.map((u) => `uniform ${glslType(u.type)} ${u.name};`).join("\n")}\n${textures.map((t) => `uniform sampler2D ${t};`).join("\n")}\nin vec2 vUv;\nout vec4 fragColor;\n${codes}\nvoid main() {${b}}\n`;
+    const code = `#version 300 es\n// transplanted from three's GLSL node builder by render/tslSource.mjs\nprecision highp float;\nprecision highp int;\nprecision highp sampler2D;\n${uniforms.map((u) => `uniform ${glslType(u.type)} ${u.name};`).join("\n")}\n${textures.map((t) => `uniform sampler2D ${t};`).join("\n")}\nin vec2 vUv;\nout vec4 fragColor;\n${codes}\n${decls.join("\n")}\nvoid main() {${b}}\n`;
     return { code, uniforms, textures, varying, usesSampler: textures.length > 0 };
 }
 /**
