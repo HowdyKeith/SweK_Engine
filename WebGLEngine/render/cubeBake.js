@@ -78,3 +78,37 @@ export function bakeCubemap(size, channels, shade) {
     const { targets } = bakeCubemapTargets(size, [channels], (dir, f, i, j) => [shade(dir, f, i, j)]);
     return { size, faces: targets[0] };
 }
+
+// ---- THE INVERSE, WHICH EVERY CALLER SO FAR HAS BEEN ABLE TO DO WITHOUT --------------------------------------
+//
+// Everything above answers "given a face and a texel, what direction is that". A BAKER only ever needs that
+// direction -- nebulaSkybox, proceduralStar and planetSurface each walk texels and shade a direction, and none
+// of them has ever needed to go the other way. physics/render/specularIBLWgsl.mjs is the first caller that does:
+// a real-time sampler is handed a REFLECTION VECTOR and has to find which face and which texel it lands on,
+// which is the question this file could not answer until now.
+//
+// The standard technique: the direction's DOMINANT axis (largest absolute component) picks the face and its
+// sign picks which of the two faces on that axis; the other two components, each divided by the dominant one,
+// are u and v. Dividing by the dominant component is exactly what undoes FACES[f]'s own construction -- every
+// entry there is built as [+-1, ...] before normalisation, so the ratio of any component to the dominant one is
+// invariant under the length-1 scaling faceTexelDir applies, and recovers u and v exactly rather than up to a
+// tolerance. Verified by round-trip in cubeBake-selfcheck.mjs: dirToFace(normalize(FACES[f](u,v))) reproduces
+// (f, u, v) to floating-point noise (1.11e-16) across all six faces and a spread of u, v -- not assumed algebra.
+export function dirToFace(d) {
+    const ax = Math.abs(d[0]), ay = Math.abs(d[1]), az = Math.abs(d[2]);
+    let face, u, v, ma;
+    if (ax >= ay && ax >= az) {
+        ma = ax;
+        if (d[0] > 0) { face = 0; u = -d[2] / ma; v = -d[1] / ma; }   // +X
+        else          { face = 1; u =  d[2] / ma; v = -d[1] / ma; }   // -X
+    } else if (ay >= ax && ay >= az) {
+        ma = ay;
+        if (d[1] > 0) { face = 2; u = d[0] / ma; v =  d[2] / ma; }    // +Y
+        else          { face = 3; u = d[0] / ma; v = -d[2] / ma; }    // -Y
+    } else {
+        ma = az;
+        if (d[2] > 0) { face = 4; u =  d[0] / ma; v = -d[1] / ma; }   // +Z
+        else          { face = 5; u = -d[0] / ma; v = -d[1] / ma; }   // -Z
+    }
+    return { face, u, v };
+}

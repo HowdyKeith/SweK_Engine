@@ -96,5 +96,5 @@ console.log("\n3. *** THE PHYSICAL PROPERTY THE WHOLE CHAIN EXISTS FOR: ROUGHER 
 }
 
 console.log(fails ? "\nspecularProbeBake-selfcheck: " + fails + " FAILED" : "\nspecularProbeBake-selfcheck: all checks pass");
-console.log("unchecked here: device-side sampling of this chain (nothing uploads it to a texture or reads it in a shader yet), and a GPU-side bake from a real captured cubemap rather than an analytic/splat radianceOf -- splitSumWgsl.mjs's PREFILTER_ENV_WGSL still takes an analytic env, not a texture.");
+console.log("unchecked here: physics/render/specularIBLWgsl-selfcheck.mjs is the one that packs this chain and samples it on a real device (storage-buffer atlas, not yet a gfx/device.js texture, and nothing in the live renderer binds it). A GPU-side BAKE from a real captured cubemap rather than an analytic/splat radianceOf remains unbuilt -- splitSumWgsl.mjs's PREFILTER_ENV_WGSL still takes an analytic env, not a texture.");
 process.exit(fails ? 1 : 0);
