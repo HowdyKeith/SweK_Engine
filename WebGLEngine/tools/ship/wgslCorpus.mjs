@@ -106,6 +106,7 @@ import * as RTP from "../../physics/render/rtPipeline.mjs";
 // stays native-only until this corpus's browser-side runner grows the same `texture` binding headlessGpu.mjs did.
 import { BRDF_LUT_WGSL, PREFILTER_ENV_WGSL, packLutParams, packPrefilterCases, ENV_KIND } from "../../physics/render/splitSumWgsl.mjs";
 import { CAPTURED_PREFILTER_WGSL } from "../../physics/render/specularProbeCapture.mjs";
+import { F82_TINT_WGSL, packF82Params } from "../../physics/render/fresnelF82Wgsl.mjs";
 const EMITTED_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), "tsl-emitted.json");
 const EMITTED = fs.existsSync(EMITTED_PATH) ? JSON.parse(fs.readFileSync(EMITTED_PATH, "utf8")) : null;
 const EMITTED_PHYS_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), "tsl-emitted-physics.json");
@@ -521,6 +522,13 @@ export function corpus() {
         { id: "specularProbeCapture.CAPTURED_PREFILTER_WGSL", from: "physics/render/specularProbeCapture.mjs", compileOnly: true,
           why: "the SAME prefilter core reading a real bound texture instead of an analytic pattern -- the texture binding is native-only until this corpus's browser runner grows one too (headlessGpu.mjs's v4580 note), so what the corpus adds here is the second backend's COMPILER; the numbers are graded, texture and all, by specularProbeCapture-selfcheck.mjs on the native backend",
           opts: { code: CAPTURED_PREFILTER_WGSL, compileOnly: true, outCount: 0 } },
+        // *** v4584 -- CAUGHT ON ARRIVAL, NOT ACCUMULATED. *** F82_TINT_WGSL was the ONE unaccounted symbol this
+        // census found when checked before this entry was written (physics/render/fresnelF82Wgsl.mjs's own
+        // selfcheck already dispatches it with real numbers, on the native backend) -- registered the same round
+        // it shipped, which is what v4472's own note above says the nine-kernel and two-kernel gaps were not.
+        { id: "fresnelF82Wgsl.F82_TINT_WGSL", from: "physics/render/fresnelF82Wgsl.mjs",
+          why: "the F82-tint correction to Schlick's Fresnel, one thread per sampled angle -- graded against fresnelF82.mjs's f64 reference by fresnelF82Wgsl-selfcheck.mjs on the native backend, here for the second backend's compiler AND numbers",
+          opts: { code: F82_TINT_WGSL, outCount: 33, uniforms: Array.from(packF82Params(0.5, 0.9, 33)), workgroups: [1, 1, 1] } },
         // *** v4295 -- THE TEXTURE ENTRIES, WHICH THE CORPUS HAD NONE OF. *** Seven shaders and 41,656 floats
         // of agreement, all of it through storage BUFFERS, while the only shader that writes a storage TEXTURE
         // was excluded for want of a native path. That was the worst place to have no evidence: v4287 measured

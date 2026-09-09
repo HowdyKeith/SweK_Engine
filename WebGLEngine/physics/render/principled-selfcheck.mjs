@@ -35,6 +35,7 @@
 "use strict";
 import * as P from "./principled.mjs";
 import { schlick } from "./fresnel.mjs";
+import { MU_PIN } from "./fresnelF82.mjs";
 import { directionalAlbedo as roughDiffuseAlbedo } from "./roughDiffuse.mjs";
 import { gateReport } from "../../tools/ship/gateReport.mjs";
 
@@ -159,6 +160,53 @@ console.log("\n4. the lobes are separable and the model is reciprocal");
         "FIXED half-vector, which is what an isotropic lobe pair allows; it is not a full-vector reciprocity test");
 }
 
+console.log("\n5. v4584 -- edgeTint: OPT-IN, BIT-FOR-BIT WHEN OMITTED, AND MEASURABLE THROUGH THE FULL BSDF WHEN SET");
+{
+    // *** THE msTable/coupled CONVENTION, APPLIED TO edgeTint TOO: PASSING IT REPRODUCES OLD BEHAVIOUR BIT FOR
+    // BIT, ASSERTED RATHER THAN ASSUMED. *** fresnelF82-selfcheck.mjs already proved f82Tint(mu, F0, b) collapses
+    // to schlick(mu, F0) EXACTLY when b = schlick(MU_PIN, F0) -- this is the same identity carried through
+    // evaluate()'s full composition (diffuse coupling, D, G2, the multi-scatter term), not re-asserted on the
+    // raw Fresnel call in isolation.
+    const p0 = { baseColour: [0.8, 0.6, 0.3], metallic: 1, roughness: 0.3, specular: 0.5 };
+    let worstReduce = 0;
+    for (const cosO of [0.2, 0.5, 0.9]) for (const cosI of [0.3, 0.6]) for (const cosM of [0.4, 0.8, 0.99]) {
+        for (let channel = 0; channel < 3; channel++) {
+            const reduceTint = [0, 1, 2].map((c) => schlick(MU_PIN, P.f0Of(p0.baseColour, 1, p0.specular)[c]));
+            const withNull = P.evaluate(p0, cosO, cosI, cosM, 1, channel);
+            const withReduce = P.evaluate({ ...p0, edgeTint: reduceTint }, cosO, cosI, cosM, 1, channel);
+            worstReduce = Math.max(worstReduce, Math.abs(withNull - withReduce));
+        }
+    }
+    ok("!! an edgeTint that asks for exactly Schlick's own pin value reproduces the untinted BSDF bit for bit",
+       worstReduce < 1e-13, `worst |evaluate(edgeTint=null) - evaluate(edgeTint=schlick-at-pin)| across 54 (cosO,cosI,cosM,channel) combinations: ${worstReduce.toExponential(2)}`);
+
+    // *** AND A REAL TINT MEASURABLY MOVES THE SPECULAR ALBEDO, ISOLATED BY albedoSplit'S OWN TECHNIQUE. ***
+    // baseColour's green channel gives f0 = 0.5 here (metallic 1, specular 0.5), so schlick(MU_PIN, 0.5) is
+    // well below 1 -- edgeTint = [1,1,1] asks for MORE reflectance at the pin than Schlick already supplies,
+    // which section 4 of fresnelF82-selfcheck.mjs already proved can only RAISE F82 in the interior, never
+    // lower it, so the integrated specular albedo has to come out higher too.
+    const metal = { baseColour: [1, 0.5, 0.2], metallic: 1, roughness: 0.4, specular: 0.5, lobes: "specular" };
+    const cosO = 0.3;
+    const plain = P.directionalAlbedo(metal, cosO, { N: 96, M: 48, channel: 1 });
+    const brightTint = P.directionalAlbedo({ ...metal, edgeTint: [1, 1, 1] }, cosO, { N: 96, M: 48, channel: 1 });
+    ok("!! *** a tint above Schlick's own pin value measurably brightens the (isolated) specular albedo, not just the raw Fresnel term ***",
+       brightTint > plain + 1e-4, `plain (Schlick) = ${plain.toFixed(5)}, edgeTint=[1,1,1] = ${brightTint.toFixed(5)}`);
+
+    // *** RECIPROCITY SURVIVES, CHECKED RATHER THAN ASSUMED -- SECTION 4's OWN DISCIPLINE, EXTENDED HERE. ***
+    // f82Tint depends only on cosM (the shared half-vector angle), exactly as schlick(cosM, f0) already did, so
+    // swapping cosO and cosI at a FIXED cosM cannot see any difference -- but section 4's own header explains why
+    // this tree checks rather than trusts a reciprocity argument, after one option (coupled) broke it in a first
+    // draft.
+    let worstRec = 0;
+    const pr = { baseColour: [0.7, 0.5, 0.3], metallic: 1, roughness: 0.4, specular: 0.5, edgeTint: [0.9, 0.95, 1] };
+    for (const a of [0.2, 0.5, 0.8]) for (const b of [0.25, 0.6, 0.9]) {
+        const f1 = P.evaluate(pr, a, b, 0.7, 0.9, 0), f2 = P.evaluate(pr, b, a, 0.7, 0.9, 0);
+        worstRec = Math.max(worstRec, Math.abs(f1 - f2) / Math.max(1e-12, Math.abs(f1)));
+    }
+    ok("!! ...and reciprocity holds with edgeTint set too, at a fixed half-vector", worstRec < 1e-12,
+       `worst relative difference ${worstRec.toExponential(2)}`);
+}
+
 say("WHAT THIS DOES NOT CLAIM. That the model is Disney's, in full: this composes the diffuse and specular " +
     "lobes and has NO sheen, NO clearcoat, NO anisotropy, NO transmission and NO subsurface, which are five of " +
     "the parameters that make that model what it is. That rough metals are right: the specular lobe is " +
@@ -167,7 +215,10 @@ say("WHAT THIS DOES NOT CLAIM. That the model is Disney's, in full: this compose
     "of this item and the reason the furnace numbers above are ceilings rather than answers. And that the " +
     "sampler is correct: sample() exists and nothing here checks that its pdf integrates to one or that a Monte " +
     "Carlo estimate through it agrees with these integrals, which is a real gap and is why every number on this " +
-    "page comes from quadrature instead.");
+    "page comes from quadrature instead. And that edgeTint retints everything a specular highlight touches: the " +
+    "kD coupling term above still reads plain schlick(), on purpose (it approximates energy the interface " +
+    "removes from the diffuse substrate, not the highlight's own colour), and no device-side material reads " +
+    "physics/render/fresnelF82Wgsl.mjs yet -- this option runs the CPU function only.");
 
 REPORT.write();
 console.log(`\nprincipled-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);

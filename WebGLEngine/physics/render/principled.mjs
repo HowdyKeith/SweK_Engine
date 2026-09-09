@@ -23,6 +23,7 @@
 "use strict";
 import { D, G2, G1, sampleHalfVector } from "./microfacet.mjs";
 import { schlick } from "./fresnel.mjs";
+import { f82Tint } from "./fresnelF82.mjs";
 import { msLobe } from "./energyCompensation.mjs";
 import { orenNayarBrdf, directionalAlbedo as diffuseAlbedo } from "./roughDiffuse.mjs";
 
@@ -50,7 +51,7 @@ export const f0Of = (baseColour, metallic, specular = 0.5) => {
  * of the projected azimuths. The specular lobe does not use it because GGX here is isotropic.
  */
 export function evaluate({ baseColour, metallic = 0, roughness = 0.5, specular = 0.5, sigma = 0,
-                          lobes = "both", coupled = false, msTable = null },
+                          lobes = "both", coupled = false, msTable = null, edgeTint = null },
                          cosO, cosI, cosM, cosPhiDiff = 1, channel = 0) {
     const m = Math.min(1, Math.max(0, metallic));
     const alpha = alphaOf(roughness);
@@ -84,7 +85,14 @@ export function evaluate({ baseColour, metallic = 0, roughness = 0.5, specular =
     const f0 = f0Of(baseColour, m, specular)[channel];
     const Dv = D(cosM, alpha);
     const Gv = G2(cosO, cosI, alpha);
-    const Fv = schlick(cosM, f0);
+    // *** edgeTint IS OPT-IN, SO NOTHING SILENTLY CHANGES -- THE msTable/coupled CONVENTION, APPLIED HERE TOO. ***
+    // Fresnel is evaluated at the MICROFACET's own cosine (cosM), which is what physics/render/fresnelF82.mjs's
+    // pin (mu = 1/7) and Schlick's own grazing term are both functions of -- the same angle schlick(cosM, f0)
+    // already used here before this option existed, so passing null reproduces the old behaviour bit for bit.
+    // The kD coupling term above deliberately does NOT read edgeTint: it approximates how much light the
+    // INTERFACE removes from the diffuse substrate, not the specular highlight's own colour, and retinting it
+    // would be a second physical effect this option was not asked to touch.
+    const Fv = edgeTint ? f82Tint(cosM, f0, edgeTint[channel]) : schlick(cosM, f0);
     const denom = 4 * Math.abs(cosO) * Math.abs(cosI);
     const spec = lobes === "diffuse" || denom <= 0 ? 0 : (Dv * Gv * Fv) / denom;
 
