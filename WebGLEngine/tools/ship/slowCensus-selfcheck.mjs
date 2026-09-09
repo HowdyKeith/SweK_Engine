@@ -41,7 +41,8 @@ import path from "node:path";
 import { ENG } from "./slowCensus.mjs";
 import { redRegister, selectGates, readTimings, DEFAULTS } from "./quickSweep.mjs";
 import { enumerateGates } from "./gateSweep.mjs";
-import { UNCONFIRMED_SLOW, SLOW_PARTIAL, RED_AT_V4424, RECHECK_V4313, RECHECK_V4314, FIXED_SINCE_V4279 } from "./redCensus.mjs";
+import { UNCONFIRMED_SLOW, SLOW_PARTIAL, RED_AT_V4424, RECHECK_V4313, RECHECK_V4314, FIXED_SINCE_V4279,
+         FIXED_AT_V4279, FIXED_SINCE_V4408 } from "./redCensus.mjs";
 import {
     MEASURED_V4424, PROTOCOL, DECIDED, V4279_CAP_MS, SERIAL_CAP_MS,
     EXEMPT_AT_V4424, UNMEASURED_AT_V4424, capRecordedAsTime, redsFound, ORPHAN_RATCHET, budgetSkip, RED_OUTSIDE_THE_BUCKET,
@@ -137,16 +138,31 @@ console.log("\n3. *** RE-MEASURED ONE AT A TIME, AND EVERY COMPARABLE VERDICT AG
     const noLine = RED_AT_V4424.filter((e) => !e.fails);
     const whyMissing = RED_AT_V4424.filter((e) => !e.why || String(e.why).length <= 60);
     const shortLine = RED_AT_V4424.filter((e) => e.fails && String(e.fails).length <= 40);
-    ok("  every one of them is FILED, with its reason, and with its failing line where a run produced one",
-        r.filed.length === r.gates.length && whyMissing.length === 0 && shortLine.length === 0 &&
+    // *** v4571 -- `filed.length === gates.length` COULD ONLY HOLD WHILE NONE OF THE THREE WAS EVER FIXED. ***
+    // r.gates is the frozen v4424 measurement -- three gates measured red at the serial cap -- and r.filed is
+    // how many of them the LIVE register still holds. orphanDisposition was repaired at v4571 and taken off
+    // RED_AT_V4424, so the equality broke at 2 of 3: a row that goes red on the repair it exists to prompt,
+    // which is the same shape sweepCoverage's killed-pass rows carried into this round and redCensus.mjs's own
+    // arithmetic hit at v4313. A repair is a TERM. What must hold is that every gate the v4424 pass measured
+    // red is ACCOUNTED FOR -- still filed, or recorded as repaired -- and that whatever IS still filed carries
+    // its reason.
+    const fixedGates = new Set([...FIXED_AT_V4279, ...FIXED_SINCE_V4279, ...FIXED_SINCE_V4408]
+        .map((e) => (typeof e === "string" ? e : e.gate)));
+    const filedSet = new Set(RED_AT_V4424.map((e) => e.gate));
+    const unaccounted = r.gates.filter((g) => !filedSet.has(g) && !fixedGates.has(g));
+    ok("  every one of them is ACCOUNTED FOR -- filed with its reason, or recorded as repaired",
+        unaccounted.length === 0 && whyMissing.length === 0 && shortLine.length === 0 &&
         noLine.length < RED_AT_V4424.length,
-        `${r.filed.length} of ${r.gates.length} in redCensus.RED_AT_V4424, each with why it fails` +
-        (noLine.length
-            ? `. ${noLine.map((e) => e.gate.replace(/^tools\/ship\//, "").replace(/-selfcheck\.mjs$/, "")).join(", ")} ` +
-              "carries NO filed line and is not asked for one: the audit's cap does not reach it, which is the " +
-              "same reason it was in the unconfirmed bucket to begin with. A BOUND IS NOT A VERDICT, and " +
-              "before v4536 this field held a fragment printed before the kill"
-            : ", each with the check that fails"));
+        unaccounted.length
+          ? "ACCOUNTED NOWHERE: " + unaccounted.join(", ")
+          : `${r.filed.length} of ${r.gates.length} still in redCensus.RED_AT_V4424, each with why it fails, and ` +
+            `${r.gates.filter((g) => fixedGates.has(g)).length} recorded as repaired` +
+            (noLine.length
+                ? `. ${noLine.map((e) => e.gate.replace(/^tools\/ship\//, "").replace(/-selfcheck\.mjs$/, "")).join(", ")} ` +
+                  "carries NO filed line and is not asked for one: the audit's cap does not reach it, which is the " +
+                  "same reason it was in the unconfirmed bucket to begin with. A BOUND IS NOT A VERDICT, and " +
+                  "before v4536 this field held a fragment printed before the kill"
+                : ", each with the check that fails"));
     // *** v4471 -- THIS READ RED_AT_V4424's `ms` AND THAT FIELD IS null BY CONSTRUCTION FOR THESE THREE. ***
     // The v4430 census makes `ms` a getter over tools/ship/register-audit.mjs, which is right for a register
     // whose readings should come from a run rather than from a typed literal -- and the audit's cap does not

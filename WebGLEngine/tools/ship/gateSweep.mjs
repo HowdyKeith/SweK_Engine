@@ -3764,6 +3764,50 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    // v4571 -- the 219th closing: the five reds the killed bucket was hiding, and four of them were the check.
+    since219: Object.freeze({
+        at: "v4571", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/commentFalsePass-selfcheck.mjs", "tools/ship/gateReach-selfcheck.mjs",
+                                "tools/ship/baselineHygiene-selfcheck.mjs", "tools/ship/gateSelection-selfcheck.mjs",
+                                "tools/ship/orphanDisposition-selfcheck.mjs"]),
+        verdict: "green, five gates repaired and RED_AT_V4568 emptied by repair rather than by deletion. *** NOT " +
+                 "ONE OF THE FIVE WAS A NEW FAILURE. *** They cost 9.6 s, 11.0 s, 31 s, 71 s and 88 s against a " +
+                 "3,000 ms sweep budget, so no ship-time step had ever run them; v4568 opened the killed bucket " +
+                 "and found five reds sitting in it, ages unknown. FOUR OF THE FIVE WERE THE CHECK BEING WRONG " +
+                 "RATHER THAN THE SUBJECT, which is the number worth carrying out of this round: a gate nothing " +
+                 "runs does not merely stop protecting, it rots. commentFalsePass's one GENUINE false pass was a " +
+                 "COPYRIGHT NOTICE -- a claim no arrangement of code could satisfy, so a comment is the only " +
+                 "place it can live. gateSelection's band expression asserted the first twenty while reachable " +
+                 "was under the plan size and THE ENTIRE PLAN once it went over, two different claims from one " +
+                 "line depending on the tree's size. orphanDisposition's guarantee was stated one clause too " +
+                 "wide and the tree found the gap at 28 of 30. Only gateReach's population pin was doing exactly " +
+                 "its job -- 472 against 520, counted per its own protocol at 48 ADDED, 0 REMOVED, reconciles " +
+                 "true -- and even that row read its record with a RELATIVE PATH, so from any other cwd it " +
+                 "reported 'expected null'. *** AND baselineHygiene WAS A LOOP: *** it reported all seven orphan " +
+                 "suppressions stale with none adopted, because orphanScan returned ZERO candidates over 4,058 " +
+                 "files -- input-sets.json shipped at v4567 with no provenance stamp (3.5 MB of every path every " +
+                 "gate reads), and redCensus and register-audit had recorded THIS GATE'S OWN FAILING LINE, which " +
+                 "names the seven paths, as string data. RECORDING THE RED IS WHAT KEPT IT RED. Fixed at the " +
+                 "source, and then guarded where it generalises: an EMPTY candidate set is refused the way v3222 " +
+                 "made a MISSING one refused, because that guard fixed the symptom it had seen and not the " +
+                 "property, and an empty array walked past it for 1,349 versions. Sabotages BB/CC/DD/EE/FF/GG " +
+                 "red by name, and FF only on its third take -- the first two proved my own new row could not " +
+                 "fail. *** AND REPAIRING FIVE REDS TOOK FIVE MORE ROWS RED, EVERY ONE OF THEM FOR THE SAME " +
+                 "REASON: THEY FORBADE THE REPAIR THEY EXIST TO PROMPT. *** sweepCoverage held 'the pass found " +
+                 "five reds and at least four must still be red'; its register cross-check demanded " +
+                 "RED_AT_V4568 still hold all five; slowCensus required its frozen three-gate measurement to " +
+                 "equal what the live register holds; gateSweep-selfcheck tested 'was in the unmeasured bucket " +
+                 "at v4297' against that bucket AS IT STANDS TODAY. redCensus.mjs wrote this down at v4313 -- " +
+                 "'the census's arithmetic punished the pruning the census demands' -- and the fix there is " +
+                 "the fix in all four: a repair is a TERM, and the property is the UNION of still-failing and " +
+                 "recorded-as-repaired. THE FIRST ATTEMPT AT THE FOURTH WAS WRONG AND TWO ROWS SAID SO WITHIN " +
+                 "THE MINUTE: I reached for the FIXED_* lists as a stand-in for 'has left the unmeasured " +
+                 "bucket', and those record repairs to the RED REGISTERS -- a different exit from a different " +
+                 "place -- so real regressions started reading as never-measured. Two exits need two records, " +
+                 "and MEASURED_OUT_OF_SLOW is the second one.",
+    }),
     // v4570 -- the 218th closing: the third twin, and the one a viewer could actually see.
     since218: Object.freeze({
         at: "v4570", swept: 0, green: 0, red: 0,

@@ -119,16 +119,43 @@ export function nonGateMentions(rel, files) {
 
 /** THE QUESTION THAT CANNOT FAIL, driven so the collapse is seen rather than asserted. */
 export function guaranteedQuestion(pile, files) {
-    // "is it imported by a gate named for something other than itself" -- true for every member, necessarily,
-    // because a module WITH a same-named gate was routed out of this pile before it ever got here.
-    let holds = 0;
+    // *** THE GUARANTEE WAS STATED ONE CLAUSE TOO WIDE, AND AT v4571 THE TREE FOUND THE GAP. ***
+    //
+    // This returned "'imported by a gate named for something else' holds for ALL of them BY CONSTRUCTION,
+    // because v3558 routes anything with a dedicated gate out of the pile first". The first half of that is
+    // true and IS the construction: no member has a same-named selfcheck, necessarily, because such a module
+    // never reaches this pile. The second half -- that it is therefore imported by SOME gate -- does not
+    // follow from the routing at all. Nothing in v3558 promises a member has any gate consumer.
+    //
+    // MEASURED at v4571: 28 of 30. The two that break it are demos_code/bitcoin_miner.js and
+    // render/isingTsl.mjs, and both break it the same way -- no dedicated gate AND NO GATE CONSUMER AT ALL.
+    // They are not counter-examples to the routing; they are a class the sentence forgot, and a more orphaned
+    // one than the other twenty-eight. A module reached by a gate named for something else is at least
+    // exercised by somebody; a module reached by no gate is exercised by nobody.
+    //
+    // So the structurally guaranteed property is stated alone -- NO MEMBER HAS A DEDICATED GATE -- and the
+    // gate-consumer question is reported as what it actually is: a fact that varies, with the zero case named
+    // rather than folded into a count. The point of the original row survives intact and is now true: a
+    // question whose answer is fixed by construction ranks nothing, and this is that question.
+    let noDedicated = 0, holds = 0;
+    const noGateAtAll = [];
     for (const m of pile) {
         const base = m.split("/").pop().replace(/\.m?js$/, "");
         const dedicated = files.some((f) => f.endsWith("/" + base + "-selfcheck.mjs") || f === base + "-selfcheck.mjs");
         const cons = gateConsumers(m, files);
+        if (!dedicated) noDedicated++;
         if (!dedicated && cons.length > 0) holds++;
+        if (!dedicated && cons.length === 0) noGateAtAll.push(m);
     }
-    return { members: pile.length, holds, discriminates: holds !== pile.length };
+    return {
+        members: pile.length,
+        // the property the routing really guarantees, and the one whose fixed answer makes it useless as a signal
+        noDedicated,
+        discriminates: noDedicated !== pile.length,
+        // reported, not guaranteed: how many are additionally reached by a gate named for something else
+        holds,
+        noGateAtAll,
+    };
 }
 
 export const MEASURED_V3601 = {
@@ -142,9 +169,15 @@ export const MEASURED_V3601 = {
     control: "EVERY non-gate mention of every member is PROSE and NOT an import -- checked line by line. " +
              "skillTrial.mjs is named in ai-bridge/server.js and skillbookBridge.js, which looks like a live " +
              "HTTP consumer and is two comments. SO GRAVEYARD'S RESOLVER IS RIGHT and the pile is real.",
-    guaranteedQuestion: "'imported by a gate named for something else' is TRUE FOR ALL ELEVEN BY CONSTRUCTION, " +
-                        "because v3558 routes anything with a dedicated gate out of the pile first. v3551's " +
-                        "defect, caught before it was built; the gate drives the collapse.",
+    guaranteedQuestion: "'has no dedicated gate' is TRUE FOR ALL ELEVEN BY CONSTRUCTION, because v3558 routes " +
+                        "anything with a dedicated gate out of the pile first. v3551's defect, caught before " +
+                        "it was built; the gate drives the collapse. *** v4571 -- THIS SENTENCE USED TO READ " +
+                        "'imported by a gate named for something else' AND THAT WAS ONE CLAUSE TOO WIDE: the " +
+                        "routing guarantees the absence of a same-named gate and promises nothing about being " +
+                        "imported by any other. Measured then at 28 of 30, the two exceptions -- " +
+                        "demos_code/bitcoin_miner.js and render/isingTsl.mjs -- reaching NO gate at all, which " +
+                        "is a worse disposition than the one the sentence described and is now reported by " +
+                        "name. The eleven above are a reading taken at v3601, not a standing count. ***",
     notClaimed: "NO disposition is invented -- each is QUOTED from the tree with its file. The seven with no " +
                 "record are listed AS UNDECIDED. Nothing is ratcheted and graveyard's count is untouched.",
 };
@@ -199,8 +232,14 @@ export function reportLines() {
     L.push("");
     L.push("4. THE QUESTION THAT CANNOT FAIL, DRIVEN");
     const g = guaranteedQuestion(pile, files);
-    L.push("   'imported by a gate named for something else' holds for " + g.holds + " of " + g.members +
-           " -- " + (g.discriminates ? "it discriminates" : "IT DISCRIMINATES NOTHING, which is why it is not used"));
+    L.push("   'has no dedicated gate' holds for " + g.noDedicated + " of " + g.members +
+           " -- " + (g.discriminates ? "it discriminates" : "IT DISCRIMINATES NOTHING, which is why it is not used") +
+           ". That one IS guaranteed by v3558's routing.");
+    L.push("   'is imported by a gate named for something else' holds for " + g.holds + " of " + g.members +
+           " -- reported, NOT guaranteed" + (g.noGateAtAll.length
+               ? ". " + g.noGateAtAll.length + " reach NO GATE AT ALL and are the more orphaned class: " +
+                 g.noGateAtAll.join(", ")
+               : ". every member reaches some gate today"));
     L.push("");
     L.push("  " + MEASURED_V3601.notClaimed);
     return L;

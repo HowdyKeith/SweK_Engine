@@ -164,6 +164,17 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         // compactly rather than with an indent: this is a 4,072-row table with 443,405 references into it,
         // and an indent per line is a megabyte of spaces.
         fs.writeFileSync(path.join(ENG, RECORD), JSON.stringify(encode(out, {
+            // *** FIRST KEY ON PURPOSE, AND IT COST orphanScan ITS EYESIGHT TO LEARN WHY. ***
+            // tools/ship/orphanScan.mjs treats a GENERATED RECORD as a file that records references rather
+            // than one that makes them, and it asks the file what it is instead of matching its name --
+            // v3900's fix, after a name list let two records walk in. The property it asks for is a
+            // provenance key in the first 4 KB. This record shipped at v4567 WITHOUT ONE, and it is a 3.5 MB
+            // list of every path every gate reads, so every module named in it scanned as REACHED. The orphan
+            // candidate set went to ZERO over 4,058 files, and baselineHygiene duly reported all seven
+            // suppressions stale -- prescribing the deletion of protection on files that are still orphans,
+            // two of which a sweep has already taken once. The note below runs to ~700 characters, so this
+            // key goes FIRST rather than merely present: inside the window by construction, not by luck.
+            generatedFrom: "tools/ship/recordInputs.mjs",
             note: "What each gate READ, observed by running it once under tools/ship/inputProbe.mjs. `paths` " +
                   "is the shared table and each gate's `r`/`d` are indices into it; `hashes`/`dirHashes` are " +
                   "the content at record time, one per PATH, so a later run can ask what moved. TWO " +

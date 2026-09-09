@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/gateReach-selfcheck.mjs — v3318
 //
-// Run: node tools/ship/gateReach-selfcheck.mjs   (~5.8s — MEASURED v3941, was ~20s; it builds the import graph)
+// Run: node tools/ship/gateReach-selfcheck.mjs   (11.0 s — MEASURED v4571, was ~5.8s at v3941; it builds the import graph. OVER the 3,000 ms sweep budget, which is why its red went unread)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // gradedCoverage reports "50 of 124 physics modules WITH A SELFCHECK are reachable from a device bind". True,
@@ -11,8 +11,8 @@
 // gated -- by physicsSuite, three directories away. A filename heuristic would have called it ungated and been
 // wrong, which is why this walks the import graph instead.
 
-import fs from "node:fs";
 import { RENDER_ROOTS, reach, reachLines, physicsModules, PHYSICS_ROOTS } from "./gateReach.mjs";
+import { readCensus } from "./populationCensus.mjs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -111,7 +111,7 @@ for (const l of reachLines(r)) console.log("        " + l);
     // so the number moves with the tree and only an UNEXPLAINED move fails.
     // The check is kept here rather than deleted, because gateReach's ROOTS still must not change silently -- but
     // the count comes from the record now, so this can no longer go stale on its own.
-    const rec = (() => { try { return JSON.parse(fs.readFileSync("tools/ship/population-census.json", "utf8")); } catch { return null; } })();
+    const rec = readCensus();
     const EXPECTED_POPULATION = rec ? rec.total : null;
 
     // *** THIS PIN WAS RED ON ARRIVAL AT v3406, AND HAD BEEN FOR A WHILE. *** It expected 328 and the tree
@@ -156,6 +156,34 @@ for (const l of reachLines(r)) console.log("        " + l);
     //          case this pin exists to wave through ONCE SOMEBODY HAS LOOKED. A removal, or a diff that failed
     //          to reconcile, would have been the other kind and is the reason the pin is worth its noise.
     //          Re-recorded with writeCensus() AFTER compare() had been read, never before.
+    //   520 -> v4571. FOUND RED IN THE KILLED BUCKET v4568 OPENED, not by anybody watching: this gate costs
+    //          11.0 s against a 3,000 ms sweep budget, so no ship-time step has run it and the pin had been
+    //          reporting 472 against a moving tree for however long that took. THE THIRD TIME IT HAS ARRIVED
+    //          RED and the first time the reason was that nothing ran it at all, which is the failure mode
+    //          this comment predicted in 2 different words at v3552 -- "a pin that goes red and stays red
+    //          stops being a signal and becomes wallpaper" -- and then went one worse: a pin nobody runs is
+    //          not even wallpaper.
+    //          Counted the way this comment demands rather than raised until it passed: compare() reports
+    //          GREW, 48 ADDED, 0 REMOVED, reconciles:true, every one named. TWENTY are physics/render's path
+    //          tracer and microfacet arc (principled, subsurface, transmission, splitSum, rtPipeline,
+    //          pathTracerGpu and their Wgsl twins); THREE are physics/mesh from this session's own rounds
+    //          (meshCSG, uvLscm, uvUnwrap); FOUR are the vehicle arc (vehicle, raceCar, raceKnob,
+    //          wheelJoint); THREE physics/box3d (jointDrive, rayCast, sensorTrigger); THREE physics/xpbd
+    //          (rigidCouple, smallSteps, xpbdWgsl); TWO physics/crypto (secp256k1, bitcoinAddress); and
+    //          physics/character/terrainWalk.mjs and simulation/wallFollow.mjs, both built in this session.
+    //          GROWTH ONLY, IN AREAS THAT ARE OBVIOUSLY LIVE WORK, which is the case this pin exists to wave
+    //          through ONCE SOMEBODY HAS LOOKED. A removal, or a diff that failed to reconcile, would have
+    //          been the other kind. Re-recorded with writeCensus() AFTER compare() had been read, never
+    //          before.
+    //
+    // *** AND THE ROW HAD A DEFECT OF ITS OWN, WHICH IS WHY IT NOW ASKS THE MODULE RATHER THAN THE DISK. ***
+    // It read the record with fs.readFileSync("tools/ship/population-census.json") -- A RELATIVE PATH -- so
+    // its verdict depended on the CWD it was run from. Run from anywhere but the engine root the read threw,
+    // EXPECTED_POPULATION was null, and the row failed reporting "expected null and found 520": a gate saying
+    // the population changed when what actually changed was where you were standing. MEASURED, not reasoned
+    // about -- run from /tmp it fails on a tree it passes on from here. populationCensus.readCensus() has
+    // always resolved against the module's own location, so the fix is to call it, which is the same
+    // single-sourcing this comment demanded of the expected value at v3528.
     ok("!! the default population is ACCOUNTED FOR -- it may grow, but not silently",
         p.roots.join(",") === "physics,simulation,fluid" && p.total === EXPECTED_POPULATION,
         "expected " + EXPECTED_POPULATION + " (from the recorded census) and found " + p.total + ". A tool that silently changed what it counts would make every " +

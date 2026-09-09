@@ -412,6 +412,36 @@ export const NEXT_ROUNDS = [
             + "every window taken at v4555, which is not the same as proven.",
     },
     {
+        id: "unstamped-generated-records",
+        blocker: "OPEN",
+        what: "29 of the 35 JSON records under tools/ship/ carry NO provenance stamp, so the property-based rule "
+            + "tools/ship/orphanScan.mjs uses to tell a RECORD of references from a MAKER of them covers six of "
+            + "them. v3900 replaced a name list with that property precisely because a name list needs editing "
+            + "every time somebody writes a report, which is the maintenance nobody does -- and then 29 records "
+            + "arrived without the property.",
+        how: "The convention already exists and costs one line: populationCensus stamps generatedFrom, the "
+            + "baselines stamp captured. Add it at each WRITER, first key rather than merely present -- the "
+            + "check reads the first 4 KB and input-sets.json's note alone runs to ~700 characters -- then let "
+            + "orphanScan drop the file from its corpus by property. The narrower half is a gate: a record "
+            + "under tools/ship/ that is written by a tool and names module paths must declare its provenance, "
+            + "which is checkable and would have caught v4567 the day it landed. tools/ship/frozenRecords.mjs "
+            + "already walks these records and knows which are generated.",
+        why: "*** ONE UNSTAMPED RECORD TOOK orphanScan TO ZERO CANDIDATES OVER 4,058 FILES. *** input-sets.json "
+            + "shipped at v4567 as a 3.5 MB list of every path every gate reads, with no stamp. Every module "
+            + "named in it scanned as REACHED, the orphan candidate set collapsed to nothing, and "
+            + "baselineHygiene reported all seven suppressions stale -- prescribing the deletion of protection "
+            + "on files that are still orphans, two of which the v3159 sweep already deleted once and had to be "
+            + "restored from a shipped zip. THIS IS THE THIRD TIME: v3126 excluded orphan-baseline.json by "
+            + "name, v3900 found two more had walked in and made it a property, v4009 found a hand-written "
+            + "report the property could not see, and v4571 found the property working perfectly against a "
+            + "record that simply did not carry it. Each round fixed the instance in front of it. The remaining "
+            + "28 are the instances not yet in front of anybody.",
+        upstream: "Nothing blocks it. The judgement it needs is which records are genuinely GENERATED -- a "
+            + "fixture somebody hand-wrote is not, and stamping it would be a lie about its provenance that "
+            + "future rounds would read as licence to regenerate it. The tsl-*-fixture.json family is the "
+            + "population to decide about first, and deciding is most of the round.",
+    },
+    {
         id: "hand-spelled-writers",
         blocker: "OPEN",
         what: "A field-parity check between what each record file's WRITER emits and what its READERS consume. Three times in one session a writer that spells its fields by hand dropped one a reader needed, and every time the failure looked like success rather than like an error.",

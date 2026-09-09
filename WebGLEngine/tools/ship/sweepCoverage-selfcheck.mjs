@@ -859,20 +859,33 @@ console.log("\n*** THE BUCKET NOTHING COULD RUN, RUN (v4568) ***");
     const led = JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "sweep-rotation.json"), "utf8"));
     const pass = (led.rotated || []).filter((r) => r.at === R.stamp);
     const fin = pass.filter((r) => r.code !== "timeout/signal");
-    ok("!! *** 103 OF THE 140 THAT COULD NEVER BE RUN NOW HAVE A VERDICT, AND FIVE OF THEM ARE RED ***",
+    // *** v4571 -- A RED THAT WAS REPAIRED MUST NOT REDDEN THIS ROW, WHICH IT DID. ***
+    // The floor read `fin.filter(r => r.code !== 0).length >= R.red - 1` -- "the pass found five reds and at
+    // least four must still be red". All five were repaired at v4571 and the row went red for it: a check
+    // that punishes the repair it exists to prompt. redCensus.mjs's own arithmetic hit this at v4313 and
+    // wrote it down -- "the census's arithmetic punished the pruning the census demands" -- and the fix there
+    // is the fix here: a repair is a TERM, not an exception. What must hold is that every red the pass found
+    // is still ACCOUNTED FOR, either as a red in the ledger today or as a recorded repair.
+    const fixedGates = new Set([...RC.FIXED_AT_V4279, ...RC.FIXED_SINCE_V4279, ...RC.FIXED_SINCE_V4408]
+        .map((e) => (typeof e === "string" ? e : e.gate)));
+    const stillRed = new Set(fin.filter((r) => r.code !== 0).map((r) => r.gate));
+    const unaccountedReds = R.reds.filter((g) => !stillRed.has(g) && !fixedGates.has(g));
+    ok("!! *** 103 OF THE 140 THAT COULD NEVER BE RUN NOW HAVE A VERDICT, AND EVERY RED IS ACCOUNTED FOR ***",
        // A PROPORTIONAL FLOOR, not a fixed slack of two, for the reason the v4565 row above already
        // records: the ledger merges BY GATE, so every gate re-timed by name since the pass leaves this
        // group. Three had within the hour -- domScope, redCensus and placementRender, each re-timed for a
        // reason this round names -- and a tolerance of two reddened on the third. What must hold is that
        // the group has not COLLAPSED, which would mean the ledger was rewritten wholesale.
        pass.length >= R.ran * 0.9 && fin.length >= R.finished * 0.9 &&
-       fin.filter((r) => r.code !== 0).length >= R.red - 1 &&
+       unaccountedReds.length === 0 &&
        fin.filter((r) => r.ms < SC.CAP_MS).length >= R.underOldCap * 0.9,
        `${pass.length} rows carry the pass stamp and ${fin.length} of them FINISHED, against ${R.ran} run and ` +
        `${R.finished} recorded. ${fin.filter((r) => r.ms < SC.CAP_MS).length} came in under the ${SC.CAP_MS} ms ` +
-       `cap that exiled them and ${fin.filter((r) => r.code !== 0).length} are red. The counts may exceed the ` +
-       "record's by a row or two and must not fall short: a gate re-timed by name since the pass carries a " +
-       "later stamp and leaves this group, which is the ledger's merge-by-gate rule, not a loss.");
+       `cap that exiled them. Of the ${R.red} reds the pass found, ${stillRed.size ? [...stillRed].length : 0} ` +
+       `are still red in the ledger and ${R.reds.filter((g) => fixedGates.has(g)).length} carry a recorded ` +
+       "repair -- none unaccounted. The counts may exceed the record's by a row or two and must not fall " +
+       "short: a gate re-timed by name since the pass carries a later stamp and leaves this group, which is " +
+       "the ledger's merge-by-gate rule, not a loss.");
     // *** THE WITNESS, CHECKED AGAINST THE LIVE FILE. *** 20,125 ms on file and 51 ms alone is not a slow
     // gate; it is a reading that was never about this gate, and nothing could ever have corrected it.
     const w = R.witness;
@@ -881,16 +894,27 @@ console.log("\n*** THE BUCKET NOTHING COULD RUN, RUN (v4568) ***");
        `${w.gate.split("/").pop()} reads ${(t.timings || {})[w.gate]} ms now against the ${w.filedMs} ms that ` +
        `exiled it -- ${Math.round(w.filedMs / w.aloneMs)}x. It is the only one of the 140 to rejoin the sweep; ` +
        "the other 34 that beat the old cap are back in the over-budget pool, where the rotation can reach them.");
-    // Every red the pass found must be REGISTERED, or the round ends by leaving reds nobody named -- which is
-    // the fault the whole bucket is made of, one level up.
+    // Every red the pass found must be NAMED SOMEWHERE -- registered while it stands, or recorded as repaired
+    // once it does not. The round ending by leaving reds nobody named is the fault the whole bucket is made
+    // of, one level up; the round ending by leaving REPAIRS nobody recorded is the same fault mirrored.
+    //
+    // *** v4571 -- THIS ROW DEMANDED THE REGISTER STILL HOLD ALL FIVE, SO REPAIRING THEM BROKE IT. ***
+    // It read `unregistered.length === 0 && RED_AT_V4568.length === R.reds.length`, which can only hold while
+    // every red the pass found is still red. All five were repaired at v4571 and RED_AT_V4568 was emptied BY
+    // REPAIR -- the outcome this row exists to prompt -- and the row called it a failure. A register entry and
+    // a repair record are the two halves of one account, and only their UNION is the property.
     const reg = new Set(RC.ALL_REGISTERED.map((e) => e.gate));
-    const unregistered = R.reds.filter((g) => !reg.has(g));
-    ok("!! *** EVERY RED THIS PASS FOUND IS IN THE REGISTER BY NAME, with what it says ***",
-       unregistered.length === 0 && RC.RED_AT_V4568.length === R.reds.length &&
-       RC.RED_AT_V4568.every((e) => typeof e.why === "string" && e.why.length > 80),
-       unregistered.length ? "UNREGISTERED: " + unregistered.join(", ")
-         : `${RC.RED_AT_V4568.length} registered, each carrying its own reason. A red that is named is a ` +
-           "known red; a red sitting over the cap is what this round exists to end.");
+    const unnamed = R.reds.filter((g) => !reg.has(g) && !fixedGates.has(g));
+    const stillListed = RC.RED_AT_V4568;
+    ok("!! *** EVERY RED THIS PASS FOUND IS NAMED -- registered while it stands, or recorded once repaired ***",
+       unnamed.length === 0 &&
+       stillListed.length + R.reds.filter((g) => fixedGates.has(g)).length === R.reds.length &&
+       stillListed.every((e) => typeof e.why === "string" && e.why.length > 80),
+       unnamed.length ? "NAMED NOWHERE: " + unnamed.join(", ")
+         : `${stillListed.length} still registered, each carrying its own reason, and ` +
+           `${R.reds.filter((g) => fixedGates.has(g)).length} recorded as repaired -- ${R.reds.length} of ` +
+           `${R.reds.length} accounted. A red that is named is a known red; a red sitting over the cap is what ` +
+           "this round exists to end, and a repair nobody wrote down is how the next round re-finds it.");
     ok("  ...and the sixth is recorded as the PASS'S OWN false red, not as a finding",
        R.falseRed === 1 && (t.codes || {})[R.falseRedWas.gate] === 0 &&
        (t.finished || {})[R.falseRedWas.gate] === true && !reg.has(R.falseRedWas.gate),

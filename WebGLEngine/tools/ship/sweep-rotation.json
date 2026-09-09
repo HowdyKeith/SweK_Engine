@@ -1,6 +1,6 @@
 {
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed.",
- "at": "2026-09-09T18:54:50.543Z",
+ "at": "2026-09-09T23:02:04.698Z",
  "budgetMs": 3000,
  "lastRun": 1,
  "rotated": [
@@ -1385,10 +1385,10 @@
   },
   {
    "gate": "tools/ship/baselineHygiene-selfcheck.mjs",
-   "ms": 31472,
-   "code": 1,
-   "priorMs": 20045,
-   "at": "2026-09-09T17:59:42.840Z"
+   "ms": 31199,
+   "code": 0,
+   "priorMs": 20034,
+   "at": "2026-09-09T22:59:30.387Z"
   },
   {
    "gate": "tools/ship/bellPage-selfcheck.mjs",
@@ -1511,10 +1511,10 @@
   },
   {
    "gate": "tools/ship/commentFalsePass-selfcheck.mjs",
-   "ms": 9649,
-   "code": 1,
-   "priorMs": 20025,
-   "at": "2026-09-09T17:59:42.840Z"
+   "ms": 9493,
+   "code": 0,
+   "priorMs": 9649,
+   "at": "2026-09-09T22:57:38.648Z"
   },
   {
    "gate": "tools/ship/consoleOrder-selfcheck.mjs",
@@ -1756,10 +1756,10 @@
   },
   {
    "gate": "tools/ship/gateReach-selfcheck.mjs",
-   "ms": 11033,
-   "code": 1,
-   "priorMs": 20157,
-   "at": "2026-09-09T17:59:42.840Z"
+   "ms": 10586,
+   "code": 0,
+   "priorMs": 11033,
+   "at": "2026-09-09T22:57:49.346Z"
   },
   {
    "gate": "tools/ship/gateReport-selfcheck.mjs",
@@ -1770,10 +1770,10 @@
   },
   {
    "gate": "tools/ship/gateSelection-selfcheck.mjs",
-   "ms": 70941,
-   "code": 1,
-   "priorMs": 20165,
-   "at": "2026-09-09T17:59:42.840Z"
+   "ms": 69346,
+   "code": 0,
+   "priorMs": 20039,
+   "at": "2026-09-09T23:00:39.847Z"
   },
   {
    "gate": "tools/ship/gatesBridge-selfcheck.mjs",
@@ -2036,10 +2036,10 @@
   },
   {
    "gate": "tools/ship/orphanDisposition-selfcheck.mjs",
-   "ms": 87648,
-   "code": 1,
-   "priorMs": 20052,
-   "at": "2026-09-09T17:59:42.840Z"
+   "ms": 84739,
+   "code": 0,
+   "priorMs": 20036,
+   "at": "2026-09-09T23:02:04.698Z"
   },
   {
    "gate": "tools/ship/orphanScan-selfcheck.mjs",

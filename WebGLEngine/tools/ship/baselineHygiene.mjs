@@ -48,6 +48,26 @@ export function orphanBaselineHygiene(engRoot, liveCandidates) {
                         "candidate set would make EVERY baseline entry look stale, and clearing a live " +
                         "suppression un-protects the file it was written to save. Pass orphanScan(root).candidates.");
     }
+    // v4571 -- *** AND AN EMPTY ARRAY MAKES THE IDENTICAL WRONG CLAIM, WHICH THE GUARD ABOVE LET THROUGH. ***
+    // v3222 refused `undefined` because `new Set(undefined)` is an empty set and the tool then answered "9 of 9
+    // STALE" with total confidence. It fixed the SYMPTOM IT HAD SEEN and not the property: a caller handing over
+    // a genuinely empty array gets that same answer, by the same arithmetic, and this time it arrived.
+    //
+    // MEASURED at v4571: orphanScan returned ZERO candidates over 4,058 code files, so all seven entries read as
+    // stale and the gate prescribed deleting every suppression in the file. The cause was two records naming the
+    // seven as data -- see the notes in orphanScan.mjs -- but the CAUSE IS NOT THE POINT. A zero-candidate scan
+    // over four thousand files is a broken instrument, not a clean tree, and this function is the last thing
+    // standing between that and a deletion. "I was not told", "nothing is live" and "my scan came back empty" are
+    // three claims and only one of them is safe to act on.
+    //
+    // The floor is ZERO rather than a fraction on purpose: a threshold would be a number nobody chose, and the
+    // honest statement is the categorical one -- an empty answer is not evidence.
+    if (liveCandidates.length === 0) {
+        throw new Error("orphanBaselineHygiene: the live candidate set is EMPTY. Refusing to answer -- with no " +
+                        "candidates every entry reads as stale, which prescribes deleting the whole baseline " +
+                        "and un-protecting files a sweep has already taken once. A scan that finds no orphans " +
+                        "at all in this tree is a broken scan, not a clean tree: check orphanScan first.");
+    }
     const p = path.join(engRoot, "tools", "ship", "orphan-baseline.json");
     const base = JSON.parse(fs.readFileSync(p, "utf8"));
     const live = new Set(liveCandidates);

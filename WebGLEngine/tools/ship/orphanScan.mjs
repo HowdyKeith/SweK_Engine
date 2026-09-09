@@ -100,6 +100,17 @@ const REPORT_MODULE = {
     "ssao-compare.html": "the human-readable rendering of the same report -- imports ssaoCompare.mjs for real " +
         "(that import stands on its own) but its page text also NAMES both implementations by path in prose, " +
         "which is the same documentation-not-a-load-path shape as the .mjs table it renders",
+    // v4571 -- *** THE REGISTER OF A FAILURE BECAME THE REASON THE FAILURE PERSISTED. ***
+    // These two RECORD what gates said. register-audit.mjs stores each red gate's first failing line
+    // VERBATIM; redCensus.mjs stores the reason each red was registered. baselineHygiene's failing line is
+    // "STALE, DELETE THESE: <seven paths>" -- so the moment that red was written down, both files contained
+    // all seven paths as string data, orphanScan read them as mentions, and the seven stopped being
+    // candidates. The gate's own failure message is what made its next run fail: recording the red is what
+    // kept it red. Neither file imports anything it names; naming a path IS their job.
+    "tools/ship/redCensus.mjs": "the register of red gates -- it stores the REASON each red was registered, " +
+        "and a reason quotes the paths the gate named. A record of what failed is not a call site",
+    "tools/ship/register-audit.mjs": "the recorded output of the register's own audit -- each entry holds a " +
+        "gate's first failing line verbatim, so every path a red gate prints lands here as data",
 };
 const isReportModule = (rel) => Object.prototype.hasOwnProperty.call(REPORT_MODULE, rel);
 const CODE = /\.(js|mjs)$/;
