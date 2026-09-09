@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SweK -- AI-presence orb (murmur-web port, "still" species)</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #050608; color: #d7e0d9; font: 13px/1.4 ui-monospace, Menlo, Consolas, monospace; }
+  #stage { display: block; width: 100vw; height: 100vh; }
+  #hud { position: fixed; left: 10px; top: 10px; max-width: 40em; background: rgba(6, 8, 10, 0.82); padding: 10px 12px; border: 1px solid #23302a; }
+  #hud .row { margin: 6px 0; }
+  button { background: #10151a; color: #9fe0b8; border: 1px solid #2a3a30; border-radius: 3px; padding: 5px 10px; margin: 2px 4px 2px 0; font: inherit; cursor: pointer; }
+  button.active { background: #1c3a2a; border-color: #4fbf88; color: #eafff2; }
+  button:hover { border-color: #4fbf88; }
+  #liveRow input[type=range] { width: 100px; vertical-align: middle; }
+  a { color: #9fe0b8; }
+  code { color: #7fb0a0; }
+</style>
+</head>
+<body>
+<!--
+  krispuckett/murmur-web (MIT) -- "responsive AI presence orbs for the web" -- hand-ported per
+  tools/ship/nextRounds.mjs's ai-presence-orb-widget entry: NOT the vgpu-dependent package (a second
+  rendering stack alongside this tree's own gfx/device.js), but the DESIGN, as a TSL graph
+  (render/aiPresenceOrbTsl.mjs) plus a pure-JS state machine (render/aiPresenceOrbState.mjs), the same
+  "port the design, hold the render/verification to this tree's own conventions" shape
+  render/swiftShaderPass.js used for this SAME author's other repo. Scope, named plainly: murmur-web has
+  18 material "species"; this page shows exactly one, "still" -- described in its own source as
+  "the minimal hero: a quiet glass sphere, one slow internal glint". tools/ship/aiPresenceOrb-selfcheck.mjs
+  is the permanent gate (hand-proven envelope/colour math, a real WebGL2 render, a real sabotage).
+-->
+<canvas id="stage"></canvas>
+<div id="hud">
+  <div class="row"><b>SweK AI-presence orb</b> &mdash; <span id="route">starting&hellip;</span></div>
+  <div class="row">state: <b id="stateLabel">idle</b> &middot; glow=<span id="glowLabel">-</span> speed=<span id="speedLabel">-</span></div>
+  <div class="row" id="stateButtons"></div>
+  <div class="row" id="liveRow">
+    voice <input id="voice" type="range" min="0" max="1" step="0.01" value="0">
+    activity <input id="activity" type="range" min="0" max="1" step="0.01" value="0">
+    <span style="color:#7c9385">(smoothed live-signal knobs, asymmetric attack/release -- see render/aiPresenceOrbState.mjs)</span>
+  </div>
+  <div class="row" style="color:#7c9385">
+    Listens for real <code>engine:wakeState</code> / <code>engine:voiceTranscript</code> / <code>engine:voiceReply</code>
+    window events if anything on the page dispatches them (idle/listening/thinking/responding); standalone here, the
+    buttons above drive it. success/error have no live event source yet in this tree -- trigger them by hand.
+    <a href="./tsl-probe.html">the TSL probe</a>
+  </div>
+</div>
+<script type="module">
+import * as THREE from "./vendor/three-webgpu/three.webgpu.js";
+import * as TSL from "./vendor/three-webgpu/three.tsl.js";
+import { makeAiPresenceOrbTsl } from "./render/aiPresenceOrbTsl.mjs";
+import { createPresenceState, STATE_NAMES } from "./render/aiPresenceOrbState.mjs";
+
+const say = (s, bad) => { const el = document.getElementById("route"); el.innerHTML = s; el.style.color = bad ? "#f08080" : ""; };
+const cv = document.getElementById("stage");
+const params = new URLSearchParams(location.search);
+function size() { const d = window.devicePixelRatio || 1; cv.width = Math.round(innerWidth * d); cv.height = Math.round(innerHeight * d); }
+size();
+
+let renderer = null;
+try {
+    renderer = new THREE.WebGPURenderer({ canvas: cv, forceWebGL: params.get("webgl") === "1", antialias: false });
+    await renderer.init();
+} catch (e) { say("WebGPURenderer could not start: " + e.message, true); throw e; }
+const backend = renderer.backend.isWebGPUBackend ? "WebGPU (WGSL from the TSL graph)" : "WebGL2 backend (GLSL from the TSL graph)";
+
+const fx = makeAiPresenceOrbTsl(THREE, TSL, {});
+const state = createPresenceState("idle");
+
+const stateButtons = document.getElementById("stateButtons");
+const buttons = {};
+for (const name of STATE_NAMES) {
+    const b = document.createElement("button");
+    b.textContent = name;
+    b.addEventListener("click", () => state.setState(name));
+    stateButtons.appendChild(b);
+    buttons[name] = b;
+}
+
+// Real, if anything on the page ever dispatches them -- ui/wakeWord.js's own idle/capturing/busy states and
+// ui/sttLayer.js's transcript/reply events, per this round's own research into what this tree already fires.
+window.addEventListener("engine:wakeState", (e) => {
+    const s = e.detail && e.detail.state;
+    if (s === "idle") state.setState("idle");
+    else if (s === "capturing") state.setState("listening");
+    else if (s === "busy") state.setState("thinking");
+});
+window.addEventListener("engine:voiceTranscript", () => state.setState("thinking"));
+window.addEventListener("engine:voiceReply", () => state.setState("responding"));
+
+const voiceSlider = document.getElementById("voice"), activitySlider = document.getElementById("activity");
+const stateLabel = document.getElementById("stateLabel"), glowLabel = document.getElementById("glowLabel"), speedLabel = document.getElementById("speedLabel");
+
+say(`three ${THREE.REVISION} &middot; ${backend} &middot; murmur-web's "still" orb as TSL nodes`);
+let last = performance.now(), t0 = last;
+function frame(now) {
+    // *** MEASURED, NOT ASSUMED SAFE: THE VERY FIRST rAF CALLBACK'S timestamp CAN PRECEDE THE performance.now()
+    // TAKEN JUST BEFORE REQUESTING IT. *** A real headless run hit createPresenceState.tick's own dt>=0 guard
+    // on frame 1 -- rAF's timestamp is when the browser began the frame sequence, not necessarily later than a
+    // synchronous performance.now() call made moments before scheduling it. Clamped at 0, not removed upstream:
+    // the guard itself stays strict (a genuinely negative dt from misuse elsewhere is still a bug worth throwing on).
+    const dt = Math.max(0, Math.min(0.1, (now - last) / 1000)); last = now;
+    if (cv.width !== Math.round(innerWidth * (window.devicePixelRatio || 1))) { size(); renderer.setSize(cv.width, cv.height, false); }
+
+    state.tick(dt, { voice: Number(voiceSlider.value), activity: Number(activitySlider.value) });
+    const p = state.getParams();
+    fx.setKnobs({
+        time: (now - t0) / 1000 * p.speed,
+        glow: p.glow, depth: p.depth, hueShift: p.hueShift,
+        presence: 0.5, clarity: 0.6, glintRate: 0.3, voice: p.voice,
+        aspect: cv.width / cv.height,
+    });
+    for (const [name, b] of Object.entries(buttons)) b.classList.toggle("active", name === p.state);
+    stateLabel.textContent = p.state; glowLabel.textContent = p.glow.toFixed(2); speedLabel.textContent = p.speed.toFixed(2);
+
+    renderer.render(fx.scene, fx.camera);
+    requestAnimationFrame(frame);
+}
+renderer.setSize(cv.width, cv.height, false);
+requestAnimationFrame(frame);
+</script>
+<script type="module" src="/ui/originNotice.js"></script>
+</body>
+</html>
