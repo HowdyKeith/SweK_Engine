@@ -389,6 +389,16 @@ export const NEXT_ROUNDS = [
         why: "A genuine, verified absence (zero hits, not an assumption) but a speculative fix -- logged because it is the spec-recommended standard and the gap is real, not because any asset in this tree has shown a wrong or seam-mismatched normal-map result under the current derivative-based fallback.",
         upstream: "no established want yet -- no gate or visual comparison has flagged a normal-mapping discrepancy attributable to tangent generation. Logged so the standard technique and its exact WASM binding are on file if such an artifact is ever found on an imported asset with authored normal maps.",
     },
+    // ---- v4571: a kripken (Alon Zakai -- Emscripten/Binaryen author) repository sweep -- one MEASURED win, found by
+    // installing the tool and running it, not by reading its README.
+    {
+        id: "wasm-opt-box3d-postlink",
+        blocker: "OPEN",
+        what: "kripken/binaryen (Apache-2.0) is the WebAssembly optimizer toolchain (wasm-opt) underneath Emscripten, AssemblyScript, wasm-pack, and effectively every other WASM pipeline. This tree's own physics/box3d/build-box3d-wasm-clang.sh hand-links box3d.wasm with clang+wasm-ld directly (deliberately, NOT emscripten -- its own header explains why) at -O2, then ships the linked binary with no post-link pass. Checked by actually running it, not assuming a gap: installed binaryen (apt-get, 108-1), ran `wasm-opt -Oz` and `-O3` against the CHECKED-IN vendor/box3d/box3d.wasm (973,188 bytes) -- Oz produced 817,360 bytes (16.0% smaller, ~153 KB saved) and O3 820,518 bytes (15.7% smaller). Re-ran the build script's own self-test (swk_world_create, swk_body_box, 120 steps of swk_world_step, swk_body_count === 1) against the -Oz output: PASSES, identical to the unoptimized binary. Export surface unchanged: WebAssembly.Module.exports() reports 48 exports before and after, byte-identical in name and count.",
+        how: "One extra line in build-box3d-wasm-clang.sh after the existing `wasm-ld ... -o box3d.wasm` step: `wasm-opt -Oz box3d.wasm -o box3d.wasm` (or -O3, which measured 0.3 percentage points larger for likely-negligible speed difference -- worth an actual step-time comparison before picking one, not assumed). Binaryen is a BUILD-TIME tool only -- nothing runtime-side changes, no new vendored JS, no new licence surface at runtime (Apache-2.0, build tooling never ships to the browser).",
+        why: "A verified, measured, near-zero-risk win on a file this tree already treats as byte-budget-sensitive (the same discipline gpu/gltfKtx2.js and tools/ship/textureBytes.mjs apply to textures). 153 KB is a real fraction of a 948 KB physics module fetched by every page that loads box3d, and the self-test proving behaviour is unchanged is the same one the build script already runs on the unoptimized output -- this did not invent a new bar, it cleared the existing one on the optimized file too.",
+        upstream: "no established want yet -- nobody has asked for a smaller box3d.wasm, and the size has not been measured against a page-weight budget the way gltfKtx2's transcoder was. Logged with the measurement already done specifically so adopting it is a one-line change, not a re-investigation.",
+    },
 ];
 
 // *** v4549 -- THIS REPORT WAS HIDING THREE OF ITS OWN OPEN ITEMS, AND HAD BEEN FOR SEVERAL ROUNDS. ***
