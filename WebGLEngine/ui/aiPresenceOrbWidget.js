@@ -28,11 +28,22 @@
 // mount); prefers-reduced-motion still shows the current state's colour (time is frozen, not blanked); devicePixelRatio capped at 2, the
 // same ceiling render/badTvTsl.mjs's own demo pages use.
 "use strict";
+import { SECONDS_PER_WORD } from "./captionClock.js";
 
 const DPR_CAP = 2;
 const SIZE_CSS_PX = 44;   // matches ui/miniIconStack.js's ICON_W (34) plus a visible margin -- a presence orb reads smaller than its clickable footprint
 const RAIL_LEFT_PX = 44;  // ui/miniIconStack.js's own left rail offset (v1967 -- clears the left-edge lcars-minitabs)
 const RAIL_BOTTOM_PX = 340;   // clear of the rail's live icon count today (6 icons * 48px gap from bottom:60 tops out near 300) with headroom for more
+
+// SUCCESS/ERROR SETTLE TIMING -- see the engine:voiceReply handler below for why these exist at all (a state
+// change can't be seen in zero rendered frames). RESPONDING_HOLD_*_S estimate how long the reply will take to
+// speak from its own word count, at SECONDS_PER_WORD -- the SAME "a guessed clock must not look like a
+// measured one" estimate ui/captionClock.js already argues for and names (0.28s/word); reused rather than a
+// second invented number for the same guess. SUCCESS_HOLD_MS/ERROR_HOLD_MS clear the state back to idle after
+// a beat, so the orb reflects the CURRENT truth rather than announcing a stale outcome indefinitely.
+const RESPONDING_HOLD_MIN_S = 1.2, RESPONDING_HOLD_MAX_S = 8;
+const SUCCESS_HOLD_MS = 3000;   // render/aiPresenceOrbState.mjs's SWELL_DURATION (1.5s) to fully taper, plus a beat to register
+const ERROR_HOLD_MS = 4000;     // its STUTTER_DURATION (0.5s) to taper, plus longer -- a failure is worth noticing
 
 let _mounted = null;
 
@@ -105,17 +116,58 @@ export async function mountAiPresenceOrbWidget(opts = {}) {
     window.addEventListener("resize", resize);
 
     // real live signals this engine already dispatches (ai-presence-orb.html's own wiring, verbatim) --
-    // idle/listening/thinking/responding react to something real; success/error have no live source in this
-    // engine yet (tools/ship/nextRounds.mjs names the /ai/chat call site as the remaining piece) and are
-    // exposed on window.aiPresenceOrb below for manual/console triggering until that exists.
+    // idle/listening/thinking/responding react to something real, and so now do success/error: ui/sttLayer.js's
+    // converseText() is the one genuine /ai/chat consumer with a real, single, user-facing outcome (the other
+    // two matches for "/ai/chat" in this tree are a settings-panel connectivity test and a bare console
+    // primitive with no fixed caller -- neither is a real interaction worth reacting to). window.aiPresenceOrb
+    // below still exists for manual/console triggering too.
+    let settleTimer = null;
+    function clearSettle() { if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; } }
+
     window.addEventListener("engine:wakeState", (e) => {
+        clearSettle();
         const s = e.detail && e.detail.state;
         if (s === "idle") state.setState("idle");
         else if (s === "capturing") state.setState("listening");
         else if (s === "busy") state.setState("thinking");
     });
-    window.addEventListener("engine:voiceTranscript", () => state.setState("thinking"));
-    window.addEventListener("engine:voiceReply", () => state.setState("responding"));
+    window.addEventListener("engine:voiceTranscript", () => { clearSettle(); state.setState("thinking"); });
+    // *** WHY THIS DOESN'T JUST setState("success") HERE, DIRECTLY: *** it would be invisible. setState() only
+    // moves cur/prev/transitionT -- nothing renders until the next tick()+render() pair, one rAF frame later at
+    // best. A second setState() call before that frame (which is exactly what firing "success" and then
+    // "responding" back to back, synchronously, in the same JS task would be) overwrites the first with zero
+    // frames ever having shown it -- a state nobody could ever have seen, gated or not. So "responding" fires
+    // immediately (unchanged from before this round -- ui/aiPresenceOrbWidget-selfcheck.mjs's section 2 still
+    // covers it), and "success" is scheduled far enough out to actually get screen time: an estimated speaking
+    // duration for the reply, cancelled by ANY new real event in the meantime (clearSettle(), called at the top
+    // of every handler here) so a stale timer from an old turn can never flip the orb out of context later.
+    window.addEventListener("engine:voiceReply", (e) => {
+        clearSettle();
+        state.setState("responding");
+        const text = (e.detail && e.detail.text) || "";
+        const words = text.trim() ? text.trim().split(/\s+/).filter(Boolean).length : 0;
+        const holdS = Math.min(RESPONDING_HOLD_MAX_S, Math.max(RESPONDING_HOLD_MIN_S, words * SECONDS_PER_WORD));
+        settleTimer = setTimeout(() => {
+            settleTimer = null;
+            if (state.state !== "responding") return;   // interrupted by something newer -- belt-and-suspenders, clearSettle() above should already have caught it
+            state.setState("success");
+            settleTimer = setTimeout(() => {
+                settleTimer = null;
+                if (state.state === "success") state.setState("idle");
+            }, SUCCESS_HOLD_MS);
+        }, holdS * 1000);
+    });
+    // the real signal ui/sttLayer.js's converseText() had NONE of before this round -- a failed /ai/chat call
+    // (network error, ai.ok false, or an empty reply) left the orb sitting wherever it was, forever, with no
+    // indication anything had gone wrong.
+    window.addEventListener("engine:voiceError", () => {
+        clearSettle();
+        state.setState("error");
+        settleTimer = setTimeout(() => {
+            settleTimer = null;
+            if (state.state === "error") state.setState("idle");
+        }, ERROR_HOLD_MS);
+    });
 
     const reducedMotion = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
     let last = null, t0 = null, running = true, rafHandle = null;
@@ -148,6 +200,7 @@ export async function mountAiPresenceOrbWidget(opts = {}) {
         remove() {
             running = false;
             if (rafHandle) cancelAnimationFrame(rafHandle);
+            clearSettle();
             window.removeEventListener("resize", resize);
             canvas.remove();
             if (_mounted === handle) _mounted = null;

@@ -186,6 +186,69 @@ async function main() {
            /engine:wakeState/.test(widgetSrc) && /engine:voiceTranscript/.test(widgetSrc) && /engine:voiceReply/.test(widgetSrc));
     }
 
+    sec("7. *** SUCCESS/ERROR: WIRED TO REAL /ai/chat OUTCOMES, NOT JUST MANUAL/CONSOLE TRIGGERING ***");
+    {
+        // engine:voiceReply/engine:voiceError are the SAME events ui/sttLayer.js's converseText() dispatches on
+        // its own /ai/chat success/failure branches -- this drives the widget through them exactly as a real
+        // reply or a real failure would, rather than calling h.setState() directly (section 5 already covers
+        // that path). A direct setState("success") right after setState("responding") would be invisible (zero
+        // rendered frames between them), so the widget schedules the settle instead -- these waits are real
+        // wall-clock time past that schedule, not a race.
+        const OUTCOME_SCRIPT = `async ({ forceWebGL }) => {
+            const { mountAiPresenceOrbWidget } = await import("/ui/aiPresenceOrbWidget.js");
+            const h = await mountAiPresenceOrbWidget({ forceWebGL });
+            if (!h) return { mounted: false };
+            const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+            window.dispatchEvent(new CustomEvent("engine:voiceReply", { detail: { text: "ok", prompt: "hi" } }));
+            const immediatelyAfter = h.getState();
+            await wait(1600);                        // past the 1.2s RESPONDING_HOLD_MIN_S floor for a 1-word reply
+            const afterSettle = h.getState();
+            await wait(3000);                         // cumulative 4.6s, past the 4.2s success-hold idle-revert
+            const afterHold = h.getState();
+
+            // interruption: a real event before the settle timer fires must cancel it -- the orb must never
+            // later flip to "success" out of context, from a turn that has already moved on.
+            window.dispatchEvent(new CustomEvent("engine:voiceReply", { detail: { text: "ok", prompt: "hi" } }));
+            window.dispatchEvent(new CustomEvent("engine:wakeState", { detail: { state: "capturing" } }));
+            await wait(1600);                         // past where an UNCANCELLED settle would have fired (1.2s)
+            const afterInterrupt = h.getState();
+
+            window.dispatchEvent(new CustomEvent("engine:voiceError", { detail: { error: "no reply", prompt: "hi" } }));
+            const errorImmediate = h.getState();
+            await wait(4400);                         // past the 4.0s ERROR_HOLD_MS idle-revert
+            const afterErrorHold = h.getState();
+
+            h.remove();
+            return { mounted: true, immediatelyAfter, afterSettle, afterHold, afterInterrupt, errorImmediate, afterErrorHold };
+        }`;
+        const r7 = await runInEngineOrigin({ engineRoot: ENG, script: OUTCOME_SCRIPT, args: { forceWebGL: true } });
+        if (!r7.ok || !r7.result || !r7.result.mounted) {
+            ok("!! outcome-wiring harness ran", false, r7.ok ? JSON.stringify(r7.result) : "harness: " + r7.reason);
+        } else {
+            const R = r7.result;
+            if (r7.pageErrors && r7.pageErrors.length) report("page errors: " + r7.pageErrors.slice(0, 5).join(" | "));
+            ok("engine:voiceReply -> responding immediately (unchanged from section 2)", R.immediatelyAfter === "responding", `immediatelyAfter=${R.immediatelyAfter}`);
+            ok("!! ...then settles into success on its own, with no new event, after an estimated speaking hold", R.afterSettle === "success", `afterSettle=${R.afterSettle}`);
+            ok("!! ...then returns to idle after success's own hold -- the orb does not stay stuck announcing a stale outcome", R.afterHold === "idle", `afterHold=${R.afterHold}`);
+            ok("!! a real event arriving before the settle timer fires CANCELS it (no stale flip to success mid-conversation)", R.afterInterrupt === "listening", `afterInterrupt=${R.afterInterrupt}`);
+            ok("!! engine:voiceError -> error immediately -- the real signal ui/sttLayer.js's failure branch had NONE of, before this round", R.errorImmediate === "error", `errorImmediate=${R.errorImmediate}`);
+            ok("!! ...then also returns to idle after its own hold", R.afterErrorHold === "idle", `afterErrorHold=${R.afterErrorHold}`);
+        }
+    }
+
+    sec("8. *** ui/sttLayer.js's /ai/chat FAILURE BRANCH REALLY DISPATCHES engine:voiceError (SOURCE CHECK) ***");
+    {
+        const sttSrc = fs.readFileSync(path.join(ENG, "ui", "sttLayer.js"), "utf8");
+        const fnStart = sttSrc.indexOf("async function converseText");
+        ok("converseText() exists (the one real /ai/chat consumer this wiring targets)", fnStart >= 0);
+        const elseAt = sttSrc.indexOf("} else {", fnStart);
+        ok("!! its /ai/chat call has a failure branch", fnStart >= 0 && elseAt >= 0);
+        const elseBranch = elseAt >= 0 ? sttSrc.slice(elseAt, elseAt + 400) : "";
+        ok("!! ...and THAT branch (not merely somewhere else in the file) dispatches engine:voiceError",
+           /engine:voiceError/.test(elseBranch));
+    }
+
     console.log(fails ? "\naiPresenceOrbWidget-selfcheck: " + fails + " FAILED" : "\naiPresenceOrbWidget-selfcheck: all checks pass");
     process.exit(fails ? 1 : 0);
 }

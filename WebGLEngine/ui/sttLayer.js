@@ -96,7 +96,11 @@ export function installStt() {
             try { window.kpop?.speak?.(reply); } catch {}
             try { window.dispatchEvent(new CustomEvent("engine:voiceReply", { detail: { text: reply, prompt: text } })); } catch {}
             window.kpop?.info?.("Avatar", reply.slice(0, 140));
-        } else window.kpop?.info?.("AI", (ai && ai.error) || "no reply");
+        } else {
+            const err = (ai && ai.error) || "no reply";
+            window.kpop?.info?.("AI", err);
+            try { window.dispatchEvent(new CustomEvent("engine:voiceError", { detail: { error: err, prompt: text } })); } catch {}
+        }
         return { ok: true, transcript: text, reply };
     }
     async function converseStop(opts = {}) {
