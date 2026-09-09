@@ -625,6 +625,81 @@ export const RED_AT_V4535 = Object.freeze(RED_AT_V4535_GATES.map((gate) => Objec
     get derived() { return !!(auditRow(gate) && auditRow(gate).first); },
 })));
 
+// *** v4557 -- SIX GATES, ONE BRANCH, TWO CAUSES -- AND THE BRANCH HAS NOT MERGED, WHICH THIS LIST SAYS
+// PLAINLY RATHER THAN LEAVING IMPLIED. *** claude/shader-porting-swek-ozgvb0 re-vendored vendor/three-webgpu
+// from 0.178.0 to 0.185.1 (tools/ship/three-probe.json settled the pin question rig-side: Chrome 152 on
+// Windows runs both cleanly), and the re-vendor broke render/tslSource.mjs's transplant pipeline outright --
+// six gates failing, one crashing, at the start of this arc. Four rounds of fixes on that branch (the v4550
+// series: objectStruct's leaked bookkeeping field, r185's GLSL naming/hoisting staleness, vertex-displacement
+// misdetection, the GLSL texture flip flag, the compute dispatch guard) brought tslWide-selfcheck and
+// tslLoopBound-selfcheck to fully green and the rest down to what is registered here. NONE OF THIS IS TRUE OF
+// MAIN, which still runs three@0.178.0 and has never seen these six gates fail for either reason below --
+// this list travels with the branch, and if the branch never merges, neither should the accusation.
+//
+// TWO CAUSES, NOT ONE. Five of the six (everything but tslIsing) fail on exactly one thing: a
+// GPUTextureComponentSwizzle TypeError this sandbox's Chromium 141 throws building a WebGPU texture view --
+// the same box-not-fleet gap render/threeProbe.mjs has documented since v4319 ("0.185 was tried and refused
+// on THIS shell's Chromium"), now reproduced for the full render path (getShaderAsync AND renderAsync's own
+// render-target view) rather than just import. Keith's rig, three versions newer, is unaffected -- the probe
+// says so and the byte-exact comparisons that DO run on this box (tslRace-selfcheck section 6, 36864/36864
+// worst 0 on both backends; tslWide-selfcheck fully green) say the code the swizzle wall is blocking is
+// otherwise correct. The sixth, tslIsing, fails on something the swizzle wall never touches: a real three.js
+// TSL type-inference question, named and left open rather than guessed at, below.
+const WHY_V4557 = Object.freeze({
+    "tools/ship/tslSource-selfcheck.mjs":
+        "TypeError: The provided value is not of type 'GPUTextureComponentSwizzle'. Thrown inside three's own " +
+        "WebGPUBackend.createBindGroup when badTv's texture-sampling graph asks getShaderAsync for a WebGPU " +
+        "shader; this box's Chromium 141 does not implement the GPUTextureViewDescriptor.swizzle field three@" +
+        "0.185.1 passes. Section 1 (pure JS/logic, no browser) is fully green. CLEARS on any Chromium build " +
+        "new enough to carry GPUTextureComponentSwizzle -- not a code fix.",
+    "tools/ship/tslRace-selfcheck.mjs":
+        "Same TypeError, same cause, two sections: 'A TEXTURE ACROSS THE SHELL BOUNDARY' and 'AND A SAMPLER' " +
+        "both build a real WebGPU device to compare a generated pipeline against the fleets' own shipped one. " +
+        "66 of 68 checks pass, including the byte-exact Pixel-race comparison this arc's GLSL flip-flag fix " +
+        "was verified against (36864/36864, worst 0, both backends) -- the two swizzle failures are the only " +
+        "ones a real Chromium would not also see pass.",
+    "tools/ship/tsl-selfcheck.mjs":
+        "Same TypeError, raised from WebGPUBackend._getRenderPassDescriptor during renderAsync() rather than " +
+        "getShaderAsync -- the wall is not only a texture-sampling-path problem, it is anywhere three's WebGPU " +
+        "backend builds a texture view on this Chromium, including an ordinary render target. One cascading " +
+        "failure follows directly (a 'row 0' read that never happened because the webgpu backend never drew).",
+    "tools/ship/tslPhysics-selfcheck.mjs":
+        "Same TypeError, same renderAsync/render-target path as tsl-selfcheck, surfacing through devicePipelineFromTsl's " +
+        "own harness this time. 67 of 68 checks pass -- the compute-side fixes in this arc (the dispatch-guard " +
+        "strip, compute-local hoisting) took this gate from 11 PASS / 10 FAIL to 67 / 1 by themselves.",
+    "tools/ship/slugTsl-selfcheck.mjs":
+        "Same TypeError. 13 of 14 checks pass, including the two Slug-specific won't-do/roadmap checks this " +
+        "gate exists to hold.",
+    "tools/ship/tslIsing-selfcheck.mjs":
+        "NOT THE SWIZZLE WALL -- a different, still-open question in three's own TSL compiler. " +
+        "render/isingTsl.mjs builds its Philox config as `uniform(uvec4(0, 0, 0, 0)).label(\"cfg\")`; three's " +
+        "live r185 emission declares the field `cfg : vec4<f32>` in the WGSL struct rather than `vec4<u32>`, " +
+        "and the shell (correctly) expects the uvec4 the graph asked for -- 'uniform \"cfg\" is vec4 in the " +
+        "pass and uvec4 in the shell'. A quick experiment forcing each literal through uint() explicitly made " +
+        "it WORSE, not better (the field collapsed to a bare `f32` scalar, most likely constant-folded away in " +
+        "a minimal repro with no real downstream use) -- inconclusive rather than confirming, so nothing was " +
+        "changed in a correctness-critical numerical kernel on a guess. Needs a more careful look at how r185's " +
+        "compiler infers a uvec4 uniform's declared type from an all-zero-literal construction before either " +
+        "isingGpu.mjs or render/isingTsl.mjs is touched.",
+});
+
+export const RED_AT_V4557_GATES = Object.freeze([
+    "tools/ship/tslSource-selfcheck.mjs",
+    "tools/ship/tslRace-selfcheck.mjs",
+    "tools/ship/tsl-selfcheck.mjs",
+    "tools/ship/tslPhysics-selfcheck.mjs",
+    "tools/ship/slugTsl-selfcheck.mjs",
+    "tools/ship/tslIsing-selfcheck.mjs",
+]);
+
+export const RED_AT_V4557 = Object.freeze(RED_AT_V4557_GATES.map((gate) => Object.freeze({
+    gate,
+    why: WHY_V4557[gate] || null,
+    get ms() { const r = auditRow(gate); return r ? r.ms : null; },
+    get fails() { const r = auditRow(gate); return r && r.first ? r.first : (UNVERIFIED_LINE[gate] || null); },
+    get derived() { return !!(auditRow(gate) && auditRow(gate).first); },
+})));
+
 // *** v4536 -- THE REGISTER HAS SEVEN LISTS AND ITS RE-RUN COVERED ONE. ***
 //
 // redCensus-selfcheck section 2 exists to catch the one failure a register cannot survive: a gate that has
@@ -647,6 +722,7 @@ export const REGISTER_LISTS = Object.freeze([
     Object.freeze(["RED_AT_V4484", RED_AT_V4484]),
     Object.freeze(["RED_AT_V4531", RED_AT_V4531]),
     Object.freeze(["RED_AT_V4535", RED_AT_V4535]),
+    Object.freeze(["RED_AT_V4557", RED_AT_V4557]),
 ]);
 
 /** Every registered gate, once, with the list that named it. The `entry` is carried rather than spread, so
