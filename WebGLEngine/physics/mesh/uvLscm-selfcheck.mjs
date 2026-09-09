@@ -178,9 +178,16 @@ console.log("\n5. the real asset, end to end");
 // -- `grown` and `chartCount` -- so a separate "grown only" run was paying half a second to re-derive a number
 // the default run already reports. Each unwrap of this asset costs 500-700 ms and this gate has a 3,000 ms
 // budget to stay inside.
-const ABLATION = [["merged + oriented + nested", {}],
-                  ["shelf packer", { nest: false }]].map(([name, opt]) =>
-                      ({ name, r: unwrapCurved(glb.positions, glb.indices, opt) }));
+// ONE unwrap, not two. The second config differs from the first ONLY in its packer, and v4560 gave
+// unwrapCurved a `from` that reuses the weld, the merge and every chart's solve: 535 ms -> 3 ms for the
+// shelf run, measured, with the atlas area identical to the digit. That mattered this round because dropping
+// maxConformal to 1.05 makes the merge try 4,009 pairs instead of 1,265, which took this gate from 1,857 ms
+// to 2,500 against a 3,000 ms budget -- and a gate recorded over budget is skipped, so it is never re-timed,
+// so it stays over budget. The equivalence is not assumed: section 10 runs both paths on a sphere and
+// compares every placement.
+const BASE = unwrapCurved(glb.positions, glb.indices);
+const ABLATION = [{ name: "merged + oriented + nested", r: BASE },
+                  { name: "shelf packer", r: unwrapCurved(glb.positions, glb.indices, { nest: false, from: BASE }) }];
 const R = ABLATION[0].r;
 // pooling every chart's triangles into one map is what the cross-chart overlap question needs, and three
 // sections ask it; computed once here rather than three times.
@@ -386,7 +393,7 @@ console.log("\n8. *** SELF-OVERLAP: the failure every per-triangle metric calls 
 console.log("\n9. *** MERGE, SPLIT, ORIENT -- the three, ablated ***");
 {
     const rows = ABLATION.map(({ name, r }) => {
-        let tri = 0, fl = 0, ov = 0, worst = 0, cov = 0;
+        let tri = 0, fl = 0, ov = 0, worst = 0, cov = 0, above = 0;
         for (const c of r.charts) {
             cov += c.tris.length;
             for (const T of c.tris) {
@@ -395,17 +402,57 @@ console.log("\n9. *** MERGE, SPLIT, ORIENT -- the three, ablated ***");
             }
             const dd = distortion(r.weld.positions, c.tris, c.uv);
             fl += dd.flipped; worst = Math.max(worst, dd.conformal.max);
-        }
-        return { name, charts: r.chartCount, grown: r.grown, tri: 100 * tri, fl, ov, worst, cov };
+            if (dd.conformal.max > 1.05) above++;      // counted HERE rather than in a second pass over the
+        }                                             // same 448 charts: this gate has 420 ms of budget left
+        return { name, charts: r.chartCount, grown: r.grown, tri: 100 * tri, fl, ov, worst, cov, above };
     });
-    const merged = rows[0], grown = { charts: merged.grown, worst: 0, ov: 0 };
-    ok("!! *** MERGING CUTS THE CHARTS BY TWO THIRDS AND THE SEAMS BY MORE THAN HALF ***",
-       merged.charts < merged.grown * 0.4 && POOL[0].pairs === 0 && merged.fl === 0 && merged.worst <= 2.0,
+    const merged = rows[0];   // the placeholder `grown` object this line used to build is gone: see below
+    // *** THE SEAM COUNT IS MEASURED HERE RATHER THAN QUOTED. *** It was three fixed numbers in this row's
+    // prose -- "1875 of 4439 (42.2%) -> 804 (18.1%)" -- and by the time anything checked, the welded mesh had
+    // 4,509 interior edges and 1,903 of them cut. The percentage happened to survive; the counts did not. A
+    // MOVING QUANTITY WRITTEN AS A FIXED ONE is this tree's most-repeated defect, so it is computed: an edge
+    // shared by two triangles is a seam when its two triangles ended up in different charts, both before the
+    // merge and after it. charts() costs 29 ms to re-run, which buys a number that cannot go stale.
+    const eKey = (a, b) => (a < b ? a + "_" + b : b + "_" + a);
+    const eTris = new Map();
+    W.tris.forEach((t, i) => { for (const [a, b] of [[t[0], t[1]], [t[1], t[2]], [t[2], t[0]]]) {
+        const k = eKey(a, b); if (!eTris.has(k)) eTris.set(k, []); eTris.get(k).push(i); } });
+    let interior = 0; for (const v of eTris.values()) if (v.length === 2) interior++;
+    const cutBy = (owner) => { let c = 0;
+        for (const ts of eTris.values()) if (ts.length === 2 && owner.get(ts[0]) !== owner.get(ts[1])) c++;
+        return c; };
+    const triId = new Map(); W.tris.forEach((t, i) => triId.set([...t].sort((a, b) => a - b).join(","), i));
+    const grownOwner = new Map();
+    charts(W.positions, W.tris, { maxNormalDeg: 40 }).forEach((m, ci) => m.forEach((t) => grownOwner.set(t, ci)));
+    const mergedOwner = new Map();
+    R.charts.forEach((c, ci) => c.tris.forEach((T) => {
+        const i = triId.get([...T].sort((a, b) => a - b).join(",")); if (i !== undefined) mergedOwner.set(i, ci); }));
+    const cutG = cutBy(grownOwner), cutM = cutBy(mergedOwner);
+    ok("!! *** MERGING CUTS A THIRD OF THE CHARTS AND A SIXTH OF THE SEAMS, AND THE HEADLINE USED TO SAY TWO THIRDS ***",
+       merged.charts < merged.grown * 0.75 && cutM < cutG * 0.9 && POOL[0].pairs === 0 && merged.fl === 0,
        `${merged.grown} charts grown on a fixed 40-degree limit -> ${merged.charts} after merging on MEASURED ` +
-       `distortion. Seam edges 1875 of 4439 (42.2%) -> 804 (18.1%). Worst conformal ${grown.worst.toFixed(2)} -> ` +
-       `${merged.worst.toFixed(2)}, inside the 2.0 bound the merge enforces, still ${merged.fl} flipped -- and ` +
-       `overlaps ${grown.ov} -> ${merged.ov}, because a merge is only accepted if the union survives all three ` +
-       "tests. A fixed angle is a PROXY for distortion; this asks the question instead.");
+       `distortion (${(100 * merged.charts / merged.grown).toFixed(1)}%). Seam edges ${cutG} of ${interior} ` +
+       `(${(100 * cutG / interior).toFixed(1)}%) -> ${cutM} (${(100 * cutM / interior).toFixed(1)}%). ` +
+       `${merged.fl} flipped and ${POOL[0].pairs} overlapping pairs, because a merge is only accepted if the ` +
+       "union survives all three tests. A fixed angle is a PROXY for distortion; this asks the question " +
+       "instead. THE NUMBERS FELL when maxConformal went 2.0 -> 1.05 in v4560 -- 258 charts and 19.1% of edges " +
+       "cut at the old bound -- and that is the trade the reference oracle priced: fewer merges, lower stretch.");
+
+    // *** AND THE BOUND DOES NOT BOUND THE ATLAS, WHICH IS THE OPPOSITE OF WHAT THE OLD ROW SAID. ***
+    // "Worst conformal ... inside the 2.0 bound the merge enforces" was wrong twice over: the 0.00 it printed
+    // as the BEFORE figure was a placeholder literal, never a measurement, and the bound is a test on a
+    // candidate UNION and not on a chart. A grown chart that never merges keeps whatever distortion the
+    // 40-degree segmentation left it with, and 111 of the 448 final charts are above 1.05 for exactly that
+    // reason. The atlas worst is therefore ABOVE the bound by construction, and a row that reads it as
+    // compliance is reading a number that cannot fail.
+    const above = merged.above;
+    ok("!! *** maxConformal GATES MERGES, NOT CHARTS -- so the atlas worst is above it and that is correct ***",
+       merged.worst > 1.05 && above > 0 && above < R.charts.length,
+       `worst conformal across the ${R.charts.length} final charts is ${merged.worst.toFixed(4)}, above the ` +
+       `1.05 merge bound, and ${above} charts are. Every one arrived that way from segmentation and was never ` +
+       "offered a merge it passed -- mergeCharts flattens the UNION and tests THAT, so a chart it never " +
+       "touches is not covered by the bound. Nothing in this file splits a chart for distortion; " +
+       "splitOverlapping splits for OVERLAP only. That gap is real and is filed rather than papered over.");
 
     // *** ROTATION IS EXACTLY FREE, TESTED ON ONE CHART RATHER THAN BY UNWRAPPING THE MESH AGAIN. ***
     // Against the SHELF packer this rotation was worth 29.5% -> 40.7% of the texture. Against a packer that
@@ -434,6 +481,34 @@ console.log("\n9. *** MERGE, SPLIT, ORIENT -- the three, ablated ***");
 
 console.log("\n10. *** PACK THE CHART, NOT ITS BOX ***");
 {
+    // *** THE SHORTCUT SECTION 5 TAKES IS CHECKED HERE, ON A MESH SMALL ENOUGH TO RUN BOTH WAYS. ***
+    // `from` reuses a previous result's solved charts and runs only the packer. If it were an APPROXIMATION
+    // the ablation above would be comparing a packer against a slightly different mesh and would still look
+    // fine, because every number it prints is a coverage figure with no reference. So both paths are run on a
+    // sphere -- full pipeline with nest:false, against a repack of the nested result -- and EVERY UV is
+    // compared, not a summary of them.
+    const sp = sphereMesh(1, 16, 12);
+    const nested = unwrapCurved(sp.positions, sp.indices);
+    const full = unwrapCurved(sp.positions, sp.indices, { nest: false });
+    const re = unwrapCurved(sp.positions, sp.indices, { nest: false, from: nested });
+    let worstDelta = 0, compared = 0, shape = full.charts.length === re.charts.length;
+    if (shape) for (let i = 0; i < full.charts.length; i++) {
+        const a = full.charts[i], b = re.charts[i];
+        if (a.tris.length !== b.tris.length) { shape = false; break; }
+        for (const [v, uv] of a.uv) { const o = b.uv.get(v);
+            if (!o) { shape = false; break; }
+            worstDelta = Math.max(worstDelta, Math.abs(uv[0] - o[0]), Math.abs(uv[1] - o[1])); compared++; }
+    }
+    ok("!! *** REPACKING A SOLVE AGREES WITH SOLVING AGAIN TO ONE ULP, WHICH IS NOT THE SAME AS EXACTLY ***",
+       shape && compared > 0 && worstDelta < 1e-15,
+       `${full.charts.length} charts, ${compared} UVs compared, worst coordinate difference ` +
+       `${worstDelta.toExponential(1)}. The claim written here first was "to the last digit" and the ` +
+       "measurement said 3.3e-16: a chart's packed UVs differ from its solved ones by a translation and one " +
+       "global scale, and the repack divides by a span and multiplies by another, so ONE rounding separates " +
+       "the paths. That is a bound of an ulp on a coordinate in [0,1] and it is asserted as one rather than " +
+       "as equality. On the robot the shortcut is 535 ms -> 3 ms, which is what keeps section 5 inside its " +
+       "budget -- a saving worth nothing if the result were merely close, so this row says how close.");
+
     const cov = (r) => { let t = 0;
         for (const c of r.charts) for (const T of c.tris) {
             const a = c.uv.get(T[0]), b = c.uv.get(T[1]), d = c.uv.get(T[2]);

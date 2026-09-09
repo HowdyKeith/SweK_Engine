@@ -3764,6 +3764,45 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    // v4560 -- the 212th closing, and the first for a gate whose reference half is a C++ program compiled from
+    // a vendored source tree. The gate never compiles it: the cold build is 5,166 ms against a 3,000 ms
+    // sweep budget, so the reference is a hash-pinned record and the binary is used only when it is already
+    // there.
+    since212: Object.freeze({
+        at: "v4560", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/mesh/xatlasRef-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 2,486 ms cold and 2,580 ms with the binary present, ten rows. *** physics/mesh/" +
+                 "uvLscm.mjs HAD BEEN GRADED ONLY AGAINST ITSELF FOR SIX ROUNDS: *** every property its gate " +
+                 "held it to was a property it asserted about its own output, and none of them could say " +
+                 "whether the segmentation was any GOOD, because good is a comparison. vendor/xatlas is the " +
+                 "reference implementation of the same weld-segment-LSCM-pack pipeline; it is C++ and there " +
+                 "is no emscripten here, so it can never ship to a browser -- but g++ is here, so it can be " +
+                 "RUN. *** THE METRIC IS COMPUTED ONCE AND APPLIED TO BOTH OUTPUTS, *** because asking each " +
+                 "tool for its own quality number would compare two definitions rather than two unwrappers. " +
+                 "THE FINDING: maxConformal, not maxNormalDeg, is the parameter that binds -- sweeping the " +
+                 "angle 40 -> 6 does not change the chart count at all -- and its 2.0 default was about " +
+                 "twice as loose as it should have been. At 1.05 this tree's stretchP90 matches or beats the " +
+                 "reference on all four fixtures (torus 1.112 vs 1.189, spheres 1.100 vs 1.170 and 1.117 vs " +
+                 "1.131). *** AND THE SECOND METRIC IS WHY THAT IS NOT A WIN. *** stretchP90 divides by its " +
+                 "own median, so it grades uniformity and cannot see an atlas that shrank -- asserted, by " +
+                 "halving every UV and watching it not move while densityP10 falls exactly 4x. Measured " +
+                 "ABSOLUTELY, xatlas is ahead on every fixture, 1.31x to 2.01x, and the CYLINDER is the " +
+                 "control that says where: developable, both tools exact at stretch 1.000, and xatlas still " +
+                 "gets 2.01x the texture because it CUTS the strip into 3 charts that tile a rectangle at " +
+                 "85.7% while this tree keeps 1 chart over 42.2% of the square. Filed as its own round. *** " +
+                 "AND THE COMPARISON FOUND A LIVE DEFECT ON THE WAY: *** rasterPack seeded its atlas side " +
+                 "at the widest chart's own span, at which that chart needs every column and its pad needs " +
+                 "two more, `x0 + padW <= gridW` admits no position at all, and the not-finite fallback " +
+                 "placed it OUTSIDE the atlas -- 1.002604, one pad cell of 384 past the edge, on 7 of the " +
+                 "cylinder's 238 coordinates. Three of three synthetic packs reproduced it. It survived six " +
+                 "rounds because the robot has enough charts that the seed never binds, and the robot is " +
+                 "what every check measured. Four sabotages red by name: the seed floor, the merge bound, " +
+                 "one byte of a recorded mesh hash, and a 1e-9 scale in the repack path.",
+    }),
     since211: Object.freeze({
         at: "v4559", swept: 1, green: 1, red: 0,
         added: Object.freeze([

@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "c97ad0e5126f5f227dfb32e00930675c6c386257",
+ "head": "4491e5245421220abea5890756f565fdb3aafeb5",
  "bodies": {
   "box3d": [
    {
@@ -86,8 +86,8 @@
    },
    {
     "path": "tools/macSession.mjs",
-    "bytes": 16446,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "bytes": 16554,
+    "sha": "359cf163ca4803c8c42c1efebfcdb88201c9e373"
    },
    {
     "path": "tools/roundhouse/backendRotation.mjs",
@@ -916,6 +916,13 @@
     "path": "wasm-bench.html",
     "bytes": 19835,
     "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+   }
+  ],
+  "xatlas": [
+   {
+    "path": "tools/mesh/xatlasRef.mjs",
+    "bytes": 15061,
+    "sha": null
    }
   ]
  }

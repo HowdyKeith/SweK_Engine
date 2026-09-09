@@ -30,8 +30,10 @@ console.log("\n1. EVERY VERDICT CARRIES ITS EVIDENCE");
     const T = tally();
     console.log(`        ${T.total} repositories: ${T.papered} papered, ${T.unpapered} not. ` +
                 `${JSON.stringify(T.bySpdx)}`);
-    // thirty-five at v4276-v4277; eighteen more at v4304, the backlog's own verdicts (#106, #100, #132, #63, #122)
-    ok("thirty-five repositories were swept, then eighteen more, then the SwiftUIShaders upstream", T.total === 54, `${T.total}`);
+    // thirty-five at v4276-v4277; eighteen more at v4304, the backlog's own verdicts (#106, #100, #132, #63, #122);
+    // the SwiftUIShaders upstream at v4305; and at v4560 jpcy/xatlas, the first whose SOURCE is in this tree
+    ok("thirty-five repositories swept, then eighteen, then SwiftUIShaders, then the first VENDORED one",
+       T.total === 55, `${T.total}`);
     ok("*** a papered entry names the FILE its licence was read from ***",
         SWEEP.filter((e) => e.licenceExists).every((e) => !!e.evidence.file && !!e.evidence.sha256 && e.evidence.lines > 0),
         "file, hash prefix and line count -- so a later round can tell a reading from a recollection");

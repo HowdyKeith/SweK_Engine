@@ -227,8 +227,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4556 -- RE-TAKEN: one gate (versionMarker) joined, the same four rows by one, NINETEENTH arrival.
     // v4557 -- RE-TAKEN: one gate (ritualCoherence) joined, the same four rows by one, TWENTIETH arrival.
     // v4559 -- RE-TAKEN: one gate (pipboyItems) joined, the same four rows by one, TWENTY-FIRST arrival.
-    gates: 1611, usesOk: 1590, definesOk: 1582, importsOk: 0,
-    distinctDefinitions: 38, nameFirst: 1483, condFirst: 91, unknownSignature: 16,
+    // v4560 -- RE-TAKEN: one gate (xatlasRef) joined, the same four rows by one, TWENTY-SECOND arrival.
+    gates: 1612, usesOk: 1591, definesOk: 1583, importsOk: 0,
+    distinctDefinitions: 38, nameFirst: 1484, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

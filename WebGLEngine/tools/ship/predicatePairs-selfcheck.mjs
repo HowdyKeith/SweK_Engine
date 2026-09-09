@@ -155,8 +155,11 @@ console.log("\n4. the widest rule in the tree, checked in the direction nobody c
     // Racing city 0: 17 -> 24. orrery.json was re-baked (it had sat at v4416 while vendor/ moved): fonts' four per-family OFL.txt
     // files (v4486) where the old bake listed two files, morphicons' LICENSE (v4498), and the two Kenney kits' LICENSE and
     // LICENSE.md. Every one of the 24 is matched, which is what the row holds; the number is the bake's, read here, not typed there.
+    // v4560: 24 -> 25, and the one is vendor/xatlas/LICENSE. jpcy/xatlas was vendored as a reference oracle for
+    // physics/mesh/uvLscm.mjs and a new body's licence file lands in the bake like any other -- which is the
+    // point of reading the number off orrery.json rather than typing it: this row moves when vendor/ moves.
     ok("!! ...and the constraint costs the rule NOTHING: every vendored licence is still matched",
-        vendorLicences === 24, `${vendorLicences} of 24 -- measured before the change and after, and again at the Racing city 0 re-bake`);
+        vendorLicences === 25, `${vendorLicences} of 25 -- measured before the change and after, again at the Racing city 0 re-bake, and again when xatlas arrived`);
     ok("...and one owner holds the rule, so the two copies cannot drift",
         // NOT a source pattern -- the first version of this row matched the exact `export { x } from "y"` line
         // and went red the moment that had to become an import plus an export, which it did, because a
