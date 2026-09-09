@@ -36,6 +36,25 @@
 //                   D  computeShell's member array no longer folded into the struct                -> exit=1, 3 red: the planes row and the refusal row in section 1 (refused by name, no throw), and the harness
 //
 // Run: node tools/ship/tslWide-selfcheck.mjs      (~20 s; section 1 is CPU-only)
+// MEASURED at v4542 (r184 in the host-shell vertex path). Applied to render/tslSource.mjs, this gate run, red count
+// read, source and emitted json restored and md5-verified. Baseline 0 red.
+//   DD the camera-matrix scan back over the WHOLE emitted text -> 1 red: r184 DECLARES both camera matrices in the
+//      shared render group whether the fragment uses them or not, so a scan that reads declarations refuses a shell
+//      that names every matrix its fragment actually reads. The scan reads the BODY now, which is the correction
+//      unreadUnlabelledUniforms got at v4538 -- one rule asking what is read and one what is written down is how
+//      r184 broke this file four separate times.
+//   FF the vertex block no longer carrying three's file-scope temporaries -> 1 red: "unresolved value 'nodeVar0'".
+//      The r184 declaration move again, fourth site -- the temporaries a computed varying reads.
+//   GG three's varyings holder no longer excluded by its TYPE -> 3 red: `var<private> varyings : VaryingsStruct;`
+//      rides into a shell that declares no VaryingsStruct. It is excluded by being a variable of the vertex entry's
+//      return type, not by its name, because its name is three's to change.
+//   *** EE WENT 0-RED AND IS RECORDED AS A FINDING, NOT A PASS. *** A derived clipSpaceName() was written this round
+//      to replace r178's hard-coded `Vertex` in two places; pinning it back to "Vertex" changed nothing anywhere.
+//      MEASURED why: varyingDecls reads @location / `out` declarations and three's clip-space member is
+//      @builtin(position), so it is never in that map on either revision, and the dependency walk -- not the stop --
+//      is what decides which statements the block takes. The helper did nothing. It was DELETED rather than kept
+//      with a comment explaining it; the one place the spelling really did bite is varyingSemantics, which filters
+//      structurally now (tslRace-selfcheck's sabotage AA).
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -153,7 +172,10 @@ else {
         r.ok ? (r.result.error || JSON.stringify([r.result.run && r.result.run.webgpu && r.result.run.webgpu.error, r.result.run && r.result.run.webgl2 && r.result.run.webgl2.error])) : r.reason);
     if (r.ok && r.result.run && !r.result.error && !r.result.run.webgpu.error && !r.result.run.webgl2.error) {
         const R = r.result;
-        ok("three's live emission has the shape the fixture holds (three named varyings, the band flat, the camera in the fragment)", /@interpolate\( flat \) vBand : i32/.test(R.emitted.webgpu.vertex) && /flat\s+out int vBand;/.test(R.emitted.webgl2.vertex) && /render\.cameraProjectionMatrix/.test(R.emitted.webgpu.fragment) && /f_cameraProjectionMatrix/.test(R.emitted.webgl2.fragment));
+        // v4542: the GLSL clause pinned `f_cameraProjectionMatrix`; r184 dropped three's `f_` field prefix, which
+        // render/tslSource.mjs already reads either way (F_). The shape being asserted is that the FRAGMENT reads the
+        // projection matrix, not which prefix three puts on the field this revision.
+        ok("three's live emission has the shape the fixture holds (three named varyings, the band flat, the camera in the fragment -- under whichever field prefix this revision uses)", /@interpolate\( flat \) vBand : i32/.test(R.emitted.webgpu.vertex) && /flat\s+out int vBand;/.test(R.emitted.webgl2.vertex) && /render\.cameraProjectionMatrix/.test(R.emitted.webgpu.fragment) && /\b(?:f_)?cameraProjectionMatrix\b/.test(R.emitted.webgl2.fragment));
         ok("  the transplanted WGSL validates", validateWgsl(R.transplanted.wgsl).length === 0 && validateWgsl(R.planesTransplanted).length === 0, validateWgsl(R.transplanted.wgsl).join("; "));
         for (const b of ["webgpu", "webgl2"]) { const o = R.run[b];
             ok(`*** ${b}: the quad drawn by the pipeline three GENERATED -- three computed varyings, one flat, the camera in the fragment -- is the hand-written twin's picture on EVERY pixel (${o.genVsHand.same} of ${o.genVsHand.total}, worst ${o.genVsHand.worst}) ***`, o.backend === b && o.genVsHand.same === o.genVsHand.total && o.errs.length === 0, o.errs.join(" | "));

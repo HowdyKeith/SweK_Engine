@@ -544,6 +544,11 @@ export function attributeNames(vertex, language) {
 }
 export function vertexVaryingBlock(vertex, language) {
     const decls = varyingDecls(vertex, language), sem = varyingSemantics(vertex, language);
+    // v4542 -- `n !== "Vertex"` is r178's spelling of three's clip-space member, and MEASURED at r184 it is a NO-OP:
+    // varyingDecls reads @location / `out` declarations and the clip member is @builtin(position), so it is never in
+    // this map on either revision. A derived clipSpaceName() was written this round to replace the spelling and its
+    // sabotage went 0-RED through the whole gate, which is what said so -- the filter it fed does nothing. The helper
+    // was deleted rather than kept with a comment; the line stays as it was, doing the nothing it has always done.
     const names = Object.keys(decls).filter((n) => n !== "Vertex");
     // v4484 -- a bare copy of ANY vertex input is the shell's own varying (Slug's texcoord, banding, glyph are attributes with
     // their own names, not three's uv/normal/color); only an expression, or a name that is neither input nor local, is computed
@@ -575,7 +580,20 @@ export function vertexVaryingBlock(vertex, language) {
     }
     const statements = taken;
     // three may have written a temporary (nodeVarN) that a statement in the block reads; declare it too
-    const declLines = lines.filter((l) => language === "wgsl" ? /^var \w+ : /.test(l) : /^(vec[234]|float|mat[234]|int|uint|bool) \w+;$/.test(l)).filter((l) => !/positionLocal|normalLocal|modelViewMatrix|v_positionView|v_modelViewProjection/.test(l));
+    // *** v4542 -- THE r184 DECLARATION MOVE, FOURTH SITE. *** r178 declared these temporaries inside the vertex
+    // entry, so reading them off `lines` found them; r184 declares them at file scope and `used` came out empty,
+    // leaving the shell's {{ASSIGN}} block reading names nothing declares ("unresolved value 'nodeVar0'"). The
+    // file-scope ones are taken too -- and a WGSL `var<private> x : T;` becomes a plain `var x : T;`, because these
+    // land INSIDE the shell's vertex function where the private address space is not spellable.
+    const inBody = lines.filter((l) => language === "wgsl" ? /^var \w+ : /.test(l) : /^(vec[234]|float|mat[234]|int|uint|bool) \w+;$/.test(l));
+    // three's own varyings holder (`var<private> varyings : VaryingsStruct;`) is NOT a temporary: the shell replaces
+    // it with its outVar, and carrying it declared a type the shell does not have ("unresolved type VaryingsStruct").
+    // It is excluded by what it IS -- a variable of the vertex entry's return type -- not by its name.
+    const retType = language === "wgsl" ? (vertex.match(/fn main\([\s\S]*?\)\s*->\s*(\w+)/) || [])[1] : null;
+    const atFileScope = carriedDeclarations(vertex, language, null, language === "wgsl" ? "fn main(" : "void main()")
+        .filter((d) => !(retType && new RegExp(`:\\s*${retType}\\s*;`).test(d)))
+        .map((d) => language === "wgsl" ? d.replace(/^var<private>\s+/, "var ") : d);
+    const declLines = [...new Set([...inBody, ...atFileScope])].filter((l) => !/positionLocal|normalLocal|modelViewMatrix|v_positionView|v_modelViewProjection/.test(l));
     const used = declLines.filter((d) => { const name = (d.match(language === "wgsl" ? /^var (\w+)/ : /(\w+);$/) || [])[1]; return name && statements.some((st) => new RegExp("\\b" + name + "\\b").test(st)); });
     const text = [...used, ...statements].join(" ");
     const uniforms = [...new Set([...text.matchAll(language === "wgsl" ? /\bobject\.(\w+)/g : /\bv_(?!cameraProjectionMatrix|cameraViewMatrix|modelViewProjection|positionView)(\w+)/g)].map((m) => m[1]))];
@@ -636,7 +654,15 @@ export function transplantIntoShell({ wgsl, glsl }, shell) {
         // v4483 -- a CAMERA matrix in the fragment crosses when the shell names its own for it (`matrices: { cameraProjectionMatrix: "cam.proj" }`);
         // the model matrix never does: three emits it as an unlabelled object uniform, which has no name to bind under.
         if (/modelViewMatrix|\bobject\.nodeUniform\d+/.test(em.fragment)) throw new Error("tslSource: the fragment reads the object's model matrix (modelViewMatrix), which three emits unlabelled; a shell transplant carries only what its vertex stage passes and what the shell names");
-        const S0 = shell[language] || {}, matricesRead = [...new Set([...em.fragment.matchAll(language === "wgsl" ? /\brender\.(\w+)/g : new RegExp("\\b" + F_ + "(cameraProjectionMatrix|cameraViewMatrix)\\b", "g"))].map((m) => m[1]))];
+        // *** v4542 -- READ, NOT WRITTEN DOWN. THE THIRD TIME THIS FILE HAS HAD TO LEARN IT. *** r184 declares BOTH
+        // camera matrices in the shared `render` group whether the fragment uses them or not; MEASURED on tslWide's
+        // quad graph, the body reads cameraProjectionMatrix alone and cameraViewMatrix appears only as a struct
+        // field. The GLSL scan ran over the WHOLE emitted text, so it saw the declaration and refused a shell that
+        // names every matrix its fragment actually uses. (The WGSL scan was already safe by accident: three writes
+        // `render.cameraProjectionMatrix` at a use and a bare field name at a declaration.) Both now read the BODY,
+        // which is the same correction unreadUnlabelledUniforms got at v4538 -- one rule asking what is read and one
+        // asking what is written down is how r184 broke this file four separate times.
+        const S0 = shell[language] || {}, matricesRead = [...new Set([...fragmentBody(em.fragment).matchAll(language === "wgsl" ? /\brender\.(\w+)/g : new RegExp("\\b" + F_ + "(cameraProjectionMatrix|cameraViewMatrix)\\b", "g"))].map((m) => m[1]))];
         for (const m of matricesRead) if (!(S0.matrices && S0.matrices[m])) throw new Error(`tslSource: the fragment reads three's ${m} and the shell "${shell.name}" names no matrix of its own for it (it names ${Object.keys(S0.matrices || {}).join(", ") || "none"})`);
         const uniforms = uniformFields(em.fragment, language), textures = textureNames(em.fragment, language);
         // v4326 -- a texture crosses when the SHELL declares it. The shell lists the names its own prefix binds
