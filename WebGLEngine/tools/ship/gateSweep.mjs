@@ -3767,6 +3767,31 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since206: Object.freeze({
+        at: "v4546", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "fx/fsr/fsr-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 1.02 s (1009/1045/1014 over three serial runs, well under the 3000 ms sweep budget). EASU, " +
+                 "the upscale half of AMD FSR1, as an ALGORITHM rather than a dependency: fx/fsr/fsr.js is a " +
+                 "transcription of the f32 reference FsrEasuF from ffx_fsr1.h (MIT) and fx/fsr/fsrKernels.js the WGSL " +
+                 "that mirrors it statement by statement, run on a real WebGPU device through gfx/device.js. The " +
+                 "vendor-or-implement question was MEASURED, not argued: @pmndrs/upscaler@0.2.0 carries 2,743 lines " +
+                 "of WGSL that import no three at all and 3,331 lines of three.js DRIVER around them, and " +
+                 "gfx/device.js already is that driver -- the same reading fx/anime4k wrote into its own header two " +
+                 "upscalers ago. MEASURED: the GPU picture is the CPU reference's to 2.98e-7 on every one of 12,288 " +
+                 "channels (3,702 of 4,096 pixels bit-identical, the rest f32 against f64 through a 12-tap " +
+                 "accumulation); a constant field comes back constant to 2.4e-8; 0 of 12,288 channels ring outside " +
+                 "the four-nearest bounds, on the CPU and on the device's own output; and on a pure diagonal EASU " +
+                 "leaves 67 intermediate pixels where bilinear leaves 248, 3.7x thinner. SPATIAL ONLY and said so: " +
+                 "FSR's temporal path wants depth, per-pixel motion vectors and a jittered projection with history, " +
+                 "and this tree has no motion vectors and no previous-frame view-projection matrix anywhere in it. " +
+                 "Five sabotages red at 2 / 2 / 2 / 1 / 2, none 0-RED; dropping the dering clamp puts 730 channels " +
+                 "outside the bounds, unrotating the kernel takes 3.7x down to 1.3x, and removing the flat-region " +
+                 "fallback reaches NaN through a 1/0 in the direction normalise.",
+    }),
     since205: Object.freeze({
         at: "v4550", swept: 1, green: 1, red: 0,
         added: Object.freeze([
