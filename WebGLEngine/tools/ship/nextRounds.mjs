@@ -261,6 +261,23 @@ export const NEXT_ROUNDS = [
         why: "Verified rather than assumed: procPlanet.js and CityGen.js were read directly, not grepped for a keyword and declared absent. Logged because it is cheap and because reproducible naming (same seed -> same name, like every other property these generators already commit to) is a natural fit -- not because anything currently displays or needs a planet's or city's proper name.",
         upstream: "no established want yet -- nothing in the UI or demos currently shows an individual planet, city, or building name; logged so the read is not re-derived if that ever changes.",
     },
+    // ---- v4563: a mattdesl (Matt DesLauriers) repository sweep -- already trusted here once, for vendor/gifenc.
+    {
+        id: "barycentric-stylized-wireframe",
+        blocker: "OPEN",
+        what: "ui/pipboyWireframe.js (the Pip-Boy HUD) builds every wireframe with THREE.EdgesGeometry/WireframeGeometry + LineBasicMaterial + LineSegments -- the plain three.js approach, which hits a real, well-known WebGL limitation rather than a stylistic one: LineBasicMaterial's linewidth is a no-op on almost every modern browser/GPU (capped at 1px by the native GL line rasterizer, a WebGL spec quirk inherited from desktop GL), so no matter what is set here the lines can never render thick or properly anti-aliased.",
+        how: "mattdesl/webgl-wireframes (MIT, github.com/mattdesl/webgl-wireframes) documents the standard fix: barycentric coordinates baked per-triangle-vertex, then a fragment shader takes the min barycentric coordinate and smoothsteps across it for a crisp, anti-aliased, THICKNESS-CONTROLLABLE edge -- single pass, no native GL line rasterizer involved at all. Also covers inner-edge removal (rendering quads as clean quads rather than X'd triangles, ui/pipboyWireframe.js already gets this for free a different way via EdgesGeometry's dihedral-angle dedup) plus dashes, tapered lines, and dual-strokes as optional extras. Not a dependency -- the technique is a small vertex attribute (barycentric coords per vertex, duplicated so triangles don't share vertices) plus one shader, hand-adaptable into this tree's own GLSL/WGSL twin convention the same way every other effect here is authored.",
+        why: "Verified against the actual file, not assumed: ui/pipboyWireframe.js's wireBox/wireCyl helpers were read directly and both go through LineSegments + LineBasicMaterial. This is explicitly stylized retro-HUD UI work (the whole point of a Pip-Boy wireframe is how the lines look), so the 1px-cap limitation is not a hypothetical -- it is the actual ceiling on this specific visual today, on every browser/GPU this ships to.",
+        upstream: "no gate is red over this -- the wireframe renders, it just cannot be thick or anti-aliased. Logged so the fix (and why LineBasicMaterial can't be coaxed into it) is not re-discovered from scratch.",
+    },
+    {
+        id: "fxaa-gap",
+        blocker: "OPEN",
+        what: "grep for FXAA/fxaa across render/ returns nothing, while a grep for vignette returns 8 files (render/crtPass.js, bloomPass.js, phosphorPass.js, effectMerge.mjs and others) -- this tree has extensive, mature postprocessing but no screen-space anti-aliasing pass of any kind.",
+        how: "mattdesl/three-shader-fxaa (MIT, github.com/mattdesl/three-shader-fxaa) is itself just an old (three r69-78) EffectComposer/ShaderPass wrapper and not worth adopting as written, but the algorithm it wraps -- NVIDIA's public FXAA 3.11, a single fragment shader reading tDiffuse plus a resolution uniform -- is small, standard, and renderer-agnostic. Same shape as the bcs_hash finding: take the technique, not the package, and slot it into render/effectMerge.mjs's existing chain the way every other post effect here already is.",
+        why: "Verified by grep against the actual tree, not assumed absent from memory. Worth having because this engine's own effect chain (bloom, CRT/phosphor, vignette, the whole swiftShaderPass roster) runs in render targets rather than directly to the backbuffer, which is exactly the situation where hardware MSAA is unavailable or disabled and a screen-space AA pass is how aliasing gets addressed at all.",
+        upstream: "no gate is red over this and nothing currently asks for it -- SweK's aesthetic leans stylized/CRT/retro rather than photorealistic, so aliasing may be read as in-theme rather than a defect on some pages. Logged so the gap is named rather than silently assumed covered.",
+    },
 ];
 
 // *** v4549 -- THIS REPORT WAS HIDING THREE OF ITS OWN OPEN ITEMS, AND HAD BEEN FOR SEVERAL ROUNDS. ***
