@@ -38,14 +38,9 @@ fn dirToFaceW(d : vec3<f32>) -> FaceUV {
 }
 `;
 
-/**
- * The sampling core, parameterised over WHERE the atlas data lives -- `atlasExpr` is a WGSL expression string
- * for "the storage array to index" (e.g. `atlas`), so the exact same logic serves the verification dispatch
- * here and a future device.js-texture-backed version without being retyped. Params struct: `P.v` is
- * array<vec4<f32>, 6> -- v[0]=(atlasWidth,atlasHeight,faceSize0,mipCount), v[1]=(lutYOffset,lutK,lutR,caseCount),
- * v[2..3]=mipYOffset (8 packed into two vec4s), v[4..5]=mipSize (same packing).
- */
-export function specularIBLCoreWgsl(atlasExpr) {
+/** fetchTexelW over a flat storage array (RGBA, 4 floats/texel) -- the verification dispatch's shape, unchanged
+ *  from before this file's sampling core was made reusable. `atlasExpr` is the WGSL name of that array. */
+export function storageFetchWgsl(atlasExpr) {
     return /* wgsl */ `
 fn fetchTexelW(x : i32, y : i32) -> vec3<f32> {
   let w = i32(P.v[0].x); let h = i32(P.v[0].y);
@@ -53,6 +48,31 @@ fn fetchTexelW(x : i32, y : i32) -> vec3<f32> {
   let o = (cy * w + cx) * 4;
   return vec3<f32>(${atlasExpr}[o], ${atlasExpr}[o + 1], ${atlasExpr}[o + 2]);
 }
+`;
+}
+
+/** fetchTexelW over a real texture_2d<f32> binding named `tAtlas` -- textureLoad, not textureSample, for the
+ *  SAME reason probeLit.mjs gives: integer reads do not disagree between backends the way filtered samples do.
+ *  Used by specularProbeLit.mjs, the real-material consumer this core was parameterised for. */
+export const TEXTURE_FETCH_WGSL = /* wgsl */ `
+fn fetchTexelW(x : i32, y : i32) -> vec3<f32> {
+  let w = i32(P.v[0].x); let h = i32(P.v[0].y);
+  let cx = clamp(x, 0, w - 1); let cy = clamp(y, 0, h - 1);
+  return textureLoad(tAtlas, vec2<i32>(cx, cy), 0).rgb;
+}
+`;
+
+/**
+ * The sampling core, parameterised over WHERE fetchTexelW reads from -- `fetchImpl` is a complete WGSL function
+ * definition (storageFetchWgsl(...) or TEXTURE_FETCH_WGSL), so the SAME bilinear/mip-blend/LUT logic below runs
+ * unchanged whether the atlas is a verification storage buffer or a real bound texture; only the eight-line
+ * fetch function differs. Params struct: `P.v` is array<vec4<f32>, 6> -- v[0]=(atlasWidth,atlasHeight,
+ * faceSize0,mipCount), v[1]=(lutYOffset,lutK,lutR,caseCount), v[2..3]=mipYOffset (8 packed into two vec4s),
+ * v[4..5]=mipSize (same packing).
+ */
+export function specularIBLCoreWgsl(fetchImpl) {
+    return /* wgsl */ `
+${fetchImpl}
 fn mipYOffsetAt(m : i32) -> f32 { if (m < 4) { return P.v[2][m]; } return P.v[3][m - 4]; }
 fn mipSizeAt(m : i32) -> f32 { if (m < 4) { return P.v[4][m]; } return P.v[5][m - 4]; }
 
@@ -118,7 +138,7 @@ struct Params { v : array<vec4<f32>, 6> };
 @group(0) @binding(1) var<uniform> P : Params;
 @group(0) @binding(2) var<storage, read> atlas : array<f32>;
 @group(0) @binding(3) var<storage, read> cases : array<f32>;
-${specularIBLCoreWgsl("atlas")}
+${specularIBLCoreWgsl(storageFetchWgsl("atlas"))}
 
 @compute @workgroup_size(32, 1, 1)
 fn main(@builtin(global_invocation_id) gid : vec3<u32>) {

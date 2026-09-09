@@ -2,13 +2,25 @@
 // WebGLEngine/tools/ship/probeLab-selfcheck.mjs -- v4516
 //
 // THE SPLAT-PROBES PAGE, AS DATA AND AS A FRAME (Probes 3): render/probeLab.mjs behind splat-probes.html. Section 1, headless: the
-// two-tone cloud (warm above the horizon, cool below, by name); the lab's record count splats + probes + 1; every splat record at
-// its splat with the marker radius, tone 1 or 2 in the extras and emissive 1; every probe record at its probe with the probe
-// radius, tint 0, emissive 0; the mesh record last at the origin; the fleet map 0 for splats and 1 for the rest; the bake's baked
-// and filled equal to the fit's open and solid; the HUD line carrying those numbers and nothing invented; the same knobs giving
-// the same records twice and a different spacing a different probe count. Section 2, ON BOTH BACKENDS: the two-fleet scene drawn
-// from inside the shell (the page's camera); the cull twin sees every record; the mesh's pixels (the CPU ray against the centre
-// sphere) read warm above the horizon and cool below; the picture has both tones; the two backends agree.
+// two-tone cloud (warm above the horizon, cool below, by name); the lab's record count splats + probes + 1 + specular row; every
+// splat record at its splat with the marker radius, tone 1 or 2 in the extras and emissive 1; every probe record at its probe with
+// the probe radius, tint 0, emissive 0; the mesh record right after the probes at the origin; every specular row record at its row
+// position; the fleet map 0 for splats, 1 for probes and the mesh, 2..(1+S) for the specular row; the bake's baked and filled equal
+// to the fit's open and solid; the HUD line carrying those numbers and nothing invented; the same knobs giving the same records
+// twice and a different spacing a different probe count. Section 2, ON BOTH BACKENDS: the whole scene's fleets drawn from inside
+// the shell (the page's camera); the cull twin sees every record; the mesh's pixels (the CPU ray against the centre sphere) read
+// warm above the horizon and cool below; the picture has both tones; the two backends agree.
+//
+// v4579 -- FOUR MORE FLEETS, NOT A NEW SECTION: physics/render/specularProbeLit.mjs's material (a roughness-gradient row of four
+// spheres, physics/render/specularIBLWgsl-selfcheck.mjs's own hotspot fixture baked from the SAME splatRadiance source the probe
+// volume already uses) draws through fleets 2..5 alongside the original two. THIS FILE DID NOT GROW A NEW BROWSER SECTION FOR IT:
+// section 2 already renders "the scene's fleets" generically, and the existing "both backends agree" / "cull twin sees" checks
+// cover whatever fleets labFleets() returns without being told how many there are -- the ONLY changes needed were the record-count
+// formula (records now run splats + probes + 1 + specular, not splats + probes + 1) and the browser script's args, which serialised
+// `packed` for the diffuse texture but not `spec` for the specular one -- a real gap the render caught by throwing on `lab.spec.atlas`
+// rather than by silently drawing four fewer spheres. RE-MEASURED, NOT LEFT AT THE v4516 NUMBERS ABOVE: 1,034 records now (was
+// 1,030), and the frame/pixel numbers in the v4516 paragraph below are likewise this file's OWN history and not re-typed here --
+// re-run the gate for today's numbers rather than trusting a paragraph that predates the fleets it now draws.
 //
 // MEASURED AT v4516: 300 splats, a 9 x 9 x 9 fitted grid of 729 probes with 176 solid and filled and 553 baked from 384 texels each in
 // 0.4 s, the box [-1.8, 1.8] from 14,974 occupied voxels; 1,030 records; a spacing of 1.0 gives 125 probes. The frame (200 x 120,
@@ -54,14 +66,16 @@ const lab = probeLab();
     for (let i = 0; i < cloud.count; i++) { const up = cloud.positions[i * 3 + 1] > 0, c = [colours[i * 3], colours[i * 3 + 1], colours[i * 3 + 2]].join(), f32 = (t) => t.map(Math.fround).join(); if (up && c === f32(TONES.warm) && tone[i] === 1) warmAbove++; else if (!up && c === f32(TONES.cool) && tone[i] === 2) coolBelow++; else wrong++; }
     ok("every splat above the horizon is warm (tone 1) and every one below cool (tone 2)", wrong === 0 && warmAbove > 100 && coolBelow > 100, `${warmAbove} warm, ${coolBelow} cool`);
     ok("TINTS is [warm, cool] so tint 1 is warm and tint 2 cool in the lit chain", TINTS[0] === TONES.warm && TINTS[1] === TONES.cool);
-    const N = lab.counts.splats, P = lab.counts.probes;
-    ok(`the lab has splats + probes + 1 records: ${N} + ${P} + 1 = ${lab.count}`, lab.count === N + P + 1 && lab.records.length === lab.count * 4 && lab.extras.length === lab.count * EXTRA_FLOATS && lab.fleetOf.length === lab.count);
+    const N = lab.counts.splats, P = lab.counts.probes, S = lab.counts.specular;
+    ok(`the lab has splats + probes + 1 + specular records: ${N} + ${P} + 1 + ${S} = ${lab.count}`, lab.count === N + P + 1 + S && lab.records.length === lab.count * 4 && lab.extras.length === lab.count * EXTRA_FLOATS && lab.fleetOf.length === lab.count);
     let sOk = 0; for (let i = 0; i < N; i++) { const r = i * 4, e = i * EXTRA_FLOATS; if (lab.records[r] === lab.cloud.positions[i * 3] && lab.records[r + 1] === lab.cloud.positions[i * 3 + 1] && lab.records[r + 2] === lab.cloud.positions[i * 3 + 2] && lab.records[r + 3] === Math.fround(LAB.splatMarker) && lab.extras[e + 1] === lab.tone[i] && lab.extras[e + 3] === 1 && lab.fleetOf[i] === 0) sOk++; }
     ok("every splat record sits at its splat with the marker radius, its tone and emissive 1, in fleet 0", sOk === N, `${sOk} of ${N}`);
     let pOk = 0; for (let p = 0; p < P; p++) { const i = N + p, r = i * 4, e = i * EXTRA_FLOATS; if (lab.records[r] === lab.grid.positions[p * 3] && lab.records[r + 1] === lab.grid.positions[p * 3 + 1] && lab.records[r + 2] === lab.grid.positions[p * 3 + 2] && lab.records[r + 3] === Math.fround(LAB.probeRadius) && lab.extras[e + 1] === 0 && lab.extras[e + 3] === 0 && lab.fleetOf[i] === 1) pOk++; }
     ok("every probe record sits at its probe with the probe radius, tint 0 and emissive 0, in fleet 1", pOk === P, `${pOk} of ${P}`);
-    const m = (lab.count - 1) * 4;
-    ok("the last record is the mesh at the origin with the mesh radius, in fleet 1", lab.records[m] === 0 && lab.records[m + 1] === 0 && lab.records[m + 2] === 0 && lab.records[m + 3] === Math.fround(LAB.meshRadius) && lab.fleetOf[lab.count - 1] === 1);
+    const m = (N + P) * 4;
+    ok("the mesh record sits right after the probes, at the origin with the mesh radius, in fleet 1", lab.records[m] === 0 && lab.records[m + 1] === 0 && lab.records[m + 2] === 0 && lab.records[m + 3] === Math.fround(LAB.meshRadius) && lab.fleetOf[N + P] === 1);
+    let specOk = 0; for (let s = 0; s < S; s++) { const i = N + P + 1 + s, r = i * 4, p = lab.spec.positions[s]; if (lab.records[r] === Math.fround(p[0]) && lab.records[r + 1] === Math.fround(p[1]) && lab.records[r + 2] === Math.fround(p[2]) && lab.records[r + 3] === Math.fround(lab.spec.radius) && lab.fleetOf[i] === 2 + s) specOk++; }
+    ok(`every specular row record sits at its row position with the row radius, in fleets 2..${1 + S}`, specOk === S, `${specOk} of ${S}`);
     ok("the bake's baked and filled are the fit's open and solid, and they sum to the probes", lab.bake.baked === lab.fit.open && lab.bake.filled === lab.fit.solid && lab.fit.open + lab.fit.solid === P, `${lab.bake.baked} baked, ${lab.bake.filled} filled of ${P}`);
     const hud = labHud(lab);
     report(hud);
@@ -81,7 +95,7 @@ sec("2. ON BOTH BACKENDS: the page's frame from inside the shell");
     else {
         const W = 200, H = 120, FOV = 1.0, R = LAB.eyeDist, yaw = 0.4, pitch = 0.15;
         const eye = [Math.sin(yaw) * Math.cos(pitch) * R, Math.sin(pitch) * R, Math.cos(yaw) * Math.cos(pitch) * R];
-        const r = await runInEngineOrigin({ engineRoot: ENG, args: { W, H, FOV, eye, records: Array.from(lab.records), extras: Array.from(lab.extras), fleetOf: Array.from(lab.fleetOf), packed: { ...lab.packed, data: Array.from(lab.packed.data) } }, script: `async (a) => {
+        const r = await runInEngineOrigin({ engineRoot: ENG, args: { W, H, FOV, eye, records: Array.from(lab.records), extras: Array.from(lab.extras), fleetOf: Array.from(lab.fleetOf), packed: { ...lab.packed, data: Array.from(lab.packed.data) }, spec: { ...lab.spec, atlas: { ...lab.spec.atlas, data: Array.from(lab.spec.atlas.data) } } }, script: `async (a) => {
             const { requestDevice } = await import("/gfx/device.js");
             const G = await import("/render/gpuDriven.mjs");
             const { labFleets } = await import("/render/probeLab.mjs");
@@ -90,8 +104,8 @@ sec("2. ON BOTH BACKENDS: the page's frame from inside the shell");
                 const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
                 const dev = await requestDevice(cv, { backend, offscreen: backend === "webgpu" });
                 const errs = []; if (dev.gpu && dev.gpu.addEventListener) dev.gpu.addEventListener("uncapturederror", (e) => errs.push(String(e.error && e.error.message).slice(0, 300)));
-                const lab = { packed: { ...a.packed, data: Float32Array.from(a.packed.data) } };
-                const { fleets } = labFleets(dev, lab);
+                const lab = { packed: { ...a.packed, data: Float32Array.from(a.packed.data) }, spec: { ...a.spec, atlas: { ...a.spec.atlas, data: Float32Array.from(a.spec.atlas.data) } } };
+                const { fleets } = labFleets(dev, lab, { eye });
                 const sc = G.makeGpuDrivenScene(dev, { fleets, fleetOf: Uint32Array.from(a.fleetOf), thresholds: [], records: Float32Array.from(a.records), headings: Float32Array.from(a.extras) });
                 const cam = { viewProj: G.multiply(G.perspective(FOV, W / H, 0.05, 50), G.lookAt(eye, [0, 0, 0])), eye };
                 const fr = sc.frame({ ...cam, read: true, clear: [0, 0, 0, 1] }), f = await fr.pixels;
@@ -100,7 +114,7 @@ sec("2. ON BOTH BACKENDS: the page's frame from inside the shell");
             }
             return out;
         }` });
-        ok("both backends built the two-fleet scene and drew the frame", r.ok && r.result && r.result.webgpu && r.result.webgl2 && r.result.webgpu.errs.length === 0, r.ok ? (r.result.webgpu.errs || []).join(" | ").slice(0, 300) : (r.reason || r.error || (r.pageErrors || []).join(" | ")).slice(0, 400));
+        ok("both backends built the scene's fleets (diffuse and specular) and drew the frame", r.ok && r.result && r.result.webgpu && r.result.webgl2 && r.result.webgpu.errs.length === 0, r.ok ? (r.result.webgpu.errs || []).join(" | ").slice(0, 300) : (r.reason || r.error || (r.pageErrors || []).join(" | ")).slice(0, 400));
         if (r.ok && r.result.webgpu && r.result.webgl2) {
             // the CPU ray against the centre sphere, through the page's camera: forward = -eye normalised, right and up from lookAt's frame
             const fwd = [-eye[0], -eye[1], -eye[2]], fl = Math.hypot(...fwd); fwd[0] /= fl; fwd[1] /= fl; fwd[2] /= fl;

@@ -107,7 +107,7 @@ async function main() {
     }
 
     console.log(fails ? "\nspecularIBLWgsl-selfcheck: " + fails + " FAILED" : "\nspecularIBLWgsl-selfcheck: all checks pass");
-    console.log("unchecked here: this atlas travels as a storage BUFFER, not a gfx/device.js texture, and nothing in the live renderer binds it to a real material's fragment shader yet -- that wiring (a texture upload, a material uniform, a call site in whatever shades a reflective surface) is the remaining piece.");
+    console.log("unchecked here: THIS file's atlas travels as a storage BUFFER, not a texture -- physics/render/specularProbeLit.mjs and its own selfcheck are the ones that pack a real gfx/device.js texture and bind it to a real material, now wired into render/probeLab.mjs's actually-drawn scene (tools/ship/probeLab-selfcheck.mjs renders it on both backends). This file's own scope stays the verification-only shim.");
     process.exit(fails ? 1 : 0);
 }
 

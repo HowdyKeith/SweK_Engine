@@ -164,7 +164,7 @@ async function main() {
     }
 
     console.log(fails ? "\nsplitSumWgsl-selfcheck: " + fails + " FAILED" : "\nsplitSumWgsl-selfcheck: all checks pass");
-    console.log("unchecked here: this file grades the SHADER's numbers against the CPU reference, not a baked cubemap -- physics/render/specularProbeBake-selfcheck.mjs is the one that bakes and verifies a real mip chain (CPU-side). Nothing in the live renderer calls either yet.");
+    console.log("unchecked here: this file grades the SHADER's numbers against the CPU reference, not a baked cubemap -- physics/render/specularProbeBake-selfcheck.mjs bakes and verifies a real mip chain (CPU-side), and physics/render/specularProbeLit.mjs packs and binds it to a real material now drawn by render/probeLab.mjs's scene on both backends. This file's own scope stays the analytic-environment shader math.");
     process.exit(fails ? 1 : 0);
 }
 
