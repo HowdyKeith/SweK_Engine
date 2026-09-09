@@ -94,7 +94,7 @@ import http from "node:http";
 import { createRequire } from "node:module";
 import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
 import { validateWgsl } from "../../render/wgslSpec.mjs";
-import { varyingSemantics, transplantIntoShell, vertexDisplacement } from "../../render/tslSource.mjs";
+import { varyingSemantics, transplantIntoShell, vertexDisplacement, stampThreeRevision } from "../../render/tslSource.mjs";
 import { lyapunovLookShell, heidlerSpriteShell, heidlerSpriteHand, spriteAtlasShell, spriteSampledShell, spriteSampledHand, inkLookShell, inkHand } from "../../render/fleetTsl.mjs";
 import { RACES, SPRITE_WGSL, SPRITE_VERTEX_GLSL, INK_WGSL, INK_VERTEX_GLSL } from "../../render/fleets.mjs";
 
@@ -157,11 +157,16 @@ else {
     ok("the harness ran both backends", r.ok && r.result && r.result.webgpu && r.result.webgl2 && !r.result.webgpu.error && !r.result.webgl2.error, r.ok ? JSON.stringify([r.result.webgpu && r.result.webgpu.error, r.result.webgl2 && r.result.webgl2.error]) : (r.reason || (r.pageErrors || []).join("; ")));
     if (r.ok && r.result.webgpu && !r.result.webgpu.error && !r.result.webgl2.error) {
         const R = r.result;
-        ok("three's vertex stage carried three varyings and said what each is: uv, normal, color", JSON.stringify(R.sem) === JSON.stringify({ nodeVarying3: "uv", nodeVarying4: "normal", nodeVarying5: "color" }), JSON.stringify(R.sem));
+        // v4541: this named the three varyings nodeVarying3/4/5, and r184 numbers them 4/5/6 -- three's counter, not
+        // a fact about the graph. What IS a fact about the graph is that the vertex carries three varyings, in that
+        // order, and that this file read what each one is; the names are three's to choose and are asserted only to
+        // be three's own generated form. (The fixture rows above still pin r178's numbers, because a fixture is a
+        // recorded text and its numbers are part of what it records.)
+        ok("three's vertex stage carried three varyings and said what each is: uv, normal, color -- in that order, under whatever numbers three's counter is on", Object.values(R.sem).join() === "uv,normal,color" && Object.keys(R.sem).every((k) => /^nodeVarying\d+$/.test(k)), JSON.stringify(R.sem));
         for (const b of ["webgpu", "webgl2"]) { const o = R[b];
             ok(`*** ${b}: the Chaos race drawn by the pipeline three GENERATED is the hand-written Chaos race on EVERY pixel (${o.same} of ${o.total}, worst 0), lit and among the other races ***`, o.backend === b && o.same === o.total && o.worst === 0 && o.lit > 500 && o.errs.length === 0, `${o.same}/${o.total}, worst ${o.worst}, ${o.lit} lit; errors ${o.errs.length}`);
             ok(`  ${b}: the pick still names the Chaos ships (the pick pipeline is the fleet's own)`, o.chaosHits > 200, `${o.chaosHits} pixels name Chaos`); }
-        fs.writeFileSync(EMITTED, JSON.stringify({ at: "v4322", three: "0.178.0", note: "the Lyapunov look as three's node builders emitted it from render/physicsTsl.mjs makeLyapunovLookTsl, and as render/tslSource.mjs transplanted it into the look's own shell; rewritten by tools/ship/tslRace-selfcheck.mjs on every run", ...R.emitted, transplanted: R.transplanted }, null, 1));
+        fs.writeFileSync(EMITTED, JSON.stringify(stampThreeRevision({ at: "v4322", note: "the Lyapunov look as three's node builders emitted it from render/physicsTsl.mjs makeLyapunovLookTsl, and as render/tslSource.mjs transplanted it into the look's own shell; rewritten by tools/ship/tslRace-selfcheck.mjs on every run", ...R.emitted, transplanted: R.transplanted }), null, 1));
         ok("the emitted and transplanted look is written to tools/ship/tsl-emitted-race.json for the WGSL corpus", fs.existsSync(EMITTED));
     }
 }
@@ -577,6 +582,17 @@ else {
 //   Q  the ?tsl=1&soft=1 link in server.html's Render TSL panel replaced with the plain page -> exit=1, 1 red, by name. A mode of a
 //      page that no link reaches is reachable only by somebody who already knows it exists, which is the whole of pageReach's case.
 //   (P and R are in tools/ship/tslPhysics-selfcheck.mjs and tools/ship/pageSections-selfcheck.mjs, the gates that own those claims.)
+// MEASURED at v4541 (the host-shell path under r184). Applied to render/tslSource.mjs, this gate run, red count
+// read, source and emitted json restored and md5-verified. Baseline 0 red.
+//   Y  the host-shell transplant carrying no declarations -> 5 red: r184 moved three's temporaries out of the entry
+//      point, and without them every generated pipeline is refused at encode time on both backends. Third path, same
+//      change; transplantFragment got it at v4540 and transplantCompute in this round.
+//   AA varyingSemantics' WGSL filter removed -> 4 red, every row that reads what the vertex carries. three writes its
+//      clip-space position into the SAME struct as the varyings; r178 spelled that member `Vertex` and this file
+//      skipped it BY NAME, r184 spells it `builtinClipSpace` and it came through as a fourth varying carrying
+//      "VERTEX_v_modelViewProjection". The filter is structural now -- a varying is a member the vertex's own return
+//      struct declares at an @location, the clip-space one is @builtin(position) -- and the name test is gone.
+//   No 0-RED.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the LOOK_KNOBS baked into the TSL Loop where the WGSL reads them at run time (the fleet binds the same numbers, " +
     "so the pictures agree; a page turning the knobs would need a new graph); a MIPPED or anisotropic sample (the device makes one sampler per filter mode, repeat " +

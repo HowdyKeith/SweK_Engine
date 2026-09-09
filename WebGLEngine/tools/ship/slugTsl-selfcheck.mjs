@@ -49,13 +49,17 @@
 // src); the picture is now drawn over a colour, and the transplant carries the shell's blend, depthWrite and depthCompare.
 //
 // Run: node tools/ship/slugTsl-selfcheck.mjs      (~30 s; section 1 is CPU-only)
+// MEASURED at v4541. Applied to render/tslSource.mjs, this gate run, restored and md5-verified. Baseline 0 red.
+//   Z  the host shell's GLSL codes region split back on `// structs` -> 1 red: "shader: ERROR: 0:423: 'main' :
+//      function already has a body". r184 moved that marker above the uniforms, so the region ran to the end of the
+//      file and main() was emitted twice. The region ends where main BEGINS now, which is what delimits it.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
 import { validateWgsl } from "../../render/wgslSpec.mjs";
-import { varyingDecls, vertexVaryingBlock, attributeNames, transplantIntoShell, textureNames } from "../../render/tslSource.mjs";
+import { varyingDecls, vertexVaryingBlock, attributeNames, transplantIntoShell, textureNames, stampThreeRevision } from "../../render/tslSource.mjs";
 import { slugShell } from "../../render/slugTsl.mjs";
 import { slugCoreWgsl, slugShaderWgsl } from "../../text/slugShaderWgsl.js";
 import { TODO } from "./todo.mjs";
@@ -165,8 +169,8 @@ else {
             if (o.error || o.compileError) { ok(`${bk} ran and compiled`, false, o.error || o.compileError); continue; }
             ok(`*** ${bk}: "${TEXT}" at ${SIZE} px drawn by the fragment three GENERATED, in the shipped pipeline's own shell, IS the shipped pipeline's picture on EVERY pixel (${o.same} of ${o.total}, worst ${o.worst}; ${o.lit} lit, ${o.quads} glyph quads) ***`,
                 o.backend === bk && o.same === o.total && o.errs.length === 0 && o.lit > 500, o.errs.join(" | ")); }
-        fs.writeFileSync(EMITTED, JSON.stringify({ at: "v4484", three: "0.178.0", note: "the Slug fragment as three's node builders emitted it from render/slugTsl.mjs makeSlugTsl and as render/tslSource.mjs transplanted it into the shipped pipeline's shell; rewritten by tools/ship/slugTsl-selfcheck.mjs on every green run",
-            slug: { wgsl: R.emitted.webgpu, glsl: R.emitted.webgl2, transplanted: R.transplanted } }, null, 1));
+        fs.writeFileSync(EMITTED, JSON.stringify(stampThreeRevision({ at: "v4484", note: "the Slug fragment as three's node builders emitted it from render/slugTsl.mjs makeSlugTsl and as render/tslSource.mjs transplanted it into the shipped pipeline's shell; rewritten by tools/ship/slugTsl-selfcheck.mjs on every green run",
+            slug: { wgsl: R.emitted.webgpu, glsl: R.emitted.webgl2, transplanted: R.transplanted } }), null, 1));
         ok("the emitted and transplanted pair is written to tools/ship/tsl-emitted-slug.json for the WGSL corpus", fs.existsSync(EMITTED));
     }
 }

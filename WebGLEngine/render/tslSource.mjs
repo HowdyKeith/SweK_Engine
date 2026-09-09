@@ -150,7 +150,7 @@ export function bindingsFromState(state) {
                 const node = u.nodeUniform && u.nodeUniform.node;
                 let value = null; try { const v = node && node.value; if (v === null || typeof v !== "object") value = v; } catch { /* a node whose value throws is simply not foldable */ }
                 out.uniforms.push({ name: u.name, type: DEVICE_UNIFORM_TYPES[nodeType] || null, nodeType,
-                                    labelled: !!(node && node.name), value });
+                                    labelled: !!(node && node.name), value, updateType: (node && node.updateType) || null });
             }
         }
     }
@@ -199,7 +199,7 @@ export function foldableConstants(state) {
     for (const u of b.uniforms) {
         if (u.labelled || !CONST_LITERAL[u.nodeType]) continue;
         const literal = CONST_LITERAL[u.nodeType](u.value);
-        if (literal != null) out.push({ name: u.name, nodeType: u.nodeType, value: u.value, literal });
+        if (literal != null) out.push({ name: u.name, nodeType: u.nodeType, value: u.value, literal, updateType: u.updateType });
     }
     return out;
 }
@@ -226,6 +226,50 @@ export function foldConstants(fragment, language, constants) {
     return { fragment: out, folded };
 }
 
+// ---- v4541: THE COMPUTE PATH, AND WHY ITS FOLD IS NOT THE FRAGMENT'S ------------------------------------
+// r184 guards every compute entry it emits with a bound three allocated for itself:
+//
+//     struct objectStruct { nodeUniform2 : u32 };
+//     if ( instanceIndex >= object.nodeUniform2 ) { return; }
+//
+// -- the dispatch count, so a partly-filled last workgroup returns instead of running. r178 emitted no such
+// guard, which means every compute pass this file has transplanted so far has run WITHOUT one, relying on the
+// caller dispatching exactly. That is a real improvement of three's, and the transplant should keep it.
+//
+// *** IT LOOKS LIKE THE flipY FOLD AND IT IS NOT. *** MEASURED: the flipY switch answers updateType "none" --
+// three fixes it when the material compiles and never touches it again. This one answers updateType "object":
+// three writes it per dispatch, because a compute node's count can be changed without rebuilding the graph.
+//
+// It is still folded, and the reason is narrow: the device NEVER BINDS three's uniform buffer. The transplanted
+// module gets the shell's own bindings, so there is no copy of this number for anyone to update -- whatever the
+// transplant does with it is fixed the moment the WGSL is generated. Folding does not freeze something that was
+// live; it makes visible that it was already frozen.
+//
+// *** WHAT FOLDING WOULD HIDE, AND WHAT IS DONE ABOUT IT. *** A caller that re-used one transplanted module at a
+// different dispatch count would get a guard for the old count, silently. The workgroup size has been held to
+// the shell since v4336 for exactly this reason; the count had nowhere to be held. So the bound is READ BACK OUT
+// of the generated module and returned, and a caller that dispatches by a different number can be told so by a
+// check instead of by a wrong picture. dispatchBoundOf is the one reader, used by both entry points.
+/** r184's entry guard, read back out of a compute module: the count it will refuse to run past, or null. */
+export function dispatchBoundOf(wgsl) {
+    const m = String(wgsl).match(/instanceIndex\s*>=\s*(\d+)u/);
+    return m ? Number(m[1]) : null;
+}
+
+/**
+ * Ask three for the COMPUTE shader of one node, with three's own constants folded in:
+ * { wgsl, folded, foldError, dispatchBound }. The twenty-one call sites that reached for
+ * `renderer._nodes.getForCompute(node).computeShader` were each throwing the state away exactly as
+ * getShaderAsync does; this keeps it long enough to read the bindings, then hands back the same string.
+ */
+export function emitCompute(renderer, node) {
+    const state = renderer._nodes.getForCompute(node);
+    let constants = [], foldError = null;
+    try { constants = foldableConstants(state); } catch (e) { foldError = String((e && e.message) || e); }
+    const f = foldConstants(state.computeShader, "wgsl", constants);
+    return { wgsl: f.fragment, folded: f.folded, foldError, dispatchBound: dispatchBoundOf(f.fragment) };
+}
+
 /**
  * Ask three for the shaders of one mesh, with three's own constants folded in: { language, vertex, fragment, folded }.
  * The strings still come from the PUBLIC debug hook; only the constants come from the state behind it, and if that
@@ -233,6 +277,17 @@ export function foldConstants(fragment, language, constants) {
  * before, rather than this file's private-field coupling taking every TSL gate down at once. The gate asserts
  * foldError is null, so a silent fall back to the old behaviour is caught by a check rather than by a picture.
  */
+/**
+ * Stamp a written-down emission record with the revision three ITSELF printed at the top of the shader, read out of
+ * the record. v4540 found tools/ship/tsl-emitted.json declaring `three: "0.178.0"` over r184 text; v4541 found the
+ * same declaration in five more of them. A version typed beside an artifact is a claim nobody rechecks; this one is
+ * derived from the artifact, so it cannot drift from what is in the file.
+ */
+export function stampThreeRevision(rec) {
+    const m = JSON.stringify(rec).match(/Three\.js\s*(r\d+)/);
+    return { ...rec, three: m ? m[1] : "unknown" };
+}
+
 export async function emitShaders(renderer, { scene, camera, mesh }) {
     const sh = await renderer.debug.getShaderAsync(scene, camera, mesh);
     const language = renderer.backend.isWebGPUBackend ? "wgsl" : "glsl";
@@ -347,8 +402,8 @@ const CARRIED_NAME = { wgsl: /^var<private>[ \t]+(\w+)/, glsl: /^\w+[ \t]+(\w+);
  * rewritten `output.color = x; return output;` into `return x;`), and render/wgslSpec.mjs's scanner called that
  * clean, so only the driver would have said so. Carry what is USED; a declaration nobody names is not a temporary.
  */
-export function carriedDeclarations(fragment, language, body = null) {
-    const head = String(fragment).split(language === "wgsl" ? "@fragment" : "void main()")[0];
+export function carriedDeclarations(fragment, language, body = null, entryMarker = null) {
+    const head = String(fragment).split(entryMarker || (language === "wgsl" ? "@fragment" : "void main()"))[0];
     const all = head.match(CARRIED_DECL[language]) || [];
     if (body == null) return all;
     return all.filter((d) => { const n = (d.match(CARRIED_NAME[language]) || [])[1]; return n && new RegExp(`\\b${n}\\b`).test(body); });
@@ -433,8 +488,21 @@ export function varyingSemantics(vertex, language) {
     const out = {};
     // v4483 -- a NAMED varying (varying(node, "vScaled")) is emitted under its label, so the name is any identifier now
     const re = language === "wgsl" ? /varyings\.(\w+)\s*=\s*(\w+);/g : /^\s*(\w+)\s*=\s*(\w+);/gm;
-    const declared = language === "wgsl" ? null : new Set(Object.keys(varyingDecls(vertex, language)));
-    for (const m of vertex.matchAll(re)) { if (declared && !declared.has(m[1])) continue; if (m[1] === "Vertex") continue; out[m[1]] = m[2]; }
+    // *** v4541 -- THE CLIP-SPACE OUTPUT IS NOT A VARYING, AND UNTIL NOW IT WAS TOLD APART BY ITS NAME. ***
+    // three writes its vertex position into the same struct: r178 spelled that member `Vertex` and this line
+    // skipped it by name; r184 spells it `builtinClipSpace`, so it came through as a fourth varying carrying
+    // "VERTEX_v_modelViewProjection", and every gate row that reads the semantics went red. The GLSL branch never
+    // had the problem because it filters by what the vertex DECLARES as an out, and GLSL writes gl_Position.
+    // So the WGSL branch filters the same way, structurally: a varying is a member the vertex's own return struct
+    // declares at an @location; the clip-space one is declared @builtin(position). The struct is found through
+    // the entry's return type rather than by its name, and the `Vertex` special case is gone with the hazard.
+    let declared;
+    if (language === "wgsl") {
+        const ret = (vertex.match(/fn main\([\s\S]*?\)\s*->\s*(\w+)/) || [])[1];
+        const members = ret ? (vertex.match(new RegExp(`struct\\s+${ret}\\s*\\{([\\s\\S]*?)\\}`)) || [])[1] : null;
+        declared = members == null ? null : new Set([...members.matchAll(/@location\(\s*\d+\s*\)\s*(?:@interpolate\([^)]*\)\s*)?(\w+)\s*:/g)].map((m) => m[1]));
+    } else declared = new Set(Object.keys(varyingDecls(vertex, language)));
+    for (const m of vertex.matchAll(re)) { if (declared && !declared.has(m[1])) continue; out[m[1]] = m[2]; }
     return out;
 }
 // ---- v4483: COMPUTED VARYINGS, and what three declares for each ------------------------------------------------------
@@ -637,17 +705,28 @@ export function transplantIntoShell({ wgsl, glsl }, shell) {
             }
             const prefix = (vertexText ? S.prefix.replace(S.vertexTemplate, vertexText) : S.prefix).replace("{{VARYINGS}}", varyingDeclText ? ", " + varyingDeclText : "");
             if (vertexText && prefix === S.prefix) throw new Error("tslSource: the shell's prefix does not contain its own vertexTemplate, so the vertex could not be replaced");
-            desc.wgsl = `// transplanted into the ${shell.name} shell from three's WGSL node builder by render/tslSource.mjs\n${prefix}\n${codes}\n@fragment fn fs(${S.varyingParam}: ${S.varyingType || "VOut"}) -> @location(0) vec4<f32> {${b}}\n`;   // v4484: the shell names its varying struct (Slug's is VSOut)
+            // *** v4541 -- THE THIRD PATH, AND THE SAME r184 CHANGE. *** transplantFragment got this at v4540 and
+            // transplantCompute in this round; the host-shell path had it too. The declarations are read AFTER the
+            // renames, so a varying three called nodeVarying4 -- now spelled as the shell's own -- is no longer named
+            // by the body and is not carried, while the temporaries, which nothing renames, are.
+            const decls = carriedDeclarations(em.fragment, "wgsl", b).filter((d) => { const n = (d.match(CARRIED_NAME.wgsl) || [])[1]; return n && !new RegExp(`\\b${n}\\b`).test(prefix); });
+            desc.wgsl = `// transplanted into the ${shell.name} shell from three's WGSL node builder by render/tslSource.mjs\n${prefix}\n${codes}\n${decls.join("\n")}${decls.length ? "\n" : ""}@fragment fn fs(${S.varyingParam}: ${S.varyingType || "VOut"}) -> @location(0) vec4<f32> {${b}}\n`;   // v4484: the shell names its varying struct (Slug's is VSOut)
         } else {
             const computedNames = block ? block.computed.map((c) => c.name) : [];
             const ins = [...em.fragment.matchAll(/^(?:flat\s+)?in\s+\w+\s+(\w+);/gm)].map((m) => m[1]).filter((n) => !computedNames.includes(n));
-            const codes = (em.fragment.split("// codes")[1] || "").split("// structs")[0].trim();
+            // v4541 -- `// structs` moved above the uniforms at r184, so this region ran to the end of the file and
+            // emitted main() a second time: "'main' : function already has a body". Same fix as transplantFragment's.
+            const codes = (em.fragment.split("// codes")[1] || "").split("void main()")[0]
+                .replace(/^\s*(?:layout\([^)]*\)\s*)?out\s+\w+\s+\w+\s*;\s*$/gm, "")
+                .replace(CARRIED_DECL.glsl, "").trim();
             const bodyAll = em.fragment.split("void main()")[1]; let b = bodyAll.slice(bodyAll.indexOf("{") + 1, bodyAll.lastIndexOf("}"));
             if (!/fragColor\s*=/.test(b)) throw new Error("tslSource: the GLSL main() does not write fragColor");
             for (const n of ins) { const what = sem[n]; const to = what && S.varyings[what]; if (!to) throw new Error(`tslSource: the fragment reads varying ${n} (${what || "unknown"}), which the shell "${shell.name}" does not carry`); b = b.replace(new RegExp(`\\b${n}\\b`, "g"), to); }
             for (const u of uniforms) b = b.replace(new RegExp(`\\bf_${u.name}\\b`, "g"), u.name);
             b = b.replace(new RegExp("\\b" + F_ + "(cameraProjectionMatrix|cameraViewMatrix)\\b", "g"), (_, m) => S.matrices[m]);
-            desc.glsl = { vertex: vertexText || S.vertex, fragment: `${S.fragmentPrefix.replace("{{VARYINGS}}", fragInText)}\n${codes}\nvoid main() {${b}}\n` };
+            const gPrefix = S.fragmentPrefix.replace("{{VARYINGS}}", fragInText);
+            const gDecls = carriedDeclarations(em.fragment, "glsl", b).filter((d) => { const n = (d.match(CARRIED_NAME.glsl) || [])[1]; return n && !new RegExp(`\\b${n}\\b`).test(gPrefix); });
+            desc.glsl = { vertex: vertexText || S.vertex, fragment: `${gPrefix}\n${codes}\n${gDecls.join("\n")}${gDecls.length ? "\n" : ""}void main() {${b}}\n` };
         }
     }
     // v4484 -- the shell's BLEND and DEPTH state ride along: a Slug shell is premultiplied with no depth write, and a transplant that dropped them drew the
@@ -855,6 +934,18 @@ export function transplantCompute(wgsl, shell) {
     sharedFound.forEach((f, i) => { b = b.replace(new RegExp(`\\b${f.name}\\b`, "g"), wantShared[i].name); });
     b = b.replace(/\bobject\.(\w+)/g, `${shell.uniformVar}.$1`);
     for (const a of memberUA) b = b.replace(new RegExp(`\\b${a.name}\\.value\\b`, "g"), `${shell.uniformVar}.${a.name}`);   // v4483: the array lives in the struct
-    const code = `// transplanted from three's WGSL compute builder by render/tslSource.mjs\n${keepSubgroups ? "enable subgroups;\n" : ""}var<private> instanceIndex : u32;\n${shell.prefix}\n@` + `compute @workgroup_size(${shell.workgroupSize})\n${b}`;
-    return { wgsl: code, shared: wantShared.map((w) => w.name), storage: shell.storage.map((b2) => b2.name), reads: wantR.map((b2) => b2.name), writes: wantW.map((b2) => b2.name), uniforms, uniformArrays: wantUA.map((a) => a.name), workgroupSize: shell.workgroupSize, shell: shell.name };
+    // *** v4541 -- r184 MOVED three's TEMPORARIES OUT OF THE ENTRY POINT HERE TOO. *** The same change that broke
+    // the fragment transplant at v4540 breaks this one: three used to declare `var nodeVar0 : f32;` inside its
+    // compute entry and now declares `var<private> nodeVar0 : f32;` at file scope, so taking the body from
+    // `@compute` onward leaves every one of them behind. MEASURED, the symptom is not a refusal but a device
+    // error -- "the WGSL for this compute pipeline did not compile: unresolved value" -- and then a pass that
+    // reads zero everywhere, which is why tslPhysics-selfcheck's counts all went to 0.
+    // Two things the shell already declares are NOT carried a second time (instanceIndex is the live one): a
+    // duplicate declaration is a compile error, and the shell's is the one the transplant means.
+    const preamble = `${keepSubgroups ? "enable subgroups;\n" : ""}var<private> instanceIndex : u32;\n${shell.prefix}\n`;
+    const decls = carriedDeclarations(wgsl, "wgsl", b, at[0])
+        .filter((d) => { const n = (d.match(CARRIED_NAME.wgsl) || [])[1]; return n && !new RegExp(`\\b${n}\\b`).test(preamble); });
+    assertDeclared(b, [...decls, `var<private> instanceIndex : u32;`], "wgsl");
+    const code = `// transplanted from three's WGSL compute builder by render/tslSource.mjs\n${preamble}${decls.join("\n")}${decls.length ? "\n" : ""}@` + `compute @workgroup_size(${shell.workgroupSize})\n${b}`;
+    return { wgsl: code, shared: wantShared.map((w) => w.name), storage: shell.storage.map((b2) => b2.name), reads: wantR.map((b2) => b2.name), writes: wantW.map((b2) => b2.name), uniforms, uniformArrays: wantUA.map((a) => a.name), workgroupSize: shell.workgroupSize, shell: shell.name, dispatchBound: dispatchBoundOf(code) };
 }

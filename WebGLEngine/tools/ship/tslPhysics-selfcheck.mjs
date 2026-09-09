@@ -235,7 +235,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
 import { LN2, PERIOD3, LY_DEFAULTS, truePeak, etaStandard, PARAMS, lyapunovSweepCpu } from "../../render/physicsTsl.mjs";
-import { computeShell, transplantCompute } from "../../render/tslSource.mjs";
+import { computeShell, transplantCompute, stampThreeRevision } from "../../render/tslSource.mjs";
 import { lyapunovComputeWgsl } from "../../render/lyapunovWgsl.mjs";
 import { validateWgsl, parseBindings } from "../../render/wgslSpec.mjs";
 import { cullLodWgsl } from "../../render/gpuDriven.mjs";
@@ -344,7 +344,7 @@ else {
         for (const b of ["webgpu", "webgl2"]) grade(R.three[b], "three's TSL path,", b);
         ok("the emitted fragments transplant (labelled uniforms in three's order: the Lyapunov key's four, the Heidler key's six)", R.uniforms && R.uniforms.lyapunov.slice().sort().join() === "rHi,rLo,seedHi,seedLo" && R.uniforms.heidler.slice().sort().join() === "eta,i0,t1,t2,tHi,tLo", JSON.stringify(R.uniforms));
         for (const b of ["webgpu", "webgl2"]) grade(R.device[b], "the device, transplanted,", b);
-        const rec = { at: "v4321", three: "0.178.0", note: "emitted by three's node builders from render/physicsTsl.mjs and transplanted by render/tslSource.mjs; rewritten by tools/ship/tslPhysics-selfcheck.mjs on every run", ...R.emitted };
+        const rec = stampThreeRevision({ at: "v4321", note: "emitted by three's node builders from render/physicsTsl.mjs and transplanted by render/tslSource.mjs; rewritten by tools/ship/tslPhysics-selfcheck.mjs on every run", ...R.emitted });
         fs.writeFileSync(EMITTED, JSON.stringify(rec, null, 1));
         ok("the emitted pairs are written to tools/ship/tsl-emitted-physics.json for the WGSL corpus", fs.existsSync(EMITTED));
         report(`three's TSL path and the transplanted device path agree on ln 2 to ${Math.abs(R.three.webgpu.lyMedian - R.device.webgpu.lyMedian).toExponential(1)} on WebGPU and ${Math.abs(R.three.webgl2.lyMedian - R.device.webgl2.lyMedian).toExponential(1)} on WebGL2`);
@@ -378,7 +378,7 @@ else {
         out.threeBackend = renderer.backend.isWebGPUBackend ? "webgpu" : "webgl2";
         // TWO configurations, and the second is the point: SHORT (the map has not had time to separate) and FULL.
         const mk = async (opts) => { const g = P.makeLyapunovComputeTsl(T, { count: a.N, seed: 0.4, ...opts }); await renderer.computeAsync(g.node);
-            return { g, emitted: renderer._nodes.getForCompute(g.node).computeShader, three: [...new Float32Array(await renderer.getArrayBufferAsync(g.buffer.value))] }; };
+            return { g, emitted: S.emitCompute(renderer, g.node).wgsl, three: [...new Float32Array(await renderer.getArrayBufferAsync(g.buffer.value))] }; };
         const full = await mk({}), short = await mk({ samples: 8, warmup: 4 });
         const g = full.g, emitted = full.emitted;
         out.emitted = emitted; out.threeValues = full.three;
@@ -435,7 +435,7 @@ else {
         ok(`  and r = 4 reads ${atFour.toFixed(6)} against the CPU's ${cpuFour.toFixed(6)} and ln 2 = ${LN2.toFixed(6)}`, Math.abs(atFour - LN2) < 0.05,
             `${LY_DEFAULTS.samples} samples is a FINITE-SAMPLE value and r = 4 is the most chaotic point in the sweep: the CPU itself sits ${Math.abs(cpuFour - LN2).toFixed(6)} from ln 2, and no bit claim is made at this end of it`);
         ok("  three's own renderer read the same buffer back, so the transplant is graded against the graph's own output too", R.threeValues && Math.max(...R.threeValues.map((v, i) => Math.abs(v - R.genValues[i]))) < 1e-6 && R.threeBackend === "webgpu" && R.deviceBackend === "webgpu", `three ${R.threeBackend}, device ${R.deviceBackend}`);
-        fs.writeFileSync(EMITTED_C, JSON.stringify({ at: "v4331", three: "0.178.0", note: "the Lyapunov sweep as a TSL compute pass, as three emitted it and as render/tslSource.mjs transplanted it into a gfx/device.js compute pipeline; rewritten by this gate on every run", emitted: R.emitted, transplanted: R.transplanted }, null, 1));
+        fs.writeFileSync(EMITTED_C, JSON.stringify(stampThreeRevision({ at: "v4331", note: "the Lyapunov sweep as a TSL compute pass, as three emitted it and as render/tslSource.mjs transplanted it into a gfx/device.js compute pipeline; rewritten by this gate on every run", emitted: R.emitted, transplanted: R.transplanted }), null, 1));
         ok("the emitted and transplanted compute pass is written to tools/ship/tsl-emitted-compute.json for the WGSL corpus", fs.existsSync(EMITTED_C));
     }
 }
@@ -454,8 +454,8 @@ else {
         await renderer.computeAsync(g.node);
         const m = P.makeChaosMaskTsl(T, { sweep: g.buffer, count: a.N });
         await renderer.computeAsync(m.node);
-        const sweepEmitted = renderer._nodes.getForCompute(g.node).computeShader;
-        const maskEmitted = renderer._nodes.getForCompute(m.node).computeShader;
+        const sweepEmitted = S.emitCompute(renderer, g.node).wgsl;
+        const maskEmitted = S.emitCompute(renderer, m.node).wgsl;
         out.bothReadWrite = (maskEmitted.match(/var<storage, read_write>/g) || []).length;   // three declares BOTH as read_write
         try {
             const cv = document.createElement("canvas"); cv.width = 32; cv.height = 32; const dev = await requestDevice(cv, { backend: "webgpu", offscreen: true });
@@ -514,8 +514,8 @@ else {
         await renderer.computeAsync(g.node);
         const t = P.makeChaosTallyTsl(T, { sweep: g.buffer, count: a.N });
         await renderer.computeAsync(t.node);
-        const sweepEmitted = renderer._nodes.getForCompute(g.node).computeShader;
-        const tallyEmitted = renderer._nodes.getForCompute(t.node).computeShader;
+        const sweepEmitted = S.emitCompute(renderer, g.node).wgsl;
+        const tallyEmitted = S.emitCompute(renderer, t.node).wgsl;
         out.threeDeclaresAtomic = /array< atomic<u32> >/.test(tallyEmitted);
         try {
             const cv = document.createElement("canvas"); cv.width = 32; cv.height = 32; const dev = await requestDevice(cv, { backend: "webgpu", offscreen: true });
@@ -584,8 +584,8 @@ else {
         const renderer = new THREE.WebGPURenderer({ canvas, forceWebGL: false, antialias: false }); await renderer.init();
         const g = P.makeLyapunovComputeTsl(T, { count: a.N, seed: 0.4 }); await renderer.computeAsync(g.node);
         const red = P.makeChaosReduceTsl(T, { sweep: g.buffer, count: a.N }); await renderer.computeAsync(red.node);
-        const sweepEmitted = renderer._nodes.getForCompute(g.node).computeShader;
-        const redEmitted = renderer._nodes.getForCompute(red.node).computeShader;
+        const sweepEmitted = S.emitCompute(renderer, g.node).wgsl;
+        const redEmitted = S.emitCompute(renderer, red.node).wgsl;
         out.threeShared = (redEmitted.match(/var<workgroup>/g) || []).length;
         out.threeBarrier = /workgroupBarrier\\(\\)/.test(redEmitted);
         try {
@@ -655,8 +655,8 @@ else {
         const t = P.makeChaosTallyTsl(T, { sweep: g.buffer, count: a.N }); await renderer.computeAsync(t.node);
         const sz = P.makeDispatchSizerTsl(T, { tally: t.tally }); await renderer.computeAsync(sz.node);
         const mk = P.makeMarkTsl(T, { count: a.N }); await renderer.computeAsync(mk.node);
-        const em = { sweep: renderer._nodes.getForCompute(g.node).computeShader, tally: renderer._nodes.getForCompute(t.node).computeShader,
-                     sizer: renderer._nodes.getForCompute(sz.node).computeShader, mark: renderer._nodes.getForCompute(mk.node).computeShader };
+        const em = { sweep: S.emitCompute(renderer, g.node).wgsl, tally: S.emitCompute(renderer, t.node).wgsl,
+                     sizer: S.emitCompute(renderer, sz.node).wgsl, mark: S.emitCompute(renderer, mk.node).wgsl };
         // the SAME buffer is atomic<u32> where the tally increments it and a plain u32 where the sizer reads it
         // three declares the tally atomic in BOTH modules -- the flag lives on the node, not on the use -- so the sizer,
         // which only reads it, gets an atomic declaration it never needed. The SHELL is what fixes that.
@@ -747,7 +747,7 @@ else {
         const renderer = new THREE.WebGPURenderer({ canvas, forceWebGL: false, antialias: false }); await renderer.init();
         const g = P.makeCullLodTsl(T, { count: a.N, lodCount: a.LODS });
         await renderer.computeAsync(g.node);
-        const emitted = renderer._nodes.getForCompute(g.node).computeShader;
+        const emitted = S.emitCompute(renderer, g.node).wgsl;
         out.emitted = emitted;
         try {
             const cv = document.createElement("canvas"); cv.width = 32; cv.height = 32; const dev = await requestDevice(cv, { backend: "webgpu", offscreen: true });
@@ -817,7 +817,7 @@ else {
         const renderer = new THREE.WebGPURenderer({ canvas, forceWebGL: false, antialias: false }); await renderer.init();
         const g = P.makeCullPassTsl(T, { count: a.N, lodCount: a.LODS, regions: a.LODS, cap: a.CAP });
         await renderer.computeAsync(g.node);
-        const emitted = renderer._nodes.getForCompute(g.node).computeShader;
+        const emitted = S.emitCompute(renderer, g.node).wgsl;
         // NO REGEX HERE: this script is a template literal, so a backslash in it is eaten twice. Plain splits, as v4337 learned.
         out.emittedOrder = emitted.split("var<storage,").slice(1).map((t) => t.split(">")[1].split(":")[0].trim());
         const mkShell = (over) => S.computeShell(Object.assign({ name: "cull pass", workgroupSize: G.CULL_WORKGROUP,
@@ -945,8 +945,8 @@ else {
         const gU = P.makeCullPassTsl(T, Object.assign({ planesUniform: true }, opts));
         const gS = P.makeCullPassTsl(T, Object.assign({ planesUniform: false }, opts));
         await renderer.computeAsync(gU.node); await renderer.computeAsync(gS.node);
-        const emitted = renderer._nodes.getForCompute(gU.node).computeShader;
-        const emittedS = renderer._nodes.getForCompute(gS.node).computeShader;
+        const emitted = S.emitCompute(renderer, gU.node).wgsl;
+        const emittedS = S.emitCompute(renderer, gS.node).wgsl;
         const CMDS = { name: "cmds", struct: P.CMD_STRUCT }, RECS = { name: "records", element: "vec4<f32>" };
         const RD = (n) => ({ name: n, element: "vec4<f32>", access: "read" });
         const UNI = [{ name: "eye", type: "vec4" }, { name: "thresholds", type: "vec4" }, { name: "info", type: "vec4" }, { name: "clock", type: "vec4" }];
@@ -1055,7 +1055,7 @@ else {
             const renderer = new THREE.WebGPURenderer({ canvas, forceWebGL: false, antialias: false }); await renderer.init();
             const g = P.makeHmcLeapfrogTsl(T, { count: a.N, inv: a.inv, mu: a.mu, eps: a.eps, L: a.L });
             await renderer.computeAsync(g.node);
-            const emitted = renderer._nodes.getForCompute(g.node).computeShader;
+            const emitted = S.emitCompute(renderer, g.node).wgsl;
             const gen = S.transplantCompute(emitted, a.shell);
             out.gen = gen.wgsl; out.reads = gen.reads; out.writes = gen.writes;
             const refuse = (fn) => { try { fn(); return null; } catch (e) { return String(e.message).slice(0, 300); } };

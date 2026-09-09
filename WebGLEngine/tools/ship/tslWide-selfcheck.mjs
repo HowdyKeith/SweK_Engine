@@ -42,7 +42,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
 import { validateWgsl } from "../../render/wgslSpec.mjs";
-import { varyingDecls, vertexVaryingBlock, vertexDisplacement, transplantIntoShell, transplantCompute, computeShell } from "../../render/tslSource.mjs";
+import { varyingDecls, vertexVaryingBlock, vertexDisplacement, transplantIntoShell, transplantCompute, computeShell, stampThreeRevision } from "../../render/tslSource.mjs";
 import { quadShell, quadHand, quadColourAt, PLANES_UNIFORMS, QUAD_KNOBS } from "../../render/tslWide.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -112,7 +112,7 @@ else {
             renderer.setRenderTarget(new THREE.RenderTarget(16, 16));
             const g = W.makeQuadVaryingsTsl(THREE, T, { cells: a.CELLS }); out.emitted[mode] = await S.emitShaders(renderer, { scene: g.scene, camera: g.camera, mesh: g.mesh });
             const g2 = W.makeQuadVaryingsTsl(THREE, T, { cells: a.CELLS, perVertexBand: true }); out.emittedPV[mode] = await S.emitShaders(renderer, { scene: g2.scene, camera: g2.camera, mesh: g2.mesh });
-            if (mode === "webgpu") { const pg = W.makePlanesTsl(T, { count: a.COUNT }); await renderer.computeAsync(pg.node); out.planesEmitted = renderer._nodes.getForCompute(pg.node).computeShader; }
+            if (mode === "webgpu") { const pg = W.makePlanesTsl(T, { count: a.COUNT }); await renderer.computeAsync(pg.node); out.planesEmitted = S.emitCompute(renderer, pg.node).wgsl; }
         }
         const em = { wgsl: out.emitted.webgpu, glsl: out.emitted.webgl2 }, emPV = { wgsl: out.emittedPV.webgpu, glsl: out.emittedPV.webgl2 };
         let desc, descPV; try { desc = S.transplantIntoShell(em, W.quadShell({ cells: a.CELLS })); descPV = S.transplantIntoShell(emPV, W.quadShell({ cells: a.CELLS })); } catch (e) { out.error = String(e.message); return out; }
@@ -163,8 +163,8 @@ else {
         ok(`*** a cell-constant flat varying draws the SAME picture on both backends (${C.cellBand} pixels apart); a per-vertex one does NOT (${C.perVertexBand} of ${C.total} apart): WebGPU takes the first vertex, OpenGL ES the last -- the rule is the graph author's ***`, C.cellBand === 0 && C.perVertexBand > 1000);
         const P = R.run.webgpu.planes;
         ok(`*** WebGPU: the planes pass, its frustum INSIDE the struct at the offset packCullUniforms writes, equals the f32 CPU twin bit for bit (${P.same} of ${P.count}, ${P.inside} inside the box) through ONE uniform binding ***`, P.same === P.count && P.inside > 5 && P.inside < P.count && P.bindings.join() === "pts,dist,u", `worst ${P.worst}, bindings ${P.bindings.join(",")}`);
-        fs.writeFileSync(EMITTED, JSON.stringify({ at: "v4483", three: "0.178.0", note: "render/tslWide.mjs's quad graph (three computed varyings, one flat, the camera in the fragment) and planes pass as three's node builders emitted them and as render/tslSource.mjs transplanted them; rewritten by tools/ship/tslWide-selfcheck.mjs on every green run",
-            quad: { wgsl: R.emitted.webgpu, glsl: R.emitted.webgl2, transplanted: R.transplanted }, planes: { wgsl: R.planesEmitted, transplanted: R.planesTransplanted } }, null, 1));
+        fs.writeFileSync(EMITTED, JSON.stringify(stampThreeRevision({ at: "v4483", note: "render/tslWide.mjs's quad graph (three computed varyings, one flat, the camera in the fragment) and planes pass as three's node builders emitted them and as render/tslSource.mjs transplanted them; rewritten by tools/ship/tslWide-selfcheck.mjs on every green run",
+            quad: { wgsl: R.emitted.webgpu, glsl: R.emitted.webgl2, transplanted: R.transplanted }, planes: { wgsl: R.planesEmitted, transplanted: R.planesTransplanted } }), null, 1));
         ok("the emitted and transplanted pair is written to tools/ship/tsl-emitted-wide.json for the WGSL corpus", fs.existsSync(EMITTED));
         report(`emitted WGSL vertex ${R.emitted.webgpu.vertex.length} chars, fragment ${R.emitted.webgpu.fragment.length} -> transplanted ${R.transplanted.wgsl.length}; planes ${R.planesEmitted.length} -> ${R.planesTransplanted.length}`);
     }

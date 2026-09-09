@@ -105,7 +105,7 @@ else {
             const pnode = Fn(() => { const r = philox(instanceIndex, uint(7), uint(1), uint(0), pcfg.x, pcfg.y);
                 pbuf.element(instanceIndex).assign(uvec4(r.x0, r.x1, r.x2, r.x3)); })().compute(a.NP);
             await renderer.computeAsync(pnode);
-            const pgen = S.transplantCompute(renderer._nodes.getForCompute(pnode).computeShader, a.pshell);
+            const pgen = S.transplantCompute(S.emitCompute(renderer, pnode).wgsl, a.pshell);
             const pob = dev.buffer({ data: new Uint32Array(a.NP * 4), usage: ["storage"] });
             const pub = dev.buffer({ data: new Uint32Array([a.SEED, a.K1, 0, 0]), usage: "uniform" });
             const pp = dev.compute({ wgsl: pgen.wgsl }); pp.bind("out", pob).bind("u", pub);
@@ -114,7 +114,7 @@ else {
 
             // ---- the sweep ----------------------------------------------------------------------------------
             const g = I.makeIsingPassTsl(T, { L: a.L }); await renderer.computeAsync(g.node);
-            const gen = S.transplantCompute(renderer._nodes.getForCompute(g.node).computeShader, a.shell);
+            const gen = S.transplantCompute(S.emitCompute(renderer, g.node).wgsl, a.shell);
             out.wgsl = gen.wgsl; out.reads = gen.reads; out.writes = gen.writes;
             out.noFloat = !(new RegExp("\\\\bf32\\\\b|\\\\b(exp|log|sin|cos|sqrt|pow)\\\\s*\\\\(").test(gen.wgsl));
             const half = (a.L * a.L) / 2, groups = Math.ceil(half / 64);

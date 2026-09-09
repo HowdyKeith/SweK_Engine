@@ -25,13 +25,25 @@
 //      render/tslSource.mjs refuses by name. A baked bound cannot pass as a buffer one at either layer.
 //   B  the bound plus one                                 -> exit=1, 14 red: every count in both variants, 0 of 1,024.
 //   C  1 - x written as 0.999 - x                          -> exit=1, 14 red: every count in both variants.
+// SABOTAGE (v4541) -- r184 guards every compute entry with a count of its own, and this gate is where that fold is
+// held to the graph. Applied to render/tslSource.mjs, this gate run, red count read, source AND every emitted json
+// restored and md5-verified. Baseline 0 red.
+//   V  emitCompute handing back three's shader unfolded (the state read and then thrown away, as getShaderAsync does)
+//      -> 1 red: "the emitted WGSL carries an UNLABELLED uniform ... THAT THE FRAGMENT READS", which is exactly the
+//      refusal this round removed the cause of, back again. The fold is what makes the compute path transplantable.
+//   W  dispatchBoundOf always answering null -> 2 red, both variants: "null == 1024". This is the row that stops the
+//      fold being a silent hazard -- a module re-used at another dispatch count would carry the old guard -- so a
+//      sabotage of the reader has to be visible, and it is.
+//   X  the compute transplant carrying no declarations -> 1 red, by the NAMED refusal ("the fragment assigns
+//      nodeVar0, which nothing in the transplanted shader declares") rather than by a driver error.
+//   No 0-RED among the three.
 "use strict";
 
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
-import { computeShell } from "../../render/tslSource.mjs";
+import { computeShell, stampThreeRevision } from "../../render/tslSource.mjs";
 /** The shell the transplant lands in, per variant: out written, r and x0 read, steps read; the bound uniform only where it is one.
  *  Defined HERE, not in render/physicsTsl.mjs, because that module exports no shell by tslPhysics-selfcheck's rule (the split). */
 function logisticStepperShell(boundFrom = "uniform") {
@@ -78,7 +90,8 @@ console.log("\n2. EMITTED ONCE PER VARIANT, RUN AT FIVE STEP COUNTS WITH THE BUF
                     // three needs the buffers filled to emit and run its own copy once; the device run below is the claim
                     g.rBuf.value.array.set(a.r); g.x0Buf.value.array.set(a.x0); if (g.stepsBuf) g.stepsBuf.value.array.set([200, 0, 0, 0]);
                     await renderer.computeAsync(g.node);
-                    v.emitted = renderer._nodes.getForCompute(g.node).computeShader;
+                    const ec = S.emitCompute(renderer, g.node); v.emitted = ec.wgsl;
+                    v.bound = ec.dispatchBound; v.folded = ec.folded.map((f) => f.name + "=" + f.literal + "@" + f.updateType); v.foldError = ec.foldError;
                     v.three = Array.from(new Float32Array(await renderer.getArrayBufferAsync(g.out.value)));
                     const shell = S.computeShell(a.shells[boundFrom]);
                     const gen = S.transplantCompute(v.emitted, shell);
@@ -92,6 +105,7 @@ console.log("\n2. EMITTED ONCE PER VARIANT, RUN AT FIVE STEP COUNTS WITH THE BUF
                     for (const n of a.STEPS) {
                         bBound.write(new Float32Array([n, 0, 0, 0]));
                         dev.frame(({ pass }) => { pass.dispatch(pipe, Math.ceil(a.count / 64)); });
+                    v.transplantBound = gen.dispatchBound;
                         v.runs[n] = Array.from(new Float32Array(await dev.read(bOut)));
                     }
                     for (const b of [bOut, bR, bX, bBound]) b.destroy();
@@ -114,11 +128,20 @@ console.log("\n2. EMITTED ONCE PER VARIANT, RUN AT FIVE STEP COUNTS WITH THE BUF
                 ok(`*** ${bf}: one emitted module, five step counts, every orbit the twin's ***`, all);
                 const t200 = sameBits(v.three, orbitCpu(F, 200));
                 ok(`  ${bf}: three's own renderer ran the graph at 200 and read the same bits back`, t200 === F.count, `${t200}/${F.count}`);
+                // v4541 -- r184 GUARDS THE ENTRY WITH A COUNT, AND THAT COUNT IS NOW BAKED INTO THE MODULE.
+                // three emits `if ( instanceIndex >= object.nodeUniformN ) { return; }`; the device never binds
+                // three's uniform buffer, so the transplant folds the bound in. Folding it would be a silent hazard
+                // if nothing said WHICH count was baked -- re-use one module at another dispatch and the guard is
+                // wrong with nothing to say so -- so emitCompute and transplantCompute both read it back out, and
+                // this row holds it to the count the graph was built with and the dispatch actually made.
+                ok(`  ${bf}: r184's entry guard was folded at the graph's own count and both readers agree -- ${v.bound} == ${F.count}, dispatched ceil(${F.count}/64) = ${Math.ceil(F.count / 64)} groups`,
+                   v.bound === F.count && v.transplantBound === F.count && v.foldError === null && v.folded.length === 1 && /@object$/.test(v.folded[0]),
+                   `emit ${v.bound}, transplant ${v.transplantBound}, folded ${JSON.stringify(v.folded)}, foldError ${v.foldError}`);
             }
             const U = r.result.variants.uniform, Sv = r.result.variants.storage;
             if (!U.error && !Sv.error) {
-                fs.writeFileSync(EMITTED, JSON.stringify({ at: "v4471", three: "0.178.0", note: "the logistic map stepped `bound` times, the bound a vec4 uniform in one variant and a storage buffer's element in the other -- the first generated pass whose trip count is not baked into its text; render/physicsTsl.mjs makeLogisticStepperTsl, transplanted by render/tslSource.mjs",
-                    emitted: U.emitted, transplanted: U.transplanted, emittedStorage: Sv.emitted, transplantedStorage: Sv.transplanted }, null, 1) + "\n");
+                fs.writeFileSync(EMITTED, JSON.stringify(stampThreeRevision({ at: "v4471", note: "the logistic map stepped `bound` times, the bound a vec4 uniform in one variant and a storage buffer's element in the other -- the first generated pass whose trip count is not baked into its text; render/physicsTsl.mjs makeLogisticStepperTsl, transplanted by render/tslSource.mjs",
+                    emitted: U.emitted, transplanted: U.transplanted, emittedStorage: Sv.emitted, transplantedStorage: Sv.transplanted }), null, 1) + "\n");
                 ok("the two emitted and transplanted passes are written to tools/ship/tsl-emitted-loop.json for the WGSL corpus", fs.existsSync(EMITTED));
             }
         }
