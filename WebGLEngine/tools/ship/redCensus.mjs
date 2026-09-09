@@ -639,6 +639,66 @@ export const RED_AT_V4535 = Object.freeze(RED_AT_V4535_GATES.map((gate) => Objec
 // v4536 did the repair; and the row that exists to notice exactly that said "24 of 24 re-ran red just now"
 // and passed. The population is DERIVED from the pairs below now, and the gate checks those pairs against
 // this file's own source, so a list that arrives without being added here fails rather than being skipped.
+// *** v4568 -- FIVE REDS THAT HAVE NEVER BEEN REGISTERED BECAUSE NOTHING COULD RUN THEM. ***
+//
+// Every list above holds a gate the sweep found. These five were found by opening the KILLED bucket: 140
+// gates that hit the 20,000 ms cap, which the rotation could not reach until v4568 and the sweep skips by
+// construction. Re-run serially at a 90 s cap, 103 of the 140 finished and SIX came back red -- five of them
+// real, confirmed by running each alone.
+//
+// They are registered rather than fixed because each is a defect in a different subsystem and the round that
+// found them is about the door, not about them. A red that is named is a known red; a red sitting over the
+// cap is the exact fault this round exists to end, and closing the round by leaving them unnamed would
+// reproduce it one level up.
+//
+// *** AND THE SIXTH WAS A FALSE RED OF THE PASS'S OWN MAKING, WHICH IS WHY THE LIST IS FIVE. ***
+// tools/ship/domScope-selfcheck.mjs was filed red at 90,129 ms and is GREEN alone at 101,386 and 102,999 ms:
+// it simply needs more than 90 seconds. The pass read it as finished-and-failed because execFileSync's
+// timeout can leave an exit STATUS rather than a signal, so "was it killed" was answered by a number instead
+// of by the fact. runGate uses spawnSync now and reports timeout/signal outright -- verified by capping a
+// 100 s gate at 5 s -- and domScope was re-timed through the owner to 103,579 ms exit 0.
+const WHY_V4568 = Object.freeze({
+    "tools/ship/commentFalsePass-selfcheck.mjs":
+        "ONE GENUINE INSTANCE of the thing it hunts, after 24 candidates the instrument explains away: " +
+        "ui/qrChannel-selfcheck.mjs asserts against RAW SOURCE and its claim is satisfied by the string " +
+        "\"Copyright (c) 2009 Kazuhiko Arase\" in a comment in ui/qrDecode.mjs. A gate asserting 'the code " +
+        "does X' against unstripped source passes on a comment saying 'we should do X' -- the defect this " +
+        "file was written for, found in a gate rather than in a pre-filter this time.",
+    "tools/ship/gateReach-selfcheck.mjs":
+        "the recorded default population is 472 and the live one is 520. A tool that silently changes what " +
+        "it counts makes every earlier figure incomparable, which is why this row is a red and not a report.",
+    "tools/ship/baselineHygiene-selfcheck.mjs":
+        "SEVEN baseline entries have outlived their reason and the gate names them for deletion: " +
+        "brain/cs/csEnv.js, render/SSAOPass.js, simulation/SpatialHash.js, tools/facePlacementSystem.js, " +
+        "tools/selectionState.js, tools/voxelToolSystem.js, ui/avatarExpression.js. A baseline that still " +
+        "excuses files which are no longer orphans is a list of fiction -- the failure mode its own header " +
+        "describes, arrived at again.",
+    "tools/ship/gateSelection-selfcheck.mjs":
+        "reachable gates are no longer scheduled first: the first 109 selected are all reachable and the " +
+        "row wants that property to hold further, so a truncated run no longer covers the change it was " +
+        "meant to cover.",
+    "tools/ship/orphanDisposition-selfcheck.mjs":
+        "'imported by a gate named for something else' now holds for 28 of 30 members, so it discriminates " +
+        "NOTHING -- v3551's defect, which this gate's own row says was caught before it was built and has " +
+        "since become true of the live population.",
+});
+
+export const RED_AT_V4568_GATES = Object.freeze([
+    "tools/ship/baselineHygiene-selfcheck.mjs",
+    "tools/ship/commentFalsePass-selfcheck.mjs",
+    "tools/ship/gateReach-selfcheck.mjs",
+    "tools/ship/gateSelection-selfcheck.mjs",
+    "tools/ship/orphanDisposition-selfcheck.mjs",
+]);
+
+export const RED_AT_V4568 = Object.freeze(RED_AT_V4568_GATES.map((gate) => Object.freeze({
+    gate,
+    why: WHY_V4568[gate] || null,
+    get ms() { const r = auditRow(gate); return r ? r.ms : null; },
+    get fails() { const r = auditRow(gate); return r && r.first ? r.first : (UNVERIFIED_LINE[gate] || null); },
+    get derived() { return !!(auditRow(gate) && auditRow(gate).first); },
+})));
+
 export const REGISTER_LISTS = Object.freeze([
     Object.freeze(["RED_AT_V4279", RED_AT_V4279]),
     Object.freeze(["RED_AT_V4408", RED_AT_V4408]),
@@ -647,6 +707,7 @@ export const REGISTER_LISTS = Object.freeze([
     Object.freeze(["RED_AT_V4484", RED_AT_V4484]),
     Object.freeze(["RED_AT_V4531", RED_AT_V4531]),
     Object.freeze(["RED_AT_V4535", RED_AT_V4535]),
+    Object.freeze(["RED_AT_V4568", RED_AT_V4568]),
 ]);
 
 /** Every registered gate, once, with the list that named it. The `entry` is carried rather than spread, so

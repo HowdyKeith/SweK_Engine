@@ -294,7 +294,9 @@ export const PROBE_AT_V4536 = Object.freeze({
     // updating one and not the other reddens a row that is about the exclude pattern rather than the count.
     // v4565/v4566 -- RE-TAKEN with `excluding` below: 97/44/180 -> 101/45/186, the same four records and the
     // same six fields, plus this module's own two records and their twenty fields.
-    currentIncludingModule: Object.freeze({ records: 101, withFields: 45, fields: 186 }),
+    // v4568 -- RE-TAKEN with `excluding`: 101/45/186 -> 104/46/189, the same three records and three fields
+    // plus this module's own two and their twenty.
+    currentIncludingModule: Object.freeze({ records: 104, withFields: 46, fields: 189 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -326,7 +328,12 @@ export const PROBE_AT_V4536 = Object.freeze({
     // tools/ship/reportDoors.mjs, all three arrivals-by-name rolls the reds needed. wgslCorpus.GENERATED_CASES
     // landed the same round and is NOT in this count: RECORD_RE matches `Object.freeze({`, and that one is a
     // frozen ARRAY. Stated rather than left as a discrepancy for the next re-take to trip over.
-    excluding: Object.freeze({ records: 99, withFields: 43, fields: 166 }),
+    // v4568 -- RE-TAKEN: 99/43/166 -> 102/44/169. THREE records from the round that opened the killed
+    // bucket: KILLED_PASS_V4568 in tools/ship/sweepCoverage.mjs (the pass, and the only one with fields --
+    // the +3), and RED_AT_V4568 plus WHY_V4568 in tools/ship/redCensus.mjs, which register the five reds it
+    // found. RED_AT_V4568_GATES is a frozen ARRAY and so is not counted, the same distinction v4566 recorded
+    // for wgslCorpus.GENERATED_CASES.
+    excluding: Object.freeze({ records: 102, withFields: 44, fields: 169 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,

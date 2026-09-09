@@ -16,7 +16,7 @@ export const REGISTER_AUDIT = Object.freeze({
   {
    "gate": "engine/frameDirtyCensus-selfcheck.mjs",
    "exit": 1,
-   "ms": 907,
+   "ms": 807,
    "first": "*** every covers list belongs to an addSource call -- none has drifted onto a constructor that would ignore it ***",
    "all": [
     "*** every covers list belongs to an addSource call -- none has drifted onto a constructor that would ignore it ***"
@@ -27,7 +27,7 @@ export const REGISTER_AUDIT = Object.freeze({
   {
    "gate": "tools/roundhouse/swekWebviewApk-selfcheck.mjs",
    "exit": 1,
-   "ms": 986,
+   "ms": 774,
    "first": "...and a failed load offers the prompt, since that is when the address is usually wrong",
    "all": [
     "...and a failed load offers the prompt, since that is when the address is usually wrong"
@@ -38,7 +38,7 @@ export const REGISTER_AUDIT = Object.freeze({
   {
    "gate": "tools/ship/avatarServerViews-selfcheck.mjs",
    "exit": 1,
-   "ms": 6733,
+   "ms": 6065,
    "first": "!! every framed surface the server.html switch mounts carries ?embed=1   rigged, stickwoman, robotexpressive2, blob, thead, krbn, ascii, heerich, stage3d, gauges3000, blobgpu",
    "all": [
     "!! every framed surface the server.html switch mounts carries ?embed=1   rigged, stickwoman, robotexpressive2, blob, thead, krbn, ascii, heerich, stage3d, gauges3000, blobgpu"
@@ -49,7 +49,7 @@ export const REGISTER_AUDIT = Object.freeze({
   {
    "gate": "tools/ship/bfcache-selfcheck.mjs",
    "exit": 1,
-   "ms": 928,
+   "ms": 909,
    "first": "!! NO PAGE TEARS THINGS DOWN ON pagehide WITHOUT CHECKING event.persisted   camera-effects.html",
    "all": [
     "!! NO PAGE TEARS THINGS DOWN ON pagehide WITHOUT CHECKING event.persisted   camera-effects.html"
@@ -60,11 +60,11 @@ export const REGISTER_AUDIT = Object.freeze({
   {
    "gate": "tools/ship/boundaryLint-selfcheck.mjs",
    "exit": 1,
-   "ms": 5743,
+   "ms": 5759,
    "first": "!! no response body is read without consulting .ok   see above",
    "all": [
     "!! no response body is read without consulting .ok   see above",
-    "!! no NEW reported boundary tell has appeared   91 sites against a baseline of 88; NEW (3): ai-bridge/vbaArchiveBridge.js :: KILL_NOT_VERIFIED (NEW), tools/ship/quickSweep.mjs :: KILL_NOT_VERIFIED (NEW), tools/ship/slowCensus.mjs :: KILL_NOT_VERIFIED (NEW). Counted every run since v3103 and never compared until now -- so a rule could have doubled quietly, and establishing that it had NOT took walking four shipped zips"
+    "!! no NEW reported boundary tell has appeared   93 sites against a baseline of 88; NEW (5): ai-bridge/vbaArchiveBridge.js :: KILL_NOT_VERIFIED (NEW), tools/ship/quickSweep.mjs :: KILL_NOT_VERIFIED (NEW), tools/ship/recordInputs.mjs :: KILL_NOT_VERIFIED (NEW), tools/ship/redCensus.mjs :: KILL_NOT_VERIFIED (NEW), tools/ship/slowCensus.mjs :: KILL_NOT_VERIFIED (NEW). Counted every run since v3103 and never compared until now -- so a rule could have doubled quietly, and establishing that it had NOT took walking four shipped zips"
    ],
    "count": 2,
    "onStderr": false
@@ -72,7 +72,7 @@ export const REGISTER_AUDIT = Object.freeze({
   {
    "gate": "tools/ship/canvasFill-selfcheck.mjs",
    "exit": 1,
-   "ms": 5111,
+   "ms": 5393,
    "first": "!! NO PAGE IN THE TREE SHIPS A FIXED, UNGROWABLE CANVAS   POSTAGE STAMPS: device-present.html#c, gpu-rig-check.html#stage, tools/ship/atmosphereHarness.html#c, tools/ship/effectMergeHarness.html#c, tools/ship/perspectiveWarpHarness.html#c, tools/ship/postChainHarness.html#c, tools/ship/solidTextureHarness.html#c",
    "all": [
     "!! NO PAGE IN THE TREE SHIPS A FIXED, UNGROWABLE CANVAS   POSTAGE STAMPS: device-present.html#c, gpu-rig-check.html#stage, tools/ship/atmosphereHarness.html#c, tools/ship/effectMergeHarness.html#c, tools/ship/perspectiveWarpHarness.html#c, tools/ship/postChainHarness.html#c, tools/ship/solidTextureHarness.html#c",
@@ -84,12 +84,12 @@ export const REGISTER_AUDIT = Object.freeze({
   {
    "gate": "tools/ship/definitionGates-selfcheck.mjs",
    "exit": 1,
-   "ms": 514,
+   "ms": 538,
    "first": "!! no NEW exported symbol under physics/ has appeared without its gate naming it   GREW to 54: physics/character/terrainWalk.mjs:functionGround, physics/character/terrainWalk.mjs:autoGround, physics/character/terrainWalk.mjs:projectOnPlane, physics/character/terrainWalk.mjs:reportLines, physics/crypto/secp256k1.mjs:pointDouble, physics/mesh/meshCSG.mjs:flatness ...",
    "all": [
     "!! no NEW exported symbol under physics/ has appeared without its gate naming it   GREW to 54: physics/character/terrainWalk.mjs:functionGround, physics/character/terrainWalk.mjs:autoGround, physics/character/terrainWalk.mjs:projectOnPlane, physics/character/terrainWalk.mjs:reportLines, physics/crypto/secp256k1.mjs:pointDouble, physics/mesh/meshCSG.mjs:flatness ...",
     "!! no NEW exported symbol ANYWHERE IN THE TREE has appeared without its gate naming it   GREW to 311: ai-bridge/chunkVerify.mjs:verifiedPrefix, ai-bridge/chunkVerify.mjs:resumePlan, ai-bridge/chunkVerify.mjs:spliceRanges, ai-bridge/chunkVerify.mjs:chunkAudit, ai-bridge/chunkVerify.mjs:resumeRanges, ai-bridge/deviceWorker.mjs:offThreadDevice ...",
-    "!! *** no NEW exported symbol OF ANY SHAPE has appeared without its gate naming it ***   GREW to 603: ai-bridge/catalogSnapshot.mjs:SNAPSHOT_PATH, ai-bridge/chunkVerify.mjs:verifiedPrefix, ai-bridge/chunkVerify.mjs:resumePlan, ai-bridge/chunkVerify.mjs:spliceRanges, ai-bridge/chunkVerify.mjs:chunkAudit, ai-bridge/chunkVerify.mjs:resumeRanges ..."
+    "!! *** no NEW exported symbol OF ANY SHAPE has appeared without its gate naming it ***   GREW to 606: ai-bridge/catalogSnapshot.mjs:SNAPSHOT_PATH, ai-bridge/chunkVerify.mjs:verifiedPrefix, ai-bridge/chunkVerify.mjs:resumePlan, ai-bridge/chunkVerify.mjs:spliceRanges, ai-bridge/chunkVerify.mjs:chunkAudit, ai-bridge/chunkVerify.mjs:resumeRanges ..."
    ],
    "count": 3,
    "onStderr": false
@@ -97,7 +97,7 @@ export const REGISTER_AUDIT = Object.freeze({
   {
    "gate": "tools/ship/gateReach-selfcheck.mjs",
    "exit": 1,
-   "ms": 10753,
+   "ms": 11730,
    "first": "!! the default population is ACCOUNTED FOR -- it may grow, but not silently   expected 472 (from the recorded census) and found 520. A tool that silently changed what it counts would make every earlier figure incomparable -- so when this fires, count what was added and update the pin WITH THE REASON, rather than raising the number until it passes",
    "all": [
     "!! the default population is ACCOUNTED FOR -- it may grow, but not silently   expected 472 (from the recorded census) and found 520. A tool that silently changed what it counts would make every earlier figure incomparable -- so when this fires, count what was added and update the pin WITH THE REASON, rather than raising the number until it passes"
@@ -108,7 +108,7 @@ export const REGISTER_AUDIT = Object.freeze({
   {
    "gate": "tools/ship/homography-selfcheck.mjs",
    "exit": 1,
-   "ms": 1304,
+   "ms": 1369,
    "first": "!! it is the only homography in the tree",
    "all": [
     "!! it is the only homography in the tree"
@@ -119,7 +119,7 @@ export const REGISTER_AUDIT = Object.freeze({
   {
    "gate": "tools/ship/pagePlacement-selfcheck.mjs",
    "exit": 1,
-   "ms": 92,
+   "ms": 100,
    "first": "!! ...and the silent bucket is the large one, which is the finding   204 silent against 242 placed. pageSections says of UNPLACED: \"an unplaced page and a page nobody has got to look identical, and the second one gets placed by a guess.\" *** UNPLACED HOLDS 23. THE OTHER 204 ARE IN EXACTLY THE STATE THE MECHANISM EXISTS TO PREVENT. ***",
    "all": [
     "!! ...and the silent bucket is the large one, which is the finding   204 silent against 242 placed. pageSections says of UNPLACED: \"an unplaced page and a page nobody has got to look identical, and the second one gets placed by a guess.\" *** UNPLACED HOLDS 23. THE OTHER 204 ARE IN EXACTLY THE STATE THE MECHANISM EXISTS TO PREVENT. ***",
@@ -131,7 +131,7 @@ export const REGISTER_AUDIT = Object.freeze({
   {
    "gate": "tools/ship/pagePlacements-selfcheck.mjs",
    "exit": 1,
-   "ms": 109,
+   "ms": 108,
    "first": "!! a page can be listed in TWO topics at once   *** SECTIONS.pages IS A PARTITION AND COULD NOT SAY THIS. *** Keith: \"a page such as Cosmic Map could show some or all or none of the sections\" -- so topics is a SET, and the base registry's one-panel-per-page shape was a limit of the storage rather than a fact about pages.",
    "all": [
     "!! a page can be listed in TWO topics at once   *** SECTIONS.pages IS A PARTITION AND COULD NOT SAY THIS. *** Keith: \"a page such as Cosmic Map could show some or all or none of the sections\" -- so topics is a SET, and the base registry's one-panel-per-page shape was a limit of the storage rather than a fact about pages.",
@@ -143,7 +143,7 @@ export const REGISTER_AUDIT = Object.freeze({
   {
    "gate": "tools/ship/pageReflow-selfcheck.mjs",
    "exit": 1,
-   "ms": 89,
+   "ms": 91,
    "first": "!! *** nothing reads layout after a DOM write inside a loop ***   ui/crtToggle.js:58 getBoundingClientRect, ui/domToTexture.js:137 clientWidth, ui/domToTexture.js:137 clientHeight, ui/textMorph.js:152 getBoundingClientRect",
    "all": [
     "!! *** nothing reads layout after a DOM write inside a loop ***   ui/crtToggle.js:58 getBoundingClientRect, ui/domToTexture.js:137 clientWidth, ui/domToTexture.js:137 clientHeight, ui/textMorph.js:152 getBoundingClientRect"
@@ -154,7 +154,7 @@ export const REGISTER_AUDIT = Object.freeze({
   {
    "gate": "tools/ship/pageSectionsReport-selfcheck.mjs",
    "exit": 1,
-   "ms": 1251,
+   "ms": 1349,
    "first": "!! and no alarm span is drawn at all when nothing is actually wrong    — 1 already linked in another part of the page: ev.html",
    "all": [
     "!! and no alarm span is drawn at all when nothing is actually wrong    — 1 already linked in another part of the page: ev.html"
@@ -165,7 +165,7 @@ export const REGISTER_AUDIT = Object.freeze({
   {
    "gate": "tools/ship/pairlaneBridge-selfcheck.mjs",
    "exit": 1,
-   "ms": 86,
+   "ms": 90,
    "first": "!! *** the panel's label is RENAMED to what Keith actually asked for, id/tab left untouched ***   renaming the internal id too would touch every existing data-tab/data-panel selector for no reason the request asked for -- the visible label is what changed",
    "all": [
     "!! *** the panel's label is RENAMED to what Keith actually asked for, id/tab left untouched ***   renaming the internal id too would touch every existing data-tab/data-panel selector for no reason the request asked for -- the visible label is what changed",
@@ -177,7 +177,7 @@ export const REGISTER_AUDIT = Object.freeze({
   {
    "gate": "tools/ship/proseAudit-selfcheck.mjs",
    "exit": 1,
-   "ms": 1998,
+   "ms": 2139,
    "first": "the audit actually resolved most of its subjects (an audit that cannot see its subjects is not an audit)   44 sound, 7 HTML (not auditable this way, declared), 2 OR-branches, 13 unresolved",
    "all": [
     "the audit actually resolved most of its subjects (an audit that cannot see its subjects is not an audit)   44 sound, 7 HTML (not auditable this way, declared), 2 OR-branches, 13 unresolved"
@@ -188,10 +188,10 @@ export const REGISTER_AUDIT = Object.freeze({
   {
    "gate": "tools/ship/referenceKind-selfcheck.mjs",
    "exit": 1,
-   "ms": 87318,
-   "first": "!! *** the prose-rescued population may only SHRINK ***   268 against a ceiling of 181. A RISE MEANS A NEW ORPHAN IS BEING HIDDEN BY A SENTENCE. Falling is progress by any of three routes -- wire it, delete it, or teach the census to resolve.",
+   "ms": 99138,
+   "first": "!! *** the prose-rescued population may only SHRINK ***   277 against a ceiling of 181. A RISE MEANS A NEW ORPHAN IS BEING HIDDEN BY A SENTENCE. Falling is progress by any of three routes -- wire it, delete it, or teach the census to resolve.",
    "all": [
-    "!! *** the prose-rescued population may only SHRINK ***   268 against a ceiling of 181. A RISE MEANS A NEW ORPHAN IS BEING HIDDEN BY A SENTENCE. Falling is progress by any of three routes -- wire it, delete it, or teach the census to resolve.",
+    "!! *** the prose-rescued population may only SHRINK ***   277 against a ceiling of 181. A RISE MEANS A NEW ORPHAN IS BEING HIDDEN BY A SENTENCE. Falling is progress by any of three routes -- wire it, delete it, or teach the census to resolve.",
     "!! *** no NEW module is hidden from the orphan census by the ship ritual's own sweep closing ***   30 against 2: brain/rl/attribution.mjs, brain/transport/scanTwin.mjs, core/ecs/index.js, engine/loop.js, ev/tools/es-arena.mjs, mesh/carve.mjs, physics/render/transmission.mjs, physics/render/wgslArc.mjs, render/img2three.mjs, render/panini.js, render/slugTsl.mjs, render/texelProbe.mjs, tools/export/glbConformance.mjs, tools/mutate/mutate.mjs, tools/roundhouse/zeroRangeFull.mjs, tools/ship/absenceScope.mjs, tools/ship/claimEvidence.mjs, tools/ship/closingCoverage.mjs, tools/ship/gateReport.mjs, tools/ship/packFonts.mjs, tools/ship/pngWrite.mjs, tools/ship/recordDrift.mjs, tools/ship/refusalStack.mjs, tools/ship/shipVerdict.mjs, tools/ship/sweepRotation.mjs, tools/ship/textureBytes.mjs, tools/ship/todo.mjs, tools/ship/vacuity.mjs, tools/ship/wgslCorpus.mjs, world/vendoredLicences.mjs. THE CLOSING IS WRITTEN BY THE RITUAL, one per round that adds a gate, and it names the module it guards -- so a round that builds a module, gates it and ships it has documented the module into invisibility without deciding to. The two standing are render/img2three.mjs (a three.js-object-tree flattener whose only caller today is its own gate; no page builds a three tree to flatten) and mesh/carve.mjs. Falling is progress by the three routes this file has always named -- wire it, delete it, or teach the census to resolve."
    ],
    "count": 2,
@@ -200,7 +200,7 @@ export const REGISTER_AUDIT = Object.freeze({
   {
    "gate": "tools/ship/registerResidue-selfcheck.mjs",
    "exit": 1,
-   "ms": 1356,
+   "ms": 1391,
    "first": "!! *** the residue may only SHRINK -- a page linked but neither placed nor excused fails on arrival ***   61 against a ceiling of 41. *** UNPLACED's OWN COMMENT SAYS \"AN UNPLACED PAGE AND A PAGE NOBODY GOT TO LOOK THE SAME\", AND UNTIL THIS LINE EXISTED NOTHING COMPARED THE REGISTER TO THE PAGES ACTUALLY OUTSIDE THE SECTIONS -- so it could not tell them apart, which is the one thing it exists to do. *** Each of the 61 is a judgement (a section, or an exemption with a sentence) and it is Keith's, one at a time.",
    "all": [
     "!! *** the residue may only SHRINK -- a page linked but neither placed nor excused fails on arrival ***   61 against a ceiling of 41. *** UNPLACED's OWN COMMENT SAYS \"AN UNPLACED PAGE AND A PAGE NOBODY GOT TO LOOK THE SAME\", AND UNTIL THIS LINE EXISTED NOTHING COMPARED THE REGISTER TO THE PAGES ACTUALLY OUTSIDE THE SECTIONS -- so it could not tell them apart, which is the one thing it exists to do. *** Each of the 61 is a judgement (a section, or an exemption with a sentence) and it is Keith's, one at a time."
@@ -211,7 +211,7 @@ export const REGISTER_AUDIT = Object.freeze({
   {
    "gate": "tools/ship/shaderRefs-selfcheck.mjs",
    "exit": "timeout",
-   "ms": 120083,
+   "ms": 120160,
    "first": "",
    "all": [],
    "count": 0,
@@ -221,7 +221,7 @@ export const REGISTER_AUDIT = Object.freeze({
   {
    "gate": "tools/ship/statedRuntime-selfcheck.mjs",
    "exit": 1,
-   "ms": 133,
+   "ms": 132,
    "first": "!! *** no NEW header has drifted from what its gate actually does ***   NEW: tools/roundhouse/reconQualityBind-selfcheck.mjs, tools/ship/commentFalsePass-selfcheck.mjs, tools/ship/shaderCensus-selfcheck.mjs, tools/ship/spacesimStart-selfcheck.mjs -- correct the header FROM THE MEASUREMENT in gate-timings.json. DO NOT ADD IT TO THE BASELINE: that is a ratchet growing back, the one thing a ratchet must never do",
    "all": [
     "!! *** no NEW header has drifted from what its gate actually does ***   NEW: tools/roundhouse/reconQualityBind-selfcheck.mjs, tools/ship/commentFalsePass-selfcheck.mjs, tools/ship/shaderCensus-selfcheck.mjs, tools/ship/spacesimStart-selfcheck.mjs -- correct the header FROM THE MEASUREMENT in gate-timings.json. DO NOT ADD IT TO THE BASELINE: that is a ratchet growing back, the one thing a ratchet must never do"
@@ -232,7 +232,7 @@ export const REGISTER_AUDIT = Object.freeze({
   {
    "gate": "tools/ship/sunshineHost-selfcheck.mjs",
    "exit": 1,
-   "ms": 107,
+   "ms": 94,
    "first": "every route the bridge lists is reachable through its own handler",
    "all": [
     "every route the bridge lists is reachable through its own handler"
@@ -243,7 +243,7 @@ export const REGISTER_AUDIT = Object.freeze({
   {
    "gate": "tools/ship/supersededFlag-selfcheck.mjs",
    "exit": 1,
-   "ms": 71,
+   "ms": 70,
    "first": "...and an UNINVITED launch still refuses, which was always correct   two launchers that both start a server take turns forever; the refusal is not the bug",
    "all": [
     "...and an UNINVITED launch still refuses, which was always correct   two launchers that both start a server take turns forever; the refusal is not the bug"
@@ -254,7 +254,7 @@ export const REGISTER_AUDIT = Object.freeze({
   {
    "gate": "tools/ship/unattendedHold-selfcheck.mjs",
    "exit": 1,
-   "ms": 49,
+   "ms": 53,
    "first": "!! the port-owner refusal still REFUSES -- the fix was to the hold, not the verdict   it must still decline to fight the owner and still exit nonzero. Making it proceed would restore the two-windows-take-turns-forever loop v3256 was built to end",
    "all": [
     "!! the port-owner refusal still REFUSES -- the fix was to the hold, not the verdict   it must still decline to fight the owner and still exit nonzero. Making it proceed would restore the two-windows-take-turns-forever loop v3256 was built to end"
@@ -265,7 +265,7 @@ export const REGISTER_AUDIT = Object.freeze({
   {
    "gate": "tools/ship/wasmSupport-selfcheck.mjs",
    "exit": 1,
-   "ms": 2577,
+   "ms": 2615,
    "first": "!! 82 files mention .wasm or the WebAssembly API -- the item's number, and it is the loose one   110 mention it",
    "all": [
     "!! 82 files mention .wasm or the WebAssembly API -- the item's number, and it is the loose one   110 mention it",
@@ -278,7 +278,7 @@ export const REGISTER_AUDIT = Object.freeze({
   {
    "gate": "tools/ship/wiringClaims-selfcheck.mjs",
    "exit": 1,
-   "ms": 2087,
+   "ms": 2021,
    "first": "!! *** every remaining hit is a CONTRAST LINE, adjudicated by name ***   a sentence that says 'A is unwired while B is live' names two modules and my extractor takes both. REPORTED AS CANDIDATES, NOT FAILED -- and this check names the two rather than loosening the pattern, so a THIRD would show up",
    "all": [
     "!! *** every remaining hit is a CONTRAST LINE, adjudicated by name ***   a sentence that says 'A is unwired while B is live' names two modules and my extractor takes both. REPORTED AS CANDIDATES, NOT FAILED -- and this check names the two rather than loosening the pattern, so a THIRD would show up"
@@ -289,7 +289,7 @@ export const REGISTER_AUDIT = Object.freeze({
   {
    "gate": "tools/ship/box3dFilter-selfcheck.mjs",
    "exit": 1,
-   "ms": 96,
+   "ms": 88,
    "first": "!! *** EVERY swk_* IN THE SHIM IS IN build-box3d-wasm.sh's HARDCODED EXPORT LIST ***   74 declared, 18 missing. *** THE TWO BUILD SCRIPTS DISAGREE ABOUT HOW EXPORTS ARE CHOSEN: *** the clang one SCANS the compiled module for /^swk_/ and needs no edit ever, while the emcc one -- which is the default -- lists them by hand. So a function added to the shim ships from one script and silently not from the other, and the failure is a missing runtime symbol far from its cause. This check is the seam.",
    "all": [
     "!! *** EVERY swk_* IN THE SHIM IS IN build-box3d-wasm.sh's HARDCODED EXPORT LIST ***   74 declared, 18 missing. *** THE TWO BUILD SCRIPTS DISAGREE ABOUT HOW EXPORTS ARE CHOSEN: *** the clang one SCANS the compiled module for /^swk_/ and needs no edit ever, while the emcc one -- which is the default -- lists them by hand. So a function added to the shim ships from one script and silently not from the other, and the failure is a missing runtime symbol far from its cause. This check is the seam.",
@@ -301,12 +301,12 @@ export const REGISTER_AUDIT = Object.freeze({
   {
    "gate": "tools/ship/doorKinds-selfcheck.mjs",
    "exit": "timeout",
-   "ms": 120020,
+   "ms": 120023,
    "first": "",
    "all": [],
    "count": 0,
    "printedBeforeTheCap": [
-    "!! EVERY MEMBER IS EXPLAINED: a door, a declared refusal, or named as owed   spawn 1  none 4  rig-job 1  import 1  refused 2  prose 1 -- v3608 read 4 doors of 8; v3609 and v3610 gave rows to three more, so the bucket is 10. UNEXPLAINED: tools/ship/orreryAuthorScan.mjs, tools/ship/verifyLicenceTexts.mjs, tools/ship/wgslDeviceLimits.mjs",
+    "!! EVERY MEMBER IS EXPLAINED: a door, a declared refusal, or named as owed   spawn 1  none 5  rig-job 1  import 1  refused 2  prose 1 -- v3608 read 4 doors of 8; v3609 and v3610 gave rows to three more, so the bucket is 11. UNEXPLAINED: tools/ship/orreryAuthorScan.mjs, tools/ship/recordInputs.mjs, tools/ship/verifyLicenceTexts.mjs, tools/ship/wgslDeviceLimits.mjs",
     "!! NO PROSE DOOR STANDS UNEXPLAINED (2 at v3608; buildPageIndex given a row, signRelease a refusal)   orreryBake.mjs"
    ],
    "onStderr": false
@@ -314,10 +314,10 @@ export const REGISTER_AUDIT = Object.freeze({
   {
    "gate": "tools/ship/graveyard-selfcheck.mjs",
    "exit": 1,
-   "ms": 79299,
-   "first": "!! ORPHANED UTILITIES HAVE NOT INCREASED   153 now vs 93 recorded. These export functions and NOTHING calls them -- wire it, or delete it. This is the number that means something; the total includes analysis records whose consumer is correctly the gate.",
+   "ms": 87914,
+   "first": "!! ORPHANED UTILITIES HAVE NOT INCREASED   155 now vs 93 recorded. These export functions and NOTHING calls them -- wire it, or delete it. This is the number that means something; the total includes analysis records whose consumer is correctly the gate.",
    "all": [
-    "!! ORPHANED UTILITIES HAVE NOT INCREASED   153 now vs 93 recorded. These export functions and NOTHING calls them -- wire it, or delete it. This is the number that means something; the total includes analysis records whose consumer is correctly the gate."
+    "!! ORPHANED UTILITIES HAVE NOT INCREASED   155 now vs 93 recorded. These export functions and NOTHING calls them -- wire it, or delete it. This is the number that means something; the total includes analysis records whose consumer is correctly the gate."
    ],
    "count": 1,
    "onStderr": false
@@ -325,7 +325,7 @@ export const REGISTER_AUDIT = Object.freeze({
   {
    "gate": "tools/ship/orphanDisposition-selfcheck.mjs",
    "exit": 1,
-   "ms": 81450,
+   "ms": 89010,
    "first": "!! 'imported by a gate named for something else' holds for EVERY member  -- 28 of 30",
    "all": [
     "!! 'imported by a gate named for something else' holds for EVERY member  -- 28 of 30",
@@ -337,7 +337,7 @@ export const REGISTER_AUDIT = Object.freeze({
   {
    "gate": "ui/stageInfo-selfcheck.mjs",
    "exit": 1,
-   "ms": 6717,
+   "ms": 6845,
    "first": "!! *** KEITH'S THIRD ASK: THE PANEL BOX IS THE SAME WIDTH WHATEVER THE VIEWPORT ***   offsetWidth 460 at both 1280 and 1920. *** MEASURED AS LAYOUT WIDTH ON PURPOSE: server.html puts a responsive `zoom` on BODY (0.8 at 1280, 0.9 at 1920), so the BOUNDING RECT reads 368 and 414 and a future reader measuring THAT would think the fix had failed. The zoom scales the whole page equally; the box is 460 in both. ***",
    "all": [
     "!! *** KEITH'S THIRD ASK: THE PANEL BOX IS THE SAME WIDTH WHATEVER THE VIEWPORT ***   offsetWidth 460 at both 1280 and 1920. *** MEASURED AS LAYOUT WIDTH ON PURPOSE: server.html puts a responsive `zoom` on BODY (0.8 at 1280, 0.9 at 1920), so the BOUNDING RECT reads 368 and 414 and a future reader measuring THAT would think the fix had failed. The zoom scales the whole page equally; the box is 460 in both. ***"
@@ -348,13 +348,48 @@ export const REGISTER_AUDIT = Object.freeze({
   {
    "gate": "tools/ship/tslSource-selfcheck.mjs",
    "exit": 1,
-   "ms": 1768,
+   "ms": 1893,
    "first": "webgl2: and three's own linear render, row-mirrored, agrees with the device to a byte or so (two samplers, one filter)   3971/4096 identical, worst 127",
    "all": [
     "webgl2: and three's own linear render, row-mirrored, agrees with the device to a byte or so (two samplers, one filter)   3971/4096 identical, worst 127",
     "-- 1 check(s)"
    ],
    "count": 2,
+   "onStderr": false
+  },
+  {
+   "gate": "tools/ship/baselineHygiene-selfcheck.mjs",
+   "exit": 1,
+   "ms": 32020,
+   "first": "!! *** no baseline entry has outlived its reason ***   STALE, DELETE THESE: brain/cs/csEnv.js, render/SSAOPass.js, simulation/SpatialHash.js, tools/facePlacementSystem.js, tools/selectionState.js, tools/voxelToolSystem.js, ui/avatarExpression.js",
+   "all": [
+    "!! *** no baseline entry has outlived its reason ***   STALE, DELETE THESE: brain/cs/csEnv.js, render/SSAOPass.js, simulation/SpatialHash.js, tools/facePlacementSystem.js, tools/selectionState.js, tools/voxelToolSystem.js, ui/avatarExpression.js",
+    "!! the checker DOES fire when an entry stops being an orphan   withholding undefined from the live set makes it report STALE. A CHECK NOBODY HAS SEEN FAIL MIGHT NOT FIRE -- v3142 proved that with a ratchet that passed its own sabotage"
+   ],
+   "count": 2,
+   "onStderr": false
+  },
+  {
+   "gate": "tools/ship/commentFalsePass-selfcheck.mjs",
+   "exit": 1,
+   "ms": 9779,
+   "first": "!! NO gate passes on a comment   24 flagged as raw-only, ALL 24 explained by the instrument rather than the gate; GENUINE: [{\"g\":\"qrChannel-selfcheck.mjs\",\"body\":\"Copyright \\\\(c\\\\) 2009 Kazuhiko Arase\",\"target\":\"ui/qrDecode.mjs\"}]. A gate asserting 'the code does X' against raw source would pass on a comment saying 'we should do X' -- which is the bug I committed at v3138 in a pre-filter, so the question was worth asking",
+   "all": [
+    "!! NO gate passes on a comment   24 flagged as raw-only, ALL 24 explained by the instrument rather than the gate; GENUINE: [{\"g\":\"qrChannel-selfcheck.mjs\",\"body\":\"Copyright \\\\(c\\\\) 2009 Kazuhiko Arase\",\"target\":\"ui/qrDecode.mjs\"}]. A gate asserting 'the code does X' against raw source would pass on a comment saying 'we should do X' -- which is the bug I committed at v3138 in a pre-filter, so the question was worth asking",
+    "...and every exemption reason is DECIDABLE, not a name on a list   12 inside a template literal (a shader is not code to codeOnly); 1 the regex hunts a comment deliberately; 10 target is HTML and codeOnly is a JavaScript instrument; 1 GENUINE. Each is checked by reading the target, not by matching a filename against an allow-list -- so a new case in a new file is judged rather than waved through"
+   ],
+   "count": 2,
+   "onStderr": false
+  },
+  {
+   "gate": "tools/ship/gateSelection-selfcheck.mjs",
+   "exit": 1,
+   "ms": 69766,
+   "first": "!! reachable gates are scheduled FIRST (a truncated run still covers the change)   first 109 selected are all reachable",
+   "all": [
+    "!! reachable gates are scheduled FIRST (a truncated run still covers the change)   first 109 selected are all reachable"
+   ],
+   "count": 1,
    "onStderr": false
   }
  ]

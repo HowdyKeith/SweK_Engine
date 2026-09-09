@@ -365,7 +365,16 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // in the census of what this runtime uses, which is what the census is for.
     // v4567 -- RE-TAKEN: six files, three rows. async/await gains one from the loader hook's async resolve
     // and load hooks, which is the census noticing that this tree now has code running on a loader thread.
-    esModules: 3764, closures: 3643, asyncAwait: 1422, typedArrays: 1034, promises: 348,
+    // v4568 -- RE-TAKEN: Promises 348 -> 349 and nothing else. No new FILE, so files, ES modules and
+    // closures do not move -- one existing module grew a promise, and it is sweepCoverage-selfcheck.mjs:
+    // `await new Promise((r) => setTimeout(r, 400))`, waiting for a capped kill to land before counting the
+    // survivors it leaves. The narrowest re-take this census has had, and it is still a re-take.
+    //
+    // MY FIRST DRAFT OF THIS LINE BLAMED redCensus-selfcheck, because that was the other file this round
+    // made slower and the guess felt close enough to write down. The diff says zero `new Promise` were added
+    // outside sweepCoverage-selfcheck. A one-row census drift is exactly where a plausible attribution goes
+    // unchecked, which is what a census is for.
+    esModules: 3764, closures: 3643, asyncAwait: 1422, typedArrays: 1034, promises: 349,
     fetchXhr: 243, performanceNow: 220, raf: 116, webgl: 141, webgpu: 48, threads: 22, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

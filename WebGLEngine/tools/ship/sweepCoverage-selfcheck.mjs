@@ -133,6 +133,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { enumerateGates } from "./gateSweep.mjs";
+import * as RC from "./redCensus.mjs";
 import * as SC from "./sweepCoverage.mjs";
 import { overNonEmpty, emptyOfNonEmpty } from "./vacuity.mjs";
 import * as QS from "./quickSweep.mjs";
@@ -796,11 +797,17 @@ console.log("\n*** THE FIRST BULK PASS AT THE EXILED POOL (v4565): HALF THE 3-8 
     const gates = enumerateGates(ENG), c = SC.census(gates, t);
     const outside = c.over.length + c.killed.length;
     ok("!! ...and the population outside the ship-time sweep is down by roughly what the pass moved",
-       outside <= R.outsideTheSweep.before && c.killed.length === R.remaining.killedUnreachable &&
+       // *** `killed` WAS PINNED TO 140 AND v4568 MOVED IT, which is the door working rather than a drift.
+       // While the bucket had no way out its size was a constant and pinning it was right; now 35 gates have
+       // beaten the cap that exiled them and left it. It can only SHRINK -- nothing puts a gate back into a
+       // bucket it was re-timed out of -- so that is what is checked, with the v4565 figure as the ceiling.
+       outside <= R.outsideTheSweep.before && c.killed.length <= R.remaining.killedUnreachable &&
        R.pool.overBefore - R.returnees - R.hitTheCap === R.pool.overAfter &&
        R.pool.killedBefore + R.hitTheCap === R.pool.killedAfter,
        `${outside} of ${gates.length} gates (${(100 * outside / gates.length).toFixed(1)}%) are outside it now, ` +
-       `against ${R.outsideTheSweep.before} (${R.outsideTheSweep.beforePct}%) before the pass. The record's own ` +
+       `against ${R.outsideTheSweep.before} (${R.outsideTheSweep.beforePct}%) before the pass. The killed ` +
+       `bucket reads ${c.killed.length} against the ${R.remaining.killedUnreachable} v4565 recorded as ` +
+       "unreachable -- v4568 opened that door and 35 gates walked out of it. The record's own " +
        `arithmetic closes: ${R.pool.overBefore} over - ${R.returnees} returned - ${R.hitTheCap} capped = ` +
        `${R.pool.overAfter}, and the ${R.hitTheCap} capped are what took killed from ${R.pool.killedBefore} to ` +
        `${R.pool.killedAfter}.`);
@@ -843,6 +850,56 @@ console.log("\n*** THE FIRST BULK PASS AT THE EXILED POOL (v4565): HALF THE 3-8 
            (hidden.map((g) => g.split("/").pop()).join(", ") || "none"));
 }
 
+console.log("\n*** THE BUCKET NOTHING COULD RUN, RUN (v4568) ***");
+{
+    const R = SC.KILLED_PASS_V4568;
+    const t = SC.readFile();
+    // RE-DERIVED FROM THE LIVE FILES. The ledger is the pass's receipt and the timings are what the tree
+    // reads; a record quoting itself is the thing this file exists to stop.
+    const led = JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "sweep-rotation.json"), "utf8"));
+    const pass = (led.rotated || []).filter((r) => r.at === R.stamp);
+    const fin = pass.filter((r) => r.code !== "timeout/signal");
+    ok("!! *** 103 OF THE 140 THAT COULD NEVER BE RUN NOW HAVE A VERDICT, AND FIVE OF THEM ARE RED ***",
+       // A PROPORTIONAL FLOOR, not a fixed slack of two, for the reason the v4565 row above already
+       // records: the ledger merges BY GATE, so every gate re-timed by name since the pass leaves this
+       // group. Three had within the hour -- domScope, redCensus and placementRender, each re-timed for a
+       // reason this round names -- and a tolerance of two reddened on the third. What must hold is that
+       // the group has not COLLAPSED, which would mean the ledger was rewritten wholesale.
+       pass.length >= R.ran * 0.9 && fin.length >= R.finished * 0.9 &&
+       fin.filter((r) => r.code !== 0).length >= R.red - 1 &&
+       fin.filter((r) => r.ms < SC.CAP_MS).length >= R.underOldCap * 0.9,
+       `${pass.length} rows carry the pass stamp and ${fin.length} of them FINISHED, against ${R.ran} run and ` +
+       `${R.finished} recorded. ${fin.filter((r) => r.ms < SC.CAP_MS).length} came in under the ${SC.CAP_MS} ms ` +
+       `cap that exiled them and ${fin.filter((r) => r.code !== 0).length} are red. The counts may exceed the ` +
+       "record's by a row or two and must not fall short: a gate re-timed by name since the pass carries a " +
+       "later stamp and leaves this group, which is the ledger's merge-by-gate rule, not a loss.");
+    // *** THE WITNESS, CHECKED AGAINST THE LIVE FILE. *** 20,125 ms on file and 51 ms alone is not a slow
+    // gate; it is a reading that was never about this gate, and nothing could ever have corrected it.
+    const w = R.witness;
+    ok("!! ...and the gate filed AT THE CAP that runs in 51 ms is back under the ship-time budget",
+       (t.timings || {})[w.gate] <= SC.BUDGET_MS && (t.finished || {})[w.gate] === true,
+       `${w.gate.split("/").pop()} reads ${(t.timings || {})[w.gate]} ms now against the ${w.filedMs} ms that ` +
+       `exiled it -- ${Math.round(w.filedMs / w.aloneMs)}x. It is the only one of the 140 to rejoin the sweep; ` +
+       "the other 34 that beat the old cap are back in the over-budget pool, where the rotation can reach them.");
+    // Every red the pass found must be REGISTERED, or the round ends by leaving reds nobody named -- which is
+    // the fault the whole bucket is made of, one level up.
+    const reg = new Set(RC.ALL_REGISTERED.map((e) => e.gate));
+    const unregistered = R.reds.filter((g) => !reg.has(g));
+    ok("!! *** EVERY RED THIS PASS FOUND IS IN THE REGISTER BY NAME, with what it says ***",
+       unregistered.length === 0 && RC.RED_AT_V4568.length === R.reds.length &&
+       RC.RED_AT_V4568.every((e) => typeof e.why === "string" && e.why.length > 80),
+       unregistered.length ? "UNREGISTERED: " + unregistered.join(", ")
+         : `${RC.RED_AT_V4568.length} registered, each carrying its own reason. A red that is named is a ` +
+           "known red; a red sitting over the cap is what this round exists to end.");
+    ok("  ...and the sixth is recorded as the PASS'S OWN false red, not as a finding",
+       R.falseRed === 1 && (t.codes || {})[R.falseRedWas.gate] === 0 &&
+       (t.finished || {})[R.falseRedWas.gate] === true && !reg.has(R.falseRedWas.gate),
+       `${R.falseRedWas.gate.split("/").pop()} reads exit ${(t.codes || {})[R.falseRedWas.gate]} at ` +
+       `${(t.timings || {})[R.falseRedWas.gate]} ms now. It was filed red at ${R.falseRedWas.filedMs} ms ` +
+       "because execFileSync's timeout leaves a status rather than a signal -- a proxy read as the fact, by " +
+       "the instrument built to stop exactly that, an hour after the record saying so.");
+}
+
 console.log("\n*** THE CAP KILLED THE GATE AND LEFT ITS CHILDREN RUNNING (v4568) ***");
 {
     // *** THIS IS THE LOOP THAT GROWS THE KILLED BUCKET, AND IT WAS FOUND BY READING `ps`. ***
@@ -873,32 +930,57 @@ console.log("\n*** THE CAP KILLED THE GATE AND LEFT ITS CHILDREN RUNNING (v4568)
         "setTimeout(() => {}, 600000);",
         "",
     ].join("\n"));
-    // The fixture has to actually WORK, or every number below is about nothing. Checked by running it.
-    const dry = spawnSync(process.execPath, [fixture], { encoding: "utf8", timeout: 3000 });
-    ok("  the leak fixture parses and runs (a broken fixture is what made the row below unfailable once)",
-       !/SyntaxError/.test(dry.stderr || ""), (dry.stderr || "").split("\n")[0] || "no error output");
-    try { spawnSync("pkill", ["-f", MARK]); } catch {}
+    // `ps` and process.kill rather than `pkill`: tools/ship/posixAssumption-selfcheck.mjs reports a POSIX
+    // TOOL invoked outside an explicit platform branch, and the first draft of this section shelled out to
+    // pkill twice for cleanup. It reddened that gate within the sweep -- correctly. The pids are already in
+    // hand from the listing this row does anyway, so nothing external is needed to end them.
+    // *** BRANCHED ON PLATFORM, AND NOT AS A FORMALITY. *** `ps -eo` does not exist on Windows, and neither
+    // does the thing this row is about: process GROUPS and a negative pid are POSIX process semantics.
+    // tools/ship/posixAssumption-selfcheck.mjs reports a POSIX tool called outside such a branch and
+    // reddened on this one, correctly -- the first draft reached for pkill, the second for a bare ps. On
+    // Windows the row cannot run and says so rather than passing on an empty listing, which would read as
+    // "no survivors" and be the silent green this whole section is against.
+    const POSIX = process.platform !== "win32";
+    const survivorPids = () => {
+        if (!POSIX) return null;
+        const r = spawnSync("ps", ["-eo", "pid,args"], { encoding: "utf8" });
+        return (r.stdout || "").split("\n").filter((l) => l.includes(MARK))
+            .map((l) => Number(l.trim().split(/\s+/)[0])).filter((n) => Number.isFinite(n) && n > 0);
+    };
+    const survivors = () => { const p = survivorPids(); return p === null ? null : p.length; };
+    const reap = () => { for (const pid of survivorPids() || []) { try { process.kill(pid, "SIGKILL"); } catch {} } };
+    // *** THE FIXTURE HAS TO PARSE, or every number below is about nothing -- checked with `node --check`
+    // rather than by running it. *** Running it costs the full 3 s timeout, because the fixture HANGS on
+    // purpose; --check is milliseconds and catches the exact failure that made this row unfailable, which
+    // was a SyntaxError. That it RUNS is established by the capped run below producing a survivor under
+    // sabotage: a fixture that does not start cannot leave one behind.
+    const dry = spawnSync(process.execPath, ["--check", fixture], { encoding: "utf8", timeout: 5000 });
+    ok("  the leak fixture parses (a fixture that was a SyntaxError is what made the row below unfailable once)",
+       dry.status === 0, (dry.stderr || "").split("\n")[0] || "node --check clean");
     // *** COUNTED AS SURVIVORS, NOT AS ORPHANS, AND THE FIRST DRAFT GOT THAT WRONG. *** It filtered `ps` for
     // a parent pid of 1, which is what an orphan eventually has -- but reparenting happens a moment after the
     // parent dies, and this counts the instant runQuickSweep resolves. So the row read zero either way and
     // SABOTAGE Q PASSED: reverting quickSweep to the single-process kill changed nothing it could see. The
     // gate's own subject, arriving in the gate. A survivor is the fact regardless of who has adopted it: the
     // capped run is over, so anything still carrying this run's mark was left behind.
-    const survivors = () => {
-        const r = spawnSync("ps", ["-eo", "args"], { encoding: "utf8" });
-        return (r.stdout || "").split("\n").filter((l) => l.includes(MARK)).length;
-    };
     const before = survivors();
-    await QS.runQuickSweep({ gates: ["tools/ship/__sweepcov_leaker_fixture.mjs"], capMs: 2500, write: false,
+    // 800 ms, not 2,500: the fixture spawns its grandchild on its first line, so the cap only has to be long
+    // enough for node to start. The first draft used 2,500 and, with a 3 s fixture run beside it, pushed this
+    // gate from under the 3,000 ms budget to over it -- which unchecked TEN records at a stroke, because
+    // KILLED_PASS_V4568 and its neighbours are guarded here. A row about a leak that exiled its own gate.
+    await QS.runQuickSweep({ gates: ["tools/ship/__sweepcov_leaker_fixture.mjs"], capMs: 800, write: false,
                              workers: 1, root: ENG });
-    await new Promise((r) => setTimeout(r, 400));   // let the kill land before asking
+    await new Promise((r) => setTimeout(r, 250));   // let the kill land before asking
     const after = survivors();
     // Whatever the outcome, do not leave the probe's own children behind.
-    try { spawnSync("pkill", ["-f", MARK]); } catch {}
+    reap();
     try { fs.unlinkSync(fixture); } catch {}
     ok("!! *** A GATE KILLED AT THE CAP TAKES ITS CHILDREN WITH IT -- the group is signalled, not the process ***",
-       after === before,
-       `${before} survivor(s) before the capped run, ${after} after. With the old single-process kill this ` +
+       POSIX ? after === before : (before === null && after === null),
+       (POSIX ? `${before} survivor(s) before the capped run, ${after} after.`
+              : "NOT A PASS ON EVIDENCE: this box is win32, where `ps -eo` and process groups do not exist. " +
+                "The claim below is unverified here and is verified on every POSIX box.") + " ".slice(0, POSIX ? 1 : 1) +
+       ` With the old single-process kill this ` +
        "reads 0 then 1: `p.kill(\"SIGKILL\")` reaches the gate and nothing it spawned. `detached: true` " +
        "makes the gate a process-GROUP leader and a negative pid signals the whole group. The fallback to " +
        "the old form is deliberate -- a group kill can fail if the child never formed one, and a cap that " +

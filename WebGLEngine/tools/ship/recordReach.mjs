@@ -129,7 +129,22 @@ export function reach({ budgetMs = null, timings = null, census = null, root = E
         blockers: Object.freeze([...blockers.values()].sort((a, b) => (b.ms ?? 0) - (a.ms ?? 0))),
         // A gate recorded AT OR OVER the cap did not finish; it is a different fact from "slow" and is
         // counted separately so a report cannot blur them.
-        atCap: Object.freeze([...blockers.values()].filter((b) => t.capMs != null && b.ms >= t.capMs).map((b) => b.gate)),
+        // *** v4568 -- "AT THE CAP" AND "DOES NOT FINISH" ARE TWO FACTS AND THIS CONFLATED THEM. ***
+        // The reading being at or over the cap was used as a proxy for the process having been cut off, which
+        // is exactly the defect KILLED_PASS_V4568 is about, in the module that reports on it. It bit
+        // immediately: tools/ship/redCensus-selfcheck.mjs was 90,096 ms and killed, was made to finish in
+        // 45,245 ms by bounding its register re-run, and this row went on calling it a gate that "does not
+        // finish" -- a claim its own recorded `finished: true` contradicts. `finished` is written by whatever
+        // ran the gate, so it is asked rather than inferred; a reading with no `finished` at all is still
+        // treated as unfinished, because an unknown is not a pass.
+        atCap: Object.freeze([...blockers.values()]
+            .filter((b) => t.capMs != null && b.ms >= t.capMs && (t.finished || {})[b.gate] !== true)
+            .map((b) => b.gate)),
+        // Expensive AND graded: it ran to completion, it just costs more than the cap. A different fact from
+        // the one above and worth its own name, since the repair for it is speed and not a verdict.
+        gradedOverCap: Object.freeze([...blockers.values()]
+            .filter((b) => t.capMs != null && b.ms >= t.capMs && (t.finished || {})[b.gate] === true)
+            .map((b) => b.gate)),
     });
 }
 
@@ -145,7 +160,7 @@ export function reach({ budgetMs = null, timings = null, census = null, root = E
 export const REACH_AT_V4548 = Object.freeze({
     at: "v4548",
     budgetMs: 3000,
-    total: 101,
+    total: 104,
     // *** READ OFF THE INSTRUMENT, NOT PREDICTED. *** The first draft of this record guessed 53/21/19/40 from
     // which gates the round had sped up, and was wrong on three of the four: the comment-strip fix below
     // moved two records the other way at the same time, and a guess cannot see two changes at once.
@@ -183,7 +198,13 @@ export const REACH_AT_V4548 = Object.freeze({
     // the lowercase copy with a case-insensitive regex, took it to 2,237 ms through the rotation owner.
     // 6,853 -> 2,237 is the gate doing the same work; both changes were checked answer-for-answer against
     // uncached re-derivations (32,576 file-classifications, 40,720 tokenMatch pairs, no difference).
-    checked: 62, overBudget: 19, unguarded: 20, unchecked: 39,
+    // v4568: 101 -> 104 records and 62 -> 64 checked, with unchecked back UP from 39 to 40 -- and the rise
+    // is honest rather than a regression to hide. The round added three records, two of them in
+    // tools/ship/redCensus.mjs, whose guardian redCensus-selfcheck is 45 s and therefore outside the
+    // ship-time sweep. That is the ratchet doing its job on the round that wrote it, for the third round
+    // running. It is NOT moved by relocating the rows: the reds those records name are gates the sweep
+    // cannot run at all, so their guardian is expensive for the same reason they are.
+    checked: 64, overBudget: 19, unguarded: 21, unchecked: 40,
     // v4550 -- the UNMEASURED class was split out of over-budget after this gate went red twice inside full
     // sweeps and passed 68 times under load; the trigger was a concurrent REWRITE of sweep-timings.json, not
     // contention. Zero records sit in it on a settled tree, which is the expected reading.
@@ -195,11 +216,26 @@ export const REACH_AT_V4548 = Object.freeze({
     rescued: Object.freeze(["PROBE_AT_V4536", "PROBE_AT_V4487", "DRIFT_AT_V4482"]),
     demotedByCommentStrip: Object.freeze(["BUDGET_DRIFT_V4536", "MEASURED_V4527"]),
     // The three whose guardian does not merely miss the budget but never finishes at all.
+    // *** v4568 -- THIS LIST WAS "THREE GUARDIANS THAT DO NOT FINISH" AND ALL THREE FINISH. ***
+    // It was built when `at or over the 20,000 ms cap` was the only fact available, and the tree read that
+    // as "cut off" -- the proxy KILLED_PASS_V4568 is about, sitting in the module that reports on guardians.
+    // Every one of them, measured with a cap big enough to let it end:
+    //   redCensus-selfcheck    90,096 ms and KILLED -> 45,245 ms exit 0, once its register re-run was
+    //                          bounded by wall clock instead of running every entry every time
+    //   dockFraming-selfcheck  21,536 ms exit 0 -- over the cap and graded
+    //   transmission-selfcheck 19,395 ms exit 0 -- no longer even over the cap
+    // So the list is kept as the POPULATION it always named, and the claim attached to it is corrected:
+    // these are expensive, not unjudged, and the repair for expensive is speed rather than a verdict.
     atCapGates: Object.freeze([
         "tools/ship/redCensus-selfcheck.mjs",
         "physics/render/transmission-selfcheck.mjs",
         "tools/ship/dockFraming-selfcheck.mjs",
     ]),
+    // What v4568 measured about them, so the correction is a number rather than a retraction.
+    atCapGatesFinish: Object.freeze({ of: 3, finished: 3, killed: 0,
+        ms: Object.freeze({ "tools/ship/redCensus-selfcheck.mjs": 45245,
+                            "tools/ship/dockFraming-selfcheck.mjs": 21536,
+                            "physics/render/transmission-selfcheck.mjs": 19395 }) }),
 });
 
 export function reportLines() {

@@ -53,11 +53,52 @@ export function classifyRows(rows, { budgetMs = BUDGET_MS, priorMs = {}, capMs =
     return { returnees, reds, killed, slower };
 }
 
+/**
+ * *** REBUILDING `finished` FROM THIS FILE'S OWN LEDGER, AFTER A SWEEP ERASED IT. ***
+ *
+ * v4568 added `finished` to sweep-timings.json and quickSweep computed it and did not write it, so the first
+ * full sweep after the killed pass deleted 140 rows of it. The pass itself is 75 minutes and re-running it to
+ * recover a field is paying for a measurement twice.
+ *
+ * It does not need re-measuring, because sweep-rotation.json is this file's OWN ledger and holds the exit
+ * code of every row the pass ran -- it survived exactly because ROTATION_LOST_V4461 gave it a separate
+ * writer for this class of accident. `finished` is DERIVED from a code the ledger already holds.
+ *
+ * WHAT MAKES THIS A RECONSTRUCTION AND NOT A FABRICATION -- the 2026-09-03 fault is a number written by
+ * something other than the thing that measured it -- is that a row is only rebuilt when the ledger and the
+ * timings file still describe THE SAME RUN: same ms, same code. A gate re-timed since carries a different
+ * reading and is left alone, because the ledger no longer knows anything about its current state.
+ */
+export function rebuildFinished(file, ledger) {
+    const timings = file.timings || {}, codes = file.codes || {};
+    const finished = { ...(file.finished || {}) };
+    let rebuilt = 0, skipped = 0;
+    for (const r of ledger.rotated || []) {
+        if (timings[r.gate] !== r.ms || String(codes[r.gate]) !== String(r.code)) { skipped++; continue; }
+        if (finished[r.gate] !== undefined) continue;
+        finished[r.gate] = r.code !== "timeout/signal";
+        rebuilt++;
+    }
+    return { finished, rebuilt, skipped };
+}
+
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     const arg = (n, d) => { const i = process.argv.indexOf(n); return i >= 0 ? process.argv[i + 1] : d; };
     const budgetMs = Number(arg("--budget-s", 180)) * 1000;
     const slots = Number(arg("--slots", 24));
     const file = readFile();
+    if (process.argv.includes("--rebuild-finished")) {
+        const led = JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "sweep-rotation.json"), "utf8"));
+        const { finished, rebuilt, skipped } = rebuildFinished(file, led);
+        console.log(`[rotation] --rebuild-finished: ${rebuilt} row(s) restored from this file's own ledger, ` +
+            `${skipped} skipped because the timings no longer describe the run the ledger recorded`);
+        if (process.argv.includes("--write")) {
+            fs.writeFileSync(path.join(ENG, "tools", "ship", "sweep-timings.json"),
+                JSON.stringify({ ...file, finished }, null, 1) + "\n");
+            console.log("[rotation] wrote sweep-timings.json");
+        } else console.log("[rotation] dry run -- pass --write to record");
+        process.exit(0);
+    }
     const gates = enumerateGates(ENG);
     const c = census(gates, file);
     // *** v4535 -- --gate: RE-TIME A NAMED GATE THROUGH THE OWNER INSTEAD OF TYPING ITS NUMBER BY HAND. ***

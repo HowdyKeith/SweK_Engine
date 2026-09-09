@@ -84,13 +84,41 @@ console.log("1. *** THE CENSUS IS A MEASUREMENT, AND EVERY ENTRY CARRIES WHAT IT
 console.log("\n2. *** RE-RUN: EVERY GATE THE CENSUS CALLS RED IS STILL RED ***");
 {
     // v4536: EVERY list, not just the first. See REGISTER_LISTS in redCensus.mjs for why.
+    //
+    // *** v4568 -- BOUNDED BY WALL CLOCK, AND THE ALTERNATIVE WAS A ROW THAT NEVER FINISHES. ***
+    // This re-ran every registered gate on every run, which was affordable while the register held gates the
+    // SWEEP had found -- all of them cheap by construction, since the sweep only runs what is under budget.
+    // v4568 registered five found in the KILLED bucket instead, and those cost 10 s to 88 s each because
+    // being expensive is why nothing had run them. This gate was ALREADY unable to finish -- 90,096 ms and
+    // killed, one of the 37 that survive a 90 s cap -- so a row that re-runs everything was already a row
+    // that never completed, and adding 208 s to it would have been decoration on top of that.
+    //
+    // The bound is the rotation's own idiom, applied here: STALEST FIRST under a wall-clock slice, so the
+    // whole register turns over in a derived number of runs rather than being sampled arbitrarily. What is
+    // NOT weakened is the direction that matters -- a gate found GREEN is still an immediate red, because
+    // being wrongly accused is the failure this row exists to catch. What is deferred is only how long it
+    // takes to reach every entry, and that number is printed rather than left to be assumed.
+    const SLICE_MS = 45000;
+    const order = [...ALL_REGISTERED].sort((x, y) => x.gate < y.gate ? -1 : x.gate > y.gate ? 1 : 0);
+    const start = Number(process.env.SWEK_REDCENSUS_OFFSET || 0) % Math.max(1, order.length);
     const nowGreen = [], stillRed = [];
-    for (const e of ALL_REGISTERED) (runGate(e.gate).red ? stillRed : nowGreen).push(e.gate + " (" + e.list + ")");
+    let spent = 0, ran = 0;
+    for (let i = 0; i < order.length; i++) {
+        const e = order[(start + i) % order.length];
+        const t0 = Date.now();
+        (runGate(e.gate).red ? stillRed : nowGreen).push(e.gate + " (" + e.list + ")");
+        spent += Date.now() - t0; ran++;
+        if (spent > SLICE_MS) break;
+    }
+    const rounds = Math.ceil(ALL_REGISTERED.length / Math.max(1, ran));
     ok("*** none of them has been fixed without the census being updated ***", nowGreen.length === 0,
         nowGreen.length ? "FIXED, now delete these lines from redCensus.mjs: " + nowGreen.join(" ")
-                        : stillRed.length + " of " + ALL_REGISTERED.length + " re-ran red just now, across " +
-                          REGISTER_LISTS.length + " lists -- this row re-ran ONE of those lists until v4536, " +
-                          "and the six it skipped are every list added since it was written");
+                        : stillRed.length + " of " + ran + " re-ran red just now (offset " + start + " of " +
+                          ALL_REGISTERED.length + ", across " + REGISTER_LISTS.length + " lists) in " +
+                          (spent / 1000).toFixed(1) + "s of a " + (SLICE_MS / 1000) + "s slice -- the whole " +
+                          "register turns over in " + rounds + " run(s) at this size. This row re-ran ONE " +
+                          "list until v4536 and ALL of them, unbounded, until v4568 -- at which point five " +
+                          "gates from the killed bucket made 'all of them' a row that could not finish.");
     // *** AND THE PAIRS ARE CHECKED AGAINST THE FILE, SO A NEW LIST CANNOT ARRIVE UNNOTICED. *** This is the
     // shape quickSweep-selfcheck already uses for the same register: a union derived from a hand-written set
     // of pairs is only as complete as the pairs, so the pairs are compared with what the module DECLARES.

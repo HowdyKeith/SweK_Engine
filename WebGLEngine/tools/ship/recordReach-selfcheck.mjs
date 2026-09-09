@@ -140,12 +140,22 @@ console.log("\n3. *** THE JOIN DISCRIMINATES: A GATE'S TIMING REALLY DECIDES A R
 console.log("\n4. *** A GATE AT THE CAP IS NOT MERELY SLOW, AND IS COUNTED SEPARATELY ***");
 {
     say("blockers, slowest first: " + live.blockers.slice(0, 5).map((b) => `${b.ms}ms ${path.basename(b.gate)}`).join(", "));
-    ok("!! *** THREE GUARDIAN GATES ARE RECORDED AT OR OVER THE 20,000 ms CAP -- THEY DO NOT FINISH ***",
-        live.atCap.length >= 3 && live.atCap.every((g) => R.atCapGates.includes(g)),
-        live.atCap.map((g) => g + " " + live.blockers.find((b) => b.gate === g).ms + " ms").join(", ") +
-        ". A record with one of these as its only guardian has a guard on paper and nothing that has run in " +
-        "a long time -- a different fact from 'a few hundred milliseconds over', and blurring the two would " +
-        "make the 40 look more uniform than it is.");
+    // *** v4568 -- THIS ROW SAID THOSE THREE "DO NOT FINISH" AND ALL THREE FINISH. *** It read a timing at
+    // or over the cap as proof the process was cut off, which is the proxy KILLED_PASS_V4568 exists to
+    // separate, in the gate that reports on guardians. `finished` is recorded by whatever ran the gate, so
+    // atCap now means CUT OFF and gradedOverCap means expensive-but-graded. The distinction is the point of
+    // the row -- "a guard on paper and nothing that has run" is a different fact from "a slow guard" -- and
+    // it was making exactly the blur it warns about.
+    ok("!! *** NO GUARDIAN IS CUT OFF ANY MORE: the three at the cap all FINISH, and slow is not unjudged ***",
+        live.atCap.length === 0 && live.gradedOverCap.length > 0 &&
+        live.gradedOverCap.every((g) => R.atCapGates.includes(g)) &&
+        R.atCapGatesFinish.finished === R.atCapGatesFinish.of && R.atCapGatesFinish.killed === 0,
+        `${live.atCap.length} guardian(s) cut off; ${live.gradedOverCap.length} over the cap and GRADED: ` +
+        live.gradedOverCap.map((g) => path.basename(g) + " " + live.blockers.find((b) => b.gate === g).ms + " ms").join(", ") +
+        ". redCensus-selfcheck was 90,096 ms and killed until its register re-run was bounded by wall clock; " +
+        "it is 45,245 ms exit 0 now. A record guarded only by a gate that is CUT OFF has a guard on paper and " +
+        "nothing that has run; a record guarded by a slow gate has a verdict that costs too much to take at " +
+        "ship time. Blurring those made the unchecked population look more uniform than it is.");
     ok("...and every at-cap gate is also counted among the blockers, so the two views cannot disagree",
         live.atCap.every((g) => live.blockers.some((b) => b.gate === g)));
     ok("!! the blocker list names records, not just a count",

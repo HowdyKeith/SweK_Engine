@@ -784,6 +784,83 @@ export const OVER_BUDGET_PASS_V4565 = Object.freeze({
                 "below it when run serially and alone, and that the sweep will now re-time them itself.",
 });
 
+/*
+ * *** v4568 -- THE BUCKET NOTHING COULD RUN, RUN. 103 OF 140 NOW HAVE A VERDICT AND FIVE OF THEM ARE RED. ***
+ *
+ * OVER_BUDGET_PASS_V4565 ended by naming what it could not reach: 140 gates that hit the 20,000 ms cap,
+ * exiled by a mechanism with no door in it, 39% of everything outside the ship-time sweep. This is that door
+ * and what came through it.
+ *
+ * THE PASS: every gate in c.killed, run SERIALLY at a 90 s cap -- ten times the cap that exiled them, because
+ * re-running a capped gate AT the cap it died on can only reproduce the death.
+ *   ran                     140 gates (139 in the ledger: domScope was re-timed after and carries a later stamp)
+ *   FINISHED                103  -- 97 green, 6 red; readings 51 ms to 87,648 ms, median 24,559
+ *   did not finish           37  -- still no verdict, now with a 90 s floor under them instead of 20 s
+ *   under the OLD 20 s cap   35  -- exiled by a reading their own re-run does not reproduce
+ *   under the 3,000 ms budget 1  -- placementRender-selfcheck, 20,125 ms on file and 51 MILLISECONDS alone
+ *
+ * *** 129 OF THE 140 CARRIED A STAMP OLDER THAN PER-ENTRY STAMPING ITSELF *** -- the same staleness the
+ * over-budget bucket turned out to be substantially made of, in a bucket nothing could refresh at all.
+ *
+ * *** THE FIVE REDS ARE THE POINT, NOT THE TIMINGS. *** v4392's rule is that a count of failures is not a
+ * verdict unless the process finished, and this bucket held gates that HAD finished and failed with nowhere
+ * to say so. Each is a defect in a different subsystem, registered by name in redCensus.RED_AT_V4568 rather
+ * than fixed here -- the round is about the door:
+ *   commentFalsePass    ui/qrChannel-selfcheck asserts against RAW source and is satisfied by a COPYRIGHT
+ *                       COMMENT in ui/qrDecode.mjs. The exact defect that gate exists to hunt, in a gate.
+ *   gateReach           the recorded default population is 472 against a live 520
+ *   baselineHygiene     seven baseline entries have outlived their reason; the gate names them for deletion
+ *   gateSelection       reachable gates are no longer scheduled first, so a truncated run misses the change
+ *   orphanDisposition   a signal that now holds for 28 of 30 members, and so discriminates nothing
+ *
+ * *** AND A SIXTH RED WAS THE PASS'S OWN, WHICH IS WHY THE MECHANISM CHANGED AND NOT ONLY THE FILE. ***
+ * domScope-selfcheck was filed red at 90,129 ms and is GREEN alone at 101,386 and 102,999 ms: it needs more
+ * than ninety seconds and nothing else. The pass called it finished-and-failed because execFileSync's timeout
+ * can leave an exit STATUS rather than a signal, so "was this killed" was answered by comparing a number to
+ * the cap instead of by the fact. runGate uses spawnSync now and reports timeout/signal outright, verified by
+ * capping a 100-second gate at five. IT IS THE SAME MISTAKE THE BUCKET IS MADE OF -- a proxy read as the
+ * fact -- committed by the instrument built to fix it, one hour after the record saying so.
+ */
+export const KILLED_PASS_V4568 = Object.freeze({
+    at: "v4568", capMs: 90000, oldCapMs: CAP_MS, serial: true,
+    stamp: "2026-09-09T17:59:42.840Z",
+    ran: 140, finished: 103, green: 97, red: 5, falseRed: 1, didNotFinish: 37,
+    underOldCap: 35, underBudget: 1,
+    msRange: Object.freeze([51, 87648]), median: 24559,
+    staleStamps: 129,                      // of 140, older than per-entry stamping (v4408)
+    witness: Object.freeze({ gate: "tools/ship/placementRender-selfcheck.mjs", filedMs: 20125, aloneMs: 51,
+        note: "395x. A gate filed AT THE CAP that runs in a twentieth of a second -- the reading that exiled " +
+              "it was never a measurement of this gate at all, and nothing could ever have corrected it." }),
+    // named, because a count of reds is a number and a list is a repair
+    reds: Object.freeze(["tools/ship/baselineHygiene-selfcheck.mjs", "tools/ship/commentFalsePass-selfcheck.mjs",
+        "tools/ship/gateReach-selfcheck.mjs", "tools/ship/gateSelection-selfcheck.mjs",
+        "tools/ship/orphanDisposition-selfcheck.mjs"]),
+    falseRedWas: Object.freeze({ gate: "tools/ship/domScope-selfcheck.mjs", filedMs: 90129, filedCode: 1,
+        aloneMs: Object.freeze([101386, 102999]), aloneCode: 0, reTimedMs: 103579,
+        cause: "execFileSync's timeout can leave an exit status rather than a signal, so the pass decided " +
+               "'finished' by comparing ms against the cap. runGate uses spawnSync and reads r.error/r.signal " +
+               "now, checked by capping a 100 s gate at 5 s." }),
+    // the loop that helped fill this bucket, fixed in the same round
+    childLeak: Object.freeze({
+        was: "p.kill(\"SIGKILL\") signals the direct child only, so a capped gate's children are reparented " +
+             "to init and keep running",
+        witness: "an orphan of tools/ship/headlessGpu-selfcheck.mjs -- which pins a WebGPU device in a child " +
+                 "ON PURPOSE, as the trap it gates -- was found holding that device for 44 minutes",
+        why: "every GPU gate running in that window competed with it, and a gate slowed past the cap is " +
+             "killed, orphaning more: the bucket feeds itself",
+        fixed: "both kill sites spawn detached and signal the process GROUP, with the single-process kill as " +
+               "a fallback; runGate signals the group whether or not the run timed out, because a gate that " +
+               "EXITS having left a child behind leaks exactly as much as one that was killed",
+        gatedBy: "a capped run of a real fixture in sweepCoverage-selfcheck -- 0 survivors against 2 under " +
+                 "sabotage. Its first two drafts could not fail: one counted orphans before reparenting had " +
+                 "happened, the other used a fixture that was a SyntaxError and spawned nothing.",
+    }),
+    notClaimed: "that the 37 which did not finish are hangs. They are gates that need more than 90 seconds, " +
+                "and this round did not find out how much more -- a floor of 90 s is what it establishes, " +
+                "against a floor of 20 s before. Nor that the 35 under the old cap are permanently there: " +
+                "BUDGET_DRIFT_V4536 measured 12-36% of hour-to-hour drift and these are single readings.",
+});
+
 export const ROTATION_BOUNDARY_V4535 = Object.freeze([
     Object.freeze({ gate: "physics/render/albedoEstimator-selfcheck.mjs", rotationMs: 2991, sweepMs: 3115,
         serialMs: Object.freeze([3065, 2823, 3208, 3269, 3000]),

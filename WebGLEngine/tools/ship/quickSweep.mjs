@@ -369,7 +369,15 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
                   "`serial` (v4562) is the UNCONTENDED cost -- from a phase-2 run or from this sweep's rotating " +
                   "slice -- while `timings` is a sample taken while seven other gates fought for the box and " +
                   "runs a MEDIAN 2.41x above it. Ask costOf(), not timings[], for what a gate costs.",
-            captured: out.at, budgetMs, capMs, timings, codes, at, crossings, serial, serialAt,
+            // *** `finished` IS IN THIS LIST BECAUSE IT WAS NOT, AND THE SWEEP ERASED IT. *** v4568 added the
+            // field, wrote it into a local object in the loop above, and left it out of the object actually
+            // written -- so the first full sweep after the killed pass silently deleted 140 rows of
+            // it and sweepCoverage's graded/no-verdict split went back to knowing nothing. THIRD TIME IN
+            // THIS SESSION for the same shape: tslRace's first section deleting the keys its later sections
+            // owned, inputSets.encode dropping a renamed flag, and now this. A writer that spells its fields
+            // by hand is a list that has to be maintained in step with every reader of the file, and
+            // ROTATION_LOST_V4461 is the same mechanism across two processes rather than inside one.
+            captured: out.at, budgetMs, capMs, timings, codes, at, finished, crossings, serial, serialAt,
         }, null, 1) + "\n");
     }
     return out;
