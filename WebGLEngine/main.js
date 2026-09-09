@@ -6932,6 +6932,7 @@ import { LavaEmberEmitter, ImpactBurstEmitter, MemoryShimmerEmitter } from "./re
 import { SpriteAtlas } from "./render/spriteAtlas.js";
 import { BloomPass } from "./render/bloomPass.js";
 import { PhosphorPass } from "./render/phosphorPass.js";
+import { FxaaPass } from "./render/fxaaPass.js";
 import { makeSwiftShaderPass, swiftShaderNames, KNOBS as SWIFT_KNOBS, DEFAULT_KNOBS as SWIFT_DEFAULTS } from "./render/swiftShaderPass.js";   // v4169
 import { RunnerPanel } from "./ui/runnerPanel.js";   // v4169
 import * as SWIFT_CPU from "./render/swiftShaderModel.mjs";   // v4169 -- the CPU reference, as the no-GPU fallback
@@ -7218,6 +7219,7 @@ let tvWall = null;
 let tvOverlay = null;
 let bloomPass = null;
 let phosphorPass = null;   // v1074 — GL CRT/phosphor post pass (opt-in)
+let fxaaPass = null;       // screen-space anti-aliasing pass (opt-in, ui/graphicsSettings.js "fxaa")
 
 // Round 30 wow-pass — transient bloom flash for kaiju attack impacts. Bumps
 // bloomPass.intensity above its current baseline and eases it back over ~380ms.
@@ -7258,6 +7260,7 @@ function resize() {
     // declaration.
     if (bloomPass) bloomPass.resize(canvas.width, canvas.height);
     if (phosphorPass) phosphorPass.resize(canvas.width, canvas.height);
+    if (fxaaPass) fxaaPass.resize(canvas.width, canvas.height);
 }
 resize();
 window.addEventListener("resize", resize);
@@ -9750,6 +9753,8 @@ renderer.fogColor = skyRenderer.getHorizonColor();
 const spriteAtlas = new SpriteAtlas(gl);
 bloomPass   = new BloomPass(gl, canvas.width, canvas.height);
 phosphorPass = new PhosphorPass(gl, canvas.width, canvas.height);   // v1074
+fxaaPass = new FxaaPass(gl, canvas.width, canvas.height);
+console.log("[fxaa] " + (fxaaPass && fxaaPass.ok ? "ready -- GFX panel's Anti-aliasing toggle (off by default)" : "unavailable (shader compile failed)"));
 // v1074 — true GL CRT/phosphor pass. Bloom composites into the phosphor FBO,
 // then a fullscreen shader applies barrel/scanlines/phosphor-tint/glow/vignette.
 // Opt-in; tint follows the live --game-color (the Pip-Boy EffectColor from v1073).
@@ -31278,6 +31283,8 @@ function loop(t, xrFrame) {
         mossPatches.enabled = gfxSettings.get("moss");
         // v4077 — the root/arch landmark, same source of truth.
         rootArchLandmark.enabled = gfxSettings.get("rootarch");
+        // screen-space anti-aliasing, same source of truth -- off by default (GFX panel "Anti-aliasing").
+        if (fxaaPass) fxaaPass.enabled = fxaaPass.ok && gfxSettings.get("fxaa");
         if (renderer.slopesEnabled !== undefined) {
             renderer.slopesEnabled = gfxSettings.get("slopes");
         }
@@ -31286,6 +31293,9 @@ function loop(t, xrFrame) {
         // v359 — quality preset can toggle bloom at runtime. _enabled
         // is set on bloomPass by the QualityPresetPanel mount logic.
         const _phOn = !!(phosphorPass && phosphorPass.ok && phosphorPass.enabled);
+        // screen-space anti-aliasing -- opt-in (ui/graphicsSettings.js "fxaa", default off; the retro/CRT
+        // look this tree leans on often reads aliasing as in-theme rather than a defect).
+        const _fxOn = !!(fxaaPass && fxaaPass.ok && fxaaPass.enabled);
         if (_phOn) {
             // v1074 — tint follows the live in-game effect color (--game-color),
             // throttled to ~4Hz to avoid per-frame style reflow.
@@ -31298,10 +31308,27 @@ function loop(t, xrFrame) {
                     if (h.length === 6) { const n = parseInt(h, 16); if (!isNaN(n)) phosphorPass.setTint([((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255]); }
                 } catch (e) {}
             }
-            bloomPass.outputFBO = phosphorPass.inputFBO;
-            bloomPass.apply();                       // composite the frame into the phosphor FBO
-            bloomPass.outputFBO = null;
+            if (_fxOn) {
+                // FXAA sits between bloom's composite and phosphor's CRT shader -- it smooths the clean
+                // rendered image before phosphor's barrel/scanline/aberration distortion reshapes it,
+                // rather than anti-aliasing an already-stylised picture.
+                bloomPass.outputFBO = fxaaPass.inputFBO;
+                bloomPass.apply();                       // composite the frame into the fxaa FBO
+                bloomPass.outputFBO = null;
+                fxaaPass.outputFBO = phosphorPass.inputFBO;
+                fxaaPass.render();                       // FXAA -> the phosphor FBO
+                fxaaPass.outputFBO = null;
+            } else {
+                bloomPass.outputFBO = phosphorPass.inputFBO;
+                bloomPass.apply();                       // composite the frame into the phosphor FBO
+                bloomPass.outputFBO = null;
+            }
             phosphorPass.render(performance.now());  // CRT shader -> screen
+        } else if (_fxOn && bloomPass._enabled !== false) {
+            bloomPass.outputFBO = fxaaPass.inputFBO;
+            bloomPass.apply();                           // composite the frame into the fxaa FBO
+            bloomPass.outputFBO = null;
+            fxaaPass.render();                           // FXAA -> screen (outputFBO left null)
         } else {
             bloomPass.outputFBO = null;
             if (bloomPass._enabled !== false) bloomPass.apply();
