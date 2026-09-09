@@ -636,15 +636,15 @@ export const RED_AT_V4535 = Object.freeze(RED_AT_V4535_GATES.map((gate) => Objec
 // MAIN, which still runs three@0.178.0 and has never seen these six gates fail for either reason below --
 // this list travels with the branch, and if the branch never merges, neither should the accusation.
 //
-// TWO CAUSES, NOT ONE. Five of the six (everything but tslIsing) fail on exactly one thing: a
-// GPUTextureComponentSwizzle TypeError this sandbox's Chromium 141 throws building a WebGPU texture view --
-// the same box-not-fleet gap render/threeProbe.mjs has documented since v4319 ("0.185 was tried and refused
-// on THIS shell's Chromium"), now reproduced for the full render path (getShaderAsync AND renderAsync's own
-// render-target view) rather than just import. Keith's rig, three versions newer, is unaffected -- the probe
-// says so and the byte-exact comparisons that DO run on this box (tslRace-selfcheck section 6, 36864/36864
-// worst 0 on both backends; tslWide-selfcheck fully green) say the code the swizzle wall is blocking is
-// otherwise correct. The sixth, tslIsing, fails on something the swizzle wall never touches: a real three.js
-// TSL type-inference question, named and left open rather than guessed at, below.
+// TWO CAUSES, NOT ONE. Five of the six left below fail on exactly one thing: a GPUTextureComponentSwizzle
+// TypeError this sandbox's Chromium 141 throws building a WebGPU texture view -- the same box-not-fleet gap
+// render/threeProbe.mjs has documented since v4319 ("0.185 was tried and refused on THIS shell's Chromium"),
+// now reproduced for the full render path (getShaderAsync AND renderAsync's own render-target view) rather
+// than just import. Keith's rig, three versions newer, is unaffected -- the probe says so and the byte-exact
+// comparisons that DO run on this box (tslRace-selfcheck section 6, 36864/36864 worst 0 on both backends;
+// tslWide-selfcheck fully green) say the code the swizzle wall is blocking is otherwise correct. THE SIXTH,
+// tslIsing, WAS NEVER THE SWIZZLE WALL AND IS NOW FIXED AND REMOVED, RATHER THAN LEFT HERE STALE -- see the
+// note just above RED_AT_V4557_GATES for what it was and how it cleared.
 const WHY_V4557 = Object.freeze({
     "tools/ship/tslSource-selfcheck.mjs":
         "TypeError: The provided value is not of type 'GPUTextureComponentSwizzle'. Thrown inside three's own " +
@@ -670,26 +670,34 @@ const WHY_V4557 = Object.freeze({
     "tools/ship/slugTsl-selfcheck.mjs":
         "Same TypeError. 13 of 14 checks pass, including the two Slug-specific won't-do/roadmap checks this " +
         "gate exists to hold.",
-    "tools/ship/tslIsing-selfcheck.mjs":
-        "NOT THE SWIZZLE WALL -- a different, still-open question in three's own TSL compiler. " +
-        "render/isingTsl.mjs builds its Philox config as `uniform(uvec4(0, 0, 0, 0)).label(\"cfg\")`; three's " +
-        "live r185 emission declares the field `cfg : vec4<f32>` in the WGSL struct rather than `vec4<u32>`, " +
-        "and the shell (correctly) expects the uvec4 the graph asked for -- 'uniform \"cfg\" is vec4 in the " +
-        "pass and uvec4 in the shell'. A quick experiment forcing each literal through uint() explicitly made " +
-        "it WORSE, not better (the field collapsed to a bare `f32` scalar, most likely constant-folded away in " +
-        "a minimal repro with no real downstream use) -- inconclusive rather than confirming, so nothing was " +
-        "changed in a correctness-critical numerical kernel on a guess. Needs a more careful look at how r185's " +
-        "compiler infers a uvec4 uniform's declared type from an all-zero-literal construction before either " +
-        "isingGpu.mjs or render/isingTsl.mjs is touched.",
 });
 
+// *** tslIsing-selfcheck.mjs LEFT THIS LIST AT v4559, BY THE REPAIR THE v4557 ENTRY ASKED FOR. *** v4557 named
+// the question rather than guessing at it: "a more careful look at how r185's compiler infers a uvec4
+// uniform's declared type from an all-zero-literal construction". That look found it. `uniform(value, type)`'s
+// bare-value path computes its node type by reading a `.nodeType` property directly off the wrapped node --
+// `getConstNodeType = (value) => value.nodeType || value.convertTo || ...` -- and the proxy `uvec4(0,0,0,0)`
+// returns does not expose that property to a plain read, so the lookup silently misses and falls through to
+// deriving the type from the (also-collapsed) raw value instead, landing on `float`. EVERY OTHER
+// `uniform(vec4(...))` call in this codebase (physicsTsl.mjs, fleetTsl.mjs, carveTsl.mjs, tslWide.mjs) has the
+// identical bare-value gap and gets away with it purely because float IS what they want -- uvec4 is the one
+// case in this tree where the silent fallback and the intent diverge, which is exactly why nothing else here
+// ever surfaced it. FIX, MEASURED RATHER THAN GUESSED THIS TIME: pass the type explicitly as `uniform()`'s
+// second argument -- `uniform(uvec4(0, 0, 0, 0), "uvec4")` -- in both render/isingTsl.mjs and the gate's own
+// inline philox harness (tools/ship/tslIsing-selfcheck.mjs line ~103 built an identical bare `pcfg` and was
+// masking the fix by failing first). Verified two ways, not just read off the WGSL: the emitted struct field
+// changed from `cfg : vec4<f32>` to `cfg : vec4<u32>`, AND the resulting UniformNode's JS-side `.value` stayed
+// a real, mutable `THREE.Vector4` that a GPU readback confirmed round-trips correctly after mutation -- the
+// earlier worry that fixing the declared type would leave `.value` collapsed to a bare scalar (which would
+// have broken driving sweep/parity/seed across dispatches) did not hold up under an actual test. The gate now
+// runs ALL GREEN: Philox4x32-10 bit-exact against the CPU mirror on all 1024 words, and 40 sweeps at T=2
+// agreeing with the shipped kernel on all 1024 spins at the kernel's own zero-tolerance contract.
 export const RED_AT_V4557_GATES = Object.freeze([
     "tools/ship/tslSource-selfcheck.mjs",
     "tools/ship/tslRace-selfcheck.mjs",
     "tools/ship/tsl-selfcheck.mjs",
     "tools/ship/tslPhysics-selfcheck.mjs",
     "tools/ship/slugTsl-selfcheck.mjs",
-    "tools/ship/tslIsing-selfcheck.mjs",
 ]);
 
 export const RED_AT_V4557 = Object.freeze(RED_AT_V4557_GATES.map((gate) => Object.freeze({

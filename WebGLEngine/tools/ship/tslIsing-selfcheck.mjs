@@ -100,7 +100,7 @@ else {
             // ---- philox alone -------------------------------------------------------------------------------
             const { Fn, uint, uvec4, uniform, instanceIndex, instancedArray } = T;
             const pbuf = instancedArray(a.NP, "uvec4").label("out");
-            const pcfg = uniform(uvec4(a.SEED, a.K1, 0, 0)).label("cfg");
+            const pcfg = uniform(uvec4(a.SEED, a.K1, 0, 0), "uvec4").label("cfg");
             const { philox } = I.philoxNodes(T);
             const pnode = Fn(() => { const r = philox(instanceIndex, uint(7), uint(1), uint(0), pcfg.x, pcfg.y);
                 pbuf.element(instanceIndex).assign(uvec4(r.x0, r.x1, r.x2, r.x3)); })().compute(a.NP);

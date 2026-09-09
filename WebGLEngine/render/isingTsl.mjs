@@ -90,7 +90,11 @@ export function makeIsingPassTsl(TSL, { L = 64 } = {}) {
 
     const spins = instancedArray(L * L, "int").label("spins");
     const thresh = instancedArray(5, "uint").label("thresh");        // (dE + 8) / 4 in {0..4}
-    const uniforms = { cfg: uniform(uvec4(0, 0, 0, 0)).label("cfg") };   // sweep, parity, seed, philox key1
+    // uniform()'s bare-value type inference reads a property the wrapped uvec4(...) node does not expose, and
+    // silently falls back to inferring "float" from the collapsed scalar -- every OTHER uniform(vec4(...)) in this
+    // codebase (physicsTsl.mjs, fleetTsl.mjs, carveTsl.mjs, ...) gets away with the same bare call only because
+    // float is what they actually want. uvec4 needs the type spelled out as the second argument to survive that.
+    const uniforms = { cfg: uniform(uvec4(0, 0, 0, 0), "uvec4").label("cfg") };   // sweep, parity, seed, philox key1
     const { philox } = philoxNodes(TSL);
 
     const node = Fn(() => {
