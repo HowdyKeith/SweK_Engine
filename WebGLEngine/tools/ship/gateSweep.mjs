@@ -3764,6 +3764,40 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    // v4566 -- the 215th closing, for a gate whose subject is the SWEEP THIS REGISTER IS PART OF.
+    since215: Object.freeze({
+        at: "v4566", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/inputSets-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, twenty-four rows. *** THE SWEEP RE-ANSWERS 1,255 QUESTIONS EVERY RUN AND A ROUND " +
+                 "MOVES FIVE TO FIFTEEN FILES. *** v4548 measured where the 500 s goes and ruled out the " +
+                 "obvious levers -- the shared walk is 42 ms, process startup across 1,141 spawns is 5% -- " +
+                 "so the only remaining saving is not doing the work when nothing a gate reads has moved. " +
+                 "tools/ship/inputProbe.mjs patches the fs default-export object and records the PATHS a " +
+                 "gate touches (v4548 counted the same calls to find its own subject); the closure comes " +
+                 "out TRANSITIVE, because a module load routes through it too. One pass over the sweep's " +
+                 "own population, 1,253 gates in 181 s at eight workers, and 1,017 came back with a usable " +
+                 "set: MEDIAN SIX PATHS, and 932 of 1,253 skippable on an unchanged tree. Changing a file " +
+                 "268 gates read still leaves 803 skippable. *** THE MECHANISM SHIPS DISARMED. *** A gate " +
+                 "that should have run and did not is the one failure here that is SILENT, so quickSweep " +
+                 "counts what it would have skipped and runs everything anyway until --incremental is " +
+                 "passed; the rule refuses on every unknown (no set, empty set, spawned, socket, named fs " +
+                 "import, own source missing, any hash moved) and each refusal is driven on a fixture. " +
+                 "FOUR DEFECTS FOUND IN MY OWN CODE BY RUNNING IT: the 'parallel' pass was serial because " +
+                 "spawnSync blocks the event loop -- a claim in a comment the code did not do; the record " +
+                 "was 42 MB and the decision 8.4 s because 443,405 path references over 4,072 distinct " +
+                 "files were stored and hashed one per gate rather than one per path (3.1 MB and 464 ms " +
+                 "indexed); the hash memoisation answered a second question from before a write, which is " +
+                 "the exact silent false green arriving through the optimisation; and the conflict sentinel " +
+                 "was null, which equals the live reading of any absent file, so a conflicting path that " +
+                 "had been deleted came back skippable. Sabotages red by name at H/I/J/K, including arming " +
+                 "the sweep without its flag. THE LIMIT IS STATED: an input set is what a gate read on ONE " +
+                 "RUN -- a sample, not a specification -- and the defence is that it ships off while the " +
+                 "number it would have skipped is printed every sweep.",
+    }),
     // v4564 -- the 214th closing, and the round found the hole in the tree's own syntax guard rather than
     // in the census it was filed against.
     since214: Object.freeze({

@@ -32,6 +32,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { backfillStamps } from "./sweepCoverage.mjs";
+import { skippable, readRecord as readInputRecord } from "./inputSets.mjs";
 import { enumerateGates, classify, VERDICT, SWEEP_V4297, ENG } from "./gateSweep.mjs";
 import { RED_AT_V4279, RED_AT_V4408, RED_AT_V4424, RED_AT_V4476, RED_AT_V4484, RED_AT_V4531, RED_AT_V4535, UNCONFIRMED_SLOW, ALL_REGISTERED } from "./redCensus.mjs";
 
@@ -152,7 +153,22 @@ export function countCrossings(prior, rows, budgetMs) {
     return out;
 }
 
-export function selectGates(all, timings, budgetMs, { crossings = null, minCrossings = MIN_CROSSINGS_TO_EVICT } = {}) {
+/**
+ * *** v4566 -- INCREMENTAL SELECTION, AND IT IS OFF BY DEFAULT ON PURPOSE. ***
+ *
+ * tools/ship/inputSets.mjs can say what each gate reads and whether any of it has moved, so a sweep could run
+ * only the gates whose inputs changed. That is a real saving and it is also the only change in this file that
+ * can produce a SILENT FALSE GREEN -- every other failure here announces itself, and a gate that should have
+ * run and did not announces nothing at all.
+ *
+ * So `inputRecord` is an opt-in parameter, and the sweep's own runs report what it WOULD have skipped without
+ * acting on it. That number accumulates across rounds in plain sight, which is the evidence anybody should
+ * want before trusting the mechanism, and it costs one hash of each recorded input rather than a gate run.
+ * When the number has been watched long enough to be boring, turning it on is a one-line change with a
+ * measured history behind it instead of an argument.
+ */
+export function selectGates(all, timings, budgetMs, { crossings = null, minCrossings = MIN_CROSSINGS_TO_EVICT,
+                                                      inputRecord = null, skipUnchanged = false } = {}) {
     const run = [], skipped = [], unmeasured = [], onProbation = [];
     for (const g of all) {
         const ms = timings[g];
@@ -167,7 +183,16 @@ export function selectGates(all, timings, budgetMs, { crossings = null, minCross
         else if (crossings && crossings[g] >= 1 && crossings[g] < minCrossings) { onProbation.push(g); run.push(g); }
         else skipped.push(g);
     }
-    return { run, skipped, unmeasured, onProbation };
+    // The incremental pass runs LAST and only narrows `run`, so every rule above still decides membership --
+    // a gate this would skip is one the budget already agreed to run. Reported either way; acted on only when
+    // skipUnchanged is set.
+    let unchanged = [];
+    if (inputRecord) {
+        const keep = [];
+        for (const g of run) (skippable(g, inputRecord) ? unchanged : keep).push(g);
+        if (skipUnchanged) { run.length = 0; for (const g of keep) run.push(g); }
+    }
+    return { run, skipped, unmeasured, onProbation, unchanged };
 }
 
 /** Reconcile serial reds against the register: known (with the record that names them) versus new. */
@@ -198,11 +223,16 @@ function runOneAsync(rel, capMs, root) {
  */
 export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DEFAULTS.workers, capMs = DEFAULTS.capMs,
                                       timingsFile = DEFAULTS.timingsFile, root = ENG, gates = null, write = true, onProgress = null,
-                                      serialSliceMs = DEFAULTS.serialSliceMs } = {}) {
+                                      serialSliceMs = DEFAULTS.serialSliceMs, skipUnchanged = false } = {}) {
     const t00 = Date.now();
     const all = gates || enumerateGates(root);
     const prior = readTimings(timingsFile, root);
-    const sel = selectGates(all, prior.timings || {}, budgetMs, { crossings: prior.crossings || {} });
+    // v4566 -- the input record is read once and used to COUNT, not to skip, unless skipUnchanged is set.
+    // A missing or unreadable record yields an empty one, and skippable() answers "no recorded input set" for
+    // every gate, so the sweep behaves exactly as it did before this parameter existed.
+    const inputRecord = readInputRecord(root);
+    const sel = selectGates(all, prior.timings || {}, budgetMs,
+        { crossings: prior.crossings || {}, inputRecord, skipUnchanged });
     const phase1 = new Map();
     let next = 0, done = 0;
     async function worker() {
@@ -288,6 +318,9 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
     const out = {
         at: out0.at, budgetMs, workers, capMs, ms: Date.now() - t00,
         enumerated: all.length, ran: sel.run.length, skippedOverBudget: sel.skipped.length, newGates: sel.unmeasured,
+        // v4566: what an incremental sweep WOULD have skipped. Reported on every run, acted on only under
+        // skipUnchanged, so the number earns trust in public before it is allowed to change anything.
+        unchangedInputs: (sel.unchanged || []).length, skippedUnchanged: skipUnchanged,
         green, falseReds, knownRed: rec.known, newRed: rec.newRed, unmeasured: rec.unmeasured, dropped,
         // v4408: green gates whose PARALLEL time crossed the budget and were re-run alone before being filed,
         // and how many of those the serial reading brought back under. The second number is the starvation.
@@ -323,6 +356,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     const opts = { budgetMs: Number(arg("--budget", DEFAULTS.budgetMs)), workers: Number(arg("--workers", DEFAULTS.workers)),
                    capMs: Number(arg("--cap", DEFAULTS.capMs)), timingsFile: arg("--timings", DEFAULTS.timingsFile) };
     let lastPct = -1;
+    opts.skipUnchanged = process.argv.includes("--incremental");
     const r = await runQuickSweep({ ...opts, onProgress: (d, t) => { const pct = Math.floor(100 * d / t); if (pct !== lastPct && pct % 10 === 0) { lastPct = pct; process.stderr.write(`[quickSweep] ${d}/${t}\n`); } } })
         .catch((e) => { console.error("[quickSweep] runner failed: " + (e && e.message)); process.exit(2); });
     if (process.argv.includes("--json")) console.log(JSON.stringify(r, null, 1));
@@ -330,6 +364,9 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         console.log(`[quickSweep] ${r.ran} of ${r.enumerated} gates under ${r.budgetMs} ms ran in ${(r.ms / 1000).toFixed(0)} s: ` +
             `${r.green} green, ${r.knownRed.length} known red, ${r.newRed.length} NEW red, ${r.falseReds} false red, ${r.unmeasured.length} unmeasured; ` +
             `${r.skippedOverBudget} over budget skipped, ${r.newGates.length} new gates measured, ${r.dropped.length} dropped from budget`);
+        if (r.unchangedInputs) console.log(`[quickSweep] ${r.unchangedInputs} of those had NO CHANGED INPUT and ` +
+            (r.skippedUnchanged ? "were SKIPPED (--incremental)" : "were run anyway -- pass --incremental to skip them, " +
+             "and read tools/ship/inputSets.mjs first: a wrongly skipped gate is the one failure here that is silent"));
         for (const k of r.knownRed) console.log(`  known  ${k.gate}  (${k.record})`);
         for (const n of r.newRed) console.log(`  NEW    ${n.gate}  exit ${n.code} in ${n.ms} ms`);
         for (const d of r.dropped) console.log(`  slower ${d}  now over budget`);
