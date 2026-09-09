@@ -3764,6 +3764,39 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    // v4567 -- the 216th closing, and it adds NO gate: it widens the one v4566 added, so the register grows
+    // by a verdict rather than by a name. Kept as its own entry because the round is a separate measurement.
+    since216: Object.freeze({
+        at: "v4567", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/inputSets-selfcheck.mjs"]),
+        verdict: "green, thirty rows, no new gate. *** v4566 SHIPPED TWO DISQUALIFIERS THAT COST 30% OF THE " +
+                 "SWEEP AND BOTH WERE THE SAME HOLE. *** 121 gates spawned a child (124 s, 23%) and 102 took " +
+                 "fs by a NAMED import (38 s, 7%); a named ESM import of a builtin does not route through a " +
+                 "patched exports object, MEASURED here rather than assumed -- such a gate recorded an EMPTY " +
+                 "set, not a partial one. A module.register() resolve hook changes what the NAME is bound to, " +
+                 "which is the only lever that reaches it, and NODE_OPTIONS carries the probe into every node " +
+                 "CHILD that inherits the environment so the child records itself into a shared directory. " +
+                 "1,254 gates re-probed: SKIPPABLE 956 -> 1,102 (59% -> 72% of gate time), 94 of the 102 " +
+                 "named-import gates now skippable against 0 before. *** AND THE ROUND'S OWN " +
+                 "RECOMMENDATION WAS WRONG, WHICH IS THE FINDING. *** The child-process block was ranked " +
+                 "first at 23% and delivered 17 gates; the named-import block was ranked second at 7% and " +
+                 "delivered 94. Sampling the 136 that still refused showed NINETEEN OF TWENTY-FIVE spawning " +
+                 "nothing at all -- flagged for merely REQUIRING child_process, which is measuring the " +
+                 "import graph rather than the run. Patching the required object instead of flagging the " +
+                 "require freed about a hundred more. What is left is real: of 24 sampled, 16 launch " +
+                 "Playwright's headless_shell, the rest git, python3, cargo, tar and a shell. TWO DEFECTS " +
+                 "OF MY OWN, both the shape this session keeps finding: registering the loader hook moved " +
+                 "module reading off the patched fs and SILENTLY COST THE TRANSITIVE CLOSURE (zero reads for " +
+                 "a gate whose whole input set is two modules -- it looks like a smaller set, not an error), " +
+                 "fixed with a `load` hook that names the module outright; and `encode` spelled its fields " +
+                 "by hand, so renaming the spawn flag dropped it on write and EVERY SPAWNING GATE BECAME " +
+                 "SKIPPABLE, the count going 956 -> 1,121 and looking like success. FLAGS is now one list " +
+                 "and a row asserts the round trip loses nothing. Sabotages L/M/N/O/P red by name -- O went " +
+                 "ZERO red first time and exposed a mechanism (merging NODE_OPTIONS into an explicit env) " +
+                 "that nothing tested, which is the 'fix that exists only in its own comment' shape.",
+    }),
     // v4566 -- the 215th closing, for a gate whose subject is the SWEEP THIS REGISTER IS PART OF.
     since215: Object.freeze({
         at: "v4566", swept: 1, green: 1, red: 0,

@@ -29,7 +29,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ENG, RECORD, hashFile, hashDir, readRecord, whyRun, skippable, partition, reasonHistogram,
-         encode, decode, clearHashCache, CONFLICT } from "./inputSets.mjs";
+         encode, decode, clearHashCache, CONFLICT, FLAGS } from "./inputSets.mjs";
 import { usesNamedFsImport, probeOne, entryFor } from "./recordInputs.mjs";
 import { selectGates } from "./quickSweep.mjs";
 
@@ -42,8 +42,8 @@ const GATES = Object.keys(REC.gates || {});
 console.log("1. the record exists and says what it is");
 ok("tools/ship/input-sets.json is present and holds entries for the sweep's population",
    GATES.length > 800, `${GATES.length} gate(s) recorded`);
-ok("  and its note names the three disqualifiers, so the file explains its own refusals",
-   /spawned/.test(REC.note) && /net/.test(REC.note) && /namedFsImport/.test(REC.note), (REC.note || "").slice(0, 60) + "...");
+ok("  and its note names the disqualifiers that remain, so the file explains its own refusals",
+   /spawnedNonNode/.test(REC.note) && /net/.test(REC.note), (REC.note || "").slice(0, 60) + "...");
 ok("  every entry carries a hash for every path it recorded -- a path with no hash cannot be compared",
    GATES.every((g) => { const e = REC.gates[g];
        return (e.reads || []).every((r) => r in (e.hashes || {})) && (e.dirs || []).every((d) => d in (e.dirHashes || {})); }),
@@ -54,19 +54,26 @@ console.log("\n2. *** THE RULE REFUSES ON EVERY UNKNOWN, AND EACH REFUSAL IS DRI
     // Fixtures rather than live entries: a rule that only ever sees the tree's own shapes is a rule nobody
     // has tested the edges of. Each of these is one disqualifier alone, everything else valid.
     const good = { reads: ["a.mjs"], dirs: [], hashes: { "a.mjs": hashFile("tools/ship/inputSets.mjs") }, dirHashes: {},
-                   spawned: false, net: false, namedFsImport: false };
+                   spawnedNonNode: false, net: false };
     const rec = (over) => ({ gates: { "a.mjs": { ...good, ...over } } });
     // the control: the same entry, with the hash actually matching the file it names
     const real = { reads: ["tools/ship/inputSets.mjs"], dirs: [], hashes: { "tools/ship/inputSets.mjs": hashFile("tools/ship/inputSets.mjs") },
-                   dirHashes: {}, spawned: false, net: false, namedFsImport: false };
+                   dirHashes: {}, spawnedNonNode: false, net: false };
     ok("CONTROL: a complete entry whose one recorded file still hashes to what it hashed is SKIPPABLE",
        whyRun("tools/ship/inputSets.mjs", { gates: { "tools/ship/inputSets.mjs": real } }) === null,
        "if this row ever fails, every refusal below is passing for the wrong reason");
     ok("REFUSED: a gate with no entry at all", whyRun("nope.mjs", rec({})) === "no recorded input set");
-    ok("REFUSED: spawned a child process", whyRun("a.mjs", rec({ spawned: true })) === "spawns a child process");
+    ok("REFUSED: spawned a child the probe could not follow",
+       whyRun("a.mjs", rec({ spawnedNonNode: true })) === "spawned a child the probe could not follow");
     ok("REFUSED: opened a socket or fetched", whyRun("a.mjs", rec({ net: true })) === "opens a socket or fetches");
-    ok("REFUSED: takes fs by NAMED import, which the probe cannot patch through",
-       whyRun("a.mjs", rec({ namedFsImport: true })) === "takes fs by named import, which the probe cannot see through");
+    // *** v4567 -- AND THE TWO THAT ARE NO LONGER REFUSALS, ASSERTED AS SUCH. *** A disqualifier that has
+    // been lifted has to be checked in the lifted direction, or the next reader cannot tell "we fixed this"
+    // from "we forgot this". A named fs import and a NODE child are both fine now, and section 3b measures
+    // WHY they are fine rather than taking the rule's word for it.
+    ok("ALLOWED now: a gate taking fs by NAMED import (the loader hook binds those names to the shim)",
+       whyRun("tools/ship/inputSets.mjs", { gates: { "tools/ship/inputSets.mjs": { ...real, namedFsImport: true } } }) === null);
+    ok("ALLOWED now: a gate that spawned only NODE children (NODE_OPTIONS carried the probe into them)",
+       whyRun("tools/ship/inputSets.mjs", { gates: { "tools/ship/inputSets.mjs": { ...real, spawnedNode: 6, procs: 7 } } }) === null);
     ok("REFUSED: an EMPTY recorded set -- 'read nothing' and 'we saw nothing' are not the same claim",
        whyRun("a.mjs", rec({ reads: [], dirs: [], hashes: {} })) === "recorded an empty input set");
     ok("REFUSED: a set that does not contain the gate's OWN source (node read it to run it, so its absence is a broken record)",
@@ -222,38 +229,121 @@ console.log("\n6. the sweep is WIRED BUT NOT ARMED");
        `off: runs ${armedOff.run.length}, counts ${armedOff.unchanged.length}; on: runs ${armedOn.run.length}`);
 }
 
-console.log("\n7. the named-fs-import detector, which is a whole disqualifier resting on one regex");
+console.log("\n7. *** THE TWO MECHANISMS v4567 ADDED, EACH DRIVEN ON A FIXTURE THAT FAILED BEFORE THEM ***");
 {
-    ok("a NAMED fs import is detected", usesNamedFsImport("tools/ship/inputSets.mjs") === false ||
-       usesNamedFsImport("tools/ship/inputSets.mjs") === true, "answers without throwing");
-    const tmp = "tools/ship/__inputsets_named__.mjs";
-    const abs = path.join(ENG, tmp);
-    const cases = [
-        ['import { readFileSync } from "node:fs";', true, "named, node: prefix"],
-        ["import { readFile } from 'fs';", true, "named, bare specifier"],
-        ['import { readFile } from "node:fs/promises";', true, "named, fs/promises"],
-        ['import fs from "node:fs";', false, "DEFAULT import -- the one the probe CAN patch"],
-        ['import fsp from "node:fs/promises";', false, "default fs/promises -- NOT patched and NOT detected"],
-    ];
-    let wrong = [];
-    for (const [src, want, why] of cases) {
-        fs.writeFileSync(abs, src + "\n");
-        if (usesNamedFsImport(tmp) !== want) wrong.push(why);
-    }
-    try { fs.unlinkSync(abs); } catch {}
-    ok("*** the detector answers each import form correctly, INCLUDING the one it is wrong about on purpose ***",
-       wrong.length === 0, wrong.join("; ") || `${cases.length} forms`);
-    // *** AND THE LAST FIXTURE IS A HOLE, NAMED RATHER THAN PAPERED OVER. *** `import fsp from
-    // "node:fs/promises"` is a DEFAULT import of a module inputProbe.mjs does not patch and
-    // usesNamedFsImport does not flag, so such a gate would be trusted on an incomplete set. It is not a
-    // theoretical worry that happens to be empty here -- it is empty here, and that is the whole defence:
-    const promiseUsers = GATES.filter((g) => { try {
-        return /^\s*import\s+[A-Za-z_$][\w$]*\s+from\s*["'](?:node:)?fs\/promises["']/m.test(fs.readFileSync(path.join(ENG, g), "utf8"));
-    } catch { return false; } });
-    ok("*** and NO gate in the tree takes fs/promises by DEFAULT import, which is the only reason that hole is safe ***",
-       promiseUsers.length === 0,
-       promiseUsers.length ? "UNSAFE: " + promiseUsers.join(", ") : `checked all ${GATES.length} recorded gates. ` +
-       "If one ever appears this row goes red, which is the point of checking a hole rather than describing it.");
+    // Fixtures written into the tree under a `__` prefix, which gateSweep's walk does not enumerate as a
+    // gate (asserted there, on a really-written file, for exactly this reason).
+    const mk = (name, src) => { const rel = "tools/ship/" + name; fs.writeFileSync(path.join(ENG, rel), src); return rel; };
+    const rm = (rel) => { try { fs.unlinkSync(path.join(ENG, rel)); } catch {} };
+
+    // (1) A NAMED IMPORT OF A BUILTIN. v4566 patched the fs default-export object and disqualified 102 gates
+    // written this way, on the theory that a named binding is resolved at link time and might not route
+    // through the patch. Measured: it recorded an EMPTY set -- not a partial one -- so the theory was right
+    // and the cost was 38 s of every sweep. A module.register() resolve hook changes what the NAME is bound
+    // to, which is the only lever that reaches it.
+    const named = mk("__inputsets_named_fixture.mjs",
+        'import { readFileSync, readdirSync } from "node:fs";\n' +
+        'readFileSync(new URL("../../main.js", import.meta.url).pathname);\n' +
+        'readdirSync(new URL("../../tools/ship", import.meta.url).pathname);\n');
+    const namedProbe = probeOne(named);
+    rm(named);
+    ok("*** a gate reading through a NAMED fs import is recorded -- the hole v4566 could only disqualify ***",
+       namedProbe.ok && namedProbe.reads.includes("main.js") && namedProbe.dirs.includes("tools/ship"),
+       `reads ${namedProbe.reads.length}, dirs ${namedProbe.dirs.length}; main.js seen: ${namedProbe.reads.includes("main.js")}`);
+
+    // (2) A NODE CHILD. The probe does not look into the child; NODE_OPTIONS puts a probe IN it, and the
+    // recorder unions the directory. The child's read must appear in the PARENT's set or the merge is a
+    // decoration.
+    // A TEMPLATE LITERAL, because the first draft built this fixture by concatenating single-quoted strings
+    // and the `" + ENG + "` meant to interpolate the engine root sat INSIDE the quotes -- so the fixture was
+    // written with that text verbatim, failed to parse, spawned nothing, and the row reported "0 node
+    // children" as though the mechanism were broken rather than the fixture.
+    const kidSrc = [
+        'import { spawnSync } from "node:child_process";',
+        `const target = ${JSON.stringify(path.join(ENG, "index.html"))};`,
+        'spawnSync(process.execPath, ["-e", `require("fs").readFileSync(${JSON.stringify(target)})`], { stdio: "ignore" });',
+        "",
+    ].join("\n");
+    const kid = mk("__inputsets_child_fixture.mjs", kidSrc);
+    const kidProbe = probeOne(kid);
+    rm(kid);
+    ok("*** what a NODE CHILD read lands in the parent's set: the probe travels in NODE_OPTIONS ***",
+       kidProbe.ok && kidProbe.procs > 1 && kidProbe.reads.includes("index.html") && !kidProbe.spawnedNonNode,
+       `${kidProbe.procs} process(es), ${kidProbe.spawnedNode} node child(ren); index.html in the parent's set: ` +
+       `${kidProbe.reads.includes("index.html")}`);
+
+    // (2b) A NODE CHILD GIVEN AN EXPLICIT `env`. NODE_OPTIONS reaches a child by INHERITANCE, so a caller
+    // that passes its own env object drops the probe on the floor and the child goes unrecorded -- silently,
+    // as a smaller set. cpWrap merges NODE_OPTIONS and the output directory into whatever env was passed,
+    // and THIS ROW IS WHY THAT MERGE IS NOT JUST A COMMENT: sabotage O removed the merge and every other row
+    // in this gate stayed green, which is the "a fix that exists only in its own comment" shape this session
+    // keeps finding. The fixture passes `env: { PATH }` deliberately -- the narrowest env a spawn can have.
+    // It reads a file that EXISTS, because the probe records an attempted read whether it succeeds or not
+    // (a gate that reads a missing path depends on it staying missing, which is the existsSync rule) -- so a
+    // fixture naming a file that is not there would have passed without proving the child ran at all.
+    const envSrc = [
+        'import { spawnSync } from "node:child_process";',
+        `const target = ${JSON.stringify(path.join(ENG, "main.js"))};`,
+        'spawnSync(process.execPath, ["-e", `require("fs").readFileSync(${JSON.stringify(target)})`],',
+        '          { stdio: "ignore", env: { PATH: process.env.PATH } });',
+        "",
+    ].join("\n");
+    const envKid = mk("__inputsets_envchild_fixture.mjs", envSrc);
+    const envProbe = probeOne(envKid);
+    rm(envKid);
+    ok("*** a node child handed its OWN env is still probed -- NODE_OPTIONS is merged in, not assumed ***",
+       envProbe.ok && envProbe.procs > 1 && envProbe.reads.includes("main.js"),
+       `${envProbe.procs} process(es); main.js in the parent's set: ${envProbe.reads.includes("main.js")}. ` +
+       "Without the merge this reads 1 process and the child's read is simply absent.");
+
+    // (3) AND THE CHILD IT CANNOT FOLLOW STILL REFUSES. This is the half that keeps the mechanism honest:
+    // 104 gates still decline, 16 of every 24 sampled because they launch Playwright's headless_shell, the
+    // rest git, python3, cargo, tar and a shell. Nobody recorded what those read.
+    const alien = mk("__inputsets_alien_fixture.mjs",
+        'import { spawnSync } from "node:child_process";\nspawnSync("/bin/echo", ["hi"], { stdio: "ignore" });\n');
+    const alienProbe = probeOne(alien);
+    rm(alien);
+    ok("*** and a child that is NOT node sets the flag that refuses the gate -- the refusal survived the fix ***",
+       alienProbe.ok && alienProbe.spawnedNonNode === true && alienProbe.spawnedNode === 0,
+       `spawnedNonNode ${alienProbe.spawnedNonNode}, node children ${alienProbe.spawnedNode}`);
+
+    // (4) A SHELL. exec/execSync launch one, and what it then runs is not knowable without parsing the
+    // shell's grammar. Guessing is how a probe starts lying, so it refuses.
+    const shell = mk("__inputsets_shell_fixture.mjs",
+        'import { execSync } from "node:child_process";\nexecSync("true");\n');
+    const shellProbe = probeOne(shell);
+    rm(shell);
+    ok("  a SHELL is refused too, rather than parsed",
+       shellProbe.ok && shellProbe.spawnedNonNode === true, `spawnedNonNode ${shellProbe.spawnedNonNode}`);
+
+    // (5) THE TRANSITIVE CLOSURE, WHICH THE LOADER HOOK NEARLY COST. v4566 got it free -- Node's ESM loader
+    // read module source through the patched fs -- and registering a hook moved that reading onto the hooks
+    // thread, so the first v4567 run recorded ZERO reads for a gate whose whole input set is two modules.
+    // A `load` hook names the module outright, which is the better instrument anyway. Re-asserted here
+    // because losing it looks like a SMALLER set rather than an error.
+    const closure = probeOne("tools/ship/vacuity-selfcheck.mjs");
+    ok("*** the module closure survived the loader hook: a gate that reads no file still records its imports ***",
+       closure.ok && closure.reads.includes("tools/ship/vacuity.mjs") && closure.reads.includes("tools/ship/vacuity-selfcheck.mjs"),
+       JSON.stringify(closure.reads));
+}
+
+console.log("\n8. the record's field list, because a hand-spelled serialiser already dropped one");
+{
+    // *** THIS ROW EXISTS BECAUSE THE BUG IT CATCHES SHIPPED FOR AN HOUR. *** v4567 renamed the spawn
+    // disqualifier in the recorder and in the rule; `encode` spelled its fields out by hand and went on
+    // writing the OLD name, so the flag was dropped on write, whyRun read nothing, and every spawning gate
+    // -- including the browser ones -- became skippable. The skip count went 956 -> 1,121 and looked like
+    // the round succeeding. Same shape as the round before, where a record's first writer deleted the keys
+    // its later sections owned.
+    const p = probeOne("tools/ship/vacuity-selfcheck.mjs");
+    const e = entryFor(p);
+    const back = decode(encode({ "tools/ship/vacuity-selfcheck.mjs": e })).gates["tools/ship/vacuity-selfcheck.mjs"];
+    const lost = Object.keys(e).filter((k) => !(k in back));
+    ok("*** every field entryFor produces survives encode -> decode, so a renamed flag cannot vanish ***",
+       lost.length === 0, lost.length ? "DROPPED: " + lost.join(", ") : Object.keys(e).length + " fields round-trip");
+    ok("  and FLAGS names every non-path field the rule reads, so the list has one home",
+       FLAGS.includes("spawnedNonNode") && FLAGS.includes("net") && FLAGS.every((f) => f in e),
+       FLAGS.join(", "));
 }
 
 console.log(fails ? `\nFAIL -- ${fails} check(s)` : "\nALL GREEN");

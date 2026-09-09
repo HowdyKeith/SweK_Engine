@@ -99,6 +99,19 @@ export const FORMAT = 2;
 // "d:" and sixteen more, and none of them is this.
 export const CONFLICT = "!conflict";
 
+// *** EVERY PER-GATE FIELD THAT IS NOT A PATH LIST, IN ONE PLACE, BECAUSE A FIELD-BY-FIELD SERIALISER DROPS
+// THINGS SILENTLY AND THIS ONE ALREADY DID. *** v4567 renamed the spawn disqualifier `spawned` ->
+// `spawnedNonNode` in the recorder and in the rule, and `encode` -- which spelled its fields out by hand --
+// went on writing `spawned: !!e.spawned`, which was now always undefined. So the flag was dropped on write,
+// `whyRun` read nothing, and EVERY SPAWNING GATE BECAME SKIPPABLE, including the ones that launch a browser
+// or a compiler. The skip count jumped 956 -> 1,121 and looked like the round succeeding.
+//
+// That is the same shape as the round before it, where tslRace-selfcheck's first section rewrote a record
+// wholesale and quietly deleted the keys its later sections owned. A serialiser that names its fields is a
+// list that has to be maintained in step with three other files; this is that list, named once, and
+// inputSets-selfcheck asserts that a round trip preserves everything entryFor produces.
+export const FLAGS = Object.freeze(["spawnedNonNode", "spawnedNode", "procs", "net", "namedFsImport"]);
+
 /** Decode the indexed on-disk form into the {gate: {reads, dirs, hashes, dirHashes, ...}} shape the rule wants. */
 export function decode(raw) {
     if (!raw || !raw.paths) return raw || { note: "", at: null, gates: {} };
@@ -109,8 +122,8 @@ export function decode(raw) {
         const hashes = {}, dirHashes = {};
         for (const i of e.r || []) hashes[P[i]] = H[i];
         for (const i of e.d || []) dirHashes[P[i]] = D[i];
-        gates[g] = { reads, dirs, hashes, dirHashes, spawned: !!e.spawned, net: !!e.net,
-                     namedFsImport: !!e.namedFsImport, probeMs: e.ms, exit: e.exit };
+        gates[g] = { reads, dirs, hashes, dirHashes, probeMs: e.ms, exit: e.exit };
+        for (const f of FLAGS) gates[g][f] = e[f];
     }
     return { note: raw.note, at: raw.at, probedMs: raw.probedMs, format: raw.format,
              conflicts: raw.conflicts || [], gates };
@@ -142,7 +155,8 @@ export function encode(gates, meta = {}) {
     for (const [g, e] of Object.entries(gates)) {
         const r = (e.reads || []).map((p) => { const i = idx(p); put(hashes, i, (e.hashes || {})[p] ?? null, p); return i; });
         const d = (e.dirs || []).map((p) => { const i = idx(p); put(dirHashes, i, (e.dirHashes || {})[p] ?? null, p); return i; });
-        out[g] = { r, d, spawned: !!e.spawned, net: !!e.net, namedFsImport: !!e.namedFsImport, ms: e.probeMs, exit: e.exit };
+        out[g] = { r, d, ms: e.probeMs, exit: e.exit };
+        for (const f of FLAGS) out[g][f] = e[f];
     }
     return { ...meta, format: FORMAT,
              conflicts: [...conflicts].sort(),
@@ -161,9 +175,21 @@ export function readRecord(root = ENG) {
 export function whyRun(gate, rec, root = ENG) {
     const e = rec && rec.gates ? rec.gates[gate] : null;
     if (!e) return "no recorded input set";
-    if (e.spawned) return "spawns a child process";
+    // *** v4567 -- TWO OF v4566'S THREE DISQUALIFIERS ARE GONE, AND NEITHER WAS RELAXED. ***
+    // `spawns a child process` covered 121 gates and 124 s -- 23% of the sweep, the single biggest block --
+    // on the true statement that a probe in the parent cannot see what a child read. The answer was not to
+    // look harder from the parent: NODE_OPTIONS carries the probe INTO every node child that inherits the
+    // environment, so the child records itself and the recorder merges the directory. What is left is the
+    // part that is still genuinely unknown -- a child that is NOT node (tsc, javac, a browser), a child
+    // reached through exec/execSync, which runs a SHELL whose grammar this must not pretend to parse, or a
+    // CJS require of child_process, which no loader hook reaches. Those still refuse.
+    //
+    // `takes fs by named import` covered 102 gates and 38 s, and was measured at v4567 rather than reasoned
+    // about: such a gate recorded an EMPTY set, not a partial one. A module.register() loader hook redirects
+    // node:fs to a shim, so the named bindings ARE the recording functions. The field is still recorded so
+    // the population can be counted; it no longer decides anything.
+    if (e.spawnedNonNode) return "spawned a child the probe could not follow";
     if (e.net) return "opens a socket or fetches";
-    if (e.namedFsImport) return "takes fs by named import, which the probe cannot see through";
     const reads = e.reads || [], dirs = e.dirs || [];
     if (!reads.length && !dirs.length) return "recorded an empty input set";
     if (!reads.includes(gate)) return "its own source is not in its recorded set";

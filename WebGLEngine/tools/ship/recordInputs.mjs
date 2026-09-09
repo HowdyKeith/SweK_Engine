@@ -34,33 +34,59 @@ export function usesNamedFsImport(rel, root = ENG) {
 // manufactured reading. This records WHAT a gate read, which is the same set whether the box is idle or loaded --
 // contention changes the clock, not the paths. So the one measurement that must be taken alone is taken alone and
 // this one is not, and neither is a habit copied from the other.
-const probeOut = () => path.join(os.tmpdir(), "swek-probe-" + process.pid + "-" + Math.random().toString(36).slice(2) + ".json");
-// HOISTED, and not only for tidiness. tools/ship/windowsImport-selfcheck.mjs reads the argument given to
-// `--import` and its pattern cannot see inside a NESTED call, so the inline
-// `pathToFileURL(path.join(root, ...)).href` fell back to matching the bare identifier and was reported as a
-// raw path. The code was already safe; the form was unreadable to the checker that has to certify it, which
-// is the checker's blind spot and this file's problem to avoid. A bare variable assigned through
-// pathToFileURL is the form it was written to read.
-const probeArgs = (root, rel) => {
+// *** v4567 -- A DIRECTORY PER GATE, NOT A FILE, BECAUSE THE CHILDREN WRITE INTO IT TOO. ***
+// NODE_OPTIONS carries the probe into every node child that inherits the environment, so one gate run can
+// produce SEVERAL probe outputs -- one per process in the tree. Each names its own pid and ppid, and the
+// merge is a union: what a gate depends on is what ANY process in its run read. The hook goes in the
+// environment rather than on the command line for exactly that reason -- an argv flag reaches one process,
+// an environment variable reaches the whole tree of them.
+const probeDir = () => fs.mkdtempSync(path.join(os.tmpdir(), "swek-probe-"));
+const probeEnv = (root, dir) => {
+    // Assigned through pathToFileURL on its own line: tools/ship/windowsImport-selfcheck.mjs reads what is
+    // handed to `--import` and its pattern cannot see inside a NESTED call, so an inline
+    // pathToFileURL(path.join(...)) is reported as a raw path. Safe code in a form its checker can read.
     const hook = pathToFileURL(path.join(root, "tools/ship/inputProbe.mjs")).href;
-    return ["--import", hook, path.join(root, rel)];
+    return { ...process.env, NODE_OPTIONS: "--import " + hook, SWEK_PROBE_DIR: dir, SWEK_PROBE_OUT: "" };
 };
-const readProbe = (out, rel, ms, status) => {
-    let seen = null;
-    try { seen = JSON.parse(fs.readFileSync(out, "utf8")); } catch {}
-    try { fs.unlinkSync(out); } catch {}
-    if (!seen) return { gate: rel, ms, code: status ?? 1, ok: false, reads: [], dirs: [], spawned: false, net: false };
-    return { gate: rel, ms, code: status ?? 1, ok: true,
-             reads: seen.reads || [], dirs: seen.dirs || [], spawned: !!seen.spawned, net: !!seen.net };
+
+/** Union every process's output, carrying the disqualifiers forward from ANY of them. */
+const readProbe = (dir, rel, ms, status) => {
+    const reads = new Set(), dirs = new Set(), execs = new Set();
+    let procs = 0, net = false, nonNode = false, nodeKids = 0;
+    let files = [];
+    try { files = fs.readdirSync(dir); } catch {}
+    for (const f of files) {
+        // The loader thread writes a plain list of module paths (see probe/hooks.mjs); every other writer
+        // in the directory writes JSON. Two shapes, one union.
+        if (f.startsWith("loads-")) {
+            try { for (const l of fs.readFileSync(path.join(dir, f), "utf8").split("\n")) if (l) reads.add(l); } catch {}
+            continue;
+        }
+        let j = null;
+        try { j = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8")); } catch { continue; }
+        procs++;
+        for (const r of j.reads || []) reads.add(r);
+        for (const d of j.dirs || []) dirs.add(d);
+        for (const e of j.execs || []) execs.add(e);
+        if (j.net) net = true;
+        if (j.spawnedNonNode) nonNode = true;
+        nodeKids += j.spawnedNode || 0;
+    }
+    try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
+    if (!procs) return { gate: rel, ms, code: status ?? 1, ok: false, procs: 0, reads: [], dirs: [], execs: [],
+                         net: false, spawnedNonNode: false, spawnedNode: 0 };
+    return { gate: rel, ms, code: status ?? 1, ok: true, procs,
+             reads: [...reads].sort(), dirs: [...dirs].sort(), execs: [...execs].sort(),
+             net, spawnedNonNode: nonNode, spawnedNode: nodeKids };
 };
 
 /** Synchronous, for one gate at a time -- the shape the gate and a --gates run want. */
 export function probeOne(rel, { root = ENG, timeoutMs = 30000 } = {}) {
-    const out = probeOut();
+    const dir = probeDir();
     const t0 = Date.now();
-    const r = spawnSync(process.execPath, probeArgs(root, rel),
-        { cwd: root, stdio: "ignore", timeout: timeoutMs, env: { ...process.env, SWEK_PROBE_OUT: out } });
-    return readProbe(out, rel, Date.now() - t0, r.status);
+    const r = spawnSync(process.execPath, [path.join(root, rel)],
+        { cwd: root, stdio: "ignore", timeout: timeoutMs, env: probeEnv(root, dir) });
+    return readProbe(dir, rel, Date.now() - t0, r.status);
 }
 
 // *** AND THE FIRST DRAFT OF THE PARALLEL PASS WAS NOT PARALLEL, WHICH IS THIS SESSION'S OWN DEFECT CLASS. ***
@@ -72,13 +98,13 @@ export function probeOne(rel, { root = ENG, timeoutMs = 30000 } = {}) {
 // a truly parallel pass over 1,253 mostly-sub-second gates cannot fail to do.
 export function probeOneAsync(rel, { root = ENG, timeoutMs = 30000 } = {}) {
     return new Promise((resolve) => {
-        const out = probeOut();
+        const dir = probeDir();
         const t0 = Date.now();
-        const p = spawn(process.execPath, probeArgs(root, rel),
-            { cwd: root, stdio: "ignore", env: { ...process.env, SWEK_PROBE_OUT: out } });
+        const p = spawn(process.execPath, [path.join(root, rel)],
+            { cwd: root, stdio: "ignore", env: probeEnv(root, dir) });
         const timer = setTimeout(() => { try { p.kill("SIGKILL"); } catch {} }, timeoutMs);
-        p.on("exit", (code, sig) => { clearTimeout(timer); resolve(readProbe(out, rel, Date.now() - t0, sig ? 124 : code)); });
-        p.on("error", () => { clearTimeout(timer); resolve(readProbe(out, rel, Date.now() - t0, 1)); });
+        p.on("exit", (code, sig) => { clearTimeout(timer); resolve(readProbe(dir, rel, Date.now() - t0, sig ? 124 : code)); });
+        p.on("error", () => { clearTimeout(timer); resolve(readProbe(dir, rel, Date.now() - t0, 1)); });
     });
 }
 
@@ -86,8 +112,12 @@ export function entryFor(p, { root = ENG } = {}) {
     const hashes = {}, dirHashes = {};
     for (const r of p.reads) hashes[r] = hashFile(r, root);
     for (const d of p.dirs) dirHashes[d] = hashDir(d, root);
-    return { reads: p.reads, dirs: p.dirs, hashes, dirHashes, spawned: p.spawned, net: p.net,
-             namedFsImport: usesNamedFsImport(p.gate, root), probeMs: p.ms, exit: p.code };
+    // namedFsImport is no longer a DISQUALIFIER at v4567 -- the loader hook reaches those bindings, measured
+    // on a fixture that recorded an empty set before it and its real set after. It is still RECORDED, because
+    // that count is the evidence the hook is what changed and not something else.
+    return { reads: p.reads, dirs: p.dirs, hashes, dirHashes,
+             spawnedNonNode: p.spawnedNonNode, spawnedNode: p.spawnedNode, procs: p.procs,
+             net: p.net, namedFsImport: usesNamedFsImport(p.gate, root), probeMs: p.ms, exit: p.code };
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
@@ -121,7 +151,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
             out[g] = entryFor(p);
             done++;
             if (!p.ok) timedOut++;
-            if (!out[g].spawned && !out[g].net && !out[g].namedFsImport && out[g].reads.length) trusted++;
+            if (!out[g].spawnedNonNode && !out[g].net && out[g].reads.length) trusted++;
             if (done % 100 === 0) process.stderr.write(`[inputs] ${done}/${gates.length}  ${trusted} usable, ${timedOut} gave no output\n`);
         }
     };
@@ -136,10 +166,12 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         fs.writeFileSync(path.join(ENG, RECORD), JSON.stringify(encode(out, {
             note: "What each gate READ, observed by running it once under tools/ship/inputProbe.mjs. `paths` " +
                   "is the shared table and each gate's `r`/`d` are indices into it; `hashes`/`dirHashes` are " +
-                  "the content at record time, one per PATH, so a later run can ask what moved. A gate with " +
-                  "`spawned`, `net` or `namedFsImport` set is recorded and NEVER skipped -- the probe cannot " +
-                  "see what a child process read, cannot follow a socket, and cannot patch a named import " +
-                  "that was bound when the module linked. See tools/ship/inputSets.mjs for the rule.",
+                  "the content at record time, one per PATH, so a later run can ask what moved. TWO " +
+                  "disqualifiers remain at v4567 and a gate carrying either is recorded and NEVER skipped: " +
+                  "`spawnedNonNode` (a child that is not node, or anything through a shell -- nobody " +
+                  "recorded what it read) and `net` (the input is not in the tree at all). `namedFsImport` " +
+                  "is still recorded and no longer decides anything: the loader hook reaches those bindings. " +
+                  "See tools/ship/inputSets.mjs for the rule.",
             at: new Date().toISOString(), probedMs: ms,
         })) + "\n");
         console.log("[inputs] wrote " + RECORD);
