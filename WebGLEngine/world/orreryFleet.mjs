@@ -481,9 +481,20 @@ export const COMMIT_BELT_DRIFT_V4534 = Object.freeze({
         "kenney-city": Object.freeze({ now: Object.freeze(["13afafec"]), why: "Kenney's two starter kits vendored, one commit for both" }),
         "kenney-racing": Object.freeze({ now: Object.freeze(["13afafec"]), why: "the same commit as kenney-city" }),
         morphicons: Object.freeze({ now: Object.freeze(["891cc90f"]), why: "glyph-outline morphing, Task 44" }),
+        // v4560 -- and this one was written the round AFTER the commit it names, on purpose: a body's entry
+        // has to carry the hash of the commit that vendored it, and that hash does not exist until the commit
+        // does. The gap is one commit wide and it is visible here rather than hidden by naming the round.
+        // WHAT IT ALSO EXPOSED, worth a later round rather than a fix here: between the two commits, xatlas
+        // was in vendor/ with NO commits touching it, and `stillMatchesV4475` compares an absent record
+        // against an empty live list -- sameList([], []) is true, so an unrecorded body read as UNCHANGED
+        // SINCE v4475. The partition row below is what caught it, which is what a partition is for.
+        xatlas: Object.freeze({ now: Object.freeze(["6b1a0686"]),
+            why: "jpcy/xatlas's two source files and its licence, vendored as a REFERENCE ORACLE for " +
+                 "physics/mesh/uvLscm.mjs -- C++ with no emscripten here, so nothing the engine ships can " +
+                 "load it and nothing does; one file compiles and runs it to grade this tree's unwrapper" }),
     }),
     removedSince4475: Object.freeze([]),
-    bodiesNow: 18,
+    bodiesNow: 19,
     // The four classes PARTITION the live fleet: unchanged, moved, arrived, removed. A body that appears in
     // vendor/ without an entry here fails the gate rather than passing as "not in the record, so not checked".
     notClaimed: "that %h was wrong to use when it was written -- it matched then. What is claimed is that its " +

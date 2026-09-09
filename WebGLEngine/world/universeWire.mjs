@@ -152,8 +152,25 @@ export const KEY_DRIFT_V4460 = Object.freeze({
                    "field, moving for the same reason and by one body instead of three",
             control: "on today's tree, dropping the xatlas body gives 6ab551e0 back -- EXACTLY the previous " +
                      "key, so this move is that body and nothing else" }),
+        // *** AND IT MOVED A SECOND TIME IN THE SAME ROUND, FOR A REASON THE FIRST ENTRY COULD NOT HAVE
+        // KNOWN: A BODY'S ARRIVAL DATE COMES FROM THE COMMIT THAT VENDORS IT, AND THAT COMMIT DOES NOT EXIST
+        // WHILE THE BODY IS BEING VENDORED. *** orreryBake reads `arrived` and `sha` from git, so at the
+        // first bake xatlas had neither -- the body was in the fleet with a null arrival, which is an ORBIT
+        // of its own, and the key was d35d45dc. The moment the vendoring commit existed the next bake gave
+        // the body its real date and the orbit moved again. Two entries for one round is the honest shape:
+        // both keys were real, both were committed, and the first is not a mistake to fold away.
+        Object.freeze({ version: "v4560", commit: "6b1a0686", hash: "fdc0bd02", file: "orrery.json",
+            field: "arrived", bodiesTouched: 1,
+            cause: "the re-bake AFTER xatlas's vendoring commit existed gave that body its real arrival date " +
+                   "(null -> 2026-09-09) and therefore its real orbit. v4414's field again, for one body " +
+                   "instead of fourteen, and reached this time by the ordinary two-step of vendoring rather " +
+                   "than by a correction",
+            control: "on today's tree, setting xatlas's `arrived` back to null gives d35d45dc -- the key this " +
+                     "round committed an hour earlier -- and dropping the body entirely gives 6ab551e0. " +
+                     "Setting its `sha` to null ALONE leaves the hash at fdc0bd02, so it is `arrived` and " +
+                     "not `sha`, which is the same probe shaDoesNotReachTheEconomy records" }),
     ]),
-    current: "d35d45dc",
+    current: "fdc0bd02",
     // *** MEASURED AND NEGATIVE, AND IT CORRECTS MY OWN FIRST WRITING OF THE ENTRY ABOVE. *** The re-bake's
     // diff moved TWO fields on 16 bodies each, `arrived` and `sha`, and I wrote "arrived + sha" into this
     // record straight off that diff -- the exact mistake bytesDoNotReachTheEconomy exists to record, made

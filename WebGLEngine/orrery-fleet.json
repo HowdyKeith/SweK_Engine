@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "4491e5245421220abea5890756f565fdb3aafeb5",
+ "head": "6b1a06864eca14d41613a26ce224e4c239b0e611",
  "bodies": {
   "box3d": [
    {
@@ -922,7 +922,7 @@
    {
     "path": "tools/mesh/xatlasRef.mjs",
     "bytes": 15061,
-    "sha": null
+    "sha": "6b1a06864eca14d41613a26ce224e4c239b0e611"
    }
   ]
  }

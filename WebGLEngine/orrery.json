@@ -1744,8 +1744,8 @@
   },
   {
    "name": "xatlas",
-   "arrived": null,
-   "sha": null,
+   "arrived": "2026-09-09",
+   "sha": "6b1a06864eca14d41613a26ce224e4c239b0e611",
    "bytes": 345457,
    "files": [
     {
