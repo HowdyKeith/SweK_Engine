@@ -168,8 +168,69 @@ async function main() {
     }
     if (r2 && r2.pageErrors && r2.pageErrors.length) report("page errors: " + r2.pageErrors.slice(0, 3).join(" | "));
 
+    sec("3. ON BOTH BACKENDS: render/probeLab.mjs's addLiveSpecSphere DRAWN, NOT JUST CAPTURED -- WHAT splat-probes.html NOW USES");
+    const SPHERE_POS = [0, 1.0, 0.5], SPHERE_RADIUS = 0.14, CAM_EYE = [0, 1.0, 2.0];
+    const r3 = await runInEngineOrigin({ engineRoot: ENG, args: {
+        records: Array.from(lab.records), extras: Array.from(lab.extras), fleetOf: Array.from(lab.fleetOf),
+        packed: { ...lab.packed, data: Array.from(lab.packed.data) }, counts: lab.counts, capSize: CAP_SIZE,
+        spec: { ...lab.spec, atlas: { ...lab.spec.atlas, data: Array.from(lab.spec.atlas.data) } },
+        spherePos: SPHERE_POS, sphereRadius: SPHERE_RADIUS, eye: CAM_EYE,
+    }, script: `async (a) => {
+        const { requestDevice } = await import("/gfx/device.js");
+        const G = await import("/render/gpuDriven.mjs");
+        const { labFleets, addLiveSpecSphere } = await import("/render/probeLab.mjs");
+        const out = {};
+        for (const backend of ["webgpu", "webgl2"]) {
+            const W = 160, H = 120;
+            const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+            const dev = await requestDevice(cv, { backend, offscreen: backend === "webgpu" });
+            const errs = []; if (dev.gpu && dev.gpu.addEventListener) dev.gpu.addEventListener("uncapturederror", (e) => errs.push(String(e.error && e.error.message).slice(0, 300)));
+            const lab = { packed: { ...a.packed, data: Float32Array.from(a.packed.data) }, records: Float32Array.from(a.records),
+                          extras: Float32Array.from(a.extras), fleetOf: Uint32Array.from(a.fleetOf), counts: a.counts,
+                          count: a.records.length / 4, spec: { ...a.spec, atlas: { ...a.spec.atlas, data: Float32Array.from(a.spec.atlas.data) } } };
+            const { fleets } = labFleets(dev, lab, { eye: (ctx) => ctx.eye });
+            const live = await addLiveSpecSphere(dev, lab, a.spherePos, { radius: a.sphereRadius, size: a.capSize });
+            const allFleets = [...fleets, live.fleet];
+            const sc = G.makeGpuDrivenScene(dev, { fleets: allFleets, fleetOf: live.fleetOf, thresholds: [], records: live.records, headings: live.extras });
+            const cam = { viewProj: G.multiply(G.perspective(1.0, W / H, 0.05, 50), G.lookAt(a.eye, a.spherePos)), eye: a.eye };
+            const fr = sc.frame({ ...cam, read: true, clear: [0, 0, 0, 1] }), f = await fr.pixels;
+            out[backend] = { errs, W, H, pixels: Array.from(f.pixels), path: sc.path, fleetIndex: live.fleetIndex, count: live.count };
+            dev.destroy();
+        }
+        return out;
+    }` });
+    ok("both backends built and drew the scene WITH the live-captured sphere appended", r3.ok && r3.result && r3.result.webgpu && r3.result.webgl2 && r3.result.webgpu.errs.length === 0 && r3.result.webgl2.errs.length === 0,
+       r3.ok ? [...(r3.result.webgpu.errs || []), ...(r3.result.webgl2.errs || [])].join(" | ").slice(0, 300) : (r3.reason || r3.error || (r3.pageErrors || []).join(" | ")).slice(0, 400));
+
+    if (r3.ok && r3.result.webgpu && r3.result.webgl2) {
+        const W = r3.result.webgpu.W, H = r3.result.webgpu.H;
+        // the CPU ray against the live sphere itself, straight down -Z from CAM_EYE at the sphere (lookAt with no
+        // yaw/pitch: forward is exactly -Z, right is +X, up is +Y) -- the same technique probeLab-selfcheck.mjs's
+        // own mesh check uses, aimed at the live sphere instead.
+        const fwd = [0, 0, -1], right = [1, 0, 0], up = [0, 1, 0], t = Math.tan(1.0 / 2);
+        const rel = [CAM_EYE[0] - SPHERE_POS[0], CAM_EYE[1] - SPHERE_POS[1], CAM_EYE[2] - SPHERE_POS[2]];
+        let expectHits = 0;
+        for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+            const sx = (x + 0.5 - W / 2) / (H / 2) * t, sy = -(y + 0.5 - H / 2) / (H / 2) * t;
+            const d = [fwd[0] + right[0] * sx + up[0] * sy, fwd[1] + right[1] * sx + up[1] * sy, fwd[2] + right[2] * sx + up[2] * sy], dl = Math.hypot(...d);
+            const dn = [d[0] / dl, d[1] / dl, d[2] / dl];
+            const b = 2 * (rel[0] * dn[0] + rel[1] * dn[1] + rel[2] * dn[2]), c = rel[0] ** 2 + rel[1] ** 2 + rel[2] ** 2 - SPHERE_RADIUS * SPHERE_RADIUS, disc = b * b - 4 * c;
+            if (disc >= 0) expectHits++;
+        }
+        report(`the live sphere (radius ${SPHERE_RADIUS} at [${SPHERE_POS}], camera at [${CAM_EYE}] looking straight at it) should key ${expectHits} pixels`);
+        for (const bk of ["webgpu", "webgl2"]) {
+            const px = r3.result[bk].pixels; let lit = 0; for (let p = 0; p < W * H; p++) if (px[p * 4] + px[p * 4 + 1] + px[p * 4 + 2] > 24) lit++;
+            report(`${bk} (${r3.result[bk].path}): ${lit} of ${W * H} pixels lit, fleetIndex ${r3.result[bk].fleetIndex}, ${r3.result[bk].count} records`);
+            ok(`*** ${bk}: the frame is lit, including (not only) the live sphere's own keyed silhouette ***`, lit > expectHits * 0.5, `${lit} lit vs ${expectHits} keyed to the sphere alone`);
+        }
+        let po = 0; const A = r3.result.webgpu.pixels, B = r3.result.webgl2.pixels;
+        for (let p = 0; p < W * H; p++) if (Math.abs(A[p * 4] - B[p * 4]) > 8 || Math.abs(A[p * 4 + 1] - B[p * 4 + 1]) > 8 || Math.abs(A[p * 4 + 2] - B[p * 4 + 2]) > 8) po++;
+        ok("the two backends' drawn frames (WITH the live sphere) agree within 8 of 255 on all but a few pixels", po < W * H * 0.05, `${po} of ${W * H} apart`);
+    }
+    if (r3 && r3.pageErrors && r3.pageErrors.length) report("page errors: " + r3.pageErrors.slice(0, 3).join(" | "));
+
     console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nall checks pass");
-    console.log("unchecked here: an HDR capture (device.texture({render:true}) is forced to the canvas's 8-bit format on both backends, named in render/liveCubeCapture.mjs's own header) -- a real bright light source would clip here exactly as it would on the screen the page shows. Also unchecked: a per-frame DYNAMIC recapture as the scene changes (this captures once, on request); and any independent numeric ground truth for what the real-rendered shell's radiance SHOULD be at a given direction -- section 1's marker test establishes the geometry is right, section 2 establishes the pipeline accepts a live atlas and produces finite output, but nothing here re-derives a rendered scene's radiance from first principles the way splatRadiance's analytic capture could be checked against directly.");
+    console.log("unchecked here: an HDR capture (device.texture({render:true}) is forced to the canvas's 8-bit format on both backends, named in render/liveCubeCapture.mjs's own header) -- a real bright light source would clip here exactly as it would on the screen the page shows. Also unchecked: a per-frame DYNAMIC recapture as the scene changes (this captures once per rebuild, as splat-probes.html now calls it, not every frame); a live-captured roughness-dependent BLUR (addLiveSpecSphere's own header names why roughness is currently inert -- one raw mip, no prefiltered chain built from a live capture yet); and any independent numeric ground truth for what the real-rendered shell's radiance SHOULD be at a given direction -- section 1's marker test establishes the geometry is right, sections 2 and 3 establish the pipeline accepts a live atlas (and a live SPHERE, drawn) and produces finite, cross-backend-agreeing output, but nothing here re-derives a rendered scene's radiance from first principles the way splatRadiance's analytic capture could be checked against directly.");
     process.exitCode = fails ? 1 : 0;
 }
 

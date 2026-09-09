@@ -152,6 +152,58 @@ export async function captureLiveSpecAtlas(device, lab, eye, opts = {}) {
     return packCapturedAtlas(capture);
 }
 
+/** ONE extra sphere, standing at `position`, its material's atlas captured LIVE from that same position rather
+ *  than shared with specLabRow's analytic four -- so a page can draw it beside the existing row rather than
+ *  through it: labFleets, SPEC_ROW and the row's own already-verified pixels are untouched by this. Returns
+ *  `records`/`extras`/`fleetOf` EXTENDED past `lab`'s own by one record (copies, `lab` itself is not mutated)
+ *  and the one fleet to append to labFleets' own list, at `fleetIndex` (right after the analytic row's fleets --
+ *  the row's own fleet count is `lab.spec.roughnesses.length`, read from `lab` rather than assumed, so this
+ *  still lands correctly if SPEC_ROW.count ever changes). `position` doubles as the sphere's own world position
+ *  AND the probe position the capture renders from, which is what a real-time reflection probe means: the
+ *  environment a reflective object shows is the one its OWN position sees. The bind hook tracks the ACTUAL
+ *  per-frame camera (a function of the draw ctx, specularBind's own convention for this), not a value fixed at
+ *  the moment this function was called -- a page that captures once per rebuild but draws every frame needs its
+ *  reflections to track the frame's own eye, not the eye rebuild() happened to see.
+ *
+ * *** NOT captureLiveSpecAtlas: THAT ATLAS HAS NO LUT, AND THE REAL MATERIAL NEEDS ONE. *** captureLiveSpecAtlas
+ * packs through packCapturedAtlas's EMPTY_LUT (K=R=0) -- correct for physics/render/specularProbeCapture.mjs's
+ * own use, grading the PREFILTER against an independent CPU reference, which never reads the LUT region at all.
+ * specularProbeLitWgsl's fragment stage DOES: sampleAtlasLutM reads LUT_K/LUT_R consts baked from the SAME
+ * atlas, and with K=R=0 its clamp() bounds invert (clamp(x, 0, -1)) -- caught on a real device, not reasoned
+ * about, as a pipeline validation failure ("[Invalid RenderPipeline] is invalid") when this function's first
+ * draft reused captureLiveSpecAtlas directly. So this packs its own atlas with a REAL brdfLut(), the same
+ * K/R/samples SPEC_ROW's analytic row already uses -- the environment is captured live, the BRDF table is the
+ * SAME closed-form table every material in this arc shares (it does not depend on the environment at all).
+ *
+ * ROUGHNESS IS CURRENTLY INERT HERE, NAMED RATHER THAN HIDDEN: a raw capture is ONE mip level (alpha 0, mirror-
+ * sharp -- see render/liveCubeCapture.mjs), so sampleSpecularAtlasM's mip blend always resolves to that one
+ * level regardless of the `roughness` argument (the same mipCount-1=0 invariance specularProbeCapture-
+ * selfcheck.mjs proves on the CPU side). The default is 0 for that reason -- not "slightly rough", exactly as
+ * sharp as any other value would render. A live-captured, roughness-dependent BLUR would mean prefiltering this
+ * capture into several mips the way specularProbeBake.bakeMipChain does for the analytic source, which is a
+ * further piece of work this function does not attempt. */
+export async function addLiveSpecSphere(device, lab, position, { radius = SPEC_ROW.radius, roughness = 0, F0 = SPEC_ROW.F0, size = 16, ...captureOpts } = {}) {
+    const scene = diffuseCaptureScene(device, lab, captureOpts.light);
+    const capture = await captureLiveCubemap(device, scene, position, { size, ...captureOpts });
+    const lut = brdfLut({ K: SPEC_ROW.lutK, R: SPEC_ROW.lutR, samples: SPEC_ROW.lutSamples });
+    const atlas = packSpecularAtlas([capture], lut);
+    const specTex = uploadSpecularAtlas(device, atlas);
+    const fleetIndex = 2 + lab.spec.roughnesses.length;
+    const fleet = {
+        name: "specular_live",
+        lods: [{ name: "only", mesh: sphereMesh(2, [1, 1, 1, 1]) }],
+        layout: LAYOUTS.lit,
+        pipeline: specularProbeLitPipelineDesc(atlas, { roughness, F0 }),
+        bind: specularBind(specTex, (ctx) => ctx.eye),
+    };
+    const count = lab.count + 1;
+    const records = new Float32Array(count * 4), extras = new Float32Array(count * EXTRA_FLOATS), fleetOf = new Uint32Array(count);
+    records.set(lab.records); extras.set(lab.extras); fleetOf.set(lab.fleetOf);
+    records.set([position[0], position[1], position[2], radius], lab.count * 4);
+    fleetOf[lab.count] = fleetIndex;
+    return { fleet, fleetIndex, records, extras, fleetOf, count, atlas, specTex };
+}
+
 /** the HUD line, from the numbers and nothing else */
 export function labHud(lab) {
     const b = lab.fit.box, c = lab.counts;

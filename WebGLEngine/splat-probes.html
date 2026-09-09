@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="demo:title" content="Splat Probes (an SH irradiance volume baked from a splat shell, drawn from inside)">
-<meta name="demo:desc" content="render/splatProbes.mjs baked over a two-tone shell of splats (render/probeFit.mjs fits the grid to occupancy and skips probes inside splats), drawn on gfx/device.js through render/probeLit.mjs: every probe a small sphere lit by its own coefficients, a mesh in the middle taking the volume's light, the splats as tone markers, the camera inside the shell. Spacing and face size live, the bake time, probe count and box in the HUD, both backends. From the technique of isaac-mason/three-spark-light-probes, which has no licence file; nothing ported.">
+<meta name="demo:title" content="Splat Probes (an SH irradiance volume, a specular row, and a live-captured reflection, from inside a splat shell)">
+<meta name="demo:desc" content="render/splatProbes.mjs baked over a two-tone shell of splats (render/probeFit.mjs fits the grid to occupancy and skips probes inside splats), drawn on gfx/device.js through render/probeLit.mjs: every probe a small sphere lit by its own coefficients, a mesh in the middle taking the volume's light, the splats as tone markers, the camera inside the shell. A row of four spheres shows the specular half (physics/render/specularProbeLit.mjs) at roughness 0..1, baked analytically from the same shell; one more sphere carries the SAME material fed a REAL captured environment instead (render/liveCubeCapture.mjs renders six faces of the actual scene through a real camera and packs the readback), so the analytic and live-captured techniques sit side by side rather than one replacing the other. Spacing and face size live, the bake time, probe count and box in the HUD, both backends. From the technique of isaac-mason/three-spark-light-probes, which has no licence file; nothing ported.">
 <meta name="demo:category" content="fx">
 <title>Splat Probes</title>
 <style>
@@ -33,20 +33,42 @@
 <script type="module">
 import { requestDevice } from "./gfx/device.js";
 import * as G from "./render/gpuDriven.mjs";
-import { probeLab, labFleets, labHud, LAB } from "./render/probeLab.mjs";
+import { probeLab, labFleets, addLiveSpecSphere, labHud, LAB, SPEC_ROW } from "./render/probeLab.mjs";
 
 const cvs = document.getElementById("c"), beEl = document.getElementById("be");
 const fail = (m) => { beEl.innerHTML = '<span class="bad">' + m + "</span>"; };
-let device, scene = null, lab = null, yaw = 0.4, pitch = 0.15, dragging = null, dirty = true;
+// v4582 -- ONE MORE SPHERE, PAST THE ANALYTIC ROW, CARRYING A LIVE-CAPTURED ENVIRONMENT INSTEAD OF ONE SHARED
+// SPLATRADIANCE BAKE: render/liveCubeCapture.mjs renders the shell's OWN six-face view from this sphere's own
+// position through a real camera, so the reflection actually seen here is the shell as this point in space
+// sees it, not the analytic stand-in the row's four spheres share.
+const LIVE_SPHERE_POS = [0, SPEC_ROW.y, 0.6], LIVE_SPHERE_RADIUS = 0.14;
+let device, scene = null, lab = null, yaw = 0.4, pitch = 0.15, dragging = null, dirty = true, rebuilding = false, liveNote = "";
 const $ = (id) => document.getElementById(id);
 
 function knobs() { return { spacing: Math.max(0.25, +$("spacing").value || LAB.spacing), faceSize: +$("face").value || LAB.faceSize, n: Math.max(20, +$("n").value || LAB.n) }; }
-function rebuild() {
+async function rebuild() {
   lab = probeLab(knobs());
-  if (scene && scene.destroy) scene.destroy();
-  const { fleets } = labFleets(device, lab);
-  scene = G.makeGpuDrivenScene(device, { fleets, fleetOf: lab.fleetOf, thresholds: [], records: lab.records, headings: lab.extras });
-  $("tick").textContent = labHud(lab);
+  const old = scene;
+  // labFleets' `eye` takes a FUNCTION of the draw ctx (specularBind's own convention) so the row's reflections
+  // track the actual orbiting camera every frame -- a fixed value here would bake in whatever eye rebuild()
+  // happened to run at, which is wrong the instant the camera moves.
+  const { fleets } = labFleets(device, lab, { eye: (ctx) => ctx.eye });
+  let allFleets = fleets, records = lab.records, extras = lab.extras, fleetOf = lab.fleetOf;
+  // THIS TRY/CATCH IS NOT PARANOIA -- IT WAS MEASURED NECESSARY. Loading this page repeatedly in a headless
+  // Chromium (no real compositor) and changing a knob a second time hit gfx/device.js's own documented WebGPU
+  // quirk on that backend only ("A valid external Instance reference no longer exists" -- see that file's
+  // Level-11 offscreen note): WebGL2 rebuilt three times running with no issue in the same test, WebGPU did not
+  // on the second. A real browser has the compositor that note says makes the difference, but the fallback
+  // costs nothing and keeps the page working (the analytic row alone) rather than betting on an environment
+  // this page cannot know it is running in.
+  try {
+    const live = await addLiveSpecSphere(device, lab, LIVE_SPHERE_POS, { radius: LIVE_SPHERE_RADIUS });
+    allFleets = [...fleets, live.fleet]; records = live.records; extras = live.extras; fleetOf = live.fleetOf;
+    liveNote = "a live-captured sphere past the row";
+  } catch (e) { console.warn("[splat-probes] live-captured sphere skipped: " + e.message); liveNote = "the live-captured sphere failed (" + e.message.slice(0, 80) + ") -- the analytic row still drew"; }
+  if (old && old.destroy) old.destroy();
+  scene = G.makeGpuDrivenScene(device, { fleets: allFleets, fleetOf, thresholds: [], records, headings: extras });
+  $("tick").textContent = labHud(lab) + " -- " + liveNote;
   dirty = false;
 }
 async function init() {
@@ -54,8 +76,8 @@ async function init() {
   try { device = await requestDevice(cvs, forceGl ? { backend: "webgl2" } : { prefer: "webgpu" }); }
   catch (e) { return fail("requestDevice threw: " + e.message); }
   if (!device || device.backend === "null") return fail("no GPU backend here (WebGPU needs a secure origin: localhost or https).");
-  try { rebuild(); } catch (e) { return fail("scene: " + e.message); }
-  beEl.textContent = "backend: " + device.backend + " · " + scene.path + " · two fleets: the splats as tone markers, the probes and the mesh through the probe-lit pipeline";
+  try { await rebuild(); } catch (e) { return fail("scene: " + e.message); }
+  beEl.textContent = "backend: " + device.backend + " · " + scene.path + " · splats as tone markers, the probes and mesh through the probe-lit pipeline, a specular row (roughness 0..1) and one live-captured sphere";
   for (const id of ["spacing", "face", "n"]) $(id).addEventListener("change", () => { dirty = true; $("tick").textContent = "baking…"; });
   cvs.addEventListener("pointerdown", (e) => { dragging = [e.clientX, e.clientY]; });
   addEventListener("pointerup", () => { dragging = null; });
@@ -66,7 +88,10 @@ function dpr() { return Math.min(2, devicePixelRatio || 1); }
 function frame() {
   const d = dpr(), w = Math.round((cvs.clientWidth || 1200) * d), h = Math.round(w * 0.55);
   if (cvs.width !== w || cvs.height !== h) { cvs.width = w; cvs.height = h; }
-  if (dirty) { try { rebuild(); } catch (e) { fail("scene: " + e.message); return; } }
+  // rebuild() is async (the live capture awaits real GPU readbacks): triggered here without blocking the loop,
+  // so the OLD scene keeps drawing until the new one is ready rather than the page freezing on every knob change.
+  if (dirty && !rebuilding) { rebuilding = true; dirty = false; rebuild().catch((e) => fail("scene: " + e.message)).finally(() => { rebuilding = false; }); }
+  if (!scene) { requestAnimationFrame(frame); return; }
   if (!dragging) yaw += 0.002;
   const R = LAB.eyeDist, eye = [Math.sin(yaw) * Math.cos(pitch) * R, Math.sin(pitch) * R, Math.cos(yaw) * Math.cos(pitch) * R];
   const cam = { viewProj: G.multiply(G.perspective(1.0, w / h, 0.05, 50), G.lookAt(eye, [0, 0, 0])), eye };
