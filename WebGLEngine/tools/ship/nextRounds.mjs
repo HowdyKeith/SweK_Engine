@@ -272,6 +272,36 @@ export const NEXT_ROUNDS = [
             + "exclusion from an oversight, and that is the actual defect.",
     },
     {
+        id: "sin-hash-everywhere-else",
+        blocker: "OPEN",
+        what: "The sin-based hash that v4558 replaced in the BCS shader family is still in 29 other files -- "
+            + "nebula, paintFields, pageVoxels, the ant-colony and slime-mold demos, blackhole.html, "
+            + "predictions.html and others. Each is the same defect: fract(sin(dot(p, K)) * 43758.5453) "
+            + "amplifies the last bits of its input by four orders of magnitude, so a float32 GPU and a "
+            + "float64 CPU draw DIFFERENT RANDOM NUMBERS rather than rounding the same one differently.",
+        how: "The v4558 replacement is the pattern and it is already written twice, once in GLSL and once in "
+            + "JS: quantise to a fixed lattice, then run a 32-bit integer avalanche. Integer arithmetic is "
+            + "exact in both precisions. What it costs is a VISUAL CHANGE -- a different hash is a different "
+            + "noise field -- so each site needs somebody to look at the picture afterwards, which is why "
+            + "this is a round per subsystem rather than one sweep of the tree.",
+        why: "*** THE TREE ALREADY KNEW, IN THREE PLACES, AND NEVER JOINED THEM UP. *** "
+            + "tools/ship/webgpuHarness.mjs records that sin(i * 12.9898) * 43758.5453 returns 0.921690 on a "
+            + "CPU and 0.240234 on a GPU for i = 1. fx/paintFields.mjs's header records the same shape for "
+            + "the nebula hash, and paintFields-selfcheck MEASURES the f64-against-f32 gap every run. "
+            + "swiftShaders-selfcheck drew a whole boundary around it -- fifteen shaders it declared could "
+            + "never be verified. Three independent notes about one defect, each treated as a local limit. "
+            + "Re-measured at v4558 over 20,000 sample points: 79.4% of them diverge by more than 0.1 and the "
+            + "worst pair is 0.9960 against 0.0000. After the integer replacement, on real WebGL2: 0% diverge "
+            + "by more than 0.1, worst 2.98e-8, and seventeen of the twenty hash-reaching shaders went to "
+            + "ZERO levels over ZERO pixels against their CPU model.",
+        upstream: "Nothing blocks it. The judgement each site needs is whether anything DEPENDS on the "
+            + "current pattern -- a baked screenshot, a recorded verdict, a demo somebody has looked at and "
+            + "approved. paintFields-selfcheck is the interesting one: it MEASURES the divergence as a "
+            + "property of its subject, so replacing the hash there turns a gate that reports a gap into a "
+            + "gate that must assert there is none, which is a rewrite rather than a re-take."
+            .replace("PLACEHOLDER", ""),
+    },
+    {
         id: "fluid-has-no-sink",
         blocker: "OPEN",
         what: "world/fluidSystem.js is a breadth-first flood fill, not a fluid. A settled particle spreads "

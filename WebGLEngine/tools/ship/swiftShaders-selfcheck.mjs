@@ -1589,18 +1589,57 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
             "of this gradient is 255/23 = 11.1 levels vertically. A rotation lands exactly on a texel boundary " +
             "and float32 and float64 round across it. Nearest sampling, not a port error.");
 
-        // D) the five that CANNOT agree, and the reason, measured.
-        for (const n of UNGRADEABLE) {
-            ok("   " + n.padEnd(15) + " DISAGREES, as the sin-hash requires", results[n].off > 100,
+        // D) *** THE HASH WAS REPLACED AT v4558 AND SEVENTEEN OF THESE TWENTY NOW AGREE. ***
+        //
+        // This block used to assert that every sin-hash shader DISAGREES -- `off > 100` -- and the row below
+        // it called that "the boundary". It was true and it was a limit of the HASH, not of the port:
+        // fract(sin(dot(p, (12.9898, 78.233))) * 43758.5453) multiplies sin's output by 43758, so one float32
+        // ULP of input becomes a different random number. Re-measured over 20,000 sample points before the
+        // replacement: 79.4% of them diverged by more than 0.1 and the worst pair was 0.9960 against 0.0000.
+        //
+        // bcs_hash is an INTEGER avalanche on a 1/256 lattice now. Integer arithmetic is exact in both
+        // precisions, so the two agree wherever the quantised coordinate agrees. On this real WebGL2 context
+        // that took fourteen of the twenty to ZERO levels over ZERO pixels, and three more to one level over
+        // zero pixels. THE BOUNDARY MOVED rather than vanished: what is left is the lattice edge, where a
+        // float32 and a float64 coordinate floor into different cells and the hash correctly returns two
+        // unrelated values. That is the same benign shape vortex already had at a texel boundary -- and it is
+        // now a SHORT NAMED LIST instead of a whole class.
+        // *** THE SET IS HASHED, NOT UNGRADEABLE, AND THE DIFFERENCE IS THE WHOLE POINT. *** UNGRADEABLE is
+        // HASHED.concat(CHAOTIC), and only the HASHED half was ever a limit of the hash. lyapunov and the
+        // other CHAOTIC shaders diverge because a Lyapunov exponent AMPLIFIES its own input error by
+        // construction -- no hash change touches that, and the first draft of this block swept them in and
+        // went red on lyapunov at 74 levels over 511 pixels, which is the correct answer to a question it
+        // should not have been asking.
+        const STILL_LATTICE_BOUND = ["shatter", "shatterGlass", "underwaterCaustics"];
+        const nowAgree = HASHED.filter((n) => !STILL_LATTICE_BOUND.includes(n));
+        for (const n of nowAgree) {
+            ok("   " + n.padEnd(15) + " now AGREES with the CPU model, which the sin-hash made impossible",
+                results[n].worst <= 1 && results[n].off === 0,
                 "worst " + results[n].worst + " levels over " + results[n].off + " pixels");
         }
-        ok("!! *** the CPU model can never verify a sin-hash shader, and this is the boundary ***",
-            UNGRADEABLE.every((n) => results[n].off > 100) && EXACTISH.every((n) => results[n].worst <= 2),
-            "bcs_hash is fract(sin(dot(p, (12.9898, 78.233))) * 43758.5453). Multiplying sin's output by 43758 " +
-            "turns one float32 ULP into a DIFFERENT RANDOM NUMBER: measured divergence up to 0.68 on a 0..1 " +
-            "value, i.e. 68% of the range. Not a tolerance to widen -- a limit to state. The source-shape " +
-            "sections are what check these eight, and they check the SHAPE rather than the pixels -- plus, " +
-            "since v4234, the two configurations above in which frosted's and pixelateMosaic's hash cancels.");
+        for (const n of STILL_LATTICE_BOUND) {
+            ok("   " + n.padEnd(15) + " still differs, and it is BOUNDED and at the lattice edge",
+                results[n].off <= 64 && results[n].worst <= 64,
+                "worst " + results[n].worst + " levels over " + results[n].off + " pixels of " + (W * H) +
+                " -- these three drive the hash from a high-frequency coordinate, so a float32 and a float64 " +
+                "input floor into different 1/256 cells often enough to see. Bounded, named, and no longer a " +
+                "class: it was 100+ pixels of pure noise for all twenty before v4558.");
+        }
+        ok("!! *** THE CPU MODEL CAN NOW VERIFY THE HASH SHADERS, AND THE BOUNDARY IS THE LATTICE EDGE ***",
+            nowAgree.every((n) => results[n].worst <= 1 && results[n].off === 0) &&
+            STILL_LATTICE_BOUND.every((n) => results[n].off <= 64) &&
+            CHAOTIC.every((n) => results[n].off > 100) &&
+            EXACTISH.every((n) => results[n].worst <= 2),
+            nowAgree.length + " of " + HASHED.length + " hash-reaching shaders now agree to " +
+            "within one level and ZERO pixels; " + STILL_LATTICE_BOUND.length + " differ at bounded lattice " +
+            "edges. *** THIS ROW IS THE ONE THAT WOULD GO RED IF THE SIN-HASH CAME BACK, *** and it is the " +
+            "inverse of the row it replaces -- that one asserted these could never be checked, which was a " +
+            "true statement about a hash nobody had questioned. NOT CLAIMED: that the pictures are unchanged. " +
+            "A different hash is a different noise field, so grain, glitch blocks, value noise and every fbm " +
+            "built on them draw a new pattern; the lattice, octaves and amplitudes are untouched. AND THE CHAOTIC " +
+            "SHADERS ARE STILL ASSERTED TO DISAGREE, because a Lyapunov exponent amplifies its own input " +
+            "error by construction and no hash can fix that -- keeping that half of the old claim is what " +
+            "stops this row reading as \"everything agrees now\".");
 
         // ---- 19b. *** THE EXTERNAL KEY: swk_lyapunov READS ln 2 OFF THE GPU *** ---------------------------
         //
@@ -1883,14 +1922,21 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
             ok("!! *** NOTHING AGREES AT 1x AND BREAKS AT 2x -- trap 3 is carried correctly ***",
                 brokeAt2.length === 0, brokeAt2.map((r) => r.name + "(" + r.at2 + ")").join(" ") || "0 of " + rows.length);
             const both = rows.filter((r) => r.at1 <= 2 && r.at2 <= 2);
-            ok("!! and " + both.length + " agree with the CPU model at BOTH 1x and 2x", both.length === 11,
+            // *** 11 AT v4265, 25 AT v4558, AND THE JUMP IS THE HASH. *** This row recorded 11 because the
+            // fourteen hash-reaching shaders in this set could not agree at ANY scale -- the sin-hash drew a
+            // different random number in float32. With the integer hash they agree at 1x and 2x alike, so the
+            // count is the same measurement of a tree that got better, not a loosened bar.
+            ok("!! and " + both.length + " agree with the CPU model at BOTH 1x and 2x", both.length === 25,
                 both.map((r) => r.name).join(" "));
             // 3. The control, asserted rather than described: the ones that fail at 2x fail at 1x too.
             const off2 = rows.filter((r) => r.at2 > 2);
             ok("!! *** every shader that disagrees at 2x ALREADY disagrees at 1x -- the hash, not the scale ***",
                 off2.every((r) => r.at1 > 2), off2.map((r) => r.name + " 1x=" + r.at1 + " 2x=" + r.at2).join(", "));
-            ok("   and each of those is a known sin-hash user, derived from the source",
-                off2.every((r) => UNGRADEABLE.includes(r.name)), off2.map((r) => r.name).join(" "));
+            ok("   and each of those is still an ungradeable one, derived from the source",
+                off2.every((r) => UNGRADEABLE.includes(r.name)),
+                (off2.map((r) => r.name).join(" ") || "none") + " -- these were ALL sin-hash users until " +
+                "v4558; what remains are the chaotic shaders and the three whose hash input sits on the " +
+                "1/256 lattice edge, so the sentence is about the ungradeable SET rather than about the hash.");
             report("*** WITHOUT THE 1x CONTROL THIS SECTION WOULD HAVE REPORTED FIVE DEFECTS THAT DO NOT " +
                 "EXIST. *** A measurement at one scale is not a comparison; it becomes one only when the " +
                 "other scale is measured the same way.");
