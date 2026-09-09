@@ -39,10 +39,28 @@ const require_ = createRequire(import.meta.url);
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const read = (rel) => { try { return fs.readFileSync(path.join(ENG, rel), "utf8"); } catch { return ""; } };
 
+// *** THIS FILE'S OWN BUG, FOUND BY ITS OWN GATE. *** shipRitual-selfcheck.mjs's publish-release check started
+// reporting "githubBridge reads v4535 but main.js says v4487" once main.js had moved past v4487 -- not because
+// the two files' version markers actually disagreed (main.js's live ENGINE_VERSION line WAS v4535, matching
+// githubBridge exactly), but because currentState()'s own regex had no comment-skip and no line anchor: main.js
+// and brain/brain.js each freeze every past version as a "// const NAME = ...;" comment ABOVE the live line
+// (v4482's own note, this file's neighbour), and a bare `const ENGINE_VERSION = "(v\d+)"` matches that substring
+// inside the FIRST such comment it meets scanning top-to-bottom just as happily as the real declaration -- here,
+// a frozen v4487 marker sitting earlier in the file than the live v4535 one. ai-bridge/githubBridge.js hit this
+// exact class of bug once already (its own v3941 note: "ONE SPELLING OF THE VERSION MARKER") and fixed it with a
+// multiline, comment-skipping regex; this file predates that fix (v3528 to v3941) and never got it. The BRAIN_
+// BUILD read had the identical defect, invisibly: main.js's and brain.js's frozen blocks both happened to freeze
+// v4487, so both misreads AGREED with each other while both disagreed with the truth, and markersAgree read
+// true on two wrong numbers -- the cross-file check against githubBridge is what actually caught it, not this
+// step. THE FIX REUSES THE SHAPE THAT WAS ALREADY PROVEN RIGHT rather than inventing a second one: parameterised
+// over the constant's name so the ONE regex serves both ENGINE_VERSION and BRAIN_BUILD instead of shipRitual.mjs
+// carrying its own second copy of the ENGINE_VERSION half specifically.
+const parseVersionConst = (src, name) => (String(src || "").match(new RegExp(`^(?!\\s*//).*\\b${name}\\s*=\\s*"(v\\d+)"`, "m")) || [])[1] || null;
+
 /** Facts the tree already knows. Read, never declared -- this is the whole argument of the file. */
 export function currentState() {
-    const engine = (read("main.js").match(/const ENGINE_VERSION = "(v\d+)"/) || [])[1] || null;
-    const brain = (read("brain/brain.js").match(/const BRAIN_BUILD = "(v\d+)"/) || [])[1] || null;
+    const engine = parseVersionConst(read("main.js"), "ENGINE_VERSION");
+    const brain = parseVersionConst(read("brain/brain.js"), "BRAIN_BUILD");
     let gates = null, instruments = null;
     try { gates = JSON.parse(read("knowledge-index.json")).gates?.length ?? null; } catch {}
     return { engine, brain, gates, markersAgree: engine !== null && engine === brain };
