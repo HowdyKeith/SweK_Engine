@@ -126,6 +126,87 @@ function easuCPU(src, w, h, W, H) {
     return { data: out, w: W, h: H };
 }
 
+// ---- RCAS -- Robust Contrast Adaptive Sharpening, the other half of FSR1 -----------------------------------
+// EASU upscales; RCAS is the pass AFTER it, at display resolution, and sharpens without the halo an unbounded
+// sharpen would leave. A transcription of `FsrRcasF` from AMD's ffx_fsr1.h (MIT).
+//
+// The shape: a 5-tap cross (b above, d left, e centre, f right, h below), a per-channel min/max RING over the four
+// neighbours, and from those a NEGATIVE LOBE weight chosen so the sharpened result cannot leave the local contrast
+// the ring describes. `hitMin` is how much lobe the darkest neighbour can take before the output would go below 0;
+// `hitMax` how much the brightest can take before it would pass 1; the lobe is the more binding of the two,
+// clamped to RCAS_LIMIT and scaled by the caller's sharpness.
+//
+// FSR1'S RCAS, NOT FSR 3.1.5's. The later form adds a luma-based lower limiter and computes the denoise on luma
+// rather than on green. Both are in @pmndrs/upscaler behind a `fsr315NumericParity` flag; this file is the FSR1
+// one, to match the EASU above it, and says so rather than leaving a reader to wonder which they have.
+//
+// The temporal path's tonemap/pre-exposure conditioning is absent here on purpose: it exists to undo what the
+// accumulate pass baked in, and there is no accumulate pass. The reference's own note says the spatial path is
+// identical either way.
+const RCAS_LIMIT = 0.25 - 1 / 16;
+const RCAS_EPS = 1e-6;   // see the 0/0 note in rcasCPU: the denominators vanish on flat black and flat white
+
+/**
+ * RCAS on the CPU. `sharpness` in [0, 1]: 1 is sharpest (no attenuation), 0 attenuates the lobe by two stops.
+ * `denoise` is FSR1's FSR_RCAS_DENOISE -- a lone outlier against its cross reads as grain, and the lobe is pulled
+ * back by up to half there so the pass does not amplify noise.
+ */
+function rcasCPU(src, w, h, sharpness = 1, denoise = false) {
+    const out = new Float32Array(w * h * 4);
+    const S = (x, y, c) => src[(clampi(y, 0, h - 1) * w + clampi(x, 0, w - 1)) * 4 + c];
+    const peak = Math.pow(2, -2 * (1 - sharpness));
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        //   b
+        // d e f      the cross, at display resolution
+        //   h
+        const b = [S(x, y - 1, 0), S(x, y - 1, 1), S(x, y - 1, 2)];
+        const d = [S(x - 1, y, 0), S(x - 1, y, 1), S(x - 1, y, 2)];
+        const e = [S(x, y, 0), S(x, y, 1), S(x, y, 2)];
+        const f = [S(x + 1, y, 0), S(x + 1, y, 1), S(x + 1, y, 2)];
+        const hh = [S(x, y + 1, 0), S(x, y + 1, 1), S(x, y + 1, 2)];
+
+        // The ring bounds how strong the negative lobe may be before the output would leave [0, 1].
+        //
+        // *** THE REFERENCE DIVIDES 0/0 HERE, AND BOTH LANGUAGES HIDE IT DIFFERENTLY. *** `mn4 / (4 * mx4)` is 0/0
+        // wherever the four neighbours are all black, and `(1 - mx4) / (4 * mn4 - 4)` is 0/0 wherever they are all
+        // white. MEASURED on this box: WGSL computes NaN there, but `max(NaN, x)` and `min(NaN, x)` return the
+        // OTHER operand, so the NaN falls through into a lobe of -RCAS_LIMIT; JS's Math.max(NaN, x) returns NaN,
+        // so a naive mirror produces NaN for the same pixel. Neither is right, and the fall-through is the worse of
+        // the two because it is silent: MEASURED, a lone WHITE pixel on black resolves to 4.0 and a lone BLACK
+        // pixel on white to -3.0, from a limiter whose entire job is that the output stays inside [0, 1].
+        //
+        // So neither side is left to its language's NaN behaviour. A vanishing denominator means that side imposes
+        // no constraint, and the epsilon says so arithmetically: hitMin goes to 0 (no negative lobe demanded) and
+        // hitMax to -1/4 (the other side still binding), which lands the lobe at 0 -- no contrast, no sharpening,
+        // which is what a flat patch should get.
+        let lobeRGB = -Infinity;
+        for (let c = 0; c < 3; c++) {
+            const mn4 = Math.min(b[c], d[c], f[c], hh[c]), mx4 = Math.max(b[c], d[c], f[c], hh[c]);
+            const hitMin = mn4 / Math.max(4 * mx4, RCAS_EPS), hitMax = (1 - mx4) / Math.min(4 * mn4 - 4, -RCAS_EPS);
+            lobeRGB = Math.max(lobeRGB, Math.max(-hitMin, hitMax));
+        }
+        let lobe = Math.max(-RCAS_LIMIT, Math.min(lobeRGB, 0)) * peak;
+
+        if (denoise) {   // FSR1 measures the outlier on GREEN; 3.1.5 uses luma
+            const mn = Math.min(b[1], d[1], f[1], hh[1]), mx = Math.max(b[1], d[1], f[1], hh[1]);
+            let nz = 0.25 * (b[1] + d[1] + f[1] + hh[1]) - e[1];
+            nz = clamp(Math.abs(nz) / Math.max(mx - mn, 1e-4), 0, 1);
+            lobe *= 1 - 0.5 * nz;
+        }
+
+        const rcpL = 1 / (4 * lobe + 1), o = (y * w + x) * 4;
+        for (let c = 0; c < 3; c++) out[o + c] = (lobe * (b[c] + d[c] + f[c] + hh[c]) + e[c]) * rcpL;
+        out[o + 3] = 1;
+    }
+    return { data: out, w, h };
+}
+
+/** FSR1 end to end: EASU upscales, RCAS sharpens the result. The order is the algorithm's, not a preference. */
+function fsr1CPU(src, w, h, W, H, sharpness = 1, denoise = false) {
+    const up = easuCPU(src, w, h, W, H);
+    return rcasCPU(up.data, W, H, sharpness, denoise);
+}
+
 /** Plain bilinear, for the gate to hold EASU against: the thing EASU has to beat on an edge. */
 function bilinearCPU(src, w, h, W, H) {
     const out = new Float32Array(W * H * 4);
@@ -141,4 +222,4 @@ function bilinearCPU(src, w, h, W, H) {
     return { data: out, w: W, h: H };
 }
 
-export { easuCPU, bilinearCPU, easuLuma, easuSet, easuTap };
+export { easuCPU, rcasCPU, fsr1CPU, bilinearCPU, easuLuma, easuSet, easuTap, RCAS_LIMIT, RCAS_EPS };

@@ -139,4 +139,64 @@ fn main(@builtin(global_invocation_id) g:vec3<u32>) {
   dst[o] = pix.x; dst[o + 1u] = pix.y; dst[o + 2u] = pix.z; dst[o + 3u] = 1.0;
 }`;
 
-export { EASU_WGSL };
+const RCAS_WGSL = `
+struct P { w:u32, h:u32, denoise:u32, sharp:f32 };
+@group(0) @binding(0) var<storage,read> src:array<f32>;
+@group(0) @binding(1) var<storage,read_write> dst:array<f32>;
+@group(0) @binding(2) var<uniform> u:P;
+
+const RCAS_LIMIT : f32 = 0.25 - (1.0 / 16.0);
+const RCAS_EPS : f32 = 1.0e-6;
+
+fn ldD(x:i32, y:i32) -> vec3<f32> {
+  let xx = u32(clamp(x, 0, i32(u.w) - 1));
+  let yy = u32(clamp(y, 0, i32(u.h) - 1));
+  let o = (yy * u.w + xx) * 4u;
+  return vec3<f32>(src[o], src[o + 1u], src[o + 2u]);
+}
+
+@compute @workgroup_size(8,8,1)
+fn main(@builtin(global_invocation_id) g:vec3<u32>) {
+  if (g.x >= u.w || g.y >= u.h) { return; }
+  let x = i32(g.x); let y = i32(g.y);
+
+  //   b
+  // d e f      the cross, at display resolution
+  //   h
+  let b = ldD(x, y - 1);
+  let d = ldD(x - 1, y);
+  let e = ldD(x, y);
+  let f = ldD(x + 1, y);
+  let h = ldD(x, y + 1);
+
+  // The ring bounds the negative lobe. The denominators VANISH on flat black and flat white, and the two
+  // languages hide that differently -- WGSL's max()/min() return the non-NaN operand and let a lobe of
+  // -RCAS_LIMIT through (measured: a lone white pixel on black resolves to 4.0), JS's Math.max returns NaN.
+  // The epsilon says "this side imposes nothing" arithmetically, so neither side depends on NaN semantics.
+  // See the long note in fx/fsr/fsr.js's rcasCPU.
+  let mn4 = min(min(b, d), min(f, h));
+  let mx4 = max(max(b, d), max(f, h));
+  let hitMin = mn4 / max(4.0 * mx4, vec3<f32>(RCAS_EPS));
+  let hitMax = (vec3<f32>(1.0) - mx4) / min(4.0 * mn4 - 4.0, vec3<f32>(-RCAS_EPS));
+  let lobeRGB = max(-hitMin, hitMax);
+  let peak = exp2(-2.0 * (1.0 - u.sharp));
+  var lobe = max(-RCAS_LIMIT, min(max(lobeRGB.x, max(lobeRGB.y, lobeRGB.z)), 0.0)) * peak;
+
+  // FSR1's FSR_RCAS_DENOISE, measured on GREEN (3.1.5 uses luma): a lone outlier against its cross reads as
+  // grain, and the lobe is pulled back by up to half so the pass does not amplify it
+  if (u.denoise != 0u) {
+    let mn = min(min(b.y, d.y), min(f.y, h.y));
+    let mx = max(max(b.y, d.y), max(f.y, h.y));
+    var nz = 0.25 * (b.y + d.y + f.y + h.y) - e.y;
+    nz = clamp(abs(nz) / max(mx - mn, 1.0e-4), 0.0, 1.0);
+    lobe = lobe * (1.0 - 0.5 * nz);
+  }
+
+  let rcpL = 1.0 / (4.0 * lobe + 1.0);
+  let pix = (lobe * (b + d + f + h) + e) * rcpL;   // NOT clamped -- the reference stores this straight, and it
+                                                   // overshoots at a local peak; see the gate's row on that
+  let o = (g.y * u.w + g.x) * 4u;
+  dst[o] = pix.x; dst[o + 1u] = pix.y; dst[o + 2u] = pix.z; dst[o + 3u] = 1.0;
+}`;
+
+export { EASU_WGSL, RCAS_WGSL };

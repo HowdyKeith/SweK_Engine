@@ -3773,24 +3773,29 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
             "fx/fsr/fsr-selfcheck.mjs",
         ]),
         redOnArrival: Object.freeze([]),
-        widened: Object.freeze([]),
-        verdict: "green, 1.02 s (1009/1045/1014 over three serial runs, well under the 3000 ms sweep budget). EASU, " +
-                 "the upscale half of AMD FSR1, as an ALGORITHM rather than a dependency: fx/fsr/fsr.js is a " +
-                 "transcription of the f32 reference FsrEasuF from ffx_fsr1.h (MIT) and fx/fsr/fsrKernels.js the WGSL " +
-                 "that mirrors it statement by statement, run on a real WebGPU device through gfx/device.js. The " +
-                 "vendor-or-implement question was MEASURED, not argued: @pmndrs/upscaler@0.2.0 carries 2,743 lines " +
-                 "of WGSL that import no three at all and 3,331 lines of three.js DRIVER around them, and " +
-                 "gfx/device.js already is that driver -- the same reading fx/anime4k wrote into its own header two " +
-                 "upscalers ago. MEASURED: the GPU picture is the CPU reference's to 2.98e-7 on every one of 12,288 " +
-                 "channels (3,702 of 4,096 pixels bit-identical, the rest f32 against f64 through a 12-tap " +
-                 "accumulation); a constant field comes back constant to 2.4e-8; 0 of 12,288 channels ring outside " +
-                 "the four-nearest bounds, on the CPU and on the device's own output; and on a pure diagonal EASU " +
-                 "leaves 67 intermediate pixels where bilinear leaves 248, 3.7x thinner. SPATIAL ONLY and said so: " +
-                 "FSR's temporal path wants depth, per-pixel motion vectors and a jittered projection with history, " +
-                 "and this tree has no motion vectors and no previous-frame view-projection matrix anywhere in it. " +
-                 "Five sabotages red at 2 / 2 / 2 / 1 / 2, none 0-RED; dropping the dering clamp puts 730 channels " +
-                 "outside the bounds, unrotating the kernel takes 3.7x down to 1.3x, and removing the flat-region " +
-                 "fallback reaches NaN through a 1/0 in the direction normalise.",
+        widened: Object.freeze([
+            "fx/fsr/fsr-selfcheck.mjs (v4547: RCAS, FSR1's other half, and the device run graded on BOTH denoise settings)",
+        ]),
+        verdict: "green, 1.42 s (1422/1502/1426 over three serial runs at v4547, from 1.02 s at v4546; well under the " +
+                 "3000 ms sweep budget). FSR1 -- EASU then RCAS -- as an ALGORITHM rather than a dependency: fx/fsr/fsr.js " +
+                 "transcribes the f32 references FsrEasuF and FsrRcasF from ffx_fsr1.h (MIT), fx/fsr/fsrKernels.js mirrors " +
+                 "them in WGSL statement by statement, and both run on a real WebGPU device through gfx/device.js. The " +
+                 "vendor-or-implement question was MEASURED: @pmndrs/upscaler@0.2.0 carries 2,743 lines of WGSL that import " +
+                 "no three at all and 3,331 lines of three.js DRIVER around them, and gfx/device.js already is that driver " +
+                 "-- the same reading fx/anime4k wrote into its own header two upscalers ago. MEASURED: the GPU picture is " +
+                 "the CPU reference's to 2.98e-7 (EASU) and 1.19e-7 (RCAS, both denoise settings) on every one of 12,288 " +
+                 "channels; a constant field survives both passes to 2.4e-8; EASU rings 0 of 12,288 channels outside the " +
+                 "four-nearest bounds and leaves 67 intermediate pixels on a pure diagonal where bilinear leaves 248; RCAS's " +
+                 "sharpness knob is monotone in Laplacian energy (11.09 -> 11.36) and its denoise pulls back 44% on grain " +
+                 "against 0.6% on a clean edge. TWO FINDINGS ABOUT RCAS's LIMITER, both recorded in the gate: its " +
+                 "denominators are 0/0 on flat black and flat white, where WGSL's NaN-swallowing max() silently resolves a " +
+                 "lone white pixel on black to 4.0 and JS's Math.max returns NaN -- both sides carry an epsilon now; and " +
+                 "RCAS_LIMIT keeps the resolve off the POLE of 1/(4*lobe+1) rather than bounding the output, so RCAS " +
+                 "overshoots a local peak (1.000 in, 1.166 out) and a caller writing 8 bits must clamp. SPATIAL ONLY and " +
+                 "said so: the temporal path wants depth, per-pixel motion vectors and a jittered projection with history, " +
+                 "and this tree has no motion vectors and no previous-frame view-projection matrix anywhere in it. Eleven " +
+                 "sabotages red at 2/2/2/1/2 (EASU) and 5/1/3/1/4/1 (RCAS), none 0-RED; dropping RCAS_LIMIT reaches " +
+                 "Infinity at the peak, which is that claim demonstrated.",
     }),
     since205: Object.freeze({
         at: "v4550", swept: 1, green: 1, red: 0,
