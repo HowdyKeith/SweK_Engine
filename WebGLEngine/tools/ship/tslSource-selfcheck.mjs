@@ -152,7 +152,10 @@ else {
             try {
                 const cv = document.createElement("canvas"); cv.width = N; cv.height = N; const dev = await requestDevice(cv, { backend, offscreen: backend === "webgpu" });
                 const errs = []; if (dev.gpu && dev.gpu.addEventListener) dev.gpu.addEventListener("uncapturederror", (e) => errs.push(String(e.error && e.error.message).slice(0, 200)));
-                const tex = dev.texture({ width: N, height: N, data: src, nearest: false });
+                // v4543 -- three's source texture is RepeatWrapping (its default), and gfx/device.js can now be TOLD
+                // which address mode to use instead of having one per backend. Saying so is what makes the row below
+                // -- the device against three's own render -- a comparison of pictures rather than of sampler defaults.
+                const tex = dev.texture({ width: N, height: N, data: src, nearest: false, wrap: "repeat" });
                 const draw = (pd, bind) => dev.frame(({ pass }) => { pass.clear([0, 0, 0, 1]); pass.use(dev.pipeline(pd)); bind(pass); pass.draw(3); }, { read: true, depth: false });
                 const hand = (await draw(D.badTvPipelineDesc(), (pass) => { for (let i = 0; i < D.KNOB_ORDER.length; i++) pass.uniform(D.KNOB_ORDER[i], knobs[i]); pass.texture("tDiffuse", tex, 0); })).pixels;
                 const gen = (await draw(desc, (pass) => { for (const u of desc.uniforms) pass.uniform(u.name, knobs[D.KNOB_ORDER.indexOf(u.name)]); pass.texture("tDiffuse", tex, 0); })).pixels;
@@ -170,22 +173,16 @@ else {
         ok("with a LinearFilter texture three emits textureSample through a sampler (nearest it read with textureLoad), and the transplant declares the device's `samp` for it", R.samplerInWgsl && R.usesSampler && R.declaresSamp);
         for (const b of ["webgpu", "webgl2"]) { const o = R.run[b]; if (o.error) { ok(`${b} ran`, false, o.error); continue; }
             ok(`*** ${b}: linear sampling through the generated pipeline is the hand-written linear pass on EVERY pixel (${o.same} of ${o.total}, worst 0) -- and the picture really is blended (a checkerboard's blue lands between its two values) ***`, o.backend === b && o.same === o.total && o.worst === 0 && o.blended > o.total * 0.2 && o.errs.length === 0, `${o.same}/${o.total}, worst ${o.worst}, ${o.blended} blended`);
-            // *** THIS ROW IS RED ON WEBGL2 AT v4540 AND THE FAULT IS gfx/device.js's, NOT THE TRANSPLANT'S. ***
-            // MEASURED, three vs three, no device involved: three's two backends agree with EACH OTHER on every pixel
-            // for the same wrap mode (repeat vs repeat 4096/4096 worst 0; clamp vs clamp 4096/4096 worst 0). three is
-            // consistent. The device is not -- gfx/device.js hard-codes OPPOSITE address modes on its two backends,
-            // with no way for a caller to say which:
-            //     gfx/device.js:482  (WebGPU)  createSampler({ ..., addressModeU: "repeat", addressModeV: "repeat" })
-            //     gfx/device.js:275  (WebGL2)  texParameteri(TEXTURE_WRAP_S/T, CLAMP_TO_EDGE)
-            // so the same dev.texture() samples differently on the two backends at every seam. The difference is
-            // exactly the seam and nothing else: row 9 entire (64 pixels, the v where the effect's fract() wraps) plus
-            // one pixel in each of 55 other rows (the u seam), worst 127 of 255.
-            // THERE IS NO WRAP SETTING THAT MAKES BOTH BACKENDS GREEN -- three at Repeat matches the WebGPU device and
-            // fails WebGL2; three at ClampToEdge matches WebGL2 and fails WebGPU. Measured both ways. So the row asserts
-            // what is TRUE (every pixel, both backends) and stays red until gfx/device.js picks one address mode or
-            // lets the caller name it. Choosing a wrap here to get green would have hidden an engine defect behind a
-            // fixture setting, which is the opposite of what this gate is for.
-            ok(`  ${b}: and three's own linear render, row-mirrored, agrees with the device on EVERY pixel (two samplers, one filter -- and, when gfx/device.js stops contradicting itself, one address mode)`, o.worstThree === 0 && o.sameThree === o.total, `${o.sameThree}/${o.total} identical, worst ${o.worstThree}`); }
+            // *** THIS ROW WAS RED AT v4540 AND THE FAULT WAS gfx/device.js's, NOT THE TRANSPLANT'S -- FIXED AT v4543. ***
+            // MEASURED then, three against three with no device in it: three's two backends agree with EACH OTHER on
+            // every pixel for the same wrap mode (repeat vs repeat 4096/4096 worst 0; clamp vs clamp the same). three
+            // was consistent. gfx/device.js was not -- it hard-coded addressModeU/V "repeat" on its WebGPU sampler
+            // (under a comment claiming that matched WebGL2) and CLAMP_TO_EDGE on its WebGL2 textures, with no way
+            // for a caller to say which, so the same dev.texture() sampled differently on the two backends at every
+            // seam: one row, one pixel per row, worst 127 of 255, and NO wrap setting made both green.
+            // The device takes `wrap` now and defaults both backends to clamp, so this row says which it wants --
+            // repeat, because three's source texture is RepeatWrapping -- and gets 4096/4096 on both.
+            ok(`  ${b}: and three's own linear render, row-mirrored, agrees with the device on EVERY pixel (two samplers, one filter, one address mode -- the device is TOLD which since v4543)`, o.worstThree === 0 && o.sameThree === o.total, `${o.sameThree}/${o.total} identical, worst ${o.worstThree}`); }
     }
 }
 
@@ -337,13 +334,10 @@ else {
 //   clean and the DERIVED file did not; `git status` after the run is what caught it, not the harness. A sabotage harness
 //   must restore everything the gate WRITES, not just what it is fed.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
-console.log("*** gfx/device.js CONTRADICTS ITSELF ON ADDRESS MODE (v4540, the one red above): line 482 creates every WebGPU sampler " +
-    "with addressModeU/V \"repeat\", line 275 sets every WebGL2 texture to CLAMP_TO_EDGE, and no caller can say which -- so the same " +
-    "dev.texture() samples differently on the two backends at every seam. MEASURED three against three, with no device in it: three's " +
-    "two backends agree with each other on every pixel for the same wrap mode (4096/4096, worst 0, both ways), so the inconsistency is " +
-    "ours. There is NO wrap setting that makes both backends green here, measured both ways, which is why the row stays red rather than " +
-    "being tuned green. Until the device picks one or lets a caller name it, a TSL graph that relies on sampler-level repeat cannot be " +
-    "transplanted and compared across backends. ***");
+console.log("gfx/device.js's address-mode contradiction (v4540: WebGPU sampled `repeat`, WebGL2 `clamp`, neither sayable by a caller) " +
+    "is FIXED at v4543: dev.texture({ wrap }) takes \"clamp\" (the default, and what WebGL2 and the mip blit have always done) or " +
+    "\"repeat\", both backends alike, and an unknown value is refused by name. The row above asks for repeat, because three's texture " +
+    "is RepeatWrapping, and gets 4096 of 4096 on both backends where it got 3971 with worst 127 on one of them.");
 console.log("unchecked here: a graph with MORE than one varying or with three's camera in it (refused, not transplanted -- a vertex-stage transplant is " +
     "the next rung); textures sampled with a linear filter through three's sampler (badTv's is nearest, which three reads with textureLoad; the fixture " +
     "covers the sampler path on the CPU only); and whether the generated code is as FAST as the hand-written -- three's nodeVar chain is longer, and nobody timed it.");

@@ -150,6 +150,71 @@ let r = null;
 }
 
 // =============================================================================================================
+console.log("\n4. THE ADDRESS MODE IS THE CALLER'S, AND IT IS THE SAME ON BOTH BACKENDS (v4543)");
+// Until v4543 gfx/device.js created its WebGPU sampler with addressModeU/V "repeat" and its WebGL2 textures with
+// CLAMP_TO_EDGE, under a comment claiming the WebGPU setting matched WebGL2's. It never had. So the same
+// dev.texture() sampled differently on the two backends at every seam and no caller could say which -- and a pixel
+// diff between the backends WAS a comparison of sampler defaults, exactly what that comment said it was not.
+// This section is what the comment claimed and could not show: for ONE named wrap the two backends agree on every
+// pixel; the two wraps DIFFER, and only at the seam; and a word that is neither is refused by name.
+{
+    const skip2 = webgpuSkipReason();
+    if (skip2) { console.log(`  SKIP  ${skip2}`); fails++; }
+    else {
+        const w = await runInEngineOrigin({ engineRoot: ENG, args: { N, TIME }, script: `async (a) => {
+            const { requestDevice } = await import("/gfx/device.js");
+            const { badTvPipelineDesc, packKnobs, KNOB_ORDER } = await import("/render/badTvDevicePass.mjs");
+            const N = a.N, src = new Uint8Array(N * N * 4);
+            for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const i = (y * N + x) * 4;
+                src[i] = Math.round(x * 255 / (N - 1)); src[i + 1] = Math.round(y * 255 / (N - 1)); src[i + 2] = ((x ^ y) & 1) ? 200 : 30; src[i + 3] = 255; }
+            const knobs = packKnobs({ time: a.TIME, rows: N });
+            const out = { shots: {}, refused: null };
+            for (const backend of ["webgpu", "webgl2"]) {
+                const cv = document.createElement("canvas"); cv.width = N; cv.height = N;
+                const dev = await requestDevice(cv, { backend, offscreen: backend === "webgpu" });
+                const pipe = dev.pipeline(badTvPipelineDesc());
+                for (const wrap of ["clamp", "repeat"]) {
+                    // linear filtering is what makes the address mode visible: at the seam the second tap is either
+                    // the far edge (repeat) or the near one again (clamp)
+                    const tex = dev.texture({ width: N, height: N, data: src, nearest: false, wrap });
+                    const px = (await dev.frame(({ pass }) => { pass.clear([0, 0, 0, 1]); pass.use(pipe);
+                        for (let i = 0; i < KNOB_ORDER.length; i++) pass.uniform(KNOB_ORDER[i], knobs[i]);
+                        pass.texture("tDiffuse", tex, 0); pass.draw(3); }, { read: true, depth: false })).pixels;
+                    out.shots[backend + ":" + wrap] = Array.from(px);
+                }
+                if (backend === "webgl2") { try { dev.texture({ width: N, height: N, data: src, wrap: "mirror" }); out.refused = "NOT REFUSED"; }
+                                            catch (e) { out.refused = String(e.message).slice(0, 160); } }
+            }
+            return out;
+        }` });
+        ok("the harness rendered one linear-filtered picture per backend per wrap", w.ok && w.result && Object.keys(w.result.shots).length === 4, w.ok ? Object.keys(w.result && w.result.shots || {}).join(",") : (w.reason || (w.pageErrors || []).join("; ")));
+        if (w.ok && w.result && Object.keys(w.result.shots).length === 4) {
+            const S4 = w.result.shots, total = N * N;
+            const diff = (a, b) => { let same = 0, worst = 0; const perRow = new Array(N).fill(0);
+                for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const i = (y * N + x) * 4; let d = 0;
+                    for (let c = 0; c < 3; c++) d = Math.max(d, Math.abs(a[i + c] - b[i + c]));
+                    if (d === 0) same++; else perRow[y]++; worst = Math.max(worst, d); }
+                const touched = perRow.filter((n) => n > 0);
+                return { same, worst, rows: touched.length, full: touched.filter((n) => n === N).length, singles: touched.filter((n) => n === 1).length, other: touched.filter((n) => n !== N && n !== 1).length }; };
+            const clampBoth = diff(S4["webgpu:clamp"], S4["webgl2:clamp"]), repeatBoth = diff(S4["webgpu:repeat"], S4["webgl2:repeat"]);
+            ok(`*** ONE named wrap, TWO backends, the SAME picture on every pixel -- clamp ${clampBoth.same}/${total}, repeat ${repeatBoth.same}/${total}, worst 0 both. This is what the comment removed at v4543 asserted and could not show ***`,
+               clampBoth.same === total && clampBoth.worst === 0 && repeatBoth.same === total && repeatBoth.worst === 0,
+               `clamp ${clampBoth.same}/${total} worst ${clampBoth.worst}; repeat ${repeatBoth.same}/${total} worst ${repeatBoth.worst}`);
+            const perBackend = ["webgpu", "webgl2"].map((b) => diff(S4[b + ":clamp"], S4[b + ":repeat"]));
+            ok(`  and the option is not a no-op: clamp and repeat DIFFER on each backend (${perBackend.map((d) => total - d.same).join(" and ")} pixels), by a lot where they differ (worst ${perBackend.map((d) => d.worst).join(", ")} of 255)`,
+               perBackend.every((d) => d.same < total && d.worst > 32), perBackend.map((d, i) => `${["webgpu", "webgl2"][i]}: ${total - d.same} differ, worst ${d.worst}`).join("; "));
+            // the SHAPE of the difference, not a bound on it: a first draft of this row asserted "at most 3 rows"
+            // from a half-remembered measurement and went red at 62. The effect wraps u and v with fract(), so an
+            // address mode can change exactly two things -- the v seam, which is ONE whole row, and the u seam,
+            // which is ONE PIXEL in every other row. That is what 125 of 4,096 is, and nothing else may differ.
+            ok(`  and they differ only where an address mode CAN differ: exactly one whole row (the v seam) and exactly one pixel in each of the others (the u seam), nothing in between -- ${perBackend.map((d) => `${d.full} full + ${d.singles} single`).join(", ")}`,
+               perBackend.every((d) => d.full === 1 && d.other === 0 && d.singles === d.rows - 1 && d.singles > 0),
+               perBackend.map((d, i) => `${["webgpu", "webgl2"][i]}: ${d.rows} rows touched -- ${d.full} full, ${d.singles} single, ${d.other} neither`).join("; "));
+            ok("  a wrap that is neither is refused BY NAME, not silently taken as whichever the backend prefers", /unknown texture wrap "mirror"/.test(w.result.refused || ""), String(w.result.refused).slice(0, 120));
+        }
+    }
+}
+
 // SABOTAGE LOG -- each applied, gate run, exit code read, file restored and its anchor re-grepped. MEASURED.
 //
 //   A  the sampler entries dropped from bindGroupFor() -> exit=1, 5 red. The bind group builds (layout "auto"
@@ -162,6 +227,22 @@ let r = null;
 //      pixel of a position-encoding source.
 //   C  update() made a no-op on the WebGPU texture handle -> exit=1, 2 red: "update() re-uploads" red for
 //      webgpu with 0 of 4,096 changed, green for webgl2 -- the leak-fix path checked per backend for this.
+// MEASURED at v4543 (section 4, the address mode). Applied to gfx/device.js, the named gate run, red count read,
+// source and emitted json restored and md5-verified. Baseline 0 red on both gates.
+//   HH the WebGPU sampler back to hard-coded "repeat" -> 3 red, and it reproduces the v4540 defect exactly: the two
+//      backends agree at repeat and read 3971/4096 at clamp, and "clamp vs repeat" on WebGPU differs by 0 pixels
+//      because both are repeat. That is the bug this round fixed, put back and caught.
+//   II the WebGL2 textures back to hard-coded CLAMP_TO_EDGE -> 3 red, the mirror image: 3971/4096 at repeat.
+//   JJ an unknown wrap taken as the default instead of refused -> 1 red ("NOT REFUSED"). A word the device does not
+//      know must not fall through to whichever mode a backend prefers, which is how this defect looked from a
+//      caller's side for as long as it existed.
+//   KK the bound texture's wrap never reaching the sampler (the option accepted and ignored on WebGPU) -> 3 red.
+//   LL the same edit graded from tools/ship/tslSource-selfcheck.mjs -> 1 red: three's RepeatWrapping texture asked
+//      for repeat and given clamp, and the device stops matching three's own render.
+//   No 0-RED among the five.
+//   And the BLAST RADIUS of defaulting both backends to clamp, measured rather than argued: every gate here that
+//   creates or binds a device texture -- 28 of them, device*, slug*, tsl*, badTv*, crt*, terrain, landing -- green,
+//   with exactly one caller (tslSource section 3, against three's RepeatWrapping texture) having to say `repeat`.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: PRESENTING TO A CANVAS ON WebGPU. This box loses the device on any canvas-targeted " +
     "render pass, so the WebGPU frames above went to an owned offscreen texture; the canvas path is the same " +
