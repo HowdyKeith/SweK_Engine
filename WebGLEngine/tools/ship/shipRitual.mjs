@@ -151,6 +151,24 @@ export const STEPS = [
         gate: "tools/ship/populationCensus-selfcheck.mjs",
     },
     {
+        id: "record-shapes",
+        what: "Record the SHAPE of every JSON record a gate reads, so a field that goes missing is named on the next run.",
+        command: "node tools/ship/recordShape.mjs --write",
+        // A writer that spells its fields by hand drops one and the record gets SMALLER WITHOUT LOOKING WRONG.
+        // Three times in one session -- an atlas key, a spawn flag, a finished map -- and every one of them
+        // read as a better number: a smaller corpus that still matched its own length, a skip count that rose,
+        // a sweep that reported fewer rows. Each was found by somebody reading a git status line or chasing a
+        // separate bug, which is not a mechanism.
+        //   The shape is read from the RECORD rather than from the code that writes it, because the writers are
+        //   not statically reachable: of the writeFileSync sites in this tree, only a small fraction hand
+        //   JSON.stringify an object literal AND name a path a static reader can resolve, and quickSweep -- the
+        //   writer of the third case -- is one of the misses. The numbers are in tools/ship/recordShape.mjs.
+        why: "the record must be refreshed by a step somebody performs, not by the gate that checks it. A check " +
+             "that rewrites its own expectation can never fail twice, which this tree has caught four times.",
+        verify: null,
+        gate: "tools/ship/recordShape-selfcheck.mjs",
+    },
+    {
         id: "derived-counts",
         what: "Refresh every derived count that is baked into a page (case-study's gate count, promptCost's device count).",
         // *** THIS STEP SAID "REFRESH" AND RAN THE CHECKER. *** The command was staleness-selfcheck.mjs, which

@@ -3764,6 +3764,40 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    // v4572 -- the 220th closing: the hand-spelled writer, and the check it asked for was not reachable.
+    since220: Object.freeze({
+        at: "v4572", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/recordShape-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/shipRitual.mjs"]),
+        verdict: "green, 751 ms, one new gate and one new ship step. *** A WRITER THAT SPELLS ITS FIELDS BY " +
+                 "HAND DROPS ONE AND THE RECORD GETS SMALLER WITHOUT LOOKING WRONG. *** Three times in one " +
+                 "session: tslRace's section-1 wholesale write deleted `atlas` and wgslCorpus quietly lost a " +
+                 "case, while crossBackend asserted results.length === corpus().length -- a corpus measured " +
+                 "against itself, which holds at ANY size; inputSets.encode kept writing the pre-rename flag " +
+                 "and every spawning gate became skippable, the count rising 956 to 1,121; quickSweep computed " +
+                 "`finished` and left it out of the object it writes, erasing 140 rows. EACH LOOKED LIKE A " +
+                 "SMALLER SET OR A BETTER NUMBER, and each was found by somebody reading a git status line. " +
+                 "*** THE ROUND AS FILED WAS A STATIC WRITER-TO-READER COMPARISON AND IT IS NOT REACHABLE, " +
+                 "WHICH WAS MEASURED RATHER THAN ASSUMED: *** 584 writeFileSync call sites, 85 handing " +
+                 "JSON.stringify an object literal, 15 whose path a static reader can resolve -- and " +
+                 "quickSweep, the writer of the third case, is one of the misses, because its path arrives " +
+                 "through DEFAULTS.timingsFile and a destructured argument. A check covering 15 of 584 while " +
+                 "carrying the word WRITERS in its name is a proxy reported as a fact, which is the defect " +
+                 "class the round is about, so it was not built and the number is recorded in its place. " +
+                 "tools/ship/recordShape.mjs reads the RECORD instead: two levels of key set -- the record's " +
+                 "own, and the UNION one level down, because the spawn flag lives there -- ratcheted so a " +
+                 "record may GAIN a field and losing one fails. The population is DERIVED from " +
+                 "input-sets.json rather than listed, 201 records with a shape to hold. *** AND THE " +
+                 "REPRODUCTION CORRECTED MY OWN ROW. *** I modelled case 2 as a loss plus a gain and said so " +
+                 "in the row's own message; restoring the old FLAGS name and re-recording all 1,255 gates " +
+                 "reported `1 LOST field(s), 0 gained`, because encode copies by out[g][f] = e[f], the new " +
+                 "name is assigned undefined, and JSON.stringify DROPS AN UNDEFINED VALUE. The record gains " +
+                 "nothing. It just gets one field smaller on every entry, silently, which is worse than a " +
+                 "rename and is why 1,121 read as success. The ratchet carries a DOOR from the first line -- " +
+                 "v4571 spent half a round on rows that forbade the repair they existed to prompt -- and the " +
+                 "door is shown OPENING rather than described, and is empty today.",
+    }),
     // v4571 -- the 219th closing: the five reds the killed bucket was hiding, and four of them were the check.
     since219: Object.freeze({
         at: "v4571", swept: 0, green: 0, red: 0,

@@ -241,8 +241,13 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // The new gate spells `ok(n, c, d = "")` where v4566's spelled `(name, cond, detail = "")`: same shape,
     // different parameter names, so it is a fortieth distinct text. Two in a row is worth watching -- this
     // row exists to notice a tree drifting toward everybody inventing their own assertion helper.
-    gates: 1616, usesOk: 1595, definesOk: 1587, importsOk: 0,
-    distinctDefinitions: 40, nameFirst: 1488, condFirst: 91, unknownSignature: 16,
+    // v4572 -- RE-TAKEN for one new gate, tools/ship/recordShape-selfcheck.mjs: gates 1616 -> 1617,
+    // usesOk 1595 -> 1596, definesOk 1587 -> 1588, nameFirst 1488 -> 1489. distinctDefinitions holds
+    // at 40 -- the new gate uses the ok(name, cond, detail) shape already counted, which is the
+    // point of that row: a gate adding a FORTY-FIRST spelling of the same idea is the thing worth
+    // noticing, and this one does not.
+    gates: 1617, usesOk: 1596, definesOk: 1588, importsOk: 0,
+    distinctDefinitions: 40, nameFirst: 1489, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([
