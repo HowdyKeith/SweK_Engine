@@ -498,7 +498,17 @@ if (process.env.SWEK_QUICKSWEEP !== "0") {
     // tools/ship/tools/ship/quickSweep.mjs before verify ever ran it.
     const { runQuickSweep } = await import("./quickSweep.mjs");
     const budgetMs = Number(arg("--sweep-budget") || 3000);
-    const r = await runQuickSweep({ budgetMs, onProgress: (d, t) => { if (d === t || d % 200 === 0) process.stderr.write(`[verify] quick sweep ${d}/${t}\n`); } });
+    // *** v4574 -- THE SHIP-TIME SWEEP IS EXPLICITLY FULL, AND THAT IS THE POINT OF ARMING THE OTHER ONE. ***
+    // quickSweep's CLI now skips gates whose recorded inputs did not move, which is worth ~5 minutes on every
+    // sweep somebody runs while working. A SHIP IS NOT THAT. The saving buys iteration speed; what it spends
+    // is a small, bounded, MEASURED chance that a gate which should have run did not -- and the one place
+    // this tree must not spend that is the run whose output is "ALL GREEN, safe to present_files".
+    //
+    // So it is passed EXPLICITLY even though the programmatic default is already false. That default is a
+    // thing somebody changes for a good reason somewhere else -- v4574 changed it to true for about ten
+    // minutes before sweepCoverage-selfcheck showed why that was wrong -- and an argument at the call site
+    // is a decision THIS file made, which the next person to arm something can see was considered here.
+    const r = await runQuickSweep({ budgetMs, skipUnchanged: false, onProgress: (d, t) => { if (d === t || d % 200 === 0) process.stderr.write(`[verify] quick sweep ${d}/${t}\n`); } });
     console.log(`[verify] quick sweep: ${r.ran} of ${r.enumerated} gates under ${budgetMs} ms in ${(r.ms / 1000).toFixed(0)} s -- ${r.green} green, ` +
       `${r.knownRed.length} known red, ${r.newRed.length} NEW red, ${r.falseReds} false red, ${r.unmeasured.length} unmeasured, ${r.dropped.length} now over budget`);
     for (const k of r.knownRed) console.log(`[verify]   known red  ${k.gate}  (${k.record})`);

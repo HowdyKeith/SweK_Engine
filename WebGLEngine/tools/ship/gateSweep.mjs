@@ -3764,6 +3764,41 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    // v4574 -- the 223rd closing: armed, at the command line only, after arming it everywhere first.
+    since223: Object.freeze({
+        // NO NEW GATE this round -- three rows added to an existing one, so the swept/green/red triple is
+        // zero rather than one. closingCoverage-selfcheck sums these against the named gates and said so.
+        at: "v4574", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/quickSweep.mjs", "tools/ship/quickSweep-selfcheck.mjs",
+                                "tools/ship/inputSets.mjs", "tools/ship/verify.mjs"]),
+        verdict: "green, three rows, no new gate. THE INCREMENTAL SWEEP IS ARMED: typing the command now skips " +
+                 "gates whose recorded inputs did not move. 926 of 1,258 skipped -- 73.6% of gates but 54.1% " +
+                 "of recorded gate time, and 409 s of wall clock becomes 233 s, 43%. THE GAP BETWEEN 73.6 AND " +
+                 "43 IS THE POINT AND IS RECORDED RATHER THAN ROUNDED AWAY: the gates that always run are also " +
+                 "the slow ones. What still runs, by reason and by cost -- 104 gates / 174 s spawn a child the " +
+                 "probe cannot follow, 133 / 132 s reach a module their recorded set does not carry (v4573's " +
+                 "bound, and that is its price in seconds), 73 / 93 s had an input change, 22 / 17 s open a " +
+                 "socket. *** AND THE FIRST WAY I ARMED IT WAS WRONG, WHICH A GATE SAID WITHIN THE MINUTE. *** " +
+                 "Flipping runQuickSweep's own default to true armed it for EVERY caller at once -- nine " +
+                 "besides the command line, almost all fixtures that drive the sweep to watch what it does -- " +
+                 "and sweepCoverage-selfcheck reported '0 gates run at a 1 ms budget, 0 confirmed alone', " +
+                 "because the sweep it was testing had skipped everything. A FIXTURE THAT SKIPS ITS OWN " +
+                 "SUBJECT IS VACUOUS, and it would have passed silently had it asserted a little less. The " +
+                 "default lives in the CLI block now and not in the function: typing the command skips, " +
+                 "calling the function does not, and the caller nobody has written yet inherits the safe one. " +
+                 "verify.mjs passes skipUnchanged:false EXPLICITLY anyway, because the saving buys iteration " +
+                 "speed and spends a small measured chance that a gate which should have run did not, and the " +
+                 "one run this tree must not spend that on is the one whose output is ALL GREEN. *** THE " +
+                 "RECORD'S OWN FORMAT IS CHECKED NOW AND NEVER WAS: *** FORMAT has been written into every " +
+                 "record since v4566 and nothing read it. While the mechanism only COUNTED that cost nothing. " +
+                 "Armed, it is the difference between a stale record and a wrong one -- the encoding is " +
+                 "INDEXED, so a record written under a different layout does not fail to decode, it decodes to " +
+                 "THE WRONG PATHS, hashes them, finds them unchanged, and skips. One line covers the missing " +
+                 "record too, and the histogram says it once rather than 1,257 times. Sabotages OO and PP red " +
+                 "by name: the dangerous default put back on the function, and verify allowed to inherit it.",
+    }),
     // v4573 -- the 222nd closing: the blocker was a sentence, and it is now two properties and a price.
     since222: Object.freeze({
         at: "v4573", swept: 1, green: 1, red: 0,
