@@ -42,6 +42,9 @@ import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
 import fs from "node:fs";
 import path from "node:path";   // used by renderThreePassToPixels, which serves the engine tree over HTTP
 import { storageWords } from "./headlessGpu.mjs";   // v4457 -- the storage-input packing both harnesses share
+// the software-adapter names live in ONE place -- rewriting the regex here would be a second copy of a
+// list that ui/localModelProbe.js already owns and tools/ship/localModelProbe-selfcheck.mjs already gates
+import { SOFTWARE_HINTS } from "../../ui/localModelProbe.js";
 
 /** The flags that worked, kept as data so a caller can report them and a future box can extend the list. */
 export const LAUNCH_ARGS = Object.freeze(["--enable-unsafe-webgpu"]);
@@ -692,7 +695,7 @@ export async function runWgslComputeToTexture({ code, entryPoint = "main", n = 6
 export async function runInEngineOrigin({ engineRoot, script, args = null, timeoutMs = 120000 }) {
     const requireFn = createRequire(import.meta.url);
     const skip = webgpuSkipReason(requireFn);
-    if (skip) return { ok: false, skipped: true, reason: skip, result: null, pageErrors: [] };
+    if (skip) return { ok: false, skipped: true, reason: skip, result: null, pageErrors: [], adapter: null, software: null };
     const pw = resolvePlaywright(requireFn);
     const root = path.resolve(engineRoot);
     // v4502: .wasm as application/wasm -- a page smoked here through an iframe loads vendor/box3d through the browser loader, whose
@@ -717,6 +720,28 @@ export async function runInEngineOrigin({ engineRoot, script, args = null, timeo
         page.on("console", (m) => { const t = m.text(); if (t.startsWith("[swek-step] ")) lastStep = t.slice(12, 200); else if (m.type() === "error") pageErrors.push("console: " + t.slice(0, 300)); });
         page.setDefaultTimeout(timeoutMs);
         await page.goto(`http://${SECURE_HOST}:${srv.address().port}/`);
+        // *** WHAT THE ADAPTER ACTUALLY IS, BECAUSE dev.backend SAYS "webgpu" AND MEANS IT ON A CPU TOO. ***
+        // Measured at v4561: every device row this harness has run in this container has been Google's
+        // SwiftShader -- a software rasteriser -- and none of the 109 gates that call this function had any
+        // way to know. Parity claims are unharmed by that; a TIMING claim is not a GPU timing at all, and the
+        // round that went looking for one nearly published a software ratio as a device ratio.
+        // Asked ONCE, here, so no gate has to remember to ask, and never throwing: an adapter that cannot be
+        // described is reported as null rather than failing somebody else's parity run.
+        const adapter = await page.evaluate(async () => {
+            try {
+                if (!navigator.gpu) return null;
+                const a = await navigator.gpu.requestAdapter();
+                if (!a) return null;
+                const i = a.info || (a.requestAdapterInfo ? await a.requestAdapterInfo() : null) || {};
+                return { vendor: i.vendor || null, architecture: i.architecture || null,
+                         device: i.device || null, description: i.description || null,
+                         // the spec's own flag is the right instrument and is ABSENT in this Chromium, so it
+                         // is read when present and the name match is the weaker fallback -- see SOFTWARE_HINTS
+                         isFallback: ("isFallbackAdapter" in a) ? !!a.isFallbackAdapter : null };
+            } catch { return null; }
+        }).catch(() => null);
+        const software = adapter ? (adapter.isFallback === true ||
+            SOFTWARE_HINTS.test([adapter.vendor, adapter.architecture, adapter.device, adapter.description].filter(Boolean).join(" "))) : null;
         // The script is compiled IN the page from its source text: page.evaluate with a string is an expression
         // in some Playwright versions and a callable in others, and a function that returns a function comes
         // back unserialisable as undefined. new Function makes the contract explicit.
@@ -742,8 +767,9 @@ export async function runInEngineOrigin({ engineRoot, script, args = null, timeo
             out.reason += probe == null ? "; the page answered the probe but named no step (set globalThis.__swekStep to be told which)" : "; last step: " + probe;
             if (lastStep != null) out.reason += "; last step logged before that: " + lastStep;
         }
-        return { skipped: false, ok: out.ok, result: out.ok ? out.result : null, reason: out.ok ? null : out.reason, pageErrors };
+        return { skipped: false, ok: out.ok, result: out.ok ? out.result : null, reason: out.ok ? null : out.reason,
+                 pageErrors, adapter, software };
     } catch (e) {
-        return { ok: false, skipped: false, reason: "harness error: " + String(e).slice(0, 300), result: null, pageErrors: [] };
+        return { ok: false, skipped: false, reason: "harness error: " + String(e).slice(0, 300), result: null, pageErrors: [], adapter: null, software: null };
     } finally { try { await browser?.close(); } catch {} srv.close(); }
 }

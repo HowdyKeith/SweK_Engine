@@ -3767,6 +3767,58 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since220: Object.freeze({
+        at: "v4561", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/ringFloorCost-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 1.30 s (1280/1304/1284 over three serial runs), under the 3000 ms budget -- AFTER a " +
+                 "first version that ran 17.4 s, which is the over-budget fault v4551, v4553, v4558 and v4559 " +
+                 "each recorded, made a fifth time and worse than any of them. *** WHAT THE DERIVED FLOOR " +
+                 "COSTS: 7.6% of the ring push it would run beside, at 128x128. *** v4560 left this as its " +
+                 "own named gap. Nothing here asserts a duration -- meshPerf-selfcheck already says a speed " +
+                 "threshold is a flaky gate, and sweep-timings' note records this box moving 12-36% between " +
+                 "hours -- so the claim is a RATIO taken in one process with the two subjects INTERLEAVED " +
+                 "A/B/A, and the ratio's own spread is measured before the ratio is used: 5-8% of median over " +
+                 "five repeats. The assertion's threshold is derived from the claim it protects rather than " +
+                 "picked, namely that the error bar does not reach the line being asserted against; it clears " +
+                 "it by 69-95x. AND IT BEATS ITS OWN OP-COUNT PREDICTION BY 3.5x: 21 array touches per pixel " +
+                 "against the push's 79 predicts 0.266 and it measures 0.076, because the push is " +
+                 "BANDWIDTH-bound on 64 bytes of ring per pixel while the estimator's stencil stays in cache. " +
+                 "Its per-pixel cost is flat with resolution (473 -> 475 ns) where the estimator's is not " +
+                 "(34 -> 37 ns), the y-stencil starting to cross the row stride. *** THE OBVIOUS " +
+                 "OPTIMISATION IS UNSAFE AND FAILS IN THE WORST POSSIBLE DIRECTION. *** The floor is a MAX, " +
+                 "so a sampled max can only go DOWN, which is the direction that sets a margin below the " +
+                 "noise. At 1-in-64 it is within 1% on the smooth, finer and chequer fixtures -- which is " +
+                 "exactly why it looks free -- and reports EXACTLY ZERO on the edge, a 100% under-report " +
+                 "saying there is no noise to clear. The three that survive have their worst pixel " +
+                 "EVERYWHERE; the one that fails has it in a single column. Sampling is safe precisely when " +
+                 "the feature is common, and a rare high-error feature is what a lock is for. *** AND THE " +
+                 "DEVICE COST IS NOT MEASURABLE IN THIS CONTAINER, WHICH THIS ROUND FOUND BY NEARLY " +
+                 "PUBLISHING IT. *** A dispatch ratio was measured -- 0.68 at 128x128, against 0.076 on the " +
+                 "CPU, an inversion striking enough to be the headline -- and only then was the adapter " +
+                 "asked: vendor google, architecture SWIFTSHADER, a software rasteriser. dev.backend reads " +
+                 "\"webgpu\" and means a CPU running WGSL. Every device row this arc has written, all ten of " +
+                 "them, ran there, and none of the 109 gates calling runInEngineOrigin had any way to know, " +
+                 "because the harness never returned the adapter. It does now, for all of them, using " +
+                 "ui/localModelProbe.js's SOFTWARE_HINTS rather than a second copy of that list. WHAT IS NOT " +
+                 "RETRACTED: parity is parity whatever executes it -- the ten existing rows stand; it is the " +
+                 "TIMING claim alone the adapter invalidates, and the 0.68 is recorded here as a software " +
+                 "measurement and asserted nowhere. Seven sabotages red at 1/2/4/2/5/12/2 against three " +
+                 "gates. *** ONE WENT 0-RED AND IT WAS THE ROUND'S BEST FINDING: *** narrowing the range " +
+                 "stencil from five taps to three changed NOTHING any gate could see, because all four of " +
+                 "v4560's contents classify identically under both -- the 47x gap that makes tau robust is " +
+                 "far too wide for a stencil change to cross. v4560's own row noted its contents sit 39, 14, " +
+                 "3.1 and 4.0 samples per period against tau's 7.9 and read that as a virtue: the threshold " +
+                 "is not fitted to the data. It is ALSO A HOLE -- no fixture exercised the regime boundary, " +
+                 "so anything mattering only there was invisible. Measured on content built AT the " +
+                 "threshold, three taps read 2.92x of truth where five read 1.66x, and flip 79% of the frame " +
+                 "to the step bound. Not wrong, since a smaller range only pushes the bound UP, but LOOSER, " +
+                 "and the tightness is what v4560 spent a round earning. ringFloor-selfcheck now carries the " +
+                 "threshold fixture and two rows that pin the width; its runtime is re-taken at 0.90 s.",
+    }),
     since219: Object.freeze({
         at: "v4560", swept: 1, green: 1, red: 0,
         added: Object.freeze([

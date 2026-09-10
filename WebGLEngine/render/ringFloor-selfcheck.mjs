@@ -37,6 +37,12 @@ const CONTENT = {
     finer: (wx, wy) => 0.5 + 0.45 * Math.sin(wx * 1.4) * Math.cos(wy * 1.1),
     chequer: (wx, wy) => ((Math.floor(wx * 5.3) + Math.floor(wy * 5.3)) & 1) ? 0.92 : 0.06,
     edge: (wx) => wx < 0.37 ? 0.06 : 0.92,
+    // *** AND ONE AT THE THRESHOLD, WHICH v4560's FOUR DID NOT COVER. *** That round's own row observed the
+    // four contents sit 39, 14, 3.1 and 4.0 samples per period against tau's 7.9, and read it as a virtue:
+    // none of them fitted the threshold. It is also a HOLE. Anything that only matters near the regime
+    // boundary was invisible, and v4561's sabotage found one -- narrowing the range stencil from five taps to
+    // three changed NOTHING on all four, and changes the estimate by 76% here.
+    near: (wx, wy) => 0.5 + 0.45 * Math.sin(wx * 3.1) * Math.cos(wy * 2.4),
 };
 const HALF_TEXEL = 0.5 * (2 * HALF / W);
 
@@ -128,6 +134,24 @@ const RATIO = {};
         `smooth ${(RATIO["smooth:8"].u*100).toFixed(0)}%, finer ${(RATIO["finer:8"].u*100).toFixed(0)}%, chequer ${(RATIO["chequer:8"].u*100).toFixed(0)}%, edge ${(RATIO["edge:8"].u*100).toFixed(0)}%`);
 }
 
+console.log("\n2b. *** THE RANGE STENCIL'S WIDTH, WHICH NOTHING PINNED UNTIL A SABOTAGE WENT 0-RED ***");
+{
+    // v4561 narrowed neighbourhood()'s range from five taps to three and every gate stayed green. The four
+    // original contents classify identically under both, because the 47x gap is far too wide for a stencil
+    // change to move anything across it. Content AT the threshold is the only thing that can tell them apart,
+    // and until `near` existed there was none. The narrower stencil is not WRONG -- a smaller range makes
+    // |D3|/range larger, so more pixels read unresolved and the bound only ever goes UP -- it is LOOSER, and
+    // tightness near the boundary is exactly what v4560 spent a round earning.
+    const q = SW["near:8"], t = truth(CONTENT.near, q, P);
+    const five = ringFloorCPU(q.luma, q.motion, W, H, P);
+    report(`at the threshold: truth ${t.worst.toExponential(2)}, five-tap range ${five.worst.toExponential(2)} (${(five.worst / t.worst).toFixed(2)}x), unresolved ${(five.unresolvedFraction * 100).toFixed(0)}%`);
+    ok("the threshold fixture is genuinely at the boundary -- resolved under the module's stencil, and near enough that a narrower one would flip it",
+        five.unresolvedFraction < 0.2 && t.n > 0, `unresolved ${(five.unresolvedFraction * 100).toFixed(0)}%, ${t.n} pixels with a full ring`);
+    ok(`*** and the five-tap range earns its width here: it holds the estimate to ${(five.worst / t.worst).toFixed(2)}x where a three-tap range reads 2.92x and flips 79% of the frame to the step bound -- safe either way, but the tightness is the whole point ***`,
+        five.worst >= t.worst && five.worst / t.worst < 2.0,
+        `five-tap ${(five.worst / t.worst).toFixed(2)}x; the three-tap figure is v4561's measurement, recorded in the closing`);
+}
+
 console.log("\n3. THE THRESHOLD SITS IN A MEASURED GAP, AND IT NAMES A RESOLUTION");
 {
     const stat = (fn) => {
@@ -143,7 +167,10 @@ console.log("\n3. THE THRESHOLD SITS IN A MEASURED GAP, AND IT NAMES A RESOLUTIO
         }
         return worst;
     };
-    const sm = stat(CONTENT.smooth), fi = stat(CONTENT.finer), ch = stat(CONTENT.chequer), ed = stat(CONTENT.edge);
+    const sm = stat(CONTENT.smooth), fi = stat(CONTENT.finer), ch = stat(CONTENT.chequer), ed = stat(CONTENT.edge), nr = stat(CONTENT.near);
+    // the threshold fixture sits BETWEEN the two groups by construction, so it is reported beside the gap
+    // rather than inside it -- folding it into either extreme would shrink the gap by moving its own edge
+    report(`the threshold fixture reads ${nr.toFixed(4)}, which is ${(nr / Math.max(sm, fi)).toFixed(0)}x above the resolved group and ${(Math.min(ch, ed) / nr).toFixed(0)}x below the unresolved one -- inside the gap, which is what makes it able to pin the stencil`);
     report(`|D3| / range, worst over the interior: smooth ${sm.toFixed(4)}, finer ${fi.toFixed(4)}, chequer ${ch.toFixed(2)}, edge ${ed.toFixed(2)}`);
     ok(`*** the statistic separates the two regimes by ${(Math.min(ch, ed) / Math.max(sm, fi)).toFixed(0)}x with nothing in between, so the threshold is chosen from a GAP rather than fitted to the data ***`,
         Math.min(ch, ed) / Math.max(sm, fi) > 15 && RESOLUTION_TAU > Math.max(sm, fi) && RESOLUTION_TAU < Math.min(ch, ed),
