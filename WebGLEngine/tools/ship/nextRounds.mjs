@@ -324,39 +324,44 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "shader-files-outside-every-census",
-        blocker: "OPEN",
-        what: "TEN OF THIS TREE'S 26 STANDALONE SHADER FILES ARE REACHED BY NO RUNTIME CODE, AND NO INSTRUMENT "
-            + "HERE CAN SEE IT. tools/ship/orphanScan.mjs is the reachability census and it walks .js and .mjs "
-            + "only -- it reports 7 orphan modules of 4,068 scanned and has never had a .glsl, .frag, .vert or "
-            + ".wgsl file in its population. Measured at v4579 over every .js/.mjs/.html outside the gates and "
-            + "the bookkeeping JSON: brain/transport/shaders/filter-packed.wgsl, gpu/waterScreen.frag.glsl, "
-            + "shaders/biome.frag.glsl, shaders/biome.vert.glsl, shaders/ghost.frag.glsl, "
-            + "shaders/selection.frag.glsl, shaders/selection.vert.glsl, shaders/transitions/swekCrossfade.glsl, "
-            + "shaders/transitions/swekIris.glsl and shaders/voxel.frag.glsl.",
-        how: "The measurement is already written and is three rules long: walk for the four shader extensions; "
-            + "search only RUNTIME code (.js/.mjs/.cjs/.html, excluding -selfcheck.mjs, tools/ship/ and okf/) "
-            + "for the basename; report the rest. *** THE ONE TRAP IS WHAT COUNTS AS A REFERENCE, AND THE FIRST "
-            + "PASS AT THIS READ 0 ORPHANS OF 26. *** tools/ship/input-sets.json names almost every shader file "
-            + "in the tree -- it is the incremental sweep's record of what a GATE READ while walking, which is "
-            + "not a page loading it. Same for tools/.incremental-manifest.json, knowledge-index.json and the "
-            + "okf/ claim documents, which are prose. Counting bookkeeping as reachability makes every dead "
-            + "file look live, which is the exact shape of a check that cannot fail.",
+        blocker: "CLOSED",
+        what: "CLOSED AT v4581, AND THE NUMBER IN THIS ENTRY WAS WRONG IN BOTH DIRECTIONS. A standalone shader "
+            + "file was in no reachability census in this tree: tools/ship/orphanScan.mjs's population was CODE, "
+            + "and CODE was .js and .mjs. It is scanned now -- one implementation, two populations -- and the "
+            + "answer is ELEVEN of 26 loaded by nothing, not the ten filed here. My ten included "
+            + "brain/transport/shaders/filter-packed.wgsl, which tools/ship/wgslCorpus.mjs really does open with "
+            + "readFileSync, and MISSED shaders/transitions/swekWipe.glsl and shaders/waterReflectRefract.frag"
+            + ".glsl. BOTH MISSES HAVE ONE CAUSE: my v4579 scan did not strip comments, so four `//` lines "
+            + "naming waterReflectRefract and one naming swekWipe.glsl counted as references. That is the "
+            + "defect orphanScan's own header spends a paragraph on -- \"PROSE IS NOT REACHABILITY, and this "
+            + "cost a round to learn\" -- committed by the person reading it.",
+        how: "*** AND FILING THIS ITEM IS WHAT WOULD HAVE HIDDEN ITS OWN SUBJECT. *** The entry listed all ten "
+            + "paths in its `what`, and FOUR of them -- shaders/ghost.frag.glsl, shaders/selection.frag.glsl, "
+            + "shaders/selection.vert.glsl, shaders/biome.vert.glsl -- are named by nothing else in the tree. "
+            + "The moment shaders entered the population, the backlog entry scheduling the round would have "
+            + "made its subjects read as reached. That is the FIFTH face of a trap orphanScan's header already "
+            + "describes four times: its own header comment, prose docs, its own output, and a tooltip. "
+            + "tools/ship/nextRounds.mjs is a report module now, with render/exactHash.mjs -- whose "
+            + "SHADER_SINHASH_V4578 carries a `notLoaded` array, a record whose CONTENT is \"nothing loads "
+            + "these\" and which was the reason the scanner believed something did -- and tools/ship/gateSweep"
+            + ".mjs, whose closing records hold 348 gate paths as history. Zeroing those three revealed "
+            + "tools/mutate/mechanicalSweep.mjs among the MODULES, correctly: its only three importers are all "
+            + "gates, and tools/mutate is the same class of directory as tools/ship, where being read by a gate "
+            + "IS the module's purpose. The gate-tool rule named one directory where two qualify.",
         why: "shaders/biome.frag.glsl is the worked example and it cost a round to find. It picks desert / "
             + "plains / forest on `b < 0.33` and `b < 0.66` -- a THRESHOLD on a sin-hash, which v4569 "
             + "established is where CPU/GPU divergence changes what EXISTS rather than how it looks -- and it "
-            + "carries the comment \"BIOME DETECTION (matches JS logic conceptually)\", which is the same kind "
-            + "of claim render/holoFoilShader.js's \"matching the model's hash2\" turned out to be false about. "
-            + "So v4578 filed it as a threshold site worth its own round. NOTHING LOADS IT. The live biome "
-            + "classification is world/worleyBiomes behind biome-map-demo.html, and this file is not wired to "
-            + "it, so its claim cannot be checked against anything and its threshold decides nothing. A round "
-            + "was budgeted for a file no page runs, and the tree had no way to say so.",
-        upstream: "Nothing blocks it. The judgement it needs is what to DO with the ten, and that is not a "
-            + "mechanical answer: a shader kept as a reference, a demo somebody means to rewire, and a file "
-            + "left behind by a deletion all look identical from outside. This is round #31's finding (\".cjs "
-            + "files are outside every census this tree runs\") in a second extension, and #31's own note "
-            + "applies unchanged -- a dozen gates own PRIVATE walks with their own extension rules, so "
-            + "widening orphanScan alone would leave most of them still blind. What is owed first is that "
-            + "nothing distinguishes a deliberate keep from an oversight, which is the actual defect.",
+            + "carries \"BIOME DETECTION (matches JS logic conceptually)\", the same kind of claim "
+            + "render/holoFoilShader.js's \"matching the model's hash2\" turned out to be false about. So "
+            + "v4578 filed it as a threshold site worth its own round. NOTHING LOADS IT, and the tree had no "
+            + "way to say so.",
+        upstream: "WHAT IS NOT DONE: the eleven are a BASELINE, not a deletion list. orphan-baseline.json "
+            + "carries them with the reason stated -- a shader kept as a reference, a demo somebody means to "
+            + "rewire and a leftover from a deletion look identical from outside, and that judgement is Keith's "
+            + "rather than a scanner's. The ratchet refuses growth; shrinking the list is the point. Also not "
+            + "done: the dozen gates that own PRIVATE walks with their own extension rules are still blind to "
+            + "shader files -- this round changed the SHARED census, which is what the others build on, and "
+            + "#31's own note said the same thing about .cjs.",
     },
     {
         id: "sin-hash-everywhere-else",

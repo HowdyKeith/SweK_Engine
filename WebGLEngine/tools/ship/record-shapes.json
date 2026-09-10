@@ -1,6 +1,6 @@
 {
  "generatedFrom": "tools/ship/recordShape.mjs",
- "at": "2026-09-10T14:46:47.738Z",
+ "at": "2026-09-10T15:29:50.293Z",
  "note": "Top-level and one-level-down key sets for every JSON record a gate reads. A record may GAIN a key; losing one is a dropped field and fails recordShape-selfcheck. A deliberate removal is recorded in DROPPED_ON_PURPOSE in tools/ship/recordShape.mjs, not by editing this file until it passes.",
  "shapes": {
   "GPU_Assets/mesh_0/mesh.json": {
@@ -2441,7 +2441,11 @@
     "captured",
     "count",
     "files",
-    "note"
+    "note",
+    "shaderCaptured",
+    "shaderCount",
+    "shaderNote",
+    "shaders"
    ],
    "entry": []
   },

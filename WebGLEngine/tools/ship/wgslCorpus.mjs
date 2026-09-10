@@ -532,7 +532,12 @@ export function corpus() {
           opts: { code: MAGMAP_SHIPPED_WGSL, entryPoint: "k_magmap", compileOnly: true, outCount: 0 } },
         ...TRANSPORT_FILES.map((f) => ({
           id: "brain/transport/shaders/" + f, from: "brain/transport/shaders/" + f, compileOnly: true,
-          why: "one pass of the brain's prime-transport pipeline (brain/transport/pipeline.js reads it with readText and binds it by its own layout); a .wgsl file, which the census could not see until v4472",
+          // v4581 -- THIS `why` WAS FALSE FOR ONE OF THE EIGHT AND TRUE FOR THE REST. brain/transport/pipeline.js
+          // loads filter.wgsl, scan.wgsl and scatter.wgsl by name; it never mentions filter-packed.wgsl, and
+          // tools/ship/orphanScan.mjs's new shader population is what made that visible -- this corpus's own
+          // readFileSync is the ONLY thing in the tree that opens that file, so the corpus is its consumer
+          // rather than a second witness to the pipeline's.
+          why: "one pass of the brain's prime-transport pipeline; brain/transport/pipeline.js reads filter, scan and scatter with readText and binds them by their own layouts, but NOT filter-packed -- for that one this corpus is the only reader in the tree. A .wgsl file, which the census could not see until v4472",
           opts: { code: fs.readFileSync(path.join(ENG, "brain/transport/shaders", f), "utf8"), entryPoint: "main", compileOnly: true, outCount: 0 } })),
         { id: "slugShaderWgsl.slugDilateProbeWgsl", from: "text/slugShaderWgsl.js",
           why: "SlugDilate under a matrix with a live perspective row: the half-pixel push whose per-axis error the v4457 note wrote down",
