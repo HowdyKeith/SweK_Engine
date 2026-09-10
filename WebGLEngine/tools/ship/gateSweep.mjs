@@ -3767,6 +3767,50 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since223: Object.freeze({
+        at: "v4564", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/ringFloorControl-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 0.31 s, under the 3000 ms budget. *** v4563 REPORTED 28.9% CHURN AND HAD NOTHING TO " +
+                 "COMPARE IT AGAINST. *** This round builds the ladder: the SCENE alone, with no ring in the " +
+                 "picture, churns 8.3% because the camera is moving and features genuinely enter and leave; " +
+                 "the ring at the fixed 0.05 churns 10.7%; a PERFECT per-pixel margin, derived from the error " +
+                 "actually there, churns 14.8%; the estimator churns 27.7%. *** SO A PERFECT MARGIN CHURNS " +
+                 "MORE THAN A CONSTANT ONE, AND PER-PIXEL CHURN IS INTRINSIC RATHER THAN ESTIMATOR ERROR. *** " +
+                 "The oracle also finds MORE ridges than either (411 against 305), so its extra churn is the " +
+                 "price of tracking, not of caution. v4563's number has a floor of 14.8% and not of zero. " +
+                 "*** AND MEASURING THAT FOUND SOMETHING WORSE THAN THE CHURN: THE ESTIMATOR WAS NEVER A " +
+                 "BOUND PER PIXEL, AND v4563 SPENT IT PER PIXEL. *** Every safety row from v4560 on compared " +
+                 "the frame's WORST estimate against the frame's WORST error -- a frame-wide claim, and it " +
+                 "holds on 14 of 14 frames. Per pixel the same numbers are BELOW the error actually present " +
+                 "at 21.5% of pixels, 36.4% of those on the resolved branch. v4563's own safety row could " +
+                 "not see it: it compared each ridge against the floor its margin was derived from, which " +
+                 "can only ever return zero. THE REASON IS ONE v4562 WROTE DOWN ABOUT A DIFFERENT FORM AND " +
+                 "NOBODY FOLLOWED THROUGH -- the ring's window spans P frames at P jitter phases, so THIS " +
+                 "frame's f does not bound the window's worst; frame-wide it washes out because some pixel " +
+                 "always has a large phase. The repair is to use the phase factor's MAXIMUM, 0.25, instead of " +
+                 "this frame's: from 21.5% under to 0.03%, four pixels in 12,348, split across both branches " +
+                 "-- so what is left is the curvature surrogate rather than the phase. It costs 19x on the " +
+                 "resolved branch, which is what a bound that holds at every pixel costs over one that holds " +
+                 "across a frame. ringFloorCPU takes a `phase` of \"frame\" (the default, so every number " +
+                 "v4560-v4562 recorded is unchanged) or \"window\"; marginsFromFloor now REFUSES the frame " +
+                 "form outright and the floor pool carries the form with the numbers, which caught this " +
+                 "round's own gates twice while they were being corrected. *** AND CORRECTING v4563's TABLE " +
+                 "CHANGED ITS HEADLINE: *** pooling was measured there as halving the churn, 51.8% to 28.9%. " +
+                 "Most of what it removed was phase noise the frame-form bound should never have carried. On " +
+                 "the window form the margin starts steady -- 15% p90 rather than 30% -- and pooling buys 15% " +
+                 "of the churn, not 50%. The four-fold steadying of the margin itself survives. Section 2 " +
+                 "locates the remaining gap to the oracle in ONE branch: the step bound runs 90x loose at " +
+                 "the median where the Taylor bound runs 17x, on 41% of on-plane pixels, and no uniform " +
+                 "scaling closes it -- dividing by 4 leaves the median 8.9x loose and already puts 2.13% of " +
+                 "pixels under their own error. Seven sabotages red at 4/3/10/2/2/1/1 against five gates. MA " +
+                 "restores exactly what v4563 shipped and now scores four; when v4563 did it nothing went " +
+                 "red, and the difference is not better code but a measurement against the error actually " +
+                 "there instead of against the estimate.",
+    }),
     since222: Object.freeze({
         at: "v4563", swept: 1, green: 1, red: 0,
         added: Object.freeze([

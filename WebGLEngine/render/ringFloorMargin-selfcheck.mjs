@@ -63,8 +63,12 @@ const F = [];
         }
         const m = motionVectorsCPU(d, W, H, mat4Invert(VP(cx)), VP(cx - SPEED)).data;
         pushLuma(lu, { current: c, motion: m, w: W, h: H });
-        const inst = ringFloorCPU(L, m, W, H, P).per;
-        pushFloor(pool, inst);
+        // *** "window", NOT THE DEFAULT (v4564). *** Everything below spends the floor PER PIXEL, and the
+        // frame form is a bound on the frame's worst error rather than on each pixel's own -- measured
+        // below the error actually present at 21.5% of pixels. marginsFromFloor now refuses the frame
+        // form outright, which is how this gate's first version was caught still using it.
+        const inst = ringFloorCPU(L, m, W, H, P, undefined, "window").per;
+        pushFloor(pool, inst, "window");
         hist.push(j);
         if (f < 2 * P + 2) continue;
         const pooled = pooledFloor(pool);
@@ -72,7 +76,7 @@ const F = [];
         const mean = new Float32Array(W * H);
         for (const fp of pool.frames) for (let i = 0; i < W * H; i++) mean[i] += fp[i] / pool.frames.length;
         let wide = 0; for (let i = 0; i < W * H; i++) if (op[i]) wide = Math.max(wide, inst[i]);
-        const opt = { contrast: CONTRAST };
+        const opt = { contrast: CONTRAST, phase: "window" };
         F.push({ op, inst, pooledWhole: pooled.whole,
             mInst: marginsFromFloor(inst, W, H, ridgeMarginBounds, opt),
             mMean: marginsFromFloor(mean, W, H, ridgeMarginBounds, opt),
@@ -145,8 +149,13 @@ const ST = {};
     ok(`*** an unpooled per-pixel margin churns ${(ST["per-pixel, this frame"].churn / ST["arc's fixed 0.05"].churn).toFixed(1)}x the fixed one (${ST["per-pixel, this frame"].churn.toFixed(1)}% against ${ST["arc's fixed 0.05"].churn.toFixed(1)}%) -- and a lock that blinks is worse than no lock, because blinking is the artefact the lock exists to suppress ***`,
         ST["per-pixel, this frame"].churn > ST["arc's fixed 0.05"].churn * 3,
         `${ST["per-pixel, this frame"].churn.toFixed(1)}% vs ${ST["arc's fixed 0.05"].churn.toFixed(1)}%`);
-    ok(`*** pooling over one jitter period roughly halves it -- ${ST["per-pixel, period MAX"].churn.toFixed(1)}% -- and steadies the margin itself from ${(ST["per-pixel, this frame"].swing * 100).toFixed(0)}% to ${(ST["per-pixel, period MAX"].swing * 100).toFixed(0)}% p90, which is v4553's insight unchanged: any P consecutive frames span a whole jitter period ***`,
-        ST["per-pixel, period MAX"].churn < ST["per-pixel, this frame"].churn * 0.7 &&
+    // *** v4563 MEASURED POOLING AS HALVING THE CHURN AND v4564's FIX TOOK MOST OF THAT AWAY. *** That
+    // measurement was taken with the frame-phase floor, whose margin carries the jitter directly -- so
+    // pooling was removing phase noise the bound should not have had. The window form's phase factor is the
+    // CONSTANT 0.25, so its margin is already steady (15% p90 against the frame form's 30%) and pooling has
+    // much less left to remove: 15%, not 50%. The swing it buys is real and unchanged.
+    ok(`*** pooling over one jitter period still steadies the margin four-fold, ${(ST["per-pixel, this frame"].swing * 100).toFixed(0)}% to ${(ST["per-pixel, period MAX"].swing * 100).toFixed(0)}% p90 -- but it now buys only ${(100 - ST["per-pixel, period MAX"].churn / ST["per-pixel, this frame"].churn * 100).toFixed(0)}% of the churn, not the half v4563 measured, because that half was mostly phase noise the frame-form bound should never have carried ***`,
+        ST["per-pixel, period MAX"].churn < ST["per-pixel, this frame"].churn &&
         ST["per-pixel, period MAX"].swing < ST["per-pixel, this frame"].swing * 0.5,
         `churn ${ST["per-pixel, this frame"].churn.toFixed(1)}% -> ${ST["per-pixel, period MAX"].churn.toFixed(1)}%, swing ${(ST["per-pixel, this frame"].swing * 100).toFixed(0)}% -> ${(ST["per-pixel, period MAX"].swing * 100).toFixed(0)}%`);
     // *** AND THE POOL IS A MAX BECAUSE THE FLOOR IS A BOUND. ***
@@ -196,12 +205,28 @@ console.log("\n4. THE PIECES THIS ROUND ADDED, HELD TO WHAT THEY CLAIM");
         pooledFloor(p2).frames === P && pooledFloor(p2).data[0] === P + 1,
         `${pooledFloor(p2).frames} frames held, max ${pooledFloor(p2).data[0]} after pushing 1..${P + 1}`);
     ok("marginsFromFloor turns an infeasible pixel into Infinity, so nothing is a ridge there -- the honest reading of an empty interval, and the opposite of the zero that would make everything one",
-        (() => { const m = marginsFromFloor(new Float32Array([1e-6, 99]), 2, 1, ridgeMarginBounds, { contrast: CONTRAST });
+        (() => { const m = marginsFromFloor(new Float32Array([1e-6, 99]), 2, 1, ridgeMarginBounds, { contrast: CONTRAST, phase: "window" });
                  return m.data[1] === Infinity && m.feasible === 1 && ridgesCPU(new Float32Array([0, 1]), 2, 1, m.data).count === 0; })(),
         "an empty interval means nothing is lockable there, not that everything is");
     ok("  and it refuses to own the composition it is handed -- ridgeMarginBounds comes in as an argument, so there is one definition of the interval and not a second copy here",
-        (() => { try { marginsFromFloor(new Float32Array(4), 2, 2, null, {}); return false; } catch { return true; } })(),
+        (() => { try { marginsFromFloor(new Float32Array(4), 2, 2, null, { phase: "window" }); return false; } catch { return true; } })(),
         "passing something that is not the bounds function throws");
+    // *** AND IT REFUSES THE FRAME FORM, WHICH IS THE MISTAKE THIS GATE ITSELF SHIPPED AT v4563. *** That
+    // round composed a frame-wide bound into a per-pixel margin and nothing could tell; its own safety row
+    // compared each ridge against the floor its margin came from, which can only ever return zero. The guard
+    // caught this gate twice while it was being corrected, which is the only evidence worth having that it
+    // catches anything.
+    ok("*** marginsFromFloor refuses a floor that is not a per-pixel bound, rather than trusting the caller to have read a comment ***",
+        (() => { try { marginsFromFloor(new Float32Array(4), 2, 2, ridgeMarginBounds, { contrast: CONTRAST }); return false; }
+                 catch (e) { return /per-pixel bound/.test(String(e.message)); } })(),
+        "omitting the phase, or passing \"frame\", throws rather than quietly composing the wrong bound");
+    ok("  and a floor pool refuses to mix the two forms, so the phase travels with the numbers rather than in a caller's memory",
+        (() => { const q = makeFloorPool(2, 2, 2); pushFloor(q, new Float32Array(4), "window");
+                 try { pushFloor(q, new Float32Array(4), "frame"); return false; } catch { return pooledFloor(q).phase === "window"; } })(),
+        "a pool holding window floors rejects a frame one and keeps saying which it holds");
+    ok("  and ringFloorCPU refuses a phase it does not implement rather than defaulting to one of them",
+        (() => { try { ringFloorCPU(new Float32Array(64), null, 8, 8, P, undefined, "whichever"); return false; } catch { return true; } })(),
+        "an unknown phase name throws");
     ok(`  and every frame this gate scored had a pool that had seen a whole period, so none of section 2's numbers came from a partial one`,
         F.every((f) => f.pooledWhole), `${F.filter((f) => f.pooledWhole).length}/${F.length} frames`);
 

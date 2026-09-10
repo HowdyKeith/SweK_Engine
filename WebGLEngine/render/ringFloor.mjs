@@ -119,11 +119,38 @@ function neighbourhood(L, i, stride) {
  * under-predict -- measured at 0.98x of truth on the finer sinusoid, unsafe by 2%. Adding |D3| costs 10% of
  * tightness and buys a bound that did not go under on any content or period measured.
  */
-export function ringFloorCPU(luma, motion, w, h, period, tau = RESOLUTION_TAU) {
+/**
+ * *** THE PHASE FACTOR IS A CHOICE, AND WHICH ONE IS RIGHT DEPENDS ON THE QUESTION (v4564). ***
+ *
+ * "frame" uses THIS frame's sub-pixel phase, f(1-f). It is what v4560 built and it is tight -- a median
+ * 1.11x of the error actually there on the resolved branch. *** IT IS A BOUND ON THE FRAME'S WORST ERROR
+ * AND NOT ON EACH PIXEL'S OWN. *** Measured on a perspective ground plane: safe frame-wide on 14 of 14
+ * frames, and BELOW the error actually present at 21.5% of pixels -- 36.2% of those on the resolved branch.
+ * The reason is the one v4562 wrote down about a different form and nobody followed through: the ring's
+ * window spans P frames at P different jitter phases, so this frame's f does not bound the window's worst.
+ * Frame-wide that washes out, because some pixel in the frame always has a large phase. Per pixel it does
+ * not.
+ *
+ * "window" uses the largest value f(1-f) can take, which is 0.25 at f = 0.5, so it holds whatever phases the
+ * window happened to contain -- and the jitter guarantees it spans them. Measured: 0.0% of pixels below
+ * their own error, at 17.3x the median looseness. That is the price of a bound that holds per pixel.
+ *
+ * Use "frame" for a frame-wide number and "window" for anything spent per pixel. marginsFromFloor REFUSES
+ * the frame form, because v4563 spent one per pixel and the round could not tell.
+ */
+export function ringFloorCPU(luma, motion, w, h, period, tau = RESOLUTION_TAU, phase = "frame") {
     if (!luma || luma.length < w * h) throw new Error("ringFloorCPU: luma must be a scalar field of w*h");
     if (w < 7 || h < 7) throw new Error("ringFloorCPU: the estimator's stencil needs at least 7x7");
+    if (phase !== "frame" && phase !== "window") throw new Error(`ringFloorCPU: phase must be "frame" or "window", not ${phase}`);
+    const windowPhase = phase === "window";
     const depth = resampleDepth(period);
     const per = new Float32Array(w * h);
+    // *** WHICH BRANCH EACH PIXEL TOOK, because the two are different KINDS of bound and their errors are
+    // nothing alike (v4564). *** The Taylor branch is tight -- measured at a median 1.1x of the error
+    // actually there; the step branch is a worst case over an unresolved neighbourhood and runs to 100x.
+    // A caller told only the number cannot tell which it holds, and the frame-wide worst is nearly always a
+    // step-branch pixel, so the aggregate hides the distinction that matters.
+    const regime = new Uint8Array(w * h);          // 1 where either axis fell back to the step bound
     let worst = 0, unresolved = 0, total = 0;
     for (let y = 3; y < h - 3; y++) for (let x = 3; x < w - 3; x++) {
         const i = y * w + x, o = i * 4;
@@ -134,17 +161,19 @@ export function ringFloorCPU(luma, motion, w, h, period, tau = RESOLUTION_TAU) {
         const X = neighbourhood(luma, i, 1), Y = neighbourhood(luma, i, w);
         const rx = X.range > 1e-6 && X.d3 / X.range < tau;
         const ry = Y.range > 1e-6 && Y.d3 / Y.range < tau;
-        const ex = rx ? depth * 0.5 * fx * (1 - fx) * (X.d2 + X.d3) : Math.max(fx, 1 - fx) * X.step;
-        const ey = ry ? depth * 0.5 * fy * (1 - fy) * (Y.d2 + Y.d3) : Math.max(fy, 1 - fy) * Y.step;
+        // 0.25 is the maximum of f(1-f), so the window form is this frame's bound taken over ANY phase
+        const px = windowPhase ? 0.25 : fx * (1 - fx), py = windowPhase ? 0.25 : fy * (1 - fy);
+        const ex = rx ? depth * 0.5 * px * (X.d2 + X.d3) : Math.max(fx, 1 - fx) * X.step;
+        const ey = ry ? depth * 0.5 * py * (Y.d2 + Y.d3) : Math.max(fy, 1 - fy) * Y.step;
         // never below the arithmetic's own floor: at an integer displacement both axis terms are exactly
         // zero and the ring is still not exact -- it is exact to within the representation
         per[i] = Math.max(ex + ey, ARITHMETIC_ULPS * EPS_F32 * Math.max(X.mag, Y.mag));
-        total++; if (!rx || !ry) unresolved++;
+        total++; if (!rx || !ry) { unresolved++; regime[i] = 1; }
         if (per[i] > worst) worst = per[i];
     }
     // *** total, NOT w*h. *** A fraction over pixels the estimator never visited would read low for a reason
     // that has nothing to do with the content -- the arc has written that absence-as-measurement twice.
-    return { worst, per, unresolved, total, unresolvedFraction: total ? unresolved / total : 0, depth };
+    return { worst, per, regime, unresolved, total, unresolvedFraction: total ? unresolved / total : 0, depth, phase };
 }
 
 /**
@@ -162,26 +191,34 @@ export function ringFloorCPU(luma, motion, w, h, period, tau = RESOLUTION_TAU) {
  * *** AND THE POOL IS A MAX, NOT A MEAN, BECAUSE THE FLOOR IS A BOUND. *** Measured over fourteen frames:
  *
  *     pooling      ridges/frame   churn per ridge   below their own floor   margin swing p90
- *     none            159.4          51.8%                0.0%                   30%
- *     period MEAN     148.2          26.7%                5.9%                    7%
- *     period MAX      124.9          28.9%                0.0%                    4%
+ *     none            101.1          32.4%                0.0%                   15%
+ *     period MEAN      98.4          25.4%                1.5%                    5%
+ *     period MAX       87.4          27.7%                0.0%                    4%
  *
- * The mean halves the churn and stops being a bound -- 5.9% of the locks it keeps stand under the floor of
- * the very frame they are in, which is the thing the whole composition exists to prevent. The max cannot do
- * that: it includes the current frame, so it is never below it. It costs 22% of the ridges the instantaneous
+ * The mean is steadier and stops being a bound -- 1.5% of the locks it keeps stand under the floor of the
+ * very frame they are in, which is the thing the whole composition exists to prevent. The max cannot do
+ * that: it includes the current frame, so it is never below it. It costs 14% of the ridges the instantaneous
  * floor would keep, and that is the price of a threshold that holds still.
  *
- * (The max's churn reads slightly above the mean's while its margin is steadier, because it holds fewer
- * ridges and the per-ridge denominator is smaller. Both are roughly half the unpooled figure.)
+ * *** THESE NUMBERS REPLACE v4563's, WHICH WERE TAKEN WITH THE FRAME-PHASE FLOOR. *** That table read
+ * 51.8 / 26.7 / 28.9% and made pooling look like a halving. Most of what it was removing was phase noise the
+ * bound should never have carried: the window form's phase factor is the constant 0.25, so its margin starts
+ * steady (15% p90 rather than 30%) and pooling buys 15% of the churn rather than 50%. The four-fold
+ * steadying of the margin itself survives unchanged.
  */
 export function makeFloorPool(w, h, period) {
     if (!Number.isInteger(period) || period < 1) throw new Error("makeFloorPool: period must be a positive integer");
-    return { w, h, period, frames: [], n: 0 };
+    return { w, h, period, frames: [], n: 0, phase: null };
 }
 
 /** Push this frame's per-pixel floor. Keeps the last `period` of them and nothing older. */
-export function pushFloor(pool, per) {
+export function pushFloor(pool, per, phase = null) {
     if (!per || per.length !== pool.w * pool.h) throw new Error("pushFloor: a floor field of w*h is required");
+    // the phase form travels WITH the numbers, so a pool cannot mix the two or be read as the wrong one
+    if (phase !== null) {
+        if (pool.phase !== null && pool.phase !== phase) throw new Error(`pushFloor: this pool holds "${pool.phase}" floors and was handed a "${phase}" one`);
+        pool.phase = phase;
+    }
     pool.frames.push(per);
     if (pool.frames.length > pool.period) pool.frames.shift();
     pool.n++;
@@ -197,7 +234,7 @@ export function pushFloor(pool, per) {
 export function pooledFloor(pool) {
     const N = pool.w * pool.h, out = new Float32Array(N);
     for (const f of pool.frames) for (let i = 0; i < N; i++) if (f[i] > out[i]) out[i] = f[i];
-    return { data: out, whole: pool.frames.length >= pool.period, frames: pool.frames.length };
+    return { data: out, whole: pool.frames.length >= pool.period, frames: pool.frames.length, phase: pool.phase };
 }
 
 /**
@@ -212,6 +249,13 @@ export function pooledFloor(pool) {
  */
 export function marginsFromFloor(floor, w, h, bounds, opts = {}) {
     if (typeof bounds !== "function") throw new Error("marginsFromFloor: pass ridgeMarginBounds -- this module does not own the composition");
+    // *** AND IT REFUSES A FLOOR THAT IS NOT A PER-PIXEL BOUND. *** v4563 composed the "frame" form into a
+    // per-pixel margin and nothing in the tree could tell; the round's own safety row compared each ridge
+    // against the floor its margin was derived from, which can only ever return zero. A caller who has not
+    // said which form this is has not made the choice, and being asked is cheaper than being wrong.
+    if (opts.phase !== "window") throw new Error(
+        `marginsFromFloor: a per-pixel margin needs a per-pixel bound -- pass opts.phase "window" and a floor built with it, not ${JSON.stringify(opts.phase)}. ` +
+        `The "frame" form bounds the frame's worst error, not each pixel's own (measured at v4564: 21.5% of pixels below their own error).`);
     const out = new Float32Array(w * h);
     let feasible = 0;
     for (let i = 0; i < w * h; i++) {
