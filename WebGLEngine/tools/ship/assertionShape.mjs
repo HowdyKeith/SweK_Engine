@@ -240,8 +240,10 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // still never moved.
     // v4554 -- RE-TAKEN: one gate (temporalDepthLock) joined, the same four rows by one, TWENTY-THIRD
     // arrival, third round running that the pre-flight prompted. The other five rows have still never moved.
-    gates: 1613, usesOk: 1592, definesOk: 1584, importsOk: 0,
-    distinctDefinitions: 38, nameFirst: 1485, condFirst: 91, unknownSignature: 16,
+    // v4555 -- RE-TAKEN: one gate (temporalCoherentLock) joined, the same four rows by one, TWENTY-FOURTH
+    // arrival, fourth round running that the pre-flight prompted. The other five rows have still never moved.
+    gates: 1614, usesOk: 1593, definesOk: 1585, importsOk: 0,
+    distinctDefinitions: 38, nameFirst: 1486, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

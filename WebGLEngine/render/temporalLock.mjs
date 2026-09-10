@@ -174,7 +174,7 @@ export function makeLockState(w, h) { return { w, h, life: new Float32Array(w * 
  * ring's jitter-free mean, which is the input that actually works.
  */
 export function ridgesCPU(lumaField, w, h, margin = 0.05) {
-    const out = new Uint8Array(w * h);
+    const out = new Uint8Array(w * h), axisX = new Uint8Array(w * h), axisY = new Uint8Array(w * h);
     let n = 0;
     for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
         const i = y * w + x;
@@ -182,7 +182,56 @@ export function ridgesCPU(lumaField, w, h, margin = 0.05) {
         const l = lumaField[i - 1], r = lumaField[i + 1], u = lumaField[i - w], d = lumaField[i + w];
         const ridgeX = (c - l > margin && c - r > margin) || (l - c > margin && r - c > margin);
         const ridgeY = (c - u > margin && c - d > margin) || (u - c > margin && d - c > margin);
+        // *** THE AXES COME OUT TOO, because which one fired is what "thin" means directionally: a ridge found
+        // on the X axis is thin HORIZONTALLY, so its band is measured across x. coherentRidgesCPU needs that
+        // and re-deriving it there would be a second definition of the test.
+        if (ridgeX) axisX[i] = 1;
+        if (ridgeY) axisY[i] = 1;
         if (ridgeX || ridgeY) { out[i] = 1; n++; }
+    }
+    return { data: out, count: n, axisX, axisY };
+}
+
+/**
+ * COHERENT RIDGES: a ridge whose BAND, measured across its own thin direction, is at most `maxBand` pixels.
+ *
+ * *** THIS IS WHAT SEPARATES A PAINTED THIN LINE FROM A PIXEL-SCALE TEXTURE, AND IT NEEDS NO NEW BUFFER. ***
+ * v4554 closed by saying an object-ID or material channel was what could do this. That was wrong, and the
+ * reason is worth keeping: a painted line and a painted chequer are BOTH albedo on one flat surface, so they
+ * share depth, normal, material and draw call. Every per-pixel buffer a renderer writes gives them the same
+ * answer. What differs is not what they are made of but their SHAPE -- a line is one pixel across, and a
+ * texture at the pixel scale is ridges everywhere.
+ *
+ * MEASURED on the ring's jitter-free mean, margin 0.05, over a 48x48 frame:
+ *     a 0.4 px painted line     46 ridges, ALL of band 1
+ *     a 1.13 px chequer       1873 ridges, of which 93 have band 1 -- a 20x cut with the line untouched
+ * Two things that did NOT work are recorded so they are not tried again: an object ID (above), and the ridge's
+ * run length ALONG its direction, which fails because it measures runs of the MASK rather than of the feature
+ * -- 690 of the chequer's 713 ridges run 16 pixels or more.
+ *
+ * `maxBand` is the width in pixels and is REQUIRED. The scan is bounded at maxBand + 1 in each direction, which
+ * is all that is needed to answer "longer than maxBand" and is what makes the WGSL mirror a local test.
+ */
+export function coherentRidgesCPU(field, w, h, margin, maxBand) {
+    if (!Number.isInteger(maxBand) || maxBand < 1) throw new Error("coherentRidgesCPU: maxBand must be an integer >= 1, the ridge band's width in pixels");
+    const r = ridgesCPU(field, w, h, margin);
+    const out = new Uint8Array(w * h);
+    let n = 0;
+    // the run containing i, bounded: step out until the mask stops or the budget runs out
+    const runLen = (mask, i, step, limit) => {
+        let len = 1;
+        for (let k = 1; k <= limit; k++) { const j = i + step * k; if (j < 0 || j >= w * h || !mask[j]) break; len++; }
+        for (let k = 1; k <= limit; k++) { const j = i - step * k; if (j < 0 || j >= w * h || !mask[j]) break; len++; }
+        return len;
+    };
+    for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+        const i = y * w + x;
+        if (!r.data[i]) continue;
+        // an X-ridge is thin across x, so its band runs along x; a Y-ridge's band runs along y
+        let band = Infinity;
+        if (r.axisX[i]) band = Math.min(band, runLen(r.axisX, i, 1, maxBand));
+        if (r.axisY[i]) band = Math.min(band, runLen(r.axisY, i, w, maxBand));
+        if (band <= maxBand) { out[i] = 1; n++; }
     }
     return { data: out, count: n };
 }

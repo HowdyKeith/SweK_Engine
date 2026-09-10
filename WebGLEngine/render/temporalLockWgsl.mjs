@@ -157,4 +157,60 @@ fn main(@builtin(global_invocation_id) g:vec3<u32>) {
   dst[i] = v;
 }`;
 
-export { RING_PUSH_WGSL, SHADING_SHIFT_WGSL, RIDGE_WGSL, FIELD_RIDGE_WGSL, LUMA_WGSL };
+// ---- COHERENT RIDGES: a ridge whose band across its own thin direction is at most maxBand ----------------
+//
+// *** ONE KERNEL AND NO INTERMEDIATE BUFFER, BECAUSE THE TEST IS LOCAL. *** The band is bounded at maxBand + 1
+// in each direction -- all that is needed to answer "longer than maxBand" -- so the axis masks are recomputed
+// for the few neighbours involved rather than written to a pass of their own. The CPU does the same bounded
+// scan, so the two are the same algorithm and not two implementations that agree on the fixtures.
+const COHERENT_RIDGE_WGSL = `
+struct P { w:u32, h:u32, maxBand:u32, pad:u32, margin:f32, p1:f32, p2:f32, p3:f32 };
+@group(0) @binding(0) var<storage,read> field:array<f32>;
+@group(0) @binding(1) var<storage,read_write> dst:array<f32>;
+@group(0) @binding(2) var<uniform> u:P;
+
+fn inside(x:i32, y:i32) -> bool {
+  return x >= 1 && y >= 1 && x + 1 < i32(u.w) && y + 1 < i32(u.h);
+}
+// which axis fires at (x,y): .x is a ridge across X, .y across Y. Recomputed rather than stored.
+fn axisAt(x:i32, y:i32) -> vec2<bool> {
+  if (!inside(x, y)) { return vec2<bool>(false, false); }
+  let i = u32(y) * u.w + u32(x);
+  let c = field[i];
+  let l = field[i - 1u];
+  let r = field[i + 1u];
+  let up = field[i - u.w];
+  let dn = field[i + u.w];
+  let ax = (c - l > u.margin && c - r > u.margin) || (l - c > u.margin && r - c > u.margin);
+  let ay = (c - up > u.margin && c - dn > u.margin) || (up - c > u.margin && dn - c > u.margin);
+  return vec2<bool>(ax, ay);
+}
+
+@compute @workgroup_size(8,8,1)
+fn main(@builtin(global_invocation_id) g:vec3<u32>) {
+  if (g.x >= u.w || g.y >= u.h) { return; }
+  let i = g.y * u.w + g.x;
+  let x = i32(g.x);
+  let y = i32(g.y);
+  let a = axisAt(x, y);
+  if (!a.x && !a.y) { dst[i] = 0.0; return; }
+
+  let lim = i32(u.maxBand);
+  var band = 1000000;
+  // an X-ridge is thin ACROSS x, so its band is the run of X-ridges ALONG x
+  if (a.x) {
+    var len = 1;
+    for (var k:i32 = 1; k <= lim; k = k + 1) { if (!axisAt(x + k, y).x) { break; } len = len + 1; }
+    for (var k:i32 = 1; k <= lim; k = k + 1) { if (!axisAt(x - k, y).x) { break; } len = len + 1; }
+    band = min(band, len);
+  }
+  if (a.y) {
+    var len = 1;
+    for (var k:i32 = 1; k <= lim; k = k + 1) { if (!axisAt(x, y + k).y) { break; } len = len + 1; }
+    for (var k:i32 = 1; k <= lim; k = k + 1) { if (!axisAt(x, y - k).y) { break; } len = len + 1; }
+    band = min(band, len);
+  }
+  dst[i] = select(0.0, 1.0, band <= lim);
+}`;
+
+export { RING_PUSH_WGSL, SHADING_SHIFT_WGSL, RIDGE_WGSL, FIELD_RIDGE_WGSL, COHERENT_RIDGE_WGSL, LUMA_WGSL };

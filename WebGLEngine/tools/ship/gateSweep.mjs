@@ -3767,6 +3767,51 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since214: Object.freeze({
+        at: "v4555", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/temporalCoherentLock-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 1.09 s (1089/1104/1075 over three serial runs, under the 3000 ms sweep budget). *** " +
+                 "v4554 CLOSED BY NAMING THE WRONG NEXT STEP AND THIS ROUND IS THE CORRECTION. *** It said an " +
+                 "object-ID or material channel was what separates a painted thin line from a pixel-scale " +
+                 "texture, and that it would be a renderer change rather than a pass change. BOTH HALVES WERE " +
+                 "WRONG. A painted line and a painted chequer are both albedo on ONE flat surface -- same " +
+                 "depth, same normal, same material, same draw -- so every per-pixel buffer a renderer writes " +
+                 "gives them the same answer, and the gate asserts that by showing their depth buffers " +
+                 "identical pixel for pixel. What differs is not what they are made of but their SHAPE, and " +
+                 "shape was already in the buffers this pipeline had. A ridge ONE PIXEL ACROSS is a thin " +
+                 "feature; a texture at the pixel scale is ridges everywhere. MEASURED on the ring's " +
+                 "jitter-free mean: the band test keeps 46 of the line's 46 ridges and cuts the chequer's " +
+                 "1,873 to 93 -- 20x with the feature untouched -- and on a PURE one-pixel alternation it " +
+                 "finds EXACTLY ZERO where the plain test finds 2,116. ON THE TWO FIXTURES THIS ARC HAS BEEN " +
+                 "ARGUING OVER IT DOMINATES BOTH EARLIER GATES: on v4554's painted line it gives 4.00x where " +
+                 "the depth gate gave 1.00x, matching the luma gate exactly; on v4553's bar-over-chequer it " +
+                 "pays 0% where the luma gate paid 26%, on 193 locks rather than 1,990. The luma gate's " +
+                 "benefit with the depth gate's protection, and neither buffer. IT DOES NOT MAKE DEPTH " +
+                 "REDUNDANT and saying so would be the easy overclaim: a wire whose luma contrast is half the " +
+                 "ridge margin is invisible to every luma test at every scale (0 ridges, 0 coherent) and " +
+                 "depth finds 46, so v4554's gate is narrowed rather than replaced and gateLocks still " +
+                 "composes them. THREE THINGS THIS ROUND GOT WRONG FIRST AND FIXED BY MEASUREMENT. The ridge's " +
+                 "run length ALONG its direction was the obvious test and it fails, because a run in the MASK " +
+                 "is not a run in the feature -- and the row asserting so was written with a threshold carried " +
+                 "from a DIFFERENT scene (690 of 713) that read 342 of 1,873 here, which is v4549's mistake " +
+                 "exactly; it now compares the two candidate tests on the SAME picture and the band test wins " +
+                 "by 3.7x. Section 4's depth row read a single frame and reported 0, repeating the very " +
+                 "single-frame fault v4554 established. And the device fixture's 'three-pixel band' was a " +
+                 "solid bar, which produces ZERO ridges -- an interior pixel is not an extremum and its edges " +
+                 "are steps -- so maxBand 3 read the same count as maxBand 1 and the parameter was never " +
+                 "tested. ALSO CHECKED BEFORE BEING BUILT ON: every scene since v4552 jittered in X only, " +
+                 "discarding j[1]. It did not distort anything -- 1,840 chequer ridges against 1,873 with the " +
+                 "full 2-D sequence -- and could not have, since a +/-0.5 px shift cannot average away 1.13 px " +
+                 "structure in either direction. Eight sabotages red at 7/5/4/1/7/2/2, ONE 0-RED FIRST: " +
+                 "conflating the ridge axes was invisible across ALL THREE lock gates, because the band is " +
+                 "min(bandX, bandY) and the min quietly takes whichever axis is still correct. Unlike v4554's " +
+                 "pair that was not a missing picture but a MASKING OPERATOR, and the property is now asserted " +
+                 "where it lives rather than through a consequence.",
+    }),
     since213: Object.freeze({
         at: "v4554", swept: 1, green: 1, red: 0,
         added: Object.freeze([
