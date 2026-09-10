@@ -264,8 +264,12 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // gate by one. distinctDefinitions holds at 40 for the SEVENTH round running.
     // v4580 -- RE-TAKEN for tools/ship/skyStars-selfcheck.mjs: 1623 -> 1624 and the three rows that follow a
     // gate by one. distinctDefinitions holds at 40 for the EIGHTH round running.
-    gates: 1624, usesOk: 1603, definesOk: 1595, importsOk: 0,
-    distinctDefinitions: 40, nameFirst: 1496, condFirst: 91, unknownSignature: 16,
+    // v4582 -- RE-TAKEN for tools/ship/zipWriter-selfcheck.mjs: 1624 -> 1625 and the three rows that follow a
+    // gate by one. NOT THIS ROUND'S GATE -- it arrived on main in commit c3f1fecb (the release zip's pure-Node
+    // writer) and is re-taken here because that commit and this one merged, and the tree has to be green for
+    // whichever lands second. distinctDefinitions holds at 40 for the NINTH round running.
+    gates: 1625, usesOk: 1604, definesOk: 1596, importsOk: 0,
+    distinctDefinitions: 40, nameFirst: 1497, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

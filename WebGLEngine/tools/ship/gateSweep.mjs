@@ -3765,6 +3765,19 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
     // v4576 -- the 225th closing: a tier for the guardians the sweep cannot afford, and it caught two on sight.
+    since229: Object.freeze({
+        at: "v4582", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/zipWriter-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["ai-bridge/packagerBridge.js", "ui/githubPanel.js"]),
+        verdict: "green, 72/71/69 ms over three serial runs. *** NOT THIS ROUND'S GATE. *** It arrived on main " +
+                 "in commit c3f1fecb -- the release zip's Compress-Archive subprocess replaced with a pure-Node " +
+                 "writer and real percentage progress -- while v4582 was in flight, and the two merged cleanly " +
+                 "with no overlapping file. It is closed here because a gate the sweep has never swept leaves " +
+                 "the surplus identity one short and tools/ship/recordDrift.mjs reads that as a stale record, " +
+                 "so whichever commit lands second owes the re-take. Recorded as its own round's work with the " +
+                 "commit named, rather than absorbed into this one's verdict.",
+    }),
     since228: Object.freeze({
         at: "v4580", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/skyStars-selfcheck.mjs"]),
