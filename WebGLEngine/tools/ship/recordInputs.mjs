@@ -18,6 +18,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 import { enumerateGates } from "./gateSweep.mjs";
 import { ENG, RECORD, hashFile, hashDir, readRecord, encode } from "./inputSets.mjs";
+import { shortfall } from "./importClosure.mjs";
 
 /** Does this gate's source take fs by NAMED import? The probe patches the builtin's exports object, and a
  *  named binding is resolved when the module links -- so those gates are recorded and never trusted. */
@@ -115,9 +116,17 @@ export function entryFor(p, { root = ENG } = {}) {
     // namedFsImport is no longer a DISQUALIFIER at v4567 -- the loader hook reaches those bindings, measured
     // on a fixture that recorded an empty set before it and its real set after. It is still RECORDED, because
     // that count is the evidence the hook is what changed and not something else.
+    // *** v4573 -- COMPUTED HERE, AT RECORD TIME, BECAUSE IT IS A FACT ABOUT THE CODE AND NOT ABOUT THE RUN. ***
+    // tools/ship/importClosure.mjs asks whether the set the probe observed covers everything the gate's source
+    // can reach: the whole STATIC import closure (unconditional, so a miss means the record is wrong) and any
+    // DYNAMIC specifier resolving outside it (conditional, so the set may have been recorded on the narrow
+    // branch -- which is the exact worry v4566 shipped this machinery disarmed for). Walking the import graph
+    // costs 2.1 s for the whole tree ONCE here; asking it inside whyRun would pay it on every partition.
+    const short = shortfall(p.gate, p.reads, root);
     return { reads: p.reads, dirs: p.dirs, hashes, dirHashes,
              spawnedNonNode: p.spawnedNonNode, spawnedNode: p.spawnedNode, procs: p.procs,
-             net: p.net, namedFsImport: usesNamedFsImport(p.gate, root), probeMs: p.ms, exit: p.code };
+             net: p.net, namedFsImport: usesNamedFsImport(p.gate, root),
+             reachesUnrecorded: short !== null, probeMs: p.ms, exit: p.code };
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {

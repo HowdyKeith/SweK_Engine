@@ -110,7 +110,12 @@ export const CONFLICT = "!conflict";
 // wholesale and quietly deleted the keys its later sections owned. A serialiser that names its fields is a
 // list that has to be maintained in step with three other files; this is that list, named once, and
 // inputSets-selfcheck asserts that a round trip preserves everything entryFor produces.
-export const FLAGS = Object.freeze(["spawnedNonNode", "spawnedNode", "procs", "net", "namedFsImport"]);
+// *** EVERY FIELD encode() CARRIES PER GATE, SPELLED ONCE. *** v4567 dropped a flag by writing the
+// pre-rename name here and the skip count ROSE from 956 to 1,121, which read as the round succeeding.
+// tools/ship/recordShape.mjs now ratchets the record's own key set for exactly that reason, and
+// `reachesUnrecorded` was added to this list and to entryFor() in the same edit.
+export const FLAGS = Object.freeze(["spawnedNonNode", "spawnedNode", "procs", "net", "namedFsImport",
+                                   "reachesUnrecorded"]);
 
 /** Decode the indexed on-disk form into the {gate: {reads, dirs, hashes, dirHashes, ...}} shape the rule wants. */
 export function decode(raw) {
@@ -190,6 +195,23 @@ export function whyRun(gate, rec, root = ENG) {
     // the population can be counted; it no longer decides anything.
     if (e.spawnedNonNode) return "spawned a child the probe could not follow";
     if (e.net) return "opens a socket or fetches";
+    // *** v4573 -- THE DISQUALIFIER THAT ANSWERS THE REASON THIS WAS SHIPPED DISARMED. ***
+    // v4566's own note says what it could not claim: "an input set is what a gate read on ONE RUN -- a
+    // sample, not a specification -- so a gate that branches on something outside the tree could have a set
+    // recorded on the narrow branch." tools/ship/importClosure.mjs answers the half a static reader CAN
+    // answer, at RECORD time, and this is the flag it leaves behind.
+    //
+    // A STATIC import is unconditional: if the module loads, every `import ... from "./x"` in it loads too,
+    // so the whole static closure must be in the recorded set or the record is simply wrong. A DYNAMIC one --
+    // `await import(...)` in a branch, a CJS require inside a function -- is exactly the conditional the worry
+    // names, and a dynamic specifier resolving to a file the set does NOT carry is the narrow branch, counted
+    // instead of feared. Either way the gate runs.
+    //
+    // MEASURED at v4573 over 1,258 recorded gates: 0 miss a static import, 152 carry a dynamic one to a file
+    // outside their set, and 1 imports a module ABOVE the engine root -- which no engine-relative record can
+    // hash, so nothing in the tree could ever invalidate it. That is 153 gates that stop being skippable, and
+    // it is the price of the skip being a structural claim rather than a sample of one run.
+    if (e.reachesUnrecorded) return "reaches a module its recorded set does not carry";
     const reads = e.reads || [], dirs = e.dirs || [];
     if (!reads.length && !dirs.length) return "recorded an empty input set";
     if (!reads.includes(gate)) return "its own source is not in its recorded set";

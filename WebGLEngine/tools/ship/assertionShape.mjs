@@ -248,13 +248,14 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // noticing, and this one does not.
     // v4572b -- RE-TAKEN for tools/ship/recordProvenance-selfcheck.mjs: 1617 -> 1618 and the three
     // rows that follow a gate by one. distinctDefinitions holds at 40 for the second round running.
-    // v4536 -- RE-TAKEN AGAIN AT THE MERGE, for tools/ship/partitionScore-selfcheck.mjs: 1618 -> 1619 and
-    // the same three rows by one. *** BOTH LINES RE-TOOK THIS TABLE IN THE SAME WINDOW AND THE MERGE HAD TO
-    // ADD THE TWO MOVES RATHER THAN PICK ONE: *** each side's note was correct for a tree containing its own
-    // gate and neither was correct for the tree containing both. The numbers below are re-derived from the
-    // merged tree, not summed from the two notes.
-    gates: 1619, usesOk: 1598, definesOk: 1590, importsOk: 0,
-    distinctDefinitions: 40, nameFirst: 1491, condFirst: 91, unknownSignature: 16,
+    // v4573 -- RE-TAKEN for tools/ship/importClosure-selfcheck.mjs: 1618 -> 1619 and the three rows
+    // that follow a gate by one. distinctDefinitions holds at 40 for the THIRD round running.
+    // v4536 -- RE-TAKEN AGAIN AT THE MERGE, for tools/ship/partitionScore-selfcheck.mjs: 1619 -> 1620.
+    // *** BOTH LINES RE-TOOK THIS TABLE IN THE SAME WINDOW, TWICE IN TWO ROUNDS, AND THE MERGE HAS TO ADD
+    // THE TWO MOVES RATHER THAN PICK ONE: *** each side's note is correct for a tree containing its own new
+    // gate and neither is correct for the tree containing both. Re-derived from the merged tree.
+    gates: 1620, usesOk: 1599, definesOk: 1591, importsOk: 0,
+    distinctDefinitions: 40, nameFirst: 1492, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

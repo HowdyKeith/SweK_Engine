@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "ccd187db5622d772bcdd2318aa103170adc1bfff",
+ "head": "7cfed42e3f8fbda285276b25b9daacfac99f6090",
  "bodies": {
   "box3d": [
    {
@@ -271,7 +271,7 @@
    {
     "path": "tools/ship/slugTsl-selfcheck.mjs",
     "bytes": 20091,
-    "sha": "5ac8ccedcd39eed6e31e4e91814f3be4770f64f0"
+    "sha": "629ce9da643276ab70d464eb1a9c9f12bd33c4f0"
    },
    {
     "path": "tools/ship/slugWgsl-selfcheck.mjs",
@@ -630,7 +630,7 @@
    },
    {
     "path": "main.js",
-    "bytes": 3218181,
+    "bytes": 3218387,
     "sha": "ccd187db5622d772bcdd2318aa103170adc1bfff"
    },
    {
@@ -731,7 +731,7 @@
    {
     "path": "tools/ship/boundaryLint-selfcheck.mjs",
     "bytes": 17216,
-    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
+    "sha": "629ce9da643276ab70d464eb1a9c9f12bd33c4f0"
    },
    {
     "path": "tools/ship/dracoWeld-selfcheck.mjs",
@@ -843,7 +843,7 @@
    {
     "path": "tools/ship/slugTsl-selfcheck.mjs",
     "bytes": 20091,
-    "sha": "5ac8ccedcd39eed6e31e4e91814f3be4770f64f0"
+    "sha": "629ce9da643276ab70d464eb1a9c9f12bd33c4f0"
    },
    {
     "path": "tools/ship/threeProbe-selfcheck.mjs",
@@ -863,27 +863,27 @@
    {
     "path": "tools/ship/tslLoopBound-selfcheck.mjs",
     "bytes": 11403,
-    "sha": "9be0173f43e103d34c3bcb6362737f9aa4621360"
+    "sha": "629ce9da643276ab70d464eb1a9c9f12bd33c4f0"
    },
    {
     "path": "tools/ship/tslPhysics-selfcheck.mjs",
     "bytes": 125949,
-    "sha": "9be0173f43e103d34c3bcb6362737f9aa4621360"
+    "sha": "629ce9da643276ab70d464eb1a9c9f12bd33c4f0"
    },
    {
     "path": "tools/ship/tslRace-selfcheck.mjs",
     "bytes": 79728,
-    "sha": "e6455e521a83205c839c617b1effe93f29201cbe"
+    "sha": "629ce9da643276ab70d464eb1a9c9f12bd33c4f0"
    },
    {
     "path": "tools/ship/tslSource-selfcheck.mjs",
     "bytes": 22758,
-    "sha": "f222fee5f8b49b3122d9d651078d156eb4b7a277"
+    "sha": "629ce9da643276ab70d464eb1a9c9f12bd33c4f0"
    },
    {
     "path": "tools/ship/tslWide-selfcheck.mjs",
     "bytes": 22627,
-    "sha": "ad535264ab7dc33e4650578484ecfecb9b207424"
+    "sha": "629ce9da643276ab70d464eb1a9c9f12bd33c4f0"
    },
    {
     "path": "tsl-probe.html",

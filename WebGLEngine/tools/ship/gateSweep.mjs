@@ -3764,11 +3764,11 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
-    // v4536 -- THE 222nd CLOSING, for the gate this round added. *** THE ORDINAL IS A KNOWN COLLISION AND IS
+    // v4536 -- THE 223rd CLOSING, for the gate this round added. *** THE ORDINAL IS A KNOWN COLLISION AND IS
     // RECORDED RATHER THAN RENUMBERED: *** the entry below is stamped v4572 from the other line's counter,
     // which runs ahead of the one main.js keeps -- main carried v4535 when that entry landed. The list shape
     // is what makes that survivable; a round appends and nobody renegotiates a name.
-    since222: Object.freeze({
+    since223: Object.freeze({
         at: "v4536", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/partitionScore-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -3787,6 +3787,47 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "navmesh, navWiring, navWiringLive and funnel ALL GREEN while returning a 110 m path UP a " +
                  "cliff on a z-oriented ledge, one axis of a two-axis correctness property ungraded in the " +
                  "gate whose own section 7 exists BECAUSE A SABOTAGE DID NOT FIRE.",
+    }),
+    // v4573 -- the 222nd closing: the blocker was a sentence, and it is now two properties and a price.
+    since222: Object.freeze({
+        at: "v4573", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/importClosure-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/inputSets.mjs", "tools/ship/recordInputs.mjs"]),
+        verdict: "green, 2.4 s, one new gate and one new disqualifier. *** THE INCREMENTAL SWEEP HAS BEEN " +
+                 "DISARMED SINCE v4566 FOR A REASON WRITTEN DOWN IN ONE SENTENCE: an input set is what a gate " +
+                 "read on ONE RUN -- a sample, not a specification. *** tools/ship/importClosure.mjs answers " +
+                 "the half a static reader can answer, at RECORD time, as a flag the rule reads rather than a " +
+                 "graph walked on every partition. A STATIC import is unconditional, so the whole closure must " +
+                 "be in the recorded set or the record is simply WRONG: over all 1,258 recorded gates, ZERO " +
+                 "miss one. A DYNAMIC import is precisely the conditional the worry names -- 152 carry one to " +
+                 "a file outside their set -- and ONE gate statically imports a module ABOVE the engine root, " +
+                 "which no engine-relative record can hash, so nothing in this tree could ever invalidate it. " +
+                 "All of those stop being skippable: 1,098 -> 975 of 1,257, still 77.6%. *** THE FIRST " +
+                 "INSTRUMENT WAS WRONG BY 75x AND IS RECORDED RATHER THAN QUIETLY FIXED. *** Following static " +
+                 "and dynamic imports together it reported 135 gates violating the closure property; checking " +
+                 "ONE case instead of believing it found populationCensus-selfcheck credited with 379 " +
+                 "reachable files against a probe's NINE. The chain was real -- populationCensus, gateReach, " +
+                 "staleness, claimsGate -- but staleness reaches claimsGate through an await import() inside a " +
+                 "function that never ran, and its true static closure is FIVE. The 135 were the instrument. " +
+                 "*** AND THE DYNAMIC HALF IS A BOUND ON A RISK NOBODY DEMONSTRATED, WHICH IS SAID RATHER " +
+                 "THAN IMPLIED: *** physics/orbits/kepler.js was made to throw on import and all three gates " +
+                 "that reach it only dynamically still exited 0. The exclusion stays on a structural argument " +
+                 "and not a measured catch, priced at 133 gates, because a branch that did not run today is " +
+                 "not a branch that cannot run -- but a rule kept that way should say so, or the next round " +
+                 "reads 133 gates of cost as 133 gates of proven danger. BESIDE THE STRUCTURE, THE SAMPLING: " +
+                 "two independent probe passes agreed on 1,246 of 1,258 read sets, 99.0%, and the twelve that " +
+                 "differed did so by their OWN random temp directory or by ANOTHER gate's scratch file racing " +
+                 "in an eight-wide probe -- pollution that errs SAFE, since a stranger's path makes a gate run " +
+                 "more and never less. Two gates changed EXIT CODE between passes on identical sets and are " +
+                 "not flaky: run alone, five times each, both green 5/5, which is SWEEP_CONTENTION_V4562 " +
+                 "again. And the differential test, twice: break render/exactHash.mjs and run all 1,055 gates " +
+                 "an incremental sweep would have skipped -- ZERO verdicts moved; break sourceScan.mjs's " +
+                 "codeOnly, the most-read shared helper in the tree at 272 gates, 882 skipped -- ZERO moved. " +
+                 "Two mutations is a sample and is offered as one. Sabotages MM and NN red by name, NN " +
+                 "reproducing the 75x error exactly. THE DEFAULT IS UNCHANGED: quickSweep still skips nothing " +
+                 "without --incremental, and what remains is a judgement about a silent failure mode with a " +
+                 "standing measurement behind it instead of an argument.",
     }),
     // v4572b -- the 221st closing: the name list was still doing the property's job, and nobody could see it.
     since221: Object.freeze({
