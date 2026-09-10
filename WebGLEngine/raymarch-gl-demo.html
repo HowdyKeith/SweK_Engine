@@ -77,7 +77,7 @@ function draw() {
     let fwd = [cx0 - eye[0], (12 + Math.tan(pitch) * R) - eye[1], cz0 - eye[2]];
     const fl = Math.hypot(...fwd); fwd = fwd.map(v => v / fl);
     let right = [fwd[2], 0, -fwd[0]]; const rl = Math.hypot(...right) || 1; right = [right[0] / rl, 0, right[2] / rl];
-    const up = [right[1] * fwd[2] - right[2] * fwd[1], right[2] * fwd[0] - right[0] * fwd[2], right[0] * fwd[1] - right[1] * fwd[0]];
+    const up = [fwd[1] * right[2] - fwd[2] * right[1], fwd[2] * right[0] - fwd[0] * right[2], fwd[0] * right[1] - fwd[1] * right[0]];
     const tanFov = Math.tan(0.5 * 60 * Math.PI / 180);
 
     gl.viewport(0, 0, c.width, c.height);

@@ -209,7 +209,7 @@ function draw() {
     const fl = Math.hypot(fwd[0], fwd[1], fwd[2]);
     const f = fwd.map((v) => v / fl);
     let rt = [f[2], 0, -f[0]]; const rl = Math.hypot(rt[0], rt[1], rt[2]) || 1; rt = rt.map((v) => v / rl);
-    const up = [rt[1] * f[2] - rt[2] * f[1], rt[2] * f[0] - rt[0] * f[2], rt[0] * f[1] - rt[1] * f[0]];
+    const up = [f[1] * rt[2] - f[2] * rt[1], f[2] * rt[0] - f[0] * rt[2], f[0] * rt[1] - f[1] * rt[0]];
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     const cam = { eye, fwd: f, right: rt, up, tanFov: 0.6 };

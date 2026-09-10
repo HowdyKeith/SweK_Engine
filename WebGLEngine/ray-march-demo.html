@@ -102,7 +102,7 @@ function render(w, h) {
     const fwd = [cx0 - eye[0], (12 + Math.tan(pitch) * R) - eye[1], cz0 - eye[2]];
     const fl = Math.hypot(...fwd); fwd[0] /= fl; fwd[1] /= fl; fwd[2] /= fl;
     const right = [fwd[2], 0, -fwd[0]]; const rl = Math.hypot(...right) || 1; right[0] /= rl; right[2] /= rl;
-    const up = [right[1] * fwd[2] - right[2] * fwd[1], right[2] * fwd[0] - right[0] * fwd[2], right[0] * fwd[1] - right[1] * fwd[0]];
+    const up = [fwd[1] * right[2] - fwd[2] * right[1], fwd[2] * right[0] - fwd[0] * right[2], fwd[0] * right[1] - fwd[1] * right[0]];
     const tanF = Math.tan(0.5 * 60 * Math.PI / 180), aspect = w / h;
     const pose = $("ship").checked ? shipPose() : null;
     const img = ctx.createImageData(w, h);
