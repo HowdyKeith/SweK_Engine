@@ -17449,7 +17449,12 @@ ${text.replace(/'/g, "''")}
         return;
     }
     if (req.method === "GET" && req.url.split("?")[0] === "/sys/update/check")  { sysadminBridge.updateCheck(false).then(sendJson).catch(e => sendJson({ ok: false, error: String(e) })); return; }
-    if (req.method === "POST" && req.url === "/sys/update/apply")  { sysadminBridge.updateCheck(true, { force: true }).then(sendJson).catch(e => sendJson({ ok: false, error: String(e) })); return; }
+    // v4610 -- force is now the CALLER's claim, not a constant. ui/engineUpdate.js only sets `manual`
+    // true from the Settings panel's own "Install & restart" button click; every automatic caller
+    // (on-load auto-apply, peer-propagation prompt/auto-confirm, its no-toast fallback) leaves it
+    // false, which lets ai-bridge/runBusy.js's defer-while-busy guard actually run for them instead
+    // of being bypassed unconditionally the way this route bypassed it for every caller before.
+    if (req.method === "POST" && req.url === "/sys/update/apply")  { readJson(d => { sysadminBridge.updateCheck(true, { force: !!(d && d.manual) }).then(sendJson).catch(e => sendJson({ ok: false, error: String(e) })); }); return; }
     if (req.method === "GET"  && req.url.split("?")[0] === "/sys/update/github") { sysadminBridge.githubStatus().then(sendJson).catch(e => sendJson({ ok: false, error: String(e) })); return; }
     if (req.method === "GET"  && req.url === "/sys/autostart") { sysadminBridge.loginAutostartStatus().then(sendJson).catch(e => sendJson({ ok: false, error: String(e) })); return; }
     if (req.method === "POST" && req.url === "/sys/autostart") { readJson(d => sysadminBridge.loginAutostartSet(!!(d && d.on)).then(sendJson).catch(e => sendJson({ ok: false, error: String(e) }))); return; }

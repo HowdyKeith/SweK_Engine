@@ -321,6 +321,46 @@ const uCode = codeOnly(sysadmin), rCode = codeOnly(runBusy);
     }
 }
 
+// --- 9. *** THE GUARD FROM SECTION 8 HAD A DOOR LEFT OPEN AROUND IT, ON THE CLIENT SIDE *** ------------------
+//
+// v4610. Section 8 proved updateCheck() ASKS runBusy and OBEYS -- and it does, every time opts.force is falsy.
+// But POST /sys/update/apply, the ONE route ui/engineUpdate.js's apply() ever calls, used to pass
+// `{ force: true }` UNCONDITIONALLY, for every caller. Section 8's own manual-apply row above tests
+// updateCheck({force:true}) directly and would stay green either way -- it cannot see which caller reached that
+// code with force set, because by the time it runs the route has already decided. That is this file's own
+// warning from line 276 ("a gate can be green for years about the wrong subject") one layer further out: the
+// SERVER-side automatic triggers (poller/boot-scan/peer-pull) never passed force and were always covered: the
+// CLIENT-side ones (the on-load auto-apply check, and the peer-propagation prompt/auto-confirm) went through
+// this same HTTP route and got force:true every time, bypassing the guard section 8 proves works.
+//
+// Keith, again, on the live rig: hours of relaunch windows during a Clone & Verify + zip, ending in "started
+// the new version of SweK and killed the zip that was running" -- with runBusy.js's guard already in the tree.
+{
+    const eu = noComments(fs.readFileSync(path.join(ENG, "ui", "engineUpdate.js"), "utf8"));
+    ok("!! /sys/update/apply's route no longer hands out force:true unconditionally",
+        !/\/sys\/update\/apply[\s\S]{0,40}updateCheck\(true,\s*\{\s*force:\s*true\s*\}\)/.test(noComments(server)),
+        "that literal shape is exactly what section 8 could not see past -- force decided before the guard ran");
+    ok("...and instead derives it from the request body's own `manual` field",
+        /req\.url === "\/sys\/update\/apply"[\s\S]{0,200}force:\s*!!\(d\s*&&\s*d\.manual\)/.test(noComments(server)),
+        "so a caller must SAY a person clicked, not merely reach the route");
+    ok("apply() sends `manual` in the POST body rather than an empty one",
+        /function apply\(manual\)[\s\S]{0,200}body:\s*JSON\.stringify\(\{\s*manual:\s*!!manual\s*\}\)/.test(eu),
+        "the flag now travels with the request instead of living only in a comment");
+    ok("!! the ONLY call site that passes manual=true is the Settings panel's own button click",
+        /installBtn\.onclick[\s\S]{0,100}_runApply\(setProg, \(\) => \{\},\s*true\)/.test(eu),
+        "the one place a person is watching a live progress readout and pressed the button themselves");
+    const autoSites = [
+        /if \(s\.autoApply\) \{[\s\S]{0,200}_runApply\(\(msg, ok\) => \{[\s\S]{0,150}\}, \(\) => \{\}\);/,          // maybePromptUpdate
+        /if \(!fn\) \{ _runApply\(\(\) => \{\}, \(\) => \{\}\); return; \}/,                                          // _promptApply, no toast surface
+        /onYes: \(\) => _runApply\(\(msg\) => \{[\s\S]{0,150}\}, \(\) => \{\}\),/,                                    // _promptApply, the toast's own button/auto-confirm
+    ];
+    ok("!! and every AUTOMATIC caller (on-load auto-apply, peer-prompt, its no-toast fallback) passes no manual arg at all",
+        autoSites.every((re) => re.test(eu)),
+        "none of these three call sites has a synchronous user gesture behind it -- the toast's own auto-confirm " +
+        "timer can fire onYes with nobody watching, which is exactly why it is grouped with the other two rather " +
+        "than trusted as a click");
+}
+
 console.log("updatePause-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));
 process.exit(fails ? 1 : 0);
 
