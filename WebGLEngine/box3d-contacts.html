@@ -31,7 +31,7 @@
   .sub { color:var(--dim); font-size:11px; max-width:86ch; }
   .wrap { display:flex; gap:14px; padding:14px 16px; align-items:flex-start; flex-wrap:wrap; }
   canvas { background:#07100b; border:1px solid var(--line); border-radius:6px; }
-  .panel { min-width:290px; font-size:12px; }
+  .panel { min-width:290px; max-width:340px; flex:1 1 320px; font-size:12px; }
   .row { display:flex; justify-content:space-between; gap:10px; padding:2px 0; border-bottom:1px solid #14251b; }
   .row b { color:var(--go); font-weight:normal; }
   .note { color:var(--warn); border:1px solid #3a3320; background:#14120a; padding:8px 10px;
@@ -49,7 +49,7 @@
     <b>not a momentum budget outside the static case</b>. The closure readout says which regime you are in.</div>
 </header>
 <div class="wrap">
-  <canvas id="c" width="260" height="380" style="width:100%;max-width:420px;height:auto"></canvas>
+  <canvas id="c" width="420" height="620" style="width:100%;max-width:500px;height:auto;flex:1 1 420px"></canvas>
   <div class="panel">
     <div class="row"><span>world</span><b id="mode">starting&hellip;</b></div>
     <div class="row"><span>bodies</span><b id="bodies">-</b></div>
@@ -85,7 +85,7 @@ let w = null;
 
 // A FIXED window so the eye can compare frames. Auto-fit would make a settling stack appear to move when only
 // the camera changed, which is the one thing this overlay must not do.
-const SX = 90, X0 = cv.width / 2, Y0 = cv.height - 40;
+const SX = 140, X0 = cv.width / 2, Y0 = cv.height - 40;
 const px = (x) => X0 + x * SX, py = (y) => Y0 - y * SX;
 
 // A FRESH WORLD each time rather than a reset method the loader does not have. createWorld() destroys and
