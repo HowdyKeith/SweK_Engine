@@ -30,6 +30,12 @@ fn range_of(i:u32, s:u32) -> f32 {
   }
   return hi - lo;
 }
+// the scale the arithmetic floor is relative to -- an HDR caller's values are not in 0..1
+fn mag_of(i:u32, s:u32) -> f32 {
+  var m = abs(luma[i - 2u * s]);
+  for (var k:i32 = -1; k <= 2; k = k + 1) { m = max(m, abs(luma[u32(i32(i) + k * i32(s))])); }
+  return m;
+}
 
 fn axis(i:u32, s:u32, f:f32, depth:f32, tau:f32) -> f32 {
   let a = d2a_of(i, s); let b = d2b_of(i, s);
@@ -57,5 +63,8 @@ fn main(@builtin(global_invocation_id) g:vec3<u32>) {
   let hv = (f32(g.y) + 0.5) / f32(u.h) + motion[o + 1u];
   let fx = hu * f32(u.w) - 0.5 - floor(hu * f32(u.w) - 0.5);
   let fy = hv * f32(u.h) - 0.5 - floor(hv * f32(u.h) - 0.5);
-  dst[i] = axis(i, 1u, fx, depth, u.tau) + axis(i, u.w, fy, depth, u.tau);
+  // never below the arithmetic's own floor: at an integer displacement both axis terms are exactly zero and
+  // the ring is still not exact -- see render/ringFloor.mjs for the ulp measurement this mirrors
+  let arith = 2.0 * 1.1920928955078125e-7 * max(mag_of(i, 1u), mag_of(i, u.w));
+  dst[i] = max(axis(i, 1u, fx, depth, u.tau) + axis(i, u.w, fy, depth, u.tau), arith);
 }`;

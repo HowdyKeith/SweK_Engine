@@ -131,8 +131,14 @@ console.log("\n3. *** THE OBVIOUS OPTIMISATION IS UNSAFE, AND ITS FAILURE IS THE
     ok("on three of the four contents a 1-in-64 sample is within 1% of the full max, which is exactly why this looks like a free optimisation",
         ["smooth", "finer", "chequer"].every((n) => rows[n].worst > 0.99),
         ["smooth", "finer", "chequer"].map((n) => `${n} ${((1 - rows[n].worst) * 100).toFixed(1)}%`).join(", "));
-    ok(`*** and on the fourth it reports EXACTLY ZERO -- a ${((1 - rows.edge.worst) * 100).toFixed(0)}% under-report, and zero is the most dangerous possible answer because it says there is no noise to clear ***`,
-        rows.edge.s[1] === 0 && rows.edge.s[2] === 0 && rows.edge.full > 0.1,
+    // *** v4561 ASSERTED THIS WAS EXACTLY ZERO AND v4562 MADE IT 2.2e-7, WHICH IS WORSE. *** Adding the
+    // arithmetic floor stopped the estimator ever returning zero, so a sampled max on the edge no longer
+    // reports the obviously-broken 0.00e+0 -- it reports one arithmetic floor, a small plausible number that
+    // looks like a measurement. The severity did not change (a factor of two million); the SIGNAL did. The
+    // row is now written against the ratio, which is what it always meant, and the change is recorded because
+    // a gate that quietly stopped failing here would have been read as the defect going away.
+    ok(`*** and on the fourth it under-reports by ${((1 - rows.edge.worst) * 100).toFixed(1)}% -- a factor of ${(rows.edge.full / Math.max(rows.edge.s[2], 1e-30)).toExponential(0)} -- and since v4562 gave the estimator an arithmetic floor it comes back as a small PLAUSIBLE number rather than an obvious zero, which is worse to read and no better to use ***`,
+        rows.edge.worst < 1e-3 && rows.edge.full > 0.1,
         `edge full ${rows.edge.full.toExponential(3)}, 1-in-16 ${rows.edge.s[1].toExponential(1)}, 1-in-64 ${rows.edge.s[2].toExponential(1)}`);
     ok("  and the reason generalises past this fixture: the three that survive have their worst pixel EVERYWHERE, the one that fails has it in a single column -- so sampling is safe exactly when the feature is common, and a rare high-error feature is what a lock is for",
         rows.edge.worst < 0.5 && rows.chequer.worst > 0.99,

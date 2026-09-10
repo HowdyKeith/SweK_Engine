@@ -59,6 +59,27 @@
  */
 export const RESOLUTION_TAU = 0.25;
 
+/**
+ * *** AND THE ESTIMATE HAS A FLOOR OF ITS OWN, WHICH v4560 RETURNED AS EXACTLY ZERO. ***
+ *
+ * At an INTEGER displacement f(1-f) is exactly zero, so the Taylor term is exactly zero, so on resolved
+ * content the estimator returned 0. A floor of zero is the answer v4561's own sampling section calls the most
+ * dangerous one there is: ridgeMarginBounds turns noiseFloor 0 into margin 0, and a margin of zero makes
+ * every fluctuation a feature. The ring is NOT exact there -- it is exact up to the arithmetic, and the
+ * arithmetic has a floor.
+ *
+ * MEASURED at an exactly-integer displacement on four contents spanning a 64x range of magnitude: the ring
+ * mean's error divided by (f32 epsilon * the local magnitude) reads 1.05, 1.05, 1.05 and 0.54. So the floor
+ * is ONE ULP of the local magnitude, and it scales with magnitude rather than being an absolute number --
+ * which matters, since an HDR caller's values are not in [0, 1].
+ *
+ * The bound is set at TWO ulps. That is the measurement rounded up to the next power of two, and it is
+ * labelled as such rather than dressed as a derivation: the (P+1)/2-ulp argument from summing P values and
+ * dividing predicts 4.5 and over-predicts the measurement by 4x, so it is not what is used.
+ */
+export const EPS_F32 = 1.1920928955078125e-7;
+export const ARITHMETIC_ULPS = 2;
+
 /** The resolution a threshold names, in samples per period -- tau's meaning, stated in v4559's own units. */
 export function samplesPerPeriodAt(tau = RESOLUTION_TAU) {
     if (!(tau > 0)) throw new Error("samplesPerPeriodAt: tau must be positive");
@@ -78,9 +99,13 @@ export function resampleDepth(period) {
 function neighbourhood(L, i, stride) {
     const d2a = L[i - stride] - 2 * L[i] + L[i + stride];
     const d2b = L[i] - 2 * L[i + stride] + L[i + 2 * stride];
-    let lo = Infinity, hi = -Infinity;
-    for (let k = -2; k <= 2; k++) { const q = L[i + k * stride]; if (q < lo) lo = q; if (q > hi) hi = q; }
-    return { d3: Math.abs(d2b - d2a), d2: Math.max(Math.abs(d2a), Math.abs(d2b)), step: Math.max(Math.abs(L[i] - L[i - stride]), Math.abs(L[i + stride] - L[i])), range: hi - lo };
+    let lo = Infinity, hi = -Infinity, mag = 0;
+    for (let k = -2; k <= 2; k++) {
+        const q = L[i + k * stride];
+        if (q < lo) lo = q; if (q > hi) hi = q;
+        const m = Math.abs(q); if (m > mag) mag = m;      // the scale the arithmetic floor is relative to
+    }
+    return { d3: Math.abs(d2b - d2a), d2: Math.max(Math.abs(d2a), Math.abs(d2b)), step: Math.max(Math.abs(L[i] - L[i - stride]), Math.abs(L[i + stride] - L[i])), range: hi - lo, mag };
 }
 
 /**
@@ -111,7 +136,9 @@ export function ringFloorCPU(luma, motion, w, h, period, tau = RESOLUTION_TAU) {
         const ry = Y.range > 1e-6 && Y.d3 / Y.range < tau;
         const ex = rx ? depth * 0.5 * fx * (1 - fx) * (X.d2 + X.d3) : Math.max(fx, 1 - fx) * X.step;
         const ey = ry ? depth * 0.5 * fy * (1 - fy) * (Y.d2 + Y.d3) : Math.max(fy, 1 - fy) * Y.step;
-        per[i] = ex + ey;
+        // never below the arithmetic's own floor: at an integer displacement both axis terms are exactly
+        // zero and the ring is still not exact -- it is exact to within the representation
+        per[i] = Math.max(ex + ey, ARITHMETIC_ULPS * EPS_F32 * Math.max(X.mag, Y.mag));
         total++; if (!rx || !ry) unresolved++;
         if (per[i] > worst) worst = per[i];
     }

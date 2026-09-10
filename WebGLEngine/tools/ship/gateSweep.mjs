@@ -3767,6 +3767,62 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since221: Object.freeze({
+        at: "v4562", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/ringFloorPerspective-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 0.83 s, under the 3000 ms budget. *** EVERY NUMBER THIS ARC HAS RECORDED SINCE v4553 " +
+                 "WAS MEASURED UNDER AN ORTHOGRAPHIC PROJECTION, WHERE A CAMERA TRANSLATION MOVES EVERY PIXEL " +
+                 "BY THE SAME AMOUNT. *** v4558 named perspective as unmeasured and v4559, v4560 and v4561 " +
+                 "each repeated the note. It matters because the floor is gated by SUB-PIXEL PHASE and under " +
+                 "perspective the phase varies across the frame with depth: measured, a 31x spread of " +
+                 "displacement inside ONE frame against orthographic's exactly 1. THE ANSWER IS THAT ONE " +
+                 "FRAME-WIDE FLOOR IS STILL SAFE AND MUCH LOOSER: 24x frame-wide where twelve orthographic " +
+                 "readings ran 1.05x to 4.48x, with the loosest band at 77x. *** AND IT IS SET BY THE FAR " +
+                 "FIELD, NOT THE NEAR ONE, WHICH IS BACKWARDS FROM THE OBVIOUS GUESS: *** parallax is largest " +
+                 "near, but a ground plane is FORESHORTENED with distance, so the far field carries the " +
+                 "highest spatial frequency per pixel -- and the floor is a content law (v4559) before it is " +
+                 "a motion one. The far band's true floor is 3.72e-2 against the fastest band's 6.56e-3, so a " +
+                 "single margin over-margins the fast band by 6x and a caller wanting that back needs a " +
+                 "per-band floor, which this round does not build. *** A REAL DEFECT IN v4560's ESTIMATOR, " +
+                 "FOUND BY THE PHASE SWEEP: it returned EXACTLY ZERO at an integer displacement. *** f(1-f) " +
+                 "is exactly zero there, so on resolved content the estimate was 0 -- and v4561's own " +
+                 "sampling section calls a zero floor the most dangerous answer there is, since " +
+                 "ridgeMarginBounds turns noiseFloor 0 into margin 0 and a margin of zero makes every " +
+                 "fluctuation a feature. The ring is not exact there; it is exact to within the ARITHMETIC. " +
+                 "Measured on four contents over a 64x range of magnitude, the ring mean's error at an " +
+                 "integer displacement is 1.05, 1.05, 1.05 and 0.54 ulps of the LOCAL MAGNITUDE -- so the " +
+                 "floor is relative, not absolute, which is what an HDR caller needs. It is bounded at two " +
+                 "ulps, which is the measurement rounded up to a power of two and is labelled as that rather " +
+                 "than dressed as a derivation: the (P+1)/2-ulp argument predicts 4.5 and over-predicts by " +
+                 "4x. *** THE REPAIR THE LOOSENESS SUGGESTS IS UNSAFE AND THE MEASUREMENT SAID SO BEFORE IT " +
+                 "SHIPPED. *** max(f, 1-f) returns the whole step at f = 0 where v4558 proved the fetch is " +
+                 "exact, and min(f, 1-f) is the obvious fix. Measured across phases it reads 0.37x, 0.79x and " +
+                 "0.68x of truth -- UNDER, the direction that matters for a margin -- because the ring's " +
+                 "window spans many frames at many jitter phases, so THIS frame's f does not bound the " +
+                 "window's worst. The crude max form is kept. A first draft of that row asserted the two " +
+                 "forms COINCIDE at a half-texel speed; they do not, and the fixture refutes it: only the " +
+                 "moving axis sits at f = 0.5, while the still axis sits at f = 0 where max returns the whole " +
+                 "step and min returns nothing. So it is a rejected alternative, not a blind spot -- what was " +
+                 "missing was anyone writing the second form down. Seven sabotages red at 4/1/2/9/4/10/1 " +
+                 "against four gates. *** KF IS THE ONE THIS ARC COULD NOT HAVE RUN BEFORE TODAY: *** " +
+                 "dropping the perspective divide from the motion-vector reconstruction is a PERFECT no-op " +
+                 "under orthographic, where w is 1 everywhere, so nine rounds left that path unpinned not for " +
+                 "want of a row but for want of a fixture that could reach it. It scores ten. *** AND KG WENT " +
+                 "0-RED: *** removing the arithmetic floor from the KERNEL while keeping it in the mirror " +
+                 "moves every affected pixel by 2.3e-7, and the parity row's tolerance is 1e-5 -- fifty times " +
+                 "coarser than the whole defect. An absolute tolerance is blind to anything smaller than " +
+                 "itself, and this arc has now built two things that live below one. The repair is a RELATIVE " +
+                 "comparison over the floored pixels, and it is a general lesson: every parity row in this " +
+                 "arc carries an absolute tolerance chosen for values of order one. Adding the floor also " +
+                 "broke v4561's sampling row, which asserted an exact zero: a sampled max on the edge now " +
+                 "returns one arithmetic floor instead of 0.00e+0. Same severity -- a factor of two million " +
+                 "-- worse signal, since a small plausible number reads like a measurement where a zero reads " +
+                 "like a bug. That row is rewritten against the ratio and its runtime re-taken at 1.33 s.",
+    }),
     since220: Object.freeze({
         at: "v4561", swept: 1, green: 1, red: 0,
         added: Object.freeze([
