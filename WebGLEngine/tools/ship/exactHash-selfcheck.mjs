@@ -253,6 +253,94 @@ console.log("\n5b. *** THE NEBULA: THE CPU FALLBACK AND THE GPU PATH DREW DIFFER
        validateWgsl(NS.NEBULA_WGSL).length === 0, validateWgsl(NS.NEBULA_WGSL).join("; ") || "clean");
 }
 
+// ---- 5d. *** THE ONE PAGE THAT DRAWS THE SAME PICTURE THROUGH TWO COMPILERS *** -------------------------------
+console.log("\n5d. nebula-device.html, whose whole claim is that both backends agree");
+{
+    // The page's own meta description reads: "one render path that runs on WebGPU (preferred) or WebGL2
+    // (fallback) ... only the shader text differs per backend (WGSL vs GLSL), everything else is written
+    // once." Its noise was fract(sin(dot(p, K)) * 43758.5453) TRANSCRIBED TWICE, once in each language, and
+    // sin() at those magnitudes is implementation-defined -- so two compilers on ONE DEVICE need not agree,
+    // and the page had nothing that could tell you. It is the only one of the census's six continuous sites
+    // that carries the idiom in two languages, and the only one making a cross-backend claim.
+    const page = fs.readFileSync(path.join(ENG, "nebula-device.html"), "utf8");
+    // Rebuild the two shader strings the way the PAGE builds them, rather than scanning its source for a
+    // spelling -- v4579's lesson: a check that reads the text instead of the artefact is a second reader.
+    const body = page.match(/<script type="module">([\s\S]*?)<\/script>/)[1]
+        .replace(/^\s*import[^\n]*\n/gm, "").split("let device = null")[0]
+        .replace(/^const cv[\s\S]*?resize\(\);\n/m, "");
+    const built = new Function("EXACT_HASH_GLSL", "EXACT_HASH_WGSL", body + "\nreturn { GLSL, WGSL };")
+        (EXACT_HASH_GLSL, EXACT_HASH_WGSL);
+    ok("!! *** both backends splice exactHash's OWN exported text, so they cannot drift by being edited apart ***",
+       built.GLSL.fragment.includes(EXACT_HASH_GLSL) && built.WGSL.includes(EXACT_HASH_WGSL),
+       "the GLSL fragment and the WGSL are assembled by the page and read back here");
+    ok("!! ...and neither carries fract(sin( any more",
+       !/fract\s*\(\s*sin\s*\(/.test(built.GLSL.fragment) && !/fract\s*\(\s*sin\s*\(/.test(built.WGSL),
+       `GLSL ${built.GLSL.fragment.length} chars, WGSL ${built.WGSL.length} chars`);
+    ok("!! ...and both call it the SAME WAY, which is the property the page's claim rests on",
+       /return exact_hash\(p, 0u\);/.test(built.GLSL.fragment) && /return exact_hash\(p, 0u\);/.test(built.WGSL),
+       "same function, same seed, in both languages. The two backends agree BY CONSTRUCTION rather than by " +
+       "hoping two implementations of sin round alike");
+    const nums = (t) => (t.match(/0x[0-9a-f]{8}|\b16777216\b|\b4294967296\b|\b256\b/g) || []).join(",");
+    ok("!! ...and the two spliced texts carry the same constants in the same order",
+       nums(built.GLSL.fragment) === nums(built.WGSL) && nums(built.WGSL).length > 40,
+       `[${nums(built.WGSL)}]`);
+    ok("  ...and the WGSL still validates with the hash spliced in",
+       validateWgsl(built.WGSL).length === 0, validateWgsl(built.WGSL).join("; ") || "clean");
+    let parses = true, why = "";
+    for (const m of page.matchAll(/<script type="module">([\s\S]*?)<\/script>/g)) {
+        try { new Function(m[1].replace(/^\s*import[^\n]*\n/gm, "")); } catch (e) { parses = false; why = e.message; }
+    }
+    ok("  ...and the page's own module still parses",
+       parses, parses ? "v4579 and v4580 each stopped a file parsing by editing a shader inside it; this page " +
+       "concatenates strings rather than using a template, but the property worth holding is the same"
+       : "SYNTAX ERROR: " + why);
+}
+
+// ---- 5e. THE FIVE THAT ARE NOT CHANGED, AND THE MEASUREMENT THAT SAYS WHY ------------------------------------
+console.log("\n5e. the five single-implementation sites, recorded rather than rewritten");
+{
+    // *** THIS IS A DECISION NOT TO ACT, SO IT CARRIES ITS EVIDENCE. *** v4580 measured that the idiom's
+    // deficit is a TAIL effect that deepens with the cut -- 0.987 of the fraction asked for at a cut of 0.900
+    // and 0.243 at 0.999. None of these five thresholds anything: each averages, mixes, or adds its hash as a
+    // small offset, so the property that made the other seven worth changing does not apply. And none has a
+    // second implementation to disagree with -- one language, one shader, no CPU twin.
+    const FIVE = SHADER_SINHASH_V4578.continuous;
+    const SIN = /fract\s*\(\s*sin\s*\(/;
+    // *** A MISSING FILE IS A FAIL ROW, NOT A THROW. *** The first draft read each path straight and a
+    // sabotage that renamed one entry killed the gate: exit 1 with ZERO FAIL lines, which a count of FAIL
+    // lines reads as a clean zero. That is v4536's rule -- a crash is not a verdict -- and it was caught by
+    // sabotaging the row rather than by reading it.
+    const rows = FIVE.map((rel) => {
+        let raw = null;
+        try { raw = fs.readFileSync(path.join(ENG, rel), "utf8"); } catch { return { rel, missing: true, sites: 0 }; }
+        const live = raw.split("\n").filter((l) => SIN.test(l) && !/^\s*(\/\/|\*|\/\*)/.test(l.trim()));
+        const wgsl = /@fragment|vec2f|vec3f|fn \w+\([^)]*\) ->/.test(raw);
+        // *** ASSEMBLED, NOT SPELLED. *** render/backendParity.mjs writes its own marker as "#" + "version 300
+        // es" because a file that SEARCHES for a marker contains it, and its header records that costing eight
+        // self-counts in eight rounds. The first draft of this line spelled it out and backendParity duly
+        // counted this gate: glslBearing 154 -> 155, both 21 -> 22, directive 137 -> 138. Ninth instance, and
+        // the instrument that documents the trap is the one that caught me in it.
+        const glsl = new RegExp("void main\\(\\)|precision (highp|mediump)|#" + "version 300 es").test(raw);
+        return { rel, sites: live.length, wgsl, glsl };
+    });
+    for (const r of rows)
+        console.log(`     ${r.rel.padEnd(32)} ${r.missing ? "*** NOT ON DISK ***" : r.sites + " site(s)   " + (r.glsl ? "GLSL" : "----") + " " + (r.wgsl ? "WGSL" : "----")}`);
+    ok("!! every site the record names is on disk",
+       rows.every((r) => !r.missing),
+       rows.filter((r) => r.missing).map((r) => r.rel).join(", ") ||
+       `${rows.length} paths, all present. A record naming a file that is gone would otherwise take this gate ` +
+       "down with a throw rather than a verdict");
+    ok("!! *** not one of the five carries the idiom in TWO languages -- there is no second half to disagree ***",
+       rows.length === 5 && rows.every((r) => !r.missing && !(r.wgsl && r.glsl)),
+       "nebula-device.html was the only one that did, and 5d fixes it. A shader-only site has no CPU twin and " +
+       "one compiler, so the divergence this census exists for cannot arise; what it carries is that sin is " +
+       "implementation-defined ACROSS DEVICES, which is a cost and not a defect");
+    ok("!! ...and every one still really carries the idiom, so this is a decision and not a deletion",
+       rows.every((r) => r.sites > 0),
+       rows.map((r) => r.rel.split("/").pop() + " x" + r.sites).join(", ") +
+       ". IF ANY READS ZERO the site was changed and this row retires with it rather than passing quietly");
+}
+
 console.log("\n6. *** THE RATCHET: no CPU/GPU TWIN may reintroduce the idiom ***");
 {
     // A census rather than a list. A file is a TWIN when it computes the sin-hash in float64 (Math.sin(...)

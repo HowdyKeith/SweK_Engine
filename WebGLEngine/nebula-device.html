@@ -22,6 +22,16 @@
 <button id="toggle">force other backend</button>
 <script type="module">
 import { requestDevice, detectBackends } from "./gfx/device.js";
+// v4582 -- *** THIS PAGE'S WHOLE CLAIM IS THAT THE TWO BACKENDS DRAW THE SAME NEBULA, AND ITS HASH WAS
+// TRANSCRIBED TWICE WITH NOTHING COMPARING THEM. *** The description above says "only the shader text differs
+// per backend (WGSL vs GLSL), everything else is written once" -- and the noise underneath it was
+// fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453), written out once in each language. sin() at those
+// magnitudes is IMPLEMENTATION-DEFINED (tools/ship/swiftShaders-selfcheck.mjs's own note; and
+// tools/ship/webgpuHarness.mjs records sin(1 * 12.9898) * 43758.5453 reading 0.921690 on a CPU against
+// 0.240234 on a GPU), so two compilers on ONE device need not agree and the page could not tell you.
+// render/exactHash.mjs is integer arithmetic: the two halves now agree BY CONSTRUCTION rather than by hoping
+// two implementations of sin round alike, and they are spliced from one module instead of typed twice.
+import { EXACT_HASH_GLSL, EXACT_HASH_WGSL } from "./render/exactHash.mjs";
 const cv = document.getElementById("c"), be = document.getElementById("be"), sub = document.getElementById("sub");
 function resize() { cv.width = innerWidth; cv.height = innerHeight; }
 addEventListener("resize", resize); resize();
@@ -30,7 +40,8 @@ const quad = new Float32Array([-1,-1, 1,-1, 1,1, -1,-1, 1,1, -1,1]);   // fullsc
 const GLSL = {
   vertex: "#version 300 es\nin vec2 pos;\nvoid main(){ gl_Position = vec4(pos, 0.0, 1.0); }",
   fragment: "#version 300 es\nprecision highp float;\nuniform float uTime;\nuniform vec2 uRes;\nout vec4 o;\n" +
-    "float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }\n" +
+    EXACT_HASH_GLSL +
+    "float hash(vec2 p){ return exact_hash(p, 0u); }\n" +
     "float noise(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(hash(i),hash(i+vec2(1,0)),f.x), mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x), f.y); }\n" +
     "float fbm(vec2 p){ float v=0.0, a=0.5; for(int i=0;i<5;i++){ v+=a*noise(p); p*=2.0; a*=0.5; } return v; }\n" +
     "void main(){ vec2 uv=gl_FragCoord.xy/uRes; uv.x*=uRes.x/uRes.y; vec2 p=uv*3.0; float t=uTime*0.05;\n" +
@@ -41,7 +52,8 @@ const GLSL = {
 const WGSL =
   "struct U { uTime: f32, uRes: vec2f };\n@group(0) @binding(0) var<uniform> u: U;\n" +
   "struct VO { @builtin(position) p: vec4f };\n@vertex fn vs(@location(0) pos: vec2f) -> VO { var o: VO; o.p = vec4f(pos, 0.0, 1.0); return o; }\n" +
-  "fn hash(p: vec2f) -> f32 { return fract(sin(dot(p, vec2f(127.1,311.7)))*43758.5453); }\n" +
+  EXACT_HASH_WGSL +
+  "fn hash(p: vec2f) -> f32 { return exact_hash(p, 0u); }\n" +
   "fn noise(pp: vec2f) -> f32 { let i=floor(pp); var f=fract(pp); f=f*f*(3.0-2.0*f); return mix(mix(hash(i),hash(i+vec2f(1,0)),f.x), mix(hash(i+vec2f(0,1)),hash(i+vec2f(1,1)),f.x), f.y); }\n" +
   "fn fbm(p0: vec2f) -> f32 { var p=p0; var v=0.0; var a=0.5; for(var i=0;i<5;i=i+1){ v=v+a*noise(p); p=p*2.0; a=a*0.5; } return v; }\n" +
   "@fragment fn fs(inp: VO) -> @location(0) vec4f { var uv=inp.p.xy/u.uRes; uv.x=uv.x*(u.uRes.x/u.uRes.y); let p=uv*3.0; let t=u.uTime*0.05;\n" +

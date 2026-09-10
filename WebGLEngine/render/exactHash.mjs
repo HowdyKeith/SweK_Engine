@@ -143,6 +143,7 @@ export const SHADER_SINHASH_V4578 = Object.freeze({
     // empty. Every remaining site averages its hash away.
     threshold: Object.freeze([]),
     starfieldSharedAtV4579: Object.freeze(["blackhole.html", "flight-gpu.html", "wormhole.html"]),
+    backendSharedAtV4582: Object.freeze(["nebula-device.html"]),
     cutsWereNeverIdentical: Object.freeze({ "blackhole.html": 0.986, "flight-gpu.html": 0.987, "wormhole.html": 0.985 }),
     // *** AND TWO OF THE TWELVE ARE FILES NO RUNTIME CODE LOADS, WHICH THIS ENTRY COUNTED AS SITES. ***
     // Measured at v4579 across every .js/.mjs/.html outside gates and bookkeeping: nothing names either.
@@ -156,11 +157,22 @@ export const SHADER_SINHASH_V4578 = Object.freeze({
     // whose job is reachability. Round #31's finding (".cjs is outside every census") in a second extension.
     // FILED, NOT FIXED HERE -- and they stay in the census below, because they DO carry the idiom.
     notLoaded: Object.freeze(["shaders/biome.frag.glsl", "gpu/waterScreen.frag.glsl"]),
+    // *** v4582 -- THE FIVE THAT STAY, AND THIS IS A DECISION RATHER THAN A REMAINDER. ***
+    // Each averages, mixes or adds its hash as a small offset, and v4580 measured that the idiom's deficit is
+    // a TAIL effect that deepens with the cut -- 0.987 of the fraction asked for at 0.900, 0.243 at 0.999 --
+    // so the property that made the other seven worth changing does not reach these. NONE has a second
+    // implementation: one language, one shader, no CPU twin, so the divergence this census exists for cannot
+    // arise here. What they do carry is that sin at these magnitudes is implementation-defined ACROSS
+    // DEVICES, which is a cost and is recorded rather than repaired.
+    //
+    // nebula-device.html LEFT this list at v4582. It was the only one of the six holding the idiom in GLSL
+    // AND WGSL, and the only one whose page makes a cross-backend claim -- "only the shader text differs per
+    // backend, everything else is written once". Two transcriptions of one hash, two compilers, and nothing
+    // comparing them; both splice exactHash's exported text now.
     continuous: Object.freeze([
         "atmosphere/AtmosphereSystem.js",   // vertical jitter on a lightning streak, through a smoothstep
         "demos_code/ant_colony.js",         // a heading nudge on the tie-break branch only
         "demos_code/slime_mold.js",         // the same nudge, the same branch
-        "nebula-device.html",               // fbm, and the ONLY file carrying the idiom in GLSL and WGSL BOTH
         "render/CloudVolume.js",            // a dithered ray start, averaged over up to 48 march steps
         "render/voxelrenderer.js",          // h1/h2/h3 surface tint and a +/-4% per-voxel colour jitter
     ]),
