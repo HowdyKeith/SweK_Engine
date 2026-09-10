@@ -3767,6 +3767,56 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since212: Object.freeze({
+        at: "v4553", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/temporalLock-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 2.14 s (2142/2124/2280 over three serial runs, under the 3000 ms sweep budget -- but " +
+                 "only after an optimisation; see below). PER-PIXEL STATE ACROSS FRAMES, AND A RUNG THAT " +
+                 "ANSWERS A REFUSAL RATHER THAN ADDING A FEATURE. v4552 wrote a shading-change detector three " +
+                 "ways and refused all three, because on a high-contrast surface a ONE-PIXEL JITTER MOVES A " +
+                 "PIXEL BY AS MUCH AS A LIGHTING CHANGE DOES. *** THAT REFUSAL STILL STANDS: a one-frame " +
+                 "detector is still refused and v4552 section 5 still holds it. *** What is shown here is that " +
+                 "a WINDOW can do what a frame cannot, and the reason is arithmetic. MEASURED FIRST, BEFORE " +
+                 "ANYTHING WAS BUILT ON IT: on a static jittered scene the worst difference between adjacent " +
+                 "window means is 2.365e-1 at one frame, 1.182e-1 at two, 1.577e-1 at THREE -- worse than two " +
+                 "-- 5.912e-2 at four, and EXACTLY ZERO at eight, the jitter phase count, because the same " +
+                 "phase offsets recur in both windows and cancel. Against a light-drop signal of 0.2331 that " +
+                 "makes a one-frame detector's signal-to-residue 0.99, which is v4552's refusal restated as " +
+                 "arithmetic. *** AND IT IS NOT MONOTONIC IN THE WINDOW LENGTH, WHICH IS THE DESIGN RULE: *** " +
+                 "the ring is jitterPhaseCount(ratio), not a taste parameter, and FSR2's 4 leaves 5.912e-2 " +
+                 "where the phase count leaves 0 -- a choice about memory, not accuracy. ON v4552's OWN TWO " +
+                 "FIXTURES: at a period of 8 the detector costs EXACTLY NOTHING, 3.660e-8 against 3.660e-8 " +
+                 "with no detection, THE SAME FLOAT TO THE BIT, where v4552's one-frame form cost 3.0e5x; a " +
+                 "period of 2 or 4 still costs 2.0e6x and 8.8e5x. It still catches the light change, worth " +
+                 "1.82x over the following 8 frames, and the price is ONE PERIOD OF LATENCY that is exact -- " +
+                 "the first four frames after the change are BIT-IDENTICAL to no detection, because both " +
+                 "windows still straddle it. THE LOCK is the other thing the ring buys: a single frame finds " +
+                 "ZERO lock candidates on a line 0.4 px wide (most jitter phases miss a sub-pixel feature " +
+                 "entirely) where the ring finds all 46, worth 3.14x on the feature while holding 2.0% of the " +
+                 "frame open -- and once the detector finds the feature every frame the LIFETIME STOPS " +
+                 "MATTERING, life 4/8/16 identical, so FSR2's lifetime is compensating for detection that " +
+                 "misses. *** THE LIMIT IS STATED WITH A NUMBER RATHER THAN LEFT TO BE FOUND: *** on a chequer " +
+                 "at the pixel scale the ring still locks 1,340 of 2,304 and the lock makes the ghost 26% " +
+                 "WORSE. There is no luma-only test separating a thin feature from a texture at the pixel " +
+                 "scale, because at that scale they are the same signal -- and v4552 established those are " +
+                 "exactly the pictures that matter. Ten sabotages red at 3/3/2/5/3/1/3/3/1/1 with one " +
+                 "deliberate 0-RED. *** THE 0-RED THAT MATTERED WAS THIS ROUND'S OWN OPTIMISATION. *** The " +
+                 "gate first ran at 3,180 ms, OVER the 3,000 ms budget -- the same fault v4551 and v4552 both " +
+                 "recorded, an over-budget gate being skipped and its control stopping. Profiling put 25.6% in " +
+                 "the harness serialising 313,000 numbers and 10% in the garbage collector, so the device " +
+                 "section moved to a quarter of the area and pushLuma began swapping a scratch pair instead of " +
+                 "allocating 147 KB a frame. Aliasing that pair with the live ring then changed NOTHING " +
+                 "anywhere in the gate: with zero motion the reprojection is the identity, so each pixel only " +
+                 "shifts its own slots. An optimisation whose safety nothing asserts is a defect waiting for a " +
+                 "different motion vector, and it now has two rows -- bit-identity against a fresh allocation " +
+                 "every frame, and the buffers staying distinct. The tenth sabotage, swapping back to " +
+                 "reallocation, is 0-RED BY RIGHT: it is behaviour-preserving and only slower, and performance " +
+                 "is held by sweep-timings and the budget rather than by a correctness row.",
+    }),
     since211: Object.freeze({
         at: "v4552", swept: 1, green: 1, red: 0,
         added: Object.freeze([

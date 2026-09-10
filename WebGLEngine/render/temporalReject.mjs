@@ -165,12 +165,12 @@ export function historyFactorCPU({ disocclusion = null, reactive = null, shading
  * exactly the current frame. Nothing here re-derives the reprojection or the bilinear fetch differently from
  * render/temporalAccumulate.mjs; what it adds is the space of the box and the weight of the result.
  */
-export function rectifiedAccumulateCPU({ current, history, motion, factor = null, w, h, alpha,
+export function rectifiedAccumulateCPU({ current, history, motion, factor = null, relax = null, w, h, alpha,
                                          space = "ycocg", clampToNeighbourhood = true }) {
     if (!CLAMP_SPACES.includes(space)) throw new Error(`rectifiedAccumulateCPU: space must be one of ${CLAMP_SPACES.join(", ")}, got ${space}`);
     const ycocg = space === "ycocg";
     const out = new Float32Array(w * h * 4);
-    const stats = { reused: 0, rejectedOffscreen: 0, rejectedInvalid: 0, clamped: 0, discarded: 0 };
+    const stats = { reused: 0, rejectedOffscreen: 0, rejectedInvalid: 0, clamped: 0, discarded: 0, relaxed: 0 };
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
         const i = y * w + x, o = i * 4;
         const cur = [current[o], current[o + 1], current[o + 2]];
@@ -194,9 +194,21 @@ export function rectifiedAccumulateCPU({ current, history, motion, factor = null
                                 : [current[no], current[no + 1], current[no + 2]];
                 for (let c = 0; c < 3; c++) { if (s[c] < lo[c]) lo[c] = s[c]; if (s[c] > hi[c]) hi[c] = s[c]; }
             }
+            // *** RELAX IS THE LOCK'S ONLY WAY IN, AND IT LIVES HERE BECAUSE THE CLAMP DOES. *** v4553 added it:
+            // a per-pixel [0,1] that lerps back toward the UNCLAMPED history, so a pixel holding a feature
+            // thinner than a pixel keeps it through the jitter phases that miss it. relax = 0 is exactly the
+            // v4552 behaviour and relax = 1 is no clamp at all -- which is why a lock that never dies is worse
+            // than no lock, and why render/temporalLock.mjs gates the kill rules rather than trimming them.
+            const rx = relax ? clamp(relax[i], 0, 1) : 0;
             let did = false;
-            for (let c = 0; c < 3; c++) { const b = hv3[c]; hv3[c] = clamp(hv3[c], lo[c], hi[c]); if (hv3[c] !== b) did = true; }
+            for (let c = 0; c < 3; c++) {
+                const b = hv3[c];
+                const cl = clamp(hv3[c], lo[c], hi[c]);
+                hv3[c] = cl + (b - cl) * rx;
+                if (hv3[c] !== b) did = true;
+            }
             if (did) stats.clamped++;
+            if (rx > 0) stats.relaxed++;
             hist = ycocg ? yCoCgToRgb(hv3[0], hv3[1], hv3[2]) : hv3;
         }
 

@@ -235,8 +235,11 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // and the first re-taken because a CHECK SAID SO rather than because a round went looking. v4551 added the
     // sixth row to recordDrift's pre-flight after this record drifted five rounds unnoticed; this round ran it
     // before the verify and it named all four obligations at once. The other five rows have still never moved.
-    gates: 1611, usesOk: 1590, definesOk: 1582, importsOk: 0,
-    distinctDefinitions: 38, nameFirst: 1483, condFirst: 91, unknownSignature: 16,
+    // v4553 -- RE-TAKEN: one gate (temporalLock) joined, the same four rows by one, TWENTY-SECOND arrival,
+    // and the second round running that the pre-flight prompted rather than a search. The other five rows have
+    // still never moved.
+    gates: 1612, usesOk: 1591, definesOk: 1583, importsOk: 0,
+    distinctDefinitions: 38, nameFirst: 1484, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([
