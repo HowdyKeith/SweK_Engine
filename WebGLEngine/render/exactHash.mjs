@@ -139,9 +139,9 @@ export const SHADER_SINHASH_V4578 = Object.freeze({
     // byte-identical on all three (md5 a8bec00ebc4c); the cuts are 0.986, 0.987 and 0.985. I checked the
     // FUNCTION on all three files and the CALLER on one, then wrote "identical" about both -- and repeating
     // the wrong number on each line made it look checked rather than copied.
-    threshold: Object.freeze([
-        "render/skyRenderer.js",     // h > 1.0 - uStarDensity * 0.005 -> a star exists. STILL OPEN.
-    ]),
+    // v4580: render/skyRenderer.js left too -- it splices render/skyStars.mjs now, so the THRESHOLD class is
+    // empty. Every remaining site averages its hash away.
+    threshold: Object.freeze([]),
     starfieldSharedAtV4579: Object.freeze(["blackhole.html", "flight-gpu.html", "wormhole.html"]),
     cutsWereNeverIdentical: Object.freeze({ "blackhole.html": 0.986, "flight-gpu.html": 0.987, "wormhole.html": 0.985 }),
     // *** AND TWO OF THE TWELVE ARE FILES NO RUNTIME CODE LOADS, WHICH THIS ENTRY COUNTED AS SITES. ***
@@ -183,6 +183,21 @@ export const SHADER_SINHASH_V4578 = Object.freeze({
     // 1.2837%, 12.4 sd low, and its per-cube readings scatter 0.077% against exact_hash3's 0.031%. A page
     // asking for 1.4% of its sky got about 1.28% of it, and how much depended on which way it looked.
     tailDeficitSd: -12.4,
+    // *** AND v4580 MEASURED WHY, AND HOW MUCH WORSE IT GETS THE DEEPER THE CUT. *** The deficit is not a
+    // fixed 8%: over a 100^3 cube of integer cells, the fraction admitted against the fraction asked for runs
+    // 0.987 at a cut of 0.900, 0.914 at 0.986, 0.854 at 0.995, 0.437 at 0.997 and 0.243 at 0.999. Both
+    // sin-hash variants in this tree show the same curve -- (17.13, 91.71, 53.97) and (12.9898, 78.233,
+    // 37.719) -- so it is the IDIOM, not the constants.
+    //
+    // THE MECHANISM IS COUNTABLE RATHER THAN DESCRIBED: over 216,000 integer cells the sin-hash produces
+    // 7,112 DISTINCT VALUES and exact_hash3 produces 216,000; above 0.997 the sin-hash has NINETEEN distinct
+    // values and exact_hash3 has 656. float32 loses the low bits of sin(x) * 43758.5453 before fract() runs,
+    // so the output lands on a coarse uneven lattice, and a threshold slicing 0.003 off the top is choosing
+    // between a handful of levels. An fbm averages that away; a threshold cannot.
+    tailRatioByCut: Object.freeze({ "0.900": 0.987, "0.950": 0.962, "0.986": 0.914,
+                                    "0.990": 0.889, "0.995": 0.854, "0.997": 0.437, "0.999": 0.243 }),
+    distinctOf216000: Object.freeze({ sinHash: 7112, exactHash3: 216000 }),
+    distinctAbove997: Object.freeze({ sinHash: 19, exactHash3: 656 }),
 });
 
 export const EXACT_HASH_WGSL = `

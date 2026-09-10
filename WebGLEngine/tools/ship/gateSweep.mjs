@@ -3765,6 +3765,52 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
     // v4576 -- the 225th closing: a tier for the guardians the sweep cannot afford, and it caught two on sight.
+    since228: Object.freeze({
+        at: "v4580", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/skyStars-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/skyRenderer.js", "render/exactHash.mjs",
+                                "tools/ship/assertionShape.mjs", "vba/runtimeGap.mjs"]),
+        verdict: "green, 333/336/373 ms over three serial runs. THE ENGINE'S OWN NIGHT SKY, WHICH main.js " +
+                 "DRAWS AND NOTHING HAD A REFERENCE FOR. render/skyRenderer.js's starfield was GLSL-only, and " +
+                 "it carried two defects a reference would have caught on the first run. *** ONE: THE DENSITY " +
+                 "KNOB WAS DIMMING EVERY STAR. *** It read `bright = (h - threshold) / 0.005` while " +
+                 "`1.0 - threshold` IS uStarDensity * 0.005, so the divisor was only correct at density 1 and " +
+                 "the brightest possible star was 0.60 at density 0.6 and 0.40 at 0.4. main.js sets density " +
+                 "0.4 with brightness 0.7 and density 0.6 with brightness 0.5, so the city-sky preset topped " +
+                 "out at 0.28 while asking for 0.7, and two knobs the API documents as independent were " +
+                 "multiplied together. THE SAME FILE HAS THE CORRECT FORM TWELVE LINES LOWER: the day-mode " +
+                 "night stars divide by 0.003, which really is their 1 - threshold. One file, both forms, " +
+                 "nothing comparing them. *** TWO: THE SIN-HASH DEFICIT DEEPENS WITH THE CUT, AND THIS SITE " +
+                 "CUTS DEEPEST IN THE TREE. *** v4579 measured 12.4 sd low at a cut of 0.986; over a 100^3 " +
+                 "cube the ratio of stars delivered to stars asked for runs 0.987 at cut 0.900, 0.914 at " +
+                 "0.986, 0.854 at 0.995, 0.437 at 0.997 and 0.243 at 0.999 -- so AT THE ENGINE'S OWN density " +
+                 "0.6 THE SKY GOT 44% OF THE STARS IT ASKED FOR. Both sin-hash variants in the tree show the " +
+                 "same curve, so it is the idiom and not the constants. THE MECHANISM IS COUNTED RATHER THAN " +
+                 "DESCRIBED: over 216,000 integer cells the sin-hash yields 7,112 DISTINCT VALUES against " +
+                 "exact_hash3's 216,000, and above 0.997 it has NINETEEN against 656 -- float32 loses the low " +
+                 "bits of sin(x) * 43758.5453 before fract() runs, so a threshold slicing 0.003 off the top " +
+                 "chooses between a handful of levels. An fbm averages that away; a threshold cannot. " +
+                 "*** FOUR OF MY OWN ROWS COULD NOT FAIL, AND THE CAUSE WAS v4579'S LESSON UNLEARNED. *** The " +
+                 "emulation held the shader's avalanche CONSTANTS but not its FORMULA, so reverting sky_star " +
+                 "to the bare 0.005 divisor, changing its seed 0u -> 9u, and drifting CELL_SCALE away from " +
+                 "the shader's own floor(ray * 240.0) all passed green. The text is read for its formula, its " +
+                 "seed and its three cell scales now -- and the row naming those scales first said TWO and " +
+                 "forgot the Milky Way's floor(ray * 6.0). A fifth row went red on THIS ROUND'S OWN COMMENT, " +
+                 "which quotes the old arithmetic to explain it: prose counted as code, in a gate written the " +
+                 "day after two rounds about exactly that. *** AND I PUT A BACKTICK IN A SHADER TEMPLATE " +
+                 "LITERAL FOR THE SECOND ROUND RUNNING, *** in render/skyRenderer.js's FS after doing it in " +
+                 "wormhole.html at v4579. I drafted a tree-wide scan for it and THREW THE SCAN AWAY: it " +
+                 "reported render/tslSource.mjs and text/slugShaderWgsl.js as truncated, and both are fine -- " +
+                 "their bodies hold NESTED template literals inside ${...}, so the first backtick is not the " +
+                 "terminator, and finding the real one needs the lexer tools/ship/pageParse.mjs uses behind " +
+                 "--experimental-vm-modules. The gap it was built for does not exist either: MEASURED, " +
+                 "breaking this file reddens tools/ship/backendParity-selfcheck.mjs because that gate IMPORTS " +
+                 "skyRenderer rather than only reading it, and wormhole.html's was caught by three page " +
+                 "gates. Both mistakes were caught by instruments that already existed; what I skipped was " +
+                 "running them before saying done. THE THRESHOLD CLASS OF SHADER_SINHASH_V4578 IS NOW EMPTY. " +
+                 "THE TRADE IS THE SAME ONE v4579 STATED: a different sky, and a brighter one.",
+    }),
     since227: Object.freeze({
         at: "v4579", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/starField-selfcheck.mjs"]),

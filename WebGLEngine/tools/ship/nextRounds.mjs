@@ -387,7 +387,14 @@ export const NEXT_ROUNDS = [
             + "threshold site, render/skyRenderer.js, which draws a star on `h > 1.0 - uStarDensity * 0.005` "
             + "and is imported by main.js, so it is the live one and it has no CPU reference; and SIX "
             + "continuous sites where the hash is a jitter, a dither, a refraction offset, an fbm or a "
-            + "per-voxel tint, and divergence changes the pattern rather than the structure.",
+            + "per-voxel tint, and divergence changes the pattern rather than the structure. *** v4580 CLOSED "
+            + "THE LAST THRESHOLD SITE: *** render/skyRenderer.js splices render/skyStars.mjs now, so the "
+            + "threshold class is EMPTY and every remaining site averages its hash away. That round also "
+            + "measured why the idiom fails a threshold specifically: the deficit DEEPENS with the cut -- 0.987 "
+            + "of the fraction asked for at a cut of 0.900, 0.437 at 0.997, 0.243 at 0.999 -- because over "
+            + "216,000 integer cells the sin-hash produces 7,112 distinct values against exact_hash3's 216,000, "
+            + "and NINETEEN of them above 0.997. What is left is six continuous sites, and the honest reading "
+            + "of that curve is that they are the ones the idiom is least wrong for.",
         why: "*** THE TREE ALREADY KNEW, IN THREE PLACES, AND NEVER JOINED THEM UP. *** "
             + "tools/ship/webgpuHarness.mjs records that sin(i * 12.9898) * 43758.5453 returns 0.921690 on a "
             + "CPU and 0.240234 on a GPU for i = 1. fx/paintFields.mjs's header records the same shape for "
