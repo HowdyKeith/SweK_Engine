@@ -362,12 +362,22 @@ export function buildNavmesh(hm, {
 }
 
 /** A* over polygon adjacency, entering each polygon at the midpoint of the portal that reached it. */
-export function corridor(mesh, s, g) {
+export function corridor(mesh, s, g, { entry = "nearest" } = {}) {
     const si = mesh.polyAt(s.x, s.z), gi = mesh.polyAt(g.x, g.z);
     if (si < 0 || gi < 0) return null;
     if (si === gi) return { chain: [], si, gi };
-    const mid = (seg) => ({ x: (seg[0].x + seg[1].x) / 2, z: (seg[0].z + seg[1].z) / 2 });
     const D = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+    // *** THE ENTRY POINT IS THE NEAREST POINT ON THE PORTAL, NOT ITS MIDPOINT, AND THAT IS THE COST MODEL. ***
+    // See the header note on backlog item "navmesh-recast" piece (2).
+    const enter = entry === "midpoint"
+        ? (seg) => ({ x: (seg[0].x + seg[1].x) / 2, z: (seg[0].z + seg[1].z) / 2 })
+        : (seg, from) => {
+            const ax = seg[0].x, az = seg[0].z, dx = seg[1].x - ax, dz = seg[1].z - az;
+            const L2 = dx * dx + dz * dz;
+            if (L2 === 0) return { x: ax, z: az };
+            const t = Math.max(0, Math.min(1, ((from.x - ax) * dx + (from.z - az) * dz) / L2));
+            return { x: ax + dx * t, z: az + dz * t };
+        };
     const gS = new Map([[si, 0]]), prev = new Map(), pt = new Map([[si, s]]);
     const open = [[0, si]], done = new Set();
     while (open.length) {
@@ -378,7 +388,7 @@ export function corridor(mesh, s, g) {
         if (i === gi) break;
         for (const e of mesh.adj[i]) {
             if (done.has(e.to)) continue;
-            const m = mid(e.seg), ng = gS.get(i) + D(pt.get(i), m);
+            const from = pt.get(i), m = enter(e.seg, from), ng = gS.get(i) + D(from, m);
             if (gS.has(e.to) && gS.get(e.to) <= ng) continue;
             gS.set(e.to, ng); prev.set(e.to, { from: i, seg: e.seg, dir: e.dir }); pt.set(e.to, m);
             open.push([ng + D(m, g), e.to]);
@@ -442,8 +452,8 @@ export function orientPortal(seg, dir) {
 }
 
 /** Plan a path: A* over polygons, then the funnel. Returns null when the agent does not fit. */
-export function planPath(mesh, s, g) {
-    const c = corridor(mesh, s, g);
+export function planPath(mesh, s, g, opts = {}) {
+    const c = corridor(mesh, s, g, opts);
     if (!c) return null;
     const portals = portalsFor(mesh, s, g, c.chain);
     const points = funnel(portals);

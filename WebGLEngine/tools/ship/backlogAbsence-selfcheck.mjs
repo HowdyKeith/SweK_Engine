@@ -49,19 +49,30 @@ const control = rows.filter((r) => r.mustFail);
 // =============================================================================================================
 console.log("\n1. *** THE BACKLOG'S OWN ABSENCE CLAIMS, GRADED BY THE INSTRUMENT BUILT FOR EXACTLY THAT ***");
 {
-    const broken = live.filter((r) => !r.holds);
-    ok("!! *** EVERY LIVE ABSENCE CLAIM IN nextRounds.mjs SURVIVES BEING RE-DERIVED ***",
+    const broken = live.filter((r) => !r.asExpected);
+    const built = live.filter((r) => r.expect === "built");
+    ok("!! *** EVERY ABSENCE CLAIM IN nextRounds.mjs READS THE WAY ITS ENTRY'S STATE SAYS IT SHOULD ***",
         broken.length === 0 && live.length === BA.CLAIMS.filter((c) => !c.mustFail).length,
-        live.length + " claims graded, " + (live.length - broken.length) + " hold" +
-        (broken.length ? ". *** FAILING: *** " + broken.map((b) => b.id + " (" + b.term + "): " + b.missed +
-            " in scope and missed -- " + b.files.slice(0, 3).join(", ")).join("; ")
+        live.length + " claims graded, " + (live.length - broken.length) + " as expected (" + built.length +
+        " of them on a CLOSED entry, where the absence is expected to be GONE)" +
+        (broken.length ? ". *** WRONG WAY ROUND: *** " + broken.map((b) => b.id + " (" + b.term + ") expects " +
+            b.expect + " and " + (b.holds ? "still holds" : "no longer holds") + " -- " +
+            b.files.slice(0, 3).join(", ")).join("; ")
         : ". *** AND THE ACQUITTALS ARE THE ARGUMENT FOR WIRING THIS, NOT THE CONVICTIONS: *** one of them is " +
           "an entry whose token returns TWELVE code files tree-wide and would read as refuted by a plain grep. " +
           "Every one of the twelve is outside the single directory its author scoped the claim to -- the same " +
           "word names a matrix layout in math/solverFit.mjs. gradeClaim separates OUT OF SCOPE from IN SCOPE " +
           "AND MISSED, which a grep cannot, and that distinction is the whole reason this file is not a grep."));
-    for (const r of live) report(r.id + " / " + r.term + ": " + (r.holds ? "holds" : "FAILS") +
-        ", " + r.inScope + " in scope, " + r.missed + " missed, " + r.outOfScope + " out of scope");
+    for (const r of live) report(r.id + " / " + r.term + ": expects " + r.expect + ", " +
+        (r.holds ? "absent" : "present") + ", " + r.inScope + " in scope, " + r.missed + " missed, " +
+        r.outOfScope + " out of scope");
+    report("*** THE `built` ROW IS THIS ROUND'S CORRECTION TO LAST ROUND'S REGISTER. *** v4537 graded every " +
+           "claim as though it were live and went RED when a merge brought the other line's conductor-Fresnel " +
+           "module, whose tint curve is exported code. The entry was already CLOSED: its absence claim is the " +
+           "record of why the round was raised, not an assertion. Grading it in the OTHER direction is worth " +
+           "more than skipping it -- the row now asserts the work LANDED, and goes red if that code is ever " +
+           "deleted. The pair also records something a single row could not: the concept arrived under ONE of " +
+           "its two names and not the other.");
 }
 
 // =============================================================================================================
@@ -125,9 +136,9 @@ console.log("\n4. *** THE RATCHET, BECAUSE A HAND-LISTED REGISTER GOES QUIETLY S
         "file exists to catch one level down.");
     ok("   ...and the recorded reading still matches the register",
         BA.BACKLOG_AT_V4537.claims === BA.CLAIMS.length &&
-        BA.BACKLOG_AT_V4537.holding === live.filter((r) => r.holds).length &&
+        BA.BACKLOG_AT_V4537.holding === live.filter((r) => r.asExpected).length &&
         BA.BACKLOG_AT_V4537.failing === control.filter((r) => !r.holds).length,
-        BA.CLAIMS.length + " claims, " + live.filter((r) => r.holds).length + " holding, " +
+        BA.CLAIMS.length + " claims, " + live.filter((r) => r.asExpected).length + " as expected, " +
         control.filter((r) => !r.holds).length + " failing, against a record of " +
         BA.BACKLOG_AT_V4537.claims + "/" + BA.BACKLOG_AT_V4537.holding + "/" + BA.BACKLOG_AT_V4537.failing);
 }

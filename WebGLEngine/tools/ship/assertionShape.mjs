@@ -277,8 +277,10 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4537 -- RE-TAKEN AT THE MERGE: 1625 -> 1627, the two gates this branch added. FOURTH MERGE RUNNING
     // where both lines re-took this table in the same window. distinctDefinitions holds at 40 for the tenth
     // round; every number here is re-derived from the merged tree and never summed from the two notes.
-    gates: 1627, usesOk: 1606, definesOk: 1598, importsOk: 0,
-    distinctDefinitions: 40, nameFirst: 1499, condFirst: 91, unknownSignature: 16,
+    // v4538 -- RE-TAKEN for tools/ship/pathCost-selfcheck.mjs: 1627 -> 1628 and the three rows that follow
+    // a gate by one. distinctDefinitions holds at 40 for the eleventh round running.
+    gates: 1628, usesOk: 1607, definesOk: 1599, importsOk: 0,
+    distinctDefinitions: 40, nameFirst: 1500, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

@@ -466,7 +466,9 @@ export const PROBE_AT_V4536 = Object.freeze({
     // fields, plus this module's own two and their twenty.
     // v4537 -- RE-TAKEN with `excluding`: 106/47/192 -> 108/49/209, the same two records and their
     // seventeen fields, plus this module's own two and their twenty.
-    currentIncludingModule: Object.freeze({ records: 108, withFields: 49, fields: 209 }),
+    // v4538 -- RE-TAKEN with `excluding`: 108/49/209 -> 109/50/212, the one new record and its three
+    // counted fields, plus this module's own two and their twenty.
+    currentIncludingModule: Object.freeze({ records: 109, withFields: 50, fields: 212 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -526,7 +528,11 @@ export const PROBE_AT_V4536 = Object.freeze({
     // own absence claims.
     // v4537 -- RE-TAKEN AT THE MERGE: 104/45/172 -> 106/47/189, the two records this branch added --
     // PARTITION_AT_V4536 in nav/partitionScore.mjs and BACKLOG_AT_V4537 in tools/ship/backlogAbsence.mjs.
-    excluding: Object.freeze({ records: 106, withFields: 47, fields: 189 }),
+    // v4538 -- RE-TAKEN: 106/47/189 -> 107/48/192. One record, COST_AT_V4538 in nav/pathCost.mjs. It
+    // carries ten fields and only THREE are counted: FIELD_RE matches `name: <digits>,` and seven of its
+    // values are decimals with a trailing comment or a signed number, so they do not match. Stated rather
+    // than left for the next re-take to wonder at, the way v4566 and v4578 stated their own misses.
+    excluding: Object.freeze({ records: 107, withFields: 48, fields: 192 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,

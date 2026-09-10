@@ -3764,6 +3764,31 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    // v4538 -- THE 232nd CLOSING, for the gate this round added.
+    since232: Object.freeze({
+        at: "v4538", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/pathCost-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["nav/navmesh.mjs"]),
+        verdict: "green on this box, run singly: 6 pass, 362-376 ms. *** THE A* COST MODEL WAS FILED AS " +
+                 "UNGUARDED FOR TWENTY ROUNDS AND WHEN IT WAS MEASURED IT WAS ALSO WRONG. *** The item asked " +
+                 "for a fixture separating g + distance from a flat g + 1 and named a trap map that had " +
+                 "failed to. That map punishes GREEDINESS, and both models are greedy once the heuristic " +
+                 "dominates, so it could never have separated them. Ranking two routes OPPOSITELY by metres " +
+                 "and by polygon count is the question, and asking it found the planner declining a route it " +
+                 "can itself find: 193.13 m returned where the mesh holds 141.42, proved by splitting the " +
+                 "query -- 70.71 m to the diagonal's midpoint and 70.71 m onward, both legs planned by the " +
+                 "same planner on the same mesh. THE CAUSE IS ONE LINE, and not the one I predicted: I " +
+                 "guessed the staircase over-priced the diagonal, and it is the reverse -- the diagonal reads " +
+                 "140.71 against a walked 141.42 while the L accumulates 100.10 for a walked 193.13, " +
+                 "UNDER-PRICED BY 48.2%, because g chained entry point to portal MIDPOINT and a long portal " +
+                 "cuts a corner in proportion to POLYGON SIZE. Entering at the nearest point returns the " +
+                 "witness exactly, at six geometries. It moves NOTHING already measured, which is why the " +
+                 "round ships a fixture rather than a row: no gate the tree had would catch the repair being " +
+                 "undone. Sabotages A/B/C/D all 2 RED by name, and B WENT 0 RED ON ITS FIRST DRAFT because it " +
+                 "passed a third argument the callee never receives -- a sabotage that goes zero red is a " +
+                 "finding about the sabotage until proven otherwise.",
+    }),
     // v4537 -- BOTH LINES APPENDED CLOSINGS IN THE SAME WINDOW AND BOTH REACHED FOR 223 AND 224. Main got
     // there with seven of them, so these two are renumbered to 230 and 231 rather than main's renamed: the
     // list shape exists exactly so a round appends and nobody renegotiates a name, and the side that merges

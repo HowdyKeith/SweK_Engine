@@ -214,7 +214,8 @@ export const REACH_AT_V4548 = Object.freeze({
     // round that adds a record makes the ceiling look roomier without checking anything.
     // v4537 -- RE-TAKEN: 105 -> 106, one record, BACKLOG_AT_V4537 in tools/ship/backlogAbsence.mjs.
     // v4537 -- RE-TAKEN AT THE MERGE: 106 -> 108, the two records this branch added.
-    total: 108,
+    // v4538 -- RE-TAKEN: 108 -> 109, one record, COST_AT_V4538 in nav/pathCost.mjs.
+    total: 109,
     // *** READ OFF THE INSTRUMENT, NOT PREDICTED. *** The first draft of this record guessed 53/21/19/40 from
     // which gates the round had sped up, and was wrong on three of the four: the comment-strip fix below
     // moved two records the other way at the same time, and a guess cannot see two changes at once.
@@ -336,7 +337,9 @@ export const UNGUARDED_SPLIT_V4577 = Object.freeze({
     // One of this branch's two arrivals joined the unguarded set and the other did not, which is the
     // distinction this row exists to keep: a record is guarded when code NAMES it, and naming it in the
     // module's own prose is not naming it in a check.
-    structural: Object.freeze({ total: 108, unguarded: 10, documentaryOfThose: 10, readByCodeOfThose: 0 }),
+    // v4538 -- RE-TAKEN: 108 -> 109 records, unguarded 10 -> 11, still all DOCUMENTARY. COST_AT_V4538 is
+    // named by its gate's prose and not by its code, which is what documentary means here.
+    structural: Object.freeze({ total: 109, unguarded: 11, documentaryOfThose: 11, readByCodeOfThose: 0 }),
     // BEFORE, on the tree this round opened on:
     before: Object.freeze({ total: 104, checked: 72, overBudget: 20, unmeasured: 0, unguarded: 12, unchecked: 32 }),
     // AFTER, as one reading rather than as a constant -- see the note above. Taken with the round's own

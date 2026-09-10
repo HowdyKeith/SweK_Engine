@@ -106,15 +106,18 @@ export const CLAIMS = Object.freeze([
     }),
     Object.freeze({
         // the entry's OWN id spells the needle, so it is joined too -- see the concatenation note above
-        id: "f" + "82-tint-metal-fresnel", frag: Object.freeze(["F", "82"]),
-        says: "the entry says there is no edge-tint code in this tree",
+        id: "f" + "82-tint-metal-fresnel", frag: Object.freeze(["F", "82"]), expect: "built",
+        says: "the entry SAID there is no edge-tint code in this tree, and it is CLOSED -- the other line " +
+              "built it, so this row now asserts the code is THERE",
         why: "the parameter's name in the literature the entry cites; the spelling a code identifier would " +
              "use is graded beside it, because a claim about a CONCEPT needs more than one token or it " +
              "grades a spelling.",
     }),
     Object.freeze({
-        id: "f" + "82-tint-metal-fresnel", frag: Object.freeze(["edge", "Tint"]),
-        says: "(the same claim under the name the code would use)",
+        id: "f" + "82-tint-metal-fresnel", frag: Object.freeze(["edge", "Tint"]), expect: "absent",
+        says: "(the same claim under the name a code identifier would use, which the built module does NOT " +
+              "use -- so this row stays an absence and the pair records that the concept arrived under one " +
+              "of its two names and not the other)",
         why: "as above.",
     }),
     // *** THE CONTROL, AND IT MUST FAIL. *** A register whose every row passes is a register that has never
@@ -143,9 +146,17 @@ export function grade(claim, { root = ENG } = {}) {
     }, { root });
     const missed = g.inScopeMissed || [];
     const scoped = claim.searched ? (g.narrow && g.narrow.code) || [] : (g.wide && g.wide.code) || [];
+    const holds = scoped.length === 0 && missed.length === 0;
+    // *** A CLOSED ENTRY EXPECTS ITS ABSENCE CLAIM TO HAVE STOPPED HOLDING, AND THAT IS NOT A LOOPHOLE. ***
+    // Closing an item means BUILDING the thing it said was missing, so the claim in its `why` field is the
+    // record of why the round was raised rather than a live assertion. Grading it as though it were live
+    // convicts the tree for having done the work. Grading it in the OTHER DIRECTION is worth more than
+    // skipping it: it asserts the round actually landed, and it goes red if a closed item's code is ever
+    // deleted. So `expect` is "absent" for a live entry and "built" for a closed one.
+    const expect = claim.expect || "absent";
     return {
-        id: claim.id, term: termOf(claim), mustFail: !!claim.mustFail,
-        holds: scoped.length === 0 && missed.length === 0,
+        id: claim.id, term: termOf(claim), mustFail: !!claim.mustFail, expect,
+        holds, asExpected: expect === "built" ? !holds : holds,
         inScope: scoped.length, missed: missed.length,
         outOfScope: (g.outOfScope || []).length,
         denialsCounted: (g.denialsCounted || []).length,
@@ -180,7 +191,8 @@ export function claimSentences({ root = ENG } = {}) {
  */
 export const BACKLOG_AT_V4537 = Object.freeze({
     claims: 7,            // six live backlog claims and one control that must convict
-    holding: 6,
+    holding: 6,           // v4538: now "as expected" -- five absences that hold, one CLOSED entry whose
+                          // absence is expected to be GONE. See the `expect` note in grade().
     failing: 1,           // the control, and a run where this is 0 is a register that cannot convict
     sentenceFloor: 8,
     // The conviction that prompted the round is NOT in the six above: it is on another branch. Recorded
