@@ -14,15 +14,19 @@ const { spawn } = require("child_process");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const zlib = require("zlib");
 const buildName = require("./buildName.js");
 
 const ENGINE_ROOT = path.resolve(__dirname, "..");      // WebGLEngine/
 const PROJECT_ROOT = path.resolve(ENGINE_ROOT, "..");   // EngineProject_vNNN/
 // v1568 - live progress for the Gmail-safe packaging (polled by the settings dialog).
+// v4607 -- _prog can now carry done/total/pct/current DURING the zip step (see _zipTreeReal below); progress()
+// forwards whatever _setProg or the zip writer put there rather than whitelisting fields, so a caller polling
+// mid-zip gets the numbers and a caller polling mid-copy still gets the plain step/label it always got.
 let _prog = { step: "", label: "", ts: 0 };
 const STEP_LABELS = { prepare: "Preparing zip for Gmail", safe: "Making Gmail Safe", zip: "Zipping up the Gmail Archive", clean: "Cleaning House", done: "Done" };
 function _setProg(step) { _prog = { step, label: STEP_LABELS[step] || step, ts: Date.now() }; }
-function progress() { return { ok: true, step: _prog.step, label: _prog.label, ts: _prog.ts }; }
+function progress() { return Object.assign({ ok: true }, _prog); }
 
 const BLOCKED = ["bat", "cmd", "ps1", "vbs", "vbe", "wsf", "wsh", "hta", "lnk", "exe", "dll", "scr", "com", "msi", "js", "mjs", "jse", "sct", "shb", "wsc"];
 const BLOCKED_SET = new Set(BLOCKED);
@@ -125,30 +129,191 @@ function normalizeZipSeparators(zipPath) {
     return { ok: true, entries: seen, bytesFixed: fixed };
 }
 
-function _zip(srcFolder, outZip) {
-    return new Promise((resolve) => {
-        let cmd, args, opts;
-        if (process.platform === "win32") {
-            cmd = "powershell";
-            args = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", `Compress-Archive -Path '${srcFolder}' -DestinationPath '${outZip}' -CompressionLevel Optimal -Force`];
-            opts = { windowsHide: true };
-        } else {
-            cmd = "zip"; args = ["-rq", outZip, path.basename(srcFolder)]; opts = { cwd: path.dirname(srcFolder) };
+// ============================================================================================================
+// v4607 -- A PURE-NODE ZIP WRITER, REPLACING THE POWERSHELL/`zip` SUBPROCESS, BECAUSE THE SUBPROCESS COULD
+// NOT REPORT PROGRESS AND THAT WAS THE ACTUAL PROBLEM, NOT JUST ITS SPEED. Keith watched a release zip sit at
+// 0 bytes for ten minutes with no way to tell "still working" from "stuck". The file COUNT here (SKIP_DIRS
+// already trims node_modules, but a real engine tree still runs to several thousand files) is exactly the
+// shape PowerShell's Compress-Archive is slowest at -- .NET's ZipFile API has real per-entry overhead mostly
+// independent of total bytes -- and there was never a hook to poll it for "which file are you on" regardless
+// of speed. Writing the archive one file at a time, in a loop this code owns, means _prog (read by GET
+// /package/progress) and the throttled console.log below both get told after every file: this many of this
+// many, this many percent, this file's name. No subprocess, nothing new to have installed, and -- as a free
+// side effect -- entry names are forward-slash by construction, never backslash: see normalizeZipSeparators's
+// own header, a few functions up, for the exact defect that sidesteps. normalizeZipSeparators(outZip) is
+// still called below, UNCONDITIONALLY, exactly as it always was: it is now provably a no-op on this writer's
+// own output (0 bytes fixed, same as the Linux `zip -rq` path always was), and releaseWorkflow-selfcheck's
+// section 7 checks for an unconditional call, not a call that is still needed -- removing it would be one
+// packer change away from the exact backslash defect that gate exists to catch.
+
+// CRC-32 (IEEE 802.3 / zip), table-based, the standard reversed 0xEDB88320 polynomial. Verified against the
+// two textbook vectors: crc32("") === 0, crc32("The quick brown fox jumps over the lazy dog") === 0x414FA339.
+const _CRC_TABLE = (() => {
+    const t = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) {
+        let c = n;
+        for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+        t[n] = c >>> 0;
+    }
+    return t;
+})();
+function _crc32(buf) {
+    let c = 0xFFFFFFFF;
+    for (let i = 0; i < buf.length; i++) c = _CRC_TABLE[(c ^ buf[i]) & 0xFF] ^ (c >>> 8);
+    return (c ^ 0xFFFFFFFF) >>> 0;
+}
+
+// MS-DOS date/time -- the format every ZIP local/central header stores mtime in (APPNOTE 4.4.6). A source
+// mtime before DOS's own 1980 epoch clamps to 1980-01-01 rather than underflow into a bogus year.
+function _dosDateTime(d) {
+    const y = Math.max(1980, d.getFullYear());
+    const date = (((y - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate()) & 0xFFFF;
+    const time = ((d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1)) & 0xFFFF;
+    return { date, time };
+}
+
+// Walk a real directory tree, returning [{abs, rel, size}] in readdir order. `rel` is ALWAYS forward-slash
+// joined by hand, never through path.relative -- on Windows that hands back backslashes, which is the exact
+// defect normalizeZipSeparators exists to repair AFTER the fact elsewhere in this file; building it right the
+// first time here means that repair has nothing to do on this writer's own archives.
+function _listFilesForZip(dir) {
+    const out = [];
+    const walk = (abs, relParts) => {
+        let ents; try { ents = fs.readdirSync(abs, { withFileTypes: true }); } catch { return; }
+        for (const e of ents) {
+            const a = path.join(abs, e.name);
+            const r = relParts.concat(e.name);
+            if (e.isDirectory()) walk(a, r);
+            else if (e.isFile()) { let size = 0; try { size = fs.statSync(a).size; } catch {} out.push({ abs: a, rel: r.join("/"), size }); }
         }
-        let se = ""; let ch;
-        try { ch = spawn(cmd, args, opts); } catch (e) { return resolve({ ok: false, error: String(e && e.message) }); }
-        ch.stderr.on("data", d => se += d);
-        ch.on("error", e => resolve({ ok: false, error: String(e && e.message) }));
-        ch.on("close", code => {
-            if (code !== 0) return resolve({ ok: false, error: (se.slice(0, 200) || ("zip exit " + code)) });
-            // EVERY archive is normalised, not just Compress-Archive's: `zip -rq` already writes forward
-            // slashes so this is a no-op there (0 bytes swapped), and a future change of packer cannot
-            // silently reintroduce the defect.
-            const norm = normalizeZipSeparators(outZip);
-            if (!norm.ok) return resolve({ ok: false, error: "packed, but the archive could not be normalised: " + norm.error });
-            resolve({ ok: true, entries: norm.entries, separatorsFixed: norm.bytesFixed });
-        });
+    };
+    walk(dir, []);
+    return out;
+}
+
+// One file: read it whole, deflate it, store instead if deflate didn't actually help (matches what every real
+// zip tool does for already-compressed assets -- a KTX2/GLB/PNG re-deflated often comes back LARGER), write
+// the local header + name + data, and hand back exactly what the central directory needs to describe this
+// entry later. `offset` is where THIS entry starts in the output file -- tracked by the caller as a running
+// sum of bytes it has asked to be written, not queried from the stream, because writes here are strictly
+// sequential and nothing else touches this file concurrently.
+function _zipEntry(ws, absPath, zipName, offset) {
+    return new Promise((resolve, reject) => {
+        let raw; try { raw = fs.readFileSync(absPath); } catch (e) { return reject(e); }
+        const crc = _crc32(raw);
+        let method = 8, data;
+        try { data = zlib.deflateRawSync(raw, { level: 9 }); } catch { data = null; }
+        if (!data || data.length >= raw.length) { method = 0; data = raw; }
+        const nameBuf = Buffer.from(zipName, "utf8");
+        const utf8Name = nameBuf.length !== zipName.length;   // non-ASCII in the path -- set the UTF-8 flag rather than guess a codepage
+        let mtime; try { mtime = fs.statSync(absPath).mtime; } catch { mtime = new Date(); }
+        const { date, time } = _dosDateTime(mtime);
+
+        const lh = Buffer.alloc(30);
+        lh.writeUInt32LE(0x04034b50, 0);
+        lh.writeUInt16LE(20, 4);                          // version needed to extract
+        lh.writeUInt16LE(utf8Name ? 0x0800 : 0, 6);        // general purpose flag: bit 11 = UTF-8 name
+        lh.writeUInt16LE(method, 8);
+        lh.writeUInt16LE(time, 10);
+        lh.writeUInt16LE(date, 12);
+        lh.writeUInt32LE(crc, 14);
+        lh.writeUInt32LE(data.length, 18);
+        lh.writeUInt32LE(raw.length, 22);
+        lh.writeUInt16LE(nameBuf.length, 26);
+        lh.writeUInt16LE(0, 28);                          // extra field length
+
+        const chunk = Buffer.concat([lh, nameBuf, data]);
+        ws.write(chunk, (err) => err ? reject(err) : resolve({
+            name: nameBuf, crc, compSize: data.length, uncompSize: raw.length,
+            method, time, date, offset, utf8: utf8Name, bytesWritten: chunk.length,
+        }));
     });
+}
+
+function _zipCentralDirectory(entries) {
+    const parts = [];
+    for (const e of entries) {
+        const cd = Buffer.alloc(46);
+        cd.writeUInt32LE(0x02014b50, 0);
+        cd.writeUInt16LE(20, 4);                          // version made by
+        cd.writeUInt16LE(20, 6);                          // version needed to extract
+        cd.writeUInt16LE(e.utf8 ? 0x0800 : 0, 8);
+        cd.writeUInt16LE(e.method, 10);
+        cd.writeUInt16LE(e.time, 12);
+        cd.writeUInt16LE(e.date, 14);
+        cd.writeUInt32LE(e.crc, 16);
+        cd.writeUInt32LE(e.compSize, 20);
+        cd.writeUInt32LE(e.uncompSize, 24);
+        cd.writeUInt16LE(e.name.length, 28);
+        cd.writeUInt32LE(e.offset, 42);
+        parts.push(cd, e.name);
+    }
+    return Buffer.concat(parts);
+}
+
+// The writer itself. Progress goes out through TWO channels on purpose, because _zip()'s two real callers can
+// only be reached one way each: makeInstallable() runs IN this process, so _prog (GET /package/progress) is
+// enough; the "Publish the verified clone" chain runs it in a SPAWNED CLONE (tools/ship/packRelease.mjs), and
+// the only channel back to the panel from there is that process's own stdout, already tailed into
+// sourceChainBridge's log and already polled by the panel while that step runs. console.log here, throttled
+// to roughly every 5% (never every file -- a ~6,000-file tree would drown that log in lines nobody reads),
+// reaches that second caller for free: it costs one more line in a log the panel already shows, not a second
+// progress mechanism to build and keep in sync with this one.
+async function _zipTreeReal(srcFolder, outZip) {
+    const files = _listFilesForZip(srcFolder);
+    const rootName = path.basename(srcFolder);
+    const totalBytes = files.reduce((s, f) => s + f.size, 0) || 1;
+    let doneBytes = 0, lastPctLogged = -1;
+    _prog = { step: "zip", label: STEP_LABELS.zip, ts: Date.now(), done: 0, total: files.length, pct: 0 };
+
+    const ws = fs.createWriteStream(outZip);
+    const entries = [];
+    let offset = 0;
+    for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        const zipName = rootName + "/" + f.rel;
+        const rec = await _zipEntry(ws, f.abs, zipName, offset);
+        offset += rec.bytesWritten;
+        entries.push(rec);
+        doneBytes += f.size;
+        // pct caps at 99 while entries are still being written -- 100 is reserved for AFTER the central
+        // directory and EOCD are actually flushed to disk, so "100%" always means a complete, openable archive.
+        const pct = Math.min(99, Math.round(100 * doneBytes / totalBytes));
+        _prog = { step: "zip", label: STEP_LABELS.zip, ts: Date.now(), done: i + 1, total: files.length, pct, current: f.rel };
+        if (pct >= lastPctLogged + 5 || i === files.length - 1) {
+            lastPctLogged = pct;
+            console.log("[zip] " + (i + 1) + "/" + files.length + " files (" + pct + "%) -- " + f.rel);
+        }
+    }
+
+    const cdStart = offset;
+    const cd = _zipCentralDirectory(entries);
+    await new Promise((res, rej) => ws.write(cd, (e) => e ? rej(e) : res()));
+    offset += cd.length;
+
+    const eocd = Buffer.alloc(22);
+    eocd.writeUInt32LE(0x06054b50, 0);
+    eocd.writeUInt16LE(entries.length, 8);
+    eocd.writeUInt16LE(entries.length, 10);
+    eocd.writeUInt32LE(cd.length, 12);
+    eocd.writeUInt32LE(cdStart, 16);
+    await new Promise((res, rej) => ws.write(eocd, (e) => e ? rej(e) : res()));
+    await new Promise((res, rej) => ws.end((e) => e ? rej(e) : res()));
+
+    _prog = { step: "zip", label: STEP_LABELS.zip, ts: Date.now(), done: files.length, total: files.length, pct: 100 };
+    console.log("[zip] " + files.length + "/" + files.length + " files (100%) -- done");
+    return { ok: true, entries: entries.length };
+}
+
+function _zip(srcFolder, outZip) {
+    return _zipTreeReal(srcFolder, outZip).then((z) => {
+        if (!z.ok) return z;
+        // EVERY archive is still normalised, unconditionally -- see the v4607 header above for why this call
+        // has to stay even though this writer's own names are already forward-slash.
+        const norm = normalizeZipSeparators(outZip);
+        if (!norm.ok) return { ok: false, error: "packed, but the archive could not be normalised: " + norm.error };
+        return { ok: true, entries: norm.entries, separatorsFixed: norm.bytesFixed };
+    }).catch((e) => ({ ok: false, error: String((e && e.message) || e) }));
 }
 
 function _unzip(srcZip, destDir) {
@@ -369,4 +534,8 @@ async function selfZipCandidate({ dlDir, liveVersion } = {}) {
 // half is the five PATTERN skips in _skipFile (*.zip, petfbi-*.json, *-seen.json, ha-*.json), which a caller
 // cannot see and would have to re-type -- and a re-typed rule is the second copy that never gets updated.
 // Exporting the PREDICATE means there is one answer to "does this file ship", not two that agree today.
-module.exports = { makeGmailSafe, makeGmailSafeFromZip, makeInstallable, selfZipCandidate, progress, engineVersion, externalAssetsDir, PROJECT_ROOT, SKIP_DIRS, SKIP_FILES, _skipFile, normalizeZipSeparators };
+// v4607 -- _zip and _crc32 join the exports for the same reason _skipFile and normalizeZipSeparators already
+// did: a gate that can only reach this file's behaviour through a full makeInstallable() run over the whole
+// real tree is a slow gate that also cannot target one edge case (an empty file, a non-ASCII name, a file
+// deflate doesn't shrink) without hoping the real tree happens to contain one today.
+module.exports = { makeGmailSafe, makeGmailSafeFromZip, makeInstallable, selfZipCandidate, progress, engineVersion, externalAssetsDir, PROJECT_ROOT, SKIP_DIRS, SKIP_FILES, _skipFile, normalizeZipSeparators, _zip, _crc32 };
