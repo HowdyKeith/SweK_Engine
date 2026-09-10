@@ -84,11 +84,25 @@ console.log("\n2. *** THE RATCHET: UNCHECKED MAY FALL AND MUST NOT RISE ***");
         `${live.unmeasured} record(s) guarded only by gates with no recorded timing, against ` +
         `${live.overBudget} guarded only by gates measured over the budget. Removing one detector's timing ` +
         `from the table moves a record into the first bucket, not the second.`);
-    ok("!! the records this round rescued really are checked now, and the demoted ones really are unguarded",
+    // *** v4576 -- THE DEMOTED HALF IS A FACT ABOUT v4548 AND WAS BEING TESTED AGAINST TODAY. ***
+    // This required every record the comment-strip demoted to be STILL unguarded. BUDGET_DRIFT_V4536 is not:
+    // v4576 taught frozenRecords to follow one level of derivation within a defining file, and that record is
+    // now guarded by three gates. A LATER ROUND RE-CLASSIFYING A RECORD IS THE OUTCOME THIS FILE EXISTS TO
+    // PROMPT, and the row reddened on it -- the third time in this one round that a historical claim was being
+    // asserted against live state, after budgetExile's cap row and its inflation row.
+    //
+    // So the claim is split the way tools/ship/budgetExile-selfcheck.mjs's section 3 prescribes: the RESCUED
+    // half is still asserted live, because a record v4548 rescued going back to unchecked would be a real
+    // regression; the DEMOTED half is asserted as v4548's finding -- the list is non-empty and disjoint from
+    // the rescued one -- and each record's class TODAY is reported rather than required.
+    const demotedNow = R.demotedByCommentStrip.map((n) => n + " " + (live.rows.find((r) => r.name === n)?.cls ?? "gone"));
+    ok("!! the records this round rescued really are checked now, and the demoted ones are accounted for",
         R.rescued.every((n) => live.rows.find((r) => r.name === n)?.cls === RR.CLASS.CHECKED) &&
-        R.demotedByCommentStrip.every((n) => live.rows.find((r) => r.name === n)?.cls === RR.CLASS.UNGUARDED) &&
+        R.demotedByCommentStrip.length > 0 &&
         R.rescued.every((n) => !R.demotedByCommentStrip.includes(n)),
-        "rescued " + R.rescued.join(", ") + "; demoted " + R.demotedByCommentStrip.join(", ") +
+        "rescued " + R.rescued.join(", ") + " -- all still checked, which is the half that would be a " +
+        "regression. Demoted at v4548 and where they stand today: " + demotedNow.join(", ") + ". A record " +
+        "leaving the demoted state is PROGRESS and this row no longer forbids it" +
         // *** THE RECORD NAMES BELOW ARE SPELT FROM `R`, NEVER TYPED, AND THAT IS NOT STYLE. *** `guardians`
         // asks which gates NAME a record, comment-stripped -- and a name in a STRING survives the strip,
         // because a string is where a real check lives too (`r.name === "FOO_V4500"`). The first draft of

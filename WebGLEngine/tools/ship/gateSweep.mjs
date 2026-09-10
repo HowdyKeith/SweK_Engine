@@ -3764,6 +3764,44 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    // v4576 -- the 225th closing: a tier for the guardians the sweep cannot afford, and it caught two on sight.
+    since225: Object.freeze({
+        at: "v4576", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/recordTier-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/frozenRecords.mjs", "tools/ship/budgetExile-selfcheck.mjs",
+                                "tools/ship/shipRitual.mjs"]),
+        verdict: "green, 0.6 s, one new module, one new gate and one new ship step. THE FILED NUMBER WAS WRONG " +
+                 "IN BOTH DIRECTIONS AGAIN -- 43 of 94 filed against 38 of 104 live -- and the gap had two " +
+                 "causes. *** SEVEN RECORDS READ AS UNGUARDED AND WERE NOT. *** frozenRecords asks which gates " +
+                 "NAME a record; redCensus.mjs defines RED_AT_V4531 from RED_AT_V4531_GATES, so the ARRAY is " +
+                 "consumed only through the derived constant and gates name the derived one. Corrupting the " +
+                 "array -- filing a GREEN gate as a known red -- does redden registerDrift-selfcheck, measured. " +
+                 "The census follows one level of derivation within the defining file now: unguarded 20 -> 12, " +
+                 "checked 66 -> 72. One level and one file on purpose, because a transitive closure would start " +
+                 "crediting records with guardians that never touch their value. *** AND I REPORTED THAT " +
+                 "CORRUPTION AS UNCAUGHT FIRST, ON A BROKEN HARNESS OF MY OWN: *** `echo \"$(basename $g) " +
+                 "exit=$?\"` reports BASENAME's exit code, because the command substitution runs before $? is " +
+                 "expanded. Every gate read as 0. The re-take checks run that way in three earlier rounds were " +
+                 "independently confirmed by their full sweeps, so no shipped claim rests on it. *** THE OTHER " +
+                 "TWENTY HAVE A GUARDIAN THAT WORKS AND COSTS TOO MUCH, AND v4548'S MEDICINE DOES NOT APPLY: " +
+                 "*** counting fs calls against unique paths gives 1.0x, 1.1x, and samplerCheck-selfcheck does " +
+                 "NO file I/O at all -- 9 s of pure arithmetic. There is no redundancy to remove, so the tier " +
+                 "is the answer. tools/ship/recordTier.mjs runs the nine, serially and capped, 93 s, wired as a " +
+                 "ship step; its list is DERIVED from recordReach and its gate asserts not one of the nine " +
+                 "names appears in its source. *** IT FOUND TWO RED GUARDIANS ON ITS FIRST RUN, COVERING EIGHT " +
+                 "RECORDS, NEITHER ON ANY REGISTER. *** orreryFleet-selfcheck: orrery-fleet.json's baked file " +
+                 "sizes had drifted on three files THIS SESSION EDITED THREE ROUNDS EARLIER, under sweeps that " +
+                 "all reported ALL GREEN -- which is the argument for the tier, made by the tier, within a " +
+                 "minute of it existing. budgetExile-selfcheck: two rows gating on the defect still being as " +
+                 "bad as when found -- gates ARE still exiled at the cap (v4568 fixed that) and the inflation " +
+                 "is STILL above 1.5x (it has fallen to 1.48). That file's own section 3 diagnosed the shape at " +
+                 "v4535 and wrote the fix down and never applied it here. IT CANNOT BE APPLIED IN FULL: " +
+                 "MEASURED_V4425 froze { verdict, ms } where ms is the SERIAL time, so the INFLATED reading " +
+                 "that did the exiling was never written down and the historical half is unassertable. Recorded " +
+                 "rather than faked. Sabotages SS and TT red by name. STILL OPEN: 12 records with no guardian " +
+                 "at all, which no tier can help with.",
+    }),
     // v4575 -- the 224th closing: the engine had no conductor Fresnel, and every metal was one fitted point.
     since224: Object.freeze({
         at: "v4575", swept: 1, green: 1, red: 0,

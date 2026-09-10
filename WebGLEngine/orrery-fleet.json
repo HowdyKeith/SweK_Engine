@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "6b1a06864eca14d41613a26ce224e4c239b0e611",
+ "head": "611383744d30a7954d0a6cf5c00380e4ba4756d9",
  "bodies": {
   "box3d": [
    {
@@ -270,8 +270,8 @@
    },
    {
     "path": "tools/ship/slugTsl-selfcheck.mjs",
-    "bytes": 20040,
-    "sha": "5ac8ccedcd39eed6e31e4e91814f3be4770f64f0"
+    "bytes": 20091,
+    "sha": "629ce9da643276ab70d464eb1a9c9f12bd33c4f0"
    },
    {
     "path": "tools/ship/slugWgsl-selfcheck.mjs",
@@ -294,8 +294,8 @@
   "grass": [
    {
     "path": "tools/ship/grassField-selfcheck.mjs",
-    "bytes": 13268,
-    "sha": "90cbc92086faeb99ad07a5b79c05703971914075"
+    "bytes": 17072,
+    "sha": "ab9c9cf7e8c571ae53ecefb56c35cdbcf0eca52b"
    },
    {
     "path": "tools/ship/orrery-selfcheck.mjs",
@@ -730,8 +730,8 @@
    },
    {
     "path": "tools/ship/boundaryLint-selfcheck.mjs",
-    "bytes": 17160,
-    "sha": "80520bd5e7b140b731db8d644e4c2938d6099fd7"
+    "bytes": 17216,
+    "sha": "629ce9da643276ab70d464eb1a9c9f12bd33c4f0"
    },
    {
     "path": "tools/ship/dracoWeld-selfcheck.mjs",
@@ -842,8 +842,8 @@
    },
    {
     "path": "tools/ship/slugTsl-selfcheck.mjs",
-    "bytes": 20040,
-    "sha": "5ac8ccedcd39eed6e31e4e91814f3be4770f64f0"
+    "bytes": 20091,
+    "sha": "629ce9da643276ab70d464eb1a9c9f12bd33c4f0"
    },
    {
     "path": "tools/ship/threeProbe-selfcheck.mjs",
@@ -862,28 +862,28 @@
    },
    {
     "path": "tools/ship/tslLoopBound-selfcheck.mjs",
-    "bytes": 11347,
-    "sha": "9be0173f43e103d34c3bcb6362737f9aa4621360"
+    "bytes": 11403,
+    "sha": "629ce9da643276ab70d464eb1a9c9f12bd33c4f0"
    },
    {
     "path": "tools/ship/tslPhysics-selfcheck.mjs",
-    "bytes": 125841,
-    "sha": "9be0173f43e103d34c3bcb6362737f9aa4621360"
+    "bytes": 125949,
+    "sha": "629ce9da643276ab70d464eb1a9c9f12bd33c4f0"
    },
    {
     "path": "tools/ship/tslRace-selfcheck.mjs",
-    "bytes": 77070,
-    "sha": "2776e510f13e8369eb45229a2b508a8beab0b696"
+    "bytes": 79728,
+    "sha": "629ce9da643276ab70d464eb1a9c9f12bd33c4f0"
    },
    {
     "path": "tools/ship/tslSource-selfcheck.mjs",
-    "bytes": 22705,
-    "sha": "f222fee5f8b49b3122d9d651078d156eb4b7a277"
+    "bytes": 22758,
+    "sha": "629ce9da643276ab70d464eb1a9c9f12bd33c4f0"
    },
    {
     "path": "tools/ship/tslWide-selfcheck.mjs",
-    "bytes": 22576,
-    "sha": "ad535264ab7dc33e4650578484ecfecb9b207424"
+    "bytes": 22627,
+    "sha": "629ce9da643276ab70d464eb1a9c9f12bd33c4f0"
    },
    {
     "path": "tsl-probe.html",

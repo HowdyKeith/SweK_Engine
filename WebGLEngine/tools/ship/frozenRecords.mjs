@@ -217,6 +217,35 @@ export function census({ files = null, read = null, exclude = null } = {}) {
     for (const f of mjs) for (const r of (memoable ? recordsIn(f, rd) : recordsIn.call(null, f, rd)))
         { all.push({ r, f }); if (!named.has(r.name)) named.set(r.name, []); }
     for (const [g, src] of gateSrc) for (const [name, list_] of named) if (src.includes(name)) list_.push(g);
+    // *** v4576 -- ONE LEVEL OF DERIVATION, BECAUSE A RECORD READ ONLY THROUGH ANOTHER ONE READ AS UNGUARDED. ***
+    // The search above asks which gates NAME a record. Seven records failed it for a reason that is not a gap
+    // in the tree: redCensus.mjs defines `RED_AT_V4531 = Object.freeze(RED_AT_V4531_GATES.map(...))`, so the
+    // ARRAY is consumed only through the derived constant, and gates name the derived one. Corrupting the array
+    // -- filing a green gate as a known red -- does redden registerDrift-selfcheck, measured, so it is guarded;
+    // the search simply could not see through the derivation.
+    //
+    // SO A RECORD IS ALSO GUARDED BY WHATEVER GUARDS A RECORD DEFINED FROM IT IN THE SAME FILE. One level and
+    // one file: a transitive closure over the whole tree would start crediting a record with guardians that
+    // never touch its value, which is how a coverage number becomes a story. The edge has to be visible in the
+    // defining module's own text, which is the same standard the NAME search uses.
+    for (const f of mjs) {
+        const src = stripComments(rd(f));
+        const here = all.filter((x) => x.f === f).map((x) => x.r.name);
+        if (here.length < 2) continue;
+        for (const r of here) {
+            const at = src.indexOf("export const " + r + " = Object.freeze(");
+            if (at < 0) continue;
+            const { body } = recordBody(src, at);
+            if (!body) continue;
+            for (const other of here) {
+                if (other === r || !body.includes(other)) continue;
+                // r is DEFINED FROM other, so r's guardians also stand over other
+                const from = named.get(r) || [], to = named.get(other);
+                if (!to) continue;
+                for (const g of from) if (!to.includes(g)) to.push(g);
+            }
+        }
+    }
     const rows = all.map(({ r, f }) => {
         const guardians = named.get(r.name);
         const sib = rel(f).replace(/\.mjs$/, "-selfcheck.mjs");
