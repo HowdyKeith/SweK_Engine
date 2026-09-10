@@ -3767,6 +3767,44 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since216: Object.freeze({
+        at: "v4557", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/temporalRidgeMargin-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 1.84 s (1835/1837/1816 over three serial runs, under the 3000 ms sweep budget). *** " +
+                 "THE RIDGE MARGIN HAS BEEN 0.05 SINCE v4553 BECAUSE THAT IS WHAT THE FIXTURES WANTED, AND " +
+                 "v4556 MADE IT LOAD-BEARING *** by showing the lock detector's blind window is " +
+                 "margin/contrast wide. This round derives what it should be standing above, and the answer " +
+                 "is that it is not a constant. THE RING MEAN'S OWN ERROR IS A FUNCTION OF CAMERA SPEED, " +
+                 "MEASURED against the analytic average the ring is supposed to reproduce: 1.2e-7 at rest, " +
+                 "2.3e-2 at a quarter pixel per frame, 4.6e-2 at a half, and 8.4e-2 at ONE -- which is 1.7x " +
+                 "the 0.05 the arc uses. So at rest the margin sits 400,000x above the floor, pure blind " +
+                 "window bought for nothing; and under ordinary camera motion every lock this arc places is " +
+                 "partly reading its own resampling error. BOTH FAILURE MODES ARE SHOWN ON A PICTURE, not in " +
+                 "arithmetic: a thin feature of contrast 0.06 with the camera still gives 0 ridges at 0.05 " +
+                 "and 46 at a floor-derived margin; the same smooth surface at 1 px/frame gives 116 ridges " +
+                 "-- on content that has none -- at a margin derived at REST. Wrong in both directions, by " +
+                 "different amounts at different speeds. *** AND THE RING HAS A HARD SPEED CEILING NOBODY HAD " +
+                 "MEASURED: *** its footprint is 2*period*speed pixels, so on a 48-pixel frame coverage falls " +
+                 "100% -> 83% -> 67% -> 33% and reaches ZERO at 3 px/frame, where the entire lock and shading " +
+                 "mechanism is off and reporting 'unknown' correctly to nobody who was asking. ringCoverage " +
+                 "is what a caller asks to find that out. COMPOSING v4556's CEILING WITH THIS ROUND'S FLOOR " +
+                 "gives an interval, and it is EMPTY more often than a fixed 0.05 suggests: a feature of " +
+                 "contrast 0.2 is lockable at rest and not at one pixel per frame, where the floor alone " +
+                 "(1.26e-1) exceeds the ceiling (2.0e-2) and the faintest lockable feature would need a " +
+                 "contrast of 1.26, which does not exist in a [0,1] signal -- printed as an impossibility " +
+                 "rather than as a threshold a reader could aim at. Eight sabotages red at 3/3/2/2/1/1/2/8. " +
+                 "*** ONE READ 0 RED AND IT WAS A CRASH, NOT A PASS, WHICH IS WORTH MORE THAN THE SABOTAGE " +
+                 "WAS. *** Hard-coding `feasible` true left an interval with a null margin, the report loop " +
+                 "guarded on `feasible` and then read `margin`, and the TypeError produced a stack trace with " +
+                 "no FAIL lines -- which a harness that counts FAIL lines reads as green. The harness now " +
+                 "scores a non-zero exit with no verdict as red, the loop guards on the value it uses, and a " +
+                 "row asserts that `feasible` and `margin` agree. This file's own blind budget of 0.1 is " +
+                 "named in its closing as the constant IT does not derive, which is the same debt one level up.",
+    }),
     since215: Object.freeze({
         at: "v4556", swept: 1, green: 1, red: 0,
         added: Object.freeze([

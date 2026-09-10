@@ -1621,7 +1621,8 @@
   "render/temporalLock-selfcheck.mjs": 2160,
   "render/temporalDepthLock-selfcheck.mjs": 1190,
   "render/temporalCoherentLock-selfcheck.mjs": 1120,
-  "render/temporalRidgePhase-selfcheck.mjs": 989
+  "render/temporalRidgePhase-selfcheck.mjs": 989,
+  "render/temporalRidgeMargin-selfcheck.mjs": 1835
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -3241,7 +3242,8 @@
   "render/temporalLock-selfcheck.mjs": 0,
   "render/temporalDepthLock-selfcheck.mjs": 0,
   "render/temporalCoherentLock-selfcheck.mjs": 0,
-  "render/temporalRidgePhase-selfcheck.mjs": 0
+  "render/temporalRidgePhase-selfcheck.mjs": 0,
+  "render/temporalRidgeMargin-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-08T20:46:53.412Z",
@@ -4861,7 +4863,8 @@
   "render/temporalLock-selfcheck.mjs": "2026-09-10T04:49:39.392728Z",
   "render/temporalDepthLock-selfcheck.mjs": "2026-09-10T05:02:43.154507Z",
   "render/temporalCoherentLock-selfcheck.mjs": "2026-09-10T05:20:14.325211Z",
-  "render/temporalRidgePhase-selfcheck.mjs": "2026-09-10T05:20:14.325211Z"
+  "render/temporalRidgePhase-selfcheck.mjs": "2026-09-10T05:20:14.325211Z",
+  "render/temporalRidgeMargin-selfcheck.mjs": "2026-09-10T12:18:53.544484Z"
  },
  "crossings": {
   "tools/roundhouse/knobPromotions-selfcheck.mjs": 2,

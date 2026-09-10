@@ -113,6 +113,57 @@ function sampleScalarFilled(buf, w, h, u, v) {
     return buf[y * w + x];
 }
 
+/**
+ * How much of the frame actually HAS a window: the fraction of pixels whose ring is full.
+ *
+ * *** THE RING HAS A SPEED CEILING AND NOTHING MEASURED IT UNTIL v4557. *** The ring is 2*period frames deep
+ * and every one of them is reprojected, so at a camera speed of v pixels per frame the window's footprint is
+ * 2*period*v pixels. At period 8 and 2 px/frame that is 32 pixels; at 3 px/frame it is 48, and MEASURED on a
+ * 48-pixel frame the fraction of pixels with a full ring goes 100% at rest, 83% at 0.5 px/frame, 67% at 1,
+ * 33% at 1.5, and ZERO at 3 -- the whole mechanism is off and every consumer correctly reports "unknown",
+ * which is exactly the answer v4553 built and exactly the answer nobody was reading. A caller that wants to
+ * know whether the lock and the shading detector are doing anything at all asks this.
+ */
+export function ringCoverage(st) {
+    const N = st.w * st.h;
+    let full = 0;
+    for (let i = 0; i < N; i++) if (st.filled[i] >= st.frames) full++;
+    return { full, total: N, fraction: full / N };
+}
+
+/**
+ * The interval a ridge margin has to live in, composed from two measurements neither of which this module
+ * makes. It is a feasibility question and the answer is sometimes NO.
+ *
+ *   LOWER BOUND -- `noiseFloor`, the ring mean's own error, which the CALLER measures for its own motion.
+ *     Below it the detector reads resampling error as features. v4557 measured 1.2e-7 at rest and 8.4e-2 at
+ *     1 px/frame of camera translation, so the floor is not a property of the tree, it is a property of how
+ *     fast the camera is going.
+ *   UPPER BOUND -- v4556's blind window is margin/contrast wide, so holding the blind fraction to
+ *     `blindBudget` caps the margin at contrast * blindBudget.
+ *
+ * *** AND THE INTERVAL IS EMPTY MORE OFTEN THAN THE ARC'S FIXED 0.05 SUGGESTS. *** At 1 px/frame with a 5%
+ * blind budget NOTHING is lockable at any contrast; at a 10% budget a feature needs contrast above 0.84. The
+ * arc's margin of 0.05 sits below the floor at speeds above roughly half a pixel per frame, which is to say
+ * that under ordinary camera motion every lock this arc places is partly reading its own resampling error.
+ * That is stated here rather than in a comment somewhere because it is the reason this function exists.
+ */
+export function ridgeMarginBounds({ noiseFloor, contrast, blindBudget = 0.1, safety = 1.5 }) {
+    if (!(noiseFloor >= 0)) throw new Error("ridgeMarginBounds: noiseFloor must be measured and non-negative, not assumed");
+    if (!(contrast > 0)) throw new Error("ridgeMarginBounds: contrast must be positive -- the feature's, not the frame's");
+    const lo = noiseFloor * safety;
+    const hi = contrast * blindBudget;
+    return {
+        lo, hi,
+        feasible: lo < hi,
+        // the faintest feature that can be locked at all under this noise floor and blind budget
+        minContrast: lo / blindBudget,
+        // the margin to use when there is one: the bottom of the interval, since every unit above the floor
+        // is blind window bought for nothing
+        margin: lo < hi ? lo : null,
+    };
+}
+
 /** The jitter-free sliding mean: any F consecutive frames span a whole number of periods. */
 export function lumaMean(st) {
     const N = st.w * st.h, F = st.frames, P = st.period, out = new Float32Array(N);
