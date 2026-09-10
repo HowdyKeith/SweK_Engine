@@ -1,0 +1,47 @@
+draco_encoder_nodejs.js + draco_encoder.wasm -- vendored
+https://www.npmjs.com/package/draco3d  (draco3d@1.5.7, tarball registry.npmjs.org/draco3d/-/draco3d-1.5.7.tgz)
+author: Google Draco Team -- see LICENSE (Apache-2.0, fetched directly from
+https://github.com/google/draco -- the tarball itself carries no LICENSE file, only
+package.json's "license": "Apache-2.0" field)
+
+Recorded at v4601.
+
+*** A DIFFERENT BUILD WAS TRIED FIRST, AND IT HUNG INDEFINITELY. *** three.js r160's own
+examples/jsm/libs/draco/draco_encoder.js (the natural sibling of vendor/draco/DRACOLoader.js's
+decoder, and where a DRACOExporter.js-based encoder would have pulled its module from) was fetched
+and tested directly: `DracoEncoderModule()`'s init promise never resolved, measured to over 100
+minutes of pinned CPU on a real 3-vertex encode before being killed. Root cause not fully
+diagnosed, but the file is internally asm.js-era Emscripten output (`"almost asm"` directive, no
+`.wasm` file or `wasmBinary` reference anywhere, no `readyPromiseResolve`/`readyPromiseReject`
+pattern) -- an old build shape, not the current one, and this sandbox's headless Chromium is not
+where it was tested against. NOT vendored, and DRACOExporter.js (which needs that module as a
+global) was never vendored either, since there was nothing working for it to call.
+
+*** draco3d IS GOOGLE'S OWN CURRENT NPM PACKAGE FOR THIS, AND draco_encoder_nodejs.js IS
+NODE-TARGETED, NOT BROWSER. *** Its own package.json test script is `nodejs
+draco_nodejs_example.js` -- this build is routinely run in Node, unlike three.js's asm.js copy,
+which was only ever exercised in a browser. Confirmed directly: `require()`'d in plain Node,
+`createEncoderModule({})`'s promise resolved, and a real triangle round-tripped to a 75-byte
+`DRACO`-magic buffer in milliseconds. RUNS IN NODE, so a gate can drive it the same way
+tools/export/voxelGlb.mjs's own header already prefers ("no browser dependency") -- and unlike the
+rejected build, no THREE.js Mesh/BufferGeometry is needed either: this talks to the low-level
+Encoder/MeshBuilder API directly against raw position/index/normal/uv arrays, the same shape
+tools/export/weldVertices.mjs already produces.
+
+WHAT IS NOT VENDORED HERE, ON PURPOSE: draco_decoder_nodejs.js and draco_decoder.wasm (this
+package's decoder half) -- vendor/draco/DRACOLoader.js already covers decoding, via a completely
+different, smaller, pure-JS reimplementation (mrdoob/draco.js), and there is no reason to carry a
+second decoder alongside it. draco3d.js itself (the tiny dispatcher this package wraps its two
+halves in) -- a caller here only ever wants the encoder, so tools/export/dracoEncode.mjs requires
+draco_encoder_nodejs.js directly.
+
+EVIDENCE:
+  - LICENSE reads "Apache License, Version 2.0" (fetched from google/draco's own repo root).
+  - package.json (kept only long enough to read, not vendored) named "license": "Apache-2.0",
+    "author": "Google Draco Team", "repository": "git+https://github.com/google/draco.git".
+  - draco_encoder_nodejs.js locates its companion wasm via `__dirname + "/"` -- the two files
+    must stay siblings in this directory, which is also why draco_encoder.wasm is binary and
+    untouched rather than re-encoded or reformatted.
+  - sha256 at time of vendoring: draco_encoder_nodejs.js
+    8434adecd1446459601763e499be3697546056bca90b286a538ae0483a00845a; draco_encoder.wasm
+    d2a3ac80c91980d5d321c116454834ff36264825c6d1794cc84e42288f158958.

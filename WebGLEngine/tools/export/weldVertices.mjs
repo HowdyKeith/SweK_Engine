@@ -6,6 +6,12 @@
 // textures, Draco-encode, write. Against what tools/export/voxelGlb.mjs actually emits:
 //   weld            -- YES. Voxel meshes share vertices heavily; that is this file.
 //   Draco-encode    -- YES, and it is the big win: quantised integer positions are what voxel geometry IS.
+//                      BUILT, separately, as tools/export/dracoEncode.mjs -- 91.1% smaller than the raw
+//                      attribute bytes on a welded greedy-meshing-shaped fixture, gated end to end (a real
+//                      Draco GLB written here, decoded by this tree's own shipped path) by
+//                      tools/ship/dracoEncode-selfcheck.mjs. Kept as a second, async writer rather than an
+//                      option on writeGlb below, because Draco's own module init is asynchronous and this
+//                      file's weld() and voxelGlb.mjs's writeGlb() are both deliberately synchronous.
 //   simplify        -- NO. Decimating a voxel mesh destroys the blocky silhouette that IS the model.
 //   smooth normals  -- NO, ACTIVELY WRONG. Voxels want flat per-face normals; smoothing melts them.
 //   WebP textures   -- no-op. voxelGlb writes POSITION + COLOR_0 and no TEXCOORD_0 at all.
