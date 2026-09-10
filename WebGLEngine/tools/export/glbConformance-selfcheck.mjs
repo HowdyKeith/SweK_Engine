@@ -1,3 +1,14 @@
+// WebGLEngine/tools/export/glbConformance-selfcheck.mjs -- v4583
+//
+// *** v4583 -- TWO ROWS IN THIS FILE WENT RED BECAUSE THE INSTRUMENT GOT BETTER, AND THAT IS ONE DEFECT, NOT
+// TWO ACCIDENTS. *** Section 1 required ZERO warnings on disk. Section 6 required the module to contain NO
+// rule mentioning skins, animations, images, textures or samplers. Each was a fair way of stopping v4550
+// overclaiming, and each was a ratchet pointing the wrong way: adding the rules made both fail on a tree that
+// had strictly improved, without a single file changing. A ROW THAT ASSERTS THE STATE OF ITS SUBJECT RATHER
+// THAN A PROPERTY OF ITS INSTRUMENT CANNOT SURVIVE THE SUBJECT GETTING BETTER. Both are replaced by
+// reconciliations against CORPUS_AT_V4583, which still redden on a NEW kind of finding -- the case worth
+// noticing -- and no longer on a fixed one.
+//
 // WebGLEngine/tools/export/glbConformance-selfcheck.mjs -- v4550
 //
 // Run: node tools/export/glbConformance-selfcheck.mjs
@@ -26,9 +37,87 @@ import { writeGlb } from "./voxelGlb.mjs";
 import { writeSceneGlb } from "./sceneGlb.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+
+/**
+ * *** THE CORPUS AS IT STANDS, TAKEN RATHER THAN REMEMBERED, SO THAT "CLEAN" HAS A DENOMINATOR. ***
+ *
+ * v4550 shipped this module with a headline of "all 31 GLBs on disk are clean" and one section saying that
+ * RobotExpressive's skins and animations were outside what was checked. Both were true. What neither said is
+ * how much of the corpus that exemption covered, and the answer measured at v4583 is ALL OF IT: every one of
+ * the 31 files carries at least one kind -- images, textures, samplers, materials, skins or animations -- for
+ * which the module had no rule at all. Thirty declared an extension nothing consulted. Two were graded on
+ * ZERO of the accessors they declare.
+ *
+ * Every field here is counted by the rows below from the files themselves. The record exists so a change in
+ * the corpus is a red row rather than a silently different headline.
+ */
+export const CORPUS_AT_V4583 = Object.freeze({
+    files: 31,
+    // Warnings standing on disk, by code. Zero was the previous claim and it was a claim about the rules,
+    // not about the tree -- see the note on the section 1 row.
+    warningsByCode: Object.freeze({ IMAGE_EXTERNAL_URI: 28 }),
+    // Files graded on fewer accessors than they declare, and how many accessor(s) went unread in total.
+    partiallyRead: 2, accessorsUnread: 107, accessorsTotal: 645,
+    // Of those two, ONE would still read nothing from a complete copy of the file: every accessor in
+    // gpu/fixtures/ABeautifulGame-draco.header.glb declares no bufferView, because KHR_draco_mesh_compression
+    // holds the geometry. The other is header-only and reverses when the release zip is unpacked.
+    headerOnly: 2, filesWithAccessorsLackingBufferView: 1,
+    // Files needing a resource served beside them: 28 kit GLBs, all naming the same relative texture, which
+    // world/kenneyKit.mjs's 28-entry MANIFEST does not record and no gate checked before this round.
+    filesNeedingExternalResource: 28, externalResource: "Textures/colormap.png",
+    // Files declaring an extension no rule here interprets, and the extensions in question.
+    filesWithUninterpretedExtension: 30,
+    uninterpretedExtensions: Object.freeze({ KHR_texture_transform: 28, KHR_materials_transmission: 2, KHR_materials_volume: 2 }),
+    // How many files carry each kind that had NO rule at all before v4583. This is the denominator the
+    // v4550 headline was missing: the answer is not "RobotExpressive", it is 31 of 31.
+    filesCarrying: Object.freeze({ skins: 1, animations: 1, images: 30, textures: 30, samplers: 31, materials: 31 }),
+    filesCarryingSomethingPreviouslyUnruled: 31,
+});
+
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const say = (m) => console.log("  ----  " + m);
+
+/** Every GLB in the tree, walked once and cached -- three sections read the same corpus. */
+let _glbs = null;
+function glbsOnDisk() {
+    if (_glbs) return _glbs;
+    const out = [];
+    (function walk(d) {
+        let e; try { e = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
+        for (const x of e) {
+            if (x.name === "node_modules" || x.name.startsWith(".")) continue;
+            const q = path.join(d, x.name);
+            if (x.isDirectory()) walk(q); else if (x.name.endsWith(".glb")) out.push(q);
+        }
+    })(ENG);
+    return (_glbs = out.sort());
+}
+
+/**
+ * The corpus census CORPUS_AT_V4583 is compared against. Everything is counted here from stats.scope, which
+ * is itself counted from the file -- so the record is guarded by two derivations and no typed constant.
+ */
+function corpusCensus() {
+    const KINDS = ["skins", "animations", "images", "textures", "samplers", "materials"];
+    const c = { files: 0, partial: 0, unread: 0, tot: 0, hdr: 0, noView: 0, ext: 0, uninterp: 0, carrying: 0, byKind: {} };
+    for (const k of KINDS) c.byKind[k] = 0;
+    for (const f of glbsOnDisk()) {
+        const r = GC.validate(fs.readFileSync(f));
+        const sc = r.stats.scope;
+        c.files++; c.tot += sc.accessorsTotal; c.unread += sc.accessorsTotal - sc.accessorsRead;
+        if (sc.accessorsRead < sc.accessorsTotal) c.partial++;
+        if (r.stats.headerOnly) c.hdr++;
+        if (sc.accessorsWithoutView) c.noView++;
+        if (sc.externalResources.length) c.ext++;
+        if (sc.extensionsUninterpreted.length) c.uninterp++;
+        let any = false;
+        for (const k of KINDS) if (r.stats[k]) { c.byKind[k]++; any = true; }
+        if (any) c.carrying++;
+    }
+    return c;
+}
+
 
 console.log("glbConformance-selfcheck -- what the bytes MEAN, not whether they are well-formed\n");
 
@@ -84,15 +173,7 @@ console.log("1. *** BOTH OF THIS TREE'S WRITERS, AND ALL 31 GLBs ON DISK, ARE SP
         GC.errorsOf(rVox).length === 0 && GC.warningsOf(rVox).length === 0,
         JSON.stringify(rVox.issues.slice(0, 3)));
 
-    const glbs = [];
-    (function walk(d) {
-        let e; try { e = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
-        for (const x of e) {
-            if (x.name === "node_modules" || x.name.startsWith(".")) continue;
-            const p = path.join(d, x.name);
-            if (x.isDirectory()) walk(p); else if (x.name.endsWith(".glb")) glbs.push(p);
-        }
-    })(ENG);
+    const glbs = glbsOnDisk();
     const rows = glbs.map((f) => ({ f, r: GC.validate(fs.readFileSync(f)) }));
     const bad = rows.filter(({ r }) => GC.errorsOf(r).length);
     const warned = rows.filter(({ r }) => GC.warningsOf(r).length);
@@ -105,15 +186,32 @@ console.log("1. *** BOTH OF THIS TREE'S WRITERS, AND ALL 31 GLBs ON DISK, ARE SP
                    : `A NULL RESULT, and section 2 is what makes it one worth having. The kits are Kenney ` +
                      `output and Khronos-derived, so clean is the expected answer; the value of running it is ` +
                      `that ui/cityPack.js now has something to run when a kit is ADDED.`);
-    // *** THE FIRST DRAFT OF THIS ROW WAS `warned.length === 0 || warned.length < glbs.length`, WHICH IS TRUE
-    // OF EVERY POSSIBLE TREE. *** Zero warnings on disk only means something if the warning channel can fire
-    // at all, so it is tied to a warning actually being produced rather than to an inequality that cannot fail.
+    // *** THIS ROW USED TO REQUIRE ZERO WARNINGS ON DISK AND IT WENT RED THE MOMENT THE INSTRUMENT GOT
+    // BETTER, WHICH IS A DEFECT IN THE ROW AND NOT IN THE TREE. *** Its previous form was
+    // `warned.length === 0 && <the channel fires on a fixture>`: a fair claim while the only warning rules
+    // were about geometry, and a trap as soon as a rule was added that finds something real. v4583 added
+    // IMAGE_EXTERNAL_URI and 28 kit files went from silent to warning WITHOUT ANY FILE CHANGING -- so the
+    // row failed on an improvement. Its sibling in section 6 failed the same run for the same reason, and
+    // both are instances of one shape: A ROW THAT ASSERTS THE CURRENT STATE OF THE TREE RATHER THAN A
+    // PROPERTY OF THE INSTRUMENT CANNOT SURVIVE THE INSTRUMENT IMPROVING.
+    //
+    // What replaces it is a reconciliation rather than a zero: every warning standing on disk must be a code
+    // this gate ACCOUNTS FOR, with the count frozen in CORPUS_AT_V4583, and the channel must still be shown
+    // to fire from a fixture. A brand-new warning kind -- the thing worth noticing -- still reddens it.
     const warnFixture = GC.validate(repack(GOOD, (j) => { j.nodes[0].rotation = [0, 0, 0, 2]; }));
-    ok("!! zero warnings on disk is a RESULT, because the warning channel demonstrably fires",
-        warned.length === 0 && GC.warningsOf(warnFixture).length > 0,
-        `0 of ${glbs.length} files warn, while a non-unit node quaternion produces ` +
-        `${GC.warningsOf(warnFixture).map((x) => x.code).join(", ")}. An unused channel and a clean tree ` +
-        `look identical from the count alone.`);
+    const byCode = {};
+    for (const { r } of rows) for (const w of GC.warningsOf(r)) byCode[w.code] = (byCode[w.code] || 0) + 1;
+    const unaccounted = Object.keys(byCode).filter((c) => CORPUS_AT_V4583.warningsByCode[c] == null);
+    const moved = Object.keys(CORPUS_AT_V4583.warningsByCode).filter((c) => (byCode[c] || 0) !== CORPUS_AT_V4583.warningsByCode[c]);
+    say(`warnings on disk by code: ${Object.entries(byCode).map(([c, n]) => `${c} x${n}`).join(", ") || "none"}`);
+    ok("!! every warning standing on disk is ACCOUNTED FOR, and the channel fires from a fixture",
+        unaccounted.length === 0 && moved.length === 0 && GC.warningsOf(warnFixture).length > 0,
+        unaccounted.length ? `unaccounted warning code(s): ${unaccounted.join(", ")} -- a NEW kind of finding, which is the case this row exists for`
+        : moved.length ? `count moved for ${moved.map((c) => `${c}: record ${CORPUS_AT_V4583.warningsByCode[c]}, live ${byCode[c] || 0}`).join("; ")}`
+        : `${Object.values(byCode).reduce((a, b) => a + b, 0)} warning(s) across ${glbs.length} files, all of ` +
+          `codes this gate names, and a non-unit node quaternion still produces ` +
+          `${GC.warningsOf(warnFixture).map((x) => x.code).join(", ")} from a fixture. Zero was never the ` +
+          `claim worth making -- an unused channel and a clean tree look identical from a zero.`);
 }
 
 // =============================================================================================================
@@ -272,6 +370,30 @@ console.log("\n5. *** THE INTAKE WIRING: EVERY GLB world/kenneyKit.mjs's MANIFES
         }
         return v !== e.verts;
     });
+    // *** v4583: THE FILES THE KITS NEED BESIDE THEM, CHECKED ON DISK RATHER THAN TAKEN ON TRUST. ***
+    // stats.scope.externalResources says 28 of these GLBs name a relative texture. Saying so is not the same
+    // as knowing it is there, and the module cannot know -- it has no filesystem by design. This gate does.
+    // The row resolves each uri against the GLB's own directory, which is how a viewer resolves it, and is
+    // the check that would have caught a kit copied without its Textures/ folder.
+    const needed = [];
+    for (const { e, p: file, r } of rows) {
+        for (const uri of r.stats.scope.externalResources) {
+            needed.push({ file: e.file, uri, at: path.resolve(path.dirname(file), decodeURIComponent(uri)) });
+        }
+    }
+    const absent = needed.filter((n) => !fs.existsSync(n.at));
+    const distinct = new Set(needed.map((n) => n.at));
+    say(`${needed.length} external resource reference(s) across ${rows.length} manifest files, ${distinct.size} distinct target(s)`);
+    ok("!! *** EVERY FILE THE KIT GLBs NEED BESIDE THEM IS ACTUALLY THERE -- and 28 of them need one ***",
+        needed.length > 0 && absent.length === 0,
+        absent.length ? absent.slice(0, 3).map((n) => `${n.file} needs ${n.uri}, absent`).join("; ")
+        : needed.length === 0 ? "no manifest file declares an external resource, so this row has no subject"
+        : `${needed.length} references resolving to ${distinct.size} file(s) on disk: ` +
+          `${[...distinct].map((d) => path.relative(ENG, d)).sort().join(", ")}. ` +
+          `world/kenneyKit.mjs's MANIFEST records kit, file, span, role, bytes, sha, verts, tris and tile ` +
+          `for each entry and does NOT record this dependency -- so the module's own documented workflow ` +
+          `("drop GLBs into GPU_Assets/<pack>/") loses it, and 28 models render untextured with nothing red.`);
+
     ok("!! ...and the manifest's recorded vertex counts agree with the accessors in the files themselves",
         withCounts.length >= 20 && mismatched.length === 0,
         mismatched.length ? mismatched.slice(0, 3).map(({ e }) => e.file + " manifest says " + e.verts).join(", ")
@@ -280,43 +402,304 @@ console.log("\n5. *** THE INTAKE WIRING: EVERY GLB world/kenneyKit.mjs's MANIFES
 }
 
 // =============================================================================================================
-console.log("\n6. *** WHAT THIS DOES NOT CHECK, NAMED RATHER THAN LEFT TO BE DISCOVERED ***");
+console.log("\n6. *** WHAT A CLEAN VERDICT RESTS ON, CARRIED BY THE VERDICT ITSELF ***");
 {
+    // *** THE ROW THAT USED TO STAND HERE REQUIRED THE GAP TO STILL BE OPEN, AND SO IT WENT RED THE MOMENT
+    // THE GAP WAS CLOSED. *** Its condition was `!rulesForUnchecked` -- the module's comment-stripped source
+    // must contain NO rule mentioning skins, animations, images, textures or samplers. As a way of stopping
+    // v4550 from overclaiming it was exactly right, and as a standing check it was a ratchet pointing the
+    // wrong way: adding the rules made it fail, on a tree that had strictly improved. Section 1's warning row
+    // failed the same run for the same reason. ONE SHAPE, TWO INSTANCES: a row that asserts the state of the
+    // subject rather than a property of the instrument cannot survive the subject getting better.
+    //
+    // What replaces it asserts the thing that stays true either way: THE RESULT STATES ITS OWN SCOPE, the
+    // statement is DERIVED from the file rather than typed, and it travels with every verdict instead of
+    // living in this file's prose. When the next gap is closed these rows keep passing; when a rule is added
+    // without being declared, or declared without being added, they go red.
+    const robot = path.join(ENG, "GPU_Assets", "RobotExpressive.glb");
     const src = fs.readFileSync(path.join(ENG, "tools", "export", "glbConformance.mjs"), "utf8");
-    // Sparse accessors are the one glTF feature this tree's PARSER is known not to support -- it is the
-    // opening item of the gltf-conformance-fixtures round -- and this validator does not check them either.
-    // *** AND IT NAMES THE REFERENCE WITHOUT CLAIMING A LICENCE FOR IT. *** `owner/repo (LICENCE)` in a
-    // header is this tree's form for RECORDING A GRANT; the first draft wrote "(MIT)" from a plan document
-    // without opening the repository, and tools/ship/citedSources-selfcheck.mjs went red at 50 against a
-    // baseline of 49 -- correctly, because a round that takes from a new source without registering it moves
-    // that debt up. Nothing was taken: these rules come from the spec text. So the licence claim went, and
-    // this row keeps it gone.
     ok("!! the module says out loud that it is a SUBSET of the spec, not a replacement for the validator",
         /subset/i.test(src) && /glTF-Validator/.test(src) &&
         !/glTF-Validator\s*\((?:MIT|Apache)/.test(src),
         "KhronosGroup/glTF-Validator is the reference implementation and is named as the thing to " +
         "check against if a dependency is ever wanted. Claiming completeness here would be the more " +
         "dangerous error: a file this passes is not thereby valid glTF.");
-    // *** THE LIMIT IS MEASURED ON A FILE THAT REALLY HAS THE UNCHECKED FEATURES, NOT ASSERTED ABOUT A CUBE.
-    // *** The first draft of this row tested that the strings "skins" and "animations" were absent from a
-    // six-vertex export's stats, which is true of every tree and says nothing about coverage.
-    const robot = path.join(ENG, "GPU_Assets", "RobotExpressive.glb");
+
+    // *** THE DECLARED SET IS HELD TO THE SOURCE IN BOTH DIRECTIONS, BECAUSE A HAND-KEPT LIST OF WHAT A
+    // CHECKER COVERS IS THE FAILURE THIS TREE KEEPS RE-FINDING. *** INSPECTED_PROPERTIES could drift from the
+    // rules two ways and only one of them is obvious: a name left in after its rule is deleted overclaims,
+    // and a rule added without its name makes stats.scope.unruled report a gap that no longer exists. Both
+    // are red here.
+    const bare = src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/g, "$1 ");
+    // *** THIS DETECTOR WAS TOO NARROW ON ITS FIRST RUN AND SAID SO, WHICH IS WHAT IT IS FOR. *** It began as
+    // `g.<k>` / `<k>.forEach` / `const <k> =` and reported `extensions` as declared-without-a-rule -- wrongly:
+    // the undeclared-extension rule walks the whole document and matches the key as a STRING, so the property
+    // is genuinely read and never spelled `g.extensions`. The quoted form is accepted too. It is matched
+    // against COMMENT-STRIPPED source, so a property discussed in a header cannot pass for a property checked.
+    const readsProperty = (k) => new RegExp(`g\\.${k}\\b|\\b${k}\\.forEach|\\bconst ${k} =|"${k}"`).test(bare);
+    const declaredWithoutRule = [...GC.INSPECTED_PROPERTIES].filter((k) => !readsProperty(k));
+    // Everything that actually appears at the top level of a GLB in this tree, so the other direction is
+    // measured against real files rather than against a second typed list.
+    const seenProps = new Set();
+    for (const f of glbsOnDisk()) for (const k of Object.keys(GC.splitGlb(fs.readFileSync(f)).json || {})) seenProps.add(k);
+    const ruledWithoutDeclaring = [...seenProps].filter((k) => !GC.INSPECTED_PROPERTIES.has(k) && readsProperty(k));
+    say(`top-level properties across the corpus: ${[...seenProps].sort().join(", ")}`);
+    ok("!! *** INSPECTED_PROPERTIES IS HELD TO THE SOURCE BOTH WAYS -- no name without a rule, no rule without a name ***",
+        declaredWithoutRule.length === 0 && ruledWithoutDeclaring.length === 0,
+        declaredWithoutRule.length ? `declared but no rule reads it: ${declaredWithoutRule.join(", ")}`
+        : ruledWithoutDeclaring.length ? `a rule reads it but it is not declared, so stats.scope.unruled lies: ${ruledWithoutDeclaring.join(", ")}`
+        : `${GC.INSPECTED_PROPERTIES.size} declared, each with a rule in the source; ${seenProps.size} distinct ` +
+          `top-level properties appear across the ${CORPUS_AT_V4583.files} files and the ones outside the set ` +
+          `(${[...seenProps].filter((k) => !GC.INSPECTED_PROPERTIES.has(k)).sort().join(", ") || "none"}) have no rule.`);
+
+    // *** THE SCOPE IS DERIVED, PROVED BY MOVING THE FILE AND WATCHING THE NUMBER FOLLOW. *** A stats field
+    // that happened to hold the right constant would pass a comparison against the record and tell a reader
+    // nothing; the only way to know it is counted is to change the input.
     if (fs.existsSync(robot)) {
+        const base = GC.validate(fs.readFileSync(robot));
         const j = GC.splitGlb(fs.readFileSync(robot)).json;
-        const r = GC.validate(fs.readFileSync(robot));
-        const src2 = src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/g, "$1 ");
-        const rulesForUnchecked = /skins|animations|\bimages\b|\btextures\b|samplers/.test(src2);
+        const stripped = GC.validate(repack(fs.readFileSync(robot), (m) => { m.accessors[5].bufferView = undefined; delete m.accessors[5].bufferView; }));
+        const withCam = GC.validate(repack(fs.readFileSync(robot), (m) => { m.cameras = [{ type: "perspective", perspective: { yfov: 1, znear: 0.1 } }]; }));
         say(`RobotExpressive: ${(j.skins || []).length} skins, ${(j.animations || []).length} animations, ` +
-            `${(j.accessors || []).length} accessors -- and ${GC.errorsOf(r).length} findings`);
-        ok("!! *** A CLEAN RESULT IS NARROWER THAN IT LOOKS, AND THE NUMBERS SAY HOW MUCH ***",
-            (j.skins || []).length > 0 && (j.animations || []).length > 0 &&
-            GC.errorsOf(r).length === 0 && !rulesForUnchecked,
-            `${(j.skins || []).length} skins and ${(j.animations || []).length} animations across ` +
-            `${(j.accessors || []).length} accessors, and this module contains NO rule mentioning skins, ` +
-            `animations, images, textures or samplers (checked against its comment-stripped source). So the ` +
-            `"clean" above means the geometry rules found nothing, not that the file is valid glTF -- and a ` +
-            `reader who took it for the second would be wrong in exactly the way section 5 exists to prevent.`);
+            `${(j.accessors || []).length} accessors, ${GC.errorsOf(base).length} findings, ` +
+            `scope reads ${base.stats.scope.accessorsRead} of ${base.stats.scope.accessorsTotal}`);
+        ok("!! *** stats.scope IS COUNTED FROM THE FILE: take one accessor's bufferView away and the count drops ***",
+            base.stats.scope.accessorsRead === (j.accessors || []).length &&
+            stripped.stats.scope.accessorsRead === base.stats.scope.accessorsRead - 1 &&
+            stripped.stats.scope.accessorsWithoutView === 1 &&
+            withCam.stats.scope.unruled.includes("cameras") && !base.stats.scope.unruled.includes("cameras"),
+            `${base.stats.scope.accessorsRead} of ${base.stats.scope.accessorsTotal} read normally, ` +
+            `${stripped.stats.scope.accessorsRead} with one accessor's bufferView removed, and adding a ` +
+            `camera -- a property this module has no rule for -- makes it appear in scope.unruled where it ` +
+            `was absent before. None of the three numbers is typed anywhere.`);
+
+        // The claim v4550's row was reaching for, said in the form that survives the fix: what a clean
+        // verdict rests on is now IN the verdict.
+        const draco = path.join(ENG, "gpu", "fixtures", "ABeautifulGame-draco.header.glb");
+        const dr = fs.existsSync(draco) ? GC.validate(fs.readFileSync(draco)) : null;
+        ok("!! *** A CLEAN RESULT CARRIES ITS OWN DENOMINATOR NOW, AND ON ONE FILE THAT DENOMINATOR IS ZERO ***",
+            dr !== null && GC.errorsOf(dr).length === 0 && dr.stats.scope.accessorsRead === 0 &&
+            dr.stats.scope.accessorsTotal === 32 && dr.stats.scope.accessorsWithoutView === 32 &&
+            GC.scopeLines(dr).some((l) => /0 of 32/.test(l)),
+            dr === null ? "the Draco fixture is not on disk"
+            : `gpu/fixtures/ABeautifulGame-draco.header.glb grades CLEAN having read 0 of its 32 accessors -- ` +
+              `all 32 declare no bufferView because KHR_draco_mesh_compression holds the geometry, so this is ` +
+              `true of a complete copy of the file and not only of the stripped fixture. reportLines and the ` +
+              `CLI both print that sentence beside the verdict; before v4583 the verdict travelled alone.`);
     }
+
+    // The corpus record, reconciled field by field against a fresh read of the files.
+    const live = corpusCensus();
+    const drift = Object.entries({
+        files: live.files, partiallyRead: live.partial, accessorsUnread: live.unread, accessorsTotal: live.tot,
+        headerOnly: live.hdr, filesWithAccessorsLackingBufferView: live.noView,
+        filesNeedingExternalResource: live.ext, filesWithUninterpretedExtension: live.uninterp,
+        filesCarryingSomethingPreviouslyUnruled: live.carrying,
+    }).filter(([k, v]) => CORPUS_AT_V4583[k] !== v);
+    ok("!! *** THE DENOMINATOR THE v4550 HEADLINE WAS MISSING: 31 OF 31 FILES CARRY SOMETHING IT HAD NO RULE FOR ***",
+        drift.length === 0 && live.carrying === live.files,
+        drift.length ? drift.map(([k, v]) => `${k}: record ${CORPUS_AT_V4583[k]}, live ${v}`).join("; ")
+        : `${live.carrying} of ${live.files} files carry images, textures, samplers, materials, skins or ` +
+          `animations -- every one of them. ${live.unread} of ${live.tot} accessors go unread across ` +
+          `${live.partial} files, ${live.ext} files need ${CORPUS_AT_V4583.externalResource} served beside ` +
+          `them, and ${live.uninterp} declare an extension no rule interprets. "31 clean" was a true ` +
+          `sentence about a subset nobody had counted.`);
+}
+
+// =============================================================================================================
+console.log("\n7. *** THE RULES ADDED AT v4583, BROKEN ONE AT A TIME ON FILES THAT REALLY HAVE THE FEATURE ***");
+{
+    // *** THE SUBJECT IS A REAL FILE IN EVERY CASE, WHICH IS NOT A STYLE CHOICE. *** Section 6's predecessor
+    // began as a test that the strings "skins" and "animations" were absent from a six-vertex cube's stats --
+    // true of every tree ever built and evidence of nothing. A skin rule is worth exactly as much as the
+    // skinned file it has been run against, so these mutate GPU_Assets/RobotExpressive.glb (2 skins, 14
+    // animations, 283 accessors), a Kenney kit GLB (images, textures, samplers, materials) and the Draco
+    // fixture (extensionsRequired), and each case must produce ITS OWN code.
+    const robotPath = path.join(ENG, "GPU_Assets", "RobotExpressive.glb");
+    const kitPath = glbsOnDisk().find((f) => /kenney-\w+[\\/]models[\\/]/.test(f));
+    const dracoPath = path.join(ENG, "gpu", "fixtures", "ABeautifulGame-draco.header.glb");
+    const load = (p) => (fs.existsSync(p) ? new Uint8Array(fs.readFileSync(p)) : null);
+    const ROBOT = load(robotPath), KIT = kitPath ? load(kitPath) : null, DRACO = load(dracoPath);
+
+    // Each case: [subject, code, what was broken, mutation]
+    const cases = [
+        // ---- extensions -------------------------------------------------------------------------------
+        [DRACO, "EXTENSION_REQUIRED_NOT_USED", "an extension required but not declared as used",
+            (j) => { j.extensionsUsed = j.extensionsUsed.filter((e) => e !== "KHR_draco_mesh_compression"); }],
+        [DRACO, "UNDECLARED_EXTENSION", "an extension used deep in the document and never declared",
+            (j) => { j.meshes[0].primitives[0].extensions.KHR_texture_transform = { offset: [0, 0] }; }],
+        // ---- an accessor with nothing behind it ---------------------------------------------------------
+        [ROBOT, "ACCESSOR_NO_DATA_SOURCE", "an accessor with a bounding box and no bytes to justify it",
+            (j) => { delete j.accessors[1].bufferView; j.accessors[1].min = [0, 0, 1]; j.accessors[1].max = [1, 1, 1]; }],
+        // ---- skins ---------------------------------------------------------------------------------------
+        [ROBOT, "SKIN_IBM_ACCESSOR_COUNT", "43 joints against 42 inverse bind matrices",
+            (j) => { j.accessors[j.skins[0].inverseBindMatrices].count = 42; }],
+        [ROBOT, "SKIN_IBM_INVALID_FORMAT", "inverse bind matrices stored as VEC4 instead of MAT4",
+            (j) => { j.accessors[j.skins[0].inverseBindMatrices].type = "VEC4"; }],
+        [ROBOT, "NODE_SKIN_WITHOUT_MESH", "a node carrying a skin and no mesh",
+            (j) => { const n = j.nodes.findIndex((x) => x.skin != null); delete j.nodes[n].mesh; }],
+        [ROBOT, "MESH_PRIMITIVE_JOINTS_WEIGHTS_MISMATCH", "a skinned node pointing at unskinned geometry",
+            (j) => { const n = j.nodes.find((x) => x.skin != null); delete j.meshes[n.mesh].primitives[0].attributes.WEIGHTS_0; }],
+        [ROBOT, "UNRESOLVED_REFERENCE", "a joint index past the end of the node list",
+            (j) => { j.skins[0].joints[3] = 99999; }],
+        // ---- animations ------------------------------------------------------------------------------------
+        [ROBOT, "ANIMATION_SAMPLER_INPUT_ACCESSOR_WITHOUT_BOUNDS", "keyframe times with no min/max, so nothing knows the clip length",
+            (j) => { delete j.accessors[j.animations[0].samplers[0].input].min; }],
+        [ROBOT, "ANIMATION_SAMPLER_INPUT_ACCESSOR_INVALID_FORMAT", "keyframe times stored as VEC3",
+            (j) => { j.accessors[j.animations[0].samplers[0].input].type = "VEC3"; }],
+        [ROBOT, "ANIMATION_SAMPLER_INVALID_INTERPOLATION", "an interpolation mode that is not one of the three",
+            (j) => { j.animations[0].samplers[0].interpolation = "SMOOTH"; }],
+        [ROBOT, "ANIMATION_SAMPLER_OUTPUT_ACCESSOR_INVALID_COUNT", "an output that is not a whole number of keyframes",
+            (j) => { j.accessors[j.animations[0].samplers[0].output].count -= 1; }],
+        [ROBOT, "ANIMATION_CHANNEL_OUTPUT_COUNT", "a weights channel whose output no longer matches keyframes x targets",
+            (j) => { const s = j.animations[0].samplers[0]; j.accessors[s.output].count = j.accessors[s.input].count; }],
+        [ROBOT, "ANIMATION_CHANNEL_TARGET_INVALID_PATH", "a channel driving a property that does not exist",
+            (j) => { j.animations[0].channels[0].target.path = "colour"; }],
+        [ROBOT, "ANIMATION_CHANNEL_TARGET_INVALID_TYPE", "VEC3 output driving a rotation",
+            (j) => { const c = j.animations[0].channels.find((x) => x.target.path === "rotation");
+                     j.accessors[j.animations[0].samplers[c.sampler].output].type = "VEC3"; }],
+        [ROBOT, "UNRESOLVED_REFERENCE", "a channel pointing at a sampler the animation does not have",
+            (j) => { j.animations[0].channels[0].sampler = 4242; }],
+        // ---- images, textures, samplers ---------------------------------------------------------------------
+        [KIT, "IMAGE_URI_AND_BUFFERVIEW", "an image claiming both a uri and a bufferView",
+            (j) => { j.images[0].bufferView = 0; }],
+        [KIT, "IMAGE_NO_SOURCE", "an image with neither",
+            (j) => { delete j.images[0].uri; }],
+        [KIT, "IMAGE_MIME_TYPE_MISSING", "an embedded image with no mimeType",
+            (j) => { delete j.images[0].uri; j.images[0].bufferView = 0; }],
+        [KIT, "IMAGE_MIME_TYPE_INVALID", "an embedded image claiming a type no declared extension permits",
+            (j) => { delete j.images[0].uri; j.images[0].bufferView = 0; j.images[0].mimeType = "image/ktx2"; }],
+        [KIT, "SAMPLER_INVALID_FILTER", "a minFilter that is not a GL enum",
+            (j) => { j.samplers[0].minFilter = 9999; }],
+        [KIT, "SAMPLER_INVALID_WRAP", "a wrap mode that is not a GL enum",
+            (j) => { j.samplers[0].wrapS = 5; }],
+        [KIT, "UNRESOLVED_REFERENCE", "a texture pointing at an image that is not there",
+            (j) => { j.textures[0].source = 7; }],
+        [KIT, "TEXTURE_NO_SOURCE", "a texture with no image and no extension to supply one",
+            (j) => { delete j.textures[0].source; }],
+        // ---- materials ---------------------------------------------------------------------------------------
+        [KIT, "MATERIAL_INVALID_ALPHA_MODE", "an alphaMode outside the three the spec names",
+            (j) => { j.materials[0].alphaMode = "DITHER"; }],
+        [KIT, "MATERIAL_INVALID_FACTOR", "a metallicFactor above 1",
+            (j) => { j.materials[0].pbrMetallicRoughness.metallicFactor = 1.5; }],
+        [KIT, "MATERIAL_ALPHA_CUTOFF_UNUSED", "an alphaCutoff on a material that is not MASK",
+            (j) => { j.materials[0].alphaCutoff = 0.5; }],
+        [KIT, "TEXTURE_INFO_INVALID_TEXCOORD", "a negative UV set index",
+            (j) => { j.materials[0].pbrMetallicRoughness.baseColorTexture.texCoord = -1; }],
+        [KIT, "UNRESOLVED_REFERENCE", "a material pointing at a texture that is not there",
+            (j) => { j.materials[0].pbrMetallicRoughness.baseColorTexture.index = 9; }],
+    ];
+
+    let fired = 0, missed = [];
+    const cleanCodes = new Set();
+    for (const b of [ROBOT, KIT, DRACO]) if (b) for (const x of GC.validate(b).issues) cleanCodes.add(x.code);
+    for (const [subject, code, what, mutate] of cases) {
+        if (!subject) { ok("   " + code + " -- " + what, false, "subject file is not on disk"); continue; }
+        const codes = codesOf(repack(subject, mutate));
+        const hit = codes.includes(code);
+        if (hit) fired++; else missed.push(code + " (" + what + ")");
+        ok((hit ? "   " : "!! ") + code + " -- " + what, hit, hit ? "" : "produced: " + [...new Set(codes)].join(", "));
+    }
+    ok("!! *** ALL " + cases.length + " FIRE, AND NONE OF THEM IS PRODUCED BY THE UNMUTATED FILES ***",
+        missed.length === 0 && cases.every(([, code]) => code === "UNRESOLVED_REFERENCE" || !cleanCodes.has(code)),
+        missed.length ? "missed: " + missed.join("; ")
+        : `${fired} rules, each broken alone against a file that really carries the feature. The three ` +
+          `subjects produce ${[...cleanCodes].join(", ") || "nothing"} unmutated, so no case is passing on a ` +
+          `finding that was already there. UNRESOLVED_REFERENCE is the one code reused across cases -- it is ` +
+          `the spec's own code for a dangling index and the PATH distinguishes them, which the details above show.`);
+}
+
+// =============================================================================================================
+console.log("\n8. *** SPARSE ACCESSORS: ZERO ON DISK, SO THE FIXTURE IS BUILT AND THE NULL RESULT IS STATED ***");
+{
+    // *** NOT ONE OF THE 31 GLBs IN THIS TREE USES A SPARSE ACCESSOR. *** That is why the sparse rules are
+    // written from the spec and proved here against a fixture assembled on top of a REAL writeSceneGlb export
+    // rather than against the corpus: a rule with no subject anywhere in the tree is exactly the rule that
+    // will be wrong the first time somebody imports a file that has one, and sparse is the opening item of
+    // the import-side round for the same reason.
+    //
+    // The fixture overrides POSITION elements 1 and 4 with values OUTSIDE the original bounding box and
+    // updates min/max to match. That is deliberate: if the substitution is not applied, the recomputed
+    // min/max disagree and the file reads as broken -- so the fixture being CLEAN is itself the proof that
+    // readAccessor honours sparse, which it did not before v4583.
+    const SUB = { 1: [9, 9, 9], 4: [-8, -8, -8] };
+    // The index pair is a parameter rather than a constant so that the ORDERING rule and the RANGE rule each
+    // get a fixture that breaks only itself. The first attempt reached the ordering rule by shortening the
+    // index view and re-reading it as bytes, which produced a non-increasing pair on the way to an
+    // out-of-range one -- two faults in one file, and the row that wanted the second passed on the first.
+    function sparseFixture(mutate = () => {}, { indices = [1, 4] } = {}) {
+        const s = GC.splitGlb(GOOD);
+        const bin = s.bin;
+        const idxBytes = new Uint8Array(new Uint16Array(indices).buffer);                         // 4 bytes
+        const valBytes = new Uint8Array(new Float32Array([...SUB[1], ...SUB[4]]).buffer);          // 24 bytes
+        const newBin = new Uint8Array(bin.byteLength + idxBytes.length + valBytes.length);
+        newBin.set(bin, 0);
+        newBin.set(idxBytes, bin.byteLength);
+        newBin.set(valBytes, bin.byteLength + idxBytes.length);
+        return repack(GOOD, (j) => {
+            const at = bin.byteLength;
+            const bvIdx = j.bufferViews.push({ buffer: 0, byteOffset: at, byteLength: idxBytes.length }) - 1;
+            const bvVal = j.bufferViews.push({ buffer: 0, byteOffset: at + idxBytes.length, byteLength: valBytes.length }) - 1;
+            j.buffers[0].byteLength = newBin.byteLength;
+            const ai = j.meshes[0].primitives[0].attributes.POSITION;
+            j.accessors[ai].sparse = {
+                count: 2,
+                indices: { bufferView: bvIdx, byteOffset: 0, componentType: 5123 },
+                values: { bufferView: bvVal, byteOffset: 0 },
+            };
+            // The bounds now describe the substituted data, which is what the spec requires.
+            const base = [...CUBE.positions];
+            for (const [k, v] of Object.entries(SUB)) for (let c = 0; c < 3; c++) base[k * 3 + c] = v[c];
+            for (let c = 0; c < 3; c++) {
+                j.accessors[ai].min[c] = Math.min(...[0, 1, 2, 3, 4, 5].map((e) => base[e * 3 + c]));
+                j.accessors[ai].max[c] = Math.max(...[0, 1, 2, 3, 4, 5].map((e) => base[e * 3 + c]));
+            }
+            mutate(j, { ai, bvIdx, bvVal });
+        }, { binBytes: newBin });
+    }
+
+    const good = sparseFixture();
+    const rGood = GC.validate(good);
+    ok("!! *** A VALID SPARSE ACCESSOR IS CLEAN, WHICH PROVES THE OVERRIDE IS APPLIED AND NOT SKIPPED ***",
+        GC.errorsOf(rGood).length === 0,
+        GC.errorsOf(rGood).length
+            ? GC.errorsOf(rGood).map((x) => x.code + " " + x.path + " " + x.detail).join("; ")
+            : `Two of six positions are substituted to values outside the original box and min/max follow ` +
+              `them. Until v4583 readAccessor returned the BASE data and this fixture would have read as ` +
+              `ACCESSOR_MIN_MISMATCH -- a correct file called broken, which is the error a second ` +
+              `implementation is meant to remove rather than introduce.`);
+
+    // The control: take the sparse block away and leave the bounds. Now the declared box really is wrong,
+    // and the min/max rule must say so -- which is what says the substitution was doing work above.
+    const noSub = GC.validate(sparseFixture((j, { ai }) => { delete j.accessors[ai].sparse; }));
+    ok("!! ...and removing the substitution while keeping its bounds is caught, so the fixture is not vacuous",
+        codesOf(sparseFixture((j, { ai }) => { delete j.accessors[ai].sparse; })).some((c) => c === "ACCESSOR_MIN_MISMATCH" || c === "ACCESSOR_MAX_MISMATCH"),
+        `${GC.errorsOf(noSub).map((x) => x.code).join(", ")} -- the bounds describe data that is only there ` +
+        `because of the sparse block, so dropping it makes them wrong.`);
+
+    const sparseCases = [
+        ["ACCESSOR_SPARSE_COUNT", "a sparse block overriding zero elements", (j, { ai }) => { j.accessors[ai].sparse.count = 0; }],
+        ["ACCESSOR_SPARSE_COUNT_OUT_OF_RANGE", "more overrides than the accessor has elements", (j, { ai }) => { j.accessors[ai].sparse.count = 99; }],
+        ["ACCESSOR_SPARSE_INDICES_TYPE", "sparse indices stored as floats", (j, { ai }) => { j.accessors[ai].sparse.indices.componentType = 5126; }],
+        ["ACCESSOR_SPARSE_INDEX_OOB", "an override aimed past the end of the accessor", null, { indices: [1, 9] }],
+        ["ACCESSOR_SPARSE_INDICES_NON_INCREASING", "overrides listed out of order, which the spec forbids", null, { indices: [4, 1] }],
+        ["UNRESOLVED_REFERENCE", "sparse values pointing at a bufferView that is not there", (j, { ai }) => { j.accessors[ai].sparse.values.bufferView = 77; }],
+        ["UNDEFINED_PROPERTY", "a sparse block with no values at all", (j, { ai }) => { delete j.accessors[ai].sparse.values; }],
+        ["BUFFER_VIEW_INVALID_BYTE_STRIDE", "a byteStride on the view holding sparse indices", (j, { bvIdx }) => { j.bufferViews[bvIdx].byteStride = 4; }],
+    ];
+    let sMissed = [];
+    for (const [code, what, mutate, opts] of sparseCases) {
+        const codes = codesOf(sparseFixture(mutate || (() => {}), opts));
+        const hit = codes.includes(code);
+        if (!hit) sMissed.push(code);
+        ok((hit ? "   " : "!! ") + code + " -- " + what, hit, hit ? "" : "produced: " + [...new Set(codes)].join(", "));
+    }
+    ok("!! *** ALL " + sparseCases.length + " SPARSE RULES FIRE, ON A FEATURE NO FILE IN THIS TREE USES ***",
+        sMissed.length === 0,
+        sMissed.length ? "missed: " + sMissed.join(", ")
+        : `${sparseCases.length} rules with zero subjects in the corpus, each broken alone against a built ` +
+          `fixture. A NULL RESULT on disk is recorded as one: 0 of ${CORPUS_AT_V4583.files} files carries a ` +
+          `sparse accessor, so nothing here was measured against this tree's own habits.`);
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
@@ -334,5 +717,18 @@ console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "other than the manifest -- a GLB dropped into GPU_Assets/ is discovered by filename and loaded " +
     "unexamined. glbConformance.mjs has zero node imports and would run in a browser as-is; what is missing " +
     "is a decision about whether a runtime check is worth its cost on a user's frame, which is a different " +
-    "question from whether the instrument exists.");
+    "question from whether the instrument exists. " +
+    "\n*** WHAT v4583 FOUND ON THE WAY AND IS WORTH MORE THAN THE RULES: 28 OF THIS TREE'S KIT GLBs ARE NOT " +
+    "SELF-CONTAINED. *** Each names one relative texture, Textures/colormap.png, which world/kenneyKit.mjs's " +
+    "28-entry MANIFEST does not record and no gate checked before this round. The module's own documented " +
+    "workflow is to drop .glb files into GPU_Assets/<pack>/ -- and doing exactly that, without also copying " +
+    "the sibling Textures/ folder, yields 28 models that fetch, parse, validate, render, and are silently " +
+    "untextured. That is not a spec violation, which is why it is a WARNING and a stats.scope.externalResources " +
+    "entry rather than an error: the spec permits an external uri. It is an INTAKE fact, and it is now stated " +
+    "by the verdict instead of discovered by a person wondering why the city is grey. " +
+    "\nWHAT IS STILL OUTSIDE THE RULES, counted rather than claimed: cameras and extras have no rule here " +
+    "(0 files use either); KHR_texture_transform, KHR_materials_transmission and KHR_materials_volume are " +
+    "declared by 30 files and INTERPRETED by nothing, so an error inside one of those payloads is outside " +
+    "what a clean verdict here can mean; and 2 files are still graded on 0 accessors, one of them for a " +
+    "reason no complete copy of the file would fix. All four numbers come out of stats.scope.");
 process.exit(fails ? 1 : 0);

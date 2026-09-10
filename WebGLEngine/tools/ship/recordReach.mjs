@@ -209,7 +209,13 @@ export const REACH_AT_V4548 = Object.freeze({
     // render/exactHash.mjs guarded by exactHash-selfcheck at 1,656 ms -- under the 3,000 ms budget, so it
     // arrived CHECKED. That is what adding a record properly looks like, against the nine this tree carries
     // that no code names at all.
-    total: 106,
+    // v4583: 106 -> 107 and the ceiling did not move. CORPUS_AT_V4583 landed in
+    // tools/export/glbConformance-selfcheck.mjs guarded by that same file at 441 ms against the 3,000 ms
+    // budget, so it arrived CHECKED -- the second round running where a new record costs the unchecked
+    // population nothing. Worth saying because the previous four rounds each went red here on their own
+    // arrival: a record written into a module whose gate is over budget arrives unchecked, and this one was
+    // written into a gate that runs at ship time on purpose.
+    total: 107,
     // *** READ OFF THE INSTRUMENT, NOT PREDICTED. *** The first draft of this record guessed 53/21/19/40 from
     // which gates the round had sped up, and was wrong on three of the four: the comment-strip fix below
     // moved two records the other way at the same time, and a guess cannot see two changes at once.
@@ -327,7 +333,9 @@ export const UNGUARDED_SPLIT_V4577 = Object.freeze({
     // v4578 -- total RE-TAKEN 105 -> 106 for SHADER_SINHASH_V4578, which arrived checked. The other three
     // are the round's actual finding and have not moved: no clock enters them, and no record has joined or
     // left the unguarded set.
-    structural: Object.freeze({ total: 106, unguarded: 9, documentaryOfThose: 9, readByCodeOfThose: 0 }),
+    // v4583 -- total RE-TAKEN 106 -> 107 for CORPUS_AT_V4583, which arrived checked. The unguarded set
+    // did not move: no record joined or left it this round.
+    structural: Object.freeze({ total: 107, unguarded: 9, documentaryOfThose: 9, readByCodeOfThose: 0 }),
     // BEFORE, on the tree this round opened on:
     before: Object.freeze({ total: 104, checked: 72, overBudget: 20, unmeasured: 0, unguarded: 12, unchecked: 32 }),
     // AFTER, as one reading rather than as a constant -- see the note above. Taken with the round's own
