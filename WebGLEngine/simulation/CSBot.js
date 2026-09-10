@@ -20,6 +20,17 @@
 // shape means most paths are L-shaped, which the room-center
 // targeting approximates well enough.
 
+// v4604 -- EXAMINED FOR MIGRATION ONTO ui/machine.mjs's defineMachine()/applyEvent() (the same framework
+// simulation/BossPhaseManager.js and simulation/CSBomb.js and simulation/CSRoundManager.js now use) and
+// DELIBERATELY LEFT ALONE. This is a considered no, not an oversight -- see tools/ship/nextRounds.mjs's
+// "npc-decision-framework" entry for the full writeup. The short version: MOVING/HOLDING/SHOOTING are NOT a
+// guarded lifecycle. They are a PRIORITY CLASSIFICATION recomputed FRESH every tick from current world state
+// (line of sight, fire cooldown, arrival distance) with no gating on the previous tick's value at all -- any
+// one can become any other on any given tick. ui/machine.mjs's whole value is CATCHING an undeclared or
+// unreachable transition; a graph where every state legitimately reaches every other state validates nothing.
+// Only DEAD (via takeDamage()) is a genuine one-way transition, and it's too trivial alone to justify the
+// migration. If this ever changes -- e.g. HOLDING gains real dwell-time hysteresis instead of being
+// recomputed from scratch -- re-read this note before assuming it still applies.
 export const BOT_STATE = Object.freeze({
     MOVING:   "moving",     // pathing toward next room center
     HOLDING:  "holding",    // arrived at target room, watching

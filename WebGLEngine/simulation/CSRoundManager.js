@@ -27,6 +27,7 @@
 // Real T-vs-CT matches arrive when bots land in a later round.
 
 import { CSBomb, BOMB_STATE, pointInZone, distSqXZ, DEFUSE_RADIUS } from "./CSBomb.js";
+import { defineMachine, applyEvent } from "../ui/machine.mjs";
 
 export const ROUND_STATE = Object.freeze({
     IDLE:           "idle",            // before any round has started
@@ -34,6 +35,31 @@ export const ROUND_STATE = Object.freeze({
     LIVE:           "live",            // round in progress, no plant yet
     BOMB_PLANTED:   "bomb_planted",    // bomb ticking, defusable
     ROUND_OVER:     "round_over",      // brief post-round pause
+});
+
+// v4603 -- the CLEANEST of the three CS-mode files to migrate, and worth saying why: every transition already
+// funnelled through ONE helper (_transition, below) before this round touched it, unlike CSBomb.js's four
+// separately-guarded methods. That made this a straight swap: _transition took a TARGET STATE and did no
+// validation at all (it would have happily jumped anywhere from anywhere); it now takes an EVENT NAME and
+// validates against this declared graph instead.
+//
+// roundStart IS LEGAL FROM EVERY STATE, INCLUDING mid-round ones, because the real code is: startMatch() has
+// NO guard on the current state before calling _beginRound() -- a caller invoking it again mid-round (a
+// "restart match" action, or a test) resets straight to WAITING regardless of where play currently is. The
+// graph says so rather than assuming startMatch is only ever called once.
+//
+// UNLIKE CSBomb.js, THERE IS NO UNREACHABLE-STATE WRINKLE HERE. idle is simply this machine's own `initial`
+// value -- reachable trivially, as every defineMachine's initial state is -- and every other state loops back
+// to waiting via the same roundStart event, so nothing needed an administrative bypass outside the graph.
+export const ROUND_MACHINE = defineMachine({
+    initial: "idle",
+    states: {
+        idle:         { on: { roundStart: "waiting" } },
+        waiting:      { on: { roundStart: "waiting", graceExpired: "live", concluded: "round_over" } },
+        live:         { on: { roundStart: "waiting", planted: "bomb_planted", concluded: "round_over" } },
+        bomb_planted: { on: { roundStart: "waiting", concluded: "round_over" } },
+        round_over:   { on: { roundStart: "waiting" } },
+    },
 });
 
 export const WINNER = Object.freeze({
@@ -250,7 +276,7 @@ export class CSRoundManager {
             this._stateTime += dt;
             if (this._stateTime < TIMINGS.WAITING_S) return;
             const overshoot = this._stateTime - TIMINGS.WAITING_S;
-            this._transition(ROUND_STATE.LIVE);
+            this._transition("graceExpired");
             this._roundTime = TIMINGS.LIVE_S;
             dt = overshoot;
             // Fall through to LIVE handler with remaining dt
@@ -273,7 +299,7 @@ export class CSRoundManager {
             // Step the bomb (planting progress)
             const transition = this.bomb.tick(dt);
             if (transition === "planted") {
-                this._transition(ROUND_STATE.BOMB_PLANTED);
+                this._transition("planted");
                 this._actionOwner = null;   // v328 — plant complete, ready for defuse
                 if (this.playerSide === "t") this._award(ECONOMY.REWARD_PLANT);   // v542 — plant bonus
                 // v325 — notify callback so main.js can spawn the bomb prop
@@ -361,7 +387,7 @@ export class CSRoundManager {
                 if (cid != null) this.bomb.assignInitialCarrier(cid);
             } catch {}
         }
-        this._transition(ROUND_STATE.WAITING);
+        this._transition("roundStart");
         // v327 — fire round-start callback so main.js can respawn
         // bots + player + reset weapons. Defensive try/catch so a
         // failing handler doesn't stall the round.
@@ -398,11 +424,11 @@ export class CSRoundManager {
         }
         this._bombPropSpawned = false;
         this._actionOwner = null;   // v328 — clear before next round begins
-        this._transition(ROUND_STATE.ROUND_OVER);
+        this._transition("concluded");
     }
 
-    _transition(next) {
-        this.state = next;
+    _transition(event) {
+        this.state = applyEvent(ROUND_MACHINE, this.state, event, null);
         this._stateTime = 0;
     }
 
