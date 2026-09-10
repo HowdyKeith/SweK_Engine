@@ -3767,6 +3767,48 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since217: Object.freeze({
+        at: "v4558", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/temporalRingFloor-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 2.44 s (2438/2432/2445 over three serial runs, under the 3000 ms sweep budget -- after " +
+                 "an optimisation; see below). *** v4557 MEASURED THE RING'S NOISE FLOOR AGAINST THE WRONG " +
+                 "REFERENCE AND ITS HEADLINE IS WITHDRAWN. *** Its analytic average evaluated the surface at " +
+                 "pixel i using EACH FRAME'S OWN camera position, which is a different world point once the " +
+                 "camera moves -- so it measured HOW FAR THE SCENE SHIFTED across the window, not what the " +
+                 "reprojection got wrong. At one pixel per frame it read 6.87e-2 where the ring's actual " +
+                 "error is 1.19e-7: five orders of magnitude. WITHDRAWN with it: 'the floor climbs THROUGH " +
+                 "the margin', 'every lock placed while the camera moves is partly reading resampling error', " +
+                 "and three feasibility intervals reported EMPTY -- all artefacts. The worst TRUE floor over " +
+                 "every speed measured is 3.68e-4, which is 136x BELOW the arc's 0.05 rather than 1.7x above " +
+                 "it, so v4556's blind window is the only binding constraint on the margin and always was. " +
+                 "*** WHY IT SURVIVED: at rest the two references AGREE, bit for bit, because a reference " +
+                 "that moves with the camera does not move when the camera does not -- and every convergence " +
+                 "fixture in this arc holds the camera still. *** WHAT SURVIVES v4557 UNTOUCHED: the ring's " +
+                 "speed ceiling, which is a count of `filled` and never depended on the reference, and the " +
+                 "SHAPE of the argument. Only the floor's value was wrong. THE LAW THE FLOOR ACTUALLY " +
+                 "FOLLOWS is the reprojection's SUB-PIXEL PHASE, not its speed: integer displacements are " +
+                 "EXACT (1.19e-7 at 0, 1 and 2) because a whole-pixel step lands the bilinear fetch on texel " +
+                 "centres, and a half-pixel phase reads the same at every speed that has one. So a bound from " +
+                 "THIS frame's phase is wrong next frame and the usable floor is the worst over phases. AND " +
+                 "THE QUESTION v4557's CLOSING LEFT OPEN IS ANSWERED NO: under camera ROLL the displacement " +
+                 "runs from zero at the centre to over a pixel at the corners, and the rotation CENTRE has " +
+                 "the SMALLEST error in the frame (2.9e-5) -- the per-pixel structure is real but a hundred " +
+                 "times too small to need its own bound, so one frame-wide number is safe under rotation too. " +
+                 "Against v4557's reference that centre read 8.2e-3 and looked exactly like the anomaly a " +
+                 "per-pixel bound would be for. Six sabotages red at 18/12/3/4/4/7. *** ONE WAS A NO-OP AND " +
+                 "READ 0 RED: *** wrapping the ring fetch's already-integer indices in Math.round left the " +
+                 "bilinear WEIGHTS untouched, so nothing changed -- second time this session (v4553's BS was " +
+                 "the first), and it matters most here, because this round's whole subject is the error " +
+                 "bilinear interpolation leaves behind. The real mutation replaces the four-tap sum with one " +
+                 "nearest sample. The corrected reference gets a sabotage of its own, since the reference IS " +
+                 "the finding. Also: the first draft ran seventeen 32-frame sweeps at 64x64 and came in at " +
+                 "3,070 ms, OVER the budget -- the fault v4551 and v4553 both recorded; sharing one sweep per " +
+                 "speed between two sections and dropping to the arc's 48x48 brought it to 2,438.",
+    }),
     since216: Object.freeze({
         at: "v4557", swept: 1, green: 1, red: 0,
         added: Object.freeze([

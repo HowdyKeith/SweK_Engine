@@ -66,18 +66,31 @@ function sweep(speed, frames = 32) {
     }
     return { lu, offs: offs.slice(-P) };
 }
-/** What the ring mean SHOULD be: the analytic average of the surface over the window's own jitter offsets. */
-function analyticMean(offs) {
+/**
+ * What the ring mean SHOULD be.
+ *
+ * *** THIS FUNCTION WAS WRONG WHEN v4557 SHIPPED, AND EVERY NUMBER IN SECTIONS 1, 3 AND 4 CAME OUT OF IT. ***
+ * It evaluated the surface at pixel i using EACH FRAME'S OWN camera position, which is a different world
+ * point once the camera moves -- so what it measured was HOW FAR THE SCENE SHIFTED ACROSS THE WINDOW, not
+ * what the reprojection got wrong. The ring, correctly reprojected, holds the luma of the surface that is at
+ * pixel i NOW, as sampled under each frame's jitter; the shading is view-independent and the surface is
+ * static, so the only thing that varies between frames is the jitter. The camera position to use is the
+ * CURRENT one, for every frame in the window.
+ *
+ * MEASURED, the difference between the two references at one pixel per frame: 8.40e-2 against 1.19e-7.
+ * v4557 overstated the floor by five orders of magnitude there and by about a hundredfold in general.
+ */
+function analyticMean(offs, camNow) {
     const a = new Float32Array(W * H);
-    for (const { j, camX } of offs) for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-        a[y * W + x] += shade((2 * ((x + 0.5) / W) - 1) * HALF + camX + j[0] * S,
+    for (const { j } of offs) for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+        a[y * W + x] += shade((2 * ((x + 0.5) / W) - 1) * HALF + camNow + j[0] * S,
                               (1 - 2 * ((y + 0.5) / H)) * HALF + j[1] * S) / offs.length;
     }
     return a;
 }
-function floorAt(speed) {
-    const { lu, offs } = sweep(speed);
-    const mm = lumaMean(lu), a = analyticMean(offs), cov = ringCoverage(lu);
+function floorAt(speed, frames = 32) {
+    const { lu, offs } = sweep(speed, frames);
+    const mm = lumaMean(lu), a = analyticMean(offs, (frames - 1) * speed), cov = ringCoverage(lu);
     let sum = 0, worst = 0, n = 0;
     for (let y = 2; y < H - 2; y++) for (let x = 2; x < W - 2; x++) {
         const i = y * W + x;
@@ -106,11 +119,18 @@ const FLOOR = {};
         FLOOR[0].worst < 1e-5 && FLOOR[0].coverage === 1, `worst ${FLOOR[0].worst.toExponential(3)}, coverage ${FLOOR[0].coverage}`);
     // and under motion it climbs past the margin
     const crossed = SPEEDS.filter((s) => Number.isFinite(FLOOR[s].mean) && FLOOR[s].worst > ARC_MARGIN);
-    ok(`*** and under motion it climbs THROUGH that margin: ${FLOOR[1].worst.toExponential(2)} at one pixel per frame, ${(FLOOR[1].worst / ARC_MARGIN).toFixed(1)}x the ${ARC_MARGIN} the arc uses -- so every lock placed while the camera moves is partly reading resampling error ***`,
-        FLOOR[1].worst > ARC_MARGIN && FLOOR[0.25].worst < ARC_MARGIN,
-        `0.25 px/f ${FLOOR[0.25].worst.toExponential(2)}, 0.5 ${FLOOR[0.5].worst.toExponential(2)}, 1.0 ${FLOOR[1].worst.toExponential(2)}; crossed at ${crossed.join(",")}`);
-    ok(`  the floor is a property of the MOTION, not of the tree: it rises monotonically from rest to 1 px/frame (${[0, 0.25, 0.5, 1].map((s) => FLOOR[s].worst.toExponential(1)).join(" -> ")})`,
-        FLOOR[0].worst < FLOOR[0.25].worst && FLOOR[0.25].worst < FLOOR[0.5].worst && FLOOR[0.5].worst < FLOOR[1].worst);
+    // *** THESE TWO ROWS ASSERTED A LAW THAT DOES NOT HOLD, AND v4558 CORRECTED THE REFERENCE UNDER THEM. ***
+    // What they said: the floor climbs monotonically with speed and passes 0.05 at one pixel per frame. What
+    // is true: the floor is a function of the reprojection's SUB-PIXEL PHASE, exact at integer displacements
+    // and worst near half a pixel -- and it never comes near 0.05 at any speed.
+    ok(`*** the floor is set by the reprojection's SUB-PIXEL PHASE, not its speed: integer displacements are EXACT (${FLOOR[0].worst.toExponential(1)} at 0, ${FLOOR[1].worst.toExponential(1)} at 1, ${FLOOR[2].worst.toExponential(1)} at 2) because the bilinear fetch lands on texel centres ***`,
+        FLOOR[1].worst < 1e-5 && FLOOR[2].worst < 1e-5 && FLOOR[0.5].worst > FLOOR[1].worst * 100,
+        `0:${FLOOR[0].worst.toExponential(2)} 1:${FLOOR[1].worst.toExponential(2)} 2:${FLOOR[2].worst.toExponential(2)}`);
+    ok(`  and a half-pixel phase reads the same at every speed that has one -- ${FLOOR[0.5].worst.toExponential(2)} at 0.5 px/frame and ${FLOOR[1.5].worst.toExponential(2)} at 1.5, identical, which is what makes it a phase law rather than a speed law`,
+        FLOOR[0.5].worst === FLOOR[1.5].worst, `0.5 ${FLOOR[0.5].worst.toExponential(3)}, 1.5 ${FLOOR[1.5].worst.toExponential(3)}`);
+    const worstAny = Math.max(...SPEEDS.filter((x) => Number.isFinite(FLOOR[x].mean)).map((x) => FLOOR[x].worst));
+    ok(`*** and the worst floor over every phase measured is ${worstAny.toExponential(2)}, which is ${(ARC_MARGIN / worstAny).toFixed(0)}x BELOW the arc's ${ARC_MARGIN} -- so the margin was never standing under the floor, it has always been far above it ***`,
+        worstAny < ARC_MARGIN / 20, `worst over phases ${worstAny.toExponential(3)}, arc margin ${ARC_MARGIN}`);
 }
 
 console.log("\n2. AND THE RING HAS A SPEED CEILING, WHICH IS ARITHMETIC NOBODY HAD RUN");
@@ -127,7 +147,7 @@ console.log("\n2. AND THE RING HAS A SPEED CEILING, WHICH IS ARITHMETIC NOBODY H
         FLOOR[2].coverage > 0 && FLOOR[2].coverage < 0.5, `coverage at 2 px/f ${FLOOR[2].coverage.toFixed(3)}`);
 }
 
-console.log("\n3. THE TWO BOUNDS, COMPOSED -- AND THE INTERVAL IS OFTEN EMPTY");
+console.log("\n3. THE TWO BOUNDS, COMPOSED -- AND WITH A CORRECT FLOOR THE INTERVAL IS WIDE");
 
 {
     // v4556: the blind window is margin/contrast wide. This round: the margin must clear the noise floor.
@@ -147,19 +167,15 @@ console.log("\n3. THE TWO BOUNDS, COMPOSED -- AND THE INTERVAL IS OFTEN EMPTY");
         rows.map((r) => `${r.s}/${r.contrast}:${r.feasible}/${r.margin === null ? "null" : "num"}`).join(" "));
     const faintStill = rows.find((r) => r.s === 0 && r.contrast === 0.2);
     const faintMoving = rows.find((r) => r.s === 1 && r.contrast === 0.2);
-    ok(`*** a faint feature (contrast 0.2) is lockable at rest -- the interval is (${faintStill.lo.toExponential(1)}, ${faintStill.hi.toExponential(1)}) -- and NOT lockable at one pixel per frame, where the floor alone is ${faintMoving.lo.toExponential(2)} against a ceiling of ${faintMoving.hi.toExponential(2)} ***`,
-        faintStill.feasible && !faintMoving.feasible,
-        `still lo ${faintStill.lo.toExponential(3)} hi ${faintStill.hi.toExponential(3)}; moving lo ${faintMoving.lo.toExponential(3)} hi ${faintMoving.hi.toExponential(3)}`);
-    const bright = rows.find((r) => r.s === 1 && r.contrast === 0.9);
-    // minContrast comes out ABOVE 1 here, and a luma contrast above 1 does not exist in a [0,1] signal --
-    // so the honest reading is not "you need a very bright feature", it is that at this speed and this blind
-    // budget NOTHING is lockable at all. Printed as the impossibility rather than as a number a reader could
-    // mistake for a threshold to aim at.
-    report(bright.minContrast > 1
-        ? `at one pixel per frame the faintest lockable feature would need contrast ${bright.minContrast.toFixed(2)} -- which does not exist in a [0,1] signal, so NOTHING is lockable at this speed and a 10% blind budget`
-        : `at one pixel per frame the faintest lockable feature has contrast ${bright.minContrast.toFixed(2)}`);
-    ok(`  and that is stated as an impossibility rather than as a threshold: a required contrast above 1 means the mechanism is off, not that a brighter feature would do`,
-        bright.minContrast > 1 && !bright.feasible, `minContrast ${bright.minContrast.toFixed(3)}`);
+    const worstCase = rows.find((r) => r.s === 0.5 && r.contrast === 0.2);
+    // *** v4557 REPORTED THREE OF THESE EIGHT AS EMPTY AND ALL THREE WERE ARTEFACTS OF ITS REFERENCE. ***
+    // With the floor measured against what the ring actually holds, every case is feasible -- so v4556's
+    // blind-window ceiling is the ONLY binding constraint on the margin, and always was.
+    ok(`*** with the floor measured correctly EVERY case is feasible, including the faintest at the worst phase (${worstCase.lo.toExponential(2)}, ${worstCase.hi.toExponential(2)}) -- so v4556's blind window is the only binding constraint, and the three EMPTY intervals v4557 reported were artefacts of its reference ***`,
+        rows.every((r) => r.feasible), rows.map((r) => `${r.s}/${r.contrast}:${r.feasible}`).join(" "));
+    ok(`  and the interval is wide: at rest and contrast 0.2 the ceiling is ${(faintStill.hi / faintStill.lo).toExponential(0)}x the floor, so the margin is a policy choice inside a large range rather than a squeeze between two walls`,
+        faintStill.hi / faintStill.lo > 1e3 && faintMoving.feasible,
+        `still ${faintStill.lo.toExponential(2)}..${faintStill.hi.toExponential(2)}, moving ${faintMoving.lo.toExponential(2)}..${faintMoving.hi.toExponential(2)}`);
     ok(`  and the bounds are REFUSED rather than guessed when the caller has not measured a floor`,
         (() => { try { ridgeMarginBounds({ contrast: 0.5 }); return false; } catch (e) { return /noiseFloor must be measured/.test(e.message); } })() &&
         (() => { try { ridgeMarginBounds({ noiseFloor: 0.01 }); return false; } catch (e) { return /contrast must be positive/.test(e.message); } })());
@@ -195,16 +211,21 @@ console.log("\n4. BOTH FAILURE MODES, ON A PICTURE RATHER THAN IN ARITHMETIC");
         arc === 0 && derived > 30, `arc margin ${arc}, derived ${derived}`);
     // (b) TOO SMALL under motion: a smooth surface with NO features, where a floor-derived margin at REST
     // would lock resampling error once the camera moves
-    const moving = FLOOR[1];
-    const tooSmall = ridgesCPU(moving.mm, W, H, Math.max(FLOOR[0].worst * 1.5, 1e-6), 2).count;
-    const arcOnMoving = ridgesCPU(moving.mm, W, H, ARC_MARGIN, 2).count;
-    const properOnMoving = ridgesCPU(moving.mm, W, H, moving.worst * 1.5, 2).count;
-    report(`the same SMOOTH surface at one pixel per frame -- it has no ridges, so every one found is noise`);
-    ok(`*** TOO SMALL under motion: a margin derived at rest finds ${tooSmall} ridges on a surface with none, the arc's ${ARC_MARGIN} finds ${arcOnMoving}, and one derived from the MOVING floor finds ${properOnMoving} ***`,
-        tooSmall > properOnMoving && properOnMoving === 0,
-        `rest-derived ${tooSmall}, arc ${arcOnMoving}, motion-derived ${properOnMoving}`);
-    ok(`  so the constant is wrong in BOTH directions and by different amounts at different speeds, which is the case for deriving it per frame rather than picking one`,
-        arc === 0 && tooSmall > 0);
+    // *** THE FLOOR FOR A RIDGE DECISION IS LARGER THAN THE PER-PIXEL ERROR, AND v4557 CONFLATED THEM. ***
+    // A ridge is decided from several samples through a plateau walk, so the noise in the DECISION compounds:
+    // measured on this smooth surface, which has no ridges at all, a margin at the per-pixel floor still finds
+    // dozens, and it takes about 3e-3 -- a few times the worst per-pixel error -- to reach none at any speed.
+    const smooth = { 0: FLOOR[0].mm, 0.5: FLOOR[0.5].mm, 1: FLOOR[1].mm };
+    const at = (mm, m) => ridgesCPU(mm, W, H, m, 2).count;
+    for (const sp of [0, 0.5, 1]) report(`  speed ${sp}: margin 1.8e-7 -> ${at(smooth[sp], 1.8e-7)} ridges, 1.0e-3 -> ${at(smooth[sp], 1.0e-3)}, 3.0e-3 -> ${at(smooth[sp], 3.0e-3)}`);
+    const DECISION = 3.0e-3;
+    ok(`*** TOO SMALL is real but for a different reason than v4557 gave: a margin at the per-pixel floor finds ${at(smooth[1], 1.8e-7)} ridges on a surface with none, and it takes ${DECISION.toExponential(1)} -- a few times the worst per-pixel error -- to reach ${at(smooth[1], DECISION)} ***`,
+        at(smooth[1], 1.8e-7) > 50 && at(smooth[1], DECISION) <= 2 && at(smooth[0], DECISION) <= 2,
+        `at 1 px/f: 1.8e-7 -> ${at(smooth[1], 1.8e-7)}, 3e-3 -> ${at(smooth[1], DECISION)}`);
+    ok(`  and the phase changes every frame, so the bound has to be the worst over PHASES rather than this frame's -- which is why ${DECISION.toExponential(1)} and not the ${FLOOR[1].worst.toExponential(1)} this frame happens to sit at`,
+        FLOOR[1].worst < DECISION / 100, `this frame ${FLOOR[1].worst.toExponential(2)}, bound ${DECISION.toExponential(1)}`);
+    ok(`  so the constant is still wrong in BOTH directions -- ${ARC_MARGIN} hides a contrast-0.06 feature and ${DECISION.toExponential(1)} would not -- but the gap is ${(ARC_MARGIN / DECISION).toFixed(0)}x, not the five orders of magnitude v4557's reference implied`,
+        arc === 0 && ARC_MARGIN / DECISION > 5 && ARC_MARGIN / DECISION < 100);
 }
 
 console.log("\n5. ON THE DEVICE: THE RING'S FILL COUNT, WHICH IS WHAT COVERAGE READS");

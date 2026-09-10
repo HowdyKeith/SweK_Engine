@@ -246,8 +246,10 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // arrival, fifth round running that the pre-flight prompted. The other five rows have still never moved.
     // v4557 -- RE-TAKEN: one gate (temporalRidgeMargin) joined, the same four rows by one, TWENTY-SIXTH
     // arrival, sixth round running that the pre-flight prompted. The other five rows have still never moved.
-    gates: 1616, usesOk: 1595, definesOk: 1587, importsOk: 0,
-    distinctDefinitions: 38, nameFirst: 1488, condFirst: 91, unknownSignature: 16,
+    // v4558 -- RE-TAKEN: one gate (temporalRingFloor) joined, the same four rows by one, TWENTY-SEVENTH
+    // arrival, seventh round running that the pre-flight prompted. The other five rows have still never moved.
+    gates: 1617, usesOk: 1596, definesOk: 1588, importsOk: 0,
+    distinctDefinitions: 38, nameFirst: 1489, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([
