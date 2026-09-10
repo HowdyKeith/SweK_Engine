@@ -296,7 +296,10 @@ export const PROBE_AT_V4536 = Object.freeze({
     // same six fields, plus this module's own two records and their twenty fields.
     // v4568 -- RE-TAKEN with `excluding`: 101/45/186 -> 104/46/189, the same three records and three fields
     // plus this module's own two and their twenty.
-    currentIncludingModule: Object.freeze({ records: 104, withFields: 46, fields: 189 }),
+    // v4536 -- RE-TAKEN with `excluding`: 104/46/189 -> 105/47/199, the one new record PARTITION_AT_V4536 and
+    // its ten fields, plus this module's own two and their twenty. The two readings move together by
+    // construction and the row below asserts the gap is exactly this module's own pair.
+    currentIncludingModule: Object.freeze({ records: 105, withFields: 47, fields: 199 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -333,7 +336,13 @@ export const PROBE_AT_V4536 = Object.freeze({
     // the +3), and RED_AT_V4568 plus WHY_V4568 in tools/ship/redCensus.mjs, which register the five reds it
     // found. RED_AT_V4568_GATES is a frozen ARRAY and so is not counted, the same distinction v4566 recorded
     // for wgslCorpus.GENERATED_CASES.
-    excluding: Object.freeze({ records: 102, withFields: 44, fields: 169 }),
+    // v4536 -- RE-TAKEN: 102/44/169 -> 103/45/179. ONE record, PARTITION_AT_V4536 in nav/partitionScore.mjs,
+    // carrying the ten numbers behind that round's refusal of backlog item "navmesh-recast" piece (1). It is
+    // the largest single-record field jump this census has recorded, which is a property of the round rather
+    // than of the rule: the round's whole content is measurements that replace claims, so the record is where
+    // they live. *** AND THE ORDINAL IS A KNOWN COLLISION, RECORDED RATHER THAN RENUMBERED: *** PROBE_AT_V4536
+    // above carries the same stamp from the other line's counter, which runs ahead of the one main.js keeps.
+    excluding: Object.freeze({ records: 103, withFields: 45, fields: 179 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,

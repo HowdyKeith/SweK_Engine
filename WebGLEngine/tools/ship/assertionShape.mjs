@@ -246,8 +246,11 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // at 40 -- the new gate uses the ok(name, cond, detail) shape already counted, which is the
     // point of that row: a gate adding a FORTY-FIRST spelling of the same idea is the thing worth
     // noticing, and this one does not.
-    gates: 1617, usesOk: 1596, definesOk: 1588, importsOk: 0,
-    distinctDefinitions: 40, nameFirst: 1489, condFirst: 91, unknownSignature: 16,
+    // v4536 -- RE-TAKEN for one new gate, tools/ship/partitionScore-selfcheck.mjs: gates 1617 -> 1618,
+    // usesOk 1596 -> 1597, definesOk 1588 -> 1589, nameFirst 1489 -> 1490. It defines its own ok() like the
+    // other 1,589, which is the census's whole finding rather than an oversight in the new gate.
+    gates: 1618, usesOk: 1597, definesOk: 1589, importsOk: 0,
+    distinctDefinitions: 40, nameFirst: 1490, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

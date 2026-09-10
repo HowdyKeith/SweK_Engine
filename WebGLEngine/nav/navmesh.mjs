@@ -64,12 +64,19 @@
 // into convex polygons. This file partitions into MAXIMAL RECTANGLES instead -- a monotone row sweep, which
 // Recast also ships as rcBuildRegionsMonotone -- and rectangles are convex already, so no contour tracing
 // and no convex merge is needed. That is a smaller mesh stage, and the reason it is enough was MEASURED
-// before it was built rather than assumed: on the obstacle fixture the sweep produces NINE polygons for
-// 251,685 cells, and the funnel over them lands on the analytic optimum to 0.00 m at r = 0. Path quality
-// comes from the PORTALS BEING REAL EDGES, not from the polygons being few or from their being contours.
-// What the missing stages would buy is polygon count on curved and diagonal boundaries, where a row sweep
-// makes a staircase of thin rectangles; that costs memory and A* nodes, and it is measured in the gate
-// rather than guessed at here.
+// before it was built rather than assumed: on the obstacle fixture the sweep produces FIVE polygons for
+// 257,725 cells at r = 0, and the funnel over them lands on the analytic optimum. Path quality comes from
+// the PORTALS BEING REAL EDGES, not from the polygons being few or from their being contours.
+//
+// *** THOSE TWO NUMBERS READ "NINE POLYGONS FOR 251,685 CELLS" UNTIL v4536 AND NEITHER HAD EVER BEEN TRUE. ***
+// They sat under this header's own claim that everything in it is re-derived on each run, which nothing was
+// doing. Both are re-measured by the gate now, and what the missing stages would buy has been measured too --
+// it is NOT what this paragraph used to say. On a 45-degree boundary the sweep emits 737 polygons, and that
+// is the PROVEN MINIMUM for the mask rather than a staircase artefact: Lipski/Ohtsuki gives 738 reflex
+// corners - 0 independent chords + 1 - 2 holes = 737, and a union of axis-aligned unit cells is convex only
+// when it is a rectangle, so nothing that stays on the lattice can do better. The prize is not A* nodes
+// either: planPath holds between 1 and 2 ms from 737 polygons to 11,242. What polygon count costs is the
+// ADJACENCY BUILD, quadratically. See nav/partitionScore.mjs, which re-derives all of it.
 "use strict";
 
 import { triarea2, funnel, pathLength, crossesAllPortals } from "./funnel.mjs";

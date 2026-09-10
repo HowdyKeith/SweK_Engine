@@ -19,6 +19,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as NM from "../../nav/navmesh.mjs";
 import * as F from "../../nav/funnel.mjs";
+import * as PS from "../../nav/partitionScore.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -146,7 +147,7 @@ console.log("\n2. THE OPEN FLOOR, WHERE THE RIGHT ANSWER IS THE STRAIGHT LINE AN
 }
 
 // =============================================================================================================
-console.log("\n3. *** A DIAGONAL WALL: 729 POLYGONS AND A FIVE-CORNER PATH, WHICH IS THE ROUND'S ARGUMENT ***");
+console.log("\n3. *** A DIAGONAL WALL: THE MINIMUM POLYGON COUNT AND A FIVE-CORNER PATH, AND THE MINIMUM IS PROVED ***");
 {
     const hm = flat();
     for (let t = 0; t < 400; t++) if (t < 150 || t > 190)
@@ -156,16 +157,28 @@ console.log("\n3. *** A DIAGONAL WALL: 729 POLYGONS AND A FIVE-CORNER PATH, WHIC
     const mesh = NM.buildNavmesh(hm, { stride: N, seedX: S.x, seedZ: S.z, radius: 1.9, supersample: 2 });
     const p = NM.planPath(mesh, S, G);
     const clip = clipCount(hm, p.points), clear = trueClearance(hm, p.points);
-    ok("!! *** A ROW SWEEP MAKES A STAIRCASE OF THIN RECTANGLES ON A 45-DEGREE BOUNDARY -- AND THE PATH IS FINE ***",
-        mesh.rects.length > 200 && p.points.length <= 8 && clip.bad === 0 && clear >= 1.9,
-        mesh.rects.length + " polygons, but the path has only " + p.points.length + " corners, " +
-        clip.bad + " of " + clip.tot + " in a wall, clearance " + clear.toFixed(3) + ". *** THIS IS WHY THE " +
-        "CONTOUR-TRACE AND CONVEX-MERGE STAGES OF RECAST ARE NOT BUILT: *** path quality comes from the " +
-        "portals being REAL EDGES, not from the polygons being few. What those stages would buy is polygon " +
-        "COUNT on curved and diagonal boundaries -- memory and A* nodes -- and this row is the measurement " +
-        "that says so rather than the assumption.");
-    report("the same boundary as a grid: 9 polygons would be a contour mesh's answer, 729 is the sweep's, " +
-           "and both give a " + p.points.length + "-corner path");
+    const floor = PS.minRectPartition(mesh.kept, mesh.stride, mesh.rows);
+    const mem = PS.pathInMesh(p.points, PS.ringsOfRects(mesh));
+    // *** THIS ROW USED TO READ `mesh.rects.length > 200`, WHICH IS AN ASSERTION THAT GOES RED ON SUCCESS. ***
+    // The count it demanded stay above 200 is the exact count backlog item "navmesh-recast" exists to reduce,
+    // and the same file's report line named 9 as the target -- so the gate would have turned red the moment
+    // the round it asks for succeeded, and could sit anywhere in [201, infinity) meanwhile. It now compares
+    // against the PROVEN MINIMUM for the mask, computed from the mask rather than from this mesh, and asks
+    // only that the sweep never do WORSE than optimal. A contour mesh at 11 polygons passes this row.
+    ok("!! *** A ROW SWEEP ON A 45-DEGREE BOUNDARY EMITS THE PROVEN MINIMUM -- AND THE PATH IS FINE ***",
+        mesh.rects.length <= floor.min && p.points.length <= 8 && clip.bad === 0 && clear >= 1.9 && mem.outside === 0,
+        mesh.rects.length + " polygons against a floor of " + floor.min + " (" + floor.reflex + " reflex - " +
+        floor.chords + " chords + 1 - " + floor.holes + " holes), path " + p.points.length + " corners, " +
+        clip.bad + " of " + clip.tot + " in a wall, " + mem.outside + " of " + mem.total + " outside the mesh, " +
+        "clearance " + clear.toFixed(3) + ". *** THE STAIRCASE IS NOT WASTE: IT IS THE FLOOR. *** A union of " +
+        "axis-aligned unit cells is convex only when it is a rectangle, so no partitioner that stays on the " +
+        "lattice emits fewer. Path quality comes from the portals being REAL EDGES rather than from the " +
+        "polygons being few, which is why the count can be at its maximum and the path still optimal.");
+    report("the same boundary as a grid: " + mesh.rects.length + " polygons is the sweep's answer AND the " +
+           "minimum for the mask, and the path has " + p.points.length + " corners. *** THIS LINE READ '9 " +
+           "POLYGONS WOULD BE A CONTOUR MESH'S ANSWER, 729 IS THE SWEEP'S' UNTIL v4536 AND BOTH NUMBERS WERE " +
+           "WRONG: *** the sweep emits " + mesh.rects.length + ", and the 9 had never been measured on any " +
+           "fixture at all");
 }
 
 // =============================================================================================================
@@ -278,6 +291,22 @@ console.log("\n5b. *** A CORRIDOR THAT DOUBLES BACK, WHICH NOTHING ABOVE PRODUCE
     // z = 58.5, so the shortest route enters at the near end of one and leaves at the near end of the other
     const gapStrip = mesh.rects.find((R) => R.z0 > D / 2), left = mesh.rects.find((R) => R.x0 === 0 && R.z0 === 0);
     const right = mesh.rects.find((R) => R.x0 > W / 2);
+    // *** A GATE THAT THROWS PRINTS NO FAIL LINE, AND A COUNT OF FAIL LINES THEN READS A CLEAN ZERO. ***
+    // Every line below this one dereferences .x0/.x1/.z0/.z1 off those three find() results and off `p`.
+    // Any change to the rectangle record -- which is exactly what backlog item "navmesh-recast" proposes --
+    // makes all three undefined, and the next line throws a TypeError at top level: before the tally, before
+    // the exit code, and taking sections 6, 7 and 8 with it. It would read as a broken harness rather than
+    // as a red gate. So the shape is CHECKED rather than assumed, and a missing record is a FAIL like any
+    // other. This guard is the round's smallest change and the one most likely to matter to somebody later.
+    const shaped = (R) => R && ["x0", "x1", "z0", "z1"].every((k) => Number.isFinite(R[k]));
+    if (!p || !shaped(gapStrip) || !shaped(left) || !shaped(right)) {
+        ok("!! section 5b can still find the three rectangles it derives its baseline from",
+            false,
+            "planPath " + (p ? "returned a path" : "returned NULL") + "; left " + (shaped(left) ? "found" : "MISSING") +
+            ", right " + (shaped(right) ? "found" : "MISSING") + ", gap strip " + (shaped(gapStrip) ? "found" : "MISSING") +
+            ". The rest of this section derives the taut baseline from those records and cannot run without " +
+            "them. It now says so instead of throwing.");
+    } else {
     const zLine = left.z1 + 0.5, xa = left.x1 + 0.5, xb = right.x0 - 0.5;
     const d = (a, b) => Math.hypot(b[0] - a[0], b[1] - a[1]);
     const taut = d([S.x, S.z], [xa, zLine]) + (xb - xa) + d([xb, zLine], [G.x, G.z]);
@@ -298,6 +327,7 @@ console.log("\n5b. *** A CORRIDOR THAT DOUBLES BACK, WHICH NOTHING ABOVE PRODUCE
         "*** THE ROUND THAT BUILT THIS MODULE MEASURED IT ONLY ON MAPS IT HAD DESIGNED. *** The first map a " +
         "CALLER handed it broke it, which is the argument for wiring a capability rather than shipping it " +
         "beside its gate.");
+    }
 }
 
 // =============================================================================================================
@@ -447,7 +477,8 @@ console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "own grid A*, and tools/ship/navWiring-selfcheck.mjs grades that end to end on the snapshot shape " +
     "BotPathfinderPool actually sends -- which is also what found section 5b's bug and a stride-0 hang no " +
     "fixture here could reach. Also unchecked: Recast's watershed partition and contour simplification, which section 3 " +
-    "measures the cost of skipping (729 polygons where a contour mesh would give a handful) and does not " +
+    "measures the cost of skipping (737 polygons, which is the PROVEN MINIMUM for that mask rather than a "
+    + "staircase artefact, so a contour mesh's 'handful' has to be bought by leaving the cell lattice) and does not " +
     "measure the cost of HAVING, since neither is built; multi-storey worlds, since a heightmap has one " +
     "surface per column and real spans are what Recast carries; and off-mesh links, jumps and doors.");
 process.exit(fails ? 1 : 0);

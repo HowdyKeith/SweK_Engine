@@ -3764,6 +3764,30 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    // v4536 -- THE 221st CLOSING, for the gate this round added. *** THE ORDINAL IS A KNOWN COLLISION AND IS
+    // RECORDED RATHER THAN RENUMBERED: *** the entry below is stamped v4572 from the other line's counter,
+    // which runs ahead of the one main.js keeps -- main carried v4535 when that entry landed. The list shape
+    // is what makes that survivable; a round appends and nobody renegotiates a name.
+    since221: Object.freeze({
+        at: "v4536", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/partitionScore-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly: 9 pass, 483 ms. *** THE ROUND REFUSED THE BACKLOG ITEM IT WAS " +
+                 "STARTED TO BUILD, AND THE REFUSAL IS ARITHMETIC RATHER THAN OPINION: *** navmesh-recast piece " +
+                 "(1) says a 45-degree wall becomes 737 thin rectangles where a contour mesh would give a " +
+                 "handful. Lipski/Ohtsuki gives the minimum rectangle partition as N - L + 1 - H = 738 reflex " +
+                 "- 0 chords + 1 - 2 holes = 737, exactly what the sweep emits, and a union of axis-aligned " +
+                 "unit cells is convex only when it is a rectangle -- so the sweep is OPTIMAL and nothing on " +
+                 "the lattice can beat it. Seven sabotages: A vertical mutual test deleted RED, B horizontal " +
+                 "RED, C max-matching term dropped RED, D hole term dropped RED, E inRing made total RED, " +
+                 "G mutualViolations Z clause RED -- and F, its X clause, WENT 0 RED, because the conviction " +
+                 "fixture built its wrong label on one axis only. That is the same defect the gate exists to " +
+                 "report, reproduced inside it on the first try; it convicts on both axes now and F is red. " +
+                 "The finding the round shipped for: deleting the row sweep's VERTICAL mutual-step test left " +
+                 "navmesh, navWiring, navWiringLive and funnel ALL GREEN while returning a 110 m path UP a " +
+                 "cliff on a z-oriented ledge, one axis of a two-axis correctness property ungraded in the " +
+                 "gate whose own section 7 exists BECAUSE A SABOTAGE DID NOT FIRE.",
+    }),
     // v4572 -- the 220th closing: the hand-spelled writer, and the check it asked for was not reachable.
     since220: Object.freeze({
         at: "v4572", swept: 1, green: 1, red: 0,

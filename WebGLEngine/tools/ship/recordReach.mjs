@@ -160,7 +160,10 @@ export function reach({ budgetMs = null, timings = null, census = null, root = E
 export const REACH_AT_V4548 = Object.freeze({
     at: "v4548",
     budgetMs: 3000,
-    total: 104,
+    // v4536 -- RE-TAKEN: 104 -> 105, one record, PARTITION_AT_V4536 in nav/partitionScore.mjs. The ratchet
+    // below is a CEILING on unchecked records, so it has to be measured against the live population or a
+    // round that adds a record makes the ceiling look roomier without checking anything.
+    total: 105,
     // *** READ OFF THE INSTRUMENT, NOT PREDICTED. *** The first draft of this record guessed 53/21/19/40 from
     // which gates the round had sped up, and was wrong on three of the four: the comment-strip fix below
     // moved two records the other way at the same time, and a guess cannot see two changes at once.
