@@ -3767,6 +3767,50 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since215: Object.freeze({
+        at: "v4556", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/temporalRidgePhase-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 0.99 s (989/949/998 over three serial runs, under the 3000 ms sweep budget). *** " +
+                 "v4555 CLOSED BY NAMING A WORRY THAT DOES NOT EXIST, AND CHECKING IT FOUND A REAL ONE " +
+                 "UNDERNEATH. *** The worry was diagonals: every line the arc locks is axis aligned, the band " +
+                 "is measured along an axis, and a diagonal ridge's band is wider by root two. MEASURED at " +
+                 "seven angles, the band test keeps ONE HUNDRED PER CENT of the ridges it finds at every one " +
+                 "-- 46/46, 50/50, 47/47, 45/45, 46/46, 49/49, 46/46 -- and the count barely moves with angle " +
+                 "(spread 5). The band is min(bandX, bandY) and a straight line is one pixel across along at " +
+                 "least ONE axis whatever its angle; a 45-degree line is the most favourable case, not the " +
+                 "worst. The concern was arithmetic nobody had run. *** WHAT THE CHECK TURNED UP IS A BLIND " +
+                 "SPOT IN EVERY LOCK DETECTOR THIS ARC HAS BUILT, SINCE v4553. *** A thin feature whose two " +
+                 "covered pixels come out within `margin` of each other -- what happens whenever it straddles " +
+                 "a pixel boundary evenly -- is a strict extremum in NEITHER: two equal columns give ZERO " +
+                 "ridges where one column gives 14, at every scale and every band setting. AND IT IS NOT A " +
+                 "KNIFE EDGE: the blind window is margin/contrast wide, so a 0.4 px line is invisible at 5.5% " +
+                 "of sub-pixel positions at contrast 0.90 and 24.5% at contrast 0.20 -- and faint thin " +
+                 "features are exactly what a lock exists to protect. THE REPAIR is one line of reasoning: the " +
+                 "deciding neighbour is the first that differs by more than the margin, not the adjacent one. " +
+                 "Two equal columns go 0 -> 28, a one-column feature is unchanged, and a FLAT field stays at " +
+                 "0 because still-inside-a-plateau-at-the-bound is UNDECIDED rather than a ridge -- which is " +
+                 "the whole thing stopping a tie-tolerant test calling everything an extremum. On a one-pixel " +
+                 "alternation the walk changes nothing (196 either way) and v4555's band test still takes it " +
+                 "to 0: the two compose. WHAT IT COST THE THREE GATES THAT ALREADY READ THIS PRIMITIVE, since " +
+                 "the change was made to the default rather than hidden behind an opt-in: raw ridges on a " +
+                 "chequer 1,873 -> 1,935, a 3% rise the band test absorbs; v4555's own two fixtures read the " +
+                 "SAME 4.00x on the line and the SAME 0% on the bar, on FEWER locks (13 against 193), so the " +
+                 "fix is free on the pictures the arc argues over. Its coherent count moved 93 -> 179 and its " +
+                 "band moved 1 -> 2, because a plateau of p makes a band of at least p; a maxBand below " +
+                 "maxPlateau is now refused by name rather than quietly disagreeing. All three WGSL kernels " +
+                 "carry the walk too. Seven sabotages red at 30/5/8/1/2/1/22 -- DA at THIRTY is the widest " +
+                 "this arc has recorded, and DC is worth reading twice: that sabotage IS v4555's shipped " +
+                 "behaviour, and it goes red only because section 2 finally has a picture that asks the " +
+                 "question. ONE 0-RED FIRST: the WGSL tie tolerance, because the device fixture held only 0.1 " +
+                 "and 0.9 so every neighbour difference was 0 or 0.8 and NOTHING ever fell inside the margin " +
+                 "-- the CPU's fixture had a 0.02 pair and caught it. Same shape as v4554's pair: a property " +
+                 "one side's pictures exercise and the other's do not. The device field now carries 0.90 " +
+                 "against 0.88.",
+    }),
     since214: Object.freeze({
         at: "v4555", swept: 1, green: 1, red: 0,
         added: Object.freeze([

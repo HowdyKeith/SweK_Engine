@@ -96,7 +96,7 @@ fn main(@builtin(global_invocation_id) g:vec3<u32>) {
 
 // ---- RIDGES: a strict luma extremum along either axis, over the ring's jitter-free mean ----------------------
 const RIDGE_WGSL = `
-struct P { w:u32, h:u32, period:u32, pad:u32, margin:f32, p1:f32, p2:f32, p3:f32 };
+struct P { w:u32, h:u32, period:u32, maxPlateau:u32, margin:f32, p1:f32, p2:f32, p3:f32 };
 @group(0) @binding(0) var<storage,read> ring:array<f32>;
 @group(0) @binding(1) var<storage,read_write> dst:array<f32>;
 @group(0) @binding(2) var<uniform> u:P;
@@ -108,6 +108,21 @@ fn meanAt(i:u32) -> f32 {
   for (var k:u32 = P; k < F; k = k + 1u) { m = m + ring[i * F + k]; }
   return m / f32(P);
 }
+// *** THE DECIDING NEIGHBOUR IS THE FIRST ONE THAT DIFFERS BY MORE THAN THE MARGIN, NOT THE ADJACENT ONE. ***
+// v4556: a thin feature straddling a pixel boundary evenly comes out as two near-equal pixels and is a strict
+// extremum in NEITHER -- two exactly equal columns gave 0 ridges against 14 for one. The walk past ties is
+// what sees it. Bounded by maxPlateau; still inside a plateau at the bound means UNDECIDED, not a ridge.
+fn decideRing(base:i32, step:i32, c:f32, margin:f32, maxPlateau:u32, n:i32) -> i32 {
+  for (var k:u32 = 1u; k <= maxPlateau; k = k + 1u) {
+    let j = base + step * i32(k);
+    if (j < 0 || j >= n) { return 0; }
+    let dv = meanAt(u32(j)) - c;
+    if (dv > margin) { return 1; }
+    if (dv < -margin) { return -1; }
+  }
+  return 0;
+}
+
 
 @compute @workgroup_size(8,8,1)
 fn main(@builtin(global_invocation_id) g:vec3<u32>) {
@@ -115,13 +130,15 @@ fn main(@builtin(global_invocation_id) g:vec3<u32>) {
   let i = g.y * u.w + g.x;
   if (g.x == 0u || g.y == 0u || g.x + 1u >= u.w || g.y + 1u >= u.h) { dst[i] = 0.0; return; }
   let c = meanAt(i);
-  let l = meanAt(i - 1u);
-  let r = meanAt(i + 1u);
-  let up = meanAt(i - u.w);
-  let dn = meanAt(i + u.w);
+  let n = i32(u.w * u.h);
+  let bi = i32(i);
   // thin in ONE direction is what thin means -- a strict 3x3 extremum finds nothing on a straight line
-  let ridgeX = (c - l > u.margin && c - r > u.margin) || (l - c > u.margin && r - c > u.margin);
-  let ridgeY = (c - up > u.margin && c - dn > u.margin) || (up - c > u.margin && dn - c > u.margin);
+  let L = decideRing(bi, -1, c, u.margin, u.maxPlateau, n);
+  let R = decideRing(bi, 1, c, u.margin, u.maxPlateau, n);
+  let U = decideRing(bi, -i32(u.w), c, u.margin, u.maxPlateau, n);
+  let D = decideRing(bi, i32(u.w), c, u.margin, u.maxPlateau, n);
+  let ridgeX = (L == -1 && R == -1) || (L == 1 && R == 1);
+  let ridgeY = (U == -1 && D == -1) || (U == 1 && D == 1);
   dst[i] = select(0.0, 1.0, ridgeX || ridgeY);
 }`;
 
@@ -131,11 +148,26 @@ fn main(@builtin(global_invocation_id) g:vec3<u32>) {
 // has. One test, two entry points, mirroring the CPU where lockCandidatesFromRing and depthRidgesCPU both call
 // ridgesCPU. The optional mask is the whole depth-gated lock in one dispatch: ridge(depth) AND lumaRidges.
 const FIELD_RIDGE_WGSL = `
-struct P { w:u32, h:u32, useMask:u32, pad:u32, margin:f32, p1:f32, p2:f32, p3:f32 };
+struct P { w:u32, h:u32, useMask:u32, maxPlateau:u32, margin:f32, p1:f32, p2:f32, p3:f32 };
 @group(0) @binding(0) var<storage,read> field:array<f32>;
 @group(0) @binding(1) var<storage,read> mask:array<f32>;
 @group(0) @binding(2) var<storage,read_write> dst:array<f32>;
 @group(0) @binding(3) var<uniform> u:P;
+
+// *** THE DECIDING NEIGHBOUR IS THE FIRST ONE THAT DIFFERS BY MORE THAN THE MARGIN, NOT THE ADJACENT ONE. ***
+// v4556: a thin feature straddling a pixel boundary evenly comes out as two near-equal pixels and is a strict
+// extremum in NEITHER -- two exactly equal columns gave 0 ridges against 14 for one. The walk past ties is
+// what sees it. Bounded by maxPlateau; still inside a plateau at the bound means UNDECIDED, not a ridge.
+fn decideField(base:i32, step:i32, c:f32, margin:f32, maxPlateau:u32, n:i32) -> i32 {
+  for (var k:u32 = 1u; k <= maxPlateau; k = k + 1u) {
+    let j = base + step * i32(k);
+    if (j < 0 || j >= n) { return 0; }
+    let dv = field[u32(j)] - c;
+    if (dv > margin) { return 1; }
+    if (dv < -margin) { return -1; }
+  }
+  return 0;
+}
 
 @compute @workgroup_size(8,8,1)
 fn main(@builtin(global_invocation_id) g:vec3<u32>) {
@@ -143,14 +175,16 @@ fn main(@builtin(global_invocation_id) g:vec3<u32>) {
   let i = g.y * u.w + g.x;
   if (g.x == 0u || g.y == 0u || g.x + 1u >= u.w || g.y + 1u >= u.h) { dst[i] = 0.0; return; }
   let c = field[i];
-  let l = field[i - 1u];
-  let r = field[i + 1u];
-  let up = field[i - u.w];
-  let dn = field[i + u.w];
+  let n = i32(u.w * u.h);
+  let bi = i32(i);
   // thin in ONE direction. A silhouette edge differs from one side only and is NOT a ridge, which is the
   // whole reason this is a ridge test rather than a depth-discontinuity test.
-  let ridgeX = (c - l > u.margin && c - r > u.margin) || (l - c > u.margin && r - c > u.margin);
-  let ridgeY = (c - up > u.margin && c - dn > u.margin) || (up - c > u.margin && dn - c > u.margin);
+  let L = decideField(bi, -1, c, u.margin, u.maxPlateau, n);
+  let R = decideField(bi, 1, c, u.margin, u.maxPlateau, n);
+  let U = decideField(bi, -i32(u.w), c, u.margin, u.maxPlateau, n);
+  let D = decideField(bi, i32(u.w), c, u.margin, u.maxPlateau, n);
+  let ridgeX = (L == -1 && R == -1) || (L == 1 && R == 1);
+  let ridgeY = (U == -1 && D == -1) || (U == 1 && D == 1);
   var v = select(0.0, 1.0, ridgeX || ridgeY);
   // AND, not OR: an OR would union the luma detector's false positives back in
   if (u.useMask != 0u) { v = v * select(0.0, 1.0, mask[i] > 0.5); }
@@ -164,7 +198,7 @@ fn main(@builtin(global_invocation_id) g:vec3<u32>) {
 // for the few neighbours involved rather than written to a pass of their own. The CPU does the same bounded
 // scan, so the two are the same algorithm and not two implementations that agree on the fixtures.
 const COHERENT_RIDGE_WGSL = `
-struct P { w:u32, h:u32, maxBand:u32, pad:u32, margin:f32, p1:f32, p2:f32, p3:f32 };
+struct P { w:u32, h:u32, maxBand:u32, maxPlateau:u32, margin:f32, p1:f32, p2:f32, p3:f32 };
 @group(0) @binding(0) var<storage,read> field:array<f32>;
 @group(0) @binding(1) var<storage,read_write> dst:array<f32>;
 @group(0) @binding(2) var<uniform> u:P;
@@ -172,17 +206,34 @@ struct P { w:u32, h:u32, maxBand:u32, pad:u32, margin:f32, p1:f32, p2:f32, p3:f3
 fn inside(x:i32, y:i32) -> bool {
   return x >= 1 && y >= 1 && x + 1 < i32(u.w) && y + 1 < i32(u.h);
 }
+// *** THE DECIDING NEIGHBOUR IS THE FIRST ONE THAT DIFFERS BY MORE THAN THE MARGIN, NOT THE ADJACENT ONE. ***
+// v4556: a thin feature straddling a pixel boundary evenly comes out as two near-equal pixels and is a strict
+// extremum in NEITHER -- two exactly equal columns gave 0 ridges against 14 for one. The walk past ties is
+// what sees it. Bounded by maxPlateau; still inside a plateau at the bound means UNDECIDED, not a ridge.
+fn decideCoh(base:i32, step:i32, c:f32, margin:f32, maxPlateau:u32, n:i32) -> i32 {
+  for (var k:u32 = 1u; k <= maxPlateau; k = k + 1u) {
+    let j = base + step * i32(k);
+    if (j < 0 || j >= n) { return 0; }
+    let dv = field[u32(j)] - c;
+    if (dv > margin) { return 1; }
+    if (dv < -margin) { return -1; }
+  }
+  return 0;
+}
+
 // which axis fires at (x,y): .x is a ridge across X, .y across Y. Recomputed rather than stored.
 fn axisAt(x:i32, y:i32) -> vec2<bool> {
   if (!inside(x, y)) { return vec2<bool>(false, false); }
   let i = u32(y) * u.w + u32(x);
   let c = field[i];
-  let l = field[i - 1u];
-  let r = field[i + 1u];
-  let up = field[i - u.w];
-  let dn = field[i + u.w];
-  let ax = (c - l > u.margin && c - r > u.margin) || (l - c > u.margin && r - c > u.margin);
-  let ay = (c - up > u.margin && c - dn > u.margin) || (up - c > u.margin && dn - c > u.margin);
+  let n = i32(u.w * u.h);
+  let bi = i32(i);
+  let L = decideCoh(bi, -1, c, u.margin, u.maxPlateau, n);
+  let R = decideCoh(bi, 1, c, u.margin, u.maxPlateau, n);
+  let U = decideCoh(bi, -i32(u.w), c, u.margin, u.maxPlateau, n);
+  let D = decideCoh(bi, i32(u.w), c, u.margin, u.maxPlateau, n);
+  let ax = (L == -1 && R == -1) || (L == 1 && R == 1);
+  let ay = (U == -1 && D == -1) || (U == 1 && D == 1);
   return vec2<bool>(ax, ay);
 }
 

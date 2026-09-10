@@ -441,7 +441,7 @@ else {
         sp.bind("ring", ringA).bind("filled", fillA).bind("dst", sdst).bind("u", dev.buffer({ data: new Uint32Array(sb), usage: "uniform" }));
         dev.frame(({ pass }) => { pass.dispatch(sp, groups); pass.clear([0,0,0,1]); }, { offscreen: true });
         const rb = new ArrayBuffer(32);
-        new Uint32Array(rb, 0, 4).set([a.W, a.H, a.P, 0]);
+        new Uint32Array(rb, 0, 4).set([a.W, a.H, a.P, 2]);   // the 4th slot is maxPlateau, 2 since v4556
         new Float32Array(rb, 16, 4).set([a.margin, 0, 0, 0]);
         const rdst = dev.buffer({ data: new Float32Array(N), usage: ["storage"] });
         const rp = dev.compute({ wgsl: RIDGE_WGSL });

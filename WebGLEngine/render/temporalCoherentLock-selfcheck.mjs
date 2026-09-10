@@ -31,7 +31,12 @@ const report = (s) => console.log(`  ----  ${s}`);
 const W = 48, H = 48, NEAR = 1, FAR = 10, HALF = 4, Z_OCC = 3, Z_BG = 8;
 const PXW = 2 * HALF / W, X0 = 0.37, LW = 0.4 * PXW, S = 2 * HALF / W, P = jitterPhaseCount(1);
 const dOf = (z) => (z - NEAR) / (FAR - NEAR);
-const MARGIN = 0.05, BAND = 1;
+// *** BAND 2, NOT 1, SINCE v4556. *** A feature straddling a pixel boundary evenly comes out as a plateau of
+// two near-equal pixels, so the ridge test walks past ties to decide -- and a plateau of 2 makes a band of at
+// least 2. Measured on this gate's own two fixtures the change costs NOTHING: the same 4.00x on the line and
+// the same 0% on the bar, on FEWER locks (13 against 193), because the plateau walk widens the chequer's
+// bands and the band test then rejects more of them.
+const MARGIN = 0.05, BAND = 2, PLATEAU = 2;
 function vpAt(cx, cy) {
     const o = new Float32Array(16);
     o[0] = 1 / HALF; o[5] = 1 / HALF; o[10] = 1 / (FAR - NEAR); o[14] = -NEAR / (FAR - NEAR); o[15] = 1;
@@ -105,8 +110,8 @@ let SEP = {};
     const line = ringOver("line").mean, chq = ringOver("chequer").mean;
     SEP.lineR = ridgesCPU(line, W, H, MARGIN).count;
     SEP.chqR = ridgesCPU(chq, W, H, MARGIN).count;
-    SEP.lineC = coherentRidgesCPU(line, W, H, MARGIN, BAND).count;
-    SEP.chqC = coherentRidgesCPU(chq, W, H, MARGIN, BAND).count;
+    SEP.lineC = coherentRidgesCPU(line, W, H, MARGIN, BAND, PLATEAU).count;
+    SEP.chqC = coherentRidgesCPU(chq, W, H, MARGIN, BAND, PLATEAU).count;
     report(`a 0.4 px PAINTED line and a 1.13 px chequer, both albedo on the same flat wall -- same depth, same material, same draw`);
     report(`plain ridges: line ${SEP.lineR}, chequer ${SEP.chqR}. Band<=${BAND}: line ${SEP.lineC}, chequer ${SEP.chqC}`);
     ok(`*** the band test keeps ${SEP.lineC} of the line's ${SEP.lineR} ridges and cuts the chequer's ${SEP.chqR} to ${SEP.chqC} -- ${(SEP.chqR / SEP.chqC).toFixed(0)}x, with the feature untouched ***`,
@@ -114,7 +119,7 @@ let SEP = {};
     // *** A PURE ALTERNATION GIVES EXACTLY ZERO, which is the cleanest statement of what the test measures. ***
     const alt = new Float32Array(W * H);
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) alt[y * W + x] = ((x + y) & 1) ? 1 : 0;
-    const altR = ridgesCPU(alt, W, H, MARGIN).count, altC = coherentRidgesCPU(alt, W, H, MARGIN, BAND).count;
+    const altR = ridgesCPU(alt, W, H, MARGIN).count, altC = coherentRidgesCPU(alt, W, H, MARGIN, BAND, PLATEAU).count;
     ok(`  on a PURE one-pixel alternation the plain test finds ${altR} ridges and the band test finds ${altC} -- every pixel is a ridge, and no pixel is a thin feature`,
         altR > W * H * 0.8 && altC === 0, `plain ${altR}, coherent ${altC}`);
     // ---- THE TWO THINGS THAT DO NOT WORK, RECORDED SO THEY ARE NOT TRIED AGAIN ----
@@ -176,7 +181,7 @@ let A = {}, B = {};
                 const lr = lockCandidatesFromRing(lu, { margin: MARGIN });
                 const nl = gate === "luma" ? lr.data
                          : gate === "depth" ? gateLocks(lr.data, activeMask(dm).data).data
-                         : coherentRidgesCPU(lumaMean(lu), W, H, MARGIN, BAND).data;
+                         : coherentRidgesCPU(lumaMean(lu), W, H, MARGIN, BAND, PLATEAU).data;
                 advanceLocks(ls, { motion: m, newLocks: nl, w: W, h: H, life: 8 });
                 relax = lockRelaxation(ls, { life: 8 });
                 if (f === 31) for (let i = 0; i < W * H; i++) if (ls.life[i] > 0) held++;
@@ -216,7 +221,7 @@ let A = {}, B = {};
                 const lr = lockCandidatesFromRing(lu, { margin: MARGIN });
                 const nl = gate === "luma" ? lr.data
                          : gate === "depth" ? gateLocks(lr.data, activeMask(dm).data).data
-                         : coherentRidgesCPU(lumaMean(lu), W, H, MARGIN, BAND).data;
+                         : coherentRidgesCPU(lumaMean(lu), W, H, MARGIN, BAND, PLATEAU).data;
                 advanceLocks(ls, { motion: m, disocclusion: dis ? dis.data : null, newLocks: nl, w: W, h: H, life: 8 });
                 relax = lockRelaxation(ls, { life: 8 });
                 if (f === N - 1) for (let i = 0; i < W * H; i++) if (ls.life[i] > 0) held++;
@@ -259,7 +264,7 @@ console.log("\n4. WHAT DEPTH STILL SEES THAT SHAPE DOES NOT");
     }
     const r = { mean: lumaMean(lu4) };
     const lumaR = ridgesCPU(r.mean, W, H, MARGIN).count;
-    const cohR = coherentRidgesCPU(r.mean, W, H, MARGIN, BAND).count;
+    const cohR = coherentRidgesCPU(r.mean, W, H, MARGIN, BAND, PLATEAU).count;
     const depthR = activeMask(dm4).count;
     report(`a wire with luma contrast ${(MARGIN * 0.5).toFixed(3)} -- half the ridge margin -- and full depth contrast`);
     ok(`*** shape finds ${cohR} of it and depth finds ${depthR}: a feature below the luma margin is invisible to every luma test at every scale, so v4554's gate is narrowed here, not replaced ***`,
@@ -297,8 +302,8 @@ else {
         else if (x >= 12 && x <= 14) v = (x === 13) ? 0.1 : 0.9;
         field[y * DW + x] = v;
     }
-    const cpu1 = coherentRidgesCPU(field, DW, DH, MARGIN, 1);
-    const cpu3 = coherentRidgesCPU(field, DW, DH, MARGIN, 3);
+    const cpu1 = coherentRidgesCPU(field, DW, DH, MARGIN, 2, PLATEAU);
+    const cpu3 = coherentRidgesCPU(field, DW, DH, MARGIN, 4, PLATEAU);
     const r = await runInEngineOrigin({ engineRoot: ENG, args: { W: DW, H: DH, field: Array.from(field), margin: MARGIN }, script: `async (a) => {
         const { requestDevice } = await import("/gfx/device.js");
         const { COHERENT_RIDGE_WGSL } = await import("/render/temporalLockWgsl.mjs");
@@ -310,14 +315,14 @@ else {
         const go = async (maxBand) => {
             const dst = dev.buffer({ data: new Float32Array(N), usage: ["storage"] });
             const ub = new ArrayBuffer(32);
-            new Uint32Array(ub, 0, 4).set([a.W, a.H, maxBand, 0]);
+            new Uint32Array(ub, 0, 4).set([a.W, a.H, maxBand, 2]);   // maxPlateau, 2 since v4556
             new Float32Array(ub, 16, 4).set([a.margin, 0, 0, 0]);
             const p = dev.compute({ wgsl: COHERENT_RIDGE_WGSL });
             p.bind("field", fb).bind("dst", dst).bind("u", dev.buffer({ data: new Uint32Array(ub), usage: "uniform" }));
             dev.frame(({ pass }) => { pass.dispatch(p, groups); pass.clear([0,0,0,1]); }, { offscreen: true });
             return Array.from(new Float32Array(await dev.read(dst)));
         };
-        return { b1: await go(1), b3: await go(3), errs, backend: dev.backend };
+        return { b1: await go(2), b3: await go(4), errs, backend: dev.backend };
     }` });
     ok("the harness ran the kernel on a real WebGPU device",
         r.ok && r.result && r.result.backend === "webgpu" && r.result.errs.length === 0,
@@ -328,9 +333,9 @@ else {
             if ((r.result.b1[i] > 0.5 ? 1 : 0) !== cpu1.data[i]) bad1++;
             if ((r.result.b3[i] > 0.5 ? 1 : 0) !== cpu3.data[i]) bad3++;
         }
-        ok(`*** the device's coherent mask is the CPU's on all ${DW * DH} pixels at maxBand 1 (${cpu1.count} set) -- a decision, so anything but exact is a different answer ***`,
+        ok(`*** the device's coherent mask is the CPU's on all ${DW * DH} pixels at maxBand 2 (${cpu1.count} set) -- a decision, so anything but exact is a different answer ***`,
             bad1 === 0, `${bad1} disagreements`);
-        ok(`  and at maxBand 3 too (${cpu3.count} set), which is what admits the three-pixel band that maxBand 1 rejects`,
+        ok(`  and at maxBand 4 too (${cpu3.count} set), which is what admits the wider band that maxBand 2 rejects`,
             bad3 === 0 && cpu3.count > cpu1.count, `${bad3} disagreements, ${cpu1.count} -> ${cpu3.count}`);
     }
 }
@@ -354,10 +359,10 @@ else {
 //   No 0-RED among the eight once the axis row exists.
 
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
-console.log("unchecked here: a thin feature that is CURVED or diagonal, since every line in this gate is axis " +
-    "aligned and the band is measured along an axis -- a diagonal ridge's band is wider by root two and " +
-    "nothing here measures what that costs; content between a flat wall and a chequer at Nyquist, which is the " +
-    "same gap v4554 left; the maxBand a real renderer wants, since 1 is what these fixtures need and a thicker " +
-    "feature would want more; and whether the band test survives a MOVING object, since the ring it reads is " +
-    "reprojected by camera-only motion vectors, which v4554 already found goes stale.");
+console.log("unchecked here: DIAGONALS were listed here at v4555 as an open worry -- v4556 measured them at " +
+    "seven angles and the worry was unfounded, so render/temporalRidgePhase-selfcheck.mjs holds that now; " +
+    "content between a flat wall and a chequer at Nyquist, which is the same gap v4554 left; the maxBand a " +
+    "real renderer wants, since 2 is what these fixtures need and a thicker feature would want more; and " +
+    "whether the band test survives a MOVING object, since the ring it reads is reprojected by camera-only " +
+    "motion vectors, which v4554 already found goes stale.");
 process.exit(fails ? 1 : 0);

@@ -173,15 +173,34 @@ export function makeLockState(w, h) { return { w, h, life: new Float32Array(w * 
  * One definition, two callers -- newLocksCPU wraps it for an rgba frame and lockCandidatesFromRing for the
  * ring's jitter-free mean, which is the input that actually works.
  */
-export function ridgesCPU(lumaField, w, h, margin = 0.05) {
+export function ridgesCPU(lumaField, w, h, margin = 0.05, maxPlateau = 2) {
     const out = new Uint8Array(w * h), axisX = new Uint8Array(w * h), axisY = new Uint8Array(w * h);
     let n = 0;
+    // *** THE WALK PAST TIES IS NOT A REFINEMENT, IT IS THE DIFFERENCE BETWEEN SEEING A FEATURE AND NOT. ***
+    // v4556: a thin feature whose two covered pixels come out within `margin` of each other -- which is what
+    // happens whenever it straddles a pixel boundary evenly -- is a strict extremum in NEITHER, and the whole
+    // lock detector found ZERO of it at every scale and every band setting. MEASURED: two exactly equal
+    // columns give 0 strict ridges against 14 for one column, and a 0.4 px line is invisible at 5.5% of
+    // sub-pixel positions with contrast 0.9. The blind window is margin/contrast wide, so a LOW-contrast
+    // feature is invisible for far more of the sweep -- at contrast 0.2 it is a quarter of all positions.
+    // So the deciding neighbour is the first one that differs by more than `margin`, not the adjacent one.
+    // maxPlateau 1 is exactly the old strict test and is kept reachable for that comparison.
+    const decide = (i, step) => {
+        const c = lumaField[i];
+        for (let k = 1; k <= maxPlateau; k++) {
+            const j = i + step * k;
+            if (j < 0 || j >= w * h) return 0;
+            const dv = lumaField[j] - c;
+            if (dv > margin) return 1;
+            if (dv < -margin) return -1;
+        }
+        return 0;                      // still inside a plateau at the bound: undecided, and NOT a ridge
+    };
     for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
         const i = y * w + x;
-        const c = lumaField[i];
-        const l = lumaField[i - 1], r = lumaField[i + 1], u = lumaField[i - w], d = lumaField[i + w];
-        const ridgeX = (c - l > margin && c - r > margin) || (l - c > margin && r - c > margin);
-        const ridgeY = (c - u > margin && c - d > margin) || (u - c > margin && d - c > margin);
+        const L = decide(i, -1), R = decide(i, 1), U = decide(i, -w), D = decide(i, w);
+        const ridgeX = (L === -1 && R === -1) || (L === 1 && R === 1);
+        const ridgeY = (U === -1 && D === -1) || (U === 1 && D === 1);
         // *** THE AXES COME OUT TOO, because which one fired is what "thin" means directionally: a ridge found
         // on the X axis is thin HORIZONTALLY, so its band is measured across x. coherentRidgesCPU needs that
         // and re-deriving it there would be a second definition of the test.
@@ -212,9 +231,12 @@ export function ridgesCPU(lumaField, w, h, margin = 0.05) {
  * `maxBand` is the width in pixels and is REQUIRED. The scan is bounded at maxBand + 1 in each direction, which
  * is all that is needed to answer "longer than maxBand" and is what makes the WGSL mirror a local test.
  */
-export function coherentRidgesCPU(field, w, h, margin, maxBand) {
+export function coherentRidgesCPU(field, w, h, margin, maxBand, maxPlateau = 2) {
     if (!Number.isInteger(maxBand) || maxBand < 1) throw new Error("coherentRidgesCPU: maxBand must be an integer >= 1, the ridge band's width in pixels");
-    const r = ridgesCPU(field, w, h, margin);
+    // a plateau of width p makes a band of at least p, so a maxBand below maxPlateau refuses every feature the
+    // plateau walk exists to find -- caught here rather than left as a pair of numbers that quietly disagree
+    if (maxBand < maxPlateau) throw new Error(`coherentRidgesCPU: maxBand ${maxBand} is below maxPlateau ${maxPlateau}, which rejects every plateau-detected feature`);
+    const r = ridgesCPU(field, w, h, margin, maxPlateau);
     const out = new Uint8Array(w * h);
     let n = 0;
     // the run containing i, bounded: step out until the mask stops or the budget runs out

@@ -328,7 +328,7 @@ else {
         const go = async (useMask) => {
             const dst = dev.buffer({ data: new Float32Array(N), usage: ["storage"] });
             const ub = new ArrayBuffer(32);
-            new Uint32Array(ub, 0, 4).set([a.W, a.H, useMask, 0]);
+            new Uint32Array(ub, 0, 4).set([a.W, a.H, useMask, 2]);   // maxPlateau, 2 since v4556
             new Float32Array(ub, 16, 4).set([a.margin, 0, 0, 0]);
             const p = dev.compute({ wgsl: FIELD_RIDGE_WGSL });
             p.bind("field", field).bind("mask", mask).bind("dst", dst).bind("u", dev.buffer({ data: new Uint32Array(ub), usage: "uniform" }));
