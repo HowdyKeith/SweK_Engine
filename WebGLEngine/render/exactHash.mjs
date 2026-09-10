@@ -66,6 +66,28 @@ export function exactHash2(x, y, seed = 0) {
     return umix(((Math.imul(qx, 0x8da6b343) >>> 0) ^ hy) >>> 0) / 4294967296;
 }
 
+/**
+ * *** THE 3-D FORM. *** A starfield hashes a CELL OF THE SKY, which is three integers, and folding one axis
+ * into `seed` would make two cells that differ only in z collide whenever their seeds happened to match.
+ *
+ * The construction is exactHash2's, extended by one link: each axis is quantised, wrapped, multiplied by its
+ * own odd constant and mixed into the chain, so every axis passes through a full avalanche before the next
+ * one is folded in. Integer arithmetic throughout, so float32 and float64 agree BIT FOR BIT.
+ *
+ * IT IS NOT exactHash2 WITH A THIRD ARGUMENT, and the gate says so rather than leaving it to be assumed:
+ * exactHash3(x, y, 0, seed) === exactHash2(x, y, umix(seed)), because at z = 0 the third link degenerates to
+ * a mix of the seed alone. A stated relation between two functions beats a claim that one contains the other.
+ */
+export function exactHash3(x, y, z, seed = 0) {
+    let qx = Math.floor(x * 256), qy = Math.floor(y * 256), qz = Math.floor(z * 256);
+    qx -= 16777216 * Math.floor(qx / 16777216);
+    qy -= 16777216 * Math.floor(qy / 16777216);
+    qz -= 16777216 * Math.floor(qz / 16777216);
+    const hz = umix(((Math.imul(qz, 0x27d4eb2f) >>> 0) ^ (seed >>> 0)) >>> 0);
+    const hy = umix(((Math.imul(qy, 0xd8163841) >>> 0) ^ hz) >>> 0);
+    return umix(((Math.imul(qx, 0x8da6b343) >>> 0) ^ hy) >>> 0) / 4294967296;
+}
+
 /** The 1-D form, for callers that already reduced a coordinate to one number. */
 export function exactHash1(x, seed = 0) { return exactHash2(x, 0, seed); }
 
@@ -108,21 +130,36 @@ export function exactHash1(x, seed = 0) { return exactHash2(x, 0, seed); }
  */
 export const SHADER_SINHASH_V4578 = Object.freeze({
     at: "v4578",
-    // *** THE THREE STARFIELDS ARE ONE FUNCTION HAND-COPIED INTO THREE FILES. *** Identical `n3` text and the
-    // identical `hh > 0.986` cut in blackhole.html, flight-gpu.html and wormhole.html. Whatever is done about
-    // the hash there is one job, not three, and doing it in one file would leave two silently different skies.
+    // *** THE THREE STARFIELDS WERE ONE FUNCTION HAND-COPIED INTO THREE FILES, AND v4579 SHARED IT. ***
+    // They are render/starField.mjs's now -- the three pages splice STARFIELD_WGSL and keep only their own
+    // density cut -- so they have left this census.
+    //
+    // *** AND THIS ENTRY SAID THEIR CUT WAS IDENTICAL, THREE TIMES, AND IT NEVER WAS. *** The prose read
+    // "the identical `hh > 0.986` cut" and all three per-line comments repeated 0.986. The n3 text WAS
+    // byte-identical on all three (md5 a8bec00ebc4c); the cuts are 0.986, 0.987 and 0.985. I checked the
+    // FUNCTION on all three files and the CALLER on one, then wrote "identical" about both -- and repeating
+    // the wrong number on each line made it look checked rather than copied.
     threshold: Object.freeze([
-        "blackhole.html",            // hh > 0.986 -> a star exists
-        "flight-gpu.html",           // hh > 0.986 -> a star exists, the same n3 and cut as blackhole.html
-        "wormhole.html",             // hh > 0.986 -> a star exists; carries h1 as well as n3
-        "render/skyRenderer.js",     // h > 1.0 - uStarDensity * 0.005 -> a star exists
-        "shaders/biome.frag.glsl",   // b < 0.33 desert, b < 0.66 plains, else forest -> WHICH BIOME a point is
+        "render/skyRenderer.js",     // h > 1.0 - uStarDensity * 0.005 -> a star exists. STILL OPEN.
     ]),
+    starfieldSharedAtV4579: Object.freeze(["blackhole.html", "flight-gpu.html", "wormhole.html"]),
+    cutsWereNeverIdentical: Object.freeze({ "blackhole.html": 0.986, "flight-gpu.html": 0.987, "wormhole.html": 0.985 }),
+    // *** AND TWO OF THE TWELVE ARE FILES NO RUNTIME CODE LOADS, WHICH THIS ENTRY COUNTED AS SITES. ***
+    // Measured at v4579 across every .js/.mjs/.html outside gates and bookkeeping: nothing names either.
+    // shaders/biome.frag.glsl is the one that matters -- it picks desert / plains / forest on `b < 0.33` and
+    // `b < 0.66`, so it read as a threshold site worth a round, and no page runs it. Its comment "BIOME
+    // DETECTION (matches JS logic conceptually)" cannot be checked against anything: the live classification
+    // is world/worleyBiomes and this file is not wired to it.
+    //
+    // TEN of this tree's 26 standalone shader files are in that position, and NO CENSUS HERE CAN SEE IT:
+    // tools/ship/orphanScan.mjs walks .js and .mjs only, so a dead .glsl is invisible to the one instrument
+    // whose job is reachability. Round #31's finding (".cjs is outside every census") in a second extension.
+    // FILED, NOT FIXED HERE -- and they stay in the census below, because they DO carry the idiom.
+    notLoaded: Object.freeze(["shaders/biome.frag.glsl", "gpu/waterScreen.frag.glsl"]),
     continuous: Object.freeze([
         "atmosphere/AtmosphereSystem.js",   // vertical jitter on a lightning streak, through a smoothstep
         "demos_code/ant_colony.js",         // a heading nudge on the tie-break branch only
         "demos_code/slime_mold.js",         // the same nudge, the same branch
-        "gpu/waterScreen.frag.glsl",        // a refraction offset scaled by 0.01
         "nebula-device.html",               // fbm, and the ONLY file carrying the idiom in GLSL and WGSL BOTH
         "render/CloudVolume.js",            // a dithered ray start, averaged over up to 48 march steps
         "render/voxelrenderer.js",          // h1/h2/h3 surface tint and a +/-4% per-voxel colour jitter
@@ -140,6 +177,12 @@ export const SHADER_SINHASH_V4578 = Object.freeze({
     // matched render/holoFoil.mjs's integer hash2, and over the 1,600 cells of the flake lattice the two drew
     // 29 of the model's 184 flakes in the same place -- 15.8%.
     fixedHere: "render/holoFoilShader.js",
+    // *** WHY THE SIN-HASH IS WRONG FOR A THRESHOLD, MEASURED AT v4579 RATHER THAN ARGUED. *** It is uniform
+    // by DECILE and deficient in the TAIL, which is the only part a star cut reads. Pooled over 1,572,864
+    // integer cells in six 64^3 cubes, against a cut of 0.986 that should admit 1.400%: the sin-hash reads
+    // 1.2837%, 12.4 sd low, and its per-cube readings scatter 0.077% against exact_hash3's 0.031%. A page
+    // asking for 1.4% of its sky got about 1.28% of it, and how much depended on which way it looked.
+    tailDeficitSd: -12.4,
 });
 
 export const EXACT_HASH_WGSL = `
@@ -172,3 +215,27 @@ float exact_hash(vec2 p, uint seed) {
     return float(exact_umix((u.x * 0x8da6b343u) ^ exact_umix((u.y * 0xd8163841u) ^ seed))) * (1.0 / 4294967296.0);
 }
 `;
+
+export const EXACT_HASH3_WGSL = `
+fn exact_hash3(p: vec3f, seed: u32) -> f32 {
+    var q = floor(p * 256.0);
+    q -= 16777216.0 * floor(q * (1.0 / 16777216.0));   // 2^24: the last integer f32 holds exactly
+    let u = vec3u(q);                                   // defined only because the wrap made q non-negative
+    let hz = exact_umix((u.z * 0x27d4eb2fu) ^ seed);
+    let hy = exact_umix((u.y * 0xd8163841u) ^ hz);
+    return f32(exact_umix((u.x * 0x8da6b343u) ^ hy)) * (1.0 / 4294967296.0);
+}
+`;
+
+/** The GLSL form, for the WebGL2 half of the tree. Same chain; uvec3 rather than vec3u. */
+export const EXACT_HASH3_GLSL = `
+float exact_hash3(vec3 p, uint seed) {
+    vec3 q = floor(p * 256.0);
+    q -= 16777216.0 * floor(q * (1.0 / 16777216.0));
+    uvec3 u = uvec3(q);
+    uint hz = exact_umix((u.z * 0x27d4eb2fu) ^ seed);
+    uint hy = exact_umix((u.y * 0xd8163841u) ^ hz);
+    return float(exact_umix((u.x * 0x8da6b343u) ^ hy)) * (1.0 / 4294967296.0);
+}
+`;
+

@@ -25,7 +25,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { exactHash2, exactHash1, umix, EXACT_HASH_GLSL, EXACT_HASH_WGSL,
-         SHADER_SINHASH_V4578 } from "../../render/exactHash.mjs";
+         EXACT_HASH3_GLSL, EXACT_HASH3_WGSL, SHADER_SINHASH_V4578 } from "../../render/exactHash.mjs";
 import { bcsHash } from "../../render/swiftShaderModel.mjs";
 import * as GM from "../../render/grassModel.mjs";
 import { validateWgsl } from "../../render/wgslSpec.mjs";
@@ -129,10 +129,18 @@ console.log("\n4. *** THE SHADER TEXTS SAY THE SAME THING AS THE JS ***");
     ok("*** the GLSL and the WGSL carry the SAME constants in the SAME ORDER ***",
        nums(EXACT_HASH_GLSL) === nums(EXACT_HASH_WGSL) && nums(EXACT_HASH_GLSL).length > 40,
        `glsl [${nums(EXACT_HASH_GLSL)}]`);
+    // v4579 -- the 3-D form is held the same way. IT IS A SEPARATE ROW rather than a widened one: the two
+    // pairs are two claims, and folding them together would let a broken 3-D text pass on the 2-D one's
+    // constants happening to appear in the concatenation.
+    ok("*** ...and so do the 3-D GLSL and WGSL, which is a second pair and a second row ***",
+       nums(EXACT_HASH3_GLSL) === nums(EXACT_HASH3_WGSL) && nums(EXACT_HASH3_GLSL).length > 40,
+       `glsl3 [${nums(EXACT_HASH3_GLSL)}]`);
     const setOf = (t) => [...new Set(nums(t).split(","))].sort().join(",");
     ok("  ...and the JS states the same set of them, differing only in the order its statements impose",
-       setOf(jsBody) === setOf(EXACT_HASH_GLSL),
-       `js [${setOf(jsBody)}] vs shader [${setOf(EXACT_HASH_GLSL)}]`);
+       setOf(jsBody) === setOf(EXACT_HASH_GLSL + EXACT_HASH3_GLSL),
+       `js [${setOf(jsBody)}] vs shader [${setOf(EXACT_HASH_GLSL + EXACT_HASH3_GLSL)}]. The JS body ` +
+       "spans umix, exactHash2 AND exactHash3, so the shader side is both exported texts -- v4579 added the " +
+       "3-D form and this row went red on the constant only the new one carries, which is the tie working");
     ok("  and the WGSL validates against the spec scanner rather than only on a device",
        validateWgsl("@fragment fn fs() -> @location(0) vec4f { return vec4f(exact_hash(vec2f(1.0), 0u)); }\n" +
                     EXACT_HASH_WGSL).length === 0);
@@ -318,7 +326,9 @@ console.log("\n6. *** THE RATCHET: no CPU/GPU TWIN may reintroduce the idiom ***
         if (!raw.split("\n").some(liveLine)) continue;
         (SHADERISH.test(raw) ? live : prose).push(rel);
     }
-    const recorded = [...REC.threshold, ...REC.continuous].sort();
+    // The census is threshold + continuous + notLoaded: a file nothing loads still CARRIES the idiom, and
+    // dropping it from the population would make the ratchet quieter by forgetting rather than by fixing.
+    const recorded = [...REC.threshold, ...REC.continuous, ...REC.notLoaded].sort();
     const missing = recorded.filter((r) => !live.includes(r));
     const extra = live.filter((r) => !recorded.includes(r));
     ok("!! *** the shader-side census is exactly what the record names -- it may shrink, not grow silently ***",
@@ -337,6 +347,17 @@ console.log("\n6. *** THE RATCHET: no CPU/GPU TWIN may reintroduce the idiom ***
        !live.includes(REC.fixedHere) && fs.existsSync(path.join(ENG, REC.fixedHere)),
        REC.fixedHere + " still exists and no longer computes the idiom in its shader -- both halves are " +
        "exactHash's now, and tools/ship/holoFoil-selfcheck.mjs section 5b holds them to each other cell by cell");
+    ok("!! *** the files the record calls UNLOADED really are named by no runtime code ***",
+       REC.notLoaded.every((f) => {
+           const base = f.split("/").pop();
+           return !walkAll(ENG).some((r) => /\.(js|mjs|cjs|html)$/.test(r) && !/-selfcheck\.mjs$/.test(r) &&
+               !/^tools\/ship\//.test(r) && !/^okf\//.test(r) && r !== "render/exactHash.mjs" &&
+               fs.readFileSync(path.join(ENG, r), "utf8").includes(base));
+       }),
+       REC.notLoaded.join(", ") + " -- searched every page, module and worker outside the gates, this record " +
+       "and the bookkeeping JSON the incremental sweep writes. tools/ship/input-sets.json names them because " +
+       "a GATE READ them while walking the tree, which is not a page loading them, and counting that as a " +
+       "reference is how the first pass at this read 0 orphans of 26");
     ok("  ...and every searcher named in the exclusion still exists",
        REC.searchers.every((f) => fs.existsSync(path.join(ENG, f))),
        REC.searchers.join(", "));

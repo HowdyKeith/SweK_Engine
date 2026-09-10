@@ -3765,6 +3765,52 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
     // v4576 -- the 225th closing: a tier for the guardians the sweep cannot afford, and it caught two on sight.
+    since227: Object.freeze({
+        at: "v4579", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/starField-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/exactHash.mjs", "tools/ship/exactHash-selfcheck.mjs",
+                                "blackhole.html", "flight-gpu.html", "wormhole.html",
+                                "tools/ship/assertionShape.mjs", "vba/runtimeGap.mjs"]),
+        verdict: "green, 177/175/187 ms over three serial runs. ONE SKY, THREE PAGES, AND EACH HAD ITS OWN " +
+                 "COPY. blackhole.html, flight-gpu.html and wormhole.html carried a byte-identical `n3` (md5 " +
+                 "a8bec00ebc4c on all three), the same three octaves, the same cell and the same falloff -- " +
+                 "and v4578's own record said their CUT was identical too, three times over, once in prose " +
+                 "and once on each of the three per-line comments. IT NEVER WAS: 0.986, 0.987, 0.985. I " +
+                 "checked the function on all three files and the caller on one, then repeated the wrong " +
+                 "number on each line, which made a copied claim look like a checked one. " +
+                 "*** THE HASH CHANGED FOR A MEASURED REASON, NOT BECAUSE A DIFFERENT PATTERN IS NICER. *** " +
+                 "fract(sin(dot(p,K))*43758.5453) is uniform by DECILE -- both hashes sit inside 0.2 points " +
+                 "of 10% in every tenth -- and a starfield never reads deciles, it reads the extreme tail. " +
+                 "Pooled over 1,572,864 integer cells in six 64^3 cubes, against a cut of 0.986 that should " +
+                 "admit 1.400%: the sin-hash reads 1.2837%, TWELVE POINT FOUR SD LOW, and its per-cube " +
+                 "readings scatter 0.077% against exact_hash3's 0.031%. So the density knob did not mean what " +
+                 "it said (a page asking for 1.4% of its sky got about 1.28%) and how much it got depended on " +
+                 "WHICH WAY IT WAS LOOKING, which is the one thing a starfield must not do. THE TRADE IS " +
+                 "STATED: it is a completely different sky -- blackhole drew 2,133 stars over the sampled " +
+                 "sphere and now draws 2,316, with 26 in the same cell, which is chance. No saved screenshot " +
+                 "of these pages still matches. render/exactHash.mjs gains exactHash3 plus its WGSL and GLSL, " +
+                 "tied to the 2-D form by a stated relation rather than a claim of containment: " +
+                 "exactHash3(x, y, 0, seed) === exactHash2(x, y, umix(seed)). " +
+                 "*** THREE OF MY OWN DEFECTS, ALL FOUND BY SABOTAGE OR BY OTHER GATES. *** The gate's " +
+                 "'float32 emulation of the WGSL' never read the WGSL -- it rebuilt exact_hash3 from the JS " +
+                 "constants, so it was a THIRD implementation agreeing with the second. Three sabotages " +
+                 "passed green, including 0x27d4eb2f -> 0x27d4eb2d inside the shipped shader text, a real " +
+                 "divergence between a shader and its reference in the gate whose headline row says they draw " +
+                 "the same stars; the text is held to the JS by its twelve constants now. The tail row first " +
+                 "asserted region-to-region spread over THREE 48^3 cubes and read 1.5 sd, which is not a " +
+                 "result -- six cubes at 64^3 pool to 12 sd, and a row that needed a lucky sample would have " +
+                 "been a row about the sample. And a comment I added inside wormhole.html's WGSL TEMPLATE " +
+                 "LITERAL wrapped a word in BACKTICKS, which ends the template: the page stopped parsing, and " +
+                 "this gate stayed GREEN throughout because it does the splice itself on the extracted " +
+                 "literal. crossArchDoor, qaAssert and tunnelSpawn all caught it, wgslAutoLayout saw the " +
+                 "knock-on binding drop, and the gate now checks that the page it edits still parses. " +
+                 "ALSO CORRECTED: two of v4578's twelve census sites are files NO RUNTIME CODE LOADS -- " +
+                 "shaders/biome.frag.glsl (a three-way biome threshold, which is why it looked like a round " +
+                 "worth doing) and gpu/waterScreen.frag.glsl. TEN of this tree's 26 standalone shader files " +
+                 "are unreachable and no census here can see it, because tools/ship/orphanScan.mjs walks .js " +
+                 "and .mjs only. That is round #31's finding in a second extension and is FILED, not fixed.",
+    }),
     since226: Object.freeze({
         at: "v4577", swept: 1, green: 1, red: 0,
         added: Object.freeze(["physics/raceKnob-selfcheck.mjs"]),

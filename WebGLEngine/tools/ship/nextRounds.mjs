@@ -323,6 +323,42 @@ export const NEXT_ROUNDS = [
             + "exclusion from an oversight, and that is the actual defect.",
     },
     {
+        id: "shader-files-outside-every-census",
+        blocker: "OPEN",
+        what: "TEN OF THIS TREE'S 26 STANDALONE SHADER FILES ARE REACHED BY NO RUNTIME CODE, AND NO INSTRUMENT "
+            + "HERE CAN SEE IT. tools/ship/orphanScan.mjs is the reachability census and it walks .js and .mjs "
+            + "only -- it reports 7 orphan modules of 4,068 scanned and has never had a .glsl, .frag, .vert or "
+            + ".wgsl file in its population. Measured at v4579 over every .js/.mjs/.html outside the gates and "
+            + "the bookkeeping JSON: brain/transport/shaders/filter-packed.wgsl, gpu/waterScreen.frag.glsl, "
+            + "shaders/biome.frag.glsl, shaders/biome.vert.glsl, shaders/ghost.frag.glsl, "
+            + "shaders/selection.frag.glsl, shaders/selection.vert.glsl, shaders/transitions/swekCrossfade.glsl, "
+            + "shaders/transitions/swekIris.glsl and shaders/voxel.frag.glsl.",
+        how: "The measurement is already written and is three rules long: walk for the four shader extensions; "
+            + "search only RUNTIME code (.js/.mjs/.cjs/.html, excluding -selfcheck.mjs, tools/ship/ and okf/) "
+            + "for the basename; report the rest. *** THE ONE TRAP IS WHAT COUNTS AS A REFERENCE, AND THE FIRST "
+            + "PASS AT THIS READ 0 ORPHANS OF 26. *** tools/ship/input-sets.json names almost every shader file "
+            + "in the tree -- it is the incremental sweep's record of what a GATE READ while walking, which is "
+            + "not a page loading it. Same for tools/.incremental-manifest.json, knowledge-index.json and the "
+            + "okf/ claim documents, which are prose. Counting bookkeeping as reachability makes every dead "
+            + "file look live, which is the exact shape of a check that cannot fail.",
+        why: "shaders/biome.frag.glsl is the worked example and it cost a round to find. It picks desert / "
+            + "plains / forest on `b < 0.33` and `b < 0.66` -- a THRESHOLD on a sin-hash, which v4569 "
+            + "established is where CPU/GPU divergence changes what EXISTS rather than how it looks -- and it "
+            + "carries the comment \"BIOME DETECTION (matches JS logic conceptually)\", which is the same kind "
+            + "of claim render/holoFoilShader.js's \"matching the model's hash2\" turned out to be false about. "
+            + "So v4578 filed it as a threshold site worth its own round. NOTHING LOADS IT. The live biome "
+            + "classification is world/worleyBiomes behind biome-map-demo.html, and this file is not wired to "
+            + "it, so its claim cannot be checked against anything and its threshold decides nothing. A round "
+            + "was budgeted for a file no page runs, and the tree had no way to say so.",
+        upstream: "Nothing blocks it. The judgement it needs is what to DO with the ten, and that is not a "
+            + "mechanical answer: a shader kept as a reference, a demo somebody means to rewire, and a file "
+            + "left behind by a deletion all look identical from outside. This is round #31's finding (\".cjs "
+            + "files are outside every census this tree runs\") in a second extension, and #31's own note "
+            + "applies unchanged -- a dozen gates own PRIVATE walks with their own extension rules, so "
+            + "widening orphanScan alone would leave most of them still blind. What is owed first is that "
+            + "nothing distinguishes a deliberate keep from an oversight, which is the actual defect.",
+    },
+    {
         id: "sin-hash-everywhere-else",
         blocker: "OPEN",
         what: "THE TWIN HALF IS DONE AND THE SHADER-ONLY HALF IS NOT -- AND THE COUNT IN THIS ENTRY WAS WRONG "
@@ -340,17 +376,18 @@ export const NEXT_ROUNDS = [
             + "OF THE MODEL'S 184 FLAKES THE SHADER DREW 29 IN THE SAME PLACE -- 15.8%. Fixed at v4578: both "
             + "halves are render/exactHash.mjs's hash, 1,600 of 1,600 cells bit-identical and 203 flakes to "
             + "203 in the same place.",
-        how: "THE TWELVE ARE NOW A CLASSIFIED, RATCHETED CENSUS rather than a number in this entry: "
-            + "render/exactHash.mjs's SHADER_SINHASH_V4578 names every one with WHAT ITS HASH FEEDS, and "
-            + "tools/ship/exactHash-selfcheck.mjs section 6 refuses a new site. The classification is the "
-            + "worklist, because v4569 established that fbm AVERAGES and a THRESHOLD DOES NOT. FIVE feed a "
-            + "threshold and are worth a round each: blackhole.html, flight-gpu.html and wormhole.html all "
-            + "draw a star on `hh > 0.986`, render/skyRenderer.js on `h > 1.0 - uStarDensity * 0.005`, and "
-            + "shaders/biome.frag.glsl picks desert / plains / forest on `b < 0.33` and `b < 0.66`. SEVEN are "
-            + "continuous -- a jitter, a dither, a refraction offset, an fbm, a per-voxel tint -- where "
-            + "divergence changes the pattern and not the structure. *** AND THE THREE STARFIELDS ARE ONE "
-            + "FUNCTION HAND-COPIED INTO THREE FILES: *** identical n3 text and identical cut, so they are one "
-            + "job, and fixing one would leave two silently different skies.",
+        how: "THE CENSUS IS NOW NINE, CLASSIFIED AND RATCHETED, and v4579 closed the biggest piece of it. "
+            + "render/exactHash.mjs's SHADER_SINHASH_V4578 names every site with WHAT ITS HASH FEEDS and "
+            + "tools/ship/exactHash-selfcheck.mjs section 6 refuses a new one. *** THE THREE STARFIELDS ARE "
+            + "DONE: *** blackhole.html, flight-gpu.html and wormhole.html splice render/starField.mjs now and "
+            + "keep only their own density cut, which was 0.986 / 0.987 / 0.985 and which THIS ENTRY AND THE "
+            + "RECORD BOTH CALLED IDENTICAL. *** AND TWO OF THE TWELVE WERE FILES NOTHING LOADS *** -- "
+            + "shaders/biome.frag.glsl and gpu/waterScreen.frag.glsl -- see the "
+            + "shader-files-outside-every-census entry, which is where that half went. WHAT IS LEFT: ONE "
+            + "threshold site, render/skyRenderer.js, which draws a star on `h > 1.0 - uStarDensity * 0.005` "
+            + "and is imported by main.js, so it is the live one and it has no CPU reference; and SIX "
+            + "continuous sites where the hash is a jitter, a dither, a refraction offset, an fbm or a "
+            + "per-voxel tint, and divergence changes the pattern rather than the structure.",
         why: "*** THE TREE ALREADY KNEW, IN THREE PLACES, AND NEVER JOINED THEM UP. *** "
             + "tools/ship/webgpuHarness.mjs records that sin(i * 12.9898) * 43758.5453 returns 0.921690 on a "
             + "CPU and 0.240234 on a GPU for i = 1. fx/paintFields.mjs's header records the same shape for "
