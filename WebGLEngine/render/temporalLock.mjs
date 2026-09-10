@@ -90,6 +90,26 @@ export function pushLuma(st, { current, motion, w, h }) {
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
         const i = y * w + x, o = i * 4;
         const l = lumaOf(current[o], current[o + 1], current[o + 2]);
+        // *** THE BOUNDS TEST IS A HARD THRESHOLD ON A COMPUTED FLOAT, AND THAT IS A MEASURED CROSS-BACKEND
+        // DIVERGENCE THIS ARC CARRIES. *** v4559: under fractional camera motion this function and its WGSL
+        // kernel disagree by the full contrast of the content -- 8.6e-1 on a pixel-scale chequer -- because
+        // at a speed that divides the texel evenly, hu lands EXACTLY on 1.0 for a whole column and f64 here
+        // and f32 there fall on opposite sides. One mirror resets the ring; the other reprojects.
+        //
+        // FOUR REPAIRS WERE TRIED AND NONE HELD, which is recorded so a fifth is not guessed at:
+        //   round -> floor for the fill index    a real tie bug (JS rounds half UP, WGSL half to EVEN) and
+        //                                        it IS fixed below, but it was not this;
+        //   a half-texel guard                   WORSE -- 0.5/h is exactly the first row's sample position;
+        //   an integer test on the bilinear taps WORSE -- with no motion in y, floor(hv*h - 0.5) is exactly
+        //                                        an integer for every row;
+        //   computing the mirror's uv in f32     moved which column straddles, from the first row to the last.
+        // The bilinear FETCH survives all of this because a floor off by one carries a compensating weight --
+        // it is continuous across the boundary. A bounds test is a hard yes or no and is not, and any
+        // threshold can be landed on exactly by a camera speed that is a simple fraction of a texel.
+        //
+        // It is left as it was rather than dressed with a fifth guess. render/temporalRingContent-selfcheck
+        // holds the divergence as a measured row: it is bounded by the content's own contrast, and it is
+        // invisible on smooth content, which is why six rounds of device-parity rows never saw it.
         const u = (x + 0.5) / w, v = (y + 0.5) / h;
         const valid = motion ? motion[o + 2] !== 0 : true;
         const hu = u + (motion ? motion[o] : 0), hv = v + (motion ? motion[o + 1] : 0);
@@ -108,9 +128,25 @@ export function pushLuma(st, { current, motion, w, h }) {
     return st;
 }
 
+/**
+ * The texel a uv lands in, for the fill count -- which is a nearest-texel question, not an interpolation one.
+ *
+ * *** floor(u*w), NOT round(u*w - 0.5), AND THE DIFFERENCE IS A CROSS-BACKEND DEFECT THIS ARC CARRIED FROM
+ * v4553. *** The two agree except at an exact tie, and there JavaScript's Math.round goes half UP while
+ * WGSL's round() goes half to EVEN: at u*w - 0.5 = 22.5 the CPU read texel 23 and the kernel read 22. Under
+ * a fractional camera speed those ties come up constantly. It stayed invisible for six rounds because every
+ * device row in the arc drove SMOOTH content or a still camera, where reading the neighbouring texel costs
+ * almost nothing -- on a pixel-scale chequer it costs the full 8.6e-1 of contrast. floor(u*w) is the standard
+ * texel index for a uv, has no tie to break, and is what render/temporalReject.mjs's disocclusion already
+ * used; this was the one place in the arc that did it differently.
+ */
+export function nearestTexel(u, v, w, h) {
+    const x = clamp(Math.floor(u * w), 0, w - 1), y = clamp(Math.floor(v * h), 0, h - 1);
+    return y * w + x;
+}
+
 function sampleScalarFilled(buf, w, h, u, v) {
-    const x = clamp(Math.round(u * w - 0.5), 0, w - 1), y = clamp(Math.round(v * h - 0.5), 0, h - 1);
-    return buf[y * w + x];
+    return buf[nearestTexel(u, v, w, h)];
 }
 
 /**
@@ -405,8 +441,11 @@ export function advanceLocks(lockSt, { motion, disocclusion = null, instability 
         const hu = u + (motion ? motion[o] : 0), hv = v + (motion ? motion[o + 1] : 0);
         let carried = 0;
         if (valid && hu >= 0 && hu < 1 && hv >= 0 && hv < 1) {
-            const px = clamp(Math.round(hu * w - 0.5), 0, w - 1), py = clamp(Math.round(hv * h - 0.5), 0, h - 1);
-            carried = Math.max(0, lockSt.life[py * w + px] - 1);
+            // *** THE SECOND COPY OF THE SAME INDEX, AND IT WAS STILL IN THE CONDEMNED FORM. *** v4559 fixed
+            // the ring's fill index and left this one; round(t - 0.5) and floor(t) agree for every f64 value
+            // JavaScript can produce, so nothing went red, but two spellings of one law is how the ring's
+            // version drifted away from the kernel's in the first place. Named once, above.
+            carried = Math.max(0, lockSt.life[nearestTexel(hu, hv, w, h)] - 1);
         }
         if (disocclusion && disocclusion[i] > 0) carried = 0;
         if (instability && instability[i] > instabilityKill) carried = 0;

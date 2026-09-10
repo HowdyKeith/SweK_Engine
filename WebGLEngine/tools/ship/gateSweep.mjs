@@ -3767,6 +3767,59 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since218: Object.freeze({
+        at: "v4559", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/temporalRingContent-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 2.77 s (2772/2671/2698 over three serial runs, under the 3000 ms sweep budget but " +
+                 "only by 8% -- and the split is worth recording, since this arc has run over budget four " +
+                 "times: the CPU sections cost 368 ms and the headless browser boot and 21 dispatches cost " +
+                 "1,907 ms, so if the budget bites here the answer is the harness every device gate pays, " +
+                 "not this fixture. *** THE RING'S FLOOR IS A CONTENT LAW WITH A PHASE GATE, AND v4558's " +
+                 "PHASE LAW HOLDS ON ALL FOUR CONTENTS. *** v4558 established that integer displacements are " +
+                 "exact on one smooth sinusoid; measured here on a smooth sinusoid, a finer one, a " +
+                 "pixel-scale chequer and a hard edge, the EXACTNESS is content-independent -- a whole-pixel " +
+                 "step lands the bilinear fetch on texel centres whatever the picture. The MAGNITUDE is the " +
+                 "picture's: at a half-pixel phase the chequer's floor is 8.7x the arc's 0.05 margin where " +
+                 "the smooth fixture is 300x under it. The floor is QUADRATIC in cycles per pixel below " +
+                 "Nyquist -- e/f^2 holds within 8% at 7.1 and 6.6, which is what linear interpolation's " +
+                 "residual does since it follows the second derivative -- crossing 0.05 at 0.084 cyc/px, a " +
+                 "period of about TWELVE PIXELS, which is ordinary detail and not pixel-scale texture; above " +
+                 "Nyquist it SATURATES at the signal's own range rather than growing. So the two claims are " +
+                 "told apart by holding one thing still: across speeds on fixed content the floor spans " +
+                 "2.1e-7, across content at fixed speed it spans 272x. The consequence is not abstract -- on " +
+                 "that content the ring's ridges and the truth's agree on only 87% of their union, so a lock " +
+                 "placed there is placed on the reprojection's artefacts as much as on the picture. *** AN " +
+                 "OPEN DEFECT IS RECORDED RATHER THAN DRESSED. *** At a half-texel camera speed the CPU " +
+                 "mirror and the WGSL kernel disagree on 192 of 576 pixels' BOUNDS TEST -- the same count on " +
+                 "both contents, because what resets is decided by geometry, not by the picture -- and the " +
+                 "COST is the content's: 8.60e-1 on the chequer, 100% of its contrast, against 2.07e-2 on " +
+                 "the smooth surface. Four repairs were tried and none held (a half-texel guard and an " +
+                 "integer tap test both made it WORSE; computing the mirror's uv in f32 moved which column " +
+                 "straddles), so the code is left as it was and the failures are written into " +
+                 "render/temporalLock.mjs so a fifth is not guessed at. It needs a hard threshold that a " +
+                 "camera speed can land on exactly; the bilinear FETCH survives because a floor off by one " +
+                 "carries a compensating weight. It appears at 24x24 and NOT at 16x16, which is most of why " +
+                 "six rounds of device-parity rows never met it -- a defect a fixture can hide by accident. " +
+                 "*** ONE THING WAS FIXED: the ring's fill index, round(u*w - 0.5) -> floor(u*w), a real tie " +
+                 "bug since JavaScript rounds half UP and WGSL half to EVEN. *** advanceLocks held a SECOND " +
+                 "copy of the same law in the condemned spelling; both now call one exported nearestTexel, " +
+                 "and both call sites are pinned. Seven sabotages red at 7/5/4/3/3/1/17 against four gates, " +
+                 "with v4557's crash rule applied. *** THE FIRST SWEEP READ THREE ZEROS AND ALL THREE WERE " +
+                 "MINE. *** The tie row asserted Math.floor(22.5/24*24) === 22 -- a fact about JavaScript, " +
+                 "not a call into the module; there was no device tie row at all, so the fix was pinned only " +
+                 "on the mirror it was FOR; and the coverage rows live in temporalRidgeMargin-selfcheck, " +
+                 "which was not in the sabotage SET. A hole in the set reads exactly like a hole in the " +
+                 "gates. *** AND THE FIXTURE VALUE DECIDED WHETHER THE CONTROL COULD FAIL: *** at the tie " +
+                 "22.5, WGSL's half-to-even gives 22 -- floor's own answer -- so a rounded kernel read the " +
+                 "RIGHT texel and the new device row stayed green on a kernel with the defect in it. Moving " +
+                 "the tie to 23.5, where both roundings give 24 and floor gives 23, took that sabotage from " +
+                 "3 red to 4. On a defect whose whole subject is which way a tie breaks, the fixture had " +
+                 "picked the one tie where it does not.",
+    }),
     since217: Object.freeze({
         at: "v4558", swept: 1, green: 1, red: 0,
         added: Object.freeze([

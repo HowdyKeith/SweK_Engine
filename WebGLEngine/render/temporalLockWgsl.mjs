@@ -52,6 +52,8 @@ fn main(@builtin(global_invocation_id) g:vec3<u32>) {
   let vv = (f32(g.y) + 0.5) / f32(u.h);
   let hu = uu + motion[o];
   let hv = vv + motion[o + 1u];
+  // NOTE: this bounds test and the CPU's disagree at an exact boundary -- see render/temporalLock.mjs
+  // for the four repairs that did not hold, and temporalRingContent-selfcheck for the measurement
   let usable = u.first == 0u && motion[o + 2u] != 0.0 && hu >= 0.0 && hu < 1.0 && hv >= 0.0 && hv < 1.0;
 
   if (!usable) {
@@ -63,8 +65,10 @@ fn main(@builtin(global_invocation_id) g:vec3<u32>) {
   // holds, for a moving camera, whatever surface happened to sit at that pixel.
   for (var k:u32 = 0u; k < F - 1u; k = k + 1u) { ringOut[i * F + k] = ringAt(hu, hv, k + 1u, F); }
   ringOut[i * F + F - 1u] = l;
-  let px = u32(clamp(round(hu * f32(u.w) - 0.5), 0.0, f32(u.w) - 1.0));
-  let py = u32(clamp(round(hv * f32(u.h) - 0.5), 0.0, f32(u.h) - 1.0));
+  // floor, not round: round() ties to EVEN in WGSL and half-UP in JavaScript, so the two mirrors read
+  // different texels at an exact tie -- measured at v4559 as a full 8.6e-1 of contrast on pixel-scale content
+  let px = u32(clamp(floor(hu * f32(u.w)), 0.0, f32(u.w) - 1.0));
+  let py = u32(clamp(floor(hv * f32(u.h)), 0.0, f32(u.h) - 1.0));
   filledOut[i] = min(255.0, filledIn[py * u.w + px] + 1.0);
 }`;
 
