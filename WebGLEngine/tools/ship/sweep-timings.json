@@ -1618,7 +1618,8 @@
   "render/temporalAccumulate-selfcheck.mjs": 1329,
   "render/temporalResolve-selfcheck.mjs": 1046,
   "render/temporalReject-selfcheck.mjs": 1523,
-  "render/temporalLock-selfcheck.mjs": 2142
+  "render/temporalLock-selfcheck.mjs": 2160,
+  "render/temporalDepthLock-selfcheck.mjs": 1180
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -3235,7 +3236,8 @@
   "render/temporalAccumulate-selfcheck.mjs": 0,
   "render/temporalResolve-selfcheck.mjs": 0,
   "render/temporalReject-selfcheck.mjs": 0,
-  "render/temporalLock-selfcheck.mjs": 0
+  "render/temporalLock-selfcheck.mjs": 0,
+  "render/temporalDepthLock-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-08T20:46:53.412Z",
@@ -4852,7 +4854,8 @@
   "render/temporalAccumulate-selfcheck.mjs": "2026-09-09T22:06:31.110810Z",
   "render/temporalResolve-selfcheck.mjs": "2026-09-09T22:06:31.110810Z",
   "render/temporalReject-selfcheck.mjs": "2026-09-10T03:51:17.306226Z",
-  "render/temporalLock-selfcheck.mjs": "2026-09-10T03:51:17.306226Z"
+  "render/temporalLock-selfcheck.mjs": "2026-09-10T04:49:39.392728Z",
+  "render/temporalDepthLock-selfcheck.mjs": "2026-09-10T04:49:39.392728Z"
  },
  "crossings": {
   "tools/roundhouse/knobPromotions-selfcheck.mjs": 2,

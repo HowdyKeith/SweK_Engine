@@ -248,7 +248,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // the earlier reading was 3878. What survives is the rule the wrong explanation was reaching for: this
     // number is MEASURED every round, never incremented from the last one, and a reason invented to explain a
     // count is worth less than re-taking it. FIVE ROUNDS RUNNING this table has been re-taken by hand.
-    files: 4051,                  // v4526 merge: 3887 -> 4002, this branch's rounds; v4527: 4004; v4528: 4007; v4529: 4009; v4530: 4011; v4533: 4012 (ai-bridge/runBusy.js); v4536: 4014 (physics/mesh/uvUnwrap.mjs and its gate); v4537: 4016 (physics/mesh/uvLscm.mjs and its gate); v4539: 4018 (physics/render/splitSum.mjs and its gate); v4543: 4020 (nav/navmesh.mjs and its gate); v4544: 4022 (physics/character/terrainWalk.mjs and its gate); v4545: 4023 (tools/ship/navWiring-selfcheck.mjs); v4546: 4024 (tools/ship/navWiringLive-selfcheck.mjs; the harness is HTML and not counted); v4547: 4025 (tools/ship/engineSceneBot-selfcheck.mjs); v4548: 4029 (tools/ship/treeRead.mjs, tools/ship/recordReach.mjs and their two gates); v4550: 4031 (tools/export/glbConformance.mjs and its gate); v4551: 4045 -- FOURTEEN files at once, because this record was not re-taken for the five rounds of the FSR arc; v4552: 4048 (render/temporalReject.mjs, its WGSL and its gate); v4553: 4051 (render/temporalLock.mjs, its WGSL and its gate)
+    files: 4052,                  // v4526 merge: 3887 -> 4002, this branch's rounds; v4527: 4004; v4528: 4007; v4529: 4009; v4530: 4011; v4533: 4012 (ai-bridge/runBusy.js); v4536: 4014 (physics/mesh/uvUnwrap.mjs and its gate); v4537: 4016 (physics/mesh/uvLscm.mjs and its gate); v4539: 4018 (physics/render/splitSum.mjs and its gate); v4543: 4020 (nav/navmesh.mjs and its gate); v4544: 4022 (physics/character/terrainWalk.mjs and its gate); v4545: 4023 (tools/ship/navWiring-selfcheck.mjs); v4546: 4024 (tools/ship/navWiringLive-selfcheck.mjs; the harness is HTML and not counted); v4547: 4025 (tools/ship/engineSceneBot-selfcheck.mjs); v4548: 4029 (tools/ship/treeRead.mjs, tools/ship/recordReach.mjs and their two gates); v4550: 4031 (tools/export/glbConformance.mjs and its gate); v4551: 4045 -- FOURTEEN files at once, because this record was not re-taken for the five rounds of the FSR arc; v4552: 4048 (render/temporalReject.mjs, its WGSL and its gate); v4553: 4051 (render/temporalLock.mjs, its WGSL and its gate); v4554: 4052 (one gate; the round extended two existing modules rather than adding any)
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
                           // RE-TAKEN TWICE IN TWO ROUNDS, and the second time only because the ship gate
                           // caught it: v4478's re-take was correct for v4478 and stale the moment v4479
@@ -376,7 +376,12 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // +3, closures +2, async/await +1, typed arrays +2. Twice running the WGSL module has moved only the
     // import row, which is now a pattern rather than an observation: a file whose whole content is template
     // strings of another language carries none of this one's capabilities.
-    esModules: 3760, closures: 3629, asyncAwait: 1426, typedArrays: 812, promises: 345,
+    // v4554 -- RE-TAKEN. ONE file this time, not three: the round added a gate and extended
+    // render/temporalLock.mjs and its WGSL in place rather than adding modules. The same four rows moved by
+    // ONE each, which is the single-gate shape v4545 and v4547 recorded -- and it is worth noting that a round
+    // whose whole subject is a new capability moved this census by exactly as much as a round that only added
+    // a checker, because what this table counts is files and their imports, not what a round is about.
+    esModules: 3761, closures: 3630, asyncAwait: 1427, typedArrays: 813, promises: 345,
     fetchXhr: 243, performanceNow: 220, raf: 116, webgl: 142, webgpu: 48, threads: 22, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
@@ -406,7 +411,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // second-smallest outright; WITH them the two tie at 22 and threads hold rank 11 on the stable sort only.
     wasmWithoutSelf: 21,          // v4526 merge: 20 -> 21
     threadsWithoutSelf: 21,
-    closuresOverThreads: 165,     // 3629 / 22, rounded at v4551 (164 at v4530: 3597 / 22; 163 at v4527: 3588 / 22; 158 at v4462: 3465 / 22)
+    closuresOverThreads: 165,     // 3630 / 22, rounded at v4551 (164 at v4530: 3597 / 22; 163 at v4527: 3588 / 22; 158 at v4462: 3465 / 22)
     // *** ONE, NOT TWO. *** The first draft filed fetch/XHR as an archive claim too; pointing the rows at
     // bytes found the HTTP client sitting in this tree's own VBA, so only WebGL still needs the archive.
     archiveRows: 1,

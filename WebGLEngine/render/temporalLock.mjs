@@ -188,6 +188,55 @@ export function ridgesCPU(lumaField, w, h, margin = 0.05) {
 }
 
 /**
+ * DEPTH RIDGES: the same ridge test, run over the depth buffer instead of over luma.
+ *
+ * *** THIS IS THE THING v4553 SECTION 5 SAID LUMA CANNOT DO, AND IT IS THE SAME FIVE LINES. *** That row
+ * measured a luma lock detector locking 1,340 of 2,304 pixels on a chequer at the pixel scale and making the
+ * ghost 26% worse, and concluded there is no luma-only test separating a thin bright feature from a texture at
+ * the pixel scale -- because at that scale they are the same signal. They are not the same signal in DEPTH: a
+ * wire is nearer than both its neighbours and a painted texture is on the surface, at its neighbours' depth.
+ *
+ * WHAT THE RIDGE TEST SEPARATES, measured on four depth fields of one column each (16x16, margin 0.02):
+ *     a WIRE, nearer than both neighbours            14 ridges
+ *     a SLOT, farther than both -- a gap showing through   14 ridges
+ *     a SILHOUETTE EDGE, differing from ONE side      0 ridges
+ *     a TILTED SURFACE, monotone across the row       0 ridges
+ * The last two are why this is a ridge test and not a depth-discontinuity test. Every object boundary in a
+ * scene is a depth discontinuity; locking them all would relax the clamp along every silhouette, which is
+ * exactly where ghosting lives. A ridge is thin BY CONSTRUCTION.
+ *
+ * Both directions are kept. A slot is as much a thin feature as a wire -- a slit of background showing between
+ * two surfaces is destroyed by a neighbourhood clamp the same way -- so restricting to "nearer" would refuse a
+ * real case to no benefit.
+ *
+ * `margin` is in the DEPTH BUFFER'S OWN UNITS and there is no default that could be right, for the same reason
+ * render/temporalReject.mjs's disocclusion threshold has none: a [0,1] projection and a [-1,1] one do not share
+ * a scale, and a reversed-Z buffer does not share a sign convention either (though the sign does not matter
+ * here, since both directions count).
+ */
+export function depthRidgesCPU(depth, w, h, margin) {
+    if (!(margin > 0)) throw new Error("depthRidgesCPU: margin must be a positive depth, in the buffer's own units");
+    return ridgesCPU(depth, w, h, margin);
+}
+
+/**
+ * Two candidate masks ANDed: a pixel locks only where both agree.
+ *
+ * *** AND, NOT OR, AND THE MEASUREMENT SAYS WHY. *** OR would union the luma detector's 1,834 false positives
+ * back in and give away everything the depth gate buys. The cost of AND is real and is named in the gate: a
+ * thin feature PAINTED on a flat wall has no depth ridge, so it is refused, and the 4.00x a luma-only lock
+ * buys on that picture goes with it. Depth separates GEOMETRY from TEXTURE, which is a different cut than THIN
+ * from NOT THIN, and a painted line and a pixel-scale texture remain the same thing to every buffer this
+ * pipeline carries.
+ */
+export function gateLocks(a, b) {
+    const out = new Uint8Array(a.length);
+    let n = 0;
+    for (let i = 0; i < a.length; i++) if (a[i] && b[i]) { out[i] = 1; n++; }
+    return { data: out, count: n };
+}
+
+/**
  * Lock candidates from ONE frame. Kept, and kept measured, because it is what a tree without a ring would
  * write -- and section 3 of the gate shows it finds ZERO pixels on a line 0.4 px wide. That is not a tuning
  * failure: most jitter phases miss a sub-pixel feature entirely, so on most frames there is nothing to find,
@@ -243,6 +292,24 @@ export function advanceLocks(lockSt, { motion, disocclusion = null, instability 
     }
     lockSt.life = next;
     return lockSt;
+}
+
+/**
+ * Which pixels a lock state currently holds, as a 0/1 mask.
+ *
+ * *** THIS IS ALSO HOW A DEPTH RIDGE IS REMEMBERED, AND THAT IS WHY THERE IS NO SECOND MECHANISM. *** A single
+ * frame's depth finds ZERO ridges on a feature thinner than a pixel, for exactly the reason v4553 recorded
+ * about luma: most jitter phases miss it entirely. What is wanted is "was this a depth ridge anywhere in the
+ * last period", and that is a lock with life = jitterPhaseCount(ratio) -- reprojected, decayed and killed by
+ * the same rules, which a separate ridge-memory would have had to re-derive. So render/temporalDepthLock's
+ * gate runs advanceLocks twice: once over the depth ridges with life = P to remember them, and once over the
+ * gated candidates to hold the actual lock.
+ */
+export function activeMask(lockSt) {
+    const out = new Uint8Array(lockSt.w * lockSt.h);
+    let n = 0;
+    for (let i = 0; i < out.length; i++) if (lockSt.life[i] > 0) { out[i] = 1; n++; }
+    return { data: out, count: n };
 }
 
 /** Per-pixel clamp relaxation in [0, 1]: 1 where a lock is fresh, falling to 0 as it expires. */

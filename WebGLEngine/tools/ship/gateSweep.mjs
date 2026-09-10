@@ -3767,6 +3767,50 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since213: Object.freeze({
+        at: "v4554", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/temporalDepthLock-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 1.18 s (1180/1166/1178 over three serial runs, under the 3000 ms sweep budget). THE ONE " +
+                 "THING v4553 SECTION 5 SAID LUMA CANNOT DO, DONE WITH DEPTH -- AND WHAT IT COSTS. That row " +
+                 "measured a luma lock detector locking 1,340 of 2,304 pixels on a chequer at the pixel scale " +
+                 "and making the ghost 26% worse, and concluded no luma-only test separates a thin bright " +
+                 "feature from a texture at that scale because they are the same signal. THEY ARE NOT THE SAME " +
+                 "SIGNAL IN DEPTH: a wire is nearer than both its neighbours, a painted texture is at its " +
+                 "neighbours' depth. MEASURED: on a geometric line over a pixel-scale chequer the candidate " +
+                 "set falls from 1,834 luma ridges to 46 depth ridges -- 40x fewer, and 46 is exactly the " +
+                 "line's own pixels -- while the chequer contributes ZERO, so the same picture with the line " +
+                 "PAINTED gives 1,834 luma ridges and 0 depth ridges. On v4553's OWN penalty fixture the luma " +
+                 "gate reproduces its 26% exactly on 1,990 locks and the depth gate removes it ENTIRELY: 0%, " +
+                 "on 26 locks, which are the bar's own pixels. *** AND THE RESULT IS TWO-SIDED, WHICH IS THE " +
+                 "ROUND RATHER THAN A CAVEAT ON IT: *** on a 0.4 px line PAINTED on a flat wall the gate " +
+                 "refuses everything, giving away the whole 4.00x a luma lock buys there. Depth separates " +
+                 "GEOMETRY from TEXTURE, which is a different cut than THIN from NOT THIN, and v4553's limit " +
+                 "has not gone away -- it has been LOCALISED: a painted thin line and a pixel-scale texture " +
+                 "are the same thing to every buffer this pipeline carries. WHY THIS IS A RIDGE TEST AND NOT " +
+                 "A DEPTH-DISCONTINUITY TEST, on four hand-built fields: a wire gives 14, a SLOT 14, a " +
+                 "SILHOUETTE EDGE 0 and a TILTED SURFACE 0. Every object boundary is a depth discontinuity, " +
+                 "and locking them all would relax the clamp along exactly the silhouettes ghosting lives on. " +
+                 "TWO FINDINGS FOUND THE HARD WAY AND HELD AS ROWS. First, a single frame's depth finds ZERO " +
+                 "ridges on a sub-pixel feature, for v4553's reason restated on a different buffer -- so the " +
+                 "ridges are remembered over a period, and that memory is a LOCK with life = P rather than a " +
+                 "second mechanism. Second, that memory needs the SAME KILL RULES as the lock: it is " +
+                 "reprojected by motion vectors, this tree's describe the CAMERA, and with a still camera and " +
+                 "a moving bar 26 real ridges became 312 stale ones and the whole penalty came back. AND " +
+                 "v4552's WIDE-BOX FINDING REACHES THIS RUNG TOO: a lock only earns anything where the clamp " +
+                 "is BINDING -- 4.00x on a flat ground, 0.97x on a chequer, where the box already admits the " +
+                 "feature -- and those are the same pictures where the luma detector's false positives live. " +
+                 "Eight sabotages red at 5/1/3/7/1/2/3/3, TWO 0-RED FIRST and they are a PAIR: dropping the " +
+                 "vertical ridge axis was invisible on the CPU AND on the device, because every feature in " +
+                 "every picture here was VERTICAL and ridgeY was never once exercised. Not a mirror agreeing " +
+                 "with itself, which is the shape v4550, v4552 and v4553 each found -- BOTH sides implemented " +
+                 "a property no picture ever asked for. A horizontal wire now sits in section 1 and in the " +
+                 "device field. One earlier sabotage attempt did not apply at all (its anchor matched both " +
+                 "kernels) and its zero was recorded as a failed edit rather than read as a measurement.",
+    }),
     since212: Object.freeze({
         at: "v4553", swept: 1, green: 1, red: 0,
         added: Object.freeze([

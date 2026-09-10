@@ -125,4 +125,36 @@ fn main(@builtin(global_invocation_id) g:vec3<u32>) {
   dst[i] = select(0.0, 1.0, ridgeX || ridgeY);
 }`;
 
-export { RING_PUSH_WGSL, SHADING_SHIFT_WGSL, RIDGE_WGSL, LUMA_WGSL };
+// ---- FIELD RIDGES: the same test over a PLAIN scalar field (depth), optionally ANDed with a mask ----------
+//
+// RIDGE_WGSL above runs the test over a ring's jitter-free mean; this runs it over a field the caller already
+// has. One test, two entry points, mirroring the CPU where lockCandidatesFromRing and depthRidgesCPU both call
+// ridgesCPU. The optional mask is the whole depth-gated lock in one dispatch: ridge(depth) AND lumaRidges.
+const FIELD_RIDGE_WGSL = `
+struct P { w:u32, h:u32, useMask:u32, pad:u32, margin:f32, p1:f32, p2:f32, p3:f32 };
+@group(0) @binding(0) var<storage,read> field:array<f32>;
+@group(0) @binding(1) var<storage,read> mask:array<f32>;
+@group(0) @binding(2) var<storage,read_write> dst:array<f32>;
+@group(0) @binding(3) var<uniform> u:P;
+
+@compute @workgroup_size(8,8,1)
+fn main(@builtin(global_invocation_id) g:vec3<u32>) {
+  if (g.x >= u.w || g.y >= u.h) { return; }
+  let i = g.y * u.w + g.x;
+  if (g.x == 0u || g.y == 0u || g.x + 1u >= u.w || g.y + 1u >= u.h) { dst[i] = 0.0; return; }
+  let c = field[i];
+  let l = field[i - 1u];
+  let r = field[i + 1u];
+  let up = field[i - u.w];
+  let dn = field[i + u.w];
+  // thin in ONE direction. A silhouette edge differs from one side only and is NOT a ridge, which is the
+  // whole reason this is a ridge test rather than a depth-discontinuity test.
+  let ridgeX = (c - l > u.margin && c - r > u.margin) || (l - c > u.margin && r - c > u.margin);
+  let ridgeY = (c - up > u.margin && c - dn > u.margin) || (up - c > u.margin && dn - c > u.margin);
+  var v = select(0.0, 1.0, ridgeX || ridgeY);
+  // AND, not OR: an OR would union the luma detector's false positives back in
+  if (u.useMask != 0u) { v = v * select(0.0, 1.0, mask[i] > 0.5); }
+  dst[i] = v;
+}`;
+
+export { RING_PUSH_WGSL, SHADING_SHIFT_WGSL, RIDGE_WGSL, FIELD_RIDGE_WGSL, LUMA_WGSL };
