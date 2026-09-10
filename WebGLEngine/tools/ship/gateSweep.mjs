@@ -3764,6 +3764,40 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    // v4575 -- the 224th closing: the engine had no conductor Fresnel, and every metal was one fitted point.
+    since224: Object.freeze({
+        at: "v4575", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["physics/render/conductorFresnel-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 0.6 s, one new module and one new gate. *** THIS TREE HAD NO CONDUCTOR FRESNEL. EVERY " +
+                 "METAL IN IT WAS SCHLICK WITH A THREE-CHANNEL F0 -- a curve fitted through ONE point. *** " +
+                 "pathTracer.mjs calls it 'F0 as a TRIPLE', microsurfaceWalk.mjs spells the Schlick line and " +
+                 "labels it 'conductor' in the comment beside it, and fresnel.mjs is exact and DIELECTRIC. The " +
+                 "backlog asked for the F82-tint model to be graded 'against a number the tree already holds by " +
+                 "another route' and there was no such number, so the exact conductor curve is built here first " +
+                 "-- AND THEN THE ROUTE EXISTS AFTER ALL: a conductor with kappa = 0 IS a dielectric, and the " +
+                 "new closed form reproduces physics/render/fresnel.mjs, derived independently from Snell's law " +
+                 "and gated since v3491 on Brewster and total internal reflection, to 2.22e-16 over 306 " +
+                 "(index, angle) pairs. Sabotage QQ drops the p-polarised branch and that row goes to 3.52e-1, " +
+                 "which matters because a conductor has NO Brewster angle and nothing local catches a " +
+                 "polarisation swap. *** WHAT SCHLICK GETS WRONG ON A METAL IS THE SIGN OF THE SLOPE, NOT THE " +
+                 "SIZE OF THE ERROR: *** aluminium's green channel FALLS 0.914 -> 0.862 over the range where " +
+                 "Schlick RISES 0.914 -> 0.954, because a conductor's reflectance dips below F0 before climbing " +
+                 "and Schlick is monotonic by construction. 0.0931 against F82-tint's 0.0065, 14.4x. The 82 " +
+                 "degrees are DERIVED and not named -- mu(1-mu)^6 is maximised at mu = 1/7, found by searching " +
+                 "100,001 points -- and sabotage RR nudges the constant to a plausible 0.15 and is caught. *** " +
+                 "THE COMPARISON IS A 4,800-POINT (eta, kappa) SWEEP RATHER THAN FOUR HAND-COPIED TRIPLES, " +
+                 "BECAUSE THE METAL CONSTANTS ARE RGB SAMPLES OF SPECTRA AND THIS ROUND DOES NOT VOUCH FOR " +
+                 "THEM -- and the result is NOT universal: 4,691 better, 105 WORSE, 4 level, with every one of " +
+                 "the 105 at kappa <= 2.4 on a grid running to 8.0. Gold's blue channel sits in that band and " +
+                 "gains 1.02x, because its exact curve happens to agree with Schlick AT 82 degrees so the " +
+                 "fitted correction is near zero. AND I REPORTED THAT LOSING GAP WRONG FIRST: 0.0009, taken by " +
+                 "subtracting the maximum of one column from the maximum of another when the two maxima are at " +
+                 "different pairs. The worst single pair is 0.0058 and the gate's own row caught it. NOTHING IN " +
+                 "THE ENGINE USES THIS YET, stated rather than implied, and the safe default is proven: " +
+                 "tint = 1 IS Schlick, identically, over 404 (F0, angle) pairs.",
+    }),
     // v4574 -- the 223rd closing: armed, at the command line only, after arming it everywhere first.
     since223: Object.freeze({
         // NO NEW GATE this round -- three rows added to an existing one, so the swept/green/red triple is

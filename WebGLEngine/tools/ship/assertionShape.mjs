@@ -250,8 +250,11 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // rows that follow a gate by one. distinctDefinitions holds at 40 for the second round running.
     // v4573 -- RE-TAKEN for tools/ship/importClosure-selfcheck.mjs: 1618 -> 1619 and the three rows
     // that follow a gate by one. distinctDefinitions holds at 40 for the THIRD round running.
-    gates: 1619, usesOk: 1598, definesOk: 1590, importsOk: 0,
-    distinctDefinitions: 40, nameFirst: 1491, condFirst: 91, unknownSignature: 16,
+    // v4575 -- RE-TAKEN for physics/render/conductorFresnel-selfcheck.mjs: 1619 -> 1620 and the three
+    // rows that follow a gate by one. distinctDefinitions holds at 40 for the FOURTH round running,
+    // and this one is a render gate rather than a tools/ship one, which is the harder case for it.
+    gates: 1620, usesOk: 1599, definesOk: 1591, importsOk: 0,
+    distinctDefinitions: 40, nameFirst: 1492, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

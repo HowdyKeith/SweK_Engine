@@ -152,10 +152,29 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "f82-tint-metal-fresnel",
-        blocker: "OPEN",
+        blocker: "CLOSED",
         what: "The F82-tint model for metal Fresnel -- the OpenPBR / Autodesk Standard Surface correction for Schlick's known inaccuracy on metals at grazing angles.",
         how: "It is a small closed-form edge-tint term, not a system: it sits directly beside the GGX + Smith lobe physics/render/microfacet.mjs already has and the multi-scatter compensation physics/render/energyCompensation.mjs already has. Grade it the way this tree graded the split-sum approximation -- against a number the tree already holds by another route, not against a tolerance.",
         why: "*** THE ABSENCE IS MEASURED, NOT ASSUMED, AND THE ONE GREP HIT IS A FALSE POSITIVE WORTH RECORDING. *** A case-insensitive search for f82, edgeTint or edge-tint across all of physics/ and render/ returns exactly ONE line, and it is a hex digest in a selfcheck comment (0df825cb06fa3785...) that happens to contain the characters f82. There is no edge-tint code in this tree. microfacet.mjs matches GGX/Smith/G1/G2 45 times, so the lobe this would correct is real and shipped.",
+        closedAt: "v4575 -- READ, BUILT AND GRADED, AND NOTHING WAS VENDORED SO THE LICENCE QUESTION THIS ENTRY "
+            + "RAISED DID NOT ARISE. The model is four lines of closed form; what took the round is that THE "
+            + "TREE HAD NOTHING TO GRADE IT AGAINST. The entry asked for it to be measured 'against a number "
+            + "the tree already holds by another route' and there was no such number: physics/render/fresnel.mjs "
+            + "is exact and DIELECTRIC, and every metal in the engine is Schlick with a three-channel F0 -- a "
+            + "curve fitted through ONE point. So physics/render/conductorFresnel.mjs builds the exact conductor "
+            + "curve from the boundary conditions FIRST, and the route the entry wanted turns out to exist after "
+            + "all: a conductor with kappa = 0 IS a dielectric, and the new closed form reproduces fresnel.mjs "
+            + "over 306 (index, angle) pairs to 2.22e-16. Dropping the p-polarised branch takes that to 3.52e-1. "
+            + "*** WHAT SCHLICK GETS WRONG ON A METAL IS THE SIGN OF THE SLOPE, NOT THE SIZE OF THE ERROR: *** "
+            + "aluminium's green channel falls from 0.914 to 0.862 while Schlick rises to 0.954, because Schlick "
+            + "interpolates F0 upward and has no shape that can dip. 0.0931 against F82-tint's 0.0065. The claim "
+            + "is tested over a 4,800-point (eta, kappa) sweep rather than four hand-copied metal triples, and "
+            + "it is NOT universal: 4,691 better, 105 WORSE, 4 level -- and all 105 losses sit at kappa <= 2.4 "
+            + "on a grid running to 8.0, the weak-absorber corner where the curve is nearly the dielectric one "
+            + "Schlick was designed for. Gold's blue channel is in that band and gains 1.02x. NOTHING IN THE "
+            + "ENGINE USES IT YET and that is stated rather than implied; the safe default is proven instead -- "
+            + "tint = 1 IS Schlick, identically. Substituting it in pathTracer and microsurfaceWalk is a "
+            + "separate round with a picture to look at.",
         upstream: "Nothing blocks READING it. Licence for https://github.com/portsmouth/F82-tint-generator is NOT CHECKED and this entry does not claim it -- verify before vendoring, not before reading. One relevant signal, measured rather than inferred: world/licenceSweep.mjs already carries THREE portsmouth repos -- EON-diffuse, OpenPBR-viewer and snelly -- all recorded MIT with licenceExists true, and F82-tint-generator is NOT among them. Same author, consistent history, still unverified for this repo.",
     },
     {
