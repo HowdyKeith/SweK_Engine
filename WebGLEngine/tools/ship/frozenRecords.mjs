@@ -299,7 +299,9 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4536 -- RE-TAKEN with `excluding`: 104/46/189 -> 105/47/199, the one new record PARTITION_AT_V4536 and
     // its ten fields, plus this module's own two and their twenty. The two readings move together by
     // construction and the row below asserts the gap is exactly this module's own pair.
-    currentIncludingModule: Object.freeze({ records: 105, withFields: 47, fields: 199 }),
+    // v4537 -- RE-TAKEN with `excluding`: 105/47/199 -> 106/48/206, the one new record and its seven
+    // fields, plus this module's own two and their twenty.
+    currentIncludingModule: Object.freeze({ records: 106, withFields: 48, fields: 206 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -342,7 +344,10 @@ export const PROBE_AT_V4536 = Object.freeze({
     // than of the rule: the round's whole content is measurements that replace claims, so the record is where
     // they live. *** AND THE ORDINAL IS A KNOWN COLLISION, RECORDED RATHER THAN RENUMBERED: *** PROBE_AT_V4536
     // above carries the same stamp from the other line's counter, which runs ahead of the one main.js keeps.
-    excluding: Object.freeze({ records: 103, withFields: 45, fields: 179 }),
+    // v4537 -- RE-TAKEN: 103/45/179 -> 104/46/186. One record, BACKLOG_AT_V4537 in
+    // tools/ship/backlogAbsence.mjs, carrying the seven numbers behind that round's grading of the backlog's
+    // own absence claims.
+    excluding: Object.freeze({ records: 104, withFields: 46, fields: 186 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,

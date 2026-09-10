@@ -3768,6 +3768,31 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // RECORDED RATHER THAN RENUMBERED: *** the entry below is stamped v4572 from the other line's counter,
     // which runs ahead of the one main.js keeps -- main carried v4535 when that entry landed. The list shape
     // is what makes that survivable; a round appends and nobody renegotiates a name.
+    // v4537 -- THE 224th CLOSING, for the gate this round added.
+    since224: Object.freeze({
+        at: "v4537", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/backlogAbsence-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly: 6 pass, 1,855-1,986 ms over three readings. *** THE " +
+                 "INSTRUMENT FOR GRADING ABSENCE CLAIMS HAD BEEN RUN ON ONE CLAIM IN ITS LIFE: ITS OWN. *** " +
+                 "absenceScope.mjs (v4435) separates OUT OF SCOPE from IN SCOPE AND MISSED from A DENIAL " +
+                 "COUNTED AS A PRESENCE, and gradeClaim() is called from one file -- absenceScope's own " +
+                 "selfcheck, on absenceScope's own frozen record. nextRounds.mjs carries the live absence " +
+                 "claims, NAMES the grader in its own prose, and imports node:url. Six live claims graded, " +
+                 "six hold -- and the acquittals are the argument, not the convictions: one entry's token " +
+                 "returns TWELVE code files tree-wide, every one outside the directory its author scoped the " +
+                 "claim to, because the same word names a matrix layout in math/solverFit.mjs. The seventh " +
+                 "row is a CONTROL that must convict, restating the off-branch entry's claim that this tree " +
+                 "has nothing resembling a GPU path tracer as a rendering feature: SIXTEEN code files in " +
+                 "scope and missed. Sabotages A 3 RED / B 1 / C 1 / D 2, and D is the thesis driven -- drop " +
+                 "the scope and a TRUE claim reads as false. *** AND THE FIRST DRAFT LANDED IN ALL SIX OF " +
+                 "ITS OWN CENSUSES, *** spelling its needles as string literals and quoting them again in " +
+                 "prose, moving two of them from one denial to two before it had graded anything: v4409's " +
+                 "rule for the sixth time this session, inside the check written to apply it. The gate also " +
+                 "first came in at 3,011 ms against the 3,000 ms budget because it cleared absenceScope's " +
+                 "read cache out of tidiness -- eleven milliseconds is not a failed gate, it is an EXILED " +
+                 "one.",
+    }),
     since223: Object.freeze({
         at: "v4536", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/partitionScore-selfcheck.mjs"]),

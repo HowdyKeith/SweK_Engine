@@ -254,8 +254,10 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // *** BOTH LINES RE-TOOK THIS TABLE IN THE SAME WINDOW, TWICE IN TWO ROUNDS, AND THE MERGE HAS TO ADD
     // THE TWO MOVES RATHER THAN PICK ONE: *** each side's note is correct for a tree containing its own new
     // gate and neither is correct for the tree containing both. Re-derived from the merged tree.
-    gates: 1620, usesOk: 1599, definesOk: 1591, importsOk: 0,
-    distinctDefinitions: 40, nameFirst: 1492, condFirst: 91, unknownSignature: 16,
+    // v4537 -- RE-TAKEN for tools/ship/backlogAbsence-selfcheck.mjs: 1620 -> 1621 and the three rows that
+    // follow a gate by one. distinctDefinitions holds at 40 for the fourth round running.
+    gates: 1621, usesOk: 1600, definesOk: 1592, importsOk: 0,
+    distinctDefinitions: 40, nameFirst: 1493, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([
