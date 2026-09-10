@@ -248,8 +248,10 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // noticing, and this one does not.
     // v4572b -- RE-TAKEN for tools/ship/recordProvenance-selfcheck.mjs: 1617 -> 1618 and the three
     // rows that follow a gate by one. distinctDefinitions holds at 40 for the second round running.
-    gates: 1618, usesOk: 1597, definesOk: 1589, importsOk: 0,
-    distinctDefinitions: 40, nameFirst: 1490, condFirst: 91, unknownSignature: 16,
+    // v4573 -- RE-TAKEN for tools/ship/importClosure-selfcheck.mjs: 1618 -> 1619 and the three rows
+    // that follow a gate by one. distinctDefinitions holds at 40 for the THIRD round running.
+    gates: 1619, usesOk: 1598, definesOk: 1590, importsOk: 0,
+    distinctDefinitions: 40, nameFirst: 1491, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([
