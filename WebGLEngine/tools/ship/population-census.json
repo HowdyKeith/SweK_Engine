@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/populationCensus.mjs",
  "roots": "physics,simulation,fluid",
- "total": 520,
+ "total": 521,
  "areas": {
   "fluid": 8,
   "physics/acoustics": 2,
@@ -41,7 +41,7 @@
   "physics/pulsar": 1,
   "physics/quantum": 5,
   "physics/reaction": 1,
-  "physics/render": 31,
+  "physics/render": 32,
   "physics/seismic": 1,
   "physics/soft": 4,
   "physics/spacefill": 1,
@@ -283,6 +283,7 @@
   "physics/render/bounces.mjs",
   "physics/render/bssrdfSample.mjs",
   "physics/render/btdfDomain.mjs",
+  "physics/render/conductorFresnel.mjs",
   "physics/render/dielectricWalk.mjs",
   "physics/render/energyCompWgsl.mjs",
   "physics/render/energyCompensation.mjs",

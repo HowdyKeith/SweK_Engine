@@ -80,6 +80,36 @@ const cmp = (a, b) => {
         G.furnacePreconditions({ albedo: 0.3, spp: 64 }).exact === false &&
         G.furnacePreconditions({ albedo: 0.5, spp: 10 }).exact === false,
         "a predicate that disagreed with the table above would be a second declaration of the rule");
+
+    // *** v4577 -- THE NUMBERS ABOVE WERE DERIVED HERE AND THEN NOT COMPARED TO THE RECORD THAT HOLDS THEM. ***
+    // MEASURED_AT_V4415's own header says "Re-take them with: node physics/render/pathTracerGpu-selfcheck.mjs",
+    // and this gate did re-take them -- and graded them against `=== 0` and `> 0`, so 163 could have been any
+    // positive number and nothing would have said so. tools/ship/recordReach.mjs called the record UNGUARDED
+    // for exactly that reason: no gate NAMED it. The only code that read it at all was PROBES[0].key(), whose
+    // single gate (tools/ship/probeConvention-selfcheck.mjs) asserts the values are FINITE -- measured at
+    // v4577, changing `hit: 0.5` to `hit: 0.77` left that gate at exit 0 with zero FAIL lines.
+    // *** THE NUMBERS ARE TAKEN FROM THE ARRAYS ABOVE, NOT RE-DERIVED. *** The first cut called bad() ten more
+    // times and cost 170 ms on a gate already 380 ms over the sweep budget -- v4548's mistake exactly, paying
+    // for the same furnace render twice because the second caller did not look at what the first had.
+    const M = G.MEASURED_AT_V4415;
+    const reNotExact = { "0.5": dyadicOk[0], "0.25": dyadicOk[1], "0.75": dyadicOk[2], "1": dyadicOk[3],
+                         "0.3": dyadicNo[0], "0.1": dyadicNo[1] };
+    ok("!! *** the frozen not-exact-by-albedo table still reads what v4415 measured, value for value ***",
+        Object.keys(M.notExact).every((k) => reNotExact[k] === M.notExact[k]),
+        `frozen ${JSON.stringify(M.notExact)} against a fresh derivation ${JSON.stringify(reNotExact)} over ` +
+        `${n} pixels. NOT "both are nonzero" -- 163 is the number, and a change that moved it to 164 is a ` +
+        "change in the renderer that this row is here to refuse");
+    const reBySpp = { 3: powNo[0], 5: powNo[1], 10: powNo[2], 64: powOk[3] };
+    ok("!! ...and so does the not-exact-by-spp table",
+        Object.keys(M.notExactBySpp).every((k) => reBySpp[k] === M.notExactBySpp[k]),
+        `frozen ${JSON.stringify(M.notExactBySpp)} against ${JSON.stringify(reBySpp)}`);
+    const distinct1 = new Set(G.furnaceCpu({ spp: 1 })).size;      // the one render this block adds, and the cheapest there is
+    ok("!! ...and the furnace's own three values, which PROBES[0].key() hands to a FINITENESS check",
+        M.furnaceValues.hit === G.FURNACE.albedo && M.furnaceValues.miss === 1 &&
+        M.furnaceValues.distinctAtSpp1 === distinct1,
+        `hit ${M.furnaceValues.hit} = FURNACE.albedo ${G.FURNACE.albedo}; miss ${M.furnaceValues.miss}; ` +
+        `distinctAtSpp1 ${M.furnaceValues.distinctAtSpp1} against ${distinct1} distinct values in the spp=1 ` +
+        "render -- the sphere and the sky, and nothing between them");
 }
 
 // ---- 2. THE TRANSPLANT, GRADED BIT FOR BIT ------------------------------------------------------------------

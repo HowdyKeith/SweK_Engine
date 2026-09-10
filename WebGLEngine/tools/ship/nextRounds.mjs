@@ -152,10 +152,29 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "f82-tint-metal-fresnel",
-        blocker: "OPEN",
+        blocker: "CLOSED",
         what: "The F82-tint model for metal Fresnel -- the OpenPBR / Autodesk Standard Surface correction for Schlick's known inaccuracy on metals at grazing angles.",
         how: "It is a small closed-form edge-tint term, not a system: it sits directly beside the GGX + Smith lobe physics/render/microfacet.mjs already has and the multi-scatter compensation physics/render/energyCompensation.mjs already has. Grade it the way this tree graded the split-sum approximation -- against a number the tree already holds by another route, not against a tolerance.",
         why: "*** THE ABSENCE IS MEASURED, NOT ASSUMED, AND THE ONE GREP HIT IS A FALSE POSITIVE WORTH RECORDING. *** A case-insensitive search for f82, edgeTint or edge-tint across all of physics/ and render/ returns exactly ONE line, and it is a hex digest in a selfcheck comment (0df825cb06fa3785...) that happens to contain the characters f82. There is no edge-tint code in this tree. microfacet.mjs matches GGX/Smith/G1/G2 45 times, so the lobe this would correct is real and shipped.",
+        closedAt: "v4575 -- READ, BUILT AND GRADED, AND NOTHING WAS VENDORED SO THE LICENCE QUESTION THIS ENTRY "
+            + "RAISED DID NOT ARISE. The model is four lines of closed form; what took the round is that THE "
+            + "TREE HAD NOTHING TO GRADE IT AGAINST. The entry asked for it to be measured 'against a number "
+            + "the tree already holds by another route' and there was no such number: physics/render/fresnel.mjs "
+            + "is exact and DIELECTRIC, and every metal in the engine is Schlick with a three-channel F0 -- a "
+            + "curve fitted through ONE point. So physics/render/conductorFresnel.mjs builds the exact conductor "
+            + "curve from the boundary conditions FIRST, and the route the entry wanted turns out to exist after "
+            + "all: a conductor with kappa = 0 IS a dielectric, and the new closed form reproduces fresnel.mjs "
+            + "over 306 (index, angle) pairs to 2.22e-16. Dropping the p-polarised branch takes that to 3.52e-1. "
+            + "*** WHAT SCHLICK GETS WRONG ON A METAL IS THE SIGN OF THE SLOPE, NOT THE SIZE OF THE ERROR: *** "
+            + "aluminium's green channel falls from 0.914 to 0.862 while Schlick rises to 0.954, because Schlick "
+            + "interpolates F0 upward and has no shape that can dip. 0.0931 against F82-tint's 0.0065. The claim "
+            + "is tested over a 4,800-point (eta, kappa) sweep rather than four hand-copied metal triples, and "
+            + "it is NOT universal: 4,691 better, 105 WORSE, 4 level -- and all 105 losses sit at kappa <= 2.4 "
+            + "on a grid running to 8.0, the weak-absorber corner where the curve is nearly the dielectric one "
+            + "Schlick was designed for. Gold's blue channel is in that band and gains 1.02x. NOTHING IN THE "
+            + "ENGINE USES IT YET and that is stated rather than implied; the safe default is proven instead -- "
+            + "tint = 1 IS Schlick, identically. Substituting it in pathTracer and microsurfaceWalk is a "
+            + "separate round with a picture to look at.",
         upstream: "Nothing blocks READING it. Licence for https://github.com/portsmouth/F82-tint-generator is NOT CHECKED and this entry does not claim it -- verify before vendoring, not before reading. One relevant signal, measured rather than inferred: world/licenceSweep.mjs already carries THREE portsmouth repos -- EON-diffuse, OpenPBR-viewer and snelly -- all recorded MIT with licenceExists true, and F82-tint-generator is NOT among them. Same author, consistent history, still unverified for this repo.",
     },
     {
@@ -304,50 +323,83 @@ export const NEXT_ROUNDS = [
             + "exclusion from an oversight, and that is the actual defect.",
     },
     {
+        id: "shader-files-outside-every-census",
+        blocker: "CLOSED",
+        what: "CLOSED AT v4581, AND THE NUMBER IN THIS ENTRY WAS WRONG IN BOTH DIRECTIONS. A standalone shader "
+            + "file was in no reachability census in this tree: tools/ship/orphanScan.mjs's population was CODE, "
+            + "and CODE was .js and .mjs. It is scanned now -- one implementation, two populations -- and the "
+            + "answer is ELEVEN of 26 loaded by nothing, not the ten filed here. My ten included "
+            + "brain/transport/shaders/filter-packed.wgsl, which tools/ship/wgslCorpus.mjs really does open with "
+            + "readFileSync, and MISSED shaders/transitions/swekWipe.glsl and shaders/waterReflectRefract.frag"
+            + ".glsl. BOTH MISSES HAVE ONE CAUSE: my v4579 scan did not strip comments, so four `//` lines "
+            + "naming waterReflectRefract and one naming swekWipe.glsl counted as references. That is the "
+            + "defect orphanScan's own header spends a paragraph on -- \"PROSE IS NOT REACHABILITY, and this "
+            + "cost a round to learn\" -- committed by the person reading it.",
+        how: "*** AND FILING THIS ITEM IS WHAT WOULD HAVE HIDDEN ITS OWN SUBJECT. *** The entry listed all ten "
+            + "paths in its `what`, and FOUR of them -- shaders/ghost.frag.glsl, shaders/selection.frag.glsl, "
+            + "shaders/selection.vert.glsl, shaders/biome.vert.glsl -- are named by nothing else in the tree. "
+            + "The moment shaders entered the population, the backlog entry scheduling the round would have "
+            + "made its subjects read as reached. That is the FIFTH face of a trap orphanScan's header already "
+            + "describes four times: its own header comment, prose docs, its own output, and a tooltip. "
+            + "tools/ship/nextRounds.mjs is a report module now, with render/exactHash.mjs -- whose "
+            + "SHADER_SINHASH_V4578 carries a `notLoaded` array, a record whose CONTENT is \"nothing loads "
+            + "these\" and which was the reason the scanner believed something did -- and tools/ship/gateSweep"
+            + ".mjs, whose closing records hold 348 gate paths as history. Zeroing those three revealed "
+            + "tools/mutate/mechanicalSweep.mjs among the MODULES, correctly: its only three importers are all "
+            + "gates, and tools/mutate is the same class of directory as tools/ship, where being read by a gate "
+            + "IS the module's purpose. The gate-tool rule named one directory where two qualify.",
+        why: "shaders/biome.frag.glsl is the worked example and it cost a round to find. It picks desert / "
+            + "plains / forest on `b < 0.33` and `b < 0.66` -- a THRESHOLD on a sin-hash, which v4569 "
+            + "established is where CPU/GPU divergence changes what EXISTS rather than how it looks -- and it "
+            + "carries \"BIOME DETECTION (matches JS logic conceptually)\", the same kind of claim "
+            + "render/holoFoilShader.js's \"matching the model's hash2\" turned out to be false about. So "
+            + "v4578 filed it as a threshold site worth its own round. NOTHING LOADS IT, and the tree had no "
+            + "way to say so.",
+        upstream: "WHAT IS NOT DONE: the eleven are a BASELINE, not a deletion list. orphan-baseline.json "
+            + "carries them with the reason stated -- a shader kept as a reference, a demo somebody means to "
+            + "rewire and a leftover from a deletion look identical from outside, and that judgement is Keith's "
+            + "rather than a scanner's. The ratchet refuses growth; shrinking the list is the point. Also not "
+            + "done: the dozen gates that own PRIVATE walks with their own extension rules are still blind to "
+            + "shader files -- this round changed the SHARED census, which is what the others build on, and "
+            + "#31's own note said the same thing about .cjs.",
+    },
+    {
         id: "sin-hash-everywhere-else",
-        blocker: "OPEN",
-        what: "THE TWIN HALF IS DONE AND THE UNGATED HALF IS NOT. fract(sin(dot(p, K)) * 43758.5453) amplifies "
-            + "the last bits of its input by four orders of magnitude, so a float32 GPU and a float64 CPU draw "
-            + "DIFFERENT RANDOM NUMBERS rather than rounding the same one differently. The backlog filed this as "
-            + "29 files; the real shipped population is 16, and the round that read them split it: THREE HAD BOTH "
-            + "HALVES and they disagreed, three are CPU-only with no shader to disagree with, two are instruments "
-            + "that compute the idiom at both precisions ON PURPOSE, and TEN HAVE NO GATE AT ALL. The three twins "
-            + "are fixed at v4569-v4570 -- render/grassField.js against render/grassModel.mjs, "
-            + "fx/wormhole/wormholeNebula.js's three transcriptions of h2, and fx/nebula/nebula.js against "
-            + "fx/nebula/nebulaShaders.js. The ten are what is left.",
-        how: "For the ten, the hash is not the work -- render/exactHash.mjs is written, twinned and gated, so the "
-            + "substitution is three lines a file. The work is that a different hash is a DIFFERENT PICTURE and "
-            + "those ten have nothing that would notice: render-QA checks their pages for notAllBlack and "
-            + "notUniform, and a completely different noise field passes both identically. So the round is a "
-            + "verifiable pair per file BEFORE the substitution -- a CPU reference the shader is held to, the "
-            + "shape render/grassModel.mjs and fx/nebula/nebula.js already have -- and that is a round per page, "
-            + "not one sweep of the tree. Changing the hash first would be a visual change wearing a fix.",
-        why: "*** THE TREE ALREADY KNEW, IN THREE PLACES, AND NEVER JOINED THEM UP. *** "
-            + "tools/ship/webgpuHarness.mjs records that sin(i * 12.9898) * 43758.5453 returns 0.921690 on a "
-            + "CPU and 0.240234 on a GPU for i = 1. fx/paintFields.mjs's header records the same shape for "
-            + "the nebula hash, and paintFields-selfcheck MEASURES the f64-against-f32 gap every run. "
-            + "swiftShaders-selfcheck drew a whole boundary around it -- fifteen shaders it declared could "
-            + "never be verified. Three independent notes about one defect, each treated as a local limit. "
-            + "*** AND THE THREE TWINS SHOW WHAT THE NOTES WERE MISSING: THE GAS SURVIVES THE DIVERGENCE AND "
-            + "THE THRESHOLD DOES NOT. *** fbm AVERAGES its noise, so a wisp drawn from an unrelated random "
-            + "field is still a wisp -- which is why nebulaShaders.js could say \"f32 vs f64 differences are "
-            + "imperceptible for gas\" and be RIGHT, and why nobody looking at the picture caught it. But "
-            + "render/grassField.js decides a blade EXISTS with a threshold on bladeHash, and "
-            + "fx/nebula/nebula.js draws a star with sv > 0.994, and A THRESHOLD DOES NOT AVERAGE. "
-            + "Measured: grass 65.4% of drawn decisions FLIPPED between the shader and the model whose stated "
-            + "job is to mirror it; wormhole h2 70.0% of 14,400 lattice points; nebula 3,006 CPU stars "
-            + "against 2,509 GPU ones with 378 in the same place -- 12.6% -- over 518,400 sampled pixels, on "
-            + "a page that imports renderNebulaCPU AND the shaders, so which sky a viewer saw depended on "
-            + "whether their browser had WebGPU. All three now read 0.0% and 100%, and "
-            + "tools/ship/exactHash-selfcheck.mjs section 6 is a RATCHET: no file may compute the sin-hash in "
-            + "float64 and emit it to a shader again.",
-        upstream: "Nothing blocks the ten. What blocks them being DONE rather than merely changed is that a "
-            + "verifiable pair has to exist first, and building one is the round. The judgement each site "
-            + "needs is whether anything DEPENDS on the current pattern -- a baked screenshot, a recorded "
-            + "verdict, a demo somebody has looked at and approved. The two instruments are the worked "
-            + "example of getting that judgement wrong: fx/paintFields.mjs's hashPrecisionGap and "
-            + "physics/kernelVerdict-selfcheck.mjs compute the idiom at both precisions to MEASURE the gap, "
-            + "and a mechanical pass over \"29 files\" would have deleted the measurement and called it a fix.",
+        blocker: "CLOSED",
+        what: "CLOSED AT v4582. fract(sin(dot(p, K)) * 43758.5453) amplifies the last bits of its input by four "
+            + "orders of magnitude, and this entry has been re-counted three times because each count was taken "
+            + "with a different rule: 29 files filed, 16 shipped at v4569, TWELVE at v4578 once prose was "
+            + "separated from shader source, and of those twelve TWO were files no runtime code loads at all "
+            + "(v4579). What the rounds actually fixed: three CPU/GPU twins at v4569-v4570 (grass 65.4% of its "
+            + "draw decisions flipped, wormhole 70.0% of 14,400 lattice points, nebula 3,006 CPU stars against "
+            + "2,509 GPU with 378 shared); a FOURTH twin at v4578 that the ratchet could not see because its "
+            + "halves live in two files (holofoil, 29 of 184 flakes in the same place -- 15.8%); three "
+            + "hand-copied starfields at v4579; and the engine's own night sky at v4580.",
+        how: "*** THE THRESHOLD CLASS IS EMPTY AND THE LAST TWO-LANGUAGE SITE IS SHARED. *** v4582 took "
+            + "nebula-device.html, the only one of the six remaining sites carrying the idiom in GLSL AND WGSL "
+            + "and the only one whose page makes a cross-backend claim -- \"only the shader text differs per "
+            + "backend, everything else is written once\". Two transcriptions of one hash, two compilers, and "
+            + "nothing comparing them; sin() at those magnitudes is implementation-defined, so the page could "
+            + "not have told you whether its own claim held. Both halves splice render/exactHash.mjs's exported "
+            + "GLSL and WGSL now, so the two backends agree BY CONSTRUCTION rather than by hoping two "
+            + "implementations of sin round alike.",
+        why: "*** THE FIVE THAT REMAIN ARE A DECISION, NOT A REMAINDER, AND IT CARRIES ITS EVIDENCE. *** "
+            + "atmosphere/AtmosphereSystem.js, demos_code/ant_colony.js, demos_code/slime_mold.js, "
+            + "render/CloudVolume.js and render/voxelrenderer.js each average, mix, or add the hash as a small "
+            + "offset -- a lightning jitter through a smoothstep, a heading nudge on a tie-break branch, a "
+            + "dithered ray start over 48 march steps, a +/-4% per-voxel tint. v4580 measured that the idiom's "
+            + "deficit is a TAIL effect that DEEPENS with the cut (0.987 of the fraction asked for at a cut of "
+            + "0.900, 0.437 at 0.997, 0.243 at 0.999), so the property that made the other seven worth changing "
+            + "does not reach a consumer that never thresholds. And measured rather than assumed: NOT ONE of "
+            + "the five carries the idiom in two languages, so there is no second half to disagree with -- one "
+            + "language, one shader, no CPU twin. tools/ship/exactHash-selfcheck.mjs section 5e holds both "
+            + "facts, and requires each site to STILL carry the idiom, so this reads as a decision rather than "
+            + "quietly passing once somebody changes one.",
+        upstream: "WHAT IS NOT CLAIMED: that the five are correct. sin at these magnitudes is "
+            + "implementation-defined ACROSS DEVICES, so two GPUs can draw different noise at every one of "
+            + "them -- that is a real cost, recorded rather than repaired, and the repair is three lines a file "
+            + "if a reason ever appears. What would supply one is a page that shows the same picture on two "
+            + "devices and claims it, which is exactly what nebula-device.html did and why that one was fixed.",
     },
     {
         id: "fluid-has-no-sink",
@@ -483,7 +535,7 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "incremental-sweeps",
-        blocker: "OPEN",
+        blocker: "CLOSED",
         what: "Stop re-running the ~1,140 gates whose inputs did not change. Record each gate's REAL input set by wrapping fs during one full sweep, then invalidate against a content hash of that set.",
         how: "The instrument already exists in miniature: v4548 found its whole subject by wrapping fs.readFileSync and fs.readdirSync and counting calls per gate. Recording the PATHS rather than the count, for every gate, over one sweep, gives each gate an observed input set. A later sweep hashes those paths and runs only the gates whose set changed. Fail safe: a gate whose set is unknown, empty, or was recorded while it spawned a subprocess or a browser always runs.",
         why: "*** MEASURED AT v4548, IN ANSWER TO EXACTLY THE WRONG IDEA -- \"load all the file info into a database\". *** A shared file database is not the lever. Only 161 of 1,604 gates touch the tree at all; the walk is 42 ms; and the other 1,443 gates would gain nothing whatever from it. The sweep costs 725 s of gate time across 1,141 gates (374 s wall at 8 workers). Node process startup is 31 ms, so 1,141 spawns is 35 s -- 5%, real but not the prize. 415 gates finish under 200 ms and account for 57 s between them. THE COST IS THE GATES DOING THEIR WORK, and the only way to make that cheaper is not to do it when nothing it depends on has moved. A round touches five to fifteen files.",
@@ -511,6 +563,28 @@ export const NEXT_ROUNDS = [
             + "ZERO moved. STILL OPEN AND STILL THE WHOLE QUESTION: whether to change the default. quickSweep "
             + "skips nothing without --incremental, and the decision that remains is a judgement about a silent "
             + "failure mode, now with a standing measurement behind it instead of an argument.",
+        closedAt: "v4574 -- ARMED, AT THE COMMAND LINE ONLY, AND THE FIRST WAY I ARMED IT WAS WRONG. "
+            + "Flipping runQuickSweep's own default to true armed it for EVERY caller at once -- nine besides "
+            + "the CLI, all fixtures driving the sweep to watch what it does plus budgetExile and verify -- and "
+            + "tools/ship/sweepCoverage-selfcheck.mjs went red within the minute, correctly: its 1 ms-budget "
+            + "fixture reported '0 gates run at a 1 ms budget, 0 confirmed alone' because the sweep it was "
+            + "testing had skipped everything. A FIXTURE THAT SKIPS ITS OWN SUBJECT IS VACUOUS, and it would "
+            + "have passed silently had it asserted a little less. So the default lives in the CLI block and "
+            + "NOT in the function: typing the command skips, calling the function does not, and the caller "
+            + "nobody has written yet inherits the safe one. verify.mjs passes skipUnchanged:false explicitly "
+            + "anyway -- the saving buys iteration speed and spends a small measured chance that a gate which "
+            + "should have run did not, and the one run this tree must not spend that on is the one whose "
+            + "output is ALL GREEN. *** AND THE RECORD'S OWN FORMAT IS CHECKED NOW, WHICH IT NEVER WAS: *** "
+            + "FORMAT has been written into every record since v4566 and nothing read it. While the mechanism "
+            + "only counted that cost nothing; armed, it is the difference between a stale record and a wrong "
+            + "one, because the encoding is INDEXED -- a record written under a different layout does not fail "
+            + "to decode, it decodes to THE WRONG PATHS, hashes them, finds them unchanged and skips. The same "
+            + "line covers a missing record. MEASURED: 926 of 1,258 gates skipped, 73.6% of gates but 54.1% of "
+            + "recorded gate time, and 409 s of wall clock becomes 233 s -- 43%. The gap is the point and is "
+            + "recorded rather than rounded away: the gates that always run are also the slow ones. What still "
+            + "runs, by reason and by cost: 104 gates / 174 s spawn a child the probe cannot follow, 133 / "
+            + "132 s reach a module their set does not carry (the v4573 bound, and that is its price), 73 / "
+            + "93 s had an input change, 22 / 17 s open a socket.",
         upstream: "Nothing technical. What it needs is a decision about SOUNDNESS, and that decision is the round: a gate that reads the clock, the network, a GPU or a spawned browser has no stable input set, and a skipped gate that should have run is a silent false green -- the worst outcome this tree recognises. So the conservative shape (an allowlist of gates with proven-stable input sets, everything else always runs) is probably right, and it should be built measuring how many gates actually qualify rather than assuming most do. *** v4566 BUILT IT, MEASURED IT, AND SHIPPED IT DISARMED. *** tools/ship/inputProbe.mjs patches the fs default-export object -- which is what 786 of the 917 fs-using gates reach through -- and records the PATHS; the closure comes out TRANSITIVE, because a module load routes through the same object, and a CommonJS require does too. One pass over the sweep\'s own population (1,253 gates, 181 s at eight workers) gave 1,017 usable sets with a MEDIAN OF SIX PATHS, and 1,004 of 1,254 gates are skippable on an unchanged tree. The 250 that always run are named by reason: 121 spawn a child process, 102 take fs by NAMED import (Node binds those when the module links, so the patch may not be on the path), 13 open a socket, 14 have had an input move. Changing a file that 268 gates read still leaves 803 skippable, so the saving survives a real round. THE DECISION ABOUT SOUNDNESS WENT THE CONSERVATIVE WAY AND IS VISIBLE IN THE DEFAULT: quickSweep REPORTS what it would have skipped on every run and skips nothing until --incremental is passed, so the number earns trust in public over rounds instead of in an argument. WHAT IS STILL NOT CLAIMED is the thing that would make it safe to arm: an input set is what a gate read on ONE RUN -- a sample, not a specification -- so a gate that branches on something outside the tree could have a set recorded on the narrow branch. Two things bound that and neither is a proof: a path checked with existsSync IS recorded even when absent, so the file APPEARING invalidates the gate (measured in the gate, not asserted), and the sets came back identical on 60 of 60 gates probed twice. *** v4567 CLOSED BOTH DISQUALIFIERS AND THE ROUND\'S OWN RANKING OF THEM WAS BACKWARDS. *** They were the same hole: a named ESM import of a builtin does not route through a patched exports object -- measured, not assumed, since such a gate recorded an EMPTY set rather than a partial one -- and a module.register() resolve hook, which changes what the NAME is bound to, reaches both node:fs and node:child_process. NODE_OPTIONS carries the probe into every node CHILD that inherits the environment, so a child records itself into a shared directory the recorder unions. SKIPPABLE went 956 -> 1,102 of 1,254, 59% -> 72% of gate time. The child-process block was ranked FIRST at 23% of sweep time and delivered 17 gates; the named-import block was ranked SECOND at 7% and delivered 94 of its 102. Sampling the gates that still refused found NINETEEN OF TWENTY-FIVE spawning nothing whatever -- disqualified for merely REQUIRING child_process, which measures the import graph instead of the run; patching the required object rather than flagging the require freed about a hundred more. WHAT REMAINS IS GENUINELY UNFOLLOWABLE: 104 gates, 123 s, and of 24 sampled 16 launch Playwright\'s headless_shell, the rest git, python3, cargo, tar and a shell whose grammar this must not pretend to parse. A CHURN FLOOR IS NOW NAMED TOO: the sweep invalidates gates BY RUNNING -- 85 gates stat something under gate-reports/, 11 read sweep-timings.json, 16 read knowledge-index.json -- so a skip count moves by roughly 60 to 120 between a fresh record and a post-sweep one, and no amount of probing removes it. STILL DISARMED, and for the unchanged reason: an input set is one run\'s sample, not a specification. The remaining work is watching the reported number across rounds, and then a decision.",
     },
     {
@@ -520,10 +594,37 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "over-budget-record-detectors",
-        blocker: "OPEN",
+        blocker: "CLOSED",
         what: "DONE IN PART at v4548 -- the two detectors are back under the budget and the number is now ratcheted -- but 43 of 94 frozen records are STILL not checked at ship time, and that is the part left open.",
         how: "Either bring both under 3,000 ms, or give the ship ritual a second tier that runs the record gates unconditionally regardless of the sweep budget. The second is probably right: these two are not ordinary gates, they are the ritual's own integrity check, and pricing them by the same clock as a geometry fixture is what produced the failure below.",
         why: "*** THIS IS NO LONGER HYPOTHETICAL AND THE COST IS MEASURED. *** frozenRecords-selfcheck runs 3,446 ms and recordDrift-selfcheck runs 3,026 ms, against a 3,000 ms budget -- over by 446 ms and by 26 ms. BUDGET_DRIFT_V4536 was added to the tree by commit 4817a29b and that round did not re-take PROBE_AT_V4536\'s census; NINE SUBSEQUENT ROUNDS THEN SHIPPED ALL GREEN over a census that was wrong by one record, one withFields and one field, and it was found by hand at v4547 rather than by anything in the ritual. *** THE ROUND THAT ADDED THE UNCOUNTED RECORD WAS THE SWEEP-BUDGET ROUND ITSELF, *** which is as close to a proof as this file is going to get that the budget is the mechanism and not a coincidence.",
+        closedAt: "v4576 -- AND THE FILED NUMBER WAS WRONG IN BOTH DIRECTIONS AGAIN: it said 43 of 94, and the "
+            + "live reading was 38 of 104. TWO CAUSES, ONE FIXED IN THE INSTRUMENT AND ONE IN THE RITUAL. *** "
+            + "FIRST, SEVEN RECORDS READ AS UNGUARDED AND WERE NOT. *** frozenRecords asks which gates NAME a "
+            + "record, and redCensus.mjs defines RED_AT_V4531 = Object.freeze(RED_AT_V4531_GATES.map(...)) -- "
+            + "so the ARRAY is consumed only through the derived constant and gates name the derived one. "
+            + "Corrupting the array, by filing a green gate as a known red, DOES redden registerDrift-selfcheck; "
+            + "measured. The census follows one level of derivation within the defining file now, and unguarded "
+            + "went 20 -> 12, checked 66 -> 72. One level and one file on purpose: a transitive closure would "
+            + "start crediting records with guardians that never touch their value. *** SECOND, THE TWENTY "
+            + "RECORDS WHOSE GUARDIAN WORKS AND COSTS TOO MUCH. *** Both fixes this entry proposed were "
+            + "measured. v4548 took 'make them cheaper' for two other gates and found they were doing the same "
+            + "work six times over; that medicine does NOT apply here -- fs calls against unique paths give "
+            + "1.0x, 1.1x, and samplerCheck-selfcheck does no file I/O at all, 9 s of pure arithmetic. So the "
+            + "second tier is right: tools/ship/recordTier.mjs runs the nine guardian gates the sweep cannot "
+            + "afford, 93 s, serially and with a cap, wired as a ship step beside population-census. Its list is "
+            + "DERIVED from recordReach and its own gate asserts that not one of the nine names appears in its "
+            + "source. *** ON ITS FIRST RUN IT FOUND TWO RED GUARDIANS COVERING EIGHT RECORDS, NEITHER ON ANY "
+            + "REGISTER. *** orreryFleet-selfcheck was red because orrery-fleet.json's baked file sizes had "
+            + "drifted on three files I EDITED THREE ROUNDS EARLIER, under sweeps that all reported ALL GREEN. "
+            + "budgetExile-selfcheck was red on two rows that gated on the defect still being as bad as when it "
+            + "was found -- 'gates ARE still exiled at the cap' (v4568 fixed that) and 'the inflation is STILL "
+            + "above 1.5x' (it has fallen to 1.48). That file's own section 3 diagnosed this exact shape at "
+            + "v4535 and wrote the fix down -- split the claim, assert the historical half from the record -- "
+            + "and never applied it to these two. IT COULD NOT BE APPLIED IN FULL: MEASURED_V4425 froze "
+            + "{ verdict, ms } where ms is the SERIAL time, so the INFLATED reading that actually did the "
+            + "exiling was never written down and the historical half is unassertable. Recorded rather than "
+            + "faked. STILL OPEN: 12 records have no guardian at all, which a tier cannot help with.",
         upstream: "Nothing -- both halves are available today. This sits here rather than in the round because raising or tiering the budget changes what every ship does, and backlog item #14 (487 gates over budget, 31% of the tree) is the wider question this is one measured instance of. Doing the narrow fix without the wide one is defensible; doing it silently is not. *** v4548 DID THE NARROW FIX, AND NEITHER BY RAISING THE BUDGET NOR BY TIERING IT. *** Both options in the `how` above were wrong. The gates were not doing expensive work: recordDrift-selfcheck issued 23,429 readFileSync and 12,397 readdirSync over 4,025 files -- every file SIX times, every directory EIGHTEEN times -- for 606 ms of actual work, because four censuses each re-derived the same read and the gate ran them six times over. tools/ship/treeRead.mjs memoises one read per process; the guardian search inside frozenRecords, ~95 record names against 1,602 gate sources recomputed per call, was memoised too. 3,289 -> 1,255 ms and 3,164 -> 1,820 ms, and quickSweep would not have noticed either (a gate recorded over budget is skipped, so it can never be re-timed -- budgetExile.mjs\'s one-way door) until sweepRotation --gate re-timed them through the owner. *** WHAT IS STILL OPEN IS THE GENERAL CASE, AND IT IS BIGGER THAN THE ROUND THAT FOUND IT: *** joining the record census to the sweep timings says 43 of 94 records are unchecked at ship time -- 23 guarded only by gates over the budget, 20 by nothing at all. Three guardians are recorded AT the 20,000 ms cap and do not finish (redCensus-selfcheck, transmission-selfcheck, dockFraming-selfcheck); one is a 14 s commit walk over a vendored repository (orreryFleet-selfcheck). Those are four separate rounds with four separate causes, and the honest next step is to take them one at a time rather than as a policy. tools/ship/recordReach.mjs RATCHETS the number so it cannot grow while nobody is looking, which is the specific failure that produced this item. *** AND v4557 MEASURED WHY THE WIDE ONE IS BIGGER THAN IT LOOKS, WHILE FIXING SOMETHING ELSE. *** budgetExile is a ONE-WAY DOOR -- a gate recorded over budget is skipped by the sweep, so it is never re-timed, so it stays over budget -- and 398 OF THE 465 OVER-BUDGET GATES CARRY A TIMING STAMPED \"unknown -- before v4408\", older than per-entry stamping itself. 164 of those sit under 8 seconds. Sixteen were sampled across that range and re-timed alone: FOURTEEN CAME IN UNDER THE 3,000 ms BUDGET, several by a wide margin (asciify 4,257 -> 339, dracoWeld 5,443 -> 76, twoFExperiment 7,097 -> 1,057). One instance was repaired at v4557 because its exile had a visible cost: staleness-selfcheck was recorded at 3,316 ms, runs in 558 alone and 1,462 under eight-way load, and while it sat outside the sweep a derived count on case-study.html drifted to 1,606 against 1,609 with its recorded exit code frozen at a stale 0. So \"31% of the tree never runs at ship time\" is substantially an artefact of readings nothing can refresh, and the round is a bulk re-time THROUGH sweepRotation --gate (which merges rather than replaces) followed by triage of whatever reds that surfaces -- the reds being why this is a round and not a script. *** v4565 RAN THAT BULK PASS AND HALF THE BAND CAME BACK. *** --band selects the pool by recorded cost instead of by staleness, because the returnees live at the cheap end and are also the fastest to measure; 210 gates filed between 3,000 and 7,922 ms were run serially, and 105 CAME BACK UNDER BUDGET (fresh readings 65 to 2,958 ms, filed/serial median 2.43x, biggest correction 89.5x). Outside the ship-time sweep went from 464 of 1,614 (28.7%) to 359 (22.2%) in one pass of about half an hour. It surfaced 12 reds, 8 of them new and every one green in the register until something ran it: absenceScope, reportDoors, brainTrail, frontDoor, mpmGpuPage, gateReport, scoreDirection all had real defects and are fixed; crtToggle is a flake, named as one rather than counted as a repair. OVER_BUDGET_PASS_V4565 in tools/ship/sweepCoverage.mjs carries the numbers and sweepCoverage-selfcheck re-derives them from the ledger and the live timings. *** WHAT IS LEFT IS THE HARD HALF AND IT HAS A DIFFERENT SHAPE. *** 219 gates are still over budget -- 91 in the 3-8 s band (the ones that really are slow) and 128 in 8-20 s, worth roughly another 24 minutes at a far worse rate of return -- AND 140 KILLED GATES THE ROTATION CANNOT REACH AT ALL, because rotation() walks c.over and c.killed is a separate bucket with no door in it whatsoever. That is 39% of everything outside the sweep sitting behind the exact one-way door v4408 opened for the other bucket, and it is the next item rather than this one. *** v4568 OPENED IT: 103 OF THE 140 NOW HAVE A VERDICT AND FIVE OF THEM ARE RED. *** rotation() takes includeKilled (pool 222 -> 362) and --killed runs the bucket serially at its own, larger cap, because re-running a capped gate AT the cap it died on can only reproduce the death. 140 gates at 90 s: 103 FINISHED (97 green, 6 red), 37 did not, 35 came in UNDER the 20,000 ms cap that exiled them, and ONE -- placementRender-selfcheck -- reads 51 MILLISECONDS against the 20,125 on file, a 395x correction on a reading that was never a measurement of that gate at all. 129 of the 140 carried a stamp older than per-entry stamping itself. THE DEEPER DEFECT WAS NOT SLOWNESS: `killed` was a proxy for 'over the cap' and the tree read it as 'no verdict', so a gate that ran green in 50 s, one cut off at 20 s, and one that ran RED were the same entry. `finished` is now written by the runner from what the process DID, and census splits the bucket on that recorded fact. The five reds are registered in redCensus.RED_AT_V4568 with what each says -- a gate passing on a COPYRIGHT COMMENT (commentFalsePass on qrChannel), a population census of 472 against a live 520 (gateReach), seven baseline entries that have outlived their reason (baselineHygiene), reachable gates no longer scheduled first (gateSelection), and a signal holding for 28 of 30 that therefore discriminates nothing (orphanDisposition). FIXING THOSE FIVE IS THE NEXT ITEM: each is a defect in a different subsystem and this round is about the door. *** AND THE CAP WAS LEAKING THE GATE'S CHILDREN, A LOOP THAT GREW THIS BUCKET. *** p.kill('SIGKILL') signals the direct child only, and headlessGpu-selfcheck spawns one that PINS A WEBGPU DEVICE on purpose; an orphan of that shape was found holding a device for forty-four minutes, competing with every GPU gate that ran meanwhile -- and a gate slowed past the cap is killed, orphaning more. Both kill sites signal the process GROUP now, and redCensus-selfcheck's register re-run went from unbounded (90,096 ms, killed, never completing) to a 45 s stalest-first slice. WHAT IS STILL OPEN: the 37 that survive 90 s have a floor under them rather than a verdict. *** AND THE PASS BROKE A RECORD, WHICH IS THE FINDING THAT TRANSFERS. *** tslRace-selfcheck hit the 20,000 ms cap under contention and died after its first section, which writes tsl-emitted-race.json WHOLESALE while its later sections merge into what that left -- so section 6\'s `atlas` key was truncated away and never rewritten, wgslCorpus dropped tslSource.spriteAtlas behind an `EMITTED_RACE.atlas &&` presence guard, and the corpus got one case smaller with NOT ONE ROW GOING RED (crossBackend asserts `results.length === corpus().length`, the corpus measured against itself, which holds at any size). Found by reading a git status line. Fixed at v4566: the section merges by key, wgslCorpus.GENERATED_CASES names all fifteen generated cases with the record and writer each comes from, and probeConvention-selfcheck is the census that sees one leave. A GATE THAT WRITES A RECORD IN SECTIONS CAN DESTROY IT BY FAILING PART-WAY, and any bulk re-time is a machine for making gates fail part-way.",
     },
     {

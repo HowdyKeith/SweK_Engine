@@ -84,11 +84,25 @@ console.log("\n2. *** THE RATCHET: UNCHECKED MAY FALL AND MUST NOT RISE ***");
         `${live.unmeasured} record(s) guarded only by gates with no recorded timing, against ` +
         `${live.overBudget} guarded only by gates measured over the budget. Removing one detector's timing ` +
         `from the table moves a record into the first bucket, not the second.`);
-    ok("!! the records this round rescued really are checked now, and the demoted ones really are unguarded",
+    // *** v4576 -- THE DEMOTED HALF IS A FACT ABOUT v4548 AND WAS BEING TESTED AGAINST TODAY. ***
+    // This required every record the comment-strip demoted to be STILL unguarded. BUDGET_DRIFT_V4536 is not:
+    // v4576 taught frozenRecords to follow one level of derivation within a defining file, and that record is
+    // now guarded by three gates. A LATER ROUND RE-CLASSIFYING A RECORD IS THE OUTCOME THIS FILE EXISTS TO
+    // PROMPT, and the row reddened on it -- the third time in this one round that a historical claim was being
+    // asserted against live state, after budgetExile's cap row and its inflation row.
+    //
+    // So the claim is split the way tools/ship/budgetExile-selfcheck.mjs's section 3 prescribes: the RESCUED
+    // half is still asserted live, because a record v4548 rescued going back to unchecked would be a real
+    // regression; the DEMOTED half is asserted as v4548's finding -- the list is non-empty and disjoint from
+    // the rescued one -- and each record's class TODAY is reported rather than required.
+    const demotedNow = R.demotedByCommentStrip.map((n) => n + " " + (live.rows.find((r) => r.name === n)?.cls ?? "gone"));
+    ok("!! the records this round rescued really are checked now, and the demoted ones are accounted for",
         R.rescued.every((n) => live.rows.find((r) => r.name === n)?.cls === RR.CLASS.CHECKED) &&
-        R.demotedByCommentStrip.every((n) => live.rows.find((r) => r.name === n)?.cls === RR.CLASS.UNGUARDED) &&
+        R.demotedByCommentStrip.length > 0 &&
         R.rescued.every((n) => !R.demotedByCommentStrip.includes(n)),
-        "rescued " + R.rescued.join(", ") + "; demoted " + R.demotedByCommentStrip.join(", ") +
+        "rescued " + R.rescued.join(", ") + " -- all still checked, which is the half that would be a " +
+        "regression. Demoted at v4548 and where they stand today: " + demotedNow.join(", ") + ". A record " +
+        "leaving the demoted state is PROGRESS and this row no longer forbids it" +
         // *** THE RECORD NAMES BELOW ARE SPELT FROM `R`, NEVER TYPED, AND THAT IS NOT STYLE. *** `guardians`
         // asks which gates NAME a record, comment-stripped -- and a name in a STRING survives the strip,
         // because a string is where a real check lives too (`r.name === "FOO_V4500"`). The first draft of
@@ -194,6 +208,91 @@ console.log("\n5. *** THE TWO GATES THIS ROUND WAS ABOUT ARE BACK INSIDE THE BUD
         `and a cold one land on opposite sides, which is how this drifted out unnoticed rather than failing ` +
         `loudly. A serial reading is REQUIRED here rather than merely preferred: falling back to the ` +
         `contended sample would put this row back on the luck it was just taken off.`);
+}
+
+console.log("\n6. *** \"UNGUARDED\" WAS ONE WORD FOR TWO FACTS, AND THE SMALLER ONE IS THE ACTIONABLE ONE ***");
+{
+    // For four rounds this file reported `unguarded` and every reader -- me included -- took it for a
+    // coverage hole somebody forgot to close. Asked properly at v4577, with comments AND every record's own
+    // declaration blanked so a declaration is not a read: nine of them are named by NO CODE ANYWHERE. They
+    // are prose in object form. A guardian for one would have to re-derive a past round's measurement, which
+    // is a round each, not a gap. The other two ARE read, by something that cannot fail on the value, and
+    // that is a defect with a repair.
+    const u = RR.splitUnguarded();
+    // *** THE ROUND'S OWN RECORD, GRADED AGAINST THE LIVE TREE RATHER THAN READ OUT. *** Without this row the
+    // record would be unguarded itself, which is the joke this file cannot afford to be the punchline of --
+    // and the ratchet caught it: UNGUARDED_SPLIT_V4577 landed in recordReach.mjs and read as unguarded until
+    // this row named it. Like the census re-takes in frozenRecords-selfcheck, A ROUND THAT ADDS A RECORD
+    // RE-TAKES THIS, and that is the price of a number somebody re-derives.
+    const R7 = RR.UNGUARDED_SPLIT_V4577;
+    // *** ONLY THE TIMING-INDEPENDENT HALF IS ASSERTED, AND THE FIRST DRAFT ASSERTED BOTH. *** `unguarded`
+    // asks which gates NAME a record and no clock enters it. `checked` and `overBudget` come from joining
+    // that census to sweep-timings.json, which quickSweep writes from an 8-WAY pass. This row went red inside
+    // the round's own closing sweep: 73/22/1 before it, 69/27/0 after, on code that had not changed, because
+    // all five that moved are guarded by tools/ship/reportDoors-selfcheck.mjs and that gate reads 2877 / 2872
+    // / 2939 / 3001 / 3025 ms over five SERIAL runs against a 3,000 ms budget. It straddles the line on its
+    // own. A row asserting those five records' class was asserting a coin toss, which is precisely the "fails
+    // a ship at random and never reproduces alone" shape this file's readTimings note already warns about.
+    ok("!! *** the structural half of this round's reading is what the tree holds -- no clock enters it ***",
+       R7.structural.total === live.total && R7.structural.unguarded === live.unguarded &&
+       R7.structural.documentaryOfThose === u.documentary.length &&
+       R7.structural.readByCodeOfThose === u.readUnchecked.length,
+       `record ${R7.structural.unguarded} unguarded of ${R7.structural.total} (${R7.structural.documentaryOfThose} ` +
+       `documentary, ${R7.structural.readByCodeOfThose} read) against live ${live.unguarded} of ${live.total} ` +
+       `(${u.documentary.length} documentary, ${u.readUnchecked.length} read)`);
+    say(`the timing-dependent half, REPORTED and not asserted: live ${live.checked} checked / ${live.overBudget} ` +
+        `over budget / ${live.unmeasured} unmeasured. The record filed ${R7.after.checked}/${R7.after.overBudget}/` +
+        `${R7.after.unmeasured} and, minutes earlier on the same code, ${R7.afterPriorSweep.checked}/` +
+        `${R7.afterPriorSweep.overBudget}/${R7.afterPriorSweep.unmeasured} -- ${R7.contendedRecords} records ` +
+        `whose class is decided by how loaded the box was when ${R7.contendedGuardian} was timed.`);
+    ok("!! ...and the pair of readings really does straddle the budget, so the instability is measured",
+       R7.contendedGuardianSerialMs.some((m) => m < live.budgetMs) &&
+       R7.contendedGuardianSerialMs.some((m) => m > live.budgetMs) &&
+       R7.afterPriorSweep.checked !== R7.after.checked,
+       `${R7.contendedGuardian}: ${R7.contendedGuardianSerialMs.join(" / ")} ms serial against a ` +
+       `${live.budgetMs} ms budget. If this ever reads all-under or all-over, the gate has moved off the ` +
+       "line and the five records have a stable class again -- which is a repair, and this row should then " +
+       "be replaced by an assertion rather than kept as a description of a wobble that stopped");
+    ok("!! ...and the three records it says moved really did leave the unguarded set",
+       Object.keys(R7.moved).every((n) => {
+           const row = live.rows.find((r) => r.name === n);
+           return row && row.cls !== "unguarded";
+       }),
+       Object.entries(R7.moved)
+           .map(([n, c]) => n + " recorded " + c + ", live " + (live.rows.find((r) => r.name === n) || {}).cls)
+           .join("; ") + ". LEAVING the unguarded set is the claim; WHICH class they landed in is the timing " +
+       "join and is reported beside it, because \"no longer unguarded\" is not \"now checked\"");
+    for (const r of u.readUnchecked) console.log(`     read by code: ${r.name}  in ${r.readBy.join(", ")}`);
+    ok("!! *** a DOCUMENTARY record is named by no code at all -- not even its own module ***",
+       u.documentary.every((n) => !u.rows.find((r) => r.name === n).readBy.length),
+       `${u.documentary.length}: ${u.documentary.join(", ")}. Every one of them scored a hit before the ` +
+       "declaration blanking went in, on its own `export const` line, which made the whole population read " +
+       "as 'named somewhere' and the split as worthless");
+    // *** THE CONTROL: the blanking must not be blanking everything. *** A splitter that returned
+    // "documentary" for all eleven would pass the row above and mean nothing, which is this session's most
+    // frequent single mistake -- a smaller number that looks like progress.
+    const guarded = live.rows.filter((r) => r.cls !== "unguarded").slice(0, 6).map((r) => r.name);
+    const sanity = FR.readSites(guarded);
+    ok("!! *** CONTROL: the same scan finds the reads of records that ARE guarded ***",
+       guarded.length > 0 && guarded.every((n) => sanity.get(n).length > 0),
+       guarded.map((n) => n + " -> " + sanity.get(n).length + " file(s)").join("; ") +
+       ". Without this row, a scan that blanked too much would report every record documentary and read as a " +
+       "clean answer");
+    // *** THIS BUCKET IS EMPTY TODAY AND THE ROW BELOW IS THEREFORE VACUOUS -- SAID, NOT HIDDEN. ***
+    // v4577 found two in it and gave both a gate: MEASURED_AT_V4415, whose only reader handed it to a
+    // FINITENESS check (`hit: 0.5` -> `hit: 0.77` left that gate green), now re-derived value for value in
+    // physics/render/pathTracerGpu-selfcheck.mjs; and MEASURED_V4527, printed by physics/raceKnob.mjs's own
+    // reportLines() and now held to LAP_BOUND, OFF_BOUND and CANDIDATES by physics/raceKnob-selfcheck.mjs.
+    // The row stays as the guard for a refill. A zero here is a state of the tree, not a passing check, and
+    // the row above -- which counts the documentary nine -- is the one carrying the weight.
+    ok("  and the readUnchecked rows name real files that really contain the name",
+       u.readUnchecked.every((r) => r.readBy.every((f) => fs.existsSync(path.join(ENG, f)) &&
+                                                          fs.readFileSync(path.join(ENG, f), "utf8").includes(r.name))),
+       u.readUnchecked.length
+         ? u.readUnchecked.map((r) => r.name + " in " + r.readBy.join(", ")).join("; ")
+         : "*** VACUOUS: the bucket is empty, so this row asserts nothing. *** v4577 emptied it by gating " +
+           "both of its members; it is here to catch the next record that is read by something that cannot " +
+           "fail on its value");
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +

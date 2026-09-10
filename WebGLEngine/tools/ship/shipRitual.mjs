@@ -151,6 +151,25 @@ export const STEPS = [
         gate: "tools/ship/populationCensus-selfcheck.mjs",
     },
     {
+        id: "record-tier",
+        what: "Run the guardian gates that cost more than the sweep budget, so the records they guard are checked at ship time too.",
+        command: "node tools/ship/recordTier.mjs",
+        // tools/ship/recordReach.mjs joins the frozen-record census to the sweep timings: at v4576, 72 of 104
+        // records are checked at ship time and TWENTY of the rest have a guardian that works and is simply too
+        // expensive -- nine gates, 3.7 s to 21.5 s each, all over the 3,000 ms sweep budget.
+        //   The two fixes the backlog proposed were both measured. v4548 took "make them cheaper" for two other
+        //   gates and found they were doing the same work six times over; memoising fixed it. That medicine does
+        //   NOT apply here: counting fs calls against unique paths gives 1.0x, 1.1x, and samplerCheck-selfcheck
+        //   does no file I/O at all -- 9 s of arithmetic. The work is real, so the tier is the answer.
+        //   ON ITS FIRST RUN IT FOUND TWO RED GUARDIANS covering eight records, neither on any register, and one
+        //   of them red because of files edited three rounds earlier under a sweep that reported ALL GREEN.
+        why: "a gate over budget is not run at ship time, so the record it guards is checked by nothing exactly " +
+             "when it matters most. These are the ritual's own integrity checks and pricing them by the same " +
+             "clock as a geometry fixture is what let a wrong census ship green for nine rounds.",
+        verify: null,
+        gate: "tools/ship/recordTier-selfcheck.mjs",
+    },
+    {
         id: "record-shapes",
         what: "Record the SHAPE of every JSON record a gate reads, so a field that goes missing is named on the next run.",
         command: "node tools/ship/recordShape.mjs --write",

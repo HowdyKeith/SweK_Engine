@@ -24,7 +24,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { exactHash2, exactHash1, umix, EXACT_HASH_GLSL, EXACT_HASH_WGSL } from "../../render/exactHash.mjs";
+import { exactHash2, exactHash1, umix, EXACT_HASH_GLSL, EXACT_HASH_WGSL,
+         EXACT_HASH3_GLSL, EXACT_HASH3_WGSL, SHADER_SINHASH_V4578 } from "../../render/exactHash.mjs";
 import { bcsHash } from "../../render/swiftShaderModel.mjs";
 import * as GM from "../../render/grassModel.mjs";
 import { validateWgsl } from "../../render/wgslSpec.mjs";
@@ -128,10 +129,18 @@ console.log("\n4. *** THE SHADER TEXTS SAY THE SAME THING AS THE JS ***");
     ok("*** the GLSL and the WGSL carry the SAME constants in the SAME ORDER ***",
        nums(EXACT_HASH_GLSL) === nums(EXACT_HASH_WGSL) && nums(EXACT_HASH_GLSL).length > 40,
        `glsl [${nums(EXACT_HASH_GLSL)}]`);
+    // v4579 -- the 3-D form is held the same way. IT IS A SEPARATE ROW rather than a widened one: the two
+    // pairs are two claims, and folding them together would let a broken 3-D text pass on the 2-D one's
+    // constants happening to appear in the concatenation.
+    ok("*** ...and so do the 3-D GLSL and WGSL, which is a second pair and a second row ***",
+       nums(EXACT_HASH3_GLSL) === nums(EXACT_HASH3_WGSL) && nums(EXACT_HASH3_GLSL).length > 40,
+       `glsl3 [${nums(EXACT_HASH3_GLSL)}]`);
     const setOf = (t) => [...new Set(nums(t).split(","))].sort().join(",");
     ok("  ...and the JS states the same set of them, differing only in the order its statements impose",
-       setOf(jsBody) === setOf(EXACT_HASH_GLSL),
-       `js [${setOf(jsBody)}] vs shader [${setOf(EXACT_HASH_GLSL)}]`);
+       setOf(jsBody) === setOf(EXACT_HASH_GLSL + EXACT_HASH3_GLSL),
+       `js [${setOf(jsBody)}] vs shader [${setOf(EXACT_HASH_GLSL + EXACT_HASH3_GLSL)}]. The JS body ` +
+       "spans umix, exactHash2 AND exactHash3, so the shader side is both exported texts -- v4579 added the " +
+       "3-D form and this row went red on the constant only the new one carries, which is the tie working");
     ok("  and the WGSL validates against the spec scanner rather than only on a device",
        validateWgsl("@fragment fn fs() -> @location(0) vec4f { return vec4f(exact_hash(vec2f(1.0), 0u)); }\n" +
                     EXACT_HASH_WGSL).length === 0);
@@ -244,6 +253,94 @@ console.log("\n5b. *** THE NEBULA: THE CPU FALLBACK AND THE GPU PATH DREW DIFFER
        validateWgsl(NS.NEBULA_WGSL).length === 0, validateWgsl(NS.NEBULA_WGSL).join("; ") || "clean");
 }
 
+// ---- 5d. *** THE ONE PAGE THAT DRAWS THE SAME PICTURE THROUGH TWO COMPILERS *** -------------------------------
+console.log("\n5d. nebula-device.html, whose whole claim is that both backends agree");
+{
+    // The page's own meta description reads: "one render path that runs on WebGPU (preferred) or WebGL2
+    // (fallback) ... only the shader text differs per backend (WGSL vs GLSL), everything else is written
+    // once." Its noise was fract(sin(dot(p, K)) * 43758.5453) TRANSCRIBED TWICE, once in each language, and
+    // sin() at those magnitudes is implementation-defined -- so two compilers on ONE DEVICE need not agree,
+    // and the page had nothing that could tell you. It is the only one of the census's six continuous sites
+    // that carries the idiom in two languages, and the only one making a cross-backend claim.
+    const page = fs.readFileSync(path.join(ENG, "nebula-device.html"), "utf8");
+    // Rebuild the two shader strings the way the PAGE builds them, rather than scanning its source for a
+    // spelling -- v4579's lesson: a check that reads the text instead of the artefact is a second reader.
+    const body = page.match(/<script type="module">([\s\S]*?)<\/script>/)[1]
+        .replace(/^\s*import[^\n]*\n/gm, "").split("let device = null")[0]
+        .replace(/^const cv[\s\S]*?resize\(\);\n/m, "");
+    const built = new Function("EXACT_HASH_GLSL", "EXACT_HASH_WGSL", body + "\nreturn { GLSL, WGSL };")
+        (EXACT_HASH_GLSL, EXACT_HASH_WGSL);
+    ok("!! *** both backends splice exactHash's OWN exported text, so they cannot drift by being edited apart ***",
+       built.GLSL.fragment.includes(EXACT_HASH_GLSL) && built.WGSL.includes(EXACT_HASH_WGSL),
+       "the GLSL fragment and the WGSL are assembled by the page and read back here");
+    ok("!! ...and neither carries fract(sin( any more",
+       !/fract\s*\(\s*sin\s*\(/.test(built.GLSL.fragment) && !/fract\s*\(\s*sin\s*\(/.test(built.WGSL),
+       `GLSL ${built.GLSL.fragment.length} chars, WGSL ${built.WGSL.length} chars`);
+    ok("!! ...and both call it the SAME WAY, which is the property the page's claim rests on",
+       /return exact_hash\(p, 0u\);/.test(built.GLSL.fragment) && /return exact_hash\(p, 0u\);/.test(built.WGSL),
+       "same function, same seed, in both languages. The two backends agree BY CONSTRUCTION rather than by " +
+       "hoping two implementations of sin round alike");
+    const nums = (t) => (t.match(/0x[0-9a-f]{8}|\b16777216\b|\b4294967296\b|\b256\b/g) || []).join(",");
+    ok("!! ...and the two spliced texts carry the same constants in the same order",
+       nums(built.GLSL.fragment) === nums(built.WGSL) && nums(built.WGSL).length > 40,
+       `[${nums(built.WGSL)}]`);
+    ok("  ...and the WGSL still validates with the hash spliced in",
+       validateWgsl(built.WGSL).length === 0, validateWgsl(built.WGSL).join("; ") || "clean");
+    let parses = true, why = "";
+    for (const m of page.matchAll(/<script type="module">([\s\S]*?)<\/script>/g)) {
+        try { new Function(m[1].replace(/^\s*import[^\n]*\n/gm, "")); } catch (e) { parses = false; why = e.message; }
+    }
+    ok("  ...and the page's own module still parses",
+       parses, parses ? "v4579 and v4580 each stopped a file parsing by editing a shader inside it; this page " +
+       "concatenates strings rather than using a template, but the property worth holding is the same"
+       : "SYNTAX ERROR: " + why);
+}
+
+// ---- 5e. THE FIVE THAT ARE NOT CHANGED, AND THE MEASUREMENT THAT SAYS WHY ------------------------------------
+console.log("\n5e. the five single-implementation sites, recorded rather than rewritten");
+{
+    // *** THIS IS A DECISION NOT TO ACT, SO IT CARRIES ITS EVIDENCE. *** v4580 measured that the idiom's
+    // deficit is a TAIL effect that deepens with the cut -- 0.987 of the fraction asked for at a cut of 0.900
+    // and 0.243 at 0.999. None of these five thresholds anything: each averages, mixes, or adds its hash as a
+    // small offset, so the property that made the other seven worth changing does not apply. And none has a
+    // second implementation to disagree with -- one language, one shader, no CPU twin.
+    const FIVE = SHADER_SINHASH_V4578.continuous;
+    const SIN = /fract\s*\(\s*sin\s*\(/;
+    // *** A MISSING FILE IS A FAIL ROW, NOT A THROW. *** The first draft read each path straight and a
+    // sabotage that renamed one entry killed the gate: exit 1 with ZERO FAIL lines, which a count of FAIL
+    // lines reads as a clean zero. That is v4536's rule -- a crash is not a verdict -- and it was caught by
+    // sabotaging the row rather than by reading it.
+    const rows = FIVE.map((rel) => {
+        let raw = null;
+        try { raw = fs.readFileSync(path.join(ENG, rel), "utf8"); } catch { return { rel, missing: true, sites: 0 }; }
+        const live = raw.split("\n").filter((l) => SIN.test(l) && !/^\s*(\/\/|\*|\/\*)/.test(l.trim()));
+        const wgsl = /@fragment|vec2f|vec3f|fn \w+\([^)]*\) ->/.test(raw);
+        // *** ASSEMBLED, NOT SPELLED. *** render/backendParity.mjs writes its own marker as "#" + "version 300
+        // es" because a file that SEARCHES for a marker contains it, and its header records that costing eight
+        // self-counts in eight rounds. The first draft of this line spelled it out and backendParity duly
+        // counted this gate: glslBearing 154 -> 155, both 21 -> 22, directive 137 -> 138. Ninth instance, and
+        // the instrument that documents the trap is the one that caught me in it.
+        const glsl = new RegExp("void main\\(\\)|precision (highp|mediump)|#" + "version 300 es").test(raw);
+        return { rel, sites: live.length, wgsl, glsl };
+    });
+    for (const r of rows)
+        console.log(`     ${r.rel.padEnd(32)} ${r.missing ? "*** NOT ON DISK ***" : r.sites + " site(s)   " + (r.glsl ? "GLSL" : "----") + " " + (r.wgsl ? "WGSL" : "----")}`);
+    ok("!! every site the record names is on disk",
+       rows.every((r) => !r.missing),
+       rows.filter((r) => r.missing).map((r) => r.rel).join(", ") ||
+       `${rows.length} paths, all present. A record naming a file that is gone would otherwise take this gate ` +
+       "down with a throw rather than a verdict");
+    ok("!! *** not one of the five carries the idiom in TWO languages -- there is no second half to disagree ***",
+       rows.length === 5 && rows.every((r) => !r.missing && !(r.wgsl && r.glsl)),
+       "nebula-device.html was the only one that did, and 5d fixes it. A shader-only site has no CPU twin and " +
+       "one compiler, so the divergence this census exists for cannot arise; what it carries is that sin is " +
+       "implementation-defined ACROSS DEVICES, which is a cost and not a defect");
+    ok("!! ...and every one still really carries the idiom, so this is a decision and not a deletion",
+       rows.every((r) => r.sites > 0),
+       rows.map((r) => r.rel.split("/").pop() + " x" + r.sites).join(", ") +
+       ". IF ANY READS ZERO the site was changed and this row retires with it rather than passing quietly");
+}
+
 console.log("\n6. *** THE RATCHET: no CPU/GPU TWIN may reintroduce the idiom ***");
 {
     // A census rather than a list. A file is a TWIN when it computes the sin-hash in float64 (Math.sin(...)
@@ -253,6 +350,7 @@ console.log("\n6. *** THE RATCHET: no CPU/GPU TWIN may reintroduce the idiom ***
     // fx/paintFields.mjs and physics/kernelVerdict-selfcheck.mjs compute the idiom AT BOTH PRECISIONS ON
     // PURPOSE, to measure the gap. They are instruments, and rewriting them would delete the measurement.
     const INSTRUMENTS = ["fx/paintFields.mjs", "physics/kernelVerdict-selfcheck.mjs"];
+    const REC = SHADER_SINHASH_V4578;
     const SKIP = /node_modules|[\\/]vendor[\\/]|[\\/]dist[\\/]/;
     const walk = (d, out = []) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) {
         const p = path.join(d, e.name); if (SKIP.test(p) || e.name === ".git") continue;
@@ -277,6 +375,80 @@ console.log("\n6. *** THE RATCHET: no CPU/GPU TWIN may reintroduce the idiom ***
     ok("  ...and those instruments still EXIST, so the exclusion is not hiding a deletion",
        INSTRUMENTS.every((i) => fs.existsSync(path.join(ENG, i))),
        INSTRUMENTS.join(", ") + " -- an exclusion list whose entries vanished would pass this row silently");
+
+    // *** THE ROW ABOVE IS A SAME-FILE RULE, AND A TWIN CAN LIVE IN TWO FILES. ***
+    // v4578: render/holoFoil.mjs's hash2 is an INTEGER avalanche and render/holoFoilShader.js's hf_hash2 was
+    // `fract(sin(dot(...)) * 43758.5453123)` under the comment "matching the model's hash2". A genuine
+    // CPU/GPU twin, shipped, gated, and INVISIBLE HERE -- because neither file carries both halves, so
+    // neither matches "computes it in float64 AND emits it to a shader". The rule was a proxy for the
+    // property, which is what this tree keeps finding at the point where a check is trusted.
+    //
+    // Measured over the 1,600 cells of the 40x40 flake lattice, the GLSL emulated in float32: 81.8% of cells
+    // differed by more than 0.1 and the two halves drew 29 of the model's 184 flakes in the same place --
+    // 15.8%. The consumer is `if (cell > coverage) return 0`, so that is not a shade difference, it is which
+    // flakes exist.
+    //
+    // A general cross-file twin finder is not attempted -- "which module is a model of which shader" is not
+    // decidable from the text, and a guess would either miss pairs or invent them. What IS decidable is the
+    // shader half: every file whose SHADER SOURCE computes the idiom, named, so a new one cannot appear
+    // without a round saying so.
+    const SIN = /fract\s*\(\s*sin\s*\(/;
+    // NOT codeOnly: it deletes template literals, which is where every shader in this tree lives, and the
+    // v4569 round walked into that three times. A line starting with // or * is a comment in JS and in GLSL
+    // and in WGSL alike, which is the rule the CPU scan above already uses.
+    const liveLine = (l) => SIN.test(l) && !/^\s*(\/\/|\*|\/\*)/.test(l.trim());
+    // ...and the file must hold SHADER SOURCE rather than prose about one. tools/ship/gateSweep.mjs and
+    // tools/ship/nextRounds.mjs quote the idiom inside ordinary JS STRINGS -- a commit verdict and a backlog
+    // entry -- so no comment rule can exclude them and a bare grep counts them as sites. This is the
+    // exemption class tools/ship/commentFalsePass-selfcheck.mjs documents.
+    const SHADERISH = /void\s+main\s*\(\s*\)|@fragment|@vertex|precision\s+(highp|mediump|lowp)|fn\s+\w+\s*\([^)]*\)\s*->/;
+    const EXT = /\.(js|mjs|html|wgsl|glsl|frag|vert)$/;
+    const walkAll = (d, out = []) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+        const p = path.join(d, e.name); if (SKIP.test(p) || e.name === ".git") continue;
+        if (e.isDirectory()) walkAll(p, out); else if (EXT.test(e.name)) out.push(path.relative(ENG, p).split(path.sep).join("/"));
+    } return out; };
+    const live = [], prose = [];
+    for (const rel of walkAll(ENG)) {
+        if (REC.searchers.includes(rel)) continue;      // these two SEARCH for the idiom, so they contain it
+        let raw; try { raw = fs.readFileSync(path.join(ENG, rel), "utf8"); } catch { continue; }
+        if (!raw.split("\n").some(liveLine)) continue;
+        (SHADERISH.test(raw) ? live : prose).push(rel);
+    }
+    // The census is threshold + continuous + notLoaded: a file nothing loads still CARRIES the idiom, and
+    // dropping it from the population would make the ratchet quieter by forgetting rather than by fixing.
+    const recorded = [...REC.threshold, ...REC.continuous, ...REC.notLoaded].sort();
+    const missing = recorded.filter((r) => !live.includes(r));
+    const extra = live.filter((r) => !recorded.includes(r));
+    ok("!! *** the shader-side census is exactly what the record names -- it may shrink, not grow silently ***",
+       missing.length === 0 && extra.length === 0,
+       extra.length ? "NEW SITE(S) NOT IN THE RECORD: " + extra.join(", ") + " -- name it and say what its hash "
+                    + "FEEDS (a threshold decides whether something exists; a continuous consumer averages it away)"
+       : missing.length ? "RECORDED BUT GONE: " + missing.join(", ") + " -- if it was fixed, take it out of the record"
+       : `${live.length} files: ${REC.threshold.length} whose hash feeds a THRESHOLD and ` +
+         `${REC.continuous.length} where it is averaged or added as a small offset. The backlog filed this ` +
+         "population as ten; the line rule plus the shader-source requirement reads twelve");
+    ok("  ...and the prose-only files are separated rather than counted as sites",
+       prose.length > 0 && prose.every((f) => !recorded.includes(f)),
+       prose.join(", ") + " -- the idiom inside a JS STRING (a commit verdict, a backlog entry). A bare grep " +
+       "counts these, which is how the v4569 census first read 21");
+    ok("!! *** the file this round FIXED is out of the census, read from the tree and not from the record ***",
+       !live.includes(REC.fixedHere) && fs.existsSync(path.join(ENG, REC.fixedHere)),
+       REC.fixedHere + " still exists and no longer computes the idiom in its shader -- both halves are " +
+       "exactHash's now, and tools/ship/holoFoil-selfcheck.mjs section 5b holds them to each other cell by cell");
+    ok("!! *** the files the record calls UNLOADED really are named by no runtime code ***",
+       REC.notLoaded.every((f) => {
+           const base = f.split("/").pop();
+           return !walkAll(ENG).some((r) => /\.(js|mjs|cjs|html)$/.test(r) && !/-selfcheck\.mjs$/.test(r) &&
+               !/^tools\/ship\//.test(r) && !/^okf\//.test(r) && r !== "render/exactHash.mjs" &&
+               fs.readFileSync(path.join(ENG, r), "utf8").includes(base));
+       }),
+       REC.notLoaded.join(", ") + " -- searched every page, module and worker outside the gates, this record " +
+       "and the bookkeeping JSON the incremental sweep writes. tools/ship/input-sets.json names them because " +
+       "a GATE READ them while walking the tree, which is not a page loading them, and counting that as a " +
+       "reference is how the first pass at this read 0 orphans of 26");
+    ok("  ...and every searcher named in the exclusion still exists",
+       REC.searchers.every((f) => fs.existsSync(path.join(ENG, f))),
+       REC.searchers.join(", "));
 }
 
 console.log(fails ? `\nFAIL -- ${fails} check(s)` : "\nALL GREEN");

@@ -178,6 +178,17 @@ export function readRecord(root = ENG) {
  * says "skipped 700" and cannot say why it ran the other 450 is a sweep nobody will trust enough to use.
  */
 export function whyRun(gate, rec, root = ENG) {
+    // *** v4574 -- THE RECORD'S OWN FORMAT IS CHECKED BEFORE ANYTHING IS SKIPPED, AND IT WAS NOT. ***
+    // FORMAT has been written into every record since v4566 and NOTHING HAS EVER READ IT. While the mechanism
+    // only counted, that cost nothing. Armed, it is the difference between a stale record and a wrong one: the
+    // encoding is INDEXED -- each gate's `r` and `d` are offsets into a shared `paths` table -- so a record
+    // written under a different layout does not fail to decode, it decodes to THE WRONG PATHS, hashes them,
+    // finds them unchanged, and skips the gate. A silent false green produced by bookkeeping.
+    //
+    // readRecord() returns { gates: {} } with no `format` when the file is missing or unparseable, so the same
+    // line covers the absent case: no record, no skipping, and the histogram says so once rather than 1,257
+    // times.
+    if (!rec || rec.format !== FORMAT) return "no usable input record (missing, or a different format)";
     const e = rec && rec.gates ? rec.gates[gate] : null;
     if (!e) return "no recorded input set";
     // *** v4567 -- TWO OF v4566'S THREE DISQUALIFIERS ARE GONE, AND NEITHER WAS RELAXED. ***

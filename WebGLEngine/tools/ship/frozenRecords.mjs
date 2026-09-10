@@ -70,6 +70,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as TR from "./treeRead.mjs";
 import { stripComments } from "../../vba/runtimeGap.mjs";
+import { resolveSpec } from "./importClosure.mjs";
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const SKIP = /node_modules|[\\/]vendor[\\/]|[\\/]dist[\\/]/;
@@ -187,7 +188,101 @@ function recordsIn(f, read) {
 }
 
 /** Drop both memos. The gate needs a cold scan to prove the warm one is not simply answering from a stale copy. */
-export function clearScanCache() { _scanCache.clear(); _recCache.clear(); }
+export function clearScanCache() { _scanCache.clear(); _recCache.clear(); _importCache.clear(); }
+
+/**
+ * *** WHICH LOCAL NAMES A GATE COULD CALL `fn` BY, IF IT IMPORTS IT FROM `target` -- AND [] IF IT DOES NOT. ***
+ *
+ * A bare `\bfn\s*\(` search is not enough and was measured not to be: `agreement` is declared in THREE
+ * modules in this tree, and the first cut of the default-argument edge credited ERASED_AT_V4394 to
+ * physics/render/samplerCheck-selfcheck.mjs and tools/ship/videoFrames-selfcheck.mjs -- each of which calls
+ * its OWN `agreement` -- and to tools/ship/shipBridge-selfcheck.mjs, where the word is English inside a test
+ * label. Three false guardians out of four, which is the same over-permissive matcher this round already threw
+ * an identifier probe away for.
+ *
+ * So the binding is followed instead of the spelling: the gate must import from the defining file, and the
+ * name it calls must be the one that import gave it -- `{ fn }`, `{ fn as other }`, or `* as NS` then `NS.fn`.
+ */
+// One resolved import table per gate, built on first need. *** THIS IS NOT A TIDY-UP, IT IS 800 ms. ***
+// The first cut called resolveSpec for every (gate, function, record) triple, and resolveSpec probes the disk
+// with up to four existsSync per specifier -- about 195,000 of them across 1,621 gates, on the gate whose
+// crossing of the 3,000 ms budget at v4536 is the reason this whole file has a header. Measured: 1,470 ->
+// 2,275 ms with the table, 1,470 -> 1,545 ms with it.
+const _importCache = new Map();     // gate rel -> Map(target rel -> [clause text])
+function importTable(gateRel, gateSrc) {
+    let t = _importCache.get(gateRel);
+    if (t) return t;
+    t = new Map();
+    for (const m of gateSrc.matchAll(/import\s+([^;]*?)\s+from\s+["']([^"']+)["']/g)) {
+        const to = resolveSpec(gateRel, m[2], ENG);
+        if (!to || to === " outside") continue;
+        if (!t.has(to)) t.set(to, []);
+        t.get(to).push(m[1]);
+    }
+    _importCache.set(gateRel, t);
+    return t;
+}
+
+export function importedAs(gateRel, gateSrc, target, fn) {
+    const out = [];
+    for (const clause of importTable(gateRel, gateSrc).get(target) || []) {
+        const ns = clause.match(/\*\s+as\s+([A-Za-z_$][\w$]*)/);
+        if (ns) out.push(ns[1] + "." + fn);
+        const braces = clause.match(/\{([\s\S]*)\}/);
+        if (!braces) continue;
+        for (const part of braces[1].split(",")) {
+            const b = part.trim().match(/^([A-Za-z_$][\w$]*)(?:\s+as\s+([A-Za-z_$][\w$]*))?$/);
+            if (b && b[1] === fn) out.push(b[2] || b[1]);
+        }
+    }
+    return out;
+}
+
+/**
+ * *** WHICH FILES NAME THESE RECORDS IN CODE -- WITH EVERY RECORD DECLARATION BLANKED FIRST. ***
+ *
+ * census() answers "which GATES name it", which is the guardian question. This answers the one underneath it:
+ * does ANYTHING read it at all? A record that no code names is DOCUMENTARY -- it is prose in object form, and
+ * asking which gate guards it is asking the wrong question. Eleven of this tree's 104 records are in that
+ * position and were being reported as a coverage hole somebody forgot to close.
+ *
+ * Two exclusions, and both are the difference between a real answer and a flattering one:
+ *   COMMENTS, for v4548's reason -- a gate that MENTIONS a record in its header was being credited with it.
+ *   EVERY RECORD'S OWN DECLARATION AND BODY, which is new here and is what makes the count mean anything. A
+ *   declaration is not a read, and neither is a mention inside ANOTHER record's body: recordReach.mjs's
+ *   REACH_AT_V4548 lists "MEASURED_V4527" in `demotedByCommentStrip`, which is a string of data ABOUT the
+ *   record, not code that reads it. Without the blanking, every one of the eleven scored a hit on its own
+ *   declaration line and the whole population read as "named somewhere".
+ *
+ * *** IT IS ASKED ONLY OF THE NAMES HANDED IN, AND THAT IS A COST DECISION SAID OUT LOUD. *** Over all 104
+ * records this is a 104 x 1,600 search, the same quadratic shape v4548 spent 500 ms per call on. The caller
+ * asks it about the unguarded eleven, so it is 11 x 1,600. It is therefore NOT a general census and must not
+ * be read as one.
+ */
+export function readSites(names, { root = ENG } = {}) {
+    const want = [...names];
+    const out = new Map(want.map((n) => [n, []]));
+    if (!want.length) return out;
+    for (const f of sources(root)) {
+        if (!/\.(mjs|js|cjs)$/.test(f)) continue;
+        let src = TR.textOf(f);
+        if (!want.some((n) => src.includes(n))) continue;         // cheap reject before the expensive work
+        src = stripComments(src);
+        RECORD_RE.lastIndex = 0;
+        let m;
+        const spans = [];
+        while ((m = RECORD_RE.exec(src))) {
+            const { body } = recordBody(src, m.index);
+            spans.push([m.index, m.index + (body ? src.slice(m.index).indexOf(body) + body.length : m[0].length)]);
+        }
+        for (const [a, b] of spans) src = src.slice(0, a) + " ".repeat(b - a) + src.slice(b);
+        for (const n of want) {
+            const re = new RegExp("\\b" + n + "\\b");
+            if (re.test(src)) out.get(n).push(rel(f));
+        }
+    }
+    return out;
+}
 
 export function census({ files = null, read = null, exclude = null } = {}) {
     const memoable = files === null && read === null;
@@ -217,6 +312,71 @@ export function census({ files = null, read = null, exclude = null } = {}) {
     for (const f of mjs) for (const r of (memoable ? recordsIn(f, rd) : recordsIn.call(null, f, rd)))
         { all.push({ r, f }); if (!named.has(r.name)) named.set(r.name, []); }
     for (const [g, src] of gateSrc) for (const [name, list_] of named) if (src.includes(name)) list_.push(g);
+    // *** v4576 -- ONE LEVEL OF DERIVATION, BECAUSE A RECORD READ ONLY THROUGH ANOTHER ONE READ AS UNGUARDED. ***
+    // The search above asks which gates NAME a record. Seven records failed it for a reason that is not a gap
+    // in the tree: redCensus.mjs defines `RED_AT_V4531 = Object.freeze(RED_AT_V4531_GATES.map(...))`, so the
+    // ARRAY is consumed only through the derived constant, and gates name the derived one. Corrupting the array
+    // -- filing a green gate as a known red -- does redden registerDrift-selfcheck, measured, so it is guarded;
+    // the search simply could not see through the derivation.
+    //
+    // SO A RECORD IS ALSO GUARDED BY WHATEVER GUARDS A RECORD DEFINED FROM IT IN THE SAME FILE. One level and
+    // one file: a transitive closure over the whole tree would start crediting a record with guardians that
+    // never touch its value, which is how a coverage number becomes a story. The edge has to be visible in the
+    // defining module's own text, which is the same standard the NAME search uses.
+    for (const f of mjs) {
+        const src = stripComments(rd(f));
+        const here = all.filter((x) => x.f === f).map((x) => x.r.name);
+        if (here.length < 2) continue;
+        for (const r of here) {
+            const at = src.indexOf("export const " + r + " = Object.freeze(");
+            if (at < 0) continue;
+            const { body } = recordBody(src, at);
+            if (!body) continue;
+            for (const other of here) {
+                if (other === r || !body.includes(other)) continue;
+                // r is DEFINED FROM other, so r's guardians also stand over other
+                const from = named.get(r) || [], to = named.get(other);
+                if (!to) continue;
+                for (const g of from) if (!to.includes(g)) to.push(g);
+            }
+        }
+    }
+    // *** v4577 -- AND A SECOND EDGE, FOR A RECORD THAT REACHES ITS GATE AS A DEFAULT ARGUMENT. ***
+    // tools/mutate/shadowedDefaults.mjs declares `agreement(rows, frozen = ERASED_AT_V4394)`, and its gate
+    // calls `agreement(S.rows)` with one argument. The record is exercised on every run and the gate never
+    // types its name, so the NAME search called it unguarded. MEASURED, not argued: changing one frozen value
+    // in that record takes the gate from 0 FAIL lines and exit 0 to THREE and exit 1.
+    //
+    // So a record used as the DEFAULT VALUE of an exported function's parameter is guarded by whatever gates
+    // CALL that function. Narrow on purpose -- the general rule, "a record named anywhere in its module's code
+    // is reached by whatever reaches the module", would credit every record in redCensus.mjs with every gate
+    // that imports it, which is how a coverage number stops meaning anything.
+    const DEFAULT_ARG = /(?:export\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(([^)]*)\)/g;
+    for (const f of mjs) {
+        const src = stripComments(rd(f));
+        const here = new Set(all.filter((x) => x.f === f).map((x) => x.r.name));
+        if (!here.size) continue;
+        const target = rel(f);
+        for (const m of src.matchAll(DEFAULT_ARG)) {
+            const fn = m[1];
+            for (const rec of here) {
+                // `,` OR END OF STRING: the capture above stops before the closing paren, so a record that is
+                // the LAST parameter has nothing after it. Requiring `[,)]` here matched only records with a
+                // parameter following them, which is why the first cut of this edge fired twice and missed the
+                // one case it was written for.
+                if (!new RegExp("=\\s*" + rec + "\\s*(?:,|$)").test(m[2].trim())) continue;
+                const to = named.get(rec);
+                if (!to) continue;
+                // any gate that CALLS THIS MODULE'S function exercises the record through the default
+                for (const [g, gsrc] of gateSrc) {
+                    const names = importedAs(g, gsrc, target, fn);
+                    if (!names.length) continue;
+                    if (!names.some((n) => new RegExp("\\b" + n.replace(".", "\\.") + "\\s*\\(").test(gsrc))) continue;
+                    if (!to.includes(g)) to.push(g);
+                }
+            }
+        }
+    }
     const rows = all.map(({ r, f }) => {
         const guardians = named.get(r.name);
         const sib = rel(f).replace(/\.mjs$/, "-selfcheck.mjs");
@@ -296,12 +456,17 @@ export const PROBE_AT_V4536 = Object.freeze({
     // same six fields, plus this module's own two records and their twenty fields.
     // v4568 -- RE-TAKEN with `excluding`: 101/45/186 -> 104/46/189, the same three records and three fields
     // plus this module's own two and their twenty.
+    // v4577 -- RE-TAKEN with `excluding` below: 104/46/189 -> 105/47/192, the one record and its three fields.
+    // v4578 -- RE-TAKEN with `excluding` below: 105/47/192 -> 106/47/192, the one record and none of its
+    // values being a bare integer.
     // v4536 -- RE-TAKEN with `excluding`: 104/46/189 -> 105/47/199, the one new record PARTITION_AT_V4536 and
     // its ten fields, plus this module's own two and their twenty. The two readings move together by
     // construction and the row below asserts the gap is exactly this module's own pair.
     // v4537 -- RE-TAKEN with `excluding`: 105/47/199 -> 106/48/206, the one new record and its seven
     // fields, plus this module's own two and their twenty.
-    currentIncludingModule: Object.freeze({ records: 106, withFields: 48, fields: 206 }),
+    // v4537 -- RE-TAKEN with `excluding`: 106/47/192 -> 108/49/209, the same two records and their
+    // seventeen fields, plus this module's own two and their twenty.
+    currentIncludingModule: Object.freeze({ records: 108, withFields: 49, fields: 209 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -338,6 +503,18 @@ export const PROBE_AT_V4536 = Object.freeze({
     // the +3), and RED_AT_V4568 plus WHY_V4568 in tools/ship/redCensus.mjs, which register the five reds it
     // found. RED_AT_V4568_GATES is a frozen ARRAY and so is not counted, the same distinction v4566 recorded
     // for wgslCorpus.GENERATED_CASES.
+    // v4577 -- RE-TAKEN: 102/44/169 -> 103/45/172. ONE record, UNGUARDED_SPLIT_V4577 in
+    // tools/ship/recordReach.mjs, from the round that asked what "unguarded" actually meant and found the
+    // twelve were three different facts. It carries TWO countable fields, not the three it looks like:
+    // `looseMatchGuardians: 4, looseMatchFalse: 3,` share a line and FIELD_RE counts `name: <digits>,` on its
+    // OWN line, so the second one is not a field; `afterExcludingThisRecord` contributes the third. Stated
+    // rather than left as a discrepancy, the same way
+    // v4566 and v4568 stated the frozen ARRAYS that RECORD_RE does not match.
+    // v4578 -- RE-TAKEN: 103/45/172 -> 104/45/172. ONE record, SHADER_SINHASH_V4578 in render/exactHash.mjs,
+    // from the round that re-counted the shader-side sin-hash population. withFields and fields do NOT move:
+    // every field it carries is a string or a frozen array of paths, and FIELD_RE counts `name: <digits>,`.
+    // A record with no numeric field is still a record, and stating that is cheaper than the next re-take
+    // wondering why one number moved and two did not.
     // v4536 -- RE-TAKEN: 102/44/169 -> 103/45/179. ONE record, PARTITION_AT_V4536 in nav/partitionScore.mjs,
     // carrying the ten numbers behind that round's refusal of backlog item "navmesh-recast" piece (1). It is
     // the largest single-record field jump this census has recorded, which is a property of the round rather
@@ -347,7 +524,9 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4537 -- RE-TAKEN: 103/45/179 -> 104/46/186. One record, BACKLOG_AT_V4537 in
     // tools/ship/backlogAbsence.mjs, carrying the seven numbers behind that round's grading of the backlog's
     // own absence claims.
-    excluding: Object.freeze({ records: 104, withFields: 46, fields: 186 }),
+    // v4537 -- RE-TAKEN AT THE MERGE: 104/45/172 -> 106/47/189, the two records this branch added --
+    // PARTITION_AT_V4536 in nav/partitionScore.mjs and BACKLOG_AT_V4537 in tools/ship/backlogAbsence.mjs.
+    excluding: Object.freeze({ records: 106, withFields: 47, fields: 189 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,

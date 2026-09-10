@@ -239,6 +239,19 @@ function runOneAsync(rel, capMs, root) {
  * The whole thing. Phase 1 in parallel, phase 2 serial for every phase-1 red, classify(), reconcile(), and
  * the timings file rewritten with what was seen. `onProgress(done, total)` is optional.
  */
+/**
+ * *** THE SKIP IS OPT-IN FOR CALLERS AND ON BY DEFAULT ONLY AT THE COMMAND LINE, AND v4574 GOT THAT BACKWARDS
+ * FIRST. *** Arming meant flipping this default to true, which armed it for EVERY programmatic caller at once
+ * -- and there are nine, all of them fixtures driving the sweep to watch what it does, plus budgetExile
+ * re-timing one named gate. tools/ship/sweepCoverage-selfcheck.mjs went red within the minute, and it was
+ * right: its 1 ms-budget fixture reported "0 gates run at a 1 ms budget, 0 confirmed alone" because the sweep
+ * it was testing had skipped everything. A FIXTURE THAT SKIPS ITS OWN SUBJECT IS VACUOUS.
+ *
+ * The default belongs off here and true in the CLI block at the bottom of this file. A human sweeping while
+ * working gets the saving by typing nothing; a caller gets a full sweep unless it says otherwise; and the
+ * caller nobody has written yet inherits the safe one. That is the difference between arming a tool and
+ * arming everything that holds it.
+ */
 export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DEFAULTS.workers, capMs = DEFAULTS.capMs,
                                       timingsFile = DEFAULTS.timingsFile, root = ENG, gates = null, write = true, onProgress = null,
                                       serialSliceMs = DEFAULTS.serialSliceMs, skipUnchanged = false } = {}) {
@@ -346,6 +359,15 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
         // v4566: what an incremental sweep WOULD have skipped. Reported on every run, acted on only under
         // skipUnchanged, so the number earns trust in public before it is allowed to change anything.
         unchangedInputs: (sel.unchanged || []).length, skippedUnchanged: skipUnchanged,
+        // *** v4574 -- A SKIPPED RED IS STILL A RED, AND THE COUNT ALONE SAID OTHERWISE. ***
+        // The first armed run reported "12 known red" against the full sweep's 19, because seven registered
+        // reds had unchanged inputs and were skipped. Nothing was wrong and the output read like seven gates
+        // had been fixed -- a SMALLER NUMBER THAT LOOKS LIKE PROGRESS, which is the shape this session has
+        // found in a corpus that shrank, a skip count that rose and a sweep that filed fewer rows. So the
+        // register is intersected with what was skipped and the difference is printed rather than left for a
+        // reader to notice.
+        knownRedSkipped: skipUnchanged
+            ? (() => { const reg = redRegister(); return (sel.unchanged || []).filter((g) => reg.has(g)).length; })() : 0,
         green, falseReds, knownRed: rec.known, newRed: rec.newRed, unmeasured: rec.unmeasured, dropped,
         // v4408: green gates whose PARALLEL time crossed the budget and were re-run alone before being filed,
         // and how many of those the serial reading brought back under. The second number is the starvation.
@@ -389,17 +411,28 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     const opts = { budgetMs: Number(arg("--budget", DEFAULTS.budgetMs)), workers: Number(arg("--workers", DEFAULTS.workers)),
                    capMs: Number(arg("--cap", DEFAULTS.capMs)), timingsFile: arg("--timings", DEFAULTS.timingsFile) };
     let lastPct = -1;
-    opts.skipUnchanged = process.argv.includes("--incremental");
+    // *** v4574 -- ARMED. THE DEFAULT IS NOW TO SKIP, AND --full IS HOW YOU TURN IT OFF. ***
+    // v4566 shipped this disarmed on a sentence -- "an input set is what a gate read on ONE RUN, a sample and
+    // not a specification" -- and v4573 turned that sentence into two measured properties: every gate's whole
+    // STATIC import closure is in its recorded set (0 misses over 1,258 gates), and every gate with a DYNAMIC
+    // reach outside its set is refused. Beside the structure: two independent probe passes agreed on 99.0% of
+    // read sets, and the differential test twice -- break render/exactHash.mjs, run all 1,055 gates this would
+    // have skipped, ZERO verdicts moved; break sourceScan.mjs's codeOnly, 882 skipped, ZERO moved.
+    //
+    // `--incremental` still parses and now means nothing, because a flag in somebody's muscle memory or a
+    // script should not become an error the day the default changes.
+    opts.skipUnchanged = !process.argv.includes("--full");
     const r = await runQuickSweep({ ...opts, onProgress: (d, t) => { const pct = Math.floor(100 * d / t); if (pct !== lastPct && pct % 10 === 0) { lastPct = pct; process.stderr.write(`[quickSweep] ${d}/${t}\n`); } } })
         .catch((e) => { console.error("[quickSweep] runner failed: " + (e && e.message)); process.exit(2); });
     if (process.argv.includes("--json")) console.log(JSON.stringify(r, null, 1));
     else {
         console.log(`[quickSweep] ${r.ran} of ${r.enumerated} gates under ${r.budgetMs} ms ran in ${(r.ms / 1000).toFixed(0)} s: ` +
-            `${r.green} green, ${r.knownRed.length} known red, ${r.newRed.length} NEW red, ${r.falseReds} false red, ${r.unmeasured.length} unmeasured; ` +
+            `${r.green} green, ${r.knownRed.length} known red${r.knownRedSkipped ? " (+" + r.knownRedSkipped + " skipped, still red)" : ""}, ${r.newRed.length} NEW red, ${r.falseReds} false red, ${r.unmeasured.length} unmeasured; ` +
             `${r.skippedOverBudget} over budget skipped, ${r.newGates.length} new gates measured, ${r.dropped.length} dropped from budget`);
         if (r.unchangedInputs) console.log(`[quickSweep] ${r.unchangedInputs} of those had NO CHANGED INPUT and ` +
-            (r.skippedUnchanged ? "were SKIPPED (--incremental)" : "were run anyway -- pass --incremental to skip them, " +
-             "and read tools/ship/inputSets.mjs first: a wrongly skipped gate is the one failure here that is silent"));
+            (r.skippedUnchanged ? "were SKIPPED. Pass --full to run them: a wrongly skipped gate is the one failure "
+                                + "here that is silent, and tools/ship/importClosure.mjs is what bounds it"
+                                : "were RUN (--full)"));
         for (const k of r.knownRed) console.log(`  known  ${k.gate}  (${k.record})`);
         for (const n of r.newRed) console.log(`  NEW    ${n.gate}  exit ${n.code} in ${n.ms} ms`);
         for (const d of r.dropped) console.log(`  slower ${d}  now over budget`);

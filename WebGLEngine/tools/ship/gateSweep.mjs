@@ -3764,12 +3764,16 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
-    // v4536 -- THE 223rd CLOSING, for the gate this round added. *** THE ORDINAL IS A KNOWN COLLISION AND IS
+    // v4537 -- BOTH LINES APPENDED CLOSINGS IN THE SAME WINDOW AND BOTH REACHED FOR 223 AND 224. Main got
+    // there with seven of them, so these two are renumbered to 230 and 231 rather than main's renamed: the
+    // list shape exists exactly so a round appends and nobody renegotiates a name, and the side that merges
+    // second is the side that moves. FOURTH MERGE RUNNING where both lines re-took the same records.
+    // v4536 -- THE 230th CLOSING, for the gate this round added. *** THE ORDINAL IS A KNOWN COLLISION AND IS
     // RECORDED RATHER THAN RENUMBERED: *** the entry below is stamped v4572 from the other line's counter,
     // which runs ahead of the one main.js keeps -- main carried v4535 when that entry landed. The list shape
     // is what makes that survivable; a round appends and nobody renegotiates a name.
-    // v4537 -- THE 224th CLOSING, for the gate this round added.
-    since224: Object.freeze({
+    // v4537 -- THE 231st CLOSING, for the gate this round added.
+    since231: Object.freeze({
         at: "v4537", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/backlogAbsence-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -3793,7 +3797,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "read cache out of tidiness -- eleven milliseconds is not a failed gate, it is an EXILED " +
                  "one.",
     }),
-    since223: Object.freeze({
+    since230: Object.freeze({
         at: "v4536", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/partitionScore-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -3813,6 +3817,277 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "cliff on a z-oriented ledge, one axis of a two-axis correctness property ungraded in the " +
                  "gate whose own section 7 exists BECAUSE A SABOTAGE DID NOT FIRE.",
     }),
+    // v4576 -- the 225th closing: a tier for the guardians the sweep cannot afford, and it caught two on sight.
+    since229: Object.freeze({
+        at: "v4582", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/zipWriter-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["ai-bridge/packagerBridge.js", "ui/githubPanel.js"]),
+        verdict: "green, 72/71/69 ms over three serial runs. *** NOT THIS ROUND'S GATE. *** It arrived on main " +
+                 "in commit c3f1fecb -- the release zip's Compress-Archive subprocess replaced with a pure-Node " +
+                 "writer and real percentage progress -- while v4582 was in flight, and the two merged cleanly " +
+                 "with no overlapping file. It is closed here because a gate the sweep has never swept leaves " +
+                 "the surplus identity one short and tools/ship/recordDrift.mjs reads that as a stale record, " +
+                 "so whichever commit lands second owes the re-take. Recorded as its own round's work with the " +
+                 "commit named, rather than absorbed into this one's verdict.",
+    }),
+    since228: Object.freeze({
+        at: "v4580", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/skyStars-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/skyRenderer.js", "render/exactHash.mjs",
+                                "tools/ship/assertionShape.mjs", "vba/runtimeGap.mjs"]),
+        verdict: "green, 333/336/373 ms over three serial runs. THE ENGINE'S OWN NIGHT SKY, WHICH main.js " +
+                 "DRAWS AND NOTHING HAD A REFERENCE FOR. render/skyRenderer.js's starfield was GLSL-only, and " +
+                 "it carried two defects a reference would have caught on the first run. *** ONE: THE DENSITY " +
+                 "KNOB WAS DIMMING EVERY STAR. *** It read `bright = (h - threshold) / 0.005` while " +
+                 "`1.0 - threshold` IS uStarDensity * 0.005, so the divisor was only correct at density 1 and " +
+                 "the brightest possible star was 0.60 at density 0.6 and 0.40 at 0.4. main.js sets density " +
+                 "0.4 with brightness 0.7 and density 0.6 with brightness 0.5, so the city-sky preset topped " +
+                 "out at 0.28 while asking for 0.7, and two knobs the API documents as independent were " +
+                 "multiplied together. THE SAME FILE HAS THE CORRECT FORM TWELVE LINES LOWER: the day-mode " +
+                 "night stars divide by 0.003, which really is their 1 - threshold. One file, both forms, " +
+                 "nothing comparing them. *** TWO: THE SIN-HASH DEFICIT DEEPENS WITH THE CUT, AND THIS SITE " +
+                 "CUTS DEEPEST IN THE TREE. *** v4579 measured 12.4 sd low at a cut of 0.986; over a 100^3 " +
+                 "cube the ratio of stars delivered to stars asked for runs 0.987 at cut 0.900, 0.914 at " +
+                 "0.986, 0.854 at 0.995, 0.437 at 0.997 and 0.243 at 0.999 -- so AT THE ENGINE'S OWN density " +
+                 "0.6 THE SKY GOT 44% OF THE STARS IT ASKED FOR. Both sin-hash variants in the tree show the " +
+                 "same curve, so it is the idiom and not the constants. THE MECHANISM IS COUNTED RATHER THAN " +
+                 "DESCRIBED: over 216,000 integer cells the sin-hash yields 7,112 DISTINCT VALUES against " +
+                 "exact_hash3's 216,000, and above 0.997 it has NINETEEN against 656 -- float32 loses the low " +
+                 "bits of sin(x) * 43758.5453 before fract() runs, so a threshold slicing 0.003 off the top " +
+                 "chooses between a handful of levels. An fbm averages that away; a threshold cannot. " +
+                 "*** FOUR OF MY OWN ROWS COULD NOT FAIL, AND THE CAUSE WAS v4579'S LESSON UNLEARNED. *** The " +
+                 "emulation held the shader's avalanche CONSTANTS but not its FORMULA, so reverting sky_star " +
+                 "to the bare 0.005 divisor, changing its seed 0u -> 9u, and drifting CELL_SCALE away from " +
+                 "the shader's own floor(ray * 240.0) all passed green. The text is read for its formula, its " +
+                 "seed and its three cell scales now -- and the row naming those scales first said TWO and " +
+                 "forgot the Milky Way's floor(ray * 6.0). A fifth row went red on THIS ROUND'S OWN COMMENT, " +
+                 "which quotes the old arithmetic to explain it: prose counted as code, in a gate written the " +
+                 "day after two rounds about exactly that. *** AND I PUT A BACKTICK IN A SHADER TEMPLATE " +
+                 "LITERAL FOR THE SECOND ROUND RUNNING, *** in render/skyRenderer.js's FS after doing it in " +
+                 "wormhole.html at v4579. I drafted a tree-wide scan for it and THREW THE SCAN AWAY: it " +
+                 "reported render/tslSource.mjs and text/slugShaderWgsl.js as truncated, and both are fine -- " +
+                 "their bodies hold NESTED template literals inside ${...}, so the first backtick is not the " +
+                 "terminator, and finding the real one needs the lexer tools/ship/pageParse.mjs uses behind " +
+                 "--experimental-vm-modules. The gap it was built for does not exist either: MEASURED, " +
+                 "breaking this file reddens tools/ship/backendParity-selfcheck.mjs because that gate IMPORTS " +
+                 "skyRenderer rather than only reading it, and wormhole.html's was caught by three page " +
+                 "gates. Both mistakes were caught by instruments that already existed; what I skipped was " +
+                 "running them before saying done. THE THRESHOLD CLASS OF SHADER_SINHASH_V4578 IS NOW EMPTY. " +
+                 "THE TRADE IS THE SAME ONE v4579 STATED: a different sky, and a brighter one.",
+    }),
+    since227: Object.freeze({
+        at: "v4579", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/starField-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/exactHash.mjs", "tools/ship/exactHash-selfcheck.mjs",
+                                "blackhole.html", "flight-gpu.html", "wormhole.html",
+                                "tools/ship/assertionShape.mjs", "vba/runtimeGap.mjs"]),
+        verdict: "green, 177/175/187 ms over three serial runs. ONE SKY, THREE PAGES, AND EACH HAD ITS OWN " +
+                 "COPY. blackhole.html, flight-gpu.html and wormhole.html carried a byte-identical `n3` (md5 " +
+                 "a8bec00ebc4c on all three), the same three octaves, the same cell and the same falloff -- " +
+                 "and v4578's own record said their CUT was identical too, three times over, once in prose " +
+                 "and once on each of the three per-line comments. IT NEVER WAS: 0.986, 0.987, 0.985. I " +
+                 "checked the function on all three files and the caller on one, then repeated the wrong " +
+                 "number on each line, which made a copied claim look like a checked one. " +
+                 "*** THE HASH CHANGED FOR A MEASURED REASON, NOT BECAUSE A DIFFERENT PATTERN IS NICER. *** " +
+                 "fract(sin(dot(p,K))*43758.5453) is uniform by DECILE -- both hashes sit inside 0.2 points " +
+                 "of 10% in every tenth -- and a starfield never reads deciles, it reads the extreme tail. " +
+                 "Pooled over 1,572,864 integer cells in six 64^3 cubes, against a cut of 0.986 that should " +
+                 "admit 1.400%: the sin-hash reads 1.2837%, TWELVE POINT FOUR SD LOW, and its per-cube " +
+                 "readings scatter 0.077% against exact_hash3's 0.031%. So the density knob did not mean what " +
+                 "it said (a page asking for 1.4% of its sky got about 1.28%) and how much it got depended on " +
+                 "WHICH WAY IT WAS LOOKING, which is the one thing a starfield must not do. THE TRADE IS " +
+                 "STATED: it is a completely different sky -- blackhole drew 2,133 stars over the sampled " +
+                 "sphere and now draws 2,316, with 26 in the same cell, which is chance. No saved screenshot " +
+                 "of these pages still matches. render/exactHash.mjs gains exactHash3 plus its WGSL and GLSL, " +
+                 "tied to the 2-D form by a stated relation rather than a claim of containment: " +
+                 "exactHash3(x, y, 0, seed) === exactHash2(x, y, umix(seed)). " +
+                 "*** THREE OF MY OWN DEFECTS, ALL FOUND BY SABOTAGE OR BY OTHER GATES. *** The gate's " +
+                 "'float32 emulation of the WGSL' never read the WGSL -- it rebuilt exact_hash3 from the JS " +
+                 "constants, so it was a THIRD implementation agreeing with the second. Three sabotages " +
+                 "passed green, including 0x27d4eb2f -> 0x27d4eb2d inside the shipped shader text, a real " +
+                 "divergence between a shader and its reference in the gate whose headline row says they draw " +
+                 "the same stars; the text is held to the JS by its twelve constants now. The tail row first " +
+                 "asserted region-to-region spread over THREE 48^3 cubes and read 1.5 sd, which is not a " +
+                 "result -- six cubes at 64^3 pool to 12 sd, and a row that needed a lucky sample would have " +
+                 "been a row about the sample. And a comment I added inside wormhole.html's WGSL TEMPLATE " +
+                 "LITERAL wrapped a word in BACKTICKS, which ends the template: the page stopped parsing, and " +
+                 "this gate stayed GREEN throughout because it does the splice itself on the extracted " +
+                 "literal. crossArchDoor, qaAssert and tunnelSpawn all caught it, wgslAutoLayout saw the " +
+                 "knock-on binding drop, and the gate now checks that the page it edits still parses. " +
+                 "ALSO CORRECTED: two of v4578's twelve census sites are files NO RUNTIME CODE LOADS -- " +
+                 "shaders/biome.frag.glsl (a three-way biome threshold, which is why it looked like a round " +
+                 "worth doing) and gpu/waterScreen.frag.glsl. TEN of this tree's 26 standalone shader files " +
+                 "are unreachable and no census here can see it, because tools/ship/orphanScan.mjs walks .js " +
+                 "and .mjs only. That is round #31's finding in a second extension and is FILED, not fixed.",
+    }),
+    since226: Object.freeze({
+        at: "v4577", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["physics/raceKnob-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/frozenRecords.mjs", "tools/ship/recordReach.mjs",
+                                "physics/render/pathTracerGpu-selfcheck.mjs", "tools/ship/reportDoors.mjs",
+                                "physics/instruments.mjs"]),
+        verdict: "green, 87/85/98 ms over three serial runs -- comfortably inside the 3,000 ms sweep budget, " +
+                 "which is the point of it. *** TWELVE RECORDS READ AS GUARDED BY NOTHING AND NOT ONE WAS WHAT " +
+                 "THE WORD IMPLIED. *** Asked the decidable question instead -- does anything READ it -- with " +
+                 "comments AND every record's own declaration blanked, because before the blanking every one of " +
+                 "the twelve scored a hit on its own `export const` line: NINE are named by no code anywhere and " +
+                 "are documentary; ONE was reached through a DEFAULT ARGUMENT the name search cannot see; TWO " +
+                 "were read by rows that could not fail. *** THE DEFAULT-ARGUMENT CASE WAS PROVEN BY CORRUPTION, " +
+                 "NOT ARGUED: *** shadowedDefaults.mjs writes `agreement(rows, frozen = ERASED_AT_V4394)` and its " +
+                 "gate calls it with one argument, and changing one frozen value takes that gate from exit 0 with " +
+                 "zero FAIL lines to exit 1 with three. *** AND THE FIRST FIX FOR IT WAS WRONG IN THIS TREE'S " +
+                 "OLDEST WAY: *** matching `\\bagreement\\s*\\(` across gate sources gave that record FOUR " +
+                 "guardians of which THREE were false -- two gates calling their own `agreement`, one where the " +
+                 "word is English in a test label. The edge follows the import BINDING now, and the fixture in " +
+                 "frozenRecords-selfcheck section 1b carries an impostor gate that declares its own function of " +
+                 "the same name, which is the row that holds it there. The v4576 derivation edge had shipped " +
+                 "with NO ROW AT ALL and is gated in the same section. *** THIS GATE ITSELF EXISTS BECAUSE " +
+                 "MEASURED_V4527's ONLY READER PRINTED IT: *** physics/raceKnob.mjs's reportLines(), while the " +
+                 "thorough gate -- 33,306 ms, over the budget AND over the 20,000 ms cap -- carries the round's " +
+                 "numbers in its HEADER as prose. It runs no simulation and says so: what it holds is that every " +
+                 "verdict in the record is a FUNCTION of the record's own laps, lap times and off-asphalt counts " +
+                 "applied to LAP_BOUND, OFF_BOUND and samples as the module exports them today. Nine sabotages, " +
+                 "eight caught on the first pass -- and the NINTH IS THE FINDING: `keySeconds === KEY_SECONDS` " +
+                 "compared the constant to itself, because the record REFERENCES it rather than freezing a " +
+                 "number. KEY_SECONDS 90 -> 60 left the gate at exit 0 with zero FAIL lines while every other " +
+                 "sabotage reddened it -- a row that could not fail, written by me inside the gate built to " +
+                 "repair rows that cannot fail, and found by sabotage rather than by reading. The replacement " +
+                 "asserts the field stays a reference, and freezing it to a literal reddens it. TWO MORE OF MY " +
+                 "OWN DEFECTS WERE CAUGHT BY THE TREE MID-ROUND: an evidence STRING in a fixture row named a " +
+                 "real record, and since the guardian search strips comments and deliberately NOT strings, it " +
+                 "promoted that record from over-budget to CHECKED on prose, in the round about prose being " +
+                 "counted as code; and the first import-table walk cost 800 ms on the gate whose crossing of " +
+                 "the budget at v4536 let a stale census ship nine ALL GREEN rounds, because it re-resolved " +
+                 "every gate's specifiers once per (function, record) pair -- memoised per gate, 115 ms. " +
+                 "AFTER: unguarded 12 -> 9, which is a fact about the tree with no clock in it. THE OTHER HALF " +
+                 "OF THE READING IS NOT A FACT AND THE FIRST DRAFT OF THE GATE ASSERTED IT ANYWAY -- and this " +
+                 "round's own closing sweep reddened it: 73 checked / 22 over-budget / 1 unmeasured before that " +
+                 "sweep, 69 / 27 / 0 after, ON CODE THAT HAD NOT CHANGED. All five that moved are guarded by " +
+                 "tools/ship/reportDoors-selfcheck.mjs, which reads 2877 / 2872 / 2939 / 3001 / 3025 ms over " +
+                 "five SERIAL runs against a 3,000 ms budget: it straddles the line by itself, so those five " +
+                 "records' class is a coin toss and is now REPORTED rather than frozen. Two of the three that " +
+                 "left the unguarded set went to OVER-BUDGET (guardians 14,464 ms and ~3,500 ms), so " +
+                 "tools/ship/recordTier.mjs runs them and the sweep still does not; the third's new guardian is " +
+                 "87 ms and is genuinely checked. NO LONGER UNGUARDED IS NOT NOW CHECKED, and the record says " +
+                 "which. AND ONE RED THIS ROUND WAS MINE FROM TWO ROUNDS BACK: tools/ship/gateReach-selfcheck " +
+                 "has been red since v4575, when physics/render/conductorFresnel.mjs was added without " +
+                 "re-recording tools/ship/population-census.json -- 520 expected, 521 found. It shipped ALL " +
+                 "GREEN because that gate is 11,491 ms and outside the sweep, which is the same failure the " +
+                 "record tier was built for, one level up on a gate that guards no record. Re-recorded here " +
+                 "with compare() read first, in the order that file's own note requires. NOT CLAIMED: that the nine documentary records are " +
+                 "fine, or that the path property repairs them -- 1,117 tree paths across 47 record bodies " +
+                 "resolve with 0 dangling, but only ONE of the nine names a path at all, so a path ratchet " +
+                 "would have been a smaller number that looked like progress and was not built.",
+    }),
+    since225: Object.freeze({
+        at: "v4576", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/recordTier-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/frozenRecords.mjs", "tools/ship/budgetExile-selfcheck.mjs",
+                                "tools/ship/shipRitual.mjs"]),
+        verdict: "green, 0.6 s, one new module, one new gate and one new ship step. THE FILED NUMBER WAS WRONG " +
+                 "IN BOTH DIRECTIONS AGAIN -- 43 of 94 filed against 38 of 104 live -- and the gap had two " +
+                 "causes. *** SEVEN RECORDS READ AS UNGUARDED AND WERE NOT. *** frozenRecords asks which gates " +
+                 "NAME a record; redCensus.mjs defines RED_AT_V4531 from RED_AT_V4531_GATES, so the ARRAY is " +
+                 "consumed only through the derived constant and gates name the derived one. Corrupting the " +
+                 "array -- filing a GREEN gate as a known red -- does redden registerDrift-selfcheck, measured. " +
+                 "The census follows one level of derivation within the defining file now: unguarded 20 -> 12, " +
+                 "checked 66 -> 72. One level and one file on purpose, because a transitive closure would start " +
+                 "crediting records with guardians that never touch their value. *** AND I REPORTED THAT " +
+                 "CORRUPTION AS UNCAUGHT FIRST, ON A BROKEN HARNESS OF MY OWN: *** `echo \"$(basename $g) " +
+                 "exit=$?\"` reports BASENAME's exit code, because the command substitution runs before $? is " +
+                 "expanded. Every gate read as 0. The re-take checks run that way in three earlier rounds were " +
+                 "independently confirmed by their full sweeps, so no shipped claim rests on it. *** THE OTHER " +
+                 "TWENTY HAVE A GUARDIAN THAT WORKS AND COSTS TOO MUCH, AND v4548'S MEDICINE DOES NOT APPLY: " +
+                 "*** counting fs calls against unique paths gives 1.0x, 1.1x, and samplerCheck-selfcheck does " +
+                 "NO file I/O at all -- 9 s of pure arithmetic. There is no redundancy to remove, so the tier " +
+                 "is the answer. tools/ship/recordTier.mjs runs the nine, serially and capped, 93 s, wired as a " +
+                 "ship step; its list is DERIVED from recordReach and its gate asserts not one of the nine " +
+                 "names appears in its source. *** IT FOUND TWO RED GUARDIANS ON ITS FIRST RUN, COVERING EIGHT " +
+                 "RECORDS, NEITHER ON ANY REGISTER. *** orreryFleet-selfcheck: orrery-fleet.json's baked file " +
+                 "sizes had drifted on three files THIS SESSION EDITED THREE ROUNDS EARLIER, under sweeps that " +
+                 "all reported ALL GREEN -- which is the argument for the tier, made by the tier, within a " +
+                 "minute of it existing. budgetExile-selfcheck: two rows gating on the defect still being as " +
+                 "bad as when found -- gates ARE still exiled at the cap (v4568 fixed that) and the inflation " +
+                 "is STILL above 1.5x (it has fallen to 1.48). That file's own section 3 diagnosed the shape at " +
+                 "v4535 and wrote the fix down and never applied it here. IT CANNOT BE APPLIED IN FULL: " +
+                 "MEASURED_V4425 froze { verdict, ms } where ms is the SERIAL time, so the INFLATED reading " +
+                 "that did the exiling was never written down and the historical half is unassertable. Recorded " +
+                 "rather than faked. Sabotages SS and TT red by name. STILL OPEN: 12 records with no guardian " +
+                 "at all, which no tier can help with.",
+    }),
+    // v4575 -- the 224th closing: the engine had no conductor Fresnel, and every metal was one fitted point.
+    since224: Object.freeze({
+        at: "v4575", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["physics/render/conductorFresnel-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 0.6 s, one new module and one new gate. *** THIS TREE HAD NO CONDUCTOR FRESNEL. EVERY " +
+                 "METAL IN IT WAS SCHLICK WITH A THREE-CHANNEL F0 -- a curve fitted through ONE point. *** " +
+                 "pathTracer.mjs calls it 'F0 as a TRIPLE', microsurfaceWalk.mjs spells the Schlick line and " +
+                 "labels it 'conductor' in the comment beside it, and fresnel.mjs is exact and DIELECTRIC. The " +
+                 "backlog asked for the F82-tint model to be graded 'against a number the tree already holds by " +
+                 "another route' and there was no such number, so the exact conductor curve is built here first " +
+                 "-- AND THEN THE ROUTE EXISTS AFTER ALL: a conductor with kappa = 0 IS a dielectric, and the " +
+                 "new closed form reproduces physics/render/fresnel.mjs, derived independently from Snell's law " +
+                 "and gated since v3491 on Brewster and total internal reflection, to 2.22e-16 over 306 " +
+                 "(index, angle) pairs. Sabotage QQ drops the p-polarised branch and that row goes to 3.52e-1, " +
+                 "which matters because a conductor has NO Brewster angle and nothing local catches a " +
+                 "polarisation swap. *** WHAT SCHLICK GETS WRONG ON A METAL IS THE SIGN OF THE SLOPE, NOT THE " +
+                 "SIZE OF THE ERROR: *** aluminium's green channel FALLS 0.914 -> 0.862 over the range where " +
+                 "Schlick RISES 0.914 -> 0.954, because a conductor's reflectance dips below F0 before climbing " +
+                 "and Schlick is monotonic by construction. 0.0931 against F82-tint's 0.0065, 14.4x. The 82 " +
+                 "degrees are DERIVED and not named -- mu(1-mu)^6 is maximised at mu = 1/7, found by searching " +
+                 "100,001 points -- and sabotage RR nudges the constant to a plausible 0.15 and is caught. *** " +
+                 "THE COMPARISON IS A 4,800-POINT (eta, kappa) SWEEP RATHER THAN FOUR HAND-COPIED TRIPLES, " +
+                 "BECAUSE THE METAL CONSTANTS ARE RGB SAMPLES OF SPECTRA AND THIS ROUND DOES NOT VOUCH FOR " +
+                 "THEM -- and the result is NOT universal: 4,691 better, 105 WORSE, 4 level, with every one of " +
+                 "the 105 at kappa <= 2.4 on a grid running to 8.0. Gold's blue channel sits in that band and " +
+                 "gains 1.02x, because its exact curve happens to agree with Schlick AT 82 degrees so the " +
+                 "fitted correction is near zero. AND I REPORTED THAT LOSING GAP WRONG FIRST: 0.0009, taken by " +
+                 "subtracting the maximum of one column from the maximum of another when the two maxima are at " +
+                 "different pairs. The worst single pair is 0.0058 and the gate's own row caught it. NOTHING IN " +
+                 "THE ENGINE USES THIS YET, stated rather than implied, and the safe default is proven: " +
+                 "tint = 1 IS Schlick, identically, over 404 (F0, angle) pairs.",
+    }),
+    // v4574 -- the 223rd closing: armed, at the command line only, after arming it everywhere first.
+    since223: Object.freeze({
+        // NO NEW GATE this round -- three rows added to an existing one, so the swept/green/red triple is
+        // zero rather than one. closingCoverage-selfcheck sums these against the named gates and said so.
+        at: "v4574", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/quickSweep.mjs", "tools/ship/quickSweep-selfcheck.mjs",
+                                "tools/ship/inputSets.mjs", "tools/ship/verify.mjs"]),
+        verdict: "green, three rows, no new gate. THE INCREMENTAL SWEEP IS ARMED: typing the command now skips " +
+                 "gates whose recorded inputs did not move. 926 of 1,258 skipped -- 73.6% of gates but 54.1% " +
+                 "of recorded gate time, and 409 s of wall clock becomes 233 s, 43%. THE GAP BETWEEN 73.6 AND " +
+                 "43 IS THE POINT AND IS RECORDED RATHER THAN ROUNDED AWAY: the gates that always run are also " +
+                 "the slow ones. What still runs, by reason and by cost -- 104 gates / 174 s spawn a child the " +
+                 "probe cannot follow, 133 / 132 s reach a module their recorded set does not carry (v4573's " +
+                 "bound, and that is its price in seconds), 73 / 93 s had an input change, 22 / 17 s open a " +
+                 "socket. *** AND THE FIRST WAY I ARMED IT WAS WRONG, WHICH A GATE SAID WITHIN THE MINUTE. *** " +
+                 "Flipping runQuickSweep's own default to true armed it for EVERY caller at once -- nine " +
+                 "besides the command line, almost all fixtures that drive the sweep to watch what it does -- " +
+                 "and sweepCoverage-selfcheck reported '0 gates run at a 1 ms budget, 0 confirmed alone', " +
+                 "because the sweep it was testing had skipped everything. A FIXTURE THAT SKIPS ITS OWN " +
+                 "SUBJECT IS VACUOUS, and it would have passed silently had it asserted a little less. The " +
+                 "default lives in the CLI block now and not in the function: typing the command skips, " +
+                 "calling the function does not, and the caller nobody has written yet inherits the safe one. " +
+                 "verify.mjs passes skipUnchanged:false EXPLICITLY anyway, because the saving buys iteration " +
+                 "speed and spends a small measured chance that a gate which should have run did not, and the " +
+                 "one run this tree must not spend that on is the one whose output is ALL GREEN. *** THE " +
+                 "RECORD'S OWN FORMAT IS CHECKED NOW AND NEVER WAS: *** FORMAT has been written into every " +
+                 "record since v4566 and nothing read it. While the mechanism only COUNTED that cost nothing. " +
+                 "Armed, it is the difference between a stale record and a wrong one -- the encoding is " +
+                 "INDEXED, so a record written under a different layout does not fail to decode, it decodes to " +
+                 "THE WRONG PATHS, hashes them, finds them unchanged, and skips. One line covers the missing " +
+                 "record too, and the histogram says it once rather than 1,257 times. Sabotages OO and PP red " +
+                 "by name: the dangerous default put back on the function, and verify allowed to inherit it.",    }),
     // v4573 -- the 222nd closing: the blocker was a sentence, and it is now two properties and a price.
     since222: Object.freeze({
         at: "v4573", swept: 1, green: 1, red: 0,

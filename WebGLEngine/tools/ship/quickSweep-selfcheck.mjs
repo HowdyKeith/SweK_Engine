@@ -324,6 +324,33 @@ console.log("\n6. *** THE FILED NUMBER IS A CONTENDED SAMPLE AND THE COST IS A D
     // tools/ship/recordReach-selfcheck.mjs counts, and it went red the moment the record landed here.
 }
 
+// ---- v4574: THE SKIP IS OPT-IN, AND THIS ROW EXISTS BECAUSE ARMING IT THE OTHER WAY BROKE A FIXTURE --------
+{
+    // *** ARMING MEANT FLIPPING runQuickSweep'S DEFAULT TO TRUE, AND THAT ARMED EVERY CALLER AT ONCE. ***
+    // There are nine besides the command line: fixtures in this file and in sweepCoverage-selfcheck that drive
+    // the sweep to watch what it does, tools/ship/budgetExile.mjs re-timing one named gate, and verify.mjs.
+    // sweepCoverage-selfcheck went red within the minute and was RIGHT -- its 1 ms-budget fixture reported
+    // "0 gates run at a 1 ms budget, 0 confirmed alone", because the sweep it was testing had skipped
+    // everything. A FIXTURE THAT SKIPS ITS OWN SUBJECT IS VACUOUS, and it would have passed silently if the
+    // fixture had asserted a little less.
+    //
+    // So the default lives in the CLI block and not in the function: typing `node tools/ship/quickSweep.mjs`
+    // skips, calling runQuickSweep() does not, and the caller nobody has written yet inherits the safe one.
+    const src = fs.readFileSync(path.join(ENG, "tools", "ship", "quickSweep.mjs"), "utf8");
+    const sig = /export async function runQuickSweep\([\s\S]{0,600}?\)\s*\{/.exec(src);
+    ok(!!sig && /skipUnchanged = false/.test(sig[0]),
+       "!! *** runQuickSweep does NOT skip unless its caller asks -- the dangerous default is never inherited ***",
+       "a programmatic caller that says nothing gets a full sweep. Nine call sites in this tree say nothing");
+    ok(/opts\.skipUnchanged = !process\.argv\.includes\("--full"\)/.test(src),
+       "!! ...and the command line skips by default, which is the whole point of arming it",
+       "the saving is for a human sweeping while working: 1,258 gates and 409 s becomes 332 and 233 s");
+    const vsrc = fs.readFileSync(path.join(ENG, "tools", "ship", "verify.mjs"), "utf8");
+    ok(/runQuickSweep\(\{ budgetMs, skipUnchanged: false/.test(vsrc),
+       "!! *** and the SHIP-TIME sweep passes skipUnchanged: false explicitly, belt and braces ***",
+       "the saving buys iteration speed and spends a small measured chance that a gate which should have run " +
+       "did not. The one run this tree must not spend that on is the one whose output is ALL GREEN");
+}
+
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the gates over the budget THE ROTATION HAS NOT REACHED YET. v4408 answered the older " +
     "version of this line -- that a regression in a 40-second gate is found by the full sweep and by nothing at " +

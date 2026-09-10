@@ -250,14 +250,35 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // rows that follow a gate by one. distinctDefinitions holds at 40 for the second round running.
     // v4573 -- RE-TAKEN for tools/ship/importClosure-selfcheck.mjs: 1618 -> 1619 and the three rows
     // that follow a gate by one. distinctDefinitions holds at 40 for the THIRD round running.
+    // v4575 -- RE-TAKEN for physics/render/conductorFresnel-selfcheck.mjs: 1619 -> 1620 and the three
+    // rows that follow a gate by one. distinctDefinitions holds at 40 for the FOURTH round running,
+    // and this one is a render gate rather than a tools/ship one, which is the harder case for it.
+    // v4576 -- RE-TAKEN for tools/ship/recordTier-selfcheck.mjs: 1620 -> 1621 and the three rows that
+    // follow a gate by one. distinctDefinitions holds at 40 for the FIFTH round running.
+    // v4577 -- RE-TAKEN for physics/raceKnob-selfcheck.mjs: 1621 -> 1622 and the three rows that follow a
+    // gate by one. distinctDefinitions holds at 40 for the SIXTH round running, and this gate is in physics/
+    // rather than tools/ship/ -- it lives beside its module on purpose, because registryOrphans derives an
+    // instrument's module from its gate path.
+    // v4577 -- RE-TAKEN for physics/raceKnob-selfcheck.mjs: 1621 -> 1622.
+    // v4579 -- RE-TAKEN for tools/ship/starField-selfcheck.mjs: 1622 -> 1623 and the three rows that follow a
+    // gate by one. distinctDefinitions holds at 40 for the SEVENTH round running.
+    // v4580 -- RE-TAKEN for tools/ship/skyStars-selfcheck.mjs: 1623 -> 1624 and the three rows that follow a
+    // gate by one. distinctDefinitions holds at 40 for the EIGHTH round running.
+    // v4582 -- RE-TAKEN for tools/ship/zipWriter-selfcheck.mjs: 1624 -> 1625 and the three rows that follow a
+    // gate by one. NOT THIS ROUND'S GATE -- it arrived on main in commit c3f1fecb (the release zip's pure-Node
+    // writer) and is re-taken here because that commit and this one merged, and the tree has to be green for
+    // whichever lands second. distinctDefinitions holds at 40 for the NINTH round running.
     // v4536 -- RE-TAKEN AGAIN AT THE MERGE, for tools/ship/partitionScore-selfcheck.mjs: 1619 -> 1620.
     // *** BOTH LINES RE-TOOK THIS TABLE IN THE SAME WINDOW, TWICE IN TWO ROUNDS, AND THE MERGE HAS TO ADD
     // THE TWO MOVES RATHER THAN PICK ONE: *** each side's note is correct for a tree containing its own new
     // gate and neither is correct for the tree containing both. Re-derived from the merged tree.
     // v4537 -- RE-TAKEN for tools/ship/backlogAbsence-selfcheck.mjs: 1620 -> 1621 and the three rows that
     // follow a gate by one. distinctDefinitions holds at 40 for the fourth round running.
-    gates: 1621, usesOk: 1600, definesOk: 1592, importsOk: 0,
-    distinctDefinitions: 40, nameFirst: 1493, condFirst: 91, unknownSignature: 16,
+    // v4537 -- RE-TAKEN AT THE MERGE: 1625 -> 1627, the two gates this branch added. FOURTH MERGE RUNNING
+    // where both lines re-took this table in the same window. distinctDefinitions holds at 40 for the tenth
+    // round; every number here is re-derived from the merged tree and never summed from the two notes.
+    gates: 1627, usesOk: 1606, definesOk: 1598, importsOk: 0,
+    distinctDefinitions: 40, nameFirst: 1499, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([
