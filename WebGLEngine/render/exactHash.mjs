@@ -77,6 +77,71 @@ export function exactHash1(x, seed = 0) { return exactHash2(x, 0, seed); }
  * The WGSL form. Same arithmetic, and the differences from the GLSL are the language's, not the hash's:
  * u32 rather than uint, vec2u rather than uvec2, and `>>` on u32 is already logical so no `u` suffixes.
  */
+/**
+ * *** WHERE THE OLD IDIOM STILL LIVES IN SHADER CODE, CLASSIFIED BY WHAT IT FEEDS. ***
+ *
+ * The v4569 round fixed the three CPU/GPU TWINS -- files where a float64 model and a float32 shader computed
+ * the same hash and disagreed. It filed the rest as "TEN HAVE NO GATE AT ALL". Re-counted at v4578 with the
+ * line rule this module's gate already uses (a `fract(sin(` on a line that is not a comment) plus a
+ * requirement that the file actually contain SHADER SOURCE rather than prose about one, the number is TWELVE,
+ * and a THIRTEENTH was not ungated at all -- render/holoFoilShader.js had a CPU model that the ratchet could
+ * not see, because the ratchet asks whether ONE FILE holds both halves and that pair is two files.
+ *
+ * *** THE CLASSIFICATION IS THE POINT, BECAUSE IT ORDERS THE WORK BY CONSEQUENCE. *** v4569 established that
+ * fbm AVERAGES its noise, so a wisp drawn from an unrelated random field is still a wisp -- which is why
+ * nobody looking at the picture ever caught the nebula. A THRESHOLD DOES NOT AVERAGE: grass decided a blade
+ * EXISTS on `bladeHash < slopeSuppress` and 65.4% of those decisions flipped; the nebula drew a star on
+ * `sv > 0.994` and 3,006 CPU stars met 2,509 GPU ones with 378 in the same place. So each site below is
+ * marked by its CONSUMER, read from the code rather than guessed:
+ *
+ *   threshold   the hash decides whether something EXISTS. Divergence changes the picture's CONTENT, and
+ *               these are the sites worth a CPU reference and a round each.
+ *   continuous  the hash is averaged, mixed or added as a small offset. Divergence changes the pattern and
+ *               not the structure, which is a real cost and a smaller one.
+ *
+ * *** THIS IS A CENSUS, NOT A DEFECT LIST. *** A shader-only site has no CPU twin to disagree with today, so
+ * nothing here is wrong in the way holoFoil was wrong. What each carries is that `sin` at these magnitudes is
+ * IMPLEMENTATION-DEFINED -- tools/ship/swiftShaders-selfcheck.mjs's own note, and tools/ship/webgpuHarness.mjs
+ * records sin(1 * 12.9898) * 43758.5453 reading 0.921690 on a CPU and 0.240234 on a GPU -- so two devices, or
+ * one page's WebGL2 and WebGPU paths, need not agree. The ratchet's job is that the set may SHRINK and may
+ * not grow silently.
+ */
+export const SHADER_SINHASH_V4578 = Object.freeze({
+    at: "v4578",
+    // *** THE THREE STARFIELDS ARE ONE FUNCTION HAND-COPIED INTO THREE FILES. *** Identical `n3` text and the
+    // identical `hh > 0.986` cut in blackhole.html, flight-gpu.html and wormhole.html. Whatever is done about
+    // the hash there is one job, not three, and doing it in one file would leave two silently different skies.
+    threshold: Object.freeze([
+        "blackhole.html",            // hh > 0.986 -> a star exists
+        "flight-gpu.html",           // hh > 0.986 -> a star exists, the same n3 and cut as blackhole.html
+        "wormhole.html",             // hh > 0.986 -> a star exists; carries h1 as well as n3
+        "render/skyRenderer.js",     // h > 1.0 - uStarDensity * 0.005 -> a star exists
+        "shaders/biome.frag.glsl",   // b < 0.33 desert, b < 0.66 plains, else forest -> WHICH BIOME a point is
+    ]),
+    continuous: Object.freeze([
+        "atmosphere/AtmosphereSystem.js",   // vertical jitter on a lightning streak, through a smoothstep
+        "demos_code/ant_colony.js",         // a heading nudge on the tie-break branch only
+        "demos_code/slime_mold.js",         // the same nudge, the same branch
+        "gpu/waterScreen.frag.glsl",        // a refraction offset scaled by 0.01
+        "nebula-device.html",               // fbm, and the ONLY file carrying the idiom in GLSL and WGSL BOTH
+        "render/CloudVolume.js",            // a dithered ray start, averaged over up to 48 march steps
+        "render/voxelrenderer.js",          // h1/h2/h3 surface tint and a +/-4% per-voxel colour jitter
+    ]),
+    // *** shaders/biome.frag.glsl SAYS IT MATCHES A JS HALF AND THE COMMENT IS "conceptually". *** Its
+    // `// BIOME DETECTION (matches JS logic conceptually)` is the same claim holoFoilShader.js's "matching the
+    // model's hash2" turned out to be false about, hedged by one adverb. Worth a look before it is touched;
+    // NOT investigated here, and recorded as unexamined rather than as a second finding.
+    claimsAJsHalf: Object.freeze(["shaders/biome.frag.glsl"]),
+    // The two gates that SEARCH for the idiom and therefore contain it. Excluded by name, and their existence
+    // is asserted, so the exclusion cannot come to hide a deletion.
+    searchers: Object.freeze(["tools/ship/exactHash-selfcheck.mjs", "tools/ship/holoFoil-selfcheck.mjs"]),
+    // *** NOT CLAIMED: that twelve is a defect count. *** It is where the idiom is. What was a defect, and is
+    // fixed at v4578, is render/holoFoilShader.js: its hf_hash2 was the sin-hash beneath a comment saying it
+    // matched render/holoFoil.mjs's integer hash2, and over the 1,600 cells of the flake lattice the two drew
+    // 29 of the model's 184 flakes in the same place -- 15.8%.
+    fixedHere: "render/holoFoilShader.js",
+});
+
 export const EXACT_HASH_WGSL = `
 fn exact_umix(hi: u32) -> u32 {
     var h = hi;

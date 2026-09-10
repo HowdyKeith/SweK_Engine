@@ -401,8 +401,13 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4577 -- RE-TAKEN: ES modules 3775 -> 3776 and closures 3654 -> 3655, for
     // physics/raceKnob-selfcheck.mjs. ONE file rather than the usual two: the module it gates already
     // existed, which is the whole reason the round wrote a gate and not a module.
-    esModules: 3776, closures: 3655, asyncAwait: 1425, typedArrays: 1034, promises: 349,
-    fetchXhr: 243, performanceNow: 220, raf: 116, webgl: 141, webgpu: 48, threads: 22, wasm: 23,
+    // v4578 -- RE-TAKEN: typed arrays 1034 -> 1035 and WebGL 141 -> 142, and NO new file. Both are the
+    // holofoil round, and both are the census reading real new usage rather than a file count moving:
+    // tools/ship/holoFoil-selfcheck.mjs now walks float64 ulps with a DataView over an ArrayBuffer to probe
+    // the cell-edge boundary, and render/holoFoilShader.js names WebGL2RenderingContext, because the shared
+    // integer hash needs GLSL ES 3.00 and the module now says so instead of leaving a page to find out.
+    esModules: 3776, closures: 3655, asyncAwait: 1425, typedArrays: 1035, promises: 349,
+    fetchXhr: 243, performanceNow: 220, raf: 116, webgl: 142, webgpu: 48, threads: 22, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.

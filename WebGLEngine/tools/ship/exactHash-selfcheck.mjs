@@ -24,7 +24,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { exactHash2, exactHash1, umix, EXACT_HASH_GLSL, EXACT_HASH_WGSL } from "../../render/exactHash.mjs";
+import { exactHash2, exactHash1, umix, EXACT_HASH_GLSL, EXACT_HASH_WGSL,
+         SHADER_SINHASH_V4578 } from "../../render/exactHash.mjs";
 import { bcsHash } from "../../render/swiftShaderModel.mjs";
 import * as GM from "../../render/grassModel.mjs";
 import { validateWgsl } from "../../render/wgslSpec.mjs";
@@ -253,6 +254,7 @@ console.log("\n6. *** THE RATCHET: no CPU/GPU TWIN may reintroduce the idiom ***
     // fx/paintFields.mjs and physics/kernelVerdict-selfcheck.mjs compute the idiom AT BOTH PRECISIONS ON
     // PURPOSE, to measure the gap. They are instruments, and rewriting them would delete the measurement.
     const INSTRUMENTS = ["fx/paintFields.mjs", "physics/kernelVerdict-selfcheck.mjs"];
+    const REC = SHADER_SINHASH_V4578;
     const SKIP = /node_modules|[\\/]vendor[\\/]|[\\/]dist[\\/]/;
     const walk = (d, out = []) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) {
         const p = path.join(d, e.name); if (SKIP.test(p) || e.name === ".git") continue;
@@ -277,6 +279,67 @@ console.log("\n6. *** THE RATCHET: no CPU/GPU TWIN may reintroduce the idiom ***
     ok("  ...and those instruments still EXIST, so the exclusion is not hiding a deletion",
        INSTRUMENTS.every((i) => fs.existsSync(path.join(ENG, i))),
        INSTRUMENTS.join(", ") + " -- an exclusion list whose entries vanished would pass this row silently");
+
+    // *** THE ROW ABOVE IS A SAME-FILE RULE, AND A TWIN CAN LIVE IN TWO FILES. ***
+    // v4578: render/holoFoil.mjs's hash2 is an INTEGER avalanche and render/holoFoilShader.js's hf_hash2 was
+    // `fract(sin(dot(...)) * 43758.5453123)` under the comment "matching the model's hash2". A genuine
+    // CPU/GPU twin, shipped, gated, and INVISIBLE HERE -- because neither file carries both halves, so
+    // neither matches "computes it in float64 AND emits it to a shader". The rule was a proxy for the
+    // property, which is what this tree keeps finding at the point where a check is trusted.
+    //
+    // Measured over the 1,600 cells of the 40x40 flake lattice, the GLSL emulated in float32: 81.8% of cells
+    // differed by more than 0.1 and the two halves drew 29 of the model's 184 flakes in the same place --
+    // 15.8%. The consumer is `if (cell > coverage) return 0`, so that is not a shade difference, it is which
+    // flakes exist.
+    //
+    // A general cross-file twin finder is not attempted -- "which module is a model of which shader" is not
+    // decidable from the text, and a guess would either miss pairs or invent them. What IS decidable is the
+    // shader half: every file whose SHADER SOURCE computes the idiom, named, so a new one cannot appear
+    // without a round saying so.
+    const SIN = /fract\s*\(\s*sin\s*\(/;
+    // NOT codeOnly: it deletes template literals, which is where every shader in this tree lives, and the
+    // v4569 round walked into that three times. A line starting with // or * is a comment in JS and in GLSL
+    // and in WGSL alike, which is the rule the CPU scan above already uses.
+    const liveLine = (l) => SIN.test(l) && !/^\s*(\/\/|\*|\/\*)/.test(l.trim());
+    // ...and the file must hold SHADER SOURCE rather than prose about one. tools/ship/gateSweep.mjs and
+    // tools/ship/nextRounds.mjs quote the idiom inside ordinary JS STRINGS -- a commit verdict and a backlog
+    // entry -- so no comment rule can exclude them and a bare grep counts them as sites. This is the
+    // exemption class tools/ship/commentFalsePass-selfcheck.mjs documents.
+    const SHADERISH = /void\s+main\s*\(\s*\)|@fragment|@vertex|precision\s+(highp|mediump|lowp)|fn\s+\w+\s*\([^)]*\)\s*->/;
+    const EXT = /\.(js|mjs|html|wgsl|glsl|frag|vert)$/;
+    const walkAll = (d, out = []) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+        const p = path.join(d, e.name); if (SKIP.test(p) || e.name === ".git") continue;
+        if (e.isDirectory()) walkAll(p, out); else if (EXT.test(e.name)) out.push(path.relative(ENG, p).split(path.sep).join("/"));
+    } return out; };
+    const live = [], prose = [];
+    for (const rel of walkAll(ENG)) {
+        if (REC.searchers.includes(rel)) continue;      // these two SEARCH for the idiom, so they contain it
+        let raw; try { raw = fs.readFileSync(path.join(ENG, rel), "utf8"); } catch { continue; }
+        if (!raw.split("\n").some(liveLine)) continue;
+        (SHADERISH.test(raw) ? live : prose).push(rel);
+    }
+    const recorded = [...REC.threshold, ...REC.continuous].sort();
+    const missing = recorded.filter((r) => !live.includes(r));
+    const extra = live.filter((r) => !recorded.includes(r));
+    ok("!! *** the shader-side census is exactly what the record names -- it may shrink, not grow silently ***",
+       missing.length === 0 && extra.length === 0,
+       extra.length ? "NEW SITE(S) NOT IN THE RECORD: " + extra.join(", ") + " -- name it and say what its hash "
+                    + "FEEDS (a threshold decides whether something exists; a continuous consumer averages it away)"
+       : missing.length ? "RECORDED BUT GONE: " + missing.join(", ") + " -- if it was fixed, take it out of the record"
+       : `${live.length} files: ${REC.threshold.length} whose hash feeds a THRESHOLD and ` +
+         `${REC.continuous.length} where it is averaged or added as a small offset. The backlog filed this ` +
+         "population as ten; the line rule plus the shader-source requirement reads twelve");
+    ok("  ...and the prose-only files are separated rather than counted as sites",
+       prose.length > 0 && prose.every((f) => !recorded.includes(f)),
+       prose.join(", ") + " -- the idiom inside a JS STRING (a commit verdict, a backlog entry). A bare grep " +
+       "counts these, which is how the v4569 census first read 21");
+    ok("!! *** the file this round FIXED is out of the census, read from the tree and not from the record ***",
+       !live.includes(REC.fixedHere) && fs.existsSync(path.join(ENG, REC.fixedHere)),
+       REC.fixedHere + " still exists and no longer computes the idiom in its shader -- both halves are " +
+       "exactHash's now, and tools/ship/holoFoil-selfcheck.mjs section 5b holds them to each other cell by cell");
+    ok("  ...and every searcher named in the exclusion still exists",
+       REC.searchers.every((f) => fs.existsSync(path.join(ENG, f))),
+       REC.searchers.join(", "));
 }
 
 console.log(fails ? `\nFAIL -- ${fails} check(s)` : "\nALL GREEN");

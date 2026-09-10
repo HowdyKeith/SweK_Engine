@@ -205,7 +205,11 @@ export const REACH_AT_V4548 = Object.freeze({
     // unguarded bucket the same round (12 -> 9, plus this arrival = 10), and `unchecked` went 32 -> 32: two
     // of the three moved to over-budget rather than to checked, so the tier runs them and the sweep still
     // does not. That distinction is the reason this ratchet counts unchecked and not unguarded.
-    total: 105,
+    // v4578: 105 -> 106 records and the ceiling did not move. SHADER_SINHASH_V4578 landed in
+    // render/exactHash.mjs guarded by exactHash-selfcheck at 1,656 ms -- under the 3,000 ms budget, so it
+    // arrived CHECKED. That is what adding a record properly looks like, against the nine this tree carries
+    // that no code names at all.
+    total: 106,
     // *** READ OFF THE INSTRUMENT, NOT PREDICTED. *** The first draft of this record guessed 53/21/19/40 from
     // which gates the round had sped up, and was wrong on three of the four: the comment-strip fix below
     // moved two records the other way at the same time, and a guess cannot see two changes at once.
@@ -320,7 +324,10 @@ export const UNGUARDED_SPLIT_V4577 = Object.freeze({
     // runs against a 3,000 ms budget -- it straddles the line by itself, and the sweep's 3,093 ms reading is
     // one sample of a quantity that has no single value. So those five records' class is not a fact and is
     // not frozen as one; the structural half below is.
-    structural: Object.freeze({ total: 105, unguarded: 9, documentaryOfThose: 9, readByCodeOfThose: 0 }),
+    // v4578 -- total RE-TAKEN 105 -> 106 for SHADER_SINHASH_V4578, which arrived checked. The other three
+    // are the round's actual finding and have not moved: no clock enters them, and no record has joined or
+    // left the unguarded set.
+    structural: Object.freeze({ total: 106, unguarded: 9, documentaryOfThose: 9, readByCodeOfThose: 0 }),
     // BEFORE, on the tree this round opened on:
     before: Object.freeze({ total: 104, checked: 72, overBudget: 20, unmeasured: 0, unguarded: 12, unchecked: 32 }),
     // AFTER, as one reading rather than as a constant -- see the note above. Taken with the round's own

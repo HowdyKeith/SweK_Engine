@@ -61,7 +61,7 @@ import { forgeFromSvg } from "/render/svgExtrude.js";
 // v4169 -- the holofoil, wired to the geometry it was written for. holoFoilShader.js is a three.js
 // onBeforeCompile patch, so it MUST be applied to a material before that material first compiles, which is
 // why this happens inside forge() on the freshly-built medal rather than once at startup.
-import { applyHoloFoil } from "/render/holoFoilShader.js";
+import { applyHoloFoil, holoFoilUnsupported } from "/render/holoFoilShader.js";
 
 const PRESETS = {
   star: '<svg viewBox="0 0 100 100"><path d="M50 5 L61 39 L97 39 L68 61 L79 95 L50 74 L21 95 L32 61 L3 39 L39 39 Z"/></svg>',
@@ -74,6 +74,13 @@ const cvs = document.getElementById("c"), view = document.getElementById("view")
 const scene = new THREE.Scene(); scene.background = new THREE.Color(0x0a0d12);
 const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100); camera.position.set(0, 0.6, 5);
 const renderer = new THREE.WebGLRenderer({ canvas: cvs, antialias: true });
+// v4578 -- *** THE FOIL NEEDS WebGL2, AND A PAGE THAT CANNOT GIVE IT ONE SAYS SO. *** Its flakes are keyed by
+// an integer hash, which is what makes render/holoFoil.mjs and the GLSL the same function flake for flake, and
+// integer arithmetic in a fragment shader needs GLSL ES 3.00 -- which three compiles only for a WebGL2
+// context. three asks for ['webgl2', 'webgl', 'experimental-webgl'] in that order, so a WebGL1 fallback is
+// reachable, and on it the medal would come back BLACK with a shader-compile error in the console and nothing
+// on screen explaining why. The checkbox is disabled with the reason instead.
+const foilBlocked = holoFoilUnsupported(renderer.getContext());
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 if ("outputColorSpace" in renderer) renderer.outputColorSpace = THREE.SRGBColorSpace;
 const controls = new OrbitControls(camera, cvs); controls.enableDamping = true; controls.minDistance = 2; controls.maxDistance = 14;
@@ -100,6 +107,7 @@ function forge() {
           // THE KEYS ARE THE UNIFORM NAMES, and getting that wrong is silent: applyHoloFoil spreads
           // { ...DEFAULTS, ...opts }, so `thicknessNm` would add a key nothing reads and leave uThicknessNm
           // at its default -- two live-looking sliders that move nothing. holoFoil-selfcheck asserts this.
+          if (foilBlocked) { errEl.textContent = foilBlocked; return; }
           applyHoloFoil(m, { uThicknessNm: +filmnm.value, uFlakeStrength: +flakes.value });
         }
       });
@@ -117,6 +125,9 @@ document.getElementById("foil").onchange = forge;
 document.getElementById("spin").onclick = (e) => { spin = !spin; e.target.textContent = "spin: " + (spin ? "on" : "off"); };
 const thick = document.getElementById("thick"), bevel = document.getElementById("bevel"), metal = document.getElementById("metal"), rough = document.getElementById("rough"), color = document.getElementById("color"), svg = document.getElementById("svg"),
       foil = document.getElementById("foil"), filmnm = document.getElementById("filmnm"), flakes = document.getElementById("flakes");
+// AFTER the element consts, not before them: `foil` is a `const` and touching it earlier is a temporal-dead-zone
+// ReferenceError that takes the whole module down, which is a worse failure than the one being guarded against.
+if (foilBlocked) { foil.checked = false; foil.disabled = true; foil.title = foilBlocked; errEl.textContent = foilBlocked; }
 
 svg.value = PRESETS.star; resize(); forge();
 (function loop() { if (spin && medal) medal.rotation.y += 0.01; controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop); })();

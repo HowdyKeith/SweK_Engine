@@ -12,7 +12,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { holoFoil, thinFilmRGB, diffractionRGB, opticalPathDifference, refractionCos, flakeAt, fresnel,
-         hash2, clamp01, LAMBDA_NM, DEFAULT_IOR, DEFAULT_THICKNESS_NM } from "../../render/holoFoil.mjs";
+         hash2, clamp01, LAMBDA_NM, DEFAULT_IOR, DEFAULT_THICKNESS_NM, FLAKE_DEFAULTS } from "../../render/holoFoil.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 // v4169 -- IMPORTED AS AN ES MODULE, THE ONLY WAY A PAGE COULD LOAD IT. The old createRequire line is why
@@ -20,6 +20,7 @@ const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..
 // browser: CommonJS works in Node and throws in a page, so this gate ran the shader in the one environment it
 // could never ship in. Section "browser-loadable" below asserts it stays that way.
 import * as shader from "../../render/holoFoilShader.js";
+import { EXACT_HASH_GLSL } from "../../render/exactHash.mjs";
 import { codeOnly } from "./sourceScan.mjs";
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -89,9 +90,30 @@ console.log("\n3. the grating, and the sparkle that must not swim");
     // *** SURFACE SPACE, NOT SCREEN SPACE. *** The check is that the same surface point keeps the same flake
     // whatever the view does, which is the difference between glitter and static.
     const sameFlake = new Set(ANGLES.map((c) => flakeAt(0.31, 0.44, c) > 0 ? "lit" : "dark"));
-    ok("!! a flake stays on its surface point as the view moves", hash2(0.31 * 40, 0.44 * 40, 1) === hash2(0.31 * 40, 0.44 * 40, 1),
-        "seeded from surface u,v -- keyed on gl_FragCoord it would crawl across the object as it turns, and the " +
-        "surface then appears to slide under its own sparkle");
+    // *** THIS ROW READ `hash2(A) === hash2(A)` AND COULD NOT FAIL. *** It compared the function to itself at
+    // one point, which is true of any deterministic function and says nothing about the property it names --
+    // that a flake's EXISTENCE is a function of the surface point and not of the view. The v4569 sin-hash
+    // round found the identical shape one file away (a row comparing windHash to windHash instead of reading
+    // bladeVisibility's answer), and it is asked of flakeAt here rather than of the hash underneath it.
+    const FD = FLAKE_DEFAULTS;
+    const CELLS = [];
+    for (let i = 0; i < FD.density; i += 3) for (let j = 0; j < FD.density; j += 3)
+        CELLS.push([(i + 0.5) / FD.density, (j + 0.5) / FD.density]);
+    const byExistence = CELLS.map(([u, v]) => ({
+        u, v,
+        // what the threshold says: a cell above coverage has NO flake, whatever the view
+        hasFlake: hash2(u * FD.density, v * FD.density, FD.seed) <= FD.coverage,
+        // what the renderer does across every angle -- dark at all of them means no flake there
+        everLit: ANGLES.some((c) => flakeAt(u, v, c) > 0),
+    }));
+    const disagree = byExistence.filter((r) => r.hasFlake !== r.everLit);
+    ok("!! a flake stays on its surface point as the view moves",
+        disagree.length === 0 && byExistence.some((r) => r.hasFlake) && byExistence.some((r) => !r.hasFlake),
+        `${byExistence.length} surface cells: ${byExistence.filter((r) => r.hasFlake).length} carry a flake and ` +
+        `light at some angle, ${byExistence.filter((r) => !r.hasFlake).length} are dark at EVERY angle, ` +
+        `${disagree.length} disagree. Seeded from surface u,v -- keyed on gl_FragCoord the set would change as ` +
+        "the object turns and the surface would appear to slide under its own sparkle. BOTH SIDES ARE " +
+        "REQUIRED NON-EMPTY: a coverage of 0 or 1 would make the two columns agree trivially");
     ok("!! ...but it only LIGHTS at its own angle", sameFlake.size === 2 || sameFlake.has("dark"),
         "each flake carries its own tilt, so they fire one at a time instead of the field flashing together");
     let lit = 0, total = 0;
@@ -152,6 +174,136 @@ console.log("\n5. the GLSL, and where it is injected");
         /#ifdef USE_UV/.test(fs.readFileSync(path.join(ENG, "render/holoFoilShader.js"), "utf8")));
     report("svg-forge.html already parses an SVG into THREE.Shape and bevel-extrudes it; this is a MATERIAL on " +
            "geometry that already existed, which is why it is one module and not a page.");
+}
+
+// ---- 5b. *** THE HASH: TWO DECLARATIONS OF ONE THING, AND THEY WERE DIFFERENT FUNCTIONS *** -------------------
+console.log("\n5b. the flake hash, which the model and the shader disagreed about for fifteen versions");
+{
+    // v4169 fixed the wavelengths, the IOR and the film thickness here and wrote the reason down: "TWO
+    // DECLARATIONS OF ONE THING THAT NOBODY EVER COMPARED is this tree's most repeated defect, and it is
+    // worse than usual here because holoFoil-selfcheck GRADES THIS SHADER AGAINST THAT MODEL". It left the
+    // hash. render/holoFoil.mjs's hash2 was an integer avalanche; render/holoFoilShader.js's hf_hash2 was
+    // `fract(sin(dot(vec3(floor(p), seed), vec3(127.1, 311.7, 74.7))) * 43758.5453123)` -- the sin-hash --
+    // beneath the comment "Integer lattice, matching the model's hash2". Two unrelated random fields, both
+    // feeding `if (cell > coverage) return 0`, which decides whether a flake EXISTS.
+    //
+    // MEASURED BEFORE THE FIX, over the 1,600 cells of the 40x40 lattice with the GLSL emulated in float32:
+    // 81.8% of cells differed by more than 0.1, worst 0.9604, the draw decision flipped on 21.3%, and of the
+    // model's 184 flakes the shader drew 29 IN THE SAME PLACE -- 15.8%.
+    const src = shader.HOLO_GLSL;
+    ok("!! *** the shader carries exactHash's OWN exported GLSL, not a transcription of it ***",
+       src.includes(EXACT_HASH_GLSL),
+       "render/exactHash.mjs exports the text and this splices it, so the three languages cannot drift by " +
+       "being edited separately. A copy that happened to be correct today is the defect this round found");
+    ok("!! ...and hf_hash2 asks it for the FLOORED cell, which is what makes the flake sit on the surface",
+       /return\s+exact_hash\(floor\(p\),\s*uint\(seed\)\);/.test(src),
+       "the model floors before hashing too -- both halves must agree on WHICH cell, not just on the hash");
+    ok("!! ...and no fract(sin( survives anywhere in this shader",
+       !/fract\s*\(\s*sin\s*\(/.test(src), "the whole GLSL, read as the exported string");
+
+    // *** THE INTEGER HASH COSTS A CAPABILITY, AND THE PAGE HAS TO SAY SO OR GO BLACK. *** GLSL ES 1.00 has
+    // no uint, no uvec2 and no bitwise operators, so exact_hash needs GLSL ES 3.00 -- which three compiles
+    // only for a WebGL2 context, and three asks for ['webgl2', 'webgl', 'experimental-webgl'] in that order.
+    // On a WebGL1 fallback this material fails to compile and svg-forge's medal comes back black with the
+    // reason only in the console. A guard nobody calls is not a guard, so the page's wiring is asserted here
+    // rather than the export merely existing.
+    const forge = fs.readFileSync(path.join(ENG, "svg-forge.html"), "utf8");
+    ok("!! *** the WebGL2 requirement is DETECTED, and detected where it is decided ***",
+       typeof shader.holoFoilUnsupported === "function" &&
+       shader.holoFoilUnsupported(null) !== null &&
+       shader.holoFoilUnsupported({}) !== null,
+       "holoFoilUnsupported returns a sentence for no context and for a non-WebGL2 one. It is asked of the " +
+       "RENDERER'S OWN context rather than of a feature-detect on the page, because what decides the GLSL " +
+       "version is the context three actually got");
+    ok("!! ...and svg-forge.html calls it, disables the foil control and shows the reason",
+       /holoFoilUnsupported/.test(forge) && /foil\.disabled = true/.test(forge) &&
+       /errEl\.textContent = foilBlocked/.test(forge),
+       "the page imports the check, ticks the checkbox off, disables it and writes the sentence into the " +
+       "error line -- so a WebGL1 visitor is told, instead of being shown a black medal");
+    ok("  ...and it reads the flag AFTER the element consts, which is where the first draft put a ReferenceError",
+       forge.indexOf("foil = document.getElementById") < forge.indexOf("foil.disabled = true"),
+       "`foil` is a const: touching it above its declaration is a temporal-dead-zone ReferenceError that " +
+       "takes the whole module down -- a worse failure than the one being guarded against, and this row is " +
+       "here because the first draft of that wiring did exactly it");
+
+    // *** THE NUMERIC ROW: the model against a float32 emulation of what the GPU computes. ***
+    // exact_hash's only floating-point steps are floor(p * 256) and the 2^24 wrap; everything after the
+    // uvec2 conversion is integer and therefore identical in both precisions. The emulation puts every one
+    // of those float steps through Math.fround, which is what a GPU does to every operand.
+    const f = Math.fround;
+    const umix32 = (hi) => { let h = hi >>> 0;
+        h = (h ^ (h >>> 16)) >>> 0; h = Math.imul(h, 0x7feb352d) >>> 0;
+        h = (h ^ (h >>> 15)) >>> 0; h = Math.imul(h, 0x846ca68b) >>> 0;
+        return (h ^ (h >>> 16)) >>> 0; };
+    const glslExactHash = (px, py, seed) => {
+        let qx = f(Math.floor(f(px * f(256)))), qy = f(Math.floor(f(py * f(256))));
+        qx = f(qx - f(16777216 * Math.floor(f(qx * f(1 / 16777216)))));
+        qy = f(qy - f(16777216 * Math.floor(f(qy * f(1 / 16777216)))));
+        return umix32((Math.imul(qx >>> 0, 0x8da6b343) >>> 0) ^
+                      umix32((Math.imul(qy >>> 0, 0xd8163841) >>> 0) ^ (seed >>> 0))) / 4294967296;
+    };
+    const glslHf = (px, py, seed) => glslExactHash(Math.floor(f(px)), Math.floor(f(py)), seed);
+
+    // *** READ OFF THE SHADER'S OWN DECLARED UNIFORMS, NEVER TYPED HERE. *** A sabotage that set
+    // uFlakeCoverage to 0 left every row below GREEN in the first draft, because each had typed its own 0.12
+    // -- a section built to catch two declarations of one thing, carrying a third.
+    const D = shader.DEFAULTS.uFlakeDensity, SEED = shader.DEFAULTS.uFlakeSeed, COV = shader.DEFAULTS.uFlakeCoverage;
+    ok("!! *** the shader's flake knobs ARE the model's, not a second set that happens to match ***",
+       D === FLAKE_DEFAULTS.density && SEED === FLAKE_DEFAULTS.seed && COV === FLAKE_DEFAULTS.coverage,
+       `density ${D}, seed ${SEED}, coverage ${COV} -- one declaration in render/holoFoil.mjs, imported. ` +
+       "v4169 did this for the wavelengths, the IOR and the film thickness and wrote down why; the flake " +
+       "knobs stayed spelled twice until a sabotage moved one and nothing went red");
+    ok("  ...and the coverage is a real threshold, so the rows below are not trivially satisfied",
+       COV > 0 && COV < 1, `coverage ${COV}: at 0 nothing is a flake and at 1 everything is, and either way ` +
+       "the two halves agree about a picture with no flakes in it");
+    let cells = 0, bitEq = 0, flip = 0, mF = 0, sF = 0, both = 0, worst = 0;
+    for (let i = 0; i < D; i++) for (let j = 0; j < D; j++) {
+        const gx = i + 0.5, gy = j + 0.5;
+        const m = hash2(gx, gy, SEED), g = glslHf(gx, gy, SEED);
+        cells++; if (m === g) bitEq++;
+        const d = Math.abs(m - g); if (d > worst) worst = d;
+        const mf = m <= COV, gf = g <= COV;
+        if (mf) mF++; if (gf) sF++; if (mf && gf) both++; if (mf !== gf) flip++;
+    }
+    ok("!! *** the model and the shader are BIT-IDENTICAL on every cell of the flake lattice ***",
+       bitEq === cells && worst === 0,
+       `${bitEq} of ${cells} cells identical, worst |d| ${worst}. Integer arithmetic, so float32 and float64 ` +
+       "are not close, they are the same number");
+    ok("!! ...and they therefore draw THE SAME FLAKES -- the property the threshold actually decides",
+       flip === 0 && both === mF && mF === sF && mF > 0,
+       `model ${mF} flakes, shader ${sF}, ${both} in the same place, ${flip} decisions flipped. Before the fix ` +
+       "this row read 184 / 214 / 29 / 340: the two halves agreed about one flake in six");
+
+    // *** AND OVER CONTINUOUS uv, WHICH IS WHAT A FRAGMENT SHADER ACTUALLY GETS. ***
+    let n = 0, eq = 0, cflip = 0;
+    for (let a = 0; a < 240; a++) for (let b = 0; b < 240; b++) {
+        const u = a / 240, v = b / 240;
+        const m = hash2(u * D, v * D, SEED);                       // float64, as the model receives it
+        const g = glslHf(f(f(u) * f(D)), f(f(v) * f(D)), SEED);    // float32, as the varying arrives
+        n++; if (m === g) eq++; if ((m <= COV) !== (g <= COV)) cflip++;
+    }
+    ok("!! ...and on a continuous uv sweep too, where the shader's coordinate is a float32 varying",
+       eq === n && cflip === 0,
+       `${eq} of ${n} samples identical, ${cflip} flake decisions differing over the unit square`);
+
+    // *** WHAT THIS DOES NOT CLAIM, AND THE v4569 ROUND OVERCLAIMED EXACTLY HERE. *** A row saying the two
+    // agree for ANY input would be false: they agree on the LATTICE, and a coordinate landing within a few
+    // ulps of a CELL EDGE floors to a different cell in float32 than in float64. That is floor() choosing a
+    // cell, not the hash disagreeing -- both halves hash whatever cell they chose identically -- and it is
+    // asserted as its own fact so the row above cannot be read as more than it is.
+    const nextDown = (x) => { const b = new DataView(new ArrayBuffer(8)); b.setFloat64(0, x);
+        let hi = b.getUint32(0), lo = b.getUint32(4);
+        if (lo === 0) { hi--; lo = 0xffffffff; } else lo--;
+        b.setUint32(0, hi); b.setUint32(4, lo); return b.getFloat64(0); };
+    let edgeTried = 0, edgeDiff = 0;
+    for (let k = 1; k < D; k++) { let u = k / D;
+        for (let t = 0; t < 3; t++) { u = nextDown(u); edgeTried++;
+            if (hash2(u * D, 0.5 * D, SEED) !== glslHf(f(f(u) * f(D)), f(f(0.5) * f(D)), SEED)) edgeDiff++; } }
+    ok("!! THE BOUNDARY IS REAL AND IS STATED RATHER THAN ROUNDED PAST",
+       edgeDiff > 0,
+       `${edgeDiff} of ${edgeTried} samples within 3 float64 ulps BELOW a cell edge land in different cells. ` +
+       "IF THIS EVER READS ZERO THE PROBE HAS STOPPED PROBING, not the boundary stopped existing -- which is " +
+       "why it asserts a NON-zero. render/exactHash.mjs's own gate bounds the same effect at its 1/256 lattice");
 }
 
 console.log("\n*** BROWSER-LOADABLE, AND ACTUALLY ON SOMETHING ***");

@@ -457,7 +457,9 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4568 -- RE-TAKEN with `excluding`: 101/45/186 -> 104/46/189, the same three records and three fields
     // plus this module's own two and their twenty.
     // v4577 -- RE-TAKEN with `excluding` below: 104/46/189 -> 105/47/192, the one record and its three fields.
-    currentIncludingModule: Object.freeze({ records: 105, withFields: 47, fields: 192 }),
+    // v4578 -- RE-TAKEN with `excluding` below: 105/47/192 -> 106/47/192, the one record and none of its
+    // values being a bare integer.
+    currentIncludingModule: Object.freeze({ records: 106, withFields: 47, fields: 192 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -501,7 +503,12 @@ export const PROBE_AT_V4536 = Object.freeze({
     // OWN line, so the second one is not a field; `afterExcludingThisRecord` contributes the third. Stated
     // rather than left as a discrepancy, the same way
     // v4566 and v4568 stated the frozen ARRAYS that RECORD_RE does not match.
-    excluding: Object.freeze({ records: 103, withFields: 45, fields: 172 }),
+    // v4578 -- RE-TAKEN: 103/45/172 -> 104/45/172. ONE record, SHADER_SINHASH_V4578 in render/exactHash.mjs,
+    // from the round that re-counted the shader-side sin-hash population. withFields and fields do NOT move:
+    // every field it carries is a string or a frozen array of paths, and FIELD_RE counts `name: <digits>,`.
+    // A record with no numeric field is still a record, and stating that is cheaper than the next re-take
+    // wondering why one number moved and two did not.
+    excluding: Object.freeze({ records: 104, withFields: 45, fields: 172 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,
