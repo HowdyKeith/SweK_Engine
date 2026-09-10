@@ -70,10 +70,48 @@ const isGateTool = (rel) => rel.startsWith(GATE_TOOL_DIR + "/");
 // tree -- populationCensus stamps `generatedFrom`, the baselines stamp `captured`/`generated` -- so the corpus
 // asks the file what it is instead of matching its name. A name list would need editing every time somebody
 // writes a new report, which is precisely the maintenance nobody does and how these two got in.
-const SKIP = /orphan-baseline\.json|node_modules|(^|[\\/])vendor[\\/]|\.git|render-qa[\\/]out|[\\/]dist[\\/]|\.min\./;
-/** A JSON file that declares it was generated is a RECORD of references, never a maker of them. */
-const isGeneratedRecord = (file, text) =>
-    /\.json$/.test(file) && /^\s*[{[]/.test(text) && /"(?:generatedFrom|generated|captured)"\s*:/.test(text.slice(0, 4096));
+//
+// *** v4572 -- AND THE PROPERTY HAS NEVER WORKED ON THE ONE FILE IT WAS WRITTEN FOR, BECAUSE THE NAME WAS
+// STILL DOING THE JOB. *** orphan-baseline.json carries `"captured": "2026-08-25"` -- it is stamped, exactly as
+// this comment says the baselines are -- AT BYTE 6,940, because its `note` runs six and a half kilobytes
+// first. The test read `text.slice(0, 4096)`, so it returned FALSE, and the file stayed out of the corpus
+// solely because `orphan-baseline\.json` sits in the SKIP regex below: the very name list v3900 replaced with
+// a property, quietly propping up the property that replaced it. Nobody could see it, because the two agreed
+// about the outcome and disagreed about the reason.
+//
+// THE WINDOW WAS ALWAYS THE BUG AND v4571 WALKED PAST IT. That round put `generatedFrom` FIRST in
+// input-sets.json's payload and wrote a comment explaining that the note runs ~700 characters so the key must
+// be inside the window -- treating a defect in the CHECK as a placement rule for every future writer. A record
+// is JSON. Its top-level keys are exactly knowable by parsing it, at no window at all, and a rule that depends
+// on where in a file a key happens to fall is a rule about formatting wearing a rule about provenance.
+//
+// AND THE VOCABULARY WAS TOO NARROW BY ONE, FOUND THE SAME WAY: gate-plan-snapshot.json declares
+// `producedBy`, which is provenance in a different word, and the three-name list did not know it. Both
+// halves are fixed together because both were found by asking what the records actually say instead of
+// what the check assumes they say.
+const SKIP = /node_modules|(^|[\\/])vendor[\\/]|\.git|render-qa[\\/]out|[\\/]dist[\\/]|\.min\./;
+/** The words a record uses in this tree to say where it came from. */
+// EACH WORD NAMES A SOURCE OR AN ACT OF CAPTURE, NEVER A TIME. `producedAt` and `refreshedAt` were both
+// considered and both REFUSED: a timestamp says when a file was written and nothing about who wrote it, and
+// a hand-edited file carrying a date would be excluded from the corpus on the strength of the date. Widening
+// this set makes the scanner blinder, which is the direction that costs orphans, so it widens on evidence
+// rather than on convenience -- gate-plan-snapshot.json carries `producedBy` beside its `producedAt`, and
+// tools/ship/releases.json was given a real `generatedFrom` rather than having `refreshedAt` admitted here.
+const PROVENANCE = new Set(["generatedFrom", "generated", "captured", "producedBy"]);
+/**
+ * A JSON file that declares it was generated is a RECORD of references, never a maker of them.
+ *
+ * PARSED, NOT MATCHED. The parse is the point: a top-level key is a fact about the document and a regex over
+ * the first 4 KB is a fact about its layout. An unparseable file is not a record -- it is a broken file, and
+ * saying so by returning false keeps it in the corpus where somebody will notice it.
+ */
+const isGeneratedRecord = (file, text) => {
+    if (!/\.json$/.test(file) || !/^\s*\{/.test(text)) return false;
+    let j = null;
+    try { j = JSON.parse(text); } catch { return false; }
+    if (!j || typeof j !== "object" || Array.isArray(j)) return false;
+    return Object.keys(j).some((k) => PROVENANCE.has(k));
+};
 
 // v4009 -- A THIRD FILE WALKED IN, AND THIS TIME THE PROPERTY DID NOT EXIST TO ASK FOR.
 // render/ssaoCompare.mjs is a hand-written report comparing two SSAO implementations. Its data table stores

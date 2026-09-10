@@ -1,6 +1,6 @@
 {
  "generatedFrom": "tools/ship/recordShape.mjs",
- "at": "2026-09-10T00:05:16.358Z",
+ "at": "2026-09-10T01:17:33.087Z",
  "note": "Top-level and one-level-down key sets for every JSON record a gate reads. A record may GAIN a key; losing one is a dropped field and fails recordShape-selfcheck. A deliberate removal is recorded in DROPPED_ON_PURPOSE in tools/ship/recordShape.mjs, not by editing this file until it passes.",
  "shapes": {
   "GPU_Assets/mesh_0/mesh.json": {
@@ -2306,6 +2306,7 @@
   },
   "tools/ship/artifact-history.json": {
    "top": [
+    "generatedFrom",
     "runs",
     "version"
    ],
@@ -2321,6 +2322,7 @@
   },
   "tools/ship/boundary-report-baseline.json": {
    "top": [
+    "generatedFrom",
     "note",
     "sites",
     "tally",
@@ -2332,6 +2334,7 @@
    "top": [
     "assign",
     "at",
+    "captured",
     "compare",
     "note",
     "three"
@@ -2340,6 +2343,7 @@
   },
   "tools/ship/duplicate-files-baseline.json": {
    "top": [
+    "generatedFrom",
     "groups"
    ],
    "entry": []
@@ -2450,6 +2454,13 @@
    ],
    "entry": []
   },
+  "tools/ship/prose-debt-baseline.json": {
+   "top": [
+    "generatedFrom",
+    "offenders"
+   ],
+   "entry": []
+  },
   "tools/ship/record-shapes.json": {
    "top": [
     "at",
@@ -2466,6 +2477,7 @@
    "top": [
     "accepted",
     "gates",
+    "generatedFrom",
     "pairs",
     "subjects"
    ],
@@ -2474,6 +2486,7 @@
   "tools/ship/releases.json": {
    "top": [
     "baseline",
+    "generatedFrom",
     "lagBudget",
     "note",
     "ratchet",
@@ -2500,6 +2513,7 @@
   },
   "tools/ship/slugTsl-fixture.json": {
    "top": [
+    "captured",
     "glslFragment",
     "glslVertex",
     "note",
@@ -2520,6 +2534,7 @@
    "top": [
     "at",
     "budgetMs",
+    "generatedFrom",
     "lastRun",
     "note",
     "rotated"
@@ -2624,6 +2639,7 @@
    "top": [
     "at",
     "emitted",
+    "generatedFrom",
     "note",
     "three",
     "transplanted"
@@ -2635,6 +2651,7 @@
     "at",
     "emitted",
     "emittedStorage",
+    "generatedFrom",
     "note",
     "three",
     "transplanted",
@@ -2645,6 +2662,7 @@
   "tools/ship/tsl-emitted-physics.json": {
    "top": [
     "at",
+    "generatedFrom",
     "heidler",
     "lyapunov",
     "note",
@@ -2659,6 +2677,7 @@
    "top": [
     "at",
     "atlas",
+    "generatedFrom",
     "glsl",
     "ink",
     "note",
@@ -2679,6 +2698,7 @@
   "tools/ship/tsl-emitted-slug.json": {
    "top": [
     "at",
+    "generatedFrom",
     "note",
     "slug",
     "three"
@@ -2694,6 +2714,7 @@
   "tools/ship/tsl-emitted-wide.json": {
    "top": [
     "at",
+    "generatedFrom",
     "note",
     "planes",
     "quad",
@@ -2713,6 +2734,7 @@
     "at",
     "badTv",
     "blackbody",
+    "generatedFrom",
     "note",
     "three"
    ],
@@ -2724,6 +2746,7 @@
   "tools/ship/tslCompute-fixture.json": {
    "top": [
     "at",
+    "captured",
     "note",
     "three",
     "wgsl"
@@ -2732,6 +2755,7 @@
   },
   "tools/ship/tslRace-fixture.json": {
    "top": [
+    "captured",
     "glslFragment",
     "glslVertex",
     "note",
@@ -2742,6 +2766,7 @@
   },
   "tools/ship/tslSource-fixture.json": {
    "top": [
+    "captured",
     "glsl",
     "note",
     "wgsl"
@@ -2750,6 +2775,7 @@
   },
   "tools/ship/tslWide-fixture.json": {
    "top": [
+    "captured",
     "glslFragment",
     "glslVertex",
     "note",

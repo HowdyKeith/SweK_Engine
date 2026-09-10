@@ -168,7 +168,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
     if (process.argv.includes("--accept")) {
         // *** DELIBERATE, NEVER AUTOMATIC. A manifest this tool refreshed on every run would agree with itself
         // forever -- the mirror shape. Accepting is a separate act, taken by a person after reading the report. ***
-        fs.writeFileSync(MANIFEST, JSON.stringify({ accepted: new Date().toISOString().slice(0, 10), ...now }, null, 0));
+        fs.writeFileSync(MANIFEST, JSON.stringify({ generatedFrom: "tools/ship/frozenReferee.mjs", accepted: new Date().toISOString().slice(0, 10), ...now }, null, 0));
         console.log("[frozenReferee] manifest accepted: " + Object.keys(now.gates).length + " gates, " +
                     Object.keys(now.subjects).length + " subjects");
         process.exit(0);

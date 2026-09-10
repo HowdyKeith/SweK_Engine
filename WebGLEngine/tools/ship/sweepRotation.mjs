@@ -197,6 +197,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         for (const r of rows) priorLedger[r.gate] = { gate: r.gate, ms: r.ms, code: r.code, priorMs: priorMs[r.gate], at: stamp };
         const merged = Object.values(priorLedger).sort((a, b) => a.gate < b.gate ? -1 : a.gate > b.gate ? 1 : 0);
         fs.writeFileSync(path.join(ENG, "tools", "ship", "sweep-rotation.json"), JSON.stringify({
+            generatedFrom: "tools/ship/sweepRotation.mjs",
             note: "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. " +
                   "Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. " +
                   "MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that " +

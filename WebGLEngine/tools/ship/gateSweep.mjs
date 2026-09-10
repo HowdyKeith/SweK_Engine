@@ -3764,6 +3764,46 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    // v4572b -- the 221st closing: the name list was still doing the property's job, and nobody could see it.
+    since221: Object.freeze({
+        at: "v4572b", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/recordProvenance-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/orphanScan.mjs", "tools/ship/gateQuality-selfcheck.mjs"]),
+        verdict: "green, 204 ms, one new gate. *** THE ROUND WAS FILED AS 29 UNSTAMPED RECORDS AND THE REAL " +
+                 "DEFECT WAS IN THE CHECK. *** Filed premise wrong in both directions: 28 of 36, not 29 of 35, " +
+                 "and it implied 28 latent instances of the v4567 collapse. MEASURED FIRST, by stamping every " +
+                 "unstamped record in place and re-running the scan: the candidate set did not move. ZERO " +
+                 "orphans were hidden. So the stamps are PREVENTION and the round says so, rather than " +
+                 "reporting a rescue it did not perform. *** THEN THE THING WORTH THE ROUND: " +
+                 "orphan-baseline.json CARRIES `captured` AT BYTE 6,940, *** because its note runs six and a " +
+                 "half kilobytes first, and isGeneratedRecord read text.slice(0, 4096). The property returned " +
+                 "FALSE for the one file it was written for, and that file stayed out of the corpus solely " +
+                 "because its NAME was still in the SKIP regex -- the list v3900 replaced with the property, " +
+                 "quietly propping up the property that replaced it. Three rounds looked at this file and none " +
+                 "saw it, because the name and the property agreed about the OUTCOME and disagreed about the " +
+                 "REASON. v4571 walked closest: it put generatedFrom FIRST in input-sets.json and wrote a " +
+                 "comment explaining that the note runs ~700 characters so the key must land inside the " +
+                 "window -- a defect in the CHECK, written down as a placement rule for every future writer. A " +
+                 "record is JSON and its top-level keys are exactly knowable by parsing it, at no window at " +
+                 "all. It parses now, the name is out of SKIP, and the proof is the sabotage: stripping that " +
+                 "one `captured` key takes the candidate set from 7 to ZERO, the exact v4571 collapse, from " +
+                 "the file the name had been protecting. Parsing also removed FALSE POSITIVES the slice had " +
+                 "been granting -- artifact-history.json and install-history.json matched a provenance word " +
+                 "NESTED inside their first 4 KB and were being excluded on it. The vocabulary gained " +
+                 "`producedBy` and REFUSED `producedAt` and `refreshedAt`: a timestamp says when a file was " +
+                 "written and nothing about who wrote it, and widening this set makes the scanner blinder, " +
+                 "which is the direction that costs orphans. 19 records stamped AT THE WRITER as well as in " +
+                 "the file, because a key added to a file a tool rewrites is erased on the next run. " +
+                 "prose-debt-baseline.json was a bare ARRAY that could carry no key at all; it names 27 " +
+                 "modules and has exactly ONE reader, so it was converted rather than given a permanent " +
+                 "exception. The judgement the entry said it needed never arose: `generatedFrom` for a tool " +
+                 "and `captured` for the five read-only three.js fixtures, and calling a hand-maintained " +
+                 "baseline `captured` is not a lie about provenance. Sabotages KK and LL red by name. AND ONE " +
+                 "COST WAS NEARLY MISATTRIBUTED: orphanScan takes 31 s, and after the parse landed I measured " +
+                 "31,239 ms against 31,267 ms on the stashed original -- the cost is its O(code x corpus) " +
+                 "substring loop and always was, and the JSON parse of all 200 corpus records is 277 ms of it.",
+    }),
     // v4572 -- the 220th closing: the hand-spelled writer, and the check it asked for was not reachable.
     since220: Object.freeze({
         at: "v4572", swept: 1, green: 1, red: 0,

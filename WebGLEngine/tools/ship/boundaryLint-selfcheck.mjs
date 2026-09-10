@@ -117,7 +117,7 @@ const { fail, report } = partition(all);
         }
         const current = Object.keys(tally).sort();
         if (process.env.SWEK_FREEZE_BOUNDARY_REPORT) {
-            fs.writeFileSync(BL, JSON.stringify({ note: "v3142 -- reported boundary tells AS FOUND, COUNTED PER file+rule. A baseline, not an approval: counts may SHRINK and may never GROW. Freeze deliberately with SWEK_FREEZE_BOUNDARY_REPORT=1.", sites: current.length, total: Object.values(tally).reduce((a, b) => a + b, 0), tally }, null, 1));
+            fs.writeFileSync(BL, JSON.stringify({ generatedFrom: "tools/ship/boundaryLint-selfcheck.mjs", note: "v3142 -- reported boundary tells AS FOUND, COUNTED PER file+rule. A baseline, not an approval: counts may SHRINK and may never GROW. Freeze deliberately with SWEK_FREEZE_BOUNDARY_REPORT=1.", sites: current.length, total: Object.values(tally).reduce((a, b) => a + b, 0), tally }, null, 1));
             console.log("  ----  froze " + current.length + " sites (" + Object.values(tally).reduce((a, b) => a + b, 0) + " tells) to boundary-report-baseline.json");
         }
         const baseRep = JSON.parse(fs.readFileSync(BL, "utf8"));

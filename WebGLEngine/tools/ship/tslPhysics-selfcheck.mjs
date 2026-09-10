@@ -344,7 +344,7 @@ else {
         for (const b of ["webgpu", "webgl2"]) grade(R.three[b], "three's TSL path,", b);
         ok("the emitted fragments transplant (labelled uniforms in three's order: the Lyapunov key's four, the Heidler key's six)", R.uniforms && R.uniforms.lyapunov.slice().sort().join() === "rHi,rLo,seedHi,seedLo" && R.uniforms.heidler.slice().sort().join() === "eta,i0,t1,t2,tHi,tLo", JSON.stringify(R.uniforms));
         for (const b of ["webgpu", "webgl2"]) grade(R.device[b], "the device, transplanted,", b);
-        const rec = { at: "v4321", three: "0.178.0", note: "emitted by three's node builders from render/physicsTsl.mjs and transplanted by render/tslSource.mjs; rewritten by tools/ship/tslPhysics-selfcheck.mjs on every run", ...R.emitted };
+        const rec = { generatedFrom: "tools/ship/tslPhysics-selfcheck.mjs", at: "v4321", three: "0.178.0", note: "emitted by three's node builders from render/physicsTsl.mjs and transplanted by render/tslSource.mjs; rewritten by tools/ship/tslPhysics-selfcheck.mjs on every run", ...R.emitted };
         fs.writeFileSync(EMITTED, JSON.stringify(rec, null, 1));
         ok("the emitted pairs are written to tools/ship/tsl-emitted-physics.json for the WGSL corpus", fs.existsSync(EMITTED));
         report(`three's TSL path and the transplanted device path agree on ln 2 to ${Math.abs(R.three.webgpu.lyMedian - R.device.webgpu.lyMedian).toExponential(1)} on WebGPU and ${Math.abs(R.three.webgl2.lyMedian - R.device.webgl2.lyMedian).toExponential(1)} on WebGL2`);
@@ -435,7 +435,7 @@ else {
         ok(`  and r = 4 reads ${atFour.toFixed(6)} against the CPU's ${cpuFour.toFixed(6)} and ln 2 = ${LN2.toFixed(6)}`, Math.abs(atFour - LN2) < 0.05,
             `${LY_DEFAULTS.samples} samples is a FINITE-SAMPLE value and r = 4 is the most chaotic point in the sweep: the CPU itself sits ${Math.abs(cpuFour - LN2).toFixed(6)} from ln 2, and no bit claim is made at this end of it`);
         ok("  three's own renderer read the same buffer back, so the transplant is graded against the graph's own output too", R.threeValues && Math.max(...R.threeValues.map((v, i) => Math.abs(v - R.genValues[i]))) < 1e-6 && R.threeBackend === "webgpu" && R.deviceBackend === "webgpu", `three ${R.threeBackend}, device ${R.deviceBackend}`);
-        fs.writeFileSync(EMITTED_C, JSON.stringify({ at: "v4331", three: "0.178.0", note: "the Lyapunov sweep as a TSL compute pass, as three emitted it and as render/tslSource.mjs transplanted it into a gfx/device.js compute pipeline; rewritten by this gate on every run", emitted: R.emitted, transplanted: R.transplanted }, null, 1));
+        fs.writeFileSync(EMITTED_C, JSON.stringify({ generatedFrom: "tools/ship/tslPhysics-selfcheck.mjs", at: "v4331", three: "0.178.0", note: "the Lyapunov sweep as a TSL compute pass, as three emitted it and as render/tslSource.mjs transplanted it into a gfx/device.js compute pipeline; rewritten by this gate on every run", emitted: R.emitted, transplanted: R.transplanted }, null, 1));
         ok("the emitted and transplanted compute pass is written to tools/ship/tsl-emitted-compute.json for the WGSL corpus", fs.existsSync(EMITTED_C));
     }
 }

@@ -100,7 +100,7 @@ else {
             const k = keyCpu(5);
             ok(`  ${b}: the blackbody graph transplants too -- the brightest column is Wien's x_lambda within a column (${o.bin.toFixed(3)}), the root in the blue byte (${k.blueByte})`, Math.abs(o.bbPeakX - k.root) <= o.bin && o.bbPeak > 0.995 && Math.abs(o.bbBlue - k.blueByte) <= 1, `peak x ${o.bbPeakX.toFixed(4)}, blue ${o.bbBlue}`); }
         // write the emitted pair down for the corpus
-        const rec = { at: "v4320", three: "0.178.0", note: "emitted by three's node builders from render/badTvTsl.mjs and render/blackbodyTsl.mjs, transplanted by render/tslSource.mjs; rewritten by tools/ship/tslSource-selfcheck.mjs on every run", ...R.emitted };
+        const rec = { generatedFrom: "tools/ship/tslSource-selfcheck.mjs", at: "v4320", three: "0.178.0", note: "emitted by three's node builders from render/badTvTsl.mjs and render/blackbodyTsl.mjs, transplanted by render/tslSource.mjs; rewritten by tools/ship/tslSource-selfcheck.mjs on every run", ...R.emitted };
         fs.writeFileSync(EMITTED, JSON.stringify(rec, null, 1));
         ok("the emitted and transplanted pair is written to tools/ship/tsl-emitted.json, for the WGSL corpus to compile as generated code", fs.existsSync(EMITTED) && JSON.parse(fs.readFileSync(EMITTED, "utf8")).badTv.transplanted.wgsl.length > 1000);
         report(`emitted WGSL ${R.emitted.badTv.wgsl.length} chars -> transplanted ${R.emitted.badTv.transplanted.wgsl.length}; GLSL ${R.emitted.badTv.glsl.length} -> ${R.emitted.badTv.transplanted.glsl.length}`);
