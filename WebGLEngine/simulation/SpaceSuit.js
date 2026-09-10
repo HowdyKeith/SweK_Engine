@@ -35,6 +35,35 @@
 // HUD: gauges rendered alongside the FPS HUD (separate element).
 // =============================================================================
 
+import { evaluateGuards } from "../ui/guards.mjs";
+
+// v4608 -- the first real migration onto ui/guards.mjs, the ordered-guard-list evaluator that
+// tools/ship/nextRounds.mjs's "npc-decision-framework" audit's PRIORITY-IF-ELSE cluster needed. _currentAtmosphere()
+// was already exactly this shape: an if/else-if chain, remade from scratch every call, first true condition wins,
+// with no state field of its own to gate anything (the opposite of ui/machine.mjs's territory). Picked as the FIRST
+// proof for the same reason BossPhaseManager.js was the FSM series' first migration -- it is a PURE classifier (no
+// side effects, no entity mutation, no damage/projectile calls), so the whole migration can be checked by comparing
+// return values alone. DungeonAI.js's much larger flee/melee/ranged/chase chain is a confirmed second candidate,
+// deliberately deferred: it drives real combat side effects (damage, projectiles, entity movement) stacked with
+// several brain-hook patches, and deserves its own round the way CSBomb.js got one after BossPhaseManager.js proved
+// the FSM utility on a simpler case first.
+//
+// Preserved exactly: submerged overrides everything, checked first; "no layout, no rooms, no camera, or the
+// player isn't inside any room" all collapse to the SAME "normal" result the original produced from two separate
+// code paths (an early return before the room scan, and falling off the end of the loop) -- same observable
+// answer, not the same control-flow shape, which is all a migration owes; an explicit room.atmosphere field wins
+// over the gravity heuristic; and both gravity boundaries stay non-strict `<=` exactly as written (g<=0.5 vacuum,
+// g<=0.85 thin), the same asymmetric-boundary care the FSM migrations gave their own thresholds.
+export const ATMOSPHERE_GUARDS = [
+    { name: "submerged",      when: (ctx) => ctx.submerged, then: () => "vacuum" },
+    { name: "no-room",        when: (ctx) => !ctx.room, then: () => "normal" },
+    { name: "explicit-field", when: (ctx) => ctx.room.atmosphere === "vacuum" || ctx.room.atmosphere === "thin" || ctx.room.atmosphere === "normal",
+                               then: (ctx) => ctx.room.atmosphere },
+    { name: "vacuum-gravity", when: (ctx) => (typeof ctx.room.gravity === "number" ? ctx.room.gravity : 1.0) <= 0.5, then: () => "vacuum" },
+    { name: "thin-gravity",   when: (ctx) => (typeof ctx.room.gravity === "number" ? ctx.room.gravity : 1.0) <= 0.85, then: () => "thin" },
+    { name: "normal-gravity", when: () => true, then: () => "normal" },
+];
+
 // Tuning constants
 const O2_DEPLETE_VACUUM = 0.012;    // 1.2% / sec → 83 sec to drain from 100%
 const O2_DEPLETE_THIN   = 0.004;    // 0.4% / sec → 250 sec
@@ -180,24 +209,23 @@ export class SpaceSuit {
         // O2 drains at vacuum rate regardless of the room's atmosphere
         // field. Wading (feet wet but head above) does NOT drain — only
         // full submersion.
-        if (this.swimMode?.isSubmerged?.()) return "vacuum";
+        return evaluateGuards(ATMOSPHERE_GUARDS, {
+            submerged: !!this.swimMode?.isSubmerged?.(),
+            room: this._findRoom(),
+        }).result;
+    }
+
+    // v4608 -- the room lookup, pulled out so ATMOSPHERE_GUARDS's "no-room" and "explicit-field" rules can read
+    // ONE precomputed value instead of each re-walking layout.rooms (the original did this scan exactly once
+    // too, inline in the if-chain now split across guards -- see this file's own v4608 header).
+    _findRoom() {
         const layout = this.ollamaLevelGen?._lastLevel;
-        if (!layout?.rooms?.length || !this.camera?.position) return "normal";
+        if (!layout?.rooms?.length || !this.camera?.position) return null;
         const cx = this.camera.position.x, cz = this.camera.position.z;
         for (const r of layout.rooms) {
-            if (cx >= r.x && cx < r.x + r.w && cz >= r.z && cz < r.z + r.d) {
-                // Explicit field wins
-                if (r.atmosphere === "vacuum" || r.atmosphere === "thin" || r.atmosphere === "normal") {
-                    return r.atmosphere;
-                }
-                // Gravity-based heuristic
-                const g = typeof r.gravity === "number" ? r.gravity : 1.0;
-                if (g <= 0.5) return "vacuum";
-                if (g <= 0.85) return "thin";
-                return "normal";
-            }
+            if (cx >= r.x && cx < r.x + r.w && cz >= r.z && cz < r.z + r.d) return r;
         }
-        return "normal";
+        return null;
     }
 
     _emitExhaust(dt) {
