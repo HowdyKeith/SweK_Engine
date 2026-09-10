@@ -3767,6 +3767,70 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since219: Object.freeze({
+        at: "v4560", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/ringFloor-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 0.93 s (888/930/899 over three serial runs), comfortably under the 3000 ms budget. " +
+                 "*** ridgeMarginBounds HAS DEMANDED A NUMBER NOBODY IN THIS TREE COULD PRODUCE SINCE v4557. " +
+                 "*** It refuses an unmeasured noiseFloor, which is right, but v4558 and v4559 both measured " +
+                 "that floor against the ANALYTIC SURFACE their fixtures were drawn from, and a renderer has " +
+                 "no analytic surface. For three rounds it has been a control nobody could call. This round " +
+                 "derives the floor from the frame and the motion vectors and nothing else. THE IDENTITY: " +
+                 "interpolating g at x = n + f leaves exactly -1/2 f(1-f) g''(xi), and both factors are in " +
+                 "the renderer's hands -- f is frac(hu*w) out of the motion vectors, g'' is the frame's own " +
+                 "second difference. It reproduces, with no fitted constant, everything v4559 measured: " +
+                 "exact at integer displacements because f(1-f) is zero there, quadratic in cycles per pixel " +
+                 "because a sinusoid's second derivative is, saturating above Nyquist. *** THE ACCUMULATION " +
+                 "DEPTH IS DERIVED TOO, AND IT IS NOT THE OBVIOUS (1+P)/2. *** pushLuma writes the current " +
+                 "luma into the newest slot and reprojects the rest, so lumaMean averages resample depths " +
+                 "0..P-1 and the mean depth is (P-1)/2 -- which at P = 1 is ZERO. Measured: a P = 1 ring's " +
+                 "floor is exactly 0.00e+0 on the chequer, the content with the largest single-step error in " +
+                 "the arc, where one step is worth 2.15e-1. The obvious guess would have predicted that step. " +
+                 "*** AND TAYLOR IS VOID AT A STEP, WHICH IS HALF OF WHY THE MODULE IS NOT ONE LINE: *** the " +
+                 "Taylor term alone under-predicts a chequer's floor by 4x, and for a margin the under " +
+                 "direction is the dangerous one. Where the field is not resolved the bound is the step's " +
+                 "own, max(f,1-f) * step size -- near-exact on a chequer and an edge, and 141x LOOSE on the " +
+                 "arc's smooth fixture. Neither bound serves alone. FINAL: safe on all twelve readings, " +
+                 "worst ratio 1.05x, and TIGHT where the field is resolved -- 1.43x at worst over six " +
+                 "readings against 141x for the step bound alone. *** MY FIRST TWO REGIME TESTS WERE BOTH " +
+                 "WRONG THE SAME WAY. *** |D2| < first difference reads every EXTREMUM of a smooth sinusoid " +
+                 "as a step, because the slope vanishes there while the curvature is maximal; |D3| < |D2| " +
+                 "moves the same degeneracy to the INFLECTIONS, where D2 passes through zero. Each " +
+                 "mis-classifies up to 5.7% and 5.0% of the arc's own smooth fixture, and a worst-over-frame " +
+                 "is a MAXIMUM, so a few false pixels own the answer: the smooth estimate went from 1.05x of " +
+                 "truth to 9.93x and then 95x. Both compared against a quantity that VANISHES somewhere on a " +
+                 "perfectly smooth field. The module's test is normalised by the local RANGE, which vanishes " +
+                 "only on a flat field where every bound is zero anyway. tau NAMES A RESOLUTION rather than " +
+                 "a preference: a sinusoid at n samples per period has |D3|/range = (2pi/n)^3/2, so 0.25 is " +
+                 "7.9 samples per period -- above Nyquist's 2 and below v4559's measured 12-pixel margin " +
+                 "crossing -- and the four contents measure 39, 14, 3.1 and 4.0, the nearest 1.81x away. The " +
+                 "separation is 47x in the statistic, which is only 3.5x once expressed as a resolution, " +
+                 "because the statistic goes as the cube. *** WHAT IT SAYS ABOUT THE ARC'S DECLARED 0.05: on " +
+                 "the arc's OWN fixture the derived margin is 2.28e-3, so 0.05 is 22x too loose and pays " +
+                 "5.8% of the range in blind window where 0.26% would do; on the chequer and the edge the " +
+                 "interval is INFEASIBLE and 0.05 sits 26x BELOW the floor, so every lock placed there reads " +
+                 "resampling error as a feature. One declared number, simultaneously 22x too loose and below " +
+                 "the floor, on two contents in the same arc. *** THIS ROUND DOES NOT ADOPT IT. *** Moving " +
+                 "the margin would move every number v4553 onward recorded and is a round of its own; and " +
+                 "the finer sinusoid is the case against assuming the declared number is always wrong, since " +
+                 "there it is 0.79x of derived. Nine sabotages red at 2/4/3/4/1/4/4/2/2. The lowest is the " +
+                 "one that matters most: restoring the D2max-alone curvature surrogate scores ONE red, the " +
+                 "safety row reading 0.98x, which is the exact 2% shortfall this round measured and fixed -- " +
+                 "a bound that goes 2% under looks identical to one that does not unless something watches " +
+                 "the direction. THE SET IS ONE GATE, weaker than v4559's four, because nothing else imports " +
+                 "the module yet: the day a caller uses the derived margin the set has to be re-run against " +
+                 "it. *** AND SECTION 4 ALMOST SHIPPED AS A WRONG CONSTANT: *** its first version built the " +
+                 "field once with no jitter and no camera offset and measured 0.0% false-unresolved for a " +
+                 "test that mis-classifies up to 5.7%, so the row went red looking like a bad number when it " +
+                 "was a blind fixture -- v4559's 24x24 finding, made again one round later. The rate had to " +
+                 "be swept over the jitter, because the jitter is what moves the sample grid relative to the " +
+                 "extrema the degeneracy lives on, and it turns out to be INTERMITTENT (1.9%-5.7% on one " +
+                 "fixed scene), which is worse than a constant error.",
+    }),
     since218: Object.freeze({
         at: "v4559", swept: 1, green: 1, red: 0,
         added: Object.freeze([
