@@ -199,6 +199,85 @@ console.log("1. what counts as a record, and who counts as its guardian");
         "end-of-file, which is the failure mode a hand-rolled lexer actually has");
 }
 
+// ---- 1b. THE TWO REACHABILITY EDGES, AND THE CONTROL THAT KEEPS THE SECOND ONE HONEST --------------------------
+// The guardian search asks which gates NAME a record. It is blind to two ways a record is really reached, and
+// both were found by a record reading UNGUARDED that a corruption test proved was not:
+//
+//   v4576  A DERIVED CONSTANT.   tools/ship/redCensus.mjs writes `RED_AT_V4531 = ...RED_AT_V4531_GATES.map()`,
+//                                so gates name the derived one and the array is invisible to the search.
+//   v4577  A DEFAULT ARGUMENT.   tools/mutate/shadowedDefaults.mjs writes `agreement(rows, frozen =
+//                                ERASED_AT_V4394)` and its gate calls `agreement(S.rows)`. Measured: changing
+//                                one frozen value takes that gate from 0 FAIL lines and exit 0 to 3 and exit 1.
+//
+// *** THE v4576 EDGE SHIPPED WITH NO ROW AT ALL AND THIS IS WHERE THAT IS REPAIRED. *** It was measured on the
+// live tree, which is not the same as being held: nothing would have noticed it breaking.
+//
+// The control matters more than either edge. `agreement` is declared in THREE modules in this tree, so the
+// first cut of the default-argument edge -- which searched gate sources for `\bagreement\s*\(` -- credited
+// ERASED_AT_V4394 to samplerCheck-selfcheck and videoFrames-selfcheck (each calling its OWN agreement) and to
+// shipBridge-selfcheck, where the word is English inside a test label. THREE FALSE GUARDIANS OUT OF FOUR, in
+// the column that decides whether a record is checked at all. The edge follows the import BINDING now, and the
+// impostor below is what holds it to that.
+{
+    console.log("\n1b. the derived constant and the default argument, with an impostor to catch the loose match");
+    const DER = "SEED" + "_AT_V4323", DFL = "GUARD" + "_AT_V4324";
+    // The default-argument edge resolves import specifiers against the DISK, so these three exist for the
+    // length of this block and are removed in the finally. Distinct names, and nothing else reads them.
+    const disk = {
+        "__fx2_dflt.mjs":
+            `${EC}${DFL}${FR}{\n  cell: 6,\n});\n` +
+            `export function agreeOn(rows, frozen = ${DFL}) { return rows.length + frozen.cell; }\n`,
+        "__fx2_dflt-selfcheck.mjs":
+            `import { agreeOn } from "./__fx2_dflt.mjs";\nagreeOn([1, 2]);\n`,
+        // *** THE CONTROL: same function name, its OWN declaration, no import from the fixture. ***
+        "__fx2_impostor-selfcheck.mjs":
+            `function agreeOn(a) { return a; }\nagreeOn(1);\n`,
+    };
+    const written = [];
+    try {
+        for (const [n, body] of Object.entries(disk)) {
+            const f = path.join(ENG, n);
+            fs.writeFileSync(f, body); written.push(f);
+        }
+        const c = census({ files: written, exclude: null });
+        const g = (n) => (c.records.find((r) => r.name === n) || { guardians: [] }).guardians;
+        ok("!! *** a record reached as a DEFAULT ARGUMENT is guarded by the gate that calls the function ***",
+           g(DFL).includes("__fx2_dflt-selfcheck.mjs"),
+           `${DFL} -> [${g(DFL).join(", ") || "nothing"}]. The gate never types the record's name; it calls ` +
+           "agreeOn with one argument, which is how tools/mutate/shadowedDefaults-selfcheck.mjs exercises the " +
+           "record named in the note above on every run, while that record read as unguarded. *** THE NAME IS " +
+           "NOT SPELLED HERE ON PURPOSE. *** The guardian search strips COMMENTS and deliberately not STRINGS, " +
+           "so an evidence string naming a real record credits THIS gate with guarding it -- and this gate " +
+           "tests a fixture. The first draft of this row spelled it and moved that record from over-budget to " +
+           "CHECKED, on prose, in the round about prose being counted as code");
+        ok("!! *** CONTROL: a gate calling its OWN function of the same name is NOT credited ***",
+           !g(DFL).includes("__fx2_impostor-selfcheck.mjs"),
+           `${DFL} -> [${g(DFL).join(", ") || "nothing"}]. This is the row that cost three of four guardians ` +
+           "on the real tree: `agreement` is declared in three modules here, and a bare name search credited " +
+           "two gates calling their own and one using the word in English. The edge follows the import " +
+           "binding -- `{ fn }`, `{ fn as other }`, `* as NS` then `NS.fn` -- and nothing else");
+    } finally { for (const f of written) { try { fs.unlinkSync(f); } catch {} } }
+
+    // The v4576 edge needs no disk: it is visible in the defining module's own text, which is the standard it
+    // was built to. So it runs on the injected-read fixtures, like everything else in section 1.
+    const DFIX = {
+        "der": `${EC}${DER}${FR}["a", "b"]);\n${EC}DERIVED_AT_V4325${FR}${DER}.map((x) => x + "!"));\n`,
+        "der-selfcheck": `import { DERIVED_AT_V4325 } from "./der.mjs";\nok(DERIVED_AT_V4325.length === 2);\n`,
+    };
+    const dc = census({ files: ["der", "der-selfcheck"].map((n) => path.join(ENG, "__fx3_" + n + ".mjs")),
+                        read: (f) => DFIX[path.basename(f).replace(/^__fx3_|\.mjs$/g, "")], exclude: null });
+    const dg = (dc.records.find((r) => r.name === DER) || { guardians: [] }).guardians;
+    ok("!! *** a record consumed only through a constant DERIVED FROM IT is guarded by that one's gates ***",
+       dg.includes("__fx3_der-selfcheck.mjs"),
+       `${DER} -> [${dg.join(", ") || "nothing"}]. The gate names DERIVED_AT_V4325 and never the array under ` +
+       "it. ONE level and ONE file: a transitive closure over the tree would start crediting records with " +
+       "gates that never touch their value, which is how a coverage number becomes a story");
+    const other = (dc.records.find((r) => r.name === "DERIVED_AT_V4325") || { guardians: [] }).guardians;
+    ok("  ...and the edge runs one way -- the derived record does not inherit the array's guardians",
+       other.length === 1 && other[0] === "__fx3_der-selfcheck.mjs",
+       `DERIVED_AT_V4325 -> [${other.join(", ")}]`);
+}
+
 // ---- 2. *** THE FILE IS ITSELF A RECORD, SO IT MOVED THE COUNT IT MEASURES *** -----------------------------------
 console.log("\n2. the observer effect, checked to be exactly one");
 

@@ -149,6 +149,45 @@ export function reach({ budgetMs = null, timings = null, census = null, root = E
 }
 
 /**
+ * *** "UNGUARDED" WAS DOING TWO JOBS AND ONE OF THEM WAS THE WRONG QUESTION. ***
+ *
+ * The class above means "no gate NAMES it", and every reader of this module -- including me, for four rounds
+ * -- read it as "a coverage hole somebody forgot to close". Asked properly at v4577, of the eleven:
+ *
+ *     9   NO CODE ANYWHERE NAMES THEM. They are prose in object form -- MEASURED_AT_V4421 records what a
+ *         round changed in ev/shipDebris.mjs, REFUSAL_ATTRIBUTION_V4481 records what three 403s turned out to
+ *         be. Nothing reads them because there is nothing to read them FOR. A guardian for one of these would
+ *         have to re-derive a past round's measurement, which is a round each, not a gap.
+ *     2   ARE read, and by something that CANNOT FAIL ON THE VALUE, which is the actionable half:
+ *           MEASURED_V4527      physics/raceKnob.mjs prints it out of its own reportLines()
+ *           MEASURED_AT_V4415   physics/render/pathTracerGpu.mjs feeds it to PROBES[0].key(), and the only
+ *                               gate that calls key() -- tools/ship/probeConvention-selfcheck.mjs -- asserts
+ *                               the values are FINITE. Measured: `hit: 0.5` -> `hit: 0.77` leaves that gate at
+ *                               exit 0 with zero FAIL lines, because 0.77 is finite too.
+ *
+ * The second bucket is this tree's oldest defect wearing a new coat -- a row that cannot fail -- and it is
+ * worth its own number because it is the one that can be repaired by a row rather than by a round.
+ *
+ * *** IT IS NOT FOLDED INTO reach(). *** readSites is a 216 ms scan of every source in the tree, reach() is
+ * called several times per gate, and a ratchet that got slower to report a nuance is how frozenRecords-selfcheck
+ * crossed the budget at v4536 in the first place.
+ */
+export function splitUnguarded({ census = null, root = ENG } = {}) {
+    const c = census || FR.census();
+    const names = c.records.filter((r) => !r.guardians.length).map((r) => r.name);
+    const sites = FR.readSites(names, { root });
+    const rows = names.map((n) => Object.freeze({ name: n, readBy: Object.freeze(sites.get(n) || []) }));
+    return Object.freeze({
+        total: rows.length,
+        // named by nothing at all: documentary, and a guardian is the wrong ask
+        documentary: Object.freeze(rows.filter((r) => !r.readBy.length).map((r) => r.name)),
+        // named by code, but no GATE names it -- so whatever reads it cannot be failing on its value
+        readUnchecked: Object.freeze(rows.filter((r) => r.readBy.length)),
+        rows: Object.freeze(rows),
+    });
+}
+
+/**
  * *** THE RATCHET. *** Measured at v4548, on the tree as this round left it. It is a CEILING that may fall
  * and must not rise: a round that puts a record's last guardian over the budget moves `unchecked` up and the
  * gate goes red, which is exactly what nothing did when frozenRecords-selfcheck crossed at v4536.
@@ -160,7 +199,13 @@ export function reach({ budgetMs = null, timings = null, census = null, root = E
 export const REACH_AT_V4548 = Object.freeze({
     at: "v4548",
     budgetMs: 3000,
-    total: 104,
+    // v4577: 104 -> 105 records and 72 -> 72 checked. UNGUARDED_SPLIT_V4577 landed in this very file, and the
+    // ratchet went red on the round that wrote it FOR THE FOURTH TIME RUNNING -- a record in recordReach.mjs
+    // is guarded only by recordReach-selfcheck.mjs naming it, which it now does. Three records LEFT the
+    // unguarded bucket the same round (12 -> 9, plus this arrival = 10), and `unchecked` went 32 -> 32: two
+    // of the three moved to over-budget rather than to checked, so the tier runs them and the sweep still
+    // does not. That distinction is the reason this ratchet counts unchecked and not unguarded.
+    total: 105,
     // *** READ OFF THE INSTRUMENT, NOT PREDICTED. *** The first draft of this record guessed 53/21/19/40 from
     // which gates the round had sped up, and was wrong on three of the four: the comment-strip fix below
     // moved two records the other way at the same time, and a guess cannot see two changes at once.
@@ -238,6 +283,81 @@ export const REACH_AT_V4548 = Object.freeze({
                             "physics/render/transmission-selfcheck.mjs": 19395 }) }),
 });
 
+/**
+ * *** WHAT v4577 MEASURED: TWELVE "UNGUARDED" RECORDS, AND NOT ONE OF THEM WAS THE THING THE WORD IMPLIED. ***
+ *
+ * Three separate faults, each found by asking the decidable question -- does anything READ it -- instead of
+ * the reported one.
+ *
+ *   ONE was a blind spot in the census.   ERASED_AT_V4394 is exercised on every run of
+ *      tools/mutate/shadowedDefaults-selfcheck.mjs, through `agreement(rows, frozen = ERASED_AT_V4394)` called
+ *      with one argument. Proven, not argued: `value: "6"` -> `"99"` takes that gate from exit 0 with zero FAIL
+ *      lines to exit 1 with three. The guardian search asks which gates NAME a record and a default argument is
+ *      invisible to it, exactly as a derived constant was at v4576.
+ *
+ *   TWO were guarded by rows that could not fail.   MEASURED_AT_V4415's only reader is PROBES[0].key(), and the
+ *      only gate that calls key() asserts the values are FINITE -- `hit: 0.5` -> `hit: 0.77` left it green.
+ *      MEASURED_V4527's only reader is physics/raceKnob.mjs's own reportLines(), which PRINTS it.
+ *
+ *   NINE are named by NO CODE ANYWHERE and a guardian is the wrong ask.   They are prose in object form.
+ *
+ * *** AND THE FIRST FIX FOR THE FIRST FAULT WAS WRONG IN THIS TREE'S OLDEST WAY. *** Crediting every gate whose
+ * source matched `\bagreement\s*\(` gave ERASED_AT_V4394 four guardians, of which THREE were false: two gates
+ * calling their own `agreement` (physics/render/samplerCheck-selfcheck.mjs, tools/ship/videoFrames-selfcheck.mjs)
+ * and one where the word is English in a test label (tools/ship/shipBridge-selfcheck.mjs). The edge follows the
+ * import binding now. An over-permissive matcher in the column that decides whether a record is checked at all
+ * is the same defect as counting prose as code, and it is the third time this session it has had to be caught.
+ */
+export const UNGUARDED_SPLIT_V4577 = Object.freeze({
+    at: "v4577",
+    // *** THE READING SPLITS INTO A PART THAT MOVES AND A PART THAT DOES NOT, AND THE FIRST DRAFT ASSERTED
+    // BOTH. *** `unguarded` asks which gates NAME a record: no timing enters it, so it is a fact about the
+    // tree. `checked` and `overBudget` are the census JOINED to sweep-timings.json, and that file is written
+    // by an 8-way pass -- SWEEP_CONTENTION_V4562 measured a 2.41x median inflation. MEASURED HERE, on code
+    // that did not change: before the round's closing sweep this tree read 73 checked / 22 over-budget / 1
+    // unmeasured, and after it read 69 / 27 / 0. FIVE records moved, all five guarded by
+    // tools/ship/reportDoors-selfcheck.mjs, which reads 2877 / 2872 / 2939 / 3001 / 3025 ms over five SERIAL
+    // runs against a 3,000 ms budget -- it straddles the line by itself, and the sweep's 3,093 ms reading is
+    // one sample of a quantity that has no single value. So those five records' class is not a fact and is
+    // not frozen as one; the structural half below is.
+    structural: Object.freeze({ total: 105, unguarded: 9, documentaryOfThose: 9, readByCodeOfThose: 0 }),
+    // BEFORE, on the tree this round opened on:
+    before: Object.freeze({ total: 104, checked: 72, overBudget: 20, unmeasured: 0, unguarded: 12, unchecked: 32 }),
+    // AFTER, as one reading rather than as a constant -- see the note above. Taken with the round's own
+    // closing sweep in the timings file.
+    after: Object.freeze({ total: 105, checked: 69, overBudget: 27, unmeasured: 0, unguarded: 9, unchecked: 36 }),
+    // The same tree read minutes earlier, before that sweep rewrote the timings. Kept because a pair of
+    // readings is the evidence for the sentence above, where one reading would just look like a regression.
+    afterPriorSweep: Object.freeze({ total: 105, checked: 73, overBudget: 22, unmeasured: 1, unguarded: 9, unchecked: 31 }),
+    contendedRecords: 5, contendedGuardian: "tools/ship/reportDoors-selfcheck.mjs",
+    contendedGuardianSerialMs: Object.freeze([2877, 2872, 2939, 3001, 3025]),
+    // The three that LEFT the unguarded set, and where they went -- because "no longer unguarded" is not
+    // "now checked". Two are guarded by gates the SWEEP cannot afford (14,464 ms and ~3,500 ms), so
+    // tools/ship/recordTier.mjs runs them and the ship-time sweep still does not. The third's new guardian is
+    // 87 / 85 / 98 ms serially, so it is genuinely checked.
+    moved: Object.freeze({ ERASED_AT_V4394: "over-budget", MEASURED_AT_V4415: "over-budget", MEASURED_V4527: "checked" }),
+    // The bare-name matcher's score on the one real case, before the import binding replaced it.
+    looseMatchGuardians: 4, looseMatchFalse: 3,
+    // Every corruption that was run to establish a guardian is real, with the gate's before/after:
+    corruptions: Object.freeze([
+        Object.freeze({ record: "ERASED_AT_V4394", change: 'value: "6" -> "99"',
+                        gate: "tools/mutate/shadowedDefaults-selfcheck.mjs",
+                        before: Object.freeze({ exit: 0, failLines: 0 }), after: Object.freeze({ exit: 1, failLines: 3 }) }),
+        Object.freeze({ record: "MEASURED_AT_V4415", change: "hit: 0.5 -> 0.77",
+                        gate: "tools/ship/probeConvention-selfcheck.mjs",
+                        before: Object.freeze({ exit: 0, failLines: 0 }), after: Object.freeze({ exit: 0, failLines: 0 }),
+                        note: "*** THE ONE THAT DID NOT MOVE, WHICH IS THE FINDING. *** 0.77 is finite too, so " +
+                              "the only row reading this record could not fail on its value" }),
+    ]),
+    documentary: 9,
+    // *** WHAT IS NOT CLAIMED. *** That the nine are fine. They are unchecked and stay unchecked; what changed
+    // is that the tree now says WHY, so the number stops reading as nine forgotten gates. Re-deriving any one
+    // of them is that round's own work -- MEASURED_AT_V4421's `additiveFiles: 12` is a countable fact about
+    // ev/shipDebris.mjs and nothing counts it.
+    notClaimed: "that the nine documentary records are checked, or should be. Only that nothing reads them, " +
+                "which is a different fact from nothing checking them and was being reported as the same one",
+});
+
 export function reportLines() {
     const r = reach();
     if (!r.judgeable) return ["[recordReach] which frozen records the ship ritual actually checks",
@@ -253,6 +373,13 @@ export function reportLines() {
     for (const b of r.blockers.slice(0, 8))
         out.push(`    ${String(b.ms).padStart(6)} ms  ${b.gate}  (${b.records.length} record(s))`);
     if (r.atCap.length) out.push(`  AT THE ${r.capMs} ms CAP -- these do not finish: ${r.atCap.join(", ")}`);
+    if (r.unguarded) {
+        const u = splitUnguarded();
+        out.push(`  of the ${u.total} guarded by nothing: ${u.documentary.length} are named by NO CODE AT ALL ` +
+                 "(documentary -- a guardian is the wrong ask), and " + u.readUnchecked.length +
+                 " are read by code that cannot fail on the value:");
+        for (const r2 of u.readUnchecked) out.push(`      ${r2.name}  read in ${r2.readBy.join(", ")}`);
+    }
     return out;
 }
 

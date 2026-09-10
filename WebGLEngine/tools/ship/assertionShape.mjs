@@ -255,8 +255,12 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // and this one is a render gate rather than a tools/ship one, which is the harder case for it.
     // v4576 -- RE-TAKEN for tools/ship/recordTier-selfcheck.mjs: 1620 -> 1621 and the three rows that
     // follow a gate by one. distinctDefinitions holds at 40 for the FIFTH round running.
-    gates: 1621, usesOk: 1600, definesOk: 1592, importsOk: 0,
-    distinctDefinitions: 40, nameFirst: 1493, condFirst: 91, unknownSignature: 16,
+    // v4577 -- RE-TAKEN for physics/raceKnob-selfcheck.mjs: 1621 -> 1622 and the three rows that follow a
+    // gate by one. distinctDefinitions holds at 40 for the SIXTH round running, and this gate is in physics/
+    // rather than tools/ship/ -- it lives beside its module on purpose, because registryOrphans derives an
+    // instrument's module from its gate path.
+    gates: 1622, usesOk: 1601, definesOk: 1593, importsOk: 0,
+    distinctDefinitions: 40, nameFirst: 1494, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

@@ -3765,6 +3765,66 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
     // v4576 -- the 225th closing: a tier for the guardians the sweep cannot afford, and it caught two on sight.
+    since226: Object.freeze({
+        at: "v4577", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["physics/raceKnob-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/frozenRecords.mjs", "tools/ship/recordReach.mjs",
+                                "physics/render/pathTracerGpu-selfcheck.mjs", "tools/ship/reportDoors.mjs",
+                                "physics/instruments.mjs"]),
+        verdict: "green, 87/85/98 ms over three serial runs -- comfortably inside the 3,000 ms sweep budget, " +
+                 "which is the point of it. *** TWELVE RECORDS READ AS GUARDED BY NOTHING AND NOT ONE WAS WHAT " +
+                 "THE WORD IMPLIED. *** Asked the decidable question instead -- does anything READ it -- with " +
+                 "comments AND every record's own declaration blanked, because before the blanking every one of " +
+                 "the twelve scored a hit on its own `export const` line: NINE are named by no code anywhere and " +
+                 "are documentary; ONE was reached through a DEFAULT ARGUMENT the name search cannot see; TWO " +
+                 "were read by rows that could not fail. *** THE DEFAULT-ARGUMENT CASE WAS PROVEN BY CORRUPTION, " +
+                 "NOT ARGUED: *** shadowedDefaults.mjs writes `agreement(rows, frozen = ERASED_AT_V4394)` and its " +
+                 "gate calls it with one argument, and changing one frozen value takes that gate from exit 0 with " +
+                 "zero FAIL lines to exit 1 with three. *** AND THE FIRST FIX FOR IT WAS WRONG IN THIS TREE'S " +
+                 "OLDEST WAY: *** matching `\\bagreement\\s*\\(` across gate sources gave that record FOUR " +
+                 "guardians of which THREE were false -- two gates calling their own `agreement`, one where the " +
+                 "word is English in a test label. The edge follows the import BINDING now, and the fixture in " +
+                 "frozenRecords-selfcheck section 1b carries an impostor gate that declares its own function of " +
+                 "the same name, which is the row that holds it there. The v4576 derivation edge had shipped " +
+                 "with NO ROW AT ALL and is gated in the same section. *** THIS GATE ITSELF EXISTS BECAUSE " +
+                 "MEASURED_V4527's ONLY READER PRINTED IT: *** physics/raceKnob.mjs's reportLines(), while the " +
+                 "thorough gate -- 33,306 ms, over the budget AND over the 20,000 ms cap -- carries the round's " +
+                 "numbers in its HEADER as prose. It runs no simulation and says so: what it holds is that every " +
+                 "verdict in the record is a FUNCTION of the record's own laps, lap times and off-asphalt counts " +
+                 "applied to LAP_BOUND, OFF_BOUND and samples as the module exports them today. Nine sabotages, " +
+                 "eight caught on the first pass -- and the NINTH IS THE FINDING: `keySeconds === KEY_SECONDS` " +
+                 "compared the constant to itself, because the record REFERENCES it rather than freezing a " +
+                 "number. KEY_SECONDS 90 -> 60 left the gate at exit 0 with zero FAIL lines while every other " +
+                 "sabotage reddened it -- a row that could not fail, written by me inside the gate built to " +
+                 "repair rows that cannot fail, and found by sabotage rather than by reading. The replacement " +
+                 "asserts the field stays a reference, and freezing it to a literal reddens it. TWO MORE OF MY " +
+                 "OWN DEFECTS WERE CAUGHT BY THE TREE MID-ROUND: an evidence STRING in a fixture row named a " +
+                 "real record, and since the guardian search strips comments and deliberately NOT strings, it " +
+                 "promoted that record from over-budget to CHECKED on prose, in the round about prose being " +
+                 "counted as code; and the first import-table walk cost 800 ms on the gate whose crossing of " +
+                 "the budget at v4536 let a stale census ship nine ALL GREEN rounds, because it re-resolved " +
+                 "every gate's specifiers once per (function, record) pair -- memoised per gate, 115 ms. " +
+                 "AFTER: unguarded 12 -> 9, which is a fact about the tree with no clock in it. THE OTHER HALF " +
+                 "OF THE READING IS NOT A FACT AND THE FIRST DRAFT OF THE GATE ASSERTED IT ANYWAY -- and this " +
+                 "round's own closing sweep reddened it: 73 checked / 22 over-budget / 1 unmeasured before that " +
+                 "sweep, 69 / 27 / 0 after, ON CODE THAT HAD NOT CHANGED. All five that moved are guarded by " +
+                 "tools/ship/reportDoors-selfcheck.mjs, which reads 2877 / 2872 / 2939 / 3001 / 3025 ms over " +
+                 "five SERIAL runs against a 3,000 ms budget: it straddles the line by itself, so those five " +
+                 "records' class is a coin toss and is now REPORTED rather than frozen. Two of the three that " +
+                 "left the unguarded set went to OVER-BUDGET (guardians 14,464 ms and ~3,500 ms), so " +
+                 "tools/ship/recordTier.mjs runs them and the sweep still does not; the third's new guardian is " +
+                 "87 ms and is genuinely checked. NO LONGER UNGUARDED IS NOT NOW CHECKED, and the record says " +
+                 "which. AND ONE RED THIS ROUND WAS MINE FROM TWO ROUNDS BACK: tools/ship/gateReach-selfcheck " +
+                 "has been red since v4575, when physics/render/conductorFresnel.mjs was added without " +
+                 "re-recording tools/ship/population-census.json -- 520 expected, 521 found. It shipped ALL " +
+                 "GREEN because that gate is 11,491 ms and outside the sweep, which is the same failure the " +
+                 "record tier was built for, one level up on a gate that guards no record. Re-recorded here " +
+                 "with compare() read first, in the order that file's own note requires. NOT CLAIMED: that the nine documentary records are " +
+                 "fine, or that the path property repairs them -- 1,117 tree paths across 47 record bodies " +
+                 "resolve with 0 dangling, but only ONE of the nine names a path at all, so a path ratchet " +
+                 "would have been a smaller number that looked like progress and was not built.",
+    }),
     since225: Object.freeze({
         at: "v4576", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/recordTier-selfcheck.mjs"]),

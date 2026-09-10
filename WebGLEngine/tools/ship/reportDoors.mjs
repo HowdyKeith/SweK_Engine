@@ -319,8 +319,16 @@ export const NO_GATE_V4458 = Object.freeze([
 // Paying it means four gates that assert what each module's report is FOR, and that is the Racing-city round's
 // to write -- inventing assertions for four modules this round has not read would be the fabrication the
 // citedSources register refuses by name. What is fixed here is the record; what is owed is four gates.
+//
+// *** v4577 -- THE FIRST OF THE FOUR IS PAID, AND THE LIST SHRINKS RATHER THAN BEING ANNOTATED. ***
+// physics/raceKnob.mjs has a sibling now: physics/raceKnob-selfcheck.mjs, 92 ms, written because
+// MEASURED_V4527 read as guarded by NOTHING -- the 33,306 ms gate in tools/ship/ carries the round's numbers
+// in its HEADER, as prose, which the guardian census stopped counting at v4548. THE DEBT THIS LIST DECLARED
+// IS WHAT MADE THAT RECORD UNREACHABLE, so the two are one fault seen from two sides.
+// The list is EDITED rather than kept with a note beside it: a name here means "no gate beside this module",
+// and leaving a name that is now false would be the second declaration this file exists to refuse. Three of
+// the Racing-city four remain, and they are still that round's to write.
 export const NO_GATE_V4531 = Object.freeze([
-    "physics/raceKnob.mjs",
     "world/crashDamage.mjs",
     "world/raceReplayBake.mjs",
     "world/ribbonRoad.mjs",
@@ -339,7 +347,7 @@ export const NO_GATE_V4565 = Object.freeze([
  * ratcheted on that -- a claim about coverage, made from a fact about file layout, in a tree that keeps
  * most of its gates in tools/ship/. Measured by looking for each basename's gate ANYWHERE:
  *
- *     physics/raceKnob.mjs          -> tools/ship/raceKnob-selfcheck.mjs
+ *     physics/raceKnob.mjs          -> tools/ship/raceKnob-selfcheck.mjs   (and, since v4577, a sibling too)
  *     physics/xpbd/clothSoak.mjs    -> tools/ship/clothSoak-selfcheck.mjs
  *     world/crashDamage.mjs         -> tools/ship/crashDamage-selfcheck.mjs
  *     world/raceReplayBake.mjs      -> tools/ship/raceReplayBake-selfcheck.mjs
