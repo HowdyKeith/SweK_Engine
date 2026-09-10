@@ -79,6 +79,46 @@ export function audit(machine) {
     };
 }
 
+// ---- v4601 -- THE PIECE A TICK-DRIVEN CALLER NEEDS THAT AN EVENT-DRIVEN ONE DOES NOT --------------------------
+//
+// Every existing caller of this file (RIG_JOB and its kin) is fired BY an explicit user or network action: a
+// click, a response arriving. `next(from, event)` is exactly right for that -- something else already knows
+// which event just happened.
+//
+// A per-tick creature/bot/boss controller does not get told "the hp-threshold event just fired" -- it has to
+// LOOK, every frame, at whether the boss's hp fraction just crossed 0.5, or whether the minion count just hit
+// zero, and decide for itself which named event (if any) that condition amounts to. That condition-to-event
+// translation is domain logic and stays the CALLER's job, on purpose -- this file has no opinion on what a
+// boss or a minion is. What IS generic, and worth factoring out exactly once, is what happens once the event
+// IS known: look up the transition, and if it actually moves the machine, run that target state's entry
+// side-effect exactly once. Every hand-rolled FSM this tree's own audit found (tools/ship/nextRounds.mjs's
+// "npc-decision-framework" entry) reimplements this same three-line dispatch privately -- a `_phase = X;
+// counters.x++; doSideEffects()` block guarded by an `if (this._phase === Y)` -- because nothing offered it
+// as a function. This is oguzeroglu/Ego's actual contribution translated into this file's own plain-data,
+// no-class idiom (see that backlog entry for the full read of Ego's source): a decision-tree/HFSM library's
+// only genuinely hard-won idea is "the same knowledge object drives the transition test AND the code that
+// runs once you arrive", and a shared knowledge object plus a `{state: onEnter}` map says the same thing in
+// four lines instead of a class hierarchy.
+/**
+ * Fire one event against a tick-driven machine. Returns the state to hold onto next tick (unchanged if the
+ * event did not apply here). `onEnter[state]` runs AT MOST ONCE per actual transition -- never on a no-op
+ * event, and never again just because tick() keeps calling with the same already-current state -- which is
+ * the exact bug a hand-rolled `if (this._phase !== "x") { this._phase = "x"; doStuff(); }` guard exists to
+ * avoid, reproduced here once instead of once per caller.
+ *
+ * @param {ReturnType<typeof defineMachine>} machine
+ * @param {string} from        the state as of last tick
+ * @param {string|null} event  the event THIS tick's world-state translates to, or null for "nothing happened"
+ * @param {Object<string,Function>} [onEnter]  state name -> side effect, called with `...args`
+ */
+export function applyEvent(machine, from, event, onEnter, ...args) {
+    if (event == null) return from;
+    const to = machine.next(from, event);
+    if (to === null || to === from) return from;
+    if (onEnter && typeof onEnter[to] === "function") onEnter[to](...args);
+    return to;
+}
+
 // ---- THE RIG JOB LIFECYCLE, as the bridge actually behaves ---------------------------------------------------
 //
 // Declared here rather than inferred from the UI, so the panel and the bridge can be checked against ONE
