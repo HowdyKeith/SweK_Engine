@@ -35,7 +35,7 @@ fn main(@builtin(global_invocation_id) g:vec3<u32>) {
   dst[o] = pu - uu;
   dst[o + 1u] = pv - vv;
   dst[o + 2u] = 1.0;
-  dst[o + 3u] = 0.0;
+  dst[o + 3u] = q.z / q.w;   // zPrev -- the depth this surface would have had last frame; disocclusion is one subtraction from it
 }`;
 
 export { MOTION_WGSL };

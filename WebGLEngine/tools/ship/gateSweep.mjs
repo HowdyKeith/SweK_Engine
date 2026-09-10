@@ -3767,6 +3767,55 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since211: Object.freeze({
+        at: "v4552", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/temporalReject-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 1.51 s (1509/1513/1492 over three serial runs, under the 3000 ms sweep budget). THE LAST " +
+                 "FOUR TEMPORAL ITEMS -- disocclusion, reactive masks, shading-change detection and the YCoCg " +
+                 "box. THREE SHIP AND THE FOURTH IS REFUSED BY MEASUREMENT, which is the round's result. *** THE " +
+                 "FINDING THAT ORGANISES ALL OF THEM: A NEIGHBOURHOOD CLAMP FAILS BY BEING TOO WIDE, NOT TOO " +
+                 "TIGHT. *** v4550 measured that from the other side without naming it -- its anti-ghosting row " +
+                 "cleared 2,304 pixels to 322 and the 322 were the EDGE pixels, where the 3x3 spans the range. " +
+                 "So every picture here is deliberately high contrast (mean 3x3 span 0.7549 of the range, " +
+                 "measured not assumed), because on a flat picture the clamp already does the work and any of " +
+                 "these would read as an improvement it is not. DISOCCLUSION is exact: 52 of 52 true positives " +
+                 "and 52 flagged, so no false positives either, and the ghost it prevents is 0.4256 rms of what " +
+                 "the clamp ALONE leaves. It needed a new input, and rather than re-derive the reprojection it " +
+                 "took render/motionVectors.mjs's fourth channel, which was a HARD-CODED ZERO, and made it " +
+                 "zPrev -- one line further down a reprojection that function already performed. THE REACTIVE " +
+                 "MASK removes 0.14885 rms the clamp cannot, and the gate says plainly that the masked rms is 0 " +
+                 "BY CONSTRUCTION and the informative number is what the clamp leaves. YCoCg IS THE FOLKLORE " +
+                 "CLAIM CUT DOWN: measured over 200,000 two-material neighbourhoods it is only 1.07x tighter, " +
+                 "not the decisive win, and neither box contains the other (RGB-only 4,745, YCoCg-only 4,257). " +
+                 "What IS real is which errors get through -- what RGB uniquely admits sits 16% farther from " +
+                 "any real neighbour. On a picture it buys 1.06x where a box can act and EXACTLY 1.00x, " +
+                 "identical to 0e+0, where the 3x3 touches the occluder: no box in any space can reject a " +
+                 "colour its own neighbours have. *** SHADING-CHANGE DETECTION IS REFUSED AND SECTION 5 IS THE " +
+                 "ROW THAT KEEPS IT REFUSED. *** Three formulations were written and measured -- point-vs-" +
+                 "history 2.3e5x, mean-vs-history 1.7e5x, mean-vs-previous-frame 2.5e5x -- and all three " +
+                 "destroy convergence on a static jittered scene, because on a high-contrast surface a ONE-" +
+                 "PIXEL JITTER MOVES A PIXEL BY AS MUCH AS A LIGHTING CHANGE DOES, and moving the sample point " +
+                 "by a pixel is what jitter is FOR. At a strength weak enough not to be degenerate it buys 1.5x " +
+                 "on the case it is sold for while still costing 3.0e5x on the case the arc is for; there is no " +
+                 "setting where the trade is worth making. It is not exported, and the gate re-derives it " +
+                 "inline so the refusal cannot be quietly undone. TWO CORRECTIONS TO CLAIMS THIS ROUND ITSELF " +
+                 "WROTE: the YCoCg round trip is NOT bit exact (42.4% of colours exact, the rest one ulp -- " +
+                 "which compounds to 1.8e-12 of an 8-bit LSB over 32 frames, so the concern was right and the " +
+                 "assertion was wrong); and the static-convergence scene was PHASE-LOCKED, its chequer cell " +
+                 "exactly one pixel and aligned to the grid, so 32 jittered frames came out bit-identical and " +
+                 "every variant read rms 0 and looked like a pass -- a picture with nothing to average is not a " +
+                 "test of an averaging pass. Nine sabotages red at 4/5/1/5/1/1/5/2/2, TWO 0-RED FIRST and both " +
+                 "the same fault: a value produced on one side and consumed on the other with nothing between " +
+                 "them asserting it. zPrev was blanked in the WGSL and NEITHER gate noticed -- the motion gate " +
+                 "read channels 0, 1 and 2, and this gate uploads a CPU-built motion buffer and never runs that " +
+                 "kernel; and the disocclusion THRESHOLD was decoration, because a 3-to-8 depth separation " +
+                 "makes every gap either 0.556 or exactly 0 and no threshold between them is distinguishable. " +
+                 "Both now have rows. A third sabotage was itself a no-op and is recorded as one.",
+    }),
     since210: Object.freeze({
         at: "v4551", swept: 1, green: 1, red: 0,
         added: Object.freeze([

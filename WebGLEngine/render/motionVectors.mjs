@@ -91,9 +91,18 @@ export function hasHistory(state) { return state.frames > 1 && state.prevVP != n
 
 /**
  * Per-pixel motion vectors on the CPU: the ground truth the WGSL is held to.
- * `depth` is w*h clip-space z values; the result is w*h*4 floats per pixel -- (du, dv, valid, 0) -- with (du, dv)
- * in UV units and being uvPrev - uvCurr. Four floats because the WGSL writes the same four, so the two can be
- * compared without either side reshaping the other's answer.
+ * `depth` is w*h clip-space z values; the result is w*h*4 floats per pixel -- (du, dv, valid, zPrev) -- with
+ * (du, dv) in UV units and being uvPrev - uvCurr. Four floats because the WGSL writes the same four, so the two
+ * can be compared without either side reshaping the other's answer.
+ *
+ * *** v4552 -- THE FOURTH CHANNEL WAS A HARD-CODED ZERO AND IS NOW zPrev, THE EXPECTED PREVIOUS DEPTH. *** It is
+ * the clip-space z this surface WOULD have had last frame: q.z/q.w, one line further down a reprojection this
+ * function already performs. DISOCCLUSION is exactly the comparison between that and the depth actually recorded
+ * in the previous frame's buffer at (u+du, v+dv) -- if what was there was NEARER, this surface was hidden behind
+ * something and its history belongs to that something. Computing it here rather than in render/temporalReject.mjs
+ * is the tree's usual rule: the unproject-reproject is defined once, in the module whose subject it is, and the
+ * consumer subtracts. On the invalid paths zPrev stays at `invalidTo` alongside the vector, so a caller that
+ * ignores `valid` gets a consistent set of nonsense rather than a plausible depth beside a refused vector.
  *
  * A pixel whose reprojection lands BEHIND the previous eye (w <= 0) has no answer -- there was no such pixel last
  * frame -- and comes back with valid = 0 and the vector set to `invalidTo`. A caller that reads the vector without
@@ -109,15 +118,16 @@ export function motionVectorsCPU(depth, w, h, invVPCur, vpPrev, { invalidTo = 0 
         // uv -> ndc (y flips: uv runs down, clip runs up), then ndc -> world through the current inverse
         const nx = 2 * u - 1, ny = 1 - 2 * v;
         const p = transform4(invVPCur, nx, ny, d, 1);
-        if (!p[3]) { out[i * 4] = invalidTo; out[i * 4 + 1] = invalidTo; valid[i] = 0; continue; }
+        if (!p[3]) { out[i * 4] = invalidTo; out[i * 4 + 1] = invalidTo; out[i * 4 + 3] = invalidTo; valid[i] = 0; continue; }
         const wx = p[0] / p[3], wy = p[1] / p[3], wz = p[2] / p[3];
         // that world point, through LAST frame's view-projection
         const q = transform4(vpPrev, wx, wy, wz, 1);
-        if (q[3] <= 0) { out[i * 4] = invalidTo; out[i * 4 + 1] = invalidTo; valid[i] = 0; continue; }
+        if (q[3] <= 0) { out[i * 4] = invalidTo; out[i * 4 + 1] = invalidTo; out[i * 4 + 3] = invalidTo; valid[i] = 0; continue; }
         const pu = (q[0] / q[3] + 1) * 0.5, pv = (1 - q[1] / q[3]) * 0.5;
         out[i * 4] = pu - u;
         out[i * 4 + 1] = pv - v;
         out[i * 4 + 2] = 1;
+        out[i * 4 + 3] = q[2] / q[3];   // the depth this surface would have had last frame -- see the header
         valid[i] = 1;
     }
     return { data: out, valid, w, h };

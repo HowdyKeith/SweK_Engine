@@ -231,8 +231,12 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // The four rows moved by FIVE, one per arrival, and the other five rows did not move at all -- across five
     // gates in five different subsystems (a CPU upscaler, a matrix reprojection, a Halton sequence, a history
     // blend, a resampling kernel), TWENTIETH arrival running with no gate written in a different shape.
-    gates: 1610, usesOk: 1589, definesOk: 1581, importsOk: 0,
-    distinctDefinitions: 38, nameFirst: 1482, condFirst: 91, unknownSignature: 16,
+    // v4552 -- RE-TAKEN: one gate (temporalReject) joined, the same four rows by one, TWENTY-FIRST arrival --
+    // and the first re-taken because a CHECK SAID SO rather than because a round went looking. v4551 added the
+    // sixth row to recordDrift's pre-flight after this record drifted five rounds unnoticed; this round ran it
+    // before the verify and it named all four obligations at once. The other five rows have still never moved.
+    gates: 1611, usesOk: 1590, definesOk: 1582, importsOk: 0,
+    distinctDefinitions: 38, nameFirst: 1483, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

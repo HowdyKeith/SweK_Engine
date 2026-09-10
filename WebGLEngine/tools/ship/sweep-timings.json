@@ -1613,10 +1613,11 @@
   "tools/ship/glbConformance-selfcheck.mjs": 892,
   "tools/export/glbConformance-selfcheck.mjs": 424,
   "fx/fsr/fsr-selfcheck.mjs": 1389,
-  "render/motionVectors-selfcheck.mjs": 740,
+  "render/motionVectors-selfcheck.mjs": 732,
   "render/jitter-selfcheck.mjs": 61,
   "render/temporalAccumulate-selfcheck.mjs": 1329,
-  "render/temporalResolve-selfcheck.mjs": 1046
+  "render/temporalResolve-selfcheck.mjs": 1046,
+  "render/temporalReject-selfcheck.mjs": 1509
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -3231,7 +3232,8 @@
   "render/motionVectors-selfcheck.mjs": 0,
   "render/jitter-selfcheck.mjs": 0,
   "render/temporalAccumulate-selfcheck.mjs": 0,
-  "render/temporalResolve-selfcheck.mjs": 0
+  "render/temporalResolve-selfcheck.mjs": 0,
+  "render/temporalReject-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-08T20:46:53.412Z",
@@ -4843,10 +4845,11 @@
   "tools/ship/glbConformance-selfcheck.mjs": "2026-09-08T19:46:35.918Z",
   "tools/export/glbConformance-selfcheck.mjs": "2026-09-08T20:46:53.412Z",
   "fx/fsr/fsr-selfcheck.mjs": "2026-09-09T22:06:31.110810Z",
-  "render/motionVectors-selfcheck.mjs": "2026-09-09T22:06:31.110810Z",
+  "render/motionVectors-selfcheck.mjs": "2026-09-10T03:30:21.278032Z",
   "render/jitter-selfcheck.mjs": "2026-09-09T22:06:31.110810Z",
   "render/temporalAccumulate-selfcheck.mjs": "2026-09-09T22:06:31.110810Z",
-  "render/temporalResolve-selfcheck.mjs": "2026-09-09T22:06:31.110810Z"
+  "render/temporalResolve-selfcheck.mjs": "2026-09-09T22:06:31.110810Z",
+  "render/temporalReject-selfcheck.mjs": "2026-09-10T03:30:21.278032Z"
  },
  "crossings": {
   "tools/roundhouse/knobPromotions-selfcheck.mjs": 2,

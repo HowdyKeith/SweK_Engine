@@ -168,6 +168,21 @@ else {
         const worstPx = worst * Math.max(W, H);
         ok(`*** the device's velocity buffer is the CPU reference's to ${worstPx.toExponential(2)} of a PIXEL (${worst.toExponential(2)} in uv) on every one of ${W * H * 2} components, and agrees about validity on all ${W * H} pixels ***`,
            worstPx < 0.01 && validBad === 0, `worst ${worstPx.toExponential(3)} px / ${worst.toExponential(3)} uv, ${validBad} validity disagreements`);
+
+        // ---- *** THE FOURTH CHANNEL, WHICH v4552 ADDED AND WHICH THIS ROW EXISTS BECAUSE NOBODY CHECKED. ***
+        // zPrev is the depth this surface would have had last frame; render/temporalReject.mjs's disocclusion
+        // test is one subtraction from it. It arrived with the row above comparing channels 0, 1 and 2 and
+        // NOTHING reading channel 3 -- so blanking `dst[o+3u] = 0.0` in the WGSL went 0-RED across this gate
+        // AND across temporalReject's, whose device section uploads a CPU-built motion buffer and never runs
+        // this kernel. A channel two gates consume and neither one measures.
+        let worstZ4 = 0, zCount = 0;
+        for (let i = 0; i < W * H; i++) {
+            if (!CPU.valid[i]) continue;
+            worstZ4 = Math.max(worstZ4, Math.abs(G[i * 4 + 3] - CPU.data[i * 4 + 3]));
+            if (Math.abs(CPU.data[i * 4 + 3]) > 1e-6) zCount++;
+        }
+        ok(`*** and the device's zPrev channel matches the CPU's to ${worstZ4.toExponential(2)} on all ${zCount} pixels that have a depth to compare -- the channel render/temporalReject.mjs's disocclusion test reads ***`,
+           worstZ4 < 1e-5 && zCount > W * H * 0.5, `worst ${worstZ4.toExponential(3)}, ${zCount} pixels with a nonzero zPrev`);
         // and the device's OWN buffer must show the static-camera zero, because a mirror is not a measurement
         const rz = await runInEngineOrigin({ engineRoot: ENG, args: { W, H, depth: Array.from(dz), invCur: Array.from(mat4Invert(gpuVP(0))), vpPrev: Array.from(gpuVP(0)) }, script: `async (a) => {
             const { requestDevice } = await import("/gfx/device.js");
