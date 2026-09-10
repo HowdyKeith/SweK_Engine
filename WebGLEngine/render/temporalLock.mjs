@@ -263,6 +263,13 @@ export function makeLockState(w, h) { return { w, h, life: new Float32Array(w * 
 export function ridgesCPU(lumaField, w, h, margin = 0.05, maxPlateau = 2) {
     const out = new Uint8Array(w * h), axisX = new Uint8Array(w * h), axisY = new Uint8Array(w * h);
     let n = 0;
+    // *** margin MAY BE A FIELD, NOT ONLY A NUMBER (v4563). *** render/ringFloor.mjs derives a floor per
+    // pixel, and under a perspective projection that floor varies 6x across one frame -- so a caller that
+    // has it should be able to spend it per pixel instead of taking the frame's worst everywhere. The
+    // threshold used is the CENTRE pixel's: `decide` is asking whether pixel i is an extremum, so the
+    // question is what counts as a difference AT i, not at whichever neighbour the walk has reached.
+    // A number behaves exactly as before -- every caller in this tree still passes one.
+    const perPixel = typeof margin !== "number";
     // *** THE WALK PAST TIES IS NOT A REFINEMENT, IT IS THE DIFFERENCE BETWEEN SEEING A FEATURE AND NOT. ***
     // v4556: a thin feature whose two covered pixels come out within `margin` of each other -- which is what
     // happens whenever it straddles a pixel boundary evenly -- is a strict extremum in NEITHER, and the whole
@@ -272,20 +279,21 @@ export function ridgesCPU(lumaField, w, h, margin = 0.05, maxPlateau = 2) {
     // feature is invisible for far more of the sweep -- at contrast 0.2 it is a quarter of all positions.
     // So the deciding neighbour is the first one that differs by more than `margin`, not the adjacent one.
     // maxPlateau 1 is exactly the old strict test and is kept reachable for that comparison.
-    const decide = (i, step) => {
+    const decide = (i, step, m) => {
         const c = lumaField[i];
         for (let k = 1; k <= maxPlateau; k++) {
             const j = i + step * k;
             if (j < 0 || j >= w * h) return 0;
             const dv = lumaField[j] - c;
-            if (dv > margin) return 1;
-            if (dv < -margin) return -1;
+            if (dv > m) return 1;
+            if (dv < -m) return -1;
         }
         return 0;                      // still inside a plateau at the bound: undecided, and NOT a ridge
     };
     for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
         const i = y * w + x;
-        const L = decide(i, -1), R = decide(i, 1), U = decide(i, -w), D = decide(i, w);
+        const m = perPixel ? margin[i] : margin;
+        const L = decide(i, -1, m), R = decide(i, 1, m), U = decide(i, -w, m), D = decide(i, w, m);
         const ridgeX = (L === -1 && R === -1) || (L === 1 && R === 1);
         const ridgeY = (U === -1 && D === -1) || (U === 1 && D === 1);
         // *** THE AXES COME OUT TOO, because which one fired is what "thin" means directionally: a ridge found

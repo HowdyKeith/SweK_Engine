@@ -3767,6 +3767,56 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since222: Object.freeze({
+        at: "v4563", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/ringFloorMargin-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 0.26 s, comfortably under the 3000 ms budget. *** v4562's CLOSING WAS WRONG TWICE AND " +
+                 "THIS ROUND MEASURES WHY. *** It called a per-BAND floor worth 6x. The right unit is not a " +
+                 "band -- ringFloor.mjs already produces a floor per PIXEL, and bands were an artefact of how " +
+                 "I read it -- and the frame-wide alternative is not 6x worse: on this perspective scene the " +
+                 "derived frame-wide margin is INFEASIBLE on all fourteen frames, so it locks NOTHING. The " +
+                 "choice was never 6%, it was between a derived margin that works and one that does not " +
+                 "exist. Per pixel, 66-71% of the ground IS lockable; the frame-wide number is set by the " +
+                 "worst pixel in the frame and then spent everywhere. *** WHAT A PER-PIXEL MARGIN COSTS IS " +
+                 "CHURN: 51.8% of held ridges change state between frames, against 10.7% for the arc's fixed " +
+                 "0.05 -- 4.9x -- and a lock that blinks is worse than no lock, since blinking is the " +
+                 "artefact the lock exists to suppress. *** The cause is the jitter, and v4553's insight " +
+                 "applies unchanged: any P consecutive frames span a whole period. Pooling the floor over one " +
+                 "period halves the churn to 28.9% and steadies the margin itself from 30% to 4% p90. *** AND " +
+                 "THE POOL IS A MAX, NOT A MEAN, BECAUSE THE FLOOR IS A BOUND: *** the mean is just as steady " +
+                 "and stops being one -- 5.9% of the locks it keeps stand UNDER the floor of the very frame " +
+                 "they are in -- where the max includes the current frame and therefore cannot. It costs 22% " +
+                 "of the ridges the instantaneous floor keeps, which is what a threshold holding still costs. " +
+                 "*** AND 71% OF THE ARC'S FIXED-MARGIN RIDGES STAND ON PIXELS WHOSE OWN FLOOR EXCEEDS THE " +
+                 "0.05 THAT FOUND THEM *** -- locks reading the ring's resampling error, which is what " +
+                 "ridgeMarginBounds was built at v4557 to refuse. A TRUTH COMPARISON CANNOT SEE THIS, and " +
+                 "that is worth stating plainly: scored against the noiseless field the fixed margin is 97.9% " +
+                 "precise and 94.9% recalling, because the artefact and the feature are in the same PLACE -- " +
+                 "a ridge placed on resampling error still lands where the truth has a ridge. Both statements " +
+                 "are true at once. *** AND MY FIRST SCORING WAS RIGGED: *** it scored both detectors against " +
+                 "truth ridges taken at 0.05, the fixed detector's own threshold, and produced 44.8% " +
+                 "precision and 23.4% recall for the derived margin -- a strong negative result that " +
+                 "evaporated once each detector was scored against truth at ITS OWN threshold (98.3% and " +
+                 "97.8%). A margin DEFINES what counts as a feature; a target built with one detector's " +
+                 "definition cannot judge the other. New here: ridgesCPU accepts a per-pixel margin field as " +
+                 "well as a scalar, and ringFloor gains makeFloorPool/pushFloor/pooledFloor and " +
+                 "marginsFromFloor, which takes ridgeMarginBounds as an argument so the interval has one " +
+                 "definition and not a second copy. Eight sabotages red at 3/6/1/1/7/8/2/6 against six gates. " +
+                 "*** ONE WENT 0-RED AND FOUND A COMMENT PRETENDING TO BE A DECISION: *** ridgesCPU reads the " +
+                 "CENTRE pixel's margin and the comment calls that deliberate, but rewriting it to read each " +
+                 "NEIGHBOUR's changed nothing -- the margin field is smooth almost everywhere, so the two " +
+                 "readings agree. It has exactly one discontinuity and it is maximal: an INFEASIBLE pixel is " +
+                 "Infinity beside a finite neighbour, and read at the neighbour that pixel gets a finite " +
+                 "threshold and becomes lockable -- the one pixel the empty interval exists to refuse. The " +
+                 "sabotage places 23 ridges on infeasible pixels where the kept form places 0 of 6094. A " +
+                 "design decision written into a comment and held by nothing is indistinguishable from a " +
+                 "decision nobody made, and this arc has now found two of them: v4561's stencil width and " +
+                 "this one.",
+    }),
     since221: Object.freeze({
         at: "v4562", swept: 1, green: 1, red: 0,
         added: Object.freeze([

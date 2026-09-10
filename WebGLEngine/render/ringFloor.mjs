@@ -146,3 +146,77 @@ export function ringFloorCPU(luma, motion, w, h, period, tau = RESOLUTION_TAU) {
     // that has nothing to do with the content -- the arc has written that absence-as-measurement twice.
     return { worst, per, unresolved, total, unresolvedFraction: total ? unresolved / total : 0, depth };
 }
+
+/**
+ * *** A FLOOR POOLED OVER ONE JITTER PERIOD, BECAUSE A MARGIN THAT MOVES MAKES A LOCK FLICKER. ***
+ *
+ * v4562 measured the floor varying 6x across one perspective frame and called a per-pixel margin worth
+ * having. Measured at v4563, spending it per pixel straight from the current frame costs 51.8% churn per
+ * ridge held, against 10.7% for the arc's fixed margin -- a lock that blinks is worse than no lock, because
+ * blinking is the artefact the lock exists to suppress.
+ *
+ * The cause is the jitter. The floor is a property of content and geometry, both of which change smoothly;
+ * the frame-to-frame swing is the sample grid moving. v4553's insight applies unchanged: any P consecutive
+ * frames span a whole jitter period.
+ *
+ * *** AND THE POOL IS A MAX, NOT A MEAN, BECAUSE THE FLOOR IS A BOUND. *** Measured over fourteen frames:
+ *
+ *     pooling      ridges/frame   churn per ridge   below their own floor   margin swing p90
+ *     none            159.4          51.8%                0.0%                   30%
+ *     period MEAN     148.2          26.7%                5.9%                    7%
+ *     period MAX      124.9          28.9%                0.0%                    4%
+ *
+ * The mean halves the churn and stops being a bound -- 5.9% of the locks it keeps stand under the floor of
+ * the very frame they are in, which is the thing the whole composition exists to prevent. The max cannot do
+ * that: it includes the current frame, so it is never below it. It costs 22% of the ridges the instantaneous
+ * floor would keep, and that is the price of a threshold that holds still.
+ *
+ * (The max's churn reads slightly above the mean's while its margin is steadier, because it holds fewer
+ * ridges and the per-ridge denominator is smaller. Both are roughly half the unpooled figure.)
+ */
+export function makeFloorPool(w, h, period) {
+    if (!Number.isInteger(period) || period < 1) throw new Error("makeFloorPool: period must be a positive integer");
+    return { w, h, period, frames: [], n: 0 };
+}
+
+/** Push this frame's per-pixel floor. Keeps the last `period` of them and nothing older. */
+export function pushFloor(pool, per) {
+    if (!per || per.length !== pool.w * pool.h) throw new Error("pushFloor: a floor field of w*h is required");
+    pool.frames.push(per);
+    if (pool.frames.length > pool.period) pool.frames.shift();
+    pool.n++;
+    return pool;
+}
+
+/**
+ * The pooled floor, and whether the pool has actually seen a whole period yet.
+ * *** `whole` IS NOT DECORATION. *** A pool part-way through its first period spans an arbitrary fraction of
+ * the jitter, so it is neither jitter-free nor a bound over one -- v4402's fault, an absence read as a pass,
+ * and the caller is told rather than guessed for.
+ */
+export function pooledFloor(pool) {
+    const N = pool.w * pool.h, out = new Float32Array(N);
+    for (const f of pool.frames) for (let i = 0; i < N; i++) if (f[i] > out[i]) out[i] = f[i];
+    return { data: out, whole: pool.frames.length >= pool.period, frames: pool.frames.length };
+}
+
+/**
+ * A per-pixel floor composed into a per-pixel MARGIN, through the same ridgeMarginBounds every frame-wide
+ * caller uses -- one composition, not two.
+ *
+ * An infeasible pixel becomes Infinity, which ridgesCPU reads as "nothing here is a ridge". That is the
+ * honest reading: the interval being empty means no margin can separate a feature from the noise, so the
+ * answer is that nothing is lockable there -- NOT that everything is. Measured on a perspective ground
+ * plane over fourteen frames, 29-34% of the pixels that HAVE a surface come out infeasible at a 10% blind
+ * budget -- counted over on-plane pixels, since a whole-buffer figure mixes "unlockable" with "nothing here".
+ */
+export function marginsFromFloor(floor, w, h, bounds, opts = {}) {
+    if (typeof bounds !== "function") throw new Error("marginsFromFloor: pass ridgeMarginBounds -- this module does not own the composition");
+    const out = new Float32Array(w * h);
+    let feasible = 0;
+    for (let i = 0; i < w * h; i++) {
+        const b = bounds({ noiseFloor: floor[i], contrast: opts.contrast, blindBudget: opts.blindBudget, safety: opts.safety });
+        if (b.feasible) { out[i] = b.margin; feasible++; } else out[i] = Infinity;
+    }
+    return { data: out, feasible, total: w * h, feasibleFraction: feasible / (w * h) };
+}
