@@ -1,4 +1,5 @@
 {
+ "generatedFrom": "tools/ship/boundaryLint-selfcheck.mjs",
  "note": "v3142 -- reported boundary tells AS FOUND, COUNTED PER file+rule. A baseline, not an approval: counts may SHRINK and may never GROW. Freeze deliberately with SWEK_FREEZE_BOUNDARY_REPORT=1.",
  "sites": 88,
  "total": 236,

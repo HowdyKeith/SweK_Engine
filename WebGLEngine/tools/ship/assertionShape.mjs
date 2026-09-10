@@ -246,11 +246,15 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // at 40 -- the new gate uses the ok(name, cond, detail) shape already counted, which is the
     // point of that row: a gate adding a FORTY-FIRST spelling of the same idea is the thing worth
     // noticing, and this one does not.
-    // v4536 -- RE-TAKEN for one new gate, tools/ship/partitionScore-selfcheck.mjs: gates 1617 -> 1618,
-    // usesOk 1596 -> 1597, definesOk 1588 -> 1589, nameFirst 1489 -> 1490. It defines its own ok() like the
-    // other 1,589, which is the census's whole finding rather than an oversight in the new gate.
-    gates: 1618, usesOk: 1597, definesOk: 1589, importsOk: 0,
-    distinctDefinitions: 40, nameFirst: 1490, condFirst: 91, unknownSignature: 16,
+    // v4572b -- RE-TAKEN for tools/ship/recordProvenance-selfcheck.mjs: 1617 -> 1618 and the three
+    // rows that follow a gate by one. distinctDefinitions holds at 40 for the second round running.
+    // v4536 -- RE-TAKEN AGAIN AT THE MERGE, for tools/ship/partitionScore-selfcheck.mjs: 1618 -> 1619 and
+    // the same three rows by one. *** BOTH LINES RE-TOOK THIS TABLE IN THE SAME WINDOW AND THE MERGE HAD TO
+    // ADD THE TWO MOVES RATHER THAN PICK ONE: *** each side's note was correct for a tree containing its own
+    // gate and neither was correct for the tree containing both. The numbers below are re-derived from the
+    // merged tree, not summed from the two notes.
+    gates: 1619, usesOk: 1598, definesOk: 1590, importsOk: 0,
+    distinctDefinitions: 40, nameFirst: 1491, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

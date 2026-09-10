@@ -179,7 +179,7 @@ else {
         // writer paid for -- inside one process instead of across two. The repair is the one that file took: merge
         // by key, so a section that did not run this time keeps what it wrote last time.
         const prior = fs.existsSync(EMITTED) ? JSON.parse(fs.readFileSync(EMITTED, "utf8")) : {};
-        fs.writeFileSync(EMITTED, JSON.stringify({ ...prior, at: "v4322", three: "0.178.0", note: "the Lyapunov look as three's node builders emitted it from render/physicsTsl.mjs makeLyapunovLookTsl, and as render/tslSource.mjs transplanted it into the look's own shell; rewritten by tools/ship/tslRace-selfcheck.mjs on every run, MERGED BY KEY (v4566) so a section that does not reach its write keeps its last reading instead of losing it", ...R.emitted, transplanted: R.transplanted }, null, 1));
+        fs.writeFileSync(EMITTED, JSON.stringify({ ...prior, generatedFrom: "tools/ship/tslRace-selfcheck.mjs", at: "v4322", three: "0.178.0", note: "the Lyapunov look as three's node builders emitted it from render/physicsTsl.mjs makeLyapunovLookTsl, and as render/tslSource.mjs transplanted it into the look's own shell; rewritten by tools/ship/tslRace-selfcheck.mjs on every run, MERGED BY KEY (v4566) so a section that does not reach its write keeps its last reading instead of losing it", ...R.emitted, transplanted: R.transplanted }, null, 1));
         ok("the emitted and transplanted look is written to tools/ship/tsl-emitted-race.json for the WGSL corpus", fs.existsSync(EMITTED));
         // The merge is the fix, so it is the thing asserted: the keys the LATER sections own must survive this write.
         // (On the very first run of a fresh tree there are none, which is why the row states what it found.)

@@ -56,7 +56,7 @@ const say = (m) => console.log("  ----  " + m);
     const found = findDuplicateGroups(ROOT);
     const key = (g) => g.join("|");
     if (process.env.SWEK_FREEZE_DUPLICATE_FILES === "1") {
-        fs.writeFileSync(BASE, JSON.stringify({ groups: found }, null, 1));
+        fs.writeFileSync(BASE, JSON.stringify({ generatedFrom: "tools/ship/duplicateFiles-selfcheck.mjs", groups: found }, null, 1));
         console.log("  ----  FROZE " + found.length + " groups into duplicate-files-baseline.json");
     }
     const baseline = JSON.parse(fs.readFileSync(BASE, "utf8")).groups;

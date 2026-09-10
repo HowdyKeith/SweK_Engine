@@ -413,7 +413,7 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "unstamped-generated-records",
-        blocker: "OPEN",
+        blocker: "CLOSED",
         what: "29 of the 35 JSON records under tools/ship/ carry NO provenance stamp, so the property-based rule "
             + "tools/ship/orphanScan.mjs uses to tell a RECORD of references from a MAKER of them covers six of "
             + "them. v3900 replaced a name list with that property precisely because a name list needs editing "
@@ -436,6 +436,37 @@ export const NEXT_ROUNDS = [
             + "report the property could not see, and v4571 found the property working perfectly against a "
             + "record that simply did not carry it. Each round fixed the instance in front of it. The remaining "
             + "28 are the instances not yet in front of anybody.",
+        closedAt: "v4572 -- AND THE FILED PREMISE WAS WRONG IN BOTH DIRECTIONS, WHICH THE MEASUREMENT SAID "
+            + "BEFORE ANYTHING WAS CHANGED. It said 29 of 35 and the count is 28 of 36; more to the point it "
+            + "implied 28 latent instances of the v4567 collapse. MEASURED FIRST, by stamping every unstamped "
+            + "record in place and re-running the scan: the candidate set did not move. ZERO orphans were "
+            + "hidden. Every module those records named was reached by real code anyway, so the round is "
+            + "PREVENTION and says so rather than claiming a rescue. *** AND THE REAL DEFECT WAS IN THE CHECK, "
+            + "NOT IN THE RECORDS. *** orphan-baseline.json -- the file v3126 excluded by name and v3900 "
+            + "replaced that name with a property for -- CARRIES `captured`, at byte 6,940, because its note "
+            + "runs six and a half kilobytes first. isGeneratedRecord read text.slice(0, 4096), so the property "
+            + "returned FALSE and the file stayed out of the corpus solely because its NAME was still sitting "
+            + "in the SKIP regex: the list the property replaced, quietly propping up the property that "
+            + "replaced it, for three rounds, because the two agreed about the outcome and disagreed about the "
+            + "reason. v4571 walked straight past this -- it put generatedFrom FIRST in input-sets.json and "
+            + "wrote a comment explaining that the note runs ~700 characters so the key must land inside the "
+            + "window, treating a defect in the CHECK as a placement rule for every future writer. A record is "
+            + "JSON; its top-level keys are exactly knowable by parsing it, at no window at all. The rule "
+            + "parses now, the name is out of SKIP, and stripping that one `captured` key takes the candidate "
+            + "set from 7 to ZERO -- so the property is demonstrably what holds it. The vocabulary gained "
+            + "`producedBy` (gate-plan-snapshot declares it) and REFUSED `producedAt` and `refreshedAt`: a "
+            + "timestamp says when a file was written and nothing about who wrote it, and widening this set "
+            + "makes the scanner blinder. 19 records stamped AT THE WRITER as well as in the file, because a "
+            + "key added to a file a tool rewrites is erased on the next run. The judgement this entry said it "
+            + "needed -- which records are genuinely generated -- did not arise: the vocabulary already "
+            + "distinguishes them, `generatedFrom` for a tool and `captured` for the five read-only three.js "
+            + "fixtures, and calling a hand-maintained baseline `captured` is not a lie about its provenance. "
+            + "prose-debt-baseline.json was a bare ARRAY and could carry no key at all; it names 27 modules and "
+            + "has exactly one reader, so it was converted rather than given a permanent exception. "
+            + "host-timings.local.json is out of scope: .local.json is this tree's convention for per-machine "
+            + "state, three files carry it and all three are in .gitignore. Gated by "
+            + "tools/ship/recordProvenance-selfcheck.mjs, 204 ms, which reads the vocabulary OUT OF "
+            + "orphanScan.mjs rather than retyping it -- two lists that must agree is two lists that will not.",
         upstream: "Nothing blocks it. The judgement it needs is which records are genuinely GENERATED -- a "
             + "fixture somebody hand-wrote is not, and stamping it would be a lie about its provenance that "
             + "future rounds would read as licence to regenerate it. The tsl-*-fixture.json family is the "

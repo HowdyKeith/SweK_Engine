@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "7c59fd22c27c39f840042a200c151e5185a16e18",
+ "head": "ccd187db5622d772bcdd2318aa103170adc1bfff",
  "bodies": {
   "box3d": [
    {
@@ -270,7 +270,7 @@
    },
    {
     "path": "tools/ship/slugTsl-selfcheck.mjs",
-    "bytes": 20040,
+    "bytes": 20091,
     "sha": "5ac8ccedcd39eed6e31e4e91814f3be4770f64f0"
    },
    {
@@ -630,8 +630,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3217829,
-    "sha": "0e231524eab1fea9c4248cde0f0c30bc74bbe1f9"
+    "bytes": 3218181,
+    "sha": "ccd187db5622d772bcdd2318aa103170adc1bfff"
    },
    {
     "path": "mpm3d.html",
@@ -730,7 +730,7 @@
    },
    {
     "path": "tools/ship/boundaryLint-selfcheck.mjs",
-    "bytes": 17160,
+    "bytes": 17216,
     "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
@@ -842,7 +842,7 @@
    },
    {
     "path": "tools/ship/slugTsl-selfcheck.mjs",
-    "bytes": 20040,
+    "bytes": 20091,
     "sha": "5ac8ccedcd39eed6e31e4e91814f3be4770f64f0"
    },
    {
@@ -862,27 +862,27 @@
    },
    {
     "path": "tools/ship/tslLoopBound-selfcheck.mjs",
-    "bytes": 11347,
+    "bytes": 11403,
     "sha": "9be0173f43e103d34c3bcb6362737f9aa4621360"
    },
    {
     "path": "tools/ship/tslPhysics-selfcheck.mjs",
-    "bytes": 125841,
+    "bytes": 125949,
     "sha": "9be0173f43e103d34c3bcb6362737f9aa4621360"
    },
    {
     "path": "tools/ship/tslRace-selfcheck.mjs",
-    "bytes": 79677,
+    "bytes": 79728,
     "sha": "e6455e521a83205c839c617b1effe93f29201cbe"
    },
    {
     "path": "tools/ship/tslSource-selfcheck.mjs",
-    "bytes": 22705,
+    "bytes": 22758,
     "sha": "f222fee5f8b49b3122d9d651078d156eb4b7a277"
    },
    {
     "path": "tools/ship/tslWide-selfcheck.mjs",
-    "bytes": 22576,
+    "bytes": 22627,
     "sha": "ad535264ab7dc33e4650578484ecfecb9b207424"
    },
    {

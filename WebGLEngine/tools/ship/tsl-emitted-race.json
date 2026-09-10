@@ -1,4 +1,5 @@
 {
+ "generatedFrom": "tools/ship/tslRace-selfcheck.mjs",
  "at": "v4322",
  "three": "0.178.0",
  "note": "the Lyapunov look as three's node builders emitted it from render/physicsTsl.mjs makeLyapunovLookTsl, and as render/tslSource.mjs transplanted it into the look's own shell; rewritten by tools/ship/tslRace-selfcheck.mjs on every run, MERGED BY KEY (v4566) so a section that does not reach its write keeps its last reading instead of losing it",
