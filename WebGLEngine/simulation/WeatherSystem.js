@@ -39,6 +39,33 @@ export class WeatherSystem {
         this.timeOfDay = opts.startTime ?? 0.5;
         this.cycleSeconds = opts.cycleSeconds ?? DAY_CYCLE_SECONDS;
 
+        // v857 -- EXAMINED FOR MIGRATION ONTO ui/machine.mjs's defineMachine()/applyEvent() (the same
+        // framework simulation/BossPhaseManager.js, simulation/CSBomb.js, and simulation/CSRoundManager.js
+        // now use) and DELIBERATELY LEFT ALONE. Considered no, not an oversight. The header comment above
+        // calls this "a state machine," and it looks the part -- a fixed STATES list, a STATE_VISUALS
+        // lookup keyed by state, a named field reassigned on a timer -- but `_pickNextState()` (the only
+        // place `this.state` is ever computed; see below) NEVER READS `this.state`, the outgoing value, to
+        // decide what's legal next. It's an unconditional weighted Math.random() draw (35% clear / 25%
+        // cloudy / 25% rain-or-snow by biome coldBias / 15% storm) that can land on any of the 5 internally
+        // reachable states from any of the 5 on every 60-120s rollover. That is CSBot.js's BOT_STATE shape
+        // (see the v4604 comment there) -- a PRIORITY CLASSIFICATION recomputed fresh from current world/
+        // timer state with no gating on the prior value -- just re-rolled once per timer instead of once per
+        // frame, which changes nothing about the diagnostic. ui/machine.mjs's whole value is catching an
+        // undeclared or unreachable transition; a graph where every state legitimately reaches every other
+        // state validates nothing. Two more reasons this isn't even a close call:
+        //   - "blizzard" sits in STATE_VISUALS and is read in tick()'s particle-picker and in _spawnSnow(),
+        //     but `_pickNextState()` can never return it -- it is reachable ONLY through the external
+        //     window.weather.setState()/pin()/blizzard() console API in main.js (~line 10617), which sets
+        //     weatherSystem.state directly from ANY current state to ANY of the 6 known values with NO
+        //     legality check at all. Unlike CSBomb.js's unreachable `idle` (exactly one narrow, documented,
+        //     audit()-asserted override), this API is unrestricted and there's no lifecycle story to pin.
+        //   - There is no boundary condition, same-tick priority race, or source-state-dependent side effect
+        //     to preserve the way CSBomb.js (fuseExpired-vs-completeDefuse race, from-state-dependent
+        //     lastEvent text) and CSRoundManager.js (dt fallthrough, unguarded reset) had -- weather has
+        //     nothing here for a migration to catch.
+        // If this ever changes -- e.g. _pickNextState() starts reading this.state to forbid/weight certain
+        // transitions (storm can't jump straight to clear, blizzard only follows snow, etc.) so the outgoing
+        // value actually constrains the incoming one -- re-read this note before assuming it still applies.
         this.state = "clear";
         this._stateAge = 0;
         this._nextStateChange = this._pickStateDuration();

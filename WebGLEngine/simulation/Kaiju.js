@@ -18,6 +18,7 @@
 
 import { generateKaijuName } from "../world/kaijuNames.js";
 import { pickKindConfig }     from "../world/kaijuKinds.js";
+import { defineMachine, applyEvent } from "../ui/machine.mjs";
 
 const ENGAGE_RANGE         = 6;
 const CIV_HIT_BASE         = 0.10;
@@ -28,6 +29,56 @@ const PASSIVE_DECAY        = 0.003;
 const KILL_REGEN_CIV       = 0.35;
 const KILL_REGEN_KAIJU     = 0.55;      // bigger reward for kaiju kill
 const DAMAGE_VOXEL_R       = 4;
+
+export const KAIJU_STATE = Object.freeze({
+    SPAWNING:   "spawning",
+    SEEKING:    "seeking",
+    ENGAGING:   "engaging",
+    RETREATING: "retreating",
+    DYING:      "dying",
+});
+
+// v4605 -- the fourth real migration of a hand-rolled FSM onto ui/machine.mjs's defineMachine()/applyEvent(),
+// after BossPhaseManager.js, CSBomb.js and CSRoundManager.js. `this.state` here is a genuine guarded,
+// history-dependent lifecycle -- tick() dispatches via switch(this.state) to exactly one private handler, and
+// every write-site checks the CURRENT state before acting -- unlike CSBot.js's BOT_STATE (see that file's own
+// v4604 comment), which is recomputed fresh every tick from world state with no dependence on the prior value
+// and was correctly DECLINED for this same treatment.
+//
+// TWO WRINKLES, both intentional, neither papered over:
+//
+//   1. "expire" (age > config.maxLifetime) is declared on every non-terminal state, not just one -- because the
+//      real check in tick() runs BEFORE the retreat check and BEFORE the switch, with NO guard on the current
+//      state at all (fires even while spawning), and short-circuits the rest of that tick unconditionally.
+//      That is CSRoundManager.js's unguarded startMatch()-style reset, not a bug to gate away: declaring it on
+//      spawning/seeking/engaging/retreating (never on dying, which has no "on" at all) reproduces the exact
+//      same "callable from anywhere, dying is dying either way" behaviour through the graph instead of a
+//      hand-rolled `if (age > max) { state = "dying"; return; }`.
+//
+//   2. `_engageKaiju()` sets `other.state = "dying"` DIRECTLY on a DIFFERENT Kaiju instance -- the victim of a
+//      kaiju-on-kaiju kill, whose own tick()/applyEvent() cycle never runs this tick because the attacker's
+//      tick is what lands the killing blow. This stays a direct assignment with a comment, exactly like
+//      CSBomb.js's reset()/forceIdle() administrative overrides -- it is not a domain event THIS instance's
+//      graph should pretend to model. Unlike CSBomb.js's forceIdle(), this does NOT create an unreachable
+//      state: "dying" is already reachable from every other state via "expire" (wrinkle 1 above), so
+//      audit(KAIJU_MACHINE) comes back with an empty unreachable list -- the CSRoundManager.js-clean case, not
+//      the CSBomb.js carve-out case, despite having an override of its own.
+//
+// One more thing the graph gets for free: the original's retreat-trigger guard --
+// `state !== spawning && state !== dying && state !== retreating` -- is exactly the set of states "lowEnergy"
+// is declared on (seeking, engaging) minus itself; firing "lowEnergy" from any OTHER state is simply not a
+// declared transition, so applyEvent leaves state unchanged with no separate guard needed at the call site.
+export const KAIJU_MACHINE = defineMachine({
+    initial: "spawning",
+    states: {
+        spawning:   { on: { land: "seeking", expire: "dying" } },
+        seeking:    { on: { engageRange: "engaging", lowEnergy: "retreating", expire: "dying" } },
+        engaging:   { on: { targetLost: "seeking", disengageRange: "seeking", civKilled: "seeking",
+                             kaijuKilled: "seeking", lowEnergy: "retreating", expire: "dying" } },
+        retreating: { on: { recovered: "seeking", expire: "dying" } },
+        dying:      { final: true },
+    },
+});
 
 export class Kaiju {
 
@@ -58,7 +109,7 @@ export class Kaiju {
         this._pathTargetZ = null;
         this._pathReplanAt = 0;
 
-        this.state  = "spawning";
+        this.state  = KAIJU_STATE.SPAWNING;
         this.energy = 1.0;
         this.age    = 0;
 
@@ -410,8 +461,12 @@ export class Kaiju {
             }
         }
 
+        // v4605 -- unconditional, unguarded, checked before the retreat trigger and before the switch, and
+        // short-circuits the rest of THIS tick regardless of whether the transition actually fires (e.g. it's
+        // already dying) -- see KAIJU_MACHINE's header, wrinkle 1. "expire" is declared on every non-terminal
+        // state so this same call is correct no matter which state we're currently in.
         if (this.age > this.config.maxLifetime) {
-            this.state = "dying";
+            this.state = applyEvent(KAIJU_MACHINE, this.state, "expire", null);
             return actions;
         }
 
@@ -437,11 +492,20 @@ export class Kaiju {
                 ? window.getBrainAggro(this.id) : null;
             if (ag != null) retreatAt = 0.3 * (1.4 - 0.8 * ag);
         }
-        if (!this.noRetreat
-            && this.state !== "spawning" && this.state !== "dying"
-            && this.state !== "retreating"
-            && this.energy < retreatAt && damagedRecently) {
-            this.state = "retreating";
+        // v4605 -- the `state !== spawning/dying/retreating` guard the original spelled out explicitly is now
+        // implicit in the graph: "lowEnergy" is declared ONLY on seeking/engaging (see KAIJU_MACHINE), so
+        // firing it from any other state is simply not a legal transition and applyEvent leaves state
+        // unchanged -- no separate guard needed here. The condition-to-event translation (including noRetreat,
+        // a per-instance opt-out with no graph-level meaning) stays the caller's job, exactly as
+        // ui/machine.mjs's own applyEvent() note says it must.
+        const retreatBefore = this.state;
+        this.state = applyEvent(KAIJU_MACHINE, this.state,
+            (!this.noRetreat && this.energy < retreatAt && damagedRecently) ? "lowEnergy" : null, null);
+        if (this.state !== retreatBefore) {
+            // Entry side effect for retreating -- identical regardless of whether we arrived from seeking or
+            // engaging, so it's fine to run it here rather than fork it by source state. This mutates
+            // this.state BEFORE the switch below runs, so a flip THIS tick sends THIS SAME tick's switch to
+            // _tickRetreating, not the old state's handler -- a full same-call swap, not a next-tick deferral.
             this._retreatStart = this.age;
             this._retreatTarget = this._pickRetreatTarget();
             this.target = null;
@@ -551,7 +615,7 @@ export class Kaiju {
         // Exit conditions: recovered (>=0.7) or timed out (18s max)
         const elapsed = this.age - this._retreatStart;
         if (this.energy >= 0.7 || elapsed > 18) {
-            this.state = "seeking";
+            this.state = applyEvent(KAIJU_MACHINE, this.state, "recovered", null);
             this._retreatTarget = null;
         }
         return [];
@@ -566,7 +630,7 @@ export class Kaiju {
             : this.position.y >= land;
         if (landed) {
             this.position.y = land;
-            this.state = "seeking";
+            this.state = applyEvent(KAIJU_MACHINE, this.state, "land", null);
         }
         return [];
     }
@@ -585,7 +649,7 @@ export class Kaiju {
 
         if (dist < ENGAGE_RANGE) {
             this.target = target;
-            this.state = "engaging";
+            this.state = applyEvent(KAIJU_MACHINE, this.state, "engageRange", null);
             return [];
         }
 
@@ -716,7 +780,7 @@ export class Kaiju {
             target = this._resolveTarget(civManager, kaijuManager);
             this.target = target;
             if (!target) {
-                this.state = "seeking";
+                this.state = applyEvent(KAIJU_MACHINE, this.state, "targetLost", null);
                 return [];
             }
         }
@@ -726,7 +790,7 @@ export class Kaiju {
         const dz = tp.z - this.position.z;
         const dist = Math.hypot(dx, dz);
         if (dist > ENGAGE_RANGE * 1.5) {
-            this.state = "seeking";
+            this.state = applyEvent(KAIJU_MACHINE, this.state, "disengageRange", null);
             this.target = null;
             return [];
         }
@@ -748,7 +812,7 @@ export class Kaiju {
             this.energy = Math.min(1.0, this.energy + KILL_REGEN_CIV);
             this.target = null;
             this.targetCivId = null;
-            this.state = "seeking";
+            this.state = applyEvent(KAIJU_MACHINE, this.state, "civKilled", null);
         }
 
         const r = DAMAGE_VOXEL_R;
@@ -771,9 +835,14 @@ export class Kaiju {
             // Victory — record for the manager to publish event
             this.energy = Math.min(1.0, this.energy + KILL_REGEN_KAIJU);
             this._lastVictim = other;
-            other.state = "dying";    // mark loser for despawn
+            // v4605 -- cross-instance administrative override, kept as a direct assignment: `other` is a
+            // DIFFERENT Kaiju, and its own tick()/applyEvent() cycle never runs this tick (the attacker's tick
+            // is what lands the killing blow), so there is no "from" state of OTHER's own graph to fire an
+            // event against here. See KAIJU_MACHINE's header, wrinkle 2, for why this does not leave "dying"
+            // unreachable the way CSBomb.js's forceIdle() left "idle" unreachable.
+            other.state = KAIJU_STATE.DYING;    // mark loser for despawn
             this.target = null;
-            this.state = "seeking";
+            this.state = applyEvent(KAIJU_MACHINE, this.state, "kaijuKilled", null);
         }
 
         // No voxel:remove for kaiju duels — the destruction trail is

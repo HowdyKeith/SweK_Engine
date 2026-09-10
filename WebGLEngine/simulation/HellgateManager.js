@@ -31,6 +31,8 @@
 // router (entity spawn/move/despawn), GPUParticles (portal fire), and
 // ProjectileManager (fireballs + civ missiles).
 
+import { defineMachine, applyEvent } from "../ui/machine.mjs";
+
 const OPEN_TIME       = 2.0;    // s, portal grows
 const CLOSE_TIME      = 1.5;    // s, portal collapses
 const GATE_MAX_HP     = 100;
@@ -53,6 +55,38 @@ const HS_SPAWN_Y      = 1.5;
 
 let _seq = 1;
 
+// v4605 -- the gate lifecycle (gate.state on each entry of `gates`, the one explicit named-state field in this
+// file), made a declared graph the same way BossPhaseManager.js and CSBomb.js already did. THIS ONE COMES OUT
+// FULLY CLEAN -- every state reachable, none dead -- closer to BossPhaseManager's clean baseline than to
+// CSBomb's harder case with its unreachable-on-purpose idle. damageGate() and closeAll() both fit as declared
+// events (hpZero / forceClose) rather than administrative bypasses, because both are guarded by a specific,
+// narrow source-state set ({opening, active} -> closing) -- precisely what a declared transition expresses,
+// not what one has to route AROUND.
+//
+// ONE WRINKLE THAT STILL STAYS OUTSIDE applyEvent(), and is worth naming rather than losing quietly: closeAll()
+// resets g.age = 0 on EVERY non-closed gate it touches, INCLUDING a gate that is already "closing" -- calling
+// closeAll() a second time genuinely restarts that gate's close timer, extending how long it takes to actually
+// close. applyEvent() never re-fires onEnter for a same-state transition (see ui/machine.mjs's own header:
+// "never ... on a same-state loop") -- correctly, since nothing actually CHANGED state -- but the original's
+// unconditional age reset is a real, observable behaviour that has nothing to do with the transition itself.
+// It is timer bookkeeping, not a state change, so closeAll() keeps it as a bare `g.age = 0` alongside the
+// applyEvent() call rather than forcing a fake closing->closing self-edge into the graph just to smuggle a
+// side effect through onEnter.
+//
+// STRUCTURAL NOTE for whoever touches this next: unlike BossPhaseManager/CSBomb (one manager-wide instance
+// apiece), HellgateManager tracks MANY concurrent gates in a Map. GATE_MACHINE is one shared graph definition;
+// applyEvent() is called once per gate per relevant tick/call, passing that gate as the onEnter arg -- there is
+// no single "current state" for the manager itself, only per-gate ones.
+export const GATE_MACHINE = defineMachine({
+    initial: "opening",
+    states: {
+        opening: { on: { openTimeout: "active", hpZero: "closing", forceClose: "closing" } },
+        active:  { on: { hpZero: "closing", forceClose: "closing" } },
+        closing: { on: { closeTimeout: "closed" } },
+        closed:  { final: true },
+    },
+});
+
 export class HellgateManager {
     constructor(fx = {}) {
         this.fx = fx;                 // injected side effects (all optional)
@@ -61,6 +95,26 @@ export class HellgateManager {
         this._civAI = new Map();      // civId -> { panic, siege, cd }
         this.t = 0;
         this.stats = { opened: 0, closed: 0, spawned: 0, hellspawnKilled: 0, civsOverwhelmed: 0, civShots: 0 };
+
+        // v4605 -- GATE_MACHINE's onEnter map, keyed by target state, one call per gate transition. Shared
+        // across every concurrent gate; each call is passed the specific gate `g` whose transition just fired
+        // (applyEvent's own ...args forwarding), the same way BossPhaseManager's onEnter took a ctx object.
+        this._onEnterGate = {
+            // entering "active" (opening's age timeout, tick()-driven only): just restarts the countdown that
+            // active's own spawn cadence measures against. No fx/stat side effect -- matches the original's
+            // bare `g.age = 0`.
+            active: (g) => { g.age = 0; },
+            // entering "closing" (damageGate()'s hp<=0, or closeAll()'s forceClose -- from EITHER opening or
+            // active): same bare age reset, no fx/stat side effect either.
+            closing: (g) => { g.age = 0; },
+            // entering "closed" (closing's age timeout, tick()-driven only): the one state entry with real
+            // side effects, firing exactly once from this one call site -- matches the original inline block.
+            closed: (g) => {
+                this.fx.gateCloseFx?.(g.x, g.z);
+                this.fx.despawnEntity?.(g.entityId);
+                this.stats.closed++;
+            },
+        };
     }
 
     // ---- gates ----------------------------------------------------------
@@ -96,13 +150,31 @@ export class HellgateManager {
 
     damageGate(id, n) {
         const g = this.gates.get(id);
+        // The guard blocks the WHOLE method body, not just the transition -- an already-closing/closed gate's
+        // hp must not decrement even by an amount that wouldn't matter. Return value tracks "was this a legal
+        // hit", NOT "did the state change" -- true for any hit that passes the guard even if hp stays above 0.
         if (!g || g.state === "closing" || g.state === "closed") return false;
         g.hp -= n;
-        if (g.hp <= 0) { g.hp = 0; g.state = "closing"; g.age = 0; }
+        if (g.hp <= 0) {
+            g.hp = 0;
+            // legal from BOTH "opening" and "active" -- a gate can be forced closed while still opening.
+            g.state = applyEvent(GATE_MACHINE, g.state, "hpZero", this._onEnterGate, g);
+        }
         return true;
     }
 
-    closeAll() { for (const g of this.gates.values()) if (g.state !== "closed") { g.state = "closing"; g.age = 0; } }
+    closeAll() {
+        for (const g of this.gates.values()) {
+            if (g.state !== "closed") {
+                g.state = applyEvent(GATE_MACHINE, g.state, "forceClose", this._onEnterGate, g);
+                // GATE_MACHINE's own header explains why this stays a bare assignment outside applyEvent: a
+                // gate already "closing" gets no onEnter re-fire (same-state transitions never fire one), but
+                // the original unconditionally reset the timer anyway -- so closeAll() called again on an
+                // already-closing gate really does restart its close countdown.
+                g.age = 0;
+            }
+        }
+    }
 
     _spawnHellspawn(gate) {
         if (this.spawn.length >= TOTAL_SPAWN_CAP) return;
@@ -174,21 +246,20 @@ export class HellgateManager {
         this.t += dt;
 
         // --- gates ---
+        // Which branch runs is chosen by g.state AT THE START of this gate's iteration -- an opening->active
+        // crossing this tick does NOT fall through into the active branch's own spawn-cadence/pulse logic this
+        // same tick (the if/else-if chain only evaluates once per gate per tick()); that gate is processed as
+        // "active" starting next tick, matching the original exactly.
         for (const g of this.gates.values()) {
             g.age += dt;
             if (g.state === "opening") {
-                if (g.age >= OPEN_TIME) { g.state = "active"; g.age = 0; }
+                if (g.age >= OPEN_TIME) g.state = applyEvent(GATE_MACHINE, g.state, "openTimeout", this._onEnterGate, g);
             } else if (g.state === "active") {
                 g.spawnTimer -= dt;
                 if (g.spawnTimer <= 0) { g.spawnTimer = SPAWN_INTERVAL; this._spawnHellspawn(g); }
                 if ((Math.floor(this.t * 2) !== Math.floor((this.t - dt) * 2))) this.fx.gatePulseFx?.(g.x, g.z, 0.4);
             } else if (g.state === "closing") {
-                if (g.age >= CLOSE_TIME) {
-                    g.state = "closed";
-                    this.fx.gateCloseFx?.(g.x, g.z);
-                    this.fx.despawnEntity?.(g.entityId);
-                    this.stats.closed++;
-                }
+                if (g.age >= CLOSE_TIME) g.state = applyEvent(GATE_MACHINE, g.state, "closeTimeout", this._onEnterGate, g);
             }
         }
         // reap closed gates
