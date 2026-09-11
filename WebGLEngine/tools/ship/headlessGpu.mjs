@@ -88,29 +88,69 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
+import { shellRoots } from "./playwrightResolve.mjs";
 
-// *** ONE PLACE THAT KNOWS, following playwrightResolve.mjs's rule verbatim: three gates each grew their own
-// guess and two went stale on the same box. A second copy of this list is that defect happening again. ***
+// v4615 -- *** THIS LIST WAS ONE SANDBOX'S OWN GLOBAL-INSTALL PATHS, AND IT NEVER MATCHED ANYTHING ELSE. ***
+// The three absolute fallbacks below (/opt/node22, /usr/local, /home/claude/.npm-global) are this specific
+// Claude Code sandbox's own directories -- not a general guess-list, a RECORD of one box. Keith's Windows rig
+// hit exactly this: headlessGpuSkipReason() printed all three verbatim, none of them meaningful on a machine
+// with no /opt or /home at all. `webgpu` (dawn-gpu/node-webgpu) genuinely ships Windows (win64) prebuilt
+// binaries -- confirmed against the package's own npm listing -- so the fix is a real Windows candidate, not a
+// platform exclusion. `require("webgpu")` cannot find a GLOBAL npm install by bare specifier on ANY platform
+// (global installs are not on Node's default resolution path), which is the entire reason this list of
+// absolute paths exists at all; %APPDATA%\npm\node_modules is where `npm i -g webgpu` actually lands one.
 export const WEBGPU_PATHS = Object.freeze([
     "webgpu",
     "/opt/node22/lib/node_modules/webgpu/index.js",
     "/usr/local/lib/node_modules/webgpu/index.js",
     "/home/claude/.npm-global/lib/node_modules/webgpu/index.js",
+    ...(process.env.APPDATA ? [path.join(process.env.APPDATA, "npm", "node_modules", "webgpu", "index.js")] : []),
 ]);
 
-/** Where a Playwright browser bundle keeps its Vulkan driver. */
-export const ICD_ROOT = process.env.PLAYWRIGHT_BROWSERS_PATH || "/opt/pw-browsers";
-export const ICD_LEAF = path.join("chrome-linux", "vk_swiftshader_icd.json");
+// v4615 -- *** THE VULKAN-ICD HALF HAD THE SAME DEFECT ITS OWN HEADER SAID playwrightResolve.mjs ALREADY
+// FIXED. *** ICD_ROOT was ONE root (PLAYWRIGHT_BROWSERS_PATH or a Linux-only literal), and ICD_LEAF was
+// hardcoded to "chrome-linux" -- exactly the single-guess shape playwrightResolve.mjs's header calls out BY
+// NAME as the defect three gates each grew once. That file already carries the fix (shellRoots(): every root
+// a Playwright install puts browsers under, per platform; SHELL_LEAVES: every platform's executable layout) --
+// so this imports it rather than writing a fourth copy, which is the exact warning that file's own header
+// gives about itself.
+/** Where a Playwright browser bundle keeps its Vulkan driver -- every root shellRoots() knows, not one. */
+export function icdRoots(env = process.env) { return shellRoots(env); }
+
+/** Back-compat single root: the first candidate, same value this always returned when PLAYWRIGHT_BROWSERS_PATH
+ * was set (which every gate here runs with) or on a box whose only root is /opt/pw-browsers. */
+export const ICD_ROOT = icdRoots()[0];
+
+/** The ICD manifest's leaf path, per platform layout -- mirrors playwrightResolve.mjs's SHELL_LEAVES exactly;
+ * the manifest's OWN filename does not change across platforms, only the folder Playwright names it under. */
+export const ICD_LEAVES = Object.freeze([
+    path.join("chrome-linux", "vk_swiftshader_icd.json"),
+    path.join("chrome-win", "vk_swiftshader_icd.json"),
+    path.join("chrome-mac", "vk_swiftshader_icd.json"),
+]);
+export const ICD_LEAF = ICD_LEAVES[0];   // back-compat: the value every existing caller of this name expects
 
 /**
- * Every SwiftShader ICD manifest under the browser root, SORTED so two boxes with the same bundles pick the
- * same one. Returns paths, not a boolean: a gate that cannot say which driver it used cannot be re-diagnosed
- * when the next Playwright version moves the directory -- which it will, the name carries a build number.
+ * Every SwiftShader ICD manifest under ONE browser root, SORTED so two boxes with the same bundles pick the
+ * same one. Single-root signature preserved deliberately (headlessGpu-selfcheck.mjs calls this with an
+ * explicit root, including a nonexistent one, as its own control case) -- multi-root search lives in
+ * configureVulkanIcd/headlessGpuSkipReason, which call this once per icdRoots() candidate instead.
  */
 export function findVulkanIcds(root = ICD_ROOT) {
     let entries = [];
     try { entries = fs.readdirSync(root); } catch { return []; }
-    return entries.map((d) => path.join(root, d, ICD_LEAF)).filter((p) => fs.existsSync(p)).sort();
+    const out = [];
+    for (const d of entries) for (const leaf of ICD_LEAVES) {
+        const p = path.join(root, d, leaf);
+        if (fs.existsSync(p)) out.push(p);
+    }
+    return out.sort();
+}
+
+/** Every ICD manifest across every root a Playwright install might use, first non-empty root wins. */
+function findVulkanIcdsAnyRoot() {
+    for (const root of icdRoots()) { const found = findVulkanIcds(root); if (found.length) return found; }
+    return [];
 }
 
 /**
@@ -120,9 +160,9 @@ export function findVulkanIcds(root = ICD_ROOT) {
  * SwiftShader, a debug driver -- and a helper that silently redirected them to Chromium's copy would make
  * every result a fact about a driver they did not pick.
  */
-export function configureVulkanIcd(root = ICD_ROOT) {
+export function configureVulkanIcd(root) {
     if (process.env.VK_ICD_FILENAMES) return { path: process.env.VK_ICD_FILENAMES, chosen: false, found: [] };
-    const found = findVulkanIcds(root);
+    const found = root != null ? findVulkanIcds(root) : findVulkanIcdsAnyRoot();
     if (!found.length) return { path: "", chosen: false, found };
     process.env.VK_ICD_FILENAMES = found[0];
     return { path: found[0], chosen: true, found };
@@ -144,14 +184,14 @@ export function resolveWebgpu(requireFn) {
  */
 export function headlessGpuSkipReason(requireFn) {
     const { mod } = resolveWebgpu(requireFn);
-    const icds = findVulkanIcds();
+    const icds = findVulkanIcdsAnyRoot();
     if (!mod && !icds.length)
-        return "neither node-webgpu (tried: " + WEBGPU_PATHS.join(", ") + ") nor a Vulkan ICD under " + ICD_ROOT;
+        return "neither node-webgpu (tried: " + WEBGPU_PATHS.join(", ") + ") nor a Vulkan ICD under " + icdRoots().join(", ");
     if (!mod)
         return "node-webgpu is not installed here -- `npm i -g webgpu` (a Vulkan ICD IS present at " + icds[0] + ")";
     if (!icds.length && !process.env.VK_ICD_FILENAMES)
-        return "node-webgpu resolved but there is no Vulkan driver: no " + ICD_LEAF + " under " + ICD_ROOT +
-               " and VK_ICD_FILENAMES is unset. Dawn will report 'Found no drivers!'";
+        return "node-webgpu resolved but there is no Vulkan driver: no " + ICD_LEAVES.join(" or ") + " under " +
+               icdRoots().join(", ") + " and VK_ICD_FILENAMES is unset. Dawn will report 'Found no drivers!'";
     return null;
 }
 
