@@ -61,13 +61,24 @@ export function shellRoots(env = process.env, home = os.homedir()) {
  * The executable inside a browser directory, per platform layout. The headless shell is preferred over the
  * full browser because that is what every caller was launching; both are listed because an install may carry
  * only one.
+ *
+ * v4617 -- *** "chrome-win" STOPPED BEING TRUE THE DAY CHROME-FOR-TESTING'S PACKAGING CHANGED, AND NOTHING
+ * HERE NOTICED. *** Measured directly on Keith's Windows rig, Playwright chromium v1243: the full browser
+ * unpacks to chrome-win64\chrome.exe (folder renamed, binary unchanged) and the headless shell unpacks to
+ * chrome-headless-shell-win64\chrome-headless-shell.exe -- BOTH the folder AND the binary renamed, an entirely
+ * different pattern from the Linux/macOS siblings that still share one folder-naming scheme with a differently
+ * named binary inside. The old "chrome-win" leaves are kept, not replaced -- an older cached Playwright install
+ * elsewhere in the tree's history may still carry the old layout, and this list has always been "every leaf
+ * tried, in order" rather than "the current one".
  */
 export const SHELL_LEAVES = Object.freeze([
     path.join("chrome-linux", "headless_shell"),
     path.join("chrome-win", "headless_shell.exe"),
+    path.join("chrome-headless-shell-win64", "chrome-headless-shell.exe"),
     path.join("chrome-mac", "headless_shell"),
     path.join("chrome-linux", "chrome"),
     path.join("chrome-win", "chrome.exe"),
+    path.join("chrome-win64", "chrome.exe"),
     path.join("chrome-mac", "Chromium.app", "Contents", "MacOS", "Chromium"),
 ]);
 

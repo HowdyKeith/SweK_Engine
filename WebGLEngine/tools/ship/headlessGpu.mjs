@@ -122,10 +122,14 @@ export function icdRoots(env = process.env) { return shellRoots(env); }
 export const ICD_ROOT = icdRoots()[0];
 
 /** The ICD manifest's leaf path, per platform layout -- mirrors playwrightResolve.mjs's SHELL_LEAVES exactly;
- * the manifest's OWN filename does not change across platforms, only the folder Playwright names it under. */
+ * the manifest's OWN filename does not change across platforms, only the folder Playwright names it under.
+ * v4617 -- chrome-win64 carries this file too (confirmed on Keith's rig, Playwright chromium v1243: it ships
+ * beside chrome.exe in chrome-win64, unlike the headless-shell package which does not need or carry it), the
+ * same folder rename playwrightResolve.mjs's SHELL_LEAVES picked up. */
 export const ICD_LEAVES = Object.freeze([
     path.join("chrome-linux", "vk_swiftshader_icd.json"),
     path.join("chrome-win", "vk_swiftshader_icd.json"),
+    path.join("chrome-win64", "vk_swiftshader_icd.json"),
     path.join("chrome-mac", "vk_swiftshader_icd.json"),
 ]);
 export const ICD_LEAF = ICD_LEAVES[0];   // back-compat: the value every existing caller of this name expects
