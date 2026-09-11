@@ -209,13 +209,20 @@ export const REACH_AT_V4548 = Object.freeze({
     // render/exactHash.mjs guarded by exactHash-selfcheck at 1,656 ms -- under the 3,000 ms budget, so it
     // arrived CHECKED. That is what adding a record properly looks like, against the nine this tree carries
     // that no code names at all.
+    // v4583: 106 -> 107 and the ceiling did not move. CORPUS_AT_V4583 landed in
+    // tools/export/glbConformance-selfcheck.mjs guarded by that same file at 441 ms against the 3,000 ms
+    // budget, so it arrived CHECKED -- the second round running where a new record costs the unchecked
+    // population nothing. Worth saying because the previous four rounds each went red here on their own
+    // arrival: a record written into a module whose gate is over budget arrives unchecked, and this one was
+    // written into a gate that runs at ship time on purpose.
     // v4536 -- RE-TAKEN: 104 -> 105, one record, PARTITION_AT_V4536 in nav/partitionScore.mjs. The ratchet
     // below is a CEILING on unchecked records, so it has to be measured against the live population or a
     // round that adds a record makes the ceiling look roomier without checking anything.
     // v4537 -- RE-TAKEN: 105 -> 106, one record, BACKLOG_AT_V4537 in tools/ship/backlogAbsence.mjs.
     // v4537 -- RE-TAKEN AT THE MERGE: 106 -> 108, the two records this branch added.
     // v4538 -- RE-TAKEN: 108 -> 109, one record, COST_AT_V4538 in nav/pathCost.mjs.
-    total: 109,
+    // v4538 -- RE-TAKEN AT THE MERGE: 107 -> 110. Both lines added records in the same window again.
+    total: 110,
     // *** READ OFF THE INSTRUMENT, NOT PREDICTED. *** The first draft of this record guessed 53/21/19/40 from
     // which gates the round had sped up, and was wrong on three of the four: the comment-strip fix below
     // moved two records the other way at the same time, and a guess cannot see two changes at once.
@@ -333,13 +340,16 @@ export const UNGUARDED_SPLIT_V4577 = Object.freeze({
     // v4578 -- total RE-TAKEN 105 -> 106 for SHADER_SINHASH_V4578, which arrived checked. The other three
     // are the round's actual finding and have not moved: no clock enters them, and no record has joined or
     // left the unguarded set.
+    // v4583 -- total RE-TAKEN 106 -> 107 for CORPUS_AT_V4583, which arrived checked. The unguarded set
+    // did not move: no record joined or left it this round.
     // v4537 -- RE-TAKEN AT THE MERGE: 106 -> 108 records and the unguarded set 9 -> 10, both DOCUMENTARY.
     // One of this branch's two arrivals joined the unguarded set and the other did not, which is the
     // distinction this row exists to keep: a record is guarded when code NAMES it, and naming it in the
     // module's own prose is not naming it in a check.
     // v4538 -- RE-TAKEN: 108 -> 109 records, unguarded 10 -> 11, still all DOCUMENTARY. COST_AT_V4538 is
     // named by its gate's prose and not by its code, which is what documentary means here.
-    structural: Object.freeze({ total: 109, unguarded: 11, documentaryOfThose: 11, readByCodeOfThose: 0 }),
+    // v4538 -- RE-TAKEN AT THE MERGE: 107 -> 110 records, unguarded 9 -> 11, all DOCUMENTARY.
+    structural: Object.freeze({ total: 110, unguarded: 11, documentaryOfThose: 11, readByCodeOfThose: 0 }),
     // BEFORE, on the tree this round opened on:
     before: Object.freeze({ total: 104, checked: 72, overBudget: 20, unmeasured: 0, unguarded: 12, unchecked: 32 }),
     // AFTER, as one reading rather than as a constant -- see the note above. Taken with the round's own
