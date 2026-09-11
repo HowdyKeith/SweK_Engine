@@ -15,12 +15,31 @@
 import fs from "node:fs";
 import path from "node:path";
 import { execSync } from "node:child_process";
+import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
 import { withheldFromMirror } from "./withheld.mjs";
 
 function arg(name) { const i = process.argv.indexOf(name); return i >= 0 ? process.argv[i + 1] : null; }
 const version = arg("--version");
 const markers = (arg("--markers") || "").split(",").map(s => s.trim()).filter(Boolean);
 const zipPath = arg("--zip");
+
+// v4612 -- *** THIS PROCESS IS INVISIBLE TO EVERY OTHER SweK INSTANCE ON THE BOX, AND THAT WAS THE BUG. ***
+// runBusy.js's guard only sees work happening inside the SAME node process; it cannot see this file running
+// at all, since verify.mjs is its own process, almost always in a freshly cloned folder. An already-running
+// SweK instance's own update poller has no way to know this is in flight, so it can apply a real update mid-
+// sweep -- see releaseHold.js for the incident this fixes. Skipped when ship.mjs already holds it (it sets
+// SWEK_RELEASE_HOLD_OWNER before spawning this as a child) so the child's exit cannot lift a lock the parent
+// ritual still needs for its later steps (pack, upload).
+if (!process.env.SWEK_RELEASE_HOLD_OWNER) {
+  try {
+    const require_ = createRequire(import.meta.url);
+    const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+    const releaseHold = require_(path.join(ENG, "ai-bridge", "releaseHold.js"));
+    const release = releaseHold.acquire(`verify.mjs${version ? " --version " + version : ""} running in ${process.cwd()}`);
+    process.on("exit", release);
+  } catch (e) { console.log("[verify] NOTE  release hold could not be acquired: " + String(e.message).slice(0, 100)); }
+}
 
 let fails = 0;
 function check(label, ok, detail) {

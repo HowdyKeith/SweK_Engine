@@ -27,6 +27,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 import { readChangelog, namesVersion, newestVersion, CHANGELOG_REL } from "./changelogSource.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -45,6 +46,18 @@ if (!version || !/^v\d+$/.test(version)) {
     console.error("\nusage: node tools/ship/ship.mjs --version vNNNN --markers \"a,b\" [--dry-run]\n");
     process.exit(2);
 }
+
+// v4612 -- held for the WHOLE ritual, not just the verify.mjs stage: an already-running SweK instance's own
+// update poller cannot see this process at all (see releaseHold.js), and the pack/upload stages after verify
+// are just as much "a release in progress" as the sweep itself. SWEK_RELEASE_HOLD_OWNER tells the verify.mjs
+// child spawned below to skip its own acquire/release -- its exit must not lift a lock this ritual still needs.
+try {
+    const require_ = createRequire(import.meta.url);
+    const releaseHold = require_(path.join(ENGINE, "ai-bridge", "releaseHold.js"));
+    const release = releaseHold.acquire(`ship.mjs --version ${version} running in ${process.cwd()}`);
+    process.env.SWEK_RELEASE_HOLD_OWNER = "1";
+    process.on("exit", release);
+} catch (e) { console.log("  NOTE: release hold could not be acquired: " + String(e.message).slice(0, 100)); }
 
 let step = 0;
 const say = (msg) => console.log("  " + msg);
