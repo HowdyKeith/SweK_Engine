@@ -41,10 +41,29 @@ import { createRequire } from "node:module";
 import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
 import fs from "node:fs";
 import path from "node:path";   // used by renderThreePassToPixels, which serves the engine tree over HTTP
-import { storageWords } from "./headlessGpu.mjs";   // v4457 -- the storage-input packing both harnesses share
+import { storageWords, configureVulkanIcd } from "./headlessGpu.mjs";   // v4457 -- the storage-input packing both harnesses share
 
 /** The flags that worked, kept as data so a caller can report them and a future box can extend the list. */
 export const LAUNCH_ARGS = Object.freeze(["--enable-unsafe-webgpu"]);
+
+// v4621 -- *** EXPERIMENTAL, UNVERIFIED ON WINDOWS -- READ BEFORE TRUSTING THIS FUNCTION'S EXISTENCE AS A FIX. ***
+// See headlessGpu.mjs's own v4615/4616 notes: Windows Dawn defaults to D3D12, and Keith's rig gets a real
+// adapter+device through it for headless COMPUTE (native, no browser) -- but navigator.gpu.requestAdapter()
+// INSIDE headless Chromium itself returns null. Search evidence ties this to a known, documented upstream
+// Chromium limitation: WebGPU canvas presentation does not reach the headless compositor on Windows, even when
+// the underlying adapter/device would otherwise work. UNVERIFIED BEYOND THAT CITATION -- this repo has no
+// Windows box to test against, and this may do nothing at all.
+//
+// The attempt mirrors the ALREADY-WORKING pattern the WebGL2 launches below use (--use-gl=swiftshader: force
+// software rendering rather than trust the platform's real GPU/compositor path in headless mode) instead of
+// inventing a new one: point Chromium's OWN Dawn instance at the SwiftShader Vulkan ICD chrome-win64 already
+// ships (confirmed present on Keith's rig by directory listing) rather than letting it default to the D3D12
+// path that returns null here. If Chromium's WebGPU backend does not consult VK_ICD_FILENAMES the way the
+// native `webgpu` package does, this changes nothing and the launch behaves exactly as it did before.
+async function launchWebgpuBrowser(pw) {
+    configureVulkanIcd();
+    return pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...LAUNCH_ARGS] });
+}
 
 /** *** NOT about:blank. *** See the header -- this is the whole reason the harness has a server in it. */
 export const SECURE_HOST = "127.0.0.1";
@@ -128,7 +147,7 @@ export async function runWgslCompute({ code, entryPoint = "main", outCount, unif
 
     let browser = null;
     try {
-        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...LAUNCH_ARGS] });
+        browser = await launchWebgpuBrowser(pw);
         const page = await browser.newPage();
         await page.goto(url);
         const out = await page.evaluate(async (a) => {
@@ -242,7 +261,7 @@ export async function renderWgslToPixels({ code, width = 64, height = 64, srcSiz
     await new Promise((r) => srv.listen(0, SECURE_HOST, r));
     let browser = null;
     try {
-        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...LAUNCH_ARGS] });
+        browser = await launchWebgpuBrowser(pw);
         const page = await browser.newPage();
         await page.goto(`http://${SECURE_HOST}:${srv.address().port}/`);
         const out = await page.evaluate(async (a) => {
@@ -632,7 +651,7 @@ export async function runWgslComputeToTexture({ code, entryPoint = "main", n = 6
 
     let browser = null;
     try {
-        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...LAUNCH_ARGS] });
+        browser = await launchWebgpuBrowser(pw);
         const page = await browser.newPage();
         page.setDefaultTimeout(timeoutMs);
         await page.goto(url);
@@ -753,7 +772,7 @@ export async function runInEngineOrigin({ engineRoot, script, args = null, timeo
     await new Promise((r) => srv.listen(0, SECURE_HOST, r));
     let browser = null;
     try {
-        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...LAUNCH_ARGS] });
+        browser = await launchWebgpuBrowser(pw);
         const page = await browser.newPage();
         const pageErrors = [];
         page.on("pageerror", (e) => pageErrors.push(String(e).slice(0, 300)));
