@@ -215,7 +215,19 @@ export function ringFloorCPU(luma, motion, w, h, period, tau = RESOLUTION_TAU, p
         // holds one history for the pixel, not one per direction. It was safer and it was arithmetic nobody
         // could justify, and the row that compares this module's private ring readings against
         // temporalLock's exported ones is what caught it.
-        if (rMean && (!rx || !ry)) e = Math.max(e, Math.abs(rMean[i] - rPrev[i]) + rSpread[i]);
+        // *** AND ONLY WHERE THE REPROJECTION ACTUALLY MOVED THE SAMPLE (v4566). *** |newer - older| is the
+        // quantity v4553 built shadingShiftCPU on to DETECT a lighting change, and v4565 spends it as
+        // reprojection noise. They are the same number. Where the displacement is ZERO the reprojection is
+        // exact -- v4558 -- so none of that number is its doing and all of it is something else. Measured on
+        // a chequer with a still camera: |newer - older| is 0.000 under static light and 0.520 under an
+        // 8%-per-frame ramp, so at zero displacement the quantity is ENTIRELY the light. Ungated, the edge
+        // fixture's floor under that ramp reads 6.2e6 times the error actually present; gated, 4.5x.
+        //
+        // *** UNDER MOTION THE TWO MIX AND THIS DOES NOT SEPARATE THEM. *** With the camera moving half a
+        // texel, the same ramp still inflates the frame-wide floor 2.8x and nothing here can tell how much
+        // of that is the light. The gate is the part that is soundly fixable, not the whole problem.
+        const moved = motion ? (motion[o] !== 0 || motion[o + 1] !== 0) : false;
+        if (rMean && (!rx || !ry) && moved) e = Math.max(e, Math.abs(rMean[i] - rPrev[i]) + rSpread[i]);
         // never below the arithmetic's own floor: at an integer displacement both axis terms are exactly
         // zero and the ring is still not exact -- it is exact to within the representation
         per[i] = Math.max(e, ARITHMETIC_ULPS * EPS_F32 * Math.max(X.mag, Y.mag));

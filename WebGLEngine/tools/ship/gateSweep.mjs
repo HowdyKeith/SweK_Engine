@@ -3767,6 +3767,48 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since225: Object.freeze({
+        at: "v4566", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/ringFloorLight-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 0.41 s, under the 3000 ms budget. *** THE FLOOR AND THE SHADING DETECTOR HAVE BEEN " +
+                 "READING THE SAME NUMBER AND CALLING IT OPPOSITE THINGS. *** v4553 built shadingShiftCPU on " +
+                 "|newer period mean - older period mean| to DETECT a lighting change; v4565 spends that same " +
+                 "quantity as REPROJECTION NOISE in the floor's step branch. Every fixture in this arc is " +
+                 "statically lit, so nothing has ever had to tell them apart. Measured on a chequer with a " +
+                 "still camera: |newer - older| is 0.000 under static light -- the jitter cancels over a whole " +
+                 "period exactly, as v4553 built it to -- and 0.520 under an 8%-per-frame ramp, while the " +
+                 "error actually present stays at 1e-7 because at zero displacement the reprojection is " +
+                 "EXACT. shadingShiftCPU reads 0.578 of its [0,1] range on the same frames and calls it " +
+                 "signal. *** AT ZERO DISPLACEMENT THE SEPARATION IS THEREFORE COMPLETE, AND THAT IS WHAT " +
+                 "THIS ROUND FIXES: *** the ring term is now gated on a displacement having happened at all, " +
+                 "which is a hard test with nothing to tune. On the edge fixture under that ramp it lowers " +
+                 "92% of step-branch pixels by a median 9.5e+5x, and under static light it changes 0% of " +
+                 "them, because there is nothing there to remove. It remains a bound on both albedos and all " +
+                 "three lighting regimes, still and moving. *** UNDER MOTION THE TWO MIX AND THIS DOES NOT " +
+                 "SEPARATE THEM: *** the same ramp still lifts the moving-camera floor 2.8x, and part of that " +
+                 "lift is real -- the true floor rises 2.5x -- which is exactly why it cannot be gated away. " +
+                 "Section 3 measures it rather than waving at it. Seven sabotages red at 3/8/1/1/4/1/3 " +
+                 "against seven gates. *** TWO WENT 0-RED AND BOTH WERE FIXTURE BLINDNESS. *** PC reads only " +
+                 "the u component of the motion vector, so a camera moving straight down reads as a still " +
+                 "one -- invisible because EVERY FIXTURE IN THIS ARC, v4553 through v4565, translates the " +
+                 "camera in X and nowhere else. Thirteen rounds, and a bound ignoring half the motion vector " +
+                 "behaves identically on all of them; section 5 is a horizontal edge swept vertically, the " +
+                 "smallest fixture that separates them. PD treats a null motion buffer as motion, unchecked " +
+                 "because the callers that pass null use the frame form, which has no ring term -- so the one " +
+                 "combination that matters, a per-pixel bound with no displacement information, had no " +
+                 "reader. *** AND THE PROBE THAT OPENED THE ROUND READ ss[i] WHERE shadingShiftCPU RETURNS " +
+                 "{ data, unknown }: *** every read undefined, every comparison false, and it reported the " +
+                 "detector firing on 0% of pixels across three lighting regimes -- the exact number that " +
+                 "would have made this collision look like it was not there. An absence read as a " +
+                 "measurement, this arc's oldest fault, in the round that is about two readings of one " +
+                 "quantity. Two rows of the new gate also had to be corrected: one asserted the floor itself " +
+                 "would vanish where the gate only removes the ring term (the geometry stays, and a step " +
+                 "scales with the light too), and one multiplied by zero and compared the result to nothing.",
+    }),
     since224: Object.freeze({
         at: "v4565", swept: 1, green: 1, red: 0,
         added: Object.freeze([

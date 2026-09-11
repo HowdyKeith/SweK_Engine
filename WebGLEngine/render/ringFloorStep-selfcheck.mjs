@@ -143,14 +143,20 @@ console.log("\n4. THE PIECES, HELD TO WHAT THEY CLAIM");
     ok("the module's private ring readings agree with temporalLock's exactly -- a second copy is only allowed because a row compares them",
         (() => {
             const st = makeLumaState(8, 8, P), c = new Float32Array(8 * 8 * 4);
+            // *** A NON-ZERO MOTION, BECAUSE v4566 GATED THE RING TERM ON ONE. *** This row used a null
+            // motion buffer, which made the ring term unreachable the moment the gate landed and turned the
+            // row red -- correctly: with no displacement there is no reprojection to bound and the private
+            // copy is not exercised at all. A quarter-texel in u keeps every pixel in bounds and fires it.
+            const mv = new Float32Array(64 * 4);
+            for (let i = 0; i < 64; i++) { mv[i * 4] = 0.25 / 8; mv[i * 4 + 2] = 1; }
             for (let f = 0; f < 2 * P; f++) {
                 for (let i = 0; i < 64; i++) { const v = Math.sin(i * 0.7 + f * 0.4) * 0.5 + 0.5;
                     c[i * 4] = v; c[i * 4 + 1] = v; c[i * 4 + 2] = v; c[i * 4 + 3] = 1; }
-                pushLuma(st, { current: c, motion: null, w: 8, h: 8 });
+                pushLuma(st, { current: c, motion: mv, w: 8, h: 8 });
             }
             // the composed floor on a flat luma field is exactly the ring term, so it exposes the private copy
             const flat = new Float32Array(64).fill(0.5);
-            const mine = ringFloorCPU(flat, null, 8, 8, P, undefined, "window", st).per;
+            const mine = ringFloorCPU(flat, mv, 8, 8, P, undefined, "window", st).per;
             const theirs = (() => { const m = lumaMean(st), p = lumaMeanPrev(st), s = lumaInstability(st);
                 return Array.from({ length: 64 }, (_, i) => Math.abs(m[i] - p[i]) + s[i]); })();
             let worst = 0;
