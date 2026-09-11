@@ -3767,6 +3767,46 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since226: Object.freeze({
+        at: "v4567", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/ringFloorYaw-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 0.28 s, under the 3000 ms budget. *** THIS ARC HAS ONE CAMERA MOTION AND IT IS THE " +
+                 "ONE THAT PROTECTS THE FLOOR. *** Every fixture from v4553 to v4566 TRANSLATES the camera -- " +
+                 "along X for thirteen rounds, along Y since v4566 -- and v4558's roll was orthographic. " +
+                 "Nothing has yawed one under perspective, which is what a camera actually does. IT IS A " +
+                 "DIFFERENT KIND OF MOTION, NOT A FASTER ONE: translation moves a pixel by PARALLAX, " +
+                 "measured varying 9.3x across the frame's depth bands, so the far field barely moves; yaw's " +
+                 "displacement varies 1.0x across the same bands because it depends on where a pixel sits in " +
+                 "the frame and NOT on how far away it is. So the far field -- where a foreshortened ground " +
+                 "plane carries its highest spatial frequency -- loses the protection parallax was giving it. " +
+                 "MEASURED AT MATCHED NEAR-FIELD SPEED, the floor is worse under yaw and the gap WIDENS with " +
+                 "depth: 3.3x at p99 within depth 8, 7.2x within 15, 7.5x within 30. *** AND THE FRAME-WIDE " +
+                 "MAX IS A HORIZON PIXEL, WHICH IS THE STATISTIC EVERY FLOOR THIS ARC HAS PUBLISHED SINCE " +
+                 "v4560 USES: *** uncapped it reads 7.3x the within-depth-30 max under yaw and 3.3x under " +
+                 "translation, while the MEDIAN moves 1.15x between the same two sets -- so the horizon moves " +
+                 "the max and almost nothing else. Not wrong; unrepresentative, and nothing has replaced it. " +
+                 "THE BOUND HOLDS under a motion it has never seen: 0 of 1314 step-branch pixels under their " +
+                 "own error across four runs, which is a result rather than an assumption, since nothing in " +
+                 "its derivation mentions the KIND of motion and this is the first fixture that separates " +
+                 "kind from magnitude. Six sabotages red at 35/4/2/2/5/6 against seven gates. QA scores " +
+                 "THIRTY-FIVE and is the round in one number: a reconstruction that ignores the previous " +
+                 "frame's rotation is a perfect no-op on a translating camera, and until this fixture there " +
+                 "was nothing in the arc it could fail against. *** QC WENT 0-RED AND FOUND A FIXTURE THAT " +
+                 "CANNOT SEPARATE TWO NUMBERS: *** the motion buffer's fourth channel is the depth the " +
+                 "surface had LAST frame, and replacing it with the depth it has NOW passed every gate -- " +
+                 "including motionVectors-selfcheck's own device-parity row, which compared the two " +
+                 "implementations to 3.33e-6 and passed, because the fixture sabotaged both in the same " +
+                 "direction. Every fixture in this tree moves the camera sideways past a surface at constant " +
+                 "distance, and under a lateral move a surface's depth does not change: the previous depth " +
+                 "and the current one are literally the same number. A DOLLY separates them, and " +
+                 "motionVectors-selfcheck now carries one, with the channel asserted against an independent " +
+                 "projection and a third row recording that a lateral move makes the two agree -- which is " +
+                 "why nothing caught it for fourteen rounds.",
+    }),
     since225: Object.freeze({
         at: "v4566", swept: 1, green: 1, red: 0,
         added: Object.freeze([

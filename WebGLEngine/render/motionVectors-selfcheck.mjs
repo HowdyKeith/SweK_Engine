@@ -122,6 +122,29 @@ const depthField = new Float32Array(W * H).map((_, i) => -0.9 + 1.8 * ((i * 37) 
     const mb = motionVectorsCPU(dB, W, H, invCur, behindPrev);
     ok(`a surface BEHIND the previous eye comes back invalid, not zero (valid=${mb.valid[centre]}, channel z=${mb.data[centre * 4 + 2]})`,
        mb.valid[centre] === 0 && mb.data[centre * 4 + 2] === 0, `valid ${mb.valid[centre]}`);
+
+    // *** THE zPrev CHANNEL HAS NEVER BEEN SEPARATED FROM THE DEPTH IT IS NOT (v4567). *** Rewriting it to
+    // return the CURRENT depth instead of the previous one went 0-RED against seven gates, including this
+    // one's own device-parity row, which compared it to 3.33e-6 and passed. The reason is that every fixture
+    // in this tree moves the camera SIDEWAYS past a surface at constant distance -- and under a lateral move
+    // a surface's depth does not change, so the previous depth and the current one are the same number. A
+    // DOLLY is the smallest fixture that separates them: moving along the view direction changes every
+    // surface's depth, so zPrev and z differ by the step.
+    const dollyPrev = viewProj([0, -8 - 2, 0], [0, 1, 0], [1, 0, 0], [0, 0, 1], TAN, ASP, NEAR, FAR);
+    const cD = proj(vpCur, [0, -8 + 6, 0]);           // a surface 6 in front of the current eye
+    const dD = new Float32Array(W * H); dD[centre] = cD.z;
+    const md = motionVectorsCPU(dD, W, H, invCur, dollyPrev);
+    const zPrev = md.data[centre * 4 + 3], zNow = cD.z;
+    // the same world point through the previous projection, computed independently of the module
+    const indep = proj(dollyPrev, [0, -8 + 6, 0]).z;
+    ok(`*** the zPrev channel is the depth the surface had LAST frame, not the one it has now: ${zPrev.toFixed(6)} against this frame's ${zNow.toFixed(6)}, under a dolly that moves the camera ALONG the view direction ***`,
+       Math.abs(zPrev - zNow) > 1e-3, `zPrev ${zPrev.toFixed(6)}, z ${zNow.toFixed(6)}, difference ${Math.abs(zPrev - zNow).toExponential(2)}`);
+    ok(`  and it is the number an independent projection of the same world point through the previous view gives, to ${Math.abs(zPrev - indep).toExponential(2)}`,
+       Math.abs(zPrev - indep) < 1e-6, `channel ${zPrev.toFixed(8)}, independent ${indep.toFixed(8)}`);
+    ok(`  and a LATERAL move gives the two the same value, which is why no fixture in this tree could tell them apart`,
+       (() => { const ml = motionVectorsCPU(dD, W, H, invCur, vpPrev);
+                return Math.abs(ml.data[centre * 4 + 3] - zNow) < 1e-6; })(),
+       "moving sideways past a surface leaves its depth unchanged, so the channel and the depth buffer agree");
 }
 
 console.log("\n3. ON THE DEVICE: the WGSL through gfx/device.js, held to the CPU reference");
