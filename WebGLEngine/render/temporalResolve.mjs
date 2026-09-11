@@ -20,8 +20,26 @@
 const clampi = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 
 /**
- * Lanczos2: 2 sin(pi x) sin(pi x / 2) / (pi x)^2. One at x = 0, zero at every other integer, and zero beyond 2 --
- * which is why a 3x3 footprint is enough when the sample is within half a texel of the centre tap.
+ * Lanczos2: 2 sin(pi x) sin(pi x / 2) / (pi x)^2. One at x = 0, zero at every other integer, and zero beyond 2.
+ *
+ * *** AND THE SENTENCE THAT USED TO FOLLOW THAT WAS WRONG (v4570). *** It read "which is why a 3x3 footprint
+ * is enough when the sample is within half a texel of the centre tap", and the arithmetic refutes it: within
+ * half a texel of the centre tap the nine taps sit at offsets spanning [-1.5, 1.5], and Lanczos2 is NOT zero
+ * on [1.5, 2). The outer lobes are simply never evaluated.
+ *
+ * MEASURED at v4570, as a fraction of |Lanczos2|'s total weight left outside the 3x3 window: 0.00% at an
+ * integer offset, 1.47% at a quarter texel, 5.00% at a half -- and 9.75% of the separable 2-D weight at the
+ * worst phase. A four-tap window (offsets -1..2 about floor) misses 0.00% at every phase.
+ *
+ * IN OUTPUT, resolving a 64x64 source to 128x128 and differencing the two footprints: up to 1.0% of the
+ * image's range on a smooth sinusoid, 6.3% on a hard edge and 15.7% on a pixel-scale chequer. That is not a
+ * rounding detail.
+ *
+ * *** IT IS NOT CHANGED HERE. *** Widening the footprint moves every number temporalResolve-selfcheck
+ * records, which is a round of its own; and the 3x3 window is a legitimate choice as long as it is described
+ * as one. What was not legitimate was the justification. The kernel and this mirror both take nine taps, so
+ * the device-parity row agrees on a truncated Lanczos2 and cannot see any of this -- the guard at |x| >= 2
+ * is unreachable dead code, which is how v4570's audit found it: doubling it to 4.0 changed nothing anywhere.
  */
 export function lanczos2(x) {
     const ax = Math.abs(x);

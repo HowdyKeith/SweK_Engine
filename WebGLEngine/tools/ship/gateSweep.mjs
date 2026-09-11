@@ -3767,6 +3767,47 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since229: Object.freeze({
+        at: "v4570", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/kernelAudit-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 0.30 s, under the 3000 ms budget. *** v4569 ASKED WHETHER ANYTHING WOULD NOTICE IF A " +
+                 "KERNEL IN THIS ARC WERE WRONG, AND THIS ROUND MEASURED IT. *** One behaviour-changing " +
+                 "mutation per kernel, twelve kernels, run against the arc's fourteen device-touching gates: " +
+                 "ELEVEN OF THIRTEEN applied mutations caught. *** AND EIGHT OF THOSE ELEVEN ARE PINNED BY " +
+                 "EXACTLY ONE ROW, IN THEIR OWN GATE *** -- LUMA, SHADING_SHIFT twice, RIDGE, YCOCG, " +
+                 "DISOCCLUSION twice. One row weakened anywhere in that list and the kernel behind it is " +
+                 "unpinned; that is not a defect today and it is the whole margin. THE TWO ZEROS WERE " +
+                 "FIXTURES UNABLE TO REACH THE THING, NOT GATES BEING LAX. *** FIRST: LANCZOS2'S SUPPORT " +
+                 "GUARD IS UNREACHABLE DEAD CODE. *** The resolve kernel's tap loop is 3x3 about round(s), so " +
+                 "the offsets it evaluates span [-1.5, 1.5] and the guard at |x| >= 2 is never reached -- " +
+                 "doubling it to 4.0 changed nothing anywhere. The module's own justification said a 3x3 " +
+                 "footprint was ENOUGH because Lanczos2 is zero beyond 2, and the arithmetic refutes that " +
+                 "flatly: Lanczos2 is NOT zero on [1.5, 2). MEASURED, the weight left unevaluated is 0.00% at " +
+                 "an integer offset, 1.47% at a quarter texel and 5.00% at a half -- 9.75% of the separable " +
+                 "2-D weight -- where a four-tap window leaves 0.00% at every phase. IN OUTPUT, resolving " +
+                 "64x64 to 128x128, the two footprints differ by up to 1.0% of the range on a smooth " +
+                 "sinusoid, 6.3% on a hard edge and 15.7% on a pixel-scale chequer. That is not a rounding " +
+                 "detail. *** THE FOOTPRINT IS NOT WIDENED: *** that moves every number " +
+                 "temporalResolve-selfcheck records and is a round of its own, and 3x3 is a legitimate choice " +
+                 "described as one. What was not legitimate was the justification, and that sentence is now " +
+                 "the measurement. Both mirrors take nine taps, so the device-parity row agrees on a " +
+                 "truncated Lanczos2 and can see none of this. *** SECOND: A PHASE TERM INVISIBLE AT THE " +
+                 "SPEED EVERY FIXTURE USES. *** v4569 pinned RING_FLOOR's window phase with a two-axis " +
+                 "sabotage; a one-axis version scored nothing. Two reasons, and the second is the keeper: at " +
+                 "a HALF-TEXEL speed f(1-f) is 0.2500 and the window form's constant is 0.25 -- the same " +
+                 "number. Measured, the two forms separate 4.77x at a tenth of a texel, 2.32x at a quarter " +
+                 "and 1.74x at a half, so a fixture running at half a texel cannot tell them apart however " +
+                 "many axes a sabotage touches, and half a texel is what almost every fixture in this arc " +
+                 "uses. The term also only appears on the RESOLVED branch, which v4569's separating edge has " +
+                 "none of. Six sabotages of this round's own work red at 3/8/2/2/2/5, no 0-RED; TE is the " +
+                 "one that matters, being exactly the mutation the audit found invisible, and it now scores " +
+                 "two. The audit harness itself is scratch and not a gate: the census it produced is a " +
+                 "snapshot and will rot like any record here that nothing re-takes.",
+    }),
     since228: Object.freeze({
         at: "v4569", swept: 1, green: 1, red: 0,
         added: Object.freeze([
