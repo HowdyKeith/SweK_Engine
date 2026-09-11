@@ -271,6 +271,30 @@ export const INSCOPE_ARRIVALS_SINCE_V4435 = Object.freeze([
     Object.freeze({ file: "physics/character/terrainWalk-selfcheck.mjs", at: "v4544",
         why: "its gate, which IMPORTS MeshBVH and trianglesFrom: the round's central cross-check runs a " +
              "bilinear heightfield gradient against a real meshBVH raycast and holds them to 4.8e-14" }),
+    Object.freeze({ file: "physics/character/groundProbe.mjs", at: "v4539",
+        why: "the fixtures that measure why terrain-controller piece (3) cannot be closed while piece (2) " +
+             "is open. It IMPORTS MeshBVH and trianglesFrom to build a bridge and a pillar of the same " +
+             "height and show every downward hit is identical at both -- so it carries the term in code, " +
+             "and it is a USER of the structure rather than one, the same distinction the two exclusions " +
+             "below draw for this module and its own gate" }),
+]);
+
+/**
+ * Arrivals since v4435 that land OUTSIDE the three searched directories.
+ *
+ * *** v4539 -- THIS LIST EXISTS BECAUSE ONE LIST WAS DOING TWO JOBS AND A MODULE-PLUS-GATE ROUND SPLIT THEM.
+ * *** INSCOPE_ARRIVALS_SINCE_V4435 fed both the in-scope membership row and the total-count arithmetic, which
+ * agree only while every arrival is in scope. v4539 added physics/character/groundProbe.mjs (in scope) and
+ * tools/ship/groundProbe-selfcheck.mjs (not), and there was no way to name the second one that left both rows
+ * green: in the arrivals list the membership row went red on a file that is not in scope, and out of it the
+ * count row went one short. That is not a wrong number, it is a field carrying two meanings, and the repair
+ * is a second list rather than a fudged total.
+ */
+export const OUTOFSCOPE_ARRIVALS_SINCE_V4435 = Object.freeze([
+    Object.freeze({ file: "tools/ship/groundProbe-selfcheck.mjs", at: "v4539",
+        why: "the gate of the round that measured why terrain-controller piece (3) cannot be closed while " +
+             "piece (2) is open. It reaches the ray-triangle BVH in top-level mesh/ through its module, " +
+             "which none of the three searched directories can see" }),
 ]);
 
 export const BVH_AT_V4435 = Object.freeze({
@@ -293,7 +317,16 @@ export const BVH_AT_V4435 = Object.freeze({
     outOfScope: Object.freeze([
         "mesh/meshBVH.mjs", "multiplayer/wadLevelHost.js", "tools/krbn/krbnCompare.js",
         "tools/roundhouse/neighbourBenchBind-selfcheck.mjs", "tools/roundhouse/neighbourBenchBind.mjs",
-        "tools/ship/box3dRay-selfcheck.mjs", "tools/ship/meshBVH-selfcheck.mjs",
+        "tools/ship/box3dRay-selfcheck.mjs",
+        // *** v4539 -- ONE ARRIVAL, NAMED: tools/ship/groundProbe-selfcheck.mjs, IN SORTED POSITION. *** The
+        // gate of the round that measured why terrain-controller piece (3) cannot be closed while piece (2)
+        // is open. It reaches the ray-triangle BVH in top-level mesh/ through
+        // physics/character/groundProbe.mjs, which none of the three searched directories can see, so it
+        // lands here as the nine before it did. Its MODULE is in physics/ and is named in
+        // INSCOPE_ARRIVALS_SINCE_V4435 instead: one file to each list is what a module-plus-gate round looks
+        // like against this claim, and the two lists are compared SORTED, so position is not decoration.
+        "tools/ship/groundProbe-selfcheck.mjs",
+        "tools/ship/meshBVH-selfcheck.mjs",
         "tools/ship/splatMesh-selfcheck.mjs", "ui/webrtxBrowser.js",
     ]),
     // 2. IN THE SEARCHED DIRECTORIES AND SUMMARISED AWAY. bvhNeighbours is a Morton BVH; the bakeoff is the

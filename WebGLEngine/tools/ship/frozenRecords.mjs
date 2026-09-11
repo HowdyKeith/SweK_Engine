@@ -469,7 +469,9 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4538 -- RE-TAKEN with `excluding`: 108/49/209 -> 109/50/212, the one new record and its three
     // counted fields, plus this module's own two and their twenty.
     // v4538 -- RE-TAKEN with `excluding`: 109/50/212 -> 110/51/218.
-    currentIncludingModule: Object.freeze({ records: 110, withFields: 51, fields: 218 }),
+    // v4539 -- RE-TAKEN with `excluding`: 110/51/218 -> 111/52/226.
+    // v4539 -- RE-TAKEN with `excluding`: 111/52/226 -> 112/52/226.
+    currentIncludingModule: Object.freeze({ records: 112, withFields: 52, fields: 226 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -534,7 +536,11 @@ export const PROBE_AT_V4536 = Object.freeze({
     // values are decimals with a trailing comment or a signed number, so they do not match. Stated rather
     // than left for the next re-take to wonder at, the way v4566 and v4578 stated their own misses.
     // v4538 -- RE-TAKEN AT THE MERGE: 107/48/192 -> 108/49/198. Both lines again.
-    excluding: Object.freeze({ records: 108, withFields: 49, fields: 198 }),
+    // v4539 -- RE-TAKEN: 108/49/198 -> 109/50/206. One record, PROBE_AT_V4539 in
+    // physics/character/groundProbe.mjs.
+    // v4539 -- RE-TAKEN AGAIN: 109/50/206 -> 110/50/206, for OUTOFSCOPE_ARRIVALS_SINCE_V4435, the second
+    // list this round had to split out of the first. A repair to a record IS a record.
+    excluding: Object.freeze({ records: 110, withFields: 50, fields: 206 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,

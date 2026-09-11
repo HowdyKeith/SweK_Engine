@@ -279,8 +279,10 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // round; every number here is re-derived from the merged tree and never summed from the two notes.
     // v4538 -- RE-TAKEN for tools/ship/pathCost-selfcheck.mjs: 1627 -> 1628 and the three rows that follow
     // a gate by one. distinctDefinitions holds at 40 for the eleventh round running.
-    gates: 1628, usesOk: 1607, definesOk: 1599, importsOk: 0,
-    distinctDefinitions: 40, nameFirst: 1500, condFirst: 91, unknownSignature: 16,
+    // v4539 -- RE-TAKEN for tools/ship/groundProbe-selfcheck.mjs: 1628 -> 1629 and the three rows that follow
+    // a gate by one.
+    gates: 1629, usesOk: 1608, definesOk: 1600, importsOk: 0,
+    distinctDefinitions: 40, nameFirst: 1501, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

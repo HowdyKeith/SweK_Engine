@@ -222,7 +222,9 @@ export const REACH_AT_V4548 = Object.freeze({
     // v4537 -- RE-TAKEN AT THE MERGE: 106 -> 108, the two records this branch added.
     // v4538 -- RE-TAKEN: 108 -> 109, one record, COST_AT_V4538 in nav/pathCost.mjs.
     // v4538 -- RE-TAKEN AT THE MERGE: 107 -> 110. Both lines added records in the same window again.
-    total: 110,
+    // v4539 -- RE-TAKEN: 110 -> 111, one record, PROBE_AT_V4539.
+    // v4539 -- RE-TAKEN AGAIN: 111 -> 112, for the second arrivals list.
+    total: 112,
     // *** READ OFF THE INSTRUMENT, NOT PREDICTED. *** The first draft of this record guessed 53/21/19/40 from
     // which gates the round had sped up, and was wrong on three of the four: the comment-strip fix below
     // moved two records the other way at the same time, and a guess cannot see two changes at once.
@@ -349,7 +351,9 @@ export const UNGUARDED_SPLIT_V4577 = Object.freeze({
     // v4538 -- RE-TAKEN: 108 -> 109 records, unguarded 10 -> 11, still all DOCUMENTARY. COST_AT_V4538 is
     // named by its gate's prose and not by its code, which is what documentary means here.
     // v4538 -- RE-TAKEN AT THE MERGE: 107 -> 110 records, unguarded 9 -> 11, all DOCUMENTARY.
-    structural: Object.freeze({ total: 110, unguarded: 11, documentaryOfThose: 11, readByCodeOfThose: 0 }),
+    // v4539 -- RE-TAKEN: 110 -> 111 records, unguarded 11 -> 11, all DOCUMENTARY.
+    // v4539 -- RE-TAKEN AGAIN: 111 -> 112 records, unguarded 11 -> 11.
+    structural: Object.freeze({ total: 112, unguarded: 11, documentaryOfThose: 11, readByCodeOfThose: 0 }),
     // BEFORE, on the tree this round opened on:
     before: Object.freeze({ total: 104, checked: 72, overBudget: 20, unmeasured: 0, unguarded: 12, unchecked: 32 }),
     // AFTER, as one reading rather than as a constant -- see the note above. Taken with the round's own

@@ -3764,6 +3764,28 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    // v4539 -- THE 233rd CLOSING, for the gate this round added.
+    since233: Object.freeze({
+        at: "v4539", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/groundProbe-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly: 6 pass, 77 ms. *** PIECE (3) OF terrain-controller CANNOT BE " +
+                 "CLOSED WHILE PIECE (2) IS OPEN, AND THAT IS A PROOF. *** An overhang really does read as a " +
+                 "wall -- the body stops at x=8.0000 on a covered walkway, refused by the STEP test and not " +
+                 "the slope test the entry's wording points at. But casting from the body's own height opens " +
+                 "the walkway to 20.0000 AND WALKS THROUGH A SOLID PILLAR to 20.0000, where the shipped " +
+                 "oracle correctly stops at 8.0000. Build the pillar to the roof's height and every surface " +
+                 "under a vertical ray is [5, 0] at both: BYTE-IDENTICAL, because a downward ray never " +
+                 "touches a side face and the side faces are the whole difference between a doorway and a " +
+                 "wall. The missing information is in the swept volume, which is piece (2). The entry also " +
+                 "points at an adapter with NO shipping caller while the live instance -- surfaceProbe's " +
+                 "standHeightAt, read by the bot manager and the pathfinder pool -- answers 21 for a body " +
+                 "standing at y=1. Sabotages A/B/C/D red by name, and TWO of them went 0 RED first: B " +
+                 "because deleting a side quad cannot move a number a downward ray produced (the row was " +
+                 "checking the thesis with the instrument the thesis calls blind, and is a horizontal ray " +
+                 "now), and C because I had the nudge backwards -- 0 works and 6 breaks it, the hazard being " +
+                 "a nudge too LARGE to stay above the next surface rather than too small to leave the last.",
+    }),
     // v4538 -- THE 232nd CLOSING, for the gate this round added.
     since232: Object.freeze({
         at: "v4538", swept: 1, green: 1, red: 0,
