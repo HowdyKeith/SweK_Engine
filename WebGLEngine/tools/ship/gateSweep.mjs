@@ -33,6 +33,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { toPosix } from "./posixAssumption.mjs";
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -4039,6 +4040,19 @@ export function repairsAgainst(baselineRed, confirmedRed) {
 }
 
 /** Every runnable gate file in the tree, sorted, so two boxes sweep the same population in the same order. */
+// v4613 -- *** THE ONE CALLER OF path.relative THAT posixAssumption.mjs'S OWN COUNT MISSED, AND THE ONE THAT
+// MATTERED MOST. *** posixAssumption.mjs found 90 unnormalised path.relative call sites and explicitly
+// declined to call them all defects -- "a relative path that is only ever printed is fine on any platform,
+// and the ones that bite are those compared against a stored '/' form." This is exactly that case, and this
+// file is the ONE population every red-register comparison in the tree is keyed against. On Windows,
+// path.relative returns backslashes; redCensus.mjs's registers are literal "a/b.mjs" strings; Map.has() does
+// exact string comparison. So EVERY gate already known red -- not a new regression, just already on record --
+// came back as a "NEW RED" the first time this sweep ran end to end on a real Windows box, because
+// "tools\\ship\\x.mjs" never equals "tools/ship/x.mjs" no matter how long it has been registered. Confirmed by
+// running two of the reported "new" reds (boundaryLint, wiringClaims) here, on Linux, on the same commit --
+// both are real, pre-existing, ALREADY-REGISTERED reds, misreported only by the separator. toPosix() is the
+// exact helper this tree already uses in 30+ other files for this exact reason; the fix is that this file
+// join(s the convention instead of being the one population-defining exception to it.
 export function enumerateGates(root = ENG) {
     const out = [];
     const skip = new Set(["node_modules", ".git", ".claude", "vendor"]);
@@ -4061,7 +4075,7 @@ export function enumerateGates(root = ENG) {
             // ship-time check can have. gateActivity's own comment already states the rule -- "a gate that
             // leaves a gate behind would grow the population it measures" -- and no caller needs a fixture
             // to be DISCOVERED: gateActivity passes its own path in explicitly.
-            else if (e.name.endsWith("-selfcheck.mjs") && !e.name.startsWith("__")) out.push(path.relative(root, full));
+            else if (e.name.endsWith("-selfcheck.mjs") && !e.name.startsWith("__")) out.push(toPosix(path.relative(root, full)));
         }
     })(root);
     return out.sort();
