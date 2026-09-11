@@ -3767,6 +3767,47 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since228: Object.freeze({
+        at: "v4569", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/ringFloorDevice-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 1.45 s, under the 3000 ms budget. *** THE KERNEL AND THE MIRROR HAD BECOME DIFFERENT " +
+                 "FUNCTIONS AND THE PARITY ROW COULD NOT TELL. *** RING_FLOOR_WGSL was written at v4562 and " +
+                 "four rounds of corrections landed on the CPU mirror alone: v4564's WINDOW phase, v4565's " +
+                 "RING TERM on the step branch, v4566's DISPLACEMENT GATE. (v4562's arithmetic floor DID " +
+                 "reach the kernel -- this round's own closing said it had not, and the kernel says " +
+                 "otherwise; v4568's quantiles are a reduction the kernel does not do at all.) " +
+                 "ringFloorPerspective's parity row went on passing, and HONESTLY: it drives the FRAME form " +
+                 "on both sides and the kernel implemented that correctly. What it could not say is that the " +
+                 "window form -- the one v4563 onward actually spends per pixel -- had NO device coverage " +
+                 "whatsoever. A parity row is only as wide as the configurations it runs. The kernel now " +
+                 "carries all three, reading the ring from device memory where RING_PUSH_WGSL already wrote " +
+                 "it, and is pinned on an EDGE that has swept past -- where the window form reads 3.2e+6x " +
+                 "the frame form at its worst pixel, so a lagging kernel FAILS rather than passes. On a " +
+                 "chequer the two forms are far closer, which is exactly the fixture that would have let it " +
+                 "through. *** THE TOLERANCE IS ONE ULP OF WHAT IS BEING DIFFERENCED, DERIVED RATHER THAN " +
+                 "PICKED: *** the ring term is |newer mean - older mean|, and on the flat side of an edge " +
+                 "those are the SAME NUMBER -- measured as exactly 0.00e+0 in f64 across a run of pixels, " +
+                 "whose floor is therefore the arithmetic floor. In f32 the difference leaves one epsilon of " +
+                 "residue, so a RELATIVE comparison reads 8.3e-4 and means nothing; the absolute worst is " +
+                 "5.96e-8 against f32's own 2.19e-7, half an ulp. Eight sabotages red at 4/2/3/2/3/3/3/5. SA " +
+                 "restores exactly what the kernel was when the round started and scores four, where before " +
+                 "this gate it scored nothing. *** SC AND SD BOTH WENT 0-RED AND BOTH WERE HOLES IN THIS " +
+                 "GATE'S OWN FIXTURES -- the same shape as the defect the round is about. *** SC drops the " +
+                 "displacement gate: the still case paired a still motion buffer with a ring built WITHOUT " +
+                 "motion, so the difference was already zero and there was nothing to refuse; it now pairs a " +
+                 "MOVING ring with a still buffer, the only combination where the gate is visible. SD applies " +
+                 "the ring term on the resolved branch: an edge is 0% resolved-branch pixels and a chequer " +
+                 "nearly so, so neither can show a term leaking onto a branch they do not have -- a smooth " +
+                 "sinusoid is 96% resolved and shows it at once. Also: the kernel gained a fifth binding, and " +
+                 "two older device gates had to bind the ring they do not read, since a declared binding must " +
+                 "still be bound. And the nested-backtick trap bit for the THIRD time this session -- a " +
+                 "backtick inside a WGSL comment closes the JS template literal the kernel lives in; the file " +
+                 "now says so and a row counts them.",
+    }),
     since227: Object.freeze({
         at: "v4568", swept: 1, green: 1, red: 0,
         added: Object.freeze([

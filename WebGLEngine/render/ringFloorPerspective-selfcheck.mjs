@@ -309,8 +309,11 @@ const skip = webgpuSkipReason();
 if (skip) { console.log(`  SKIP  ${skip}`); report("*** NOT A PASS. *** Sections 1-5 are CPU only; nothing above has run a kernel."); fails++; }
 else {
     const est = ringFloorCPU(SC.luma, SC.motion, W, H, P);
+    // the kernel gained a fifth binding at v4569 -- the ring, which its window form reads. This section
+    // drives the FRAME form, which does not read it, and a declared binding must still be bound.
     const r = await runInEngineOrigin({ engineRoot: ENG, args: { W, H, P, tau: 0.25,
-        luma: Array.from(SC.luma), motion: Array.from(SC.motion) }, script: `async (a) => {
+        luma: Array.from(SC.luma), motion: Array.from(SC.motion),
+        ring: Array.from(SC.lu.ring) }, script: `async (a) => {
         const { requestDevice } = await import("/gfx/device.js");
         const { RING_FLOOR_WGSL } = await import("/render/ringFloorWgsl.mjs");
         const cv = document.createElement("canvas"); cv.width = 8; cv.height = 8;
@@ -323,6 +326,7 @@ else {
         new Float32Array(ub, 16, 4).set([a.tau, 0, 0, 0]);
         p.bind("luma", dev.buffer({ data: new Float32Array(a.luma), usage: ["storage"] }))
          .bind("motion", dev.buffer({ data: new Float32Array(a.motion), usage: ["storage"] }))
+         .bind("ring", dev.buffer({ data: new Float32Array(a.ring), usage: ["storage"] }))
          .bind("dst", dst).bind("u", dev.buffer({ data: new Uint32Array(ub), usage: "uniform" }));
         dev.frame(({ pass }) => { pass.dispatch(p, [Math.ceil(a.W / 8), Math.ceil(a.H / 8)]); pass.clear([0,0,0,1]); }, { offscreen: true });
         return { dst: Array.from(new Float32Array(await dev.read(dst))), errs, backend: dev.backend };

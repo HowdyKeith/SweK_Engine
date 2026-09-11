@@ -1633,7 +1633,8 @@
   "render/ringFloorStep-selfcheck.mjs": 405,
   "render/ringFloorLight-selfcheck.mjs": 411,
   "render/ringFloorYaw-selfcheck.mjs": 278,
-  "render/ringFloorStat-selfcheck.mjs": 418
+  "render/ringFloorStat-selfcheck.mjs": 418,
+  "render/ringFloorDevice-selfcheck.mjs": 1454
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -3265,7 +3266,8 @@
   "render/ringFloorStep-selfcheck.mjs": 0,
   "render/ringFloorLight-selfcheck.mjs": 0,
   "render/ringFloorYaw-selfcheck.mjs": 0,
-  "render/ringFloorStat-selfcheck.mjs": 0
+  "render/ringFloorStat-selfcheck.mjs": 0,
+  "render/ringFloorDevice-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-08T20:46:53.412Z",
@@ -4897,7 +4899,8 @@
   "render/ringFloorStep-selfcheck.mjs": "2026-09-11T07:20:00.000000Z",
   "render/ringFloorLight-selfcheck.mjs": "2026-09-11T09:10:00.000000Z",
   "render/ringFloorYaw-selfcheck.mjs": "2026-09-11T10:40:00.000000Z",
-  "render/ringFloorStat-selfcheck.mjs": "2026-09-11T12:10:00.000000Z"
+  "render/ringFloorStat-selfcheck.mjs": "2026-09-11T12:10:00.000000Z",
+  "render/ringFloorDevice-selfcheck.mjs": "2026-09-11T13:40:00.000000Z"
  },
  "crossings": {
   "tools/roundhouse/knobPromotions-selfcheck.mjs": 2,

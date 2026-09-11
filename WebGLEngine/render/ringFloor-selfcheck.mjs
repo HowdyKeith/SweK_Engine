@@ -279,7 +279,10 @@ else {
     // smooth content at an integer speed cannot see the defects that matter
     const cases = ["chequer", "smooth"].map((n) => ({ n, q: SW[`${n}:8`] }));
     const r = await runInEngineOrigin({ engineRoot: ENG, args: { W, H, P, tau: RESOLUTION_TAU,
-        cases: cases.map((c) => ({ luma: Array.from(c.q.luma), motion: Array.from(c.q.motion) })) }, script: `async (a) => {
+        // the kernel gained a fifth binding at v4569 -- the ring, which its WINDOW form reads. This section
+        // drives the FRAME form, which does not read it, and a declared binding must still be bound.
+        cases: cases.map((c) => ({ luma: Array.from(c.q.luma), motion: Array.from(c.q.motion),
+                                   ring: Array.from(c.q.lu.ring) })) }, script: `async (a) => {
         const { requestDevice } = await import("/gfx/device.js");
         const { RING_FLOOR_WGSL } = await import("/render/ringFloorWgsl.mjs");
         const cv = document.createElement("canvas"); cv.width = 8; cv.height = 8;
@@ -292,7 +295,8 @@ else {
             const ub = new ArrayBuffer(32);
             new Uint32Array(ub, 0, 4).set([a.W, a.H, a.P, 0]);
             new Float32Array(ub, 16, 4).set([a.tau, 0, 0, 0]);
-            p.bind("luma", dev.buffer({ data: new Float32Array(c.luma), usage: ["storage"] }))
+            p.bind("ring", dev.buffer({ data: new Float32Array(c.ring), usage: ["storage"] }))
+             .bind("luma", dev.buffer({ data: new Float32Array(c.luma), usage: ["storage"] }))
              .bind("motion", dev.buffer({ data: new Float32Array(c.motion), usage: ["storage"] }))
              .bind("dst", dst).bind("u", dev.buffer({ data: new Uint32Array(ub), usage: "uniform" }));
             dev.frame(({ pass }) => { pass.dispatch(p, [Math.ceil(a.W / 8), Math.ceil(a.H / 8)]); pass.clear([0,0,0,1]); }, { offscreen: true });
