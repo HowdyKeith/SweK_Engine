@@ -3767,6 +3767,43 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since227: Object.freeze({
+        at: "v4568", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/ringFloorStat-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 0.42 s, under the 3000 ms budget. *** THE NUMBER THIS ARC HAS REPORTED SINCE v4560 IS " +
+                 "AN ORDER STATISTIC, AND IT MOVES THE WRONG WAY WHEN THE PICTURE IMPROVES. *** ringFloorCPU's " +
+                 "headline is `worst`, a MAX over the frame, and every floor published in this arc is one -- " +
+                 "v4559's 8.6e-1, v4562's 24x, v4564's ladder, v4567's yaw comparison. A max over N samples " +
+                 "grows with N whether or not the thing measured has changed: on ONE FIXED FRAME, the max over " +
+                 "a random subset of its pixels reads 44% of the all-pixel max at N = 64, 77% at 256, 93% at " +
+                 "1024 and 100% at 3673, while the MEDIAN over the same pixels does not move. *** AND IN A REAL " +
+                 "RESOLUTION CHANGE THE TWO EFFECTS CANCEL: *** sampling the same scene three times finer cuts " +
+                 "the typical pixel's floor 11x, 3.4e-3 to 3.1e-4, which is v4559's quadratic law doing exactly " +
+                 "what it should -- and over the same four runs `worst` stays flat at 3.6e-2 to 4.4e-2, while " +
+                 "the ESTIMATE's worst RISES 1.07 to 1.60. A caller watching the headline would conclude the " +
+                 "frame got worse where it got eleven times better. `worst` is still the only one of these " +
+                 "that is a BOUND and it is kept unchanged; what is added is the distribution underneath it, " +
+                 "so a caller can tell \"this frame is bad\" from \"this frame has a horizon\". *** BY " +
+                 "HISTOGRAM, NOT BY SORT, AND THE DIFFERENCE IS PRICED: *** a full sort of the per-pixel field " +
+                 "costs 68-72% of the estimator's own run at 128x128 through 512x512 -- it would nearly double " +
+                 "the floor's price -- where a 1024-bucket log-scale histogram costs 15.6-18.7%, about 1.2% of " +
+                 "a frame against v4561's measurement of the estimator at 7.6% of the ring push. The bucket " +
+                 "width BOUNDS the error rather than a tolerance being chosen: over a dynamic range R it is " +
+                 "R^(1/1024) - 1, which reads 1.62% on this frame and is matched to within 0.83% by an exact " +
+                 "sort at p50, p90 and p99. An empty field returns NULL quantiles rather than zeros, and a " +
+                 "flat one returns the value its pixels hold with zero error. Eight sabotages red at " +
+                 "1/1/2/2/1/1/1/1 against six gates. *** TWO WENT 0-RED AND BOTH WERE ROWS OF MINE CHECKING " +
+                 "THE WRONG THING. *** RE hard-codes the stated error to 1.62% and passed, because the section " +
+                 "measured exactly ONE field and 1.62% is its true answer -- a derived number and a constant " +
+                 "are indistinguishable when there is only one case; it is now checked against the bucket " +
+                 "formula applied to each field's own observed range, on two fields whose ranges differ. RH " +
+                 "returns zero for a flat field and passed a row asserting `p50 !== null`, because zero is not " +
+                 "null -- a check on the shape of the answer where the claim was about its value.",
+    }),
     since226: Object.freeze({
         at: "v4567", swept: 1, green: 1, red: 0,
         added: Object.freeze([
