@@ -287,8 +287,8 @@ const uCode = codeOnly(sysadmin), rCode = codeOnly(runBusy);
     const req = (await import("node:module")).createRequire(pathToFileURL(path.join(ENG, "ai-bridge", "x.js")).href);
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "swek-updpause-"));
     fs.writeFileSync(path.join(dir, "SweK_Engine_v4600.zip"), Buffer.alloc(200 * 1024, 7));
-    const sys = req("./sysadminBridge.js"), rb = req("./runBusy.js");
-    const realActive = rb.active;
+    const sys = req("./sysadminBridge.js"), rb = req("./runBusy.js"), rh = req("./releaseHold.js");
+    const realActive = rb.active, realReleaseHoldRunning = rh.running;
     try {
         rb.active = () => ({ active: true, what: "the source chain (verifying)" });
         const auto = await sys.updateCheck(true, { silent: true, dir });
@@ -310,13 +310,24 @@ const uCode = codeOnly(sysadmin), rCode = codeOnly(runBusy);
             "the poller calls updateCheck(false) when autoApply is off; deferring the report would hide a " +
             "waiting build behind unrelated work");
         rb.active = realActive;
+        // v4614 -- *** THIS ROW RUNS AS A CHILD OF verify.mjs's OWN QUICK SWEEP, WHICH IS ITSELF A RELEASE BUILD
+        // IN PROGRESS. *** releaseHold.js (a runBusy.js runner since v4612) answers "is a release build running
+        // on this machine" from a lock file, not from this test's rb.active stub -- so restoring rb.active alone
+        // does not produce an idle machine when the process asking is a gate spawned BY verify.mjs, which holds
+        // that exact lock for its whole run. Found by reproducing Keith's Windows report here: the row failed
+        // ONLY when nested inside a real release hold, not when this file runs standalone, which is precisely
+        // how it reached him. Stubbed the same way rb.active already is, for the same reason: an "idle" fixture
+        // has to fake EVERY runner an off state, not just the one this test happens to control directly.
+        rh.running = () => false;
         const idle = await sys.updateCheck(true, { silent: true, dir });
+        rh.running = realReleaseHoldRunning;
         ok("!! *** and with NOTHING running it does not defer -- the guard has an off state ***",
             !!idle && idle.deferred !== true,
             "a deferral that never lifts is an updater that never runs, which is the same outage wearing a " +
             "politer word");
     } finally {
         rb.active = realActive;
+        rh.running = realReleaseHoldRunning;
         try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
     }
 }
