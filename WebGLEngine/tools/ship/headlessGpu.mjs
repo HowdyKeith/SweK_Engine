@@ -181,14 +181,27 @@ export function resolveWebgpu(requireFn) {
 /**
  * Why a caller cannot run, or null when it can. Two independent facts reported on their own evidence rather
  * than collapsed into one guess -- browserSkipReason's rule, for the same reason it exists there.
+ *
+ * v4616 -- *** THE VULKAN-DRIVER REQUIREMENT WAS APPLIED TO EVERY PLATFORM, AND IT ONLY HOLDS ON ONE OF
+ * THEM. *** Measured directly on Keith's Windows rig: mod.create([]).requestAdapter() with NO Vulkan ICD
+ * configured anywhere and VK_ICD_FILENAMES unset returns a REAL adapter and a REAL device. Dawn's default
+ * backend on win32 is D3D12 (macOS: Metal); neither needs SwiftShader or a Vulkan manifest at all -- that
+ * whole discovery mechanism exists because Linux Dawn has ONLY a Vulkan backend, and most Linux CI/sandbox
+ * boxes have no real Vulkan-capable driver, which is exactly what the SwiftShader software fallback answers.
+ * So this function was refusing to even attempt requestAdapter() on Windows, based on a requirement Windows
+ * does not have. The refusal is now Linux-only; win32 and darwin trust node-webgpu's own default adapter
+ * selection rather than second-guessing it with a Linux-shaped check.
  */
 export function headlessGpuSkipReason(requireFn) {
     const { mod } = resolveWebgpu(requireFn);
+    if (!mod) {
+        const icds = process.platform === "linux" ? findVulkanIcdsAnyRoot() : [];
+        if (icds.length) return "node-webgpu is not installed here -- `npm i -g webgpu` (a Vulkan ICD IS present at " + icds[0] + ")";
+        return "node-webgpu did not resolve (tried: " + WEBGPU_PATHS.join(", ") + ")" +
+               (process.platform === "linux" ? ", and no Vulkan ICD was found under " + icdRoots().join(", ") + " either" : "");
+    }
+    if (process.platform !== "linux") return null;   // D3D12 (win32) and Metal (darwin) need no ICD at all
     const icds = findVulkanIcdsAnyRoot();
-    if (!mod && !icds.length)
-        return "neither node-webgpu (tried: " + WEBGPU_PATHS.join(", ") + ") nor a Vulkan ICD under " + icdRoots().join(", ");
-    if (!mod)
-        return "node-webgpu is not installed here -- `npm i -g webgpu` (a Vulkan ICD IS present at " + icds[0] + ")";
     if (!icds.length && !process.env.VK_ICD_FILENAMES)
         return "node-webgpu resolved but there is no Vulkan driver: no " + ICD_LEAVES.join(" or ") + " under " +
                icdRoots().join(", ") + " and VK_ICD_FILENAMES is unset. Dawn will report 'Found no drivers!'";
