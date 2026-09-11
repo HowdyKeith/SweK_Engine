@@ -361,6 +361,61 @@ const uCode = codeOnly(sysadmin), rCode = codeOnly(runBusy);
         "than trusted as a click");
 }
 
+// --- 10. *** A GATE-SPAWNED server.js WAS RUNNING THIS BOX'S REAL UPDATE-APPLY, NOT A DOUBLE'S *** -------------
+//
+// v4611. galaxyProfile-selfcheck.mjs and verifiedPolygonIntersection-selfcheck.mjs each boot a REAL
+// ai-bridge/server.js child (on its own dedicated port) to drive a real headless browser against a real bridge --
+// and every one of those boots called sysadminBridge.start() with nothing to say "this is disposable". start()'s
+// boot scan reads the SAME machine-wide ~/.voxelbridge/sysadmin.json a real SweK does and, independent of the
+// `enabled` flag, APPLIES a waiting Downloads zip for real whenever cfg.update.autoApply is on -- extracting a
+// build and spawning a launcher via `cmd /c start`, a real visible window, from a process whose only job was to
+// answer a few HTTP requests for a test. Keith, watching this happen while running `node tools/ship/verify.mjs`
+// BY HAND IN A TERMINAL -- nowhere near the browser-driven Clone & Verify flow the earlier sections in this file
+// are about -- correctly guessed the mechanism before this section existed: "I bet when it gets to 1400 about,
+// it will launch a SweK." It did, because nothing here ever distinguished a gate's throwaway child from the
+// real thing.
+//
+// *** WHY THIS IS STRUCTURAL, NOT BEHAVIOURAL, LIKE SECTION 8. *** start()'s five side-effecting blocks
+// (login-autostart, the poller, the autoFetch boot-pull, the boot-scan apply, autoRemoveOld's prune) are ALL
+// individually gated `isWin || isMac` inside sysadminBridge.js itself -- correctly, since none of them make
+// sense on the Linux boxes gates run on. That means this sandbox cannot drive any of the five to fire AT ALL,
+// with or without the fix, so a behavioural row here would be exercising nothing. What IS platform-independent
+// and provably testable is the ONE thing that matters: that SWEK_TEST_SERVER's early return sits BEFORE every
+// one of those five blocks in source order, so on the platforms where they DO fire, none of them can.
+{
+    const startFn = (uCode.match(/function start\(\)\{[\s\S]*?\n\}/) || [""])[0];
+    ok("!! start() checks SWEK_TEST_SERVER and returns before doing anything else",
+        /function start\(\)\{\s*if\s*\(process\.env\.SWEK_TEST_SERVER\)\s*\{[\s\S]{0,200}return;\s*\}/.test(startFn),
+        "the guard has to be the FIRST statement in the function body -- a guard placed after even one " +
+        "side-effecting call would still let that one call fire");
+    const guardEnd = startFn.indexOf("return;");
+    ok("!! and EVERY side-effecting call in start() sits AFTER that return, not just the ones that inspired it", (() => {
+        if (guardEnd < 0) return false;
+        const after = startFn.slice(guardEnd);
+        const before = startFn.slice(0, guardEnd);
+        const calls = ["loginAutostartSet(true)", "startUpdatePoller()", "githubPull(false)", "updateCheck(", "pruneOldVersions("];
+        return calls.every((c) => after.includes(c)) && calls.every((c) => !before.includes(c));
+    })(), "login-autostart, the poller, the autoFetch pull, the boot-scan apply, and the old-version prune -- all five, not a subset");
+
+    ok("!! SWEK_TEST_SERVER is a real env-var check, not a comment claiming one",
+        /process\.env\.SWEK_TEST_SERVER/.test(uCode), "codeOnly() strips comments, so this cannot pass on prose alone");
+
+    for (const [file, label] of [["galaxyProfile-selfcheck.mjs", "galaxyProfile"], ["verifiedPolygonIntersection-selfcheck.mjs", "verifiedPolygonIntersection"]]) {
+        // noComments, not codeOnly -- the value inside the string is exactly what is under test here (a truthy
+        // "1", not an empty string that would fail the guard's own `if (process.env.SWEK_TEST_SERVER)` check),
+        // and codeOnly() blanks string CONTENT by design, which would make this check pass on "" just as readily.
+        const src = noComments(fs.readFileSync(path.join(ENG, "tools", "ship", file), "utf8"));
+        ok("!! " + label + "-selfcheck.mjs's spawned server.js carries SWEK_TEST_SERVER in its env",
+            /SWEK_TEST_SERVER:\s*"1"/.test(src),
+            "the two known real-server spawners, so a future third one is the thing left to catch by review, not by this gate");
+    }
+}
+// *** WHAT IS STILL NOT COVERED, SAID PLAINLY. *** No gate here proves the Windows apply path is actually
+// suppressed end to end -- that needs a Windows box with a real Downloads zip and cfg.update.autoApply on,
+// which is exactly the rig-only shape this file's other sections already admit to at their own edges. What IS
+// proven is that the return is unconditionally first and every guarded call is unconditionally after it, which
+// makes the platform gates inside those calls redundant rather than load-bearing for this specific claim.
+
 console.log("updatePause-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));
 process.exit(fails ? 1 : 0);
 

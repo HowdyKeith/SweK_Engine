@@ -1034,7 +1034,30 @@ function setConfig(patch){
     saveCfg(); startUpdatePoller();
     return getConfig();
 }
+// v4611 -- A GATE-SPAWNED server.js WAS RUNNING THIS PROCESS'S REAL UPDATE-APPLY AND REGISTRY-AUTOSTART LOGIC.
+// galaxyProfile-selfcheck.mjs and verifiedPolygonIntersection-selfcheck.mjs each boot a REAL ai-bridge/server.js
+// child on its own dedicated port to drive a real browser against a real bridge -- and every one of those boots
+// called THIS function, unconditionally, because there was no way to say "this instance is a disposable test
+// double, not a machine anyone should treat as real". start()'s bootScan reads the SAME machine-wide
+// ~/.voxelbridge/sysadmin.json a real, user-facing SweK does, and (independent of the `enabled` flag -- see the
+// v1516 comment on that block) APPLIES a waiting Downloads zip for real whenever cfg.update.autoApply is on,
+// extracting a build and spawning a launcher via `cmd /c start` -- a real, visible window, from a process whose
+// only job was to answer a few HTTP requests for a headless-browser test. loginAutostart's Run-key rewrite is
+// the same shape of bug: a throwaway test boot has no business repointing the user's real login-autostart entry
+// at a git-cloned temp tree. Keith, watching this happen while running `node tools/ship/verify.mjs` by hand in a
+// terminal: "I bet when it gets to 1400 about, it will launch a SweK" -- and it did, because nothing here ever
+// distinguished a gate's disposable child from the real thing.
+//
+// SWEK_TEST_SERVER is the escape hatch, checked ONCE, here, rather than threaded into every side-effecting block
+// below separately -- a flag that only some of five blocks honoured would still fire the other four. Set by the
+// SPAWNER, not inferred from PORT or any other heuristic: a real user is entitled to run a real SweK on a
+// non-default port (see nextRounds.mjs's task on wiring cfg.port through to the launcher), and inferring
+// "test" from an unusual port would misfire on exactly that legitimate case.
 function start(){
+    if (process.env.SWEK_TEST_SERVER) {
+        log("SWEK_TEST_SERVER set -- skipping update poller, boot scan, login-autostart rewrite and old-version pruning (this instance answers HTTP only)");
+        return;
+    }
     if (cfg.keepAwake) { try { keepAwake(true); } catch {} }   // re-assert across restarts
     // v2514 -- DO NOT DELETE THE FLAG HERE. This line was the other half of the auto-update race, and it is the
     // reason an update ends with the old window printing "exited with code -1" and sitting on a pause forever:
