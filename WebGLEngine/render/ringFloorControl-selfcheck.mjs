@@ -66,7 +66,8 @@ const F = [];
         // *** THE ORACLE: the error actually present, not a bound on it. ***
         const oracle = new Float32Array(W * H);
         for (let i = 0; i < W * H; i++) oracle[i] = Math.abs(mean[i] - truth[i]);
-        const eW = ringFloorCPU(L, m, W, H, P, undefined, "window"), eF = ringFloorCPU(L, m, W, H, P);
+        // the window form now takes the ring, because its step branch reads the history (v4565)
+        const eW = ringFloorCPU(L, m, W, H, P, undefined, "window", lu), eF = ringFloorCPU(L, m, W, H, P);
         pushFloor(poolW, eW.per, "window"); pushFloor(poolF, eF.per, "frame"); pushFloor(poolO, oracle, "window");
         if (f < 2 * P + 2) continue;
         const opt = { contrast: CONTRAST, phase: "window" };
@@ -180,8 +181,13 @@ console.log("\n3. *** THE ESTIMATOR WAS NEVER A BOUND PER PIXEL, AND v4563 SPENT
     ok(`*** and the repair is to take the phase factor's maximum, 0.25, instead of this frame's: from ${(fr.under * 100).toFixed(0)}% down to ${(wi.under * 100).toFixed(2)}% -- ${tayU + stpU} pixels in ${nT + nS}, split ${tayU} on the Taylor branch and ${stpU} on the step ***`,
         wi.under < 0.002 && wi.under < fr.under / 50,
         `window ${(wi.under * 100).toFixed(3)}% vs frame ${(fr.under * 100).toFixed(1)}%`);
-    ok(`  and the residue is not a systematic hole: it is split across both branches, so it is the CURVATURE surrogate (D2max + D3 standing in for f'' at an unknown point between the taps) rather than the phase term this round repaired`,
-        tayU > 0 && stpU > 0 && tayU + stpU < 10, `${tayU} Taylor, ${stpU} step, of ${nT + nS}`);
+    // *** v4564 RECORDED THIS RESIDUE AS SPLIT ACROSS BOTH BRANCHES AND v4565's STEP REPAIR REMOVED THE STEP
+    // HALF OF IT. *** What is left is one pixel, on the Taylor branch, where the curvature surrogate
+    // (D2max + D3 standing in for f'' at an unknown point between the taps) came in under the truth. That is
+    // a cleaner result than the split one and it confirms the reading v4564 gave: what remains is the
+    // surrogate, not the phase term.
+    ok(`  and the residue is now ${tayU + stpU} pixel${tayU + stpU === 1 ? "" : "s"} in ${nT + nS}, ALL on the Taylor branch (${stpU} on the step branch, which v4565's ring bound closed) -- so what is left is the CURVATURE surrogate and not the phase term v4564 repaired`,
+        stpU === 0 && tayU + stpU < 10, `${tayU} Taylor, ${stpU} step, of ${nT + nS}`);
     // and the price, stated rather than buried
     const loosen = (() => { let a = 0, b = 0, n = 0;
         for (const f of F) for (let i = 0; i < W * H; i++) {
@@ -204,9 +210,12 @@ console.log("\n4. THE GUARD THAT MAKES THE v4563 MISTAKE UNREPEATABLE");
         "a pool holding one form rejects the other and reports which it holds");
     ok("  and ringFloorCPU still defaults to the frame form, so every frame-wide claim v4560 through v4562 recorded is the number it was",
         (() => { const L = new Float32Array(16 * 16).map((_, i) => Math.sin(i * 0.4));
-                 const a = ringFloorCPU(L, null, 16, 16, P).worst, b = ringFloorCPU(L, null, 16, 16, P, undefined, "frame").worst;
-                 return a === b && ringFloorCPU(L, null, 16, 16, P, undefined, "window").worst >= a; })(),
-        "the default is `frame`, and `window` is never below it");
+                 return ringFloorCPU(L, null, 16, 16, P).worst === ringFloorCPU(L, null, 16, 16, P, undefined, "frame").worst; })(),
+        "the default is `frame`");
+    ok("*** and the window form now REFUSES to run without the ring, because v4565 measured its step branch below the error at 70-86% of pixels on the edge fixture when it reads only this frame ***",
+        (() => { try { ringFloorCPU(new Float32Array(256), null, 16, 16, P, undefined, "window"); return false; }
+                 catch (e) { return /needs the ring state/.test(String(e.message)); } })(),
+        "the per-pixel form without the history it depends on is refused rather than computed");
 }
 
 // SABOTAGE. Seven rewrites of the phase form, the guard and the regime mask, run against five gates --

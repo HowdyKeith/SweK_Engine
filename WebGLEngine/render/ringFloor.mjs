@@ -138,11 +138,48 @@ function neighbourhood(L, i, stride) {
  * Use "frame" for a frame-wide number and "window" for anything spent per pixel. marginsFromFloor REFUSES
  * the frame form, because v4563 spent one per pixel and the round could not tell.
  */
-export function ringFloorCPU(luma, motion, w, h, period, tau = RESOLUTION_TAU, phase = "frame") {
+
+/**
+ * The ring's own account of what the reprojection is doing, which is the half the current frame cannot see.
+ * These three mirror temporalLock's lumaMean / lumaMeanPrev / lumaInstability exactly, and are here rather
+ * than imported because temporalLock imports nothing from this module and the arc keeps that direction --
+ * a cycle between the ring and the floor that bounds it is the kind of edge that survives a long time.
+ * They are held to agreement with temporalLock's by a row in ringFloorStep-selfcheck.
+ */
+function lumaMeanOf(st) {
+    const N = st.w * st.h, F = st.frames, P = st.period, out = new Float32Array(N);
+    for (let i = 0; i < N; i++) { let m = 0; for (let k = P; k < F; k++) m += st.ring[i * F + k]; out[i] = m / P; }
+    return out;
+}
+function lumaMeanPrevOf(st) {
+    const N = st.w * st.h, F = st.frames, P = st.period, out = new Float32Array(N);
+    for (let i = 0; i < N; i++) { let m = 0; for (let k = 0; k < P; k++) m += st.ring[i * F + k]; out[i] = m / P; }
+    return out;
+}
+function lumaSpreadOf(st) {
+    const N = st.w * st.h, F = st.frames, P = st.period, out = new Float32Array(N), m = lumaMeanOf(st);
+    for (let i = 0; i < N; i++) { let a = 0; for (let k = P; k < F; k++) a += Math.abs(st.ring[i * F + k] - m[i]); out[i] = a / P; }
+    return out;
+}
+
+export function ringFloorCPU(luma, motion, w, h, period, tau = RESOLUTION_TAU, phase = "frame", ring = null) {
     if (!luma || luma.length < w * h) throw new Error("ringFloorCPU: luma must be a scalar field of w*h");
     if (w < 7 || h < 7) throw new Error("ringFloorCPU: the estimator's stencil needs at least 7x7");
     if (phase !== "frame" && phase !== "window") throw new Error(`ringFloorCPU: phase must be "frame" or "window", not ${phase}`);
     const windowPhase = phase === "window";
+    // *** THE WINDOW FORM NEEDS THE RING, AND WITHOUT IT IT IS NOT A PER-PIXEL BOUND (v4565). ***
+    // The step branch below reads only the CURRENT frame's neighbourhood, and on content where a
+    // high-contrast feature has SWEPT PAST, a pixel is locally flat now and still carries that feature's
+    // reprojection error in the ring. Measured on the arc's edge fixture: the geometric step bound is BELOW
+    // the error actually present at 70-86% of step-branch pixels. The ring is where that history is, so a
+    // per-pixel claim cannot be made without it. The frame form is unaffected -- its claim is frame-wide,
+    // and frame-wide some pixel always has a large geometric bound (v4562 measured the edge at 1.38x).
+    if (windowPhase && !ring) throw new Error(
+        "ringFloorCPU: the window form is a PER-PIXEL bound and needs the ring state -- pass it as the eighth argument. " +
+        "Without it the step branch reads only this frame's neighbourhood and misses error the ring carries from a feature " +
+        "that has swept past (measured at v4565: 70-86% below the error on the edge fixture).");
+    // both halves of the ring, jitter-free by construction, and the spread within the newer one
+    const rMean = ring ? lumaMeanOf(ring) : null, rPrev = ring ? lumaMeanPrevOf(ring) : null, rSpread = ring ? lumaSpreadOf(ring) : null;
     const depth = resampleDepth(period);
     const per = new Float32Array(w * h);
     // *** WHICH BRANCH EACH PIXEL TOOK, because the two are different KINDS of bound and their errors are
@@ -165,9 +202,23 @@ export function ringFloorCPU(luma, motion, w, h, period, tau = RESOLUTION_TAU, p
         const px = windowPhase ? 0.25 : fx * (1 - fx), py = windowPhase ? 0.25 : fy * (1 - fy);
         const ex = rx ? depth * 0.5 * px * (X.d2 + X.d3) : Math.max(fx, 1 - fx) * X.step;
         const ey = ry ? depth * 0.5 * py * (Y.d2 + Y.d3) : Math.max(fy, 1 - fy) * Y.step;
+        let e = ex + ey;
+        // *** ON THE STEP BRANCH, THE MAX OF TWO BOUNDS THAT FAIL IN DIFFERENT PLACES. ***
+        // GEOMETRY bounds error the current neighbourhood explains -- safe on a chequer (0.00% under),
+        // blind on an edge that has swept past (70-86% under). THE RING bounds what its own history shows:
+        // |newer mean - older mean| is what the reprojection did over one period, and the spread within the
+        // newer period is what it is still doing. Safe on the edge, and under by 5-14% on a chequer, whose
+        // error is a persistent bias that a temporal difference cannot see. Neither is a bound alone.
+        //
+        // *** THE MAX IS TAKEN ONCE, ON THE PIXEL, NOT ADDED INTO EACH AXIS. *** The first version of this
+        // added `carried` to both ex and ey, which double-counts a quantity that is not per-axis: the ring
+        // holds one history for the pixel, not one per direction. It was safer and it was arithmetic nobody
+        // could justify, and the row that compares this module's private ring readings against
+        // temporalLock's exported ones is what caught it.
+        if (rMean && (!rx || !ry)) e = Math.max(e, Math.abs(rMean[i] - rPrev[i]) + rSpread[i]);
         // never below the arithmetic's own floor: at an integer displacement both axis terms are exactly
         // zero and the ring is still not exact -- it is exact to within the representation
-        per[i] = Math.max(ex + ey, ARITHMETIC_ULPS * EPS_F32 * Math.max(X.mag, Y.mag));
+        per[i] = Math.max(e, ARITHMETIC_ULPS * EPS_F32 * Math.max(X.mag, Y.mag));
         total++; if (!rx || !ry) { unresolved++; regime[i] = 1; }
         if (per[i] > worst) worst = per[i];
     }

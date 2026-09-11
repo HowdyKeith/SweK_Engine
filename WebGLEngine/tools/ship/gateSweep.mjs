@@ -3767,6 +3767,49 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since224: Object.freeze({
+        at: "v4565", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/ringFloorStep-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 0.41 s, under the 3000 ms budget. *** v4564 NAMED TIGHTENING THE STEP BOUND AS THIS " +
+                 "RUNG. IT IS NOT TIGHTENED, BECAUSE IT WAS NOT A BOUND. *** max(f, 1-f) * step reads only " +
+                 "THIS frame's neighbourhood, and where a high-contrast feature has SWEPT PAST a pixel is " +
+                 "locally flat now and still carries that feature's reprojection error in the ring: the " +
+                 "stencil is flat, the bound returns nearly nothing, the error is large. Measured on this " +
+                 "arc's own EDGE fixture, the geometric step bound is BELOW the error actually present at " +
+                 "70-86% of step-branch pixels, with a median of 0.00x of the error. v4564 shipped that form " +
+                 "as a per-pixel bound on the strength of ONE fixture -- a perspective ground plane, where it " +
+                 "reads 0.03%. *** AND THE CHEQUER IS CLEAN AT 0.00%, WHICH IS WHY NOTHING CAUGHT IT: *** the " +
+                 "two contents fail the geometry in opposite ways and the arc has had both since v4553. THE " +
+                 "MISSING HALF IS THE RING, which has been in the tree since v4553: |newer period mean - " +
+                 "older period mean| is what the reprojection did over one period and the spread within the " +
+                 "newer period is what it is still doing. It is safe on the edge and UNDER by 5-14% on the " +
+                 "chequer, whose error is a persistent BIAS that a difference between two periods cannot see. " +
+                 "*** NEITHER IS A BOUND ALONE AND NEITHER DOMINATES: *** on the two sinusoids the ring reads " +
+                 "1200-2256x where the geometry reads 33-65x. Their MAX is under at 0.00% across ten " +
+                 "content-and-phase combinations and 13,398 step-branch pixel-frames. IT TIGHTENS NOTHING -- " +
+                 "the max can only be the looser of the two, so the 90x on a perspective plane stands " +
+                 "untouched. What changed is that it is a bound at all. The window form now REFUSES to run " +
+                 "without the ring rather than returning the half-bound v4564 shipped; the frame form is " +
+                 "untouched, so every frame-wide number v4560 through v4562 recorded reads what it read. " +
+                 "*** THE COMPOSITION SHIPPED IS THE SECOND ONE WRITTEN: *** the first added the ring term " +
+                 "into BOTH axis terms, double-counting a quantity the ring holds once per pixel rather than " +
+                 "once per direction -- safer than what replaced it, and arithmetic nobody could justify. " +
+                 "What caught it was the row comparing this module's private ring readings against " +
+                 "temporalLock's exported ones on a FLAT field, the one place the geometric term is zero and " +
+                 "the ring term is visible alone. A second copy of three functions is allowed only because " +
+                 "something compares it to the original, and that row earned its place on its first run. " +
+                 "Eight sabotages red at 3/2/3/2/6/2/2/2 against six gates; NC and ND are a pair, each half " +
+                 "of the ring term load-bearing for a different failure. Two rows of v4564's own gate needed " +
+                 "correcting: its residue is now ONE pixel, all on the Taylor branch, the step half having " +
+                 "been closed -- which confirms the reading v4564 gave, that what remains is the curvature " +
+                 "surrogate. AND A DERIVED RECORD MOVED FOR THE FIRST TIME SINCE v4551: runtimeGap's " +
+                 "closuresOverThreads, 3641 / 22, went 165 -> 166, and its own gate caught the stale value " +
+                 "rather than a reader noticing.",
+    }),
     since223: Object.freeze({
         at: "v4564", swept: 1, green: 1, red: 0,
         added: Object.freeze([
