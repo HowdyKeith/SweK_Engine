@@ -3767,6 +3767,92 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since230: Object.freeze({
+        at: "v4571", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/ringFloorPhase-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 1.03 s, under the 3000 ms budget. *** v4570 CLOSED BY NOTICING THAT THREE SEPARATE " +
+                 "BLIND SPOTS SAT AT ONE FIXTURE CONSTANT, AND THIS ROUND MEASURED WHY. *** f = 1/2 is the " +
+                 "unique fixed point of sigma: f -> 1-f. A pair {g, g . sigma} agrees exactly there; a " +
+                 "sigma-symmetric g is STATIONARY there, so it meets its own maximum. MEASURED over a " +
+                 "3999-phase sweep: SIX of the eight phase-expression pairs this arc uses agree at 1/2 and " +
+                 "nowhere else in (0,1), and the two that do not are round-vs-floor, where 1/2 is not a " +
+                 "meeting point but the BOUNDARY between the half-intervals each agrees on. Not three " +
+                 "coincidences -- one fixed point, seen three times. *** AND THE COST IS AN ARC-WIDE 0-RED. " +
+                 "*** Substituting 0.5*min(f,1-f) for f(1-f) -- an impostor agreeing with truth at f = 0 and " +
+                 "f = 1/2, reading 0.667x of it at a quarter texel, UNSAFE in the direction a margin cares " +
+                 "about -- into BOTH the mirror and the kernel scored ZERO RED across all eleven gates of " +
+                 "this arc. 21 of 475 reported lines moved; no row failed. FOUR reasons, and only the last " +
+                 "is a tolerance: STRUCTURAL (Light/Margin/Yaw and most of Step call only the window form, " +
+                 "whose factor is the constant 0.25 and reads no phase); NUMERICAL (ringFloor and " +
+                 "ringFloorDevice call the frame form only at f in {0, 1/2}, where the impostor EQUALS " +
+                 "truth); DEGENERATE (Stat's frame-form calls are on zero and flat fields); UNASSERTED " +
+                 "(Cost/Perspective/Control/kernelAudit DID move and every moved number was printed and " +
+                 "asserted around -- ringFloorControl's headline row went from 21.5% to 32.7% of pixels " +
+                 "below their own error and still PASSED, because it asserts the defect EXISTS and reports " +
+                 "its size rather than pinning it). *** A PHASE CENSUS WAS TAKEN AND IT DOES NOT EXPLAIN THE " +
+                 "ZERO, WHICH IS WHY IT IS RECORDED. *** Instrumenting ringFloorCPU to log every (fx, fy) it " +
+                 "computes: three gates reach TWO distinct phases, {0, 1/2}; ringFloorYaw reaches 1986 and " +
+                 "still reported not one moved number, because it calls only the window form. Breadth of " +
+                 "fixture is not the same as reaching the quantity. *** THE REPAIR IS A SHAPE ROW, NOT A " +
+                 "TIGHTER TOLERANCE. *** Every row that missed this was checking the bound's SAFETY or its " +
+                 "DIRECTION, and the arc's headroom over observed error is only 1.10x-1.62x at the median, " +
+                 "so tightening was never available. The phase factor is a multiplicative law and can be " +
+                 "read off: a synthetic motion buffer puts every pixel at one chosen sub-texel phase, and " +
+                 "the frame form's per-pixel floor then scales as f(1-f) to 9.43e-8 relative across eight " +
+                 "phases and 5408 readings, where the closest impostor is 16.8% off. The same row runs on " +
+                 "the DEVICE against the law rather than against the mirror -- 8.40e-8 over 2704 readings -- " +
+                 "because v4570 established that a parity row is immune by construction to a mutation " +
+                 "applied to both sides, and a phase edit is exactly that. *** AND v4570's \"ROUGHLY TWENTY " +
+                 "GATES HARD-CODE IT\" WAS AN IMPRESSION, SO IT WAS COUNTED. *** 18 gates under render/ carry a " +
+                 "half-texel fixture construct and 11 tree-wide NAME one -- five in this arc and six outside " +
+                 "it (strengthField, badTvDevicePass, xrStereo, slugFill, deviceTexture, water2d), none of " +
+                 "which this round looked at. The law's own limit is predicted " +
+                 "too: which pixel leaves it, and at which phase, follows from the arithmetic floor alone, " +
+                 "7 of 7 phases agreeing pixel-for-pixel. *** THE ROUND'S OWN 0-RED, AND IT IS THE ROUND'S " +
+                 "OWN SUBJECT. *** Eight sabotages scored 1/1/1/1/1/1/0/2; the zero was moving the window " +
+                 "form's constant from 0.25 to 0.24, invisible because the control asserted the window form " +
+                 "is phase-INDEPENDENT -- a DIRECTION -- which 0.24 leaves perfectly true. Repaired by a row " +
+                 "that names the constant the way the module earns it: the window form at any phase IS the " +
+                 "frame form at the fixed point, bit for bit, 2704 readings at 0.00e+0, with 0.25 appearing " +
+                 "nowhere in the row. 8/8 red after. Six of the eight score exactly ONE red, which is the " +
+                 "thin margin v4570 named about kernels and is no better here. AND THE PHASE PROBE'S FIRST " +
+                 "RUN REPORTED NO FLOOR CALL FOR ALL ELEVEN GATES -- a relative import resolving against the " +
+                 "probe's own directory. An absence read as a measurement is v4402's fault, produced again " +
+                 "in the round built to catch it, and recorded in the gate. *** THE VERIFY SWEEP WAS WIDENED " +
+                 "AND IMMEDIATELY FOUND A RED THIS ROUND DID NOT CAUSE. *** render/colourReach-selfcheck has " +
+                 "been red since ff463a60 on 2026-09-09: fx/fsr/fsr.js pushed its literal-colour census 86 -> " +
+                 "87, and v4569 and v4570 both shipped over it because those rounds swept the arc they were " +
+                 "working in rather than the directory. The arrival is a FALSE POSITIVE of a predicate that " +
+                 "already calls itself crude -- EASU's tap accumulator `{ r: 0, g: 0, b: 0, w: 0 }`, four " +
+                 "running sums whose `w` is the tell -- and the PREDICATE IS NOT CHANGED, because narrowing " +
+                 "it moves that census and the hot one with it. The count is re-taken as a true count of what " +
+                 "the detector detects, with the reason in the header. recordDrift's six pre-flight checks do " +
+                 "not cover a per-module census like this one: that is a seventh obligation and nothing names " +
+                 "it, which is the round's own subject arriving in the round's own bookkeeping. A second, " +
+                 "smaller instance of the same shape: this pre-flight's assertionShape check compares FOUR of " +
+                 "that census's nine rows, so nameFirst (1501 -> 1502) read clean there and red in the gate, " +
+                 "which compares all nine and labels itself so. Designed behaviour, not a defect, and the " +
+                 "same lesson -- a check covering part of a record reports on the part it covers. *** AND " +
+                 "WIDENING THE SWEEP AGAIN, TO THE 37 GATES THAT PIN A TREE-WIDE CENSUS, FOUND EIGHT MORE RED " +
+                 "AT HEAD: *** frameDirtyCensus, gateSelection, referenceKind, definitionGates, staleness, " +
+                 "crossBackend, statedRuntime, recordReach. All predate this round and none is re-taken here " +
+                 "-- re-taking a record without understanding what moved it is the fault this arc warns " +
+                 "about, and eight is a round of its own; they are named so the next round starts from a list " +
+                 "rather than a discovery. ONE IS THIS ARC'S OWN DEBT AND IS ANSWERED: crossBackend has named " +
+                 "RING_FLOOR_WGSL as neither in the WGSL corpus nor excluded with a reason since v4560, and " +
+                 "it could name only ONE of the arc's THIRTEEN kernels because wgslCorpus's census detector " +
+                 "reads `export const X` while the whole temporal arc re-exports at the foot of the file as " +
+                 "`export { A, B }`. MEASURED: 95 producers seen, TWELVE invisible -- 11% of the tree's WGSL " +
+                 "outside a census whose purpose is to notice absences, and the THIRD distinct reason this " +
+                 "census has failed to see a producer (v4464: a root outside the scan; v4472: a file type " +
+                 "with no export to match; v4571: a spelling). The detector is widened so the red names all " +
+                 "thirteen. The gate was already red on that line, so no verdict changes -- only whether the " +
+                 "red tells the truth. Answering the thirteen is not done here.",
+    }),
     since229: Object.freeze({
         at: "v4570", swept: 1, green: 1, red: 0,
         added: Object.freeze([

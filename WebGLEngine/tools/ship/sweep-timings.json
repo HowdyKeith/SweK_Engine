@@ -1,6 +1,6 @@
 {
  "note": "OBSERVED at the last quickSweep run: ms per gate (serial where a serial re-run happened) and exit code. Rewritten every run; used only to choose which gates are under the ship-time budget. Not a claim about the tree -- the register is. `at` is PER ENTRY (v4408): the capture that actually observed that gate. `captured` is this run's stamp and applies ONLY to entries whose `at` equals it -- the rest were not run and say so. `crossings` (v4536) counts CONSECUTIVE sweeps on which a gate came in over budget, and it takes two to evict: one crossing is a reading from one hour, and this box moves 12-36% between hours on unchanged code. A gate that comes back under loses its count entirely.",
- "captured": "2026-09-08T20:46:53.412Z",
+ "captured": "2026-09-11T12:29:11.330Z",
  "budgetMs": 3000,
  "capMs": 20000,
  "timings": {
@@ -1635,7 +1635,8 @@
   "render/ringFloorYaw-selfcheck.mjs": 278,
   "render/ringFloorStat-selfcheck.mjs": 418,
   "render/ringFloorDevice-selfcheck.mjs": 1454,
-  "render/kernelAudit-selfcheck.mjs": 297
+  "render/kernelAudit-selfcheck.mjs": 297,
+  "render/ringFloorPhase-selfcheck.mjs": 1030
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -3269,7 +3270,8 @@
   "render/ringFloorYaw-selfcheck.mjs": 0,
   "render/ringFloorStat-selfcheck.mjs": 0,
   "render/ringFloorDevice-selfcheck.mjs": 0,
-  "render/kernelAudit-selfcheck.mjs": 0
+  "render/kernelAudit-selfcheck.mjs": 0,
+  "render/ringFloorPhase-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-08T20:46:53.412Z",
@@ -4903,7 +4905,8 @@
   "render/ringFloorYaw-selfcheck.mjs": "2026-09-11T10:40:00.000000Z",
   "render/ringFloorStat-selfcheck.mjs": "2026-09-11T12:10:00.000000Z",
   "render/ringFloorDevice-selfcheck.mjs": "2026-09-11T13:40:00.000000Z",
-  "render/kernelAudit-selfcheck.mjs": "2026-09-11T15:20:00.000000Z"
+  "render/kernelAudit-selfcheck.mjs": "2026-09-11T15:20:00.000000Z",
+  "render/ringFloorPhase-selfcheck.mjs": "2026-09-11T12:29:11.330Z"
  },
  "crossings": {
   "tools/roundhouse/knobPromotions-selfcheck.mjs": 2,

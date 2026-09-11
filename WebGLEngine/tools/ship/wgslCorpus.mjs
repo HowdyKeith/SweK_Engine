@@ -628,6 +628,21 @@ export function census({ roots = ["render", "physics/render", "physics/xpbd", "p
             const re = /export\s+(?:function|const)\s+(\w*(?:Wgsl|WGSL)\w*)\b/g;
             let m;
             while ((m = re.exec(src))) found.push({ symbol: m[1], file: rel.replace(/\\/g, "/"), kind: "export" });
+            // *** v4571 -- AND THE THIRD TIME THIS CENSUS COULD NOT SEE A PRODUCER, FOR THE THIRD REASON. ***
+            // v4464's was a root outside the scan; v4472's was a file type with no export to match; this one is
+            // a SPELLING. The regex above reads a DECLARATION -- `export const X` -- and the whole temporal arc
+            // (v4552-v4570) declares its kernels privately and re-exports them at the foot of the file as
+            // `export { A, B, C }`. MEASURED at v4571: 95 producers seen by the declaration form, TWELVE
+            // invisible to it -- MOTION_WGSL, ACCUMULATE_WGSL, RING_PUSH_WGSL, SHADING_SHIFT_WGSL, RIDGE_WGSL,
+            // FIELD_RIDGE_WGSL, COHERENT_RIDGE_WGSL, LUMA_WGSL, DISOCCLUSION_WGSL, RECTIFY_WGSL, YCOCG_WGSL and
+            // RESOLVE_WGSL -- 11% of the tree's WGSL producers outside a census whose entire purpose is to
+            // notice absences. RING_FLOOR_WGSL was visible only because it happens to use the other spelling,
+            // which is why crossBackend named one kernel of an arc that had added thirteen.
+            const reList = /export\s*\{([^}]*)\}/g;
+            while ((m = reList.exec(src))) for (const part of m[1].split(",")) {
+                const name = part.trim().split(/\s+as\s+/).pop().trim();
+                if (/Wgsl|WGSL/.test(name)) found.push({ symbol: name, file: rel.replace(/\\/g, "/"), kind: "export" });
+            }
         }
     };
     for (const r of roots) walk(r);
