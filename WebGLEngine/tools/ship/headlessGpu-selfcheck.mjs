@@ -53,12 +53,23 @@ const CODE = lcgWgsl(), UNI = lcgUniforms(SEED, N), WG = Math.ceil(N / 64);
 sec("1. THE DRIVER IS DISCOVERED, NOT HARDCODED -- AND IT COMES OUT OF THE BROWSER BUNDLE");
 // ---------------------------------------------------------------------------------------------------------
 {
+    // v4616 -- *** THIS SECTION WAS UNCONDITIONALLY LINUX-SHAPED. *** A Vulkan ICD is how Dawn gets a software
+    // rasteriser on Linux, where Vulkan is the ONLY backend; win32 (D3D12) and darwin (Metal) have their own
+    // native backend and never need one, measured directly (see headlessGpu.mjs's own v4616 note). So finding
+    // ZERO manifests on those platforms is the CORRECT reading, not a discovery failure -- asserting `> 0`
+    // there would fail a working gate for the reason this whole round exists to stop happening.
     const icds = HG.findVulkanIcds();
-    ok(icds.length > 0, "*** a SwiftShader ICD is found under the Playwright browser root ***",
-       `${icds.length} manifest(s), first: ${icds[0]}`);
-    ok(icds.every((p) => /chromium/i.test(p)),
-       "and it ships INSIDE chromium -- the browser we are avoiding is where the driver lives",
-       "so this takes no new dependency on a GPU driver; it uses the one the tree already downloads");
+    if (process.platform === "linux") {
+        ok(icds.length > 0, "*** a SwiftShader ICD is found under the Playwright browser root ***",
+           `${icds.length} manifest(s), first: ${icds[0]}`);
+        ok(icds.every((p) => /chromium/i.test(p)),
+           "and it ships INSIDE chromium -- the browser we are avoiding is where the driver lives",
+           "so this takes no new dependency on a GPU driver; it uses the one the tree already downloads");
+    } else {
+        ok(icds.length === 0, "*** this platform's Dawn backend needs no Vulkan ICD, and correctly finds none ***",
+           process.platform + " uses its own native backend (D3D12 on win32, Metal on darwin) -- " +
+           "section 2 proves requestAdapter() succeeds without one");
+    }
     ok(icds.join(",") === HG.findVulkanIcds().join(","), "discovery is stable across calls (sorted)",
        "two boxes with the same bundles must pick the same driver or their results are not comparable");
     ok(HG.findVulkanIcds("/nonexistent-browser-root").length === 0,
