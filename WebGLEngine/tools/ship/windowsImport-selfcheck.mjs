@@ -52,6 +52,21 @@ function walk(dir, out = []) {
         const code = src.replace(/^\s*\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
         // import( path.join(...) )  or  import( someAbsolutePathVariable )
         for (const m of code.matchAll(/import\(\s*(path\.(?:join|resolve)\([^)]*\)|[A-Za-z_$][\w$]*(?:Path|File|Dir|Full|Abs))\s*\)/g)) {
+            // v4620 -- *** THIS CHECK EXISTS FOR NODE'S OWN ESM LOADER, AND A BROWSER HAS A DIFFERENT ONE. ***
+            // Four real offenders here, measured: webgpuHarness.mjs and two -selfcheck.mjs files each build a
+            // STRING template (SCRIPT/RENDER_SCRIPT) that Playwright hands to page.evaluate() -- the "import(...)"
+            // text inside it is parsed by the BROWSER's own module loader once the page runs it, not by the Node
+            // process running this gate. And ui/aiPresenceOrbWidget.js opens with `if (typeof document ===
+            // "undefined") return null;` -- it cannot execute anywhere but a browser. ERR_UNSUPPORTED_ESM_URL_SCHEME
+            // is Node's own error; a browser resolves a leading "/" against its page origin over HTTP and has no
+            // concept of a Windows drive letter as a URL scheme at all. Two markers, both ALREADY load-bearing
+            // conventions elsewhere in this tree rather than invented for this check: a sibling `import("/...")`
+            // literal (an absolute server-root string is meaningless to Node's loader and only resolves against an
+            // HTTP origin), or the `@vite-ignore` pragma (which exists ONLY to tell a browser bundler not to
+            // statically analyse a dynamic import -- Node's loader has no notion of it whatsoever).
+            const nearby = code.slice(Math.max(0, m.index - 2000), m.index);
+            const browserContext = /import\(\s*["'`]\//.test(nearby) || /@vite-ignore/.test(src);
+            if (browserContext) continue;
             offenders.push(path.relative(ENG, f).replace(/\\/g, "/") + " -> import(" + m[1].slice(0, 46) + ")");
         }
     }

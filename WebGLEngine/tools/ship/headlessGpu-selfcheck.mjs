@@ -15,7 +15,7 @@
 "use strict";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import * as HG from "./headlessGpu.mjs";
 import { runWgslCompute, webgpuSkipReason } from "./webgpuHarness.mjs";
 import { lcgWgsl, lcgUniforms, lcgStatesCpu, lcgValuesCpu, unpackState, bracketsF64 }
@@ -148,7 +148,16 @@ sec("4. THE EXIT HAZARD IS REAL, AND ITS EXACT CONDITION IS SPAWNED RATHER THAN 
     // requesting a device aborts, spawned a child that used runWgslComputeNative, and got status 0 -- because
     // that harness keeps its device LOCAL. The claim was too wide, and only a spawned process could show it.
     // Three shapes now, because the difference between them IS the finding.
-    const mod = JSON.stringify(path.join(HERE, "headlessGpu.mjs"));
+    //
+    // v4619 -- *** A RAW WINDOWS PATH IS NOT AN IMPORT SPECIFIER, AND THIS IS THE BUG posixAssumption.mjs
+    // ALREADY NAMED ONCE. *** path.join(HERE, ...) JSON.stringify'd straight into `await import(...)` gives
+    // Node's ESM loader "C:\\Users\\...\\headlessGpu.mjs" on Windows -- ERR_UNSUPPORTED_ESM_URL_SCHEME, the
+    // exact failure posixAssumption.mjs's header already recorded from songHeightfield. Measured directly on
+    // Keith's rig: all three spawned children in this section died on their own first line with status=1,
+    // never SIGABRT/SIGSEGV, because none of them got past the import. pathToFileURL().href is a valid
+    // specifier on every platform, POSIX included -- this is not a Windows-only guard, it fixes a latent bug
+    // that happened to go unnoticed on Linux rather than adding a branch for one platform.
+    const mod = JSON.stringify(pathToFileURL(path.join(HERE, "headlessGpu.mjs")).href);
     const prelude = `const HG = await import(${mod}); HG.configureVulkanIcd();
         const { create } = HG.resolveWebgpu().mod;`;
     // A device pinned at module scope -- reachable when the process ends.
