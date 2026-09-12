@@ -3767,6 +3767,52 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since233: Object.freeze({
+        at: "v4574", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/capReading-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 0.11 s, under the 3000 ms budget. *** v4573 LEFT THE BIMODALITY AS THE NEXT RUNG AND " +
+                 "THIS ROUND FAILED TO REPRODUCE IT. *** Three hypotheses for headlessGpu-selfcheck's 181 s " +
+                 "stall, each tested and REFUTED: the section that spawns a deliberately-crashing child (18 " +
+                 "child runs, 55-73 ms, zero stalls); plain concurrency (2, 4 and 8 copies at once scale to " +
+                 "2.6 s, not 180); a dirty working tree (green clean and dirty alike). Roughly twenty-five " +
+                 "runs, no reproduction. It is real -- seen twice at ~181 s -- and it is NOT explained here, " +
+                 "which is recorded rather than dressed up. *** SO THE ROUND TOOK THE MEASURABLE HALF, AND " +
+                 "FOUND THE TREE ALREADY KNEW PART OF IT. *** sweepCoverage's notVerdicts has said since " +
+                 "v4460 that a non-zero code beside a killed process is no verdict, and v4460 studied the " +
+                 "OTHER class at length: 314 over-budget entries carrying a stale code 0, of which running " +
+                 "them one at a time found TWENTY-TWO RED. *** THE 137 ARE THE CLASS NOBODY RAN. *** They " +
+                 "carry code 124: killed in parallel AND in the serial re-run every phase-1 red gets, since " +
+                 "quickSweep files serialMs ?? parallelMs. Their recorded millisecond is the cap plus a few " +
+                 "-- the whole population spans 20,006 to 20,461, a 2.27% band, which is what a killer's " +
+                 "clock looks like and not what runtimes look like. Only TWO of the 137 are named anywhere " +
+                 "in sweepCoverage. *** SEVENTEEN WERE LET FINISH. ALL SEVENTEEN ARE GREEN. *** And SEVEN OF " +
+                 "THE SEVENTEEN finish INSIDE the 20 s cap they were killed at, the fastest in 13,473 ms, " +
+                 "while the rest run out to 549,048 -- a 41x spread filed under one indistinguishable " +
+                 "number. *** THE CONSEQUENCE IS NOT THE ONE THE ROUND WENT LOOKING FOR, AND THE GATE SAYS " +
+                 "SO. *** The hypothesis was that rotation() spends a cap reading as if it were a cost. It " +
+                 "does not: rotation and doorCandidates draw from c.over, and classify() files a killed " +
+                 "reading under c.killed -- ZERO of the 24 gates the rotation picks is a cap reading. An " +
+                 "earlier draft of this gate asserted the opposite, from a scratch probe that had built its " +
+                 "own coverage object with everything in `over`; the measurement was of a rotation that does " +
+                 "not exist. What IS wrong is the other side of that exclusion: rotation is the mechanism by " +
+                 "which an over-budget gate gets re-observed, and the killed bucket sits outside it, so " +
+                 "nothing ever schedules these 137. Their absent verdict is a property of the machinery, and " +
+                 "it shows -- 129 of the 137 still carry the pre-v4408 `unknown` stamp. Eight sabotages " +
+                 "scored 2/1/1/1/2/1/2/6, no 0-RED, after one repair: the row counting how many finish under " +
+                 "the cap said `>= 6` where the derived answer is 7, and moving a frozen table entry above " +
+                 "the cap went 0-RED -- a threshold set one below the value it guards absorbs exactly one " +
+                 "defect, and a frozen table needs no slack. ALSO CORRECTED: v4573 reported " +
+                 "gateSelection-selfcheck red at HEAD. It is green in four subsequent runs, clean tree and " +
+                 "dirty, at ~68 s. That gate is non-deterministic; the earlier report rested on one " +
+                 "observation and does not hold. AND AN EIGHTEENTH GATE ARRIVED FROM THIS ROUND'S OWN " +
+                 "VERIFY: tools/ship/redCensus-selfcheck.mjs, recorded at 20,021 ms with code 124 and the " +
+                 "same pre-v4408 stamp, exceeded a 400-SECOND harness timeout without completing. It is kept " +
+                 "OUT of the frozen table -- a timeout is a lower bound, not a measurement -- but it puts " +
+                 "the population's upper end past 400 s, and that gate's own header describes it as taking " +
+                 "two minutes.",
+    }),
     since232: Object.freeze({
         at: "v4573", swept: 0, green: 0, red: 0,
         added: Object.freeze([]),

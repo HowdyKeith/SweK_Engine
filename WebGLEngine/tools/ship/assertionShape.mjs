@@ -272,8 +272,8 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // eighteenth round running that the pre-flight prompted. The other five rows have never moved.
     // v4570 -- RE-TAKEN: one gate (kernelAudit) joined, the same four rows by one, THIRTY-NINTH arrival,
     // nineteenth round running that the pre-flight prompted. The other five rows have never moved.
-    gates: 1631, usesOk: 1610, definesOk: 1602, importsOk: 0,
-    distinctDefinitions: 38, nameFirst: 1503, condFirst: 91, unknownSignature: 16,
+    gates: 1632, usesOk: 1611, definesOk: 1603, importsOk: 0,
+    distinctDefinitions: 38, nameFirst: 1504, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([
