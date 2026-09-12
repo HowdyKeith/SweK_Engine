@@ -3767,6 +3767,45 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since237: Object.freeze({
+        at: "v4578", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/timingSemantics-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/timingSurvivors-selfcheck.mjs", "tools/ship/timingRecords-selfcheck.mjs"]),
+        verdict: "green, 0.06 s, under the 3000 ms budget. *** v4577 PROPOSED A SHARPER DETECTOR AND CHECKING " +
+                 "ITS PREMISE FOUND SOMETHING BIGGER: THE SWEEP'S MS COLUMN HOLDS TWO DIFFERENT QUANTITIES. " +
+                 "*** quickSweep writes `serialMs ?? parallelMs`, and a gate only gets a serialMs if it was " +
+                 "red or crossed the budget. So UNDER the budget the number is a LOADED eight-wide reading " +
+                 "and AT OR OVER it an ALONE one, in one column, with nothing marking which. MEASURED over " +
+                 "the dated comparable gates: under the budget the column sits at 1.93x gate-timings, which " +
+                 "IS the load factor, and at or over it at 0.98x, which is two alone readings agreeing. The " +
+                 "boundary is exactly the budget, predicted from the source before it was measured. *** AND " +
+                 "THIS ARC PUT THE WRONG QUANTITY IN NINE ENTRIES. *** v4577 wrote alone readings into " +
+                 "sweep-timings reasoning that quickSweep `prefers the serial -- which is an alone reading " +
+                 "too`; true only for a gate that GETS one, and nine of its fourteen sit under the budget " +
+                 "and never do. Re-measured at exactly eight concurrent -- two batches of eight covering all " +
+                 "nine, three rounds -- and replaced. Those numbers have now moved TWICE, once wrongly by " +
+                 "this arc. *** THE DETECTOR ITSELF WORKS WHERE THE COLUMN'S MEANING IS KNOWN: TEN FOR TEN, " +
+                 "NO FALSE POSITIVES. *** Eleven candidates, ten usable -- the eleventh dropped because this " +
+                 "arc had corrupted its column -- all ten green, all ten with a gate-timings entry between " +
+                 "2.0x and 6.3x too high. *** AND NOT ONE WAS VISIBLE TO v4577'S OWN CRITERION: *** their " +
+                 "residuals run 0.66x to 2.73x, all under its 3x line, because an entry three times too high " +
+                 "makes a SYMMETRIC ratio of about 1.4x, which reads as agreement. The old criterion " +
+                 "conflates `gate-timings is wrong` with `gate-timings is right`. Its magnitude is not " +
+                 "usable below about 100 ms -- esFlight3dMath predicted 12.63x and measured 5.34x, because a " +
+                 "40 ms loaded reading is mostly process startup -- but the DIRECTION held for all ten. " +
+                 "Nineteen entries corrected. *** AND TWO DOWNSTREAM GATES WENT RED ON CONCEPTUAL GROUNDS, " +
+                 "NOT BOOKKEEPING. *** timingSurvivors asserted the repaired sweep entries hold the ALONE " +
+                 "reading -- the very thing refuted here -- and timingRecords kept an invariant that every " +
+                 "moved entry moves TOWARD the alone measurement, which is false for the sweep column by " +
+                 "construction. Both now hold the per-file rule: gate-timings toward the alone reading, the " +
+                 "sweep column toward the quantity its own branch records. Eight sabotages, seven red. The " +
+                 "one zero is loosening a bar, the class v4576 proved inert and v4577 failed to fix with a " +
+                 "second row; three rounds have met it, so this file pins the number it REPORTS instead of " +
+                 "pretending to police its bar. That zero was also scored RED once by mistake when the " +
+                 "sabotage harness itself was edited and crashed -- rc 1 with no FAIL line, which the " +
+                 "crash-aware rule reads as red. Applied cleanly it is rc 0, and a crash is not a verdict.",
+    }),
     since236: Object.freeze({
         at: "v4577", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/timingSurvivors-selfcheck.mjs"]),

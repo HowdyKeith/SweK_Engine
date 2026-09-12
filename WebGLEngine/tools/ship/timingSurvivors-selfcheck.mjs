@@ -180,8 +180,15 @@ console.log("\n5. AND EVERY STALE ENTRY IS CORRECTED, WHICH IS WHY SECTION 3 REA
     ok(`*** all ${gFixed.length} stale gate-timings entries now hold this round's alone reading ***`,
         gFixed.every((x) => G[x.gate] === x.alone),
         gFixed.map((x) => `${path.basename(x.gate)} ${x.gateWas}->${G[x.gate]}`).join(", "));
-    ok(`*** and all ${sFixed.length} stale sweep entries do too, each with a fresh stamp replacing the pre-v4408 one where it had it ***`,
-        sFixed.every((x) => S.timings[x.gate] === x.alone && (S.at || {})[x.gate] !== UNKNOWN_AT),
+    // *** AND THIS ROW'S FIRST VERSION ASSERTED THE THING v4578 FOUND WRONG. *** It required each repaired
+    // sweep entry to hold this round's ALONE reading, on the reasoning that quickSweep prefers serialMs. It
+    // does -- but only for a gate that GETS a serial run, which means over the budget or red. Nine of these
+    // sit under it and can only ever hold a LOADED reading, so v4578 re-measured them at exactly eight
+    // concurrent and replaced the numbers this round wrote. What the row can honestly require is that every
+    // repaired entry moved OFF its stale value and carries a fresh stamp; which quantity belongs there is
+    // timingSemantics-selfcheck's subject, and it is not settled by this table.
+    ok(`*** and all ${sFixed.length} stale sweep entries are off their stale values with a fresh stamp -- the number v4578 put there is the LOADED reading, not the alone one this round first wrote ***`,
+        sFixed.every((x) => S.timings[x.gate] !== x.sweepWas && (S.at || {})[x.gate] !== UNKNOWN_AT),
         sFixed.map((x) => `${path.basename(x.gate)} ${x.sweepWas}->${S.timings[x.gate]}`).join(", "));
     ok("  and an entry this round judged SOUND was left alone, so the repair is targeted rather than a rewrite of both files",
         R.filter((x) => !x.sweepStale).every((x) => S.timings[x.gate] === x.sweepWas) &&
