@@ -88,9 +88,47 @@ export function exportedDefinitions(src, { shapes = "narrow" } = {}) {
     return out;
 }
 
+/**
+ * *** v4573 -- EVERY GATE IN THE TREE, WITH THE MODULES IT IMPORTS, so "its gate" can stop meaning "the one
+ * file with its name". *** The census below has always resolved a module to ONE gate, by filename. That was
+ * right when a module had one gate and is measurably wrong now: the temporal arc alone has ELEVEN gates
+ * beside render/ringFloor.mjs, and EPS_F32 and ARITHMETIC_ULPS are driven hard by ringFloorPhase-selfcheck
+ * while ringFloor-selfcheck never names them -- so both counted as definitions nobody had looked at.
+ * MEASURED at v4573, tree-wide over all shapes: 619 unmentioned under the name-matched rule, 480 under this
+ * one. 145 of the difference are named by a gate that IMPORTS the module, and 139 of those in that gate's
+ * BODY rather than only its import list.
+ *
+ * A gate is an OWNER of a module when it imports it. That is the tie the check has always been about -- a
+ * gate that loads the module and names the symbol has looked at it -- and it is far narrower than "any gate
+ * anywhere names this word", which a common name like `add` would satisfy from the other side of the tree.
+ */
+export function gateIndex(root) {
+    const gates = [];
+    const walk = (dir) => {
+        let ents; try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+        for (const e of ents) {
+            const p = path.join(dir, e.name);
+            if (e.isDirectory()) { if (!/^(node_modules|vendor|\.git|\.venv)$/.test(e.name)) walk(p); continue; }
+            if (!/-selfcheck\.mjs$/.test(e.name)) continue;
+            let src; try { src = fs.readFileSync(p, "utf8"); } catch { continue; }
+            const imports = new Set();
+            for (const m of src.matchAll(/from\s+["\']([^"\']+)["\']/g))
+                if (m[1].startsWith(".")) imports.add(path.resolve(path.dirname(p), m[1]));
+            gates.push({ p, src,
+                body: src.replace(/^import[\s\S]*?from[^\n]*\n/gm, "").replace(/^\s*\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, ""),
+                imports });
+        }
+    };
+    walk(root);
+    return gates;
+}
+
 /** Exported one-line definitions, and whether the module's own gate names them. */
-export function definitionCoverage(root, sub = "physics", { shapes = "narrow" } = {}) {
-    const out = { total: 0, ungated: [], importOnly: [], gatedModules: 0, byKind: {} };
+export function definitionCoverage(root, sub = "physics", { shapes = "narrow", owners = null } = {}) {
+    // v4573 -- `owners` is a gateIndex(). Supplying it widens WHICH GATE may name a definition; leaving it
+    // null is the name-matched rule every frozen number below was set against. Same discipline as `shapes`
+    // at v4535: a second census beside the first, never an edit to it.
+    const out = { total: 0, ungated: [], importOnly: [], gatedModules: 0, byKind: {}, rescued: [] };
     const walk = (dir) => {
         let ents; try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
         for (const e of ents) {
@@ -121,8 +159,13 @@ export function definitionCoverage(root, sub = "physics", { shapes = "narrow" } 
                 out.byKind[m.kind] = (out.byKind[m.kind] || 0) + 1;
                 const rel = path.relative(root, p).replace(/\\/g, "/") + ":" + m.name;
                 const re = new RegExp("\\b" + m.name + "\\b");
-                if (!re.test(gsrc)) out.ungated.push(rel);
-                else if (!re.test(body)) out.importOnly.push(rel);
+                if (re.test(gsrc)) { if (!re.test(body)) out.importOnly.push(rel); continue; }
+                // Not named by the gate that shares its name. Under the widened rule, ask whether any gate
+                // that IMPORTS this module names it in its body; record those separately so the split between
+                // "the detector could not see it" and "nothing has looked at it" stays visible.
+                const byOwner = owners && owners.some((g) =>
+                    (g.imports.has(p) || g.imports.has(p.replace(/\.(js|mjs)$/, ""))) && re.test(g.body));
+                if (byOwner) out.rescued.push(rel); else out.ungated.push(rel);
             }
         }
     };
@@ -258,6 +301,81 @@ const cov = definitionCoverage(ENG);
         "unmentioned ones that the physics ratchet cannot see. REPORTED rather than ratcheted, because one " +
         "floor on the population that subsumes it is a floor somebody can act on and two are a number nobody " +
         "re-derives.");
+    // ---- v4573 -- THE THIRD CENSUS: WHICH GATE IS ALLOWED TO HAVE LOOKED AT A DEFINITION ----------------
+    //
+    // *** THE THREE RATCHETS ABOVE RESOLVE A MODULE TO ONE GATE, BY FILENAME, AND THAT HAS BECOME WRONG. ***
+    // It was right when a module had one gate. The temporal arc alone put ELEVEN gates beside
+    // render/ringFloor.mjs, and two of that module's exports -- EPS_F32 and ARITHMETIC_ULPS -- are driven
+    // hard by ringFloorPhase-selfcheck while ringFloor-selfcheck never names them. Both counted here as
+    // definitions nobody had looked at. They are not: the check's own stated subject is "a definition nobody
+    // had even looked at", and a gate that imports the module and names the symbol in its body has looked.
+    //
+    // MEASURED at v4573, tree-wide, all shapes: 619 unmentioned by the name-matched rule, 480 once an
+    // IMPORTING gate may also name it. The 145-symbol difference splits 139 named in an owning gate's BODY
+    // and 6 only in its import list. Per scope:
+    //
+    //                              name-matched      any importing gate
+    //     physics/, narrow              55                   37
+    //     tree-wide, narrow            321                  237
+    //     tree-wide, all shapes        619                  480
+    //
+    // *** TWO OF THE THREE STAY RED UNDER THE WIDER RULE, WHICH IS WHY IT IS NOT A WAY OUT. *** physics is
+    // 37 against a floor of 0 and tree-wide narrow is 237 against 209. Only the all-shapes count falls under
+    // its own pin, and it falls by 102 WITHOUT ONE SYMBOL BECOMING BETTER TESTED. A count that drops because
+    // the instrument got better is not the tree getting better, and reading it as progress would be the same
+    // error as lifting a baseline to meet the tree.
+    //
+    // SO IT IS A SECOND CENSUS, NOT AN EDIT TO THE FIRST -- the rule this file set for itself at v4535 and
+    // the reason the three numbers above are untouched by this section. `owners` defaults to null everywhere
+    // they are computed. This rule gets its own floor, at today's honest count, ratcheting down.
+    // 480 was this rule's count when the round began; 475 is where it ended, because the round PAID FIVE --
+    // nearestTexel in render/temporalLock.mjs and BYTES_PER_TEXEL, paddedBytesPerRow, halfToDouble and
+    // ICD_ROOT in tools/ship/headlessGpu.mjs, every one of them this arc's own debt and every one now keyed
+    // rather than merely mentioned. The pin is set at the ENDING number, so the five cannot be spent twice.
+    const BASELINE_OWNED = 475;   // v4573: tree-wide, all shapes, any importing gate -- ratchets down, never up
+    const owners = gateIndex(ENG);
+    const owned = definitionCoverage(ENG, "", { shapes: "all", owners });
+    ok("!! *** no NEW exported symbol is unmentioned by EVERY gate that imports its module ***",
+        owned.ungated.length <= BASELINE_OWNED && owned.rescued.length > 0,
+        owned.ungated.length > BASELINE_OWNED
+            ? "GREW to " + owned.ungated.length + ": " + owned.ungated.slice(0, 6).join(", ") + " ..."
+            : `${owned.ungated.length} of ${owned.total} against a frozen ${BASELINE_OWNED}; ` +
+              `${owned.rescued.length} more are named by an owning gate that is not the one sharing their name`);
+    report(`the two rules differ by ${shapesWide.ungated.length - owned.ungated.length} symbols -- ` +
+        `${shapesWide.ungated.length} unmentioned when only the name-matched gate may name a definition, ` +
+        `${owned.ungated.length} when any gate that IMPORTS the module may. THE DIFFERENCE IS INSTRUMENT, NOT ` +
+        `COVERAGE: not one of those symbols became better tested, and the ${owned.ungated.length} that remain ` +
+        `are the floor with no detector artefact left in it.`);
+    ok("  and the wider rule is not a way out of the three ratchets above -- two of them stay red under it, so this is a correction and not an amnesty",
+        (() => { const a = definitionCoverage(ENG, "physics", { shapes: "narrow", owners });
+                 const b = definitionCoverage(ENG, "", { shapes: "narrow", owners });
+                 return a.ungated.length > BASELINE && b.ungated.length > BASELINE_WIDE; })(),
+        `physics ${definitionCoverage(ENG, "physics", { shapes: "narrow", owners }).ungated.length} against ${BASELINE}, ` +
+        `tree-wide narrow ${definitionCoverage(ENG, "", { shapes: "narrow", owners }).ungated.length} against ${BASELINE_WIDE}`);
+    // *** AND THE OWNERSHIP TIE IS NARROW ON PURPOSE. *** "Any gate anywhere names this word" would be
+    // satisfied for a symbol called `add` by a gate on the other side of the tree that has never heard of the
+    // module. The tie is an IMPORT: the gate loaded this module. This row fails if that stops being true.
+    // *** THE NEGATIVE CONTROL FOR `owners`, AND THE SABOTAGE THAT ASKED FOR IT. *** `shapes` has had one
+    // since v4535 because a wider default silently re-baselines every frozen number against a bigger
+    // denominator. `owners` is the same hazard from the other side -- a more GENEROUS coverage rule leaking
+    // into the three ratchets above would shrink their counts without shrinking the debt. MEASURED at v4573
+    // by passing owners into the tree-wide narrow ratchet: it read 234 instead of 321 and NOTHING CAUGHT IT,
+    // because all three were already red and stayed red on a different number. The tie is exact rather than
+    // numeric: `rescued` is populated ONLY when owners is supplied, so an empty one on all three proves the
+    // frozen numbers were taken under the old rule.
+    ok("!! CONTROL: none of the three frozen ratchets above was computed with the wider ownership rule",
+        cov.rescued.length === 0 && wide.rescued.length === 0 && shapesWide.rescued.length === 0 &&
+        owned.rescued.length > 0,
+        `physics ${cov.rescued.length}, tree-wide ${wide.rescued.length}, all-shapes ${shapesWide.rescued.length} rescued ` +
+        `(each must be 0), against ${owned.rescued.length} in the census that does use it. IF THIS ROW GOES RED, ` +
+        `a frozen number has been re-baselined against a more generous rule without moving`);
+    ok("  and ownership means the gate IMPORTS the module, not that some gate somewhere uses the same word",
+        (() => { const g = owners.find((x) => /ringFloorPhase-selfcheck/.test(x.p));
+                 if (!g) return false;
+                 const rf = path.join(ENG, "render", "ringFloor.mjs"), lock = path.join(ENG, "render", "temporalLock.mjs");
+                 return g.imports.has(rf) && !g.imports.has(path.join(ENG, "physics", "chaos", "logistic.mjs")); })(),
+        `${owners.length} gates indexed by what they import`);
+
     // *** THE NEGATIVE CONTROL, AND IT IS THE ROW THAT MAKES THE PARAMETER SAFE. *** If `shapes: "all"` ever
     // leaks into the default, every frozen number above is silently re-baselined against a bigger denominator
     // -- the exact failure the split was made to avoid. So the narrow rule is driven over a fixture carrying

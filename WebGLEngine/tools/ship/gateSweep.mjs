@@ -3767,6 +3767,61 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since232: Object.freeze({
+        at: "v4573", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/definitionGates-selfcheck.mjs",
+                                "tools/ship/headlessGpu-selfcheck.mjs",
+                                "render/temporalLock-selfcheck.mjs"]),
+        verdict: "NO NEW GATE. Three existing ones widened, which is what the work was. *** v4572 LEFT SEVEN " +
+                 "TREE-WIDE CENSUS GATES RED AND NAMED definitionGates FIRST: 618 EXPORTED SYMBOLS WITH NO " +
+                 "GATE NAMING THEM, AND THE QUESTION WAS WHETHER THAT IS DEBT OR A DETECTOR MISCOUNTING. *** " +
+                 "It is both, and the split is measurable. The census resolves a module to ONE gate, by " +
+                 "filename. That was right when a module had one gate; the temporal arc alone put ELEVEN " +
+                 "beside render/ringFloor.mjs, and EPS_F32 and ARITHMETIC_ULPS are driven hard by " +
+                 "ringFloorPhase-selfcheck while ringFloor-selfcheck never names them -- so both counted as " +
+                 "definitions nobody had looked at. MEASURED tree-wide over all shapes: 619 unmentioned under " +
+                 "the name-matched rule, 480 once a gate that IMPORTS the module may also name it, the " +
+                 "difference being 139 symbols named in an owning gate's BODY. *** BUT IT IS NOT A WAY OUT, " +
+                 "AND THAT IS THE POINT: *** physics reads 55 -> 37 against a floor of 0 and tree-wide narrow " +
+                 "321 -> 237 against 209, so TWO OF THE THREE FROZEN RATCHETS STAY RED under the wider rule. " +
+                 "Only the all-shapes count falls under its pin, by 102, WITHOUT ONE SYMBOL BECOMING BETTER " +
+                 "TESTED -- a count that drops because the instrument improved is not the tree improving, and " +
+                 "reading it as progress would be the same error as lifting a baseline to meet the tree. *** " +
+                 "SO IT IS A SECOND CENSUS, NOT AN EDIT TO THE FIRST *** -- the rule this file set for itself " +
+                 "at v4535 -- and the three frozen numbers are untouched: `owners` defaults to null wherever " +
+                 "they are computed, and they still read 55 / 321 / 613. The new rule gets its own floor at " +
+                 "475. *** AND THE ROUND PAID FIVE, ALL OF THEM THIS ARC'S OWN DEBT. *** Of 21 unmentioned " +
+                 "symbols in the arc's modules, 16 were the detector's blind spot and FIVE were genuinely " +
+                 "unlooked-at: nearestTexel, which every ring fetch in temporalLock goes through and whose one " +
+                 "interesting choice was explained only by a comment in the SHADER beside it (floor, not " +
+                 "round, because round ties to even in WGSL and half-up in JavaScript); and BYTES_PER_TEXEL, " +
+                 "paddedBytesPerRow, halfToDouble and ICD_ROOT -- the arithmetic that turns a read-back " +
+                 "texture into numbers, which v4572's closing listed as the thing it could not check. All " +
+                 "five are keyed now, not mentioned: the half decode is held to the format's OWN mantissa " +
+                 "(worst 4.685e-4 against 2^-11 = 4.883e-4 over 2000 values), all three exponent branches are " +
+                 "reached, and the unknown-format fallback is taken at a width where four and eight bytes " +
+                 "DIFFER, because 64 is exactly the width where they do not. The arc now owes zero. *** A " +
+                 "SABOTAGE ASKED FOR THE ROUND'S LAST ROW. *** Nine mutations scored 2/1/1/2/5/1/1/4 and then " +
+                 "a ninth: leaking `owners` into a frozen ratchet moved it from 321 to 234 and NOTHING CAUGHT " +
+                 "IT, because all three were already red and stayed red on a different number. `shapes` has " +
+                 "had a negative control since v4535 for exactly this; `owners` now has one, tied to " +
+                 "something exact rather than numeric -- `rescued` is populated only when owners is supplied, " +
+                 "so an empty one on all three proves the frozen numbers were taken under the old rule. 9/9 " +
+                 "red after. *** TIMINGS, AND TWO CORRECTIONS THIS ROUND MADE TO ITSELF. *** definitionGates " +
+                 "502 -> 1841 ms, mine and inside budget. render/temporalLock-selfcheck read 3346 ms and " +
+                 "looked like my doing -- it measures 4009 ms AT HEAD on the same code, so it was over the " +
+                 "3000 ms budget before this round and its recorded 2160 ms was the low end of a wide spread " +
+                 "(3911/2655/2464 across three runs); re-recorded at 2655. headlessGpu-selfcheck ran 180,857 " +
+                 "ms and looked like a 200x regression -- run again back to back on the identical file it " +
+                 "took 805 ms, against 870 at HEAD. IT IS BIMODAL, not regressed, and a gate that sometimes " +
+                 "takes three minutes against quickSweep's 20 s SIGKILL cap is a concrete mechanism for the " +
+                 "138 gates v4572 observed at or over that cap. NOT INVESTIGATED HERE. And the pre-flight " +
+                 "earned its keep: a stray tools/ship/temporalLock-selfcheck.mjs, created by a bug in this " +
+                 "round's own sabotage-restore loop where the first cp succeeded instead of falling through, " +
+                 "was named by the gate-count check before the verify rather than found in the diff.",
+    }),
     since231: Object.freeze({
         at: "v4572", swept: 1, green: 1, red: 0,
         added: Object.freeze([

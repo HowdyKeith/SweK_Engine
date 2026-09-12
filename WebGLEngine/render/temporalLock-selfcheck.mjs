@@ -19,7 +19,8 @@ import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "../tools/ship/webgpuHarness.mjs";
 import { validateWgsl } from "./wgslSpec.mjs";
 import { makeLumaState, pushLuma, lumaMean, lumaMeanPrev, lumaInstability, shadingShiftCPU,
-         makeLockState, newLocksCPU, lockCandidatesFromRing, ridgesCPU, advanceLocks, lockRelaxation, luma } from "./temporalLock.mjs";
+         makeLockState, newLocksCPU, lockCandidatesFromRing, ridgesCPU, advanceLocks, lockRelaxation, luma,
+         nearestTexel } from "./temporalLock.mjs";
 import { RING_PUSH_WGSL, SHADING_SHIFT_WGSL, RIDGE_WGSL } from "./temporalLockWgsl.mjs";
 import { rectifiedAccumulateCPU, historyFactorCPU, disocclusionCPU } from "./temporalReject.mjs";
 import { mat4Invert, mat4Multiply, motionVectorsCPU } from "./motionVectors.mjs";
@@ -514,4 +515,49 @@ console.log("unchecked here: a lock detector that CAN separate a thin feature fr
     "come from camera translation only; and the memory this rung spends, which is 2*P scalars per pixel and " +
     "is the reason FSR2 uses 4 rather than the phase count -- section 1 prices that choice but nothing here " +
     "argues the other side of it.");
+// ================================================================================================
+// *** v4573 -- nearestTexel, WHICH BOTH SAMPLERS IN THIS MODULE GO THROUGH AND NO GATE HAD NAMED. ***
+//
+// v4559 exported it so sampleScalarFilled and advanceLocks would stop each having their own copy of the
+// arithmetic, and definitionGates' census then found it unmentioned by any gate that imports this module --
+// a function on the path of every ring fetch, never once looked at. The kernel beside it carries the reason
+// for its one interesting choice ("floor, not round: round() ties to EVEN in WGSL and half-UP in
+// JavaScript"), which is a comment in a shader explaining a decision taken in a JavaScript file that nothing
+// checked. These rows check it where it is made.
+console.log("\n9. THE TEXEL THIS MODULE'S SAMPLERS LAND ON");
+{
+    const W = 32, H = 16;
+    // A sample anywhere inside texel i's cell resolves to i. Checked at three points across EVERY cell
+    // rather than at a handful, because an off-by-one at one edge is the whole failure mode.
+    let cells = 0, wrong = 0;
+    for (let i = 0; i < W; i++) for (const f of [0.01, 0.5, 0.99]) {
+        cells++; if (nearestTexel((i + f) / W, 0.5 / H, W, H) % W !== i) wrong++;
+    }
+    ok(`nearestTexel resolves a sample to the texel whose CELL contains it, at three points in all ${W} cells`,
+        wrong === 0, `${cells} samples, ${wrong} landing on the wrong texel`);
+    // *** THE CHOICE THE KERNEL'S COMMENT EXPLAINS, PINNED ON THE SIDE THAT MAKES IT. *** A sample exactly
+    // on a boundary belongs to the HIGHER texel, which is floor's answer. Math.round would disagree at the
+    // half -- and disagree with WGSL's round as well, which ties to even. Using floor on both sides removes
+    // the language from the question entirely, and that is what this row holds.
+    const u = 22.5 / W;
+    ok("  and a sample exactly on a texel boundary belongs to the HIGHER texel, which is floor's answer and not round's -- the choice temporalLockWgsl's comment explains and this is the side that makes it",
+        nearestTexel(22 / W, 0, W, H) === 22 && Math.floor(u * W) === 22 && Math.round(u * W) === 23,
+        `u*w = 22.5: floor 22, JS round 23 (half-up), WGSL round 22 (to even) -- floor is the only answer that does not depend on the language`);
+    // Out of range is CLAMPED, not wrapped: a reprojection that leaves the frame reads an edge texel. The
+    // difference matters because a wrap would read the opposite edge and look like plausible content.
+    ok("  and a sample outside the frame is CLAMPED to the edge texel, not wrapped to the far side where it would look like plausible content",
+        nearestTexel(-5, 0.5 / H, W, H) % W === 0 && nearestTexel(5, 0.5 / H, W, H) % W === W - 1 &&
+        nearestTexel(1.0, 0.5 / H, W, H) % W === W - 1,
+        `u = -5 -> 0, u = 5 -> ${W - 1}, u = 1.0 -> ${W - 1} (1.0 is off the last cell's open end)`);
+    // It returns a FLAT index. A version that dropped the row term would pass every row above, since they
+    // all read the index modulo W.
+    ok("  and it returns a flat y*w+x index, checked where the row term is the only thing that differs",
+        nearestTexel(0.5 / W, (3 + 0.5) / H, W, H) === 3 * W + 0 &&
+        nearestTexel((7 + 0.5) / W, (3 + 0.5) / H, W, H) === 3 * W + 7,
+        `row 3 col 0 -> ${3 * W}, row 3 col 7 -> ${3 * W + 7}`);
+    ok("  and the y axis is clamped by h, not by w -- a non-square frame is where those two stop being the same mistake",
+        nearestTexel(0.5 / W, 5, W, H) === (H - 1) * W && W !== H,
+        `${W}x${H}: v = 5 -> row ${H - 1}`);
+}
+
 process.exit(fails ? 1 : 0);
