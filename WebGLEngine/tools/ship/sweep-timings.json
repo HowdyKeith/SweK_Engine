@@ -1,6 +1,6 @@
 {
  "note": "OBSERVED at the last quickSweep run: ms per gate (serial where a serial re-run happened) and exit code. Rewritten every run; used only to choose which gates are under the ship-time budget. Not a claim about the tree -- the register is. `at` is PER ENTRY (v4408): the capture that actually observed that gate. `captured` is this run's stamp and applies ONLY to entries whose `at` equals it -- the rest were not run and say so. `crossings` (v4536) counts CONSECUTIVE sweeps on which a gate came in over budget, and it takes two to evict: one crossing is a reading from one hour, and this box moves 12-36% between hours on unchanged code. A gate that comes back under loses its count entirely.",
- "captured": "2026-09-11T12:29:11.330Z",
+ "captured": "2026-09-12T00:42:44.382Z",
  "budgetMs": 3000,
  "capMs": 20000,
  "timings": {
@@ -1018,7 +1018,7 @@
   "tools/ship/corpusText-selfcheck.mjs": 703,
   "tools/ship/coverageTriage-selfcheck.mjs": 7885,
   "tools/ship/crossArchDoor-selfcheck.mjs": 809,
-  "tools/ship/crossBackend-selfcheck.mjs": 20487,
+  "tools/ship/crossBackend-selfcheck.mjs": 25772,
   "tools/ship/crossdesk-selfcheck.mjs": 153,
   "tools/ship/crossdeskProxy-selfcheck.mjs": 115,
   "tools/ship/crtPass-selfcheck.mjs": 5398,
@@ -1636,7 +1636,8 @@
   "render/ringFloorStat-selfcheck.mjs": 418,
   "render/ringFloorDevice-selfcheck.mjs": 1454,
   "render/kernelAudit-selfcheck.mjs": 297,
-  "render/ringFloorPhase-selfcheck.mjs": 1030
+  "render/ringFloorPhase-selfcheck.mjs": 1030,
+  "tools/ship/harnessLiveness-selfcheck.mjs": 2435
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -3271,7 +3272,8 @@
   "render/ringFloorStat-selfcheck.mjs": 0,
   "render/ringFloorDevice-selfcheck.mjs": 0,
   "render/kernelAudit-selfcheck.mjs": 0,
-  "render/ringFloorPhase-selfcheck.mjs": 0
+  "render/ringFloorPhase-selfcheck.mjs": 0,
+  "tools/ship/harnessLiveness-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-08T20:46:53.412Z",
@@ -4288,7 +4290,7 @@
   "tools/ship/corpusText-selfcheck.mjs": "2026-09-08T20:46:53.412Z",
   "tools/ship/coverageTriage-selfcheck.mjs": "unknown -- before v4408",
   "tools/ship/crossArchDoor-selfcheck.mjs": "2026-09-08T20:46:53.412Z",
-  "tools/ship/crossBackend-selfcheck.mjs": "2026-09-07T05:54:14.427Z",
+  "tools/ship/crossBackend-selfcheck.mjs": "2026-09-12T00:42:44.382Z",
   "tools/ship/crossdesk-selfcheck.mjs": "2026-09-08T20:46:53.412Z",
   "tools/ship/crossdeskProxy-selfcheck.mjs": "2026-09-08T20:46:53.412Z",
   "tools/ship/crtPass-selfcheck.mjs": "unknown -- before v4408",
@@ -4906,7 +4908,8 @@
   "render/ringFloorStat-selfcheck.mjs": "2026-09-11T12:10:00.000000Z",
   "render/ringFloorDevice-selfcheck.mjs": "2026-09-11T13:40:00.000000Z",
   "render/kernelAudit-selfcheck.mjs": "2026-09-11T15:20:00.000000Z",
-  "render/ringFloorPhase-selfcheck.mjs": "2026-09-11T12:29:11.330Z"
+  "render/ringFloorPhase-selfcheck.mjs": "2026-09-11T12:29:11.330Z",
+  "tools/ship/harnessLiveness-selfcheck.mjs": "2026-09-12T00:42:44.382Z"
  },
  "crossings": {
   "tools/roundhouse/knobPromotions-selfcheck.mjs": 2,

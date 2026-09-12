@@ -50,6 +50,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as B from "../../render/bloomFused.mjs";
 import { PROBE_WGSL, FRAGMENT_WGSL, packKnobs } from "../../render/badTvWgsl.mjs";
+import { temporalEntries } from "./temporalCorpus.mjs";   // v4572 -- the temporal arc's thirteen, fixtured there
 import * as PT from "../../physics/render/pathTracerWgsl.mjs";
 import * as GD from "../../render/gpuDriven.mjs";
 import { FIELD_FRAGMENT_WGSL } from "../../render/badTvWgsl.mjs";
@@ -514,6 +515,13 @@ export function corpus() {
                "about what an out-of-range value becomes, which is a correctness decision and not a rounding one",
           opts: { code: B.fusedWgslToTexture({ format: B.STORAGE_FORMATS.clipping }), n,
                   format: B.STORAGE_FORMATS.clipping, uniforms: [T, 0, 0, 0], workgroups: (n / B.TILE) * (n / B.TILE) } },
+        // *** v4572 -- THE TEMPORAL ARC'S THIRTEEN, WHICH v4571 MADE VISIBLE AND THIS ROUND ANSWERS. ***
+        // They live in their own module because each needs a fixture rather than a uniform vector, and
+        // because their bindings are read out of the kernels instead of restated -- see temporalCorpus.mjs
+        // on why thirteen hand-copied binding tables was not an option once v4572 measured what a wrong
+        // one costs. Eleven are dispatched; LUMA_WGSL and YCOCG_WGSL are function fragments with no entry
+        // point and are compiled inside a shell that calls them.
+        ...temporalEntries(),
     ];
 }
 
@@ -690,6 +698,17 @@ export async function compare(entry, runBrowser, runNative, runBrowserTex = null
                  browserOk: b.ok, nativeOk: a.ok,
                  errors: [...(b.errors || []), ...(a.errors || [])] };
     if (!b.ok || !a.ok) return { id: entry.id, ok: false, reason: b.reason || a.reason || "run failed" };
+    // *** v4572 -- AND A RUN THAT WROTE NOTHING IS NOT A COMPARISON. *** Both harnesses now fill the
+    // read-back with LIVENESS_SENTINEL when the entry supplies no outInit, and report `wroteNothing` when
+    // every word of it survives. Without this the loop below scores two untouched buffers as
+    // { same: n, identical: true } -- MEASURED at v4572 on a kernel bound so that it wrote to a buffer
+    // nobody reads: eight of eight identical, no error on either side, and "no divergence" reported for a
+    // result neither backend produced. Agreement between two silences is the cheapest pass there is.
+    if (b.wroteNothing || a.wroteNothing)
+        return { id: entry.id, ok: false, wroteNothing: true,
+                 reason: "the read-back is untouched on " +
+                         (b.wroteNothing && a.wroteNothing ? "BOTH backends" : b.wroteNothing ? "the browser" : "the native") +
+                         " -- this entry's out buffer is not where its kernel writes, so there is nothing to compare" };
     let same = 0, maxAbs = 0, firstDiff = -1;
     for (let i = 0; i < b.values.length; i++) {
         if (b.values[i] === a.values[i]) same++;

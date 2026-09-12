@@ -3767,6 +3767,68 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since231: Object.freeze({
+        at: "v4572", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/harnessLiveness-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/crossBackend-selfcheck.mjs"]),
+        verdict: "green, 2.44 s, under the 3000 ms budget. *** v4571 LEFT crossBackend NAMING THIRTEEN " +
+                 "UNREGISTERED KERNELS AND ANSWERING THEM FOUND SOMETHING UNDERNEATH: THE CROSS-BACKEND " +
+                 "HARNESS COULD NOT TELL AGREEMENT FROM SILENCE. *** MEASURED on a kernel that must write " +
+                 "src + 7 at every lane: bound so the device REJECTS the bind group, both harnesses returned " +
+                 "{ ok: true, errors: [] } and a field of zeros -- createBindGroup hands back an invalid " +
+                 "object rather than throwing, the submit is dropped, and the read-back is the zeros it was " +
+                 "created with. Bound VALIDLY but with the read-back where the kernel reads its INPUT, no " +
+                 "error is raised on either side at all: a legal program writing to a buffer nobody reads. " +
+                 "Either way wgslCorpus.compare scored { n: 8, same: 8, identical: true }. The corpus's " +
+                 "headline claim, 'no divergence anywhere', was satisfiable by a kernel that never ran on " +
+                 "either side -- and the whole temporal arc was one option away from that state, since its " +
+                 "thirteen kernels put dst at bindings 1 to 4 and the uniform last while both harnesses " +
+                 "hard-coded out-at-0 and uniform-at-1. Registering them without this would have added " +
+                 "thirteen silent passes. *** THREE REPAIRS AND ONLY ONE IS AN ERROR CHECK. *** A validation " +
+                 "error scope catches the rejected case. NOTHING catches the second -- no error exists -- so " +
+                 "the read-back is filled with LIVENESS_SENTINEL and a run leaving every word intact reports " +
+                 "`wroteNothing`, which compare() refuses. And the browser TEXTURE path already had a scope " +
+                 "whose finding it pushed into a list and returned ok:true beside: gathering evidence and " +
+                 "not acting on it is the same fault as never gathering it. `outBinding`/`uniformBinding` " +
+                 "make the arc's convention runnable. MEASURED SAFE: the existing 70-entry corpus and all 20 " +
+                 "harness-calling gates in the tree swept green with all of it in place. *** AND THE " +
+                 "THIRTEEN ARE ANSWERED: crossBackend IS GREEN, a red that had stood since v4560. *** 101 " +
+                 "corpus entries, 35 excluded, ZERO unaccounted. Eleven kernels dispatched -- 7,680 floats, " +
+                 "0 untouched, all identical across backends -- and LUMA_WGSL and YCOCG_WGSL turned out not " +
+                 "to be kernels at all but function fragments with no entry point, so they are compiled " +
+                 "inside a shell that CALLS them, because a fragment is only covered where the splice site " +
+                 "uses it. *** THE BINDINGS ARE PARSED OUT OF EACH KERNEL, NOT RESTATED. *** Thirteen " +
+                 "hand-copied binding tables is thirteen chances to write 2 for 3, and this round measured " +
+                 "what a wrong one costs. *** LIVENESS IS NOT EXERCISE, AND THIS ROUND'S OWN FIXTURE PROVED " +
+                 "IT. *** DISOCCLUSION passed every check above while writing 256 identical zeros: the " +
+                 "shared motion field's expected-depth channel sat 0.08 below the threshold at every pixel. " +
+                 "Two backends agreeing on one constant is not evidence about a branch. A dedicated fixture " +
+                 "straddles it, and a row now refuses any dispatched entry whose output has one distinct " +
+                 "value. Eight sabotages scored 2/3/2/1/3/1/3/crash-only, no 0-RED -- after a repair: the " +
+                 "FIRST run went 0-RED on giving the two harnesses DIFFERENT sentinels, because all three " +
+                 "sentinel rows read the constant in THIS process and none watched either harness use it, a " +
+                 "claim about a label rather than behaviour and the same fault v4571's window-form control " +
+                 "made one round earlier. The separating case is a PARTIALLY written read-back, where two " +
+                 "fills read as a DIVERGENCE -- a red pointing at the kernel for a defect in the harness. " +
+                 "*** OBSERVED, NOT CLAIMED: *** 138 gates sit at or over quickSweep's 20 s SIGKILL cap, and " +
+                 "the cluster at 20.2 s records code 124; crossBackend records code 0 at what was 20,487 ms " +
+                 "and is now 25,772 ms with the thirteen, consistent with the serial re-run the timings note " +
+                 "describes rather than with a killed verdict. This round did not investigate that and does " +
+                 "not claim it. Of the eight tree-wide census gates v4571 found red at HEAD, this round " +
+                 "answered ONE; frameDirtyCensus, gateSelection, referenceKind, definitionGates, staleness, " +
+                 "statedRuntime and recordReach are exactly where they were. *** AND out-AT-0 / uniform-AT-1 " +
+                 "WAS BAKED IN THREE PLACES. *** Both harnesses hard-coded it and so did computeRun.mjs's " +
+                 "corpusSpec, the device path deviceCompute-selfcheck drives: every corpus entry until now " +
+                 "happened to follow the convention, so nothing ever had to declare it, and adding the " +
+                 "thirteen turned corpusSpec's at(0) into a demand for a buffer nobody supplies -- TWELVE " +
+                 "REDS, found by the verify sweep and by none of the three harnesses. Repaired in the third " +
+                 "place and in deviceCompute's packer, which dropped the two options crossing into the page: " +
+                 "a field that exists is not a field that travels. The thirteen therefore run on THREE paths " +
+                 "now, and deviceCompute reports 86,541 floats across 32 kernels.",
+    }),
     since230: Object.freeze({
         at: "v4571", swept: 1, green: 1, red: 0,
         added: Object.freeze([

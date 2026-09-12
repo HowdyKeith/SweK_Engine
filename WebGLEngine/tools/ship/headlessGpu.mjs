@@ -224,6 +224,15 @@ export const MEASURED = Object.freeze({
  * multiple of 4 (WebGPU refuses an odd-sized buffer, and a Uint16Array of odd length is one). The padding is
  * zero and sits past the last real element, where a shader that indexes correctly never reads.
  */
+/**
+ * *** v4572 -- THE VALUE AN UNTOUCHED READ-BACK CARRIES, so that "nothing ran" and "it wrote zeros" stop
+ * being the same reading. *** -999999 is outside every range this corpus computes (the widest is the path
+ * tracer's coverage buffer) and is exactly representable in f32, so an equality test against it is not a
+ * tolerance. The browser harness fills with the same number; the two must agree or a liveness failure would
+ * read as a divergence.
+ */
+export const LIVENESS_SENTINEL = -999999;
+
 export function storageWords(data) {
     const u8 = data instanceof ArrayBuffer ? new Uint8Array(data)
              : ArrayBuffer.isView(data) ? new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
@@ -235,9 +244,18 @@ export function storageWords(data) {
     return new Uint32Array(out.buffer);
 }
 
+// *** v4572 -- `outBinding` AND `uniformBinding`, BECAUSE 0-AND-1 WAS A HOUSE STYLE MISTAKEN FOR A LAW. ***
+// Every corpus entry until now declared its out buffer at binding 0 and its uniform at 1, and the harness
+// hard-coded that. The temporal arc (v4552-v4571) writes thirteen kernels the other way round -- inputs
+// first, dst next, uniform last -- so running one here bound the READ-BACK buffer where the kernel reads its
+// INPUT. The device is perfectly happy with that: the bind group is valid, the kernel runs, it writes to a
+// buffer nobody reads, and the read-back is whatever it was created as. MEASURED at v4572 with a -999 fill:
+// the harness returned ok:true, no errors, and eight untouched sentinels. NO ERROR SCOPE CATCHES THIS ONE,
+// which is why `outInit` now defaults to a sentinel and a run that leaves it whole is reported as such.
 export async function runWgslComputeNative({ code, entryPoint = "main", outCount, uniforms = null,
                                              workgroups = 1, compileOnly = false, requireFn = null,
-                                             inputs = null, outInit = null } = {}) {
+                                             inputs = null, outInit = null,
+                                             outBinding = 0, uniformBinding = 1 } = {}) {
     const skip = headlessGpuSkipReason(requireFn);
     if (skip) return { ok: false, skipped: true, reason: skip, values: [], errors: [] };
     const icd = configureVulkanIcd();
@@ -267,14 +285,19 @@ export async function runWgslComputeNative({ code, entryPoint = "main", outCount
         const outBuf = dev.createBuffer({ size: bytes, usage: U.STORAGE | U.COPY_SRC | U.COPY_DST });
         // v4465 -- `outInit`: the out buffer's starting contents, for a kernel that works IN PLACE on binding 0 (the
         // XPBD solve relaxes the prediction it is handed). Same option on the browser harness, same signature.
+        // *** v4572 -- AND WHEN THE CALLER SUPPLIES NONE, THE FILL IS A SENTINEL RATHER THAN ZEROS. *** A
+        // zero-filled read-back is indistinguishable from a kernel that wrote zeros, so "the buffer is still
+        // as created" was not a question this harness could answer. LIVENESS_SENTINEL is a value no kernel
+        // here produces, and `wroteNothing` below reports a run that left every word of it intact.
         if (outInit) dev.queue.writeBuffer(outBuf, 0, storageWords(outInit).subarray(0, outCount));
+        else dev.queue.writeBuffer(outBuf, 0, new Float32Array(outCount).fill(LIVENESS_SENTINEL));
         const readBuf = dev.createBuffer({ size: bytes, usage: U.COPY_DST | U.MAP_READ });
-        const entries = [{ binding: 0, resource: { buffer: outBuf } }];
+        const entries = [{ binding: outBinding, resource: { buffer: outBuf } }];
         let uniBuf = null;
         if (uniforms) {
             uniBuf = dev.createBuffer({ size: Math.max(16, uniforms.length * 4), usage: U.UNIFORM | U.COPY_DST });
             dev.queue.writeBuffer(uniBuf, 0, new Float32Array(uniforms));
-            entries.push({ binding: 1, resource: { buffer: uniBuf } });
+            entries.push({ binding: uniformBinding, resource: { buffer: uniBuf } });
         }
         // v4457 -- READ-ONLY STORAGE INPUTS, so a probe can read the bytes a texture would hold. The Slug gate
         // hands the atlas's own Uint16Arrays in here and unpacks halves on the device; a uniform buffer could not
@@ -287,6 +310,17 @@ export async function runWgslComputeNative({ code, entryPoint = "main", outCount
             entries.push({ binding: inp.binding, resource: { buffer: b } });
             inBufs.push(b);
         }
+        // *** v4572 -- EVERYTHING FROM HERE IS INSIDE A VALIDATION ERROR SCOPE, AND THE REASON IS THE WORST
+        // KIND OF PASS. *** Until this round a bind group the device REJECTED cost nothing: createBindGroup
+        // returns an invalid object rather than throwing, the submit is dropped, the read-back is still the
+        // zeros the buffer was created with, and this function returned { ok: true, errors: [] } beside them.
+        // MEASURED at v4572: a kernel that must write src + 7 everywhere, run with its input bound where the
+        // code declares read_write, returned ok:true and eight zeros on BOTH harnesses -- and
+        // wgslCorpus.compare scored it { n: 8, same: 8, identical: true }. The corpus's headline claim, "no
+        // divergence anywhere", is satisfiable by a kernel that never ran on either side. Two backends
+        // agreeing because neither did anything is v4402's fault sitting inside the instrument this tree
+        // uses to prove parity.
+        dev.pushErrorScope("validation");
         const pipe = dev.createComputePipeline({ layout: "auto", compute: { module: shader, entryPoint } });
         const bind = dev.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries });
         const enc = dev.createCommandEncoder();
@@ -295,12 +329,21 @@ export async function runWgslComputeNative({ code, entryPoint = "main", outCount
         cp.setPipeline(pipe); cp.setBindGroup(0, bind); cp.dispatchWorkgroups(...(Array.isArray(workgroups) ? workgroups : [workgroups])); cp.end();
         enc.copyBufferToBuffer(outBuf, 0, readBuf, 0, bytes);
         dev.queue.submit([enc.finish()]);
+        const validation = await dev.popErrorScope();
+        if (validation) {
+            outBuf.destroy(); readBuf.destroy(); uniBuf?.destroy();
+            for (const b of inBufs) b.destroy();
+            return { ok: false, skipped: false, values: [], ...meta,
+                     reason: "the device REJECTED this run -- an empty read-back is not a measurement",
+                     errors: [String(validation.message || validation).slice(0, 300)] };
+        }
         await readBuf.mapAsync(M.READ);
         const values = Array.from(new Float32Array(readBuf.getMappedRange()));
         readBuf.unmap();
         outBuf.destroy(); readBuf.destroy(); uniBuf?.destroy();
         for (const b of inBufs) b.destroy();
-        return { ok: true, skipped: false, values, errors: [], ...meta };
+        const wroteNothing = !outInit && outCount > 0 && values.every((v) => v === LIVENESS_SENTINEL);
+        return { ok: true, skipped: false, values, errors: [], wroteNothing, ...meta };
     } catch (e) {
         return { ok: false, skipped: false, reason: "headlessGpu error: " + String(e).slice(0, 200), values: [], errors: [] };
     }
@@ -410,6 +453,17 @@ export async function runWgslComputeToTextureNative({ code, entryPoint = "main",
             entries.push({ binding: 1, resource: { buffer: ub } });
         }
 
+        // *** v4572 -- THE TEXTURE PATH TAKES THE SAME SCOPE, FOR THE SAME REASON. *** See the buffer
+        // path above: a rejected bind group returned ok:true beside a read-back nobody wrote. *** Until this round a bind group the device REJECTED cost nothing: createBindGroup
+        // returns an invalid object rather than throwing, the submit is dropped, the read-back is still the
+        // zeros the buffer was created with, and this function returned { ok: true, errors: [] } beside them.
+        // MEASURED at v4572: a kernel that must write src + 7 everywhere, run with its input bound where the
+        // code declares read_write, returned ok:true and eight zeros on BOTH harnesses -- and
+        // wgslCorpus.compare scored it { n: 8, same: 8, identical: true }. The corpus's headline claim, "no
+        // divergence anywhere", is satisfiable by a kernel that never ran on either side. Two backends
+        // agreeing because neither did anything is v4402's fault sitting inside the instrument this tree
+        // uses to prove parity.
+        dev.pushErrorScope("validation");
         const pipe = dev.createComputePipeline({ layout: "auto", compute: { module: shader, entryPoint } });
         const bind = dev.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries });
         const enc = dev.createCommandEncoder();
@@ -417,6 +471,13 @@ export async function runWgslComputeToTextureNative({ code, entryPoint = "main",
         cp.setPipeline(pipe); cp.setBindGroup(0, bind); cp.dispatchWorkgroups(...(Array.isArray(workgroups) ? workgroups : [workgroups])); cp.end();
         enc.copyTextureToBuffer({ texture: tex }, { buffer: readBuf, bytesPerRow }, [n, n]);
         dev.queue.submit([enc.finish()]);
+        const validation = await dev.popErrorScope();
+        if (validation) {
+            tex.destroy(); readBuf.destroy();
+            return { ok: false, skipped: false, pixels: [], ...meta,
+                     reason: "the device REJECTED this run -- an empty read-back is not a measurement",
+                     errors: [String(validation.message || validation).slice(0, 300)] };
+        }
         await readBuf.mapAsync(MM.READ);
         const raw = new Uint8Array(readBuf.getMappedRange()).slice();
         readBuf.unmap();

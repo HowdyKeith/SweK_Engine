@@ -41,7 +41,7 @@ import { createRequire } from "node:module";
 import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
 import fs from "node:fs";
 import path from "node:path";   // used by renderThreePassToPixels, which serves the engine tree over HTTP
-import { storageWords } from "./headlessGpu.mjs";   // v4457 -- the storage-input packing both harnesses share
+import { storageWords, LIVENESS_SENTINEL } from "./headlessGpu.mjs";   // v4457 -- the storage-input packing both harnesses share; v4572 -- and the liveness fill, which must be ONE number
 // the software-adapter names live in ONE place -- rewriting the regex here would be a second copy of a
 // list that ui/localModelProbe.js already owns and tools/ship/localModelProbe-selfcheck.mjs already gates
 import { SOFTWARE_HINTS } from "../../ui/localModelProbe.js";
@@ -72,7 +72,8 @@ export function webgpuSkipReason(requireFn = createRequire(import.meta.url)) {
  */
 export async function runWgslCompute({ code, entryPoint = "main", outCount, uniforms = null,
                                        workgroups = 1, compileOnly = false, timeoutMs = 60000,
-                                       inputs = null, outInit = null }) {
+                                       inputs = null, outInit = null,
+                                       outBinding = 0, uniformBinding = 1 }) {
     const requireFn = createRequire(import.meta.url);
     const skip = webgpuSkipReason(requireFn);
     if (skip) return { ok: false, skipped: true, reason: skip, values: [], errors: [] };
@@ -115,16 +116,19 @@ export async function runWgslCompute({ code, entryPoint = "main", outCount, unif
             const outBuf = dev.createBuffer({ size: a.outCount * 4,
                 usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST });
             // v4465 -- outInit: starting contents for a kernel that works in place on binding 0 (headlessGpu takes the same).
+            // v4572 -- the same sentinel fill the native harness uses, so "nothing ran" is a reading here too
+            // and a liveness failure on one side does not read as a DIVERGENCE between the two.
             if (a.outInit) dev.queue.writeBuffer(outBuf, 0, new Uint32Array(a.outInit).subarray(0, a.outCount));
+            else dev.queue.writeBuffer(outBuf, 0, new Float32Array(a.outCount).fill(a.sentinel));
             const readBuf = dev.createBuffer({ size: a.outCount * 4,
                 usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
-            const entries = [{ binding: 0, resource: { buffer: outBuf } }];
+            const entries = [{ binding: a.outBinding, resource: { buffer: outBuf } }];
             let uniBuf = null;
             if (a.uniforms) {
                 uniBuf = dev.createBuffer({ size: Math.max(16, a.uniforms.length * 4),
                     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
                 dev.queue.writeBuffer(uniBuf, 0, new Float32Array(a.uniforms));
-                entries.push({ binding: 1, resource: { buffer: uniBuf } });
+                entries.push({ binding: a.uniformBinding, resource: { buffer: uniBuf } });
             }
             // v4457 -- read-only storage inputs, the same option headlessGpu.runWgslComputeNative takes, so the
             // two harnesses keep one signature (crossBackend-selfcheck's corpus depends on that).
@@ -134,6 +138,9 @@ export async function runWgslCompute({ code, entryPoint = "main", outCount, unif
                 dev.queue.writeBuffer(b, 0, words);
                 entries.push({ binding: inp.binding, resource: { buffer: b } });
             }
+            // v4572 -- the validation error scope the native harness took this round, for the same reason:
+            // a REJECTED bind group left the read-back untouched and this function returned ok:true beside it.
+            dev.pushErrorScope("validation");
             const pipe = dev.createComputePipeline({ layout: "auto",
                 compute: { module: mod, entryPoint: a.entryPoint } });
             const bind = dev.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries });
@@ -143,14 +150,20 @@ export async function runWgslCompute({ code, entryPoint = "main", outCount, unif
             cp.setPipeline(pipe); cp.setBindGroup(0, bind); cp.dispatchWorkgroups(...(Array.isArray(a.workgroups) ? a.workgroups : [a.workgroups])); cp.end();
             enc.copyBufferToBuffer(outBuf, 0, readBuf, 0, a.outCount * 4);
             dev.queue.submit([enc.finish()]);
+            const validation = await dev.popErrorScope();
+            if (validation) return { ok: false, values: [],
+                reason: "the device REJECTED this run -- an empty read-back is not a measurement",
+                errors: [String(validation.message || validation).slice(0, 300)] };
             await readBuf.mapAsync(GPUMapMode.READ);
             const values = Array.from(new Float32Array(readBuf.getMappedRange()));
             readBuf.unmap();
             const ai = adapter.info || {};
             return { ok: true, values, errors: [],
+                     wroteNothing: !a.outInit && a.outCount > 0 && values.every((v) => v === a.sentinel),
                      adapter: { vendor: ai.vendor || null, architecture: ai.architecture || null,
                                 description: ai.description || null } };
         }, { code, entryPoint, outCount, uniforms: uniforms ? Array.from(uniforms) : null, workgroups, compileOnly,
+             outBinding, uniformBinding, sentinel: LIVENESS_SENTINEL,
              inputs: inputs ? inputs.map((i) => ({ binding: i.binding, words: Array.from(storageWords(i.data)) })) : null,
              outInit: outInit ? Array.from(storageWords(outInit)) : null });
         return { skipped: false, errors: [], values: [], ...out };
@@ -638,8 +651,15 @@ export async function runWgslComputeToTexture({ code, entryPoint = "main", n = 6
             cp.setPipeline(pipe); cp.setBindGroup(0, bind); cp.dispatchWorkgroups(...(Array.isArray(a.workgroups) ? a.workgroups : [a.workgroups])); cp.end();
             enc.copyTextureToBuffer({ texture: tex }, { buffer: readBuf, bytesPerRow }, [a.n, a.n]);
             dev.queue.submit([enc.finish()]);
+            // *** v4572 -- THIS SCOPE WAS ALREADY HERE AND ITS FINDING WAS DISCARDED. *** The error was
+            // collected into `errs` and the function returned ok:true beside it, and wgslCorpus.compare's
+            // texture branch gates on `ok` alone -- so a rejected texture run reported a clean comparison
+            // with the reason sitting in a list nobody read. Gathering evidence and not acting on it is the
+            // same fault as never gathering it.
             const scoped = await dev.popErrorScope();
-            if (scoped) errs.push(scoped.message);
+            if (scoped) return { ok: false, raw: null, bytesPerRow: null,
+                reason: "the device REJECTED this run -- an empty read-back is not a measurement",
+                errors: [...errs, String(scoped.message || scoped).slice(0, 300)] };
             await readBuf.mapAsync(GPUMapMode.READ);
             const raw = new Uint8Array(readBuf.getMappedRange()).slice();
             readBuf.unmap();
