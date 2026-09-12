@@ -415,17 +415,32 @@ sec("7. THE v4297 RECORD RECONCILES, NAMES ITS REGRESSIONS, AND EVERY NAME STILL
     // RED_AT_V4279 is not a regression, it is a standing failure; one from UNCONFIRMED_SLOW was never green.
     const wasRed = new Set(RC.RED_AT_V4279.map((e) => e.gate));
     const wasSlow = new Set(RC.UNCONFIRMED_SLOW); // plain paths, unlike RED_AT_V4279
+    // *** v4571 -- `wasSlow` IS A LIVE LIST STANDING IN FOR A HISTORICAL ONE, AND A REPAIR BROKE IT. ***
+    // S.fromSlowBucket records which gates were red AND in the unmeasured bucket AT v4297. The rows below
+    // tested that against RC.UNCONFIRMED_SLOW as it stands TODAY, which is a different claim: a gate leaves
+    // that bucket the moment somebody measures it, and leaving is the outcome the bucket exists to produce.
+    // orphanDisposition was repaired at v4571 and taken off the list -- it has a verdict now, 82 s and exit 0
+    // -- and both rows went red for it. There is no frozen v4297 copy of the bucket to compare against, so
+    // the honest reconstruction is the union: a gate satisfies "was in the bucket" if it is still there, or
+    // if the tree records it having left. Same term redCensus.mjs added at v4313 and sweepCoverage and
+    // slowCensus both needed in this round.
+    // NOT the FIXED_* lists: those record repairs to the RED REGISTERS, a different exit from a different
+    // place, and using them here called two real regressions "already unmeasured" within the minute.
+    const leftBucket = new Set(RC.MEASURED_OUT_OF_SLOW.map((e) => e.gate));
+    const wasSlowThen = (g) => wasSlow.has(g) || leftBucket.has(g);
     ok(S.regressions.length > 0,
        "*** the regression list is NON-EMPTY: the question v4296 could not answer has an answer ***",
        `${S.regressions.length} gates green at v4279 are red at v4297`);
-    ok(S.regressions.every((g) => !wasRed.has(g) && !wasSlow.has(g)),
+    ok(S.regressions.every((g) => !wasRed.has(g) && !wasSlowThen(g)),
        "and none of them was already red or already unmeasured at v4279, so each one is a real regression",
        "otherwise it belongs in stillRed or fromSlowBucket and the split above is lying");
-    ok(S.fromSlowBucket.every((g) => wasSlow.has(g)),
-       "every slow-bucket red WAS in UNCONFIRMED_SLOW", "that is the definition of the bucket");
+    ok(S.fromSlowBucket.every(wasSlowThen),
+       "every slow-bucket red WAS in UNCONFIRMED_SLOW, allowing for the ones since measured out of it",
+       S.fromSlowBucket.filter((g) => !wasSlow.has(g)).length + " of " + S.fromSlowBucket.length +
+       " have since left the bucket by acquiring a verdict, which is what the bucket is for");
     ok(GS.regressionsAgainst(RC.RED_AT_V4279.map((e) => e.gate),
                              [...RC.RED_AT_V4279.map((e) => e.gate), ...S.fromSlowBucket, ...S.regressions])
-         .filter((g) => !wasSlow.has(g)).length === S.regressions.length,
+         .filter((g) => !wasSlowThen(g)).length === S.regressions.length,
        "and the module's own regressionsAgainst() recovers the same six from the same inputs",
        "the record was built by this code, not beside it");
     const unm = new Set(S.unmeasured);

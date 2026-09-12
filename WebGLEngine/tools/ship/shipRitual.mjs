@@ -34,33 +34,27 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
+import VM from "../../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
 const require_ = createRequire(import.meta.url);
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const read = (rel) => { try { return fs.readFileSync(path.join(ENG, rel), "utf8"); } catch { return ""; } };
 
-// *** THIS FILE'S OWN BUG, FOUND BY ITS OWN GATE. *** shipRitual-selfcheck.mjs's publish-release check started
-// reporting "githubBridge reads v4535 but main.js says v4487" once main.js had moved past v4487 -- not because
-// the two files' version markers actually disagreed (main.js's live ENGINE_VERSION line WAS v4535, matching
-// githubBridge exactly), but because currentState()'s own regex had no comment-skip and no line anchor: main.js
-// and brain/brain.js each freeze every past version as a "// const NAME = ...;" comment ABOVE the live line
-// (v4482's own note, this file's neighbour), and a bare `const ENGINE_VERSION = "(v\d+)"` matches that substring
-// inside the FIRST such comment it meets scanning top-to-bottom just as happily as the real declaration -- here,
-// a frozen v4487 marker sitting earlier in the file than the live v4535 one. ai-bridge/githubBridge.js hit this
-// exact class of bug once already (its own v3941 note: "ONE SPELLING OF THE VERSION MARKER") and fixed it with a
-// multiline, comment-skipping regex; this file predates that fix (v3528 to v3941) and never got it. The BRAIN_
-// BUILD read had the identical defect, invisibly: main.js's and brain.js's frozen blocks both happened to freeze
-// v4487, so both misreads AGREED with each other while both disagreed with the truth, and markersAgree read
-// true on two wrong numbers -- the cross-file check against githubBridge is what actually caught it, not this
-// step. THE FIX REUSES THE SHAPE THAT WAS ALREADY PROVEN RIGHT rather than inventing a second one: parameterised
-// over the constant's name so the ONE regex serves both ENGINE_VERSION and BRAIN_BUILD instead of shipRitual.mjs
-// carrying its own second copy of the ENGINE_VERSION half specifically.
-const parseVersionConst = (src, name) => (String(src || "").match(new RegExp(`^(?!\\s*//).*\\b${name}\\s*=\\s*"(v\\d+)"`, "m")) || [])[1] || null;
-
 /** Facts the tree already knows. Read, never declared -- this is the whole argument of the file. */
 export function currentState() {
-    const engine = parseVersionConst(read("main.js"), "ENGINE_VERSION");
-    const brain = parseVersionConst(read("brain/brain.js"), "BRAIN_BUILD");
+    // *** ANCHORED AT LINE START, BECAUSE THE FIRST OCCURRENCE IN main.js IS A DEAD ONE. *** The ritual's
+    // changelog step prepends a block ABOVE the ENGINE_VERSION line, and one of those blocks opens with a
+    // commented `// const ENGINE_VERSION = "v4487";`. An unanchored match takes that comment, so this
+    // function reported v4487 while the shipped constant read v4535 -- and the publish-release step then
+    // said "githubBridge reads v4535 but main.js says v4487", blaming the bridge for reading correctly.
+    // MEASURED ACROSS THE TREE: 38 of 44 places that parse this constant use a pattern that takes the
+    // comment; only 6 anchor or exclude comments. Filed as engine-version-readers.
+    const engine = (read("main.js").match(VM.markerRe("ENGINE_VERSION")) || [])[1] || null;
+    // Same anchoring, same reason: brain/brain.js carries commented BRAIN_BUILD lines from v4487 and v4476
+    // above the live one, so an unanchored match read v4487 against a real v4535. The two markers AGREE and
+    // always did -- what disagreed was this file's reading of them, in both places, which is the exact shape
+    // this step exists to catch and could not see in itself.
+    const brain = (read("brain/brain.js").match(VM.markerRe("BRAIN_BUILD")) || [])[1] || null;
     let gates = null, instruments = null;
     try { gates = JSON.parse(read("knowledge-index.json")).gates?.length ?? null; } catch {}
     return { engine, brain, gates, markersAgree: engine !== null && engine === brain };
@@ -157,11 +151,54 @@ export const STEPS = [
         gate: "tools/ship/populationCensus-selfcheck.mjs",
     },
     {
+        id: "record-tier",
+        what: "Run the guardian gates that cost more than the sweep budget, so the records they guard are checked at ship time too.",
+        command: "node tools/ship/recordTier.mjs",
+        // tools/ship/recordReach.mjs joins the frozen-record census to the sweep timings: at v4576, 72 of 104
+        // records are checked at ship time and TWENTY of the rest have a guardian that works and is simply too
+        // expensive -- nine gates, 3.7 s to 21.5 s each, all over the 3,000 ms sweep budget.
+        //   The two fixes the backlog proposed were both measured. v4548 took "make them cheaper" for two other
+        //   gates and found they were doing the same work six times over; memoising fixed it. That medicine does
+        //   NOT apply here: counting fs calls against unique paths gives 1.0x, 1.1x, and samplerCheck-selfcheck
+        //   does no file I/O at all -- 9 s of arithmetic. The work is real, so the tier is the answer.
+        //   ON ITS FIRST RUN IT FOUND TWO RED GUARDIANS covering eight records, neither on any register, and one
+        //   of them red because of files edited three rounds earlier under a sweep that reported ALL GREEN.
+        why: "a gate over budget is not run at ship time, so the record it guards is checked by nothing exactly " +
+             "when it matters most. These are the ritual's own integrity checks and pricing them by the same " +
+             "clock as a geometry fixture is what let a wrong census ship green for nine rounds.",
+        verify: null,
+        gate: "tools/ship/recordTier-selfcheck.mjs",
+    },
+    {
+        id: "record-shapes",
+        what: "Record the SHAPE of every JSON record a gate reads, so a field that goes missing is named on the next run.",
+        command: "node tools/ship/recordShape.mjs --write",
+        // A writer that spells its fields by hand drops one and the record gets SMALLER WITHOUT LOOKING WRONG.
+        // Three times in one session -- an atlas key, a spawn flag, a finished map -- and every one of them
+        // read as a better number: a smaller corpus that still matched its own length, a skip count that rose,
+        // a sweep that reported fewer rows. Each was found by somebody reading a git status line or chasing a
+        // separate bug, which is not a mechanism.
+        //   The shape is read from the RECORD rather than from the code that writes it, because the writers are
+        //   not statically reachable: of the writeFileSync sites in this tree, only a small fraction hand
+        //   JSON.stringify an object literal AND name a path a static reader can resolve, and quickSweep -- the
+        //   writer of the third case -- is one of the misses. The numbers are in tools/ship/recordShape.mjs.
+        why: "the record must be refreshed by a step somebody performs, not by the gate that checks it. A check " +
+             "that rewrites its own expectation can never fail twice, which this tree has caught four times.",
+        verify: null,
+        gate: "tools/ship/recordShape-selfcheck.mjs",
+    },
+    {
         id: "derived-counts",
         what: "Refresh every derived count that is baked into a page (case-study's gate count, promptCost's device count).",
-        command: "node tools/ship/staleness-selfcheck.mjs",
-        why: "these are numbers a READER sees. staleness-selfcheck exists precisely because they drift, and it has " +
-             "caught them on three consecutive patches.",
+        // *** THIS STEP SAID "REFRESH" AND RAN THE CHECKER. *** The command was staleness-selfcheck.mjs, which
+        // contains no writeFileSync at all: running it changes nothing. The writer is staleness.mjs --fix, and
+        // the two are deliberately separate -- that file's own header says --fix "is never part of a check run".
+        // So a ritual followed exactly never refreshed a single derived count; it reported the drift and moved
+        // on. MEASURED CONSEQUENCE AT v4557: case-study.html claimed 1,606 gates against 1,609 on disk, three
+        // rounds of drift on a number a reader sees, and the gate that says so is listed below.
+        command: "node tools/ship/staleness.mjs --fix",
+        why: "these are numbers a READER sees. The step REFRESHES with --fix and the gate beside it CHECKS; " +
+             "naming the checker in both places meant nothing ever did the refreshing.",
         verify: null,     // stated as a gate rather than duplicated here: see the note on second declarations
         gate: "tools/ship/staleness-selfcheck.mjs",
     },

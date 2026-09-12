@@ -124,10 +124,21 @@ console.log("\n4. *** THE PAGE LINKS ARE REAL PAGES, AND instruments.mjs IS WHY 
     // pages that never mention the brain, which is exactly what swekPage-selfcheck was written for.
     const { INSTRUMENTS } = await import("../../physics/instruments.mjs");
     const brainy = (INSTRUMENTS || []).filter((i) => /brain|rl\//i.test((i.gate || "") + " " + (i.id || "")));
-    ok("!! instruments.mjs really has nothing to offer here -- the reason is measured, not assumed",
-        brainy.length === 0,
-        (INSTRUMENTS || []).length + " instruments, " + brainy.length + " brain-related. Had this been non-zero " +
-        "the links should come from there instead, and this check would say so");
+    // *** AND IT WENT NON-ZERO, WHICH THIS ROW SAID IT WOULD SAY SO ABOUT -- SO IT SAYS SO. ***
+    // `brain-kernels` (tools/ship/brainKernels-selfcheck.mjs) arrived in the registry, and the row's old
+    // condition -- zero brain entries -- was never the property the links depend on. What they need is a
+    // PAGE, and that entry carries `page: null`. So the claim is re-taken at the thing it is actually about:
+    // instruments.mjs still supplies no brain page, now for a sharper reason than "there are none".
+    // Found at v4565 by re-timing the over-budget pool; this gate was outside the ship-time sweep, so the
+    // arrival landed with nothing running the check that watches for it.
+    const withPage = brainy.filter((i) => i.page);
+    ok("!! instruments.mjs still offers no brain PAGE, which is the thing the links need -- measured, not assumed",
+        withPage.length === 0,
+        (INSTRUMENTS || []).length + " instruments, " + brainy.length + " brain-related, " + withPage.length +
+        " of those carrying a page" + (brainy.length ? " (" + brainy.map((i) => i.id + ": page " + JSON.stringify(i.page)).join(", ") + ")" : "") +
+        ". The old row asserted brain-related === 0 and went red when one arrived; a registry entry with no " +
+        "page cannot supply a link, so the count that matters is the second one. Had THAT been non-zero the " +
+        "links should come from there instead, and this check would say so.");
 
     let missing = [];
     for (const k of Object.keys(STAGE_PAGES)) {

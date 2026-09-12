@@ -55,7 +55,16 @@ export const PATTERNS = Object.freeze({
     "ES modules":            /^\s*(import|export)\s/m,
     "closures as values":    /=>|\bfunction\s*\(/,
     "async/await":           /\basync\s|\bawait\s/,
-    "typed arrays":          /(Float32Array|Uint8Array|Uint16Array|Int32Array|ArrayBuffer|DataView|Uint8ClampedArray)/,
+    // *** THIS ROW NAMED SEVEN OF THE ELEVEN TYPED-ARRAY CONSTRUCTORS AND CALLED THE RESULT "typed arrays". ***
+    // Found at v4560 by a round that added two files which allocate nothing but typed arrays and watched this
+    // row NOT MOVE: the ones they use -- the 64-bit float array and the 32-bit unsigned integer array -- were
+    // both outside the list, along with the 8- and 16-bit signed arrays and the two big-integer ones. Measured
+    // across the tree, 233 files match the complete set and NOT the old one: 798 -> 1031, a 29% undercount, in
+    // a row that has been re-taken by hand for ninety rounds. Same species as the WebGL lookbehind at v4547 and
+    // the comment strip at v4462 -- every previous re-take asked whether the number CHANGED and none asked what
+    // it was counting. The list is now the whole set the language defines rather than the subset this tree
+    // happened to use the day the row was written.
+    "typed arrays":          /(Float32Array|Float64Array|Uint8Array|Uint8ClampedArray|Uint16Array|Uint32Array|Int8Array|Int16Array|Int32Array|BigInt64Array|BigUint64Array|ArrayBuffer|DataView)/,
     "Promises":              /(new Promise|Promise\.(all|race|resolve|reject))/,
     "fetch/XHR":             /(fetch\(|XMLHttpRequest)/,
     "performance.now":       /performance\.now/,
@@ -218,7 +227,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // the earlier reading was 3878. What survives is the rule the wrong explanation was reaching for: this
     // number is MEASURED every round, never incremented from the last one, and a reason invented to explain a
     // count is worth less than re-taking it. FIVE ROUNDS RUNNING this table has been re-taken by hand.
-    files: 4029,                  // v4526 merge: 3887 -> 4002, this branch's rounds; v4527: 4004; v4528: 4007; v4529: 4009; v4530: 4011; v4533: 4012 (ai-bridge/runBusy.js); v4536: 4014 (physics/mesh/uvUnwrap.mjs and its gate); v4537: 4016 (physics/mesh/uvLscm.mjs and its gate); v4539: 4018 (physics/render/splitSum.mjs and its gate); v4543: 4020 (nav/navmesh.mjs and its gate); v4544: 4022 (physics/character/terrainWalk.mjs and its gate); v4545: 4023 (tools/ship/navWiring-selfcheck.mjs); v4546: 4024 (tools/ship/navWiringLive-selfcheck.mjs; the harness is HTML and not counted); v4547: 4025 (tools/ship/engineSceneBot-selfcheck.mjs); v4548: 4029 (tools/ship/treeRead.mjs, tools/ship/recordReach.mjs and their two gates)
+    files: 4079,                  // v4526 merge: 3887 -> 4002, this branch's rounds; v4527: 4004; v4528: 4007; v4529: 4009; v4530: 4011; v4533: 4012 (ai-bridge/runBusy.js); v4536: 4014 (physics/mesh/uvUnwrap.mjs and its gate); v4537: 4016 (physics/mesh/uvLscm.mjs and its gate); v4539: 4018 (physics/render/splitSum.mjs and its gate); v4543: 4020 (nav/navmesh.mjs and its gate); v4544: 4022 (physics/character/terrainWalk.mjs and its gate); v4545: 4023 (tools/ship/navWiring-selfcheck.mjs); v4546: 4024 (tools/ship/navWiringLive-selfcheck.mjs; the harness is HTML and not counted); v4547: 4025 (tools/ship/engineSceneBot-selfcheck.mjs); v4548: 4029 (tools/ship/treeRead.mjs, tools/ship/recordReach.mjs and their two gates); v4550: 4031 (tools/export/glbConformance.mjs and its gate); v4552: 4033 (nav/detourScale.mjs and its gate; the terrain fixture is JSON and not counted); v4554: 4035 (world/surfaceProbe.mjs and its gate); v4555: 4036 (world/chunk-selfcheck.mjs; the module it gates already existed); v4556: 4038 (tools/ship/versionMarker.js and its gate -- .js RATHER THAN .cjs on purpose: this walk matches .js/.mjs and NOT .cjs, so the first draft of that module was invisible here and moved this count by one where a module-plus-gate round moves it by two); v4557: 4039 (tools/ship/ritualCoherence-selfcheck.mjs; the ritual it gates already existed); v4559: 4041 (ui/pipboyItems.mjs and its gate); v4560: 4043 (tools/mesh/xatlasRef.mjs and its gate; the C++ harness and the JSON record are neither .js nor .mjs and are not counted); v4563: 4044 (world/fluidSystem-selfcheck.mjs; the module it gates already existed); v4564: 4052 -- 4050 with NO NEW FILE, the walk starting to count the six .cjs modules it had never been able to see, then 4052 for tools/ship/sourceKind.mjs and its gate; v4566: 4056 for the incremental-sweep round -- tools/ship/inputProbe.mjs, tools/ship/inputSets.mjs, tools/ship/recordInputs.mjs and tools/ship/inputSets-selfcheck.mjs. FOUR files for one gate, which is unusual here and is the shape of the thing: the probe must be a SEPARATE module because it is loaded with --import into the gate being measured, the rule has to be importable by both the recorder and quickSweep, and the recorder is the expensive pass nobody wants inside the rule; v4567: 4062 for the loader-hook probe -- tools/ship/probe/{record,fsShim,fsPromisesShim,cpShim,cpWrap,hooks}.mjs. SIX files and NO new gate, which is the opposite of the usual shape: a module.register() hook needs its shims in their own directory so the hook can tell the shim's own import of the real builtin from everybody else's by a single prefix test, and the wrappers are shared between the ESM shim and the CJS patch so the two cannot make different judgements about the same spawn; v4577: 4074 for physics/raceKnob-selfcheck.mjs, ONE file -- the module it gates already existed, and the round wrote a gate rather than a module because MEASURED_V4527's only reader was the module's own reportLines(); v4579: 4076 for render/starField.mjs and its gate -- the shared starfield the three star pages had each hand-copied; v4580: 4078 for render/skyStars.mjs and its gate -- the engine's own night sky, which had no CPU reference at all; v4582: 4079 for tools/ship/zipWriter-selfcheck.mjs, which is commit c3f1fecb's and not this round's
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
                           // RE-TAKEN TWICE IN TWO ROUNDS, and the second time only because the ship gate
                           // caught it: v4478's re-take was correct for v4478 and stale the moment v4479
@@ -292,6 +301,17 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // arrays and Promises NOT AT ALL -- BotManager already allocated neither, and the worker already
     // returned a Promise. This is the second consecutive round in which a census note written before the
     // re-run was wrong, which is the argument for re-running rather than reasoning about a diff.
+    // v4552 -- RE-TAKEN: TWO files (nav/detourScale.mjs and its gate) moved ES modules and closures by two
+    // and TYPED ARRAYS BY ONE, and nothing else -- no async, no fetch, no GPU. The typed-array row is the
+    // informative one again and it splits the pair exactly the way v4544 recorded: the MODULE owns buffers
+    // (Float64Array distances and an Int32Array predecessor map for a Dijkstra over 9,216 cells) and the
+    // GATE does not -- it builds Int16Array fixtures, which is being HANDED buffers rather than owning them.
+    // v4550 -- RE-TAKEN: TWO files (tools/export/glbConformance.mjs and its gate) moved FOUR rows by two --
+    // ES modules, closures, async/await and TYPED ARRAYS -- and nothing else. The typed-array row is the
+    // informative one and it is the shape v4537 and v4543 recorded: a module that OWNS buffers moves it, one
+    // merely handed them does not. A glTF validator reads a BIN chunk through a DataView and reconstructs
+    // accessor data, so it owns them. asyncAwait moves because the gate top-level-awaits its dynamic imports.
+    // No Promises row, no fetch, no GPU: a file-format checker is arithmetic over bytes.
     // v4548 -- RE-TAKEN off the gate. FOUR files (treeRead.mjs, recordReach.mjs and their gates) moved TWO
     // rows by four and NOTHING ELSE -- no async, no typed arrays, no Promises, no GPU. That is the narrowest
     // shape a four-file round can have here, and it is the right one: this round is a filesystem walk, a
@@ -313,8 +333,88 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // asyncAwait by one -- ONE new file, tools/ship/navWiringLive-selfcheck.mjs, which imports, closes over
     // its helpers and awaits a browser. The harness it drives is HTML and does not enter this census at all,
     // which is why the file count moves by one where a module-plus-gate round moves it by two.
-    esModules: 3738, closures: 3615, asyncAwait: 1418, typedArrays: 795, promises: 345,
-    fetchXhr: 243, performanceNow: 220, raf: 116, webgl: 141, webgpu: 48, threads: 22, wasm: 23,
+    // v4560 -- RE-TAKEN: TWO files (tools/mesh/xatlasRef.mjs and its gate) moved ES modules and closures by two
+    // and NOTHING else, and the row that DID NOT move is the finding. Both files allocate typed arrays and
+    // little else -- the reference harness marshals vertices and indices across a process boundary -- and the
+    // typed-array row sat still, because the pattern named seven of the eleven constructors and neither of the
+    // two these use was among them. Widened above; the row goes 798 -> 1031 on the same tree, 233 files it had
+    // never counted. THE OTHER ELEVEN ROWS ARE UNAFFECTED by that widening, which is what says it is this row's
+    // definition rather than the census's population that moved, and threads still rank 12 of 12.
+    // v4561 -- RE-TAKEN: no new files, ONE row moved by one. tools/mesh/xatlasRef-selfcheck.mjs gained a
+    // fixture built on a 64-bit float array, and that row now counts the 64-bit float array because v4560
+    // widened it. A census that had been re-taken for ninety rounds moving for a NEW reason one round after
+    // the definition was corrected is the definition doing its job.
+    // v4563 -- RE-TAKEN: ONE file (world/fluidSystem-selfcheck.mjs; the module it gates already existed)
+    // moved two rows by one and nothing else. No typed arrays, no async, no GPU: a voxel fluid graded on a
+    // hand-built chunk is arithmetic over a flat array somebody else owns.
+    // v4564 -- RE-TAKEN, AND THE POPULATION GREW WITHOUT A FILE BEING WRITTEN: 4,044 -> 4,050. The walk's
+    // extension rule was mjs and js, and ".cjs" matches NEITHER -- the dot is part of the pattern, so it is
+    // not ".js" with a c in front. Six modules in ai-bridge/ are CommonJS, 1,471 lines, every one `require`d
+    // by ai-bridge/server.js at startup, and no census in this tree had counted a line of them. THE ROW THAT
+    // SAYS IT MATTERS IS TYPED ARRAYS, 1,032 -> 1,034: two of the six own buffers, which is the distinction
+    // this census's own notes keep making between a module that carries data and one that is handed it.
+    // ES modules does NOT move, which is the control -- CommonJS files do not import or export, so a census
+    // that counted them as ES modules would be measuring its own walk rather than the tree.
+    // v4564 -- RE-TAKEN a second time in the same round: TWO files (tools/ship/sourceKind.mjs and its gate)
+    // moved ES modules and closures by two and nothing else. The .cjs correction above and these two files
+    // are separate movements of the same row and are recorded as two, because folding them into one number
+    // would lose which of them was the finding.
+    // v4566 -- RE-TAKEN: four files, and FOUR rows move rather than the usual two. async/await and Promises
+    // each gain one, from tools/ship/recordInputs.mjs's async worker pool over a promise-wrapped spawn --
+    // the pass that probes what every gate reads. A round that adds concurrency to the ship tooling shows up
+    // in the census of what this runtime uses, which is what the census is for.
+    // v4567 -- RE-TAKEN: six files, three rows. async/await gains one from the loader hook's async resolve
+    // and load hooks, which is the census noticing that this tree now has code running on a loader thread.
+    // v4568 -- RE-TAKEN: Promises 348 -> 349 and nothing else. No new FILE, so files, ES modules and
+    // closures do not move -- one existing module grew a promise, and it is sweepCoverage-selfcheck.mjs:
+    // `await new Promise((r) => setTimeout(r, 400))`, waiting for a capped kill to land before counting the
+    // survivors it leaves. The narrowest re-take this census has had, and it is still a re-take.
+    //
+    // MY FIRST DRAFT OF THIS LINE BLAMED redCensus-selfcheck, because that was the other file this round
+    // made slower and the guess felt close enough to write down. The diff says zero `new Promise` were added
+    // outside sweepCoverage-selfcheck. A one-row census drift is exactly where a plausible attribution goes
+    // unchecked, which is what a census is for.
+    // v4569 -- RE-TAKEN: one file, one row. render/exactHash.mjs is the shared home for the integer hash
+    // that replaces fract(sin(dot(p,K))*43758.5453); closures does not move because the module exports named
+    // functions rather than storing any, which is the distinction this census keeps making.
+    // v4569 -- RE-TAKEN a second time in the round: tools/ship/exactHash-selfcheck.mjs joined, moving files
+    // 4063 -> 4064 and three rows by one. async/await moves because the gate awaits a dynamic import of the
+    // wormhole module -- it reads the EXPORTED shader strings rather than the file text, since codeOnly
+    // deletes shader template literals and a scan through it would have passed on an empty string.
+    // v4570 -- RE-TAKEN: closures 3644 -> 3645 and nothing else. No new FILE; fx/nebula/nebula.js's hash2
+    // went from a function DECLARATION to a const arrow bound to exactHash2, and this census counts a
+    // function stored as a value rather than declared. The narrowest kind of move it records, and it records
+    // it -- a row that only moved on new files would miss every refactor.
+    // v4572 -- RE-TAKEN: ES modules 3766 -> 3768 and closures-as-values 3645 -> 3647, for the two
+    // files of the record-shape round (tools/ship/recordShape.mjs and its gate). Two files, two
+    // modules, and two closures apiece is what a module-plus-gate round looks like here.
+    // v4572b -- RE-TAKEN: ES modules 3768 -> 3769 and closures 3647 -> 3648, for the provenance gate.
+    // ONE file rather than the usual two: it gates tools/ship/orphanScan.mjs, which already existed.
+    // v4573 -- RE-TAKEN: ES modules 3769 -> 3771, closures 3648 -> 3650, async/await 1423 -> 1425,
+    // for tools/ship/importClosure.mjs and its gate. async/await moves because both await a dynamic
+    // import of the module under test -- which is the very construct the round is about.
+    // v4575 -- RE-TAKEN: ES modules 3771 -> 3773 and closures 3650 -> 3652, for
+    // physics/render/conductorFresnel.mjs and its gate. async/await does NOT move: neither file
+    // awaits anything, which is unusual for a round here and is what a pure-arithmetic module is.
+    // v4576 -- RE-TAKEN: ES modules 3773 -> 3775 and closures 3652 -> 3654, for
+    // tools/ship/recordTier.mjs and its gate.
+    // v4577 -- RE-TAKEN: ES modules 3775 -> 3776 and closures 3654 -> 3655, for
+    // physics/raceKnob-selfcheck.mjs. ONE file rather than the usual two: the module it gates already
+    // existed, which is the whole reason the round wrote a gate and not a module.
+    // v4578 -- RE-TAKEN: typed arrays 1034 -> 1035 and WebGL 141 -> 142, and NO new file. Both are the
+    // holofoil round, and both are the census reading real new usage rather than a file count moving:
+    // tools/ship/holoFoil-selfcheck.mjs now walks float64 ulps with a DataView over an ArrayBuffer to probe
+    // the cell-edge boundary, and render/holoFoilShader.js names WebGL2RenderingContext, because the shared
+    // integer hash needs GLSL ES 3.00 and the module now says so instead of leaving a page to find out.
+    // v4579 -- RE-TAKEN: ES modules 3776 -> 3778 and closures 3655 -> 3657, for render/starField.mjs and its
+    // gate. The usual two-file shape of a module-plus-gate round.
+    // v4580 -- RE-TAKEN: ES modules 3778 -> 3780 and closures 3657 -> 3659, for render/skyStars.mjs and its
+    // gate. The usual module-plus-gate shape.
+    // v4582 -- RE-TAKEN for commit c3f1fecb's tools/ship/zipWriter-selfcheck.mjs, which arrived on main
+    // alongside this round: ES modules 3780 -> 3781, closures 3659 -> 3660, async/await 1425 -> 1426 and typed
+    // arrays 1035 -> 1036. ONE file moving four rows is the shape of a gate that awaits and writes bytes.
+    esModules: 3781, closures: 3660, asyncAwait: 1426, typedArrays: 1036, promises: 349,
+    fetchXhr: 243, performanceNow: 220, raf: 116, webgl: 142, webgpu: 48, threads: 22, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.
@@ -334,7 +434,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // second-smallest outright; WITH them the two tie at 22 and threads hold rank 11 on the stable sort only.
     wasmWithoutSelf: 21,          // v4526 merge: 20 -> 21
     threadsWithoutSelf: 21,
-    closuresOverThreads: 164,     // 3597 / 22, rounded at v4530 (163 at v4527: 3588 / 22; 158 at v4462: 3465 / 22)
+    closuresOverThreads: 166,     // 3643 / 22 at v4567 (165 at v4552: 3619 / 22 (164 at v4530: 3597 / 22; 163 at v4527: 3588 / 22; 158 at v4462: 3465 / 22) -- a DERIVED ratio, so it moves whenever either row does, which is why it is re-taken rather than pinned once
     // *** ONE, NOT TWO. *** The first draft filed fetch/XHR as an archive claim too; pointing the rows at
     // bytes found the HTTP client sitting in this tree's own VBA, so only WebGL still needs the archive.
     archiveRows: 1,

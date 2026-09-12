@@ -9,6 +9,7 @@
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const VM = require("../tools/ship/versionMarker.js");   // v4556 -- one definition of how to read a version marker
 
 const CFG = process.env.GITHUB_CFG || path.join(os.homedir(), ".voxelbridge", "github.json");
 const SEED_REPOS = [
@@ -392,8 +393,9 @@ async function _publishEngineBuildInner({ repo, notes, draft, prerelease } = {})
 // that shape and nothing else, so a bare "ENGINE_VERSION = ..." with no "const" (the existing gate's own
 // spacing-tolerance case) still matches.
 function _parseEngineVersion(src) {
-    const x = String(src || "").match(/^(?!\s*\/\/).*ENGINE_VERSION\s*=\s*"(v\d+)"/m);
-    return x ? x[1] : "";
+    // v4556 -- this was the FIRST correct reader in the tree, fixed at v4550 while thirty-one others still
+    // returned the commented changelog line. It now delegates rather than holding a thirty-second spelling.
+    return VM.parseMarker(src, "ENGINE_VERSION");
 }
 function _versionInTree(root) {
     try { return _parseEngineVersion(fs.readFileSync(path.join(root, "WebGLEngine", "main.js"), "utf8")); } catch {}

@@ -45,13 +45,26 @@ const SIG_CONST = /^export const reportLines = (?:async )?\(([^)]*)\)/m;
 const SKIP_DIR = /^(node_modules|vendor|\.git|\.venv)$/;
 
 /** Every module that exports reportLines, derived from the tree rather than listed. */
+// *** "NO GATE OF ITS OWN" WAS MEASURED AS "NO GATE BESIDE IT", AND SIX OF THE SEVEN RECORDED HAD ONE. ***
+//
+// hasGate has always been an existsSync of the SIBLING path, and this module's own front door says so --
+// "no sibling gate". The gate reading it called the same number "the modules providing this convention with
+// no gate of their own", which is a different claim and a false one: this tree keeps most gates in
+// tools/ship/ rather than beside their subject. Measured at v4565 over the seven then recorded, six have a
+// gate somewhere (raceKnob, clothSoak, crashDamage, raceReplayBake, ribbonRoad, and nav/navmesh.mjs as it
+// arrived) and TWO genuinely have none: tools/ship/bootTraceReport.mjs and tools/ship/morphCounter.mjs.
+//
+// So the walk collects every gate BASENAME as it goes and answers both questions. The debt is the second
+// number, and it was hidden inside the first.
 export function population(root) {
     const out = [];
+    const gateNames = new Set();
     const walk = (dir) => {
         let ents; try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
         for (const e of ents) {
             const p = path.join(dir, e.name);
             if (e.isDirectory()) { if (!SKIP_DIR.test(e.name)) walk(p); continue; }
+            if (/-selfcheck\.mjs$/.test(e.name)) gateNames.add(e.name);
             if (!/\.(js|mjs)$/.test(e.name) || /selfcheck/.test(e.name)) continue;
             let src; try { src = fs.readFileSync(p, "utf8"); } catch { continue; }
             const m = SIG.exec(src) || SIG_CONST.exec(src);
@@ -68,6 +81,9 @@ export function population(root) {
         }
     };
     walk(root);
+    // second pass, once the whole tree's gate names are known: a gate that does not sit beside its subject
+    // is still a gate, and the two facts are kept apart rather than one standing in for the other
+    for (const r of out) r.gateAnywhere = r.hasGate || gateNames.has(path.basename(r.rel).replace(/\.(js|mjs)$/, "-selfcheck.mjs"));
     return out.sort((a, b) => a.rel.localeCompare(b.rel));
 }
 
@@ -102,6 +118,12 @@ export const FORMATTERS = Object.freeze([
     "tools/roundhouse/refusalExpiry.mjs",
     "tools/ship/composePropose.mjs",
     "tools/ship/composeValidate.mjs",
+    // *** TWO ARRIVALS, BOTH FROM ROUNDS THAT DID NOT REGISTER THEMSELVES HERE, AND NOTHING SAW IT FOR
+    // TWENTY VERSIONS. *** This gate is over the ship-time budget, so re-timing the over-budget pool at
+    // v4565 is what ran it and found 8 measured against 6 registered. Both take a SUBJECT rather than
+    // options -- a mesh, a ground function -- which is why Function.length reports them as requiring one.
+    "nav/navmesh.mjs",                    // v4543: reportLines(mesh, path) -- arity 2, the widest here
+    "physics/character/terrainWalk.mjs",  // v4544: reportLines(ground) -- refuses bare with "g is not a function"
 ]);
 
 // *** AND Function.length CANNOT TELL THE LAST TWO FROM THE FIRST FOUR EITHER, WHICH IS THE THIRD INSTRUMENT
@@ -139,6 +161,11 @@ export const STRICT_FORMATTERS = Object.freeze([
     "tools/roundhouse/officeManager.mjs",
     "tools/roundhouse/refusalExpiry.mjs",
     "tools/ship/composePropose.mjs",
+    // v4565 -- both measured by CALLING them bare, not read off a signature, which is this file's whole
+    // argument: nav/navmesh.mjs refuses with "Cannot read properties of undefined (reading 'rects')" and
+    // physics/character/terrainWalk.mjs with "g is not a function". Neither fabricates a report.
+    "nav/navmesh.mjs",
+    "physics/character/terrainWalk.mjs",
 ]);
 export const TOLERANT_FORMATTERS = Object.freeze([
     "tools/roundhouse/curriculum.mjs",
@@ -292,15 +319,50 @@ export const NO_GATE_V4458 = Object.freeze([
 // Paying it means four gates that assert what each module's report is FOR, and that is the Racing-city round's
 // to write -- inventing assertions for four modules this round has not read would be the fabrication the
 // citedSources register refuses by name. What is fixed here is the record; what is owed is four gates.
+//
+// *** v4577 -- THE FIRST OF THE FOUR IS PAID, AND THE LIST SHRINKS RATHER THAN BEING ANNOTATED. ***
+// physics/raceKnob.mjs has a sibling now: physics/raceKnob-selfcheck.mjs, 92 ms, written because
+// MEASURED_V4527 read as guarded by NOTHING -- the 33,306 ms gate in tools/ship/ carries the round's numbers
+// in its HEADER, as prose, which the guardian census stopped counting at v4548. THE DEBT THIS LIST DECLARED
+// IS WHAT MADE THAT RECORD UNREACHABLE, so the two are one fault seen from two sides.
+// The list is EDITED rather than kept with a note beside it: a name here means "no gate beside this module",
+// and leaving a name that is now false would be the second declaration this file exists to refuse. Three of
+// the Racing-city four remain, and they are still that round's to write.
 export const NO_GATE_V4531 = Object.freeze([
-    "physics/raceKnob.mjs",
     "world/crashDamage.mjs",
     "world/raceReplayBake.mjs",
     "world/ribbonRoad.mjs",
 ]);
+// v4565 -- one arrival, nav/navmesh.mjs, and the round that found it also found that this list has been
+// MISNAMED since it was written: see UNGATED_ANYWHERE_V4565 below.
+export const NO_GATE_V4565 = Object.freeze([
+    "nav/navmesh.mjs",
+]);
+
+/**
+ * *** SIX OF THE SEVEN "WITHOUT A GATE" HAVE ONE, AND THE DEBT IS THE OTHER TWO. ***
+ *
+ * The lists above are modules with no gate BESIDE them, which is what hasGate measures and what this
+ * module's own front door has always called it. The gate reading them called it "no gate of their own" and
+ * ratcheted on that -- a claim about coverage, made from a fact about file layout, in a tree that keeps
+ * most of its gates in tools/ship/. Measured by looking for each basename's gate ANYWHERE:
+ *
+ *     physics/raceKnob.mjs          -> tools/ship/raceKnob-selfcheck.mjs   (and, since v4577, a sibling too)
+ *     physics/xpbd/clothSoak.mjs    -> tools/ship/clothSoak-selfcheck.mjs
+ *     world/crashDamage.mjs         -> tools/ship/crashDamage-selfcheck.mjs
+ *     world/raceReplayBake.mjs      -> tools/ship/raceReplayBake-selfcheck.mjs
+ *     world/ribbonRoad.mjs          -> tools/ship/ribbonRoad-selfcheck.mjs
+ *     nav/navmesh.mjs               -> tools/ship/navmesh-selfcheck.mjs
+ *
+ * These two have none anywhere, and they are the number worth ratcheting.
+ */
+export const UNGATED_ANYWHERE_V4565 = Object.freeze([
+    "tools/ship/bootTraceReport.mjs",
+    "tools/ship/morphCounter.mjs",
+]);
 
 /** Every provider with no gate of its own, across both frozen lists. Derived, so neither list can drift. */
-export const NO_GATE_ALL = Object.freeze([...NO_GATE_V4458, ...NO_GATE_V4531].sort());
+export const NO_GATE_ALL = Object.freeze([...NO_GATE_V4458, ...NO_GATE_V4531, ...NO_GATE_V4565].sort());
 
 /** This module's own front door -- it is a member of the population it counts. */
 export function reportLines() {

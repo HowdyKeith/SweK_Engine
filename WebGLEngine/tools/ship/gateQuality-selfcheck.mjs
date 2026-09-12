@@ -229,10 +229,19 @@ function regexLiterals(src) {
     // THE LIST MAY ONLY SHRINK FROM HERE, and it is now a HARDER list to be on than it was yesterday: an entry
     // can no longer be cleared by a sibling site in the same file.
     if (process.env.SWEK_FREEZE_PROSE_DEBT) {
-        fs.writeFileSync(path.join(SHIP, "prose-debt-baseline.json"), JSON.stringify(offenders.sort(), null, 1));
+        // v4572 -- AN OBJECT, NOT A BARE ARRAY, SO THE RECORD CAN SAY WHERE IT CAME FROM. A top-level array
+        // cannot carry a provenance key, and this record NAMES 27 MODULE BASENAMES -- which is exactly the
+        // shape that blinds tools/ship/orphanScan.mjs when it is read as code rather than as a record. It was
+        // the only file in tools/ship/ that could not be stamped, and carrying a permanent exception for one
+        // file costs more than changing the file: it has exactly ONE reader, four lines below this one.
+        fs.writeFileSync(path.join(SHIP, "prose-debt-baseline.json"),
+            JSON.stringify({ generatedFrom: "tools/ship/gateQuality-selfcheck.mjs", offenders: offenders.sort() }, null, 1));
         console.log("  ----  froze " + offenders.length + " offenders to prose-debt-baseline.json");
     }
-    const BASELINE_LIST = JSON.parse(fs.readFileSync(path.join(SHIP, "prose-debt-baseline.json"), "utf8"));
+    // Reads either shape: the record was a bare array until v4572 and a checkout from before that is not a
+    // reason for this gate to fail.
+    const BASELINE_RAW = JSON.parse(fs.readFileSync(path.join(SHIP, "prose-debt-baseline.json"), "utf8"));
+    const BASELINE_LIST = Array.isArray(BASELINE_RAW) ? BASELINE_RAW : BASELINE_RAW.offenders;
     const BASELINE = BASELINE_LIST.length;
     say("prose regexes pointed at SOURCE without unwrapping: " + offenders.length + " (baseline " + BASELINE + ")");
     // v3683 -- the third state, printed BY NAME AND BY COUNT so it can never be a quiet place to put things.

@@ -50,8 +50,20 @@ const inRegisteredDir = (rel) => Object.keys(DIRECTORY_LOADED).some((d) => rel =
 // a gate IS the module's purpose and the suite runs every gate it discovers. The first version of this scan did
 // not draw that line and flagged deadImportScan.mjs the moment it was written -- a gate failing on the arrival
 // of a working lint is a gate telling you to stop writing lints.
-const GATE_TOOL_DIR = "tools/ship";
-const isGateTool = (rel) => rel.startsWith(GATE_TOOL_DIR + "/");
+// v4581 -- *** AND THE RULE NAMED ONE DIRECTORY WHERE TWO QUALIFY, WHICH ONLY SHOWED WHEN SOMETHING STOPPED
+// HIDING THE SECOND. *** tools/mutate holds the mutation-testing tooling, and being read by a gate is the whole
+// purpose of every module in it -- the same sentence as the paragraph above, about a different folder. It never
+// surfaced because tools/ship/gateSweep.mjs's closing records mention "mechanicalSweep" in a verdict string, so
+// the one module in there whose importers are ALL gates read as reached by prose. The moment gateSweep became a
+// report module the scan reported it, correctly and for the first time.
+//
+// MEASURED before widening, so this is not a convenience: every one of the eight non-gate modules in
+// tools/mutate is imported by at least one gate, and tools/mutate/mechanicalSweep.mjs is imported by exactly
+// three -- shadowedDefaults-selfcheck, mechanical-selfcheck and operators-selfcheck -- and by nothing else at
+// all. It is a frozen RECORD of a mutation sweep that three gates read; wiring it to product code would be
+// inventing a caller to satisfy a scan.
+const GATE_TOOL_DIRS = Object.freeze(["tools/ship", "tools/mutate"]);
+const isGateTool = (rel) => GATE_TOOL_DIRS.some((d) => rel.startsWith(d + "/"));
 
 // v3126 -- AND THE BASELINE ITSELF MUST NOT BE CORPUS. It lists all 147 orphan paths, so including it marks
 // every one of them "mentioned" and the scan reports zero. Third time in a single round that this scanner was
@@ -70,10 +82,48 @@ const isGateTool = (rel) => rel.startsWith(GATE_TOOL_DIR + "/");
 // tree -- populationCensus stamps `generatedFrom`, the baselines stamp `captured`/`generated` -- so the corpus
 // asks the file what it is instead of matching its name. A name list would need editing every time somebody
 // writes a new report, which is precisely the maintenance nobody does and how these two got in.
-const SKIP = /orphan-baseline\.json|node_modules|(^|[\\/])vendor[\\/]|\.git|render-qa[\\/]out|[\\/]dist[\\/]|\.min\./;
-/** A JSON file that declares it was generated is a RECORD of references, never a maker of them. */
-const isGeneratedRecord = (file, text) =>
-    /\.json$/.test(file) && /^\s*[{[]/.test(text) && /"(?:generatedFrom|generated|captured)"\s*:/.test(text.slice(0, 4096));
+//
+// *** v4572 -- AND THE PROPERTY HAS NEVER WORKED ON THE ONE FILE IT WAS WRITTEN FOR, BECAUSE THE NAME WAS
+// STILL DOING THE JOB. *** orphan-baseline.json carries `"captured": "2026-08-25"` -- it is stamped, exactly as
+// this comment says the baselines are -- AT BYTE 6,940, because its `note` runs six and a half kilobytes
+// first. The test read `text.slice(0, 4096)`, so it returned FALSE, and the file stayed out of the corpus
+// solely because `orphan-baseline\.json` sits in the SKIP regex below: the very name list v3900 replaced with
+// a property, quietly propping up the property that replaced it. Nobody could see it, because the two agreed
+// about the outcome and disagreed about the reason.
+//
+// THE WINDOW WAS ALWAYS THE BUG AND v4571 WALKED PAST IT. That round put `generatedFrom` FIRST in
+// input-sets.json's payload and wrote a comment explaining that the note runs ~700 characters so the key must
+// be inside the window -- treating a defect in the CHECK as a placement rule for every future writer. A record
+// is JSON. Its top-level keys are exactly knowable by parsing it, at no window at all, and a rule that depends
+// on where in a file a key happens to fall is a rule about formatting wearing a rule about provenance.
+//
+// AND THE VOCABULARY WAS TOO NARROW BY ONE, FOUND THE SAME WAY: gate-plan-snapshot.json declares
+// `producedBy`, which is provenance in a different word, and the three-name list did not know it. Both
+// halves are fixed together because both were found by asking what the records actually say instead of
+// what the check assumes they say.
+const SKIP = /node_modules|(^|[\\/])vendor[\\/]|\.git|render-qa[\\/]out|[\\/]dist[\\/]|\.min\./;
+/** The words a record uses in this tree to say where it came from. */
+// EACH WORD NAMES A SOURCE OR AN ACT OF CAPTURE, NEVER A TIME. `producedAt` and `refreshedAt` were both
+// considered and both REFUSED: a timestamp says when a file was written and nothing about who wrote it, and
+// a hand-edited file carrying a date would be excluded from the corpus on the strength of the date. Widening
+// this set makes the scanner blinder, which is the direction that costs orphans, so it widens on evidence
+// rather than on convenience -- gate-plan-snapshot.json carries `producedBy` beside its `producedAt`, and
+// tools/ship/releases.json was given a real `generatedFrom` rather than having `refreshedAt` admitted here.
+const PROVENANCE = new Set(["generatedFrom", "generated", "captured", "producedBy"]);
+/**
+ * A JSON file that declares it was generated is a RECORD of references, never a maker of them.
+ *
+ * PARSED, NOT MATCHED. The parse is the point: a top-level key is a fact about the document and a regex over
+ * the first 4 KB is a fact about its layout. An unparseable file is not a record -- it is a broken file, and
+ * saying so by returning false keeps it in the corpus where somebody will notice it.
+ */
+const isGeneratedRecord = (file, text) => {
+    if (!/\.json$/.test(file) || !/^\s*\{/.test(text)) return false;
+    let j = null;
+    try { j = JSON.parse(text); } catch { return false; }
+    if (!j || typeof j !== "object" || Array.isArray(j)) return false;
+    return Object.keys(j).some((k) => PROVENANCE.has(k));
+};
 
 // v4009 -- A THIRD FILE WALKED IN, AND THIS TIME THE PROPERTY DID NOT EXIST TO ASK FOR.
 // render/ssaoCompare.mjs is a hand-written report comparing two SSAO implementations. Its data table stores
@@ -100,9 +150,62 @@ const REPORT_MODULE = {
     "ssao-compare.html": "the human-readable rendering of the same report -- imports ssaoCompare.mjs for real " +
         "(that import stands on its own) but its page text also NAMES both implementations by path in prose, " +
         "which is the same documentation-not-a-load-path shape as the .mjs table it renders",
+    // v4571 -- *** THE REGISTER OF A FAILURE BECAME THE REASON THE FAILURE PERSISTED. ***
+    // These two RECORD what gates said. register-audit.mjs stores each red gate's first failing line
+    // VERBATIM; redCensus.mjs stores the reason each red was registered. baselineHygiene's failing line is
+    // "STALE, DELETE THESE: <seven paths>" -- so the moment that red was written down, both files contained
+    // all seven paths as string data, orphanScan read them as mentions, and the seven stopped being
+    // candidates. The gate's own failure message is what made its next run fail: recording the red is what
+    // kept it red. Neither file imports anything it names; naming a path IS their job.
+    "tools/ship/redCensus.mjs": "the register of red gates -- it stores the REASON each red was registered, " +
+        "and a reason quotes the paths the gate named. A record of what failed is not a call site",
+    "tools/ship/register-audit.mjs": "the recorded output of the register's own audit -- each entry holds a " +
+        "gate's first failing line verbatim, so every path a red gate prints lands here as data",
+    // v4581 -- *** THE BACKLOG NAMES THE THING THAT NEEDS DOING, SO WRITING AN ITEM DOWN HIDES ITS SUBJECT. ***
+    // This is the fifth face of the trap this file's own header describes four times -- its header comment,
+    // prose docs, its own output, a tooltip -- and I walked into it by FILING one. Round #44 was filed at
+    // v4579 as "ten standalone shader files are outside every reachability census" and listed all ten paths
+    // in its `what`. Four of them (shaders/ghost.frag.glsl, shaders/selection.frag.glsl,
+    // shaders/selection.vert.glsl, shaders/biome.vert.glsl) were named by NOTHING ELSE IN THE TREE, so the
+    // act of scheduling the round is what would have made its subjects read as reached the moment shaders
+    // entered the population.
+    //
+    // Naming a path IS this file's job, exactly as it is redCensus's and register-audit's, and it makes no
+    // reference it does not also describe: every entry is a string in an exported array of prose.
+    "tools/ship/nextRounds.mjs": "the backlog -- every entry names the paths a future round must touch, in " +
+        "prose held as string data. A plan to work on a file is not a call to it, and an item that hid its " +
+        "own subject would be a round that could never be seen to be needed",
+    // v4581 -- TWO MORE OF THE SAME, AND THE FIRST IS THE SHARPEST INSTANCE THIS FILE HAS. exactHash.mjs's
+    // SHADER_SINHASH_V4578 carries a `notLoaded` array -- a record whose CONTENT is "nothing loads these
+    // files" -- and holding that record is what made the scanner believe something did. MEASURED: every one
+    // of the ten paths it names in non-comment text sits inside that census, and the module makes no file
+    // reference of its own.
+    "render/exactHash.mjs": "the sin-hash census -- SHADER_SINHASH_V4578 names every site the idiom survives " +
+        "at, classified by what its hash feeds, including a `notLoaded` list of files nothing loads. Every " +
+        "path in the module is inside that record; the arithmetic it exports refers to no file at all",
+    "tools/ship/gateSweep.mjs": "the sweep's closings -- each `since<N>` entry records which gates a round " +
+        "added and swept, so 348 gate paths sit in it as history. The phase-2 runner takes its work from " +
+        "argv and a TSV, never from those arrays: a record of what was swept is not a call site",
 };
 const isReportModule = (rel) => Object.prototype.hasOwnProperty.call(REPORT_MODULE, rel);
 const CODE = /\.(js|mjs)$/;
+// v4581 -- *** AND A SECOND POPULATION, BECAUSE A SHADER FILE WAS IN NO REACHABILITY CENSUS AT ALL. ***
+// This tree keeps 26 standalone .glsl/.frag/.vert/.wgsl files. None of them has ever been scanned: CODE is the
+// population, CODE is .js and .mjs, and a dead shader is therefore invisible to the one instrument whose job
+// is reachability. That is round #31's finding (".cjs files are outside every census this tree runs") in a
+// second extension, and it is the same shape -- nothing distinguished a deliberate keep from an oversight.
+//
+// THE RULES DIFFER FROM CODE'S IN TWO WAYS, AND BOTH ARE PROPERTIES OF WHAT A SHADER IS:
+//
+//   NO EXPORTS. The module scan skips a file with no `export` as "a script, not a module". A shader has no
+//   exports by construction, so that skip would drop the entire population and report a clean zero.
+//
+//   THE WHOLE FILENAME. The module rule strips the extension, because `import "./x.mjs"` may be written
+//   `./x` -- an extension-less import is a real thing. A shader is FETCHED, always by its whole name, so the
+//   stripped rule is wrong for it and measurably so: shaders/transitions/swekWipe.glsl reads as reached
+//   because the string "swekWipe" appears in render/transitionModel.mjs, and what that module actually loads
+//   is a different transition. One of 26 turns on this.
+const SHADER = /\.(glsl|frag|vert|wgsl)$/;
 // v3126 -- PROSE IS NOT REACHABILITY, and this cost a round to learn. The corpus first included .md and .txt,
 // and this scanner's OWN header names the orphans it was written for -- so documenting SSAOPass and SpatialHash
 // as motivation made both invisible to it. Same for a design doc that mentions a class. A file is reached when
@@ -156,10 +259,22 @@ export function walk(root, test, acc = []) {
  * Find modules that export something and that nothing appears to reach.
  * `root` is the engine directory. Returns { candidates, scanned, corpus }.
  */
-export { DIRECTORY_LOADED };
+export { DIRECTORY_LOADED, REPORT_MODULE };
 
-export function orphanScan(root) {
-    const codeFiles = walk(root, CODE);
+/**
+ * *** ONE IMPLEMENTATION, TWO POPULATIONS. *** The corpus, the comment strip, the title strip, the
+ * generated-record property and the report-module list are the hard-won parts and are shared exactly. What a
+ * caller varies is which files are being ASKED about and how a reference to one is spelled.
+ */
+export const MODULE_POP = Object.freeze({
+    name: "module", test: CODE, wholeName: false, requireExports: true,
+});
+export const SHADER_POP = Object.freeze({
+    name: "shader", test: SHADER, wholeName: true, requireExports: false,
+});
+
+export function orphanScan(root, pop = MODULE_POP) {
+    const codeFiles = walk(root, pop.test);
     const corpusFiles = walk(root, CORPUS);
     const texts = new Map();
     for (const f of corpusFiles) {
@@ -176,14 +291,16 @@ export function orphanScan(root) {
     const candidates = [];
     for (const f of codeFiles) {
         const rel = path.relative(root, f).replace(/\\/g, "/");
-        const base = path.basename(f).replace(CODE, "");
+        // whole filename for a fetched asset; extension stripped for an importable module -- see SHADER above
+        const base = pop.wholeName ? path.basename(f) : path.basename(f).replace(pop.test, "");
         const dir = path.dirname(rel);
 
         let src = texts.get(f);
         if (src === undefined) { try { src = fs.readFileSync(f, "utf8"); } catch { continue; } }
 
-        // a file with no exports cannot be orphaned in the sense that matters -- it is a script, not a module
-        if (!/\bexport\b|module\.exports/.test(src)) continue;
+        // a file with no exports cannot be orphaned in the sense that matters -- it is a script, not a module.
+        // A SHADER has none by construction, so the population says whether to ask.
+        if (pop.requireExports && !/\bexport\b|module\.exports/.test(src)) continue;
         // gates, tests and entry points are reached by a runner or a person, not by an import
         if (/selfcheck|-test$|\.test$/.test(base)) continue;
         if (/^#!/.test(src) || /process\.argv\[1\]/.test(src)) continue;
@@ -207,7 +324,7 @@ export function orphanScan(root) {
         if (!reached) candidates.push({ file: rel, bytes: src.length, exports: (src.match(/^export /gm) || []).length });
     }
     candidates.sort((a, b) => b.bytes - a.bytes);
-    return { candidates, scanned: codeFiles.length, corpus: corpusFiles.length };
+    return { candidates, scanned: codeFiles.length, corpus: corpusFiles.length, population: pop.name };
 }
 
 const ENGROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -224,4 +341,9 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     console.log("[orphanScan] SUBSTRING-MATCHED, not parsed -- it over-reports rather than under-reports, which is");
     console.log("[orphanScan] the safe direction for a list somebody might delete from.");
     for (const c of r.candidates) console.log("      " + (typeof c === "string" ? c : (c.file || JSON.stringify(c))));
+    const sh = orphanScan(ENGROOT, SHADER_POP);
+    console.log("[orphanScan] " + sh.candidates.length + " shader file(s) nothing loads, of " + sh.scanned + " scanned.");
+    console.log("[orphanScan] A shader is FETCHED by its whole name, so no extension is stripped and no export");
+    console.log("[orphanScan] is required -- see the SHADER note above for what each of those costs.");
+    for (const c of sh.candidates) console.log("      " + c.file);
 }

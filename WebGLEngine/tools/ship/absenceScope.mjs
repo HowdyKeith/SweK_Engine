@@ -56,7 +56,35 @@ export const KINDS = Object.freeze(["code", "denial", "mention"]);
 const SKIP_DIRS = new Set(["node_modules", ".git", "gate-reports"]);
 const SOURCE_RE = /\.(mjs|js|glsl|wgsl)$/;
 
+// *** v4566 -- ONE READ PER FILE PER PROCESS, THE SHAPE treeRead.mjs ESTABLISHED AT v4548. ***
+// gradeClaim calls scan() once per claim and scan() walks the tree and reads every source file it finds.
+// The gate makes seven of those calls, so it was doing 28,507 readFileSync and 2,352 readdirSync for 390 MB
+// of I/O to answer seven questions about 56 MB of source -- and at 6.5-6.9 s serially it sat OUTSIDE the
+// 3,000 ms ship-time sweep, which put INSCOPE_ARRIVALS_SINCE_V4435 (added this same round) among the records
+// nothing checks at ship time. recordReach's ratchet went red for it, exactly as it did for
+// SWEEP_CONTENTION_V4562 the round before, and it is the same repair v4548 made to recordDrift and
+// frozenRecords: the censuses are cheap, the re-reading is not.
+//
+// NOT treeRead.mjs itself, and the reason is the file set: treeRead's SOURCE_EXT is /\.(mjs|cjs|js)$/ and
+// this module must see .glsl and .wgsl too -- a shader is exactly where an absence claim goes wrong. Sharing
+// the cache would mean widening treeRead's extension list for every consumer of it, which is a bigger change
+// than this round is entitled to make and would move the .cjs census v4565 just took. Same shape, own cache.
+const _walkCache = new Map();
+const _textCache = new Map();
+export function clearScanCache() { _walkCache.clear(); _textCache.clear(); _strippedCache.clear(); }
+export function scanStats() { return { walks: _walkCache.size, files: _textCache.size, stripped: _strippedCache.size }; }
+
+function textOf(abs) {
+    if (_textCache.has(abs)) return _textCache.get(abs);
+    let src = null;
+    try { src = fs.readFileSync(abs, "utf8"); } catch { src = null; }
+    _textCache.set(abs, src);
+    return src;
+}
+
 export function sourceFiles(root = ENG, { dirs = null, includeVendor = false } = {}) {
+    const key = root + "\u0000" + (dirs ? dirs.join(",") : "") + "\u0000" + (includeVendor ? "1" : "0");
+    if (_walkCache.has(key)) return _walkCache.get(key);
     const roots = dirs ? dirs.map((d) => path.join(root, d)) : [root];
     const out = [];
     for (const r of roots) {
@@ -74,7 +102,9 @@ export function sourceFiles(root = ENG, { dirs = null, includeVendor = false } =
             }
         })(r);
     }
-    return out.sort();
+    out.sort();
+    _walkCache.set(key, out);
+    return out;
 }
 
 // ---- *** THE MATCHER, AND IT IS THE PART THAT ALREADY FAILED ONCE IN THIS FILE'S OWN LIFETIME *** --------
@@ -93,19 +123,36 @@ export function sourceFiles(root = ENG, { dirs = null, includeVendor = false } =
 
 const alnum = (c) => c !== undefined && /[A-Za-z0-9]/.test(c);
 
+// *** v4566 -- THE CASE-INSENSITIVE SEARCH NO LONGER ALLOCATES A LOWERCASE COPY OF EVERY FILE. ***
+// The first draft did `text.toLowerCase()` at the top of every call, and this function is called twice per
+// (file, term) -- once on the comment-stripped source and once on the raw. After the codeOnly cache landed it
+// was the single largest cost left in the gate at 719 ms of 2.8 s, all of it allocating and discarding ~56 MB
+// of lowercased string per pass. A case-insensitive regex finds the SAME positions with no copy at all, and
+// the boundary rules below still read the ORIGINAL text's characters, which is what makes the camel-hump
+// rule work -- so the semantics are unchanged by construction, and were checked file-for-file besides.
+const _termRe = new Map();
+const termRe = (needle) => {
+    let re = _termRe.get(needle);
+    if (!re) { re = new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"); _termRe.set(needle, re); }
+    return re;
+};
+
 export function tokenMatch(text, term) {
-    const hay = text.toLowerCase(), needle = term.toLowerCase();
-    if (!needle) return false;
-    let i = hay.indexOf(needle);
-    while (i !== -1) {
-        const prev = text[i - 1], next = text[i + needle.length];
-        const first = text[i], last = text[i + needle.length - 1];
-        const raw = text.slice(i, i + needle.length);
+    if (!term) return false;
+    const n = term.length;
+    const re = termRe(term);
+    re.lastIndex = 0;
+    let m;
+    while ((m = re.exec(text)) !== null) {
+        const i = m.index;
+        const prev = text[i - 1], next = text[i + n];
+        const first = text[i], last = text[i + n - 1];
+        const raw = text.slice(i, i + n);
         const beforeOk = i === 0 || !alnum(prev) || (/[a-z0-9]/.test(prev) && /[A-Z]/.test(first));
         const afterOk = next === undefined || !alnum(next) ||
             (/[A-Z]/.test(next) && (/[a-z0-9]/.test(last) || raw === raw.toUpperCase()));
         if (beforeOk && afterOk) return true;
-        i = hay.indexOf(needle, i + 1);
+        re.lastIndex = i + 1;   // the old scan advanced by ONE, not by the match length -- overlaps still count
     }
     return false;
 }
@@ -129,9 +176,26 @@ export function denialRe(term) {
     return new RegExp(DENIAL_SHAPES.map((s) => s.replace("{T}", t)).join("|"), "i");
 }
 
+// *** v4566 -- AND THE COST WAS NEVER THE I/O, WHICH IS WHY THE FIRST FIX BARELY MOVED IT. ***
+// Memoising the read took this module from 28,507 readFileSync and 390 MB to 4,075 and 55.8 MB -- a 7x cut
+// in I/O that bought 1.2 s of 10.2. The seven scans are seven passes over the tree and classifyFile runs
+// codeOnly() on every file on every pass: 28,504 comment-strips of 56 MB of source to answer seven questions.
+// codeOnly's answer does not depend on the term, so it is computed once per file and reused.
+//
+// The wrong diagnosis is recorded rather than quietly replaced, because it is the same error this module
+// exists to catch one level up: I read "reads the tree seven times" and concluded "the reads are the cost"
+// without measuring which part of the pass was expensive. The instrument said 4,075 reads and 8,961 ms in
+// the same breath, and only the second number was the answer.
+const _strippedCache = new Map();
+function strippedOf(src) {
+    let out = _strippedCache.get(src);
+    if (out === undefined) { out = codeOnly(src); _strippedCache.set(src, out); }
+    return out;
+}
+
 /** The kind one file takes against one term. codeOnly runs FIRST and its answer is final -- see the header. */
 export function classifyFile(src, term) {
-    if (tokenMatch(codeOnly(src), term)) return "code";
+    if (tokenMatch(strippedOf(src), term)) return "code";
     if (!tokenMatch(src, term)) return null;
     return denialRe(term).test(src) ? "denial" : "mention";
 }
@@ -141,8 +205,8 @@ export function classifyFile(src, term) {
 export function scan(term, { root = ENG, dirs = null } = {}) {
     const buckets = { code: [], denial: [], mention: [] };
     for (const rel of sourceFiles(root, { dirs })) {
-        let src;
-        try { src = fs.readFileSync(path.join(root, rel), "utf8"); } catch { continue; }
+        const src = textOf(path.join(root, rel));
+        if (src === null) continue;
         const kind = tokenMatch(rel, term) ? "code" : classifyFile(src, term);
         if (kind) buckets[kind].push(rel);
     }
@@ -189,6 +253,26 @@ export function gradeClaim(claim, { root = ENG } = {}) {
 // A count goes stale the first time anybody adds a file; names say WHICH, so a change reads as a change
 // rather than as a number that moved. THE CLAIM GRADED IS MINE, WRITTEN ONE ROUND EARLIER, AND IT IS THE
 // EIGHTH SIGHTING THIS SESSION OF A DETECTOR MATCHING THE SHAPE ITS AUTHOR PICTURED.
+/**
+ * *** ARRIVALS SINCE, NAMED, BECAUSE THE RECORD ABOVE IS A CLAIM ABOUT v4435 AND STAYS TRUE ABOUT v4435. ***
+ *
+ * BVH_AT_V4435 is the grade of a claim as it stood, frozen BY NAME so a change reads as a change. The tree
+ * then grew two files that carry the term in CODE and sit inside the claim's own search scope, and the three
+ * rows comparing the live grade against the record went red -- correctly, and invisibly, because this gate is
+ * over the ship-time budget and nothing ran it until the over-budget pool was re-timed at v4565.
+ *
+ * The record is not rewritten. The arrivals are recorded beside it with why, which is the shape
+ * gfx/frontDoor.mjs uses for its reach and world/orreryFleet.mjs for its commit belt.
+ */
+export const INSCOPE_ARRIVALS_SINCE_V4435 = Object.freeze([
+    Object.freeze({ file: "physics/character/terrainWalk.mjs", at: "v4544",
+        why: "the slope-aware ground controller. Its header names mesh/meshBVH.mjs as the query a capsule " +
+             "against triangles would use -- in code, not prose, so codeOnly sees it" }),
+    Object.freeze({ file: "physics/character/terrainWalk-selfcheck.mjs", at: "v4544",
+        why: "its gate, which IMPORTS MeshBVH and trianglesFrom: the round's central cross-check runs a " +
+             "bilinear heightfield gradient against a real meshBVH raycast and holds them to 4.8e-14" }),
+]);
+
 export const BVH_AT_V4435 = Object.freeze({
     at: "v4435",
     claim: "docs/EXPLAIN-ITSELF.md item 10, as written at v4432",

@@ -29,6 +29,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { readChangelog, namesVersion, newestVersion, CHANGELOG_REL } from "./changelogSource.mjs";
+import VM from "../../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ENGINE = path.resolve(HERE, "..", "..");        // .../SweK_Engine_vNNNN/WebGLEngine
@@ -128,8 +129,8 @@ console.log("");
 stage("the version markers agree", () => {
     const main = fs.readFileSync(path.join(ENGINE, "main.js"), "utf8");
     const brain = fs.readFileSync(path.join(ENGINE, "brain", "brain.js"), "utf8");
-    const mv = (main.match(/ENGINE_VERSION\s*=\s*"(v\d+)"/) || [])[1];
-    const bv = (brain.match(/BRAIN_BUILD\s*=\s*"(v\d+)"/) || [])[1];
+    const mv = (main.match(VM.markerRe("ENGINE_VERSION")) || [])[1];
+    const bv = (brain.match(VM.markerRe("BRAIN_BUILD")) || [])[1];
     if (mv !== version) throw new Error("main.js says ENGINE_VERSION = " + mv + ", you asked for " + version);
     if (bv !== version) throw new Error("brain.js says BRAIN_BUILD = " + bv + ", main.js says " + mv + " -- they must match");
     return mv + " in both";

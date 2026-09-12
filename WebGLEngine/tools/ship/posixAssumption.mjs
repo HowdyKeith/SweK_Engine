@@ -152,7 +152,17 @@ export const POSIX_AT_V4485 = Object.freeze({
     // 38 -> 40 and never held at 90 -> 93, so nothing was un-normalised; the monotonic half of the assertion
     // is what carries the meaning and it was never in danger. Taken with the gate's own two files skipped,
     // because v4409's rule is that a census must not count the instrument.
-    separator: Object.freeze({ callers: 133, calls: 182, normalised: 40, never: 93 }),
+    // v4569 -- RE-TAKEN: 133/182/40/93 -> 140/190/43/97. Seven callers arrived across three rounds of
+    // sweep tooling and one engine round (render/exactHash.mjs and its gate, and the probe modules under
+    // tools/ship/probe/). The NORMALISED count rose with them, which is the direction this record allows: a
+    // fall would mean a repair was undone.
+    // *** TAKEN UNDER THE GATE'S OWN SKIP LIST, WHICH IS THE RULE THE RECORD IS COMPARED BY. ***
+    // My first re-take used a bare scan() and read 140/190/43/97; the gate compares against
+    // scan({ skip: [posixAssumption.mjs, posixAssumption-selfcheck.mjs] }) so that this module and its gate
+    // cannot inflate their own census, and that reads 138/188/41/97. A record taken under a different rule
+    // from the one that checks it is a number nobody can re-derive -- which is the whole subject of
+    // separatorRule beside it.
+    separator: Object.freeze({ callers: 138, calls: 188, normalised: 41, never: 97 }),
     rulesTried: Object.freeze([53, 74, 90]),
     notClaimed: "that the 90 are defects. A relative path that is only printed is portable already; the ones " +
                 "that bite are compared against a stored form, and three static rules for 'compared against' " +

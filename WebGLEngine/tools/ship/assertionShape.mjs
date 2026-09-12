@@ -220,8 +220,56 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4548 -- RE-TAKEN: TWO gates (treeRead, recordReach) joined, the same four rows by TWO, FOURTEENTH
     // arrival. The round's third new file is tools/ship/recordReach.mjs, a module rather than a gate, and it
     // moves none of these -- which is the distinction these nine rows exist to make.
-    gates: 1604, usesOk: 1583, definesOk: 1575, importsOk: 0,
-    distinctDefinitions: 38, nameFirst: 1476, condFirst: 91, unknownSignature: 16,
+    // v4550 -- RE-TAKEN: one gate (glbConformance) joined, the same four rows by one, FIFTEENTH arrival.
+    // v4552 -- RE-TAKEN: one gate (detourScale) joined, the same four rows by one, SIXTEENTH arrival.
+    // v4554 -- RE-TAKEN: one gate (surfaceProbe) joined, the same four rows by one, SEVENTEENTH arrival.
+    // v4555 -- RE-TAKEN: one gate (chunk) joined, the same four rows by one, EIGHTEENTH arrival.
+    // v4556 -- RE-TAKEN: one gate (versionMarker) joined, the same four rows by one, NINETEENTH arrival.
+    // v4557 -- RE-TAKEN: one gate (ritualCoherence) joined, the same four rows by one, TWENTIETH arrival.
+    // v4559 -- RE-TAKEN: one gate (pipboyItems) joined, the same four rows by one, TWENTY-FIRST arrival.
+    // v4560 -- RE-TAKEN: one gate (xatlasRef) joined, the same four rows by one, TWENTY-SECOND arrival.
+    // v4563 -- RE-TAKEN: one gate (fluidSystem) joined, the same four rows by one, TWENTY-THIRD arrival.
+    // v4564 -- RE-TAKEN: one gate (sourceExtensions) joined, the same four rows by one, TWENTY-FOURTH.
+    // v4566 -- RE-TAKEN: one gate (inputSets) joined, the same four rows by one, TWENTY-FIFTH -- AND
+    // distinctDefinitions MOVED for the first time in ten arrivals, 38 -> 39. The new gate spells its own
+    // ok() with a default argument (`(name, cond, detail = "")`) that no existing gate uses verbatim, so it
+    // is a thirty-ninth distinct text rather than a thirty-eighth copy. Worth a line: this row is the one
+    // that would notice a tree drifting toward everybody inventing their own assertion helper, and every
+    // previous arrival had reused one.
+    // v4569 -- RE-TAKEN: one gate (exactHash) joined, the same four rows by one, TWENTY-SIXTH arrival --
+    // and distinctDefinitions moved AGAIN, 39 -> 40, for the second round running after ten that did not.
+    // The new gate spells `ok(n, c, d = "")` where v4566's spelled `(name, cond, detail = "")`: same shape,
+    // different parameter names, so it is a fortieth distinct text. Two in a row is worth watching -- this
+    // row exists to notice a tree drifting toward everybody inventing their own assertion helper.
+    // v4572 -- RE-TAKEN for one new gate, tools/ship/recordShape-selfcheck.mjs: gates 1616 -> 1617,
+    // usesOk 1595 -> 1596, definesOk 1587 -> 1588, nameFirst 1488 -> 1489. distinctDefinitions holds
+    // at 40 -- the new gate uses the ok(name, cond, detail) shape already counted, which is the
+    // point of that row: a gate adding a FORTY-FIRST spelling of the same idea is the thing worth
+    // noticing, and this one does not.
+    // v4572b -- RE-TAKEN for tools/ship/recordProvenance-selfcheck.mjs: 1617 -> 1618 and the three
+    // rows that follow a gate by one. distinctDefinitions holds at 40 for the second round running.
+    // v4573 -- RE-TAKEN for tools/ship/importClosure-selfcheck.mjs: 1618 -> 1619 and the three rows
+    // that follow a gate by one. distinctDefinitions holds at 40 for the THIRD round running.
+    // v4575 -- RE-TAKEN for physics/render/conductorFresnel-selfcheck.mjs: 1619 -> 1620 and the three
+    // rows that follow a gate by one. distinctDefinitions holds at 40 for the FOURTH round running,
+    // and this one is a render gate rather than a tools/ship one, which is the harder case for it.
+    // v4576 -- RE-TAKEN for tools/ship/recordTier-selfcheck.mjs: 1620 -> 1621 and the three rows that
+    // follow a gate by one. distinctDefinitions holds at 40 for the FIFTH round running.
+    // v4577 -- RE-TAKEN for physics/raceKnob-selfcheck.mjs: 1621 -> 1622 and the three rows that follow a
+    // gate by one. distinctDefinitions holds at 40 for the SIXTH round running, and this gate is in physics/
+    // rather than tools/ship/ -- it lives beside its module on purpose, because registryOrphans derives an
+    // instrument's module from its gate path.
+    // v4577 -- RE-TAKEN for physics/raceKnob-selfcheck.mjs: 1621 -> 1622.
+    // v4579 -- RE-TAKEN for tools/ship/starField-selfcheck.mjs: 1622 -> 1623 and the three rows that follow a
+    // gate by one. distinctDefinitions holds at 40 for the SEVENTH round running.
+    // v4580 -- RE-TAKEN for tools/ship/skyStars-selfcheck.mjs: 1623 -> 1624 and the three rows that follow a
+    // gate by one. distinctDefinitions holds at 40 for the EIGHTH round running.
+    // v4582 -- RE-TAKEN for tools/ship/zipWriter-selfcheck.mjs: 1624 -> 1625 and the three rows that follow a
+    // gate by one. NOT THIS ROUND'S GATE -- it arrived on main in commit c3f1fecb (the release zip's pure-Node
+    // writer) and is re-taken here because that commit and this one merged, and the tree has to be green for
+    // whichever lands second. distinctDefinitions holds at 40 for the NINTH round running.
+    gates: 1625, usesOk: 1604, definesOk: 1596, importsOk: 0,
+    distinctDefinitions: 40, nameFirst: 1497, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

@@ -44,7 +44,7 @@
 // at its cause (the walk skips .claude now) rather than by moving a baseline.
 "use strict";
 import { REGISTER_AUDIT } from "./register-audit.mjs";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -107,7 +107,9 @@ const RED_AT_V4279_GATES = Object.freeze([
     "tools/ship/boundaryLint-selfcheck.mjs",
     "tools/ship/canvasFill-selfcheck.mjs",
     "tools/ship/definitionGates-selfcheck.mjs",
-    "tools/ship/gateReach-selfcheck.mjs",
+    // v4571 -- tools/ship/gateReach-selfcheck.mjs REMOVED, repaired: see FIXED_SINCE_V4408. It stood in
+    // this list AND was registered again at v4568, because the killed bucket found it red without
+    // noticing it was already filed -- one gate, two entries, and only one of them ever revisited.
     "tools/ship/homography-selfcheck.mjs",
     "tools/ship/pagePlacement-selfcheck.mjs",
     "tools/ship/pagePlacements-selfcheck.mjs",
@@ -219,6 +221,22 @@ export const registerAtSweep = () =>
     RED_AT_V4279.length + FIXED_SINCE_V4279.length - RECOVERED_SINCE_V4279.length;
 
 export const FIXED_SINCE_V4279 = Object.freeze([
+    // *** v4571 -- FILED HERE AND NOT IN FIXED_SINCE_V4408, BECAUSE THIS IS THE LIST THAT HELD IT. ***
+    // gateReach stood in RED_AT_V4279_GATES and was registered a SECOND time at v4568 when the killed
+    // bucket found it red without noticing it was already filed. Putting the repair in the v4408 list
+    // left the v4279 identity one short -- 39 confirmed + 1 recovered - 3 - 14 + 1 = 24 against a list of
+    // 23 -- and the census said so within the minute. A list is a claim about an instant; the repair goes
+    // where the claim was made. Same rule the note above RED_AT_V4408 states about orreryEjecta.
+    { gate: "tools/ship/gateReach-selfcheck.mjs", round: "v4571",
+      why: "THE POPULATION PIN, 472 AGAINST 520, COUNTED THE WAY THE FILE'S OWN PROTOCOL DEMANDS RATHER THAN " +
+           "RAISED: populationCensus.compare() reports GREW, 48 ADDED, 0 REMOVED, reconciles:true, every one " +
+           "named -- 20 in physics/render's path-tracer and microfacet arc, 3 in physics/mesh from this " +
+           "session's own rounds, 4 in the vehicle arc, 3 box3d, 3 xpbd, 2 crypto, plus terrainWalk and " +
+           "wallFollow. Growth only, in areas that are live work, re-recorded with writeCensus() AFTER " +
+           "compare() had been read. AND THE ROW HAD A DEFECT OF ITS OWN: it read the record with a RELATIVE " +
+           "path, so run from anywhere but the engine root it reported 'expected null and found 520' -- a gate " +
+           "claiming the population moved when what moved was the caller's cwd. It calls readCensus() now, " +
+           "which has always resolved against the module's own location." },
     { gate: "tools/ship/updatePause-selfcheck.mjs", round: "v4451",
       why: "RED SINCE v4279 AND THE CODE WAS RIGHT THE WHOLE TIME. Its last check required " +
            "`c._errored = true; tally();` -- the two statements ADJACENT ON ONE LINE -- and somebody later " +
@@ -417,7 +435,8 @@ export const RED_AT_V4408 = Object.freeze(RED_AT_V4408_GATES.map((gate) => Objec
 export const RED_AT_V4424_GATES = Object.freeze([
     "tools/ship/doorKinds-selfcheck.mjs",
     "tools/ship/graveyard-selfcheck.mjs",
-    "tools/ship/orphanDisposition-selfcheck.mjs",
+    // v4571 -- tools/ship/orphanDisposition-selfcheck.mjs REMOVED, repaired: see FIXED_SINCE_V4408. Same
+    // double-filing as gateReach above -- registered here at v4424 and again at v4568.
 ]);
 
 const WHY_V4424 = Object.freeze({
@@ -796,6 +815,64 @@ export const RED_AT_V4557 = Object.freeze(RED_AT_V4557_GATES.map((gate) => Objec
 // v4536 did the repair; and the row that exists to notice exactly that said "24 of 24 re-ran red just now"
 // and passed. The population is DERIVED from the pairs below now, and the gate checks those pairs against
 // this file's own source, so a list that arrives without being added here fails rather than being skipped.
+// *** v4568 -- FIVE REDS THAT HAVE NEVER BEEN REGISTERED BECAUSE NOTHING COULD RUN THEM. ***
+//
+// Every list above holds a gate the sweep found. These five were found by opening the KILLED bucket: 140
+// gates that hit the 20,000 ms cap, which the rotation could not reach until v4568 and the sweep skips by
+// construction. Re-run serially at a 90 s cap, 103 of the 140 finished and SIX came back red -- five of them
+// real, confirmed by running each alone.
+//
+// They are registered rather than fixed because each is a defect in a different subsystem and the round that
+// found them is about the door, not about them. A red that is named is a known red; a red sitting over the
+// cap is the exact fault this round exists to end, and closing the round by leaving them unnamed would
+// reproduce it one level up.
+//
+// *** AND THE SIXTH WAS A FALSE RED OF THE PASS'S OWN MAKING, WHICH IS WHY THE LIST IS FIVE. ***
+// tools/ship/domScope-selfcheck.mjs was filed red at 90,129 ms and is GREEN alone at 101,386 and 102,999 ms:
+// it simply needs more than 90 seconds. The pass read it as finished-and-failed because execFileSync's
+// timeout can leave an exit STATUS rather than a signal, so "was it killed" was answered by a number instead
+// of by the fact. runGate uses spawnSync now and reports timeout/signal outright -- verified by capping a
+// 100 s gate at 5 s -- and domScope was re-timed through the owner to 103,579 ms exit 0.
+const WHY_V4568 = Object.freeze({
+    "tools/ship/commentFalsePass-selfcheck.mjs":
+        "ONE GENUINE INSTANCE of the thing it hunts, after 24 candidates the instrument explains away: " +
+        "ui/qrChannel-selfcheck.mjs asserts against RAW SOURCE and its claim is satisfied by the string " +
+        "\"Copyright (c) 2009 Kazuhiko Arase\" in a comment in ui/qrDecode.mjs. A gate asserting 'the code " +
+        "does X' against unstripped source passes on a comment saying 'we should do X' -- the defect this " +
+        "file was written for, found in a gate rather than in a pre-filter this time.",
+    "tools/ship/gateReach-selfcheck.mjs":
+        "the recorded default population is 472 and the live one is 520. A tool that silently changes what " +
+        "it counts makes every earlier figure incomparable, which is why this row is a red and not a report.",
+    "tools/ship/baselineHygiene-selfcheck.mjs":
+        "SEVEN baseline entries have outlived their reason and the gate names them for deletion: " +
+        "brain/cs/csEnv.js, render/SSAOPass.js, simulation/SpatialHash.js, tools/facePlacementSystem.js, " +
+        "tools/selectionState.js, tools/voxelToolSystem.js, ui/avatarExpression.js. A baseline that still " +
+        "excuses files which are no longer orphans is a list of fiction -- the failure mode its own header " +
+        "describes, arrived at again.",
+    "tools/ship/gateSelection-selfcheck.mjs":
+        "reachable gates are no longer scheduled first: the first 109 selected are all reachable and the " +
+        "row wants that property to hold further, so a truncated run no longer covers the change it was " +
+        "meant to cover.",
+    "tools/ship/orphanDisposition-selfcheck.mjs":
+        "'imported by a gate named for something else' now holds for 28 of 30 members, so it discriminates " +
+        "NOTHING -- v3551's defect, which this gate's own row says was caught before it was built and has " +
+        "since become true of the live population.",
+});
+
+// v4571 -- EMPTY, AND EMPTIED BY REPAIR RATHER THAN BY DELETION. All five were registered at v4568 when the
+// killed bucket was first opened, and all five are fixed and green; see FIXED_SINCE_V4408 below for what each
+// one actually turned out to be. The list stays declared so the register's own rows keep a name to resolve and
+// so the next round that opens a bucket has somewhere to put what it finds.
+export const RED_AT_V4568_GATES = Object.freeze([]);
+
+export const RED_AT_V4568 = Object.freeze(RED_AT_V4568_GATES.map((gate) => Object.freeze({
+    gate,
+    why: WHY_V4568[gate] || null,
+    get ms() { const r = auditRow(gate); return r ? r.ms : null; },
+    get fails() { const r = auditRow(gate); return r && r.first ? r.first : (UNVERIFIED_LINE[gate] || null); },
+    get derived() { return !!(auditRow(gate) && auditRow(gate).first); },
+})));
+
 export const REGISTER_LISTS = Object.freeze([
     Object.freeze(["RED_AT_V4279", RED_AT_V4279]),
     Object.freeze(["RED_AT_V4408", RED_AT_V4408]),
@@ -805,6 +882,7 @@ export const REGISTER_LISTS = Object.freeze([
     Object.freeze(["RED_AT_V4531", RED_AT_V4531]),
     Object.freeze(["RED_AT_V4535", RED_AT_V4535]),
     Object.freeze(["RED_AT_V4557", RED_AT_V4557]),
+    Object.freeze(["RED_AT_V4568", RED_AT_V4568]),
 ]);
 
 /** Every registered gate, once, with the list that named it. The `entry` is carried rather than spread, so
@@ -817,6 +895,60 @@ export const ALL_REGISTERED = Object.freeze((() => {
 })());
 
 export const FIXED_SINCE_V4408 = Object.freeze([
+    // *** v4571 -- ALL FIVE OF RED_AT_V4568 REPAIRED, AND NOT ONE OF THEM WAS A NEW FAILURE. ***
+    // They were found by v4568 opening the killed bucket: 9.6 s, 11.0 s, 31 s, 71 s and 88 s against a
+    // 3,000 ms sweep budget, so no ship-time step had run any of them and each had been holding its red for
+    // an unknown number of rounds. FOUR OF THE FIVE WERE THE CHECK BEING WRONG, NOT THE SUBJECT.
+    { gate: "tools/ship/commentFalsePass-selfcheck.mjs", round: "v4571",
+      why: "ITS ONE 'GENUINE' FALSE PASS WAS A COPYRIGHT NOTICE. qrChannel-selfcheck asserts /Copyright \\(c\\) " +
+           "2009 Kazuhiko Arase/ against ui/qrDecode.mjs, a vendored copy reproducing the MIT notice in full as " +
+           "MIT requires. That matches raw and not codeOnly because a licence notice IS a comment -- there is no " +
+           "arrangement of code that could satisfy the claim instead -- which is not the defect this gate hunts " +
+           "(a comment stating INTENT read as behaviour). It reached the idiom filter because `\\(c\\)`, an " +
+           "escaped paren in an English sentence, reads as a call. A decidable exemption now covers it: the " +
+           "matched TEXT is licence boilerplate AND it sits in a comment block carrying a copyright line and the " +
+           "grant. The obvious fix was measured and REJECTED -- requiring a word character before `\\(` drops 214 " +
+           "of 277 tested assertions, because `if \\(`, `for \\(` and `while \\(` put a space there too. Its " +
+           "header's census numbers were stale in the same breath (142/48/12 against a live 569/239/24) and now " +
+           "state the shape while the run states the numbers." },
+    { gate: "tools/ship/baselineHygiene-selfcheck.mjs", round: "v4571",
+      why: "*** IT REPORTED ALL SEVEN SUPPRESSIONS STALE AND NOT ONE HAD BEEN ADOPTED. *** orphanScan was " +
+           "returning ZERO candidates over 4,058 code files, so every entry read as stale and the gate " +
+           "prescribed deleting the whole baseline -- un-protecting files a sweep has already taken once. TWO " +
+           "CAUSES, AND THE SECOND IS A LOOP: tools/ship/input-sets.json (3.5 MB of every path every gate " +
+           "reads, written at v4567 by my own round) carried no provenance stamp, so isGeneratedRecord could " +
+           "not see it was a record; and redCensus.mjs and register-audit.mjs had recorded THIS GATE'S OWN " +
+           "FAILING LINE -- 'STALE, DELETE THESE: <seven paths>' -- as string data, which orphanScan read as " +
+           "mentions. Recording the red is what kept it red. With the stamp restored and the two registers " +
+           "excluded as report modules, the candidate set went 0 -> 7 and is EXACTLY the baseline's own seven. " +
+           "THE PART THAT GENERALISES is the refusal: orphanBaselineHygiene now rejects an EMPTY candidate set " +
+           "as v3222 made it reject a missing one, because 'I was not told', 'nothing is live' and 'my scan " +
+           "came back empty' are three claims and only one is safe to act on." },
+    { gate: "tools/ship/gateSelection-selfcheck.mjs", round: "v4571",
+      why: "THE ROW CHANGED WHAT IT ASSERTED AS THE TREE GREW. Its band was selected.slice(0, reachable > " +
+           "selected ? selected.length : min(20, reachable)) -- the first twenty while reachable <= selected, " +
+           "and THE WHOLE PLAN once reachable exceeded it, at which point it demanded every selected gate be " +
+           "reachable, which the selector never promised. Measured: plan 109, positions 0-97 reachable and " +
+           "98-108 not, 23 reachable gates missed, 3 ms leftover. The eleven tail gates cost 44-48 ms EACH; the " +
+           "cheapest missed reachable gate costs 12,518 ms and the dearest 839,022. Not one could have taken a " +
+           "tail slot -- the selector filled the last milliseconds instead of idling and the row called it a " +
+           "failure. Restated structurally: the plan is PARTITIONED, every reachable gate before every " +
+           "unreachable one, which cannot drift with size. AND THE COMPANION ROW COULD NOT FAIL ON ITS FIRST " +
+           "DRAFT -- comparing the cheapest missed gate to the LEFTOVER budget passed while an 81 ms reachable " +
+           "gate was displaced, because the packer immediately spent the freed 81 ms. It reclaims everything " +
+           "spent on unreachable work now (3 + 514 ms) and asks whether the cheapest missed gate would fit even " +
+           "then. Sabotage fired only after that." },
+    { gate: "tools/ship/orphanDisposition-selfcheck.mjs", round: "v4571",
+      why: "THE GUARANTEE WAS STATED ONE CLAUSE TOO WIDE. It asserted \"'imported by a gate named for something " +
+           "else' holds for EVERY member\" on the grounds that v3558 routes modules with a dedicated gate out " +
+           "of the pile first -- which guarantees the ABSENCE OF A SAME-NAMED GATE and promises nothing about " +
+           "being imported by any other. At 28 of 30 the tree found the gap: demos_code/bitcoin_miner.js and " +
+           "render/isingTsl.mjs have no dedicated gate AND NO GATE CONSUMER AT ALL, a worse disposition than " +
+           "the one the sentence described. Not relaxed to a looser count: the guaranteed property is asserted " +
+           "alone (30 of 30, still discriminating nothing, which was always the point) and the varying one is " +
+           "reported with its exceptions NAMED, the two accounts summing to the pile. It is a real cross-check " +
+           "rather than a tautology -- disabling orphanTriage's hasOwnGate routing reddens all three rows at " +
+           "30 of 77." },
     { gate: "tools/ship/frozenRecords-selfcheck.mjs", round: "v4536",
       why: "REGISTERED AT v4535 WITH THE REPAIR NAMED, AND REPAIRED BY DOING THAT. The census read a record's " +
            "body as `src.slice(i, i + 6000)` capped at twelve fields -- wrong in four directions at once on " +
@@ -843,6 +975,30 @@ export const FIXED_SINCE_V4408 = Object.freeze([
            "entries are records, and it never saw 17 files that reach a body through path.join. The baseline " +
            "is now a FROZEN LIST OF NAMES with the counts derived from it, so the next arrival is reported by " +
            "name; that ratchet caught this round's own new gate joining box3d's fleet within the hour." },
+]);
+
+/**
+ * *** GATES THAT HAVE LEFT UNCONFIRMED_SLOW BY ACQUIRING A VERDICT. ***
+ *
+ * v4571. UNCONFIRMED_SLOW is the not-red-and-not-green bucket: gates nothing ever ran to completion, waved
+ * past the ship gate for absence of evidence. Leaving it is the outcome it exists to produce -- and until
+ * now nothing recorded the leaving, so every frozen record that partitioned gates BY that bucket was reading
+ * a historical claim against a live list. tools/ship/gateSweep-selfcheck.mjs's fromSlowBucket rows went red
+ * the moment orphanDisposition acquired a verdict, because "was in the bucket at v4297" was being tested as
+ * "is in the bucket today".
+ *
+ * *** AND THE FIRST FIX FOR THAT WAS WRONG, WHICH IS WHY THIS LIST EXISTS RATHER THAN A UNION. *** I reached
+ * for the FIXED_* lists as a stand-in for "has left the bucket" and two rows went red immediately: those
+ * record repairs to the RED REGISTERS, which is a different exit from a different place. A gate repaired
+ * from RED_AT_V4279 was never unmeasured, and folding the two together made the regression rows call real
+ * regressions unmeasured. Two exits, two records.
+ */
+export const MEASURED_OUT_OF_SLOW = Object.freeze([
+    { gate: "tools/ship/orphanDisposition-selfcheck.mjs", round: "v4571",
+      why: "REPAIRED AND THEN MEASURED, IN THAT ORDER. Its guarantee was stated one clause too wide and stood " +
+           "at 28 of 30; repaired at v4571, then re-timed by name at a 150 s cap -- 82 s, exit 0. It had been " +
+           "in this bucket because the audit's 120 s cap and the 20 s rotation cap both fell short of it, " +
+           "which is absence of evidence and not evidence of absence. It has evidence now." },
 ]);
 
 export const UNCONFIRMED_SLOW = Object.freeze([
@@ -906,7 +1062,11 @@ export const UNCONFIRMED_SLOW = Object.freeze([
     "tools/ship/labDevices-selfcheck.mjs",
     "tools/ship/loopSearch-selfcheck.mjs",
     "tools/ship/moduleRefs-selfcheck.mjs",
-    "tools/ship/orphanDisposition-selfcheck.mjs",
+    // v4571 -- tools/ship/orphanDisposition-selfcheck.mjs REMOVED. This bucket is for gates with NO VERDICT
+    // because nothing ever ran them to completion; it is explicitly not-red and not-green. That gate now has
+    // a verdict: repaired at v4571 and re-timed by name at a 150 s cap, 82 s, exit 0. Leaving it here would
+    // have filed a MEASURED green under absence of evidence -- and it showed up immediately as slowCensus's
+    // exempt ceiling going 60 -> 61, a gate falling INTO the unmeasured bucket on the round that measured it.
     "tools/ship/orphanTriage-selfcheck.mjs",
     "tools/ship/toolFrontDoor-selfcheck.mjs"
 ]);
@@ -1012,13 +1172,20 @@ export const SLOW_PARTIAL = Object.freeze({
 });
 
 /** Run one gate and report whether it is red. Nothing here interprets WHY -- only the exit code. */
+// *** v4568 -- THE SAME CHILD LEAK quickSweep HAD, in the runner the rotation uses. ***
+// execFileSync's `timeout` kills the direct child and nothing below it, so a gate that spawned anything of
+// its own leaves it running when the cap fires. tools/ship/headlessGpu-selfcheck.mjs pins a WebGPU device in
+// a child on purpose; one such orphan was found holding a device for forty-four minutes on this box, which
+// slows every GPU gate that runs afterwards -- and a gate slowed past the cap is killed, orphaning more.
+// spawnSync exposes the pid execFileSync does not, so the group can be signalled after a timeout.
 export function runGate(rel, { timeoutMs = 120000 } = {}) {
-    try {
-        execFileSync(process.execPath, [rel], { cwd: ENG, timeout: timeoutMs, stdio: "ignore" });
-        return { red: false, code: 0 };
-    } catch (e) {
-        return { red: true, code: e.status == null ? "timeout/signal" : e.status };
-    }
+    const r = spawnSync(process.execPath, [rel], { cwd: ENG, timeout: timeoutMs, stdio: "ignore", detached: true });
+    // The group is signalled whether or not this timed out: a gate that EXITS having left a child behind
+    // leaks exactly as much as one that was killed, and the exit code says nothing about its children.
+    if (r.pid) { try { process.kill(-r.pid, "SIGKILL"); } catch {} }
+    if (r.error) return { red: true, code: "timeout/signal" };
+    if (r.signal) return { red: true, code: "timeout/signal" };
+    return { red: r.status !== 0, code: r.status };
 }
 
 /** Total cost of re-verifying the whole census, in ms, from the recorded per-gate times. */

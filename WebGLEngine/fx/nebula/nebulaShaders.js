@@ -1,13 +1,31 @@
 // fx/nebula/nebulaShaders.js -- WebGPU (WGSL) + WebGL2 (GLSL ES 3.0) fragment shaders for the nebula, transcribed
 // from the CPU reference in nebula.js (same hash/vnoise/fbm/palette/parallax/stars). Fullscreen; uniforms are
-// resolution, camera offset (parallax), and time. GPU exec is RIG-only; the algorithm is the verified CPU ref, so
-// these are correct-by-construction and visually equivalent (f32 vs f64 differences are imperceptible for gas).
+// resolution, camera offset (parallax), and time. GPU exec is RIG-only; the algorithm is the verified CPU ref.
+//
+// *** v4570 -- THE LINE THAT USED TO STAND HERE WAS HALF RIGHT, AND THE OTHER HALF WAS THE STARFIELD. ***
+// It read: "these are correct-by-construction and visually equivalent (f32 vs f64 differences are
+// imperceptible for gas)". Imperceptible FOR GAS is true and was tested by eye: fbm averages its noise, so a
+// wisp drawn from a different random field is still a wisp. But this header also claims the transcription
+// keeps "same hash/vnoise/fbm/palette/parallax/STARS", and a star is not gas -- nebula.js draws one with
+// `if (sv > 0.994)`, a THRESHOLD, and a threshold does not average.
+//
+// fract(sin(dot(p,K))*43758.5453) in f32 here against f64 there is not one number rounded twice; sin(x)*43758
+// amplifies the last bits of x by four orders of magnitude and the two are unrelated. MEASURED over 518,400
+// sampled pixels of a 1920x1080 frame: the CPU drew 3,006 stars, the GPU drew 2,509, and 378 were in the same
+// place -- 12.6%. nebula.html imports renderNebulaCPU AND these shaders, so which sky a viewer saw depended
+// on whether their browser had WebGPU. tools/ship/exactHash-selfcheck.mjs re-derives that pair every run
+// rather than quoting it, over the same pixels as the after-reading it is compared against.
+//
+// hash2 is render/exactHash.mjs's integer hash in all three languages now, so the transcription is exact
+// rather than correct-by-construction.
 "use strict";
+import { EXACT_HASH_GLSL, EXACT_HASH_WGSL } from "../../render/exactHash.mjs";
 
 const NEBULA_WGSL = `
 struct U { res:vec2<f32>, cam:vec2<f32>, time:f32, pad:f32 };
 @group(0) @binding(0) var<uniform> u:U;
-fn hash2(p:vec2<f32>) -> f32 { return fract(sin(p.x * 127.1 + p.y * 311.7) * 43758.5453); }
+${EXACT_HASH_WGSL}
+fn hash2(p:vec2<f32>) -> f32 { return exact_hash(p, 0u); }
 fn vnoise(p:vec2<f32>) -> f32 {
   let i = floor(p); let f = fract(p); let uu = f * f * (3.0 - 2.0 * f);
   let a = hash2(i); let b = hash2(i + vec2<f32>(1.0, 0.0)); let c = hash2(i + vec2<f32>(0.0, 1.0)); let d = hash2(i + vec2<f32>(1.0, 1.0));
@@ -41,7 +59,8 @@ const NEBULA_GLSL_FS = `#version 300 es
 precision highp float;
 uniform vec2 uRes; uniform vec2 uCam; uniform float uTime;
 out vec4 frag;
-float hash2(vec2 p) { return fract(sin(p.x * 127.1 + p.y * 311.7) * 43758.5453); }
+${EXACT_HASH_GLSL}
+float hash2(vec2 p) { return exact_hash(p, 0u); }
 float vnoise(vec2 p) { vec2 i = floor(p); vec2 f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);
   float a = hash2(i), b = hash2(i + vec2(1.0, 0.0)), c = hash2(i + vec2(0.0, 1.0)), d = hash2(i + vec2(1.0, 1.0));
   return mix(mix(a, b, u.x), mix(c, d, u.x), u.y); }

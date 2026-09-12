@@ -178,9 +178,15 @@ export function axesFor(body, languages) {
 }
 
 /** What v4432 measured. Re-take with: node tools/ship/orreryUniverse-selfcheck.mjs */
+// v4560 -- vendor/xatlas arrived and its upstream row was FETCHED rather than left owed: jpcy/xatlas, C++,
+// 2,554 stars, 274 forks, MIT, through search_repositories, which is the non-repo-scoped endpoint this module's
+// header establishes as the one that answers for any public repository. So upstreams 9 -> 10, resolved 8 -> 9,
+// and the language axis AGREES on it -- a C++ tree against a C++ upstream, the seventh such body. The
+// `unmeasured` count stays at 1 and stays named: morphicons still owes its row, and holding the number at one
+// is what stops a second body hiding inside it.
 export const MEASURED_AT_V4432 = Object.freeze({
-    upstreams: 9,
-    resolved: 8,
+    upstreams: 10,
+    resolved: 9,
     notFound: 1,
     notFoundOwner: "justjakel",
     realOwner: "justjake",
@@ -190,7 +196,7 @@ export const MEASURED_AT_V4432 = Object.freeze({
     vendoredBytesMisattributed: 810948,
     axesReachable: 1,
     axesRefused: 2,
-    languageAgree: 6,
+    languageAgree: 7,       // v4560: xatlas, C++ against C++
     languageBuilt: 2,
     languageTranspiled: 2,
     languagePaperwork: 1,

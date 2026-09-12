@@ -92,7 +92,7 @@ const biomeOf = (p) => BIOME_ORDER[biomeIdFor(p)];
     ok("the correction moved exactly the record that was wrong and left the others alone",
         AUTH.bodies.filter((b) => b.upstream && b.upstream.owner === "justjakel").length === 0 &&
         AUTH.bodies.filter((b) => b.upstream && b.upstream.owner === "justjake").length === 1 &&
-        AUTH.counts.withUpstream === 14,   // 11 at v4432; 14 since Racing city 0 re-baked orrery-authors.json (morphicons at v4498, kenney-city and kenney-racing now, each with a PROVENANCE.md)
+        AUTH.counts.withUpstream === 15,   // 11 at v4432; 14 since Racing city 0 re-baked orrery-authors.json (morphicons at v4498, kenney-city and kenney-racing now, each with a PROVENANCE.md); 15 at v4560 (xatlas, whose PROVENANCE.txt names jpcy/xatlas)
         "gifenc's git:// URL and htmx's LICENSE-blob URL say more about where the bytes came from than a repo " +
         "root does, so a canonical URL is synthesised ONLY when the vote overrides the first URL's owner");
     ok("and the vendored text was NOT edited -- the stray L is still in the file, as measured",

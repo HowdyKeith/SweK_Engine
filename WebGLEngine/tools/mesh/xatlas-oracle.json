@@ -1,0 +1,83 @@
+{
+  "note": "xatlas run over tools/mesh/xatlasRef.mjs FIXTURES. Regenerate: node tools/mesh/xatlasRef.mjs --record",
+  "pin": "f700c7790aaa030e794b52ba7791a05c085faf0c",
+  "inputs": {
+    "vendor/xatlas/xatlas.cpp": "0ed0283aad005c94",
+    "vendor/xatlas/xatlas.h": "e7675335ad8ab1c1",
+    "tools/mesh/xatlasRef.cpp": "7abc5187a5f460f1"
+  },
+  "meshes": {
+    "cylinder 16x6": {
+      "meshHash": "91d41b5a70f05883",
+      "charts": 3,
+      "atlas": [
+        1107,
+        834
+      ],
+      "util": 0.856851,
+      "verts": 133,
+      "triangles": 192,
+      "stretchP90": 1,
+      "densityP10": 0.090237,
+      "densityMedian": 0.090825,
+      "uvArea": 0.853483,
+      "uvLo": 0.000452,
+      "uvHi": 0.999548,
+      "uvOutside": 0
+    },
+    "torus 16x10": {
+      "meshHash": "7c30ae2aadaac46f",
+      "charts": 10,
+      "atlas": [
+        1113,
+        1169
+      ],
+      "util": 0.617321,
+      "verts": 248,
+      "triangles": 320,
+      "stretchP90": 1.1891,
+      "densityP10": 0.041823,
+      "densityMedian": 0.043771,
+      "uvArea": 0.606063,
+      "uvLo": 0.000428,
+      "uvHi": 0.999572,
+      "uvOutside": 0
+    },
+    "sphere 12x8": {
+      "meshHash": "7b0d07415a9b5062",
+      "charts": 6,
+      "atlas": [
+        1206,
+        876
+      ],
+      "util": 0.75543,
+      "verts": 130,
+      "triangles": 168,
+      "stretchP90": 1.1697,
+      "densityP10": 0.056621,
+      "densityMedian": 0.060051,
+      "uvArea": 0.746833,
+      "uvLo": 0.000415,
+      "uvHi": 0.999585,
+      "uvOutside": 0
+    },
+    "sphere 24x16": {
+      "meshHash": "0e98d0b57a1b45c0",
+      "charts": 6,
+      "atlas": [
+        1220,
+        838
+      ],
+      "util": 0.781977,
+      "verts": 446,
+      "triangles": 720,
+      "stretchP90": 1.1305,
+      "densityP10": 0.055682,
+      "densityMedian": 0.063907,
+      "uvArea": 0.772578,
+      "uvLo": 0.00041,
+      "uvHi": 0.99959,
+      "uvOutside": 0
+    }
+  }
+}

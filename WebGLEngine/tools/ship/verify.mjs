@@ -18,6 +18,7 @@ import { execSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { withheldFromMirror } from "./withheld.mjs";
+import VM from "../../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
 
 function arg(name) { const i = process.argv.indexOf(name); return i >= 0 ? process.argv[i + 1] : null; }
 const version = arg("--version");
@@ -71,7 +72,7 @@ if (version) {
   // 524c536c: the regex returns v4487 where the live declaration says v4504, so the two marker rows below
   // failed on every ship that carried commented history -- v4504's own round recorded its DO NOT SHIP as
   // "the release lag alone" and was wrong about two of its three failures. ^ with /m fixes it outright.
-  try { mv = (fs.readFileSync("main.js", "utf8").match(/^const ENGINE_VERSION = "(v\d+)"/m) || [])[1]; } catch {}
+  try { mv = (fs.readFileSync("main.js", "utf8").match(VM.markerRe("ENGINE_VERSION")) || [])[1]; } catch {}
   check(`version marker: main.js says ${mv || "?"} , shipping ${version}`, mv === version, mv === version ? "" : "MISLABELED BUILD — bump main.js or fix --version");
 } else {
   check("version marker", false, "no --version given");
@@ -84,7 +85,7 @@ if (version) {
   let bb = null;
   // v4531 -- anchored for the same reason as the engine marker above, and it was worse here: the pattern had
   // no `const` either, so it also matched the word inside a comment sentence mentioning BRAIN_BUILD = "vNNNN".
-  try { bb = (fs.readFileSync("brain/brain.js", "utf8").match(/^const BRAIN_BUILD = "(v\d+)"/m) || [])[1]; } catch {}
+  try { bb = (fs.readFileSync("brain/brain.js", "utf8").match(VM.markerRe("BRAIN_BUILD")) || [])[1]; } catch {}
   check(`brain build marker: brain.js says ${bb || "?"} , shipping ${version}`, bb === version,
         bb === version ? "" : "BRAIN_BUILD is stale — it will announce the wrong build in every log line");
 }
@@ -516,7 +517,17 @@ if (process.env.SWEK_QUICKSWEEP !== "0") {
     // tools/ship/tools/ship/quickSweep.mjs before verify ever ran it.
     const { runQuickSweep } = await import("./quickSweep.mjs");
     const budgetMs = Number(arg("--sweep-budget") || 3000);
-    const r = await runQuickSweep({ budgetMs, onProgress: (d, t) => { if (d === t || d % 200 === 0) process.stderr.write(`[verify] quick sweep ${d}/${t}\n`); } });
+    // *** v4574 -- THE SHIP-TIME SWEEP IS EXPLICITLY FULL, AND THAT IS THE POINT OF ARMING THE OTHER ONE. ***
+    // quickSweep's CLI now skips gates whose recorded inputs did not move, which is worth ~5 minutes on every
+    // sweep somebody runs while working. A SHIP IS NOT THAT. The saving buys iteration speed; what it spends
+    // is a small, bounded, MEASURED chance that a gate which should have run did not -- and the one place
+    // this tree must not spend that is the run whose output is "ALL GREEN, safe to present_files".
+    //
+    // So it is passed EXPLICITLY even though the programmatic default is already false. That default is a
+    // thing somebody changes for a good reason somewhere else -- v4574 changed it to true for about ten
+    // minutes before sweepCoverage-selfcheck showed why that was wrong -- and an argument at the call site
+    // is a decision THIS file made, which the next person to arm something can see was considered here.
+    const r = await runQuickSweep({ budgetMs, skipUnchanged: false, onProgress: (d, t) => { if (d === t || d % 200 === 0) process.stderr.write(`[verify] quick sweep ${d}/${t}\n`); } });
     console.log(`[verify] quick sweep: ${r.ran} of ${r.enumerated} gates under ${budgetMs} ms in ${(r.ms / 1000).toFixed(0)} s -- ${r.green} green, ` +
       `${r.knownRed.length} known red, ${r.newRed.length} NEW red, ${r.falseReds} false red, ${r.unmeasured.length} unmeasured, ${r.dropped.length} now over budget`);
     for (const k of r.knownRed) console.log(`[verify]   known red  ${k.gate}  (${k.record})`);

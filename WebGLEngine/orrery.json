@@ -1741,6 +1741,30 @@
      "bytes": 2549
     }
    ]
+  },
+  {
+   "name": "xatlas",
+   "arrived": "2026-09-09",
+   "sha": "6b1a06864eca14d41613a26ce224e4c239b0e611",
+   "bytes": 345457,
+   "files": [
+    {
+     "path": "LICENSE",
+     "bytes": 1075
+    },
+    {
+     "path": "PROVENANCE.txt",
+     "bytes": 1743
+    },
+    {
+     "path": "xatlas.cpp",
+     "bytes": 332735
+    },
+    {
+     "path": "xatlas.h",
+     "bytes": 9904
+    }
+   ]
   }
  ]
 }

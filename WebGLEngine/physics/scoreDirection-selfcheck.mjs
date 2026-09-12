@@ -219,10 +219,26 @@ section("5. THE CENSUS -- REPORTED, NOT FROZEN");
        rows.every((x) => (x.r.accepted === null) === (x.r.acceptedRank === -1)));
     ok("an accepted candidate always carries a PASSING verdict",
        rows.every((x) => x.r.accepted === null || x.r.acceptedVerdict.pass === true));
-    ok("where the greedy pick is refused, the loop still names a survivor",
-       greedyRefused.every((x) => x.r.accepted !== null),
+    // *** THE ANTIDOTE ABOVE WAS WRITTEN IN ADVANCE AND THIS IS THE ROUND THAT CASHED IT. *** A proposer was
+    // added whose candidates ALL fail -- `race-speed`, greedy 0.15 refused, accepted null at rank -1 after
+    // EIGHT adjudications -- and the row went red exactly as its own note predicted. It is rewritten as that
+    // note instructs: not weakened, not deleted. "The search found nothing" is a real answer, and what must
+    // never be indistinguishable from it is "the loop only looked at one candidate" -- so the exhausted
+    // proposer is named, and the thing asserted about it is that the loop ADJUDICATED MORE THAN ONE
+    // candidate before reporting nothing. Everyone else must still name a survivor.
+    //
+    // Found at v4565 by re-timing the over-budget pool: this gate had been outside the ship-time sweep, so
+    // the antidote fired into a terminal nobody was reading.
+    const EXHAUSTED = ["race-speed"];
+    const exhausted = greedyRefused.filter((x) => x.r.accepted === null);
+    ok("where the greedy pick is refused, the loop still names a survivor -- or says it looked and found none",
+       greedyRefused.every((x) => x.r.accepted !== null || EXHAUSTED.includes(x.id)) &&
+       exhausted.every((x) => EXHAUSTED.includes(x.id) && x.r.acceptedRank === -1 && x.r.adjudicated > 1),
        greedyRefused.length + " refused, " + greedyRefused.filter((x) => x.r.accepted !== null).length +
-       " with a survivor named");
+       " with a survivor named, " + exhausted.length + " exhausted (" +
+       exhausted.map((x) => x.id + ": " + x.r.adjudicated + " adjudications, rank " + x.r.acceptedRank).join("; ") +
+       "). A proposer with no passing candidate reports accepted:null AND a count above one, which is what " +
+       "separates an exhausted search from a search that never happened.");
 }
 
 console.log("\n" + (fail ? "FAILED " + fail + " of " + (pass + fail) : "ALL " + pass + " CHECKS PASS"));

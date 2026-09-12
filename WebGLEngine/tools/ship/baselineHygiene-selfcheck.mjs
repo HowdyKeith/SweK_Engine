@@ -33,7 +33,22 @@ const O = await import(pathToFileURL(path.join(HERE, "orphanScan.mjs")).href);
 
 const scan = O.orphanScan(ENG);
 const live = (scan.candidates || []).map((x) => x.file || x);
-const h = H.orphanBaselineHygiene(ENG, live);
+// *** THE REFUSAL IS CAUGHT AND REPORTED, NOT LET THROUGH AS A STACK TRACE. ***
+// baselineHygiene.mjs refuses an absent or empty candidate set rather than answering "everything is stale",
+// and that refusal is the correct behaviour -- but a gate that dies with a stack tells a reader nothing about
+// which of its claims failed, and a sweep records it as a crash rather than as this check's verdict. So the
+// refusal becomes a named FAIL and the rest of the gate is skipped, because there is nothing left to say
+// about a baseline nobody could assess.
+let h = null, refusal = null;
+try { h = H.orphanBaselineHygiene(ENG, live); } catch (e) { refusal = e.message; }
+if (refusal) {
+    ok("!! the live candidate set is usable at all", false,
+       "orphanScan returned " + live.length + " candidate(s) over " + (scan.scanned || "?") + " scanned files, " +
+       "and the hygiene checker REFUSED it: " + refusal + " Nothing below this line can be assessed, so nothing " +
+       "below it is claimed.");
+    console.log("baselineHygiene-selfcheck: 1 FAILURES");
+    process.exit(1);
+}
 
 // ---- 1. EVERY ENTRY STILL DESCRIBES AN ORPHAN --------------------------------------------------------------------
 {
@@ -79,6 +94,30 @@ const h = H.orphanBaselineHygiene(ENG, live);
         "MIGHT NOT FIRE -- v3142 proved that with a ratchet that passed its own sabotage");
 }
 
+// ---- 4. THE REFUSAL, SHOWN REFUSING ------------------------------------------------------------------------
+{
+    // *** THIS GATE WAS RED FOR A REASON THAT HAD NOTHING TO DO WITH ITS SUBJECT, AND ITS ADVICE WAS TO DELETE
+    // THE WHOLE FILE. *** Found in the killed bucket v4568 opened -- it costs ~31 s against a 3,000 ms sweep
+    // budget, so nothing at ship time had run it. It reported ALL SEVEN entries stale. Not one had been
+    // adopted: orphanScan was returning ZERO candidates over 4,058 code files, because tools/ship/
+    // input-sets.json (3.5 MB of every path every gate reads, written at v4567 with no provenance stamp) and
+    // the two registers that had just recorded THIS GATE'S OWN FAILING LINE named all seven as string data.
+    // The register of the failure was keeping the failure alive.
+    //
+    // The scan is fixed at the source, but a fix in the scan protects nothing the next time something else
+    // blinds it. THE REFUSAL IS THE PART THAT GENERALISES, and it must be shown refusing: v3222 wrote the
+    // same guard for `undefined` and an empty array walked straight past it for 1,349 versions.
+    let refused = null;
+    try { H.orphanBaselineHygiene(ENG, []); } catch (e) { refused = e.message; }
+    ok("!! *** an EMPTY candidate set is refused, not answered -- it would call every entry stale ***",
+        refused !== null && /EMPTY/.test(refused),
+        refused ? "refused: " + refused.slice(0, 120) + "..." : "IT ANSWERED. With no candidates every entry " +
+        "reads as stale, so the answer is 'delete the whole baseline' delivered with total confidence");
+    ok("...and a non-empty set is still answered, so the refusal is not simply a wall",
+        h.entries.length > 0 && live.length > 0,
+        live.length + " live candidates and " + h.entries.length + " entries -- the guard narrows what this " +
+        "tool will answer, and a check that refused everything would pass the row above just as well");
+}
 console.log();
 console.log("  ----  NOT DONE: claim-trace-baseline, lab-results-baseline and graded-coverage-baseline have the");
 console.log("  ----  same exposure -- an entry can outlive its reason and nothing checks. THEY ARE DIFFERENT");

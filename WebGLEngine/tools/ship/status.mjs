@@ -12,6 +12,7 @@
 //   node tools/ship/status.mjs --next /tmp/next.md   # regenerate + replace the "## Next" block from a file
 import fs from "node:fs";
 import path from "node:path";
+import VM from "../../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
 
 function findAtRoot(name) { let d = process.cwd(); for (let i = 0; i < 5; i++) { const p = path.join(d, name); if (fs.existsSync(p)) return p; const up = path.dirname(d); if (up === d) break; d = up; } return null; }
 function findEngine() { let d = process.cwd(); for (let i = 0; i < 6; i++) { const p = path.join(d, "WebGLEngine", "main.js"); if (fs.existsSync(p)) return p; if (fs.existsSync(path.join(d, "main.js")) && d.endsWith("WebGLEngine")) return path.join(d, "main.js"); const up = path.dirname(d); if (up === d) break; d = up; } return null; }
@@ -24,7 +25,7 @@ if (!backlogPath || !statusPath) { console.error("[status] BACKLOG.md not found 
 
 // current version
 let version = "?";
-try { version = (fs.readFileSync(mainPath, "utf8").match(/const ENGINE_VERSION = "(v\d+)"/) || [])[1] || "?"; } catch {}
+try { version = (fs.readFileSync(mainPath, "utf8").match(VM.markerRe("ENGINE_VERSION")) || [])[1] || "?"; } catch {}
 
 // parse BACKLOG into version blocks
 const backlog = fs.readFileSync(backlogPath, "utf8");

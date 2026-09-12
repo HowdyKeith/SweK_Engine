@@ -33,6 +33,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import VM from "../../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const REPO = path.resolve(ENG, "..");
@@ -46,7 +47,7 @@ export function versionNumber(v) {
 // The ENGINE_VERSION a main.js declares, read from the text rather than imported (main.js is a browser module
 // and importing it here would drag the engine in to answer a question about one line).
 export function engineVersionOf(text) {
-    const m = /^const ENGINE_VERSION = "(v\d+)"/m.exec(String(text || ""));
+    const m = VM.markerRe("ENGINE_VERSION").exec(String(text || ""));
     return m ? m[1] : null;
 }
 

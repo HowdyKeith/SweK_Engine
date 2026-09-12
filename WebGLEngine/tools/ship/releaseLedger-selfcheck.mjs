@@ -99,6 +99,7 @@ import os from "node:os";
 import { execFileSync } from "node:child_process";
 import { ledgerState, readLedger, engineVersion, shippedVersions, num, LEDGER, ENG, ROOT } from "./releaseLedger.mjs";
 import { rowsFrom } from "./refreshReleases.mjs";
+import VM from "../../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -125,6 +126,13 @@ const LED = readLedger();
 // check that passed either way would be worth nothing.
 {
     const mainSrc = fs.readFileSync(path.join(ENG, "main.js"), "utf8");
+    // *** THE TWO LITERALS BELOW ARE DELIBERATE AND THIS FILE IS THE ONE EXEMPTION FROM THE SHARED READER. ***
+    // Every other reader in the tree was moved onto tools/ship/versionMarker.js at v4556; this gate's whole
+    // subject is the DIFFERENCE between an anchored read and an unanchored one, so it must hold both spellings
+    // itself. Pointing both at the shared pattern makes `firstMatch !== live` false and the row below passes
+    // vacuously -- which is what the v4556 conversion did before this comment existed, turning a gate about
+    // the defect into a gate that cannot see it. tools/ship/versionMarker-selfcheck.mjs names this file as the
+    // one permitted second spelling, so the ratchet stays honest rather than silently excepting it.
     const live = (mainSrc.match(/^const ENGINE_VERSION = "v(\d+)"/m) || [])[1];
     const firstMatch = (mainSrc.match(/ENGINE_VERSION\s*=\s*"v(\d+)"/) || [])[1];
     ok("!! *** the tree version is the LIVE declaration, read independently and anchored ***",

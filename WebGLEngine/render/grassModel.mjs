@@ -107,15 +107,31 @@ const smoothstepEdge = (e0, e1, x) => { const t = clamp01((x - e0) / (e1 - e0));
 export function bladeVisibility(slopeMag, originX, originZ) {
     if (slopeMag > 0.65) return { drawn: false, reason: "slope", slopeSuppress: 1, bladeHash: NaN };
     const slopeSuppress = smoothstepEdge(0.28, 0.65, slopeMag);
-    // the shader's own per-blade hash -- sin/dot/fract, NOT windHash. Kept as written: it is a different
-    // hash for a different job, and unifying them would change which blades disappear.
-    const bladeHash = fractSin(originX * 127.1 + originZ * 311.7);
+    // *** v4569 -- THIS NOW USES windHash, AND THE NOTE IT REPLACES WAS RIGHT ABOUT THE COST AND WRONG
+    // ABOUT WHAT THERE WAS TO LOSE. *** It read: "the shader's own per-blade hash -- sin/dot/fract, NOT
+    // windHash. Kept as written: it is a different hash for a different job, and unifying them would change
+    // which blades disappear." Unifying them does change that. But WHICH BLADES DISAPPEAR WAS NEVER A FACT
+    // THIS PAIR AGREED ON: the shader computes fract(sin(...)) in float32 and this file computed it in
+    // float64, and sin(x) * 43758 amplifies the last bits of x by four orders of magnitude, so the two drew
+    // unrelated numbers. Measured over 32,000 origins on the 0.25 m lattice the field uses -- 65.0% differ
+    // by more than 0.1, worst delta 1.0000, and the drawn decision below flips on 65.4%.
+    //
+    // A model that is wrong about two thirds of the grass is not a model, and nothing noticed because the
+    // gate checks windHash's twin and only ever MENTIONED this one. windHash is integer arithmetic, exact in
+    // both precisions, and its twin is the one the gate already verifies -- so this hash inherits a checked
+    // pair instead of needing a new one. Bias and lattice match the shader's line for line.
+    const bladeQ = (v) => Math.floor(v * 256) + 8388608;
+    const bladeHash = windHash(bladeQ(originX), bladeQ(originZ));
     if (bladeHash < slopeSuppress) return { drawn: false, reason: "thinned", slopeSuppress, bladeHash };
     return { drawn: true, reason: "drawn", slopeSuppress, bladeHash };
 }
 
-/** fract(sin(x) * 43758.545), the GLSL idiom. Float64 here against float32 on the GPU -- see the gate's note. */
-export function fractSin(x) { const v = Math.sin(x) * 43758.545; return v - Math.floor(v); }
+// *** v4569 -- fractSin IS GONE, AND ITS OWN DOC COMMENT SAID WHY IT HAD TO BE. ***
+// It read: "fract(sin(x) * 43758.545), the GLSL idiom. Float64 here against float32 on the GPU -- see the
+// gate's note." That was the whole defect, written down and shipped: the model computed the shader's hash at
+// a different precision, so the two drew unrelated numbers and disagreed about 65.4% of the blades. Its only
+// caller now uses windHash, which is integer arithmetic and exact in both. Deleting it rather than leaving
+// it exported is the point -- a dead helper that IS the defect is a defect waiting to be reused.
 
 /**
  * The blade's deformation at one vertex: sway, gust, bend, growth and the push field.

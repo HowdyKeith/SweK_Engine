@@ -169,7 +169,8 @@ const BOT_KINDS = {
 // enemies. Each entry mirrors a KAIJU_KINDS entry's color + scale +
 // attack profile, so visual identity (tracer color, mesh size, themed
 // speech) comes from the shared kaiju config.
-import { stepTerrain, autoGround, SURFACE } from "../physics/character/terrainWalk.mjs";
+import { stepTerrain, stepTerrainFan, autoGround, SURFACE } from "../physics/character/terrainWalk.mjs";
+import { standHeightAt, hasVoxels } from "../world/surfaceProbe.mjs";
 
 /** Eye/centre offset above the feet -- the +1 this file has always added to the terrain height. */
 const BOT_EYE = 1;
@@ -1195,11 +1196,21 @@ export class BotManager {
             const ground = this._groundOracle();
             let handled = false;
             if (ground) {
-                const r = stepTerrain({
+                // *** stepTerrainFan, NOT stepTerrain, AND THE DIFFERENCE IS A BOT THAT MOVES. *** The
+                // paragraph above states this tree's ruling that "refusing a move must not mean standing at
+                // the wall waiting to be killed", and the line below then treated `blocked` as HANDLED --
+                // parking the bot at its own unchanged position and skipping every fallback. Measured by
+                // spawning a real bot in a real boot of index.html: it walked 6.28 units, reached
+                // (5.957, 1.986), and stood there for the remaining 429 frames WITH 21 OF ITS 24 COMPASS
+                // DIRECTIONS OPEN. The refusal was correct -- the cell it wanted is a two-unit drop reading
+                // 65.9 degrees against this limit of 55 -- so the fix is not in the physics; it is that
+                // nothing asked a second question. stepTerrainFan tries the wish, then fans around it.
+                const r = stepTerrainFan({
                     pos: [bot.x, bot.y - BOT_EYE, bot.z], ground, wish: [dx / dist, dz / dist],
                     dt, speed, maxSlopeDeg: this.botMaxSlopeDeg ?? 55,
                     stepHeight: 1.2, snapDown: 1.2, convention: SURFACE,
                 });
+                if (r.fanned) this._detours = (this._detours || 0) + 1;
                 if (r.grounded || r.blocked) {
                     bot.x = r.pos[0]; bot.z = r.pos[2]; bot.y = r.pos[1] + BOT_EYE;
                     handled = true;
@@ -1234,7 +1245,13 @@ export class BotManager {
             // answers ONLY at integer coordinates, returning nothing in between. Every bot in the real
             // engine was blocked at 0.0000 movement, and no gate saw it because every fixture's fake world
             // answered at any float. Found by booting index.html headlessly and spawning a real bot.
-            this._ground = autoGround((x, z) => w._heightAt(x, z));
+            // *** THE SAME BLINDNESS, ONE FILE OVER: the controller reads the terrain MODEL, and the model
+            // reports a stand height inside solid rock in 6 to 9% of this world's columns -- by up to 17
+            // voxels. standHeightAt trusts it and verifies it against the voxels, scanning only where it
+            // fails. A world with no voxel grid gets exactly the old function, so every fixture in every
+            // gate that supplies a bare _heightAt is unaffected.
+            const surf = hasVoxels(w) ? ((x, z) => standHeightAt(w, x, z)) : ((x, z) => w._heightAt(x, z));
+            this._ground = autoGround(surf);
         }
         return this._ground;
     }

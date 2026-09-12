@@ -37,6 +37,7 @@ import { artifactCensus, mb } from "./artifactCensus.mjs";
 // for a call reads the explanation as the call. Third time this species bit in two days (gateWalk-selfcheck,
 // patchBase-selfcheck), and the file being searched is one I wrote ten minutes earlier.
 import { codeOnly } from "./sourceScan.mjs";
+import VM from "../../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const HIST = path.join(ROOT, "tools", "ship", "artifact-history.json");
@@ -50,7 +51,7 @@ const report = (l) => console.log("  ----  " + l);
 const BAND_PCT = 3;
 
 const engineVersion = () => {
-    try { return (fs.readFileSync(path.join(ROOT, "main.js"), "utf8").match(/ENGINE_VERSION\s*=\s*"(v\d+)"/) || [])[1] || ""; }
+    try { return (fs.readFileSync(path.join(ROOT, "main.js"), "utf8").match(VM.markerRe("ENGINE_VERSION")) || [])[1] || ""; }
     catch { return ""; }
 };
 

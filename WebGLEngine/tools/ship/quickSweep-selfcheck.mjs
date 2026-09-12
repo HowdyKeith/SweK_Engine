@@ -292,6 +292,65 @@ sec("5. verify.mjs RUNS IT, AND FAILS ON NEW REDS ONLY");
 //   D  a serial timeout reported as a NEW red.
 //      -> exit=1, three lines: section 3, and section 4's hang test. A timeout alone is not a verdict --
 //      v4297's UNMEASURED bucket exists so that "did not finish" is never folded into "failed".
+// =============================================================================================================
+// *** ALL FOUR ROWS BELOW WERE WRITTEN NAME-FIRST AND THIS FILE'S ok() TAKES THE CONDITION FIRST, SO ALL
+// FOUR PASSED UNCONDITIONALLY -- a non-empty string is truthy. Nothing in the section could fail. It was
+// caught by tools/ship/assertionShape-selfcheck.mjs, which exists for exactly this and named all four in
+// one line ("78 gates in this tree take the condition first; a line pasted from the other 1,403 always
+// passes"). Written down here because the lesson is not "be careful": it is that the instrument works and
+// should be run before a gate is believed.
+console.log("\n6. *** THE FILED NUMBER IS A CONTENDED SAMPLE AND THE COST IS A DIFFERENT NUMBER (v4562) ***");
+{
+    // costOf: three sources, each named rather than blended into one figure
+    const fake = { timings: { a: 900, b: 500 }, at: { a: "T1", b: "T1" }, serial: { a: 400 }, serialAt: { a: "T2" } };
+    const A = Q.costOf(fake, "a"), B = Q.costOf(fake, "b"), C = Q.costOf(fake, "zzz");
+    ok(A.ms === 400 && A.source === "serial" && B.ms === 500 && B.source === "parallel" &&
+       C.ms === null && C.source === "none",
+       "!! costOf prefers the SERIAL reading, falls back to the filed one, and SAYS WHICH",
+       `a: ${A.ms} (${A.source}), b: ${B.ms} (${B.source}), unknown: ${C.ms} (${C.source}). A consumer that ` +
+       "cannot tell a cost from a sample will quote whichever it was handed, which is what put " +
+       "recordReach-selfcheck's margin row on scheduling luck.");
+
+    ok(Q.serialSliceOrder(["x", "y", "z"], { y: "2026-01-02", z: "2026-01-01" }).join(",") === "x,z,y" &&
+       Q.serialSliceOrder(["x", "y", "z"], { y: "2026-01-02", z: "2026-01-01" }).join(",") ===
+       Q.serialSliceOrder(["x", "y", "z"], { y: "2026-01-02", z: "2026-01-01" }).join(","),
+       "!! the slice order owes the never-measured first, then the oldest, and is deterministic",
+       "an absent reading sorts before any present one, ties keep enumeration order, and the same input " +
+       "gives the same slice -- a rotation that shuffles cannot say when the tree last turned over.");
+
+    // The two rows that grade SWEEP_CONTENTION_V4562 itself live in tools/ship/sweepCoverage-selfcheck.mjs,
+    // beside the record, and NOT here -- this gate is 9.1 s serially and stays outside the ship-time sweep,
+    // so a record guarded only from here is a record nothing checks at ship time. That is the population
+    // tools/ship/recordReach-selfcheck.mjs counts, and it went red the moment the record landed here.
+}
+
+// ---- v4574: THE SKIP IS OPT-IN, AND THIS ROW EXISTS BECAUSE ARMING IT THE OTHER WAY BROKE A FIXTURE --------
+{
+    // *** ARMING MEANT FLIPPING runQuickSweep'S DEFAULT TO TRUE, AND THAT ARMED EVERY CALLER AT ONCE. ***
+    // There are nine besides the command line: fixtures in this file and in sweepCoverage-selfcheck that drive
+    // the sweep to watch what it does, tools/ship/budgetExile.mjs re-timing one named gate, and verify.mjs.
+    // sweepCoverage-selfcheck went red within the minute and was RIGHT -- its 1 ms-budget fixture reported
+    // "0 gates run at a 1 ms budget, 0 confirmed alone", because the sweep it was testing had skipped
+    // everything. A FIXTURE THAT SKIPS ITS OWN SUBJECT IS VACUOUS, and it would have passed silently if the
+    // fixture had asserted a little less.
+    //
+    // So the default lives in the CLI block and not in the function: typing `node tools/ship/quickSweep.mjs`
+    // skips, calling runQuickSweep() does not, and the caller nobody has written yet inherits the safe one.
+    const src = fs.readFileSync(path.join(ENG, "tools", "ship", "quickSweep.mjs"), "utf8");
+    const sig = /export async function runQuickSweep\([\s\S]{0,600}?\)\s*\{/.exec(src);
+    ok(!!sig && /skipUnchanged = false/.test(sig[0]),
+       "!! *** runQuickSweep does NOT skip unless its caller asks -- the dangerous default is never inherited ***",
+       "a programmatic caller that says nothing gets a full sweep. Nine call sites in this tree say nothing");
+    ok(/opts\.skipUnchanged = !process\.argv\.includes\("--full"\)/.test(src),
+       "!! ...and the command line skips by default, which is the whole point of arming it",
+       "the saving is for a human sweeping while working: 1,258 gates and 409 s becomes 332 and 233 s");
+    const vsrc = fs.readFileSync(path.join(ENG, "tools", "ship", "verify.mjs"), "utf8");
+    ok(/runQuickSweep\(\{ budgetMs, skipUnchanged: false/.test(vsrc),
+       "!! *** and the SHIP-TIME sweep passes skipUnchanged: false explicitly, belt and braces ***",
+       "the saving buys iteration speed and spends a small measured chance that a gate which should have run " +
+       "did not. The one run this tree must not spend that on is the one whose output is ALL GREEN");
+}
+
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the gates over the budget THE ROTATION HAS NOT REACHED YET. v4408 answered the older " +
     "version of this line -- that a regression in a 40-second gate is found by the full sweep and by nothing at " +

@@ -32,10 +32,54 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { backfillStamps } from "./sweepCoverage.mjs";
+import { skippable, readRecord as readInputRecord } from "./inputSets.mjs";
 import { enumerateGates, classify, VERDICT, SWEEP_V4297, ENG } from "./gateSweep.mjs";
 import { RED_AT_V4279, RED_AT_V4408, RED_AT_V4424, RED_AT_V4476, RED_AT_V4484, RED_AT_V4531, RED_AT_V4535, UNCONFIRMED_SLOW, ALL_REGISTERED } from "./redCensus.mjs";
 
-export const DEFAULTS = Object.freeze({ budgetMs: 3000, workers: 8, capMs: 20000, timingsFile: "tools/ship/sweep-timings.json" });
+export const DEFAULTS = Object.freeze({ budgetMs: 3000, workers: 8, capMs: 20000, timingsFile: "tools/ship/sweep-timings.json",
+                                        serialSliceMs: 15000 });
+
+/**
+ * *** WHAT THIS FILE RECORDS IS A CONTENDED SAMPLE, AND THE TREE HAS BEEN READING IT AS A COST. ***
+ *
+ * The parallel phase runs 8 workers on a 4-core box, so every reading it files is taken while seven other
+ * gates fight it for the machine. Measured at v4562 by running the SAME sweep at 8 workers and at 1 and
+ * comparing 1,011 gates that ran in both:
+ *
+ *     parallel / serial     p10 1.25x    MEDIAN 2.41x    p90 3.44x    max 6.88x    min 0.55x
+ *     total filed time      685 s at 8 workers against 358 s at 1
+ *     wall time             230 s at 8 workers against 374 s at 1
+ *
+ * So the parallelism buys a 1.63x WALL-CLOCK speedup and costs a 2.41x median inflation of every number the
+ * tree then reads as "what this gate costs". v4408 and v4536 both repaired the EVICTION that rests on such a
+ * reading -- a crosser is confirmed alone, and a crossing must reproduce -- and neither made the recorded
+ * number honest, because nothing had measured how far off it was.
+ *
+ * `serial` holds uncontended readings: every phase-2 run is one (the box is quiet by then), and each sweep
+ * spends a stated slice of wall time re-running the gates whose serial reading is oldest or absent. costOf()
+ * is what a consumer should ask; timings[] remains the membership number it always was.
+ */
+export function costOf(t, gate) {
+    const serial = t && t.serial ? t.serial[gate] : undefined;
+    if (serial != null) return { ms: serial, source: "serial", at: (t.serialAt || {})[gate] || null };
+    const par = t && t.timings ? t.timings[gate] : undefined;
+    if (par != null) return { ms: par, source: "parallel", at: (t.at || {})[gate] || null };
+    return { ms: null, source: "none", at: null };
+}
+
+/**
+ * Which gates owe a serial reading, oldest first. Pure so a gate can drive it: an absent reading sorts
+ * before any present one, and ties keep enumeration order so the slice is deterministic.
+ */
+export function serialSliceOrder(gates, serialAt = {}) {
+    return gates.slice().sort((a, b) => {
+        const A = serialAt[a], B = serialAt[b];
+        if (!A && !B) return 0;
+        if (!A) return -1;
+        if (!B) return 1;
+        return A < B ? -1 : A > B ? 1 : 0;
+    });
+}
 
 /** The register: every gate whose red is already on record, with the record that names it. */
 export function redRegister() {
@@ -109,7 +153,22 @@ export function countCrossings(prior, rows, budgetMs) {
     return out;
 }
 
-export function selectGates(all, timings, budgetMs, { crossings = null, minCrossings = MIN_CROSSINGS_TO_EVICT } = {}) {
+/**
+ * *** v4566 -- INCREMENTAL SELECTION, AND IT IS OFF BY DEFAULT ON PURPOSE. ***
+ *
+ * tools/ship/inputSets.mjs can say what each gate reads and whether any of it has moved, so a sweep could run
+ * only the gates whose inputs changed. That is a real saving and it is also the only change in this file that
+ * can produce a SILENT FALSE GREEN -- every other failure here announces itself, and a gate that should have
+ * run and did not announces nothing at all.
+ *
+ * So `inputRecord` is an opt-in parameter, and the sweep's own runs report what it WOULD have skipped without
+ * acting on it. That number accumulates across rounds in plain sight, which is the evidence anybody should
+ * want before trusting the mechanism, and it costs one hash of each recorded input rather than a gate run.
+ * When the number has been watched long enough to be boring, turning it on is a one-line change with a
+ * measured history behind it instead of an argument.
+ */
+export function selectGates(all, timings, budgetMs, { crossings = null, minCrossings = MIN_CROSSINGS_TO_EVICT,
+                                                      inputRecord = null, skipUnchanged = false } = {}) {
     const run = [], skipped = [], unmeasured = [], onProbation = [];
     for (const g of all) {
         const ms = timings[g];
@@ -124,7 +183,16 @@ export function selectGates(all, timings, budgetMs, { crossings = null, minCross
         else if (crossings && crossings[g] >= 1 && crossings[g] < minCrossings) { onProbation.push(g); run.push(g); }
         else skipped.push(g);
     }
-    return { run, skipped, unmeasured, onProbation };
+    // The incremental pass runs LAST and only narrows `run`, so every rule above still decides membership --
+    // a gate this would skip is one the budget already agreed to run. Reported either way; acted on only when
+    // skipUnchanged is set.
+    let unchanged = [];
+    if (inputRecord) {
+        const keep = [];
+        for (const g of run) (skippable(g, inputRecord) ? unchanged : keep).push(g);
+        if (skipUnchanged) { run.length = 0; for (const g of keep) run.push(g); }
+    }
+    return { run, skipped, unmeasured, onProbation, unchanged };
 }
 
 /** Reconcile serial reds against the register: known (with the record that names them) versus new. */
@@ -139,11 +207,29 @@ export function reconcile(rows, register = redRegister()) {
     return { known, newRed: fresh, unmeasured };
 }
 
+// *** v4568 -- THE CAP KILLED THE GATE AND LEFT ITS CHILDREN RUNNING, AND ONE OF THEM HOLDS A GPU. ***
+//
+// `p.kill("SIGKILL")` signals the direct child only. A gate that spawned anything of its own is SIGKILLed
+// before it can clean up, its children are reparented to init, and they keep running -- for as long as they
+// like. Measured on a fixture: zero orphans before, one after, from a single capped run.
+//
+// AND IT IS NOT A TIDINESS PROBLEM. tools/ship/headlessGpu-selfcheck.mjs deliberately spawns a child that
+// PINS A WEBGPU DEVICE at module scope -- that is the trap it exists to gate -- and relies on spawnSync's
+// own timeout to end it. If the PARENT is killed first that timeout never fires. One such orphan was found
+// holding a device for FORTY-FOUR MINUTES on this box, and every GPU gate that ran in that window was
+// competing with it. A gate slowed past the cap is then killed, orphaning more, which is a loop that grows
+// the killed bucket this round is about: 140 gates, of which the GPU ones are heavily represented.
+//
+// `detached: true` makes the child a process-GROUP leader, and a negative pid signals the whole group -- so
+// a gate's children die with it. The fallback is the old single-process kill, because a group kill can fail
+// if the child never got as far as forming a group, and a cap that throws instead of killing is worse.
 function runOneAsync(rel, capMs, root) {
     return new Promise((resolve) => {
         const t0 = Date.now();
-        const p = spawn(process.execPath, [rel], { cwd: root, stdio: "ignore" });
-        const timer = setTimeout(() => { try { p.kill("SIGKILL"); } catch {} }, capMs);
+        const p = spawn(process.execPath, [rel], { cwd: root, stdio: "ignore", detached: true });
+        const timer = setTimeout(() => {
+            try { process.kill(-p.pid, "SIGKILL"); } catch { try { p.kill("SIGKILL"); } catch {} }
+        }, capMs);
         p.on("exit", (code, sig) => { clearTimeout(timer); const ms = Date.now() - t0; resolve({ code: sig ? 124 : (code ?? 1), ms, timedOut: !!sig || ms >= capMs }); });
         p.on("error", () => { clearTimeout(timer); resolve({ code: 1, ms: Date.now() - t0, timedOut: false }); });
     });
@@ -153,12 +239,31 @@ function runOneAsync(rel, capMs, root) {
  * The whole thing. Phase 1 in parallel, phase 2 serial for every phase-1 red, classify(), reconcile(), and
  * the timings file rewritten with what was seen. `onProgress(done, total)` is optional.
  */
+/**
+ * *** THE SKIP IS OPT-IN FOR CALLERS AND ON BY DEFAULT ONLY AT THE COMMAND LINE, AND v4574 GOT THAT BACKWARDS
+ * FIRST. *** Arming meant flipping this default to true, which armed it for EVERY programmatic caller at once
+ * -- and there are nine, all of them fixtures driving the sweep to watch what it does, plus budgetExile
+ * re-timing one named gate. tools/ship/sweepCoverage-selfcheck.mjs went red within the minute, and it was
+ * right: its 1 ms-budget fixture reported "0 gates run at a 1 ms budget, 0 confirmed alone" because the sweep
+ * it was testing had skipped everything. A FIXTURE THAT SKIPS ITS OWN SUBJECT IS VACUOUS.
+ *
+ * The default belongs off here and true in the CLI block at the bottom of this file. A human sweeping while
+ * working gets the saving by typing nothing; a caller gets a full sweep unless it says otherwise; and the
+ * caller nobody has written yet inherits the safe one. That is the difference between arming a tool and
+ * arming everything that holds it.
+ */
 export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DEFAULTS.workers, capMs = DEFAULTS.capMs,
-                                      timingsFile = DEFAULTS.timingsFile, root = ENG, gates = null, write = true, onProgress = null } = {}) {
+                                      timingsFile = DEFAULTS.timingsFile, root = ENG, gates = null, write = true, onProgress = null,
+                                      serialSliceMs = DEFAULTS.serialSliceMs, skipUnchanged = false } = {}) {
     const t00 = Date.now();
     const all = gates || enumerateGates(root);
     const prior = readTimings(timingsFile, root);
-    const sel = selectGates(all, prior.timings || {}, budgetMs, { crossings: prior.crossings || {} });
+    // v4566 -- the input record is read once and used to COUNT, not to skip, unless skipUnchanged is set.
+    // A missing or unreadable record yields an empty one, and skippable() answers "no recorded input set" for
+    // every gate, so the sweep behaves exactly as it did before this parameter existed.
+    const inputRecord = readInputRecord(root);
+    const sel = selectGates(all, prior.timings || {}, budgetMs,
+        { crossings: prior.crossings || {}, inputRecord, skipUnchanged });
     const phase1 = new Map();
     let next = 0, done = 0;
     async function worker() {
@@ -184,14 +289,33 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
             // is filed, which is the same two-phase discipline reds have had since v4297, applied to timings.
             if (p1.ms > budgetMs) {
                 const conf = await runOneAsync(rel, capMs, root);
-                rows.push({ gate: rel, verdict: VERDICT.GREEN, parallelMs: p1.ms, serialMs: conf.ms, serialCode: conf.code, from: "budget-confirm" });
-            } else rows.push({ gate: rel, verdict: VERDICT.GREEN, parallelMs: p1.ms });
+                rows.push({ gate: rel, verdict: VERDICT.GREEN, parallelMs: p1.ms, serialMs: conf.ms, serialCode: conf.code, from: "budget-confirm", serialTimedOut: conf.timedOut, parallelTimedOut: p1.timedOut });
+            } else rows.push({ gate: rel, verdict: VERDICT.GREEN, parallelMs: p1.ms, parallelTimedOut: p1.timedOut });
             continue;
         }
         const p2 = await runOneAsync(rel, capMs, root);
         const serial = { code: p2.code, ms: p2.ms, timedOut: p2.timedOut };
         const c = classify(parallel, serial);   // { verdict, from, note } -- gateSweep's rule, not a copy of it
-        rows.push({ gate: rel, verdict: c.verdict, from: c.from, parallelMs: p1.ms, serialMs: p2.ms, serialCode: p2.code });
+        rows.push({ gate: rel, verdict: c.verdict, from: c.from, parallelMs: p1.ms, serialMs: p2.ms, serialCode: p2.code, serialTimedOut: p2.timedOut, parallelTimedOut: p1.timedOut });
+    }
+    // *** AND A SLICE OF THE TREE IS RE-RUN ALONE, SO THE FILE ACCUMULATES COSTS AND NOT ONLY SAMPLES. ***
+    // Phase 2 above already leaves an uncontended reading for every red and every budget crosser; this
+    // extends that to the rest, oldest-first, bounded by WALL TIME rather than by a gate count -- a count
+    // would need a per-gate estimate, which is the thing being measured. At the default 15 s against a
+    // 230 s sweep that is 6.5% of the run and about 40 gates, so a 1,150-gate tree turns over in roughly
+    // thirty sweeps. Set serialSliceMs to 0 to skip it entirely.
+    const serial = { ...(prior.serial || {}) }, serialAt = { ...(prior.serialAt || {}) };
+    const sliceStamp = new Date().toISOString();
+    for (const r of rows) if (r.serialMs != null) { serial[r.gate] = r.serialMs; serialAt[r.gate] = sliceStamp; }
+    let sliced = 0;
+    if (serialSliceMs > 0) {
+        const owed = serialSliceOrder(sel.run.filter((g) => serialAt[g] !== sliceStamp), serialAt);
+        const until = Date.now() + serialSliceMs;
+        for (const rel of owed) {
+            if (Date.now() >= until) break;
+            const one = await runOneAsync(rel, capMs, root);
+            serial[rel] = one.ms; serialAt[rel] = sliceStamp; sliced++;
+        }
     }
     const out0 = { at: new Date().toISOString() };
     const rec = reconcile(rows);
@@ -217,14 +341,33 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
     // a gate can drive the reset on a fixture. It was NOT, in the first draft of this round, and the sabotage
     // that deleted the reset went 0 red beside a comment warning that deleting the reset is the whole risk.
     const crossings = countCrossings(prior.crossings, rows, budgetMs);
+    // *** v4568 -- WHETHER THE PROCESS FINISHED IS WRITTEN HERE TOO, or the field only ever describes gates
+    // the rotation happened to touch. *** sweepCoverage.census splits the killed bucket on `finished`, and a
+    // split fed by one writer of two is a split that goes stale the moment the other writer runs. A sweep
+    // that caps a gate must be able to say so, and a sweep that runs one to completion must be able to
+    // clear a stale true -- so it is recorded in BOTH directions on every row, never only when it is false.
+    const finished = { ...(prior.finished || {}) };
     for (const r of rows) {
         timings[r.gate] = r.serialMs ?? r.parallelMs; codes[r.gate] = r.serialCode ?? 0; at[r.gate] = stamp;
+        finished[r.gate] = !(r.serialTimedOut ?? r.parallelTimedOut ?? false);
     }
     backfillStamps(timings, at);
     const dropped = sel.run.filter((g) => (prior.timings || {})[g] != null && timings[g] > budgetMs);
     const out = {
         at: out0.at, budgetMs, workers, capMs, ms: Date.now() - t00,
         enumerated: all.length, ran: sel.run.length, skippedOverBudget: sel.skipped.length, newGates: sel.unmeasured,
+        // v4566: what an incremental sweep WOULD have skipped. Reported on every run, acted on only under
+        // skipUnchanged, so the number earns trust in public before it is allowed to change anything.
+        unchangedInputs: (sel.unchanged || []).length, skippedUnchanged: skipUnchanged,
+        // *** v4574 -- A SKIPPED RED IS STILL A RED, AND THE COUNT ALONE SAID OTHERWISE. ***
+        // The first armed run reported "12 known red" against the full sweep's 19, because seven registered
+        // reds had unchanged inputs and were skipped. Nothing was wrong and the output read like seven gates
+        // had been fixed -- a SMALLER NUMBER THAT LOOKS LIKE PROGRESS, which is the shape this session has
+        // found in a corpus that shrank, a skip count that rose and a sweep that filed fewer rows. So the
+        // register is intersected with what was skipped and the difference is printed rather than left for a
+        // reader to notice.
+        knownRedSkipped: skipUnchanged
+            ? (() => { const reg = redRegister(); return (sel.unchanged || []).filter((g) => reg.has(g)).length; })() : 0,
         green, falseReds, knownRed: rec.known, newRed: rec.newRed, unmeasured: rec.unmeasured, dropped,
         // v4408: green gates whose PARALLEL time crossed the budget and were re-run alone before being filed,
         // and how many of those the serial reading brought back under. The second number is the starvation.
@@ -232,6 +375,7 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
         budgetRescued: rows.filter((r) => r.from === "budget-confirm" && r.serialMs <= budgetMs).length,
         // v4536: gates over budget that were RUN ANYWAY because this is their first crossing, and how many
         // crossed on this sweep. A first crossing is a reading from one hour; a second is a property.
+        serialSliced: sliced, serialKnown: Object.keys(serial).length,
         onProbation: sel.onProbation, crossedOnce: Object.keys(crossings).filter((g) => crossings[g] === 1).length,
         evictable: Object.keys(crossings).filter((g) => crossings[g] >= MIN_CROSSINGS_TO_EVICT).length,
     };
@@ -243,8 +387,19 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
                   "applies ONLY to entries whose `at` equals it -- the rest were not run and say so. " +
                   "`crossings` (v4536) counts CONSECUTIVE sweeps on which a gate came in over budget, and it takes " +
                   "two to evict: one crossing is a reading from one hour, and this box moves 12-36% between hours " +
-                  "on unchanged code. A gate that comes back under loses its count entirely.",
-            captured: out.at, budgetMs, capMs, timings, codes, at, crossings,
+                  "on unchanged code. A gate that comes back under loses its count entirely. " +
+                  "`serial` (v4562) is the UNCONTENDED cost -- from a phase-2 run or from this sweep's rotating " +
+                  "slice -- while `timings` is a sample taken while seven other gates fought for the box and " +
+                  "runs a MEDIAN 2.41x above it. Ask costOf(), not timings[], for what a gate costs.",
+            // *** `finished` IS IN THIS LIST BECAUSE IT WAS NOT, AND THE SWEEP ERASED IT. *** v4568 added the
+            // field, wrote it into a local object in the loop above, and left it out of the object actually
+            // written -- so the first full sweep after the killed pass silently deleted 140 rows of
+            // it and sweepCoverage's graded/no-verdict split went back to knowing nothing. THIRD TIME IN
+            // THIS SESSION for the same shape: tslRace's first section deleting the keys its later sections
+            // owned, inputSets.encode dropping a renamed flag, and now this. A writer that spells its fields
+            // by hand is a list that has to be maintained in step with every reader of the file, and
+            // ROTATION_LOST_V4461 is the same mechanism across two processes rather than inside one.
+            captured: out.at, budgetMs, capMs, timings, codes, at, finished, crossings, serial, serialAt,
         }, null, 1) + "\n");
     }
     return out;
@@ -256,13 +411,28 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     const opts = { budgetMs: Number(arg("--budget", DEFAULTS.budgetMs)), workers: Number(arg("--workers", DEFAULTS.workers)),
                    capMs: Number(arg("--cap", DEFAULTS.capMs)), timingsFile: arg("--timings", DEFAULTS.timingsFile) };
     let lastPct = -1;
+    // *** v4574 -- ARMED. THE DEFAULT IS NOW TO SKIP, AND --full IS HOW YOU TURN IT OFF. ***
+    // v4566 shipped this disarmed on a sentence -- "an input set is what a gate read on ONE RUN, a sample and
+    // not a specification" -- and v4573 turned that sentence into two measured properties: every gate's whole
+    // STATIC import closure is in its recorded set (0 misses over 1,258 gates), and every gate with a DYNAMIC
+    // reach outside its set is refused. Beside the structure: two independent probe passes agreed on 99.0% of
+    // read sets, and the differential test twice -- break render/exactHash.mjs, run all 1,055 gates this would
+    // have skipped, ZERO verdicts moved; break sourceScan.mjs's codeOnly, 882 skipped, ZERO moved.
+    //
+    // `--incremental` still parses and now means nothing, because a flag in somebody's muscle memory or a
+    // script should not become an error the day the default changes.
+    opts.skipUnchanged = !process.argv.includes("--full");
     const r = await runQuickSweep({ ...opts, onProgress: (d, t) => { const pct = Math.floor(100 * d / t); if (pct !== lastPct && pct % 10 === 0) { lastPct = pct; process.stderr.write(`[quickSweep] ${d}/${t}\n`); } } })
         .catch((e) => { console.error("[quickSweep] runner failed: " + (e && e.message)); process.exit(2); });
     if (process.argv.includes("--json")) console.log(JSON.stringify(r, null, 1));
     else {
         console.log(`[quickSweep] ${r.ran} of ${r.enumerated} gates under ${r.budgetMs} ms ran in ${(r.ms / 1000).toFixed(0)} s: ` +
-            `${r.green} green, ${r.knownRed.length} known red, ${r.newRed.length} NEW red, ${r.falseReds} false red, ${r.unmeasured.length} unmeasured; ` +
+            `${r.green} green, ${r.knownRed.length} known red${r.knownRedSkipped ? " (+" + r.knownRedSkipped + " skipped, still red)" : ""}, ${r.newRed.length} NEW red, ${r.falseReds} false red, ${r.unmeasured.length} unmeasured; ` +
             `${r.skippedOverBudget} over budget skipped, ${r.newGates.length} new gates measured, ${r.dropped.length} dropped from budget`);
+        if (r.unchangedInputs) console.log(`[quickSweep] ${r.unchangedInputs} of those had NO CHANGED INPUT and ` +
+            (r.skippedUnchanged ? "were SKIPPED. Pass --full to run them: a wrongly skipped gate is the one failure "
+                                + "here that is silent, and tools/ship/importClosure.mjs is what bounds it"
+                                : "were RUN (--full)"));
         for (const k of r.knownRed) console.log(`  known  ${k.gate}  (${k.record})`);
         for (const n of r.newRed) console.log(`  NEW    ${n.gate}  exit ${n.code} in ${n.ms} ms`);
         for (const d of r.dropped) console.log(`  slower ${d}  now over budget`);

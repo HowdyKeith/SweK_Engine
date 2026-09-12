@@ -26,13 +26,14 @@
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
+const VM = require("../tools/ship/versionMarker.js");   // v4556 -- one definition of how to read a version marker
 
 const ROOT = path.resolve(__dirname, "..");                 // WebGLEngine/
 let _cacheDir = null;
 let _cacheVersion = null;
 
 function engineVersion() {
-    try { return (fs.readFileSync(path.join(ROOT, "main.js"), "utf8").match(/ENGINE_VERSION = "(v\d+)"/) || [, "v0000"])[1]; }
+    try { return (fs.readFileSync(path.join(ROOT, "main.js"), "utf8").match(VM.markerRe("ENGINE_VERSION")) || [, "v0000"])[1]; }
     catch { return "v0000"; }
 }
 

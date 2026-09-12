@@ -12,6 +12,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { RED_AT_V4279, RED_AT_V4408_GATES, RED_AT_V4424_GATES, RED_AT_V4476_GATES , RED_AT_V4484_GATES, ALL_REGISTERED } from "./redCensus.mjs";
+import VM from "../../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
 
 // *** v4400 -- THE VERSION WAS A STRING LITERAL AND THE AUDIT LIED ABOUT ITS OWN AGE FOR TWENTY ROUNDS. ***
 // This tool wrote `at: "v4380"` as text, so every re-freeze since has produced a file claiming to have been
@@ -20,7 +21,7 @@ import { RED_AT_V4279, RED_AT_V4408_GATES, RED_AT_V4424_GATES, RED_AT_V4476_GATE
 // freezer typed the number instead of reading it. It is read from main.js now, which is where the tree keeps it.
 function ENGINE_VERSION() {
     const src = fs.readFileSync(path.join(ENG, "main.js"), "utf8");
-    const m = src.match(/const ENGINE_VERSION = "(v\d+)"/);
+    const m = src.match(VM.markerRe("ENGINE_VERSION"));
     if (!m) throw new Error("freezeRegisterAudit: main.js has no ENGINE_VERSION to read");
     return m[1];
 }

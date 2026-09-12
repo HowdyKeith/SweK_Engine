@@ -1,0 +1,2920 @@
+{
+ "generatedFrom": "tools/ship/recordShape.mjs",
+ "at": "2026-09-10T16:04:56.679Z",
+ "note": "Top-level and one-level-down key sets for every JSON record a gate reads. A record may GAIN a key; losing one is a dropped field and fails recordShape-selfcheck. A deliberate removal is recorded in DROPPED_ON_PURPOSE in tools/ship/recordShape.mjs, not by editing this file until it passes.",
+ "shapes": {
+  "GPU_Assets/mesh_0/mesh.json": {
+   "top": [
+    "indexBuffer",
+    "indexCount",
+    "name",
+    "vertexBuffer",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_0/Mesh_0.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_1/Mesh_1.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_10/Mesh_10.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_11/Mesh_11.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_12/Mesh_12.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_13/Mesh_13.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_14/Mesh_14.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_15/Mesh_15.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_16/Mesh_16.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_17/Mesh_17.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_18/Mesh_18.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_19/Mesh_19.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_2/Mesh_2.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_20/Mesh_20.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_21/Mesh_21.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_22/Mesh_22.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_23/Mesh_23.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_24/Mesh_24.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_25/Mesh_25.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_26/Mesh_26.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_27/Mesh_27.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_28/Mesh_28.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_29/Mesh_29.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_3/Mesh_3.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_30/Mesh_30.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_31/Mesh_31.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_32/Mesh_32.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_33/Mesh_33.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_34/Mesh_34.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_35/Mesh_35.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_36/Mesh_36.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_37/Mesh_37.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_38/Mesh_38.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_39/Mesh_39.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_4/Mesh_4.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_40/Mesh_40.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_41/Mesh_41.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_42/Mesh_42.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_43/Mesh_43.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_44/Mesh_44.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_45/Mesh_45.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_46/Mesh_46.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_47/Mesh_47.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_48/Mesh_48.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_49/Mesh_49.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_5/Mesh_5.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_50/Mesh_50.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_51/Mesh_51.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_52/Mesh_52.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_53/Mesh_53.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_54/Mesh_54.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_55/Mesh_55.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_56/Mesh_56.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_57/Mesh_57.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_58/Mesh_58.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_59/Mesh_59.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_6/Mesh_6.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_60/Mesh_60.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_61/Mesh_61.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_62/Mesh_62.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_63/Mesh_63.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_64/Mesh_64.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_65/Mesh_65.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_66/Mesh_66.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_67/Mesh_67.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_68/Mesh_68.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_69/Mesh_69.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_7/Mesh_7.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_70/Mesh_70.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_8/Mesh_8.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "GPU_Assets/uploads_files_3694169_machine/Mesh_9/Mesh_9.asset.json": {
+   "top": [
+    "asset",
+    "indexCount",
+    "name",
+    "vertexCount"
+   ],
+   "entry": []
+  },
+  "LivelyProperties.json": {
+   "top": [
+    "hud",
+    "speed"
+   ],
+   "entry": []
+  },
+  "ai-bridge/asset-heights.seed.json": {
+   "top": [
+    "_comment",
+    "assets",
+    "roleTargets"
+   ],
+   "entry": []
+  },
+  "ai-bridge/catalog-snapshot.json": {
+   "top": [
+    "inputs",
+    "kind",
+    "observations",
+    "producedAt",
+    "producedBy",
+    "schemaVersion"
+   ],
+   "entry": [
+    "hasInstall",
+    "hasUrl",
+    "id",
+    "kind",
+    "name"
+   ]
+  },
+  "ai-bridge/drive.example.json": {
+   "top": [
+    "_comment",
+    "_mode_A_service_account",
+    "_mode_B_oauth_personal_drive",
+    "enabled",
+    "folderId",
+    "key",
+    "keyFile",
+    "oauth",
+    "pollMs"
+   ],
+   "entry": []
+  },
+  "ai-bridge/ha.config.example.json": {
+   "top": [
+    "HA_MOTION_ENTITIES",
+    "HA_MOTION_POLL_MS",
+    "HA_TOKEN",
+    "HA_URL",
+    "_comment"
+   ],
+   "entry": []
+  },
+  "ai-bridge/install_catalog.json": {
+   "top": [
+    "_doc",
+    "_format",
+    "alt-sendme",
+    "app-apple-container",
+    "app-codegraph",
+    "app-dokploy",
+    "app-firecrawl",
+    "app-immich",
+    "app-markitdown",
+    "app-voicebox",
+    "ardy",
+    "bridge",
+    "chrome-devtools-mcp",
+    "comfyui",
+    "feed-iptv",
+    "flag-launch",
+    "gltfpack",
+    "jellyfin",
+    "journey-forge-local",
+    "kaggle-cli-classic",
+    "kaggle-legacy-key",
+    "model-dinov3",
+    "model-juggernaut",
+    "model-sdxl",
+    "model-totalsegmentator",
+    "model-trellis-fp8",
+    "model-triposplat",
+    "model-triposplat-flux2-vae",
+    "model-ultrashape",
+    "node-3d-pack",
+    "node-comfy3d-pack",
+    "node-essentials",
+    "node-flowty-crm-clone",
+    "node-flowty-crm-cuda",
+    "node-flowty-crm-req",
+    "node-gguf",
+    "node-hitem3d",
+    "node-hunyuan3d",
+    "node-layerdiffuse",
+    "node-manager",
+    "node-sparc3d",
+    "node-trellis2",
+    "node-triposplat-workflow",
+    "node-triposr",
+    "node-ultrashape",
+    "node3d-gl",
+    "ntfy-server",
+    "ollama",
+    "patch-cumesh",
+    "patch-defaults",
+    "patch-flex-gemm-nodes",
+    "patch-flex-gemm-pipeline",
+    "patch-nvdiffrast",
+    "patch-ovoxel",
+    "patch-triton",
+    "py-accelerate",
+    "py-cubvh",
+    "py-diso",
+    "py-embed-headers",
+    "py-fake-triton",
+    "py-gradio",
+    "py-imageio",
+    "py-kiui",
+    "py-meshlib",
+    "py-mol-pipeline",
+    "py-mto-pipeline",
+    "py-nvdiffrast",
+    "py-openclip",
+    "py-opencv-force",
+    "py-opencv-reset",
+    "py-pixal3d-stack",
+    "py-pyhocon",
+    "py-pymeshlab",
+    "py-safetensors",
+    "py-trellis2-wheels",
+    "py-trimesh",
+    "py-triposplat",
+    "py-triposplat-gradio",
+    "py-wnd-pipeline",
+    "raycast-llm",
+    "sheets-googleapis",
+    "skill-addyosmani",
+    "skill-humanizer",
+    "skill-marketing",
+    "skill-mattpocock",
+    "skill-newsjack",
+    "skill-taste",
+    "sparc3d-gradio",
+    "tool-7zip",
+    "tool-agent-reach",
+    "tool-bun",
+    "tool-bun-uninstall",
+    "tool-cuda-voxelizer",
+    "tool-dev-browser",
+    "tool-ffmpeg",
+    "tool-git",
+    "tool-mesh2motion",
+    "tool-ollama",
+    "tool-raycast",
+    "tool-skillspector",
+    "tool-triposplat",
+    "turbo-fieldfare",
+    "x4-external-app",
+    "x4-http-mod",
+    "x4-msapi-legacy",
+    "x4-telemetry-push"
+   ],
+   "entry": [
+    "arch",
+    "macosMin",
+    "os",
+    "platforms",
+    "unknown",
+    "why"
+   ]
+  },
+  "ai-bridge/package-lock.json": {
+   "top": [
+    "lockfileVersion",
+    "name",
+    "packages",
+    "requires",
+    "version"
+   ],
+   "entry": [
+    "bin",
+    "dependencies",
+    "deprecated",
+    "engines",
+    "funding",
+    "hasInstallScript",
+    "integrity",
+    "license",
+    "name",
+    "optional",
+    "optionalDependencies",
+    "peerDependencies",
+    "peerDependenciesMeta",
+    "resolved",
+    "version",
+    "workspaces"
+   ]
+  },
+  "ai-bridge/package.json": {
+   "top": [
+    "dependencies",
+    "description",
+    "engines",
+    "main",
+    "name",
+    "optionalDependencies",
+    "private",
+    "scripts",
+    "version"
+   ],
+   "entry": []
+  },
+  "ai-bridge/rgb.config.example.json": {
+   "top": [
+    "HA_RGB_ENTITIES",
+    "OPENRGB_CLI",
+    "OPENRGB_HOST",
+    "OPENRGB_PORT",
+    "RGB_BACKEND",
+    "SOLAR_BATTERY_ENTITY",
+    "SOLAR_FOLLOW",
+    "SOLAR_POLL_MS",
+    "SOLAR_TARGETS",
+    "_comment"
+   ],
+   "entry": []
+  },
+  "ai-bridge/scrapers/example_title.json": {
+   "top": [
+    "params",
+    "task"
+   ],
+   "entry": [
+    "desc",
+    "name",
+    "required"
+   ]
+  },
+  "ai-bridge/scrapers/petfbi_grab.json": {
+   "top": [
+    "params",
+    "task"
+   ],
+   "entry": [
+    "desc",
+    "name",
+    "required"
+   ]
+  },
+  "ai-bridge/scrapers/petfbi_map_grab.json": {
+   "top": [
+    "params",
+    "task"
+   ],
+   "entry": [
+    "desc",
+    "name",
+    "required"
+   ]
+  },
+  "ai-bridge/scrapers/scrapling_fetch.json": {
+   "top": [
+    "params",
+    "task"
+   ],
+   "entry": [
+    "desc",
+    "name",
+    "required"
+   ]
+  },
+  "demos/centipede.json": {
+   "top": [
+    "camera",
+    "centipede",
+    "description",
+    "name"
+   ],
+   "entry": []
+  },
+  "demos/cinematic_obelisk.json": {
+   "top": [
+    "description",
+    "name",
+    "sequence"
+   ],
+   "entry": [
+    "camera",
+    "duration"
+   ]
+  },
+  "demos/obelisk_a.json": {
+   "top": [
+    "camera",
+    "description",
+    "name"
+   ],
+   "entry": []
+  },
+  "demos/origin_closeup.json": {
+   "top": [
+    "camera",
+    "description",
+    "name"
+   ],
+   "entry": []
+  },
+  "demos/sky_survey.json": {
+   "top": [
+    "camera",
+    "description",
+    "name"
+   ],
+   "entry": []
+  },
+  "demos/spawn.json": {
+   "top": [
+    "camera",
+    "description",
+    "name"
+   ],
+   "entry": []
+  },
+  "demos/watchtower.json": {
+   "top": [
+    "camera",
+    "description",
+    "name",
+    "structures"
+   ],
+   "entry": [
+    "cx",
+    "cy",
+    "cz",
+    "kind",
+    "material",
+    "radius",
+    "x",
+    "y0",
+    "y1",
+    "z"
+   ]
+  },
+  "engine-catalog.json": {
+   "top": [
+    "apps",
+    "builtinDemos",
+    "generatedFrom"
+   ],
+   "entry": [
+    "id",
+    "label",
+    "url"
+   ]
+  },
+  "es-universe.json": {
+   "top": [
+    "commodities",
+    "conversations",
+    "counts",
+    "coverage",
+    "dudes",
+    "esEvents",
+    "esFleets",
+    "esMissions",
+    "fleets",
+    "govts",
+    "missions",
+    "news",
+    "outfits",
+    "outfitters",
+    "persons",
+    "phrases",
+    "ships",
+    "shipyards",
+    "source",
+    "spobs",
+    "starts",
+    "substitutions",
+    "systems",
+    "weapons",
+    "wormholes"
+   ],
+   "entry": [
+    "_systemId",
+    "_systemName",
+    "accel",
+    "account",
+    "active cooling",
+    "afterburner effect",
+    "afterburner energy",
+    "afterburner fuel",
+    "afterburner heat",
+    "afterburner shields",
+    "afterburner thrust",
+    "allies",
+    "ammo",
+    "anchor point",
+    "armor",
+    "asteroid mount",
+    "asteroid mount 2",
+    "asteroid mount 3",
+    "asteroid mount 4",
+    "asteroid mount am",
+    "asteroid mount jd",
+    "asteroid mount small",
+    "asteroid scan power",
+    "atmosphere scan",
+    "attributes",
+    "automaton",
+    "avgShips",
+    "basePrice",
+    "bunks",
+    "canBuyShips",
+    "canLand",
+    "canOutfit",
+    "capture attack",
+    "capture defense",
+    "cargo scan efficiency",
+    "cargo scan opacity",
+    "cargo scan power",
+    "cargo space",
+    "category",
+    "children",
+    "classes",
+    "cloak",
+    "cloaked regen multiplier",
+    "cloaked repair multiplier",
+    "cloaking energy",
+    "cloaking fuel",
+    "color",
+    "conditions",
+    "conversation",
+    "cooling",
+    "cooling energy",
+    "cooling inefficiency",
+    "core crystal",
+    "cost",
+    "crystal projector",
+    "date",
+    "defaultOutfits",
+    "delayed shield energy",
+    "delayed shield generation",
+    "delayed shield heat",
+    "depleted shield delay",
+    "description",
+    "display name",
+    "disruption protection",
+    "drag",
+    "drag reduction",
+    "drill lock",
+    "drill port",
+    "drill spar",
+    "emp torpedo capacity",
+    "enemies",
+    "energy capacity",
+    "energy consumption",
+    "energy generation",
+    "energyDmg",
+    "engine capacity",
+    "filter",
+    "filterUnsupported",
+    "finisher capacity",
+    "firelight missile capacity",
+    "firestorm torpedo capacity",
+    "flags",
+    "flags2",
+    "flare sound",
+    "flare sprite",
+    "fleets",
+    "flotsam chance",
+    "flotsam sprite",
+    "force protection",
+    "freeMass",
+    "frequency",
+    "fuel",
+    "fuel capacity",
+    "fuel generation",
+    "fuel protection",
+    "gatling round capacity",
+    "govt",
+    "govtName",
+    "guidance",
+    "gun ports",
+    "hail",
+    "hails",
+    "hasBar",
+    "hasCommodity",
+    "heat capacity",
+    "heat dissipation",
+    "heat generation",
+    "high",
+    "holds",
+    "holographic entertainment",
+    "hull",
+    "hull energy",
+    "hull energy multiplier",
+    "hull heat",
+    "hull protection",
+    "hull repair multiplier",
+    "hull repair rate",
+    "hyperdrive",
+    "id",
+    "illegal",
+    "index",
+    "inertia reduction",
+    "inscrutable",
+    "installable",
+    "ion protection",
+    "ion resistance",
+    "isStar",
+    "isStation",
+    "isWormhole",
+    "javelin capacity",
+    "jump drive",
+    "jump effect",
+    "jump fuel",
+    "jump range",
+    "jump speed",
+    "key",
+    "kind",
+    "landDesc",
+    "landable",
+    "landscape",
+    "lasing power",
+    "licenses",
+    "lifetime",
+    "linked",
+    "links",
+    "locked",
+    "low",
+    "magnetic nozzle",
+    "maneuver",
+    "map",
+    "map minables",
+    "mappable",
+    "mass",
+    "massDmg",
+    "messages",
+    "meteor capacity",
+    "minable",
+    "minelayer capacity",
+    "multimodal armor",
+    "name",
+    "names",
+    "nanite upgrades",
+    "nav",
+    "nettle capacity",
+    "operating costs",
+    "ophrys capacity",
+    "optical jamming",
+    "orchid capacity",
+    "outfit scan efficiency",
+    "outfit scan opacity",
+    "outfit scan power",
+    "outfit space",
+    "outfitId",
+    "outfitterGroups",
+    "overheat damage rate",
+    "piercer capacity",
+    "piercing protection",
+    "planet",
+    "planetName",
+    "playerRep",
+    "plural",
+    "quantum keystone",
+    "radar jamming",
+    "railgun slug capacity",
+    "ramscoop",
+    "reactor upgrades",
+    "relay upgrades",
+    "reload",
+    "replacement",
+    "required crew",
+    "reverse flare sound",
+    "reverse flare sprite",
+    "reverse thrust",
+    "reverse thrusting energy",
+    "reverse thrusting heat",
+    "rocket capacity",
+    "scan brightness",
+    "scan interference",
+    "scram drive",
+    "scramble resistance",
+    "series",
+    "shield",
+    "shield connection point",
+    "shield delay",
+    "shield energy",
+    "shield energy multiplier",
+    "shield fuel",
+    "shield generation",
+    "shield generation multiplier",
+    "shield heat",
+    "shield protection",
+    "shieldRech",
+    "shipCount",
+    "shipyardGroups",
+    "shooting star",
+    "sidewinder capacity",
+    "slowing resistance",
+    "solar cell",
+    "solar collection",
+    "solar heat",
+    "speck capacity",
+    "speed",
+    "spike capacity",
+    "spinal mount",
+    "spobs",
+    "sprite",
+    "star tail capacity",
+    "steering flare sound",
+    "steering flare sprite",
+    "swarm capacity",
+    "system",
+    "systemName",
+    "tactical scan power",
+    "techLevel",
+    "thrust",
+    "thrusting energy",
+    "thrusting fuel",
+    "thrusting heat",
+    "thumbnail",
+    "thunderhead capacity",
+    "toShow",
+    "tokens",
+    "torpedo capacity",
+    "tracker capacity",
+    "trade",
+    "turn",
+    "turning energy",
+    "turning heat",
+    "turret mounts",
+    "type",
+    "typhoon capacity",
+    "unique",
+    "unplunderable",
+    "weapon capacity",
+    "wormholeMappable",
+    "wormholeName",
+    "wormholeTo",
+    "x",
+    "y"
+   ]
+  },
+  "gate-activity.json": {
+   "top": [
+    "age",
+    "byRoute",
+    "counts",
+    "gates",
+    "namedByNeither",
+    "nodes",
+    "note"
+   ],
+   "entry": [
+    "gates",
+    "id",
+    "ms",
+    "routes",
+    "state",
+    "timedGates"
+   ]
+  },
+  "gate-reports/backendRouting-selfcheck.json": {
+   "top": [
+    "at",
+    "gate",
+    "notes",
+    "skipped",
+    "tables"
+   ],
+   "entry": [
+    "columns",
+    "note",
+    "rows",
+    "title",
+    "what",
+    "why"
+   ]
+  },
+  "gate-reports/bssrdfSample-selfcheck.json": {
+   "top": [
+    "at",
+    "gate",
+    "notes",
+    "skipped",
+    "tables"
+   ],
+   "entry": [
+    "columns",
+    "note",
+    "rows",
+    "title"
+   ]
+  },
+  "gate-reports/chunk-selfcheck.json": {
+   "top": [
+    "at",
+    "gate",
+    "notes",
+    "skipped",
+    "tables"
+   ],
+   "entry": [
+    "columns",
+    "note",
+    "rows",
+    "title"
+   ]
+  },
+  "gate-reports/claimEvidence-selfcheck.json": {
+   "top": [
+    "at",
+    "gate",
+    "notes",
+    "skipped",
+    "tables"
+   ],
+   "entry": [
+    "columns",
+    "note",
+    "rows",
+    "title"
+   ]
+  },
+  "gate-reports/closingCoverage-selfcheck.json": {
+   "top": [
+    "at",
+    "gate",
+    "notes",
+    "skipped",
+    "tables"
+   ],
+   "entry": [
+    "columns",
+    "note",
+    "rows",
+    "title"
+   ]
+  },
+  "gate-reports/detourScale-selfcheck.json": {
+   "top": [
+    "at",
+    "gate",
+    "notes",
+    "skipped",
+    "tables"
+   ],
+   "entry": [
+    "columns",
+    "note",
+    "rows",
+    "title"
+   ]
+  },
+  "gate-reports/dielectricWalk-selfcheck.json": {
+   "top": [
+    "at",
+    "gate",
+    "notes",
+    "skipped",
+    "tables"
+   ],
+   "entry": [
+    "columns",
+    "note",
+    "rows",
+    "title"
+   ]
+  },
+  "gate-reports/fireSpread-selfcheck.json": {
+   "top": [
+    "at",
+    "gate",
+    "notes",
+    "skipped",
+    "tables"
+   ],
+   "entry": [
+    "columns",
+    "note",
+    "rows",
+    "title"
+   ]
+  },
+  "gate-reports/frontDoor-selfcheck.json": {
+   "top": [
+    "at",
+    "gate",
+    "notes",
+    "skipped",
+    "tables"
+   ],
+   "entry": [
+    "columns",
+    "note",
+    "rows",
+    "title",
+    "what",
+    "why"
+   ]
+  },
+  "gate-reports/gateReport-selfcheck.json": {
+   "top": [
+    "at",
+    "gate",
+    "notes",
+    "skipped",
+    "tables"
+   ],
+   "entry": [
+    "columns",
+    "note",
+    "rows",
+    "title"
+   ]
+  },
+  "gate-reports/index.json": {
+   "top": [
+    "built",
+    "reports"
+   ],
+   "entry": []
+  },
+  "gate-reports/microsurfaceWalk-selfcheck.json": {
+   "top": [
+    "at",
+    "gate",
+    "notes",
+    "skipped",
+    "tables"
+   ],
+   "entry": [
+    "columns",
+    "note",
+    "rows",
+    "title"
+   ]
+  },
+  "gate-reports/multiScatter-selfcheck.json": {
+   "top": [
+    "at",
+    "gate",
+    "notes",
+    "skipped",
+    "tables"
+   ],
+   "entry": [
+    "columns",
+    "note",
+    "rows",
+    "title"
+   ]
+  },
+  "gate-reports/pageFxOverlay-selfcheck.json": {
+   "top": [
+    "at",
+    "gate",
+    "notes",
+    "skipped",
+    "tables"
+   ],
+   "entry": [
+    "what",
+    "why"
+   ]
+  },
+  "gate-reports/pathTracerGpu-selfcheck.json": {
+   "top": [
+    "at",
+    "gate",
+    "notes",
+    "skipped",
+    "tables"
+   ],
+   "entry": [
+    "columns",
+    "note",
+    "rows",
+    "title"
+   ]
+  },
+  "gate-reports/registerDrift-selfcheck.json": {
+   "top": [
+    "at",
+    "gate",
+    "notes",
+    "skipped",
+    "tables"
+   ],
+   "entry": [
+    "columns",
+    "note",
+    "rows",
+    "title"
+   ]
+  },
+  "gate-reports/reportDoors-selfcheck.json": {
+   "top": [
+    "at",
+    "gate",
+    "notes",
+    "skipped",
+    "tables"
+   ],
+   "entry": [
+    "columns",
+    "note",
+    "rows",
+    "title"
+   ]
+  },
+  "gate-reports/retroRaster-selfcheck.json": {
+   "top": [
+    "at",
+    "gate",
+    "notes",
+    "skipped",
+    "tables"
+   ],
+   "entry": [
+    "columns",
+    "note",
+    "rows",
+    "title"
+   ]
+  },
+  "gate-reports/rigidCouple-selfcheck.json": {
+   "top": [
+    "at",
+    "gate",
+    "notes",
+    "skipped",
+    "tables"
+   ],
+   "entry": [
+    "columns",
+    "note",
+    "rows",
+    "title",
+    "what",
+    "why"
+   ]
+  },
+  "gate-reports/rigidFloat-selfcheck.json": {
+   "top": [
+    "at",
+    "gate",
+    "notes",
+    "skipped",
+    "tables"
+   ],
+   "entry": [
+    "columns",
+    "note",
+    "rows",
+    "title",
+    "what",
+    "why"
+   ]
+  },
+  "gate-reports/rtPipeline-selfcheck.json": {
+   "top": [
+    "at",
+    "gate",
+    "notes",
+    "skipped",
+    "tables"
+   ],
+   "entry": [
+    "columns",
+    "note",
+    "rows",
+    "title"
+   ]
+  },
+  "gate-reports/runtimeGap-selfcheck.json": {
+   "top": [
+    "at",
+    "gate",
+    "notes",
+    "skipped",
+    "tables"
+   ],
+   "entry": [
+    "columns",
+    "note",
+    "rows",
+    "title"
+   ]
+  },
+  "gate-reports/shipDebris-selfcheck.json": {
+   "top": [
+    "at",
+    "gate",
+    "notes",
+    "skipped",
+    "tables"
+   ],
+   "entry": [
+    "columns",
+    "note",
+    "rows",
+    "title"
+   ]
+  },
+  "gate-reports/shipyard-selfcheck.json": {
+   "top": [
+    "at",
+    "gate",
+    "notes",
+    "skipped",
+    "tables"
+   ],
+   "entry": [
+    "columns",
+    "note",
+    "rows",
+    "title"
+   ]
+  },
+  "gate-reports/vorticity-selfcheck.json": {
+   "top": [
+    "at",
+    "gate",
+    "notes",
+    "skipped",
+    "tables"
+   ],
+   "entry": [
+    "columns",
+    "note",
+    "rows",
+    "title"
+   ]
+  },
+  "gate-reports/xatlasRef-selfcheck.json": {
+   "top": [
+    "at",
+    "gate",
+    "notes",
+    "skipped",
+    "tables"
+   ],
+   "entry": [
+    "columns",
+    "note",
+    "rows",
+    "title"
+   ]
+  },
+  "knowledge-index.json": {
+   "top": [
+    "built",
+    "claims",
+    "counts",
+    "findings",
+    "gates"
+   ],
+   "entry": [
+    "id",
+    "kind",
+    "path",
+    "state",
+    "text"
+   ]
+  },
+  "lab-galaxy.json": {
+   "top": [
+    "captured",
+    "components",
+    "counts",
+    "edges",
+    "islands",
+    "nodes",
+    "note",
+    "placed"
+   ],
+   "entry": [
+    "a",
+    "b",
+    "coupling",
+    "id",
+    "interrogated",
+    "kinds",
+    "modules",
+    "observables",
+    "room",
+    "section",
+    "substrate",
+    "x",
+    "y"
+   ]
+  },
+  "launch-index.json": {
+   "top": [
+    "counts",
+    "entries",
+    "generatedFrom",
+    "kinds"
+   ],
+   "entry": [
+    "collision",
+    "display",
+    "href",
+    "id",
+    "kind",
+    "note",
+    "section",
+    "survives",
+    "verb"
+   ]
+  },
+  "mods/example_crystal_spire.json": {
+   "top": [
+    "civStyle",
+    "megaType",
+    "name",
+    "type",
+    "voxels"
+   ],
+   "entry": [
+    "dx",
+    "dy",
+    "dz",
+    "mat"
+   ]
+  },
+  "mods/example_frost_attack.json": {
+   "top": [
+    "attackName",
+    "kind",
+    "name",
+    "spec",
+    "type"
+   ],
+   "entry": []
+  },
+  "mods/example_frost_kaiju.json": {
+   "top": [
+    "config",
+    "name",
+    "type"
+   ],
+   "entry": []
+  },
+  "mods/example_sky_obelisk_override.json": {
+   "top": [
+    "asset",
+    "default",
+    "type"
+   ],
+   "entry": []
+  },
+  "nav/fixtures/engineTerrain96.json": {
+   "top": [
+    "heights",
+    "max",
+    "min",
+    "note",
+    "origin",
+    "rows",
+    "stride",
+    "why"
+   ],
+   "entry": []
+  },
+  "orrery-authors.json": {
+   "top": [
+    "bodies",
+    "built",
+    "counts",
+    "note",
+    "systems",
+    "unattributed"
+   ],
+   "entry": [
+    "alsoHolders",
+    "author",
+    "bodies",
+    "bytes",
+    "kind",
+    "licenceFile",
+    "licences",
+    "line",
+    "name",
+    "upstream",
+    "upstreamFile",
+    "who"
+   ]
+  },
+  "orrery-fleet.json": {
+   "top": [
+    "bodies",
+    "built",
+    "head",
+    "source"
+   ],
+   "entry": []
+  },
+  "orrery-reached.json": {
+   "top": [
+    "built",
+    "catalogue",
+    "coverage",
+    "head",
+    "registerSources",
+    "source",
+    "visited",
+    "wideCount",
+    "wideTop"
+   ],
+   "entry": [
+    "attribution",
+    "by",
+    "hits",
+    "name",
+    "public-domain",
+    "restricted"
+   ]
+  },
+  "orrery-universe.json": {
+   "top": [
+    "bodies",
+    "built",
+    "note",
+    "population",
+    "reachable",
+    "refused",
+    "source"
+   ],
+   "entry": [
+    "axis",
+    "createdAt",
+    "forks",
+    "language",
+    "licence",
+    "notASubstitute",
+    "owner",
+    "ownerType",
+    "pushedAt",
+    "repo",
+    "sizeKB",
+    "stars",
+    "why"
+   ]
+  },
+  "orrery.json": {
+   "top": [
+    "bodies",
+    "built",
+    "source"
+   ],
+   "entry": [
+    "arrived",
+    "bytes",
+    "files",
+    "name",
+    "sha"
+   ]
+  },
+  "page-index.json": {
+   "top": [
+    "count",
+    "generated",
+    "pages",
+    "version"
+   ],
+   "entry": [
+    "d",
+    "f",
+    "g",
+    "p",
+    "t"
+   ]
+  },
+  "scene.json": {
+   "top": [
+    "entities",
+    "meta"
+   ],
+   "entry": [
+    "components",
+    "id",
+    "tag"
+   ]
+  },
+  "sounds/manifest.json": {
+   "top": [
+    "_comment",
+    "samples"
+   ],
+   "entry": []
+  },
+  "tools/.incremental-manifest.json": {
+   "top": [
+    "baseline",
+    "deletes",
+    "writes"
+   ],
+   "entry": []
+  },
+  "tools/crossarch-baseline.json": {
+   "top": [
+    "arch",
+    "engineVersion",
+    "note",
+    "platform",
+    "recordedAt",
+    "stages"
+   ],
+   "entry": [
+    "match",
+    "new",
+    "regression"
+   ]
+  },
+  "tools/dictate-tray/package.json": {
+   "top": [
+    "bin",
+    "dependencies",
+    "description",
+    "engines",
+    "main",
+    "name",
+    "optionalDependencies",
+    "private",
+    "scripts",
+    "type",
+    "version"
+   ],
+   "entry": []
+  },
+  "tools/ha-panel-lab/panels/manifest.json": {
+   "top": [
+    "panels"
+   ],
+   "entry": [
+    "config",
+    "file",
+    "name",
+    "tag"
+   ]
+  },
+  "tools/ledger/LEDGER.json": {
+   "top": [
+    "entries",
+    "version"
+   ],
+   "entry": [
+    "name",
+    "results"
+   ]
+  },
+  "tools/mesh/xatlas-oracle.json": {
+   "top": [
+    "inputs",
+    "meshes",
+    "note",
+    "pin"
+   ],
+   "entry": [
+    "atlas",
+    "charts",
+    "densityMedian",
+    "densityP10",
+    "meshHash",
+    "stretchP90",
+    "triangles",
+    "util",
+    "uvArea",
+    "uvHi",
+    "uvLo",
+    "uvOutside",
+    "verts"
+   ]
+  },
+  "tools/pageReach-baseline.json": {
+   "top": [
+    "count",
+    "note",
+    "pages",
+    "recorded"
+   ],
+   "entry": []
+  },
+  "tools/render-qa/backend-baseline.json": {
+   "top": [
+    "determinism",
+    "pairs",
+    "recorded",
+    "ticks"
+   ],
+   "entry": [
+    "driftEnvelope",
+    "measured",
+    "perceptual",
+    "render",
+    "renderDiff",
+    "trajectory",
+    "visualEnvelope"
+   ]
+  },
+  "tools/render-qa/manifest.json": {
+   "top": [
+    "auto",
+    "defaults",
+    "exclude",
+    "pages"
+   ],
+   "entry": [
+    "assert",
+    "canvas",
+    "checks",
+    "ignoreConsole",
+    "name",
+    "noConsoleErrors",
+    "note",
+    "probe",
+    "stress",
+    "url",
+    "wait"
+   ]
+  },
+  "tools/render-qa/package.json": {
+   "top": [
+    "bin",
+    "dependencies",
+    "description",
+    "engines",
+    "name",
+    "private",
+    "scripts",
+    "type",
+    "version"
+   ],
+   "entry": []
+  },
+  "tools/roundhouse/android-reference.json": {
+   "top": [
+    "at",
+    "budgetMs",
+    "checks",
+    "counts",
+    "host",
+    "kind",
+    "note",
+    "probes",
+    "version"
+   ],
+   "entry": [
+    "exitCode",
+    "ms",
+    "name",
+    "status",
+    "tail"
+   ]
+  },
+  "tools/roundhouse/claim-trace-baseline.json": {
+   "top": [
+    "captured",
+    "gates",
+    "note",
+    "previousCapture",
+    "total",
+    "untraceable"
+   ],
+   "entry": []
+  },
+  "tools/roundhouse/corroboration-reach-baseline.json": {
+   "top": [
+    "eligible",
+    "nuisance",
+    "refinement"
+   ],
+   "entry": []
+  },
+  "tools/roundhouse/device-cost-baseline.json": {
+   "top": [
+    "costs",
+    "entries",
+    "frozenOn",
+    "note",
+    "sweepAtLeast",
+    "sweepCosts",
+    "sweepFrozenOn"
+   ],
+   "entry": []
+  },
+  "tools/roundhouse/device-ledger.json": {
+   "top": [
+    "devices",
+    "kind",
+    "version"
+   ],
+   "entry": [
+    "adapter",
+    "family",
+    "firstSeen",
+    "key",
+    "lastSeen",
+    "mobile",
+    "runs",
+    "ua"
+   ]
+  },
+  "tools/roundhouse/evidence/magmap-mali-valhall-CONFIRMED.json": {
+   "top": [
+    "adapter",
+    "adjudication",
+    "at",
+    "cfg",
+    "fellBack",
+    "floor",
+    "fullGrid",
+    "gradedPeak",
+    "kind",
+    "proposedBy",
+    "tol",
+    "ua",
+    "version"
+   ],
+   "entry": []
+  },
+  "tools/roundhouse/external-linalg-answers.json": {
+   "top": [
+    "answers",
+    "source"
+   ],
+   "entry": [
+    "claim",
+    "definite",
+    "name",
+    "value",
+    "values"
+   ]
+  },
+  "tools/roundhouse/external-linalg-problems.json": {
+   "top": [
+    "note",
+    "problems"
+   ],
+   "entry": [
+    "M",
+    "b",
+    "claim",
+    "name"
+   ]
+  },
+  "tools/roundhouse/floor-atlas.json": {
+   "top": [
+    "entries",
+    "kind",
+    "skipped"
+   ],
+   "entry": [
+    "adapter",
+    "kernel",
+    "lastAt",
+    "latest",
+    "metric",
+    "runs",
+    "tol",
+    "version",
+    "worst"
+   ]
+  },
+  "tools/roundhouse/graded-coverage-baseline.json": {
+   "top": [
+    "captured",
+    "graded",
+    "gradedList",
+    "note",
+    "proven"
+   ],
+   "entry": []
+  },
+  "tools/roundhouse/lab-results-baseline.json": {
+   "top": [
+    "captured",
+    "deviceCount",
+    "devices",
+    "note",
+    "observables",
+    "pairCount",
+    "pairObservables",
+    "pairs"
+   ],
+   "entry": [
+    "mode",
+    "outputs",
+    "unavailable"
+   ]
+  },
+  "tools/roundhouse/magmap-bench.json": {
+   "top": [
+    "adapter",
+    "at",
+    "baselineMs",
+    "best",
+    "cfg",
+    "kind",
+    "reps",
+    "results",
+    "taichi",
+    "tol",
+    "ua",
+    "version"
+   ],
+   "entry": [
+    "all",
+    "id",
+    "ms",
+    "note",
+    "sharedTrig",
+    "status",
+    "why",
+    "workgroup",
+    "worstRelDiff"
+   ]
+  },
+  "tools/roundhouse/submissions/2026-08-26T18-34-22-712Z-magmap-bench.json": {
+   "top": [
+    "adapter",
+    "at",
+    "baselineMs",
+    "best",
+    "cfg",
+    "kind",
+    "reps",
+    "results",
+    "taichi",
+    "tol",
+    "ua",
+    "version"
+   ],
+   "entry": [
+    "all",
+    "id",
+    "ms",
+    "note",
+    "sharedTrig",
+    "status",
+    "why",
+    "workgroup",
+    "worstRelDiff"
+   ]
+  },
+  "tools/ship/artifact-history.json": {
+   "top": [
+    "generatedFrom",
+    "runs",
+    "version"
+   ],
+   "entry": [
+    "byTop",
+    "bytes",
+    "captured",
+    "files",
+    "mb",
+    "note",
+    "version"
+   ]
+  },
+  "tools/ship/boundary-report-baseline.json": {
+   "top": [
+    "generatedFrom",
+    "note",
+    "sites",
+    "tally",
+    "total"
+   ],
+   "entry": []
+  },
+  "tools/ship/carveRoles-fixture.json": {
+   "top": [
+    "assign",
+    "at",
+    "captured",
+    "compare",
+    "note",
+    "three"
+   ],
+   "entry": []
+  },
+  "tools/ship/duplicate-files-baseline.json": {
+   "top": [
+    "generatedFrom",
+    "groups"
+   ],
+   "entry": []
+  },
+  "tools/ship/gate-plan-snapshot.json": {
+   "top": [
+    "changed",
+    "inputs",
+    "kind",
+    "observations",
+    "producedAt",
+    "producedBy",
+    "schemaVersion"
+   ],
+   "entry": [
+    "budgetSeconds",
+    "directlyTests",
+    "firstTen",
+    "guessedCost",
+    "missedReachable",
+    "missedReachableNames",
+    "reachable",
+    "selected",
+    "spentMs",
+    "total"
+   ]
+  },
+  "tools/ship/gate-timings.json": {
+   "top": [
+    "captured",
+    "coverage",
+    "failingAt",
+    "failingNote",
+    "note",
+    "timings"
+   ],
+   "entry": []
+  },
+  "tools/ship/host-timings.local.json": {
+   "top": [
+    "note",
+    "runs"
+   ],
+   "entry": [
+    "at",
+    "completed",
+    "ms",
+    "passAt",
+    "passHash"
+   ]
+  },
+  "tools/ship/input-sets.json": {
+   "top": [
+    "at",
+    "conflicts",
+    "dirHashes",
+    "format",
+    "gates",
+    "generatedFrom",
+    "hashes",
+    "note",
+    "paths",
+    "probedMs"
+   ],
+   "entry": [
+    "d",
+    "exit",
+    "ms",
+    "namedFsImport",
+    "net",
+    "procs",
+    "r",
+    "reachesUnrecorded",
+    "spawnedNode",
+    "spawnedNonNode"
+   ]
+  },
+  "tools/ship/install-history.json": {
+   "top": [
+    "runs",
+    "version"
+   ],
+   "entry": [
+    "bootAt",
+    "buildWrittenAt",
+    "downMs",
+    "installToReadyMs",
+    "lastSeenAt",
+    "newBuild",
+    "version"
+   ]
+  },
+  "tools/ship/orphan-baseline.json": {
+   "top": [
+    "captured",
+    "count",
+    "files",
+    "note",
+    "shaderCaptured",
+    "shaderCount",
+    "shaderNote",
+    "shaders"
+   ],
+   "entry": []
+  },
+  "tools/ship/population-census.json": {
+   "top": [
+    "areas",
+    "generatedFrom",
+    "modules",
+    "roots",
+    "total"
+   ],
+   "entry": []
+  },
+  "tools/ship/prose-debt-baseline.json": {
+   "top": [
+    "generatedFrom",
+    "offenders"
+   ],
+   "entry": []
+  },
+  "tools/ship/record-shapes.json": {
+   "top": [
+    "at",
+    "generatedFrom",
+    "note",
+    "shapes"
+   ],
+   "entry": [
+    "entry",
+    "top"
+   ]
+  },
+  "tools/ship/referee-hashes.json": {
+   "top": [
+    "accepted",
+    "gates",
+    "generatedFrom",
+    "pairs",
+    "subjects"
+   ],
+   "entry": []
+  },
+  "tools/ship/releases.json": {
+   "top": [
+    "baseline",
+    "generatedFrom",
+    "lagBudget",
+    "note",
+    "ratchet",
+    "refreshedAt",
+    "releases",
+    "source"
+   ],
+   "entry": [
+    "publishedAt",
+    "tag"
+   ]
+  },
+  "tools/ship/rig-expected.json": {
+   "top": [
+    "counts",
+    "from",
+    "hist",
+    "scene",
+    "tolerance",
+    "webgl2",
+    "written"
+   ],
+   "entry": []
+  },
+  "tools/ship/slugTsl-fixture.json": {
+   "top": [
+    "captured",
+    "glslFragment",
+    "glslVertex",
+    "note",
+    "wgslFragment",
+    "wgslVertex"
+   ],
+   "entry": []
+  },
+  "tools/ship/stated-runtime-baseline.json": {
+   "top": [
+    "captured",
+    "gates",
+    "note"
+   ],
+   "entry": []
+  },
+  "tools/ship/sweep-rotation.json": {
+   "top": [
+    "at",
+    "budgetMs",
+    "generatedFrom",
+    "lastRun",
+    "note",
+    "rotated"
+   ],
+   "entry": [
+    "at",
+    "code",
+    "gate",
+    "ms",
+    "priorMs"
+   ]
+  },
+  "tools/ship/sweep-timings.json": {
+   "top": [
+    "at",
+    "budgetMs",
+    "capMs",
+    "captured",
+    "codes",
+    "crossings",
+    "finished",
+    "note",
+    "serial",
+    "serialAt",
+    "timings"
+   ],
+   "entry": []
+  },
+  "tools/ship/swekPage-baseline.json": {
+   "top": [
+    "captured",
+    "count",
+    "entries",
+    "note"
+   ],
+   "entry": [
+    "label",
+    "swekPage"
+   ]
+  },
+  "tools/ship/three-probe.json": {
+   "top": [
+    "at",
+    "page",
+    "results",
+    "route",
+    "ua",
+    "when"
+   ],
+   "entry": [
+    "backend",
+    "error",
+    "fetchMs",
+    "imports",
+    "label",
+    "ms",
+    "ok",
+    "revision",
+    "tarBytes",
+    "version"
+   ]
+  },
+  "tools/ship/trader-policy-spread.json": {
+   "top": [
+    "days",
+    "greedy",
+    "measuredAt",
+    "runs",
+    "shapeAt",
+    "verdict"
+   ],
+   "entry": [
+    "heldReturn",
+    "hidden",
+    "iters",
+    "name",
+    "params",
+    "pop",
+    "ratio",
+    "seed"
+   ]
+  },
+  "tools/ship/trader-policy.json": {
+   "top": [
+    "curve",
+    "days",
+    "episodes",
+    "greedy",
+    "heldOut",
+    "hidden",
+    "iterations",
+    "learned",
+    "measuredAt",
+    "obsDim",
+    "params",
+    "ratioTrain",
+    "shapeAt"
+   ],
+   "entry": []
+  },
+  "tools/ship/tsl-emitted-compute.json": {
+   "top": [
+    "at",
+    "emitted",
+    "generatedFrom",
+    "note",
+    "three",
+    "transplanted"
+   ],
+   "entry": []
+  },
+  "tools/ship/tsl-emitted-loop.json": {
+   "top": [
+    "at",
+    "emitted",
+    "emittedStorage",
+    "generatedFrom",
+    "note",
+    "three",
+    "transplanted",
+    "transplantedStorage"
+   ],
+   "entry": []
+  },
+  "tools/ship/tsl-emitted-physics.json": {
+   "top": [
+    "at",
+    "generatedFrom",
+    "heidler",
+    "lyapunov",
+    "note",
+    "three"
+   ],
+   "entry": [
+    "glsl",
+    "wgsl"
+   ]
+  },
+  "tools/ship/tsl-emitted-race.json": {
+   "top": [
+    "at",
+    "atlas",
+    "generatedFrom",
+    "glsl",
+    "ink",
+    "note",
+    "sampled",
+    "sprite",
+    "three",
+    "transplanted",
+    "wgsl"
+   ],
+   "entry": [
+    "fragment",
+    "glsl",
+    "language",
+    "vertex",
+    "wgsl"
+   ]
+  },
+  "tools/ship/tsl-emitted-slug.json": {
+   "top": [
+    "at",
+    "generatedFrom",
+    "note",
+    "slug",
+    "three"
+   ],
+   "entry": [
+    "fragment",
+    "glslFragment",
+    "language",
+    "vertex",
+    "wgsl"
+   ]
+  },
+  "tools/ship/tsl-emitted-wide.json": {
+   "top": [
+    "at",
+    "generatedFrom",
+    "note",
+    "planes",
+    "quad",
+    "three"
+   ],
+   "entry": [
+    "fragment",
+    "glslFragment",
+    "glslVertex",
+    "language",
+    "vertex",
+    "wgsl"
+   ]
+  },
+  "tools/ship/tsl-emitted.json": {
+   "top": [
+    "at",
+    "badTv",
+    "blackbody",
+    "generatedFrom",
+    "note",
+    "three"
+   ],
+   "entry": [
+    "glsl",
+    "wgsl"
+   ]
+  },
+  "tools/ship/tslCompute-fixture.json": {
+   "top": [
+    "at",
+    "captured",
+    "note",
+    "three",
+    "wgsl"
+   ],
+   "entry": []
+  },
+  "tools/ship/tslRace-fixture.json": {
+   "top": [
+    "captured",
+    "glslFragment",
+    "glslVertex",
+    "note",
+    "wgslFragment",
+    "wgslVertex"
+   ],
+   "entry": []
+  },
+  "tools/ship/tslSource-fixture.json": {
+   "top": [
+    "captured",
+    "glsl",
+    "note",
+    "wgsl"
+   ],
+   "entry": []
+  },
+  "tools/ship/tslWide-fixture.json": {
+   "top": [
+    "captured",
+    "glslFragment",
+    "glslVertex",
+    "note",
+    "planesCompute",
+    "wgslFragment",
+    "wgslVertex"
+   ],
+   "entry": []
+  },
+  "tools/ship/universe-hash-expected.json": {
+   "top": [
+    "dt",
+    "engine",
+    "hash",
+    "note",
+    "seed",
+    "tick",
+    "ticks",
+    "today",
+    "written"
+   ],
+   "entry": []
+  },
+  "tools/strict-libm-pkg/package.json": {
+   "top": [
+    "description",
+    "exports",
+    "keywords",
+    "license",
+    "main",
+    "name",
+    "scripts",
+    "type",
+    "version"
+   ],
+   "entry": []
+  },
+  "tools/verify_config.json": {
+   "top": [
+    "warnFactor",
+    "warnMinRuns"
+   ],
+   "entry": []
+  },
+  "tools/verify_timing.json": {
+   "top": [],
+   "entry": [
+    "green",
+    "steps",
+    "ts"
+   ]
+  },
+  "vendor/wasm/quickjs/quickjs-emscripten-core/package.json": {
+   "top": [
+    "author",
+    "dependencies",
+    "exports",
+    "files",
+    "keywords",
+    "license",
+    "main",
+    "module",
+    "name",
+    "repository",
+    "scripts",
+    "sideEffects",
+    "type",
+    "types",
+    "version"
+   ],
+   "entry": [
+    "import",
+    "require",
+    "types"
+   ]
+  },
+  "vendor/wasm/quickjs/quickjs-ffi-types/package.json": {
+   "top": [
+    "author",
+    "devDependencies",
+    "exports",
+    "files",
+    "license",
+    "main",
+    "module",
+    "name",
+    "repository",
+    "scripts",
+    "types",
+    "version"
+   ],
+   "entry": [
+    "import",
+    "require",
+    "types"
+   ]
+  },
+  "vendor/wasm/quickjs/quickjs-wasmfile-release-sync/package.json": {
+   "top": [
+    "author",
+    "browser",
+    "dependencies",
+    "description",
+    "exports",
+    "files",
+    "license",
+    "main",
+    "module",
+    "name",
+    "repository",
+    "scripts",
+    "sideEffects",
+    "types",
+    "version"
+   ],
+   "entry": [
+    "browser",
+    "default",
+    "iife",
+    "import",
+    "require",
+    "types",
+    "workerd"
+   ]
+  },
+  "vendor/wasm/sandbox-examples/index.json": {
+   "top": [],
+   "entry": [
+    "desc",
+    "id",
+    "input",
+    "label",
+    "src"
+   ]
+  }
+ }
+}

@@ -1,4 +1,5 @@
 {
+ "generatedFrom": "tools/ship/tslPhysics-selfcheck.mjs",
  "at": "v4331",
  "three": "0.178.0",
  "note": "the Lyapunov sweep as a TSL compute pass, as three emitted it and as render/tslSource.mjs transplanted it into a gfx/device.js compute pipeline; rewritten by this gate on every run",

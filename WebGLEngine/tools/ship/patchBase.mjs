@@ -28,6 +28,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { readCentralDirectory } from "../roundhouse/safeExtract.mjs";
 import { inflateEntry } from "./moduleHistory.mjs";
+import VM from "../../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
 
 export const UNSTATED = "unstated", MATCHES = "matches", DIFFERS = "differs";
 
@@ -86,7 +87,7 @@ export function auditable(patchRoot, treeVersion) {
 /** The tree's own marker, read rather than supplied. */
 export function treeVersionOf(engRoot) {
     try {
-        const m = /const ENGINE_VERSION = "(v\d+)"/.exec(fs.readFileSync(path.join(engRoot, "main.js"), "utf8"));
+        const m = VM.markerRe("ENGINE_VERSION").exec(fs.readFileSync(path.join(engRoot, "main.js"), "utf8"));
         return m ? m[1] : null;
     } catch { return null; }
 }

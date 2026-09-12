@@ -94,10 +94,18 @@ try {
         // cells is the population that cannot be satisfied by standing still.
         let worstOff = 0, moved = 0, sampled = 0;
         const cells = new Set(), heights = new Set();
+        // *** THE LONGEST RUN OF FRAMES THAT MOVED NOTHING, WHICH IS THE ACTUAL SYMPTOM. *** Total distance
+        // hides a stall: a bot that walks 6 units and then stands still for 429 frames and one that walks 6
+        // units steadily report the same number. This is the one that separates them.
+        let stallRun = 0, worstStall = 0, stallFrom = -1, worstFrom = -1;
         for (let i = 0; i < 600; i++) {
             const bx = bot.x, bz = bot.z;
             bm._followPathOrSteer(bot, 120, 40, 1 / 60, 1);
-            moved += Math.hypot(bot.x - bx, bot.z - bz);
+            const d = Math.hypot(bot.x - bx, bot.z - bz);
+            if (d < 1e-6) { if (stallRun === 0) stallFrom = i; stallRun++;
+                            if (stallRun > worstStall) { worstStall = stallRun; worstFrom = stallFrom; } }
+            else stallRun = 0;
+            moved += d;
             const h = refH(bot.x, bot.z);
             if (h !== null) {
                 worstOff = Math.max(worstOff, Math.abs(bot.y - (h + 1)));
@@ -109,11 +117,27 @@ try {
         // Does the ground autoGround CHOSE actually answer between lattice points? offLattice alone is the
         // detection, and a detection that nothing honours reads exactly the same as one that everything does.
         let mid = null; try { const m = G(0.5, 0.5); mid = m ? +m.y.toFixed(4) : null; } catch { mid = null; }
-        return { rawQuarterUnit: raw, offLattice: G.offLattice, midY: mid, spawnH, botCount: bm.bots.size,
+        // *** THE TERRAIN MODEL AGAINST THE VOXELS, IN THE RUNNING ENGINE. *** world._heightAt is the model's
+        // column height out of an erosion cache; world.voxelAt is what is solid. v4553 measured them
+        // disagreeing in 6 to 9% of columns by up to 17 voxels, a different count every boot. Re-derived
+        // live here rather than quoted, which is why this row states a SHAPE and not a number.
+        const SP = await import("/world/surfaceProbe.mjs");
+        const census = SP.surfaceCensus(w, { x0: -60, x1: 60, z0: -60, z1: 60, step: 3 });
+        // and a body placed in one of the columns the model gets wrong
+        let affected = null;
+        for (let z = -60; z <= 60 && !affected; z += 3) for (let x = -60; x <= 60 && !affected; x += 3) {
+            const h = w._heightAt(x, z);
+            if (!Number.isFinite(h) || w.isAir(x, h, z)) continue;
+            affected = { x, z, model: h, probe: SP.standHeightAt(w, x, z), topSolid: SP.topSolidAt(w, x, z),
+                         modelInsideRock: !w.isAir(x, h, z) };
+        }
+        return { rawQuarterUnit: raw, offLattice: G.offLattice, midY: mid, spawnH, census, affected,
+                 botCount: bm.bots.size,
                  start: { x: +start.x.toFixed(2), y: +start.y.toFixed(2) },
                  end: { x: +bot.x.toFixed(2), z: +bot.z.toFixed(2), y: +bot.y.toFixed(2) },
                  moved: +moved.toFixed(2), worstOff: +worstOff.toExponential(2), sampled,
                  cells: cells.size, heights: heights.size,
+                 worstStall, worstFrom, detours: bm._detours || 0,
                  poolRoute: bm.pathfinderPool && bm.pathfinderPool.route,
                  canvases: document.querySelectorAll("canvas").length, title: document.title };
     });
@@ -168,24 +192,58 @@ console.log("\n2. *** A REAL BOT, SPAWNED BY THE REAL BotManager, WALKING THE RE
         "scored over FRAMES alone this row stayed green under the sabotage that froze the bot at spawn -- " +
         "600 identical samples of the one height it was placed at read as 600 confirmations. A float/sink " +
         "claim is only a claim if the body crossed ground that changes height under it.");
+    // *** THE ROW THE LATTICE-LIP ROUND EXISTS FOR. *** Before it, this bot walked 6.28 units, arrived at
+    // (5.957, 1.986) and stood there for the remaining 429 frames -- and the total-distance row above stayed
+    // GREEN throughout, because 6.28 is more than 3. A stall is a RUN of frames that moved nothing, and
+    // nothing was counting runs.
+    report("longest run of frames that moved nothing: " + R.worstStall + " (from frame " + R.worstFrom +
+           "); " + R.detours + " frames took a fanned heading");
+    ok("!! *** IT NEVER STANDS STILL: LONGEST ZERO-MOVEMENT RUN IS " + R.worstStall + " FRAMES OF 600 ***",
+        R.worstStall < 30,
+        "before this round it was 429 -- the bot reached a cell whose four corner heights are 28, 29, 26, 27, " +
+        "a TWO-UNIT DROP reading 65.9 degrees against its 55-degree limit, and stopped. *** THE REFUSAL WAS " +
+        "CORRECT AND THE ROUND WAS FILED ON THE WRONG PREMISE: *** it is not a one-unit lip that stepHeight " +
+        "should have cleared, it is a genuine cliff -- and 21 of the bot's 24 compass directions were OPEN " +
+        "while it stood there. simulation/BotManager.js treated `blocked` as HANDLED, so nothing ever asked " +
+        "a second question.");
+    ok("!! ...and it got there BY DETOURING, not because the terrain happened to be easier",
+        R.detours > 0 && R.detours < 600,
+        R.detours + " of 600 frames took a fanned heading. A run that reported zero detours and more distance " +
+        "would mean the fan was never exercised and something else had changed.");
+    // =========================================================================================================
+    report("terrain model vs voxels, live: " + R.census.insideSolid + " of " + R.census.sampled +
+           " columns (" + R.census.insideSolidPct + "%) report a stand height INSIDE solid rock; error median " +
+           R.census.error.median + ", p90 " + R.census.error.p90 + ", max " + R.census.error.max +
+           ", min " + R.census.error.min);
+    ok("!! *** THE TERRAIN MODEL AND THE VOXELS DISAGREE, AND THE DISAGREEMENT IS NOT AT THE EDGE ***",
+        R.census.insideSolid > 0 && R.census.insideSolidPct < 25 && R.census.error.max >= 8,
+        "box " + JSON.stringify(R.census.box) + ". world._heightAt is the terrain MODEL out of an erosion " +
+        "cache; world.voxelAt is what is actually solid. The median error is 0 -- the model is right for most " +
+        "of the map and its convention is sound -- and the TAIL is the defect.");
+    ok("!! *** AND IN ONE OF THOSE COLUMNS THE PROBE PUTS A BODY ON THE REAL SURFACE, NOT INSIDE THE ROCK ***",
+        !!R.affected && R.affected.modelInsideRock && R.affected.probe === R.affected.topSolid + 1 &&
+        R.affected.probe !== R.affected.model,
+        R.affected ? `at (${R.affected.x}, ${R.affected.z}) the model says ${R.affected.model}, which is inside ` +
+            `a solid voxel; the topmost solid is ${R.affected.topSolid} so a body stands at ` +
+            `${R.affected.probe}. THE BOT'S OWN 600 FRAMES NEVER REACH ONE OF THESE COLUMNS, which is why ` +
+            `every row above stayed green through the defect and why this row exists.`
+            : "no affected column found -- if the world stopped producing them this row is the one to re-derive");
     ok("   ...and the engine's own pathfinder pool is on the navmesh route",
         R.poolRoute === "navmesh",
         "\"" + R.poolRoute + "\" -- v4545's wiring, observed in the running engine rather than in a fixture.");
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
-    "\nknown and NOT fixed, with its numbers in physics/character/terrainWalk.mjs: on this lattice world the " +
-    "bot climbs 45-to-54-degree ground and then STOPS at a one-unit voxel lip, because the interpolated " +
-    "surface between two cells reads 65.9 degrees and the normal test runs before stepHeight ever gets a " +
-    "chance. A fix was written and REMOVED: re-probing a fixed distance ahead keeps the frame-rate " +
-    "independence, but on a lattice the steep band between cells is wider than the probe, and the 2.0-unit " +
-    "probe that finally clears it moved the body 2.0 units in a step whose budget was 0.05 -- gains ground " +
-    "on contact, the defect this session repaired in kinematic.js. A teleporting bot is worse than a stalled " +
-    "one. Also unchecked here: what a bot LOOKS like -- this drives the manager directly and reads numbers, " +
-    "and never renders one; tools/ship/navWiringLive-selfcheck.mjs section 4 draws one, but on its own " +
-    "canvas rather than the engine's. *** AND THE COST IS STATED RATHER THAN HIDDEN: this gate takes about " +
-    "7.8 s against a 3,000 ms ship-time sweep budget, so IT DOES NOT RUN AT SHIP TIME *** -- it is registered " +
-    "over budget, which means the regression it exists for would be caught by somebody running it, not by " +
-    "the ritual. This round measured what that position actually costs: frozenRecords-selfcheck sits 446 ms " +
-    "over the same budget, and a record added ten rounds ago went unre-taken through nine ALL GREEN ships.");
+    "\n*** THE LIMIT THIS GATE CARRIED AS 'KNOWN AND NOT FIXED' WAS DIAGNOSED WRONG, AND IS FIXED. *** It " +
+    "read: the bot climbs 45-to-54-degree ground and stops at a one-unit voxel lip because the interpolated " +
+    "surface reads 65.9 degrees and the normal test runs before stepHeight. The 65.9 is real; the lip is " +
+    "not. Measured by probing all 24 compass headings at the stall: the cell the bot wanted has corner " +
+    "heights 28, 29, 26, 27 -- a TWO-UNIT DROP -- so refusing it is CORRECT, two of the three refused " +
+    "headings were going downhill, and 21 OF 24 HEADINGS WERE OPEN. simulation/BotManager.js treated " +
+    "`blocked` as HANDLED, parking the bot and skipping every fallback, three lines under a comment stating " +
+    "this tree's ruling that refusing a move must not mean standing at the wall. stepTerrainFan tries the " +
+    "wish and then fans around it: 6.28 units and 429 stalled frames became 21.09 units and 0. " +
+    "\nStill unchecked here: what a bot LOOKS like -- this drives the manager directly and reads numbers, " +
+    "and never renders one. And the cost is stated rather than hidden: this gate takes about 7.8 s against a " +
+    "3,000 ms ship-time sweep budget, so IT DOES NOT RUN AT SHIP TIME.");
 process.exit(fails ? 1 : 0);

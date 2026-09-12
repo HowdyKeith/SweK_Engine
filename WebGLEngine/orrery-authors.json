@@ -1,6 +1,6 @@
 {
  "note": "WHO the bytes say wrote each vendored body, read from the copyright line in its licence and from a PROVENANCE.md where one records an upstream. Baked by tools/ship/orreryAuthorScan.mjs. A body whose author cannot be read is in `unattributed` -- never dropped, never given a placeholder.",
- "built": "2026-09-07",
+ "built": "2026-09-09",
  "bodies": [
   {
    "name": "box3d",
@@ -290,6 +290,22 @@
     ]
    },
    "bytes": 810948
+  },
+  {
+   "name": "xatlas",
+   "kind": "person",
+   "who": "Jonathan Young",
+   "line": "Copyright (c) 2018-2020 Jonathan Young",
+   "licenceFile": "LICENSE",
+   "licences": 1,
+   "upstreamFile": "PROVENANCE.txt",
+   "alsoHolders": [],
+   "upstream": {
+    "url": "https://github.com/jpcy/xatlas",
+    "owner": "jpcy",
+    "repo": "xatlas"
+   },
+   "bytes": 345457
   }
  ],
  "systems": [
@@ -360,6 +376,14 @@
    "bytes": 810948
   },
   {
+   "author": "Jonathan Young",
+   "kind": "person",
+   "bodies": [
+    "xatlas"
+   ],
+   "bytes": 345457
+  },
+  {
    "author": "Mr.doob",
    "kind": "person",
    "bodies": [
@@ -421,13 +445,13 @@
   }
  ],
  "counts": {
-  "bodies": 18,
-  "attributed": 16,
-  "authors": 14,
-  "covered": 16,
+  "bodies": 19,
+  "attributed": 17,
+  "authors": 15,
+  "covered": 17,
   "missing": 2,
-  "withUpstream": 14,
-  "person": 12,
+  "withUpstream": 15,
+  "person": 13,
   "collective": 4,
   "disclaimed": 1,
   "prose": 1,

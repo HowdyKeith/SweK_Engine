@@ -440,13 +440,25 @@ export function rasterPack(shapes, { cells = 256, padCells = 1, aspect = null } 
         // letterboxes the fine one (0.0849 x 0.0610 at 512 cells, a 28% band, coverage stuck at 42.0% for
         // every resolution). The balance point is a property of the packing, so it moves with the packing.
         // It converges in two or three passes, so the cost is a small multiple rather than a search.
-        let side = Math.max(span0, Math.sqrt(total));
+        // *** THE WIDEST CHART CANNOT BE THE WHOLE ATLAS, BECAUSE THE PAD HAS TO GO SOMEWHERE. ***
+        // The floor was span0 -- the widest chart's own span -- and the search below can and does settle
+        // there, on any input where one chart dominates. At that side the widest chart is `cells` columns
+        // wide, its padded width is cells + 2*padCells, the placement scan's `x0 + padW <= gridW` is then
+        // satisfied by NO x0 at all, and the not-finite fallback drops it at x = padCells * cell: OUTSIDE
+        // the atlas, by exactly one pad cell. Measured 1.002604 = 1 + 1/384 on a one-chart pack, on a
+        // square chart, and on two charts -- three of three synthetic packs -- and on the cylinder fixture
+        // end to end, 7 of 238 UV coordinates past 1.0. It survived because the ROBOT never reaches the
+        // floor (many charts, so sqrt(total) is larger) and the robot is what every check here measured.
+        // The floor is therefore the side at which the widest chart plus its pad is exactly the grid.
+        const usable = Math.max(1, cells - 2 * padCells);
+        const minSide = span0 * cells / usable;
+        let side = Math.max(minSide, Math.sqrt(total));
         for (let it = 0; it < 5; it++) {
             const t = rasterPack(shapes, { cells, padCells, aspect: side });
             if (!(t.height > 0)) break;
             const ratio = t.height / t.width;
             if (Math.abs(ratio - 1) < 0.02) return t;
-            side = Math.max(span0, side * Math.sqrt(ratio));
+            side = Math.max(minSide, side * Math.sqrt(ratio));
         }
         return rasterPack(shapes, { cells, padCells, aspect: side });
     }
@@ -505,7 +517,14 @@ export function rasterPack(shapes, { cells = 256, padCells = 1, aspect = null } 
             const col = bestX + padCells + d;
             if (col >= 0 && col < gridW) skyline[col] = Math.max(skyline[col], bestY + h + 1 + padCells);
         }
-        place[si] = { x: (bestX + padCells) * cell, y: bestY * cell, w: S.w, h: S.h };
+        // and the placement is CLAMPED into the atlas rather than trusted to the arithmetic above. The seed
+        // floor makes the scan always have a valid x0 for the widest chart, but an explicit `aspect` comes
+        // from callers as well as from the loop, and a packer that can silently emit a UV outside [0,1] is
+        // one bad argument away from a texture that wraps. When this clamp bites, the pack is degenerate
+        // and the caller's cross-chart overlap verification is what catches it -- it already falls back to
+        // the shelf packer, which is disjoint by construction.
+        const px = Math.min((bestX + padCells) * cell, Math.max(0, side - S.w));
+        place[si] = { x: px, y: bestY * cell, w: S.w, h: S.h };
         usedH = Math.max(usedH, bestY * cell + S.h);
     }
     return { placements: place, width: gridW * cell, height: usedH, cell };
@@ -622,7 +641,58 @@ export function splitOverlapping(P, tris, chartList, { maxDepth = 8 } = {}) {
  * accepted solve. A rejected pair is never retried against the same partner, but both sides stay live for
  * other partners -- so one bad neighbour does not freeze a chart.
  */
-export function mergeCharts(P, tris, chartList, { maxConformal = 2.0, maxRounds = 12 } = {}) {
+// *** 2.0 WAS TWICE AS LOOSE AS IT SHOULD HAVE BEEN, AND NOTHING IN THIS TREE COULD SAY SO. ***
+// This threshold decides when two charts may be merged, and it is the parameter that actually binds: sweeping
+// maxNormalDeg from 40 down to 6 does not change the chart count at all -- segmentation proposes and this
+// disposes. At 2.0 a sphere came out as TWO charts and the merge stopped exactly where its own ceiling was.
+//
+// The reason it stood for so long is that every check on this module measured it against itself. vendor/xatlas
+// is the reference implementation of this same pipeline, and tools/mesh/xatlasRef.mjs now builds it and runs
+// it on the same meshes, with ONE metric computed here over BOTH outputs rather than each tool's own number.
+//
+// TWO metrics, because the first one alone would have been a proxy again:
+//   stretchP90   90th percentile of per-triangle UV-area / 3D-area, divided by its own median. Scale-free, so
+//                it grades UNIFORMITY -- and being scale-free it cannot see an atlas that shrank.
+//   densityP10   10th percentile of the SAME ratio, raw. Absolute texels per unit surface at the worst-served
+//                tenth of the mesh, so packing efficiency and stretch are both inside it.
+//
+//   mesh            tool     charts   stretchP90   densityP10   p10/median
+//   sphere 24x16    xatlas       6       1.131       5.57e-2       0.871
+//                   @2.00        2       1.676       2.33e-2       0.680
+//                   @1.05        9       1.117       4.25e-2       0.906
+//   sphere 12x8     xatlas       6       1.170       5.66e-2       0.943
+//                   @2.00        2       1.909       1.93e-2       0.550
+//                   @1.05       11       1.100       4.19e-2       0.908
+//   torus 16x10     xatlas      10       1.189       4.18e-2       0.955
+//                   @2.00        4       1.921       9.09e-3       0.328
+//                   @1.05       15       1.112       2.52e-2       0.718
+//   cylinder 16x6   xatlas       3       1.000       9.02e-2       0.994   <- developable: the control
+//                   @2.00        1       1.000       4.49e-2       1.000
+//                   @1.05        1       1.000       4.49e-2       1.000   <- UNCHANGED, nothing to un-merge
+//
+// Those are the fixtures tools/mesh/xatlasRef.mjs exports and tools/mesh/xatlasRef-selfcheck.mjs grades, so
+// this table and that gate are the same measurement and not two of them.
+//
+// So 1.05 is right, and it is right on BOTH metrics on every curved fixture: on the 24x16 sphere it nearly
+// doubles the absolute texel density of the worst-served tenth (2.33e-2 -> 4.25e-2) while cutting p90 stretch
+// from 1.676 to 1.117, and on the torus the density goes 9.09e-3 -> 2.52e-2, a factor of 2.8. The cylinder is
+// the control that says this is the merge and not the solver: developable, one chart at both settings, and
+// every number identical.
+//
+// *** AND THE COMPARISON DOES NOT SAY THIS FILE WON. *** On stretch alone it reads that way -- 1.117 against
+// xatlas's 1.131, and ahead on all three curved fixtures -- and that reading is the proxy talking. Measured
+// ABSOLUTELY, xatlas is ahead on every mesh here: 1.31x on the 24x16 sphere, 1.35x on the 12x8, 1.66x on the
+// torus, and 2.01x on the CYLINDER, where both unwrappers produce a perfect map of a developable surface and
+// there is nothing left to blame but the atlas. xatlas gets its 2x there by CUTTING the strip into three
+// charts that tile a rectangle at 85.7% utilisation; this file keeps it as one 1 x 0.426 strip and lets 57%
+// of the square go empty, because nothing in the merge scores packing and nothing ever splits a chart that is
+// not overlapping. That is a real and separate round, and it is filed as one.
+//
+// THE COST IS PAID IN SEAMS AND IS STATED RATHER THAN HIDDEN: on the 24x16 sphere the output goes 406 -> 495
+// vertices (+22%), and on RobotExpressive 258 -> 448 charts with 19.1% -> 35.4% of the mesh's 4,509 interior
+// edges cut. Both are still UNDER xatlas's own splitting of the same meshes (446 vertices and 563 charts),
+// which is the check that says the trade bought lower distortion rather than merely more pieces.
+export function mergeCharts(P, tris, chartList, { maxConformal = 1.05, maxRounds = 12 } = {}) {
     let cur = chartList.map((m) => m.slice());
     const stats = { tried: 0, accepted: 0, rejectedDisk: 0, rejectedDistortion: 0, rejectedOverlap: 0, rounds: 0 };
     const key = (a, b) => (a < b ? a + "_" + b : b + "_" + a);
@@ -781,41 +851,232 @@ export function selfOverlaps(chartTris, uv, { maxPairs = 4e6 } = {}) {
  * whatever the mesh measures. The span is solved for in two passes because it depends on the padding that
  * depends on it.
  */
-export function unwrapCurved(positions, indices,
-        { maxNormalDeg = 40, paddingTexels = 2, textureSize = 1024, relTol = 1e-6,
-          merge = true, maxConformal = 2.0, orient = true, nest = true, nestCells = 384 } = {}) {
-    const w = weld(positions, indices, { relTol });
-    let cs = charts(w.positions, w.tris, { maxNormalDeg });
-    const grown = cs.length;
-    let mergeStats = null, splitStats = null;
-    if (merge) {
-        const m = mergeCharts(w.positions, w.tris, cs, { maxConformal });
-        const sp = splitOverlapping(w.positions, w.tris, m.charts);
-        cs = sp.charts; mergeStats = m.stats; splitStats = sp.stats;
+/** Area of one triangle in 3D, from a flat position array. */
+function area3(P, T) {
+    const [i, j, k] = T;
+    const ax = P[j * 3] - P[i * 3], ay = P[j * 3 + 1] - P[i * 3 + 1], az = P[j * 3 + 2] - P[i * 3 + 2];
+    const bx = P[k * 3] - P[i * 3], by = P[k * 3 + 1] - P[i * 3 + 1], bz = P[k * 3 + 2] - P[i * 3 + 2];
+    return 0.5 * Math.hypot(ay * bz - az * by, az * bx - ax * bz, ax * by - ay * bx);
+}
+
+/** Area of one chart in UV and in 3D. */
+export function chartArea(P, chart) {
+    let uv = 0, xyz = 0;
+    for (const T of chart.tris) {
+        const a = chart.uv.get(T[0]), b = chart.uv.get(T[1]), c = chart.uv.get(T[2]);
+        if (a && b && c) uv += Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])) / 2;
+        xyz += area3(P, T);
     }
-    const laid = [];
-    let worstResidual = 0, nestFellBack = 0;
-    for (const members of cs) {
-        const T = members.map((i) => w.tris[i]);
-        let uv = lscm(w.positions, T);
-        if (!uv) continue;
-        worstResidual = Math.max(worstResidual, uv.residual || 0);
-        if (orient) uv = orientChart(uv).uv;
+    return { uv, xyz, density: xyz > 1e-12 ? uv / xyz : 0 };
+}
+
+/**
+ * *** EVERY CHART ARRIVES AT WHATEVER SCALE ITS OWN SOLVE LEFT IT AT, AND NOTHING HAD EVER ASKED. ***
+ *
+ * LSCM determines a chart's map up to a SIMILARITY -- rotation, translation AND SCALE -- so the scale that
+ * comes out is a property of which two vertices the solver pinned, not of the surface. Packing charts at
+ * those scales hands each one however much texture its pin distance happened to imply. Measured on
+ * RobotExpressive's 448 charts, UV area per unit surface spans 2.55e+1 to 8.84e+2: A FACTOR OF 34.7 between
+ * the best-served chart and the worst, with p90/p10 at 1.63. The small fixtures hide it -- their charts are
+ * near-copies of each other and span only 1.2x to 1.4x -- which is why six rounds of gates on this file did
+ * not see it.
+ *
+ * This scales every chart to ONE texel density, chosen so the total UV area is unchanged. A uniform scale of
+ * a conformal map is still conformal and every per-triangle distortion number is invariant under it, so this
+ * costs nothing that distortion measures; what it changes is WHO GETS THE TEXTURE.
+ *
+ *   RobotExpressive   densityP10 3.94e+1 -> 7.20e+1 (+83%), p10/median 0.631 -> 0.980,
+ *                     stretchP90 1.178 -> 1.018, and coverage RISES 37.2% -> 41.1%
+ *   sphere 24x16      densityP10 +12%, coverage +10%, stretchP90 1.117 -> 1.077
+ *   torus 16x10       densityP10 unchanged, uniformity 0.718 -> 0.905, coverage 44.6% -> 37.2%
+ *   sphere 12x8       densityP10 -9%, coverage -14%, uniformity 0.908 -> 0.949
+ *
+ * SO IT IS NOT FREE ON EVERY MESH AND THAT IS STATED RATHER THAN AVERAGED AWAY: on the two coarsest fixtures
+ * it trades coverage for uniformity, because their chart scales barely differed to begin with and all the
+ * change does is perturb the boxes the packer was already doing well with. On the real asset, where the
+ * spread is 34.7x, every number improves at once.
+ */
+export function equaliseChartScale(P, charts) {
+    let sumUv = 0, sumXyz = 0;
+    const per = charts.map((c) => { const a = chartArea(P, c); sumUv += a.uv; sumXyz += a.xyz; return a; });
+    const target = sumXyz > 1e-12 ? sumUv / sumXyz : 1;    // preserves the total UV area
+    return charts.map((c, i) => {
+        const k = Math.sqrt(target / (per[i].density || target));
+        if (!isFinite(k) || k <= 0) return c;
+        const uv = new Map();
+        for (const [v, p] of c.uv) uv.set(v, [p[0] * k, p[1] * k]);
+        return { ...c, uv };
+    });
+}
+
+/** The axis-aligned box a chart's own UVs occupy. */
+export function chartBox(chart) {
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const T of chart.tris) for (const v of T) {
+        const p = chart.uv.get(v); if (!p) continue;
+        if (p[0] < x0) x0 = p[0]; if (p[0] > x1) x1 = p[0];
+        if (p[1] < y0) y0 = p[1]; if (p[1] > y1) y1 = p[1];
+    }
+    return { lo: [x0, y0], w: x1 - x0, h: y1 - y0 };
+}
+
+/** Cut a chart in two across its longer axis, by triangle centroid, keeping every UV exactly as it is. */
+export function halveChart(chart) {
+    const b = chartBox(chart);
+    const axis = b.w >= b.h ? 0 : 1, lo = b.lo[axis], span = (axis ? b.h : b.w) || 1e-12;
+    const bins = [[], []];
+    for (const T of chart.tris) {
+        let m = 0, n = 0;
+        for (const v of T) { const p = chart.uv.get(v); if (p) { m += p[axis]; n++; } }
+        bins[(n ? m / n : lo) - lo < span / 2 ? 0 : 1].push(T);
+    }
+    // each part carries ONLY its own vertices: a chart's box is read from its map, so a shared map would
+    // give both halves the whole chart's box and the packer would be placing shapes that do not exist
+    return bins.filter((t) => t.length).map((tris) => {
+        const uv = new Map();
+        for (const T of tris) for (const v of T) if (!uv.has(v)) uv.set(v, chart.uv.get(v));
+        return { tris, uv };
+    });
+}
+
+/**
+ * *** A CHART IS CUT TO PACK IT ONLY WHILE ONE CHART IS SETTING THE ATLAS SIZE, AND ONLY IF THE MEASUREMENT
+ * AGREES AFTERWARDS. ***
+ *
+ * The premise this was filed under -- "split a chart and the atlas gets better" -- is WRONG as a general
+ * rule, and measuring it is what said so. Slicing every chart whose box is more than 1.5x from square, at
+ * k = 2, 3 and 4, LOSES coverage on four of five meshes: the torus goes 44.6% -> 40.9%, RobotExpressive
+ * 37.4% -> 36.0%, and only the cylinder gains. So the trigger is DERIVED rather than chosen: the widest
+ * chart's span against the square root of the total box area is exactly the question "can any rearrangement
+ * of these shapes reach a square, or is one chart already wider than the square would be?".
+ *
+ *   cylinder 16x6   widest span 0.9948, sqrt(total) 0.6493, ratio 1.53   <- one chart sets the atlas
+ *   torus 16x10     0.9948 against 0.9543, ratio 1.04                    <- marginal
+ *   sphere 12x8     0.3862 against 0.9378, ratio 0.41                    <- area sets the atlas
+ *   sphere 24x16    0.3849 against 0.9224, ratio 0.42
+ *   robot           0.5629 against 0.9105, ratio 0.62
+ *
+ * AND THE TRIGGER IS STILL ONLY A PROPOSAL: the cut is kept only if a real pack of the cut set covers more
+ * of the square than a real pack of the uncut one, packing THE SHAPES THE ATLAS WILL PACK rather than
+ * rectangles standing in for them. The cylinder gains 37% (coverage 42.2% -> 57.7%, densityP10 4.49e-2 ->
+ * 6.14e-2) and is kept. The torus is the case that shows the accept test doing work rather than decorating
+ * one: on its own the cut is REFUSED (trigger 1.04, 15 charts, nothing changes), and after
+ * equaliseChartScale has moved every box it is ACCEPTED and pays -- 15 charts -> 16, densityP10
+ * 2.517e-2 -> 2.661e-2. The same trigger, the same chart, opposite answers, because the question is about
+ * the pack and not about the chart.
+ */
+export function nestShapes(charts) {
+    return charts.map((c) => {
+        const b = c.lo ? { lo: c.lo, w: c.w, h: c.h } : chartBox(c);
+        const tri = c.tris.map((T) => [c.uv.get(T[0]), c.uv.get(T[1]), c.uv.get(T[2])])
+                          .filter((t) => t[0] && t[1] && t[2]);
+        const W2 = b.w || 1e-12, H2 = b.h || 1e-12;
+        return { w: W2, h: H2, cells: (mw, mh, cell) => conservativeMask(tri, b.lo, W2, H2, mw, mh, cell) };
+    });
+}
+
+export function cutWideCharts(charts, { cells = 384, padCells = 1, maxCuts = 8, pack = null } = {}) {
+    // *** THE ACCEPT TEST PACKS THE SHAPES THE ATLAS WILL PACK, NOT A RECTANGLE STANDING IN FOR THEM. ***
+    // The first version scored a candidate with an all-cells-filled mask, which is a different packer -- it
+    // cannot nest, so it mis-ranked the torus, accepted a cut that the real pack then paid 12% of the atlas
+    // for, and the comment above it claimed "a real pack" while the code did no such thing.
+    const packer = pack || ((cs) => {
+        const p = rasterPack(nestShapes(cs), { cells, padCells });
+        const span = Math.max(p.width, p.height) || 1;
+        return cs.reduce((s, c) => { const b = chartBox(c); return s + b.w * b.h; }, 0) / (span * span);
+    });
+    let cur = charts, score = null, cuts = 0;
+    for (let i = 0; i < maxCuts; i++) {
+        const boxes = cur.map(chartBox);
+        const root = Math.sqrt(boxes.reduce((s, b) => s + b.w * b.h, 0));
+        let wi = -1, widest = 0;
+        boxes.forEach((b, j) => { const sp = Math.max(b.w, b.h); if (sp > widest) { widest = sp; wi = j; } });
+        if (wi < 0 || widest <= root) break;                       // area sets the atlas: nothing to gain
+        const parts = halveChart(cur[wi]);
+        if (parts.length < 2) break;
+        const next = cur.slice(0, wi).concat(parts, cur.slice(wi + 1));
+        if (score === null) score = packer(cur);
+        const after = packer(next);
+        if (!(after > score)) break;                               // measured, not predicted
+        cur = next; score = after; cuts++;
+    }
+    return { charts: cur, cuts };
+}
+
+// *** REPACKING IS NOT RE-SOLVING, AND UNTIL NOW THE ONLY WAY TO ASK FOR A SECOND PACK WAS TO PAY FOR BOTH. ***
+// `from` takes a previous result of this function and reuses everything up to the pack: the weld, the
+// segmentation, the merge and every chart's LSCM solve. Only the packer runs again. That is exact rather than
+// approximate -- a chart's packed UVs differ from its solved ones by a translation and one global scale, and
+// the packer works in each chart's own units and normalises the scale away at the end, so a repack of a pack
+// lands where a repack of the solve would. The caller that needs this is a gate comparing two PACKERS on one
+// mesh, which was running the whole pipeline twice for a difference confined to its last step: measured on
+// RobotExpressive, 1,760 ms for the pair against 900 ms for one, and this gate has a 3,000 ms budget.
+export function unwrapCurved(positions, indices,
+        { maxNormalDeg = 40, paddingTexels = 2, textureSize = 1024, relTol = 1e-6, from = null,
+          merge = true, maxConformal = 1.05, orient = true, nest = true, nestCells = 384,
+          equalScale = true, cutWide = true } = {}) {   // v4560: maxConformal was 2.0 -- see mergeCharts
+    const bbox = (uv) => {
         let lo = [Infinity, Infinity], hi = [-Infinity, -Infinity];
         for (const [u, v] of uv.values()) {
             if (u < lo[0]) lo[0] = u; if (u > hi[0]) hi[0] = u;
             if (v < lo[1]) lo[1] = v; if (v > hi[1]) hi[1] = v;
         }
-        laid.push({ tris: T, uv, w: hi[0] - lo[0], h: hi[1] - lo[1], lo });
+        return { lo, w: hi[0] - lo[0], h: hi[1] - lo[1] };
+    };
+    const laid = [];
+    let worstResidual = 0, nestFellBack = 0, grown = 0, mergeStats = null, splitStats = null;
+    let w;
+    if (from) {
+        w = from.weld; grown = from.grown; mergeStats = from.mergeStats; splitStats = from.splitStats;
+        worstResidual = from.worstResidual;
+        for (const c of from.charts) laid.push({ tris: c.tris, uv: c.uv, ...bbox(c.uv) });
+    } else {
+        w = weld(positions, indices, { relTol });
+        let cs = charts(w.positions, w.tris, { maxNormalDeg });
+        grown = cs.length;
+        if (merge) {
+            const m = mergeCharts(w.positions, w.tris, cs, { maxConformal });
+            const sp = splitOverlapping(w.positions, w.tris, m.charts);
+            cs = sp.charts; mergeStats = m.stats; splitStats = sp.stats;
+        }
+        for (const members of cs) {
+            const T = members.map((i) => w.tris[i]);
+            let uv = lscm(w.positions, T);
+            if (!uv) continue;
+            worstResidual = Math.max(worstResidual, uv.residual || 0);
+            if (orient) uv = orientChart(uv).uv;
+            laid.push({ tris: T, uv, ...bbox(uv) });
+        }
+    }
+    // *** THE TWO PASSES BETWEEN THE SOLVE AND THE PACK, BOTH ADDED AT v4561 AND BOTH MEASURED ABOVE. ***
+    // equaliseChartScale is the one that matters on a real asset: LSCM fixes a chart up to a SIMILARITY, so
+    // the scale is the pin distance's and not the surface's, and RobotExpressive's charts span 34.7x. It is
+    // applied first because it changes every box the cut trigger then reads.
+    let cuts = 0, scaleSpread = null;
+    if (laid.length > 1) {
+        // the spread the solve arrived with, measured BEFORE anything corrects it -- this is the finding
+        // equaliseChartScale exists for, and a result that only reported the corrected state would leave
+        // every gate asserting that a repair it cannot see is unnecessary
+        const d = laid.map((c) => chartArea(w.positions, c).density).filter((x) => x > 0).sort((a, b) => a - b);
+        if (d.length) scaleSpread = { min: d[0], max: d[d.length - 1], ratio: d[d.length - 1] / d[0],
+                                      p10: d[Math.floor(d.length * 0.1)], p90: d[Math.floor(d.length * 0.9)] };
+    }
+    // *** REBUILT INTO A FRESH ARRAY, NEVER CLEARED IN PLACE. *** The first version did `laid.length = 0`
+    // and then read the pass's result -- which is the SAME array the moment a pass returns its input
+    // unchanged, so the charts were destroyed before they could be copied back and the unwrap silently
+    // produced nothing. Found by a sabotage that made equaliseChartScale a no-op: the atlas came back empty
+    // and a row asserting "every chart is at one density" PASSED ON THE EMPTY SET.
+    const replace = (next) => { const out = next.map((c) => ({ tris: c.tris, uv: c.uv, ...bbox(c.uv) }));
+        laid.length = 0; for (const c of out) laid.push(c); };
+    if (equalScale && laid.length > 1) replace(equaliseChartScale(w.positions, laid));
+    if (cutWide && laid.length) {
+        const r2 = cutWideCharts(laid, { cells: nestCells, padCells: 1 });
+        cuts = r2.cuts;
+        if (cuts) replace(r2.charts);
     }
     if (nest) {
         // occupancy of a chart at a normalised (u,v) inside its own box: is any triangle over that point?
-        const shapes = laid.map((c) => {
-            const tri = c.tris.map((T) => [c.uv.get(T[0]), c.uv.get(T[1]), c.uv.get(T[2])])
-                              .filter((t) => t[0] && t[1] && t[2]);
-            const W2 = c.w || 1e-12, H2 = c.h || 1e-12;
-            return { w: W2, h: H2, cells: (mw, mh) => conservativeMask(tri, c.lo, W2, H2, mw, mh) };
-        });
+        const shapes = nestShapes(laid);
         const first = rasterPack(shapes, { cells: nestCells, padCells: 0 });
         const span0 = Math.max(first.width, first.height) || 1;
         const pad0 = Math.max(1, Math.round(paddingTexels / Math.max(1, textureSize) * nestCells * (span0 / first.width)));
@@ -857,7 +1118,7 @@ export function unwrapCurved(positions, indices,
             const span2 = Math.max(nested.width, nested.height) || 1;
             return { weld: w, charts: laid.map((c, i) => ({ tris: c.tris, uv: uvs2[i] })),
                      atlas: { w: nested.width, h: nested.height, span: span2 }, chartCount: laid.length,
-                     worstResidual, grown, mergeStats, splitStats, packer: "nest", padCells: padUsed };
+                     worstResidual, grown, mergeStats, splitStats, packer: "nest", padCells: padUsed, cuts, scaleSpread };
         }
         // fall through to the shelf packer, and SAY SO in the result rather than silently degrading
         nestFellBack = verified;
@@ -880,7 +1141,7 @@ export function unwrapCurved(positions, indices,
     }
     return { weld: w, charts: out, atlas: { span }, chartCount: out.length, worstResidual,
              grown, mergeStats, splitStats, packer: nestFellBack ? "shelf (nest fell back)" : "shelf",
-             nestFellBack };
+             nestFellBack, cuts, scaleSpread };
 }
 
 /**

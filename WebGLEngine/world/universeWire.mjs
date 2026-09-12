@@ -138,16 +138,48 @@ export const KEY_DRIFT_V4460 = Object.freeze({
             alsoFixed: "orreryView-selfcheck and gpuGitTime-selfcheck, both red on the stale bake",
             control: "on today's tree, reverting `arrived` to the pre-bake values gives 73e6ee41, and " +
                      "setting any single body's arrived to 2026-01-02 moves the hash -- 18 of 18 tried" }),
+        // *** v4560 -- THE FIRST MOVE THIS RECORD HAS EVER CAUGHT ON THE ROUND THAT CAUSED IT. *** Every
+        // entry above was written after the fact, two of them seventeen rounds after. This one was owed
+        // before the bake: vendoring xatlas made vendoredLicences, importPosition and orreryView go red in
+        // the same minute, `--write` refuses a hash this record does not already name, and so the entry
+        // came first and the key moved second. The gate is still over budget and still outside the
+        // ship-time sweep -- that has not changed and is not claimed to have.
+        Object.freeze({ version: "v4560", commit: "v4560's own commit", hash: "d35d45dc", file: "orrery.json",
+            field: "bodies", bodiesTouched: 1,
+            cause: "vendor/xatlas arrived -- jpcy/xatlas's two source files and its licence, vendored as a " +
+                   "REFERENCE ORACLE for physics/mesh/uvLscm.mjs rather than as a dependency -- and a new " +
+                   "directory under vendor/ is a new BODY with its own orbit, stock and prices. v4504's " +
+                   "field, moving for the same reason and by one body instead of three",
+            control: "on today's tree, dropping the xatlas body gives 6ab551e0 back -- EXACTLY the previous " +
+                     "key, so this move is that body and nothing else" }),
+        // *** AND IT MOVED A SECOND TIME IN THE SAME ROUND, FOR A REASON THE FIRST ENTRY COULD NOT HAVE
+        // KNOWN: A BODY'S ARRIVAL DATE COMES FROM THE COMMIT THAT VENDORS IT, AND THAT COMMIT DOES NOT EXIST
+        // WHILE THE BODY IS BEING VENDORED. *** orreryBake reads `arrived` and `sha` from git, so at the
+        // first bake xatlas had neither -- the body was in the fleet with a null arrival, which is an ORBIT
+        // of its own, and the key was d35d45dc. The moment the vendoring commit existed the next bake gave
+        // the body its real date and the orbit moved again. Two entries for one round is the honest shape:
+        // both keys were real, both were committed, and the first is not a mistake to fold away.
+        Object.freeze({ version: "v4560", commit: "6b1a0686", hash: "fdc0bd02", file: "orrery.json",
+            field: "arrived", bodiesTouched: 1,
+            cause: "the re-bake AFTER xatlas's vendoring commit existed gave that body its real arrival date " +
+                   "(null -> 2026-09-09) and therefore its real orbit. v4414's field again, for one body " +
+                   "instead of fourteen, and reached this time by the ordinary two-step of vendoring rather " +
+                   "than by a correction",
+            control: "on today's tree, setting xatlas's `arrived` back to null gives d35d45dc -- the key this " +
+                     "round committed an hour earlier -- and dropping the body entirely gives 6ab551e0. " +
+                     "Setting its `sha` to null ALONE leaves the hash at fdc0bd02, so it is `arrived` and " +
+                     "not `sha`, which is the same probe shaDoesNotReachTheEconomy records" }),
     ]),
-    current: "6ab551e0",
+    current: "fdc0bd02",
     // *** MEASURED AND NEGATIVE, AND IT CORRECTS MY OWN FIRST WRITING OF THE ENTRY ABOVE. *** The re-bake's
     // diff moved TWO fields on 16 bodies each, `arrived` and `sha`, and I wrote "arrived + sha" into this
     // record straight off that diff -- the exact mistake bytesDoNotReachTheEconomy exists to record, made
     // again in the same file four moves later. `sha` reaches NOTHING: each of the 18 bodies' sha set to
     // forty zeros in turn, one at a time, and the hash never moved. A DIFF NAMES WHAT CHANGED, NOT WHAT
     // COUNTED, and the only way to tell them apart is to run it.
-    shaDoesNotReachTheEconomy: Object.freeze({ bodiesTried: 18, movedTheHash: 0,
-        note: "against `arrived`, the same probe on the same 18 bodies: 18 of 18 moved the hash" }),
+    shaDoesNotReachTheEconomy: Object.freeze({ bodiesTried: 19, movedTheHash: 0,
+        note: "against `arrived`, the same probe on the same 19 bodies: 19 of 19 moved the hash. 18 at " +
+              "v4534; xatlas made it 19 at v4560 and the probe is re-run rather than the count adjusted" }),
     // WHY THE 2026-09-07 DRIFT SHIPPED ANYWAY, read from tools/ship/sweep-timings.json rather than argued:
     // the gate is over the ship-time budget, so quickSweep does not run it, so its recorded verdict is a
     // snapshot of a tree that no longer exists. The RELATION (gate slower than budget) is asserted live in

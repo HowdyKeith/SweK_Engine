@@ -165,7 +165,7 @@ else {
             if (o.error || o.compileError) { ok(`${bk} ran and compiled`, false, o.error || o.compileError); continue; }
             ok(`*** ${bk}: "${TEXT}" at ${SIZE} px drawn by the fragment three GENERATED, in the shipped pipeline's own shell, IS the shipped pipeline's picture on EVERY pixel (${o.same} of ${o.total}, worst ${o.worst}; ${o.lit} lit, ${o.quads} glyph quads) ***`,
                 o.backend === bk && o.same === o.total && o.errs.length === 0 && o.lit > 500, o.errs.join(" | ")); }
-        fs.writeFileSync(EMITTED, JSON.stringify({ at: "v4484", three: "0.178.0", note: "the Slug fragment as three's node builders emitted it from render/slugTsl.mjs makeSlugTsl and as render/tslSource.mjs transplanted it into the shipped pipeline's shell; rewritten by tools/ship/slugTsl-selfcheck.mjs on every green run",
+        fs.writeFileSync(EMITTED, JSON.stringify({ generatedFrom: "tools/ship/slugTsl-selfcheck.mjs", at: "v4484", three: "0.178.0", note: "the Slug fragment as three's node builders emitted it from render/slugTsl.mjs makeSlugTsl and as render/tslSource.mjs transplanted it into the shipped pipeline's shell; rewritten by tools/ship/slugTsl-selfcheck.mjs on every green run",
             slug: { wgsl: R.emitted.webgpu, glsl: R.emitted.webgl2, transplanted: R.transplanted } }, null, 1));
         ok("the emitted and transplanted pair is written to tools/ship/tsl-emitted-slug.json for the WGSL corpus", fs.existsSync(EMITTED));
     }

@@ -28,6 +28,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { decide, verifyBuild, readPolicy } from "./updatePolicy.mjs";
+import VM from "../../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const MEMO = path.join(here, ".swek-lighthouse");
@@ -46,7 +47,7 @@ export function readAndroidPolicy() {
 /** Which build is this tree? Read from main.js so it cannot drift from what is actually installed. */
 export function localVersion() {
     try {
-        const m = fs.readFileSync(path.join(here, "..", "..", "main.js"), "utf8").match(/ENGINE_VERSION\s*=\s*"(v\d+)"/);
+        const m = fs.readFileSync(path.join(here, "..", "..", "main.js"), "utf8").match(VM.markerRe("ENGINE_VERSION"));
         return m ? m[1] : null;
     } catch { return null; }
 }

@@ -30,6 +30,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { gateFiles } from "./staleness.mjs";
+import VM from "../../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ENG = path.resolve(HERE, "..", "..");
@@ -127,7 +128,7 @@ export function pairedEdits(manifest, now) {
  * exactly the sentence a reader needs in order to tell a correction from a widening. ***
  */
 export function buildVersion() {
-    try { return (readFileSyncSafe(path.join(ENG, "main.js")).match(/ENGINE_VERSION = "(v\d+)"/) || [])[1] || null; }
+    try { return (readFileSyncSafe(path.join(ENG, "main.js")).match(VM.markerRe("ENGINE_VERSION")) || [])[1] || null; }
     catch { return null; }
 }
 function readFileSyncSafe(p) { return fs.readFileSync(p, "utf8"); }
@@ -167,7 +168,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
     if (process.argv.includes("--accept")) {
         // *** DELIBERATE, NEVER AUTOMATIC. A manifest this tool refreshed on every run would agree with itself
         // forever -- the mirror shape. Accepting is a separate act, taken by a person after reading the report. ***
-        fs.writeFileSync(MANIFEST, JSON.stringify({ accepted: new Date().toISOString().slice(0, 10), ...now }, null, 0));
+        fs.writeFileSync(MANIFEST, JSON.stringify({ generatedFrom: "tools/ship/frozenReferee.mjs", accepted: new Date().toISOString().slice(0, 10), ...now }, null, 0));
         console.log("[frozenReferee] manifest accepted: " + Object.keys(now.gates).length + " gates, " +
                     Object.keys(now.subjects).length + " subjects");
         process.exit(0);

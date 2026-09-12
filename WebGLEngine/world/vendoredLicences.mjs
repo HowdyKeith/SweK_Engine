@@ -113,6 +113,17 @@ export const VENDORED = Object.freeze([
       note: "*** OURS, NOT SOMEBODY ELSE'S. *** sha256.wasm and graphlayout.wasm are AssemblyScript output " +
             "from sha256.ts and graphlayout.ts in the same directory. A filename census calls this unpapered; " +
             "the right answer is that there is nobody to ask." },
+    { path: "vendor/xatlas",    kind: KIND.THIRD_PARTY, spdx: "MIT",       grant: GRANT.LICENCE_FILE, file: "LICENSE",
+      upstream: "https://github.com/jpcy/xatlas", pin: "f700c7790aaa030e794b52ba7791a05c085faf0c",
+      note: "*** A REFERENCE ORACLE, NOT A DEPENDENCY, AND THE DISTINCTION IS ENFORCED BY THE LANGUAGE. *** " +
+            "xatlas.h and xatlas.cpp are C++ and there is no emscripten in this sandbox, so nothing the engine " +
+            "ships can load them and nothing does -- tools/mesh/xatlasRef.mjs COMPILES them on demand with g++ " +
+            "and runs the binary as a subprocess, to grade physics/mesh/uvLscm.mjs against the reference " +
+            "implementation of the same pipeline. (c) 2018-2020 Jonathan Young. The LICENCE IS TWENTY LINES, " +
+            "sha256 2c16d5b1c280, which is NOT the 21-line MIT text six other bodies here share -- the length " +
+            "is what says it was read rather than assumed, and world/licenceSweep.mjs records the hash for " +
+            "exactly that reason. Only the two source files and the licence were taken: no models, no build " +
+            "script, no thirdparty tree. vendor/xatlas/PROVENANCE.txt carries the evidence commands." },
     { path: "ui/vendor",        kind: KIND.THIRD_PARTY, spdx: "MIT",       grant: GRANT.IN_HEADER,    file: "qrcode.mjs",
       upstream: "qrcode-generator, Kazuhiko Arase, 2009",
       note: "*** AND A SECOND vendor/ DIRECTORY ENTIRELY, which a census pointed at the top-level one misses. " +

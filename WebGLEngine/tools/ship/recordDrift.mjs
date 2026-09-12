@@ -57,6 +57,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as TR from "./treeRead.mjs";
+import * as RR from "./recordReach.mjs";   // readTimings: the guarded, shared reader of sweep-timings.json
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -90,27 +91,69 @@ export const OWES = Object.freeze({
  * deliberately stale record and watch it be found -- a drift detector that cannot be given drift is a
  * detector nobody has run.
  */
-export async function checks({ load = null, timings = null } = {}) {
+/**
+ * Read sweep-timings.json, retrying a TORN read.
+ *
+ * *** EXPORTED SO THE GATE CAN DRIVE IT WITHOUT RE-RUNNING checks(). *** The first version of the row that
+ * proves this behaviour called checks({}) twice more, and checks() is O(tree): recordDrift-selfcheck went from
+ * 1,870 ms to 2,376 ms against a 3,000 ms budget, eating the 800 ms margin recordReach-selfcheck requires of
+ * both stale-record detectors. That gate caught it, which is what it is for -- and the answer is to make the
+ * thing testable rather than to lower the bar it failed.
+ *
+ * The wait is a REAL timer. The first draft spun on Date.now(), which blocks this process's own event loop, so
+ * nothing it is awaiting can progress and it burns a core doing it -- caught by a test that broke the file,
+ * scheduled a restore 50 ms out, and watched all three attempts fail anyway.
+ */
+export async function readTimingsWithRetry(root = ENG, attempts = 3, waitMs = 40) {
+    let tries = 0, error = null;
+    while (tries < attempts) {
+        const t = RR.readTimings(root);
+        tries++;
+        if (t.ok) return { rec: t, tries, error: null };
+        error = t.error || "no timings";
+        if (tries < attempts) await new Promise((r) => setTimeout(r, waitMs));
+    }
+    return { rec: null, tries, error };
+}
+
+/**
+ * *** `only` EXISTS BECAUSE A FIXTURE FOR ONE RECORD WAS RE-DERIVING FOUR. ***
+ *
+ * Every check here is O(tree), and the gate drives eight fixtures through this function -- three that
+ * perturb the timings file and three that swap one module -- so a run cost ten full censuses to answer ten
+ * questions about one of them each. Measured: 213 to 317 ms per call, ten calls, and the gate reached
+ * 2,215 ms serial against a 3,000 ms budget with recordReach-selfcheck requiring 800 ms of margin. It is
+ * also MORE PRECISE than it was: a fixture that breaks the timings file should not be able to pass or fail
+ * on the assertion census, and until now it could.
+ */
+export async function checks({ load = null, timings = null, only = null } = {}) {
     const mod = load || ((p) => import(p));
     const out = [];
+    const wanted = (n) => !only || (Array.isArray(only) ? only.includes(n) : only === n);
 
+    // assertionShape is imported either way: two checks below need its gateFiles() walk, and the module
+    // import is cheap -- census() is the 147 ms.
     const A = await mod("./assertionShape.mjs");
-    const ac = A.census();
-    out.push({
-        name: "assertionShape census", owes: OWES.assertion,
-        recorded: A.SHAPE_AT_V4480.definesOk, actual: ac.definesOk,
-        stale: A.SHAPE_AT_V4480.definesOk !== ac.definesOk || A.SHAPE_AT_V4480.gates !== ac.gates,
-        detail: `gates ${A.SHAPE_AT_V4480.gates} vs ${ac.gates}, copies ${A.SHAPE_AT_V4480.definesOk} vs ${ac.definesOk}`,
-    });
+    if (wanted("assertionShape census")) {
+        const ac = A.census();
+        out.push({
+            name: "assertionShape census", owes: OWES.assertion,
+            recorded: A.SHAPE_AT_V4480.definesOk, actual: ac.definesOk,
+            stale: A.SHAPE_AT_V4480.definesOk !== ac.definesOk || A.SHAPE_AT_V4480.gates !== ac.gates,
+            detail: `gates ${A.SHAPE_AT_V4480.gates} vs ${ac.gates}, copies ${A.SHAPE_AT_V4480.definesOk} vs ${ac.definesOk}`,
+        });
+    }
 
-    const C = await mod("./closingCoverage.mjs");
-    const cc = C.coverage();
-    out.push({
-        name: "sweep closings", owes: OWES.closing,
-        recorded: 0, actual: cc.summedUncovered,
-        stale: cc.summedUncovered > 0 || cc.duplicates.length > 0,
-        detail: `${cc.summedUncovered} gate(s) no closing names, ${cc.duplicates.length} duplicate claim(s)`,
-    });
+    if (wanted("sweep closings")) {
+        const C = await mod("./closingCoverage.mjs");
+        const cc = C.coverage();
+        out.push({
+            name: "sweep closings", owes: OWES.closing,
+            recorded: 0, actual: cc.summedUncovered,
+            stale: cc.summedUncovered > 0 || cc.duplicates.length > 0,
+            detail: `${cc.summedUncovered} gate(s) no closing names, ${cc.duplicates.length} duplicate claim(s)`,
+        });
+    }
 
     // ---- *** v4483 -- THE KNOWLEDGE INDEX IS ITSELF A DERIVED RECORD, AND THE REGISTRY CHECK READS IT. ***
     //
@@ -121,10 +164,12 @@ export async function checks({ load = null, timings = null } = {}) {
     // it on the next round. The fix is not to re-derive the orphan rule here -- two definitions of one rule
     // is the defect this module avoided by exporting `sources` -- but to check the INPUT and say so, so the
     // registry answer is never read as clean when it was computed from yesterday's tree.
-    const onDisk = A.gateFiles(ENG).length;
+    const gateFiles = (wanted("knowledge index") || wanted("instrument registry") || wanted("sweep timings"))
+        ? A.gateFiles(ENG) : [];
+    const onDisk = gateFiles.length;
     const K = JSON.parse(fs.readFileSync(path.join(ENG, "knowledge-index.json"), "utf8"));
     const indexStale = K.gates.length !== onDisk;
-    out.push({
+    if (wanted("knowledge index")) out.push({
         name: "knowledge index", owes: OWES.index,
         recorded: K.gates.length, actual: onDisk,
         stale: indexStale,
@@ -132,6 +177,7 @@ export async function checks({ load = null, timings = null } = {}) {
                            : `${onDisk} gates, index agrees`,
     });
 
+    if (wanted("instrument registry")) {
     const R = await mod("./registryOrphans.mjs");
     const rs = R.scan();
     out.push({
@@ -146,13 +192,36 @@ export async function checks({ load = null, timings = null } = {}) {
                            + "it does not yet list every gate on disk"
               : "no module with reportLines lacks an entry",
     });
+    }
 
     // *** INJECTABLE, BECAUSE THE FIRST DRAFT'S CONTROL FOR THIS CHECK WAS VACUOUS. *** It asserted a fact
     // about its own fixture object and never called the code, so deleting the stamp requirement below cost
     // NOTHING -- the fourth check-that-cannot-fail this session. A timings record the caller supplies is what
     // makes "a reading without its own capture stamp is not evidence" a thing the gate can actually drive.
-    const rec = timings || JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "sweep-timings.json"), "utf8"));
-    const missing = A.gateFiles(ENG)
+    // *** AND THE READ ITSELF WAS A BARE JSON.parse OF THE FILE quickSweep REWRITES AT RUN END. *** This gate
+    // went NEW RED inside a full sweep at v4555 and passed every time it was run alone -- the "fails a ship
+    // at random and never reproduces" shape gateSweep.mjs's header calls the worst thing a ship-time check
+    // can be. It is the SAME torn read tools/ship/recordReach.mjs was repaired for at v4550, and the repair
+    // there was readTimings(), which returns `ok` instead of assuming it. This module had its own second
+    // reader and did not use the shared one -- which is the rule recordDrift-selfcheck's own section 3
+    // asserts about `sources`, that one walk means one definition, turned on this file.
+    //
+    // A torn read is a window of milliseconds, so it is RETRIED rather than either crashing or being passed
+    // on nothing. A file still unparseable after three attempts is genuinely broken, and the check then
+    // reports UNREADABLE -- stale, named, and not a silent green.
+    if (!wanted("sweep timings")) return out;
+    const read = timings ? { rec: timings, tries: 0, error: null } : await readTimingsWithRetry(ENG);
+    if (!read.rec) {
+        out.push({
+            name: "sweep timings", owes: OWES.timing, recorded: 0, actual: -1, stale: true,
+            detail: `sweep-timings.json UNREADABLE after ${read.tries} attempts (${read.error}) -- a torn read ` +
+                    `from a concurrent quickSweep heals on retry, so this means the file is broken rather ` +
+                    `than busy`,
+        });
+        return out;
+    }
+    const rec = read.rec;
+    const missing = gateFiles
         .map((p) => path.relative(ENG, p).replace(/\\/g, "/"))
         .filter((g) => !(g in (rec.timings || {})) || !((rec.at || {})[g]));
     out.push({

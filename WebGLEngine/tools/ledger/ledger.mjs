@@ -33,6 +33,7 @@ const LEDGER_PATH = path.join(HERE, "LEDGER.json");
 
 // The source files that DEFINE each subsystem's result. A change to any of these SHOULD change the key.
 import { SUBSYSTEM_SOURCES } from "./subsystemSources.mjs";
+import VM from "../../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
 export { SUBSYSTEM_SOURCES };
 const SCENARIO_SOURCE = "tools/fingerprint/fingerprint.mjs";   // defines the inputs; changing it re-keys every subsystem
 
@@ -100,7 +101,7 @@ export function currentResults() {
 
 function thisMachine() {
     let version = "unknown";
-    try { version = (fs.readFileSync(path.join(ROOT, "main.js"), "utf8").match(/ENGINE_VERSION = "(v\d+)"/) || [])[1] || "unknown"; } catch { }
+    try { version = (fs.readFileSync(path.join(ROOT, "main.js"), "utf8").match(VM.markerRe("ENGINE_VERSION")) || [])[1] || "unknown"; } catch { }
     return { machine: os.hostname(), arch: process.arch, version };
 }
 export function loadLedger() { try { return JSON.parse(fs.readFileSync(LEDGER_PATH, "utf8")); } catch { return emptyLedger(); } }
