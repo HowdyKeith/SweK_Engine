@@ -1,6 +1,9 @@
 // tools/ship/spacesimStart-selfcheck.mjs
 //
-// Run: node tools/ship/spacesimStart-selfcheck.mjs   (~1.4s MEASURED (gate-timings.json) -- was ~1s)
+// Run: node tools/ship/spacesimStart-selfcheck.mjs   (~0.14s MEASURED at v4575, median of 136/126/146 --
+//   superseding a stated ~1.4s, itself taken from gate-timings.json, which is 10x OVER. The first run of a
+//   cold process measured 1181 ms; the median of three is the honest figure and the cold read is noted so
+//   nobody re-derives the old number from one sample.)
 //
 // v3165 -- THE PANEL COULD DRIVE A SIMULATOR IT COULD NOT LAUNCH.
 //

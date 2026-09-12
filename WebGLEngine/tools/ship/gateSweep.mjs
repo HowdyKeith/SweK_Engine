@@ -3767,6 +3767,45 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since234: Object.freeze({
+        at: "v4575", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/timingRecords-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/commentFalsePass-selfcheck.mjs"]),
+        verdict: "green, 0.06 s, under the 3000 ms budget. *** v4574 CLOSED ON GATE PROSE ABOUT COST AND THE " +
+                 "INSTRUMENT ALREADY EXISTED. *** statedRuntime-selfcheck has compared stated runtimes against " +
+                 "observed ones since v3213, and it was RED, naming four drifted headers. Not a rung to build " +
+                 "-- a red to act on, and the second round running where the first finding was that the tree " +
+                 "already knew. All four were corrected FROM A CLOCK: reconQualityBind ~0.4s against a " +
+                 "measured 2.35s, commentFalsePass ~4.2s against 9.6s, shaderCensus ~0.5s against 1.5s, " +
+                 "spacesimStart ~1.4s against 0.14s -- three under, one 10x over. *** AND ONE OF THE FOUR WAS " +
+                 "HIDING A RED GATE. *** commentFalsePass EXITS NON-ZERO, and is recorded in sweep-timings at " +
+                 "20,025 ms with exit 124 -- one of the 137 cap readings v4574 counted, which is exactly why " +
+                 "nobody had looked. *** THAT FALSIFIES v4574'S OWN SENTENCE *** that 'not one of the gates " +
+                 "the sweep has only ever killed is red'. Seventeen sampled were green; the population is " +
+                 "not, and capReading-selfcheck's row now says so instead. Its red was a FALSE POSITIVE -- " +
+                 "qrChannel asserts the vendored QR decoder carries the MIT copyright and permission notice " +
+                 "in full, and a licence notice exists only as a comment, so reading it off raw source is the " +
+                 "row working. Repaired with a DECIDABLE exemption on the asserted text, which is what that " +
+                 "gate's own second row demands. *** AND FOLLOWING statedRuntime'S INSTRUCTION WOULD HAVE " +
+                 "WRITTEN A WRONG NUMBER. *** It says to correct a drifted header 'FROM THE MEASUREMENT in " +
+                 "gate-timings.json'. For shaderCensus that file held 239 ms against a measured 1501 -- the " +
+                 "header was right to be flagged and THE RECORD WAS THE STALE HALF. Re-timed there, with the " +
+                 "reason in the file's own captured note. *** SO THE ROUND'S SUBJECT BECAME THE PAIR OF " +
+                 "RECORDS. *** gate-timings.json and sweep-timings.json both claim ms per gate. Where the " +
+                 "sweep reading is real, 1143 gates appear in both and 496 of them -- 43% -- DISAGREE BY 2x " +
+                 "OR MORE, the worst by 144x. A four-gate spot-check against a clock splits TWO AND TWO on " +
+                 "which record is closer, so neither can correct the other. The disagreement is 487-to-9 " +
+                 "one-directional, which growth and an eight-wide sweep both explain -- and the nine that run " +
+                 "the other way, neither does. Eight sabotages: six red, and the two zeros are mutations that " +
+                 "CHANGE NOTHING rather than rows that miss something. Dropping the cap clause from the filter " +
+                 "selects the identical 1143 gates, VERIFIED -- every capped entry in the overlap carries exit " +
+                 "124, so the code filter already removes it, which is the inertness the gate states outright. " +
+                 "And loosening a threshold cannot redden the row it loosens. One row was repaired before " +
+                 "that stood: the first version asserted the disagreement 'runs both ways, so it is not " +
+                 "growth and not parallel load' while PRINTING 487 against 9 -- a label refuted by its own " +
+                 "detail, and 98% in one direction is precisely what growth looks like.",
+    }),
     since233: Object.freeze({
         at: "v4574", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/capReading-selfcheck.mjs"]),

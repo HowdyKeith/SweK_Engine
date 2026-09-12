@@ -69,7 +69,7 @@ const NV = SC.notVerdicts(c, { codes: T.codes });
     // v4460's class is the other one, and keeping them apart is the reason this gate exists beside that work
     // rather than on top of it.
     const SG = SC.standingGreens(c, { codes: T.codes });
-    ok(`  and this is NOT v4460's population: that one is ${SG.length} over-budget entries carrying a stale code 0, where twenty-two were found red. These 137 carry 124 and were never observed at all`,
+    ok(`  and this is NOT v4460's population: that one is ${SG.length} over-budget entries carrying a stale code 0, where twenty-two were found red. These ${NV.length} carry 124 and were never observed at all`,
         SG.length > 0 && !SG.some((g) => NV.includes(g)),
         `standingGreens ${SG.length}, notVerdicts ${NV.length}, overlap ${SG.filter((g) => NV.includes(g)).length}`);
 }
@@ -106,8 +106,13 @@ export const LET_FINISH_V4573 = Object.freeze({
     const R = LET_FINISH_V4573.runs, msAll = R.map((r) => r.ms);
     const under = R.filter((r) => r.ms < CAP), green = R.filter((r) => r.rc === 0);
     report(`the seventeen, in order: ${msAll.map((m) => (m / 1000).toFixed(1)).join(", ")} s`);
-    ok(`*** all ${R.length} are GREEN when allowed to finish -- not one of the gates the sweep has only ever killed is red ***`,
-        green.length === R.length, `${green.length}/${R.length} exit 0`);
+    // *** THE SENTENCE THIS ROW ORIGINALLY CARRIED WAS FALSIFIED ONE ROUND LATER. *** It read "not one of
+    // the gates the sweep has only ever killed is red", which is true of the seventeen and was never true of
+    // the population: v4575 found commentFalsePass-selfcheck red at 9.6 s while recorded at 20,025 ms with
+    // exit 124 -- the same class, reached by a different route. Seventeen greens are seventeen greens; the
+    // generalisation was mine and it was wrong, so the row now says what it measured.
+    ok(`*** all ${R.length} SAMPLED gates are green when allowed to finish -- and the population is NOT: v4575 found commentFalsePass red in it, at 9.6 s against a recorded 20,025 ***`,
+        green.length === R.length, `${green.length}/${R.length} of the sample exit 0; the sample is not the population`);
     // *** THE FIRST VERSION OF THIS ROW SAID `>= 6` AND ITS SABOTAGE WENT 0-RED. *** Moving one table entry
     // from 13,473 to 33,473 takes the count from seven to six, which `>= 6` still accepts -- a threshold set
     // one below the value it guards absorbs exactly one defect, and this table is FROZEN, so the count is

@@ -1,6 +1,10 @@
 // tools/ship/commentFalsePass-selfcheck.mjs
 //
-// Run: node tools/ship/commentFalsePass-selfcheck.mjs   (~4.2s MEASURED (gate-timings.json))
+// Run: node tools/ship/commentFalsePass-selfcheck.mjs   (~9.6s MEASURED at v4575, median of
+//   9369/9667/9613 -- superseding a stated ~4.2s taken from gate-timings.json, which is 2.3x under.
+//   sweep-timings.json has it at 20,025 ms with exit code 124, which is not a runtime at all but the
+//   SIGKILL cap v4574 counted 137 gates sitting on. This gate was one of them, which is why it went red
+//   for rounds with nobody looking: nothing in the sweep has ever let it finish.)
 //
 // v3141 -- A GATE THAT ASSERTS "THE CODE DOES X" AGAINST RAW SOURCE PASSES ON A COMMENT SAYING "WE SHOULD DO X".
 //
@@ -44,6 +48,16 @@ function exemptReason(targetRel, body, raw, index) {
     if (/\\\/\\\*|\/\*/.test(body)) return "the regex hunts a comment deliberately";
     // ODD number of backticks before the match means it sits inside a template literal -- a shader, usually.
     if (index >= 0 && raw.slice(0, index).split("`").length % 2 === 0) return "inside a template literal (a shader is not code to codeOnly)";
+    // *** v4575 -- AN ASSERTION ABOUT A LICENCE NOTICE MUST MATCH A COMMENT, BECAUSE THAT IS WHERE A LICENCE
+    // LIVES. *** This gate's own GENUINE list had exactly one entry for many rounds and nobody saw it, because
+    // the sweep only ever killed this gate (recorded 20,025 ms, code 124 -- one of the 137 v4574 counted).
+    // The entry is qrChannel-selfcheck asserting that the vendored QR decoder carries the MIT copyright and
+    // permission notice IN FULL. Reading that off raw source is the row working: a notice moved out of a
+    // comment is still a notice, and a notice deleted still reddens the row, so there is no false-pass here to
+    // find. DECIDABLE FROM THE PATTERN ALONE, which is what the row below demands -- the test is on the
+    // asserted text, not on the name of the gate doing the asserting.
+    if (/copyright|permission is hereby granted|THE SOFTWARE IS PROVIDED|SPDX-License-Identifier|licen[cs]ed under/i.test(body))
+        return "the assertion IS a licence notice, which exists only as a comment";
     return null;
 }
 
