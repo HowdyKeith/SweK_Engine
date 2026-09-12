@@ -119,29 +119,36 @@ export const SPOT_CHECK_V4575 = Object.freeze({
     // `closer` verdict and reddened the row below. Correcting a record deletes the evidence it was wrong, so
     // the table records the state it was measured against and the row re-derives from that.
     runs: Object.freeze([
-        Object.freeze({ gate: "tools/ship/rigJobs-selfcheck.mjs",     measured: 6296, closer: "sweep",        sweepWas: 6929 }),
-        Object.freeze({ gate: "tools/ship/exitBanner-selfcheck.mjs",  measured: 69,   closer: "gate-timings", sweepWas: 12940 }),
-        Object.freeze({ gate: "ui/dockSystem-selfcheck.mjs",          measured: 45,   closer: "sweep",        sweepWas: 73 }),
-        Object.freeze({ gate: "tools/ship/hostScale-selfcheck.mjs",   measured: 62,   closer: "gate-timings", sweepWas: 5815 }),
+        Object.freeze({ gate: "tools/ship/rigJobs-selfcheck.mjs",     measured: 6296, closer: "sweep",        sweepWas: 6929,  gateWas: 48 }),
+        Object.freeze({ gate: "tools/ship/exitBanner-selfcheck.mjs",  measured: 69,   closer: "gate-timings", sweepWas: 12940, gateWas: 139 }),
+        Object.freeze({ gate: "ui/dockSystem-selfcheck.mjs",          measured: 45,   closer: "sweep",        sweepWas: 73,    gateWas: 1005 }),
+        Object.freeze({ gate: "tools/ship/hostScale-selfcheck.mjs",   measured: 62,   closer: "gate-timings", sweepWas: 5815,  gateWas: 77 }),
     ]),
 });
 {
     const R = SPOT_CHECK_V4575.runs;
     for (const r of R)
-        report(`${path.basename(r.gate).padEnd(30)} measured ${String(r.measured).padStart(6)}   gate-timings ${String(G.timings[r.gate]).padStart(6)}   sweepWas ${String(r.sweepWas).padStart(6)}   sweep now ${String(S.timings[r.gate]).padStart(6)}   closer: ${r.closer}`);
+        report(`${path.basename(r.gate).padEnd(30)} measured ${String(r.measured).padStart(6)}   gateWas ${String(r.gateWas).padStart(6)}   sweepWas ${String(r.sweepWas).padStart(6)}   now ${String(G.timings[r.gate]).padStart(6)}/${String(S.timings[r.gate]).padStart(6)}   closer: ${r.closer}`);
     // The claim is not "these four numbers": it is that the recorded verdict is RE-DERIVABLE from the two
     // records and the measurement. It is derived against `sweepWas`, the entry the verdict was taken against,
     // because v4576 corrected two of them and a verdict re-derived from the corrected file is a verdict about
     // a different question.
+    // v4577 corrected BOTH files for three of these four, so the verdict derives from `gateWas` and
+    // `sweepWas` -- the entries it was taken against. A verdict re-derived from repaired records answers a
+    // different question, and this is the fourth time in three rounds that has mattered.
     const derived = R.map((r) => ({ gate: r.gate,
-        closer: Math.abs(G.timings[r.gate] - r.measured) < Math.abs(r.sweepWas - r.measured) ? "gate-timings" : "sweep" }));
+        closer: Math.abs(r.gateWas - r.measured) < Math.abs(r.sweepWas - r.measured) ? "gate-timings" : "sweep" }));
     ok("the recorded 'closer' verdict is re-derived from both records and the measurement, not restated -- against the sweep entry it was TAKEN against, which v4576 has since corrected for two of the four",
         derived.every((d, i) => d.closer === R[i].closer),
         derived.map((d) => `${path.basename(d.gate)}:${d.closer}`).join(" "));
-    const moved = R.filter((r) => S.timings[r.gate] !== r.sweepWas);
-    ok(`  and ${moved.length} of the ${R.length} sweep entries have MOVED since, which is recorded rather than absorbed: v4576 re-took them from its own measurements`,
-        moved.length === 2 && moved.every((r) => Math.abs(S.timings[r.gate] - r.measured) < Math.abs(r.sweepWas - r.measured)),
-        moved.map((r) => `${path.basename(r.gate)} ${r.sweepWas} -> ${S.timings[r.gate]} (measured ${r.measured})`).join(", "));
+    // The repair side, and the only thing in this section that reads the CURRENT files: every entry that has
+    // moved must have moved TOWARD the measurement. That is a live invariant and survives further repair.
+    const moved = R.filter((r) => S.timings[r.gate] !== r.sweepWas || G.timings[r.gate] !== r.gateWas);
+    const closerNow = (was, now, m) => Math.abs(now - m) <= Math.abs(was - m);
+    ok(`  and ${moved.length} of the ${R.length} have had an entry corrected since, by v4576 and v4577 -- every one moved TOWARD the measurement, which is the invariant this row keeps as the files go on changing`,
+        moved.length >= 2 && moved.every((r) => closerNow(r.sweepWas, S.timings[r.gate], r.measured) &&
+                                                closerNow(r.gateWas, G.timings[r.gate], r.measured)),
+        moved.map((r) => `${path.basename(r.gate)} sweep ${r.sweepWas}->${S.timings[r.gate]}, gate-t ${r.gateWas}->${G.timings[r.gate]}`).join("; "));
     const bySweep = R.filter((r) => r.closer === "sweep").length;
     ok(`*** neither record wins: ${bySweep} of ${R.length} are closer to the sweep and ${R.length - bySweep} to gate-timings, so neither can be used to correct the other ***`,
         bySweep > 0 && bySweep < R.length, `${bySweep} / ${R.length - bySweep}`);

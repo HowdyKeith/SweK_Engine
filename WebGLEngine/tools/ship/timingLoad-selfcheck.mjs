@@ -57,14 +57,14 @@ export const LOAD_EXPERIMENT_V4576 = Object.freeze({
     // removed the live evidence the finding was derived from -- the same shape as v4476's returned twelve. The
     // residual below is computed from sweepWas, and a row after it checks the repair against the live file.
     runs: Object.freeze([
-        Object.freeze({ gate: "tools/ship/rigJobs-selfcheck.mjs",              alone: 6155, wide: 6222, sweepWas: 6929, datedWas: false }),
-        Object.freeze({ gate: "tools/ship/hostScale-selfcheck.mjs",            alone: 64,   wide: 160,  sweepWas: 5815, datedWas: false }),
-        Object.freeze({ gate: "tools/groundtruth/traceField-selfcheck.mjs",    alone: 135,  wide: 281,  sweepWas: 454,  datedWas: true }),
-        Object.freeze({ gate: "ui/webgpuProbe-selfcheck.mjs",                  alone: 273,  wide: 373,  sweepWas: 808,  datedWas: true }),
-        Object.freeze({ gate: "world/spaceStructures-selfcheck.mjs",           alone: 141,  wide: 303,  sweepWas: 440,  datedWas: true }),
-        Object.freeze({ gate: "tools/ship/trim-selfcheck.mjs",                 alone: 51,   wide: 137,  sweepWas: 145,  datedWas: true }),
-        Object.freeze({ gate: "physics/render/fresnel-selfcheck.mjs",          alone: 54,   wide: 100,  sweepWas: 130,  datedWas: true }),
-        Object.freeze({ gate: "ui/dockSystem-selfcheck.mjs",                   alone: 51,   wide: 117,  sweepWas: 73,   datedWas: true }),
+        Object.freeze({ gate: "tools/ship/rigJobs-selfcheck.mjs",              alone: 6155, wide: 6222, sweepWas: 6929, datedWas: false, gateWas: 48 }),
+        Object.freeze({ gate: "tools/ship/hostScale-selfcheck.mjs",            alone: 64,   wide: 160,  sweepWas: 5815, datedWas: false, gateWas: 77 }),
+        Object.freeze({ gate: "tools/groundtruth/traceField-selfcheck.mjs",    alone: 135,  wide: 281,  sweepWas: 454,  datedWas: true, gateWas: 164 }),
+        Object.freeze({ gate: "ui/webgpuProbe-selfcheck.mjs",                  alone: 273,  wide: 373,  sweepWas: 808,  datedWas: true, gateWas: 292 }),
+        Object.freeze({ gate: "world/spaceStructures-selfcheck.mjs",           alone: 141,  wide: 303,  sweepWas: 440,  datedWas: true, gateWas: 182 }),
+        Object.freeze({ gate: "tools/ship/trim-selfcheck.mjs",                 alone: 51,   wide: 137,  sweepWas: 145,  datedWas: true, gateWas: 60 }),
+        Object.freeze({ gate: "physics/render/fresnel-selfcheck.mjs",          alone: 54,   wide: 100,  sweepWas: 130,  datedWas: true, gateWas: 65 }),
+        Object.freeze({ gate: "ui/dockSystem-selfcheck.mjs",                   alone: 51,   wide: 117,  sweepWas: 73,   datedWas: true, gateWas: 1005 }),
     ]),
 });
 const R = LOAD_EXPERIMENT_V4576.runs;
@@ -100,7 +100,11 @@ console.log("1. *** THE LOAD FACTOR, MEASURED BY RUNNING ONE SAMPLE BOTH WAYS **
 // -----------------------------------------------------------------------------------------------------------
 console.log("\n2. THE AGE TERM: gate-timings IS ACCURATE FOR SIX OF THE EIGHT");
 {
-    const age = R.map((x) => ({ g: x.gate, f: x.alone / Math.max(1, G[x.gate]) }));
+    // v4577 -- `gateWas` rather than the live file, because v4577 corrected rigJobs' and dockSystem's
+    // gate-timings entries from these very readings. This section is a MEASUREMENT OF A RECORD'S STATE and
+    // must therefore freeze that state; the live file is read only where a row asserts an invariant. Third
+    // time this hazard has bitten across three rounds, and this is the rule that settles it.
+    const age = R.map((x) => ({ g: x.gate, f: x.alone / Math.max(1, x.gateWas) }));
     for (const a of age) report(`${path.basename(a.g).padEnd(34)}alone / gate-timings = ${a.f.toFixed(2)}x`);
     const close = age.filter((a) => a.f > 0.7 && a.f < 1.4);
     ok(`*** ${close.length} of ${R.length} run within 30% of their gate-timings entry, so that file is NOT broadly stale -- the "age" explanation is refuted for most of the sample ***`,
@@ -108,7 +112,8 @@ console.log("\n2. THE AGE TERM: gate-timings IS ACCURATE FOR SIX OF THE EIGHT");
     const off = age.filter((a) => a.f <= 0.7 || a.f >= 1.4);
     ok(`  and the ${off.length} that are not run in OPPOSITE directions, so it is drift in the gates rather than a slow or fast box`,
         off.length === 2 && off.some((a) => a.f > 2) && off.some((a) => a.f < 0.5),
-        off.map((a) => `${path.basename(a.g)} ${a.f.toFixed(2)}x`).join(", "));
+        off.map((a) => `${path.basename(a.g)} ${a.f.toFixed(2)}x`).join(", ") +
+        " -- both corrected at v4577 in the live file, which is why this reads from gateWas");
 }
 
 // -----------------------------------------------------------------------------------------------------------
@@ -155,10 +160,22 @@ const undated = real.filter((k) => (S.at || {})[k] === UNKNOWN_AT);
     ok(`  and that is why v4575's "43% disagree by 2x or more" was the LINE and not a defect: the median sits at ${dm.toFixed(2)}x and the threshold was 2x, so the distribution straddles it`,
         dm < 2 && dm > 1.5 && real.filter((k) => ratioOf(k) >= 2).length / real.length > 0.35,
         `${real.filter((k) => ratioOf(k) >= 2).length} of ${real.length} cross 2x; the median is ${dm.toFixed(2)}x`);
-    const rd = 100 * overRes(dated) / dated.length, ru = 100 * overRes(undated) / undated.length;
-    ok(`*** what survives is ${overRes(dated) + overRes(undated)} gates, and undated readings carry it at ${(ru / Math.max(rd, 0.01)).toFixed(0)}x the rate of dated ones -- ${ru.toFixed(1)}% against ${rd.toFixed(1)}% ***`,
-        ru > 5 * rd && overRes(dated) + overRes(undated) < 40,
-        `${overRes(undated)} of ${undated.length} undated, ${overRes(dated)} of ${dated.length} dated`);
+    // *** THIS WAS A COUNT AND IS A RATCHET NOW, BECAUSE v4577 CLOSED EVERY ONE OF THEM. *** The row read
+    // "what survives is 13 gates, and undated readings carry it at 16x the rate of dated ones" -- then v4577
+    // ran all twelve remaining and corrected fourteen entries, and the live count went to zero. A finding
+    // stated as a count reddens the day somebody acts on it. Stated as a ratchet it does the opposite: the
+    // recorded pair is what v4576 measured, the live number may only FALL, and going UP means new drift.
+    const SURVIVORS_V4576 = Object.freeze({ dated: 3, undated: 10, undatedRate: 5.1, datedRate: 0.3 });
+    const liveSurvivors = overRes(dated) + overRes(undated);
+    report(`v4576 measured ${SURVIVORS_V4576.undated + SURVIVORS_V4576.dated} survivors -- ` +
+        `${SURVIVORS_V4576.undatedRate}% of undated readings against ${SURVIVORS_V4576.datedRate}% of dated, sixteen times the rate`);
+    ok(`*** the residual population RATCHETS DOWN: v4576 measured ${SURVIVORS_V4576.undated + SURVIVORS_V4576.dated} and there are ${liveSurvivors} now, every one of them run and corrected at v4577 ***`,
+        liveSurvivors <= SURVIVORS_V4576.undated + SURVIVORS_V4576.dated,
+        liveSurvivors === 0 ? "all closed; a rise above the recorded figure means new drift, which is what this row exists to catch"
+                            : `${overRes(undated)} of ${undated.length} undated, ${overRes(dated)} of ${dated.length} dated`);
+    ok(`  and the rate asymmetry v4576 measured is recorded rather than re-derived, because the population it described is gone: ${SURVIVORS_V4576.undatedRate}% against ${SURVIVORS_V4576.datedRate}%`,
+        SURVIVORS_V4576.undatedRate > 5 * SURVIVORS_V4576.datedRate,
+        `v4577 confirmed the direction by running all twelve: 8 of 8 undated were sweep-stale, 4 of 4 dated were gate-timings-stale`);
 }
 
 // -----------------------------------------------------------------------------------------------------------

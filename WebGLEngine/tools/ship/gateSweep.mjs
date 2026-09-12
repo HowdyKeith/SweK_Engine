@@ -3767,6 +3767,47 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since236: Object.freeze({
+        at: "v4577", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/timingSurvivors-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/timingLoad-selfcheck.mjs", "tools/ship/timingRecords-selfcheck.mjs"]),
+        verdict: "green, 0.06 s, under the 3000 ms budget. *** v4576 CLOSED SAYING THE SURVIVORS WERE A RATE " +
+                 "AND NOT A LIST. THE LIST IS TWELVE AND ALL TWELVE WERE RUN. *** Three times alone, twice " +
+                 "with all twelve at once, 60 runs. *** EVERY ONE IS GREEN *** -- whatever these numbers are " +
+                 "wrong about, none hides a failing gate, which is a different answer from v4575's " +
+                 "commentFalsePass because that was the CAP-READING population and none of these twelve was " +
+                 "ever killed. *** AND THE STAMP PREDICTS WHICH FILE IS WRONG, BOTH WAYS, TWELVE FOR TWELVE. " +
+                 "*** The step v4576 got half-right is that gate-timings records an ALONE run and the sweep " +
+                 "records a LOADED one, so `which is closer to the measurement` is the wrong question -- the " +
+                 "sweep entry is SUPPOSED to be higher. Judging each entry against what it claims to be: ALL " +
+                 "EIGHT UNDATED entries have a stale SWEEP number, and ALL FOUR DATED entries have a stale " +
+                 "GATE-TIMINGS number. No exceptions in either direction, which is what the stamp should " +
+                 "mean -- an undated reading is pre-v4408 and therefore the sweep drifted, a dated one is " +
+                 "recent so a disagreement surviving load belongs to the other file. v4576 saw one direction " +
+                 "of this from four gates; twelve give both. *** THE CRITERION HAS NO FALSE POSITIVES: *** " +
+                 "two of the twelve are stale in BOTH files and ten in exactly one, and NONE has two " +
+                 "plausible entries -- a test costing no runs at all fired twelve times and was right twelve " +
+                 "times. Twelve-wide costs 3.56x against 2.15x at eight, and even that MORE load falls short " +
+                 "of all eight sweep entries that are too high, the worst by 45x, which is what rules load " +
+                 "out rather than making it unlikely. One is stale the OTHER way -- dockSystem recorded BELOW " +
+                 "its own loaded reading -- and a row claiming `falls short of every` could not hold both, " +
+                 "which is how that came out. FOURTEEN ENTRIES CORRECTED, five in gate-timings and nine in " +
+                 "the sweep, all from this round's alone readings, and entries judged SOUND were left alone. " +
+                 "*** AND THE REPAIR BROKE TWO DOWNSTREAM GATES, WHICH IS THE THIRD AND FOURTH TIME IN THREE " +
+                 "ROUNDS. *** timingLoad went red on three rows and timingRecords on two, because both " +
+                 "derive findings from records this round repaired. The rule that settles it is now written " +
+                 "in both: a gate reporting a MEASUREMENT OF A RECORD'S STATE must freeze that state, and " +
+                 "only a row asserting a live INVARIANT may read the current file. timingLoad's survivor " +
+                 "count became a RATCHET -- v4576's thirteen recorded, the live count may only fall, a rise " +
+                 "means new drift -- and timingRecords' verdict row now derives from `gateWas` and " +
+                 "`sweepWas` with a live row requiring that every moved entry moved TOWARD the measurement. " +
+                 "Eight sabotages, seven red. The one zero is loosening the precision bar from `=== 0` to " +
+                 "`<= 1`, which is the class v4576 proved inert: weakening an assertion moves no reading. " +
+                 "This round added a second row carrying the claim as a partition, re-ran the mutation, and " +
+                 "it was STILL invisible -- the row is kept for being the stronger statement, not for " +
+                 "catching anything, and the gate says so rather than implying the repair worked.",
+    }),
     since235: Object.freeze({
         at: "v4576", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/timingLoad-selfcheck.mjs"]),
