@@ -3767,6 +3767,48 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since235: Object.freeze({
+        at: "v4576", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/timingLoad-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/timingRecords-selfcheck.mjs"]),
+        verdict: "green, 0.07 s, under the 3000 ms budget. *** v4575 NAMED THREE EXPLANATIONS FOR ITS 43% AND " +
+                 "COULD NOT SEPARATE THEM. SIX RUNS SEPARATED THEM. *** Eight gates, three rounds with all " +
+                 "eight dispatched at once exactly as quickSweep runs them, three rounds each alone. *** THE " +
+                 "LOAD FACTOR IS 2.15x AND THE THRESHOLD WAS 2x -- which is most of v4575's finding, and this " +
+                 "round is the correction. *** Across the 949 gates whose sweep reading carries a real capture " +
+                 "stamp the median disagreement is 1.94x; divided by the measured load factor that is a " +
+                 "residual of 0.90x. THE TWO RECORDS AGREE once the conditions each was taken under are " +
+                 "accounted for, and 46% cross a 2x line only because the median sits just under it. A " +
+                 "threshold artifact was reported as a defect, and timingRecords-selfcheck's headline now " +
+                 "says so at the top of its own file. *** WHAT SURVIVES IS ABOUT THIRTEEN GATES, AND THE TWO " +
+                 "FILES FAIL IN DIFFERENT COLUMNS. *** `sweepWas / 8-wide` asks whether the SWEEP entry is " +
+                 "explained by load: seven of eight are, and the one that is not is hostScale at 5815 against " +
+                 "160 measured eight-wide, a 36x residual. `alone / gate-timings` asks whether the " +
+                 "GATE-TIMINGS entry is right: six of eight are within 30%, so that file is NOT broadly stale " +
+                 "-- the age explanation is refuted for most of the sample -- and the two that fail go in " +
+                 "OPPOSITE directions, rigJobs having grown 128x and dockSystem shrunk 20x. Three wrong " +
+                 "numbers across two files, which is why v4575's spot-check split two and two: not noise, two " +
+                 "failure modes in two records. *** AND THE CAPTURE STAMP PREDICTS ONE FILE'S STALENESS AND " +
+                 "NOT THE OTHER'S. *** Every unexplained SWEEP reading in the sample is undated, and across " +
+                 "the population undated readings carry a residual above 3x at 5.1% against 0.3% for dated " +
+                 "ones -- SIXTEEN TIMES the rate. But dockSystem's bad number is in gate-timings while its " +
+                 "sweep reading is dated and fine, so the stamp says nothing about the other file. *** THE " +
+                 "ROUND THEN DELETED ITS OWN EVIDENCE AND HAD TO RESTRUCTURE. *** Re-taking the two stale " +
+                 "sweep entries from this experiment's own alone-readings -- the right thing to do -- made the " +
+                 "residual row read 0 unexplained and went red. The table now carries `sweepWas` and " +
+                 "`datedWas`, the state as the experiment found it, and a second row checks the repair against " +
+                 "the live file: v4476's shape, a row built to go red the day somebody fixes it, followed by " +
+                 "the record of that day. AND IT HAPPENED TWICE: the same correction flipped a verdict in " +
+                 "v4575's own four-gate spot-check one gate over, reddening timingRecords-selfcheck in the " +
+                 "final verify. That table carries `sweepWas` now as well. Nine sabotages, 9/9 red, no 0-RED after one repair: the load " +
+                 "factor's first row accepted anything between 1.5x and 3x, and lowering one table reading " +
+                 "moved the median 2.15x -> 2.08x inside that band. A number everything downstream divides by " +
+                 "cannot sit in a tolerance a single edit fits through, so it is pinned to the hundredth now. " +
+                 "One row also went red on its own data first: it claimed all but the slowest gate slow down " +
+                 "under load, and the slowest does too, by 1.01x -- monotone for eight of eight is the true " +
+                 "and stronger property.",
+    }),
     since234: Object.freeze({
         at: "v4575", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/timingRecords-selfcheck.mjs"]),

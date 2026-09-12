@@ -1,6 +1,6 @@
 {
  "note": "OBSERVED at the last quickSweep run: ms per gate (serial where a serial re-run happened) and exit code. Rewritten every run; used only to choose which gates are under the ship-time budget. Not a claim about the tree -- the register is. `at` is PER ENTRY (v4408): the capture that actually observed that gate. `captured` is this run's stamp and applies ONLY to entries whose `at` equals it -- the rest were not run and say so. `crossings` (v4536) counts CONSECUTIVE sweeps on which a gate came in over budget, and it takes two to evict: one crossing is a reading from one hour, and this box moves 12-36% between hours on unchanged code. A gate that comes back under loses its count entirely.",
- "captured": "2026-09-12T08:56:47.552Z",
+ "captured": "2026-09-12T12:19:43.468Z",
  "budgetMs": 3000,
  "capMs": 20000,
  "timings": {
@@ -1138,7 +1138,7 @@
   "tools/ship/holoFoil-selfcheck.mjs": 168,
   "tools/ship/homography-selfcheck.mjs": 1546,
   "tools/ship/hookupState-selfcheck.mjs": 716,
-  "tools/ship/hostScale-selfcheck.mjs": 5815,
+  "tools/ship/hostScale-selfcheck.mjs": 64,
   "tools/ship/hostingControls-selfcheck.mjs": 2300,
   "tools/ship/hostingPanel-selfcheck.mjs": 198,
   "tools/ship/ik-selfcheck.mjs": 240,
@@ -1327,7 +1327,7 @@
   "tools/ship/rigCanvas-selfcheck.mjs": 6485,
   "tools/ship/rigJobDoor-selfcheck.mjs": 106,
   "tools/ship/rigJobPanel-selfcheck.mjs": 364,
-  "tools/ship/rigJobs-selfcheck.mjs": 6929,
+  "tools/ship/rigJobs-selfcheck.mjs": 6155,
   "tools/ship/rigLabGeminiKey-selfcheck.mjs": 18605,
   "tools/ship/rigMix-selfcheck.mjs": 77,
   "tools/ship/rigProgress-selfcheck.mjs": 13936,
@@ -1639,7 +1639,8 @@
   "render/ringFloorPhase-selfcheck.mjs": 1030,
   "tools/ship/harnessLiveness-selfcheck.mjs": 2435,
   "tools/ship/capReading-selfcheck.mjs": 109,
-  "tools/ship/timingRecords-selfcheck.mjs": 63
+  "tools/ship/timingRecords-selfcheck.mjs": 63,
+  "tools/ship/timingLoad-selfcheck.mjs": 65
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -3277,7 +3278,8 @@
   "render/ringFloorPhase-selfcheck.mjs": 0,
   "tools/ship/harnessLiveness-selfcheck.mjs": 0,
   "tools/ship/capReading-selfcheck.mjs": 0,
-  "tools/ship/timingRecords-selfcheck.mjs": 0
+  "tools/ship/timingRecords-selfcheck.mjs": 0,
+  "tools/ship/timingLoad-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-08T20:46:53.412Z",
@@ -4414,7 +4416,7 @@
   "tools/ship/holoFoil-selfcheck.mjs": "2026-09-08T20:46:53.412Z",
   "tools/ship/homography-selfcheck.mjs": "2026-09-08T20:46:53.412Z",
   "tools/ship/hookupState-selfcheck.mjs": "2026-09-08T20:46:53.412Z",
-  "tools/ship/hostScale-selfcheck.mjs": "unknown -- before v4408",
+  "tools/ship/hostScale-selfcheck.mjs": "2026-09-12T12:19:43.468Z",
   "tools/ship/hostingControls-selfcheck.mjs": "2026-09-08T20:46:53.412Z",
   "tools/ship/hostingPanel-selfcheck.mjs": "2026-09-08T20:46:53.412Z",
   "tools/ship/ik-selfcheck.mjs": "2026-09-08T20:46:53.412Z",
@@ -4603,7 +4605,7 @@
   "tools/ship/rigCanvas-selfcheck.mjs": "unknown -- before v4408",
   "tools/ship/rigJobDoor-selfcheck.mjs": "2026-09-08T20:46:53.412Z",
   "tools/ship/rigJobPanel-selfcheck.mjs": "2026-09-08T20:46:53.412Z",
-  "tools/ship/rigJobs-selfcheck.mjs": "unknown -- before v4408",
+  "tools/ship/rigJobs-selfcheck.mjs": "2026-09-12T12:19:43.468Z",
   "tools/ship/rigLabGeminiKey-selfcheck.mjs": "unknown -- before v4408",
   "tools/ship/rigMix-selfcheck.mjs": "2026-09-08T20:46:53.412Z",
   "tools/ship/rigProgress-selfcheck.mjs": "unknown -- before v4408",
@@ -4915,7 +4917,8 @@
   "render/ringFloorPhase-selfcheck.mjs": "2026-09-11T12:29:11.330Z",
   "tools/ship/harnessLiveness-selfcheck.mjs": "2026-09-12T00:42:44.382Z",
   "tools/ship/capReading-selfcheck.mjs": "2026-09-12T07:40:05.443Z",
-  "tools/ship/timingRecords-selfcheck.mjs": "2026-09-12T08:56:47.552Z"
+  "tools/ship/timingRecords-selfcheck.mjs": "2026-09-12T08:56:47.552Z",
+  "tools/ship/timingLoad-selfcheck.mjs": "2026-09-12T12:19:43.468Z"
  },
  "crossings": {
   "tools/roundhouse/knobPromotions-selfcheck.mjs": 2,

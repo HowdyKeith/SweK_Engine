@@ -1,6 +1,11 @@
 /**
  * TWO RECORDS OF ONE QUANTITY, DISAGREEING FOR 43% OF GATES, AND NEITHER IS THE ONE TO TRUST.
  *
+ * *** v4576 CORRECTED THIS GATE'S HEADLINE AND THE CORRECTION BELONGS AT THE TOP. *** The 43% below is
+ * real as a count and was reported here as though it were a defect. It is mostly the threshold: the measured
+ * load factor is 2.15x, the median dated disagreement is 1.94x, and the residual is 0.90x. See
+ * timingLoad-selfcheck.mjs for the experiment. What remains is roughly thirteen gates.
+ *
  * v4574 closed on a cheap lead: tools/ship/redCensus-selfcheck.mjs describes itself as taking two minutes and
  * exceeded a 400-second timeout without finishing, so gate prose about cost might be as stale as the timings
  * v4574 had just finished picking apart. *** THE FIRST THING THIS ROUND FOUND IS THAT THE INSTRUMENT ALREADY
@@ -70,7 +75,14 @@ const rows = real.map((k) => ({ k, g: G.timings[k], s: S.timings[k], r: ratioOf(
                                   [5, 10, "5x - 10x"], [10, Infinity, "10x or more"]])
         report(`  ${name.padEnd(12)} ${String(band(lo, hi)).padStart(4)}`);
     const over2 = rows.filter((x) => x.r >= 2).length;
-    ok(`*** ${over2} of ${real.length} gates (${(100 * over2 / real.length).toFixed(0)}%) have two records of their runtime that disagree by 2x or more ***`,
+    // *** AND v4576 MEASURED WHAT THIS NUMBER IS, WHICH IS MOSTLY THE LINE IT IS DRAWN AT. *** Running one
+    // sample eight-wide and alone put the load factor at 2.15x; the median disagreement among gates with a
+    // DATED sweep reading is 1.94x, so dividing it out leaves 0.90x -- the two records agree once the
+    // conditions each was taken under are accounted for. The 43% cross 2x because the median sits just under
+    // 2x and the distribution straddles it. What survives is about thirteen gates, concentrated in undated
+    // readings at sixteen times the dated rate. This row therefore COUNTS the disagreement and no longer
+    // implies it is a defect; timingLoad-selfcheck holds the decomposition.
+    ok(`*** ${over2} of ${real.length} gates (${(100 * over2 / real.length).toFixed(0)}%) have two records of their runtime that disagree by 2x or more -- v4576 measured the load factor at 2.15x, so MOST OF THIS IS THE THRESHOLD ***`,
         over2 > real.length / 4, `worst ${rows[0].r.toFixed(0)}x: ${rows[0].k} recorded ${rows[0].g} and ${rows[0].s}`);
     // *** THE DIRECTION, AND THE FIRST VERSION OF THIS ROW GOT IT BACKWARDS. *** It asserted the
     // disagreement "runs both ways, so it is not growth and not parallel load" and PASSED on nine
@@ -102,24 +114,34 @@ console.log("\n3. *** AND A CLOCK SPLITS TWO AND TWO ON WHICH RECORD IS CLOSER *
  */
 export const SPOT_CHECK_V4575 = Object.freeze({
     at: "v4575",
+    // `sweepWas` is the sweep entry AS IT STOOD at v4575. v4576 re-took two of them from its own
+    // alone-measurements -- rigJobs 6929 -> 6155 and hostScale 5815 -> 64 -- which flipped hostScale's
+    // `closer` verdict and reddened the row below. Correcting a record deletes the evidence it was wrong, so
+    // the table records the state it was measured against and the row re-derives from that.
     runs: Object.freeze([
-        Object.freeze({ gate: "tools/ship/rigJobs-selfcheck.mjs",     measured: 6296, closer: "sweep" }),
-        Object.freeze({ gate: "tools/ship/exitBanner-selfcheck.mjs",  measured: 69,   closer: "gate-timings" }),
-        Object.freeze({ gate: "ui/dockSystem-selfcheck.mjs",          measured: 45,   closer: "sweep" }),
-        Object.freeze({ gate: "tools/ship/hostScale-selfcheck.mjs",   measured: 62,   closer: "gate-timings" }),
+        Object.freeze({ gate: "tools/ship/rigJobs-selfcheck.mjs",     measured: 6296, closer: "sweep",        sweepWas: 6929 }),
+        Object.freeze({ gate: "tools/ship/exitBanner-selfcheck.mjs",  measured: 69,   closer: "gate-timings", sweepWas: 12940 }),
+        Object.freeze({ gate: "ui/dockSystem-selfcheck.mjs",          measured: 45,   closer: "sweep",        sweepWas: 73 }),
+        Object.freeze({ gate: "tools/ship/hostScale-selfcheck.mjs",   measured: 62,   closer: "gate-timings", sweepWas: 5815 }),
     ]),
 });
 {
     const R = SPOT_CHECK_V4575.runs;
     for (const r of R)
-        report(`${path.basename(r.gate).padEnd(30)} measured ${String(r.measured).padStart(6)}   gate-timings ${String(G.timings[r.gate]).padStart(6)}   sweep ${String(S.timings[r.gate]).padStart(6)}   closer: ${r.closer}`);
-    // The claim is not "these four numbers": it is that the RECORDED verdict of which file is closer can be
-    // re-derived from the two files plus the measurement, so a record moving under this table breaks it.
+        report(`${path.basename(r.gate).padEnd(30)} measured ${String(r.measured).padStart(6)}   gate-timings ${String(G.timings[r.gate]).padStart(6)}   sweepWas ${String(r.sweepWas).padStart(6)}   sweep now ${String(S.timings[r.gate]).padStart(6)}   closer: ${r.closer}`);
+    // The claim is not "these four numbers": it is that the recorded verdict is RE-DERIVABLE from the two
+    // records and the measurement. It is derived against `sweepWas`, the entry the verdict was taken against,
+    // because v4576 corrected two of them and a verdict re-derived from the corrected file is a verdict about
+    // a different question.
     const derived = R.map((r) => ({ gate: r.gate,
-        closer: Math.abs(G.timings[r.gate] - r.measured) < Math.abs(S.timings[r.gate] - r.measured) ? "gate-timings" : "sweep" }));
-    ok("the recorded 'closer' verdict is re-derived here from both files and the measurement, not restated",
+        closer: Math.abs(G.timings[r.gate] - r.measured) < Math.abs(r.sweepWas - r.measured) ? "gate-timings" : "sweep" }));
+    ok("the recorded 'closer' verdict is re-derived from both records and the measurement, not restated -- against the sweep entry it was TAKEN against, which v4576 has since corrected for two of the four",
         derived.every((d, i) => d.closer === R[i].closer),
         derived.map((d) => `${path.basename(d.gate)}:${d.closer}`).join(" "));
+    const moved = R.filter((r) => S.timings[r.gate] !== r.sweepWas);
+    ok(`  and ${moved.length} of the ${R.length} sweep entries have MOVED since, which is recorded rather than absorbed: v4576 re-took them from its own measurements`,
+        moved.length === 2 && moved.every((r) => Math.abs(S.timings[r.gate] - r.measured) < Math.abs(r.sweepWas - r.measured)),
+        moved.map((r) => `${path.basename(r.gate)} ${r.sweepWas} -> ${S.timings[r.gate]} (measured ${r.measured})`).join(", "));
     const bySweep = R.filter((r) => r.closer === "sweep").length;
     ok(`*** neither record wins: ${bySweep} of ${R.length} are closer to the sweep and ${R.length - bySweep} to gate-timings, so neither can be used to correct the other ***`,
         bySweep > 0 && bySweep < R.length, `${bySweep} / ${R.length - bySweep}`);
