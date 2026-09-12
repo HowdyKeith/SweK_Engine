@@ -66,7 +66,7 @@ else {
         }
         const out = { languages: [emitted.webgpu.language, emitted.webgl2.language] };
         let desc, descBB; try { desc = S.devicePipelineFromTsl({ wgsl: emitted.webgpu.fragment, glsl: emitted.webgl2.fragment }); descBB = S.devicePipelineFromTsl({ wgsl: emittedBB.webgpu.fragment, glsl: emittedBB.webgl2.fragment }); } catch (e) { out.error = String(e && e.message || e).slice(0, 400); return out; }
-        out.uniforms = desc.uniforms.map((u) => u.name); out.textures = desc.textures; out.bbUniforms = descBB.uniforms.map((u) => u.name);
+        out.uniforms = desc.uniforms; out.textures = desc.textures; out.bbUniforms = descBB.uniforms;
         out.emitted = { badTv: { wgsl: emitted.webgpu.fragment, glsl: emitted.webgl2.fragment, transplanted: { wgsl: desc.shaders.wgsl, glsl: desc.shaders.glsl.fragment } }, blackbody: { wgsl: emittedBB.webgpu.fragment, glsl: emittedBB.webgl2.fragment, transplanted: { wgsl: descBB.shaders.wgsl, glsl: descBB.shaders.glsl.fragment } } };
         const knobs = D.packKnobs({ time: a.TIME }); out.run = {};
         for (const backend of ["webgpu", "webgl2"]) {
@@ -93,7 +93,14 @@ else {
         const R = r.result;
         // three emits only what the fragment READS: `rows` (a probe-only knob the device pass keeps in its struct) is dropped by both builders
         const read = KNOB_ORDER.filter((k) => k !== "rows");
-        ok("three emitted WGSL from its WebGPU backend and GLSL from its WebGL2 backend; both builders named the five knobs the fragment reads (labelled), dropped the unread sixth (rows), and named the one texture", R.languages.join() === "wgsl,glsl" && R.uniforms.slice().sort().join() === read.slice().sort().join() && !R.uniforms.includes("rows") && R.textures.join() === "tDiffuse" && R.bbUniforms.join() === "xLo,xHi,nLo,nHi,rootScale", `${R.uniforms.join(",")}; ${R.textures.join(",")}`);
+        // v4557 -- desc.uniforms carries the FULL struct (devicePipelineFromTsl's own precedent: a binding layout
+        // needs every declared slot, even a dead one), so an unread mat4 bookkeeping field (v4550's shape, r185's
+        // GLSL/WebGPU-count drift) can ride along beside the five real, labelled knobs -- excluded here BY SHAPE
+        // (mat4, three's own auto-generated name) rather than by asserting it never appears, which is what broke.
+        const dropBookkeeping = (u) => !(u.type === "mat4" && /^nodeUniform\d+$/.test(u.name));
+        const named = R.uniforms.filter(dropBookkeeping).map((u) => u.name);
+        const bbNamed = R.bbUniforms.filter(dropBookkeeping).map((u) => u.name);
+        ok("three emitted WGSL from its WebGPU backend and GLSL from its WebGL2 backend; both builders named the five knobs the fragment reads (labelled), dropped the unread sixth (rows), and named the one texture", R.languages.join() === "wgsl,glsl" && named.slice().sort().join() === read.slice().sort().join() && !named.includes("rows") && R.textures.join() === "tDiffuse" && bbNamed.join() === "xLo,xHi,nLo,nHi,rootScale", `${named.join(",")}; ${R.textures.join(",")}; bb ${bbNamed.join(",")}`);
         ok("  the transplanted WGSL validates against the spec scanner", validateWgsl(R.emitted.badTv.transplanted.wgsl).length === 0 && validateWgsl(R.emitted.blackbody.transplanted.wgsl).length === 0, validateWgsl(R.emitted.badTv.transplanted.wgsl).join("; "));
         for (const b of ["webgpu", "webgl2"]) { const o = R.run[b]; if (o.error) { ok(`${b} ran`, false, o.error); continue; }
             ok(`*** ${b}: the pipeline whose ${b === "webgpu" ? "WGSL" : "GLSL"} three GENERATED draws the hand-written pass's picture on EVERY pixel -- ${o.same} of ${o.total}, worst 0, no mirror needed (the device's own vertex stage) ***`, o.backend === b && o.same === o.total && o.worst === 0 && o.moved > o.total * 0.5 && o.errs.length === 0, `${o.same}/${o.total}, worst ${o.worst}, ${o.moved} moved; errors ${o.errs.length}`);

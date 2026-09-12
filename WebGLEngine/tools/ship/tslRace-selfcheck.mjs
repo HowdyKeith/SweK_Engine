@@ -384,7 +384,7 @@ else {
         for (const mode of ["webgpu", "webgl2"]) { const canvas = document.createElement("canvas"); canvas.width = 64; canvas.height = 64; const renderer = new THREE.WebGPURenderer({ canvas, forceWebGL: mode === "webgl2", antialias: false }); await renderer.init();
             const look = P.makeSpriteAtlasTsl(THREE, T, { texture: tex }); renderer.setRenderTarget(new THREE.RenderTarget(64, 64)); em[mode] = await S.emitShaders(renderer, { scene: look.scene, camera: look.camera, mesh: look.scene.children[0] }); }
         const out = { sem: S.varyingSemantics(em.webgpu.vertex, "wgsl"), emitted: { wgsl: em.webgpu, glsl: em.webgl2 },
-                      uniformsWgsl: S.uniformFields(em.webgpu.fragment, "wgsl").map((u) => u.name), uniformsGlsl: S.uniformFields(em.webgl2.fragment, "glsl").map((u) => u.name),
+                      uniformsWgsl: S.uniformFields(em.webgpu.fragment, "wgsl"), uniformsGlsl: S.uniformFields(em.webgl2.fragment, "glsl"),
                       textures: S.textureNames(em.webgpu.fragment, "wgsl"), fetches: (em.webgpu.fragment.match(/textureLoad\\(/g) || []).length };
         const records = G.gridScene({ side: 6, z: -2, spacing: 1.2, radii: [0.45] }), count = records.length / 4; const fleetOf = Uint32Array.from({ length: count }, (_, i) => (i % 2 === 0 ? a.PIX : i % 10));
         const cam = { viewProj: G.multiply(G.perspective(Math.PI / 3, 1, 0.1, 100), G.lookAt([0, 0, 8], [0, 0, 0])), eye: [0, 0, 8] };
@@ -411,7 +411,16 @@ else {
     ok("the harness ran both backends", r.ok && r.result && r.result.webgpu && r.result.webgl2 && !r.result.webgpu.error && !r.result.webgl2.error, r.ok ? JSON.stringify([r.result.webgpu && r.result.webgpu.error, r.result.webgl2 && r.result.webgl2.error]) : (r.reason || (r.pageErrors || []).join("; ")));
     if (r.ok && r.result.webgpu && !r.result.webgpu.error && !r.result.webgl2.error) {
         const R = r.result;
-        ok("*** the emitted fragment carries the atlas under the name the graph labelled it with and NO uniform at all -- the uv given at construction, so three's uv-transform matrix is never built ***", R.textures.join() === "atlas" && R.uniformsWgsl.length === 0 && R.uniformsGlsl.length === 0 && JSON.stringify(Object.values(R.sem)) === JSON.stringify(["uv", "color"]), `textures ${R.textures.join()}, uniforms ${R.uniformsWgsl.join()}|${R.uniformsGlsl.join()}, varyings ${JSON.stringify(R.sem)}`);
+        // v4557 -- WGSL TRULY CARRIES ZERO: three's own codegen never declares the uv-transform matrix field at
+        // all when uv() is given at construction, on either backend, matching this file's original comment. What
+        // changed under r185 is GLSL alone: its codegen now declares that same matrix's struct FIELD unconditionally
+        // (dead -- nothing in the fragment body ever reads it), where r178 omitted the field's declaration entirely
+        // when unused. That is exactly the v4550 unread-bookkeeping shape uniformFields() already tolerates rather
+        // than a real binding this graph forgot to label, so it is allowed here BY SHAPE (mat4, unread) rather than
+        // by hardcoding three's own internal nodeUniformN counter, which this same file was burned by once already.
+        const isUnreadMat4Bookkeeping = (u) => u.type === "mat4" && /^nodeUniform\d+$/.test(u.name);
+        const glslOk = R.uniformsGlsl.every(isUnreadMat4Bookkeeping);
+        ok("*** the emitted fragment carries the atlas under the name the graph labelled it with and NO REAL uniform at all -- the uv given at construction, so three's uv-transform matrix is never READ (GLSL still unconditionally DECLARES its own unread copy, r185) ***", R.textures.join() === "atlas" && R.uniformsWgsl.length === 0 && glslOk && JSON.stringify(Object.values(R.sem)) === JSON.stringify(["uv", "color"]), `textures ${R.textures.join()}, uniforms ${R.uniformsWgsl.map((u) => u.name).join()}|${R.uniformsGlsl.map((u) => u.name).join()}, varyings ${JSON.stringify(R.sem)}`);
         report(`three fetches the texel ${R.fetches} times for one Discard that reads it: the var it fetched into is not reused across the discard, so the texel is read again after it. Measured, not fixed -- the picture is the same and the cost is one extra fetch on a texel already in cache.`);
         for (const b of ["webgpu", "webgl2"]) { const o = R[b];
             ok(`*** ${b}: the Pixel race painted by the GENERATED pipeline is the fleets' OWN shipped Pixel race on EVERY pixel (${o.same} of ${o.total}, worst 0) -- transparent texels discarded the same, and the fleet's own bind hook fed the generated shader ***`, o.backend === b && o.same === o.total && o.worst === 0 && o.errs.length === 0 && o.textures.join() === "atlas", `${o.same}/${o.total}, worst ${o.worst}; errors ${o.errs.length}`);

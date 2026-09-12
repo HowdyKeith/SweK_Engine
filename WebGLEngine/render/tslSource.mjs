@@ -168,13 +168,21 @@ export function uniformFields(fragment, language) {
         if (!m) return out;
         for (const line of m[0].match(/\{([\s\S]*?)\};/)[1].split("\n")) { const f = line.trim().replace(/,$/, "").match(/^(\w+)\s*:\s*(.+)$/); if (!f) continue; const t = WGSL_TYPES[f[2].trim()]; if (!t) throw new Error(`tslSource: uniform ${f[1]} has type ${f[2]}, which the device's uniform list does not carry`); out.push({ name: f[1], type: t }); }
     } else {
+        // v4557 -- STRIPPED HERE TOO, NOT ONLY AT transplantFragment'S OWN CALL SITE. uniformFields() is exported
+        // and called directly by selfchecks that want a fragment's uniform LIST without going through a transplant
+        // (tslRace-selfcheck.mjs section 6, grading three's raw emission before any shell exists) -- a caller with
+        // no reason to know about v4555's GLSL flip-flag quirk hit the exact throw _stripGlslFlipFlag exists to
+        // avoid, because stripping lived only in transplantFragment/emitAndTransplant rather than in the function
+        // that actually does the refusing. Idempotent on already-stripped text (the field is simply gone, so the
+        // "referenced exactly once" match fails to find it) -- calling it twice costs nothing.
+        const scan = _stripGlslFlipFlag(fragment);
         // v4551 -- three@0.185.1 renamed the fragment's uniform block from "fragment_object" to plain "object" and
         // dropped the "f_" member prefix (measured: `layout( std140 ) uniform object { vec2 scale; ... };`, where
         // r178 said `uniform fragment_object { float f_time; ... };`) -- the SAME de-prefixing transplantFragment's
         // and transplantIntoShell's body rewrites already tolerate (their `\bf_${name}\b` replace is a no-op on an
         // already-bare token). Matching both block names and an optional "f_" keeps the r178 fixtures this gate's
         // section 1 still carries (tools/ship/tslSource-fixture.json) working unchanged.
-        const m = fragment.match(/uniform (?:fragment_object|object) \{([\s\S]*?)\};/);
+        const m = scan.match(/uniform (?:fragment_object|object) \{([\s\S]*?)\};/);
         if (!m) return out;
         for (const line of m[1].split("\n")) { const f = line.trim().replace(/;$/, "").match(/^(\w+)\s+(?:f_)?(\w+)$/); if (!f) continue; const t = GLSL_TYPES[f[1]]; if (!t) throw new Error(`tslSource: uniform ${f[2]} has type ${f[1]}, which the device's uniform list does not carry`); out.push({ name: f[2], type: t }); }
     }
@@ -246,7 +254,18 @@ export function transplantFragment(fragment, language) {
  */
 export function devicePipelineFromTsl({ wgsl, glsl }) {
     const W = transplantFragment(wgsl, "wgsl"), G = transplantFragment(glsl, "glsl");
-    if (W.uniforms.map((u) => u.name + ":" + u.type).join() !== G.uniforms.map((u) => u.name + ":" + u.type).join()) throw new Error(`tslSource: the WGSL and GLSL builders emitted different uniform lists (${W.uniforms.map((u) => u.name).join(",")} vs ${G.uniforms.map((u) => u.name).join(",")})`);
+    // v4557 -- COMPARED WITH THE SAME BOOKKEEPING EXCLUDED THAT uniformFields() ALREADY DECLINES TO THROW ON. Each
+    // backend counts its own internal nodes independently, so an unread mat4 field (v4550's shape) can legitimately
+    // land on "nodeUniform8" in one backend's emission and "nodeUniform9" in the other's -- same dead field, two
+    // auto-generated names, neither the graph author could ever have labelled. Comparing the FULL lists (as this
+    // used to) reads that as "the two builders disagree", which they do not: they agree on every uniform a shader
+    // actually reads and differ only in the name three's own counter happened to give a field neither reads. The
+    // returned pipeline still carries the FULL, unfiltered list (below) -- a struct's binding layout needs every
+    // declared slot accounted for even when a slot is dead, which is the same reason v4550 kept uniformFields()'s
+    // own return value whole and narrowed only its throw.
+    const real = (list, fragment, language) => list.filter((u) => !_unreadBookkeeping(fragment, language, u));
+    const Wreal = real(W.uniforms, wgsl, "wgsl"), Greal = real(G.uniforms, _stripGlslFlipFlag(glsl), "glsl");
+    if (Wreal.map((u) => u.name + ":" + u.type).join() !== Greal.map((u) => u.name + ":" + u.type).join()) throw new Error(`tslSource: the WGSL and GLSL builders emitted different uniform lists (${W.uniforms.map((u) => u.name).join(",")} vs ${G.uniforms.map((u) => u.name).join(",")})`);
     if (W.textures.join() !== G.textures.join()) throw new Error(`tslSource: the WGSL and GLSL builders emitted different textures (${W.textures.join(",")} vs ${G.textures.join(",")})`);
     return { shaders: { wgsl: W.code, glsl: { vertex: VERTEX_GLSL, fragment: G.code } }, vs: "vs", fs: "fs", attributes: [], stride: 0,
              uniforms: W.uniforms.map((u) => ({ name: u.name, type: u.type })), textures: W.textures, transplant: { wgsl: W, glsl: G } };
