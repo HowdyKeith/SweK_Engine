@@ -35,6 +35,13 @@ import { backfillStamps } from "./sweepCoverage.mjs";
 import { enumerateGates, classify, VERDICT, SWEEP_V4297, ENG } from "./gateSweep.mjs";
 import { RED_AT_V4279, RED_AT_V4408, RED_AT_V4424, RED_AT_V4476, RED_AT_V4484, RED_AT_V4531, RED_AT_V4535, UNCONFIRMED_SLOW, ALL_REGISTERED } from "./redCensus.mjs";
 
+/**
+ * *** v4579 -- THE THREE THINGS A MILLISECOND IN sweep-timings.json CAN BE. *** Exported so a reader asks by
+ * name instead of re-deriving the branch rule, and so the one place that decides it is the one place that
+ * knows: quickSweep, at the moment it writes the number.
+ */
+export const KIND = Object.freeze({ LOADED: "loaded", ALONE: "alone", CAPPED: "capped" });
+
 export const DEFAULTS = Object.freeze({ budgetMs: 3000, workers: 8, capMs: 20000, timingsFile: "tools/ship/sweep-timings.json" });
 
 /** The register: every gate whose red is already on record, with the record that names it. */
@@ -212,6 +219,13 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
     // about ENGINE_VERSION, one level down -- so `at` is kept (it is what main ships and what backfillStamps
     // already fills) and tools/ship/budgetExile.mjs was changed to read it.
     const at = { ...(prior.at || {}) };
+    // *** v4579 -- WHAT THE MILLISECOND IS, NOT JUST WHAT IT IS. *** The line below files
+    // `serialMs ?? parallelMs`, so an entry is an ALONE reading when a serial run happened and a LOADED one
+    // when it did not -- two different physical quantities in one column, which v4578 measured at 1.93x apart
+    // and which this arc itself got wrong for nine entries by assuming the column meant one thing. Nothing
+    // marked which until now. `kinds` records it AT THE MOMENT OF WRITING, where it is known for certain
+    // rather than inferred later from which side of the budget the number landed on.
+    const kinds = { ...(prior.kinds || {}) };
     const stamp = out0.at;
     // v4536: a crossing is COUNTED rather than acted on -- see countCrossings, which is exported and pure so
     // a gate can drive the reset on a fixture. It was NOT, in the first draft of this round, and the sabotage
@@ -219,6 +233,9 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
     const crossings = countCrossings(prior.crossings, rows, budgetMs);
     for (const r of rows) {
         timings[r.gate] = r.serialMs ?? r.parallelMs; codes[r.gate] = r.serialCode ?? 0; at[r.gate] = stamp;
+        // A killed reading is neither quantity -- v4574 established it is the cap's clock and not the gate's.
+        kinds[r.gate] = (r.serialCode ?? 0) === 124 || timings[r.gate] >= capMs ? KIND.CAPPED
+                      : r.serialMs != null ? KIND.ALONE : KIND.LOADED;
     }
     backfillStamps(timings, at);
     const dropped = sel.run.filter((g) => (prior.timings || {})[g] != null && timings[g] > budgetMs);
@@ -237,14 +254,19 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
     };
     if (write) {
         fs.writeFileSync(path.join(root, timingsFile), JSON.stringify({
-            note: "OBSERVED at the last quickSweep run: ms per gate (serial where a serial re-run happened) and exit code. Rewritten every run; " +
+            note: "OBSERVED at the last quickSweep run: ms per gate (serial where a serial re-run happened) and exit code. " +
+                  "*** `kinds` (v4579) SAYS WHICH QUANTITY EACH MS IS: `loaded` is a parallel reading taken with " +
+                  "`workers` gates running at once, `alone` is a serial re-run, `capped` is the SIGKILL cap and not a " +
+                  "runtime at all. The two real kinds sit about 1.93x apart (v4578), so comparing a ms against anything " +
+                  "without knowing its kind is comparing two different quantities -- which is how nine entries came to " +
+                  "hold the wrong one. *** Rewritten every run; " +
                   "used only to choose which gates are under the ship-time budget. Not a claim about the tree -- the register is. " +
                   "`at` is PER ENTRY (v4408): the capture that actually observed that gate. `captured` is this run's stamp and " +
                   "applies ONLY to entries whose `at` equals it -- the rest were not run and say so. " +
                   "`crossings` (v4536) counts CONSECUTIVE sweeps on which a gate came in over budget, and it takes " +
                   "two to evict: one crossing is a reading from one hour, and this box moves 12-36% between hours " +
                   "on unchanged code. A gate that comes back under loses its count entirely.",
-            captured: out.at, budgetMs, capMs, timings, codes, at, crossings,
+            captured: out.at, budgetMs, capMs, timings, codes, at, kinds, crossings,
         }, null, 1) + "\n");
     }
     return out;

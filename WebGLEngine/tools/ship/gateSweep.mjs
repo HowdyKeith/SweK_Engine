@@ -3767,6 +3767,46 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since238: Object.freeze({
+        at: "v4579", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/timingKind-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/quickSweep.mjs", "tools/ship/recordDrift.mjs", "tools/ship/timingLoad-selfcheck.mjs"]),
+        verdict: "green, 0.10 s at eight-wide, under the 3000 ms budget. *** v4578 NAMED THE REPAIR IT DID NOT " +
+                 "DO AND THIS IS IT: THE COLUMN SAYS WHAT ITS NUMBERS ARE. *** quickSweep writes `kinds[gate]` " +
+                 "-- loaded, alone or capped -- in the SAME STATEMENT that chooses the millisecond, so the " +
+                 "label cannot drift from the branch that picked it. The 1,620 entries predating this round " +
+                 "have the kind INFERRED from the branch rule and every one of them is named in " +
+                 "`kindsInferred`, because an inference dressed as an observation is the fault five rounds of " +
+                 "this arc have been about. Census: 1,167 loaded, 335 alone, 137 capped. *** AND WRITING THE " +
+                 "FIELD FORCED THE QUESTION FOR EVERY ENTRY, WHICH FOUND EIGHT MORE WRONG ONES, ALL OF THEM " +
+                 "THIS ARC'S. *** v4578 found nine and fixed nine because it looked only at what v4577 wrote. " +
+                 "Asking of every entry this arc ever hand-wrote turns up eight more alone readings in " +
+                 "under-budget slots, from v4575, v4576, v4577 AND v4578 -- one per round, INCLUDING the " +
+                 "round that diagnosed the problem. *** FOUR OF THE EIGHT ARE THE ARC'S OWN GATES: *** " +
+                 "timingRecords, timingLoad, timingSurvivors and timingSemantics, whose runtimes were filed " +
+                 "as alone readings every single round while those same files argued about this defect. " +
+                 "Seventeen wrong entries across five rounds. *** THE ENUMERATION ALSO HAD TWO FALSE MEMBERS " +
+                 "AND THE MEASUREMENT REFUSED THEM. *** reskin and winPathGuard were listed as arc-written " +
+                 "and are not -- v4577 corrected their gate-timings rows, not their sweep rows -- and reskin " +
+                 "measured 0.56x of its recorded value at eight-wide, which is impossible for an alone " +
+                 "reading and ordinary for a correct loaded one. Ten became eight because the numbers " +
+                 "disagreed with the list. *** AND THE PRE-FLIGHT DEMANDS A KIND NOW, WHICH IS WHAT ENDS THE " +
+                 "CLASS RATHER THAN THIS INSTANCE OF IT. *** recordDrift has asked for a runtime and a stamp " +
+                 "since v4408; a new gate owes it a kind too. A reading whose quantity is unknown is not a " +
+                 "reading anybody can compare, and seventeen entries are the evidence. THE NEW GATE'S OWN " +
+                 "ENTRY IS A LOADED READING measured at exactly eight concurrent, because the gate that " +
+                 "demands kinds cannot carry the wrong one. Eight sabotages, 8/8 red, no 0-RED. Two " +
+                 "downstream reds along the way: timingLoad still asserted the ALONE reading for a repaired " +
+                 "entry -- the third gate in this arc to carry that mistaken assertion -- and " +
+                 "recordDrift-selfcheck was red on its own fixture because a new file had made the runtimeGap " +
+                 "census stale, which the bookkeeping closed. The second one was NOT this round's edit: " +
+                 "reverting the edit left it equally red, which is how that was established rather than " +
+                 "assumed. The final verify also surfaced budgetExile-selfcheck red and it is equally red at " +
+                 "HEAD: it reports a recorded REPAIR regressed in staleness-selfcheck and caseStudy-selfcheck, " +
+                 "and staleness was already on v4571's list of tree-wide census gates red at HEAD. Same " +
+                 "standing debt seen from another instrument, left where it was.",
+    }),
     since237: Object.freeze({
         at: "v4578", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/timingSemantics-selfcheck.mjs"]),

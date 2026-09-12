@@ -134,9 +134,14 @@ console.log("\n3. *** AND THE CAPTURE STAMP PICKS OUT EXACTLY THE TWO LOAD CANNO
     // evidence that it was wrong. This row is the other half -- it goes red if either entry is reverted, or
     // if either drifts away from what was measured here.
     const fixed = R.filter((x) => !x.datedWas);
-    ok(`*** and both are corrected in the live file now: re-taken from this experiment's own alone-readings, so the row above is past tense and this one goes red if either is reverted ***`,
-        fixed.every((x) => S.timings[x.gate] === x.alone && (S.at || {})[x.gate] !== UNKNOWN_AT),
-        fixed.map((x) => `${path.basename(x.gate)} ${x.sweepWas} -> ${S.timings[x.gate]}`).join(", "));
+    // *** AND THIS ROW ASSERTED THE ALONE READING, WHICH v4578 AND v4579 REFUTED. *** It required each
+    // repaired entry to hold this experiment's alone number. For a gate UNDER the budget the column records a
+    // LOADED reading, so hostScale's entry was re-measured at eight-wide and replaced at v4579 -- the third
+    // gate in this arc to carry that mistaken assertion. What the row can require is that both are off their
+    // stale values with a fresh stamp; which quantity belongs there is timingKind-selfcheck's subject.
+    ok(`*** and both are corrected in the live file now, off their stale values with a fresh stamp -- the QUANTITY each holds is settled by its kind, not by this table ***`,
+        fixed.every((x) => S.timings[x.gate] !== x.sweepWas && (S.at || {})[x.gate] !== UNKNOWN_AT),
+        fixed.map((x) => `${path.basename(x.gate)} ${x.sweepWas} -> ${S.timings[x.gate]} (${(S.kinds || {})[x.gate] || "no kind"})`).join(", "));
     ok("  and the stamp sentinel is sweepCoverage's own, not a string typed here -- the table records which entries carried it, and the file no longer does for those two",
         typeof UNKNOWN_AT === "string" && UNKNOWN_AT.length > 5 && resid.some((x) => !x.dated) &&
         fixed.every((x) => (S.at || {})[x.gate] !== UNKNOWN_AT),

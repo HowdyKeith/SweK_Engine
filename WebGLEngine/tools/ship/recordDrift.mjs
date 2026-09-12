@@ -79,7 +79,7 @@ export function sources(dir = ENG) { return TR.treeFiles(dir); }
 export const OWES = Object.freeze({
     registry: "a module exporting reportLines owes physics/instruments.mjs an entry",
     closing: "a new gate owes gateSweep.mjs a closing that names it",
-    timing: "a new gate owes tools/ship/sweep-timings.json a runtime and a capture stamp",
+    timing: "a new gate owes tools/ship/sweep-timings.json a runtime, a capture stamp and a kind (v4579: loaded, alone or capped -- a ms without one is two quantities)",
     assertion: "a gate defining its own ok() moves tools/ship/assertionShape.mjs's census",
     runtimeGap: "any new .mjs moves vba/runtimeGap.mjs's twelve-row capability census",
     index: "a new gate owes knowledge-index.json a rebuild, and every check reading it owes nothing until it has one",
@@ -155,14 +155,21 @@ export async function checks({ load = null, timings = null } = {}) {
     // NOTHING -- the fourth check-that-cannot-fail this session. A timings record the caller supplies is what
     // makes "a reading without its own capture stamp is not evidence" a thing the gate can actually drive.
     const rec = timings || JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "sweep-timings.json"), "utf8"));
+    // *** v4579 -- AND A KIND, BECAUSE A MILLISECOND WITHOUT ONE IS TWO DIFFERENT QUANTITIES. *** v4578
+    // measured that the ms column holds a LOADED parallel reading under the budget and an ALONE serial one at
+    // or over it, 1.93x apart, with nothing marking which -- and this arc filled seventeen entries with the
+    // wrong one across four rounds, including the round that found the problem and the gate that reported it.
+    // quickSweep writes `kinds` now. This check is what stops the class coming back: a new gate owes the file
+    // a kind exactly as it owes it a runtime and a stamp, and a reading whose quantity is unknown is not a
+    // reading anybody can compare.
     const missing = A.gateFiles(ENG)
         .map((p) => path.relative(ENG, p).replace(/\\/g, "/"))
-        .filter((g) => !(g in (rec.timings || {})) || !((rec.at || {})[g]));
+        .filter((g) => !(g in (rec.timings || {})) || !((rec.at || {})[g]) || !((rec.kinds || {})[g]));
     out.push({
         name: "sweep timings", owes: OWES.timing,
         recorded: 0, actual: missing.length,
         stale: missing.length > 0,
-        detail: missing.length ? missing.join(", ") : "every gate has a timing and its own capture stamp",
+        detail: missing.length ? missing.join(", ") : "every gate has a timing, its own capture stamp and a kind",
     });
 
     // ---- *** v4551 -- THE SIXTH CHECK, AND THE OBLIGATION IT READS HAD BEEN DECLARED HERE SINCE v4482 WITH
