@@ -3849,6 +3849,49 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // object keys of the same name, the later one wins silently and the earlier round's swept count vanishes
     // from the surplus arithmetic. FIFTH ORDINAL COLLISION between the two lines this session; the side that
     // merges second is the side that moves.
+    since238: Object.freeze({
+        at: "v4545", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/playerGround-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly: 15 checks in nine sections, 693-758 ms over three runs. " +
+                 "*** THE LAST FIVE ROUNDS GAVE THE BOTS A BODY-AWARE GROUND AND THE PLAYER READ NONE OF " +
+                 "THEM. *** camera/camera.js is a separate controller with its own gravity, its own " +
+                 "step-up, its own cliff rule and its own ground query, and _terrainTopAt scanned down from " +
+                 "y=80 and returned the first solid it met. Measured in a real boot over 1,681 columns: 921 " +
+                 "(54.8%) hold more than one place a body can stand, giving 2,687 such places, and the " +
+                 "topmost answer is right in 1,681 of them -- EXACTLY THE COLUMN COUNT, which is the " +
+                 "finding and not a coincidence. Worst gap 42 voxels. *** AND THE SYMPTOM IS NOT THE " +
+                 "TELEPORT IT LOOKS LIKE: *** the `dy > STEP_UP_MAX` guard holds, so the body is never " +
+                 "lifted -- vertical tracking DIES instead. Driven east into a cave whose floor rises one " +
+                 "voxel every four units, 260 frames: HEAD stops at x=13.92, y=2.70 AND STAYS, onGround " +
+                 "stuck true, no fall even with the floor removed; the repair tracks 2.70 -> 3.70 -> 4.70 " +
+                 "-> 5.70 -> 6.70 and reaches x=27.17. A frozen body in a cave is a STUCK PLAYER. *** THE " +
+                 "REPAIR\'S FIRST DRAFT DID NOT APPLY AT ALL: *** it gated on hasVoxels(this.world) and " +
+                 "the camera\'s world interface has always been `voxelAt` while surfaceProbe\'s is `isAir` " +
+                 "plus `chunkHeight`, so the branch was never entered and every fixture went on showing " +
+                 "the defect -- \'a check nothing reaches\', in code. A four-line shim adapts the one to " +
+                 "the other so the GATED rule runs rather than a third copy of it being written. Six " +
+                 "sabotages, none crashing: A 4 RED, B 8, C 5, D 4, E 2, F 1 -- and E and F went ZERO on " +
+                 "the first battery, which is what added two rows. E (the not-found fallback) was " +
+                 "invisible because the only fixture for it was an EMPTY world, where the topmost scan " +
+                 "also answers 0 and both arms agree by accident; the discriminating fixture is a body " +
+                 "under a floating slab, which a fallback would teleport six voxels up through solid " +
+                 "stone. F is not a defect and is recorded as one: replacing Camera.STEP_UP_MAX with the " +
+                 "literal 1.2 inside _moveFP changes no behaviour, because *** THE WALL BRANCH CANNOT FIRE " +
+                 "-- dy <= STEP_UP_MAX BY ARITHMETIC once the probe is given the feet *** (0.083333 max " +
+                 "over a 260-frame four-voxel climb, 0 firings), so the load-bearing use of that constant " +
+                 "is the PROBE\'S REACH and the row for it is a wiring row anchored on the functions\' own " +
+                 "text. That branch\'s comment claimed _canStandAt had already blocked such moves; section " +
+                 "3 drives _canStandAt at a cave floor and gets TRUE, so the reason was false and has been " +
+                 "replaced by the arithmetic one. *** AND THE PRE-FLIGHT STAYED GREEN THROUGH A ROUND THAT " +
+                 "ADDED A RECORD, WHICH IS THE ONE THING IT EXISTS TO NOTICE: *** frozenRecords.census() " +
+                 "narrows to `.mjs` one line before the record search, so PLAYER_GROUND_AT_V4545 in " +
+                 "camera/camera.js is invisible to it, along with ADDED_AT_V4403 and MEASURED_AT_V4463, " +
+                 "which have been outside every headline that module ever published. Section 9 pins the " +
+                 "hole at three records and is written to GO RED the day somebody widens the walk -- not " +
+                 "repaired here because the widening also reddens a REPLAY of commit 75f0c033 that was " +
+                 "taken with the same narrow ruler.",
+    }),
     since237: Object.freeze({
         at: "v4544", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/fallBody-selfcheck.mjs"]),

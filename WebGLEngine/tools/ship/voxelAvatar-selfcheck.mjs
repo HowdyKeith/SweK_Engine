@@ -75,13 +75,20 @@ sec("1. the walk, headless, on the hand world");
     ok("walking diagonally into it slides along the wall: x keeps moving (5 cos 45 a second) while z stays in the voxel before the wall", p3.z >= 11 && p3.z < 12 && p3.x > 24.5 + 5 * Math.SQRT1_2 * 1.5, `x ${p3.x.toFixed(2)}, z ${p3.z.toFixed(3)}`);
     const c4 = avatarCamera(w, { x: 8.5, z: 14.5, yaw: Math.PI }); const p4 = walk(c4, ["KeyW"], 24);
     ok("the one-voxel step at z 16 is climbed (auto-step): standing on it at z 16.5 the eye is 6.7", near(p4.z, 16.5, 1e-6) && near(p4.y, 6.7, 1e-6) && p4.onGround, `z ${p4.z.toFixed(2)}, y ${p4.y.toFixed(2)}`);
-    // *** THE SANDBOX'S OWN ASYMMETRY, MEASURED AND RECORDED, NOT FIXED HERE. *** camera.js samples the ground bilinearly between the column
-    // it stands in and the columns at +x and +z, so a wall approached going +z is felt as a ramp one voxel early and climbed if the eye
-    // can rise past it, while the same wall approached going -z is a wall. Two voxels is climbable one way and not the other; three is
-    // a wall both ways. And a two-voxel ledge walked off toward +z sinks the feet into the last row and STICKS at the lip; walked off
-    // toward -z it is descended. The camera is index.html's and is left as it is; this round carries it, and says what it does.
+    // *** THE SANDBOX'S OWN ASYMMETRY, MEASURED AND RECORDED -- AND HALF OF IT IS CLOSED AT v4545. *** camera.js samples the ground
+    // bilinearly between the column it stands in and the columns at +x and +z, so a wall approached going +z was felt as a ramp one
+    // voxel early and CLIMBED if the eye could rise past it, while the same wall approached going -z was a wall. Two voxels was
+    // climbable one way and not the other; three was a wall both ways. The row below said so and said plainly that it was not fixed
+    // here -- and v4545 fixed it somewhere else, by giving camera.js's ground query the body's feet: a column whose only surface is
+    // two voxels above this body is now NOT-FOUND rather than a height to blend toward, so it is a wall from either side. The row is
+    // REWRITTEN rather than argued with, which is what this file's own header asked for the day the camera got a body.
+    // WHAT REMAINS, and is still this file's to carry: a two-voxel ledge walked off toward +z sinks the feet into the last row and
+    // STICKS at the lip, because the blend looks toward +x and +z and nothing has made it symmetric. Walked off toward -z it is
+    // descended cleanly -- which v4545 very nearly broke, parking the avatar at z 3.250 for good by averaging a NOT-FOUND corner in
+    // as zero; THIS FILE IS WHAT CAUGHT THAT, green at HEAD and red against the repair, after the ship ritual's sweep rotation
+    // brought it back under budget in the same round. The camera is index.html's; this round carries what is left.
     const c5 = avatarCamera(w, { x: 8.5, z: 18.5, yaw: Math.PI }); const p5 = walk(c5, ["KeyW"], 60);
-    ok("the two-voxel wall at z 20 approached going +z is CLIMBED as a ramp (the bilinear sample looks toward +z)", p5.z > 21 && near(p5.y, 7.7, 0.3), `z ${p5.z.toFixed(3)}, y ${p5.y.toFixed(2)}`);
+    ok("*** the two-voxel wall at z 20 is a WALL going +z too, since v4545: the body-aware query cannot name a surface two voxels up ***", p5.z >= 19 && p5.z < 20 && near(p5.y, 5.7), `z ${p5.z.toFixed(3)}, y ${p5.y.toFixed(2)} -- it CLIMBED to z 21.083, y 7.53 before v4545, which this row recorded as the sandbox's asymmetry and said was not fixed here`);
     const c5b = avatarCamera(w, { x: 8.5, z: 23.5, yaw: 0 }); const p5b = walk(c5b, ["KeyW"], 60);
     ok("the same two-voxel wall approached going -z is a wall: the walk stops in the voxel before it", p5b.z >= 22 && p5b.z < 23 && near(p5b.y, 5.7), `z ${p5b.z.toFixed(3)}, y ${p5b.y.toFixed(2)}`);
     const c6 = avatarCamera(w, { x: 8.5, z: 30.5 }); stepAvatar(c6, 1 / 60, ["Space"]); let apex = 0, landed = -1; for (let i = 0; i < 120; i++) { const p = stepAvatar(c6, 1 / 60, []); if (p.y > apex) apex = p.y; if (landed < 0 && p.onGround && i > 5) landed = i; }

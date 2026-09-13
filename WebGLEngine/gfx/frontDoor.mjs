@@ -246,6 +246,22 @@ export const REACH_ARRIVALS_SINCE_V4407 = Object.freeze([
              "round that stopped bots writing bot.y = _heightAt(x, z) + 1" }),
     Object.freeze({ module: "world/surfaceProbe.mjs",
         why: "v4554's terrain-against-voxels probe, imported by BotManager on the same path" }),
+    // *** AND IT HAPPENED AGAIN, THREE MORE, FOR THE SAME REASON: THIS GATE IS OVER THE SHIP-TIME BUDGET SO
+    // NOTHING RUNS IT. *** The row went red at 705 against 695 + 7 and stayed red across v4541 to v4544 with
+    // every one of those rounds ALL GREEN, because the quick sweep skips a gate at 3,462 ms and only the
+    // over-budget rotation reaches it -- the v4545 rotation is what ran it. The reach is diffed against the
+    // walk at e6455e52, the commit this list was last taken at, rather than guessed: 702 there, 705 here,
+    // three arrived and NOTHING LOST.
+    Object.freeze({ module: "physics/character/fallBody.mjs",
+        why: "v4544's gravity-and-landing module. main.js -> simulation/BotManager.js -> fallBody: the " +
+             "round that stopped an airborne bot being assigned world._heightAt(x, z) + BOT_EYE in one " +
+             "frame. Mine, and it did not record itself here" }),
+    Object.freeze({ module: "render/skyStars.mjs",
+        why: "v4580's night sky, arriving from the other line. main.js -> render/skyRenderer.js -> " +
+             "skyStars, which imports SKY_STARS_GLSL" }),
+    Object.freeze({ module: "render/exactHash.mjs",
+        why: "the hash skyStars is written against -- exactHash3 plus its GLSL -- so it came with it on the " +
+             "same edge and is not a second arrival to explain" }),
 ]);
 export const REACH_LOST_SINCE_V4407 = Object.freeze([]);
 

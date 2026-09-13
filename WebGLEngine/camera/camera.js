@@ -12,12 +12,43 @@
 //   * Projection params (fov, near, far) added as fields.
 
 import { buildViewProj } from "./buildViewProj.js";
+// v4545 -- the body-aware voxel probe, rather than a third copy of its rule. See _terrainTopAt.
+import { standHeightAt } from "../world/surfaceProbe.mjs";
+
+/**
+ * *** RE-DERIVED BY tools/ship/playerGround-selfcheck.mjs ON EVERY RUN. *** Readings at v4545.
+ */
+export const PLAYER_GROUND_AT_V4545 = Object.freeze({
+    at: "v4545",
+    // the population, measured in a real boot of index.html
+    columns: 1681,
+    multiSurface: 921,          // columns holding more than one place a body can stand
+    multiSurfacePct: 54.8,      // NOT reproducible boot to boot -- the floor below is what a gate may assert
+    multiSurfaceFloorPct: 25,
+    bodyPlaces: 2687,
+    topmostRight: 1681,         // 62.56%, and exactly the column count, which is the finding
+    topmostRightPct: 62.56,
+    worstGap: 42,               // voxels between the lowest surface and the topmost answer
+    // the scan ceiling this query used, against the world's own
+    scannedFrom: 80,
+    worldChunkHeight: 64,
+    // what the defect actually did, driven on a cave with a rising floor
+    stuckAtX: 13.92,            // where HEAD stops dead, four units into the cave
+    stuckAtY: 2.7,
+    repairedX: 27.17,           // and where the body-aware query gets to
+    repairedY: 6.7,
+    stepUpMax: 1.2,
+});
 
 export class Camera {
     // The keys the _move* methods consult in EVERY mode that moves. KeyE is deliberately absent: it is
     // kaiju-drive only, and consumesKey() adds it there. Cross-checked against the keys.has() literals in this
     // file by tools/ship/cameraKeys-selfcheck.mjs, so this cannot quietly fall behind the code it describes.
     static MOVEMENT_KEYS = new Set(["KeyW", "KeyA", "KeyS", "KeyD", "Space", "ShiftLeft"]);
+
+    /** The tallest auto-step, in voxels. Read by _moveFP's walk rule AND by _terrainTopAt's reach, which
+     *  are the same question asked twice -- so it is one number rather than two that must agree. */
+    static STEP_UP_MAX = 1.2;
 
 
     constructor(canvas) {
@@ -715,7 +746,11 @@ export class Camera {
         // _terrainTopAt (mode-init snap, orbit clearance, kaiju drive
         // ground check) keep the integer version because they're
         // one-shot snaps or comparisons where integer is fine.
-        const groundY = this._terrainTopAtBilinear(this.position.x, this.position.z);
+        // v4545 -- the body's FEET, so the probe answers the surface this body is on rather than the topmost
+        // in the column. The reach is STEP_UP_MAX because this is the WALKING query: a walker may step up.
+        // fallBody's falling query takes no reach at all, and the difference is the whole of v4544's note.
+        const groundY = this._terrainTopAtBilinear(this.position.x, this.position.z,
+                                                   this.position.y - this._eyeHeight);
         const targetY = groundY + this._eyeHeight;
 
         if (this._fpOnGround) {
@@ -730,15 +765,29 @@ export class Camera {
             //
             // New rule: smoothly track targetY when on ground for any
             // delta within a "walkable" envelope. Only enter falling on
-            // a genuine cliff (drop > CLIFF_DROP in one frame). Climbs
-            // taller than STEP_UP_MAX are blocked by _canStandAt earlier
-            // so we don't need a separate "wall" branch here.
-            const STEP_UP_MAX = 1.2;     // tallest auto-step in voxels
+            // a genuine cliff (drop > CLIFF_DROP in one frame).
+            // v4545 -- STEP_UP_MAX is Camera.STEP_UP_MAX now, because _terrainTopAt reads it too: the probe's
+            // reach and the walker's allowance are the same question and two copies of a number that must
+            // agree is the shape v4542 removed from BotManager. CLIFF_DROP stays local; nothing else reads it.
+            // The sentence that used to sit here -- "climbs taller than STEP_UP_MAX are blocked by
+            // _canStandAt earlier" -- WAS FALSE, and the wall branch below carried the same false reason.
+            // See there.
+            const STEP_UP_MAX = Camera.STEP_UP_MAX;
             const CLIFF_DROP  = 1.5;     // drop bigger than this = walked off a ledge
             const dy = targetY - this.position.y;
             if (dy > STEP_UP_MAX) {
-                // Wall in front — _canStandAt already blocked the XZ
-                // move, so this should be unreachable. Defensive: stay.
+                // *** UNREACHABLE FROM THE VOXEL PATH, AND v4545 IS THE ROUND THAT MADE THAT TRUE. *** This
+                // read "_canStandAt already blocked the XZ move, so this should be unreachable. Defensive:
+                // stay." -- and _canStandAt returns TRUE at a cave floor, at a tunnel floor and on the lower
+                // of two decks, so it blocked nothing of the sort; tools/ship/playerGround-selfcheck.mjs
+                // section 3 drives it and gets true. A defensive branch with a FALSE reason is worse than no
+                // branch, because it tells the next reader not to look.
+                // The true reason is arithmetic, not a guard: _terrainTopAt is given the body's feet and
+                // cannot return a surface more than STEP_UP_MAX above them, the bilinear blend of four such
+                // corners is bounded by the same number, and both read THIS number -- so dy <= STEP_UP_MAX
+                // identically. Measured at 0.083333 max over a 260-frame climb of four voxels, 0 firings.
+                // It stays as a total for `dy` rather than being deleted, because _extMove and the kaiju
+                // path can set position.y from outside this function.
             } else if (dy < -CLIFF_DROP) {
                 // Cliff — start falling
                 this._fpOnGround = false;
@@ -970,7 +1019,7 @@ export class Camera {
         // across sloped voxel terrain.
         this._kaijuDriveVelY -= this._gravity * dt;
         k.position.y += this._kaijuDriveVelY * dt;
-        const groundY = this._terrainTopAtBilinear(k.position.x, k.position.z);
+        const groundY = this._terrainTopAtBilinear(k.position.x, k.position.z, k.position.y);
         if (k.position.y <= groundY) {
             k.position.y = groundY;
             this._kaijuDriveVelY = 0;
@@ -1003,8 +1052,65 @@ export class Camera {
         this.velocity.z = mz * speed;
     }
 
-    _terrainTopAt(x, z) {
+    // *** THE TOPMOST SOLID IN THE COLUMN IS NOT WHERE A BODY STANDS, AND ON THIS WORLD IT IS NOT EVEN
+    // CLOSE. *** This scanned down from y = 80 and returned the first solid it met, with no account of where
+    // the body was. Measured in a real boot over 1,681 columns: 921 of them (54.8%) hold MORE THAN ONE place
+    // a body can stand, giving 2,687 such places, and the topmost answer is right in 1,681 of them --
+    // 62.56%, which is exactly the column count and not a coincidence: a function returning one y per column
+    // is right once per column however good it is. Worst gap 42 voxels; at (-42,-60) the surfaces are 2 and
+    // 19 and this said 19. It is the defect v4542 repaired for world/surfaceProbe.mjs's standHeightAt, never
+    // applied to the controller the human drives.
+    //
+    // *** AND THE SYMPTOM IS NOT THE ONE IT LOOKS LIKE. *** _moveFP guards with `dy > STEP_UP_MAX`, so the
+    // player is NOT lifted onto the hillside -- the guard holds. What happens instead is that vertical
+    // tracking DIES: driven from open ground into a tunnel mouth, y freezes at 2.700 and stays there, with
+    // _fpOnGround stuck true, and the player does not fall even when the floor under them is removed
+    // entirely. The freeze begins at x = 9.08, a voxel BEFORE the tunnel, because the bilinear sampler
+    // blends the neighbouring column's 21 in. That guard's own comment read "_canStandAt already blocked the
+    // XZ move, so this should be unreachable" -- and _canStandAt at a tunnel floor returns TRUE, so it never
+    // blocked anything.
+    //
+    // Given the body's feet in `fromY` this asks world/surfaceProbe.mjs instead, which scans DOWN from the
+    // body's own reach. That module is gated and measured (2,644 of 2,644 body-places correct against this
+    // rule's 1,681) and importing it is the point: a third copy of the rule is the defect, not the fix.
+    // Without `fromY` the answer is byte-identical to the pre-v4545 one, which is what lets the orbit
+    // clearance test -- which genuinely wants the topmost, because it is keeping a CAMERA out of a hill --
+    // keep its behaviour and its readings.
+    /**
+     * The surface THIS body can stand on in one column, or `null` when the column offers none from the
+     * body's reach down to the bottom of the world.
+     *
+     * *** null AND 0 ARE DIFFERENT ANSWERS AND CONFLATING THEM PARKED THE BODY INSIDE THE FLOOR. *** See
+     * _terrainTopAtBilinear: the blend averages four columns, and a column reported as 0 when it really
+     * means "nothing you can reach here" drags that average halfway to the world floor. 0 is also a
+     * legitimate height, so the distinction cannot be carried in the number -- hence this method, and
+     * _terrainTopAt below mapping null to 0 for the callers whose contract has always been a number.
+     *
+     * *** AN ADAPTER, NOT A COPY, AND NOT A hasVoxels GATE EITHER. *** The first draft asked
+     * hasVoxels(this.world) and called standHeightAt directly -- and every fixture in this file's own gate
+     * went on showing the defect, because the camera's world interface has always been `voxelAt` and
+     * surfaceProbe's is `isAir` plus `chunkHeight`. A repair that silently does not apply to the worlds its
+     * own caller supports is the shape of "a check nothing reaches", in code. The shim is four lines and
+     * makes the gated rule work on every world the camera already accepts; writing the scan out again here
+     * would be the third copy of it this session filed as a task.
+     */
+    _standYAt(x, z, fromY) {
+        const v = (xx, yy, zz) => this.world.voxelAt(xx, yy, zz);
+        const shim = {
+            chunkHeight: Number.isFinite(this.world.chunkHeight) ? this.world.chunkHeight : 80,
+            // the camera's own air test, verbatim: anything not 0 and not undefined is solid
+            isAir: (xx, yy, zz) => { const q = v(xx, yy, zz); return q === 0 || q === undefined; },
+        };
+        return standHeightAt(shim, Math.floor(x), Math.floor(z),
+                             { y: fromY, stepUp: Camera.STEP_UP_MAX });
+    }
+
+    _terrainTopAt(x, z, fromY = null) {
         if (!this.world?.voxelAt) return 0;
+        if (Number.isFinite(fromY)) {
+            const found = this._standYAt(x, z, fromY);
+            return found === null ? 0 : found;   // nothing under this body: 0 falls, as it always did
+        }
         const fx = Math.floor(x), fz = Math.floor(z);
         for (let y = 80; y >= 0; y--) {
             const v = this.world.voxelAt(fx, y, fz);
@@ -1031,10 +1137,40 @@ export class Camera {
     // sub-voxel boundary. Edge-fall detection still works because
     // _terrainTopAt (integer) is still what the canStandAt logic
     // implicitly uses for collision.
-    _terrainTopAtBilinear(x, z) {
+    _terrainTopAtBilinear(x, z, fromY = null) {
         if (!this.world?.voxelAt) return 0;
         const ix = Math.floor(x), iz = Math.floor(z);
         const fx = x - ix, fz = z - iz;
+        // *** THE BODY GOES TO ALL FOUR CORNERS, WHICH IS WHY THE DEAD ZONE STARTED A VOXEL EARLY. *** The
+        // blend reads the neighbouring columns, so one tunnel column beside open ground was enough to make
+        // the sample jump to 21 and freeze the walker before it ever entered.
+        if (Number.isFinite(fromY)) {
+            // *** A COLUMN THIS BODY CANNOT STAND IN IS NOT A COLUMN WHOSE GROUND IS ZERO, AND AVERAGING IT
+            // IN AS ZERO PUT THE BODY INSIDE THE FLOOR AND LOCKED IT THERE. *** Found by
+            // tools/ship/voxelAvatar-selfcheck.mjs, which the sweep rotation brought back under budget in
+            // the same round -- it drives THIS method on a hand world and was green at HEAD. Walking off a
+            // two-voxel ledge toward -z at x=40: the floor column answers 2 and the ledge column answers
+            // NOT-FOUND, because the ledge's own surface is above this body's reach -- a wall, not a hole.
+            // Read as 0 and blended at fz=0.25 that is 1.5, so targetY came out at 3.200, dy was 0, the
+            // body read as GROUNDED half a voxel inside the floor, and _canStandAt then refused every
+            // further step: stuck at z=3.250 for as long as the walk ran. The stuck player this very round
+            // is about, re-introduced by its own repair, one method over.
+            //
+            // So the weights are renormalised over the corners that ANSWERED. A wall contributes nothing
+            // and the body keeps the floor it is on; a genuine hole -- no surface from the reach down to
+            // the bottom of the world -- makes every corner null, and 0 then means what it has always
+            // meant here, which is that the cliff branch takes over and gravity does the rest.
+            let sum = 0, wsum = 0;
+            const corner = (cx, cz, wt) => {
+                const h = this._standYAt(cx, cz, fromY);
+                if (h !== null) { sum += h * wt; wsum += wt; }
+            };
+            corner(ix,     iz,     (1 - fx) * (1 - fz));
+            corner(ix + 1, iz,     fx * (1 - fz));
+            corner(ix,     iz + 1, (1 - fx) * fz);
+            corner(ix + 1, iz + 1, fx * fz);
+            return wsum > 0 ? sum / wsum : 0;
+        }
         const h00 = this._terrainTopAt(ix,     iz    );
         const h10 = this._terrainTopAt(ix + 1, iz    );
         const h01 = this._terrainTopAt(ix,     iz + 1);

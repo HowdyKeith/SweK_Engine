@@ -455,7 +455,8 @@ console.log("\n7. *** THE MIRROR standingReds NEVER HAD: A ZERO IS AS OLD AS THE
     // The returned rolls accumulate by round -- v4565 added its own rather than appending to v4535's, so a
     // retirement carries the round that measured it. The row checks the union: what matters is that every gate
     // that LEFT the still-over roll left it with readings, whichever round took them.
-    const V29ret = [...(SC.RETURNED_AT_V4529.returnedAt_v4535 || []), ...(SC.RETURNED_AT_V4529.returnedAt_v4565 || [])];
+    const V29ret = [...(SC.RETURNED_AT_V4529.returnedAt_v4535 || []), ...(SC.RETURNED_AT_V4529.returnedAt_v4565 || []),
+                    ...(SC.RETURNED_AT_V4529.returnedAt_v4545 || [])];
     ok("!! a returnee that went back over the budget on a later box is NAMED with its serial readings, and is live over",
        overNonEmpty(SC.RETURNED_AT_V4529.stillOver, (x) => (FILE.timings || {})[x.gate] > SC.BUDGET_MS && typeof x.why === "string" && x.why.length > 40 && x.hereMs > SC.BUDGET_MS && back.some((b) => b.gate === x.gate)) ||
        (emptyOfNonEmpty(SC.RETURNED_AT_V4529.stillOver, V29ret) &&
@@ -774,16 +775,34 @@ console.log("\n*** THE FIRST BULK PASS AT THE EXILED POOL (v4565): HALF THE 3-8 
     // used again. The group is a CEILING that only falls, so that is what is checked -- plus every row still
     // in it being in-band, which is the claim about --band that a shrinking count cannot weaken.
     const leftTheGroup = R.ran - pass.length;
+    // *** v4545 -- THE FRACTION WAS A GUARD THE SHIP RITUAL IS GUARANTEED TO BREAK, AND IT BROKE. *** This
+    // asserted `pass.length >= R.ran * 0.9`. The stamp group erodes BY DESIGN -- the ledger merges by gate,
+    // so any later re-timing moves a row out -- and step 3b of the ritual mandates an 80-slot rotation EVERY
+    // ROUND over this exact pool, covering it in about five. The v4545 rotation re-timed 62 gates, 53 from
+    // this group, and the row went red at 156 of 210 with nothing wrong. The comment below already stated
+    // the right rule in prose: a row leaves only by being RE-TIMED BY NAME under a LATER stamp, and a
+    // COLLAPSE would mean a wholesale rewrite. That is now what is checked, gate by gate against
+    // R.ranGates, and it does not decay however many rotations run. `back` keeps a floor because it counts
+    // READINGS rather than membership and a returnee that crosses back is the file working (see the row
+    // below), but it is a floor on the pass's own 105 and not on a group that is supposed to shrink.
+    const byGate = new Map((led.rotated || []).map((r) => [r.gate, r]));
+    const unaccounted = R.ranGates.filter((g) => { const r = byGate.get(g); return !r || r.at < R.stamp; });
+    const reTimedLater = R.ranGates.filter((g) => (byGate.get(g) || {}).at > R.stamp);
     ok("!! *** THE PASS'S OWN LEDGER STILL SHOWS THE RETURNEES, GATE BY GATE ***",
-       pass.length <= R.ran && pass.length >= R.ran * 0.9 &&
+       R.ranGates.length === R.ran - 1 && unaccounted.length === 0 &&
+       pass.length + reTimedLater.length === R.ranGates.length && pass.length <= R.ran &&
        back.length <= R.returnees && back.length >= R.returnees * 0.9 &&
        pass.every((r) => r.priorMs > R.band[0] && r.priorMs <= R.band[1]),
-       `${pass.length} of the ${R.ran} rows still carry the pass stamp ${R.stamp} and ${back.length} of them ` +
-       `read at or under the ${SC.BUDGET_MS} ms budget, against ${R.returnees} returnees recorded. ` +
-       `${leftTheGroup} row(s) have since been re-timed by name and carry a later stamp, which is the ledger's ` +
-       "merge-by-gate rule and not a loss -- the group can only shrink, never grow, and a COLLAPSE of it would " +
-       `mean the ledger had been rewritten wholesale. Every row still in it has a PRIOR reading inside the ` +
-       `${R.band[0]}-${R.band[1]} ms band the pass selected, which is --band doing what it says.`);
+       `every one of the ${R.ranGates.length} named gates is still in the ledger: ${pass.length} under the ` +
+       `pass stamp ${R.stamp} and ${reTimedLater.length} re-timed by name since, ${unaccounted.length} ` +
+       `unaccounted. ${back.length} of the stamped rows read at or under the ${SC.BUDGET_MS} ms budget, ` +
+       `against ${R.returnees} returnees recorded. ${leftTheGroup} row(s) have left the group, which is the ` +
+       "ledger's merge-by-gate rule and not a loss -- the group can only shrink, never grow, and a COLLAPSE " +
+       "of it would mean the ledger had been rewritten wholesale, which is exactly what `unaccounted` " +
+       `catches now that the names are frozen rather than a fraction of a count. Every row still in the ` +
+       `group has a PRIOR reading inside the ${R.band[0]}-${R.band[1]} ms band the pass selected, which is ` +
+       "--band doing what it says. The list is 209 against a recorded `ran` of 210: one gate had already " +
+       "been merged away before the pass's own commit, which a count cannot notice and a list can.");
     // The point of a returnee is that it is back IN the sweep, so that is the thing checked -- in the file the
     // sweep actually reads, not in the ledger that recorded the measurement.
     const t = SC.readFile();
