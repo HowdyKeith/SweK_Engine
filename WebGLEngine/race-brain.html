@@ -17,6 +17,10 @@
   .bad { color:#ff9a9a; }
   a { color:#59d1ff; }
   input[type=number] { width:48px; background:#0c140f; color:#9fb2d4; border:1px solid #2a3a30; font:inherit; }
+  #views { display:flex; flex-wrap:wrap; gap:8px; padding:6px 14px; }
+  .carWin { display:flex; flex-direction:column; gap:2px; }
+  .carView { background:#000; border:1px solid #2a3a30; cursor:pointer; display:block; }
+  .viewLabel { color:#5f7aa0; font-size:10px; max-width:240px; line-height:1.3; }
 </style>
 </head>
 <body>
@@ -28,6 +32,8 @@
     <span id="tick">loading the racing kit and box3d&hellip;</span><br><span id="brain">no stored brain: the hand policy drives</span><br><span id="gun">turrets: the hand gunner on every car (v4588, task 77)</span> <button id="trainGun">Train the gunner in idle time</button> <button id="stopGun" disabled>Stop</button> <button id="forgetGun">Forget the stored gunner</button><br><span id="racing"></span><br><button id="labReplay">Replay the lab's accepted driver</button> <span id="lab">the Physics Lab's race scene stores the driver its adjudicator accepted; this plays that log back, not real time</span> &middot; drag to orbit, wheel to dolly</div>
 </div>
 <canvas id="c"></canvas>
+<div id="views"></div>
+<div id="viewsNote" class="viewLabel" style="padding:0 14px 8px"></div>
 <script type="module" src="/ui/originNotice.js"></script>
 <script type="module">
 import { requestDevice } from "./gfx/device.js";
@@ -40,6 +46,7 @@ import * as D from "./brain/drivePolicy.mjs";
 import * as GP from "./brain/gunnerPolicy.mjs";
 import * as U from "./physics/turret.mjs";
 import { turretFleets, placeTurrets } from "./render/raceTurret.mjs";
+import * as CV from "./render/carViews.mjs";
 import { miniWorld, meshWorld, SUN } from "./render/voxelDevice.mjs";
 import { CityGen } from "./world/CityGen.js";
 import { box3d } from "./physics/box3d/box3dLoader.js";
@@ -55,6 +62,9 @@ let replayRec = null;   // v4527: the lab's accepted driver's log, played back t
 // v4588 -- the turret copilot (task 77): a turret on every car, a gunner policy in each (the stored gunner on car 0, the hand
 // gunner elsewhere), shells stepped and tested in the same lockstep tick, hits as impulses on the chassis they land on
 let turrets = [], gunners = [], shells = [], turretBase = 0, gunStore = null, gunTrainer = null, gunTraining = false;
+// v4589 -- a view window per car (task 78): first person, the turret's sight, or the brain (the two policies' activations), a
+// click cycles them. Each 3D view is the same scene drawn into a small render target with that car's camera and read back.
+let views = [], viewFrame = 0, viewBusy = false, viewFailures = 0, driverWeights = [], gunnerWeights = [];
 let yaw = 0.6, pitch = 0.7, dist = 190, dragging = null, camNow = null, centre = [0, 0, 0], acc = 0, lastT = 0;
 
 const readBytes = async (p) => { const r = await fetch("/" + p); if (!r.ok) throw new Error(`${p}: HTTP ${r.status}`); return r.arrayBuffer(); };
@@ -83,7 +93,9 @@ function setupRace() {
   drivers = brains.map((w, i) => D.policyDriver(w, surface, cars[i])); trackers = cars.map(() => lapTracker(surface));
   const gcur = gunStore.current();
   turrets = cars.map(() => U.createTurret()); shells = [];
-  gunners = cars.map((c, i) => GP.gunnerFor(gcur && i === 0 ? gcur.weights : GP.handWeights()));
+  gunnerWeights = cars.map((c, i) => (gcur && i === 0 ? gcur.weights : GP.handWeights())); driverWeights = brains;
+  gunners = gunnerWeights.map((w) => GP.gunnerFor(w));
+  setupViews(cars.length);
   hash = 0x811c9dc5; ticks = 0; acc = 0;
   const trucks = cars.map((c, i) => ({ file: FILES[i], ...truckPlacement(carPose(phys, c)) }));
   if (scene && scene.destroy) scene.destroy();
@@ -105,6 +117,49 @@ function stepRace() {
   rs.forEach((r, i) => trackers[i].update(r.pose));
   hash = foldHash(hash, phys.stateHash()); if (!replayRec) hash = U.turretHash(hash, turrets, shells, foldHash); ticks++;
   if (replayRec && ticks === replayRec.ticks) { const fp = (hash >>> 0).toString(16).padStart(8, "0"); $("lab").textContent = `played back ${ticks} ticks: fingerprint ${fp} ${fp === replayRec.fingerprint ? "= the record's" : "DIFFERS from the record's " + replayRec.fingerprint} (offline replay ${replayRec.offline})`; }
+}
+
+function setupViews(n) {
+  const host = $("views"); host.textContent = "";
+  while (views.length > n) { const v = views.pop(); if (v.target && v.target.destroy) v.target.destroy(); }
+  for (let i = 0; i < n; i++) {
+    if (!views[i]) {
+      const cv = document.createElement("canvas"); cv.width = CV.VIEW_DRAW.width; cv.height = CV.VIEW_DRAW.height; cv.className = "carView";
+      const v = { view: "first-person", canvas: cv, ctx: cv.getContext("2d"), target: device.texture({ width: CV.VIEW_DRAW.width, height: CV.VIEW_DRAW.height, render: true }), label: document.createElement("div") };
+      v.label.className = "viewLabel";
+      cv.addEventListener("click", () => { v.view = CV.nextView(v.view); v.label.textContent = CV.windowLabel(i, names[i] || "car", v.view); });
+      views[i] = v;
+    }
+    const v = views[i], box = document.createElement("div"); box.className = "carWin"; box.appendChild(v.canvas); box.appendChild(v.label); host.appendChild(box);
+    v.label.textContent = CV.windowLabel(i, names[i] || "car", v.view);
+  }
+}
+async function refreshViews(poses) {
+  if (viewBusy || !scene) return; viewBusy = true;
+  try {
+    for (let i = 0; i < views.length && i < poses.length; i++) {
+      const v = views[i];
+      if (v.view === "brain") {
+        const j = GP.nearestOther(i, poses), pose = poses[i];
+        const dAct = CV.activationsOf(D, driverWeights[i], D.features(surface, pose, cars[i].last && cars[i].last.wheels.every((q) => q.kind === "asphalt") ? "asphalt" : "off"));
+        const gAct = CV.activationsOf(GP, gunnerWeights[i], GP.features(pose, turrets[i], j === null ? null : { pose: poses[j] }));
+        CV.drawBrainPanel(v.ctx, v.canvas.width, v.canvas.height, CV.brainRows({ driver: { act: dAct, names: D.FEATURE_NAMES }, gunner: { act: gAct, names: GP.FEATURE_NAMES } }), { title: `${names[i] || "car"}: driver 9-8-2, gunner 9-8-3` });
+        continue;
+      }
+      if (viewFailures >= 3) continue;   // the 3D windows are off after three failed readbacks; the brain windows above stay live
+      const cam = CV.cameraFor(v.view, poses[i], turrets[i], G, { aspect: v.canvas.width / v.canvas.height });
+      // scene.frame returns the frame handle whose .pixels is the readback promise (the gates await it the same way)
+      const fr = scene.frame({ ...cam, clear: CV.VIEW_DRAW.clear, target: v.target, read: true }), r = fr && fr.pixels ? await fr.pixels : null;
+      if (r && r.pixels && r.width) v.ctx.putImageData(new ImageData(new Uint8ClampedArray(r.pixels.buffer, r.pixels.byteOffset, r.pixels.length), r.width, r.height), 0, 0);
+    }
+  } catch (e) {
+    // a readback that fails three times is not retried every four frames: the windows say so and the brain view stays live.
+    // (Measured on the ship harness: its WebGPU loses a PRESENTED canvas device at the first frame, so there the 3D
+    // windows go dark on WebGPU and work on ?webgl=1; on a real browser both backends read back.)
+    viewFailures++; const msg = "view windows off: the device could not read a window back (" + (e && e.message ? e.message : e).slice(0, 90) + ")";
+    $("viewsNote").textContent = msg; if (viewFailures >= 3) for (const v of views) if (v.view !== "brain") v.label.textContent = msg + " -- click for the brain view";
+  }
+  finally { viewBusy = false; }
 }
 
 function gunLine() {
@@ -211,6 +266,7 @@ function frame(t) {
   const eye = [centre[0] + dist * Math.sin(yaw) * Math.cos(pitch), centre[1] + dist * Math.sin(pitch), centre[2] + dist * Math.cos(yaw) * Math.cos(pitch)];
   camNow = { viewProj: G.multiply(G.perspective(0.9, w / h, 0.5, 2000), G.lookAt(eye, centre)), eye };
   scene.frame({ ...camNow, clear: [0.03, 0.05, 0.08, 1] });
+  if (++viewFrame % CV.VIEW_DRAW.refreshEvery === 0) refreshViews(poses);
 }
 
 main();

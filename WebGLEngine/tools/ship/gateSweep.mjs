@@ -4870,6 +4870,24 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "sabotages, all red by name, including a normal taken from a central difference of the samples " +
                  "instead of the bilinear patch the height comes from.",
     }),
+    since235: Object.freeze({
+        at: "v4589", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/carViews-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 15 s: the pure cameras headless, then race-brain.html twice in the harness. A VIEW WINDOW PER CAR (task 78): " +
+                 "render/carViews.mjs draws the same scene into a 240 x 160 render target with the car's first-person camera (the " +
+                 "driver's seat, a point 12 m ahead at the window's exact centre) or the turret's sight (along the barrel, turning with " +
+                 "it), reads it back and puts it into a 2D canvas beside the main one -- no second viewport, no new shader -- or draws " +
+                 "the car's two policies' activations (9-8-2 and 9-8-3 through the kernel's twin) as bars: the brain view. A click " +
+                 "cycles the three and the label says which and what it costs. Sabotages red at A..E. Found, measured: on this harness " +
+                 "a presented WebGPU canvas device is lost at its first frame (device.lost, every mapAsync after it fails) while an " +
+                 "offscreen device and a presented WebGL2 canvas read back indefinitely -- so the windows' pixels are held on ?webgl=1 " +
+                 "here (first-person 15 % lit, brain 12 %), the WebGPU boot on what survives the loss, and the page caps its readback " +
+                 "failures at three, says so in the labels and keeps the brain windows live (the first draft stopped those too).",
+    }),
     since234: Object.freeze({
         at: "v4588", swept: 3, green: 3, red: 0,
         added: Object.freeze([

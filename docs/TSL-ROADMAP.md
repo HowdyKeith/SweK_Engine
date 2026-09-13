@@ -1790,6 +1790,29 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         repair as v4586 and v4587): the committed readings stand and the three new gates' readings were added (287 ms, 7.0 s
         and 11.3 s; the two over budget are the racing line's kind, beside drivePolicy's 63 s and raceKnob's 33 s).
         Census: 1631 -> 1634 gates, 4090 -> 4096 files; since234.
+     Then (v4589) A VIEW WINDOW PER CAR (task 78). Keith asked for a window per car that a click switches between First Person,
+        Turret view and GPU Brain view. The race pages had one inline orbit camera each and no second viewport on the device path
+        (gl.viewport / scissor exist only in the legacy TV wall), and no new shader was wanted for it: gfx/device.js has drawn a
+        whole frame into a texture on both backends since v4318 (frame({ target })) and handed the bytes back row 0 at the top
+        (frame({ read })), so render/carViews.mjs draws the SAME scene into a 240 x 160 render target with that car's camera and
+        puts the readback into a small 2D canvas beside the main one. The first-person camera is the driver's seat looking 12 m
+        along the chassis forward (that point projects to the window's exact centre; a point behind is null); the turret's sight
+        sits just above and behind the pivot looking along the barrel and turns with the turret; the third view is not a camera:
+        the car's driver (9-8-2) and gunner (9-8-3) run layer by layer through the kernel's f32 twin and their features, hidden
+        activations and outputs are drawn as bars, live, for the car in that window -- the GPU Brain's view of the race is the
+        numbers its layer computes this tick. A click cycles the three; the label says which and what it costs (a readback every
+        four main frames). MEASURED ON THE HARNESS, AND SAID PLAINLY: a presented WebGPU canvas device is LOST at its first frame
+        there (device.lost reads "A valid external Instance reference no longer exists" and every mapAsync after it fails), while
+        an offscreen device reads back indefinitely -- which is why every device gate uses offscreen: true -- and a presented
+        WebGL2 canvas keeps reading targets back under a running loop. A page's main canvas cannot be offscreen, so the gate
+        holds the windows' pixels on ?webgl=1 (a first-person window 15 % lit from its readback, the brain window 12 % lit with
+        bars, the click cycling turret then brain with the label saying so) and the WebGPU boot on what survives the loss (the
+        windows, the labels, the cycle, the brain windows live); the page caps its readback failures at three, says so in the
+        labels, and keeps the brain windows refreshing -- the first draft stopped those too, which the WebGPU boot found. Five
+        sabotages red by name. On the rig both backends read back; that claim is the rig's to make, and the page's label will
+        say "view windows off" if it is wrong there. The quick sweep found the one cross-effect: the windows' failure message
+        was written into the gunner's HUD line, which v4588's page gate reads for "hand gunner", so the new code turned the
+        older gate red; the windows have a line of their own now. Census: 1634 -> 1635 gates; since235.
 ## The count that says when step 4 matters
 
 tools/ship/shaderCensus-selfcheck.mjs has held, since v3274, that a hand-written pair is cheaper than an
