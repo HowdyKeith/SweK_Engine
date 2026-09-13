@@ -271,8 +271,10 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4584 -- RE-TAKEN on the tree merged with main at v4583: one gate (fleetRouting) joined, the same four rows by one.
     // v4585 -- RE-TAKEN: one gate (labHome) joined, the same four rows by one.
     // v4586 -- RE-TAKEN: one gate (labKnobs) joined, the same four rows by one.
-    gates: 1628, usesOk: 1607, definesOk: 1599, importsOk: 0,
-    distinctDefinitions: 40, nameFirst: 1500, condFirst: 91, unknownSignature: 16,
+    // v4587 -- RE-TAKEN with the three sibling gates of the v4586 knob modules (physics/apsidalKnob-, impactKnob-,
+    // hologramKnob-selfcheck.mjs): 1628 -> 1631 gates, and usesOk, definesOk and nameFirst each by three; nothing else moved.
+    gates: 1631, usesOk: 1610, definesOk: 1602, importsOk: 0,
+    distinctDefinitions: 40, nameFirst: 1503, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

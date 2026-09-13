@@ -215,7 +215,8 @@ export const REACH_AT_V4548 = Object.freeze({
     // population nothing. Worth saying because the previous four rounds each went red here on their own
     // arrival: a record written into a module whose gate is over budget arrives unchecked, and this one was
     // written into a gate that runs at ship time on purpose.
-    total: 107,
+    // v4587 -- RE-TAKEN: 107 -> 108, one record, reportDoors' NO_GATE_V4587 (a dated list of two module names; documentary, no gate reads it as data), unguarded 9 -> 9.
+    total: 108,
     // *** READ OFF THE INSTRUMENT, NOT PREDICTED. *** The first draft of this record guessed 53/21/19/40 from
     // which gates the round had sped up, and was wrong on three of the four: the comment-strip fix below
     // moved two records the other way at the same time, and a guess cannot see two changes at once.
@@ -335,7 +336,8 @@ export const UNGUARDED_SPLIT_V4577 = Object.freeze({
     // left the unguarded set.
     // v4583 -- total RE-TAKEN 106 -> 107 for CORPUS_AT_V4583, which arrived checked. The unguarded set
     // did not move: no record joined or left it this round.
-    structural: Object.freeze({ total: 107, unguarded: 9, documentaryOfThose: 9, readByCodeOfThose: 0 }),
+    // v4587 -- RE-TAKEN with `total` above: 107 -> 108 on NO_GATE_V4587; the unguarded nine are the same nine.
+    structural: Object.freeze({ total: 108, unguarded: 9, documentaryOfThose: 9, readByCodeOfThose: 0 }),
     // BEFORE, on the tree this round opened on:
     before: Object.freeze({ total: 104, checked: 72, overBudget: 20, unmeasured: 0, unguarded: 12, unchecked: 32 }),
     // AFTER, as one reading rather than as a constant -- see the note above. Taken with the round's own

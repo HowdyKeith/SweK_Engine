@@ -9,9 +9,9 @@
 // is registered, joined to its triage row, and reachable from the lab's front door.
 //
 // FOUND BY THE MEASUREMENTS THAT PRECEDED THE REGISTRATIONS (the numbers are in each module's MEASURED_V4586): the black
-// hole's and neutron star's 'below the ISCO' status lines describe a launch that never plunges; the impact scene prints a
-// capture radius of 1.73 for a boundary that is 1.703; the hologram's slider opens at a separation whose fringes cannot be
-// read; the plasma scene's mirror-point law is 5-11 % off at its gyroradius with dt ruled out, so it is REFUSED on a
+// hole's and neutron star's 'below the ISCO' status lines describe a launch that never plunges; the impact scene printed a
+// capture radius of 1.73 for a boundary that is 1.703; the hologram's slider opened at a separation whose fringes cannot be
+// read (all three rewritten at v4587); the plasma scene's mirror-point law is 5-11 % off at its gyroradius with dt ruled out, so it is REFUSED on a
 // measurement rather than registered with a tolerance that could never fail; the pendulum wave re-syncs to 1e-13 at every k.
 //
 // SABOTAGES (each restored):
@@ -90,7 +90,7 @@ console.log("\n3. *** THE HOLOGRAM SEPARATION: READ BACK FROM THE FRINGES, REFUS
     ok("!! the separation is recovered from the scene's own scan wherever three fringes fit, under the pitch-derived bound", good.every((a) => a.pass && a.evidence.rel <= a.evidence.tol && a.evidence.peaks >= HK.MIN_PEAKS),
         good.map((a) => `${a.evidence.sep}: ${a.evidence.recovered != null ? a.evidence.recovered.toFixed(3) + " (rel " + a.evidence.rel.toExponential(1) + ", tol " + a.evidence.tol.toExponential(1) + ")" : a.evidence.reason}`).join("; "));
     const low = [4, 8].map((s) => HK.adjudicate(s));
-    ok("!! *** IT SAYS NO ON ITS OWN SUBJECT: sep = 4 and 8 put one bright fringe on the screen and are refused as unreadable -- and 8 is the page's slider minimum ***",
+    ok("!! *** IT SAYS NO ON ITS OWN SUBJECT: sep = 4 and 8 put one bright fringe on the screen and are refused as unreadable -- and 8 was the page's slider minimum until v4587 ***",
         low.every((a) => !a.pass && a.evidence.peaks === 1 && /no spacing can be read/.test(a.evidence.reason)), low.map((a) => a.evidence.sep + ": " + a.evidence.peaks + " peak").join(", "));
     ok("the bound is two pitches over the expected spacing, per candidate", good.every((a) => Math.abs(a.evidence.tol - HK.TOL_PITCHES * HK.PITCH / a.evidence.expected) < 1e-12));
     ok("the worst recovery (sep = 12) is still a factor of three inside its bound", (() => { const a = HK.adjudicate(12); return a.evidence.rel * 3 < a.evidence.tol; })());

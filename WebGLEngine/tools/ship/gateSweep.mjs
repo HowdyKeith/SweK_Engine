@@ -4870,6 +4870,26 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "sabotages, all red by name, including a normal taken from a central difference of the samples " +
                  "instead of the bilinear patch the height comes from.",
     }),
+    since233: Object.freeze({
+        at: "v4587", swept: 3, green: 3, red: 0,
+        added: Object.freeze([
+            "physics/apsidalKnob-selfcheck.mjs",
+            "physics/hologramKnob-selfcheck.mjs",
+            "physics/impactKnob-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 6 s, headless. The three v4586 knob modules got the sibling gate reportDoors asks of a reportLines() " +
+                 "provider (each holds its two routes to each other, the refusal on its own subject, and the derived tolerance), " +
+                 "and physics-lab.html's four status lines were rewritten to what the adjudicators measured: the black hole says " +
+                 "unbound or bound by the energy rather than 'below the ISCO', the neutron star says nothing on its slider plunges, " +
+                 "plasma names the mirror-point estimate's 5-11 % miss and that there is no loss cone, impact prints the capture " +
+                 "radius from the start point (1.703, not 1.732) -- verified in the page. Found: the first draft of apsidalKnob's " +
+                 "gate called the dt-sweep residual a floor and pinned it under 2e-5; it is a slope (5.4e-5, 1.7e-5, 2.6e-6) and " +
+                 "each reading is held under the tolerance derived for its step instead. Found: reportDoors' no-sibling row had been " +
+                 "red since v4584 on fleetRouting and labHome (both gated from tools/ship/), unrecorded by three notes; dated into " +
+                 "NO_GATE_V4587. Sabotages red at A / B / C / D on each of the three, none crashing, none 0-red.",
+    }),
     since232: Object.freeze({
         at: "v4586", swept: 1, green: 1, red: 0,
         added: Object.freeze([

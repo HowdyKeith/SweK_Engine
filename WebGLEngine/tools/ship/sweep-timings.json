@@ -1,6 +1,6 @@
 {
  "note": "OBSERVED at the last quickSweep run: ms per gate (serial where a serial re-run happened) and exit code. Rewritten every run; used only to choose which gates are under the ship-time budget. Not a claim about the tree -- the register is. `at` is PER ENTRY (v4408): the capture that actually observed that gate. `captured` is this run's stamp and applies ONLY to entries whose `at` equals it -- the rest were not run and say so. `crossings` (v4536) counts CONSECUTIVE sweeps on which a gate came in over budget, and it takes two to evict: one crossing is a reading from one hour, and this box moves 12-36% between hours on unchanged code. A gate that comes back under loses its count entirely. `serial` (v4562) is the UNCONTENDED cost -- from a phase-2 run or from this sweep's rotating slice -- while `timings` is a sample taken while seven other gates fought for the box and runs a MEDIAN 2.41x above it. Ask costOf(), not timings[], for what a gate costs.",
- "captured": "2026-09-13T12:20:08.112Z",
+ "captured": "2026-09-13T17:50:01.157Z",
  "budgetMs": 3000,
  "capMs": 20000,
  "timings": {
@@ -1634,7 +1634,10 @@
   "tools/ship/zipWriter-selfcheck.mjs": 233,
   "tools/ship/fleetRouting-selfcheck.mjs": 2173,
   "tools/ship/labHome-selfcheck.mjs": 1650,
-  "physics/labKnobs-selfcheck.mjs": 1282
+  "physics/labKnobs-selfcheck.mjs": 1282,
+  "physics/apsidalKnob-selfcheck.mjs": 917,
+  "physics/hologramKnob-selfcheck.mjs": 115,
+  "physics/impactKnob-selfcheck.mjs": 243
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -3267,7 +3270,10 @@
   "tools/ship/zipWriter-selfcheck.mjs": 0,
   "tools/ship/fleetRouting-selfcheck.mjs": 0,
   "tools/ship/labHome-selfcheck.mjs": 0,
-  "physics/labKnobs-selfcheck.mjs": 0
+  "physics/labKnobs-selfcheck.mjs": 0,
+  "physics/apsidalKnob-selfcheck.mjs": 0,
+  "physics/hologramKnob-selfcheck.mjs": 0,
+  "physics/impactKnob-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-10T04:24:20.054Z",
@@ -4900,7 +4906,10 @@
   "tools/ship/zipWriter-selfcheck.mjs": "2026-09-13T12:20:08.112Z",
   "tools/ship/fleetRouting-selfcheck.mjs": "2026-09-13T12:20:08.112Z",
   "tools/ship/labHome-selfcheck.mjs": "2026-09-13T12:20:08.112Z",
-  "physics/labKnobs-selfcheck.mjs": "2026-09-13T12:20:08.112Z"
+  "physics/labKnobs-selfcheck.mjs": "2026-09-13T12:20:08.112Z",
+  "physics/apsidalKnob-selfcheck.mjs": "2026-09-13T17:50:01.157Z",
+  "physics/hologramKnob-selfcheck.mjs": "2026-09-13T17:50:01.157Z",
+  "physics/impactKnob-selfcheck.mjs": "2026-09-13T17:50:01.157Z"
  },
  "finished": {
   "tools/ship/placementRender-selfcheck.mjs": true,
@@ -6420,7 +6429,10 @@
   "tools/ship/zipWriter-selfcheck.mjs": true,
   "tools/ship/fleetRouting-selfcheck.mjs": true,
   "tools/ship/labHome-selfcheck.mjs": true,
-  "physics/labKnobs-selfcheck.mjs": true
+  "physics/labKnobs-selfcheck.mjs": true,
+  "physics/apsidalKnob-selfcheck.mjs": true,
+  "physics/hologramKnob-selfcheck.mjs": true,
+  "physics/impactKnob-selfcheck.mjs": true
  },
  "crossings": {
   "tools/ship/engineSceneBot-selfcheck.mjs": 2,
@@ -7701,7 +7713,10 @@
   "tools/ship/zipWriter-selfcheck.mjs": 83,
   "tools/ship/fleetRouting-selfcheck.mjs": 928,
   "tools/ship/labHome-selfcheck.mjs": 769,
-  "physics/labKnobs-selfcheck.mjs": 515
+  "physics/labKnobs-selfcheck.mjs": 515,
+  "physics/apsidalKnob-selfcheck.mjs": 483,
+  "physics/hologramKnob-selfcheck.mjs": 62,
+  "physics/impactKnob-selfcheck.mjs": 78
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-10T01:23:58.721Z",
@@ -8974,6 +8989,9 @@
   "tools/ship/zipWriter-selfcheck.mjs": "2026-09-10T16:00:54.439Z",
   "tools/ship/fleetRouting-selfcheck.mjs": "2026-09-13T07:37:17.561Z",
   "tools/ship/labHome-selfcheck.mjs": "2026-09-13T08:09:15.322Z",
-  "physics/labKnobs-selfcheck.mjs": "2026-09-13T12:19:53.062Z"
+  "physics/labKnobs-selfcheck.mjs": "2026-09-13T12:19:53.062Z",
+  "physics/apsidalKnob-selfcheck.mjs": "2026-09-13T17:49:45.684Z",
+  "physics/hologramKnob-selfcheck.mjs": "2026-09-13T17:49:45.684Z",
+  "physics/impactKnob-selfcheck.mjs": "2026-09-13T17:49:45.684Z"
  }
 }

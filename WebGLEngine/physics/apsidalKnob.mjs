@@ -14,8 +14,8 @@
 // Compared MODULO A FULL TURN, because near a neutron star's surface the advance exceeds 360 degrees per radial period
 // (380.0 at r0 = 5.4, measured) and the apoapsis detector can only see it reduced.
 //
-// *** THE KEYS THE SCENES' OWN STATUS LINES STATE ARE THE WRONG ONES, AND THIS FILE MEASURED IT. *** Both pages say
-// "below the ISCO" for r0 < 6 as if an orbit there plunged; at 1.05 x circular speed NOTHING plunges (rMin = r0 at every r0
+// *** THE KEYS THE SCENES' OWN STATUS LINES STATED WERE THE WRONG ONES, AND THIS FILE MEASURED IT (lines rewritten at v4587). ***
+// Both scenes said "below the ISCO" for r0 < 6 as if an orbit there plunged; at 1.05 x circular speed NOTHING plunges (rMin = r0 at every r0
 // down to 5, captured = false throughout), and below r0 ~ 4.6 the launch is UNBOUND (E >= 0) and escapes instead. The
 // near-circular closed form 2 pi (sqrt((r - rs)/(r - 3 rs)) - 1) is 90 degrees wrong at r0 = 6 (130 against 220 measured) because the launch is far from
 // circular (rMax = 15.4 from r0 = 6). Neither is used. The exact quadrature agrees with the integration to a few parts per
@@ -129,7 +129,7 @@ export const MEASURED_V4586 = {
     theIscoIsNotTheBoundary:
         "At 1.05 x circular speed nothing plunges: rMin = r0 and captured = false at every r0 from 5 to 20; at r0 = 4 the " +
         "launch is unbound (E = +0.051) and at 4.5 marginally (E = -0.003, rMax 287). The pages' 'below the ISCO' line " +
-        "describes a circular orbit's stability, not this launch.",
+        "described a circular orbit's stability, not this launch (rewritten at v4587).",
     theNearCircularFormIsNotTheKey:
         "2 pi (sqrt((r - rs)/(r - 3 rs)) - 1) reads 130.1 deg at r0 = 6 against 220.2 measured (0.41 of the measured) and 99.5 " +
         "at r0 = 10 against 106.4 (0.065): the launch is eccentric (rMax 15.4 from r0 = 6) and the small-eccentricity " +

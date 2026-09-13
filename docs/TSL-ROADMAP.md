@@ -1711,6 +1711,45 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         string on a residual a refused row does not carry; a run on a proposer the sabotage removed) -- both report now.
         The door: 25 triaged, 9 registered, 26 buttons of which 9 are enabled. brainTrail (task 76) needed no round: main's
         v4565 had already re-founded its check and the v4584 merge carried it; measured green and recorded above.
+     Then (v4587) THE STATUS LINES REWRITTEN. The three v4586 findings about physics-lab.html's own prose are fixed on the
+        page: the black hole's status computes the launch's energy and says "UNBOUND at this start radius -- escaping, not
+        plunging" below r0 ~ 4.6 and "bound -- precessing, apoapsis N" above it, with the ISCO named as a circular orbit's
+        limit and the launch as 1.05 x circular; the neutron star's says bound and precessing with the surface (5.32) named
+        below its slider; the impact's capture radius and impact speed are computed FROM THE START POINT (v_inf^2 = v0^2 -
+        2GM/r0), so the line prints 1.703 and 1.703 where it printed 1.73 and 1.73; the plasma's line shows the mirror
+        point as the adiabatic estimate it is (5-11 % off at this gyroradius) and says "mirroring beyond the +-L marks --
+        the field keeps growing, there is no loss cone" where it said "IN THE LOSS CONE -- escaping"; and the hologram's
+        slider minimum moved from 8 to 10, the smallest separation whose fringes the screen can read. Verified in the
+        harness browser: the page's own status element reads each line as written, the hologram's input min reads 10, and
+        the module parses (a first draft left one paren too many on the neutron-star line and the page's script did not
+        load -- caught by the smoke, not by a gate, because no gate reads these lines). Every "the page prints" and "the
+        slider starts at 8" in the v4586 rows, headers and instrument entries is now history and says so. THE ASSETS
+        QUESTION, answered from the pages: race-track.html, race-car.html and race-brain.html draw Kenney's road tiles and
+        truck through world/kenneyKit.mjs's kitScene beside CityGen's procedural voxel blocks; race-replay.html,
+        race-terrain.html and race-crash.html load no kit at all -- baked voxels, the ribbon road over the git terrain with
+        a box car, CityGen's city with a box car. Kenney's city buildings were vendored as REFERENCE only and are drawn
+        nowhere. THE ROUND ALSO OWED THREE GATES AND FOUND TWO THINGS IT HAD SAID WRONG. reportDoors-selfcheck asks a
+        gate named <basename>-selfcheck.mjs of every module that provides reportLines(), and the three v4586 knob modules
+        had none: physics/apsidalKnob-selfcheck.mjs, impactKnob-selfcheck.mjs and hologramKnob-selfcheck.mjs now sit
+        beside them (each holds the module's two routes to each other, its refusal on its own subject, and that its
+        tolerance is derived, not chosen; twelve sabotages, red by name, none crashing, logged in the headers; since233).
+        Correction one: the first draft of apsidalKnob's gate called the dt-sweep residual at r0 = 10 "a floor, not a
+        slope" and pinned it under 2e-5 -- it reads 5.4e-5, 1.7e-5, 2.6e-6 at dt 0.04, 0.02, 0.01, a slope and the
+        detector's own, so the row holds each reading under the tolerance derived for its step (8.3e-4, 4.1e-4, 2.1e-4)
+        and falling with it. Correction two: reportDoors' "no gate BESIDE them" row had been red since v4584 on
+        brain/fleetRouting.mjs and physics/labHome.mjs, both gated from tools/ship/, and the v4584, v4585 and v4586
+        notes above do not say so -- each round read the red it expected and not that one. They are dated into
+        NO_GATE_V4587 with the reason, the ratchet re-sabotaged (a name dropped, the list spread twice: red both ways),
+        and the census rows re-taken: assertionShape 1628 -> 1631 gates, runtimeGap 4087 -> 4090 files, frozenRecords
+        105 -> 106 records excluding its own module, recordReach 107 -> 108. The quick sweep (401 under budget in 374 s
+        on a slow box) found four new reds and every one was this round's own doing: physicsReach and registryOrphans
+        because a physics module with a sibling gate and a reportLines() is a graded module that owes the instruments
+        registry a row -- pileKnob, gyroKnob, centrifugeKnob, vibrationKnob and raceKnob each have one -- so
+        apsidal-knob, impact-knob and hologram-knob are rows now, doored by their sibling gates; recordReach on the
+        record total; recordDrift on the same missing rows. The sweep's own timings were NOT carried: the box ran the
+        sweep three times slower than usual and evicted nine gates, so the committed readings stand and only the three
+        new gates' readings (917, 243 and 115 ms) were added, with the run's capture stamp -- the same repair as v4586,
+        and the one sweepCoverage's ledger is green on.
 ## The count that says when step 4 matters
 
 tools/ship/shaderCensus-selfcheck.mjs has held, since v3274, that a hand-written pair is cheaper than an

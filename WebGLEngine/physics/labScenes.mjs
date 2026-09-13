@@ -172,7 +172,7 @@ export const SCENE_TRIAGE = [
       key: "THE APSIDAL ADVANCE PER RADIAL PERIOD: the mean apoapsis-to-apoapsis angle of the Paczynski-Wiita integration " +
            "equals the radial quadrature of the same potential from the launch's (E, L), modulo a turn -- 243.175 vs 243.176 " +
            "deg at r0 = 5, 106.373 vs 106.373 at r0 = 10, parts per million, with a tolerance derived from the apoapsis " +
-           "detector's once-per-step sampling. *** THE PAGE'S OWN 'BELOW THE ISCO' LINE IS NOT THE KEY: at 1.05 x circular " +
+           "detector's once-per-step sampling. *** THE PAGE'S OWN 'BELOW THE ISCO' LINE (rewritten at v4587) WAS NOT THE KEY: at 1.05 x circular " +
            "speed nothing plunges (rMin = r0 down to 5), and below r0 ~ 4.6 the launch is UNBOUND and escapes; the " +
            "near-circular closed form is 90 degrees wrong at r0 = 6 (130 against 220) because the launch is eccentric. *** Registered: bh-start-radius." },
     { scene: "solar-system", knob: "planets", instrument: null, eligible: "refused", provenance: PROVENANCE.ASSESSED, responds: "n/a",
@@ -184,7 +184,7 @@ export const SCENE_TRIAGE = [
       key: "THE SAME APSIDAL ADVANCE under the same potential at 1.02 x circular speed, with the canonical 1.4 M_sun, 11 km " +
            "star's surface at 5.321 (rs = 2 units) as the impact boundary: 346.321 vs 346.320 deg at r0 = 6, and at r0 = 5.4 " +
            "the exact advance is 380.000 deg per radial period, read by the detector as 19.999 -- equal modulo a full turn. " +
-           "The surface lies BELOW the page's slider minimum of 5.4, so nothing on the slider impacts; the proposer offers " +
+           "The surface lies BELOW the page's slider minimum of 5.4, so nothing on the slider impacts (its status line said 'below the ISCO' until v4587); the proposer offers " +
            "r0 = 5 so the refusal branch runs. Registered: ns-start-radius." },
     { scene: "white-dwarf", knob: "mass", instrument: "white-dwarf", eligible: "refused", provenance: PROVENANCE.ASSESSED, responds: "identity",
       key: null,
@@ -200,15 +200,15 @@ export const SCENE_TRIAGE = [
               "at dt = 0.04, 0.02, 0.01, 0.005 (7.26e-2 at every one), so the residual is the adiabatic approximation at a " +
               "gyroradius one fifth of the bottle (vperp = 1, B0 = 1, L = 5), not the integrator. A tolerance wide enough to " +
               "pass is a control that cannot fail; one tight enough to mean anything refuses every candidate. Also found: the " +
-              "page's status calls zMax > L 'IN THE LOSS CONE -- escaping', and this bottle's field grows without bound, so " +
-              "every run reflected (4 reflections at vpar = 1.2 and 1.6); there is no loss cone in it." },
+              "page's status called zMax > L 'IN THE LOSS CONE -- escaping' until v4587, and this bottle's field grows without bound, " +
+              "so every run reflected (4 reflections at vpar = 1.2 and 1.6); there is no loss cone in it." },
     { scene: "impact", knob: "b", instrument: "impact", eligible: "candidate", provenance: PROVENANCE.MEASURED, responds: "yes",
       key: "THE CAPTURE BOUNDARY FROM THE START POINT, b_c = R sqrt(v0^2 + 2GM/R - 2GM/r0)/v0 = 1.70294, bisected at 1.70301 " +
            "by the integration; either side of it a closed form of the launch's exact invariants -- a miss's closest approach " +
            "is the (E, L) pericentre (1.0064 vs 1.0063 at b = 1.71), a hit's speed at the radius reached is energy " +
-           "conservation's (residual 1.5e-4) -- with the tolerance derived from dt. *** THE PAGE PRINTS 1.73: it hands the " +
+           "conservation's (residual 1.5e-4) -- with the tolerance derived from dt. *** THE PAGE PRINTED 1.73 until v4587: it handed the " +
            "launch speed at r0 = 20 to criticalImpactParameter as the speed at infinity, and an adjudicator built on that " +
-           "line would refuse a correct flyby at b = 1.71. *** Registered: impact-aim." },
+           "line would refuse a correct flyby at b = 1.71; the status line now computes the boundary from the start. *** Registered: impact-aim." },
     { scene: "star-catalog", knob: "depth", instrument: null, eligible: "refused", provenance: PROVENANCE.ASSESSED, responds: "n/a",
       key: null,
       reason: "the knob blends the view between a flat sky and the recorded distances; the data are a baked catalog (ev/" +
@@ -228,8 +228,8 @@ export const SCENE_TRIAGE = [
       key: "THE SEPARATION READ BACK FROM THE FRINGES: spacing = lambda D / sep, so hologram.recoverSeparation over the " +
            "scene's own screen scan must return the knob -- 10.008 / 10, 20.017 / 20, 59.835 / 60, every residual under a " +
            "bound derived from the screen's pitch. It refuses below sep = 10, where fewer than three bright fringes fit the " +
-           "+-60 screen (one at sep = 4, 6 and 8) and no spacing can be read -- *** and the page's slider starts at 8, inside " +
-           "that region. *** Registered: hologram-sep." },
+           "+-60 screen (one at sep = 4, 6 and 8) and no spacing can be read -- *** and the page's slider started at 8, inside " +
+           "that region, until v4587 moved it to 10. *** Registered: hologram-sep." },
     { scene: "race", knob: "speedGain", instrument: "drive-policy", eligible: "candidate", provenance: PROVENANCE.MEASURED, responds: "yes",
       key: "A LAP ON A TRACK THE SCORE NEVER SAW: the score is metres in 30 s on seed 1 and the key is 90 s on seeds 2 " +
            "and 3 -- a lap inside 80 s with at most 1% of wheel samples off the asphalt -- so a driver that memorised " +

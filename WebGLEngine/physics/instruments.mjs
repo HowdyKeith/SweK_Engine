@@ -1078,6 +1078,24 @@ export const INSTRUMENTS = [
         key: "*** IT REFUSES AT BOTH ENDS AND THE REASONS ARE DIFFERENT, WHICH MAKES IT A WINDOW RATHER THAN A THRESHOLD. *** LOW mu: the additive offset of ~0.0102 is CONSTANT, so dividing it by a shrinking knob explodes -- 51% relative error at mu = 0.02, 20% at 0.05, 10% at 0.1. HIGH mu: the block is a CUBE and topples at tan(theta) = 1 whatever the friction, so tan(theta_c) reads 1.01359, 1.01266, 1.01266 at mu = 1.0, 1.3, 2.0 -- IDENTICAL TO FIVE DIGITS. THE OBSERVABLE GOES DEAF TO THE KNOB, WHICH IS EXACTLY WHY ORBIT WAS WITHDRAWN AT v3588 -- except pile goes deaf only above a boundary the physics NAMES, so it can be refused there and accepted below, and the saturation is detectable from the inside: three knob values returning one answer is a REPORT THAT THE KNOB HAS STOPPED BEING THE CAUSE. The topple check runs FIRST, because running the bisection anyway returns 1.0127 and looks like a 49% error, inviting somebody to widen the tolerance until it passed -- when the answer is not wrong, it is ABOUT SOMETHING ELSE. v3570's adjudicator is REUSED rather than rebuilt, with both findings carried: the detector must be VELOCITY not displacement, and the residual is ADDITIVE so the bound sits ABOVE it. *** AND knobRegistry'S OWN GATE CAUGHT THE FIRST VERSION: it returned pass:false when box3d was absent and was reported as ALWAYS REFUSES -- correctly, because from the outside A DEPENDENCY FAILURE AND A PHYSICS VERDICT ARE THE SAME BOOLEAN. ***",
     },
     {
+        id: "apsidal-knob", area: "method", name: "The start radius as an adjudicator: the apsidal advance, integration against quadrature, modulo a turn",
+        page: "physics-lab.html", gate: "physics/apsidalKnob-selfcheck.mjs",
+        measures: "physics/apsidalKnob.mjs, the black-hole and neutron-star scenes' adjudicator (v4586): the mean apoapsis-to-apoapsis angle of the integration against the radial quadrature of the same Paczynski-Wiita potential, compared modulo 2 pi, under a tolerance derived from the detector's step rather than chosen.",
+        key: "*** IT REFUSES ON ITS OWN SUBJECT, AND THE PAGE'S SLIDER OFFERED THE REFUSED VALUE. *** At 1.05 x circular speed r0 = 4 (on the black hole's slider) is UNBOUND (E = +0.051) and refused with the energy named; r0 = 5 is inside the neutron star's surface and refused; the greedy pick (the smallest radius, score 1 / r0) is refused for both scenes. Where the launch is bound the two routes agree to better than 2e-5 at r0 = 5, 6, 10, 20, and the dt sweep at r0 = 10 is a SLOPE, the detector's own (5.4e-5, 1.7e-5, 2.6e-6 at dt 0.04, 0.02, 0.01), each reading under the tolerance derived for its step -- the first draft of the gate called it a floor under 2e-5 and was wrong at dt 0.04 (v4587).",
+    },
+    {
+        id: "impact-knob", area: "method", name: "The aim as an adjudicator: the capture boundary from the start point, and the laws either side of it",
+        page: "physics-lab.html", gate: "physics/impactKnob-selfcheck.mjs",
+        measures: "physics/impactKnob.mjs, the impact scene's adjudicator (v4586): a hit is graded on the speed at the radius reached, a miss on the (E, L) pericentre, under TOL_PER_DT * dt * TOL_HEADROOM; an aim inside the dt-derived band around the boundary is refused as undecidable by name.",
+        key: "*** THE BOUNDARY IS THE START POINT'S, NOT THE FORMULA'S AT INFINITY. *** b_c = R sqrt(v0^2 + 2GM/R - 2GM/r0) / v0 = sqrt(2.9) = 1.70294 from x0 = -20 at v0 = 1; the vInf = v0 form gives sqrt(3) = 1.732, 1.7 % wide, and the page printed it until v4587. b = 1.71 MISSES, which the start-point form predicts and the infinity form does not. The greedy pick (the closest shave, b = 1.703, 6e-5 from the boundary) is refused as undecidable at dt = 0.02, so the search is told no first.",
+    },
+    {
+        id: "hologram-knob", area: "method", name: "The separation as an adjudicator: read back from the fringes, or refused where fewer than three fit",
+        page: "physics-lab.html", gate: "physics/hologramKnob-selfcheck.mjs",
+        measures: "physics/hologramKnob.mjs, the hologram scene's adjudicator (v4586): the separation recovered from the measured peak spacing (hologram.recoverSeparation) against the knob, under a bound of TOL_PITCHES pitches of the screen per fringe spacing.",
+        key: "*** BELOW sep = 10 ONE BRIGHT FRINGE SITS ON THE +-60 SCREEN AND NO SPACING CAN BE READ, AND THE PAGE'S SLIDER STARTED AT 8. *** sep = 4 and 8 are refused as unreadable by name (peaks < MIN_PEAKS = 3); the greedy pick (the widest fringes, score 1 / sep) is sep = 4 and is refused. From 10 to 60 every separation is recovered under its pitch-derived bound, the worst (sep = 12, 6.2e-3) a factor of three inside it. The slider's minimum moved to 10 at v4587.",
+    },
+    {
         id: "hookup-state", area: "ship", name: "How far along, derived rather than kept",
         page: "instrument-bench.html", gate: "tools/ship/hookupState-selfcheck.mjs",
         measures: "The state of every physics instrument with respect to the lab -- proposer, bench, page or nothing -- and the attrition rate that governs any plan to change it.",
@@ -1885,7 +1903,7 @@ export const INSTRUMENTS = [
         id: "black-hole", area: "physics", page: "physics-lab.html", name: "A Paczynski-Wiita black hole: horizon, photon sphere, ISCO and precessing orbits from one pseudo-Newtonian potential",
         gate: "physics/blackHole-selfcheck.mjs",   // physics/blackHole.js; the lab's black-hole scene; adjudicated by apsidalKnob's bh-start-radius
         measures: "the apsidal advance per radial period of a launch at 1.05 x circular speed, integration against the radial quadrature of the same potential: 243.175 vs 243.176 deg at r0 = 5, 106.373 vs 106.373 at r0 = 10, parts per million; below r0 ~ 4.6 the launch is unbound",
-        key: "*** THE ORBIT'S PRECESSION IS THE KEY, AND THE PAGE'S 'BELOW THE ISCO' LINE IS NOT: at 1.05 x circular speed nothing plunges and the near-circular closed form is 90 degrees wrong at r0 = 6 (130 against 220) *** -- the exact quadrature of the launch's (E, L) agrees with the time integration to the apoapsis detector's own step quantisation, which is the tolerance.",
+        key: "*** THE ORBIT'S PRECESSION IS THE KEY, AND THE PAGE'S 'BELOW THE ISCO' LINE (rewritten at v4587) WAS NOT: at 1.05 x circular speed nothing plunges and the near-circular closed form is 90 degrees wrong at r0 = 6 (130 against 220) *** -- the exact quadrature of the launch's (E, L) agrees with the time integration to the apoapsis detector's own step quantisation, which is the tolerance.",
     },
     {
         id: "neutron-star", area: "physics", page: "physics-lab.html", name: "A canonical 1.4 M_sun, 11 km neutron star: the same relativistic gravity as the black hole with a surface instead of a horizon",
@@ -1897,13 +1915,13 @@ export const INSTRUMENTS = [
         id: "impact", area: "physics", page: "physics-lab.html", name: "An asteroid's approach under gravitational focusing: the capture boundary and the pericentre and speed laws either side of it",
         gate: "physics/impact-selfcheck.mjs",   // physics/impact.js stage 1; adjudicated by impactKnob's impact-aim
         measures: "the boundary from the start point b_c = sqrt(2.9) = 1.70294, bisected at 1.70301 by the integration; a miss's closest approach against the (E, L) pericentre to 1.2e-4, a hit's speed at the radius reached against energy conservation to 1.5e-4, flat across dt",
-        key: "*** THE PAGE PRINTS 1.73 BECAUSE IT HANDS THE LAUNCH SPEED AT r0 = 20 TO THE FORMULA AS THE SPEED AT INFINITY; the true boundary is 1.703 and b = 1.71 MISSES *** -- an adjudicator built on the printed line would refuse a correct flyby.",
+        key: "*** THE PAGE PRINTED 1.73 UNTIL v4587 BECAUSE IT HANDED THE LAUNCH SPEED AT r0 = 20 TO THE FORMULA AS THE SPEED AT INFINITY; the true boundary is 1.703 and b = 1.71 MISSES *** -- an adjudicator built on the printed line would refuse a correct flyby.",
     },
     {
         id: "hologram", area: "physics", page: "physics-lab.html", name: "Two coherent point sources on a screen: the fringe spacing lambda D / sep, and the separation read back from it",
         gate: "physics/hologram-selfcheck.mjs",   // physics/hologram.js; adjudicated by hologramKnob's hologram-sep
         measures: "the separation recovered from the scene's own screen scan: 10.008 / 10, 20.017 / 20, 59.835 / 60, every residual under a bound derived from the 0.502 pitch; 1 bright fringe on the +-60 screen at sep = 4, 6 and 8",
-        key: "*** BELOW sep = 10 FEWER THAN THREE FRINGES FIT THE SCREEN AND NOTHING CAN BE READ BACK, AND THE PAGE'S SLIDER STARTS AT 8 *** -- the adjudicator refuses there by name rather than reading a spacing of zero as a separation of infinity.",
+        key: "*** BELOW sep = 10 FEWER THAN THREE FRINGES FIT THE SCREEN AND NOTHING CAN BE READ BACK, AND THE PAGE'S SLIDER STARTED AT 8 UNTIL v4587 *** -- the adjudicator refuses there by name rather than reading a spacing of zero as a separation of infinity.",
     },
     {
         id: "lab-home", area: "method", page: "lab-home.html", name: "The Physics Lab's front door: one Initiate button, a 2D live strip of the scene, the proposer, its pick and the adjudicator's verdicts as they land, the curated presets as buttons, and under each a plain line naming the instrument, its key and the device or peer that runs it, every line derived from the tree's own records",

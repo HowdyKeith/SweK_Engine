@@ -11,8 +11,8 @@
 //   a hit          the speed at the radius actually reached equals sqrt(v0^2 + 2GM(1/r_end - 1/r0)) -- evaluated at r_end
 //                  rather than at R, because a step lands INSIDE the surface and the overshoot alone reads 1 % at b = 0.5.
 //
-// *** THE PAGE'S OWN STATUS LINE PRINTS THE WRONG CAPTURE RADIUS, AND THIS FILE MEASURED IT. *** physics-lab.html passes
-// vInf = 1 to criticalImpactParameter and prints 1.73; the launch speed 1 is the speed at r0 = 20, not at infinity, and the
+// *** THE PAGE'S OWN STATUS LINE PRINTED THE WRONG CAPTURE RADIUS, AND THIS FILE MEASURED IT (fixed at v4587). *** physics-lab.html
+// passed vInf = 1 to criticalImpactParameter and printed 1.73; the launch speed 1 is the speed at r0 = 20, not at infinity, and the
 // true boundary from that start is 1.70294: MEASURED at 1.70263, 1.70297, 1.70301, 1.70304 by bisection at dt = 0.04, 0.02,
 // 0.01, 0.005. An adjudicator built on the printed boundary would REFUSE a correct flyby at b = 1.71 (it misses, rMin
 // 1.0064; the naive form says capture). The knob is a value a key can be wrong about, and the first candidate key was.
@@ -68,7 +68,7 @@ export function score(b) { return Number.isFinite(b) && b >= 0 ? 1 / (Math.abs(b
 export function propose({ current = 1.3 } = {}) { return [0.5, 1.0, 1.3, 1.6, 1.7, 1.703, 1.71, 1.8, 2.0, 2.5, 3.2].filter((v) => v !== current); }
 
 export const MEASURED_V4586 = {
-    thePrintedBoundaryIsWrong: "the page prints 1.73 (vInf = 1); the boundary from x0 = -20 is 1.70294, bisected at 1.70263 / 1.70297 / 1.70301 / 1.70304 over dt = 0.04 .. 0.005; b = 1.71 MISSES (rMin 1.0064) where the printed form says capture",
+    thePrintedBoundaryIsWrong: "the page printed 1.73 (vInf = 1) until v4587; the boundary from x0 = -20 is 1.70294, bisected at 1.70263 / 1.70297 / 1.70301 / 1.70304 over dt = 0.04 .. 0.005; b = 1.71 MISSES (rMin 1.0064) where the printed form says capture",
     theHitLawNeedsTheRadiusReached: "at b = 0.5 the speed at impact reads 1.72115 against 1.70294 at R (1.1 %): the step lands inside the surface; evaluated at the radius reached the residual is Verlet's alone, 1.5e-4",
     theGreedyPickIsUndecidable: "the search's preference is the closest shave, b = 1.703, which sits 6e-5 from the boundary: inside the dt-derived band of 1.7e-3 the step lands on either side, so it is refused as undecidable and the next-closest, 1.70, is accepted as a hit",
     theFloorIsFlatInDt: "miss b = 2: 6.0e-5, 1.2e-4, 1.3e-4, 1.5e-4; hit b = 1.3: 1.5e-4 at every dt -- the once-per-step sampling of the closest approach, so the bound is stated as TOL_PER_DT * dt * TOL_HEADROOM rather than fitted",

@@ -464,7 +464,8 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4585 measured main's own tree at 4f89c470 in a worktree: 105/46/178 against its recorded 104/45/172 -- the row
     // had gone stale ON MAIN, where the quick sweep skips a gate whose inputs did not change, and the merged tree's full
     // run was the first to say so. Right numbers, wrong attribution, corrected here rather than left.
-    currentIncludingModule: Object.freeze({ records: 107, withFields: 48, fields: 198 }),
+    // v4587 -- RE-TAKEN with `excluding` below: 107/48/198 -> 108/48/198, the one record (NO_GATE_V4587) and no field.
+    currentIncludingModule: Object.freeze({ records: 108, withFields: 48, fields: 198 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -516,7 +517,9 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4584 -- RE-TAKEN: 104/45/172 -> 105/46/178, on the tree merged with main at v4583. NOT gateSweep's since230, as the
     // first draft of this note said: sinceNNN records are not version-stamped names and the census never counts them.
     // v4585 ran the census on main's own tree (4f89c470) and got 105/46/178 there too: the row was stale on main.
-    excluding: Object.freeze({ records: 105, withFields: 46, fields: 178 }),
+    // v4587 -- RE-TAKEN: 105/46/178 -> 106/46/178, one record: reportDoors' NO_GATE_V4587, a dated list of two module
+    // names and no numeric field, so records moves by one and withFields and fields do not.
+    excluding: Object.freeze({ records: 106, withFields: 46, fields: 178 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,
