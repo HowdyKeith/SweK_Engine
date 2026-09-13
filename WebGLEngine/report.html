@@ -280,11 +280,30 @@
           // this is the shortest path from "that box is getting worse" to seeing which round it happened in.
           const link = a && a.state === "running" && a.runId
             ? ' <a href="/run-inspector.html?id=' + encodeURIComponent(a.runId) + '" target="_blank" rel="noopener" style="color:#9fe6c0;">inspect</a>' : "";
-          return '<div><span style="color:' + col + '">' + esc(a ? a.state : "?") + "</span> " +
+          return '<div data-host="' + esc(r.host || r.origin || "") + '"><span style="color:' + col + '">' + esc(a ? a.state : "?") + "</span> " +
             esc(r.host || r.origin || "?") +
             ' <span style="color:#6f8a7c">' + esc(r.engineVersion || "version not reported") + "</span>" +
-            detail + link + "</div>";
-        }).join("");
+            detail + link + '<span class="took"></span></div>';
+        }).join("") + '<div id="fleetRouted" style="margin-top:6px;color:#6f8a7c;">routed requests: reading&hellip;</div>';
+      // v4584 -- WHICH PEER TOOK WHICH REQUEST. /ai/brain/routed is the ledger POST /ai/brain/route fills through
+      // brain/fleetRouting.mjs: per peer, how many it took, of which kinds, and the last one named (kind, scene, policy,
+      // tick range). A peer whose id names a roster host gets the line ON ITS ROW; every peer gets a line below, so a
+      // brain the lighthouse never rostered is still attributed. "none routed yet" is a true reading, not a fault.
+      try {
+        const q = await (await fetch("/ai/brain/routed", { cache: "no-store" })).json();
+        const peers = (q && q.summary && q.summary.peers) || [];
+        const rt = document.getElementById("fleetRouted");
+        const line = (p) => esc(p.id) + " (" + esc(p.gpu) + ") took " + p.count + " request" + (p.count === 1 ? "" : "s") +
+          " (" + Object.entries(p.kinds).map(([k, n]) => k + " " + n).join(", ") + "), last: " + esc(p.last && (p.last.what || p.last.line) || "?");
+        for (const p of peers) {
+          const host = [...el.querySelectorAll("[data-host]")].find((d) => { const h = (d.dataset.host || "").toLowerCase(); return h && (p.id.toLowerCase().includes(h) || h.includes(p.id.toLowerCase())); });
+          if (host) host.querySelector(".took").innerHTML = ' <span style="color:#e0b0ff">took ' + p.count + ", last " + esc(p.last && p.last.what || "?") + "</span>";
+        }
+        rt.innerHTML = !q || !q.ok ? "routed requests: bridge predates routing"
+          : !q.count ? "routed requests: none routed yet (POST /ai/brain/route fills the ledger)"
+          : "routed requests: " + q.count + " on the ledger" + (q.summary.unattributed ? ' <span style="color:#f28b8b">' + q.summary.unattributed + " UNATTRIBUTED</span>" : ", every one attributed") +
+            peers.map((p) => "<div>" + line(p) + "</div>").join("");
+      } catch { const rt = document.getElementById("fleetRouted"); if (rt) rt.textContent = "routed requests: bridge unreachable"; }
     } catch { el.textContent = "lighthouse unreachable"; }
   })();
 

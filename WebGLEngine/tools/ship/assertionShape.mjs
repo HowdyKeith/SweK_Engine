@@ -268,6 +268,7 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // gate by one. NOT THIS ROUND'S GATE -- it arrived on main in commit c3f1fecb (the release zip's pure-Node
     // writer) and is re-taken here because that commit and this one merged, and the tree has to be green for
     // whichever lands second. distinctDefinitions holds at 40 for the NINTH round running.
+    // v4584 -- RE-TAKEN on the tree merged with main at v4583: one gate (fleetRouting) joined, the same four rows by one.
     // v4536 -- RE-TAKEN AGAIN AT THE MERGE, for tools/ship/partitionScore-selfcheck.mjs: 1619 -> 1620.
     // *** BOTH LINES RE-TOOK THIS TABLE IN THE SAME WINDOW, TWICE IN TWO ROUNDS, AND THE MERGE HAS TO ADD
     // THE TWO MOVES RATHER THAN PICK ONE: *** each side's note is correct for a tree containing its own new
@@ -281,8 +282,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // a gate by one. distinctDefinitions holds at 40 for the eleventh round running.
     // v4539 -- RE-TAKEN for tools/ship/groundProbe-selfcheck.mjs: 1628 -> 1629 and the three rows that follow
     // a gate by one.
-    gates: 1629, usesOk: 1608, definesOk: 1600, importsOk: 0,
-    distinctDefinitions: 40, nameFirst: 1501, condFirst: 91, unknownSignature: 16,
+    // v4540 -- RE-TAKEN AT THE MERGE: 1626 -> 1630.
+    gates: 1630, usesOk: 1609, definesOk: 1601, importsOk: 0,
+    distinctDefinitions: 40, nameFirst: 1502, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

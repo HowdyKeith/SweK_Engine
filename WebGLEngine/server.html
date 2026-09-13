@@ -1913,6 +1913,15 @@ window.addEventListener("load", function () {
               <div id="bgSolver" style="font-size:16px;font-weight:bold;color:#8ab4ff;">&mdash;</div>
               <div id="bgSolverNote" style="font-size:10px;color:var(--dim);margin-top:2px;">cpu / gpu / auto / demoted</div>
             </div>
+            <!-- v4584 -- WHICH PEER TOOK THE LAST REQUEST, AND WHAT IT WAS. /ai/brain/health's `routed` field: the ledger
+                 POST /ai/brain/route fills (brain/fleetRouting.mjs over the live registry). The big value is the peer, the
+                 note is the request (kind, scene, policy, tick range). "none routed yet" is a true reading, not a fault;
+                 an unattributed count above zero reddens the value, because a routed request nobody took is the defect. -->
+            <div style="flex:1;min-width:160px;background:#0a0d12;border:1px solid var(--line);border-radius:6px;padding:8px 10px;">
+              <div style="font-size:10px;color:var(--dim);">last routed request &rarr; peer</div>
+              <div id="bgRouted" style="font-size:16px;font-weight:bold;color:#e0b0ff;">&mdash;</div>
+              <div id="bgRoutedNote" style="font-size:10px;color:var(--dim);margin-top:2px;">none routed yet</div>
+            </div>
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px;padding-top:6px;border-top:1px solid var(--line);">
             <b style="font-size:11px;color:var(--ink);">Benchmark</b>
@@ -7557,6 +7566,14 @@ try{const r=await fetch("/self/whoami",{cache:"no-store"});const j=await r.json(
           set("bgSolves", (h.fieldPosts != null ? h.fieldPosts : "\u2014"));
           set("bgSolveAge", h.lastSolveMsAgo != null ? ("last solve " + secs(h.lastSolveMsAgo)) : "no solves yet");
           set("bgExp", (h.experience != null ? h.experience : "\u2014"));
+          // v4584 -- the last routed request: WHICH peer took it (the value) and WHAT it was (the note).
+          var rt = h.routed || null;
+          if (rt && rt.last && rt.last.peer) {
+            set("bgRouted", rt.last.peer.id + " (" + (rt.last.peer.gpu || "?") + ")", rt.unattributed ? COLORS.offline : "#e0b0ff");
+            set("bgRoutedNote", (rt.last.what || "") + " \u2014 " + rt.count + " routed" + (rt.unattributed ? ", " + rt.unattributed + " UNATTRIBUTED" : ""));
+          } else {
+            set("bgRouted", "\u2014", "#6d829a"); set("bgRoutedNote", rt ? "none routed yet" : "bridge predates routing");
+          }
           // v2215 -- which solver produced the last field. Short tag as the big value, full
           // live string as the note; red when a GPU field truncated (same signal the maze uses).
           var sb = h.solverBackend || null;
@@ -7576,6 +7593,7 @@ try{const r=await fetch("/self/whoami",{cache:"no-store"});const j=await r.json(
           set("bgState", "unreachable", COLORS.err);
           set("bgStateDetail", ""); set("bgSolves", "\u2014"); set("bgSolveAge", ""); set("bgExp", "\u2014");
           set("bgSolver", "\u2014", "#6d829a"); set("bgSolverNote", "");
+          set("bgRouted", "\u2014", "#6d829a"); set("bgRoutedNote", "");
         })
         .then(function () { clearTimeout(t); busy = false; });
     }

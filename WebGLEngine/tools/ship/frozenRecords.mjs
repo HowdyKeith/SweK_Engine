@@ -459,6 +459,8 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4577 -- RE-TAKEN with `excluding` below: 104/46/189 -> 105/47/192, the one record and its three fields.
     // v4578 -- RE-TAKEN with `excluding` below: 105/47/192 -> 106/47/192, the one record and none of its
     // values being a bare integer.
+    // v4584 -- RE-TAKEN with `excluding` below: 106/47/192 -> 107/48/198, the one record (gateSweep's since230) and its
+    // six fields, on the tree merged with main at v4583.
     // v4536 -- RE-TAKEN with `excluding`: 104/46/189 -> 105/47/199, the one new record PARTITION_AT_V4536 and
     // its ten fields, plus this module's own two and their twenty. The two readings move together by
     // construction and the row below asserts the gap is exactly this module's own pair.
@@ -471,6 +473,7 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4538 -- RE-TAKEN with `excluding`: 109/50/212 -> 110/51/218.
     // v4539 -- RE-TAKEN with `excluding`: 110/51/218 -> 111/52/226.
     // v4539 -- RE-TAKEN with `excluding`: 111/52/226 -> 112/52/226.
+    // v4540 -- RE-TAKEN with `excluding`: 107/48/198 -> 112/52/226.
     currentIncludingModule: Object.freeze({ records: 112, withFields: 52, fields: 226 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
@@ -520,6 +523,8 @@ export const PROBE_AT_V4536 = Object.freeze({
     // every field it carries is a string or a frozen array of paths, and FIELD_RE counts `name: <digits>,`.
     // A record with no numeric field is still a record, and stating that is cheaper than the next re-take
     // wondering why one number moved and two did not.
+    // v4584 -- RE-TAKEN: 104/45/172 -> 105/46/178. ONE record, gateSweep.mjs's since230 (the fleetRouting gate's sweep
+    // record, six fields: at, swept, green, red, added, verdict shapes), taken on the tree merged with main at v4583.
     // v4536 -- RE-TAKEN: 102/44/169 -> 103/45/179. ONE record, PARTITION_AT_V4536 in nav/partitionScore.mjs,
     // carrying the ten numbers behind that round's refusal of backlog item "navmesh-recast" piece (1). It is
     // the largest single-record field jump this census has recorded, which is a property of the round rather
@@ -540,6 +545,7 @@ export const PROBE_AT_V4536 = Object.freeze({
     // physics/character/groundProbe.mjs.
     // v4539 -- RE-TAKEN AGAIN: 109/50/206 -> 110/50/206, for OUTOFSCOPE_ARRIVALS_SINCE_V4435, the second
     // list this round had to split out of the first. A repair to a record IS a record.
+    // v4540 -- RE-TAKEN AT THE MERGE: 105/46/178 -> 110/50/206.
     excluding: Object.freeze({ records: 110, withFields: 50, fields: 206 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,

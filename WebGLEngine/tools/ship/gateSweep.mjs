@@ -3844,7 +3844,12 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "read cache out of tidiness -- eleven milliseconds is not a failed gate, it is an EXILED " +
                  "one.",
     }),
-    since230: Object.freeze({
+    // v4540 -- RENUMBERED 230 -> 234 AT THE MERGE. Main's v4584 reached for 230 while this branch's v4536
+    // already held it, which gateSweep's own duplicate-ordinal row caught -- a runtime read cannot see two
+    // object keys of the same name, the later one wins silently and the earlier round's swept count vanishes
+    // from the surplus arithmetic. FIFTH ORDINAL COLLISION between the two lines this session; the side that
+    // merges second is the side that moves.
+    since234: Object.freeze({
         at: "v4536", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/partitionScore-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -4968,6 +4973,23 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "which is a ground controller FLYING -- 143 substeps sailing over a deck 10 units below. Six " +
                  "sabotages, all red by name, including a normal taken from a central difference of the samples " +
                  "instead of the bilinear patch the height comes from.",
+    }),
+    since230: Object.freeze({
+        at: "v4584", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/fleetRouting-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green headless on box3d's wasm, 0.9 s; no GPU in it. Fleet brain routing, named: brain/fleetRouting.mjs makes a " +
+                 "request { kind, scene, policy, ticks } and a routed row that names the peer that took it, over fleet.js's learned " +
+                 "scheduler fed by the bridge's live registry; POST /ai/brain/route and GET /ai/brain/routed keep the ledger that " +
+                 "server.html's gauge card, report.html's fleet rows and brain-fleet.html's cards read; the trainer's episodes and " +
+                 "the race's lockstep tick ranges are routed the same way and run here, the ranges chaining to the record's " +
+                 "fingerprint. Three corrections found by the gate: an ineligible peer was only slowed, not excluded; the " +
+                 "scheduler's prior ignored the telemetry; the routed row dropped the request's payload. Sabotages red at " +
+                 "A / B / C / D / E, and A crashed the gate's first draft on a null peer before it reported. Built on the branch " +
+                 "as v4531 and relabelled at the merge: main had shipped v4531 to v4583 meanwhile.",
     }),
     since199: Object.freeze({
         at: "v4543", swept: 1, green: 1, red: 0,
