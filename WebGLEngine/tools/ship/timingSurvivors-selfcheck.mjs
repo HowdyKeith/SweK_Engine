@@ -177,9 +177,18 @@ console.log("\n5. AND EVERY STALE ENTRY IS CORRECTED, WHICH IS WHY SECTION 3 REA
     // parallelMs`, preferring the serial -- which is an alone reading too. A twelve-wide number would carry
     // neither meaning, so it is not written anywhere.
     const gFixed = R.filter((x) => x.gateStale), sFixed = R.filter((x) => x.sweepStale);
-    ok(`*** all ${gFixed.length} stale gate-timings entries now hold this round's alone reading ***`,
-        gFixed.every((x) => G[x.gate] === x.alone),
-        gFixed.map((x) => `${path.basename(x.gate)} ${x.gateWas}->${G[x.gate]}`).join(", "));
+    // *** v4580 -- AND THE GATE-TIMINGS HALF NEEDED THE SAME CORRECTION THE SWEEP HALF GOT AT v4578. ***
+    // This required `G[x.gate] === x.alone` -- the EXACT millisecond this round measured. v4580 ran the real
+    // runner over 953 gates and re-measured five of these: exitBanner 69 -> 73, reskin 929 -> 911, dockSystem
+    // 45 -> 50. Ordinary run-to-run jitter on a fresh, complete, exit-0 reading of the same gate on the same
+    // box -- and the row called it a failure. A GATE THAT GOES RED ON A BETTER MEASUREMENT is the shape v3936
+    // recorded when hostScale-selfcheck's own example moved, and pinning one noisy sample is how you build it.
+    // What the row can honestly require is what the sweep half already requires: the entry moved OFF its stale
+    // value, and it is within reach of the alone reading rather than back near the number that was wrong.
+    const nearAlone = (x) => { const r = G[x.gate] / x.alone; return r > 0.6 && r < 1.7; };
+    ok(`*** all ${gFixed.length} stale gate-timings entries are off their stale values and hold an alone-scale reading ***`,
+        gFixed.every((x) => G[x.gate] !== x.gateWas && nearAlone(x)),
+        gFixed.map((x) => `${path.basename(x.gate)} ${x.gateWas}->${G[x.gate]} (alone ${x.alone}, ${(G[x.gate] / x.alone).toFixed(2)}x)`).join(", "));
     // *** AND THIS ROW'S FIRST VERSION ASSERTED THE THING v4578 FOUND WRONG. *** It required each repaired
     // sweep entry to hold this round's ALONE reading, on the reasoning that quickSweep prefers serialMs. It
     // does -- but only for a gate that GETS a serial run, which means over the budget or red. Nine of these
@@ -190,10 +199,20 @@ console.log("\n5. AND EVERY STALE ENTRY IS CORRECTED, WHICH IS WHY SECTION 3 REA
     ok(`*** and all ${sFixed.length} stale sweep entries are off their stale values with a fresh stamp -- the number v4578 put there is the LOADED reading, not the alone one this round first wrote ***`,
         sFixed.every((x) => S.timings[x.gate] !== x.sweepWas && (S.at || {})[x.gate] !== UNKNOWN_AT),
         sFixed.map((x) => `${path.basename(x.gate)} ${x.sweepWas}->${S.timings[x.gate]}`).join(", "));
-    ok("  and an entry this round judged SOUND was left alone, so the repair is targeted rather than a rewrite of both files",
-        R.filter((x) => !x.sweepStale).every((x) => S.timings[x.gate] === x.sweepWas) &&
-        R.filter((x) => !x.gateStale).every((x) => G[x.gate] === x.gateWas),
-        `${R.filter((x) => !x.sweepStale).length} sweep and ${R.filter((x) => !x.gateStale).length} gate-timings entries untouched`);
+    // *** v4580 -- THE GATE-TIMINGS HALF OF THIS ASKED A LIVE FILE A QUESTION ABOUT A PAST ROUND, AND A LATER
+    // ROUND ANSWERED NO. *** "Left alone" was true of v4577's edit and is false of the file today, because
+    // v4580's writer run re-measured 934 of its entries -- including the sound ones. The row was not wrong
+    // about v4577; it was reading the wrong thing to find out. A CLAIM ABOUT WHAT ONE ROUND TOUCHED MUST BE
+    // FROZEN, which is the fifth time this arc has landed on that rule. The sound entries' own recorded values
+    // are already frozen in this table as `gateWas`, so the targeting is asserted from the table; whether the
+    // file still holds them is a question about v4580 and belongs to timingProvenance-selfcheck.
+    const soundSweep = R.filter((x) => !x.sweepStale), soundGate = R.filter((x) => !x.gateStale);
+    ok("  and an entry this round judged SOUND was left alone by THIS round's repair, which is what the table records",
+        soundSweep.every((x) => S.timings[x.gate] === x.sweepWas) &&
+        soundGate.every((x) => typeof x.gateWas === "number" && x.gateWas > 0),
+        `${soundSweep.length} sweep entries still untouched; ${soundGate.length} sound gate-timings entries frozen here ` +
+        `at their v4577 values, of which ${soundGate.filter((x) => G[x.gate] !== x.gateWas).length} have since been ` +
+        "RE-MEASURED by v4580's full-runner pass -- a different round's edit, recorded rather than asserted away.");
 }
 
 // -----------------------------------------------------------------------------------------------------------

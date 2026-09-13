@@ -168,12 +168,36 @@ say("reference for " + GATE.split("/").pop() + ": MEASURED " + REF + "ms, budget
     // happens to be low today.
     const raw = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "gate-timings.json"), "utf8"));
     const entries = Object.entries(raw.timings);
-    ok("!! *** an entry cannot say whether it is a TIME or a TRUNCATION, which is why MEASURED is the denominator ***",
-       entries.length > 0 && entries.every(([, v]) => typeof v === "number"),
-       entries.length + " entries, every one a bare number. A gate killed at its budget records the moment it died "
-       + "and looks exactly like a gate that finished. DIVIDING BY THIS SAID THIS BOX RUNS AT 4.90x. The fix is not "
-       + "to detect truncation -- it cannot be detected from here -- but to divide by a table of numbers that were "
-       + "all obtained the same way.");
+    // *** v4580 -- THIS CONDITION PINNED A REPRESENTATION AND CLAIMED A PROPERTY, AND THE TWO CAME APART. ***
+    //
+    // It asserted `entries.every(([, v]) => typeof v === "number")` under the sentence "an entry cannot say
+    // whether it is a TIME or a TRUNCATION". Those are different statements. sweep-timings.json ALSO holds
+    // nothing but bare numbers in its `timings`, and since v4579 every one of its entries says exactly which of
+    // three quantities it is -- the saying rides in a sibling `kinds` map. So this row was satisfied by a file
+    // that refutes its own sentence, and it would have stayed green straight through the repair.
+    //
+    // AND THE SENTENCE'S SECOND HALF WAS WRONG IN A WAY THAT COST 644 VERSIONS. "The fix is not to detect
+    // truncation -- IT CANNOT BE DETECTED FROM HERE." True of a reader, and this is a reader. But the PRODUCER --
+    // tools/ship/selfchecks.mjs -- branches on completed, killed, and declined-to-run by name, and threw the
+    // distinction away one line later by writing an integer. v4580 stamps it at that line. The generalisation
+    // from "from here" to "at all" is what stopped anyone looking.
+    //
+    // WHAT IS PINNED NOW IS THE PROPERTY: how many entries carry no provenance. It is >0 today, and THIS ROW IS
+    // BUILT TO GO RED THE DAY IT REACHES ZERO -- which is the day this module should reconsider its denominator
+    // rather than the day somebody edits a comment.
+    const unprovenanced = entries.filter(([k]) => !((raw.kinds || {})[k])).length;
+    ok("!! *** entries that cannot say whether they are a TIME or a TRUNCATION, which is why MEASURED is the denominator ***",
+       unprovenanced > 0,
+       unprovenanced + " of " + entries.length + " entries carry no kind, no box and no stamp. For each of those a "
+       + "gate killed at its budget records the moment it died and looks exactly like a gate that finished. "
+       + "DIVIDING BY THIS SAID THIS BOX RUNS AT 4.90x. The denominator stays MEASURED because its numbers were "
+       + "all obtained the same way -- and when this count reaches zero this row goes red on purpose, because the "
+       + "reason will have expired. v4580 made the producer record it; it cannot be recovered for the rest.");
+    ok("...and the repair exists on this file, so the impossibility claim is retired rather than restated",
+       Object.keys(raw.kinds || {}).length > 0 && Object.keys(raw.boxLegend || {}).length > 0,
+       "a kind map and a machine legend, written by tools/ship/selfchecks.mjs at the point of decision. The old "
+       + "form of this row asserted the absence was structural; it was only unrecoverable, which is a different "
+       + "thing and does not excuse leaving the producer silent.");
 
     // The truncation is REPORTED, not pinned. How many entries sit below their MEASURED value is a fact about
     // today's data; it will change every sweep, and a gate that failed when it improved would be a ratchet

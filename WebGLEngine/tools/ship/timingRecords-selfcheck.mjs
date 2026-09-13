@@ -175,7 +175,14 @@ console.log("\n4. *** THE CONSEQUENCE: AN INSTRUCTION THAT NAMES ONE RECORD AS '
     // that file is right, and section 3 says it is right about half the time.
     const sr = fs.readFileSync(path.join(ENG, "tools", "ship", "statedRuntime-selfcheck.mjs"), "utf8");
     ok("statedRuntime's failure message names gate-timings.json as the thing to correct a header from",
-        /correct the header FROM THE MEASUREMENT/.test(sr), "its instruction to whoever finds the row red");
+        // *** v4580 -- CONVERTED TO proseHas FIRST, WHICH BROKE IT, WHICH IS THE ANSWER. *** This site was on
+        // gateQuality-selfcheck's prose-debt list and absent from its frozen baseline, so that gate was red at
+        // HEAD for it. Unwrapping comments made the row FAIL: the phrase is a STRING LITERAL in
+        // statedRuntime-selfcheck's failure message, not a comment, so prose() strips away the very thing being
+        // hunted. gateQuality's own header measured this at v3106 -- 28 of 38 attempted conversions break, and a
+        // regex that breaks when comments are all that is left WAS NEVER HUNTING A COMMENT. A plain substring
+        // test is the honest instrument for a literal, and it is not prose debt at all.
+        sr.includes("correct the header FROM THE MEASUREMENT"), "its instruction to whoever finds the row red");
     // MEASURED at v4575: shaderCensus stated ~0.5s, gate-timings held 239 ms, a clock said 1501 ms. Following
     // the instruction literally writes 0.24s into a gate that takes 1.5s -- the header was flagged correctly
     // and the file was the stale half. The entry has since been re-timed, so this row pins the LESSON against

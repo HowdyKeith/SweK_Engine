@@ -88,7 +88,24 @@ function walk(dir, out, skip) {
         const p = path.join(dir, e.name);
         if (skip.test(p)) continue;
         if (e.isDirectory()) walk(p, out, skip);
-        else if (SOURCE_EXT.test(e.name)) out.push(p);
+        // *** v4580 -- A TRANSIENT FIXTURE IS NOT A SOURCE FILE, AND FOUR GATES PLANT ONE WHILE THEY RUN. ***
+        //
+        // rigProgress's __rigprogress-fixture, gateActivity's __routeProbe, and gateMutation's __mutation-decoy
+        // and __mutation-crash exist on disk only for the seconds their own gate is running. v4409 found this
+        // race and closed it AT ONE WALKER: tools/ship/gateSweep.mjs's enumerateGates skips `__`-prefixed names,
+        // because a fixture discovered as a gate got RUN, and rigProgress's is built to exit 1. The rule was
+        // never applied here, so the four censuses this walker feeds kept counting them.
+        //
+        // MEASURED: vba/runtimeGap.mjs's census read 4081 files instead of 4080 whenever it overlapped
+        // gateActivity-selfcheck, moving closures 3657 -> 3658, async/await 1438 -> 1439 and Promises 345 -> 346,
+        // and runtimeGap-selfcheck went red on it. Green in three runs alone and red about half the time at
+        // eight-wide -- A SHIP FAILURE THAT NEVER REPRODUCES ALONE, which is the shape v4409 named as the worst
+        // a ship-time check can have. Found by catching the file in the act: polling the tree during a sweep
+        // turned up ./tools/roundhouse/__routeProbe-selfcheck.mjs, rather than by reasoning about the counts.
+        //
+        // NOTHING PERMANENT IS LOST: no tracked source file in this tree starts with `__` (the only match is
+        // inside node_modules, already skipped), so every census this feeds reads the same number it did before.
+        else if (SOURCE_EXT.test(e.name) && !e.name.startsWith("__")) out.push(p);
     }
     return out;
 }

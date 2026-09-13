@@ -38,8 +38,13 @@ console.log("1. *** THE COUNT IS READ FROM THE RIGHT PLACE THIS TIME ***");
     report("the register's old probe said", String(wrong));
     report("the file actually holds", String(right));
 
+    // *** v4580 -- `wrong < 10` WAS THE FILE'S TOP-LEVEL KEY COUNT WEARING A PROPERTY'S CLOTHES. ***
+    // The old probe counts top-level keys, and there were three. This row pinned "fewer than ten" -- which held
+    // until v4580 added four provenance keys and made it exactly ten, turning a row about a BROKEN PROBE red
+    // because the FILE grew. The property is that the old probe is off by orders of magnitude, so that is what
+    // is asserted: it cannot be restated as a count of keys without going red every time the file gains one.
     ok("!! the two probes disagree, which is why the old number was believed",
-        wrong !== right && wrong < 10,
+        wrong !== right && wrong < right / 10,
         "Object.keys(t.gates||t) -- THERE IS NO `gates` KEY, so it fell through to the file's three TOP-LEVEL " +
         "KEYS: note, captured, timings. *** IT WAS NOT WRONG BY A LITTLE; IT WAS COUNTING A DIFFERENT THING. *** " +
         "And todo-selfcheck ran the same command with an assertion of `< 50`, so TWO CHECKS THAT LOOKED " +
@@ -139,7 +144,12 @@ console.log("\n4. THE 15 GATES ADDED THIS SESSION ARE TIMED, INDIVIDUALLY");
     // noComments and not codeOnly: the tokens live in STRING LITERALS, and codeOnly blanks string contents.
     const sc = noComments(fs.readFileSync(path.join(ENG, "tools", "ship", "selfchecks.mjs"), "utf8"));
     ok("!! *** the WRITER refuses to record a gate that declined to run ***",
-        /SKIP_LINE/.test(sc) && /declinedToRun/.test(sc) && /else observedMs\[/.test(sc),
+        // v4580 -- WAS /else observedMs\[/, which required the record write to be a BARE STATEMENT after the
+        // else. It went red the moment v4580 gave that branch a block so it could stamp a kind alongside the
+        // number -- the guard was untouched and the row reported it broken. Matched as a STRUCTURE now: the skip
+        // branch, an else, and the record write, in that order, whatever punctuation sits between them.
+        /SKIP_LINE/.test(sc) && /declinedToRun/.test(sc) &&
+        /if \(declinedToRun\)[\s\S]{0,400}?\belse\b[\s\S]{0,400}?observedMs\[[^\]]+\] = ms;/.test(sc),
         "*** A GATE THAT SKIPS EXITS 0, SO IT LANDS ON THE SUCCESS PATH AND ITS SKIP TIME IS MERGED OVER THE " +
         "REAL MEASUREMENT. *** Failures are excluded and timeouts are excluded; skips were not, because a skip " +
         "looks exactly like a fast pass from the runner. Forty gates in this tree can skip on an absent " +
@@ -154,7 +164,11 @@ console.log("\n4. THE 15 GATES ADDED THIS SESSION ARE TIMED, INDIVIDUALLY");
     // the line above must do) made it unfallible-then-unpassable in one move. The PROPERTY is that pass++ runs
     // for a skipped gate exactly as for any other: it sits after the if/else, unguarded, on the success path.
     ok("!! ...and the verdict is still the exit code, untouched by any of this",
-        /if \(declinedToRun\) skipped\.push[\s\S]{0,600}?\n        pass\+\+;/.test(sc) &&
+        // v4580 -- the window was 600 characters and the stamping block pushed pass++ past it. A DISTANCE IS
+        // NOT A PROPERTY: the claim is that a skipped gate reaches pass++ on the same path, and how many
+        // characters of comment sit between them is not part of it. Widened to 1600; if a future edit moves it
+        // further this row will say so again, which is the cost of asking a text reader a control-flow question.
+        /if \(declinedToRun\)[\s\S]{0,1600}?\n        pass\+\+;/.test(sc) &&
         !/declinedToRun[\s\S]{0,200}?failures\.push/.test(sc),
         "*** THIS DECIDES TIMING ELIGIBILITY, NOT PASS OR FAIL. *** pass++ is reached by a skipped gate on the " +
         "same path as any other, and nothing about the skip reaches failures.push. A skip is still a pass, " +

@@ -171,6 +171,43 @@ console.log("\n6. *** THE FOUR CENSUSES STILL AGREE WITH EACH OTHER ON THE SIZE 
         `${gates} of ${tree}`);
 }
 
+console.log("\n7. *** A TRANSIENT FIXTURE IS NOT A SOURCE FILE, AND THE RACE WAS OPEN AT THIS WALKER ***");
+{
+    // Four gates plant a `__`-prefixed *-selfcheck.mjs on disk while they run and delete it after. v4409 closed
+    // this for tools/ship/gateSweep.mjs's enumerateGates, where a discovered fixture got RUN; the same rule was
+    // never applied to the shared walker, so the four censuses it feeds counted them whenever a run overlapped.
+    // MEASURED at v4580: runtimeGap-selfcheck read 4081 files instead of 4080 about half the time at eight-wide
+    // and was green in three runs alone -- a ship failure that never reproduces by itself.
+    //
+    // DRIVEN ON A REAL FILE, not on the walker's opinion of one. Planting and removing a fixture is the only way
+    // to check an exclusion that only matters while a file exists.
+    const fixture = path.join(ENG, "tools", "ship", "__treeread-fixture-selfcheck.mjs");
+    const decoy = path.join(ENG, "tools", "ship", "zz-treeread-fixture-selfcheck.mjs");
+    const body = "// transient fixture planted by treeRead-selfcheck; delete if you find it.\nexport const x = 1;\n";
+    const base = TR.treeFiles(ENG, /node_modules|[/\\]dist[/\\]|[/\\]vendor[/\\]/).length;
+    let withFixture = null, withDecoy = null;
+    try {
+        fs.writeFileSync(fixture, body);
+        withFixture = TR.treeFiles(ENG, /node_modules|[/\\]dist[/\\]|[/\\]vendor[/\\]/).length;
+        fs.unlinkSync(fixture);
+        fs.writeFileSync(decoy, body);
+        withDecoy = TR.treeFiles(ENG, /node_modules|[/\\]dist[/\\]|[/\\]vendor[/\\]/).length;
+    } finally {
+        for (const f of [fixture, decoy]) { try { fs.unlinkSync(f); } catch { /* already gone */ } }
+    }
+    say(`walk size: ${base} bare, ${withFixture} with a __ fixture on disk, ${withDecoy} with an ordinary one`);
+    ok("!! *** a `__` fixture on disk does not change the population ***",
+        withFixture === base,
+        "the exclusion is in walk() itself, so all four censuses get it at once rather than one gate at a time");
+    ok("...and the exclusion is NARROW: an ordinary new file still counts, so this is not a walk that ignores arrivals",
+        withDecoy === base + 1,
+        `${withDecoy} against ${base}. Without this half the row above would pass for a walker that had stopped ` +
+        "seeing new files altogether -- which is the flattering failure, and it would make every census blind.");
+    ok("...and nothing permanent is being hidden: no tracked source file in the tree starts with `__`",
+        TR.treePaths().every((q) => !path.basename(q).startsWith("__")),
+        "so the counts every census recorded before this change are the counts it reads after it");
+}
+
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nNOT claimed here: that enumerateGates in tools/ship/gateSweep.mjs was made cheap too. It was left " +
     "alone ON PURPOSE and the reason is a row in another gate: tools/ship/gateSweep-selfcheck.mjs PLANTS a " +

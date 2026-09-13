@@ -3767,6 +3767,86 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since239: Object.freeze({
+        at: "v4580", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/timingProvenance-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/selfchecks.mjs", "tools/ship/gateBudget.mjs", "tools/ship/hostScale.mjs",
+                                "tools/ship/hostScale-selfcheck.mjs", "tools/ship/gate-timings.json",
+                                "tools/ship/treeRead.mjs", "tools/ship/treeRead-selfcheck.mjs",
+                                "tools/ship/timingCoverage-selfcheck.mjs", "tools/ship/timingLoad-selfcheck.mjs",
+                                "tools/ship/timingSurvivors-selfcheck.mjs", "tools/ship/timingSemantics-selfcheck.mjs",
+                                "tools/ship/timingRecords-selfcheck.mjs"]),
+        verdict: "green, 197 ms at eight-wide and 133 ms alone, under the 3000 ms budget. *** THE ROUND'S OWN " +
+                 "PREMISE WAS WRONG AND THE FIRST MEASUREMENT SAID SO. *** v4579's close proposed that " +
+                 "gate-timings.json 'mixes a batch quantity with individual ones exactly as the sweep column " +
+                 "did'. IT DOES NOT: the runner's loop is `for (const f of toRun)` around execFileSync, so a " +
+                 "full-run entry and a hand-timed entry are the same physical quantity. Measured rather than " +
+                 "read -- 89 gates summed 30,525 ms inside a 51,259 ms wall, 0.60x, where a five-worker pool " +
+                 "would sit near 5x. The analogy had been carried across on the strength of two files looking " +
+                 "alike. *** WHAT WAS ACTUALLY THERE IS A CLAIM THAT THE FIX COULD NOT BE DONE. *** " +
+                 "hostScale-selfcheck has asserted since v3936 that 'an entry cannot say whether it is a TIME " +
+                 "or a TRUNCATION' and concluded 'it cannot be detected from here'. True of a READER, false of " +
+                 "the PRODUCER: tools/ship/selfchecks.mjs branches on completed / killed / declined-to-run BY " +
+                 "NAME and then wrote a bare integer. 644 versions of the tree acted on the general version of " +
+                 "that sentence, and v4579 had just made this exact repair on the other file. *** AND THE ROW " +
+                 "PINNED A REPRESENTATION WHILE CLAIMING A PROPERTY, SO IT COULD NEVER HAVE NOTICED. *** Its " +
+                 "condition was `entries.every(([, v]) => typeof v === 'number')`, which is TRUE of " +
+                 "sweep-timings.json -- a file where every entry does say what it is, via a sibling map. It " +
+                 "would have stayed green straight through the repair with its own sentence gone false; " +
+                 "measured on both files to establish that it is a fact about the predicate, not about the " +
+                 "data. Repaired to pin the unprovenanced COUNT, which goes red the day it reaches zero -- the " +
+                 "day the reason expires. *** THE REPAIR: the runner stamps kinds, boxes and per-entry stamps " +
+                 "at the point of decision, *** plus a boxLegend decoding each machine id and " +
+                 "coverage.unprovenanced counting what carries none of it. 934 of 1,332 entries stamped by one " +
+                 "bounded pass; the remaining 398 are UNRECOVERABLE, and the ratchet may only fall. The box id " +
+                 "is derived from the machine and deliberately excludes the node version, which is not a new " +
+                 "machine; its facts are asserted equal to androidRunner.mjs's existing fingerprint rather " +
+                 "than defined a second time. *** RUNNING THE WRITER FOUND A SECOND FAULT THAT READING IT DID " +
+                 "NOT. *** writeTimings was called with a literal `true`, so a --budget pass covering 953 of " +
+                 "1,630 gates wrote coverage.complete: true -- exactly the 'partial measurement wearing a " +
+                 "complete one's name' v3584's own note warned of, arriving through a filter added one round " +
+                 "after the note. `complete` is now derived from the population; the true that pass wrote is " +
+                 "corrected to false by hand in the record, with the reason beside it. *** AND THE HEADLINE " +
+                 "THIS ROUND WANTED WAS REFUSED BY ITS OWN ARITHMETIC. *** The sixteen entries this arc " +
+                 "re-timed by hand went 12 DOWN and 4 UP. A faster second machine predicts 16-0; staleness " +
+                 "alone predicts a coin toss; 12-4 gives two-sided p 0.077 and the threshold on n=16 is 13. ONE " +
+                 "MORE CORRECTION WOULD HAVE CARRIED IT, so whether this file mixes two boxes or is merely " +
+                 "stale is left unsettled and is not claimed either way -- and v4578's 10-0 cohort is not the " +
+                 "evidence it looked like, because the detector that found it SELECTS for entries that are too " +
+                 "high. Also recorded: hostScale.mjs still cites assumptionMap at 47,729 ms as its reason for " +
+                 "refusing this file, and the file holds 333,639 -- 7.0x -- which its own gate noticed at v3936 " +
+                 "while the module's header was never re-read; and the 300 s truncation story does not describe " +
+                 "today's file, which holds 13 entries above 300 s outright. 17 sabotages, 17/17 red, no 0-RED, " +
+                 "nothing crashed. TWO OF THE SEVENTEEN EXIST BECAUSE THE FIRST DRAFT CARRIED A CLAUSE THAT " +
+                 "COULD NOT FAIL: `pTwoSided > 0.05` alongside a pinned 12-4, where the counts determine p. " +
+                 "Replaced by the threshold derivation, which can be wrong and is now checked. *** AND THE VERIFY SWEEP " +
+                 "FLAPPED, WHICH TURNED OUT TO BE A RACE v4409 HAD ALREADY CLOSED SOMEWHERE ELSE. *** " +
+                 "runtimeGap-selfcheck went red about half the time at eight-wide and green in three runs alone, " +
+                 "reading 4081 files instead of 4080. Four gates plant a `__`-prefixed *-selfcheck.mjs on disk " +
+                 "while they run; v4409 taught gateSweep's enumerateGates to skip them, because a discovered " +
+                 "fixture got RUN, and the rule was never applied to tools/ship/treeRead.mjs -- the SHARED walker " +
+                 "four censuses read. Caught by polling the tree during a sweep and finding " +
+                 "tools/roundhouse/__routeProbe-selfcheck.mjs in the act, not by reasoning about the counts. " +
+                 "Excluded at the walker so all four get it at once, with a driven control that plants a real " +
+                 "fixture and a real ordinary file, because an exclusion that dropped every arrival would pass " +
+                 "the first half and blind every census. gateQuality-selfcheck was ALSO red at HEAD, for a " +
+                 "prose-debt site in timingRecords absent from its frozen baseline; converting it to proseHas " +
+                 "made the row FAIL, which is the answer -- the phrase is a string literal, and gateQuality's own " +
+                 "header measured at v3106 that 28 of 38 such conversions break because the regex was never " +
+                 "hunting a comment. A substring test fixed it and that gate is green for the first time in this arc. " +
+                 "Five downstream gates needed repair, all of them pinned to something this round moved: three " +
+                 "pinned an exact millisecond and went red on a BETTER measurement, timingCoverage pinned a " +
+                 "count of the record's top-level keys, and timingLoad recomputed a v4576 finding against a live " +
+                 "file. Standing reds left in place: budgetExile, definitionGates' three immovable ratchets, and " +
+                 "staleness, all equally red at HEAD -- staleness confirmed so by a probe run BEFORE this round's first " +
+                 "edit, not assumed. *** AND THE VERIFY HARNESS ITSELF WAS WRONG ABOUT THREE GATES. *** At " +
+                 "eight-wide it reported rigProgress, sweepBudget and shadowedHelper as reds; each is green alone, " +
+                 "twice. They are load-sensitive, and a harness that calls a load failure a red is the harness " +
+                 "being wrong about the tree -- the same shape as 'a crash is not a verdict', one level out. It " +
+                 "now re-runs every red ALONE before naming it, and reports LOAD-ONLY apart from RED. Final: 26 " +
+                 "green, 3 red, 1 load-only, 0 crash-only over 30 gates.",
+    }),
     since238: Object.freeze({
         at: "v4579", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/timingKind-selfcheck.mjs"]),

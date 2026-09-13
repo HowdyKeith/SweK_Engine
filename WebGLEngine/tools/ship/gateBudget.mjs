@@ -88,6 +88,36 @@
 // table's own rule; the default budget moves from 309 s to 330 s with this line, and nothing else changes.
 export const SLOWEST_GENERAL = { gate: "tools/roundhouse/opticsBind-selfcheck.mjs", ms: 109899 };
 
+// *** v4580 -- WHAT AN ENTRY IN gate-timings.json IS, WHICH UNTIL NOW NOTHING SAID. ***
+//
+// hostScale-selfcheck has asserted since v3936 that "an entry cannot say whether it is a TIME or a TRUNCATION",
+// and concluded that the fix "is not to detect truncation -- IT CANNOT BE DETECTED FROM HERE". The second half
+// was true of a READER and false of the PRODUCER, and the producer is tools/ship/selfchecks.mjs in this repo. It
+// knows exactly which of the three a run was -- it branches on all three -- and then wrote a bare number that
+// threw the distinction away. v4579 made the same repair on sweep-timings.json a round earlier.
+//
+// TWO MEMBERS, BOTH DECIDABLE. There is no TRUNCATED or SKIPPED member here, and their absence is the point: the
+// runner records neither, so a member no writer can write would be a label nobody could ever check. COMPLETE is
+// what the runner establishes -- exit 0, not a timeout, not a gate that declined to run. UNKNOWN is the reading
+// for the 1289 entries that predate this, and it is a statement about the RECORD rather than about the gate: it
+// means nobody wrote down what this number is, which is not the same as the number being wrong.
+export const TIMING_KIND = Object.freeze({
+    // ONE RUN TO COMPLETION BY THE SUITE RUNNER, AND THAT IS ALL IT CLAIMS: a single sample, taken with a cold
+    // module cache, in whatever state the box was in when the runner reached that gate. It is NOT a median and
+    // not a warm reading. *** v4580 MEASURED WHAT THAT COSTS: one entry in four written by the provenance pass
+    // disagreed with a median of three alone runs by more than 20%, and tools/ship/spacesimStart-selfcheck.mjs
+    // was 1486 ms against a 124 ms median -- 12x over, and its header had already recorded that this exact
+    // number was 10x over when the record last held it. *** A kind that says "completed" and nothing about how
+    // many samples is a better record than a bare integer and still not enough, so the two are named apart.
+    COMPLETE: "complete",
+    // A HAND-TAKEN MEDIAN OF THREE ALONE RUNS -- the procedure this tree's headers have used since v3285 and
+    // which `captured` describes for every cohort it names. Not written by any automatic pass: a human runs the
+    // gate three times with nothing else on the box and records the middle number. It earns a member because it
+    // is what the headers are compared against, and an entry holding it must not be read as a runner sample.
+    MEDIAN3: "median of 3 alone",
+    UNKNOWN: "unknown -- before v4580",
+});
+
 /** The factor selfchecks.mjs's own header already committed to. Kept as a named constant, not a multiplication. */
 export const HEADROOM = 3;
 

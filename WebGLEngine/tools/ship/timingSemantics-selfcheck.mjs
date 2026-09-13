@@ -177,9 +177,15 @@ console.log("\n5. AND ITS MAGNITUDE IS NOT USABLE AT THE SMALL END");
     ok("  and the DIRECTION survives it: every one of the ten was correctly flagged whatever the predicted size",
         TEN.every((x) => predicted(x) > 1.4 && actual(x) > 1.4),
         "detect with it, do not quote it");
-    ok(`  and all ${TEN.length} gate-timings entries now hold this round's alone reading`,
-        TEN.every((x) => G[x.gate] === x.alone),
-        TEN.slice(0, 3).map((x) => `${path.basename(x.gate)} ${x.gateWas}->${G[x.gate]}`).join(", ") + ", ...");
+    // *** v4580 -- PINNED TO THE EXACT MILLISECOND, AND A BETTER MEASUREMENT MADE IT RED. *** This required
+    // `G[x.gate] === x.alone`. v4580's writer pass re-timed these gates on the same box -- esFlight3dMath 44 ->
+    // 45, es-gates 65 -> 66, es-start 70 -> 68 -- fresh, complete, exit-0 readings differing by jitter, and the
+    // row reported a defect. A SINGLE SAMPLE IS NOT A PROPERTY. Required now: off the stale value, and within
+    // reach of the alone reading rather than back near the number that was wrong. timingSurvivors-selfcheck
+    // carried the identical mistake and took the identical repair in the same round.
+    ok(`  and all ${TEN.length} gate-timings entries are off their stale values and hold an alone-scale reading`,
+        TEN.every((x) => G[x.gate] !== x.gateWas && G[x.gate] / x.alone > 0.6 && G[x.gate] / x.alone < 1.7),
+        TEN.slice(0, 3).map((x) => `${path.basename(x.gate)} ${x.gateWas}->${G[x.gate]} (alone ${x.alone})`).join(", ") + ", ...");
 }
 
 // -----------------------------------------------------------------------------------------------------------
