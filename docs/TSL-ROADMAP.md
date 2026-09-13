@@ -1813,6 +1813,40 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         say "view windows off" if it is wrong there. The quick sweep found the one cross-effect: the windows' failure message
         was written into the gunner's HUD line, which v4588's page gate reads for "hand gunner", so the new code turned the
         older gate red; the windows have a line of their own now. Census: 1634 -> 1635 gates; since235.
+     Then (v4590) THE OIL SLICK AND THE DOOM FIRE ON IT (task 79). Keith asked whether the turret gunner could also trigger an
+        oil slick, and Doom Fire from the slick. The tree had no oil and no way to change the grip under a wheel at a point:
+        physics/raceCar.mjs's trackSurface.at(x, z) is a pure function of the track's geometry, and the only fire on the ground
+        was world/fireSystem.js's voxel wildfire on grass; render/doomFire.mjs's byte automaton (the Slug fill's fire) had never
+        burned anywhere in a 3D world. physics/slick.mjs: dropSlick puts a 1.8 x 3.4 m patch 2.6 m behind the chassis along its
+        yaw, and slickSurface(base, state) WRAPS the surface rather than rewriting it -- at(x, z) asks the track and then the
+        patches: under an unlit patch the grip is the road's x 0.3 and the rolling resistance x 0.5 and the kind reads "oil"
+        (the driver's off-asphalt feature sees it), under a burning one the kind reads "fire" with the road's own grip (oil that
+        has caught is hot, not slippery) -- so carForces takes the oil as it takes any surface and not a line of raceCar changed.
+        igniteSlick lights the owner's newest unlit patch into a DoomFire of 12 x 8 cells with its source row at the patch's
+        rear edge, stepped every 3 ticks, fed for 6 s and burning out on its own schedule: one patch burns 394 ticks (6.57 s)
+        and is spent; a car whose chassis centre is inside takes a burn event a tick. The gunner (brain/gunnerPolicy.mjs) grew
+        from 9 -> 8 -> 3 to 11 -> 8 -> 5: two facts (a pursuer inside 14 m behind me; a car on my unlit oil) and two outputs
+        (drop, ignite), the hand gunner dropping only when pursued and lighting only with a car on the oil, the reward paying
+        half a hit per second of an opponent on my fire. The duel turned around for it (the gunner PURSUED, so there is
+        someone to oil): pursued, the hand gunner lands 13 of 15 and 12 of 14 with 5 and 4 drops and 223 and 182 burn ticks
+        on the pursuer; the three-car race (hits 23 of 23, 0 of 0, 9 of 20; drops 7, 0, 0; burn ticks 0, 307, 0) is
+        deterministic and replays from its eight-field log to the same fingerprint, hits, drops and burn ticks; the
+        fingerprint folds box3d's state, the turrets, the shells and now the patches. Found on the way: turning the duel
+        around made 8 m/s HITTABLE (a closing target meets the slow shell, 4 of 4), which would have let the shell-speed key's
+        first refusal through -- so adjudicateShell runs a chase leg AND a pursued leg and passes only a speed that lands the
+        bound in both; 8 m/s still fails the chase leg with no solution. Drawn: two more fleets in render/raceTurret.mjs, the
+        patch as a flat dark box in the quat mode and every burning cell as a small box in the lit pipeline's colour mode (the
+        palette on the road, cell for cell); race-brain.html runs the wheels on the wrapped surface, folds the slick hash,
+        shows slicks and burn seconds per car in the standings, and the brain window's gunner rows read 11-8-5. Gates:
+        physics/slick-selfcheck.mjs new (eight sabotages, THREE of them findings fixed in the gate: an axis-aligned patch
+        cannot see the frame's handedness, so an oblique patch holds it; a hash of the count alone already differed on the
+        old row, so the same count lit later or dropped a metre over must differ; a hash without the heat still differed by
+        the ignition tick, so the same patch with its automaton stepped once more must differ), and its first run was red on
+        the burn-events row because the fire steps before the burn check and the tick that burns it out hands out no event
+        (393 of 394); the gunner's gate re-pinned to the grown shape with six more sabotages red by name; the turret's
+        contract widened to { yaw, pitch, fire, drop, ignite }; the windows' gate re-pinned (43 bars). Unchecked: the slick
+        has no lab knob of its own yet (its patch size and burn time are spec constants), and the fire cells are drawn
+        without light of their own. Census: 1635 -> 1636 gates; since236.
 ## The count that says when step 4 matters
 
 tools/ship/shaderCensus-selfcheck.mjs has held, since v3274, that a hand-written pair is cheaper than an

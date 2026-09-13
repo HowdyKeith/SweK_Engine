@@ -74,7 +74,7 @@ export function brainRows({ driver = null, gunner = null } = {}) {
         rows.push({ who, layer: "outputs", names: outNames, values: Array.from(act.output) });
     };
     if (driver) push("driver", driver.act, driver.names, ["steer", "drive"]);
-    if (gunner) push("gunner", gunner.act, gunner.names, ["yaw", "pitch", "fire"]);
+    if (gunner) push("gunner", gunner.act, gunner.names, ["yaw", "pitch", "fire", "drop", "ignite"]);   // v4590: the slick outputs
     return rows;
 }
 

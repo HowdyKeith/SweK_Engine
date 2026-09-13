@@ -276,8 +276,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4588 -- RE-TAKEN with the turret copilot's three gates (physics/turret-, brain/gunnerPolicy-, tools/ship/raceTurret-selfcheck.mjs):
     // 1631 -> 1634 gates, and usesOk, definesOk and nameFirst each by three; nothing else moved.
     // v4589 -- RE-TAKEN: one gate (tools/ship/carViews-selfcheck.mjs) joined, the same four rows by one.
-    gates: 1635, usesOk: 1614, definesOk: 1606, importsOk: 0,
-    distinctDefinitions: 40, nameFirst: 1507, condFirst: 91, unknownSignature: 16,
+    // v4590 -- RE-TAKEN: one gate (physics/slick-selfcheck.mjs) joined, the same four rows by one.
+    gates: 1636, usesOk: 1615, definesOk: 1607, importsOk: 0,
+    distinctDefinitions: 40, nameFirst: 1508, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

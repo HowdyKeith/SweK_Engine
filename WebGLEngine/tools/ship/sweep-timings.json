@@ -1641,7 +1641,8 @@
   "physics/turret-selfcheck.mjs": 287,
   "brain/gunnerPolicy-selfcheck.mjs": 6966,
   "tools/ship/raceTurret-selfcheck.mjs": 11262,
-  "tools/ship/carViews-selfcheck.mjs": 15670
+  "tools/ship/carViews-selfcheck.mjs": 15670,
+  "physics/slick-selfcheck.mjs": 441
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -3281,7 +3282,8 @@
   "physics/turret-selfcheck.mjs": 0,
   "brain/gunnerPolicy-selfcheck.mjs": 0,
   "tools/ship/raceTurret-selfcheck.mjs": 0,
-  "tools/ship/carViews-selfcheck.mjs": 0
+  "tools/ship/carViews-selfcheck.mjs": 0,
+  "physics/slick-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-10T04:24:20.054Z",
@@ -4921,7 +4923,8 @@
   "physics/turret-selfcheck.mjs": "2026-09-13T22:45:29.696Z",
   "brain/gunnerPolicy-selfcheck.mjs": "2026-09-13T22:45:29.696Z",
   "tools/ship/raceTurret-selfcheck.mjs": "2026-09-13T22:45:29.696Z",
-  "tools/ship/carViews-selfcheck.mjs": "2026-09-13T23:14:02.310Z"
+  "tools/ship/carViews-selfcheck.mjs": "2026-09-13T23:14:02.310Z",
+  "physics/slick-selfcheck.mjs": "2026-09-13T23:51:07.340Z"
  },
  "finished": {
   "tools/ship/placementRender-selfcheck.mjs": true,
@@ -6448,7 +6451,8 @@
   "physics/turret-selfcheck.mjs": true,
   "brain/gunnerPolicy-selfcheck.mjs": true,
   "tools/ship/raceTurret-selfcheck.mjs": true,
-  "tools/ship/carViews-selfcheck.mjs": true
+  "tools/ship/carViews-selfcheck.mjs": true,
+  "physics/slick-selfcheck.mjs": true
  },
  "crossings": {
   "tools/ship/engineSceneBot-selfcheck.mjs": 2,
@@ -7739,7 +7743,8 @@
   "physics/turret-selfcheck.mjs": 98,
   "brain/gunnerPolicy-selfcheck.mjs": 6966,
   "tools/ship/raceTurret-selfcheck.mjs": 11262,
-  "tools/ship/carViews-selfcheck.mjs": 15670
+  "tools/ship/carViews-selfcheck.mjs": 15670,
+  "physics/slick-selfcheck.mjs": 116
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-10T01:23:58.721Z",
@@ -9019,6 +9024,7 @@
   "physics/turret-selfcheck.mjs": "2026-09-13T22:45:14.323Z",
   "brain/gunnerPolicy-selfcheck.mjs": "2026-09-13T22:45:14.323Z",
   "tools/ship/raceTurret-selfcheck.mjs": "2026-09-13T22:45:14.323Z",
-  "tools/ship/carViews-selfcheck.mjs": "2026-09-13T23:13:46.542Z"
+  "tools/ship/carViews-selfcheck.mjs": "2026-09-13T23:13:46.542Z",
+  "physics/slick-selfcheck.mjs": "2026-09-13T23:50:52.146Z"
  }
 }

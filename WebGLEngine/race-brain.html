@@ -29,7 +29,7 @@
   <div id="be">requesting a device&hellip;</div>
   <div id="sub">seed <input id="seed" type="number" value="1" min="1"> &middot; <button id="train">Train in idle time</button> <button id="stopTrain" disabled>Stop</button> &middot; <button id="race">Race</button> &middot; <button id="forget">Forget the stored brain</button>
     &middot; <a href="?webgl=1">force WebGL2</a><br>
-    <span id="tick">loading the racing kit and box3d&hellip;</span><br><span id="brain">no stored brain: the hand policy drives</span><br><span id="gun">turrets: the hand gunner on every car (v4588, task 77)</span> <button id="trainGun">Train the gunner in idle time</button> <button id="stopGun" disabled>Stop</button> <button id="forgetGun">Forget the stored gunner</button><br><span id="racing"></span><br><button id="labReplay">Replay the lab's accepted driver</button> <span id="lab">the Physics Lab's race scene stores the driver its adjudicator accepted; this plays that log back, not real time</span> &middot; drag to orbit, wheel to dolly</div>
+    <span id="tick">loading the racing kit and box3d&hellip;</span><br><span id="brain">no stored brain: the hand policy drives</span><br><span id="gun">turrets: the hand gunner on every car (v4588, task 77); it drops oil on a pursuer and lights it under them (v4590, task 79)</span> <button id="trainGun">Train the gunner in idle time</button> <button id="stopGun" disabled>Stop</button> <button id="forgetGun">Forget the stored gunner</button><br><span id="racing"></span><br><button id="labReplay">Replay the lab's accepted driver</button> <span id="lab">the Physics Lab's race scene stores the driver its adjudicator accepted; this plays that log back, not real time</span> &middot; drag to orbit, wheel to dolly</div>
 </div>
 <canvas id="c"></canvas>
 <div id="views"></div>
@@ -45,7 +45,8 @@ import { trackSurface, createCar, stepCars, carPose, lapTracker, truckPlacement,
 import * as D from "./brain/drivePolicy.mjs";
 import * as GP from "./brain/gunnerPolicy.mjs";
 import * as U from "./physics/turret.mjs";
-import { turretFleets, placeTurrets } from "./render/raceTurret.mjs";
+import { turretFleets, placeTurrets, slickFleets, placeSlicks, TURRET_DRAW } from "./render/raceTurret.mjs";
+import * as S from "./physics/slick.mjs";
 import * as CV from "./render/carViews.mjs";
 import { miniWorld, meshWorld, SUN } from "./render/voxelDevice.mjs";
 import { CityGen } from "./world/CityGen.js";
@@ -62,6 +63,9 @@ let replayRec = null;   // v4527: the lab's accepted driver's log, played back t
 // v4588 -- the turret copilot (task 77): a turret on every car, a gunner policy in each (the stored gunner on car 0, the hand
 // gunner elsewhere), shells stepped and tested in the same lockstep tick, hits as impulses on the chassis they land on
 let turrets = [], gunners = [], shells = [], turretBase = 0, gunStore = null, gunTrainer = null, gunTraining = false;
+// v4590 -- the oil slick and the Doom Fire (task 79): the gunner's drop and ignite outputs land on physics/slick.mjs's patches; the
+// wheels run on the WRAPPED surface (oil cuts the grip, fire is hot road) and the slick state is folded into the fingerprint
+let slicks = null, slickSurf = null, slickBase = 0;
 // v4589 -- a view window per car (task 78): first person, the turret's sight, or the brain (the two policies' activations), a
 // click cycles them. Each 3D view is the same scene drawn into a small render target with that car's camera and read back.
 let views = [], viewFrame = 0, viewBusy = false, viewFailures = 0, driverWeights = [], gunnerWeights = [];
@@ -95,13 +99,15 @@ function setupRace() {
   turrets = cars.map(() => U.createTurret()); shells = [];
   gunnerWeights = cars.map((c, i) => (gcur && i === 0 ? gcur.weights : GP.handWeights())); driverWeights = brains;
   gunners = gunnerWeights.map((w) => GP.gunnerFor(w));
+  slicks = S.createSlicks(); slickSurf = S.slickSurface(surface, slicks);
   setupViews(cars.length);
   hash = 0x811c9dc5; ticks = 0; acc = 0;
   const trucks = cars.map((c, i) => ({ file: FILES[i], ...truckPlacement(carPose(phys, c)) }));
   if (scene && scene.destroy) scene.destroy();
   const worldFleet = { name: "world", mesh: packed.mesh, pipeline: L.litPipelineDesc({ cull: "none" }), bind: L.litBind(SUN), records: Float32Array.from([0, 0, 0, 1]), extras: new Float32Array(4) };
   turretBase = placements.length + trucks.length + worldFleet.records.length / 4;   // the first dome's record: after the kit's placements and the world
-  scene = kitScene(device, kit, [...placements, ...trucks], G, L, { light: SUN, dynamic: true, extraFleets: [worldFleet, ...turretFleets(cars.length, U.TURRET.barrel, L, { light: SUN })] });
+  slickBase = turretBase + 2 * cars.length + TURRET_DRAW.maxShells;                  // the first slick record: after the domes, barrels and shells
+  scene = kitScene(device, kit, [...placements, ...trucks], G, L, { light: SUN, dynamic: true, extraFleets: [worldFleet, ...turretFleets(cars.length, U.TURRET.barrel, L, { light: SUN }), ...slickFleets(L, { light: SUN })] });
   gunLine();
   $("tick").textContent = `${describeTrack(track)}; ${rects.length} buildings; ${cars.length} cars: ${names.join(", ")} (red, green, yellow, purple), a turret on each; built in ${(performance.now() - t0).toFixed(0)} ms on ${scene.path}`;
 }
@@ -111,11 +117,11 @@ function stepRace() {
   const xf = phys.readTransforms(), vel = phys.readVelocities(), poses = cars.map((c) => carPose(phys, c, xf, vel));
   const inputs = replayRec ? (replayRec.log[ticks] || cars.map(() => ({ throttle: 0, steer: 0, brake: 1 }))) : cars.map((c, i) => clampInput(drivers[i](poses[i])));
   // the lab's replay carries no gun log and its fingerprint has no turret in it: the turrets stay idle while it plays
-  const cmds = replayRec ? cars.map(() => ({ yaw: 0, pitch: 0, fire: 0 })) : cars.map((c, i) => { const j = GP.nearestOther(i, poses); return U.clampGun(gunners[i](poses[i], turrets[i], j === null ? null : { pose: poses[j] })); });
-  GP.turretTick(phys, cars, turrets, shells, poses, cmds, ticks, U.TURRET);
-  const rs = stepCars(phys, cars, surface, inputs, CAR.dt);
+  const cmds = replayRec ? cars.map(() => ({ yaw: 0, pitch: 0, fire: 0, drop: 0, ignite: 0 })) : cars.map((c, i) => { const j = GP.nearestOther(i, poses); return U.clampGun(gunners[i](poses[i], turrets[i], j === null ? null : { pose: poses[j] }, GP.pursuerInfo(i, poses, slicks))); });
+  GP.turretTick(phys, cars, turrets, shells, poses, cmds, ticks, U.TURRET, replayRec ? null : slicks);
+  const rs = stepCars(phys, cars, replayRec ? surface : slickSurf, inputs, CAR.dt);   // the lab's record was driven on the bare track
   rs.forEach((r, i) => trackers[i].update(r.pose));
-  hash = foldHash(hash, phys.stateHash()); if (!replayRec) hash = U.turretHash(hash, turrets, shells, foldHash); ticks++;
+  hash = foldHash(hash, phys.stateHash()); if (!replayRec) { hash = U.turretHash(hash, turrets, shells, foldHash); hash = S.slickHash(hash, slicks, foldHash); } ticks++;
   if (replayRec && ticks === replayRec.ticks) { const fp = (hash >>> 0).toString(16).padStart(8, "0"); $("lab").textContent = `played back ${ticks} ticks: fingerprint ${fp} ${fp === replayRec.fingerprint ? "= the record's" : "DIFFERS from the record's " + replayRec.fingerprint} (offline replay ${replayRec.offline})`; }
 }
 
@@ -142,8 +148,8 @@ async function refreshViews(poses) {
       if (v.view === "brain") {
         const j = GP.nearestOther(i, poses), pose = poses[i];
         const dAct = CV.activationsOf(D, driverWeights[i], D.features(surface, pose, cars[i].last && cars[i].last.wheels.every((q) => q.kind === "asphalt") ? "asphalt" : "off"));
-        const gAct = CV.activationsOf(GP, gunnerWeights[i], GP.features(pose, turrets[i], j === null ? null : { pose: poses[j] }));
-        CV.drawBrainPanel(v.ctx, v.canvas.width, v.canvas.height, CV.brainRows({ driver: { act: dAct, names: D.FEATURE_NAMES }, gunner: { act: gAct, names: GP.FEATURE_NAMES } }), { title: `${names[i] || "car"}: driver 9-8-2, gunner 9-8-3` });
+        const gAct = CV.activationsOf(GP, gunnerWeights[i], GP.features(pose, turrets[i], j === null ? null : { pose: poses[j] }, GP.pursuerInfo(i, poses, slicks)));
+        CV.drawBrainPanel(v.ctx, v.canvas.width, v.canvas.height, CV.brainRows({ driver: { act: dAct, names: D.FEATURE_NAMES }, gunner: { act: gAct, names: GP.FEATURE_NAMES } }), { title: `${names[i] || "car"}: driver 9-8-2, gunner 11-8-5` });
         continue;
       }
       if (viewFailures >= 3) continue;   // the 3D windows are off after three failed readbacks; the brain windows above stay live
@@ -164,8 +170,9 @@ async function refreshViews(poses) {
 
 function gunLine() {
   const cur = gunStore.current(), rep = gunTrainer ? gunTrainer.report() : null;
-  $("gun").textContent = (cur ? `stored gunner ${cur.hash}: held-out duel score ${cur.score.toFixed(2)} (on car 0; the hand gunner on the rest)` : "turrets: the hand gunner on every car (v4588, task 77)") +
-    (rep ? ` -- ${rep.attempts} attempts, ${rep.accepted} accepted, best held-out ${rep.best.toFixed(2)}` : "") + (shells.length ? ` -- ${shells.length} shell${shells.length === 1 ? "" : "s"} in the air` : "");
+  $("gun").textContent = (cur ? `stored gunner ${cur.hash}: held-out duel score ${cur.score.toFixed(2)} (on car 0; the hand gunner on the rest)` : "turrets: the hand gunner on every car (v4588, task 77); it drops oil on a pursuer and lights it under them (v4590, task 79)") +
+    (rep ? ` -- ${rep.attempts} attempts, ${rep.accepted} accepted, best held-out ${rep.best.toFixed(2)}` : "") + (shells.length ? ` -- ${shells.length} shell${shells.length === 1 ? "" : "s"} in the air` : "") +
+    (slicks && slicks.patches.length ? ` -- ${slicks.patches.length} slick${slicks.patches.length === 1 ? "" : "s"} on the road, ${slicks.patches.filter(S.isBurning).length} burning` : "");
 }
 /** The gunner's idle-time trainer: drivePolicy's ES on the duel from the stored gunner (or zero), judged on the held-out seed by the store's ratchet. */
 function gunnerTrainer() {
@@ -260,8 +267,9 @@ function frame(t) {
   const poses = cars.map((c) => carPose(phys, c));
   poses.forEach((p, i) => { const tp = truckPlacement(p), k = placements.length + i; scene.kitRecords.set([tp.pos[0], tp.pos[1], tp.pos[2], 1], k * 4); scene.kitExtras.set(tp.quat, k * 4); });
   placeTurrets(scene, turretBase, poses, turrets, shells);
+  if (slicks) placeSlicks(scene, slickBase, slicks);
   const order = trackers.map((tk, i) => ({ i, laps: tk.laps, hit: tk.hit })).sort((a, b) => (b.laps - a.laps) || (b.hit - a.hit));
-  $("racing").textContent = training ? $("racing").textContent : `${(ticks * CAR.dt).toFixed(1)} s: ` + order.map((o, k) => `${k + 1}. ${names[o.i]} (${o.laps} laps, ${o.hit} checkpoints, ${turrets[o.i].hits} hits of ${turrets[o.i].shots})`).join("  ") + ` -- fingerprint ${(hash >>> 0).toString(16).padStart(8, "0")}`;
+  $("racing").textContent = training ? $("racing").textContent : `${(ticks * CAR.dt).toFixed(1)} s: ` + order.map((o, k) => `${k + 1}. ${names[o.i]} (${o.laps} laps, ${o.hit} checkpoints, ${turrets[o.i].hits} hits of ${turrets[o.i].shots}, ${turrets[o.i].drops || 0} slicks, burned ${((turrets[o.i].burned || 0) * CAR.dt).toFixed(1)} s)`).join("  ") + ` -- fingerprint ${(hash >>> 0).toString(16).padStart(8, "0")}`;
   const lead = poses[order[0].i]; centre = [lead.pos[0], 0, lead.pos[2]];
   const eye = [centre[0] + dist * Math.sin(yaw) * Math.cos(pitch), centre[1] + dist * Math.sin(pitch), centre[2] + dist * Math.cos(yaw) * Math.cos(pitch)];
   camNow = { viewProj: G.multiply(G.perspective(0.9, w / h, 0.5, 2000), G.lookAt(eye, centre)), eye };

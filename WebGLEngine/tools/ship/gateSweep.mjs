@@ -4870,6 +4870,24 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "sabotages, all red by name, including a normal taken from a central difference of the samples " +
                  "instead of the bilinear patch the height comes from.",
     }),
+    since236: Object.freeze({
+        at: "v4590", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "physics/slick-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in under a second, pure: a flat surface and a pose, no box3d. THE OIL SLICK AND THE DOOM FIRE ON IT (task 79): " +
+                 "physics/slick.mjs drops a 1.8 x 3.4 m patch 2.6 m behind the car along its yaw and WRAPS the surface (slickSurface asks " +
+                 "the track and then the patches: under oil grip x 0.3 and rolling x 0.5, a burning patch is hot road with the road's grip), " +
+                 "so raceCar's carForces takes the oil as any surface and not a line of it changed; ignite lights the owner's newest unlit " +
+                 "patch into render/doomFire.mjs's byte automaton -- the Slug fill's fire -- one per patch, fed for 6 s, burning out on " +
+                 "its own schedule (394 ticks), a burn event a tick for a car standing in it. The gunner grew to 11 -> 8 -> 5 (two facts: " +
+                 "a pursuer inside 14 m behind, a car on my oil; two outputs: drop, ignite) and its gate, the turret's and the windows' " +
+                 "were re-pinned; the shell-speed key runs a chase leg AND a pursued leg because turning the duel around made 8 m/s " +
+                 "hittable. Sabotages A..H, three of them findings fixed in the gate (an axis-aligned patch cannot see the frame's " +
+                 "handedness; a hash of the count alone; a hash without the heat) and six more on the gunner F..K, all red by name.",
+    }),
     since235: Object.freeze({
         at: "v4589", swept: 1, green: 1, red: 0,
         added: Object.freeze([

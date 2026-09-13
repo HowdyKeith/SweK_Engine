@@ -14,6 +14,8 @@
 import { boxMesh } from "./buildingLab.mjs";
 import { sphereMesh } from "./litSphere.mjs";
 import { muzzle } from "../physics/turret.mjs";
+import { yawQuat } from "../physics/raceCar.mjs";
+import { SLICK, fireCells, isBurning } from "../physics/slick.mjs";
 
 export const TURRET_DRAW = Object.freeze({
     domeScale: 0.32, barrelSide: 0.16, shellScale: 0.12, maxShells: 64, park: Object.freeze([0, -500, 0]),
@@ -57,4 +59,41 @@ export function placeTurrets(scene, base, poses, turrets, shells, { draw = TURRE
         E.set([0, 0, 0, 1], o);
     }
     return { domes: base, barrels: base + n, shells: s0, count: 2 * n + draw.maxShells };
+}
+
+// ---- v4590 (task 79): the oil slicks and the Doom Fire on them -------------------------------------------------------------------
+// Two more fleets: SLICKS, a flat dark box pre-sized to the patch (SLICK.width x 0.04 x SLICK.length at scale 1) placed with the
+// patch's yaw in the quat mode; and FIRE, the burning cells of every lit patch as small boxes in the lit pipeline's colour mode (the
+// instance's colour in the extras, round 4's debris cubes' mode) -- the automaton's palette on the road, cell for cell.
+export const SLICK_DRAW = Object.freeze({ maxPatches: 24, maxCells: 512, oilColour: Object.freeze([0.05, 0.05, 0.07, 1]), park: Object.freeze([0, -500, 0]) });
+
+/** A flat box of the patch's footprint, centred, at scale 1. */
+export function slickMesh(width = SLICK.width, length = SLICK.length, colour = SLICK_DRAW.oilColour, thickness = 0.04) {
+    const m = boxMesh(colour), p = m.positions;
+    for (let i = 0; i < p.length; i += 3) { p[i] *= width; p[i + 1] *= thickness; p[i + 2] *= length; }
+    return m;
+}
+
+/** The two fleets for kitScene's extraFleets: the slicks (quat mode) and the fire cells (colour mode). Records start parked. */
+export function slickFleets(L, { light, draw = SLICK_DRAW } = {}) {
+    const rec = (count) => { const r = new Float32Array(count * 4); for (let i = 0; i < count; i++) r.set([draw.park[0], draw.park[1], draw.park[2], 1], i * 4); return r; };
+    const ext = (count, w) => { const e = new Float32Array(count * 4); for (let i = 0; i < count; i++) e[i * 4 + 3] = w; return e; };
+    const bind = L.litBind(light);
+    return [
+        { name: "slicks", mesh: slickMesh(), pipeline: L.litPipelineDesc({ cull: "none", extra: "quat" }), bind, records: rec(draw.maxPatches), extras: ext(draw.maxPatches, 1) },
+        { name: "fire", mesh: boxMesh([1, 1, 1, 1]), pipeline: L.litPipelineDesc({ cull: "none", extra: "colour" }), bind, records: rec(draw.maxCells), extras: ext(draw.maxCells, 1) },
+    ];
+}
+
+/** Write this frame's patches and burning cells into a dynamic kit scene; `base` is the first slick record. Returns the counts placed. */
+export function placeSlicks(scene, base, state, { draw = SLICK_DRAW } = {}) {
+    const R = scene.kitRecords, E = scene.kitExtras, patches = state.patches;
+    for (let k = 0; k < draw.maxPatches; k++) {
+        const p = patches[k], o = (base + k) * 4;
+        if (p) { R.set([p.x, p.y + 0.02, p.z, 1], o); E.set(yawQuat(p.yaw), o); } else { R.set([draw.park[0], draw.park[1], draw.park[2], 1], o); E.set([0, 0, 0, 1], o); }
+    }
+    const f0 = base + draw.maxPatches; let n = 0;
+    for (const p of patches) { if (!isBurning(p)) continue; for (const c of fireCells(p)) { if (n >= draw.maxCells) break; const o = (f0 + n) * 4; R.set([c.x, c.y, c.z, c.w], o); E.set([c.colour[0], c.colour[1], c.colour[2], 1], o); n++; } }
+    for (let k = n; k < draw.maxCells; k++) { const o = (f0 + k) * 4; R.set([draw.park[0], draw.park[1], draw.park[2], 1], o); E.set([0, 0, 0, 1], o); }
+    return { patches: Math.min(patches.length, draw.maxPatches), cells: n, slicks: base, fire: f0, count: draw.maxPatches + draw.maxCells };
 }

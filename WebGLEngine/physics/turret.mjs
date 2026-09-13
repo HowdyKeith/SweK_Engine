@@ -1,8 +1,9 @@
 // WebGLEngine/physics/turret.mjs -- v4588 (task 77): a turret on the race car's roof, with its own contract
 //
 // THE COPILOT'S SEAT. physics/raceCar.mjs gives the driver a chassis and a contract { throttle, steer, brake }; this gives the
-// gunner a mount on that chassis and a contract of its own, { yaw, pitch, fire } -- yaw and pitch are RATE commands in [-1, 1]
-// (a full command turns the turret at TURRET.yawRate / pitchRate), fire is 0 or 1 and does nothing while the gun is reloading.
+// gunner a mount on that chassis and a contract of its own, { yaw, pitch, fire, drop, ignite } -- yaw and pitch are RATE commands
+// in [-1, 1] (a full command turns the turret at TURRET.yawRate / pitchRate), fire is 0 or 1 and does nothing while the gun is
+// reloading; drop and ignite (v4590) are the oil slick's triggers, honoured by the race loop that owns the slick state.
 // Nothing here steps box3d: the turret is JS state carried beside a car (createTurret), read from the car's pose (carPose), and
 // the shells it fires are vacuum ballistics stepped by physics/ballistics.mjs's stepShell with the world's own gravity. A hit is
 // an EVENT the caller turns into an impulse on the target's chassis; this module never touches a body.
@@ -57,8 +58,12 @@ const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 
-/** The clamped gunner contract: yaw and pitch rates in [-1, 1], fire 0 or 1. */
-export const clampGun = (u = {}) => ({ yaw: clamp(+u.yaw || 0, -1, 1), pitch: clamp(+u.pitch || 0, -1, 1), fire: +u.fire > 0 ? 1 : 0 });
+/**
+ * The clamped gunner contract: yaw and pitch rates in [-1, 1], fire 0 or 1 -- and, since v4590 (task 79), drop and ignite, 0 or 1:
+ * drop lays an oil slick behind the car (physics/slick.mjs, on its own reload), ignite lights the newest one. The mount ignores
+ * both; the race loop that carries the slick state honours them (brain/gunnerPolicy.mjs's turretTick).
+ */
+export const clampGun = (u = {}) => ({ yaw: clamp(+u.yaw || 0, -1, 1), pitch: clamp(+u.pitch || 0, -1, 1), fire: +u.fire > 0 ? 1 : 0, drop: +u.drop > 0 ? 1 : 0, ignite: +u.ignite > 0 ? 1 : 0 });
 
 /** A pitch about the local x axis; positive raises a barrel that points along +z (the rotation is right-handed about -x). */
 export const pitchQuat = (p) => [-Math.sin(p / 2), 0, 0, Math.cos(p / 2)];

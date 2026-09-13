@@ -48,8 +48,9 @@ console.log("1. THE MOUNT AND THE MUZZLE");
     ok("a turret yaw of +pi/2 points the barrel along +x (raceCar's yawQuat convention), and muzzle.yaw reads it back", near(m2.dir[0], 1, 1e-12) && near(m2.dir[2], 0, 1e-12) && near(m2.yaw, Math.PI / 2, 1e-12));
     t.yaw = 0; const yawed = still([3, 1, 5], Math.PI / 2), m3 = U.muzzle(yawed, t);
     ok("the mount turns with the chassis: a car yawed +pi/2 (its +z now along +x) carries its pivot at pos + [mount.z, mount.y, -mount.x]", near(m3.pivot[0], 3 + U.TURRET.mount[2], 1e-12) && near(m3.pivot[1], 1 + U.TURRET.mount[1], 1e-12) && near(m3.pivot[2], 5 - U.TURRET.mount[0], 1e-12) && near(m3.dir[0], 1, 1e-12), `pivot ${m3.pivot.map((c) => c.toFixed(3)).join(", ")}`);
-    const c = U.clampGun({ yaw: 5, pitch: -3, fire: 0.3 }), c0 = U.clampGun({});
-    ok("the contract clamps: yaw and pitch to [-1, 1], fire to 0 or 1, nothing to zeros", c.yaw === 1 && c.pitch === -1 && c.fire === 1 && c0.yaw === 0 && c0.pitch === 0 && c0.fire === 0 && U.clampGun({ fire: "0" }).fire === 0);
+    const c = U.clampGun({ yaw: 5, pitch: -3, fire: 0.3, drop: 2, ignite: -1 }), c0 = U.clampGun({});
+    ok("the contract clamps: yaw and pitch to [-1, 1], fire, drop and ignite to 0 or 1, nothing to zeros", c.yaw === 1 && c.pitch === -1 && c.fire === 1 && c.drop === 1 && c.ignite === 0 && c0.yaw === 0 && c0.pitch === 0 && c0.fire === 0 && c0.drop === 0 && c0.ignite === 0 && U.clampGun({ fire: "0" }).fire === 0 && Object.keys(c).join() === "yaw,pitch,fire,drop,ignite");
+    ok("...and the mount passes drop and ignite through untouched: they are the slick's, not the mount's", (() => { const t = U.createTurret(), r = U.stepTurret(t, { drop: 1, ignite: 1 }, DT); return r.drop === 1 && r.ignite === 1 && r.fires === false && t.shots === 0; })());
 }
 console.log("\n2. THE MOUNT INTEGRATES ITS RATES AND RELOADS");
 {
