@@ -3738,6 +3738,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "world culled when the camera's frustum lost the origin (the world was one unit-radius record there), which " +
                  "crashScene fixes for itself and the roadmap names for the other scenes. Sabotages red at A / B / C / D / E / F / G.",
     }),
+    since196: Object.freeze({
+        at: "v4531", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/fleetRouting-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green headless on box3d's wasm; no GPU in it. Fleet brain routing, named: brain/fleetRouting.mjs makes a request " +
+                 "{ kind, scene, policy, ticks } and a routed row that names the peer that took it, over fleet.js's learned scheduler " +
+                 "fed by the bridge's live registry; POST /ai/brain/route and GET /ai/brain/routed keep the ledger that server.html's " +
+                 "gauge card, report.html's fleet rows and brain-fleet.html's cards read; the trainer's episodes and the race's " +
+                 "lockstep tick ranges are routed the same way and run here, the ranges chaining to the record's fingerprint. " +
+                 "Three corrections found by the gate: an ineligible peer was only slowed, not excluded; the scheduler's prior " +
+                 "ignored the telemetry; the routed row dropped the request's payload. Sabotages red at A / B / C / D / E.",
+    }),
 
 });
 

@@ -1618,6 +1618,39 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         box stands until the topple); debris that collides (the sandbox's does not either); the brain driving into
         buildings (the ram is a launch); CityGen's crumble side-bite direction, which is Math.random and not the
         seed's (the first impact is deterministic, a later bite's voxels are not); the other scenes' origin record.
+     Then (v4531) THE FLEET BRAIN ROUTING, NAMED. What the gauges called a "fleet brain request" was FOUND FIRST: a
+        brain's POST to ai-bridge/gpuBrainBridge.js (hello, flowfield, learn) landing in its fleet registry as `posts` and
+        `solveMsEwma` -- counted and timed, never attributed. server.html's brains dial counted them, brain-fleet.html's
+        pool summed their training, report.html's grid showed each peer's version, and brain/agent/fleet.js's learned
+        scheduler routed a SIMULATED task stream; no record said which peer took which request. brain/fleetRouting.mjs is
+        the record: a request is { kind, scene, policy, ticks: [from, to) }, a routed row is that plus the peer, the
+        estimate and the time, and the router is fleet.js's learned scheduler over fleet.js's telemetry model of the LIVE
+        registry (solveMsEwma -> speed per kind). The bridge's POST /ai/brain/route routes over the registry and keeps a
+        200-row ledger; GET /ai/brain/routed and /ai/brain/health's `routed` publish it; server.html's gauge row gained a
+        card (the last request's peer as the value, the request as the note, reddened when any row is unattributed),
+        report.html's fleet rows say "took N, last <what>" with a line per peer, and brain-fleet.html's pool cards say
+        what each brain took. THEN THE RACE: the trainer's episodes (one per candidate per seed, the policy its weights
+        hash) and the race's lockstep ticks (a range every 300) are cut into requests and routed the same way, and RUN
+        HERE by this box standing in for every named peer -- said on every result as `ranOn`, because a peer that runs
+        a box3d episode on request is the rig's to build; the attribution is what this round adds and gates. A world
+        cannot be handed between peers, so each range's replay runs from tick 0 and folds the state hash only inside
+        its range, starting from the previous range's fold: the last fold is the race's fingerprint, and the cost grows
+        with the square of the range count, said plainly. MEASURED (tools/ship/fleetRouting-selfcheck.mjs): 12 train
+        requests over a 20 ms, an 80 ms and a field-only peer -- 12 attributed, 9 / 3 / 0; the bridge with two hello'd
+        brains posting 20 ms and 80 ms solves attributes 6 requests 5 and 1 and health names the last; 4 routed
+        episodes score and fingerprint exactly as drivePolicy.episode; a 10 s race in 3 ranges chains 269365c6 ->
+        b0b25647 -> 2ff47ea2, the record's own fingerprint, and one flipped input breaks the chain. THREE CORRECTIONS
+        THE FIRST DRAFT NEEDED, found by the numbers: fleet.js's model only SLOWS a peer at a kind it does not handle
+        (by 0.15), so a fast field-only peer outran a slow eligible one and took a train request -- the router masks
+        ineligible peers out of the pick whenever any eligible peer exists; the learned scheduler's prior is a constant
+        2.0 s for every brain and kind, so until it had observed a time it routed by load alone -- seeded from the
+        telemetry's own times now; and the routed row dropped the request's payload, so the first routed episode ran
+        with no policy at all. NOT BUILT, said plainly: a peer that executes a routed request (the brains post solves;
+        none accepts an episode); the ledger surviving a bridge restart; the activity ring learning a fourth kind
+        (brainTrail's census names three, and this round leaves it so). FOUND AND LEFT, said plainly: tools/ship/brainTrail-selfcheck.mjs
+        is red on this branch BEFORE this round -- its section 4 holds that physics/instruments.mjs has zero brain entries, and
+        the brain-kernels instrument (registered by an earlier sidebar round) is one; the gate runs in 3.4 s, over the quick
+        sweep's budget, so no sweep has named it. Its premise is stale, not its subject; re-founding that check is its own round.
 ## The count that says when step 4 matters
 
 tools/ship/shaderCensus-selfcheck.mjs has held, since v3274, that a hand-written pair is cheaper than an
