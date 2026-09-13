@@ -483,7 +483,10 @@ export const PROBE_AT_V4536 = Object.freeze({
     // NO_GATE_V4540 in tools/ship/reportDoors.mjs -- a frozen list of module paths, so it is a record by
     // every rule here and carries not one numeric field. A ROUND THAT REGISTERS A NAME IN A DATED LIST HAS
     // ADDED A RECORD, which is the shape the pre-flight missed twice in one round.
-    currentIncludingModule: Object.freeze({ records: 113, withFields: 52, fields: 228 }),
+    // v4541 -- RE-TAKEN with `excluding`: 113/52/228 -> 114/53/235. One record, CAPSULE_AT_V4541 in
+    // physics/character/capsuleMove.mjs, carrying seven counted fields of the seventeen it holds -- the rest
+    // are decimals, booleans or an array, none of which FIELD_RE's `name: <digits>,` matches.
+    currentIncludingModule: Object.freeze({ records: 114, withFields: 53, fields: 235 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -561,7 +564,8 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4540 -- RE-TAKEN A THIRD TIME: 110/50/208 -> 111/50/208, for NO_GATE_V4540, the list this round had
     // to open in reportDoors for an arrival that came through the merge. Zero numeric fields, so `fields`
     // does not move -- the mirror image of the re-take above it, where fields moved and records did not.
-    excluding: Object.freeze({ records: 111, withFields: 50, fields: 208 }),
+    // v4541 -- RE-TAKEN: 111/50/208 -> 112/51/215, for CAPSULE_AT_V4541 in physics/character/capsuleMove.mjs.
+    excluding: Object.freeze({ records: 112, withFields: 51, fields: 215 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,

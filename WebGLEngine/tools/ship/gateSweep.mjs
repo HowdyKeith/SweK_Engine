@@ -3849,6 +3849,36 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // object keys of the same name, the later one wins silently and the earlier round's swept count vanishes
     // from the surplus arithmetic. FIFTH ORDINAL COLLISION between the two lines this session; the side that
     // merges second is the side that moves.
+    since235: Object.freeze({
+        at: "v4541", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/capsuleMove-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly: 15 pass, 242-275 ms over three runs. Backlog " +
+                 "terrain-controller piece (2), capsule against triangles, which v4539 proved is the blocker " +
+                 "under piece (3). *** THE SEPARATION IS THE ROUND: *** a bridge and a pillar of the same " +
+                 "height give byte-identical columns to any downward ray -- [5,0] and [5,0] -- and one " +
+                 "capsule rule with no ground oracle at all walks under the first to x=20 and is stopped by " +
+                 "the second at x=7.6, which is x0 minus the RADIUS at four different radii. FOUR THINGS " +
+                 "MEASURED BEFORE BUILDING AND THREE CHANGED THE DESIGN: the closest-point direction is the " +
+                 "zero vector for EVERY depth past the axis crossing and the depth saturates at the radius, " +
+                 "so the formulation has a domain rather than a tolerance; that domain's boundary is the " +
+                 "radius EXACTLY, bisected to twelve decimals -- 0.2 per frame stops, 0.4 walks through four " +
+                 "square metres of stone, with 0 dropped degenerate contacts on one side and 2 on the other, " +
+                 "so the dropped contact IS the tunnel; summing every contact drifts a body 0.63 m sideways " +
+                 "and costs 2.55 m of progress on a PERFECTLY FLAT tessellated floor, while deepest-first " +
+                 "drifts exact zero and handles an inside corner identically; and every floor triangle in " +
+                 "this tree's own fixtures is wound INWARD (n.y = -1), so nothing here may read a cross " +
+                 "product -- reversing the winding of both fixtures gives bit-identical walks. AND THE GATE " +
+                 "CONVICTED THE MODULE'S OWN JUSTIFICATION: the header claimed five boundary sub-problems " +
+                 "were complete because 'a segment that crosses the triangle reports zero in all five'. It " +
+                 "does not. A body with a thin ledge through its chest reads 0.400000 -- exactly the radius, " +
+                 "so depth 0, so NO CONTACT AT ALL. The sixth sub-problem is meshBVH's own rayTriangle. Five " +
+                 "sabotages, A 2 RED, B 2 RED, C 2 RED, D 8 RED, E 2 RED -- and TWO WENT 0 RED FIRST, " +
+                 "neither the module's fault: A and E crashed the gate instead of failing it (an eager " +
+                 "detail string reading degenerate[0] under the sabotage that empties it, inside a run " +
+                 "already red elsewhere), and B found section 5 grading a hand-rolled COPY of depenetrate " +
+                 "rather than the shipped one.",
+    }),
     since234: Object.freeze({
         at: "v4536", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/partitionScore-selfcheck.mjs"]),

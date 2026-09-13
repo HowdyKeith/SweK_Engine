@@ -225,7 +225,8 @@ export const REACH_AT_V4548 = Object.freeze({
     // v4539 -- RE-TAKEN: 110 -> 111, one record, PROBE_AT_V4539.
     // v4539 -- RE-TAKEN AGAIN: 111 -> 112, for the second arrivals list.
     // v4540 -- RE-TAKEN: 112 -> 113, for NO_GATE_V4540 in tools/ship/reportDoors.mjs.
-    total: 113,
+    // v4541 -- RE-TAKEN: 113 -> 114, for CAPSULE_AT_V4541 in physics/character/capsuleMove.mjs.
+    total: 114,
     // *** READ OFF THE INSTRUMENT, NOT PREDICTED. *** The first draft of this record guessed 53/21/19/40 from
     // which gates the round had sped up, and was wrong on three of the four: the comment-strip fix below
     // moved two records the other way at the same time, and a guess cannot see two changes at once.
@@ -357,7 +358,9 @@ export const UNGUARDED_SPLIT_V4577 = Object.freeze({
     // v4540 -- RE-TAKEN: 112 -> 113 records, unguarded 11 -> 11. The arrival is GUARDED on arrival --
     // NO_GATE_V4540 is spread into NO_GATE_ALL and read by reportDoors-selfcheck in the same round that
     // wrote it -- so the unguarded count is unmoved and the total is not.
-    structural: Object.freeze({ total: 113, unguarded: 11, documentaryOfThose: 11, readByCodeOfThose: 0 }),
+    // v4541 -- RE-TAKEN: 113 -> 114 records, unguarded 11 -> 11. Guarded on arrival, by the gate written
+    // in the same round: capsuleMove-selfcheck reads every field of it in section 7.
+    structural: Object.freeze({ total: 114, unguarded: 11, documentaryOfThose: 11, readByCodeOfThose: 0 }),
     // BEFORE, on the tree this round opened on:
     before: Object.freeze({ total: 104, checked: 72, overBudget: 20, unmeasured: 0, unguarded: 12, unchecked: 32 }),
     // AFTER, as one reading rather than as a constant -- see the note above. Taken with the round's own
