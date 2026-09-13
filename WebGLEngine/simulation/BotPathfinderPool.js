@@ -108,7 +108,7 @@ export class BotPathfinderPool {
 
     // Build a heightmap snapshot covering the bounding box of [start, goal]
     // padded by HM_PADDING. Returns { hm, hmStride, hmOriginX, hmOriginZ }.
-    _heightmapForJob(sx, sz, gx, gz, pad = HM_PADDING) {
+    _heightmapForJob(sx, sz, gx, gz, pad = HM_PADDING, y = null, stepUp = 0) {
         const minX = Math.min(sx, gx) - pad;
         const maxX = Math.max(sx, gx) + pad;
         const minZ = Math.min(sz, gz) - pad;
@@ -128,8 +128,20 @@ export class BotPathfinderPool {
         // below, leaving y at 0 -- 121 zeros of 121 over an 11x11 window. THE SNAPSHOT WAS A FLAT PLANE AT
         // ZERO for both routes, and no fixture could see it because every fake world in this tree supplies
         // _heightAt as a plain function, which has no `this` to lose. Both branches are closures now.
+        // *** AND FROM v4542 IT IS TOLD WHICH LEVEL THE BODY IS ON. *** More than half of this world's
+        // columns hold more than one standable surface -- 51.3% of 1,681 sampled, up to 47 voxels apart --
+        // and standHeightAt returns one number. Without a body it returned whichever surface the terrain
+        // model named, which is the upper one, so a planner routing a bot along a tunnel floor was handed a
+        // snapshot of the hillside above it and planned over that instead. The level comes from plan()'s
+        // caller, which is the only thing that knows where the bot actually is.
+        //
+        // *** WHAT THIS DOES NOT BUY: A ROUTE THAT CHANGES LEVEL. *** One heightmap holds one surface per
+        // column, so the snapshot is the surfaces reachable from the level the bot starts on -- which is
+        // what this data structure can say, and strictly more than it said before. A route that must climb
+        // out of a tunnel and over a ridge needs the layered mesh nav/navmesh.mjs's own entry lists as not
+        // built, and is not bought here.
         const w0 = this.world;
-        const hAt = hasVoxels(w0) ? ((x, z) => standHeightAt(w0, x, z))
+        const hAt = hasVoxels(w0) ? ((x, z) => standHeightAt(w0, x, z, { y, stepUp }))
                   : (typeof w0?._heightAt === "function" ? ((x, z) => w0._heightAt(x, z))
                                                          : ((x, z) => 5));
         for (let dz = 0; dz < d; dz++) {
@@ -177,7 +189,8 @@ export class BotPathfinderPool {
         if (this.workers.length === 0) return { path: null, found: false, expanded: 0 };
         const id = this._nextId++;
         const widx = this._nextWorker++ % this.workers.length;
-        const { hm, hmStride, hmOriginX, hmOriginZ } = this._heightmapForJob(sx, sz, gx, gz, pad);
+        const { hm, hmStride, hmOriginX, hmOriginZ } =
+            this._heightmapForJob(sx, sz, gx, gz, pad, opts.y ?? null, opts.stepUp ?? 0);
         if (pad !== this.padSchedule[0]) this._widened++;
 
         // *** A JOB THAT NEVER COMES BACK USED TO STRAND ITS BOT FOR THE LIFE OF THE PAGE. ***

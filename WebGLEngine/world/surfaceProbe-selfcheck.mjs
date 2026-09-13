@@ -11,6 +11,38 @@
 // *** THE FIXTURES HERE ARE HAND-BUILT VOXEL COLUMNS WITH KNOWN ANSWERS, AND THAT IS DELIBERATE. *** The
 // engine reading needs a browser and minutes; what a gate must establish is that the probe returns the right
 // y for a column somebody can read off the page, and that it does NOT pay the scan when the model is right.
+//
+// ---- v4542: SECTIONS 8 TO 13, AND WHAT THIS FILE'S OWN TAIL USED TO SAY ---------------------------------
+//
+// Since v4554 the last paragraph of this file has read "NOT FIXED HERE: ... multi-layer ground, where an
+// overhang gives two surfaces over one point and this probe answers the roof." On the engine's own world
+// that is MORE THAN HALF OF IT -- 863 of 1,681 columns hold more than one standable surface, up to 47
+// voxels apart -- and standHeightAt returns one number, so it is right in 1,681 of the 2,644 places a body
+// could actually be standing. 63.58%. The repair is an argument: pass the body's feet and its own step
+// allowance, and the answer is the surface THAT body is on, 2,644 of 2,644.
+//
+// ---- SABOTAGES, WITH THEIR RESULTS ---------------------------------------------------------------------
+//
+//   A  the body-aware branch removed, back to the pre-v4542 function    4 RED here + 1 in groundProbe
+//   B  the scan started at the body's feet, ignoring its reach          1 RED, section 9
+//   C  the reach hardcoded to 1.2 instead of the caller's allowance     1 RED, section 9
+//      -- B and C redden the SAME row and nothing else, which is stated rather than
+//      dressed up: one fixture separates a probe that reads the allowance from one
+//      that does not, and it is the only place in this file where the allowance varies.
+//   D  standablesAt made to report only the topmost surface             4 RED, sections 8, 9, 11
+//   E  BotManager's oracle stops passing the body                       1 RED, section 12
+//   F  the pathfinder snapshot stops carrying the level                 1 RED, section 12
+//   G  the body-aware path taken even when no body is passed            4 RED, sections 8, 10 AND TWO v4554
+//      ROWS -- the cost row and the canopy row. *** THAT IS THE ONE WORTH READING: *** the
+//      backward-compatibility guarantee in section 10 is not a courtesy, it is what holds
+//      up readings taken two rounds before this one, and breaking it reddens rows nobody
+//      wrote with this change in mind.
+//   H  standablesAt made to ignore the body's height, accepting a one-voxel gap   1 RED, section 11
+//
+// NONE CRASHED. The first run of this battery reported all eight as crashing, which was the DETECTOR and not
+// the gates: it grepped the output for "TypeError", and section 6's own prose tells the story of a lost
+// receiver that threw one. A crash test that matches a passing row's evidence string is a crash test that
+// cannot tell a green run from a stack trace -- the v4541 shape, one level up.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -249,15 +281,250 @@ console.log("\n7. *** THE WORLD CALLS EVERYTHING ABOVE ITS OWN CEILING SOLID, AN
         "index would have said there was floor.");
 }
 
+// =============================================================================================================
+console.log("\n8. *** MULTI-LAYER GROUND: THE PROBE ANSWERED THE ROOF, AND THIS FILE FILED THAT ITSELF ***");
+{
+    // A cave with a hillside over it: floor at y=1, ceiling of the cave at 5..8, hillside top at 21.
+    const w = fakeWorld({ columns: () => [[0, 0], [5, 8], [18, 20]], model: () => 21 });
+    const all = SP.standablesAt(w, 0, 0);
+    const blind = SP.standHeightAt(w, 0, 0);
+    const inCave = SP.standHeightAt(w, 0, 0, { y: 1, stepUp: 1.2 });
+    const onHill = SP.standHeightAt(w, 0, 0, { y: 21, stepUp: 1.2 });
+    ok("!! *** A BODY ON THE CAVE FLOOR WAS TOLD THE GROUND WAS TWENTY VOXELS UP, ON THE HILLSIDE ***",
+        all.join(",") === "1,9,21" && blind === 21 && inCave === 1 && onHill === 21,
+        "the column is solid 0, 5..8 and 18..20, so a body of " + SP.DEFAULT_BODY + " stands at " +
+        all.join(", ") + ". With no body the probe answers " + blind + " -- and it is RIGHT to, because it " +
+        "was asked which surface this COLUMN has and the column has three. Told where the body is, it " +
+        "answers " + inCave + " on the cave floor and " + onHill + " on the hill. *** THE DEFECT WAS NEVER " +
+        "IN THE ARITHMETIC, IT WAS IN THE SIGNATURE: *** there was nowhere to put the body, so the function " +
+        "could only ever be right about one of the three.");
+    say("this gate's own tail has said 'NOT FIXED HERE: multi-layer ground, where an overhang gives two " +
+        "surfaces over one point and this probe answers the roof' since v4554. That sentence is deleted by " +
+        "this round rather than argued with.");
+
+    // *** AND THE FALLBACK IS NOT WHERE THE LIVE DEFECT LIVES, WHICH THE v4539 FIXTURE GOT WRONG. ***
+    const modelAgrees = fakeWorld({ columns: () => [[0, 0], [5, 8], [18, 20]], model: () => 21 });
+    const before = modelAgrees.airCalls;
+    const ansA = SP.standHeightAt(modelAgrees, 0, 0);
+    const scanned = modelAgrees.airCalls - before;
+    ok("!! ...and on the live world the MODEL names the upper surface, so the topSolidAt fallback never runs",
+        ansA === 21 && scanned <= 1 + SP.DEFAULT_BODY,
+        "the model says 21, fits(21) passes, and the probe returns it after " + scanned + " voxel reads -- " +
+        "it never reaches topSolidAt at all. v4539's fixture drove this with _heightAt returning NaN, which " +
+        "forces the fallback, and concluded the fallback was the bug. *** ON THE ENGINE'S OWN WORLD THE " +
+        "EXAMPLE COLUMNS READ (-42,-60) surfaces [2, 19] with _heightAt = 19, *** so the model agrees with " +
+        "the roof and the fallback is never entered. A repair aimed at topSolidAt would have fixed a path " +
+        "the live defect does not take.");
+}
+
+// =============================================================================================================
+console.log("\n9. the reach is the CALLER'S step allowance, and a probe with its own would answer a different question");
+{
+    //  floor at 1, a lip one voxel up at 2, and a ledge four up at 5
+    const w = fakeWorld({ columns: () => [[0, 0], [1, 1], [4, 4]], model: () => NaN });
+    const all = SP.standablesAt(w, 0, 0);
+    const rows = [0, 0.5, 1.2, 4].map((stepUp) => ({ stepUp, y: SP.standHeightAt(w, 0, 0, { y: 2, stepUp }) }));
+    ok("!! *** THE SAME BODY IN THE SAME COLUMN GETS A DIFFERENT SURFACE FOR A DIFFERENT ALLOWANCE ***",
+        all.join(",") === "2,5" && rows[0].y === 2 && rows[1].y === 2 && rows[2].y === 2 && rows[3].y === 5,
+        "surfaces at " + all.join(" and ") + "; a body standing at 2 reads " +
+        rows.map((r) => "stepUp " + r.stepUp + " -> " + r.y).join(", ") + ". *** A PROBE THAT PICKED ITS OWN " +
+        "REACH WOULD BE ANSWERING A QUESTION THE CONTROLLER IS NOT ASKING, *** and BotManager walks its bots " +
+        "at stepHeight " + "1.2" + " -- so it passes that same named constant rather than a second copy of " +
+        "the number. Sabotage C is aimed here: hardcoding the reach passes every other row in this file.");
+    ok("   ...and with no surface under the body at all the answer is null rather than an invented floor",
+        SP.standHeightAt(fakeWorld({ columns: () => [], model: () => 12 }), 0, 0, { y: 30, stepUp: 1.2 }) === null,
+        "an empty column and a body at y=30: nothing to stand on, and saying so is the only honest answer. " +
+        "The bodyless path returns the model's 12 here, which is a guess this one declines to repeat.");
+    ok("   a body in the air is told what it is falling TOWARDS, not what is above it",
+        SP.standHeightAt(w, 0, 0, { y: 40, stepUp: 1.2 }) === 5,
+        "from y=40 the scan starts at 41 and walks down to the first surface, 5 -- the ledge, not the " +
+        "floor under it. Nothing above a body's reach can be stood on and the first thing below it is what " +
+        "it meets, which is one rule covering standing, stepping and falling.");
+}
+
+// =============================================================================================================
+console.log("\n10. *** WITHOUT A BODY THE ANSWER IS BYTE-IDENTICAL TO THE PRE-v4542 ONE, WHICH IS THE WHOLE ***");
+console.log("    REASON THIS SHIPS WITHOUT RE-DERIVING SIX GATES");
+{
+    // the pre-v4542 function, verbatim, so the comparison is against the code and not against a memory of it
+    const legacy = (world, x, z, { body = SP.DEFAULT_BODY, maxY = null } = {}) => {
+        const CH = maxY ?? world.chunkHeight;
+        const fits = (y) => {
+            if (y < 1 || y + body > CH) return false;
+            try {
+                if (world.isAir(x, y - 1, z)) return false;
+                for (let k = 0; k < body; k++) if (!world.isAir(x, y + k, z)) return false;
+            } catch { return false; }
+            return true;
+        };
+        let h = null;
+        try { h = world._heightAt(x, z); } catch { h = null; }
+        if (Number.isFinite(h) && fits(h)) return h;
+        const top = SP.topSolidAt(world, x, z, { maxY: CH });
+        if (top < 0) return Number.isFinite(h) ? h : null;
+        const s = top + 1;
+        return s + body <= CH ? s : null;
+    };
+    const shapes = [
+        [[[0, 4]], () => 5], [[[0, 4]], () => 9], [[[0, 4]], () => 2], [[[0, 4]], () => NaN],
+        [[[0, 0], [5, 8], [18, 20]], () => 21], [[[0, 0], [5, 8], [18, 20]], () => NaN],
+        [[], () => 7], [[[0, 62]], () => 30], [[[0, 62]], () => NaN], [[[3, 3]], () => 4],
+    ];
+    let same = 0, differ = [];
+    for (let i = 0; i < shapes.length; i++) {
+        const [cols, model] = shapes[i];
+        const a = SP.standHeightAt(fakeWorld({ columns: () => cols, model }), 0, 0);
+        const b = legacy(fakeWorld({ columns: () => cols, model }), 0, 0);
+        if (Object.is(a, b)) same++; else differ.push(i + ": " + a + " vs " + b);
+    }
+    ok("!! every column shape gives the SAME answer as the function this replaced, when no body is passed",
+        same === shapes.length,
+        same + " of " + shapes.length + " identical" + (differ.length ? " -- DIFFER: " + differ.join("; ") : "") +
+        ". The legacy function is written out in full here rather than described, so this compares against " +
+        "CODE and not a memory of it. It is what lets BotManager's non-voxel branch, every fixture in every " +
+        "other gate, and world/surfaceProbe.mjs's own census keep their readings through this round.");
+    // *** THE COST ROW IS AN AVERAGE OVER A MIX AND NOT A BEST CASE, BECAUSE THE FIRST DRAFT ASSERTED THE
+    // BEST CASE AND WAS WRONG. *** With the model right, the bodyless path costs 3 reads and the body-aware
+    // one costs 4 -- it starts at floor(y + stepUp) and tests the lip above the body before the body's own
+    // surface. The saving is not there. It is in the columns where the model is WRONG, where the old path
+    // scans the whole column and this one stops at the first surface under the body, and the engine
+    // measurement is an average over both kinds in their real proportion.
+    const mix = [
+        [[[0, 4]], () => 5, 5], [[[0, 4]], () => 5, 5],            // model right -- the common case
+        [[[0, 4]], () => 5, 5], [[[0, 4]], () => 5, 5],
+        [[[0, 4]], () => 40, 5],                                   // model wrong high: old path scans
+        [[[0, 0], [5, 8], [18, 20]], () => NaN, 1],                // no model at all: old path scans
+    ];
+    let oldReads = 0, newReads = 0;
+    for (const [cols, model, at] of mix) {
+        const a = fakeWorld({ columns: () => cols, model });
+        SP.standHeightAt(a, 0, 0); oldReads += a.airCalls;
+        const b = fakeWorld({ columns: () => cols, model });
+        SP.standHeightAt(b, 0, 0, { y: at, stepUp: 1.2 }); newReads += b.airCalls;
+    }
+    const one = fakeWorld({ columns: () => [[0, 4]], model: () => 5 });
+    SP.standHeightAt(one, 0, 0, { y: 5, stepUp: 1.2 });
+    ok("!! *** AND THE BODY-AWARE PATH IS CHEAPER ON AVERAGE, WHICH IS NOT USUALLY HOW A CORRECTNESS FIX GOES ***",
+        newReads < oldReads && one.heightCalls === 0,
+        "over six columns -- four where the model is right, one where it is 35 voxels high, one with no " +
+        "model -- the bodyless path costs " + oldReads + " voxel reads and the body-aware path " + newReads +
+        ". *** IN THE BEST CASE IT IS ONE READ WORSE, NOT BETTER, *** and the first draft of this row " +
+        "asserted otherwise and went red: with the model right it tests the lip above the body before the " +
+        "body's own surface. It also never calls _heightAt at all (" + one.heightCalls + " times), because " +
+        "it has no use for a guess. MEASURED IN THE ENGINE over 1,681 columns in their real proportion: " +
+        "model alone 0.6 ms / 0 reads per call, BODY-AWARE 1.5 ms / 4.0, as shipped 2.8 ms / 7.4, full " +
+        "column scan 7.5 ms / 42.4. Knowing where the body is REMOVES THE SEARCH.");
+}
+
+// =============================================================================================================
+console.log("\n11. standablesAt is the instrument, and it is checked against a scan rather than trusted");
+{
+    const cases = [
+        [[[0, 0]], "1"], [[], ""], [[[0, 0], [5, 8], [18, 20]], "1,9,21"],
+        [[[0, 0], [2, 2]], "3"],                         // a one-voxel gap is not two cells of air
+        [[[0, 0], [3, 3]], "1,4"],
+    ];
+    let agreed = 0;
+    for (const [cols, want] of cases) {
+        const w = fakeWorld({ columns: () => cols, model: () => NaN });
+        if (SP.standablesAt(w, 0, 0).join(",") === want) agreed++;
+    }
+    ok("!! every standable surface, and a body of 2 does not fit in a gap of 1",
+        agreed === cases.length,
+        agreed + " of " + cases.length + " columns enumerate exactly as read off the page -- including " +
+        "solid 0 and solid 2, where the single air cell at y=1 holds no body of " + SP.DEFAULT_BODY +
+        " and the only surface is 3, above the lot.");
+    const CH = 64;
+    const w = fakeWorld({ columns: () => [[0, 0], [5, 8], [18, 20]], model: () => NaN, chunkHeight: CH });
+    const brute = [];
+    for (let y = 1; y + SP.DEFAULT_BODY <= CH; y++) {
+        let good = !w.isAir(0, y - 1, 0);
+        for (let k = 0; k < SP.DEFAULT_BODY && good; k++) if (!w.isAir(0, y + k, 0)) good = false;
+        if (good) brute.push(y);
+    }
+    ok("   ...and it agrees with a scan written separately in this file",
+        SP.standablesAt(w, 0, 0).join(",") === brute.join(","),
+        "[" + brute.join(",") + "] both ways. Trivial here and not trivial in principle: this is the " +
+        "population every claim in section 8 is drawn from, and a census that defines its own population " +
+        "is the one shape this tree has been bitten by most.");
+    ok("   the ceiling bound holds for the enumeration as well as for the single answer",
+        SP.standablesAt(fakeWorld({ columns: () => [[0, 61]], model: () => NaN, chunkHeight: 64 }), 0, 0)
+            .join(",") === "62",
+        "solid to 61 in a world 64 tall leaves exactly one surface at 62, and nothing at 63 -- where a body " +
+        "of 2 would need cells 63 and 64, and the world answers SOLID above its own ceiling.");
+}
+
+// =============================================================================================================
+console.log("\n12. the wiring: both consumers pass a body, and the level comes from the caller");
+{
+    const bm = fs.readFileSync(path.join(ENG, "simulation", "BotManager.js"), "utf8");
+    const pool = fs.readFileSync(path.join(ENG, "simulation", "BotPathfinderPool.js"), "utf8");
+    ok("!! BotManager's oracle is told the body's feet and the walker's own step allowance",
+        /standHeightAt\(w, x, z, \{ y: this\._groundY, stepUp: BOT_STEP \}\)/.test(bm) &&
+        /this\._groundY = bot\.y - BOT_EYE;/.test(bm) &&
+        /stepHeight: BOT_STEP, snapDown: BOT_STEP/.test(bm) &&
+        (bm.match(/const BOT_STEP = [\d.]+;/) || []).length === 1,
+        "the ground closure stays cached per world -- rebuilding it per frame is the expensive part -- and " +
+        "_groundY is the one thing that changes per body, set to the SAME quantity handed to pos[1]. " +
+        "BOT_STEP is declared once and read by both the walker and the probe, so the two cannot drift.");
+    ok("!! the pathfinder snapshot is built for the level the bot is on",
+        /_heightmapForJob\(sx, sz, gx, gz, pad = HM_PADDING, y = null, stepUp = 0\)/.test(pool) &&
+        /standHeightAt\(w0, x, z, \{ y, stepUp \}\)/.test(pool) &&
+        /this\.pathfinderPool\.plan\(bot\.x, bot\.z, gx, gz, \{ y: bot\.y - BOT_EYE, stepUp: BOT_STEP \}\)/.test(bm),
+        "plan() carries the level through to the snapshot, because the pool is the one thing in the chain " +
+        "that does NOT know where the bot is. A planner given the hillside over a tunnel plans over the " +
+        "hillside.");
+    ok("   and a world with no voxel grid still gets exactly the old function, in both files",
+        /hasVoxels\(w\)\s*\n?\s*\?/.test(bm) && /hasVoxels\(w0\)/.test(pool),
+        "hasVoxels gates both call sites, so every fixture in this tree that supplies a bare _heightAt is " +
+        "untouched by this round -- the same guard the v4554 wiring used and for the same reason.");
+    say("NOT WIRED: nothing else reads standHeightAt. tools/ship/groundProbe-selfcheck.mjs did, to " +
+        "characterise this defect, and that row is DELETED by this round rather than argued with -- it was " +
+        "labelled in its own text as a check that goes red on success.");
+}
+
+// =============================================================================================================
+console.log("\n13. the v4542 record is arithmetic that has to close, and a live figure a gate may not assert");
+{
+    const B = SP.BODY_AWARE_AT_V4542;
+    ok("!! the correctness halves account for every place a body could be, and the rule's is all of them",
+        B.bodyAwareCorrect === B.bodyPlaces && B.shippedCorrect === B.columns &&
+        B.shippedCorrect < B.bodyPlaces && B.multiSurface < B.columns,
+        B.bodyAwareCorrect + " of " + B.bodyPlaces + " for the rule and " + B.shippedCorrect + " of " +
+        B.bodyPlaces + " as shipped -- and the second number is exactly the COLUMN count, which is not a " +
+        "coincidence and is the whole finding: a function returning one number per column is right once per " +
+        "column however good it is. " + B.multiSurface + " of " + B.columns + " columns hold more than one " +
+        "surface, up to " + B.worstSpread + " voxels apart.");
+    ok("!! *** THE LIVE PERCENTAGE IS NOT ASSERTED, BECAUSE THE VOXELS ARE NOT A FUNCTION OF THE SEED ***",
+        B.multiSurfacePct > B.multiSurfaceFloorPct &&
+        Math.abs(100 * B.multiSurface / B.columns - B.multiSurfacePct) < 0.1,
+        "four boots read " + B.multiSurfacePct + "%, 51.9%, 53.5% and 57.7% from one seed, because the fluid and " +
+        "erosion systems write chunk.set() all through the run -- the same non-determinism MEASURED_AT_V4553 " +
+        "found and for the same reason. So the record carries a FLOOR of " + B.multiSurfaceFloorPct + "% " +
+        "that every boot cleared twice over, and this row checks the stored pair is self-consistent and " +
+        "above it. A row asserting 51.3 would be red on the next boot and would be RIGHT to be, which is " +
+        "what makes it the wrong row.");
+    ok("   the cost ladder is ordered and the correct rung is not the dearest",
+        B.readsModelOnly < B.readsBodyAware && B.readsBodyAware < B.readsShipped &&
+        B.readsShipped < B.readsFullScan && B.msBodyAware < B.msShipped && B.msShipped < B.msFullScan &&
+        Object.isFrozen(B),
+        "reads per call " + [B.readsModelOnly, B.readsBodyAware, B.readsShipped, B.readsFullScan].join(" < ") +
+        "; milliseconds " + [B.msModelOnly, B.msBodyAware, B.msShipped, B.msFullScan].join(" < ") + ".");
+}
+
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\n*** ONE READING THIS ROUND TOOK AND THEN THREW OUT, because the negative is the more useful record: *** " +
     "a real bot walking 600 frames had its feet in a solid voxel on 235 of them, which looked like a bot " +
     "buried in rock. It is not. The depth was ALWAYS exactly 1 and the head was blocked on ZERO frames -- " +
     "that is a bilinear surface sitting inside its own top voxel, which is what a smoothed ground over a " +
     "lattice means. The bot's 600 frames never reached one of the 101-to-158 genuinely wrong columns. " +
-    "\nNOT FIXED HERE: world._heightAt itself, which a dozen systems read and which is a legitimate answer " +
-    "to a different question; multi-layer ground, where an overhang gives two surfaces over one point and " +
-    "this probe answers the roof; and whether the model or the voxels is the one that is WRONG in the affected " +
+    "\nFIXED AT v4542 AND THIS SENTENCE USED TO SAY OTHERWISE: multi-layer ground. It read 'NOT FIXED " +
+    "HERE ... an overhang gives two surfaces over one point and this probe answers the roof', which on the " +
+    "engine's own world was 863 columns of 1,681. The probe takes the body now. " +
+    "\nSTILL NOT FIXED HERE: world._heightAt itself, which a dozen systems read and which is a legitimate " +
+    "answer to a different question; whether a body may MOVE from this column's surface to the next one's, " +
+    "which is a swept-volume question and is terrainWalk's step test rather than this probe's; and whether " +
+    "the model or the voxels is the one that is WRONG in the affected " +
     "columns -- the probe only asserts that a body stands on what is actually there. AND NOT REPAIRED "
     + "HERE: Chunk.index()'s missing range check, which is what makes the world answer SOLID above "
     + "its own ceiling. The probe is bounded against it; the engine still has it, and it is filed.");

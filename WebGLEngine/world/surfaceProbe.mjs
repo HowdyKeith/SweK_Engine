@@ -107,17 +107,69 @@ export function topSolidAt(world, x, z, { maxY = null } = {}) {
  * Checking only that the feet are in air would accept a stand height FLOATING above the ground, which is the
  * other half of the measured error -- _heightAt runs up to 7 voxels ABOVE the real surface as well as 17
  * below it.
+ *
+ * ---- *** AND UNTIL v4542 IT HAD NOWHERE TO PUT THE BODY, WHICH IS A LARGER DEFECT THAN THE CENSUS ***
+ *
+ * Pass `y` -- the body's own feet -- and this answers the surface that body is ON. Leave it out and the
+ * answer is exactly what it always was, for every caller and every fixture that never had one.
+ *
+ * THE MEASUREMENT THAT SAYS WHY, taken by booting index.html and asking for every standable surface in
+ * 1,681 columns of the real world rather than one per column:
+ *
+ *     1,681 columns, 863 of them multi-surface (51.3%), 2,615 places a body could actually be standing
+ *     body-aware:  2,644 of 2,644 correct        100%
+ *     as shipped:  1,681 of 2,644 correct         63.58%   -- one right answer per column, by construction
+ *
+ * The 36% is not noise, it is the shape of the function: a body under a cave roof, on the floor of a
+ * tunnel, or on the lower of two decks was told the ground was the thing above its head. On the example
+ * columns the model AGREES with the upper surface -- (-42,-60) holds surfaces at 2 and 19 and _heightAt
+ * says 19 -- so `fits(h)` passes and the fallback never runs. *** THE DEFECT IS NOT IN THE topSolidAt
+ * FALLBACK, WHICH IS WHERE v4539's FIXTURE FOUND IT. It is in the signature. ***
+ *
+ * ---- THE RULE IS A DOWNWARD SCAN FROM THE BODY'S OWN REACH, AND IT IS THE CHEAP PATH TOO ---------------
+ *
+ * From `y + stepUp`, take the first surface that fits, going down. `stepUp` is the CALLER'S step allowance
+ * and has no default worth the name here -- BotManager walks its bots with stepHeight 1.2 and passes that
+ * same constant, because a probe that invented its own would answer a question the controller is not
+ * asking. Nothing above the body's reach can be stood on; the first thing below it is what it is standing
+ * on, or falling towards. Timed in the engine over the same 1,681 columns:
+ *
+ *     _heightAt alone        0.6 ms    0 voxel reads per call
+ *     BODY-AWARE (this)      1.5 ms    4.0        <- correct, and 1.9x faster than the line it replaces
+ *     as shipped             2.8 ms    7.4
+ *     full column scan       7.5 ms   42.4
+ *
+ * *** THE RIGHT ANSWER IS THE CHEAP ONE, WHICH IS NOT USUALLY HOW THIS GOES, *** and the reason is worth
+ * a line: knowing where the body is removes the search. The shipped path pays to verify a model answer and
+ * then, when it fails, to scan a whole column looking for a surface it has no way to choose between.
+ *
+ * ---- WHAT THIS DOES NOT CLOSE --------------------------------------------------------------------------
+ *
+ * v4539 wrote that this repair "is no easier than the one section 3 refuses ... which is piece (2) again".
+ * *** THAT IS HALF RIGHT AND THE HALF MATTERS. *** Choosing which surface a body is ON needs no swept
+ * volume, because a voxel column HAS no side faces within itself -- the column is the sweep. What needs the
+ * swept volume is whether the body may MOVE from this column's surface to the next one's, and that is
+ * unchanged: it is terrainWalk's step test, and on a mesh it is physics/character/capsuleMove.mjs (v4541).
+ * So this closes the choice and leaves the movement exactly where it was.
  */
-export function standHeightAt(world, x, z, { body = DEFAULT_BODY, maxY = null } = {}) {
+export function standHeightAt(world, x, z, { body = DEFAULT_BODY, maxY = null, y = null, stepUp = 0 } = {}) {
     const CH = maxY ?? world.chunkHeight;
-    const fits = (y) => {
-        if (y < 1 || y + body > CH) return false;
+    const fits = (yy) => {
+        if (yy < 1 || yy + body > CH) return false;
         try {
-            if (world.isAir(x, y - 1, z)) return false;          // nothing to stand on
-            for (let k = 0; k < body; k++) if (!world.isAir(x, y + k, z)) return false;
+            if (world.isAir(x, yy - 1, z)) return false;          // nothing to stand on
+            for (let k = 0; k < body; k++) if (!world.isAir(x, yy + k, z)) return false;
         } catch { return false; }
         return true;
     };
+    // *** THE BODY-AWARE PATH IS FIRST AND IS ENTERED ONLY WHEN THERE IS A BODY. *** Every caller and
+    // fixture that passes no `y` falls through to the original three lines unchanged, which is what lets
+    // this ship without re-deriving six gates' worth of readings.
+    if (Number.isFinite(y)) {
+        const start = Math.min(CH - body, Math.floor(y + stepUp));
+        for (let yy = start; yy >= 1; yy--) if (fits(yy)) return yy;
+        return null;                                              // nothing under this body at all
+    }
     let h = null;
     try { h = world._heightAt(x, z); } catch { h = null; }
     if (Number.isFinite(h) && fits(h)) return h;                  // the model was right -- 93% of columns
@@ -125,6 +177,33 @@ export function standHeightAt(world, x, z, { body = DEFAULT_BODY, maxY = null } 
     if (top < 0) return Number.isFinite(h) ? h : null;            // empty column: nothing better to say
     const s = top + 1;
     return s + body <= CH ? s : null;                             // a column solid to the ceiling has no surface
+}
+
+/**
+ * *** EVERY y A BODY COULD STAND AT IN THIS COLUMN, LOWEST FIRST. THE INSTRUMENT THE ROUND NEEDED. ***
+ *
+ * standHeightAt returns ONE number, and until v4542 nothing in this tree could ask how many there were. On
+ * the engine's own world, over 1,681 columns on a 3-unit lattice, MORE THAN HALF HAVE MORE THAN ONE --
+ * 57.7%, 51.9% and 51.3% in three boots, with the topmost and lowest up to 47 voxels apart. A cave with a
+ * hillside over it, a deck above a floor, a tunnel under a ridge: ordinary shapes in a voxel world, and
+ * every one of them a place where "the ground height here" is not a question with an answer.
+ *
+ * The count moves between boots and the module header says why -- the voxels are not a pure function of the
+ * seed, because the fluid and erosion systems write chunk.set() all through the run. So a gate may assert
+ * that this is COMMON and must not assert how common.
+ */
+export function standablesAt(world, x, z, { body = DEFAULT_BODY, maxY = null } = {}) {
+    const CH = maxY ?? world.chunkHeight;
+    const out = [];
+    for (let y = 1; y + body <= CH; y++) {
+        let ok = true;
+        try {
+            if (world.isAir(x, y - 1, z)) ok = false;
+            else for (let k = 0; k < body && ok; k++) if (!world.isAir(x, y + k, z)) ok = false;
+        } catch { ok = false; }
+        if (ok) out.push(y);
+    }
+    return out;
 }
 
 /**
@@ -168,6 +247,36 @@ export function surfaceCensus(world, { x0 = -60, x1 = 60, z0 = -60, z1 = 60, ste
  * browser; the gate re-derives every claim's SHAPE on voxel worlds it builds itself, and holds these to the
  * arithmetic that must be true of them.
  */
+/**
+ * *** THE v4542 READING: HOW OFTEN "THE GROUND HEIGHT HERE" IS NOT A QUESTION WITH AN ANSWER. ***
+ *
+ * Taken by booting index.html headlessly and asking for EVERY standable surface in 1,681 columns on a
+ * 3-unit lattice, rather than one per column. The multi-surface count is not reproducible and the module
+ * header says why -- the voxels are edited by the running simulation, so four boots gave 57.7%, 51.9%,
+ * 51.3% and 53.5%. What IS reproducible is that it is more than half, every time, so the gate asserts a floor and not
+ * a figure. The correctness and cost numbers below are properties of the RULE and are re-derived on fixtures
+ * by world/surfaceProbe-selfcheck.mjs on every run.
+ */
+export const BODY_AWARE_AT_V4542 = Object.freeze({
+    at: "v4542",
+    columns: 1681,                 // the lattice, matching MEASURED_AT_V4553's
+    multiSurface: 863,             // columns holding more than one standable surface, in the boot below
+    multiSurfacePct: 51.3,         // ...and 57.7, 51.9 and 53.5 in three others. NOT reproducible; a floor
+    multiSurfaceFloorPct: 25,      // is what a gate may assert, and every boot cleared it twice over
+    worstSpread: 47,               // voxels between the lowest and highest surface in one column (46 in another boot)
+    bodyPlaces: 2644,              // (column, surface) pairs -- the places a body could actually be standing
+    bodyAwareCorrect: 2644,        // 100%
+    shippedCorrect: 1681,          // 63.58% -- one right answer per column, by construction
+    readsModelOnly: 0,             // voxel reads per call
+    readsBodyAware: 4,             // ...and it is the correct one
+    readsShipped: 7.4,
+    readsFullScan: 42.4,
+    msModelOnly: 0.6,              // milliseconds over all 1,681 columns
+    msBodyAware: 1.5,
+    msShipped: 2.8,
+    msFullScan: 7.5,
+});
+
 export const MEASURED_AT_V4553 = Object.freeze({
     at: "v4553, corrected at v4554",
     world: "main.js world._heightAt against world.voxelAt, chunkHeight 64",

@@ -171,8 +171,13 @@ export const PROBE_AT_V4539 = Object.freeze({
     roofY: 5,
     stepTestFires: true,        // the STEP test, not the slope test the entry's wording points at
     meshGroundShippingCallers: 0,
-    liveProbeAnswer: 21,        // world/surfaceProbe.mjs's standHeightAt, for a body standing at y = 1
-    liveProbeShouldBe: 1,
+    // *** BOTH OF THESE ARE NOW CORRECT ANSWERS TO DIFFERENT QUESTIONS, AND THAT IS THE v4542 REPAIR. ***
+    // The 21 was standHeightAt's answer for a body standing at y = 1, and it was wrong because the function
+    // had nowhere to put the body. It is now what the BODYLESS call returns -- "which surface does this
+    // column have", where the column has two -- and the body-aware call returns the 1. The names are kept
+    // so this record still reads against v4539's own prose; the gate asserts both.
+    liveProbeAnswer: 21,        // standHeightAt(world, x, z) with no body -- the topmost, and right to be
+    liveProbeShouldBe: 1,       // standHeightAt(world, x, z, { y: 1, stepUp }) -- the floor the body is on
     standingTeleportWas: 5,     // metres a stationary body was lifted under the bridge, before v4540
     standingTeleportNow: 0,
     settlingKept: 0.3,          // and a body 0.3 above the floor still snaps to it

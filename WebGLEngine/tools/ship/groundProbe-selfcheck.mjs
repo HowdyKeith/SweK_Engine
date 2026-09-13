@@ -31,13 +31,17 @@
 //      one saying what it must.
 //   G  the band hardcoded to 0.5 instead of the caller's allowances      1 RED, the band row alone
 //
-// SECTION 4 IS NOT SABOTAGED AND THAT IS DELIBERATE. It characterises a defect in another module, so the
-// only thing that drives it red is REPAIRING that module -- which makes it a check that goes red on success,
-// the shape v4536 found and removed elsewhere in this tree. It is kept because the alternative is no record,
-// and it is labelled in its own report line so the round that fixes the probe deletes it instead of arguing.
+// *** SECTION 4 WAS A CHECK THAT GOES RED ON SUCCESS, AND v4542 PAID IT OFF. *** It characterised a defect
+// in world/surfaceProbe.mjs -- a body on a cave floor told the ground was the hillside over it -- so the
+// only thing that could drive it red was REPAIRING that module, the shape v4536 found and removed elsewhere
+// in this tree. It was kept because the alternative was no record, and labelled in its own report line so
+// the round that fixed the probe would DELETE it rather than argue with it. v4542 made standHeightAt
+// body-aware; the row is gone, replaced by a one-row check that the defect is closed, and the behaviour of
+// the repaired function is gated where it belongs, in world/surfaceProbe-selfcheck.mjs sections 8 to 12.
 "use strict";
 import * as GP from "../../physics/character/groundProbe.mjs";
 import { standHeightAt } from "../../world/surfaceProbe.mjs";
+const PROBE = GP.PROBE_AT_V4539;
 import { meshGround as NM_meshGround, stepTerrain } from "../../physics/character/terrainWalk.mjs";
 import { meshGround } from "../../physics/character/terrainWalk.mjs";
 
@@ -125,35 +129,34 @@ console.log("\n3. *** WHY NO DOWNWARD RULE CAN DO BETTER: THE TWO WORLDS ARE THE
 }
 
 // =============================================================================================================
-console.log("\n4. *** AND THE SAME MISTAKE IS LIVE, IN THE MODULE THE SHIPPING CALLERS ACTUALLY READ ***");
+console.log("\n4. *** THE LIVE INSTANCE THIS SECTION CHARACTERISED IS REPAIRED, SO THE CHARACTERISATION IS GONE ***");
 {
-    // *** THE BACKLOG POINTS AT AN ADAPTER NOTHING CALLS. *** meshGround has no consumer outside its own
-    // gate; the shipping path builds its oracle from a height FUNCTION, which cannot hold two surfaces. But
-    // world/surfaceProbe.mjs's standHeightAt -- read by the bot manager and the pathfinder pool -- falls back
-    // to `topSolidAt(...) + 1`, which is take-the-topmost by another name, on a voxel world where a column
-    // really can carry several standable surfaces. A SYNTHETIC WORLD RATHER THAN A BOOTED ONE, on purpose: a
-    // gate that starts the engine is a gate the sweep cannot afford, and the behaviour does not need one.
+    // *** THIS SECTION USED TO ASSERT THE DEFECT AND IS NOW ONE LINE. *** Until v4542 it drove
+    // world/surfaceProbe.mjs's standHeightAt on a column standable at y=1 and y=21 and asserted the answer
+    // was 21 -- a body on the floor told the ground was on the deck -- and it said so about itself, in its
+    // own report lines: "THIS ROW IS A CHARACTERISATION AND IT GOES RED WHEN THE DEFECT IS FIXED ... the
+    // round that makes standHeightAt body-aware must DELETE this row, not argue with it."
+    //
+    // v4542 made it body-aware. The row is deleted rather than inverted, because a gate for surfaceProbe's
+    // behaviour belongs in world/surfaceProbe-selfcheck.mjs, which now carries five sections of it. What is
+    // kept here is the ONE fact this file is entitled to: that the defect it filed is closed, checked by
+    // asking the repaired function the same question with a body in it.
     const solid = new Set([0, 20]);                       // floor at y=1, deck at y=21
     const world = { chunkHeight: 64, isAir: (x, y, z) => !solid.has(y), _heightAt: () => NaN };
-    const answer = standHeightAt(world, 0, 0);
-    ok("!! *** A BODY STANDING ON THE FLOOR IS TOLD THE GROUND IS TWENTY VOXELS UP, ON THE DECK ***",
-        answer === 21,
-        "a column solid at y=0 and y=20 is standable at y=1 and at y=21, and standHeightAt answers " + answer +
-        ". It takes no account of where the body is, because its signature has nowhere to put it -- the same " +
-        "shape as the mesh adapter and the same consequence. *** THIS IS THE LIVE INSTANCE AND THE BACKLOG " +
-        "ENTRY DOES NOT MENTION IT, *** naming instead an adapter with no shipping caller and calling the " +
-        "defect a thing that 'will be the first thing wrong on a real mesh' -- future tense, on a path " +
-        "nothing walks, while the present tense is one directory over.");
-    report("and the repair here is no easier than the one section 3 refuses: a voxel column's standable " +
-           "surfaces are knowable from above, but WHICH of them the body may move to is a question about the " +
-           "body's swept volume, which is piece (2) again.");
-    report("*** THIS ROW IS A CHARACTERISATION AND IT GOES RED WHEN THE DEFECT IS FIXED, WHICH IS SAID HERE " +
-           "RATHER THAN LEFT TO BE DISCOVERED. *** v4536 found an assertion in this tree that demanded a " +
-           "polygon count stay ABOVE the figure a filed round existed to reduce -- a check that goes red on " +
-           "success. This row has the same shape and is kept only because the alternative is no record at " +
-           "all: the round that makes standHeightAt body-aware must DELETE this row, not argue with it, and " +
-           "the frozen record beside it carries liveProbeShouldBe: 1 so the intended answer is written down " +
-           "next to the wrong one.");
+    const onFloor = standHeightAt(world, 0, 0, { y: 1, stepUp: 1.2 });
+    const onDeck = standHeightAt(world, 0, 0, { y: 21, stepUp: 1.2 });
+    ok("!! *** THE BODY ON THE FLOOR IS TOLD THE FLOOR, AND v4539's ROW IS DELETED RATHER THAN INVERTED ***",
+        onFloor === PROBE.liveProbeShouldBe && onDeck === PROBE.liveProbeAnswer,
+        "the same column v4539 filed: standable at 1 and at 21, and standHeightAt answers " + onFloor +
+        " for a body on the floor and " + onDeck + " for one on the deck -- against a record of " +
+        PROBE.liveProbeShouldBe + " and " + PROBE.liveProbeAnswer + ", where the second number is what the " +
+        "BODYLESS call still returns and is still right to. *** A CHECK THAT GOES RED ON SUCCESS IS A DEBT " +
+        "AND THIS ROUND PAID IT, *** on the terms the row itself set out.");
+    report("v4539 wrote that this repair 'is no easier than the one section 3 refuses ... which is piece (2) " +
+           "again'. HALF RIGHT, AND THE HALF MATTERS: choosing which surface a body is ON needs no swept " +
+           "volume, because a voxel column has no side faces WITHIN itself -- the column is the sweep. What " +
+           "needs the swept volume is whether the body may MOVE to the next column's surface, and that is " +
+           "unchanged. Section 3 still stands exactly as written.");
 }
 
 // =============================================================================================================
@@ -219,10 +222,12 @@ console.log("\n6. *** THE RECORD, RE-DERIVED ***");
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
-    "\nunchecked here: the LIVE instance of this mistake, which is not in the adapter the backlog names. The " +
-    "voxel stand-height probe the bot manager and the pathfinder pool both read answers the topmost standable " +
-    "surface the same way, and on the engine's own generated world it is wrong on about half the columns -- " +
-    "measured by booting the engine, which is a gate the sweep cannot afford, so the figure is in the round " +
+    "\nCLOSED SINCE v4539: the LIVE instance, which was not in the adapter the backlog names. The voxel " +
+    "stand-height probe the bot manager and the pathfinder pool both read answered the topmost standable " +
+    "surface the same way, and on the engine's own generated world it was wrong on more than half the " +
+    "columns -- 51.3% of 1,681 measured in a real boot at v4542, up to 47 voxels apart. It takes the " +
+    "body now. The mesh adapter this file is about does NOT, and that is piece (3), still open: the " +
+    "figure is in the round " +
     "note and not in a row here. Also unchecked: sloped or curved overhangs, tunnels with non-flat roofs, " +
     "and anything about what a fix SHOULD do once piece (2) exists -- this file measures that the cheap fix " +
     "is worse, and says nothing about the dear one.");

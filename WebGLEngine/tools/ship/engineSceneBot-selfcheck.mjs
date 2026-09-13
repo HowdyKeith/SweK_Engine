@@ -123,6 +123,26 @@ try {
         // live here rather than quoted, which is why this row states a SHAPE and not a number.
         const SP = await import("/world/surfaceProbe.mjs");
         const census = SP.surfaceCensus(w, { x0: -60, x1: 60, z0: -60, z1: 60, step: 3 });
+        // *** HOW OFTEN "THE GROUND HEIGHT HERE" IS NOT A QUESTION WITH AN ANSWER. *** standHeightAt
+        // returns one y; standablesAt (v4542) returns every y a body could stand at. The gap between the
+        // two is the population of the defect v4542 repaired, and it can only be read in a real world --
+        // a hand-built fixture proves the RULE and can say nothing about how much of a map it applies to.
+        let cols = 0, multi = 0, places = 0, bodyOk = 0, blindOk = 0, spread = 0;
+        for (let z = -60; z <= 60; z += 3) for (let x = -60; x <= 60; x += 3) {
+            const ys = SP.standablesAt(w, x, z);
+            if (!ys.length) continue;
+            cols++; places += ys.length;
+            if (ys.length > 1) { multi++; spread = Math.max(spread, ys[ys.length - 1] - ys[0]); }
+            const blind = SP.standHeightAt(w, x, z);
+            for (const y of ys) {
+                if (SP.standHeightAt(w, x, z, { y, stepUp: 1.2 }) === y) bodyOk++;
+                if (blind === y) blindOk++;
+            }
+        }
+        const layers = { cols, multi, places, bodyOk, blindOk, spread,
+                         multiPct: +(100 * multi / cols).toFixed(1),
+                         bodyPct: +(100 * bodyOk / places).toFixed(2),
+                         blindPct: +(100 * blindOk / places).toFixed(2) };
         // and a body placed in one of the columns the model gets wrong
         let affected = null;
         for (let z = -60; z <= 60 && !affected; z += 3) for (let x = -60; x <= 60 && !affected; x += 3) {
@@ -131,7 +151,7 @@ try {
             affected = { x, z, model: h, probe: SP.standHeightAt(w, x, z), topSolid: SP.topSolidAt(w, x, z),
                          modelInsideRock: !w.isAir(x, h, z) };
         }
-        return { rawQuarterUnit: raw, offLattice: G.offLattice, midY: mid, spawnH, census, affected,
+        return { rawQuarterUnit: raw, offLattice: G.offLattice, midY: mid, spawnH, census, affected, layers,
                  botCount: bm.bots.size,
                  start: { x: +start.x.toFixed(2), y: +start.y.toFixed(2) },
                  end: { x: +bot.x.toFixed(2), z: +bot.z.toFixed(2), y: +bot.y.toFixed(2) },
@@ -228,6 +248,21 @@ console.log("\n2. *** A REAL BOT, SPAWNED BY THE REAL BotManager, WALKING THE RE
             `${R.affected.probe}. THE BOT'S OWN 600 FRAMES NEVER REACH ONE OF THESE COLUMNS, which is why ` +
             `every row above stayed green through the defect and why this row exists.`
             : "no affected column found -- if the world stopped producing them this row is the one to re-derive");
+    const L = R.layers;
+    report("multi-layer ground, live: " + L.multi + " of " + L.cols + " columns (" + L.multiPct + "%) hold " +
+           "more than one standable surface, worst spread " + L.spread + " voxels; " + L.places + " places a " +
+           "body could be standing.");
+    ok("!! *** MORE THAN HALF THIS WORLD'S COLUMNS HAVE MORE THAN ONE GROUND, AND ONE NUMBER CANNOT SAY SO ***",
+        L.multiPct > 25 && L.bodyOk === L.places && L.blindOk === L.cols && L.blindOk < L.places &&
+        L.spread >= 8,
+        L.multiPct + "% of " + L.cols + " columns are multi-surface, up to " + L.spread + " voxels apart. " +
+        "Asked with a body, standHeightAt is right in " + L.bodyOk + " of " + L.places + " places (" +
+        L.bodyPct + "%); asked without one it is right in " + L.blindOk + " (" + L.blindPct + "%) -- AND " +
+        "THAT SECOND NUMBER IS EXACTLY THE COLUMN COUNT, which is the whole finding rather than a " +
+        "coincidence: a function returning one y per column is right once per column however good it is. " +
+        "*** THE PERCENTAGE IS REPORTED AND THE FLOOR IS ASSERTED, *** because the voxels are not a pure " +
+        "function of the seed -- four boots read 57.7, 51.9, 51.3 and 53.5 -- and a row pinning any of them " +
+        "would be red on the next boot and right to be.");
     ok("   ...and the engine's own pathfinder pool is on the navmesh route",
         R.poolRoute === "navmesh",
         "\"" + R.poolRoute + "\" -- v4545's wiring, observed in the running engine rather than in a fixture.");

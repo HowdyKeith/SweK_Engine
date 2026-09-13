@@ -174,6 +174,11 @@ import { standHeightAt, hasVoxels } from "../world/surfaceProbe.mjs";
 
 /** Eye/centre offset above the feet -- the +1 this file has always added to the terrain height. */
 const BOT_EYE = 1;
+// *** THE BOT'S STEP ALLOWANCE, NAMED ONCE BECAUSE TWO THINGS NOW READ IT. *** It is what stepTerrainFan
+// may climb, and from v4542 it is also how far above its feet the stand-height probe may look for the
+// surface this bot is on. A probe that invented its own allowance would answer a question the controller is
+// not asking, and the two drifting apart is the kind of defect nothing would report.
+const BOT_STEP = 1.2;
 
 import { KAIJU_BOT_KINDS, KAIJU_BOT_KIND_NAMES, isKaijuBotKind } from "./KaijuBotKinds.js";
 // Round 234 — king-tier kaiju bots (boss roster). 7 kings with promoted
@@ -1205,10 +1210,18 @@ export class BotManager {
                 // DIRECTIONS OPEN. The refusal was correct -- the cell it wanted is a two-unit drop reading
                 // 65.9 degrees against this limit of 55 -- so the fix is not in the physics; it is that
                 // nothing asked a second question. stepTerrainFan tries the wish, then fans around it.
+                // *** WHICH BODY IS ASKING, WHICH THE ORACLE HAD NO WAY TO KNOW. *** standHeightAt
+                // returns ONE height for a column, and more than half of this world's columns hold more
+                // than one standable surface -- 51.3% of 1,681, up to 47 voxels apart. Without this the
+                // probe answered whichever surface the terrain model named, which is the upper one, so a
+                // bot in a tunnel or under a cave roof was told the ground was above its head. The oracle
+                // stays cached per world (rebuilding it per frame is the expensive part); this field is
+                // the one thing that changes per body, and it is the SAME quantity handed to pos[1] below.
+                this._groundY = bot.y - BOT_EYE;
                 const r = stepTerrainFan({
                     pos: [bot.x, bot.y - BOT_EYE, bot.z], ground, wish: [dx / dist, dz / dist],
                     dt, speed, maxSlopeDeg: this.botMaxSlopeDeg ?? 55,
-                    stepHeight: 1.2, snapDown: 1.2, convention: SURFACE,
+                    stepHeight: BOT_STEP, snapDown: BOT_STEP, convention: SURFACE,
                 });
                 if (r.fanned) this._detours = (this._detours || 0) + 1;
                 if (r.grounded || r.blocked) {
@@ -1250,7 +1263,13 @@ export class BotManager {
             // voxels. standHeightAt trusts it and verifies it against the voxels, scanning only where it
             // fails. A world with no voxel grid gets exactly the old function, so every fixture in every
             // gate that supplies a bare _heightAt is unaffected.
-            const surf = hasVoxels(w) ? ((x, z) => standHeightAt(w, x, z)) : ((x, z) => w._heightAt(x, z));
+            // v4542 -- the probe is told the body's feet and the walker's own step allowance, so it
+            // answers the surface THIS body is on rather than the topmost in the column. `_groundY` is set
+            // immediately before each stepTerrainFan call; when it is null -- no body has asked yet -- the
+            // probe falls through to exactly the pre-v4542 answer.
+            const surf = hasVoxels(w)
+                ? ((x, z) => standHeightAt(w, x, z, { y: this._groundY, stepUp: BOT_STEP }))
+                : ((x, z) => w._heightAt(x, z));
             this._ground = autoGround(surf);
         }
         return this._ground;
@@ -1272,7 +1291,8 @@ export class BotManager {
         bot.pathRequestPending = true;
         const reqId = ++bot.pathRequestId;
         const t0 = performance.now();
-        this.pathfinderPool.plan(bot.x, bot.z, gx, gz).then((res) => {
+        // the level this bot is on, so the snapshot is its surfaces and not the hillside overhead
+        this.pathfinderPool.plan(bot.x, bot.z, gx, gz, { y: bot.y - BOT_EYE, stepUp: BOT_STEP }).then((res) => {
             // Stale check
             if (reqId !== bot.pathRequestId || !this.bots.has(bot.entityId)) return;
             bot.pathRequestPending = false;
