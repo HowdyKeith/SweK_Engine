@@ -1651,6 +1651,32 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         is red on this branch BEFORE this round -- its section 4 holds that physics/instruments.mjs has zero brain entries, and
         the brain-kernels instrument (registered by an earlier sidebar round) is one; the gate runs in 3.4 s, over the quick
         sweep's budget, so no sweep has named it. Its premise is stale, not its subject; re-founding that check is its own round.
+     Then (v4585) THE PHYSICS LAB'S FRONT DOOR. lab-home.html is a plain landing page anyone can open, in three bands:
+        THE DOOR -- one Initiate button and one sentence under it saying what pressing it runs right now (the first
+        registered scene, its proposer and knob, and that it PROPOSES and never applies); THE LIVE STRIP -- a 2D view in
+        three columns of what the engine is doing, the scene, the proposer and what it proposed, the adjudicator's
+        verdicts landing newest first, the outcome named (the accepted value and its rank, or that nothing survived), with
+        brain-3d.html one click away; THE PRESETS -- physics/labPresets.js's curated presets as buttons, each with a plain
+        line naming what the Physics AI pulls from: the instrument by id with its gate, the key's first sentence, and the
+        device or peer that runs it. physics/labHome.mjs DERIVES every band from the tree's own records (labPresets,
+        labScenes.joinRegistered, proposers.listProposers, instruments.mjs, the v4584 routing ledger) and the page holds no
+        facts; Initiate runs the same route physics-lab.html's "Initiate AI workers" uses (/roundhouse/lab-scene-run) and
+        nothing on the page can apply a knob. SAID PLAINLY: the proposer runs in the bridge's own node process
+        (fingerprintBridge imports proposers.mjs and calls runProposer in-process), so "the device that runs it" is this
+        hub for every scene; the race is the one scene whose work is routed elsewhere, and its line names the ledger's
+        peers only when the ledger has rows. MEASURED (tools/ship/labHome-selfcheck.mjs, 1.6 s, headless plus one page
+        load in the harness browser): 25 curated presets over 13 triaged scenes, 5 registered (pile, centrifuge,
+        gyroscope, vibrations, race), 26 buttons of which 5 are enabled and one (the race) comes from the registry
+        because no preset names it; every registered scene's line carries its instrument's gate, proposer, knob and key;
+        the race's line names gate-fast (3 training, 2 race) from a ledger and not the field-only peer, and no peer at
+        all without a ledger; gyro-spin's real run fills the strip with 5 verdicts newest first and omega = 80 at rank 5
+        of 6; a route refusal is rendered as one; the page loads with no bridge, paints the 25 presets disabled and says
+        the bridge is unreachable rather than inventing a registry. FOUND: 12 of the 25 curated presets (pendulum-wave
+        through hologram) name scenes labScenes' triage never assessed, so their buttons are disabled and their line
+        says "not assessed"; and physics/labPresets.js's header names a physicsLab-selfcheck.mjs that does not exist --
+        no gate had held the presets to anything, and this one is the first. NOT BUILT, said plainly: the triage of
+        those 12 scenes (a judgement per scene, each its own round); a live strip that polls while a run is in flight
+        (the route answers once, when the run is done); the door on a page without the server (it says so instead).
 ## The count that says when step 4 matters
 
 tools/ship/shaderCensus-selfcheck.mjs has held, since v3274, that a hand-written pair is cheaper than an

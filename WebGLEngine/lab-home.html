@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<!--
+  lab-home.html -- THE PHYSICS LAB'S FRONT DOOR (v4585). A plain landing page anyone can open. RIG-ONLY like
+  physics-lab.html: it reads /roundhouse/lab-scenes, /roundhouse/lab-scene-run and /ai/brain/routed from the running
+  server, so a standalone sandbox shows the door with the bridge marked unreachable.
+
+  Three bands, top to bottom. THE DOOR: one Initiate button and one sentence under it saying what pressing it runs right
+  now. THE LIVE STRIP: a 2D view of what the engine is doing -- the scene, the proposer and what it proposed, the
+  adjudicator's verdicts landing newest first -- with the 3D GPU Brain view (brain-3d.html) one click away. THE PRESETS:
+  the curated presets of physics/labPresets.js as buttons, and under each a plain line naming what the Physics AI pulls
+  from: the instrument, its key, and the device or peer that runs it. Every line is DERIVED by physics/labHome.mjs from
+  the tree's own records; this page holds no facts and tools/ship/labHome-selfcheck.mjs grades the derivation headless.
+
+  What Initiate does and does not do: it runs the registered proposer for a scene through the same route physics-lab.html's
+  "Initiate AI workers" uses, and it PROPOSES ONLY -- tier 'propose' means a person or a gate sets the value; nothing on
+  this page can apply a knob.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Physics Lab front door (Initiate, the live strip, the presets and what the AI pulls from)">
+<meta name="demo:desc" content="The Physics Lab's plain landing page: one Initiate button that runs a registered proposer and shows every verdict; a 2D live strip of the scene, the proposer, its pick and the adjudicator's verdicts as they land, with brain-3d.html a click away; the curated presets as buttons, each with a line naming the instrument, its key and the device or peer that runs it, derived by physics/labHome.mjs from the tree's own records.">
+<meta name="demo:category" content="lab">
+<title>Physics Lab front door</title>
+<style>
+  :root { --bg:#050a07; --ink:#c9e6d3; --dim:#6f8a7c; --line:#1e4a30; --good:#6fe39b; --warn:#ffcc66; --bad:#f28b8b; --acc:#7fe6b0; --pill:#06140c; }
+  html,body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.5 ui-monospace,Menlo,monospace; }
+  main { max-width:1100px; margin:0 auto; padding:24px 16px 48px; }
+  h1 { font-size:20px; letter-spacing:.08em; text-transform:uppercase; color:#f6a623; margin:0 0 4px; }
+  .sub { color:var(--dim); font-size:12px; margin-bottom:22px; }
+  section { border:1px solid var(--line); border-radius:8px; padding:14px 16px; margin-bottom:18px; background:#070f0a; }
+  h2 { font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); margin:0 0 10px; }
+  #initiate { font:inherit; font-size:18px; padding:12px 28px; background:#0f3a24; color:var(--good); border:1px solid #2a7a4c; border-radius:8px; cursor:pointer; }
+  #initiate:disabled { opacity:.5; cursor:default; }
+  #doorLine { color:var(--dim); font-size:12px; margin-top:8px; }
+  .strip { display:grid; grid-template-columns:1fr 1fr 1.2fr; gap:12px; }
+  @media (max-width:720px) { .strip { grid-template-columns:1fr; } }
+  .col { background:var(--pill); border:1px solid var(--line); border-radius:6px; padding:10px 12px; min-height:110px; }
+  .col h3 { font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:.1em; margin:0 0 6px; }
+  .big { font-size:16px; color:var(--acc); }
+  .v { padding:2px 0; border-bottom:1px dashed #133020; font-size:12px; }
+  .v:last-child { border-bottom:0; }
+  .ok { color:var(--good); } .no { color:var(--warn); } .err { color:var(--bad); }
+  .presets { display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:10px; }
+  .preset { background:var(--pill); border:1px solid var(--line); border-radius:6px; padding:10px 12px; }
+  .preset button { font:inherit; width:100%; text-align:left; padding:6px 10px; background:#0c1f14; color:var(--ink); border:1px solid #2a4a34; border-radius:5px; cursor:pointer; }
+  .preset button.reg { border-color:#2a7a4c; color:var(--good); }
+  .preset button:disabled { cursor:default; }
+  .src { color:var(--dim); font-size:11px; margin-top:6px; line-height:1.5; }
+  .src b { color:var(--ink); font-weight:normal; }
+  a { color:#59d1ff; }
+  .links { font-size:12px; color:var(--dim); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Physics Lab front door</h1>
+  <div class="sub">One button, a live view of what the engine is doing, and every preset with a line naming what the Physics AI pulls from. Nothing here applies a value.
+    <span class="links">&middot; <a href="/brain-3d.html" target="_blank" rel="noopener">the 3D GPU Brain view</a> &middot; <a href="/physics-lab.html" target="_blank" rel="noopener">the full lab</a> &middot; <a href="/brain-fleet.html" target="_blank" rel="noopener">the fleet</a></span></div>
+
+  <section id="door">
+    <h2>The door</h2>
+    <button id="initiate" disabled>Initiate</button>
+    <div id="doorLine">reading the proposer registry&hellip;</div>
+  </section>
+
+  <section>
+    <h2>The live strip &mdash; what the engine is doing <span id="liveState" style="text-transform:none;letter-spacing:0"></span></h2>
+    <div class="strip">
+      <div class="col"><h3>scene</h3><div id="sScene" class="big">&mdash;</div><div id="sSceneNote" class="src"></div></div>
+      <div class="col"><h3>proposer &middot; what it proposed</h3><div id="sProp" class="big">&mdash;</div><div id="sPropNote" class="src"></div></div>
+      <div class="col"><h3>the adjudicator's verdicts, newest first</h3><div id="sVerdicts"><div class="v" style="color:var(--dim)">none yet</div></div><div id="sOutcome" class="src"></div></div>
+    </div>
+    <div class="src" style="margin-top:8px">The 3D view of the GPU Brain is <a href="/brain-3d.html" target="_blank" rel="noopener">brain-3d.html</a>; the race's routed work is on <a href="/brain-fleet.html" target="_blank" rel="noopener">brain-fleet.html</a>. PROPOSED, NOT APPLIED: the scene is unchanged by anything shown here.</div>
+  </section>
+
+  <section>
+    <h2>The presets &mdash; and what the Physics AI pulls from</h2>
+    <div id="presets" class="presets"><div class="src">loading&hellip;</div></div>
+  </section>
+</main>
+<script type="module" src="/ui/originNotice.js"></script>
+<script type="module">
+import * as H from "./physics/labHome.mjs";
+import { PRESETS } from "./physics/labPresets.js";
+import { INSTRUMENTS } from "./physics/instruments.mjs";
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+let RH = null, ROUTED = null, current = null;
+
+async function load() {
+  try {
+    const j = await (await fetch("/roundhouse/lab-scenes", { cache: "no-store" })).json();
+    if (!j || !j.ok) throw new Error(j && j.error || "bad answer");
+    RH = j;
+  } catch (e) { RH = null; $("doorLine").textContent = "bridge not reachable: this page reads the live proposer registry from the running server (" + (e && e.message || e) + ")"; }
+  try { ROUTED = await (await fetch("/ai/brain/routed", { cache: "no-store" })).json(); } catch { ROUTED = null; }
+  paint();
+}
+
+function paint() {
+  const scenes = RH ? RH.scenes : [], proposers = RH ? RH.proposers : [];
+  const door = H.doorLine(scenes, proposers);
+  $("doorLine").textContent = RH ? door.text : $("doorLine").textContent;
+  $("initiate").disabled = !door.scene;
+  current = current || door.scene;
+  const buttons = H.presetButtons(PRESETS, scenes);
+  $("presets").innerHTML = buttons.map((b, i) => {
+    const s = H.sourcesLine(b.scene, scenes, proposers, INSTRUMENTS, ROUTED);
+    return `<div class="preset"><button data-scene="${esc(b.scene)}" class="${b.registered ? "reg" : ""}" ${b.registered ? "" : "disabled"} title="${b.registered ? "select this scene for Initiate" : "no registered proposer: Initiate cannot run this scene"}">${esc(b.label)}${b.registered ? "" : " <span class='no'>(" + esc(b.eligible) + ")</span>"}</button>` +
+           `<div class="src"><b>${b.registered ? "pulls from" : "not run"}:</b> ${esc(s.text)}</div></div>`;
+  }).join("");
+  document.querySelectorAll("#presets button[data-scene]").forEach((el) => { el.onclick = () => { current = el.dataset.scene; $("doorLine").textContent = "Initiate will run " + current + ": " + H.sourcesLine(current, scenes, proposers, INSTRUMENTS, ROUTED).text; }; });
+}
+
+function paintStrip(strip) {
+  $("sScene").textContent = strip.scene.id || "-";
+  $("sSceneNote").textContent = (strip.scene.knob ? "knob " + strip.scene.knob + (strip.scene.key ? "; key: " + strip.scene.key : "") : "");
+  if (strip.proposer) {
+    $("sProp").textContent = strip.proposer.id + " proposed " + strip.proposer.knobs.join(",") + " = " + strip.proposer.proposed;
+    $("sPropNote").innerHTML = "tier " + esc(strip.proposer.tier) + " &middot; " + strip.proposer.tried + " candidates, " + strip.proposer.adjudicated + " adjudicated &middot; the search's pick was <span class='" + (strip.proposer.proposedVerdict === "accepted" ? "ok" : "no") + "'>" + esc(strip.proposer.proposedVerdict) + "</span>" + (strip.proposer.reason ? " &middot; " + esc(strip.proposer.reason) : "");
+  } else { $("sProp").textContent = "-"; $("sPropNote").textContent = ""; }
+  $("sVerdicts").innerHTML = strip.verdicts.length ? strip.verdicts.map((v) => `<div class="v"><span class="${v.pass ? "ok" : "no"}">${esc(v.word)}</span> candidate ${esc(v.candidate)} (rank ${v.rank})</div>`).join("") : '<div class="v" style="color:var(--dim)">no verdict landed</div>';
+  $("sOutcome").innerHTML = "<b>" + esc(strip.outcome) + "</b>" + (strip.law ? "<br>" + esc(strip.law) : "") + (strip.replay && strip.replay.fingerprint ? "<br>replay stored, fingerprint " + esc(strip.replay.fingerprint) : "");
+  $("liveState").textContent = strip.ok ? "(landed " + new Date().toLocaleTimeString() + ")" : "(refused)";
+}
+
+$("initiate").onclick = async () => {
+  if (!current) return;
+  $("initiate").disabled = true; $("liveState").textContent = "(running " + current + "...)";
+  const row = H.sceneRow(RH ? RH.scenes : [], current);
+  try {
+    const j = await (await fetch("/roundhouse/lab-scene-run?scene=" + encodeURIComponent(current), { cache: "no-store" })).json();
+    paintStrip(H.liveStrip(j, row));
+  } catch (e) { paintStrip(H.liveStrip({ ok: false, error: String(e && e.message || e) }, row)); }
+  finally { $("initiate").disabled = false; try { ROUTED = await (await fetch("/ai/brain/routed", { cache: "no-store" })).json(); } catch {} }
+};
+load();
+</script>
+</body>
+</html>

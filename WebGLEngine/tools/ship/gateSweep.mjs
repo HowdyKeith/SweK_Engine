@@ -4870,6 +4870,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "sabotages, all red by name, including a normal taken from a central difference of the samples " +
                  "instead of the bilinear patch the height comes from.",
     }),
+    since231: Object.freeze({
+        at: "v4585", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/labHome-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 1.6 s, headless plus one page load in the harness browser. The Physics Lab's front door: lab-home.html is " +
+                 "one Initiate button, a 2D live strip (scene, proposer and its pick, the adjudicator's verdicts newest first) with " +
+                 "brain-3d.html a click away, and the curated presets as buttons, each with a line naming the instrument, its key and " +
+                 "where it runs; physics/labHome.mjs derives every one of them from labPresets, labScenes.joinRegistered, " +
+                 "proposers.listProposers, instruments.mjs and the v4584 routing ledger, and the gate grades the derivation against " +
+                 "the live registry. Found: 12 of 25 curated presets name scenes the triage never assessed (their buttons say so), " +
+                 "and no gate had ever held the presets to the triage. Sabotages red at A / B / C / D / E, the gate finishing each time.",
+    }),
     since230: Object.freeze({
         at: "v4584", swept: 1, green: 1, red: 0,
         added: Object.freeze([

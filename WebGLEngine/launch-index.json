@@ -21,7 +21,7 @@
   }
  },
  "counts": {
-  "page": 469,
+  "page": 470,
   "demo": 49,
   "builtin": 34
  },
@@ -1935,6 +1935,14 @@
    "id": "lab-export.html",
    "display": "Lab Export",
    "href": "/lab-export.html",
+   "section": "Physics Lab",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "lab-home.html",
+   "display": "Lab Home",
+   "href": "/lab-home.html",
    "section": "Physics Lab",
    "collision": false
   },

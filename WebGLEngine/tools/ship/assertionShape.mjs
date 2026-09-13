@@ -269,8 +269,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // writer) and is re-taken here because that commit and this one merged, and the tree has to be green for
     // whichever lands second. distinctDefinitions holds at 40 for the NINTH round running.
     // v4584 -- RE-TAKEN on the tree merged with main at v4583: one gate (fleetRouting) joined, the same four rows by one.
-    gates: 1626, usesOk: 1605, definesOk: 1597, importsOk: 0,
-    distinctDefinitions: 40, nameFirst: 1498, condFirst: 91, unknownSignature: 16,
+    // v4585 -- RE-TAKEN: one gate (labHome) joined, the same four rows by one.
+    gates: 1627, usesOk: 1606, definesOk: 1598, importsOk: 0,
+    distinctDefinitions: 40, nameFirst: 1499, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

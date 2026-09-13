@@ -36,7 +36,12 @@ export const SECTIONS = [
       // on the same reading: LQR/Riccati control, the door onto physics/control/cartPole.mjs, and NOT the GPU
       // Brain drawer the name suggests -- the page mentions no policy, no brain and no /ai/ route at all.
       pages: ["reactor.html", "cartpole.html",
-              "physics-lab.html", "roundhouse.html", "device.html", "models.html", "gates.html",
+              // v4585 -- lab-home.html is the lab's FRONT DOOR (task 71): one Initiate button, the live strip, the presets
+              // with what the Physics AI pulls from; it belongs beside the lab it opens.
+              "lab-home.html",
+              // v4585 -- gates.html MOVED to System Tools: the gate register is "the record" that drawer's note names,
+              // beside gate-plan.html and case-study.html, and lab-home.html took the lab drawer's fifteenth slot.
+              "physics-lab.html", "roundhouse.html", "device.html", "models.html",
               "instruments.html", "instrument-bench.html", "catalog.html", "lab-export.html",
               "run-inspector.html", "frugon.html",
               // v3818 -- THE STATISTICAL-MECHANICS DOOR BELONGS WITH THE LAB, not in a thermal drawer of its
@@ -234,7 +239,7 @@ export const SECTIONS = [
       // question, not "shall I install somebody's repo".
       pages: ["webgpu-llm.html",
               "rig.html", "tools.html", "ship.html", "changelog.html", "module-history.html",
-              "page-index.html", "case-study.html", "gate-plan.html", "method-lab.html",
+              "page-index.html", "case-study.html", "gate-plan.html", "gates.html", "method-lab.html",
               // v3813 -- settings.html JOINS, closing an issue open since v3809. Keith: "we need to add this
               // page to the sort list ... most of the settings are connected to other things." It had a TOOLBAR
               // link only -- above the Arriving header, so the mover could not take it and the drawer would have
