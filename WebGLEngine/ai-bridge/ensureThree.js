@@ -23,6 +23,18 @@ const FILES = [
     ["jsm/controls/OrbitControls.js", "examples/jsm/controls/OrbitControls.js"],
     ["jsm/loaders/GLTFLoader.js", "examples/jsm/loaders/GLTFLoader.js"],
     ["jsm/utils/BufferGeometryUtils.js", "examples/jsm/utils/BufferGeometryUtils.js"],
+    // GLTFExporter.js was already on disk (tools/krbn/riggedExport.js depends on it) but missing from this
+    // self-heal list -- a latent gap this round found and closed rather than one it created.
+    ["jsm/exporters/GLTFExporter.js", "examples/jsm/exporters/GLTFExporter.js"],
+    // Backlog "fbx-ingest-has-no-loader" (tools/ship/nextRounds.mjs, commit 48488938): .fbx is a
+    // first-class recognized model extension throughout the tree (ai-bridge/assetIngest.js's MODEL_EXTS,
+    // assetLibraryBridge.js's _LOOSE_MESH) but nothing ever parsed one. FBXLoader.js pulls in fflate (zlib
+    // inflate, for compressed-binary FBX) and NURBSCurve.js (which itself needs NURBSUtils.js) -- vendored
+    // as a closed dependency set at the same r160 pin as everything else here, not a partial copy.
+    ["jsm/loaders/FBXLoader.js", "examples/jsm/loaders/FBXLoader.js"],
+    ["jsm/libs/fflate.module.js", "examples/jsm/libs/fflate.module.js"],
+    ["jsm/curves/NURBSCurve.js", "examples/jsm/curves/NURBSCurve.js"],
+    ["jsm/curves/NURBSUtils.js", "examples/jsm/curves/NURBSUtils.js"],
 ];
 const SENTINEL = path.join(DIR, "three.module.js");
 

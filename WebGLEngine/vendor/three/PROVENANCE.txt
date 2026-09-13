@@ -17,3 +17,32 @@ exists as an attestation with its reasoning, and not as a scan.
 NOT ESTABLISHED HERE: the version. vendor/three-webgpu/README.md records an npm registry URL for
 the three package; this directory carries no version marker of its own and this file does not
 guess one.
+
+---- jsm/loaders/FBXLoader.js + its dependency closure -- vendored at r160, added for backlog
+"fbx-ingest-has-no-loader" (tools/ship/nextRounds.mjs, commit 48488938: .fbx is treated as a
+first-class recognized model extension throughout the tree but nothing ever parsed one) ----
+
+Fetched directly from https://raw.githubusercontent.com/mrdoob/three.js/r160/, the exact revision
+ai-bridge/ensureThree.js already pins every other file in this directory to -- not a newer release,
+so this addition cannot silently diverge the rest of vendor/three from the version the viewer pages
+were authored against.
+
+FBXLoader.js imports two things beyond three's own core, both vendored alongside it rather than
+left as a dangling import: jsm/libs/fflate.module.js (101arrowz/fflate, MIT, embedded in three's own
+tree at examples/jsm/libs/ -- its own header carries the MIT notice directly, a separately-authored
+library three vendors rather than something three.js authors wrote) for zlib inflate on
+compressed-binary FBX, and jsm/curves/NURBSCurve.js for NURBS surface support, which itself needs
+jsm/curves/NURBSUtils.js. Traced by grep on every new file's own `^import` lines; the chain
+terminates there -- NURBSUtils.js imports only from three's core, already present.
+
+sha256 at time of vendoring:
+  jsm/loaders/FBXLoader.js:      e8c2a47dffc04ca5699839a6d80fa9140fd9c943f62cea8d074736d7de9c5d98
+  jsm/libs/fflate.module.js:     5686c3d02432a47d8e31f16cabc2d725bbf4531a3abb37cc6fd00142256e3730
+  jsm/curves/NURBSCurve.js:      34dee297704432358680934a8d5acae35f05c71aa59ce7a8e97decb0ac38e452
+  jsm/curves/NURBSUtils.js:      86bcf4002721854739f6dc7fd185b5eb0540d6b8676feaae6979bb605baac85e
+
+NOT YET WIRED TO ANYTHING. This round only vendors the loader and registers it in
+ai-bridge/ensureThree.js's self-heal list (alongside a pre-existing gap that round also closed:
+jsm/exporters/GLTFExporter.js was already on disk, used by tools/krbn/riggedExport.js, but missing
+from that same self-heal list). No conversion path, no test fixture, no gate exist yet -- that is
+the next round's work, not this one's.
