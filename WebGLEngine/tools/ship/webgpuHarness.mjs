@@ -43,8 +43,20 @@ import fs from "node:fs";
 import path from "node:path";   // used by renderThreePassToPixels, which serves the engine tree over HTTP
 import { storageWords } from "./headlessGpu.mjs";   // v4457 -- the storage-input packing both harnesses share
 
-/** The flags that worked, kept as data so a caller can report them and a future box can extend the list. */
-export const LAUNCH_ARGS = Object.freeze(["--enable-unsafe-webgpu"]);
+// *** WINDOWS NEEDS A SECOND FLAG, MEASURED ON KEITH'S RIG, NOT GUESSED. *** --enable-unsafe-webgpu alone is
+// sufficient on Linux (this file's own header measurement) but on win32 headless_shell requestAdapter() came
+// back null with it alone -- ANGLE's default backend selection in that binary does not land on one WebGPU can
+// use, even though the SAME box's native node-webgpu backend reaches this exact adapter fine (intel/gen-9,
+// D3D12 driver 30.0.101.1692 -- see headlessGpu-selfcheck.mjs section 2). A small sweep of candidate flags
+// against this file's own secure-origin server (winWebgpuProbe.mjs, same pattern, only the args varied) found
+// --use-angle=d3d11 both necessary and sufficient: it alone passed, and every larger combination that also
+// passed was a superset of it. --ignore-gpu-blocklist, --disable-gpu-sandbox, --use-gpu-in-tests, --use-angle=
+// d3d12, and Vulkan-via-ANGLE were each tried alone and did nothing on this box. Scoped to win32 only because
+// that is the one platform this was actually measured on -- darwin's real behaviour here is still unknown and
+// guessing a flag for it would be exactly the mistake this comment is refusing to make for Linux already.
+export const LAUNCH_ARGS = Object.freeze(
+    process.platform === "win32" ? ["--enable-unsafe-webgpu", "--use-angle=d3d11"] : ["--enable-unsafe-webgpu"]
+);
 
 /** *** NOT about:blank. *** See the header -- this is the whole reason the harness has a server in it. */
 export const SECURE_HOST = "127.0.0.1";
