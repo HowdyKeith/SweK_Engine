@@ -338,6 +338,20 @@ export const NO_GATE_V4531 = Object.freeze([
 export const NO_GATE_V4565 = Object.freeze([
     "nav/navmesh.mjs",
 ]);
+// *** v4540 -- ONE ARRIVAL, AND IT ARRIVED THROUGH A MERGE RATHER THAN THROUGH THIS ROUND'S OWN WORK. ***
+// brain/fleetRouting.mjs, added by commit 30fba56e on the other line with a reportLines() and a gate at
+// tools/ship/fleetRouting-selfcheck.mjs -- gated ANYWHERE, so UNGATED_ANYWHERE_V4565 is untouched and stays
+// at two; ungated BESIDE, so this list owes it a name. That round did not re-take the list, so the red
+// travelled here with the merge and is registered here rather than argued about: the row went red on a
+// tree neither line had run this census over, which is what a union ratchet is for.
+//
+// *** THE VERSION ON THIS LIST IS LOWER THAN THE ONE ABOVE IT, ON PURPOSE. *** Two lines number this tree
+// from two counters and the other one is ahead; freezing by name AT A VERSION means the name records WHICH
+// ROUND WROTE IT DOWN, not what order the rounds happened in. Renumbering this to sort after V4565 would
+// make the list read as a chronology it is not.
+export const NO_GATE_V4540 = Object.freeze([
+    "brain/fleetRouting.mjs",
+]);
 
 /**
  * *** SIX OF THE SEVEN "WITHOUT A GATE" HAVE ONE, AND THE DEBT IS THE OTHER TWO. ***
@@ -361,8 +375,9 @@ export const UNGATED_ANYWHERE_V4565 = Object.freeze([
     "tools/ship/morphCounter.mjs",
 ]);
 
-/** Every provider with no gate of its own, across both frozen lists. Derived, so neither list can drift. */
-export const NO_GATE_ALL = Object.freeze([...NO_GATE_V4458, ...NO_GATE_V4531, ...NO_GATE_V4565].sort());
+/** Every provider with no gate BESIDE it, across all four dated lists. Derived, so no list can drift alone. */
+export const NO_GATE_ALL = Object.freeze(
+    [...NO_GATE_V4458, ...NO_GATE_V4531, ...NO_GATE_V4565, ...NO_GATE_V4540].sort());
 
 /** This module's own front door -- it is a member of the population it counts. */
 export function reportLines() {

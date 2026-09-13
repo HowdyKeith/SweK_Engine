@@ -24,6 +24,13 @@
 //      of mine has failed its own sabotage, and the sabotage is how I found out.
 //   D  the pillar built shorter than the roof                            RED, sections 3 and 5 (columns differ)
 //
+//   E  the v4540 standing-branch fix reverted                            4 RED, all of section 5
+//   F  the teleport "fixed" by never snapping at all                     2 RED, and the TELEPORT row still
+//      passes -- correctly, because never snapping does stop it. Only the SETTLING row and the band row
+//      catch it, which is the whole reason a repair needs a row saying what it must NOT break as well as
+//      one saying what it must.
+//   G  the band hardcoded to 0.5 instead of the caller's allowances      1 RED, the band row alone
+//
 // SECTION 4 IS NOT SABOTAGED AND THAT IS DELIBERATE. It characterises a defect in another module, so the
 // only thing that drives it red is REPAIRING that module -- which makes it a check that goes red on success,
 // the shape v4536 found and removed elsewhere in this tree. It is kept because the alternative is no record,
@@ -31,6 +38,7 @@
 "use strict";
 import * as GP from "../../physics/character/groundProbe.mjs";
 import { standHeightAt } from "../../world/surfaceProbe.mjs";
+import { meshGround as NM_meshGround, stepTerrain } from "../../physics/character/terrainWalk.mjs";
 import { meshGround } from "../../physics/character/terrainWalk.mjs";
 
 let fails = 0;
@@ -149,7 +157,50 @@ console.log("\n4. *** AND THE SAME MISTAKE IS LIVE, IN THE MODULE THE SHIPPING C
 }
 
 // =============================================================================================================
-console.log("\n5. *** THE RECORD, RE-DERIVED ***");
+console.log("\n5. *** STANDING STILL IS NOT A LICENCE TO BE MOVED, WHICH IS THE ONE REPAIR THIS ROUND SHIPS ***");
+{
+    const g = NM_meshGround(bridge);
+    const still = (pos, o = {}) => stepTerrain({ pos, ground: g, wish: [0, 0], ...o });
+    const under = still([12, 0, 10]);
+    ok("!! *** A BODY STANDING UNDER THE BRIDGE IS NOT LIFTED FIVE METRES ONTO IT ***",
+        Math.abs(under.pos[1] - 0) < 1e-9 && under.airborne === true && under.grounded === false,
+        "in at y=0, out at y=" + under.pos[1].toFixed(2) + ", grounded=" + under.grounded + ", airborne=" +
+        under.airborne + ". *** THE ZERO-WISH RETURN USED TO ASSIGN THE ORACLE'S ANSWER OUTRIGHT, *** with " +
+        "no step test at all, while the walking path four lines down has had one since the module shipped. " +
+        "A body that asked for nothing came back five metres up. Out of range now reports AIRBORNE rather " +
+        "than moving, which is the honest of the two: this module owns no vertical velocity, so 'the ground " +
+        "I can see is not one you could be on' is the caller's problem and saying so hands it over.");
+    const settle = still([2, 0.3, 10]), beyond = still([2, 0.6, 10]);
+    ok("!! ...and SETTLING still works, which is what the branch is for",
+        Math.abs(settle.pos[1]) < 1e-9 && settle.grounded === true &&
+        Math.abs(beyond.pos[1] - 0.6) < 1e-9 && beyond.grounded === false,
+        "0.3 above the floor snaps to " + settle.pos[1].toFixed(2) + " (inside snapDown 0.5); 0.6 above stays " +
+        "at " + beyond.pos[1].toFixed(2) + " and reports airborne. A repair that fixed the teleport by never " +
+        "snapping would pass the row above and fail this one.");
+    const high = still([2, 20, 10]);
+    ok("!! ...and it does not drop a body down a cliff either, which is the same bug facing the other way",
+        Math.abs(high.pos[1] - 20) < 1e-9 && high.airborne === true,
+        "20 above open floor stays at " + high.pos[1].toFixed(2) + " and reports airborne, where the old " +
+        "branch assigned 0.00 -- a twenty-metre fall completed in one frame by a module that owns no gravity.");
+    // *** THE BAND IS THE WALKING PATH'S OWN, AND THIS ROW IS WHAT STOPS THE TWO DRIFTING APART. ***
+    // A repair that hardcoded 0.5 would pass every row above and fail here.
+    const band = [];
+    for (const [sh, sd] of [[0.5, 0.5], [2, 0.25], [0.25, 3]]) {
+        const up = still([2, -sh + 0.01, 10], { stepHeight: sh, snapDown: sd }).grounded;
+        const upOut = still([2, -sh - 0.01, 10], { stepHeight: sh, snapDown: sd }).grounded;
+        const dn = still([2, sd - 0.01, 10], { stepHeight: sh, snapDown: sd }).grounded;
+        const dnOut = still([2, sd + 0.01, 10], { stepHeight: sh, snapDown: sd }).grounded;
+        band.push({ sh, sd, ok: up && !upOut && dn && !dnOut });
+    }
+    ok("!! *** AND THE ACCEPTED BAND IS stepHeight UP AND snapDown DOWN, NOT A CONSTANT ***",
+        band.every((b) => b.ok),
+        band.map((b) => "stepHeight " + b.sh + " / snapDown " + b.sd + ": " + (b.ok ? "band follows" : "BAND WRONG"))
+            .join("; ") + ". The standing rule is the walking rule applied to the same quantity, because a " +
+        "rule that depends on whether the body happened to be moving is two rules.");
+}
+
+// =============================================================================================================
+console.log("\n6. *** THE RECORD, RE-DERIVED ***");
 {
     const R = GP.PROBE_AT_V4539;
     const br = { shipped: GP.walkEast(bridge, meshGround(bridge)).x,

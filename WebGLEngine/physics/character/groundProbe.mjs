@@ -173,5 +173,9 @@ export const PROBE_AT_V4539 = Object.freeze({
     meshGroundShippingCallers: 0,
     liveProbeAnswer: 21,        // world/surfaceProbe.mjs's standHeightAt, for a body standing at y = 1
     liveProbeShouldBe: 1,
+    standingTeleportWas: 5,     // metres a stationary body was lifted under the bridge, before v4540
+    standingTeleportNow: 0,
+    settlingKept: 0.3,          // and a body 0.3 above the floor still snaps to it
+
 
 });

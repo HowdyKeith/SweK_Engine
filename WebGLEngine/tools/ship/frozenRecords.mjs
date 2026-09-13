@@ -474,7 +474,16 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4539 -- RE-TAKEN with `excluding`: 110/51/218 -> 111/52/226.
     // v4539 -- RE-TAKEN with `excluding`: 111/52/226 -> 112/52/226.
     // v4540 -- RE-TAKEN with `excluding`: 107/48/198 -> 112/52/226.
-    currentIncludingModule: Object.freeze({ records: 112, withFields: 52, fields: 226 }),
+    // v4540 -- RE-TAKEN AGAIN with `excluding`: 112/52/226 -> 112/52/228. NO RECORD ARRIVED. The two fields
+    // are `standingTeleportWas` and `standingTeleportNow`, added to PROBE_AT_V4539 by this round's repair --
+    // a record that already had fields gaining two more, which moves `fields` and neither of the other two.
+    // The third field written beside them, `settlingKept: 0.3`, is NOT counted: FIELD_RE matches
+    // `name: <digits>,` and a decimal is not that. Stated here rather than left for the next re-take.
+    // v4540 -- RE-TAKEN A THIRD TIME: 112/52/228 -> 113/52/228. The arrival is this round's OWN
+    // NO_GATE_V4540 in tools/ship/reportDoors.mjs -- a frozen list of module paths, so it is a record by
+    // every rule here and carries not one numeric field. A ROUND THAT REGISTERS A NAME IN A DATED LIST HAS
+    // ADDED A RECORD, which is the shape the pre-flight missed twice in one round.
+    currentIncludingModule: Object.freeze({ records: 113, withFields: 52, fields: 228 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -546,7 +555,13 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4539 -- RE-TAKEN AGAIN: 109/50/206 -> 110/50/206, for OUTOFSCOPE_ARRIVALS_SINCE_V4435, the second
     // list this round had to split out of the first. A repair to a record IS a record.
     // v4540 -- RE-TAKEN AT THE MERGE: 105/46/178 -> 110/50/206.
-    excluding: Object.freeze({ records: 110, withFields: 50, fields: 206 }),
+    // v4540 -- RE-TAKEN FOR THE REPAIR: 110/50/206 -> 110/50/208, the two integer fields v4540 wrote into
+    // PROBE_AT_V4539. A ROUND THAT EDITS A RECORD RE-TAKES THIS TOO, not only a round that adds one --
+    // which is the case the row's own prose had not yet had to say out loud.
+    // v4540 -- RE-TAKEN A THIRD TIME: 110/50/208 -> 111/50/208, for NO_GATE_V4540, the list this round had
+    // to open in reportDoors for an arrival that came through the merge. Zero numeric fields, so `fields`
+    // does not move -- the mirror image of the re-take above it, where fields moved and records did not.
+    excluding: Object.freeze({ records: 111, withFields: 50, fields: 208 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,
