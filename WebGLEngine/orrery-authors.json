@@ -1,6 +1,6 @@
 {
  "note": "WHO the bytes say wrote each vendored body, read from the copyright line in its licence and from a PROVENANCE.md where one records an upstream. Baked by tools/ship/orreryAuthorScan.mjs. A body whose author cannot be read is in `unattributed` -- never dropped, never given a placeholder.",
- "built": "2026-09-09",
+ "built": "2026-09-12",
  "bodies": [
   {
    "name": "box3d",
@@ -16,7 +16,7 @@
     "owner": "erincatto",
     "repo": "box3d"
    },
-   "bytes": 1226434
+   "bytes": 1082363
   },
   {
    "name": "draco",
@@ -33,6 +33,22 @@
     "repo": "three.js"
    },
    "bytes": 258392
+  },
+  {
+   "name": "draco-encoder",
+   "kind": "person",
+   "who": "notice that is included in or attached to the work",
+   "line": "copyright notice that is included in or attached to the work",
+   "licenceFile": "LICENSE",
+   "licences": 1,
+   "upstreamFile": "PROVENANCE.txt",
+   "alsoHolders": [],
+   "upstream": {
+    "url": "https://github.com/google/draco",
+    "owner": "google",
+    "repo": "draco"
+   },
+   "bytes": 436554
   },
   {
    "name": "fonts",
@@ -251,7 +267,7 @@
    "name": "three-webgpu",
    "kind": "collective",
    "who": "three.js authors",
-   "line": "Copyright © 2010-2025 three.js authors",
+   "line": "Copyright © 2010-2026 three.js authors",
    "licenceFile": "LICENSE",
    "licences": 1,
    "upstreamFile": "PROVENANCE.txt",
@@ -261,7 +277,7 @@
     "owner": "mrdoob",
     "repo": "three.js"
    },
-   "bytes": 3215271
+   "bytes": 3654294
   },
   {
    "name": "wasm",
@@ -316,7 +332,7 @@
     "three",
     "three-webgpu"
    ],
-   "bytes": 5415346
+   "bytes": 5854369
   },
   {
    "author": "Dunfan Lu",
@@ -357,7 +373,7 @@
    "bodies": [
     "box3d"
    ],
-   "bytes": 1226434
+   "bytes": 1082363
   },
   {
    "author": "Krbn contributors",
@@ -374,6 +390,14 @@
     "wasm"
    ],
    "bytes": 810948
+  },
+  {
+   "author": "notice that is included in or attached to the work",
+   "kind": "person",
+   "bodies": [
+    "draco-encoder"
+   ],
+   "bytes": 436554
   },
   {
    "author": "Jonathan Young",
@@ -445,13 +469,13 @@
   }
  ],
  "counts": {
-  "bodies": 19,
-  "attributed": 17,
-  "authors": 15,
-  "covered": 17,
+  "bodies": 20,
+  "attributed": 18,
+  "authors": 16,
+  "covered": 18,
   "missing": 2,
-  "withUpstream": 15,
-  "person": 13,
+  "withUpstream": 16,
+  "person": 14,
   "collective": 4,
   "disclaimed": 1,
   "prose": 1,

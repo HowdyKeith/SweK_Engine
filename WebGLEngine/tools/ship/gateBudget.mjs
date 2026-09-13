@@ -356,7 +356,9 @@ export const MEASURED = {
     // the only measurement of the gate as it now ships, so it is the basis. The rig has no figure for this
     // shape yet; at the 1.63x ratio it would run ~690 s, inside the 847 s this basis buys, and the
     // gate-timings.json cross-check below will raise the basis again the day the rig records more.
-    "tools/roundhouse/knobLiveness-selfcheck.mjs":   423693,
+    // IT DID: gate-timings.json now records 449,704ms, above the 423,693ms basis above. Raised to that
+    // observation, per this table's own rule that the basis only ever grows from a re-measure.
+    "tools/roundhouse/knobLiveness-selfcheck.mjs":   449704,
 
     // v4426 -- *** THE LAST THREE GATES IN THE TREE WITH NO EVIDENCE ABOUT THEIR OWN RUNTIME. ***
     // tools/ship/budgetEvidence-selfcheck.mjs has been red since v4279 asking for exactly this, and its
@@ -436,7 +438,9 @@ export const MEASURED = {
     "tools/render-qa/terminatorOracle-selfcheck.mjs":      91559,
     "tools/roundhouse/zeroRangeSweep-selfcheck.mjs":       70538,
     "tools/roundhouse/stabilityBind-selfcheck.mjs":        86618,
-    "tools/ship/ddaPrecisionReport-selfcheck.mjs":         108706,
+    // gate-timings.json now records 144,408ms, above the 108,706ms basis this carried. Raised to that
+    // observation, per this table's own rule that the basis only ever grows from a re-measure.
+    "tools/ship/ddaPrecisionReport-selfcheck.mjs":         144408,
     "physics/sph/tiltPower-selfcheck.mjs":                 65440,
     "physics/sph/wideTilt-selfcheck.mjs":                  64162,
     "physics/mesh/weightScaling-selfcheck.mjs":            85072,

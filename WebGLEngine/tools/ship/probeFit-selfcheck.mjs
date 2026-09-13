@@ -31,7 +31,7 @@
 //                   D  the apron not applied                                  -> 1 red: the apron hold.
 //                   Each restored and the baseline re-run: 0 red.
 //
-// Run: node tools/ship/probeFit-selfcheck.mjs      (~3 s)
+// Run: node tools/ship/probeFit-selfcheck.mjs      (~0.51 s)
 "use strict";
 import { FIT, quantileOf, occupancyBox, solidProbes, nearestOpen, bakeFitted, fitProbeGrid } from "../../render/probeFit.mjs";
 import { probeGrid, probeIndex, cloudBounds, splatRadiance, sampleProbes, evalSH, irradianceSH, SQRT_4PI } from "../../render/splatProbes.mjs";

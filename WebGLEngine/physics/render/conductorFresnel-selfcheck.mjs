@@ -12,7 +12,9 @@
 import { conductorReflectance, conductorF, schlickF, f82Tint, f82TintFromTint, fitF82,
          compareModels, MU_BAR, MU_BAR_TERM, METALS, reportLines } from "./conductorFresnel.mjs";
 import { fresnel } from "./fresnel.mjs";
+import { gateReport } from "../../tools/ship/gateReport.mjs";
 
+const REPORT = gateReport("physics/render/conductorFresnel-selfcheck.mjs");
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const sec = (s) => console.log("\n" + s);
@@ -157,6 +159,20 @@ sec("5. THE COMPARISON OVER A SWEEP, BECAUSE FOUR HAND-COPIED TRIPLES WOULD BE A
 console.log();
 for (const l of reportLines()) console.log(l);
 console.log();
+
+{
+    // The same rows reportLines() prints, kept as numbers rather than a pre-formatted string -- so a second
+    // reader gets the values reportLines() rendered, not a re-tokenising of its text.
+    const rows = [];
+    for (const [name, m] of Object.entries(METALS)) for (let ch = 0; ch < 3; ch++) {
+        const r = compareModels(m.eta[ch], m.kappa[ch]);
+        rows.push([`${name} ${"RGB"[ch]}`, r.schlickMax, r.f82Max, r.ratio, r.dipDepth]);
+    }
+    REPORT.table("worst absolute error against the exact conductor curve, over 2001 angles",
+        ["metal channel", "Schlick max", "F82-tint max", "ratio", "dip below F0"], rows,
+        "the same computation reportLines() prints to the terminal, kept as numbers rather than text.");
+    REPORT.write();
+}
 console.log("  ----  WHAT THIS DOES NOT CLAIM");
 console.log("  ----  THAT THE METAL CONSTANTS ARE RIGHT. n and k here are the widely-circulated RGB samples of");
 console.log("  ----  measured spectra, and three numbers are not a spectrum. Section 5 is deliberately a sweep");

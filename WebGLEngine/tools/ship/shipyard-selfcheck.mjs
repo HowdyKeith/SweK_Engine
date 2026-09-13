@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/shipyard-selfcheck.mjs
 //
-// Run: node tools/ship/shipyard-selfcheck.mjs   (~25s -- MEASURED, most of it the live page)
+// Run: node tools/ship/shipyard-selfcheck.mjs   (~5.6s -- MEASURED, most of it the live page)
 //
 // v4388 -- VALKYRIEN SKIES 2's SHIPYARD, MEASURED AGAINST THIS ENGINE RATHER THAN ADMIRED.
 //

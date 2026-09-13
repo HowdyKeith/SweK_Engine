@@ -6,7 +6,7 @@
    "name": "box3d",
    "arrived": "2026-08-19",
    "sha": "66db97c45b5286d98d1c018506effca552f05a23",
-   "bytes": 1226434,
+   "bytes": 1082363,
    "files": [
     {
      "path": "box3d.js",
@@ -14,7 +14,7 @@
     },
     {
      "path": "box3d.wasm",
-     "bytes": 973188
+     "bytes": 829117
     },
     {
      "path": "include/box3d/base.h",
@@ -75,6 +75,30 @@
     {
      "path": "PROVENANCE.txt",
      "bytes": 964
+    }
+   ]
+  },
+  {
+   "name": "draco-encoder",
+   "arrived": "2026-09-10",
+   "sha": "9c1d4e76e2de04a03dd8b50fba410a7d4bb2d237",
+   "bytes": 436554,
+   "files": [
+    {
+     "path": "draco_encoder_nodejs.js",
+     "bytes": 49007
+    },
+    {
+     "path": "draco_encoder.wasm",
+     "bytes": 370188
+    },
+    {
+     "path": "LICENSE",
+     "bytes": 13898
+    },
+    {
+     "path": "PROVENANCE.txt",
+     "bytes": 3461
     }
    ]
   },
@@ -1526,7 +1550,7 @@
    "name": "three-webgpu",
    "arrived": "2026-09-02",
    "sha": "614dbcf4e48a438ddae6123aa08eb2df45b610cd",
-   "bytes": 3215271,
+   "bytes": 3654294,
    "files": [
     {
      "path": "LICENSE",
@@ -1534,23 +1558,23 @@
     },
     {
      "path": "PROVENANCE.txt",
-     "bytes": 960
+     "bytes": 1302
     },
     {
      "path": "README.md",
-     "bytes": 1061
+     "bytes": 2195
     },
     {
      "path": "three.core.js",
-     "bytes": 1389353
+     "bytes": 1443056
     },
     {
      "path": "three.tsl.js",
-     "bytes": 28536
+     "bytes": 34218
     },
     {
      "path": "three.webgpu.js",
-     "bytes": 1794280
+     "bytes": 2172442
     }
    ]
   },

@@ -1,6 +1,6 @@
 // tools/roundhouse/libmControl-selfcheck.mjs
 //
-// Run: node tools/roundhouse/libmControl-selfcheck.mjs   (~40s)
+// Run: node tools/roundhouse/libmControl-selfcheck.mjs   (~18s)
 // Gated by tools/ship/selfchecks.mjs (discovery gate).
 //
 // v3083 -- CRITERION 4 WAS HANDING OUT A PASS FOR NOT MOVING, AND TWO OF THE LAB'S THREE STANDINGS RESTED ON IT.

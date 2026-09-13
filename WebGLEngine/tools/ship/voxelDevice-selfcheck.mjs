@@ -31,7 +31,7 @@
 //                                                                                step, and the floor hold.
 //                   Each restored and the baseline re-run: 0 red.
 //
-// Run: node tools/ship/voxelDevice-selfcheck.mjs      (~30 s: two worlds here, one in each browser backend)
+// Run: node tools/ship/voxelDevice-selfcheck.mjs      (~4.5 s: two worlds here, one in each browser backend)
 "use strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

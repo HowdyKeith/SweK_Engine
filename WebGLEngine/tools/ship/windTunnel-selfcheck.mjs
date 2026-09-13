@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/windTunnel-selfcheck.mjs -- v2796
 //
-// Run: node tools/ship/windTunnel-selfcheck.mjs   (~60s -- it runs real LBM sims)
+// Run: node tools/ship/windTunnel-selfcheck.mjs   (~28s -- it runs real LBM sims)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // GATES simulation/lbm/windTunnel.mjs. The lab's rule is that an instrument needs an ANSWER KEY, and this one has

@@ -34,7 +34,7 @@
 //                                                                                                       both backends, both pictures inverted.
 //                   Each restored and the baseline re-run: 0 red.
 //
-// Run: node tools/ship/probeLit-selfcheck.mjs      (~25 s: the shell bake and six frames)
+// Run: node tools/ship/probeLit-selfcheck.mjs      (~4.9 s: the shell bake and six frames)
 "use strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

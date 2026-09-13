@@ -25,7 +25,7 @@
 //                   D  the seed not narrowed to u32 (this.seed = seed)               -> 1 red: the u32 hold (-1 and 7.9 recorded as given).
 //                   Each restored and the baseline re-run: 0 red.
 //
-// Run: node tools/ship/cityGenSeed-selfcheck.mjs      (~2 s)
+// Run: node tools/ship/cityGenSeed-selfcheck.mjs      (~0.53 s)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";

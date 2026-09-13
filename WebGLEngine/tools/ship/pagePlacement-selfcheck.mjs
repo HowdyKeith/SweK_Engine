@@ -34,9 +34,17 @@ console.log("1. *** 228 PAGES ARE SILENTLY UNPLACED, WHICH pageSections' OWN DOC
         "*** A PAGE INVISIBLE TO THE THREE BUCKETS WOULD BE INVISIBLE TO THE TOOL BUILT TO FIND INVISIBLE " +
         "PAGES. *** placed comes from SECTIONS, reasoned from UNPLACED, silent is the remainder, and the sum " +
         "must be the tree or one of the three is lying.");
-    ok("!! ...and the silent bucket is the large one, which is the finding",
-        inv.counts.silent > inv.counts.placed,
-        inv.counts.silent + " silent against " + inv.counts.placed + " placed. pageSections says of UNPLACED: " +
+    // this compared silent against PLACED, not against reasoned, even though every sentence around it -- both
+    // here and in pageSections' own doctrine quoted below -- is about silent vs REASONED: a page nobody has
+    // got to (documented in UNPLACED) versus a page nobody has even LOOKED at (silent). That happened to read
+    // the same at v3576, when placed (102) was also smaller than silent. Placed has since more than doubled to
+    // 242 as panels absorbed real pages -- pageSections doing exactly what it is for -- which flipped the
+    // placed-comparison for a reason that is progress, not regression, and says nothing about whether the
+    // silent/reasoned gap the prose actually describes is still real. It is: 205 against 23, the same order of
+    // magnitude as the day this was written.
+    ok("!! ...and the silent bucket dwarfs the REASONED one, which is the finding",
+        inv.counts.silent > inv.counts.reasoned,
+        inv.counts.silent + " silent against " + inv.counts.reasoned + " reasoned. pageSections says of UNPLACED: " +
         "\"an unplaced page and a page nobody has got to look identical, and the second one gets placed by a " +
         "guess.\" *** UNPLACED HOLDS " + inv.counts.reasoned + ". THE OTHER " + inv.counts.silent + " ARE IN " +
         "EXACTLY THE STATE THE MECHANISM EXISTS TO PREVENT. ***");

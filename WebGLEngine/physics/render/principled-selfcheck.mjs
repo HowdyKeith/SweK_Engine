@@ -1,6 +1,6 @@
 // WebGLEngine/physics/render/principled-selfcheck.mjs
 //
-// Run: node physics/render/principled-selfcheck.mjs   (~4s -- MEASURED)
+// Run: node physics/render/principled-selfcheck.mjs   (~1.2s -- MEASURED)
 //
 // v4432 -- *** THE COMPOSITION DOUBLE-COUNTS AT THE SEAMS, AND THE FURNACE SAYS BY HOW MUCH: 1.0796. ***
 //

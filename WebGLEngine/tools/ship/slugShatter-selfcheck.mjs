@@ -34,7 +34,7 @@
 //                                                                                          both frames' spread hold (10 x 27: the shards overlap).
 //                   Each restored and the baseline re-run: 0 red.
 //
-// Run: node tools/ship/slugShatter-selfcheck.mjs      (~90 s)
+// Run: node tools/ship/slugShatter-selfcheck.mjs      (~6.8 s)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";

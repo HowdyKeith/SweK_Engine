@@ -21,7 +21,7 @@
   }
  },
  "counts": {
-  "page": 469,
+  "page": 470,
   "demo": 49,
   "builtin": 34
  },
@@ -64,6 +64,14 @@
    "display": "Agent Arena",
    "href": "/agent-arena.html",
    "section": "GPU Brain",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "ai-presence-orb.html",
+   "display": "Ai Presence Orb",
+   "href": "/ai-presence-orb.html",
+   "section": null,
    "collision": false
   },
   {

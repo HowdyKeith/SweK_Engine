@@ -165,6 +165,13 @@ export function suggestFor(file, inv = inventory(), prof = panelProfiles(inv)) {
     for (const p of prof.values()) {
         let score = 0; const hits = [];
         for (const t of tk) if (p.bag.has(t)) { score += p.bag.get(t); hits.push(t); }
+        // box3d-blobs.html re-broke this the moment es-box3d-3d.html, es-box3d-fly3d.html and flight-gpu.html
+        // joined the Endless Sky panel: those four pages outnumber the three real box3d-*.html pages IN the
+        // Box3D panel, so raw-count-over-spread alone now hands "box3d" to the panel that merely runs ON box3d
+        // rather than the panel ABOUT box3d. A panel's own id, appearing verbatim as a token, is evidence no
+        // accumulation of somebody else's pages can outweigh: it is the panel naming itself, not a bystander
+        // mentioning it.
+        if (tk.has(p.id)) { score += SCORE_FLOOR; if (!hits.includes(p.id)) hits.push(p.id); }
         if (score > 0) scored.push({ panel: p.id, label: p.label, score, hits, full: p.size >= MAX_PER_PANEL });
     }
     scored.sort((a, b) => b.score - a.score);

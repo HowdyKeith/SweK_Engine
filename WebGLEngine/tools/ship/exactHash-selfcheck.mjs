@@ -30,7 +30,9 @@ import { bcsHash } from "../../render/swiftShaderModel.mjs";
 import * as GM from "../../render/grassModel.mjs";
 import { validateWgsl } from "../../render/wgslSpec.mjs";
 import { codeOnly } from "./sourceScan.mjs";
+import { gateReport } from "./gateReport.mjs";
 
+const REPORT = gateReport("tools/ship/exactHash-selfcheck.mjs");
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
 const ok = (n, c, d = "") => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -325,6 +327,11 @@ console.log("\n5e. the five single-implementation sites, recorded rather than re
     });
     for (const r of rows)
         console.log(`     ${r.rel.padEnd(32)} ${r.missing ? "*** NOT ON DISK ***" : r.sites + " site(s)   " + (r.glsl ? "GLSL" : "----") + " " + (r.wgsl ? "WGSL" : "----")}`);
+    REPORT.table("the five single-implementation sin-hash sites",
+        ["file", "sites", "GLSL", "WGSL"],
+        rows.map((r) => [r.rel, r.missing ? 0 : r.sites, !!r.glsl, !!r.wgsl]),
+        "the sites SHADER_SINHASH_V4578.continuous names, none of which has a second-language twin to disagree with.");
+    REPORT.write();
     ok("!! every site the record names is on disk",
        rows.every((r) => !r.missing),
        rows.filter((r) => r.missing).map((r) => r.rel).join(", ") ||

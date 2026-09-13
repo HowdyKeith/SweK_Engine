@@ -1,6 +1,6 @@
 // tools/roundhouse/manifoldCensusBind-selfcheck.mjs
 //
-// Run: node tools/roundhouse/manifoldCensusBind-selfcheck.mjs   (~1s MEASURED -- two builds, four extractions)
+// Run: node tools/roundhouse/manifoldCensusBind-selfcheck.mjs   (~0.43s MEASURED -- two builds, four extractions)
 //
 // THIS GRADES THE BIND. physics/mesh/manifoldCensus-selfcheck.mjs owns the census itself.
 //

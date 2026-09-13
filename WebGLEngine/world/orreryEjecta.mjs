@@ -220,6 +220,14 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "gpu/gltfDraco.js",
         "tools/ship/dracoWeld-selfcheck.mjs",
     ]),
+    // vendor/draco-encoder arrived as a distinct body from vendor/draco (the decoder): it is google/draco's own
+    // encoder build, gated by tools/ship/dracoEncode-selfcheck.mjs and driven by tools/export/dracoEncode.mjs --
+    // a new key rather than folding into "draco", because the bake (world/orrery.mjs) already scans it as its
+    // own vendor/ directory with its own LICENSE and PROVENANCE.
+    "draco-encoder": Object.freeze([
+        "tools/export/dracoEncode.mjs",
+        "tools/ship/dracoEncode-selfcheck.mjs",
+    ]),
     // v4476 MERGE -- tools/ship/slugWgsl-selfcheck.mjs (main, v4457) reads
     // vendor/fonts/IBMPlexSerif-Regular.ttf as its test corpus. IT IS A DEPENDANT, NOT A SCANNER: the
     // NOT_IMPORTERS rows are files that ENUMERATE a vendor directory to assert facts about it, and this one
@@ -385,7 +393,12 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "tools/krbn/krbnCompareLive-selfcheck.mjs",
         "tools/ship/artifactWeight.mjs",
         "tools/ship/boundaryLint-selfcheck.mjs",
+        // dracoEncode-selfcheck round-trips a real GLTFLoader through /vendor/three/jsm/loaders/GLTFLoader.js
+        // to confirm the KHR_draco_mesh_compression export decodes; pipboyWireframe-selfcheck builds its
+        // barycentric wireframe geometry with vendor/three/three.module.js directly.
+        "tools/ship/dracoEncode-selfcheck.mjs",
         "tools/ship/dracoWeld-selfcheck.mjs",
+        "tools/ship/pipboyWireframe-selfcheck.mjs",
         "tools/ship/threeImportmap-selfcheck.mjs",
         "tools/ship/tsl-selfcheck.mjs",
         "tools/ship/webgpuHarness.mjs",
@@ -402,7 +415,14 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "wear-field.html",
     ]),
     "three-webgpu": Object.freeze([
+        // backlog #31/#49/#51 -- the AI-presence orb (krispuckett/murmur-web ported into tslSource.mjs) is a
+        // real WebGPU/TSL scene: the standalone page, its mount widget, and the gates that drive both import
+        // /vendor/three-webgpu/three.webgpu.js and three.tsl.js directly, the same shape as the other TSL rows
+        // already in this list.
+        "ai-presence-orb.html",
         "orrery-gpu.html",
+        "tools/ship/aiPresenceOrb-selfcheck.mjs",
+        "tools/ship/aiPresenceOrbPresent-selfcheck.mjs",
         "tools/ship/brainTsl-page.js",
         "tools/ship/carveGpu-selfcheck.mjs",
         "tools/ship/tslIsing-selfcheck.mjs",
@@ -422,6 +442,11 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "tools/ship/threeProbe-selfcheck.mjs",
         "tools/ship/tslLoopBound-selfcheck.mjs",
         "tools/ship/tslWide-selfcheck.mjs",
+        // webgpuHarness.mjs renders the SHIPPING three.js pass to pixels through both bodies at once -- three
+        // (the WGSL comparand named in its v4279 arrival, above) and three-webgpu (the WebGPU renderer under
+        // test) -- so it is a dependant of each, correctly, rather than a sign one of the two rows is wrong.
+        "tools/ship/webgpuHarness.mjs",
+        "ui/aiPresenceOrbWidget.js",
     ]),
     "wasm": Object.freeze([
         "ai-bridge/wasmDemoBridge.js",

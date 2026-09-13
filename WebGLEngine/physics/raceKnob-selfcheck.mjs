@@ -32,7 +32,9 @@
 "use strict";
 import fs from "node:fs";
 import * as R from "./raceKnob.mjs";
+import { gateReport } from "../tools/ship/gateReport.mjs";
 
+const REPORT = gateReport("physics/raceKnob-selfcheck.mjs");
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const M = R.MEASURED_V4527;
@@ -87,6 +89,12 @@ console.log("\n2. EVERY VERDICT IS RE-DERIVED FROM THE RECORD'S NUMBERS AND THE 
         console.log(`     ${String(t.row.speedGain).padEnd(5)} noLap ${t.noLap ? "y" : "n"}  overLap ` +
                     `${t.overLap ? "y" : "n"}  off ${(100 * t.offRate).toFixed(2)}%  ->  ` +
                     `${t.shouldPass ? "accept" : "refuse"}   record: ${t.row.verdict}`);
+    REPORT.table("the eight speed-gain candidates, re-adjudicated from the record's own numbers",
+        ["speed gain", "no lap", "over lap bound", "off-asphalt %", "verdict"],
+        table.map((t) => [t.row.speedGain, t.noLap, t.overLap, 100 * t.offRate, t.shouldPass ? "accept" : "refuse"]),
+        "re-derived from MEASURED_V4527's rows against LAP_BOUND and OFF_BOUND as raceKnob.mjs exports them " +
+        "today, not read off the stored verdict strings.");
+    REPORT.write();
     ok("!! *** accepted EXACTLY when no bound is broken, refused exactly when one is ***",
        table.every((t) => t.shouldPass === (t.row.verdict === "accepted")),
        `LAP_BOUND ${R.LAP_BOUND} s, OFF_BOUND ${100 * R.OFF_BOUND}% of ${M.samples} wheel samples. Raise ` +

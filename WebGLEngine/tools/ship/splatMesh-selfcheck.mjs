@@ -34,7 +34,7 @@
 //                                                                                        centers hold (0.8 + 0.5 in one voxel).
 //                   Each restored and the baseline re-run: 0 red.
 //
-// Run: node tools/ship/splatMesh-selfcheck.mjs      (~3 s)
+// Run: node tools/ship/splatMesh-selfcheck.mjs      (~0.85 s)
 "use strict";
 import { createVolume, getDensity, setDensity, maxDensity, voxelOf, voxelBounds, rasterise, surfaceNets, meshStats, meshHash, meshTriples, sphereCloud, ballVolume, EDGES, ISO } from "../../physics/splat/splatMesh.mjs";
 import { trianglesFrom, MeshBVH } from "../../mesh/meshBVH.mjs";

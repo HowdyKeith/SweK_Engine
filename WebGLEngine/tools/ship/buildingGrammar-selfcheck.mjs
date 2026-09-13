@@ -27,7 +27,7 @@
 //                                                                                   "back" first).
 //                   Each restored and the baseline re-run: 0 red.
 //
-// Run: node tools/ship/buildingGrammar-selfcheck.mjs      (~1 s)
+// Run: node tools/ship/buildingGrammar-selfcheck.mjs      (~0.21 s)
 "use strict";
 import { buildingGrammar, sidesOf, onSide, placementHash, SIDES, DEFAULTS } from "../../world/buildingGrammar.mjs";
 

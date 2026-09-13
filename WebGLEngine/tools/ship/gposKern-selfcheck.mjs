@@ -29,7 +29,7 @@
 //                   C  the extension subtable's 32-bit offset read as 16 bits                                       -> exit=1, 1 red: the extension row (the pair lands nowhere)
 //                   D  layoutText's kerningSource written from hasKernTable again                                 -> exit=1, 1 red: the 'AV' layout row (the real font reports none)
 //
-// Run: node tools/ship/gposKern-selfcheck.mjs      (~0.5 s, headless)
+// Run: node tools/ship/gposKern-selfcheck.mjs      (~0.07 s, headless)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";

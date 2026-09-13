@@ -24,7 +24,7 @@
 //                                                                         BOTH backends at worst 113 -- the picture right, the twin wrong, red either way
 //   C  orrery-gpu.html: the look select dropped from the bind          -> exit=1, 1 red: the page's wiring
 //
-// Run: node tools/ship/terrainLook-selfcheck.mjs      (~6 s: one browser, two backends, three looks)
+// Run: node tools/ship/terrainLook-selfcheck.mjs      (~1.3 s: one browser, two backends, three looks)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";

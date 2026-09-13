@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/claimEvidence-selfcheck.mjs
 //
-// Run: node tools/ship/claimEvidence-selfcheck.mjs   (~1s -- MEASURED)
+// Run: node tools/ship/claimEvidence-selfcheck.mjs   (~0.1s -- MEASURED)
 //
 // v4404 -- *** A CLAIM NAMES ITS OWN FALSIFIER IN PROSE, AND NOTHING EVER PULLED THE TRIGGER. ***
 //

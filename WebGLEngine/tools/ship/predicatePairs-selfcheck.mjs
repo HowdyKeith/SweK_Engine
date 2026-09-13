@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/predicatePairs-selfcheck.mjs
 //
-// Run: node tools/ship/predicatePairs-selfcheck.mjs   (~8s -- MEASURED, it imports the tree's quiet modules)
+// Run: node tools/ship/predicatePairs-selfcheck.mjs   (~0.2s -- MEASURED, it imports the tree's quiet modules)
 //
 // v4420 -- *** DISCOVERING THAT TWO FUNCTIONS ANSWER THE SAME QUESTION, WHICH IS WHERE v4418'S FINDING LIVED
 // AND WHICH v4419 NAMED AS THE HALF NOTHING DID. ***

@@ -31,7 +31,7 @@
 //                                                                                  (the key blurred where the GPU took the nearest texel).
 //                   Each restored and the baseline re-run: 0 red, 9,216 of 9,216 exact on both, 0 apart.
 //
-// Run: node tools/ship/slugFill-selfcheck.mjs      (~50 s)
+// Run: node tools/ship/slugFill-selfcheck.mjs      (~1.5 s)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";

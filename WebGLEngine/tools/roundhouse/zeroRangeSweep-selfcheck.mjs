@@ -1,6 +1,6 @@
 // tools/roundhouse/zeroRangeSweep-selfcheck.mjs
 //
-// Run: node tools/roundhouse/zeroRangeSweep-selfcheck.mjs   (~90s, scoped)
+// Run: node tools/roundhouse/zeroRangeSweep-selfcheck.mjs   (~39s, scoped)
 // Gated by tools/ship/selfchecks.mjs (discovery gate).
 //
 // v2912 -- ASKING THE QUESTION v2898 ASKED, AT CONFIGURATIONS IT NEVER VISITED.

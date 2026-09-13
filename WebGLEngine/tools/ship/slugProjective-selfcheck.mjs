@@ -31,7 +31,7 @@
 //                   D  the frame key using the flat gate's emsPerPixel (constant) instead of the local one      -> exit=1, red 4: all four frames (rotated worst 41, perspective 88): the filter
 //                      width is the 2x2 quad's own differences, and under a rotation it is already not 1/size per axis
 //
-// Run: node tools/ship/slugProjective-selfcheck.mjs      (~60 s)
+// Run: node tools/ship/slugProjective-selfcheck.mjs      (~11 s)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";

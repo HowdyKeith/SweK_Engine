@@ -28,7 +28,7 @@
 //                   D  maxHp left at w * d * h (doors not subtracted)                -> 2 red: the hit-points hold and the minGap-0 city's total.
 //                   Each restored and the baseline re-run: 0 red.
 //
-// Run: node tools/ship/buildingFacade-selfcheck.mjs      (~2 s)
+// Run: node tools/ship/buildingFacade-selfcheck.mjs      (~0.12 s)
 "use strict";
 import { createHash } from "node:crypto";
 import { CityGen } from "../../world/CityGen.js";

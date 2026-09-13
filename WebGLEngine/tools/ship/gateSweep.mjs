@@ -3765,6 +3765,48 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    // the 230th closing: TWENTY-FIVE gates this branch had shipped without ever naming here -- the AI-presence
+    // orb cluster, the boss/dungeon/CS-round managers, satellite fleet, space suit, F82 fresnel and split-sum
+    // WGSL, draco encode, FXAA, pipboy wireframe, sprite-mesh blueprint and ui/guards -- found by diffing the
+    // current tree against 58cdda44 (the v4297 commit) rather than by memory, so the set is exactly what is
+    // missing and not a guess at it. Run one at a time on this box, each to completion: 25 GREEN, 0 red.
+    since230: Object.freeze({
+        at: "ce5d9b22", swept: 25, green: 25, red: 0,
+        added: Object.freeze([
+            "fx/spritemesh/blueprint-selfcheck.mjs",
+            "physics/render/fresnelF82-selfcheck.mjs",
+            "physics/render/fresnelF82Wgsl-selfcheck.mjs",
+            "physics/render/specularIBLWgsl-selfcheck.mjs",
+            "physics/render/specularProbeBake-selfcheck.mjs",
+            "physics/render/specularProbeCapture-selfcheck.mjs",
+            "physics/render/specularProbeLit-selfcheck.mjs",
+            "physics/render/splitSumWgsl-selfcheck.mjs",
+            "tools/ship/aiHuntBrain-selfcheck.mjs",
+            "tools/ship/aiPresenceOrb-selfcheck.mjs",
+            "tools/ship/aiPresenceOrbPresent-selfcheck.mjs",
+            "tools/ship/aiPresenceOrbWidget-selfcheck.mjs",
+            "tools/ship/bossPhaseManager-selfcheck.mjs",
+            "tools/ship/csBomb-selfcheck.mjs",
+            "tools/ship/csRoundManager-selfcheck.mjs",
+            "tools/ship/dracoEncode-selfcheck.mjs",
+            "tools/ship/dungeonAI-selfcheck.mjs",
+            "tools/ship/fxaaPass-selfcheck.mjs",
+            "tools/ship/hellgateManager-selfcheck.mjs",
+            "tools/ship/kaiju-selfcheck.mjs",
+            "tools/ship/liveCubeCapture-selfcheck.mjs",
+            "tools/ship/pipboyWireframe-selfcheck.mjs",
+            "tools/ship/satelliteFleet-selfcheck.mjs",
+            "tools/ship/spaceSuit-selfcheck.mjs",
+            "ui/guards-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "all 25 green, run singly on this box (43 ms to 12.6 s; aiPresenceOrbWidget and " +
+                 "liveCubeCapture are the two headless-Chromium gates in the set and account for most of " +
+                 "that spread). None of these twenty-five came from the origin/main merge -- diffing the " +
+                 "merge's two parents found twenty gates unique to origin/main, and all twenty were already " +
+                 "named in earlier closings -- so this surplus is this branch's own unswept backlog, not the " +
+                 "merge's.",
+    }),
     // v4576 -- the 225th closing: a tier for the guardians the sweep cannot afford, and it caught two on sight.
     since229: Object.freeze({
         at: "v4582", swept: 1, green: 1, red: 0,

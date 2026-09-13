@@ -31,7 +31,7 @@
 //                   D  avatarViewProj looking from the target to the eye    -> 4 red: the twin, the centre column, both backends.
 //                   Each restored and the baseline re-run: 0 red.
 //
-// Run: node tools/ship/voxelAvatar-selfcheck.mjs      (~20 s)
+// Run: node tools/ship/voxelAvatar-selfcheck.mjs      (~2.4 s)
 "use strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

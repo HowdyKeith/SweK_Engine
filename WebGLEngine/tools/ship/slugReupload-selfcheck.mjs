@@ -26,7 +26,7 @@
 //                      and the write the sabotage skipped was redundant. Both batches now skip it by design, the gate holds the structure by name,
 //                      and the sabotage became D': the reuse path writing the indices anyway (the pre-finding code)
 //
-// Run: node tools/ship/slugReupload-selfcheck.mjs      (~60 s)
+// Run: node tools/ship/slugReupload-selfcheck.mjs      (~2.7 s)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";

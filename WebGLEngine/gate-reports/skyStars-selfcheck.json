@@ -1,0 +1,82 @@
+{
+ "gate": "tools/ship/skyStars-selfcheck.mjs",
+ "at": "2026-09-12",
+ "tables": [
+  {
+   "title": "brightest star before and after the density-knob fix, at every density main.js uses",
+   "columns": [
+    "density",
+    "brightest star (old)",
+    "brightest star (now)"
+   ],
+   "rows": [
+    [
+     0.4,
+     0.40000000000000036,
+     1
+    ],
+    [
+     1,
+     1.0000000000000009,
+     1
+    ],
+    [
+     0.6,
+     0.6000000000000005,
+     1
+    ]
+   ],
+   "note": "the old divisor was a fixed DENSITY_SPAN; the fixed one scales by density * DENSITY_SPAN, so only density 1 was ever right before."
+  },
+  {
+   "title": "the sin-hash's deficit against exact_hash3, by depth of cut",
+   "columns": [
+    "cut",
+    "asked %",
+    "sin-hash %",
+    "exact_hash3 %"
+   ],
+   "rows": [
+    [
+     0.9,
+     9.999999999999998,
+     9.880758017492711,
+     10.025072886297377
+    ],
+    [
+     0.95,
+     5.000000000000004,
+     4.81399416909621,
+     5.003498542274053
+    ],
+    [
+     0.99,
+     1.0000000000000009,
+     0.8822157434402332,
+     1.014868804664723
+    ],
+    [
+     0.995,
+     0.5000000000000004,
+     0.4221574344023324,
+     0.5049562682215744
+    ],
+    [
+     0.997,
+     0.30000000000000027,
+     0.12682215743440234,
+     0.30903790087463556
+    ],
+    [
+     0.999,
+     0.10000000000000009,
+     0.0239067055393586,
+     0.10029154518950437
+    ]
+   ],
+   "note": "asked is 100 * (1 - cut); the deficit deepens as the cut deepens because sin(x) * 43758.5453 loses low bits in float32 before fract() runs."
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

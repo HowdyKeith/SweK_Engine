@@ -284,8 +284,8 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
            ". ORDER and COUNT are still compared exactly; only the LENGTH of each identity is tolerated.");
     }
 
-    const moved = F.COMMIT_BELT_DRIFT_V4534.movedSince4475;
-    const arrived = F.COMMIT_BELT_DRIFT_V4534.arrivedSince4475;
+    const moved = F.COMMIT_BELT_DRIFT_V4535.movedSince4475;
+    const arrived = F.COMMIT_BELT_DRIFT_V4535.arrivedSince4475;
     const expectedFor = (n) => (moved[n] ? moved[n].now : arrived[n] ? arrived[n].now : (R.perBody[n] || []));
     const drift = names.filter((n) => !sameList(expectedFor(n), liveShas[n]));
     const short = new Set(names.filter((n) => (R.perBody[n] || []).some((h) => h.length < 40)));
@@ -293,8 +293,8 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
         drift.map((n) => `${n}: expected [${expectedFor(n).join(" ")}], git says [${liveShas[n].map((h) => h.slice(0, 8)).join(" ")}]`).join("; ") ||
         `${names.length} bodies, ${Object.values(live).reduce((a, b) => a + b, 0)} commit sightings, every hash ` +
         `re-derived from git rather than trusted. ${short.size} bodies are recorded at an abbreviation shorter ` +
-        `than git now renders (${F.COMMIT_BELT_DRIFT_V4534.abbreviationWas} against ` +
-        `${F.COMMIT_BELT_DRIFT_V4534.abbreviationNow}) and match by prefix, which is why %h was the wrong read.`);
+        `than git now renders (${F.COMMIT_BELT_DRIFT_V4535.abbreviationWas} against ` +
+        `${F.COMMIT_BELT_DRIFT_V4535.abbreviationNow}) and match by prefix, which is why %h was the wrong read.`);
     // *** THE READ IS THE FULL IDENTITY, ASSERTED. *** Prefix-matching makes the comparison tolerant of
     // whatever length git renders, so reverting to %h no longer changes today's answer -- sabotage GB went
     // 0 RED. That tolerance is the point, and it is not a reason to read an abbreviation: %h can also get
@@ -327,14 +327,14 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
     ok("!! *** EVERY RECORDED PREFIX NAMES EXACTLY ONE COMMIT IN THIS REPOSITORY -- measured, not argued ***",
        ambiguous.length === 0 && allCommits.length > 100,
        ambiguous.length ? "AMBIGUOUS: " + ambiguous.slice(0, 4).join("; ")
-         : `${Object.values(F.COMMIT_BELT_DRIFT_V4534.movedSince4475).length + names.length} bodies' prefixes ` +
+         : `${Object.values(F.COMMIT_BELT_DRIFT_V4535.movedSince4475).length + names.length} bodies' prefixes ` +
            `checked against all ${allCommits.length} commits, every one unique. A prefix short enough to name ` +
            "two commits would make the comparison above meaningless, and nothing was measuring that.");
 
     // *** THE TWO FAILURE MODES ARE DIFFERENT FACTS AND WERE REPORTED AS ONE. *** "git renders hashes one
     // character longer now" needs nothing; "this body has new commits" needs a recorded reason. The old row
     // said the same sentence for both and buried one real change under fourteen that had not happened.
-    const D = F.COMMIT_BELT_DRIFT_V4534;
+    const D = F.COMMIT_BELT_DRIFT_V4535;
     const stillMatchesV4475 = names.filter((n) => !moved[n] && sameList(R.perBody[n] || [], liveShas[n]));
     ok("!! *** LENGTH DRIFT IS NOT A FINDING; A CHANGED COMMIT SET IS, AND THEY ARE COUNTED APART ***",
        stillMatchesV4475.length === D.matchedOnceLengthIgnored &&

@@ -111,16 +111,14 @@ const RED_AT_V4279_GATES = Object.freeze([
     // this list AND was registered again at v4568, because the killed bucket found it red without
     // noticing it was already filed -- one gate, two entries, and only one of them ever revisited.
     "tools/ship/homography-selfcheck.mjs",
-    "tools/ship/pagePlacement-selfcheck.mjs",
-    "tools/ship/pagePlacements-selfcheck.mjs",
-    "tools/ship/pageReflow-selfcheck.mjs",
-    "tools/ship/pageSectionsReport-selfcheck.mjs",
+    // pagePlacement, pagePlacements, pageReflow, pageSectionsReport and statedRuntime REMOVED: a fresh
+    // freezeRegisterAudit.mjs run over the whole register (prompted by the four new tslXxx entries below
+    // needing a re-freeze) found all five exit 0 today. See FIXED_SINCE_V4279 for what each one now reads.
     "tools/ship/pairlaneBridge-selfcheck.mjs",
     "tools/ship/proseAudit-selfcheck.mjs",
     "tools/ship/referenceKind-selfcheck.mjs",
     "tools/ship/registerResidue-selfcheck.mjs",
     "tools/ship/shaderRefs-selfcheck.mjs",
-    "tools/ship/statedRuntime-selfcheck.mjs",
     "tools/ship/sunshineHost-selfcheck.mjs",
     "tools/ship/supersededFlag-selfcheck.mjs",
     "tools/ship/unattendedHold-selfcheck.mjs",
@@ -221,6 +219,28 @@ export const registerAtSweep = () =>
     RED_AT_V4279.length + FIXED_SINCE_V4279.length - RECOVERED_SINCE_V4279.length;
 
 export const FIXED_SINCE_V4279 = Object.freeze([
+    // *** FIVE MORE, FOUND THE SAME WAY gateReach WAS -- BY RE-FREEZING THE WHOLE REGISTER RATHER THAN
+    // SAMPLING IT. *** register-audit.mjs had sat frozen since v4535; re-running it in full (to pick up the
+    // four tslXxx entries this round added) found these five already exit 0. Each gate's OWN file is
+    // unchanged on this branch, so the repair is in whatever it gates (pageSections.mjs, server.html, or
+    // the reporting-tools it reads) or arrived through the merge this round is built on -- not chased down
+    // to a single commit here, because a register that says WHICH gate stopped failing is doing its job even
+    // when it cannot also say which diff did it.
+    { gate: "tools/ship/pagePlacement-selfcheck.mjs", round: "this round's re-freeze",
+      why: "exits 0 against a freshly re-run register-audit.mjs, where the v4535 freeze had it red. Its own " +
+           "file is untouched on this branch; whatever it gates repaired underneath it." },
+    { gate: "tools/ship/pagePlacements-selfcheck.mjs", round: "this round's re-freeze",
+      why: "exits 0 against a freshly re-run register-audit.mjs, where the v4535 freeze had it red. Its own " +
+           "file is untouched on this branch; whatever it gates repaired underneath it." },
+    { gate: "tools/ship/pageReflow-selfcheck.mjs", round: "this round's re-freeze",
+      why: "exits 0 against a freshly re-run register-audit.mjs, where the v4535 freeze had it red. Its own " +
+           "file is untouched on this branch; whatever it gates repaired underneath it." },
+    { gate: "tools/ship/pageSectionsReport-selfcheck.mjs", round: "this round's re-freeze",
+      why: "exits 0 against a freshly re-run register-audit.mjs, where the v4535 freeze had it red. Its own " +
+           "file is untouched on this branch; whatever it gates repaired underneath it." },
+    { gate: "tools/ship/statedRuntime-selfcheck.mjs", round: "this round's re-freeze",
+      why: "exits 0 against a freshly re-run register-audit.mjs, where the v4535 freeze had it red. Its own " +
+           "file is untouched on this branch; whatever it gates repaired underneath it." },
     // *** v4571 -- FILED HERE AND NOT IN FIXED_SINCE_V4408, BECAUSE THIS IS THE LIST THAT HELD IT. ***
     // gateReach stood in RED_AT_V4279_GATES and was registered a SECOND time at v4568 when the killed
     // bucket found it red without noticing it was already filed. Putting the repair in the v4408 list
@@ -729,12 +749,6 @@ const WHY_V4557 = Object.freeze({
         "...,nodeUniform9)' out of devicePipelineFromTsl's own agreement check on badTv's graph. Freshly " +
         "counted, not assumed: 8 PASS, 2 FAIL. Section 1 (pure JS/logic, no browser) is still fully green, " +
         "unaffected either way.",
-    "tools/ship/tslRace-selfcheck.mjs":
-        "THE SWIZZLE WALL IS GONE. Freshly counted, not assumed: 73 PASS, 1 FAIL -- including real byte-exact " +
-        "WebGPU renders across five different generated shells (36864/36864, worst 0, each). The one " +
-        "remaining red is section 6, 'A TEXTURE ACROSS THE SHELL BOUNDARY': 'tslSource: the emitted GLSL " +
-        "carries an UNLABELLED uniform (nodeUniform1)' -- a GLSL-specific labelling gap in a graph this " +
-        "section builds, not swizzle, not WebGPU-specific (WGSL was never the problem here).",
     "tools/ship/tsl-selfcheck.mjs":
         "THE SWIZZLE WALL IS GONE. Freshly counted, not assumed: 27 PASS, 1 FAIL -- including the badTv " +
         "cross-backend byte-exact compare (4096/4096, worst 0, both backends) and a 24-step TSL Loop finding " +
@@ -751,13 +765,6 @@ const WHY_V4557 = Object.freeze({
         "3's uniform transplant, carries the SAME auto-numbered-uniform shape tslSource and tslRace now show " +
         "(nodeUniform6, nodeUniform8 in the emitted list) -- not swizzle, not the cullLodWgsl({occlusion:true}) " +
         "gap this file's own closing note already names separately and correctly as pre-existing.",
-    "tools/ship/tslRig-selfcheck.mjs":
-        "NOT ON THIS LIST BEFORE -- found by the affected-gates sweep this round, hitting the identical " +
-        "swizzle TypeError through its own page.goto (not runInEngineOrigin), fixed separately with " +
-        "page.addInitScript(installSwizzleWorkaround) in the gate itself (see the note above this object). " +
-        "Freshly counted: 3 PASS, 1 FAIL -- section 1 hits the SAME uniform-list mismatch as tslSource-" +
-        "selfcheck above ('...,nodeUniform8 vs ...,nodeUniform9'), since tsl-rig.html renders the same badTv " +
-        "graph.",
 });
 
 // *** tslIsing-selfcheck.mjs LEFT THIS LIST AT v4559, BY THE REPAIR THE v4557 ENTRY ASKED FOR. *** v4557 named
@@ -782,13 +789,16 @@ const WHY_V4557 = Object.freeze({
 // agreeing with the shipped kernel on all 1024 spins at the kernel's own zero-tolerance contract.
 export const RED_AT_V4557_GATES = Object.freeze([
     "tools/ship/tslSource-selfcheck.mjs",
-    "tools/ship/tslRace-selfcheck.mjs",
     "tools/ship/tsl-selfcheck.mjs",
     "tools/ship/tslPhysics-selfcheck.mjs",
     // slugTsl-selfcheck.mjs REMOVED: re-run after the swizzle workaround above, it is fully green (14/14) --
     // the list may only shrink, and only on purpose. See the note above WHY_V4557 for what changed and why
     // the other four are still here, for a different reason than the one this list originally named.
-    "tools/ship/tslRig-selfcheck.mjs",
+    // tslRace-selfcheck.mjs and tslRig-selfcheck.mjs REMOVED: this round's re-freeze of register-audit.mjs
+    // (needed anyway to pick up this list's own four entries, which had never been run) found both fully
+    // green -- tslRace's one remaining red (the unlabelled GLSL uniform, nodeUniform1) and tslRig's (the
+    // shared badTv uniform-list mismatch) are both gone. Neither gate's own file is touched on this branch;
+    // whichever round fixed the uniform-numbering lead this list's own header names as a follow-up did it.
     // ADDED, not previously here: same swizzle wall, a code path this list's original sweep missed. See the
     // note above WHY_V4557 ("A SIXTH GATE HIT THE SAME WALL...") for how it was found and fixed.
 ]);

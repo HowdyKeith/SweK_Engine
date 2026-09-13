@@ -43,7 +43,7 @@
 //                   D  the HUD reporting the grid's total as the baked count                     -> 1 red: the HUD hold.
 //                   Each restored and the baseline re-run: 0 red.
 //
-// Run: node tools/ship/probeLab-selfcheck.mjs      (~20 s)
+// Run: node tools/ship/probeLab-selfcheck.mjs      (~2.9 s)
 "use strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

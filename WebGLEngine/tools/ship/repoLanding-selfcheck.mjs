@@ -18,7 +18,7 @@
 //   D  gpuTerrain: the pick stage's half-size taken as rec.w      -> exit=1, 3 red: 2 of 6 and 1 of 6 picks on their chunk, the backends parting --
 //                                                                   the DEFAULT pick picture's fault, reproduced on purpose
 //
-// Run: node tools/ship/repoLanding-selfcheck.mjs      (~4 s: one browser, two backends)
+// Run: node tools/ship/repoLanding-selfcheck.mjs      (~1.2 s: one browser, two backends)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";

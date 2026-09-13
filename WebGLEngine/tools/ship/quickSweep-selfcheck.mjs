@@ -50,7 +50,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as Q from "./quickSweep.mjs";
 import { VERDICT, SWEEP_V4297, REGRESSIONS_REPAIRED } from "./gateSweep.mjs";
-import { RED_AT_V4279, RED_AT_V4408, RED_AT_V4424, RED_AT_V4476, UNCONFIRMED_SLOW , RED_AT_V4484, RED_AT_V4531, RED_AT_V4535} from "./redCensus.mjs";
+import { RED_AT_V4279, RED_AT_V4408, RED_AT_V4424, RED_AT_V4476, UNCONFIRMED_SLOW , RED_AT_V4484, RED_AT_V4531, RED_AT_V4535,
+         RED_AT_V4557, RED_AT_V4568 } from "./redCensus.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -155,10 +156,14 @@ sec("2. THE REGISTER IS BUILT FROM THE RECORDS IT NAMES, AND THE SIX REGRESSIONS
     // v4531 -- AND IT HAPPENED AGAIN, ON SCHEDULE. RED_AT_V4531 joined for tslSource and this row went red
     // within the minute, before any sweep ran. Adding the list here is the deliberate act the row exists to
     // demand: the register is 91 gates where it held 90 an hour earlier, and the diff is where that is said.
+    // AND AGAIN: RED_AT_V4557 and RED_AT_V4568 both joined REGISTER_LISTS in redCensus.mjs (the second is
+    // empty today, and an empty list is still a list this row must know about) and this row went red on
+    // both, exactly as designed -- so both are added to the union rather than the count being widened.
     ok(reg.size === new Set([...RED_AT_V4279.map((e) => e.gate), ...RED_AT_V4408.map((e) => e.gate),
                              ...RED_AT_V4424.map((e) => e.gate), ...RED_AT_V4476.map((e) => e.gate),
                              ...RED_AT_V4484.map((e) => e.gate), ...RED_AT_V4531.map((e) => e.gate),
-                             ...RED_AT_V4535.map((e) => e.gate),
+                             ...RED_AT_V4535.map((e) => e.gate), ...RED_AT_V4557.map((e) => e.gate),
+                             ...RED_AT_V4568.map((e) => e.gate),
                              ...UNCONFIRMED_SLOW, ...SWEEP_V4297.fromSlowBucket, ...SWEEP_V4297.unmeasured]).size,
        "and the register's size is the union of those lists, nothing typed", `${reg.size} gates`);
     const repaired = Object.keys(REGRESSIONS_REPAIRED.gates).sort();

@@ -35,7 +35,7 @@
 //                                                                                                 are flat under either sampling).
 //                   Each restored and the baseline re-run: 0 red.
 //
-// Run: node tools/ship/asciiShape-selfcheck.mjs      (~40 s)
+// Run: node tools/ship/asciiShape-selfcheck.mjs      (~1 s)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";

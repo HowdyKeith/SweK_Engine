@@ -1,6 +1,6 @@
 // tools/roundhouse/airyRefined-selfcheck.mjs
 //
-// Run: node tools/roundhouse/airyRefined-selfcheck.mjs   (~40s)
+// Run: node tools/roundhouse/airyRefined-selfcheck.mjs   (~19s)
 // Gated by tools/ship/selfchecks.mjs (discovery gate).
 //
 // v2911 -- A GRADED OBSERVABLE THAT SCORES EXACTLY ZERO AGAINST A CONSTANT THAT IS WRONG IN THE FOURTH DIGIT.

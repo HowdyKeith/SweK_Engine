@@ -21,7 +21,7 @@
 //                   C  the per-frame reset dropped (the pool position never returns to 0)                    -> FIRST 0 RED: the picture stays right while the pool grows by four
 //                      buffers a frame -- a leak no pixel shows. The pool-length row was added (four after every frame); re-run -> exit=1, red: that row
 //
-// Run: node tools/ship/deviceUniformsPerDraw-selfcheck.mjs      (~25 s)
+// Run: node tools/ship/deviceUniformsPerDraw-selfcheck.mjs      (~2.9 s)
 "use strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

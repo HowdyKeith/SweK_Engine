@@ -1084,6 +1084,13 @@ window.addEventListener("load", function () {
             <a href="/ev-loader.html" target="_blank" rel="noopener">EV Loader</a>
             <a href="/ev-mission-creator.html" target="_blank" rel="noopener">Mission Authoring Console &middot; SweK EV Engine</a>
             <a href="/ev-sprites.html" target="_blank" rel="noopener">EV Sprite Viewer</a>
+            <!-- ev.html carries the "ev" topic in pageSections.mjs same as its five siblings just above, but
+                 had no Arriving anchor of its own -- the mover had nothing to move, and the endlesssky panel's
+                 unrelated "Fly it" convenience link (the same page, reached from a different game's panel) was
+                 the only anchor on the page, which pageSectionsReport correctly read as filed in the WRONG
+                 drawer. This is the real fix: an anchor the mover can carry into the ev panel, same as its
+                 siblings, not a change to what counts as "home". -->
+            <a href="/ev.html" target="_blank" rel="noopener">EV Stellar Atlas</a>
             <a href="/wadmap.html" target="_blank" rel="noopener">WAD Map &mdash; Engine Companion</a>
             <a href="/uvtt.html" target="_blank" rel="noopener">UVTT dungeon loader</a>
             <a href="/skyrim.html" target="_blank" rel="noopener">&#128009; Skyrim &mdash; SweK Engine</a>
@@ -2400,7 +2407,7 @@ A password fetches a token from the list server; an unregistered callsign needs 
              where best to put it... moved to the alphabetical link buttons for now" / "not sure where best to
              put it, but not a big button. so into alphabet buckets is okay." Neither page carries a
              pageSections.mjs topic assignment, so removing the button does not strand them: pagePlacements.mjs's
-             alphaBuckets() already gives every unclaimed page an A-Z holding panel (rendered in the Arriving
+             pagePlacements.alphaBuckets already gives every unclaimed page an A-Z holding panel (rendered in the Arriving
              section above, `#unsortedBuckets`) precisely so a page nothing has decided a home for yet is still
              one click away rather than unreachable. -->
 

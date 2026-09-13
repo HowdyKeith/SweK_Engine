@@ -1,0 +1,50 @@
+{
+ "gate": "tools/ship/exactHash-selfcheck.mjs",
+ "at": "2026-09-12",
+ "tables": [
+  {
+   "title": "the five single-implementation sin-hash sites",
+   "columns": [
+    "file",
+    "sites",
+    "GLSL",
+    "WGSL"
+   ],
+   "rows": [
+    [
+     "atmosphere/AtmosphereSystem.js",
+     1,
+     true,
+     false
+    ],
+    [
+     "demos_code/ant_colony.js",
+     1,
+     true,
+     false
+    ],
+    [
+     "demos_code/slime_mold.js",
+     1,
+     true,
+     false
+    ],
+    [
+     "render/CloudVolume.js",
+     1,
+     true,
+     false
+    ],
+    [
+     "render/voxelrenderer.js",
+     4,
+     true,
+     false
+    ]
+   ],
+   "note": "the sites SHADER_SINHASH_V4578.continuous names, none of which has a second-language twin to disagree with."
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

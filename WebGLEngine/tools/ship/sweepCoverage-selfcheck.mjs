@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/sweepCoverage-selfcheck.mjs -- v4460
 //
-// Run: node tools/ship/sweepCoverage-selfcheck.mjs   (~2s -- MEASURED)
+// Run: node tools/ship/sweepCoverage-selfcheck.mjs   (~0.26s -- MEASURED)
 //
 // v4408 -- *** THE SHIP-TIME SWEEP EVICTS GATES ON TIMINGS IT MANUFACTURED ITSELF, AND NEVER RE-MEASURES THEM. ***
 //

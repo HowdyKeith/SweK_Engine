@@ -21,7 +21,7 @@
 //                   B  orrery-gpu.html's tints line removed                           -> exit=1, red: the colours row, and the count of held rows
 //                   C  a held row's 2D evidence broken (STATE_COLOUR's key renamed)   -> not applied: it is another gate's module; the row reads it
 //
-// Run: node tools/ship/orreryPromotion-selfcheck.mjs      (~0.5 s, no browser)
+// Run: node tools/ship/orreryPromotion-selfcheck.mjs      (~0.08 s, no browser)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";

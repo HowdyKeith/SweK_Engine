@@ -21,7 +21,7 @@
 //                   C  decodePack's kern pairs dropped                                       -> exit=1, 9 red: the layout and picture rows for the three kerning families; JetBrains Mono kerns by 0 and survives
 //                   D  fromPack uploading the band texels as the curve texture              -> exit=1, 8 red: the picture rows for every family on both backends
 //
-// Run: node tools/ship/fontPacks-selfcheck.mjs      (~25 s; sections 1-3 are headless)
+// Run: node tools/ship/fontPacks-selfcheck.mjs      (~1.9 s; sections 1-3 are headless)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
