@@ -491,7 +491,9 @@ export const PROBE_AT_V4536 = Object.freeze({
     // string, which FIELD_RE's `name: <digits>,` does not match.
     // v4543 -- RE-TAKEN with `excluding`: 115/54/244 -> 116/55/252. One record, GROUND_AT_V4543 in
     // physics/character/capsuleGround.mjs, carrying eight counted fields of its twenty-eight.
-    currentIncludingModule: Object.freeze({ records: 116, withFields: 55, fields: 252 }),
+    // v4544 -- RE-TAKEN with `excluding`: 116/55/252 -> 117/56/267. One record, FALL_AT_V4544 in
+    // physics/character/fallBody.mjs, carrying fifteen counted integer fields.
+    currentIncludingModule: Object.freeze({ records: 117, withFields: 56, fields: 273 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -572,7 +574,12 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4541 -- RE-TAKEN: 111/50/208 -> 112/51/215, for CAPSULE_AT_V4541 in physics/character/capsuleMove.mjs.
     // v4542 -- RE-TAKEN: 112/51/215 -> 113/52/224, for BODY_AWARE_AT_V4542 in world/surfaceProbe.mjs.
     // v4543 -- RE-TAKEN: 113/52/224 -> 114/53/232, for GROUND_AT_V4543.
-    excluding: Object.freeze({ records: 114, withFields: 53, fields: 232 }),
+    // v4544 -- RE-TAKEN: 114/53/232 -> 115/54/247, for FALL_AT_V4544.
+    // v4544 -- RE-TAKEN AGAIN: 115/54/247 -> 115/54/253, for the six fields the round added to that
+    // record after a reading party found five defects the gate could not see. NO RECORD ARRIVED, which
+    // is the case v4540 had to teach this row: a repair that writes integers into an existing record
+    // moves the census as surely as a new one.
+    excluding: Object.freeze({ records: 115, withFields: 54, fields: 253 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,

@@ -271,6 +271,12 @@ export const INSCOPE_ARRIVALS_SINCE_V4435 = Object.freeze([
     Object.freeze({ file: "physics/character/terrainWalk-selfcheck.mjs", at: "v4544",
         why: "its gate, which IMPORTS MeshBVH and trianglesFrom: the round's central cross-check runs a " +
              "bilinear heightfield gradient against a real meshBVH raycast and holds them to 4.8e-14" }),
+    Object.freeze({ file: "physics/character/fallBody.mjs", at: "v4544",
+        why: "terrain-controller piece (1). The module imports no BVH and has no business with one -- it takes " +
+             "injected oracles -- but its mesh adapter takes the BVH as a PARAMETER, `meshSurface(capsuleGround, " +
+             "bvh, opts)`, and a parameter name is code. It arrived in scope at the moment that adapter changed " +
+             "shape to inject the builder rather than a built oracle, which is the repair that let it force " +
+             "stepUp 0 on the mesh side" }),
     Object.freeze({ file: "physics/character/capsuleGround.mjs", at: "v4543",
         why: "terrain-controller piece (3). It IMPORTS MeshBVH and trianglesFrom for its own fixtures and " +
              "asks a BVH, through capsuleMove, whether a body could stand on each surface under a point -- " +
@@ -300,6 +306,11 @@ export const INSCOPE_ARRIVALS_SINCE_V4435 = Object.freeze([
  * is a second list rather than a fudged total.
  */
 export const OUTOFSCOPE_ARRIVALS_SINCE_V4435 = Object.freeze([
+    Object.freeze({ file: "tools/ship/fallBody-selfcheck.mjs", at: "v4544",
+        why: "the gate of terrain-controller piece (1). The MODULE it gates carries the term nowhere at all " +
+             "-- fallBody takes injected oracles and imports neither the voxel probe nor the mesh one -- but " +
+             "the gate imports MeshBVH to build the mesh half of its adapter comparison, so the gate is an " +
+             "arrival here and the module is not. That asymmetry is the point of keeping two lists" }),
     Object.freeze({ file: "tools/ship/capsuleGround-selfcheck.mjs", at: "v4543",
         why: "the gate of terrain-controller piece (3). It reaches the ray-triangle BVH in top-level mesh/ " +
              "through its module and through groundProbe's fixtures, and lives in tools/ship/ where none of " +
@@ -344,6 +355,7 @@ export const BVH_AT_V4435 = Object.freeze({
         // like against this claim, and the two lists are compared SORTED, so position is not decoration.
         "tools/ship/capsuleGround-selfcheck.mjs",
         "tools/ship/capsuleMove-selfcheck.mjs",
+        "tools/ship/fallBody-selfcheck.mjs",
         "tools/ship/groundProbe-selfcheck.mjs",
         "tools/ship/meshBVH-selfcheck.mjs",
         "tools/ship/splatMesh-selfcheck.mjs", "ui/webrtxBrowser.js",

@@ -3849,6 +3849,37 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // object keys of the same name, the later one wins silently and the earlier round's swept count vanishes
     // from the surplus arithmetic. FIFTH ORDINAL COLLISION between the two lines this session; the side that
     // merges second is the side that moves.
+    since237: Object.freeze({
+        at: "v4544", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/fallBody-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly: 12 pass, 59-64 ms. Backlog terrain-controller piece (1), " +
+                 "the vertical half nothing in this tree played -- and the round found the entry names the " +
+                 "WRONG STATE. *** AT A CLIFF, EVERY ADAPTER A LIVE WORLD USES REPORTS blocked AND NEVER " +
+                 "airborne *** (lattice 165 blocked / 0 airborne over 200 frames, functionGround the same, " +
+                 "meshGround the opposite at 153 airborne), because the drop reads as a steep slope and the " +
+                 "slope test runs before the step test. What DOES reach airborne is a body ABOVE the ground " +
+                 "-- 1.2 up is grounded and 1.3 up is airborne at snapDown 1.2 -- and simulation/" +
+                 "BotManager.js branched on `grounded || blocked`, so every such body fell to a line that " +
+                 "wrote world._heightAt(x, z) + BOT_EYE: the terrain MODEL, in ONE frame, with no fall and " +
+                 "no voxel check. MEASURED IN A REAL BOOT over 441 columns, that write disagrees with where " +
+                 "a falling body lands in 167 of them (37.9%), by up to 44 voxels, and lands INSIDE SOLID " +
+                 "ROCK in 39 (8.8%) -- the defect v4542 repaired, on the branch v4542 did not touch, and " +
+                 "the standing-still line undid v4540 the same way by writing the model every frame. Both " +
+                 "fall now: at column (-57,-60), standable at 12 and 23, a bot from y=43 falls 81 frames " +
+                 "and lands at 24, and one starting BETWEEN the surfaces at 17.5 falls 35 frames to 13 " +
+                 "where the old line snapped it to 24, eleven voxels UP. *** THE PROBE TAKES NO REACH AND " +
+                 "THE FIRST DRAFT LIFTED A FALLING BODY: *** stepUp is how far a body may CLIMB, and with " +
+                 "1.2 a body falling from 20.5 was put at 21 in one frame instead of falling to 9 in 64. " +
+                 "AND THE FALL CANNOT TUNNEL, structurally rather than by substepping -- the oracle is " +
+                 "re-asked at the body's current height and returns the first surface below it, so a drop " +
+                 "onto a thin ledge lands on it at initial speeds from 1 to ten million, where capsuleMove " +
+                 "must substep because its query is local and this one is a column. Six sabotages, none " +
+                 "crashing: A 2 RED, B 5, C 1, D 1, E 6, F 1. Two of the file's OWN rows failed first: one " +
+                 "called a record method that does not exist and CRASHED instead of failing, the fourth " +
+                 "instance of that species this session; the other anchored on the comment 'standing still' " +
+                 "and went red when this same round rewrote that comment in capitals.",
+    }),
     since236: Object.freeze({
         at: "v4543", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/capsuleGround-selfcheck.mjs"]),

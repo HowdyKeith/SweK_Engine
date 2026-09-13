@@ -170,6 +170,7 @@ const BOT_KINDS = {
 // attack profile, so visual identity (tracer color, mesh size, themed
 // speech) comes from the shared kaiju config.
 import { stepTerrain, stepTerrainFan, autoGround, SURFACE } from "../physics/character/terrainWalk.mjs";
+import { fallStep, voxelSurface } from "../physics/character/fallBody.mjs";
 import { standHeightAt, hasVoxels } from "../world/surfaceProbe.mjs";
 
 /** Eye/centre offset above the feet -- the +1 this file has always added to the terrain height. */
@@ -1226,6 +1227,38 @@ export class BotManager {
                 if (r.fanned) this._detours = (this._detours || 0) + 1;
                 if (r.grounded || r.blocked) {
                     bot.x = r.pos[0]; bot.z = r.pos[2]; bot.y = r.pos[1] + BOT_EYE;
+                    bot.vy = 0;                       // standing on something: the fall is over
+                    handled = true;
+                } else if (r.airborne) {
+                    // *** AIRBORNE IS A STATE THIS FILE USED TO DROP ON THE FLOOR. *** A body more than
+                    // snapDown above the ground matches neither `grounded` nor `blocked`, so it fell to the
+                    // branch below and was written to `world._heightAt(x, z) + BOT_EYE`: the terrain MODEL,
+                    // in ONE frame, with no fall and no voxel check. Measured over 441 columns of this
+                    // world, that write disagrees with where a falling body actually lands in 167 of them
+                    // (37.9%), by up to 44 voxels, and lands INSIDE SOLID ROCK in 39 (8.8%) -- the defect
+                    // v4542 repaired, on the branch v4542 did not touch. It falls now.
+                    //
+                    // *** THE HORIZONTAL STEP IS TAKEN HERE AND NOT READ OFF terrainWalk, AND THE FIRST
+                    // DRAFT OF THIS BRANCH GROUNDED EVERY PLANE IN THE GAME. *** stepTerrainFan reports
+                    // movedH = 0 on an airborne step -- it is a GROUND controller and an airborne body is
+                    // not its business -- so taking r.pos moved the body nowhere, and setting handled=true
+                    // skipped the fallback below, which advanced x and z at full speed and was the only
+                    // reason a flying bot moved at all. Measured against HEAD on a bot_plane steering at a
+                    // player 40 away: 14.0000 units/s before, 0.0000 after. Horizontal motion while
+                    // airborne belongs to the CONTROLLER, which is this file; fallBody's own header
+                    // disclaims air control and is right to.
+                    bot.x += (dx / dist) * speed * dt;
+                    bot.z += (dz / dist) * speed * dt;
+                    // *** AND A FLYING BOT'S HEIGHT ALREADY HAS AN OWNER. *** _tickBot glides bot.y toward
+                    // playerPos.y + altitudeOffset after this returns, so applying gravity here would be a
+                    // second author for one number -- which is the shape of defect this session has spent
+                    // four rounds removing. A plane is airborne by design, not by accident.
+                    if (!bot.spec?.flying) {
+                        const f = fallStep({ pos: [bot.x, bot.y - BOT_EYE, bot.z], vy: bot.vy ?? 0,
+                                             surfaceUnder: this._fallSurface(), dt });
+                        bot.y = f.pos[1] + BOT_EYE;
+                        bot.vy = f.vy;
+                    }
                     handled = true;
                 }
             }
@@ -1236,8 +1269,17 @@ export class BotManager {
             }
             bot.yaw = Math.atan2(dx, dz);
         } else {
-            // standing still: still sit on the surface rather than wherever the last move left us
-            try { bot.y = (this.world?._heightAt?.(bot.x, bot.z) ?? bot.y) + BOT_EYE; } catch {}
+            // *** STANDING STILL USED TO WRITE THE TERRAIN MODEL EVERY FRAME, WHICH UNDID v4540 ONE FILE
+            // OVER. *** v4540 gave stepTerrain's zero-wish branch the walking path's own allowances so a
+            // body standing under a bridge would stop being lifted onto the roof -- and this line then
+            // ignored its answer and wrote the model's anyway. A standing body is asked the same question
+            // as a moving one now, and falls if the answer is that it is not on anything.
+            if (!bot.spec?.flying) {
+                const surf = this._fallSurface();
+                const f = fallStep({ pos: [bot.x, bot.y - BOT_EYE, bot.z], vy: bot.vy ?? 0, surfaceUnder: surf, dt });
+                bot.y = f.pos[1] + BOT_EYE;
+                bot.vy = f.landed ? 0 : f.vy;
+            }
         }
     }
 
@@ -1248,6 +1290,35 @@ export class BotManager {
      * rebuilding the closure every frame would be the expensive part of an otherwise cheap change. Cached
      * against the world object identity, so a world swap rebuilds it and nothing else does.
      */
+    /**
+     * The surface oracle physics/character/fallBody.mjs needs: the highest surface AT OR BELOW a body.
+     *
+     * *** stepUp IS ZERO AND fallBody's HEADER SAYS WHY. *** The walking allowance lets the probe name a
+     * surface ABOVE the body, and a falling body clamped to one of those is lifted rather than landed --
+     * v4540's defect in the branch v4540 did not touch. voxelSurface passes 0 and this file does not get a
+     * say in it. A world with no voxel grid falls back to the terrain model, which is all it has.
+     */
+    _fallSurface() {
+        const w = this.world;
+        if (this._fallFor !== w) {
+            this._fallFor = w;
+            this._fallSurf = hasVoxels(w)
+                ? voxelSurface(standHeightAt, w)
+                // *** AND THIS ARM TOOK (x, z) AND THREW THE BODY AWAY, WHICH IS SABOTAGE A SHIPPING IN
+                // THE SIBLING ADAPTER. *** fallBody's contract is "the highest surface AT OR BELOW y", and
+                // a height function that answers 20 for a body at 6 had it clamped UP to 20 with
+                // landed:true, in one frame, and pinned there. The voxel arm passes stepUp 0 to get this
+                // right; the model has no such knob, so the comparison is made here.
+                : ((x, z, y) => {
+                    try {
+                        const h = w?._heightAt?.(x, z);
+                        return Number.isFinite(h) && h <= y ? h : null;
+                    } catch { return null; }
+                });
+        }
+        return this._fallSurf;
+    }
+
     _groundOracle() {
         const w = this.world;
         if (!w || typeof w._heightAt !== "function") return null;

@@ -291,8 +291,11 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4543 -- RE-TAKEN for tools/ship/capsuleGround-selfcheck.mjs: 1631 -> 1632 and the three rows that
     // follow a gate by one. The round's second new file is physics/character/capsuleGround.mjs, a MODULE,
     // and it moves none of these. distinctDefinitions holds at 40 for the thirteenth round running.
-    gates: 1632, usesOk: 1611, definesOk: 1603, importsOk: 0,
-    distinctDefinitions: 40, nameFirst: 1504, condFirst: 91, unknownSignature: 16,
+    // v4544 -- RE-TAKEN for tools/ship/fallBody-selfcheck.mjs: 1632 -> 1633 and the three rows that follow
+    // a gate by one. The round's second new file is physics/character/fallBody.mjs, a MODULE, and it moves
+    // none of these. distinctDefinitions holds at 40 for the fourteenth round running.
+    gates: 1633, usesOk: 1612, definesOk: 1604, importsOk: 0,
+    distinctDefinitions: 40, nameFirst: 1505, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([
