@@ -20,7 +20,7 @@ import { fileURLToPath } from "node:url";
 import { noComments } from "./sourceScan.mjs";
 import {
     SLOWEST_GENERAL, HEADROOM, DEFAULT_BUDGET_MS, MEASURED, MEASURED_RUNS, TAIL_HEADROOM, UNRESOLVED,
-    budgetFor, budgetReason, maxBudgetMs,
+    budgetFor, budgetReason, maxBudgetMs, slowestRun,
 } from "./gateBudget.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -47,13 +47,56 @@ const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "
 // ---- 2. EVERY TAIL BUDGET CARRIES THE MEASUREMENT IT CAME FROM ----------------------------------------------------
 {
     const names = Object.keys(MEASURED);
-    ok("!! *** every named budget is derived from a recorded completion, not a guess ***",
-        names.length > 0 && names.every((k) => Number.isFinite(MEASURED[k]) && MEASURED[k] > 0 &&
-                                               budgetFor(k) === MEASURED[k] * TAIL_HEADROOM),
-        names.length + " gates with measured times from " + (Math.min(...names.map((k) => MEASURED[k])) / 1000).toFixed(1) +
-        "s to " + (Math.max(...names.map((k) => MEASURED[k])) / 1000).toFixed(1) + "s, each budgeted at x" +
-        TAIL_HEADROOM + ". A NUMBER WITH ITS MEASUREMENT ATTACHED CAN BE CONTRADICTED BY A RE-MEASURE; a bare " +
-        "number cannot, which is the whole difference between this table and the constant it replaces");
+    // *** v4581 -- THIS ROW CLAIMED PROVENANCE AND CHECKED ARITHMETIC IT DEFINES ITSELF. ***
+    //
+    // It read: `Number.isFinite(MEASURED[k]) && MEASURED[k] > 0 && budgetFor(k) === MEASURED[k] * TAIL_HEADROOM`,
+    // under the sentence "every named budget is derived from a recorded completion, not a guess" and a detail
+    // string ending "A NUMBER WITH ITS MEASUREMENT ATTACHED CAN BE CONTRADICTED BY A RE-MEASURE; a bare number
+    // cannot". Three problems, and the third is the one that matters.
+    //
+    //   1. THE THIRD CLAUSE IS A TAUTOLOGY. budgetFor's body IS `m * TAIL_HEADROOM` for a gate in MEASURED, so it
+    //      cannot fail for any k in this table, whatever the number is. It restates the function under test.
+    //   2. The first two clauses check that a number is a positive number. They would pass a value typed from
+    //      nothing at all, which is the one thing the sentence above them denies.
+    //   3. *** AND THE SENTENCE IS FALSE FOR MOST OF THE TABLE. *** 50 of 62 entries have no MEASURED_RUNS row,
+    //      so for them there is no recorded completion to be derived from and no re-measure to contradict. The
+    //      mechanism that makes a number contradictable EXISTS and covers a fifth of the rows.
+    //
+    // What is asserted now: the 12 derived entries really are derived (re-computed, not trusted), the BRANCH in
+    // budgetFor is exercised in both directions, and the entries with no recorded runs are COUNTED against a
+    // ratchet that may only fall. The claim then matches what the table can support.
+    const derivedNames = names.filter((k) => MEASURED_RUNS[k]);
+    const bareNames = names.filter((k) => !MEASURED_RUNS[k]);
+    ok("!! *** every budget that CLAIMS a recorded completion is re-derived here from the runs themselves ***",
+        derivedNames.length > 0 && derivedNames.every((k) => MEASURED[k] === slowestRun(k)),
+        derivedNames.length + " of " + names.length + " entries carry a MEASURED_RUNS row, and each table value " +
+        "equals the slowest run recorded for it. These are written as `slowestRun(\"...\")` rather than as a " +
+        "number, so the value and its evidence CANNOT drift apart -- that is what makes the sentence below true " +
+        "of them and only them");
+
+    // A BRANCH CHECK, WHICH CAN FAIL, IN PLACE OF THE ARITHMETIC THAT COULD NOT. budgetFor either reads this
+    // table or hands back the general default; a gate in the table must not get the default, and a gate outside
+    // it must get exactly the default. Both halves break if the lookup key stops matching -- the separator bug
+    // hostScale spent v3941 on, one file over.
+    const outsider = "tools/ship/__no-such-gate-selfcheck.mjs";
+    ok("!! ...and budgetFor takes the table for a gate in it and the DEFAULT for one outside, both checked",
+        names.every((k) => budgetFor(k) !== DEFAULT_BUDGET_MS || MEASURED[k] * TAIL_HEADROOM === DEFAULT_BUDGET_MS) &&
+        budgetFor(outsider) === DEFAULT_BUDGET_MS && !MEASURED[outsider],
+        "the old form of this row asserted budgetFor(k) === MEASURED[k] * TAIL_HEADROOM, which is budgetFor's own " +
+        "body and could never fail. A gate silently falling through to the default is the failure that matters, " +
+        "and it is what a normalisation bug in the key looks like from outside");
+
+    // *** THE RATCHET, AND IT IS AIMED AT THIS TABLE'S OWN HABIT. *** Every entry added since v4456 carries runs;
+    // every entry older than that does not, and they cannot be recovered -- only re-measured one at a time, which
+    // is what v4581 did for configContract and found a 24x error. The count may only fall.
+    const BARE_BASELINE_V4581 = 50;
+    ok("!! *** the number of budgets with no recorded runs may only fall ***",
+        bareNames.length <= BARE_BASELINE_V4581,
+        bareNames.length + " of " + names.length + " (baseline " + BARE_BASELINE_V4581 + "). A new entry owes a " +
+        "MEASURED_RUNS row; an old one owes a re-measure, and this is the denominator hostScale divides by, so a " +
+        "wrong number here moves every budget on a rig. Measured times run from " +
+        (Math.min(...names.map((k) => MEASURED[k])) / 1000).toFixed(1) + "s to " +
+        (Math.max(...names.map((k) => MEASURED[k])) / 1000).toFixed(1) + "s, each budgeted at x" + TAIL_HEADROOM);
 
     ok("!! ...and every one of them names a gate that EXISTS",
         names.every((k) => fs.existsSync(path.join(ROOT, k))),

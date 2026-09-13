@@ -190,9 +190,22 @@ say("reference for " + GATE.split("/").pop() + ": MEASURED " + REF + "ms, budget
        unprovenanced > 0,
        unprovenanced + " of " + entries.length + " entries carry no kind, no box and no stamp. For each of those a "
        + "gate killed at its budget records the moment it died and looks exactly like a gate that finished. "
-       + "DIVIDING BY THIS SAID THIS BOX RUNS AT 4.90x. The denominator stays MEASURED because its numbers were "
-       + "all obtained the same way -- and when this count reaches zero this row goes red on purpose, because the "
-       + "reason will have expired. v4580 made the producer record it; it cannot be recovered for the rest.");
+       + "DIVIDING BY THIS SAID THIS BOX RUNS AT 4.90x. And when this count reaches zero this row goes red on "
+       + "purpose, because the reason will have expired. v4580 made the producer record it; it cannot be "
+       + "recovered for the rest."
+       // *** v4581 -- AND THE REASON v4580 GAVE FOR PREFERRING MEASURED WAS NOT CHECKED, AND IS WRONG. ***
+       // This detail read "The denominator stays MEASURED because its numbers were all obtained the same way".
+       // I wrote that sentence here one round ago and did not measure it. 50 of gateBudget.MEASURED's 62 entries
+       // have no MEASURED_RUNS row at all, so for most of the table nothing says how the number was obtained --
+       // and three of the twelve that do say `observedHere: false`. The same fault this row exists to name,
+       // asserted about the table offered as the cure, inside the gate that names it.
+       //
+       // THE CONCLUSION SURVIVES ON A DIFFERENT AND SMALLER REASON, measured at v4581: MEASURED's numbers agree
+       // with the independent records for 43 of the 50 entries those records cover, none is LOWER than observed,
+       // and after configContract's removal no entry is more than about 3x high. gate-timings has 397 entries
+       // that cannot say what they are. Curated-and-mostly-checked beats unprovenanced-at-scale; "all obtained
+       // the same way" was a claim about process that nobody had asked the table for.
+       + " (v4581: see tools/ship/budgetProvenance-selfcheck.mjs for what MEASURED can and cannot say.)");
     ok("...and the repair exists on this file, so the impossibility claim is retired rather than restated",
        Object.keys(raw.kinds || {}).length > 0 && Object.keys(raw.boxLegend || {}).length > 0,
        "a kind map and a machine legend, written by tools/ship/selfchecks.mjs at the point of decision. The old "

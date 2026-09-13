@@ -3767,6 +3767,51 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since240: Object.freeze({
+        at: "v4581", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/budgetProvenance-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/gateBudget.mjs", "tools/ship/gateBudget-selfcheck.mjs",
+                                "tools/ship/hostScale-selfcheck.mjs", "tools/ship/gate-timings.json"]),
+        verdict: "green, 132 ms at eight-wide and 84 ms alone, under the 3000 ms budget. *** THE TABLE EVERY " +
+                 "BUDGET IN THE TREE RESTS ON HAD FOUR KEYS WRITTEN TWICE, AND NOTHING PARSES IT. *** " +
+                 "gateBudget.MEASURED is the curated slow tail and hostScale divides every rig budget by it. " +
+                 "configContract, compose, assumptionMap and census each appeared twice in one object literal; a " +
+                 "repeated key is not an error in JavaScript and the later one silently wins. Three re-stated the " +
+                 "same number and were harmless -- WHICH IS WHY ALL FOUR SURVIVED. configContract re-stated a " +
+                 "DIFFERENT one, 78000 at one site and 72509 three hundred lines later, so one typed budget was " +
+                 "discarded with no trace and THE SMALLER READING WAS IN FORCE -- against the losing entry's own " +
+                 "written rule, 'the larger of the two readings is used'. The language overruled the table quietly, " +
+                 "because a rule stated in prose is enforced by whoever happens to read it. *** AND THE ENTRY WAS " +
+                 "WRONG BY TWENTY-FOUR TIMES EITHER WAY: *** re-measured at 2997/2856/3473 ms, three runs alone, " +
+                 "all exit 0. hostScale-selfcheck has REPORTED it as the table's worst under-record for rounds and " +
+                 "reporting is where it stopped. So the conservative rule pointed the wrong way -- 'take the " +
+                 "larger' protects against a fast sample when both readings are current and entrenches the staler " +
+                 "one when they are not, and the accident was LESS wrong than the rule. Removed rather than " +
+                 "corrected: the table is the slow tail and a 3 s gate is the population, so it falls to the " +
+                 "default and its budget RISES from 145,018 to 329,697 ms; correcting in place to 3473 x 2 would " +
+                 "have given 6,946 ms to a gate observed at 5,769 ms under load. Its own first sentence had always " +
+                 "said 'IT NEVER NEEDED A BIGGER BUDGET AT ALL'. *** THE GATE GUARDING THE TABLE ASSERTED " +
+                 "PROVENANCE AND CHECKED ARITHMETIC IT DEFINES ITSELF: *** gateBudget-selfcheck's row read " +
+                 "`budgetFor(k) === MEASURED[k] * TAIL_HEADROOM` under the sentence 'every named budget is derived " +
+                 "from a recorded completion, not a guess'. budgetFor's body IS that expression, so it could not " +
+                 "fail for any entry -- including the 24x one -- and the sentence is false for 50 of 62 rows, which " +
+                 "have no MEASURED_RUNS at all. The mechanism for provenance EXISTS here, is derived rather than " +
+                 "typed, and covers a fifth of the table. Replaced by a branch check, an independent maximum, a " +
+                 "spelling check and a ratchet. *** AND v4580'S OWN CLAIM IS WITHDRAWN WHERE I WROTE IT: *** " +
+                 "'the denominator stays MEASURED because its numbers were all obtained the same way', written " +
+                 "into hostScale-selfcheck one round ago without measuring it, in the very row that exists to name " +
+                 "unprovenanced records. The conclusion survives on a smaller measured reason: 43 of 49 entries " +
+                 "agree with the independent records within 1.5x and NONE is lower, which is the half that matters " +
+                 "-- so the round's finding is the PROCESS, not the numbers, and a row says which. 17 sabotages, " +
+                 "17/17 red, no 0-RED -- AFTER A FIRST PASS THAT PRODUCED FOUR 0-REDS, EVERY ONE A DEFECT IN THIS " +
+                 "ROUND'S OWN WORK: the nested-row guard was unreachable behind a `^\\s*` anchor and two fixtures " +
+                 "failed to drive it; the withdrawn-claim row used codeOnly, which empties string literals, so " +
+                 "re-adding the claim to a detail string moved nothing; gateBudget-selfcheck's new ratchet baseline " +
+                 "could be raised from 50 to 60 with nothing noticing, so the honesty check now lives in the other " +
+                 "gate; and one was the HARNESS scoring each mutation against a single gate, which reported the " +
+                 "restored tautology as invisible when the whole point is that only the other gate can see it.",
+    }),
     since239: Object.freeze({
         at: "v4580", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/timingProvenance-selfcheck.mjs"]),
