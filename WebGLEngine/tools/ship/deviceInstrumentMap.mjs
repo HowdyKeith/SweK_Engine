@@ -164,7 +164,10 @@ export const NO_INSTRUMENT = {
     // response it names is DELETION, NOT WEAKENING, which is what this is. The reason it gave was also
     // true and is now beside the point: an ORDER is not a number a front door can display, and the
     // instrument row does not claim it is; it points at the page that drives the physics.
-    blackhole: "the raytracer scene, graded by the kerr and probe-lab instruments that use its physics; the scene itself has no separate answer key",
+    // v4586 -- blackhole's exemption DELETED, on this file's own rule (deletion, not weakening): physics/blackHole.js is the
+    // Paczynski-Wiita module the lab's black-hole scene draws, and it has an instrument now (black-hole, gate
+    // physics/blackHole-selfcheck.mjs, adjudicated by apsidalKnob's bh-start-radius). The old reason called it "the raytracer
+    // scene", which it never was -- an excuse written about the wrong device, and staleExempt is what noticed.
     geometry: "marching cubes: a meshing primitive, gated where it lives, with no physical constant to put on a front door",
     kh: "Kelvin-Helmholtz dispersion feeds the lbm-fluid and thermal-flow instruments; promoting it separately would list one growth rate twice",
     csg: "exact signed-distance geometry: the value is that a box corner, a unit gradient and a set identity are graded against CLOSED FORMS, not that any physical constant sits on a front door. A meshing primitive has no dial to read, the same reason geometry and sdfmarch carry no instrument -- the gate IS the deliverable.",

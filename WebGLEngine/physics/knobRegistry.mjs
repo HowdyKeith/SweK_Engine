@@ -26,6 +26,10 @@ import { adjudicate as pileAdjudicate, score as pileScore, propose as pilePropos
 import { adjudicate as vibAdjudicate, score as vibScore, propose as vibPropose } from "./vibrationKnob.mjs";
 import { adjudicate as cfgAdjudicate, score as cfgScore, propose as cfgPropose } from "./centrifugeKnob.mjs";
 import { adjudicate as raceAdjudicate, score as raceScore, propose as racePropose, replay as raceReplay, ready as raceReady } from "./raceKnob.mjs";
+// v4586 -- the twelve scenes the triage never saw, four of them with a key that says no (physics/labScenes.mjs, task 75)
+import { adjudicateBlackHole, adjudicateNeutronStar, score as apsidalScore, proposeBlackHole, proposeNeutronStar } from "./apsidalKnob.mjs";
+import { adjudicate as impactAdjudicate, score as impactScore, propose as impactPropose } from "./impactKnob.mjs";
+import { adjudicate as holoAdjudicate, score as holoScore, propose as holoPropose } from "./hologramKnob.mjs";
 import { yangMagnetisation } from "./statmech/ising.js";
 import { wellLevel, levels } from "./quantum/schrodinger1d.js";
 import { lzExact, lzSweep } from "./quantum/landauZener.js";
@@ -239,6 +243,40 @@ export function registerAll() {
     // SHARE THE ASSUMPTION THAT IS WRONG. *** So the verdict is three parts: the mode must be EXCITED (j =
     // N+1 writes machine zero and the crossing detector still answers), j must be the SMALLEST index giving
     // that frequency, and only then is the frequency graded.
+    // v4586 -- FOUR MORE LAB-SCENE PROPOSERS, from the twelve scenes labScenes' parser had never seen. Each adjudicator was
+    // MEASURED before it was registered (physics/apsidalKnob.mjs, impactKnob.mjs, hologramKnob.mjs carry the numbers), each
+    // refuses a well-formed value on its own subject (an unbound launch, a start inside the surface, an aim the boundary
+    // contradicts, a screen too narrow to read), and three of the four found the page's own status line wrong: the black
+    // hole's and neutron star's 'below the ISCO', the impact's printed capture radius 1.73 against 1.703.
+    registerProposer({
+        id: "bh-start-radius", instrument: "black-hole", knobs: ["r0"],
+        propose: proposeBlackHole, score: apsidalScore, adjudicate: adjudicateBlackHole,
+        notes: "the apsidal advance per radial period, integration against the radial quadrature of the same Paczynski-Wiita " +
+               "potential, modulo a turn; tolerance = the apoapsis detector's step quantisation (L dt / rmax^2 per angle, " +
+               "twice, against the advance), floor 1e-4. Refuses r0 <= ~4.6: unbound at 1.05 x circular speed.",
+    });
+    registerProposer({
+        id: "ns-start-radius", instrument: "neutron-star", knobs: ["r0"],
+        propose: proposeNeutronStar, score: apsidalScore, adjudicate: adjudicateNeutronStar,
+        notes: "the same apsidal law at 1.02 x circular speed with the canonical star's surface (5.321, rs = 2 units) as the " +
+               "impact boundary; the advance exceeds a full turn at r0 = 5.4 (380.000 deg), so the comparison is circular. " +
+               "Refuses a start inside the surface.",
+    });
+    registerProposer({
+        id: "impact-aim", instrument: "impact", knobs: ["b"],
+        propose: impactPropose, score: impactScore, adjudicate: impactAdjudicate,
+        notes: "the capture boundary from the start point (1.70294, not the page's 1.73), a miss's closest approach against " +
+               "the (E, L) pericentre, a hit's speed at the radius reached against energy conservation; tolerance " +
+               "0.05 * dt * 2, derived from a dt sweep whose floor is the once-per-step sampling of the closest approach.",
+    });
+    registerProposer({
+        id: "hologram-sep", instrument: "hologram", knobs: ["sep"],
+        propose: holoPropose, score: holoScore, adjudicate: holoAdjudicate,
+        notes: "the separation read back from the scene's own screen scan through recoverSeparation; tolerance = two " +
+               "pitches over the expected spacing; refuses below sep = 10, where fewer than three bright fringes fit the " +
+               "+-60 screen and the page's slider (from 8) already sits.",
+    });
+
     registerProposer({
         id: "vib-mode", instrument: "vibrations", knobs: ["mode"],
         propose: vibPropose, score: vibScore, adjudicate: vibAdjudicate,

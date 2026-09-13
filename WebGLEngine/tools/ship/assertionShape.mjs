@@ -270,8 +270,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // whichever lands second. distinctDefinitions holds at 40 for the NINTH round running.
     // v4584 -- RE-TAKEN on the tree merged with main at v4583: one gate (fleetRouting) joined, the same four rows by one.
     // v4585 -- RE-TAKEN: one gate (labHome) joined, the same four rows by one.
-    gates: 1627, usesOk: 1606, definesOk: 1598, importsOk: 0,
-    distinctDefinitions: 40, nameFirst: 1499, condFirst: 91, unknownSignature: 16,
+    // v4586 -- RE-TAKEN: one gate (labKnobs) joined, the same four rows by one.
+    gates: 1628, usesOk: 1607, definesOk: 1599, importsOk: 0,
+    distinctDefinitions: 40, nameFirst: 1500, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

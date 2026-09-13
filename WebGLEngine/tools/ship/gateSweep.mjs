@@ -4870,6 +4870,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "sabotages, all red by name, including a normal taken from a central difference of the samples " +
                  "instead of the bilinear patch the height comes from.",
     }),
+    since232: Object.freeze({
+        at: "v4586", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "physics/labKnobs-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 0.5 s, headless. The twelve lab scenes the triage never saw: labScenes-selfcheck's page parser matched " +
+                 "only two-space unquoted keys, so 'every scene has a triage row' held over 13 of 25; widened, re-pinned, and twelve " +
+                 "rows written. Four registered with adjudicators that refuse on their own subject (apsidalKnob's black-hole and " +
+                 "neutron-star: the apsidal advance, integration against quadrature, modulo a turn; impactKnob: the capture boundary " +
+                 "from the start point with the pericentre and speed laws either side; hologramKnob: the separation read back from " +
+                 "the fringes), eight refused, plasma and pendulum-wave on a measurement. Three of the page's status lines found wrong. " +
+                 "Sabotages red at A / B / C / D / E; B and D crashed the first draft and report now.",
+    }),
     since231: Object.freeze({
         at: "v4585", swept: 1, green: 1, red: 0,
         added: Object.freeze([

@@ -25,7 +25,11 @@ const PAGE = fs.readFileSync(path.join(ENG, "physics-lab.html"), "utf8");
 const BODY = PAGE.slice(PAGE.indexOf("const SCENES = {"));
 const pageScenes = new Map();
 {
-    const re = /\n  ([a-zA-Z0-9_]+): \{[\s\S]*?params: \[([\s\S]*?)\],\n/g;
+    // v4586 -- *** THE PARSER SAW 13 OF 25 SCENES, AND "EVERY SCENE ON THE PAGE HAS A TRIAGE ROW" HELD OVER THE 13. ***
+    // It matched two-space, unquoted keys (`  balloon: {`); every scene added after v3587 is four-space and quoted
+    // (`    "black-hole": {`), so twelve scenes were invisible to the check that exists to notice a scene nobody triaged.
+    // Widened to both forms; the pin below moved 13 -> 25 and twelve rows were written to satisfy the check it now makes.
+    const re = /\n {2,4}"?([a-zA-Z0-9_-]+)"?: \{[\s\S]*?params: \[([\s\S]*?)\],\n/g;
     let m;
     while ((m = re.exec(BODY))) pageScenes.set(m[1], [...m[2].matchAll(/name: "([^"]+)"/g)].map((x) => x[1]));
 }
@@ -80,7 +84,7 @@ console.log("\n2. *** THE KNOB NAMES ARE THE PAGE'S, AND NINE OF TWELVE WERE NOT
         "says e -- typed from the LABELS. A claim about provenance is a claim like any other, and that one was " +
         "false in the same paragraph that made it.");
     ok("!! ...and this check parses the page rather than restating the table",
-        pageScenes.size === 13 && [...pageScenes.values()].every((v) => v.length > 0),   // v4527: 12 -> 13, the race scene (Racing city 4)
+        pageScenes.size === 25 && [...pageScenes.values()].every((v) => v.length > 0),   // v4527: 12 -> 13, the race scene (Racing city 4); v4586: 13 -> 25, the parser widened to the quoted, four-space scenes
         "the scene ids and their params come out of physics-lab.html's own SCENES object. A gate holding its " +
         "own copy of the knob names would agree with the table by construction and catch nothing.");
     ok("every scene on the page has a triage row",

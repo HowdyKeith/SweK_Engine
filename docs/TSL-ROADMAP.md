@@ -1647,10 +1647,11 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         telemetry's own times now; and the routed row dropped the request's payload, so the first routed episode ran
         with no policy at all. NOT BUILT, said plainly: a peer that executes a routed request (the brains post solves;
         none accepts an episode); the ledger surviving a bridge restart; the activity ring learning a fourth kind
-        (brainTrail's census names three, and this round leaves it so). FOUND AND LEFT, said plainly: tools/ship/brainTrail-selfcheck.mjs
-        is red on this branch BEFORE this round -- its section 4 holds that physics/instruments.mjs has zero brain entries, and
-        the brain-kernels instrument (registered by an earlier sidebar round) is one; the gate runs in 3.4 s, over the quick
-        sweep's budget, so no sweep has named it. Its premise is stale, not its subject; re-founding that check is its own round.
+        (brainTrail's census names three, and this round leaves it so). FOUND, AND RESOLVED BY THE MERGE: tools/ship/brainTrail-selfcheck.mjs was
+        red on this branch before this round -- its section 4 held that physics/instruments.mjs has zero brain entries, and
+        brain-kernels (an earlier sidebar round) is one; over the quick sweep's budget, no sweep named it. main's v4565 had
+        already re-founded that check at the property the links depend on (no brain entry carries a PAGE), and the merge at
+        v4584 brought it: the gate is green on the merged tree, measured at v4586, and needed no round of its own.
      Then (v4585) THE PHYSICS LAB'S FRONT DOOR. lab-home.html is a plain landing page anyone can open, in three bands:
         THE DOOR -- one Initiate button and one sentence under it saying what pressing it runs right now (the first
         registered scene, its proposer and knob, and that it PROPOSES and never applies); THE LIVE STRIP -- a 2D view in
@@ -1677,6 +1678,39 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         no gate had held the presets to anything, and this one is the first. NOT BUILT, said plainly: the triage of
         those 12 scenes (a judgement per scene, each its own round); a live strip that polls while a run is in flight
         (the route answers once, when the run is done); the door on a page without the server (it says so instead).
+     Then (v4586) THE TWELVE SCENES THE TRIAGE NEVER SAW. labScenes-selfcheck's page parser matched two-space, unquoted
+        scene keys, and every scene added after v3587 is four-space and quoted, so "every scene on the page has a triage
+        row" held over 13 of 25 scenes -- the check that exists to notice an untriaged scene could not see the twelve
+        that were. The parser is widened (13 -> 25 pinned) and the twelve rows written, each MEASURED where a measurement
+        exists: FOUR REGISTERED, with adjudicators that refuse a well-formed value on their own subject and preferences
+        the adjudicator overrules (knobRegistry's bar: every greedy pick refused). black-hole and neutron-star
+        (physics/apsidalKnob.mjs): the apsidal advance per radial period, the time integration's apoapsis-to-apoapsis
+        angle against the radial quadrature of the same Paczynski-Wiita potential from the launch's (E, L), modulo a
+        turn, agreeing to parts per million with a tolerance derived from the apoapsis detector's once-per-step sampling
+        (a dt sweep at r0 = 10 reads a floor of 1e-6, not a slope); refused: r0 = 4 UNBOUND at 1.05 x circular speed, and
+        a neutron-star start inside the surface. impact (physics/impactKnob.mjs): the capture boundary FROM THE START
+        POINT, sqrt(2.9) = 1.70294, bisected at 1.70301 by the integration, with the (E, L) pericentre grading a miss and
+        energy conservation at the radius reached grading a hit (residuals 1e-4, flat in dt); refused: an aim inside the
+        boundary's dt-resolution as undecidable. hologram (physics/hologramKnob.mjs): the separation read back from the
+        scene's own screen scan, under a bound derived from the 0.502 pitch; refused: sep < 10, where fewer than three
+        bright fringes fit the screen. EIGHT REFUSED, two on a measurement: plasma's mirror-point law is 5-11 % off at a
+        gyroradius one fifth of the bottle and IDENTICAL across four dt (7.26e-2), so the residual is the adiabatic
+        approximation and a tolerance wide enough to pass is a control that cannot fail; pendulum-wave re-syncs to 1e-13
+        at t = cycle for every k, exact by construction and deaf to the knob. Six on structure: figure-eight (a trail
+        length), solar-system (a planet count), white-dwarf (the scene evaluates the relation it would be graded on),
+        star-catalog (a view blend), distributed-render (equal at every peer count by determinism), render-cluster (the
+        knob is the setpoint the coordinator recovers). *** THREE OF THE PAGE'S OWN STATUS LINES ARE WRONG, MEASURED: ***
+        the black hole's and neutron star's "below the ISCO" describe a circular orbit's stability, not this launch, which
+        never plunges (rMin = r0 down to 5) and escapes below r0 ~ 4.6; the impact's capture radius prints 1.73 because it
+        hands the launch speed at r0 = 20 to the formula as the speed at infinity, and b = 1.71 MISSES where 1.73 says
+        capture; the hologram's slider opens at 8, inside the unreadable region, and the plasma's "IN THE LOSS CONE --
+        escaping" names a cone a bottle whose field grows without bound does not have (every run reflected). Said here and
+        in the rows; the page's prose is not rewritten this round. The near-circular precession formula was tried first
+        and is 90 degrees off at r0 = 6 (130 against 220): the launch is eccentric, and the exact quadrature is the key.
+        Sabotages on physics/labKnobs-selfcheck.mjs red at A / B / C / D / E, and TWO CRASHED THE FIRST DRAFT (a detail
+        string on a residual a refused row does not carry; a run on a proposer the sabotage removed) -- both report now.
+        The door: 25 triaged, 9 registered, 26 buttons of which 9 are enabled. brainTrail (task 76) needed no round: main's
+        v4565 had already re-founded its check and the v4584 merge carried it; measured green and recorded above.
 ## The count that says when step 4 matters
 
 tools/ship/shaderCensus-selfcheck.mjs has held, since v3274, that a hand-written pair is cheaper than an

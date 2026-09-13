@@ -10,6 +10,9 @@
 // every line to the records it came from. Then it smokes the page in the harness's browser, where no bridge answers,
 // and reads that the page says so rather than inventing a registry.
 //
+// v4586 -- the 12 untriaged scenes named below were triaged that round (physics/labScenes.mjs), four of them registered
+// (black-hole, neutron-star, impact, hologram), so section A's "untriaged" check is now vacuous by design and the door
+// shows 25 triaged and 9 registered; the finding stands as the history of why the check exists.
 // FOUND WHILE BUILDING IT: physics/labPresets.js's header says physicsLab-selfcheck.mjs runs each preset; no gate in the
 // tree imports labPresets (there is no physicsLab-selfcheck.mjs). This gate is the first to hold the presets to the
 // scene triage, and it found every curated preset naming a triaged scene and NONE naming the race, which is why the

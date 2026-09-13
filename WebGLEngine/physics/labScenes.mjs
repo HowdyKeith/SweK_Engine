@@ -151,6 +151,85 @@ export const SCENE_TRIAGE = [
     // parameter. The page's race scene steps physics/raceCar.mjs's car on box3d with brain/drivePolicy.mjs's hand policy
     // at the chosen speed gain, drawn as a schematic (the centreline, the checkpoints, the car and its trail); the
     // adjudication is physics/raceKnob.mjs's and runs in node through the bridge, NOT in real time.
+    // v4586 -- THE TWELVE SCENES THE TRIAGE NEVER SAW. labScenes-selfcheck's page parser matched only two-space, unquoted scene
+    // keys, and every scene added after v3587 is four-space and quoted, so "every scene on the page has a triage row" held
+    // over 13 of 25 scenes. The parser is widened this round and these rows are what it then demanded. Each is MEASURED
+    // where a measurement exists (physics/apsidalKnob.mjs, impactKnob.mjs, hologramKnob.mjs, and the probes recorded on
+    // the refused rows) and ASSESSED where the refusal is structural.
+    { scene: "pendulum-wave", knob: "k", instrument: null, eligible: "refused", provenance: PROVENANCE.MEASURED, responds: "no",
+      key: null,
+      reason: "THE RE-SYNC IS EXACT BY CONSTRUCTION AND DEAF TO THE KNOB. pendulumWave.js rotates each (theta, v) through " +
+              "omega dt exactly, with omega = 2 pi (k + n) / cycle, so every pendulum returns to phase at t = cycle whatever k: " +
+              "the spread at t = 60 reads 1.13e-13, 1.12e-13, 1.18e-13 at k = 12, 20, 34, and the half-cycle fold reads " +
+              "0.6400 (2 x amp) at all three. k sets the pattern's fineness, and no closed form the scene does not itself " +
+              "evaluate says which fineness is right -- balloon's objection (agrees by construction) and orbit's (deaf) at once." },
+    { scene: "figure-eight", knob: "trail", instrument: "figure-eight", eligible: "refused", provenance: PROVENANCE.ASSESSED, responds: "n/a",
+      key: null,
+      reason: "the knob is the TRAIL LENGTH, a rendering count of past positions; the choreography's period (FIG8_PERIOD) is " +
+              "the instrument's own key and does not depend on how much of the path is drawn. A knob nothing physical " +
+              "responds to has no independent measurable a search could be right or wrong about." },
+    { scene: "black-hole", knob: "r0", instrument: "black-hole", eligible: "candidate", provenance: PROVENANCE.MEASURED, responds: "yes",
+      key: "THE APSIDAL ADVANCE PER RADIAL PERIOD: the mean apoapsis-to-apoapsis angle of the Paczynski-Wiita integration " +
+           "equals the radial quadrature of the same potential from the launch's (E, L), modulo a turn -- 243.175 vs 243.176 " +
+           "deg at r0 = 5, 106.373 vs 106.373 at r0 = 10, parts per million, with a tolerance derived from the apoapsis " +
+           "detector's once-per-step sampling. *** THE PAGE'S OWN 'BELOW THE ISCO' LINE IS NOT THE KEY: at 1.05 x circular " +
+           "speed nothing plunges (rMin = r0 down to 5), and below r0 ~ 4.6 the launch is UNBOUND and escapes; the " +
+           "near-circular closed form is 90 degrees wrong at r0 = 6 (130 against 220) because the launch is eccentric. *** Registered: bh-start-radius." },
+    { scene: "solar-system", knob: "planets", instrument: null, eligible: "refused", provenance: PROVENANCE.ASSESSED, responds: "n/a",
+      key: null,
+      reason: "the knob is HOW MANY of the real planets are dropped into the N-body engine; Kepler's third law holds for each " +
+              "planet's own (a, T) whatever the count, so the observable is deaf to the knob -- orbit's REAL-BUT-DEAF shape, " +
+              "and this time the key is real but the knob is not a physical one." },
+    { scene: "neutron-star", knob: "r0", instrument: "neutron-star", eligible: "candidate", provenance: PROVENANCE.MEASURED, responds: "yes",
+      key: "THE SAME APSIDAL ADVANCE under the same potential at 1.02 x circular speed, with the canonical 1.4 M_sun, 11 km " +
+           "star's surface at 5.321 (rs = 2 units) as the impact boundary: 346.321 vs 346.320 deg at r0 = 6, and at r0 = 5.4 " +
+           "the exact advance is 380.000 deg per radial period, read by the detector as 19.999 -- equal modulo a full turn. " +
+           "The surface lies BELOW the page's slider minimum of 5.4, so nothing on the slider impacts; the proposer offers " +
+           "r0 = 5 so the refusal branch runs. Registered: ns-start-radius." },
+    { scene: "white-dwarf", knob: "mass", instrument: "white-dwarf", eligible: "refused", provenance: PROVENANCE.ASSESSED, responds: "identity",
+      key: null,
+      reason: "the scene EVALUATES the mass-radius relation (whiteDwarf.radiusSolar, R ~ M^-1/3 up to the Chandrasekhar mass) " +
+              "and draws it; a key that recovers the exponent from the drawn radii recovers the formula the scene computed " +
+              "from -- balloon's AGREES BY CONSTRUCTION. The instrument's own gate holds the relation to its sources; a knob " +
+              "search over the mass has nothing independent to be wrong about." },
+    { scene: "plasma", knob: "vpar", instrument: null, eligible: "refused", provenance: PROVENANCE.MEASURED, responds: "yes",
+      key: null,
+      reason: "ATTEMPTED AND WITHDRAWN ON A MEASUREMENT. The closed form is the mirror point of the first adiabatic " +
+              "invariant, z_m = L vpar / vperp for Bz = B0 (1 + z^2/L^2): the Boris integration's zMax reads 0.947, 1.855, 3.321, " +
+              "4.436, 7.106 against 1.0, 2.0, 3.0, 5.0, 8.0 at vpar = 0.2, 0.4, 0.6, 1.0, 1.6 -- 5 to 11 % off, and IDENTICAL " +
+              "at dt = 0.04, 0.02, 0.01, 0.005 (7.26e-2 at every one), so the residual is the adiabatic approximation at a " +
+              "gyroradius one fifth of the bottle (vperp = 1, B0 = 1, L = 5), not the integrator. A tolerance wide enough to " +
+              "pass is a control that cannot fail; one tight enough to mean anything refuses every candidate. Also found: the " +
+              "page's status calls zMax > L 'IN THE LOSS CONE -- escaping', and this bottle's field grows without bound, so " +
+              "every run reflected (4 reflections at vpar = 1.2 and 1.6); there is no loss cone in it." },
+    { scene: "impact", knob: "b", instrument: "impact", eligible: "candidate", provenance: PROVENANCE.MEASURED, responds: "yes",
+      key: "THE CAPTURE BOUNDARY FROM THE START POINT, b_c = R sqrt(v0^2 + 2GM/R - 2GM/r0)/v0 = 1.70294, bisected at 1.70301 " +
+           "by the integration; either side of it a closed form of the launch's exact invariants -- a miss's closest approach " +
+           "is the (E, L) pericentre (1.0064 vs 1.0063 at b = 1.71), a hit's speed at the radius reached is energy " +
+           "conservation's (residual 1.5e-4) -- with the tolerance derived from dt. *** THE PAGE PRINTS 1.73: it hands the " +
+           "launch speed at r0 = 20 to criticalImpactParameter as the speed at infinity, and an adjudicator built on that " +
+           "line would refuse a correct flyby at b = 1.71. *** Registered: impact-aim." },
+    { scene: "star-catalog", knob: "depth", instrument: null, eligible: "refused", provenance: PROVENANCE.ASSESSED, responds: "n/a",
+      key: null,
+      reason: "the knob blends the view between a flat sky and the recorded distances; the data are a baked catalog (ev/" +
+              "starCatalog.js, gated on its own records) and the blend is a camera, not a measurement. splat-lab's refusal " +
+              "applies: a visual comparison no knob search can adjudicate headlessly." },
+    { scene: "distributed-render", knob: "peers", instrument: null, eligible: "refused", provenance: PROVENANCE.ASSESSED, responds: "identity",
+      key: null,
+      reason: "the frame split across N peers equals the whole frame BY DETERMINISM for every N -- that equality is " +
+              "tools/render/render.js's own gate, and it holds identically at 1 peer and at 8. A key that is true at every " +
+              "knob value cannot say no to any of them: balloon's shape, on a rendering knob." },
+    { scene: "render-cluster", knob: "faulty", instrument: null, eligible: "refused", provenance: PROVENANCE.ASSESSED, responds: "identity",
+      key: null,
+      reason: "the knob NAMES the faulty peer and the coordinator's job is to recover exactly that index by recomputing each " +
+              "band -- so the key is the setpoint, and an adjudicator would grade the scene against its own input. " +
+              "renderCluster.js's gate already holds the recovery; a knob search has nothing to add." },
+    { scene: "hologram", knob: "sep", instrument: "hologram", eligible: "candidate", provenance: PROVENANCE.MEASURED, responds: "yes",
+      key: "THE SEPARATION READ BACK FROM THE FRINGES: spacing = lambda D / sep, so hologram.recoverSeparation over the " +
+           "scene's own screen scan must return the knob -- 10.008 / 10, 20.017 / 20, 59.835 / 60, every residual under a " +
+           "bound derived from the screen's pitch. It refuses below sep = 10, where fewer than three bright fringes fit the " +
+           "+-60 screen (one at sep = 4, 6 and 8) and no spacing can be read -- *** and the page's slider starts at 8, inside " +
+           "that region. *** Registered: hologram-sep." },
     { scene: "race", knob: "speedGain", instrument: "drive-policy", eligible: "candidate", provenance: PROVENANCE.MEASURED, responds: "yes",
       key: "A LAP ON A TRACK THE SCORE NEVER SAW: the score is metres in 30 s on seed 1 and the key is 90 s on seeds 2 " +
            "and 3 -- a lap inside 80 s with at most 1% of wheel samples off the asphalt -- so a driver that memorised " +
