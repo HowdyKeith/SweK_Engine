@@ -46,9 +46,15 @@
 // not on the ray.
 //
 // Distinguishing them needs the swept volume of the body against the triangles it would pass through, which
-// is backlog piece (2), CAPSULE AGAINST TRIANGLES, still open. *** PIECE (3) CANNOT BE HONESTLY CLOSED WHILE
-// PIECE (2) IS OPEN, *** and this module exists to hold that measurement so the next person to reach for the
-// obvious fix meets the pillar before the merge does.
+// is backlog piece (2), CAPSULE AGAINST TRIANGLES. *** PIECE (3) COULD NOT BE HONESTLY CLOSED WHILE PIECE (2)
+// WAS OPEN, *** and this module existed to hold that measurement so the next person to reach for the obvious
+// fix would meet the pillar before the merge did.
+//
+// *** BOTH HAVE SHIPPED: piece (2) at v4541 (physics/character/capsuleMove.mjs) and piece (3) at v4543
+// (physics/character/capsuleGround.mjs), which casts from the body for a candidate and asks the capsule
+// whether this body could stand there. *** The proof below is no longer a blocker. It is kept, and re-derived
+// on every run, because it is the REASON the repair had to be a swept volume rather than a cleverer ray --
+// and because a reader who deletes it and reaches for the obvious fix will still walk through the pillar.
 //
 // ---- TWO MORE THINGS THE ENTRY GETS WRONG --------------------------------------------------------------
 //
@@ -160,7 +166,12 @@ export function walkEast(bvh, oracle, { start = [2, 0, 10], frames = 400, bodyAw
 }
 
 /**
- * *** RE-DERIVED BY tools/ship/groundProbe-selfcheck.mjs ON EVERY RUN. *** Readings of this tree at v4539.
+ * *** RE-DERIVED BY tools/ship/groundProbe-selfcheck.mjs ON EVERY RUN, AND THAT SENTENCE WAS FALSE OF SIX OF
+ * THESE THIRTEEN FIELDS UNTIL v4543. *** roofY, stepTestFires, meshGroundShippingCallers,
+ * standingTeleportWas, standingTeleportNow and settlingKept were read by NOTHING in the tree -- they could
+ * have been set to any value at all and nothing would have gone red -- under a header claiming otherwise.
+ * Found by grepping the tree for each field name rather than trusting this comment, which is
+ * frozenRecords-selfcheck's own thesis arriving in a file that cites it. All thirteen are read now.
  */
 export const PROBE_AT_V4539 = Object.freeze({
     bridgeShippedX: 8,          // an overhang reads as a wall

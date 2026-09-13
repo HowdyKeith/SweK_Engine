@@ -288,8 +288,11 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // physics/character/capsuleMove.mjs, a MODULE, and it moves none of these, which is the distinction
     // these nine rows exist to make. distinctDefinitions holds at 40 for the twelfth round running: the new
     // gate reuses the ok(name, cond, detail) spelling already counted rather than inventing a forty-first.
-    gates: 1631, usesOk: 1610, definesOk: 1602, importsOk: 0,
-    distinctDefinitions: 40, nameFirst: 1503, condFirst: 91, unknownSignature: 16,
+    // v4543 -- RE-TAKEN for tools/ship/capsuleGround-selfcheck.mjs: 1631 -> 1632 and the three rows that
+    // follow a gate by one. The round's second new file is physics/character/capsuleGround.mjs, a MODULE,
+    // and it moves none of these. distinctDefinitions holds at 40 for the thirteenth round running.
+    gates: 1632, usesOk: 1611, definesOk: 1603, importsOk: 0,
+    distinctDefinitions: 40, nameFirst: 1504, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

@@ -22,7 +22,11 @@
 //      exact reason the comment said it would stall. Only a nudge large enough to
 //      step PAST the next surface breaks it. Third time this session a justification
 //      of mine has failed its own sabotage, and the sabotage is how I found out.
-//   D  the pillar built shorter than the roof                            RED, sections 3 and 5 (columns differ)
+//   D  the pillar built shorter than the roof                            RED, sections 3 and 6 (columns differ)
+//      -- *** THE REFERENCE READ "3 AND 5" UNTIL v4543 AND HAD BEEN WRONG SINCE v4540, ***
+//      which inserted a section and renumbered the file under a log nobody re-ran. Re-driven
+//      at v4543: D reddens 3 and 6, B reddens 3 alone. A sabotage log is a MEASUREMENT and
+//      goes stale exactly like any other; this one was found by a reader that re-ran them.
 //
 //   E  the v4540 standing-branch fix reverted                            4 RED, all of section 5
 //   F  the teleport "fixed" by never snapping at all                     2 RED, and the TELEPORT row still
@@ -39,7 +43,11 @@
 // body-aware; the row is gone, replaced by a one-row check that the defect is closed, and the behaviour of
 // the repaired function is gated where it belongs, in world/surfaceProbe-selfcheck.mjs sections 8 to 12.
 "use strict";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import * as GP from "../../physics/character/groundProbe.mjs";
+const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 import { standHeightAt } from "../../world/surfaceProbe.mjs";
 const PROBE = GP.PROBE_AT_V4539;
 import { meshGround as NM_meshGround, stepTerrain } from "../../physics/character/terrainWalk.mjs";
@@ -107,7 +115,9 @@ console.log("\n3. *** WHY NO DOWNWARD RULE CAN DO BETTER: THE TWO WORLDS ARE THE
         "them: not one cast, not two, not the all-hits query a richer oracle would offer. Telling them apart " +
         "needs the swept volume of the BODY against the triangles it would pass through, which is backlog " +
         "piece (2) CAPSULE AGAINST TRIANGLES and is still open. *** PIECE (3) CANNOT BE HONESTLY CLOSED " +
-        "WHILE PIECE (2) IS OPEN, AND THIS ROW IS THE PROOF RATHER THAN THE OPINION. ***");
+        "WHILE PIECE (2) WAS OPEN, AND THIS ROW IS THE PROOF RATHER THAN THE OPINION. *** Piece (2) " +
+        "shipped at v4541 and piece (3) at v4543, so what this row proves is no longer a blocker -- it is " +
+        "the REASON the repair had to be a capsule, and it is kept for that.");
     // *** THE FIRST DRAFT OF THIS ROW COULD NOT BE DRIVEN, AND FINDING THAT OUT IS WORTH THE PARAGRAPH. ***
     // It asserted "the pillar really is solid, so the identity is not an artefact of a missing face" by
     // checking the column again -- and sabotage B, deleting one of the pillar's side quads, went 0 RED.
@@ -219,6 +229,57 @@ console.log("\n6. *** THE RECORD, RE-DERIVED ***");
         "/" + pl.fixed.toFixed(0) + ", columns identical " + cols + " -- against a record of " +
         R.bridgeShippedX + "/" + R.bridgeFixedX + ", " + R.pillarShippedX + "/" + R.pillarFixedX + ", " +
         R.columnsIdentical);
+
+    // *** SIX OF THIS RECORD'S THIRTEEN FIELDS WERE READ BY NOTHING, UNDER A HEADER SAYING THEY WERE
+    // "RE-DERIVED ON EVERY RUN". *** Found at v4543 by a reader that grepped the tree for each field name
+    // rather than trusting the sentence above the record. That is frozenRecords-selfcheck's whole thesis
+    // arriving inside a file that quotes it: a version-stamped frozen number is load-bearing exactly when
+    // changing it turns something red, and these six could be set to anything at all.
+    const roofY = NM_meshGround(bridge)(12, 10);
+    const roofNormal = roofY.n[1];
+    const slopePasses = roofNormal >= Math.cos(45 * Math.PI / 180) - 1e-12;
+    // *** COUNTED BY IMPORT AND NOT BY MENTION, because the first draft of this row counted 4 -- three of
+    // them this round's own changelog prose in main.js and brain/brain.js, which name the function in
+    // English. A census that cannot tell a caller from a sentence is the defect corpusFilters was built for.
+    const callers = (() => {
+        const walk = (d, out = []) => {
+            for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+                if (e.name === "node_modules" || e.name === "vendor" || e.name.startsWith(".")) continue;
+                const q = path.join(d, e.name);
+                if (e.isDirectory()) walk(q, out);
+                else if (/\.(mjs|js)$/.test(e.name)) out.push(q);
+            }
+            return out;
+        };
+        return walk(ENG).filter((f) => {
+            if (/-selfcheck\.mjs$/.test(f)) return false;                      // gates are not consumers
+            if (/groundProbe\.mjs$|capsuleGround\.mjs$|terrainWalk\.mjs$/.test(f)) return false; // fixtures and the definition
+            const src = fs.readFileSync(f, "utf8");
+            return /import\s*\{[^}]*\bmeshGround\b[^}]*\}\s*from/.test(src);
+        }).length;
+    })();
+    // the teleport was measured UNDER the roof, where the oracle names y=5; settling is on OPEN floor,
+    // where it names y=0 -- two different columns of the same fixture, and mixing them was the first
+    // draft's other mistake.
+    const g = NM_meshGround(bridge);
+    const step = (pos) => stepTerrain({ pos, ground: g, wish: [0, 0], dt: 1 / 60, speed: 5,
+                                        stepHeight: 0.5, snapDown: 0.5 });
+    const underRoof = step([12, 0, 10]);                       // the v4540 teleport column
+    const settles = step([2, R.settlingKept, 10]);             // open floor, 0.3 up
+    const doesNot = step([2, 0.6, 10]);                        // open floor, 0.6 up
+    ok("!! *** AND THE OTHER SIX FIELDS ARE READ HERE, BECAUSE UNTIL v4543 NOTHING READ THEM AT ALL ***",
+        roofY.y === R.roofY && slopePasses === R.stepTestFires && callers === R.meshGroundShippingCallers &&
+        underRoof.pos[1] === R.standingTeleportNow && settles.pos[1] === 0 && doesNot.pos[1] === 0.6 &&
+        R.standingTeleportWas === R.roofY,
+        "roofY " + roofY.y + "; the roof's normal is " + roofNormal.toFixed(4) + ", so the SLOPE test PASSES " +
+        "and it is the STEP test that refuses -- which is what stepTestFires records, and it is the " +
+        "correction v4539 made to the backlog entry's own wording; meshGround is IMPORTED by " + callers +
+        " file(s) outside gates, fixtures and its own definition; a body standing still under the roof stays " +
+        "at " + underRoof.pos[1] + " where v4540 found it lifted to " + R.standingTeleportWas + "; and on " +
+        "open floor a body " + R.settlingKept + " up still settles to " + settles.pos[1] + " while one 0.6 up " +
+        "stays at " + doesNot.pos[1] + ". *** standingTeleportWas IS THE ROOF HEIGHT AND THAT IS ASSERTED " +
+        "RATHER THAN LEFT AS A COINCIDENCE: *** the teleport was exactly the " +
+        "distance to the surface the oracle named.");
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +

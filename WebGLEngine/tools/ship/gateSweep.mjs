@@ -3849,6 +3849,37 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // object keys of the same name, the later one wins silently and the earlier round's swept count vanishes
     // from the surplus arithmetic. FIFTH ORDINAL COLLISION between the two lines this session; the side that
     // merges second is the side that moves.
+    since236: Object.freeze({
+        at: "v4543", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/capsuleGround-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly: 13 pass, 327-351 ms over three runs. Backlog " +
+                 "terrain-controller piece (3), the ground that is not a function of (x, z). *** THE " +
+                 "SHIPPED ADAPTER ANSWERS x = 8.000 FOR FIVE DIFFERENT WORLDS *** -- a bridge you fit " +
+                 "under, a pillar you do not, a roof at 1.8 that clears a 1.8 body, a roof at 1.7 that does " +
+                 "not, and a solid wall -- and on a sixth, a doorway whose jamb the body clips, it walks the " +
+                 "body THROUGH to x = 20. One number for five worlds is not caution. The body-aware oracle " +
+                 "gives five different answers and the sixth is 7.583. *** SIX FORMULATIONS WERE BUILT AND " +
+                 "FIVE DIED TO A FIXTURE THE ONE BEFORE IT DID NOT HAVE, *** which is the round's real " +
+                 "content and is written into the module header: cast-from-the-body walks through the " +
+                 "pillar because the ray STARTS INSIDE the stone; refuse-on-any-contact refuses every ramp, " +
+                 "because a capsule placed at a surface point cuts any slope; refuse-on-sideways-push and " +
+                 "refuse-on-depth both fail because the ranges OVERLAP (a 45-degree ramp displaces 0.0828 " +
+                 "and penetrates 0.1172, a wall displaces 0.1 to 0.3 and a roof 0.1 too low penetrates " +
+                 "0.1000); and falling back to the sky when obstructed walks a body through a DOORFRAME, " +
+                 "because a refusal answered by the oracle it just refused is not a refusal. The sixth " +
+                 "classified every contact and a 26.6-degree ramp then refused ITSELF at x = 13.597, at its " +
+                 "own tessellation seam -- v4541's internal-edge artefact arriving from the other side, and " +
+                 "its conclusion, deepest-first, holds for CLASSIFYING as it did for RESOLVING. What ships " +
+                 "classifies the deepest contact by DIRECTION against stepTerrain's own slope limit. Seven " +
+                 "sabotages, none crashing: A 8 RED, B 8, C 3, D 8, E 1, F 1, G 2 -- and TWO PREDICTIONS " +
+                 "WERE WRONG IN THE SAME DIRECTION, B and D predicted at 2 and 1 and measured at 8 apiece, " +
+                 "because neither defect fails narrowly once the descend loop is load-bearing. NOT CLAIMED: " +
+                 "step-up, which neither this nor capsuleMove does -- both stop a 0.4 body at x = 7.6 " +
+                 "before a 0.4 riser, independently, and a riser of 0.2 IS mounted by capsuleMove's bottom " +
+                 "sphere; and containment, because `contacts` is a SURFACE query and a body fits inside a " +
+                 "wall thicker than its own diameter (0.79 blocked, 0.80 clear, and 0.80 is 2r).",
+    }),
     since235: Object.freeze({
         at: "v4541", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/capsuleMove-selfcheck.mjs"]),

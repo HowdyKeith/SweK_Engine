@@ -271,6 +271,10 @@ export const INSCOPE_ARRIVALS_SINCE_V4435 = Object.freeze([
     Object.freeze({ file: "physics/character/terrainWalk-selfcheck.mjs", at: "v4544",
         why: "its gate, which IMPORTS MeshBVH and trianglesFrom: the round's central cross-check runs a " +
              "bilinear heightfield gradient against a real meshBVH raycast and holds them to 4.8e-14" }),
+    Object.freeze({ file: "physics/character/capsuleGround.mjs", at: "v4543",
+        why: "terrain-controller piece (3). It IMPORTS MeshBVH and trianglesFrom for its own fixtures and " +
+             "asks a BVH, through capsuleMove, whether a body could stand on each surface under a point -- " +
+             "so it carries the term in code and is a USER of the structure rather than one" }),
     Object.freeze({ file: "physics/character/capsuleMove.mjs", at: "v4541",
         why: "terrain-controller piece (2) itself -- the capsule against triangles v4539's fixtures proved " +
              "was the missing instrument. It IMPORTS MeshBVH, trianglesFrom and rayTriangle, and its whole " +
@@ -296,6 +300,10 @@ export const INSCOPE_ARRIVALS_SINCE_V4435 = Object.freeze([
  * is a second list rather than a fudged total.
  */
 export const OUTOFSCOPE_ARRIVALS_SINCE_V4435 = Object.freeze([
+    Object.freeze({ file: "tools/ship/capsuleGround-selfcheck.mjs", at: "v4543",
+        why: "the gate of terrain-controller piece (3). It reaches the ray-triangle BVH in top-level mesh/ " +
+             "through its module and through groundProbe's fixtures, and lives in tools/ship/ where none of " +
+             "the three searched directories can see it" }),
     Object.freeze({ file: "tools/ship/capsuleMove-selfcheck.mjs", at: "v4541",
         why: "the gate of terrain-controller piece (2). It imports MeshBVH directly, to reverse the winding " +
              "of both fixtures and show the resolver's answers are bit-identical either way, and it lives " +
@@ -334,6 +342,7 @@ export const BVH_AT_V4435 = Object.freeze({
         // lands here as the nine before it did. Its MODULE is in physics/ and is named in
         // INSCOPE_ARRIVALS_SINCE_V4435 instead: one file to each list is what a module-plus-gate round looks
         // like against this claim, and the two lists are compared SORTED, so position is not decoration.
+        "tools/ship/capsuleGround-selfcheck.mjs",
         "tools/ship/capsuleMove-selfcheck.mjs",
         "tools/ship/groundProbe-selfcheck.mjs",
         "tools/ship/meshBVH-selfcheck.mjs",

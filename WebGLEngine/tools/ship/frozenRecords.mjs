@@ -489,7 +489,9 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4542 -- RE-TAKEN with `excluding`: 114/53/235 -> 115/54/244. One record, BODY_AWARE_AT_V4542 in
     // world/surfaceProbe.mjs, carrying nine counted fields of its seventeen -- the rest are decimals or a
     // string, which FIELD_RE's `name: <digits>,` does not match.
-    currentIncludingModule: Object.freeze({ records: 115, withFields: 54, fields: 244 }),
+    // v4543 -- RE-TAKEN with `excluding`: 115/54/244 -> 116/55/252. One record, GROUND_AT_V4543 in
+    // physics/character/capsuleGround.mjs, carrying eight counted fields of its twenty-eight.
+    currentIncludingModule: Object.freeze({ records: 116, withFields: 55, fields: 252 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -569,7 +571,8 @@ export const PROBE_AT_V4536 = Object.freeze({
     // does not move -- the mirror image of the re-take above it, where fields moved and records did not.
     // v4541 -- RE-TAKEN: 111/50/208 -> 112/51/215, for CAPSULE_AT_V4541 in physics/character/capsuleMove.mjs.
     // v4542 -- RE-TAKEN: 112/51/215 -> 113/52/224, for BODY_AWARE_AT_V4542 in world/surfaceProbe.mjs.
-    excluding: Object.freeze({ records: 113, withFields: 52, fields: 224 }),
+    // v4543 -- RE-TAKEN: 113/52/224 -> 114/53/232, for GROUND_AT_V4543.
+    excluding: Object.freeze({ records: 114, withFields: 53, fields: 232 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,
