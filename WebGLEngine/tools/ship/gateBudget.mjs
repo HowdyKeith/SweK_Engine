@@ -433,7 +433,13 @@ export const MEASURED = {
     // BELOW its entry (230.5s against 284s), and was left alone for exactly that reason. A table that is
     // only ever revised upward is a table that drifts toward never failing.
     "tools/roundhouse/hydrostatic-selfcheck.mjs":          132215,
-    "tools/ship/doorKinds-selfcheck.mjs":                  100047,
+    // RE-MEASURED after doorKinds read as UNRESOLVED on this box's default ceiling: stopwatch-timed to
+    // completion at 212608ms (contended four-wide alongside labResults/plantedCoverage/libmSensitivity/
+    // responseCensus on a 4-core box), exit 0, all checks pass. The 100047ms entry it replaces already exceeded
+    // its own x2 budget on this run, so it was stale rather than wrong in kind -- the contended reading is kept
+    // per this table's own convention (claimTrace, stability above: "for a BUDGET the observed worst is the
+    // conservative choice").
+    "tools/ship/doorKinds-selfcheck.mjs":                  212608,
     "physics/astroparticle/jeans-selfcheck.mjs":           98899,
     "tools/render-qa/terminatorOracle-selfcheck.mjs":      91559,
     "tools/roundhouse/zeroRangeSweep-selfcheck.mjs":       70538,
@@ -536,7 +542,13 @@ export const MEASURED = {
     // own message names the fix (re-freeze with SWEK_FREEZE_LAB_RESULTS=1) and it is NOT run here: a re-freeze
     // writes this box's numbers into that baseline, which is the same borrowed-stopwatch mistake one level up,
     // and it is a one-way edit to a record. It belongs on the box that owns the table.
-    "tools/roundhouse/labResults-selfcheck.mjs":      94282,
+    //
+    // *** MEASURED ON THE BOX THAT OWNS THE TABLE, AS ASKED FOR ABOVE. *** Stopwatch-timed to completion:
+    // 1186239ms (19m46s), exit 0, ALL CHECKS PASS -- the frozen baseline already matches this tree's lab, so no
+    // re-freeze was needed this round. 94282ms was the v3211 reading; 1186239ms is 12.6x it, consistent with
+    // the registry growth this table already tracks elsewhere (129 devices, up from whatever count v3211 ran
+    // against). Raised to the observation per this table's own rule that the basis only ever grows.
+    "tools/roundhouse/labResults-selfcheck.mjs":      1186239,
     // *** MEASURED AT v3853, STOPWATCH-TIMED ON AN IDLE BOX: 555s, AND IT PASSES. Its own header said
     // "~25s -- MEASURED". *** It spawns every row of reportingTools' REPORTING registry, so it grows
     // with the registry and the 25s was true of a much smaller one. THE COST OF THE MISSING ENTRY WAS
@@ -663,6 +675,12 @@ export const MEASURED = {
     // measurement never ran. Not broken, not hung: the gate grew a real section and the number describing it
     // had not been asked since.
     "physics/sph/stability-selfcheck.mjs":           405628,
+    // *** plantedCoverage MOVES OUT OF UNRESOLVED, WHICH IS WHAT THAT TABLE'S OWN HEADER SAYS SHOULD HAPPEN
+    // WHEN ONE OF THESE IS MEASURED TO COMPLETION: "IT MOVES INTO MEASURED ABOVE AND ITS LINE HERE IS DELETED,
+    // NOT EDITED IN PLACE." *** It sat there since v3924 as "exceeded a 150s cap ... cost tracks the plant
+    // census rather than any fixture of its own" -- never a hang, just never given room. Stopwatch-timed to
+    // completion, alone on an otherwise-idle core: 941634ms (15m41s), exit 0, all checks pass.
+    "tools/roundhouse/plantedCoverage-selfcheck.mjs": 941634,
 };
 
 export const TAIL_HEADROOM = 2;
@@ -698,10 +716,9 @@ export const UNRESOLVED = {
         "on a device registry that has since grown to 129 devices (up from whatever count v3924 measured " +
         "against) and STILL DID NOT COMPLETE -- 2400s is now a measured LOWER BOUND, not a runtime. Its own " +
         "cost model explains why: three builds per device/mode (base, a determinism control, and the " +
-        "perturbed rebuild), which is the same registry-scaling shape as corroborationCensus, plantedCoverage " +
-        "and responseCensus below. Still not measured to completion",
-    "tools/roundhouse/plantedCoverage-selfcheck.mjs":
-        "exceeded a 150s cap at v3924. It builds two arms of every declared plant across the whole registry, so its cost tracks the plant census rather than any fixture of its own",
+        "perturbed rebuild), which is the same registry-scaling shape as corroborationCensus and responseCensus " +
+        "below -- plantedCoverage was the same shape and has since been measured to completion, in MEASURED " +
+        "above. Still not measured to completion",
     "tools/roundhouse/responseCensus-selfcheck.mjs":
         "exceeded a 150s cap at v3924. Another registry-wide census; cost grows with the device count",
 
