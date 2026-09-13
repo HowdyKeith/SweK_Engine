@@ -1618,7 +1618,7 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         box stands until the topple); debris that collides (the sandbox's does not either); the brain driving into
         buildings (the ram is a launch); CityGen's crumble side-bite direction, which is Math.random and not the
         seed's (the first impact is deterministic, a later bite's voxels are not); the other scenes' origin record.
-     Then (v4531) THE FLEET BRAIN ROUTING, NAMED. What the gauges called a "fleet brain request" was FOUND FIRST: a
+     Then (v4584) THE FLEET BRAIN ROUTING, NAMED. What the gauges called a "fleet brain request" was FOUND FIRST: a
         brain's POST to ai-bridge/gpuBrainBridge.js (hello, flowfield, learn) landing in its fleet registry as `posts` and
         `solveMsEwma` -- counted and timed, never attributed. server.html's brains dial counted them, brain-fleet.html's
         pool summed their training, report.html's grid showed each peer's version, and brain/agent/fleet.js's learned

@@ -40,6 +40,7 @@
 </div></div>
 
 <script type="module">
+import { STARFIELD_WGSL, OCTAVES } from "/render/starField.mjs";
 // ===== the sim is es-box3d's, verbatim: tactics-policy pilots + Box3D collisions + shots. We only swap the view. =====
 import { spawnEnemies, stepAI, applyDamage } from "/ev/combat.js";
 import { headingVector } from "/ev/flightModel.js";
@@ -208,6 +209,8 @@ struct O { @builtin(position) pos: vec4f, @location(0) uv: vec2f, @location(1) c
 // v2313 -- lensing backdrop: a Schwarzschild black hole ray-traced from the SCENE camera (BH at world origin,
 // disk in the battle plane y=0), drawn behind the ships. Same photon-geodesic core as blackhole.html.
 const BACKDROP_WGSL = `
+${STARFIELD_WGSL}
+
 struct C { eye: vec4f, fwd: vec4f, rgt: vec4f, up: vec4f, prm: vec4f, vp0: vec4f, vp1: vec4f, vp2: vec4f, vp3: vec4f };
 @group(0) @binding(0) var<uniform> c: C;
 @group(0) @binding(1) var samp: sampler;
@@ -216,14 +219,14 @@ struct C { eye: vec4f, fwd: vec4f, rgt: vec4f, up: vec4f, prm: vec4f, vp0: vec4f
 @vertex fn vs(@builtin(vertex_index) vid: u32) -> @builtin(position) vec4f {
   var p = array<vec2f,3>(vec2f(-1.,-1.), vec2f(3.,-1.), vec2f(-1.,3.)); return vec4f(p[vid], 0., 1.);
 }
-fn n3(p: vec3f) -> f32 { return fract(sin(dot(p, vec3f(12.9898, 78.233, 37.719))) * 43758.5453); }
 fn sky(dir: vec3f) -> vec3f {
   let neb = 0.5 + 0.5 * sin(dir.x * 3.1 + dir.z * 2.3 + dir.y * 1.7);
   var col = vec3f(0.015, 0.02, 0.05) * neb;
+  // v4579: render/starField.mjs's starfield, spliced above; the cut stays this page's own knob.
+  let cut = 0.987;
   for (var o = 0; o < 3; o = o + 1) {
-    let sc = 55.0 * pow(2.0, f32(o)); let g = dir * sc; let id = floor(g); let fp = fract(g); let hh = n3(id + f32(o) * 17.0);
-    if (hh > 0.987) { let d = length(fp - vec3f(0.5)); let star = smoothstep(0.55, 0.0, d) * (hh - 0.987) / 0.013;
-      col = col + mix(vec3f(0.7, 0.82, 1.0), vec3f(1.0, 0.9, 0.7), n3(id + 3.0)) * star * 1.2; }
+    let sf = starfield_at(dir, cut, o);
+    if (sf.x > 0.0) { col = col + mix(vec3f(0.7, 0.82, 1.0), vec3f(1.0, 0.9, 0.7), sf.y) * sf.x * 1.2; }
   }
   return col;
 }

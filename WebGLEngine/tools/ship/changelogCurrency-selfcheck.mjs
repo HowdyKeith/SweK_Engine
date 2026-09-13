@@ -25,6 +25,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { readChangelog, namesVersion, newestVersion, CHANGELOG_REL } from "./changelogSource.mjs";
 import { fileURLToPath } from "node:url";
+import VM from "../../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const PROJECT = path.resolve(ENG, "..");
 let fails = 0;
@@ -84,7 +85,7 @@ const names = namesVersion;
 
 // ---- 4. THE LIVE TREE ------------------------------------------------------------------------------------------
 {
-    const v = (fs.readFileSync(path.join(ENG, "main.js"), "utf8").match(/ENGINE_VERSION\s*=\s*"(v\d+)"/) || [])[1];
+    const v = (fs.readFileSync(path.join(ENG, "main.js"), "utf8").match(VM.markerRe("ENGINE_VERSION")) || [])[1];
     // v3964 taught this to SKIP when BACKLOG.md was absent, which was right about the CRASH it replaced (a
     // stack trace says the gate is broken; a red line says which claim broke) and wrong about the remedy. The
     // record is TRACKED now, so absence is a broken tree rather than a clone, and it is reported as one.

@@ -69,10 +69,62 @@ const CHANGED = ["physics/statmech/ising.js"];
        s.reachable.length > 20 && s.reachable.includes("physics/statmech/ising-selfcheck.mjs") &&
        s.reachable.includes("physics/consistency-selfcheck.mjs"),
        s.reachable.length + " gates reachable from " + CHANGED[0] + " (including the consistency board, which imports it two levels down)");
-    const firstBand = s.selected.slice(0, s.reachable.length > s.selected.length ? s.selected.length : Math.min(20, s.reachable.length));
+    // *** THE BAND EXPRESSION CHANGED WHAT THIS ROW ASSERTED AS THE TREE GREW, WHICH IS THE FAULT THE v3941
+    // NOTE TWO SECTIONS DOWN ALREADY DIAGNOSED IN ITS NEIGHBOUR. *** It read:
+    //
+    //     s.selected.slice(0, s.reachable.length > s.selected.length ? s.selected.length : Math.min(20, ...))
+    //
+    // While reachable <= selected that checks the first twenty and says "reachable gates lead the plan". Once
+    // reachable EXCEEDS selected -- 121 against 109 today -- the band silently becomes THE WHOLE PLAN and the
+    // row starts asserting "every selected gate is reachable", which the selector never promised and must not
+    // satisfy. One expression, two different claims, and which one you got depended on the size of the tree.
+    //
+    // MEASURED at v4571, and the numbers settle it in the selector's favour: the plan is 109 gates, positions
+    // 0-97 are reachable and 98-108 are not, 23 reachable gates missed the budget, and the leftover after
+    // packing is 3 ms. The eleven unreachable tail gates cost 44-48 ms EACH. The cheapest of the 23 missed
+    // reachable gates costs 12,518 ms and the dearest 839,022. NOT ONE of them could have taken a tail slot.
+    // The selector filled the last few milliseconds with cheap work instead of leaving them idle, which is
+    // right, and the row called it a scheduling failure.
+    //
+    // SO THE PROPERTY IS STATED STRUCTURALLY AND CANNOT DRIFT WITH THE TREE'S SIZE: the plan is PARTITIONED --
+    // every reachable gate in it comes before every unreachable one -- which is exactly what "a truncated run
+    // still covers the change" needs, and says nothing about how many of either there are.
+    const firstUnreachable = s.selected.findIndex((g) => !s.reachable.includes(g));
+    const cut = firstUnreachable < 0 ? s.selected.length : firstUnreachable;
+    const head = s.selected.slice(0, cut), tail = s.selected.slice(cut);
     ok("!! reachable gates are scheduled FIRST (a truncated run still covers the change)",
-       firstBand.every((g) => s.reachable.includes(g)),
-       "first " + firstBand.length + " selected are all reachable");
+       head.length > 0 && head.every((g) => s.reachable.includes(g)) && tail.every((g) => !s.reachable.includes(g)),
+       "the plan is partitioned at " + cut + " of " + s.selected.length + ": every gate before the cut is " +
+       "reachable and every gate after it is not. TRUNCATE ANYWHERE and you lose unreachable work before you " +
+       "lose any of the change's own coverage, which is the property -- not a count, which moves with the tree");
+
+    // *** AND THE LOAD-BEARING HALF: a reachable gate was dropped because it DID NOT FIT, never because an
+    // unreachable one took its place. *** The partition row above would still pass if the selector packed
+    // cheap unreachable gates and then refused a reachable gate that had room, so the budget arithmetic is
+    // asserted beside it rather than assumed.
+    //
+    // *** THE FIRST DRAFT OF THIS ROW COMPARED THE CHEAPEST MISSED GATE AGAINST THE LEFTOVER BUDGET AND COULD
+    // NOT FAIL. *** Sabotage found it: dropping an 81 ms reachable gate that plainly fitted changed nothing,
+    // because the greedy packer immediately spent the freed 81 ms on something else and the leftover stayed at
+    // 3 ms -- so 81 > 3 held and the row passed while a reachable gate had just been displaced. It tested the
+    // second half of its own sentence not at all.
+    //
+    // The budget a reachable gate could have claimed is the leftover PLUS everything spent on unreachable
+    // work, because that spending is only defensible if no reachable gate wanted it. So: hand back every
+    // millisecond the plan spent on gates the change cannot reach, and ask whether the cheapest missed
+    // reachable gate would fit even then.
+    const costOf = (g) => (s.costs && s.costs[g] != null) ? s.costs[g] : Infinity;
+    const leftover = s.budgetMs - s.spentMs;
+    const onUnreachable = tail.reduce((n, g) => n + costOf(g), 0);
+    const reclaimable = leftover + onUnreachable;
+    const cheapestMissed = s.missedReachable.length ? Math.min(...s.missedReachable.map(costOf)) : Infinity;
+    ok("!! ...and every reachable gate that was dropped was dropped because it DID NOT FIT",
+       s.missedReachable.length === 0 || cheapestMissed > reclaimable,
+       s.missedReachable.length + " reachable gate(s) missed the budget; the cheapest costs " + cheapestMissed +
+       " ms. Reclaim EVERYTHING the plan could have given it -- " + leftover + " ms unspent plus " +
+       Math.round(onUnreachable) + " ms spent on " + tail.length + " gate(s) the change cannot reach = " +
+       Math.round(reclaimable) + " ms -- and it still would not fit. A dropped gate that WOULD have fitted is a " +
+       "scheduling defect; one that would not is arithmetic, and only the first is this row's business");
 }
 
 // ---- 2. THE PATH-CONVENTION REGRESSION, WHICH THIS FILE EXISTS TO PIN ------------------------------------------------

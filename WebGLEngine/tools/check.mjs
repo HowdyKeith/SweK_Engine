@@ -20,6 +20,7 @@ import { readFileSync, writeFileSync, readdirSync, statSync, existsSync, mkdtemp
 import { spawn } from "node:child_process";
 import { join, dirname, relative, extname, basename } from "node:path";
 import { fileURLToPath } from "node:url";
+import { SOURCE_EXT, kindOf } from "./ship/sourceKind.mjs";
 import { tmpdir } from "node:os";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -38,10 +39,27 @@ function walk(dir, out = []) {
     const p = join(dir, name);
     let st; try { st = statSync(p); } catch { continue; }
     if (st.isDirectory()) walk(p, out);
-    else if (extname(p) === ".js") out.push(p);
+    else if (SOURCE.has(extname(p))) out.push(p);
   }
   return out;
 }
+
+// *** THIS GUARD HAD NEVER SEEN A .mjs FILE. ***
+//
+// The walk was `extname(p) === ".js"`, so of 4,143 source files in this tree it checked 1,527: every .js,
+// and NOT the 2,608 .mjs files nor the 7 .cjs ones. Its own line says "1527 files checked" and reads as
+// coverage. Two thirds of the tree, including every module written since this project moved to ES modules,
+// has been outside the syntax guard for as long as it has existed.
+//
+// AND THE COMMONJS SPLIT WAS BY DIRECTORY, which is the second half of the same mistake: `isBridge` calls
+// everything under ai-bridge/ CommonJS, and 56 of the files there are .mjs using import and export. While
+// the walk could not see them that was harmless; the moment it can, a directory rule would hand real ES
+// modules to a script parser. The extension says what a file IS -- .mjs is a module, .cjs is CommonJS --
+// and the directory rule is kept only for .js, where it is the only signal there is.
+// The rule lives in tools/ship/sourceKind.mjs so the gate can drive it without running this script, which
+// spawns a node --check per file and takes 31 s. Two definitions of "what is a source file" is how this
+// tree ended up with a census that could not see CommonJS and a guard that could not see ES modules.
+const SOURCE = new Set(SOURCE_EXT);
 
 // Shaders are GLSL-as-text wrapped in .js — they are NOT real modules; skip.
 const isShader = (p) => /\/shaders\//.test(norm(p)) || /\.(vert|frag|glsl)\.js$/.test(p);
@@ -51,8 +69,11 @@ const inCore   = (p) => { const n = norm(p); return n.endsWith("/main.js") || /\
 let all = walk(ROOT);
 if (CORE) all = all.filter((p) => inCore(p) || isBridge(p));
 const shaders  = all.filter(isShader);
-const modules  = all.filter((p) => !isShader(p) && !isBridge(p));
-const commonjs = all.filter((p) => isBridge(p) && !isShader(p));
+// Extension first, directory second: .mjs is a module and .cjs is CommonJS whatever they sit beside, and
+// the ai-bridge rule decides only the .js files, where nothing else can.
+const isCjs    = (p) => kindOf(p, { bridge: isBridge }) === "commonjs";
+const modules  = all.filter((p) => !isShader(p) && !isCjs(p));
+const commonjs = all.filter((p) => !isShader(p) && isCjs(p));
 
 // ── syntax checks (parallel) ───────────────────────────────────────────────
 const tmp = mkdtempSync(join(tmpdir(), "swek-check-"));

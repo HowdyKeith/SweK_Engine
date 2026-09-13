@@ -58,23 +58,24 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "node:url";
 
+import * as TR from "./treeRead.mjs";
+
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
-const SKIP = new Set(["node_modules", ".git", "vendor", ".claude"]);
+// (the old walker's SKIP set retired with it at v4548 -- see gateFiles below)
 
 /** Every gate in the tree, by the same rule gateSweep uses: `-selfcheck.mjs`, and never a `__` fixture. */
+// v4548 -- filtered out of tools/ship/treeRead.mjs's single cached walk instead of walking again. VERIFIED
+// BEFORE SWITCHING, not assumed: the old walker's 1,602 gates and the filtered tree's 1,602 are the same set
+// AND THE SAME ORDER, zero either way -- which matters because recordDrift-selfcheck picks gateFiles()[0] as
+// its sample gate, so a reordering would have silently changed what that fixture tests. treeRead-selfcheck
+// keeps asserting it. The old rule skipped .git and dot-directories and did NOT skip dist/; the new one is
+// the other way round, and the two agree because no gate lives in either place.
 export function gateFiles(root = ENG) {
-    const out = [];
-    (function walk(d) {
-        let ents; try { ents = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
-        for (const e of ents.sort((a, b) => a.name.localeCompare(b.name))) {
-            if (SKIP.has(e.name) || (e.name.startsWith(".") && e.name !== ".claude")) continue;
-            const p = path.join(d, e.name);
-            if (e.isDirectory()) walk(p);
-            else if (e.name.endsWith("-selfcheck.mjs") && !e.name.startsWith("__")) out.push(p);
-        }
-    })(root);
-    return out;
+    return TR.treePaths(root).filter((p) => {
+        const n = p.split(/[\\/]/).pop();
+        return n.endsWith("-selfcheck.mjs") && !n.startsWith("__");
+    });
 }
 
 export const SIG = Object.freeze({ nameFirst: "nameFirst", condFirst: "condFirst", unknown: "unknown", none: "none" });
@@ -158,7 +159,7 @@ export function census({ root = ENG, files = null } = {}) {
     const suspects = [];
     let usesOk = 0, definesOk = 0, importsOk = 0;
     for (const g of gates) {
-        const src = fs.readFileSync(g, "utf8");
+        const src = TR.textOf(g);   // v4548: out of the shared memo, not a fourth read of the same file
         if (/\bok\s*\(/.test(src)) usesOk++;
         const def = src.match(/^[ \t]*(?:const|let|function)\s+ok\b[^\n]*/m);
         if (def) { definesOk++; const k = def[0].trim().replace(/\s+/g, " "); definitions.set(k, (definitions.get(k) || 0) + 1); }
@@ -199,8 +200,77 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4528 -- RE-TAKEN: one gate (raceReplayBake) joined, and the same four rows moved by one again.
     // v4529 -- RE-TAKEN: one gate (ribbonRoad) joined, the same four rows by one.
     // v4530 -- RE-TAKEN: one gate (crashDamage) joined, the same four rows by one.
-    gates: 1595, usesOk: 1574, definesOk: 1566, importsOk: 0,
-    distinctDefinitions: 38, nameFirst: 1467, condFirst: 91, unknownSignature: 16,
+    // v4536 -- RE-TAKEN: one gate (uvUnwrap) joined, and the same four rows moved by one. Fifth round running
+    // in which a single new gate moves gates/usesOk/definesOk/nameFirst by exactly one and moves nothing else,
+    // which is what makes the other five rows worth keeping: they are the ones that would say a gate arrived
+    // with a DIFFERENT shape, and they have now stayed still across six arrivals.
+    // v4537 -- RE-TAKEN: one gate (uvLscm) joined, the same four rows by one, seventh arrival running.
+    // v4539 -- RE-TAKEN: one gate (splitSum) joined, the same four rows by one, eighth arrival running.
+    // v4543 -- RE-TAKEN: one gate (navmesh) joined, the same four rows by one, NINTH arrival running. The
+    // five rows that have now stayed still across nine consecutive arrivals are the ones carrying the
+    // information: distinctDefinitions, condFirst, unknownSignature, importsOk and suspects would each move
+    // if a gate turned up written in a different shape, and none of them has.
+    // v4544 -- RE-TAKEN: one gate (terrainWalk) joined, the same four rows by one, TENTH arrival running.
+    // v4545 -- RE-TAKEN: one gate (navWiring) joined, the same four rows by one, ELEVENTH arrival running.
+    // v4546 -- RE-TAKEN: one gate (navWiringLive) joined, the same four rows by one, TWELFTH arrival running.
+    // v4547 -- RE-TAKEN: one gate (engineSceneBot) joined, the same four rows by one, THIRTEENTH arrival
+    // running -- and this one is the arrival most likely to have moved the OTHER five, because it is the
+    // first gate in the tree that boots index.html and reads its assertions out of a page rather than out of
+    // a fixture. It did not: it is written in the same shape as the other 1,473.
+    // v4548 -- RE-TAKEN: TWO gates (treeRead, recordReach) joined, the same four rows by TWO, FOURTEENTH
+    // arrival. The round's third new file is tools/ship/recordReach.mjs, a module rather than a gate, and it
+    // moves none of these -- which is the distinction these nine rows exist to make.
+    // v4550 -- RE-TAKEN: one gate (glbConformance) joined, the same four rows by one, FIFTEENTH arrival.
+    // v4552 -- RE-TAKEN: one gate (detourScale) joined, the same four rows by one, SIXTEENTH arrival.
+    // v4554 -- RE-TAKEN: one gate (surfaceProbe) joined, the same four rows by one, SEVENTEENTH arrival.
+    // v4555 -- RE-TAKEN: one gate (chunk) joined, the same four rows by one, EIGHTEENTH arrival.
+    // v4556 -- RE-TAKEN: one gate (versionMarker) joined, the same four rows by one, NINETEENTH arrival.
+    // v4557 -- RE-TAKEN: one gate (ritualCoherence) joined, the same four rows by one, TWENTIETH arrival.
+    // v4559 -- RE-TAKEN: one gate (pipboyItems) joined, the same four rows by one, TWENTY-FIRST arrival.
+    // v4560 -- RE-TAKEN: one gate (xatlasRef) joined, the same four rows by one, TWENTY-SECOND arrival.
+    // v4563 -- RE-TAKEN: one gate (fluidSystem) joined, the same four rows by one, TWENTY-THIRD arrival.
+    // v4564 -- RE-TAKEN: one gate (sourceExtensions) joined, the same four rows by one, TWENTY-FOURTH.
+    // v4566 -- RE-TAKEN: one gate (inputSets) joined, the same four rows by one, TWENTY-FIFTH -- AND
+    // distinctDefinitions MOVED for the first time in ten arrivals, 38 -> 39. The new gate spells its own
+    // ok() with a default argument (`(name, cond, detail = "")`) that no existing gate uses verbatim, so it
+    // is a thirty-ninth distinct text rather than a thirty-eighth copy. Worth a line: this row is the one
+    // that would notice a tree drifting toward everybody inventing their own assertion helper, and every
+    // previous arrival had reused one.
+    // v4569 -- RE-TAKEN: one gate (exactHash) joined, the same four rows by one, TWENTY-SIXTH arrival --
+    // and distinctDefinitions moved AGAIN, 39 -> 40, for the second round running after ten that did not.
+    // The new gate spells `ok(n, c, d = "")` where v4566's spelled `(name, cond, detail = "")`: same shape,
+    // different parameter names, so it is a fortieth distinct text. Two in a row is worth watching -- this
+    // row exists to notice a tree drifting toward everybody inventing their own assertion helper.
+    // v4572 -- RE-TAKEN for one new gate, tools/ship/recordShape-selfcheck.mjs: gates 1616 -> 1617,
+    // usesOk 1595 -> 1596, definesOk 1587 -> 1588, nameFirst 1488 -> 1489. distinctDefinitions holds
+    // at 40 -- the new gate uses the ok(name, cond, detail) shape already counted, which is the
+    // point of that row: a gate adding a FORTY-FIRST spelling of the same idea is the thing worth
+    // noticing, and this one does not.
+    // v4572b -- RE-TAKEN for tools/ship/recordProvenance-selfcheck.mjs: 1617 -> 1618 and the three
+    // rows that follow a gate by one. distinctDefinitions holds at 40 for the second round running.
+    // v4573 -- RE-TAKEN for tools/ship/importClosure-selfcheck.mjs: 1618 -> 1619 and the three rows
+    // that follow a gate by one. distinctDefinitions holds at 40 for the THIRD round running.
+    // v4575 -- RE-TAKEN for physics/render/conductorFresnel-selfcheck.mjs: 1619 -> 1620 and the three
+    // rows that follow a gate by one. distinctDefinitions holds at 40 for the FOURTH round running,
+    // and this one is a render gate rather than a tools/ship one, which is the harder case for it.
+    // v4576 -- RE-TAKEN for tools/ship/recordTier-selfcheck.mjs: 1620 -> 1621 and the three rows that
+    // follow a gate by one. distinctDefinitions holds at 40 for the FIFTH round running.
+    // v4577 -- RE-TAKEN for physics/raceKnob-selfcheck.mjs: 1621 -> 1622 and the three rows that follow a
+    // gate by one. distinctDefinitions holds at 40 for the SIXTH round running, and this gate is in physics/
+    // rather than tools/ship/ -- it lives beside its module on purpose, because registryOrphans derives an
+    // instrument's module from its gate path.
+    // v4577 -- RE-TAKEN for physics/raceKnob-selfcheck.mjs: 1621 -> 1622.
+    // v4579 -- RE-TAKEN for tools/ship/starField-selfcheck.mjs: 1622 -> 1623 and the three rows that follow a
+    // gate by one. distinctDefinitions holds at 40 for the SEVENTH round running.
+    // v4580 -- RE-TAKEN for tools/ship/skyStars-selfcheck.mjs: 1623 -> 1624 and the three rows that follow a
+    // gate by one. distinctDefinitions holds at 40 for the EIGHTH round running.
+    // v4582 -- RE-TAKEN for tools/ship/zipWriter-selfcheck.mjs: 1624 -> 1625 and the three rows that follow a
+    // gate by one. NOT THIS ROUND'S GATE -- it arrived on main in commit c3f1fecb (the release zip's pure-Node
+    // writer) and is re-taken here because that commit and this one merged, and the tree has to be green for
+    // whichever lands second. distinctDefinitions holds at 40 for the NINTH round running.
+    // v4584 -- RE-TAKEN on the tree merged with main at v4583: one gate (fleetRouting) joined, the same four rows by one.
+    gates: 1626, usesOk: 1605, definesOk: 1597, importsOk: 0,
+    distinctDefinitions: 40, nameFirst: 1498, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

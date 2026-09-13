@@ -1,4 +1,4 @@
-// WebGLEngine/brain/fleetRouting.mjs -- v4531
+// WebGLEngine/brain/fleetRouting.mjs -- v4584
 //
 // FLEET BRAIN ROUTING, NAMED. What the tree calls a fleet brain request today is a POST to ai-bridge/gpuBrainBridge.js from a
 // brain (a field solve, a hello, a learn report) that lands in the bridge's fleet registry: { id, gpu, role, kinds, solveMsEwma,

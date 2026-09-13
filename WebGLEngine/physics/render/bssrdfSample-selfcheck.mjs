@@ -29,7 +29,9 @@ import {
     groundTruth, importanceSample, uniformSample, estimate, compare, dipole, dipoleIntegral, rng,
 } from "./bssrdfSample.mjs";
 import { profile } from "./subsurface.mjs";
+import { gateReport } from "../../tools/ship/gateReport.mjs";
 
+const REPORT = gateReport("physics/render/bssrdfSample-selfcheck.mjs");
 let fails = 0;
 const ok = (n, c, d = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${n}${d ? "   " + d : ""}`); };
 const say = (m) => console.log("  ----  " + m);
@@ -133,4 +135,14 @@ ok("and Burley's is exactly one by construction, which is the contrast", (() => 
 })(), "same quadrature, same limits, same shape -- one integrates to 1 and the other does not");
 
 console.log(`\nbssrdfSample-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);
+// v4534: these numbers used to die with the terminal -- gateReport-selfcheck named this gate for it.
+REPORT.table("both estimators against the truth, in units of their OWN standard error",
+    ["a", "truth", "importance", "z (se)", "uniform", "z (se)"],
+    runs.map((c) => [String(c.a), c.truth.toFixed(6), c.importance.mean.toFixed(6),
+        (Math.abs(c.importance.mean - c.truth) / c.importance.stderr).toFixed(2),
+        c.uniform.mean.toFixed(6), (Math.abs(c.uniform.mean - c.truth) / c.uniform.stderr).toFixed(2)]),
+    "The bound is the estimator's own standard error, not a number somebody liked: v4437 learned that when a " +
+    "hand-picked tolerance went red on 1.35 sd of ordinary noise.");
+REPORT.write();
+
 process.exit(fails === 0 ? 0 : 1);

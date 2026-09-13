@@ -50,7 +50,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as Q from "./quickSweep.mjs";
 import { VERDICT, SWEEP_V4297, REGRESSIONS_REPAIRED } from "./gateSweep.mjs";
-import { RED_AT_V4279, RED_AT_V4408, RED_AT_V4424, RED_AT_V4476, UNCONFIRMED_SLOW , RED_AT_V4484} from "./redCensus.mjs";
+import { RED_AT_V4279, RED_AT_V4408, RED_AT_V4424, RED_AT_V4476, UNCONFIRMED_SLOW , RED_AT_V4484, RED_AT_V4531, RED_AT_V4535} from "./redCensus.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -71,6 +71,70 @@ sec("1. SELECTION: UNDER BUDGET RUNS, OVER BUDGET IS SKIPPED, NO TIMING ALWAYS R
 }
 
 // ---------------------------------------------------------------------------------------------------------
+sec("1b. EVICTION TAKES TWO CROSSINGS, BECAUSE ONE IS A READING FROM ONE HOUR");
+// ---------------------------------------------------------------------------------------------------------
+// v4536. Driven on FIXTURES, not on the live timings file: the property is about the rule, and a rule tested
+// against whatever the tree happens to hold today is tested against one sample of it.
+{
+    const all = ["over.mjs", "again.mjs", "under.mjs"];
+    const timings = { "over.mjs": 4000, "again.mjs": 4000, "under.mjs": 100 };
+    const first = Q.selectGates(all, timings, 3000, { crossings: { "over.mjs": 1, "again.mjs": 2 } });
+    ok(first.run.includes("over.mjs") && first.skipped.includes("again.mjs") &&
+       first.onProbation.join() === "over.mjs",
+       "*** a gate over budget on its FIRST crossing still runs; on its SECOND it is evicted ***",
+       `run ${first.run.join(",")}; skipped ${first.skipped.join(",")}; on probation ${first.onProbation.join(",")}`);
+    // *** AND A GATE ALREADY OUT OF THE SWEEP STAYS OUT: PROBATION IS FOR A GATE THAT CROSSED. ***
+    // The first draft ran anything over budget with no crossing count -- which is the whole over-budget pool,
+    // about three hundred of the most expensive gates, twice over before the counts settled. That is the cost
+    // sweepRotation exists to spread across rounds, and it would have been paid at ship time instead. A
+    // MISSING count means "evicted before this rule existed", not "never crossed", and those stay out.
+    // budgetExile-selfcheck found it inside the round by seeding a lie and watching the sweep go and run it.
+    const exiled = Q.selectGates(["old.mjs"], { "old.mjs": 999999 }, 3000, { crossings: { other: 1 } });
+    ok(exiled.skipped.join() === "old.mjs" && exiled.onProbation.length === 0,
+       "!! a gate with a big recorded time and NO crossing count stays skipped -- the pool is not re-run",
+       `skipped ${exiled.skipped.join(",")}, on probation ${exiled.onProbation.join(",") || "none"}. ` +
+       "The rotation re-times that pool on its own schedule; this rule only holds open a door for a gate " +
+       "that crossed under it");
+    // the old behaviour is still available and is what every other caller gets: no crossings, no probation
+    const old = Q.selectGates(all, timings, 3000);
+    ok(old.skipped.length === 2 && old.onProbation.length === 0,
+       "  without a crossings map the rule is exactly what it was, so no other caller changed",
+       `${old.skipped.length} skipped, ${old.onProbation.length} on probation`);
+    // *** AND THE COUNT MUST RESET, OR IT IS A LIFETIME TALLY AND EVERY STRADDLER EVICTS ITSELF EVENTUALLY. ***
+    // This is the difference between "crossed twice in a row" and "crossed twice since the beginning of time",
+    // and a straddler crosses about half the time, so the second rule evicts every one of them within a few
+    // sweeps while claiming to be corroboration.
+    //
+    // *** THIS PARAGRAPH SAT HERE WITH NOTHING UNDER IT CHECKING IT, AND THE SABOTAGE THAT DELETED THE RESET
+    // WENT 0 RED. *** The reset lived inside the writer where no fixture could reach it, and the row beside
+    // this comment asserted the THRESHOLD instead -- prose promising a check the assertion did not have,
+    // which is the defect v4536's own author found in RETURNED_AT_V4529 two rounds earlier. countCrossings is
+    // pure and exported now, and the straddler is walked through four sweeps here rather than described.
+    {
+        const over = [{ gate: "s.mjs", serialMs: 4000 }], under = [{ gate: "s.mjs", serialMs: 2000 }];
+        let c = {};
+        c = Q.countCrossings(c, over, 3000);     const afterOver1 = c["s.mjs"];
+        c = Q.countCrossings(c, under, 3000);    const afterUnder = c["s.mjs"];
+        c = Q.countCrossings(c, over, 3000);     const afterOver2 = c["s.mjs"];
+        c = Q.countCrossings(c, over, 3000);     const afterOver3 = c["s.mjs"];
+        ok(afterOver1 === 1 && afterUnder === undefined && afterOver2 === 1 && afterOver3 === 2,
+           "!! *** FIXTURE: a straddler that alternates over and under NEVER reaches two, and two in a row does ***",
+           `over -> ${afterOver1}, under -> ${afterUnder === undefined ? "cleared" : afterUnder}, over -> ` +
+           `${afterOver2}, over -> ${afterOver3}. A count that survived the under would read 3 by now and the ` +
+           "gate would be evicted for having straddled, which is precisely what it must not mean");
+        ok(Q.countCrossings({ "s.mjs": 5 }, under, 3000)["s.mjs"] === undefined,
+           "  ...and coming back under clears the count outright rather than decrementing it",
+           "a decrement would take five sweeps under budget to undo five crossings; the reading that matters " +
+           "is the most recent run of them");
+    }
+    ok(Q.MIN_CROSSINGS_TO_EVICT === 2,
+       "  the threshold is a named constant rather than a literal in the selection", `${Q.MIN_CROSSINGS_TO_EVICT}`);
+    ok(Q.selectGates(all, timings, 3000, { crossings: { "over.mjs": 1 }, minCrossings: 1 }).skipped.includes("over.mjs"),
+       "  ...and it is a PARAMETER, so the rule can be driven to its boundary here rather than argued about",
+       "at minCrossings 1 the first crossing evicts, which is the pre-v4536 behaviour exactly");
+}
+
+// ---------------------------------------------------------------------------------------------------------
 sec("2. THE REGISTER IS BUILT FROM THE RECORDS IT NAMES, AND THE SIX REGRESSIONS ARE DELIBERATELY NOT IN IT");
 // ---------------------------------------------------------------------------------------------------------
 {
@@ -88,9 +152,13 @@ sec("2. THE REGISTER IS BUILT FROM THE RECORDS IT NAMES, AND THE SIX REGRESSIONS
     // v4476 -- A SEVENTH LIST JOINED, AND THIS ROW WENT RED THE MOMENT IT DID, EXACTLY AS THE NOTE ABOVE
     // PROMISES. RED_AT_V4424 (v4471) and RED_AT_V4476 are both here now. The union is derived rather than
     // typed precisely so a register that quietly grows cannot pass as one that did not.
+    // v4531 -- AND IT HAPPENED AGAIN, ON SCHEDULE. RED_AT_V4531 joined for tslSource and this row went red
+    // within the minute, before any sweep ran. Adding the list here is the deliberate act the row exists to
+    // demand: the register is 91 gates where it held 90 an hour earlier, and the diff is where that is said.
     ok(reg.size === new Set([...RED_AT_V4279.map((e) => e.gate), ...RED_AT_V4408.map((e) => e.gate),
                              ...RED_AT_V4424.map((e) => e.gate), ...RED_AT_V4476.map((e) => e.gate),
-                             ...RED_AT_V4484.map((e) => e.gate),
+                             ...RED_AT_V4484.map((e) => e.gate), ...RED_AT_V4531.map((e) => e.gate),
+                             ...RED_AT_V4535.map((e) => e.gate),
                              ...UNCONFIRMED_SLOW, ...SWEEP_V4297.fromSlowBucket, ...SWEEP_V4297.unmeasured]).size,
        "and the register's size is the union of those lists, nothing typed", `${reg.size} gates`);
     const repaired = Object.keys(REGRESSIONS_REPAIRED.gates).sort();
@@ -224,6 +292,65 @@ sec("5. verify.mjs RUNS IT, AND FAILS ON NEW REDS ONLY");
 //   D  a serial timeout reported as a NEW red.
 //      -> exit=1, three lines: section 3, and section 4's hang test. A timeout alone is not a verdict --
 //      v4297's UNMEASURED bucket exists so that "did not finish" is never folded into "failed".
+// =============================================================================================================
+// *** ALL FOUR ROWS BELOW WERE WRITTEN NAME-FIRST AND THIS FILE'S ok() TAKES THE CONDITION FIRST, SO ALL
+// FOUR PASSED UNCONDITIONALLY -- a non-empty string is truthy. Nothing in the section could fail. It was
+// caught by tools/ship/assertionShape-selfcheck.mjs, which exists for exactly this and named all four in
+// one line ("78 gates in this tree take the condition first; a line pasted from the other 1,403 always
+// passes"). Written down here because the lesson is not "be careful": it is that the instrument works and
+// should be run before a gate is believed.
+console.log("\n6. *** THE FILED NUMBER IS A CONTENDED SAMPLE AND THE COST IS A DIFFERENT NUMBER (v4562) ***");
+{
+    // costOf: three sources, each named rather than blended into one figure
+    const fake = { timings: { a: 900, b: 500 }, at: { a: "T1", b: "T1" }, serial: { a: 400 }, serialAt: { a: "T2" } };
+    const A = Q.costOf(fake, "a"), B = Q.costOf(fake, "b"), C = Q.costOf(fake, "zzz");
+    ok(A.ms === 400 && A.source === "serial" && B.ms === 500 && B.source === "parallel" &&
+       C.ms === null && C.source === "none",
+       "!! costOf prefers the SERIAL reading, falls back to the filed one, and SAYS WHICH",
+       `a: ${A.ms} (${A.source}), b: ${B.ms} (${B.source}), unknown: ${C.ms} (${C.source}). A consumer that ` +
+       "cannot tell a cost from a sample will quote whichever it was handed, which is what put " +
+       "recordReach-selfcheck's margin row on scheduling luck.");
+
+    ok(Q.serialSliceOrder(["x", "y", "z"], { y: "2026-01-02", z: "2026-01-01" }).join(",") === "x,z,y" &&
+       Q.serialSliceOrder(["x", "y", "z"], { y: "2026-01-02", z: "2026-01-01" }).join(",") ===
+       Q.serialSliceOrder(["x", "y", "z"], { y: "2026-01-02", z: "2026-01-01" }).join(","),
+       "!! the slice order owes the never-measured first, then the oldest, and is deterministic",
+       "an absent reading sorts before any present one, ties keep enumeration order, and the same input " +
+       "gives the same slice -- a rotation that shuffles cannot say when the tree last turned over.");
+
+    // The two rows that grade SWEEP_CONTENTION_V4562 itself live in tools/ship/sweepCoverage-selfcheck.mjs,
+    // beside the record, and NOT here -- this gate is 9.1 s serially and stays outside the ship-time sweep,
+    // so a record guarded only from here is a record nothing checks at ship time. That is the population
+    // tools/ship/recordReach-selfcheck.mjs counts, and it went red the moment the record landed here.
+}
+
+// ---- v4574: THE SKIP IS OPT-IN, AND THIS ROW EXISTS BECAUSE ARMING IT THE OTHER WAY BROKE A FIXTURE --------
+{
+    // *** ARMING MEANT FLIPPING runQuickSweep'S DEFAULT TO TRUE, AND THAT ARMED EVERY CALLER AT ONCE. ***
+    // There are nine besides the command line: fixtures in this file and in sweepCoverage-selfcheck that drive
+    // the sweep to watch what it does, tools/ship/budgetExile.mjs re-timing one named gate, and verify.mjs.
+    // sweepCoverage-selfcheck went red within the minute and was RIGHT -- its 1 ms-budget fixture reported
+    // "0 gates run at a 1 ms budget, 0 confirmed alone", because the sweep it was testing had skipped
+    // everything. A FIXTURE THAT SKIPS ITS OWN SUBJECT IS VACUOUS, and it would have passed silently if the
+    // fixture had asserted a little less.
+    //
+    // So the default lives in the CLI block and not in the function: typing `node tools/ship/quickSweep.mjs`
+    // skips, calling runQuickSweep() does not, and the caller nobody has written yet inherits the safe one.
+    const src = fs.readFileSync(path.join(ENG, "tools", "ship", "quickSweep.mjs"), "utf8");
+    const sig = /export async function runQuickSweep\([\s\S]{0,600}?\)\s*\{/.exec(src);
+    ok(!!sig && /skipUnchanged = false/.test(sig[0]),
+       "!! *** runQuickSweep does NOT skip unless its caller asks -- the dangerous default is never inherited ***",
+       "a programmatic caller that says nothing gets a full sweep. Nine call sites in this tree say nothing");
+    ok(/opts\.skipUnchanged = !process\.argv\.includes\("--full"\)/.test(src),
+       "!! ...and the command line skips by default, which is the whole point of arming it",
+       "the saving is for a human sweeping while working: 1,258 gates and 409 s becomes 332 and 233 s");
+    const vsrc = fs.readFileSync(path.join(ENG, "tools", "ship", "verify.mjs"), "utf8");
+    ok(/runQuickSweep\(\{ budgetMs, skipUnchanged: false/.test(vsrc),
+       "!! *** and the SHIP-TIME sweep passes skipUnchanged: false explicitly, belt and braces ***",
+       "the saving buys iteration speed and spends a small measured chance that a gate which should have run " +
+       "did not. The one run this tree must not spend that on is the one whose output is ALL GREEN");
+}
+
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the gates over the budget THE ROTATION HAS NOT REACHED YET. v4408 answered the older " +
     "version of this line -- that a regression in a 40-second gate is found by the full sweep and by nothing at " +

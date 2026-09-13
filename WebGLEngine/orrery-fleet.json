@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "524c536c26fc795ea48c83dbe979abe3ee6eff77",
+ "head": "30fba56e9a4200e83d605ecc6015267af997e1ad",
  "bodies": {
   "box3d": [
    {
@@ -11,7 +11,7 @@
    },
    {
     "path": "ai-bridge/server.js",
-    "bytes": 1486291,
+    "bytes": 1484887,
     "sha": "8d4739838f05a92bdeac10bf9aa1db9960de937c"
    },
    {
@@ -86,7 +86,7 @@
    },
    {
     "path": "tools/macSession.mjs",
-    "bytes": 16446,
+    "bytes": 16554,
     "sha": "aefc87ad6bbf6fedaf1dc91461ae0580c33b773c"
    },
    {
@@ -165,7 +165,7 @@
    },
    {
     "path": "orrery-gpu.html",
-    "bytes": 48481,
+    "bytes": 49462,
     "sha": "25bbf4add8c06b1a6ebf823c7fcdfc7c78dfd6b4"
    },
    {
@@ -270,7 +270,7 @@
    },
    {
     "path": "tools/ship/slugTsl-selfcheck.mjs",
-    "bytes": 20040,
+    "bytes": 20091,
     "sha": "5ac8ccedcd39eed6e31e4e91814f3be4770f64f0"
    },
    {
@@ -294,7 +294,7 @@
   "grass": [
    {
     "path": "tools/ship/grassField-selfcheck.mjs",
-    "bytes": 13268,
+    "bytes": 17072,
     "sha": "aefc87ad6bbf6fedaf1dc91461ae0580c33b773c"
    },
    {
@@ -318,7 +318,7 @@
    },
    {
     "path": "ai-bridge/server.js",
-    "bytes": 1486291,
+    "bytes": 1484887,
     "sha": "8d4739838f05a92bdeac10bf9aa1db9960de937c"
    },
    {
@@ -329,7 +329,7 @@
    {
     "path": "server.html",
     "bytes": 862976,
-    "sha": "524c536c26fc795ea48c83dbe979abe3ee6eff77"
+    "sha": "30fba56e9a4200e83d605ecc6015267af997e1ad"
    },
    {
     "path": "tools/ship/artifactWeight.mjs",
@@ -455,7 +455,7 @@
    },
    {
     "path": "ai-bridge/server.js",
-    "bytes": 1486291,
+    "bytes": 1484887,
     "sha": "8d4739838f05a92bdeac10bf9aa1db9960de937c"
    },
    {
@@ -630,7 +630,7 @@
    },
    {
     "path": "main.js",
-    "bytes": 3179042,
+    "bytes": 3227495,
     "sha": "75f0c033273475d49a3e60bb2f61c4bdef3fb1b4"
    },
    {
@@ -676,7 +676,7 @@
    {
     "path": "server.html",
     "bytes": 862976,
-    "sha": "524c536c26fc795ea48c83dbe979abe3ee6eff77"
+    "sha": "30fba56e9a4200e83d605ecc6015267af997e1ad"
    },
    {
     "path": "shipavatar.html",
@@ -700,7 +700,7 @@
    },
    {
     "path": "svg-forge.html",
-    "bytes": 9529,
+    "bytes": 10662,
     "sha": "aefc87ad6bbf6fedaf1dc91461ae0580c33b773c"
    },
    {
@@ -730,7 +730,7 @@
    },
    {
     "path": "tools/ship/boundaryLint-selfcheck.mjs",
-    "bytes": 17160,
+    "bytes": 17216,
     "sha": "aefc87ad6bbf6fedaf1dc91461ae0580c33b773c"
    },
    {
@@ -812,7 +812,7 @@
   "three-webgpu": [
    {
     "path": "orrery-gpu.html",
-    "bytes": 48481,
+    "bytes": 49462,
     "sha": "25bbf4add8c06b1a6ebf823c7fcdfc7c78dfd6b4"
    },
    {
@@ -842,7 +842,7 @@
    },
    {
     "path": "tools/ship/slugTsl-selfcheck.mjs",
-    "bytes": 20040,
+    "bytes": 20091,
     "sha": "5ac8ccedcd39eed6e31e4e91814f3be4770f64f0"
    },
    {
@@ -862,27 +862,27 @@
    },
    {
     "path": "tools/ship/tslLoopBound-selfcheck.mjs",
-    "bytes": 11347,
+    "bytes": 11403,
     "sha": "9be0173f43e103d34c3bcb6362737f9aa4621360"
    },
    {
     "path": "tools/ship/tslPhysics-selfcheck.mjs",
-    "bytes": 125841,
+    "bytes": 125949,
     "sha": "9be0173f43e103d34c3bcb6362737f9aa4621360"
    },
    {
     "path": "tools/ship/tslRace-selfcheck.mjs",
-    "bytes": 77070,
+    "bytes": 79728,
     "sha": "aefc87ad6bbf6fedaf1dc91461ae0580c33b773c"
    },
    {
     "path": "tools/ship/tslSource-selfcheck.mjs",
-    "bytes": 22705,
+    "bytes": 22758,
     "sha": "aefc87ad6bbf6fedaf1dc91461ae0580c33b773c"
    },
    {
     "path": "tools/ship/tslWide-selfcheck.mjs",
-    "bytes": 22576,
+    "bytes": 22627,
     "sha": "ad535264ab7dc33e4650578484ecfecb9b207424"
    },
    {
@@ -916,6 +916,13 @@
     "path": "wasm-bench.html",
     "bytes": 19835,
     "sha": "aefc87ad6bbf6fedaf1dc91461ae0580c33b773c"
+   }
+  ],
+  "xatlas": [
+   {
+    "path": "tools/mesh/xatlasRef.mjs",
+    "bytes": 15061,
+    "sha": null
    }
   ]
  }

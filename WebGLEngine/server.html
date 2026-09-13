@@ -1913,7 +1913,7 @@ window.addEventListener("load", function () {
               <div id="bgSolver" style="font-size:16px;font-weight:bold;color:#8ab4ff;">&mdash;</div>
               <div id="bgSolverNote" style="font-size:10px;color:var(--dim);margin-top:2px;">cpu / gpu / auto / demoted</div>
             </div>
-            <!-- v4531 -- WHICH PEER TOOK THE LAST REQUEST, AND WHAT IT WAS. /ai/brain/health's `routed` field: the ledger
+            <!-- v4584 -- WHICH PEER TOOK THE LAST REQUEST, AND WHAT IT WAS. /ai/brain/health's `routed` field: the ledger
                  POST /ai/brain/route fills (brain/fleetRouting.mjs over the live registry). The big value is the peer, the
                  note is the request (kind, scene, policy, tick range). "none routed yet" is a true reading, not a fault;
                  an unattributed count above zero reddens the value, because a routed request nobody took is the defect. -->
@@ -7566,7 +7566,7 @@ try{const r=await fetch("/self/whoami",{cache:"no-store"});const j=await r.json(
           set("bgSolves", (h.fieldPosts != null ? h.fieldPosts : "\u2014"));
           set("bgSolveAge", h.lastSolveMsAgo != null ? ("last solve " + secs(h.lastSolveMsAgo)) : "no solves yet");
           set("bgExp", (h.experience != null ? h.experience : "\u2014"));
-          // v4531 -- the last routed request: WHICH peer took it (the value) and WHAT it was (the note).
+          // v4584 -- the last routed request: WHICH peer took it (the value) and WHAT it was (the note).
           var rt = h.routed || null;
           if (rt && rt.last && rt.last.peer) {
             set("bgRouted", rt.last.peer.id + " (" + (rt.last.peer.gpu || "?") + ")", rt.unattributed ? COLORS.offline : "#e0b0ff");

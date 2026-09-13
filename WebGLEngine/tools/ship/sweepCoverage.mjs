@@ -43,14 +43,42 @@ export function classify(ms, { budgetMs = BUDGET_MS, capMs = CAP_MS } = {}) {
 // gates: the enumerated tree. timings/codes/at: the file's three maps. Returns a PARTITION -- the four buckets
 // sum to the tree, and `ghosts` (entries naming no gate) are reported separately rather than folded in, because
 // a stale entry is a different problem from a stale reading and v4406 found one of each.
-export function census(gates, { timings = {}, codes = {}, at = {} } = {}, opts = {}) {
+/*
+ * *** v4568 -- "KILLED" WAS A PROXY FOR "OVER THE CAP" AND THE TREE READ IT AS "NO VERDICT". ***
+ *
+ * classify() puts any reading at or above CAP_MS in `killed`, and everything downstream treats that bucket as
+ * unjudged -- rightly, since v4392's rule is that a count of failures is not a verdict unless the process
+ * finished. But the FILE cannot tell the two apart: a gate cut off at 20,000 ms and a gate that ran happily
+ * to completion in 50,214 ms are the same entry. So a gate can be graded, green, and filed as though nothing
+ * were known about it -- or graded, RED, and filed the same way.
+ *
+ * MEASURED at v4568 on twelve of the 140, run serially with a 90 s cap: EIGHT FINISHED, three did not, and
+ * one of the eight is RED (tools/ship/commentFalsePass-selfcheck.mjs, exit 1 in 9.5 s -- it names a gate
+ * asserting against raw source that passes on a copyright comment). Three finished in UNDER the 20,000 ms
+ * cap that exiled them: 9.5 s, 13.0 s, 15.2 s. And 129 of the 140 carry a stamp older than per-entry
+ * stamping itself, which is the same staleness OVER_BUDGET_PASS_V4565 found in the other bucket.
+ *
+ * `finished` is a map the runner writes for a gate whose process EXITED rather than being killed, so the
+ * split is a recorded fact rather than an inference from the number. The four buckets are unchanged --
+ * `killed` still holds everything over the cap, so `partitions` and every existing consumer still hold --
+ * and the split lives INSIDE it as `noVerdict` and `graded`.
+ */
+export function census(gates, { timings = {}, codes = {}, at = {}, finished = {} } = {}, opts = {}) {
     const set = new Set(gates);
     const buckets = { under: [], over: [], killed: [], never: [] };
     for (const g of gates) buckets[classify(timings[g], opts)].push(g);
     const ghosts = Object.keys(timings).filter((k) => !set.has(k));
     const sum = buckets.under.length + buckets.over.length + buckets.killed.length + buckets.never.length;
-    return { ...buckets, ghosts, enumerated: gates.length, sum, partitions: sum === gates.length,
+    // The split inside `killed`: a gate whose process finished HAS a verdict, however expensive it was.
+    const graded = buckets.killed.filter((g) => finished[g] === true);
+    const noVerdict = buckets.killed.filter((g) => finished[g] !== true);
+    return { ...buckets, graded, noVerdict, ghosts, enumerated: gates.length, sum, partitions: sum === gates.length,
              ageOf: (g) => at[g] || UNKNOWN_AT, codeOf: (g) => codes[g], msOf: (g) => timings[g] };
+}
+
+/** A red hiding in the killed bucket: it FINISHED, and it finished nonzero. Empty until something runs them. */
+export function gradedReds(c, { codes = {} } = {}) {
+    return (c.graded || []).filter((g) => codes[g] !== 0 && codes[g] !== undefined);
 }
 
 // *** A KILLED PROCESS'S NONZERO CODE IS NOT A RED. *** 130 of the 143 nonzero over-budget entries hit the cap,
@@ -121,21 +149,87 @@ export function verdictClasses(c, { codes = {} } = {}) {
 // policyPilot (2,617 ms) and traderGraph (2,933) came back under, and meshLine did not: 3,083 / 3,073 / 3,154 ms alone,
 // three runs, 2,929 at v4476. It is over by a few percent of the budget, not by a factor, and the honest record is the
 // reading and the box rather than a number rounded down to fit.
+/**
+ * *** v4535 -- BOTH ENTRIES RETURNED, AND THE RECORD SAID IN ADVANCE WHAT WOULD RETIRE THEM. ***
+ *
+ * meshLine's entry: "a sweep that finds it under returns it by the row's other branch." It has been found
+ * under, three times serially on a quiet box, and so has traderGraph. The readings, against the five and three
+ * serial samples that put each on this list:
+ *
+ *     meshLine      over at v4529/v4530: 3083 / 3073 / 3154        under now: 2515 / 2480 / 2757
+ *     traderGraph   over at v4529/v4530: 2933 3083 2719 3123 3152  under now: 2729 / 2344 / 2659
+ *
+ * *** THE STRADDLE WAS NEVER A PROPERTY OF EITHER GATE. *** Eight straddlers were named across v4529, v4531
+ * and v4533 -- these two and the six in ROTATION_BOUNDARY_RETIRED_V4535 -- each with serial evidence, each
+ * filed as "this gate genuinely sits just over on this box", and ALL EIGHT come back under on a quiet one.
+ * Eight independent gates do not improve by 15-30% in the same week; ONE BOX GOT QUIETER. The measurement was
+ * honest every time and the attribution was wrong every time, which is the difference between a reading and a
+ * conclusion -- and the only reason it could be caught is that every entry carried its gate name and its
+ * numbers, so eight claims could be re-run in ninety seconds.
+ */
 export const RETURNED_AT_V4529 = Object.freeze({
     at: "v4529",
+    // *** v4536 -- meshLine WAS RETIRED THIS MORNING AND IS BACK BY THE EVENING, WHICH IS THE ENTRY. *** Its
+    // v4535 retirement was honest -- three serial readings under budget on a quiet box, 2515/2480/2757 -- and
+    // the ship sweep hours later wrote 3,014 for the same unchanged file. A record that flips a gate on and off
+    // a roll every time the machine's load changes is recording the machine, so the roll keeps it with BOTH
+    // sets of numbers rather than picking whichever half was measured most recently.
     stillOver: Object.freeze([
-        Object.freeze({ gate: "tools/ship/meshLine-selfcheck.mjs", recordedWas: 4404, v4476Ms: 2929, hereMs: 3154,
-            why: "over the 3,000 ms budget on this box by a few percent: 3,083 / 3,073 / 3,154 ms alone across three serial " +
-                 "runs at v4529, against 2,929 ms at v4476 on the same branch. A gate that straddles the budget is recorded " +
-                 "at the reading it gave, not at the one that would put it back in." }),
-        // v4530: the same straddle, one round on -- a v4461 returnee at 2,793 ms then, and here 2,933 / 3,083 / 2,719 / 3,123 /
-        // 3,152 ms across five serial runs. The v4530 sweep dropped it from budget again under parallel load; the serial reading
-        // that went into the file is the one it gave last, which is over. Named, so a later sweep that finds it under (the row's
-        // other branch) or over (this one) is right either way.
-        Object.freeze({ gate: "tools/ship/traderGraph-selfcheck.mjs", recordedWas: 3368, v4461Ms: 2793, hereMs: 3152,
-            why: "straddles the 3,000 ms budget on this box: 2,933 / 3,083 / 2,719 / 3,123 / 3,152 ms across five serial runs at " +
-                 "v4529 and v4530, against 2,793 ms at v4461's rotation. Recorded at the reading it gave last, which is over; a " +
-                 "sweep that finds it under returns it by the row's other branch." }),
+        Object.freeze({ gate: "tools/ship/meshLine-selfcheck.mjs", recordedWas: 4404, v4476Ms: 2929, hereMs: 3014,
+            quietMs: Object.freeze([2515, 2480, 2757]),
+            why: "straddles the 3,000 ms budget, and which side it lands on is a fact about the hour: 3,083 / " +
+                 "3,073 / 3,154 ms at v4529, then 2,515 / 2,480 / 2,757 ms serially on a quiet box at v4535, " +
+                 "then 3,014 ms from the v4536 ship sweep -- one file, unchanged throughout. Retiring it on the " +
+                 "quiet readings was right on the evidence available and wrong within a day, so it is recorded " +
+                 "here with both rather than moved a third time." }),
+        // *** AND traderGraph, THE SECOND OF THE TWO RETIRED AT v4536, BACK BY THE SAME ROUTE TWO DAYS LATER. ***
+        // Both gates retired that day have now returned to this roll, which is the clearest statement yet that
+        // the roll is tracking the machine: 3,096 / 2,460 / 2,631 ms across three serial runs TAKEN TOGETHER --
+        // a 26% spread within one minute on one unchanged file, straddling the budget inside a single sample.
+        Object.freeze({ gate: "tools/ship/traderGraph-selfcheck.mjs", recordedWas: 3368, v4461Ms: 2793, hereMs: 3008,
+            quietMs: Object.freeze([2729, 2344, 2659]),
+            why: "straddles the 3,000 ms budget and cannot be pinned either side of it: 2,933 / 3,083 / 2,719 / " +
+                 "3,123 / 3,152 ms at v4529, 2,729 / 2,344 / 2,659 quiet at v4536, 3,008 from the v4538 sweep, " +
+                 "and 3,096 / 2,460 / 2,631 serially straight after -- a 26% spread inside ONE minute. Retiring " +
+                 "it on the quiet readings was right on the evidence and wrong within two days, exactly as " +
+                 "meshLine was, so it is recorded with both rather than moved a third time." }),
+        // *** v4541 -- TWO MORE, AND THESE ARE NOT STRADDLERS: THEY ARE GENUINELY SLOW AND GENUINELY FASTER. ***
+        // Both were v4460 returnees recorded at the time that evicted them, both have since been re-timed, and
+        // both improved a lot without reaching the budget -- which is the third state this roll exists for and
+        // the one that is easiest to confuse with the oscillation above. Three serial runs each, on the same
+        // loaded box that took 403 s over a sweep it usually finishes in 220:
+        Object.freeze({ gate: "tools/ship/wgslSpec-selfcheck.mjs", recordedWas: 5162, hereMs: 4242,
+            serialMs: Object.freeze([3922, 3658, 3906]),
+            why: "re-timed from 5,162 ms to 3,658-3,922 across three serial runs -- 27% faster and 22% over the " +
+                 "budget. The widest margin on this roll, and the least ambiguous: no reading of it has ever " +
+                 "been under 3,000." }),
+    ]),
+    // *** v4565 -- RETIRED BY THE BAND PASS, AND IT TAKES A SENTENCE OF THE v4541 ENTRY WITH IT. ***
+    // sweepBudget was named still-over at v4541 on three serial readings of 3,165 / 3,266 / 3,273 ms, with the
+    // reason: "Every one of three serial runs is over, none of them marginally, SO THIS IS NOT THE BOX: it is a
+    // gate that got much faster and is still too slow." The v4565 band pass read it at 2,746 and four more serial
+    // runs here read 2,770 / 2,589 / 2,750 / 2,651 -- five readings, all under, none marginal either.
+    //
+    // AND tools/roundhouse/sweepBudget-selfcheck.mjs HAS NOT BEEN TOUCHED SINCE v4361. So the whole journey --
+    // 5,526 ms when it was evicted, ~3,200 at v4541, ~2,700 now -- happened to a file nobody edited, and the
+    // v4541 entry's confident half ("this is not the box") was exactly backwards. IT IS ALL THE BOX. Three
+    // consistent serial readings felt like enough evidence to rule the box out and were not, which is the same
+    // mistake ROTATION_BOUNDARY_V4535 caught on five other gates the day after naming them. The rule that
+    // survives: consistency WITHIN one sitting says nothing about the next sitting, and only a re-run does.
+    returnedAt_v4565: Object.freeze([
+        Object.freeze({ gate: "tools/roundhouse/sweepBudget-selfcheck.mjs", overMs: 3172,
+            serialNow: Object.freeze([2746, 2770, 2589, 2750, 2651]),
+            why: "returned by the v4565 band pass at 2,746 ms and confirmed by four more serial runs here at " +
+                 "2,770 / 2,589 / 2,750 / 2,651 -- every one under, the highest 8% clear of the budget. Its v4541 " +
+                 "entry ruled the box out on three readings; the gate has not been edited since v4361, so the " +
+                 "5,526 -> 3,200 -> 2,700 it travelled is the box and nothing else." }),
+    ]),
+    returnedAt_v4535: Object.freeze([
+        Object.freeze({ gate: "tools/ship/traderGraph-selfcheck.mjs", overMs: 3152,
+            serialNow: Object.freeze([2729, 2344, 2659]),
+            why: "named still-over at v4529/v4530 on five serial readings spanning 2,719 to 3,152 ms -- itself " +
+                 "a straddle wide enough to have been the answer -- and re-measured at v4535 at 2,729 / 2,344 / " +
+                 "2,659 ms with the timings file at 2,726. Under on every sample of the later run." }),
     ]),
 });
 
@@ -284,13 +378,516 @@ export function rotationHeld(file, rot, { budgetMs = BUDGET_MS } = {}) {
     const timings = (file && file.timings) || {}, at = (file && file.at) || {};
     const rows = (rot && rot.rotated) || [];
     const measuredUnder = rows.filter((r) => r && typeof r.ms === "number" && r.ms < budgetMs);
-    const lost = measuredUnder.filter((r) => (timings[r.gate] || 0) >= budgetMs);
+    // *** v4531 -- A ROTATION READING IS ONE SAMPLE, AND A GATE WHOSE TRUE COST STRADDLES THE BUDGET WILL
+    // CROSS IT BY LUCK. *** This row fired on physics/render/misWgsl-selfcheck.mjs, rotation 2966 against a
+    // 3000 ms budget and 3480 in the timings -- and re-measured SERIALLY, three runs in a row, it takes 3075,
+    // 3102 and 3134 ms. The rotation's 2966 was the outlier, so "restore it" would have meant writing a number
+    // already measured to be false. That is v4458's own finding -- an observation promoted to a property --
+    // and the sibling row two sections up carries the rule this one was missing: A THRESHOLD IS THE PROPERTY,
+    // A MILLISECOND IS AN OBSERVATION.
+    //
+    // *** THE TEETH ARE KEPT BY NAMING THE OUTLIERS RATHER THAN BY WIDENING THE RULE. *** No tolerance band is
+    // introduced -- a band would forgive every future boundary case silently, which is the escape hatch this
+    // file has caught three times. An entry here is a MEASUREMENT somebody took and wrote down, and the fault
+    // this row exists for is untouched: the 2026-09-03 loss was 146 gates reverted wholesale to their
+    // pre-rotation readings carrying a stale stamp, and no list of individually re-measured gates can hide
+    // that.
+    // *** v4536 -- "LOST" IS A QUESTION ABOUT PROVENANCE, AND IT HAD BEEN ASKED IN MILLISECONDS. ***
+    //
+    // This row was named for a real fault: 146 gates put back at their pre-rotation readings, wholesale, by a
+    // writer that was not the thing that measured them. It was implemented as "the rotation said under and the
+    // timings say over", and that catches the fault -- along with every gate that was simply MEASURED AGAIN
+    // AND CAME OUT SLOWER, which is not a loss at all. In one day this session named eight straddlers, retired
+    // all eight on serial evidence, and watched four cross back; each crossing fired this row and each was
+    // answered by adding a name to a list. Three rounds of that is a treadmill, and the treadmill is what says
+    // the question was wrong rather than the answer.
+    //
+    // A LOSS AND A RE-MEASUREMENT ARE TOLD APART BY THE STAMP, WHICH v4408 PUT THERE FOR EXACTLY THIS. An entry
+    // re-timed AFTER the rotation carries a newer `at` and is a fresh observation, whoever it disagrees with.
+    // An entry sitting over budget with a stamp NO NEWER than the rotation's is the fault: the rotation's
+    // reading is gone and nothing has looked since. Measured on the 2026-09-03 loss, the 146 carried a stamp
+    // from before v4408 -- older, every one. Measured on this round's crossings, meshLine / microfacetVndf /
+    // slugReupload carry 2026-09-08T00:03 and 00:10 against a rotation at 2026-09-07T22:31 -- newer, every one.
+    // The two faults separate cleanly on the field that was already in the file.
+    //
+    // *** WHAT THIS DOES NOT CLAIM: that a wholesale revert carrying FRESH stamps would be caught here. *** It
+    // would not, and that is why `reverted` below exists rather than a wider version of this rule -- a revert
+    // is many gates at once and a re-measurement is a handful, so the second fault is caught by its SHAPE
+    // instead of by its stamp, and neither test is asked to do the other's job.
+    const rotAt = Date.parse((rot && rot.at) || "") || 0;
+    const freshlyRetimed = (g, rowAt) => {
+        const t = Date.parse(at[g] || "") || 0;
+        const since = Date.parse(rowAt || "") || rotAt;
+        return t > 0 && since > 0 && t > since;
+    };
+    // *** AND THE THREE NAME-LISTS COME OUT OF THE RULE ENTIRELY, WHICH IS THE POINT. *** v4531, v4533 and
+    // v4535 each answered a crossing by naming the gate that crossed; measured just now, with all three
+    // exclusions removed and only the stamp test left, this reads 43 measured under, 7 back over, ZERO LOST.
+    // Every name on those lists was a workaround for the wrong question, so none of them is load-bearing any
+    // more. They are kept as a RECORD -- they hold the serial readings that make the oscillation checkable,
+    // and they are the evidence for the calibration round in nextRounds.mjs -- and the selfcheck asserts they
+    // are no longer needed, so if a change ever makes them load-bearing again that fact is visible instead of
+    // silent. ONE MECHANISM, not one mechanism and a list of apologies.
+    const lost = measuredUnder.filter((r) => (timings[r.gate] || 0) >= budgetMs && !freshlyRetimed(r.gate, r.at));
+    // *** THE ORIGINAL FAULT, CAUGHT BY ITS SHAPE RATHER THAN BY ANY GATE'S NAME. *** 146 of 150 went back at
+    // once. A stamp cannot see that and a per-gate rule should not try: if MOST of what the rotation brought
+    // under budget is over budget again, that is a rewrite whatever any individual entry claims. Half is the
+    // line because the fault was 97% and the largest honest crossing this session has produced is 4 of 44 (9%);
+    // nothing observed lies between, and the gap is stated so a later reading inside it is visible as new.
+    const backOver = measuredUnder.filter((r) => (timings[r.gate] || 0) >= budgetMs);
+    const reverted = measuredUnder.length > 0 && backOver.length > measuredUnder.length / 2 ? backOver : [];
     // A gate the rotation wrote carries the rotation's stamp. UNKNOWN_AT on one of them is the fingerprint of
     // a file that was replaced rather than updated, which is a different fault from a gate that got slower.
     const unstamped = measuredUnder.filter((r) => (at[r.gate] || UNKNOWN_AT) === UNKNOWN_AT);
-    return { measuredUnder: measuredUnder.length, lost, unstamped,
+    return { measuredUnder: measuredUnder.length, lost, unstamped, reverted, backOver: backOver.length,
              held: measuredUnder.length - lost.length, rotatedAt: (rot && rot.at) || null };
 }
+
+/**
+ * Gates whose rotation reading crossed the budget by luck, each with the serial re-measurement that says so.
+ * A gate leaves this list by being re-measured under budget, not by being deleted.
+ */
+/**
+ * *** v4533 -- FIVE AT ONCE, AND THE HONEST NAME FOR IT IS NOT "OUTLIER". ***
+ *
+ * v4531 excluded ONE gate whose rotation reading crossed the budget by luck. This round's sweep reported
+ * FIVE lost, and re-measuring them serially says something different from five coincidences:
+ *
+ *     microfacetVndf   rotation 2560   serial now 3152, 3216
+ *     reportDoors      rotation 2262   serial now 3158, 2965
+ *     slugReupload     rotation 2734   serial now 3133, 3124
+ *     water2d          rotation 2551   serial now 3132, 3153
+ *     probeLab         rotation 2870   serial now 3189, 3197
+ *
+ * Every one landed in 2.2-2.9s at rotation time and every one lands at ~3.1s now, SERIALLY, with nothing in
+ * this round touching any of them. That is not five gates flapping independently; it is ONE BOX MEASURED AT
+ * TWO DIFFERENT TIMES, and the 3,000 ms budget sits exactly where this machine's noise lives. Calling them
+ * outliers would file a property of the hardware as five properties of five gates.
+ *
+ * *** SO THE ENTRY IS THE CLUSTER, AND WHAT IT ADMITS IS THAT THE ROTATION LEDGER IS STALE RATHER THAN THAT
+ * THE TIMINGS ARE WRONG. *** The durable repair is a re-run of step 3b on a quiet box, which re-times
+ * serially and writes today's numbers back; until somebody does that, these five are recorded here WITH the
+ * measurements that justify each one, so a reader can check the claim rather than take it. A gate leaves this
+ * list by being re-measured under budget, never by being deleted.
+ */
+/**
+ * *** v4535 -- EMPTY, AND THAT IS THE EXIT CONDITION BEING MET RATHER THAN THE LIST BEING TIDIED. ***
+ *
+ * v4533's own words: "the durable repair is a re-run of step 3b on a quiet box, which re-times serially and
+ * writes today's numbers back". Somebody did that. All six entries -- five here and v4531's one -- were
+ * re-measured THREE TIMES SERIALLY, the same instrument that put them on the list, and every one of the
+ * eighteen readings came back under budget:
+ *
+ *     misWgsl          serial then 3075/3102/3134   serial now 2638/2822/2809
+ *     microfacetVndf   serial then 3152/3216        serial now 2157/2136/2363
+ *     reportDoors      serial then 3158/2965        serial now 1848/2016/1883
+ *     slugReupload     serial then 3133/3124        serial now 2521/2441/2391
+ *     water2d          serial then 3132/3153        serial now 2400/2427/2369
+ *     probeLab         serial then 3189/3197        serial now 2523/2465/2503
+ *
+ * *** SO v4533 WAS RIGHT ABOUT THE CLUSTER AND v4531 WAS WRONG ABOUT THE OUTLIER, AND ONLY THE SECOND
+ * MEASUREMENT COULD TELL THEM APART. *** Five gates moving together said "one box measured at two different
+ * times"; the sixth was filed as a property of misWgsl -- "the gate genuinely sits just OVER budget on this
+ * box" -- and it moves with the other five. Three serial samples were enough to refute a single sub-budget
+ * rotation reading and NOT enough to establish a gate's cost, because the noise this budget sits in has a
+ * period longer than three consecutive runs of one gate.
+ *
+ * THE LIST IS WHAT MADE THAT CHECKABLE. Both entries carried the gate names and the numbers behind them, so
+ * the claim could be refuted by re-running six commands; a tolerance band -- the repair v4531 declined --
+ * would have forgiven all six silently and left nothing to re-run. Empty is the state a record like this is
+ * supposed to reach, and rotationHeld now runs with no exemptions at all.
+ */
+export const ROTATION_BOUNDARY_V4533 = Object.freeze([]);
+
+/** The retired entries, kept with BOTH measurements so the retirement is as checkable as the entry was. */
+export const ROTATION_BOUNDARY_RETIRED_V4535 = Object.freeze([
+    Object.freeze({ gate: "physics/render/misWgsl-selfcheck.mjs",        at: "v4531", rotationMs: 2966, serialThen: Object.freeze([3075, 3102, 3134]), serialNow: Object.freeze([2638, 2822, 2809]) }),
+    Object.freeze({ gate: "physics/render/microfacetVndf-selfcheck.mjs", at: "v4533", rotationMs: 2560, serialThen: Object.freeze([3152, 3216]),       serialNow: Object.freeze([2157, 2136, 2363]) }),
+    Object.freeze({ gate: "tools/ship/reportDoors-selfcheck.mjs",        at: "v4533", rotationMs: 2262, serialThen: Object.freeze([3158, 2965]),       serialNow: Object.freeze([1848, 2016, 1883]) }),
+    Object.freeze({ gate: "tools/ship/slugReupload-selfcheck.mjs",       at: "v4533", rotationMs: 2734, serialThen: Object.freeze([3133, 3124]),       serialNow: Object.freeze([2521, 2441, 2391]) }),
+    Object.freeze({ gate: "tools/ship/water2d-selfcheck.mjs",            at: "v4533", rotationMs: 2551, serialThen: Object.freeze([3132, 3153]),       serialNow: Object.freeze([2400, 2427, 2369]) }),
+    Object.freeze({ gate: "tools/ship/probeLab-selfcheck.mjs",           at: "v4533", rotationMs: 2870, serialThen: Object.freeze([3189, 3197]),       serialNow: Object.freeze([2523, 2465, 2503]) }),
+]);
+
+export const ROTATION_OUTLIERS_V4531 = Object.freeze([]);   // retired at v4535 -- see the note above; misWgsl
+                                                            // re-measured 2638/2822/2809 serially, under budget.
+
+/**
+ * *** v4535 -- ONE GATE THAT REALLY DOES STRADDLE, AND IT TOOK EMPTYING THE LIST TO SEE IT. ***
+ *
+ * Eight entries were retired this round because a quiet box put all eight back under budget, and the same
+ * round's sweep produced exactly ONE new lost gate -- and this one does not move when the box quiets down:
+ * 3,065 / 2,823 / 3,208 / 3,269 / 3,000 ms across five serial runs, median 3,065 against a 3,000 ms budget.
+ * The rotation caught it at 2,991 and the sweep wrote 3,115; BOTH READINGS ARE HONEST AND THE GATE IS THE
+ * COIN, not the box. That is what the eight false straddlers were being confused with, and the difference is
+ * five samples rather than one.
+ *
+ * NOTHING IS FORGIVEN BY THIS ENTRY. The gate stays out of the quick sweep, because 3,065 ms IS over the
+ * budget and the budget is not the thing under negotiation here; what the entry says is that a 2,991 ms
+ * rotation reading followed by a 3,115 ms sweep reading is one gate sampled twice, not a measurement lost
+ * between them. It leaves this list the way the other eight did -- by being re-measured under budget, or by
+ * being made cheaper. winPathGuard was made cheaper in this same round (3,033 -> 1,675 ms, by deleting a
+ * second walk of the tree it did not need), which is the repair this one has not had yet.
+ */
+/**
+ * *** v4536 -- THREE OF THE EIGHT RETIRED ONE ROUND AGO ARE BACK, AND THAT IS THE MECHANISM'S OWN FINDING
+ * RATHER THAN A MISTAKE IN EITHER ROUND. ***
+ *
+ * v4535 emptied both boundary lists on the argument that eight straddlers moving together meant ONE BOX GOT
+ * QUIETER, with three serial readings each to prove it. The box got loud again inside a day, and the same
+ * three serial runs on the same unchanged code read:
+ *
+ *     misWgsl      v4535 quiet: 2638 / 2822 / 2809      v4536 loud: 4026 / 3992 / 4015
+ *     probeLab     v4535 quiet: 2523 / 2465 / 2503      v4536 loud: 3211 / 3157 / 3167
+ *     water2d      v4535 quiet: 2400 / 2427 / 2369      v4536 loud: 3048 / 3027 / 3042
+ *
+ * misWgsl is 43% slower than it was, with not one byte of it changed, and the sweep that surfaced this took
+ * 265 s against 197 s for the identical work. BOTH ROUNDS MEASURED HONESTLY AND BOTH ATTRIBUTED TO THE GATE.
+ *
+ * *** SO THIS LIST IS A LOG OF THE BOX'S WEATHER WEARING THE NAME OF A GATE PROPERTY, AND NO NUMBER OF
+ * RE-MEASUREMENTS FIXES THAT. *** rotationHeld compares a rotation reading against a timings reading taken at
+ * a different hour under different load; for anything within ~30% of the budget the comparison is decided by
+ * which hour, and this session has now watched eight gates cross in one direction and three cross back. A
+ * tolerance band is still the wrong repair (v4531's argument stands: it forgives every future case silently).
+ * The repair that would actually work is CALIBRATION -- time a fixed reference workload during the sweep and
+ * normalise every reading by it, so a slow hour moves all 1,595 numbers together instead of moving thirty of
+ * them across a line. That is a round of its own and is filed as one in tools/ship/nextRounds.mjs; until it
+ * exists, these three are named here WITH BOTH READINGS, so the next reader inherits the oscillation as
+ * evidence rather than re-deriving it from an empty list for the third time.
+ */
+/**
+ * *** v4536 -- THE BACKLOG ASKED FOR A REFERENCE WORKLOAD. IT WAS BUILT, MEASURED, AND IT DOES NOT WORK. ***
+ *
+ * nextRounds' `sweep-budget-calibration` is right about the disease: "a millisecond on a loaded box and a
+ * millisecond on a quiet one are being compared as if they were the same quantity". It proposes normalising
+ * every reading by a fixed workload timed during the sweep. Two candidates were built and driven under a
+ * synthetic 8-hog load on this 4-core box:
+ *
+ *     refCompute   a pure integer loop over a 16 KB working set     moved 1.02x while gates moved 1.22-2.26x
+ *     refSpawn     `node -e 0`, the cost every gate pays first      moved 2.43x while gates moved 1.22-2.26x
+ *
+ * NEITHER TRACKS. A single-threaded ALU loop keeps its own core and barely notices; process spawn is far more
+ * contended than the gates are. Normalising by the first changes nothing and by the second overcorrects by
+ * about 2x. The residual spread after normalising is 1.15x and 1.9x respectively -- both larger than the
+ * margin that decides eviction, so the treadmill would continue with an extra number in the file.
+ *
+ * *** AND THE DRIFT IS NOT A COMMON FACTOR, WHICH IS THE DEEPER REASON. *** Serial against serial, on gates
+ * whose gate file and subject are BYTE-IDENTICAL since the earlier reading (checked with git, not assumed):
+ *
+ *     microfacetVndf   3184 -> 3613   1.13x        probeLab   3193 -> 4337   1.36x
+ *     water2d          3143 -> 3546   1.13x        meshLine   2792 -> 3804   1.36x
+ *     slugReupload     3129 -> 3507   1.12x
+ *
+ * Three at 1.12-1.13 and two at 1.36 is not one number the box is multiplied by; a scalar cannot carry it.
+ * AND AT LEAST ONE OF THE OUTLIERS IS NOT THE BOX AT ALL: meshLine WALKS THE TREE (three readdir sites), so
+ * its cost grows as the tree grows, and that growth is real work. *** A REFERENCE NORMALISER WOULD HAVE
+ * DIVIDED THAT AWAY AND FILED GENUINE GROWTH AS A SLOW HOUR, *** which is a worse fault than the one it was
+ * sent to fix.
+ *
+ * WHAT WAS DONE INSTEAD is in quickSweep.mjs: a crossing must be reproduced on a later sweep before it evicts.
+ * Within one hour these gates repeat to about 2% (probeLab 4398 / 4425 / 4337); across hours they move up to
+ * 36%. So one crossing is a reading and two are a property -- v4297's rule for reds, applied to time.
+ *
+ * ONE MORE READING, KEPT BECAUSE IT IS LARGER THAN EVERYTHING ABOVE: twelve gates from a single capture,
+ * unchanged code, re-measured serially, came in at 0.41x to 0.92x of their recorded time -- A 2.24x SPREAD --
+ * because the file mixes 8-way parallel readings with serial ones and compares both against one budget. That
+ * is not repaired here and is the next thing to look at.
+ */
+export const BUDGET_DRIFT_V4536 = Object.freeze({
+    at: "v4536", box: "4 cores", budgetMs: BUDGET_MS,
+    referenceWorkloadsTried: Object.freeze([
+        Object.freeze({ name: "refCompute", what: "pure integer loop, 16 KB working set", movedUnderLoad: 1.02 }),
+        Object.freeze({ name: "refSpawn", what: "node -e 0", movedUnderLoad: 2.43 }),
+    ]),
+    gatesMovedUnderLoadFrom: 1.22, gatesMovedUnderLoadTo: 2.26,
+    // serial-against-serial, code byte-identical, hours apart
+    hourDrift: Object.freeze([
+        Object.freeze({ gate: "physics/render/microfacetVndf-selfcheck.mjs", was: 3184, now: 3613 }),
+        Object.freeze({ gate: "tools/ship/water2d-selfcheck.mjs", was: 3143, now: 3546 }),
+        Object.freeze({ gate: "tools/ship/slugReupload-selfcheck.mjs", was: 3129, now: 3507 }),
+        Object.freeze({ gate: "tools/ship/probeLab-selfcheck.mjs", was: 3193, now: 4337 }),
+        Object.freeze({ gate: "tools/ship/meshLine-selfcheck.mjs", was: 2792, now: 3804 }),
+    ]),
+    withinHourSpreadPct: 2,        // probeLab 4398 / 4425 / 4337 across three consecutive runs
+    growthNotDrift: "tools/ship/meshLine-selfcheck.mjs walks the tree, so part of its 1.36x is the tree " +
+                    "growing rather than the box slowing. A scalar normaliser cannot tell those apart and " +
+                    "would file the first as the second.",
+    parallelToSerialSpread: 2.24,  // twelve unchanged gates, one capture, re-measured alone: 0.41x to 0.92x
+    repairShipped: "quickSweep.MIN_CROSSINGS_TO_EVICT -- a crossing must be reproduced on a later sweep",
+    // *** AND THE FIRST DRAFT OF THAT REPAIR WOULD HAVE RUN THE WHOLE OVER-BUDGET POOL AT SHIP TIME. ***
+    // It gave probation to any gate over budget whose crossing count was MISSING, and a missing count is the
+    // normal state of the ~300 gates evicted before this rule existed -- the expensive ones, twice over
+    // before the counts settled, which is exactly the cost sweepRotation exists to spread across rounds.
+    // budgetExile-selfcheck caught it inside the round by seeding a gate with a 999,999 ms lie and watching
+    // the sweep go and run it. Probation is for a gate that crossed UNDER this rule; a missing count means
+    // "evicted before it existed" and those stay out.
+    firstDraftFault: "probation on a MISSING count is probation for the entire over-budget pool",
+    notClaimed: "that two crossings prove a gate is over budget on a quiet box. They prove the reading " +
+                "reproduced. What this removes is the eviction that rests on ONE hour, which is the one the " +
+                "straddler lists have been undoing by hand for three rounds.",
+});
+
+/**
+ * *** WHAT THE SWEEP FILES IS A CONTENDED SAMPLE, AND THE WHOLE TREE HAS BEEN READING IT AS A COST. ***
+ *
+ * v4536 (BUDGET_DRIFT_V4536, above) established that this box moves 12-36% between hours and that a scalar
+ * reference workload cannot normalise it, and repaired the EVICTION that rested on one reading. It did not
+ * ask how far the recorded number is from the gate's actual cost, because nothing needed to know until a
+ * gate started going red on the answer: tools/ship/recordReach-selfcheck.mjs asserts a MARGIN below the
+ * budget, and frozenRecords-selfcheck was filed at 1,185 / 1,217 / 2,931 ms across three sweeps of
+ * byte-identical code while running 1,201 to 1,219 ms alone. A row that reddens on scheduling luck.
+ *
+ * MEASURED BY RUNNING THE SAME SWEEP TWICE, at 8 workers and at 1, and comparing the 1,011 gates that ran
+ * in both (four cores, so eight workers is 2x oversubscription):
+ *
+ *     parallel / serial     p10 1.25x    MEDIAN 2.41x    p90 3.44x    max 6.88x    min 0.55x
+ *     total filed time      685 s at 8 workers against 358 s at 1
+ *     wall time             230 s at 8 workers against 374 s at 1
+ *
+ * SO THE PARALLELISM BUYS 1.63x OF WALL CLOCK AND COSTS A 2.41x MEDIAN INFLATION OF EVERY NUMBER THE TREE
+ * THEN QUOTES. Neither run put a single gate over the budget that the other put under, which is v4408 and
+ * v4536 working: eviction is protected. What was not protected is the reading itself.
+ *
+ * *** AND IT IS THE BEST EVIDENCE THE OVER-BUDGET ITEM HAS EVER HAD. *** Twelve of the 464 exiled gates,
+ * sampled across the 3-to-20-second band and run ALONE: filed/serial median 1.86x, range 0.83x to 4.60x,
+ * and FIVE OF TWELVE COME IN UNDER THE 3,000 ms BUDGET. Most carry a stamp from before v4408, so they were
+ * exiled on exactly the kind of reading this record is about. One of the twelve (gateReport-selfcheck) is
+ * SLOWER alone and exits 1 -- a red that has been sitting in the exiled pool where nothing runs it.
+ *
+ * THE REPAIR IS NOT TO STOP PARALLELISING. It is to stop conflating two numbers: `timings` decides
+ * MEMBERSHIP next sweep and is a sample of the conditions membership will be decided under, while `serial`
+ * is what the gate costs. Every phase-2 run already produces one; each sweep now spends a stated slice of
+ * wall time (15 s, about 6.5% of the run) re-running the gates whose serial reading is oldest, so the file
+ * turns over in roughly thirty sweeps. quickSweep.costOf() is what a consumer asks.
+ */
+export const SWEEP_CONTENTION_V4562 = Object.freeze({
+    at: "v4562", cores: 4, workers: 8, budgetMs: BUDGET_MS,
+    comparedGates: 1011,
+    ratio: Object.freeze({ p10: 1.25, median: 2.41, p90: 3.44, max: 6.88, min: 0.55 }),
+    worst: Object.freeze({ gate: "tools/ship/installHistoryReadout-selfcheck.mjs", parallelMs: 358, serialMs: 52 }),
+    filedTotalMs: Object.freeze({ workers8: 685000, workers1: 358000 }),
+    wallMs: Object.freeze({ workers8: 230000, workers1: 374000 }),
+    speedup: 1.63,
+    crossedInOneButNotTheOther: 0,
+    // the exiled pool, sampled directly rather than by applying the median above to it
+    overBudgetSample: Object.freeze({
+        n: 12, band: "3,000 to 20,000 ms as filed", medianRatio: 1.86, minRatio: 0.83, maxRatio: 4.60,
+        underBudgetWhenRunAlone: 5,
+        slowerAloneAndRed: "tools/ship/gateReport-selfcheck.mjs -- 6,290 filed, 7,553 alone, exit 1",
+    }),
+    repairShipped: "quickSweep.costOf() plus a `serial` map the sweep accumulates on a wall-time-bounded " +
+                   "rotating slice; recordReach-selfcheck reads it and REQUIRES a serial source",
+    notClaimed: "that 2.41x is a constant of this box. It is one pair of sweeps an hour apart, and " +
+                "BUDGET_DRIFT_V4536 already measured 12-36% of hour-to-hour drift underneath it. What is " +
+                "claimed is the SHAPE -- that the filed number runs well above the cost, on nearly every " +
+                "gate, in a way no consumer of the file was accounting for.",
+});
+
+/*
+ * *** v4565 -- THE FIRST BULK PASS AT THE EXILED POOL, AND WHAT COMES BACK IS HALF OF IT. ***
+ *
+ * Backlog item #14 has said since v4406 that a third of the tree never runs at ship time. Every round before this
+ * one measured the pool, sampled it, or opened a door in the mechanism; none of them emptied any of it, because the
+ * stalest-first rotation is the wrong selection for the job. Stalest-first covers the pool fairly and spends its
+ * budget on whatever happens to be oldest, which on this file means twenty-second gates that were never coming back.
+ * The RETURNEES live at the cheap end -- a gate filed at 4 s that really costs 1 s -- and those are also the fastest
+ * to measure, so a pass aimed at them buys back an order of magnitude more gates per minute. --band (v4565, this
+ * round) selects by recorded cost; everything else about the rotation is unchanged, which is the rule --gate set.
+ *
+ * THE PASS: every over-budget gate filed between 3,000 and 8,000 ms, run SERIALLY, one at a time, on this box.
+ *   ran                      210 gates (prior readings 3,008 to 7,922 ms) in one slice, stamp 2026-09-09T12:57:13Z
+ *   RETURNED UNDER BUDGET    105  -- fresh serial readings 65 ms to 2,958 ms, filed/serial median 2.43x
+ *   red                       12  -- 4 already registered, 8 NEW, each named below
+ *   hit the 20,000 ms cap      2  -- shippedLadder (4,906 filed) and tslRace (5,996 filed)
+ *   materially slower          9  -- over 1.5x their filed reading, the two cap-hitters among them
+ *
+ * THE POOL, before and after, from census() on the live file:
+ *   over budget    326 -> 219        killed  138 -> 140        under  1,150 -> 1,255
+ *   (326 - 105 returned - 2 that hit the cap = 219, and the 2 are what moved killed from 138 to 140: the pass
+ *   walks c.over, so a cap-hit does not leave the exiled population, it changes which bucket exiles it.)
+ *   OUTSIDE THE SHIP-TIME SWEEP  464 of 1,614 (28.7%)  ->  359 of 1,614 (22.2%)
+ *
+ * So one pass of thirty-odd minutes moved 6.5 points of the tree back inside the sweep, and the mechanism v4408
+ * built is the whole reason it could: the readings that evicted these 105 were contended samples, and 89 of them
+ * carried a stamp saying so. The biggest single correction was 89.5x.
+ *
+ * *** WHAT IS LEFT IS THE HARD HALF, AND THE SHAPE OF IT IS THE POINT. *** 219 over budget: 91 still in the 3-8 s
+ * band (the ones that really are slow, plus the 12 reds and 9 slower) and 128 in 8-20 s, which is another ~24
+ * minutes of serial time and a far worse rate of return. AND 140 KILLED GATES THE ROTATION CANNOT REACH AT ALL:
+ * rotation() walks c.over, and c.killed is a different bucket. A gate that hit the cap is exiled by a mechanism
+ * with no door in it whatsoever -- the one-way door this file exists to open, still shut for 39% of what is
+ * outside the sweep. That is the next round's item, not this one's, and it is stated rather than left to be
+ * rediscovered.
+ *
+ * *** THE EIGHT NEW REDS. *** All eight were green in the register and red the moment something ran them; none is a
+ * regression this round caused. Each is fixed in this commit, cause first:
+ *   absenceScope      the gate's own scope list had drifted from the module's -- ARRIVALS RECORDED BY NAME now
+ *                     (INSCOPE_ARRIVALS_SINCE_V4435), the idiom frontDoor and orreryFleet already use
+ *   reportDoors      a door with no gate anywhere, which the population() census could not express until it grew
+ *                     gateAnywhere (NO_GATE_V4565, UNGATED_ANYWHERE_V4565)
+ *   brainTrail        asserted a brain page that no longer exists; re-taken against what is there
+ *   frontDoor         four reaches arrived since v4407 and were never recorded by name
+ *   mpmGpuPage        the detector matched `initial-scale=1` in a viewport META TAG -- prose counted as code. It
+ *                     now extracts <script> bodies before looking, and says so as a prohibition
+ *   gateReport        three gates emitted no report at all (xatlasRef, chunk, detourScale); each now writes one
+ *   scoreDirection    an exhausted-adjudication row that could not fail; re-taken to assert the exhaustion
+ *   crtToggle         a FLAKE, and named as one rather than fixed: green alone twice, red under the pass. It is
+ *                     the only one of the eight with nothing wrong in the tree, and calling it fixed would be
+ *                     the lie this record exists to avoid.
+ *
+ * *** AND THE PASS BROKE SOMETHING, WHICH IS THE FINDING THAT MATTERED MOST. *** tslRace-selfcheck writes
+ * tools/ship/tsl-emitted-race.json in five sections, section 1 wholesale and sections 5-8 merging into what it
+ * left. Under the pass it took 23,750 ms against 5,996 filed, hit the cap, and died after section 1 -- so the
+ * `atlas` key, section 6's, was truncated away and never rewritten. tools/ship/wgslCorpus.mjs dropped
+ * tslSource.spriteAtlas behind its `EMITTED_RACE.atlas &&` presence guard, the corpus got one case smaller, and
+ * NOT ONE ROW ANYWHERE WENT RED: crossBackend asserts `results.length === corpus().length`, the corpus compared
+ * against itself, which holds at any size. It was found by reading a `git status` line. The same shape as
+ * ROTATION_LOST_V4461 below -- a whole-file writer erasing rows another writer paid for -- inside one process
+ * instead of across two, and fixed the same way: merge by key. wgslCorpus.GENERATED_CASES now names all fifteen
+ * generated cases, and probeConvention-selfcheck is the census that sees one leave.
+ */
+export const OVER_BUDGET_PASS_V4565 = Object.freeze({
+    at: "v4565", band: Object.freeze([3000, 8000]), stamp: "2026-09-09T12:57:13.333Z", serial: true,
+    ran: 210, priorMsRange: Object.freeze([3008, 7922]),
+    returnees: 105, red: 12, hitTheCap: 2, materiallySlower: 9,
+    newlyRed: 8, alreadyRegistered: 4,
+    returneeMsRange: Object.freeze([65, 2958]), returneeSpeedup: Object.freeze({ median: 2.43, max: 89.46 }),
+    pool: Object.freeze({ overBefore: 326, overAfter: 219, killedBefore: 138, killedAfter: 140,
+                          underBefore: 1150, underAfter: 1255, gates: 1614 }),
+    outsideTheSweep: Object.freeze({ before: 464, after: 359, beforePct: 28.7, afterPct: 22.2 }),
+    // what the pass did NOT touch, stated so the next round does not have to rediscover its own size
+    remaining: Object.freeze({
+        band3to8: 91, band8to20: 128,
+        killedUnreachable: 140,
+        why: "rotation() walks c.over and c.killed is a different bucket, so a gate that hit the 20,000 ms cap " +
+             "is exiled with no door at all -- 39% of everything outside the sweep, and the next item",
+    }),
+    // named, because a count of reds is a number and a list of causes is a repair
+    newReds: Object.freeze(["tools/ship/absenceScope-selfcheck.mjs", "tools/ship/reportDoors-selfcheck.mjs",
+        "tools/ship/brainTrail-selfcheck.mjs", "gfx/frontDoor-selfcheck.mjs", "tools/ship/mpmGpuPage-selfcheck.mjs",
+        "tools/ship/gateReport-selfcheck.mjs", "physics/scoreDirection-selfcheck.mjs", "tools/ship/crtToggle-selfcheck.mjs"]),
+    flakeNotFixed: "tools/ship/crtToggle-selfcheck.mjs -- green alone twice, red under the pass; nothing in the " +
+                   "tree is wrong and it is recorded as a flake rather than counted as a repair",
+    cappedAndDestructive: Object.freeze({
+        gate: "tools/ship/tslRace-selfcheck.mjs", filedMs: 5996, underPassMs: 23750, aloneMs: 20000,
+        lost: "tools/ship/tsl-emitted-race.json `atlas` (section 6, 17 lines)",
+        corpusCaseLost: "tslSource.spriteAtlas (generated)",
+        seenByNothing: "every generated corpus case sits behind a presence guard, and crossBackend's " +
+                       "`results.length === corpus().length` is the corpus measured against itself",
+        foundBy: "a `git status` line, not a gate",
+        fixed: "tslRace section 1 merges by key (v4566); wgslCorpus.GENERATED_CASES names all 15; " +
+               "probeConvention-selfcheck is the census",
+    }),
+    notClaimed: "that 105 of these gates are permanently under budget. BUDGET_DRIFT_V4536 measured 12-36% of " +
+                "hour-to-hour drift and ROTATION_BOUNDARY_V4535 names five gates that cross the budget in both " +
+                "directions on the same day. What is claimed is that 105 gates filed above 3,000 ms measured " +
+                "below it when run serially and alone, and that the sweep will now re-time them itself.",
+});
+
+/*
+ * *** v4568 -- THE BUCKET NOTHING COULD RUN, RUN. 103 OF 140 NOW HAVE A VERDICT AND FIVE OF THEM ARE RED. ***
+ *
+ * OVER_BUDGET_PASS_V4565 ended by naming what it could not reach: 140 gates that hit the 20,000 ms cap,
+ * exiled by a mechanism with no door in it, 39% of everything outside the ship-time sweep. This is that door
+ * and what came through it.
+ *
+ * THE PASS: every gate in c.killed, run SERIALLY at a 90 s cap -- ten times the cap that exiled them, because
+ * re-running a capped gate AT the cap it died on can only reproduce the death.
+ *   ran                     140 gates (139 in the ledger: domScope was re-timed after and carries a later stamp)
+ *   FINISHED                103  -- 97 green, 6 red; readings 51 ms to 87,648 ms, median 24,559
+ *   did not finish           37  -- still no verdict, now with a 90 s floor under them instead of 20 s
+ *   under the OLD 20 s cap   35  -- exiled by a reading their own re-run does not reproduce
+ *   under the 3,000 ms budget 1  -- placementRender-selfcheck, 20,125 ms on file and 51 MILLISECONDS alone
+ *
+ * *** 129 OF THE 140 CARRIED A STAMP OLDER THAN PER-ENTRY STAMPING ITSELF *** -- the same staleness the
+ * over-budget bucket turned out to be substantially made of, in a bucket nothing could refresh at all.
+ *
+ * *** THE FIVE REDS ARE THE POINT, NOT THE TIMINGS. *** v4392's rule is that a count of failures is not a
+ * verdict unless the process finished, and this bucket held gates that HAD finished and failed with nowhere
+ * to say so. Each is a defect in a different subsystem, registered by name in redCensus.RED_AT_V4568 rather
+ * than fixed here -- the round is about the door:
+ *   commentFalsePass    ui/qrChannel-selfcheck asserts against RAW source and is satisfied by a COPYRIGHT
+ *                       COMMENT in ui/qrDecode.mjs. The exact defect that gate exists to hunt, in a gate.
+ *   gateReach           the recorded default population is 472 against a live 520
+ *   baselineHygiene     seven baseline entries have outlived their reason; the gate names them for deletion
+ *   gateSelection       reachable gates are no longer scheduled first, so a truncated run misses the change
+ *   orphanDisposition   a signal that now holds for 28 of 30 members, and so discriminates nothing
+ *
+ * *** AND A SIXTH RED WAS THE PASS'S OWN, WHICH IS WHY THE MECHANISM CHANGED AND NOT ONLY THE FILE. ***
+ * domScope-selfcheck was filed red at 90,129 ms and is GREEN alone at 101,386 and 102,999 ms: it needs more
+ * than ninety seconds and nothing else. The pass called it finished-and-failed because execFileSync's timeout
+ * can leave an exit STATUS rather than a signal, so "was this killed" was answered by comparing a number to
+ * the cap instead of by the fact. runGate uses spawnSync now and reports timeout/signal outright, verified by
+ * capping a 100-second gate at five. IT IS THE SAME MISTAKE THE BUCKET IS MADE OF -- a proxy read as the
+ * fact -- committed by the instrument built to fix it, one hour after the record saying so.
+ */
+export const KILLED_PASS_V4568 = Object.freeze({
+    at: "v4568", capMs: 90000, oldCapMs: CAP_MS, serial: true,
+    stamp: "2026-09-09T17:59:42.840Z",
+    ran: 140, finished: 103, green: 97, red: 5, falseRed: 1, didNotFinish: 37,
+    underOldCap: 35, underBudget: 1,
+    msRange: Object.freeze([51, 87648]), median: 24559,
+    staleStamps: 129,                      // of 140, older than per-entry stamping (v4408)
+    witness: Object.freeze({ gate: "tools/ship/placementRender-selfcheck.mjs", filedMs: 20125, aloneMs: 51,
+        note: "395x. A gate filed AT THE CAP that runs in a twentieth of a second -- the reading that exiled " +
+              "it was never a measurement of this gate at all, and nothing could ever have corrected it." }),
+    // named, because a count of reds is a number and a list is a repair
+    reds: Object.freeze(["tools/ship/baselineHygiene-selfcheck.mjs", "tools/ship/commentFalsePass-selfcheck.mjs",
+        "tools/ship/gateReach-selfcheck.mjs", "tools/ship/gateSelection-selfcheck.mjs",
+        "tools/ship/orphanDisposition-selfcheck.mjs"]),
+    falseRedWas: Object.freeze({ gate: "tools/ship/domScope-selfcheck.mjs", filedMs: 90129, filedCode: 1,
+        aloneMs: Object.freeze([101386, 102999]), aloneCode: 0, reTimedMs: 103579,
+        cause: "execFileSync's timeout can leave an exit status rather than a signal, so the pass decided " +
+               "'finished' by comparing ms against the cap. runGate uses spawnSync and reads r.error/r.signal " +
+               "now, checked by capping a 100 s gate at 5 s." }),
+    // the loop that helped fill this bucket, fixed in the same round
+    childLeak: Object.freeze({
+        was: "p.kill(\"SIGKILL\") signals the direct child only, so a capped gate's children are reparented " +
+             "to init and keep running",
+        witness: "an orphan of tools/ship/headlessGpu-selfcheck.mjs -- which pins a WebGPU device in a child " +
+                 "ON PURPOSE, as the trap it gates -- was found holding that device for 44 minutes",
+        why: "every GPU gate running in that window competed with it, and a gate slowed past the cap is " +
+             "killed, orphaning more: the bucket feeds itself",
+        fixed: "both kill sites spawn detached and signal the process GROUP, with the single-process kill as " +
+               "a fallback; runGate signals the group whether or not the run timed out, because a gate that " +
+               "EXITS having left a child behind leaks exactly as much as one that was killed",
+        gatedBy: "a capped run of a real fixture in sweepCoverage-selfcheck -- 0 survivors against 2 under " +
+                 "sabotage. Its first two drafts could not fail: one counted orphans before reparenting had " +
+                 "happened, the other used a fixture that was a SyntaxError and spawned nothing.",
+    }),
+    notClaimed: "that the 37 which did not finish are hangs. They are gates that need more than 90 seconds, " +
+                "and this round did not find out how much more -- a floor of 90 s is what it establishes, " +
+                "against a floor of 20 s before. Nor that the 35 under the old cap are permanently there: " +
+                "BUDGET_DRIFT_V4536 measured 12-36% of hour-to-hour drift and these are single readings.",
+});
+
+export const ROTATION_BOUNDARY_V4535 = Object.freeze([
+    Object.freeze({ gate: "physics/render/albedoEstimator-selfcheck.mjs", rotationMs: 2991, sweepMs: 3115,
+        serialMs: Object.freeze([3065, 2823, 3208, 3269, 3000]),
+        why: "straddles the 3,000 ms budget on a QUIET box, which is what distinguishes it from the eight " +
+             "entries retired this round: five serial runs read 3,065 / 2,823 / 3,208 / 3,269 / 3,000 ms, " +
+             "median 3,065 and over. The rotation's 2,991 and the sweep's 3,115 are two samples of that " +
+             "spread rather than a reading lost between two writers." }),
+    Object.freeze({ gate: "physics/render/misWgsl-selfcheck.mjs", rotationMs: 2746, sweepMs: 3810,
+        serialMs: Object.freeze([4026, 3992, 4015]), quietMs: Object.freeze([2638, 2822, 2809]),
+        why: "retired at v4535 on three serial readings under budget and back over on three more the next " +
+             "day, unchanged: 2638/2822/2809 quiet against 4026/3992/4015 loud, a 43% swing with no code in " +
+             "between. Named with BOTH, because either set alone is a confident wrong answer." }),
+    Object.freeze({ gate: "tools/ship/probeLab-selfcheck.mjs", rotationMs: 2474, sweepMs: 3090,
+        serialMs: Object.freeze([3211, 3157, 3167]), quietMs: Object.freeze([2523, 2465, 2503]),
+        why: "the same swing on the same day as misWgsl and water2d -- 2523/2465/2503 quiet, 3211/3157/3167 " +
+             "loud. Three gates moving together is the box, which is exactly what v4533 said about five." }),
+    Object.freeze({ gate: "tools/ship/meshLine-selfcheck.mjs", rotationMs: 2457, sweepMs: 3014,
+        serialMs: Object.freeze([3014]), quietMs: Object.freeze([2515, 2480, 2757]),
+        why: "the fourth oscillator of the day, and the one that crossed DURING the ship sweep rather than " +
+             "before it: green while the sweep ran, red the moment the sweep's own write landed. The sweep " +
+             "rewrites the record this gate reads, so a verdict and the gate behind it can disagree by " +
+             "construction -- which is a property of the ordering, not a flake." }),
+    Object.freeze({ gate: "tools/ship/water2d-selfcheck.mjs", rotationMs: 2401, sweepMs: 3015,
+        serialMs: Object.freeze([3048, 3027, 3042]), quietMs: Object.freeze([2400, 2427, 2369]),
+        why: "2400/2427/2369 quiet against 3048/3027/3042 loud. The narrowest of the three and still a clean " +
+             "27% -- it straddles nothing; it is measured on two different machines that share a name." }),
+]);
 
 // *** THE MEASUREMENT OF THE LOSS, FROZEN BY NAME, because the ledger that proves it is REWRITTEN BY THE NEXT
 // ROTATION -- sweep-rotation.json holds only the last run, so this is the one place the 2026-09-03 run
@@ -362,8 +959,19 @@ export function doorCandidates(c, { timings = {} } = {}, { lo = BUDGET_MS, hi = 
 
 // The rotation, stalest first. `at` is a per-entry provenance string; entries with none are the stalest there
 // are, which is why UNKNOWN_AT sorts before every real capture.
-export function rotation(c, { at = {}, timings = {} } = {}, { slots = 24, budgetMs = 120000 } = {}) {
-    const pool = [...c.over].sort((a, b) => {
+// `filter` narrows the pool before the stalest-first sort -- v4565, for the bulk pass backlog item #14 asks
+// for. The ORDER within whatever is selected stays stalest-first, so a narrowed run is still the same
+// rotation on a smaller population rather than a different policy wearing its name.
+// `includeKilled` -- v4568, and it is the door OVER_BUDGET_PASS_V4565 said this file did not have. The
+// rotation walked c.over only, so 140 gates that hit the cap were exiled by a mechanism with no way back:
+// 39% of everything outside the ship-time sweep, behind the same one-way door v4408 opened for the other
+// bucket. The selection is the only thing that changes, which is the rule --gate set at v4535 and --band
+// kept at v4565; the caller supplies a bigger cap, because re-running a capped gate at the cap it died on
+// can only ever reproduce the death.
+export function rotation(c, { at = {}, timings = {} } = {}, { slots = 24, budgetMs = 120000, filter = null,
+                                                              includeKilled = false } = {}) {
+    const source = includeKilled ? [...c.over, ...c.killed] : [...c.over];
+    const pool = source.filter((g) => !filter || filter(g)).sort((a, b) => {
         const aa = at[a] || "", bb = at[b] || "";
         if (aa !== bb) return aa < bb ? -1 : 1;
         return (timings[a] || 0) - (timings[b] || 0);

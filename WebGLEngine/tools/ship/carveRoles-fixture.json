@@ -1,4 +1,5 @@
 {
+ "captured": "hand-written shader fixture; read-only, no writer in the tree",
  "at": "v4372",
  "three": "0.178.0",
  "note": "Two minimal three-shaped compute shaders for tools/ship/carveGpu-selfcheck.mjs section 1, which asks whether render/tslSource.mjs's write-detector can tell a COMPARISON from an ASSIGNMENT. They live here rather than inline for the reason render/backendParity.mjs's header gives and this tree has relearned a dozen times: a file that spells a shader marker becomes a file the shader census counts, and a gate is not a shader-bearing module. tools/ship/tslCompute-fixture.json is the same decision at v4331.",

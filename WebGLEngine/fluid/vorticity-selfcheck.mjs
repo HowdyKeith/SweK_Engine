@@ -29,7 +29,9 @@ import {
     advectSemiLagrangian, run, taylorGreen, TG,
 } from "./vorticity.mjs";
 import { inducedVelocity } from "../fx/vorton/vorton.js";
+import { gateReport } from "../tools/ship/gateReport.mjs";
 
+const REPORT = gateReport("fluid/vorticity-selfcheck.mjs");
 let fails = 0;
 const ok = (n, c, d = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${n}${d ? "   " + d : ""}`); };
 const say = (m) => console.log("  ----  " + m);
@@ -150,4 +152,11 @@ ok("...and the residual is the finite difference, not the field -- coarsening th
    coarse > worstDiv * 5, `e=1e-2 gives ${coarse.toExponential(2)} against e=1e-4's ${worstDiv.toExponential(2)}`);
 
 console.log(`\nvorticity-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);
+// v4534: these numbers used to die with the terminal -- gateReport-selfcheck named this gate for it.
+REPORT.table("curl error under refinement", ["grid n", "max curl error"],
+    errs.map((e, i) => [String(16 * (1 << i)), e.toExponential(2)]),
+    `Ratios ${ratios.map((r) => r.toFixed(2)).join(", ")} against 4 for second order: the order is read off ` +
+    "refinement rather than asserted, so a scheme that quietly dropped to first order would show it here.");
+REPORT.write();
+
 process.exit(fails === 0 ? 0 : 1);

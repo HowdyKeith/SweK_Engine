@@ -32,7 +32,14 @@
 // A STATUS CODE IS A READING, NOT A PROPERTY. This module asserts the direction the header states -- the
 // recorded axes are shut, and each refusal is attributable to a NAMED gate -- and REPORTS the readings.
 "use strict";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
 import { RUNNER, GITHUB, refusalSource } from "../../world/traderGraph.mjs";
+
+// Defined before anything that reads it: v4534's sibling round put a lookup ABOVE its `const ENG` and the
+// temporal-dead-zone ReferenceError was swallowed by a try/catch as a missing file.
+export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 /**
  * The three gates, innermost last. `mark` is what the proxy says when it is the one that stopped you; `who`
@@ -68,7 +75,11 @@ export const GATES = Object.freeze([
 export function gateOf(body) {
     const t = String(body || "");
     if (!t.trim()) return null;
-    for (const g of GATES) if (g.mark.test(t)) return g.gate;
+    // v4534: a malformed entry is SKIPPED, not thrown on. Sabotage FG emptied one gate's `mark` and this
+    // line raised a TypeError inside stack(), so the gate died before the row that checks the record could
+    // name the problem -- a crash is not a verdict, and the check that exists for exactly this defect sat
+    // twenty lines downstream of the throw.
+    for (const g of GATES) if (g.mark instanceof RegExp && g.mark.test(t)) return g.gate;
     return null;
 }
 
@@ -77,12 +88,64 @@ export function gateOf(body) {
  * and whose refusal it is. `unnamed` is the set this session cannot classify, which is the set that makes
  * the record above stale.
  */
+// ---- *** v4534 -- THE DISCRIMINATION v4483 NAMED IN PROSE, AND DID NOT PUT IN THE ASSERTION *** -----------
+//
+// v4534 SABOTAGES, RESULTS BY NAME:
+//   FA. an UNBOUND path opens (users/but0n reads 200)      -> 2 RED   <- THE INVITATION, still firing
+//   FB. isOwnRepoPath calls every path the own repo        -> *** 0 RED, THEN 2 RED ***
+//   FC. isOwnRepoPath matches nothing                      -> 3 RED
+//   FD. ownRepoOf returns a typed name instead of deriving -> 2 RED
+//   FE. two of the three gates share one holder            -> 2 RED
+//   FF. a GATES entry is deleted, so "three" is two        -> 2 RED
+//   FG. a gate's `mark` is emptied, so it is unnameable    -> *** CRASH, THEN 3 RED ***
+//
+// *** FB WENT 0 RED AND IT IS THE ONE THAT MATTERS. *** Making the discriminator answer true for every path
+// empties openElsewhere by construction, so THE INVITATION CAN NEVER FIRE AGAIN -- and the only row that
+// could have caught that is the row built on top of it. A discriminator that widens to swallow its own alarm
+// is this session's fifth control-built-from-the-defect; a fixture pins it on fixed strings now.
+//
+// FG CRASHED BEFORE IT COULD FAIL. `mark` is a RegExp and gateOf called .test() on whatever it found, so a
+// malformed record raised a TypeError inside stack() and the gate died twenty lines upstream of the row that
+// exists to name exactly that. A crash is not a verdict; gateOf skips a malformed entry now and the record
+// check reports it.
+//
+// v4483's own report line says it exactly: "What is NOT an invitation is a 200 arriving because this session
+// happens to be bound to the repository." Then the assertion is `s.open.length === 0`, which cannot tell the
+// two apart, so the gate goes red on precisely the 200 that note excludes. *** THE DISTINCTION WAS WRITTEN
+// DOWN AND NOT IMPLEMENTED. ***
+//
+// AND IT IS THE SAME MISTAKE FROM BOTH SIDES. v4481 asserted `own.code === 200` -- a reading of the box --
+// and went red when that path closed. v4483 restored the direction and asserted the path is SHUT, which goes
+// red when it opens. MEASURED: the contested path answers 200 ten times out of ten in this container and was
+// 403 throughout v4483's, while users/but0n and repos/but0n/vixel are 403 in both. *** THE VALUE IS A
+// PROPERTY OF WHICH CONTAINER RUNS THE GATE, STABLE WITHIN A SESSION AND VARYING BETWEEN THEM, so an
+// assertion about it in EITHER direction is an assertion about the box. ***
+//
+// What is assertable is the part that does not vary: a path OUTSIDE this tree's own repository. That is
+// derivable rather than typed -- the git remote says which repository this is -- so a session bound to some
+// other repo gets the same answer without editing a list.
+export function ownRepoOf(root) {
+    try {
+        const url = execFileSync("git", ["-C", root, "remote", "get-url", "origin"], { encoding: "utf8" }).trim();
+        const m = /github\.com[/:]([^/]+)\/([^/.]+)/i.exec(url);
+        return m ? `${m[1].toLowerCase()}/${m[2].toLowerCase()}` : null;
+    } catch { return null; }
+}
+
+/** Is this API path addressed at the repository this tree IS? `repos/<owner>/<repo>/...`, case-insensitively. */
+export function isOwnRepoPath(apiPath, ownRepo) {
+    if (!ownRepo) return false;
+    const m = /^repos\/([^/]+)\/([^/]+)(?:\/|$)/i.exec(String(apiPath || ""));
+    return !!m && `${m[1].toLowerCase()}/${m[2].toLowerCase()}` === ownRepo;
+}
+
 export function stack(probes) {
     // *** A PROBE THAT NEVER REACHED THE NETWORK IS NOT A REFUSAL. *** curl absent, curl killed, DNS gone:
     // the caller reports code -1 and there is no response to attribute. Folding that in with the 403s would
     // say "the proxy reworded its message" about a box that never sent a request -- the same misattribution
     // playwrightResolve.mjs's header says this tree has already paid for twice. Keith's rig reports -1 on all
     // three, and the answer it needs is "install curl", not "re-take the record".
+    const ownRepo = probes.ownRepo !== undefined ? probes.ownRepo : ownRepoOf(ENG);
     const rows = probes.map((p) => {
         const reached = p.code >= 100;
         const open = p.code === 200;
@@ -93,6 +156,9 @@ export function stack(probes) {
             reached,
             open,
             source,
+            // v4534: a 200 here is expected whenever the session is bound to this repository, so it is not
+            // an axis opening to anybody else. Derived from the git remote, not from a typed name.
+            ownRepo: isOwnRepoPath(p.path, ownRepo),
             gate: !reached || open ? null : gateOf(p.body),
         });
     });
@@ -100,7 +166,12 @@ export function stack(probes) {
     const unreached = rows.filter((r) => !r.reached);
     return Object.freeze({
         rows: Object.freeze(rows),
+        ownRepo,
         open: Object.freeze(rows.filter((r) => r.open).map((r) => r.path)),
+        // *** THE ASSERTABLE SET. *** An axis that opens somewhere this session has no binding is an
+        // invitation to anybody; one that opens on this tree's own repository is the container talking.
+        openElsewhere: Object.freeze(rows.filter((r) => r.open && !r.ownRepo).map((r) => r.path)),
+        openOwnRepo: Object.freeze(rows.filter((r) => r.open && r.ownRepo).map((r) => r.path)),
         refused: Object.freeze(refused.map((r) => r.path)),
         unreached: Object.freeze(unreached.map((r) => r.path)),
         byRunner: refused.filter((r) => r.source === RUNNER).length,

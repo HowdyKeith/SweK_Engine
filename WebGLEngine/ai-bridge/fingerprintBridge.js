@@ -25,6 +25,7 @@ const os = require("os");
 // nothing there, which is why only the one loud route ever got reported.
 const fs = require("fs");
 const path = require("path");
+const VM = require("../tools/ship/versionMarker.js");   // v4556 -- one definition of how to read a version marker
 
 // v3484 -- one measurement per process, shared by everyone who asks while it is running.
 let _obsCache = null, _obsInFlight = null, _obsAt = 0, _obsOffThread = null;
@@ -762,7 +763,7 @@ function handle(req, res) {
                 let update = null;
                 try {
                     const mainJs = fs.readFileSync(path.join(process.cwd(), "main.js"), "utf8");
-                    const m = mainJs.match(/ENGINE_VERSION\s*=\s*"(v\d+)"/);
+                    const m = mainJs.match(VM.markerRe("ENGINE_VERSION"));
                     const hubV = m ? m[1] : null;
                     const yours = rep.engineVersion || null;
                     const n = (v) => (v ? parseInt(String(v).replace(/^v/, ""), 10) : NaN);

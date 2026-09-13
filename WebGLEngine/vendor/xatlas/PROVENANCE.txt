@@ -1,0 +1,30 @@
+xatlas.h, xatlas.cpp -- vendored
+https://github.com/jpcy/xatlas
+author: Jonathan Young -- see LICENSE (MIT, Copyright (c) 2018-2020 Jonathan Young)
+
+Pinned at f700c7790aaa030e794b52ba7791a05c085faf0c, cloned and read in this tree rather than
+remembered. LICENSE is 20 lines, sha256 2c16d5b1c280 -- which is NOT the 21-line MIT text six
+other vendored repositories here share (74bf9a05e75f). world/licenceSweep.mjs records the hash
+for exactly that reason.
+
+Recorded at v4560.
+
+*** THIS IS A REFERENCE, NOT A DEPENDENCY. NOTHING IN THE ENGINE LOADS IT. ***
+
+xatlas is C++ and there is no emscripten in this sandbox, so it cannot ship to the browser --
+clang++ and g++ ARE here, so it can be BUILT AND RUN natively, and that is what it is for. The
+engine's own unwrapper, physics/mesh/uvLscm.mjs, welds, segments into charts and solves LSCM:
+the same pipeline in miniature. Until now it was graded only against itself and against
+properties it asserted about its own output. xatlas is the reference implementation of that
+pipeline, so it can be run on the SAME mesh and the two outputs scored by ONE metric.
+
+WHAT IS VENDORED: the two files of the core library and its licence. Not the repository --
+no models/, no bin/, no premake5.lua, no thirdparty. The two files are self-contained: they
+compile with `g++ -O2 -std=c++11` and no other dependency, which is checked rather than
+claimed (tools/mesh/xatlasRef.mjs builds them on demand and SKIPS when no compiler is present).
+
+EVIDENCE:
+  git ls-remote https://github.com/jpcy/xatlas HEAD  ->  f700c7790aaa030e794b52ba7791a05c085faf0c
+  head -3 LICENSE  ->  "MIT License" / "" / "Copyright (c) 2018-2020 Jonathan Young"
+  sha256sum LICENSE | cut -c1-12  ->  2c16d5b1c280
+  wc -l LICENSE  ->  20

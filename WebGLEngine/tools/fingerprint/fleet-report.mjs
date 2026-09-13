@@ -25,12 +25,13 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { peerReport, compareReports, reportLines, ledgerEntriesFrom } from "./peerReport.mjs";
 import { loadLedger, saveLedger, record } from "../ledger/ledger.mjs";
+import VM from "../../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "../..");
 
 function engineVersion() {
-    try { return (fs.readFileSync(path.join(ROOT, "main.js"), "utf8").match(/ENGINE_VERSION = "(v\d+)"/) || [])[1] || "unknown"; }
+    try { return (fs.readFileSync(path.join(ROOT, "main.js"), "utf8").match(VM.markerRe("ENGINE_VERSION")) || [])[1] || "unknown"; }
     catch { return "unknown"; }
 }
 

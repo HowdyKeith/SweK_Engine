@@ -81,12 +81,46 @@ say(gates.length + " gates: " + gates.filter((g) => evidence(g) === "timed").len
 function MEASURED_COUNT() { return gates.filter((g) => evidence(g) === "measured").length; }
 
 // ---- 2. THE WALL -------------------------------------------------------------------------------------------
-ok("!! *** every gate carries evidence about its own runtime, or admits that it does not finish ***",
-   noEvidence.length === 0,
-   noEvidence.length + " with none" +
-   (noEvidence.length ? " -- " + noEvidence.slice(0, 6).join(", ") + (noEvidence.length > 6 ? " (+" + (noEvidence.length - 6) + ")" : "")
+// *** v4547 -- THIS ROW WENT RED ONCE FOR EVERY GATE THE TREE GAINED, AND IT WAS CALLED A FLAKE. ***
+//
+// It was not a flake, it was deterministic, and the reason is the ORDER OF TWO WRITES. quickSweep.mjs
+// rewrites sweep-timings.json at the END of a sweep, and this gate runs INSIDE that sweep -- so it reads the
+// PREVIOUS run's file, which was written before the new gate existed. A gate added this round therefore has
+// no entry, is counted as "no evidence", and goes red exactly once; the next verify reads a file that now
+// contains it and goes green. Re-running it alone afterwards ALSO reads the new file, which is why it looked
+// like load. Reproduced against four committed versions of the timings file: HEAD green, HEAD~1 red naming
+// navWiringLive, HEAD~2 red naming navWiring, HEAD~3 red naming terrainWalk -- one per round that added one.
+//
+// *** THE TWO POPULATIONS ARE DIFFERENT AND ONLY ONE OF THEM IS THE POINT. *** The sweep's map holds an entry
+// for every gate it has ever enumerated -- 1,603 entries against 1,601 gates, including stale ones for files
+// since deleted -- so:
+//
+//   ABSENT from the map entirely   the sweep has never seen this file: it arrived after the last capture
+//   PRESENT with no completion     the sweep HAS seen it and it has never finished -- code 124, killed at
+//                                  the cap. tools/ship/referenceKind-selfcheck.mjs is exactly this, in every
+//                                  historical file checked, and it is the case this gate exists for.
+//
+// The old row lumped them together, so a new arrival read identically to a gate that has been timed out for
+// months. Splitting them keeps the teeth and drops the structural red. NOT CLAIMED: that an absent gate is
+// harmless forever -- it is named in the line below on every run, and more than a handful of them means the
+// sweep's walk and this gate's walk disagree about what a gate is, which is a different defect and fails.
+const newSinceCapture = noEvidence.filter((g) => !(g in (sweepFile.timings || {})));
+const seenAndUntimed = noEvidence.filter((g) => g in (sweepFile.timings || {}));
+if (newSinceCapture.length) say("*** " + newSinceCapture.length + " gate(s) arrived after the last sweep capture (" +
+    (sweepFile.captured || "no stamp") + ") and cannot be in it: " + newSinceCapture.join(", ") +
+    " -- the sweep running now is what times them, and the next capture will carry them");
+ok("!! *** every gate the sweep HAS SEEN carries evidence, or admits that it does not finish ***",
+   seenAndUntimed.length === 0,
+   seenAndUntimed.length + " seen-and-unevidenced" +
+   (seenAndUntimed.length ? " -- " + seenAndUntimed.slice(0, 6).join(", ") + (seenAndUntimed.length > 6 ? " (+" + (seenAndUntimed.length - 6) + ")" : "")
     : ". 55 gates were in this state before v3924 and twelve of them exceeded the default. A gate nobody has " +
-      "timed is not a fast gate, it is an unmeasured one, and the record's silence reads identically either way"));
+      "timed is not a fast gate, it is an unmeasured one, and the record's silence reads identically either way") +
+   ". " + newSinceCapture.length + " more arrived since the capture and are excluded, by name, above.");
+ok("   ...and no more than a handful of gates are new since the capture, or the two walks disagree",
+   newSinceCapture.length <= 8,
+   newSinceCapture.length + " new since " + (sweepFile.captured || "no stamp") + ". A round adds one or two " +
+   "gates; a large number here would mean the sweep never enumerates files this gate counts as gates, which " +
+   "is a walk mismatch rather than a fresh arrival, and is a different failure wearing the same clothes.");
 
 // ---- 2b. THE FAILING SET IS NAMED, EVERY RUN, BECAUSE IT IS THE ROUND AFTER THIS ONE --------------------
 {

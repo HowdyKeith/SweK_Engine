@@ -21,6 +21,7 @@
 const os = require("os");
 const path = require("path");
 const { fetchJson } = require("./fingerprintBridge.js");
+const VM = require("../tools/ship/versionMarker.js");   // v4556 -- one definition of how to read a version marker
 
 // v3021 -- WAS "/bench", AND THAT MADE THIS ENTIRE BRIDGE UNREACHABLE FROM v2985 TO v3020.
 //
@@ -42,7 +43,7 @@ function owns(url) {
 function engineVersion() {
     try {
         return (require("fs").readFileSync(path.join(__dirname, "..", "main.js"), "utf8")
-            .match(/ENGINE_VERSION = "(v\d+)"/) || [])[1] || "unknown";
+            .match(VM.markerRe("ENGINE_VERSION")) || [])[1] || "unknown";
     } catch { return "unknown"; }
 }
 

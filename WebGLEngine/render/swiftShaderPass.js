@@ -84,7 +84,25 @@ void main() {
 // the CALL SITE, so the helper keeps fmod's semantics and costs nothing for it.
 const HELPERS = `
 float bcs_fmod(float a, float b) { return a - b * trunc(a / b); }
-float bcs_hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+// *** THE SIN-HASH WAS A DIFFERENT RANDOM NUMBER GENERATOR ON THE GPU, NOT A ROUNDING OF THE CPU'S. ***
+// fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453) amplifies the last bits of its input by four orders
+// of magnitude, so float32 here and float64 in render/swiftShaderModel.mjs disagreed on 79.4% of sample
+// points and by as much as 0.9960 against 0.0000. Fifteen shaders in this pass could never be verified
+// because of it. This is an INTEGER avalanche on a 1/256 lattice: integer ops are exact in both precisions,
+// so the two agree bit for bit. It MUST stay character-for-character equivalent to bcsHash/bcsUMix in the
+// model -- tools/ship/swiftShaders-selfcheck.mjs runs both and compares.
+uint bcs_umix(uint h) {
+    h ^= h >> 16u;   h *= 0x7feb352du;
+    h ^= h >> 15u;   h *= 0x846ca68bu;
+    h ^= h >> 16u;
+    return h;
+}
+float bcs_hash(vec2 p) {
+    vec2 q = floor(p * 256.0);
+    q -= 16777216.0 * floor(q * (1.0 / 16777216.0));   // 2^24: the last integer float32 holds exactly
+    uvec2 u = uvec2(q);
+    return float(bcs_umix((u.x * 0x8da6b343u) ^ bcs_umix(u.y * 0xd8163841u))) * (1.0 / 4294967296.0);
+}
 float bcs_valueNoise(vec2 st) {
     vec2 i = floor(st), f = fract(st), u = f * f * (3.0 - 2.0 * f);
     float a = bcs_hash(i), b = bcs_hash(i + vec2(1.0, 0.0));

@@ -19,6 +19,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { gateReport } from "./gateReport.mjs";
 // *** A MISSING DEV DEPENDENCY MUST SKIP RATHER THAN THROW, AND THIS IMPORT THREW. *** Repaired at v4435.
 // tools/ship/placementRender-selfcheck.mjs states the tree's convention in its own header -- jsdom is not
 // vendored, it is `npm i jsdom --no-save`, and a static import makes the shipped tree CRASH WITH A STACK
@@ -29,6 +30,7 @@ let JSDOM = null;
 try { ({ JSDOM } = await import("jsdom")); } catch { /* named below, not swallowed */ }
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+const REPORT = gateReport("tools/ship/pageFxOverlay-selfcheck.mjs");
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 
@@ -38,6 +40,12 @@ if (!JSDOM) {
     console.log("        *** THIS IS A SKIP AND NOT A PASS. Nothing below ran, and the listener-leak check");
     console.log("        this gate exists for is UNANSWERED on this box rather than answered green. ***");
     console.log("\npageFxOverlay-selfcheck: SKIPPED -- jsdom absent, 0 checks run");
+    // v4534: the artefact is written even here, because "nothing ran on this box" is the fact a reader most
+    // needs and the one a terminal loses first. gateReport.skip() exists for exactly this: an empty report
+    // that SAYS it is empty is not the same document as one whose tables happened to come out green.
+    REPORT.skip("everything below", "jsdom is not installed, so ui/pageFxOverlay.js cannot be mounted here -- " +
+        "the listener-leak check this gate exists for is UNANSWERED on this box rather than answered green");
+    REPORT.write();
     process.exit(0);
 }
 const say = (m) => console.log("  ----  " + m);
@@ -311,4 +319,9 @@ const M = await import(pathToFileURL(path.join(ENG, "ui", "pageFxOverlay.js")).h
 }
 
 console.log("pageFxOverlay-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));
+// v4534: these numbers used to die with the terminal -- gateReport-selfcheck named this gate for it.
+REPORT.note(`ran with jsdom: ${fails} failing check(s). The listener-leak question this gate exists for was ` +
+    "ANSWERED on this box rather than skipped.");
+REPORT.write();
+
 process.exit(fails ? 1 : 0);

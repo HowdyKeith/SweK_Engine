@@ -26,6 +26,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { fileURLToPath } from "node:url";
+import VM from "../../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ENG = path.resolve(HERE, "..", "..");
@@ -101,8 +102,8 @@ export function stalenessRows() {
     });
 
     // 3. version markers agreeing with each other (not with a --version flag; that is verify.mjs's job)
-    const ev = (readOr("main.js").match(/ENGINE_VERSION = "(v\d+)"/) || [])[1] || null;
-    const bb = (readOr("brain/brain.js").match(/BRAIN_BUILD = "(v\d+)"/) || [])[1] || null;
+    const ev = (readOr("main.js").match(VM.markerRe("ENGINE_VERSION")) || [])[1] || null;
+    const bb = (readOr("brain/brain.js").match(VM.markerRe("BRAIN_BUILD")) || [])[1] || null;
     rows.push({
         id: "brain build vs engine version",
         claimed: bb, actual: ev, ok: bb === ev,

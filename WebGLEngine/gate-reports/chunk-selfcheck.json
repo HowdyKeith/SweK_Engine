@@ -1,0 +1,39 @@
+{
+ "gate": "world/chunk-selfcheck.mjs",
+ "at": "2026-09-09",
+ "tables": [
+  {
+   "title": "what an unbounded read told a listener standing in open air",
+   "columns": [
+    "listener y",
+    "cave factor, unbounded read",
+    "cave factor, bounded read"
+   ],
+   "rows": [
+    [
+     54,
+     0,
+     0
+    ],
+    [
+     59,
+     0.286,
+     0
+    ],
+    [
+     62,
+     0.571,
+     0
+    ],
+    [
+     64,
+     0.857,
+     0
+    ]
+   ],
+   "note": "0 is open sky and 1 is fully enclosed, by getCaveFactor's own comment. The unbounded read counted every cell above the world's ceiling as solid, so the higher the listener stood the more enclosed it was told it was."
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

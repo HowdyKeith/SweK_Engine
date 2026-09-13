@@ -71,16 +71,33 @@ console.log("\n2. NEITHER PAGE ADDS PHYSICS, AND NEITHER RETYPES A MATERIAL CONS
             !/firstPiola|returnMap|dpReturn|quadWeights|advanceF|\bp2g\b|\bg2p\b|normalise|stressForces/.test(dispatchOnly),
             "no stress, no return mapping, no transfer, no weights. Every number either page shows was " +
             "computed by a module with a gate behind it");
-        ok("!! ...and it gets its material from the graded modules rather than typing one",
-            /lame\(500, 0\.3\)/.test(src) && /alphaOf\(/.test(src) && /clampLimits\(\)/.test(src) &&
-            !/0\.025|0\.0075/.test(src),
-            "lame() for the moduli, alphaOf() for the friction coefficient, clampLimits() for the plastic " +
-            "limits -- and clampLimits MEASURES those from returnMap rather than reading them from a source " +
-            "file, so plasticity.mjs stays the only place they exist");
-        ok("!! ...and its fixed-point scales are derived, not chosen",
-            /fixedPointScales\(\{ h/.test(src),
+        // *** THE RULE IS A PROHIBITION ON TYPING, AND IT WAS WRITTEN AS A REQUIREMENT TO IMPORT. ***
+        // Both rows demanded a specific call of BOTH pages, and mpm-gpu-check.html is a 238-line rig that
+        // does not set plastic limits or fixed-point scales AT ALL -- it hands `plastic: true` to step() and
+        // lets the module decide, and takes the kernel's scales from gpuKernel.mjs. It types nothing, which
+        // is what these rows are about, and it was red for not importing something it has no use for.
+        // A page that delegates deeper than the helper is not the failure a page that types a number is.
+        // Found at v4565 by re-timing the over-budget pool -- this gate was outside the ship-time sweep.
+        // *** AND THE DETECTOR IS RUN OVER THE SCRIPT AND NOT OVER THE PAGE, which the first draft got wrong
+        // in the way this tree keeps getting wrong: `<meta name="viewport" content="...initial-scale=1">`
+        // matched "a scale assigned a number" and the row went red on an HTML attribute. Markup counted as
+        // code is the same defect as prose counted as code.
+        const js = (src.match(/<script[^>]*>[\s\S]*?<\/script>/gi) || []).join("\n") || src;
+        const setsLimits = /clampLimits\(\)|Fp[A-Za-z]*\s*[:=]\s*[\d.]/.test(js);
+        const setsScales = /fixedPointScales\(\{ h|scale[A-Za-z]*\s*[:=]\s*[\d.]+/.test(js);
+        ok("!! " + name + " gets its material from the graded modules rather than typing one",
+            /lame\(500, 0\.3\)/.test(src) && /alphaOf\(/.test(src) &&
+            !/0\.025|0\.0075/.test(src) && (!setsLimits || /clampLimits\(\)/.test(src)),
+            "lame() for the moduli, alphaOf() for the friction coefficient, and the plastic limits either " +
+            "from clampLimits() or NOT SET BY THE PAGE AT ALL -- clampLimits MEASURES them from returnMap " +
+            "rather than reading them from a source file, so plasticity.mjs stays the only place they exist. " +
+            (setsLimits ? "This page sets them, so it must derive them." : "This page does not set them."));
+        ok("!! " + name + " has no fixed-point scale it chose for itself",
+            !setsScales || /fixedPointScales\(\{ h/.test(src),
             "scaleFor() is arithmetic on a measured peak scaled to the cell size in use. A SCALE TYPED INTO A " +
-            "PAGE WOULD BE RIGHT ON THE GRID IT WAS TRIED ON AND WRONG ON THE OTHER TWO");
+            "PAGE WOULD BE RIGHT ON THE GRID IT WAS TRIED ON AND WRONG ON THE OTHER TWO. " +
+            (setsScales ? "This page sets scales, so they must be derived." : "This page sets none: the " +
+             "kernel's own scales come from physics/mpm/gpuKernel.mjs and the page never touches them."));
         ok("!! ...and the particles come from the graded fixture",
             /restBlock\(/.test(src) && /centreOfMass\(/.test(src),
             "restBlock decides what a particle at rest IS -- rest velocity, zero affine matrix, identity F, F0 " +

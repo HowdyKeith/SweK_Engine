@@ -1,4 +1,5 @@
 {
+ "generatedFrom": "tools/ship/artefactWriters.mjs",
  "version": 1,
  "runs": [
   {

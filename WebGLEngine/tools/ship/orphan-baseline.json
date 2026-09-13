@@ -10,5 +10,21 @@
   "tools/selectionState.js",
   "tools/voxelToolSystem.js",
   "ui/avatarExpression.js"
+ ],
+ "shaderNote": "v4581 -- the SHADER population, which had never been scanned at all. A standalone .glsl/.frag/.vert/.wgsl file was in no reachability census in this tree: CODE was the population and CODE was .js and .mjs. These eleven are reached by nothing that LOADS them. THE LIST IS DEBT, NOT APPROVAL, and it is not a deletion list either -- a shader kept as a reference, a demo somebody means to rewire and a leftover from a deletion look identical from outside, which is the judgement this baseline records rather than makes.",
+ "shaderCaptured": "2026-09-10",
+ "shaderCount": 11,
+ "shaders": [
+  "gpu/waterScreen.frag.glsl",
+  "shaders/biome.frag.glsl",
+  "shaders/biome.vert.glsl",
+  "shaders/ghost.frag.glsl",
+  "shaders/selection.frag.glsl",
+  "shaders/selection.vert.glsl",
+  "shaders/transitions/swekCrossfade.glsl",
+  "shaders/transitions/swekIris.glsl",
+  "shaders/transitions/swekWipe.glsl",
+  "shaders/voxel.frag.glsl",
+  "shaders/waterReflectRefract.frag.glsl"
  ]
 }

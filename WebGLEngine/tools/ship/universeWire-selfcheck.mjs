@@ -115,9 +115,61 @@ let key = null;
        ". v4414 rewrote every ARRIVAL DATE, so every ORBIT moved. v4416 added PROVENANCE.txt ATTRIBUTION " +
        "FILES to six dependencies, and stockOfFiles turns every file into cargo at max(1, bytes/4096) -- all " +
        "six are under 1 KB, so each rounds to zero and is lifted to a ton. *** SIX TONS OF docs APPEARED " +
-       "BECAUSE SOMEBODY WROTE DOWN WHO OWNS THE CODE. *** And `bytes` reaches none of it: " +
+       "BECAUSE SOMEBODY WROTE DOWN WHO OWNS THE CODE. *** Then it moved TWICE MORE on 2026-09-07, past " +
+       "this repaired row, and " +
+       `${KEY_DRIFT_V4460.unseenBecause.roundsShippedPast} rounds shipped over it -- see unseenBecause. ` +
+       "And `bytes` reaches none of it: " +
        `${KEY_DRIFT_V4460.bytesDoNotReachTheEconomy.bodiesTried} bodies tried, ` +
        `${KEY_DRIFT_V4460.bytesDoNotReachTheEconomy.movedTheHash} moved the hash.`);
+    // *** THE FIELD IS RE-DERIVED HERE, NOT READ OFF THE RECORD. *** The v4534 move's diff touched `arrived`
+    // AND `sha` on sixteen bodies each and I wrote both into the record straight off it, which is the mistake
+    // bytesDoNotReachTheEconomy exists to record. So the probe runs every time rather than being quoted: each
+    // body's field mutated in turn, one at a time, and the hash re-taken. Thirty-six economies at 400 ticks
+    // costs 0.4s, which is what a derived number is worth against a remembered one.
+    {
+        const probe = (field, value) => {
+            let tried = 0, moved = 0;
+            for (const b of raw.bodies) {
+                if (b[field] === undefined) continue;
+                tried++;
+                const bodies = raw.bodies.map((x) => (x === b ? { ...x, [field]: value } : x));
+                if (hashKey((seed, today) => makeGitEconomy(buildOrrery(bodies, { today }), { seed, history: true }), { seed: 7, ticks: 400 }).hash !== key.hash) moved++;
+            }
+            return { tried, moved };
+        };
+        const sha = probe("sha", "0".repeat(40));
+        const arr = probe("arrived", "2026-01-02");
+        const rec = KEY_DRIFT_V4460.shaDoesNotReachTheEconomy;
+        ok("!! *** `sha` REACHES NOTHING AND `arrived` REACHES EVERYTHING -- RE-RUN HERE, NOT QUOTED ***",
+           sha.moved === 0 && sha.tried > 0 && arr.moved === arr.tried && arr.tried === sha.tried &&
+           rec.bodiesTried === sha.tried && rec.movedTheHash === sha.moved,
+           `sha: ${sha.moved} of ${sha.tried} bodies moved the hash. arrived: ${arr.moved} of ${arr.tried}. ` +
+           `The record says ${rec.movedTheHash} of ${rec.bodiesTried}. The v4534 entry's diff showed BOTH ` +
+           "fields moving on sixteen bodies and only one of them counts -- A DIFF NAMES WHAT CHANGED, NOT " +
+           "WHAT COUNTED. If the record and the probe ever disagree, the probe is right and the record is a " +
+           "memory of a tree that has moved.");
+    }
+    // *** AND THE REASON THE DRIFT SHIPPED ANYWAY IS A NUMBER IN A FILE, SO IT IS READ FROM THAT FILE. ***
+    // v4460 made this row able to fail; on 2026-09-07 it DID fail, on main, and seventeen rounds shipped
+    // past it because quickSweep never runs a gate slower than its budget -- so the exit code beside this
+    // gate's name in sweep-timings.json is a green captured before v4408, describing a tree three keys ago.
+    // The RELATION is what is asserted: if this gate ever comes under budget the row goes red and the
+    // record is owed a correction, which is the only honest way to hold "it was not run" in a check.
+    {
+        const TIM = path.join(ENG, "tools/ship/sweep-timings.json");
+        const t = fs.existsSync(TIM) ? JSON.parse(fs.readFileSync(TIM, "utf8")) : null;
+        const me = "tools/ship/universeWire-selfcheck.mjs";
+        const ms = t && t.timings ? t.timings[me] : undefined;
+        const u = KEY_DRIFT_V4460.unseenBecause;
+        ok("!! the drift shipped because this gate is over the ship-time budget -- read from sweep-timings.json",
+           !!t && typeof ms === "number" && typeof t.budgetMs === "number" && ms > t.budgetMs &&
+           u.gate === me && u.budgetMs === t.budgetMs,
+           t ? `${ms} ms against a ${t.budgetMs} ms budget, captured ${t.captured}; the code recorded beside ` +
+               `it is ${JSON.stringify(t.codes && t.codes[me])} from "${t.at && t.at[me]}". THE REPAIR AT ` +
+               "v4460 WAS REAL AND THE GATE STILL SAID NOTHING, BECAUSE A GATE THAT IS NOT RUN CANNOT FAIL. " +
+               `${u.roundsShippedPast} rounds, ${u.versionedShipsPast} of them versioned.`
+             : "no tools/ship/sweep-timings.json to read -- the claim above cannot be checked from here");
+    }
     ok("compareKey: the same key AGREES, a different hash DIFFERS and says which engine, a different question is refused as such", compareKey(key, { ...key, engine: "x" }).verdict === "AGREES" && compareKey({ ...key, hash: "00000000" }, { ...key, engine: "x" }).verdict === "DIFFERS" && compareKey({ ...key, ticks: 10 }, key).verdict === "DIFFERENT QUESTION" && compareKey(key, null).verdict === "NO KEY");
 }
 

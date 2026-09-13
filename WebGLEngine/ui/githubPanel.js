@@ -465,7 +465,15 @@ export function mountGithubPanel() {
             chainPub.onclick = async () => {
                 if (chainPub.disabled) return;
                 chainPub.disabled = true; say("packing the VERIFIED clone with its own packer, then uploading\u2026");
+                // v4607 -- POLL DURING THE FETCH, not just once after it resolves. Packing a several-thousand-
+                // file tree used to be an opaque black box between this line and the next -- Keith watched a
+                // release zip sit at 0 bytes for ten minutes with nothing on screen to tell "still working"
+                // from "stuck". The clone's own packRelease.mjs now prints a throttled "[zip] N/M files (X%)"
+                // line roughly every 5%, which _spawnIn already tails into R.log -- chainPoll() (the same
+                // function step 3's button already polls with) is the one thing missing to show it live here.
+                const poll = setInterval(chainPoll, 1200);
                 const j = await fetch("/source-chain/publish", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ repo: repo() || undefined, body: notes.value, draft: dr.checked, prerelease: pr.checked }) }).then(r => r.json()).catch(e => ({ ok: false, error: e.message }));
+                clearInterval(poll);
                 await chainPoll();
                 const rel = j.release || {};
                 say(j.ok ? "\u2713 published " + (j.tag || rel.tag) + "\nbuilt from the verified tree at " + (j.fromVerifiedTree || "?") + "\n" + (rel.url || "")
@@ -499,7 +507,12 @@ export function mountGithubPanel() {
                     // ---- 4: publish the tree that just passed -----------------------------------------
                     log.push("4/6  packing the verified clone with its own packer, and uploading\u2026");
                     say(log.join("\n"));
+                    // v4607 -- same fix as the standalone Publish button: poll DURING the request so the
+                    // clone's throttled "[zip] N/M files (X%)" lines (tailed into R.log by _spawnIn) show up
+                    // here instead of leaving this step looking frozen for however long the zip takes.
+                    const pubPoll = setInterval(chainPoll, 1200);
                     const j4 = await post("/source-chain/publish", { repo: er, body: notes.value, draft: dr.checked, prerelease: pr.checked });
+                    clearInterval(pubPoll);
                     await chainPoll();
                     if (!j4.ok) return stop(4, j4.error || "the publish failed");
                     const rel4 = j4.release || {};
@@ -650,9 +663,29 @@ export function mountGithubPanel() {
                     "\u2713 " + j.version + " cloned from " + (j.ref || "?") + " to\n" + j.path +
                     "\n\nThis engine is still " + (j.running || "?") + " \u2014 the new copy is a SEPARATE folder and nothing here changed." +
                     "\nTo use it: stop this server, start it from " + j.path + "\\WebGLEngine, and reload the page.", !j.older); };
+            // v4607 -- POLLS /package/progress WHILE THE ZIP RUNS. This button's build happens IN THIS SERVER'S
+            // OWN PROCESS (unlike step 4's, which runs in a spawned clone) -- packagerBridge.makeInstallable()
+            // sets real done/total/pct numbers on _prog as it writes each entry, and GET /package/progress
+            // already exposed them; nothing here ever polled it, so the button just said "a few seconds" and
+            // went silent until the whole request returned. It usually IS a few seconds now that the zip step
+            // itself is a Node loop instead of a spawned Compress-Archive -- but "usually" is not "always", and
+            // a real number beats a promise every time this tree can show one for free.
             eng.onclick = async () => { let er = repo();
                 if (!er) { try { const s0 = await api("config"); er = ((s0 && s0.engineRepo) || "").trim(); } catch {} }
-                if (!er) return say("pick a repo, or set engineRepo in Account", false); eng.disabled = true; say("building the engine zip + publishing\u2026 (takes a few seconds)"); const j = await api("publish-engine", { repo: er, body: notes.value, draft: dr.checked, prerelease: pr.checked }); eng.disabled = false; const rel = j.release || {}; say(j.ok ? "\u2713 released " + (j.tag || rel.tag) + (j.asset ? (j.asset.ok ? " + engine zip uploaded" : " (asset: " + j.asset.error + ")") : "") + "\n" + (rel.url || "") : "\u2717 " + (j.error || ""), j.ok); };
+                if (!er) return say("pick a repo, or set engineRepo in Account", false);
+                eng.disabled = true;
+                say("building the engine zip + publishing\u2026");
+                const engPoll = setInterval(async () => {
+                    const p = await fetch("/package/progress", { cache: "no-store" }).then(r => r.json()).catch(() => null);
+                    if (p && p.step === "zip" && p.total) say("zipping\u2026 " + p.pct + "%  (" + p.done + "/" + p.total + " files)" + (p.current ? "\n" + p.current : ""));
+                    else if (p && p.label) say(p.label + "\u2026");
+                }, 500);
+                const j = await api("publish-engine", { repo: er, body: notes.value, draft: dr.checked, prerelease: pr.checked });
+                clearInterval(engPoll);
+                eng.disabled = false;
+                const rel = j.release || {};
+                say(j.ok ? "\u2713 released " + (j.tag || rel.tag) + (j.asset ? (j.asset.ok ? " + engine zip uploaded" : " (asset: " + j.asset.error + ")") : "") + "\n" + (rel.url || "") : "\u2717 " + (j.error || ""), j.ok);
+            };
             return w;
             return w;
         },

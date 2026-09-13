@@ -1,0 +1,39 @@
+{
+ "page": "three-probe.html",
+ "at": "v4494",
+ "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+ "when": "2026-09-08T19:59:48.598Z",
+ "route": "webgpu",
+ "results": [
+  {
+   "label": "vendored 0.178",
+   "version": null,
+   "revision": "178",
+   "backend": "webgpu",
+   "ok": true,
+   "error": null,
+   "ms": 1303,
+   "fetchMs": 490,
+   "tarBytes": 0,
+   "imports": {
+    "core": 2,
+    "tsl": 1
+   }
+  },
+  {
+   "label": "three@0.185.1",
+   "version": "0.185.1",
+   "revision": "185",
+   "backend": "webgpu",
+   "ok": true,
+   "error": null,
+   "ms": 2162,
+   "fetchMs": 1906,
+   "tarBytes": 24090624,
+   "imports": {
+    "core": 2,
+    "tsl": 1
+   }
+  }
+ ]
+}

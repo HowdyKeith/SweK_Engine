@@ -471,7 +471,7 @@ function handle(req, res, ctx) {
             // page or read the terminal to see which backend is live. `truncated` reddens it.
             solverBackend: (gpuBrain.field && gpuBrain.field.solver && gpuBrain.field.solver.backend) || null,
             solverTruncated: !!(gpuBrain.field && gpuBrain.field.solver && gpuBrain.field.solver.truncated),
-            // v4531 -- WHICH PEER TOOK THE LAST REQUEST, AND WHAT IT WAS. The ledger POST /ai/brain/route fills; the
+            // v4584 -- WHICH PEER TOOK THE LAST REQUEST, AND WHAT IT WAS. The ledger POST /ai/brain/route fills; the
             // gauge caption on server.html reads `routed.last.line`. `unattributed` must read 0: a routed row that
             // names no peer or no work is the defect this field exists to show.
             routed: (() => { const rows = routedLedger.rows, last = rows.length ? rows[rows.length - 1] : null; return {
@@ -2001,7 +2001,7 @@ registry.get("/ai/brain/experience", {
 });
 
 // ---------------------------------------------------------------------------------------------------------
-// v4531 -- FLEET BRAIN ROUTING, NAMED. Until this round a "fleet brain request" was a brain's POST landing in the
+// v4584 -- FLEET BRAIN ROUTING, NAMED. Until this round a "fleet brain request" was a brain's POST landing in the
 // registry above: counted (posts), timed (solveMsEwma), never attributed. server.html's gauge counted brains,
 // brain-fleet.html's pool summed their training, report.html's grid showed each peer's version -- none said WHICH
 // peer took WHICH request. These two routes are the record. POST /ai/brain/route takes requests ({ kind, scene,

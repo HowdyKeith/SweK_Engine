@@ -6,6 +6,16 @@
 // dynamic body's final position depends on an integrator, while this one depends on geometry, and geometry has
 // exact answers.
 //
+// *** AND IT CANNOT WALK ON A SLOPE, WHICH IS NOT A DEFECT HERE AND IS A LIMIT WORTH POINTING AT. *** A voxel
+// world has no slopes -- only staircases of unit lips -- so on a voxelised ramp this controller either cannot
+// climb at all (measured: 0.31x the requested speed at 14 degrees, 0.11x at 26.6, 0.01x and stuck at 45) or,
+// with a step allowance, climbs while moving along the surface at exactly sec(theta) of the speed it was
+// asked for: 1.020x, 1.118x and 1.414x at those same angles. That is the HORIZONTAL speed convention arrived
+// at by accident rather than chosen, and it means you sprint up hills faster than you run on the flat.
+// physics/character/terrainWalk.mjs (v4544) is the slope-aware half, over heightfields and triangle meshes,
+// with the convention named and a slope limit taken from the surface normal. Neither replaces the other:
+// this one is exact against the world it was written for, and that is the reason it exists.
+//
 // WHY AN AABB AND NOT A CAPSULE. The world is axis-aligned unit voxels. An axis-aligned box against axis-aligned
 // boxes has an exact overlap test and an exact resolution; a capsule needs closest-point-on-segment work that
 // buys nothing here except rounder corners. Choosing the shape the world is made of keeps every invariant below
@@ -15,8 +25,17 @@
 //   NEVER INSIDE      the body must never come to rest overlapping a solid voxel. Not "rarely". Never.
 //   SLIDE PRESERVES   when a plane blocks motion, the component ALONG that plane survives untouched:
 //                     v' = v - (v.n)n exactly, so walking into a wall at an angle does not shave your speed.
-//   NEVER FURTHER     total displacement can never exceed the requested distance. A controller that gains
-//                     ground on contact is how players get flung through walls.
+//   NEVER FURTHER     HORIZONTAL displacement can never exceed the requested horizontal, and the VERTICAL
+//                     gain can never exceed stepHeight. A controller that gains ground on contact is how
+//                     players get flung through walls.
+//                     *** THIS WAS WRITTEN AS "total displacement can never exceed the requested distance"
+//                     AND THAT IS FALSE OF THIS FILE. *** A step-up lifts the body by the allowance and
+//                     settles it on the lip, and that height was never in the requested delta: measured on a
+//                     one-voxel lip with stepHeight 1.1, a request of 0.800 moves 1.360, seventy per cent
+//                     further. The gate's 400-move sweep reported "worst excess 8.9e-16" for as long as it
+//                     stood, because it passed no stepHeight and defaulted to 0 -- so it was measuring this
+//                     controller with its step-up switched off. The bound belongs on the two components
+//                     separately, and the sweep runs with the allowance ON now.
 //   NO TUNNELLING     at any speed. This is the one that bites: per-axis resolution alone lets a fast body
 //                     step clean over a thin wall, so motion is SUBSTEPPED below one voxel per step.
 //
@@ -129,9 +148,29 @@ export function moveCharacter({ pos, half, delta, isSolid, stepHeight = 0, maxSu
                     const t = substep(lifted, half, [d[0], 0, d[2]], isSolid, []);
                     const movedUp = Math.hypot(t.centre[0] - lifted[0], t.centre[2] - lifted[2]);
                     if (movedUp > movedH + EPS) {
-                        // settle: fall back down by at most the lift, stopping on whatever is under us
-                        const drop = substep(t.centre, half, [0, -stepHeight, 0], isSolid, []);
-                        if (drop.grounded) { centre = drop.centre; grounded = true; }
+                        // *** THE SETTLE IS SUBSTEPPED, AND IT WAS NOT, AND THAT LEFT THE BODY IN THE AIR. ***
+                        // This used to be one substep() call carrying the whole -stepHeight, which bypasses
+                        // the cap this file's own header calls not optional. moveAxis snaps to the boundary
+                        // nearest the TARGET rather than the first one crossed, which is exact only while a
+                        // move stays inside one voxel; overshoot the blocking face into the next voxel and
+                        // the snap lands embedded, the "refuse to move rather than push through" branch
+                        // fires, and the body does not descend AT ALL. Measured on a floor whose top face is
+                        // y=1, body resting height 1.9, dropped from 2.4: requests down to a target of 0.10
+                        // land at 1.900001, and from 0.00 down every one of them stays at 2.400000 -- half a
+                        // unit in the air, with grounded reporting TRUE. On a one-voxel lip with the usual
+                        // stepHeight of 1.1 that is exactly the case reached, so a body that climbed a stair
+                        // hovered 0.1 above it.
+                        let cur = t.centre, remaining = stepHeight, landed = false;
+                        while (remaining > EPS) {
+                            const chunk = Math.min(remaining, Math.max(1e-3, maxSubstep));
+                            const dr = substep(cur, half, [0, -chunk, 0], isSolid, []);
+                            const moved = cur[1] - dr.centre[1];
+                            cur = dr.centre;
+                            if (dr.grounded) { landed = true; break; }
+                            if (moved < EPS) break;                 // made no progress and is not grounded
+                            remaining -= chunk;
+                        }
+                        if (landed) { centre = cur; grounded = true; }
                     }
                 }
             }

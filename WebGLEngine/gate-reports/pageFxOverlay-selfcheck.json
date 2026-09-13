@@ -1,0 +1,12 @@
+{
+ "gate": "tools/ship/pageFxOverlay-selfcheck.mjs",
+ "at": "2026-09-07",
+ "tables": [],
+ "notes": [],
+ "skipped": [
+  {
+   "what": "everything below",
+   "why": "jsdom is not installed, so ui/pageFxOverlay.js cannot be mounted here -- the listener-leak check this gate exists for is UNANSWERED on this box rather than answered green"
+  }
+ ]
+}

@@ -102,7 +102,7 @@ function setLive(state) {
   txt.textContent = state === "ok" ? "live" : state === "err" ? "bridge unreachable" : "connecting";
 }
 
-// v4531 -- WHICH REQUEST EACH BRAIN TOOK. /ai/brain/routed's per-peer summary keyed by brain id; the card's foot says
+// v4584 -- WHICH REQUEST EACH BRAIN TOOK. /ai/brain/routed's per-peer summary keyed by brain id; the card's foot says
 // how many and names the last (kind, scene, policy, tick range). A brain with none says "no requests routed".
 function render(sum, routed = null) {
   const tookOf = (id) => { const p = routed && routed.summary && routed.summary.peers ? routed.summary.peers.find((q) => q.id === id) : null; return p ? `took ${p.count} request${p.count === 1 ? "" : "s"}, last: ${p.last && p.last.what || "?"}` : "no requests routed"; };

@@ -26,7 +26,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { orphanScan, DIRECTORY_LOADED } from "./orphanScan.mjs";
+import { orphanScan, SHADER_POP, MODULE_POP, REPORT_MODULE, DIRECTORY_LOADED } from "./orphanScan.mjs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -68,6 +68,64 @@ const known = new Set(base.files);
     ok(fixed.length ? `...and ${fixed.length} baseline entr${fixed.length === 1 ? "y is" : "ies are"} now reachable -- update the baseline` : "the baseline is current",
         true,
         fixed.length ? fixed.slice(0, 6).join(", ") : "nothing has been wired up or deleted since capture");
+}
+
+// ---- 2b. *** THE SHADER POPULATION, WHICH WAS IN NO REACHABILITY CENSUS AT ALL *** -----------------------------
+console.log("\n2b. the shaders, scanned for the first time at v4581");
+{
+    const sh = orphanScan(ENG, SHADER_POP);
+    const shFound = new Set(sh.candidates.map((c) => c.file));
+    const shKnown = new Set(base.shaders || []);
+    const shAdded = [...shFound].filter((f) => !shKnown.has(f));
+    const shFixed = [...shKnown].filter((f) => !shFound.has(f));
+    ok("!! *** shader files are IN a reachability census now, and the population is not empty ***",
+       sh.scanned >= 20 && shFound.size > 0,
+       `${shFound.size} of ${sh.scanned} standalone .glsl/.frag/.vert/.wgsl files are loaded by nothing. Until ` +
+       "v4581 the population was .js and .mjs only, so a dead shader was invisible to the one instrument whose " +
+       "job is reachability -- round #31's finding (\".cjs is outside every census\") in a second extension");
+    ok("!! no shader has become unreachable since the baseline",
+       shAdded.length === 0,
+       shAdded.length ? "NEW: " + shAdded.join(", ") + " -- either wire it up, or register the mechanism"
+                      : `${shKnown.size} known, none added. DEBT, not approval`);
+    ok(shFixed.length ? `...and ${shFixed.length} baseline shader(s) are now loaded -- update the baseline` : "the shader baseline is current",
+       true, shFixed.length ? shFixed.join(", ") : "nothing has been wired up or deleted since capture");
+
+    // *** THE TWO RULES THAT DIFFER FROM THE MODULE SCAN, EACH HELD TO THE CASE THAT FORCED IT. ***
+    ok("!! *** the whole FILENAME is matched, not the stem -- a shader is fetched, never imported ***",
+       SHADER_POP.wholeName === true && shFound.has("shaders/transitions/swekWipe.glsl"),
+       "render/transitionModel.mjs exports MODELS = { swekCrossfade, swekWipe, swekIris } -- object KEYS, not " +
+       "filenames. Strip the extension and swekWipe.glsl reads as reached by a key that loads nothing. One of " +
+       "the 26 turns on this rule and it is the one that proves the rule");
+    ok("!! ...and no export is required, since a shader has none by construction",
+       SHADER_POP.requireExports === false,
+       "the module scan skips a file with no `export` as a script rather than a module. Applied to shaders " +
+       "that skip drops the entire population and reports a clean zero");
+    ok("  ...and the two populations really are the same implementation",
+       typeof SHADER_POP.test === "object" && SHADER_POP.name !== MODULE_POP.name &&
+       String(SHADER_POP.test) !== String(MODULE_POP.test),
+       "orphanScan(root, pop) -- the corpus, the comment strip, the title strip, the generated-record property " +
+       "and the report-module list are the hard-won parts and are shared exactly; a second copy of them would " +
+       "be a second thing to keep right");
+}
+
+// ---- 2c. *** A FILE THAT RECORDS A PATH IS NOT A FILE THAT LOADS IT, AND THE BACKLOG IS ONE *** -----------------
+console.log("\n2c. the records that were counting as references");
+{
+    const RECORDS = ["tools/ship/nextRounds.mjs", "render/exactHash.mjs", "tools/ship/gateSweep.mjs"];
+    ok("!! *** the backlog is a report module -- writing an item down was hiding its own subject ***",
+       RECORDS.every((r) => Object.prototype.hasOwnProperty.call(REPORT_MODULE, r)),
+       "Round #44 was filed at v4579 naming ten shader paths in its `what`. FOUR of them -- ghost.frag.glsl, " +
+       "selection.frag.glsl, selection.vert.glsl, biome.vert.glsl -- are named by NOTHING ELSE in the tree, so " +
+       "scheduling the round is what would have made its subjects read as reached. Fifth face of the trap this " +
+       "scanner's header already describes four times: its own header, prose docs, its own output, a tooltip");
+    ok("!! ...and every one of them still EXISTS, so the list is not hiding a deletion",
+       RECORDS.every((r) => fs.existsSync(path.join(ENG, r))), RECORDS.join(", "));
+    // The measurement that makes those three exclusions honest rather than convenient.
+    const src = fs.readFileSync(path.join(ENG, "render/exactHash.mjs"), "utf8");
+    ok("!! ...and exactHash.mjs's `notLoaded` record is the sharpest instance: it says nothing loads them",
+       /notLoaded:\s*Object\.freeze\(\[/.test(src),
+       "a record whose CONTENT is \"these files are loaded by nothing\" was the reason the scanner believed " +
+       "something did. Both files it names are in the shader baseline now");
 }
 
 // ---- 3. THE EXEMPTIONS ARE A LIST, WITH REASONS ---------------------------------------------------------------

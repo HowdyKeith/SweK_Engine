@@ -55,8 +55,14 @@ const offer = { version: "v3000", sha256: "a".repeat(64), size: 22000000 };
 
 // ---- 3. THE VERSION IS READ FROM THE INSTALL, NOT ASSUMED ------------------------------------------------------------
 {
+    // v4556 -- this asserted the source contained a hand-spelled marker pattern. Every reader in the tree
+    // moved onto tools/ship/versionMarker.js, so that arm went dead and the check fell through to a bare
+    // mention of the name, which any comment satisfies. It now asks for the SHARED READER by name, which is
+    // what "read from the install" means today, and keeps the old spelling as an alternative so the row means
+    // the same thing in an older tree.
     ok("!! the local version comes from main.js, so it cannot drift from what is installed",
-        /ENGINE_VERSION\\s\*=\\s\*"\(v\\d\+\)"/.test(src.replace(/\\\\/g, "\\")) || /ENGINE_VERSION/.test(src),
+        /versionMarker\.cjs/.test(src) || /markerRe\(/.test(src) ||
+        /ENGINE_VERSION\s*=\s*"\(v/.test(src.replace(/\\/g, "")),
         "reported version " + localVersion() + ", read out of the tree it is running from. A hardcoded or " +
         "remembered version would eventually lie after a manual install");
 }

@@ -13,6 +13,7 @@ import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { parseConcept, consumeBundle, briefMarkdown } from "./okfConsume.mjs";
 import { emitOKF } from "./emitOKF.mjs";
+import VM from "../../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
 
 let fails = 0;
 const ok = (name, cond, detail) => {
@@ -69,7 +70,7 @@ ok("!! the engine summary comes from the type:system concept", brief.engine && /
 // ---- 5. ON THE REAL BUNDLE, THE TALLY MATCHES THE ENGINE ----------------------------------------------------------
 {
     const REAL = path.join(os.tmpdir(), "okf-real-" + process.pid);
-    const version = (fs.readFileSync(path.join(ROOT, "main.js"), "utf8").match(/ENGINE_VERSION = "(v\d+)"/) || [, "v0"])[1];
+    const version = (fs.readFileSync(path.join(ROOT, "main.js"), "utf8").match(VM.markerRe("ENGINE_VERSION")) || [, "v0"])[1];
     emitOKF(REAL, { version });
     const rb = consumeBundle(REAL);
     ok("!! consuming the real bundle yields a complete, non-empty brief", rb.tally.total > 50 && rb.openClaims.length === rb.tally.open && rb.engine,

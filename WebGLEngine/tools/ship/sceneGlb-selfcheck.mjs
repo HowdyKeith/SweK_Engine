@@ -224,6 +224,28 @@ const quad = (name = "q") => ({ name, positions: new Float32Array([0,0,0, 1,0,0,
     ok(/src/.test(viewCode) && /URLSearchParams/.test(viewCode), "and takes a ?src= URL, so the PC can hand the TV a link instead of the TV typing one with a remote");
 }
 
+// *** v4550 -- GRADED AGAINST THE SPEC, NOT ONLY AGAINST THE CONTAINER AND THIS TREE'S OWN PARSER. ***
+// Reading the bytes back with the writer's sibling reader proves the pair AGREE; it cannot prove either is
+// right, because a writer and a reader that share an assumption share its errors too.
+// tools/export/glbConformance.mjs is a third opinion: it recomputes POSITION min/max from the buffer,
+// range-tests every index against the real vertex count, and checks accessor bounds against bufferViews.
+{
+    const GC = await import("../export/glbConformance.mjs");
+    const out = writeSceneGlb({ meshes: [{ name: "conformance",
+        positions: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 0]),
+        indices: new Uint16Array([0, 1, 2, 1, 3, 2]) }] });
+    const r = GC.validate(out);
+    ok(GC.errorsOf(r).length === 0 && GC.warningsOf(r).length === 0,
+       "spec-semantics: " + JSON.stringify(GC.errorsOf(r).concat(GC.warningsOf(r)).slice(0, 3)));
+    // *** DERIVED, BECAUSE THE FIRST DRAFT OF THIS LINE WAS A CONSTANT AND IT LIED. *** It printed
+    // "0 errors, 0 warnings" unconditionally, so the sabotage that made this writer emit an out-of-range
+    // index showed a FAIL row with a cheerful all-clear summary printed directly underneath it. A count that
+    // is typed rather than counted is not a report of anything.
+    console.log(`  ....  spec-semantics check: ${GC.errorsOf(r).length} error(s), ${GC.warningsOf(r).length} ` +
+                `warning(s) -- accessor bounds, recomputed min/max, index range, attribute types, reference integrity` +
+                (GC.errorsOf(r).length ? ": " + GC.errorsOf(r).map((x) => x.code).join(", ") : ""));
+}
+
 console.log(`sceneGlb-selfcheck: ${pass} passed, ${fail} failed`);
 console.log("unchecked here: the file opening on an actual Shield TV. The bytes are read back by this tree's own\n" +
             "parser and the node transforms are verified numerically, which is what settles headlessly; whether\n" +

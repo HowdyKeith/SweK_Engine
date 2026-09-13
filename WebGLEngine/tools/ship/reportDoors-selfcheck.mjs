@@ -69,14 +69,16 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { validateComposition } from "./composeValidate.mjs";
 import { overNonEmpty, emptyOfNonEmpty } from "./vacuity.mjs";
+import { gateReport } from "./gateReport.mjs";
 import { population, classify, contractOf, FORMATTERS, STRICT_FORMATTERS, TOLERANT_FORMATTERS, NEVER_CALL,
          RETURNS_BARE_BECAUSE, CHEAP_STATES, CHEAP_STATES_WITH_SECONDS,
-         CALL_COST_V4459 as COST, NO_GATE_V4458 as NOGATE,
+         CALL_COST_V4459 as COST, NO_GATE_ALL as NOGATE, NO_GATE_V4458, NO_GATE_V4531, NO_GATE_V4565, UNGATED_ANYWHERE_V4565,
          reportLines as doorsReport } from "./reportDoors.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const ALL = process.argv.includes("--all");
 
+const REPORT = gateReport("tools/ship/reportDoors-selfcheck.mjs");
 let fails = 0;
 const ok = (n, c, d = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${n}${d ? "   " + d : ""}`); };
 const say = (m) => console.log("  ----  " + m);
@@ -272,10 +274,27 @@ console.log("\n6. who provides the convention and cannot check it");
 {
     const noGate = rows.filter((r) => !r.hasGate).map((r) => r.rel).sort();
     say(`no sibling gate: ${noGate.join(", ") || "(none)"}`);
-    ok("!! the modules providing this convention with no gate of their own are named, not counted",
+    // *** AND THE SECOND ROW IS THE ONE THAT MEANS SOMETHING, WHICH THIS SECTION DID NOT HAVE. *** The list
+    // above is modules with no gate BESIDE them; the row called it "no gate of their own" and ratcheted on
+    // it. Six of the seven recorded at v4565 have a gate in tools/ship/, which is where this tree keeps most
+    // of them. The debt is the two that have none anywhere, and it was hidden inside a number eight times
+    // its size. Found by re-timing the over-budget pool: this gate had been outside the ship-time sweep.
+    const ungated = rows.filter((r) => !r.gateAnywhere).map((r) => r.rel).sort();
+    ok("!! *** AND OF THOSE, THE ONES WITH NO GATE ANYWHERE -- WHICH IS THE ACTUAL DEBT ***",
+       ungated.length === UNGATED_ANYWHERE_V4565.length && ungated.every((r) => UNGATED_ANYWHERE_V4565.includes(r)),
+       `${ungated.length} of the ${noGate.length} without a sibling gate have none anywhere: ` +
+       `${ungated.join(", ") || "(none)"}. The other ${noGate.length - ungated.length} are gated from ` +
+       "tools/ship/ -- a fact about where this tree puts gates, not about coverage, and the row below " +
+       "ratcheted on it for as long as nobody could tell the two apart.");
+    ok("!! the modules providing this convention with no gate BESIDE them are named, not counted",
        noGate.length === NOGATE.length && noGate.every((r) => NOGATE.includes(r)),
-       `${noGate.length} of ${rows.length}. They are LISTED so that adding a member without a gate fails here ` +
-       "rather than passing quietly under a number that moved by one.");
+       `${noGate.length} of ${rows.length}, over ${NO_GATE_V4458.length} frozen at v4458, ` +
+       `${NO_GATE_V4531.length} at v4531 and ${NO_GATE_V4565.length} at v4565. They are LISTED so that ` +
+       "adding a member without a gate fails here " +
+       "rather than passing quietly under a number that moved by one -- WHICH IS WHAT HAPPENED: the four at " +
+       "v4531 arrived with the Racing-city line and turned this row red, which is the row working. The two " +
+       "lists are kept apart because freezing by name AT A VERSION is what lets a later reader see WHEN each " +
+       "arrived; the assertion is over their union, so the ratchet loses no strength.");
 }
 
 // ---- 7. *** THE FRONT DOOR IS THE LAST COPY CORRECTED AND THE ONLY COPY ANYBODY RUNS *** -------------------
@@ -453,5 +472,46 @@ console.log("\n9. the MEASURED entries, re-measured");
        "not the different question this record says it is.");
 }
 
+// *** v4534 -- THE NUMBERS ABOVE USED TO DIE WITH THE TERMINAL. *** gateReport-selfcheck names every gate
+// that argues in numbers and emits nothing, and this one arrived on that list. The tables below are the
+// census this gate computes anyway; writing them costs a walk it has already done.
+REPORT.table("the reportLines convention, by kind", ["kind", "modules", "what it means"],
+    [["members", String(rows.length), "modules exporting reportLines"],
+     ["self-reports", String(rows.filter((r) => r.kind === "self-report").length), "callable with nothing"],
+     ["formatters", String(FORMATTERS.length), "REQUIRE an argument (Function.length)"],
+     ["  of those, refuse a bare call", String(STRICT_FORMATTERS.length), "an honest throw a consumer can catch"],
+     ["  of those, return anyway", String(TOLERANT_FORMATTERS.length), "and neither fabricates -- see the header"],
+     ["no sibling gate", String(rows.filter((r) => !r.hasGate).length), "provide the convention, cannot check it"]],
+    "Three instruments give three answers: the source text says 20 take a parameter, Function.length says 6 " +
+    "REQUIRE one, and CALLING says 4 refuse and 2 return. The last is the only one a consumer feels.");
+REPORT.table("what it costs to open a front door", ["module", "bare (s)", "cheap path"],
+    COST.slow.map((c) => [c.rel, String(c.bare),
+        c.cheap === "IMPOSSIBLE" ? "no parameter -- nothing to pass"
+        : c.cheap === "UNMEASURED" ? "nobody has tried: " + c.cheapFlag
+        : `${c.cheapFlag} -> ${c.cheapSeconds}s`]),
+    "Exercising the whole convention once costs about seven and a half minutes, which is why no gate did " +
+    "until this one, and why the sample here is bounded and says so.");
+REPORT.write();
+
 console.log(`\nreportDoors-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);
 process.exit(fails === 0 ? 0 : 1);
+
+// =============================================================================================================
+// SABOTAGE LOG -- v4531, section 6's union ratchet after four arrivals were dated into NO_GATE_V4531.
+// Applied to tools/ship/reportDoors.mjs, graded on EXIT CODES, restored md5 834b6e5e187dabaf6de039545b332258.
+//
+//   A  world/ribbonRoad.mjs dropped from NO_GATE_V4531 -- a real arrival the list stops naming.
+//      -> exit 1. The direction the row exists for: a provider with no gate that nobody wrote down.
+//
+//   B  a name added that no module provides ("world/phantomThatDoesNotExist.mjs").
+//      -> exit 1. The OTHER direction, and the one a list-based ratchet loses if it only checks length >=
+//      derived: a list may not carry names the tree cannot produce, or it becomes a place to park excuses.
+//
+//   C  NO_GATE_V4531 spread twice into NO_GATE_ALL, inflating the union's length without changing its members.
+//      -> exit 1. The assertion is `noGate.length === NOGATE.length && every member included`, so a duplicate
+//      breaks the count while every containment check still passes -- which is the shape that would let a
+//      later edit quietly widen the union.
+//
+// Clean tree: exit 0. *** THE ROW WENT RED ON ITS OWN BEFORE ANY OF THIS, WHICH IS WHY IT IS TRUSTED HERE. ***
+// Four providers arrived with the Racing-city line and section 6 refused; it was not made to fail on purpose
+// to prove it could.

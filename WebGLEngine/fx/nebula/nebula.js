@@ -5,7 +5,29 @@
 // renders (downsampled) so the nebula shows on any device. The WGSL (WebGPU) + GLSL (WebGL2) ports mirror this math.
 "use strict";
 
-function hash2(x, y) { const h = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return h - Math.floor(h); }
+import { exactHash2 } from "../../render/exactHash.mjs";
+
+// *** v4570 -- THE CPU FALLBACK AND THE GPU PATH DREW DIFFERENT STARS, AND THE SAME PAGE USES BOTH. ***
+// hash2 was fract(sin(p.x*127.1 + p.y*311.7) * 43758.5453) here in float64 and, transcribed into
+// fx/nebula/nebulaShaders.js, the same expression in float32 in WGSL and again in GLSL. sin(x)*43758
+// amplifies the last bits of x by four orders of magnitude, so those are not one number rounded three ways,
+// they are three unrelated numbers.
+//
+// THE GAS SURVIVES IT AND THE STARS DO NOT. fbm averages the noise, so a wisp drawn from a different field
+// still looks like a wisp -- which is why nebulaShaders.js could say "f32 vs f64 differences are
+// imperceptible for gas" and be right. But nebulaColorAt below draws a star with `if (sv > 0.994)`, a
+// THRESHOLD, and a threshold does not average. Measured over 518,400 sampled pixels of a 1920x1080 frame:
+// the CPU drew 3,006 stars, the GPU drew 2,509, and only 378 were in the same place -- 12.6%. nebula.html
+// imports renderNebulaCPU AND the shaders, so a viewer without WebGPU saw a different sky.
+//
+// That pair is not quoted from a note -- tools/ship/exactHash-selfcheck.mjs recomputes the old idiom beside
+// the new one over the SAME pixels on every run, because a first reading of it under a different sampling
+// said 3,070 against 2,576, and a sampled quantity written down as a fixed one is a number nobody can
+// re-derive.
+//
+// exactHash2 quantises to a 1/256 lattice and runs an integer avalanche; integer arithmetic is exact in both
+// precisions. render/exactHash.mjs is the one definition and ships the two shader texts with it.
+const hash2 = (x, y) => exactHash2(x, y);
 function vnoise(x, y) {
     const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
     const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);

@@ -18,7 +18,7 @@ import path from "node:path";
 import { RED_AT_V4279, FIXED_AT_V4279, FIXED_SINCE_V4279, RECOVERED_SINCE_V4279,
          RECHECK_V4313, RECHECK_V4314,
          METHOD, runGate, censusCostMs, ENG, UNVERIFIED_LINE,
-         UNCONFIRMED_SLOW, SLOW_PARTIAL } from "./redCensus.mjs";
+         UNCONFIRMED_SLOW, SLOW_PARTIAL, ALL_REGISTERED, REGISTER_LISTS } from "./redCensus.mjs";
 
 // *** v4451 -- THIS FILE HAD BEEN DEAD AT IMPORT SINCE v4430, AND THE BUDGET IS WHY NOBODY SAW IT. ***
 //
@@ -83,11 +83,53 @@ console.log("1. *** THE CENSUS IS A MEASUREMENT, AND EVERY ENTRY CARRIES WHAT IT
 
 console.log("\n2. *** RE-RUN: EVERY GATE THE CENSUS CALLS RED IS STILL RED ***");
 {
+    // v4536: EVERY list, not just the first. See REGISTER_LISTS in redCensus.mjs for why.
+    //
+    // *** v4568 -- BOUNDED BY WALL CLOCK, AND THE ALTERNATIVE WAS A ROW THAT NEVER FINISHES. ***
+    // This re-ran every registered gate on every run, which was affordable while the register held gates the
+    // SWEEP had found -- all of them cheap by construction, since the sweep only runs what is under budget.
+    // v4568 registered five found in the KILLED bucket instead, and those cost 10 s to 88 s each because
+    // being expensive is why nothing had run them. This gate was ALREADY unable to finish -- 90,096 ms and
+    // killed, one of the 37 that survive a 90 s cap -- so a row that re-runs everything was already a row
+    // that never completed, and adding 208 s to it would have been decoration on top of that.
+    //
+    // The bound is the rotation's own idiom, applied here: STALEST FIRST under a wall-clock slice, so the
+    // whole register turns over in a derived number of runs rather than being sampled arbitrarily. What is
+    // NOT weakened is the direction that matters -- a gate found GREEN is still an immediate red, because
+    // being wrongly accused is the failure this row exists to catch. What is deferred is only how long it
+    // takes to reach every entry, and that number is printed rather than left to be assumed.
+    const SLICE_MS = 45000;
+    const order = [...ALL_REGISTERED].sort((x, y) => x.gate < y.gate ? -1 : x.gate > y.gate ? 1 : 0);
+    const start = Number(process.env.SWEK_REDCENSUS_OFFSET || 0) % Math.max(1, order.length);
     const nowGreen = [], stillRed = [];
-    for (const e of RED_AT_V4279) (runGate(e.gate).red ? stillRed : nowGreen).push(e.gate);
+    let spent = 0, ran = 0;
+    for (let i = 0; i < order.length; i++) {
+        const e = order[(start + i) % order.length];
+        const t0 = Date.now();
+        (runGate(e.gate).red ? stillRed : nowGreen).push(e.gate + " (" + e.list + ")");
+        spent += Date.now() - t0; ran++;
+        if (spent > SLICE_MS) break;
+    }
+    const rounds = Math.ceil(ALL_REGISTERED.length / Math.max(1, ran));
     ok("*** none of them has been fixed without the census being updated ***", nowGreen.length === 0,
         nowGreen.length ? "FIXED, now delete these lines from redCensus.mjs: " + nowGreen.join(" ")
-                        : stillRed.length + " of " + RED_AT_V4279.length + " re-ran red just now");
+                        : stillRed.length + " of " + ran + " re-ran red just now (offset " + start + " of " +
+                          ALL_REGISTERED.length + ", across " + REGISTER_LISTS.length + " lists) in " +
+                          (spent / 1000).toFixed(1) + "s of a " + (SLICE_MS / 1000) + "s slice -- the whole " +
+                          "register turns over in " + rounds + " run(s) at this size. This row re-ran ONE " +
+                          "list until v4536 and ALL of them, unbounded, until v4568 -- at which point five " +
+                          "gates from the killed bucket made 'all of them' a row that could not finish.");
+    // *** AND THE PAIRS ARE CHECKED AGAINST THE FILE, SO A NEW LIST CANNOT ARRIVE UNNOTICED. *** This is the
+    // shape quickSweep-selfcheck already uses for the same register: a union derived from a hand-written set
+    // of pairs is only as complete as the pairs, so the pairs are compared with what the module DECLARES.
+    const censusSrc = fs.readFileSync(path.join(ENG, "tools/ship/redCensus.mjs"), "utf8");
+    const declared = [...censusSrc.matchAll(/^export const (RED_AT_V\d+) = Object\.freeze\(/gm)].map((m) => m[1]).sort();
+    const paired = REGISTER_LISTS.map(([n]) => n).sort();
+    ok("!! ...and the lists it re-runs are every RED_AT_ list this module declares",
+        declared.length > 0 && declared.join() === paired.join(),
+        declared.join() === paired.join()
+            ? `${declared.length} lists, all re-run: ${declared.join(", ")}`
+            : `MISMATCH -- declared [${declared.join(", ")}] against re-run [${paired.join(", ")}]`);
     report("a gate turning green is GOOD NEWS that must be recorded by hand. Making that a red is the whole " +
         "mechanism: the alternative is a list nobody prunes, which is how gate-timings.json ended up " +
         "accusing thirteen working gates. The list may only shrink, and only on purpose.");
@@ -142,8 +184,29 @@ console.log("\n3. *** THE OLD RECORD WAS WRONG IN BOTH DIRECTIONS, AND BOTH ARE 
     const sample = ["tools/ship/rootLayout-selfcheck.mjs", "ui/stageInfo-selfcheck.mjs",
                     "tools/ship/timingCoverage-selfcheck.mjs"];
     ok("  the sample is drawn from the wrongly-accused list", sample.every((g) => RECORDED_BUT_GREEN.includes(g)));
-    const wronglyAccused = sample.filter((g) => fs.existsSync(path.join(ENG, g)) && !runGate(g).red);
-    ok("CONTROL: a sample of the wrongly-accused really does pass when run", wronglyAccused.length === sample.length,
+    // *** v4536 -- AND ONE OF THE THREE STOPPED BEING A COUNTER-EXAMPLE, WHICH IS NOT THE SAME AS THE CONTROL
+    // FAILING. *** RECORDED_BUT_GREEN is a claim about gate-timings.json's ACCUSATIONS: these gates were
+    // listed as failing and were green. ui/stageInfo-selfcheck.mjs was green then and is RED now -- registered
+    // at v4484, for Keith's third ask, when the gate stopped silently skipping its browser section. The old
+    // record is still wrong about it (it was green when accused); it is simply no longer available as
+    // EVIDENCE of that, because running it today says red for a reason that arrived afterwards.
+    //
+    // Asserting "all three still pass" made a claim about the past falsifiable by ordinary later work -- the
+    // same shape as the row four lines up, which was repaired at v4451 for exactly this and says so: "a claim
+    // about a moment measured against a moving set goes false the day somebody does the work it asked for".
+    // So the register is subtracted, the subtraction is NAMED, and the control runs what is left.
+    const registeredNow = new Set(ALL_REGISTERED.map((e) => e.gate));
+    const retired = sample.filter((g) => registeredNow.has(g));
+    const live = sample.filter((g) => !registeredNow.has(g));
+    ok("!! ...and a sampled gate that has since become genuinely red is NAMED and subtracted, not counted as a miss",
+        live.length > 0 && retired.every((g) => registeredNow.has(g)),
+        retired.length
+            ? `${retired.join(", ")} left the sample: green when gate-timings.json accused it, RED and ` +
+              `REGISTERED now, so it can no longer serve as evidence that the old record was wrong about it. ` +
+              `${live.length} of ${sample.length} still can.`
+            : `all ${sample.length} of the sample are still unregistered`);
+    const wronglyAccused = live.filter((g) => fs.existsSync(path.join(ENG, g)) && !runGate(g).red);
+    ok("CONTROL: a sample of the wrongly-accused really does pass when run", wronglyAccused.length === live.length,
         wronglyAccused.join(" ") + " -- run, not inferred from a set difference");
 }
 

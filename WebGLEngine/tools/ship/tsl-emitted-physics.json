@@ -1,4 +1,5 @@
 {
+ "generatedFrom": "tools/ship/tslPhysics-selfcheck.mjs",
  "at": "v4321",
  "three": "0.178.0",
  "note": "emitted by three's node builders from render/physicsTsl.mjs and transplanted by render/tslSource.mjs; rewritten by tools/ship/tslPhysics-selfcheck.mjs on every run",

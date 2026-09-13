@@ -1,0 +1,220 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>nav wiring harness</title>
+<!--
+  Drives the REAL simulation/BotPathfinderPool.js through REAL Web Workers, which is the half
+  tools/ship/navWiring-selfcheck.mjs cannot reach: that gate calls the worker's onmessage directly in Node,
+  so it never loads worker/botPathfinder.worker.js AS A MODULE WORKER and never transfers a buffer.
+
+  Both of those are things v4545 put at risk. The worker gained a static `import` of ../nav/navmesh.mjs, which
+  in a browser must resolve over HTTP with a JavaScript MIME type or the whole worker fails to construct --
+  and a worker that fails to construct is a bot that never gets a path, with nothing in Node to say so.
+
+  Publishes window.__navWiring when finished.
+-->
+<body>
+<pre id="out">running…</pre>
+<script type="module">
+import { BotPathfinderPool } from "/simulation/BotPathfinderPool.js";
+
+// A world with a wall and a gap, the shape the pool's own _heightmapForJob samples.
+// *** THE GAP HAS TO BE INSIDE THE SNAPSHOT, AND THE FIRST DRAFT PUT IT OUTSIDE. ***
+// BotPathfinderPool._heightmapForJob pads the start/goal bounding box by HM_PADDING = 24 and samples ONLY
+// that. With start and goal both at z=100 the window is z 76..124, so a gap at z 40..60 is not in the data
+// either planner is given, and both correctly returned found:false. That is a real property of the pool
+// rather than a bug in either planner: A ROUTE THAT DETOURS MORE THAN 24 UNITS OFF THE STRAIGHT LINE IS NOT
+// IN THE SNAPSHOT, and no planner can find what it was not sent. The gap sits at z 78..90 now -- inside the
+// window, and off the straight line, so it still forces a detour.
+const WALL_X0 = 60, WALL_X1 = 68, GAP_Z0 = 78, GAP_Z1 = 90;
+const world = {
+    _heightAt(x, z) {
+        const inWall = x >= WALL_X0 && x <= WALL_X1 && !(z >= GAP_Z0 && z <= GAP_Z1);
+        return inWall ? 40 : Math.round(3 + 2 * Math.sin(x * 0.08) * Math.cos(z * 0.11));
+    },
+};
+
+const results = { errors: [] };
+try {
+    // ---- 1. the plumbing: one plan, through a real Worker -------------------------------------------------
+    // jobTimeoutMs 1500: long enough that a healthy plan (single-digit ms) never trips it, short enough that
+    // a DEAD worker -- one whose module import failed, so it constructs and never replies -- is reported as a
+    // timeout instead of hanging this page until the driving gate gives up.
+    const pool = new BotPathfinderPool({ world, poolSize: 2, jobTimeoutMs: 1500 });
+    const one = await pool.plan(20, 100, 110, 100);
+    results.one = { found: one.found, route: one.route, waypoints: one.path ? one.path.length : 0 };
+
+    // ---- 2. the same job on the grid route, so the browser sees both ------------------------------------
+    const grid = await pool.plan(20, 100, 110, 100, { route: "grid" });
+    results.grid = { found: grid.found, route: grid.route, waypoints: grid.path ? grid.path.length : 0 };
+
+    // ---- 3. repeat plans, because the pool posts hm with [hm.buffer] and a transferred buffer detaches ---
+    const repeats = [];
+    for (let i = 0; i < 6; i++) {
+        const r = await pool.plan(20 + i, 100, 110, 100 + i);
+        repeats.push(r.found && r.route === "navmesh");
+    }
+    results.repeats = { total: repeats.length, ok: repeats.filter(Boolean).length };
+
+    // ---- 4. THE COST AT REAL BOT COUNTS, which is the number the Node gate could not take ----------------
+    // BotManager re-plans a bot every few seconds; a burst is what happens when many bots go stale together.
+    results.cost = [];
+    for (const n of [1, 8, 24, 48]) {
+        for (const route of ["navmesh", "grid"]) {
+            const jobs = [];
+            const t0 = performance.now();
+            for (let i = 0; i < n; i++) jobs.push(pool.plan(20 + (i % 17), 90 + (i % 23), 110, 100, { route }));
+            const got = await Promise.all(jobs);
+            const ms = performance.now() - t0;
+            results.cost.push({ n, route, ms: +ms.toFixed(1), perJob: +(ms / n).toFixed(2),
+                                found: got.filter((g) => g.found).length });
+        }
+    }
+    results.poolSize = pool.poolSize;
+    results.byRoute = pool._byRoute;
+    results.timeouts = pool._timeouts;
+    pool.dispose?.();
+
+    // ---- 5. BotManager IN A BROWSER, over a hill and into a wall ---------------------------------------
+    // Not for what it LOOKS like -- nothing here renders a bot -- but because v4545 gave BotManager a static
+    // import of physics/character/terrainWalk.mjs, and that module graph had never been loaded by a browser.
+    // A Node gate importing the same file proves the syntax and not the resolution.
+    const { BotManager } = await import("/simulation/BotManager.js");
+    const hillWorld = { _heightAt: (x, z) => (x < 40 ? 0.3 * Math.max(0, x - 10) : 12 + 40) };
+    const bm = Object.create(BotManager.prototype);
+    bm.world = hillWorld;
+    const bot = { x: 0, y: 1, z: 0, yaw: 0, spec: { speed: 5 }, path: null, pathIdx: 0 };
+    let worstOff = 0;
+    for (let i = 0; i < 900; i++) {
+        bm._followPathOrSteer(bot, 200, 0, 1 / 60, 1);
+        worstOff = Math.max(worstOff, Math.abs(bot.y - (hillWorld._heightAt(bot.x, bot.z) + 1)));
+    }
+    results.bot = { x: +bot.x.toFixed(3), y: +bot.y.toFixed(3), worstOff: +worstOff.toExponential(2) };
+
+    // ---- 6. DOES THE BOT YOU CAN SEE STAND ON THE GROUND YOU CAN SEE? ------------------------------------
+    // *** THE ONLY VISUAL CLAIM WORTH ASSERTING IS AN AGREEMENT BETWEEN TWO INDEPENDENT PATHS. *** "It looks
+    // right" needs a reference nobody has. What a render CAN settle is whether the surface drawn from the
+    // heightmap and the height the controller computed are the same surface -- the float/sink bug, where a
+    // character hovers or sinks because the renderer and the collision read different ground. So: draw a side
+    // elevation of the terrain from the heightmap, draw the bot from the CONTROLLER's y, then READ THE PIXELS
+    // BACK and find the terrain's silhouette in the bot's own column. If the two paths agree the marker sits
+    // on the silhouette; if they disagree it floats above or sinks below, in pixels, visibly.
+    const W = 480, H = 200, X0 = 0, X1 = 48, Y0 = -1, Y1 = 17;
+    const cvs = document.createElement("canvas");
+    cvs.width = W; cvs.height = H;
+    const g2 = cvs.getContext("2d", { willReadFrequently: true });
+    const px = (wx) => Math.round((wx - X0) / (X1 - X0) * (W - 1));
+    const py = (wy) => Math.round(H - 1 - (wy - Y0) / (Y1 - Y0) * (H - 1));
+    const hillW = { _heightAt: (x, z) => (x < 40 ? 0.3 * Math.max(0, x - 10) : 52) };
+    g2.fillStyle = "#000"; g2.fillRect(0, 0, W, H);
+    g2.fillStyle = "#0a0";                                  // the terrain, straight from the heightmap
+    for (let c = 0; c < W; c++) {
+        const wx = X0 + c / (W - 1) * (X1 - X0);
+        const top = py(hillW._heightAt(wx, 0));
+        if (top < H) g2.fillRect(c, top, 1, H - top);
+    }
+    // *** THE SILHOUETTE IS CAPTURED ONCE, BEFORE ANY MARKER EXISTS. *** Reading it per sample put the probe
+    // in its own way twice: drawing the marker first painted over the terrain's top row in the column being
+    // read (a constant -2 px on every sample), and once the bot STOPS at the wall it re-samples the SAME
+    // column, so a marker from an earlier iteration occluded the later reads (-2 on the last four). One
+    // capture of the clean render has neither hazard, and the ordering cannot rot.
+    const silhouette = new Int16Array(W).fill(-1);
+    {
+        const all = g2.getImageData(0, 0, W, H).data;
+        for (let c = 0; c < W; c++)
+            for (let r = 0; r < H; r++) {
+                const i = (r * W + c) * 4;
+                if (all[i + 1] > 100 && all[i] < 100) { silhouette[c] = r; break; }
+            }
+    }
+    const b2 = { x: 0, y: 1, z: 0, yaw: 0, spec: { speed: 5 }, path: null, pathIdx: 0 };
+    const bm2 = Object.create(BotManager.prototype); bm2.world = hillW;
+    const samples = [];
+    for (let i = 0; i < 900; i++) {
+        bm2._followPathOrSteer(b2, 200, 0, 1 / 60, 1);
+        if (i % 100 !== 99) continue;
+        const c = px(b2.x);
+        if (c < 0 || c >= W) continue;
+        // the bot's FEET, which is bot.y minus the +1 eye offset BotManager adds
+        const feetRow = py(b2.y - 1);
+        const terrainRow = silhouette[c];
+        g2.fillStyle = "#f0f"; g2.fillRect(c - 1, feetRow - 1, 3, 3);
+        const wxCol = X0 + c / (W - 1) * (X1 - X0);
+        samples.push({ x: +b2.x.toFixed(2), wxCol: +wxCol.toFixed(3), feetY: +(b2.y - 1).toFixed(4),
+            groundAtBot: +hillW._heightAt(b2.x, 0).toFixed(4), groundAtCol: +hillW._heightAt(wxCol, 0).toFixed(4),
+            feetRow, terrainRow, pyGroundAtCol: py(hillW._heightAt(wxCol, 0)),
+            gapPx: terrainRow < 0 ? null : feetRow - terrainRow });
+    }
+    const gaps = samples.filter((s) => s.gapPx !== null).map((s) => s.gapPx);
+    results.render = { W, H, samples: samples.length, detail: samples,
+        worstGapPx: gaps.length ? Math.max(...gaps.map(Math.abs)) : null,
+        gaps, dataUrlBytes: cvs.toDataURL("image/png").length };
+
+    // ---- 7. THE POOL ABOVE TWO WORKERS -------------------------------------------------------------------
+    results.pools = [];
+    for (const size of [1, 2, 4, 8]) {
+        const p2 = new BotPathfinderPool({ world, poolSize: size, jobTimeoutMs: 1500 });
+        const jobs = []; const t0 = performance.now();
+        for (let i = 0; i < 32; i++) jobs.push(p2.plan(20 + (i % 17), 90 + (i % 23), 110, 100));
+        const got = await Promise.all(jobs);
+        results.pools.push({ size, ms: +(performance.now() - t0).toFixed(1), found: got.filter((g) => g.found).length,
+                             workers: p2.workers.length });
+        p2.dispose?.();
+    }
+
+    // ---- 8. THE WINDOW, THE LADDER THAT EXTENDS IT, AND WHAT THE LADDER COSTS ---------------------------
+    // The pool samples only the start/goal bbox padded by HM_PADDING, so a detour wider than that is not in
+    // the data either planner receives -- and the bot then gets NO path rather than a long one. v4548 makes
+    // the window ESCALATE ON FAILURE. Both rungs are measured here: the first alone, to show the limit is
+    // still exactly where the constant puts it, and the whole ladder, to show how much further it reaches.
+    const wallWorld = (off) => ({ _heightAt(x, z) {
+        const inWall = x >= 60 && x <= 68 && !(z >= 100 + off - 6 && z <= 100 + off + 6);
+        return inWall ? 40 : 3;
+    } });
+    // Nine offsets, not thirteen. Every claim section 6 makes still has its sample: the first rung's edge
+    // (26 reached, 32 lost), rung two (32, 48, 64), rung three (96, 128) and past the ceiling (160). The four
+    // dropped -- 8, 22, 24, 200 -- were each a second point inside a band another offset already establishes,
+    // and they cost about 450 ms of pad-144 snapshots. THE REASON THAT MATTERS: this gate measured 3,454 ms
+    // against a 3,000 ms ship-time budget, so the round that added the ladder had pushed the gate grading the
+    // WORKER PLUMBING out of the sweep entirely -- the same failure this round filed as a backlog item after
+    // finding it had hidden a stale record for nine ships. Redundant sample points are the right thing to
+    // spend; a claim is not.
+    const OFFS = [0, 16, 26, 32, 48, 64, 96, 128, 160];
+    results.padding = [];
+    for (const off of OFFS) {
+        const p3 = new BotPathfinderPool({ world: wallWorld(off), poolSize: 2, jobTimeoutMs: 1500 });
+        const first = await p3.plan(20, 100, 110, 100, { pads: [24] });          // the first rung alone
+        const ladder = await p3.plan(20, 100, 110, 100);                          // the whole schedule
+        results.padding.push({ gapOffset: off, firstRung: first.found,
+                               ladder: ladder.found, attempts: ladder.attempts, pad: ladder.pad });
+        p3.dispose?.();
+    }
+    // what the ladder costs: a plan that succeeds on the first rung must not widen at all, and the
+    // walled-off case -- which fails at every rung and would repeat forever -- must be bounded.
+    const easy = new BotPathfinderPool({ world: wallWorld(0), poolSize: 2, jobTimeoutMs: 1500 });
+    const tEasy0 = performance.now();
+    const EASY_N = 8;
+    for (let i = 0; i < EASY_N; i++) await easy.plan(20, 100, 110, 100);
+    results.ladderCost = { easyMs: +(performance.now() - tEasy0).toFixed(1), easyWidened: easy._widened, easyN: EASY_N };
+    easy.dispose?.();
+    const sealed = new BotPathfinderPool({ world: { _heightAt: (x, z) => (x >= 60 && x <= 68 ? 40 : 3) },
+                                           poolSize: 2, jobTimeoutMs: 1500 });
+    const tSeal0 = performance.now();
+    // Four hopeless plans, not eight. The claim is a PER-REQUEST cost and a per-plan widening count, both of
+    // which four measure exactly as well as eight; the gate divides rather than quoting the total, so the
+    // number it asserts does not move. Worth 220 ms of a 3,000 ms budget this gate had just gone over.
+    const SEALED_N = 4;
+    for (let i = 0; i < SEALED_N; i++) await sealed.plan(20, 100, 110, 100);
+    results.ladderCost.sealedN = SEALED_N;
+    results.ladderCost.sealedMs = +(performance.now() - tSeal0).toFixed(1);
+    results.ladderCost.sealedWidened = sealed._widened;
+    results.ladderCost.sealedInVain = sealed._widenedInVain;
+    results.ladderCost.schedule = sealed.padSchedule;
+    sealed.dispose?.();
+
+} catch (e) {
+    results.errors.push(String(e && e.stack || e).slice(0, 400));
+}
+window.__navWiring = results;
+document.getElementById("out").textContent = JSON.stringify(results, null, 2);
+</script>
+</body>

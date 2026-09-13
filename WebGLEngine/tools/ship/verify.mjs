@@ -16,6 +16,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execSync } from "node:child_process";
 import { withheldFromMirror } from "./withheld.mjs";
+import VM from "../../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
 
 function arg(name) { const i = process.argv.indexOf(name); return i >= 0 ? process.argv[i + 1] : null; }
 const version = arg("--version");
@@ -45,7 +46,14 @@ if (version) {
 // 1. version marker matches what we claim
 if (version) {
   let mv = null;
-  try { mv = (fs.readFileSync("main.js", "utf8").match(/const ENGINE_VERSION = "(v\d+)"/) || [])[1]; } catch {}
+  // *** v4531 -- ANCHORED, BECAUSE THIS CHECK WAS READING A COMMENTED-OUT LABEL. *** main.js keeps its version
+  // history as commented copies of the declaration ABOVE the live one, so an unanchored match returns line
+  // 6527's `// const ENGINE_VERSION = "v4487"` and never reaches the live line. The check whose whole purpose
+  // is v1603's "old code wearing a new label" was reading a label that is not the code's. Measured at
+  // 524c536c: the regex returns v4487 where the live declaration says v4504, so the two marker rows below
+  // failed on every ship that carried commented history -- v4504's own round recorded its DO NOT SHIP as
+  // "the release lag alone" and was wrong about two of its three failures. ^ with /m fixes it outright.
+  try { mv = (fs.readFileSync("main.js", "utf8").match(VM.markerRe("ENGINE_VERSION")) || [])[1]; } catch {}
   check(`version marker: main.js says ${mv || "?"} , shipping ${version}`, mv === version, mv === version ? "" : "MISLABELED BUILD — bump main.js or fix --version");
 } else {
   check("version marker", false, "no --version given");
@@ -56,7 +64,9 @@ if (version) {
 // Nothing gated on it, which is exactly why it drifted: a number nobody checks is a number that quietly lies.
 if (version) {
   let bb = null;
-  try { bb = (fs.readFileSync("brain/brain.js", "utf8").match(/BRAIN_BUILD = "(v\d+)"/) || [])[1]; } catch {}
+  // v4531 -- anchored for the same reason as the engine marker above, and it was worse here: the pattern had
+  // no `const` either, so it also matched the word inside a comment sentence mentioning BRAIN_BUILD = "vNNNN".
+  try { bb = (fs.readFileSync("brain/brain.js", "utf8").match(VM.markerRe("BRAIN_BUILD")) || [])[1]; } catch {}
   check(`brain build marker: brain.js says ${bb || "?"} , shipping ${version}`, bb === version,
         bb === version ? "" : "BRAIN_BUILD is stale — it will announce the wrong build in every log line");
 }
@@ -488,7 +498,17 @@ if (process.env.SWEK_QUICKSWEEP !== "0") {
     // tools/ship/tools/ship/quickSweep.mjs before verify ever ran it.
     const { runQuickSweep } = await import("./quickSweep.mjs");
     const budgetMs = Number(arg("--sweep-budget") || 3000);
-    const r = await runQuickSweep({ budgetMs, onProgress: (d, t) => { if (d === t || d % 200 === 0) process.stderr.write(`[verify] quick sweep ${d}/${t}\n`); } });
+    // *** v4574 -- THE SHIP-TIME SWEEP IS EXPLICITLY FULL, AND THAT IS THE POINT OF ARMING THE OTHER ONE. ***
+    // quickSweep's CLI now skips gates whose recorded inputs did not move, which is worth ~5 minutes on every
+    // sweep somebody runs while working. A SHIP IS NOT THAT. The saving buys iteration speed; what it spends
+    // is a small, bounded, MEASURED chance that a gate which should have run did not -- and the one place
+    // this tree must not spend that is the run whose output is "ALL GREEN, safe to present_files".
+    //
+    // So it is passed EXPLICITLY even though the programmatic default is already false. That default is a
+    // thing somebody changes for a good reason somewhere else -- v4574 changed it to true for about ten
+    // minutes before sweepCoverage-selfcheck showed why that was wrong -- and an argument at the call site
+    // is a decision THIS file made, which the next person to arm something can see was considered here.
+    const r = await runQuickSweep({ budgetMs, skipUnchanged: false, onProgress: (d, t) => { if (d === t || d % 200 === 0) process.stderr.write(`[verify] quick sweep ${d}/${t}\n`); } });
     console.log(`[verify] quick sweep: ${r.ran} of ${r.enumerated} gates under ${budgetMs} ms in ${(r.ms / 1000).toFixed(0)} s -- ${r.green} green, ` +
       `${r.knownRed.length} known red, ${r.newRed.length} NEW red, ${r.falseReds} false red, ${r.unmeasured.length} unmeasured, ${r.dropped.length} now over budget`);
     for (const k of r.knownRed) console.log(`[verify]   known red  ${k.gate}  (${k.record})`);

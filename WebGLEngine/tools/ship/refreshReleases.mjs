@@ -70,6 +70,7 @@ export function ledgerUpdate({ rows, prev, repo, now } = {}) {
     const added = rows.filter((r) => !before.has(r.tag)).map((r) => r.tag);
     const gone = [...before].filter((t) => !rows.some((r) => r.tag === t));
     const out = Object.assign({}, prev, {
+        generatedFrom: "tools/ship/refreshReleases.mjs",
         refreshedAt: (now || new Date()).toISOString(),
         source: `GET /repos/${repo}/releases (per_page=100)`,
         releases: rows,

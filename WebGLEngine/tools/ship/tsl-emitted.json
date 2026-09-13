@@ -1,4 +1,5 @@
 {
+ "generatedFrom": "tools/ship/tslSource-selfcheck.mjs",
  "at": "v4320",
  "three": "0.178.0",
  "note": "emitted by three's node builders from render/badTvTsl.mjs and render/blackbodyTsl.mjs, transplanted by render/tslSource.mjs; rewritten by tools/ship/tslSource-selfcheck.mjs on every run",

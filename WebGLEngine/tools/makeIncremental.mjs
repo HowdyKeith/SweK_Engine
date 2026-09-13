@@ -53,10 +53,21 @@ export function makeIncremental({ toVersion, fromVersion, note, writes = [], del
 // ship calls resetBaseline() to start the next accumulation window.
 const MANIFEST = path.join(ROOT, "WebGLEngine", "tools", ".incremental-manifest.json");
 
+// v4581 -- *** STAMPED, BECAUSE THE MANIFEST IS A RECORD OF PATHS AND NOTHING SAID SO. ***
+// tools/ship/orphanScan.mjs drops a GENERATED RECORD from its corpus by asking the file what it is: v3900 made
+// the exclusion a property rather than a name list, and v4572 fixed the property and stamped nineteen records
+// at their writers. This one was missed. Its top-level keys are `baseline`, `writes` and `deletes` -- a list of
+// every path a round touched -- so every file named in it reads as referenced by something, and none of them is
+// loaded by it. FOURTEEN of the tree's fifteen reachable shader files are named here.
+//
+// IT CHANGES NO VERDICT TODAY, and that is stated rather than implied: all fourteen have a real loader as well,
+// so nothing currently hangs on the manifest. The stamp closes it before something does.
+const PROVENANCE = { generatedFrom: "tools/makeIncremental.mjs" };
+
 export function loadManifest(mp = MANIFEST) {
     try { return JSON.parse(fs.readFileSync(mp, "utf8")); } catch { return { baseline: null, writes: [], deletes: [] }; }
 }
-export function saveManifest(m, mp = MANIFEST) { fs.writeFileSync(mp, JSON.stringify(m, null, 2)); }
+export function saveManifest(m, mp = MANIFEST) { fs.writeFileSync(mp, JSON.stringify({ ...PROVENANCE, ...m }, null, 2)); }
 export function resetBaseline(version, mp = MANIFEST) { saveManifest({ baseline: String(version), writes: [], deletes: [] }, mp); }
 
 export function accumulate({ writes = [], deletes = [] }, mp = MANIFEST) {

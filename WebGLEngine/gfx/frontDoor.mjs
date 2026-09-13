@@ -219,6 +219,36 @@ export const CLOSED_AT_V4407 = Object.freeze(["gfx/device.js"]);
 export const MAIN_REACH_BEFORE_V4407 = 692;
 export const MAIN_REACH_AFTER_V4407 = 695;
 
+// *** v4534 -- THE ROW BELOW ASSERTED THIS TOTAL EXACTLY, WHICH PINS THE WHOLE FRONT-DOOR CLOSURE TO A NUMBER
+// FROZEN AT v4407. *** Any round adding an import anywhere in main.js's reach breaks it, and the break says
+// nothing about what v4407 claimed. Three modules have arrived since, all by unrelated rounds, and NONE HAS
+// BEEN LOST -- measured by replaying the same walk against a v4407 worktree and diffing the two sets.
+//
+// Growth is ACCOUNTED rather than pinned or unbounded: each arrival is named with why it is on the path, and
+// the total is asserted to be the v4407 number plus exactly these. The membership claims that carry the
+// round's actual finding -- gfx/device.js is reached, exactly what CLOSED_AT_V4407 says is closed, nine are
+// still outside -- are untouched and are where the meaning lives.
+export const REACH_ARRIVALS_SINCE_V4407 = Object.freeze([
+    Object.freeze({ module: "ui/webgpuProbe.mjs", why: "the WebGPU capability probe the front door now consults" }),
+    Object.freeze({ module: "world/buildingFacade.mjs", why: "facade generation, pulled in by the building work" }),
+    Object.freeze({ module: "world/buildingGrammar.mjs", why: "its grammar, imported by the facade" }),
+    // *** FOUR ARRIVALS FROM THIS SESSION'S OWN ROUNDS, NONE OF WHICH RECORDED ITSELF HERE. *** The row that
+    // demands each arrival be named went red at 702 against 695 + 3, and it was invisible for as long as it
+    // was: this gate is over the ship-time budget, so re-timing the over-budget pool at v4565 is what ran it.
+    // Every chain below is walked with the tree's own resolver rather than assumed.
+    Object.freeze({ module: "physics/mesh/uvUnwrap.mjs",
+        why: "v4536's planar unwrapper. main.js -> tools/export/reskin.js (dynamic) -> uvLscm -> uvUnwrap: " +
+             "reskin's ROUTE 3 is the UV texture path, so the unwrappers came with it" }),
+    Object.freeze({ module: "physics/mesh/uvLscm.mjs",
+        why: "v4537's curved unwrapper, the other half of that route and the module reskin imports directly" }),
+    Object.freeze({ module: "physics/character/terrainWalk.mjs",
+        why: "v4544's slope-aware ground controller, wired into simulation/BotManager.js at v4545 -- the " +
+             "round that stopped bots writing bot.y = _heightAt(x, z) + 1" }),
+    Object.freeze({ module: "world/surfaceProbe.mjs",
+        why: "v4554's terrain-against-voxels probe, imported by BotManager on the same path" }),
+]);
+export const REACH_LOST_SINCE_V4407 = Object.freeze([]);
+
 export const ADDED_AT_V4407 = Object.freeze([
     "BACKEND_STATE", "SECURE_ONLY", "originVerdict", "backendState", "webgpuDiagnosis", "open", "status",
 ]);

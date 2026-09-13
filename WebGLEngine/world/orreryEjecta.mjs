@@ -429,6 +429,15 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "ai-bridge/wasmSandbox.js",
         "wasm-bench.html",
     ]),
+    // v4560 -- vendor/xatlas arrived as a REFERENCE ORACLE rather than a dependency, and it has exactly ONE
+    // dependant on purpose: nothing the engine ships loads it, and nothing can, because it is C++ and there is
+    // no emscripten here. The one file names the two vendored sources in order to COMPILE them on demand --
+    // a build input rather than an import, which the substring rule reads the same way and should. Ejecting
+    // this body would take out tools/mesh/xatlasRef-selfcheck.mjs's reference half; that gate would still
+    // grade this tree's own unwrapper against the recorded numbers, which is why the record is hash-pinned.
+    "xatlas": Object.freeze([
+        "tools/mesh/xatlasRef.mjs",
+    ]),
 });
 
 /** DERIVED from the list above, never typed. The old EJECTA_BASELINE shape, for readers that want a count. */

@@ -1,4 +1,5 @@
 {
+ "captured": "a three r178 run; read-only fixture, no writer in the tree",
  "at": "v4331",
  "three": "0.178.0",
  "note": "three's emitted compute WGSL for the Lyapunov sweep, kept as a fixture so the CPU-side checks in tools/ship/tslPhysics-selfcheck.mjs run without a GPU",

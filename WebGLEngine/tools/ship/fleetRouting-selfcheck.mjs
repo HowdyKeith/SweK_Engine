@@ -1,4 +1,4 @@
-// tools/ship/fleetRouting-selfcheck.mjs -- v4531
+// tools/ship/fleetRouting-selfcheck.mjs -- v4584
 //
 // FLEET BRAIN ROUTING, NAMED. Task 72 asked what the gauges call a "fleet brain request" and for every one to say WHICH
 // peer took it and WHAT it was, in the grid view and the gauge, with a gate that a routed request is attributed; then for

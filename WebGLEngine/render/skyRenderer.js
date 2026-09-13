@@ -11,6 +11,8 @@
 // world feels atmospherically unified — terrain at distance fades
 // into the same color the sky shows at the horizon.
 
+import { SKY_STARS_GLSL } from "./skyStars.mjs";
+
 const VS = `#version 300 es
 layout(location=0) in vec2 aClipPos;
 out vec2 vClipPos;
@@ -24,6 +26,7 @@ void main() {
 }`;
 
 const FS = `#version 300 es
+${SKY_STARS_GLSL}
 precision highp float;
 in vec2 vClipPos;
 out vec4 outColor;
@@ -58,11 +61,6 @@ uniform sampler2D uSkybox;
 uniform float uSkyboxStrength;
 uniform float uSkyboxYaw;       // radians; rotates the skybox horizontally
 
-// Cheap 3D hash → 0..1, deterministic per integer cell. Used for
-// procedural starfield.
-float starHash(vec3 p) {
-    return fract(sin(dot(p, vec3(17.13, 91.71, 53.97))) * 43758.5453);
-}
 
 void main() {
     // Reconstruct world-space far-plane point from clip space, then
@@ -88,25 +86,30 @@ void main() {
         // see them through the ground otherwise.
         if (uStarDensity > 0.0 && ray.y > -0.05) {
             vec3 cellP = floor(ray * 240.0);
-            float h = starHash(cellP);
-            float threshold = 1.0 - uStarDensity * 0.005;
-            if (h > threshold) {
-                float bright = (h - threshold) / 0.005;
+            // v4580: render/skyStars.mjs owns the cut AND the normalisation, because they are one number.
+            // This read bright = (h - threshold) / 0.005 while 1.0 - threshold is uStarDensity * 0.005,
+            // (NO BACKTICKS IN HERE: this comment is inside a JS template literal and one would end it.)
+            // so the brightest star at density 0.6 was 0.60 and at 0.4 was 0.40 -- the density knob was
+            // dimming every star, on top of thinning them.
+            vec2 st = sky_star(cellP, uStarDensity);
+            float h = st.y;
+            if (st.x > 0.0) {
+                float bright = st.x;
                 // v824 base star palette: cool blue/white/warm yellow per cell
                 vec3 starColCool = vec3(0.85, 0.90, 1.0);
                 vec3 starColWarm = vec3(1.0,  0.95, 0.75);
                 vec3 starColAmber = vec3(1.0, 0.78, 0.55);
-                float palette = starHash(cellP + 7.3);
+                float palette = sky_hash(cellP, 1u);
                 vec3 baseCol = mix(starColCool, starColWarm, palette);
                 // v825 — slow color drift. Each star has unique drift phase
                 // + speed; sinusoidal blend toward amber over ~20s cycle.
-                float driftPhase = starHash(cellP + 41.3) * 6.2831853;
-                float driftSpeed = 0.05 + 0.15 * starHash(cellP + 53.7);   // 0.05–0.20 Hz
+                float driftPhase = sky_hash(cellP, 2u) * 6.2831853;
+                float driftSpeed = 0.05 + 0.15 * sky_hash(cellP, 3u);   // 0.05–0.20 Hz
                 float driftMix   = 0.5 + 0.5 * sin(uTime * driftSpeed + driftPhase);
                 vec3 starCol = mix(baseCol, starColAmber, driftMix * 0.35);
                 // v824 twinkle
-                float twinklePhase = starHash(cellP + 13.7) * 6.2831853;
-                float twinkleSpeed = 1.5 + starHash(cellP + 29.4) * 2.5;
+                float twinklePhase = sky_hash(cellP, 4u) * 6.2831853;
+                float twinkleSpeed = 1.5 + sky_hash(cellP, 5u) * 2.5;
                 float twinkle = 0.55 + 0.45 * sin(uTime * twinkleSpeed + twinklePhase);
                 col += starCol * bright * uStarBrightness * twinkle;
             }
@@ -123,7 +126,7 @@ void main() {
                 // Add a coarse cell-noise modulation along the band so it's
                 // not a uniform stripe — gives the cloudy texture.
                 vec3 bandCell = floor(ray * 6.0);
-                float bandHash = starHash(bandCell);
+                float bandHash = sky_hash(bandCell, 6u);
                 float bandMod = 0.5 + 0.5 * bandHash;
                 // Slight blue-violet tint, dim
                 vec3 bandCol = vec3(0.45, 0.50, 0.70) * 0.18;
@@ -151,13 +154,17 @@ void main() {
         float nightness = clamp(-uSunDir.y * 2.0, 0.0, 1.0);
         if (nightness > 0.02 && ray.y > 0.05) {
             vec3 cellP = floor(ray * 220.0);
-            float h = starHash(cellP);
-            float threshold = 1.0 - 0.003;
-            if (h > threshold) {
-                float bright = (h - threshold) / 0.003;
+            // v4580 -- *** THIS BLOCK ALWAYS HAD THE NORMALISATION RIGHT AND THE SPACE-MODE ONE ABOVE DID
+            // NOT. *** Here the divisor 0.003 really IS 1.0 - threshold; up there it was a fixed 0.005 while
+            // 1.0 - threshold was uStarDensity * 0.005. One file, both forms, and nothing compared them.
+            // The fixed 0.003 cut is what sky_star gives at density 0.6, so it is spelled that way rather
+            // than as a second constant.
+            vec2 st = sky_star(cellP, 0.6);
+            if (st.x > 0.0) {
+                float bright = st.x;
                 vec3 starCol = mix(vec3(0.85, 0.90, 1.00),
                                    vec3(1.00, 0.95, 0.75),
-                                   starHash(cellP + 7.3));
+                                   sky_hash(cellP, 1u));
                 col += starCol * bright * nightness * 0.85;
             }
         }

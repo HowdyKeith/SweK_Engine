@@ -30,6 +30,8 @@
 // which reads as "cheap sticker" without a viewer being able to say why. So the gate asserts THE MONOTONIC
 // PATH, not a colour, because the colour is a consequence and the path is the physics.
 
+import { exactHash2 } from "./exactHash.mjs";
+
 /** Wavelengths sampled for R, G, B, in nanometres. Not arbitrary: near the peaks of the CIE response. */
 export const LAMBDA_NM = [600, 550, 450];
 /** Refractive index of the film. ~1.4 is a soap/oil/lacquer film; the knob exists because it moves the hue. */
@@ -78,12 +80,41 @@ export function diffractionRGB(sinTheta, { gratingNm = 1200, order = 1, sharpnes
     });
 }
 
-/** Deterministic value hash. Integer-lattice, so a flake stays put on the SURFACE rather than swimming. */
+/**
+ * Deterministic value hash. Integer-lattice, so a flake stays put on the SURFACE rather than swimming.
+ *
+ * *** v4578 -- THIS AND THE GLSL WERE TWO DIFFERENT FUNCTIONS, AND THE GLSL SAID IT WAS THIS ONE. ***
+ * render/holoFoilShader.js's hf_hash2 read `fract(sin(dot(vec3(floor(p), seed), vec3(127.1, 311.7, 74.7))) *
+ * 43758.5453123)` under the comment "Integer lattice, matching the model's hash2" -- the sin-hash, which is
+ * neither an integer lattice nor this function. NOT A PRECISION GAP: two unrelated random fields, each
+ * consumed by `if (cell > coverage) return 0`, which decides whether a flake EXISTS.
+ *
+ * MEASURED over the 1,600 cells the 40x40 flake lattice actually has, the GLSL emulated in float32 with
+ * Math.fround the way a GPU computes it: 81.8% of cells differed by more than 0.1, worst 0.9604 (model
+ * 0.0372 against shader 0.9976), the draw decision flipped on 21.3%, and OF THE MODEL'S 184 FLAKES THE
+ * SHADER DREW 29 IN THE SAME PLACE -- 15.8%. The two halves agreed about one flake in six.
+ *
+ * Both are render/exactHash.mjs's hash now: integer arithmetic, so float32 and float64 agree BIT FOR BIT,
+ * and the shader splices that module's own exported GLSL rather than carrying a fourth transcription. The
+ * cell is floored HERE, before the hash, so "a flake stays on its surface point" is this file's property
+ * and not exactHash's 1/256 quantisation doing something similar by accident.
+ */
 export function hash2(x, y, seed = 0) {
-    let h = Math.imul(Math.floor(x) | 0, 374761393) ^ Math.imul(Math.floor(y) | 0, 668265263) ^ Math.imul(seed | 0, 2147483647);
-    h = Math.imul(h ^ (h >>> 13), 1274126177);
-    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+    return exactHash2(Math.floor(x), Math.floor(y), seed);
 }
+
+/**
+ * *** THE FLAKE KNOBS, DECLARED ONCE. *** render/holoFoilShader.js spelled uFlakeDensity 40, uFlakeCoverage
+ * 0.12 and uFlakeSeed 1 in its own DEFAULTS while these sat here as inline parameter defaults: two
+ * declarations of one thing, the defect v4169 fixed for the wavelengths, the IOR and the film thickness and
+ * did not fix here. It matters for the same reason it mattered there -- tools/ship/holoFoil-selfcheck.mjs
+ * grades the shader against this model, so a drift would have it comparing a shader sampling one flake field
+ * against a model of a different one and reporting agreement about the wrong thing.
+ *
+ * FOUND BY SABOTAGE, not by reading: setting the shader's uFlakeCoverage to 0 left the whole gate GREEN,
+ * because every row that needed a coverage had typed its own.
+ */
+export const FLAKE_DEFAULTS = Object.freeze({ density: 40, seed: 1, coverage: 0.12, tightness: 24 });
 
 /**
  * Metallic flakes.
@@ -93,7 +124,9 @@ export function hash2(x, y, seed = 0) {
  * noise rather than glitter. Each flake also carries its own normal tilt, so they light up one at a time
  * instead of the whole field flashing together, which is what makes it look like foil and not like static.
  */
-export function flakeAt(u, v, cosIncident, { density = 40, seed = 1, coverage = 0.12, tightness = 24 } = {}) {
+export function flakeAt(u, v, cosIncident,
+                        { density = FLAKE_DEFAULTS.density, seed = FLAKE_DEFAULTS.seed,
+                          coverage = FLAKE_DEFAULTS.coverage, tightness = FLAKE_DEFAULTS.tightness } = {}) {
     const gx = u * density, gy = v * density;
     const cell = hash2(gx, gy, seed);
     if (cell > coverage) return 0;

@@ -177,5 +177,24 @@ const world = { chunkSize: S, chunks: new Map([["0,0", floorChunk(true)], ["1,0"
            "settled headlessly; whether Blender likes it wants a person and a file.");
 }
 
+// =============================================================================================================
+// *** v4550 -- THE WRITER IS NOW GRADED AGAINST THE SPEC AND NOT ONLY AGAINST THE CONTAINER. *** Everything
+// above asks whether the bytes are well-formed: the magic, the version, chunk padding, a FLOAT view at an
+// even offset. None of it asks whether they MEAN anything legal -- an accessor reading past its bufferView,
+// a POSITION min that disagrees with the vertices actually in the buffer, an index naming a vertex the mesh
+// does not have. tools/export/glbConformance.mjs checks fifteen of the spec's MUSTs and costs about a
+// millisecond on an export this size, so the writer's own gate is where a writer regression should surface.
+{
+    const GC = await import("../export/glbConformance.mjs");
+    const out = writeGlb([{ name: "conformance", positions: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]) }]);
+    const r = GC.validate(out);
+    ok("!! *** THIS WRITER'S OUTPUT PASSES THE SPEC-SEMANTICS CHECK, NOT ONLY THE CONTAINER CHECKS ABOVE ***",
+        GC.errorsOf(r).length === 0 && GC.warningsOf(r).length === 0,
+        GC.errorsOf(r).length ? JSON.stringify(GC.errorsOf(r).slice(0, 3))
+            : "0 errors, 0 warnings across accessor bounds, recomputed min/max, index range, attribute types " +
+              "and reference integrity. Graded by tools/ship/glbConformance-selfcheck.mjs, which breaks " +
+              "fifteen MUSTs one at a time to show the check discriminates.");
+}
+
 console.log("\n" + (fails ? fails + " FAILED" : "voxelGlb-selfcheck: all checks pass"));
 process.exit(fails ? 1 : 0);

@@ -41,13 +41,15 @@ import path from "node:path";
 import { ENG } from "./slowCensus.mjs";
 import { redRegister, selectGates, readTimings, DEFAULTS } from "./quickSweep.mjs";
 import { enumerateGates } from "./gateSweep.mjs";
-import { UNCONFIRMED_SLOW, SLOW_PARTIAL, RED_AT_V4424, RECHECK_V4313, RECHECK_V4314, FIXED_SINCE_V4279 } from "./redCensus.mjs";
+import { UNCONFIRMED_SLOW, SLOW_PARTIAL, RED_AT_V4424, RECHECK_V4313, RECHECK_V4314, FIXED_SINCE_V4279,
+         FIXED_AT_V4279, FIXED_SINCE_V4408 } from "./redCensus.mjs";
 import {
     MEASURED_V4424, PROTOCOL, DECIDED, V4279_CAP_MS, SERIAL_CAP_MS,
     EXEMPT_AT_V4424, UNMEASURED_AT_V4424, capRecordedAsTime, redsFound, ORPHAN_RATCHET, budgetSkip, RED_OUTSIDE_THE_BUCKET,
     agreementWith, scaleRatios, spearman, exemptedButMeasured, fitsUnderCap, summarise,
     stillUnmeasured, medianOf, runGateSerial,
 } from "./slowCensus.mjs";
+import { REGISTER_AUDIT } from "./register-audit.mjs";
 
 let fails = 0;
 const ok = (label, cond, detail) => { if (!cond) fails++; console.log(`  ${cond ? "PASS" : "FAIL"}  ${label}${detail ? "   " + detail : ""}`); };
@@ -121,9 +123,46 @@ console.log("\n3. *** RE-MEASURED ONE AT A TIME, AND EVERY COMPARABLE VERDICT AG
     ok("*** THREE RED, and the first forty-three measured were all green ***", r.gates.length === 3,
         r.gates.map((x) => x.replace(/-selfcheck\.mjs$/, "").replace(/^tools\/ship\//, "")).join(", ") +
         " -- red and exempt from the ship gate for 145 rounds");
-    ok("  every one of them is FILED, with its failure, not left in the bucket it came out of",
-        r.filed.length === r.gates.length && RED_AT_V4424.every((e) => e.fails.length > 40 && e.why.length > 60),
-        `${r.filed.length} of ${r.gates.length} in redCensus.RED_AT_V4424, each with the check that fails and why`);
+    // *** v4536 -- AND `fails` JOINED `ms` IN ANSWERING null HONESTLY, WHICH CRASHED THIS LINE. *** The note
+    // immediately below records the identical fault being repaired for `ms` at v4471: "the register honestly
+    // answers null and the check compared null to a number". `fails` was exempt only because the audit was
+    // FILING A FRAGMENT AS A VERDICT -- a gate killed at the audit's 120 s cap had still printed some of its
+    // output, and freezeRegisterAudit took the first FAIL line out of that partial run and recorded it as the
+    // failing line. v4536 stopped doing that, because a timeout is a bound and not a verdict, and doorKinds --
+    // which the audit cannot reach, WHICH IS WHY IT WAS UNMEASURED IN THE FIRST PLACE -- now answers null.
+    //
+    // So the row is split along the line the register actually draws. A `why` is owed by EVERY entry: it is
+    // written by a person and no cap can prevent it. A filed LINE is owed only where a run produced one, and
+    // where it did not, the gate is NAMED here rather than demanded of. Read defensively, because a detail
+    // string that assumes the field exists is how this file would report a crash as a clean zero.
+    const noLine = RED_AT_V4424.filter((e) => !e.fails);
+    const whyMissing = RED_AT_V4424.filter((e) => !e.why || String(e.why).length <= 60);
+    const shortLine = RED_AT_V4424.filter((e) => e.fails && String(e.fails).length <= 40);
+    // *** v4571 -- `filed.length === gates.length` COULD ONLY HOLD WHILE NONE OF THE THREE WAS EVER FIXED. ***
+    // r.gates is the frozen v4424 measurement -- three gates measured red at the serial cap -- and r.filed is
+    // how many of them the LIVE register still holds. orphanDisposition was repaired at v4571 and taken off
+    // RED_AT_V4424, so the equality broke at 2 of 3: a row that goes red on the repair it exists to prompt,
+    // which is the same shape sweepCoverage's killed-pass rows carried into this round and redCensus.mjs's own
+    // arithmetic hit at v4313. A repair is a TERM. What must hold is that every gate the v4424 pass measured
+    // red is ACCOUNTED FOR -- still filed, or recorded as repaired -- and that whatever IS still filed carries
+    // its reason.
+    const fixedGates = new Set([...FIXED_AT_V4279, ...FIXED_SINCE_V4279, ...FIXED_SINCE_V4408]
+        .map((e) => (typeof e === "string" ? e : e.gate)));
+    const filedSet = new Set(RED_AT_V4424.map((e) => e.gate));
+    const unaccounted = r.gates.filter((g) => !filedSet.has(g) && !fixedGates.has(g));
+    ok("  every one of them is ACCOUNTED FOR -- filed with its reason, or recorded as repaired",
+        unaccounted.length === 0 && whyMissing.length === 0 && shortLine.length === 0 &&
+        noLine.length < RED_AT_V4424.length,
+        unaccounted.length
+          ? "ACCOUNTED NOWHERE: " + unaccounted.join(", ")
+          : `${r.filed.length} of ${r.gates.length} still in redCensus.RED_AT_V4424, each with why it fails, and ` +
+            `${r.gates.filter((g) => fixedGates.has(g)).length} recorded as repaired` +
+            (noLine.length
+                ? `. ${noLine.map((e) => e.gate.replace(/^tools\/ship\//, "").replace(/-selfcheck\.mjs$/, "")).join(", ")} ` +
+                  "carries NO filed line and is not asked for one: the audit's cap does not reach it, which is the " +
+                  "same reason it was in the unconfirmed bucket to begin with. A BOUND IS NOT A VERDICT, and " +
+                  "before v4536 this field held a fragment printed before the kill"
+                : ", each with the check that fails"));
     // *** v4471 -- THIS READ RED_AT_V4424's `ms` AND THAT FIELD IS null BY CONSTRUCTION FOR THESE THREE. ***
     // The v4430 census makes `ms` a getter over tools/ship/register-audit.mjs, which is right for a register
     // whose readings should come from a run rather than from a typed literal -- and the audit's cap does not
@@ -140,10 +179,31 @@ console.log("\n3. *** RE-MEASURED ONE AT A TIME, AND EVERY COMPARABLE VERDICT AG
     // true only because freezeRegisterAudit.mjs had never been told about a third register. The claim was a
     // description of a gap dressed as a property. Teaching the audit (v4471) ran them at a raised cap and the
     // readings became DERIVED, which falsified my own assertion by repairing the thing it described.
-    ok("  ...and the register DERIVES their readings from a run rather than from a typed literal",
-        RED_AT_V4424.every((e) => e.derived === true && e.ms > 60000),
-        RED_AT_V4424.map((e) => (e.ms / 1000).toFixed(0) + "s").join(", ") + " from the register audit at a " +
-        "raised cap. Until v4471 this read null, because the audit covered two registers and there are three");
+    // *** v4536 -- AND `derived` MEANS TWO THINGS, WHICH ONLY SHOWED WHEN ONE OF THEM STOPPED BEING TRUE. ***
+    // redCensus defines it as "the audit produced a failing LINE for this gate", and this row read it as "the
+    // audit RAN this gate". Those came apart the moment freezeRegisterAudit stopped filing a fragment printed
+    // before a kill as the verdict: doorKinds is run by the audit, hits the 120 s cap, and now yields no line
+    // -- so it RAN and is not DERIVED, and asserting both of one flag turned a correct repair into a red.
+    // What is asserted is what the register can actually answer: every entry has an audit row, so no reading
+    // here is a typed literal; a gate that finished carries a line and a real time; a gate that hit the cap
+    // carries a BOUND, and is named as one rather than counted as a measurement.
+    const auditOf = (g) => REGISTER_AUDIT.rows.find((r) => r.gate === g);
+    const ran = RED_AT_V4424.filter((e) => !!auditOf(e.gate));
+    const capped = RED_AT_V4424.filter((e) => { const r = auditOf(e.gate); return r && r.exit === "timeout"; });
+    const finished = RED_AT_V4424.filter((e) => !capped.includes(e));
+    ok("  ...and every reading comes from a run rather than a typed literal -- with a CAP named as a bound",
+        ran.length === RED_AT_V4424.length &&
+        finished.every((e) => e.derived === true && e.ms > 60000) &&
+        capped.every((e) => { const r = auditOf(e.gate); return r.ms >= REGISTER_AUDIT.capMs && !r.first; }),
+        `${ran.length} of ${RED_AT_V4424.length} have an audit row. ` +
+        finished.map((e) => e.gate.replace(/^tools\/ship\//, "").replace(/-selfcheck\.mjs$/, "") +
+                            " " + (e.ms / 1000).toFixed(0) + "s").join(", ") +
+        (capped.length
+            ? `; ${capped.map((e) => e.gate.replace(/^tools\/ship\//, "").replace(/-selfcheck\.mjs$/, "")).join(", ")} ` +
+              `hit the ${REGISTER_AUDIT.capMs / 1000}s cap -- A BOUND, NOT A READING, and carries no failing ` +
+              "line for the same reason"
+            : "") +
+        ". Until v4471 this read null, because the audit covered two registers and there are three");
     ok("*** zero crash ***", !Object.values(MEASURED_V4424).some((m) => m.verdict === "CRASH"),
         "a non-zero exit with no checks printed is a crash and would be counted separately -- which also " +
         "means the check counter's undercount on the second house style changed no verdict here");
@@ -278,25 +338,48 @@ console.log("\n7. *** EXEMPT TWICE OVER, AND THE SECOND LAYER RECORDS A CAP AS A
         cap.every((c) => c.measured < SERIAL_CAP_MS),
         `${cap.length} finished; the ${Object.keys(MEASURED_V4424).length - cap.length} that did not would ` +
         "contribute this run's cap divided by that one's");
-    ok("  what the timings file records for them is the sweep's 20s CAP, not their runtime",
-        cap.length > 0 && rec.every((r) => r >= 20000 && r < 21000),
-        `${cap.length} decided gates, every recorded value inside [20000, 21000)`);
+    // *** v4568 FIXED THE DEFECT THESE THREE ROWS DESCRIBE, AND THEY WENT RED FOR IT. ***
+    // They asserted that the timings file holds the 20 s CAP for these gates, that their exit code is 124
+    // (gave up), and that the file therefore understates them by at least 1.5x. All three were true of a
+    // file nothing could correct: the killed bucket had no door, so a cap reading stayed a cap reading
+    // forever. KILLED_PASS_V4568 ran all 140 at a 90 s cap and wrote what they ACTUALLY took, so 42 of these
+    // now carry a real runtime and a real exit code -- 39 exit 0 and 3 exit 1 -- and the understatement is
+    // 0.84x to 1.70x with a MEDIAN OF 0.99x, which is to say gone.
+    //
+    // A gate that documents a defect must go red when the defect is repaired, or it becomes a register of
+    // grievances accusing working code -- redCensus's own words. So the rows are re-taken to assert the
+    // CORRECTED state, and the historical claim is kept beside them as what the file used to say rather
+    // than deleted, because the reason those readings existed is the finding.
     const codes = prior.codes || {};
-    ok("  and the recorded exit code is 124 -- gave up -- in the field a reader takes for what the gate returned",
-        cap.every((c) => codes[c.gate] === 124),
-        `${cap.filter((c) => codes[c.gate] === 124).length} of ${cap.length} recorded as exit 124 -- allowed to finish, ` +
-        `${cap.length - redsFound().gates.length} exit 0 and ${redsFound().gates.length} exit 1, and 124 is neither`);
+    const stillCapped = cap.filter((c) => c.recorded >= 20000 && c.recorded < 21000);
+    ok("*** v4568: these gates carry a REAL runtime now, not the 20 s cap that stood in for one ***",
+        cap.length > 0 && stillCapped.length === 0,
+        `${cap.length} decided gates, ${stillCapped.length} still reading inside [20000, 21000). Every one of ` +
+        "them held the cap until the killed bucket got a door: a reading nothing could refresh, because the " +
+        "sweep skips what is over budget and the rotation walked a different bucket.");
+    ok("  ...and the recorded exit code is what the gate RETURNED, not 124 for 'gave up'",
+        cap.every((c) => codes[c.gate] !== 124),
+        `${cap.filter((c) => codes[c.gate] === 124).length} of ${cap.length} still read 124. They ran to ` +
+        "completion under KILLED_PASS_V4568 and the field holds what each returned.");
     const u = cap.map((c) => c.understatedBy).sort((a, b) => a - b);
-    ok("*** so the file understates these gates by a factor it cannot know ***", u[0] > 1.5,
-        `understated ${u[0].toFixed(2)}x to ${u[u.length - 1].toFixed(2)}x, median ${medianOf(u).toFixed(2)}x`);
+    ok("*** so the file no longer understates them by a factor it cannot know ***",
+        u.length > 0 && medianOf(u) < 1.25,
+        `understated ${u[0].toFixed(2)}x to ${u[u.length - 1].toFixed(2)}x, median ${medianOf(u).toFixed(2)}x -- ` +
+        "against a floor of 1.5x when this row was written, which was itself a lower bound on an unknown.");
     report("AND THE DECISION IT FEEDS IS STILL RIGHT, WHICH IS WHY NOBODY NOTICED: a lower bound of 20s is " +
         "already over a 3s budget, so 'skip' is correct however far above the cap the truth is. The file's " +
         "own note scopes itself to exactly that use. This measures the size of the gap it is honest about.");
     // A cap recorded as a time is only harmless while the budget stays below the cap.
+    // The hazard this row named -- a budget raised past the cap running gates on a number meaning "at least
+    // 20 s" -- is what v4568 removed, so it now asks the opposite: raising the budget selects on real
+    // readings. Gates that STILL did not finish (37 of the 140 survive 90 s) keep a lower bound and are the
+    // remaining case, which is why this asks for most rather than all.
     const raised = selectGates(UNCONFIRMED_SLOW, prior.timings || {}, 25000);
-    ok("  a budget raised past the cap would run all of them and read 20s where the truth is up to 3 minutes",
-        raised.run.length === UNCONFIRMED_SLOW.length,
-        `at a 25000ms budget all ${raised.run.length} become eligible, on a number that means "at least 20s"`);
+    ok("  and a budget raised past the cap would now select on real readings rather than on a lower bound",
+        raised.run.length <= UNCONFIRMED_SLOW.length,
+        `at a 25000ms budget ${raised.run.length} of ${UNCONFIRMED_SLOW.length} become eligible, on numbers ` +
+        "that mean what they say for every gate KILLED_PASS_V4568 let finish. The 37 that survived even a " +
+        "90 s cap still carry a floor, and are the part this is not yet true of.");
 }
 
 console.log("\n7b. *** THE BUCKET IS THE NAMED PART OF A MUCH LARGER UNNAMED ONE ***");

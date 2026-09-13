@@ -69,10 +69,28 @@ section("3. THE CONTROL -- WITHOUT THIS THE ROUND IS AN ACCUSATION RATHER THAN A
 section("4. A QUESTION WHOSE ANSWER IS STRUCTURALLY GUARANTEED, DRIVEN");
 {
     const g = guaranteedQuestion(pile, files);
-    ok("!! 'imported by a gate named for something else' holds for EVERY member",
-       g.holds === g.members, g.holds + " of " + g.members);
+    // *** THE ROW USED TO ASSERT THE WIDER SENTENCE AND WENT RED WHEN THE TREE FOUND ITS GAP. ***
+    // It read "'imported by a gate named for something else' holds for EVERY member" and demanded
+    // holds === members. At v4571 that is 28 of 30. The routing v3558 performs guarantees only the FIRST
+    // clause -- no member has a same-named selfcheck -- and being imported by some other gate never followed
+    // from it. The fix is not a looser count: it is to assert the property that IS guaranteed, and to report
+    // the one that is not as the varying fact it always was.
+    ok("!! 'has no dedicated gate' holds for EVERY member, which is what the routing guarantees",
+       g.noDedicated === g.members, g.noDedicated + " of " + g.members +
+       " -- a module WITH a same-named gate is routed out of this pile before it arrives, so this cannot be " +
+       "otherwise");
     ok("...so it discriminates NOTHING and is not used as a signal", g.discriminates === false,
        "v3551's defect, caught before it was built");
+    // *** AND THE CLAUSE THAT DID NOT FOLLOW NAMES ITS OWN EXCEPTIONS RATHER THAN BEING RELAXED. ***
+    // A member reached by a gate named for something else is at least exercised by somebody. A member reached
+    // by NO gate is exercised by nobody, which is a different and worse disposition -- so it is surfaced by
+    // name instead of being absorbed into a count that no longer holds.
+    ok("!! the members reaching NO GATE AT ALL are named, not folded into a count",
+       g.holds + g.noGateAtAll.length === g.members,
+       g.holds + " of " + g.members + " are imported by a gate named for something else; the other " +
+       g.noGateAtAll.length + " reach no gate at all and are the more orphaned class" +
+       (g.noGateAtAll.length ? ": " + g.noGateAtAll.join(", ") : "") +
+       ". The two accounts sum to the pile, so nothing is dropped between them");
     // What IS used is a COUNT, and it is offered as degree rather than verdict.
     const counts = pile.map((m) => gateConsumers(m, files).length);
     ok("the gate-consumer count VARIES across the pile, so it ranks even though it cannot decide",

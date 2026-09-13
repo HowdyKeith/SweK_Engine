@@ -1,4 +1,5 @@
 {
+ "generatedFrom": "tools/ship/duplicateFiles-selfcheck.mjs",
  "groups": [
   [
    "HomeAssistant/haDiscovery.js",

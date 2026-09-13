@@ -34,7 +34,9 @@
 import {
     perspectiveCorrect, affine, warpError, worstWarp, quantise, snapVertex, latticeStep, siteCount,
 } from "./retroRaster.mjs";
+import { gateReport } from "../tools/ship/gateReport.mjs";
 
+const REPORT = gateReport("render/retroRaster-selfcheck.mjs");
 let fails = 0;
 const ok = (n, c, d = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${n}${d ? "   " + d : ""}`); };
 const say = (m) => console.log("  ----  " + m);
@@ -135,4 +137,11 @@ ok("Bayer dithering is still the tree's existing one, not a second copy", (() =>
 })(), "fx/dither.js has had a gate since before this round; duplicating it would be a second declaration");
 
 console.log(`\nretroRaster-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);
+// v4534: these numbers used to die with the terminal -- gateReport-selfcheck named this gate for it.
+REPORT.table("perspective-correct warp against depth ratio", ["depth ratio", "worst warp", "at barycentric"],
+    sweep.map((r) => [String(r.k), r.err.toFixed(6), r.b.map((v) => v.toFixed(3)).join(", ")]),
+    "The warp is what a depth-unaware rasteriser gets wrong, and it grows with the depth ratio -- which is " +
+    "why a single flat-triangle fixture cannot tell a correct interpolator from a lucky one.");
+REPORT.write();
+
 process.exit(fails === 0 ? 0 : 1);

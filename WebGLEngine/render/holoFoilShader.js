@@ -19,18 +19,34 @@
 // because holoFoil-selfcheck GRADES THIS SHADER AGAINST THAT MODEL -- had either copy drifted, the gate would
 // have compared a shader sampling one film against a model of a different one and reported agreement or
 // disagreement about the wrong thing entirely. One declaration, one place, imported.
-import { LAMBDA_NM, DEFAULT_IOR, DEFAULT_THICKNESS_NM } from "./holoFoil.mjs";
+import { LAMBDA_NM, DEFAULT_IOR, DEFAULT_THICKNESS_NM, FLAKE_DEFAULTS } from "./holoFoil.mjs";
+// *** v4578 -- AND THE HASH IS NOW THE SAME ONE DECLARATION TOO, WHICH IS WHAT THE NOTE ABOVE MISSED. ***
+// v4169 fixed the wavelengths, the IOR and the film thickness and left hf_hash2 spelled out here as
+// `fract(sin(dot(...)) * 43758.5453123)` beneath a comment claiming it was "matching the model's hash2".
+// It was not matching it -- the model's is an integer avalanche and this was the sin-hash, a different
+// function, and both feed `if (cell > coverage) return 0`, which decides whether a flake EXISTS. Measured
+// over the 1,600 cells of the 40x40 lattice, with this GLSL emulated in float32: 81.8% of cells differed by
+// more than 0.1 and THE TWO HALVES DREW 29 OF THE MODEL'S 184 FLAKES IN THE SAME PLACE, 15.8%.
+// So the GLSL comes from the module that owns the arithmetic, and the two halves cannot drift by being
+// edited separately.
+import { EXACT_HASH_GLSL } from "./exactHash.mjs";
 
 const LAMBDA = "vec3(" + LAMBDA_NM.map((n) => n.toFixed(1)).join(", ") + ")";
 
+// *** REQUIRES GLSL ES 3.00, WHICH THREE GIVES EVERY BUILT-IN MATERIAL ON A WebGL2 CONTEXT. ***
+// exact_hash is integer arithmetic and GLSL ES 1.00 has no uint, no uvec2 and no bitwise operators, so on a
+// WebGL1 fallback this fragment shader does not compile. three r160 asks for contexts in the order
+// ['webgl2', 'webgl', 'experimental-webgl'] and its GLSL 3.00 conversion is guarded by `isWebGL2 &&
+// !isRawShaderMaterial` -- so WebGL2 is what makes this legal, and the exported REQUIRES_WEBGL2 below says
+// so out loud rather than leaving a page to discover it as a black medal.
 const HOLO_GLSL = `
 uniform float uThicknessNm, uIor, uFilmStrength, uGratingStrength, uFlakeStrength;
 uniform float uGratingNm, uFlakeDensity, uFlakeCoverage, uFlakeSeed;
-
+${EXACT_HASH_GLSL}
 float hf_hash2(vec2 p, float seed) {
-    // Integer lattice, matching the model's hash2: a flake must sit on the SURFACE, not on the screen.
-    vec3 q = vec3(floor(p), seed);
-    return fract(sin(dot(q, vec3(127.1, 311.7, 74.7))) * 43758.5453123);
+    // The CELL, floored here exactly as render/holoFoil.mjs floors it, then the shared integer hash: a flake
+    // must sit on the SURFACE, not on the screen, and both halves must agree on WHICH surface cell it is.
+    return exact_hash(floor(p), uint(seed));
 }
 float hf_fresnel(float ci) { float c = 1.0 - clamp(abs(ci), 0.0, 1.0); float c2 = c * c; return 0.04 + 0.96 * c2 * c2 * c; }
 
@@ -78,7 +94,12 @@ const DEFAULTS = {
     // the two the model also declares come FROM the model; the rest are this shader's own and live only here
     uThicknessNm: DEFAULT_THICKNESS_NM, uIor: DEFAULT_IOR,
     uFilmStrength: 0.6, uGratingStrength: 0.35, uFlakeStrength: 0.8,
-    uGratingNm: 1200, uFlakeDensity: 40, uFlakeCoverage: 0.12, uFlakeSeed: 1,
+    uGratingNm: 1200,
+    // v4578: the three flake knobs come FROM the model too, for v4169's reason applied to what it missed --
+    // the gate grades this shader against that model, and a drift here would compare a shader sampling one
+    // flake field against a model of a different one.
+    uFlakeDensity: FLAKE_DEFAULTS.density, uFlakeCoverage: FLAKE_DEFAULTS.coverage,
+    uFlakeSeed: FLAKE_DEFAULTS.seed,
 };
 
 /**
@@ -118,4 +139,22 @@ function applyHoloFoil(material, opts = {}) {
 // three.js onBeforeCompile patch, which by definition runs against a live WebGL material in a page -- was
 // reachable only from Node's createRequire. Same defect as swiftShaderPass.js, same round, and the same
 // reason neither was caught: the gate loaded it the one way that works and never the way it ships.
-export { HOLO_GLSL, DEFAULTS, LAMBDA, applyHoloFoil };
+/**
+ * *** THE MATERIAL NEEDS WebGL2, AND A PAGE THAT CANNOT GIVE IT ONE SHOULD SAY SO RATHER THAN GO BLACK. ***
+ * The foil's hash is integer arithmetic -- that is what makes the CPU model and this shader the same
+ * function -- and integers in a fragment shader need GLSL ES 3.00. three compiles a built-in material to
+ * GLSL 3.00 exactly when its context is WebGL2, so this is the one capability that decides whether the
+ * medal renders or throws a shader-compile error into the console with nothing on screen.
+ *
+ * Pass the renderer's own context. Returns null when the foil is safe to apply, or a sentence to show.
+ */
+function holoFoilUnsupported(gl) {
+    if (!gl) return "no WebGL context";
+    const isWebGL2 = typeof WebGL2RenderingContext !== "undefined" && gl instanceof WebGL2RenderingContext;
+    return isWebGL2 ? null
+        : "This holofoil needs WebGL2. The flakes are keyed by an integer hash so the CPU reference and the " +
+          "shader agree flake for flake, and integer arithmetic in a fragment shader needs GLSL ES 3.00, " +
+          "which three compiles only for a WebGL2 context.";
+}
+
+export { HOLO_GLSL, DEFAULTS, LAMBDA, applyHoloFoil, holoFoilUnsupported };

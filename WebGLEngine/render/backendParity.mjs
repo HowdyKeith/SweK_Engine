@@ -251,7 +251,11 @@ export const PARITY_BASELINE = Object.freeze({
     // main brought seven WGSL-only producers this branch never had (its microfacet arc, v4408-v4425, and the KTX2 work),
     // this branch brought its own; classify() on the tree that has both reports wgslBearing 80 and wgslOnly 59 where the
     // two sides recorded 73 / 52 (here) and 68 / 55 (main). `both` and glslOnly did not move: the merge added no dual file.
-    wgslBearing: 80,     // v4520: see glslBearing; v4499: +1, render/stereographic.mjs; v4504: +1, render/zoomBlur.mjs; v4505: +1, render/asciiShape.mjs; v4506: +1, render/water2d.mjs; v4514: +1, render/probeLit.mjs
+    // v4569: +1, render/exactHash.mjs -- the integer hash that replaces fract(sin(dot(p,K))*43758.5453),
+    // which ships its GLSL and WGSL texts as exports so the three languages cannot drift apart by being
+    // edited separately. It is WGSL-BEARING WITHOUT BEING A PAIR: it carries both shader texts but is not a
+    // shader module, which is why wgslOnly moves with it and `both` does not.
+    wgslBearing: 81,     // v4520: see glslBearing; v4499: +1, render/stereographic.mjs; v4504: +1, render/zoomBlur.mjs; v4505: +1, render/asciiShape.mjs; v4506: +1, render/water2d.mjs; v4514: +1, render/probeLit.mjs
     both: 21,            // v4499: +1, render/stereographic.mjs -- both languages in one module, a CPU twin beside them
                          // v4504: +1, render/zoomBlur.mjs -- the radial march toward an arbitrary centre, both languages, a CPU twin, GODRAYS_FS graded beside it
                          // v4505: +1, render/asciiShape.mjs -- the six-point glyph search, both languages, a CPU argmin twin, the table derived from Plex
@@ -259,7 +263,7 @@ export const PARITY_BASELINE = Object.freeze({
                          // v4514: +1, render/probeLit.mjs -- the probe-lit pipeline: the SH volume read by integer texel and evaluated per fragment, both languages
                          // v4520: render/voxelBodies.mjs and render/voxelDamage.mjs DERIVE their pipelines from litSphere's generators (extra: quat, extra: colour) and author no shader text -- the twentieth dual module was one lit variant away, and a variant is a mode, not a module
     glslOnly: 133,
-    wgslOnly: 59,        // v4526 merge: 52 here, 55 on main, 59 on the merged tree
+    wgslOnly: 60,        // v4526 merge: 52 here, 55 on main, 59 on the merged tree; v4569: 60, render/exactHash.mjs
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:
     // a page carrying both languages carries its own two shaders, and lends nothing to anybody else.
     bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleetMask.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/fleetTsl.mjs", "render/lyapunovWgsl.mjs", "render/tslSource.mjs", "render/stereographic.mjs", "render/texelProbe.mjs", "render/litSphere.mjs", "render/tslWide.mjs", "render/zoomBlur.mjs", "render/asciiShape.mjs", "render/water2d.mjs", "render/probeLit.mjs"]),

@@ -1,6 +1,6 @@
 // tools/ship/commentFalsePass-selfcheck.mjs
 //
-// Run: node tools/ship/commentFalsePass-selfcheck.mjs   (~4.2s MEASURED (gate-timings.json))
+// Run: node tools/ship/commentFalsePass-selfcheck.mjs   (9.6 s -- OVER the 3,000 ms sweep budget, see below)
 //
 // v3141 -- A GATE THAT ASSERTS "THE CODE DOES X" AGAINST RAW SOURCE PASSES ON A COMMENT SAYING "WE SHOULD DO X".
 //
@@ -9,24 +9,30 @@
 // later" would have made a file eligible. So: how many gates are doing that RIGHT NOW?
 //
 // THE CENSUS, and it is the "a crude count is an unasked question" shape with a NEGATIVE result.
-//   142 gates read shipping source; 48 use sourceScan.
-//   Of the 94 that do not, 43 assert a CODE IDIOM (no quote characters, contains a call or keyword) against a
-//     variable holding file content -- 121 such regexes.
-//   94 of those resolve to a real target file and can be tested mechanically.
+//   Gates that read shipping source are counted; those using sourceScan are already safe and are set aside.
+//   Of the rest, the ones asserting a CODE IDIOM (no quote characters, contains a call or keyword) against a
+//     variable holding file content are resolved to their target file and tested mechanically.
 //   THE TEST: does the regex match the RAW file and NOT the codeOnly() view? If so it is matching something
 //     the comment stripper removed, which is a comment.
-//   TWELVE FLAGGED. *** ZERO GENUINE. ***
+//   EVERY FLAGGED CASE MUST BE EXPLAINED BY THE INSTRUMENT, decidably, by reading the target. Any that is not
+//     is a GENUINE false pass and this gate goes red on it.
 //
-// EVERY ONE OF THE TWELVE IS EXPLAINED BY THE INSTRUMENT, NOT BY THE GATE:
-//   EIGHT are GLSL inside a TEMPLATE LITERAL (render/voxelrenderer.js). codeOnly blanks the whole string, so
-//     "absent from codeOnly" means "inside a shader", not "inside a comment" -- v3121's finding exactly.
-//   THREE target HTML files. codeOnly is a JAVASCRIPT instrument and HTML is not JavaScript.
-//   ONE (deviceBridge) hunts a comment ON PURPOSE -- its regex literally contains an opening comment marker.
+// *** THE COUNTS USED TO LIVE IN THIS HEADER AND THEY WENT STALE, WHICH IS THE FAULT THIS FILE IS ABOUT. ***
+// It read "142 gates read shipping source; 48 use sourceScan ... TWELVE FLAGGED. ZERO GENUINE" and listed the
+// twelve by reason. At v4571 the live reading is 569 / 239 / 277 tested / 24 flagged, and the reason mix is
+// different too. Not one of those numbers was wrong when written; every one of them was a MOVING QUANTITY
+// written down as a fixed one, in prose, where nothing re-derives it -- which is the same defect as a gate
+// believing a comment. The gate PRINTS all of them on every run. So the header states the shape and the run
+// states the numbers, and the one place they are still written down is a paragraph that says they are a
+// reading taken at v3141.
 //
 // SO THE ANSWER IS ZERO, AND THAT IS WORTH SHIPPING RATHER THAN CONCLUDING. A negative result nobody records
 // gets re-investigated; a negative result in a gate gets RE-CHECKED EVERY RUN, and would catch the first real
 // one the day it arrives.
-
+//
+// *** AND IT NEARLY DID NOT GET RE-CHECKED. *** This gate costs 9.6 s and the sweep budget is 3,000 ms, so no
+// ship-time step has run it since it was written -- it reached the killed bucket v4568 opened, and the red it
+// had been holding was found there, unread, along with four others. A gate nothing runs is a comment.
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -38,15 +44,62 @@ let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const { codeOnly } = await import(pathToFileURL(path.join(SHIP, "sourceScan.mjs")).href);
 
+/** Licence boilerplate: the text a copy is REQUIRED to reproduce. */
+const LICENCE_TEXT = /Copyright|Permission is hereby granted|THE SOFTWARE IS PROVIDED|SPDX-License-Identifier|WITHOUT WARRANTY OF ANY KIND/;
+
+/** Is `index` inside a comment block that IS a licence notice -- a copyright line and the grant beside it?
+ *  Read from the TARGET, by walking out to the edges of the comment run the match sits in. */
+function inLicenceNotice(raw, index) {
+    const lines = raw.split("\n");
+    let at = 0, li = 0;
+    for (; li < lines.length; li++) { const next = at + lines[li].length + 1; if (index < next) break; at = next; }
+    const isComment = (l) => /^\s*(\/\/|\*|\/\*)/.test(l) || /^\s*$/.test(l);
+    if (!/^\s*(\/\/|\*|\/\*)/.test(lines[li] || "")) return false;
+    let lo = li, hi = li;
+    while (lo > 0 && isComment(lines[lo - 1])) lo--;
+    while (hi < lines.length - 1 && isComment(lines[hi + 1])) hi++;
+    const block = lines.slice(lo, hi + 1).join("\n");
+    return /Copyright/.test(block) &&
+           /Permission is hereby granted|THE SOFTWARE IS PROVIDED|WITHOUT WARRANTY|SPDX-License-Identifier/.test(block);
+}
+
 /** A flagged case is EXEMPT when the instrument, not the gate, explains it. Each reason is decidable. */
-function exemptReason(targetRel, body, raw, index) {
+function exemptReason(targetRel, body, raw, index, hit) {
     if (/\.html?$/.test(targetRel)) return "target is HTML and codeOnly is a JavaScript instrument";
     if (/\\\/\\\*|\/\*/.test(body)) return "the regex hunts a comment deliberately";
+    // *** AN ASSERTION NO CODE COULD SATISFY IS NOT AN ASSERTION ABOUT CODE. ***
+    // Found at v4571, by running this gate for the first time in a long while -- it costs 9.6 s against a
+    // 3,000 ms sweep budget, so nothing at ship time had reached it. It reported ONE GENUINE case:
+    // tools/ship/qrChannel-selfcheck.mjs asserting /Copyright \(c\) 2009 Kazuhiko Arase/ against
+    // ui/qrDecode.mjs, a vendored copy reproducing the MIT notice in full as MIT requires of a copy.
+    //
+    // That is not the defect this file hunts, and the difference is not a matter of degree. The hazard is a
+    // gate reading a comment that says "we should do X" and concluding the code does X -- a statement of
+    // INTENT standing in for behaviour. A copyright notice states no intent about behaviour: it IS the
+    // artifact being asserted about, it lives in a comment BY DEFINITION, and there is no arrangement of code
+    // that could satisfy "this file carries the notice" instead. codeOnly stripping it is the stripper doing
+    // its job, not the gate being fooled.
+    //
+    // TWO CONDITIONS, BOTH READ FROM THE TARGET, so this stays a decidable class and not a name on a list:
+    // the matched TEXT is licence boilerplate, AND it sits inside a comment block that carries a copyright
+    // line and the grant beside it. A genuine code idiom that happened to fall inside a licence header would
+    // fail the first condition and still be flagged.
+    //
+    // THE POPULATION IS ONE TODAY and the census says so rather than the exemption implying more: five
+    // licence-text assertions exist across three gates (copiedOutsideVendor, procBrush, qrChannel), and four
+    // never reach this function because they carry quote characters or no code idiom at all. This one reaches
+    // it because `\(c\)` -- an escaped paren in an English sentence -- reads as a call to the idiom filter.
+    //
+    // AND THE OBVIOUS FIX WAS MEASURED AND REJECTED: tightening that filter to require a word character
+    // before `\(` -- so `fetch\(` counts and `\(c\)` does not -- drops 214 of the 277 assertions this census
+    // tests, because `if \(`, `for \(` and `while \(` are code and put a SPACE there too. It would have made
+    // the detector nearly blind and this gate green, which is the trade this file exists to refuse.
+    if (index >= 0 && LICENCE_TEXT.test(hit || "") && inLicenceNotice(raw, index))
+        return "a licence notice, which must be a comment -- no code could satisfy the claim";
     // ODD number of backticks before the match means it sits inside a template literal -- a shader, usually.
     if (index >= 0 && raw.slice(0, index).split("`").length % 2 === 0) return "inside a template literal (a shader is not code to codeOnly)";
     return null;
 }
-
 const gates = fs.readdirSync(SHIP).filter((f) => f.endsWith("-selfcheck.mjs"));
 let readsSource = 0, usesScan = 0, tested = 0;
 const flagged = [], genuine = [];
@@ -74,7 +127,8 @@ for (const g of gates) {
         const raw = fs.readFileSync(cand, "utf8");
         if (!re.test(raw) || re.test(codeOnly(raw))) continue;              // fine either way
         const relTarget = path.relative(ENG, cand);
-        const why = exemptReason(relTarget, body, raw, raw.search(re));
+        const hit = raw.match(re);
+        const why = exemptReason(relTarget, body, raw, hit ? hit.index : -1, hit ? hit[0] : "");
         flagged.push({ g, body: body.slice(0, 46), target: relTarget, why });
         if (!why) genuine.push({ g, body: body.slice(0, 46), target: relTarget });
     }

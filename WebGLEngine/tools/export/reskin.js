@@ -35,6 +35,7 @@
 "use strict";
 import { RAMP } from "../render-qa/asciify.mjs";   // the SAME ten-level ladder the ASCII view uses, not a copy
 import { rng } from "../../world/procPlanet.js";   // the one seeded PRNG in the tree
+import { unwrapCurved } from "../../physics/mesh/uvLscm.mjs";   // route 3: the coordinates this asset never had
 
 /**
  * Lambert shade per vertex, 0..1, from the model's own normals.
@@ -136,6 +137,97 @@ export function vertexColourReskin(parsed, opts = {}) {
                  levelsUsed: hist.filter((n) => n > 0).length,
                  normalized: norm.stretched, rawRange: [+norm.min.toFixed(4), +norm.max.toFixed(4)],
                  ramp: RAMP, unchanged: ["positions", "normals", "joints", "weights", "indices"] },
+    };
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Route 3 -- UV texture   (v4540)
+// ---------------------------------------------------------------------------------------------------------------
+//
+// *** THIS DOES NOT RE-OPEN ROUTE 1'S DECISION. IT REMOVES THE LIMIT ROUTE 1 STATES. *** Route 1 was chosen
+// because this asset has no TEXCOORD_0, and its own header names what that costs: "7,214 vertices is about
+// 85x85 if it were a texture. Too coarse for photographic detail." physics/mesh/uvLscm.mjs can produce the
+// coordinates now, so the resolution ceiling is a choice rather than a fact, and route 1 stays exactly as it
+// is for callers who want a file that changes nothing.
+//
+// ---- THE WELD THAT UNWRAPS IS NOT THE WELD THAT EXPORTS, AND MEASURING SAID SO LOUDLY ---------------------------
+//
+// LSCM needs connectivity, so uvLscm welds coincident vertices -- 7,214 down to 1,759 here. Rebuilding the
+// OUTPUT from that welded mesh is the obvious move and it is wrong. Of the 5,456 coincident pairs it merges:
+//
+//     232 have DIFFERENT SKINNING   -- merging them breaks the deform
+//   5,346 have DIFFERENT NORMALS    -- merging them flattens every hard edge this robot has
+//
+// A vertex is duplicated in a shipped file for a reason, and "they are in the same place" is not the same
+// question as "they are the same vertex". So the unwrap runs on the welded mesh and the UVs come BACK to the
+// original vertices, which are never merged: each original corner takes the UV of its own triangle's chart,
+// and an original vertex is split only where its triangles land in more than one chart.
+//
+// MEASURED: 151 of 7,214 vertices need splitting, 158 extra copies -- 7,372 out, a 2.2% increase, with
+// positions, normals, joints and weights bit-identical to what came in. Against route 1's 7,214 shading
+// samples (~85x85), a 1024-square atlas at this unwrap's 51.1% coverage is about 536,000 texels of surface:
+// SEVENTY-FOUR TIMES the sample budget, for 2.2% more vertices and no change to the rig.
+export function uvReskin(parsed, opts = {}) {
+    if (!parsed || !parsed.positions || !parsed.positions.length) throw new Error("uvReskin: no positions");
+    const P = parsed.positions, nv = P.length / 3, idx = parsed.indices;
+    const r = unwrapCurved(P, idx, opts.unwrap || {});
+    // the same position quantisation uvLscm's weld uses, so original vertices can be traced to welded ones
+    let lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+    for (let i = 0; i < nv; i++) for (let k = 0; k < 3; k++) {
+        const v = P[3 * i + k]; if (v < lo[k]) lo[k] = v; if (v > hi[k]) hi[k] = v;
+    }
+    const q = (Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) || 1) * (opts.relTol || 1e-6);
+    const cell = new Map(), remap = new Int32Array(nv);
+    let n2 = 0;
+    for (let i = 0; i < nv; i++) {
+        const k = Math.round(P[3 * i] / q) + "," + Math.round(P[3 * i + 1] / q) + "," + Math.round(P[3 * i + 2] / q);
+        if (!cell.has(k)) cell.set(k, n2++);
+        remap[i] = cell.get(k);
+    }
+    const triKey = (a, b, c) => [a, b, c].sort((x, y) => x - y).join("_");
+    const chartOf = new Map(), uvOf = new Map();
+    r.charts.forEach((c, ci) => { for (const T of c.tris) chartOf.set(triKey(T[0], T[1], T[2]), ci); });
+    r.charts.forEach((c, ci) => { for (const [v, uv] of c.uv) uvOf.set(ci + "|" + v, uv); });
+    const copy = new Map(), positions = [], normals = [], joints = [], weights = [], uvs = [], out = [];
+    let dropped = 0;
+    const has = (a) => a && a.length;
+    for (let t = 0; t < idx.length; t += 3) {
+        const o = [idx[t], idx[t + 1], idx[t + 2]];
+        const ci = chartOf.get(triKey(remap[o[0]], remap[o[1]], remap[o[2]]));
+        if (ci === undefined) { dropped++; continue; }   // a face the unwrap's weld found redundant
+        const tri = [];
+        for (const v of o) {
+            const k = v + "|" + ci;
+            let n = copy.get(k);
+            if (n === undefined) {
+                n = positions.length / 3;
+                copy.set(k, n);
+                positions.push(P[3 * v], P[3 * v + 1], P[3 * v + 2]);
+                if (has(parsed.normals)) normals.push(parsed.normals[3 * v], parsed.normals[3 * v + 1], parsed.normals[3 * v + 2]);
+                if (has(parsed.joints)) for (let c2 = 0; c2 < 4; c2++) joints.push(parsed.joints[4 * v + c2]);
+                if (has(parsed.weights)) for (let c2 = 0; c2 < 4; c2++) weights.push(parsed.weights[4 * v + c2]);
+                const uv = uvOf.get(ci + "|" + remap[v]) || [0, 0];
+                uvs.push(uv[0], uv[1]);
+            }
+            tri.push(n);
+        }
+        out.push(tri[0], tri[1], tri[2]);
+    }
+    const vOut = positions.length / 3;
+    const texels = (opts.atlasPx || 1024) * (opts.atlasPx || 1024);
+    return {
+        positions: Float32Array.from(positions),
+        normals: has(parsed.normals) ? Float32Array.from(normals) : null,
+        joints: has(parsed.joints) ? Uint16Array.from(joints) : null,
+        weights: has(parsed.weights) ? Float32Array.from(weights) : null,
+        indices: Uint32Array.from(out), uvs: Float32Array.from(uvs),
+        stats: {
+            verticesIn: nv, verticesOut: vOut, splitCopies: vOut - nv, droppedFaces: dropped,
+            charts: r.chartCount, trianglesIn: idx.length / 3, trianglesOut: out.length / 3,
+            // the number this route exists for: route 1's budget is one sample per vertex
+            vertexSamples: nv, texelSamples: Math.round(texels * (opts.coverage || 0.511)),
+            unchanged: ["positions", "normals", "joints", "weights"],
+        },
     };
 }
 

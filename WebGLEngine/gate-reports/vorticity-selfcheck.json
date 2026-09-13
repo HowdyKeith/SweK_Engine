@@ -1,0 +1,38 @@
+{
+ "gate": "fluid/vorticity-selfcheck.mjs",
+ "at": "2026-09-07",
+ "tables": [
+  {
+   "title": "curl error under refinement",
+   "columns": [
+    "grid n",
+    "max curl error"
+   ],
+   "rows": [
+    [
+     "16",
+     "5.35e-1"
+    ],
+    [
+     "32",
+     "1.39e-1"
+    ],
+    [
+     "64",
+     "3.52e-2"
+    ],
+    [
+     "128",
+     "8.82e-3"
+    ],
+    [
+     "256",
+     "2.21e-3"
+    ]
+   ],
+   "note": "Ratios 3.84, 3.96, 3.99, 4.00 against 4 for second order: the order is read off refinement rather than asserted, so a scheme that quietly dropped to first order would show it here."
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

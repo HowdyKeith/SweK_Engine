@@ -285,7 +285,7 @@
             ' <span style="color:#6f8a7c">' + esc(r.engineVersion || "version not reported") + "</span>" +
             detail + link + '<span class="took"></span></div>';
         }).join("") + '<div id="fleetRouted" style="margin-top:6px;color:#6f8a7c;">routed requests: reading&hellip;</div>';
-      // v4531 -- WHICH PEER TOOK WHICH REQUEST. /ai/brain/routed is the ledger POST /ai/brain/route fills through
+      // v4584 -- WHICH PEER TOOK WHICH REQUEST. /ai/brain/routed is the ledger POST /ai/brain/route fills through
       // brain/fleetRouting.mjs: per peer, how many it took, of which kinds, and the last one named (kind, scene, policy,
       // tick range). A peer whose id names a roster host gets the line ON ITS ROW; every peer gets a line below, so a
       // brain the lighthouse never rostered is still attributed. "none routed yet" is a true reading, not a fault.

@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 import { GLBParser } from "../../gpu/GLBParser.js";
 import { blendInfluences } from "../krbn/riggedExport.js";
 import { RAMP } from "../render-qa/asciify.mjs";
-import { vertexColourReskin, shadeVertices, normalizeShade, rampLevel, rampColors,
+import { vertexColourReskin, uvReskin, shadeVertices, normalizeShade, rampLevel, rampColors,
          surfaceSamples, buildGlyphQuads, glyphUV, baryAttr } from "../export/reskin.js";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -220,6 +220,126 @@ const parsed = await GLBParser.parse(buf.buffer.slice(buf.byteOffset, buf.byteOf
            "is settled headlessly is every number they depend on -- the shade, the ramp, the sampling, the " +
            "influences and the UVs -- plus the wiring above.");
 }
+
+// ---------------------------------------------------------------------------------------------------------------
+console.log("\nROUTE 3 -- the coordinates this asset never had");
+{
+    // *** THE WELD THAT UNWRAPS IS NOT THE WELD THAT EXPORTS, AND THIS IS THE MEASUREMENT THAT SAYS SO. ***
+    // uvLscm welds coincident vertices to recover the connectivity LSCM needs -- 7,214 down to 1,759 here.
+    // Rebuilding the OUTPUT from that welded mesh is the obvious move and it destroys the model.
+    const P = parsed.positions, nv = P.length / 3;
+    let lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+    for (let i = 0; i < nv; i++) for (let k = 0; k < 3; k++) {
+        const v = P[3 * i + k]; if (v < lo[k]) lo[k] = v; if (v > hi[k]) hi[k] = v;
+    }
+    const q = (Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) || 1) * 1e-6;
+    const groups = new Map();
+    for (let i = 0; i < nv; i++) {
+        const k = Math.round(P[3 * i] / q) + "," + Math.round(P[3 * i + 1] / q) + "," + Math.round(P[3 * i + 2] / q);
+        if (!groups.has(k)) groups.set(k, []); groups.get(k).push(i);
+    }
+    let pairs = 0, skinDiffer = 0, normalDiffer = 0;
+    for (const is of groups.values()) {
+        for (let a = 1; a < is.length; a++) {
+            pairs++;
+            let dj = false;
+            for (let k = 0; k < 4; k++)
+                if (parsed.joints[is[0] * 4 + k] !== parsed.joints[is[a] * 4 + k] ||
+                    Math.abs(parsed.weights[is[0] * 4 + k] - parsed.weights[is[a] * 4 + k]) > 1e-6) dj = true;
+            if (dj) skinDiffer++;
+            let dn = false;
+            for (let k = 0; k < 3; k++)
+                if (Math.abs(parsed.normals[is[0] * 3 + k] - parsed.normals[is[a] * 3 + k]) > 1e-6) dn = true;
+            if (dn) normalDiffer++;
+        }
+    }
+    ok("!! *** A VERTEX IS DUPLICATED IN A SHIPPED FILE FOR A REASON, and 'same place' is not 'same vertex' ***",
+       skinDiffer > 100 && normalDiffer > 5000 && pairs > 5000,
+       `of ${pairs} coincident pairs the unwrap's weld merges, ${skinDiffer} have DIFFERENT SKINNING -- merging ` +
+       `them breaks the deform -- and ${normalDiffer} have DIFFERENT NORMALS, which merging flattens into ` +
+       "smooth shading across every hard edge this robot has. That is why route 3 unwraps on the welded mesh " +
+       "and brings the UVs BACK to the original vertices instead of exporting the welded one.");
+
+    const r3 = uvReskin(parsed);
+    const S = r3.stats;
+    ok("!! *** positions, normals, joints and weights come through BIT-IDENTICAL, per vertex ***",
+       (() => {
+           // every output vertex must match some input vertex exactly on all four attributes
+           for (let n = 0; n < S.verticesOut; n++) {
+               const px = r3.positions[3 * n], py = r3.positions[3 * n + 1], pz = r3.positions[3 * n + 2];
+               const k = Math.round(px / q) + "," + Math.round(py / q) + "," + Math.round(pz / q);
+               const cands = groups.get(k);
+               if (!cands) return false;
+               let hit = false;
+               for (const v of cands) {
+                   if (P[3 * v] !== px || P[3 * v + 1] !== py || P[3 * v + 2] !== pz) continue;
+                   let same = true;
+                   for (let c = 0; c < 3; c++) if (parsed.normals[3 * v + c] !== r3.normals[3 * n + c]) same = false;
+                   for (let c = 0; c < 4; c++) if (parsed.joints[4 * v + c] !== r3.joints[4 * n + c]) same = false;
+                   for (let c = 0; c < 4; c++) if (parsed.weights[4 * v + c] !== r3.weights[4 * n + c]) same = false;
+                   if (same) { hit = true; break; }
+               }
+               if (!hit) return false;
+           }
+           return true;
+       })(),
+       `all ${S.verticesOut} output vertices match a source vertex exactly on position, normal, joints and ` +
+       "weights. Route 1's virtue is that it changes nothing; route 3 changes only the vertex COUNT.");
+
+    ok("!! *** 74x THE SAMPLE BUDGET FOR 2.1% MORE VERTICES ***",
+       S.splitCopies < nv * 0.05 && S.texelSamples > S.vertexSamples * 50 && S.droppedFaces <= 3,
+       `${S.verticesIn} -> ${S.verticesOut} vertices (${S.splitCopies} split copies, ` +
+       `${(100 * S.splitCopies / S.verticesIn).toFixed(1)}%), ${S.charts} charts, ${S.droppedFaces} faces ` +
+       `dropped as redundant. Route 1 shades ${S.vertexSamples} vertices -- its header calls that "about 85x85 ` +
+       `if it were a texture" -- and a 1024-square atlas at 51.1% coverage is ${S.texelSamples} texels of ` +
+       "surface. The resolution ceiling route 1 STATES is removed rather than argued with, and route 1 is " +
+       "untouched for callers who want a file whose indices do not move.");
+
+    // *** NOTHING IS MERGED -- THE CLAIM ROUTE 3 RESTS ON, AND THE ONE I FIRST FORGOT TO CHECK. ***
+    // Keying the copy map by the WELDED vertex instead of the original collapses 7,214 vertices to 1,759 and
+    // went 0 RED: the attribute row asks only that each OUTPUT vertex match SOME source vertex, which stays
+    // true when most of them have been thrown away, and "split copies under 5%" is satisfied by a negative
+    // number. A check on what survives is not a check on what was lost.
+    ok("!! *** NO ORIGINAL VERTEX IS MERGED AWAY: the count only ever goes UP ***",
+       S.verticesOut >= S.verticesIn && S.verticesOut === S.verticesIn + S.splitCopies,
+       `${S.verticesIn} in, ${S.verticesOut} out, ${S.splitCopies} of them split copies. Exporting the WELDED ` +
+       "mesh instead would give 1,759 -- smaller, and with the 229 differing skins and 5,346 differing normals " +
+       "above silently averaged together.");
+
+    let outside = 0, uvArea = 0;
+    for (let i = 0; i < r3.uvs.length; i++) if (r3.uvs[i] < -1e-9 || r3.uvs[i] > 1 + 1e-9) outside++;
+    for (let t = 0; t < r3.indices.length; t += 3) {
+        const [a, b, c] = [r3.indices[t], r3.indices[t + 1], r3.indices[t + 2]];
+        uvArea += Math.abs((r3.uvs[2 * b] - r3.uvs[2 * a]) * (r3.uvs[2 * c + 1] - r3.uvs[2 * a + 1]) -
+                           (r3.uvs[2 * b + 1] - r3.uvs[2 * a + 1]) * (r3.uvs[2 * c] - r3.uvs[2 * a])) / 2;
+    }
+    // *** AND THE UVs HAVE TO ADDRESS SOMETHING. *** Collapsing every coordinate to (0,0) also went 0 red:
+    // the origin is inside [0,1], there is still one pair per vertex, and every triangle still survives. A
+    // range check accepts a constant. The atlas has to hold AREA, and how much is the coverage this unwrap
+    // reports -- so this row is the resolution claim above, made checkable at the other end of the pipe.
+    ok("!! one UV per vertex, inside [0,1], every triangle surviving -- AND AN ATLAS THAT HOLDS AREA",
+       r3.uvs.length / 2 === S.verticesOut && outside === 0 &&
+       S.trianglesOut === S.trianglesIn - S.droppedFaces && uvArea > 0.35,
+       `${r3.uvs.length / 2} UVs for ${S.verticesOut} vertices, ${outside} outside the unit square, ` +
+       `${S.trianglesOut} of ${S.trianglesIn} triangles, and the UV triangles cover ` +
+       `${(100 * uvArea).toFixed(1)}% of the atlas. The ${S.droppedFaces} dropped faces are the same-winding ` +
+       "duplicates uvLscm's weld found -- one face written twice, not geometry.");
+}
+
+// ---- ROUTE 3 SABOTAGE LOG -- graded on EXIT CODES, each restored before the next --------------------------------
+//   W  the copy map keyed by the WELDED vertex, not the original     exit 1
+//   X  normals not carried per vertex (all take vertex 0's)          exit 1
+//   Y  every UV collapsed to the origin                              exit 1
+//   Z  joints zeroed on the split copies                             exit 1
+//
+// *** W AND Y BOTH WENT 0 RED FIRST, AND BOTH FOR THE SAME REASON: A CHECK ON WHAT SURVIVES IS NOT A CHECK ON
+// WHAT WAS LOST. *** W collapses 7,214 vertices to 1,759 by exporting the welded topology, and the attribute
+// row stayed green because it asks only that each OUTPUT vertex match SOME source vertex -- which is still
+// true when five sixths of them have been thrown away -- while "split copies under 5%" is satisfied by a
+// negative number. Y sets every coordinate to (0,0), and the range row stayed green because the origin is
+// inside [0,1], there is still one pair per vertex, and every triangle still survives: A RANGE CHECK ACCEPTS
+// A CONSTANT. The two rows added are the claims themselves rather than their shadows -- the vertex count only
+// ever goes UP, and the atlas holds AREA.
 
 console.log("\n" + (fails ? fails + " FAILED" : "reskin-selfcheck: all checks pass"));
 process.exit(fails ? 1 : 0);

@@ -1,4 +1,5 @@
 {
+ "generatedFrom": "tools/ship/slugTsl-selfcheck.mjs",
  "at": "v4484",
  "three": "0.178.0",
  "note": "the Slug fragment as three's node builders emitted it from render/slugTsl.mjs makeSlugTsl and as render/tslSource.mjs transplanted it into the shipped pipeline's shell; rewritten by tools/ship/slugTsl-selfcheck.mjs on every green run",

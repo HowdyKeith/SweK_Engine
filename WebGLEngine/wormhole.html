@@ -35,10 +35,13 @@
 </div></div>
 
 <script type="module">
+import { STARFIELD_WGSL, OCTAVES } from "/render/starField.mjs";
 const canvas = document.getElementById("c");
 function fallback(why) { document.getElementById("hud").style.display = "none"; canvas.style.display = "none"; document.getElementById("fbwhy").textContent = why || ""; document.getElementById("fallback").style.display = "flex"; }
 
 const WGSL = `
+${STARFIELD_WGSL}
+
 struct U { a: vec4f, b: vec4f };   // a = (resX, resY, time, camDist);  b = (throatK, yaw, pitch, _)
 @group(0) @binding(0) var<uniform> u: U;
 
@@ -47,8 +50,6 @@ struct U { a: vec4f, b: vec4f };   // a = (resX, resY, time, camDist);  b = (thr
   return vec4f(p[vid], 0., 1.);
 }
 
-fn h1(n: f32) -> f32 { return fract(sin(n) * 43758.5453); }
-fn n3(p: vec3f) -> f32 { return fract(sin(dot(p, vec3f(12.9898, 78.233, 37.719))) * 43758.5453); }
 
 // procedural sky sampled along a 3D direction; warm=1 tints the "far" universe differently.
 fn sky(dir: vec3f, warm: f32) -> vec3f {
@@ -57,15 +58,15 @@ fn sky(dir: vec3f, warm: f32) -> vec3f {
   let coolN = (vec3f(0.03, 0.05, 0.12) * neb + vec3f(0.02, 0.03, 0.07) * neb2);
   let warmN = (vec3f(0.12, 0.05, 0.03) * neb + vec3f(0.09, 0.04, 0.02) * neb2);
   var c = mix(coolN, warmN, warm);
+  // v4579: render/starField.mjs's starfield, spliced above; the cut stays this page's own knob, and so does
+  // the warm term -- the far universe tints differently, which is this page's and not the starfield's.
+  // (NO BACKTICKS IN HERE: this comment sits inside a JS template literal, and one would end the string.)
+  let cut = 0.985;
   for (var o = 0; o < 3; o = o + 1) {
-    let sc = 55.0 * pow(2.0, f32(o));
-    let g = dir * sc; let id = floor(g); let fp = fract(g);
-    let hh = n3(id + f32(o) * 17.0);
-    if (hh > 0.985) {
-      let d = length(fp - vec3f(0.5));
-      let star = smoothstep(0.55, 0.0, d) * (hh - 0.985) / 0.015;
-      let tint = mix(vec3f(0.7, 0.82, 1.0), vec3f(1.0, 0.86, 0.62), clamp(warm * 0.7 + n3(id + 3.0) * 0.4, 0.0, 1.0));
-      c = c + tint * star * 1.3;
+    let sf = starfield_at(dir, cut, o);
+    if (sf.x > 0.0) {
+      let tint = mix(vec3f(0.7, 0.82, 1.0), vec3f(1.0, 0.86, 0.62), clamp(warm * 0.7 + sf.y * 0.4, 0.0, 1.0));
+      c = c + tint * sf.x * 1.3;
     }
   }
   return c;

@@ -1,4 +1,4 @@
-// WebGLEngine/physics/mesh/meshCSG-selfcheck.mjs -- v4235
+// WebGLEngine/physics/mesh/meshCSG-selfcheck.mjs -- v4542
 //
 // Run: node physics/mesh/meshCSG-selfcheck.mjs
 //
@@ -23,6 +23,10 @@ let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const report = (m) => console.log("  ....  " + m);
 const rel = (a, b) => Math.abs(a - b) / Math.max(1e-12, Math.abs(b));
+const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const area3 = (a, b, c) => 0.5 * Math.hypot(...cross(sub(b, a), sub(c, a)));
 
 // the edge census this whole round turned on -- an unmatched edge is only a CRACK if nothing covers it
 function edgeCensus(polys) {
@@ -239,6 +243,7 @@ console.log("\n4. *** 'GAP-FREE' IS TWO DIFFERENT CLAIMS AND ONLY ONE OF THEM WA
 
 // =============================================================================================================
 console.log("\n5. *** TWELVE BLASTS: WHERE IT HOLDS, WHERE IT DOES NOT, AND THREE REFUTED EXPLANATIONS ***");
+let TWELVE_CUT = null, TWELVE_SETTLED = null;   // shared with section 8; re-cutting them costs 1.1 s
 {
     M.resetSplitStats();
     let wall = WALL(); const V0 = M.volume(wall);
@@ -289,6 +294,7 @@ console.log("\n5. *** TWELVE BLASTS: WHERE IT HOLDS, WHERE IT DOES NOT, AND THRE
         settled.polys.length < wall.length * 0.4,
         wall.length + " -> " + settled.polys.length + " polygons (" +
         (100 * (1 - settled.polys.length / wall.length)).toFixed(0) + "% off), " + settled.stats.merged + " merges");
+    TWELVE_CUT = wall; TWELVE_SETTLED = settled.polys;
 }
 
 // =============================================================================================================
@@ -340,10 +346,189 @@ console.log("\n7. WHAT THIS FILE IS NOT, WHICH IS HALF OF WHAT WAS ASKED FOR");
         /THE THIRD QUERY/.test(fs.readFileSync(path.join(ENG, "mesh/meshBVH.mjs"), "utf8")));
 }
 
+// =============================================================================================================
+console.log("\n8. *** THE FAN WAS SHIPPING TRIANGLES THAT COVER NOTHING, AND FOUR INSTRUMENTS HERE CANNOT SEE IT ***");
+{
+    // *** THIS SECTION EXISTS BECAUSE AN AUDIT AGAINST A FORMAL CSG PROPERTY LIST ASKED "NO DEGENERATE
+    // TRIANGLES?" AND NOTHING IN THE MODULE OR THE GATE COULD ANSWER. *** The answer was 21.4%.
+    const merged = M.mergeCoplanar(M.snapVertices(TWELVE_CUT, { tol: 1e-9 }).polys).polys;
+    const pre = M.degenerateFan(merged), post = M.degenerateFan(TWELVE_SETTLED);
+    ok("!! *** THE WELD MAKES THEM: ZERO DEGENERATE FAN TRIANGLES BEFORE IT, " + post.degenerate + " AFTER ***",
+        pre.degenerate === 0 && post.degenerate > 0,
+        pre.tris + " triangles before the weld with a flattest of " + pre.worstKept.toExponential(2) + ", " +
+        post.tris + " after with " + post.degenerate + " (" + (100 * post.degenerate / post.tris).toFixed(1) +
+        "%) at or under " + M.DEGENERATE_FLATNESS.toExponential(0) + ". weldTJunctions inserts a vertex into " +
+        "every edge that has one lying on it, and an inserted vertex is COLLINEAR WITH THAT EDGE by " +
+        "definition -- so wherever the fan's apex sits on the same straight run, the triangle has three " +
+        "collinear corners. This is a comparison of two measurements rather than a constant: what makes it a " +
+        "finding is the ZERO on the left.");
+    ok("!! ...and the threshold is a reading of a MEASURED EMPTY BAND rather than a knob",
+        post.bestDropped * 100 < post.worstKept &&
+        M.degenerateFan(TWELVE_SETTLED, 1e-13).degenerate === post.degenerate &&
+        M.degenerateFan(TWELVE_SETTLED, post.worstKept * 0.99).degenerate === post.degenerate,
+        "largest dropped " + post.bestDropped.toExponential(2) + ", smallest kept " +
+        post.worstKept.toExponential(2) + " -- a gap of " + (post.worstKept / post.bestDropped).toFixed(0) +
+        "x with nothing in it, so every threshold across the whole band drops the same " + post.degenerate +
+        " triangles. A constant chosen inside an empty band is a reading; the same constant chosen inside a " +
+        "continuous distribution would be a guess, and this row is what tells the two apart.");
+    // *** LOSSLESS IS ASSERTED ACROSS TWO INDEPENDENT CODE PATHS ON PURPOSE. *** surfaceArea() inlines its
+    // own fan and never calls toTriangles(), so the instrument grading the drop is not the code that drops.
+    const kept = M.toTriangles(TWELVE_SETTLED);
+    const keptArea = kept.reduce((a, [x, y, z]) => a + area3(x, y, z), 0);
+    ok("!! *** DROPPING THEM CHANGES THE SURFACE BY EXACTLY ZERO, TO THE LAST BIT ***",
+        kept.length === post.tris - post.degenerate && keptArea === M.surfaceArea(TWELVE_SETTLED),
+        kept.length + " triangles kept of " + post.tris + ", area " + keptArea.toFixed(12) + " against " +
+        "surfaceArea()'s " + M.surfaceArea(TWELVE_SETTLED).toFixed(12) + " -- BIT-IDENTICAL, from two fans " +
+        "written independently. The dropped ones carried " + post.area.toExponential(2) + " between them. The " +
+        "T-junction the weld went in to sew is sewn by the vertex being ON THE BOUNDARY, which is a polygon " +
+        "property; nothing about it ever needed a triangle of zero width to carry it.");
+    ok("   ...and it reaches the buffer meshBVH is handed, not just the array",
+        M.toTriangleBuffer(TWELVE_SETTLED).length === kept.length * 9,
+        kept.length * 9 + " floats");
+    // ---- WHY NOTHING CAUGHT THIS: each instrument is right for its own question and blind to this one ----
+    const collinear = [{ vs: [[0, 0, 0], [1, 0, 0], [2, 0, 0]], pl: { n: [0, 0, 1], w: 0 } }];
+    const repeated  = [{ vs: [[0, 0, 0], [1, 0, 0], [0, 0, 0]], pl: { n: [0, 0, 1], w: 0 } }];
+    // *** THIS ROW AND THE THREE UNDER IT ARE CHARACTERISATIONS OF THE INSTRUMENTS, NOT OF THE MESH, WHICH
+    // MAKES THEIR RED MEAN THE OPPOSITE OF THE USUAL ONE. *** If someone gives allConvex() a degeneracy test
+    // this goes red on GOOD news, and the right response is to update this section rather than to revert
+    // them. Kept as assertions anyway, because the alternative is a comment claiming a blind spot that
+    // nothing re-derives -- and the blind spot is the whole reason 21.4% of the buffer shipped unseen. It is
+    // not idle: flipping allConvex's comparison to < eps reddens it AND reddens two long-standing rows in
+    // sections 4 and 5, which is what says the "fix" is not free.
+    ok("!! *** allConvex() CALLS A FULLY COLLINEAR POLYGON CONVEX, AND A REPEATED VERTEX TOO ***",
+        M.allConvex(collinear).ok && M.allConvex(repeated).ok,
+        "both {ok:true, reflex:0}. The test is dot(cross(v-u, w-v), n) < -eps and a collinear triple gives " +
+        "EXACTLY ZERO, which is not less than -eps. That is correct for the question it asks -- is there a " +
+        "reflex vertex -- and it is why the comment on toTriangles() saying the fan is 'valid because " +
+        "allConvex() says so' was resting on an instrument that cannot see the failure it names.");
+    ok("!! ...volume() and surfaceArea() weight each triangle BY ITS AREA, so a degenerate one is invisible",
+        M.volume(collinear) === 0 && M.surfaceArea(collinear) === 0);
+    ok("!! ...watertight() skips an edge whose endpoints quantise the same, by an explicit line",
+        M.watertight(repeated).ok && /if \(a === b\) continue;/.test(fs.readFileSync(path.join(ENG, "physics/mesh/meshCSG.mjs"), "utf8")),
+        "'a degenerate edge is not an edge' -- true, and it means a mesh made entirely of them reads closed");
+    // *** MY FIRST DRAFT OF THIS ROW ASSERTED edgeCensus(repeated).edges === 0 AND WAS RED. *** A polygon
+    // [p, q, p] has TWO edges of length 1 and one of length 0; only the last is dropped. What the census
+    // actually does with a degenerate polygon is worse than ignoring it -- it reads it as a CLOSED SURFACE,
+    // because p->q and q->p are a matched pair. The corrected row says that instead.
+    const collapsed = [{ vs: [[0, 0, 0], [0, 0, 0], [0, 0, 0]], pl: { n: [0, 0, 1], w: 0 } }];
+    const cr2 = edgeCensus(repeated);
+    ok("!! ...and this gate's OWN edgeCensus reads a degenerate polygon as a WATERTIGHT surface",
+        edgeCensus(collapsed).edges === 0 && cr2.edges === 2 && cr2.matched === 2 && cr2.gap === 0,
+        "a wholly collapsed polygon contributes 0 edges because every one is zero-length and dropped; a " +
+        "[p,q,p] one contributes " + cr2.edges + ", " + cr2.matched + " of them MATCHED and " + cr2.gap +
+        " uncovered -- a perfect score for a triangle with no area. So FOUR instruments -- three in the " +
+        "module, one here -- each skip or mis-read degenerate geometry by construction, and between them " +
+        "they read 21.4% of the shipped triangle buffer as clean. Every one is a PROXY that was standing " +
+        "in for 'the mesh is fine'.");
+}
+
+// =============================================================================================================
+console.log("\n9. *** THE DEGENERATE CONTACTS: EIGHT CASES A FORMAL PROPERTY LIST NAMES AND THIS GATE HAD NONE OF ***");
+{
+    // *** THE EXPECTED VOLUME IS DERIVED, NOT WRITTEN DOWN. *** Both operands are axis-aligned boxes, so the
+    // overlap is a product of three interval lengths -- an oracle that shares no code with the BSP. A hand
+    // -typed constant here would be checking my arithmetic, and my arithmetic was WRONG on the first draft of
+    // this fixture: I read boxPolys's second argument as a full extent and predicted 28.8 for a cut that
+    // removes 0.12. The module was right and the expectation was not.
+    const overlap = (c1, h1, c2, h2) => {
+        let v = 1;
+        for (let i = 0; i < 3; i++) {
+            const lo = Math.max(c1[i] - h1[i], c2[i] - h2[i]), hi = Math.min(c1[i] + h1[i], c2[i] + h2[i]);
+            v *= Math.max(0, hi - lo);
+        }
+        return v;
+    };
+    const WC = [0, 0, 0], WH = [4, 3, 0.3];
+    const cases = [
+        ["a corner exactly on an edge",       [4.5, 0, 0.8],  [0.5, 0.4, 0.5]],
+        ["an edge lying along an edge",       [4.5, 0, 0.8],  [0.5, 4.0, 0.5]],
+        ["a face flush against a face",       [0, 0, 0.8],    [1.0, 1.0, 0.5]],
+        ["...flush and hanging off the side", [4, 0, 0.8],    [1.0, 1.0, 0.5]],
+        ["a through-cut, BOTH faces flush",   [0, 0, 0],      [1.0, 1.0, 0.3]],
+        ["a cutter that swallows the wall",   [0, 0, 0],      [9.0, 9.0, 9.0]],
+        ["a cutter that IS the wall",         [0, 0, 0],      [4.0, 3.0, 0.3]],
+        ["a corner on a face interior",       [0, 0, 0.8],    [0.5, 0.5, 0.5]],
+    ];
+    const A = WALL(), VA = M.volume(A);
+    let exact = 0, rawOpen = 0, sealed = 0, worstResid = 0;
+    for (const [name, c, h] of cases) {
+        const B = M.boxPolys(c, h), exp = overlap(WC, WH, c, h);
+        const dif = M.subtract(A, B), int = M.intersect(A, B);
+        const eDif = Math.abs(M.volume(dif) - (VA - exp)), eInt = Math.abs(M.volume(int) - exp);
+        const resid = Math.abs(VA - M.volume(dif) - M.volume(int));
+        if (eDif < 1e-12 && eInt < 1e-12) exact++;
+        if (resid > worstResid) worstResid = resid;
+        if (!M.watertight(dif).ok) rawOpen++;
+        const s = M.settle(dif);
+        if (M.watertight(s.polys).ok && Math.abs(M.volume(s.polys) - M.volume(dif)) < 1e-12) sealed++;
+        report(name.padEnd(34) + " removes " + exp.toFixed(6) + ", got " + (VA - M.volume(dif)).toFixed(6) +
+               ", raw watertight " + M.watertight(dif).ok + " -> settled " + M.watertight(s.polys).ok);
+    }
+    ok("!! *** ALL " + cases.length + " DEGENERATE CONTACTS GIVE THE EXACT VOLUME, AGAINST AN INDEPENDENT ORACLE ***",
+        exact === cases.length,
+        exact + " of " + cases.length + " to 1e-12, including the two that a BSP is supposed to find hardest: " +
+        "a cutter IDENTICAL to the solid (every face coplanar with a face, both operators exact) and a " +
+        "through-cut with both z faces flush. The BSP's COPLANAR bucket was never wrong; it was never tested.");
+    ok("!! ...and the partition identity holds across every one of them",
+        worstResid < 1e-12, "worst residual " + worstResid.toExponential(2));
+    ok("!! *** " + rawOpen + " OF " + cases.length + " ARE NOT WATERTIGHT RAW, AND SETTLE CLOSES ALL " + cases.length + " ***",
+        rawOpen > 0 && sealed === cases.length,
+        rawOpen + " leave unmatched edges straight out of the boolean -- flush faces split each other and " +
+        "leave T-junctions, exactly as one blast does -- and settle() takes all " + cases.length + " to zero " +
+        "unmatched with the volume unmoved. That is the ONE-blast result reproduced on a fixture class the " +
+        "twelve-blast wall never reaches, because a jagged blob never lands a face on a face.");
+    // ---- MULTIPLICITY: an UNSIGNED instrument, where volume is a signed one -------------------------------
+    // *** AND THE FIRST DRAFT OF THE ROW BELOW CLAIMED SOMETHING FALSE, WHICH IS WHY THE CLAIM IS NARROWED
+    // HERE. *** I wrote that parity catches a shell counted twice with one copy inverted, because the volume
+    // cancels. It does not: four crossings is still EVEN, and parity is blind to that exactly as volume is.
+    // What parity actually adds is that it is UNSIGNED and LOCAL where volume is signed and global -- a
+    // missing face and a face wound the wrong way both leave a ray crossing an odd number of times, while
+    // their volume error can be arbitrarily small or cancel against another. On this mesh that is the
+    // sharpest available statement about the 15 uncovered edges: they are hairlines, not missing faces.
+    const T = M.toTriangles(TWELVE_SETTLED);
+    let rng = 12345; const rnd = () => { rng = (rng * 1664525 + 1013904223) >>> 0; return rng / 4294967296; };
+    let odd = 0, N = 100, crossings = 0;
+    for (let i = 0; i < N; i++) {
+        const o = [-9, -2.8 + rnd() * 5.6, -0.29 + rnd() * 0.58];
+        const d = [1, (rnd() - 0.5) * 0.02, (rnd() - 0.5) * 0.02], L = Math.hypot(d[0], d[1], d[2]);
+        const u = [d[0] / L, d[1] / L, d[2] / L];
+        let n = 0;
+        for (const [a, b, c] of T) {
+            const e1 = sub(b, a), e2 = sub(c, a), pv = cross(u, e2), det = dot(e1, pv);
+            if (Math.abs(det) < 1e-12) continue;
+            const inv = 1 / det, tv = sub(o, a), bu = dot(tv, pv) * inv;
+            if (bu < 0 || bu > 1) continue;
+            const qv = cross(tv, e1), bvv = dot(u, qv) * inv;
+            if (bvv < 0 || bu + bvv > 1) continue;
+            if (dot(e2, qv) * inv > 1e-9) n++;
+        }
+        crossings += n;
+        if (n % 2 === 1) odd++;
+    }
+    ok("!! *** THE TWELVE-BLAST SOLID IS BOUNDED WITH MULTIPLICITY ONE: " + (N - odd) + " OF " + N + " RAYS CROSS EVENLY ***",
+        odd === 0,
+        crossings + " crossings over " + N + " rays, " + odd + " odd. Worth having BESIDE the volume rather than " +
+        "behind it because it is UNSIGNED and LOCAL: a dropped face or one wound the wrong way makes a ray " +
+        "cross oddly however small its area, where the volume it costs can be a rounding error or can cancel " +
+        "against another face entirely. NOT claimed: that this sees a doubled shell -- two copies is an even " +
+        "number of crossings and parity is as blind to it as volume is. What it does say here is that the 15 " +
+        "uncovered edges are hairlines rather than missing faces: " + (N - odd) + " of " + N + " rays across " +
+        "the wall's whole cross-section cross evenly. (A face-sized hole, planted by making settle() drop one " +
+        "polygon, reads 5 of 100 odd -- so the row discriminates rather than reporting a constant.)");
+}
+
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nunchecked here: whether a blasted wall LOOKS like concrete, and whether the 0.1% of unsewn edges is " +
     "ever visible -- it would take a rasterised A/B at a known resolution to say, and nothing in this gate " +
     "renders. What IS checked: that A - B and A AND B tile A to 1e-13; that the localised path is the same " +
     "SOLID and a smaller MESH; that the BVH query is conservative in the only safe direction; that one blast " +
-    "settles to 100.0% matched edges; and that twelve do not, with three proposed causes measured and refused.");
+    "settles to 100.0% matched edges; and that twelve do not, with three proposed causes measured and refused. " +
+    "\nADDED BY THE v4542 AUDIT AGAINST A FORMAL CSG PROPERTY LIST: that the weld makes 1,637 of 7,665 fan " +
+    "triangles that cover nothing and dropping them changes the surface by exactly zero; that four " +
+    "instruments here read a degenerate polygon as clean, one of them scoring it a watertight surface; that " +
+    "eight degenerate CONTACTS -- flush faces, a corner on an edge, a cutter identical to the solid -- are " +
+    "all exact against an interval oracle and settle to watertight; and that 100 rays cross the twelve-blast " +
+    "solid evenly, which says the 15 uncovered edges are hairlines rather than missing faces. STILL " +
+    "UNCHECKED by that audit: self-intersection away from shared edges, which needs a pairwise triangle test " +
+    "this gate does not have, and doubled shells, which neither the volume nor the parity can see.");
 process.exit(fails ? 1 : 0);

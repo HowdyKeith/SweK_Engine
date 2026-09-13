@@ -20,6 +20,7 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
+import VM from "../../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const MEMO = path.join(here, ".swek-lighthouse");        // the ORDERED candidate list, newline separated
@@ -51,7 +52,7 @@ async function main() {
     let engineVersion = null;
     try {
         const mj = fs.readFileSync(path.join(here, "..", "..", "main.js"), "utf8");
-        const m = mj.match(/ENGINE_VERSION\s*=\s*"(v\d+)"/);
+        const m = mj.match(VM.markerRe("ENGINE_VERSION"));
         engineVersion = m ? m[1] : null;
     } catch {}
     const report = {

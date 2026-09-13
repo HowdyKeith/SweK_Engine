@@ -1,4 +1,5 @@
 {
+ "generatedFrom": "tools/ship/tslWide-selfcheck.mjs",
  "at": "v4483",
  "three": "0.178.0",
  "note": "render/tslWide.mjs's quad graph (three computed varyings, one flat, the camera in the fragment) and planes pass as three's node builders emitted them and as render/tslSource.mjs transplanted them; rewritten by tools/ship/tslWide-selfcheck.mjs on every green run",

@@ -35,7 +35,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { runWgslComputeNative, headlessGpuSkipReason } from "./headlessGpu.mjs";
-import { corpus } from "./wgslCorpus.mjs";
+import { corpus, GENERATED_CASES } from "./wgslCorpus.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 let fails = 0;
@@ -81,6 +81,36 @@ const mods = [];
     ok("*** every physics corpus entry has a manifest entry (the census that cannot be appended to by hand) ***", missing.length === 0 && pc.length >= 12, missing.length ? "missing: " + missing.map((e) => e.id).join(", ") : `${pc.length} corpus entries covered`);
     const corpusIds = new Set(corpus().map((e) => e.id.replace(/\+.*$/, "")));
     ok("  and every manifest id is a corpus id (a manifest for a kernel the corpus never runs is a stranger)", ids.every((i) => corpusIds.has(i)), ids.filter((i) => !corpusIds.has(i)).join(", ") || "all known");
+}
+
+// *** v4566 -- THE SECOND CENSUS, AND IT IS THE ONE THE CORPUS HAD NO SIZE FOR. ***
+// Section 1 asks that every physics corpus entry has a manifest. This asks the reverse question of the GENERATED
+// entries: every case wgslCorpus.GENERATED_CASES names must actually BE in corpus(). Each of those cases sits behind
+// a `...(EMITTED_X && EMITTED_X.key ? [...] : [])` presence guard, which is right for "the writer gate has not run
+// yet" and identical for "the writer gate ran, failed part-way, and deleted it". Nothing downstream could tell the
+// two apart: crossBackend asserts `results.length === corpus().length`, the corpus measured against itself, which
+// holds at any size.
+//
+// tslSource.spriteAtlas fell out on 2026-09-09 exactly that way (see GENERATED_CASES' comment) and the tree stayed
+// green. This section is cheap -- corpus() is already built for section 1 -- and it names the writer gate to re-run,
+// because "run tools/ship/tslRace-selfcheck.mjs" is the whole repair.
+console.log("\n1b. EVERY GENERATED CORPUS CASE IS PRESENT (a presence guard cannot tell 'not written yet' from 'lost')");
+{
+    const have = new Set(corpus().map((e) => e.id));
+    const gone = GENERATED_CASES.filter((g) => !have.has(g.id));
+    ok(`*** all ${GENERATED_CASES.length} generated cases are in the corpus -- a record whose section was lost takes its case with it, silently, and this is the only row that sees it ***`,
+        gone.length === 0,
+        gone.length ? gone.map((g) => `${g.id} (${g.record}.${g.key} -- re-run ${g.writer})`).join("; ") : `${GENERATED_CASES.length} named, ${have.size} in the corpus`);
+    // A name in the list that the corpus never had is the other direction of the same fault: a census that can be
+    // satisfied by editing the census. Every id here must be an id wgslCorpus actually builds.
+    const generatedInCorpus = corpus().filter((e) => e.id.endsWith("(generated)")).map((e) => e.id);
+    const named = new Set(GENERATED_CASES.map((g) => g.id));
+    const strangers = generatedInCorpus.filter((i) => !named.has(i));
+    ok("  and no generated case is in the corpus WITHOUT a name here (a new one joins this list or this row goes red)",
+        strangers.length === 0, strangers.join(", ") || `${generatedInCorpus.length} generated cases, all named`);
+    // The records are written by gates, so the gate that writes each one must exist to be re-run.
+    const noWriter = GENERATED_CASES.filter((g) => !exists(g.writer));
+    ok("  and every case names a writer gate that exists", noWriter.length === 0, noWriter.map((g) => g.writer).join(", ") || "all present");
 }
 
 console.log("\n2. EVERY MANIFEST ENTRY RUNS ON THE HEADLESS DAWN DEVICE AND MEETS ITS OWN TOLERANCE");

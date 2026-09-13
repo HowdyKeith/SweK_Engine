@@ -117,7 +117,7 @@ console.log("\n2. EMITTED ONCE PER VARIANT, RUN AT FIVE STEP COUNTS WITH THE BUF
             }
             const U = r.result.variants.uniform, Sv = r.result.variants.storage;
             if (!U.error && !Sv.error) {
-                fs.writeFileSync(EMITTED, JSON.stringify({ at: "v4471", three: "0.178.0", note: "the logistic map stepped `bound` times, the bound a vec4 uniform in one variant and a storage buffer's element in the other -- the first generated pass whose trip count is not baked into its text; render/physicsTsl.mjs makeLogisticStepperTsl, transplanted by render/tslSource.mjs",
+                fs.writeFileSync(EMITTED, JSON.stringify({ generatedFrom: "tools/ship/tslLoopBound-selfcheck.mjs", at: "v4471", three: "0.178.0", note: "the logistic map stepped `bound` times, the bound a vec4 uniform in one variant and a storage buffer's element in the other -- the first generated pass whose trip count is not baked into its text; render/physicsTsl.mjs makeLogisticStepperTsl, transplanted by render/tslSource.mjs",
                     emitted: U.emitted, transplanted: U.transplanted, emittedStorage: Sv.emitted, transplantedStorage: Sv.transplanted }, null, 1) + "\n");
                 ok("the two emitted and transplanted passes are written to tools/ship/tsl-emitted-loop.json for the WGSL corpus", fs.existsSync(EMITTED));
             }

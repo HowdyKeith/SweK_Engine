@@ -454,6 +454,17 @@ export const SWEEP = Object.freeze([
       note: "(c) 2026 Kris Puckett; the README's 'use them, ship them, remix them' is the same grant in prose. " +
             "Cited in render/swiftShaderModel.mjs's header since v4163 on the strength of that README line; the " +
             "LICENSE file itself was opened at v4305, when the last thirteen of its 41 shaders were ported." },
+    // ---- v4560: the first entry in this file for a repository whose SOURCE is vendored, not just cited ------
+    { repo: "jpcy/xatlas", spdx: "MIT", licenceExists: true,
+      evidence: { file: "LICENSE", sha256: "2c16d5b1c280", lines: 20 }, namedIn: "v4560 xatlas round",
+      grantor: { named: "Jonathan Young", isRepoOwner: true }, permissive: true,
+      note: "(c) 2018-2020 Jonathan Young, pinned at f700c779. TWENTY lines, and every other MIT in this sweep " +
+            "that reads as the same licence is 21 or 23 -- the length is what says it was read rather than " +
+            "assumed. VENDORED rather than cited: vendor/xatlas/xatlas.{h,cpp} are in this tree, which is a " +
+            "stronger obligation than a citation and is why the copyright line is recorded beside the hash. " +
+            "It is a REFERENCE ORACLE and not a dependency: there is no emscripten here, so it can never reach " +
+            "a browser, and nothing under physics/ or render/ imports it. Only the two source files were taken " +
+            "-- no models/, no bin/, no build script -- and vendor/xatlas/PROVENANCE.txt records that." },
 ]);
 
 /** Only a nested third-party licence, which is NOT the repository's own and must never be read as one. */

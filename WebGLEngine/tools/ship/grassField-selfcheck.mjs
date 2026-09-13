@@ -209,6 +209,56 @@ console.log("\n6. IT IS WIRED, AND THE LICENCE TRAVELS WITH IT");
         "-- appreciated is enough of a reason, and a licence named in a comment is not a licence shipped");
 }
 
+console.log("\n*** v4569 -- bladeHash: THE ONE THE MODEL AND THE SHADER USED TO DISAGREE ABOUT ***");
+{
+    // *** THIS GATE ALREADY SAID "does the CPU reference agree with the shader" AND NEVER ASKED IT OF THIS
+    // HASH. *** windHash has a twin here and a trap section above; bladeHash was MENTIONED once, in a table
+    // of shader terms, and checked by nothing. It was fract(sin(dot(origin.xz, vec2(127.1, 311.7))) *
+    // 43758.545) on the GPU in float32 and fractSin(originX * 127.1 + originZ * 311.7) here in float64 --
+    // and sin(x) * 43758 amplifies the last bits of x by four orders of magnitude, so the two drew
+    // UNRELATED numbers rather than rounding one. It decides `if (bladeHash < slopeSuppress) drawn = false`,
+    // so the disagreement is about whether a blade of grass exists.
+    //
+    // MEASURED BEFORE THE CHANGE over the same 32,000 origins this row sweeps: 65.0% of hashes differed by
+    // more than 0.1, worst delta 1.0000, and the drawn decision flipped on 65.4%.
+    //
+    // The float32 emulation is the point of the row: Math.fround at every step is what the GPU does, and if
+    // the arithmetic is exact in both precisions the two must agree EXACTLY -- not closely.
+    // *** THE CPU SIDE COMES OUT OF bladeVisibility, NOT OUT OF windHash. ***
+    // The first draft of this row computed BOTH sides itself and compared windHash against windHash, which
+    // agrees by construction -- so reverting bladeVisibility to the sin-hash left it green. Sabotage R
+    // caught that: a row that tests the hash FUNCTION says nothing about the code that uses it. The model's
+    // own answer is what the shader has to match, so the model's own answer is what is read.
+    const f = Math.fround;
+    const gpuQ = (v) => f(Math.floor(f(f(v) * f(256))) + 8388608);
+    let n = 0, worst = 0, flips = 0;
+    for (let ix = 0; ix < 800; ix++) for (let iz = 0; iz < 40; iz++) {
+        const x = ix * 0.25, z = iz * 0.25;
+        const a2 = M.bladeVisibility(0.45, x, z).bladeHash;   // what the MODEL says, through its real path
+        const b2 = M.windHash(gpuQ(x), gpuQ(z));              // what the shader's line computes in float32
+        n++;
+        worst = Math.max(worst, Math.abs(a2 - b2));
+        for (const sup of [0.1, 0.25, 0.5, 0.75, 0.9]) if ((a2 < sup) !== (b2 < sup)) { flips++; break; }
+    }
+    ok("!! *** the model and the shader draw the SAME bladeHash in float32 and float64 -- exactly, not closely ***",
+       n > 30000 && worst === 0 && flips === 0,
+       `${n} blade origins on the 0.25 m lattice the field uses: worst |delta| ${worst}, ${flips} drawn-decision ` +
+       "flips. Before v4569 this read 65.0% differing by more than 0.1, worst 1.0000, and 65.4% flips.");
+    // *** AND THE MODEL MUST STILL DECIDE SOMETHING. *** A hash that returned a constant would agree
+    // perfectly and thin nothing, which is the way this row could pass while being useless.
+    let drawn = 0, thinned = 0;
+    for (let i = 0; i < 200; i++) { const r = M.bladeVisibility(0.45, i * 0.25, 3.5);
+        if (r.drawn) drawn++; else if (r.reason === "thinned") thinned++; }
+    ok("  ...and it still THINS -- a constant hash would agree perfectly and decide nothing",
+       drawn > 20 && thinned > 20,
+       `${drawn} drawn and ${thinned} thinned of 200 at slope 0.45, where slopeSuppress is mid-range`);
+    // The shader must not have kept the old idiom, or the row above is measuring a model against nothing.
+    const src = fs.readFileSync(path.join(ENG, "render/grassField.js"), "utf8");
+    ok("  ...and the SHADER really uses windHash for it, so this compares against what runs",
+       /float bladeHash\s*=\s*windHash\(/.test(src) && !/bladeHash\s*=\s*fract\(sin/.test(src),
+       "the divergent idiom is gone from the bladeHash line");
+}
+
 report("NOT CHECKED HERE: the GLSL executing, or whether it looks like grass. No GL context on this box, so " +
        "the shader is read for correspondence against a model that IS exercised -- the same limit " +
        "swiftShaders-selfcheck states, and for the same reason. The water half of the upstream repo is not " +

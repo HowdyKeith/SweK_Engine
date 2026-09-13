@@ -106,7 +106,24 @@ const GRASS_VERTEX = `
 
     // Stochastic thinning across the slope shoulder for a soft transition.
     float slopeSuppress = smoothstep(0.28, 0.65, slopeMag);
-    float bladeHash     = fract(sin(dot(instanceOrigin.xz, vec2(127.1, 311.7))) * 43758.545);
+    // *** v4569 -- windHash ON A QUANTISED LATTICE, NOT fract(sin(dot(...))). ***
+    // This line was fract(sin(dot(instanceOrigin.xz, vec2(127.1, 311.7))) * 43758.545), and
+    // render/grassModel.mjs mirrors it in float64 so the two can be compared term by term. They cannot:
+    // sin(x) * 43758 amplifies the last bits of x by four orders of magnitude, so float32 here and float64
+    // there draw UNRELATED numbers. Measured over 32,000 blade origins on the 0.25 m lattice the field
+    // actually uses: 65.0% differ by more than 0.1, worst delta 1.0000, and because the next line decides
+    // whether the blade exists at all, THE DRAWN DECISION FLIPS ON 65.4% OF THEM.
+    //
+    // grassModel's own note declined this unification -- "it is a different hash for a different job, and
+    // unifying them would change which blades disappear". Which blades disappear was never a shared fact:
+    // the model and the shader already disagreed about two thirds of them, so there is nothing to preserve.
+    //
+    // windHash is a Wang-style INTEGER hash, exact in both precisions, already in scope here and already
+    // mirrored by a CPU twin that tools/ship/grassField-selfcheck.mjs verifies. Reusing it beats a third
+    // hash. The bias keeps the value non-negative -- converting a negative float to uint is undefined -- and
+    // holds the lattice under 2^24, the last integer float32 represents exactly, for any |origin| < 32,768 m.
+    vec2  bladeQ        = floor(instanceOrigin.xz * 256.0) + 8388608.0;
+    float bladeHash     = windHash(uvec2(bladeQ));
     if (bladeHash < slopeSuppress) {
       gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
       return;

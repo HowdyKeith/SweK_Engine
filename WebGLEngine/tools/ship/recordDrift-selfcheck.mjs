@@ -65,7 +65,7 @@ console.log("\n2. handed a stale record, each check names it");
         ...real,
         SHAPE_AT_V4480: Object.freeze({ ...real.SHAPE_AT_V4480, definesOk: 1, gates: 1 }),
     };
-    const d = await checks({ load: async (p) => (p.includes("assertionShape") ? fake : import(p)) });
+    const d = await checks({ load: async (p) => (p.includes("assertionShape") ? fake : import(p)), only: "assertionShape census" });
     const row = d.find((c) => c.name === "assertionShape census");
     say(`fixture: a census record claiming 1 gate and 1 copy`);
     ok("!! a stale assertion census is found and both numbers are shown",
@@ -84,7 +84,7 @@ console.log("\n2. handed a stale record, each check names it");
     // closingCoverage: a gate no closing names
     const real = await import("./closingCoverage.mjs");
     const fake = { ...real, coverage: () => ({ summedUncovered: 2, duplicates: [{ gate: "x", by: ["a", "b"] }] }) };
-    const d = await checks({ load: async (p) => (p.includes("closingCoverage") ? fake : import(p)) });
+    const d = await checks({ load: async (p) => (p.includes("closingCoverage") ? fake : import(p)), only: "sweep closings" });
     const row = d.find((c) => c.name === "sweep closings");
     ok("!! an unswept gate and a duplicate claim are both found",
         row.stale === true && /2 gate\(s\)/.test(row.detail) && /1 duplicate/.test(row.detail));
@@ -95,7 +95,7 @@ console.log("\n2. handed a stale record, each check names it");
     // registryOrphans: a module with reportLines and no entry
     const real = await import("./registryOrphans.mjs");
     const fake = { ...real, scan: () => ({ narrow: [{ gate: "g", module: "physics/made-up.mjs" }] }) };
-    const d = await checks({ load: async (p) => (p.includes("registryOrphans") ? fake : import(p)) });
+    const d = await checks({ load: async (p) => (p.includes("registryOrphans") ? fake : import(p)), only: "instrument registry" });
     const row = d.find((c) => c.name === "instrument registry");
     ok("!! an unregistered instrument is found AND NAMED, not counted",
         row.stale === true && row.detail.includes("physics/made-up.mjs"),
@@ -106,10 +106,59 @@ console.log("\n2. handed a stale record, each check names it");
     const real = await import("./assertionShape.mjs");
     const one = real.gateFiles(ENG)[0];
     const rel = path.relative(ENG, one).replace(/\\/g, "/");
-    const t = JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "sweep-timings.json"), "utf8"));
+    // *** THIS WAS A BARE JSON.parse OF THE FILE quickSweep REWRITES AT RUN END, AND IT WENT RED INSIDE A
+    // SWEEP. *** Exactly the torn read tools/ship/recordReach.mjs was repaired for at v4550 -- red twice
+    // inside a full sweep, green on 68 runs under 16-way load afterwards, because the trigger was the
+    // concurrent WRITE and never the load. The repair there was readTimings(), which returns `ok` rather
+    // than assuming it; this gate had its own second reader and did not use it. THAT IS THE RULE THIS FILE'S
+    // OWN SECTION 3 ASSERTS ABOUT `sources` -- one definition of the walk, because a second walker can
+    // disagree with the first -- applied to itself. Shared reader now, and a torn read is RETRIED rather
+    // than either crashing the gate or passing it on nothing: the window is milliseconds, so a file that is
+    // still unreadable after three attempts is genuinely broken and the row below says so.
+    const { readTimings } = await import("./recordReach.mjs");
+    let t = readTimings(ENG), tries = 1;
+    while (!t.ok && tries < 3) { await new Promise((r) => setTimeout(r, 40)); t = readTimings(ENG); tries++; }
+    ok("!! the live sweep timings are readable, after at most three attempts",
+        t.ok === true && t.at && Object.keys(t.at).length > 0,
+        `read on attempt ${tries} of at most 3: ${t.entries} readings` +
+        (t.error ? `. last error: ${t.error}` : "") + ". A single unguarded parse here is a gate that fails a " +
+        "ship at random and never reproduces alone, which gateSweep.mjs's own header calls the worst thing a " +
+        "ship-time check can be.");
+    if (!t.ok) { console.log("\n" + "FAIL -- sweep timings unreadable after 3 attempts"); process.exit(1); }
+    // *** THE TORN READ IS DRIVEN, NOT DESCRIBED -- AND DRIVEN THROUGH THE READER, NOT THE CENSUS. *** Two
+    // cases must land differently: a file briefly unparseable because quickSweep is rewriting it must HEAL on
+    // retry, and one that stays unparseable must be named rather than crashing the gate or passing it on an
+    // empty map. The first version of this row proved that by calling checks({}) twice more, and checks() is
+    // O(tree): this gate went 1,870 ms -> 2,376 ms against a 3,000 ms budget and ate the 800 ms margin
+    // recordReach-selfcheck requires of both stale-record detectors. IT WENT RED AND IT WAS RIGHT TO. The
+    // retry is its own exported function now, so the same two cases cost milliseconds instead of two censuses.
+    {
+        const TP = path.join(ENG, "tools", "ship", "sweep-timings.json");
+        const good = fs.readFileSync(TP, "utf8");
+        const RD = await import("./recordDrift.mjs");
+        let healed = null, broken = null;
+        try {
+            fs.writeFileSync(TP, good.slice(0, 300));                                  // torn
+            setTimeout(() => { try { fs.writeFileSync(TP, good); } catch {} }, 50);    // ...and healed
+            healed = await RD.readTimingsWithRetry(ENG);
+            fs.writeFileSync(TP, good.slice(0, 300));                                  // and never healed
+            broken = await RD.readTimingsWithRetry(ENG);
+        } finally { fs.writeFileSync(TP, good); }
+        ok("!! *** A TORN READ HEALS ON RETRY, AND A BROKEN FILE IS NAMED RATHER THAN CRASHING ***",
+            healed && healed.rec && healed.tries > 1 && broken && !broken.rec && broken.tries === 3 &&
+            typeof broken.error === "string",
+            `torn-then-restored: read on attempt ${healed && healed.tries} of 3. permanently truncated: ` +
+            `${broken && broken.tries} attempts, then "${String(broken && broken.error).slice(0, 40)}". *** ` +
+            `THIS GATE WENT NEW RED INSIDE A SWEEP AT v4556 AND PASSED EVERY TIME IT RAN ALONE *** -- ` +
+            `recordDrift.mjs parsed sweep-timings.json bare, the same torn read recordReach.mjs was repaired ` +
+            `for at v4550, in a module that had its own second reader and never used the shared one. The ` +
+            `retry AWAITS a timer: the first draft spun on Date.now(), blocking this process's event loop, so ` +
+            `a restore scheduled 50 ms out could never be dispatched and all three attempts failed. THE ` +
+            `\`tries > 1\` IS THE POINT OF THE HEALED CASE -- succeeding on attempt one would prove nothing.`);
+    }
     say(`the live timings hold ${Object.keys(t.timings).length} readings and ${Object.keys(t.at).length} stamps`);
     const noStamp = { ...t, at: Object.fromEntries(Object.entries(t.at).filter(([k]) => k !== rel)) };
-    const dStamp = await checks({ timings: noStamp });
+    const dStamp = await checks({ timings: noStamp, only: "sweep timings" });
     const rowStamp = dStamp.find((c) => c.name === "sweep timings");
     ok("!! a reading WITH a time but WITHOUT its own capture stamp counts as missing evidence",
         rowStamp.stale === true && rowStamp.detail.includes(rel),
@@ -117,9 +166,9 @@ console.log("\n2. handed a stale record, each check names it");
         "937 -- an entry carries its own stamp or it carries nothing");
     const noTime = { ...t, timings: Object.fromEntries(Object.entries(t.timings).filter(([k]) => k !== rel)) };
     ok("...and a missing reading is caught too, so the check is not only about stamps",
-        (await checks({ timings: noTime })).find((c) => c.name === "sweep timings").stale === true);
+        (await checks({ timings: noTime, only: "sweep timings" })).find((c) => c.name === "sweep timings").stale === true);
     ok("...while the untouched record is clean, so neither is simply always true",
-        (await checks({ timings: t })).find((c) => c.name === "sweep timings").stale === false);
+        (await checks({ timings: t, only: "sweep timings" })).find((c) => c.name === "sweep timings").stale === false);
 }
 
 // ---- 2b. THE TOP-LEVEL PARTITION, WHICH NOTHING GRADED IN THE FIRST DRAFT ---------------------------------------
