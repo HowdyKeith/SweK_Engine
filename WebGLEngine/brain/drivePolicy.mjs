@@ -92,7 +92,7 @@ export function policyDriver(w, surface, car = null) {
 }
 
 /** Lap progress in metres from a lap-parameter delta (the centreline's segments are not equal). */
-function metresBetween(surface, s0, s1) {
+export function metresBetween(surface, s0, s1) {
     const pts = surface.centreline, n = pts.length; let i = Math.floor(s0), t = s0 - i, left = ((s1 - s0) % n + n) % n, m = 0;
     if (left > n / 2) return -metresBetween(surface, s1, s0);   // went backwards
     for (let guard = 0; guard < n + 2 && left > 1e-9; guard++) { const a = pts[i % n], b = pts[(i + 1) % n], L = Math.hypot(b[0] - a[0], b[1] - a[1]), take = Math.min(1 - t, left); m += L * take; left -= take; i++; t = 0; }

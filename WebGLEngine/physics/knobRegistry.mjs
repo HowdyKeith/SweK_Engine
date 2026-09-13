@@ -30,6 +30,8 @@ import { adjudicate as raceAdjudicate, score as raceScore, propose as racePropos
 import { adjudicateBlackHole, adjudicateNeutronStar, score as apsidalScore, proposeBlackHole, proposeNeutronStar } from "./apsidalKnob.mjs";
 import { adjudicate as impactAdjudicate, score as impactScore, propose as impactPropose } from "./impactKnob.mjs";
 import { adjudicate as holoAdjudicate, score as holoScore, propose as holoPropose } from "./hologramKnob.mjs";
+// v4588 -- the turret copilot (task 77): the shell speed, proposed slow, adjudicated by the hand gunner's hits in a duel
+import { adjudicateShell, scoreShell, proposeShell, ready as gunnerReady } from "../brain/gunnerPolicy.mjs";
 import { yangMagnetisation } from "./statmech/ising.js";
 import { wellLevel, levels } from "./quantum/schrodinger1d.js";
 import { lzExact, lzSweep } from "./quantum/landauZener.js";
@@ -275,6 +277,21 @@ export function registerAll() {
         notes: "the separation read back from the scene's own screen scan through recoverSeparation; tolerance = two " +
                "pitches over the expected spacing; refuses below sep = 10, where fewer than three bright fringes fit the " +
                "+-60 screen and the page's slider (from 8) already sits.",
+    });
+
+    // v4588 -- THE SIXTH lab-line proposer whose key runs box3d, and THE FIRST WHOSE KNOB IS A WEAPON. The turret on
+    // the race car (physics/turret.mjs) fires a shell of the knob's speed; the search prefers the SLOWEST (1 / speed:
+    // the arc a person can watch) and the adjudicator runs the hand gunner in a 20 s duel on the held-out track
+    // and asks for three hits. A shell slower than the cars never catches the target: the aim solution has no
+    // root, the gunner never aligns, never fires, and 8 m/s is refused with 0 hits of 0 shots -- the greedy pick
+    // is the first refusal, by measurement. 12 m/s and up pass (6 of 6 hits at 12, 16 of 17 at 28, measured).
+    // Needs box3d's wasm like the race: gunnerPolicy.ready() in node, setModule() in a page; unready, refused BY NAME.
+    registerProposer({
+        id: "gunner-shell", instrument: "turret-gunner", knobs: ["shellSpeed"],
+        propose: proposeShell, score: scoreShell, adjudicate: adjudicateShell, ready: gunnerReady,
+        notes: "the shell speed of the race car's turret: score = 1 / speed (the slowest arc), key = the hand gunner's " +
+               "hits in a 20 s duel on the held-out track (seed 2), at least 3. 8 m/s: no solution, no shot, refused; " +
+               "12: 6 of 6; 28: 16 of 17; 60: 17 of 17 (measured). The greedy pick is the first refusal.",
     });
 
     registerProposer({

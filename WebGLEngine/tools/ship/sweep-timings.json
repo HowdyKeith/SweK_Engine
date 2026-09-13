@@ -1,6 +1,6 @@
 {
  "note": "OBSERVED at the last quickSweep run: ms per gate (serial where a serial re-run happened) and exit code. Rewritten every run; used only to choose which gates are under the ship-time budget. Not a claim about the tree -- the register is. `at` is PER ENTRY (v4408): the capture that actually observed that gate. `captured` is this run's stamp and applies ONLY to entries whose `at` equals it -- the rest were not run and say so. `crossings` (v4536) counts CONSECUTIVE sweeps on which a gate came in over budget, and it takes two to evict: one crossing is a reading from one hour, and this box moves 12-36% between hours on unchanged code. A gate that comes back under loses its count entirely. `serial` (v4562) is the UNCONTENDED cost -- from a phase-2 run or from this sweep's rotating slice -- while `timings` is a sample taken while seven other gates fought for the box and runs a MEDIAN 2.41x above it. Ask costOf(), not timings[], for what a gate costs.",
- "captured": "2026-09-13T17:50:01.157Z",
+ "captured": "2026-09-13T22:45:29.696Z",
  "budgetMs": 3000,
  "capMs": 20000,
  "timings": {
@@ -1637,7 +1637,10 @@
   "physics/labKnobs-selfcheck.mjs": 1282,
   "physics/apsidalKnob-selfcheck.mjs": 917,
   "physics/hologramKnob-selfcheck.mjs": 115,
-  "physics/impactKnob-selfcheck.mjs": 243
+  "physics/impactKnob-selfcheck.mjs": 243,
+  "physics/turret-selfcheck.mjs": 287,
+  "brain/gunnerPolicy-selfcheck.mjs": 6966,
+  "tools/ship/raceTurret-selfcheck.mjs": 11262
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -3273,7 +3276,10 @@
   "physics/labKnobs-selfcheck.mjs": 0,
   "physics/apsidalKnob-selfcheck.mjs": 0,
   "physics/hologramKnob-selfcheck.mjs": 0,
-  "physics/impactKnob-selfcheck.mjs": 0
+  "physics/impactKnob-selfcheck.mjs": 0,
+  "physics/turret-selfcheck.mjs": 0,
+  "brain/gunnerPolicy-selfcheck.mjs": 0,
+  "tools/ship/raceTurret-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-10T04:24:20.054Z",
@@ -4909,7 +4915,10 @@
   "physics/labKnobs-selfcheck.mjs": "2026-09-13T12:20:08.112Z",
   "physics/apsidalKnob-selfcheck.mjs": "2026-09-13T17:50:01.157Z",
   "physics/hologramKnob-selfcheck.mjs": "2026-09-13T17:50:01.157Z",
-  "physics/impactKnob-selfcheck.mjs": "2026-09-13T17:50:01.157Z"
+  "physics/impactKnob-selfcheck.mjs": "2026-09-13T17:50:01.157Z",
+  "physics/turret-selfcheck.mjs": "2026-09-13T22:45:29.696Z",
+  "brain/gunnerPolicy-selfcheck.mjs": "2026-09-13T22:45:29.696Z",
+  "tools/ship/raceTurret-selfcheck.mjs": "2026-09-13T22:45:29.696Z"
  },
  "finished": {
   "tools/ship/placementRender-selfcheck.mjs": true,
@@ -6432,7 +6441,10 @@
   "physics/labKnobs-selfcheck.mjs": true,
   "physics/apsidalKnob-selfcheck.mjs": true,
   "physics/hologramKnob-selfcheck.mjs": true,
-  "physics/impactKnob-selfcheck.mjs": true
+  "physics/impactKnob-selfcheck.mjs": true,
+  "physics/turret-selfcheck.mjs": true,
+  "brain/gunnerPolicy-selfcheck.mjs": true,
+  "tools/ship/raceTurret-selfcheck.mjs": true
  },
  "crossings": {
   "tools/ship/engineSceneBot-selfcheck.mjs": 2,
@@ -6440,7 +6452,9 @@
   "tools/ship/wasmSupport-selfcheck.mjs": 2,
   "tools/ship/inputSets-selfcheck.mjs": 2,
   "tools/ship/domToTexture-selfcheck.mjs": 2,
-  "tools/ship/reportDoors-selfcheck.mjs": 2
+  "tools/ship/reportDoors-selfcheck.mjs": 2,
+  "brain/gunnerPolicy-selfcheck.mjs": 1,
+  "tools/ship/raceTurret-selfcheck.mjs": 1
  },
  "serial": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 2404,
@@ -7716,7 +7730,10 @@
   "physics/labKnobs-selfcheck.mjs": 515,
   "physics/apsidalKnob-selfcheck.mjs": 483,
   "physics/hologramKnob-selfcheck.mjs": 62,
-  "physics/impactKnob-selfcheck.mjs": 78
+  "physics/impactKnob-selfcheck.mjs": 78,
+  "physics/turret-selfcheck.mjs": 98,
+  "brain/gunnerPolicy-selfcheck.mjs": 6966,
+  "tools/ship/raceTurret-selfcheck.mjs": 11262
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-10T01:23:58.721Z",
@@ -8992,6 +9009,9 @@
   "physics/labKnobs-selfcheck.mjs": "2026-09-13T12:19:53.062Z",
   "physics/apsidalKnob-selfcheck.mjs": "2026-09-13T17:49:45.684Z",
   "physics/hologramKnob-selfcheck.mjs": "2026-09-13T17:49:45.684Z",
-  "physics/impactKnob-selfcheck.mjs": "2026-09-13T17:49:45.684Z"
+  "physics/impactKnob-selfcheck.mjs": "2026-09-13T17:49:45.684Z",
+  "physics/turret-selfcheck.mjs": "2026-09-13T22:45:14.323Z",
+  "brain/gunnerPolicy-selfcheck.mjs": "2026-09-13T22:45:14.323Z",
+  "tools/ship/raceTurret-selfcheck.mjs": "2026-09-13T22:45:14.323Z"
  }
 }

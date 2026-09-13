@@ -273,8 +273,10 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4586 -- RE-TAKEN: one gate (labKnobs) joined, the same four rows by one.
     // v4587 -- RE-TAKEN with the three sibling gates of the v4586 knob modules (physics/apsidalKnob-, impactKnob-,
     // hologramKnob-selfcheck.mjs): 1628 -> 1631 gates, and usesOk, definesOk and nameFirst each by three; nothing else moved.
-    gates: 1631, usesOk: 1610, definesOk: 1602, importsOk: 0,
-    distinctDefinitions: 40, nameFirst: 1503, condFirst: 91, unknownSignature: 16,
+    // v4588 -- RE-TAKEN with the turret copilot's three gates (physics/turret-, brain/gunnerPolicy-, tools/ship/raceTurret-selfcheck.mjs):
+    // 1631 -> 1634 gates, and usesOk, definesOk and nameFirst each by three; nothing else moved.
+    gates: 1634, usesOk: 1613, definesOk: 1605, importsOk: 0,
+    distinctDefinitions: 40, nameFirst: 1506, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

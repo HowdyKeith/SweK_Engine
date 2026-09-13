@@ -4870,6 +4870,33 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "sabotages, all red by name, including a normal taken from a central difference of the samples " +
                  "instead of the bilinear patch the height comes from.",
     }),
+    since234: Object.freeze({
+        at: "v4588", swept: 3, green: 3, red: 0,
+        added: Object.freeze([
+            "brain/gunnerPolicy-selfcheck.mjs",
+            "physics/turret-selfcheck.mjs",
+            "tools/ship/raceTurret-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 0.3 s, 9 s and 11 s: one headless and pure, one on box3d's wasm headless, one in two harness browsers. " +
+                 "THE TURRET COPILOT (task 77): physics/turret.mjs mounts a turret on the race car's chassis with its own contract " +
+                 "{ yaw, pitch, fire }, vacuum shells and a swept hit test, and an aim solution that is one quartic for a moving gun " +
+                 "and a moving target (iterated to the muzzle's fixed point: two passes left 0.03 deg against ballistics.launchAngles " +
+                 "at 20 m, found by the gate); brain/gunnerPolicy.mjs is a 9 -> 8 -> 3 relu MLP on the turret's aim errors, the " +
+                 "hand gunner as weights (15 of 15 and 16 of 17 hits in 20 s duels, the zero gunner never fires), drivePolicy's ES " +
+                 "on the duel (from zero to a positive score in 10 candidates, deterministic per seed), the race with turrets in " +
+                 "the same lockstep (replayed from a log of both contracts to the same fingerprint and hits), and the shell-speed " +
+                 "knob registered as gunner-shell on the turret-gunner instrument (score 1 / speed, the greedy 8 m/s refused with 0 " +
+                 "hits of 0 shots, 12 and up pass); render/raceTurret.mjs draws domes, barrels and shells as kit fleets and " +
+                 "race-brain.html races with a turret on every car, hits in the standings, and a gunner trainer in idle time. " +
+                 "The browser's race with gunners is node's fingerprint on both backends, and the page boots in half a second in a " +
+                 "browser of its own (inside the harness page that had just drawn the frames it froze past 300 s twice: the " +
+                 "split is the fix). Sabotages red at A..E on the turret, A..E on the gunner, A..D on the page gate; C on the turret " +
+                 "was a 0-red sabotage until the moving-gun row was added, and the gunner's impulse row stepped a world with no " +
+                 "ground until it stood the cars on their suspension. brainTrail's fifty-round row (no brain page in the registry) " +
+                 "re-founded on registryPages: turret-gunner is the first, and the link is derived.",
+    }),
     since233: Object.freeze({
         at: "v4587", swept: 3, green: 3, red: 0,
         added: Object.freeze([

@@ -1750,6 +1750,46 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         sweep three times slower than usual and evicted nine gates, so the committed readings stand and only the three
         new gates' readings (917, 243 and 115 ms) were added, with the run's capture stamp -- the same repair as v4586,
         and the one sweepCoverage's ledger is green on.
+     Then (v4588) THE TURRET COPILOT (task 77). Keith asked whether the cars could have a turret copilot; the tree had turrets
+        that draw (render/turretRenderer.js, yaw-only, bound to OgreScenario), turrets that weigh (brain/rl/driveEnv.js's
+        ROOF_TURRET, a 400 kg mass that aims at nothing) and a ballistics module with no owner, and none that mount.
+        physics/turret.mjs mounts one on the race car's roof with its own contract { yaw, pitch, fire } (rates in [-1, 1] and a
+        trigger the reload ignores), vacuum shells flown by ballistics.stepShell under the world's gravity, a swept hit test in
+        the target's body frame (a point test at the end of a tick steps over a chassis at a grazing angle), and an aim solution
+        that is ONE quartic for a moving gun and a moving target -- |w(t)| = v t with w the drop-corrected relative displacement --
+        rather than leadMoving bolted to launchAngles, whose time of flight is wrong by the cosine of the elevation. Found by the
+        gate: two passes of that solve left 0.03 deg against launchAngles' flat root at 20 m because the muzzle moves with the
+        solution; iterated to the muzzle's fixed point the two routes agree to 1e-9. brain/gunnerPolicy.mjs is the copilot: a
+        9 -> 8 -> 3 relu MLP in drivePolicy's layer shape on the turret's aim errors (bearing, pitch, range, closing, lateral,
+        reloading, reachable, aligned), the hand gunner as weights (a proportional turn on two errors, a trigger on the aligned
+        bit), a DUEL as the episode (two hand-driven cars, the candidate in the rear turret, hits minus a waste penalty), the ES on
+        it, and the race with turrets in the same lockstep as the drivers: both contracts per car per tick in one log, the
+        fingerprint folding box3d's state hash AND the turret and shell state, a replay from the log alone reaching it. Measured:
+        the hand gunner lands 15 of 15 and 16 of 17 in 20 s on seeds 1 and 2, the zero gunner never fires, the ES from zero reaches
+        a positive score in 10 candidates and is deterministic per seed, a three-car race with turrets is deterministic and its
+        replay carries the same hits, the browser's race is node's fingerprint on both backends. The knob is the shell speed,
+        gunner-shell on the turret-gunner instrument: the search wants it SLOW (1 / speed, the arc a person can watch) and the
+        key -- the hand gunner's hits in a 20 s duel on the held-out track -- refuses 8 m/s with 0 hits of 0 shots because the
+        target outruns the shell and the gunner never aligns; 12 m/s and up pass. render/raceTurret.mjs draws domes, barrels and
+        shells as kit fleets (the barrel mesh pre-sized to [0, 0.9] along +z so the drawn muzzle is the physics muzzle), and
+        race-brain.html races with a turret on every car, hits in the standings, and a gunner trainer in idle time beside the
+        driver's. Three gates, fourteen sabotages, three findings: the turret gate's sabotage C (the shell without the gun's
+        velocity) reached no assertion until a moving-gun row was added; the gunner gate's impulse row stepped a bare box3d world,
+        which has no ground body, so both cars fell during the shell's flight; the page gate booted race-brain.html inside the
+        harness page that had just drawn two device frames and froze that page's main thread past 300 s twice after passing once
+        -- in a browser of its own it boots in half a second and the whole gate runs in 11 s. And brainTrail-selfcheck's row that
+        said for fifty rounds "instruments.mjs offers no brain page, and when it does the links should come from there" met its
+        first: turret-gunner carries race-brain.html, ui/brainTrail.js derives it (registryPages), the stages stay hand-declared.
+        The quick sweep (404 under budget in 390 s on the slow box again) found one new red that was this round's: browserNodeGuard
+        walks every RELATIVE literal import, static or dynamic, from each page, and race-brain.html reaches
+        brain/gunnerPolicy.mjs relatively, whose ready() lazily imported physics/box3d/box3dNode.mjs -- a module with node:
+        imports at its top. The guard is right that a page must never load that file; ready() now refuses outside node and
+        imports through a specifier the walk cannot follow. Said plainly: physics/raceKnob.mjs carries the identical lazy
+        import and is unflagged only because physics-lab.html and race-replay.html import it by absolute specifiers the walk
+        ignores, not because it is guarded. The sweep's timings were not carried (nine evictions on a slow box, the same
+        repair as v4586 and v4587): the committed readings stand and the three new gates' readings were added (287 ms, 7.0 s
+        and 11.3 s; the two over budget are the racing line's kind, beside drivePolicy's 63 s and raceKnob's 33 s).
+        Census: 1631 -> 1634 gates, 4090 -> 4096 files; since234.
 ## The count that says when step 4 matters
 
 tools/ship/shaderCensus-selfcheck.mjs has held, since v3274, that a hand-written pair is cheaper than an
