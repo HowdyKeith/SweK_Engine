@@ -3767,6 +3767,48 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since242: Object.freeze({
+        at: "v4583", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/runnerReach-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/runnerBudget-selfcheck.mjs", "tools/ship/ship.mjs",
+                                "tools/ship/verify.mjs", "ai-bridge/shipBridge.js", "ai-bridge/sourceChainBridge.js"]),
+        verdict: "green, 3431 ms at eight-wide and 3414 ms alone -- OVER the 3000 ms sweep budget on purpose, " +
+                 "because the row that matters runs runnerBudget-selfcheck and reads the population it prints. " +
+                 "*** THE CHECK THAT ASKS WHO BUDGETS A GATE DEFINED ITS POPULATION BY THREE STRING " +
+                 "COINCIDENCES, AND ALL THREE ARE WRONG. *** v4582 found the third by accident: adding a " +
+                 "SKIP_LINE regex to quickSweep introduced the string `-selfcheck` and pulled a runner of eleven " +
+                 "rounds' standing into the population for the first time. Asked what else the predicates hid: " +
+                 "(1) THE SPAWN TEST wanted process.execPath as the literal first argument, so verify.mjs (which " +
+                 "destructures execFileSync from a dynamic import) and ship.mjs (which passes it through a `run` " +
+                 "helper) were both outside -- THE SHIP AND ITS OWN GATE RUNNER -- and so was shipBridge, which " +
+                 "reaches gates only through ship.mjs. (2) THE TIME-LIMIT TEST admits any `timeout:`, so " +
+                 "sourceChainBridge entered on a 1500 ms HTTP health probe and was excluded again for naming no " +
+                 "selfcheck, while the verify.mjs it spawns over a cloned tree carries NO cap at all: admitted " +
+                 "for one wrong reason, excluded for another, so the absence was never a decision. (3) THE " +
+                 "`-selfcheck` MENTION misses one level of indirection and misses enumeration entirely. *** THE " +
+                 "MEASURED CONSEQUENCE, AT ITS TRUE SIZE: *** shipBridge's dry-run total was 600,000 ms around a " +
+                 "process whose own per-step cap is 900,000 -- AN OUTER TOTAL BELOW THE INNER PER-STEP LIMIT IT " +
+                 "CONTAINS -- so a dry run could die while its slowest step sat well inside its budget, reporting " +
+                 "timedOut with no text, which is exactly what ship.mjs's v3936 note records after a 923-second " +
+                 "ritual. Fixed: the bridge now reads ship.mjs's --step-timeout out of its source and uses a " +
+                 "named multiple of it. verify.mjs's flat 180 s is NOT a live problem and is declared as such: " +
+                 "the three lockstep gates it guards cost 61, 127 and 112 ms. No ship limit can come from " +
+                 "gateBudget.MEASURED at all -- three single gates each exceed 900 s and the tail sums to 267 " +
+                 "minutes -- so these are declared rather than derived, and budgetIsOwn says why. *** THE " +
+                 "POPULATION IS A CLOSURE NOW: *** a runner spawns a gate, or spawns a file that is itself a " +
+                 "runner, to a fixed point. 5 modules became 14, and FOUR REFINEMENTS WERE EACH FORCED BY A WRONG " +
+                 "RESULT rather than foreseen -- a gate spawning a gate as a fixture is not an authority (25 " +
+                 "members), requiring a runner is not being one (15), accepting a caller's timeout is not " +
+                 "choosing one (six silent), and a runner may ENUMERATE rather than name, which the import-line " +
+                 "fix had just pushed quickSweep back out over. What remains is named: a target built entirely " +
+                 "from run-time data stays invisible, and that hole was load-bearing within minutes of being " +
+                 "written down. 15 sabotages, 15/15 red, no 0-RED -- after a first pass with SEVEN 0-REDs, all " +
+                 "of them here: six rows tested that a declaration EXISTS while the sabotage changed the " +
+                 "BEHAVIOUR it declares, now replaced by one row that runs the check and reads its number, and " +
+                 "one was a substring -- renaming budgetIsOwn to budgetIsOwnX left `/budgetIsOwn/` matching, so " +
+                 "three declarations could be removed invisibly. Verify: 30 green, 3 red, 0 crash-only.",
+    }),
     since241: Object.freeze({
         at: "v4582", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/skipReading-selfcheck.mjs"]),

@@ -38,6 +38,46 @@ function nextVersion(cur) {
     return n ? "v" + (parseInt(n[1], 10) + 1) : null;
 }
 
+// *** v4583 -- TWO CAPS ON ONE PIECE OF WORK, AND THE OUTER ONE WAS SMALLER THAN THE INNER ONE. ***
+//
+// This bridge spawned ship.mjs under a typed 900000 for a real ship and 600000 for a dry run. tools/ship/ship.mjs
+// has its OWN per-step cap -- `RUN_TIMEOUT_MS = Number(arg("--step-timeout", "900")) * 1000` -- so the dry-run
+// limit here was 600 s around a process whose single verify step is allowed 900 s. THE OUTER TOTAL WAS BELOW THE
+// INNER PER-STEP LIMIT IT CONTAINS, which means a dry run could be killed while its slowest step was still
+// comfortably inside its own budget, and the bridge reports `timedOut` with no text because -- as ship.mjs's own
+// v3936 note records, after a 923-second ritual hit that same 900 -- A KILLED CHILD'S BUFFERED STDOUT NEVER
+// FLUSHES. Two anonymous numbers, nested the wrong way round, each unable to explain the other's failure.
+//
+// DERIVED FROM THE INNER CAP RATHER THAN TYPED. The step cap is read out of ship.mjs the same way this file
+// already reads ENGINE_VERSION out of main.js, so the two cannot drift apart. The multiple is a judgement and is
+// named as one: a ship runs several steps and verify is the long one, so twice the step cap is the room for the
+// rest. IT IS NOT DERIVED FROM gateBudget.MEASURED, and it must not be -- that table's tail sums to 266 minutes
+// and three single gates each exceed 900 s on their own, so no wall-clock ship limit can be honest about the
+// whole suite. What this bridge can promise is that it never kills a ship the ritual's own cap would have let run.
+const SHIP_STEP_CAP_MS = (() => {
+    try {
+        const src = fs.readFileSync(path.join(ENGINE, "tools", "ship", "ship.mjs"), "utf8");
+        const m = src.match(/arg\("--step-timeout",\s*"(\d+)"\)/);
+        // No fallback that pretends to know: if the shape moved, the bridge says so rather than inventing a cap.
+        return m ? Number(m[1]) * 1000 : null;
+    } catch { return null; }
+})();
+const SHIP_STEP_MULTIPLE = 2;
+const SHIP_TIMEOUT_MS = SHIP_STEP_CAP_MS ? SHIP_STEP_CAP_MS * SHIP_STEP_MULTIPLE : 1800000;
+
+/** Declared for tools/ship/runnerBudget-selfcheck.mjs, which could not see this file until v4583. */
+const budgetIsOwn =
+    "this bridge budgets a whole SHIP, not a gate, so gateBudget.MEASURED's per-gate numbers cannot produce its " +
+    "limit -- that table's tail sums to 266 minutes and three single gates each cost more than any plausible " +
+    "wall-clock ship limit. What the limit CAN be derived from is the inner cap it wraps: ship.mjs's own " +
+    "--step-timeout, read from its source, times a named multiple of " + SHIP_STEP_MULTIPLE + " for the steps " +
+    "either side of verify. Before v4583 it was a typed 900000/600000, and the dry-run figure was BELOW the " +
+    "900 s per-step cap it contained.";
+// Exported at the bottom with the rest. The first draft wrote `module.exports.budgetIsOwn = ...` HERE, sixty lines
+// above the file's `module.exports = { ... }`, which replaces the whole object and threw it away silently -- the
+// later-assignment-wins class v4581 spent a round on in gateBudget.MEASURED, committed one file over by the round
+// that reported it. Caught by asking the module for the value instead of assuming the line had worked.
+
 function runShip(args, timeoutMs) {
     return new Promise((resolve) => {
         const t0 = Date.now();
@@ -91,11 +131,13 @@ async function handle(req, res, { sendJson }) {
         }
 
         const args = ["--version", version, ...(markers ? ["--markers", markers] : []), ...(isReal ? [] : ["--dry-run"])];
-        const r = await runShip(args, isReal ? 900000 : 600000);
+        // ONE LIMIT FOR BOTH: a dry run still executes the verify step, which is where the time goes, so giving
+        // it less was the inversion described above rather than a saving.
+        const r = await runShip(args, SHIP_TIMEOUT_MS);
         return sendJson({ ok: r.pass, dryRun: !isReal, version, markers, ...r });
     }
 
     return sendJson({ ok: false, error: "unknown-route", route }, 404);
 }
 
-module.exports = { owns, handle, readMarkers, nextVersion, PREFIX };
+module.exports = { owns, handle, readMarkers, nextVersion, PREFIX, budgetIsOwn, SHIP_TIMEOUT_MS, SHIP_STEP_CAP_MS };
