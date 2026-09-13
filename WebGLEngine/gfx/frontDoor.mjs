@@ -246,6 +246,20 @@ export const REACH_ARRIVALS_SINCE_V4407 = Object.freeze([
              "round that stopped bots writing bot.y = _heightAt(x, z) + 1" }),
     Object.freeze({ module: "world/surfaceProbe.mjs",
         why: "v4554's terrain-against-voxels probe, imported by BotManager on the same path" }),
+    Object.freeze({ module: "render/fxaaPass.js",
+        why: "the FXAA screen-space anti-aliasing pass, main.js's own opt-in GFX-panel toggle" }),
+    Object.freeze({ module: "render/skyStars.mjs",
+        why: "v4580's star field, imported by render/skyRenderer.js which main.js already reached" }),
+    Object.freeze({ module: "render/exactHash.mjs",
+        why: "the star field's own hash, one hop further down the same skyRenderer.js chain" }),
+    Object.freeze({ module: "ui/aiPresenceOrbWidget.js",
+        why: "the AI-presence orb mounted into the live HUD, a dynamic import main.js awaits at boot" }),
+    Object.freeze({ module: "ui/captionClock.js",
+        why: "the orb widget's caption-timing estimate, imported by ui/aiPresenceOrbWidget.js" }),
+    Object.freeze({ module: "ui/guards.mjs",
+        why: "v4608's ordered-guard-list evaluator, migrated onto from simulation/SpaceSuit.js" }),
+    Object.freeze({ module: "ui/machine.mjs",
+        why: "the state-machine evaluator simulation/CSRoundManager.js drives its round states through" }),
 ]);
 export const REACH_LOST_SINCE_V4407 = Object.freeze([]);
 

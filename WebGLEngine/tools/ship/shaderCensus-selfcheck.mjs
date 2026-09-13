@@ -78,7 +78,11 @@ const c = shaderCensus(ROOT);
     // irradiance read by integer texel). Each authors both halves BY DESIGN so a gate can hold the two backends to one twin,
     // which is the shape this branch's DUAL_BASELINE note (dropped here, per main's v4470 merge note) had been recording;
     // none is a translation an IR would have saved. The trigger below is still 20.
-    const DUPLICATION_BASELINE = 8;   // v4414 -- MEASURED, in the units the claim is actually about; v4526: 8 on the merged tree
+    //
+    // 8 -> 9, read before raising again: physics/render/specularProbeLit.mjs (fae26dbf, "wire specular IBL into a real
+    // material shader") shares fetchTexelM/mipSizeAt/mipYAt between its WGSL and GLSL halves -- a real duplicated
+    // computation, not a detector artifact. Still nine files, not twenty.
+    const DUPLICATION_BASELINE = 9;   // v4414 -- MEASURED, in the units the claim is actually about
     ok("!! *** only " + pairs.duplication.length + " files DUPLICATE a computation across the two languages ***",
         pairs.duplication.length <= DUPLICATION_BASELINE,
         pairs.duplication.map((r) => r.file).join(", ") + " -- against " + c.both.length +

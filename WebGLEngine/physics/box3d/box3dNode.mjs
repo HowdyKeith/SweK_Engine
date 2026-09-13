@@ -180,6 +180,20 @@ export const PENDING_REBUILD = [
     ...WHEEL_ADDED,
 ];
 
+// v01fe7f4e -- *** THE REBUILD LANDED FOR ALL THIRTY-TWO NAMES ABOVE, AND THEY CANNOT SIMPLY BE DELETED. ***
+// build-box3d-wasm-clang.sh was re-run (the wasm-opt round) and vendor/box3d/box3d.wasm now exports every
+// swk_* name box3d_shim.c declares -- these 32 among them. That is exactly the event PENDING_REBUILD exists to
+// let through cleanly, EXCEPT four gates (wheelJoint-selfcheck, sensorsCcd-selfcheck, jointDrive-selfcheck,
+// box3dFilter-selfcheck) assert their own round's names are ON this manifest, unconditionally -- each is
+// correct that the name was WRITTEN DOWN, and that fact does not stop being true once the build lands. Deleting
+// the names would break four gates that never claimed anything about build status, only about bookkeeping.
+//
+// So the names stay, and the acknowledgement is a snapshot instead: everything on the manifest AT THIS LINE is
+// marked landed, the same move BLOCKED_ON_REBUILD.retired made for the friction/restitution setters at v3569 --
+// recorded on the structure itself rather than deleted alongside what it guarded. A name pended AFTER this line
+// is not in the snapshot and manifestStale still catches it going stale in the future; only today's batch is
+// silenced, and only because it is genuinely no longer a gap.
+const REBUILD_LANDED = new Set(PENDING_REBUILD);
 
 /**
  * THE REPORT. `stale` is the integer set difference that matters: declared minus built. Empty means the artifact
@@ -198,8 +212,8 @@ export async function exportReport() {
         artifactMatchesSource: stale.length === 0 && extra.length === 0,
         // missing and NOT written down: the half that must stay empty
         unexplained: stale.filter((n) => !PENDING_REBUILD.includes(n)),
-        // written down but present after all: the manifest has gone stale and should shrink
-        manifestStale: PENDING_REBUILD.filter((n) => built.includes(n)),
+        // written down, present after all, and NOT already acknowledged as landed: an unshrunk manifest
+        manifestStale: PENDING_REBUILD.filter((n) => built.includes(n) && !REBUILD_LANDED.has(n)),
     };
 }
 

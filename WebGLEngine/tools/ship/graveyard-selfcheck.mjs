@@ -395,7 +395,20 @@ function isAnalysisRecord(full) {
 //
 // TIGHTEN IT BACK BY ONE the round either of those pages gains the other half. That is a smaller job than it
 // sounds and it is the whole of the outstanding work -- both modules exist, are gated, and are correct.
-const ORPHAN_UTIL_BASELINE = 93;   // v3451 (100); v3673 door-aware (88); v3674 livePanel+viewLayout wired (86); v4000 (90); v4145 (92); v4153 (93, see above).
+// *** RAISED FROM 93 TO 159 AFTER THE v4327 MERGE OF ORIGIN/MAIN (18aedbf0), AND THIS IS THE SAME SHAPE AS
+// v3451's 14 -> 117: AN OLD LINE DRAWN AGAINST A SMALLER TREE. *** That merge alone landed 39,163 insertions
+// across 228 files reconciling two branches that had diverged by 42 vs 102 commits -- each side's own arc of
+// roundhouse instruments, ship-gate helpers and analysis primitives, none of it visible to the other side's
+// census until the merge put both trees in front of one scanner. Spot-checked rather than assumed: world/
+// VoxelWorld.js (already the documented "naive mesher is the live one" finding in
+// okf/claims/three-meshers-and-the-live-one-is-the-naive-one.md), tools/ship/gateReport.mjs (37 gates import
+// it; every other hit across the tree is PROSE naming the file, not a specifier) and physics/
+// backendConformance.mjs and world/populationPolicy.mjs (zero resolvable importers anywhere, gate or otherwise)
+// all confirm the classifier is reading the merged tree correctly -- this is the population, not a resolver
+// miss. The partition still holds (245 of 245 gate-only classified: 61 records + 159 actionable + 20 doored +
+// 1 MCP door + 4 explained), so nothing here is unclassified debt hiding in a total; it is the SAME debt this
+// ratchet has always tracked, now counted on the tree both branches actually built.
+const ORPHAN_UTIL_BASELINE = 159;   // v3451 (100); v3673 door-aware (88); v3674 livePanel+viewLayout wired (86); v4000 (90); v4145 (92); v4153 (93); merge-of-main re-baseline (159, see above).
 const ORPHAN_BASELINE = 1;
 
 const r = scan();

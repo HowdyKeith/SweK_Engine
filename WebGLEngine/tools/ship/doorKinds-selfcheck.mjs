@@ -91,20 +91,41 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
     // v3608 said: when a `prose` member gets a real answer, rewrite this to the smaller number and NAME WHO WAS
     // FIXED. buildPageIndex got a row at v3609; signRelease got a DECLARED REFUSAL at v3610 after its threat
     // model was read. The property that survives both: NO PROSE DOOR STANDS UNEXPLAINED.
+    // TWO MORE ARRIVED SINCE v3610, THE SAME SHAPE AS THE FIRST TWO: orrery.html and orrery-gpu.html fetch
+    // orrery.json (and orrery.html fetches orrery-authors.json too) with a `.catch(() => null)` fallback --
+    // worse than a printed command in one sense, because nothing even tells the reader what to type -- and
+    // recordInputs.mjs was named a member of orphanTriage's cliOnly bucket the same round. orreryBake.mjs and
+    // orreryAuthorScan.mjs got real rows (dry-run by default, --write to emit, on corpus.mjs's precedent);
+    // recordInputs.mjs got a DECLARED REFUSAL for the reason signRelease did -- read, then refused, on evidence
+    // in its own header rather than on preference.
     const bareProse = rows.filter((r) => r.hasProse && r.kind === "prose");
-    ok("!! NO PROSE DOOR STANDS UNEXPLAINED (2 at v3608; buildPageIndex given a row, signRelease a refusal)",
+    ok("!! NO PROSE DOOR STANDS UNEXPLAINED (2 at v3608, buildPageIndex/signRelease; 2 more here, orreryBake/orreryAuthorScan given rows and recordInputs a refusal)",
        bareProse.length === 0,
        bareProse.length ? bareProse.map((r) => path.basename(r.rel)).join(", ")
-         : "signRelease still SAYS the command -- its `all` keeps `prose` so the distinction is not hidden -- but " +
-           "the reason is recorded, and a refusal with a reason is an answer where a bare prose door is debt");
+         : "signRelease and recordInputs still SAY the command -- `all` keeps `prose` on both so the distinction " +
+           "is not hidden -- but the reason is recorded, and a refusal with a reason is an answer where a bare " +
+           "prose door is debt");
     ok("!! ...which v3447 already named as WORSE than no door", (MEASURED_V3608.theProseDoorIsNotProgress || "").includes("LOOKS FINISHED"),
        "so it is its own KIND and cannot be counted as progress toward a door");
-    ok("the refusals carry evidence rather than preference", Object.keys(MEASURED_V3608.refusedWithAReason).length === 2 &&
-       (kinds.refused || 0) === 2,
+    // ANTIDOTE FIRED AGAIN: the bucket grew a THIRD prose door (recordInputs.mjs, same round orreryAuthorScan
+    // and the two rig-needing tools below turned up) and it was closed the same way signRelease was -- READ,
+    // THEN REFUSED, on evidence in the tool's own header (runs the whole gate tree once, the cost class of
+    // verify.mjs, against a 180s per-press cap). 2 at v3610 -> 3 here; rewritten to the new count rather than
+    // widened to keep the old one, per this file's own rule two lines above.
+    ok("the refusals carry evidence rather than preference", Object.keys(MEASURED_V3608.refusedWithAReason).length === 3 &&
+       (kinds.refused || 0) === 3,
        "removeCluster: v3202's sweep deleted 61 LIVE modules, so a one-click mass deletion is the wrong shape " +
-       "-- a measurement outranks a preference");
-    ok("...leaving exactly ONE genuinely owed, and it needs the rig", Object.keys(MEASURED_V3608.genuinelyOwed).length === 1,
-       "physics/backend-qa-check.mjs -- box3d's WASM must build; a gate importing its functions is not a door");
+       "-- a measurement outranks a preference. recordInputs.mjs: runs the whole gate tree once, the same cost " +
+       "class as verify.mjs, against a 180s per-press cap");
+    // ANTIDOTE FIRED A THIRD TIME: orreryAuthorScan.mjs got a REAL DOOR (a reportingTools row, dry-run by " +
+    // default like orreryBake beside it) and LEFT the owed list; verifyLicenceTexts.mjs and wgslDeviceLimits.mjs
+    // ARRIVED on it, each for the reason physics/backend-qa-check.mjs is already there -- a real, stated
+    // environmental need (live network egress; a WebGPU-capable browser) rather than debt. 1 at v3610 -> 3 here.
+    ok("...leaving exactly THREE genuinely owed, each needing something this box does not have",
+       Object.keys(MEASURED_V3608.genuinelyOwed).length === 3,
+       "physics/backend-qa-check.mjs needs a rig where box3d's WASM builds; verifyLicenceTexts.mjs needs live " +
+       "network egress to GitHub; wgslDeviceLimits.mjs needs a WebGPU-capable browser -- none of the three is a " +
+       "door this box can build, whatever box eventually runs them can");
 }
 
 // ---- 4. THE DOOR THAT DOES NOT TERMINATE, AND WHAT IS NOT CLAIMED --------------------------------------------------

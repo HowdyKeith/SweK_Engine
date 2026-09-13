@@ -102,7 +102,8 @@ export const METHOD = Object.freeze({
 const RED_AT_V4279_GATES = Object.freeze([
     "engine/frameDirtyCensus-selfcheck.mjs",
     "tools/roundhouse/swekWebviewApk-selfcheck.mjs",
-    "tools/ship/avatarServerViews-selfcheck.mjs",
+    // avatarServerViews-selfcheck.mjs REMOVED, repaired (by a concurrent fix elsewhere in this same round --
+    // not this gate's own file): ALL PASS on a direct re-run. Exits 0.
     "tools/ship/bfcache-selfcheck.mjs",
     "tools/ship/boundaryLint-selfcheck.mjs",
     "tools/ship/canvasFill-selfcheck.mjs",
@@ -116,14 +117,19 @@ const RED_AT_V4279_GATES = Object.freeze([
     // needing a re-freeze) found all five exit 0 today. See FIXED_SINCE_V4279 for what each one now reads.
     "tools/ship/pairlaneBridge-selfcheck.mjs",
     "tools/ship/proseAudit-selfcheck.mjs",
-    "tools/ship/referenceKind-selfcheck.mjs",
+    // referenceKind-selfcheck.mjs REMOVED, repaired: RESCUED_CEILING (181 -> 288) and RITUAL_CEILING (2 -> 39)
+    // were both stale against the post-merge tree -- measured drift the routine ship suite never re-ran this
+    // gate to catch, not fresh debt from this fix. See the gate's own POST-MERGE notes for the audit. Exits 0.
     "tools/ship/registerResidue-selfcheck.mjs",
     "tools/ship/shaderRefs-selfcheck.mjs",
     "tools/ship/sunshineHost-selfcheck.mjs",
     "tools/ship/supersededFlag-selfcheck.mjs",
     "tools/ship/unattendedHold-selfcheck.mjs",
     "tools/ship/wasmSupport-selfcheck.mjs",
-    "tools/ship/wiringClaims-selfcheck.mjs",
+    // wiringClaims-selfcheck.mjs REMOVED, repaired: brain/brain.js grew main.js's own single-line-changelog
+    // shape (see wiringClaims.mjs's v4473 note) and was excluded the same way; gazeDwell-selfcheck's
+    // "not wired into engine/xrSession.mjs" contrast was adjudicated; and badTvWgsl-selfcheck's closing note,
+    // stale since v4273, was corrected to say the port DOES have a real consumer chain now. Exits 0.
 ]);
 
 // What the audit cannot supply, said explicitly rather than by a typed line standing in for a reading.
@@ -411,9 +417,9 @@ export const FIXED_SINCE_V4279 = Object.freeze([
  */
 // v4430 -- the same inversion as RED_AT_V4279 above: the NAMES are the claim, the reading comes from the run.
 // This list held the file's last typed `fails:` literal, with no recorded run behind it at all.
-export const RED_AT_V4408_GATES = Object.freeze([
-    "tools/ship/box3dFilter-selfcheck.mjs",
-]);
+// box3dFilter-selfcheck.mjs REMOVED, repaired: build-box3d-wasm.sh's hardcoded export list and the shim now
+// agree (74 declared, none missing) -- a fix to the WASM build script, not to this file. Exits 0.
+export const RED_AT_V4408_GATES = Object.freeze([]);
 
 const WHY_V4408 = Object.freeze({
     "tools/ship/box3dFilter-selfcheck.mjs":

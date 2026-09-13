@@ -252,6 +252,11 @@ console.log("\n8. what it is and is not");
     const src = codeOnly(fs.readFileSync(path.join(ROOT, "vision", "homography.mjs"), "utf8"));
     ok("no DOM, no canvas, no camera -- it takes numbers", !/document|canvas|getUserMedia|ImageData/.test(src));
     ok("no dependency on an SVD or matrix library", !/require\(|from "gl-matrix"|numeric/.test(src));
+    // A consumer that imports and calls homographyDLT/ransacHomography mentions the name too (in its import
+    // line, and in a comment explaining what it calls), which the old text-match could not tell apart from a
+    // SECOND DEFINITION. render/perspectiveWarp.mjs is exactly that -- it imports both from vision/homography.mjs
+    // and calls homographyDLT once -- so the check now looks for a DEFINITION (`function name(`), the thing this
+    // row actually claims is singular, and lets consumers exist without going red for using what they import.
     ok("!! it is the only homography in the tree", (() => {
         const files = [];
         (function walk(d) {
@@ -261,7 +266,7 @@ console.log("\n8. what it is and is not");
                 if (e.isDirectory()) walk(p); else if (/\.(js|mjs)$/.test(e.name)) files.push(p);
             }
         })(ROOT);
-        const owners = files.filter((f) => /homographyDLT|ransacHomography/.test(codeOnly(fs.readFileSync(f, "utf8"))))
+        const owners = files.filter((f) => /function\s+(homographyDLT|ransacHomography)\s*\(/.test(codeOnly(fs.readFileSync(f, "utf8"))))
             .map((f) => path.relative(ROOT, f)).filter((f) => !f.includes("selfcheck"));
         return owners.length === 1 && owners[0] === path.join("vision", "homography.mjs");
     })());

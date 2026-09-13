@@ -8,10 +8,10 @@
   :root { --amber:#ffcc66; --cyan:#33ccff; --green:#9fe6c0; --red:#ff6b5e; --bg:#06120b; --panel:#0b1d15; --line:#1c3f2e; --dim:#6f8f7f; --ink:#e6f2ec; }
   * { box-sizing:border-box; }
   html,body { margin:0; height:100%; background:var(--bg); color:var(--ink); font:14px/1.5 ui-monospace,"SF Mono",Menlo,Consolas,monospace; overflow:hidden; }
-  #stage { position:absolute; inset:0; display:block; cursor:grab; }
+  #stage { position:absolute; inset:0; width:100%; height:100%; display:block; cursor:grab; }
   /* The post stage draws HERE, over the 2D canvas, and is hidden until it attaches. It ignores the pointer so
      every click, drag and scroll still reaches #stage -- the effect must not cost the orrery its interaction. */
-  #fx { position:absolute; inset:0; display:none; pointer-events:none; }
+  #fx { position:absolute; inset:0; width:100%; height:100%; display:none; pointer-events:none; }
   #stage.zoomed { cursor:zoom-out; }
   .card { position:absolute; background:rgba(11,29,21,0.92); border:1px solid var(--line); border-radius:12px; padding:12px 14px; backdrop-filter:blur(6px); }
   #hud { top:14px; left:14px; max-width:340px; }

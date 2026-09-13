@@ -2,7 +2,7 @@
  "note": "v3186 -- FROZEN LAB RESULTS. Every gate in the lab checks a RELATIONSHIP (error < tol, ratio ~ 2, converges) and NOTHING CHECKED THE VALUES, so a number could drift on a refactor, a dependency bump or a float change and every gate would still pass. 26 of 27 devices are DETERMINISTIC (measured, replay-exact); lbm has no defaults() and its ABSENCE IS FROZEN so the day it grows one the gate says so. Comparison is EXACT: a difference is a FINDING, and a tolerance would hide the day a device stops being deterministic. Re-freeze DELIBERATELY after an intended change: SWEK_FREEZE_LAB_RESULTS=1 node tools/roundhouse/labResults-selfcheck.mjs  RE-FROZEN v3336: the previous capture was stamped v3186 -- 150 versions and 17 devices stale, and verify.mjs does not run this gate. IT WAS NOT RE-FROZEN BLIND: all 52 devices were compared against the v3186 values first and NOTHING HAD MOVED (moved 0, vanished 0, appeared 0), so this absorbs 17 NEW devices and no drift. A blanket re-freeze without that comparison would have been a record of whatever happened to be there.  v3340: ONE DEVICE ADDED (fieldnav) BY DELTA, NOT BY BLANKET RE-FREEZE. All 52 existing devices were compared first and NONE had moved (moved 0, vanished 0, appeared 0) despite the v3339 patches touching probeBind and instruments -- so their v3336 values stand untouched rather than being rewritten from a run they did not need. Rewriting them would have discarded the ratchet to add one row.  v3366: added by DELTA again -- only the devices absent from the baseline were captured; every existing row keeps its frozen value, so the ratchet is extended rather than discarded.  v3379: reaction added BY DELTA -- only the new device was captured; every existing row keeps its frozen value.  v3380: beam added BY DELTA -- only the new device captured.  v3381: pulsar added BY DELTA.  v3382: galaxy and geostats added, AND THE FIRST FULL RE-RUN OF EVERY FROZEN ROW SINCE v3336 -- five rounds had extended this baseline BY DELTA, which never re-runs the rows it protects. All 57 existing devices were captured in two chunks (twof 100s and kh 22s in one, the other 55 in the other) and compared BEFORE anything was written: MOVED 0, VANISHED 0, APPEARED 1. The one appearance is twof.dragOverLift, null at freeze time and 0.1262 now, WITH EVERY OTHER twof VALUE BIT-IDENTICAL -- so the physics did not move. THE CAUSE IS v3341, which fixed dominantFrequency(...).freq being read as an object: every frequency in twoFExperiment.mjs had been NaN since v2862, so the ratio was absent for a reason that no longer holds. liftSustained is STILL false, so the run remains DISQUALIFIED and the 2f question remains open -- what changed is that the negative is now a number from a bad run rather than no number at all. Absorbed DELIBERATELY with that reason, and the stale lbm-two-frequency instrument key was corrected in the same commit.  v3391: FULL RE-RUN AGAIN, second in a row -- v3382 argued a delta never re-runs the rows it protects, so this build re-ran all 59 existing devices in two chunks before writing. MOVED 0, VANISHED 0, APPEARED 1. The appearance is clocks.crossoverErrOrder = 0, added THIS round as the order statistic for the clocks planted error, and it reads zero because the baseline run plants nothing. Four new devices absorbed from the v3390 patch (nuclear, seismic, acoustics, em).  v3392: FULL RE-RUN, third in a row. All 63 devices captured in two chunks and compared BEFORE writing: MOVED 0, VANISHED 0, APPEARED 2 -- inspiral.ratePower and inspiral.a0Exponent, both added THIS round for the wrong-power-law plant, and the unplanted run reports 3 and 4 exactly as Peters does. kerr gained `planted` (boolean, so runRecord drops it) and its horizon values are UNCHANGED, which is the evidence that the plant is opt-in rather than always on. AND THE CAPTURE SCRIPT ITSELF FAILED SILENTLY FIRST: it still pointed at the previous rounds path, exited 1, and the comparison ran against STALE JSON and reported a comfortable moved 0. A COMPARISON IS ONLY AS GOOD AS THE FRESHNESS OF BOTH SIDES.  v3393: FULL RE-RUN, fourth in a row, and THE CAPTURE SCRIPT WAS REPOINTED AT THE CURRENT DIRECTORY FIRST -- v3392 ran it against a renamed path, got exit 1, and compared stale JSON to the baseline while reporting a comfortable moved 0. MOVED 0, VANISHED 0, APPEARED 0: pipe3d gained only `planted`, which is a boolean and dropped by runRecord, so the reader plant leaves every frozen number untouched -- which is the evidence that it is opt-in.",
  "captured": "v3446",
  "deviceCount": 129,
- "observables": 1264,
+ "observables": 1263,
  "devices": {
   "friction": {
    "mode": "critical",
@@ -262,7 +262,9 @@
     "breakNonCentroTwo": 6.992256391181141,
     "breakNonCentroZero": 0,
     "breakCentroTwo": 1.7763568394002505e-15,
-    "unreachableRingRefused": 1
+    "unreachableRingRefused": 1,
+    "ringAtLimitAccepted": 180,
+    "ringPastLimitRefused": 1
    }
   },
   "renderBounce": {
@@ -272,7 +274,15 @@
     "kGeometric": 0.25,
     "kResidual": 0.0008833333333333471,
     "seriesWorstRel": 0.0046167846760963895,
-    "seriesDepths": 6,
+    "seriesDeepestRel": 0.0007094466865403124,
+    "seriesRelByDepth": [
+     0.0046167846760963895,
+     0.000506415955461683,
+     0.0009639723374118492,
+     0.0006784719470795112,
+     0.0006853124143287466,
+     0.0007094466865403124
+    ],
     "whiteFurnaceWorstRel": 0.003418196346525271,
     "deficitVsKPowNWorst": 0.002566666666666717,
     "neeRel": 0.00025162909855866444,
@@ -302,7 +312,8 @@
     "iouShifted": 0.4952256944444444,
     "fbpRatioMean": 0.9455679270833335,
     "fbpRatioSpread": 0.018543833333333315,
-    "fbpGainSpread": 0.502127
+    "fbpGainSpread": 0.502127,
+    "fbpTableWorstDrift": 3.8287603904008094e-7
    }
   },
   "manifoldCensus": {
@@ -352,6 +363,7 @@
     "straightLineWorstErr": 6.280369834735101e-16,
     "resampleEndpointMismatch": 0,
     "resampleEndpointPlantedMismatch": 0,
+    "resampleEndpointBreakDetected": 10,
     "morphZeroMismatch": 0,
     "morphOneMismatch": 0,
     "morphComparisons": 640,
@@ -424,6 +436,7 @@
    "outputs": {
     "chainWorstDiff": 4.468647674116255e-15,
     "conservationResidual": 0,
+    "integratedConservationResidual": 4.773959005888173e-15,
     "nA": 0.24659696394160643,
     "nB": 0.07133219721404896,
     "nC": 0.6820708388443446,
@@ -697,15 +710,7 @@
     "sigmaPredicted": 0.4803844614152614,
     "sigmaMeasured": 0.4803777959207057,
     "sigmaRelErr": 0.0000138753333863241,
-    "sigmaR2": 0.9999999993279604,
-    "factorMid": 0,
-    "factorMax": 0,
-    "factorMin": 0,
-    "driftE": 0,
-    "driftL": 0,
-    "driftWorldL": 0,
-    "flips": 0,
-    "attitudeOrder": 0
+    "sigmaR2": 0.9999999993279604
    }
   },
   "invariants": {
@@ -965,6 +970,7 @@
     "surfaceDeviation": 0.00860350085337347,
     "watertight": true,
     "boundaryEdges": 0,
+    "boundaryDetectorFires": true,
     "volumeMeasured": 4.153100617154511,
     "volumeTheory": 4.1887902047863905,
     "volumeErrFrac": 0.008520261432787534,
@@ -1262,7 +1268,7 @@
     "bose3Rel": 2.338562085506922e-13,
     "sigma": 5.6703744191844314e-8,
     "wienB": 0.0028977719551851722,
-    "exitanceQuarticRel": 0
+    "sigmaFromBoseRel": 1.5171270421660813e-15
    }
   },
   "debye": {
@@ -1498,10 +1504,10 @@
     "steps": 200,
     "particles": 216,
     "soundSpeed": 15,
-    "maxSpeed": 3.6004129758538643,
-    "advectiveCourant": 0.07200825951707729,
+    "maxSpeed": 3.600412976223761,
+    "advectiveCourant": 0.07200825952447522,
     "acousticCourant": 0.3,
-    "optimismFactor": 4.166188740179907,
+    "optimismFactor": 4.166188739751884,
     "allFinite": true
    }
   },
@@ -1565,28 +1571,28 @@
     "ratioLadder": [
      {
       "visc": 0.1,
-      "ratio": 2.733993373641249
+      "ratio": 2.6897464693437882
      },
      {
       "visc": 0.3,
-      "ratio": 1.549745456117029
+      "ratio": 1.2556734112930965
      },
      {
       "visc": 0.47,
-      "ratio": 0.775476180324773
+      "ratio": 0.9193847719786156
      },
      {
       "visc": 0.7,
-      "ratio": 0.6916453535441158
+      "ratio": 0.6385296313202838
      },
      {
       "visc": 1.5,
-      "ratio": 0.34605131386197197
+      "ratio": 0.3662435321715133
      }
     ],
-    "ratio": 0.775476180324773,
+    "ratio": 0.9193847719786156,
     "monotoneInViscosity": true,
-    "spanAcrossViscosity": 7.9005432550727015,
+    "spanAcrossViscosity": 7.344147358441731,
     "respondsToViscosity": true
    }
   },
@@ -1825,8 +1831,8 @@
     "differingLists": 0,
     "listsMatch": true,
     "gridCandPerQuery": [
-     33.412,
-     71.771
+     33.436,
+     71.745
     ],
     "bvhVisitsPerQuery": [
      278.32,
@@ -1837,8 +1843,8 @@
      3999
     ],
     "ratios": [
-     8.329941338441278,
-     8.093645065555727
+     8.32396219643498,
+     8.096578158756708
     ],
     "gridWins": true,
     "ratioStable": true
@@ -3340,7 +3346,9 @@
     "breakNonCentroTwo": 6.992256391181141,
     "breakNonCentroZero": 0,
     "breakCentroTwo": 1.7763568394002505e-15,
-    "unreachableRingRefused": 1
+    "unreachableRingRefused": 1,
+    "ringAtLimitAccepted": 180,
+    "ringPastLimitRefused": 1
    }
   },
   "renderBounce/series": {
@@ -3349,7 +3357,15 @@
     "kGeometric": 0.25,
     "kResidual": 0.0008833333333333471,
     "seriesWorstRel": 0.0046167846760963895,
-    "seriesDepths": 6,
+    "seriesDeepestRel": 0.0007094466865403124,
+    "seriesRelByDepth": [
+     0.0046167846760963895,
+     0.000506415955461683,
+     0.0009639723374118492,
+     0.0006784719470795112,
+     0.0006853124143287466,
+     0.0007094466865403124
+    ],
     "whiteFurnaceWorstRel": 0.003418196346525271,
     "deficitVsKPowNWorst": 0.002566666666666717,
     "neeRel": 0.00025162909855866444,
@@ -3378,7 +3394,8 @@
     "iouShifted": 0.4952256944444444,
     "fbpRatioMean": 0.9455679270833335,
     "fbpRatioSpread": 0.018543833333333315,
-    "fbpGainSpread": 0.502127
+    "fbpGainSpread": 0.502127,
+    "fbpTableWorstDrift": 3.8287603904008094e-7
    }
   },
   "manifoldCensus/census": {
@@ -3426,6 +3443,7 @@
     "straightLineWorstErr": 6.280369834735101e-16,
     "resampleEndpointMismatch": 0,
     "resampleEndpointPlantedMismatch": 0,
+    "resampleEndpointBreakDetected": 10,
     "morphZeroMismatch": 0,
     "morphOneMismatch": 0,
     "morphComparisons": 640,
@@ -3463,7 +3481,6 @@
     "iterWorstErrFrac": 0.00000591587621199402,
     "halvesWithIterations": false,
     "compliance": 0.001,
-    "iterations": 1,
     "substeps": 800,
     "planted": false
    }
@@ -3475,15 +3492,11 @@
     "amplitudeGrows": true,
     "compliance": 0.001,
     "iterations": 1,
-    "substeps": 800,
     "planted": false
    }
   },
   "xpbd/volume": {
    "outputs": {
-    "compliance": 0.001,
-    "iterations": 1,
-    "substeps": 800,
     "planted": false,
     "meshVolume": 4.091600620085997,
     "meshVolumeErrFrac": 0.023202304233174032,
@@ -3495,9 +3508,6 @@
   },
   "xpbd/pressure": {
    "outputs": {
-    "compliance": 0.001,
-    "iterations": 1,
-    "substeps": 800,
     "planted": false,
     "volumeRatio": 1.4999999999999998,
     "targetErrFrac": 1.4802973661668753e-16
@@ -3507,9 +3517,6 @@
    "outputs": {
     "exactStretch": 0.01,
     "stretchErrFrac": 1.0826721654616511e-7,
-    "compliance": 0.001,
-    "iterations": 1,
-    "substeps": 800,
     "planted": false,
     "amplitudeReduction": 6.01230634036021,
     "amplitudeMonotoneDown": true,
@@ -3519,9 +3526,6 @@
   },
   "xpbd/friction": {
    "outputs": {
-    "compliance": 0.001,
-    "iterations": 1,
-    "substeps": 800,
     "planted": false,
     "criticalAngleDeg": 26.588032841682434,
     "coulombExactDeg": 26.56505117707799,
@@ -3532,9 +3536,6 @@
   },
   "xpbd/kernel": {
    "outputs": {
-    "compliance": 0.001,
-    "iterations": 1,
-    "substeps": 800,
     "planted": false,
     "kernelIntegral": 1.0000000000000153,
     "kernelIntegralErr": 1.532107773982716e-14
@@ -3542,9 +3543,6 @@
   },
   "xpbd/density": {
    "outputs": {
-    "compliance": 0.001,
-    "iterations": 1,
-    "substeps": 800,
     "planted": false,
     "restDensity": 185.76967340822029,
     "densityReduction": 9.219052925092535,
@@ -3553,9 +3551,6 @@
   },
   "xpbd/muscle": {
    "outputs": {
-    "compliance": 0.001,
-    "iterations": 1,
-    "substeps": 800,
     "planted": false,
     "muscleVolumeHeld": 1.7985612998927536e-14,
     "muscleVolumeLostWithout": 0.4799168224226934,
@@ -3566,9 +3561,6 @@
   },
   "xpbd/weave": {
    "outputs": {
-    "compliance": 0.001,
-    "iterations": 1,
-    "substeps": 800,
     "planted": false,
     "anisotropyRatio": 14.027346008104345,
     "swapReverses": true,
@@ -3578,9 +3570,6 @@
   },
   "xpbd/tear": {
    "outputs": {
-    "compliance": 0.001,
-    "iterations": 1,
-    "substeps": 800,
     "planted": false,
     "tearStart": 180,
     "tearEnd": 170,
@@ -3589,9 +3578,6 @@
   },
   "xpbd/modulate": {
    "outputs": {
-    "compliance": 0.001,
-    "iterations": 1,
-    "substeps": 800,
     "planted": false,
     "zeroFieldErr": 0,
     "compoundErr": 0,
@@ -3602,9 +3588,6 @@
   },
   "xpbd/sampled": {
    "outputs": {
-    "compliance": 0.001,
-    "iterations": 1,
-    "substeps": 800,
     "planted": false,
     "affineErr": 2.6645352591003757e-15,
     "nodeErr": 0,
@@ -3616,9 +3599,6 @@
   },
   "xpbd/fluid": {
    "outputs": {
-    "compliance": 0.001,
-    "iterations": 1,
-    "substeps": 800,
     "planted": false,
     "momentumErr": 5.0009760763387015e-18,
     "splitErr": 2.220446049250313e-16,
@@ -3632,9 +3612,6 @@
   },
   "xpbd/attach": {
    "outputs": {
-    "compliance": 0.001,
-    "iterations": 1,
-    "substeps": 800,
     "planted": false,
     "orderErr": 0,
     "snapErr": 0,
@@ -3648,9 +3625,6 @@
   },
   "xpbd/clothloop": {
    "outputs": {
-    "compliance": 0.001,
-    "iterations": 1,
-    "substeps": 800,
     "planted": false,
     "freeFallErr": 0,
     "equivErr": 0,
@@ -3662,9 +3636,6 @@
   },
   "xpbd/grains": {
    "outputs": {
-    "compliance": 0.001,
-    "iterations": 1,
-    "substeps": 800,
     "planted": false,
     "coneErr": 1.3877787807814457e-17,
     "stickErr": 0,
@@ -3844,6 +3815,7 @@
    "outputs": {
     "chainWorstDiff": 4.468647674116255e-15,
     "conservationResidual": 0,
+    "integratedConservationResidual": 4.773959005888173e-15,
     "nA": 0.24659696394160643,
     "nB": 0.07133219721404896,
     "nC": 0.6820708388443446,
@@ -4706,7 +4678,6 @@
     "pcr": 2.46738128799358,
     "pcrExact": 2.4674011002723395,
     "pcrRelErr": 0.000008029614138199943,
-    "closedFormPcr": 2.4674011002723395,
     "oddSquare2": 8.999421699276564,
     "oddSquare3": 24.99518116522394,
     "refineRatio": 4.001055954663423,
@@ -4801,9 +4772,10 @@
    "outputs": {
     "planted": false,
     "neutralDensityRecovered": 1,
-    "neutralDensityConfigured": 1,
     "neutralRelErr": 0,
-    "driftAtNeutral": 0
+    "driftAtNeutral": 0,
+    "driftOffNeutral": 0.01,
+    "offNeutralMoved": true
    }
   },
   "centrifuge/bands": {
@@ -4826,15 +4798,7 @@
     "sigmaPredicted": 0.4803844614152614,
     "sigmaMeasured": 0.4803777959207057,
     "sigmaRelErr": 0.0000138753333863241,
-    "sigmaR2": 0.9999999993279604,
-    "factorMid": 0,
-    "factorMax": 0,
-    "factorMin": 0,
-    "driftE": 0,
-    "driftL": 0,
-    "driftWorldL": 0,
-    "flips": 0,
-    "attitudeOrder": 0
+    "sigmaR2": 0.9999999993279604
    }
   },
   "freerotation/conserve": {
@@ -4843,18 +4807,10 @@
     "I1": 3.333333333333333,
     "I2": 1.6666666666666665,
     "midAxis": 1,
-    "sigmaPredicted": 0,
-    "sigmaMeasured": 0,
-    "sigmaRelErr": 0,
-    "sigmaR2": 0,
-    "factorMid": 0,
-    "factorMax": 0,
-    "factorMin": 0,
     "driftE": 1.155076034820013e-13,
     "driftL": 5.768718835952314e-14,
     "driftWorldL": 0.00024020828465800938,
-    "flips": 1,
-    "attitudeOrder": 0
+    "flips": 1
    }
   },
   "freerotation/flip": {
@@ -4863,18 +4819,10 @@
     "I1": 3.333333333333333,
     "I2": 1.6666666666666665,
     "midAxis": 1,
-    "sigmaPredicted": 0,
-    "sigmaMeasured": 0,
-    "sigmaRelErr": 0,
-    "sigmaR2": 0,
     "factorMid": 110238372.87450363,
     "factorMax": 0.9999999999975874,
     "factorMin": 0.9999999993196067,
-    "driftE": 0,
-    "driftL": 0,
-    "driftWorldL": 0,
-    "flips": 1,
-    "attitudeOrder": 0
+    "flips": 1
    }
   },
   "freerotation/attitude": {
@@ -4883,17 +4831,7 @@
     "I1": 3.333333333333333,
     "I2": 1.6666666666666665,
     "midAxis": 1,
-    "sigmaPredicted": 0,
-    "sigmaMeasured": 0,
-    "sigmaRelErr": 0,
-    "sigmaR2": 0,
-    "factorMid": 0,
-    "factorMax": 0,
-    "factorMin": 0,
-    "driftE": 0,
-    "driftL": 0,
     "driftWorldL": 0.00024020828465800938,
-    "flips": 0,
     "attitudeOrder": 1.0000964586005865
    }
   },
@@ -5013,7 +4951,8 @@
     "planted": false,
     "worstCropDiff": 0,
     "cropRegions": 5,
-    "cropSky": 1.4
+    "cropDiffAltSky": 0,
+    "cropSkyGraded": true
    }
   },
   "refscan/sign": {
@@ -5721,6 +5660,7 @@
     "surfaceDeviation": 0.00860350085337347,
     "watertight": true,
     "boundaryEdges": 0,
+    "boundaryDetectorFires": true,
     "volumeMeasured": 4.153100617154511,
     "volumeTheory": 4.1887902047863905,
     "volumeErrFrac": 0.008520261432787534,
@@ -5735,6 +5675,7 @@
     "surfaceDeviation": 0.023383630527718635,
     "watertight": true,
     "boundaryEdges": 0,
+    "boundaryDetectorFires": true,
     "triangles": 2732,
     "vertices": 1368,
     "resolution": 28,
@@ -5749,6 +5690,7 @@
     "volumeTheory": 4.1887902047863905,
     "watertight": true,
     "boundaryEdges": 0,
+    "boundaryDetectorFires": true,
     "surfaceDeviation": 0.020775623268698196,
     "hasVolumeTruth": true
    }
@@ -5758,6 +5700,7 @@
     "surfaceDeviation": 0.17952806122449005,
     "watertight": true,
     "boundaryEdges": 0,
+    "boundaryDetectorFires": true,
     "volumeMeasured": 4.176316508746498,
     "volumeTheory": 4.1887902047863905,
     "volumeErrFrac": 0.0029778755750620002,
@@ -6357,7 +6300,7 @@
     "bose3Rel": 2.338562085506922e-13,
     "sigma": 5.6703744191844314e-8,
     "wienB": 0.0028977719551851722,
-    "exitanceQuarticRel": 0
+    "sigmaFromBoseRel": 1.5171270421660813e-15
    }
   },
   "debye/capacity": {
@@ -6488,7 +6431,7 @@
   },
   "hydrostatic/tait": {
    "outputs": {
-    "retained": 1.8418072201343816,
+    "retained": 1.8199301349487849,
     "collapsed": false,
     "expanded": true,
     "finite": true,
@@ -6496,7 +6439,7 @@
     "packedDensity": 144.33852379429118,
     "densityMismatch": 0.0023453461029824276,
     "startHeight": 0.65,
-    "endHeight": 1.1971746930873481
+    "endHeight": 1.1829545877167102
    }
   },
   "hydrostatic/mismatched": {
@@ -6800,17 +6743,17 @@
     "steps": 200,
     "particles": 216,
     "soundSpeed": 15,
-    "breakDt": 0.003,
-    "lastGoodDt": 0.002,
-    "breakOverHOverC": 0.44999999999999996,
+    "breakDt": 0.004,
+    "lastGoodDt": 0.003,
+    "breakOverHOverC": 0.6,
     "scalesWithC": true,
-    "ratioSpread": 0.3333333333333334,
+    "ratioSpread": 0,
     "ladder": [
      {
       "c": 15,
-      "lastGood": 0.002,
-      "breakDt": 0.003,
-      "ratio": 0.44999999999999996
+      "lastGood": 0.003,
+      "breakDt": 0.004,
+      "ratio": 0.6
      },
      {
       "c": 30,
@@ -6834,10 +6777,10 @@
     "steps": 200,
     "particles": 216,
     "soundSpeed": 15,
-    "maxSpeed": 3.6004129758538643,
-    "advectiveCourant": 0.07200825951707729,
+    "maxSpeed": 3.600412976223761,
+    "advectiveCourant": 0.07200825952447522,
     "acousticCourant": 0.3,
-    "optimismFactor": 4.166188740179907,
+    "optimismFactor": 4.166188739751884,
     "allFinite": true
    }
   },
@@ -6848,11 +6791,11 @@
     "steps": 200,
     "particles": 216,
     "soundSpeed": 15,
-    "maxSpeed": 879657329.0585285,
+    "maxSpeed": 16259089870022.596,
     "allFinite": true,
     "finiteButBroken": true,
-    "acousticCourant": 2.9999999999999996,
-    "advectiveCourant": 175931465.81170568
+    "acousticCourant": 7.5,
+    "advectiveCourant": 8129544935011.299
    }
   },
   "cfl/advectiveonly": {
@@ -6862,29 +6805,29 @@
     "steps": 200,
     "particles": 216,
     "soundSpeed": 15,
-    "breakDt": 0.003,
-    "lastGoodDt": 0.002,
-    "breakOverHOverC": 0.10801238927561593,
+    "breakDt": 0.004,
+    "lastGoodDt": 0.003,
+    "breakOverHOverC": 0.14401651904895044,
     "scalesWithC": false,
-    "ratioSpread": 44.14513789228817,
+    "ratioSpread": 19.41457117307694,
     "ladder": [
      {
       "c": 15,
-      "lastGood": 0.002,
-      "breakDt": 0.003,
-      "ratio": 0.10801238927561593
+      "lastGood": 0.003,
+      "breakDt": 0.004,
+      "ratio": 0.14401651904895044
      },
      {
       "c": 30,
       "lastGood": 0.001,
       "breakDt": 0.002,
-      "ratio": 2.7426238070804523
+      "ratio": 2.9400354782235896
      },
      {
       "c": 60,
       "lastGood": 0.0005,
       "breakDt": 0.001,
-      "ratio": 4.876234207923189
+      "ratio": 2.924013458927208
      }
     ]
    }
@@ -7048,28 +6991,28 @@
     "ratioLadder": [
      {
       "visc": 0.1,
-      "ratio": 2.733993373641249
+      "ratio": 2.6897464693437882
      },
      {
       "visc": 0.3,
-      "ratio": 1.549745456117029
+      "ratio": 1.2556734112930965
      },
      {
       "visc": 0.47,
-      "ratio": 0.775476180324773
+      "ratio": 0.9193847719786156
      },
      {
       "visc": 0.7,
-      "ratio": 0.6916453535441158
+      "ratio": 0.6385296313202838
      },
      {
       "visc": 1.5,
-      "ratio": 0.34605131386197197
+      "ratio": 0.3662435321715133
      }
     ],
-    "ratio": 0.775476180324773,
+    "ratio": 0.9193847719786156,
     "monotoneInViscosity": true,
-    "spanAcrossViscosity": 7.9005432550727015,
+    "spanAcrossViscosity": 7.344147358441731,
     "respondsToViscosity": true
    }
   },
@@ -7077,7 +7020,7 @@
    "outputs": {
     "viscosity": 0.47,
     "horizon": 1,
-    "ratio": 0.775476180324773,
+    "ratio": 0.9193847719786156,
     "createsEnergy": false
    }
   },
@@ -7085,9 +7028,9 @@
    "outputs": {
     "viscosity": 0.47,
     "horizon": 1,
-    "ratioShort": 0.775476180324773,
-    "ratioLong": 0.8182025446165591,
-    "horizonDrift": 0.055096939629908574,
+    "ratioShort": 0.9193847719786156,
+    "ratioLong": 0.9107013171240774,
+    "horizonDrift": 0.00944485390578137,
     "driftsWithHorizon": false
    }
   },
@@ -7098,26 +7041,26 @@
     "ratioLadder": [
      {
       "visc": 0.1,
-      "ratio": 2.733993373641249
+      "ratio": 2.6897464693437882
      },
      {
       "visc": 0.3,
-      "ratio": 2.733993373641249
+      "ratio": 2.6897464693437882
      },
      {
       "visc": 0.47,
-      "ratio": 2.733993373641249
+      "ratio": 2.6897464693437882
      },
      {
       "visc": 0.7,
-      "ratio": 2.733993373641249
+      "ratio": 2.6897464693437882
      },
      {
       "visc": 1.5,
-      "ratio": 2.733993373641249
+      "ratio": 2.6897464693437882
      }
     ],
-    "ratio": 2.733993373641249,
+    "ratio": 2.6897464693437882,
     "monotoneInViscosity": true,
     "spanAcrossViscosity": 1,
     "respondsToViscosity": false
@@ -7180,7 +7123,10 @@
     "nx": 12,
     "coarseErrFrac": 4.311336438523009e-16,
     "fineErrFrac": 2.155668219261505e-16,
-    "scalesWithGrid": false
+    "scalesWithGrid": false,
+    "plantedCoarseErrFrac": 0.007936507936507978,
+    "plantedFineErrFrac": 1.53968253968254,
+    "scalesWithGridPlanted": true
    }
   },
   "mpmgrid/walls": {
@@ -7308,7 +7254,11 @@
     "maxForceCoarse": 55.24010853486899,
     "maxForceFine": 110.48021706973798,
     "scaleRatio": 2,
-    "scalesWithH": true
+    "scalesWithH": true,
+    "maxForceCoarsePlanted": 55.24010853486899,
+    "maxForceFinePlanted": 55.24010853486899,
+    "scaleRatioPlanted": 1,
+    "scalesWithHPlanted": false
    }
   },
   "mpmforce/stencil": {
@@ -7785,8 +7735,8 @@
     "differingLists": 0,
     "listsMatch": true,
     "gridCandPerQuery": [
-     33.412,
-     71.771
+     33.436,
+     71.745
     ],
     "bvhVisitsPerQuery": [
      278.32,
@@ -7797,8 +7747,8 @@
      3999
     ],
     "ratios": [
-     8.329941338441278,
-     8.093645065555727
+     8.32396219643498,
+     8.096578158756708
     ],
     "gridWins": true,
     "ratioStable": true
@@ -7810,8 +7760,8 @@
     "differingLists": 2500,
     "listsMatch": false,
     "gridCandPerQuery": [
-     33.412,
-     71.771
+     33.436,
+     71.745
     ],
     "bvhVisitsPerQuery": [
      278.32,
@@ -7822,8 +7772,8 @@
      3999
     ],
     "ratios": [
-     8.329941338441278,
-     8.093645065555727
+     8.32396219643498,
+     8.096578158756708
     ],
     "gridWins": false,
     "ratioStable": true
@@ -7850,10 +7800,12 @@
    "outputs": {
     "kind": "scale",
     "foldScaleDisagreements": 0,
-    "scalesSwept": 32,
+    "pinchScaleDisagreements": 0,
+    "scalesSwept": 48,
     "pinchHomogeneityErr": 2.14164261263749e-15,
     "pinchCriticalScale": 0.6291298599907221,
-    "pinchFlipsAtCritical": 4,
+    "pinchFlipsAtCritical": 0,
+    "pinchRatioDrift": 2.78695360313088e-15,
     "poses": 4
    }
   },
@@ -7868,10 +7820,10 @@
   "hands/flatdistance": {
    "outputs": {
     "kind": "flatdistance",
-    "rigidDisagreements": 20,
-    "rotationDisagreements": 20,
+    "rigidDisagreements": 21,
+    "rotationDisagreements": 21,
     "translationDisagreements": 0,
-    "outOfPlaneDisagreements": 20,
+    "outOfPlaneDisagreements": 21,
     "inPlaneDisagreements": 0,
     "posesSwept": 256,
     "poses": 4,
@@ -7921,6 +7873,19 @@
     "kind": "mirror",
     "mirrorMaxDelta": 0.127,
     "mirrorPoses": 4,
+    "poses": 4
+   }
+  },
+  "hands/absolutethreshold": {
+   "outputs": {
+    "kind": "absolutethreshold",
+    "foldScaleDisagreements": 0,
+    "pinchScaleDisagreements": 9,
+    "scalesSwept": 48,
+    "pinchHomogeneityErr": 2.14164261263749e-15,
+    "pinchCriticalScale": 0.6291298599907221,
+    "pinchFlipsAtCritical": 4,
+    "pinchRatioDrift": 2.78695360313088e-15,
     "poses": 4
    }
   },
@@ -9402,6 +9367,6 @@
    }
   }
  },
- "pairCount": 484,
- "pairObservables": 4265
+ "pairCount": 485,
+ "pairObservables": 4213
 }

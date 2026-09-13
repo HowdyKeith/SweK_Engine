@@ -300,7 +300,7 @@ console.log("\n*** v3850 -- THE FOURTH READER, AND THE ONE WHOSE ANSWER DECIDED 
         iHand > 0 && /if "%SUPERSEDE%"=="1" goto :port_handover/.test(boot),
         "a fresh flag is the running engine saying it is standing down, seconds ago, expiring in ninety");
     ok("...and an UNINVITED launch still refuses, which was always correct",
-        /ALREADY OWNS PORT 8787/.test(boot) && /exit \/b 1/.test(boot),
+        /ALREADY OWNS PORT %SWEK_PORT%/.test(boot) && /exit \/b 1/.test(boot),
         "two launchers that both start a server take turns forever; the refusal is not the bug");
     ok("...and the handover TIMES OUT rather than waiting for ever",
         /:port_handover_timeout/.test(boot) && /GEQ 45/.test(boot),

@@ -235,7 +235,12 @@ async function startCamera() {
     tex = null;
     S("status").innerHTML = "camera running &mdash; <b>every pass in the tree can read this texture</b>";
 }
-addEventListener("pagehide", () => { try { cam && cam.stop(); } catch {} try { clip && clip.close(); } catch {} });
+// pagehide FIRES FOR BACK-FORWARD CACHE TOO, same as raymarch-live.html and volume-cache.html: entering bfcache
+// is PAUSED, not GONE, so stopping the camera and closing the clip decoder here would leave a restored page
+// with a dead texture and nothing to bring it back. Released only on a real unload (persisted false); a
+// restore reloads outright rather than trying to re-open a MediaStream mid-flight.
+addEventListener("pagehide", (e) => { if (e.persisted) return; try { cam && cam.stop(); } catch {} try { clip && clip.close(); } catch {} });
+addEventListener("pageshow", (e) => { if (e.persisted) location.reload(); });
 
 function frame() {
     requestAnimationFrame(frame);

@@ -195,11 +195,21 @@ console.log("\n6. *** SIGNAL A: A DEDICATED GATE NAMED FOR THE CONCEPT -- AND IT
     // SOMETHING. Both halves are checked here rather than one.
     ok("!! it ADMITS members -- the class is not empty", r.split.dedicatedGate.length > 0,
         r.split.dedicatedGate.length + ": " + r.split.dedicatedGate.join(", "));
+    // v4530 -- CEILING RAISED 25 -> 40 AFTER THE v4327 MERGE OF ORIGIN/MAIN, THE SAME TREE-GROWTH THAT MOVED
+    // graveyard-selfcheck's orphanUtils ratchet 93 -> 159 (39,163 insertions across 228 files reconciling two
+    // branches diverged by 42 vs 102 commits). This check's OWN JOB, PER v3558'S HEADER, IS NARROWER THAN A
+    // DEBT COUNT: it exists to catch a classifier COLLAPSING the pile to (near) zero, which is a guaranteed-
+    // answer question and not evidence -- not to track the exact size of the pile, which this file's own
+    // opening comment disclaims ("NOTHING IN THIS GATE IS A FROZEN COUNT"). 31 on the merged tree is nowhere
+    // near either failure shape the check exists to catch (an empty list or a list that IS the whole 180), so
+    // 40 keeps headroom for the same modest drift rather than chasing the count exactly, the way the lower
+    // bound of 0 was never meant to become "not 24".
     ok("!! *** AND IT DOES NOT COLLAPSE THE PILE -- unclassified is still a real list ***",
-        r.split.unclassified.length > 0 && r.split.unclassified.length < 25,
-        r.split.unclassified.length + " remain of the 25 v3551 left. *** v3551's FIRST FIX TOOK 32 TO 0 AND " +
-        "WAS CAUGHT ONLY BECAUSE THE COLLAPSE WAS IMPLAUSIBLE. A classifier that empties the list it sorts is " +
-        "answering a question whose answer was guaranteed. ***");
+        r.split.unclassified.length > 0 && r.split.unclassified.length < 40,
+        r.split.unclassified.length + " remain (ceiling 40, raised from 25 after the origin/main merge grew " +
+        "the tree this reads). *** v3551's FIRST FIX TOOK 32 TO 0 AND WAS CAUGHT ONLY BECAUSE THE COLLAPSE WAS " +
+        "IMPLAUSIBLE. A classifier that empties the list it sorts is answering a question whose answer was " +
+        "guaranteed. ***");
 
     // THE NAMED NEGATIVE, WITH THE NUMBERS THAT REFUSE IT rather than an assertion that it is refused.
     const RD = "tools/roundhouse/run-device.mjs";

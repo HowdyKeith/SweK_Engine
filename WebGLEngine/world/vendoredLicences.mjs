@@ -57,6 +57,12 @@ export const VENDORED = Object.freeze([
       upstream: "https://github.com/erincatto/box3d", pin: "v0.1.0 / 8441b4a06d6d09dcfb0b0f704df4d847d1437b92",
       note: "papered at v4256 alongside the vendored headers. PROVENANCE.md records the commit." },
     { path: "vendor/draco",     kind: KIND.THIRD_PARTY, spdx: "MIT",       grant: GRANT.LICENCE_FILE, file: "LICENSE" },
+    { path: "vendor/draco-encoder", kind: KIND.THIRD_PARTY, spdx: "Apache-2.0", grant: GRANT.LICENCE_FILE, file: "LICENSE",
+      upstream: "https://github.com/google/draco", pin: "draco3d@1.5.7 (npm tarball registry.npmjs.org/draco3d/-/draco3d-1.5.7.tgz)",
+      note: "draco_encoder_nodejs.js + draco_encoder.wasm, vendored at v4601 for task #53's mesh-compression " +
+            "export. The tarball itself carries no LICENSE file -- fetched directly from google/draco's own " +
+            "repo root, per package.json's \"license\": \"Apache-2.0\" field. PROVENANCE.txt beside it records " +
+            "the evidence and why the decoder half was left unvendored." },
     // v4486 -- vendor/fonts holds FOUR families now (Plex flat, cinzel/, jetbrains-mono/, source-sans-3/), each with its own
     // <Family>-OFL.txt beside it; this entry papers the directory under the Plex grant as before, and the per-family grants,
     // Reserved Font Names, sources and digests are text/fontRegistry.mjs, held by tools/ship/vendoredFonts-selfcheck.mjs.

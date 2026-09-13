@@ -708,6 +708,14 @@ export const EXCLUDED = Object.freeze([
                     why: "the three-pattern envSample(d, sel) body, no entry point -- PREFILTER_ENV_WGSL (in the corpus) is its one composition" }),
     Object.freeze({ id: "specularProbeCapture.CAPTURED_ENV_WGSL", kind: "source fragment",
                     why: "the texture-backed envSample(d, sel) body (dirToFaceW plus a manual bilinear tap), no entry point -- CAPTURED_PREFILTER_WGSL (in the corpus, compile-only) is its one composition" }),
+    // ab9c9cf7 -- the sin-hash round's own census gap: two functions with no entry point of their own.
+    Object.freeze({ id: "exactHash.EXACT_HASH_WGSL", kind: "source fragment",
+                    why: "exact_umix() and the 2-D exact_hash(), spliced into shaders that need the integer hash -- neither has an entry point of its own; tools/ship/exactHash-selfcheck.mjs holds the arithmetic to exactHash2 on a device" }),
+    Object.freeze({ id: "exactHash.EXACT_HASH3_WGSL", kind: "source fragment",
+                    why: "the 3-D exact_hash3(), spliced in beside EXACT_HASH_WGSL for callers that hash a cell of a volume -- no entry point of its own; held to exactHash3 by the same gate" }),
+    // v4579 -- the three hand-copied starfields' shared function, after render/starField.mjs collected them.
+    Object.freeze({ id: "starField.STARFIELD_WGSL", kind: "source fragment",
+                    why: "exact_umix, exact_hash3 and starfield_at(dir, cut, o) with no entry point -- each page splices this string around its own density cut, so there is no runnable composition in this tree, only three callers with different constants" }),
 ]);
 
 /**

@@ -355,7 +355,16 @@ function webgl2Backend(canvas, opts = {}) {
             const pass = {
                 dispatch: () => { throw _refuse("webgl2", "compute pipelines", CPU_TWIN); },
                 dispatchIndirect: () => { throw _refuse("webgl2", "compute pipelines", CPU_TWIN); },
-                clear: (c) => { cleared = true; gl.clearColor(c[0], c[1], c[2], c[3] == null ? 1 : c[3]); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); },
+                // v4530 -- glClear(DEPTH_BUFFER_BIT) IS A NO-OP WHEN depthMask IS FALSE, and depthMask is a GLOBAL
+                // GL state that the LAST pipeline's use() left behind -- not this call's own pipeline, which every
+                // caller in this tree sets up AFTER clear() (clear(); use(pipe); ...; draw()). A pipeline that
+                // writes no depth (pickMaskPipelineDesc, compositePipelineDesc) leaves depthMask false for
+                // whatever draws next, so the NEXT frame's clear() silently keeps a stale depth buffer -- and if
+                // that next pass draws the same static geometry again (fleetMask's makeMaskRig calling a()/b()
+                // a second time for a second composite weight), the new fragments land at the SAME depth as the
+                // old ones and LESS rejects every one of them. Forcing the write mask on for the clear call itself
+                // costs nothing: the use() two lines below always sets the real mask before anything is drawn.
+                clear: (c) => { cleared = true; gl.depthMask(true); gl.clearColor(c[0], c[1], c[2], c[3] == null ? 1 : c[3]); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); },
                 // Level 13 -- begin(): draw ON TOP of what the last frame left, colour and depth both kept. GL keeps
                 // them by not clearing; WebGPU says loadOp: "load". A second occlusion phase needs exactly this.
                 begin: () => { cleared = true; },

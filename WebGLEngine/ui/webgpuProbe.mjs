@@ -123,10 +123,18 @@ export function showOriginBanner(probe, doc) {
     if (d.getElementById("swek-origin-banner")) return true;
     const el = d.createElement("div");
     el.id = "swek-origin-banner";
+    // *** pointer-events:none ON THE BANNER ITSELF. *** It sits at z-index 2147483000 -- above everything, on
+    // purpose, so it is never hidden behind a page's own UI -- but that same top strip is exactly where HUD
+    // bars put their own buttons (es-box3d-fly3d.html's Reset battle button lives at top:8px). A banner that
+    // eats pointer events there makes every such button silently unclickable for as long as the origin stays
+    // insecure, which is worse than the thing it is warning about. The one link inside gets pointer-events:auto
+    // back explicitly, so the banner reads and its route-(1) link still clicks.
     el.style.cssText = "position:fixed;left:0;right:0;top:0;z-index:2147483000;background:#1a1206;" +
         "border-bottom:1px solid #6a4d12;color:#f0dfb0;font:12px/1.55 ui-monospace,Menlo,monospace;" +
-        "padding:9px 14px;box-shadow:0 2px 14px rgba(0,0,0,.5)";
+        "padding:9px 14px;box-shadow:0 2px 14px rgba(0,0,0,.5);pointer-events:none";
     el.innerHTML = html;
+    const link = el.querySelector && el.querySelector("a");
+    if (link) link.style.pointerEvents = "auto";
     d.body.appendChild(el);
     return true;
 }

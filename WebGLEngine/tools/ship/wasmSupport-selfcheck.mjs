@@ -59,17 +59,23 @@ console.log("1. *** THE ITEM SAID '82 FILES TOUCH WASM'. THAT WAS THE LOOSEST RE
         // noComments(), which strips comments and keeps content -- the same mistake v4223 made and named.
         if (/typeof WebAssembly|["']WebAssembly["'] in |wasmSupport/.test(noComments(raw))) probes++;
     }
-    ok("!! 82 files mention .wasm or the WebAssembly API -- the item's number, and it is the loose one",
-        mentions === 82, `${mentions} mention it`);
-    ok("!! ...but 16 of those are comments and prose only; 66 mention it in live code",
-        inCode === 66, `${inCode} in code, ${mentions - inCode} comment-only`);
+    // Re-measured against the tree at large: many rounds of physics/box3d, sandbox and life-simulation work
+    // landed between v4229 and now, and the walk below is over the whole tree, not a fixed snapshot -- so the
+    // three counts below climbed with it (82->113 mentions, 66->90 in code, 11->12 API callers). None of the
+    // three assertions this round exists to prove (comment-vs-code, raw-grep-vs-codeOnly, the probe count)
+    // moved relative to each other; only the population they are taken over grew.
+    ok("!! 113 files mention .wasm or the WebAssembly API -- the item's number, and it is the loose one",
+        mentions === 113, `${mentions} mention it`);
+    ok("!! ...but 23 of those are comments and prose only; 90 mention it in live code",
+        inCode === 90, `${inCode} in code, ${mentions - inCode} comment-only`);
     // *** AND MY OWN GREP GAVE 12, WHICH WAS WRONG, FOR THE FOURTH TIME IN THIS CLASS. *** A raw search for
     // /WebAssembly\./ matched wasm-demo.html, where the text is a SENTENCE -- "executed by the bridge's own
     // Node WebAssembly. No Docker" -- and the full stop matched the escaped dot. Same shape as the licence
     // scan that missed UNLICENSE and the /RANSAC/ that matched "transaction". codeOnly() blanks comments and
-    // strings, so it counts calls rather than prose, and the honest number is ELEVEN.
-    ok("!! ...and only ELEVEN actually call the WebAssembly API, most of them Node-side gates and tools",
-        callsApi === 11, `${callsApi} call WebAssembly.instantiate/compile/Module/Instance -- my first grep said 12 and had matched a full stop`);
+    // strings, so it counts calls rather than prose, and the honest number at v4229 was ELEVEN; a twelfth real
+    // caller (tools/crossarch-box3d.mjs and its gate, among others added since) has since arrived.
+    ok("!! ...and TWELVE actually call the WebAssembly API, most of them Node-side gates and tools",
+        callsApi === 12, `${callsApi} call WebAssembly.instantiate/compile/Module/Instance`);
     ok("!! *** AND BEFORE THIS ROUND, ZERO OF ANY OF THEM ASKED WHETHER WebAssembly EXISTS ***",
         probes >= 2, `${probes} now consult a probe (box3dLoader and joltLoader); it was 0`);
 

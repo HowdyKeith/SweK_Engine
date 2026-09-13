@@ -154,10 +154,18 @@ console.log("\n3. *** A POINTER IS NOT AN INCLUSION: what the copies carried bef
     const preexisting = all.filter((f) => !quoters.test(f) && !inFile.has(f));
     // v4322 -- sixteen: vendor/three-webgpu/LICENSE arrived at v4319 (three 0.178's WebGPU build and TSL, beside r160), under
     // vendor/ where a vendored copy's notice belongs; the count moved by one and this line says why.
+    //
+    // v4601 -- twenty-seven: eleven MORE vendored MIT/OFL notices arrived under vendor/ since v4322, each its
+    // own dependency papered where the orrery expects it -- draco-encoder/LICENSE (task #53's mesh-compression
+    // encoder), the three new font families' *-OFL.txt (cinzel, jetbrains-mono, source-sans-3, sawarabi-gothic),
+    // kenney-city/LICENSE.md and kenney-racing/LICENSE (the Kenney starter kits), morphicons/LICENSE, and
+    // xatlas/LICENSE plus the two source files it papers (xatlas.cpp, xatlas.h). None is a copy outside vendor/;
+    // the count moved because the vendor tree grew, which is exactly what section 1 says this gate does not
+    // police -- it only re-counts to catch a REGRESSION in what was already there.
     ok("the tree held " + preexisting.length + " MIT permission notices (15 before v4263, plus vendor/three-webgpu at v4319), quoters and in-file copies aside",
-        preexisting.length === 16, preexisting.join(" ").slice(0, 120) + "...");
-    ok("*** and 15 of those 16 are under vendor/ -- the 16th is a packaged dependency, not engine code ***",
-        underVendor.length === 15 && preexisting.filter((f) => !f.startsWith("vendor/")).join("") ===
+        preexisting.length === 27, preexisting.join(" ").slice(0, 120) + "...");
+    ok("*** and 26 of those 27 are under vendor/ -- the 27th is a packaged dependency, not engine code ***",
+        underVendor.length === 26 && preexisting.filter((f) => !f.startsWith("vendor/")).join("") ===
         "tools/strict-libm-pkg/LICENSE",
         underVendor.length + " under vendor/, plus " + preexisting.filter((f) => !f.startsWith("vendor/")).join(" "));
     ok("  so NO engine-source copy outside vendor/ carried one",

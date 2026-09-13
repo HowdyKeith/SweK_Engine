@@ -173,7 +173,16 @@ export function auditClaims(root = ENG) {
                 // derived-sounding rule with one member; REPORTED alongside the prose blocks so the exclusion is
                 // visible rather than silent. main.js line 1967 already records this same file as a hazard for a
                 // different scanner.
-                if (rel === "main.js") {
+                //
+                // *** THE "EXACTLY ONE SUCH FILE" PREMISE STOPPED HOLDING. *** brain/brain.js grew the identical
+                // shape -- one dated "// vNNNN -- ..." paragraph per round, each closing "Full changelog on
+                // docs/CHANGELOG.md" -- for the GPU Brain process, which keeps its own changelog rather than
+                // main.js's. Its v4473 entry alone named gpu/glbTexture.mjs and vendor's GLTFLoader.js as a
+                // two-subject "claim" the exact width MAX_SUBJECTS_PER_CLAIM lets through, for the same reason
+                // main.js's mega-lines used to: a historical record read as live prose. The rule is now a
+                // two-member list rather than a one-member "by name", which is the derived-sounding shape the
+                // note above declined only because the second instance had not yet arrived.
+                if (rel === "main.js" || rel === "brain/brain.js") {
                     prose.push({ file: rel, line: i + 1, subjects: subjects.length,
                                  why: "engine changelog: a dated record OF a claim, not a claim",
                                  text: line.trim().slice(0, 120) });

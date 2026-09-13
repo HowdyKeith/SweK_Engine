@@ -238,11 +238,14 @@ console.log("\n2. THE TRIGGER COUNTS CO-OCCURRENCE AND THE DECISION NEEDS 5");
     // render/litSphere.mjs, render/water2d.mjs and render/probeLit.mjs, each authoring both halves so a gate can hold the two
     // backends to one CPU twin (the same reading shaderCensus records at its DUPLICATION_BASELINE); the third CONVENTION file
     // shares an entry-point name and nothing else. Still pinned, still a list below rather than a number.
-    ok("*** of the files the trigger counts, EIGHT duplicate a computation and THREE share only a convention ***",
-        C.duplication.length === 8 && C.convention.length === 3,
+    //
+    // 8 / 3 -> 9 / 4, read before raising again: physics/render/specularProbeLit.mjs (fae26dbf) is the new DUPLICATION,
+    // sharing fetchTexelM/mipSizeAt/mipYAt for real; the fourth CONVENTION file shares only a generic entry-point name.
+    ok("*** of the files the trigger counts, NINE duplicate a computation and FOUR share only a convention ***",
+        C.duplication.length === 9 && C.convention.length === 4,
         `${C.duplication.length} DUPLICATION, ${C.convention.length} CONVENTION out of ${census.both.length} -- and ${C.disjoint.length} DISJOINT, REPORTED rather than asserted because that class is the noise this gate exists to name. An IR replaces DUPLICATION; it can do nothing for a file whose two halves compute different things, and render/bloomFused.mjs exists precisely because WebGPU can fuse what WebGL2 cannot`);
     ok("  ...and the two that bear on the decision are exactly the two that survived a detector replacement",
-        C.duplication.length + C.convention.length === 11,   // v4526 merge: 7 -> 11, the four files named above
+        C.duplication.length + C.convention.length === 13,   // v4526 merge: 7 -> 11; specularProbeLit: 11 -> 13
         `main's v4383 replaced shaderCensus's detector and \`both\` fell 14 -> ${census.both.length}, a 29% move in the headline number. DUPLICATION and CONVENTION did not change by one file. THIS IS A CONTROL THAT WAS RUN WITHOUT BEING PLANNED: the round predicted the count was measuring something other than the claim, and then an independent correction to the count left the claim untouched`);
     ok("  and the five are named, so the decision rests on a list rather than on a number",
         C.duplication.every((r) => r.real.length >= DUPLICATION_MIN),

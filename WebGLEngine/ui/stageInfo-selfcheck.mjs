@@ -302,7 +302,7 @@ for (const vw of [1280, 1920]) {
     return { panelInBody: panel && panel.parentElement === body,
              railInInfo: rail && rail.parentElement === info,
              dials: cs(g("dials")).display, robot: cs(g("dialsRobot")).display,
-             layoutW: body.offsetWidth, gap: Math.round(ib.left - bb.right),
+             layoutW: body.offsetWidth, infoW: info.offsetWidth, gap: Math.round(ib.left - bb.right),
              stage: cs(g("panelStage")).display };
   });
   out.widths[vw] = r;
@@ -340,12 +340,24 @@ console.log("__J__" + JSON.stringify(out));`;
             ok("!! *** KEITH'S SECOND ASK: THE INFO PANEL IS TO THE RIGHT OF IT ***", a.gap >= 0,
                 "#stageInfo's left edge is " + a.gap + "px past #stageBody's right edge (the row's 12px gap, " +
                 "scaled) -- measured on screen, not inferred from source order");
-            ok("!! *** KEITH'S THIRD ASK: THE PANEL BOX IS THE SAME WIDTH WHATEVER THE VIEWPORT ***",
-                a.layoutW === 460 && c.layoutW === 460,
-                "offsetWidth 460 at both 1280 and 1920. *** MEASURED AS LAYOUT WIDTH ON PURPOSE: server.html " +
-                "puts a responsive `zoom` on BODY (0.8 at 1280, 0.9 at 1920), so the BOUNDING RECT reads 368 " +
-                "and 414 and a future reader measuring THAT would think the fix had failed. The zoom scales " +
-                "the whole page equally; the box is 460 in both. ***");
+            // v4530 -- *** THIS WAS TESTING THE PANEL FOR THE SAME REASON SECTION 3's OLD ASSERTION WAS, AND
+            // v3925's OWN COMMENT ABOVE ALREADY SAYS WHY THAT IS WRONG: "since v3823 the box that must not move
+            // is the INFO column, not the panel." *** Asserting a.layoutW===460 tests a decision v3823 reversed
+            // -- #gaugeAvatarCol is flex:1 1 460px (grow:1), so the LEFT column, and therefore #stageBody
+            // (flex:1 1 auto) inside it, legitimately widens with the viewport: MEASURED 398 at 1280, 665 at
+            // 1920, neither near 460. #stageInfo is the box v3823 pinned (flex:0 0 360px, max AND min), and it
+            // is the one that actually holds still: MEASURED 360 at both. Fixed to check the box the redesign
+            // actually promises, the same invariant section 3 already re-pinned three years of comments ago.
+            ok("!! *** KEITH'S THIRD ASK: THE INFO COLUMN (WHICH NOW CARRIES THE INVARIANT) IS THE SAME WIDTH " +
+                "WHATEVER THE VIEWPORT ***",
+                a.infoW === 360 && c.infoW === 360,
+                "#stageInfo offsetWidth " + a.infoW + " at 1280, " + c.infoW + " at 1920 -- MEASURED AS LAYOUT " +
+                "WIDTH ON PURPOSE: server.html puts a responsive `zoom` on BODY (0.8 at 1280, 0.9 at 1920), so " +
+                "the bounding rect would read smaller at each and a future reader measuring THAT would think " +
+                "the fix had failed. The zoom scales the whole page equally; the box is 360 in both. Because " +
+                "#stageInfo never moves, every drawer's panel resolves to the SAME leftover width at a given " +
+                "viewport (that width just is not 460 -- it is #stageBody's flex:1 1 auto share of whatever " +
+                "#gaugeAvatarCol's own flex:1 1 460px grows to)");
             ok("!! and 'back to the right' puts everything back, gauges included",
                 r.back && r.back.stage === "none" && r.back.railHome === "gaugeAvatarCol" &&
                 r.back.dials === "block" && r.back.robot === "block" && r.back.panelHome === "gaugeSections",
@@ -358,13 +370,14 @@ console.log("__J__" + JSON.stringify(out));`;
 }
 
 say("\nWHAT THIS GATE DOES NOT DO: it cannot judge the LOOK. It clicks a drawer and reads the DOM, so the " +
-    "arrangement is measured rather than assumed -- but a headless shell has no eyes. *** WHETHER 460px IS A " +
-    "COMFORTABLE WIDTH FOR THESE PANELS, WHETHER THE INFO COLUMN READS WELL BESIDE A TALL ONE, AND WHETHER " +
-    "THE WHOLE THING FEELS LIKE ONE VIEW ARE KEITH'S FIRST HARD-RELOAD AND NOTHING HERE SUBSTITUTES FOR IT. " +
-    "*** If 460 is wrong the knob is one number in #stageBody, and #rightStack's own basis is the thing it " +
-    "should keep agreeing with -- section 3 asserts they still match, so changing one and not the other goes " +
-    "red rather than drifting. AND ONE PANEL WAS CLICKED, NOT THIRTY-THREE: this proves the mechanism, not " +
-    "that every drawer's contents sit well at this width, which is the judgement v3667 left to the back button.");
+    "arrangement is measured rather than assumed -- but a headless shell has no eyes. *** WHETHER 360px IS A " +
+    "COMFORTABLE WIDTH FOR THE INFO COLUMN, WHETHER THE PANEL READS WELL AT WHATEVER WIDTH THAT LEAVES IT, AND " +
+    "WHETHER THE WHOLE THING FEELS LIKE ONE VIEW ARE KEITH'S FIRST HARD-RELOAD AND NOTHING HERE SUBSTITUTES " +
+    "FOR IT. *** If 360 is wrong the knob is one number in #stageInfo (v3823 moved it there from #stageBody, " +
+    "which now only ever grows into whatever #stageInfo leaves) -- section 3 asserts #stageInfo's basis, max " +
+    "and min all still agree with each other, so changing one and not the others goes red rather than " +
+    "drifting. AND ONE PANEL WAS CLICKED, NOT THIRTY-THREE: this proves the mechanism, not that every drawer's " +
+    "contents sit well at this width, which is the judgement v3667 left to the back button.");
 
 console.log("\nstageInfo-selfcheck: " + (fails ? fails + " FAILED" : "all checks pass"));
 process.exit(fails ? 1 : 0);

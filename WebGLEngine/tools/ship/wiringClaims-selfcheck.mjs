@@ -40,6 +40,10 @@ const KNOWN_CONTRAST = {
         "shipped with an exact key and NO CONSUMER, which is v3473's nee.mjs shape'. The subject is " +
         "energyCompensation; nee.mjs is the earlier case being compared to, exactly the contrast form the two " +
         "entries above describe",
+    "engine/xrSession.mjs": "gazeDwell-selfcheck's closing note reads 'gaze is not wired into " +
+        "engine/xrSession.mjs, so nothing feeds it a real head pose'. The subject of 'not wired into' is gaze " +
+        "(ui/gazeDwell.mjs) -- xrSession.mjs is the FEED IT IS MISSING, named as the target rather than as the " +
+        "thing lacking a consumer, and xrSession.mjs itself has real importers elsewhere in the engine",
 };
 ok("!! *** every remaining hit is a CONTRAST LINE, adjudicated by name ***",
     claims.every((c) => KNOWN_CONTRAST[c.subject]),

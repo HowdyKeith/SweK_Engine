@@ -232,16 +232,16 @@ console.log("pairlaneBridge-selfcheck -- who may start a transfer, and who may r
 
     const sections = fs.readFileSync(path.join(ENG, "tools", "ship", "pageSections.mjs"), "utf8");
     const nearshareBlock = (sections.match(/id: "nearshare"[\s\S]{0,900}?pages: \[[^\]]*\]/) || [""])[0];
-    ok("!! pairlane.html joined the (renamed) File Transfer Utils panel's page list too",
+    ok("!! pairlane.html joined the (renamed) Peer 2 Peer panel's page list too",
         /"pairlane\.html"/.test(nearshareBlock), nearshareBlock.slice(0, 160));
     ok("!! *** the panel's label is RENAMED to what Keith actually asked for, id/tab left untouched ***",
-        /label: "File Transfer Utils"/.test(nearshareBlock) && /id: "nearshare", tab: "nearshare"/.test(nearshareBlock),
+        /label: "Peer 2 Peer"/.test(nearshareBlock) && /id: "nearshare", tab: "nearshare"/.test(nearshareBlock),
         "renaming the internal id too would touch every existing data-tab/data-panel selector for no reason " +
-        "the request asked for -- the visible label is what changed");
+        "the request asked for -- the visible label is what changed (v4109 File Transfer Utils, v4211 Peer 2 Peer)");
 
     const serverHtml = fs.readFileSync(path.join(ENG, "server.html"), "utf8");
     ok("!! the server.html tab button shows the renamed label, not the old one",
-        /data-tab="nearshare">[\s\S]{0,80}File Transfer Utils/.test(serverHtml) && !/data-tab="nearshare">[\s\S]{0,80}>\s*NearShare</.test(serverHtml));
+        /data-tab="nearshare">[\s\S]{0,80}Peer 2 Peer/.test(serverHtml) && !/data-tab="nearshare">[\s\S]{0,80}>\s*NearShare</.test(serverHtml));
     ok("!! ...and pairlane.html is also a direct link where the other Mac-System tools already are",
         /href="\/pairlane\.html"/.test(serverHtml));
 }

@@ -215,7 +215,11 @@ export const REACH_AT_V4548 = Object.freeze({
     // population nothing. Worth saying because the previous four rounds each went red here on their own
     // arrival: a record written into a module whose gate is over budget arrives unchecked, and this one was
     // written into a gate that runs at ship time on purpose.
-    total: 107,
+    // RE-TAKEN after the origin/main merge (25 new gates: the F82 Fresnel / specular-probe family, the
+    // AI-presence-orb set, and others): 107 -> 110 records, 64 -> 70 checked, 19 -> 29 over-budget,
+    // 21 -> 11 unguarded, unchecked held at 40. All three arrivals landed CHECKED or moved a record out of
+    // `unguarded` into `over-budget` rather than raising the ceiling -- read off reach(), not guessed.
+    total: 110,
     // *** READ OFF THE INSTRUMENT, NOT PREDICTED. *** The first draft of this record guessed 53/21/19/40 from
     // which gates the round had sped up, and was wrong on three of the four: the comment-strip fix below
     // moved two records the other way at the same time, and a guess cannot see two changes at once.
@@ -259,7 +263,7 @@ export const REACH_AT_V4548 = Object.freeze({
     // ship-time sweep. That is the ratchet doing its job on the round that wrote it, for the third round
     // running. It is NOT moved by relocating the rows: the reds those records name are gates the sweep
     // cannot run at all, so their guardian is expensive for the same reason they are.
-    checked: 64, overBudget: 19, unguarded: 21, unchecked: 40,
+    checked: 70, overBudget: 29, unguarded: 11, unchecked: 40,
     // v4550 -- the UNMEASURED class was split out of over-budget after this gate went red twice inside full
     // sweeps and passed 68 times under load; the trigger was a concurrent REWRITE of sweep-timings.json, not
     // contention. Zero records sit in it on a settled tree, which is the expected reading.
@@ -335,7 +339,9 @@ export const UNGUARDED_SPLIT_V4577 = Object.freeze({
     // left the unguarded set.
     // v4583 -- total RE-TAKEN 106 -> 107 for CORPUS_AT_V4583, which arrived checked. The unguarded set
     // did not move: no record joined or left it this round.
-    structural: Object.freeze({ total: 107, unguarded: 9, documentaryOfThose: 9, readByCodeOfThose: 0 }),
+    // RE-TAKEN after the origin/main merge: 107 -> 110 records. Two records joined the unguarded set (9 ->
+    // 11), both documentary (named by no code at all) -- read off splitUnguarded(), not guessed.
+    structural: Object.freeze({ total: 110, unguarded: 11, documentaryOfThose: 11, readByCodeOfThose: 0 }),
     // BEFORE, on the tree this round opened on:
     before: Object.freeze({ total: 104, checked: 72, overBudget: 20, unmeasured: 0, unguarded: 12, unchecked: 32 }),
     // AFTER, as one reading rather than as a constant -- see the note above. Taken with the round's own
