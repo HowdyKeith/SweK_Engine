@@ -63,8 +63,14 @@ const R = WRONG_QUANTITY_V4579.runs;
 // -----------------------------------------------------------------------------------------------------------
 console.log("1. *** THE KIND IS WRITTEN WHERE IT IS KNOWN, IN THE STATEMENT THAT CHOOSES THE NUMBER ***");
 {
-    ok("quickSweep exports the three kinds a millisecond can be, so a reader asks by name instead of re-deriving the branch rule",
-        KIND.LOADED === "loaded" && KIND.ALONE === "alone" && KIND.CAPPED === "capped",
+    // *** v4582 -- THREE BECAME FOUR, AND THE FOURTH ANSWERS A DIFFERENT QUESTION FROM THE OTHER THREE. ***
+    // LOADED, ALONE and CAPPED all say under what conditions the number was taken. SKIPPED says the gate DECLINED
+    // TO RUN, so the number measures a refusal -- three entries were filed as ordinary loaded readings at 234,
+    // 164 and 175 ms while their gates printed "SKIPPED". The count is asserted, not just the spellings: a fifth
+    // member arriving unnoticed is how a reader comes to switch on a value it has never seen.
+    ok("quickSweep exports the four kinds a millisecond can be, so a reader asks by name instead of re-deriving the branch rule",
+        KIND.LOADED === "loaded" && KIND.ALONE === "alone" && KIND.CAPPED === "capped" &&
+        KIND.SKIPPED === "skipped" && Object.keys(KIND).length === 4,
         JSON.stringify(KIND));
     ok("*** and it assigns the kind in the same loop that assigns the millisecond, so the label cannot drift from the branch that chose it ***",
         /kinds\[r\.gate\]\s*=/.test(QS) && /r\.serialMs\s*!=\s*null\s*\?\s*KIND\.ALONE\s*:\s*KIND\.LOADED/.test(QS),
@@ -98,6 +104,21 @@ console.log("\n2. AN INFERENCE IS NAMED AS ONE, ALL 1,620 OF THEM");
     ok("  and every inferred kind IS the branch rule applied to that entry, re-derived here rather than trusted",
         wrongInference.length === 0,
         wrongInference.length ? wrongInference.slice(0, 4).join(", ") : `${inferred.size} re-derived, all agreeing`);
+
+    // *** v4582 -- AND A SKIP CANNOT BE INFERRED AT ALL, WHICH IS WHY IT NEEDED A WRITER. ***
+    //
+    // The branch rule above reads a millisecond and an exit code. A skipping gate exits 0 in well under the
+    // budget, so the rule can only ever call it LOADED -- the three that were mislabelled sat at 164-234 ms with
+    // code 0 and looked exactly like fast passes. The evidence is the gate's own printed declaration, which
+    // quickSweep discarded with `stdio: "ignore"` until v4582 kept a bounded tail. SO NO ENTRY MAY CARRY SKIPPED
+    // BY INFERENCE: if one does, somebody has back-filled a label the data cannot support.
+    const skippedGates = Object.keys(S.kinds).filter((g) => S.kinds[g] === KIND.SKIPPED);
+    const inferredSkips = skippedGates.filter((g) => inferred.has(g));
+    ok(`*** all ${skippedGates.length} skipped entries are OBSERVED, never inferred -- the branch rule cannot produce this kind ***`,
+        skippedGates.length > 0 && inferredSkips.length === 0,
+        skippedGates.map((g) => `${g.split("/").pop()} ${S.timings[g]}ms code ${S.codes[g] ?? 0}`).join(", ") +
+        ". Each exits 0 under the budget, so ms-and-code says LOADED and only the gate's own output says otherwise." +
+        (inferredSkips.length ? " BACK-FILLED: " + inferredSkips.join(", ") : ""));
     ok("  and the observed ones are NOT required to match it, which is the point of recording them separately",
         observed.length > 0, `${observed.length} entries this arc measured directly`);
 }

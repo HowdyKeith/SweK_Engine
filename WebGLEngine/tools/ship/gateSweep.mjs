@@ -3767,6 +3767,56 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since241: Object.freeze({
+        at: "v4582", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/skipReading-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/quickSweep.mjs", "tools/ship/timingKind-selfcheck.mjs",
+                                "tools/ship/sweep-timings.json"]),
+        verdict: "green, 322 ms at eight-wide and 267 ms alone, under the 3000 ms budget. *** THREE ENTRIES IN " +
+                 "THE SWEEP RECORD WERE A GATE SAYING 'I DID NOT RUN'. *** render/holoPicture, render/holoAgree " +
+                 "and tools/ship/pageFxOverlay skip without a rasteriser, exit 0 well under the budget, and sat " +
+                 "in sweep-timings.json at 234, 164 and 175 ms with a confident `loaded` kind -- 2.4x to 3.6x " +
+                 "their bare skip cost, so they were LOADED measurements of a refusal. tools/ship/selfchecks.mjs " +
+                 "has refused to record a skip since v3941, after placementRender was filed at its skip time " +
+                 "THREE TIMES, and gateBudget.UNRESOLVED names two of these three saying 'its former 55ms entry " +
+                 "was the SKIP time'. THE TREE KNEW, FOR THE OTHER FILE -- v4580's fixture race and v4581's prose " +
+                 "rule wearing a third face. *** AND THE MECHANICAL REASON IS BETTER THAN FORGETFULNESS: THE " +
+                 "SWEEP COULD NOT SEE. *** runOneAsync spawned with `stdio: \"ignore\"`, and a skip's only " +
+                 "evidence is the gate's printed declaration, so from an exit code a skip is indistinguishable " +
+                 "from a fast pass. MEASURED BEFORE PAYING FOR IT: piping and keeping a 4 KB tail costs 1.4 ms a " +
+                 "gate over eight gates timed three times each -- inside the noise, with two of the eight coming " +
+                 "out FASTER captured -- about 2 s across a full sweep. Eleven rounds of blindness for two " +
+                 "seconds. A fourth KIND was added, and it answers a DIFFERENT question from the other three: " +
+                 "loaded/alone/capped say under what conditions the number was taken, skipped says the gate never " +
+                 "started, and the branch rule CANNOT produce it -- ms-and-code can only ever call a skipping " +
+                 "gate loaded, which is why it needed a writer and why no entry may carry it by inference. *** " +
+                 "AND DRIVING THE FIXED WRITER ERASED v4579'S OTHER RECORD. *** kindsInferred names the 1,620 " +
+                 "entries whose kind was back-derived rather than watched, written because 'an inference dressed " +
+                 "as an observation is the fault five rounds of this arc have been about' -- and the writer was " +
+                 "never taught the field, so a five-gate run took the list to ZERO and left 1,637 inferred kinds " +
+                 "presenting as observed. Found by RUNNING the writer, as v4580's `complete: true` was; reading " +
+                 "it shows a field that is simply absent. Now carried forward minus what each run observes. The " +
+                 "census was driven by running all 22 skippable gates rather than by matching the record: 4 " +
+                 "decline here, 3 held a code-0 reading, and the fourth was already safe because v4574's CAPPED " +
+                 "kind had it. 18 of 22 produced real measurements, which is why this is narrow and not a claim " +
+                 "the record is untrustworthy -- and gateBudget-selfcheck's UNRESOLVED cross-check was green " +
+                 "before and after, correctly, because it reads the guarded file. A GREEN ROW IS NOT EVIDENCE " +
+                 "THAT A RULE IS APPLIED, ONLY THAT IT IS APPLIED HERE. 15 sabotages, 15/15 red, no 0-RED, after " +
+                 "one 0-RED that was this gate's own: timingKind's member-count condition could be replaced by " +
+                 "`true` with nothing noticing, so this gate vouches for that pin from outside. Also recorded: " +
+                 "the absence-check trap fired a FOURTH time in three rounds, and the three instruments are now " +
+                 "written down -- raw source finds the text in the comment recording its removal, codeOnly EMPTIES " +
+                 "string literals and broke the clause brought in to fix it, and noComments is the one for a " +
+                 "string literal in live code. AND THE SKIP GUARD REVEALED AN ELEVEN-ROUND SILENCE ON ITS " +
+                 "WAY IN: runnerBudget-selfcheck admits a runner that mentions `-selfcheck` outside its own name, " +
+                 "and quickSweep happened never to contain the string until the new SKIP_LINE regex introduced it. " +
+                 "It has budgeted gates with its own two numbers since it was written and never declared them. " +
+                 "budgetIsOwn now says what they are: budgetMs is a MEMBERSHIP THRESHOLD about the sweep's total " +
+                 "cost, capMs is a SIGKILL ceiling whose readings are the cap's clock. Verify: 29 green, 3 red, 0 " +
+                 "load-only, 0 crash-only; the three reds equally red at HEAD.",
+        widenedLate: Object.freeze(["tools/ship/quickSweep.mjs"]),
+    }),
     since240: Object.freeze({
         at: "v4581", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/budgetProvenance-selfcheck.mjs"]),
