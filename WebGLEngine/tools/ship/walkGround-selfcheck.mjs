@@ -45,6 +45,14 @@
 //   S9  delete the eye's snap guard                                             1 RED
 //   S10 mistune EYE_SMOOTH_RATE to 30                                           4 RED
 //   S11 centre the blend's half-cell stencil                                    2 RED
+//   S12 the eye's ease made a PER-FRAME constant instead of a rate                2 RED
+//
+// *** S12 IS THE ONE THIS GATE COULD NOT HAVE CAUGHT UNTIL v4553, AND IT IS INVISIBLE BY CONSTRUCTION AT
+// THE FIXTURE'S OWN FRAME RATE. *** Replacing `* Math.min(1, dt * EYE_SMOOTH_RATE)` with `* 0.2` is v4546's
+// species exactly -- a per-frame constant standing in for a rate -- and at 60 Hz the two are BIT-IDENTICAL,
+// because (1/60) * 12 IS 0.2. Section 4 ran at 1/60 and nothing else, so it could never have seen it: a
+// check that cannot fail at its fixture's operating point. The frame-rate sweep catches it at 240, 144,
+// 120 and 30 fps, where a rate converges in the same wall-clock time and a per-frame constant does not.
 //
 // Counted across this gate, playerGround, playerSlope, controllerAgreement, cameraFall, playerBody,
 // playerWater and voxelAvatar.
@@ -308,7 +316,57 @@ console.log("\n-- 4. the render eye writes _eyeRenderY and nothing else");
     report(`k=${Camera.EYE_SMOOTH_RATE}: max per-frame eye |dy| ${shipped.maxEyeStep}, steps >= 0.5: ` +
            `${shipped.overHalf}, max eye-to-body offset ${shipped.maxOffset}`);
     report(`k=30 (the mistune): max ${fast.maxEyeStep}, steps >= 0.5: ${fast.overHalf}`);
-    ok("!! at the shipped rate the eye never steps half a voxel in one frame", shipped.overHalf === 0);
+    ok("!! at 60 Hz the eye never steps half a voxel in one frame", shipped.overHalf === 0,
+       "AT 60 Hz, and the qualifier is load-bearing -- see the frame-rate sweep below, which is the " +
+       "property this row was reaching for and failing to state.");
+
+    // *** THE ROW ABOVE IS TRUE AT 60 Hz AND FALSE BELOW 24, AND ITS FIRST DRAFT SAID NEITHER. *** The ease
+    // catches dt*k of the remaining distance each frame, so a one-voxel step moves the eye 5.0% of a voxel
+    // at 240 fps, 20.0% at 60, 60.0% at 20 and 100% at 10 -- update() caps dt at 0.1, so at or below 10 fps
+    // there is no smoothing at all and the eye simply snaps. An unconditional "0 steps >= 0.5" is therefore
+    // a claim about the FIXTURE'S frame rate wearing the clothes of a claim about the code.
+    //
+    // *** AND THE THING ACTUALLY WORTH ASSERTING IS THE OPPOSITE ONE: THE TIME CONSTANT DOES NOT MOVE WITH
+    // THE FRAME RATE. *** That is exactly v4546's lesson from the other side -- that round found a slope
+    // limit tested on a PER-FRAME difference and called it "a frame-rate switch ... the definition of a bug
+    // you cannot reproduce". A per-frame EYE STEP is the same shape of quantity. What is frame-rate
+    // independent here is the wall-clock time to close a step, and that is what this sweep measures.
+    {
+        const closeTime = (fps) => {                 // seconds to close 90% of a one-voxel step
+            const dt = 1 / fps;
+            const c = mk(voxelWorld((fx, y) => y <= 1), [5.5, 2 + 1.7, 5.5], [], 0);
+            c.mode = "fp"; c._stepRenderEye(dt);
+            c.position.y += 1;
+            let f = 0;
+            while (Math.abs(c._eyeRenderY - c.position.y) > 0.1 && f < 10000) { c._stepRenderEye(dt); f++; }
+            return +(f * dt).toFixed(4);
+        };
+        const rates = [240, 144, 120, 60, 30], times = rates.map(closeTime);
+        report("seconds to close 90% of a one-voxel step: " +
+               rates.map((r, i) => `${r} fps ${times[i]}`).join(", "));
+        // *** AND MY FIRST THRESHOLD HERE WAS WRONG, WHICH THE SWEEP CAUGHT. *** I asserted the times were
+        // EQUAL to within 0.02 s and they are not: they read 0.1875, 0.1875, 0.1833, 0.1833, 0.1667, a
+        // spread of 0.0208. That spread is the DISCRETE ease's own quantisation, not drift -- the exact
+        // continuous constant is ln(10)/k, and a rate whose frame is 0.0333 s can only answer in multiples
+        // of 0.0333. So the claim is not "equal" but "does not SCALE with the frame rate", which is the
+        // thing that would be a bug, and the bound is the continuous constant plus a frame.
+        const analytic = Math.log(10) / Camera.EYE_SMOOTH_RATE;
+        const worstRatio = Math.max(...times.map((t) => Math.abs(t - analytic) / analytic));
+        ok("*** the eye's TIME CONSTANT does not SCALE with the frame rate, which is the real claim ***",
+           worstRatio < 0.15 && Math.max(...times) - Math.min(...times) <= 1 / Math.min(...rates) + 1e-9,
+           `every reading is within ${(100 * worstRatio).toFixed(1)}% of the continuous constant ` +
+           `ln(10)/${Camera.EYE_SMOOTH_RATE} = ${analytic.toFixed(4)} s, and the whole spread ` +
+           `(${(Math.max(...times) - Math.min(...times)).toFixed(4)} s) fits inside ONE FRAME at the ` +
+           `coarsest rate sampled. An eye that took twice as long at half the frame rate would be the bug; ` +
+           `this one takes the same wall-clock time and answers it in coarser steps. A per-frame step is ` +
+           `not frame-rate independent and never can be -- below about 24 fps a single frame closes more ` +
+           `than half a voxel, which is measured and is not a defect: you cannot smooth a step you sample once.`);
+        ok("!! and the analytic threshold is stated rather than left for the next reader to rediscover",
+           Math.min(1, (1 / 24) * Camera.EYE_SMOOTH_RATE) >= 0.5 &&
+           Math.min(1, (1 / 25) * Camera.EYE_SMOOTH_RATE) < 0.5,
+           `dt * ${Camera.EYE_SMOOTH_RATE} >= 0.5 at 24 fps and below; at 10 fps and below update()'s own ` +
+           `dt cap of 0.1 makes the ease exactly 1 and the eye snaps outright.`);
+    }
     ok("*** and the eye never gets more than EYE_SMOOTH_SNAP from the body ***",
        shipped.maxOffset <= Camera.EYE_SMOOTH_SNAP,
        `${shipped.maxOffset} against ${Camera.EYE_SMOOTH_SNAP}. The option this replaced -- hand the ` +
