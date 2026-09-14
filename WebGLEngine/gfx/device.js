@@ -272,7 +272,17 @@ function webgl2Backend(canvas, opts = {}) {
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, nearest ? gl.NEAREST_MIPMAP_NEAREST : gl.LINEAR_MIPMAP_LINEAR);
         } else gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, f);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, f);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        // REPEAT, not CLAMP_TO_EDGE: this is the WebGL2 half of the cross-backend contract the WebGPU
+        // sampler's own comment states (samplerFor(), above in this file) -- "repeat addressing... the
+        // WebGL2 backend's texture parameters, which is what makes a pixel diff between the two a
+        // comparison of pictures and not of sampler defaults." CLAMP_TO_EDGE here silently broke exactly
+        // that: edge texels under LINEAR filtering blend against a clamped duplicate on WebGL2 and a
+        // wrapped-around opposite-edge texel on WebGPU, a same-shader cross-backend discrepancy up to 127
+        // levels at every border pixel (tools/ship/tslSource-selfcheck.mjs's "three's own linear render"
+        // check, section 3). The WebGPU-only mip-chain blit sampler (mipSampler, below in this file) stays
+        // clamp-to-edge on purpose -- it is an internal downsampling detail with no WebGL2 equivalent
+        // (generateMipmap is native there), not the general per-draw sampling path this upload() serves.
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
     };
     const dev = {
         backend: "webgl2", gl, features: Object.freeze([]),
