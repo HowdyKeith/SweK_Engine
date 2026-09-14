@@ -1,5 +1,7 @@
 // FILE: gpu/fbxLoad.js
-// VERSION: v1 -- FBX ingest, round 2 of the work vendoring commit b5fccadb deferred.
+// VERSION: v2 -- task #59, the deferred follow-up to task #44 (FBX ingest, commit ca8b8f0c): animation-clip
+// mapping. Round 1 (v1) shipped skin/joint extraction but left `animations: null` unconditionally, named
+// as a deliberate v1 gap (see git history for the original header text). This round closes that gap.
 //
 // *** THE LOADER IS INJECTED, EXACTLY LIKE gpu/gltfDraco.js AND gpu/glbLoad.js. *** `FBXLoaderCtor` is passed
 // in by the caller rather than imported here, so this module stays testable with no browser and no three.js
@@ -22,16 +24,25 @@
 //   * SINGLE MESH ONLY. Finds the FIRST object in the tree with .isMesh or .isSkinnedMesh true and reads only
 //     that one. This matches GLBParser's own original v1 scope (single primitive) before multi-primitive
 //     concat was added over many later rounds -- multi-mesh FBX concat is a real follow-up, not attempted here.
-//   * NO ANIMATION. FBXLoader DOES attach `group.animations` (an array of THREE.AnimationClip) when the source
-//     file has them -- this is set to `null` regardless. A future round should map each clip's `.tracks`
-//     (KeyframeTrack: `.times`, `.values`, a binding-path `.name` like `<nodeName>.position`) into GLBParser's
-//     `animations: [{name, duration, samplers, channels}]` shape. This round does not, because it could not be
-//     verified against a real skinned+animated fixture without either introducing a licensing-uncertain
-//     third-party asset into the committed test suite, or hand-authoring FBX animation curve data blind --
-//     see gpu/fixtures/PROVENANCE.md for why this tree does not commit an asset whose licence it has not
-//     personally verified, and this file's own tools/ship/fbxIngest-selfcheck.mjs header for the one INFORMAL,
-//     uncommitted, one-time local spot-check that WAS done against three.js's own Samba Dancing.fbx sample
-//     (downloaded to scratch, never committed, its measured numbers never cited as a repo-verified claim).
+//   * ANIMATION MAPPING (task #59, closed this round) -- mapFbxAnimations() below reads `group.animations`
+//     (THREE.AnimationClip[], attached by FBXLoader's own AnimationParser when the source file has curves) and
+//     maps each clip's `.tracks` (VectorKeyframeTrack | QuaternionKeyframeTrack, each exposing `.name`,
+//     `.times`, `.values` as plain own properties -- duck-typed, no `instanceof`) into GLBParser's documented
+//     `animations: [{name, duration, samplers: [{times, values, interpolation}], channels: [{samplerIdx,
+//     targetNode, path}]}]` shape (gpu/GLBParser.js's `_parseAnimationClip`, ~line 976). Verified against
+//     gpu/fixtures/fbxAnim.ascii.fbx -- see gpu/fixtures/PROVENANCE.md's entry for that fixture and this
+//     file's own tools/ship/fbxIngest-selfcheck.mjs section 6 for exact measured numbers. NOT covered by this
+//     round, stated plainly rather than silently: `preRotation`/`postRotation` and non-default euler orders
+//     (FBXLoader applies these itself before the track's values ever reach normalizeFbxGroup(), so THIS code
+//     doesn't need to re-derive them -- but a file that exercises them was not built, so that FBXLoader-side
+//     path is unverified by this repo's own gates); multiple AnimationStacks/clips in one file (the fixture
+//     has exactly one); CUBICSPLINE interpolation (FBXLoader's AnimationParser never emits anything but the
+//     KeyframeTrack class default of InterpolateLinear -- confirmed by reading vendor/three/jsm/loaders/
+//     FBXLoader.js's AnimationParser in full, it never calls `.setInterpolation()` -- so LINEAR is not a
+//     guessed default here, it is the only value FBXLoader's own vendored code can currently produce); and
+//     morph-target (`DeformPercent`) tracks, which FBXLoader maps to a `NumberKeyframeTrack` named
+//     `<model>.morphTargetInfluences[n]` -- a distinct shape from GLBParser's node-TRS channels that
+//     `mapFbxAnimations()` below deliberately skips (see its own comment) rather than mis-mapping.
 //   * NORMALS ARE AN APPROXIMATION. The mesh's matrixWorld is baked into normals via its upper-3x3 submatrix,
 //     inverse-transposed and renormalized (see _inverseTranspose3x3 below, duplicated in miniature from
 //     GLBParser.js's own static method of the same name rather than importing GLBParser -- the two copies are
@@ -41,9 +52,10 @@
 //   * NO TEXTURES, NO VERTEX COLORS, NO MORPH TARGETS, NO MULTI-MATERIAL. FBXLoader does extract embedded or
 //     referenced textures onto `mesh.material.map` when present; converting `.map.image` into something
 //     `_uploadParsedMesh` can `gl.texImage2D` from was left undone because it could not be verified against a
-//     real textured FBX (same licensing constraint as animation, above) -- guessing at texture-extraction code
-//     that has never been run is worse than the gap being visible. `texture`, `colors`, `morphTargets`,
-//     `morphTargetNames`, `morphWeights`, `primitiveRanges`, and `texturesByMaterial` are all null/0 here.
+//     real textured FBX (the same licensing-clean-fixture constraint task #59's own header, above, worked
+//     around for animation) -- guessing at texture-extraction code that has never been run is worse than the
+//     gap being visible. `texture`, `colors`, `morphTargets`, `morphTargetNames`, `morphWeights`,
+//     `primitiveRanges`, and `texturesByMaterial` are all null/0 here.
 //
 // All of these are reasonable to add in future rounds without breaking this file's API, exactly as GLBParser's
 // own header says of its list.
@@ -131,6 +143,123 @@ function snapshotNodes(root) {
     return { nodes, indexOf };
 }
 
+// Numeric IDs of vendor/three/three.module.js's InterpolateDiscrete/InterpolateLinear/InterpolateSmooth
+// constants (defined near the top of that file, consumed by KeyframeTrack.getInterpolation() ~line 42291).
+// Duplicated as bare numbers rather than imported -- same reason as inverseTranspose3x3 above: this file
+// must stay requirable with no 'three' present. Confirmed by reading three.module.js directly, not guessed.
+const THREE_INTERPOLATE_DISCRETE = 2300;
+const THREE_INTERPOLATE_LINEAR   = 2301;
+const THREE_INTERPOLATE_SMOOTH   = 2302;
+
+// Map a duck-typed KeyframeTrack's interpolation to GLBParser's "LINEAR"|"STEP"|"CUBICSPLINE" sampler
+// vocabulary. `track.getInterpolation()` is a real KeyframeTrack.prototype method (not something FBXLoader
+// adds) -- present on every VectorKeyframeTrack/QuaternionKeyframeTrack FBXLoader's AnimationParser builds,
+// duck-typed here (no `instanceof`) the same way the rest of this file checks shape rather than class.
+// FBXLoader's own AnimationParser (vendor/three/jsm/loaders/FBXLoader.js) never calls `.setInterpolation()`
+// on a track it builds -- confirmed by reading that class in full -- so every track it produces carries
+// KeyframeTrack's own class default, InterpolateLinear. LINEAR here is therefore not a guessed fallback for
+// the common case; for FBX input specifically it is currently the ONLY case. The DISCRETE/SMOOTH branches
+// are kept anyway (duck-typing has no way to promise FBXLoader never changes) rather than hard-coding "always
+// LINEAR", so a future FBXLoader that does call setInterpolation still maps correctly instead of silently
+// mislabeling STEP/CUBICSPLINE data as LINEAR.
+function samplerInterpolation(track) {
+    if (typeof track.getInterpolation === "function") {
+        const v = track.getInterpolation();
+        if (v === THREE_INTERPOLATE_DISCRETE) return "STEP";
+        if (v === THREE_INTERPOLATE_SMOOTH) return "CUBICSPLINE";
+        if (v === THREE_INTERPOLATE_LINEAR) return "LINEAR";
+    }
+    return "LINEAR";
+}
+
+// FBXLoader's internal three.js track-name convention -> GLBParser's glTF-vocabulary channel path.
+// NOTE: FBXLoader names its own tracks "<model>.quaternion" (three.js's Object3D property name), NOT
+// "<model>.rotation" (glTF's channel-path name GLBParser's consumers expect) -- confirmed by reading
+// generateRotationTrack (~line 2809) and generateVectorTrack (~line 2800) in vendor/three/jsm/loaders/
+// FBXLoader.js. This map is the one place that translation happens; everywhere else in this file "rotation"
+// means the glTF/GLBParser word.
+const FBX_TRACK_PROPERTY_TO_GLTF_PATH = {
+    position:   "translation",
+    quaternion: "rotation",
+    scale:      "scale",
+};
+
+/**
+ * Map FBXLoader's `group.animations` (THREE.AnimationClip[]) into GLBParser's documented
+ * `animations: [{name, duration, samplers, channels}]` shape (gpu/GLBParser.js's `_parseAnimationClip`,
+ * ~line 976 -- this function matches that shape field-for-field). One sampler + one channel per FBX track,
+ * mirroring `_parseAnimationClip`'s own 1:1 sampler/channel structure. Returns `null` when the group carries
+ * no clips (FBXLoader always sets `group.animations` to an array -- possibly empty -- never undefined, but
+ * this function tolerates either).
+ *
+ * `nodes` is the flat array `snapshotNodes()` already built for skin/node output -- reused, not rebuilt, per
+ * this file's header. A track resolves to a node by matching everything before the LAST "." in its `.name`
+ * (FBXLoader's own `<sanitizedModelName>.<property>` convention) against `nodes[i].name` -- the same name
+ * `Object3D.name` was given when FBXLoader built that node (`PropertyBinding.sanitizeNodeName(attrName)`,
+ * vendor/three/jsm/loaders/FBXLoader.js ~line 981/1018). A track whose target name isn't found, or whose
+ * property isn't one of position/quaternion/scale (e.g. a `DeformPercent` morph-target track -- see this
+ * file's header), is skipped rather than crashing or emitting a bogus channel.
+ */
+function mapFbxAnimations(clips, nodes) {
+    if (!Array.isArray(clips) || clips.length === 0) return null;
+
+    return clips.map((clip, clipIdx) => {
+        const samplers = [];
+        const channels = [];
+
+        for (const track of (clip.tracks || [])) {
+            const name = track && track.name;
+            if (typeof name !== "string") continue;
+            const lastDot = name.lastIndexOf(".");
+            if (lastDot < 0) continue;
+
+            const targetName = name.slice(0, lastDot);
+            const fbxProperty = name.slice(lastDot + 1);
+            const path = FBX_TRACK_PROPERTY_TO_GLTF_PATH[fbxProperty];
+            if (!path) continue;   // morph-target ("morphTargetInfluences[n]") or unknown -- see header
+
+            let targetNode = -1;
+            for (let i = 0; i < nodes.length; i++) {
+                if (nodes[i].name === targetName) { targetNode = i; break; }
+            }
+            if (targetNode < 0) continue;   // no matching node -- skip rather than emit an unresolved channel
+
+            const times  = track.times  instanceof Float32Array ? track.times  : Float32Array.from(track.times || []);
+            const values = track.values instanceof Float32Array ? track.values : Float32Array.from(track.values || []);
+            if (times.length === 0) continue;
+
+            const samplerIdx = samplers.length;
+            samplers.push({ times, values, interpolation: samplerInterpolation(track) });
+            channels.push({ samplerIdx, targetNode, path });
+        }
+
+        // clip.duration: trusted directly, not recomputed. FBXLoader's AnimationParser (addClip(), ~line 2752)
+        // always constructs `new AnimationClip(name, -1, tracks)` -- duration -1 makes THREE.AnimationClip's
+        // own constructor call `this.resetDuration()` (vendor/three/three.module.js ~line 42719), which sets
+        // `duration = max(track.times[last])` across the clip's tracks -- confirmed by reading resetDuration()
+        // (~line 43010) directly: it is EXACTLY the computation GLBParser._parseAnimationClip does by hand for
+        // glTF clips (glTF's JSON has no separate duration field to trust or distrust). Since FBXLoader can
+        // only ever hand this function a THREE.AnimationClip built that way, `clip.duration` and "max time
+        // across this clip's tracks" cannot disagree for FBX input -- recomputing it here would just be
+        // re-deriving the same number by hand. If `clip.duration` is ever missing or non-numeric (defensive
+        // only -- not reachable via FBXLoader's own code path), fall back to the max sampler time.
+        let duration = typeof clip.duration === "number" && isFinite(clip.duration) ? clip.duration : 0;
+        if (!(typeof clip.duration === "number" && isFinite(clip.duration))) {
+            for (const samp of samplers) {
+                const t = samp.times[samp.times.length - 1] ?? 0;
+                if (t > duration) duration = t;
+            }
+        }
+
+        return {
+            name: clip.name || `clip_${clipIdx}`,
+            duration,
+            samplers,
+            channels,
+        };
+    });
+}
+
 /**
  * Convert a THREE.Group (FBXLoader's parse() return value) into a GLBParser.parse()-shaped object -- same
  * field names, same types, documented at the top of gpu/GLBParser.js. See this file's header for exactly what
@@ -145,6 +274,11 @@ export function normalizeFbxGroup(group) {
     group.updateMatrixWorld(true);
 
     const { nodes, indexOf } = snapshotNodes(group);
+
+    // Task #59 -- mapped once, up front, independent of whether a mesh is found below: an FBX file's
+    // animation clips live on the group itself (`group.animations`, set by FBXLoader's AnimationParser), not
+    // on the mesh, so this does not belong inside the mesh-found branch below.
+    const animations = mapFbxAnimations(group.animations, nodes);
 
     // Single-mesh v1 scope (see header) -- first isMesh/isSkinnedMesh found, pre-order.
     let meshObj = null;
@@ -163,7 +297,7 @@ export function normalizeFbxGroup(group) {
         joints: null,
         weights: null,
         skin: null,
-        animations: null,   // deliberate v1 gap -- see this file's header
+        animations,   // task #59 -- mapped from group.animations even when no mesh was found (see above)
         nodes,
         colors: null,
         morphTargets: null,
@@ -268,7 +402,7 @@ export function normalizeFbxGroup(group) {
         joints,
         weights,
         skin,
-        animations: null,           // deliberate v1 gap -- see this file's header
+        animations,                 // task #59 -- see mapFbxAnimations() and this file's header
         nodes,
         colors: null,               // v1 gap -- see this file's header
         morphTargets: null,

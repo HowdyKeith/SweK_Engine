@@ -1,27 +1,32 @@
-// WebGLEngine/tools/ship/fbxIngest-selfcheck.mjs -- v1
+// WebGLEngine/tools/ship/fbxIngest-selfcheck.mjs -- v2 (task #59 added section 6)
 //
 // Run: node tools/ship/fbxIngest-selfcheck.mjs
 //
 // GATES gpu/fbxLoad.js, the .fbx branch gpu/gpuAssetLoader.js's _load()/_loadFBX() added, the
 // _loadGLBFromBytes -> _uploadParsedMesh refactor that made the FBX and GLB paths share one GPU-upload
-// implementation, and index.html's new "three" import map.
+// implementation, index.html's "three" import map, and (task #59, section 6) gpu/fbxLoad.js's
+// mapFbxAnimations() -- the FBX-clip -> GLBParser-shape animation mapping.
 //
 // *** TASK #44: FBX ASSETS WERE RECOGNIZED THROUGHOUT THE TREE AND NOTHING EVER LOADED ONE. *** Keith's call
 // was three.js's own vendored FBXLoader (vendor/three/jsm/loaders/FBXLoader.js, vendored at r160 in commit
-// b5fccadb, "round 1" of this work) run in-browser, NOT a native FBX2glTF conversion step. This gate covers
-// round 2: gpu/fbxLoad.js (parseFbx / normalizeFbxGroup), the wiring in gpu/gpuAssetLoader.js, and the
-// import map index.html needed to resolve FBXLoader.js's own bare `from "three"`.
+// b5fccadb, "round 1" of this work) run in-browser, NOT a native FBX2glTF conversion step. Round 2 (commit
+// ca8b8f0c) covered gpu/fbxLoad.js (parseFbx / normalizeFbxGroup), the wiring in gpu/gpuAssetLoader.js, and
+// the import map index.html needed to resolve FBXLoader.js's own bare `from "three"` -- sections 1-5 below.
+//
+// *** TASK #59: THE DEFERRED FOLLOW-UP, ANIMATION-CLIP MAPPING. *** Round 2 shipped skin/joint extraction
+// but left `animations: null` unconditionally, named plainly as a v1 gap because no committed, license-clean
+// rigged+animated fixture existed to verify it against (see the "informal spot-check" paragraph this section
+// used to carry -- superseded now, kept below in spirit as an explanation of why closing it took a second
+// round rather than being done in round 2). Section 6 below closes that gap: gpu/fixtures/fbxAnim.ascii.fbx
+// (a second hand-authored fixture, same licensing discipline as fbxIngest.ascii.fbx) round-trips through the
+// real pipeline with a populated skeleton AND a real animation clip, and mapFbxAnimations() is graded against
+// exact, hand-computed numbers -- not the one-time informal spot-check round 2 could not repeat.
 //
 // ================================================================================================
 // WHAT THIS GATE DOES NOT PROVE -- READ THIS BEFORE TRUSTING A GREEN RUN, SAME STYLE AS
 // gpu/fixtures/PROVENANCE.md AND gpu/GLBParser.js's OWN HEADER
 // ================================================================================================
 //
-//   * NO ANIMATION-CLIP MAPPING. gpu/fbxLoad.js's normalizeFbxGroup() sets `animations: null`
-//     unconditionally -- a deliberate, named v1 gap, not a silent omission. FBXLoader DOES attach
-//     group.animations (THREE.AnimationClip[]) when the source file has them; mapping each clip's
-//     `.tracks` into GLBParser's `{name, duration, samplers, channels}` shape is real follow-up work, not
-//     attempted here. See gpu/fbxLoad.js's header for the full reasoning.
 //   * NO MULTI-PRIMITIVE / MULTI-MESH CONCAT. normalizeFbxGroup() reads only the FIRST object in the tree
 //     with .isMesh or .isSkinnedMesh true -- single-mesh v1 scope, matching GLBParser's own original v1
 //     scope before multi-primitive concat grew in over many later rounds. A multi-mesh FBX loses everything
@@ -32,40 +37,47 @@
 //     `gl.texImage2D` from was left undone because it could not be verified against a real textured FBX (see
 //     the licensing note below) -- an unverified guess at texture-extraction code is worse than the visible
 //     gap.
-//   * THE SKINNED / RIGGED PATH WAS SPOT-CHECKED EXACTLY ONCE, INFORMALLY, AND THIS GATE DOES NOT REPEAT IT.
-//     Section 3 below proves normalizeFbxGroup()'s skin/joint code against the committed hand-authored
-//     fixture, which has NO skeleton (see the licensing note below for why the fixture is unrigged). The
-//     skin-extraction branch (skeleton.bones, boneInverses, skinIndex/skinWeight -> GLBParser's skin/joints/
-//     weights shape) was instead run, once, locally, against three.js's own examples/models/fbx/
-//     "Samba Dancing.fbx" sample -- downloaded to an out-of-repo scratch directory, never staged, deleted
-//     immediately after the check, and its measured numbers (52 joints, 103,440 vertices, 2 animation
-//     clips, no NaNs) are recorded HERE as an informal one-time observation, not as a gate-verified or
-//     repo-verified claim, and this gate does not re-run it, because doing so would require either
-//     re-downloading that file into the toolchain on every gate run (a networked, licence-uncertain
-//     dependency this gate refuses to carry) or committing it (which gpu/fixtures/PROVENANCE.md's own
-//     licensing discipline refuses without a personally-verified licence -- Samba Dancing.fbx being a
-//     Mixamo-class asset shipped alongside three.js's MIT-licensed example CODE, under terms that license
-//     does not itself cover, and which was not chased down further once the informal check had already
-//     answered "does the code crash on a real rigged file"). If a committed, rigged, license-clean fixture
-//     is ever built (most likely: hand-authoring one, the same route this gate's own static-mesh fixture
-//     took), this gap should close then.
+//   * ANIMATION MAPPING IS NOW PROVEN FOR THE COMMON CASE, NOT EVERY CASE. Section 6 below proves, against
+//     real measured numbers: a QuaternionKeyframeTrack (rotation) resolved to its target node by name, LINEAR
+//     interpolation, a clip's `duration` trusted from THREE.AnimationClip (see gpu/fbxLoad.js's header for
+//     why that is safe rather than assumed), and skin extraction (bones, inverse-bind matrices, skinIndex/
+//     skinWeight) exercised TOGETHER with animation on the same rig for the first time in a committed gate --
+//     closing the exact gap round 2's own header named ("the skin-extraction branch was spot-checked once,
+//     informally, against an uncommitted third-party file"). Still NOT covered, stated plainly rather than
+//     silently: `preRotation`/`postRotation` and non-default Euler rotation orders (the fixture uses neither);
+//     a VectorKeyframeTrack (position/scale) channel (the fixture animates rotation only -- generateVectorTrack
+//     and generateRotationTrack are different code paths in FBXLoader's own AnimationParser, and only the
+//     latter is exercised here); more than one AnimationStack/clip in a single file; CUBICSPLINE interpolation
+//     (FBXLoader's AnimationParser never emits it -- see gpu/fbxLoad.js's header for why LINEAR is not a
+//     guessed default for FBX input specifically); and morph-target (`DeformPercent`) animation tracks, which
+//     mapFbxAnimations() deliberately skips rather than mis-mapping (see its own comment in gpu/fbxLoad.js).
 //
 // ================================================================================================
-// THE FIXTURE, AND WHY IT IS HAND-WRITTEN RATHER THAN SOURCED
+// THE FIXTURES, AND WHY THEY ARE HAND-WRITTEN RATHER THAN SOURCED
 // ================================================================================================
 //
-// gpu/fixtures/fbxIngest.ascii.fbx is committed. It is not derived from anything -- see
-// gpu/fixtures/PROVENANCE.md's own entry for it. gpu/fixtures/PROVENANCE.md already established this
-// tree's rule for exactly this situation (its ABeautifulGame entries): a licence must be personally
+// gpu/fixtures/fbxIngest.ascii.fbx and gpu/fixtures/fbxAnim.ascii.fbx are both committed. Neither is derived
+// from anything -- see gpu/fixtures/PROVENANCE.md's own entries for each. PROVENANCE.md already established
+// this tree's rule for exactly this situation (its ABeautifulGame entries): a licence must be personally
 // verified before a third-party asset is vendored, even trimmed, and Duck/BrainStem in the SAME sample
 // repository as the CC-BY-4.0 ABeautifulGame model carry different, more restrictive licences -- so
 // "everyone uses this for testing" is not a licence. The common FBX test fixtures the wider ecosystem
 // reaches for (Mixamo exports, most game-asset-marketplace samples, three.js's own examples/models/fbx/
-// Samba Dancing.fbx) could not be positively confirmed redistributable in the time this round had, so none
-// of them is here. The fixture instead is plain ASCII FBX 7.4 text, written directly against
-// vendor/three/jsm/loaders/FBXLoader.js's own TextParser/FBXTreeParser/GeometryParser source (confirmed by
-// reading that source, not guessed) -- two triangles sharing an edge, the same quad shape
-// tools/ship/dracoEncode-selfcheck.mjs's own QUAD fixture uses, with per-corner normals and UVs.
+// Samba Dancing.fbx) could not be positively confirmed redistributable, so none of them is here. Both
+// fixtures instead are plain ASCII FBX 7.4 text, written directly against vendor/three/jsm/loaders/
+// FBXLoader.js's own TextParser/FBXTreeParser/GeometryParser/DeformerParser/AnimationParser source (confirmed
+// by reading that source, not guessed):
+//
+//   * fbxIngest.ascii.fbx (round 2, task #44) -- two triangles sharing an edge, the same quad shape
+//     tools/ship/dracoEncode-selfcheck.mjs's own QUAD fixture uses, with per-corner normals and UVs, no
+//     skeleton, no animation.
+//   * fbxAnim.ascii.fbx (round 3, task #59) -- the SAME quad, skinned to a minimal 2-bone rig (root at the
+//     origin, a child bone offset (0,1,0), the quad's bottom 2 control points weighted 100% to the root and
+//     the top 2 to the child), plus one animation clip ("TestClip") rotating the child bone 0 -> 90 degrees
+//     about X over 1 second (2 keyframes) -- the smallest rig that exercises skin and animation together.
+//     Iterated against the real headless-Chromium harness (tools/ship/webgpuHarness.mjs's runInEngineOrigin,
+//     the same one section 6 below uses) rather than trusted from reading the FBX grammar alone -- the same
+//     discipline task #44's own fixture took.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -114,8 +126,11 @@ console.log("\n2. gpu/fbxLoad.js FOLLOWS THE SAME DEPENDENCY-INJECTION SHAPE AS 
     ok("!! normalizeFbxGroup uses ONLY duck-typing (.isMesh/.isSkinnedMesh/.isBone-shaped checks), no 'three' import",
         !/from ['"]three['"]/.test(fbxLoadSrc) &&
         /\.isMesh \|\| obj\.isSkinnedMesh/.test(fbxLoadSrc));
-    ok("!! the v1 scope gaps are documented in the file's own header, GLBParser.js-header style",
-        /NO ANIMATION/.test(fbxLoadSrc) && /SINGLE MESH ONLY/.test(fbxLoadSrc));
+    ok("!! the remaining v1 scope gaps are documented in the file's own header, GLBParser.js-header style",
+        /SINGLE MESH ONLY/.test(fbxLoadSrc) && /NO TEXTURES, NO VERTEX COLORS/.test(fbxLoadSrc));
+    ok("!! ...and task #59's animation-mapping closure is documented too, not silently folded in",
+        /ANIMATION MAPPING \(task #59, closed this round\)/.test(fbxLoadSrc) &&
+        /mapFbxAnimations/.test(fbxLoadSrc));
 }
 
 // ---- 3. THE FIXTURE, THROUGH THE REAL PIPELINE, IN A REAL BROWSER ----------------------------------------------
@@ -347,9 +362,153 @@ console.log("\n5. index.html'S IMPORT MAP -- THE DOCUMENT gpuAssetLoader.js's DY
         "that needed the fix.");
 }
 
+// ---- 6. TASK #59 -- THE RIGGED+ANIMATED FIXTURE ROUND-TRIPS, WITH EXACT MEASURED NUMBERS -----------------------
+console.log("\n6. *** TASK #59: gpu/fbxLoad.js's mapFbxAnimations() -- SKIN + ANIMATION, TOGETHER, THROUGH THE REAL");
+console.log("      PIPELINE, GRADED AGAINST HAND-COMPUTED NUMBERS, NOT \"IT LOADED\" ***");
+{
+    const skip = webgpuSkipReason();
+    if (skip) {
+        say("SKIP (no headless shell / playwright): " + skip);
+        fails++;
+    } else {
+        const animFixturePath = path.join(ENG, "gpu/fixtures/fbxAnim.ascii.fbx");
+        ok("!! the committed rigged+animated fixture exists", fs.existsSync(animFixturePath), animFixturePath);
+
+        const SCRIPT = `async () => {
+            const im = document.createElement("script");
+            im.type = "importmap";
+            im.textContent = JSON.stringify({ imports: { "three": "/vendor/three/three.module.js" } });
+            document.head.appendChild(im);
+            await new Promise((r) => setTimeout(r, 10));
+
+            const canvas = document.createElement("canvas");
+            const gl = canvas.getContext("webgl2");
+            if (!gl) return { ok: false, reason: "no webgl2 context in this headless page" };
+            const { GPUAssetLoader } = await import("/gpu/gpuAssetLoader.js");
+            const loader = new GPUAssetLoader(gl, { basePath: "/gpu/fixtures/" });
+            loader.primeKnownAssets(["fbxAnim.ascii"], {
+                "fbxAnim.ascii": { glb: false, obj: false, fbx: true, folder: false },
+            });
+            let mesh;
+            try { mesh = await loader.loadAsset("fbxAnim.ascii"); }
+            catch (e) { return { ok: false, stage: "loadAsset threw", error: String(e && e.message || e) }; }
+            if (!mesh) return { ok: false, reason: "loadAsset returned null" };
+            return {
+                ok: true,
+                vertexCount: mesh.vertexCount,
+                indexCount: mesh.indexCount,
+                hasNormals: mesh.hasNormals,
+                hasTexCoords: mesh.hasTexCoords,
+                isRigged: mesh.isRigged,
+                nodeNames: mesh.nodes ? mesh.nodes.map((n) => n.name) : null,
+                skinJoints: mesh.skin ? mesh.skin.joints : null,
+                skinIndex: mesh.joints ? Array.from(mesh.joints) : null,
+                skinWeight: mesh.weights ? Array.from(mesh.weights) : null,
+                animations: mesh.animations ? mesh.animations.map((c) => ({
+                    name: c.name,
+                    duration: c.duration,
+                    samplers: c.samplers.map((s) => ({
+                        times: Array.from(s.times),
+                        values: Array.from(s.values),
+                        interpolation: s.interpolation,
+                    })),
+                    channels: c.channels,
+                })) : null,
+            };
+        }`;
+        const out = await runInEngineOrigin({ engineRoot: ENG, script: SCRIPT });
+        if (out.skipped) { say("SKIP: " + out.reason); fails++; }
+        else {
+            ok("!! *** the SHIPPED pipeline loads the rigged+animated fixture (loadAsset -> _loadFBX -> real ***",
+                out.ok && out.result && out.result.ok,
+                out.ok ? JSON.stringify(out.result).slice(0, 200) : out.reason);
+            if (out.ok && out.result && out.result.ok) {
+                const r = out.result;
+                // Every number below is measured, then hand-derived independently from the fixture's own
+                // authored values (gpu/fixtures/fbxAnim.ascii.fbx) -- not copy-pasted from a first passing run.
+                // See this file's header for the fixture's shape (2 bones, quad skinned to them, one clip).
+                ok("!! *** vertexCount/indexCount are EXACTLY 6/6 (the same quad as fbxIngest.ascii.fbx) ***",
+                    r.vertexCount === 6 && r.indexCount === 6,
+                    "got vertexCount=" + r.vertexCount + " indexCount=" + r.indexCount);
+                ok("!! hasNormals/hasTexCoords are both true -- the skin path did not disturb the geometry path",
+                    r.hasNormals === true && r.hasTexCoords === true);
+                ok("!! *** isRigged is true -- skin AND animations are both present, the first time this gate has",
+                    r.isRigged === true, "  seen that (fbxIngest.ascii.fbx has neither; task #44's fixture alone could never set this flag)");
+
+                // nodes: pre-order DFS from the group. Objects.Model's file order is fixtureMesh(2000000),
+                // root(2100000), child(2200000) -- modelMap preserves insertion order, so snapshotNodes() visits
+                // [group, fixtureMesh, root, child] in exactly that order. Measured, not assumed: verified via
+                // this file's own iteration script against FBXLoader directly before this section was written.
+                ok("!! *** nodes are EXACTLY [\"\", \"fixtureMesh\", \"root\", \"child\"], in that pre-order ***",
+                    JSON.stringify(r.nodeNames) === JSON.stringify(["", "fixtureMesh", "root", "child"]),
+                    JSON.stringify(r.nodeNames));
+
+                // skin.joints holds NODE INDICES (glTF convention) in skeleton.bones order (root Cluster's
+                // connection precedes child Cluster's in the fixture's Connections block, so bones = [root,
+                // child]) -- node indices 2 and 3 per the nodes array just proven above.
+                ok("!! *** skin.joints is EXACTLY [2, 3] (root's node index, then child's) ***",
+                    JSON.stringify(r.skinJoints) === JSON.stringify([2, 3]), JSON.stringify(r.skinJoints));
+
+                // skinIndex/skinWeight: the fixture's Cluster Indexes assign control points 0,1 (the quad's
+                // bottom edge, y=0) fully to bone 0 (root) and control points 2,3 (the top edge, y=2) fully to
+                // bone 1 (child), each with weight 1 and no blending. FBXLoader expands 4 control points into
+                // 6 non-indexed polygon-vertex corners (triangles [0,1,2],[1,3,2]) the same way fbxIngest.ascii
+                // .fbx's position path does -- so the SAME per-control-point skin assignment appears 6 times
+                // (once per corner), each padded to 4 joint/weight slots (glTF's fixed vec4 convention), with
+                // the 3 unused slots at weight 0.
+                const expectSkinIndex  = [0,0,0,0, 0,0,0,0, 1,0,0,0,  0,0,0,0, 1,0,0,0, 1,0,0,0];
+                const expectSkinWeight = [1,0,0,0, 1,0,0,0, 1,0,0,0,  1,0,0,0, 1,0,0,0, 1,0,0,0];
+                ok("!! *** skinIndex (the GPU joints attribute) matches the fixture's Cluster assignment exactly ***",
+                    JSON.stringify(r.skinIndex) === JSON.stringify(expectSkinIndex), JSON.stringify(r.skinIndex));
+                ok("!! *** skinWeight matches too -- every corner fully weighted to its one bone, no blending ***",
+                    JSON.stringify(r.skinWeight) === JSON.stringify(expectSkinWeight), JSON.stringify(r.skinWeight));
+
+                // animations -- THE NEW CODE THIS ROUND ADDS. One clip, one QuaternionKeyframeTrack (rotation),
+                // resolved to the child bone (node index 3). Values are hand-derived below, not copied from a
+                // first passing run:
+                //   FBX curve values are DEGREES: X goes 0 -> 90 over KeyTime 0 -> 46186158000 FBX time units.
+                //   convertFBXTimeToSeconds divides by 46186158000 (vendor/three/jsm/loaders/FBXLoader.js
+                //   ~line 4082) -- so times are EXACTLY [0, 1] (both integers, exact in f64 division).
+                //   A pure-X Euler rotation of 90 degrees ((pi/2, 0, 0) radians, any Euler order since the other
+                //   two axes are zero) is the quaternion (sin(pi/4), 0, 0, cos(pi/4)) = (0.7071067811865476, 0,
+                //   0, 0.7071067811865476) in float64 -- QuaternionKeyframeTrack stores values as Float32Array
+                //   (vendor/three/three.module.js's KeyframeTrack.ValueBufferType), and that value rounds to
+                //   EXACTLY 0.7071067690849304 in float32 -- the number below is that rounded value, not the
+                //   float64 one, because that is what actually reaches normalizeFbxGroup().
+                //   duration: trusted from THREE.AnimationClip (see gpu/fbxLoad.js's header for why) -- for a
+                //   single 2-keyframe track spanning t=[0,1], that is exactly 1.
+                const clip = r.animations && r.animations[0];
+                ok("!! *** exactly 1 animation clip, named \"TestClip\", duration EXACTLY 1 ***",
+                    r.animations && r.animations.length === 1 && clip &&
+                    clip.name === "TestClip" && clip.duration === 1,
+                    JSON.stringify(r.animations).slice(0, 200));
+                if (clip) {
+                    ok("!! *** exactly 1 sampler, times EXACTLY [0, 1], LINEAR interpolation ***",
+                        clip.samplers.length === 1 &&
+                        JSON.stringify(clip.samplers[0].times) === JSON.stringify([0, 1]) &&
+                        clip.samplers[0].interpolation === "LINEAR",
+                        JSON.stringify(clip.samplers[0]).slice(0, 200));
+                    const expectValues = [0, 0, 0, 1,  0.7071067690849304, 0, 0, 0.7071067690849304];
+                    ok("!! *** the quaternion values are EXACTLY [identity, then a 90-degree X rotation] ***",
+                        JSON.stringify(clip.samplers[0].values) === JSON.stringify(expectValues),
+                        JSON.stringify(clip.samplers[0].values));
+                    ok("!! *** exactly 1 channel: samplerIdx 0, targetNode 3 (\"child\"), path \"rotation\" ***",
+                        clip.channels.length === 1 && clip.channels[0].samplerIdx === 0 &&
+                        clip.channels[0].targetNode === 3 && clip.channels[0].path === "rotation",
+                        JSON.stringify(clip.channels));
+                    say("path is \"rotation\", NOT \"quaternion\" -- FBXLoader names its own track " +
+                        "\"child.quaternion\" (three.js's Object3D property), and mapFbxAnimations() translates " +
+                        "that to glTF's channel-path word, which is what GLBParser's own consumers expect " +
+                        "(see gpu/fbxLoad.js's FBX_TRACK_PROPERTY_TO_GLTF_PATH and header).");
+                }
+            }
+        }
+    }
+}
+
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
-    "\nSee this file's own header for the full list of what is deliberately NOT proven here: no animation-clip " +
-    "mapping, no multi-mesh/multi-material concat, no embedded-texture extraction, and the skin/joint " +
-    "extraction code path's only verification against a real rigged file was one informal, uncommitted, " +
-    "local spot-check this gate does not repeat.");
+    "\nSee this file's own header for the full list of what is deliberately NOT proven here: no multi-mesh/" +
+    "multi-material concat, no embedded-texture extraction, no VectorKeyframeTrack (position/scale) channel, " +
+    "no preRotation/postRotation or non-default Euler order, no multi-clip file, and no CUBICSPLINE " +
+    "interpolation (FBXLoader's own AnimationParser never emits it).");
 process.exit(fails ? 1 : 0);

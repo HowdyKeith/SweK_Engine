@@ -65,19 +65,54 @@ The fixture is two triangles sharing an edge (the same quad shape `tools/ship/dr
 own `QUAD` fixture uses: control points `(0,0,0) (2,0,0) (0,2,0) (2,2,0)`, triangles `[0,1,2]` and `[1,3,2]`),
 carrying per-corner normals (`(0,0,1)` — the quad's flat-plane normal) and per-corner UVs, so
 `gpu/fbxLoad.js`'s normal and UV paths are exercised and not only positions. It has no skin and no
-animation, which is consistent with `gpu/fbxLoad.js`'s own header: this round's normal/UV/position path is
-verified against a committed, repo-owned fixture; the skinned+animated code path was instead spot-checked
-**once, informally, locally, uncommitted** against three.js's own `Samba Dancing.fbx` (downloaded to a
-scratch directory outside this repository, never staged, deleted immediately after the check) — see
-`tools/ship/fbxIngest-selfcheck.mjs`'s own header for exactly what that check did and did not prove, and why
-its numbers are not repeated here as a repo-verified claim.
+animation on purpose — this round's normal/UV/position path is verified against a committed, repo-owned
+fixture, while the skinned+animated code path was instead spot-checked **once, informally, locally,
+uncommitted** against three.js's own `Samba Dancing.fbx` (downloaded to a scratch directory outside this
+repository, never staged, deleted immediately after the check). That gap is closed by `fbxAnim.ascii.fbx`,
+below (task #59) — see that entry, and `tools/ship/fbxIngest-selfcheck.mjs`'s header, for what is proven now
+and what still isn't.
 
 `tools/ship/fbxIngest-selfcheck.mjs` round-trips this file through the real pipeline (HEAD-probe →
 `GPUAssetLoader._loadFBX` → `gpu/fbxLoad.js`'s `parseFbx`/`normalizeFbxGroup` → `_uploadParsedMesh`) in a
 real headless-Chromium page, via `tools/ship/webgpuHarness.mjs`'s `runInEngineOrigin`, and asserts exact
 measured vertex/index/normal/UV counts against it — not "it loaded", specific numbers.
 
-## `regressionTri.glb` — same round, the GLB-side regression fixture
+## `fbxAnim.ascii.fbx` — task #59, the deferred animation-mapping round
+
+A fourth file, added when `gpu/fbxLoad.js`'s `mapFbxAnimations()` mapped FBX animation clips into
+GLBParser's `animations` shape (round 2, task #44, shipped skin/joint extraction but left `animations: null`
+unconditionally — a named gap, not an oversight, because no committed license-clean rigged+animated fixture
+existed to check it against). Same discipline as `fbxIngest.ascii.fbx` above, for the same reason: hand-
+authored, plain-ASCII FBX 7.4, written directly against `vendor/three/jsm/loaders/FBXLoader.js`'s
+`DeformerParser` (`parseDeformers`/`parseSkeleton`, the `Skin`/`Cluster` `Deformer` node shapes and their
+`Indexes`/`Weights`/`TransformLink` sub-properties) and `AnimationParser` (`parseAnimationCurveNodes`/
+`parseAnimationCurves`/`parseAnimationLayers`/`parseAnimStacks`, and the `Connections` wiring between
+`AnimationCurve` → `AnimationCurveNode` → `AnimationLayer` → `AnimationStack`, plus the `"OP"`
+curve-node-to-Model property connection) — confirmed by reading that source directly, then iterated against
+the real headless-Chromium harness (`tools/ship/webgpuHarness.mjs`'s `runInEngineOrigin`) until FBXLoader
+produced a populated `SkinnedMesh`/`Skeleton` and a non-empty `group.animations`, rather than trusted from
+the grammar alone.
+
+**What it is:** the smallest rig that exercises skin and animation together, not a realistic character. Two
+bones — a root at the origin and a child offset `(0, 1, 0)` — and the same quad `fbxIngest.ascii.fbx` uses,
+skinned to them with no blending (the quad's bottom edge, control points 0 and 1, weighted 100% to the root;
+the top edge, control points 2 and 3, 100% to the child). One animation clip, `"TestClip"`, with a single
+`QuaternionKeyframeTrack` rotating the child bone 0 → 90 degrees about X over 1 second (2 keyframes, LINEAR
+interpolation — the only interpolation FBXLoader's own `AnimationParser` ever produces).
+
+**What it proves, and the limit:** `tools/ship/fbxIngest-selfcheck.mjs` section 6 round-trips this file
+through the exact same shipped pipeline as `fbxIngest.ascii.fbx`, and asserts exact measured values — node
+names and their pre-order indices, `skin.joints`, the full `skinIndex`/`skinWeight` GPU attribute contents,
+the clip's name/duration, its sampler's times/values/interpolation, and its channel's `targetNode`/`path` —
+each hand-derived from the fixture's own authored numbers (see that gate's own comments for the derivation,
+including the float64→float32 rounding of the quaternion values). This closes the specific gap task #44's
+gate named: skin extraction and animation mapping are now proven **together**, on one committed fixture, not
+assumed compatible or checked once informally on a file nobody can re-run. It does **not** prove
+`preRotation`/`postRotation` handling, non-default Euler rotation orders, a `VectorKeyframeTrack`
+(position/scale) channel, more than one clip in a file, or CUBICSPLINE interpolation — see
+`tools/ship/fbxIngest-selfcheck.mjs`'s header for the full, current list of what is still open.
+
+## `regressionTri.glb` — same round as `fbxIngest.ascii.fbx`, the GLB-side regression fixture
 
 Also self-authored, but by code rather than by hand: `tools/export/voxelGlb.mjs`'s own `writeGlb()` (the
 same writer `tools/ship/voxelGlb-selfcheck.mjs` grades) generating two triangles with positions, normals and

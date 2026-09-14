@@ -1,0 +1,136 @@
+; SweK_Engine fbxAnimIngest-selfcheck fixture -- hand-authored, original content, ASCII FBX 7.4.
+; Not derived from any third-party asset -- written for this repository, zero licensing question.
+; Task #59 (the deferred follow-up to task #44). Minimal rigged + animated rig: 2 bones (root at
+; the origin, child offset (0,1,0)), the same quad mesh gpu/fixtures/fbxIngest.ascii.fbx uses, skinned
+; to them (bottom 2 control points -> root, top 2 -> child, full weight each, no blending), and one
+; animation clip ("TestClip") with a single QuaternionKeyframeTrack rotating the child bone 0 -> 90
+; degrees about X over 1 second (2 keyframes). See gpu/fixtures/PROVENANCE.md's entry for this file
+; and gpu/fbxLoad.js's header for exactly what this exercises.
+
+FBXHeaderExtension:  {
+	FBXHeaderVersion: 1003
+	FBXVersion: 7400
+	Creator: "SweK_Engine fbxAnimIngest-selfcheck fixture"
+}
+GlobalSettings:  {
+}
+Objects:  {
+	Geometry: 1000000, "Geometry::fixtureMesh", "Mesh" {
+		Vertices: *12 {
+			a: 0,0,0,2,0,0,0,2,0,2,2,0
+		}
+		PolygonVertexIndex: *6 {
+			a: 0,1,-3,1,3,-3
+		}
+		GeometryVersion: 124
+		LayerElementNormal: 0 {
+			Version: 101
+			Name: ""
+			MappingInformationType: "ByPolygonVertex"
+			ReferenceInformationType: "Direct"
+			Normals: *18 {
+				a: 0,0,1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1
+			}
+		}
+		LayerElementUV: 0 {
+			Version: 101
+			Name: "UVMap"
+			MappingInformationType: "ByPolygonVertex"
+			ReferenceInformationType: "Direct"
+			UV: *12 {
+				a: 0,0,1,0,0,1,1,0,1,1,0,1
+			}
+		}
+	}
+	Model: 2000000, "Model::fixtureMesh", "Mesh" {
+		Version: 232
+		Shading: T
+		Culling: "CullingOff"
+	}
+	Model: 2100000, "Model::root", "LimbNode" {
+		Version: 232
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2200000, "Model::child", "LimbNode" {
+		Version: 232
+		Shading: Y
+		Culling: "CullingOff"
+		Properties70:  {
+			P: "Lcl Translation", "Lcl Translation", "", "A",0,1,0
+		}
+	}
+	Deformer: 5000000, "Deformer::", "Skin" {
+		Version: 101
+		Link_DeformAcuracy: 50
+	}
+	Deformer: 5000001, "Deformer::", "Cluster" {
+		Version: 100
+		Indexes: *2 {
+			a: 0,1
+		}
+		Weights: *2 {
+			a: 1,1
+		}
+		TransformLink: *16 {
+			a: 1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1
+		}
+	}
+	Deformer: 5000002, "Deformer::", "Cluster" {
+		Version: 100
+		Indexes: *2 {
+			a: 2,3
+		}
+		Weights: *2 {
+			a: 1,1
+		}
+		TransformLink: *16 {
+			a: 1,0,0,0,0,1,0,0,0,0,1,0,0,1,0,1
+		}
+	}
+	AnimationStack: 6000000, "AnimStack::TestClip", "" {
+	}
+	AnimationLayer: 6000001, "AnimLayer::BaseLayer", "" {
+	}
+	AnimationCurveNode: 6000010, "AnimCurveNode::R", "" {
+	}
+	AnimationCurve: 6000011, "AnimCurve::", "" {
+		KeyTime: *2 {
+			a: 0,46186158000
+		}
+		KeyValueFloat: *2 {
+			a: 0,90
+		}
+	}
+	AnimationCurve: 6000012, "AnimCurve::", "" {
+		KeyTime: *2 {
+			a: 0,46186158000
+		}
+		KeyValueFloat: *2 {
+			a: 0,0
+		}
+	}
+	AnimationCurve: 6000013, "AnimCurve::", "" {
+		KeyTime: *2 {
+			a: 0,46186158000
+		}
+		KeyValueFloat: *2 {
+			a: 0,0
+		}
+	}
+}
+Connections:  {
+	C: "OO",1000000,2000000
+	C: "OO",5000000,1000000
+	C: "OO",5000001,5000000
+	C: "OO",5000002,5000000
+	C: "OO",2100000,5000001
+	C: "OO",2200000,5000002
+	C: "OO",2200000,2100000
+	C: "OO",6000010,6000001
+	C: "OO",6000001,6000000
+	C: "OP",6000011,6000010,"d|X"
+	C: "OP",6000012,6000010,"d|Y"
+	C: "OP",6000013,6000010,"d|Z"
+	C: "OP",6000010,2200000,"Lcl Rotation"
+}

@@ -1115,10 +1115,10 @@ export class GPUAssetLoader {
         }
 
         const group = await parseFbx(buf, FBXLoader, { path: url.replace(/[^/]*$/, "") });
-        const parsed = normalizeFbxGroup(group);
+        const parsed = normalizeFbxGroup(group);   // task #59 -- animations mapped now
         console.log(`[GPUAssetLoader] FBX "${name}" parsed: ${parsed.positions.length / 3} verts, ${parsed.indices.length} indices` +
             (parsed.skin ? `, rigged (${parsed.skin.joints.length} joints)` : "") +
-            ` — animations NOT mapped this round (see gpu/fbxLoad.js header)`);
+            (parsed.animations ? `, ${parsed.animations.length} clip(s)` : ""));
         return this._uploadParsedMesh(name, parsed, {});
     }
 
