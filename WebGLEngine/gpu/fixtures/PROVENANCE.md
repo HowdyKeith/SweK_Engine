@@ -176,3 +176,17 @@ including actual `gl.getBufferSubData()` readback of the VBO/IBO/NBO contents, n
 both immediately before the refactor (`git stash` on `gpu/gpuAssetLoader.js` alone, HEAD's version) and
 after. `tools/ship/fbxIngest-selfcheck.mjs` re-runs the "after" half of that as a standing regression check,
 pinned to the values that comparison measured.
+
+## `autoRigUnrigged.glb` — task #38/#39, the auto-rig-wiring fixture
+
+Self-authored, hand-built directly against the glTF 2.0 container spec (not through `writeGlb()`, which does
+not emit `NORMAL`/`TEXCOORD_0`/image accessors) — see `tools/ship/trellisAutoRig-selfcheck.mjs`'s own header
+for the generator script's shape, reproduced in that gate's comments. A single mesh, single primitive, 12
+vertices (a vertical 2-column "ladder" spanning y=0..26, x=-1..1, z=0 — chosen to match
+`rig/templates/kaijuBiped.js`'s `KAIJU_BIPED_RIG` bone span so the gate's force-skin assertions bind to
+geometrically sensible bones), with `POSITION`, `NORMAL`, `TEXCOORD_0`, and an embedded 2x2 checkerboard PNG
+base-color texture (encoded with `tools/ship/pngWrite.mjs`'s own `encodePNG`, already vendored in this tree
+for exactly this kind of self-authored fixture). Deliberately carries **no** `JOINTS_0`/`WEIGHTS_0`/skin/
+animations — that is the entire point: it is shaped exactly like a Trellis-generated GLB
+(`ai/ComfyUIClient.js`'s image-to-3D pipeline), which lands with geometry but no skeleton. No third-party
+bytes anywhere, same "no license to verify" reasoning as the fixtures above.

@@ -185,6 +185,14 @@ import { KING_KAIJU_BOT_KINDS, KING_KAIJU_BOT_KIND_NAMES, pickRandomKingKind, is
 // signature instead of the generic tracer line. Imports keep this
 // concern in BotManager rather than spreading through FPSShooter.
 import { KAIJU_ATTACKS, KIND_TO_ATTACK, KIND_TO_RIG } from "../world/kaijuAttacks.js";
+// Task #38/#39 — Trellis-generated kaiju GLBs land with no skin/joints/
+// weights (gpu/GLBParser.js finds none to parse). ForceSkin is this
+// tree's existing tool for force-binding a static mesh to an authored
+// rig template (rig/forceSkin.js); _autoAttachRig below reaches for it
+// when the kaiju's mesh turns out to be unrigged, using the SAME
+// window.kaijuRigs template attachEntityRig will retarget onto next —
+// see the comment block at that call site for why that pairing matters.
+import { installForceSkinGlobal } from "../rig/forceSkin.js";
 for (const [name, spec] of Object.entries(KAIJU_BOT_KINDS)) {
     BOT_KINDS[name] = spec;
 }
@@ -468,6 +476,23 @@ export class BotManager {
      * v834 — best-effort auto-attach. Looks up KIND_TO_RIG[bot.spec.kaijuOrigin],
      * resolves the template from window.kaijuRigs, then calls
      * window.rigSystem.attachEntityRig if the kaiju's mesh is rigged.
+     *
+     * Task #38/#39 — a Trellis-generated GLB (ai/ComfyUIClient.js's image-
+     * to-3D pipeline, landed via assetLoader.swapMesh) has geometry but no
+     * skin/joints/weights/animations, so mesh.isRigged comes out false and
+     * this used to just bail ("unrigged mesh — auto-attach skipped"). Now,
+     * when the mesh is unrigged but we already resolved a matching rig
+     * template above, we force-bind the mesh to THAT SAME template via
+     * ForceSkin (rig/forceSkin.js) before falling through to
+     * attachEntityRig. This is deliberately NOT autoSpineRig.js's fitted-
+     * spine/dance approach: the kaiju already has a canonical, named-bone
+     * pose (KIND_TO_RIG → window.kaijuRigs) that attack-origin lookups
+     * elsewhere key off bone names like "mouth"/"claw_L"/"foot_L" — an
+     * auto-fitted spine has no relationship to those names. ForceSkin's
+     * MeshRigBinding(mesh, rig).autoBind() K=4-nearest-bone bind sets
+     * mesh.skin.joints[i] = i = rig.bones[i], so the mesh's new joint
+     * indices line up 1:1 with the exact rig object we then hand to
+     * attachEntityRig — no separate name-matching step needed.
      */
     _autoAttachRig(bot) {
         try {
@@ -481,10 +506,17 @@ export class BotManager {
             // Find the asset entry to get the mesh. The mesh's assetId is
             // typically the bot's kind (or some mapping). Best-effort lookup:
             // try kind directly, then assetId from the bot's spec.
-            const assetEntry =
-                window.entityMeshRenderer.assetVAOs?.get(bot.spec?.kind || bot.kind);
-            const mesh = assetEntry?.mesh;
-            if (!mesh?.isRigged) return;  // unrigged mesh — auto-attach skipped
+            const assetId = bot.spec?.kind || bot.kind;
+            const assetEntry = window.entityMeshRenderer.assetVAOs?.get(assetId);
+            let mesh = assetEntry?.mesh || window.entityMeshRenderer.loader?.cache?.get(assetId);
+            if (!mesh) return;            // asset not loaded yet
+            if (!mesh.isRigged) {
+                const forceSkin = window.forceSkin || installForceSkinGlobal();
+                const fsRes = forceSkin.apply(assetId, rig, { renderer: window.entityMeshRenderer, mesh });
+                if (!fsRes?.ok) return;    // force-skin failed — leave attack origins at bot center, as before
+                this._counters.rigForceSkinned = (this._counters.rigForceSkinned || 0) + 1;
+            }
+            if (!mesh.isRigged) return;   // belt-and-suspenders — should be unreachable after a successful apply()
             const r = window.rigSystem.attachEntityRig(bot.id, rig, null, { mesh });
             if (r?.ok) {
                 this._counters.rigAutoAttached = (this._counters.rigAutoAttached || 0) + 1;

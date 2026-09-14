@@ -499,6 +499,26 @@ export function voxelPlaneMesh(kind = "jet", { color = [0.9, 0.9, 0.95, 1] } = {
  * ASCII glyph quads pinned to a hull's surface (tools/export/reskin.js: area-weighted samples, a quad in each
  * tangent plane, the glyph chosen by the lit shade at the sample). Drawn through the sprite look over the glyph
  * atlas. The blend hook is a stand-in: these hulls have no skeleton.
+ *
+ * Task #38/#39 investigated wiring gpu/autoSpineRig.js or rig/forceSkin.js in here to give these hulls a real
+ * skeleton, and found it doesn't fit -- not a judgment call between rig shapes, an architecture mismatch:
+ *   - `hull` here never comes from gpu/GLBParser.js / gpu/gpuAssetLoader.js at all. It's built by this file's own
+ *     procedural generators (svgHullMesh, loftMesh, voxelPlaneMesh) or physics/mesh/glb.mjs's minimal parseGLB
+ *     (userModelSources()/loadUserModel(), below) -- a different, much smaller parser that never looks for
+ *     glTF skin/joints/weights in the first place. ai/ComfyUIClient.js's Trellis pipeline does not feed fleets.
+ *   - Fleets never touch render/EntityMeshRenderer.js, mesh.isRigged, or gpu/SkeletalAnimator.js. Every race here
+ *     draws through render/gpuDriven.mjs's own WGSL/GLSL "look" pairs -- instanced, per-record heading only
+ *     (extra.x), with no uJointMatrices uniform or per-vertex joint/weight attribute anywhere in this file's
+ *     shader source. buildGlyphQuads() (tools/export/reskin.js) DOES compute real joints/weights when a caller
+ *     hands it a rigged source mesh (see its Route 1/2 header) -- but glyphSkinMesh's own return below discards
+ *     q.joints/q.weights, because there is no downstream consumer for them.
+ *   - Giving glyphSkinMesh a real rig would mean either (a) building a second, parallel GPU-skinning path inside
+ *     gpuDriven.mjs's shaders for this one race, which the task's own instructions rule out ("don't build a
+ *     parallel rendering path"), or (b) routing fleet hulls through EntityMeshRenderer's pipeline instead --
+ *     a rendering-architecture change far outside "wire up the existing auto-rig tooling."
+ * Reported as a blocker rather than forced: this dead end stays as-is. If gpuDriven.mjs ever grows a skinning
+ * "look," buildSpineRigGeometry (autoSpineRig.js) is the natural fit function for these mostly axial hulls --
+ * plain spine, not buildWheelRig (they fly/float, they don't roll) and not buildDanceRig (not humanoid).
  */
 export function glyphSkinMesh(hull, { count = 320, seed = 1337, size = 0.16, color = [0.55, 1, 0.6, 1] } = {}) {
     const samples = surfaceSamples(hull.positions, hull.indices, { count, seed });
