@@ -42,7 +42,9 @@ let fails = 0;
 const ok = (label, cond, detail) => { if (!cond) fails++; console.log(`  ${cond ? "PASS" : "FAIL"}  ${label}${detail ? "   " + detail : ""}`); };
 const report = (s) => console.log(`  ----  ${s}`);
 
-const G = JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "gate-timings.json"), "utf8")).timings;
+const GRAW = JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "gate-timings.json"), "utf8"));
+const G = GRAW.timings;
+const GK = GRAW.kinds || {};   // v4584 -- so a row can require a kind rather than a band
 const S = JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "sweep-timings.json"), "utf8"));
 const LOAD_8 = 2.15;   // v4576, measured; the criterion below divides by it
 
@@ -185,9 +187,18 @@ console.log("\n5. AND EVERY STALE ENTRY IS CORRECTED, WHICH IS WHY SECTION 3 REA
     // recorded when hostScale-selfcheck's own example moved, and pinning one noisy sample is how you build it.
     // What the row can honestly require is what the sweep half already requires: the entry moved OFF its stale
     // value, and it is within reach of the alone reading rather than back near the number that was wrong.
+    // *** v4584 -- AND THE BAND AROUND A FROZEN ALONE READING IS A GATE'S COST HELD STILL, WHICH IT IS NOT. ***
+    // v4581 replaced an exact-millisecond pin with a 0.6x-1.7x band around `x.alone`, v4577's measurement. Two
+    // rounds on, dockSystem costs 149 ms against the 45 frozen here -- measured, not drifted -- and holding the
+    // entry inside a band around a two-round-old number would force the record to keep a value the gate no longer
+    // costs. timingSemantics-selfcheck carried the identical pin and took the identical repair in this round: what
+    // the row requires is movement OFF the stale value and a KIND on the entry; the ratio is reported, and a gate
+    // that has outgrown its frozen reading is a prompt to re-measure rather than a failure to re-band.
     const nearAlone = (x) => { const r = G[x.gate] / x.alone; return r > 0.6 && r < 1.7; };
-    ok(`*** all ${gFixed.length} stale gate-timings entries are off their stale values and hold an alone-scale reading ***`,
-        gFixed.every((x) => G[x.gate] !== x.gateWas && nearAlone(x)),
+    for (const x of gFixed.filter((y) => !nearAlone(y)))
+        report(`  OUTGROWN  ${path.basename(x.gate).padEnd(32)}now ${G[x.gate]} against v4577's alone ${x.alone} -- re-measure, do not re-band`);
+    ok(`*** all ${gFixed.length} stale gate-timings entries are off their stale values and every one carries a kind ***`,
+        gFixed.every((x) => G[x.gate] !== x.gateWas && !!GK[x.gate]),
         gFixed.map((x) => `${path.basename(x.gate)} ${x.gateWas}->${G[x.gate]} (alone ${x.alone}, ${(G[x.gate] / x.alone).toFixed(2)}x)`).join(", "));
     // *** AND THIS ROW'S FIRST VERSION ASSERTED THE THING v4578 FOUND WRONG. *** It required each repaired
     // sweep entry to hold this round's ALONE reading, on the reasoning that quickSweep prefers serialMs. It

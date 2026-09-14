@@ -3767,6 +3767,60 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since243: Object.freeze({
+        at: "v4584", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/walkerParity-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["ai-bridge/gateWalk.js", "tools/ship/selfchecks.mjs",
+                                "tools/ship/gateWalk-selfcheck.mjs"]),
+        verdict: "green, 3973 ms at eight-wide and 3901 ms alone -- OVER the 3000 ms sweep budget on purpose, " +
+                 "because it runs selfchecks.mjs twice as a child to read the suite's own population, which is " +
+                 "the only way to ask the one walker with no exported walk. *** THE SHIP'S SUITE RUNNER WAS " +
+                 "DISCOVERING AND SCHEDULING TRANSIENT FIXTURES. *** Four gates plant a `__`-prefixed " +
+                 "*-selfcheck.mjs while they run. v4409 found what that costs and closed it at ONE walker -- a " +
+                 "discovered fixture gets RUN, rigProgress's is built to exit 1, 'a NEW RED outside every " +
+                 "register... a race, so it fails a ship at random and never reproduces alone, which is the worst " +
+                 "shape a ship-time check can have'. v4580 closed it at treeRead and wrote that the fix lands at " +
+                 "the walker 'so all four censuses get it at once'. THAT WAS TRUE OF treeRead'S FOUR CONSUMERS " +
+                 "AND I LET IT READ AS FOUR WALKERS. Measured at v4584 by planting one file: " +
+                 "tools/ship/selfchecks.mjs went from 1,634 files to 1,635 AND its selection from 23 gates to 24, " +
+                 "so the fixture was discovered and scheduled; ai-bridge/gateWalk.js -- the shared discovery for " +
+                 "rig.html and gates.html -- returned it as a clickable gate. *** AND THE GATE COMPARING THE TWO " +
+                 "TWINS COULD NOT SEE IT, BECAUSE THEY AGREED. *** gateWalk-selfcheck asserts the twin returns " +
+                 "the same set as the suite's rules; both were missing v4409's rule, so it passed on a false " +
+                 "answer -- the second-copy defect timingCoverage recorded at v3584 -- and it held a THIRD copy " +
+                 "of the walk inline, also missing it. Three copies, one omission, unanimous. *** A FIFTH WALKER " +
+                 "HAD THE RULE ALL ALONG, IN A SPELLING NOTHING GREPPED FOR: *** staleness.mjs's pattern is " +
+                 "/^(?!__)[^/]*-selfcheck.mjs$/, a negative lookahead, and a row in the arriving gate that " +
+                 "grepped for `!f.startsWith(\"__\")` would have failed it while it was CORRECT -- a string proxy " +
+                 "for a property, written into the row built to catch string proxies. That row is gone; all six " +
+                 "exported gate populations are DRIVEN against a planted file instead, and a seventh fails on " +
+                 "arrival. *** AND THE ROUND'S PROPOSED RUNG WAS WRONG THREE TIMES OVER, WHICH IS RECORDED IN THE " +
+                 "GATE. *** v4583 closed by proposing that rigRunner builds its gate list from a payload the rig " +
+                 "sends: it discovers from disk through the shared walk (v4018). Nor is /rig/run unvalidated -- " +
+                 "suffix, existence, no parent escape. Nor do those predicates diverge from the offered menu: " +
+                 "1,641 against 1,641, zero either way. THE DEFECT WAS ONE LAYER PAST ALL THREE GUESSES and no " +
+                 "amount of reading found it. 13 sabotages, 13/13 red, no 0-RED -- after FIVE 0-REDs, all of them " +
+                 "here, two arriving by fixing an earlier row: the suite probe could return a constant and pass " +
+                 "on 0 === 0; pinning `selected` to fix that was itself wrong, because it is the budget planner's " +
+                 "output and read 27 then 26 with no fixture involved; and dropping that clause lost coverage it " +
+                 "had been giving by accident, so three sabotages went 0-RED until each earned a row -- including " +
+                 "one asserting the fixture ACTUALLY EXISTED while the walkers were asked, which is the same " +
+                 "absence the defect hid behind for three rounds. *** AND THE PROBE ITSELF WAS REWRITING THE RECORD IT " +
+                 "REPORTS ON. *** Asking the suite runner for its population meant `--budget 1`, and writeTimings " +
+                 "only refuses for --affected -- so this gate wrote gate-timings.json twice per run, 116 entries " +
+                 "before it was caught, which is v4580's unprotected-filter finding committed by the round that " +
+                 "cited it. selfchecks.mjs gained --count-only: the population, no spawn, no write, and the gate " +
+                 "dropped from 3901 ms to 1754. The 116 are kept rather than reverted -- each is a real exit-0 run " +
+                 "labelled `complete`, which v4580 defined as one cold sample, so the record says what they are -- " +
+                 "and statedRuntime-selfcheck found the one badly out, extrudePolygon at 229 ms against a 31 ms " +
+                 "gate with the HEADER as the correct half. Three gates were then repaired for the same class of " +
+                 "pin: timingSemantics and timingSurvivors held a 0.6x-1.7x band around a frozen alone reading, " +
+                 "and a gate is allowed to outgrow one -- dockSystem costs 149 ms against 45, puppeteer-bridge 133 " +
+                 "against 44, both measured. They require movement off the stale value and a KIND now, and report " +
+                 "the ratio; that demand sent four unprovenanced entries to be re-measured rather than excused, " +
+                 "taking the count 397 -> 394. Verify: 33 green, 3 red, 1 load-only, 0 crash-only.",
+    }),
     since242: Object.freeze({
         at: "v4583", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/runnerReach-selfcheck.mjs"]),

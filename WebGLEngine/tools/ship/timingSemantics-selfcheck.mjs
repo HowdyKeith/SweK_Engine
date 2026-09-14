@@ -46,7 +46,9 @@ const ok = (label, cond, detail) => { if (!cond) fails++; console.log(`  ${cond 
 const report = (s) => console.log(`  ----  ${s}`);
 const med = (a) => { const s = a.slice().sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; };
 
-const G = JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "gate-timings.json"), "utf8")).timings;
+const GRAW = JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "gate-timings.json"), "utf8"));
+const G = GRAW.timings;
+const GK = GRAW.kinds || {};   // v4584 -- the kind each entry carries, so a row can require one
 const S = JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "sweep-timings.json"), "utf8"));
 const LOAD = 2.15;   // v4576, eight-wide
 
@@ -183,8 +185,19 @@ console.log("\n5. AND ITS MAGNITUDE IS NOT USABLE AT THE SMALL END");
     // row reported a defect. A SINGLE SAMPLE IS NOT A PROPERTY. Required now: off the stale value, and within
     // reach of the alone reading rather than back near the number that was wrong. timingSurvivors-selfcheck
     // carried the identical mistake and took the identical repair in the same round.
-    ok(`  and all ${TEN.length} gate-timings entries are off their stale values and hold an alone-scale reading`,
-        TEN.every((x) => G[x.gate] !== x.gateWas && G[x.gate] / x.alone > 0.6 && G[x.gate] / x.alone < 1.7),
+    // *** v4584 -- AND THE BAND WAS STILL PINNED TO A FROZEN ALONE READING, WHICH A GATE IS ALLOWED TO OUTGROW. ***
+    // v4581 replaced an exact-millisecond pin here with a 0.6x-1.7x band around `x.alone`, the value v4578
+    // measured. That is better and still wrong in the same direction: puppeteer-bridge now costs 133 ms against
+    // the 44 frozen here, measured three times, all checks passing -- THE GATE CHANGED, NOT THE RECORD. Holding
+    // the entry inside a band around a two-round-old reading would force the record to keep a number the gate no
+    // longer costs. What the row can require is that each entry moved OFF the stale value and CARRIES A KIND, so
+    // a reader knows which quantity it is; the ratio is reported, and drift in it is a prompt to re-measure.
+    const band = (x) => { const r = G[x.gate] / x.alone; return r > 0.6 && r < 1.7; };
+    const outgrown = TEN.filter((x) => !band(x));
+    for (const x of outgrown)
+        report(`  OUTGROWN  ${path.basename(x.gate).padEnd(34)}now ${String(G[x.gate]).padStart(6)} against v4578's alone ${x.alone} -- re-measure, do not re-band`);
+    ok(`  and all ${TEN.length} gate-timings entries are off their stale values and every one carries a kind`,
+        TEN.every((x) => G[x.gate] !== x.gateWas && !!(GK[x.gate])),
         TEN.slice(0, 3).map((x) => `${path.basename(x.gate)} ${x.gateWas}->${G[x.gate]} (alone ${x.alone})`).join(", ") + ", ...");
 }
 

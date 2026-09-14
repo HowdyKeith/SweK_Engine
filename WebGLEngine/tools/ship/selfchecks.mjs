@@ -91,7 +91,17 @@ function walk(dir, out = []) {
         let st;
         try { st = fs.statSync(p); } catch { continue; }
         if (st.isDirectory()) walk(p, out);
-        else if (/selfcheck.*\.mjs$/.test(f)) out.push(path.relative(ROOT, p));
+        // *** v4584 -- A TRANSIENT FIXTURE IS NOT A GATE, AND THIS WALK HAS BEEN RUNNING THEM. ***
+        //
+        // Four gates plant a `__`-prefixed *-selfcheck.mjs on disk for the seconds they run: rigProgress's
+        // __rigprogress-fixture, gateActivity's __routeProbe, gateMutation's __mutation-decoy and
+        // __mutation-crash. v4409 found this race and closed it at gateSweep.mjs's enumerateGates, because a
+        // discovered fixture gets RUN and rigProgress's is built to exit 1 -- "a NEW RED outside every register.
+        // It is a race, so it fails a ship at random and never reproduces alone, which is the worst shape a
+        // ship-time check can have." v4580 closed it at treeRead.mjs. NOBODY CLOSED IT HERE, in the runner that
+        // actually runs the suite. MEASURED at v4584: planting one fixture took this walk from 1,634 files to
+        // 1,635 AND the selection from 23 gates to 24, so it was discovered and scheduled, not merely seen.
+        else if (/selfcheck.*\.mjs$/.test(f) && !f.startsWith("__")) out.push(path.relative(ROOT, p));
     }
     return out;
 }
@@ -194,6 +204,18 @@ let toRun = all.filter((f) => f !== SELF && !ALREADY_GATED.has(f) && !SKIP.has(f
 // --affected was protected by refusing to write at all. --budget was not protected, because the protection was
 // spelled as a check for one flag rather than as a question about the population.
 const UNFILTERED_COUNT = toRun.length;
+
+// *** v4584 -- COUNT THE POPULATION AND WRITE NOTHING, BECAUSE A GATE ASKED THIS BY RUNNING THE SUITE. ***
+//
+// tools/ship/walkerParity-selfcheck.mjs needs the number this walk returns -- it is the one walker with no
+// exported walk, so the only way to ask it was `--budget 1`, twice per run. THAT WRITES: writeTimings only
+// refuses for --affected, so a gate reporting on the timing record was REWRITING IT on every invocation, which is
+// exactly the unprotected-filter finding v4580 recorded one file over, committed by the round that cited it.
+// --count-only prints the walk's population and exits before anything is spawned or written.
+if (process.argv.includes("--count-only")) {
+    console.log("[selfchecks] population " + UNFILTERED_COUNT + " runnable of " + all.length + " discovered");
+    process.exit(0);
+}
 
 // v3285 -- *** --budget <seconds>: A WALL-CLOCK CAP, COMPOSED WITH --affected RATHER THAN RIVALLING IT. ***
 // --affected answers "which gates can this change reach"; --budget answers "and which of those fit in the time
