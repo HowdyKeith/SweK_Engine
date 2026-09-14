@@ -268,6 +268,15 @@
       } catch (e) { /* never block the engine */ }
     })();
     </script>
+    <!-- v44 (FBX task) -- "three" import map, copied verbatim from aquarelle.html's pattern. Placed ahead of
+         every module-type script tag below so a bare bareword-"three" specifier resolves for every module
+         graph reachable from here -- gpu/fbxLoad.js's caller (gpu/gpuAssetLoader.js's _loadFBX) dynamically
+         imports the vendored jsm FBXLoader module, which bare-imports the same specifier at its own top, and
+         window.swekReskin's _load() (main.js) already dynamic-imports it directly and had no map to resolve
+         against before this. -->
+    <script type="importmap">
+    { "imports": { "three": "/vendor/three/three.module.js" } }
+    </script>
     <!-- v859 — pre-install window.kpopFavorites so PipAvatar (non-module
          legacy script) can read favorites for the avatar cycle. Loaded
          before main.js so the singleton is ready by the time PipAvatar

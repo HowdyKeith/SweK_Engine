@@ -215,7 +215,17 @@ const RESOLVED = new Map(all.map((f) => [f, (GRAPH.refs.get(f) || []).map((r) =>
 // (NURBSCurve.js, NURBSUtils.js, fflate.module.js) are NOT on this list: FBXLoader.js genuinely imports all
 // three, so each has a real non-gate importer and none is rescued. Paying this one down is round 2 of the FBX
 // work the vendoring commit already deferred, not a fix that belongs to this gate.
-const RESCUED_CEILING = 289;
+//
+// ROUND 2, TASK #44 -- 289 -> 288, THE ONE ENTRY THE PREVIOUS NOTE NAMED PAID DOWN, BY THE SAME METHOD. Keith's
+// call was three.js's own vendored FBXLoader, in-browser, not a native FBX2glTF step (see gpu/fbxLoad.js and
+// gpu/gpuAssetLoader.js's _loadFBX). _loadFBX dynamic-imports "/vendor/three/jsm/loaders/FBXLoader.js" with a
+// real string literal (not a composed path), which is exactly the "dynamic" route moduleRefs.mjs resolves --
+// re-run after wiring it, measured 288, not merely expected. This is the entry the FOLLOW-UP note above named
+// as "round 2 of the FBX work the vendoring commit already deferred," now closed. Lowered rather than left
+// with slack, per this file's own rule that a ratchet with slack is a ratchet holding nothing (v3195) -- the
+// gate's own 8-slack budget check confirmed 289 - 288 = 1 is inside tolerance, but the true count is 288 and
+// there is no reason to leave a stale ceiling standing once the real number is in hand.
+const RESCUED_CEILING = 288;
 
 const rescued = [];
 {
