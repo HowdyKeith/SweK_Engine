@@ -1,5 +1,5 @@
 // demos_code/ocean_ecosystem.js — open-water ecosystem over real terrain
-// VERSION: v1 — harvested from the "ocean systems" build session
+// VERSION: v2 — emergent fish/octopus population (see simulation/OceanPopulation.mjs)
 //
 // This is the IDIOMATIC, working distillation of the standalone
 // underwater code. The original used self-rendering WebGL classes that
@@ -10,36 +10,50 @@
 // window.waterField. The behaviors are what survived the teardown:
 //
 //   • Stingrays   — bottom gliders: hug the seabed via ctx.getSurfaceY,
-//                   slow heading changes, gentle banking roll.
+//                   slow heading changes, gentle banking roll. (fixed count)
 //   • Sea turtles — cruise <-> surface FSM: periodically rise to the
 //                   water surface (window.waterField) to "breathe", hold,
-//                   then dive back to mid-water.
-//   • Octopus     — denned on the floor; ink-cloud particle burst when a
-//                   fish strays into its threat radius (+ idle ink wisps).
-//   • Fish school — trimmed Reynolds boids (sep/ali/coh + soft homing),
-//                   flee from active ink clouds. Gives the scene life and
-//                   something for the octopus to react to.
+//                   then dive back to mid-water. (fixed count)
+//   • Fish school — POPULATION EMERGES from per-fish energy budgets, not a
+//                   spawn count. simulation/OceanPopulation.mjs runs a
+//                   headless sim (food-grid grazing, metabolism, movement
+//                   cost, reproduction, death) and this file just reconciles
+//                   spawned meshes against whichever agent ids are alive
+//                   each tick — birth spawns a mesh, death despawns one,
+//                   survivors get moved to the agent's x/z. NUM_FISH below
+//                   is the STARTING population, not a cap.
+//   • Octopus     — same emergent-population treatment: octopus hunt fish
+//                   in the population sim (a real catch chance within a
+//                   catch radius, not guaranteed), gain energy from a catch,
+//                   pay a slow metabolism, starve if they go too long
+//                   without eating, and reproduce on a much longer
+//                   timescale than fish. A catch fires the same ink-cloud
+//                   particle burst this file always had — it now marks a
+//                   real kill instead of a cosmetic near-miss deterrent.
+//                   Simplification made here on purpose: the old
+//                   "threat radius -> idle ink deterrence" near-miss
+//                   behavior is gone; every ink burst now comes from an
+//                   actual catch, which is the sim's own source of truth
+//                   for predation. Idle ink wisps (ambient, not
+//                   predation-linked) are unchanged.
 //   • Plankton    — drifting bioluminescent GPU particles, night-boosted.
 //   • Bubble vents — fixed seabed points emitting rising bubble columns.
 //
 // PARKED (see OCEAN_TEARDOWN.md): SDF/L-system/metaball coral geometry,
-// GPU-transform-feedback soft-body tentacles, shark sonar/thermal/pack
-// sensing, per-instance camouflage + procedural shell textures. Those
+// GPU-transform-feedback soft-body tentacles beyond what octopus arms
+// already do, shark sonar/thermal/pack sensing, per-instance camouflage +
+// procedural shell textures beyond the existing camo/flash tint. Those
 // need real geometry/material work the engine doesn't expose to a demo.
+//
+// Headless/deterministic: simulation/OceanPopulation.mjs has no GL/ctx
+// dependency and no Date.now()/Math.random() of its own — see
+// tools/ship/oceanPopulation-selfcheck.mjs for the population curves this
+// produces, checked by a gate instead of eyeballed in the browser.
 
-const AREA_R   = 50;          // play radius around origin (inside WaterField patch + gridRadius)
-const DEPTH_MARGIN_FLOOR = 2; // creatures stay this far above the seabed
-const DEPTH_MARGIN_SURF  = 2; // ...and this far below the water surface
-
-// Existing always-available base kinds reused as approximations (the same
-// pragmatic move the aquarium makes — its "jelly" is wad_pickup_o2). The
-// rigged_* kinds are lazy (only registered via window.rig.*), so we use the
-// base kinds the aquarium proves are spawnable. Bespoke ray/turtle/octopus
-// meshes are a parked follow-up. Coral kinds ARE registered at engine init
-// (gpu/coralReef.js) so they spawn reliably here.
 import { CORAL_KINDS } from "../gpu/coralReef.js";
 import { SEA_RAY, SEA_TURTLE, SEA_OCTOPUS_MANTLE, TENTACLE_SEG, SEA_KELP } from "../gpu/seaCreatures.js";
 import { createTentacle, stepTentacle } from "../simulation/verletTentacle.js";
+import { OceanPopulation } from "../simulation/OceanPopulation.mjs";
 
 const FISH_KIND    = "wad_pickup_bullet_pen";  // elongated → reads fishy
 const RAY_KIND     = SEA_RAY;                  // v547 — real flat-diamond stingray voxel mesh
@@ -47,54 +61,50 @@ const TURTLE_KIND  = SEA_TURTLE;               // v547 — real domed shell + fl
 const OCTOPUS_KIND = SEA_OCTOPUS_MANTLE;       // v548 — mantle only; arms are Verlet chains
 const KELP_KIND    = SEA_KELP;                 // v547 — tall swaying kelp (tilt wobble in tick)
 
+const AREA_R   = 50;          // play radius around origin (inside WaterField patch + gridRadius)
+const DEPTH_MARGIN_FLOOR = 2; // creatures stay this far above the seabed
+const DEPTH_MARGIN_SURF  = 2; // ...and this far below the water surface
+
 // v548 — octopus Verlet arms
 const OCTO_ARMS = 8, OCTO_ARM_NODES = 5, OCTO_REST = 1.1, OCTO_MANTLE_R = 1.5;
 
 const NUM_CORAL   = 18;
 const NUM_KELP    = 14;   // v547 — swaying kelp clumps on the seabed
 
-const NUM_FISH    = 24;
+const NUM_FISH    = 24;   // STARTING population fed into OceanPopulation, not a cap
 const NUM_RAYS    = 3;
 const NUM_TURTLES = 2;
-const NUM_OCTOPUS = 2;
-
-// Fish boids
-const FISH_MAX_SPEED = 5.5;
-const FISH_MAX_FORCE = 0.35;
-const VISION    = 8,  VISION_SQ = VISION * VISION;
-const SEP       = 2.5, SEP_SQ   = SEP * SEP;
-const W_SEP = 2.4, W_ALI = 1.0, W_COH = 0.7, W_HOME = 0.5, W_INK_FLEE = 5.0;
+const NUM_OCTOPUS = 2;    // STARTING population fed into OceanPopulation, not a cap
 
 // Sea turtle FSM
 const TURTLE_SPEED      = 3.0;
 const TURTLE_SURFACE_EVERY = 24.0;   // seconds between breaths
 const TURTLE_HOLD       = 3.0;       // seconds held at the surface
 
-// Octopus ink
-const OCTO_THREAT_R    = 9,  OCTO_THREAT_R_SQ = OCTO_THREAT_R * OCTO_THREAT_R;
-const OCTO_INK_COOLDOWN = 5.0;
-// v549 — camouflage via the entity:tint hook. Idle = blended to the seabed;
-// inking startles it to a pale alarm flash, then it re-blends.
+// Octopus ink / camouflage. v549 — camouflage via the entity:tint hook. Idle = blended to the
+// seabed; a catch startles it to a pale alarm flash, then it re-blends.
 const OCTO_CAMO_COLOR = [0.50, 0.46, 0.36];   // sandy seabed
 const OCTO_CAMO_MIX   = 0.62;
 const OCTO_FLASH_COLOR = [0.90, 0.93, 1.0];   // pale startle
 const OCTO_FLASH_MIX  = 0.85;
 const OCTO_FLASH_TIME = 1.0;
-function tintOctopus(ctx, o, color, mix) {
-    ctx.router?.exec?.({ type: "entity:tint", id: o.id, color, mix });
-    for (const arm of o.arms) for (const sid of arm.segIds)
+const INK_LIFE_S      = 4.0;   // ink particle burst lifetime
+
+function tintOctopus(ctx, rec, color, mix) {
+    ctx.router?.exec?.({ type: "entity:tint", id: rec.meshId, color, mix });
+    for (const arm of rec.arms) for (const sid of arm.segIds)
         if (sid != null) ctx.router?.exec?.({ type: "entity:tint", id: sid, color, mix });
 }
-const INK_LIFE_S        = 4.0;       // how long an ink cloud repels fish
 
-let fish = [];
+let population = null;        // OceanPopulation — source of truth for fish/octopus counts
+let fishMeshes = new Map();   // agent id -> { meshId, yaw, depthPhase }
+let octoMeshes = new Map();   // agent id -> { meshId, arms, sway, wisp, flashT, tintState }
+
 let rays = [];
 let turtles = [];
-let octopi = [];
 let coral = [];
 let kelp = [];
 let vents = [];
-let inkClouds = [];          // { x,y,z, age } active repellers
 let t = 0;
 
 function rnd(ctx, min, max) { return min + ctx.rand() * (max - min); }
@@ -121,35 +131,65 @@ function nightFactor() {
     return 0.3;
 }
 
+// ---- fish/octopus mesh spawners, shared by start() (initial population) and tick() (births) ----
+function spawnFishMesh(ctx, top, agent) {
+    const floor = surfaceY(ctx, agent.x, agent.z);
+    const y = Math.min(top - DEPTH_MARGIN_SURF, floor + 6 + ctx.rand() * 8);
+    const id = ctx.spawnMesh(FISH_KIND, agent.x, y, agent.z, 0.5);
+    if (id == null) return null;
+    return { meshId: id, yaw: 0, depthPhase: ctx.rand() * Math.PI * 2 };
+}
+
+function spawnOctoMesh(ctx, agent) {
+    const y = surfaceY(ctx, agent.x, agent.z) + 1.2;
+    const id = ctx.spawnMesh(OCTOPUS_KIND, agent.x, y, agent.z, 0.5);
+    if (id == null) return null;
+    const rec = { meshId: id, arms: [], sway: ctx.rand() * Math.PI * 2, wisp: 0,
+                  flashT: 0, tintState: "camo" };
+    // 8 Verlet arms, each a chain of tapering tentacle_seg voxels.
+    for (let a = 0; a < OCTO_ARMS; a++) {
+        const ang = (a / OCTO_ARMS) * Math.PI * 2, dx = Math.cos(ang), dz = Math.sin(ang);
+        const arm = createTentacle(agent.x + dx * OCTO_MANTLE_R, y, agent.z + dz * OCTO_MANTLE_R, dx, dz, OCTO_ARM_NODES, OCTO_REST);
+        arm.ang = ang; arm.segIds = [];
+        for (let n = 1; n < OCTO_ARM_NODES; n++) {
+            const sc = Math.max(0.18, 0.42 - (n - 1) * 0.06);   // taper toward the tip
+            const nd = arm.nodes[n];
+            arm.segIds.push(ctx.spawnMesh(TENTACLE_SEG, nd.x, nd.y, nd.z, sc));
+        }
+        rec.arms.push(arm);
+    }
+    tintOctopus(ctx, rec, OCTO_CAMO_COLOR, OCTO_CAMO_MIX);   // spawn blended into the seabed
+    return rec;
+}
+
 export default {
     id:    "ocean_ecosystem",
     label: "OCEAN ECOSYSTEM (open water)",
-    hint:  "Stingrays glide the seabed, turtles surface to breathe, an octopus inks at passing fish; plankton + bubble vents",
+    hint:  "Fish and octopus populations EMERGE from per-agent energy budgets; stingrays glide the seabed, turtles surface to breathe; plankton + bubble vents",
     controls: [
         "Auto — open-water scene over the real terrain, between seabed and the live water surface",
-        NUM_FISH + " schooling fish · " + NUM_RAYS + " stingrays · " + NUM_TURTLES + " sea turtles · " + NUM_OCTOPUS + " octopus",
-        "Octopus inks when fish stray too close; fish flee the ink cloud",
+        "Population EMERGES from per-fish/per-octopus energy budgets — starts at " + NUM_FISH +
+            " fish / " + NUM_OCTOPUS + " octopus · " + NUM_RAYS + " stingrays · " + NUM_TURTLES + " sea turtles (fixed)",
+        "Octopus really hunt: a catch removes the fish, feeds the octopus, and inks the water; well-fed fish/octopus reproduce, starved ones die",
         "Try time.set('night') — plankton glow brightens in the dark",
     ],
 
     start(ctx) {
         t = 0;
-        fish = []; rays = []; turtles = []; octopi = []; coral = []; vents = []; inkClouds = [];
+        fishMeshes = new Map(); octoMeshes = new Map();
+        rays = []; turtles = []; coral = []; kelp = []; vents = [];
 
         const top = waterTop();
 
-        // ---- Fish school ----
-        for (let i = 0; i < NUM_FISH; i++) {
-            const a = ctx.rand() * Math.PI * 2;
-            const r = ctx.rand() * AREA_R * 0.5;
-            const x = Math.cos(a) * r, z = Math.sin(a) * r;
-            const floor = surfaceY(ctx, x, z);
-            const y = Math.min(top - DEPTH_MARGIN_SURF, floor + 6 + ctx.rand() * 8);
-            const id = ctx.spawnMesh(FISH_KIND, x, y, z, 0.5);
-            if (id == null) continue;
-            fish.push({ id, x, y, z,
-                vx: rnd(ctx, -1, 1), vy: rnd(ctx, -0.4, 0.4), vz: rnd(ctx, -1, 1),
-                ax: 0, ay: 0, az: 0, yaw: 0 });
+        // ---- Emergent fish/octopus population ----
+        population = new OceanPopulation({ areaR: AREA_R, rng: ctx.rand, initFish: NUM_FISH, initOctopus: NUM_OCTOPUS });
+        for (const agent of population.fishList()) {
+            const rec = spawnFishMesh(ctx, top, agent);
+            if (rec) fishMeshes.set(agent.id, rec);
+        }
+        for (const agent of population.octopusList()) {
+            const rec = spawnOctoMesh(ctx, agent);
+            if (rec) octoMeshes.set(agent.id, rec);
         }
 
         // ---- Stingrays (seabed gliders) ----
@@ -177,34 +217,6 @@ export default {
                 state: "cruise", stateT: 0,
                 breatheAt: rnd(ctx, 8, TURTLE_SURFACE_EVERY),
                 cruiseY: y, turnT: rnd(ctx, 3, 7) });
-        }
-
-        // ---- Octopus dens ----
-        for (let i = 0; i < NUM_OCTOPUS; i++) {
-            const a = ctx.rand() * Math.PI * 2;
-            const r = rnd(ctx, 12, AREA_R * 0.7);
-            const x = Math.cos(a) * r, z = Math.sin(a) * r;
-            const y = surfaceY(ctx, x, z) + 1.2;
-            const id = ctx.spawnMesh(OCTOPUS_KIND, x, y, z, 0.5);
-            if (id == null) continue;
-            const floorY = surfaceY(ctx, x, z);
-            const oct = { id, x, y, z, sway: ctx.rand() * Math.PI * 2,
-                inkCooldown: rnd(ctx, 0, OCTO_INK_COOLDOWN), wisp: 0, floorY, arms: [] };
-            // 8 Verlet arms, each a chain of tapering tentacle_seg voxels.
-            for (let a = 0; a < OCTO_ARMS; a++) {
-                const ang = (a / OCTO_ARMS) * Math.PI * 2, dx = Math.cos(ang), dz = Math.sin(ang);
-                const arm = createTentacle(x + dx * OCTO_MANTLE_R, y, z + dz * OCTO_MANTLE_R, dx, dz, OCTO_ARM_NODES, OCTO_REST);
-                arm.ang = ang; arm.segIds = [];
-                for (let n = 1; n < OCTO_ARM_NODES; n++) {
-                    const sc = Math.max(0.18, 0.42 - (n - 1) * 0.06);   // taper toward the tip
-                    const nd = arm.nodes[n];
-                    arm.segIds.push(ctx.spawnMesh(TENTACLE_SEG, nd.x, nd.y, nd.z, sc));
-                }
-                oct.arms.push(arm);
-            }
-            oct.flashT = 0; oct.tintState = "camo";
-            tintOctopus(ctx, oct, OCTO_CAMO_COLOR, OCTO_CAMO_MIX);   // spawn blended into the seabed
-            octopi.push(oct);
         }
 
         // ---- Coral reef (static voxel kinds scattered on the seabed) ----
@@ -250,10 +262,11 @@ export default {
         }
 
         try { ctx.lookAt?.(0, waterTop() - 6, 0); } catch {}
+        const pc = population.counts();
         ctx.kpop?.info?.("Ocean ecosystem",
-            fish.length + " fish · " + rays.length + " rays · " + turtles.length + " turtles · " + octopi.length + " octopus · " + coral.length + " coral");
-        console.log("[ocean_ecosystem v1] started — " + fish.length + " fish, " +
-            rays.length + " rays, " + turtles.length + " turtles, " + octopi.length + " octopus, " +
+            pc.fish + " fish (emergent) · " + pc.octopus + " octopus (emergent) · " + rays.length + " rays · " + turtles.length + " turtles · " + coral.length + " coral");
+        console.log("[ocean_ecosystem v2] started — " + pc.fish + " fish, " +
+            pc.octopus + " octopus (both emergent from OceanPopulation), " + rays.length + " rays, " + turtles.length + " turtles, " +
             coral.length + " coral, " + vents.length + " vents; surface=" + waterTop());
     },
 
@@ -264,10 +277,101 @@ export default {
         const top = waterTop();
         const night = nightFactor();
 
-        // ---- Age out ink clouds ----
-        for (let i = inkClouds.length - 1; i >= 0; i--) {
-            inkClouds[i].age += dt;
-            if (inkClouds[i].age > INK_LIFE_S) inkClouds.splice(i, 1);
+        // ---- Advance the population sim one tick; reconcile meshes against it below ----
+        const events = population.update(dt);
+
+        // ---- Fish: birth spawns a mesh, death despawns one, survivors get moved ----
+        const liveFish = population.fishList();
+        const liveFishIds = new Set();
+        for (const agent of liveFish) {
+            liveFishIds.add(agent.id);
+            let rec = fishMeshes.get(agent.id);
+            if (!rec) {
+                rec = spawnFishMesh(ctx, top, agent);
+                if (!rec) continue;
+                fishMeshes.set(agent.id, rec);
+            }
+            const floor = surfaceY(ctx, agent.x, agent.z);
+            const yLo = floor + DEPTH_MARGIN_FLOOR, yHi = top - DEPTH_MARGIN_SURF;
+            const y = Math.min(yHi, Math.max(yLo, floor + 6 + Math.sin(t * 0.4 + rec.depthPhase) * 3));
+            if (Math.abs(agent.vx) > 0.01 || Math.abs(agent.vz) > 0.01) rec.yaw = Math.atan2(agent.vx, agent.vz);
+            ctx.router?.exec?.({ type: "entity:move", id: rec.meshId, x: agent.x, y, z: agent.z, yaw: rec.yaw });
+        }
+        for (const [id, rec] of fishMeshes) {
+            if (!liveFishIds.has(id)) { ctx.despawnEntity?.(rec.meshId); fishMeshes.delete(id); }
+        }
+
+        // ---- Octopus: same birth/death reconciliation, plus arms + camo tint + idle wisp ----
+        const liveOcto = population.octopusList();
+        const liveOctoIds = new Set();
+        for (const agent of liveOcto) {
+            liveOctoIds.add(agent.id);
+            let rec = octoMeshes.get(agent.id);
+            if (!rec) {
+                rec = spawnOctoMesh(ctx, agent);
+                if (!rec) continue;
+                octoMeshes.set(agent.id, rec);
+            }
+            rec.sway += dt;
+            rec.flashT = Math.max(0, rec.flashT - dt);
+            if (rec.flashT > 0 && rec.tintState !== "flash") { tintOctopus(ctx, rec, OCTO_FLASH_COLOR, OCTO_FLASH_MIX); rec.tintState = "flash"; }
+            else if (rec.flashT <= 0 && rec.tintState !== "camo") { tintOctopus(ctx, rec, OCTO_CAMO_COLOR, OCTO_CAMO_MIX); rec.tintState = "camo"; }
+
+            const floorY = surfaceY(ctx, agent.x, agent.z);
+            const y = floorY + 1.2;
+            ctx.router?.exec?.({ type: "entity:move", id: rec.meshId, x: agent.x, y, z: agent.z,
+                yaw: Math.sin(rec.sway * 0.5) * 0.3 });
+
+            // idle ink wisp (ambient, not tied to predation)
+            if (G) {
+                rec.wisp += dt * 1.5;
+                while (rec.wisp >= 1) {
+                    rec.wisp -= 1;
+                    G.spawn({ x: agent.x + rnd(ctx, -0.6, 0.6), y: y + 0.5, z: agent.z + rnd(ctx, -0.6, 0.6),
+                        vx: rnd(ctx, -0.2, 0.2), vy: rnd(ctx, 0.2, 0.5), vz: rnd(ctx, -0.2, 0.2),
+                        life: 1.4, size: 0.4, r: 0.12, g: 0.10, b: 0.18, shape: 0 });
+                }
+            }
+
+            // ---- Verlet arms: wave with the current, droop, rest on the seabed ----
+            const env = { gravity: 1.6, damping: 0.86, iters: 3, floorY: floorY + 0.2,
+                swayX: Math.sin(t * 0.7 + rec.sway) * 0.7, swayZ: Math.cos(t * 0.55 + rec.sway) * 0.7 };
+            for (const arm of rec.arms) {
+                const ax = agent.x + Math.cos(arm.ang) * OCTO_MANTLE_R;
+                const az = agent.z + Math.sin(arm.ang) * OCTO_MANTLE_R;
+                stepTentacle(arm, { x: ax, y, z: az }, dt, env);
+                for (let n = 1; n < arm.nodes.length; n++) {
+                    const sid = arm.segIds[n - 1]; if (sid == null) continue;
+                    const nd = arm.nodes[n];
+                    ctx.router?.exec?.({ type: "entity:move", id: sid, x: nd.x, y: nd.y, z: nd.z });
+                }
+            }
+        }
+        for (const [id, rec] of octoMeshes) {
+            if (!liveOctoIds.has(id)) {
+                ctx.despawnEntity?.(rec.meshId);
+                for (const arm of rec.arms) for (const sid of arm.segIds) ctx.despawnEntity?.(sid);
+                octoMeshes.delete(id);
+            }
+        }
+
+        // ---- A catch is a real kill: fire the same ink-cloud burst this file always had ----
+        for (const e of events) {
+            if (e.type !== "catch") continue;
+            const oy = surfaceY(ctx, e.x, e.z) + 1.2 + 1.0;
+            const rec = octoMeshes.get(e.octopusId);
+            if (rec) rec.flashT = OCTO_FLASH_TIME;   // v549 — startle flash, then re-camouflage
+            if (G) {
+                for (let i = 0; i < 40; i++) {
+                    const a = ctx.rand() * Math.PI * 2;
+                    const sp = ctx.rand() * 2.5;
+                    G.spawn({ x: e.x, y: oy, z: e.z,
+                        vx: Math.cos(a) * sp, vy: rnd(ctx, 0, 1.2), vz: Math.sin(a) * sp,
+                        life: INK_LIFE_S * 0.8, size: 0.6 + ctx.rand() * 0.8,
+                        r: 0.05, g: 0.06, b: 0.09, shape: 0 });
+                }
+            }
+            console.log("[ocean_ecosystem] octopus " + e.octopusId + " caught fish " + e.fishId);
         }
 
         // ---- Stingrays ----
@@ -313,121 +417,6 @@ export default {
             ctx.router?.exec?.({ type: "entity:move", id: u.id, x: u.x, y: u.y, z: u.z, yaw: u.heading });
         }
 
-        // ---- Octopus (idle sway + ink defense) ----
-        for (const o of octopi) {
-            o.sway += dt;
-            o.inkCooldown -= dt;
-            // v549 — camouflage state: flash pale briefly after inking, else stay blended.
-            o.flashT = Math.max(0, (o.flashT || 0) - dt);
-            if (o.flashT > 0 && o.tintState !== "flash") { tintOctopus(ctx, o, OCTO_FLASH_COLOR, OCTO_FLASH_MIX); o.tintState = "flash"; }
-            else if (o.flashT <= 0 && o.tintState !== "camo") { tintOctopus(ctx, o, OCTO_CAMO_COLOR, OCTO_CAMO_MIX); o.tintState = "camo"; }
-            // threat check: nearest fish within radius triggers an ink cloud
-            if (o.inkCooldown <= 0) {
-                let threatened = false;
-                for (const f of fish) {
-                    const dx = f.x - o.x, dy = f.y - o.y, dz = f.z - o.z;
-                    if (dx*dx + dy*dy + dz*dz < OCTO_THREAT_R_SQ) { threatened = true; break; }
-                }
-                if (threatened) {
-                    inkClouds.push({ x: o.x, y: o.y + 1.0, z: o.z, age: 0 });
-                    o.inkCooldown = OCTO_INK_COOLDOWN;
-                    o.flashT = OCTO_FLASH_TIME;          // v549 — startle flash, then re-camouflage
-                    if (G) {
-                        for (let i = 0; i < 40; i++) {
-                            const a = ctx.rand() * Math.PI * 2;
-                            const sp = ctx.rand() * 2.5;
-                            G.spawn({ x: o.x, y: o.y + 1.0, z: o.z,
-                                vx: Math.cos(a) * sp, vy: rnd(ctx, 0, 1.2), vz: Math.sin(a) * sp,
-                                life: INK_LIFE_S * 0.8, size: 0.6 + ctx.rand() * 0.8,
-                                r: 0.05, g: 0.06, b: 0.09, shape: 0 });
-                        }
-                    }
-                    console.log("[ocean_ecosystem] octopus inked");
-                }
-            }
-            // idle ink wisp
-            if (G) {
-                o.wisp += dt * 1.5;
-                while (o.wisp >= 1) {
-                    o.wisp -= 1;
-                    G.spawn({ x: o.x + rnd(ctx, -0.6, 0.6), y: o.y + 0.5, z: o.z + rnd(ctx, -0.6, 0.6),
-                        vx: rnd(ctx, -0.2, 0.2), vy: rnd(ctx, 0.2, 0.5), vz: rnd(ctx, -0.2, 0.2),
-                        life: 1.4, size: 0.4, r: 0.12, g: 0.10, b: 0.18, shape: 0 });
-                }
-            }
-            ctx.router?.exec?.({ type: "entity:move", id: o.id, x: o.x, y: o.y, z: o.z,
-                yaw: Math.sin(o.sway * 0.5) * 0.3 });
-
-            // ---- Verlet arms: wave with the current, droop, rest on the seabed ----
-            const env = { gravity: 1.6, damping: 0.86, iters: 3, floorY: o.floorY + 0.2,
-                swayX: Math.sin(t * 0.7 + o.sway) * 0.7, swayZ: Math.cos(t * 0.55 + o.sway) * 0.7 };
-            for (const arm of o.arms) {
-                const ax = o.x + Math.cos(arm.ang) * OCTO_MANTLE_R;
-                const az = o.z + Math.sin(arm.ang) * OCTO_MANTLE_R;
-                stepTentacle(arm, { x: ax, y: o.y, z: az }, dt, env);
-                for (let n = 1; n < arm.nodes.length; n++) {
-                    const sid = arm.segIds[n - 1]; if (sid == null) continue;
-                    const nd = arm.nodes[n];
-                    ctx.router?.exec?.({ type: "entity:move", id: sid, x: nd.x, y: nd.y, z: nd.z });
-                }
-            }
-        }
-
-        // ---- Fish school (boids + ink flee) ----
-        if (fish.length) {
-            for (const f of fish) { f.ax = 0; f.ay = 0; f.az = 0; }
-            for (let i = 0; i < fish.length; i++) {
-                const a = fish[i];
-                let sepX=0,sepY=0,sepZ=0,sepN=0, aliX=0,aliY=0,aliZ=0,aliN=0, cohX=0,cohY=0,cohZ=0,cohN=0;
-                for (let j = 0; j < fish.length; j++) {
-                    if (i === j) continue;
-                    const b = fish[j];
-                    const dx = a.x-b.x, dy = a.y-b.y, dz = a.z-b.z;
-                    const d2 = dx*dx + dy*dy + dz*dz;
-                    if (d2 < VISION_SQ && d2 > 0) {
-                        if (d2 < SEP_SQ) { const d = Math.sqrt(d2); sepX+=dx/d; sepY+=dy/d; sepZ+=dz/d; sepN++; }
-                        aliX+=b.vx; aliY+=b.vy; aliZ+=b.vz; aliN++;
-                        cohX+=b.x;  cohY+=b.y;  cohZ+=b.z;  cohN++;
-                    }
-                }
-                if (sepN) { a.ax += sepX/sepN*FISH_MAX_SPEED*W_SEP; a.ay += sepY/sepN*FISH_MAX_SPEED*W_SEP; a.az += sepZ/sepN*FISH_MAX_SPEED*W_SEP; }
-                if (aliN) { a.ax += (aliX/aliN-a.vx)*W_ALI; a.ay += (aliY/aliN-a.vy)*W_ALI; a.az += (aliZ/aliN-a.vz)*W_ALI; }
-                if (cohN) { a.ax += (cohX/cohN-a.x)/VISION*FISH_MAX_SPEED*W_COH; a.ay += (cohY/cohN-a.y)/VISION*FISH_MAX_SPEED*W_COH; a.az += (cohZ/cohN-a.z)/VISION*FISH_MAX_SPEED*W_COH; }
-                // soft homing to center
-                const hd = Math.hypot(a.x, a.z);
-                if (hd > AREA_R * 0.6 && hd > 0) {
-                    const k = (hd - AREA_R*0.6) / (AREA_R*0.4);
-                    a.ax += -a.x/hd * FISH_MAX_SPEED * W_HOME * k;
-                    a.az += -a.z/hd * FISH_MAX_SPEED * W_HOME * k;
-                }
-                // flee ink clouds
-                for (const ink of inkClouds) {
-                    const dx = a.x-ink.x, dy = a.y-ink.y, dz = a.z-ink.z;
-                    const d2 = dx*dx + dy*dy + dz*dz;
-                    if (d2 < 144 && d2 > 0) {   // 12u range
-                        const d = Math.sqrt(d2); const k = 1 - d/12;
-                        a.ax += dx/d*FISH_MAX_SPEED*W_INK_FLEE*k;
-                        a.ay += dy/d*FISH_MAX_SPEED*W_INK_FLEE*k;
-                        a.az += dz/d*FISH_MAX_SPEED*W_INK_FLEE*k;
-                    }
-                }
-                const al = Math.hypot(a.ax, a.ay, a.az), maxA = FISH_MAX_FORCE*FISH_MAX_SPEED;
-                if (al > maxA) { const s = maxA/al; a.ax*=s; a.ay*=s; a.az*=s; }
-            }
-            for (const f of fish) {
-                f.vx += f.ax*dt; f.vy += f.ay*dt; f.vz += f.az*dt; f.vy *= 0.99;
-                const vl = Math.hypot(f.vx, f.vy, f.vz);
-                if (vl > FISH_MAX_SPEED) { const s = FISH_MAX_SPEED/vl; f.vx*=s; f.vy*=s; f.vz*=s; }
-                f.x += f.vx*dt; f.y += f.vy*dt; f.z += f.vz*dt;
-                const floor = surfaceY(ctx, f.x, f.z);
-                const yLo = floor + DEPTH_MARGIN_FLOOR, yHi = top - DEPTH_MARGIN_SURF;
-                if (f.y < yLo) { f.y = yLo; f.vy *= -0.3; }
-                if (f.y > yHi) { f.y = yHi; f.vy *= -0.3; }
-                if (Math.abs(f.vx) > 0.01 || Math.abs(f.vz) > 0.01) f.yaw = Math.atan2(f.vx, f.vz);
-                ctx.router?.exec?.({ type: "entity:move", id: f.id, x: f.x, y: f.y, z: f.z, yaw: f.yaw });
-            }
-        }
-
         // ---- Kelp sway (gentle tilt wobble; two-axis so it bends, not spins) ----
         for (const k of kelp) {
             const a = t * k.swayHz * Math.PI * 2 + k.phase;
@@ -462,14 +451,18 @@ export default {
     },
 
     stop(ctx) {
-        for (const f of fish) ctx.despawnEntity?.(f.id);
+        for (const [, rec] of fishMeshes) ctx.despawnEntity?.(rec.meshId);
         for (const r of rays) ctx.despawnEntity?.(r.id);
         for (const u of turtles) ctx.despawnEntity?.(u.id);
-        for (const o of octopi) ctx.despawnEntity?.(o.id);
-        for (const o of octopi) if (o.arms) for (const arm of o.arms) for (const sid of arm.segIds) ctx.despawnEntity?.(sid);
+        for (const [, rec] of octoMeshes) {
+            ctx.despawnEntity?.(rec.meshId);
+            for (const arm of rec.arms) for (const sid of arm.segIds) ctx.despawnEntity?.(sid);
+        }
         for (const id of coral) ctx.despawnEntity?.(id);
         for (const k of kelp) ctx.despawnEntity?.(k.id);
-        fish = []; rays = []; turtles = []; octopi = []; coral = []; kelp = []; vents = []; inkClouds = [];
+        fishMeshes = new Map(); octoMeshes = new Map();
+        rays = []; turtles = []; coral = []; kelp = []; vents = [];
+        population = null;
         console.log("[ocean_ecosystem] stopped");
     },
 };
