@@ -199,21 +199,34 @@ console.log("\n5. AN ABSENCE IS NOT A SITE, AND THE FIRST DRAFT OF THIS CENSUS C
     const t = qOf("terminal");
     const pl = t.rows.find((r) => r.who === "player");
     const fb = t.rows.find((r) => r.who === "fallBody");
+    const kd = t.rows.find((r) => r.who === "kaijuDrive");
     ok("!! the player's MISSING terminal clamp is a census row, so the quantity can disagree with itself",
-        pl && pl.absence === true && pl.value === 0 && fb.value === -55 && !t.shippedAgree,
-        "player " + pl.value + " (no clamp), fallBody " + fb.value + ". *** THE FIRST DRAFT READ THIS AS " +
-        "AGREED *** -- one site, one value, nothing to differ from -- on the quantity section 2 measures " +
-        "the largest gap in. The anchor is the SHAPE of the player's integration, a bare `-=` where " +
-        "fallBody wraps the same arithmetic in Math.max, so adding a clamp stops it matching and the " +
-        "census reports STALE rather than quietly agreeing again.");
+        pl && pl.value === -Infinity && kd && kd.value === -Infinity && fb.value === -55 && !t.shippedAgree,
+        "player " + pl.value + ", kaiju drive " + kd.value + ", fallBody " + fb.value + ". *** THE FIRST " +
+        "DRAFT OF THIS CENSUS READ THIS AS AGREED *** -- one site, one value, nothing to differ from -- on " +
+        "the quantity section 2 measures the largest gap in, because AN ABSENCE IS NOT A SITE. v4547 " +
+        "anchored it on the SHAPE of the player's integration and wrote that the day the shape changed the " +
+        "site would read null and the census would say STALE. *** IT DID, ONE ROUND LATER, AND THE NEW " +
+        "SHAPE IS BETTER: *** v4548 routed both camera falls through fallBody.fallStep, which made them " +
+        "NAME a terminal, so 'no terminal velocity' stopped being a thing a regex had to infer and became " +
+        "a literal the call site states. Two sites now, and both say it out loud.");
 
     const camSrc = fs.readFileSync(path.join(ENG, "camera", "camera.js"), "utf8");
     const fbSrc = fs.readFileSync(path.join(ENG, "physics", "character", "fallBody.mjs"), "utf8");
-    ok("   and the two shapes are really different in the source, not just in this file's prose",
-        /Math\.max\(terminal,/.test(fbSrc) && !/Math\.max\([^)]*_fpVelY/.test(camSrc),
-        "fallBody clamps with Math.max(terminal, ...); camera.js has no Math.max anywhere near _fpVelY. " +
-        "Checked against the bytes rather than asserted, because 'the player has no terminal velocity' is " +
-        "the claim this whole section rests on.");
+    // *** THE ROUND'S OWN SUBJECT, CHECKED AGAINST THE BYTES: THE COPIES ARE GONE. *** A "fall until you
+    // land" is an integration of a vertical velocity followed by a clamp to a probed surface, and camera.js
+    // had TWO of them -- _moveFP's airborne branch and _moveKaijuDrive's six lines -- beside fallBody's and
+    // kinematic's. It now has NONE: both call fallStep. The shape is searched for rather than described.
+    const integrations = (camSrc.match(/^\s*this\._(?:fpVelY|kaijuDriveVelY)\s*[-+]=\s*this\._gravity/gm) || []);
+    const fallStepCalls = (camSrc.match(/fallStep\(\{/g) || []);
+    ok("!! *** camera.js INTEGRATES NO GRAVITY OF ITS OWN ANY MORE: TWO COPIES OUT, TWO CALLS IN ***",
+        integrations.length === 0 && fallStepCalls.length === 2 &&
+        /Math\.max\(terminal,/.test(fbSrc) && /import \{ fallStep \}/.test(camSrc),
+        integrations.length + " gravity integrations left in camera.js and " + fallStepCalls.length +
+        " calls to fallStep. Before v4548 it was 2 and 0. fallBody is the one that clamps with " +
+        "Math.max(terminal, ...) and the one that probes at the CURRENT height and compares the WANTED " +
+        "one -- which is the whole of its 'cannot tunnel, structurally rather than by substepping' claim, " +
+        "and the thing neither copy did.");
 }
 
 // =============================================================================================================

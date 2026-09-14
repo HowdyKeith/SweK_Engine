@@ -305,8 +305,11 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4547 -- RE-TAKEN for tools/ship/controllerAgreement-selfcheck.mjs: 1635 -> 1636 and the three rows
     // that follow a gate by one. The round's second new file is tools/ship/controllerAgreement.mjs, a
     // MODULE, and it moves none of these. distinctDefinitions holds at 40 for the seventeenth round.
-    gates: 1636, usesOk: 1615, definesOk: 1607, importsOk: 0,
-    distinctDefinitions: 40, nameFirst: 1508, condFirst: 91, unknownSignature: 16,
+    // v4548 -- RE-TAKEN for tools/ship/cameraFall-selfcheck.mjs: 1636 -> 1637 and the three rows that
+    // follow a gate by one. The round's other change is to camera/camera.js, an existing module -- it
+    // REMOVES code rather than adding a file. distinctDefinitions holds at 40 for the eighteenth round.
+    gates: 1637, usesOk: 1616, definesOk: 1608, importsOk: 0,
+    distinctDefinitions: 40, nameFirst: 1509, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

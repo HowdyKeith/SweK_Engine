@@ -3849,6 +3849,40 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // object keys of the same name, the later one wins silently and the earlier round's swept count vanishes
     // from the surplus arithmetic. FIFTH ORDINAL COLLISION between the two lines this session; the side that
     // merges second is the side that moves.
+    since241: Object.freeze({
+        at: "v4548", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/cameraFall-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly: 11 checks in seven sections, 67-72 ms over three runs. " +
+                 "*** THE TREE HAD FOUR IMPLEMENTATIONS OF 'FALL UNTIL YOU LAND' AND TWO OF THEM WERE SIX " +
+                 "LINES INSIDE A CAMERA. *** camera/camera.js integrates no gravity of its own now: " +
+                 "_moveFP's airborne branch and _moveKaijuDrive's vertical block are both calls to " +
+                 "physics/character/fallBody.mjs. *** AND THE TWO COPIES DID NOT AGREE WITH EACH OTHER " +
+                 "ABOUT THE ORDER OF THE TWO STEPS: *** _moveFP probed at the body's CURRENT height then " +
+                 "moved; _moveKaijuDrive moved then probed where it arrived. Driven on one fixture, one " +
+                 "body, one release height of 19.8, they answer ELEVEN VOXELS APART -- 21 against 10 -- " +
+                 "and nothing in the tree noticed one rule had two implementations that disagreed about " +
+                 "its central step. THREE DEFECTS CAME OUT WITH THE COPIES. (1) Both handed the WALKING " +
+                 "reach to a falling body, which is v4544's defect arriving via v4545's repair: a body " +
+                 "1.2 below a ledge was YANKED ONTO IT and one 1.3 below fell eleven voxels, the cut " +
+                 "sitting exactly at STEP_UP_MAX. (2) The kaiju's order TUNNELS THROUGH EVERYTHING the " +
+                 "moment the reach is honest -- with reach 0 every release from 19.7 to 25.0 falls past " +
+                 "both decks to the floor -- so its six lines only looked like they worked because the " +
+                 "walking reach let the probe see above where the body landed. One defect was concealing " +
+                 "the other and removing either alone makes it worse. (3) *** _kaijuDriveOnGround WAS A " +
+                 "LATCH: *** only landing set it, only jumping cleared it, so walking off a 38-voxel " +
+                 "cliff left it TRUE for the whole descent -- at frame 89, 34 units up and falling at " +
+                 "14.4 m/s, Space still gave a free jump. It is read off fallBody's own `airborne` now. " +
+                 "A THIRD DRAFT FED THE FALL THE CAMERA'S BILINEAR GROUND and landed a body with its feet " +
+                 "INSIDE SOLID ROCK: a walk crosses a boundary and wants two columns averaged, a LANDING " +
+                 "happens on ONE COLUMN, which is why fallBody ships voxelSurface over the integer probe. " +
+                 "Seven sabotages, none crashing: A 2 RED, B 2, C 1, D 7, E 5, F 3, G 3, every one caught " +
+                 "by this file too. B went ZERO here first -- section 5 compared two probes and never " +
+                 "dropped a body through either, so it asserted a property of the probes rather than " +
+                 "which one the fall asks. NOT UNIFIED: the camera's gravity of 18 and its absent terminal " +
+                 "are passed through explicitly, because v4547 measured both as gameplay decisions and " +
+                 "removing a duplicate must not smuggle one in.",
+    }),
     since240: Object.freeze({
         at: "v4547", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/controllerAgreement-selfcheck.mjs"]),

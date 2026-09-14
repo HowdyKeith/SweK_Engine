@@ -14,6 +14,8 @@
 import { buildViewProj } from "./buildViewProj.js";
 // v4545 -- the body-aware voxel probe, rather than a third copy of its rule. See _terrainTopAt.
 import { standHeightAt } from "../world/surfaceProbe.mjs";
+// v4548 -- the gated fall, rather than a third and fourth copy of it. See _fallSurface.
+import { fallStep } from "../physics/character/fallBody.mjs";
 
 /**
  * *** RE-DERIVED BY tools/ship/playerGround-selfcheck.mjs ON EVERY RUN. *** Readings at v4545.
@@ -80,6 +82,53 @@ export const PLAYER_SLOPE_AT_V4546 = Object.freeze({
     epsDeg: 1e-9,
     maxSlopeDeg: 45,
     slopeRun: 1,
+});
+
+/**
+ * *** RE-DERIVED BY tools/ship/cameraFall-selfcheck.mjs ON EVERY RUN. *** Readings at v4548.
+ */
+export const CAMERA_FALL_AT_V4548 = Object.freeze({
+    at: "v4548",
+    // the population: implementations of "integrate a vertical velocity, then clamp to a probed surface"
+    copiesBefore: 4,            // _moveFP, _moveKaijuDrive, fallBody.fallStep, kinematic.stepCharacter
+    copiesAfter: 2,             // the two modules; both camera paths call fallBody now
+    integrationsInCameraBefore: 2,
+    integrationsInCameraAfter: 0,
+    // *** AND THE TWO COPIES DO NOT EVEN AGREE WITH EACH OTHER ABOUT THE ORDER OF THE TWO STEPS. ***
+    // _moveFP probed the ground at the body's CURRENT height and then moved; _moveKaijuDrive moved and then
+    // probed where it had arrived. One of those is fallBody's order and the other is not, and nothing in
+    // the tree noticed that one rule had two implementations that disagreed about its central step.
+    fpOrder: "probe at the current height, then move, then compare",
+    kaijuOrder: "move, then probe where it arrived, then compare",
+    // (1) THE WALKING REACH HANDED TO A FALLING BODY -- v4544's defect, in both camera paths
+    deckAt: 21, deckBelow: 10,
+    liftedFrom: Object.freeze([19.8, 19.9, 20.0, 20.2, 20.5]),
+    liftedBy: Object.freeze([1.20, 1.10, 1.00, 0.80, 0.50]),
+    fellFrom: 19.7,             // one tenth lower, and it falls ELEVEN voxels instead
+    fellTo: 10,
+    liftCutIsStepUpMax: true,   // the boundary sits exactly at STEP_UP_MAX, which is what names the cause
+    // *** THE SAME BODY, THE SAME WORLD, THE SAME RELEASE HEIGHT, AND THE TWO COPIES ANSWER DIFFERENTLY. ***
+    disagreeAt: 19.8, fpAnswer: 21, kaijuAnswer: 10,
+    // (2) THE KAIJU'S ORDER TUNNELS THROUGH EVERYTHING THE MOMENT THE REACH IS HONEST. Its six lines only
+    // looked like they worked because the walking reach let the probe see 1.2 ABOVE where the body landed,
+    // catching surfaces the step had already crossed. Driven with that order and a reach of 0, EVERY
+    // release -- 19.7, 19.8, 19.9, 20.2, 20.5, 21.0 and 25.0 -- falls past both decks to the world floor.
+    kaijuOrderZeroReachLandsAt: 0,
+    kaijuOrderZeroReachFrom: Object.freeze([19.7, 19.8, 19.9, 20.2, 20.5, 21.0, 25.0]),
+    // (3) THE KAIJU'S GROUND FLAG WAS A LATCH: only landing set it, only jumping cleared it
+    cliffTop: 40, cliffLeftAtFrame: 42,
+    latchStillTrueAtFrame: 89, latchHeightThen: 34.12, latchVelocityThen: -14.40,
+    freeJumpVelocity: 10.70,    // Space at frame 90, thirty-four units up and falling
+    // (4) A LANDING HAPPENS ON ONE COLUMN, NOT ON AN INTERPOLATION
+    // Straddling z=39.5, where the column the body is IN has rock up to y=3 (so its surface is 4) and the
+    // next one along has rock to y=1 (surface 2). The blend answers 3 -- A HEIGHT NEITHER COLUMN HAS, and
+    // one that is INSIDE the rock of the column the body occupies. The integer probe answers 4.
+    blendLandsFeetAt: 3,
+    columnLandsFeetAt: 4,
+    blendRockTopInThatColumn: 3,
+    // what is deliberately UNCHANGED, because v4547 measured both as gameplay decisions
+    gravityPassedThrough: 18,
+    terminalPassedThrough: -Infinity,
 });
 
 export class Camera {
@@ -895,14 +944,37 @@ export class Camera {
                 this._fpOnGround = false;
             }
         } else {
-            // Airborne — apply gravity
-            this._fpVelY -= this._gravity * dt;
-            this.position.y += this._fpVelY * dt;
-            if (this.position.y <= targetY) {
-                this.position.y = targetY;
-                this._fpVelY = 0;
-                this._fpOnGround = true;
-            }
+            // *** A FALLING BODY GETS NO REACH, AND UNTIL v4548 THIS ONE GOT THE WALKER'S. ***
+            // `groundY` above is the WALKING query and carries STEP_UP_MAX, because a walker may step up.
+            // Handing that to a body in mid-air lets the probe name a surface ABOVE it and this clamp then
+            // puts it there. physics/character/fallBody.mjs found and fixed exactly this for the bots at
+            // v4544 -- "stepUp is how far a body may CLIMB onto something; handing it to a falling body
+            // lets the probe name a surface ABOVE it and the clamp then lands it up there" -- and v4545
+            // brought the body-aware probe into this file without separating the two queries, so the
+            // defect arrived here with the repair.
+            // MEASURED on a column standable at 2, 10 and 21: a body released in open air with its feet at
+            // 19.8 was LIFTED 1.20 UPWARDS onto the deck at 21 in ONE FRAME, at 19.9 lifted 1.10, at 20.5
+            // lifted 0.50 -- and at 19.7 it fell eleven voxels to the deck at 10. A tenth of a unit in
+            // release height, eleven voxels of outcome, and the cut sits exactly at STEP_UP_MAX, which is
+            // what proves it is the walking allowance and not anything else.
+            // *** AND ZEROING THE REACH ALONE IS NOT THE FIX -- IT TRADES A LIFT FOR A TUNNEL. *** These
+            // six lines MOVED the body and then probed at where it had arrived, so with no reach the probe
+            // is asked from BELOW a surface the body crossed during the step and cannot see it any more.
+            // Measured with the reach zeroed and the order left alone: a body released at feet 20.5 fell
+            // PAST the deck at 21 AND the deck at 10 and landed at 0, 91 frames. physics/character/
+            // fallBody.mjs is built the other way round -- probe at the CURRENT height, compare the WANTED
+            // one -- which is the whole of its "cannot tunnel, structurally rather than by substepping"
+            // claim, driven there at speeds up to ten million. So this calls that module instead of being
+            // a third copy of it, which is what task #25 is about.
+            // The gravity and the absent terminal are the CAMERA'S and are passed through unchanged:
+            // v4547 measured both as live disagreements with the bots and recorded that changing either is
+            // a gameplay decision. Removing a duplicate must not smuggle one in.
+            const r = fallStep({ pos: [this.position.x, this.position.y - this._eyeHeight, this.position.z],
+                                 vy: this._fpVelY, surfaceUnder: this._fallSurface(),
+                                 dt, gravity: -this._gravity, terminal: -Infinity });
+            this.position.y = r.pos[1] + this._eyeHeight;
+            this._fpVelY = r.vy;
+            if (r.landed) this._fpOnGround = true;
         }
 
         this.velocity.x = mx * speed;
@@ -1108,14 +1180,25 @@ export class Camera {
         // v405 — bilinear ground sample for kaiju drive too. Integer
         // Y was producing stairs when the controlled kaiju walked
         // across sloped voxel terrain.
-        this._kaijuDriveVelY -= this._gravity * dt;
-        k.position.y += this._kaijuDriveVelY * dt;
-        const groundY = this._terrainTopAtBilinear(k.position.x, k.position.z, k.position.y);
-        if (k.position.y <= groundY) {
-            k.position.y = groundY;
-            this._kaijuDriveVelY = 0;
-            this._kaijuDriveOnGround = true;
-        }
+        // *** THE FOURTH COPY OF "FALL UNTIL YOU LAND" IS GONE, AND TWO DEFECTS WENT WITH IT. ***
+        // These were six lines -- integrate, move, probe, clamp -- and they carried BOTH of the defects the
+        // player's copy carried plus one of their own:
+        //   (1) the probe was the WALKING one, so a kaiju passing under a ledge within STEP_UP_MAX was
+        //       LIFTED onto it: measured, y 19.9 under a deck at 21 became 21 in one frame, 1.10 upwards,
+        //       while one at 19.7 fell eleven voxels to the deck at 10;
+        //   (2) it moved first and probed after, so zeroing that reach alone would trade the lift for a
+        //       tunnel -- see _moveFP's airborne branch, which had the same shape;
+        //   (3) *** _kaijuDriveOnGround WAS A LATCH THAT ONLY LANDING SET AND ONLY JUMPING CLEARED. ***
+        //       Walking off a ledge never touched it. Driven off a 38-voxel cliff, the flag read TRUE for
+        //       the whole descent -- at frame 89, 34 units up and falling at 14.4 m/s, it still read true
+        //       -- so Space gave a FREE MID-AIR JUMP at any height, gated only by stamina. It is read off
+        //       the module's own `airborne` now, which is computed per frame and cannot latch.
+        const kr = fallStep({ pos: [k.position.x, k.position.y, k.position.z], vy: this._kaijuDriveVelY,
+                              surfaceUnder: this._fallSurface(),
+                              dt, gravity: -this._gravity, terminal: -Infinity });
+        k.position.y = kr.pos[1];
+        this._kaijuDriveVelY = kr.vy;
+        this._kaijuDriveOnGround = !kr.airborne;
 
         // Camera position — slightly above the kaiju's "head" + 2u
         // back along the look direction so the kaiju's silhouette is
@@ -1185,15 +1268,14 @@ export class Camera {
      * makes the gated rule work on every world the camera already accepts; writing the scan out again here
      * would be the third copy of it this session filed as a task.
      */
-    _standYAt(x, z, fromY) {
+    _standYAt(x, z, fromY, reach = Camera.STEP_UP_MAX) {
         const v = (xx, yy, zz) => this.world.voxelAt(xx, yy, zz);
         const shim = {
             chunkHeight: Number.isFinite(this.world.chunkHeight) ? this.world.chunkHeight : 80,
             // the camera's own air test, verbatim: anything not 0 and not undefined is solid
             isAir: (xx, yy, zz) => { const q = v(xx, yy, zz); return q === 0 || q === undefined; },
         };
-        return standHeightAt(shim, Math.floor(x), Math.floor(z),
-                             { y: fromY, stepUp: Camera.STEP_UP_MAX });
+        return standHeightAt(shim, Math.floor(x), Math.floor(z), { y: fromY, stepUp: reach });
     }
 
     /**
@@ -1233,10 +1315,33 @@ export class Camera {
         return Math.atan2(Math.abs(ahead - groundY), Camera.SLOPE_RUN) * 180 / Math.PI;
     }
 
-    _terrainTopAt(x, z, fromY = null) {
+    /**
+     * The surface oracle physics/character/fallBody.mjs asks for: the first surface AT OR BELOW this body,
+     * with NO reach, over this camera's own bilinear ground.
+     *
+     * *** THE ZERO IS THE POINT, AND SO IS THE INTEGER -- AND THE FIRST DRAFT OF THIS USED THE BLEND. ***
+     * v404/v405 moved both camera paths to a BILINEAR ground because the integer one "produced visible
+     * stairs" as a body walked across voxel boundaries, so the blend looked like the obvious thing to hand
+     * a fall. It is not. A WALK crosses a boundary and wants the two columns averaged; a LANDING happens on
+     * ONE COLUMN, and averaging puts the body at a height neither column has. Measured on the sandbox's own
+     * hand world, a body walking off a two-voxel ledge at z=40 and landing at z=39.500: the blend drops the
+     * higher corner (out of reach, correctly, for a falling body) and answers the LOWER floor at 2 -- while
+     * the body straddles a column whose rock goes up to y=3. It landed with its FEET INSIDE SOLID STONE and
+     * _canStandAt then refused every move, which is the stuck player these rounds keep being about.
+     * So this is the integer probe with the reach forced to 0 -- which is precisely what fallBody's own
+     * voxelSurface() does, and the reason that function exists. The blend keeps the walking query, where it
+     * is right and where the stairs it was added for actually show.
+     */
+    _fallSurface() {
+        // _standYAt IS that probe, and it already reports NOT-FOUND as null rather than as 0 -- which is
+        // the distinction fallBody's contract needs and the one v4545 added this method for.
+        return (x, z, y) => (this.world?.voxelAt ? this._standYAt(x, z, y, 0) : null);
+    }
+
+    _terrainTopAt(x, z, fromY = null, reach = Camera.STEP_UP_MAX) {
         if (!this.world?.voxelAt) return 0;
         if (Number.isFinite(fromY)) {
-            const found = this._standYAt(x, z, fromY);
+            const found = this._standYAt(x, z, fromY, reach);
             return found === null ? 0 : found;   // nothing under this body: 0 falls, as it always did
         }
         const fx = Math.floor(x), fz = Math.floor(z);
@@ -1265,7 +1370,7 @@ export class Camera {
     // sub-voxel boundary. Edge-fall detection still works because
     // _terrainTopAt (integer) is still what the canStandAt logic
     // implicitly uses for collision.
-    _terrainTopAtBilinear(x, z, fromY = null) {
+    _terrainTopAtBilinear(x, z, fromY = null, reach = Camera.STEP_UP_MAX) {
         if (!this.world?.voxelAt) return 0;
         const ix = Math.floor(x), iz = Math.floor(z);
         const fx = x - ix, fz = z - iz;
@@ -1290,7 +1395,7 @@ export class Camera {
             // meant here, which is that the cliff branch takes over and gravity does the rest.
             let sum = 0, wsum = 0;
             const corner = (cx, cz, wt) => {
-                const h = this._standYAt(cx, cz, fromY);
+                const h = this._standYAt(cx, cz, fromY, reach);
                 if (h !== null) { sum += h * wt; wsum += wt; }
             };
             corner(ix,     iz,     (1 - fx) * (1 - fz));

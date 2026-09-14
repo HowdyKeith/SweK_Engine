@@ -230,19 +230,26 @@ console.log("\n8. ONE number, read live by both -- and what that number turns ou
     // window the repair pushed to 2,585; both are the same mistake, so the anchor here is the function.
     const bare = (f) => f.toString().replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " ");
     const walkAssigns = bare(Camera.prototype._moveFP).match(/STEP_UP_MAX\s*=\s*[^;]+/g) || [];
-    // The reach is spelled in _standYAt and NOWHERE ELSE -- not in _terrainTopAt and not in the blend,
-    // both of which reach the probe through it. The first draft of this row read _terrainTopAt and went
-    // red the moment the shim moved, which is the row doing its job: it is anchored on where the number
-    // IS, so moving the number without moving the row is a red rather than a silence.
+    // The reach is spelled ONCE, as _standYAt's default, and every probe reaches the world through it.
+    // *** v4548 MADE IT A PARAMETER AND THAT IS A STRONGER STATEMENT, NOT A WEAKER ONE. *** A falling body
+    // must get NO reach -- the walking allowance belongs to the walker -- so there is now exactly one caller
+    // that overrides the default, and it passes 0, and it is the fall. The row checks the default, the
+    // count of overrides, and that the only override is zero: a second override, or a non-zero one, is a
+    // second policy about the same number and reddens this.
+    const probeSig    = bare(Camera.prototype._standYAt).match(/reach\s*=\s*([A-Za-z_.]+)/) || [];
     const probeReach  = bare(Camera.prototype._standYAt).match(/stepUp\s*:\s*[^ ,}]+/g) || [];
-    const elsewhere   = ["_terrainTopAt", "_terrainTopAtBilinear", "_moveKaijuDrive"]
-        .filter((m) => /stepUp\s*:/.test(bare(Camera.prototype[m])));
-    ok("!! the walker's allowance and the probe's reach are both spelled Camera.STEP_UP_MAX, once each",
+    const overrides   = ["_moveFP", "_moveKaijuDrive", "_fallSurface", "_terrainTopAt", "_terrainTopAtBilinear"]
+        .flatMap((m) => (bare(Camera.prototype[m]).match(/_(?:standYAt|terrainTopAt|terrainTopAtBilinear)\([^)]*,\s*(-?[\w.]+)\s*\)/g) || [])
+            .filter((c) => /,\s*-?[\d]/.test(c)).map((c) => m + ": " + c.trim()));
+    ok("!! the reach is Camera.STEP_UP_MAX once, and the only caller that overrides it passes ZERO",
         walkAssigns.length === 1 && /=\s*Camera\.STEP_UP_MAX\s*$/.test(walkAssigns[0]) &&
-        probeReach.length === 1 && probeReach[0] === "stepUp: Camera.STEP_UP_MAX" && elsewhere.length === 0,
-        "_moveFP: `" + walkAssigns.join(" | ") + "`; _standYAt: `" + probeReach.join(" | ") + "`; and no " +
-        "other method spells a reach at all (" + (elsewhere.join(", ") || "none") + "). Two copies of a " +
-        "number that must agree is the shape v4542 removed from BotManager.");
+        probeSig[1] === "Camera.STEP_UP_MAX" && probeReach.length === 1 && probeReach[0] === "stepUp: reach" &&
+        overrides.length === 1 && /,\s*0\s*\)/.test(overrides[0]) && /_fallSurface/.test(overrides[0]),
+        "_moveFP: `" + walkAssigns.join(" | ") + "`; _standYAt(x, z, fromY, reach = " + probeSig[1] +
+        ") and `" + probeReach.join(" | ") + "`; overrides: " + (overrides.join(", ") || "none") + ". *** THE " +
+        "ONE OVERRIDE IS THE FALL, AND IT IS ZERO, *** which is physics/character/fallBody.mjs's rule -- " +
+        "'the walking allowance belongs to the walker' -- applied here at v4548. Two copies of a number " +
+        "that must agree is the shape v4542 removed from BotManager.");
 
     // ...and read LIVE, which a text match cannot say. Both are re-driven with the static moved.
     const keep = Camera.STEP_UP_MAX;
@@ -367,10 +374,14 @@ console.log("\n10. *** THIS ROUND'S OWN RECORD IS INVISIBLE TO THE RECORD CENSUS
     // It was written at v4545 to go red the day somebody FIXES the hole; it also goes red the day somebody
     // WIDENS it, and the next round to add a record beside its code found that out within the hour. Both
     // directions are the row doing its job: the number is pinned, so the hole cannot change size in silence.
-    ok("!! *** THE HOLE IS FOUR RECORDS WIDE AND TWO OF THEM PREDATE THIS SESSION BY A HUNDRED VERSIONS ***",
-        missed.length === 4 && missed.every((r) => /\.(js|cjs)$/.test(r.file)) &&
+    // THREE ROUNDS RUNNING NOW -- v4546 made it four and v4548 made it five -- which is the strongest
+    // argument the pin could have made for itself: every round that writes a record beside camera.js widens
+    // a hole the record censuses cannot see, and the only thing that says so is this row.
+    ok("!! *** THE HOLE IS FIVE RECORDS WIDE AND TWO OF THEM PREDATE THIS SESSION BY A HUNDRED VERSIONS ***",
+        missed.length === 5 && missed.every((r) => /\.(js|cjs)$/.test(r.file)) &&
         missed.some((r) => r.name === "PLAYER_GROUND_AT_V4545") &&
         missed.some((r) => r.name === "PLAYER_SLOPE_AT_V4546") &&
+        missed.some((r) => r.name === "CAMERA_FALL_AT_V4548") &&
         missed.some((r) => r.name === "ADDED_AT_V4403") &&
         missed.some((r) => r.name === "MEASURED_AT_V4463") && jsFiles.length > 1000,
         missed.map((r) => r.name + " (" + r.file + ")").join(", ") + " -- " + missed.length + " records in " +

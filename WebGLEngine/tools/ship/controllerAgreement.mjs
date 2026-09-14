@@ -50,14 +50,22 @@ export const SITES = Object.freeze([
       re: /export const TERMINAL\s*=\s*(-?[\d.]+)\s*;/, sign: "signed floor on vy" },
     // *** AN ABSENCE IS NOT A SITE, AND THE FIRST DRAFT OF THIS CENSUS THEREFORE REPORTED `terminal` AS
     // AGREED -- ONE VALUE, NOTHING TO DISAGREE WITH. *** That is a check that cannot fail, on the quantity
-    // with the largest measured gap in the file. The player's absence of a terminal clamp is visible in the
-    // source as the SHAPE of its integration: a bare `-=` where fallBody wraps the same arithmetic in
-    // Math.max. So the anchor matches the bare form and yields 0, and the day somebody adds a clamp the
-    // anchor stops matching, the site reads null, and the gate says the census has gone stale rather than
-    // quietly reporting agreement again.
-    { q: "terminal", who: "player", ships: true, file: "camera/camera.js", sym: "no clamp (bare integration)",
-      re: /this\._fpVelY\s*-=\s*this\._gravity\s*\*\s*dt;\s*\n\s*this\.position\.y\s*\+=\s*this\._fpVelY\s*\*\s*dt;()/,
-      absence: true, sign: "none -- unbounded" },
+    // with the largest measured gap in the file. At v4547 the player's absence of a clamp was only visible
+    // as the SHAPE of its integration -- a bare `-=` where fallBody wraps the same arithmetic in Math.max --
+    // so the anchor matched that shape and yielded 0, and that row said in so many words that the day
+    // somebody changed the shape the site would read null and the census would report STALE.
+    //
+    // *** IT DID, ONE ROUND LATER, AND THE NEW SHAPE IS BETTER THAN THE OLD ONE. *** v4548 routed both
+    // camera falls through fallBody.fallStep and had to say what terminal to use; it passes -Infinity, so
+    // the player's "no terminal velocity" stopped being an absence a regex had to infer and became a
+    // LITERAL THE CALL SITE STATES. The site is a plain number now, and the quantity still disagrees --
+    // -Infinity against -55 -- for the same measured reason v4547 recorded.
+    { q: "terminal", who: "player", ships: true, file: "camera/camera.js", sym: "fallStep terminal argument",
+      re: /terminal:\s*(-Infinity)\s*\}\);\n\s*this\.position\.y = r\.pos\[1\]/,
+      sign: "explicitly none" },
+    { q: "terminal", who: "kaijuDrive", ships: true, file: "camera/camera.js", sym: "fallStep terminal argument",
+      re: /terminal:\s*(-Infinity)\s*\}\);\n\s*k\.position\.y = kr\.pos\[1\]/,
+      sign: "explicitly none" },
     { q: "stepUp", who: "player", ships: true, file: "camera/camera.js", sym: "Camera.STEP_UP_MAX",
       re: /static STEP_UP_MAX\s*=\s*(-?[\d.]+)\s*;/ },
     { q: "stepUp", who: "bots", ships: true, file: "simulation/BotManager.js", sym: "BOT_STEP",
@@ -117,9 +125,9 @@ export function characterModules() {
  */
 export const AGREEMENT_AT_V4547 = Object.freeze({
     at: "v4547",
-    sites: 18,
+    sites: 19,
     quantities: 6,
-    shippingSites: 11,
+    shippingSites: 12,
     modules: 6,
     // *** THE COUNTS ABOVE CANNOT CATCH A NUMBER MOVING, AND THE SABOTAGE BATTERY IS WHAT SAID SO. ***
     // Moving terrainWalk's NON-shipping snapDown default from 0.5 left the whole census green, because
@@ -131,7 +139,8 @@ export const AGREEMENT_AT_V4547 = Object.freeze({
         "gravity:fallBody": -20,
         "gravity:kinematic": -20,
         "terminal:fallBody": -55,
-        "terminal:player": 0,
+        "terminal:player": -Infinity,
+        "terminal:kaijuDrive": -Infinity,
         "stepUp:player": 1.2,
         "stepUp:bots": 1.2,
         "stepUp:terrainWalk": 0.5,

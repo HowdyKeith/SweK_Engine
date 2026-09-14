@@ -497,7 +497,12 @@ export const PROBE_AT_V4536 = Object.freeze({
     // tools/ship/controllerAgreement.mjs and its five numeric fields. The two rounds between wrote their
     // records into camera/camera.js and this census cannot see a .js file at all -- which is why v4545 and
     // v4546 moved neither number and is pinned as a defect by playerGround-selfcheck section 10.
-    currentIncludingModule: Object.freeze({ records: 118, withFields: 57, fields: 278 }),
+    // v4548 -- RE-TAKEN with `excluding` below: 118/57/278 -> 118/57/279. NO RECORD ARRIVED: this round's
+    // own record went into camera/camera.js, which this census cannot see. The single field is
+    // REACH_AT_V4548's cap-straddler entry in tools/ship/recordReach.mjs -- a round that edits an existing
+    // record moves the field count without moving the record count, which is v4540's lesson arriving again
+    // and the reason this is re-taken on EDITS and not only on arrivals.
+    currentIncludingModule: Object.freeze({ records: 118, withFields: 57, fields: 279 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -586,7 +591,8 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4547 -- RE-TAKEN with `currentIncludingModule` above: 115/54/253 -> 116/55/258. The difference
     // between the two blocks stays exactly this module's own two records and their twenty fields, which is
     // what the gate checks, so moving one and not the other reddens a row about the exclude pattern.
-    excluding: Object.freeze({ records: 116, withFields: 55, fields: 258 }),
+    // v4548 -- RE-TAKEN with `currentIncludingModule` above: 258 -> 259, the one field described there.
+    excluding: Object.freeze({ records: 116, withFields: 55, fields: 259 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,
