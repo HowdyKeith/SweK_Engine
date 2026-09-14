@@ -4870,6 +4870,23 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "sabotages, all red by name, including a normal taken from a central difference of the samples " +
                  "instead of the bilinear patch the height comes from.",
     }),
+    since238: Object.freeze({
+        at: "v4592", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "physics/spellAmmo-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 3 s: the book pure, then box3d headless for the hits, the race and the duels. THE SPELLBOOK AS AMMUNITION " +
+                 "(task 81): physics/spellAmmo.mjs reads world/spellBook.mjs by reference -- AMMO_NAMES is SPELL_NAMES itself, a " +
+                 "shell's landing is the spell's own row (damage, radius with the dungeon grenade's 1 - d / R, ignite as a Doom Fire " +
+                 "under the target, slow as half throttle for the book's seconds, pool as a caustic patch of the book's dps) -- and " +
+                 "the pickups on the track load a magazine of ENERGY_POOL / manaFor(spell) shells, the book's measured cost turned " +
+                 "around (cataclysm 1, spark 10, novaBurst 100). A spark hit is v4588's 0.743 m/s to the thousandth, a cataclysm hit " +
+                 "9.92; the race on seed 1 has the leader take four pickups and land causticSpray and cataclysm shells, replays from " +
+                 "its log, and the duel without pickups scores 14.558 as at v4590. The gate's first run was red on the plain-shell " +
+                 "pickup (the endless magazine swallowed it); a pickup of spark is a finite one now.",
+    }),
     since237: Object.freeze({
         at: "v4591", swept: 1, green: 1, red: 0,
         added: Object.freeze([

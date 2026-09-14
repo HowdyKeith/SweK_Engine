@@ -1884,6 +1884,40 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         in for fracture.js's exact centre of mass (reported beside it: the stub voxels pull it 0.04 m); a block leaning on
         the road or on a neighbour is left leaning; no cascade damage to neighbours from the fall; the page on WebGPU (the
         presented device is lost on this harness). Census: 1636 -> 1637 gates; since237.
+     Then (v4592) THE SPELLBOOK AS AMMUNITION (task 81). Keith asked whether the car turrets could have the same spellbook
+        ammo as the dungeon spellbook -- reusing the effects and the damage scale -- with power pickups applying toward the ammo
+        choice. physics/spellAmmo.mjs READS THE BOOK, IT DOES NOT COPY IT: AMMO_NAMES is world/spellBook.mjs's SPELL_NAMES itself
+        (the same frozen array), and what a shell does when it lands is the spell's own row -- `damage` (the dungeon's scale: 3
+        for a spark, 40 for a cataclysm) scaling TURRET.hitImpulse over spark's, `radius` as a splash with DungeonDemo's grenade
+        falloff 1 - d / R, `ignite` (ember) as a Doom Fire patch lit under the car it hit through physics/slick.mjs (a patch
+        free of the gunner's reload and cap, centred on the target), `slow` (frostbite) as half throttle for the book's 3 s
+        (DungeonDemo's ai.slow(id, 3.0)), `pool` (causticSpray) as a caustic patch of the book's { 4 s, 1.2 dps } that burns
+        what stands in it (the dungeon's _pools row) -- change a number in the book and the turret changes with it. The plain
+        shell is spark, the spell of least damage, so a spark hit is v4588's 0.743 m/s to the thousandth and every earlier
+        gate keeps its numbers. THE PICKUPS ARE THE COST MODEL TURNED AROUND: a pickup on the track holds ENERGY_POOL /
+        manaFor(spell) shells, the mana the book DERIVES from measured work (v4192), so a cataclysm pickup is one shell, spark
+        ten, and novaBurst -- the book's cheapest spell by measured cost, eight ported particles, though its damage is 12 -- a
+        hundred: the magazine follows the cost, which is the book's own rule and the reason the pickups are not a second
+        balance table. Fifteen pickups sit every 24 m along seed 1's 379 m centreline, 1.5 m off it, all on the asphalt,
+        their spells cycling through the book in cost order from a seeded first, taken within 2.2 m and back after 15 s; the
+        newest pickup is what fires next, the rest wait in the magazine, and at zero the fullest held spell takes over and
+        then the plain shell. The gunner's contract is unchanged (yaw, pitch, fire, drop, ignite): what a shell carries is the
+        turret's state, a pure function of the pickups the car drove over, so the race replays from its eight-field input
+        log and the fingerprint folds the magazines and the pickups (and the shell's spell). Measured headless: a cataclysm
+        hit moves the still car at 9.92 m/s (40 / 3 of the spark's), frostbite sets slowUntil 180 ticks out, ember's patch
+        burns the target, the caustic pool lands 60-odd acid ticks, a quake reaches a second car 3 m from the hit and not one
+        9 m away; the three-car race on seed 1 has the leader take four pickups and land causticSpray and cataclysm shells
+        (the car behind takes 155 damage and 68 acid ticks), deterministic and replayed to the same fingerprint, damage and
+        pickups; the duel without pickups scores 14.558 exactly as at v4590 (the reward pays 0.05 a point only for damage
+        BEYOND the plain shell's), with pickups 16.762 on 89.7 damage. Drawn: shells in the colour of the spell they carry
+        (the book's burst colour, the lit pipeline's colour mode) and a bobbing pickup sphere per spell; race-brain.html's
+        standings read the loaded spell and count, damage dealt and taken, and the gun line counts the pickups on the track;
+        the raceTurret gate's browser race still matches node's fingerprint with the pickups in it. Corrected on the way: the
+        gate's first run was red on a pickup of the plain spell, which the endless magazine (count Infinity) swallowed; a
+        pickup of spark is a finite magazine now. Seven sabotages, all red by name. Gate physics/spellAmmo-selfcheck.mjs
+        beside its module (3 s). Unchecked: quake's and cataclysm's fracture and raymarch rows have no target on the race
+        track's static city (they land as damage and splash only); the gunner does not choose its ammo; the pickups are not
+        yet on race-crash.html. Census: 1637 -> 1638 gates; since238.
 ## The count that says when step 4 matters
 
 tools/ship/shaderCensus-selfcheck.mjs has held, since v3274, that a hand-written pair is cheaper than an

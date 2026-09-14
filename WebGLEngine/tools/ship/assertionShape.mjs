@@ -278,8 +278,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4589 -- RE-TAKEN: one gate (tools/ship/carViews-selfcheck.mjs) joined, the same four rows by one.
     // v4590 -- RE-TAKEN: one gate (physics/slick-selfcheck.mjs) joined, the same four rows by one.
     // v4591 -- RE-TAKEN: one gate (world/buildingTopple-selfcheck.mjs) joined, the same four rows by one.
-    gates: 1637, usesOk: 1616, definesOk: 1608, importsOk: 0,
-    distinctDefinitions: 40, nameFirst: 1509, condFirst: 91, unknownSignature: 16,
+    // v4592 -- RE-TAKEN: one gate (physics/spellAmmo-selfcheck.mjs) joined, the same four rows by one.
+    gates: 1638, usesOk: 1617, definesOk: 1609, importsOk: 0,
+    distinctDefinitions: 40, nameFirst: 1510, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

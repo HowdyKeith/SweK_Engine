@@ -16,6 +16,8 @@ import { sphereMesh } from "./litSphere.mjs";
 import { muzzle } from "../physics/turret.mjs";
 import { yawQuat } from "../physics/raceCar.mjs";
 import { SLICK, fireCells, isBurning } from "../physics/slick.mjs";
+import { SPELLS } from "../world/spellBook.mjs";
+import { AMMO, pickupAvailable } from "../physics/spellAmmo.mjs";
 
 export const TURRET_DRAW = Object.freeze({
     domeScale: 0.32, barrelSide: 0.16, shellScale: 0.12, maxShells: 64, park: Object.freeze([0, -500, 0]),
@@ -37,9 +39,13 @@ export function turretFleets(n, barrel, L, { light, draw = TURRET_DRAW } = {}) {
     return [
         { name: "turret-domes", mesh: sphereMesh(2, draw.domeColour), pipeline, bind, records: rec(n), extras: ext(n) },
         { name: "turret-barrels", mesh: barrelMesh(barrel, draw.barrelSide, draw.barrelColour), pipeline, bind, records: rec(n), extras: ext(n) },
-        { name: "shells", mesh: sphereMesh(1, draw.shellColour), pipeline, bind, records: rec(draw.maxShells), extras: ext(draw.maxShells) },
+        // v4592: a shell is drawn in the colour of the spell it carries (the book's burst colour) -- the lit pipeline's colour mode
+        { name: "shells", mesh: sphereMesh(1, [1, 1, 1, 1]), pipeline: L.litPipelineDesc({ cull: "back", extra: "colour" }), bind, records: rec(draw.maxShells), extras: ext(draw.maxShells) },
     ];
 }
+
+/** The colour a shell is drawn in: its spell's burst colour from the book; the plain shell (spark, or none) the turret's own. */
+export function shellColour(ammo, draw = TURRET_DRAW) { const s = ammo && ammo !== AMMO.plain ? SPELLS[ammo] : null; return s ? s.burst.colour : [draw.shellColour[0], draw.shellColour[1], draw.shellColour[2]]; }
 
 /**
  * Write this frame's turret and shell placements into a dynamic kit scene. `base` is the record index of the first dome (the kit's
@@ -55,8 +61,8 @@ export function placeTurrets(scene, base, poses, turrets, shells, { draw = TURRE
     const s0 = base + 2 * n;
     for (let k = 0; k < draw.maxShells; k++) {
         const s = shells[k], o = (s0 + k) * 4;
-        if (s) R.set([s.x, s.y, s.z, draw.shellScale], o); else R.set([draw.park[0], draw.park[1], draw.park[2], 1], o);
-        E.set([0, 0, 0, 1], o);
+        if (s) { const c = shellColour(s.ammo); R.set([s.x, s.y, s.z, draw.shellScale], o); E.set([c[0], c[1], c[2], 1], o); }
+        else { R.set([draw.park[0], draw.park[1], draw.park[2], 1], o); E.set([draw.shellColour[0], draw.shellColour[1], draw.shellColour[2], 1], o); }
     }
     return { domes: base, barrels: base + n, shells: s0, count: 2 * n + draw.maxShells };
 }
@@ -96,4 +102,27 @@ export function placeSlicks(scene, base, state, { draw = SLICK_DRAW } = {}) {
     for (const p of patches) { if (!isBurning(p)) continue; for (const c of fireCells(p)) { if (n >= draw.maxCells) break; const o = (f0 + n) * 4; R.set([c.x, c.y, c.z, c.w], o); E.set([c.colour[0], c.colour[1], c.colour[2], 1], o); n++; } }
     for (let k = n; k < draw.maxCells; k++) { const o = (f0 + k) * 4; R.set([draw.park[0], draw.park[1], draw.park[2], 1], o); E.set([0, 0, 0, 1], o); }
     return { patches: Math.min(patches.length, draw.maxPatches), cells: n, slicks: base, fire: f0, count: draw.maxPatches + draw.maxCells };
+}
+
+// ---- v4592 (task 81): the spellbook's pickups on the track ------------------------------------------------------------------------
+// One fleet: a small sphere per pickup in the colour of the spell it loads (the book's burst colour, the colour mode), bobbing on the
+// tick; a taken pickup is parked until it respawns.
+export const PICKUP_DRAW = Object.freeze({ scale: 0.45, bob: 0.15, bobTicks: 40, park: Object.freeze([0, -500, 0]) });
+
+/** The pickups fleet for kitScene's extraFleets. Records start parked. */
+export function pickupFleets(L, { light, draw = PICKUP_DRAW, max = AMMO.maxPickups } = {}) {
+    const r = new Float32Array(max * 4), e = new Float32Array(max * 4);
+    for (let i = 0; i < max; i++) { r.set([draw.park[0], draw.park[1], draw.park[2], 1], i * 4); e.set([1, 1, 1, 1], i * 4); }
+    return [{ name: "pickups", mesh: sphereMesh(2, [1, 1, 1, 1]), pipeline: L.litPipelineDesc({ cull: "back", extra: "colour" }), bind: L.litBind(light), records: r, extras: e }];
+}
+
+/** Write this tick's pickups into a dynamic kit scene; `base` is the first pickup record. Returns the counts placed. */
+export function placePickups(scene, base, field, t = 0, { draw = PICKUP_DRAW, max = AMMO.maxPickups } = {}) {
+    const R = scene.kitRecords, E = scene.kitExtras; let shown = 0;
+    for (let k = 0; k < max; k++) {
+        const p = field && field.pickups[k], o = (base + k) * 4;
+        if (p && pickupAvailable(p, t)) { const c = SPELLS[p.spell].burst.colour; R.set([p.x, p.y + draw.bob * Math.sin((t + p.id * 7) / draw.bobTicks), p.z, draw.scale], o); E.set([c[0], c[1], c[2], 1], o); shown++; }
+        else { R.set([draw.park[0], draw.park[1], draw.park[2], 1], o); E.set([1, 1, 1, 1], o); }
+    }
+    return { shown, pickups: base, count: max };
 }

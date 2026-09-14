@@ -115,7 +115,7 @@ export function stepShells(shells, targets, dt, { groundY = 0, gravity = TURRET.
             if (tg.index === s0.owner) continue;
             for (let k = 1; k <= HIT_SAMPLES && !hit; k++) {
                 const f = k / HIT_SAMPLES, p = [s0.x + (s1.x - s0.x) * f, s0.y + (s1.y - s0.y) * f, s0.z + (s1.z - s0.z) * f];
-                if (insideBox(p, tg.pose, tg.half, spec.shellRadius)) hit = { owner: s0.owner, target: tg.index, point: p, dir: unit([s1.vx, s1.vy, s1.vz]) };
+                if (insideBox(p, tg.pose, tg.half, spec.shellRadius)) hit = { owner: s0.owner, target: tg.index, point: p, dir: unit([s1.vx, s1.vy, s1.vz]), ammo: s0.ammo };   // ammo: v4592, what the shell carries
             }
             if (hit) break;
         }
@@ -171,7 +171,7 @@ export function aimErrors(pose, turret, targetPos, targetVel) {
 export function turretHash(h, turrets, shells, fold) {
     for (const t of turrets) { h = fold(h, Math.round(t.yaw * 1e6) | 0); h = fold(h, Math.round(t.pitch * 1e6) | 0); h = fold(h, t.reload); h = fold(h, t.hits); h = fold(h, t.shots); }
     h = fold(h, shells.length);
-    for (const s of shells) { h = fold(h, Math.round(s.x * 1e3) | 0); h = fold(h, Math.round(s.y * 1e3) | 0); h = fold(h, Math.round(s.z * 1e3) | 0); }
+    for (const s of shells) { h = fold(h, Math.round(s.x * 1e3) | 0); h = fold(h, Math.round(s.y * 1e3) | 0); h = fold(h, Math.round(s.z * 1e3) | 0); h = fold(h, s.ammoIndex || 0); }   // ammoIndex: v4592, the spell the shell carries
     return h;
 }
 

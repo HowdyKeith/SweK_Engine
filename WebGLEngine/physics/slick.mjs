@@ -35,7 +35,7 @@ export const SLICK = Object.freeze({
     maxPerCar: 4,                       // older patches of a car are spent when it drops a fifth
     fire: Object.freeze({ cols: 12, rows: 8, stepEvery: 3, burn: 6, cellY: 0.06 }),   // the automaton per patch, its source row fed for `burn` s
 });
-export const KIND_OIL = "oil", KIND_FIRE = "fire";
+export const KIND_OIL = "oil", KIND_FIRE = "fire", KIND_ACID = "acid";   // acid: v4592, the spellbook's caustic pool (task 81)
 
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
@@ -56,15 +56,21 @@ export function patchAt(state, x, z) {
     return null;
 }
 
-/** Drop a patch behind a car's pose at tick t. Refused (null) inside the car's drop reload. */
-export function dropSlick(state, pose, owner, t, spec = state.spec) {
+/**
+ * Drop a patch behind a car's pose at tick t. Refused (null) inside the car's drop reload. v4592 (task 81): a SPELL's patch --
+ * `{ free: true }` skips the reload clock and the per-car cap (it is the shell's, not the gunner's drop), `at: [x, z]` centres it
+ * there instead of behind the car (under the car it hit), and `acid: { dps, seconds }` makes it a caustic pool that burns what
+ * stands in it for `seconds` without slipping or lighting: the spellbook's own pool, read from the book by the caller.
+ */
+export function dropSlick(state, pose, owner, t, spec = state.spec, { free = false, at = null, acid = null } = {}) {
     const last = state.lastDrop.get(owner);
-    if (last != null && t - last < spec.dropReloadTicks) return null;
+    if (!free && last != null && t - last < spec.dropReloadTicks) return null;
     const yaw = pose.yaw, fx = Math.sin(yaw), fz = Math.cos(yaw);
-    const patch = { id: state.next++, owner, x: pose.pos[0] - fx * spec.behind, z: pose.pos[2] - fz * spec.behind, y: pose.pos[1] - 0.9, yaw: wrap(yaw),
-                    half: [spec.width / 2, spec.length / 2], born: t, fire: null, ignitedAt: null, spent: false };
-    state.patches.push(patch); state.lastDrop.set(owner, t);
-    const mine = state.patches.filter((p) => p.owner === owner && !p.fire);
+    const patch = { id: state.next++, owner, x: at ? at[0] : pose.pos[0] - fx * spec.behind, z: at ? at[1] : pose.pos[2] - fz * spec.behind, y: pose.pos[1] - 0.9, yaw: wrap(yaw),
+                    half: [spec.width / 2, spec.length / 2], born: t, fire: null, ignitedAt: null, spent: false, free,
+                    acid: acid ? { dps: acid.dps, until: t + Math.round(acid.seconds / (1 / 60)) } : null };
+    state.patches.push(patch); if (!free) state.lastDrop.set(owner, t);
+    const mine = state.patches.filter((p) => p.owner === owner && !p.fire && !p.free);
     if (mine.length > spec.maxPerCar) mine[0].spent = true;
     return patch;
 }
@@ -73,7 +79,7 @@ export function dropSlick(state, pose, owner, t, spec = state.spec) {
 export function igniteSlick(state, owner, t, spec = state.spec) {
     for (let i = state.patches.length - 1; i >= 0; i--) {
         const p = state.patches[i];
-        if (p.owner === owner && !p.fire && !p.spent) {
+        if (p.owner === owner && !p.fire && !p.spent && !p.acid) {
             p.fire = new DoomFire({ width: spec.fire.cols, height: spec.fire.rows, seed: 0x5EED ^ (p.id * 2654435761 >>> 0) });
             p.ignitedAt = t; return p;
         }
@@ -90,13 +96,18 @@ export const isBurning = (patch) => !!(patch.fire && patch.fire.heat() > 0);
 export function stepSlicks(state, cars, t, spec = state.spec) {
     const events = [], dt = 1 / 60;
     for (const p of state.patches) {
-        if (p.fire) {
+        if (p.acid) { if (t >= p.acid.until) p.spent = true; }
+        else if (p.fire) {
             if (t - p.ignitedAt >= spec.fire.burn / dt) p.fire.extinguish();
             if ((t - p.ignitedAt) % spec.fire.stepEvery === 0) p.fire.step();
             if (p.fire.heat() === 0 && t - p.ignitedAt > spec.fire.rows * spec.fire.stepEvery) p.spent = true;
         } else if (t - p.born >= spec.life / dt) p.spent = true;
     }
-    for (const c of cars) { const p = patchAt(state, c.pose.pos[0], c.pose.pos[2]); if (p && isBurning(p)) events.push({ kind: "burn", car: c.index, patch: p.id, owner: p.owner }); }
+    for (const c of cars) {
+        const p = patchAt(state, c.pose.pos[0], c.pose.pos[2]); if (!p) continue;
+        if (p.acid && !p.spent) events.push({ kind: "acid", car: c.index, patch: p.id, owner: p.owner, dps: p.acid.dps });
+        else if (isBurning(p)) events.push({ kind: "burn", car: c.index, patch: p.id, owner: p.owner });
+    }
     const before = state.patches.length; state.patches = state.patches.filter((p) => !p.spent);
     return { events, removed: before - state.patches.length };
 }
@@ -108,6 +119,7 @@ export function slickSurface(base, state, spec = state.spec) {
         at(x, z) {
             const g = base.at(x, z), p = patchAt(state, x, z);
             if (!p) return g;
+            if (p.acid) return { ...g, kind: KIND_ACID };          // a caustic pool burns; it is not slippery
             if (isBurning(p)) return { ...g, kind: KIND_FIRE };
             return { ...g, kind: KIND_OIL, grip: g.grip * spec.grip, rolling: g.rolling * spec.rolling };
         },
@@ -116,7 +128,7 @@ export function slickSurface(base, state, spec = state.spec) {
 
 /** Is any of `poses` (other than the owner's) inside one of the owner's unlit patches? The gunner's ignite feature. */
 export function someoneOnMyOil(state, owner, poses) {
-    for (let i = 0; i < poses.length; i++) { if (i === owner) continue; const p = patchAt(state, poses[i].pos[0], poses[i].pos[2]); if (p && p.owner === owner && !p.fire) return true; }
+    for (let i = 0; i < poses.length; i++) { if (i === owner) continue; const p = patchAt(state, poses[i].pos[0], poses[i].pos[2]); if (p && p.owner === owner && !p.fire && !p.acid) return true; }
     return false;
 }
 
@@ -136,7 +148,7 @@ export function fireCells(patch, spec = SLICK) {
 /** The lockstep fold: every patch's id, pose, birth, ignition and heat, and the drop clocks. */
 export function slickHash(h, state, fold) {
     h = fold(h, state.patches.length);
-    for (const p of state.patches) { h = fold(h, p.id); h = fold(h, Math.round(p.x * 1e3) | 0); h = fold(h, Math.round(p.z * 1e3) | 0); h = fold(h, p.born); h = fold(h, p.ignitedAt == null ? -1 : p.ignitedAt); h = fold(h, p.fire ? p.fire.heat() : 0); }
+    for (const p of state.patches) { h = fold(h, p.id); h = fold(h, Math.round(p.x * 1e3) | 0); h = fold(h, Math.round(p.z * 1e3) | 0); h = fold(h, p.born); h = fold(h, p.ignitedAt == null ? -1 : p.ignitedAt); h = fold(h, p.fire ? p.fire.heat() : 0); if (p.acid) h = fold(h, p.acid.until); }
     return h;
 }
 

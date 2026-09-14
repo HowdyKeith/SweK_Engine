@@ -30,6 +30,7 @@ import * as C from "../physics/raceCar.mjs";
 import * as D from "./drivePolicy.mjs";
 import * as U from "../physics/turret.mjs";
 import * as S from "../physics/slick.mjs";
+import * as A from "../physics/spellAmmo.mjs";   // v4592 (task 81): the spellbook as ammunition, and the pickups
 import { worldFromModule } from "../render/slugTicker.mjs";
 
 // v4590 (task 79) -- two more features and two more outputs: the gunner sees whether a car is close BEHIND (the slick's target)
@@ -38,7 +39,7 @@ export const FEATURES = 11, HIDDEN = 8, OUTPUTS = 5;
 export const FEATURE_NAMES = Object.freeze(["bias", "bearing", "pitch", "range", "closing", "lateral", "reloading", "reachable", "aligned", "pursuerNear", "onMyOil"]);
 export const OUTPUT_NAMES = Object.freeze(["yaw", "pitch", "fire", "drop", "ignite"]);
 export const WEIGHT_COUNT = FEATURES * HIDDEN + HIDDEN + HIDDEN * OUTPUTS + OUTPUTS;   // 88 + 8 + 40 + 5 = 141
-export const REWARD = Object.freeze({ hit: 1, waste: 0.02, burn: 0.5 });               // a shot costs 2 % of a hit; an opponent's second on my fire pays half a hit
+export const REWARD = Object.freeze({ hit: 1, waste: 0.02, burn: 0.5, damage: 0.05 });  // a shot costs 2 % of a hit; an opponent's second on my fire pays half a hit; v4592: a twentieth per point of damage BEYOND the plain shell's
 export const DROP_RANGE = 14;                                                          // m: a pursuer inside this is worth a slick
 
 /** The all-zero gunner: never turns, never fires (tanh 0 is not > 0). What every trained gunner is measured against. */
@@ -116,16 +117,23 @@ export function perturb(w, sigma, rng) { const o = Float32Array.from(w); for (le
  * fired and flown, hits turned into impulses on the target chassis; and, with a slick state, drops laid, ignitions lit, the fires
  * stepped and the burns tallied. Returns the commands (for the log), the hit events and the burn events.
  */
-export function turretTick(world, cars, turrets, shells, poses, cmds, t, spec, slicks = null) {
+export function turretTick(world, cars, turrets, shells, poses, cmds, t, spec, slicks = null, pickups = null) {
     const fired = cmds.map((c, i) => U.stepTurret(turrets[i], c, C.CAR.dt));
-    fired.forEach((f, i) => { if (f.fires) U.fireShell(shells, poses[i], turrets[i], i, t); });
+    // v4592: a shell carries the spell its turret has loaded (spark, the plain shell, without a magazine); the pickups load the rest
+    fired.forEach((f, i) => { if (f.fires) { const sh = U.fireShell(shells, poses[i], turrets[i], i, t); sh.ammo = turrets[i].ammo ? A.spendShell(turrets[i].ammo) : A.AMMO.plain; sh.ammoIndex = A.ammoIndex(sh.ammo); } });
     if (slicks) fired.forEach((f, i) => { if (f.drop && S.dropSlick(slicks, poses[i], i, t)) turrets[i].drops = (turrets[i].drops || 0) + 1; if (f.ignite) S.igniteSlick(slicks, i, t); });
     const targets = cars.map((car, i) => ({ index: i, pose: poses[i], half: car.spec.half }));
     const events = U.stepShells(shells, targets, C.CAR.dt, { groundY: T.ROAD_Y - 2, gravity: spec.gravity, spec });
-    for (const e of events) { turrets[e.owner].hits++; world.impulse(cars[e.target].body, [e.dir[0] * spec.hitImpulse, e.dir[1] * spec.hitImpulse, e.dir[2] * spec.hitImpulse]); }
+    // a hit is the spell's row applied: the impulse scaled by its damage over spark's, the splash, the slow, the fire or the pool under the target
+    const effects = [];
+    for (const e of events) { turrets[e.owner].hits++; effects.push(...A.applyHit(e, { world, cars, turrets, poses, slicks, t, spec })); }
+    const taken = pickups ? A.collectPickups(pickups, poses, turrets, t) : [];
     const burns = slicks ? S.stepSlicks(slicks, targets, t).events : [];
-    for (const b of burns) turrets[b.car].burned = (turrets[b.car].burned || 0) + 1;
-    return { cmds: fired.map((f) => ({ yaw: f.yaw, pitch: f.pitch, fire: f.fire, drop: f.drop, ignite: f.ignite })), events, burns };
+    for (const b of burns) {
+        if (b.kind === "acid") { const dmg = b.dps * C.CAR.dt; turrets[b.car].damageTaken = (turrets[b.car].damageTaken || 0) + dmg; turrets[b.car].acid = (turrets[b.car].acid || 0) + 1; if (turrets[b.owner]) turrets[b.owner].damageDealt = (turrets[b.owner].damageDealt || 0) + dmg; }
+        else turrets[b.car].burned = (turrets[b.car].burned || 0) + 1;
+    }
+    return { cmds: fired.map((f) => ({ yaw: f.yaw, pitch: f.pitch, fire: f.fire, drop: f.drop, ignite: f.ignite })), events, burns, effects, taken };
 }
 
 /**
@@ -135,7 +143,7 @@ export function turretTick(world, cars, turrets, shells, poses, cmds, t, spec, s
  * seed }. A world is made and destroyed here. v4590 turned the duel around: until then the candidate sat behind a target it
  * could only shoot, and a slick dropped behind a rear car meets nobody.
  */
-export function duel(worldFrom, w, { seed = 1, seconds = 20, gap = 10, shellSpeed = U.TURRET.shellSpeed, driver = null, otherDriver = null, slicks: withSlicks = true, geometry = "pursued" } = {}) {
+export function duel(worldFrom, w, { seed = 1, seconds = 20, gap = 10, shellSpeed = U.TURRET.shellSpeed, driver = null, otherDriver = null, slicks: withSlicks = true, geometry = "pursued", pickups: withPickups = false } = {}) {
     // "pursued": the candidate in the FRONT car, the other car behind it (the slick's geometry, the trainer's default);
     // "chase": the candidate BEHIND a car that pulls away (v4588's original duel), where a slow shell never catches the target
     const me = geometry === "chase" ? 1 : 0, other = 1 - me;
@@ -145,19 +153,22 @@ export function duel(worldFrom, w, { seed = 1, seconds = 20, gap = 10, shellSpee
     const drivers = weights.map((dw, i) => D.policyDriver(dw, surface, cars[i]));
     const spec = Object.freeze({ ...U.TURRET, shellSpeed }), turrets = [U.createTurret(spec), U.createTurret(spec)], shells = [], gunner = gunnerFor(w);
     const slicks = withSlicks ? S.createSlicks() : null, surf = slicks ? S.slickSurface(surface, slicks) : surface, idle = { yaw: 0, pitch: 0, fire: 0, drop: 0, ignite: 0 };
+    const field = withPickups ? A.pickupField(surface, { seed }) : null; turrets.forEach((tr) => { tr.ammo = A.createAmmo(); });
     const ticks = Math.round(seconds / C.CAR.dt); let h = 0x811c9dc5, burned = 0;
     for (let t = 0; t < ticks; t++) {
         const xf = world.readTransforms(), vel = world.readVelocities(), poses = cars.map((c) => C.carPose(world, c, xf, vel));
-        const inputs = poses.map((p, i) => C.clampInput(drivers[i](p)));
+        const inputs = poses.map((p, i) => { const u = C.clampInput(drivers[i](p)); return { ...u, throttle: u.throttle * A.throttleFactor(turrets[i], t) }; });
         const cmds = [idle, idle]; cmds[me] = U.clampGun(gunner(poses[me], turrets[me], { pose: poses[other] }, pursuerInfo(me, poses, slicks)));
-        const tt = turretTick(world, cars, turrets, shells, poses, cmds, t, spec, slicks);
-        for (const b of tt.burns) if (b.car === other && b.owner === me) burned++;
+        const tt = turretTick(world, cars, turrets, shells, poses, cmds, t, spec, slicks, field);
+        for (const b of tt.burns) if (b.kind === "burn" && b.car === other && b.owner === me) burned++;
         C.stepCars(world, cars, surf, inputs, C.CAR.dt);
-        h = C.foldHash(h, world.stateHash()); h = U.turretHash(h, turrets, shells, C.foldHash); if (slicks) h = S.slickHash(h, slicks, C.foldHash);
+        h = C.foldHash(h, world.stateHash()); h = U.turretHash(h, turrets, shells, C.foldHash); if (slicks) h = S.slickHash(h, slicks, C.foldHash); h = A.ammoHash(h, turrets, C.foldHash); if (field) h = A.pickupHash(h, field, C.foldHash);
     }
     world.destroy();
-    const hits = turrets[me].hits, shots = turrets[me].shots, drops = turrets[me].drops || 0;
-    return { hits, shots, drops, burned, score: REWARD.hit * hits - REWARD.waste * shots + REWARD.burn * burned * C.CAR.dt, fingerprint: (h >>> 0).toString(16).padStart(8, "0"), ticks, seed, shellSpeed, geometry };
+    const hits = turrets[me].hits, shots = turrets[me].shots, drops = turrets[me].drops || 0, damage = turrets[me].damageDealt || 0, pickups = turrets[me].ammo.taken;
+    // the damage bonus is what the SPELLS add beyond the plain shell: a duel without pickups scores exactly as it did before them
+    const beyond = Math.max(0, damage - hits * A.hitEffect(A.AMMO.plain).damage);
+    return { hits, shots, drops, burned, damage, pickups, score: REWARD.hit * hits - REWARD.waste * shots + REWARD.burn * burned * C.CAR.dt + REWARD.damage * beyond, fingerprint: (h >>> 0).toString(16).padStart(8, "0"), ticks, seed, shellSpeed, geometry };
 }
 
 /** The mean duel score of a gunner over track seeds. */
@@ -204,12 +215,13 @@ export function gunnerStore({ persist = null, restore = null } = {}) {
  * every gunner shoots at the nearest other car. The log carries both contracts per car per tick; `inputsLog` replays one with no
  * policies. Returns { order, results, fingerprint, log, ticks, seed, fleet, shellSpeed } with results[i] carrying hits and shots.
  */
-export function raceWithGunners(worldFrom, drivers, gunners, { seed = 1, seconds = 60, fleet = "00000000", gap = 4, shellSpeed = U.TURRET.shellSpeed, inputsLog = null, onTick = null } = {}) {
+export function raceWithGunners(worldFrom, drivers, gunners, { seed = 1, seconds = 60, fleet = "00000000", gap = 4, shellSpeed = U.TURRET.shellSpeed, inputsLog = null, onTick = null, pickups: withPickups = true } = {}) {
     const surface = D.surfaceFor(seed), world = worldFrom(), cp = T.checkpoints(surface.track)[0]; C.addBuildings(world, T.cityRects(surface.track));
     const n = drivers.length, cars = drivers.map((w, i) => C.createCar(world, { x: cp.x + 5 - gap * i, z: cp.z, yaw: Math.PI / 2 }));
     const drive = drivers.map((w, i) => D.policyDriver(w, surface, cars[i])), gun = gunners.map((w) => gunnerFor(w)), trackers = cars.map(() => C.lapTracker(surface));
     const spec = Object.freeze({ ...U.TURRET, shellSpeed }), turrets = cars.map(() => U.createTurret(spec)), shells = [];
     const slicks = S.createSlicks(), surf = S.slickSurface(surface, slicks);   // v4590: the oil and the fire under the wheels
+    const field = withPickups ? A.pickupField(surface, { seed }) : null; turrets.forEach((tr) => { tr.ammo = A.createAmmo(); });   // v4592: the spellbook's pickups
     const s0 = cars.map((c, i) => surface.along(cp.x + 5 - gap * i, cp.z).s), metres = cars.map(() => 0), lapTimes = cars.map(() => null);
     const ticks = Math.round(seconds / C.CAR.dt), log = []; let h = 0x811c9dc5;
     for (let t = 0; t < ticks; t++) {
@@ -217,24 +229,26 @@ export function raceWithGunners(worldFrom, drivers, gunners, { seed = 1, seconds
         const rec = inputsLog ? inputsLog[t] : null;
         const inputs = rec ? rec.map((r) => C.clampInput(r)) : poses.map((p, i) => C.clampInput(drive[i](p)));
         const cmds = rec ? rec.map((r) => U.clampGun(r)) : poses.map((p, i) => { const j = nearestOther(i, poses); return U.clampGun(gun[i](p, turrets[i], j === null ? null : { pose: poses[j] }, pursuerInfo(i, poses, slicks))); });
-        const tt = turretTick(world, cars, turrets, shells, poses, cmds, t, spec, slicks);
+        const tt = turretTick(world, cars, turrets, shells, poses, cmds, t, spec, slicks, field);
         log.push(inputs.map((u, i) => ({ throttle: u.throttle, steer: u.steer, brake: u.brake, yaw: tt.cmds[i].yaw, pitch: tt.cmds[i].pitch, fire: tt.cmds[i].fire, drop: tt.cmds[i].drop, ignite: tt.cmds[i].ignite })));
-        const rs = C.stepCars(world, cars, surf, inputs, C.CAR.dt);
+        // v4592: a frostbitten car drives at half throttle -- applied after the log (the log is the policy's word; the slow is the world's, and the replay re-derives it)
+        const slowed = inputs.map((u, i) => ({ ...u, throttle: u.throttle * A.throttleFactor(turrets[i], t) }));
+        const rs = C.stepCars(world, cars, surf, slowed, C.CAR.dt);
         rs.forEach((r, i) => { const s1 = surface.along(r.pose.pos[0], r.pose.pos[2]).s; metres[i] += D.metresBetween(surface, s0[i], s1); s0[i] = s1; const tk = trackers[i].update(r.pose); if (tk.laps >= 1 && lapTimes[i] === null) lapTimes[i] = (t + 1) * C.CAR.dt; });
-        h = C.foldHash(h, world.stateHash()); h = U.turretHash(h, turrets, shells, C.foldHash); h = S.slickHash(h, slicks, C.foldHash);
-        if (onTick) onTick(t, rs.map((r) => r.pose), turrets, shells, tt.events, slicks, tt.burns);
+        h = C.foldHash(h, world.stateHash()); h = U.turretHash(h, turrets, shells, C.foldHash); h = S.slickHash(h, slicks, C.foldHash); h = A.ammoHash(h, turrets, C.foldHash); if (field) h = A.pickupHash(h, field, C.foldHash);
+        if (onTick) onTick(t, rs.map((r) => r.pose), turrets, shells, tt.events, slicks, tt.burns, field, tt.taken, tt.effects);
     }
     const poses = cars.map((c) => C.carPose(world, c)); world.destroy();
-    const results = drivers.map((w, i) => ({ car: i, laps: trackers[i].laps, metres: metres[i], lapTime: lapTimes[i], hash: D.weightsHash(w), gunnerHash: D.weightsHash(gunners[i]), hits: turrets[i].hits, shots: turrets[i].shots, drops: turrets[i].drops || 0, burned: turrets[i].burned || 0, pose: poses[i] }));
+    const results = drivers.map((w, i) => ({ car: i, laps: trackers[i].laps, metres: metres[i], lapTime: lapTimes[i], hash: D.weightsHash(w), gunnerHash: D.weightsHash(gunners[i]), hits: turrets[i].hits, shots: turrets[i].shots, drops: turrets[i].drops || 0, burned: turrets[i].burned || 0, damageDealt: turrets[i].damageDealt || 0, damageTaken: turrets[i].damageTaken || 0, acid: turrets[i].acid || 0, pickups: turrets[i].ammo.taken, ammo: turrets[i].ammo.loaded, pose: poses[i] }));
     const tieKey = (r) => { let k = 0x811c9dc5; for (const ch of fleet + r.hash + r.gunnerHash) { k ^= ch.charCodeAt(0); k = Math.imul(k, 0x01000193); } return k >>> 0; };
     const order = results.slice().sort((a, b) => (b.laps - a.laps) || (Math.abs(b.metres - a.metres) > 1 ? b.metres - a.metres : tieKey(a) - tieKey(b))).map((r) => r.car);
-    return { order, results, fingerprint: (h >>> 0).toString(16).padStart(8, "0"), log, ticks, seed, fleet, shellSpeed, n };
+    return { order, results, fingerprint: (h >>> 0).toString(16).padStart(8, "0"), log, ticks, seed, fleet, shellSpeed, n, pickups: !!field, pickupCount: field ? field.pickups.length : 0 };
 }
 
 /** Replay a gunners' race from its log alone: the same seed, car count and shell speed, no policies. Must reach the same fingerprint. */
 export function replayGunners(worldFrom, rec, { onTick = null } = {}) {
     const n = rec.log[0].length, zeros = Array.from({ length: n }, () => D.zeroWeights()), zg = Array.from({ length: n }, () => zeroWeights());
-    return raceWithGunners(worldFrom, zeros, zg, { seed: rec.seed, seconds: rec.ticks * C.CAR.dt, fleet: rec.fleet, shellSpeed: rec.shellSpeed, inputsLog: rec.log, onTick });
+    return raceWithGunners(worldFrom, zeros, zg, { seed: rec.seed, seconds: rec.ticks * C.CAR.dt, fleet: rec.fleet, shellSpeed: rec.shellSpeed, inputsLog: rec.log, onTick, pickups: rec.pickups !== false });
 }
 
 // ---- THE KNOB: the shell speed, proposed slow, adjudicated by hits ------------------------------------------------------------
@@ -290,7 +304,7 @@ export function reportLines() {
     return [
         "[gunnerPolicy] the gunner: an 11 -> 8 -> 5 relu MLP on the turret's aim errors and the slick's two facts, the hand gunner as weights, the duel, the ES, the race with turrets and oil, the shell-speed knob",
         `  ${WEIGHT_COUNT} weights (${FEATURES} x ${HIDDEN} + ${HIDDEN} + ${HIDDEN} x ${OUTPUTS} + ${OUTPUTS}); features ${FEATURE_NAMES.join(", ")}; outputs ${OUTPUT_NAMES.join(", ")}`,
-        `  reward: ${REWARD.hit} per hit, -${REWARD.waste} per shot, ${REWARD.burn} per second of an opponent on my fire; knob ${KNOB} over [${SHELL_CANDIDATES.join(", ")}] m/s, score 1 / speed, key ${HIT_BOUND} hits in ${KEY_SECONDS} s on seed ${KEY_SEED}`,
+        `  reward: ${REWARD.hit} per hit, -${REWARD.waste} per shot, ${REWARD.burn} per second of an opponent on my fire, ${REWARD.damage} per point of spell damage beyond the plain shell's (physics/spellAmmo.mjs, v4592); knob ${KNOB} over [${SHELL_CANDIDATES.join(", ")}] m/s, score 1 / speed, key ${HIT_BOUND} hits in ${KEY_SECONDS} s on seed ${KEY_SEED}`,
         `  box3d ${MOD ? "ready" : "not loaded here (ready() in node, setModule() in a page)"}`,
     ];
 }
