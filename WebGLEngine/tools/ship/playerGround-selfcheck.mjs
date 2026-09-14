@@ -394,15 +394,16 @@ console.log("\n10. *** THIS ROUND'S OWN RECORD IS INVISIBLE TO THE RECORD CENSUS
     // It was written at v4545 to go red the day somebody FIXES the hole; it also goes red the day somebody
     // WIDENS it, and the next round to add a record beside its code found that out within the hour. Both
     // directions are the row doing its job: the number is pinned, so the hole cannot change size in silence.
-    // SIX ROUNDS RUNNING NOW -- v4546 made it four, v4548 five, v4549 six, v4550 seven and v4552 eight -- which is the
+    // SEVEN ROUNDS RUNNING NOW -- v4546 four, v4548 five, v4549 six, v4550 seven, v4552 eight, v4554 nine -- which is the
     // strongest argument the pin could have made for itself: every round that writes a record beside
     // camera.js widens a hole the record censuses cannot see, and the only thing that says so is this row.
     // *** AND AT v4550 IT CAUGHT A CLAIM RATHER THAN A RECORD. *** That round read this red as one of its
     // own sabotages being caught and wrote so in a gate header; it is not, it fires with or without the
     // sabotage, and the header was corrected before the round shipped. A row that reddens on every run of
     // a neighbouring experiment will be mistaken for that experiment's signal, which is worth the line.
-    ok("!! *** THE HOLE IS EIGHT RECORDS WIDE AND TWO OF THEM PREDATE THIS SESSION BY A HUNDRED VERSIONS ***",
-        missed.length === 8 && missed.every((r) => /\.(js|cjs)$/.test(r.file)) &&
+    ok("!! *** THE HOLE IS NINE RECORDS WIDE AND TWO OF THEM PREDATE THIS SESSION BY A HUNDRED VERSIONS ***",
+        missed.length === 9 && missed.every((r) => /\.(js|cjs)$/.test(r.file)) &&
+        missed.some((r) => r.name === "KAIJU_GROUND_AT_V4554") &&
         missed.some((r) => r.name === "WALK_GROUND_AT_V4552") &&
         missed.some((r) => r.name === "PLAYER_WATER_AT_V4550") &&
         missed.some((r) => r.name === "PLAYER_BODY_AT_V4549") &&

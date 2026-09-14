@@ -319,8 +319,10 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // arrive -- so this table counts FILES and not coverage, which is worth saying where it is read.
     // v4552 -- RE-TAKEN for tools/ship/walkGround-selfcheck.mjs: 1640 -> 1641, usesOk 1620, definesOk
     // 1612, nameFirst 1513.
-    gates: 1641, usesOk: 1620, definesOk: 1612, importsOk: 0,
-    distinctDefinitions: 40, nameFirst: 1513, condFirst: 91, unknownSignature: 16,
+    // v4554 -- RE-TAKEN for tools/ship/kaijuGround-selfcheck.mjs: 1641 -> 1642, usesOk 1621, definesOk
+    // 1613, nameFirst 1514.
+    gates: 1642, usesOk: 1621, definesOk: 1613, importsOk: 0,
+    distinctDefinitions: 40, nameFirst: 1514, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

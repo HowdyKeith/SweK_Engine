@@ -303,6 +303,47 @@ export const WALK_GROUND_AT_V4552 = Object.freeze({
     ]),
 });
 
+/**
+ * *** RE-DERIVED BY tools/ship/kaijuGround-selfcheck.mjs ON EVERY RUN. *** Readings at v4554.
+ *
+ * The creature's height is written twice a frame by two rules, and the one that wins is the one nobody
+ * designed to win -- so the drive camera's vertical physics is dead code in the shipping frame order, and
+ * the write that kills it is the only thing keeping driven kaiju in the world.
+ */
+export const KAIJU_GROUND_AT_V4554 = Object.freeze({
+    at: "v4554",
+    // (1) THE DOUBLE WRITE
+    driveWritesY: "camera/camera.js _moveKaijuDrive, through fallBody.fallStep",
+    clampWritesY: "simulation/KaijuManager.js:280, k.position.y = gy, gated on k.state alone",
+    frameOrder: "main.js:29660 camera.update() then main.js:29931 kaijuManager.tick(dt)",
+    framesDriveDiscardedOf300: 300,
+    isPlayerDrivenUsesInManager: 1,      // and it selects an ANIMATION CLIP; it guards no physics
+    // (2) *** AND THE OBVIOUS FIX IS A CATASTROPHE, WHICH IS WHY THE ROUND DOES NOT MAKE IT ***
+    lostWithClamp: 0,                    // of 60, five seconds of holding W on the generated world
+    lostWithoutClamp: 56,                // ...guarding the clamp with _isPlayerDriven
+    naiveFixIsACatastrophe: true,
+    closingItRequires: Object.freeze([
+        "a step-up for the drive: its probe is _fallSurface() at reach 0, so it can never name a surface " +
+        "ABOVE the body and a driven kaiju has never once gained height",
+        "a horizontal collision for the drive: k.position.x += mx * speed * dt is unguarded, and " +
+        "_canStandAt has exactly ONE call site in the tree -- _moveFP, the other controller in this class",
+    ]),
+    // (3) THE OFF-BY-ONE, MEASURED AND DECLINED
+    heightAtIsFirstAirIndex: true,       // 2,240 of 2,240 non-water samples; topmost-solid in 0
+    terrainTopAddsOne: true,             // so `return h + 1` is one voxel above the model's own stand height
+    terrainTopAboveVoxelTruth: 2240,     // of 2,240 non-water samples: ABOVE in every one of them
+    offByOneFixed: false,                // gy feeds flyer clearance, the water line and the wake test
+    notClosed: Object.freeze([
+        "the double write itself -- closing it needs the drive to hold a body up alone, which is the " +
+        "player's v4545..v4552 arc repeated for a second body",
+        "the +1 in _terrainTop: correcting it moves every kaiju, every flyer's cruise altitude and the " +
+        "water line at once, which is a gameplay decision and not a census's to make",
+        "the body height: KAIJU_HEAD_Y is a CAMERA offset and the ground probe asks about 2 cells, but a " +
+        "body-height fix is INVISIBLE until the double write is closed -- measured, and the reason this " +
+        "round reordered itself",
+    ]),
+});
+
 export class Camera {
     // The keys the _move* methods consult in EVERY mode that moves. KeyE is deliberately absent: it is
     // kaiju-drive only, and consumesKey() adds it there. Cross-checked against the keys.has() literals in this
@@ -814,8 +855,16 @@ export class Camera {
             // each be driven across mode toggles without state leakage.
             this._kaijuDriveVelY = 0;
             this._kaijuDriveOnGround = true;
-            // Round 125 — set persistent player-drive flag so AI tick
-            // skips and mesh-sync can pick velocity-based clip.
+            // Round 125 — set persistent player-drive flag so mesh-sync can pick a velocity-based clip.
+            // *** THIS SENTENCE USED TO SAY "so AI tick skips" AND THAT HALF WAS FALSE. *** v4554 counted
+            // the flag's uses in simulation/KaijuManager.js: there is exactly ONE, at :394, and it selects
+            // an animation clip. It guards no physics. In particular the ground clamp at :280 --
+            // `k.position.y = gy`, gated only on k.state -- runs for a DRIVEN kaiju too, in the same frame,
+            // after camera.update(), so everything _moveKaijuDrive computes vertically is overwritten
+            // before it is drawn. A false reason is worse than no reason because it tells the next reader
+            // not to look; v4545 convicted the identical species one method over.
+            // AND THE CLAMP IS LOAD-BEARING BY ACCIDENT, which is why this round did not simply guard it:
+            // with it, 0 of 60 driven kaiju leave the world over five seconds of walking; without it, 56.
             if (this._kaijuTarget) this._kaijuTarget._isPlayerDriven = true;
         }
         // Round 124 — leaving kaiju_drive: clear AI-skip flag so the

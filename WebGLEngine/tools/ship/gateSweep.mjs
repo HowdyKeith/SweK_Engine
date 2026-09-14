@@ -3849,6 +3849,37 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // object keys of the same name, the later one wins silently and the earlier round's swept count vanishes
     // from the surplus arithmetic. FIFTH ORDINAL COLLISION between the two lines this session; the side that
     // merges second is the side that moves.
+    since246: Object.freeze({
+        at: "v4554", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/kaijuGround-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly: 19 checks in six sections, 708-721 ms over three runs. "
+               + "*** THE KAIJU'S HEIGHT IS WRITTEN TWICE EVERY FRAME BY TWO RULES, AND THE ONE THAT WINS IS "
+               + "THE ONE NOBODY DESIGNED TO WIN. *** main.js calls camera.update() at :29660 and "
+               + "kaijuManager.tick(dt) at :29931, same frame, camera first. _moveKaijuDrive integrates a "
+               + "fall through fallBody.fallStep and writes k.position.y; KaijuManager.js:280 then assigns "
+               + "`k.position.y = gy` outright, guarded on k.state ALONE. Measured: the clamp overwrote the "
+               + "drive's answer on 300 of 300 frames. So v4548's work removing the fourth copy of 'fall "
+               + "until you land' from this path is correct and DEAD in the shipping frame order. "
+               + "*** AND THE OBVIOUS ONE-LINE FIX IS A CATASTROPHE, WHICH IS THE ROUND: *** guarding the "
+               + "clamp with _isPlayerDriven -- exactly what two writers for one quantity usually deserve -- "
+               + "drops 56 of 60 driven kaiju below y = -20 over five seconds of walking, against 0 of 60 "
+               + "with the clamp left alone. The drive cannot hold a body up: its probe is _fallSurface() at "
+               + "reach 0 so it has never once gained height, and its horizontal move is unguarded because "
+               + "_canStandAt has exactly ONE call site in the tree and it is the other controller in the "
+               + "same class. The redundant write is load-bearing by accident. FIVE SABOTAGES: K1 the naive "
+               + "guard 1 RED, K2 _terrainTop drops its +1 1, K3 the drive stops writing y 5, K4 the drive "
+               + "given a step-up 4, K5 the false comment restored 2. *** K2 WENT ZERO RED FIRST BECAUSE "
+               + "SECTIONS 2-4 DRIVE A TRANSCRIPTION OF _terrainTop *** -- a check grading its own copy, for "
+               + "the third time in five rounds; the copy is pinned to the source's text now. ALSO MEASURED "
+               + "AND DECLINED: _heightAt is the FIRST AIR index in 2,240 of 2,240 non-water samples, so "
+               + "_terrainTop's `return h + 1` is one voxel too high by the model's own convention and reads "
+               + "above the voxel stand height in every sample. NOT FIXED: gy feeds the flyers' cruise "
+               + "altitude, the swimmers' water line and the wake test, so a one-voxel correction moves every "
+               + "kaiju in the game -- a gameplay decision, not a census's. AND THE FALSE COMMENT IS "
+               + "CORRECTED: camera.js said the drive flag is set 'so AI tick skips'; the flag has exactly "
+               + "ONE use in the manager and it picks an animation clip.",
+    }),
     since245: Object.freeze({
         at: "v4552", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/walkGround-selfcheck.mjs"]),
