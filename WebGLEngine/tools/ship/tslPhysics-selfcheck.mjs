@@ -313,7 +313,13 @@ else {
         // the transplant into gfx/device.js
         let descLy, descH; try { descLy = S.devicePipelineFromTsl({ wgsl: emitted.lyapunov.webgpu, glsl: emitted.lyapunov.webgl2 }); descH = S.devicePipelineFromTsl({ wgsl: emitted.heidler.webgpu, glsl: emitted.heidler.webgl2 }); } catch (e) { out.transplantError = String(e && e.message || e).slice(0, 300); return out; }
         out.emitted = { lyapunov: { wgsl: emitted.lyapunov.webgpu, glsl: emitted.lyapunov.webgl2, transplanted: { wgsl: descLy.shaders.wgsl, glsl: descLy.shaders.glsl.fragment } }, heidler: { wgsl: emitted.heidler.webgpu, glsl: emitted.heidler.webgl2, transplanted: { wgsl: descH.shaders.wgsl, glsl: descH.shaders.glsl.fragment } } };
-        out.uniforms = { lyapunov: descLy.uniforms.map((u) => u.name), heidler: descH.uniforms.map((u) => u.name) };
+        // Raw, unfiltered -- devicePipelineFromTsl() returns the FULL uniform list on purpose (render/
+        // tslSource.mjs's own _unreadBookkeeping comment). Dropping the GLSL-only mat4 "nodeUniformN"
+        // bookkeeping field happens OUTSIDE this script, in plain Node code after the harness returns: a
+        // regex written here would be inside this template literal's own string-cooking, where an
+        // unrecognised escape like \d is silently dropped (nodeUniform\d+ would cook to nodeUniformd+) --
+        // exactly the trap tslSource-selfcheck.mjs avoids by filtering after R = r.result, not in-page.
+        out.uniforms = { lyapunov: descLy.uniforms, heidler: descH.uniforms };
         for (const backend of ["webgpu", "webgl2"]) {
             const o = {};
             try {
@@ -342,7 +348,16 @@ else {
             ok(`*** ${via} ${b}: the lightning's peak over i0 reads 1 at the true eta (1e-4) and 1.0667 at the published one (1e-3) ***`, Math.abs(o.heidlerTrue - 1) < 1e-4 && Math.abs(o.heidlerStd - 1.0667) < 1e-3, `${o.heidlerTrue.toFixed(5)}, ${o.heidlerStd.toFixed(4)}`);
         };
         for (const b of ["webgpu", "webgl2"]) grade(R.three[b], "three's TSL path,", b);
-        ok("the emitted fragments transplant (labelled uniforms in three's order: the Lyapunov key's four, the Heidler key's six)", R.uniforms && R.uniforms.lyapunov.slice().sort().join() === "rHi,rLo,seedHi,seedLo" && R.uniforms.heidler.slice().sort().join() === "eta,i0,t1,t2,tHi,tLo", JSON.stringify(R.uniforms));
+        // Same exclusion tslSource-selfcheck.mjs already applies (its own dropBookkeeping, defined here in
+        // plain Node code rather than inside the script string sent to the page -- see the comment where
+        // R.uniforms is built): devicePipelineFromTsl() returns the FULL uniform list on purpose (render/
+        // tslSource.mjs's own _unreadBookkeeping comment), including a GLSL-only mat4 "nodeUniformN"
+        // bookkeeping field three's builder emits and never reads. This gate's claim is about the uniforms
+        // the KERNEL actually names, not that bookkeeping field.
+        const dropBookkeeping = (u) => !(u.type === "mat4" && /^nodeUniform\d+$/.test(u.name));
+        const lyNamed = R.uniforms && R.uniforms.lyapunov.filter(dropBookkeeping).map((u) => u.name);
+        const hNamed = R.uniforms && R.uniforms.heidler.filter(dropBookkeeping).map((u) => u.name);
+        ok("the emitted fragments transplant (labelled uniforms in three's order: the Lyapunov key's four, the Heidler key's six)", lyNamed && lyNamed.slice().sort().join() === "rHi,rLo,seedHi,seedLo" && hNamed.slice().sort().join() === "eta,i0,t1,t2,tHi,tLo", JSON.stringify({ lyapunov: lyNamed, heidler: hNamed }));
         for (const b of ["webgpu", "webgl2"]) grade(R.device[b], "the device, transplanted,", b);
         const rec = { generatedFrom: "tools/ship/tslPhysics-selfcheck.mjs", at: "v4321", three: "0.178.0", note: "emitted by three's node builders from render/physicsTsl.mjs and transplanted by render/tslSource.mjs; rewritten by tools/ship/tslPhysics-selfcheck.mjs on every run", ...R.emitted };
         fs.writeFileSync(EMITTED, JSON.stringify(rec, null, 1));
