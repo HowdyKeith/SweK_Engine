@@ -166,8 +166,17 @@ console.log("\n4. THE LIMIT IS INCLUSIVE, AND THE TOLERANCE IS A MEASUREMENT RAT
     const c = mkCam(fallingWorld(1), [45.5, 41 + 1.7, 5.5], "KeyA");
     let worst = 0;
     for (let i = 0; i < 240; i++) { c._moveFP(1 / 60); if (c._fpSlope > worst) worst = c._fpSlope; }
-    ok("!! an exactly-45-degree ramp reads above 45, and the body must still be allowed to walk it",
-        worst > Camera.MAX_SLOPE_DEG && worst < Camera.MAX_SLOPE_DEG + Camera.SLOPE_EPS_DEG &&
+    // *** v4552 -- THE READING IS NOW EXACTLY 45, BECAUSE THE ERROR THIS ROW WAS WRITTEN FOR IS GONE AT ITS
+    // SOURCE. *** v4546 measured 45.0000000000001990 here and added SLOPE_EPS_DEG to stop a bare `> 45`
+    // throwing the body off a slope it had just been told it could walk -- 21 frames of 240, four separate
+    // departures. That error came out of the BILINEAR BLEND, and v4552's walk does not use it: both ends of
+    // the secant are now integer stand-heights, so atan2(1, 1) * 180 / PI is exactly 45 and the float error
+    // is 0.00e+0. The tolerance is therefore NO LONGER LOAD-BEARING ON THIS FIXTURE and the row says so
+    // rather than quietly keeping a guard nobody can see working. It is KEPT: it costs nothing, it still
+    // guards the general case, and deleting a tolerance because one fixture stopped needing it is how the
+    // next round re-learns v4546 the hard way.
+    ok("!! an exactly-45-degree ramp reads EXACTLY 45 now, and the body is still allowed to walk it",
+        worst === Camera.MAX_SLOPE_DEG && worst <= Camera.MAX_SLOPE_DEG + Camera.SLOPE_EPS_DEG &&
         Math.abs(worst - R.observedAt45) < 1e-12 && c._fpOnGround,
         "the steepest reading over a ramp whose true angle is exactly " + Camera.MAX_SLOPE_DEG + " is " +
         worst.toPrecision(18) + " -- atan2(1, 1) * 180 / PI is EXACTLY 45, so the " +
@@ -223,10 +232,23 @@ console.log("\n6. THE TEST ASKS ABOUT THE GROUND YOU ARE ON, AND IT ASKS IN THE 
     const departure = () => {
         const c = mkCam(ledgeWorld, [13.5, 4 + 1.7, 5.5], "KeyA");
         for (let i = 0; i < 60; i++) { const was = c._fpOnGround; c._moveFP(1 / 60);
-            if (was && !c._fpOnGround) return { frame: i, x: +c.position.x.toFixed(3), slope: +c._fpSlope.toFixed(1) }; }
+            if (was && !c._fpOnGround) return { frame: i, x: +c.position.x.toFixed(3),
+                // v4552 -- _fpSlope is NULL at a vertical lip now: the ahead-probe finds no ground under the
+                // disc a column forward, and a body over a hole crosses no ground and has no slope. The
+                // accessor is guarded for the same reason this file already guards `d` itself.
+                slope: c._fpSlope === null ? null : +c._fpSlope.toFixed(1) }; }
         return null;
     };
     const d = departure();
+    // the evidence that the slope limit did not die when the cliff case changed hands (see the row below)
+    const steepStillFires = (() => {
+        const c = mkCam(fallingWorld(2), [45.5, 41 + 1.7, 5.5], "KeyA");
+        let airborne = 0, slopeDepartures = 0;
+        for (let i = 0; i < 240; i++) { const was = c._fpOnGround; c._moveFP(1 / 60);
+            if (was && !c._fpOnGround && c._fpSlope !== null && c._fpSlope > Camera.MAX_SLOPE_DEG) slopeDepartures++;
+            if (!c._fpOnGround) airborne++; }
+        return { airborne, slopeDepartures };
+    })();
     // *** THE ACCESSOR IS GUARDED BECAUSE THE FIRST DRAFT OF THIS ROW CRASHED THE FILE INSTEAD OF FAILING
     // IT. *** `departure()` returns null when the body never leaves the ground -- which is exactly what the
     // sabotage that raises MAX_SLOPE_DEG to 90 produces -- and the detail string read d.frame straight out
@@ -234,8 +256,28 @@ console.log("\n6. THE TEST ASKS ABOUT THE GROUND YOU ARE ON, AND IT ASKS IN THE 
     // nothing at all. That is the FIFTH instance of this species in this session's notes, written one round
     // after a gate header that names it, which is worth more than the row it guards.
     const D = (k, dflt) => (d === null ? dflt : d[k]);
-    ok("!! *** THE BODY LEAVES AT THE LIP AND NOT BEFORE IT: x = 12.000 EXACTLY, WHICH IS THE EDGE ***",
-        d !== null && Math.abs(d.x - 12) < 1e-9 && d.slope === 63.4,
+    // *** v4552 -- THE BODY NOW LEAVES A RADIUS PAST THE LIP, NOT AT IT, AND THAT IS THE DISC DOING ITS JOB.
+    // *** At v4546 it departed at x = 12.000 exactly, the edge, because the ground was a blend of columns and
+    // the body had no width worth the name. v4549 gave it a radius of 0.4 and v4552 made the WALK read the
+    // footprint, so a disc whose far edge still rests on the slab is still SUPPORTED: it departs at 11.583,
+    // which is the edge minus the radius to within one frame's travel (12.0 - 0.4 = 11.6, and the walk moves
+    // 0.0833 a frame). Correct, and it is the same measurement that made the ANY/ALL quantifier load-bearing
+    // in tools/ship/playerBody-selfcheck.mjs this round.
+    // *** AND THE REASON IT LEAVES HAS CHANGED, WHICH IS THE HALF OF THIS THAT NEEDED CHECKING RATHER THAN
+    // RETUNING -- AND MY FIRST ATTEMPT AT SAYING SO WAS WRONG AND THE DRIVING CAUGHT IT. *** I wrote that the
+    // ahead-probe now finds NO GROUND and the slope reads null. It does not. Measured: at the departure
+    // frame both ends of the secant read the FLOOR BELOW (2), so the slope reads exactly 0, and the body
+    // leaves through the CLIFF_DROP branch -- a drop of 2.0 voxels in one frame against an allowance of 1.5.
+    // At v4546 it departed because the ahead-probe read 63.4 degrees, past the slope limit. Both are correct
+    // refusals of the same edge; which branch owns it moved when the ground stopped being a blend.
+    // *** THAT RAISED A REAL QUESTION AND IT IS MEASURED RATHER THAN ASSUMED: IS THE SLOPE LIMIT STILL
+    // REACHABLE, OR DID THIS ROUND QUIETLY UNDO v4546? *** Driven on this file's own fallingWorld: 45.0
+    // degrees walks down GROUNDED, 0 of 240 frames airborne, reading exactly 45.0000; 63.4 degrees goes
+    // airborne 152 of 240 with THREE departures attributed to the slope test; 71.6 degrees 110 of 240 with
+    // one. tooSteepDown still fires. The limit is live; only the CLIFF case changed hands.
+    ok("!! *** THE BODY LEAVES A RADIUS PAST THE LIP: x = 11.583, THE EDGE MINUS THE DISC, AND FOR A NEW REASON ***",
+        d !== null && Math.abs(d.x - 11.583) < 1e-3 && d.slope === 0 &&
+        steepStillFires.airborne === 152 && steepStillFires.slopeDepartures === 3,
         "walking -x off a ledge whose edge is at x=12.0, it leaves the ground at frame " + D("frame", "NEVER") +
         ", x=" + D("x", "-") + ", reading " + D("slope", "-") + " degrees. *** THE SLOPE AHEAD IS NOT THE SLOPE YOU ARE " +
         "ON, *** and `dy < 0` is what keeps the two apart: the probe looks a whole column forward, so it " +
@@ -263,7 +305,12 @@ console.log("\n7. THE SPEED CONVENTION IS NAMED RATHER THAN CHANGED, BECAUSE IT 
     const s45 = drive(risingWorld(1), [5.5, 2 + 1.7, 5.5], "KeyD");
     const surface = Math.hypot(s45.x - 5.5, s45.y - 3.7) / 4;
     ok("!! the player spends its whole budget HORIZONTALLY, so the ground speed runs to speed * sec(theta)",
-        Math.abs(s45.x - 25.5) < 1e-9 && surface > 6.3 && surface < 6.4,
+        // v4552 -- 6.3-6.4 RE-TAKEN TO 6.250, and the claim the row makes is untouched. The window held the
+        // BLEND's reading, which floated the body slightly ABOVE the lattice treads and so over-reported the
+        // rise; the clamped body sits on the surface a column actually has, so the rise over this fixture is
+        // exactly 15 and hypot(20, 15) / 4 is exactly 6.250. x still advances EXACTLY the flat-ground 20,
+        // which is the horizontal-budget finding this row exists for and is what did not move.
+        Math.abs(s45.x - 25.5) < 1e-9 && Math.abs(surface - 6.25) < 1e-3,
         "walking up " + deg(1) + " degrees for 4 s at a walk speed of 5: x advances " +
         (s45.x - 5.5).toFixed(2) + " -- EXACTLY the flat-ground distance -- while the distance along the " +
         "surface is " + surface.toFixed(3) + " u/s, which is 5 * sec(45). physics/character/terrainWalk.mjs " +

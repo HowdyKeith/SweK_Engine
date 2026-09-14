@@ -317,8 +317,10 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // voxelAvatar: 1639 -> 1640, usesOk 1619, definesOk 1611, nameFirst 1512. *** A SPLIT ADDS A GATE TO
     // THIS CENSUS EVEN THOUGH IT ADDED NO CHECK TO THE TREE *** -- the rows moved files, they did not
     // arrive -- so this table counts FILES and not coverage, which is worth saying where it is read.
-    gates: 1640, usesOk: 1619, definesOk: 1611, importsOk: 0,
-    distinctDefinitions: 40, nameFirst: 1512, condFirst: 91, unknownSignature: 16,
+    // v4552 -- RE-TAKEN for tools/ship/walkGround-selfcheck.mjs: 1640 -> 1641, usesOk 1620, definesOk
+    // 1612, nameFirst 1513.
+    gates: 1641, usesOk: 1620, definesOk: 1612, importsOk: 0,
+    distinctDefinitions: 40, nameFirst: 1513, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

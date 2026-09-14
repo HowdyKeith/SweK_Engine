@@ -3849,6 +3849,44 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // object keys of the same name, the later one wins silently and the earlier round's swept count vanishes
     // from the surplus arithmetic. FIFTH ORDINAL COLLISION between the two lines this session; the side that
     // merges second is the side that moves.
+    since245: Object.freeze({
+        at: "v4552", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/walkGround-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly: 35 checks in eleven sections, 840-922 ms over three runs. "
+               + "*** THE WALK STOOD THE BODY INSIDE SOLID ROCK AND HAD DONE SINCE v404 MADE THE GROUND "
+               + "BILINEAR. *** _terrainTopAtBilinear blends up to four columns and so answers heights "
+               + "NEITHER has; _moveFP assigned one to position.y and nothing asked _canStandAt whether a "
+               + "body fits there -- that predicate has one shipping call site and it is the HORIZONTAL "
+               + "move. Measured on the generated world with an instrument sharing no code with the fix: "
+               + "56.56% of grounded frames and 36.13% of distinct standing positions buried, 67 of 128 "
+               + "ordinary walks frozen inside rock. After: 1.51%, 2.77%, 2 of 128. *** THE FINDING THAT "
+               + "DECIDED THE SHAPE IS THAT NO GROUND RULE IS BOTH LEGAL AND SMOOTH: *** a sub-voxel height "
+               + "on a unit lattice is by construction a height no column has, so the blend's smoothness IS "
+               + "its illegality, and the smoothness has to come from TIME instead. The body stands on real "
+               + "surfaces and the EYE eases toward it at 12/s, bounded by a snap guard between STEP_UP_MAX "
+               + "and CLIFF_DROP. *** THE HYBRID max(blend, legal) LOOKED LIKE A FREE LUNCH AND IS A STENCIL "
+               + "BUG: *** the blend samples the body's own cell and the three in +x/+z ONLY, so it leads "
+               + "the terrain by half a cell and that shift cancels the footprint lookahead one way and "
+               + "doubles it the other -- 0.4167 max |dy| on +x/+z ramps against 1.0000 on -x/-z. A hill "
+               + "that glides walking north and stairs walking south is a new defect; the four-direction row "
+               + "that catches it is new and no prior round had one. ELEVEN SABOTAGES: S1 18 RED, S2 10, S3 "
+               + "6, S4 2, S5 15, S6 15, S7 6, S8 3, S9 1, S10 4, S11 2. *** S8 AND S9 WENT ZERO RED FIRST "
+               + "AND BOTH WERE THE GATE'S OWN FAULT -- IT WAS GRADING A COPY OF THE SMOOTHER because "
+               + "update() wants a canvas, which is v4541's sabotage B in the round that keeps naming the "
+               + "species; camera.js grew _stepRenderEye so the gate drives what ships. S9 then still read 0 "
+               + "because a natural fall never trips the snap guard: MEASURED, gravity 18 at 60 Hz moves a "
+               + "body at most 0.45 in a frame, so the guard is for the ten external writers of position.y "
+               + "and the fixture teleports instead. *** S6 CARRIED A DECLARED STOP CONDITION AND SHARPENED "
+               + "THE ANSWER RATHER THAN TRIPPING IT: with BODY_RADIUS = 0 the residual burial goes to "
+               + "0.00%, so the clamp's entire residual is the RADIUS meeting the step-up reach limit. AND "
+               + "S11 FALSIFIED THE ROUND'S OWN PREDICTION: the design expected taking the walk off the "
+               + "blend to ORPHAN its stencil defect at 0 RED; it goes 2, because playerSlope and cameraFall "
+               + "drive the blend directly. Filed, not unguarded. NOT CLOSED AND SAID PLAINLY: whether a "
+               + "1.0-voxel step eased at 12/s LOOKS smooth -- no frame has been rendered at any rate by "
+               + "anyone in this round or its four measurement probes, so every smoothness number here is a "
+               + "trace and the perceptual question is a human's.",
+    }),
     since244: Object.freeze({
         at: "v4551", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/voxelAvatarDevice-selfcheck.mjs"]),

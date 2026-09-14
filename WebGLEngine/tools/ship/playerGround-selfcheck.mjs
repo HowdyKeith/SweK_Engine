@@ -259,21 +259,36 @@ console.log("\n8. ONE number, read live by both -- and what that number turns ou
     const oneFrame = (m) => { Camera.STEP_UP_MAX = m;
         const c = mkCam(caveWorld, [15.5, 1 + 1.7, 5.5], null); c._moveFP(1 / 60);
         Camera.STEP_UP_MAX = keep; return +c.position.y.toFixed(4); };
+    // v4552 -- oneFrame(0.5) RE-TAKEN, 1.7 -> 2.7, and the row's claim is untouched by the move. Under the
+    // blend a half-voxel reach put the body's feet at 0.0; under the clamp they land at 1.0, because
+    // _stepTargetAt names a SURFACE a column has rather than an average of four. The row asserts that
+    // moving the static moves the behaviour -- 3.7 against 2.7 still says so, and says it about a legal
+    // pair of heights rather than one legal and one invented.
     ok("!! moving the static moves the behaviour, so neither site holds a copy of the value",
-        probeAt(1.2) === 3 && probeAt(0) === 0 && oneFrame(1.2) === 3.7 && oneFrame(0.5) === 1.7 &&
-        Camera.STEP_UP_MAX === keep,
+        probeAt(1.2) === 3 && probeAt(0) === 0 && oneFrame(1.2) === 3.7 && oneFrame(0.5) === 2.7 &&
+        oneFrame(1.2) !== oneFrame(0.5) && Camera.STEP_UP_MAX === keep,
         "the column at x=19 stands at 3 and its floor is one voxel above x=15's: with the reach at 1.2 a " +
         "body with feet at 2 is told " + probeAt(1.2) + " and steps up, with the reach at 0 it is told " +
         probeAt(0) + " -- nothing in range -- and stays. Driven through _moveFP for one frame from the same " +
         "body: " + oneFrame(1.2) + " against " + oneFrame(0.5) + ". The static is restored after each.");
 
     // What the number is actually FOR, measured rather than assumed.
+    // *** v4552 -- THIS HOOK WAS ON _terrainTopAtBilinear AND THE WALK STOPPED CALLING IT, SO THE ROW READ
+    // -Infinity RATHER THAN FAILING. *** An instrument going blind is the vacuous-by-construction species on
+    // the GATE's own side of the fence, and it is why the walk's ground now has a NAME -- _walkGroundAt --
+    // for a gate to hook rather than a method the walk merely happened to use. The row is re-pointed, not
+    // relaxed: it still measures the largest rise the wall branch ever sees, and the number it measures is
+    // now BIGGER and more honest (1.000000, a whole lip, against the blend's 0.083333).
     const maxDy = (world, start) => {
         const c = mkCam(world, start); let m = -Infinity, fired = 0;
-        const real = Camera.prototype._terrainTopAtBilinear;
-        c._terrainTopAtBilinear = function (x, z, fy) {
-            const g = real.call(this, x, z, fy), d = g - (this.position.y - this._eyeHeight);
-            if (d > m) m = d; if (d > Camera.STEP_UP_MAX) fired++; return g; };
+        const real = Camera.prototype._walkGroundAt;
+        c._walkGroundAt = function (x, z, fy) {
+            const g = real.call(this, x, z, fy);
+            if (g !== null) {
+                const d = g - (this.position.y - this._eyeHeight);
+                if (d > m) m = d; if (d > Camera.STEP_UP_MAX) fired++;
+            }
+            return g; };
         for (let f = 0; f < 260; f++) c._moveFP(1 / 60);
         return { m: +m.toFixed(6), fired };
     };
@@ -379,15 +394,16 @@ console.log("\n10. *** THIS ROUND'S OWN RECORD IS INVISIBLE TO THE RECORD CENSUS
     // It was written at v4545 to go red the day somebody FIXES the hole; it also goes red the day somebody
     // WIDENS it, and the next round to add a record beside its code found that out within the hour. Both
     // directions are the row doing its job: the number is pinned, so the hole cannot change size in silence.
-    // FIVE ROUNDS RUNNING NOW -- v4546 made it four, v4548 five, v4549 six and v4550 seven -- which is the
+    // SIX ROUNDS RUNNING NOW -- v4546 made it four, v4548 five, v4549 six, v4550 seven and v4552 eight -- which is the
     // strongest argument the pin could have made for itself: every round that writes a record beside
     // camera.js widens a hole the record censuses cannot see, and the only thing that says so is this row.
     // *** AND AT v4550 IT CAUGHT A CLAIM RATHER THAN A RECORD. *** That round read this red as one of its
     // own sabotages being caught and wrote so in a gate header; it is not, it fires with or without the
     // sabotage, and the header was corrected before the round shipped. A row that reddens on every run of
     // a neighbouring experiment will be mistaken for that experiment's signal, which is worth the line.
-    ok("!! *** THE HOLE IS SEVEN RECORDS WIDE AND TWO OF THEM PREDATE THIS SESSION BY A HUNDRED VERSIONS ***",
-        missed.length === 7 && missed.every((r) => /\.(js|cjs)$/.test(r.file)) &&
+    ok("!! *** THE HOLE IS EIGHT RECORDS WIDE AND TWO OF THEM PREDATE THIS SESSION BY A HUNDRED VERSIONS ***",
+        missed.length === 8 && missed.every((r) => /\.(js|cjs)$/.test(r.file)) &&
+        missed.some((r) => r.name === "WALK_GROUND_AT_V4552") &&
         missed.some((r) => r.name === "PLAYER_WATER_AT_V4550") &&
         missed.some((r) => r.name === "PLAYER_BODY_AT_V4549") &&
         missed.some((r) => r.name === "PLAYER_GROUND_AT_V4545") &&

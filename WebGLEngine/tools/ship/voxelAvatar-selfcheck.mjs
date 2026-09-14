@@ -110,24 +110,32 @@ sec("1. the walk, headless, on the hand world");
     // and 2) and _canStandAt refuses from there. A bilinear blend of a lattice reports heights that are not
     // ground, which is v404's own bargain and is not this round's to unpick; what is recorded is that the
     // stick is the same defect at a new place, nearer the edge and a voxel lower.
-    const c7 = avatarCamera(w, { x: 40.5, z: 38.5, yaw: Math.PI }); const p7 = walk(c7, ["KeyW"], 300);
-    // *** v4549 -- AND THE BODY IS STANDING INSIDE THE ROCK, WHICH IT WAS DOING BEFORE THIS FILE HAD A
-    // RADIUS TO NOTICE IT WITH. *** Cell z=39 is solid up to y=3. Driven at v4548, with the body still a
-    // zero-width line, it stops at z 39.500 with its FEET AT 3.000 -- inside that rock. v4549 gave the body
-    // a radius of 0.4 and the reading moved to z 39.67, feet 2.000: the same defect, a voxel deeper, now
-    // inside the body's OWN footprint. The cause is v404's bilinear ground, which averages the surfaces of
-    // the columns a body straddles and answers a height NEITHER of them has; _canStandAt would refuse that
-    // position and is asked on every horizontal move, but the vertical snap never asks it.
-    // Not closed here: clamping the walk to a legal height means taking the highest surface under the
-    // footprint, which binds at EVERY one-voxel lip and brings back exactly the stairs v404 removed. Filed
-    // with its numbers. The row asserts the body is stuck INSIDE the rock rather than pretending otherwise.
-    const rockTopAt39 = [0, 1, 2, 3, 4, 5].filter((y) => (w.voxelAt(40, y, 39) || 0) !== 0).pop();
-    ok("walking toward +z off the two-voxel ledge at z 40 STILL STICKS, and stands INSIDE the rock while it does", p7.z > 39 && p7.z < 40 && near(p7.y, 3.7, 1e-6) && (p7.y - 1.7) <= rockTopAt39, `z ${p7.z.toFixed(2)}, y ${p7.y.toFixed(2)} at 300 ticks (feet ${(p7.y - 1.7).toFixed(3)}, and cell z=39 is solid to y=${rockTopAt39}) -- it read z 39.50 feet 3.000 at v4548 with NO radius at all, and z 39.08 y 5.53 before v4546. Three readings of one defect that v404 has carried since it was written`);
+    // *** v4552 -- THIS ROW USED TO ASSERT THE DEFECT, AND THAT IS WHY IT IS REWRITTEN RATHER THAN RETUNED.
+    // *** Its PASS condition was `(p7.y - 1.7) <= rockTopAt39` -- the body's feet AT OR BELOW the top of the
+    // rock in the cell it occupies -- so the row went green precisely because the walk stood the body inside
+    // solid stone, and it would have gone RED the day somebody fixed it. It did. A check written to hold a
+    // defect in place is worth keeping only while nobody can fix the defect; v4552 clamps the walk to a
+    // surface a column actually has, so the row now asserts the repair and keeps the old reading in prose.
+    //
+    // WHAT THE BODY DOES NOW, traced: it holds feet 4.000 out past the lip while its disc is still supported,
+    // goes airborne at z 40.5, falls cleanly (3.86, 3.54, 3.05, 2.37) and lands on the FLOOR at feet 2.000,
+    // grounded and legal, and then keeps walking. 300 ticks would take it off the 48-wide fixture entirely,
+    // so the count is 72 -- the walk is no longer stuck, which is the whole point, and a frame count chosen
+    // for a body that never moved is not a frame count for one that does.
+    const c7 = avatarCamera(w, { x: 40.5, z: 38.5, yaw: Math.PI }); const p7 = walk(c7, ["KeyW"], 72);
+    const rockTopUnder7 = [0, 1, 2, 3, 4, 5].filter((y) => (w.voxelAt(40, y, Math.floor(p7.z)) || 0) !== 0).pop();
+    ok("*** walking toward +z off the two-voxel ledge NO LONGER STICKS, and the body is NOT inside the rock ***",
+        p7.z > 44 && p7.z < 45 && near(p7.y, 3.7, 1e-6) && p7.onGround && (p7.y - 1.7) > rockTopUnder7,
+        `z ${p7.z.toFixed(2)}, y ${p7.y.toFixed(2)} at 72 ticks (feet ${(p7.y - 1.7).toFixed(3)}, and cell ` +
+        `z=${Math.floor(p7.z)} is solid to y=${rockTopUnder7}, so the feet are ON the surface and not in it). ` +
+        `*** IT READ z 39.67 FEET 2.000 AT v4549, INSIDE A CELL SOLID TO y=3, AND NEVER MOVED AGAIN *** -- ` +
+        `and z 39.50 feet 3.000 at v4548 with no radius at all, and z 39.08 y 5.53 before v4546. Four ` +
+        `readings of one defect that v404 carried from the day the walk was made bilinear.`);
     // 48 ticks, not 36: the same descent, but v4546 makes the body FALL the two voxels instead of gliding
     // down them, and the fall takes about twelve frames. Four units, so it lands on the floor and is not
     // yet off the world -- the floor's end at z 0 is what the first draft walked past.
-    const c7b = avatarCamera(w, { x: 40.5, z: 5.5, yaw: 0 }); const p7b = walk(c7b, ["KeyW"], 48);
-    ok("walking toward -z off the ledge at z 4 FALLS the two voxels and lands on the floor (eye 3.7)", near(p7b.z, 1.5, 1e-6) && near(p7b.y, 3.7, 1e-6) && p7b.onGround, `z ${p7b.z.toFixed(2)}, y ${p7b.y.toFixed(2)}; airborne at tick 36 (y 4.94) where before v4546 it was already down at y 3.70`);
+    const c7b = avatarCamera(w, { x: 40.5, z: 5.5, yaw: 0 }); const p7b = walk(c7b, ["KeyW"], 52);
+    ok("walking toward -z off the ledge at z 4 FALLS the two voxels and lands on the floor (eye 3.7)", near(p7b.z, 1.167, 1e-3) && near(p7b.y, 3.7, 1e-6) && p7b.onGround, `z ${p7b.z.toFixed(3)}, y ${p7b.y.toFixed(2)} at 52 ticks. *** v4552 -- 48 TICKS NO LONGER REACHES THE FLOOR AND THE FOUR EXTRA TICKS ARE THE REPAIR, NOT A REGRESSION: *** the clamped walk holds the body on the slab's real surface until its disc leaves it, so it departs later and lands at tick 50 rather than 46. At the old count of 48 it is still in the air at y 4.075. Before v4546 it was already down at y 3.70 because it glided rather than fell.`);
     const c8 = avatarCamera(w, { x: 40.5, z: 30.5 }); const p8 = walk(c8, ["KeyW", "ShiftLeft"], 60);
     ok("Shift sprints at 9 units a second", near(p8.z, 21.5, 1e-6) && near(p8.velocity.z, -9), `z ${p8.z.toFixed(2)}`);
     const c9 = avatarCamera(w, { x: 8.5, z: 30.5 }); const r1 = [];  for (let i = 0; i < 90; i++) r1.push(stepAvatar(c9, 1 / 60, i < 30 ? ["KeyW"] : i < 40 ? ["KeyW", "Space"] : ["KeyD"]).z);

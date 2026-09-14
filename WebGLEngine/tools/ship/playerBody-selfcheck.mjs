@@ -206,16 +206,19 @@ console.log("\n3. *** A RADIUS ALONE STOPS THE PLAYER CLIMBING ANYTHING, AND THA
         };
         const any = walkPit(false), all = walkPit(true);
         ok("!! *** A NULL TARGET MUST NOT REFUSE THE MOVE: A BODY IS ENTITLED TO WALK OFF A CLIFF ***",
-            any >= 19.9 && any <= 20.1 && all === any,
+            any >= 20.3 && any <= 20.4 && all < any,
             "a floor that simply ends at x = 20 with NOTHING below it. The furthest the body stands while " +
             "still on the ground is " + any + ", its disc already half over the void, and it then falls. " +
-            "*** AND THE `support from ANY cell` RULE IS INDISTINGUISHABLE FROM `from ALL` HERE, MEASURED " +
-            "AT " + all + " AGAINST " + any + ": *** the target is only ever used to RAISE the body, and a " +
-            "null falls back to the height it is already at, so the two quantifiers produce the same walk. " +
-            "The sabotage that swaps them goes ZERO RED and is right to. What IS load-bearing is that null " +
-            "does not REFUSE -- a rule that did would stop the body a radius short of every edge -- and " +
-            "that is what this row holds. The comment in _stepTargetAt claimed a distinction the driving " +
-            "does not support and has been corrected to this.");
+            "*** v4552 -- AND THE `ANY` vs `ALL` QUANTIFIER HAS BECOME LOAD-BEARING, WHICH IS THE FINDING " +
+            "AND NOT A RETUNE: *** at v4549 the two measured IDENTICALLY (20.000 against 20.000) and this " +
+            "row said so, because the step target was only ever used to RAISE the body and a null fell back " +
+            "to the height it already had -- so the sabotage that swaps them went ZERO RED and was right to. " +
+            "v4552 clamps the WALK to that same target, so it now also SETS the body, and the two " +
+            "quantifiers separate: ANY " + any + " against ALL " + all + ". A sabotage whose verdict flips " +
+            "between rounds is worth more than one that never moves, and _stepTargetAt's comment claiming " +
+            "the quantifier is not load-bearing is corrected in the same round that made it false. ANY is " +
+            "still the right rule: a disc whose far edge rests on the slab IS supported, and demanding " +
+            "support from every overlapped cell stops the body a radius short of every edge.");
 
         // The centre's cell is always in the footprint, whatever the radius.
         const c = mkCam(wallWorld, [11.5, 3.7, 5.5]);
