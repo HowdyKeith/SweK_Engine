@@ -70,24 +70,41 @@ const CHANGED = ["physics/statmech/ising.js"];
        s.reachable.includes("physics/consistency-selfcheck.mjs"),
        s.reachable.length + " gates reachable from " + CHANGED[0] + " (including the consistency board, which imports it two levels down)");
     const firstBand = s.selected.slice(0, s.reachable.length > s.selected.length ? s.selected.length : Math.min(20, s.reachable.length));
-    // *** v4585 -- THIS FAILED SAYING "first 123 selected are all reachable", WHICH READS LIKE A PASS. ***
+    // *** v4586 -- THIS ROW WAS A FALSE ALARM, AND v4585 GAVE IT A CAUSAL STORY IT HAD NOT MEASURED. ***
     //
-    // The detail described the intent and not the result, so the red named nothing to do -- neither a command nor a
-    // count, which tools/ship/redAction-selfcheck.mjs calls the one unactionable class. It is REPRODUCIBLE (twice
-    // alone at v4585) and it is growth, not staleness: `reachable` now exceeds what a 180 s budget can select, so
-    // firstBand becomes the whole 123-gate selection and any single unreachable gate in it fails the row. The
-    // message now says HOW MANY and WHICH, so the debt has a size.
-    const intruders = firstBand.filter((g) => !s.reachable.includes(g));
-    ok("!! reachable gates are scheduled FIRST (a truncated run still covers the change)",
-       intruders.length === 0,
-       intruders.length === 0
-         ? "first " + firstBand.length + " selected are all reachable"
-         : intruders.length + " of the first " + firstBand.length + " selected are NOT reachable from " + CHANGED[0] +
-           ", so a truncated run can miss the change: " + intruders.slice(0, 6).join(", ") +
-           (intruders.length > 6 ? " and " + (intruders.length - 6) + " more" : "") +
-           ". OWED: the planner must order reachable gates ahead of the rest when the budget truncates -- " +
-           s.reachable.length + " reachable against " + s.selected.length + " selectable in 180 s, so the " +
-           "truncation is now the normal case rather than the edge one.");
+    // It asserted that the first N entries of `selected` are all reachable. Once the budget truncates that is not a
+    // property the selector ever promised: `ranked` puts every reachable gate ahead of every unreachable one, the
+    // fill is greedy, and CHEAP UNREACHABLE GATES FIT IN THE RESIDUE the expensive reachable ones leave behind. At
+    // 180 s that residue held 22 gates costing 1,079 ms in total, while the cheapest reachable gate the plan skipped
+    // costs 12,518 ms -- so deleting all 22 frees nowhere near enough to admit even one of them.
+    //
+    // v4585 rewrote this row's MESSAGE to say "so a truncated run can miss the change". A truncated run does miss
+    // reachable gates -- 124 reachable, 101 selected at 180 s -- but NOT BECAUSE OF THE 22, and that sentence was a
+    // cause asserted without being measured, written one round after a round about exactly that.
+    //
+    // *** THE REAL INVARIANT IS STRUCTURAL AND IS WHAT IS ASSERTED NOW: admitting unreachable gates cannot change
+    // which reachable gates are selected. *** The sort guarantees it -- at the moment any reachable gate is
+    // considered, `spent` contains no unreachable gate's cost, because none has been reached yet. Driven here
+    // against the selector run both ways, and measured across five budgets at v4586: identical every time.
+    //
+    // SABOTAGED before it was believed, because the row it replaces was a false alarm and a row that cannot fail
+    // would be a second one. Dropping `band(a) - band(b)` from the ranking in gateSelection.mjs -- the one line
+    // that puts reachable gates first -- takes this row RED and names the size: "51 reachable selected with
+    // unreachable admitted against 101 without". THREE OTHER ROWS IN THIS FILE WENT RED WITH IT, which is the
+    // reason to score a mutation against the whole population rather than the row it was aimed at.
+    const noUnreachable = selectGates({ changed: CHANGED, budgetMs: 180000, includeUnreachable: false });
+    const reachSelected = s.selected.filter((g) => s.reachable.includes(g));
+    const identical = reachSelected.length === noUnreachable.selected.length &&
+                      reachSelected.every((g, i) => g === noUnreachable.selected[i]);
+    const riders = s.selected.filter((g) => !s.reachable.includes(g));
+    const ridersMs = riders.reduce((n, g) => n + (s.costs[g] || 0), 0);
+    ok("!! admitting unreachable gates cannot displace a reachable one (the truncated run still covers the change)",
+       identical,
+       identical
+         ? `${reachSelected.length} reachable gates selected, the same set in the same order with unreachable ones ` +
+           `excluded entirely. The ${riders.length} that rode along cost ${ridersMs} ms of residue between them.`
+         : `DISPLACED: ${reachSelected.length} reachable selected with unreachable admitted against ` +
+           `${noUnreachable.selected.length} without -- the greedy fill is spending budget the change needed.`);
 }
 
 // ---- 2. THE PATH-CONVENTION REGRESSION, WHICH THIS FILE EXISTS TO PIN ------------------------------------------------
