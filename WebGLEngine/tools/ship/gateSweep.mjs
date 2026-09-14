@@ -3849,6 +3849,33 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // object keys of the same name, the later one wins silently and the earlier round's swept count vanishes
     // from the surplus arithmetic. FIFTH ORDINAL COLLISION between the two lines this session; the side that
     // merges second is the side that moves.
+    since240: Object.freeze({
+        at: "v4547", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/controllerAgreement-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly: 12 checks in seven sections, 81-82 ms over three runs. " +
+                 "*** SIX CHARACTER-PHYSICS QUANTITIES, EIGHTEEN SITES, AND NOT ONE LINE IN THE TREE " +
+                 "COMPARED ANY TWO OF THEM. *** The player falls at 18 and every bot at 20; the player has " +
+                 "NO terminal velocity and a falling bot clamps at 55; the player refuses ground at 45 and " +
+                 "the shipping bots at 55. *** BUT THE CENTRAL RESULT IS THAT MOST OF THE DISAGREEMENTS DO " +
+                 "NOTHING: *** driven over every slope a voxel lattice can express, the bot numbers " +
+                 "(1.2/1.2/55) and the player numbers (1.2/1.5/45) give BYTE-IDENTICAL walks -- same x, y, " +
+                 "blocked and airborne on 45.0 up, 63.4 up, 45.0 down and 63.4 down -- so each row carries " +
+                 "a measured verdict, LIVE or LATENT, rather than a count. The two LIVE ones point OPPOSITE " +
+                 "WAYS and cross at about 150 units: from 100 a bot lands first, 189 frames against 198, " +
+                 "and from 2,000 the PLAYER lands first, 894 against 2,262, arriving at 267.9 m/s against " +
+                 "the bot's clamped 55 -- 4.87 times as fast. *** IT DOES NOT TUNNEL, WHICH WAS THE " +
+                 "HYPOTHESIS AND IS NOT THE ANSWER, *** so nothing is unified: changing either number is a " +
+                 "gameplay decision and a census does not make one. ALSO A CORRECTION TO v4546, the round " +
+                 "before and also mine: it set Camera.MAX_SLOPE_DEG to 45 saying that 'matches the bots', " +
+                 "and the bots ship 55 -- the 45 came from terrainWalk's module DEFAULT, which no shipping " +
+                 "caller reads. That is why every site here carries a `ships` flag. Eight sabotages, none " +
+                 "crashing: A 3 RED, B 5, C 5, D 3, E 3, F 2, G 1, H 1. TWO ROWS EXIST BECAUSE THE BATTERY " +
+                 "FOUND THEM MISSING: the first draft read `terminal` as AGREED, because an ABSENCE is not " +
+                 "a site and one value has nothing to differ from -- a check that cannot fail, on the " +
+                 "quantity with the largest gap in the file; and moving a NON-shipping default left every " +
+                 "row green, so the record now pins each site's VALUE and not only the counts.",
+    }),
     since239: Object.freeze({
         at: "v4546", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/playerSlope-selfcheck.mjs"]),

@@ -180,7 +180,49 @@ export const RETURNED_AT_V4529 = Object.freeze({
     // stronger reading than the quiet-box ones that retired meshLine and traderGraph before and were wrong
     // within a day -- those were taken when nothing else was running, and these were not. See
     // returnedAt_v4545 below, which carries each gate's whole history rather than only its retirement.
-    stillOver: Object.freeze([]),
+    // *** v4547 -- TWO OF v4546'S THREE RETIREMENTS ARE BACK WITHIN ONE ROUND, AND THE REASON IS NOT THE
+    // HOUR. IT IS THAT SERIAL AND PARALLEL ARE DIFFERENT MEASUREMENTS WRITTEN TO THE SAME FIELD. ***
+    // v4546 retired meshLine, traderGraph and wgslSpec on four serial readings each, and argued that
+    // taking them on a LOADED box right after a 469-second sweep made them stronger than the quiet
+    // readings that had failed before. That argument was wrong, and this is the measurement that kills it:
+    // the same three gates, the same box, the same minute --
+    //
+    //     meshLine     serial 2963 / 3009 / 3146      8-way parallel 7259      2.4x
+    //     wgslSpec     serial 2688 / 2698 / 2927      8-way parallel 7087      2.5x
+    //     sweepBudget  serial 2459 / 2574 / 2576      8-way parallel 6316      2.5x
+    //
+    // SERIAL-AFTER-LOAD IS STILL SERIAL. The thing that evicts these gates is CONTENTION, and the quick
+    // sweep runs 8-way and writes contended times into the same `timings` field the rotation writes serial
+    // times into. One number, one 3,000 ms threshold, two measurements that differ by two and a half
+    // times, and whichever ran last wins -- so these gates oscillate every round forever and the rows over
+    // them go red on the ordering rather than on anything being wrong. Filed as its own round; what
+    // belongs HERE is the pair going back on the roll with both readings, which is what this roll is for.
+    stillOver: Object.freeze([
+        Object.freeze({ gate: "tools/ship/meshLine-selfcheck.mjs", recordedWas: 4404, v4476Ms: 2929, hereMs: 4379,
+            quietMs: Object.freeze([2515, 2480, 2757]),
+            why: "retired at v4535 on quiet readings and back within a day; retired again at v4546 on " +
+                 "2,691 / 2,700 / 2,717 / 2,772 taken serially on a LOADED box, and back within ONE " +
+                 "ROUND at 4,379. Its serial time now straddles the budget outright -- 2,963 / 3,009 / " +
+                 "3,146 -- and 8-way it is 7,259. Three retirements and three returns: the gate is not " +
+                 "moving, the measurement is, and the roll keeps it with every set of numbers rather than " +
+                 "moving it a fourth time" }),
+        Object.freeze({ gate: "tools/ship/traderGraph-selfcheck.mjs", recordedWas: 3368, v4461Ms: 2793, hereMs: 3008,
+            quietMs: Object.freeze([2729, 2344, 2659]),
+            serialNow: Object.freeze([2245, 2308, 2319, 2437]),
+            why: "*** THE CLEAREST ILLUSTRATION ON THIS ROLL: THE VERIFY FILED IT AT 3,003 MS. THREE " +
+                 "MILLISECONDS OVER. *** Retired at v4535 on quiet readings and back in two days; retired " +
+                 "again at v4546 on 2,245 / 2,308 / 2,319 / 2,437 serial, the widest margin it has ever " +
+                 "had; and the very next 8-way sweep filed 3,003 and flipped the row that reads this roll. " +
+                 "A gate whose two measurements sit either side of the budget cannot be retired by taking " +
+                 "one of them, however carefully, and this is the third attempt to prove otherwise" }),
+        Object.freeze({ gate: "tools/ship/wgslSpec-selfcheck.mjs", recordedWas: 5162, hereMs: 3737,
+            serialMs: Object.freeze([2688, 2698, 2927]),
+            why: "v4541 called it the least ambiguous on this roll and said no reading had ever been " +
+                 "under 3,000; v4546 retired it at 2,505-2,688 and falsified that, correctly. It is at " +
+                 "3,737 one round later, and 8-way at 7,087 against 2,688-2,927 serial. BOTH earlier " +
+                 "statements were true of the measurement each was taken with, which is the finding: the " +
+                 "gate has one cost under contention and another alone, and the file holds one field" }),
+    ]),
     // *** v4565 -- RETIRED BY THE BAND PASS, AND IT TAKES A SENTENCE OF THE v4541 ENTRY WITH IT. ***
     // sweepBudget was named still-over at v4541 on three serial readings of 3,165 / 3,266 / 3,273 ms, with the
     // reason: "Every one of three serial runs is over, none of them marginally, SO THIS IS NOT THE BOX: it is a
@@ -193,32 +235,14 @@ export const RETURNED_AT_V4529 = Object.freeze({
     // consistent serial readings felt like enough evidence to rule the box out and were not, which is the same
     // mistake ROTATION_BOUNDARY_V4535 caught on five other gates the day after naming them. The rule that
     // survives: consistency WITHIN one sitting says nothing about the next sitting, and only a re-run does.
-    returnedAt_v4545: Object.freeze([
-        Object.freeze({ gate: "tools/ship/meshLine-selfcheck.mjs", overMs: 3014,
-            serialNow: Object.freeze([2691, 2700, 2717, 2772]),
-            why: "the straddler, retired a second time and on better evidence than the first. Its history is " +
-                 "4,404 recorded, 2,929 at v4476, 3,083 / 3,073 / 3,154 at v4529, 2,515 / 2,480 / 2,757 quiet " +
-                 "at v4535, 3,014 from the v4536 sweep -- and now 2,691 / 2,700 / 2,717 / 2,772, a 3% spread " +
-                 "with the highest 7.6% clear of the budget, TAKEN ON A LOADED BOX straight after a 469 s " +
-                 "sweep. The v4535 retirement was made on quiet readings and was wrong within a day; this one " +
-                 "is made on the noisy ones, which is the direction that matters." }),
-        Object.freeze({ gate: "tools/ship/traderGraph-selfcheck.mjs", overMs: 3008,
-            serialNow: Object.freeze([2437, 2308, 2319, 2245]),
-            why: "the other straddler, by the same route and the same standard: 3,368 recorded, 2,793 at " +
-                 "v4461, five readings spanning 2,719-3,152 at v4529, 2,729 / 2,344 / 2,659 quiet at v4536, " +
-                 "3,008 from the v4538 sweep, 3,096 / 2,460 / 2,631 straight after -- and now 2,437 / 2,308 / " +
-                 "2,319 / 2,245 on a loaded box, an 8% spread with the highest 19% clear. The widest margin " +
-                 "this gate has ever had." }),
-        Object.freeze({ gate: "tools/ship/wgslSpec-selfcheck.mjs", overMs: 4242,
-            serialNow: Object.freeze([2688, 2550, 2536, 2505]),
-            why: "*** AND THIS ONE FALSIFIES ITS OWN ENTRY. *** The v4541 record called it 'the least " +
-                 "ambiguous' on the roll and said in so many words that NO READING OF IT HAD EVER BEEN UNDER " +
-                 "3,000: 5,162 recorded, 4,242 at v4541, 3,922 / 3,658 / 3,906 serially there. It reads 2,688 " +
-                 "/ 2,550 / 2,536 / 2,505 here, every one under, the highest 10% clear -- so the sentence was " +
-                 "true when written and is false now, which is the difference between a claim with its " +
-                 "readings attached and a claim without. The file has not been edited since; 5,162 -> 3,900 " +
-                 "-> 2,550 is the box." }),
-    ]),
+    // *** v4547 -- ALL THREE OF v4546'S RETIREMENTS ARE WITHDRAWN, AND THE ROLL IS EMPTY RATHER THAN
+    // WRONG. *** meshLine, wgslSpec and traderGraph were retired on four serial readings each, argued as
+    // stronger than the quiet readings that had failed before because they were taken on a LOADED box. That
+    // argument is refuted: serial-after-load is still serial, and what evicts these gates is CONTENTION --
+    // the same three read 2.4-2.5x slower 8-way than alone, same box, same minute. All three are back on
+    // `stillOver` above with every set of numbers they have ever produced, which is what that roll is for.
+    // The entries are not deleted from history; they are in the changelog and in this comment.
+    returnedAt_v4545: Object.freeze([]),
     returnedAt_v4565: Object.freeze([
         Object.freeze({ gate: "tools/roundhouse/sweepBudget-selfcheck.mjs", overMs: 3172,
             serialNow: Object.freeze([2746, 2770, 2589, 2750, 2651]),
@@ -872,6 +896,67 @@ export const OVER_BUDGET_PASS_V4565 = Object.freeze({
         "tools/ship/wgslSpec-selfcheck.mjs", "tools/ship/xbarPlugin-selfcheck.mjs",
         "tools/ship/zoomBlur-selfcheck.mjs", "ui/stageInfo-selfcheck.mjs",
     ]),
+    // *** v4547 -- A PROPORTIONAL FLOOR OVER A GROUP THAT ERODES BY DESIGN IS THE SAME DEFECT v4546
+    // REPLACED ONE INSTANCE OF, AND THE ROOT CAUSE IS NOW MEASURED. *** The ledger merges BY GATE, so
+    // every re-timing moves a row out of a stamp group; the ship ritual mandates a rotation every round
+    // AND a quick sweep, and the two write DIFFERENT MEASUREMENTS to the same field -- serial and 8-way
+    // contended, which differ by 2.4 to 2.5 times on this box (see stillOver above). So the filed time of
+    // any straddling gate depends on which ran last, and a fraction-of-a-count guard over these groups
+    // goes red on the ordering rather than on anything being wrong. The names are frozen instead and the
+    // check is ACCOUNTING: every gate the pass touched is still in the ledger. Counts are REPORTED.
+    returneeGates: Object.freeze([
+        "brain/rl/hunt-transfer-selfcheck.mjs", "brain/rl/memory-selfcheck.mjs",
+        "brain/tools/maze-walker-selfcheck.mjs", "ev/tools/es-arena-selfcheck.mjs",
+        "physics/control/controlMargins-selfcheck.mjs", "physics/em/hall-selfcheck.mjs",
+        "physics/hmc/inference-selfcheck.mjs", "physics/jolt/jolt-structures-selfcheck.mjs",
+        "physics/mechanics/contactKeys-selfcheck.mjs", "physics/mechanics/reposeOps-selfcheck.mjs",
+        "physics/mesh/dualContour-selfcheck.mjs", "physics/mesh/marchingCubes-selfcheck.mjs",
+        "physics/mesh/rowWeight-selfcheck.mjs", "physics/mesh/svgProfile-selfcheck.mjs",
+        "physics/optics/fresnel-selfcheck.mjs", "physics/render/bounces-selfcheck.mjs",
+        "physics/render/lightRouting-selfcheck.mjs", "physics/render/microfacet-selfcheck.mjs",
+        "physics/render/pathTracer-selfcheck.mjs", "physics/statmech/wolff-selfcheck.mjs",
+        "physics/thermal/bec-selfcheck.mjs", "physics/thermal/freeze-selfcheck.mjs",
+        "physics/tomography/adjoint-selfcheck.mjs", "simulation/lbm/twoFExperiment-selfcheck.mjs",
+        "tools/caseStudy-selfcheck.mjs", "tools/fingerprint/attest-selfcheck.mjs",
+        "tools/fingerprint/fingerprint-selfcheck.mjs", "tools/frame-budget-selfcheck.mjs",
+        "tools/krbn/sceneMeshes-selfcheck.mjs", "tools/mcp/physicsAi-selfcheck.mjs",
+        "tools/render-qa/traceAscii-selfcheck.mjs", "tools/roundhouse/blackHoleBind-selfcheck.mjs",
+        "tools/roundhouse/chemicalPotentialBind-selfcheck.mjs", "tools/roundhouse/crossDevice-selfcheck.mjs",
+        "tools/roundhouse/diffusion-selfcheck.mjs", "tools/roundhouse/inference-selfcheck.mjs",
+        "tools/roundhouse/knobGate-selfcheck.mjs", "tools/roundhouse/knobPromotions-selfcheck.mjs",
+        "tools/roundhouse/landauZener-selfcheck.mjs", "tools/roundhouse/mpmRefineBind-selfcheck.mjs",
+        "tools/roundhouse/multigrid3dBind-selfcheck.mjs", "tools/roundhouse/reconQualityBind-selfcheck.mjs",
+        "tools/roundhouse/strictConfig-selfcheck.mjs", "tools/roundhouse/sweepBudget-selfcheck.mjs",
+        "tools/roundhouse/voxelizeBind-selfcheck.mjs", "tools/ship/artefactWriters-selfcheck.mjs",
+        "tools/ship/asciify-selfcheck.mjs", "tools/ship/authTrust-selfcheck.mjs",
+        "tools/ship/badTvDevicePass-selfcheck.mjs", "tools/ship/badTvThreeParity-selfcheck.mjs",
+        "tools/ship/bezierEasing-selfcheck.mjs", "tools/ship/blameChain-selfcheck.mjs",
+        "tools/ship/bloomFused-selfcheck.mjs", "tools/ship/bloomFusedTexture-selfcheck.mjs",
+        "tools/ship/brainTrail-selfcheck.mjs", "tools/ship/buildingLab-selfcheck.mjs",
+        "tools/ship/chipOrder-selfcheck.mjs", "tools/ship/ddaPrecision-selfcheck.mjs",
+        "tools/ship/deletionHarness-selfcheck.mjs", "tools/ship/deviceTexture-selfcheck.mjs",
+        "tools/ship/domAnimation-selfcheck.mjs", "tools/ship/domToTexture-selfcheck.mjs",
+        "tools/ship/dracoWeld-selfcheck.mjs", "tools/ship/fetchCap-selfcheck.mjs",
+        "tools/ship/gatesBridge-selfcheck.mjs", "tools/ship/githubPanelLive-selfcheck.mjs",
+        "tools/ship/glCapture-selfcheck.mjs", "tools/ship/gpuGitTime-selfcheck.mjs",
+        "tools/ship/hostScale-selfcheck.mjs", "tools/ship/inputChain-selfcheck.mjs",
+        "tools/ship/instruments-selfcheck.mjs", "tools/ship/iosDevice-selfcheck.mjs",
+        "tools/ship/lathe-selfcheck.mjs", "tools/ship/liquefy-selfcheck.mjs", "tools/ship/litSphere-selfcheck.mjs",
+        "tools/ship/macSession-selfcheck.mjs", "tools/ship/meshBVH-selfcheck.mjs",
+        "tools/ship/multigrid3dTiming-selfcheck.mjs", "tools/ship/notifyDoor-selfcheck.mjs",
+        "tools/ship/peerDebounce-selfcheck.mjs", "tools/ship/platformRequires-selfcheck.mjs",
+        "tools/ship/portBeacon-selfcheck.mjs", "tools/ship/proseAudit-selfcheck.mjs",
+        "tools/ship/rebar-selfcheck.mjs", "tools/ship/registerResidue-selfcheck.mjs",
+        "tools/ship/repoTerrain-selfcheck.mjs", "tools/ship/reportDoors-selfcheck.mjs",
+        "tools/ship/sharpBridge-selfcheck.mjs", "tools/ship/slugMorph-selfcheck.mjs",
+        "tools/ship/solidTexture-selfcheck.mjs", "tools/ship/solverFit-selfcheck.mjs",
+        "tools/ship/songGlobe-selfcheck.mjs", "tools/ship/splatRoundTrip-selfcheck.mjs",
+        "tools/ship/staleQueue-selfcheck.mjs", "tools/ship/stealthRace-selfcheck.mjs",
+        "tools/ship/stereographic-selfcheck.mjs", "tools/ship/strengthField-selfcheck.mjs",
+        "tools/ship/transitionSpec-selfcheck.mjs", "tools/ship/tsl-selfcheck.mjs",
+        "tools/ship/tslRig-selfcheck.mjs", "tools/ship/tunnelSpawn-selfcheck.mjs",
+        "tools/ship/typecheck-selfcheck.mjs", "tools/ship/videoFrames-selfcheck.mjs",
+        "tools/ship/wasmSupport-selfcheck.mjs", "tools/ship/xbarPlugin-selfcheck.mjs",    ]),
     returnees: 105, red: 12, hitTheCap: 2, materiallySlower: 9,
     newlyRed: 8, alreadyRegistered: 4,
     returneeMsRange: Object.freeze([65, 2958]), returneeSpeedup: Object.freeze({ median: 2.43, max: 89.46 }),
@@ -947,6 +1032,79 @@ export const OVER_BUDGET_PASS_V4565 = Object.freeze({
 export const KILLED_PASS_V4568 = Object.freeze({
     at: "v4568", capMs: 90000, oldCapMs: CAP_MS, serial: true,
     stamp: "2026-09-09T17:59:42.840Z",
+    // v4547 -- the pass's own rows, frozen by NAME for the reason above. 137 of the 140 are
+    // recoverable from the ledger at 9eb8dc0b, the first commit that holds this stamp: three had already
+    // merged away before anything read the file, which is the same shape as the v4565 receipt being 209
+    // against a recorded 210. A count cannot notice that and a list can.
+    passGates: Object.freeze([
+        "ai-bridge/fingerprintCache-selfcheck.mjs", "ai-bridge/tools/self-zip-selfcheck.mjs",
+        "brain/rl/dock-hazard-selfcheck.mjs", "brain/rl/occlusion-bptt-selfcheck.mjs",
+        "bz/tools/bz-bridge-selfcheck.mjs", "bz/tools/bz-pilot-selfcheck.mjs", "fluid/flip3d-selfcheck.mjs",
+        "fluid/multigrid3d-selfcheck.mjs", "physics/astroparticle/jeans-selfcheck.mjs",
+        "physics/consistency-selfcheck.mjs", "physics/mesh/featurePreserve-selfcheck.mjs",
+        "physics/mesh/weightScaling-selfcheck.mjs", "physics/nuclear/reactorControl-selfcheck.mjs",
+        "physics/render/transmission-selfcheck.mjs", "physics/sph/hydrostatic-selfcheck.mjs",
+        "physics/sph/levelClaim-selfcheck.mjs", "physics/sph/materialKnobs-selfcheck.mjs",
+        "physics/sph/packingTransfer-selfcheck.mjs", "physics/sph/poolFixture-selfcheck.mjs",
+        "physics/sph/stability-selfcheck.mjs", "physics/sph/tiltPower-selfcheck.mjs",
+        "physics/sph/wideTilt-selfcheck.mjs", "physics/thermal/stefan-selfcheck.mjs",
+        "physics/tomography/matchedAdjoint-selfcheck.mjs", "physics/tomography/reconOps-selfcheck.mjs",
+        "physics/tomography/sirt-selfcheck.mjs", "render/cloudField-selfcheck.mjs",
+        "render/mossField-selfcheck.mjs", "rig/cinematicShot-selfcheck.mjs", "simulation/carrySpawn-selfcheck.mjs",
+        "simulation/lbm/inflow-selfcheck.mjs", "simulation/lbm/onsetTrend-selfcheck.mjs",
+        "simulation/lbm/settleCurve-selfcheck.mjs", "simulation/tomo/nullspace-selfcheck.mjs",
+        "text/slug-selfcheck.mjs", "tools/krbn/krbnCompareLive-selfcheck.mjs",
+        "tools/render-qa/terminatorOracle-selfcheck.mjs", "tools/roundhouse/airyRefined-selfcheck.mjs",
+        "tools/roundhouse/assumptionMap-selfcheck.mjs", "tools/roundhouse/census-selfcheck.mjs",
+        "tools/roundhouse/claimTrace-selfcheck.mjs", "tools/roundhouse/compose-selfcheck.mjs",
+        "tools/roundhouse/corroborateFully-selfcheck.mjs", "tools/roundhouse/corroborationCensus-selfcheck.mjs",
+        "tools/roundhouse/defaultPlacementSweep-selfcheck.mjs", "tools/roundhouse/detectionMap-selfcheck.mjs",
+        "tools/roundhouse/domainCoverage-selfcheck.mjs", "tools/roundhouse/flip3dBind-selfcheck.mjs",
+        "tools/roundhouse/fluidBind-selfcheck.mjs", "tools/roundhouse/freeSurfaceBind-selfcheck.mjs",
+        "tools/roundhouse/hydrostatic-selfcheck.mjs", "tools/roundhouse/khBind-selfcheck.mjs",
+        "tools/roundhouse/khConvergence-selfcheck.mjs", "tools/roundhouse/khGrowthKey-selfcheck.mjs",
+        "tools/roundhouse/khMichalke-selfcheck.mjs", "tools/roundhouse/knobLiveness-selfcheck.mjs",
+        "tools/roundhouse/kuramoto-selfcheck.mjs", "tools/roundhouse/labExport-selfcheck.mjs",
+        "tools/roundhouse/labResults-selfcheck.mjs", "tools/roundhouse/libmControl-selfcheck.mjs",
+        "tools/roundhouse/libmSensitivity-selfcheck.mjs", "tools/roundhouse/menuScope-selfcheck.mjs",
+        "tools/roundhouse/modeDistinct-selfcheck.mjs", "tools/roundhouse/observableFinite-selfcheck.mjs",
+        "tools/roundhouse/observableRange-selfcheck.mjs", "tools/roundhouse/observableUnits-selfcheck.mjs",
+        "tools/roundhouse/opticsBind-selfcheck.mjs", "tools/roundhouse/pipeFlowKey-selfcheck.mjs",
+        "tools/roundhouse/plantDirection-selfcheck.mjs", "tools/roundhouse/plantedCoverage-selfcheck.mjs",
+        "tools/roundhouse/rayleighOnset-selfcheck.mjs", "tools/roundhouse/responseCensus-selfcheck.mjs",
+        "tools/roundhouse/seedSpreadModule-selfcheck.mjs", "tools/roundhouse/sensitivity-selfcheck.mjs",
+        "tools/roundhouse/stabilityBind-selfcheck.mjs", "tools/roundhouse/sweepDevice-selfcheck.mjs",
+        "tools/roundhouse/thermalScaling-selfcheck.mjs", "tools/roundhouse/twoF-selfcheck.mjs",
+        "tools/roundhouse/twoFBind-selfcheck.mjs", "tools/roundhouse/valueMatch-selfcheck.mjs",
+        "tools/roundhouse/zeroRangeSweep-selfcheck.mjs", "tools/ship/avatarZWander-selfcheck.mjs",
+        "tools/ship/baselineHygiene-selfcheck.mjs", "tools/ship/benchBridge-selfcheck.mjs",
+        "tools/ship/benchCollect-selfcheck.mjs", "tools/ship/carveGpu-selfcheck.mjs",
+        "tools/ship/changedPaths-selfcheck.mjs", "tools/ship/collisionCensus-selfcheck.mjs",
+        "tools/ship/commentFalsePass-selfcheck.mjs", "tools/ship/crossBackend-selfcheck.mjs",
+        "tools/ship/ddaPrecisionReport-selfcheck.mjs", "tools/ship/detectionFloor-selfcheck.mjs",
+        "tools/ship/deterministicRaf-selfcheck.mjs", "tools/ship/divineEye-selfcheck.mjs",
+        "tools/ship/dockFraming-selfcheck.mjs", "tools/ship/doorKinds-selfcheck.mjs",
+        "tools/ship/driveEnv-selfcheck.mjs", "tools/ship/drivePolicy-selfcheck.mjs",
+        "tools/ship/effectLegibility-selfcheck.mjs", "tools/ship/eulerGpu-selfcheck.mjs",
+        "tools/ship/floors-selfcheck.mjs", "tools/ship/galaxyProfile-selfcheck.mjs",
+        "tools/ship/gateReach-selfcheck.mjs", "tools/ship/gateSelection-selfcheck.mjs",
+        "tools/ship/gpuUniverse-selfcheck.mjs", "tools/ship/graveyard-selfcheck.mjs",
+        "tools/ship/labDevices-selfcheck.mjs", "tools/ship/loopAccept-selfcheck.mjs",
+        "tools/ship/loopNoise-selfcheck.mjs", "tools/ship/loopSearch-selfcheck.mjs",
+        "tools/ship/loopTarget-selfcheck.mjs", "tools/ship/loopTrace-selfcheck.mjs",
+        "tools/ship/moduleRefs-selfcheck.mjs", "tools/ship/orphanDisposition-selfcheck.mjs",
+        "tools/ship/orphanScan-selfcheck.mjs", "tools/ship/orphanTriage-selfcheck.mjs",
+        "tools/ship/orreryView-selfcheck.mjs", "tools/ship/paintFields-selfcheck.mjs",
+        "tools/ship/paintTransfer-selfcheck.mjs", "tools/ship/postChain-selfcheck.mjs",
+        "tools/ship/primitiveFit-selfcheck.mjs", "tools/ship/raceKnob-selfcheck.mjs",
+        "tools/ship/realTerrainFlyIn-selfcheck.mjs", "tools/ship/referenceKind-selfcheck.mjs",
+        "tools/ship/ribbonRoad-selfcheck.mjs", "tools/ship/rootCoverage-selfcheck.mjs",
+        "tools/ship/shaderRefs-selfcheck.mjs", "tools/ship/sharpPanel-selfcheck.mjs",
+        "tools/ship/sheddingSpectrum-selfcheck.mjs", "tools/ship/shippedLadder-selfcheck.mjs",
+        "tools/ship/songButton-selfcheck.mjs", "tools/ship/toolFrontDoor-selfcheck.mjs",
+        "tools/ship/traderPolicy-selfcheck.mjs", "tools/ship/tslRace-selfcheck.mjs",
+        "tools/ship/vendoredLicences-selfcheck.mjs", "tools/ship/windTunnel-selfcheck.mjs",
+        "world/rootArch-selfcheck.mjs",    ]),
     ran: 140, finished: 103, green: 97, red: 5, falseRed: 1, didNotFinish: 37,
     underOldCap: 35, underBudget: 1,
     msRange: Object.freeze([51, 87648]), median: 24559,

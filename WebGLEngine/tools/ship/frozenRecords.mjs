@@ -493,7 +493,11 @@ export const PROBE_AT_V4536 = Object.freeze({
     // physics/character/capsuleGround.mjs, carrying eight counted fields of its twenty-eight.
     // v4544 -- RE-TAKEN with `excluding`: 116/55/252 -> 117/56/267. One record, FALL_AT_V4544 in
     // physics/character/fallBody.mjs, carrying fifteen counted integer fields.
-    currentIncludingModule: Object.freeze({ records: 117, withFields: 56, fields: 273 }),
+    // v4547 -- RE-TAKEN with `excluding` below: 117/56/273 -> 118/57/278, for AGREEMENT_AT_V4547 in
+    // tools/ship/controllerAgreement.mjs and its five numeric fields. The two rounds between wrote their
+    // records into camera/camera.js and this census cannot see a .js file at all -- which is why v4545 and
+    // v4546 moved neither number and is pinned as a defect by playerGround-selfcheck section 10.
+    currentIncludingModule: Object.freeze({ records: 118, withFields: 57, fields: 278 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -579,7 +583,10 @@ export const PROBE_AT_V4536 = Object.freeze({
     // record after a reading party found five defects the gate could not see. NO RECORD ARRIVED, which
     // is the case v4540 had to teach this row: a repair that writes integers into an existing record
     // moves the census as surely as a new one.
-    excluding: Object.freeze({ records: 115, withFields: 54, fields: 253 }),
+    // v4547 -- RE-TAKEN with `currentIncludingModule` above: 115/54/253 -> 116/55/258. The difference
+    // between the two blocks stays exactly this module's own two records and their twenty fields, which is
+    // what the gate checks, so moving one and not the other reddens a row about the exclude pattern.
+    excluding: Object.freeze({ records: 116, withFields: 55, fields: 258 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,

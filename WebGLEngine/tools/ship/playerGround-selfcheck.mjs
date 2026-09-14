@@ -379,9 +379,12 @@ console.log("\n10. *** THIS ROUND'S OWN RECORD IS INVISIBLE TO THE RECORD CENSUS
         "that module has ever published, including the +7 sweep it was built for. *** THIS ROW ASSERTS A " +
         "DEFECT RATHER THAN A PROPERTY, AND IT IS WRITTEN TO GO RED THE DAY SOMEBODY FIXES IT. ***");
 
+    // 117 at v4545, 118 at v4547: AGREEMENT_AT_V4547 landed in a .mjs, so the census CAN see it and the
+    // pinned number moved by exactly one. That is the .mjs/.js line this row is about, drawn from the
+    // other side -- a record beside camera.js is invisible and a record in tools/ship/ is not.
     ok("   ...and it is not repaired HERE, because the one-word fix reddens a replay of an OLD commit",
-        recordCensus().records.length === 117,
-        "widening that filter to /\\.(mjs|js)$/ was driven: 117 records -> 120, 273 fields -> 284, " +
+        recordCensus().records.length === 118,
+        "widening that filter to /\\.(mjs|js)$/ was driven at v4545: 117 records -> 120, 273 fields -> 284, " +
         "1,687 ms against a 3,000 ms budget, and PLAYER_GROUND_AT_V4545 comes back correctly attributed to " +
         "this gate while MEASURED_AT_V4463 comes back guarded by stereoPanini-selfcheck. It also turns " +
         "frozenRecords-selfcheck RED in three rows, and the first of them is the instructive one: the sweep " +
