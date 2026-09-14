@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 469,
+ "count": 470,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -1275,6 +1275,13 @@
    "t": "SweK LLM Cost",
    "d": "",
    "g": "physicslab",
+   "p": 0
+  },
+  {
+   "f": "fsr.html",
+   "t": "FSR Upscaler",
+   "d": "AMD FidelityFX Super Resolution, reimplemented natively in SweK. EASU+RCAS is the spatial half (one frame in, one out). The temporal half -- jitter, jitter-aware resolve, reprojected accumulation -- is what recovers detail the render resolution cannot carry. Watch it converge frame by frame against a supersampled ground truth, with live PSNR: on a zone plate it beats bilinear by ~6.4 dB static and ~2.1 dB panning, and on smooth content it cannot beat bilinear at all, because there is nothing past Nyquist to recover.",
+   "g": "renders",
    "p": 0
   },
   {
