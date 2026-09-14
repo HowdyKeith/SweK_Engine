@@ -340,10 +340,15 @@ console.log("\n9. *** THE BLEND AVERAGED A COLUMN THIS BODY CANNOT STAND IN AS Z
         const wallWorld = voxelWorld((fx, y) => y <= 1 || (fx >= 12 && y >= 2 && y <= 6));
         const w = mkCam(wallWorld, [9.5, 2 + 1.7, 5.5]);
         for (let i = 0; i < 90; i++) w._moveFP(1 / 60);
+        // v4549 -- the body has a RADIUS now, so it stops 0.4 short of the wall face rather than pressing
+        // its centre against it. The row is about the HEIGHT, which is unchanged and is what the v4545
+        // blend defect moved; the x bound tracks Camera.BODY_RADIUS so it cannot drift silently.
         ok("!! a body walked into a wall stands ON the floor at the wall, not a voxel inside it",
-            Math.abs(w.position.y - 3.7) < 1e-9 && w.position.x > 11.9 && w._fpOnGround,
+            Math.abs(w.position.y - 3.7) < 1e-9 && w._fpOnGround &&
+            Math.abs((12 - w.position.x) - Camera.BODY_RADIUS) < 0.1,
             "floor top y=2, a five-voxel wall at x=12, 90 frames of walking into it: the body ends at x=" +
-            w.position.x.toFixed(3) + ", y=" + w.position.y.toFixed(3) + ". With the not-found corner " +
+            w.position.x.toFixed(3) + " -- " + (12 - w.position.x).toFixed(3) + " from the face, which is " +
+            "its radius of " + Camera.BODY_RADIUS + " -- at y=" + w.position.y.toFixed(3) + ". With the not-found corner " +
             "averaged in as 0 it ends at x=11.500, y=2.700 -- *** HALF A UNIT SHORT OF THE WALL AND A " +
             "WHOLE VOXEL INSIDE THE FLOOR, *** standing there for as long as the walk runs. This row " +
             "exists because v4546's slope limit rescued the ledge fixture that used to catch it.");
@@ -374,11 +379,12 @@ console.log("\n10. *** THIS ROUND'S OWN RECORD IS INVISIBLE TO THE RECORD CENSUS
     // It was written at v4545 to go red the day somebody FIXES the hole; it also goes red the day somebody
     // WIDENS it, and the next round to add a record beside its code found that out within the hour. Both
     // directions are the row doing its job: the number is pinned, so the hole cannot change size in silence.
-    // THREE ROUNDS RUNNING NOW -- v4546 made it four and v4548 made it five -- which is the strongest
+    // FOUR ROUNDS RUNNING NOW -- v4546 made it four, v4548 five and v4549 six -- which is the strongest
     // argument the pin could have made for itself: every round that writes a record beside camera.js widens
     // a hole the record censuses cannot see, and the only thing that says so is this row.
-    ok("!! *** THE HOLE IS FIVE RECORDS WIDE AND TWO OF THEM PREDATE THIS SESSION BY A HUNDRED VERSIONS ***",
-        missed.length === 5 && missed.every((r) => /\.(js|cjs)$/.test(r.file)) &&
+    ok("!! *** THE HOLE IS SIX RECORDS WIDE AND TWO OF THEM PREDATE THIS SESSION BY A HUNDRED VERSIONS ***",
+        missed.length === 6 && missed.every((r) => /\.(js|cjs)$/.test(r.file)) &&
+        missed.some((r) => r.name === "PLAYER_BODY_AT_V4549") &&
         missed.some((r) => r.name === "PLAYER_GROUND_AT_V4545") &&
         missed.some((r) => r.name === "PLAYER_SLOPE_AT_V4546") &&
         missed.some((r) => r.name === "CAMERA_FALL_AT_V4548") &&

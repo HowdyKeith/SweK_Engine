@@ -101,7 +101,18 @@ sec("1. the walk, headless, on the hand world");
     // ground, which is v404's own bargain and is not this round's to unpick; what is recorded is that the
     // stick is the same defect at a new place, nearer the edge and a voxel lower.
     const c7 = avatarCamera(w, { x: 40.5, z: 38.5, yaw: Math.PI }); const p7 = walk(c7, ["KeyW"], 300);
-    ok("walking toward +z off the two-voxel ledge at z 40 STILL STICKS, now on the interpolated surface rather than sunk into the last row", p7.z > 39 && p7.z < 40 && near(p7.y, 4.7, 1e-6), `z ${p7.z.toFixed(2)}, y ${p7.y.toFixed(2)} at 300 ticks, unmoved since tick 36 -- it read z 39.08, y 5.53 before v4546`);
+    // *** v4549 -- AND THE BODY IS STANDING INSIDE THE ROCK, WHICH IT WAS DOING BEFORE THIS FILE HAD A
+    // RADIUS TO NOTICE IT WITH. *** Cell z=39 is solid up to y=3. Driven at v4548, with the body still a
+    // zero-width line, it stops at z 39.500 with its FEET AT 3.000 -- inside that rock. v4549 gave the body
+    // a radius of 0.4 and the reading moved to z 39.67, feet 2.000: the same defect, a voxel deeper, now
+    // inside the body's OWN footprint. The cause is v404's bilinear ground, which averages the surfaces of
+    // the columns a body straddles and answers a height NEITHER of them has; _canStandAt would refuse that
+    // position and is asked on every horizontal move, but the vertical snap never asks it.
+    // Not closed here: clamping the walk to a legal height means taking the highest surface under the
+    // footprint, which binds at EVERY one-voxel lip and brings back exactly the stairs v404 removed. Filed
+    // with its numbers. The row asserts the body is stuck INSIDE the rock rather than pretending otherwise.
+    const rockTopAt39 = [0, 1, 2, 3, 4, 5].filter((y) => (w.voxelAt(40, y, 39) || 0) !== 0).pop();
+    ok("walking toward +z off the two-voxel ledge at z 40 STILL STICKS, and stands INSIDE the rock while it does", p7.z > 39 && p7.z < 40 && near(p7.y, 3.7, 1e-6) && (p7.y - 1.7) <= rockTopAt39, `z ${p7.z.toFixed(2)}, y ${p7.y.toFixed(2)} at 300 ticks (feet ${(p7.y - 1.7).toFixed(3)}, and cell z=39 is solid to y=${rockTopAt39}) -- it read z 39.50 feet 3.000 at v4548 with NO radius at all, and z 39.08 y 5.53 before v4546. Three readings of one defect that v404 has carried since it was written`);
     // 48 ticks, not 36: the same descent, but v4546 makes the body FALL the two voxels instead of gliding
     // down them, and the fall takes about twelve frames. Four units, so it lands on the floor and is not
     // yet off the world -- the floor's end at z 0 is what the first draft walked past.

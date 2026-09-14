@@ -131,11 +131,57 @@ export const CAMERA_FALL_AT_V4548 = Object.freeze({
     terminalPassedThrough: -Infinity,
 });
 
+/**
+ * *** RE-DERIVED BY tools/ship/playerBody-selfcheck.mjs ON EVERY RUN. *** Readings at v4549.
+ */
+export const PLAYER_BODY_AT_V4549 = Object.freeze({
+    at: "v4549",
+    radiusBefore: 0,            // _canStandAt tested ONE cell: floor(x), floor(z). The body was a LINE.
+    radiusAfter: 0.4,           // physics/character/capsuleGround.mjs's own radius
+    cellsTestedBefore: 1,
+    cellsTestedAfterMax: 4,     // a disc of r < 0.5 touches at most four lattice cells
+    // (1) THE DIAGONAL GAP: two pillars sharing one corner and nothing between them but a point
+    diagonalFrom: Object.freeze([10.5, 9.5]),
+    diagonalThroughTo: Object.freeze([15.80, 14.80]),   // where the line body ended up: past both pillars
+    diagonalBlockedAt: Object.freeze([11.56, 10.56]),   // where the disc body stops
+    // *** A RADIUS BELOW THE PER-FRAME STEP DOES NOT RELIABLY BLOCK. *** The test is discrete, so a body
+    // moving 0.0833 per frame at walk speed steps over a slit narrower than that: r = 0.01 still goes
+    // through, r = 0.05 does not. 0.4 is nearly five times the walking step and three times the sprint's.
+    diagonalPassesAtRadius: Object.freeze([0, 0.01]),
+    diagonalBlocksAtRadius: Object.freeze([0.05, 0.1, 0.2, 0.4]),
+    perFrameStepAtWalk: 5 / 60,
+    // (2) HOW CLOSE THE CENTRE GETS TO A WALL FACE
+    wallFaceX: 12, centreStoppedBefore: 11.9167, centreStoppedAfter: 11.5833,
+    // the live census: what a radius costs in standable ground, on a real boot
+    censusCells: 14641, sampledPerCell: 256,
+    lostPct: Object.freeze({ "0.40": 27.65, "0.42": 31.51, "0.44": 31.61, "0.46": 31.71,
+                             "0.48": 35.34, "0.50": 35.58 }),
+    cellsFullyLost: Object.freeze({ "0.40": 0, "0.42": 0, "0.44": 0, "0.46": 0, "0.48": 587, "0.50": 587 }),
+    cliffBetween: Object.freeze([0.46, 0.48]),   // 0 cells lost below it, 587 above
+    lostFloorPct: 10,           // the percentage is REPORTED; only a floor is asserted, per the usual rule
+    // *** MY OWN CENSUS WAS WRONG TWICE BEFORE IT SAID ANYTHING. *** The first draft sampled CELL CENTRES
+    // and read 0 lost at every radius, which is vacuous: a disc of r <= 0.5 centred in a cell never leaves
+    // it. The second sampled offsets 0.125/0.375, whose only distances to a cell edge are 0.125 and 0.375,
+    // so r=0.2 read identically to r=0.3 and r=0.4 to r=0.5 -- A GRID COARSER THAN THE THING MEASURED.
+    censusFirstDraft: "cell centres -- 0 lost at every radius, vacuous by construction",
+    censusSecondDraft: "offsets 0.125/0.375 -- quantised the radius into two buckets",
+    // the cost, measured
+    canStandAtMicroseconds: 0.115,
+    callsPerFrame: 3,
+});
+
 export class Camera {
     // The keys the _move* methods consult in EVERY mode that moves. KeyE is deliberately absent: it is
     // kaiju-drive only, and consumesKey() adds it there. Cross-checked against the keys.has() literals in this
     // file by tools/ship/cameraKeys-selfcheck.mjs, so this cannot quietly fall behind the code it describes.
     static MOVEMENT_KEYS = new Set(["KeyW", "KeyA", "KeyS", "KeyD", "Space", "ShiftLeft"]);
+
+    /** The body's radius, in voxels. *** BEFORE v4549 IT WAS ZERO AND NOT BY DECISION: *** _canStandAt
+     *  tested ONE lattice cell, floor(x) and floor(z), so the thing the player drove was a vertical LINE.
+     *  0.4 is physics/character/capsuleGround.mjs's radius, taken so the player and the mesh authority
+     *  describe the same body rather than two numbers nobody compared -- the v4547 lesson applied to a
+     *  quantity that did not exist on this side at all. */
+    static BODY_RADIUS = 0.4;
 
     /** The tallest auto-step, in voxels. Read by _moveFP's walk rule AND by _terrainTopAt's reach, which
      *  are the same question asked twice -- so it is one number rather than two that must agree. */
@@ -839,13 +885,21 @@ export class Camera {
         // Try horizontal move with collision check
         const newX = this.position.x + mx * speed * dt;
         const newZ = this.position.z + mz * speed * dt;
-        if (this._canStandAt(newX, this.position.y, newZ)) {
+        // v4549 -- ASKED AT THE HEIGHT THE BODY WOULD STAND AT, NOT THE ONE IT IS AT. See _stepTargetAt:
+        // a body with a radius cannot approach a lip at its current height, because its disc overlaps the
+        // column it is about to climb. The step-up and the footprint are one question and this asks it once.
+        const feetNow = this.position.y - this._eyeHeight;
+        const canGo = (nx, nz) => {
+            const t = this._stepTargetAt(nx, nz, feetNow);
+            return this._canStandAt(nx, (t === null ? feetNow : t) + this._eyeHeight, nz);
+        };
+        if (canGo(newX, newZ)) {
             this.position.x = newX;
             this.position.z = newZ;
         } else {
             // Try axes independently — slide along walls
-            if (this._canStandAt(newX, this.position.y, this.position.z)) this.position.x = newX;
-            if (this._canStandAt(this.position.x, this.position.y, newZ)) this.position.z = newZ;
+            if (canGo(newX, this.position.z)) this.position.x = newX;
+            if (canGo(this.position.x, newZ)) this.position.z = newZ;
         }
 
         // Vertical — gravity + ground snap + jump
@@ -1415,16 +1469,87 @@ export class Camera {
 
     // Can the player stand at (x, y, z) — requires 2 voxels of clear
     // air at the body footprint (head + feet).
+    /**
+     * The lattice cells this body's disc actually overlaps at (x, z). At r < 0.5 the bounds give at most
+     * four and the distance test rejects the corners the disc does not reach, so the footprint is a DISC
+     * and not the square that bounds it -- which is the whole diagonal-gap case, since a square footprint
+     * would block a body a disc legitimately admits.
+     *
+     * Both the clearance test and the step-up target read the footprint from HERE, so the two cannot come
+     * to disagree about which cells the body is in -- the defect v4548 found between two copies of a fall.
+     */
+    _footprint(x, z) {
+        const r = Camera.BODY_RADIUS;
+        // *** THE CELL THE CENTRE IS IN IS ALWAYS IN THE FOOTPRINT, AND A GATE FOUND OUT WHY. *** The
+        // distance test below is strict, so at r = 0 it admits nothing and the footprint came back EMPTY --
+        // and an empty footprint means _canStandAt tests no cells and returns true, which is not "a body
+        // with no radius" but NO COLLISION AT ALL. Driven: with BODY_RADIUS set to 0 the body walked
+        // straight through a five-voxel wall to x = 17. A body of zero width still occupies the cell it
+        // stands in, so that cell is seeded rather than derived, and the radius only ever ADDS neighbours.
+        // The centre's cell is named rather than read back out of the array: the first draft indexed
+        // `out[0]` to skip it, which throws the moment the seed is removed -- a shipped TypeError, and the
+        // species this session has now hit six times. Named consts cannot be emptied out from under it.
+        const hx = Math.floor(x), hz = Math.floor(z);
+        const out = [[hx, hz]];
+        const x0 = Math.floor(x - r), x1 = Math.floor(x + r);
+        const z0 = Math.floor(z - r), z1 = Math.floor(z + r);
+        for (let cx = x0; cx <= x1; cx++) {
+            for (let cz = z0; cz <= z1; cz++) {
+                if (cx === hx && cz === hz) continue;
+                // closest point on this cell's square to the body's axis -- exact for a cylinder against an
+                // axis-aligned box, which is what a voxel is. The same question capsuleMove asks of a
+                // triangle, on a lattice where it costs two clamps instead of seven Voronoi regions.
+                const nx = Math.min(Math.max(x, cx), cx + 1);
+                const nz = Math.min(Math.max(z, cz), cz + 1);
+                if ((nx - x) * (nx - x) + (nz - z) * (nz - z) < r * r) out.push([cx, cz]);
+            }
+        }
+        return out;
+    }
+
+    /**
+     * *** THE HEIGHT THIS BODY WOULD STAND AT IF IT MOVED TO (x, z), OR null IF NOTHING SUPPORTS IT. ***
+     *
+     * A radius and a step-up cannot be tested separately, and the first draft of v4549 proved it: giving the
+     * body width while still asking `_canStandAt(newX, THIS FRAME'S y, newZ)` made it unable to climb
+     * ANYTHING, because approaching a lip means the disc overlaps the column being climbed at a height that
+     * column is still solid at. Measured -- every ramp from 14 degrees up stopped dead, and the sandbox's
+     * one-voxel auto-step stopped being climbed. The move test has to ask where the body would BE.
+     *
+     * The target is the HIGHEST surface among the cells that have one, and _canStandAt then requires the
+     * span to be clear in EVERY overlapped cell -- support from any, clearance from all.
+     *
+     * *** THE `any` IS NOT LOAD-BEARING AND THE GATE SAYS SO RATHER THAN LETTING THE COMMENT CLAIM IT. ***
+     * Swapping it for `support from ALL` -- refuse the moment one overlapped cell is bottomless -- produces
+     * an IDENTICAL walk, measured at a floor that simply ends with nothing below it: 20.000 either way.
+     * The target is only ever used to RAISE the body and a null falls back to the height it is already at,
+     * so the two quantifiers cannot differ. What matters is that a null does NOT refuse the move: a body is
+     * entitled to walk off a cliff, and a rule that refused would stop it a radius short of every edge.
+     */
+    _stepTargetAt(x, z, feetY) {
+        let best = null;
+        for (const [cx, cz] of this._footprint(x, z)) {
+            const g = this._standYAt(cx + 0.5, cz + 0.5, feetY, Camera.STEP_UP_MAX);
+            if (g !== null && (best === null || g > best)) best = g;
+        }
+        return best;
+    }
+
     _canStandAt(x, y, z) {
         if (!this.world?.voxelAt) return true;
-        const fx = Math.floor(x), fz = Math.floor(z);
         const feetY = Math.floor(y - this._eyeHeight + 0.1);
         const headY = Math.floor(y);
-        for (let yy = feetY; yy <= headY; yy++) {
-            const v = this.world.voxelAt(fx, yy, fz);
-            if (v !== 0 && v !== undefined && v !== 10 && v !== 11) {
-                // Solid (water = id 10/11 = passable in FP)
-                return false;
+        // *** THE CELLS THE BODY'S DISC CAN TOUCH, NOT THE ONE ITS CENTRE IS IN. *** At r < 0.5 that is at
+        // most four, and the distance test below rejects the corners the disc does not actually reach -- so
+        // the footprint is a DISC and not the square its bounds describe. That distinction is the whole
+        // diagonal-gap case: a square footprint would block a body that a disc lets through legitimately.
+        for (const [cx, cz] of this._footprint(x, z)) {
+            for (let yy = feetY; yy <= headY; yy++) {
+                const v = this.world.voxelAt(cx, yy, cz);
+                if (v !== 0 && v !== undefined && v !== 10 && v !== 11) {
+                    // Solid (water = id 10/11 = passable in FP)
+                    return false;
+                }
             }
         }
         return true;

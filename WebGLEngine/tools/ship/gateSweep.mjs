@@ -3849,6 +3849,39 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // object keys of the same name, the later one wins silently and the earlier round's swept count vanishes
     // from the surplus arithmetic. FIFTH ORDINAL COLLISION between the two lines this session; the side that
     // merges second is the side that moves.
+    since242: Object.freeze({
+        at: "v4549", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/playerBody-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly: 12 checks in six sections, 145-152 ms over three runs. " +
+                 "*** THE THING THE PLAYER DROVE WAS A VERTICAL LINE. *** _canStandAt tested ONE lattice " +
+                 "cell -- floor(x), floor(z) -- so the body had no width, and none of v4541's capsuleMove " +
+                 "findings or v4543's capsuleGround ones could reach it. Driven diagonally between two " +
+                 "pillars that share a single corner and nothing else, the line body goes STRAIGHT " +
+                 "THROUGH to (15.80, 14.80): a slit of zero width admits a body of zero width. It has a " +
+                 "radius now, 0.4, which is capsuleGround's own, and stops at (11.56, 10.56); against a " +
+                 "wall face its centre stops 0.417 away rather than 0.083, which was one frame's travel " +
+                 "and not a body. *** A RADIUS ALONE MAKES THE PLAYER UNABLE TO CLIMB ANYTHING AND THE " +
+                 "FIRST DRAFT SHIPPED THAT: *** approaching a lip means the disc overlaps the column being " +
+                 "climbed at a height it is still solid at, so every ramp from 14 degrees up stopped dead " +
+                 "and the sandbox's one-voxel auto-step stopped being climbed. The footprint and the " +
+                 "step-up are ONE question; _stepTargetAt asks it. LIVE CENSUS over 14,641 standable cells " +
+                 "at 256 sub-cell positions each: at r = 0.4 NOT ONE CELL is fully lost, at 0.48 five " +
+                 "hundred and eighty-seven are, and the cliff is structural -- a disc of r >= 0.5 cannot " +
+                 "fit in a cell. *** THE CENSUS WAS WRONG TWICE BEFORE IT SAID ANYTHING, BOTH VACUOUSLY: " +
+                 "*** the first sampled CELL CENTRES and read 0 at every radius, which a disc of r <= 0.5 " +
+                 "cannot do otherwise; the second used offsets whose only distances to a cell edge were " +
+                 "0.125 and 0.375, so r=0.2 read identically to r=0.3 -- a grid coarser than the thing " +
+                 "measured. Seven sabotages: A 6 RED, B 1, C 12, D 0, E 16, F 2, G 5. D IS ZERO AND THAT " +
+                 "IS THE ANSWER: `support from any cell` and `from all` cannot differ, because the target " +
+                 "is only used to RAISE the body and a null falls back to the current height -- the code " +
+                 "comment claimed a distinction the driving does not support and was corrected. F CRASHED " +
+                 "camera.js rather than failing a row, an `out[0]` read on a seed that sabotage removes. " +
+                 "NOT CLOSED: the walk's bilinear ground can stand the body INSIDE SOLID ROCK, and could " +
+                 "before this round gave it a radius to notice with -- driven at v4548 with no radius at " +
+                 "all, feet at 3.000 in a cell solid to y=3. Clamping that brings back the stairs v404 " +
+                 "removed, so it is filed rather than chosen.",
+    }),
     since241: Object.freeze({
         at: "v4548", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/cameraFall-selfcheck.mjs"]),
