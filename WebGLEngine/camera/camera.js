@@ -170,6 +170,61 @@ export const PLAYER_BODY_AT_V4549 = Object.freeze({
     callsPerFrame: 3,
 });
 
+/**
+ * *** RE-DERIVED BY tools/ship/playerWater-selfcheck.mjs ON EVERY RUN. *** Readings at v4550.
+ *
+ * The filed item read "water is passable to the player and solid to every bot, which nothing states as
+ * deliberate". HALF OF THAT IS WRONG AND THE CENSUS BELOW IS WHAT SAYS SO: the player's own ground query
+ * and the bots' answer the same number in 146 of 146 water columns. The disagreement was between two
+ * functions in ONE file.
+ */
+export const PLAYER_WATER_AT_V4550 = Object.freeze({
+    at: "v4550",
+    // (1) THE SHAPE OF THE DEFECT: one question, three answers, one of them different
+    predicateCopiesBefore: 3,   // _canStandAt, _standYAt's shim, _terrainTopAt's legacy scan
+    predicateCopiesAfter: 1,    // Camera.isSolidToBody
+    idsExcludedByCanStandAt: Object.freeze([10, 11]),   // WATER, FLOWING_WATER
+    idsExcludedByTheOtherTwo: Object.freeze([]),
+    // (2) THE LIVE WORLD, 5x5 CHUNKS GENERATED IN NODE FROM world/world.js
+    censusColumns: 3721,
+    waterColumns: 146,          // 3.92% -- water is not a hypothetical in this world
+    surfaceWaterColumns: 79,    // water is the topmost non-air voxel: a lake you can walk to
+    waterDepthRange: Object.freeze([1, 7]),
+    surfaceDepthRange: Object.freeze([1, 3]),
+    // *** THE PLAYER AND THE BOTS AGREED ALL ALONG, WHICH IS THE CORRECTION TO THE FILED ITEM. ***
+    columnsWherePlayerGroundEqualsBotGround: 146,
+    ofWaterColumns: 146,
+    // (3) *** AND THE EXCLUSION WAS ASKED ON ZERO REACHABLE SITES. *** Over every standable column in the
+    // census, the four-neighbour cells holding water anywhere in the body's own two-cell span: none. A lake
+    // surface is level, so the land beside it stands at top+1 and the neighbour's span is the air above the
+    // water. It takes water standing HIGHER than the land next to it -- which the fluid systems level away.
+    reachableExclusionSites: 0,
+    reachabilityIsAFixtureClaim: false,   // taken on the generated world, not on a hand-built one
+    // (4) WHERE IT IS REACHABLE, BUILT BY HAND: a wall of water from y=2 to y=9 against land topping at 5
+    stoneWallStopsBodyAt: 9.583,          // a radius short of the face at x = 10
+    waterWallBeforeEndedAt: 13.333,       // it walked IN
+    waterWallBeforeFeetAfter240Frames: -92.505,
+    waterWallBeforeVyAfter240Frames: -59.4,     // still accelerating; the world has no floor
+    waterWallAfterStopsBodyAt: 9.583,     // identical to stone, which is the whole repair
+    botGroundInThatColumn: null,          // the bots never entered it in either world
+    // (5) WHAT DOES NOT MOVE, WHICH IS THE POINT OF (3): the shipping walk is unchanged
+    lakeCrossingFrames: 300,
+    lakeCrossingFeetY: 8,
+    lakeCrossingAirborneFrames: 0,
+    // (6) WHAT IS NOT IMPLEMENTED AND IS NOT CLAIMED
+    // *** SCOPED TO WHAT IS CHECKED, WHICH IS THIS FILE. *** The first draft of this field was called
+    // swimStatesInTree and its gate row read camera.js, so the name claimed a tree-wide absence one file
+    // had been searched for. An absence is only worth what its scope is.
+    swimStatesInTheController: 0,
+    buoyancyForThePlayer: false,
+    // The intent WAS swimming, and main.js says so in prose while nothing implements it: the v465 comment
+    // beside renderer.skipWater reads "without this you swim into a blue void with no ground under the
+    // water". That is about drawing the lakebed; the collision side never had a swim state to reach it.
+    proseIntendedSwimming: true,
+    botWaterRuleIsSpeedOnly: true,        // BotManager._waterSpeedMul, off a ROOM record, not off voxels
+    botWaterSpeedMultipliers: Object.freeze({ waterKaijuDeep: 1.30, otherKaijuDeep: 0.40 }),
+});
+
 export class Camera {
     // The keys the _move* methods consult in EVERY mode that moves. KeyE is deliberately absent: it is
     // kaiju-drive only, and consumesKey() adds it there. Cross-checked against the keys.has() literals in this
@@ -182,6 +237,41 @@ export class Camera {
      *  describe the same body rather than two numbers nobody compared -- the v4547 lesson applied to a
      *  quantity that did not exist on this side at all. */
     static BODY_RADIUS = 0.4;
+
+    /**
+     * *** IS THIS VOXEL SOLID TO THE PLAYER'S BODY? THE FILE HELD THREE ANSWERS AND ONE OF THEM DIFFERED.
+     * *** Until v4550 camera.js decided that question in three places -- _canStandAt's clearance loop,
+     * _standYAt's surfaceProbe shim, and _terrainTopAt's legacy downward scan -- and _canStandAt alone
+     * carried `&& v !== 10 && v !== 11`, which made WATER PASSABLE to the collision test while the same
+     * file's ground test stood the body ON it. A body may not both walk into a thing and stand on it.
+     *
+     * *** WHAT THAT COST, DRIVEN RATHER THAN ARGUED: THE PLAYER FELL OUT OF THE WORLD. *** Against a wall
+     * of stone from y=2 to y=9 the body stops at x = 9.583, a radius short of the face. Against a wall of
+     * WATER with the identical shape it walks in to x = 13.333, finds no ground under it -- because the
+     * ground probe needs two cells of AIR and water is not air -- and falls: feet at -92.505 after 240
+     * frames
+     * with vy = -59.4 and still accelerating, past the bottom of a world that has no floor to catch it.
+     *
+     * *** THE RULE IS `NOT AIR`, WHICH IS world.isAir's RULE, WHICH IS WHAT THE BOTS ALREADY GET. ***
+     * world/world.js answers isAir as `voxelAt === VOXEL.AIR`, and simulation/BotManager.js walks its bots
+     * on surfaceProbe.standHeightAt over that. So water was never "solid to bots and passable to the
+     * player": MEASURED ON A REAL GENERATED WORLD, the player's ground and the bots' ground agree in 146
+     * of 146 water columns. The disagreement was inside this file, not across the two controllers.
+     *
+     * *** NO SWIMMING IS CLAIMED AND NONE IS IMPLEMENTED. *** There is no buoyancy, no water drag and no
+     * swim state in this controller; the bots' only water rule is a speed multiplier
+     * read off a ROOM record (BotManager._waterSpeedMul), not off voxels. So a lake is a walkable floor
+     * here, to everyone -- driven, the player crosses one at y = 8 grounded for 300 frames. This round
+     * makes the tree SAY that in one place instead of contradicting itself in three. Refusing is the safe
+     * direction, in physics/character/terrainWalk.mjs's own words, and a wall beats a fall out of the map.
+     *
+     * `undefined` is air, which is the fixture worlds' convention and not the engine's: world.voxelAt
+     * returns 0 for a missing chunk and chunk.get returns 0 out of bounds, so the live world never
+     * produces one. The guard is kept because the gates' worlds do.
+     */
+    static isSolidToBody(v) {
+        return v !== 0 && v !== undefined;
+    }
 
     /** The tallest auto-step, in voxels. Read by _moveFP's walk rule AND by _terrainTopAt's reach, which
      *  are the same question asked twice -- so it is one number rather than two that must agree. */
@@ -1326,8 +1416,9 @@ export class Camera {
         const v = (xx, yy, zz) => this.world.voxelAt(xx, yy, zz);
         const shim = {
             chunkHeight: Number.isFinite(this.world.chunkHeight) ? this.world.chunkHeight : 80,
-            // the camera's own air test, verbatim: anything not 0 and not undefined is solid
-            isAir: (xx, yy, zz) => { const q = v(xx, yy, zz); return q === 0 || q === undefined; },
+            // v4550 -- the camera's ONE air test, and world.isAir's rule. Was written out here and in
+            // two other places; the copy in _canStandAt had drifted onto a different answer for water.
+            isAir: (xx, yy, zz) => !Camera.isSolidToBody(v(xx, yy, zz)),
         };
         return standHeightAt(shim, Math.floor(x), Math.floor(z), { y: fromY, stepUp: reach });
     }
@@ -1400,8 +1491,7 @@ export class Camera {
         }
         const fx = Math.floor(x), fz = Math.floor(z);
         for (let y = 80; y >= 0; y--) {
-            const v = this.world.voxelAt(fx, y, fz);
-            if (v !== 0 && v !== undefined) return y + 1;
+            if (Camera.isSolidToBody(this.world.voxelAt(fx, y, fz))) return y + 1;   // v4550 -- one rule
         }
         return 0;
     }
@@ -1545,11 +1635,10 @@ export class Camera {
         // diagonal-gap case: a square footprint would block a body that a disc lets through legitimately.
         for (const [cx, cz] of this._footprint(x, z)) {
             for (let yy = feetY; yy <= headY; yy++) {
-                const v = this.world.voxelAt(cx, yy, cz);
-                if (v !== 0 && v !== undefined && v !== 10 && v !== 11) {
-                    // Solid (water = id 10/11 = passable in FP)
-                    return false;
-                }
+                // v4550 -- ONE predicate, shared with _standYAt's shim and _terrainTopAt's scan. This
+                // loop used to carry its own, and its own let water through while the other two stood the
+                // body on it. See Camera.isSolidToBody.
+                if (Camera.isSolidToBody(this.world.voxelAt(cx, yy, cz))) return false;
             }
         }
         return true;

@@ -3849,6 +3849,45 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // object keys of the same name, the later one wins silently and the earlier round's swept count vanishes
     // from the surplus arithmetic. FIFTH ORDINAL COLLISION between the two lines this session; the side that
     // merges second is the side that moves.
+    since243: Object.freeze({
+        at: "v4550", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/playerWater-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly: 44 checks in twelve sections, 370-388 ms over three runs. "
+               + "*** camera/camera.js DECIDED 'IS THIS VOXEL SOLID' IN THREE PLACES AND ONE OF THEM SAID "
+               + "SOMETHING ELSE. *** _canStandAt's clearance loop carried `&& v !== 10 && v !== 11` -- "
+               + "water passable -- while _standYAt's surfaceProbe shim and _terrainTopAt's legacy scan "
+               + "both stood the body ON water. *** THE FILED ITEM SAID WATER WAS 'PASSABLE TO THE PLAYER "
+               + "AND SOLID TO EVERY BOT' AND HALF OF THAT IS WRONG: *** on a world generated from "
+               + "world/world.js, 3,721 columns of which 146 hold water, the player's own ground query and "
+               + "the bots' agree in 146 OF 146. The disagreement was between two functions in one file. "
+               + "*** WHAT IT COST, DRIVEN: THE PLAYER FELL OUT OF THE WORLD. *** Against a wall of stone "
+               + "from y=2 to y=9 the body stops at x = 9.583; against a wall of WATER of identical shape "
+               + "it walks IN to 13.333, finds no ground -- the probe needs two cells of AIR and water is "
+               + "not air -- and falls to feet -92.505 after 240 frames with vy -59.4, still accelerating. "
+               + "The bot oracle answers null for that column in BOTH worlds and never enters either, so "
+               + "the repair moves the player TOWARD the bots. One predicate now, Camera.isSolidToBody, "
+               + "which is world.isAir's rule: not air is solid. *** AND IT WAS ASKED ON ZERO REACHABLE "
+               + "SITES, WHICH IS WHY NOTHING SHIPPING MOVES: *** over every standable column, the "
+               + "four-neighbour cells holding water inside the body's own two-cell span number NONE -- a "
+               + "lake surface is level, so the land beside it stands above the water. The walk across a "
+               + "lake is byte-identical before and after, 300 frames grounded at feet 8. Section 8 holds "
+               + "that 0 and goes RED the day somebody floods a room, which is the row working. FIVE "
+               + "SABOTAGES: A 8 RED, B 12, C 3, D 16, E 4. *** THE FIRST BATTERY PUT EVERY RED IN THIS "
+               + "GATE ALONE -- six other camera gates green through all five, none of their fixtures "
+               + "holding a water voxel -- so a second keeper was written into controllerAgreement, the "
+               + "gate about the two controllers agreeing. *** AND THE FIRST COUNT WAS WRONG IN MY FAVOUR: "
+               + "*** it read one extra red per sabotage from playerGround, which was that gate's .js "
+               + "record-census pin going from six to seven under this round's own new record, firing with "
+               + "or without a sabotage. The pin is raised and the claim deleted. Three gate rows also "
+               + "went red against correct code because their regexes matched the very PROSE camera.js now "
+               + "carries about the removed exclusion -- 'a wiring row anchored on prose' for the third "
+               + "time this session; they read tools/ship/sourceScan.mjs's noComments now, which is the "
+               + "tree's own answer and has been since v4418. NOT CLAIMED: swimming. There is no buoyancy, "
+               + "no water drag and no swim state for the player anywhere in this tree, and the bots' only "
+               + "water rule is a speed multiplier off a ROOM record. A lake is a walkable floor here; "
+               + "this round makes the tree say so in one place instead of contradicting itself in three.",
+    }),
     since242: Object.freeze({
         at: "v4549", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/playerBody-selfcheck.mjs"]),

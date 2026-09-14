@@ -38,6 +38,7 @@ import path from "node:path";
 import { census, characterModules, SITES, MODULES, ENG,
          AGREEMENT_AT_V4547 as R } from "./controllerAgreement.mjs";
 import { Camera } from "../../camera/camera.js";
+import { noComments } from "./sourceScan.mjs";
 import { fallStep } from "../../physics/character/fallBody.mjs";
 import { stepTerrain, SURFACE } from "../../physics/character/terrainWalk.mjs";
 
@@ -227,6 +228,23 @@ console.log("\n5. AN ABSENCE IS NOT A SITE, AND THE FIRST DRAFT OF THIS CENSUS C
         "Math.max(terminal, ...) and the one that probes at the CURRENT height and compares the WANTED " +
         "one -- which is the whole of its 'cannot tunnel, structurally rather than by substepping' claim, " +
         "and the thing neither copy did.");
+
+    // *** v4550 -- THE SEVENTH QUANTITY, AND IT IS NOT A NUMBER: WHAT COUNTS AS SOLID. *** The census in
+    // SITES compares gravity, step-up, terminal and the rest, all of which are numbers a regex can lift.
+    // "Is this voxel solid to a body" is a PREDICATE, and camera.js held three copies of it with one of
+    // them excluding the water ids -- so the file's collision test walked into water its own ground test
+    // stood the body on. One predicate now, and it is world.isAir's rule, which is what BotManager's bots
+    // already got through surfaceProbe. tools/ship/playerWater-selfcheck.mjs owns the driving; this row is
+    // the SECOND KEEPER, and it exists because that gate's sabotage battery found it was the only one --
+    // all six other camera gates stayed green through every sabotage, none of their fixtures having a
+    // water voxel in it.
+    ok("!! *** the player and the bots share ONE rule for what a voxel is, and it is a predicate ***",
+        Camera.isSolidToBody(10) && Camera.isSolidToBody(11) && !Camera.isSolidToBody(0)
+        && !Camera.isSolidToBody(undefined)
+        && (camSrc.match(/Camera\.isSolidToBody\(/g) || []).length >= 3
+        && !/!==\s*1[01]\b/.test(noComments(camSrc)),
+        "water and flowing water are SOLID to the player's body, as they are to every bot; the three " +
+        "sites in camera.js route through Camera.isSolidToBody and no `!== 10`/`!== 11` survives in code.");
 }
 
 // =============================================================================================================

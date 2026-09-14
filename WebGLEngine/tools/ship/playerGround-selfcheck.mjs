@@ -379,11 +379,16 @@ console.log("\n10. *** THIS ROUND'S OWN RECORD IS INVISIBLE TO THE RECORD CENSUS
     // It was written at v4545 to go red the day somebody FIXES the hole; it also goes red the day somebody
     // WIDENS it, and the next round to add a record beside its code found that out within the hour. Both
     // directions are the row doing its job: the number is pinned, so the hole cannot change size in silence.
-    // FOUR ROUNDS RUNNING NOW -- v4546 made it four, v4548 five and v4549 six -- which is the strongest
-    // argument the pin could have made for itself: every round that writes a record beside camera.js widens
-    // a hole the record censuses cannot see, and the only thing that says so is this row.
-    ok("!! *** THE HOLE IS SIX RECORDS WIDE AND TWO OF THEM PREDATE THIS SESSION BY A HUNDRED VERSIONS ***",
-        missed.length === 6 && missed.every((r) => /\.(js|cjs)$/.test(r.file)) &&
+    // FIVE ROUNDS RUNNING NOW -- v4546 made it four, v4548 five, v4549 six and v4550 seven -- which is the
+    // strongest argument the pin could have made for itself: every round that writes a record beside
+    // camera.js widens a hole the record censuses cannot see, and the only thing that says so is this row.
+    // *** AND AT v4550 IT CAUGHT A CLAIM RATHER THAN A RECORD. *** That round read this red as one of its
+    // own sabotages being caught and wrote so in a gate header; it is not, it fires with or without the
+    // sabotage, and the header was corrected before the round shipped. A row that reddens on every run of
+    // a neighbouring experiment will be mistaken for that experiment's signal, which is worth the line.
+    ok("!! *** THE HOLE IS SEVEN RECORDS WIDE AND TWO OF THEM PREDATE THIS SESSION BY A HUNDRED VERSIONS ***",
+        missed.length === 7 && missed.every((r) => /\.(js|cjs)$/.test(r.file)) &&
+        missed.some((r) => r.name === "PLAYER_WATER_AT_V4550") &&
         missed.some((r) => r.name === "PLAYER_BODY_AT_V4549") &&
         missed.some((r) => r.name === "PLAYER_GROUND_AT_V4545") &&
         missed.some((r) => r.name === "PLAYER_SLOPE_AT_V4546") &&
@@ -413,11 +418,14 @@ console.log("\n10. *** THIS ROUND'S OWN RECORD IS INVISIBLE TO THE RECORD CENSUS
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
-    "\nunchecked here, and each is filed as its own round: the player has NO SLOPE LIMIT at all -- _moveFP " +
-    "never computes a normal, so terrainWalk's founding thesis is absent from the thing the human drives; " +
-    "player gravity is 18 where fallBody and kinematic use 20, and the cliff rule is 1.5 against snapDown; " +
-    "_moveKaijuDrive is a THIRD copy of the vertical logic, and with fallBody and kinematic's stepCharacter " +
-    "that makes four; the player's body is a COLUMN with no radius, so none of v4541's or v4543's capsule " +
-    "findings reach it; and water is passable to the player (_canStandAt excludes ids 10 and 11) and solid " +
-    "to every bot, which nothing states as deliberate.");
+    "\nunchecked here. *** EVERY ITEM THIS LINE USED TO CARRY IS NOW CLOSED, AND THE LINE IS REWRITTEN " +
+    "RATHER THAN APPENDED TO: *** the slope limit at v4546, the two controllers' gravity at v4547, the " +
+    "third copy of the vertical logic at v4548, the body's radius at v4549 and the water predicate at " +
+    "v4550. A standing list of open items that nobody prunes becomes a list of closed ones, which reads " +
+    "as work outstanding and is not. WHAT IS STILL OPEN AND TOUCHES THIS FILE: the record census reads " +
+    ".mjs alone, so the SEVEN records section 10 pins are invisible to it, and widening it reddens a " +
+    "replay taken with the same narrow ruler at commit 75f0c033; the walk's bilinear ground can still " +
+    "stand the body inside solid rock, which pre-dates the radius and whose clamp brings back v404's " +
+    "stairs; and the player spends its speed budget HORIZONTALLY where terrainWalk defaults to SURFACE, " +
+    "which is a gameplay choice v4546 named and did not make.");
 process.exit(fails ? 1 : 0);

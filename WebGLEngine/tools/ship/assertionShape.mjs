@@ -311,8 +311,10 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4549 -- RE-TAKEN for tools/ship/playerBody-selfcheck.mjs: 1637 -> 1638 and the three rows that
     // follow a gate by one. The round's other change is to camera/camera.js, an existing module.
     // distinctDefinitions holds at 40 for the nineteenth round running.
-    gates: 1638, usesOk: 1617, definesOk: 1609, importsOk: 0,
-    distinctDefinitions: 40, nameFirst: 1510, condFirst: 91, unknownSignature: 16,
+    // v4550 -- RE-TAKEN for tools/ship/playerWater-selfcheck.mjs: gates 1638 -> 1639, usesOk 1617 ->
+    // 1618, definesOk 1609 -> 1610, nameFirst 1510 -> 1511. One gate moves four of the nine rows.
+    gates: 1639, usesOk: 1618, definesOk: 1610, importsOk: 0,
+    distinctDefinitions: 40, nameFirst: 1511, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([
