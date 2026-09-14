@@ -1,6 +1,6 @@
 // tools/ship/spacesimStart-selfcheck.mjs
 //
-// Run: node tools/ship/spacesimStart-selfcheck.mjs   (~0.17s MEASURED (gate-timings.json) -- was ~1s)
+// Run: node tools/ship/spacesimStart-selfcheck.mjs   (~1.36s MEASURED (gate-timings.json), was ~0.17s -- itself a correction of an original ~1s)
 //
 // v3165 -- THE PANEL COULD DRIVE A SIMULATOR IT COULD NOT LAUNCH.
 //

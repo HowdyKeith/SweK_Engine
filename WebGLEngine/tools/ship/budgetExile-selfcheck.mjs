@@ -205,10 +205,41 @@ console.log("\n5. *** WHAT THE EXILE WAS HIDING, AND WHO PUT IT THERE ***");
         `repaired, ${nowRegistered.length} now on a register -- ` +
         (nowRegistered.map((e) => e.gate.split("/").pop().replace("-selfcheck.mjs", "") + " on " + reg.get(e.gate)).join(", ") || "none") +
         ". A debt on the register is worse-looking and better than a debt behind a stale green");
+    // 2026-09-14 -- MORE GATES LEFT THE REGISTER AFTER v4425 THAN EVER JOINED EXILED_REGRESSIONS, AND THE SET
+    // MOVES WHILE THIS FILE IS BEING READ. avatarServerViews, canvasFill and homography were all still RED in
+    // MEASURED_V4425's frozen v4425 census, on no register, AND (before this note) carrying a stale
+    // sweep-timings.json code of 1 -- the exact "hidden regression" shape this section hunts for, but
+    // backwards: not hidden, REPAIRED, with nobody re-timing an exiled gate to notice. Their codes are
+    // corrected now (measured via runQuickSweep, not typed).
+    //
+    // *** NAMING THEM BY HAND WAS TRIED FIRST AND WAS WRONG WITHIN THE SAME SESSION. *** This repo has other
+    // rounds concurrently repairing and DE-REGISTERING gates from the very same RED_AT_V4279 list --
+    // boundaryLint left it between two runs of this very check, moving the registered count by one with
+    // nothing here touched -- so a hand-typed list of "who left after v4425" goes stale before the session
+    // that wrote it ends. USING sweep-timings.json's `C[g]` AS THE SIGNAL WAS TRIED SECOND AND WAS ALSO WRONG:
+    // physicsReach and wgslSpec are STILL genuinely red (LEDGER_AT_V4472 measured them at code 1) and their
+    // OWN sweep-timings.json entries ALSO read code 0 -- C[g] is exactly the stale-pass lie for them, the
+    // thing this section exists to catch, not evidence of a repair. A record that lies for ten gates cannot
+    // be trusted to tell the truth for an eleventh just because nobody has named it yet.
+    //
+    // *** SO THIS IS A LIVE RUN, NOT A RECORD READ, FOR EXACTLY THE GATES NEITHER RECORD ALREADY COVERS. ***
+    // Bounded in size (only entries outside EXILED_REGRESSIONS reach here) and in cost the same way section 6
+    // bounds its cheap re-runs: this is the honest answer, not the cached one, and it is what makes "covered"
+    // mean something rather than reading a field that has already been shown to lie.
+    const namedInLedger = unreg.filter((g) => EXILED_REGRESSIONS.some((e) => e.gate === g));
+    const unnamed = unreg.filter((g) => !EXILED_REGRESSIONS.some((e) => e.gate === g));
+    const liveChecked = unnamed.length ? measureExiled(unnamed) : {};
+    const stillBroken = unnamed.filter((g) => liveChecked[g].code !== 0);
+    if (unnamed.length) report(`${unnamed.length} unregistered red(s) outside EXILED_REGRESSIONS, run live just now: ` +
+        unnamed.map((g) => g + " code " + liveChecked[g].code).join(", "));
     ok("  and the unregistered reds are all covered by the record, with nothing loose",
-        unreg.every((g) => EXILED_REGRESSIONS.some((e) => e.gate === g)),
-        `${unreg.length} unregistered reds, every one named in EXILED_REGRESSIONS. The COUNTS no longer have ` +
-        "to match: an entry that leaves the unregistered set by being registered is still an entry");
+        stillBroken.length === 0,
+        stillBroken.length
+            ? `${stillBroken.length} unregistered red(s) run live and STILL non-zero, unnamed anywhere: ` +
+              stillBroken.map((g) => g + " -> " + liveChecked[g].first).join("; ")
+            : `${unreg.length} unregistered reds: ${namedInLedger.length} named in EXILED_REGRESSIONS, ` +
+              `${unnamed.length} run live just now and confirmed exit 0 (${unnamed.join(", ") || "none"}). ` +
+              "The COUNTS no longer have to match: an entry that leaves the unregistered set by being registered is still an entry");
     const repaired = EXILED_REGRESSIONS.filter((e) => e.claimedAtV4425 === "REPAIRED HERE");
     const owed = EXILED_REGRESSIONS.filter((e) => e.claimedAtV4425 === "OWED");
     ok("*** four were this session's own, and v4425 repaired them ***",

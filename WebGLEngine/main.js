@@ -21692,7 +21692,9 @@ window.songTerrain = {
             const Ctx = window.AudioContext || window.webkitAudioContext;
             if (!Ctx) throw new Error("songTerrain: no AudioContext, so nothing here can decode audio");
             const ctx = new Ctx();
-            const bytes = o.file ? await o.file.arrayBuffer() : await (await fetch(o.url)).arrayBuffer();
+            let bytes;
+            if (o.file) { bytes = await o.file.arrayBuffer(); }
+            else { const r = await fetch(o.url); if (!r.ok) throw new Error(`songTerrain fetch failed: ${r.status} ${o.url}`); bytes = await r.arrayBuffer(); }
             const buf = await ctx.decodeAudioData(bytes);
             samples = buf.getChannelData(0); sampleRate = buf.sampleRate;
             label = label || (o.file ? o.file.name : o.url.split("/").pop());
@@ -29024,7 +29026,7 @@ try {
             try {
                 const { KNOB_SHADERS } = await import("./ai/qualityTiers.mjs");
                 const texts = {};
-                await Promise.all(Object.values(KNOB_SHADERS).flat().map(async (rel) => { try { texts[rel] = await (await fetch("./" + rel)).text(); } catch { texts[rel] = null; } }));
+                await Promise.all(Object.values(KNOB_SHADERS).flat().map(async (rel) => { try { const r = await fetch("./" + rel); texts[rel] = r.ok ? await r.text() : null; } catch { texts[rel] = null; } }));
                 deriveTierOrder((rel) => texts[rel] ?? null);
             } catch (e) { console.warn("[autoQuality] tier order left on the stand-in fallback:", e && e.message); }
             const setBloomHook = (enabled) => {

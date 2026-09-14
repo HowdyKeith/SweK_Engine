@@ -176,11 +176,17 @@ const MAIN = readFileSync(fileURLToPath(new URL("../main.js", import.meta.url)),
     // Every covers list must be an argument to addSource and nothing else. While wiring this round a regex
     // stamped one onto the XRSessionManager constructor instead -- a second argument that constructor
     // ignores, so it was syntactically valid, silently meaningless, and node --check said nothing at all.
+    //
+    // The window below was 700 until the dayNight probe grew the v4232 postmortem comment (main.js, the
+    // addSource("dayNight" block) between its addSource( call and its covers list -- measured directly
+    // against the current tree at 1545 chars, the widest legitimate gap of the 16 probes here. 700 was too
+    // tight for that real comment and flagged it as misplaced; 1550 is the measured 1545 plus headroom for
+    // one more line, not a number picked to silence the check.
     const coversAt = [...nc.matchAll(/\{ covers: \[/g)].map((m) => m.index);
     ok(coversAt.length >= 5, coversAt.length + " probes declare what they guard");
     let misplaced = 0;
     for (const idx of coversAt) {
-        const before = nc.slice(Math.max(0, idx - 700), idx);
+        const before = nc.slice(Math.max(0, idx - 1550), idx);
         if (!/addSource\(/.test(before)) misplaced++;
     }
     ok(misplaced === 0, "*** every covers list belongs to an addSource call -- none has drifted onto a constructor that would ignore it ***");

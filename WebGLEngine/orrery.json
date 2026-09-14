@@ -1470,11 +1470,19 @@
    "name": "three",
    "arrived": "2026-08-19",
    "sha": "66db97c45b5286d98d1c018506effca552f05a23",
-   "bytes": 2200075,
+   "bytes": 2396670,
    "files": [
     {
      "path": "jsm/controls/OrbitControls.js",
      "bytes": 29868
+    },
+    {
+     "path": "jsm/curves/NURBSCurve.js",
+     "bytes": 1878
+    },
+    {
+     "path": "jsm/curves/NURBSUtils.js",
+     "bytes": 7861
     },
     {
      "path": "jsm/exporters/GLTFExporter.js",
@@ -1497,6 +1505,10 @@
      "bytes": 1448
     },
     {
+     "path": "jsm/libs/fflate.module.js",
+     "bytes": 83291
+    },
+    {
      "path": "jsm/libs/ktx-parse.module.js",
      "bytes": 18676
     },
@@ -1511,6 +1523,10 @@
     {
      "path": "jsm/libs/zstddec.module.js",
      "bytes": 39754
+    },
+    {
+     "path": "jsm/loaders/FBXLoader.js",
+     "bytes": 101466
     },
     {
      "path": "jsm/loaders/GLTFLoader.js",
@@ -1538,7 +1554,7 @@
     },
     {
      "path": "PROVENANCE.txt",
-     "bytes": 902
+     "bytes": 3001
     },
     {
      "path": "three.module.js",

@@ -1,6 +1,6 @@
 // tools/roundhouse/labResults-selfcheck.mjs
 //
-// Run: node tools/roundhouse/labResults-selfcheck.mjs   (~9 min on one core; twof/inlet alone is 328s of it)
+// Run: node tools/roundhouse/labResults-selfcheck.mjs   (~19.5 min on one core MEASURED (gate-timings.json), was ~9 min; twof/inlet alone is 328s of it)
 //
 // *** THE LINE ABOVE SAID "~35s" UNTIL v3519 AND THE GATE TAKES NINE MINUTES. *** Measured, not estimated:
 // 273 device-mode pairs, 521.9s of building, and ONE PAIR -- twof/inlet -- IS 328s OF IT, 63% of the total.

@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/shaderCensus-selfcheck.mjs
 //
-// Run: node tools/ship/shaderCensus-selfcheck.mjs   (~0.24s -- MEASURED)
+// Run: node tools/ship/shaderCensus-selfcheck.mjs   (~1.83s MEASURED (gate-timings.json), was ~0.24s)
 //
 // v3274 -- COUNT BEFORE BUILDING A COMPILER.
 //

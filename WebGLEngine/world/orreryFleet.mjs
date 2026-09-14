@@ -552,3 +552,40 @@ export const COMMIT_BELT_DRIFT_V4535 = Object.freeze({
     bodiesNow: 20,
     notClaimed: COMMIT_BELT_DRIFT_V4534.notClaimed,
 });
+
+/**
+ * v4621 -- *** ANOTHER MOVE AWAY FROM THE SAME v4475 BASELINE, AND ONLY ONE BODY DID IT. *** Same rule as
+ * V4534/V4535: COMMIT_BELT_DRIFT_V4535 is a claim about the tree at v4535 and stays true about v4535, so this
+ * is a NEW drift record, not an edit to the old one. It carries every entry V4535 recorded (fonts, box3d,
+ * three-webgpu moved; kenney-city, kenney-racing, morphicons, xatlas, draco-encoder arrived) plus the one thing
+ * that moved since: "Vendor FBXLoader.js + dependency closure at r160" (b5fccadb) touched vendor/three, so it
+ * picks up a fifth commit. Verified directly against this repository's history rather than taken from the
+ * gate's own failure text: `git log --format=%H -- WebGLEngine/vendor/three` returns, newest first,
+ * b5fccadb98a37f86a7e62cb182ec97eddb6a58e2, 842116468f889501b1b19fc021a74d9a4f2dc285,
+ * 7e680f9621808731da80a473a5fc0bfe5e479052, e08b1b69f736e9335ea4bd59fd48f0dd2aef1d8d and
+ * 66db97c45b5286d98d1c018506effca552f05a23 -- the same four V4475 already named, plus this one, in order.
+ * No other body's commit list moved: re-checked `git log --format=%H -- WebGLEngine/vendor/<name>` for all
+ * twenty bodies against V4535's record and only `three` disagreed.
+ */
+export const COMMIT_BELT_DRIFT_V4621 = Object.freeze({
+    at: "v4621",
+    against: "v4475",
+    abbreviationWas: 7, abbreviationNow: 8,
+    matchedOnceLengthIgnored: 11, ofBodies: 15,
+    movedSince4475: Object.freeze({
+        fonts: COMMIT_BELT_DRIFT_V4535.movedSince4475.fonts,
+        box3d: COMMIT_BELT_DRIFT_V4535.movedSince4475.box3d,
+        "three-webgpu": COMMIT_BELT_DRIFT_V4535.movedSince4475["three-webgpu"],
+        three: Object.freeze({
+            recorded: Object.freeze(["8421164", "7e680f9", "e08b1b6", "66db97c"]),
+            now: Object.freeze(["b5fccadb", "84211646", "7e680f96", "e08b1b69", "66db97c4"]),
+            why: "\"Vendor FBXLoader.js + dependency closure at r160 (round 1 of FBX ingest support)\" " +
+                 "(b5fccadb) added FBXLoader.js and its dependency closure under vendor/three -- a real " +
+                 "vendoring commit, so the body picks up a fifth commit rather than moving to a different four",
+        }),
+    }),
+    arrivedSince4475: COMMIT_BELT_DRIFT_V4535.arrivedSince4475,
+    removedSince4475: Object.freeze([]),
+    bodiesNow: 20,
+    notClaimed: COMMIT_BELT_DRIFT_V4535.notClaimed,
+});

@@ -416,8 +416,15 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // origin/main MERGE -- RE-TAKEN for the 25-gate arrival: ES modules 3781 -> 3824, closures 3660 -> 3700,
     // async/await 1426 -> 1444, typed arrays 1036 -> 1057, Promises 349 -> 355, WebGL 142 -> 148,
     // requestAnimationFrame 116 -> 119, WebGPU 48 -> 49 -- eight of twelve rows, all read off census().
+    //
+    // FOLLOW-UP -- WebGPU 49 -> 50, AND THE 49 WAS WRONG THE MOMENT IT WAS WRITTEN, NOT A DRIFT SINCE. Checked
+    // against the exact commit that recorded it (a worktree pinned to 5d3d8d83, census() re-run there
+    // unmodified): the tree AT THAT COMMIT already reads WebGPU 50, not 49 -- a miscount in the merge's manual
+    // retake, caught here because the gate re-derives every run rather than trusting the note beside the
+    // number. No file arrived and no line changed between then and now to explain the extra one; it was always
+    // there. files (4123) and the other ten of twelve rows in that same retake were correct and are unchanged.
     esModules: 3824, closures: 3700, asyncAwait: 1444, typedArrays: 1057, promises: 355,
-    fetchXhr: 243, performanceNow: 220, raf: 119, webgl: 148, webgpu: 49, threads: 22, wasm: 23,
+    fetchXhr: 243, performanceNow: 220, raf: 119, webgl: 148, webgpu: 50, threads: 22, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.

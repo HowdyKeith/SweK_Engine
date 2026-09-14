@@ -62,6 +62,14 @@ export const METHOD = Object.freeze({
     // referenceKind at 73.7s exits 1 (red), twoF at 120.5s exits 0 (green). Both had been "unmeasured", and
     // a bucket that holds a red and a green with equal confidence is exactly why it may not be waved through.
     resolvedOutOfTimeoutBucket: 2,
+    // *** THE FROZEN EXAMPLE, NOT A LIVE LOOKUP. *** redCensus-selfcheck.mjs section 5 used to find this by
+    // searching RED_AT_V4279 for referenceKind directly -- which meant the day referenceKind got fixed (this
+    // round: post-cba0f571 drift-fix pass) and left that array, the control demonstrating "a gate CAN escape
+    // the timeout bucket by being measured red" would find nothing and fail, even though the demonstration it
+    // is about is a historical event from the v4297/v4298 sweep, not a claim that referenceKind must stay red
+    // forever. Recorded here as its own fact instead, so fixing the gate cannot break the control that once
+    // proved it was genuinely measured rather than merely timed out.
+    timeoutBucketEscapeExample: Object.freeze({ gate: "tools/ship/referenceKind-selfcheck.mjs", ms: 73700, exit: 1 }),
     preExistingAtV4266: 36,
     introducedThisSession: 2,
     falseAttribution: 1,
@@ -100,36 +108,83 @@ export const METHOD = Object.freeze({
  * `ms` and `fails` are still on every entry, so every reader keeps working. They are GETTERS over the audit.
  */
 const RED_AT_V4279_GATES = Object.freeze([
-    "engine/frameDirtyCensus-selfcheck.mjs",
-    "tools/roundhouse/swekWebviewApk-selfcheck.mjs",
+    // engine/frameDirtyCensus-selfcheck.mjs REMOVED, repaired: see FIXED_SINCE_V4279. Fixed by this round's
+    // drift-fix pass (post-full-sweep triage, commit cba0f571's follow-on); freshly re-run direct at the
+    // final tree state (node engine/frameDirtyCensus-selfcheck.mjs): exit 0, all checks pass.
+    // tools/roundhouse/swekWebviewApk-selfcheck.mjs REMOVED, repaired: see FIXED_SINCE_V4279. Freshly re-run
+    // direct (node tools/roundhouse/swekWebviewApk-selfcheck.mjs) during this maintenance pass at cba0f571:
+    // exit 0, "all checks pass". redCensus-selfcheck's own section-2 slice caught this one and named it.
+    //
     // avatarServerViews-selfcheck.mjs REMOVED, repaired (by a concurrent fix elsewhere in this same round --
-    // not this gate's own file): ALL PASS on a direct re-run. Exits 0.
-    "tools/ship/bfcache-selfcheck.mjs",
-    "tools/ship/boundaryLint-selfcheck.mjs",
-    "tools/ship/canvasFill-selfcheck.mjs",
+    // not this gate's own file): ALL PASS on a direct re-run. Exits 0. NOW ALSO IN FIXED_SINCE_V4279: this
+    // note documented the removal but nobody added the accounting entry, which is exactly the gap that left
+    // registerAtSweep() reading 34 against MOMENTS.standingAfterFixes' frozen 37 -- a 3-short arithmetic
+    // drift this maintenance pass traced to TWO different bugs, not one: this REMOVED comment and
+    // wiringClaims' below each lacked a matching FIXED_SINCE_V4279 line (2 of the 3), and
+    // referenceKind-selfcheck.mjs had been wrongly ABSENT from this array entirely despite
+    // redCensus-selfcheck.mjs's own section 5 requiring it present (the 3rd) -- see that gate's entry below
+    // for the fuller story. Re-confirmed green again today, directly: exit 0, all pass.
+    // tools/ship/bfcache-selfcheck.mjs REMOVED, repaired: see FIXED_SINCE_V4279. Freshly re-run direct at
+    // cba0f571: exit 0, "bfcache-selfcheck: all pass". Named by redCensus-selfcheck's own section-2 slice.
+    //
+    // tools/ship/boundaryLint-selfcheck.mjs REMOVED, repaired: see FIXED_SINCE_V4279. NOT clean-cut like the
+    // rest of this pass's finds -- the FIRST direct run this pass took of it, early on, printed "2 FAILURES"
+    // (full text not kept). SEVEN direct re-runs since, at different points across this pass, all print exit
+    // 0, "boundaryLint-selfcheck: all checks pass", with no code of this pass's own touching anything this
+    // gate scans (child-handle kill idioms and unchecked fetch bodies across the tree, none of it in
+    // redCensus.mjs or physics/instruments.mjs). Trusted on the weight of seven consistent re-runs over the
+    // one inconsistent one, per this file's own rule 6 (measure fresh, don't trust a single reading) --
+    // logged here rather than quietly folded in, because a gate that read red once and green seven times is
+    // a fact worth a future reader knowing even though it isn't chased down further in this pass.
+    // tools/ship/canvasFill-selfcheck.mjs REMOVED, repaired: see FIXED_SINCE_V4279. Freshly re-run direct at
+    // cba0f571: exit 0, "canvasFill-selfcheck: all checks pass". Named by redCensus-selfcheck's own
+    // section-2 slice as one of the three it reached before its 45s budget ran out.
     "tools/ship/definitionGates-selfcheck.mjs",
     // v4571 -- tools/ship/gateReach-selfcheck.mjs REMOVED, repaired: see FIXED_SINCE_V4408. It stood in
     // this list AND was registered again at v4568, because the killed bucket found it red without
     // noticing it was already filed -- one gate, two entries, and only one of them ever revisited.
-    "tools/ship/homography-selfcheck.mjs",
+    //
+    // tools/ship/homography-selfcheck.mjs REMOVED, repaired: see FIXED_SINCE_V4279. redCensus-selfcheck's
+    // section-2 slice is bounded to 45s of wall clock and did not reach this one before running out of
+    // budget on this pass, but a direct fresh run (node tools/ship/homography-selfcheck.mjs) at cba0f571
+    // shows exit 0, "homography-selfcheck: all checks pass" -- independently confirmed rather than assumed
+    // from the slice missing it.
     // pagePlacement, pagePlacements, pageReflow, pageSectionsReport and statedRuntime REMOVED: a fresh
     // freezeRegisterAudit.mjs run over the whole register (prompted by the four new tslXxx entries below
     // needing a re-freeze) found all five exit 0 today. See FIXED_SINCE_V4279 for what each one now reads.
-    "tools/ship/pairlaneBridge-selfcheck.mjs",
-    "tools/ship/proseAudit-selfcheck.mjs",
-    // referenceKind-selfcheck.mjs REMOVED, repaired: RESCUED_CEILING (181 -> 288) and RITUAL_CEILING (2 -> 39)
-    // were both stale against the post-merge tree -- measured drift the routine ship suite never re-ran this
-    // gate to catch, not fresh debt from this fix. See the gate's own POST-MERGE notes for the audit. Exits 0.
+    //
+    // tools/ship/pairlaneBridge-selfcheck.mjs REMOVED, repaired: see FIXED_SINCE_V4279. registerDrift-
+    // selfcheck's live cheapest-first sample caught this one directly: "frozen exit 1, now 0". Independently
+    // re-confirmed by a direct run at cba0f571: exit 0, "all checks pass".
+    //
+    // tools/ship/proseAudit-selfcheck.mjs REMOVED, repaired: see FIXED_SINCE_V4279. Fixed by this round's
+    // post-v4297-sweep drift-fix pass; re-run twice fresh (not once, given this array's own history of
+    // reading a stale comment as a repair) -- exit 0 both times, "all passed".
+    //
+    // tools/ship/referenceKind-selfcheck.mjs REMOVED, repaired: see FIXED_SINCE_V4279. Fixed by this round's
+    // post-v4297-sweep drift-fix pass; re-run twice fresh -- exit 0 both times, "all checks pass". Its
+    // presence here USED to double as redCensus-selfcheck.mjs section 5's control (proving a gate can escape
+    // the timeout bucket by being genuinely measured red) -- that control now reads from
+    // METHOD.timeoutBucketEscapeExample, a frozen historical fact, specifically so fixing this gate would
+    // never again have to choose between "true" and "keeps a different check passing".
     "tools/ship/registerResidue-selfcheck.mjs",
     "tools/ship/shaderRefs-selfcheck.mjs",
-    "tools/ship/sunshineHost-selfcheck.mjs",
-    "tools/ship/supersededFlag-selfcheck.mjs",
-    "tools/ship/unattendedHold-selfcheck.mjs",
-    "tools/ship/wasmSupport-selfcheck.mjs",
+    // tools/ship/sunshineHost-selfcheck.mjs REMOVED, repaired: see FIXED_SINCE_V4279. registerDrift-
+    // selfcheck's live cheapest-first sample caught this one directly: "frozen exit 1, now 0". Independently
+    // re-confirmed by a direct run at cba0f571: exit 0, "sunshineHost-selfcheck: all checks pass".
+    // tools/ship/supersededFlag-selfcheck.mjs REMOVED, repaired: see FIXED_SINCE_V4279. Same registerDrift
+    // live sample, same independent re-confirmation at cba0f571: exit 0, "all checks pass".
+    // tools/ship/unattendedHold-selfcheck.mjs REMOVED, repaired: see FIXED_SINCE_V4279. Same registerDrift
+    // live sample, same independent re-confirmation at cba0f571: exit 0, "all checks pass".
+    //
+    // tools/ship/wasmSupport-selfcheck.mjs REMOVED, repaired: see FIXED_SINCE_V4279. Fixed by this round's
+    // post-v4297-sweep drift-fix pass; freshly re-run direct: exit 0, "wasmSupport-selfcheck: all checks pass".
     // wiringClaims-selfcheck.mjs REMOVED, repaired: brain/brain.js grew main.js's own single-line-changelog
     // shape (see wiringClaims.mjs's v4473 note) and was excluded the same way; gazeDwell-selfcheck's
     // "not wired into engine/xrSession.mjs" contrast was adjudicated; and badTvWgsl-selfcheck's closing note,
     // stale since v4273, was corrected to say the port DOES have a real consumer chain now. Exits 0.
+    // NOW ALSO IN FIXED_SINCE_V4279, the third of the three accounting gaps this pass closes. Re-confirmed
+    // by a direct run at cba0f571: exit 0, "wiringClaims-selfcheck: all checks pass".
 ]);
 
 // What the audit cannot supply, said explicitly rather than by a typed line standing in for a reading.
@@ -225,6 +280,30 @@ export const registerAtSweep = () =>
     RED_AT_V4279.length + FIXED_SINCE_V4279.length - RECOVERED_SINCE_V4279.length;
 
 export const FIXED_SINCE_V4279 = Object.freeze([
+    { gate: "tools/ship/proseAudit-selfcheck.mjs", round: "post-v4297-sweep drift-fix pass",
+      why: "the full selfchecks.mjs sweep at cba0f571 (1643 gates, 24626.2s) found this one FAILED, and a " +
+           "following batch-fix round repaired it. redCensus-selfcheck's own live re-run caught the gap " +
+           "first ('FIXED, now delete these lines from redCensus.mjs: tools/ship/proseAudit-selfcheck.mjs') " +
+           "-- freshly re-run direct twice after the fix (node tools/ship/proseAudit-selfcheck.mjs): exit 0 " +
+           "both times, \"all passed\"." },
+    { gate: "tools/ship/referenceKind-selfcheck.mjs", round: "post-v4297-sweep drift-fix pass",
+      why: "the full selfchecks.mjs sweep at cba0f571 (1643 gates, 24626.2s) found this one FAILED (\"289 " +
+           "against a ceiling of 288\"), and a following batch-fix round repaired it. redCensus-selfcheck's " +
+           "own live re-run caught the gap first ('FIXED, now delete these lines from redCensus.mjs: " +
+           "tools/ship/referenceKind-selfcheck.mjs') -- freshly re-run direct twice after the fix (node " +
+           "tools/ship/referenceKind-selfcheck.mjs): exit 0 both times, \"all checks pass\". See " +
+           "METHOD.timeoutBucketEscapeExample for where this gate's old double-duty as a control moved." },
+    { gate: "tools/ship/wasmSupport-selfcheck.mjs", round: "post-v4297-sweep drift-fix pass",
+      why: "the full selfchecks.mjs sweep at cba0f571 (1643 gates, 24626.2s) found this one FAILED, and a " +
+           "following batch-fix round repaired it. freezeRegisterAudit.mjs's own re-run caught the gap " +
+           "first (audited exit 0 while still standing in RED_AT_V4279_GATES) -- freshly re-run direct " +
+           "after the fix (node tools/ship/wasmSupport-selfcheck.mjs): exit 0, \"all checks pass\"." },
+    { gate: "engine/frameDirtyCensus-selfcheck.mjs", round: "post-v4297-sweep drift-fix pass",
+      why: "the full selfchecks.mjs sweep at cba0f571 (1643 gates, 24626.2s) found this one FAILED, and a " +
+           "following batch-fix round repaired it. redCensusFresh-selfcheck's own bounded re-run caught the " +
+           "gap first ('1 have been FIXED and never removed: engine/frameDirtyCensus-selfcheck.mjs') -- " +
+           "freshly re-run direct after the fix (node engine/frameDirtyCensus-selfcheck.mjs): exit 0, all " +
+           "checks pass." },
     // *** FIVE MORE, FOUND THE SAME WAY gateReach WAS -- BY RE-FREEZING THE WHOLE REGISTER RATHER THAN
     // SAMPLING IT. *** register-audit.mjs had sat frozen since v4535; re-running it in full (to pick up the
     // four tslXxx entries this round added) found these five already exit 0. Each gate's OWN file is
@@ -385,6 +464,63 @@ export const FIXED_SINCE_V4279 = Object.freeze([
            "other eleven into UNPLACED with the reason each is still there. Invisible 96 -> 84 against a " +
            "baseline of 100; Arriving 47 -> 58 of 440, 13.2% against a 15% cap. Fixed by linking pages, not " +
            "by touching the ratchet." },
+    // *** EIGHT MORE, FOUND BY redCensus-selfcheck AND registerDrift-selfcheck's LIVE RE-RUNS RATHER THAN BY
+    // REMEMBERING. *** A ship-gate maintenance pass at cba0f571 re-ran every gate these two selfchecks named
+    // (plus a few their own bounded slices had not yet reached) directly, one at a time, rather than trusting
+    // either check's own sample. All eight below exit 0 today. Each gate's OWN file is unexamined here except
+    // where its WHY entry above already recorded what fixed it (avatarServerViews, referenceKind,
+    // wiringClaims) -- for the other five, the repair is in whatever the gate covers, not chased to a commit.
+    { gate: "tools/roundhouse/swekWebviewApk-selfcheck.mjs", round: "this maintenance pass",
+      why: "named by redCensus-selfcheck's own section-2 slice as fixed and undeleted. Freshly re-run direct " +
+           "at cba0f571: exit 0, \"swekWebviewApk-selfcheck: all checks pass\"." },
+    { gate: "tools/ship/bfcache-selfcheck.mjs", round: "this maintenance pass",
+      why: "named by redCensus-selfcheck's own section-2 slice as fixed and undeleted. Freshly re-run direct " +
+           "at cba0f571: exit 0, \"bfcache-selfcheck: all pass\"." },
+    { gate: "tools/ship/canvasFill-selfcheck.mjs", round: "this maintenance pass",
+      why: "named by redCensus-selfcheck's own section-2 slice as fixed and undeleted. Freshly re-run direct " +
+           "at cba0f571: exit 0, \"canvasFill-selfcheck: all checks pass\" -- the live canvas.clientWidth/" +
+           "Height now matches #host in glb_viewer.html." },
+    { gate: "tools/ship/boundaryLint-selfcheck.mjs", round: "this maintenance pass",
+      why: "THE ONE ENTRY IN THIS BATCH WITH A MIXED READING, SAID PLAINLY RATHER THAN AVERAGED AWAY. The " +
+           "first direct run this pass took, early on, printed \"boundaryLint-selfcheck: 2 FAILURES\" (the " +
+           "specific failing lines were not kept). Seven direct re-runs since, spread across the rest of this " +
+           "pass, all print exit 0, \"boundaryLint-selfcheck: all checks pass\" -- and nothing this pass " +
+           "touched (redCensus.mjs's own text, gateReach-selfcheck.mjs's comment history, physics/" +
+           "instruments.mjs's page fields) is anywhere near what this gate scans (child-handle kill idioms, " +
+           "unchecked fetch bodies, prose-vs-code boundary lint across the tree). Filed as fixed on the " +
+           "seven-to-one weight of evidence rather than chased to a cause that is out of this pass's scope; " +
+           "if it reads red again for anyone, that first run was the true one and this entry should be undone." },
+    { gate: "tools/ship/homography-selfcheck.mjs", round: "this maintenance pass",
+      why: "NOT caught by either selfcheck's own bounded sample this round (redCensus-selfcheck's 45s slice " +
+           "ran out before reaching it; registerDrift-selfcheck's cheapest-first sample did not include it " +
+           "either) -- found by independently re-running every RED_AT_V4279 entry directly rather than " +
+           "trusting either check's coverage. Exit 0, \"homography-selfcheck: all checks pass\" at cba0f571." },
+    { gate: "tools/ship/pairlaneBridge-selfcheck.mjs", round: "this maintenance pass",
+      why: "caught live by registerDrift-selfcheck's cheapest-first re-run: \"frozen exit 1, now 0\". " +
+           "Independently re-confirmed direct at cba0f571: exit 0, \"all checks pass\" -- server.html's tab " +
+           "label reads the renamed text and pairlane.html links from the Mac-System tools row." },
+    { gate: "tools/ship/sunshineHost-selfcheck.mjs", round: "this maintenance pass",
+      why: "caught live by registerDrift-selfcheck's cheapest-first re-run: \"frozen exit 1, now 0\". " +
+           "Independently re-confirmed direct at cba0f571: exit 0, \"sunshineHost-selfcheck: all checks pass\"." },
+    { gate: "tools/ship/supersededFlag-selfcheck.mjs", round: "this maintenance pass",
+      why: "caught live by registerDrift-selfcheck's cheapest-first re-run: \"frozen exit 1, now 0\". " +
+           "Independently re-confirmed direct at cba0f571: exit 0, \"supersededFlag-selfcheck: all checks " +
+           "pass\"." },
+    { gate: "tools/ship/unattendedHold-selfcheck.mjs", round: "this maintenance pass",
+      why: "caught live by registerDrift-selfcheck's cheapest-first re-run: \"frozen exit 1, now 0\". " +
+           "Independently re-confirmed direct at cba0f571: exit 0, \"unattendedHold-selfcheck: all checks " +
+           "pass\"." },
+    { gate: "tools/ship/wiringClaims-selfcheck.mjs", round: "this maintenance pass",
+      why: "named by this file's own REMOVED comment above (multigridGPU's stale unwired-port sentence " +
+           "corrected) but never ledgered here -- one of two missing-ledger-entry accounting gaps this pass " +
+           "closes (with avatarServerViews; referenceKind's part of the same 3-gate shortfall was a " +
+           "DIFFERENT bug, a wrongly-absent standing entry rather than a missing ledger line -- see " +
+           "referenceKind-selfcheck.mjs's own entry above in RED_AT_V4279_GATES for that one). Freshly " +
+           "re-confirmed direct at cba0f571: exit 0, \"wiringClaims-selfcheck: all checks pass\"." },
+    { gate: "tools/ship/avatarServerViews-selfcheck.mjs", round: "this maintenance pass (repair predates it)",
+      why: "named by this file's own REMOVED comment above (\"repaired... in this same round\") but never " +
+           "ledgered here -- the other of the two missing-ledger-entry accounting gaps this pass closes. " +
+           "Freshly re-confirmed direct at cba0f571: exit 0, \"ALL PASS\"." },
 ]);
 
 /**
@@ -459,8 +595,16 @@ export const RED_AT_V4408 = Object.freeze(RED_AT_V4408_GATES.map((gate) => Objec
 // are what each gate printed on the v4424 serial run, kept in UNVERIFIED_LINE until the audit reaches them --
 // these three are over the audit's own budget, which is the reason they were unmeasured in the first place.
 export const RED_AT_V4424_GATES = Object.freeze([
-    "tools/ship/doorKinds-selfcheck.mjs",
-    "tools/ship/graveyard-selfcheck.mjs",
+    // tools/ship/doorKinds-selfcheck.mjs REMOVED, repaired: see FIXED_SINCE_V4408. A ship-gate maintenance
+    // pass at cba0f571 re-ran it direct, TWICE (it takes ~150s, over this file's WHY_V4424 note's own 151s):
+    // exit 0 both times, "doorKinds-selfcheck: all checks pass" -- contradicting the WHY text below, which is
+    // kept as history rather than deleted, per this file's own rule for a debt that has since been paid.
+    //
+    // tools/ship/graveyard-selfcheck.mjs REMOVED, repaired: see FIXED_SINCE_V4408. WHY_V4424 below describes
+    // a baseline of 93 against a measured 145; the SAME ship-gate maintenance pass re-ran it direct (95.3s,
+    // under the audit's 120s cap) and got exit 0, "graveyard-selfcheck: all pass" -- 157 orphaned utilities
+    // against a since-raised ORPHAN_UTIL_BASELINE of 159, each raise carrying its own reason in the source.
+    // The WHY text is kept as history rather than deleted, same rule as doorKinds above.
     // v4571 -- tools/ship/orphanDisposition-selfcheck.mjs REMOVED, repaired: see FIXED_SINCE_V4408. Same
     // double-filing as gateReach above -- registered here at v4424 and again at v4568.
 ]);
@@ -551,7 +695,11 @@ export const RED_AT_V4476 = Object.freeze(RED_AT_V4476_GATES.map((gate) => Objec
 })));
 
 export const RED_AT_V4484_GATES = Object.freeze([
-    "ui/stageInfo-selfcheck.mjs",
+    // ui/stageInfo-selfcheck.mjs REMOVED, repaired: see FIXED_SINCE_V4408. The WHY_V4484 note below already
+    // named the fix ("CLEARED BY making the panel responsive in server.html") -- a ship-gate maintenance pass
+    // at cba0f571 confirmed it landed: direct re-run exits 0, "stageInfo-selfcheck: all checks pass",
+    // including the section this gate exists for -- #stageInfo now measures offsetWidth 360 at BOTH 1280 and
+    // 1920 (was 460 at both, unchanging, which is what this note originally flagged).
 ]);
 
 const WHY_V4484 = Object.freeze({
@@ -991,6 +1139,27 @@ export const FIXED_SINCE_V4408 = Object.freeze([
            "entries are records, and it never saw 17 files that reach a body through path.join. The baseline " +
            "is now a FROZEN LIST OF NAMES with the counts derived from it, so the next arrival is reported by " +
            "name; that ratchet caught this round's own new gate joining box3d's fleet within the hour." },
+    { gate: "tools/ship/doorKinds-selfcheck.mjs", round: "this maintenance pass",
+      why: "REGISTERED AT V4424 AS A TIMING FAILURE, AND GREEN WHEN GIVEN THE TIME. WHY_V4424's note says it " +
+           "'exits 1 in 151s alone on an idle box, and would exit 1 at any cap that let it finish' -- a ship-" +
+           "gate maintenance pass at cba0f571 let it finish, twice, and both times it is exit 0: " +
+           "'doorKinds-selfcheck: all checks pass'. Whatever repaired the underlying door-kinds partition is " +
+           "not chased to a single commit here; the WHY_V4424 text is kept, struck through by this note, under " +
+           "this file's own rule that a debt's reason outlives the debt." },
+    { gate: "ui/stageInfo-selfcheck.mjs", round: "this maintenance pass",
+      why: "REGISTERED AT V4484 FOR A PANEL THAT DID NOT GROW WITH THE WINDOW, AND ITS OWN WHY_V4484 NOTE " +
+           "ALREADY NAMED THE FIX: 'CLEARED BY making the panel responsive in server.html'. A ship-gate " +
+           "maintenance pass at cba0f571 confirms it landed -- direct re-run exits 0, 'stageInfo-selfcheck: " +
+           "all checks pass', including Keith's third ask specifically: #stageInfo now measures offsetWidth " +
+           "360 at both 1280 and 1920 (previously 460 at both, unmoving)." },
+    { gate: "tools/ship/graveyard-selfcheck.mjs", round: "this maintenance pass",
+      why: "REGISTERED AT V4424 FOR A BROKEN RATCHET -- baseline 93, measured 145, this session accused of " +
+           "breaking it while shipping ALL GREEN over it. A ship-gate maintenance pass at cba0f571 re-ran it " +
+           "direct (95.3s, under the audit's 120s cap): exit 0, 'graveyard-selfcheck: all pass'. The ratchet " +
+           "was repaired properly, not raised to wave the debt through: ORPHAN_UTIL_BASELINE now reads 159 " +
+           "(against 157 measured today) as a literal in the gate's own source, with every raise carrying its " +
+           "reason beside it per the gate's own 'the baselines are NUMBERS in the source' check. Whatever " +
+           "round moved it is not chased to a single commit here." },
 ]);
 
 /**
@@ -1015,6 +1184,20 @@ export const MEASURED_OUT_OF_SLOW = Object.freeze([
            "at 28 of 30; repaired at v4571, then re-timed by name at a 150 s cap -- 82 s, exit 0. It had been " +
            "in this bucket because the audit's 120 s cap and the 20 s rotation cap both fell short of it, " +
            "which is absence of evidence and not evidence of absence. It has evidence now." },
+    // FOLLOW-UP -- the other two of v4424's three named reds joined orphanDisposition here, both confirmed
+    // by direct re-run today (not inferred from FIXED_SINCE_V4408's note about them): doorKinds-selfcheck
+    // "all checks pass" and graveyard-selfcheck "all pass", exit 0 both, run to completion with no cap.
+    { gate: "tools/ship/doorKinds-selfcheck.mjs", round: "this maintenance pass",
+      why: "REGISTERED AT V4424 AS A TIMING FAILURE ('exits 1 in 151s alone on an idle box'), AND GREEN WHEN " +
+           "GIVEN THE TIME. FIXED_SINCE_V4408 already records a ship-gate maintenance pass at cba0f571 letting " +
+           "it finish twice, both exit 0; re-run again here, direct, no cap: 'doorKinds-selfcheck: all checks " +
+           "pass', exit 0. Left in UNCONFIRMED_SLOW after acquiring this verdict, which is exactly the gap " +
+           "orphanDisposition's entry above closed for itself and not for its two siblings." },
+    { gate: "tools/ship/graveyard-selfcheck.mjs", round: "this maintenance pass",
+      why: "REGISTERED AT V4424 FOR A BROKEN RATCHET (baseline 93, measured 145) AND REPAIRED SINCE -- " +
+           "ORPHAN_UTIL_BASELINE now reads 159 against 157 measured, per FIXED_SINCE_V4408's entry. Re-run " +
+           "again here, direct, no cap: 'graveyard-selfcheck: all pass', exit 0. Same gap as doorKinds: a " +
+           "decided verdict sitting in the bucket built for having none." },
 ]);
 
 export const UNCONFIRMED_SLOW = Object.freeze([
@@ -1070,11 +1253,16 @@ export const UNCONFIRMED_SLOW = Object.freeze([
     "tools/ship/ddaPrecisionReport-selfcheck.mjs",
     "tools/ship/deterministicRaf-selfcheck.mjs",
     "tools/ship/domScope-selfcheck.mjs",
-    "tools/ship/doorKinds-selfcheck.mjs",
+    // FOLLOW-UP -- tools/ship/doorKinds-selfcheck.mjs and tools/ship/graveyard-selfcheck.mjs REMOVED, the same
+    // move v4571 made for orphanDisposition and for the same reason: RED_AT_V4424 named all three as this
+    // bucket's first exits and is now Object.freeze([]) with all three repaired (FIXED_SINCE_V4408, confirmed
+    // again by a fresh direct re-run today: both exit 0). Leaving them here after RED_AT_V4424 emptied is
+    // exactly the v4571 note's own prediction landing a second time -- the two gates newly fell OUT of the
+    // reason that had been suppressing UNCONFIRMED_SLOW for them, and slowCensus's exempt ceiling read it as
+    // TWO gates falling INTO the unmeasured bucket (60 -> 62) on a round that had, if anything, measured them.
     "tools/ship/driveEnv-selfcheck.mjs",
     "tools/ship/floors-selfcheck.mjs",
     "tools/ship/gateSelection-selfcheck.mjs",
-    "tools/ship/graveyard-selfcheck.mjs",
     "tools/ship/labDevices-selfcheck.mjs",
     "tools/ship/loopSearch-selfcheck.mjs",
     "tools/ship/moduleRefs-selfcheck.mjs",

@@ -38,27 +38,36 @@ export const INSTRUMENTS = [
     // physicsReach counts a graded module unreachable when no roundhouse device, no instruments row and no
     // page names it -- and these six shipped fully graded, with no door, the same way split-sum did before
     // the row above. The row IS the door; instruments.html renders it so a person can find the module.
-    { id: "split-sum-wgsl", page: "instrument-bench.html", name: "Split-sum specular IBL (device)", area: "render",
+    //
+    // page: null on all six below, corrected by a ship-gate maintenance pass at cba0f571: unlike split-sum
+    // above, none of these six modules' own .mjs files export reportLines() (grep for it across all six
+    // returns nothing) -- their gates compute and print the rich numbers quoted in `key` below, but the
+    // module itself has no reader the bench can call, so a page:"instrument-bench.html" claim would render
+    // an error rather than a measurement. Caught by registryOrphans-selfcheck.mjs's benchBroken check
+    // ("no bench page points at a module that cannot report"). NOT weakened to a looser check and not
+    // fabricated with a reportLines() nobody has verified -- corrected to the row's OTHER honest state
+    // (registered, with a door in instruments.html, but no bench page yet) until a real reportLines() lands.
+    { id: "split-sum-wgsl", page: null, name: "Split-sum specular IBL (device)", area: "render",
       measures: "The device side of split-sum.mjs's specular IBL: a BRDF-LUT compute shader and a prefiltered-environment compute shader, hand-written in WGSL and graded against the CPU reference term for term.",
       key: "A uniform-environment identity alone is BLIND to a weighting-sign sabotage -- it still reads exactly 0 deviation under it -- but a gradient/spot cross-check catches the same sabotage at a worst relative disagreement of 3.625e-1, against 1e-6-scale agreement unsabotaged. That is why the gate carries both checks rather than the identity alone.",
       gate: "physics/render/splitSumWgsl-selfcheck.mjs" },
-    { id: "fresnel-f82", page: "instrument-bench.html", name: "F82-tint metal Fresnel", area: "render",
+    { id: "fresnel-f82", page: null, name: "F82-tint metal Fresnel", area: "render",
       measures: "The grazing-angle correction Schlick's Fresnel has no room for (Hoffman; Kutz et al.'s F82-tint, since adopted by OpenPBR and Blender's Principled BSDF), added on top of schlick() rather than replacing it.",
       key: "Anchored to a number the tree already had rather than a tolerance: at the white/white limit, f82Tint's own VNDF-sampled directional albedo agrees with energyCompensation.mjs's independently-derived table to a worst 3.53e-3 over 12 (alpha, cosO) points -- and a genuinely tinted case (F0=0.5, b=0.9) diverges from that same table by 3.37e-1, which is what proves the anchor is not vacuous.",
       gate: "physics/render/fresnelF82-selfcheck.mjs" },
-    { id: "fresnel-f82-wgsl", page: "instrument-bench.html", name: "F82-tint Fresnel (device)", area: "render",
+    { id: "fresnel-f82-wgsl", page: null, name: "F82-tint Fresnel (device)", area: "render",
       measures: "The device twin of fresnelF82.mjs, hand-written directly against it term for term (no GLSL sibling exists in this tree to translate from).",
       key: "Graded on a real device against the CPU curve. A sign-flipped correction sabotage disagrees with the true CPU curve by 3.357e-1 across 33 angles, where the correct shader measures 2.516e-7 -- and the endpoint alone (F(1) = f0) cannot see the sabotage at all, which is why the gate sweeps the curve rather than checking its ends.",
       gate: "physics/render/fresnelF82Wgsl-selfcheck.mjs" },
-    { id: "specular-ibl-wgsl", page: "instrument-bench.html", name: "Specular IBL sampler (device)", area: "render",
+    { id: "specular-ibl-wgsl", page: null, name: "Specular IBL sampler (device)", area: "render",
       measures: "The device-side sampler for specular IBL, term for term with specularIBLSample.mjs -- the prefiltered mip chain travels as a storage buffer with integer-indexed fetches rather than a filtered texture sample, so the two backends' samplers cannot disagree about addressing.",
       key: "Agrees with the CPU sampler to a worst 1e-7-scale error on correct parameters; a sabotaged face-column offset (faceSize0 understated) moves an off-centre, mip-0 sample to a relative error of 9.86e-1 -- six orders of magnitude worse, which is what says the correct-parameter agreement was not a coincidence of the test point.",
       gate: "physics/render/specularIBLWgsl-selfcheck.mjs" },
-    { id: "specular-probe-bake", page: "instrument-bench.html", name: "Specular probe bake (mip chain)", area: "render",
+    { id: "specular-probe-bake", page: null, name: "Specular probe bake (mip chain)", area: "render",
       measures: "The cubemap capture and mip chain for specular IBL, on the same pattern render/splatProbes.mjs established for the diffuse half: six faces per mip level, each prefiltered at a different roughness via splitSum.mjs's prefilterEnv rather than projected to spherical harmonics.",
-      key: "Roughness increases monotonically across the baked mips, and the check is proven sensitive rather than vacuous by sabotage: feeding the SAME per-level measurements in reverse mip order fails the monotonicity check, which is what a check that passed on any ordering could not do.",
+      key: "Roughness increases monotonically across the baked mips -- EMERGENT from independently prefiltered levels, not asserted per-level -- and the check is proven sensitive rather than vacuous by sabotage: feeding the SAME per-level measurements in reverse mip order fails the monotonicity check, which is what a check that passed on any ordering could not do.",
       gate: "physics/render/specularProbeBake-selfcheck.mjs" },
-    { id: "specular-probe-capture", page: "instrument-bench.html", name: "Specular probe capture (device)", area: "render",
+    { id: "specular-probe-capture", page: null, name: "Specular probe capture (device)", area: "render",
       measures: "Closes the last named gap in the specular-IBL arc: the GPU prefilter convolution now runs against a REAL captured texture rather than an analytic env(dir) function computed inline.",
       key: "At mip 3 (fully rough), mean absolute error against the analytic reference is 0.04076 at the live page's own 32 samples and 0.03644 at 2048 samples -- close to each other, which is the signature of sampling variance rather than a logic bug (a real error would not shrink toward the same floor as sample count rises).",
       gate: "physics/render/specularProbeCapture-selfcheck.mjs" },

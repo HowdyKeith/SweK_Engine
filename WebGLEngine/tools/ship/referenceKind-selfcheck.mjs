@@ -204,7 +204,18 @@ const RESOLVED = new Map(all.map((f) => [f, (GRAPH.refs.get(f) || []).map((r) =>
 // entry. Actually paying 288 down still needs the same three routes applied one module at a time, which is a
 // real round of its own and not this one; raising the ceiling here is catching the ratchet up to what the
 // merge already made true, not loosening it against debt this pass created.
-const RESCUED_CEILING = 288;
+//
+// FOLLOW-UP, SAME DAY (after commit b5fccadb) -- 288 -> 289, ONE NEW ENTRY, MEASURED BY NAME: vendor/three/jsm/loaders/
+// FBXLoader.js. Commit b5fccadb ("Vendor FBXLoader.js + dependency closure at r160 (round 1 of FBX ingest
+// support)") vendored it and said so itself -- "NOT YET WIRED: no conversion path, no test fixture, no gate.
+// This is the vendoring step only." No import statement anywhere in the tree pulls it in yet (grepped: the only
+// hits are ai-bridge/ensureThree.js's self-heal FILES list, a literal path string for re-downloading a missing
+// vendor file, and world/orreryFleet.mjs's ledger prose recording its arrival) -- both are mentions, neither is
+// a caller, which is exactly the property this file measures. Its three siblings vendored in the same commit
+// (NURBSCurve.js, NURBSUtils.js, fflate.module.js) are NOT on this list: FBXLoader.js genuinely imports all
+// three, so each has a real non-gate importer and none is rescued. Paying this one down is round 2 of the FBX
+// work the vendoring commit already deferred, not a fix that belongs to this gate.
+const RESCUED_CEILING = 289;
 
 const rescued = [];
 {

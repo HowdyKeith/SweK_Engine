@@ -268,8 +268,16 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // gate by one. NOT THIS ROUND'S GATE -- it arrived on main in commit c3f1fecb (the release zip's pure-Node
     // writer) and is re-taken here because that commit and this one merged, and the tree has to be green for
     // whichever lands second. distinctDefinitions holds at 40 for the NINTH round running.
-    gates: 1625, usesOk: 1604, definesOk: 1596, importsOk: 0,
-    distinctDefinitions: 40, nameFirst: 1497, condFirst: 91, unknownSignature: 16,
+    // 2026-09-14 -- RE-TAKEN after a prior session fixed dozens of gates across the tree, adding 25 gates
+    // (1625 -> 1650) between this record and the tree: usesOk 1604 -> 1629, definesOk 1596 -> 1621,
+    // nameFirst 1497 -> 1522 -- the same three-rows-move-together pattern every earlier arrival showed, now
+    // scaled up because many gates landed instead of one. distinctDefinitions ALSO moved, 40 -> 41: one of
+    // the new definitions is not verbatim-identical to an existing one, so it is a forty-first distinct text
+    // rather than reuse. importsOk, condFirst, unknownSignature and suspects held at 0, 91, 16 and 0 --
+    // verified against a fresh `census()` run (node -e importing tools/ship/assertionShape.mjs) before this
+    // edit, independent of the failing gate's own printed numbers.
+    gates: 1650, usesOk: 1629, definesOk: 1621, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1522, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

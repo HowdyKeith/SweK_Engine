@@ -91,7 +91,9 @@ window.songGlobe = {
             const Ctx = window.AudioContext || window.webkitAudioContext;
             if (!Ctx) throw new Error("song-globe: no AudioContext");
             const ctx = new Ctx();
-            const bytes = o.file ? await o.file.arrayBuffer() : await (await fetch(o.url)).arrayBuffer();
+            let bytes;
+            if (o.file) { bytes = await o.file.arrayBuffer(); }
+            else { const r = await fetch(o.url); if (!r.ok) throw new Error(`song-globe fetch failed: ${r.status} ${o.url}`); bytes = await r.arrayBuffer(); }
             const buf = await ctx.decodeAudioData(bytes);
             samples = buf.getChannelData(0); sampleRate = buf.sampleRate; label = o.file ? o.file.name : o.url.split("/").pop();
             try { ctx.close(); } catch {}

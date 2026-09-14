@@ -28,7 +28,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { ENG, RECORD, hashFile, hashDir, readRecord, whyRun, skippable, partition, reasonHistogram,
+import { ENG, RECORD, FORMAT, hashFile, hashDir, readRecord, whyRun, skippable, partition, reasonHistogram,
          encode, decode, clearHashCache, CONFLICT, FLAGS } from "./inputSets.mjs";
 import { usesNamedFsImport, probeOne, entryFor } from "./recordInputs.mjs";
 import { selectGates } from "./quickSweep.mjs";
@@ -55,12 +55,12 @@ console.log("\n2. *** THE RULE REFUSES ON EVERY UNKNOWN, AND EACH REFUSAL IS DRI
     // has tested the edges of. Each of these is one disqualifier alone, everything else valid.
     const good = { reads: ["a.mjs"], dirs: [], hashes: { "a.mjs": hashFile("tools/ship/inputSets.mjs") }, dirHashes: {},
                    spawnedNonNode: false, net: false };
-    const rec = (over) => ({ gates: { "a.mjs": { ...good, ...over } } });
+    const rec = (over) => ({ format: FORMAT, gates: { "a.mjs": { ...good, ...over } } });
     // the control: the same entry, with the hash actually matching the file it names
     const real = { reads: ["tools/ship/inputSets.mjs"], dirs: [], hashes: { "tools/ship/inputSets.mjs": hashFile("tools/ship/inputSets.mjs") },
                    dirHashes: {}, spawnedNonNode: false, net: false };
     ok("CONTROL: a complete entry whose one recorded file still hashes to what it hashed is SKIPPABLE",
-       whyRun("tools/ship/inputSets.mjs", { gates: { "tools/ship/inputSets.mjs": real } }) === null,
+       whyRun("tools/ship/inputSets.mjs", { format: FORMAT, gates: { "tools/ship/inputSets.mjs": real } }) === null,
        "if this row ever fails, every refusal below is passing for the wrong reason");
     ok("REFUSED: a gate with no entry at all", whyRun("nope.mjs", rec({})) === "no recorded input set");
     ok("REFUSED: spawned a child the probe could not follow",
@@ -71,9 +71,9 @@ console.log("\n2. *** THE RULE REFUSES ON EVERY UNKNOWN, AND EACH REFUSAL IS DRI
     // from "we forgot this". A named fs import and a NODE child are both fine now, and section 3b measures
     // WHY they are fine rather than taking the rule's word for it.
     ok("ALLOWED now: a gate taking fs by NAMED import (the loader hook binds those names to the shim)",
-       whyRun("tools/ship/inputSets.mjs", { gates: { "tools/ship/inputSets.mjs": { ...real, namedFsImport: true } } }) === null);
+       whyRun("tools/ship/inputSets.mjs", { format: FORMAT, gates: { "tools/ship/inputSets.mjs": { ...real, namedFsImport: true } } }) === null);
     ok("ALLOWED now: a gate that spawned only NODE children (NODE_OPTIONS carried the probe into them)",
-       whyRun("tools/ship/inputSets.mjs", { gates: { "tools/ship/inputSets.mjs": { ...real, spawnedNode: 6, procs: 7 } } }) === null);
+       whyRun("tools/ship/inputSets.mjs", { format: FORMAT, gates: { "tools/ship/inputSets.mjs": { ...real, spawnedNode: 6, procs: 7 } } }) === null);
     ok("REFUSED: an EMPTY recorded set -- 'read nothing' and 'we saw nothing' are not the same claim",
        whyRun("a.mjs", rec({ reads: [], dirs: [], hashes: {} })) === "recorded an empty input set");
     ok("REFUSED: a set that does not contain the gate's OWN source (node read it to run it, so its absence is a broken record)",
@@ -85,7 +85,7 @@ console.log("\n2. *** THE RULE REFUSES ON EVERY UNKNOWN, AND EACH REFUSAL IS DRI
     // filename and the row tested nothing about a missing file at all.)
     const self = "tools/ship/inputSets.mjs";
     ok("REFUSED: a recorded file that is GONE (hashFile returns null, which no recorded hash equals)",
-       whyRun(self, { gates: { [self]: { ...good, reads: [self, "vanished.mjs"], dirs: [],
+       whyRun(self, { format: FORMAT, gates: { [self]: { ...good, reads: [self, "vanished.mjs"], dirs: [],
            hashes: { [self]: hashFile(self), "vanished.mjs": "abc" } } } }) === "changed: vanished.mjs");
 }
 
@@ -122,7 +122,7 @@ console.log("\n4. *** A FILE THAT DID NOT EXIST AT RECORD TIME AND NOW DOES ***"
     const entry = { reads: ["tools/ship/inputSets.mjs"], dirs: [tmp],
                     hashes: { "tools/ship/inputSets.mjs": hashFile("tools/ship/inputSets.mjs") },
                     dirHashes: { [tmp]: hashDir(tmp) }, spawned: false, net: false, namedFsImport: false };
-    const rec = { gates: { "tools/ship/inputSets.mjs": entry } };
+    const rec = { format: FORMAT, gates: { "tools/ship/inputSets.mjs": entry } };
     ok("with the file absent -- exactly as it was when the entry was recorded -- the gate is skippable",
        whyRun("tools/ship/inputSets.mjs", rec) === null, `recorded dirHash ${JSON.stringify(entry.dirHashes[tmp])}`);
     fs.writeFileSync(abs, "{}\n");
@@ -207,7 +207,7 @@ console.log("\n5. what the record actually bought, on the live tree");
 console.log("\n6. the sweep is WIRED BUT NOT ARMED");
 {
     const all = ["a.mjs", "b.mjs"], timings = { "a.mjs": 100, "b.mjs": 100 };
-    const rec = { gates: { "a.mjs": { reads: ["a.mjs"], dirs: [], hashes: { "a.mjs": hashFile("tools/ship/inputSets.mjs") },
+    const rec = { format: FORMAT, gates: { "a.mjs": { reads: ["a.mjs"], dirs: [], hashes: { "a.mjs": hashFile("tools/ship/inputSets.mjs") },
                                       dirHashes: {}, spawned: false, net: false, namedFsImport: false } } };
     const off = selectGates(all, timings, 3000, { inputRecord: rec });
     const on = selectGates(all, timings, 3000, { inputRecord: rec, skipUnchanged: true });
@@ -219,7 +219,7 @@ console.log("\n6. the sweep is WIRED BUT NOT ARMED");
                 return none.run.length === 2 && (none.unchanged || []).length === 0; })(),
        "a missing tools/ship/input-sets.json is not a behaviour change");
     // the arming path, on an entry that really is skippable
-    const real = { gates: { "tools/ship/inputSets.mjs": { reads: ["tools/ship/inputSets.mjs"], dirs: [],
+    const real = { format: FORMAT, gates: { "tools/ship/inputSets.mjs": { reads: ["tools/ship/inputSets.mjs"], dirs: [],
         hashes: { "tools/ship/inputSets.mjs": hashFile("tools/ship/inputSets.mjs") }, dirHashes: {},
         spawned: false, net: false, namedFsImport: false } } };
     const armedOff = selectGates(["tools/ship/inputSets.mjs"], { "tools/ship/inputSets.mjs": 100 }, 3000, { inputRecord: real });

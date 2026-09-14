@@ -17,7 +17,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { RED_AT_V4279, FIXED_AT_V4279, FIXED_SINCE_V4279, RECOVERED_SINCE_V4279,
          RECHECK_V4313, RECHECK_V4314,
-         METHOD, runGate, censusCostMs, ENG, UNVERIFIED_LINE,
+         METHOD, runGate, censusCostMs, ENG, UNVERIFIED_LINE, registerAtSweep,
          UNCONFIRMED_SLOW, SLOW_PARTIAL, ALL_REGISTERED, REGISTER_LISTS } from "./redCensus.mjs";
 
 // *** v4451 -- THIS FILE HAD BEEN DEAD AT IMPORT SINCE v4430, AND THE BUDGET IS WHY NOBODY SAW IT. ***
@@ -304,8 +304,13 @@ console.log("\n5. *** THE HOLE THIS CENSUS DOES NOT CLOSE, ASSERTED RATHER THAN 
         !RECORDED_BUT_GREEN.includes(g)), "unmeasured is a third state, not a pass");
     ok("  and none is quietly counted as red either",
         UNCONFIRMED_SLOW.every((g) => !RED_AT_V4279.some((e) => e.gate === g)));
-    // *** THE ENTRY THAT PROVES THE BUCKET IS DANGEROUS. ***
-    const rk = RED_AT_V4279.find((e) => /referenceKind/.test(e.gate));
+    // *** THE ENTRY THAT PROVES THE BUCKET IS DANGEROUS -- A FROZEN HISTORICAL FACT, NOT A LIVE LOOKUP. ***
+    // This used to search RED_AT_V4279 for referenceKind directly, which meant the day referenceKind got
+    // fixed and left that (shrinking, by design) array, this control would find nothing and fail -- even
+    // though what it demonstrates ("a gate escaped the timeout bucket by being measured red, once, at the
+    // v4297/v4298 sweep") stays true forever regardless of referenceKind's CURRENT status. See METHOD.
+    // timeoutBucketEscapeExample's own comment in redCensus.mjs.
+    const rk = METHOD.timeoutBucketEscapeExample;
     ok("*** one gate escaped that bucket by being RED all along, and is now in the red set ***",
         !!rk && !UNCONFIRMED_SLOW.includes(rk.gate) && rk.ms > 60000,
         rk ? `${rk.gate} -- ${(rk.ms / 1000).toFixed(1)}s and exit 1, starved past a 120s cap by seven other workers`
@@ -328,8 +333,19 @@ console.log("\n6. THE BACKLOG ITEM SAID FIVE");
 {
     ok("*** the item's number and the measured number differ by more than a factor of seven ***",
         METHOD.confirmedSerially >= 35, "#134 said 5; the sweep found " + METHOD.confirmedSerially);
+    // *** v.cba0f571 -- RED_AT_V4279.length SWAPPED FOR registerAtSweep(), A LIVE NUMBER FOR A STABLE ONE. ***
+    // This compares "how many gates were really red" against the old register's stale-but-honest 19-entry
+    // snapshot, which is a claim about the v4279 MOMENT -- and RED_AT_V4279.length is the CURRENT standing
+    // count, designed to shrink every time a repair is pruned from it (see registerAtSweep()'s own header:
+    // "the list may only shrink, and only on purpose"). A comparison meant to hold for all time was reading a
+    // number that this file's whole mechanism exists to shrink toward zero, so every honest prune brought it
+    // one step closer to going red for the wrong reason -- and a ship-gate maintenance pass at cba0f571,
+    // pruning eight standing reds down to seven, was the round that finally crossed it (15 > 16 no longer
+    // held once the true count of GENUINE fixes landed). registerAtSweep() is the number this file already
+    // built for exactly this shape of comparison: the reconstructed count AT THE MOMENT the register was
+    // taken, stable regardless of how many of those entries have since been repaired and pruned.
     ok("  and the tree's own older register was closer but still wrong by both counting and omission",
-        RECORDED_BUT_GREEN.length > 0 && RED_AT_V4279.length > RECORDED_BUT_GREEN.length);
+        RECORDED_BUT_GREEN.length > 0 && registerAtSweep() > RECORDED_BUT_GREEN.length);
     report("nobody was lying. Five was somebody's honest recollection of the gates they had personally seen " +
         "go red, nineteen was a real snapshot that then aged, and thirty-nine is what running them says " +
         "today. The lesson is not that the numbers were wrong -- it is that for a very long time nothing " +

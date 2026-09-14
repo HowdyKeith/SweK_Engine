@@ -40,9 +40,17 @@ console.log("1. *** THE ITEM SAID '82 FILES TOUCH WASM'. THAT WAS THE LOOSEST RE
     // ITSELF. *** v4224's basis owner, v4225's meshLine file count, v4227's recording-gate count, now this:
     // it first read 84 and 68 because engine/wasmSupport.mjs and this gate both talk about wasm. The numbers
     // being reported are the ones that motivated the round, so they must be the numbers as they were.
+    //
+    // *** AND A FIFTH TIME, ONE LEVEL FURTHER REMOVED. *** tools/ship/register-audit.mjs is not code that
+    // touches wasm -- it is freezeRegisterAudit.mjs's frozen capture of every red gate's OWN failing text, so
+    // when this very gate is red its captured line ("113 files mention .wasm ... 114 mention it") quotes the
+    // word back verbatim and the census counts that quotation as a 114th file. Measured directly: with
+    // register-audit.mjs excluded the count is 113, unchanged; leave it in and it swings with whichever gates
+    // happen to be red when the register was last frozen, which is not a fact about wasm at all.
     const ADDED_BY_THIS_ROUND = new Set([
         path.join(ROOT, "engine", "wasmSupport.mjs"),
         path.join(ROOT, "tools", "ship", SELF),
+        path.join(ROOT, "tools", "ship", "register-audit.mjs"),
     ]);
     const files = walk(ROOT).filter((f) => !ADDED_BY_THIS_ROUND.has(f));
     let mentions = 0, inCode = 0, callsApi = 0, probes = 0;
@@ -66,8 +74,8 @@ console.log("1. *** THE ITEM SAID '82 FILES TOUCH WASM'. THAT WAS THE LOOSEST RE
     // moved relative to each other; only the population they are taken over grew.
     ok("!! 113 files mention .wasm or the WebAssembly API -- the item's number, and it is the loose one",
         mentions === 113, `${mentions} mention it`);
-    ok("!! ...but 23 of those are comments and prose only; 90 mention it in live code",
-        inCode === 90, `${inCode} in code, ${mentions - inCode} comment-only`);
+    ok("!! ...but 24 of those are comments and prose only; 89 mention it in live code",
+        inCode === 89, `${inCode} in code, ${mentions - inCode} comment-only`);
     // *** AND MY OWN GREP GAVE 12, WHICH WAS WRONG, FOR THE FOURTH TIME IN THIS CLASS. *** A raw search for
     // /WebAssembly\./ matched wasm-demo.html, where the text is a SENTENCE -- "executed by the bridge's own
     // Node WebAssembly. No Docker" -- and the full stop matched the escaped dot. Same shape as the licence

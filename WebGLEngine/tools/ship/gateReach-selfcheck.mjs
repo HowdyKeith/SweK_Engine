@@ -175,6 +175,19 @@ for (const l of reachLines(r)) console.log("        " + l);
     //          through ONCE SOMEBODY HAS LOOKED. A removal, or a diff that failed to reconcile, would have
     //          been the other kind. Re-recorded with writeCensus() AFTER compare() had been read, never
     //          before.
+    //   521 -> recorded some round between v4571 and this pass, history not written down here -- the JSON
+    //          record (tools/ship/population-census.json) already read 521 before this pass touched it.
+    //   529 -> this maintenance pass, found RED because nothing had run this gate again since 521 was
+    //          recorded and eight more physics/render modules landed in the meantime. Counted the way this
+    //          comment demands rather than raised until it passed: `node tools/ship/populationCensus.mjs
+    //          --write`'s own compare() (read BEFORE writing) reports GREW, 8 ADDED, 0 REMOVED,
+    //          reconciles:true, every one named -- physics/render/fresnelF82.mjs, fresnelF82Wgsl.mjs,
+    //          specularIBLSample.mjs, specularIBLWgsl.mjs, specularProbeBake.mjs, specularProbeCapture.mjs,
+    //          specularProbeLit.mjs, splitSumWgsl.mjs -- the fresnel/specular-IBL probe arc, all eight real
+    //          files with real content, all physics/render (already the arc's biggest area at 32). GROWTH
+    //          ONLY, IN AN AREA THAT IS OBVIOUSLY LIVE WORK, which is exactly the case this pin exists to
+    //          wave through once somebody has looked. Re-recorded with writeCensus() AFTER compare() had
+    //          been read, never before.
     //
     // *** AND THE ROW HAD A DEFECT OF ITS OWN, WHICH IS WHY IT NOW ASKS THE MODULE RATHER THAN THE DISK. ***
     // It read the record with fs.readFileSync("tools/ship/population-census.json") -- A RELATIVE PATH -- so
