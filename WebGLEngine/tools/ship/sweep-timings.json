@@ -1642,7 +1642,8 @@
   "brain/gunnerPolicy-selfcheck.mjs": 6966,
   "tools/ship/raceTurret-selfcheck.mjs": 11262,
   "tools/ship/carViews-selfcheck.mjs": 15670,
-  "physics/slick-selfcheck.mjs": 441
+  "physics/slick-selfcheck.mjs": 441,
+  "world/buildingTopple-selfcheck.mjs": 18897
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -3283,7 +3284,8 @@
   "brain/gunnerPolicy-selfcheck.mjs": 0,
   "tools/ship/raceTurret-selfcheck.mjs": 0,
   "tools/ship/carViews-selfcheck.mjs": 0,
-  "physics/slick-selfcheck.mjs": 0
+  "physics/slick-selfcheck.mjs": 0,
+  "world/buildingTopple-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-10T04:24:20.054Z",
@@ -4924,7 +4926,8 @@
   "brain/gunnerPolicy-selfcheck.mjs": "2026-09-13T22:45:29.696Z",
   "tools/ship/raceTurret-selfcheck.mjs": "2026-09-13T22:45:29.696Z",
   "tools/ship/carViews-selfcheck.mjs": "2026-09-13T23:14:02.310Z",
-  "physics/slick-selfcheck.mjs": "2026-09-13T23:51:07.340Z"
+  "physics/slick-selfcheck.mjs": "2026-09-13T23:51:07.340Z",
+  "world/buildingTopple-selfcheck.mjs": "2026-09-14T03:33:37.486Z"
  },
  "finished": {
   "tools/ship/placementRender-selfcheck.mjs": true,
@@ -6452,7 +6455,8 @@
   "brain/gunnerPolicy-selfcheck.mjs": true,
   "tools/ship/raceTurret-selfcheck.mjs": true,
   "tools/ship/carViews-selfcheck.mjs": true,
-  "physics/slick-selfcheck.mjs": true
+  "physics/slick-selfcheck.mjs": true,
+  "world/buildingTopple-selfcheck.mjs": true
  },
  "crossings": {
   "tools/ship/engineSceneBot-selfcheck.mjs": 2,
@@ -6463,7 +6467,8 @@
   "tools/ship/reportDoors-selfcheck.mjs": 2,
   "brain/gunnerPolicy-selfcheck.mjs": 1,
   "tools/ship/raceTurret-selfcheck.mjs": 1,
-  "tools/ship/carViews-selfcheck.mjs": 1
+  "tools/ship/carViews-selfcheck.mjs": 1,
+  "world/buildingTopple-selfcheck.mjs": 1
  },
  "serial": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 2404,
@@ -7744,7 +7749,8 @@
   "brain/gunnerPolicy-selfcheck.mjs": 6966,
   "tools/ship/raceTurret-selfcheck.mjs": 11262,
   "tools/ship/carViews-selfcheck.mjs": 15670,
-  "physics/slick-selfcheck.mjs": 116
+  "physics/slick-selfcheck.mjs": 116,
+  "world/buildingTopple-selfcheck.mjs": 18897
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-10T01:23:58.721Z",
@@ -9025,6 +9031,7 @@
   "brain/gunnerPolicy-selfcheck.mjs": "2026-09-13T22:45:14.323Z",
   "tools/ship/raceTurret-selfcheck.mjs": "2026-09-13T22:45:14.323Z",
   "tools/ship/carViews-selfcheck.mjs": "2026-09-13T23:13:46.542Z",
-  "physics/slick-selfcheck.mjs": "2026-09-13T23:50:52.146Z"
+  "physics/slick-selfcheck.mjs": "2026-09-13T23:50:52.146Z",
+  "world/buildingTopple-selfcheck.mjs": "2026-09-14T03:33:22.304Z"
  }
 }

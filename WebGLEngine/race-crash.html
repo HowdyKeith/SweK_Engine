@@ -23,9 +23,9 @@
 <div id="hud">
   <div id="cap">Race crash on the GPU: the car against the city's buildings, the rebar in the cut</div>
   <div id="be">requesting a device&hellip;</div>
-  <div id="sub">seed <input id="seed" type="number" value="1" min="1"> &middot; <button id="reset">Reset</button> &middot; <button id="ram">Ram the nearest standing building</button> &middot; <button id="lap">Back to the lap</button>
+  <div id="sub">seed <input id="seed" type="number" value="1" min="1"> &middot; <button id="reset">Reset</button> &middot; <button id="ram">Ram the nearest standing building</button> <button id="demolish" title="charge the nearest standing building to zero hit points from the car's side, and watch it fall">Demolish nearest</button> &middot; <button id="lap">Back to the lap</button>
     &middot; <label><input type="checkbox" id="follow" checked> camera follows the car</label> &middot; <a href="?webgl=1">force WebGL2</a><br>
-    <span id="tick">loading box3d&hellip;</span><br><span id="city"></span><br><span id="car"></span> &middot; drag to orbit, wheel to dolly</div>
+    <span id="tick">loading box3d&hellip;</span><br><span id="city"></span><br><span id="topple">buildings that fall (v4591, task 80): none yet</span><br><span id="car"></span> &middot; drag to orbit, wheel to dolly</div>
 </div>
 <canvas id="c"></canvas>
 <script type="module" src="/ui/originNotice.js"></script>
@@ -34,6 +34,7 @@ import { requestDevice } from "./gfx/device.js";
 import * as G from "./render/gpuDriven.mjs";
 import * as L from "./render/litSphere.mjs";
 import * as D from "./world/crashDamage.mjs";
+import * as BT from "./world/buildingTopple.mjs";
 import { generateTrack, describeTrack, checkpoints } from "./world/raceTrack.mjs";
 import { trackSurface, createCar, carPose, pursuitDriver, lapTracker, CAR } from "./physics/raceCar.mjs";
 import { CityGen } from "./world/CityGen.js";
@@ -55,6 +56,15 @@ function nearestStanding(pose) {
 }
 function ramMode() { const pose = carPose(g.phys, car), i = nearestStanding(pose); if (i < 0) return; const r = g.rects[i]; driver = D.ramDriver([r.x + r.w / 2, 0, r.z + r.d / 2]); mode = "ram " + i; }
 function lapMode() { driver = pursuit; mode = "lap"; }
+// v4591 (task 80): the demolition charge -- the nearest standing building charged to zero hit points from the car's side, so the
+// fall can be watched without a dozen rams (CityGen's crumble passes run first, then the topple raises the body)
+function demolish() {
+  const pose = carPose(g.phys, car), i = nearestStanding(pose); if (i < 0) return null;
+  const r = g.rects[i], b = g.city.buildingAt(r.x + 0.5, r.z + 0.5), dir = { x: r.x + r.w / 2 - pose.pos[0], z: r.z + r.d / 2 - pose.pos[2] };
+  const res = g.city.damageAt(r.x + 0.5, r.z + 0.5, b.hp, dir);
+  if (g.colliders && g.colliders[i] != null && !g.parked.has(i)) { g.phys.setTransform(g.colliders[i], D.CRASH.park.slice()); g.parked.add(i); }
+  return res;
+}
 
 function rebuild() {
   if (!physMod) return;
@@ -63,13 +73,16 @@ function rebuild() {
   if (g && g.phys) g.phys.destroy();
   g = D.crashWorld(track, CityGen); D.buildingColliders(g, worldFromModule(physMod, [0, -9.81, 0]));
   surface = trackSurface(track); pursuit = pursuitDriver(surface); tracker = lapTracker(surface); debris = new VoxelDebrisSystem();
+  // v4591 (task 80): a building at zero hit points falls over as a box3d body on what is left of its ground floor, then shatters
+  BT.toppleWorld(g, { debris });
   const cp = checkpoints(track)[0]; car = createCar(g.phys, { x: cp.x + 5, z: cp.z, yaw: Math.PI / 2 });
   hash = 0x811c9dc5; steps = 0; acc = 0; removed = 0; rebar = 0;
   if (sc && sc.scene.destroy) sc.scene.destroy();
-  sc = D.crashScene(device, g.state, debris, G, L); sc.setCar(carPose(g.phys, car));
+  sc = D.crashScene(device, g.state, debris, G, L, { extras: BT.sceneExtras(g.topple, G, L) }); sc.setCar(carPose(g.phys, car)); BT.bindScene(g.topple, sc, sc.extrasBase);
   lapMode();
   $("tick").textContent = `${describeTrack(track)}; ${g.rects.length} buildings as static boxes; built in ${(performance.now() - t0).toFixed(0)} ms on ${sc.scene.path}`;
-  if (new URLSearchParams(location.search).get("ram") === "1") ramMode();
+  const qs = new URLSearchParams(location.search); if (qs.get("ram") === "1") ramMode();
+  if (qs.get("demolish") === "1") demolish();
 }
 
 async function main() {
@@ -81,7 +94,7 @@ async function main() {
   catch (e) { return fail("loading threw: " + e.message); }
   rebuild();
   $("seed").addEventListener("change", rebuild); $("reset").addEventListener("click", rebuild);
-  $("ram").addEventListener("click", ramMode); $("lap").addEventListener("click", lapMode);
+  $("ram").addEventListener("click", ramMode); $("lap").addEventListener("click", lapMode); $("demolish").addEventListener("click", () => { demolish(); });
   cvs.addEventListener("pointerdown", (e) => { dragging = [e.clientX, e.clientY]; });
   addEventListener("pointerup", () => { dragging = null; });
   addEventListener("pointermove", (e) => { if (!dragging) return; yaw += (e.clientX - dragging[0]) * 0.006; pitch = Math.max(0.05, Math.min(1.5, pitch + (e.clientY - dragging[1]) * 0.006)); dragging = [e.clientX, e.clientY]; });
@@ -99,11 +112,13 @@ function frame(t) {
     const pose = carPose(g.phys, car), r = D.crashStep(g, car, surface, driver(pose), { debris }); hash = fold(hash, g.phys.stateHash()); steps++; acc -= CAR.dt; n++;
     if (r.impact) { removed += r.impact.removed; rebar += r.impact.rebar; if (mode !== "lap") { const nx = nearestStanding(r.pose); if (nx >= 0) { const q = g.rects[nx]; driver = D.ramDriver([q.x + q.w / 2, 0, q.z + q.d / 2]); mode = "ram " + nx; } } }
     if (mode === "lap") tracker.update(r.pose);
+    BT.stepTopple(g.topple, steps);
     debris.update(CAR.dt);
   }
   const pose = carPose(g.phys, car); sc.setCar(pose);
   let standing = 0, damaged = 0, toppled = 0; for (const b of g.city.buildings) { if (b.state === "toppled") toppled++; else if (b.hp < b.maxHp) damaged++; else standing++; }
   $("city").textContent = `the city: ${g.rects.length} buildings, ${standing} standing whole, ${damaged} damaged, ${toppled} toppled; ${removed} voxels removed, ${rebar} rebar voxels revealed, ${debris.particles.length} debris live; impacts ${g.impacts.length}${g.impacts.length ? ` (last: ${g.impacts[g.impacts.length - 1].dv.toFixed(1)} m/s lost, ${g.impacts[g.impacts.length - 1].removed} voxels, hp ${g.impacts[g.impacts.length - 1].hp} of ${g.impacts[g.impacts.length - 1].maxHp}${g.impacts[g.impacts.length - 1].toppled ? ", TOPPLED" : ""})` : ""}`;
+  { const t = g.topple, sc2 = BT.standingCount(t), fell = t.events.filter((e) => e.kind === "topple" || e.kind === "drop").length; $("topple").textContent = fell || t.crumbs ? `buildings that fall (v4591, task 80): ${fell} became box3d bodies on what was left of their ground floor (${sc2.standing} stand on it, ${sc2.fallen} lie fallen, ${sc2.dropped} dropped with nothing under them); ${t.shattered} shattered into ${t.rubble} rubble voxels and ${t.burst} debris bursts; ${t.crumbs} were crumbs` : "buildings that fall (v4591, task 80): none yet -- ram one to zero hit points"; }
   $("car").textContent = `the car (${mode}): speed ${Math.max(0, pose.speed).toFixed(1)} m/s, checkpoints ${tracker.hit}, laps ${tracker.laps}, ${steps} steps, fingerprint ${(hash >>> 0).toString(16).padStart(8, "0")}`;
   if ($("follow").checked) centre = [pose.pos[0], 1, pose.pos[2]];
   const eye = [centre[0] + dist * Math.sin(yaw) * Math.cos(pitch), centre[1] + dist * Math.sin(pitch), centre[2] + dist * Math.cos(yaw) * Math.cos(pitch)];

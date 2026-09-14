@@ -1847,6 +1847,43 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         contract widened to { yaw, pitch, fire, drop, ignite }; the windows' gate re-pinned (43 bars). Unchecked: the slick
         has no lab knob of its own yet (its patch size and burn time are spec constants), and the fire cells are drawn
         without light of their own. Census: 1635 -> 1636 gates; since236.
+     Then (v4591) BUILDINGS THAT FALL (task 80). Keith asked whether the buildings, which have rebar and take damage, could box3d
+        fall over or turn into debris. Until this round a building at zero hit points vanished: CityGen's _topple rotated its
+        voxel coordinates by arithmetic and stamped a sparsened rubble log in one tick, and crashDamage parked its static box.
+        world/buildingTopple.mjs: A BUILDING STANDS WHILE ITS CENTRE OF MASS IS OVER WHAT IS LEFT OF ITS GROUND FLOOR. When
+        CityGen calls for the topple (hit points at zero; crashDamage charges the rest once the car has taken the ground floor
+        under CRASH.support), the module takes the standing block above the ground floor -- physics/voxel/fracture.js's largest
+        component anchored to the ground floor; a piece cut loose, or a smaller anchored tower, bursts as debris -- and makes it
+        ONE dynamic box3d body, a box of the block's extents with the block's voxel mass (600 kg a voxel), resting on the ground
+        floor's remaining voxels, which become static stubs (rebar and all: the hinge), over a static slab at the road. No
+        impulse is invented: gravity and box3d's contact solver decide. Measured headless: a 4 x 10 x 4 block on a far-quarter
+        stub lies flat within 3.7 s (up.y 0.00, its centre 5.5 m past the face it fell toward, at the height of its half width)
+        and shatters; over a middle stub it stands (up.y 1.000, unmoved) and STAYS a body until something pushes it; with no
+        ground floor left it drops onto the slab and pancakes where it stands; two fresh worlds give one state hash. The
+        prediction is the support polygon -- the convex hull of the stub rectangles (two opposite corner stubs hold a block
+        whose centre is over neither) -- and over seed 1's 34 buildings with a lane, rammed at 25 m/s and left 6 s, the outcome
+        follows it on every one: 3 predicted to stand stood untouched, 12 predicted to fall left their stubs (fell and
+        shattered, or landed leaning on the road), 15 with no ground floor dropped, 4 were crumbs (under 8 voxels above the
+        ground floor: rubble where they stood, no body). The shatter: when a fallen or dropped block comes to rest (or after
+        12 s) its voxels go through the body's final pose -- rotateQ, the quaternion the record is drawn with -- into world
+        cells as RUBBLE, one voxel in three bursts through voxelDebrisSystem, the body is parked, the slots re-mesh; a block
+        that fell toward -x leaves its rubble beyond that face, from the road up, none over the stub column, none higher than
+        it is wide. Drawn: the block is meshed once (the greedy mesher makes a uniform 4 x 9 x 4 block six quads) into a fleet
+        reserved per slot in the crash scene (crashScene's new `extras`, three fleets of 12000 vertices in the bodies' quat
+        mode) and the body's transform is its record each frame, so the windows fall with the wall; race-crash.html installs
+        the topple, shows a HUD line (how many became bodies, stand, lie fallen, dropped, shattered, crumbs) and has a
+        Demolish button (?demolish=1 on load) that charges the nearest standing building to zero from the car's side so the
+        fall can be watched without a dozen rams. Corrected on the way: the first probe shattered a STANDING block after a
+        second because the rest rule did not ask whether it had fallen (only a fallen or dropped block shatters now); the
+        bare-rect path never parked the building's static box, so the block was pushed 4 m out of the box it overlapped and
+        dropped upright (a real bug the gate's first run found: 14 red); bindScene took the crash scene's result for the
+        gpuDriven scene, a silent no-op headless and a TypeError in the page that aborted rebuild() -- the page's HUD read
+        "none yet" for 60 s -- it takes either now. Seven sabotages, six red by name; F (the smallest anchored component) went
+        0 red because every case had one tower, so a split-tower row holds it. Gate world/buildingTopple-selfcheck.mjs beside
+        its module (18 s). Unchecked: the body is the block's bounding box with the block's voxel mass, so its centre stands
+        in for fracture.js's exact centre of mass (reported beside it: the stub voxels pull it 0.04 m); a block leaning on
+        the road or on a neighbour is left leaning; no cascade damage to neighbours from the fall; the page on WebGPU (the
+        presented device is lost on this harness). Census: 1636 -> 1637 gates; since237.
 ## The count that says when step 4 matters
 
 tools/ship/shaderCensus-selfcheck.mjs has held, since v3274, that a hand-written pair is cheaper than an

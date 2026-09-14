@@ -204,11 +204,15 @@ export const HOT_UNREGISTERED = Object.freeze([
  * v4523 (Racing city 0): 85 -> 86. The arrival is world/kenneyKit.mjs, whose kitMesh() restates the same [1, 1, 1, 1] beside
  * the colours it bakes from Kenney's colormap (every colour it draws is the kit's own texel, read at load time, not a literal);
  * the kit draws through litSphere's lit pipeline in quat mode, nothing additively; the overlap stays 0.
+ * v4591 (Racing city 11, task 80): 86 -> 87. The arrival is world/buildingTopple.mjs, whose reservedMesh() restates the same
+ * [1, 1, 1, 1] (gpuDriven's default) on the empty mesh a falling block's fleet is reserved with; the block's own colours are
+ * the mesher's, unpacked per vertex, and it draws through the bodies' lit pipeline in quat mode, nothing additively; the
+ * overlap stays 0.
  */
 export const MEASURED_AT_V4424 = Object.freeze({
     namedRamps: 5,
     drawSiteFiles: 13,
-    literalColourFiles: 86,
+    literalColourFiles: 87,
     overlapDrawAndLiteral: 0,
     hotUnregistered: 24,   // v4505: ascii-shape.html arrived (see HOT_UNREGISTERED)   // v4500: slug-fire.html arrived; v4501: slug-morph.html's melt mode; v4502: slug-ticker.html's napalm mode (see HOT_UNREGISTERED)
     // The three Keith named, and what the old detector saw of them.

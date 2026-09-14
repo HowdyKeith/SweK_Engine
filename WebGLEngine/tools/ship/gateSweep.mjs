@@ -4870,6 +4870,23 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "sabotages, all red by name, including a normal taken from a central difference of the samples " +
                  "instead of the bilinear patch the height comes from.",
     }),
+    since237: Object.freeze({
+        at: "v4591", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "world/buildingTopple-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 18 s: pure rows, box3d headless, seed 1's city rammed building by building, and race-crash.html in its own " +
+                 "browser. BUILDINGS THAT FALL (task 80): world/buildingTopple.mjs. A building stands while its centre of mass is over " +
+                 "what is left of its ground floor: at the topple the block above the ground floor (fracture.js's largest anchored " +
+                 "component) is ONE dynamic box3d body on the remaining ground-floor voxels as static stubs over a slab at the road, and " +
+                 "gravity decides -- no impulse is invented. A 4 x 10 x 4 block on a far-quarter stub lies flat in 3.7 s and shatters into " +
+                 "rubble through its final pose; over a middle stub it stands and stays a body; with no ground floor it drops and " +
+                 "pancakes; over seed 1's 34 buildings with a lane the outcome after 6 s follows the support-polygon prediction on every " +
+                 "one. Seven sabotages A..G; F (the smallest anchored component) went 0 red because every case had one tower, so a " +
+                 "split-tower row was added and holds it. The page rams on load with a demolition charge and names the body.",
+    }),
     since236: Object.freeze({
         at: "v4590", swept: 1, green: 1, red: 0,
         added: Object.freeze([

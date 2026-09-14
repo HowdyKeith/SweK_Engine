@@ -20,6 +20,9 @@
 //                                         vertical rod runs down the face. Oriented and placed, as the module's header promised.
 //   collapse                              CityGen's topple at zero hit points erases the footprint and stamps rubble; this module then
 //                                         PARKS the building's static box (setTransform to CRASH.park) so the car drives the rubble.
+//                                         v4591 (task 80): with world/buildingTopple.mjs installed on the world (toppleWorld), the
+//                                         topple raises the block above the ground floor as a box3d body on its remaining ground
+//                                         floor instead, and the rubble is stamped through the body's final pose when it has fallen.
 //   crashScene(device, state, debris, G, L)   the world's slots, the car in quat mode, the debris with its colour in the extras --
 //                                         voxelDamage's damageScene with the car in the bodies' place.
 //
@@ -230,20 +233,22 @@ export function worldSphere(world) {
  * (remeshChunks, through state.vbuf), so state.vbuf is a proxy that rescales positions on their way to the device. The other
  * scenes keep the origin record; they are named in the roadmap, not touched here.
  */
-export function crashScene(device, state, debris, G, L, { light = SUN, cap = DAMAGE.debrisCap, colour = CAR_COLOURS[0] } = {}) {
-    const count = 2 + cap, fleetOf = new Uint32Array(count); fleetOf[1] = 1; for (let i = 2; i < count; i++) fleetOf[i] = 2;
+export function crashScene(device, state, debris, G, L, { light = SUN, cap = DAMAGE.debrisCap, colour = CAR_COLOURS[0], extras = null } = {}) {   // extras: v4591
+    // v4591 (task 80): `extras` = { count, fleets, fill(rec, ext, at) } -- world/buildingTopple.mjs's reserved block fleets ride behind the debris, one record each
+    const xn = extras ? extras.count : 0, count = 2 + cap + xn, fleetOf = new Uint32Array(count); fleetOf[1] = 1; for (let i = 2; i < 2 + cap; i++) fleetOf[i] = 2; for (let k = 0; k < xn; k++) fleetOf[2 + cap + k] = 3 + k;
     const { centre, radius } = worldSphere(state.world), FLOATS = 10;   // voxelDeviceEdit's p3 + colour4 + n3
     const unit = (positions) => { const out = Float32Array.from(positions); for (let i = 0; i < out.length; i += 3) { out[i] = (out[i] - centre[0]) / radius; out[i + 1] = (out[i + 1] - centre[1]) / radius; out[i + 2] = (out[i + 2] - centre[2]) / radius; } return out; };
     const worldMesh = { ...state.mesh, positions: unit(state.mesh.positions) };
     const rec = new Float32Array(count * 4), ext = new Float32Array(count * 4); rec.set([centre[0], centre[1], centre[2], radius], 0);
     const carRec = new Float32Array([0, -500, 0, 1]), carExt = new Float32Array([0, 0, 0, 1]);
-    const fill = () => { rec.set(carRec, 4); ext.set(carExt, 4); const d = debrisRecords(debris, cap); rec.set(d.records, 8); ext.set(d.extras, 8); };
+    const fill = () => { rec.set(carRec, 4); ext.set(carExt, 4); const d = debrisRecords(debris, cap); rec.set(d.records, 8); ext.set(d.extras, 8); if (extras) extras.fill(rec, ext, 2 + cap); };
     fill(); const buffer = device.backend === "webgpu" ? device.buffer({ data: rec, usage: "storage" }) : null;   // v4520: a moving source brings a buffer
     const records = { count, cpu: () => { fill(); return rec; }, ...(buffer ? { buffer } : {}) }, headings = { cpu: () => { fill(); if (buffer) buffer.write(rec); return ext; } };
     const fleets = [
         { name: "world", lods: [{ name: "only", mesh: worldMesh }], layout: G.LAYOUTS.lit, pipeline: litPipelineDesc({ cull: "none" }), bind: litBind(light) },
         { name: "car", lods: [{ name: "only", mesh: carMesh(colour) }], layout: G.LAYOUTS.lit, pipeline: bodyLitPipelineDesc(), bind: litBind(light) },
         { name: "debris", lods: [{ name: "only", mesh: boxMesh([1, 1, 1, 1]) }], layout: G.LAYOUTS.lit, pipeline: debrisLitPipelineDesc(), bind: litBind(light) },
+        ...(extras ? extras.fleets : []),
     ];
     const sc = G.makeGpuDrivenScene(device, { fleets, fleetOf, thresholds: [], records, headings });
     const vbuf = sc.fleets[0].vbuf;
@@ -251,7 +256,7 @@ export function crashScene(device, state, debris, G, L, { light = SUN, cap = DAM
     state.vbuf = { write(data, byteOffset = 0) { const out = Float32Array.from(data); for (let i = 0; i < out.length; i += FLOATS) { out[i] = (out[i] - centre[0]) / radius; out[i + 1] = (out[i + 1] - centre[1]) / radius; out[i + 2] = (out[i + 2] - centre[2]) / radius; } vbuf.write(out, byteOffset); } };
     state.scene = sc;
     const setCar = (pose) => { carRec.set([pose.pos[0], pose.pos[1], pose.pos[2], 1]); carExt.set(pose.quat); };
-    return { scene: sc, setCar, count, centre, radius };
+    return { scene: sc, setCar, count, centre, radius, extrasBase: 3 };
 }
 
 export { trackSurface };
@@ -259,6 +264,6 @@ export { trackSurface };
 export function reportLines() {
     return [
         `crashDamage: a car that loses ${CRASH.speedLoss} m/s in one step against a building blasts it through voxelDamage (radius ${CRASH.minRadius} + ${CRASH.radiusPer}/m/s, at most ${CRASH.maxRadius}), CityGen charges the hit points, the debris bursts`,
-        `the cut reveals rebar.mjs's cage at voxel scale (rods every ${CRASH.cage.pitch} voxels along x and y) as palette id ${REBAR_ID}; at zero hit points CityGen topples the building and its static box is parked`,
+        `the cut reveals rebar.mjs's cage at voxel scale (rods every ${CRASH.cage.pitch} voxels along x and y) as palette id ${REBAR_ID}; at zero hit points CityGen topples the building and its static box is parked -- or, with world/buildingTopple.mjs installed (v4591), the block above the ground floor falls as a box3d body first`,
     ];
 }
