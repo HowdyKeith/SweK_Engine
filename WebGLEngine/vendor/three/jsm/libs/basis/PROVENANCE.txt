@@ -1,12 +1,13 @@
 basis_transcoder.js + basis_transcoder.wasm -- vendored
-https://github.com/mrdoob/three.js  (examples/jsm/libs/basis/, tag r160)
+https://github.com/mrdoob/three.js  (examples/jsm/libs/basis/, npm tarball three@0.185.1)
 
-Recorded at v4475.
+Recorded at v4475. RE-VENDORED alongside the rest of vendor/three, see ../../../PROVENANCE.txt for
+the r160 -> 0.185.1 re-vendor record and why.
 
 *** NOT ONE OF THESE FILES CARRIES A LICENCE HEADER, AND THE DIRECTORY HAS NO LICENSE FILE. ***
-Checked directly: basis_transcoder.js (62,337 bytes) and basis_transcoder.wasm (499,935 bytes)
-contain no "copyright", no "Apache", no SPDX tag, in any part of the file. Upstream has no
-examples/jsm/libs/basis/LICENSE either -- fetched, 404.
+Re-checked directly at 0.185.1: basis_transcoder.js (57,529 bytes) and basis_transcoder.wasm
+(527,333 bytes) contain no "copyright", no "Apache", no SPDX tag, in any part of the file. Upstream
+still has no examples/jsm/libs/basis/LICENSE either -- same absence as at r160, not a new gap.
 
 WHERE THE ATTRIBUTION ACTUALLY IS: README.md, vendored here beside them, which names
 https://github.com/BinomialLLC/basis_universal as the source of the transcoder. That repository's
@@ -29,7 +30,8 @@ SIBLINGS THIS LOADER NEEDS, vendored at the same time and also carrying no in-fi
   vendor/three/jsm/utils/WorkerPool.js       -- three.js, MIT (see ../../../LICENSE)
 Both McCurdy licences were fetched and read first-hand at v4475.
 
-EVERY FILE IS BYTE-IDENTICAL TO UPSTREAM r160. Nothing was rewritten -- KTX2Loader.js keeps its
-bare `from 'three'` specifier and its relative '../utils/' and '../libs/' imports, which is why the
-directory layout mirrors upstream exactly and why the pages that use it need the import map they
-already carry for GLTFLoader.
+EVERY FILE IS BYTE-IDENTICAL TO UPSTREAM 0.185.1 (re-confirmed at the re-vendor: file sizes above,
+re-fetched from the same npm tarball as the rest of this directory). Nothing was rewritten --
+KTX2Loader.js keeps its bare `from 'three'` specifier and its relative '../utils/' and '../libs/'
+imports, which is why the directory layout mirrors upstream exactly and why the pages that use it
+need the import map they already carry for GLTFLoader.

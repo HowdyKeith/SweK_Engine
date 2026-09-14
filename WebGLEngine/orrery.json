@@ -1470,51 +1470,51 @@
    "name": "three",
    "arrived": "2026-08-19",
    "sha": "66db97c45b5286d98d1c018506effca552f05a23",
-   "bytes": 2396670,
+   "bytes": 3344827,
    "files": [
     {
      "path": "jsm/controls/OrbitControls.js",
-     "bytes": 29868
+     "bytes": 40504
     },
     {
      "path": "jsm/curves/NURBSCurve.js",
-     "bytes": 1878
+     "bytes": 3888
     },
     {
      "path": "jsm/curves/NURBSUtils.js",
-     "bytes": 7861
+     "bytes": 10802
     },
     {
      "path": "jsm/exporters/GLTFExporter.js",
-     "bytes": 77714
+     "bytes": 92973
     },
     {
      "path": "jsm/libs/basis/basis_transcoder.js",
-     "bytes": 62337
+     "bytes": 57529
     },
     {
      "path": "jsm/libs/basis/basis_transcoder.wasm",
-     "bytes": 499935
+     "bytes": 527333
     },
     {
      "path": "jsm/libs/basis/PROVENANCE.txt",
-     "bytes": 2250
+     "bytes": 2560
     },
     {
      "path": "jsm/libs/basis/README.md",
-     "bytes": 1448
+     "bytes": 1388
     },
     {
      "path": "jsm/libs/fflate.module.js",
-     "bytes": 83291
+     "bytes": 89384
     },
     {
      "path": "jsm/libs/ktx-parse.module.js",
-     "bytes": 18676
+     "bytes": 19932
     },
     {
      "path": "jsm/libs/meshopt_decoder.module.js",
-     "bytes": 24850
+     "bytes": 29256
     },
     {
      "path": "jsm/libs/meshoptGltf.js",
@@ -1526,27 +1526,31 @@
     },
     {
      "path": "jsm/loaders/FBXLoader.js",
-     "bytes": 101466
+     "bytes": 111266
     },
     {
      "path": "jsm/loaders/GLTFLoader.js",
-     "bytes": 108522
+     "bytes": 114959
     },
     {
      "path": "jsm/loaders/KTX2Loader.js",
-     "bytes": 22589
+     "bytes": 36567
+    },
+    {
+     "path": "jsm/math/ColorSpaces.js",
+     "bytes": 4290
     },
     {
      "path": "jsm/utils/BufferGeometryUtils.js",
-     "bytes": 31906
+     "bytes": 37621
     },
     {
-     "path": "jsm/utils/TextureUtils.js",
-     "bytes": 2367
+     "path": "jsm/utils/SkeletonUtils.js",
+     "bytes": 11535
     },
     {
      "path": "jsm/utils/WorkerPool.js",
-     "bytes": 1712
+     "bytes": 3110
     },
     {
      "path": "LICENSE",
@@ -1554,11 +1558,15 @@
     },
     {
      "path": "PROVENANCE.txt",
-     "bytes": 3001
+     "bytes": 14694
+    },
+    {
+     "path": "three.core.js",
+     "bytes": 1443056
     },
     {
      "path": "three.module.js",
-     "bytes": 1272972
+     "bytes": 650153
     }
    ]
   },
