@@ -1221,6 +1221,8 @@ window.addEventListener("load", function () {
         <button class="gtab" data-tab="rigonly"><span class="gtabTog">&#9656;</span><span>&#128296; Only at the rig</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="rendertsl"><span class="gtabTog">&#9656;</span><span>&#128302; Render TSL</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="slugtext"><span class="gtabTog">&#9656;</span><span>&#9999;&#65039; Slug Text</span><span class="gtabState"></span></button>
+        <button class="gtab" data-tab="avatars"><span class="gtabTog">&#9656;</span><span>&#128100; Avatars</span><span class="gtabState"></span></button>
+        <button class="gtab" data-tab="toroidal"><span class="gtabTog">&#9656;</span><span>&#127760; Toroidal Buffers</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="box3d"><span class="gtabTog">&#9656;</span><span>&#127922; Box3D</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="blobs"><span class="gtabTog">&#9656;</span><span>&#129514; Blobs</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="face"><span class="gtabTog">&#9656;</span><span>&#128100; Face &amp; Population</span><span class="gtabState"></span></button>
@@ -1801,6 +1803,16 @@ window.addEventListener("load", function () {
           <div class="gpanelHdr">&#9999;&#65039; Slug Text</div>
           <div style="font-size:11px;color:var(--dim);margin:6px 0;">The Slug GPU text rasteriser: curves, morphs, rigging, projective text and a device-pipeline transplant, all built on text/slugFont.js. Pages in this drawer are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
           <div data-panel-pages="slugtext" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
+        </div>
+        <div class="gpanel" data-panel="avatars" hidden>
+          <div class="gpanelHdr">&#128100; Avatars</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Character rendering: the ASCII cluster (tools/render-qa/asciify.mjs) and the Krbn/Heerich rig family (tools/krbn/glbMesh.js). Pages in this drawer are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
+          <div data-panel-pages="avatars" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
+        </div>
+        <div class="gpanel" data-panel="toroidal" hidden>
+          <div class="gpanelHdr">&#127760; Toroidal Buffers</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">A wraparound buffer (toroidal-wave.html), what accumulates on it (wear-field.html), and what it remembers (fog-of-war.html) -- one sequential family, built the same way. Pages in this drawer are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
+          <div data-panel-pages="toroidal" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
         <div class="gpanel" data-panel="box3d" hidden>
           <div class="gpanelHdr">&#127922; Box3D</div>

@@ -96,6 +96,9 @@ export const SECTIONS = [
       // fresnel/diffraction/tomography pages are wave and imaging optics -- a page called "lensing" filed by its
       // name would have landed in exactly the wrong drawer. Lane-Emden POLYTROPES are stellar structure, the
       // same arc as kepler and pulsar.
+      // v4590 -- cosmic-web.html fits this drawer by subject (Zel'dovich large-scale structure, the same arc as
+      // cosmic-map/warp-map) but is NOT filed here -- see UNPLACED: it already carries a live "Blast Wax"
+      // convenience anchor elsewhere on the page, and claiming it here too would give it two anchors.
       pages: ["lensing.html", "stellar.html",
               "kerr.html", "geodesic.html", "cosmic-map.html", "warp-map.html", "pulsar.html",
               "kepler.html", "meijer-g.html", "elliptic.html", "rmt.html", "landau-zener.html", "hmc.html"] },
@@ -344,7 +347,9 @@ export const SECTIONS = [
     // sweeping it in because it is the third of an old trio would be the subject filing this file warns about.
     { id: "rendertsl", tab: "rendertsl", label: "Render TSL",
       note: "three's node language as a SOURCE for gfx/device.js -- the graphs, the pages that draw them, and the two that owe the rig a number",
-      pages: ["tsl-probe.html", "tsl-rig.html", "orrery-gpu.html", "gpu-rig-check.html"] },
+      // v4590 -- ai-presence-orb.html JOINS, from registerResidue's second (judgement) pass: a TSL shader port
+      // (three.tsl.js) is exactly this drawer's own subject, not a stretch reading.
+      pages: ["tsl-probe.html", "tsl-rig.html", "orrery-gpu.html", "gpu-rig-check.html", "ai-presence-orb.html"] },
     { id: "renders", tab: "renders", label: "Renders", note: "the TECHNIQUE: passes, effects, and how a frame is made",
       pages: ["path-tracer.html", "pom-demo.html", "sphere-impostor.html", "krbn.html", "amplified-diff.html",
               "backend-dom.html",
@@ -384,6 +389,9 @@ export const SECTIONS = [
               "ios-tools.html"] },
 
     { id: "blobs", tab: "blobs", label: "Blobs", note: "the authoring surface and the aquarium",
+      // v4590 -- blob-shock.html ("metaballs hit by a shockwave") fits this drawer by subject but is NOT filed
+      // here -- see UNPLACED: it already carries a live "Tomograph" convenience anchor elsewhere on the page,
+      // and claiming it here too would give it two anchors.
       pages: ["blob-studio.html", "blobarium.html", "blobulator.html"] },
 
     { id: "face", tab: "face", label: "Face & Population", note: "landmarks, the mirror, the GPU population field",
@@ -581,7 +589,10 @@ export const SECTIONS = [
     // git terrain, the destructible buildings). Filed the round the Arriving row crossed pageReach's 15 % cap (70 links of 465 pages):
     // three racing anchors had gone into Arriving one per round, which is the pile that row exists to prevent.
     { id: "racing", tab: "racing", label: "Racing City", note: "Kenney's kits, the grid track, the car on box3d, and the brains that will drive it",
-      pages: ["kenney-kit.html", "race-track.html", "race-car.html", "race-brain.html", "race-replay.html", "race-terrain.html", "race-crash.html"] },
+      // v4590 -- building-lab.html JOINS, from registerResidue's second (judgement) pass: a seeded building
+      // grammar is exactly "the destructible buildings" this drawer's own note already names as a coming round.
+      pages: ["kenney-kit.html", "race-track.html", "race-car.html", "race-brain.html", "race-replay.html", "race-terrain.html", "race-crash.html",
+              "building-lab.html"] },
 
     // v4590 -- NEW DRAWER, FROM registerResidue's RESIDUE SWEEP. Eight pages -- slug-curved, slug-device,
     // slug-fire, slug-morph, slug-projective, slug-rig, slug-text, slug-ticker -- share ONE machinery
@@ -592,6 +603,21 @@ export const SECTIONS = [
     { id: "slugtext", tab: "slugtext", label: "Slug Text", note: "the Slug GPU text rasteriser -- curves, morphs, rigging, projective and device transplant",
       pages: ["slug-text.html", "slug-device.html", "slug-curved.html", "slug-projective.html",
               "slug-morph.html", "slug-rig.html", "slug-fire.html", "slug-ticker.html"] },
+
+    // v4590 -- NEW DRAWER, FROM registerResidue's SECOND (JUDGEMENT) PASS, Keith's explicit yes. Six pages --
+    // ascii-avatar, ascii-object, ascii-shape, krbn-avatar, krbn-rigged, heerich-avatar -- share real machinery
+    // (tools/krbn/glbMesh.js, tools/render-qa/asciify.mjs) and had no drawer, the same shape as Slug Text
+    // (a family with zero prior home) rather than a drift out of an existing one.
+    { id: "avatars", tab: "avatars", label: "Avatars", note: "character rendering: the ASCII cluster and the Krbn/Heerich rig family",
+      pages: ["ascii-avatar.html", "ascii-object.html", "ascii-shape.html",
+              "krbn-avatar.html", "krbn-rigged.html", "heerich-avatar.html"] },
+
+    // v4590 -- NEW DRAWER, FROM registerResidue's SECOND (JUDGEMENT) PASS, Keith's explicit yes. Three pages --
+    // toroidal-wave, wear-field, fog-of-war -- are a literal sequential family (v3837 a wraparound-buffer wave
+    // sim, v3838 persistent accumulation over it, v3839 fog-of-war memory built the same way) with no drawer.
+    // Three pages is the same founding size as Blobs and PetFBI, both real panels today.
+    { id: "toroidal", tab: "toroidal", label: "Toroidal Buffers", note: "a wraparound buffer, what accumulates on it, and what it remembers",
+      pages: ["toroidal-wave.html", "wear-field.html", "fog-of-war.html"] },
 ];
 
 /** Keith's rule. A drawer of 25 is the flat row again with a lid on it. */
@@ -730,6 +756,19 @@ export const UNPLACED = new Map([
     ["android-peer.html", "box3d's Cross-Arch cluster is the right SUBJECT (peer grading across architectures), but its only anchor is the peer-picker TOOLBAR button (id=\"androidPeerBtn\"), above the Arriving header -- the mover can only move an anchor OUT OF Arriving (v3259's rule, the page-index.html toolbar trap), and there is none to take"],
     ["ios-peer.html", "same toolbar-only anchor as android-peer.html (id=\"iosPeerBtn\") -- no Arriving anchor exists for box3d to claim, though it is the right subject"],
     ["steamdeck-peer.html", "same toolbar-only anchor as its two peer siblings (id=\"steamdeckPeerBtn\") -- no Arriving anchor for box3d to claim"],
+    // v4590 -- registerResidue's SECOND (JUDGEMENT) PASS. Nine pages that fit a real drawer by subject but have
+    // no room in it this round, or fit no drawer at all -- reported rather than guessed at.
+    ["beam.html", "elasticity/buckling is matter-shaped (\"dynamics\") but PL: Matter & Chaos is at MAX_PER_PANEL (15 of 15) and, unlike cosmic-web.html, has no cleaner second subject home to try instead"],
+    ["euler-blast.html", "the same euler2d machinery PL: Fluids already holds several pipelines of, but that drawer reached MAX_PER_PANEL (15 of 15) this same round -- a capacity shortfall, not a taxonomy question"],
+    ["little-planet.html", "a stereographic render pass over procPlanet.js -- a clean Renders fit, but Renders reached MAX_PER_PANEL (15 of 15) this same round"],
+    ["render-review.html", "a render-batch review/publish tool -- no existing drawer is about curating and shipping what the engine already produced, and two pages is not yet a family (see youtube-export.html)"],
+    ["skillbook.html", "a deterministic-mock trial/critic/verdict harness -- re-examined on this second pass and still no clean subject fit: not GPU Brain (no policy, no /ai/ route), not PetFBI (no lost-pet workflow)"],
+    ["svg-forge.html", "an SVG-extrude-plus-holofoil shader technique -- a clean Renders fit, but Renders reached MAX_PER_PANEL (15 of 15) this same round"],
+    ["water-2d.html", "a parallax water shader technique -- a clean Renders fit, but Renders reached MAX_PER_PANEL (15 of 15) this same round"],
+    ["youtube-export.html", "a cross-subsystem showcase/export compositor -- no single drawer owns it, and paired with render-review.html it is still only two pages, not yet a family worth naming a drawer for"],
+    ["zoom-blur.html", "a post-fx render pass over procPlanet.js -- a clean Renders fit, but Renders reached MAX_PER_PANEL (15 of 15) this same round"],
+    ["cosmic-web.html", "fits PL: Cosmic & Relativity by subject (Zel'dovich large-scale structure), but already has a hand-written 'Blast Wax' convenience anchor elsewhere on the page -- the same two-anchor conflict pageSectionsReport-selfcheck.mjs caught for blob-selfie.html and backend-physics-check.html earlier this round"],
+    ["blob-shock.html", "fits Blobs by subject ('metaballs hit by a shockwave'), but already has a hand-written 'Tomograph' convenience anchor elsewhere on the page -- same two-anchor conflict as cosmic-web.html"],
     ["blob-selfie.html", "fits PL: Optics & Imaging by subject (tomography/reconstruction over the blobulator), but already has a hand-written convenience anchor inside the fluidgpu panel -- claiming it in optics too would give it two anchors, which pageSectionsReport-selfcheck.mjs measures and correctly refuses"],
     ["backend-physics-check.html", "fits Box3D & Cross-Arch by subject (the box3d-vs-Jolt adjudicator), but already has a hand-written 'GPU adjudicator' convenience anchor inside another panel -- same two-anchor conflict as blob-selfie.html"],
     ["bzflag.html", "fits Game Theory by subject (its own chip is already lifted into this panel's chip row via CHIP_GROUPS), but its Arriving anchor would be a SECOND anchor alongside the 'Drive it' link already inside its own bzflag gpanel -- pageSectionsReport-selfcheck.mjs measures this and refuses it"],

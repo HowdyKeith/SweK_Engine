@@ -42,7 +42,7 @@
    "f": "ai-presence-orb.html",
    "t": "- AI-presence orb (murmur-web port, \"still\" species)",
    "d": "",
-   "g": "",
+   "g": "rendertsl",
    "p": 0
   },
   {
@@ -126,21 +126,21 @@
    "f": "ascii-avatar.html",
    "t": "SweK &middot; ASCII Avatar",
    "d": "The loaded avatar GLB rendered live and sampled into a character ramp, real frame rate -- monochrome by default, with an in-panel toggle to color.",
-   "g": "",
+   "g": "avatars",
    "p": 0
   },
   {
    "f": "ascii-object.html",
    "t": "SweK &middot; ASCII Object",
    "d": "",
-   "g": "",
+   "g": "avatars",
    "p": 0
   },
   {
    "f": "ascii-shape.html",
    "t": "ASCII Shape",
    "d": "Shape-aware ASCII on gfx/device.js: every cell takes six luminance samples of the scene and picks the nearest of 95 glyph shape vectors derived from the vendored Plex through the Slug evaluator, in both shader languages; the picked glyphs are then drawn by Slug from the same font. After edoardolunardi/ascii-logo (MIT), read and hand-written. Gated cell for cell against a CPU argmin by tools/ship/asciiShape-selfcheck.mjs.",
-   "g": "",
+   "g": "avatars",
    "p": 0
   },
   {
@@ -525,7 +525,7 @@
    "f": "building-lab.html",
    "t": "Building Lab",
    "d": "world/buildingGrammar.mjs drawn on gfx/device.js: one instanced box per cell through render/gpuDriven.mjs's records and the lit pipeline, tinted by kind (corner, wall, party-wall blank, stairs, roof cap, interior), for a seed, cell counts, party-wall sides, a stairs side and accessory percentages. After VladimirKobranov/configurator-unreal-building (Apache-2.0), read and hand-written. Held to the placement list by tools/ship/buildingLab-selfcheck.mjs.",
-   "g": "",
+   "g": "racing",
    "p": 0
   },
   {
@@ -1246,7 +1246,7 @@
    "f": "fog-of-war.html",
    "t": "Fog of War (line-of-sight + toroidal memory)",
    "d": "FOG OF WAR on a toroidal explored-memory buffer (v3839). The current field of view is recomputed every frame by RECURSIVE SHADOWCASTING, so the pillars actually occlude -- what is behind a pillar is dark and vision does not leak diagonally through a corner. What has been seen is REMEMBERED (dim) in a persistent toroidal wearField buffer that follows the viewer, until it travels far enough that old ground scrolls out of the window and is forgotten -- which is why a fixed buffer that follows the viewer is the right structure, not an infinite map. Three states per cell: unseen (black), remembered (dim), visible (lit). The viewer wanders on its own. Answer-key gate: fogOfWar-selfcheck (origin sees itself, an open disc lit to its radius, walls occlude, no corner leak, tri-state memory monotone).",
-   "g": "",
+   "g": "toroidal",
    "p": 0
   },
   {
@@ -1449,7 +1449,7 @@
    "f": "heerich-avatar.html",
    "t": "SweK &middot; Heerich Avatar (voxel CSG, in the panel)",
    "d": "The rigged avatar GLB voxelized and rendered as a colored voxel-art SVG through Heerich's CSG-to-SVG pipeline, redrawn on a slow turntable.",
-   "g": "",
+   "g": "avatars",
    "p": 0
   },
   {
@@ -1624,7 +1624,7 @@
    "f": "krbn-avatar.html",
    "t": "SweK &middot; Krbn Avatar (pencil-drawn, in the panel)",
    "d": "The rigged avatar GLB drawn by Krbn as a pencil sketch -- skinned, posed, and re-drawn slowly because a pencil frame costs half a second.",
-   "g": "",
+   "g": "avatars",
    "p": 0
   },
   {
@@ -1645,7 +1645,7 @@
    "f": "krbn-rigged.html",
    "t": "SweK &middot; Krbn Rigged (the pencil drawing, animated)",
    "d": "Krbn draws the model ONCE; every stroke is pinned to a triangle and then follows the skeleton, so the pencil line-work animates at frame rate.",
-   "g": "",
+   "g": "avatars",
    "p": 0
   },
   {
@@ -2926,7 +2926,7 @@
    "f": "toroidal-wave.html",
    "t": "Toroidal Wave Buffer",
    "d": "A TOROIDAL DEFORM BUFFER driving a real-time wave simulation on a curved surface (v3837). An N x N field is addressed with wraparound (modulo) indexing, so it has no edges -- a ripple leaving one side re-enters the other, the domain is periodic, and scrolling the read origin moves the whole field under the viewport with no buffer copy. Because a wrapped grid IS a torus topologically, the field maps onto a torus with no seam and the waves chase themselves around it. The 2D wave equation runs on the CPU here (leapfrog, wraparound 5-point Laplacian, CFL-safe); the GPU ping-pong-texture version is the optimisation. Drops splat with toroidal wrap; Scroll demonstrates the moving window; Reset stills the field. Answer-key gate: toroidalField-selfcheck (wraparound indexing, the cross-seam energy transfer, CFL stability, scroll==shift, seamless torus map).",
-   "g": "",
+   "g": "toroidal",
    "p": 0
   },
   {
@@ -3178,7 +3178,7 @@
    "f": "wear-field.html",
    "t": "Wear Field (Toroidal Accumulation)",
    "d": "A PERSISTENT TOROIDAL ACCUMULATION BUFFER following a ship (v3838) -- the snowflow deform buffer proper, the persistent half the stateless wave could not do. An N x N field is world-locked by wraparound addressing so it covers a size x size window that FOLLOWS the ship without ever being copied; the ship stamps wear/scorch into it every frame and it DECAYS, so a trail smears behind and heals over time. The subtle part, gated in wearField-selfcheck: the SCROLL-AND-CLEAR -- when the window recenters, only the newly-exposed texels (world the ship has just reached) are zeroed, while everything still in the window keeps accumulating; clearing everything would erase the trail, clearing nothing would ghost the world you left and returned to. The buffer runs on the CPU here; the GPU ping-pong-texture version is the optimisation. Pause/Reset/Heal. Answer-key gate: wearField-selfcheck (toroidal addressing, accumulation, persistence across scroll, re-entry clearing, decay).",
-   "g": "",
+   "g": "toroidal",
    "p": 0
   },
   {
