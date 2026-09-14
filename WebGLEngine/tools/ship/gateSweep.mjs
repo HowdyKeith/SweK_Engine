@@ -3849,6 +3849,35 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // object keys of the same name, the later one wins silently and the earlier round's swept count vanishes
     // from the surplus arithmetic. FIFTH ORDINAL COLLISION between the two lines this session; the side that
     // merges second is the side that moves.
+    since244: Object.freeze({
+        at: "v4551", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/voxelAvatarDevice-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly: 6 checks, 2,796-2,928 ms over three runs -- OVER the 3,000 "
+               + "ms budget on purpose, which is the round. *** A GATE THAT BOOTS A BROWSER CANNOT FIT IN A "
+               + "SHIP-TIME BUDGET, AND THE CPU ROWS SHARING ITS FILE ARE EXILED WITH IT. *** "
+               + "tools/ship/voxelAvatar-selfcheck read 3,063 ms against 3,000, so the quick sweep skipped "
+               + "the WHOLE file -- including the rows that had actually caught a camera regression, v4545's "
+               + "repair being red there and green at HEAD. Timed by section: the walk 40 ms, the matrix "
+               + "twin 2 ms, both-backends ~2,800 ms. 42 MS OF 2,850 WAS CPU. The device half is a Chromium "
+               + "launch plus two GPU device initialisations already reduced to one origin call looping over "
+               + "both backends, so there is nothing to compress and 'make the gate faster' has one "
+               + "available meaning: make the SHIP-TIME gate cheap. Split here; voxelAvatar-selfcheck now "
+               + "runs in 102-138 ms, a 22-30x drop, with margin enough that it is no longer a straddler. "
+               + "*** NO COVERAGE MOVED DOWN AND THE COUNTS SAY SO: *** the whole file was over budget "
+               + "before, so both halves were covered only by the sweep rotation; 21 ok() sites became 17 + "
+               + "4 and 23 PASS rows became 17 + 6. AND THE v4522 BATTERY WAS RE-RUN ACROSS BOTH HALVES "
+               + "RATHER THAN THE NEW FILE MERELY PASSING: A 5 RED, B 12, C 13, D 4 -- every count IDENTICAL "
+               + "to v4522's, every sabotage caught by BOTH halves, and all four now caught at ship time "
+               + "where none of them was. A fifth sabotage deletes this file and reddens "
+               + "instruments-selfcheck by name, because physics/instruments.mjs carries a voxel-avatar-"
+               + "device entry: the device half cannot evaporate and leave a register claiming coverage "
+               + "nobody runs. *** AND voxelAvatar WAS ONE OF FIFTY-TWO: *** 95 gates call "
+               + "runInEngineOrigin and 52 were over the budget; the remaining 50 carry 698 ok() sites "
+               + "BEFORE their first harness call. That 698 is a CANDIDATE COUNT BY ROW POSITION AND NOT A "
+               + "MEASUREMENT OF TIME -- said plainly because only voxelAvatar was timed by section, and "
+               + "turning a candidate into a split means timing that gate the same way first.",
+    }),
     since243: Object.freeze({
         at: "v4550", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/playerWater-selfcheck.mjs"]),

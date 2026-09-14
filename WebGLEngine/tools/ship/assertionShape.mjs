@@ -313,8 +313,12 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // distinctDefinitions holds at 40 for the nineteenth round running.
     // v4550 -- RE-TAKEN for tools/ship/playerWater-selfcheck.mjs: gates 1638 -> 1639, usesOk 1617 ->
     // 1618, definesOk 1609 -> 1610, nameFirst 1510 -> 1511. One gate moves four of the nine rows.
-    gates: 1639, usesOk: 1618, definesOk: 1610, importsOk: 0,
-    distinctDefinitions: 40, nameFirst: 1511, condFirst: 91, unknownSignature: 16,
+    // v4551 -- RE-TAKEN for tools/ship/voxelAvatarDevice-selfcheck.mjs, the device half split out of
+    // voxelAvatar: 1639 -> 1640, usesOk 1619, definesOk 1611, nameFirst 1512. *** A SPLIT ADDS A GATE TO
+    // THIS CENSUS EVEN THOUGH IT ADDED NO CHECK TO THE TREE *** -- the rows moved files, they did not
+    // arrive -- so this table counts FILES and not coverage, which is worth saying where it is read.
+    gates: 1640, usesOk: 1619, definesOk: 1611, importsOk: 0,
+    distinctDefinitions: 40, nameFirst: 1512, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([
