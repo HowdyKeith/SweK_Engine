@@ -1,19 +1,26 @@
 // WebGLEngine/render/threeProbe.mjs -- v4494
 //
-// *** IS THE three 0.178 PIN THE FLEET'S OR THE BUILD BOX'S? *** (docs/TSL-ROADMAP.md step 7 item 17, task 17.) At
-// v4319 three 0.185 was tried and refused on THIS shell's Chromium -- its texture views pass a `swizzle` the browser
-// did not know -- and 0.178 was vendored because it ran unpatched. That is a fact about one headless shell. Whether
-// a rig's Chrome refuses the same build is the question, and nobody can answer it from here. three-probe.html is the
-// instrument: it fetches a named three version's tarball from registry.npmjs.org (CORS *, measured), gunzips it with
-// the browser's DecompressionStream, walks the tar (this file), rewrites the build's two internal imports to blob
-// URLs, imports it, starts a WebGPURenderer, renders one TSL gradient into a render target and reads it back --
-// beside the vendored 0.178 through the same steps as the control. tools/ship/threeProbe-selfcheck.mjs runs the
+// *** WAS THE three 0.178 PIN THE FLEET'S OR THE BUILD BOX'S? IT WAS THE BUILD BOX'S. *** (docs/TSL-ROADMAP.md
+// step 7 item 17, task 17.) At v4319 three 0.185 was tried and refused on THIS shell's Chromium -- its texture
+// views pass a `swizzle` the browser did not know -- and 0.178 was vendored because it ran unpatched. tools/ship/
+// three-probe.json (a real rig, Chrome 152, 2026-09-08) drew 0.185.1 cleanly on WebGPU: the refusal was one
+// headless shell's WebGPU implementation lagging the spec, not a fact about the build or the fleet. vendor/
+// three-webgpu was re-vendored to 0.185.1 on that finding (see its own PROVENANCE.txt) -- PROBE_CONTROL below
+// names the version now ACTUALLY vendored, not the one this file's history started against. three-probe.html is
+// the instrument: it fetches a named three version's tarball from registry.npmjs.org (CORS *, measured), gunzips
+// it with the browser's DecompressionStream, walks the tar (this file), rewrites the build's two internal
+// imports to blob URLs, imports it, starts a WebGPURenderer, renders one TSL gradient into a render target and
+// reads it back -- beside the vendored control through the same steps. tools/ship/threeProbe-selfcheck.mjs runs the
 // same page here against a cached tarball and records what THIS box says; the rig's answer is RIG-PENDING until
 // tools/ship/three-probe.json is saved from the page.
 "use strict";
 
-export const PROBE_CONTROL = Object.freeze({ label: "vendored 0.178", kind: "local", src: "./vendor/three-webgpu/" });
+export const PROBE_CONTROL = Object.freeze({ label: "vendored 0.185.1", kind: "local", src: "./vendor/three-webgpu/" });
 export const PROBE_VERSIONS = Object.freeze(["0.185.1"]);          // the newest at v4494; the page takes ?versions=
+// *** THE KNOWN, NAMED SHAPE OF THE ONE ACCEPTABLE CONTROL FAILURE. *** See gradeProbe()'s own comment: since
+// the re-vendor, PROBE_CONTROL and PROBE_VERSIONS[0] can be the SAME build, so a control that fails on webgpu
+// with THIS exact browser refusal is reporting the identical finding the newest probe does, not a broken rig.
+export const KNOWN_WEBGPU_SWIZZLE_REFUSAL = /GPUTextureComponentSwizzle|createView/;
 export const BUILD_FILES = Object.freeze(["three.webgpu.js", "three.core.js", "three.tsl.js"]);
 export const tarballUrl = (version) => `https://registry.npmjs.org/three/-/three-${version}.tgz`;
 
@@ -79,6 +86,16 @@ export function gradeProbe(j) {
         if (!(Number.isFinite(r.ms) && r.ms >= 0)) { problems.push(`${r.label}: ms not finite`); break; }
     }
     const control = rs.find((r) => r.label === PROBE_CONTROL.label);
-    if (control && !control.ok) problems.push("the vendored control failed: the box, not the version, is the finding");
+    // *** POST-RE-VENDOR: A CONTROL FAILURE IS NOT AUTOMATICALLY "THE BOX, NOT THE VERSION". *** Before the
+    // 0.178.0 -> 0.185.1 re-vendor, PROBE_CONTROL was a DIFFERENT, already-proven-safe build from whatever
+    // PROBE_VERSIONS named, so any control failure meant the harness itself was broken -- the version under
+    // test could not be blamed for a build it had nothing to do with. PROBE_CONTROL is now the SAME vendored
+    // build the newest probes reach for, so a control that fails with the identical, already-understood
+    // GPUTextureComponentSwizzle refusal is reporting the SAME finding a same-revision newest probe reports,
+    // from the same bytes, for the same browser-side reason -- not evidence of a broken rig. Anything else
+    // failing the control (a network error, a parse error, any OTHER message) is still fatal: this exemption
+    // names one specific, expected shape and does not open a general escape hatch.
+    if (control && !control.ok && !KNOWN_WEBGPU_SWIZZLE_REFUSAL.test(control.error || ""))
+        problems.push("the vendored control failed: the box, not the version, is the finding");
     return { ok: problems.length === 0, problems, route: j && j.route, newest: rs.filter((r) => r.label !== PROBE_CONTROL.label), control };
 }

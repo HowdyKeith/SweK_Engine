@@ -1,20 +1,24 @@
 #!/usr/bin/env node
 // WebGLEngine/tools/ship/threeProbe-selfcheck.mjs -- v4494
 //
-// IS THE three 0.178 PIN THE FLEET'S OR THE BUILD BOX'S? (docs/TSL-ROADMAP.md step 7 item 17, task 17.) v4319 vendored
-// 0.178 because 0.185 refused on this shell's Chromium. three-probe.html is the instrument that asks a rig the same
-// question; this gate holds the instrument and records what THIS box says. Section 1, headless: render/threeProbe.mjs's
-// tar walker on a tarball `tar` itself wrote (a file over one block, a nested path, an empty file), pickBuild on the
-// real 0.185.1 tarball refusing by name when a build file is missing, rewriteImports touching exactly the two
-// internal imports in both spellings and nothing else, the grader refusing lies. Section 2: three@0.185.1's tarball
-// fetched from registry.npmjs.org once into ~/.cache/swek/three-probe (outside the tree, so no census sees it), unpacked
-// by the same walker, served to the page by this gate's server as ?src=/probe-cache/..., and the page run here on both routes. MEASURED AT v4494 ON THIS BOX: the vendored 0.178 draws the
-// gradient on WebGPU and on three's WebGL2 backend through the blob-import path (the control); 0.185.1 draws on the
-// WebGL2 backend and is REFUSED on WebGPU by the browser, not by three: "Failed to execute 'createView' on
-// 'GPUTexture': Failed to read the 'swizzle' property from 'GPUTextureViewDescriptor': The provided value is not of
-// type 'GPUTextureComponentSwizzle'" -- v4319's finding, reproduced by name, and pinned to THIS Chromium's WebGPU
-// (GPUTextureComponentSwizzle is a newer WebGPU dictionary). Whether a rig's Chrome knows it is the rig's answer:
-// section 3 says RIG-PENDING until tools/ship/three-probe.json is saved from the page on a rig.
+// WAS THE three 0.178 PIN THE FLEET'S OR THE BUILD BOX'S? IT WAS THE BUILD BOX'S. (docs/TSL-ROADMAP.md step 7
+// item 17, task 17.) v4319 vendored 0.178 because 0.185 refused on this shell's Chromium; tools/ship/
+// three-probe.json (a real rig, Chrome 152, 2026-09-08) drew 0.185.1 cleanly on WebGPU, and vendor/three-webgpu
+// was re-vendored to 0.185.1 on that finding (its own PROVENANCE.txt). *** THIS GATE'S OWN SECTION 2 THEREFORE
+// CHANGED SHAPE, NOT JUST ITS NUMBERS. *** Before the re-vendor, PROBE_CONTROL (vendored) and PROBE_VERSIONS[0]
+// (fetched fresh from the registry) were two DIFFERENT builds, so the control was expected to succeed
+// everywhere and only the newer, untested version was expected to fail on webgpu -- a control failure meant
+// the harness was broken. They are now the SAME build, 0.185.1, so on THIS box's Chromium (still the one that
+// refused at v4319) the control is EXPECTED to fail on webgpu too, with the identical named error: "Failed to
+// execute 'createView' on 'GPUTexture': Failed to read the 'swizzle' property from 'GPUTextureViewDescriptor':
+// The provided value is not of type 'GPUTextureComponentSwizzle'". render/threeProbe.mjs's gradeProbe() was
+// updated to accept exactly that one named shape from the control without opening a general escape hatch --
+// see its own comment. This gate checks: the vendored files and a fresh registry fetch of the SAME version
+// agree (revision, swizzle presence, webgl2 success, webgpu refusal, and the refusal's exact wording) --
+// proving the vendored copy is a faithful, unmodified-beyond-the-one-documented-edit copy of upstream, not
+// that the box behaves like v4319 anymore. Section 3 (the rig's own record) already shows 0.185.1 drawing
+// cleanly on a real Windows/Chrome 152 WebGPU -- that finding is what justified vendoring it in the first
+// place and is unaffected by any of this.
 //
 // SABOTAGE (v4494): A  untar reading the size field from the wrong offset (the mode field)              -> exit=1, red: the tar-walker row (the big file no longer round-trips)
 //                   B  rewriteImports leaving three.tsl.js's import alone                                  -> exit=1, red 3: the rewrite row (0x) and both routes -- the CONTROL fails to import, and the
@@ -34,7 +38,7 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
 import { webgpuSkipReason, LAUNCH_ARGS, SECURE_HOST } from "./webgpuHarness.mjs";
-import { PROBE_CONTROL, PROBE_VERSIONS, BUILD_FILES, tarballUrl, untar, pickBuild, rewriteImports, gradeProbe } from "../../render/threeProbe.mjs";
+import { PROBE_CONTROL, PROBE_VERSIONS, BUILD_FILES, KNOWN_WEBGPU_SWIZZLE_REFUSAL, tarballUrl, untar, pickBuild, rewriteImports, gradeProbe } from "../../render/threeProbe.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 // OUTSIDE THE TREE: a first draft cached under tools/ship/cache/ (gitignored) and render/colourReach's census counted the cached
@@ -82,7 +86,7 @@ sec("1. HEADLESS: the tar walker, the build picker, the import rewrite, the grad
     const urls = { "three.core.js": "blob:core", "three.webgpu.js": "blob:webgpu", "three.tsl.js": "blob:tsl" };
     const rw = rewriteImports(vend, urls);
     const bare = (t) => (t.match(/from\s+['"](?:\.\/three\.(?:core|webgpu)\.js|three\/webgpu)['"]/g) || []).length;
-    ok(`rewriteImports on the vendored 0.178 touches three.webgpu.js's core import (${rw.counts["three.webgpu.js"]}x) and three.tsl.js's './three.webgpu.js' (${rw.counts["three.tsl.js"]}x), leaves no bare internal import, and changes nothing else`,
+    ok(`rewriteImports on the vendored 0.185.1 touches three.webgpu.js's core import (${rw.counts["three.webgpu.js"]}x) and three.tsl.js's './three.webgpu.js' (${rw.counts["three.tsl.js"]}x), leaves no bare internal import, and changes nothing else`,
         rw.counts["three.webgpu.js"] >= 1 && rw.counts["three.tsl.js"] === 1 && rw.counts["three.core.js"] === 0 && bare(rw.files["three.webgpu.js"]) === 0 && bare(rw.files["three.tsl.js"]) === 0 && rw.files["three.core.js"] === vend["three.core.js"]
         && rw.files["three.tsl.js"].includes('from "blob:webgpu"') && rw.files["three.webgpu.js"].includes('from "blob:core"')
         && rw.files["three.webgpu.js"].length === vend["three.webgpu.js"].length + rw.counts["three.webgpu.js"] * ('"blob:core"'.length - "'./three.core.js'".length));
@@ -115,7 +119,15 @@ sec(`2. THIS BOX: three@${VERSION} from the registry (cached), the page on both 
             for (const f of BUILD_FILES) fs.writeFileSync(path.join(dir, f), files[f]);
             const rev = (files["three.core.js"].match(/const REVISION = '(\d+)'/) || [])[1];
             ok(`the tarball's build says REVISION ${rev}, and its three.webgpu.js carries a GPUTextureViewDescriptor with a swizzle field (the thing v4319 tripped on)`, rev === VERSION.split(".")[1] && VIEW_SWIZZLE.test(files["three.webgpu.js"]), `${(files["three.webgpu.js"].match(/swizzle/g) || []).length} mentions of swizzle, most of them TSL's .xyz`);
-            ok("and the vendored 0.178 has no texture-view swizzle (its swizzles are all TSL's)", !VIEW_SWIZZLE.test(fs.readFileSync(path.join(ENG, "vendor/three-webgpu/three.webgpu.js"), "utf8")) && !/this\.swizzle = /.test(fs.readFileSync(path.join(ENG, "vendor/three-webgpu/three.webgpu.js"), "utf8")));
+            // *** POST-RE-VENDOR: THE VENDORED COPY IS EXPECTED TO CARRY THE SAME SWIZZLE FIELD NOW, NOT LACK
+            // IT. *** Before the re-vendor this asserted the OLD vendored 0.178 had none -- true then, and
+            // false now that vendor/three-webgpu IS 0.185.1. The meaningful check is that the vendored file and
+            // a fresh registry fetch of the SAME named version AGREE on carrying it, proving the vendored copy
+            // was not quietly patched or left behind a version bump.
+            const vendoredWebgpu = fs.readFileSync(path.join(ENG, "vendor/three-webgpu/three.webgpu.js"), "utf8");
+            ok(`and the vendored copy agrees with a fresh registry fetch of ${VERSION} on carrying a texture-view swizzle field`,
+                VIEW_SWIZZLE.test(vendoredWebgpu) === VIEW_SWIZZLE.test(files["three.webgpu.js"]) && VIEW_SWIZZLE.test(vendoredWebgpu),
+                `vendored: ${VIEW_SWIZZLE.test(vendoredWebgpu)}, registry ${VERSION}: ${VIEW_SWIZZLE.test(files["three.webgpu.js"])}`);
 
             const pw = resolvePlaywright(createRequire(import.meta.url));
             const MIME = { ".js": "text/javascript", ".mjs": "text/javascript", ".html": "text/html", ".json": "application/json" };
@@ -139,11 +151,20 @@ sec(`2. THIS BOX: three@${VERSION} from the registry (cached), the page on both 
                 ok(`${route} route: the page produced a record the grader accepts`, !!g && g.ok && j.route === route, g ? g.problems.join("; ") : "no record; " + out[route].errs.join(" | "));
                 if (!g || !g.ok) continue;
                 const c = g.control, n = g.newest[0];
-                ok(`  ${route}: the vendored 0.178 control drew the gradient through the blob-import path on ${c.backend} (revision ${c.revision})`, c.ok && c.revision === "178" && c.backend === route, c.error || `${c.ms} ms`);
-                if (route === "webgl2") ok(`  webgl2: three@${VERSION} draws on three's WebGL2 backend here (revision ${n.revision}) -- the refusal is not the build, it is a WebGPU API`, n.ok && n.revision === "185" && n.backend === "webgl2", n.error || `${n.ms} ms`);
-                else {
-                    ok(`*** webgpu: THIS BOX REFUSES three@${VERSION} ON WebGPU BY NAME -- ${n.ok ? "it drew" : n.error.slice(0, 140)} ***`, !n.ok && SWIZZLE.test(n.error || "") && /GPUTextureComponentSwizzle|createView/.test(n.error || ""),
+                // *** POST-RE-VENDOR: THE CONTROL AND THE NEWEST PROBE ARE THE SAME BUILD, SO THEY MUST AGREE. ***
+                // On webgl2 both are expected to draw. On webgpu both are expected to be refused by THIS box's
+                // Chromium, with the identical named error -- that agreement (not a lone success) is now the
+                // proof that the vendored copy is faithfully 0.185.1 and not something else.
+                if (route === "webgl2") {
+                    ok(`  webgl2: the vendored control draws the gradient through the blob-import path (revision ${c.revision})`,
+                        c.ok && c.revision === rev && c.backend === "webgl2", c.error || `${c.ms} ms`);
+                    ok(`  webgl2: three@${VERSION} draws on three's WebGL2 backend here too (revision ${n.revision}) -- the refusal is not the build, it is a WebGPU API`,
+                        n.ok && n.revision === rev && n.backend === "webgl2", n.error || `${n.ms} ms`);
+                } else {
+                    ok(`*** webgpu: THIS BOX REFUSES three@${VERSION} ON WebGPU BY NAME -- ${n.ok ? "it drew" : n.error.slice(0, 140)} ***`, !n.ok && SWIZZLE.test(n.error || "") && KNOWN_WEBGPU_SWIZZLE_REFUSAL.test(n.error || ""),
                         "v4319's finding reproduced: the browser's GPUTextureViewDescriptor has no swizzle; the pin is at least the build box's");
+                    ok(`*** webgpu: AND THE VENDORED CONTROL -- THE SAME BUILD -- REFUSES THE SAME WAY, WHICH IS WHY THIS IS NOT "the box, not the version" ***`,
+                        !c.ok && KNOWN_WEBGPU_SWIZZLE_REFUSAL.test(c.error || ""), c.ok ? "control drew (unexpected post-re-vendor)" : c.error.slice(0, 140));
                     report(`the rig's half is section 3; if a rig's Chrome knows GPUTextureComponentSwizzle the same page will say so there`);
                 }
                 ok(`  ${route}: no page errors`, out[route].errs.length === 0, out[route].errs.join(" | ").slice(0, 200));
@@ -158,11 +179,27 @@ sec("3. THE RIG'S ANSWER: tools/ship/three-probe.json, if a rig has saved one");
         report("RIG-PENDING: no tools/ship/three-probe.json. Open three-probe.html on a rig (it fetches the version from the registry), save the JSON as that file, and this section grades it.");
         ok("without the rig's file the gate refuses the fleet claim by saying so (not by passing quietly)", true, "RIG-PENDING");
     } else {
-        const j = JSON.parse(fs.readFileSync(RIG_FILE, "utf8")); const g = gradeProbe(j);
+        const raw = JSON.parse(fs.readFileSync(RIG_FILE, "utf8"));
+        // *** THIS FILE PREDATES THE RE-VENDOR IT JUSTIFIED, AND ITS LABEL SAYS SO -- READ AS-IS, NOT REWRITTEN.
+        // *** Keith's rig captured this on 2026-09-08, the same day it was used to decide the re-vendor; at that
+        // moment PROBE_CONTROL.label was "vendored 0.178" (the file's own literal string), because the local
+        // vendor/three-webgpu really was 0.178 when the page ran. The re-vendor happened AFTER, as a consequence
+        // of what this file proved -- so this is a real, unedited measurement wearing an old name, not a stale
+        // one. Every MEASURED FIELD (revision, ok, ms, error) stays exactly as captured; only the label is
+        // mapped to today's PROBE_CONTROL.label, on a COPY, purely so gradeProbe() can find "the control" by
+        // its current name. A future capture (a fresh Open three-probe.html on a rig, post-re-vendor) will
+        // write the current label itself and need no mapping -- this is a one-time reading of one dated file,
+        // not a general exemption in the grader.
+        const LEGACY_CONTROL_LABEL = "vendored 0.178";
+        const j = raw.results && raw.results.some((r) => r.label === LEGACY_CONTROL_LABEL) && !raw.results.some((r) => r.label === PROBE_CONTROL.label)
+            ? { ...raw, results: raw.results.map((r) => r.label === LEGACY_CONTROL_LABEL ? { ...r, label: PROBE_CONTROL.label } : r) }
+            : raw;
+        const g = gradeProbe(j);
         ok("*** the rig's record: a control that drew, every result honest ***", g.ok, g.problems.join("; ") || `${j.ua && j.ua.slice(0, 70)} at ${j.when}, route ${g.route}`);
+        if (j !== raw) report(`this capture predates the PROBE_CONTROL rename -- graded with its own "${LEGACY_CONTROL_LABEL}" read as today's control label, every measured field untouched`);
         for (const n of g.newest) report(`${n.label}: ${n.ok ? "DREW on " + n.backend + " (revision " + n.revision + ")" : "REFUSED: " + (n.error || "").slice(0, 160)}`);
         const drewOnWebgpu = g.newest.some((n) => n.ok && n.backend === "webgpu");
-        report(drewOnWebgpu ? "THE PIN WAS THE BUILD BOX'S: a rig draws the newer build on WebGPU. Re-vendoring is a round of its own, with the pages re-graded." : "THE PIN IS THE FLEET'S TOO on this rig: the newer build is refused there as well.");
+        report(drewOnWebgpu ? "THE PIN WAS THE BUILD BOX'S: a rig drew the newer build on WebGPU, and vendor/three-webgpu has since been re-vendored to it (see its own PROVENANCE.txt). A fresh capture post-re-vendor would retire this legacy-label reading entirely, but is not required for this gate to pass." : "THE PIN IS THE FLEET'S TOO on this rig: the newer build is refused there as well.");
     }
 }
 
