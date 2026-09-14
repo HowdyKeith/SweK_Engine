@@ -298,8 +298,12 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // follow a gate by one. The round's other change is to camera/camera.js, an existing MODULE, and a
     // round that edits a module without adding one moves none of these. distinctDefinitions holds at 40
     // for the fifteenth round running.
-    gates: 1634, usesOk: 1613, definesOk: 1605, importsOk: 0,
-    distinctDefinitions: 40, nameFirst: 1506, condFirst: 91, unknownSignature: 16,
+    // v4546 -- RE-TAKEN for tools/ship/playerSlope-selfcheck.mjs: 1634 -> 1635 and the three rows that
+    // follow a gate by one. The round's other changes are all to existing files -- camera/camera.js and
+    // two gates whose expectations moved -- and a round that edits without adding moves none of these.
+    // distinctDefinitions holds at 40 for the sixteenth round running.
+    gates: 1635, usesOk: 1614, definesOk: 1606, importsOk: 0,
+    distinctDefinitions: 40, nameFirst: 1507, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

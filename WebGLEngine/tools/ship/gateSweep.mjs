@@ -3849,6 +3849,38 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // object keys of the same name, the later one wins silently and the earlier round's swept count vanishes
     // from the surplus arithmetic. FIFTH ORDINAL COLLISION between the two lines this session; the side that
     // merges second is the side that moves.
+    since239: Object.freeze({
+        at: "v4546", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/playerSlope-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly: 13 checks in eight sections, 125-130 ms over three runs. " +
+                 "*** THE PLAYER HAD NO SLOPE LIMIT, AND WHAT IT HAD INSTEAD WAS A FRAME-RATE SWITCH. *** " +
+                 "_moveFP never computed a normal and decided `is this a cliff` by comparing ONE FRAME\'S " +
+                 "drop against 1.5 -- which is the exact anti-pattern physics/character/terrainWalk.mjs is " +
+                 "shaped around and names in its own header. Driven: one body, one speed, one 63.4-degree " +
+                 "slope, only the frame rate changing, it FELL AT 6 fps and WALKED DOWN IT GROUNDED at " +
+                 "10, 15, 20, 30, 60, 120, 144 and 240, covering 8.247 units per second along the ground " +
+                 "against a walk speed of 5. Measured in a real boot: 254 of 6,279 adjacent walkable " +
+                 "column pairs (4.05%) are steeper than terrainWalk\'s own 45-degree default, worst 88.1. " +
+                 "*** AND THE LATTICE EXPRESSES NOTHING BETWEEN 45.0 AND 60, MEASURED RATHER THAN " +
+                 "REASONED: *** all 1,826 pairs in the [45, 60) bucket are exactly 45.0, a one-voxel lip, " +
+                 "and every steep pair is 60 or more -- so 45, 50 and 60 refuse identical ground here and " +
+                 "45 is chosen to match the bots. The repair is a SECANT over a fixed one-column run, not " +
+                 "a normal: terrainWalk tests its limit on the normal and RECORDS IN THAT FILE that a " +
+                 "lattice defeats it (65.9 degrees over a one-unit lip, a fix written, measured and " +
+                 "reverted). *** THE FIRST DRAFT HAD THE SAME BUG IN A RATIO *** -- it took the run from " +
+                 "the frame\'s own travel, and a run that shrinks with dt shrinks INTO a lip whose rise " +
+                 "does not, so a 26.6-degree hill fell 76 frames of 240. Seven sabotages, none crashing " +
+                 "after a repair: A 5 RED, B 2, C 2, D 8, E 7, F 3, G 1. F and G went ZERO on this file " +
+                 "first while two other gates caught them, which added section 6; and three sabotages " +
+                 "CRASHED the gate instead of failing it, an eager detail string reading off a null -- " +
+                 "the FIFTH instance of that species this session, written one round after a header that " +
+                 "names it. WHAT DOES NOT CHANGE: the climb, because STEP_UP_MAX already admitted " +
+                 "1-per-column and refused 2-per-column and the lattice has nothing in between, so this " +
+                 "round changes the DESCENT and nothing else; and the speed convention, which is " +
+                 "HORIZONTAL where every bot is SURFACE -- named here rather than changed, because which " +
+                 "one the player uses is a gameplay decision and not a correctness one.",
+    }),
     since238: Object.freeze({
         at: "v4545", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/playerGround-selfcheck.mjs"]),

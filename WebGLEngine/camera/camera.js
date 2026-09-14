@@ -40,6 +40,48 @@ export const PLAYER_GROUND_AT_V4545 = Object.freeze({
     stepUpMax: 1.2,
 });
 
+/**
+ * *** RE-DERIVED BY tools/ship/playerSlope-selfcheck.mjs ON EVERY RUN. *** Readings at v4546.
+ */
+export const PLAYER_SLOPE_AT_V4546 = Object.freeze({
+    at: "v4546",
+    // the population, measured in a real boot of index.html over a 3-unit lattice
+    columns: 1681,
+    pairs: 6279,                // adjacent walkable column pairs a body could step between
+    steep: 254,                 // pairs steeper than 45 degrees -- ground the bots refuse
+    steepPct: 4.05,             // NOT reproducible boot to boot; the floor below is what a gate may assert
+    steepFloorPct: 1,
+    worstDeg: 88.1,
+    // *** THE LATTICE EXPRESSES NO SLOPE BETWEEN 45.0 AND 60 DEGREES, AND THAT IS MEASURED RATHER THAN
+    // REASONED. *** 1,826 pairs land in the [45, 60) bucket and EVERY ONE of them is exactly 45.0 -- a
+    // one-voxel lip -- while every steep pair is 60 or more. So the limit could be 45, 50 or 60 and refuse
+    // the identical ground on this world; 45 is chosen to match terrainWalk's default, not because this
+    // world can tell it from the others.
+    atExactly45: 1826,
+    bucket0to15: 4199, bucket45to60: 1826, bucket60to75: 183, bucket75to90: 71,
+    // what the old rule did, driven on a plateau falling k voxels per column
+    headWalkedDownDeg: 63.4,    // walked down at full speed, permanently grounded, 0 frames airborne
+    headSurfaceSpeed: 8.247,    // units per second along the ground, against a walk speed of 5
+    // *** THE OLD RULE WAS A FRAME-RATE SWITCH. *** One body, one speed, one 63.4-degree slope:
+    fellAtFps: 6,               // and only at 6 -- 10, 15, 20, 30, 60, 120, 144 and 240 all walked it
+    walkedAtFps: Object.freeze([10, 15, 20, 30, 60, 120, 144, 240]),
+    // the first draft of the repair, and what killed it
+    firstDraftFellOnDeg: 26.6,  // a shallow hill, because a run that shrinks with dt shrinks into a lip
+    // *** TWO NUMBERS, AND THEY MEASURE DIFFERENT THINGS -- SAID HERE BECAUSE THE FIRST DRAFT OF THIS
+    // RECORD CARRIED ONE AND THE GATE ASSERTED IT AGAINST THE OTHER, AND WENT RED. *** `fellFrames` was
+    // taken with the draft INSTALLED as the rule, so the body really left the ground and its whole path
+    // differed from then on; the gate cannot re-run that without shipping the draft. `wouldFire` is what
+    // the draft's arithmetic reports while the SHIPPED rule drives the body, which is re-derivable and is
+    // what section 3 asserts. The shipped rule reports 0 on the same walk either way.
+    firstDraftFellFrames: 76,   // of 240, with the draft installed -- NOT re-derived by the gate
+    firstDraftWouldFire: 18,    // of 240, observed alongside the shipped rule -- this one is re-derived
+    // the float error the inclusive limit has to absorb, measured on an exactly-45-degree ramp
+    observedAt45: 45.0000000000001990,
+    epsDeg: 1e-9,
+    maxSlopeDeg: 45,
+    slopeRun: 1,
+});
+
 export class Camera {
     // The keys the _move* methods consult in EVERY mode that moves. KeyE is deliberately absent: it is
     // kaiju-drive only, and consumesKey() adds it there. Cross-checked against the keys.has() literals in this
@@ -49,6 +91,23 @@ export class Camera {
     /** The tallest auto-step, in voxels. Read by _moveFP's walk rule AND by _terrainTopAt's reach, which
      *  are the same question asked twice -- so it is one number rather than two that must agree. */
     static STEP_UP_MAX = 1.2;
+
+    /** Steeper than this and the ground is not walkable DOWN; the body leaves it and falls. v4546.
+     *  45 is physics/character/terrainWalk.mjs's own default, taken so the player and the bots refuse the
+     *  same ground rather than two numbers nobody compared. *** ON A VOXEL LATTICE EVERY LIMIT FROM 45 UP
+     *  TO 63.4 IS THE SAME RULE, *** because the only slopes a lattice can express are n voxels per column
+     *  -- 45.0, 63.4, 71.6 degrees -- and nothing lies between the first two. So this number is chosen to
+     *  MATCH THE BOTS and not because this world can tell it from 50 or 60; said here rather than implied. */
+    static MAX_SLOPE_DEG = 45;
+
+    /** The world distance the slope is measured over, in voxels. ONE COLUMN, and it is fixed rather than
+     *  derived from the frame's own travel for the reason _fpSlopeDeg sets out: a run that shrinks with dt
+     *  shrinks into a single lip and reports 90 degrees for ordinary ground. v4546. */
+    static SLOPE_RUN = 1;
+
+    /** The tolerance that makes MAX_SLOPE_DEG inclusive, in degrees. See _moveFP's cliff branch: the
+     *  bilinear blend puts about 2e-13 degrees of float error on an exactly-45-degree ramp. v4546. */
+    static SLOPE_EPS_DEG = 1e-9;
 
 
     constructor(canvas) {
@@ -749,9 +808,14 @@ export class Camera {
         // v4545 -- the body's FEET, so the probe answers the surface this body is on rather than the topmost
         // in the column. The reach is STEP_UP_MAX because this is the WALKING query: a walker may step up.
         // fallBody's falling query takes no reach at all, and the difference is the whole of v4544's note.
-        const groundY = this._terrainTopAtBilinear(this.position.x, this.position.z,
-                                                   this.position.y - this._eyeHeight);
+        const feetY = this.position.y - this._eyeHeight;
+        const groundY = this._terrainTopAtBilinear(this.position.x, this.position.z, feetY);
         const targetY = groundY + this._eyeHeight;
+        // v4546 -- THE SLOPE OF THE GROUND CROSSED THIS FRAME. See _fpSlopeDeg for why it is a secant over
+        // the distance travelled rather than a normal, and why that is the only form of it a voxel lattice
+        // can answer. Zero when the body did not move horizontally: a body standing still crosses no ground.
+        const slope = this._fpSlopeDeg(mx, mz, groundY, feetY);
+        this._fpSlope = slope;
 
         if (this._fpOnGround) {
             // v406 — branch logic retuned for the v404 bilinear ground.
@@ -773,8 +837,35 @@ export class Camera {
             // _canStandAt earlier" -- WAS FALSE, and the wall branch below carried the same false reason.
             // See there.
             const STEP_UP_MAX = Camera.STEP_UP_MAX;
-            const CLIFF_DROP  = 1.5;     // drop bigger than this = walked off a ledge
+            // *** CLIFF_DROP WAS A PER-FRAME TEST, WHICH MAKES IT A FRAME-RATE SWITCH RATHER THAN A CLIFF
+            // RULE. *** physics/character/terrainWalk.mjs is shaped around exactly this: "a slope limit
+            // tested on the per-step height difference is not a slope limit ... the height difference over
+            // one substep shrinks with the substep while the slope does not. The limit then depends on the
+            // frame rate, which is the definition of a bug you cannot reproduce." Measured here, one body,
+            // one speed, one 63.4-degree slope, ONLY THE FRAME RATE CHANGING: it falls at 6 fps and walks
+            // down it grounded at 10, 15, 20, 30, 60, 120, 144 and 240. The drop per frame is 5 * dt * 2,
+            // which crosses 1.5 only below about 9 fps.
+            //
+            // The slope is a RATIO of two quantities that both scale with dt, so it does not move with the
+            // frame rate at all, and it is kept as a second test rather than replacing CLIFF_DROP because
+            // the two catch different things: a cliff EDGE is a discontinuity where the ground falls away
+            // over no horizontal distance at all, and a slope is what you can walk down. Both still end the
+            // step by leaving the ground, which is the only outcome this branch has.
+            const CLIFF_DROP  = 1.5;     // drop bigger than this = walked off a ledge, in ONE frame
             const dy = targetY - this.position.y;
+            // *** THE LIMIT IS INCLUSIVE, AND THE TOLERANCE IS A MEASUREMENT RATHER THAN A CUSHION. ***
+            // A one-voxel-per-column ramp is 45.0000 degrees by construction and atan2(1, 1) * 180 / PI is
+            // EXACTLY 45 -- but the two heights come out of the bilinear blend, which accumulates about
+            // 2e-13 of it, so the ramp reads 45.0000000000001990 and a bare `> 45` threw the body off a
+            // slope it had just been told it could walk. Measured: 21 frames of 240 over the limit, four
+            // separate departures from the ground, on a hill whose true angle is the limit exactly.
+            // terrainWalk records the same hazard from the other side -- `n.y` against cos(45) is one ULP
+            // and its remedy is a 1e-12 tolerance in cosine, "far below anything terrain can express and
+            // far above the 1.1e-16 that caused it". 1e-9 DEGREES is that argument in this file's units:
+            // five thousand times the error measured here, and a lattice's finest real distinction is
+            // 45.0 against 63.4.
+            const tooSteepDown = dy < 0 && slope !== null &&
+                                 slope > Camera.MAX_SLOPE_DEG + Camera.SLOPE_EPS_DEG;
             if (dy > STEP_UP_MAX) {
                 // *** UNREACHABLE FROM THE VOXEL PATH, AND v4545 IS THE ROUND THAT MADE THAT TRUE. *** This
                 // read "_canStandAt already blocked the XZ move, so this should be unreachable. Defensive:
@@ -788,8 +879,8 @@ export class Camera {
                 // identically. Measured at 0.083333 max over a 260-frame climb of four voxels, 0 firings.
                 // It stays as a total for `dy` rather than being deleted, because _extMove and the kaiju
                 // path can set position.y from outside this function.
-            } else if (dy < -CLIFF_DROP) {
-                // Cliff — start falling
+            } else if (dy < -CLIFF_DROP || tooSteepDown) {
+                // Cliff, or ground too steep to walk down — start falling
                 this._fpOnGround = false;
                 this._fpVelY = 0;
                 this._fpFallStartTime = performance.now();
@@ -1103,6 +1194,43 @@ export class Camera {
         };
         return standHeightAt(shim, Math.floor(x), Math.floor(z),
                              { y: fromY, stepUp: Camera.STEP_UP_MAX });
+    }
+
+    /**
+     * *** THE SLOPE OF THE GROUND THIS BODY JUST CROSSED, AS A RISE OVER A RUN. *** Returns degrees, or
+     * null when the body did not move horizontally -- a body standing still crosses no ground and has no
+     * slope to be refused by.
+     *
+     * *** IT IS A SECANT AND NOT A NORMAL, AND ON THIS WORLD THAT IS THE ONLY FORM OF IT THAT WORKS. ***
+     * physics/character/terrainWalk.mjs tests its limit on the surface NORMAL, which is right on a
+     * heightfield and is recorded IN THAT FILE as failing on a lattice: "a bot standing on a flat cell at
+     * (5.96, 1.99) reads 65.9 degrees 0.25 units ahead, over a lattice row of 28, 28, 29, 29, 30 -- a
+     * ONE-UNIT LIP -- and stops there permanently." A fix was written there, measured, and REVERTED, because
+     * re-probing a fixed distance ahead still lands inside the inter-cell band where the interpolated
+     * surface is steep everywhere: 1.0, 1.25 and 1.5 all stayed blocked and 2.0 teleported the body.
+     *
+     * A secant does not have that problem, because it never asks about a point: it asks how much the ground
+     * rose over how far the body went. Across a one-voxel lip that is 1 over 1, which is 45.0 degrees and
+     * walkable; across a two-voxel lip it is 2 over 1, which is 63.4 and is not. The bilinear blend the
+     * camera already samples IS the staircase's secant, so this costs one extra blend and no new instrument.
+     *
+     * *** AND IT DOES NOT MOVE WITH THE FRAME RATE, WHICH IS THE WHOLE POINT -- BUT ONLY BECAUSE THE RUN IS
+     * A FIXED WORLD DISTANCE. *** The first draft of this took the secant over the distance travelled IN
+     * THAT FRAME, on the reasoning that a rise and a run which both scale with dt have a ratio that does
+     * not. That is true of a plane and false of a staircase: as dt shrinks the run shrinks INTO a lip, whose
+     * rise does not shrink with it, so the angle runs to 90 and a shallow hill reads 45 degrees at every
+     * voxel edge and 0 between them. Measured -- a 26.6-degree hill (one voxel every two columns) fell 76
+     * frames of 240, because alternate column boundaries each read 45.0. The same trap as the rule it
+     * replaces, wearing a ratio. SLOPE_RUN is one column, so the sample always spans a whole tread and a
+     * whole riser and the average is the hill.
+     */
+    _fpSlopeDeg(dirX, dirZ, groundY, feetY) {
+        const L = Math.hypot(dirX, dirZ);
+        if (!(L > 1e-9)) return null;
+        const R = Camera.SLOPE_RUN / L;
+        const ahead = this._terrainTopAtBilinear(this.position.x + dirX * R,
+                                                 this.position.z + dirZ * R, feetY);
+        return Math.atan2(Math.abs(ahead - groundY), Camera.SLOPE_RUN) * 180 / Math.PI;
     }
 
     _terrainTopAt(x, z, fromY = null) {

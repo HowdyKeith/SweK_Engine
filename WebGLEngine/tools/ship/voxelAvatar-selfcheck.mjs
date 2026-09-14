@@ -93,10 +93,20 @@ sec("1. the walk, headless, on the hand world");
     ok("the same two-voxel wall approached going -z is a wall: the walk stops in the voxel before it", p5b.z >= 22 && p5b.z < 23 && near(p5b.y, 5.7), `z ${p5b.z.toFixed(3)}, y ${p5b.y.toFixed(2)}`);
     const c6 = avatarCamera(w, { x: 8.5, z: 30.5 }); stepAvatar(c6, 1 / 60, ["Space"]); let apex = 0, landed = -1; for (let i = 0; i < 120; i++) { const p = stepAvatar(c6, 1 / 60, []); if (p.y > apex) apex = p.y; if (landed < 0 && p.onGround && i > 5) landed = i; }
     ok("Space jumps: the apex is near v^2 / 2g = 1.56 above the eye and the landing is back at 5.7", apex - 5.7 > 1.3 && apex - 5.7 < 1.7 && landed > 0 && near(c6.position.y, 5.7), `apex +${(apex - 5.7).toFixed(2)} at tick ${landed}`);
-    const c7 = avatarCamera(w, { x: 40.5, z: 38.5, yaw: Math.PI }); const p7 = walk(c7, ["KeyW"], 180);
-    ok("walking toward +z off the two-voxel ledge at z 40 STICKS at the lip (the sandbox's own: the bilinear ground sinks the feet into the last row)", p7.z > 39 && p7.z < 40 && p7.y < 5.7 && p7.y > 5.3, `z ${p7.z.toFixed(2)}, y ${p7.y.toFixed(2)}`);
-    const c7b = avatarCamera(w, { x: 40.5, z: 5.5, yaw: 0 }); const p7b = walk(c7b, ["KeyW"], 36);   // three units: onto the floor, not off the world (the first draft walked 15 and left the floor's end at z 0 behind)
-    ok("walking toward -z off the ledge at z 4 descends to the floor (eye 3.7 at z 2.5)", near(p7b.z, 2.5, 1e-6) && near(p7b.y, 3.7, 1e-6) && p7b.onGround, `z ${p7b.z.toFixed(2)}, y ${p7b.y.toFixed(2)}`);
+    // *** THE +z STICK SURVIVES v4546 AND MOVED, WHICH IS WHY THE ROW CARRIES BOTH READINGS. *** The
+    // two-voxel drop is 63.4 degrees over one column, so the slope limit now takes the body OFF the ledge
+    // instead of letting the blend sink it into the last row -- and it still does not get past, because it
+    // lands on the INTERPOLATED surface between the two columns (feet at 3.0, where the real surfaces are 4
+    // and 2) and _canStandAt refuses from there. A bilinear blend of a lattice reports heights that are not
+    // ground, which is v404's own bargain and is not this round's to unpick; what is recorded is that the
+    // stick is the same defect at a new place, nearer the edge and a voxel lower.
+    const c7 = avatarCamera(w, { x: 40.5, z: 38.5, yaw: Math.PI }); const p7 = walk(c7, ["KeyW"], 300);
+    ok("walking toward +z off the two-voxel ledge at z 40 STILL STICKS, now on the interpolated surface rather than sunk into the last row", p7.z > 39 && p7.z < 40 && near(p7.y, 4.7, 1e-6), `z ${p7.z.toFixed(2)}, y ${p7.y.toFixed(2)} at 300 ticks, unmoved since tick 36 -- it read z 39.08, y 5.53 before v4546`);
+    // 48 ticks, not 36: the same descent, but v4546 makes the body FALL the two voxels instead of gliding
+    // down them, and the fall takes about twelve frames. Four units, so it lands on the floor and is not
+    // yet off the world -- the floor's end at z 0 is what the first draft walked past.
+    const c7b = avatarCamera(w, { x: 40.5, z: 5.5, yaw: 0 }); const p7b = walk(c7b, ["KeyW"], 48);
+    ok("walking toward -z off the ledge at z 4 FALLS the two voxels and lands on the floor (eye 3.7)", near(p7b.z, 1.5, 1e-6) && near(p7b.y, 3.7, 1e-6) && p7b.onGround, `z ${p7b.z.toFixed(2)}, y ${p7b.y.toFixed(2)}; airborne at tick 36 (y 4.94) where before v4546 it was already down at y 3.70`);
     const c8 = avatarCamera(w, { x: 40.5, z: 30.5 }); const p8 = walk(c8, ["KeyW", "ShiftLeft"], 60);
     ok("Shift sprints at 9 units a second", near(p8.z, 21.5, 1e-6) && near(p8.velocity.z, -9), `z ${p8.z.toFixed(2)}`);
     const c9 = avatarCamera(w, { x: 8.5, z: 30.5 }); const r1 = [];  for (let i = 0; i < 90; i++) r1.push(stepAvatar(c9, 1 / 60, i < 30 ? ["KeyW"] : i < 40 ? ["KeyW", "Space"] : ["KeyD"]).z);

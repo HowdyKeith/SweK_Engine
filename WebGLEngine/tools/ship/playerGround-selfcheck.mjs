@@ -305,14 +305,42 @@ console.log("\n9. *** THE BLEND AVERAGED A COLUMN THIS BODY CANNOT STAND IN AS Z
     const at = (n) => { const k = mkCam(ledgeWorld, [13.5, 4 + 1.7, 5.5], "KeyA");
         for (let i = 0; i < n; i++) k._moveFP(1 / 60);
         return { x: +k.position.x.toFixed(2), y: +k.position.y.toFixed(2), onGround: k._fpOnGround }; };
-    const mid = at(24), end = at(120);
+    const mid = at(30), end = at(120);
+    // *** v4546 CHANGED HOW THIS DESCENT HAPPENS AND NOT WHETHER IT DOES. *** A two-voxel drop over one
+    // column is 63.4 degrees, past the new slope limit, so the body now LEAVES the ledge and falls where
+    // it used to glide down it. The endpoint is the same to the centimetre; only the middle differs, and
+    // this row asserts the endpoint plus the leaving, because the endpoint is what "completes" means and
+    // the leaving is what v4546 did. Before v4545 it completed NOTHING: it parked at the lip for good.
     ok("!! and the walk DOWN the ledge completes instead of locking at the lip",
-        Math.abs(mid.y - 4.7) < 1e-9 && Math.abs(end.y - 3.7) < 1e-9 && end.x < 4 && end.onGround,
-        "walking -x off a two-voxel ledge: 5.70 -> " + mid.y + " -> " + end.y + ", reaching x=" + end.x +
-        " in 120 frames. The unfixed blend parked the sandbox's own avatar at z=3.250, y=3.200 and it " +
-        "never moved again for as long as the walk ran -- THE STUCK PLAYER THIS ROUND IS ABOUT, " +
-        "re-introduced by its own repair. A genuine hole still falls: every corner null gives 0, and 0 is " +
-        "what the cliff branch has always been handed.");
+        !mid.onGround && mid.y < 5.7 && mid.y > 4.7 &&
+        Math.abs(end.y - 3.7) < 1e-9 && end.x < 4 && end.onGround,
+        "walking -x off a two-voxel ledge: 5.70 -> " + mid.y + " airborne at 30 frames -> " + end.y +
+        " grounded, reaching x=" + end.x + " in 120. The unfixed blend parked the sandbox's own avatar at " +
+        "z=3.250, y=3.200 and it never moved again for as long as the walk ran -- THE STUCK PLAYER v4545 " +
+        "IS ABOUT, re-introduced by its own repair. A genuine hole still falls: every corner null gives 0, " +
+        "and 0 is what the cliff branch has always been handed.");
+
+    // *** v4546 TOOK HALF OF THIS SECTION'S COVERAGE AWAY, AND THE BATTERY IS WHAT SAID SO. *** Sabotages G
+    // and H went from 2 RED to 1 the moment the slope limit landed: a not-found corner means a column whose
+    // surface is out of the body's 1.2 reach, which over one column is steeper than 50 degrees, which is
+    // past the 45-degree limit -- so the body now LEAVES the ledge before the broken blend can park it.
+    // Driven rather than argued: with the blend sabotaged, ledges of 1, 2, 3, 4, 6 and 10 voxels ALL let
+    // the body get away, every one. The masking is structural and no ledge fixture can undo it.
+    // The defect is still there, so the fixture moves to where the body stays GROUNDED and the blend still
+    // governs: walking INTO A WALL, where the wall column is not-found and the body is held by _canStandAt
+    // rather than dropped. That is also the defect's other face -- it SINKS the body as well as locking it.
+    {
+        const wallWorld = voxelWorld((fx, y) => y <= 1 || (fx >= 12 && y >= 2 && y <= 6));
+        const w = mkCam(wallWorld, [9.5, 2 + 1.7, 5.5]);
+        for (let i = 0; i < 90; i++) w._moveFP(1 / 60);
+        ok("!! a body walked into a wall stands ON the floor at the wall, not a voxel inside it",
+            Math.abs(w.position.y - 3.7) < 1e-9 && w.position.x > 11.9 && w._fpOnGround,
+            "floor top y=2, a five-voxel wall at x=12, 90 frames of walking into it: the body ends at x=" +
+            w.position.x.toFixed(3) + ", y=" + w.position.y.toFixed(3) + ". With the not-found corner " +
+            "averaged in as 0 it ends at x=11.500, y=2.700 -- *** HALF A UNIT SHORT OF THE WALL AND A " +
+            "WHOLE VOXEL INSIDE THE FLOOR, *** standing there for as long as the walk runs. This row " +
+            "exists because v4546's slope limit rescued the ledge fixture that used to catch it.");
+    }
 }
 
 // =============================================================================================================
@@ -335,9 +363,14 @@ console.log("\n10. *** THIS ROUND'S OWN RECORD IS INVISIBLE TO THE RECORD CENSUS
     const seen = new Set(recordCensus().records.map((r) => r.name));
     const missed = inJs.filter((r) => !seen.has(r.name));
 
-    ok("!! *** THE HOLE IS THREE RECORDS WIDE AND TWO OF THEM PREDATE THIS ROUND BY A HUNDRED VERSIONS ***",
-        missed.length === 3 && missed.every((r) => /\.(js|cjs)$/.test(r.file)) &&
+    // *** v4546 MADE IT FOUR, AND THIS ROW WENT RED THE MOMENT THE RECORD LANDED, WHICH IS THE POINT. ***
+    // It was written at v4545 to go red the day somebody FIXES the hole; it also goes red the day somebody
+    // WIDENS it, and the next round to add a record beside its code found that out within the hour. Both
+    // directions are the row doing its job: the number is pinned, so the hole cannot change size in silence.
+    ok("!! *** THE HOLE IS FOUR RECORDS WIDE AND TWO OF THEM PREDATE THIS SESSION BY A HUNDRED VERSIONS ***",
+        missed.length === 4 && missed.every((r) => /\.(js|cjs)$/.test(r.file)) &&
         missed.some((r) => r.name === "PLAYER_GROUND_AT_V4545") &&
+        missed.some((r) => r.name === "PLAYER_SLOPE_AT_V4546") &&
         missed.some((r) => r.name === "ADDED_AT_V4403") &&
         missed.some((r) => r.name === "MEASURED_AT_V4463") && jsFiles.length > 1000,
         missed.map((r) => r.name + " (" + r.file + ")").join(", ") + " -- " + missed.length + " records in " +
