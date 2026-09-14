@@ -1,7 +1,10 @@
 // FILE: gpu/fbxLoad.js
-// VERSION: v2 -- task #59, the deferred follow-up to task #44 (FBX ingest, commit ca8b8f0c): animation-clip
-// mapping. Round 1 (v1) shipped skin/joint extraction but left `animations: null` unconditionally, named
-// as a deliberate v1 gap (see git history for the original header text). This round closes that gap.
+// VERSION: v3 -- task #59, closing the gaps its own v2 round (commit 5fc21a72) named but did not close:
+// preRotation/postRotation composition, a non-default Euler rotation order, position/scale
+// (VectorKeyframeTrack) channels, and multiple AnimationStacks/clips in one file. Round 1 (v1) shipped
+// skin/joint extraction but left `animations: null` unconditionally (see git history for that header
+// text); v2 mapped the common case (one rotation-only clip); this round proves the rest of the shape
+// mapFbxAnimations() already handled in code but no fixture had ever exercised.
 //
 // *** THE LOADER IS INJECTED, EXACTLY LIKE gpu/gltfDraco.js AND gpu/glbLoad.js. *** `FBXLoaderCtor` is passed
 // in by the caller rather than imported here, so this module stays testable with no browser and no three.js
@@ -24,23 +27,37 @@
 //   * SINGLE MESH ONLY. Finds the FIRST object in the tree with .isMesh or .isSkinnedMesh true and reads only
 //     that one. This matches GLBParser's own original v1 scope (single primitive) before multi-primitive
 //     concat was added over many later rounds -- multi-mesh FBX concat is a real follow-up, not attempted here.
-//   * ANIMATION MAPPING (task #59, closed this round) -- mapFbxAnimations() below reads `group.animations`
-//     (THREE.AnimationClip[], attached by FBXLoader's own AnimationParser when the source file has curves) and
-//     maps each clip's `.tracks` (VectorKeyframeTrack | QuaternionKeyframeTrack, each exposing `.name`,
-//     `.times`, `.values` as plain own properties -- duck-typed, no `instanceof`) into GLBParser's documented
-//     `animations: [{name, duration, samplers: [{times, values, interpolation}], channels: [{samplerIdx,
-//     targetNode, path}]}]` shape (gpu/GLBParser.js's `_parseAnimationClip`, ~line 976). Verified against
-//     gpu/fixtures/fbxAnim.ascii.fbx -- see gpu/fixtures/PROVENANCE.md's entry for that fixture and this
-//     file's own tools/ship/fbxIngest-selfcheck.mjs section 6 for exact measured numbers. NOT covered by this
-//     round, stated plainly rather than silently: `preRotation`/`postRotation` and non-default euler orders
-//     (FBXLoader applies these itself before the track's values ever reach normalizeFbxGroup(), so THIS code
-//     doesn't need to re-derive them -- but a file that exercises them was not built, so that FBXLoader-side
-//     path is unverified by this repo's own gates); multiple AnimationStacks/clips in one file (the fixture
-//     has exactly one); CUBICSPLINE interpolation (FBXLoader's AnimationParser never emits anything but the
-//     KeyframeTrack class default of InterpolateLinear -- confirmed by reading vendor/three/jsm/loaders/
-//     FBXLoader.js's AnimationParser in full, it never calls `.setInterpolation()` -- so LINEAR is not a
-//     guessed default here, it is the only value FBXLoader's own vendored code can currently produce); and
-//     morph-target (`DeformPercent`) tracks, which FBXLoader maps to a `NumberKeyframeTrack` named
+//   * ANIMATION MAPPING (task #59) -- mapFbxAnimations() below reads `group.animations` (THREE.AnimationClip[],
+//     attached by FBXLoader's own AnimationParser when the source file has curves, ALL of them -- clips.map()
+//     below runs over every entry in that array, not just the first) and maps each clip's `.tracks`
+//     (VectorKeyframeTrack | QuaternionKeyframeTrack, each exposing `.name`, `.times`, `.values` as plain own
+//     properties -- duck-typed, no `instanceof`) into GLBParser's documented `animations: [{name, duration,
+//     samplers: [{times, values, interpolation}], channels: [{samplerIdx, targetNode, path}]}]` shape
+//     (gpu/GLBParser.js's `_parseAnimationClip`, ~line 976). Verified against two fixtures now:
+//     gpu/fixtures/fbxAnim.ascii.fbx (single rotation-only clip, together with skin extraction on the same
+//     rig -- tools/ship/fbxIngest-selfcheck.mjs section 6) and gpu/fixtures/fbxAnimAdvanced.ascii.fbx (added
+//     this round, no skin -- section 7), which between them prove, against exact measured numbers:
+//       - preRotation/postRotation composition and a non-default RotationOrder (enum 5, "XYZ" -- the implicit
+//         default when the property is absent is enum 0, "ZYX", NOT "XYZ"; see getEulerOrder() in
+//         vendor/three/jsm/loaders/FBXLoader.js ~line 4243). FBXLoader's own generateRotationTrack composes
+//         these BEFORE any track value reaches this file (Euler->quaternion per keyframe, premultiply(pre),
+//         multiply(post.invert()), ~line 2809-2880 of that vendored file) -- this file still does not
+//         re-derive that math, it only trusts the already-composed quaternion values. Section 7's expected
+//         values for that composition come from an independent three.js Quaternion/Euler script mirroring
+//         generateRotationTrack's own steps, not hand trigonometry -- see that section's own comments.
+//       - VectorKeyframeTrack position AND scale channels (generateVectorTrack, a different FBXLoader code
+//         path from generateRotationTrack -- plain per-axis curve values, no Euler/quaternion math at all).
+//       - multiple AnimationStacks/clips in one file, each resolving to its own distinct entry in
+//         mapFbxAnimations()'s returned array with correct, non-overlapping channels.
+//     Still not covered by either fixture, stated plainly rather than silently: CUBICSPLINE interpolation --
+//     this is not merely untested, it is UNREACHABLE from the currently-vendored FBXLoader. Confirmed by
+//     reading vendor/three/jsm/loaders/FBXLoader.js's AnimationParser in full: it never calls
+//     `.setInterpolation()` on any track it builds, so every track it can ever produce carries KeyframeTrack's
+//     own class default, InterpolateLinear -- there is no FBX file, hand-authored or otherwise, that could
+//     make this specific vendored loader emit anything but "LINEAR" through samplerInterpolation() below. Do
+//     not read a future missing CUBICSPLINE fixture as an open gap; it would need a patched or newer
+//     FBXLoader to ever be reachable, which is out of this file's scope. Also still open: morph-target
+//     (`DeformPercent`) tracks, which FBXLoader maps to a `NumberKeyframeTrack` named
 //     `<model>.morphTargetInfluences[n]` -- a distinct shape from GLBParser's node-TRS channels that
 //     `mapFbxAnimations()` below deliberately skips (see its own comment) rather than mis-mapping.
 //   * NORMALS ARE AN APPROXIMATION. The mesh's matrixWorld is baked into normals via its upper-3x3 submatrix,

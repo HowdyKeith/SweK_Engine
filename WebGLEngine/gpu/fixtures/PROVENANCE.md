@@ -109,8 +109,58 @@ including the float64→float32 rounding of the quaternion values). This closes 
 gate named: skin extraction and animation mapping are now proven **together**, on one committed fixture, not
 assumed compatible or checked once informally on a file nobody can re-run. It does **not** prove
 `preRotation`/`postRotation` handling, non-default Euler rotation orders, a `VectorKeyframeTrack`
-(position/scale) channel, more than one clip in a file, or CUBICSPLINE interpolation — see
-`tools/ship/fbxIngest-selfcheck.mjs`'s header for the full, current list of what is still open.
+(position/scale) channel, or more than one clip in a file — `fbxAnimAdvanced.ascii.fbx`, below (task #59,
+closed this round), closes those. CUBICSPLINE interpolation is a separate matter, not a gap — see that
+entry's own note.
+
+## `fbxAnimAdvanced.ascii.fbx` — task #59, closed this round: the gaps `fbxAnim.ascii.fbx` left named
+
+A fifth file, added when `fbxAnim.ascii.fbx`'s own remaining named gaps — `preRotation`/`postRotation`
+composition, a non-default Euler rotation order, `VectorKeyframeTrack` (position/scale) channels, and
+multiple `AnimationStack`s in one file — were closed. Same discipline as the other four: hand-authored,
+plain-ASCII FBX 7.4, written directly against `vendor/three/jsm/loaders/FBXLoader.js`'s `AnimationParser`
+source (`generateRotationTrack`, `generateVectorTrack`, `parseAnimationCurveNodes`, `parseAnimationLayers`,
+`parseAnimStacks`, and `getTransformData`/`getEulerOrder` for how `PreRotation`/`PostRotation`/
+`RotationOrder` reach a track) — confirmed by reading that source directly, then run against the real
+headless-Chromium harness before being trusted (it passed first try; that is not a licence to skip the real
+run next time, only this round's actual result). Unlike `fbxAnim.ascii.fbx`, this fixture carries **no
+geometry and no skin at all** — `gpu/fbxLoad.js`'s `mapFbxAnimations()` reads `group.animations` up front,
+independent of whether a mesh is found (see that file's `normalizeFbxGroup()`), so a mesh-less file is a
+smaller, more isolated way to exercise the animation-mapping code specifically, without also re-proving skin
+extraction `fbxAnim.ascii.fbx` already covers.
+
+**What it is:** two `LimbNode` bones, `root` and `mover`, with no parent/child relationship between them
+(both attach directly to the scene root) and no `Mesh`/`Geometry` object anywhere in the file. `root`'s
+`Properties70` carry `RotationOrder` (enum `5`, `"XYZ"` — FBXLoader's `getEulerOrder()` table, NOT the
+implicit default when the property is absent, which is enum `0`, `"ZYX"`), `PreRotation` (`30,0,0` degrees)
+and `PostRotation` (`0,45,0` degrees). Two `AnimationStack`s (clips):
+
+- `"ClipA"` — `root`'s rotation (`QuaternionKeyframeTrack`, 2 keyframes, a single-axis animated Euler value
+  of `(0,0,0)` → `(60,0,0)` degrees composed through the non-identity preRotation/postRotation/RotationOrder
+  above) and `mover`'s position (`VectorKeyframeTrack`, 2 keyframes, `(0,0,0)` → `(5,-3,2)`).
+- `"ClipB"` — `mover`'s scale (`VectorKeyframeTrack`, 2 keyframes, `(1,1,1)` → `(2,1,0.5)`), in its own
+  `AnimationLayer`/`AnimationStack`, separate from `ClipA`'s.
+
+**What it proves, and the limit:** `tools/ship/fbxIngest-selfcheck.mjs` section 7 round-trips this file
+through the same shipped pipeline and asserts exact measured values for both clips: names, durations,
+sampler times/values/interpolation, and channel `targetNode`/`path`, including that the two clips are
+distinct entries in `mapFbxAnimations()`'s output with non-overlapping channels. The composed rotation
+quaternions are checked against an **independent three.js Quaternion/Euler script** (mirroring
+`generateRotationTrack`'s own composition — `Quaternion.setFromEuler` per keyframe, then
+`.premultiply(preRotationQuat)`, then `.multiply(postRotationQuat.invert())`, all three built from
+`vendor/three/three.module.js`'s own classes, not from this repository's arithmetic) rather than by hand —
+see that gate section's own comments for the exact script and its output. It does **not** prove morph-target
+(`DeformPercent`) animation tracks (`mapFbxAnimations()` deliberately skips these — see its own comment in
+`gpu/fbxLoad.js`) or a rotation curve whose per-axis span exceeds 180 degrees between keyframes (FBXLoader's
+`interpolateRotations()` switches to a slerp-subdivided sub-interval path above that threshold — a
+genuinely different code path this fixture's small single-axis 60-degree span never reaches).
+
+CUBICSPLINE interpolation is not attempted here either, and deliberately not a gap: FBXLoader's own
+`AnimationParser` never calls `.setInterpolation()` on any track it builds (confirmed by reading that class
+in full), so every track it can produce carries `KeyframeTrack`'s class default, `InterpolateLinear` — no
+FBX file, however constructed, could make the currently-vendored loader emit anything else. A missing
+CUBICSPLINE fixture is not an open item to close; it would need a patched or newer `FBXLoader` to even be
+reachable.
 
 ## `regressionTri.glb` — same round as `fbxIngest.ascii.fbx`, the GLB-side regression fixture
 

@@ -1,11 +1,12 @@
-// WebGLEngine/tools/ship/fbxIngest-selfcheck.mjs -- v2 (task #59 added section 6)
+// WebGLEngine/tools/ship/fbxIngest-selfcheck.mjs -- v3 (task #59 remaining-gaps round added section 7)
 //
 // Run: node tools/ship/fbxIngest-selfcheck.mjs
 //
 // GATES gpu/fbxLoad.js, the .fbx branch gpu/gpuAssetLoader.js's _load()/_loadFBX() added, the
 // _loadGLBFromBytes -> _uploadParsedMesh refactor that made the FBX and GLB paths share one GPU-upload
-// implementation, index.html's "three" import map, and (task #59, section 6) gpu/fbxLoad.js's
-// mapFbxAnimations() -- the FBX-clip -> GLBParser-shape animation mapping.
+// implementation, index.html's "three" import map, and gpu/fbxLoad.js's mapFbxAnimations() -- the
+// FBX-clip -> GLBParser-shape animation mapping (section 6, task #59 round 1; section 7, task #59 round 2,
+// this round).
 //
 // *** TASK #44: FBX ASSETS WERE RECOGNIZED THROUGHOUT THE TREE AND NOTHING EVER LOADED ONE. *** Keith's call
 // was three.js's own vendored FBXLoader (vendor/three/jsm/loaders/FBXLoader.js, vendored at r160 in commit
@@ -13,14 +14,27 @@
 // ca8b8f0c) covered gpu/fbxLoad.js (parseFbx / normalizeFbxGroup), the wiring in gpu/gpuAssetLoader.js, and
 // the import map index.html needed to resolve FBXLoader.js's own bare `from "three"` -- sections 1-5 below.
 //
-// *** TASK #59: THE DEFERRED FOLLOW-UP, ANIMATION-CLIP MAPPING. *** Round 2 shipped skin/joint extraction
-// but left `animations: null` unconditionally, named plainly as a v1 gap because no committed, license-clean
-// rigged+animated fixture existed to verify it against (see the "informal spot-check" paragraph this section
-// used to carry -- superseded now, kept below in spirit as an explanation of why closing it took a second
-// round rather than being done in round 2). Section 6 below closes that gap: gpu/fixtures/fbxAnim.ascii.fbx
-// (a second hand-authored fixture, same licensing discipline as fbxIngest.ascii.fbx) round-trips through the
-// real pipeline with a populated skeleton AND a real animation clip, and mapFbxAnimations() is graded against
-// exact, hand-computed numbers -- not the one-time informal spot-check round 2 could not repeat.
+// *** TASK #59, ROUND 1 (commit 5fc21a72): ANIMATION-CLIP MAPPING, THE COMMON CASE. *** Round 2 of task #44
+// shipped skin/joint extraction but left `animations: null` unconditionally, named plainly as a v1 gap
+// because no committed, license-clean rigged+animated fixture existed to verify it against. Section 6 below
+// closed that gap: gpu/fixtures/fbxAnim.ascii.fbx round-trips through the real pipeline with a populated
+// skeleton AND a real animation clip (one QuaternionKeyframeTrack, LINEAR interpolation), graded against
+// exact, hand-computed numbers. That round's own header named what it did NOT cover, plainly rather than
+// silently: preRotation/postRotation composition, a non-default Euler rotation order, a VectorKeyframeTrack
+// (position/scale) channel, and more than one AnimationStack/clip in a file.
+//
+// *** TASK #59, ROUND 2 (THIS ROUND): THE REMAINING GAPS. *** mapFbxAnimations() itself already handled all
+// of the above in code -- it `clips.map()`s over EVERY entry in `group.animations`, not just the first, and
+// FBX_TRACK_PROPERTY_TO_GLTF_PATH already maps position/quaternion/scale generically, nothing rotation-
+// specific. preRotation/postRotation/euler-order composition happens entirely inside FBXLoader.js itself,
+// before any value reaches this repo's code. So this round is VERIFICATION work, not a rewrite: section 7
+// below adds gpu/fixtures/fbxAnimAdvanced.ascii.fbx (a mesh-less, skin-less fixture -- mapFbxAnimations()
+// reads group.animations independent of whether a mesh was found, so no geometry/skin was needed to exercise
+// it) with two AnimationStacks and a rotation track composed through a non-identity PreRotation, PostRotation
+// and non-default RotationOrder, plus position and scale VectorKeyframeTrack channels. The composed rotation
+// quaternions are checked against an INDEPENDENT three.js Quaternion/Euler script that mirrors
+// generateRotationTrack's own composition steps -- not hand trigonometry -- see section 7's own comments for
+// that script and its output.
 //
 // ================================================================================================
 // WHAT THIS GATE DOES NOT PROVE -- READ THIS BEFORE TRUSTING A GREEN RUN, SAME STYLE AS
@@ -37,47 +51,68 @@
 //     `gl.texImage2D` from was left undone because it could not be verified against a real textured FBX (see
 //     the licensing note below) -- an unverified guess at texture-extraction code is worse than the visible
 //     gap.
-//   * ANIMATION MAPPING IS NOW PROVEN FOR THE COMMON CASE, NOT EVERY CASE. Section 6 below proves, against
-//     real measured numbers: a QuaternionKeyframeTrack (rotation) resolved to its target node by name, LINEAR
-//     interpolation, a clip's `duration` trusted from THREE.AnimationClip (see gpu/fbxLoad.js's header for
-//     why that is safe rather than assumed), and skin extraction (bones, inverse-bind matrices, skinIndex/
-//     skinWeight) exercised TOGETHER with animation on the same rig for the first time in a committed gate --
-//     closing the exact gap round 2's own header named ("the skin-extraction branch was spot-checked once,
-//     informally, against an uncommitted third-party file"). Still NOT covered, stated plainly rather than
-//     silently: `preRotation`/`postRotation` and non-default Euler rotation orders (the fixture uses neither);
-//     a VectorKeyframeTrack (position/scale) channel (the fixture animates rotation only -- generateVectorTrack
-//     and generateRotationTrack are different code paths in FBXLoader's own AnimationParser, and only the
-//     latter is exercised here); more than one AnimationStack/clip in a single file; CUBICSPLINE interpolation
-//     (FBXLoader's AnimationParser never emits it -- see gpu/fbxLoad.js's header for why LINEAR is not a
-//     guessed default for FBX input specifically); and morph-target (`DeformPercent`) animation tracks, which
-//     mapFbxAnimations() deliberately skips rather than mis-mapping (see its own comment in gpu/fbxLoad.js).
+//   * ANIMATION MAPPING IS NOW PROVEN ACROSS BOTH THE COMMON CASE AND THE HARDER COMPOSITION CASES. Section 6
+//     proves: a QuaternionKeyframeTrack (rotation) resolved to its target node by name, LINEAR interpolation,
+//     a clip's `duration` trusted from THREE.AnimationClip (see gpu/fbxLoad.js's header for why that is safe
+//     rather than assumed), and skin extraction (bones, inverse-bind matrices, skinIndex/skinWeight)
+//     exercised TOGETHER with animation on the same rig. Section 7 (this round) proves, against exact
+//     measured numbers, independently cross-checked against three.js's own Quaternion/Euler classes rather
+//     than hand arithmetic: preRotation/postRotation composition and a non-default RotationOrder (enum 5,
+//     "XYZ" -- the implicit default when the property is absent is enum 0, "ZYX", NOT "XYZ"); a
+//     VectorKeyframeTrack position channel AND a VectorKeyframeTrack scale channel (generateVectorTrack, a
+//     different FBXLoader code path from generateRotationTrack, exercising raw per-axis curve values with no
+//     Euler/quaternion math); and two separate AnimationStacks/clips in one file, resolving to two distinct,
+//     correctly-named entries in mapFbxAnimations()'s output with non-overlapping channels. Still NOT
+//     covered, stated plainly rather than silently: morph-target (`DeformPercent`) animation tracks, which
+//     mapFbxAnimations() deliberately skips rather than mis-mapping (see its own comment in gpu/fbxLoad.js);
+//     and a rotation curve whose per-axis span exceeds 180 degrees between keyframes (FBXLoader's own
+//     interpolateRotations() switches to a slerp-subdivided sub-interval path above that threshold -- a
+//     genuinely different code path from either fixture's small spans, neither of which reaches it).
+//   * CUBICSPLINE INTERPOLATION IS NOT A GAP -- IT IS UNREACHABLE FROM THE CURRENTLY-VENDORED FBXLoader, AND
+//     DELIBERATELY NOT ATTEMPTED. Confirmed by reading vendor/three/jsm/loaders/FBXLoader.js's
+//     AnimationParser in full: it never calls `.setInterpolation()` on any track it builds, so every track it
+//     can ever produce carries KeyframeTrack's own class default, InterpolateLinear -- there is no FBX file,
+//     hand-authored or otherwise, that could make THIS vendored loader emit anything but "LINEAR" through
+//     gpu/fbxLoad.js's samplerInterpolation(). A future reader should not read a missing CUBICSPLINE fixture
+//     as an unclosed item on this list; closing it would need a patched or newer FBXLoader, which is out of
+//     this gate's scope entirely, not merely undone within it.
 //
 // ================================================================================================
 // THE FIXTURES, AND WHY THEY ARE HAND-WRITTEN RATHER THAN SOURCED
 // ================================================================================================
 //
-// gpu/fixtures/fbxIngest.ascii.fbx and gpu/fixtures/fbxAnim.ascii.fbx are both committed. Neither is derived
-// from anything -- see gpu/fixtures/PROVENANCE.md's own entries for each. PROVENANCE.md already established
-// this tree's rule for exactly this situation (its ABeautifulGame entries): a licence must be personally
-// verified before a third-party asset is vendored, even trimmed, and Duck/BrainStem in the SAME sample
-// repository as the CC-BY-4.0 ABeautifulGame model carry different, more restrictive licences -- so
-// "everyone uses this for testing" is not a licence. The common FBX test fixtures the wider ecosystem
-// reaches for (Mixamo exports, most game-asset-marketplace samples, three.js's own examples/models/fbx/
-// Samba Dancing.fbx) could not be positively confirmed redistributable, so none of them is here. Both
-// fixtures instead are plain ASCII FBX 7.4 text, written directly against vendor/three/jsm/loaders/
-// FBXLoader.js's own TextParser/FBXTreeParser/GeometryParser/DeformerParser/AnimationParser source (confirmed
-// by reading that source, not guessed):
+// gpu/fixtures/fbxIngest.ascii.fbx, gpu/fixtures/fbxAnim.ascii.fbx, and gpu/fixtures/fbxAnimAdvanced.ascii.fbx
+// are all committed. None is derived from anything -- see gpu/fixtures/PROVENANCE.md's own entries for each.
+// PROVENANCE.md already established this tree's rule for exactly this situation (its ABeautifulGame
+// entries): a licence must be personally verified before a third-party asset is vendored, even trimmed, and
+// Duck/BrainStem in the SAME sample repository as the CC-BY-4.0 ABeautifulGame model carry different, more
+// restrictive licences -- so "everyone uses this for testing" is not a licence. The common FBX test fixtures
+// the wider ecosystem reaches for (Mixamo exports, most game-asset-marketplace samples, three.js's own
+// examples/models/fbx/Samba Dancing.fbx) could not be positively confirmed redistributable, so none of them
+// is here. All three fixtures instead are plain ASCII FBX 7.4 text, written directly against
+// vendor/three/jsm/loaders/FBXLoader.js's own TextParser/FBXTreeParser/GeometryParser/DeformerParser/
+// AnimationParser source (confirmed by reading that source, not guessed):
 //
 //   * fbxIngest.ascii.fbx (round 2, task #44) -- two triangles sharing an edge, the same quad shape
 //     tools/ship/dracoEncode-selfcheck.mjs's own QUAD fixture uses, with per-corner normals and UVs, no
 //     skeleton, no animation.
-//   * fbxAnim.ascii.fbx (round 3, task #59) -- the SAME quad, skinned to a minimal 2-bone rig (root at the
-//     origin, a child bone offset (0,1,0), the quad's bottom 2 control points weighted 100% to the root and
-//     the top 2 to the child), plus one animation clip ("TestClip") rotating the child bone 0 -> 90 degrees
-//     about X over 1 second (2 keyframes) -- the smallest rig that exercises skin and animation together.
-//     Iterated against the real headless-Chromium harness (tools/ship/webgpuHarness.mjs's runInEngineOrigin,
-//     the same one section 6 below uses) rather than trusted from reading the FBX grammar alone -- the same
-//     discipline task #44's own fixture took.
+//   * fbxAnim.ascii.fbx (round 3, task #59 round 1) -- the SAME quad, skinned to a minimal 2-bone rig (root
+//     at the origin, a child bone offset (0,1,0), the quad's bottom 2 control points weighted 100% to the
+//     root and the top 2 to the child), plus one animation clip ("TestClip") rotating the child bone 0 -> 90
+//     degrees about X over 1 second (2 keyframes) -- the smallest rig that exercises skin and animation
+//     together. Iterated against the real headless-Chromium harness (tools/ship/webgpuHarness.mjs's
+//     runInEngineOrigin, the same one sections 6-7 below use) rather than trusted from reading the FBX
+//     grammar alone -- the same discipline task #44's own fixture took.
+//   * fbxAnimAdvanced.ascii.fbx (task #59 round 2, this round) -- NO geometry and NO skin (deliberately --
+//     mapFbxAnimations() reads group.animations up front regardless of whether a mesh was found, so this is
+//     a smaller, more isolated way to exercise animation mapping alone). Two LimbNode bones, `root` and
+//     `mover`, neither parented to the other. `root` carries a non-default RotationOrder (enum 5, "XYZ"),
+//     PreRotation (30,0,0 deg) and PostRotation (0,45,0 deg) on its Properties70, and an animated rotation
+//     curve (0,0,0) -> (60,0,0) degrees. Two AnimationStacks: "ClipA" (root's rotation + mover's position,
+//     one AnimationLayer) and "ClipB" (mover's scale, a separate AnimationLayer/AnimationStack). Verified
+//     against a real headless-Chromium run (this fixture's design read FBXLoader.js's AnimationParser and
+//     TextParser Property70 grammar closely enough beforehand that it passed on the first real run -- still
+//     run for real, not trusted from the reading alone, per this file's own standing discipline).
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -129,7 +164,7 @@ console.log("\n2. gpu/fbxLoad.js FOLLOWS THE SAME DEPENDENCY-INJECTION SHAPE AS 
     ok("!! the remaining v1 scope gaps are documented in the file's own header, GLBParser.js-header style",
         /SINGLE MESH ONLY/.test(fbxLoadSrc) && /NO TEXTURES, NO VERTEX COLORS/.test(fbxLoadSrc));
     ok("!! ...and task #59's animation-mapping closure is documented too, not silently folded in",
-        /ANIMATION MAPPING \(task #59, closed this round\)/.test(fbxLoadSrc) &&
+        /ANIMATION MAPPING \(task #59\)/.test(fbxLoadSrc) &&
         /mapFbxAnimations/.test(fbxLoadSrc));
 }
 
@@ -506,9 +541,203 @@ console.log("      PIPELINE, GRADED AGAINST HAND-COMPUTED NUMBERS, NOT \"IT LOAD
     }
 }
 
+// ---- 7. TASK #59 ROUND 2 -- preRotation/postRotation, non-default Euler order, position/scale tracks, -----
+//         and multi-clip files, ALL GRADED AGAINST EXACT MEASURED NUMBERS -----------------------------------
+console.log("\n7. *** TASK #59 ROUND 2: THE GAPS SECTION 6 NAMED -- preRotation/postRotation composition, a");
+console.log("      non-default RotationOrder, position/scale (VectorKeyframeTrack) channels, and TWO");
+console.log("      AnimationStacks in one file, THROUGH THE REAL PIPELINE, GRADED AGAINST NUMBERS FROM AN");
+console.log("      INDEPENDENT three.js QUATERNION/EULER ORACLE, NOT HAND TRIGONOMETRY ***");
+{
+    const skip = webgpuSkipReason();
+    if (skip) {
+        say("SKIP (no headless shell / playwright): " + skip);
+        fails++;
+    } else {
+        const advFixturePath = path.join(ENG, "gpu/fixtures/fbxAnimAdvanced.ascii.fbx");
+        ok("!! the committed mesh-less, skin-less animation fixture exists", fs.existsSync(advFixturePath), advFixturePath);
+
+        const SCRIPT = `async () => {
+            const im = document.createElement("script");
+            im.type = "importmap";
+            im.textContent = JSON.stringify({ imports: { "three": "/vendor/three/three.module.js" } });
+            document.head.appendChild(im);
+            await new Promise((r) => setTimeout(r, 10));
+
+            const canvas = document.createElement("canvas");
+            const gl = canvas.getContext("webgl2");
+            if (!gl) return { ok: false, reason: "no webgl2 context in this headless page" };
+            const { GPUAssetLoader } = await import("/gpu/gpuAssetLoader.js");
+            const loader = new GPUAssetLoader(gl, { basePath: "/gpu/fixtures/" });
+            loader.primeKnownAssets(["fbxAnimAdvanced.ascii"], {
+                "fbxAnimAdvanced.ascii": { glb: false, obj: false, fbx: true, folder: false },
+            });
+            let mesh;
+            try { mesh = await loader.loadAsset("fbxAnimAdvanced.ascii"); }
+            catch (e) { return { ok: false, stage: "loadAsset threw", error: String(e && e.message || e) }; }
+            if (!mesh) return { ok: false, reason: "loadAsset returned null" };
+            return {
+                ok: true,
+                nodeNames: mesh.nodes ? mesh.nodes.map((n) => n.name) : null,
+                animations: mesh.animations ? mesh.animations.map((c) => ({
+                    name: c.name,
+                    duration: c.duration,
+                    samplers: c.samplers.map((s) => ({
+                        times: Array.from(s.times),
+                        values: Array.from(s.values),
+                        interpolation: s.interpolation,
+                    })),
+                    channels: c.channels,
+                })) : null,
+            };
+        }`;
+        const out = await runInEngineOrigin({ engineRoot: ENG, script: SCRIPT });
+        if (out.skipped) { say("SKIP: " + out.reason); fails++; }
+        else {
+            ok("!! *** the SHIPPED pipeline loads the mesh-less, multi-clip fixture (loadAsset -> _loadFBX -> ***",
+                out.ok && out.result && out.result.ok,
+                out.ok ? JSON.stringify(out.result).slice(0, 200) : out.reason);
+            if (out.ok && out.result && out.result.ok) {
+                const r = out.result;
+                // No mesh, no skin -- mapFbxAnimations() runs regardless (see gpu/fbxLoad.js's
+                // normalizeFbxGroup(): `animations` is computed once, up front, before the mesh search).
+                // nodes: pre-order DFS from the group. Objects.Model's file order is root(100000),
+                // mover(100001), neither with a Model-Model parent connection, so both attach directly to
+                // the scene root -- snapshotNodes() visits [group, root, mover] in that order.
+                ok("!! *** nodes are EXACTLY [\"\", \"root\", \"mover\"], in that pre-order ***",
+                    JSON.stringify(r.nodeNames) === JSON.stringify(["", "root", "mover"]), JSON.stringify(r.nodeNames));
+
+                ok("!! *** exactly 2 animation clips (TWO AnimationStacks in one file, each its own entry) ***",
+                    r.animations && r.animations.length === 2,
+                    JSON.stringify(r.animations).slice(0, 300));
+
+                const clipA = r.animations && r.animations.find((c) => c.name === "ClipA");
+                const clipB = r.animations && r.animations.find((c) => c.name === "ClipB");
+                ok("!! *** both clips are present, by name, and distinct (\"ClipA\" and \"ClipB\") ***",
+                    !!clipA && !!clipB, JSON.stringify((r.animations || []).map((c) => c.name)));
+
+                if (clipA) {
+                    // --------------------------------------------------------------------------------------
+                    // ClipA -- root's rotation (preRotation/postRotation/non-default RotationOrder composed
+                    // through FBXLoader's own generateRotationTrack) + mover's position (plain VectorKeyframeTrack
+                    // values, no trig at all).
+                    // --------------------------------------------------------------------------------------
+                    ok("!! *** ClipA: duration EXACTLY 1, 2 samplers/channels (root's rotation, mover's position) ***",
+                        clipA.duration === 1 && clipA.samplers.length === 2 && clipA.channels.length === 2,
+                        JSON.stringify(clipA).slice(0, 300));
+
+                    const rotCh = clipA.channels.find((c) => c.path === "rotation");
+                    const posCh = clipA.channels.find((c) => c.path === "translation");
+                    ok("!! *** ClipA's rotation channel targets node 1 (\"root\"); position channel targets node 2 (\"mover\") ***",
+                        rotCh && rotCh.targetNode === 1 && posCh && posCh.targetNode === 2,
+                        JSON.stringify(clipA.channels));
+
+                    const rotSamp = rotCh && clipA.samplers[rotCh.samplerIdx];
+                    const posSamp = posCh && clipA.samplers[posCh.samplerIdx];
+
+                    // ---- The composed rotation quaternions ------------------------------------------------
+                    // Fixture: root's Properties70 set RotationOrder = enum 5 ("XYZ" -- FBXLoader's
+                    // getEulerOrder() table at vendor/three/jsm/loaders/FBXLoader.js ~line 4243-4266; the
+                    // IMPLICIT default when RotationOrder is absent is enum 0, "ZYX", NOT "XYZ" -- this fixture
+                    // sets it explicitly to something else on purpose), PreRotation = (30,0,0) degrees,
+                    // PostRotation = (0,45,0) degrees. The animated rotation curve (2 keyframes) goes
+                    // (0,0,0) -> (60,0,0) degrees -- a single-axis span of 60 degrees, well under the 180-degree
+                    // threshold where FBXLoader's interpolateRotations() would switch to a slerp-subdivided
+                    // sub-interval path (a different code path this fixture does not exercise -- see this
+                    // file's header).
+                    //
+                    // generateRotationTrack (vendor/three/jsm/loaders/FBXLoader.js ~line 2809-2880) composes,
+                    // per keyframe:
+                    //   quaternion = Quaternion().setFromEuler(Euler(keyframeXYZ_radians, eulerOrder))
+                    //   quaternion.premultiply(preRotationQuat)          // this = preRotationQuat * this
+                    //   quaternion.multiply(postRotationQuat.invert())   // this = this * postRotationQuat^-1
+                    // where preRotationQuat/postRotationQuat are themselves
+                    // Quaternion().setFromEuler(Euler(degToRad(PreRotation/PostRotation), eulerOrder)).
+                    //
+                    // *** THESE EXPECTED VALUES ARE NOT HAND-COMPUTED TRIGONOMETRY. *** They come from an
+                    // independent Node.js script (not committed -- see this section's own comment for its full
+                    // text, reproducible from what is written here) that imports Quaternion/Euler/MathUtils
+                    // DIRECTLY from vendor/three/three.module.js and performs the EXACT SAME steps above:
+                    //
+                    //   import { Quaternion, Euler, MathUtils } from ".../vendor/three/three.module.js";
+                    //   const eulerOrder = "XYZ";
+                    //   function toQuat(degXYZ) {
+                    //       const rad = degXYZ.map(MathUtils.degToRad);
+                    //       return new Quaternion().setFromEuler(new Euler(rad[0], rad[1], rad[2], eulerOrder));
+                    //   }
+                    //   const preQuat = toQuat([30, 0, 0]);
+                    //   const postQuatInv = toQuat([0, 45, 0]).invert();
+                    //   function composed(keyDeg) {
+                    //       const q = toQuat(keyDeg);
+                    //       q.premultiply(preQuat);
+                    //       q.multiply(postQuatInv);
+                    //       return q;
+                    //   }
+                    //   // composed([0,0,0]) and composed([60,0,0]), each component then Math.fround()-ed to
+                    //   // float32 (QuaternionKeyframeTrack's ValueBufferType), since float32 is what actually
+                    //   // reaches normalizeFbxGroup() -- the same float64->float32 rounding discipline section 6
+                    //   // used for its single rotation value.
+                    //
+                    // That oracle's output for t=0 (keyframe (0,0,0) deg -- NOT identity, because the composition
+                    // still applies preRotationQuat/postRotationQuat even to a zero animated rotation) and t=1
+                    // (keyframe (60,0,0) deg) is reproduced below and matched exactly against the real pipeline's
+                    // output -- if the two ever disagree, that is a real finding in either FBXLoader's actual
+                    // behaviour or this repo's understanding of it, not a rounding note to paper over.
+                    const expectRotTimes = [0, 1];
+                    const expectRotValues = [
+                        0.23911762237548828, -0.36964380741119385, -0.0990457609295845, 0.8923990726470947,
+                        0.6532815098762512, -0.27059805393218994, -0.27059805393218994, 0.6532815098762512,
+                    ];
+                    ok("!! *** rotation sampler: times EXACTLY [0, 1], LINEAR interpolation ***",
+                        rotSamp && JSON.stringify(rotSamp.times) === JSON.stringify(expectRotTimes) &&
+                        rotSamp.interpolation === "LINEAR",
+                        rotSamp ? JSON.stringify({ times: rotSamp.times, interpolation: rotSamp.interpolation }) : "no rotation sampler");
+                    ok("!! *** rotation sampler values match the independent three.js Quaternion/Euler oracle EXACTLY ***",
+                        rotSamp && JSON.stringify(rotSamp.values) === JSON.stringify(expectRotValues),
+                        rotSamp ? JSON.stringify(rotSamp.values) : "no rotation sampler");
+
+                    // ---- The position (VectorKeyframeTrack) channel: plain values, no trig at all ----
+                    const expectPosTimes = [0, 1];
+                    const expectPosValues = [0, 0, 0, 5, -3, 2];
+                    ok("!! *** position sampler: times EXACTLY [0, 1], values EXACTLY [(0,0,0), (5,-3,2)], LINEAR ***",
+                        posSamp && JSON.stringify(posSamp.times) === JSON.stringify(expectPosTimes) &&
+                        JSON.stringify(posSamp.values) === JSON.stringify(expectPosValues) &&
+                        posSamp.interpolation === "LINEAR",
+                        posSamp ? JSON.stringify(posSamp) : "no position sampler");
+                }
+
+                if (clipB) {
+                    // --------------------------------------------------------------------------------------
+                    // ClipB -- mover's scale, in a SEPARATE AnimationStack/AnimationLayer from ClipA. Proves
+                    // multi-clip resolution: this channel must NOT leak into ClipA's channel list above, and
+                    // ClipA's channels must not leak into this one.
+                    // --------------------------------------------------------------------------------------
+                    ok("!! *** ClipB: duration EXACTLY 1, exactly 1 sampler/channel (mover's scale only) ***",
+                        clipB.duration === 1 && clipB.samplers.length === 1 && clipB.channels.length === 1,
+                        JSON.stringify(clipB));
+                    const scaleCh = clipB.channels[0];
+                    ok("!! *** ClipB's scale channel targets node 2 (\"mover\"), path \"scale\" ***",
+                        scaleCh && scaleCh.targetNode === 2 && scaleCh.path === "scale", JSON.stringify(scaleCh));
+                    const scaleSamp = scaleCh && clipB.samplers[scaleCh.samplerIdx];
+                    const expectScaleTimes = [0, 1];
+                    const expectScaleValues = [1, 1, 1, 2, 1, 0.5];
+                    ok("!! *** scale sampler: times EXACTLY [0, 1], values EXACTLY [(1,1,1), (2,1,0.5)], LINEAR ***",
+                        scaleSamp && JSON.stringify(scaleSamp.times) === JSON.stringify(expectScaleTimes) &&
+                        JSON.stringify(scaleSamp.values) === JSON.stringify(expectScaleValues) &&
+                        scaleSamp.interpolation === "LINEAR",
+                        scaleSamp ? JSON.stringify(scaleSamp) : "no scale sampler");
+                    say("ClipA's channels (root.rotation, mover.translation) and ClipB's channel " +
+                        "(mover.scale) stayed in their own clips -- multi-clip files resolve to distinct, " +
+                        "non-overlapping entries in mapFbxAnimations()'s output, not one merged clip.");
+                }
+            }
+        }
+    }
+}
+
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nSee this file's own header for the full list of what is deliberately NOT proven here: no multi-mesh/" +
-    "multi-material concat, no embedded-texture extraction, no VectorKeyframeTrack (position/scale) channel, " +
-    "no preRotation/postRotation or non-default Euler order, no multi-clip file, and no CUBICSPLINE " +
-    "interpolation (FBXLoader's own AnimationParser never emits it).");
+    "multi-material concat, no embedded-texture extraction, no morph-target (DeformPercent) animation tracks, " +
+    "and no rotation curve spanning >=180 degrees between keyframes on one axis (FBXLoader's slerp-subdivision " +
+    "path). CUBICSPLINE interpolation is NOT on that list as an open gap -- it is unreachable from the " +
+    "currently-vendored FBXLoader (see the header for why), not merely undone.");
 process.exit(fails ? 1 : 0);

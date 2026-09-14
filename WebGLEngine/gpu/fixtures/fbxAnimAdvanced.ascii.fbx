@@ -1,0 +1,145 @@
+; SweK_Engine fbxAnimIngest-selfcheck fixture -- hand-authored, original content, ASCII FBX 7.4.
+; Not derived from any third-party asset -- written for this repository, zero licensing question.
+; Task #59 remaining-gaps round. Two unrigged bones, no geometry (mapFbxAnimations() reads
+; group.animations up front, independent of whether a mesh is found -- see gpu/fbxLoad.js), and TWO
+; AnimationStacks:
+;   AnimStack::ClipA -- "root"'s rotation (a QuaternionKeyframeTrack exercising a non-default
+;     RotationOrder (enum 5, "XYZ") plus non-identity PreRotation (30,0,0 deg) and PostRotation
+;     (0,45,0 deg), composed by FBXLoader's own generateRotationTrack -- NOT re-derived here) and
+;     "mover"'s position (a VectorKeyframeTrack, plain values, no trig).
+;   AnimStack::ClipB -- "mover"'s scale (a second VectorKeyframeTrack, in a separate stack/layer from
+;     ClipA, proving multi-clip files resolve to distinct entries in mapFbxAnimations()'s output).
+; See gpu/fixtures/PROVENANCE.md's entry for this file, gpu/fbxLoad.js's header, and
+; tools/ship/fbxIngest-selfcheck.mjs section 7 for exactly what this exercises and how the composed
+; rotation quaternions were verified (an independent three.js Quaternion/Euler oracle script, not
+; hand trigonometry).
+
+FBXHeaderExtension:  {
+	FBXHeaderVersion: 1003
+	FBXVersion: 7400
+	Creator: "SweK_Engine fbxAnimIngest-selfcheck fixture"
+}
+GlobalSettings:  {
+}
+Objects:  {
+	Model: 100000, "Model::root", "LimbNode" {
+		Version: 232
+		Shading: Y
+		Culling: "CullingOff"
+		Properties70:  {
+			P: "RotationOrder", "enum", "", "A",5
+			P: "PreRotation", "Vector3D", "Vector3D", "",30,0,0
+			P: "PostRotation", "Vector3D", "Vector3D", "",0,45,0
+		}
+	}
+	Model: 100001, "Model::mover", "LimbNode" {
+		Version: 232
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	AnimationStack: 200000, "AnimStack::ClipA", "" {
+	}
+	AnimationLayer: 200001, "AnimLayer::ClipA_Base", "" {
+	}
+	AnimationCurveNode: 210000, "AnimCurveNode::R", "" {
+	}
+	AnimationCurve: 210001, "AnimCurve::", "" {
+		KeyTime: *2 {
+			a: 0,46186158000
+		}
+		KeyValueFloat: *2 {
+			a: 0,60
+		}
+	}
+	AnimationCurve: 210002, "AnimCurve::", "" {
+		KeyTime: *2 {
+			a: 0,46186158000
+		}
+		KeyValueFloat: *2 {
+			a: 0,0
+		}
+	}
+	AnimationCurve: 210003, "AnimCurve::", "" {
+		KeyTime: *2 {
+			a: 0,46186158000
+		}
+		KeyValueFloat: *2 {
+			a: 0,0
+		}
+	}
+	AnimationCurveNode: 220000, "AnimCurveNode::T", "" {
+	}
+	AnimationCurve: 220001, "AnimCurve::", "" {
+		KeyTime: *2 {
+			a: 0,46186158000
+		}
+		KeyValueFloat: *2 {
+			a: 0,5
+		}
+	}
+	AnimationCurve: 220002, "AnimCurve::", "" {
+		KeyTime: *2 {
+			a: 0,46186158000
+		}
+		KeyValueFloat: *2 {
+			a: 0,-3
+		}
+	}
+	AnimationCurve: 220003, "AnimCurve::", "" {
+		KeyTime: *2 {
+			a: 0,46186158000
+		}
+		KeyValueFloat: *2 {
+			a: 0,2
+		}
+	}
+	AnimationStack: 300000, "AnimStack::ClipB", "" {
+	}
+	AnimationLayer: 300001, "AnimLayer::ClipB_Base", "" {
+	}
+	AnimationCurveNode: 310000, "AnimCurveNode::S", "" {
+	}
+	AnimationCurve: 310001, "AnimCurve::", "" {
+		KeyTime: *2 {
+			a: 0,46186158000
+		}
+		KeyValueFloat: *2 {
+			a: 1,2
+		}
+	}
+	AnimationCurve: 310002, "AnimCurve::", "" {
+		KeyTime: *2 {
+			a: 0,46186158000
+		}
+		KeyValueFloat: *2 {
+			a: 1,1
+		}
+	}
+	AnimationCurve: 310003, "AnimCurve::", "" {
+		KeyTime: *2 {
+			a: 0,46186158000
+		}
+		KeyValueFloat: *2 {
+			a: 1,0.5
+		}
+	}
+}
+Connections:  {
+	C: "OP",210001,210000,"d|X"
+	C: "OP",210002,210000,"d|Y"
+	C: "OP",210003,210000,"d|Z"
+	C: "OP",210000,100000,"Lcl Rotation"
+	C: "OO",210000,200001
+	C: "OO",200001,200000
+	C: "OP",220001,220000,"d|X"
+	C: "OP",220002,220000,"d|Y"
+	C: "OP",220003,220000,"d|Z"
+	C: "OP",220000,100001,"Lcl Translation"
+	C: "OO",220000,200001
+	C: "OP",310001,310000,"d|X"
+	C: "OP",310002,310000,"d|Y"
+	C: "OP",310003,310000,"d|Z"
+	C: "OP",310000,100001,"Lcl Scaling"
+	C: "OO",310000,300001
+	C: "OO",300001,300000
+}
