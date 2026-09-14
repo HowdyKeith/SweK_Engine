@@ -141,7 +141,14 @@ function emitters() {
 // v3927 -- 42 -> 41. Eleven pages got homes this round (eight GPU Brain, three lattice-Boltzmann) and the
 // residue fell 52 -> 41, so the bar comes down with it: "every one that gets a home lowers the bar". A ratchet
 // left above the real number is a ratchet holding nothing, which the check below this one exists to say.
-const RESIDUE_CEILING = 41;
+// v4590 -- 41 -> 22. A background research pass read all 62 residue pages and proposed a section or an
+// exemption for each; the confident half of its proposals landed this round -- 21 pages into nine existing
+// drawers, 8 into a new "Slug Text" drawer named for a family with zero prior home, and 11 more into UNPLACED
+// with an honest reason (three of them -- android-peer, ios-peer, steamdeck-peer -- were RIGHT by subject but
+// have no Arriving anchor for the mover to take, which UNPLACED can say and SECTIONS cannot). The remaining ~20
+// pages from that same pass were flagged "needs Keith's judgement" and are deliberately NOT placed yet -- so
+// residue stayed at 22 rather than falling further, and the ceiling comes down to meet it rather than past it.
+const RESIDUE_CEILING = 22;
 
 {
     const html = fs.readFileSync(path.join(ENG, "server.html"), "utf8");

@@ -61,12 +61,22 @@ console.log("\n2. *** 'JUST PLACE THEM' IS ARITHMETICALLY IMPOSSIBLE, AND THAT I
     report("used / free / needed", cap.used + " / " + cap.free + " / " + cap.need);
     report("shortfall", cap.shortfall + " -> at least " + cap.extraPanelsNeeded + " more panels");
 
-    ok("!! the whole cabinet cannot hold the unplaced pages",
-        cap.shortfall > 0,
+    // v4590 -- SHORTFALL REACHED ZERO, MEASURED RATHER THAN ASSUMED STILL POSITIVE. This assertion held since
+    // v3576 (105 short at first measurement, 21 short immediately before this round) and this round's
+    // registerResidue residue sweep -- 21 pages placed into nine existing panels, 8 into a new "Slug Text"
+    // drawer named for a family with zero prior home, 11 more moved from silent into UNPLACED with a reason --
+    // closed the LAST 21-page gap by shrinking `need` and growing `free` at once. Filling every panel to
+    // MAX_PER_PANEL now places 170 of a needed 165, not the other way around. *** THE MARGIN IS FIVE, WHICH IS
+    // NOT SLACK -- it is five silent pages that could still land in an existing panel's remaining room, and one
+    // more subject with no drawer (like the eight Slug Text pages before this round) would put the cabinet back
+    // in deficit. *** Naming a panel is still naming a subject, which is still Keith's call; the arithmetic
+    // question this section exists to answer has just changed its answer, honestly, for the first time.
+    ok("!! the whole cabinet can -- BARELY -- hold the unplaced pages, for the first time",
+        cap.shortfall === 0,
         "filling EVERY panel to Keith's v3434 cap of " + MAX_PER_PANEL + " places " + cap.free + " of " +
-        cap.need + ". *** SO THE ANSWER TO 'JUST PUT THEM IN PANELS' IS A SHORTFALL OF " + cap.shortfall +
-        ", NOT AN OPINION. *** Naming " + cap.extraPanelsNeeded + " more panels is naming " +
-        cap.extraPanelsNeeded + " more subjects, which is Keith's call.");
+        cap.need + ". *** THE SHORTFALL THAT WAS 105 AT v3576 AND 21 IMMEDIATELY BEFORE THIS ROUND IS NOW " +
+        cap.shortfall + " -- MEASURED, NOT ASSUMED STILL POSITIVE. *** The next unplaced page with no fitting " +
+        "panel reopens the deficit; this line will catch it the same way it caught the deficit closing.");
     ok("...and the capacity is derived from the registry rather than typed here",
         cap.totalSlots === SECTIONS.length * MAX_PER_PANEL && cap.used === SECTIONS.reduce((a, s) => a + s.pages.length, 0),
         "a hard-coded slot count would rot the moment a panel is added, which is the defect this tool reports");

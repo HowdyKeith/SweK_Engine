@@ -399,7 +399,7 @@
    "f": "boot-sidecar.html",
    "t": "boot sidecar reports",
    "d": "Slow startup work handed to a helper process, so boot reads a timestamped file instead of talking to the outside world. This page shows every known sidecar report in the three states the contract defines and never collapses them into two: no report is not the same as a stale one, and a stale one is not the same as fresh. A malformed report reads as ABSENT, because a file the server trusts at boot is a trust surface.",
-   "g": "",
+   "g": "systools",
    "p": 0
   },
   {
@@ -854,7 +854,7 @@
    "f": "device-present.html",
    "t": "Presented Frame Check",
    "d": "Draws a known two-colour pattern through gfx/device.js on a canvas the device PRESENTS to, and reads it back three ways -- the device's canvas readback, an offscreen frame with the same commands, and a 2D drawImage of the presented canvas (what the compositor sees) -- comparing all three with the expectation. Every other device gate reads an offscreen texture because the build box loses the WebGPU device on a presented pass; this page is the rig's answer to whether presentation itself is right. ?webgl=1 forces WebGL2.",
-   "g": "",
+   "g": "webgpu",
    "p": 0
   },
   {
@@ -1456,7 +1456,7 @@
    "f": "heightfield-vs-volume.html",
    "t": "SweK &middot; Heightfield vs Volume",
    "d": "",
-   "g": "",
+   "g": "renders",
    "p": 0
   },
   {
@@ -1554,7 +1554,7 @@
    "f": "ios-tools.html",
    "t": "SweK iOS Device Tools",
    "d": "adb for iOS: install and drive doronz88/pymobiledevice3 through a read-only allowlist. Lists devices and apps, reads crash names and battery, over a normal pairing with no jailbreak.",
-   "g": "",
+   "g": "box3d",
    "p": 0
   },
   {
@@ -1673,7 +1673,7 @@
    "f": "lab-census.html",
    "t": "Lab census",
    "d": "The physics lab's coverage in one read: how many proven modules a device bind reaches, how many binds declare a plant, how many devices can face the four-criterion corroboration battery, how many are reachable from an instrument, and whether the job dispatcher is actually ticking. Every figure is imported from the tool that owns it -- the page re-derives nothing, which is the whole point: four censuses that each print their own prose is why the numbers in the notes went stale.",
-   "g": "",
+   "g": "systools",
    "p": 0
   },
   {
@@ -1911,7 +1911,7 @@
    "f": "mpm3d.html",
    "t": "MPM in 3D",
    "d": "The 3D MPM loop, drawn (v3841). mpm3dBind proved the transfer identities lift to 3D; this is the loop above them -- p2g3, a 27-node stress scatter, gravity, g2p3, a 3x3 deformation-gradient update -- running an elastic block that falls into a box and settles. The graded key is the same one that graded the 2D loop: the centre of mass follows the analytic fall whatever the block does internally (step3d-selfcheck), now in three axes, with a 3x3 Neo-Hookean stress whose Cauchy tensor is symmetric (angular-momentum balance) and which returns NaN for an inverted particle rather than clamping. Drag to orbit. Run/Reset. Answer-key gate: step3d-selfcheck.",
-   "g": "",
+   "g": "fluidgpu",
    "p": 0
   },
   {
@@ -2366,7 +2366,7 @@
    "f": "raymarch-options.html",
    "t": "Ray-march options (v3351)",
    "d": "",
-   "g": "",
+   "g": "voxels",
    "p": 0
   },
   {
@@ -2499,7 +2499,7 @@
    "f": "sandbox-gpu.html",
    "t": "Sandbox on the GPU",
    "d": "The main sandbox's world on the device path: world/world.js's VoxelWorld terrain with CityGen's facade buildings, greedy-meshed by the sandbox's own mesher (world/chunkMesherCore.js) with the registry's colours and corner AO, every chunk in its own slot of one lit mesh, drawn through render/gpuDriven.mjs and the lit pipeline on WebGPU or WebGL2. Rounds 1 to 6 of the sandbox on the device: the world; dig/build -- click a voxel to dig it, shift-click or right-click to build across its face, the touched chunks re-meshed and their slots rewritten in place (render/voxelDeviceEdit.mjs); Box3D crates (render/voxelBodies.mjs) dropped from the Drop a crate button onto the voxels, which reach box3d as a collision window of merged static boxes around each body -- dig under a crate and it falls; and the sandbox's damage (render/voxelDamage.mjs): Blast carves a sphere at the last picked voxel, bursts the debris system's cubes out of every voxel it removes, charges CityGen's buildings the voxels they lost through their own crumble passes and topple, and syncs every chunk the world marked dirty; and the sandbox's save (render/voxelSave.mjs over world/WorldPersistence.js): Save writes every chunk that diverged from the generator to IndexedDB in the sandbox's own format and the camera pose to localStorage, Load regenerates the world, restores the saved chunks and syncs their slots, Export and Import carry the same payload as JSON, autosave every 30 s; and the sandbox's own first-person camera (render/voxelAvatar.mjs over camera/camera.js): Walk drops the avatar at the last picked voxel, WASD walks, Shift sprints, Space jumps, drag or middle-click pointer lock to look, click to dig where you look, Esc or the button back to the orbit. All six rounds of the sandbox on the device are in. A seed and the city live, chunk and triangle counts, the mesh time and the last edit in the HUD, drag to orbit, wheel to dolly.",
-   "g": "",
+   "g": "voxels",
    "p": 0
   },
   {
@@ -2646,56 +2646,56 @@
    "f": "slug-curved.html",
    "t": "Curved Slug Text",
    "d": "Slug outline text bent along circular arcs by tessellated strips, each strip carrying its own Jacobian so the half-pixel dilation stays exact: text/slugCurve.mjs through gfx/device.js on either backend, with the measured texcoord error of each arc beside it.",
-   "g": "",
+   "g": "slugtext",
    "p": 0
   },
   {
    "f": "slug-device.html",
    "t": "Slug Text on the Device",
    "d": "Resolution-independent Slug text drawn through gfx/device.js on whichever backend the page has: the same atlas, the same batch, the WGSL twin on WebGPU and the GLSL port on WebGL2, premultiplied blend from the descriptor. slug-text.html is the raw WebGL2 original; this page is the device path that any device frame can draw text inside. ?webgl=1 forces the WebGL2 backend.",
-   "g": "",
+   "g": "slugtext",
    "p": 0
   },
   {
    "f": "slug-fire.html",
    "t": "Slug Fire",
    "d": "A word drawn by Slug with the Doom Fire automaton as its fill: the fragment multiplies coverage by a texture sampled at the glyph's em coordinates through an em rectangle, in both shader twins, and the fire is stepped and re-uploaded into one texture every frame. Gated pixel for pixel by tools/ship/slugFill-selfcheck.mjs.",
-   "g": "",
+   "g": "slugtext",
    "p": 0
   },
   {
    "f": "slug-morph.html",
    "t": "Slug Morph",
    "d": "One glyph outline morphing into the next through vendor/morphicons and drawn by Slug: the quadratic contours become an SVG path, morphicons pairs and interpolates the subpaths, and each frame packs one glyph into its own atlas. The melt mode fills the glyph with the Doom Fire and melts it to a puddle on the baseline, the fill riding along. Gated by tools/ship/slugMorph-selfcheck.mjs and tools/ship/slugMelt-selfcheck.mjs.",
-   "g": "",
+   "g": "slugtext",
    "p": 0
   },
   {
    "f": "slug-projective.html",
    "t": "Projective Slug Text",
    "d": "Slug outline text rotated on screen and laid on a plane in perspective through gfx/device.js on either backend: the shipped SlugDilate keeps its half-pixel edge under a varying w, held by tools/ship/slugProjective-selfcheck.mjs. Drag the sliders.",
-   "g": "",
+   "g": "slugtext",
    "p": 0
   },
   {
    "f": "slug-rig.html",
    "t": "- Slug on the rig",
    "d": "Slug text cost on THIS machine's GPU: a wall of glyphs per face at five sizes and three squashes, timed by GPU timestamps where the device was granted them, beside the atlas's own curves-per-band statistics -- the numbers the band-count question needs before anybody tunes one.",
-   "g": "",
+   "g": "slugtext",
    "p": 0
   },
   {
    "f": "slug-text.html",
    "t": "SweK &middot; Slug text",
    "d": "The first on-GPU draw of the Slug outline-text renderer merged at v3823: one quadratic TrueType font is packed into a curve texture and a band texture once, then the same data is drawn at eight sizes from 8px to a wall-filling title with no atlas to rebuild and no size-dependent baking, because the fragment shader reads the actual Bezier control points and solves for coverage per pixel. The Cross-check button reads the framebuffer back and compares coverage against slugEval.slugRender at matching points -- the check the library's note left open. Font: IBM Plex Serif (SIL OFL 1.1). Slug (c) Eric Lengyel, MIT OR Apache-2.0.",
-   "g": "",
+   "g": "slugtext",
    "p": 0
   },
   {
    "f": "slug-ticker.html",
    "t": "Slug Ticker",
    "d": "A 3-D ticker of Slug outline glyphs as Box3D rigid bodies: one box per glyph dropped onto a conveyor, tumbling and wrapping, each drawn through gfx/device.js with its own body matrix on either backend. The plumbing is gated by tools/ship/slugTicker-selfcheck.mjs. The napalm mode (?mode=napalm) draws the bodies through the Doom Fire fill and drops a trail of fire puddles on the floor behind each, fading by age, gated by tools/ship/slugNapalm-selfcheck.mjs. The shatter button bursts the centre glyph into nine box3d shards each carrying its sub-rectangle of the glyph, gated by tools/ship/slugShatter-selfcheck.mjs.",
-   "g": "",
+   "g": "slugtext",
    "p": 0
   },
   {
@@ -2765,7 +2765,7 @@
    "f": "splat-probes.html",
    "t": "Splat Probes",
    "d": "render/splatProbes.mjs baked over a two-tone shell of splats (render/probeFit.mjs fits the grid to occupancy and skips probes inside splats), drawn on gfx/device.js through render/probeLit.mjs: every probe a small sphere lit by its own coefficients, a mesh in the middle taking the volume's light, the splats as tone markers, the camera inside the shell. A row of four spheres shows the specular half (physics/render/specularProbeLit.mjs) at roughness 0..1, baked analytically from the same shell; one more sphere carries the SAME material fed a REAL captured environment instead (render/liveCubeCapture.mjs renders six faces of the actual scene through a real camera and packs the readback), so the analytic and live-captured techniques sit side by side rather than one replacing the other. Spacing and face size live, the bake time, probe count and box in the HUD, both backends. From the technique of isaac-mason/three-spark-light-probes, which has no licence file; nothing ported.",
-   "g": "",
+   "g": "optics",
    "p": 0
   },
   {
@@ -2793,7 +2793,7 @@
    "f": "ssao-compare.html",
    "t": "SSAO comparison (v3369)",
    "d": "",
-   "g": "",
+   "g": "renders",
    "p": 0
   },
   {
@@ -2842,7 +2842,7 @@
    "f": "sunshine.html",
    "t": "SweK Sunshine Host",
    "d": "Install and run the Sunshine game-stream HOST, and launch Moonlight V+ on a phone over adb. The host half of the phone-as-a-screen story.",
-   "g": "",
+   "g": "thirdparty",
    "p": 0
   },
   {
@@ -2891,21 +2891,21 @@
    "f": "thermal-flow.html",
    "t": "Convection",
    "d": "The thermal lattice, made visible. A second distribution carries heat the way the first carries momentum, and one line couples them: hot fluid is lighter. Heat a layer from below and nothing happens -- the heat just conducts through -- until the Rayleigh number crosses 1708, and then the fluid organises itself into rolls. Nothing in the code contains that number; drag the slider across it and watch it decide. Or turn the layers over -- heavy resting on light -- and gravity refuses the arrangement: the interface goes unstable and overturns into mushrooms. The colour is the temperature, on the same blackbody ramp the lava uses, because here the heat really is the material.",
-   "g": "",
+   "g": "fluidgpu",
    "p": 0
   },
   {
    "f": "thermal3d-cells.html",
    "t": "Plumes",
    "d": "Rayleigh-Benard convection in three dimensions: a layer heated from below organising itself into plumes, hot columns rising and cold sheets falling. Nothing tells it to. The surfaces are isosurfaces of temperature, marched fresh from the live field, and here the blackbody ramp is honestly reading heat -- unlike the duct, where it reads speed and says so. The Mach gauge matters: this engine measured its own lattice's Galilean error and wrote down a rule -- trust it below Mach 0.1. Push the Rayleigh slider hard enough and the page will tell you when you have broken the engine's own rule, because a demo that quietly runs outside its verified range is a lie with nice colours.",
-   "g": "",
+   "g": "fluidgpu",
    "p": 0
   },
   {
    "f": "three-probe.html",
    "t": "three Probe",
    "d": "Fetches a named three version from the npm registry in the browser, imports its WebGPU build beside the vendored 0.178, renders one TSL gradient with each and reads it back: whether the newer build runs on THIS machine's Chrome, with the exact error when it does not. Save the JSON as tools/ship/three-probe.json.",
-   "g": "",
+   "g": "systools",
    "p": 0
   },
   {
@@ -3171,7 +3171,7 @@
    "f": "waveguide.html",
    "t": "SweK Physics — waveguide cutoffs",
    "d": "A hollow metal pipe carries nothing below its cutoff frequency. TE and TM modes come from the same 2D eigenproblem differing only in a boundary condition, and that difference decides which mode is dominant: solving TM with the wrong condition returns a tidy, plausible cutoff for a pipe that does not exist. The mode SET is what catches it, not the frequencies.",
-   "g": "",
+   "g": "em",
    "p": 0
   },
   {

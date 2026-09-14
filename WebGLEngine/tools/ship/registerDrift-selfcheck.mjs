@@ -108,7 +108,15 @@ console.log("\n2b. THE FREEZE IS A CLAIM ABOUT THE PAST, SO A BOUNDED SAMPLE OF 
     // the audit not re-taken -- passed silently until v4414 repaired shaderCensus and this gate said nothing.
     // Re-taking all 28 costs minutes, so a DETERMINISTIC CHEAPEST-FIRST SAMPLE is re-run instead, under a
     // stated budget, and the coverage is reported rather than implied.
-    const BUDGET_MS = 1200;
+    // v4590 -- 1200 -> 12000, MEASURED AGAINST A POPULATION THAT COLLAPSED, NOT PICKED TO FIT. The v4590
+    // residue sweep and this round's re-baselining fixed enough of the register that REGISTER_AUDIT.rows is
+    // down to 4: one genuine timeout (shaderRefs, excluded here since it carries no `ms`) and three real
+    // readings (1,854 / 2,045 / 7,334 ms) that together cost 11,233 ms -- individually and in total, none of
+    // them fit the old 1,200 ms budget, so `sample` came back EMPTY and the message below crashed reading
+    // `sample[sample.length - 1].ms` off nothing. 12,000 ms is not a number chosen to make the crash go away;
+    // it is the smallest round budget that covers the population as it actually stands today, the same move
+    // redCensusFresh-selfcheck.mjs made the same round for the same reason.
+    const BUDGET_MS = 12000;
     const byCost = REGISTER_AUDIT.rows.filter((r) => typeof r.ms === "number").sort((a, b) => a.ms - b.ms);
     const sample = [];
     let cum = 0;
@@ -129,7 +137,7 @@ console.log("\n2b. THE FREEZE IS A CLAIM ABOUT THE PAST, SO A BOUNDED SAMPLE OF 
     ok(`!! *** a cheapest-first sample of the register is re-run LIVE, so a repaired red cannot hide behind the freeze ***`,
         moved.length === 0,
         moved.length ? `${moved.map((r) => `${r.gate} frozen exit ${r.frozen}, now ${r.now}`).join("; ")} -- re-run tools/ship/freezeRegisterAudit.mjs`
-                     : `${live.length} of ${REGISTER_AUDIT.rows.length} gates re-run in a ${BUDGET_MS} ms budget (${cum} ms recorded), all still failing. THE OTHER ${REGISTER_AUDIT.rows.length - live.length} ARE TAKEN ON THE FREEZE'S WORD. *** AND THIS SAMPLE WOULD NOT HAVE CAUGHT v4414's OWN REPAIR: *** shaderCensus cost 279 ms, and the ten cheapest stop at ${sample[sample.length - 1].ms} ms. Raising the budget until it reached that one case would be fitting the instrument to the answer, which is the error the round that added this block is ABOUT. It is a bounded sample and the bound is the number above`);
+                     : `${live.length} of ${REGISTER_AUDIT.rows.length} gates re-run in a ${BUDGET_MS} ms budget (${cum} ms recorded), all still failing. THE OTHER ${REGISTER_AUDIT.rows.length - live.length} ARE TAKEN ON THE FREEZE'S WORD${sample.length ? ` (cheapest ${sample.length}: up to ${sample[sample.length - 1].ms} ms each)` : ""}. It is a bounded sample and the bound is the number above -- a budget raised only when the real population outgrows it, never to make one case fit`);
     ok("  ...and every gate in the sample PRINTED a FAIL line, which is what says it ran at all",
         silent.length === 0 && live.every((r) => r.now >= 0),
         silent.length ? `${silent.map((r) => r.gate).join(", ")} produced no FAIL line -- a re-run reporting agreement without running is worth less than no check`
@@ -319,7 +327,15 @@ console.log("\n4. A RED WHOSE REASON CANNOT BE READ");
         stderrOnly.length === 0,
         stderrOnly.length ? `${stderrOnly.map((r) => r.gate).join(", ")} prints to STDERR. It still exits 1, so the sweep sees the red -- but every consumer in this tree scrapes stdout, so the REASON is invisible. That is most of the way to a red nobody opens, which is the failure this whole gate exists for`
                           : "so a red's reason reaches every consumer that scrapes a verdict");
-    const noLine = REGISTER_AUDIT.rows.filter((r) => r.exit !== "timeout" && r.count === 0);
+    // v4590 -- `r.exit !== 0` ADDED. Every prior freeze this file ever read happened to audit ONLY gates that
+    // were still red, so "not a timeout" and "still failing" were the same population and nothing distinguished
+    // them. The v4590 re-freeze is the first one to catch entries that went GREEN since being registered under
+    // an older version-named list (tslSource, tsl, tslPhysics -- ALL_REGISTERED's broader scope, not this
+    // round's own residue work) -- each legitimately prints zero FAIL lines because it has nothing to fail on,
+    // and without this clause they read as "a red with no reason", which is a different defect from "passes
+    // cleanly". A row this gate itself reports as still failing (section 2) is the only population this check
+    // is about.
+    const noLine = REGISTER_AUDIT.rows.filter((r) => r.exit !== "timeout" && r.exit !== 0 && r.count === 0);
     ok("  and a gate that fails without printing any FAIL line at all is named, because an exit code with no sentence is a red nobody can act on",
         noLine.length === 0, noLine.length ? noLine.map((r) => r.gate).join(", ") : "every failing gate says something");
 }

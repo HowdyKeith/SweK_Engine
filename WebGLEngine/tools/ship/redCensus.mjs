@@ -139,7 +139,9 @@ const RED_AT_V4279_GATES = Object.freeze([
     // tools/ship/canvasFill-selfcheck.mjs REMOVED, repaired: see FIXED_SINCE_V4279. Freshly re-run direct at
     // cba0f571: exit 0, "canvasFill-selfcheck: all checks pass". Named by redCensus-selfcheck's own
     // section-2 slice as one of the three it reached before its 45s budget ran out.
-    "tools/ship/definitionGates-selfcheck.mjs",
+    // tools/ship/definitionGates-selfcheck.mjs REMOVED, repaired: see FIXED_SINCE_V4279. Re-baselined at
+    // Keith's explicit choice ("re-baseline to current reality") and re-run twice fresh: exit 0 both times,
+    // "all checks pass".
     // v4571 -- tools/ship/gateReach-selfcheck.mjs REMOVED, repaired: see FIXED_SINCE_V4408. It stood in
     // this list AND was registered again at v4568, because the killed bucket found it red without
     // noticing it was already filed -- one gate, two entries, and only one of them ever revisited.
@@ -167,7 +169,9 @@ const RED_AT_V4279_GATES = Object.freeze([
     // the timeout bucket by being genuinely measured red) -- that control now reads from
     // METHOD.timeoutBucketEscapeExample, a frozen historical fact, specifically so fixing this gate would
     // never again have to choose between "true" and "keeps a different check passing".
-    "tools/ship/registerResidue-selfcheck.mjs",
+    // tools/ship/registerResidue-selfcheck.mjs REMOVED, repaired: see FIXED_SINCE_V4279. The v4590 residue
+    // sweep dropped it from 62 to 22 against a ceiling lowered to match; re-run fresh, exit 0, "all checks
+    // pass".
     "tools/ship/shaderRefs-selfcheck.mjs",
     // tools/ship/sunshineHost-selfcheck.mjs REMOVED, repaired: see FIXED_SINCE_V4279. registerDrift-
     // selfcheck's live cheapest-first sample caught this one directly: "frozen exit 1, now 0". Independently
@@ -521,6 +525,16 @@ export const FIXED_SINCE_V4279 = Object.freeze([
       why: "named by this file's own REMOVED comment above (\"repaired... in this same round\") but never " +
            "ledgered here -- the other of the two missing-ledger-entry accounting gaps this pass closes. " +
            "Freshly re-confirmed direct at cba0f571: exit 0, \"ALL PASS\"." },
+    { gate: "tools/ship/definitionGates-selfcheck.mjs", round: "v4590 -- three-ratchet re-baseline",
+      why: "Keith's explicit choice (\"re-baseline to current reality\") for a gate whose three ratchet " +
+           "constants (BASELINE, BASELINE_WIDE, BASELINE_SHAPES) had fallen behind the tree's honest current " +
+           "count, precedented by the file's own v4062/v4060 re-baselining history. Measured fresh and reset " +
+           "to 68/332/639; re-run twice, exit 0 both times, \"all checks pass\"." },
+    { gate: "tools/ship/registerResidue-selfcheck.mjs", round: "v4590 -- residue sweep",
+      why: "a background research pass proposed a home or an exemption for all 62 residue pages; the confident " +
+           "half landed this round (21 into nine existing drawers, 8 into a new Slug Text drawer, 11 into " +
+           "UNPLACED with a reason), dropping residue from 62 to 22 against a ceiling lowered to match. Re-run " +
+           "fresh, exit 0, \"all checks pass\"." },
 ]);
 
 /**
@@ -749,9 +763,13 @@ const WHY_V4531 = Object.freeze({
         "which of the two WebGL2 sampling paths is wrong, which belongs to the line that built the transplant.",
 });
 
-export const RED_AT_V4531_GATES = Object.freeze([
-    "tools/ship/tslSource-selfcheck.mjs",
-]);
+// tools/ship/tslSource-selfcheck.mjs REMOVED, at v4590. The v4531 finding (three's OWN WebGL2 linear render
+// disagreeing with the device on 125 of 4096 pixels) was a DIFFERENT red from the v4557 one this same gate was
+// also registered under -- both are now gone. The v4590 re-freeze of register-audit.mjs found the gate exit 0;
+// re-confirmed fresh (node tools/ship/tslSource-selfcheck.mjs): exit 0, "all checks pass". Whichever round
+// fixed the WebGL2 sampling disagreement this entry described did not touch this file, so the bookkeeping is
+// the only thing that moved here.
+export const RED_AT_V4531_GATES = Object.freeze([]);
 
 export const RED_AT_V4531 = Object.freeze(RED_AT_V4531_GATES.map((gate) => Object.freeze({
     gate,
@@ -942,9 +960,16 @@ const WHY_V4557 = Object.freeze({
 // runs ALL GREEN: Philox4x32-10 bit-exact against the CPU mirror on all 1024 words, and 40 sweeps at T=2
 // agreeing with the shipped kernel on all 1024 spins at the kernel's own zero-tolerance contract.
 export const RED_AT_V4557_GATES = Object.freeze([
-    "tools/ship/tslSource-selfcheck.mjs",
-    "tools/ship/tsl-selfcheck.mjs",
-    "tools/ship/tslPhysics-selfcheck.mjs",
+    // tools/ship/tslSource-selfcheck.mjs, tools/ship/tsl-selfcheck.mjs and tools/ship/tslPhysics-selfcheck.mjs
+    // REMOVED, at v4590. The v4590 re-freeze of register-audit.mjs (prompted by the residue sweep's own
+    // redCensus.mjs edits) found all three exit 0 for the first time this list has ever caught it --
+    // registerDrift-selfcheck.mjs's section 2 named them directly ("a red that has been repaired and left on
+    // the list"). Each was fixed earlier this session, by name: tslSource's uniform-transplant filter
+    // (dropBookkeeping, matching the pattern tslSource-selfcheck.mjs already used), tsl-selfcheck.mjs's 32px
+    // WebGPU readback control (the real three@0.185.1 row-padding behaviour, not the three@0.178 validation
+    // error WHY_V4557 describes below), and tslPhysics's uniform-order labelling. None of those fixes touched
+    // this file; the bookkeeping just never caught up until the re-freeze forced it to. Re-confirmed fresh,
+    // not just taken on the freeze's word: node on all three, exit 0 each, "all checks pass"/"ALL GREEN".
     // slugTsl-selfcheck.mjs REMOVED: re-run after the swizzle workaround above, it is fully green (14/14) --
     // the list may only shrink, and only on purpose. See the note above WHY_V4557 for what changed and why
     // the other four are still here, for a different reason than the one this list originally named.
