@@ -70,9 +70,24 @@ const CHANGED = ["physics/statmech/ising.js"];
        s.reachable.includes("physics/consistency-selfcheck.mjs"),
        s.reachable.length + " gates reachable from " + CHANGED[0] + " (including the consistency board, which imports it two levels down)");
     const firstBand = s.selected.slice(0, s.reachable.length > s.selected.length ? s.selected.length : Math.min(20, s.reachable.length));
+    // *** v4585 -- THIS FAILED SAYING "first 123 selected are all reachable", WHICH READS LIKE A PASS. ***
+    //
+    // The detail described the intent and not the result, so the red named nothing to do -- neither a command nor a
+    // count, which tools/ship/redAction-selfcheck.mjs calls the one unactionable class. It is REPRODUCIBLE (twice
+    // alone at v4585) and it is growth, not staleness: `reachable` now exceeds what a 180 s budget can select, so
+    // firstBand becomes the whole 123-gate selection and any single unreachable gate in it fails the row. The
+    // message now says HOW MANY and WHICH, so the debt has a size.
+    const intruders = firstBand.filter((g) => !s.reachable.includes(g));
     ok("!! reachable gates are scheduled FIRST (a truncated run still covers the change)",
-       firstBand.every((g) => s.reachable.includes(g)),
-       "first " + firstBand.length + " selected are all reachable");
+       intruders.length === 0,
+       intruders.length === 0
+         ? "first " + firstBand.length + " selected are all reachable"
+         : intruders.length + " of the first " + firstBand.length + " selected are NOT reachable from " + CHANGED[0] +
+           ", so a truncated run can miss the change: " + intruders.slice(0, 6).join(", ") +
+           (intruders.length > 6 ? " and " + (intruders.length - 6) + " more" : "") +
+           ". OWED: the planner must order reachable gates ahead of the rest when the budget truncates -- " +
+           s.reachable.length + " reachable against " + s.selected.length + " selectable in 180 s, so the " +
+           "truncation is now the normal case rather than the edge one.");
 }
 
 // ---- 2. THE PATH-CONVENTION REGRESSION, WHICH THIS FILE EXISTS TO PIN ------------------------------------------------

@@ -78,12 +78,21 @@ const readOr = (rel, fallback = "") => { try { return fs.readFileSync(path.join(
  * Every derived fact, with what it CLAIMS and what is TRUE. Returns rows so a caller can report them however it
  * likes -- verify.mjs prints them as ship checks, the selfcheck asserts on them.
  */
-export function stalenessRows() {
+// *** v4585 -- AND A BAKER WAS WRITTEN HERE BEFORE CHECKING, WHICH IS THE DEFECT THIS ROUND IS ABOUT. ***
+//
+// The first draft of v4585 added refreshCaseStudyGates() to this module: read case-study.html, replace the gate
+// stat from countGateFiles(), write it back. fixDerived() below has done exactly that since v3929, twenty lines
+// down in the same file. A SECOND COPY OF ONE RULE IS THIS TREE'S MOST REPEATED DEFECT and it was committed here
+// by the round three deep in finding it elsewhere -- v4582 at a fourth walker, v4583 at a fifth, v4584 at a fifth
+// again -- because the round asked "is there a baker?" of the ship's stages and of grep, and not of this file.
+// It was deleted, and the real question is the one it hid: the fixer EXISTS, so why was the number 37 behind?
+//
+export function stalenessRows({ read = readOr, gateCount = countGateFiles } = {}) {
     const rows = [];
 
     // 1. the gate count a reader sees on the case study
-    const actualGates = countGateFiles();
-    const csMatch = readOr("case-study.html").match(/<b>(\d+)<\/b><span>gates<\/span>/);
+    const actualGates = gateCount();
+    const csMatch = read("case-study.html").match(/<b>(\d+)<\/b><span>gates<\/span>/);
     const claimedGates = csMatch ? parseInt(csMatch[1], 10) : null;
     rows.push({
         id: "case-study gate count",
@@ -93,7 +102,7 @@ export function stalenessRows() {
 
     // 2. the knowledge index -- the thing that answers "does this already exist?"
     let idxGates = null;
-    try { idxGates = JSON.parse(readOr("knowledge-index.json", "{}")).counts.gates; } catch {}
+    try { idxGates = JSON.parse(read("knowledge-index.json", "{}")).counts.gates; } catch {}
     rows.push({
         id: "knowledge-index gate count",
         claimed: idxGates, actual: actualGates, ok: idxGates === actualGates,
@@ -101,8 +110,8 @@ export function stalenessRows() {
     });
 
     // 3. version markers agreeing with each other (not with a --version flag; that is verify.mjs's job)
-    const ev = (readOr("main.js").match(/ENGINE_VERSION = "(v\d+)"/) || [])[1] || null;
-    const bb = (readOr("brain/brain.js").match(/BRAIN_BUILD = "(v\d+)"/) || [])[1] || null;
+    const ev = (read("main.js").match(/ENGINE_VERSION = "(v\d+)"/) || [])[1] || null;
+    const bb = (read("brain/brain.js").match(/BRAIN_BUILD = "(v\d+)"/) || [])[1] || null;
     rows.push({
         id: "brain build vs engine version",
         claimed: bb, actual: ev, ok: bb === ev,

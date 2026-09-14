@@ -282,8 +282,10 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // twenty-third round running that the pre-flight prompted. The other five rows have never moved.
     // v4584 -- RE-TAKEN: one gate (walkerParity) joined, the same four rows by one, FORTY-FOURTH arrival,
     // twenty-fourth round running that the pre-flight prompted. The other five rows have never moved.
-    gates: 1642, usesOk: 1621, definesOk: 1613, importsOk: 0,
-    distinctDefinitions: 38, nameFirst: 1514, condFirst: 91, unknownSignature: 16,
+    // v4585 -- RE-TAKEN: one gate (redAction) joined, the same four rows by one, FORTY-FIFTH arrival,
+    // twenty-fifth round running that the pre-flight prompted. The other five rows have never moved.
+    gates: 1643, usesOk: 1622, definesOk: 1614, importsOk: 0,
+    distinctDefinitions: 38, nameFirst: 1515, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

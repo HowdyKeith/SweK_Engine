@@ -3767,6 +3767,61 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since244: Object.freeze({
+        at: "v4585", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/redAction-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/staleness.mjs", "tools/ship/staleness-selfcheck.mjs", "case-study.html"]),
+        verdict: "green, 6925 ms at eight-wide and 6822 ms alone -- over the sweep budget because it RUNS three " +
+                 "gates to classify their reds from what they print. *** A RED THAT NAMED ITS OWN ONE-COMMAND FIX " +
+                 "WAS CARRIED AS FURNITURE FOR FIVE ROUNDS. *** staleness-selfcheck was red on a case-study page " +
+                 "37 gates behind, and its failure text said in capitals: THE FIX IS ONE COMMAND: node " +
+                 "tools/ship/staleness.mjs --fix. v3087 decided deliberately that --fix never runs during a check " +
+                 "-- 'a ritual that auto-fixed before asserting would be a gate that agrees with whatever " +
+                 "shipped' -- and v3922 added the sentence naming the command so the human step would be obvious. " +
+                 "THE DESIGN WAS COMPLETE AND CORRECT. I read that red across v4580-v4584, wrote 'budgetExile, " +
+                 "definitionGates and staleness, equally red at HEAD' into five round summaries, and never opened " +
+                 "the message. One command closed it AND budgetExile with it -- that gate had only ever been " +
+                 "reporting staleness's debt from another instrument. Nothing was built for this finding. *** AND " +
+                 "THE THIRD RED WAS MISDESCRIBED: *** definitionGates' rows are frozen ratchets that may only move " +
+                 "DOWN, which is design, but the REDNESS is unpaid debt its own file prescribes a repair for -- 55 " +
+                 "exported symbols under physics/, 319 tree-wide, 617 of any shape, each owed a check that calls it " +
+                 "and grades the answer. Calling debt 'deliberately immovable' five times is how it stops being " +
+                 "paid. *** THREE DEFECTS IN THE ROUND'S OWN WORK, EACH CAUGHT BY THE TREE RATHER THAN BY CARE: *** " +
+                 "a duplicate baker was written into staleness.mjs before checking, twenty lines above fixDerived(), " +
+                 "which has done the same since v3087 -- a second copy of one rule, committed by the round three " +
+                 "deep in finding second copies elsewhere. A draft proposed adding a ship stage that auto-fixed " +
+                 "before verify, which is exactly what v3087's sentence refuses, and reading the file refused it. " +
+                 "And the gate's first version called fixDerived({write:false}) to prove the row was closable: " +
+                 "staleness-selfcheck asserts NO gate calls fixDerived and went red naming this file -- the red " +
+                 "this round spent itself learning to read caught its author on the first run. write:false is a " +
+                 "promise about an argument, not a property of a design. Also repaired: that detector scanned the " +
+                 "RAW file, so a COMMENT recording the removed call kept it red -- the rule could only be satisfied " +
+                 "by deleting the history of having broken it -- and this file already preaches the fix two rows up " +
+                 "('ask the code, never the commentary'). It uses codeHas now. And staleness-selfcheck's " +
+                 "falsifiability row was a second copy of the row it protected: headed 'the comparison is a real " +
+                 "equality, not a tautology' under a section headed 'a control that cannot fail is decoration', its " +
+                 "condition was claimed === actual -- WHAT SECTION 1 ALREADY ASSERTS -- while its own comment " +
+                 "described the right design. ONE STALE NUMBER WAS REPORTING AS TWO REDS for five sweeps. " +
+                 "stalenessRows is injectable now (recordDrift.checks()'s shape since v4482) and the control is " +
+                 "driven with a page claiming 1 gate. 14 sabotages, 14/14 red, no 0-RED -- after eight 0-REDs and a " +
+                 "crash, all of them here: the first baseline was itself red because ADDING THIS GATE RE-STALED THE " +
+                 "PAGE, which is the documented cycle and is why the sweep is re-run after the command; the harness " +
+                 "counted a red going GREEN as a catch; and three anchors were satisfied by a sibling line or a " +
+                 "substring, including a consistency check on the frozen figures that a coherent rewrite satisfied " +
+                 "while shrinking the finding from 37 gates to 1. Verify: the three reds this arc has been " +
+                 "reporting are now one -- and a second one surfaced that had been hiding behind them. " +
+                 "gateSelection-selfcheck is reproducibly red (twice alone) and its failure read \"first 123 " +
+                 "selected are all reachable\", which describes the INTENT and reads like a pass: neither a command " +
+                 "nor a count, the one unactionable class. It is growth, not staleness -- `reachable` now exceeds " +
+                 "what a 180 s budget selects, so truncation is the normal case and 22 of the first 123 selected are " +
+                 "not reachable from the change. Its message says how many, which, and what is OWED now. Also " +
+                 "recorded: adding it to the DRIVEN list took this gate past seventy seconds and the sabotage sweep " +
+                 "from four minutes to twenty, so the costly red is classified from the one named row of its source " +
+                 "-- redCensus's own rule, that re-verifying a registered red belongs to its two minutes and not to " +
+                 "a routine check -- and the first read arm classified the WHOLE file, which any of thirty rows " +
+                 "satisfied. 16 sabotages, 16/16 red, no 0-RED. Verify: 37 green, 2 red, 1 load-only, 0 crash-only.",
+    }),
     since243: Object.freeze({
         at: "v4584", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/walkerParity-selfcheck.mjs"]),
