@@ -1,6 +1,6 @@
 {
  "note": "WHO the bytes say wrote each vendored body, read from the copyright line in its licence and from a PROVENANCE.md where one records an upstream. Baked by tools/ship/orreryAuthorScan.mjs. A body whose author cannot be read is in `unattributed` -- never dropped, never given a placeholder.",
- "built": "2026-09-14",
+ "built": "2026-09-15",
  "bodies": [
   {
    "name": "box3d",
@@ -251,7 +251,7 @@
    "name": "three",
    "kind": "collective",
    "who": "three.js authors",
-   "line": "Copyright © 2010-2023 three.js authors",
+   "line": "Copyright © 2010-2026 three.js authors",
    "licenceFile": "LICENSE",
    "licences": 1,
    "upstreamFile": "PROVENANCE.txt",
@@ -261,7 +261,7 @@
     "owner": "mrdoob",
     "repo": "three.js"
    },
-   "bytes": 2396670
+   "bytes": 3344827
   },
   {
    "name": "three-webgpu",
@@ -332,7 +332,7 @@
     "three",
     "three-webgpu"
    ],
-   "bytes": 6050964
+   "bytes": 6999121
   },
   {
    "author": "Dunfan Lu",

@@ -9,13 +9,19 @@
 // has timed box3d against Jolt for hundreds of versions and never weighed either, so a faster engine costing two
 // extra megabytes on every page load looked free.
 //
-// THE MEASUREMENT THAT MAKES THIS MORE THAN A DIRECTORY LISTING: raw bytes and transferred bytes DISAGREE ABOUT
-// WHICH DEPENDENCY IS BIGGER. three.js is 1.30x box3d raw and 0.74x transferred -- THE ORDERING FLIPS. JS text
-// gzips to about a fifth; WASM, already a compact binary, only to about a third. A raw-byte "bundle size" table
-// systematically flatters WASM and penalises JS, and ranks the wrong quantity.
+// THE MEASUREMENT THAT MAKES THIS MORE THAN A DIRECTORY LISTING: raw bytes and transferred bytes CAN DISAGREE
+// ABOUT WHICH DEPENDENCY IS BIGGER. JS text gzips to about a fifth; WASM, already a compact binary, only to
+// about a third. A raw-byte "bundle size" table systematically flatters WASM and penalises JS, and ranks the
+// wrong quantity when that gap is wide enough to flip an ordering.
 //
-// So this asserts BOTH numbers exist, that the flip is DETECTED rather than smoothed over, and that no single
-// "size" is ever reported.
+// *** v4622 -- three.js's own live example of the flip STOPPED EXISTING when the re-vendor split it into two
+// files (see artifactWeight.mjs's header for the measurement). *** Weighed correctly now (both files, since
+// one imports the other), three.js is heavier than box3d on BOTH dimensions -- same shape as jolt vs box3d,
+// not a flip. So this section asserts what is CURRENTLY true (both comparisons agree in ordering) rather
+// than keeping a hardcoded "flip" the live tree no longer produces.
+//
+// So this asserts BOTH numbers exist, that the module's own note field matches what it measured, and that no
+// single "size" is ever reported.
 import { weigh, compare, BUNDLES } from "./artifactWeight.mjs";
 import fs from "node:fs";
 import path from "node:path";
@@ -50,14 +56,18 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
     ok("...every ratio is between 0 and 1", w.every((b) => b.ratio > 0 && b.ratio < 1));
 }
 
-// ---- 3. THE HEADLINE: raw and transferred disagree about the ordering ---------------------------------------------------
+// ---- 3. THE HEADLINE: does raw agree with transferred, and does the module say so correctly -----------------------------
 {
     const t = compare("three", "box3d");
     ok("comparing three.js against box3d works", !!t && t.rawRatio > 0 && t.gzipRatio > 0);
-    ok("!! three.js is HEAVIER raw and LIGHTER transferred", t.rawRatio > 1 && t.gzipRatio < 1,
-       "raw " + t.rawRatio.toFixed(2) + "x, transferred " + t.gzipRatio.toFixed(2) + "x");
-    ok("!! ...and the module DETECTS the flip rather than smoothing it", t.orderingAgrees === false && /FLIPS/.test(t.note),
-       "a table built on raw bytes would rank these the wrong way round and nothing would say so");
+    ok("!! three.js is HEAVIER on both dimensions now, not a flip",
+       t.rawRatio > 1 && t.gzipRatio > 1 && t.orderingAgrees === true,
+       "raw " + t.rawRatio.toFixed(2) + "x, transferred " + t.gzipRatio.toFixed(2) + "x -- weighed as both " +
+       "files (three.module.js imports three.core.js), the re-vendor's own live example of the flip is gone");
+    ok("!! ...and the module's note agrees with what it measured, not with a stale story",
+       /agree on the ordering/.test(t.note) && !/FLIP/i.test(t.note),
+       "a note claiming a flip that is not there would be exactly the failure this module exists to catch, " +
+       "one level up from the bundle it weighs");
 
     const j = compare("jolt", "box3d");
     ok("jolt is heavier than box3d BOTH ways", j.rawRatio > 1 && j.gzipRatio > 1 && j.orderingAgrees === true,

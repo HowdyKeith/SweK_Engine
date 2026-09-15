@@ -459,7 +459,11 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4577 -- RE-TAKEN with `excluding` below: 104/46/189 -> 105/47/192, the one record and its three fields.
     // v4578 -- RE-TAKEN with `excluding` below: 105/47/192 -> 106/47/192, the one record and none of its
     // values being a bare integer.
-    currentIncludingModule: Object.freeze({ records: 110, withFields: 49, fields: 201 }),
+    // v4622 -- RE-TAKEN with `excluding` below: the ordinary growth of concurrent rounds took excluding to
+    // 109/48/184; this module's own two records and their twenty fields are unchanged, so 111/50/204.
+    // v4622b -- RE-TAKEN AGAIN, WITHIN THE SAME ROUND, WITH `excluding` above: 109 -> 111 records (this
+    // round's own two-record redCensus.mjs registration), so 113/50/204.
+    currentIncludingModule: Object.freeze({ records: 113, withFields: 50, fields: 204 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -510,7 +514,15 @@ export const PROBE_AT_V4536 = Object.freeze({
     // wondering why one number moved and two did not.
     // RE-TAKEN: 104/45/172 -> 108/47/181, from the ordinary growth of concurrent rounds since -- no single
     // one named here because none of them touched this file; the live census is what the tree holds today.
-    excluding: Object.freeze({ records: 108, withFields: 47, fields: 181 }),
+    // v4622 -- RE-TAKEN: 108/47/181 -> 109/48/184, from the ordinary growth of concurrent rounds on this
+    // same unshipped branch since -- no single one named here because none of them touched this file; the
+    // live census is what the tree holds today.
+    // v4622b -- RE-TAKEN AGAIN, WITHIN THE SAME ROUND: 109/48/184 -> 111/48/184. This round's own registration
+    // of three reds added RED_AT_V4622_GATES and RED_AT_V4622 to redCensus.mjs -- two more V-stamped records,
+    // no numeric fields in either (a frozen array and a map of gate->reason string), which is exactly the
+    // "record with no numeric field is still a record" shape v4578's note above already names. Editing the
+    // register that names a round's own reds is itself something a round does, and this file re-takes it.
+    excluding: Object.freeze({ records: 111, withFields: 48, fields: 184 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,

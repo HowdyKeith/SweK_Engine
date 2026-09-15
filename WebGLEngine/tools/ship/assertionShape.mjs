@@ -276,8 +276,14 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // rather than reuse. importsOk, condFirst, unknownSignature and suspects held at 0, 91, 16 and 0 --
     // verified against a fresh `census()` run (node -e importing tools/ship/assertionShape.mjs) before this
     // edit, independent of the failing gate's own printed numbers.
-    gates: 1650, usesOk: 1629, definesOk: 1621, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1522, condFirst: 91, unknownSignature: 16,
+    // v4622 -- RE-TAKEN: 1650 -> 1656 (usesOk 1629 -> 1635, definesOk 1621 -> 1627, nameFirst 1522 -> 1528),
+    // the same three-rows-move-together pattern, six gates landing across this branch's own unshipped rounds
+    // since the record above was taken -- tools/ship/ffmpegWasmBridge-selfcheck.mjs is this round's own; the
+    // other five arrived in earlier rounds on the same branch. condFirst, unknownSignature, suspects and
+    // distinctDefinitions held at 91, 16, 0 and 41 -- verified against a fresh census() run, independent of
+    // the failing gate's own printed numbers.
+    gates: 1656, usesOk: 1635, definesOk: 1627, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1528, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

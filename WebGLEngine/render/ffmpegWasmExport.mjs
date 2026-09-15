@@ -27,6 +27,7 @@
 // caller.
 "use strict";
 import { sniffMp4Codec } from "./blobRecorder.js";
+import { probeWasm, explainWasmFailure } from "../engine/wasmSupport.mjs";
 
 const DEFAULT_BASE_URL = "/ffwasm/app/";
 const DEFAULT_STATUS_URL = "/ffwasm/status";
@@ -100,11 +101,22 @@ export async function transcodeWebmToH264Mp4(webmBytes, opts = {}) {
     const baseUrl = opts.baseUrl || DEFAULT_BASE_URL;
     const coreURL = opts.coreURL || (baseUrl + "ffmpeg-core.js");
     const wasmURL = opts.wasmURL || (baseUrl + "ffmpeg-core.wasm");
+    // ASK FIRST, same rule physics/jolt/joltLoader.js and physics/box3d/box3dLoader.js apply to their own
+    // wasm init -- this module is browser-side and user-triggered exactly like those two, not a Node-side
+    // gate where WebAssembly is always present. Without this, WebAssembly switched off (Lockdown Mode) or a
+    // CSP missing 'wasm-unsafe-eval' would surface as whatever raw error ffmpeg.js's own worker throws deep
+    // inside ffmpeg.load(), rather than the true cause.
+    const probe = probeWasm();
+    if (!probe.usable) return { ok: false, bytes: null, error: "H.264 export needs WebAssembly. " + probe.reason, codec: null };
     let ffmpeg = null;
     try {
         const FFmpegWASM = await _loadFfmpegScript(baseUrl);
         ffmpeg = new FFmpegWASM.FFmpeg();
-        await ffmpeg.load({ coreURL, wasmURL });
+        try {
+            await ffmpeg.load({ coreURL, wasmURL });
+        } catch (e) {
+            return { ok: false, bytes: null, error: explainWasmFailure(e, "ffmpeg.wasm failed to initialise"), codec: null };
+        }
         // *** COPY, NEVER THE CALLER'S OWN BUFFER. *** ffmpeg.js's own writeFile() posts the Uint8Array to its
         // Worker with the buffer in the TRANSFER list (a real, measured effect, not a guess -- read its own UMD
         // bundle: `s instanceof Uint8Array && a.push(s.buffer)` before `postMessage(msg, a)`), which DETACHES

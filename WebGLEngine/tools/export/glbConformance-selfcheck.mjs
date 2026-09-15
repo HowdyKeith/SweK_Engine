@@ -52,12 +52,18 @@ const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..
  * the corpus is a red row rather than a silently different headline.
  */
 export const CORPUS_AT_V4583 = Object.freeze({
-    files: 31,
+    // v4622 -- RE-TAKEN: files 31 -> 33, accessorsTotal 645 -> 651, filesCarryingSomethingPreviouslyUnruled
+    // 31 -> 33 (below), from the ordinary growth of concurrent rounds on this same unshipped branch -- two
+    // more GLBs on disk, both carrying something this module has a rule for, same as all 31 before them.
+    // The other drift-checked fields (partiallyRead, accessorsUnread, headerOnly,
+    // filesWithAccessorsLackingBufferView, filesNeedingExternalResource, filesWithUninterpretedExtension)
+    // held.
+    files: 33,
     // Warnings standing on disk, by code. Zero was the previous claim and it was a claim about the rules,
     // not about the tree -- see the note on the section 1 row.
     warningsByCode: Object.freeze({ IMAGE_EXTERNAL_URI: 28 }),
     // Files graded on fewer accessors than they declare, and how many accessor(s) went unread in total.
-    partiallyRead: 2, accessorsUnread: 107, accessorsTotal: 645,
+    partiallyRead: 2, accessorsUnread: 107, accessorsTotal: 651,
     // Of those two, ONE would still read nothing from a complete copy of the file: every accessor in
     // gpu/fixtures/ABeautifulGame-draco.header.glb declares no bufferView, because KHR_draco_mesh_compression
     // holds the geometry. The other is header-only and reverses when the release zip is unpacked.
@@ -71,7 +77,7 @@ export const CORPUS_AT_V4583 = Object.freeze({
     // How many files carry each kind that had NO rule at all before v4583. This is the denominator the
     // v4550 headline was missing: the answer is not "RobotExpressive", it is 31 of 31.
     filesCarrying: Object.freeze({ skins: 1, animations: 1, images: 30, textures: 30, samplers: 31, materials: 31 }),
-    filesCarryingSomethingPreviouslyUnruled: 31,
+    filesCarryingSomethingPreviouslyUnruled: 33,
 });
 
 let fails = 0;

@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "cba0f571e3911cf4831cd90198cb282fb0b088b6",
+ "head": "ce276dffd8af8c9e2308cb1fc8ea21f515a03eb2",
  "bodies": {
   "box3d": [
    {
@@ -11,8 +11,8 @@
    },
    {
     "path": "ai-bridge/server.js",
-    "bytes": 1485419,
-    "sha": "0f0fa7d1b30def54d50323c4f43e3c07bc0e0fb4"
+    "bytes": 1487967,
+    "sha": "e6aaaa93d0aa3c8152d75811714cc86b0ecfd093"
    },
    {
     "path": "physics/backendRouting-selfcheck.mjs",
@@ -178,7 +178,7 @@
    {
     "path": "orrery-gpu.html",
     "bytes": 49611,
-    "sha": "0e231524eab1fea9c4248cde0f0c30bc74bbe1f9"
+    "sha": "cc2293510dd6de403175380275e7a76a7a4ececf"
    },
    {
     "path": "slug-curved.html",
@@ -319,7 +319,7 @@
    {
     "path": "heerich-avatar.html",
     "bytes": 11793,
-    "sha": "445fe95c6dfe579e86312478fb97b8dae236bff2"
+    "sha": "cc2293510dd6de403175380275e7a76a7a4ececf"
    }
   ],
   "htmx": [
@@ -330,8 +330,8 @@
    },
    {
     "path": "ai-bridge/server.js",
-    "bytes": 1485419,
-    "sha": "0f0fa7d1b30def54d50323c4f43e3c07bc0e0fb4"
+    "bytes": 1487967,
+    "sha": "e6aaaa93d0aa3c8152d75811714cc86b0ecfd093"
    },
    {
     "path": "clients.html",
@@ -340,8 +340,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 862899,
-    "sha": "5d3d8d83a3e03fe43ca343af0b34483783a2b4e8"
+    "bytes": 865315,
+    "sha": "03094e54d3d50b93b26656db6c68f6999920f14a"
    },
    {
     "path": "tools/ship/artifactWeight.mjs",
@@ -391,7 +391,7 @@
    {
     "path": "krbn-avatar.html",
     "bytes": 14036,
-    "sha": "80520bd5e7b140b731db8d644e4c2938d6099fd7"
+    "sha": "cc2293510dd6de403175380275e7a76a7a4ececf"
    },
    {
     "path": "krbn-compare.html",
@@ -462,13 +462,13 @@
   "three": [
    {
     "path": "ai-bridge/ensureThree.js",
-    "bytes": 4225,
-    "sha": "b5fccadb98a37f86a7e62cb182ec97eddb6a58e2"
+    "bytes": 11626,
+    "sha": "ce276dffd8af8c9e2308cb1fc8ea21f515a03eb2"
    },
    {
     "path": "ai-bridge/server.js",
-    "bytes": 1485419,
-    "sha": "0f0fa7d1b30def54d50323c4f43e3c07bc0e0fb4"
+    "bytes": 1487967,
+    "sha": "e6aaaa93d0aa3c8152d75811714cc86b0ecfd093"
    },
    {
     "path": "aquarelle.html",
@@ -478,7 +478,7 @@
    {
     "path": "ascii-avatar.html",
     "bytes": 17231,
-    "sha": "80520bd5e7b140b731db8d644e4c2938d6099fd7"
+    "sha": "cc2293510dd6de403175380275e7a76a7a4ececf"
    },
    {
     "path": "ascii-object.html",
@@ -606,6 +606,11 @@
     "sha": "842116468f889501b1b19fc021a74d9a4f2dc285"
    },
    {
+    "path": "gpu/gpuAssetLoader.js",
+    "bytes": 96300,
+    "sha": "5fc21a72b394395f5fdbe7c79bed00982d52c341"
+   },
+   {
     "path": "graph_viewer.html",
     "bytes": 17025,
     "sha": "aa8a7a9ea40b00726069200b77a117aa99707e75"
@@ -613,12 +618,17 @@
    {
     "path": "heerich-avatar.html",
     "bytes": 11793,
-    "sha": "445fe95c6dfe579e86312478fb97b8dae236bff2"
+    "sha": "cc2293510dd6de403175380275e7a76a7a4ececf"
+   },
+   {
+    "path": "index.html",
+    "bytes": 23021,
+    "sha": "ca8b8f0ce2cd7678617f50a01920d68eddd146f7"
    },
    {
     "path": "krbn-avatar.html",
     "bytes": 14036,
-    "sha": "80520bd5e7b140b731db8d644e4c2938d6099fd7"
+    "sha": "cc2293510dd6de403175380275e7a76a7a4ececf"
    },
    {
     "path": "krbn-compare.html",
@@ -642,8 +652,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3230419,
-    "sha": "5a73738493f611e9d755837f8a696d270dc3d9ae"
+    "bytes": 3233647,
+    "sha": "cc2293510dd6de403175380275e7a76a7a4ececf"
    },
    {
     "path": "mpm3d.html",
@@ -687,8 +697,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 862899,
-    "sha": "5d3d8d83a3e03fe43ca343af0b34483783a2b4e8"
+    "bytes": 865315,
+    "sha": "03094e54d3d50b93b26656db6c68f6999920f14a"
    },
    {
     "path": "shipavatar.html",
@@ -703,7 +713,7 @@
    {
     "path": "song-globe.html",
     "bytes": 8655,
-    "sha": "3b6204794f1686a8eeb07661b0c01ade989793c2"
+    "sha": "cc2293510dd6de403175380275e7a76a7a4ececf"
    },
    {
     "path": "splat_viewer.html",
@@ -756,6 +766,11 @@
     "sha": "9c1d4e76e2de04a03dd8b50fba410a7d4bb2d237"
    },
    {
+    "path": "tools/ship/fbxIngest-selfcheck.mjs",
+    "bytes": 54340,
+    "sha": "fb9a1ad6e626a59da301153a768ee5183fc95f56"
+   },
+   {
     "path": "tools/ship/pipboyWireframe-selfcheck.mjs",
     "bytes": 21647,
     "sha": "7da1207e0b0a8ffa459f25f393950de3ed1b2e51"
@@ -767,8 +782,8 @@
    },
    {
     "path": "tools/ship/tsl-selfcheck.mjs",
-    "bytes": 21296,
-    "sha": "94f939edc242007f0e1dfab8fe19dd64418b97d3"
+    "bytes": 25361,
+    "sha": "85925bd438c78d222bef6fa257fa2fe10adb4e33"
    },
    {
     "path": "tools/ship/webgpuHarness.mjs",
@@ -797,8 +812,8 @@
    },
    {
     "path": "view.html",
-    "bytes": 21781,
-    "sha": "c9d9ce2e614112b74590ef04b26cd79212466be8"
+    "bytes": 22104,
+    "sha": "ce276dffd8af8c9e2308cb1fc8ea21f515a03eb2"
    },
    {
     "path": "voxearth.html",
@@ -840,7 +855,7 @@
    {
     "path": "orrery-gpu.html",
     "bytes": 49611,
-    "sha": "0e231524eab1fea9c4248cde0f0c30bc74bbe1f9"
+    "sha": "cc2293510dd6de403175380275e7a76a7a4ececf"
    },
    {
     "path": "tools/ship/aiPresenceOrb-selfcheck.mjs",
@@ -884,13 +899,13 @@
    },
    {
     "path": "tools/ship/threeProbe-selfcheck.mjs",
-    "bytes": 16108,
-    "sha": "2303f26dd6de4b975925e7d0df01a607597014c7"
+    "bytes": 19635,
+    "sha": "55e04fb3bc009e53881d4b4a23b9831f5de44c6c"
    },
    {
     "path": "tools/ship/tsl-selfcheck.mjs",
-    "bytes": 21296,
-    "sha": "94f939edc242007f0e1dfab8fe19dd64418b97d3"
+    "bytes": 25361,
+    "sha": "85925bd438c78d222bef6fa257fa2fe10adb4e33"
    },
    {
     "path": "tools/ship/tslIsing-selfcheck.mjs",
@@ -904,8 +919,8 @@
    },
    {
     "path": "tools/ship/tslPhysics-selfcheck.mjs",
-    "bytes": 125949,
-    "sha": "629ce9da643276ab70d464eb1a9c9f12bd33c4f0"
+    "bytes": 127431,
+    "sha": "fc12eefc9f64da7cf9431f56db51c076e84810ad"
    },
    {
     "path": "tools/ship/tslRace-selfcheck.mjs",

@@ -72,10 +72,16 @@ console.log("1. *** THE ITEM SAID '82 FILES TOUCH WASM'. THAT WAS THE LOOSEST RE
     // three counts below climbed with it (82->113 mentions, 66->90 in code, 11->12 API callers). None of the
     // three assertions this round exists to prove (comment-vs-code, raw-grep-vs-codeOnly, the probe count)
     // moved relative to each other; only the population they are taken over grew.
-    ok("!! 113 files mention .wasm or the WebAssembly API -- the item's number, and it is the loose one",
-        mentions === 113, `${mentions} mention it`);
-    ok("!! ...but 24 of those are comments and prose only; 89 mention it in live code",
-        inCode === 89, `${inCode} in code, ${mentions - inCode} comment-only`);
+    //
+    // Re-measured again for the ffmpeg.wasm H.264 export and the three.js r160->0.185.1 re-vendor: 113->118
+    // mentions, 89->94 in code, comment-only unchanged at 24. Five of the nine files gained since the last
+    // freeze are this round's own (ai-bridge/ffmpegWasmBridge.js, render/ffmpegWasmExport.mjs, its gate, the
+    // rewritten ai-bridge/ensureThree.js, and ui/canvasRecorder.js's exportH264 addition); the rest arrived
+    // from other rounds on the same branch. callsApi and probes did not move.
+    ok("!! 118 files mention .wasm or the WebAssembly API -- the item's number, and it is the loose one",
+        mentions === 118, `${mentions} mention it`);
+    ok("!! ...but 24 of those are comments and prose only; 94 mention it in live code",
+        inCode === 94, `${inCode} in code, ${mentions - inCode} comment-only`);
     // *** AND MY OWN GREP GAVE 12, WHICH WAS WRONG, FOR THE FOURTH TIME IN THIS CLASS. *** A raw search for
     // /WebAssembly\./ matched wasm-demo.html, where the text is a SENTENCE -- "executed by the bridge's own
     // Node WebAssembly. No Docker" -- and the full stop matched the escaped dot. Same shape as the licence
@@ -85,7 +91,7 @@ console.log("1. *** THE ITEM SAID '82 FILES TOUCH WASM'. THAT WAS THE LOOSEST RE
     ok("!! ...and TWELVE actually call the WebAssembly API, most of them Node-side gates and tools",
         callsApi === 12, `${callsApi} call WebAssembly.instantiate/compile/Module/Instance`);
     ok("!! *** AND BEFORE THIS ROUND, ZERO OF ANY OF THEM ASKED WHETHER WebAssembly EXISTS ***",
-        probes >= 2, `${probes} now consult a probe (box3dLoader and joltLoader); it was 0`);
+        probes >= 2, `${probes} now consult a probe (box3dLoader, joltLoader and ffmpegWasmExport); it was 0`);
 
     // The polyfill is refused, and the refusal is written down where it can be re-read.
     const src = fs.readFileSync(path.join(ROOT, "engine", "wasmSupport.mjs"), "utf8");

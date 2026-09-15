@@ -115,8 +115,10 @@ export const toHex = (bytes) => Array.from(bytes, (b) => b.toString(16).padStart
 
 /** What v4425 measured. Re-take with: node tools/ship/demosReach-selfcheck.mjs */
 export const MEASURED_AT_V4425 = Object.freeze({
+    // v4622 -- RE-TAKEN: functionNames 242 -> 244, from the ordinary growth of concurrent rounds on this
+    // same unshipped branch. files, collisions and the collision names held.
     files: 56, lines: 19110, hiddenGates: 0,
-    functionNames: 242, collisions: 7,
+    functionNames: 244, collisions: 7,
     sha256: Object.freeze({ nistVectors: 3, nistPassing: 3, randomInputs: 200, randomDisagreeing: 0 }),
     // The collision list, by NAME, so an arrival can be pointed at rather than inferred (v4424's rule).
     collisionNames: Object.freeze(["buildPlane", "frame", "initGL", "mat4Identity", "render", "setMode", "sha256"]),

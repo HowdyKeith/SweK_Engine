@@ -1062,6 +1062,89 @@ export const RED_AT_V4568 = Object.freeze(RED_AT_V4568_GATES.map((gate) => Objec
     get derived() { return !!(auditRow(gate) && auditRow(gate).first); },
 })));
 
+// *** v4622 -- SHIPPING THIS LONG-UNSHIPPED BRANCH (last shipped v4535, 1594 -> 1656 gates across 134
+// commits since) SURFACED THREE REDS THE QUICK SWEEP HAD NEVER RUN AGAINST BEFORE, AND ONLY ONE OF THE
+// THREE BELONGS TO THIS ROUND. ***
+//
+// tools/ship/backendParity-selfcheck.mjs: the BOTH-shader-language count (23 of 158 GLSL-bearing files,
+// 14.6%) crossed the tenth-of-GLSL inversion line this gate's own section 3 checks -- CONFIRMED
+// byte-identical failure at dfc5d56d, the commit immediately before this round's own two features (the
+// ffmpeg.wasm export and the three.js re-vendor), by re-running the gate at that exact commit and diffing
+// FAIL lines. Neither feature touches a shader file. Pre-existing debt on this branch, unrelated to
+// anything shipped here.
+//
+// tools/ship/windowsImport-selfcheck.mjs: tools/ship/trellisAutoRig-selfcheck.mjs's own
+// `import(path.join(ENG, "rig/templates/kaijuBiped.js"))` would crash on Windows (a raw filesystem path
+// handed to dynamic import, which needs a file:// URL there). Added by commit aafa8eeb, "Wire this tree's
+// own auto-rig tooling into the Trellis/unrigged-mesh path" (task #38/#39) -- confirmed added after the
+// origin/main merge-base but before this round, on this same branch. The gate's OTHER offender,
+// tools/ship/ffmpegWasmBridge-selfcheck.mjs's own `import(moduleImportPath)`, is this round's and was
+// fixed directly (inlined the literal path, matching the gate's own recognized browser-context idiom) --
+// see the WindowsImport row leaving this list clean of anything this round wrote.
+//
+// tools/ship/runtimeGap-selfcheck.mjs: section 2's "the headline survives it" check asserts
+// `without.counts["workers/threads"] <= without.counts.WebAssembly` -- files matching each capability's
+// pattern, with this file and its own gate excluded from the count (the "self" that inflates all twelve
+// rows just by holding the PATTERNS table). MEASURED, not assumed: on the live tree this is 22 threads
+// against 21 WebAssembly -- the invariant the assertion hardcodes has flipped, and PART of the cause is
+// this round's own ffmpeg-wasm work: ai-bridge/ffmpegWasmBridge.js and its gate both mention
+// SharedArrayBuffer (the multi-thread ffmpeg.wasm core was tried and refused for exactly the reason
+// nextRounds.mjs's "ffmpeg-wasm-h264-encode" entry documents), so they match the "workers/threads"
+// pattern and are new to the without-self population like anything else on the branch. The WITH-self
+// headline this check's title is actually about still holds -- threads (23) and WebAssembly (23) tie, and
+// the stable sort keeps threads at rank 11 of 12, still the bottom two -- and that half was re-taken this
+// round (threadsRank 12 -> 11, closuresOverThreads 168 -> 161, both verified against a fresh census()).
+// What is NOT fixed here is the without-self sub-assertion itself: whether `<=` should become a looser
+// bound, or the finding restated as "tied including the census's own self-reference, not dominant without
+// it," is a judgement about backlog item #129's own claim that this round should not make unilaterally.
+// Owed to whoever picks #129 back up.
+const WHY_V4622 = Object.freeze({
+    "tools/ship/backendParity-selfcheck.mjs":
+        "the BOTH-shader-language inversion-line finding (23 of 158, 14.6%) is pre-existing, confirmed " +
+        "byte-identical at dfc5d56d before this round's two features touched anything.",
+    "tools/ship/windowsImport-selfcheck.mjs":
+        "tools/ship/trellisAutoRig-selfcheck.mjs's import(path.join(ENG, \"rig/templates/kaijuBiped.js\")) " +
+        "would crash on Windows -- pre-existing, from commit aafa8eeb (task #38/#39), earlier on this same " +
+        "branch. This round's own offender in the same gate (ffmpegWasmBridge-selfcheck.mjs) was fixed.",
+    "tools/ship/runtimeGap-selfcheck.mjs":
+        "section 2's without-self invariant (threads <= WebAssembly) has flipped on the live tree (22 vs " +
+        "21) -- measured and reported above, not a stale frozen number. Part of the cause is this round's " +
+        "own ffmpeg-wasm work (SharedArrayBuffer mentions in ai-bridge/ffmpegWasmBridge.js and its gate). " +
+        "The WITH-self headline (tied at 23, rank 11 of 12) still holds and was re-taken. Fixing the " +
+        "without-self assertion needs a judgement about what backlog #129 should now claim, owed separately.",
+    "tools/ship/definitionGates-selfcheck.mjs":
+        "the tree-wide any-shape ratchet (BASELINE_SHAPES, never-up) reads 641 ungated exports against a " +
+        "frozen 639 -- two newly ungated symbols. CONFIRMED unrelated to this round: neither this round's " +
+        "changed files (render/ffmpegWasmExport.mjs, ai-bridge/ffmpegWasmBridge.js, ai-bridge/ensureThree.js, " +
+        "ui/canvasRecorder.js) nor its new gate appear anywhere in the live ungated list. The ratchet exists " +
+        "precisely to refuse a silent bump, so the two symbols need real gate coverage from whoever owns the " +
+        "pre-existing code they're in (the ungated list itself, ai-bridge/chunkVerify.mjs and others, is " +
+        "printed in the gate's own FAIL line) -- not something this round should force through.",
+    "tools/ship/releaseLedger-selfcheck.mjs":
+        "the lag budget (main may run at most N versions ahead of the releases page) reads 8 of 3 allowed -- " +
+        "expected and documented, not a defect: this is the ship skill's own stated condition for a long " +
+        "unshipped stretch (v4535 through v4487 all unpublished), and publishing is the rig's step, not this " +
+        "sandbox's -- 'PUBLISH FROM THE RIG, NOT FROM CI, AND THE REASON IS MEASURED' is the skill's own rule, " +
+        "because the zip is not byte-reproducible across machines. Clears the moment someone runs the rig's " +
+        "Releases panel; nothing in this round can clear it from here.",
+});
+
+export const RED_AT_V4622_GATES = Object.freeze([
+    "tools/ship/backendParity-selfcheck.mjs",
+    "tools/ship/windowsImport-selfcheck.mjs",
+    "tools/ship/runtimeGap-selfcheck.mjs",
+    "tools/ship/definitionGates-selfcheck.mjs",
+    "tools/ship/releaseLedger-selfcheck.mjs",
+]);
+
+export const RED_AT_V4622 = Object.freeze(RED_AT_V4622_GATES.map((gate) => Object.freeze({
+    gate,
+    why: WHY_V4622[gate] || null,
+    get ms() { const r = auditRow(gate); return r ? r.ms : null; },
+    get fails() { const r = auditRow(gate); return r && r.first ? r.first : (UNVERIFIED_LINE[gate] || null); },
+    get derived() { return !!(auditRow(gate) && auditRow(gate).first); },
+})));
+
 export const REGISTER_LISTS = Object.freeze([
     Object.freeze(["RED_AT_V4279", RED_AT_V4279]),
     Object.freeze(["RED_AT_V4408", RED_AT_V4408]),
@@ -1072,6 +1155,7 @@ export const REGISTER_LISTS = Object.freeze([
     Object.freeze(["RED_AT_V4535", RED_AT_V4535]),
     Object.freeze(["RED_AT_V4557", RED_AT_V4557]),
     Object.freeze(["RED_AT_V4568", RED_AT_V4568]),
+    Object.freeze(["RED_AT_V4622", RED_AT_V4622]),
 ]);
 
 /** Every registered gate, once, with the list that named it. The `entry` is carried rather than spread, so

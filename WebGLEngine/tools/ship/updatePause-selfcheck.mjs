@@ -286,7 +286,11 @@ const uCode = codeOnly(sysadmin), rCode = codeOnly(runBusy);
     const { pathToFileURL } = await import("node:url");
     const req = (await import("node:module")).createRequire(pathToFileURL(path.join(ENG, "ai-bridge", "x.js")).href);
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "swek-updpause-"));
-    fs.writeFileSync(path.join(dir, "SweK_Engine_v4600.zip"), Buffer.alloc(200 * 1024, 7));
+    // v4622 -- was v4600, which this round's own version bump overtook (ENGINE_VERSION is v4622 now, so a
+    // fixture build 22 versions BEHIND stopped reading as an update at all). v4999 matches this tree's own
+    // sentinel for "obviously newer than anything real" (see releaseLedger-selfcheck.mjs's identical fixture
+    // shape), so a future version bump does not silently re-break this row's premise the same way.
+    fs.writeFileSync(path.join(dir, "SweK_Engine_v4999.zip"), Buffer.alloc(200 * 1024, 7));
     const sys = req("./sysadminBridge.js"), rb = req("./runBusy.js"), rh = req("./releaseHold.js");
     const realActive = rb.active, realReleaseHoldRunning = rh.running;
     try {

@@ -298,7 +298,7 @@ let sharedTmp = null; // real downloaded artefacts, reused by sections 6 and 7 r
             // string/regex here gets eaten by the OUTER template literal before the browser ever sees it (a real
             // pitfall this session already diagnosed once). Any post-processing that needs a regex happens back
             // in plain Node, on the plain array of bytes this script hands back.
-            const SCRIPT = `async ({ moduleImportPath, ffmpegBaseUrl }) => {
+            const SCRIPT = `async ({ ffmpegBaseUrl }) => {
                 const canvas = document.createElement("canvas");
                 canvas.width = 64; canvas.height = 64;
                 const ctx = canvas.getContext("2d");
@@ -323,7 +323,7 @@ let sharedTmp = null; // real downloaded artefacts, reused by sections 6 and 7 r
                 const webmBytes = new Uint8Array(await webmBlob.arrayBuffer());
                 if (webmBytes.length < 100) return { ok: false, reason: "captured webm suspiciously small: " + webmBytes.length + " bytes" };
 
-                const mod = await import(moduleImportPath);
+                const mod = await import("/render/ffmpegWasmExport.mjs");
                 const t0 = performance.now();
                 const result = await mod.transcodeWebmToH264Mp4(webmBytes, { baseUrl: ffmpegBaseUrl });
                 const ms = performance.now() - t0;
@@ -338,7 +338,7 @@ let sharedTmp = null; // real downloaded artefacts, reused by sections 6 and 7 r
 
             const out = await runInEngineOrigin({
                 engineRoot: ENG, script: SCRIPT, timeoutMs: 120000,
-                args: { moduleImportPath: "/render/ffmpegWasmExport.mjs", ffmpegBaseUrl: baseUrl },
+                args: { ffmpegBaseUrl: baseUrl },
             });
 
             if (out.skipped) {

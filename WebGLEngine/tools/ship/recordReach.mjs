@@ -219,7 +219,13 @@ export const REACH_AT_V4548 = Object.freeze({
     // AI-presence-orb set, and others): 107 -> 110 records, 64 -> 70 checked, 19 -> 29 over-budget,
     // 21 -> 11 unguarded, unchecked held at 40. All three arrivals landed CHECKED or moved a record out of
     // `unguarded` into `over-budget` rather than raising the ceiling -- read off reach(), not guessed.
-    total: 110,
+    // v4622 -- RE-TAKEN: 110 -> 111 records from the ordinary growth of concurrent rounds on this same
+    // unshipped branch; see checked/overBudget/unguarded/unchecked below for the rest of the reading.
+    // v4622b -- RE-TAKEN AGAIN, WITHIN THE SAME ROUND: 111 -> 113. This round's own registration of three
+    // reds added RED_AT_V4622_GATES and RED_AT_V4622 to redCensus.mjs -- two more records, neither guarded
+    // by any gate that names it (redCensus.mjs's own gate, redCensus-selfcheck.mjs, is over budget and does
+    // not name individual export constants), so both land in unguarded rather than checked.
+    total: 113,
     // *** READ OFF THE INSTRUMENT, NOT PREDICTED. *** The first draft of this record guessed 53/21/19/40 from
     // which gates the round had sped up, and was wrong on three of the four: the comment-strip fix below
     // moved two records the other way at the same time, and a guess cannot see two changes at once.
@@ -263,7 +269,13 @@ export const REACH_AT_V4548 = Object.freeze({
     // ship-time sweep. That is the ratchet doing its job on the round that wrote it, for the third round
     // running. It is NOT moved by relocating the rows: the reds those records name are gates the sweep
     // cannot run at all, so their guardian is expensive for the same reason they are.
-    checked: 70, overBudget: 29, unguarded: 11, unchecked: 40,
+    // v4622 -- RE-TAKEN: total 110 -> 111 from the ordinary growth of concurrent rounds on this same
+    // unshipped branch; checked and overBudget held at 70 and 29 (read off the instrument, not guessed), so
+    // the one new record landed in unguarded (11 -> 12) and unchecked rose with it (40 -> 41).
+    // v4622b -- RE-TAKEN AGAIN, WITHIN THE SAME ROUND: total 111 -> 113 (this round's own two-record
+    // redCensus.mjs registration, see the note above `total`). checked and overBudget held at 70 and 29;
+    // both new records landed in unguarded (12 -> 14) and unchecked rose with it (41 -> 43).
+    checked: 70, overBudget: 29, unguarded: 14, unchecked: 43,
     // v4550 -- the UNMEASURED class was split out of over-budget after this gate went red twice inside full
     // sweeps and passed 68 times under load; the trigger was a concurrent REWRITE of sweep-timings.json, not
     // contention. Zero records sit in it on a settled tree, which is the expected reading.
@@ -341,7 +353,12 @@ export const UNGUARDED_SPLIT_V4577 = Object.freeze({
     // did not move: no record joined or left it this round.
     // RE-TAKEN after the origin/main merge: 107 -> 110 records. Two records joined the unguarded set (9 ->
     // 11), both documentary (named by no code at all) -- read off splitUnguarded(), not guessed.
-    structural: Object.freeze({ total: 110, unguarded: 11, documentaryOfThose: 11, readByCodeOfThose: 0 }),
+    // v4622 -- RE-TAKEN: 110 -> 111 records from the ordinary growth of concurrent rounds on this same
+    // unshipped branch. One record joined the unguarded set (11 -> 12), documentary -- read off
+    // splitUnguarded(), not guessed.
+    // v4622b -- RE-TAKEN AGAIN, WITHIN THE SAME ROUND: 111 -> 113 (this round's own two-record redCensus.mjs
+    // registration). Both joined the unguarded set (12 -> 14), both documentary -- read off splitUnguarded().
+    structural: Object.freeze({ total: 113, unguarded: 14, documentaryOfThose: 14, readByCodeOfThose: 0 }),
     // BEFORE, on the tree this round opened on:
     before: Object.freeze({ total: 104, checked: 72, overBudget: 20, unmeasured: 0, unguarded: 12, unchecked: 32 }),
     // AFTER, as one reading rather than as a constant -- see the note above. Taken with the round's own

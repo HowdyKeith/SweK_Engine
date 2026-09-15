@@ -3765,6 +3765,30 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    // v4622 -- the 231st closing: SIX gates this same long-unshipped branch had added without ever naming
+    // here, found the same way since230 was -- diffing the current tree against ce5d9b22 (since230's own
+    // commit) rather than by memory, so the set is exactly what is missing since the last closing and not a
+    // guess at it. Two are this round's own (ffmpeg.wasm's export and its gate is one file, the other three
+    // are pre-existing branch work: FBX ingest (task #44), the frame recorder (task #64), ocean population
+    // dynamics (task #71), reach-IK (task #40) and the Trellis auto-rig (task #38/#39). Run one at a time on
+    // this box, each to completion: 6 GREEN, 0 red -- including trellisAutoRig-selfcheck.mjs itself, whose
+    // own exit code is unrelated to the Windows-path defect tools/ship/windowsImport-selfcheck.mjs finds IN
+    // its source (registered separately in redCensus.mjs's RED_AT_V4622).
+    since231: Object.freeze({
+        at: "e6aaaa93", swept: 6, green: 6, red: 0,
+        added: Object.freeze([
+            "tools/ship/fbxIngest-selfcheck.mjs",
+            "tools/ship/ffmpegWasmBridge-selfcheck.mjs",
+            "tools/ship/frameRecorder-selfcheck.mjs",
+            "tools/ship/oceanPopulation-selfcheck.mjs",
+            "tools/ship/reachIK-selfcheck.mjs",
+            "tools/ship/trellisAutoRig-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "all 6 green, run singly on this box. None of these six exists on origin/main -- confirmed " +
+                 "directly (git cat-file -e origin/main:... for each), not inferred -- so this surplus is " +
+                 "this branch's own unswept backlog, not a merge's.",
+    }),
     // the 230th closing: TWENTY-FIVE gates this branch had shipped without ever naming here -- the AI-presence
     // orb cluster, the boss/dungeon/CS-round managers, satellite fleet, space suit, F82 fresnel and split-sum
     // WGSL, draco encode, FXAA, pipboy wireframe, sprite-mesh blueprint and ui/guards -- found by diffing the

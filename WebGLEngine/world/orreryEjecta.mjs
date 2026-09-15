@@ -365,8 +365,10 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "fpsmirror.html",
         "glb_viewer.html",
         "gpu/gltfKtx2.js",
+        "gpu/gpuAssetLoader.js",
         "graph_viewer.html",
         "heerich-avatar.html",
+        "index.html",
         "krbn-avatar.html",
         "krbn-compare.html",
         "krbn-rigged.html",
@@ -398,6 +400,7 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         // barycentric wireframe geometry with vendor/three/three.module.js directly.
         "tools/ship/dracoEncode-selfcheck.mjs",
         "tools/ship/dracoWeld-selfcheck.mjs",
+        "tools/ship/fbxIngest-selfcheck.mjs",
         "tools/ship/pipboyWireframe-selfcheck.mjs",
         "tools/ship/threeImportmap-selfcheck.mjs",
         "tools/ship/tsl-selfcheck.mjs",

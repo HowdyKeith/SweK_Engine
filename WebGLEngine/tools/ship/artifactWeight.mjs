@@ -10,15 +10,25 @@
 // megabytes on every page load may still be the wrong trade, and nothing here could say so.
 //
 // MEASURE WHAT IS TRANSFERRED, NOT WHAT IS ON DISK -- and that distinction is not pedantry, it CHANGES THE
-// ANSWER. Measured on this tree:
+// ANSWER. Measured on this tree at r160 (a single monolithic three.module.js):
 //
 //     three.module.js     1.21 MB raw   0.25 MB gzip   (ratio 0.202)
 //     box3d .js + .wasm   0.93 MB raw   0.33 MB gzip   (ratio 0.358)
 //
-// BY RAW BYTES three.js is HEAVIER than box3d. BY WHAT A BROWSER ACTUALLY DOWNLOADS IT IS LIGHTER. The ordering
-// FLIPS. JS text compresses to about a fifth; WASM, already a compact binary, only to about a third. So a raw
-// byte count systematically flatters WASM and penalises JS, and any "bundle size" table built on it is ranking
-// the wrong quantity.
+// BY RAW BYTES three.js was HEAVIER than box3d. BY WHAT A BROWSER ACTUALLY DOWNLOADS IT WAS LIGHTER. The
+// ordering FLIPPED. JS text compresses to about a fifth; WASM, already a compact binary, only to about a
+// third. So a raw byte count systematically flatters WASM and penalises JS, and any "bundle size" table
+// built on it is ranking the wrong quantity.
+//
+// *** v4622 -- THE FLIP WAS AN ARTIFACT OF AN INCOMPLETE BUNDLE, NOT A PROPERTY OF THE COMPARISON. *** The
+// three.js re-vendor to 0.185.1 split the single file into a thin three.module.js shim that imports/re-exports
+// from a new three.core.js carrying the bulk of the code. Weighing three.module.js alone after that split
+// measured only the shim (0.62 MB), not what a page actually downloads (both files, since one imports the
+// other) -- and on THAT number the "ordering flips" story looked like it survived the re-vendor, purely
+// because the shim happens to compress worse than box3d's WASM. Weighed correctly (both files, 2.0 MB raw,
+// 0.39 MB gzip): three.js is heavier than box3d on BOTH dimensions now, same shape as jolt vs box3d below --
+// the raw-vs-transferred flip this module exists to demonstrate does not currently have a live example in
+// this tree, and the module says so rather than keeping a stale one.
 //
 // This reports both, always, and never a single "size".
 "use strict";
@@ -39,8 +49,13 @@ export const BUNDLES = [
       files: ["vendor/box3d/box3d.js", "vendor/box3d/box3d.wasm"] },
     { id: "jolt", label: "Jolt (WASM physics)", kind: "wasm",
       files: ["vendor/jolt/jolt-physics.wasm-compat.js"] },
+    // v4622 -- three.js re-vendored r160 -> 0.185.1 split the single monolithic file into a thin
+    // three.module.js shim that imports/re-exports from a new three.core.js carrying the bulk of the code
+    // (confirmed: three.module.js's own first import statement pulls hundreds of names from './three.core.js').
+    // Weighing three.module.js alone after that split measures only the shim, not what a page actually
+    // downloads -- both files are in the bundle now, same as box3d's .js + .wasm pair above.
     { id: "three", label: "three.js (renderer)", kind: "js",
-      files: ["vendor/three/three.module.js"] },
+      files: ["vendor/three/three.module.js", "vendor/three/three.core.js"] },
     { id: "htmx", label: "htmx", kind: "js",
       files: ["vendor/htmx/htmx.2.0.10.min.js"] },
 ];
