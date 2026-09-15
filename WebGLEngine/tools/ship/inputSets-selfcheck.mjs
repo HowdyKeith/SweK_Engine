@@ -29,9 +29,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ENG, RECORD, hashFile, hashDir, readRecord, whyRun, skippable, partition, reasonHistogram,
-         encode, decode, clearHashCache, CONFLICT, FLAGS } from "./inputSets.mjs";
-import { usesNamedFsImport, probeOne, entryFor } from "./recordInputs.mjs";
+         encode, decode, clearHashCache, CONFLICT, FLAGS, FORMAT } from "./inputSets.mjs";
+import { usesNamedFsImport, probeOne, entryFor, conflictReport } from "./recordInputs.mjs";
 import { selectGates } from "./quickSweep.mjs";
+import { noComments } from "./sourceScan.mjs";
 
 let fails = 0;
 const ok = (name, cond, detail = "") => { console.log((cond ? "  PASS  " : "  FAIL  ") + name + (detail ? "   " + detail : "")); if (!cond) fails++; };
@@ -50,43 +51,140 @@ ok("  every entry carries a hash for every path it recorded -- a path with no ha
    "reads -> hashes, dirs -> dirHashes");
 
 console.log("\n2. *** THE RULE REFUSES ON EVERY UNKNOWN, AND EACH REFUSAL IS DRIVEN ON A FIXTURE ***");
+const observed = [];
 {
-    // Fixtures rather than live entries: a rule that only ever sees the tree's own shapes is a rule nobody
-    // has tested the edges of. Each of these is one disqualifier alone, everything else valid.
-    const good = { reads: ["a.mjs"], dirs: [], hashes: { "a.mjs": hashFile("tools/ship/inputSets.mjs") }, dirHashes: {},
-                   spawnedNonNode: false, net: false };
-    const rec = (over) => ({ gates: { "a.mjs": { ...good, ...over } } });
-    // the control: the same entry, with the hash actually matching the file it names
-    const real = { reads: ["tools/ship/inputSets.mjs"], dirs: [], hashes: { "tools/ship/inputSets.mjs": hashFile("tools/ship/inputSets.mjs") },
-                   dirHashes: {}, spawnedNonNode: false, net: false };
+    // *** v4556 -- TWELVE FIXTURES ANSWERED ONE SENTENCE FOR EIGHT ROUNDS, AND THE CONTROL ROW IS THE ONLY
+    // REASON ANYBODY COULD TELL WHICH SENTENCE. *** whyRun grew a FIRST LINE -- `rec.format !== FORMAT` --
+    // because the encoding is INDEXED: a record written under another layout does not fail to decode, it
+    // decodes to the WRONG PATHS, hashes them, finds them unchanged and skips the gate. Correct, and every
+    // fixture below was hand-spelled in the DECODED shape with no envelope around it, so from that day each
+    // one returned "no usable input record" and NONE of them was about the disqualifier it names. Thirteen
+    // of this gate's fourteen reds were that one line arriving.
+    //
+    // *** THE FIX IS NOT TO ADD `format` TO TWELVE LITERALS. *** A fixture hand-built in a shape the
+    // mechanism never produces is a check aimed beside its subject: readRecord() goes through decode(),
+    // decode() always stamps the envelope, so NO LIVE CALLER CAN HAND whyRun WHAT THESE ROWS WERE HANDING
+    // IT. They go through encode()/decode() -- the shipped serialiser -- so the envelope is whatever the
+    // recorder writes today and the next required field lands in every fixture without an edit here.
+    const SELF = "tools/ship/inputSets.mjs", OTHER = "tools/ship/recordInputs.mjs";
+    const mkRec = (gates) => decode(encode(gates));
+    const rec1 = (entry, key = SELF) => mkRec({ [key]: entry });
+    // *** AND THE BASE IS VALID, WHICH THE OLD ONE WAS NOT. *** The battery's own comment said "one
+    // disqualifier alone, everything else valid", and its base recorded `a.mjs` hashing to the bytes of
+    // inputSets.mjs -- a path that does not exist, so the base was ALREADY refusable as `changed: a.mjs`.
+    // THREE rows stood on it -- spawnedNonNode, net, and the own-source row, whose "b.mjs" hashed to
+    // "deadbeef" and was therefore a missing file AND a changed one -- and they were green only because the
+    // check they test is read ABOVE the hash loop. MEASURED by moving the hash loop above the flags: two of
+    // the three then answer "changed: a.mjs", a refusal with nothing to do with their subject, and the
+    // third survives only that particular reorder. The repaired battery is ALL GREEN under the same
+    // reordered rule, which is the claim: every row below carries its own REVERT -- the same fixture with
+    // the one mutation undone, which must be SKIPPABLE -- so the mutation is provably the only thing that
+    // moved, whatever order the rule reads its checks in.
+    const base = () => ({ reads: [SELF], dirs: [], hashes: { [SELF]: hashFile(SELF) }, dirHashes: {},
+                          spawnedNonNode: false, spawnedNode: 0, procs: 1, net: false,
+                          namedFsImport: false, reachesUnrecorded: false });
+    const over = (o) => ({ ...base(), ...o });
+    const control = () => whyRun(SELF, rec1(base()));
     ok("CONTROL: a complete entry whose one recorded file still hashes to what it hashed is SKIPPABLE",
-       whyRun("tools/ship/inputSets.mjs", { gates: { "tools/ship/inputSets.mjs": real } }) === null,
-       "if this row ever fails, every refusal below is passing for the wrong reason");
-    ok("REFUSED: a gate with no entry at all", whyRun("nope.mjs", rec({})) === "no recorded input set");
-    ok("REFUSED: spawned a child the probe could not follow",
-       whyRun("a.mjs", rec({ spawnedNonNode: true })) === "spawned a child the probe could not follow");
-    ok("REFUSED: opened a socket or fetched", whyRun("a.mjs", rec({ net: true })) === "opens a socket or fetches");
-    // *** v4567 -- AND THE TWO THAT ARE NO LONGER REFUSALS, ASSERTED AS SUCH. *** A disqualifier that has
-    // been lifted has to be checked in the lifted direction, or the next reader cannot tell "we fixed this"
-    // from "we forgot this". A named fs import and a NODE child are both fine now, and section 3b measures
-    // WHY they are fine rather than taking the rule's word for it.
-    ok("ALLOWED now: a gate taking fs by NAMED import (the loader hook binds those names to the shim)",
-       whyRun("tools/ship/inputSets.mjs", { gates: { "tools/ship/inputSets.mjs": { ...real, namedFsImport: true } } }) === null);
-    ok("ALLOWED now: a gate that spawned only NODE children (NODE_OPTIONS carried the probe into them)",
-       whyRun("tools/ship/inputSets.mjs", { gates: { "tools/ship/inputSets.mjs": { ...real, spawnedNode: 6, procs: 7 } } }) === null);
-    ok("REFUSED: an EMPTY recorded set -- 'read nothing' and 'we saw nothing' are not the same claim",
-       whyRun("a.mjs", rec({ reads: [], dirs: [], hashes: {} })) === "recorded an empty input set");
-    ok("REFUSED: a set that does not contain the gate's OWN source (node read it to run it, so its absence is a broken record)",
-       whyRun("a.mjs", rec({ reads: ["b.mjs"], hashes: { "b.mjs": "deadbeef" } })) === "its own source is not in its recorded set");
-    ok("REFUSED: a recorded file whose content has moved, and the reason NAMES the file",
-       whyRun("a.mjs", rec({ hashes: { "a.mjs": "0000000000000000" } })) === "changed: a.mjs");
-    // Keyed on a file that really exists, so the FIRST recorded path passes and the row is about the second.
-    // (My first draft used the "a.mjs" fixture, whose own hash could never match, so it reported the wrong
-    // filename and the row tested nothing about a missing file at all.)
-    const self = "tools/ship/inputSets.mjs";
-    ok("REFUSED: a recorded file that is GONE (hashFile returns null, which no recorded hash equals)",
-       whyRun(self, { gates: { [self]: { ...good, reads: [self, "vanished.mjs"], dirs: [],
-           hashes: { [self]: hashFile(self), "vanished.mjs": "abc" } } } }) === "changed: vanished.mjs");
+       control() === null, "if this row ever fails, every refusal below is passing for the wrong reason");
+
+    // Each row: what the fixture must say, and what the SAME fixture says with the mutation undone. A row
+    // is green only when the first is the named refusal AND the second is null.
+    const BATTERY = [
+        // *** THE TWO THE OLD BATTERY DROVE WITH NOTHING, AND THE FIRST IS THE ONE THAT BROKE IT. ***
+        { name: "REFUSED: a record with NO envelope -- the exact shape this gate used to hand-build",
+          reason: "no usable input record (missing, or a different format)",
+          detail: "the indexed form decodes to the wrong paths under another layout, so a missing format is not a formality",
+          run: () => whyRun(SELF, { gates: { [SELF]: base() } }) },
+        { name: "REFUSED: a record stamped with a format this build does not speak",
+          reason: "no usable input record (missing, or a different format)",
+          run: () => whyRun(SELF, { ...rec1(base()), format: FORMAT + 1 }) },
+        { name: "REFUSED: a gate with no entry at all",
+          reason: "no recorded input set",
+          run: () => whyRun("nope.mjs", rec1(base())),
+          back: () => whyRun(SELF, rec1(base())) },
+        { name: "REFUSED: spawned a child the probe could not follow",
+          reason: "spawned a child the probe could not follow",
+          run: () => whyRun(SELF, rec1(over({ spawnedNonNode: true }))) },
+        { name: "REFUSED: opened a socket or fetched",
+          reason: "opens a socket or fetches",
+          run: () => whyRun(SELF, rec1(over({ net: true }))) },
+        // *** DRIVEN BY NOTHING UNTIL NOW, AND IT IS THE LARGEST REFUSAL THE LIVE RECORD MAKES: *** 133 of
+        // the 486 gates that would run do so because their recorded set does not carry a module their
+        // source can reach. A refusal costing a third of the run had no fixture at all.
+        { name: "REFUSED: reaches a module its recorded set does not carry (the static closure, at record time)",
+          reason: "reaches a module its recorded set does not carry",
+          detail: "133 of the live record's 486 runs are this one",
+          run: () => whyRun(SELF, rec1(over({ reachesUnrecorded: true }))) },
+        { name: "REFUSED: an EMPTY recorded set -- 'read nothing' and 'we saw nothing' are not the same claim",
+          reason: "recorded an empty input set",
+          run: () => whyRun(SELF, rec1(over({ reads: [], dirs: [], hashes: {} }))) },
+        // One variable: a set of one REAL file with its REAL hash, which is simply not this gate's source.
+        // The old row recorded "b.mjs" hashing to "deadbeef", so it was also a changed file and a missing
+        // one, and passed on the order of the two checks rather than on the claim.
+        { name: "REFUSED: a set that does not contain the gate's OWN source (node read it to run it, so its absence is a broken record)",
+          reason: "its own source is not in its recorded set",
+          run: () => whyRun(SELF, rec1(over({ reads: [OTHER], hashes: { [OTHER]: hashFile(OTHER) } }))),
+          back: () => whyRun(SELF, rec1(over({ reads: [SELF, OTHER],
+                                               hashes: { [SELF]: hashFile(SELF), [OTHER]: hashFile(OTHER) } }))) },
+        { name: "REFUSED: a recorded file whose content has moved, and the reason NAMES the file",
+          reason: "changed: " + SELF,
+          run: () => whyRun(SELF, rec1(over({ hashes: { [SELF]: "0000000000000000" } }))) },
+        { name: "REFUSED: a recorded file that is GONE (hashFile returns null, which no recorded hash equals)",
+          reason: "changed: vanished.mjs",
+          run: () => whyRun(SELF, rec1(over({ reads: [SELF, "vanished.mjs"],
+                                              hashes: { [SELF]: hashFile(SELF), "vanished.mjs": "abc" } }))),
+          back: () => control() },
+        // *** v4567 -- AND THE TWO THAT ARE NO LONGER REFUSALS, ASSERTED IN THE LIFTED DIRECTION. *** A
+        // disqualifier that has been lifted has to be checked as lifted, or the next reader cannot tell
+        // "we fixed this" from "we forgot this". Section 7 measures WHY each is safe rather than taking
+        // the rule's word for it. Their revert is the control, so these rows say the flag changes nothing.
+        { name: "ALLOWED now: a gate taking fs by NAMED import (the loader hook binds those names to the shim)",
+          reason: null, run: () => whyRun(SELF, rec1(over({ namedFsImport: true }))) },
+        { name: "ALLOWED now: a gate that spawned only NODE children (NODE_OPTIONS carried the probe into them)",
+          reason: null, run: () => whyRun(SELF, rec1(over({ spawnedNode: 6, procs: 7 }))) },
+    ];
+    for (const b of BATTERY) {
+        clearHashCache();
+        const got = b.run(), rev = (b.back || control)();
+        observed.push(got);
+        const said = got === b.reason;
+        ok(b.name, said && rev === null,
+           (said ? "" : `SAID ${JSON.stringify(got)} rather than ${JSON.stringify(b.reason)}; `) +
+           (rev === null ? "reverted: skippable" : `REVERTED FIXTURE IS NOT SKIPPABLE: ${rev}`) +
+           (b.detail ? " -- " + b.detail : ""));
+    }
+}
+
+console.log("\n2b. *** AND THE LIST OF REFUSALS HAS ONE HOME: THE RULE'S OWN SOURCE ***");
+{
+    // *** THIS IS THE ROW v4574 SHOULD HAVE TURNED RED. *** What went wrong above was not that a fixture
+    // was wrong -- it was that a refusal was ADDED to whyRun and nothing in this file had to change, so
+    // twelve rows quietly started answering the new one instead of their own subjects. Two of the rule's
+    // nine refusals had no fixture at all when this was written: the format check, and `reachesUnrecorded`,
+    // which is the single largest reason the live record gives for running a gate.
+    //
+    // So the list is HARVESTED from the rule's source rather than typed here, and each entry must have been
+    // OBSERVED coming out of a fixture above. Add a tenth refusal and this gate goes red naming it.
+    // noComments(), because a row that reads the rule's PROSE is a row its own explanation can satisfy --
+    // the shape this session has now found four times.
+    const src = noComments(fs.readFileSync(path.join(ENG, "tools/ship/inputSets.mjs"), "utf8"));
+    const at = src.indexOf("export function whyRun");
+    let depth = 0, end = src.length;
+    for (let i = src.indexOf("{", at); i < src.length; i++) {
+        if (src[i] === "{") depth++;
+        else if (src[i] === "}" && --depth === 0) { end = i; break; }
+    }
+    const body = at >= 0 ? src.slice(at, end) : "";
+    const literals = [...body.matchAll(/return\s+"((?:[^"\\]|\\.)*)"/g)].map((m) => m[1]);
+    const seen = observed.filter((o) => typeof o === "string");
+    const undriven = literals.filter((L) => !seen.some((o) => o.startsWith(L)));
+    ok("*** the rule's whyRun body was located and it returns the refusals this gate is about ***",
+       at >= 0 && literals.length >= 8, `${literals.length} refusal(s) harvested from ${body.length} chars of code`);
+    ok("*** every refusal whyRun can return is DRIVEN by a fixture above -- a new one reddens this row ***",
+       undriven.length === 0 && literals.length >= 8,
+       undriven.length ? "DRIVEN BY NOTHING: " + undriven.map((u) => JSON.stringify(u)).join(", ")
+                       : `${literals.length} refusal(s), ${new Set(seen).size} distinct sentence(s) observed`);
 }
 
 console.log("\n3. *** THE PROBE, AGAINST A GATE WHOSE INPUTS ARE KNOWN BY OTHER MEANS ***");
@@ -119,10 +217,16 @@ console.log("\n4. *** A FILE THAT DID NOT EXIST AT RECORD TIME AND NOW DOES ***"
     const tmp = "tools/ship/__inputsets_fixture__.json";
     const abs = path.join(ENG, tmp);
     try { fs.unlinkSync(abs); } catch {}
+    // Through encode()/decode() for the reason section 2 gives at length: hand-spelled in the decoded
+    // shape, this fixture answered "no usable input record" from v4574 onward and the row below reported
+    // that sentence as though it were about the appearing file. `spawned` was the pre-v4567 spelling and
+    // had been dead here since the rename; the flags are the ones FLAGS names.
     const entry = { reads: ["tools/ship/inputSets.mjs"], dirs: [tmp],
                     hashes: { "tools/ship/inputSets.mjs": hashFile("tools/ship/inputSets.mjs") },
-                    dirHashes: { [tmp]: hashDir(tmp) }, spawned: false, net: false, namedFsImport: false };
-    const rec = { gates: { "tools/ship/inputSets.mjs": entry } };
+                    dirHashes: { [tmp]: hashDir(tmp) },
+                    spawnedNonNode: false, spawnedNode: 0, procs: 1, net: false,
+                    namedFsImport: false, reachesUnrecorded: false };
+    const rec = decode(encode({ "tools/ship/inputSets.mjs": entry }));
     ok("with the file absent -- exactly as it was when the entry was recorded -- the gate is skippable",
        whyRun("tools/ship/inputSets.mjs", rec) === null, `recorded dirHash ${JSON.stringify(entry.dirHashes[tmp])}`);
     fs.writeFileSync(abs, "{}\n");
@@ -131,6 +235,7 @@ console.log("\n4. *** A FILE THAT DID NOT EXIST AT RECORD TIME AND NOW DOES ***"
     clearHashCache();
     const why = whyRun("tools/ship/inputSets.mjs", rec);
     try { fs.unlinkSync(abs); } catch {}
+    observed.push(why);   // the DIRECTORY arm of `changed:`, which section 2 drives on a file
     ok("*** and the moment the file APPEARS the same entry says RUN, naming it -- an absence is a dependency ***",
        why === "changed: " + tmp, why || "(skippable -- which would be the silent false green)");
 }
@@ -164,10 +269,46 @@ console.log("\n4b. the indexed format, and the conflict it exists to refuse");
        "sentinel would have matched its live null reading and skipped both");
     ok("  agreeing gates are NOT a conflict, so the check is not simply flagging every shared path",
        encode({ "a.mjs": A, "b.mjs": { ...A } }).conflicts.length === 0);
-    // The live record has none, and that is a measurement rather than a design guarantee.
-    ok("  the live record's own conflict list is EMPTY -- measured, not assumed",
-       Array.isArray(REC.conflicts) && REC.conflicts.length === 0,
-       `${(REC.conflicts || []).length} conflicting path(s) across ${GATES.length} gates in one 181 s pass`);
+    // *** v4556 -- THIS ROW ASSERTED A PROPERTY OF THE CALENDAR AND NOT OF THE MECHANISM. *** It required
+    // the live conflict list to be EMPTY, which is the claim that nobody edited the tree during the 181 s
+    // recording pass -- and the pass is exactly long enough for that to be untrue. The record taken on
+    // 2026-09-13 carries four, every one a file the rounds running at the time were moving:
+    // physics/character/fallBody.mjs, physics/character/terrainWalk.mjs, simulation/BotManager.js and
+    // world/surfaceProbe.mjs. So the row went red WHILE THE CONFLICT MACHINERY WAS DOING ITS JOB, which is
+    // the "a check that goes red on success" shape, and a reader would have gone looking for a bug in
+    // encode().
+    //
+    // THE COUNT IS REPORTED AND THE INVARIANT IS ASSERTED. What belongs to the mechanism is that a
+    // conflicting path REFUSES every gate that touched it -- measured here on the live record rather than
+    // on the fixture two rows up, because the sentinel has to survive the round trip through the file.
+    // MEASURED: 72 of 1,267 gates read one of the four and 0 of 72 are skippable -- 5.7% of the population
+    // paying for the pass not being hermetic. (My first reading was 198, which is the sum of the four
+    // per-path counts and therefore counts a gate reading three of them three times; the row reports the
+    // DISTINCT population, which is the only one that means anything as a fraction.) That price is the
+    // finding; zero conflicts was never a property anything guaranteed.
+    const liveConflicts = Array.isArray(REC.conflicts) ? REC.conflicts : [];
+    const touching = GATES.filter((g) => (REC.gates[g].reads || []).some((r) => liveConflicts.includes(r)));
+    const clash = partition(touching, REC).skip;
+    ok("*** every gate that touched a CONFLICTING path is refused, on the LIVE record and not just a fixture ***",
+       clash.length === 0 && (liveConflicts.length === 0 || touching.length > 0),
+       `${liveConflicts.length} conflicting path(s) across ${GATES.length} gates, recorded ${REC.at}: ` +
+       `${touching.length} gate(s) read one and ${clash.length} of those are skippable` +
+       (liveConflicts.length ? " -- " + liveConflicts.join(", ") + ". The tree moved under the pass; the sentinel " +
+        "is what makes that cost skips rather than correctness."
+                          : ". The live population is EMPTY, so this row claims nothing today and the two " +
+        "fixture rows above carry the sentinel's whole weight -- said here rather than left to look like evidence."));
+    // *** v4556 -- AND THE PASS NOW SAYS SO OUT LOUD, WHICH IS THE HALF THAT WAS MISSING. *** The sentinel
+    // has refused correctly since v4566 and the recorder has never PRINTED a conflict, so the operator who
+    // caused one -- by editing the tree during a 181 s pass -- had no way to learn that 72 gates had just
+    // stopped being skippable. Driven on the same two-gate fixture, and on an agreeing pair, because a
+    // report that fires on everything is no more use than one that fires on nothing.
+    const clashing = { "a.mjs": A, "b.mjs": B }, agreeing = { "a.mjs": A, "b.mjs": { ...A } };
+    const said = conflictReport(encode(clashing), clashing);
+    ok("*** the recorder REPORTS a conflict, with its price in gates -- it has been silent about them since v4566 ***",
+       typeof said === "string" && said.includes("x.mjs") && /\b2 of 2 gate\(s\)/.test(said), said || "(said nothing)");
+    ok("  and says nothing when the pass did not contradict itself, so the report is not noise",
+       conflictReport(encode(agreeing), agreeing) === null);
+
     // round trip: the compact form must mean exactly what the expanded one did
     const round = decode(encode({ "a.mjs": A }));
     ok("*** and encode/decode round-trips: the compact form says exactly what the expanded one said ***",
@@ -207,8 +348,13 @@ console.log("\n5. what the record actually bought, on the live tree");
 console.log("\n6. the sweep is WIRED BUT NOT ARMED");
 {
     const all = ["a.mjs", "b.mjs"], timings = { "a.mjs": 100, "b.mjs": 100 };
-    const rec = { gates: { "a.mjs": { reads: ["a.mjs"], dirs: [], hashes: { "a.mjs": hashFile("tools/ship/inputSets.mjs") },
-                                      dirHashes: {}, spawned: false, net: false, namedFsImport: false } } };
+    // Through encode()/decode(), for section 2's reason: hand-spelled these carried no envelope, so
+    // selectGates was reading "no usable input record" for BOTH fixtures and the armed row below could
+    // never show a difference between the flag being on and off.
+    const flags = { spawnedNonNode: false, spawnedNode: 0, procs: 1, net: false,
+                    namedFsImport: false, reachesUnrecorded: false };
+    const rec = decode(encode({ "a.mjs": { reads: ["a.mjs"], dirs: [], hashes: { "a.mjs": hashFile("tools/ship/inputSets.mjs") },
+                                           dirHashes: {}, ...flags } }));
     const off = selectGates(all, timings, 3000, { inputRecord: rec });
     const on = selectGates(all, timings, 3000, { inputRecord: rec, skipUnchanged: true });
     ok("*** without skipUnchanged the sweep RUNS everything and only COUNTS what it could have skipped ***",
@@ -219,9 +365,8 @@ console.log("\n6. the sweep is WIRED BUT NOT ARMED");
                 return none.run.length === 2 && (none.unchanged || []).length === 0; })(),
        "a missing tools/ship/input-sets.json is not a behaviour change");
     // the arming path, on an entry that really is skippable
-    const real = { gates: { "tools/ship/inputSets.mjs": { reads: ["tools/ship/inputSets.mjs"], dirs: [],
-        hashes: { "tools/ship/inputSets.mjs": hashFile("tools/ship/inputSets.mjs") }, dirHashes: {},
-        spawned: false, net: false, namedFsImport: false } } };
+    const real = decode(encode({ "tools/ship/inputSets.mjs": { reads: ["tools/ship/inputSets.mjs"], dirs: [],
+        hashes: { "tools/ship/inputSets.mjs": hashFile("tools/ship/inputSets.mjs") }, dirHashes: {}, ...flags } }));
     const armedOff = selectGates(["tools/ship/inputSets.mjs"], { "tools/ship/inputSets.mjs": 100 }, 3000, { inputRecord: real });
     const armedOn = selectGates(["tools/ship/inputSets.mjs"], { "tools/ship/inputSets.mjs": 100 }, 3000, { inputRecord: real, skipUnchanged: true });
     ok("*** and WITH skipUnchanged the same gate is dropped from the run, so the flag is the only difference ***",

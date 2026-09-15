@@ -129,6 +129,31 @@ export function entryFor(p, { root = ENG } = {}) {
              reachesUnrecorded: short !== null, probeMs: p.ms, exit: p.code };
 }
 
+/**
+ * What the pass has to say about CONTRADICTING ITSELF, or null when it has nothing to say.
+ *
+ * *** encode() HAS RECORDED A CONFLICT SINCE v4566 AND NOTHING HAS EVER PRINTED ONE. *** A conflict is a
+ * path two gates read with two DIFFERENT contents in the same pass -- the tree moved while the pass ran --
+ * and it is stored as a sentinel so every gate that touched it is refused rather than skipped on a coin
+ * flip. That part works. What was missing is that it is also a REASON TO RE-RECORD: the record of
+ * 2026-09-13 carries four paths, every one a file the rounds running at the time were editing, and the
+ * price is 72 of 1,267 gates that can never be skipped until the pass is taken again on a quiet tree. A
+ * number nobody can see is a number nobody acts on, so it goes in the report with its price in gates.
+ *
+ * It is a FUNCTION rather than three lines inside the CLI block because a fix nothing can reach is a fix
+ * that lives in its own comment -- tools/ship/inputSets-selfcheck.mjs drives it on a two-gate fixture that
+ * really conflicts, and on one that does not.
+ */
+export function conflictReport(enc, gates) {
+    const conflicts = (enc && enc.conflicts) || [];
+    if (!conflicts.length) return null;
+    const names = Object.keys(gates || {});
+    const hit = names.filter((g) => ((gates[g] || {}).reads || []).some((r) => conflicts.includes(r)));
+    return `${conflicts.length} path(s) were read with TWO different contents during the pass -- the tree ` +
+           `moved while it ran. ${hit.length} of ${names.length} gate(s) touch one and are refused rather ` +
+           "than skipped until this is re-recorded on a quiet tree: " + conflicts.join(", ");
+}
+
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     const arg = (n, d) => { const i = process.argv.indexOf(n); return i >= 0 ? process.argv[i + 1] : d; };
     const only = arg("--gates", null), limit = Number(arg("--limit", 0));
@@ -172,7 +197,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         // INDEXED, not one path list per gate -- see the note above `FORMAT` in inputSets.mjs. Written
         // compactly rather than with an indent: this is a 4,072-row table with 443,405 references into it,
         // and an indent per line is a megabyte of spaces.
-        fs.writeFileSync(path.join(ENG, RECORD), JSON.stringify(encode(out, {
+        const enc = encode(out, {
             // *** FIRST KEY ON PURPOSE, AND IT COST orphanScan ITS EYESIGHT TO LEARN WHY. ***
             // tools/ship/orphanScan.mjs treats a GENERATED RECORD as a file that records references rather
             // than one that makes them, and it asks the file what it is instead of matching its name --
@@ -193,7 +218,10 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
                   "is still recorded and no longer decides anything: the loader hook reaches those bindings. " +
                   "See tools/ship/inputSets.mjs for the rule.",
             at: new Date().toISOString(), probedMs: ms,
-        })) + "\n");
+        });
+        fs.writeFileSync(path.join(ENG, RECORD), JSON.stringify(enc) + "\n");
         console.log("[inputs] wrote " + RECORD);
+        const clash = conflictReport(enc, out);
+        if (clash) console.log("[inputs] " + clash);
     } else console.log("[inputs] dry run -- pass --write to record");
 }
