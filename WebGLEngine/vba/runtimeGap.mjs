@@ -399,7 +399,12 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // case yet that the sameness means nothing: the round's subject was that a PREVIOUS round measured
     // against the wrong reference and overstated a number by five orders of magnitude. Not one row here
     // could move for that, and none did.
-    esModules: 3794, closures: 3662, asyncAwait: 1439, typedArrays: 833, promises: 345,
+    // v4587 -- RE-TAKEN, and two rows moved for once: asyncAwait 1439 -> 1441 and promises 345 -> 346. The round
+    // gave redCensus.mjs a parallel driver (driveReds: a Promise per child, Promise.all over a worker pool) and
+    // redAction-selfcheck an await at its call site. The file count did not move -- no module was added, two were
+    // extended -- so this is the shape the previous notes kept predicting and not seeing: a round whose reach the
+    // FILE row cannot show and the CAPABILITY rows can.
+    esModules: 3794, closures: 3662, asyncAwait: 1441, typedArrays: 833, promises: 346,
     fetchXhr: 243, performanceNow: 220, raf: 116, webgl: 142, webgpu: 48, threads: 22, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

@@ -1,12 +1,48 @@
 // WebGLEngine/tools/ship/redAction-selfcheck.mjs -- v4585
 //
 // Run: node tools/ship/redAction-selfcheck.mjs
-// RUNTIME 6709 ms ALONE (median of 6709/6730/6696) and about 6.9 s at eight-wide. Well over the
-// 3000 ms sweep budget: it RUNS three gates as children -- staleness, budgetExile and definitionGates -- because
-// classifying a red from its own printed failure means making it print one. quickSweep confirms it serially per
-// v4408 and files an ALONE reading; it belongs in the full suite.
+// RUNTIME 27565 ms ALONE (median of 27565/28323/27473 at v4587, up from 6709 ms at v4585). Well over the
+// 3000 ms sweep budget: it RUNS its subjects as children, because classifying a red from its own printed failure
+// means making it print one. quickSweep confirms it serially per v4408 and files an ALONE reading; it belongs in
+// the full suite.
 //
-// SABOTAGE: 14 mutations, 14 red, no 0-RED, nothing crashed -- after passes that produced eight 0-REDs and a crash,
+// THE 4x IS THE POPULATION, AND IT IS THE POINT: v4585 ran three children off a typed list, v4587 derives the
+// list from the sweep record and runs 29. Measured at eight-wide inside this gate: 25.1 s for the 29, against
+// 126.2 s of recorded serial time. IT NESTS -- during a full sweep this gate spawns 8 children while the sweep
+// itself runs 8-wide -- which is survivable only because quickSweep re-runs an over-budget gate ALONE.
+// Not one of the 29 writes to the tree -- established on the THIRD try, after the first two compared a git
+// status that was already dirty and so could not have shown a write either way. See redCensus.standingReds.
+//
+// sweep-timings.json STILL SAYS 6709 AND IS NOT HAND-EDITED TO SAY OTHERWISE. Its own note says it holds what
+// "the last quickSweep run" OBSERVED, and typing a number I measured elsewhere into a record that claims to be
+// observed is the declared-for-derived swap this file exists to object to. The next full sweep writes it; until
+// then the honest state is a record four times behind and a header that says so. gate-timings.json has no entry
+// for this gate at all, for the same reason -- tools/ship/selfchecks.mjs writes that one on a full run.
+//
+// SABOTAGE v4587 (section 4, rebuilt): 6 mutations. 4 caught, 1 uncompletable, 1 genuine 0-RED that was MY
+// MUTATION AIMED WRONG, and two of the three scoring mistakes were ones this header already warns about:
+//   - M2 removed the exclusions from standingReds() so 124s and __ fixtures counted as reds. First scored as a
+//     0-RED. IT WAS A KILL: the gate drove 165 gates instead of 29 and `timeout` took it at exit 124, so the
+//     empty output grepped to FAIL=0. *** A CRASH IS NOT A VERDICT AND NEITHER IS A KILL, *** which is the rule
+//     this very round wrote into standingReds' own doc comment about the sweep's 136 capped gates -- and the
+//     harness scoring it still read the silence as a pass. Rescored with the exit code captured: the mutation
+//     does not produce a wrong answer, it produces NO answer in fifteen minutes. The exclusion is load-bearing
+//     twice over: for correctness, and for termination.
+//   - M4 stripped the detail off a live red to force a fifteenth bare line, and the ratchet did not move. A real
+//     0-RED, and the cause was the target: that line WAS ALREADY ONE OF THE FOURTEEN, so nothing could change.
+//     Re-aimed at pageReflow, whose detail names files: 14 -> 15 and the ratchet fired. A mutation that does not
+//     change the measured quantity tests nothing, and picking the target by "it is a red" is not picking it.
+//   - and M4's re-aim found a defect in the detector being sabotaged, which is the point of doing it: the
+//     leftover fallback said "(Keith measured 267ms)" and `\b\d+\b` refused it, because the trailing boundary
+//     rejects a number glued to its unit. Repaired to `\b\d+` at the site, with the measurement both ways.
+// M1 (population typed out instead of derived) -> 2 rows red. M3 (a live red given a command) -> the command row
+// red, naming the gate. M5 (ratchet seed inflated to 20) -> the slack row red. M6 reverted instruments' repaired
+// detail and NOTHING WENT RED, because its subject is green now and no check reads a passing row's shape -- an
+// honest gap, stated rather than papered over: the evidence rule can only see a row that is failing.
+// M7 put recordDrift back to the count comparison against a content-stale index: the pre-flight printed
+// "1643 gates, rebuilt and byte-identical". With the content comparison it printed the changed entry by name.
+//
+// SABOTAGE v4585: 14 mutations, 14 red, no 0-RED, nothing crashed -- after passes that produced eight 0-REDs and a crash,
 // every one a defect here. The instructive ones:
 //   - the first baseline was itself red, because ADDING THIS GATE RE-STALED THE PAGE. Every comparison in that run
 //     was against a moving baseline, which is why the sweep is re-run after the one command.
@@ -55,6 +91,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { prose } from "./sourceScan.mjs";
 import { stalenessRows } from "./staleness.mjs";
+import { standingReds, driveReds } from "./redCensus.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ENG = path.resolve(HERE, "..", "..");
@@ -221,78 +258,155 @@ console.log("\n3. *** THE ROW THAT PROMISED FALSIFIABILITY AND RE-ASSERTED THE T
 }
 
 // ---------------------------------------------------------------------------
-console.log("\n4. EVERY REMAINING RED NAMES WHAT CLOSES IT -- A COMMAND OR A COUNT");
+console.log("\n4. *** THE POPULATION IS DERIVED NOW. IT WAS A LIST OF TWO, UNDER ROWS BEGINNING 'EVERY RED'. ***");
 {
-    // The gates this arc has been calling standing reds. Each is RUN, and its own output is classified.
-    // gateSelection joined this list at v4585 BECAUSE IT FAILED THE RULE: its failure read "first 123 selected are
-    // all reachable", which describes the intent and reads like a pass, naming neither a command nor a count. It is
-    // reproducible and it is growth -- `reachable` now exceeds a 180 s budget's selection, so the truncation is the
-    // normal case. Its message says "22 of the first 123 selected are NOT reachable" and states what is owed now,
-    // which is the minimum for a red somebody can act on.
-    // *** AND ONE OF THE TWO IS CLASSIFIED FROM ITS SOURCE, BECAUSE RUNNING IT COSTS 63 SECONDS. ***
+    // *** v4587 -- THIS SECTION SAID "every red still standing names a COUNT" AND ASKED TWO GATES. ***
     //
-    // Adding gateSelection to the driven list took this gate from 6.8 s to over seventy, and the sabotage sweep from
-    // four minutes to twenty -- for one classification. tools/ship/redCensus.mjs states the rule this tree already
-    // settled on: "Re-verifying a registered red means RUNNING it, which is redCensus-selfcheck's two minutes and
-    // does not belong in a pre-flight." So the cheap one is DRIVEN and the expensive one is read: its message text
-    // lives in its source, and what is being classified is the MESSAGE, which a source read answers exactly.
-    const DRIVEN = ["tools/ship/definitionGates-selfcheck.mjs"];
-    // *** AND THE READ ARM MUST TARGET THE FAILING ROW, NOT THE WHOLE FILE. ***
-    // Its first version joined EVERY ok(...) block in the source and classified that, so any count-ish phrasing
-    // anywhere in a 30-row gate satisfied the classification. Deleting the OWED clause from the row that actually
-    // fails moved nothing -- a 0-RED -- because a sibling row still carried a number. The driven arm classifies the
-    // FAIL lines a run produces; the read arm now reads the one row known to fail, named with it.
-    const READ_ONLY = [{ rel: "tools/ship/gateSelection-selfcheck.mjs",
-                         row: "reachable gates are scheduled FIRST" }];
-    const STANDING = [...DRIVEN, ...READ_ONLY.map((x) => x.rel)];
-    const rows = [
-        ...DRIVEN.map((g) => { const r = runGate(g, 180000); return { ...r, ...classify(r.failLines), how: "run" }; }),
-        ...READ_ONLY.map(({ rel, row }) => {
-            const src = fs.readFileSync(path.join(ENG, rel), "utf8");
-            const at = src.indexOf(row);
-            // From the row's label to the end of its ok(...) call -- the text THAT row prints and nothing else.
-            const block = at < 0 ? "" : src.slice(at, src.indexOf(");", at) + 2);
-            return { rel, code: 1, failLines: [block], ...classify([block]), how: "read", found: at >= 0 };
-        }),
-    ];
-    for (const r of rows)
-        say(r.rel.split("/").pop().padEnd(34), (r.code === 0 ? "green" : `red; names a command: ${r.command || "no"}; names a count: ${r.count}`) + `   [${r.how}]`);
+    // v4585 typed out STANDING = [definitionGates, gateSelection] -- the two reds that round had been reading --
+    // and wrote three rows over them beginning "every red still standing", "...and none of them", "...and a red
+    // naming NEITHER would be unactionable". All three passed. Both members happen to speak the classifier's
+    // own dialect, so the rows were true of the list and said nothing about the tree.
+    //
+    // A DECLARED POPULATION UNDER THE WORD "EVERY" IS THE FAULT THIS WHOLE ARC IS ABOUT: v4582 found the skip
+    // guard at one of two runners, v4583 found budgetIsOwn at 5 of 14, v4584 found the `__` fixture rule at 2 of
+    // 4 walkers, and v4587 -- this round -- found recordDrift comparing a COUNT under a check named "knowledge
+    // index" while the index had been content-stale for three rounds. Each time: a rule applied where it was
+    // written and not where it was claimed.
+    //
+    // DERIVED: redCensus.standingReds() reads the sweep record's `codes` table. 29 against 2, and each one is RUN
+    // -- 25.1 s at eight-wide, measured, and no gate in the set writes to the tree (git status compared before
+    // and after). The membership can only be read from a record; the VERDICT is always a live run.
+    const pop = standingReds();
+    const drivenAll = await driveReds(pop.reds);
+    const live = drivenAll.filter((r) => r.code !== 0);
+    const recovered = drivenAll.filter((r) => r.code === 0);
 
-    // M: breaking the COMMAND pattern moved nothing, because no standing red happens to name a command -- so the
-    // classifier was never exercised on the case it exists to separate. Driven on fixture text instead.
+    say("population, derived from the sweep record", `${pop.reds.length} gate(s) recorded exit 1, captured ${pop.captured}`);
+    say("...and the 124s are NOT in it", `${pop.capped} gate(s) carry the SIGKILL cap -- a kill is not a verdict`);
+    say("driven live", `${live.length} still red, ${recovered.length} green now`);
+
+    // REPORTED, NOT ASSERTED, and the frozen-table rule is why: a gate recorded red that is now green is the
+    // record being behind, and the record is refreshed by the same sweep that runs everything. Asserting a
+    // literal here would be a tripwire on a cycle whose whole point is that reds get fixed. v4587 fixed two of
+    // these itself -- see below -- so the number MOVED DURING THE ROUND THAT MEASURED IT.
+    if (recovered.length) say("the record is behind on", recovered.map((r) => r.rel.split("/").pop()).join(", "));
+
+    ok("*** the population is READ FROM THE RECORD, not typed into this file ***",
+        pop.reds.length >= 10 && drivenAll.length === pop.reds.length &&
+        // driven with a record that says something else, so a hardcoded list could not satisfy this row
+        (await (async () => {
+            const tmp = path.join(ENG, "tools", "ship", "__redpop-fixture.json");
+            fs.writeFileSync(tmp, JSON.stringify({ captured: "fixture",
+                codes: { "a-selfcheck.mjs": 1, "b-selfcheck.mjs": 0, "c-selfcheck.mjs": 124, "__d-selfcheck.mjs": 1 } }));
+            const f = standingReds({ codesPath: tmp });
+            fs.unlinkSync(tmp);
+            // one red, the zero and the 124 and the __ fixture all excluded -- the three exclusions, driven
+            return f.reds.length === 1 && f.reds[0] === "a-selfcheck.mjs" && f.capped === 1;
+        })()),
+        `${pop.reds.length} gates from sweep-timings.json against the TWO this section listed at v4585. The ` +
+        "derivation is driven against a fixture record: exit 0, the SIGKILL 124 and a __ fixture are each " +
+        "excluded, so replacing standingReds() with a literal list fails here rather than passing quietly.");
+
+    // ---- the classifier, on a population that did not choose it -------------------------------------------
+    const rows = live.map((r) => ({ ...r, ...classify(r.failLines) }));
+    const named = rows.filter((r) => r.command || r.count);
+
+    // *** AND THE FIRST THING THE REAL POPULATION SAID IS THAT THE CLASSIFIER IS A DIALECT. ***
+    //
+    // v4585 already widened COUNT once, from definitionGates' vocabulary to "a size or an explicit debt marker",
+    // after gateSelection's repaired message was classified as naming nothing. On 23 live reds it classifies 22
+    // as naming NEITHER -- and several of those name a size in plain English: "74 declared, 18 missing",
+    // "204 silent against 243 placed", "91 sites against a baseline of 88". Widening the regex until they pass
+    // would be fitting the instrument to the answer, so the count is REPORTED and the rule that is ASSERTED is
+    // the one below, which does not depend on dialect at all.
+    say("classified by the v4585 vocabulary", `${named.length} of ${rows.length} name a command or a count`);
+
+    // ---- THE ROW THAT COST TWO COMMANDS TO MAKE TRUE ------------------------------------------------------
+    //
+    // A red naming a COMMAND is a pending human step and should never survive a round -- that is this arc's
+    // founding lesson, learned from staleness-selfcheck surviving five. Asserted over TWO gates it was free.
+    // Asserted over the derived population it was FALSE when this round started:
+    //
+    //     tools/ship/instruments-selfcheck.mjs   "node tools/ship/buildKnowledgeIndex.mjs"   standing 3 rounds
+    //     tools/ship/orrerySeed-selfcheck.mjs    "node tools/ship/orreryBake.mjs --write"     one body drifted
+    //
+    // Both were run. Both went green. THE INDEX ONE WAS THIS GATE'S OWN INDEX ENTRY -- v4585 shipped this file
+    // with a placeholder RUNTIME line, measured the real number the same round, and the index kept the
+    // placeholder while recordDrift printed "index agrees" over it for three rounds.
+    ok("*** no standing red names a COMMAND: a pending human step must not survive a round ***",
+        rows.every((r) => !r.command),
+        rows.every((r) => !r.command)
+            ? `${rows.length} live reds, none naming a command. Two did when this round opened and both were ` +
+              "closed by running what their own text said."
+            : "STILL PENDING: " + rows.filter((r) => r.command).map((r) => r.rel + " -> " + r.command).join("; ") +
+              " -- run it, then re-run this gate.");
+
+    // ---- THE EVIDENCE RULE, WHICH IS WHAT THE DIALECT PROBLEM LEFT BEHIND ---------------------------------
+    //
+    // *** A FAIL LINE WHOSE DETAIL CARRIES NO EVIDENCE READS AS A PASS, AND 14 OF THEM DO. ***
+    //
+    // Found by reading the derived population's actual output. The shape is always the same: the label is a
+    // POSITIVE assertion and the detail was written for the passing case, so the printed failure asserts the
+    // thing that is false. Three from today, verbatim:
+    //
+    //   FAIL  !! ...and is NOT STALE   rebuilt and byte-identical: 1643 gates, 262 claims
+    //   FAIL  *** every covers list belongs to an addSource call -- none has drifted onto a constructor ***
+    //   FAIL  !! it is the only homography in the tree
+    //
+    // The first is instruments-selfcheck, red for three rounds, and it is the reason this round exists: its
+    // detail was computed from `fresh` alone, so it COULD NOT describe a disagreement even in principle. Fixed
+    // this round by making the detail a ternary on the row's own condition -- which is the general repair, since
+    // A SINGLE DETAIL STRING CANNOT BE RIGHT FOR BOTH OUTCOMES.
+    //
+    // The rule asked here is dialect-free: a failure's detail must carry a COMMAND, a NUMBER, or a NAMED FILE.
+    // Not "is it well worded" -- whether there is anything in it to act on.
+    // `\b\d+` and NOT `\b\d+\b`: the trailing boundary rejects a number glued to its unit, so "(Keith measured
+    // 267ms)" classified as carrying no size. A SABOTAGE FOUND THAT -- stripping pageReflow's hit list left the
+    // fallback sentence, which names a real measurement, and the first version would have called it evidence-free.
+    // The LEADING boundary stays, because it is what keeps "v3256" from reading as a quantity: a version
+    // reference is a citation, not a size somebody can act on. Measured both ways over the live population: 14
+    // either way today, so the seed below is not sensitive to the repair -- but the next such line would be.
+    const EVIDENCE = { command: COMMAND, size: /\b\d+/, subject: /[\w-]+\.(?:html|mjs|js|json|sh|wgsl|css)\b|::/ };
+    const bare = [];
+    for (const r of rows) for (const raw of r.failLines) {
+        const parts = raw.replace(/^ {2}FAIL\s+/, "").split(/ {3,}/);   // label   detail -- three spaces, as ok() prints
+        const detail = parts.slice(1).join("   ");
+        if (!Object.values(EVIDENCE).some((re) => re.test(detail))) bare.push({ rel: r.rel, label: parts[0] });
+    }
+    // RATCHET, seeded at what was MEASURED after this round's two repairs, and it may only fall. Not asserted
+    // at zero: 14 bare lines across 11 gates is other gates' debt and which ones get repaired is Keith's call,
+    // one at a time. A ratchet set to today's number fails the moment a fifteenth is written, which is the half
+    // that matters -- the existing 14 are visible, sized, and named below.
+    const BARE_AT_V4587 = 14;
+    ok("!! *** no NEW failure line arrives with nothing in it to act on ***",
+        bare.length <= BARE_AT_V4587,
+        `${bare.length} FAIL line(s) carry no command, no number and no named file in the detail, against a ` +
+        `frozen ${BARE_AT_V4587}. OWED: each is a detail written for the passing case, so the red asserts what ` +
+        "is false. Worst offenders: " + [...new Set(bare.map((b) => b.rel.split("/").pop()))].slice(0, 6).join(", "));
+
+    ok("...and the ratchet has not been left behind by real progress",
+        bare.length >= BARE_AT_V4587 - 3,
+        `${bare.length} against a frozen ${BARE_AT_V4587}. A RATCHET WITH SLACK IN IT IS A RATCHET HOLDING ` +
+        "NOTHING (v3195's stale baseline, and registerResidue-selfcheck says the same of its 41), so this half " +
+        "asks for the seed to be lowered once the debt is actually paid.");
+
+    // N: emptying the population left every row above vacuously true -- the same 0-RED shape as v4585's.
+    ok("...and the rows above are asked of a non-empty population, driven",
+        rows.length > 0 && drivenAll.length === pop.reds.length && bare.length >= 0,
+        `${rows.length} live red(s) of ${pop.reds.length} recorded. An empty population makes every "no standing ` +
+        'red..." row trivially true, which is the shape of a check that passed because it looked at nothing.');
+
+    // M: the classifier's own arms, driven on fixture text, because no live red exercises the command arm now
+    // that both were closed -- which is exactly when a classifier stops being tested by its subjects.
     const cmdCase = classify(["  FAIL  the page is STALE. THE FIX IS ONE COMMAND: node tools/ship/staleness.mjs --fix"]);
     const cntCase = classify(["  FAIL  no NEW exported symbol has appeared   GREW to 55: physics/x.mjs:y"]);
     const neither = classify(["  FAIL  something is wrong and nothing says what to do about it"]);
-    ok("*** the classifier is driven on all three cases, because no live red exercises the command arm ***",
+    ok("*** the classifier is driven on all three cases, because NO live red exercises the command arm ***",
         cmdCase.command === "node tools/ship/staleness.mjs" && !cmdCase.count &&
         cntCase.count && !cntCase.command && !neither.command && !neither.count,
-        `command arm: ${cmdCase.command}; count arm: ${cntCase.count}; neither: ` +
-        `${neither.command || neither.count}. A classifier tested only on today's reds is tested on one arm.`);
-
-    // N: emptying the standing list left every row below vacuously true.
-    ok("...and the standing list is not empty, and both arms are populated",
-        STANDING.length > 0 && rows.length === STANDING.length && DRIVEN.length > 0 && READ_ONLY.length > 0 &&
-        rows.filter((r) => r.how === "read").every((r) => r.found),
-        `${STANDING.length} gate(s) driven. An empty list makes every 'every red...' row below trivially true, ` +
-        "which is the shape of a check that passed because it looked at nothing.");
-
-    ok("*** every red still standing names a COUNT, so it is debt rather than a pending human step ***",
-        rows.every((r) => r.code === 0 || r.count),
-        "definitionGates' three rows are frozen ratchets that may only move DOWN, and the redness is 55 exported " +
-        "symbols under physics/, 319 tree-wide and 617 of any shape, each owed 'a check that calls it and grades " +
-        "the answer'. I CALLED THESE 'THREE DELIBERATELY IMMOVABLE RATCHETS' IN SIX SUMMARIES: the freezing is " +
-        "deliberate, the redness is unpaid, and describing debt as design is how it stops being paid.");
-
-    ok("...and none of them names a command, which is what separates debt from a step somebody skipped",
-        rows.every((r) => r.code === 0 || !r.command),
-        "a red naming a command should never survive a round -- staleness's survived five. A red naming a count " +
-        "may survive many, and saying which is which is the only thing that makes a standing red readable.");
-
-    ok("...and a red naming NEITHER would be unactionable, which is the class this gate exists to forbid",
-        rows.every((r) => r.code === 0 || r.command || r.count),
-        "the classifier reads the gate's own printed failure, not a register somebody maintains: " +
-        "tools/ship/redCensus.mjs records 29 registered reds with the line that failed and NOT what closes it, " +
-        "which is the field whose absence let six rounds go by.");
+        `command arm: ${cmdCase.command}; count arm: ${cntCase.count}; neither: ${neither.command || neither.count}. ` +
+        "At v4585 this said 'no live red happens to name a command'. It is now true BECAUSE the round closed the " +
+        "two that did, which is a better reason and the same requirement.");
 }
 
 console.log(fails ? `\nredAction-selfcheck: ${fails} FAILED` : "\nredAction-selfcheck: all checks pass");

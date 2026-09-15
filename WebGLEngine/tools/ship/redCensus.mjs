@@ -44,7 +44,8 @@
 // at its cause (the walk skips .claude now) rather than by moving a baseline.
 "use strict";
 import { REGISTER_AUDIT } from "./register-audit.mjs";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -876,6 +877,78 @@ export function runGate(rel, { timeoutMs = 120000 } = {}) {
 
 /** Total cost of re-verifying the whole census, in ms, from the recorded per-gate times. */
 export const censusCostMs = (list = RED_AT_V4279) => list.reduce((a, e) => a + e.ms, 0);
+
+// ================================================================================================
+// *** v4587 -- WHICH GATES ARE RED, DERIVED FROM THE SWEEP RECORD RATHER THAN WRITTEN DOWN. ***
+//
+// Everything above this line is a HAND-MAINTAINED register: RED_AT_V4279, _V4408, _V4424, _V4476,
+// _V4484, _V4531, _V4535. Those are frozen historical snapshots and they should stay frozen -- the
+// only check on history is that it has not been edited. But a frozen snapshot cannot answer "what is
+// red NOW", and redAction-selfcheck was answering that question from a list of TWO gates it had typed
+// out, under rows beginning "every red still standing...". The population was declared, and the word
+// was every.
+//
+// DERIVED: 29 gates carry exit 1 in sweep-timings.json's `codes` table -- fifteen times the list.
+// Driven at v4587: 23 still red, 6 green, 25.1 s wall at eight-wide.
+//
+// AND NOT ONE OF THE 29 WRITES TO THE TREE -- which took three attempts to establish honestly. The first two
+// compared `git status --porcelain` before and after and reported no new modification, and that was WORTHLESS
+// EVIDENCE: cloud/swek-rendezvous/rendezvous-state.json was ALREADY dirty from something earlier in the
+// session, so a diff of the two status listings could not show it either way. The claim went into this comment
+// before it had been tested against a clean file. Re-run with that file restored first, the 29 leave it
+// untouched -- the write came from elsewhere in the round (redCensus-selfcheck alone runs for 581 s and
+// rebakes knowledge-index.json as a side effect). A BEFORE/AFTER COMPARISON THAT STARTS DIRTY IS NOT A CONTROL.
+//
+// THE RECORD IS A RECORD AND IS TREATED AS ONE. recordDrift's closing note says exactly why: at v4551
+// tslSource-selfcheck sat in `codes` as exit 1 while the gate had exited 0 since v4543, so a check that
+// READ the table would have confirmed a stale registration instead of finding it. That cuts one way
+// only -- membership. Every member is RUN, so a gate recorded red that is now green is reported as the
+// record being behind, with a number, rather than counted as a red. The direction it cannot see is a
+// gate that went red AFTER the capture: knowledge-index staleness did exactly that at v4585 and is
+// missing from these 29. So the population is a floor, it is called one, and the sweep that refreshes
+// it is the same sweep that would have to run every gate anyway.
+const CODES_PATH = path.join(ENG, "tools", "ship", "sweep-timings.json");
+
+/**
+ * The gates the last sweep recorded as exit 1. `__` fixtures are excluded -- the tree's convention
+ * since v4584, and tools/ship/__rigprogress-fixture-selfcheck.mjs is one, deliberately red.
+ *
+ * EXIT 124 IS NOT IN HERE AND THAT IS THE POINT: 136 gates carry it, and it is the sweep's SIGKILL cap,
+ * not a verdict. A crash is not a verdict, and neither is a kill -- counting them as reds would put 136
+ * unread gates into a population whose whole purpose is that every member's failure text gets read.
+ */
+export function standingReds({ codesPath = CODES_PATH } = {}) {
+    let j = {};
+    try { j = JSON.parse(fs.readFileSync(codesPath, "utf8")); } catch { return { reds: [], capped: 0, captured: null }; }
+    const codes = j.codes || {};
+    const reds = Object.keys(codes)
+        .filter((k) => codes[k] === 1 && !path.basename(k).startsWith("__"))
+        .sort();
+    return { reds, capped: Object.keys(codes).filter((k) => codes[k] === 124).length, captured: j.captured || null };
+}
+
+/**
+ * Run gates in parallel and KEEP THEIR OUTPUT, which runGate() above deliberately throws away
+ * (stdio:"ignore" -- it answers "red?" and nothing else, and its callers ask nothing else).
+ * Classifying a red from its own printed failure needs the text, so this is a second entry point to
+ * one subject rather than a second copy of one rule.
+ */
+export function driveReds(list, { timeoutMs = 180000, workers = 8 } = {}) {
+    const one = (rel) => new Promise((res) => {
+        const t = Date.now();
+        const c = spawn(process.execPath, [path.join(ENG, rel)], { cwd: ENG });
+        let out = "";
+        const killer = setTimeout(() => { try { c.kill("SIGKILL"); } catch {} }, timeoutMs);
+        c.stdout.on("data", (d) => { out += d; });
+        c.stderr.on("data", (d) => { out += d; });
+        c.on("close", (code) => { clearTimeout(killer);
+            res({ rel, code, ms: Date.now() - t, failLines: out.match(/^ {2}FAIL.*/gm) || [] }); });
+    });
+    const queue = [...list], done = [];
+    return Promise.all(Array.from({ length: Math.min(workers, queue.length) }, async () => {
+        while (queue.length) done.push(await one(queue.shift()));
+    })).then(() => done.sort((a, b) => a.rel.localeCompare(b.rel)));
+}
 
 // ================================================================================================
 // v4295 -- THE RE-CHECK, SIXTEEN ROUNDS LATER

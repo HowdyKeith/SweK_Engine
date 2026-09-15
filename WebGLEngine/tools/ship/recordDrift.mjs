@@ -126,13 +126,33 @@ export async function checks({ load = null, timings = null } = {}) {
     // registry answer is never read as clean when it was computed from yesterday's tree.
     const onDisk = A.gateFiles(ENG).length;
     const K = JSON.parse(fs.readFileSync(path.join(ENG, "knowledge-index.json"), "utf8"));
-    const indexStale = K.gates.length !== onDisk;
+    // *** v4587 -- THIS CHECK COMPARED A COUNT AND REPORTED "index agrees". ***
+    //
+    // It was `K.gates.length !== onDisk`: a POPULATION check under a name that promises agreement. Adding or
+    // removing a gate moves the count and it caught that -- which is the case it was written for, and why it
+    // looked right. EDITING A GATE'S HEADER does not move the count, and the header text is the whole product:
+    // this index exists to be "one searchable answer to does this already exist?", and what is searched is the
+    // text. v4585 added a gate with a placeholder runtime line, measured the real number the same round, and
+    // the index kept the placeholder through three rounds of this line saying "1643 gates, index agrees".
+    //
+    // instruments-selfcheck rebuilds and compares BYTES, and was red for all three. So the tree held the right
+    // check and the cheap pre-view of it answered a different question -- and the pre-flight is the thing that
+    // gets read, because it runs in a second and the gate runs in the suite. A preview that is weaker than what
+    // it previews has to say so, or it is read as the same answer for less money.
+    //
+    // MEASURED before changing it: buildIndex() is 360-401 ms over three runs and the whole pre-flight was
+    // 948 ms, so the honest comparison costs about 40 % more pre-flight and answers the question in the name.
+    // diffIndex() is imported rather than re-derived -- one definition of "the index disagrees", which is the
+    // rule this file already states for the orphan scan two checks down.
+    const fresh = (await mod("./buildKnowledgeIndex.mjs"));
+    const idxDiff = fresh.diffIndex(K, fresh.buildIndex());
+    const indexStale = !idxDiff.same;
     out.push({
         name: "knowledge index", owes: OWES.index,
         recorded: K.gates.length, actual: onDisk,
         stale: indexStale,
-        detail: indexStale ? `index lists ${K.gates.length} gates, disk holds ${onDisk}`
-                           : `${onDisk} gates, index agrees`,
+        detail: indexStale ? `${idxDiff.summary} -- run node tools/ship/buildKnowledgeIndex.mjs`
+                           : `${onDisk} gates, rebuilt and byte-identical`,
     });
 
     const R = await mod("./registryOrphans.mjs");
