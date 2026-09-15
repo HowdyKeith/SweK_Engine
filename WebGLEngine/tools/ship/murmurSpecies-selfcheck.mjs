@@ -57,6 +57,21 @@ const run = await renderThreeTslToPixels({
         ...STILL_TIMES.map((t) => sp("still", t)),
         ...DROP_TIMES.map((t) => sp("droplet", t, SIL_VOICE)),
     ],
+    // *** NINE FRAMES, FOUR SHADERS. *** comet is rendered at four times and still and droplet at two each,
+    // and until v4627 every one of those rebuilt the NodeMaterial and paid a fresh WGSL compile -- measured
+    // at about 195 ms a frame against a 978 ms launch-and-first-frame, so five of the nine frames were
+    // compiling a shader this page had already compiled. reuseInstances caches the built effect on module +
+    // factory + factoryArgs and only writes the knobs again.
+    //
+    // *** AND THE IDENTITY WAS MEASURED, NOT ASSUMED. *** render/aiPresenceOrbTsl.mjs's setKnobs writes only
+    // the names present in its argument, so a reused instance keeps any knob the next frame does not name --
+    // which is exact here only because every frame passes the same two, time and voice. Rendering all nine
+    // both ways: 0 bytes of 82,944 differ, and the render went from 2,774 ms to 2,227 ms. The gate as a
+    // whole came down from 2,967-3,099 ms over three runs to 2,572-2,639 ms over three, against a 3,000 ms
+    // budget on a box the tree measures running about 10% slower under a contended sweep. Without this the
+    // colour rail would have put the gate over, which is the difference between a gate that runs at ship time
+    // and one that does not.
+    reuseInstances: true,
 });
 const okRun = run.ok && run.frames && run.frames.length === 2 + times.length + STILL_TIMES.length + DROP_TIMES.length;
 if (!okRun) ok("!! the species render ran", false, `could not render: ${run.reason || "frames " + (run.frames ? run.frames.length : "none")}`);
@@ -130,22 +145,60 @@ sec("1. *** LIMN, THE SECOND SPECIES: THE COMMA THAT MUST NEVER CLOSE INTO A RIN
     //
     // What replaces it measures the RING, all the way round, 72 samples inside the antialiased edge: the
     // fraction of the ring standing at or above half its own peak. For a comma that is small; for a body lit
-    // evenly enough to read as a sphere it is everything. Measured: still 100%, comet 100%, limn 29%.
+    // evenly enough to read as a sphere it is everything.
+    //
+    // *** AND THAT MEASURE WAS ITSELF REBUILT AT v4627, BECAUSE THE COLOUR RAIL EXPOSED TWO FLAWS IN IT. ***
+    // The v4626 version read the ring by rounding each sample to the nearest pixel and summing the three
+    // 8-BIT sRGB channels. Both parts are wrong, and neither showed while the species wore this port's own
+    // gentle invented ramp:
+    //
+    //   * "at or above HALF its peak" is a statement about LIGHT, and an sRGB byte is not light -- it is that
+    //     light through a ~2.2 gamma. Half the encoded value is about a fifth of the brightness. Once the
+    //     species wore murmur's real rail, whose bottom segment runs from near-black ink to a deep blue, the
+    //     encoding error stopped being a constant and started deciding the answer.
+    //   * rounding to the nearest pixel makes the ring land on whichever pixels a 13-px radius happens to
+    //     snap to, which is exactly the "whichever sample happens to land deepest in the dark" artifact the
+    //     row below already had to write a caveat about.
+    //
+    // MEASURED, on identical pixels: the old instrument read still at 58% at 48 px and 100% at 64 px -- a
+    // 42-point swing on a frame-size change, on a row whose own comment says a limit fitted to one frame size
+    // is a limit fitted to a frame size. Sampling bilinearly in linear light, the same two resolutions read
+    // 100% / 17% / 100% and 100% / 18% / 100%, and peak-over-minimum 1.35 / 193.97 / 1.74 against
+    // 1.34 / 197.77 / 1.66. Every figure now agrees between the two to within a point, and limn's separation
+    // got an order of magnitude sharper rather than being widened to fit.
 
     if (!okRun) {
         ok("!! the three species render", false, `could not render: ${run.reason || "frames " + (run.frames ? run.frames.length : "none")}`);
     } else {
+        // One 8-bit sRGB channel back to the light it encodes. The same curve render/murmurKit.mjs exports
+        // and the probe's own encode inverts -- not a 2.2 power, which is off by up to 4% near black and
+        // therefore wrong in precisely the part of the rail the dark side of limn's ring lives in.
+        const toLight = (c) => { const v = c / 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+        // Bilinear rather than nearest: a 72-sample ring at a 13-px radius snaps onto far fewer than 72
+        // distinct pixels, so nearest sampling measures the grid as much as the species.
+        const sampleAt = (px, x, y) => {
+            const x0 = Math.floor(x), y0 = Math.floor(y), fx = x - x0, fy = y - y0;
+            let v = 0, aw = 0;
+            for (const [dx, dy, w] of [[0, 0, (1 - fx) * (1 - fy)], [1, 0, fx * (1 - fy)],
+                                       [0, 1, (1 - fx) * fy], [1, 1, fx * fy]]) {
+                const xx = Math.min(N3 - 1, Math.max(0, x0 + dx)), yy = Math.min(N3 - 1, Math.max(0, y0 + dy));
+                const i = (yy * N3 + xx) * 4;
+                v += w * (toLight(px[i]) + toLight(px[i + 1]) + toLight(px[i + 2]));
+                aw += w * (px[i + 3] / 255);
+            }
+            return { v, a: aw };
+        };
         const ring = (px) => {
             const vals = [];
             for (let a = 0; a < 72; a++) {
                 const th = a * 2 * Math.PI / 72, rr = 0.62 * 0.88 * (N3 / 2);
-                const x = Math.round(N3 / 2 + rr * Math.cos(th)), y = Math.round(N3 / 2 + rr * Math.sin(th));
-                const i = (y * N3 + x) * 4;
-                if (px[i + 3] < 200) continue;                       // stay inside the antialiased silhouette
-                vals.push(px[i] + px[i + 1] + px[i + 2]);
+                // -0.5 puts the sample on the pixel-centre grid the bilinear weights are written against
+                const s = sampleAt(px, N3 / 2 + rr * Math.cos(th) - 0.5, N3 / 2 + rr * Math.sin(th) - 0.5);
+                if (s.a < 0.8) continue;                             // stay inside the antialiased silhouette
+                vals.push(s.v);
             }
             const mx = Math.max(...vals), mn = Math.min(...vals);
-            return { lit: vals.filter((v) => v >= mx * 0.5).length / vals.length, peakOverMin: mx / mn, n: vals.length };
+            return { lit: vals.filter((v) => v >= mx * 0.5).length / vals.length, peakOverMin: mx / Math.max(mn, 1e-9), n: vals.length };
         };
         const rs = ring(run.frames[0]), rl = ring(run.frames[1]), rc = ring(run.frames[2]);
         say(`ring lit at or above half its peak -- still ${(rs.lit * 100).toFixed(0)}%, limn ${(rl.lit * 100).toFixed(0)}%, comet ${(rc.lit * 100).toFixed(0)}% (${rs.n} samples each)`);
@@ -154,20 +207,24 @@ sec("1. *** LIMN, THE SECOND SPECIES: THE COMMA THAT MUST NEVER CLOSE INTO A RIN
             `still ${(rs.lit * 100).toFixed(0)}% of the ring at or above half peak, comet ${(rc.lit * 100).toFixed(0)}%, ` +
             `limn ${(rl.lit * 100).toFixed(0)}%. Peak over minimum: still ${rs.peakOverMin.toFixed(2)}, comet ` +
             `${rc.peakOverMin.toFixed(2)}, limn ${rl.peakOverMin.toFixed(2)}. *** THE THRESHOLDS ARE SET FROM ` +
-            `TWO RESOLUTIONS, NOT ONE: *** at 64 px this ring read 100% / 100% / 29% and at 48 px it reads ` +
-            `86% / 89% / 28% -- the absolute figures move with how many distinct pixels a 72-sample ring can ` +
-            `land on, and the THREEFOLD separation does not. A limit fitted to one frame size is a limit ` +
-            `fitted to a frame size. That concentration IS the species -- ` +
+            `TWO RESOLUTIONS, NOT ONE: *** in linear light this ring reads 100% / 17% / 100% at 48 px and ` +
+            `100% / 18% / 100% at 64 px -- within a point either way, where the 8-bit nearest-pixel version ` +
+            `this replaced swung still from 58% to 100% across the same two sizes. A limit fitted to one ` +
+            `frame size is a limit fitted to a frame size. That concentration IS the species -- ` +
             `"a bright head with a soft tail streaming off one side, built so the far side of the ring never ` +
             `rises past a dim glow" -- and it is measured over the whole ring rather than at a chosen pair of points.`);
-        // Stated as a RELATION rather than three absolute bounds, for the same reason: still's own peak-over-
-        // minimum reads 1.75 at 64 px and 2.55 at 48 px on identical pixels, because the minimum is whichever
-        // sample happens to land deepest in the dark. limn's lead over both survives either.
+        // Still stated as a RELATION rather than three absolute bounds -- but the factor is now 10 and not
+        // 1.4, because the bilinear/linear instrument measures a real separation instead of a sampling
+        // artifact. The old 1.4 was set when still's own figure read 1.75 at 64 px and 2.55 at 48 px on
+        // IDENTICAL pixels; those two now read 1.34 and 1.35, and limn's lead over the larger of the other
+        // two is 111x at 48 px and 119x at 64 px. A limit an order of magnitude under the measurement is a
+        // limit; one a third under it is a restatement.
         ok("...and limn is the DARK hero: its ring swings far harder than either of the others'",
-            rl.peakOverMin > Math.max(rs.peakOverMin, rc.peakOverMin) * 1.4,
+            rl.peakOverMin > Math.max(rs.peakOverMin, rc.peakOverMin) * 10.0,
             `limn ${rl.peakOverMin.toFixed(2)} against still ${rs.peakOverMin.toFixed(2)} and comet ` +
-            `${rc.peakOverMin.toFixed(2)}. murmur's own fitted base rim is 0.30 for limn where still's is 0.85, ` +
-            `and still's file calls its rim "the highest in the collection".`);
+            `${rc.peakOverMin.toFixed(2)} -- ${(rl.peakOverMin / Math.max(rs.peakOverMin, rc.peakOverMin)).toFixed(0)}x ` +
+            `the larger of the two, against a limit of 10. murmur's own fitted base rim is 0.30 for limn where ` +
+            `still's is 0.85, and still's file calls its rim "the highest in the collection".`);
     }
 }
 
@@ -330,10 +387,20 @@ sec("3. *** DROPLET: THE BODY ITSELF IS THE SPECIES ***");
         say(`silhouette change at voice ${SIL_VOICE} -- droplet (t=${DROP_TIMES[0]} vs ${DROP_TIMES[1]}) max ${(dropCh.max * 100).toFixed(2)}% mean ${(dropCh.mean * 100).toFixed(2)}%; still (t=${times[0]} vs ${STILL_TIMES[0]}) max ${(stillCh.max * 100).toFixed(3)}%`);
         // *** AND THE HEART, WHICH THE SILHOUETTE ROW DOES NOT SEE AT ALL. *** Deleting droplet's solved core
         // left every row here green -- the same hole comet's missing head went through. The peak is no use:
-        // it saturates at 765 with the heart and without it. What the heart does is LIGHT THE FOG IT SITS IN
-        // ("the drop comes out as a lamp inside a lens instead of a disc pasted on ink"), so the measure is
-        // the interior's MEAN, which halves when the core is removed: 487 against 254.
-        const lumAt = (px, x, y) => { const i = (y * N3 + x) * 4; return px[i] + px[i + 1] + px[i + 2]; };
+        // it saturates with the heart and without it. What the heart does is LIGHT THE FOG IT SITS IN ("the
+        // drop comes out as a lamp inside a lens instead of a disc pasted on ink"), so the measure is the
+        // interior's MEAN.
+        //
+        // *** IN LINEAR LIGHT, AND RE-MEASURED AT v4627 RATHER THAN RESCALED. *** The v4626 limit of 350 was
+        // fitted to an 8-bit sRGB channel sum under this port's own invented ramp: 487 lit against 254 with
+        // the core deleted, a 1.9x separation. Wearing murmur's real rail the same sum reads 199 against 75,
+        // so the old limit would have reddened a CORRECT render -- and the fix is not to divide 350 by the
+        // same factor, because a mean of gamma-encoded bytes is not a mean of anything. Measured in linear
+        // light, lit against core-deleted: 0.3871 / 0.0729 at 48 px and 0.3773 / 0.0687 at 64 px -- stable
+        // across the frame size, and a 5.3x separation where the byte sum shows 2.7x. The limit of 0.20 sits
+        // a factor of 1.9 under the lit figure and 2.7 over the ablated one, at both resolutions.
+        const toLight2 = (c) => { const v = c / 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+        const lumAt = (px, x, y) => { const i = (y * N3 + x) * 4; return toLight2(px[i]) + toLight2(px[i + 1]) + toLight2(px[i + 2]); };
         let dSum = 0, dN = 0;
         for (let y = 0; y < N3; y++) for (let x = 0; x < N3; x++) {
             const dx = (x + 0.5) / N3 * 2 - 1, dy = (y + 0.5) / N3 * 2 - 1;
@@ -341,13 +408,14 @@ sec("3. *** DROPLET: THE BODY ITSELF IS THE SPECIES ***");
             dSum += lumAt(run.frames[7], x, y); dN++;
         }
         const dropMean = dSum / dN;
-        say(`droplet interior mean luminance ${dropMean.toFixed(0)} over ${dN} pixels`);
+        say(`droplet interior mean linear light ${dropMean.toFixed(4)} over ${dN} pixels`);
         ok("!! *** THE HEART LIGHTS THE VOLUME AROUND IT: droplet's interior is lit, not a dark shell ***",
-            dropMean > 350,
-            `interior mean ${dropMean.toFixed(0)}; with the solved core deleted the same measure reads 254, ` +
-            `because what is left is haze alone. droplet.ts: "A clear interior is not an empty one -- it is ` +
-            `what lets the refraction be visible, because the only way to see a lens is to see something ` +
-            `through it." The peak cannot carry this row: it saturates at 765 either way.`);
+            dropMean > 0.20,
+            `interior mean ${dropMean.toFixed(4)} in linear light; with the solved core deleted the same ` +
+            `measure reads 0.0729, because what is left is haze alone -- a 5.3x separation, measured at two ` +
+            `frame sizes. droplet.ts: "A clear interior is not an empty one -- it is what lets the refraction ` +
+            `be visible, because the only way to see a lens is to see something through it." The peak cannot ` +
+            `carry this row: it reads 646 either way.`);
 
         ok("!! *** THE BODY ITSELF IS THE SPECIES: droplet's SILHOUETTE moves and still's does not move at all ***",
             dropCh.mean > 0.002 && stillCh.max === 0,

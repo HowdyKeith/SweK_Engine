@@ -1641,7 +1641,7 @@
   "physics/render/specularProbeLit-selfcheck.mjs": 1418,
   "physics/render/splitSumWgsl-selfcheck.mjs": 394,
   "tools/ship/aiHuntBrain-selfcheck.mjs": 403,
-  "tools/ship/aiPresenceOrb-selfcheck.mjs": 2213,
+  "tools/ship/aiPresenceOrb-selfcheck.mjs": 2407,
   "tools/ship/aiPresenceOrbPresent-selfcheck.mjs": 2218,
   "tools/ship/aiPresenceOrbWidget-selfcheck.mjs": 12633,
   "tools/ship/bossPhaseManager-selfcheck.mjs": 302,
@@ -1676,8 +1676,8 @@
   "tools/ship/labHome-selfcheck.mjs": 1441,
   "tools/ship/raceTurret-selfcheck.mjs": 10708,
   "world/buildingTopple-selfcheck.mjs": 9513,
-  "tools/ship/murmurKit-selfcheck.mjs": 894,
-  "tools/ship/murmurSpecies-selfcheck.mjs": 2440
+  "tools/ship/murmurKit-selfcheck.mjs": 1579,
+  "tools/ship/murmurSpecies-selfcheck.mjs": 2829
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -4993,7 +4993,7 @@
   "physics/render/specularProbeLit-selfcheck.mjs": "2026-09-15T13:49:44.492Z",
   "physics/render/splitSumWgsl-selfcheck.mjs": "2026-09-15T13:49:44.492Z",
   "tools/ship/aiHuntBrain-selfcheck.mjs": "2026-09-15T13:49:44.492Z",
-  "tools/ship/aiPresenceOrb-selfcheck.mjs": "2026-09-15T16:01:37.780Z",
+  "tools/ship/aiPresenceOrb-selfcheck.mjs": "2026-09-15T19:02:44.113Z",
   "tools/ship/aiPresenceOrbPresent-selfcheck.mjs": "2026-09-15T13:49:44.492Z",
   "tools/ship/aiPresenceOrbWidget-selfcheck.mjs": "2026-09-13T07:22:47.177Z",
   "tools/ship/bossPhaseManager-selfcheck.mjs": "2026-09-15T13:49:44.492Z",
@@ -5028,8 +5028,8 @@
   "tools/ship/labHome-selfcheck.mjs": "2026-09-15T13:49:44.492Z",
   "tools/ship/raceTurret-selfcheck.mjs": "2026-09-15T13:49:44.492Z",
   "world/buildingTopple-selfcheck.mjs": "2026-09-15T13:49:44.492Z",
-  "tools/ship/murmurKit-selfcheck.mjs": "2026-09-15T17:50:24.798Z",
-  "tools/ship/murmurSpecies-selfcheck.mjs": "2026-09-15T17:58:44.586Z"
+  "tools/ship/murmurKit-selfcheck.mjs": "2026-09-15T19:00:16.011Z",
+  "tools/ship/murmurSpecies-selfcheck.mjs": "2026-09-15T19:02:47.072Z"
  },
  "finished": {
   "tools/ship/placementRender-selfcheck.mjs": true,

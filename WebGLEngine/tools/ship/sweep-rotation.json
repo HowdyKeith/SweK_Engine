@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed.",
- "at": "2026-09-15T17:58:44.586Z",
+ "at": "2026-09-15T19:02:47.072Z",
  "budgetMs": 3000,
  "lastRun": 1,
  "rotated": [
@@ -1330,10 +1330,10 @@
   },
   {
    "gate": "tools/ship/aiPresenceOrb-selfcheck.mjs",
-   "ms": 2213,
+   "ms": 2407,
    "code": 0,
-   "priorMs": 2157,
-   "at": "2026-09-15T16:01:37.780Z"
+   "priorMs": 3084,
+   "at": "2026-09-15T19:02:44.113Z"
   },
   {
    "gate": "tools/ship/artefactWriters-selfcheck.mjs",
@@ -2037,17 +2037,17 @@
   },
   {
    "gate": "tools/ship/murmurKit-selfcheck.mjs",
-   "ms": 894,
+   "ms": 1579,
    "code": 0,
-   "priorMs": 2806,
-   "at": "2026-09-15T17:50:24.798Z"
+   "priorMs": 894,
+   "at": "2026-09-15T19:00:16.011Z"
   },
   {
    "gate": "tools/ship/murmurSpecies-selfcheck.mjs",
-   "ms": 2440,
+   "ms": 2829,
    "code": 0,
-   "priorMs": 2462,
-   "at": "2026-09-15T17:58:44.586Z"
+   "priorMs": 2909,
+   "at": "2026-09-15T19:02:47.072Z"
   },
   {
    "gate": "tools/ship/notifyDoor-selfcheck.mjs",

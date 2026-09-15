@@ -15,7 +15,8 @@
 // counter already does uint bit-mixing in TSL with .toVar()/.assign()/.bitXor(), and this reads the same way.
 "use strict";
 
-import { MH_R, MH_ETA, MH_EXT, MH_TILT, MH_SCATTER_K, MH_EXIT_CAP, MH_DRIFT_WOBBLE_CAP, MH_AMP_CAP } from "./murmurKit.mjs";
+import { MH_R, MH_ETA, MH_EXT, MH_TILT, MH_SCATTER_K, MH_SPREAD, MH_EXIT_CAP, MH_DRIFT_WOBBLE_CAP,
+         MH_AMP_CAP } from "./murmurKit.mjs";
 
 /**
  * makeMurmurKitTsl(TSL) -> the kit's node builders.
@@ -136,6 +137,139 @@ export function makeMurmurKitTsl(TSL) {
                       clamp(b.negate().add(sqrt(max(disc, float(0.0)))), 0.0, MH_EXIT_CAP));
     });
 
+    // ---- the colour rail: mh_palette / mh_shade / mh_tier / mh_lit ----------------------------------------
+    // *** THE LAST STRUCTURAL PIECE OF THE KIT, AND THE ONE EVERY SPECIES WAS WEARING AN APPROXIMATION OF. ***
+    // render/aiPresenceOrbTsl.mjs carried an OKLab ramp from a BASE_L / BASE_C / BASE_H this port chose, plus
+    // a rim and two speculars ADDED AS WHITE on top -- which is the one thing murmur's own present pass calls
+    // out as forbidden ("precisely the white overlay the family law forbids"). The rail below routes surface
+    // and interior through the SAME energy-to-colour curve, which kit.ts says is "most of what keeps the
+    // family reading as one family".
+
+    const oklabToLinearT = Fn(([L, aa, bb]) => {
+        const l_ = L.add(aa.mul(0.3963377773761749)).add(bb.mul(0.2158037573099136));
+        const m_ = L.sub(aa.mul(0.1055613458156586)).sub(bb.mul(0.0638541728258133));
+        const s_ = L.sub(aa.mul(0.0894841775298119)).sub(bb.mul(1.2914855480194092));
+        const l = l_.mul(l_).mul(l_), m = m_.mul(m_).mul(m_), s = s_.mul(s_).mul(s_);
+        return vec3(
+            l.mul(4.0767416621).sub(m.mul(3.3077115913)).add(s.mul(0.2309699292)),
+            l.mul(-1.2684380046).add(m.mul(2.6097574011)).sub(s.mul(0.3413193965)),
+            l.mul(-0.0041960863).sub(m.mul(0.7034186147)).add(s.mul(1.7076147010)));
+    });
+    const srgbToLinearT = Fn(([c]) => select(c.lessThanEqual(0.04045), c.div(12.92), pow(max(c.add(0.055).div(1.055), float(1e-6)), float(2.4))));
+    const linearToOklabT = Fn(([rgb]) => {
+        const l = rgb.x.mul(0.4122214708).add(rgb.y.mul(0.5363325363)).add(rgb.z.mul(0.0514459929));
+        const m = rgb.x.mul(0.2119034982).add(rgb.y.mul(0.6806995451)).add(rgb.z.mul(0.1073969566));
+        const s = rgb.x.mul(0.0883024619).add(rgb.y.mul(0.2817188376)).add(rgb.z.mul(0.6299787005));
+        const l_ = TSL.sign(l).mul(pow(abs(l), float(1 / 3))), m_ = TSL.sign(m).mul(pow(abs(m), float(1 / 3))), s_ = TSL.sign(s).mul(pow(abs(s), float(1 / 3)));
+        return vec3(
+            l_.mul(0.2104542683093140).add(m_.mul(0.7936177747023054)).sub(s_.mul(0.0040720430116193)),
+            l_.mul(1.9779985324311684).sub(m_.mul(2.4285922420485799)).add(s_.mul(0.4505937096174110)),
+            l_.mul(0.0259040424655478).add(m_.mul(0.7827717124575296)).sub(s_.mul(0.8086757549230774)));
+    });
+    const labOfSrgb = Fn(([rgb]) => linearToOklabT(vec3(srgbToLinearT(rgb.x), srgbToLinearT(rgb.y), srgbToLinearT(rgb.z))));
+    const mhLchT = Fn(([L, C, h]) => vec3(L, C.mul(cos(h)), C.mul(sin(h))));
+
+    /** HOW LIGHT THE GROUND IS, in OKLab lightness and not an RGB average. 0 for the house ink, 1 for paper. */
+    const mhPaper = Fn(([inkRgb]) => smoothstep(float(0.50), float(0.72), labOfSrgb(inkRgb).x));
+
+    /**
+     * *** THE RAIL IS BUILT BY PLAIN JS CLOSURES, NOT BY Fn, AND THE REASON IS STRUCTURAL. ***
+     * mh_palette hands back NINE values -- four OKLab stops and five scalars -- and mh_shade and mh_lit take
+     * that whole set as one argument. An Fn's parameter list carries NODES, not a JS object of them, so
+     * expressing this as shader functions would mean either nine separate parameters threaded through every
+     * call site or packing scalars into spare vector channels. A JS closure inlines exactly the same nodes
+     * into the caller's graph and keeps the set together, which is what the CPU twin in murmurKit.mjs does
+     * too. The kit's other builders take and return single nodes and stay Fn.
+     *
+     * *** AN EARLIER VERSION OF THIS COMMENT BLAMED THE Fn BOUNDARY FOR A BLACK RENDER. THAT WAS WRONG. ***
+     * The rail did render black at every input, and the bisect that chased it eliminated the palette, the
+     * OKLab decode, the stop walk, an out-parameter theory and finally an Fn-arity theory -- each of which
+     * measured CORRECT -- before writing the arity theory down as the cause anyway, on the strength of "the
+     * same walk works inline". It did not survive the rewrite: the closures rendered black too. The actual
+     * cause was one line: mh_shade used MH_SPREAD and this module never imported it, so the identifier threw
+     * inside the builder. three.js CATCHES that, console.errors it, and substitutes a node generating zero --
+     * see the note in tools/ship/webgpuHarness.mjs, which used to return those black pixels as ok:true and now
+     * fails the render and names the file and line. The lesson is not about Fn: it is that four correct
+     * components do not add up to a working shader, and "did it compile" is a question worth asking FIRST.
+     *
+     * Returns a plain object of nodes. No out-parameters, no packing into spare channels.
+     */
+    const mhPalette = (inkRgb, toneRgb, tone2Rgb, hueShift, depth) => {
+        const ink = labOfSrgb(inkRgb).toVar(), tone = labOfSrgb(toneRgb).toVar(), tone2 = labOfSrgb(tone2Rgb).toVar();
+        const L = tone.x.toVar();
+        const C = length(vec2(tone.y, tone.z)).toVar();
+        const h = TSL.atan(tone.z, tone.y).add(hueShift).toVar();
+        const d = clamp(depth, 0.30, 2.00).toVar();
+        const paper = mhPaper(inkRgb).toVar();
+        const C2 = length(vec2(tone2.y, tone2.z)).toVar();
+        const h2 = TSL.atan(tone2.z, tone2.y).add(hueShift).toVar();
+        const dhRaw = h2.sub(TSL.atan(tone.z, tone.y).add(hueShift)).toVar();
+        // the SHORT way round: without the wrap two anchors either side of the origin walk through green.
+        const dHue = dhRaw.sub(float(6.2831853).mul(TSL.floor(dhRaw.div(6.2831853).add(0.5)))).toVar();
+        const dC = C2.div(max(C, float(1e-4))).toVar();
+        const dL = tone2.x.div(max(L, float(1e-4))).toVar();
+        // EXACTLY ZERO when the anchors are equal -- kit.ts: "the property the whole upgrade rests on".
+        const duo = smoothstep(float(0.004), float(0.035), length(tone2.sub(tone))).toVar();
+
+        // THE INK RAIL climbs (energy becomes light); THE PAPER RAIL descends and DEEPENS, because on a light
+        // ground energy cannot become light -- it becomes chroma and shadow, which is what a tinted
+        // transparent object does to the light behind it. Mixed at the STOPS, which kit.ts calls exact.
+        const d0 = ink, d1 = mhLchT(mix(ink.x, L, float(0.30).div(d)), C.mul(float(0.52).add(d.mul(0.10))), h.sub(0.35));
+        const d2 = mhLchT(L, C, h), d3 = mhLchT(min(L.mul(float(1.20).add(d.mul(0.12))), float(0.93)), C.mul(0.55), h.add(0.10));
+        const l0 = ink, l1 = mhLchT(mix(ink.x, L, float(0.42).div(d)), C.mul(float(0.34).add(d.mul(0.10))), h.add(0.05));
+        const l2 = mhLchT(L.mul(float(0.82).sub(d.mul(0.06))), C.mul(float(1.20).add(d.mul(0.14))), h);
+        const l3 = mhLchT(max(L.mul(float(0.52).sub(d.mul(0.05))), float(0.18)), C.mul(float(1.05).add(d.mul(0.10))), h.sub(0.08));
+        return {
+            s0: mix(d0, l0, paper).toVar(), s1: mix(d1, l1, paper).toVar(),
+            s2: mix(d2, l2, paper).toVar(), s3: mix(d3, l3, paper).toVar(),
+            paper, duo, dHue, dC, dL,
+        };
+    };
+
+    /** WALK THE FAMILY. Three eased segments so the joins are C1 -- no kink shows as a contour line. */
+    const mhShade = (p, tIn, hue) => {
+        const t = clamp(tIn, 0.0, 1.0).toVar();
+        const lab = mix(p.s2, p.s3, smoothstep(float(0.0), float(1.0), t.sub(0.78).div(0.22))).toVar();
+        lab.assign(select(t.lessThan(0.78), mix(p.s1, p.s2, smoothstep(float(0.0), float(1.0), t.sub(0.40).div(0.38))), lab));
+        lab.assign(select(t.lessThan(0.40), mix(p.s0, p.s1, smoothstep(float(0.0), float(1.0), t.mul(2.5))), lab));
+        // Decomposed into pos and neg rather than clamped to the cap, because opal deliberately runs its
+        // spread a third past MH_SPREAD. The rotation moves hue while holding lightness and chroma EXACTLY --
+        // the safe axis; the unsafe one trades chroma for hue, which is how a warm palette turns to mud.
+        const a = hue.div(MH_SPREAD).toVar();
+        const pos = max(a, float(0.0)).toVar(), neg = max(a.negate(), float(0.0)).toVar();
+        const rot = neg.negate().mul(MH_SPREAD).add(pos.mul(mix(float(MH_SPREAD), p.dHue, p.duo))).toVar();
+        const w = min(pos, float(1.0)).mul(p.duo).toVar();
+        const cS = float(1.0).add(w.mul(p.dC.sub(1.0))).toVar();
+        const lS = float(1.0).add(w.mul(p.dL.sub(1.0))).toVar();
+        const ch = cos(rot).toVar(), sh = sin(rot).toVar();
+        return oklabToLinearT(lab.x.mul(lS),
+            lab.y.mul(ch).sub(lab.z.mul(sh)).mul(cS),
+            lab.y.mul(sh).add(lab.z.mul(ch)).mul(cS));
+    };
+
+    /** Identity below the knee, an asymptotic compression above -- so a specular keeps its SHAPE, not a plateau. */
+    const mhKnee = (x, knee) => select(x.lessThan(knee), x,
+        knee.add(float(1.0).sub(knee).mul(float(1.0).sub(exp(x.sub(knee).div(max(float(1.0).sub(knee), float(1e-3))).negate())))));
+
+    /** THE VALUE HIERARCHY AS ONE CURVE: the bottom 78% of energy into the rail's first 72%, the rest on the peak. */
+    const mhTier = (e) => {
+        const x = clamp(e, 0.0, 1.0).toVar();
+        const body = x.div(0.78).mul(0.72);
+        const peak = float(0.72).add(x.sub(0.78).div(1.0 - 0.78).mul(0.28));
+        return mix(body, peak, smoothstep(float(0.78 - 0.10), float(0.78 + 0.10), x));
+    };
+
+    /** THE ONE PLACE ENERGY BECOMES LIGHT. At glow = 0 a third of the energy survives, on purpose. */
+    const mhLit = (p, e, glow, base, span, emis, hue) => {
+        const G = max(glow, float(0.0)).toVar();
+        const en = clamp(mhKnee(max(e, float(0.0)).mul(float(0.35).add(G.mul(0.65))), float(0.92)), 0.0, 1.0).toVar();
+        const tRail = clamp(base.add(span.mul(mhTier(en))), 0.0, 1.0).toVar();
+        const col = mhShade(p, tRail, hue).toVar();
+        // Emission is gated to the SPECULAR and switched off as the ground goes light, because on paper the
+        // top of the rail is the DEEPEST colour rather than the brightest.
+        return col.mul(float(1.0).add(emis.mul(G).mul(float(1.0).sub(p.paper)).mul(smoothstep(float(0.72), float(1.0), tRail))));
+    };
+
     // ---- the deformed body: mh_shape / mh_deform / mh_body ------------------------------------------------
     // The half of the kit the first three species did not need. still, limn and comet are all solved against
     // an UNDEFORMED sphere; droplet is the one where "the body itself is the species".
@@ -226,6 +360,7 @@ export function makeMurmurKitTsl(TSL) {
         mhHash, mhGrad3, mhNoise3, mhHash1, mhFlourish, mhBreath, mhDrift, mhSpin,
         mhRefract, mhLook, mhExit, mhHaze, mhMedium, mhInside, mhTransmit, mhScatter,
         mhDeform, mhBody, MH_AMP_CAP,
+        mhPaper, mhPalette, mhShade, mhKnee, mhTier, mhLit, mhLchT, labOfSrgb, srgbToLinearT, linearToOklabT, oklabToLinearT,
         Loop,
     };
 }
@@ -247,7 +382,7 @@ export function makeMurmurKitTsl(TSL) {
  */
 export function makeMurmurKitProbeTsl(THREE, TSL, { mode = "hash", n = 16 } = {}) {
     const K = makeMurmurKitTsl(TSL);
-    const { Fn, float, vec3, vec4, uint, int, uv, floor, clamp } = TSL;
+    const { Fn, float, vec2, vec3, vec4, uint, int, uv, floor, clamp, select, pow, max } = TSL;
 
     const main = Fn(() => {
         // Pixel indices from uv. floor(uv * n) is the cell, exactly as the CPU side enumerates it.
@@ -262,6 +397,24 @@ export function makeMurmurKitProbeTsl(THREE, TSL, { mode = "hash", n = 16 } = {}
             const b2 = float(h.shiftRight(uint(8)).bitAnd(uint(255))).div(255.0);
             const b3 = float(h.bitAnd(uint(255))).div(255.0);
             return vec4(b0, b1, b2, b3);
+        }
+        if (mode === "rail" || mode === "railLight") {
+            // *** THE RAIL, PIXEL BY PIXEL, AGAINST THE CPU REFERENCE. *** x carries the energy 0..2 and y the
+            // glow 0..1, so one frame samples the surface of mh_lit rather than a point on it.
+            //
+            // *** TWO TONES, AND THE SECOND ONE IS NOT A SECOND SAMPLE OF THE SAME THING. *** The house tone
+            // #6C63E8 has an OKLab L of 0.5800, so the ink rail's top stop lands at 0.7656 and the 0.93
+            // ceiling on it is never reached at any depth in range -- measured, and with only that tone here
+            // the ceiling could be deleted from the shader without moving a single pixel of this frame. The
+            // light tone #C8C4FF would put that stop at 1.1136, off the end of the lightness axis, so it is
+            // the input on which the cap is load-bearing.
+            const TONE = mode === "railLight"
+                ? vec3(0xC8 / 255, 0xC4 / 255, 0xFF / 255)
+                : vec3(0x6C / 255, 0x63 / 255, 0xE8 / 255);
+            const pal = K.mhPalette(vec3(0x0A / 255, 0x0A / 255, 0x0B / 255), TONE, TONE, float(0.0), float(1.0));
+            const lit = K.mhLit(pal, px.div(n).mul(2.0), py.div(n), float(0.0), float(1.0), float(0.34), float(0.0)).toVar();
+            const enc = (v) => select(v.lessThanEqual(0.0031308), v.mul(12.92), pow(max(v, float(1e-6)), float(1 / 2.4)).mul(1.055).sub(0.055));
+            return vec4(clamp(enc(lit.x), 0.0, 1.0), clamp(enc(lit.y), 0.0, 1.0), clamp(enc(lit.z), 0.0, 1.0), 1.0);
         }
         if (mode === "noise") {
             // A lattice that deliberately straddles cell boundaries, where a wrong fade or a wrong gradient

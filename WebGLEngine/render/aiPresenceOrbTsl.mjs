@@ -50,6 +50,17 @@ export const ORB_KNOBS = Object.freeze([
 /** The species this file can build. murmur ships eighteen; these are the two that are ported. */
 export const ORB_SPECIES = Object.freeze(["still", "limn", "comet", "droplet"]);
 
+/**
+ * The three colour anchors the rail is built from, as murmur's own WEB-SPEC names them: ink '#0A0A0B' is the
+ * ground the field dissolves into, tone '#6C63E8' the single hue family anchor. tone2 defaults to tone, which
+ * is the case murmur calls out as having to collapse EXACTLY to the single-anchor rail -- duo is 0 there and
+ * every duotone term becomes the identity.
+ */
+export const ORB_COLORS = Object.freeze({
+    ink: Object.freeze([0x0A / 255, 0x0A / 255, 0x0B / 255]),
+    tone: Object.freeze([0x6C / 255, 0x63 / 255, 0xE8 / 255]),
+});
+
 import { makeMurmurKitTsl } from "./murmurKitTsl.mjs";
 import { MH_EXT, MH_TAPS } from "./murmurKit.mjs";
 
@@ -61,7 +72,13 @@ const EDGE_FEATHER = 0.015;   // antialiased silhouette width, in the same units
 // Both were left behind by the same change and both would have read, to the next person, as live tuning knobs
 // for behaviour the file no longer has -- which is exactly how the dead refraction survived a round with a
 // gate written about it.
-const BASE_L = 0.30, BASE_C = 0.09, BASE_H = 3.6;   // OKLab base tone: a deliberately calm blue-violet, this port's own pick (murmur-web's actual per-species palette table was not part of what was fetched)
+// *** BASE_L / BASE_C / BASE_H ARE GONE, AND THAT IS THE POINT OF v4627. *** They were this port's own
+// choice of anchor -- the header said so: "a deliberately calm blue-violet, this port's own pick" --
+// standing in for murmur's palette table, which was not part of what had been fetched. The rail is
+// built from the ink and tone anchors now (ORB_COLORS, murmur's own house values), so a constant that
+// chose the family's colour on this port's behalf has nothing left to choose. Removed rather than left
+// sitting: a dead tuning knob reads as a live one, which is exactly how the dead refraction survived a
+// round with a gate written about it.
 
 /**
  * Build the "still" orb from a TSL namespace (vendor/three-webgpu/three.tsl.js) and a THREE
@@ -94,22 +111,18 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
                  orbitTilt: 0.5, trail: 0.5, pointSize: 0.4,
                  wobble: 0.5, tension: 0.5, sheen: 0.5, ...knobs };
     const uniforms = {}; for (const n of ORB_KNOBS) uniforms[n] = uniform(float(k0[n])).label(n);
+    // The rail's three anchors are colours, not scalars, so they sit beside the knob block rather than in it.
+    const col0 = { ink: ORB_COLORS.ink, tone: ORB_COLORS.tone, tone2: ORB_COLORS.tone, ...(knobs.colors || {}) };
+    for (const n of ["ink", "tone", "tone2"]) uniforms[n] = uniform(vec3(...col0[n])).label(n);
 
     // OKLab -> linear sRGB, cube done as explicit x*x*x (not pow(x,3): l_/m_/s_ can be legitimately negative
     // for an out-of-gamut Lab, and pow() with a non-integral-looking runtime exponent is the wrong tool here
     // even though 3 is an integer -- multiplication is unambiguous for a negative base).
     const cube = (x) => x.mul(x).mul(x);
-    const oklabToLinear = Fn(([L, a, b]) => {
-        const l_ = L.add(a.mul(0.3963377773761749)).add(b.mul(0.2158037573099136));
-        const m_ = L.sub(a.mul(0.1055613458156586)).sub(b.mul(0.0638541728258133));
-        const s_ = L.sub(a.mul(0.0894841775298119)).sub(b.mul(1.2914855480194092));
-        const l = cube(l_), m = cube(m_), s = cube(s_);
-        return vec3(
-            l.mul(4.0767416621).sub(m.mul(3.3077115913)).add(s.mul(0.2309699292)),
-            l.mul(-1.2684380046).add(m.mul(2.6097574011)).sub(s.mul(0.3413193965)),
-            l.mul(-0.0041960863).sub(m.mul(0.7034186147)).add(s.mul(1.7076147010)),
-        );
-    });
+    // The local OKLab decode is gone too: render/murmurKitTsl.mjs owns that conversion now, and two
+    // copies of the same sixteen constants free to drift apart is the shape this tree spends most of
+    // its gates on. The sabotage that proved this file's colour reaches pixels used to aim at this
+    // decode's dominant coefficient -- it aims at the kit's now, which is where the decode lives.
     const linearToSrgb1 = Fn(([c]) => select(c.lessThanEqual(0.0031308), c.mul(12.92), pow(max(c, 1e-6), 1 / 2.4).mul(1.055).sub(0.055)));
     const linearToSrgb = Fn(([c]) => vec3(linearToSrgb1(c.x), linearToSrgb1(c.y), linearToSrgb1(c.z)));
 
@@ -457,16 +470,20 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         const specTight = pow(nh, 96.0).mul(specScale);
         const specBroad = pow(nh, 4.0).mul(0.09);
 
-        // colour: OKLab lightness driven by density*glow, a state-driven hue rotation of the base tone
-        const Lc = clamp(float(BASE_L).add(density.mul(uniforms.glow)), 0.0, 1.0);
-        const theta = uniforms.hueShift.mul(Math.PI);
-        const a0 = float(BASE_C * Math.cos(BASE_H)), b0 = float(BASE_C * Math.sin(BASE_H));
-        const aRot = a0.mul(cos(theta)).sub(b0.mul(sin(theta)));
-        const bRot = a0.mul(sin(theta)).add(b0.mul(cos(theta)));
-        const bodyLinear = oklabToLinear(Lc, aRot, bRot);
-
-        const surfaceGlow = rim.add(specTight).add(specBroad).mul(uniforms.glow);
-        const colorLinear = max(bodyLinear.add(vec3(surfaceGlow)), vec3(0.0));
+        // *** THE COLOUR IS murmur's RAIL NOW, NOT THIS PORT'S OWN RAMP. *** What stood here was an OKLab
+        // ramp from a BASE_L / BASE_C / BASE_H chosen by this file, with the rim and both speculars ADDED AS
+        // WHITE on top. murmur's own present pass names that addition as the thing the family forbids -- its
+        // droplet notes a first cut that "rendered as a solid white disc, which is precisely the white overlay
+        // the family law forbids" -- and routes surface and interior through ONE energy-to-colour curve
+        // instead. kit.ts: that curve is "most of what keeps the family reading as one family".
+        //
+        // mh_present's own composition, transcribed: railE = body + (spec + contact) * dark, then
+        // mh_lit(pal, railE, glow, base 0, span 1, emis 0.34, hue). The surface does not bypass the rail.
+        const pal = KIT.mhPalette(uniforms.ink, uniforms.tone, uniforms.tone2, uniforms.hueShift, uniforms.depth);
+        const dark = float(1.0).sub(pal.paper).toVar();
+        const railE = density.add(specTight.add(specBroad).add(rim).mul(dark)).toVar();
+        const colorLinear = max(KIT.mhLit(pal, railE, uniforms.glow, float(0.0), float(1.0), float(0.34), float(0.0)),
+                                vec3(0.0));
         const outColor = linear ? colorLinear : linearToSrgb(colorLinear);
 
         // *** smoothstep(edge0, edge1, x) NEEDS edge0 < edge1 -- "results are undefined" otherwise (GLSL spec,

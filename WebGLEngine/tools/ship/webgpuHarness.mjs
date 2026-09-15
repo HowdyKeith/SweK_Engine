@@ -843,8 +843,9 @@ export async function runInEngineOrigin({ engineRoot, script, args = null, timeo
  * above which read bottom-first).
  */
 export async function renderThreeTslToPixels({ engineRoot, moduleImportPath, factoryName, factoryArgs = {},
-                                               knobs = {}, width = 64, height = 64, variants = null }) {
-    const SCRIPT = `async ({ moduleImportPath, factoryName, factoryArgs, knobs, width, height, variants }) => {
+                                               knobs = {}, width = 64, height = 64, variants = null,
+                                               reuseInstances = false }) {
+    const SCRIPT = `async ({ moduleImportPath, factoryName, factoryArgs, knobs, width, height, variants, reuseInstances }) => {
         const THREE = await import("/vendor/three-webgpu/three.webgpu.js");
         const TSL = await import("/vendor/three-webgpu/three.tsl.js");
         const mod = await import(moduleImportPath);
@@ -865,7 +866,29 @@ export async function renderThreeTslToPixels({ engineRoot, moduleImportPath, fac
         const isWebGPUBackend = !!(renderer.backend && renderer.backend.isWebGPUBackend);
         renderer.setSize(width, height, false);
 
-        const fx = make(THREE, TSL, factoryArgs);
+        // *** REUSING A BUILT EFFECT ACROSS FRAMES THAT DIFFER ONLY IN KNOBS. *** Each call to a factory builds
+        // a fresh NodeMaterial, and the first render of one pays a WGSL compile -- measured at about 195 ms a
+        // frame for the orb against a 978 ms launch-and-first-frame, so on a gate rendering one species at
+        // four times the compile is most of the bill and three quarters of it is for a shader already built.
+        // With reuseInstances the instance is cached on module + factory + factoryArgs, and a variant naming
+        // the same three only has its knobs written again.
+        //
+        // *** IT IS OPT-IN, AND THE REASON IS A REAL HAZARD RATHER THAN CAUTION. *** A setKnobs that writes
+        // only the names PRESENT in its argument (which is what render/aiPresenceOrbTsl.mjs does, and it is a
+        // reasonable thing to do) leaves every unnamed knob at whatever the previous frame set it to. Fresh
+        // instances get the factory's defaults instead. The two agree only while every frame passes the same
+        // knob NAMES, so a caller turning this on is promising that, and tools/ship/murmurSpecies-selfcheck
+        // .mjs proved it for its own eight frames byte-for-byte before turning it on rather than assuming it.
+        const instKey = (mp, fn, fa) => mp + "::" + fn + "::" + JSON.stringify(fa || null);
+        const instances = {};
+        const build = (mk, mp, fn, fa) => {
+            if (!reuseInstances) return mk(THREE, TSL, fa);
+            const k = instKey(mp, fn, fa);
+            if (!instances[k]) instances[k] = mk(THREE, TSL, fa);
+            return instances[k];
+        };
+
+        const fx = build(make, moduleImportPath, factoryName, factoryArgs);
         if (typeof fx.setKnobs === "function") fx.setKnobs(knobs);
 
         const rt = new THREE.RenderTarget(width, height);
@@ -923,7 +946,7 @@ export async function renderThreeTslToPixels({ engineRoot, moduleImportPath, fac
                 if (typeof m[fn] !== "function") return { ok: false, reason: fn + " is not exported by " + mp, isWebGPUBackend };
                 cache[key] = m[fn];
             }
-            const fxV = cache[key](THREE, TSL, v.factoryArgs || factoryArgs);
+            const fxV = build(cache[key], mp, fn, v.factoryArgs || factoryArgs);
             if (typeof fxV.setKnobs === "function") fxV.setKnobs(v.knobs || knobs);
             const shot = await shoot(fxV);
             if (shot.err) return { ok: false, reason: shot.err, isWebGPUBackend };
@@ -932,8 +955,30 @@ export async function renderThreeTslToPixels({ engineRoot, moduleImportPath, fac
         return { ok: true, isWebGPUBackend, pixels: frames[0], frames };
     }`;
     const out = await runInEngineOrigin({ engineRoot, script: SCRIPT,
-        args: { moduleImportPath, factoryName, factoryArgs, knobs, width, height, variants } });
+        args: { moduleImportPath, factoryName, factoryArgs, knobs, width, height, variants, reuseInstances } });
     if (out.skipped || !out.ok) return { ...out, pixels: null, frames: null, isWebGPUBackend: null };
     if (!out.result || !out.result.ok) return { ...out, ok: false, reason: out.result ? out.result.reason : "no result", pixels: null, frames: null, isWebGPUBackend: out.result ? out.result.isWebGPUBackend : null };
-    return { skipped: false, ok: true, pixels: out.result.pixels, frames: out.result.frames, isWebGPUBackend: out.result.isWebGPUBackend, pageErrors: out.pageErrors };
+
+    // *** A SHADER THAT FAILED TO BUILD USED TO COME BACK AS ok:true AND BLACK PIXELS. *** three.js does not
+    // throw when a TSL builder function raises: it CATCHES the exception, console.errors it as
+    // "THREE.TSL: <error> in <fn> at <file:line>", and substitutes a node that generates zero. renderer.render
+    // then returns normally, the RenderTarget reads back, and every byte is 0 -- so this function reported a
+    // successful render of a shader that does not exist, and the caller's rows graded the black.
+    //
+    // v4627 paid for that directly: render/murmurKitTsl.mjs used MH_SPREAD without importing it, the colour
+    // rail rendered black at every input, and the bisect that followed cost most of a round -- it eliminated
+    // the palette, the OKLab decode, the stop walk, an out-parameter theory and an Fn-arity theory, all of
+    // which measured CORRECT, because the one thing not being measured was whether the shader compiled at all.
+    // The page errors were being captured the whole time and thrown away here.
+    //
+    // So: a page error during a render is a FAILED render, not a footnote. Anything Chromium reports as an
+    // error on a page whose only job is to import one module and draw one quad is about that module.
+    const errs = out.pageErrors || [];
+    if (errs.length) {
+        return { skipped: false, ok: false, pixels: null, frames: null, isWebGPUBackend: out.result.isWebGPUBackend,
+                 pageErrors: errs,
+                 reason: `the page reported ${errs.length} error${errs.length === 1 ? "" : "s"} during the render, so the ` +
+                         `pixels are not evidence of anything: ${errs.map((e) => String(e).replace(/\s+/g, " ")).join(" | ").slice(0, 900)}` };
+    }
+    return { skipped: false, ok: true, pixels: out.result.pixels, frames: out.result.frames, isWebGPUBackend: out.result.isWebGPUBackend, pageErrors: errs };
 }

@@ -313,7 +313,8 @@ const N = 16;   // the probe's lattice: 16x16 cells, one pixel each
 const probeRun = await renderThreeTslToPixels({
     engineRoot: ENG, moduleImportPath: "/render/murmurKitTsl.mjs",
     factoryName: "makeMurmurKitProbeTsl", factoryArgs: { mode: "hash", n: N }, width: N, height: N,
-    variants: [{ factoryArgs: { mode: "noise", n: N } }],
+    variants: [{ factoryArgs: { mode: "noise", n: N } }, { factoryArgs: { mode: "rail", n: N } },
+               { factoryArgs: { mode: "railLight", n: N } }],
 });
 
 sec("6. *** THE PAIR: THE REAL COMPILED SHADER AGAINST THE CPU REFERENCE, BIT FOR BIT ***");
@@ -461,12 +462,292 @@ sec("7. *** THE DEFORMED BODY SOLVE -- the half of the kit the first three speci
         `shipped with the slip named, the same way MH_SCATTER_K's prose-versus-code gap is.`);
 }
 
+// =============================================================================================================
+sec("8. *** THE COLOUR RAIL: mh_palette / mh_shade / mh_tier / mh_lit ***");
+{
+    // *** WHAT THIS SECTION REPLACES. *** Until v4627 every ported species wore a colour this port invented:
+    // render/aiPresenceOrbTsl.mjs carried "const BASE_L = 0.30, BASE_C = 0.09, BASE_H = 3.6" with a comment
+    // saying it was this port's own pick, and put the rim and both speculars on top AS WHITE -- which murmur's
+    // own present pass names as the one forbidden move, "precisely the white overlay the family law forbids".
+    // kit.ts calls the rail "most of what keeps the family reading as one family", so an approximation of it
+    // is not a cosmetic shortfall; it is the part of the family the port had not ported.
+    const INK = [0x0A / 255, 0x0A / 255, 0x0B / 255];
+    const TONE = [0x6C / 255, 0x63 / 255, 0xE8 / 255];
+    const TONE2 = [0xE8 / 255, 0x7A / 255, 0x3C / 255];
+    const PAPERRGB = [0.97, 0.96, 0.94];
+
+    // ---- mh_paper: three stated values and one stated PROPERTY -------------------------------------------
+    const pInk = K.mhPaper(INK), pPaper = K.mhPaper(PAPERRGB), pMid = K.mhPaper([0.5, 0.5, 0.5]);
+    ok("!! mh_paper reads 0 for the house ink, 1 for paper, and about four tenths for a true mid grey",
+        pInk === 0 && pPaper === 1 && Math.abs(pMid - 0.42) < 0.02,
+        `ink ${pInk.toFixed(4)}, paper ${pPaper.toFixed(4)}, sRGB 0.5 grey ${pMid.toFixed(4)} against kit.ts's ` +
+        `"about four tenths across". It is OKLab lightness and not an RGB average, "because a saturated ` +
+        `mid-blue paper and a light grey with the same channel mean are nowhere near the same brightness to ` +
+        `the eye" -- that grey's OKLab L is 0.60, which is where the four tenths comes from.`);
+
+    // The STATED PROPERTY, checked as continuity rather than read off the source: "Nothing in this file ever
+    // branches on it; every use is a mix, so dragging the ink from ink to paper shows no jump."
+    let worstJump = 0, prevPaper = null;
+    for (let i = 0; i <= 20000; i++) {
+        const g = i / 20000, v = K.mhPaper([g, g, g]);
+        if (prevPaper !== null) worstJump = Math.max(worstJump, Math.abs(v - prevPaper));
+        prevPaper = v;
+    }
+    ok("...and dragging the ground from ink to paper shows no jump, because nothing branches on it",
+        worstJump < 1e-3,
+        `worst step ${worstJump.toExponential(2)} across 20,001 greys at a 5e-5 spacing -- a smooth ramp, not ` +
+        `a switch. Read as a PROPERTY of 20,001 samples rather than as the absence of an if-statement in the ` +
+        `source, because the second is a claim about this file and the first is a claim about the function.`);
+
+    // ---- mh_palette: the duotone collapse, which kit.ts calls the property the upgrade rests on ----------
+    const p1 = K.mhPalette(INK, TONE, TONE, 0, 1);
+    const p2 = K.mhPalette(INK, TONE, TONE2, 0, 1);
+    ok("!! *** duo IS EXACTLY ZERO WHEN THE TWO ANCHORS ARE EQUAL, and every term collapses to the identity ***",
+        p1.duo === 0 && p1.dHue === 0 && p1.dC === 1 && p1.dL === 1,
+        `duo = ${p1.duo}, dHue = ${p1.dHue}, dC = ${p1.dC}, dL = ${p1.dL} -- exact, not small. kit.ts: "the ` +
+        `property the whole upgrade rests on: at zero every term below collapses to the identity". A ` +
+        `smoothstep whose lower edge were 0 instead of 0.004 would read a tiny nonzero here, and every ` +
+        `single-anchor species would carry a trace of a second anchor it does not have.`);
+
+    // *** AND THE COLLAPSE HAS A DEADBAND, WHICH IS WHAT THE 0.004 LOWER EDGE BUYS. *** Exact equality is
+    // the easy half: smoothstep returns 0 at its lower edge whatever that edge is, so a row testing only
+    // equal anchors stays green with the edge moved to zero -- measured, that sabotage passed. The edge is
+    // there so anchors that are merely CLOSE also collapse exactly, which is what stops a species whose two
+    // anchors came from the same swatch rounded differently from carrying a trace of a duotone.
+    const TONE_NEAR = [TONE[0] + 2 / 255, TONE[1], TONE[2]];   // 0.00297 apart in OKLab -- inside the band
+    const TONE_FAR = [TONE[0] + 6 / 255, TONE[1], TONE[2]];    // 0.00900 apart -- outside it
+    const pNear = K.mhPalette(INK, TONE, TONE_NEAR, 0, 1), pFar = K.mhPalette(INK, TONE, TONE_FAR, 0, 1);
+    ok("!! ...and anchors merely CLOSE collapse exactly too, which is what the 0.004 lower edge is for",
+        pNear.duo === 0 && pFar.duo > 0,
+        `a second anchor 0.00297 away in OKLab reads duo = ${pNear.duo} -- exactly zero, not 1e-4 -- while ` +
+        `one 0.00900 away reads ${pFar.duo.toFixed(6)}, so the row cannot pass by duo being zero everywhere. ` +
+        `With the lower edge at 0 instead of 0.004 the near palette reads 6.7e-4 and every "one anchor" ` +
+        `species carries a sliver of a second one.`);
+
+    ok("MH_SPREAD is half a radian, which is the 29 degrees either side kit.ts describes",
+        Math.abs(K.MH_SPREAD - 0.50) < 1e-12 && Math.abs(K.MH_SPREAD * 180 / Math.PI - 28.65) < 0.01,
+        `${K.MH_SPREAD.toFixed(2)} rad = ${(K.MH_SPREAD * 180 / Math.PI).toFixed(2)} degrees against kit.ts's ` +
+        `"about 29 degrees of OKLAB hue either side of the anchor".`);
+
+    // *** THE 0.93 CEILING ON THE TOP STOP, ON A TONE THAT ACTUALLY REACHES IT. *** With the house tone the
+    // cap is dead code: its OKLab L is 0.5800, the ink rail's top stop is L * 1.32 = 0.7656, and no depth in
+    // range gets it to 0.93 -- so removing the min() entirely changes nothing anywhere the rest of this
+    // section looks, and that sabotage passed. A light tone is where the ceiling does work, and murmur puts
+    // one there on purpose: without it a pale anchor's top stop runs past the top of the space and the
+    // brightest part of the figure clips to a flat white, which is the family's one forbidden ending.
+    const TONE_LIGHT = [0xC8 / 255, 0xC4 / 255, 0xFF / 255];
+    const pLight = K.mhPalette(INK, TONE_LIGHT, TONE_LIGHT, 0, 1);
+    const lightL = (() => { const l = TONE_LIGHT.map(K.srgbToLinear); return K.linearToOklab(l[0], l[1], l[2]).L; })();
+    ok("!! the top stop is capped at 0.93 for a light anchor, where an uncapped rail would run off the space",
+        Math.abs(pLight.s3[0] - 0.93) < 1e-12 && lightL * 1.32 > 1.0,
+        `a tone of OKLab L ${lightL.toFixed(4)} would put the top stop at ${(lightL * 1.32).toFixed(4)} ` +
+        `uncapped -- past 1.0, off the end of the lightness axis -- and it reads ${pLight.s3[0].toFixed(4)}. ` +
+        `The house tone cannot exercise this at all (L 0.5800, top stop 0.7656), which is why this row uses a ` +
+        `different anchor rather than more depths of the same one.`);
+
+    // ---- the walk: the linearity identity, measured on the LAB WALK and not on the decoded colour --------
+    // *** THE FIRST VERSION OF THIS ROW ASKED THE WRONG QUESTION AND IS RECORDED HERE RATHER THAN DELETED. ***
+    // kit.ts: "mh_shade's walk is linear in the stops for any fixed t." At a fixed t the walk is a fixed
+    // convex combination, so walking a mix of two palettes must equal mixing the two walks EXACTLY. Asked of
+    // mhShade's return value -- linear light, three cubes past the walk -- the same test measures 2.7e-1 and
+    // says nothing at all. render/murmurKit.mjs exports mhWalk for precisely this reason.
+    const PD = { s0: [0, 0, 0], s1: [0.20, 0.03, -0.09], s2: [0.52, 0.06, -0.19], s3: [0.70, 0.03, -0.10] };
+    const PL = { s0: [0.90, 0, 0], s1: [0.70, 0.05, -0.02], s2: [0.50, 0.09, -0.05], s3: [0.30, 0.10, -0.03] };
+    const IDENT = { paper: 0, duo: 0, dHue: 0, dC: 1, dL: 1 };
+    let worstLin = 0, worstDecoded = 0, pairs = 0;
+    for (let i = 0; i <= 200; i++) {
+        const t = i / 200;
+        for (const u of [0, 0.125, 0.25, 0.5, 0.75, 0.875, 1]) {
+            const pm = {};
+            for (const k of ["s0", "s1", "s2", "s3"]) pm[k] = PD[k].map((v, j) => v + (PL[k][j] - v) * u);
+            const a = K.mhWalk(PD, t), b = K.mhWalk(PL, t), c = K.mhWalk(pm, t);
+            for (let j = 0; j < 3; j++) worstLin = Math.max(worstLin, Math.abs(c[j] - (a[j] + (b[j] - a[j]) * u)));
+            const A = K.mhShade({ ...IDENT, ...PD }, t, 0), B = K.mhShade({ ...IDENT, ...PL }, t, 0), C = K.mhShade({ ...IDENT, ...pm }, t, 0);
+            for (let j = 0; j < 3; j++) worstDecoded = Math.max(worstDecoded, Math.abs(C[j] - (A[j] + (B[j] - A[j]) * u)));
+            pairs++;
+        }
+    }
+    ok("!! *** THE WALK IS LINEAR IN THE STOPS TO THE LAST BIT, so mixing the two rails at the stops is EXACT ***",
+        worstLin < 1e-15,
+        `worst departure ${worstLin.toExponential(3)} over ${pairs} (t, mix) pairs -- f64 rounding, which is ` +
+        `what "exact rather than an approximation" has to mean. THE SAME TEST ON THE DECODED COLOUR READS ` +
+        `${worstDecoded.toExponential(3)}, and that is not a failure of the walk: the OKLab decode cubes its ` +
+        `inputs, so nothing downstream of it is linear in anything. This row sits at the walk because that is ` +
+        `where the claim lives.`);
+
+    // ---- the hue rotation: the SAFE axis, READ BACK OUT OF mhShade AND NOT RE-DERIVED HERE -------------
+    // *** THE FIRST VERSION OF THIS ROW RE-STATED THE ROTATION IN THE GATE AND GRADED ITS OWN COPY. ***
+    // It rebuilt pos/neg/rot/cS/lS from K.MH_SPREAD and the palette's scalars, ran that on mhWalk's output,
+    // and asserted the result -- so mhShade was never called, and a sabotage that made the rotation trade
+    // chroma for hue (lab[2] * sh * 0.8, the exact failure kit.ts says this axis cannot have) left the row
+    // GREEN. That is v4579's and v4580's mistake with a new subject: an instrument that re-implements the
+    // thing it grades measures itself. What follows calls mhShade and recovers L and C from the LINEAR LIGHT
+    // it returns, through linearToOklab -- the inverse of the transform mhShade ends with, so the residual is
+    // f64 round-trip noise and nothing else.
+    const lcOf = (rgb) => { const o = K.linearToOklab(rgb[0], rgb[1], rgb[2]); return [o.L, Math.hypot(o.a, o.b)]; };
+    let w1L = 0, w1C = 0, hp = 0;
+    for (let i = 0; i <= 50; i++) {
+        const t = i / 50, b = lcOf(K.mhShade(p1, t, 0));
+        for (const h of [-0.75, -0.6, -0.3, 0.3, 0.6, 0.75]) {
+            const r = lcOf(K.mhShade(p1, t, h));
+            w1L = Math.max(w1L, Math.abs(r[0] - b[0])); w1C = Math.max(w1C, Math.abs(r[1] - b[1])); hp++;
+        }
+    }
+    ok("!! *** THE ROTATION MOVES HUE AND HOLDS LIGHTNESS AND CHROMA -- read back out of mhShade, not re-derived ***",
+        w1L < 1e-9 && w1C < 1e-9,
+        `with ONE anchor, over ${hp} (t, hue) pairs at hues out to 1.5x MH_SPREAD: L moves by ` +
+        `${w1L.toExponential(2)} and C by ${w1C.toExponential(2)} against the unrotated colour at the same t. ` +
+        `Both are the f64 cost of going through linear light and back, not a tolerance chosen to fit. kit.ts: ` +
+        `it "moves the hue while holding lightness and chroma exactly. The unsafe one is trading chroma for ` +
+        `hue, which is how a warm palette turns to mud, and this cannot do it."`);
+
+    // With two anchors L and C are SUPPOSED to move on the positive side -- that is what duotone is -- so the
+    // identity there is different and is still not a re-derivation: the NEGATIVE side must be untouched
+    // ("the negative side is left exactly as it was"), and the positive side's scaling must be ONE SCALAR for
+    // the whole rail rather than something that varies along it. The two scalars are then checked against the
+    // palette's own published dL and dC, which mhShade never returns and the gate never computes.
+    let negL = 0, negC = 0;
+    const ratL = [], ratC = [];
+    for (let i = 1; i <= 50; i++) {
+        const t = i / 50, b = lcOf(K.mhShade(p2, t, 0));
+        const n = lcOf(K.mhShade(p2, t, -0.5));
+        negL = Math.max(negL, Math.abs(n[0] - b[0])); negC = Math.max(negC, Math.abs(n[1] - b[1]));
+        const q = lcOf(K.mhShade(p2, t, 0.5));
+        ratL.push(q[0] / b[0]); ratC.push(q[1] / b[1]);
+    }
+    const spread = (a) => (Math.max(...a) - Math.min(...a)) / (a.reduce((x, y) => x + y, 0) / a.length);
+    const meanOf = (a) => a.reduce((x, y) => x + y, 0) / a.length;
+    ok("!! ...and with TWO anchors the negative side is untouched while the positive side scales by ONE pair of numbers",
+        negL < 1e-9 && negC < 1e-9 && spread(ratL) < 1e-6 && spread(ratC) < 1e-6 &&
+        Math.abs(meanOf(ratL) - p2.dL) < 1e-6 && Math.abs(meanOf(ratC) - p2.dC) < 1e-6,
+        `negative side: L moves ${negL.toExponential(2)}, C moves ${negC.toExponential(2)}. Positive side, ` +
+        `across 50 points on the rail: the L ratio varies by ${spread(ratL).toExponential(2)} of its mean and ` +
+        `the C ratio by ${spread(ratC).toExponential(2)} -- one scalar each, not a function of position. ` +
+        `Those scalars are ${meanOf(ratL).toFixed(6)} and ${meanOf(ratC).toFixed(6)}, against the palette's ` +
+        `own dL ${p2.dL.toFixed(6)} and dC ${p2.dC.toFixed(6)}, on a palette reading duo ${p2.duo.toFixed(3)} ` +
+        `-- so the row is not passing because the second anchor did nothing.`);
+
+    // ---- the joins are C1, which is the whole reason for the three easings ------------------------------
+    const dx = 1e-5;
+    const slope = (t) => (K.mhWalk(p1, t + dx)[0] - K.mhWalk(p1, t - dx)[0]) / (2 * dx);
+    const midSlope = Math.abs(slope(0.59));
+    let worstKink = 0, kinkAt = "";
+    for (const j of [0.40, 0.78]) {
+        const rel = Math.abs(slope(j - 3 * dx) - slope(j + 3 * dx)) / midSlope;
+        if (rel > worstKink) { worstKink = rel; kinkAt = "t = " + j.toFixed(2); }
+    }
+    ok("the two segment joins are C1, so no kink shows up as a contour line",
+        worstKink < 1e-2,
+        `worst slope discontinuity ${worstKink.toExponential(2)} of the mid-segment slope ` +
+        `${midSlope.toFixed(4)}, at ${kinkAt}. Stated as a FRACTION of the slope rather than an absolute, ` +
+        `because a kink only shows against the ramp it sits on. kit.ts: "each eased so its ends are flat, ` +
+        `which makes the joins C1: no kink shows up as a contour line in a smooth field".`);
+
+    // ---- the tier curve and the knee --------------------------------------------------------------------
+    ok("!! mh_tier puts the bottom 78% of the energy into the rail's first 72%, and lands on 0.72 EXACTLY",
+        K.mhTier(0.78) === 0.72 && K.mhTier(0) === 0 && Math.abs(K.mhTier(1) - 1) < 1e-12,
+        `tier(0.78) = ${K.mhTier(0.78).toFixed(6)} exactly, tier(0) = ${K.mhTier(0)}, tier(1) = ` +
+        `${K.mhTier(1).toFixed(6)}. The two branches are EQUAL at the knot, so the smoothstep blending them ` +
+        `over a fifth of the range cannot move the value there -- which makes the exact 0.72 a property of ` +
+        `the construction rather than a coincidence of two fitted numbers.`);
+
+    let kneeMax = 0, kneeBelow = 0;
+    for (let x = 0; x <= 200; x += 0.05) {
+        kneeMax = Math.max(kneeMax, K.mhKnee(x, 0.92));
+        if (x < 0.92) kneeBelow = Math.max(kneeBelow, Math.abs(K.mhKnee(x, 0.92) - x));
+    }
+    ok("!! the knee is the identity below it and never reaches 1 above it, so a specular keeps its SHAPE",
+        kneeBelow === 0 && kneeMax <= 1 && K.mhKnee(0.92, 0.92) === 0.92,
+        `below the knee the worst departure from the identity is ${kneeBelow} -- exactly zero, it IS x -- and ` +
+        `over x in [0, 200] the largest value is ${kneeMax.toFixed(6)}, never above 1. A hard clamp would also ` +
+        `satisfy that bound and would flatten every specular above 0.92 into one plateau; this keeps them ` +
+        `ordered, which is what "keeps its shape" means.`);
+
+    ok("!! at glow = 0 exactly a third of the energy survives, because a dial that switches it off is a bug",
+        K.mhKnee(1.0 * (0.35 + 0.65 * 0), 0.92) === 0.35,
+        `e = 1 at glow 0 reaches the rail as ${K.mhKnee(1.0 * 0.35, 0.92)} -- 0.35 exactly, and below the ` +
+        `knee, so the knee is the identity there and the number is murmur's own constant unmodified. kit.ts: ` +
+        `"because an indicator that can be switched off by a dial is a bug and not a dial".`);
+
+    // ---- AND THE PAIR: THE WHOLE RAIL ON A REAL GPU AGAINST THE CPU REFERENCE ---------------------------
+    // *** THIS IS THE ROW THE ROUND WAS BUILT AROUND, AND THE ONE THAT WOULD HAVE CAUGHT IT IN A MINUTE. ***
+    // The rail rendered BLACK at every input for most of v4627 because render/murmurKitTsl.mjs used MH_SPREAD
+    // without importing it. three.js catches a builder that throws, console.errors it, and substitutes a node
+    // generating zero, so renderer.render returns cleanly and the readback is all zeros. Every component
+    // measured correct in isolation; nothing measured the whole rail against anything.
+    if (!probeRun.ok) {
+        ok("!! *** THE COLOUR RAIL RENDERS ON A REAL GPU AND MATCHES THE CPU REFERENCE ***", false,
+            `could not render: ${probeRun.reason || (probeRun.skipped ? "skipped: " + probeRun.skipped : "unknown")}`);
+    } else {
+        const encode = (v) => {
+            const c = v <= 0.0031308 ? v * 12.92 : 1.055 * Math.pow(Math.max(v, 1e-6), 1 / 2.4) - 0.055;
+            return Math.round(Math.min(1, Math.max(0, c)) * 255);
+        };
+        const grade = (rail, palG, flip) => {
+            let worst = 0, sum = 0, at = "";
+            for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+                const e = (x / N) * 2, g = y / N;
+                const want = K.mhLit(palG, e, g, 0, 1, 0.34, 0).map(encode);
+                const yy = flip ? N - 1 - y : y, i = (yy * N + x) * 4;
+                for (let c = 0; c < 3; c++) {
+                    const d = Math.abs(rail[i + c] - want[c]);
+                    sum += d;
+                    if (d > worst) { worst = d; at = `e = ${e.toFixed(2)}, glow = ${g.toFixed(2)}: gpu ${rail[i]},${rail[i + 1]},${rail[i + 2]} against cpu ${want.join(",")}`; }
+                }
+            }
+            return { worst, mean: sum / (N * N * 3), at };
+        };
+        // TWO TONES. The house one is what the species wear; the LIGHT one is the only input on which the top
+        // stop's 0.93 ceiling does any work at all -- with the house tone alone, deleting that min() from the
+        // shader moves nothing in this frame, measured.
+        const palG = K.mhPalette(INK, TONE, TONE, 0, 1);
+        const palL = K.mhPalette(INK, [0xC8 / 255, 0xC4 / 255, 0xFF / 255], [0xC8 / 255, 0xC4 / 255, 0xFF / 255], 0, 1);
+        const gF = grade(probeRun.frames[2], palG, true), gA = grade(probeRun.frames[2], palG, false);
+        const lF = grade(probeRun.frames[3], palL, true);
+        say(`rail over 256 (energy, glow) points: house tone flipped worst ${gF.worst}/255 mean ${gF.mean.toFixed(3)}, as read worst ${gA.worst}/255; light tone worst ${lF.worst}/255 mean ${lF.mean.toFixed(3)}`);
+        ok("!! *** THE COLOUR RAIL RENDERS ON A REAL GPU AND MATCHES THE CPU REFERENCE ACROSS ITS SURFACE ***",
+            gF.worst <= 2 && gF.mean < 0.05 && lF.worst <= 2 && lF.mean < 0.05 && gA.worst > 50,
+            `house tone: worst channel error ${gF.worst} of 255 and mean ${gF.mean.toFixed(3)} over 256 points ` +
+            `spanning energy 0..2 and glow 0..1 -- one frame samples the SURFACE of mh_lit rather than a point ` +
+            `on it. Worst at ${gF.at}. LIGHT TONE, where the top stop's ceiling is load-bearing: worst ` +
+            `${lF.worst}, mean ${lF.mean.toFixed(3)}. The unflipped orientation is off by ${gA.worst}, so this cannot pass by the ` +
+            `symmetry a centred test pattern would have. *** AND IT IS THE ROW THAT DID NOT EXIST WHILE IT ` +
+            `WAS NEEDED: *** the rail read 0,0,0 at every one of these points for most of v4627, and the ` +
+            `bisect that chased it verified the palette, the decode, the walk and the stops one at a time -- ` +
+            `each correct -- because nothing was asking the whole rail this one question.`);
+    }
+
+    // ---- AND THE INSTRUMENT ITSELF, WHICH IS WHAT ACTUALLY FAILED THIS ROUND ---------------------------
+    // *** THE ROW ABOVE IS ONLY WORTH ITS RUNTIME IF A BUILD FAILURE CANNOT REACH IT AS BLACK PIXELS. ***
+    // Every check in this gate that reads a frame grades the numbers it gets back. three.js catches a TSL
+    // builder that throws, console.errors it and substitutes a node generating zero, so renderer.render
+    // returns cleanly and the readback is all zeros -- and until v4627 renderThreeTslToPixels handed those
+    // zeros over as ok:true. A gate reading them is grading a shader that does not exist. Disabling the
+    // harness's new guard reddens nothing at all on a correct tree, which is exactly why this row renders a
+    // subject that is WRONG ON PURPOSE and asserts the failure, rather than trusting the guard's presence.
+    const brokeRun = await renderThreeTslToPixels({
+        engineRoot: ENG, moduleImportPath: "/tools/ship/fixtures/tslBuilderThrows.mjs",
+        factoryName: "makeThrowingProbe", width: 8, height: 8,
+    });
+    const named = !brokeRun.ok && /tslBuilderThrows/.test(String(brokeRun.reason)) &&
+                  /fails on purpose/.test(String(brokeRun.reason));
+    ok("!! *** A SHADER THAT FAILED TO BUILD IS A FAILED RENDER, NOT A FRAME OF BLACK PIXELS ***",
+        brokeRun.ok === false && brokeRun.frames == null && named,
+        `rendering tools/ship/fixtures/tslBuilderThrows.mjs -- a builder that raises while three.js builds ` +
+        `the fragment graph -- comes back ok = ${brokeRun.ok} with no frames, and the reason NAMES the file ` +
+        `and the message: ${String(brokeRun.reason).replace(/\s+/g, " ").slice(0, 200)}. Both halves matter: ` +
+        `a guard that failed the render without saying which file threw would have left this round's bisect ` +
+        `exactly where it was. Costs one launch, about 584 ms, and is the only row here whose subject is the ` +
+        `instrument rather than the kit.`);
+}
+
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nWHAT THIS KIT IS FOR: four of murmur-web's eighteen species are built out of it, and the other fourteen " +
     "would each otherwise have re-approximated the march, the medium, the gesture clock and the hash " +
     "separately. The SPECIES themselves are gated next door in tools/ship/murmurSpecies-selfcheck.mjs -- they " +
     "need real renders and this gate does not, which is a budget fact before it is a tidiness one. " +
-    "\nWHAT IS NOT CLAIMED: mh_surface, mh_palette and mh_present, which render/aiPresenceOrbTsl.mjs still " +
-    "approximates in its own file with a fresnel rim, two speculars and an OKLab ramp of this port's own " +
-    "choosing. The deformed body solve IS here now, at section 7, and droplet is the first species to need it.");
+    "\nWHAT IS NOT CLAIMED: mh_surface and mh_present, which render/aiPresenceOrbTsl.mjs still approximates in " +
+    "its own file. THE COLOUR RAIL IS NO LONGER AMONG THEM -- section 8 -- so the four species now wear " +
+    "murmur's own palette walk instead of an OKLab ramp of this port's choosing with white speculars laid " +
+    "over it. The deformed body solve is at section 7, and droplet is the first species to need it.");
 process.exit(fails ? 1 : 0);

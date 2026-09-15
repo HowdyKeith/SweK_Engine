@@ -11,7 +11,7 @@
 // needs Chromium -- WebGL2 always, real WebGPU too since tools/ship/webgpuHarness.mjs's swizzle workaround),
 // so a math regression fails in milliseconds rather than after a browser boot.
 "use strict";
-import { SECURE_HOST, renderThreeTslToPixels } from "./webgpuHarness.mjs";
+import { SECURE_HOST } from "./webgpuHarness.mjs";   // v4627: renderThreeTslToPixels is no longer needed -- section 10 reads its WebGPU shot out of RENDER_SCRIPT's own launch
 import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
 import http from "node:http";
 import fs from "node:fs";
@@ -202,6 +202,23 @@ async function runWebGL2InEngineOrigin({ engineRoot, script, args = null, sabota
         page.on("console", (m) => { if (m.type() === "error") pageErrors.push("console: " + m.text().slice(0, 300)); });
         await page.goto(`http://${SECURE_HOST}:${srv.address().port}/`);
         const out = await page.evaluate(async ({ src, a }) => {
+            // *** THE SWIZZLE WORKAROUND, INLINED -- WITHOUT IT NO REAL WebGPU RENDER SURVIVES IN THIS PAGE. ***
+            // tools/ship/webgpuHarness.mjs's header has the full account: three.js sets swizzle:"rgba" as a
+            // bare string on every texture view it builds, and this sandbox's headless-shell validates that
+            // field's TYPE before deciding to ignore it, so createView throws. The shared runInEngineOrigin
+            // installs this; THIS runner did not, which is the whole reason section 10's WebGPU render used
+            // to open a SECOND browser through renderThreeTslToPixels. It does not any more (v4627). Inlined
+            // rather than imported because page.evaluate serialises only the function it is given.
+            if (typeof GPUTexture !== "undefined") {
+                const orig = GPUTexture.prototype.createView;
+                GPUTexture.prototype.createView = function (descriptor) {
+                    if (descriptor && typeof descriptor === "object" && typeof descriptor.swizzle === "string") {
+                        const { swizzle, ...rest } = descriptor;
+                        return orig.call(this, rest);
+                    }
+                    return orig.call(this, descriptor);
+                };
+            }
             try { const fn = new Function("return (" + src + ")")(); return { ok: true, result: await fn(a) }; }
             catch (e) { return { ok: false, reason: String(e && e.stack || e).slice(0, 600) }; }
         }, { src: String(script), a: args });
@@ -249,7 +266,7 @@ const RENDER_SCRIPT = `async ({ n, time, modulePath, modulePaths, skipWgsl }) =>
     // emitShaders() derives the language from renderer.backend.isWebGPUBackend, which forceWebGL sets false by
     // definition. A SEPARATE, non-forced renderer (never rendered through, only asked to compile) is what
     // actually reaches the WGSL builder -- the same instance the earlier throwaway probe used successfully.
-    let wgslOk = false, wgslLen = 0, wgslError = null;
+    let wgslOk = false, wgslLen = 0, wgslError = null, gpu = null;
     try {
         if (skipWgsl) throw new Error("skipped by caller");
         const wgslRenderer = new THREE.WebGPURenderer({ canvas: document.createElement("canvas"), forceWebGL: false, antialias: false });
@@ -257,6 +274,36 @@ const RENDER_SCRIPT = `async ({ n, time, modulePath, modulePaths, skipWgsl }) =>
         const fxW = makeAiPresenceOrbTsl(THREE, TSL, {});
         const sh = await S.emitShaders(wgslRenderer, { scene: fxW.scene, camera: fxW.camera, mesh: fxW.scene.children[0] });
         wgslOk = sh.language === "wgsl" && sh.fragment.length > 0; wgslLen = sh.fragment.length;
+
+        // *** AND NOW IT RENDERS, INSTEAD OF BEING BUILT AND THROWN AWAY. *** This renderer was already
+        // constructed and initialised here purely to reach three's WGSL builder, and section 10 then opened a
+        // WHOLE SECOND BROWSER through renderThreeTslToPixels to get the same graph onto the same backend. At
+        // v4627 the colour rail made every species shader bigger, the compile bill went with it, and this
+        // gate crossed its budget at 3,084 ms on the sweep rotation -- so the second launch is gone and the
+        // real WebGPU pixels come from the device this page already had. Nothing about the CLAIM changes: it
+        // is still a real WebGPU backend, the same graph, the same knobs, the same 64x64, compared against
+        // the forceWebGL render below.
+        if (wgslRenderer.backend && wgslRenderer.backend.isWebGPUBackend) {
+            wgslRenderer.outputColorSpace = THREE.LinearSRGBColorSpace;   // see the note on the WebGL2 renderer above
+            wgslRenderer.setSize(n, n, false);
+            fxW.setKnobs({ time });
+            const rt = new THREE.RenderTarget(n, n);
+            wgslRenderer.setRenderTarget(rt);
+            wgslRenderer.render(fxW.scene, fxW.camera);
+            wgslRenderer.setRenderTarget(null);
+            const device = wgslRenderer.backend.device;
+            const bpr = Math.ceil(n * 4 / 256) * 256;
+            const tex = wgslRenderer.backend.get(rt.texture).texture;
+            const readBuf = device.createBuffer({ size: bpr * n, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+            const enc = device.createCommandEncoder();
+            enc.copyTextureToBuffer({ texture: tex }, { buffer: readBuf, bytesPerRow: bpr }, { width: n, height: n });
+            device.queue.submit([enc.finish()]);
+            await readBuf.mapAsync(GPUMapMode.READ);
+            const raw = new Uint8Array(readBuf.getMappedRange()).slice();
+            readBuf.unmap();
+            const gat = (x, y) => { const o = y * bpr + x * 4; return [raw[o], raw[o + 1], raw[o + 2], raw[o + 3]]; };
+            gpu = { isWebGPUBackend: true, center: gat(n / 2, n / 2), corner: gat(2, 2) };
+        }
     } catch (e) { wgslError = String(e && e.message || e); }
 
     renderer.setSize(n, n, false);
@@ -278,7 +325,7 @@ const RENDER_SCRIPT = `async ({ n, time, modulePath, modulePaths, skipWgsl }) =>
         fxI.setKnobs({ time });
         shots.push(shot(fxI));
     }
-    return { ok: true, wgslOk, wgslLen, wgslError, center: shots[0].center, farCorner: shots[0].farCorner, shots };
+    return { ok: true, wgslOk, wgslLen, wgslError, gpu, center: shots[0].center, farCorner: shots[0].farCorner, shots };
 }`;
 
 async function main() {
@@ -306,21 +353,31 @@ async function main() {
         // *** A REAL WebGPU RENDER, NOW EXECUTED -- tools/ship/webgpuHarness.mjs's swizzle workaround closed
         // the gap this section used to report as "NOT executed". *** Same graph, same knobs (time=1.2), same
         // N=64 canvas, THE OTHER real backend -- cross-backend PIXEL agreement, not just WGSL compilation.
-        const rGpu = await renderThreeTslToPixels({
-            engineRoot: ENG, moduleImportPath: "/render/aiPresenceOrbTsl.mjs", factoryName: "makeAiPresenceOrbTsl",
-            factoryArgs: {}, knobs: { time: 1.2 }, width: N, height: N,
-        });
-        if (!rGpu.ok) {
-            ok("!! a real WebGPU render of this graph executes in headless Chromium", false, rGpu.skipped ? "SKIP: " + rGpu.reason : rGpu.reason);
+        // *** THE SECOND BROWSER LAUNCH IS GONE, AND THE CLAIM IS NOT. *** This used to call
+        // renderThreeTslToPixels, which opens its own Chromium and initialises its own WebGPU device -- about
+        // 700 ms, for a device the page above already has. v4627's colour rail made every species shader
+        // bigger and pushed this gate to 3,084 ms on the sweep rotation, OVER the 3,000 ms budget, which is
+        // the point at which a gate stops running at ship time. The render now happens on the non-forced
+        // renderer RENDER_SCRIPT already built for the WGSL emission, in the same page, and this section
+        // reads it back. Same backend, same graph, same knobs, same 64x64.
+        const gpuShot = r10.result.gpu;
+        if (!gpuShot) {
+            ok("!! a real WebGPU render of this graph executes in headless Chromium", false,
+               `RENDER_SCRIPT returned no WebGPU shot; wgslError=${wgslError}`);
         } else {
-            const at = (x, y) => { const o = (y * N + x) * 4; return [rGpu.pixels[o], rGpu.pixels[o + 1], rGpu.pixels[o + 2], rGpu.pixels[o + 3]]; };
-            const gpuCenter = at(N / 2, N / 2), gpuCorner = at(2, 2);
-            ok("!! a real WebGPU render executes (renderer.backend.isWebGPUBackend, not the WebGL2 fallback)", rGpu.isWebGPUBackend === true);
+            const gpuCenter = gpuShot.center, gpuCorner = gpuShot.corner;
+            ok("!! a real WebGPU render executes (renderer.backend.isWebGPUBackend, not the WebGL2 fallback)", gpuShot.isWebGPUBackend === true);
             const delta = Math.abs(gpuCenter[0] - center[0]) + Math.abs(gpuCenter[1] - center[1]) + Math.abs(gpuCenter[2] - center[2]) + Math.abs(gpuCenter[3] - center[3]);
-            // 20 is real headroom over the measured delta (7, once both sides carry the SAME outputColorSpace
-            // fix -- see RENDER_SCRIPT's own comment), not a number picked to make this pass: a genuine cross-
-            // backend disagreement (the double-encoding bug this uncovered gave a delta of 215) blows through
-            // it by more than an order of magnitude, so this stays a real check, not a rubber stamp.
+            // 20 is real headroom over the measured delta, not a number picked to make this pass: a genuine
+            // cross-backend disagreement (the double-encoding bug this uncovered gave a delta of 215) blows
+            // through it by more than an order of magnitude, so this stays a real check, not a rubber stamp.
+            // *** THE DELTA ITSELF MOVED AT v4627, FROM 7 TO 2, AND THE REASON IS THE MERGE ABOVE. *** The two
+            // renders used to happen in two separate Chromium launches with different flags (this runner adds
+            // --use-gl=swiftshader; the shared harness does not), so the WebGL2 side ran on a different GL
+            // implementation from the one it does now. The INDEPENDENCE this row claims is unaffected -- it is
+            // three's WGSL backend against three's GLSL backend on the same graph, which is the axis that
+            // matters, and the row still asserts isWebGPUBackend is genuinely true rather than a fallback.
+            // What is gone is a second GL stack, which was never what was being compared.
             ok("!! *** CROSS-BACKEND PIXEL AGREEMENT: the SAME TSL graph's centre pixel on WebGPU matches its WebGL2 render (section 10's own baseline) within f32/driver rounding, not merely both compiling ***",
                delta <= 20, `webgpu centre=${JSON.stringify(gpuCenter)} vs webgl2 centre=${JSON.stringify(center)}, |delta|=${delta}`);
             ok("!! and the far corner agrees too -- fully transparent on both backends", gpuCorner[3] === 0, `webgpu corner=${JSON.stringify(gpuCorner)}`);
@@ -334,17 +391,26 @@ async function main() {
     // stops running at ship time, and v4535 is a long account of what follows from that. Nothing is dropped:
     // both sabotages still happen, on the same files, with the same assertions. They share a page.
     {
-        // ---- A: the species' own OKLab decode, corrupted --------------------------------------------------
-        // A GENUINELY LOAD-BEARING TARGET: the OKLab decode's dominant L-channel coefficient (4.0767416621,
-        // the l-term of the R-channel reconstruction). "L" is the ONE OKLab channel never near zero for this
-        // orb -- density is always positive -- unlike a and b, which legitimately can be. An earlier draft of
-        // this section aimed at a smoothstep argument order instead and found, by hand and then by rendering,
-        // that smoothstep(a,b,x) IS 1-smoothstep(b,a,x) identically, so the "sabotage" changed nothing: a
-        // spec-compliance fix, not a correctness one, and recorded as such rather than quietly re-aimed.
+        // ---- A: the species' own knobs reaching the colour rail, cut -------------------------------------
+        // *** THIS ROW WAS RE-AIMED AT v4627, AND THE OLD AIM IS RECORDED RATHER THAN OVERWRITTEN. *** Until
+        // then it corrupted the OKLab decode's dominant L-channel coefficient (4.0767416621) IN THIS FILE.
+        // v4627 replaced this file's invented OKLab ramp with murmur's own colour rail, and the decode moved
+        // with it into render/murmurKitTsl.mjs -- so the needle stopped existing here. It did not go quietly
+        // green: the needle-present row went RED and said the text was missing, which is the behaviour v4626
+        // built after a stale anchor reported a passing gate. This is what that row is for.
+        //
+        // THE NEW AIM, and why it is not weaker: the species hands the rail its own uniforms, and `depth`
+        // is the one that reshapes the palette's stops rather than merely scaling the result -- pinning it to
+        // the clamp floor of 0.30 moves the centre pixel from 10,15,27 to 23,29,40, a delta of 40 of 765
+        // against this row's limit of 10. Measured on this exact frame before the row was written, not hoped
+        // for. What it proves is that the rail the species draws through is built from the SPECIES' state and
+        // not from constants baked at module scope -- which is precisely the failure v4627 replaced, where a
+        // BASE_L/BASE_C/BASE_H chosen by this file stood in for the palette.
         const realSrc = fs.readFileSync(path.join(ENG, "render", "aiPresenceOrbTsl.mjs"), "utf8");
-        const needle = "l.mul(4.0767416621).sub(m.mul(3.3077115913)).add(s.mul(0.2309699292))";
+        const needle = "KIT.mhPalette(uniforms.ink, uniforms.tone, uniforms.tone2, uniforms.hueShift, uniforms.depth)";
         ok("the sabotage needle is present in the real source (so the replace below is not a silent no-op)", realSrc.includes(needle));
-        const sabotaged = realSrc.replace(needle, "l.mul(0.5).sub(m.mul(3.3077115913)).add(s.mul(0.2309699292))");
+        const sabotaged = realSrc.replace(needle,
+            "KIT.mhPalette(uniforms.ink, uniforms.tone, uniforms.tone2, uniforms.hueShift, float(0.30))");
         ok("the sabotage actually changed the text", sabotaged !== realSrc);
 
         // *** THE COPY IS SERVED FROM /_sabotage/, SO ITS OWN RELATIVE IMPORTS MOVE WITH IT. *** v4624 gave
@@ -366,7 +432,15 @@ async function main() {
             // anything this file owns, so an edit that quietly reverts the interior to a constant reddens it.
             const toSab = (src) => src.replace(/from\s+"\.\/([A-Za-z0-9_.-]+\.mjs)"/g, 'from "/_sabotage/$1"');
             fs.writeFileSync(path.join(sabDir, "speciesKit.mjs"), toSab(realSrc));
-            fs.writeFileSync(path.join(sabDir, "murmurKit.mjs"), fs.readFileSync(path.join(ENG, "render", "murmurKit.mjs"), "utf8"));
+            // *** murmurKit.mjs'S OWN IMPORT GETS toAbs, NOT toSab, AND THE DIFFERENCE IS THE WHOLE BUG. ***
+            // v4627 gave it "import { srgbToLinear, ... } from ./aiPresenceOrbState.mjs" so the colour rail's
+            // two halves share one set of sixteen OKLab constants instead of keeping a second copy free to
+            // drift. Copied verbatim into the sabotage directory that import resolved to
+            // /_sabotage/aiPresenceOrbState.mjs, which is not there, and the whole run died with "Failed to
+            // fetch dynamically imported module" -- the same failure mode v4624 hit one level up and the same
+            // repair. aiPresenceOrbState.mjs is NOT part of this sabotage, so it is served real.
+            fs.writeFileSync(path.join(sabDir, "murmurKit.mjs"),
+                toAbs(fs.readFileSync(path.join(ENG, "render", "murmurKit.mjs"), "utf8")));
             const kitTslSrc = toSab(fs.readFileSync(path.join(ENG, "render", "murmurKitTsl.mjs"), "utf8"));
             // mh_medium is what every tap of the march reads. Zeroing the whole term takes the marched
             // contribution away, which is the question -- does the march reach the image. An earlier aim
@@ -391,7 +465,7 @@ async function main() {
                 const baseline = r10 && r10.result ? r10.result.center : null;
                 const dist = (c) => baseline ? Math.abs(c[0] - baseline[0]) + Math.abs(c[1] - baseline[1]) + Math.abs(c[2] - baseline[2]) : -1;
                 const cA = r11.result.shots[0].center, cB = r11.result.shots[1].center;
-                ok("!! under the corrupted OKLab L-coefficient, the centre pixel's colour measurably differs from section 10's real render",
+                ok("!! with the species' own depth pinned to the clamp floor, the centre pixel's colour measurably differs from section 10's real render",
                     baseline !== null && dist(cA) >= 10,
                     `sabotaged centre=${JSON.stringify(cA)} vs real centre=${JSON.stringify(baseline)}, |delta|=${dist(cA)}`);
                 ok("!! *** THE KIT'S MARCH REACHES THE PIXEL: zero mh_medium and the orb's centre MOVES ***",
@@ -402,7 +476,7 @@ async function main() {
                 // The two sabotages must not be the same sabotage wearing two names.
                 ok("...and the two corruptions move the pixel in different ways, so neither row is the other's echo",
                     cA[0] !== cB[0] || cA[1] !== cB[1] || cA[2] !== cB[2],
-                    `oklab-sabotaged ${JSON.stringify(cA)} against kit-sabotaged ${JSON.stringify(cB)}`);
+                    `depth-sabotaged ${JSON.stringify(cA)} against kit-sabotaged ${JSON.stringify(cB)}`);
             }
         } finally { fs.rmSync(sabDir, { recursive: true, force: true }); }
     }
@@ -416,6 +490,27 @@ async function main() {
     // survives the merge. The margin is 843 ms now, and 2,157 * 1.1 = 2,373 is comfortably inside. Recorded
     // with the miss visible, because a number predicted and never checked is how the previous round's own
     // WebAssembly row drifted: what makes an estimate safe is the re-measurement, not the care taken guessing.
+    //
+    // *** AND v4627 SPENT MOST OF THAT MARGIN, WHICH IS WORTH SAYING BEFORE THE NEXT ROUND SPENDS THE REST. ***
+    // Porting murmur's colour rail into render/aiPresenceOrbTsl.mjs made every species' fragment graph bigger,
+    // and the bill is a COMPILE bill: this gate went 2,157 -> 2,797 ms over two runs each, a margin of 203 ms
+    // rather than 843. It is still under budget serially, which is the number tools/ship/quickSweep.mjs's
+    // eviction rule reads, so the gate still runs -- but 2,797 * 1.1 = 3,077 is over, so a contended sweep now
+    // pays a serial re-time for it every pass.
+    //
+    // *** AND THE FIX WAS DONE, BECAUSE THE SWEEP ROTATION READ IT OVER. *** The paragraph above first said
+    // this was identified and deferred, on a standalone reading of 2,797 ms. sweepRotation --gate then
+    // measured 3,084 ms, which is OVER, and a gate over budget is exactly what this file's v4624 note is a
+    // long account of. So the second launch is gone: section 10's WebGPU parity render now happens on the
+    // non-forced renderer RENDER_SCRIPT already built for the WGSL emission, in the page it already had, and
+    // this file's own runWebGL2InEngineOrigin gained the swizzle workaround that made that possible. Measured
+    // after: 2,486-2,537 ms over three runs, against 2,797 before and 2,157 at v4626 -- so the merge gave
+    // back about 300 ms of the 640 the colour rail cost, and 2,511 * 1.1 = 2,762 is inside the budget again.
+    // The parity claim is unchanged and the measured delta improved from 7 to 2; see the note at the row.
+    //
+    // The species gate's own fix for the same pressure -- reuseInstances, one shader per species instead of
+    // one per frame -- does not apply here, because each of section 11's three shots deliberately loads a
+    // DIFFERENT module.
     console.log(fails ? "\naiPresenceOrb-selfcheck: " + fails + " FAILED" : "\naiPresenceOrb-selfcheck: all checks pass");
     process.exit(fails ? 1 : 0);
 }

@@ -38,6 +38,15 @@
 // This is a hand-port of a design whose real numbers were checked, not vendored code. No file is copied.
 "use strict";
 
+// *** THE OKLab PAIR IS IMPORTED, NOT COPIED, AND THE DIRECTION IS DELIBERATE. *** render/aiPresenceOrbState
+// .mjs already carries Bjoern Ottosson's forward and inverse matrices, cross-checked against a real fetched
+// implementation (color-js/color.js) before it shipped and round-trip tested by its own gate. A second copy
+// here would be two sets of the same sixteen constants free to drift apart silently, which is the failure
+// this tree spends most of its gates on. That module is pure -- it imports nothing -- so there is no cycle,
+// and the gate asserts the two files agree by IDENTITY rather than by coincidence.
+import { srgbToLinear, linearToSrgb, linearToOklab, oklabToLinear } from "./aiPresenceOrbState.mjs";
+export { srgbToLinear, linearToSrgb, linearToOklab, oklabToLinear };
+
 // ---------------------------------------------------------------------------------------------------------
 // CONSTANTS. Every one of these is murmur's own, quoted from kit.ts with its own stated reason, because a
 // magic number whose justification lives in another repository is a magic number.
@@ -534,6 +543,178 @@ export function dropletSwell(t, voice) { return (0.22 + 0.78 * mhBreath(t, 0.9))
  * is 0.300 * 1.05 * 1.085 = 0.339 uv, and the containment does not begin until 0.36."
  */
 export function dropletWorstSilhouette() { return MH_R * 1.05 * (1 + MH_AMP_CAP); }
+
+// ---------------------------------------------------------------------------------------------------------
+// THE COLOUR RAIL -- mh_palette / mh_shade / mh_tier / mh_lit, and the last structural piece of the kit.
+//
+// *** THE FOUR SPECIES WERE PORTED AND THEIR COLOUR WAS NOT. *** render/aiPresenceOrbTsl.mjs has carried a
+// fresnel rim at pow(fres, 4.5), two speculars on a fixed light direction, and an OKLab ramp from a BASE_L /
+// BASE_C / BASE_H THIS PORT CHOSE -- its own header says so. murmur's own answer is a four-stop rail in OKLab
+// built from one anchor, walked by an energy-to-lightness curve with a deliberate three-tier hierarchy, and
+// mixed between an INK rail and a PAPER rail that run in OPPOSITE directions. None of that was here.
+//
+// It is the same shape as v4623's finding one layer out: the thing every species shares, approximated per
+// species. And it is worth more than another species, because every species already ported is currently
+// wearing the wrong colour.
+// ---------------------------------------------------------------------------------------------------------
+
+/** kit.ts: the spread cap, 0.50 rad -- "about 29 degrees of OKLAB hue either side of the anchor". */
+export const MH_SPREAD_CAP = MH_SPREAD;
+
+/** L, C, h -> OKLab. The rail is built in polar form because hue is the axis the family walks. */
+export function mhLch(L, C, h) { return [L, C * Math.cos(h), C * Math.sin(h)]; }
+
+/**
+ * HOW LIGHT THE GROUND IS, in OKLAB lightness rather than an RGB average, "because a saturated mid-blue paper
+ * and a light grey with the same channel mean are nowhere near the same brightness to the eye."
+ *
+ * kit.ts states three values for this function and the gate checks all three: 0 for the house ink (L about
+ * 0.16), 1 for paper (L about 0.97), and a true mid grey -- sRGB 0.5, OKLab L 0.60 -- landing "about four
+ * tenths across". It also states a PROPERTY: "Nothing in this file ever branches on it; every use is a mix,
+ * so dragging the ink from ink to paper shows no jump" -- which is checked as continuity, not read.
+ */
+export function mhPaper(rgb) {
+    const lin = rgb.map(srgbToLinear);
+    return smoothstep(0.50, 0.72, linearToOklab(lin[0], lin[1], lin[2]).L);
+}
+
+/** sRGB triple -> OKLab as a 3-vector, the form the rail works in. */
+function labOf(rgb) {
+    const lin = rgb.map(srgbToLinear);
+    const o = linearToOklab(lin[0], lin[1], lin[2]);
+    return [o.L, o.a, o.b];
+}
+
+/**
+ * FOUR OKLAB STOPS BUILT FROM ONE ANCHOR, on two rails that run opposite ways.
+ *
+ * THE INK RAIL climbs dark to bright: energy becomes light. Its shadow shifts WARM as it darkens -- about
+ * twenty degrees toward ember -- and keeps most of its chroma, "a straight desaturating fall from gold to ink
+ * passes through olive".
+ *
+ * THE PAPER RAIL descends and DEEPENS, "because on a light ground energy cannot become light. So energy
+ * becomes chroma and shadow, which is what a tinted transparent object actually does to the light behind it."
+ *
+ * *** AND THE TWO ARE MIXED AT THE STOPS, WHICH kit.ts CALLS EXACT RATHER THAN AN APPROXIMATION: *** "mh_shade's
+ * walk is linear in the stops for any fixed t." That is an identity, so the gate asserts it as one -- walking
+ * the mixed stops must equal mixing the two walks.
+ */
+export function mhPalette(inkRgb, toneRgb, tone2Rgb, hueShift = 0, depth = 1) {
+    const ink = labOf(inkRgb), tone = labOf(toneRgb), tone2 = labOf(tone2Rgb);
+    const L = tone[0], C = Math.hypot(tone[1], tone[2]);
+    const h = Math.atan2(tone[2], tone[1]) + hueShift;
+    const d = Math.min(2.0, Math.max(0.30, depth));
+    const paper = mhPaper(inkRgb);
+
+    // THE SECOND ANCHOR, read as a DIFFERENCE from the first rather than as a palette of its own -- which is
+    // what keeps duotone inside the family's one law. `duo` is EXACTLY ZERO when the anchors are equal, and
+    // kit.ts calls that "the property the whole upgrade rests on: at zero every term below collapses to the
+    // identity". The hue difference takes the SHORT way round, or two anchors either side of the origin would
+    // walk the long way through green to reach each other.
+    const C2 = Math.hypot(tone2[1], tone2[2]);
+    const h2 = Math.atan2(tone2[2], tone2[1]) + hueShift;
+    const dhRaw = h2 - (Math.atan2(tone[2], tone[1]) + hueShift);
+    const dHue = wrapPi(dhRaw);
+    const dC = C2 / Math.max(C, 1e-4);
+    const dL = tone2[0] / Math.max(L, 1e-4);
+    const duo = smoothstep(0.004, 0.035, Math.hypot(tone2[0] - tone[0], tone2[1] - tone[1], tone2[2] - tone[2]));
+
+    const d0 = ink;
+    const d1 = mhLch(ink[0] + (L - ink[0]) * (0.30 / d), C * (0.52 + 0.10 * d), h - 0.35);
+    const d2 = mhLch(L, C, h);
+    const d3 = mhLch(Math.min(L * (1.20 + 0.12 * d), 0.93), C * 0.55, h + 0.10);
+
+    const Lp = ink[0];
+    const l0 = ink;
+    const l1 = mhLch(Lp + (L - Lp) * (0.42 / d), C * (0.34 + 0.10 * d), h + 0.05);
+    const l2 = mhLch(L * (0.82 - 0.06 * d), C * (1.20 + 0.14 * d), h);
+    const l3 = mhLch(Math.max(L * (0.52 - 0.05 * d), 0.18), C * (1.05 + 0.10 * d), h - 0.08);
+
+    const mixv = (a, b) => [a[0] + (b[0] - a[0]) * paper, a[1] + (b[1] - a[1]) * paper, a[2] + (b[2] - a[2]) * paper];
+    return { s0: mixv(d0, l0), s1: mixv(d1, l1), s2: mixv(d2, l2), s3: mixv(d3, l3), paper, duo, dHue, dC, dL };
+}
+
+/**
+ * WALK THE FAMILY. Three segments, each eased so its ends are flat, "which makes the joins C1: no kink shows
+ * up as a contour line in a smooth field". Returns LINEAR light.
+ *
+ * THE ONE EXTENSION is the hue rotation, and kit.ts is precise about why it is the safe axis: it "moves the
+ * hue while holding lightness and chroma exactly. The unsafe one is trading chroma for hue, which is how a
+ * warm palette turns to mud, and this cannot do it." Both halves are asserted in the gate as identities.
+ */
+/**
+ * THE WALK ALONE, in OKLab and before the hue rotation or the decode -- split out of mhShade so kit.ts's
+ * claim about it can be asserted as the IDENTITY it is rather than checked through two more transforms.
+ * "mh_shade's walk is linear in the stops for any fixed t": at a fixed t this is a fixed convex combination
+ * of s0..s3, so walking a mix of two palettes must equal mixing the two walks, to the last bit. That is true
+ * of the lab walk and NOT of mhShade's return value, which is linear LIGHT -- the OKLab decode cubes its
+ * inputs, so a row asserting the identity on the decoded colour measures 2.7e-1 and is simply asking the
+ * wrong question. Measured that way first, which is why this split exists.
+ */
+export function mhWalk(p, t) {
+    const tc = Math.min(1, Math.max(0, t));
+    const mix3 = (a, b, u) => [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u];
+    if (tc < 0.40) return mix3(p.s0, p.s1, smoothstep(0, 1, tc * 2.5));
+    if (tc < 0.78) return mix3(p.s1, p.s2, smoothstep(0, 1, (tc - 0.40) / 0.38));
+    return mix3(p.s2, p.s3, smoothstep(0, 1, (tc - 0.78) / 0.22));
+}
+
+export function mhShade(p, t, hue = 0) {
+    const lab = mhWalk(p, t);
+
+    // Decomposed into pos and neg rather than clamped to the cap, "because opal deliberately runs its spread
+    // a third past MH_SPREAD". With one anchor both sides are the same rotation mirrored; with two, the
+    // POSITIVE side becomes a walk toward tone2 and the negative side is left exactly as it was.
+    const a = hue / MH_SPREAD;
+    const pos = Math.max(a, 0), neg = Math.max(-a, 0);
+    const rot = -neg * MH_SPREAD + pos * (MH_SPREAD + (p.dHue - MH_SPREAD) * p.duo);
+    const w = Math.min(pos, 1) * p.duo;
+    const cS = 1 + w * (p.dC - 1);
+    const lS = 1 + w * (p.dL - 1);
+    const ch = Math.cos(rot), sh = Math.sin(rot);
+    const y = lab[1] * ch - lab[2] * sh, z = lab[1] * sh + lab[2] * ch;
+    return oklabToLinear(lab[0] * lS, y * cS, z * cS);
+}
+
+/** kit.ts's knee: identity below it, an asymptotic compression above, so a specular keeps its shape. */
+export function mhKnee(x, knee) {
+    return x < knee ? x : knee + (1 - knee) * (1 - Math.exp(-(x - knee) / Math.max(1 - knee, 1e-3)));
+}
+
+/**
+ * THE VALUE HIERARCHY AS ONE CURVE. "Three tiers or it fails: ink ground, amber body, CREAM PEAKS." The bottom
+ * 78% of the energy is compressed into the rail's first 72% -- the whole amber body -- and the last 22% of the
+ * energy is spent on the rail's last 28%, where the specular lives, "so only the figure's key structure goes
+ * cream, and when it goes it goes decisively rather than creeping". The join is smoothed over a fifth of the
+ * range "because a slope kink in a map this shallow shows up as a contour line in a smooth field".
+ */
+export function mhTier(e) {
+    const x = Math.min(1, Math.max(0, e));
+    const K = 0.78;
+    const body = (x / K) * 0.72;
+    const peak = 0.72 + ((x - K) / (1 - K)) * 0.28;
+    return body + (peak - body) * smoothstep(K - 0.10, K + 0.10, x);
+}
+
+/**
+ * THE ONE PLACE ENERGY BECOMES LIGHT, and kit.ts says why that matters: "Every species computes a density in
+ * 0..1 and hands it here, which is most of what keeps the family reading as one family."
+ *
+ * `glow` enters twice, "both times where it cannot lie": before the rail walk, so a lower setting walks less
+ * far and reads cooler and deeper rather than merely faded, and again on the emission. AT glow = 0 A THIRD OF
+ * THE ENERGY SURVIVES -- exactly 0.35 -- "because an indicator that can be switched off by a dial is a bug and
+ * not a dial", which is an exact number the gate checks rather than a sentiment.
+ */
+export function mhLit(pal, e, glow, base, span, emis, hue = 0) {
+    const G = Math.max(glow, 0);
+    const en = Math.min(1, Math.max(0, mhKnee(Math.max(e, 0) * (0.35 + 0.65 * G), 0.92)));
+    const tRail = Math.min(1, Math.max(0, base + span * mhTier(en)));
+    const col = mhShade(pal, tRail, hue);
+    // Emission is gated to the SPECULAR and not to the tone, and switched off as the ground goes light,
+    // "because on paper the top of the rail is the DEEPEST colour rather than the brightest".
+    const k = 1 + emis * G * (1 - pal.paper) * smoothstep(0.72, 1.0, tRail);
+    return [col[0] * k, col[1] * k, col[2] * k];
+}
 
 // ---------------------------------------------------------------------------------------------------------
 // COMET -- the third species. "One bright point on a tilted orbit inside the glass, trailing light."
