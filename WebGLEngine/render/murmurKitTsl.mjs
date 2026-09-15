@@ -91,6 +91,14 @@ export function makeMurmurKitTsl(TSL) {
         return TSL.vec4(env, uc, mhHash1(slot.add(1607.0), lane), dur);
     });
 
+    /** kit.ts's mh_spin: yaw about y then tilt about x. A rotation -- the CPU twin's gate asserts it preserves length. */
+    const mhSpin = Fn(([p, ay, ax]) => {
+        const ca = cos(ay).toVar(), sa = sin(ay).toVar();
+        const q = vec3(ca.mul(p.x).add(sa.mul(p.z)), p.y, sa.negate().mul(p.x).add(ca.mul(p.z))).toVar();
+        const cb = cos(ax).toVar(), sb = sin(ax).toVar();
+        return vec3(q.x, cb.mul(q.y).sub(sb.mul(q.z)), sb.mul(q.y).add(cb.mul(q.z)));
+    });
+
     /** kit.ts's mh_drift: eased angular travel, so an arc hurries and dawdles instead of spinning. */
     const mhDrift = Fn(([t, rate, wobble, lane]) => {
         const k = clamp(wobble, 0.0, MH_DRIFT_WOBBLE_CAP).toVar();
@@ -147,7 +155,7 @@ export function makeMurmurKitTsl(TSL) {
 
     return {
         MH_R, MH_ETA, MH_EXT, MH_TILT, MH_SCATTER_K, MH_EXIT_CAP,
-        mhHash, mhGrad3, mhNoise3, mhHash1, mhFlourish, mhBreath, mhDrift,
+        mhHash, mhGrad3, mhNoise3, mhHash1, mhFlourish, mhBreath, mhDrift, mhSpin,
         mhRefract, mhLook, mhExit, mhHaze, mhMedium, mhInside, mhTransmit, mhScatter,
         Loop,
     };

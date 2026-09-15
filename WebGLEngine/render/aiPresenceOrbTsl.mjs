@@ -39,10 +39,13 @@ export const ORB_KNOBS = Object.freeze([
     // second one because a species is a different BODY over one shared kit, which is exactly how murmur's own
     // eighteen are arranged -- each reads c0..c3 out of the same argument list.
     "rimWidth", "travel", "innerHint", "spread",
+    // comet's own three (it shares `spread` with limn, exactly as murmur's roster does -- c3 is `spread` on
+    // seventeen of the eighteen species).
+    "orbitTilt", "trail", "pointSize",
 ]);
 
 /** The species this file can build. murmur ships eighteen; these are the two that are ported. */
-export const ORB_SPECIES = Object.freeze(["still", "limn"]);
+export const ORB_SPECIES = Object.freeze(["still", "limn", "comet"]);
 
 import { makeMurmurKitTsl } from "./murmurKitTsl.mjs";
 import { MH_EXT, MH_TAPS } from "./murmurKit.mjs";
@@ -84,7 +87,8 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
     const KIT = makeMurmurKitTsl(TSL);
 
     const k0 = { time: 0, speed: 1, glow: 1, depth: 1, hueShift: 0, presence: 0.5, clarity: 0.6, glintRate: 0.3, voice: 0, aspect: 1,
-                 rimWidth: 0.4, travel: 0.5, innerHint: 0.3, spread: 0.4, ...knobs };
+                 rimWidth: 0.4, travel: 0.5, innerHint: 0.3, spread: 0.4,
+                 orbitTilt: 0.5, trail: 0.5, pointSize: 0.4, ...knobs };
     const uniforms = {}; for (const n of ORB_KNOBS) uniforms[n] = uniform(float(k0[n])).label(n);
 
     // OKLab -> linear sRGB, cube done as explicit x*x*x (not pow(x,3): l_/m_/s_ can be legitimately negative
@@ -256,7 +260,93 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         });
         const limnDensity = accL.mul(3.0).add(rimE).mul(uniforms.depth);
 
-        const density = species === "limn" ? limnDensity : stillDensity;
+        // =====================================================================================================
+        // *** COMET -- THE THIRD SPECIES. "One bright point on a tilted orbit inside the glass, trailing light." ***
+        //
+        // *** THE TRAIL IS NOT A HISTORY BUFFER AND COULD NOT BE. *** comet.ts: "The obvious build -- remember
+        // where the point was and smear it -- is impossible here, because these shaders are STATELESS BY
+        // CONTRACT: any time value has to render the correct frame." So it is solved geometrically. The orbit
+        // is a circle in a plane, so the nearest point on it is closed form, and the ANGLE of that nearest
+        // point subtracted from the head's angle IS how long ago the head was there. render/murmurKit.mjs's
+        // cometNearest is the CPU twin, checked in the gate against a 200,000-sample brute force over the
+        // circle -- a different method, agreeing to 7e-11.
+        //
+        // THE ORBIT IS TILTED ON PURPOSE AND BOUNDED AWAY FROM BOTH FAILURES: "face-on is a circle drawn on
+        // the glass, edge-on is a line." tau runs 0.30..1.05 radians, and a slow precession keeps the edge-on
+        // moment from landing twice in the same place.
+        const tau = float(0.30).add(uniforms.orbitTilt.mul(1.05 - 0.30)).toVar();
+        const prec = KIT.mhDrift(uniforms.time, float(0.070), float(0.45), float(2.0)).toVar();
+        const e1 = KIT.mhSpin(vec3(1.0, 0.0, 0.0), prec, float(0.0)).toVar();
+        const e2 = KIT.mhSpin(vec3(float(0.0), sin(tau), cos(tau)), prec, float(0.0)).toVar();
+        const nrm = TSL.cross(e1, e2).toVar();
+        const r0 = clamp(float(0.54).mul(float(1.0).sub(uniforms.voice.mul(0.24))), 0.20, 0.70).toVar();
+        const rate = float(1.05).mul(float(1.0).add(uniforms.voice.mul(0.85))).toVar();
+        const psi = KIT.mhDrift(uniforms.time, rate, float(0.38), float(3.0)).toVar();
+        // Head width: comet.ts's first cut ran at 0.086 and "the head was a soft blob half the size of the core
+        // it was supposed to be orbiting inside: a point of light has to be a POINT or the trail behind it has
+        // nothing to have come from." The tube is deliberately WIDER than the nucleus -- true of comets, and
+        // necessary because a tube thinner than the march step aliases the way the head did.
+        const hw = float(0.028).add(uniforms.pointSize.mul(0.030)).mul(float(1.0).add(uniforms.voice.mul(0.45))).toVar();
+        const tubeW = hw.mul(1.45).toVar();
+        const decay = float(1.30).add(uniforms.trail.mul(2.60)).toVar();
+
+        const accC = float(0.0).toVar();
+        const transC = float(1.0).toVar();
+        Loop({ start: 0, end: MH_TAPS }, ({ i }) => {
+            const sM = float(i).add(0.5).mul(ds);
+            const p3 = P.add(rd.mul(sM));
+            const fadeC = KIT.mhInside(p3).toVar();
+            // THE NEAREST POINT ON THE ORBIT, in closed form.
+            const u = dot(p3, e1).toVar(), v = dot(p3, e2).toVar(), w = dot(p3, nrm).toVar();
+            const qd = sqrt(u.mul(u).add(v.mul(v))).sub(r0).toVar();
+            const dist2 = qd.mul(qd).add(w.mul(w)).toVar();
+            // ...and how long ago the head was there, wrapped into -pi..pi.
+            const ageRaw = psi.sub(TSL.atan(v, u)).toVar();
+            const age = ageRaw.sub(float(6.2831853).mul(TSL.floor(ageRaw.div(6.2831853).add(0.5)))).toVar();
+            // *** THE FALL IS TAKEN TO ZERO AT BOTH ENDS, AND comet.ts RECORDS WHAT HAPPENED WHEN IT WAS NOT:
+            // *** the trail still stood at a fifth when it met its own head and the scatter halo carried that
+            // step into "a hard-edged wedge cut through the glass". "Two soft gradients meeting is a gradient;
+            // A SOFT GRADIENT MEETING A STEP IS THE STEP."
+            const fallBack = exp(age.negate().div(max(decay, float(1e-3))))
+                .mul(float(1.0).sub(smoothstep(float(2.30), float(3.1416), age)));
+            const fallAhead = exp(age.div(0.30));
+            const fall = select(age.greaterThanEqual(0.0), fallBack, fallAhead).toVar();
+            const targ = dist2.div(tubeW.mul(tubeW)).toVar();
+            const trail = exp(negate(targ)).add(KIT.mhScatter(targ, float(0.22))).mul(fall).toVar();
+            const eC = trail.mul(1.55).add(KIT.mhMedium(p3, uniforms.time, float(2.3)).mul(0.055)).mul(fadeC).toVar();
+            accC.addAssign(eC.mul(transC).mul(ds));
+            transC.assign(transC.mul(exp(eC.mul(4.20).add(MH_EXT).mul(ds).negate())));
+        });
+        // *** THE HEAD IS SOLVED, NOT SAMPLED, AND LEAVING IT OUT GAVE comet A TRAIL AND NO POINT. ***
+        // This was measured before it was fixed: with only the march, comet's brightest interior pixel sat at
+        // (36,25) -- the SAME pixel as still's, and it did not move between t=2.4 and t=3.9. That is the
+        // specular catchlight, not an orbiting spark. A species whose whole brief is "one bright point" had no
+        // point. comet.ts says exactly why sampling cannot work: "The head is 0.043 body units across and the
+        // march steps about 0.38, so whether a ray caught it at all depended on where the tap planes happened
+        // to fall: the point flickered as it moved, and near the limb, where the refracted ray is long and the
+        // ghost image lives, it rendered as a SECOND comet. A species whose whole brief is one bright point
+        // cannot have two."
+        //
+        // sH is how far into the glass the closest approach lies, so exp(-MH_EXT * sH) dims the head on the
+        // far side of its orbit -- the depth cue that says the point went BEHIND the middle, which is the
+        // entire reason this species is tilted at all.
+        const headPos = e1.mul(cos(psi)).add(e2.mul(sin(psi))).mul(r0).toVar();
+        const toH = headPos.sub(P).toVar();
+        const sH = dot(toH, rd).toVar();
+        const dH2 = max(dot(toH, toH).sub(sH.mul(sH)), float(0.0)).toVar();
+        const harg = dH2.div(max(hw.mul(hw), float(1e-6))).toVar();
+        const visH = KIT.mhInside(P.add(rd.mul(sH))).mul(exp(sH.mul(-MH_EXT))).mul(KIT.mhTransmit(fres)).toVar();
+        // A SOFTER POINT THAT BLOOMS: murmur's round one drove the narrow term to 1.55 and "a gaussian whose
+        // peak is that far above the rail's knee is flat over most of its width: what draws is a disc of
+        // constant cream with a step at its rim." At 0.92 the peak lands just into cream and the light that
+        // was in the core is spent on the scatter instead -- ten times the area, dimming with depth.
+        const headBright = float(1.0).add(uniforms.voice.mul(1.30));
+        const headE = select(sH.greaterThan(0.0).and(sH.lessThan(L)),
+            exp(negate(harg)).mul(0.92).add(KIT.mhScatter(harg, float(0.30))).mul(headBright).mul(visH),
+            float(0.0)).toVar();
+        const cometDensity = accC.mul(4.20).add(headE).mul(uniforms.depth);
+
+        const density = species === "limn" ? limnDensity : species === "comet" ? cometDensity : stillDensity;
 
         // surface: fresnel rim + two specular lobes (a tight highlight, a broad soft one), a fixed light direction
         // *** LIMN'S BASE RIM IS 0.30 AND still'S IS THE HIGHEST IN THE COLLECTION, AND BOTH ARE FITTED
@@ -264,12 +354,21 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // are free to be the figure." limn.ts: its first cut set the base rim near zero to stop the comma
         // becoming a ring, "and it did avoid that -- and produced a crescent moon rather than a dark glass
         // body with a lit edge. 0.30 is the fitted middle."
-        const rimBase = species === "limn" ? 0.30 : 0.85;
+        // comet is "the dark hero of the luminous three" by its own file -- it needs contrast around its
+        // point more than a filled body, so its rim sits between limn's 0.30 and still's 0.85.
+        const rimBase = species === "limn" ? 0.30 : species === "comet" ? 0.55 : 0.85;
         const rim = pow(fres, 4.5).mul(rimBase);
         const L_DIR = normalize(vec3(0.45, 0.6, 0.65));
         const H = normalize(negate(V).add(L_DIR));
         const nh = max(dot(N, H), 0.0);
-        const specTight = pow(nh, 96.0).mul(0.9);
+        // *** comet DROPS ITS SPECULAR AND murmur SAYS WHY, IN THE SAME WORDS THE MEASUREMENT ABOVE FOUND. ***
+        // comet.ts: at 0.40 the highlight "was landing as a second warm light a third of the way in from the
+        // rim and reading as a stray artifact next to a species whose entire brief is one point. At 0.22 it is
+        // a catchlight." That is exactly the failure the missing-head measurement surfaced here -- the
+        // catchlight WAS the brightest thing in the glass -- so the head being solved and the specular coming
+        // down are two halves of one repair, not a fix and a tweak.
+        const specScale = species === "comet" ? 0.22 : 0.9;
+        const specTight = pow(nh, 96.0).mul(specScale);
         const specBroad = pow(nh, 4.0).mul(0.09);
 
         // colour: OKLab lightness driven by density*glow, a state-driven hue rotation of the base tone

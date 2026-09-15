@@ -387,6 +387,67 @@ export function limnTailShare(aw, opts = {}) {
 /** Wrap an angle to -pi..pi the way limn.ts does it -- subtracting a rounded turn, not an atan round-trip. */
 export function wrapPi(a) { return a - 2 * Math.PI * Math.floor(a / (2 * Math.PI) + 0.5); }
 
+// ---------------------------------------------------------------------------------------------------------
+// COMET -- the third species. "One bright point on a tilted orbit inside the glass, trailing light."
+// ---------------------------------------------------------------------------------------------------------
+
+/** comet.ts's own four knobs and their shipped defaults, from murmur's src/styles.ts roster. */
+export const COMET_DEFAULTS = Object.freeze({ orbitTilt: 0.5, trail: 0.5, pointSize: 0.4, spread: 0.3 });
+
+/** kit.ts's mh_spin: yaw about y, then tilt about x. A rotation, so it preserves length -- asserted, not assumed. */
+export function mhSpin(p, ay, ax) {
+    const ca = Math.cos(ay), sa = Math.sin(ay);
+    const q = [ca * p[0] + sa * p[2], p[1], -sa * p[0] + ca * p[2]];
+    const cb = Math.cos(ax), sb = Math.sin(ax);
+    return [q[0], cb * q[1] - sb * q[2], sb * q[1] + cb * q[2]];
+}
+
+/**
+ * The orbit plane. comet.ts: "A tilt about x, then a slow eased precession about y, so the plane's edge-on
+ * moment never lands twice in the same place. The tilt is bounded away from both failures: FACE-ON IS A CIRCLE
+ * DRAWN ON THE GLASS, EDGE-ON IS A LINE." tau runs 0.30..1.05 radians for exactly that reason.
+ */
+export function cometBasis(tiltK, prec) {
+    const tau = 0.30 + (1.05 - 0.30) * Math.min(1, Math.max(0, tiltK));
+    const e1 = mhSpin([1, 0, 0], prec, 0);
+    const e2 = mhSpin([0, Math.sin(tau), Math.cos(tau)], prec, 0);
+    const nrm = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
+    return { tau, e1, e2, nrm };
+}
+
+/**
+ * *** THE TRAIL IS NOT A HISTORY BUFFER, AND COULD NOT BE. *** comet.ts: "these shaders are stateless by
+ * contract: any time value has to render the correct frame. So the trail is solved geometrically instead."
+ *
+ * The orbit is a circle in a plane, so the nearest point on it is closed form: project into the plane's basis,
+ * pull the in-plane component out to the orbit radius, and the leftover is the distance to the tube. The angle
+ * of that nearest point, subtracted from the head's angle and wrapped, IS how long ago the head was there.
+ *
+ * Returns { dist2, psiP } -- squared distance to the orbit tube, and the nearest point's own angle.
+ */
+export function cometNearest(p, { e1, e2, nrm }, r0) {
+    const u = dot3(p, e1), v = dot3(p, e2), w = dot3(p, nrm);
+    const q = Math.hypot(u, v);
+    const dq = q - r0;
+    return { dist2: dq * dq + w * w, psiP: Math.atan2(v, u) };
+}
+
+/**
+ * The trail's fall with age, in radians behind the head.
+ *
+ * *** IT IS TAKEN TO ZERO AT BOTH ENDS OF THE WRAPPED INTERVAL, AND comet.ts RECORDS WHAT HAPPENED WHEN IT WAS
+ * NOT. *** "At a decay of 2.0 the trail is still at a fifth when it comes round to meet its own head, and the
+ * scatter halo carried that step out into a wide swath: what drew was a hard-edged wedge cut through the glass
+ * along the head's own radius. Two soft gradients meeting is a gradient; A SOFT GRADIENT MEETING A STEP IS THE
+ * STEP." So: an exponential behind the head faded out before pi, and a short coma ahead of it gone by -pi.
+ * They meet at the head at exactly 1, with a kink rather than a step -- and the kink sits under the head's own
+ * bloom, "which is where a comet keeps it too".
+ */
+export function cometFall(age, decay) {
+    if (age >= 0) return Math.exp(-age / Math.max(decay, 1e-3)) * (1 - smoothstep(2.30, 3.1416, age));
+    return Math.exp(age / 0.30);
+}
+
 /** still.ts's glint slot length: ~11.5 s at rate 0 down to ~7 s at rate 1, shortened by pace and drive. */
 export function stillGlintSlot(glintRate, { pace = 0, drive = 0 } = {}) {
     const k = Math.min(1, Math.max(0, glintRate));

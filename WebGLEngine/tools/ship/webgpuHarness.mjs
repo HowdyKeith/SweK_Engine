@@ -843,8 +843,8 @@ export async function runInEngineOrigin({ engineRoot, script, args = null, timeo
  * above which read bottom-first).
  */
 export async function renderThreeTslToPixels({ engineRoot, moduleImportPath, factoryName, factoryArgs = {},
-                                               knobs = {}, width = 64, height = 64 }) {
-    const SCRIPT = `async ({ moduleImportPath, factoryName, factoryArgs, knobs, width, height }) => {
+                                               knobs = {}, width = 64, height = 64, variants = null }) {
+    const SCRIPT = `async ({ moduleImportPath, factoryName, factoryArgs, knobs, width, height, variants }) => {
         const THREE = await import("/vendor/three-webgpu/three.webgpu.js");
         const TSL = await import("/vendor/three-webgpu/three.tsl.js");
         const mod = await import(moduleImportPath);
@@ -869,34 +869,59 @@ export async function renderThreeTslToPixels({ engineRoot, moduleImportPath, fac
         if (typeof fx.setKnobs === "function") fx.setKnobs(knobs);
 
         const rt = new THREE.RenderTarget(width, height);
-        let renderErr = null;
-        try {
-            renderer.setRenderTarget(rt);
-            renderer.render(fx.scene, fx.camera);
-            renderer.setRenderTarget(null);
-        } catch (e) { renderErr = String(e && e.stack || e).slice(0, 600); }
-        if (renderErr) return { ok: false, reason: renderErr, isWebGPUBackend };
-
         const device = renderer.backend.device;
-        const gpuTexture = renderer.backend.get(rt.texture).texture;
         const bpr = Math.ceil(width * 4 / 256) * 256;
-        const readBuf = device.createBuffer({ size: bpr * height, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
-        const enc = device.createCommandEncoder();
-        enc.copyTextureToBuffer({ texture: gpuTexture }, { buffer: readBuf, bytesPerRow: bpr }, { width, height });
-        device.queue.submit([enc.finish()]);
-        await readBuf.mapAsync(GPUMapMode.READ);
-        const raw = new Uint8Array(readBuf.getMappedRange()).slice();
-        readBuf.unmap();
 
-        // strip the 256-byte row padding copyTextureToBuffer requires -- the same de-stride every readback in
-        // this file does, here done row by row rather than left as a caller footgun.
-        const pixels = new Uint8Array(width * height * 4);
-        for (let y = 0; y < height; y++) pixels.set(raw.slice(y * bpr, y * bpr + width * 4), y * width * 4);
-        return { ok: true, isWebGPUBackend, pixels: Array.from(pixels) };
+        // *** ONE LAUNCH, AS MANY FRAMES AS THE CALLER ASKS FOR. *** Each call to this helper starts a
+        // Chromium and initialises a WebGPU device, and that is nearly the whole bill -- the 64x64 render
+        // itself is noise beside it. A gate wanting one effect at four times, or three effects at one time,
+        // used to pay for four browsers; tools/ship/aiPresenceOrb-selfcheck.mjs hit its budget ceiling exactly
+        // that way and was rescued by the same change one level up. The variants argument is a list of
+        // {factoryArgs, knobs} and the result carries one pixel buffer per entry, in order.
+        //
+        // *** NO BACK-TICKS ANYWHERE IN THIS COMMENT, AND THAT IS NOT A STYLE NOTE. *** This whole script is a
+        // template literal, so one back-tick ends it and the file stops parsing. Writing the name of a
+        // parameter in the usual quoting is what broke it here -- for the THIRD time this session, after a
+        // shader string in wormhole.html and another in skyRenderer.js. The habit that keeps failing is
+        // quoting an identifier inside a template; the rule that works is to name it plainly.
+        const shoot = async (fxI) => {
+            let renderErr = null;
+            try {
+                renderer.setRenderTarget(rt);
+                renderer.render(fxI.scene, fxI.camera);
+                renderer.setRenderTarget(null);
+            } catch (e) { renderErr = String(e && e.stack || e).slice(0, 600); }
+            if (renderErr) return { err: renderErr };
+            const gpuTexture = renderer.backend.get(rt.texture).texture;
+            const readBuf = device.createBuffer({ size: bpr * height, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+            const enc = device.createCommandEncoder();
+            enc.copyTextureToBuffer({ texture: gpuTexture }, { buffer: readBuf, bytesPerRow: bpr }, { width, height });
+            device.queue.submit([enc.finish()]);
+            await readBuf.mapAsync(GPUMapMode.READ);
+            const raw = new Uint8Array(readBuf.getMappedRange()).slice();
+            readBuf.unmap();
+            // strip the 256-byte row padding copyTextureToBuffer requires -- the same de-stride every readback
+            // in this file does, here done row by row rather than left as a caller footgun.
+            const px = new Uint8Array(width * height * 4);
+            for (let y = 0; y < height; y++) px.set(raw.slice(y * bpr, y * bpr + width * 4), y * width * 4);
+            return { px: Array.from(px) };
+        };
+
+        const first = await shoot(fx);
+        if (first.err) return { ok: false, reason: first.err, isWebGPUBackend };
+        const frames = [first.px];
+        for (const v of (variants || [])) {
+            const fxV = make(THREE, TSL, v.factoryArgs || factoryArgs);
+            if (typeof fxV.setKnobs === "function") fxV.setKnobs(v.knobs || knobs);
+            const shot = await shoot(fxV);
+            if (shot.err) return { ok: false, reason: shot.err, isWebGPUBackend };
+            frames.push(shot.px);
+        }
+        return { ok: true, isWebGPUBackend, pixels: frames[0], frames };
     }`;
     const out = await runInEngineOrigin({ engineRoot, script: SCRIPT,
-        args: { moduleImportPath, factoryName, factoryArgs, knobs, width, height } });
-    if (out.skipped || !out.ok) return { ...out, pixels: null, isWebGPUBackend: null };
-    if (!out.result || !out.result.ok) return { ...out, ok: false, reason: out.result ? out.result.reason : "no result", pixels: null, isWebGPUBackend: out.result ? out.result.isWebGPUBackend : null };
-    return { skipped: false, ok: true, pixels: out.result.pixels, isWebGPUBackend: out.result.isWebGPUBackend, pageErrors: out.pageErrors };
+        args: { moduleImportPath, factoryName, factoryArgs, knobs, width, height, variants } });
+    if (out.skipped || !out.ok) return { ...out, pixels: null, frames: null, isWebGPUBackend: null };
+    if (!out.result || !out.result.ok) return { ...out, ok: false, reason: out.result ? out.result.reason : "no result", pixels: null, frames: null, isWebGPUBackend: out.result ? out.result.isWebGPUBackend : null };
+    return { skipped: false, ok: true, pixels: out.result.pixels, frames: out.result.frames, isWebGPUBackend: out.result.isWebGPUBackend, pageErrors: out.pageErrors };
 }

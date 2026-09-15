@@ -307,9 +307,15 @@ sec("5. *** THE MEDIUM AND THE MARCH ***");
 sec("6. *** THE PAIR: THE REAL COMPILED SHADER AGAINST THE CPU REFERENCE, BIT FOR BIT ***");
 {
     const N = 16;
+    // *** BOTH PROBES IN ONE BROWSER LAUNCH. *** v4625 gave renderThreeTslToPixels a variants list for the
+    // same reason aiPresenceOrb-selfcheck needed one a level up: the launch is nearly the whole cost of a
+    // render, so a gate that wanted two probes paid for two Chromiums. Nothing is skipped to save time here --
+    // the noise probe used to sit behind a note pleading exactly that, and a sabotage walked straight through
+    // the hole it left.
     const r = await renderThreeTslToPixels({
         engineRoot: ENG, moduleImportPath: "/render/murmurKitTsl.mjs",
         factoryName: "makeMurmurKitProbeTsl", factoryArgs: { mode: "hash", n: N }, width: N, height: N,
+        variants: [{ factoryArgs: { mode: "noise", n: N } }],
     });
     if (!r.ok) {
         ok("!! the kit's integer hash matches a real GPU render bit-for-bit", false,
@@ -346,10 +352,7 @@ sec("6. *** THE PAIR: THE REAL COMPILED SHADER AGAINST THE CPU REFERENCE, BIT FO
     // gradient lattice offset off 4096, BOTH left this gate fully green -- the remaining CPU rows (|g| = 1,
     // noise zero at lattice points, continuity) are true under either. Only the pair catches them, and the
     // pair has to actually run.
-    const rn = await renderThreeTslToPixels({
-        engineRoot: ENG, moduleImportPath: "/render/murmurKitTsl.mjs",
-        factoryName: "makeMurmurKitProbeTsl", factoryArgs: { mode: "noise", n: N }, width: N, height: N,
-    });
+    const rn = r.ok && r.frames && r.frames[1] ? { ok: true, pixels: r.frames[1] } : { ok: false, reason: "second frame missing" };
     if (!rn.ok) {
         ok("!! the kit's gradient noise matches a real GPU render", false, `could not render: ${rn.reason || rn.skipped}`);
     } else {
@@ -368,6 +371,28 @@ sec("6. *** THE PAIR: THE REAL COMPILED SHADER AGAINST THE CPU REFERENCE, BIT FO
 }
 
 // =============================================================================================================
+// *** ONE RENDER RUN, NINE FRAMES, SHARED BY SECTIONS 7 AND 8. *** Declared here rather than inside
+// either section because both need it: rendering them twice cost a second browser launch and took this
+// gate to 3,339 ms against a 3,000 ms budget, which immediately moved KIT_AT_V4623 out of recordReach's
+// CHECKED set -- a record guarded by a gate the sweep cannot afford is guarded on paper.
+// 48 rather than 64, and the still control runs at two times rather than four: nine 64x64 frames put
+// this gate at 2,962 ms, THIRTY-EIGHT milliseconds under the budget, which is not margin -- it is the
+// same straddle this round was opened to remove from aiPresenceOrb-selfcheck. Seven 48x48 frames
+// carry every claim below unchanged; the ring is sampled at 72 angles either way, and 'still's
+// hotspot does not move' needs two times to be false, not four.
+const N3 = 48, times = [2.4, 3.2, 3.9, 4.6], VOICE = 0.3, STILL_TIMES = [3.9];
+const run = await renderThreeTslToPixels({
+    engineRoot: ENG, moduleImportPath: "/render/aiPresenceOrbTsl.mjs", factoryName: "makeAiPresenceOrbTsl",
+    factoryArgs: { species: "still" }, knobs: { time: times[0], voice: VOICE }, width: N3, height: N3,
+    variants: [
+        { factoryArgs: { species: "limn" }, knobs: { time: times[0], voice: VOICE } },
+        ...times.map((t) => ({ factoryArgs: { species: "comet" }, knobs: { time: t, voice: VOICE } })),
+        ...STILL_TIMES.map((t) => ({ factoryArgs: { species: "still" }, knobs: { time: t, voice: VOICE } })),
+    ],
+});
+// ONE LAUNCH for all nine frames. Section 8 reads the same run -- see the note on the harness's variants.
+const okRun = run.ok && run.frames && run.frames.length === 2 + times.length + STILL_TIMES.length;
+
 sec("7. *** LIMN, THE SECOND SPECIES: THE COMMA THAT MUST NEVER CLOSE INTO A RING ***");
 {
     // *** THE PROFILE IS PERIODIC BY CONSTRUCTION AND THE ROW ASSERTS IT AS AN IDENTITY. *** limn.ts records
@@ -425,43 +450,172 @@ sec("7. *** LIMN, THE SECOND SPECIES: THE COMMA THAT MUST NEVER CLOSE INTO A RIN
         `limn.ts chose it over the wrapped angle for exactly this: "unlike the wrapped angle the first cut ` +
         `used, PERIODIC -- so the hue has no seam either"`);
 
-    // THE SPECIES, RENDERED. still's rim is even all the way round; limn's is a bright arc with a dim far
-    // side. That is the whole brief, and it is asserted on real pixels rather than on the profile function.
-    const N2 = 48;
-    const shot = async (species) => renderThreeTslToPixels({
-        engineRoot: ENG, moduleImportPath: "/render/aiPresenceOrbTsl.mjs", factoryName: "makeAiPresenceOrbTsl",
-        factoryArgs: { species }, knobs: { time: 2.4, voice: 0.3 }, width: N2, height: N2,
-    });
-    const [sr, lr] = [await shot("still"), await shot("limn")];
-    if (!sr.ok || !lr.ok) {
-        ok("!! limn renders and its rim is asymmetric where still's is not", false,
-            `could not render: still ${sr.reason || "ok"}, limn ${lr.reason || "ok"}`);
+    // *** THE SPECIES, RENDERED -- AND THE v4624 VERSION OF THIS ROW WAS PASSING ON LUCK. *** It sampled two
+    // pixels, (9,24) and (38,24) on a 48-wide frame, called them the left and right rim, and asserted still's
+    // differed by under 2% while limn's differed by more than 25%. Those two points are 15 and 14 pixels from
+    // the centre -- NOT a symmetric pair -- and they happened to read 448 and 449 on still. Sampled at
+    // genuinely symmetric points, still reads 172 against 251: a 31% difference, because the key light is at a
+    // fixed direction and the specular is nowhere near even. THE CLAIM WAS TRUE OF TWO PIXELS AND FALSE OF THE
+    // RIM, which is the same species of error as v4535's HUD row that passed for as long as something happened
+    // to sit on one of its grid points.
+    //
+    // What replaces it measures the RING, all the way round, 72 samples inside the antialiased edge: the
+    // fraction of the ring standing at or above half its own peak. For a comma that is small; for a body lit
+    // evenly enough to read as a sphere it is everything. Measured: still 100%, comet 100%, limn 29%.
+
+    if (!okRun) {
+        ok("!! the three species render", false, `could not render: ${run.reason || "frames " + (run.frames ? run.frames.length : "none")}`);
     } else {
-        const lum = (r, x, y) => { const i = (y * N2 + x) * 4; return r.pixels[i] + r.pixels[i + 1] + r.pixels[i + 2]; };
-        const sL = lum(sr, 9, 24), sR = lum(sr, 38, 24);
-        const lL = lum(lr, 9, 24), lR = lum(lr, 38, 24);
-        const sAsym = Math.abs(sL - sR) / Math.max(sL, sR), lAsym = Math.abs(lL - lR) / Math.max(lL, lR);
-        say(`rim luminance L/R -- still ${sL}/${sR} (asym ${(sAsym * 100).toFixed(1)}%), limn ${lL}/${lR} (asym ${(lAsym * 100).toFixed(1)}%)`);
-        ok("!! *** NEVER A FULL EVEN RING: limn's rim is strongly asymmetric and still's is even, on real pixels ***",
-            sAsym < 0.02 && lAsym > 0.25,
-            `still's two rim samples differ by ${(sAsym * 100).toFixed(1)}% -- an even edge, which is what a ` +
-            `plain fresnel rim gives. limn's differ by ${(lAsym * 100).toFixed(1)}%: a bright head on one side ` +
-            `and a dim glow opposite. The species is the asymmetry, so this is the row that would notice limn ` +
-            `quietly becoming a ring.`);
-        ok("...and the two species really are different pictures, not one picture with a different constant",
-            Math.abs(lum(sr, 24, 24) - lum(lr, 24, 24)) > 5 || Math.abs(lL - sL) > 60,
-            `centre ${lum(sr, 24, 24)} vs ${lum(lr, 24, 24)}, lit rim ${sL} vs ${lL}`);
-        // *** AND limn'S DARK SIDE HAS TO BE DARK, WHICH THE ASYMMETRY ROW ABOVE DOES NOT ASK. *** Raising
-        // limn's base rim from murmur's fitted 0.30 to still's 0.85 lifts BOTH sides together, so the ratio
-        // the row above measures barely moves and it stayed green under exactly that sabotage. limn's brief
-        // is that it is the mostly-dark one -- "on a gallery wall it is the one your eye goes to second", "in
-        // a chat UI it is the one that does not compete with the text" -- so the claim worth making is about
-        // the level of the unlit side, not only the contrast across it.
-        ok("!! *** limn IS THE DARK HERO: its unlit side sits well below still's even rim ***",
-            lR < sR * 0.85,
-            `limn's far side ${lR} against still's rim ${sR} -- ${(100 * lR / sR).toFixed(0)}% of it. murmur's ` +
-            `own fitted base rim for limn is 0.30 where still's is 0.85, and still is described in its own ` +
-            `file as carrying "the highest rim and specular in the collection".`);
+        const ring = (px) => {
+            const vals = [];
+            for (let a = 0; a < 72; a++) {
+                const th = a * 2 * Math.PI / 72, rr = 0.62 * 0.88 * (N3 / 2);
+                const x = Math.round(N3 / 2 + rr * Math.cos(th)), y = Math.round(N3 / 2 + rr * Math.sin(th));
+                const i = (y * N3 + x) * 4;
+                if (px[i + 3] < 200) continue;                       // stay inside the antialiased silhouette
+                vals.push(px[i] + px[i + 1] + px[i + 2]);
+            }
+            const mx = Math.max(...vals), mn = Math.min(...vals);
+            return { lit: vals.filter((v) => v >= mx * 0.5).length / vals.length, peakOverMin: mx / mn, n: vals.length };
+        };
+        const rs = ring(run.frames[0]), rl = ring(run.frames[1]), rc = ring(run.frames[2]);
+        say(`ring lit at or above half its peak -- still ${(rs.lit * 100).toFixed(0)}%, limn ${(rl.lit * 100).toFixed(0)}%, comet ${(rc.lit * 100).toFixed(0)}% (${rs.n} samples each)`);
+        ok("!! *** NEVER A FULL EVEN RING: limn lights under a third of its rim where the other two light all of theirs ***",
+            rl.lit < 0.45 && rs.lit > 0.75 && rc.lit > 0.75,
+            `still ${(rs.lit * 100).toFixed(0)}% of the ring at or above half peak, comet ${(rc.lit * 100).toFixed(0)}%, ` +
+            `limn ${(rl.lit * 100).toFixed(0)}%. Peak over minimum: still ${rs.peakOverMin.toFixed(2)}, comet ` +
+            `${rc.peakOverMin.toFixed(2)}, limn ${rl.peakOverMin.toFixed(2)}. *** THE THRESHOLDS ARE SET FROM ` +
+            `TWO RESOLUTIONS, NOT ONE: *** at 64 px this ring read 100% / 100% / 29% and at 48 px it reads ` +
+            `86% / 89% / 28% -- the absolute figures move with how many distinct pixels a 72-sample ring can ` +
+            `land on, and the THREEFOLD separation does not. A limit fitted to one frame size is a limit ` +
+            `fitted to a frame size. That concentration IS the species -- ` +
+            `"a bright head with a soft tail streaming off one side, built so the far side of the ring never ` +
+            `rises past a dim glow" -- and it is measured over the whole ring rather than at a chosen pair of points.`);
+        // Stated as a RELATION rather than three absolute bounds, for the same reason: still's own peak-over-
+        // minimum reads 1.75 at 64 px and 2.55 at 48 px on identical pixels, because the minimum is whichever
+        // sample happens to land deepest in the dark. limn's lead over both survives either.
+        ok("...and limn is the DARK hero: its ring swings far harder than either of the others'",
+            rl.peakOverMin > Math.max(rs.peakOverMin, rc.peakOverMin) * 1.4,
+            `limn ${rl.peakOverMin.toFixed(2)} against still ${rs.peakOverMin.toFixed(2)} and comet ` +
+            `${rc.peakOverMin.toFixed(2)}. murmur's own fitted base rim is 0.30 for limn where still's is 0.85, ` +
+            `and still's file calls its rim "the highest in the collection".`);
+    }
+}
+
+// =============================================================================================================
+sec("8. *** COMET, THE THIRD SPECIES: A TRAIL SOLVED IN CLOSED FORM, AND A HEAD THAT HAD TO BE SOLVED TOO ***");
+{
+    // mh_spin must be a rotation, or the orbit plane is not a plane.
+    const B = K.cometBasis(0.5, 0.3);
+    ok("!! the orbit basis is orthonormal to f64 -- e1.e2 exactly zero, all three unit",
+        Math.abs(K.dot3(B.e1, B.e2)) < 1e-15 && Math.abs(K.len3(B.e1) - 1) < 1e-15 &&
+        Math.abs(K.len3(B.e2) - 1) < 1e-15 && Math.abs(K.len3(B.nrm) - 1) < 1e-15,
+        `e1.e2 = ${K.dot3(B.e1, B.e2).toExponential(1)}, |e1| |e2| |nrm| = ${K.len3(B.e1).toFixed(12)} ${K.len3(B.e2).toFixed(12)} ${K.len3(B.nrm).toFixed(12)}`);
+    // The tilt is bounded away from BOTH degeneracies, which is a stated design constraint and not a range.
+    ok("the orbit tilt is bounded away from face-on and edge-on at both ends of the knob",
+        K.cometBasis(0, 0).tau === 0.30 && Math.abs(K.cometBasis(1, 0).tau - 1.05) < 1e-12,
+        `tau runs ${K.cometBasis(0, 0).tau} .. ${K.cometBasis(1, 0).tau} rad. comet.ts: "face-on is a circle ` +
+        `drawn on the glass, edge-on is a line."`);
+
+    // *** THE CLOSED-FORM NEAREST POINT, AGAINST A DIFFERENT METHOD. *** This is the whole trail: comet.ts
+    // cannot keep a history buffer ("these shaders are stateless by contract"), so the age of the trail at a
+    // sample is the ANGLE of the nearest point on the orbit. If that is wrong the trail is wrong everywhere.
+    const r0 = 0.55;
+    let worst = 0, compared = 0;
+    for (let i = 0; i < 12; i++) {
+        const p = [Math.sin(i * 1.7) * 0.8, Math.cos(i * 2.3) * 0.7, Math.sin(i * 0.9) * 0.6];
+        const { dist2 } = K.cometNearest(p, B, r0);
+        let best = Infinity;
+        for (let a = 0; a < 60000; a++) {
+            const th = a * 2 * Math.PI / 60000;
+            const c = [r0 * (Math.cos(th) * B.e1[0] + Math.sin(th) * B.e2[0]),
+                       r0 * (Math.cos(th) * B.e1[1] + Math.sin(th) * B.e2[1]),
+                       r0 * (Math.cos(th) * B.e1[2] + Math.sin(th) * B.e2[2])];
+            const d = (p[0] - c[0]) ** 2 + (p[1] - c[1]) ** 2 + (p[2] - c[2]) ** 2;
+            if (d < best) best = d;
+        }
+        compared++; worst = Math.max(worst, Math.abs(dist2 - best));
+    }
+    ok("!! *** THE TRAIL'S GEOMETRY AGREES WITH A 60,000-SAMPLE SEARCH OVER THE CIRCLE ***",
+        compared === 12 && worst < 1e-8,
+        `worst |closed form - brute force| = ${worst.toExponential(2)} over ${compared} points; the residual ` +
+        `is the SEARCH's own angular resolution, not the formula's. A different method reaching the same ` +
+        `answer, which is the only agreement worth asserting about a closed form.`);
+
+    // *** THE TRAIL HAS TO DIE BEFORE IT WRAPS, and comet.ts records what happened when it did not: ***
+    // "a soft gradient meeting a step is the step" -- a hard-edged wedge cut through the glass along the
+    // head's own radius.
+    const fPlus = K.cometFall(Math.PI, 2.0), fMinus = K.cometFall(-Math.PI, 2.0);
+    ok("!! *** THE TRAIL IS GONE AT BOTH ENDS OF THE WRAP, so it never meets its own head as a step ***",
+        fPlus < 1e-6 && fMinus < 1e-3,
+        `fall(+pi) = ${fPlus.toExponential(2)} behind the head and fall(-pi) = ${fMinus.toExponential(2)} ` +
+        `ahead of it, at murmur's own decay of 2.0 -- where an unfaded exponential would still stand at a fifth.`);
+    ok("...and the two branches meet at the head at exactly one, a kink rather than a step",
+        K.cometFall(0, 2.0) === 1 && Math.abs(K.cometFall(-1e-12, 2.0) - 1) < 1e-9,
+        `fall(0) = ${K.cometFall(0, 2.0)} from behind and ${K.cometFall(-1e-12, 2.0).toFixed(12)} from ahead. ` +
+        `comet.ts keeps the kink deliberately, "under the head's own bloom, which is where a comet keeps it too".`);
+
+    // *** THE ROW THAT WOULD HAVE CAUGHT THIS SPECIES SHIPPING WITHOUT ITS HEAD -- AND DID. ***
+    // comet's whole brief is ONE BRIGHT POINT ORBITING. Ported with only the march, its brightest interior
+    // pixel sat at (36,25) at every time tested -- the SPECULAR CATCHLIGHT, motionless -- because the head is
+    // 0.043 body units across against a march step of about 0.38 and simply fell between the taps. comet.ts
+    // says so in its own words and solves the head at the ray's closest approach instead. So the claim worth
+    // asserting is not that comet renders: it is that its brightest interior point MOVES, and that the two
+    // species without an orbiting object hold still.
+    // *** THE SAME NINE FRAMES SECTION 7 ALREADY PAID FOR. *** Rendering them again here cost a second
+    // browser launch and took this gate to 3,339 ms, over the 3,000 ms budget -- which promptly moved
+    // KIT_AT_V4623 out of recordReach's CHECKED set, because a record guarded by a gate the sweep cannot
+    // afford is guarded on paper. Frames 2..5 are comet across a lap; frames 0 and 6..8 are still across the
+    // same times.
+    if (!okRun) {
+        ok("!! comet's bright point travels and still's does not", false,
+            `could not render: ${run.reason || "frames " + (run.frames ? run.frames.length : "none")}`);
+    } else {
+        const peak = (px) => {
+            let best = -1;
+            for (let y = 0; y < N3; y++) for (let x = 0; x < N3; x++) {
+                const dx = (x + 0.5) / N3 * 2 - 1, dy = (y + 0.5) / N3 * 2 - 1;
+                if (Math.hypot(dx, dy) > 0.62 * 0.75) continue;
+                const i = (y * N3 + x) * 4, v = px[i] + px[i + 1] + px[i + 2];
+                if (v > best) best = v;
+            }
+            return best;
+        };
+        const hotspot = (px) => {
+            let best = -1, bx = 0, by = 0;
+            for (let y = 0; y < N3; y++) for (let x = 0; x < N3; x++) {
+                const dx = (x + 0.5) / N3 * 2 - 1, dy = (y + 0.5) / N3 * 2 - 1;
+                if (Math.hypot(dx, dy) > 0.62 * 0.75) continue;        // interior only, clear of the rim
+                const i = (y * N3 + x) * 4, v = px[i] + px[i + 1] + px[i + 2];
+                if (v > best) { best = v; bx = x; by = y; }
+            }
+            return bx + "," + by;
+        };
+        const cometPts = run.frames.slice(2, 6).map(hotspot);
+        const stillPts = [run.frames[0], run.frames[6]].map(hotspot);
+        const cN = new Set(cometPts).size, sN = new Set(stillPts).size;
+        say(`interior hotspot over ${times.length} times -- comet ${cometPts.join(" ")} (${cN} distinct), still ${stillPts.join(" ")} (${sN} distinct)`);
+        ok("!! *** comet'S BRIGHT POINT TRAVELS ITS ORBIT AND still'S CATCHLIGHT DOES NOT MOVE AT ALL ***",
+            cN >= 3 && sN === 1,
+            `comet takes ${cN} distinct hotspot positions across ${times.length} frames; still takes ${sN} across ${stillPts.length}.`);
+
+        // *** AND THAT ROW ALONE DOES NOT CATCH THE BUG THIS SPECIES ACTUALLY SHIPPED WITH -- the sabotage
+        // sweep proved it. *** Deleting the solved head left the row above GREEN, because the TRAIL moves too:
+        // "something bright moves" is satisfied by a smear. What separates a solved point from a smear is that
+        // the point is EQUALLY BRIGHT WHEREVER IT IS on its orbit, give or take the depth extinction that dims
+        // it behind the core, while the trail's own maximum rises and falls with the geometry. Measured: with
+        // the head, the peak runs 705/692/693/698 across a lap -- a spread of 1.8%. With the head removed it
+        // runs 705/677/580/561, a spread of 20.4%. The threshold is set between them and both readings are
+        // written here so a later change can be judged against numbers rather than against a limit.
+        const peaks = run.frames.slice(2, 6).map(peak);
+        const spread = (Math.max(...peaks) - Math.min(...peaks)) / Math.max(...peaks);
+        say(`comet peak brightness across the lap: ${peaks.join(" ")} -- spread ${(spread * 100).toFixed(1)}%`);
+        ok("!! *** THE HEAD IS A SOLVED POINT, SO IT IS AS BRIGHT AT THE BACK OF ITS ORBIT AS AT THE FRONT ***",
+            spread < 0.10,
+            `spread ${(spread * 100).toFixed(1)}% over ${peaks.length} phases, against 20.4% measured with the ` +
+            `head deleted. comet.ts: the head is 0.043 body units across against a march step of about 0.38, ` +
+            `so sampling it "depended on where the tap planes happened to fall" -- it flickered, and near the ` +
+            `limb it drew a SECOND comet. This is the row that fails when it is left to the march.`);
     }
 }
 

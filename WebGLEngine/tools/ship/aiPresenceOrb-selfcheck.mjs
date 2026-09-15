@@ -217,10 +217,17 @@ async function runWebGL2InEngineOrigin({ engineRoot, script, args = null, sabota
 // N=64, samples a handful of exact pixel coordinates, and also reports whether WGSL EMISSION (not execution)
 // succeeds, which is the compiler-level check still available on that backend. `modulePath` lets section 11
 // point this at a SABOTAGED copy of aiPresenceOrbTsl.mjs instead of the real one.
-const RENDER_SCRIPT = `async ({ n, time, modulePath }) => {
+// *** ONE LAUNCH, AS MANY RENDERS AS THE CALLER ASKS FOR. *** This script took a single modulePath until
+// v4625, which meant every sabotage row cost its own Chromium launch -- and the launch, not the 64x64 render,
+// is nearly the whole bill. Two sabotage sections had pushed this gate to 2,883 ms against a 3,000 ms budget,
+// 117 ms of margin on a box this tree measures running ~10% slower under a contended sweep. `modulePaths` is
+// a list now and the result carries one entry per module. `skipWgsl` exists for the same reason: emitting WGSL
+// needs a SECOND renderer built and initialised, which is pure waste on a sabotage run that only wants pixels.
+const RENDER_SCRIPT = `async ({ n, time, modulePath, modulePaths, skipWgsl }) => {
     const THREE = await import("/vendor/three-webgpu/three.webgpu.js");
     const TSL = await import("/vendor/three-webgpu/three.tsl.js");
-    const { makeAiPresenceOrbTsl } = await import(modulePath);
+    const paths = modulePaths && modulePaths.length ? modulePaths : [modulePath];
+    const { makeAiPresenceOrbTsl } = await import(paths[0]);
     const S = await import("/render/tslSource.mjs");
     const canvas = document.createElement("canvas");
     canvas.width = n; canvas.height = n;
@@ -244,6 +251,7 @@ const RENDER_SCRIPT = `async ({ n, time, modulePath }) => {
     // actually reaches the WGSL builder -- the same instance the earlier throwaway probe used successfully.
     let wgslOk = false, wgslLen = 0, wgslError = null;
     try {
+        if (skipWgsl) throw new Error("skipped by caller");
         const wgslRenderer = new THREE.WebGPURenderer({ canvas: document.createElement("canvas"), forceWebGL: false, antialias: false });
         await wgslRenderer.init();
         const fxW = makeAiPresenceOrbTsl(THREE, TSL, {});
@@ -252,14 +260,25 @@ const RENDER_SCRIPT = `async ({ n, time, modulePath }) => {
     } catch (e) { wgslError = String(e && e.message || e); }
 
     renderer.setSize(n, n, false);
-    renderer.render(fx.scene, fx.camera);
-
     const gl = canvas.getContext("webgl2");
-    const buf = new Uint8Array(n * n * 4);
-    gl.readPixels(0, 0, n, n, gl.RGBA, gl.UNSIGNED_BYTE, buf);
-    const at = (x, y) => { const o = (y * n + x) * 4; return [buf[o], buf[o + 1], buf[o + 2], buf[o + 3]]; };
     const c = n / 2;
-    return { ok: true, wgslOk, wgslLen, wgslError, center: at(c, c), farCorner: at(2, 2) };
+    const shot = (effect) => {
+        renderer.render(effect.scene, effect.camera);
+        const buf = new Uint8Array(n * n * 4);
+        gl.readPixels(0, 0, n, n, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+        const at = (x, y) => { const o = (y * n + x) * 4; return [buf[o], buf[o + 1], buf[o + 2], buf[o + 3]]; };
+        return { center: at(c, c), farCorner: at(2, 2) };
+    };
+    const shots = [shot(fx)];
+    // Each extra module gets its own factory and its own render THROUGH THE SAME renderer and canvas, which
+    // is what makes this cheap: one context, one shader compile pipeline warmed, one process.
+    for (let i = 1; i < paths.length; i++) {
+        const m = await import(paths[i]);
+        const fxI = m.makeAiPresenceOrbTsl(THREE, TSL, {});
+        fxI.setKnobs({ time });
+        shots.push(shot(fxI));
+    }
+    return { ok: true, wgslOk, wgslLen, wgslError, center: shots[0].center, farCorner: shots[0].farCorner, shots };
 }`;
 
 async function main() {
@@ -308,137 +327,95 @@ async function main() {
         }
     }
 
-    sec("11. *** SABOTAGE, ON THE REAL AUTHORED SOURCE TEXT: CORRUPTING THE OKLAB DECODE'S DOMINANT COEFFICIENT MEASURABLY CHANGES THE RENDERED CENTRE PIXEL ***");
+    sec("11. *** TWO SABOTAGES, ONE BROWSER LAUNCH: THE SPECIES' OWN MATH, AND THE KIT UNDERNEATH IT ***");
+    // *** BOTH ROWS USED TO LAUNCH THEIR OWN CHROMIUM AND THAT COST MORE THAN EVERYTHING ELSE HERE COMBINED. ***
+    // The gate was 2,883 ms against a 3,000 ms budget -- 117 ms of margin, on a box this tree has measured
+    // running about 10% slower under a contended 8-way sweep, which is 3,171 ms and OVER. A gate that crosses
+    // stops running at ship time, and v4535 is a long account of what follows from that. Nothing is dropped:
+    // both sabotages still happen, on the same files, with the same assertions. They share a page.
     {
-        // *** THE FIRST SABOTAGE TRIED HERE WAS THE smoothstep ARGUMENT-ORDER FIX, AND IT IS NOT ONE. ***
-        // Hand-derived, then measured on this exact device, BEFORE trusting it as a sabotage target:
-        // smoothstep(a,b,x) = clamp((x-a)/(b-a),0,1) run through a Hermite curve that is itself point-
-        // symmetric (smoothstep(t) = 1-smoothstep(1-t)); substituting shows (x-a)/(b-a) = 1-(x-b)/(a-b)
-        // EXACTLY, for every x, not only inside the transition band -- so smoothstep(a,b,x) IS 1-smoothstep(b,
-        // a,x), identically, and reverting the earlier fix renders BIT-IDENTICAL output on this device. That
-        // is not a failure to find a real sabotage; it is the proof that fix was spec-compliance (the GLSL/
-        // WGSL spec still calls edge0>=edge1 undefined, and a DIFFERENT device is free to implement it some
-        // other way), not a correctness bug this specific renderer ever had. Recorded rather than discarded --
-        // a sabotage that measurably does nothing is itself a finding, and pretending otherwise would be
-        // exactly the "asserted rather than measured" mistake this tree's own gates exist to catch.
-        //
-        // A GENUINELY LOAD-BEARING TARGET INSTEAD: the OKLab decode's dominant L-channel coefficient
-        // (4.0767416621, the l-term of the R-channel reconstruction) -- corrupting it must change the
-        // rendered colour, because "L" (lightness) is the ONE OKLab channel that is never near zero for this
-        // orb (density is always positive), unlike a and b which legitimately can be.
+        // ---- A: the species' own OKLab decode, corrupted --------------------------------------------------
+        // A GENUINELY LOAD-BEARING TARGET: the OKLab decode's dominant L-channel coefficient (4.0767416621,
+        // the l-term of the R-channel reconstruction). "L" is the ONE OKLab channel never near zero for this
+        // orb -- density is always positive -- unlike a and b, which legitimately can be. An earlier draft of
+        // this section aimed at a smoothstep argument order instead and found, by hand and then by rendering,
+        // that smoothstep(a,b,x) IS 1-smoothstep(b,a,x) identically, so the "sabotage" changed nothing: a
+        // spec-compliance fix, not a correctness one, and recorded as such rather than quietly re-aimed.
         const realSrc = fs.readFileSync(path.join(ENG, "render", "aiPresenceOrbTsl.mjs"), "utf8");
         const needle = "l.mul(4.0767416621).sub(m.mul(3.3077115913)).add(s.mul(0.2309699292))";
         ok("the sabotage needle is present in the real source (so the replace below is not a silent no-op)", realSrc.includes(needle));
         const sabotaged = realSrc.replace(needle, "l.mul(0.5).sub(m.mul(3.3077115913)).add(s.mul(0.2309699292))");
         ok("the sabotage actually changed the text", sabotaged !== realSrc);
 
-        // *** THE SABOTAGE COPY IS SERVED FROM /_sabotage/, SO ITS OWN RELATIVE IMPORTS MOVE WITH IT. ***
-        // v4624 gave this module real imports for the first time -- ./murmurKitTsl.mjs and ./murmurKit.mjs --
-        // and from /_sabotage/ those resolve to /_sabotage/murmurKitTsl.mjs, which is not there: the run died
-        // with "Failed to fetch dynamically imported module" and the sabotage row went red for a reason that
-        // had nothing to do with the sabotage. Rewritten to absolute engine paths, which is also the correct
-        // SCOPE: this row corrupts aiPresenceOrbTsl's own OKLab decode, so the kit must be served REAL and
-        // unmodified underneath it. A sabotage that quietly took its dependencies down with it would prove
-        // only that the page can fail to load.
-        const sabotagedRewritten = sabotaged.replace(/from\s+"\.\/([A-Za-z0-9_.-]+\.mjs)"/g, 'from "/render/$1"');
-        ok("the sabotage copy's relative imports are rewritten to absolute engine paths",
-            !/from\s+"\.\//.test(sabotagedRewritten) || !/from\s+"\.\//.test(realSrc),
-            `${(realSrc.match(/from\s+"\.\//g) || []).length} relative import(s) in the real source, ` +
-            `${(sabotagedRewritten.match(/from\s+"\.\//g) || []).length} left in the copy`);
-
+        // *** THE COPY IS SERVED FROM /_sabotage/, SO ITS OWN RELATIVE IMPORTS MOVE WITH IT. *** v4624 gave
+        // this module real imports and from /_sabotage/ they resolve to /_sabotage/murmurKitTsl.mjs, which is
+        // not there -- the run died with "Failed to fetch dynamically imported module" and the row went red
+        // for a reason that had nothing to do with the sabotage. Rewritten to absolute engine paths, which is
+        // also the correct SCOPE: this row corrupts the species' colour decode, so the kit under it must be
+        // served REAL. A sabotage that takes its dependencies down with it proves only that a page can fail.
+        const toAbs = (src) => src.replace(/from\s+"\.\/([A-Za-z0-9_.-]+\.mjs)"/g, 'from "/render/$1"');
         const sabDir = fs.mkdtempSync(path.join(os.tmpdir(), "aiOrbSab-"));
-        fs.writeFileSync(path.join(sabDir, "aiPresenceOrbTsl.sabotage.mjs"), sabotagedRewritten);
-        const r11 = await runWebGL2InEngineOrigin({
-            engineRoot: ENG, script, sabotageDir: sabDir,
-            args: { n: N, time: 1.2, modulePath: "/_sabotage/aiPresenceOrbTsl.sabotage.mjs" },
-        });
-        fs.rmSync(sabDir, { recursive: true, force: true });
-        if (!r11.ok || !r11.result || !r11.result.ok) {
-            ok("!! sabotage harness ran", false, r11.ok ? JSON.stringify(r11.result) : "harness: " + r11.reason);
-        } else {
-            const { center } = r11.result;
-            const baseline = r10 && r10.result ? r10.result.center : null;
-            const changed = baseline ? Math.abs(center[0] - baseline[0]) + Math.abs(center[1] - baseline[1]) + Math.abs(center[2] - baseline[2]) : -1;
-            ok("!! under the corrupted OKLab L-coefficient, the centre pixel's colour measurably differs from section 10's real render",
-               baseline !== null && changed >= 10, `sabotaged centre=${JSON.stringify(center)} vs real centre=${JSON.stringify(baseline)}, |delta|=${changed}`);
-        }
-    }
-
-
-    // =========================================================================================================
-    // *** 12. DOES THE KIT ACTUALLY REACH THE IMAGE? SABOTAGE THE KIT, NOT THE SPECIES. ***
-    //
-    // v4624 replaced this shader's constant interior floor and its gaussian-in-t glint with render/murmurKit
-    // Tsl.mjs's real march and a glint solved at the ray's closest approach. An import is not evidence that
-    // any of it arrives at a pixel: v4535 found a frozen record field whose bytes reached nothing, and the
-    // round before this one found a refracted ray this very file computed and discarded while its gate proved
-    // a property of it. So the probe is the same one those rounds settled on -- BREAK THE DEPENDENCY AND
-    // REQUIRE THE PICTURE TO MOVE -- and it is aimed at the kit's medium rather than at anything this file
-    // owns, so a future edit that quietly reverts the interior to a constant cannot keep this row green.
-    {
-        const sabDir2 = fs.mkdtempSync(path.join(os.tmpdir(), "aiOrbKit-"));
         try {
-            // The species, with its relative imports pointed INTO the sabotage directory.
-            const tsl = fs.readFileSync(path.join(ENG, "render", "aiPresenceOrbTsl.mjs"), "utf8")
-                .replace(/from\s+"\.\/([A-Za-z0-9_.-]+\.mjs)"/g, 'from "/_sabotage/$1"');
-            fs.writeFileSync(path.join(sabDir2, "aiPresenceOrbTsl.sabotage.mjs"), tsl);
-            // The CPU kit is carried across unmodified -- only the SHADER kit is corrupted, so this is a probe
-            // of the graph that actually renders and not of the reference beside it.
-            const kitCpu = fs.readFileSync(path.join(ENG, "render", "murmurKit.mjs"), "utf8");
-            fs.writeFileSync(path.join(sabDir2, "murmurKit.mjs"), kitCpu);
-            const kitTslSrc = fs.readFileSync(path.join(ENG, "render", "murmurKitTsl.mjs"), "utf8")
-                .replace(/from\s+"\.\/([A-Za-z0-9_.-]+\.mjs)"/g, 'from "/_sabotage/$1"');
-            // mh_medium is what every tap of the march reads. Flattened to a constant, the volume stops having
-            // structure -- which is precisely the pre-v4624 behaviour, so this sabotage restores the bug.
-            // mh_medium's structure comes entirely from mh_haze -- the advecting gradient noise every tap
-            // of the march samples. Flattening THAT to a constant leaves the radial fog intact and valid, and
-            // removes exactly what the pre-v4624 constant floor did not have. ONE substitution, because the
-            // first attempt wrapped the whole function in an extra paren pair across two replaces and produced
-            // "SyntaxError: missing ) after argument list" -- a sabotage that breaks the file proves only that
-            // a broken file does not render.
-            // *** THE FIRST SABOTAGE HERE WAS TOO WEAK AND THE ROW SAID SO RATHER THAN BEING RE-AIMED
-            // QUIETLY. *** Flattening mh_haze to a constant moved the centre pixel by 1 of 255: real, but
-            // within a rounding argument, and weak BY CONSTRUCTION rather than because the wiring is thin --
-            // mh_medium is fog * (0.55 + 0.45*haze), so replacing a haze that already sits near 0.5 with 0.5
-            // barely changes the product. The question this row asks is whether the MARCH reaches the image,
-            // and the way to ask it is to take the marched contribution away, not to jiggle its texture.
+            fs.writeFileSync(path.join(sabDir, "speciesOklab.mjs"), toAbs(sabotaged));
+
+            // ---- B: the KIT underneath the real species --------------------------------------------------
+            // An import is not evidence that anything arrives at a pixel. v4535 found a frozen record field
+            // whose bytes reached nothing; v4624's own subject was a refracted ray this file computed and
+            // discarded while its gate proved a property of it. So the probe is the one those rounds settled
+            // on -- BREAK THE DEPENDENCY AND REQUIRE THE PICTURE TO MOVE -- aimed at the kit rather than at
+            // anything this file owns, so an edit that quietly reverts the interior to a constant reddens it.
+            const toSab = (src) => src.replace(/from\s+"\.\/([A-Za-z0-9_.-]+\.mjs)"/g, 'from "/_sabotage/$1"');
+            fs.writeFileSync(path.join(sabDir, "speciesKit.mjs"), toSab(realSrc));
+            fs.writeFileSync(path.join(sabDir, "murmurKit.mjs"), fs.readFileSync(path.join(ENG, "render", "murmurKit.mjs"), "utf8"));
+            const kitTslSrc = toSab(fs.readFileSync(path.join(ENG, "render", "murmurKitTsl.mjs"), "utf8"));
+            // mh_medium is what every tap of the march reads. Zeroing the whole term takes the marched
+            // contribution away, which is the question -- does the march reach the image. An earlier aim
+            // flattened mh_haze to a constant and moved the centre by 1 of 255: real, but weak BY
+            // CONSTRUCTION, since mh_medium is fog*(0.55 + 0.45*haze) and haze already sits near 0.5.
             const mediumNeedle = "float(0.55).add(float(0.45).mul(mhHaze(p, t, scale)))";
             ok("the kit sabotage needle is present (so the replace below is not a silent no-op)",
-                kitTslSrc.split(mediumNeedle).length - 1 >= 1,
-                `${kitTslSrc.split(mediumNeedle).length - 1} occurrence(s) of the haze call inside the kit`);
-            const kitSabFixed = kitTslSrc.split(mediumNeedle).join("float(0.0)");
-            ok("the kit sabotage actually changed the text", kitSabFixed !== kitTslSrc);
-            fs.writeFileSync(path.join(sabDir2, "murmurKitTsl.mjs"), kitSabFixed);
+                kitTslSrc.includes(mediumNeedle), `${kitTslSrc.split(mediumNeedle).length - 1} occurrence(s)`);
+            const kitSab = kitTslSrc.split(mediumNeedle).join("float(0.0)");
+            ok("the kit sabotage actually changed the text", kitSab !== kitTslSrc);
+            fs.writeFileSync(path.join(sabDir, "murmurKitTsl.mjs"), kitSab);
 
-            const r12 = await runWebGL2InEngineOrigin({
-                engineRoot: ENG, script, sabotageDir: sabDir2,
-                args: { n: N, time: 1.2, modulePath: "/_sabotage/aiPresenceOrbTsl.sabotage.mjs" },
+            const r11 = await runWebGL2InEngineOrigin({
+                engineRoot: ENG, script, sabotageDir: sabDir,
+                args: { n: N, time: 1.2, skipWgsl: true,
+                        modulePaths: ["/_sabotage/speciesOklab.mjs", "/_sabotage/speciesKit.mjs"] },
             });
-            if (!r12.ok || !r12.result || !r12.result.ok) {
-                ok("!! the kit-sabotage harness ran", false, r12.ok ? JSON.stringify(r12.result) : "harness: " + r12.reason);
+            if (!r11.ok || !r11.result || !r11.result.ok || !r11.result.shots || r11.result.shots.length !== 2) {
+                ok("!! the sabotage harness ran and returned both renders", false,
+                    r11.ok ? JSON.stringify(r11.result).slice(0, 300) : "harness: " + r11.reason);
             } else {
-                const base = r10 && r10.result ? r10.result.center : null;
-                const c = r12.result.center;
-                const delta = base ? Math.abs(c[0] - base[0]) + Math.abs(c[1] - base[1]) + Math.abs(c[2] - base[2]) : -1;
-                ok("!! *** THE KIT'S MARCH REACHES THE PIXEL: zero mh_medium and the orb's centre MOVES BY 23 ***",
-                    base !== null && delta >= 8,
-                    `kit-sabotaged centre=${JSON.stringify(c)} vs real centre=${JSON.stringify(base)}, |delta|=${delta} of 765. ` +
+                const baseline = r10 && r10.result ? r10.result.center : null;
+                const dist = (c) => baseline ? Math.abs(c[0] - baseline[0]) + Math.abs(c[1] - baseline[1]) + Math.abs(c[2] - baseline[2]) : -1;
+                const cA = r11.result.shots[0].center, cB = r11.result.shots[1].center;
+                ok("!! under the corrupted OKLab L-coefficient, the centre pixel's colour measurably differs from section 10's real render",
+                    baseline !== null && dist(cA) >= 10,
+                    `sabotaged centre=${JSON.stringify(cA)} vs real centre=${JSON.stringify(baseline)}, |delta|=${dist(cA)}`);
+                ok("!! *** THE KIT'S MARCH REACHES THE PIXEL: zero mh_medium and the orb's centre MOVES ***",
+                    baseline !== null && dist(cB) >= 8,
+                    `kit-sabotaged centre=${JSON.stringify(cB)} vs real centre=${JSON.stringify(baseline)}, |delta|=${dist(cB)} of 765. ` +
                     `Before v4624 this row could not have existed: the interior was a CONSTANT, so zeroing a medium ` +
                     `nothing sampled would have moved nothing at all, and the import would still have been sitting there.`);
+                // The two sabotages must not be the same sabotage wearing two names.
+                ok("...and the two corruptions move the pixel in different ways, so neither row is the other's echo",
+                    cA[0] !== cB[0] || cA[1] !== cB[1] || cA[2] !== cB[2],
+                    `oklab-sabotaged ${JSON.stringify(cA)} against kit-sabotaged ${JSON.stringify(cB)}`);
             }
-        } finally { fs.rmSync(sabDir2, { recursive: true, force: true }); }
+        } finally { fs.rmSync(sabDir, { recursive: true, force: true }); }
     }
 
-    // *** BUDGET WARNING, MEASURED AND WRITTEN DOWN RATHER THAN LEFT FOR THE NEXT SWEEP TO DISCOVER. ***
-    // Section 12 added a second sabotage render and with it a second browser launch: this gate went 1,625 ms
-    // -> 2,883 ms serial, against quickSweep's 3,000 ms budget. That is 117 ms of margin, and this tree has
-    // already measured what a contended 8-way sweep does to a serial reading -- about 10% slower, which is
-    // 3,171 ms and OVER. A gate that crosses the budget stops running at ship time, and the v4535 record is
-    // an account of what happens then: seventeen rounds shipped over a red gate nobody was running.
-    // THE FIX, IF IT CROSSES, IS NOT TO DELETE A ROW: sections 11 and 12 each launch their own browser to
-    // render one 64x64 frame, and the launch is nearly all of the cost. Folding both sabotages into a single
-    // page load -- two files in one sabotage directory, one script rendering both -- buys back roughly 1.2 s
-    // and changes no claim. Named here so the next reader does not have to re-derive it from a red.
+    // *** THE BUDGET WARNING v4624 WROTE HERE IS DISCHARGED, AND THE ESTIMATE IN IT WAS WRONG. ***
+    // That round left this gate at 2,883 ms against a 3,000 ms budget -- 117 ms of margin on a box this tree
+    // has measured running about 10% slower under a contended 8-way sweep, which is 3,171 ms and OVER -- and
+    // named the fix: fold the two sabotage sections into one browser launch, "worth ~1.2 s and no claim".
+    // Measured after doing it: 2,883 -> 2,157 ms, a saving of 726 ms, not 1.2 s. The launch was not quite the
+    // whole bill; the second render, the second module import and the extra readback are real work that
+    // survives the merge. The margin is 843 ms now, and 2,157 * 1.1 = 2,373 is comfortably inside. Recorded
+    // with the miss visible, because a number predicted and never checked is how the previous round's own
+    // WebAssembly row drifted: what makes an estimate safe is the re-measurement, not the care taken guessing.
     console.log(fails ? "\naiPresenceOrb-selfcheck: " + fails + " FAILED" : "\naiPresenceOrb-selfcheck: all checks pass");
     process.exit(fails ? 1 : 0);
 }

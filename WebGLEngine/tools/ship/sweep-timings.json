@@ -1641,7 +1641,7 @@
   "physics/render/specularProbeLit-selfcheck.mjs": 1418,
   "physics/render/splitSumWgsl-selfcheck.mjs": 394,
   "tools/ship/aiHuntBrain-selfcheck.mjs": 403,
-  "tools/ship/aiPresenceOrb-selfcheck.mjs": 2883,
+  "tools/ship/aiPresenceOrb-selfcheck.mjs": 2213,
   "tools/ship/aiPresenceOrbPresent-selfcheck.mjs": 2218,
   "tools/ship/aiPresenceOrbWidget-selfcheck.mjs": 12633,
   "tools/ship/bossPhaseManager-selfcheck.mjs": 302,
@@ -1676,7 +1676,7 @@
   "tools/ship/labHome-selfcheck.mjs": 1441,
   "tools/ship/raceTurret-selfcheck.mjs": 10708,
   "world/buildingTopple-selfcheck.mjs": 9513,
-  "tools/ship/murmurKit-selfcheck.mjs": 2404
+  "tools/ship/murmurKit-selfcheck.mjs": 2501
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -4991,7 +4991,7 @@
   "physics/render/specularProbeLit-selfcheck.mjs": "2026-09-15T13:49:44.492Z",
   "physics/render/splitSumWgsl-selfcheck.mjs": "2026-09-15T13:49:44.492Z",
   "tools/ship/aiHuntBrain-selfcheck.mjs": "2026-09-15T13:49:44.492Z",
-  "tools/ship/aiPresenceOrb-selfcheck.mjs": "2026-09-15T15:37:51.973Z",
+  "tools/ship/aiPresenceOrb-selfcheck.mjs": "2026-09-15T16:01:37.780Z",
   "tools/ship/aiPresenceOrbPresent-selfcheck.mjs": "2026-09-15T13:49:44.492Z",
   "tools/ship/aiPresenceOrbWidget-selfcheck.mjs": "2026-09-13T07:22:47.177Z",
   "tools/ship/bossPhaseManager-selfcheck.mjs": "2026-09-15T13:49:44.492Z",
@@ -5026,7 +5026,7 @@
   "tools/ship/labHome-selfcheck.mjs": "2026-09-15T13:49:44.492Z",
   "tools/ship/raceTurret-selfcheck.mjs": "2026-09-15T13:49:44.492Z",
   "world/buildingTopple-selfcheck.mjs": "2026-09-15T13:49:44.492Z",
-  "tools/ship/murmurKit-selfcheck.mjs": "2026-09-15T15:37:48.971Z"
+  "tools/ship/murmurKit-selfcheck.mjs": "2026-09-15T16:07:17.220Z"
  },
  "finished": {
   "tools/ship/placementRender-selfcheck.mjs": true,
