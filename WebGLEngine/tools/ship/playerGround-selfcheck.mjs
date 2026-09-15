@@ -401,37 +401,36 @@ console.log("\n10. *** THIS ROUND'S OWN RECORD IS INVISIBLE TO THE RECORD CENSUS
     // own sabotages being caught and wrote so in a gate header; it is not, it fires with or without the
     // sabotage, and the header was corrected before the round shipped. A row that reddens on every run of
     // a neighbouring experiment will be mistaken for that experiment's signal, which is worth the line.
-    ok("!! *** THE HOLE IS NINE RECORDS WIDE AND TWO OF THEM PREDATE THIS SESSION BY A HUNDRED VERSIONS ***",
-        missed.length === 9 && missed.every((r) => /\.(js|cjs)$/.test(r.file)) &&
-        missed.some((r) => r.name === "KAIJU_GROUND_AT_V4554") &&
-        missed.some((r) => r.name === "WALK_GROUND_AT_V4552") &&
-        missed.some((r) => r.name === "PLAYER_WATER_AT_V4550") &&
-        missed.some((r) => r.name === "PLAYER_BODY_AT_V4549") &&
-        missed.some((r) => r.name === "PLAYER_GROUND_AT_V4545") &&
-        missed.some((r) => r.name === "PLAYER_SLOPE_AT_V4546") &&
-        missed.some((r) => r.name === "CAMERA_FALL_AT_V4548") &&
-        missed.some((r) => r.name === "ADDED_AT_V4403") &&
-        missed.some((r) => r.name === "MEASURED_AT_V4463") && jsFiles.length > 1000,
-        missed.map((r) => r.name + " (" + r.file + ")").join(", ") + " -- " + missed.length + " records in " +
-        jsFiles.length + " .js/.cjs files the walk DOES visit, dropped by `list.filter(/\\.mjs$/)` one line " +
-        "before the record search. ADDED_AT_V4403 and MEASURED_AT_V4463 have been outside every headline " +
-        "that module has ever published, including the +7 sweep it was built for. *** THIS ROW ASSERTS A " +
-        "DEFECT RATHER THAN A PROPERTY, AND IT IS WRITTEN TO GO RED THE DAY SOMEBODY FIXES IT. ***");
+    // *** v4555 -- THE HOLE IS CLOSED AND THIS ROW IS THE RECEIPT. *** It asserted a DEFECT rather than a
+    // property and said in its own text that it was written to go RED the day somebody fixed it. It did.
+    // The number it pinned went four (v4546), five (v4548), six (v4549), seven (v4550), eight (v4552) and
+    // NINE (v4554): it grew by one in every round that wrote a record beside the code it describes, which
+    // was every round this session spent on the camera. The pin is what made that visible -- nothing else
+    // in the tree could see a record the census could not see.
+    //
+    // The fix is the one word it always was: frozenRecords.mjs's `list.filter(/\.mjs$/)` becomes
+    // `/\.(mjs|cjs|js)$/`. What blocked it for ten rounds was the REPLAY -- frozenRecords pins a record
+    // population at commit 75f0c033, and the wide rule finds 76 records there against the 74 the replay
+    // counted, BECAUSE THAT REPLAY HAD BEEN TAKEN WITH THE NARROW RULER TOO. v4555 re-took it at that
+    // commit over the same 3,893 files with the same exclude, reproducing the recorded 74 / 35 / 138 first
+    // to prove the harness and then reading 76 / 36 / 141 wide.
+    ok("!! *** THE HOLE IS CLOSED: NO RECORD IN A .js FILE IS INVISIBLE TO THE CENSUS ANY MORE ***",
+        missed.length === 0 && jsFiles.length > 1000,
+        missed.length + " records unseen in " + jsFiles.length + " .js/.cjs files the walk visits. It was " +
+        "NINE at v4554 -- the seven written into camera/camera.js by v4545 through v4554, plus " +
+        "ADDED_AT_V4403 and MEASURED_AT_V4463, which had been outside every headline frozenRecords or " +
+        "recordReach ever published, including the +7 sweep frozenRecords was built for. *** THIS ROW SPENT " +
+        "SIX ROUNDS ASSERTING A DEFECT AND NOW ASSERTS ITS ABSENCE; THE DIRECTION IT WATCHES IS UNCHANGED, " +
+        "so a filter that ever narrows again reddens it exactly as before. ***");
 
-    // 117 at v4545, 118 at v4547: AGREEMENT_AT_V4547 landed in a .mjs, so the census CAN see it and the
-    // pinned number moved by exactly one. That is the .mjs/.js line this row is about, drawn from the
-    // other side -- a record beside camera.js is invisible and a record in tools/ship/ is not.
-    ok("   ...and it is not repaired HERE, because the one-word fix reddens a replay of an OLD commit",
-        recordCensus().records.length === 118,
-        "widening that filter to /\\.(mjs|js)$/ was driven at v4545: 117 records -> 120, 273 fields -> 284, " +
-        "1,687 ms against a 3,000 ms budget, and PLAYER_GROUND_AT_V4545 comes back correctly attributed to " +
-        "this gate while MEASURED_AT_V4463 comes back guarded by stereoPanini-selfcheck. It also turns " +
-        "frozenRecords-selfcheck RED in three rows, and the first of them is the instructive one: the sweep " +
-        "row replays the record population at commit 75f0c033, and under the wider rule today's tree holds " +
-        "76 records that existed there against the 74 THE REPLAY COUNTS -- *** BECAUSE THE REPLAY WAS TAKEN " +
-        "WITH THE NARROW RULER TOO. *** Closing this means re-taking that replay at that commit, which is a " +
-        "round with its own gate and not a line in a round about a camera. The number above is pinned so " +
-        "this row cannot quietly stop being about anything.");
+    ok("   ...and the census now sees the whole tree, which is what re-taking the replay bought",
+        recordCensus().records.length === 127,
+        "127 records under the wide rule against 118 under `.mjs` alone -- +9 records, +8 carrying fields, " +
+        "+68 FIELDS. *** THE UNGUARDED COUNT DID NOT MOVE, AND THAT IS THE REASSURING HALF: *** all nine " +
+        "were already guarded by the gates written beside them in the same rounds, so what the tree had " +
+        "lost was never the guarding -- only its ability to SAY it was guarded. frozenRecords' v4487Recount " +
+        "now carries both rulers, 74 / 35 / 138 narrow and 76 / 36 / 141 wide, because a measurement taken " +
+        "correctly under a stated rule is evidence about the rule rather than an error to overwrite.");
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +

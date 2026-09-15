@@ -303,7 +303,15 @@ export function census({ files = null, read = null, exclude = null } = {}) {
     // Record DETECTION is left on the raw text and that is deliberate: a declaration only appears in code,
     // and stripping first was measured to find the same 94 records, so it would be cost without effect.
     const gateSrc = gates.map((g) => [rel(g), stripComments(rd(g))]);
-    const mjs = list.filter((f) => /\.mjs$/.test(f));
+    // *** v4555 -- THIS LINE READ `/\.mjs$/` AND THE WALK ABOVE ALREADY ACCEPTS .mjs, .cjs AND .js. ***
+    // Every frozen record in a .js file was therefore invisible to this census AND to recordReach, which
+    // derives its whole population from here -- so both under-reported, and not randomly: what they missed
+    // was exactly the records written BESIDE the code they describe, which is where this session has been
+    // putting them. tools/ship/playerGround-selfcheck.mjs section 10 pinned the hole and the pin was raised
+    // five times waiting for this: four records at v4546, five at v4548, six at v4549, seven at v4550,
+    // eight at v4552, NINE at v4554. It grew by one every round that did good work.
+    // Widening is +9 records, +8 carrying fields, +68 FIELDS -- 118/57/279 becomes 127/65/347.
+    const mjs = list.filter((f) => /\.(mjs|cjs|js)$/.test(f));
     // ONE pass over the gates per census instead of one per record: collect every name first, then ask each
     // gate source which of them it contains. Same answer, and the 152,000 searches happen once rather than
     // once per record's turn through the loop.
@@ -502,7 +510,8 @@ export const PROBE_AT_V4536 = Object.freeze({
     // REACH_AT_V4548's cap-straddler entry in tools/ship/recordReach.mjs -- a round that edits an existing
     // record moves the field count without moving the record count, which is v4540's lesson arriving again
     // and the reason this is re-taken on EDITS and not only on arrivals.
-    currentIncludingModule: Object.freeze({ records: 118, withFields: 57, fields: 279 }),
+    // v4555 -- RE-TAKEN under the wide rule: 118 / 57 / 279 becomes 127 / 65 / 347.
+    currentIncludingModule: Object.freeze({ records: 127, withFields: 65, fields: 347 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -592,7 +601,9 @@ export const PROBE_AT_V4536 = Object.freeze({
     // between the two blocks stays exactly this module's own two records and their twenty fields, which is
     // what the gate checks, so moving one and not the other reddens a row about the exclude pattern.
     // v4548 -- RE-TAKEN with `currentIncludingModule` above: 258 -> 259, the one field described there.
-    excluding: Object.freeze({ records: 116, withFields: 55, fields: 259 }),
+    // v4555 -- RE-TAKEN under the wide rule: 116 / 55 / 259 becomes 125 / 63 / 327. Nine of those records
+    // and sixty-eight of those fields were always there; only the census's eyesight changed.
+    excluding: Object.freeze({ records: 125, withFields: 63, fields: 327 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,
@@ -622,8 +633,26 @@ export const PROBE_AT_V4536 = Object.freeze({
     fullyGuarded: 8,
     caughtByANonSiblingGate: 27,
     // What the replay says the v4487 record should have read, at its own commit, under a correct extraction.
-    v4487Recount: Object.freeze({ records: 74, withFields: 35, fields: 138,
-        recordSays: "74 / 36 / 135", neverProbed: 3 }),
+    // *** v4555 -- RE-TAKEN AT THE SAME COMMIT WITH THE WIDE RULE, AND THIS RE-TAKE IS THE THING THAT WAS
+    // BLOCKING THE FIX FOR TEN ROUNDS. *** The v4536 replay was correct FOR THE RULER IT USED: it walked
+    // 75f0c033 with the census narrowed to `.mjs`, and under that ruler the tree held 74 / 35 / 138. The
+    // narrowing is gone now, so the replay was re-run over the same commit, the same 3,893 files and the
+    // same exclude, and the wide ruler finds 76 / 36 / 141. The two extra are ADDED_AT_V4403 in
+    // physics/xpbd/rigidCouple.js and MEASURED_AT_V4463 in render/stereographic.js -- which have been
+    // outside every headline this module has ever published, including the +7 sweep it was built for.
+    // *** THE NARROW READING IS KEPT BESIDE IT RATHER THAN OVERWRITTEN, *** because it is a correct
+    // measurement of a tree under a stated rule, and the pair is the evidence that the rule was the thing
+    // that moved. The harness was validated by reproducing 74 / 35 / 138 exactly before the wide run.
+    v4487Recount: Object.freeze({ records: 76, withFields: 36, fields: 141,
+        // *** neverProbed GOES 3 TO 6 AND THE SIX DECOMPOSE CLEANLY, WHICH IS WHY IT IS WORTH THE FIELD. ***
+        // 138 - 135 = 3 the BROKEN WINDOW missed; 141 - 138 = 3 more the NARROW RULER could not see, all
+        // three belonging to MEASURED_AT_V4463 (ADDED_AT_V4403 carries none). Two different instruments
+        // failing in the same direction on the same tree, found ten rounds apart.
+        recordSays: "74 / 36 / 135", neverProbed: 6, missedByWindow: 3, missedByRuler: 3,
+        narrowRuler: Object.freeze({ records: 74, withFields: 35, fields: 138,
+            note: "the v4536 replay, correct under the .mjs-only census it was taken with" }),
+        widenedAt: "v4555",
+        theTwoItCouldNotSee: Object.freeze(["ADDED_AT_V4403", "MEASURED_AT_V4463"]) }),
     // The enumerator's failure modes, each with the record that shows it. Measured, not listed from memory.
     windowFailures: Object.freeze({
         recordsDisagreeing: 14,

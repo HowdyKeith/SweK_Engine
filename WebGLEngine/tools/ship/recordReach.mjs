@@ -232,7 +232,14 @@ export const REACH_AT_V4548 = Object.freeze({
     // v4547 -- RE-TAKEN: 117 -> 118, for AGREEMENT_AT_V4547 in tools/ship/controllerAgreement.mjs. The two
     // rounds between wrote their records into camera/camera.js, a .js file this census cannot see at all --
     // see tools/ship/playerGround-selfcheck.mjs section 10, which pins that hole at four records.
-    total: 118,
+    // *** v4555 -- 118 -> 127, AND THE SENTENCE ABOVE IS NO LONGER TRUE, WHICH IS THE ROUND. *** This census
+    // derives its whole population from tools/ship/frozenRecords.mjs, and that module narrowed a .mjs/.cjs/.js
+    // walk to `.mjs` one line before the record search. So every record in a .js file was invisible HERE too,
+    // inherited rather than chosen. The hole reached NINE records before it was closed and it grew by one in
+    // every round that wrote a record beside the code it describes. The nine are the seven in camera/camera.js
+    // from v4545..v4554, plus ADDED_AT_V4403 and MEASURED_AT_V4463, which had been outside every headline
+    // either census ever published. The unguarded count does NOT move: all nine are named by a gate.
+    total: 127,
     // *** READ OFF THE INSTRUMENT, NOT PREDICTED. *** The first draft of this record guessed 53/21/19/40 from
     // which gates the round had sped up, and was wrong on three of the four: the comment-strip fix below
     // moved two records the other way at the same time, and a guess cannot see two changes at once.
@@ -390,7 +397,10 @@ export const UNGUARDED_SPLIT_V4577 = Object.freeze({
     // section 8 reads the record, and sections 1 to 6 read fifteen of its fields between them.
     // v4547 -- RE-TAKEN with `total` above: 117 -> 118. The unguarded count does NOT move: the arriving
     // record is named by the gate beside it, which is the whole point of writing one.
-    structural: Object.freeze({ total: 118, unguarded: 11, documentaryOfThose: 11, readByCodeOfThose: 0 }),
+    // v4555 -- RE-TAKEN with `total`: 118 -> 127 for the nine the widened census can now see. UNGUARDED IS
+    // STILL 11, and that is the reassuring half of the finding: the records the tree could not SEE were
+    // nonetheless all being GUARDED, by the gates written beside them in the same rounds.
+    structural: Object.freeze({ total: 127, unguarded: 11, documentaryOfThose: 11, readByCodeOfThose: 0 }),
     // BEFORE, on the tree this round opened on:
     before: Object.freeze({ total: 104, checked: 72, overBudget: 20, unmeasured: 0, unguarded: 12, unchecked: 32 }),
     // AFTER, as one reading rather than as a constant -- see the note above. Taken with the round's own

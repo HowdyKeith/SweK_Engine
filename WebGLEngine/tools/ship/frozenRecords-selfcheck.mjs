@@ -365,7 +365,13 @@ console.log("\n2. the observer effect, checked to be exactly one");
         // the derivation must actually disagree with the naive rule somewhere, or it is the naive rule
         // wearing a git call: the two records v4534 had to name by hand are exactly the disagreement.
         arrivals.some((r) => stampOf(r.name) <= sweepV) &&
-        arrivals.every((r) => r.file.endsWith(".mjs")),
+        // *** v4555 -- THIS READ `.endsWith(".mjs")` AND THAT WAS THE NARROW CENSUS'S ASSUMPTION WRITTEN
+        // INTO THE GATE. *** The clause was true only because the census could not see a record anywhere
+        // else; widening it to .mjs/.cjs/.js made the row red against a correct census, which is the
+        // clause doing its job in reverse. It now asserts what the census actually walks, AND that the
+        // widening reached: at least one arrival lives outside .mjs, or the fix did nothing.
+        arrivals.every((r) => /\.(mjs|cjs|js)$/.test(r.file)) &&
+        arrivals.some((r) => !r.file.endsWith(".mjs")),
         atSweepNames
           ? `${atSweepNames.size} record declarations in ${REC.commit}; ${arrivals.length} of the census are ` +
             `not among them, and ${arrivals.filter((r) => stampOf(r.name) <= sweepV).length} of THOSE carry a ` +
@@ -418,9 +424,20 @@ ok("!! *** all FOUR classes account for every field in the population ***",
 // replay was run once, over 75f0c033's tree with the balanced extractor, and its result is recorded above.
 // What is checked here is that the recount and the record it corrects are consistent with each other and
 // with the count of fields the v4487 sweep therefore never probed.
+// *** v4555 -- THE RELATIONSHIP THIS ROW CHECKS MOVED WHEN THE CENSUS'S RULER DID, AND THE NEW ONE IS
+// STRICTLY MORE INFORMATIVE. *** Under the .mjs-only census the replay matched the v4487 record on RECORDS
+// (74) and differed on FIELDS. Widened to .mjs/.cjs/.js it differs on records too -- 76 against 74 -- and
+// AGREES on withFields at 36, because the one newly-visible record that carries fields replaces the one the
+// broken window had over-credited. So the row now asserts the DECOMPOSITION rather than the old pair: the
+// six fields the v4487 sweep never probed are 3 the window missed plus 3 the ruler could not see, and the
+// two extra records are named in the record. An arithmetic identity that survives both instruments changing
+// is worth more than one that pinned the coincidence of a single ruler.
 ok("!! the v4487 record is superseded by a REPLAY at its own commit, and the arithmetic of that is checked",
     REC.v4487Recount.fields - OLD.fields === REC.v4487Recount.neverProbed &&
-    REC.v4487Recount.records === OLD.records && REC.v4487Recount.withFields !== OLD.withFields &&
+    REC.v4487Recount.missedByWindow + REC.v4487Recount.missedByRuler === REC.v4487Recount.neverProbed &&
+    REC.v4487Recount.narrowRuler.fields - OLD.fields === REC.v4487Recount.missedByWindow &&
+    REC.v4487Recount.fields - REC.v4487Recount.narrowRuler.fields === REC.v4487Recount.missedByRuler &&
+    REC.v4487Recount.records - REC.v4487Recount.narrowRuler.records === REC.v4487Recount.theTwoItCouldNotSee.length &&
     REC.commit === OLD.commit,
     `replayed at ${REC.commit} with a balanced extraction the v4487 tree held ${REC.v4487Recount.records} ` +
     `records, ${REC.v4487Recount.withFields} with fields, ${REC.v4487Recount.fields} fields; the record ` +
