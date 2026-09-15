@@ -299,8 +299,11 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // alone but a fresh census() over the merged tree: 1656 -> 1669, usesOk 1635 -> 1648, definesOk 1627 ->
     // 1640, nameFirst 1528 -> 1541 -- the same three-rows-move-together pattern. importsOk, condFirst,
     // unknownSignature, suspects and distinctDefinitions held at 0, 91, 16, 0 and 41.
-    gates: 1669, usesOk: 1648, definesOk: 1640, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1541, condFirst: 91, unknownSignature: 16,
+    // v4623 -- RE-TAKEN 1669 -> 1670 for tools/ship/murmurKit-selfcheck.mjs, the kit's gate. usesOk,
+    // definesOk and nameFirst move with it, which is the same three-rows-together pattern the note above
+    // records: one new gate that names its subject first is counted by all four.
+    gates: 1670, usesOk: 1649, definesOk: 1641, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1542, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

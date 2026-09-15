@@ -231,7 +231,10 @@ export const REACH_AT_V4548 = Object.freeze({
     // v4622-merge -- RE-TAKEN on this branch's actual merge of origin/main: the two histories above both
     // diverged from 107 and are both real. The final reading is a fresh reach() over the merged tree.
     // v4622-merge-b -- RE-TAKEN after the actual merge landed: 113 -> 114.
-    total: 114,
+    // v4623: 114 -> 115. KIT_AT_V4623 landed in tools/ship/murmurKit-selfcheck.mjs, guarded by that same
+    // gate at 1,147 ms against the 3,000 ms budget, so it arrived CHECKED -- a third consecutive round
+    // where a new record costs the unchecked population nothing.
+    total: 115,
     // *** READ OFF THE INSTRUMENT, NOT PREDICTED. *** The first draft of this record guessed 53/21/19/40 from
     // which gates the round had sped up, and was wrong on three of the four: the comment-strip fix below
     // moved two records the other way at the same time, and a guess cannot see two changes at once.
@@ -374,7 +377,7 @@ export const UNGUARDED_SPLIT_V4577 = Object.freeze({
     // v4622-merge -- RE-TAKEN on this branch's actual merge of origin/main: both histories above diverged
     // from 107 and are both real. The final reading is a fresh splitUnguarded() over the merged tree.
     // v4622-merge-b -- RE-TAKEN after the actual merge landed: total 113 -> 114; unguarded held at 14.
-    structural: Object.freeze({ total: 114, unguarded: 14, documentaryOfThose: 14, readByCodeOfThose: 0 }),
+    structural: Object.freeze({ total: 115, unguarded: 14, documentaryOfThose: 14, readByCodeOfThose: 0 }),
     // BEFORE, on the tree this round opened on:
     before: Object.freeze({ total: 104, checked: 72, overBudget: 20, unmeasured: 0, unguarded: 12, unchecked: 32 }),
     // AFTER, as one reading rather than as a constant -- see the note above. Taken with the round's own

@@ -476,7 +476,9 @@ export const PROBE_AT_V4536 = Object.freeze({
     // diverged from 104/45/172 and are both real. The final reading is a fresh census() over the merged tree.
     // v4622-merge-b -- RE-TAKEN with `excluding` below, after the actual merge landed and NO_GATE_V4587 and
     // COMMIT_BELT_DRIFT_V4621 arrived with it: 113 -> 114.
-    currentIncludingModule: Object.freeze({ records: 114, withFields: 50, fields: 204 }),
+    // v4623 -- RE-TAKEN 114/50/204 -> 115/51/208 alongside the `excluding` pair below, for KIT_AT_V4623
+    // and its four numeric fields. The two readings must stay exactly this module's own two records apart.
+    currentIncludingModule: Object.freeze({ records: 115, withFields: 51, fields: 208 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -546,7 +548,8 @@ export const PROBE_AT_V4536 = Object.freeze({
     // diverged from 104/45/172 and are both real. The final reading is a fresh census() over the merged tree.
     // v4622-merge-b -- RE-TAKEN, after the actual merge landed: 111 -> 112. NO_GATE_V4587 (origin/main's own)
     // and COMMIT_BELT_DRIFT_V4621 both arrived; neither carries a numeric field.
-    excluding: Object.freeze({ records: 112, withFields: 48, fields: 184 }),
+    // v4623 -- RE-TAKEN 112/48/184 -> 113/49/188 for KIT_AT_V4623, which carries four numeric fields.
+    excluding: Object.freeze({ records: 113, withFields: 49, fields: 188 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,

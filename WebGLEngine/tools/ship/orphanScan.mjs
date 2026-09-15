@@ -144,6 +144,19 @@ const isGeneratedRecord = (file, text) => {
 // NOTE: this reason string deliberately avoids spelling out either implementation's literal path -- doing so
 // would recreate the exact bug being excluded, this time inside orphanScan.mjs's own corpus text.
 const REPORT_MODULE = {
+    // v4623 -- *** REACHED BY A STRING, WHICH NO STATIC SCAN CAN FOLLOW AND WHICH IS NOT THE SAME AS
+    // UNREACHED. *** tools/ship/murmurKit-selfcheck.mjs drives this module through
+    // tools/ship/webgpuHarness.mjs's renderThreeTslToPixels(), which takes an import path as DATA
+    // ("/render/murmurKitTsl.mjs") and imports it inside a browser page -- the only way to execute a TSL
+    // graph is to compile and run it on a real backend, so the gate cannot import its subject directly the
+    // way an ordinary selfcheck does. The exemption is narrow and has an expiry written into it: the
+    // permanent fix is render/aiPresenceOrbTsl.mjs importing this kit for real, which is what makes the
+    // species use the march instead of approximating it, and on that day this entry should be DELETED
+    // rather than left standing. An exemption nobody revisits is how a temporary note becomes a permanent
+    // hole -- which is the v4571 lesson four entries below, from the other direction.
+    "render/murmurKitTsl.mjs": "executed by tools/ship/murmurKit-selfcheck.mjs through webgpuHarness's " +
+        "renderThreeTslToPixels, which imports it BY STRING inside a browser page because a TSL graph can " +
+        "only be checked by compiling and running it; delete this entry once aiPresenceOrbTsl.mjs imports it",
     "render/ssaoCompare.mjs": "compares the two render/ SSAO implementations named in its own header from " +
         "source; its data table names each by path as documentation and loads neither -- the live one stays " +
         "reached on its own via main.js's real import",

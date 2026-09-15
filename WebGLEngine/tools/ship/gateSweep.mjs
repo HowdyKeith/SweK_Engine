@@ -5060,6 +5060,30 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "red since v4584 on fleetRouting and labHome (both gated from tools/ship/), unrecorded by three notes; dated into " +
                  "NO_GATE_V4587. Sabotages red at A / B / C / D on each of the three, none crashing, none 0-red.",
     }),
+    since249: Object.freeze({
+        at: "v4623", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/murmurKit-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 1.1 s, real WebGPU in headless Chromium. Gates the shared kit all eighteen murmur-web species " +
+                 "are built from -- render/murmurKit.mjs (CPU reference) and render/murmurKitTsl.mjs (TSL graph) -- which " +
+                 "the ai-presence-orb-widget entry claimed the first orb round had ported and which, measured, was absent: " +
+                 "mh_exit, mh_flourish, mh_medium, mh_scatter, mh_transmit, the march, MH_EXT and MH_SPREAD occurred ZERO " +
+                 "times across both halves of that port. The integer avalanche is compared BIT-EXACTLY between f64 JS and a " +
+                 "compiled WGSL shader on a GPU: 256 of 256 uint32s equal, packed one byte per channel so an 8-bit UNORM " +
+                 "round-trips it losslessly; the gradient noise agrees on all 256 samples to the byte. TEN SABOTAGES, ALL " +
+                 "RED BY NAME -- and FOUR of them were GREEN on the first sweep and are why the gate grew: the gradient " +
+                 "lattice offset and the quintic fade both survive every CPU-only row, caught only once the NOISE render " +
+                 "was moved INTO the gate from a note pleading browser-launch cost; the 2.2 exit cap row tested a ray whose " +
+                 "true exit was 1.9, so deleting the clamp left it green, and now aims at one whose far root is 4.0; and " +
+                 "sin^2 vs a plain sine passed the peak row (both peak at 1) until the row asked kit.ts's own stated " +
+                 "property, zero slope at both ends. Provenance: murmur's avalanche is murmur3's fmix32 constants with a " +
+                 "different FIRST shift, 15 against 16, and 63,999 of 64,000 lattice cells disagree -- run against this " +
+                 "tree's own canonical copy in ev/esAuthority.js rather than argued. One row was wrong the other way and " +
+                 "is kept: it held MH_SCATTER_K to 1/3.2^2 because kit.ts's PROSE says 3.2, when its CODE says 0.098.",
+    }),
     since242: Object.freeze({
         at: "v4586", swept: 1, green: 1, red: 0,
         added: Object.freeze([

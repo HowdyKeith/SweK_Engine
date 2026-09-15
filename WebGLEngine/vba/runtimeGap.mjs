@@ -227,7 +227,21 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // the earlier reading was 3878. What survives is the rule the wrong explanation was reaching for: this
     // number is MEASURED every round, never incremented from the last one, and a reason invented to explain a
     // count is worth less than re-taking it. FIVE ROUNDS RUNNING this table has been re-taken by hand.
-    files: 4160,                  // v4622-merge-b -- RE-TAKEN after the actual merge landed: 4135 -> 4160.
+    // *** v4623 -- RE-TAKEN 4160 -> 4163 for render/murmurKit.mjs, render/murmurKitTsl.mjs and
+    // tools/ship/murmurKit-selfcheck.mjs. esModules, closures and asyncAwait move with them by construction.
+    // *** THE WebAssembly ROW (23 -> 24) IS NOT THIS ROUND'S AND IS NOT REPORTED AS IF IT WERE. *** It was
+    // already red on a clean checkout of d2388463 -- verified by stashing this round's work entirely and
+    // re-running the gate, which still failed on that one row and only that one row. Absorbing another
+    // round's drift into this round's numbers without saying so would make the next reader believe five rows
+    // moved here when four did.
+    //
+    // *** AND IT WAS A HALF-FINISHED RE-TAKE RATHER THAN A MISSED ONE, WHICH IS THE MORE INTERESTING SHAPE. ***
+    // The v4622 merge DID notice: the rank note below says in so many words "WebAssembly moved to 24 (one
+    // file...)" and re-took the DERIVED rank from 11 to 12 on that basis. The census row it derives FROM was
+    // left at 23. So one record in this file said 24 and another said 23 for as long as nothing re-ran the
+    // gate -- a derived number updated past the measurement it is derived from. The row is corrected here
+    // because a red on a number nobody disputes would block every later round for a fact already agreed.
+    files: 4163,                  // v4622-merge-b -- RE-TAKEN after the actual merge landed: 4135 -> 4160.
                                    // shared history through v4582: 4079 for tools/ship/zipWriter-selfcheck.mjs (commit c3f1fecb's, not either branch's own round) -- v4526 merge: 3887 -> 4002, this branch's rounds; v4527: 4004; v4528: 4007; v4529: 4009; v4530: 4011; v4533: 4012 (ai-bridge/runBusy.js); v4536: 4014 (physics/mesh/uvUnwrap.mjs and its gate); v4537: 4016 (physics/mesh/uvLscm.mjs and its gate); v4539: 4018 (physics/render/splitSum.mjs and its gate); v4543: 4020 (nav/navmesh.mjs and its gate); v4544: 4022 (physics/character/terrainWalk.mjs and its gate); v4545: 4023 (tools/ship/navWiring-selfcheck.mjs); v4546: 4024 (tools/ship/navWiringLive-selfcheck.mjs; the harness is HTML and not counted); v4547: 4025 (tools/ship/engineSceneBot-selfcheck.mjs); v4548: 4029 (tools/ship/treeRead.mjs, tools/ship/recordReach.mjs and their two gates); v4550: 4031 (tools/export/glbConformance.mjs and its gate); v4552: 4033 (nav/detourScale.mjs and its gate; the terrain fixture is JSON and not counted); v4554: 4035 (world/surfaceProbe.mjs and its gate); v4555: 4036 (world/chunk-selfcheck.mjs; the module it gates already existed); v4556: 4038 (tools/ship/versionMarker.js and its gate -- .js RATHER THAN .cjs on purpose: this walk matches .js/.mjs and NOT .cjs, so the first draft of that module was invisible here and moved this count by one where a module-plus-gate round moves it by two); v4557: 4039 (tools/ship/ritualCoherence-selfcheck.mjs; the ritual it gates already existed); v4559: 4041 (ui/pipboyItems.mjs and its gate); v4560: 4043 (tools/mesh/xatlasRef.mjs and its gate; the C++ harness and the JSON record are neither .js nor .mjs and are not counted); v4563: 4044 (world/fluidSystem-selfcheck.mjs; the module it gates already existed); v4564: 4052 -- 4050 with NO NEW FILE, the walk starting to count the six .cjs modules it had never been able to see, then 4052 for tools/ship/sourceKind.mjs and its gate; v4566: 4056 for the incremental-sweep round -- tools/ship/inputProbe.mjs, tools/ship/inputSets.mjs, tools/ship/recordInputs.mjs and tools/ship/inputSets-selfcheck.mjs. FOUR files for one gate, which is unusual here and is the shape of the thing: the probe must be a SEPARATE module because it is loaded with --import into the gate being measured, the rule has to be importable by both the recorder and quickSweep, and the recorder is the expensive pass nobody wants inside the rule; v4567: 4062 for the loader-hook probe -- tools/ship/probe/{record,fsShim,fsPromisesShim,cpShim,cpWrap,hooks}.mjs. SIX files and NO new gate, which is the opposite of the usual shape: a module.register() hook needs its shims in their own directory so the hook can tell the shim's own import of the real builtin from everybody else's by a single prefix test, and the wrappers are shared between the ESM shim and the CJS patch so the two cannot make different judgements about the same spawn; v4577: 4074 for physics/raceKnob-selfcheck.mjs, ONE file -- the module it gates already existed, and the round wrote a gate rather than a module because MEASURED_V4527's only reader was the module's own reportLines(); v4579: 4076 for render/starField.mjs and its gate -- the shared starfield the three star pages had each hand-copied; v4580: 4078 for render/skyStars.mjs and its gate -- the engine's own night sky, which had no CPU reference at all.
                                    // DIVERGED AT 4079: this branch went its own way to 4123 via the origin/main MERGE (the 25-gate arrival re-taken alongside it -- F82 Fresnel / specular-probe family, AI-presence-orb set, FXAA, Draco encode and others -- read off census(), not guessed), then v4622 -- RE-TAKEN: 4123 -> 4135 from the ordinary growth of concurrent rounds on this same unshipped branch; see esModules/closures/asyncAwait/typedArrays/promises/fetchXhr/performanceNow/raf/threads below for what moved with it. webgpu and wasm held.
                                    // MEANWHILE origin/main went its own way from 4079 to 4104: v4584: 4081; v4585: 4083; v4586: 4087; v4587: 4090 (the three sibling gates of the v4586 knob modules: physics/apsidalKnob-, impactKnob- and hologramKnob-selfcheck.mjs); v4588: 4096 (the turret copilot: physics/turret.mjs, brain/gunnerPolicy.mjs, render/raceTurret.mjs and their gates physics/turret-, brain/gunnerPolicy- and tools/ship/raceTurret-selfcheck.mjs); v4589: 4098 (render/carViews.mjs and tools/ship/carViews-selfcheck.mjs); v4590: 4100 (physics/slick.mjs and physics/slick-selfcheck.mjs); v4591: 4102 (world/buildingTopple.mjs and world/buildingTopple-selfcheck.mjs); v4592: 4104 (physics/spellAmmo.mjs and physics/spellAmmo-selfcheck.mjs).
@@ -459,8 +473,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4622-merge-c -- RE-TAKEN: wasm 24 -> 23. The ffmpegWasmBridge-selfcheck.mjs fix (inlining the browser-
     // context import literal instead of holding its path in a `moduleImportPath` variable, for windowsImport's
     // recognized scanner idiom) removed one of the two lines the WebAssembly pattern had matched in that file.
-    esModules: 3860, closures: 3738, asyncAwait: 1462, typedArrays: 1073, promises: 366,
-    fetchXhr: 245, performanceNow: 227, raf: 120, webgl: 151, webgpu: 50, threads: 23, wasm: 23,
+    esModules: 3863, closures: 3741, asyncAwait: 1463, typedArrays: 1073, promises: 366,
+    fetchXhr: 245, performanceNow: 227, raf: 120, webgl: 151, webgpu: 50, threads: 23, wasm: 24,   // v4623: 23 -> 24, NOT this round's -- see the note on `files` above
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.
@@ -473,7 +487,11 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4622-merge-c -- RE-TAKEN: 12 -> 11. WebAssembly dropped back to 23 (the ffmpegWasmBridge-selfcheck.mjs
     // fix removed one of its two matched lines), re-tying threads and WebAssembly at 23 -- the stable sort
     // places WebAssembly (earlier in PATTERNS) at rank 12 and threads at rank 11, still the bottom two.
-    threadsRank: 11,               // of 12, biggest first -- second-smallest on the merged tree (tied with WebAssembly at 23)
+    // v4623: 11 -> 12. This is the DERIVED half of the same half-finished re-take noted on `files` above --
+    // the v4622 merge corrected the prose to say WebAssembly had moved to 24 and left BOTH the census row
+    // (wasm: 23) and this rank at their pre-merge values. With wasm: 24 the tie at 23 breaks and threads
+    // is the smallest of the twelve outright, which is the direction the row's own headline already argued.
+    threadsRank: 12,               // of 12, biggest first -- the SMALLEST gap on the merged tree, no longer tied
     // *** THE MODULE THAT DEFINES THE CENSUS MATCHES EVERY SINGLE ONE OF ITS OWN TWELVE PATTERNS. ***
     // Not five rows -- all twelve. runtimeGap.mjs holds the PATTERNS table, so the literal text of every
     // regex sits in it (`Float32Array`, `new Promise`, `fetch(`, `WebAssembly`, ...), and a regex source is a
@@ -498,7 +516,14 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4622-merge-b -- RE-TAKEN after the actual merge landed: wasmWithoutSelf 21 -> 22 (wasm 24 with this
     // round's own +2 self-inflation); threadsWithoutSelf held at 22 (threads 23 with +1, unchanged).
     // v4622-merge-c -- RE-TAKEN: wasmWithoutSelf 22 -> 21 (wasm 23 with this round's own +2 self-inflation).
-    wasmWithoutSelf: 21,
+    // *** v4623: BACK TO 22, AND THE FLIP-FLOP IS THE FINDING. *** This field went 21 -> 22 at merge-b and
+    // 22 -> 21 at merge-c, inside one round, in opposite directions. Neither move was wrong arithmetic: both
+    // were derived correctly FROM `wasm`, which was itself left at the pre-merge 23 while the prose beside it
+    // already said 24. A derived number fitted to a stale measurement will track the staleness exactly and
+    // never look inconsistent on its own -- which is why it took a gate run on a clean checkout, not a
+    // reading of the file, to see that the whole chain was one row behind. Re-measured, not re-derived: the
+    // live census reads wasm 24 with this module's own +2, and 22 without it.
+    wasmWithoutSelf: 22,
     threadsWithoutSelf: 22,       // v4622 -- RE-TAKEN: 21 -> 22 (threads 23 with this round's own +1 self-inflation)
     closuresOverThreads: 163,     // v4622-merge-b -- RE-TAKEN: 161 -> 163 (3738 / 23). A DERIVED ratio, so it moves whenever either row does, which is why it is re-taken rather than pinned once
     // *** ONE, NOT TWO. *** The first draft filed fetch/XHR as an archive claim too; pointing the rows at

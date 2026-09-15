@@ -1675,7 +1675,8 @@
   "tools/ship/fleetRouting-selfcheck.mjs": 2003,
   "tools/ship/labHome-selfcheck.mjs": 1441,
   "tools/ship/raceTurret-selfcheck.mjs": 10708,
-  "world/buildingTopple-selfcheck.mjs": 9513
+  "world/buildingTopple-selfcheck.mjs": 9513,
+  "tools/ship/murmurKit-selfcheck.mjs": 1202
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -3349,7 +3350,8 @@
   "tools/ship/fleetRouting-selfcheck.mjs": 0,
   "tools/ship/labHome-selfcheck.mjs": 0,
   "tools/ship/raceTurret-selfcheck.mjs": 0,
-  "world/buildingTopple-selfcheck.mjs": 0
+  "world/buildingTopple-selfcheck.mjs": 0,
+  "tools/ship/murmurKit-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-15T13:49:44.492Z",
@@ -5023,7 +5025,8 @@
   "tools/ship/fleetRouting-selfcheck.mjs": "2026-09-15T13:49:44.492Z",
   "tools/ship/labHome-selfcheck.mjs": "2026-09-15T13:49:44.492Z",
   "tools/ship/raceTurret-selfcheck.mjs": "2026-09-15T13:49:44.492Z",
-  "world/buildingTopple-selfcheck.mjs": "2026-09-15T13:49:44.492Z"
+  "world/buildingTopple-selfcheck.mjs": "2026-09-15T13:49:44.492Z",
+  "tools/ship/murmurKit-selfcheck.mjs": "2026-09-15T15:18:04.599Z"
  },
  "finished": {
   "tools/ship/placementRender-selfcheck.mjs": true,
@@ -6584,7 +6587,8 @@
   "tools/ship/fleetRouting-selfcheck.mjs": true,
   "tools/ship/labHome-selfcheck.mjs": true,
   "tools/ship/raceTurret-selfcheck.mjs": true,
-  "world/buildingTopple-selfcheck.mjs": true
+  "world/buildingTopple-selfcheck.mjs": true,
+  "tools/ship/murmurKit-selfcheck.mjs": true
  },
  "crossings": {
   "tools/ship/engineSceneBot-selfcheck.mjs": 2,
