@@ -5060,6 +5060,31 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "red since v4584 on fleetRouting and labHome (both gated from tools/ship/), unrecorded by three notes; dated into " +
                  "NO_GATE_V4587. Sabotages red at A / B / C / D on each of the three, none crashing, none 0-red.",
     }),
+    since250: Object.freeze({
+        at: "v4626", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/murmurSpecies-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 2.4 s, real WebGPU. SPLIT OUT of murmurKit-selfcheck rather than newly written: every " +
+                 "species row needs a real render and a render needs a Chromium, so folding four species into the " +
+                 "kit's gate put it at 2,806 ms against a 3,000 ms budget -- 194 ms of margin on a box this tree " +
+                 "measures running ~10% slower under a contended sweep, which is OVER. Fifteen species are still " +
+                 "unported, so that pressure only grows: a single gate rendering all eighteen crosses the budget " +
+                 "no matter how it is tuned, and a gate over budget does not run at ship time at all. The split " +
+                 "is also better attribution -- a red here says a species is wrong, a red next door says the kit " +
+                 "is. murmurKit-selfcheck came back to 894 ms; this gate is 2,440 ms. Carries droplet, the fourth " +
+                 "species and the first whose SILHOUETTE moves. TWENTY-EIGHT SABOTAGES ACROSS BOTH GATES, ALL RED " +
+                 "-- and FOUR were green on the first sweep: the amplitude-clip row asked mhRadiusAt, which does " +
+                 "its own clamp, so deleting the clamp inside the SOLVE left it green; droplet's silhouette row " +
+                 "ran at voice 0.3, where the breath scales the whole body between frames, so freezing the " +
+                 "deformation still moved the outline 0.36% and passed -- it runs at voice 0 now, where a frozen " +
+                 "body reads EXACTLY 0.000%; deleting droplet's solved heart passed every row, because the peak " +
+                 "saturates at 765 with or without it and what the heart actually does is light the fog around " +
+                 "it (interior mean 441 against 254); and one sabotage's anchor had gone stale against a " +
+                 "multi-line ternary and was reported as green rather than as missing.",
+    }),
     since249: Object.freeze({
         at: "v4623", swept: 1, green: 1, red: 0,
         added: Object.freeze([

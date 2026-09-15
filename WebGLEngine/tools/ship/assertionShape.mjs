@@ -302,8 +302,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4623 -- RE-TAKEN 1669 -> 1670 for tools/ship/murmurKit-selfcheck.mjs, the kit's gate. usesOk,
     // definesOk and nameFirst move with it, which is the same three-rows-together pattern the note above
     // records: one new gate that names its subject first is counted by all four.
-    gates: 1670, usesOk: 1649, definesOk: 1641, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1542, condFirst: 91, unknownSignature: 16,
+    // v4626 -- RE-TAKEN 1670 -> 1671 for tools/ship/murmurSpecies-selfcheck.mjs.
+    gates: 1671, usesOk: 1650, definesOk: 1642, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1543, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

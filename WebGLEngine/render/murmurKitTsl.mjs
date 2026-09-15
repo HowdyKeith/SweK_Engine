@@ -15,7 +15,7 @@
 // counter already does uint bit-mixing in TSL with .toVar()/.assign()/.bitXor(), and this reads the same way.
 "use strict";
 
-import { MH_R, MH_ETA, MH_EXT, MH_TILT, MH_SCATTER_K, MH_EXIT_CAP, MH_DRIFT_WOBBLE_CAP } from "./murmurKit.mjs";
+import { MH_R, MH_ETA, MH_EXT, MH_TILT, MH_SCATTER_K, MH_EXIT_CAP, MH_DRIFT_WOBBLE_CAP, MH_AMP_CAP } from "./murmurKit.mjs";
 
 /**
  * makeMurmurKitTsl(TSL) -> the kit's node builders.
@@ -136,6 +136,74 @@ export function makeMurmurKitTsl(TSL) {
                       clamp(b.negate().add(sqrt(max(disc, float(0.0)))), 0.0, MH_EXIT_CAP));
     });
 
+    // ---- the deformed body: mh_shape / mh_deform / mh_body ------------------------------------------------
+    // The half of the kit the first three species did not need. still, limn and comet are all solved against
+    // an UNDEFORMED sphere; droplet is the one where "the body itself is the species".
+
+    /** THE DEFORMATION AND ITS EXACT GRADIENT. Returns vec4(d, g.x, g.y, g.z) -- one call, both answers. */
+    const mhDeform = Fn(([n, t, amp, hi, flowDir, flowAmp, flowPhase]) => {
+        const a1 = t.mul(0.083).toVar();
+        const a2 = t.mul(0.061).add(2.10).toVar();
+        const a3 = t.mul(0.047).add(4.37).toVar();
+        const ax1 = normalize(vec3(cos(a1), float(0.62), sin(a1))).toVar();
+        const ax2 = normalize(vec3(float(0.55), cos(a2), sin(a2))).toVar();
+        const ax3 = normalize(vec3(sin(a3), float(-0.44), cos(a3))).toVar();
+        const NORM = 1 / (0.55 + 0.30 + 0.18);
+        const u1 = dot(n, ax1).toVar(), u2 = dot(n, ax2).toVar(), u3 = dot(n, ax3).toVar();
+        const d = sin(u1.mul(1.70)).mul(0.55)
+            .add(sin(u2.mul(2.60).add(1.9)).mul(0.30))
+            .add(sin(u3.mul(3.40).add(4.1)).mul(0.18)).mul(NORM).toVar();
+        // d/dn of sin(k * dot(n, a)) is k*cos(...)*a -- the normal is analytic, not finite-differenced, which
+        // is what lets the specular and the rim ride the wobble without stair-stepping.
+        const g = ax1.mul(cos(u1.mul(1.70)).mul(0.55 * 1.70 * NORM))
+            .add(ax2.mul(cos(u2.mul(2.60).add(1.9)).mul(0.30 * 2.60 * NORM)))
+            .add(ax3.mul(cos(u3.mul(3.40).add(4.1)).mul(0.18 * 3.40 * NORM))).toVar();
+        // The tremor -- a fourth mode at wavenumber 6.9, its axis turning eight times faster than the body's.
+        const a4 = t.mul(0.63).toVar();
+        const ax4 = normalize(vec3(cos(a4).mul(0.8), sin(a4.mul(0.77)), sin(a4))).toVar();
+        const u4 = dot(n, ax4).toVar();
+        d.addAssign(hi.mul(sin(u4.mul(6.90))));
+        g.addAssign(ax4.mul(hi.mul(6.90).mul(cos(u4.mul(6.90)))));
+        // The travelling wave: how RESPONDING gets a heading into the silhouette.
+        const uf = dot(n, flowDir).toVar();
+        d.addAssign(flowAmp.mul(sin(uf.mul(3.20).add(flowPhase))));
+        g.addAssign(flowDir.mul(flowAmp.mul(3.20).mul(cos(uf.mul(3.20).add(flowPhase)))));
+        return TSL.vec4(d, g);
+    });
+
+    /**
+     * THE BODY, SOLVED WITHOUT MARCHING IT. Two fixed-point iterations on z = sqrt(Rd(n)^2 - rho^2) -- measured
+     * against a run-to-fixpoint solve in the gate at 0.021 pixels of disagreement at the amplitude cap and the
+     * limb, which is kit.ts's "well under a pixel" made into a number.
+     *
+     * Returns vec4(m, Rd, rho, fres) and writes the entry point and normal into the two Var arguments, because
+     * a TSL Fn returns one node and this solve produces four things worth having.
+     */
+    const mhBody = Fn(([uvIn, t, px, ampIn, hi, gain, flowDir, flowAmp, flowPhase, outP, outN]) => {
+        const amp = clamp(ampIn, 0.0, MH_AMP_CAP).toVar();       // THE CLIP IS THE LAW
+        const s = uvIn.div(MH_R).toVar();
+        const rho = length(s).toVar();
+        const z0 = sqrt(max(float(1.0).sub(min(rho.mul(rho), float(1.0))), float(0.0))).toVar();
+        const n0 = normalize(vec3(s.x, s.y, z0.add(1e-6))).toVar();
+        const R0 = float(1.0).add(mhDeform(n0, t, amp, hi, flowDir, flowAmp, flowPhase).x.mul(amp)).toVar();
+        const z1 = sqrt(max(R0.mul(R0).sub(rho.mul(rho)), float(0.0))).toVar();
+        const n1 = normalize(vec3(s.x, s.y, z1.add(1e-6))).toVar();
+        const d1 = mhDeform(n1, t, amp, hi, flowDir, flowAmp, flowPhase).toVar();
+        const Rd = float(1.0).add(d1.x.mul(amp)).toVar();
+        const z2 = sqrt(max(Rd.mul(Rd).sub(rho.mul(rho)), float(0.0))).toVar();
+        outP.assign(vec3(s.x, s.y, z2));
+        // For F(p) = |p| - Rd(p/|p|) the gradient is n minus the tangential part of Rd's gradient over Rd.
+        const gt0 = vec3(d1.y, d1.z, d1.w).mul(amp).toVar();
+        const gt = gt0.sub(n1.mul(dot(gt0, n1))).toVar();
+        outN.assign(normalize(n1.sub(gt.mul(gain).div(max(Rd, float(1e-3))))));
+        // The silhouette is soft by two numbers ADDED rather than multiplied: 1.8% of organic feather because
+        // nothing in this house has a hard edge, plus 1.3 px of antialiasing because at 18 pt the fixed
+        // feather is a fifth of a pixel and would alias to a staircase.
+        const feather = max(float(0.018), px.mul(1.3)).toVar();
+        const m = float(1.0).sub(smoothstep(Rd.sub(feather), Rd.add(feather), rho)).toVar();
+        return TSL.vec4(m, Rd, rho, float(1.0).sub(clamp(outN.z, 0.0, 1.0)));
+    });
+
     // ---- the medium -----------------------------------------------------------------------------------------
     const mhHaze = Fn(([p, t, scale]) =>
         clamp(float(0.5).add(float(0.85).mul(
@@ -157,6 +225,7 @@ export function makeMurmurKitTsl(TSL) {
         MH_R, MH_ETA, MH_EXT, MH_TILT, MH_SCATTER_K, MH_EXIT_CAP,
         mhHash, mhGrad3, mhNoise3, mhHash1, mhFlourish, mhBreath, mhDrift, mhSpin,
         mhRefract, mhLook, mhExit, mhHaze, mhMedium, mhInside, mhTransmit, mhScatter,
+        mhDeform, mhBody, MH_AMP_CAP,
         Loop,
     };
 }

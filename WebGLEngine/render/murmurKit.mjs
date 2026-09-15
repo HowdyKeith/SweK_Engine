@@ -388,6 +388,154 @@ export function limnTailShare(aw, opts = {}) {
 export function wrapPi(a) { return a - 2 * Math.PI * Math.floor(a / (2 * Math.PI) + 0.5); }
 
 // ---------------------------------------------------------------------------------------------------------
+// THE DEFORMED BODY -- the half of the kit the first three species did not need.
+//
+// still, limn and comet are all solved against an UNDEFORMED sphere, which is what the port has carried since
+// v4623. droplet is the species where "the body itself is the species: a sphere of water in free fall", so it
+// needs mh_shape / mh_deform / mh_body -- and having them is what unlocks the silhouette-deforming half of
+// murmur's roster rather than one more species.
+// ---------------------------------------------------------------------------------------------------------
+
+/** THE CLIP IS THE LAW. kit.ts clamps amp here and says so: "Everything downstream trusts this cap." */
+export const MH_AMP_CAP = 0.085;
+
+/** A still shape: three slow modes, no travelling wave. hi is the tremor, gain scales SHADING past physical. */
+export function mhShape(amp, hi = 0, gain = 1.35, flow = null) {
+    return {
+        amp, hi, gain,
+        flowDir: flow ? flow.dir : [0, 0, 1],
+        flowAmp: flow ? flow.amp : 0,
+        flowPhase: flow ? flow.phase : 0,
+    };
+}
+
+/**
+ * THE DEFORMATION, AND ITS EXACT GRADIENT.
+ *
+ * Three modes, each a sine of the dot product with a slowly rotating axis. kit.ts on the wavenumbers 1.7, 2.6
+ * and 3.4: "low enough that the result reads as 'slightly out of round' rather than as texture, which is the
+ * entire difference between a water droplet and a golf ball." The axes turn at 0.083, 0.061 and 0.047 rad/s --
+ * periods of 76, 103 and 134 seconds, mutually incommensurate, "so the shape never repeats and never sits still".
+ *
+ * *** THE GRADIENT IS FREE AND EXACT, AND THAT IS THE WHOLE REASON THIS IS A SINE SUM. *** d/dn of
+ * sin(k * dot(n, a)) is k*cos(...)*a, so the surface NORMAL is analytic rather than finite-differenced -- which
+ * is what lets the specular and the fresnel rim ride the wobble without stair-stepping. The gate checks the
+ * analytic gradient against a central difference rather than taking the claim on trust.
+ *
+ * Returns { d, g } -- displacement and its gradient with respect to n.
+ */
+export function mhDeform(n, t, sh) {
+    const a1 = t * 0.083, a2 = t * 0.061 + 2.10, a3 = t * 0.047 + 4.37;
+    const ax1 = norm3([Math.cos(a1), 0.62, Math.sin(a1)]);
+    const ax2 = norm3([0.55, Math.cos(a2), Math.sin(a2)]);
+    const ax3 = norm3([Math.sin(a3), -0.44, Math.cos(a3)]);
+    const k1 = 1.70, k2 = 2.60, k3 = 3.40;
+    const w1 = 0.55, w2 = 0.30, w3 = 0.18;
+    const NORM = 1 / (w1 + w2 + w3);
+
+    const u1 = dot3(n, ax1), u2 = dot3(n, ax2), u3 = dot3(n, ax3);
+    let d = (w1 * Math.sin(k1 * u1) + w2 * Math.sin(k2 * u2 + 1.9) + w3 * Math.sin(k3 * u3 + 4.1)) * NORM;
+    const g = [0, 0, 0];
+    const addG = (c, ax) => { g[0] += c * ax[0]; g[1] += c * ax[1]; g[2] += c * ax[2]; };
+    addG(w1 * k1 * Math.cos(k1 * u1) * NORM, ax1);
+    addG(w2 * k2 * Math.cos(k2 * u2 + 1.9) * NORM, ax2);
+    addG(w3 * k3 * Math.cos(k3 * u3 + 4.1) * NORM, ax3);
+
+    // The tremor: a fourth mode at wavenumber 6.9, texture rather than shape, whose axis turns eight times
+    // faster than the body's. Only droplet's activity response ever gives it amplitude.
+    if (sh.hi > 1e-4) {
+        const a4 = t * 0.63;
+        const ax4 = norm3([Math.cos(a4) * 0.8, Math.sin(a4 * 0.77), Math.sin(a4)]);
+        const k4 = 6.90, u4 = dot3(n, ax4);
+        d += sh.hi * Math.sin(k4 * u4);
+        addG(sh.hi * k4 * Math.cos(k4 * u4), ax4);
+    }
+    // The travelling wave: how RESPONDING gets a heading into the silhouette.
+    if (sh.flowAmp > 1e-4) {
+        const kf = 3.20, uf = dot3(n, sh.flowDir);
+        d += sh.flowAmp * Math.sin(kf * uf + sh.flowPhase);
+        addG(sh.flowAmp * kf * Math.cos(kf * uf + sh.flowPhase), sh.flowDir);
+    }
+    return { d, g };
+}
+
+/**
+ * *** SOLVING A STAR-SHAPED SDF WITHOUT MARCHING IT. *** The surface is r = Rd(n) about the origin, so for an
+ * orthographic ray at in-plane radius rho the entry height satisfies z = sqrt(Rd(n)^2 - rho^2) with n itself
+ * depending on z. kit.ts: "Two fixed-point iterations solve it to well under a pixel for displacements this
+ * small, and two evaluations of mh_deform is a tenth of what a sphere-trace would cost." The gate measures
+ * that convergence against a run-to-fixpoint solve rather than repeating the claim.
+ *
+ * THE NORMAL is exact: for F(p) = |p| - Rd(p/|p|) the gradient is n minus the tangential part of Rd's gradient
+ * over Rd, and mhDeform hands the gradient back. `gain` then scales the perturbation PAST physical, because
+ * "the silhouette is capped by the clip but the SHADING is not, so a droplet can look far more liquid than its
+ * outline is allowed to be".
+ *
+ * Returns { m, P, N, Rd, rho, fres } in BODY UNITS, where the undeformed radius is 1.
+ */
+export function mhBody(uv, t, px, shIn) {
+    const sh = { ...shIn, amp: Math.min(MH_AMP_CAP, Math.max(0, shIn.amp)) };
+    const s = [uv[0] / MH_R, uv[1] / MH_R];
+    const rho = Math.hypot(s[0], s[1]);
+
+    const z0 = Math.sqrt(Math.max(1 - Math.min(rho * rho, 1), 0));
+    const n0 = norm3([s[0], s[1], z0 + 1e-6]);
+    const R0 = 1 + mhDeform(n0, t, sh).d * sh.amp;
+
+    const z1 = Math.sqrt(Math.max(R0 * R0 - rho * rho, 0));
+    const n1 = norm3([s[0], s[1], z1 + 1e-6]);
+    const d1 = mhDeform(n1, t, sh);
+    const Rd = 1 + d1.d * sh.amp;
+
+    const z2 = Math.sqrt(Math.max(Rd * Rd - rho * rho, 0));
+    const P = [s[0], s[1], z2];
+
+    let gt = [d1.g[0] * sh.amp, d1.g[1] * sh.amp, d1.g[2] * sh.amp];
+    const gn = dot3(gt, n1);
+    gt = [gt[0] - gn * n1[0], gt[1] - gn * n1[1], gt[2] - gn * n1[2]];
+    const denom = Math.max(Rd, 1e-3);
+    const N = norm3([n1[0] - gt[0] * sh.gain / denom, n1[1] - gt[1] * sh.gain / denom, n1[2] - gt[2] * sh.gain / denom]);
+
+    // THE SILHOUETTE IS SOFT BY TWO NUMBERS ADDED RATHER THAN MULTIPLIED: a fixed 1.8% of organic feather,
+    // "because nothing in this house has a hard edge", plus 1.3 pixels of antialiasing, "because at 18 pt the
+    // fixed feather is a fifth of a pixel and would alias to a staircase".
+    const feather = Math.max(0.018, 1.3 * px);
+    const m = 1 - smoothstep(Rd - feather, Rd + feather, rho);
+    return { m, P, N, Rd, rho, fres: 1 - Math.min(1, Math.max(0, N[2])) };
+}
+
+/** The deformed radius along a direction -- the silhouette itself, which for droplet IS the species. */
+export function mhRadiusAt(n, t, sh) {
+    const amp = Math.min(MH_AMP_CAP, Math.max(0, sh.amp));
+    return 1 + mhDeform(norm3(n), t, sh).d * amp;
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// DROPLET -- the fourth species, and the first whose silhouette moves.
+// ---------------------------------------------------------------------------------------------------------
+
+/** droplet's own four knobs and their shipped defaults, from murmur's src/styles.ts roster. */
+export const DROPLET_DEFAULTS = Object.freeze({ wobble: 0.5, tension: 0.5, sheen: 0.5, spread: 0.3 });
+
+/**
+ * droplet's wobble amplitude. "Higher tension means a body that holds its shape: the knob runs BACKWARDS
+ * through the amplitude on purpose, because that is what tension IS."
+ */
+export function dropletWobble(wobbleK, tensionK, swell = 0, small = 0) {
+    return (0.052 + 0.040 * wobbleK) * (1 - 0.22 * tensionK) * (1 + 0.30 * swell) * (1 + 0.20 * small);
+}
+
+/** The inhale: the breath is the carrier and voice is what fills it, so the swell arrives on a curve. */
+export function dropletSwell(t, voice) { return (0.22 + 0.78 * mhBreath(t, 0.9)) * voice; }
+
+/**
+ * *** THE WORST-CASE SILHOUETTE, WHICH murmur ARGUES IS SAFE AND THIS TREE CHECKS. *** droplet.ts caps the
+ * swell at 0.05 and states the arithmetic: "with the 0.085 deformation cap on top, the worst-case silhouette
+ * is 0.300 * 1.05 * 1.085 = 0.339 uv, and the containment does not begin until 0.36."
+ */
+export function dropletWorstSilhouette() { return MH_R * 1.05 * (1 + MH_AMP_CAP); }
+
+// ---------------------------------------------------------------------------------------------------------
 // COMET -- the third species. "One bright point on a tilted orbit inside the glass, trailing light."
 // ---------------------------------------------------------------------------------------------------------
 

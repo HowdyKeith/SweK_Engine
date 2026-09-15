@@ -910,8 +910,20 @@ export async function renderThreeTslToPixels({ engineRoot, moduleImportPath, fac
         const first = await shoot(fx);
         if (first.err) return { ok: false, reason: first.err, isWebGPUBackend };
         const frames = [first.px];
+        // A variant may name its OWN module and factory, not just different arguments. That is what lets one
+        // launch cover two unrelated subjects -- murmurKit-selfcheck renders kit probes AND four species, and
+        // paying for a second Chromium to cross that boundary took it from 2,167 ms of renders to 2,800 with
+        // 165 ms of actual computation in the gate. The cost of a gate like this is launches, nothing else.
+        const cache = {};
         for (const v of (variants || [])) {
-            const fxV = make(THREE, TSL, v.factoryArgs || factoryArgs);
+            const mp = v.moduleImportPath || moduleImportPath, fn = v.factoryName || factoryName;
+            const key = mp + "::" + fn;
+            if (!cache[key]) {
+                const m = await import(mp);
+                if (typeof m[fn] !== "function") return { ok: false, reason: fn + " is not exported by " + mp, isWebGPUBackend };
+                cache[key] = m[fn];
+            }
+            const fxV = cache[key](THREE, TSL, v.factoryArgs || factoryArgs);
             if (typeof fxV.setKnobs === "function") fxV.setKnobs(v.knobs || knobs);
             const shot = await shoot(fxV);
             if (shot.err) return { ok: false, reason: shot.err, isWebGPUBackend };

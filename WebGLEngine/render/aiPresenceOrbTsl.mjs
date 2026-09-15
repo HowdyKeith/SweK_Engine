@@ -42,10 +42,13 @@ export const ORB_KNOBS = Object.freeze([
     // comet's own three (it shares `spread` with limn, exactly as murmur's roster does -- c3 is `spread` on
     // seventeen of the eighteen species).
     "orbitTilt", "trail", "pointSize",
+    // droplet's own three. It is the FIRST species here whose silhouette moves, so it is also the first to
+    // replace the analytic sphere below with the kit's deformed solve.
+    "wobble", "tension", "sheen",
 ]);
 
 /** The species this file can build. murmur ships eighteen; these are the two that are ported. */
-export const ORB_SPECIES = Object.freeze(["still", "limn", "comet"]);
+export const ORB_SPECIES = Object.freeze(["still", "limn", "comet", "droplet"]);
 
 import { makeMurmurKitTsl } from "./murmurKitTsl.mjs";
 import { MH_EXT, MH_TAPS } from "./murmurKit.mjs";
@@ -88,7 +91,8 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
 
     const k0 = { time: 0, speed: 1, glow: 1, depth: 1, hueShift: 0, presence: 0.5, clarity: 0.6, glintRate: 0.3, voice: 0, aspect: 1,
                  rimWidth: 0.4, travel: 0.5, innerHint: 0.3, spread: 0.4,
-                 orbitTilt: 0.5, trail: 0.5, pointSize: 0.4, ...knobs };
+                 orbitTilt: 0.5, trail: 0.5, pointSize: 0.4,
+                 wobble: 0.5, tension: 0.5, sheen: 0.5, ...knobs };
     const uniforms = {}; for (const n of ORB_KNOBS) uniforms[n] = uniform(float(k0[n])).label(n);
 
     // OKLab -> linear sRGB, cube done as explicit x*x*x (not pow(x,3): l_/m_/s_ can be legitimately negative
@@ -133,12 +137,44 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         const rho2 = dot(pc, pc);
         const rho = sqrt(rho2);
         const R = float(R_BODY);
-        const zArg = max(R.mul(R).sub(rho2), 0.0);   // clamped: outside the disk this would go negative
-        const z = sqrt(zArg);
-        const N = vec3(pc, z).div(R);                 // sphere centred at the origin: outward normal = position / R
         const V = vec3(0.0, 0.0, -1.0);                // orthographic ray, into the screen
+
+        // *** DROPLET IS THE FIRST SPECIES HERE WHOSE SILHOUETTE MOVES, SO IT IS THE FIRST TO REPLACE THE
+        // ANALYTIC SPHERE WITH THE KIT'S DEFORMED SOLVE. *** droplet.ts: "the body itself is the species: a
+        // sphere of water in free fall ... everything the others keep at a whisper is turned up". Its
+        // deformation runs at 0.052-0.092 against the other three's 0.018-0.024, and its shading gain at 3.30
+        // against their 1.05-1.30 -- the shading is deliberately allowed past what the silhouette is.
+        //
+        // THE OTHER THREE KEEP THE INLINE SPHERE, and that is a measurement rather than a preference: mhBody
+        // costs two extra mhDeform evaluations per pixel, and at amp = 0 it reduces to exactly this sphere
+        // (checked in the gate -- Rd is 1 and the normal matches to f64). Paying for a solve whose answer is
+        // known would slow three species to buy nothing, and would move their gates' pixels for no reason.
+        const dN = vec3(0.0, 0.0, 1.0).toVar();
+        const dP = vec3(0.0, 0.0, 0.0).toVar();
+        let N, fres, bodyMask;
+        if (species === "droplet") {
+            // THE INHALE: the breath is the carrier and voice is what fills it, so the swell arrives on a
+            // curve. droplet.ts: "a body that follows the raw envelope reads as a VU meter."
+            const swell = float(0.22).add(KIT.mhBreath(uniforms.time, float(0.9)).mul(0.78)).mul(uniforms.voice).toVar();
+            const bodyScale = float(1.0).add(swell.mul(0.050)).toVar();
+            // Tension runs BACKWARDS through the amplitude on purpose, "because that is what tension IS".
+            const wob = float(0.052).add(uniforms.wobble.mul(0.040))
+                .mul(float(1.0).sub(uniforms.tension.mul(0.22)))
+                .mul(float(1.0).add(swell.mul(0.30))).toVar();
+            // uv in murmur's own units: this file's quad is -1..1 with the body at R_BODY, murmur's is uv with
+            // the body at MH_R, so the ratio carries one space into the other.
+            const uvM = pc.mul(KIT.MH_R / R_BODY).div(bodyScale).toVar();
+            const b = KIT.mhBody(uvM, uniforms.time, float(0.004), wob, float(0.0), float(3.30),
+                                 vec3(0.0, 0.0, 1.0), float(0.0), float(0.0), dP, dN).toVar();
+            N = dN; fres = b.w; bodyMask = b.x;
+        } else {
+            const zArg = max(R.mul(R).sub(rho2), 0.0);   // clamped: outside the disk this would go negative
+            const z = sqrt(zArg);
+            N = vec3(pc, z).div(R);                      // sphere at the origin: outward normal = position / R
+            fres = float(1.0).sub(clamp(N.z, 0.0, 1.0)); // 0 dead centre, 1 at the silhouette -- see header
+            bodyMask = null;
+        }
         const ci = clamp(N.z, 0.0, 1.0);               // = -dot(V, N) since V = (0,0,-1); cos(incidence)
-        const fres = float(1.0).sub(ci);               // 0 dead centre, 1 at the silhouette -- see header
 
         // *** THE REFRACTED RAY IS THE DIRECTION THE INTERIOR IS MARCHED ALONG, AND UNTIL v4624 IT WENT
         // NOWHERE. *** This file computed exactly this vector -- Snell with a TIR guard, matching kit.ts's
@@ -148,7 +184,9 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // constant floor plus a gaussian in t. Both halves are repaired by the same change.
         const rd = KIT.mhLook(V, N, vec2(0.0, 0.0));   // tilt is not wired to a uniform here; the kit's exact
                                                        // zero test returns mh_refract's vector untouched
-        const P = N;                                   // entry point in BODY UNITS -- the sphere is radius 1 there
+        // Entry point in BODY UNITS. On the sphere that IS the normal; on a deformed body it is not, so
+        // droplet takes the point the solve actually returned.
+        const P = species === "droplet" ? dP : N;
         const L = KIT.mhExit(P, rd).toVar();
 
         // still.ts's GESTURE CLOCK and its glint PATH. The light enters one side of the volume and leaves by
@@ -346,7 +384,53 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             float(0.0)).toVar();
         const cometDensity = accC.mul(4.20).add(headE).mul(uniforms.depth);
 
-        const density = species === "limn" ? limnDensity : species === "comet" ? cometDensity : stillDensity;
+        // =====================================================================================================
+        // *** DROPLET -- THE FOURTH SPECIES. "A sphere of water in free fall." ***
+        //
+        // Its interior is briefed as very nearly CLEAR, and droplet.ts is explicit that this is not the same
+        // as empty: "A clear interior is not an empty one -- it is what lets the refraction be visible,
+        // because the only way to see a lens is to see something through it." So: a little haze, and one
+        // soft luminous heart.
+        //
+        // THE HEART IS SOLVED AT THE RAY'S CLOSEST APPROACH, NOT SAMPLED -- the third species in a row where
+        // that is the defining detail, and the one I got wrong on comet by stopping reading too early.
+        // droplet.ts: "a core 0.22 body units across, marched at steps of about 0.38, was caught by one tap or
+        // two depending on where the planes fell along a refracted ray whose direction changes every pixel."
+        // IT IS CENTRED, and only just off it: a lag of 0.028 on three incommensurate periods, "enough that
+        // the core is never nailed to the exact centre and far too little to read as off-centre".
+        const swellD = float(0.22).add(KIT.mhBreath(uniforms.time, float(0.9)).mul(0.78)).mul(uniforms.voice).toVar();
+        const coreC = vec3(
+            sin(uniforms.time.mul(0.213).add(0.6)).mul(0.028),
+            sin(uniforms.time.mul(0.167).add(2.4)).mul(0.026),
+            sin(uniforms.time.mul(0.139).add(4.1)).mul(0.024)).toVar();
+        // THE CORE IS SMALL, and has to be: "a core that fills the body is not a light inside glass, it is a
+        // lamp with a shade." At a quarter of the radius it occupies a sixtieth of the volume, leaving the
+        // rest for the refraction to be visible in -- and the refraction is the species.
+        const coreR = float(0.17).add(float(1.0).sub(uniforms.tension).mul(0.10)).mul(float(1.0).add(swellD.mul(0.22))).toVar();
+        const coreBright = float(1.0).add(uniforms.voice.mul(0.85)).toVar();
+        const accD = float(0.0).toVar();
+        const transD = float(1.0).toVar();
+        Loop({ start: 0, end: MH_TAPS }, ({ i }) => {
+            const sM = float(i).add(0.5).mul(ds);
+            const pD = P.add(rd.mul(sM));
+            const eD = KIT.mhMedium(pD, uniforms.time, float(2.1)).mul(0.090).mul(KIT.mhInside(pD)).toVar();
+            accD.addAssign(eD.mul(transD).mul(ds));
+            transD.assign(transD.mul(exp(eD.mul(2.40).add(MH_EXT).mul(ds).negate())));
+        });
+        const toC = coreC.sub(P).toVar();
+        const sC = dot(toC, rd).toVar();
+        const dC2 = max(dot(toC, toC).sub(sC.mul(sC)), float(0.0)).div(max(coreR.mul(coreR), float(1e-6))).toVar();
+        const visC = KIT.mhInside(P.add(rd.mul(sC))).mul(exp(sC.mul(-MH_EXT))).mul(coreBright).toVar();
+        // The scatter is what stops a clear interior reading as an empty one: "the heart lights the fog it
+        // sits in, the fog dims with depth because MH_EXT is in the visibility term, and the drop comes out as
+        // a lamp inside a lens instead of a disc pasted on ink."
+        const heart = select(sC.greaterThan(0.0).and(sC.lessThan(L)),
+            exp(negate(dC2)).mul(1.65).add(KIT.mhScatter(dC2, float(0.34))).mul(visC), float(0.0)).toVar();
+        const dropletDensity = accD.mul(4.20).add(heart).mul(uniforms.depth);
+
+        const density = species === "limn" ? limnDensity
+            : species === "comet" ? cometDensity
+            : species === "droplet" ? dropletDensity : stillDensity;
 
         // surface: fresnel rim + two specular lobes (a tight highlight, a broad soft one), a fixed light direction
         // *** LIMN'S BASE RIM IS 0.30 AND still'S IS THE HIGHEST IN THE COLLECTION, AND BOTH ARE FITTED
@@ -367,7 +451,9 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // a catchlight." That is exactly the failure the missing-head measurement surfaced here -- the
         // catchlight WAS the brightest thing in the glass -- so the head being solved and the specular coming
         // down are two halves of one repair, not a fix and a tweak.
-        const specScale = species === "comet" ? 0.22 : 0.9;
+        // droplet spends more energy on the specular than any other hero, and its file says why: "a
+        // wobbling surface is only visibly wobbling if there is a highlight riding it".
+        const specScale = species === "comet" ? 0.22 : species === "droplet" ? 1.25 : 0.9;
         const specTight = pow(nh, 96.0).mul(specScale);
         const specBroad = pow(nh, 4.0).mul(0.09);
 
@@ -394,7 +480,13 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // that swaps the arguments back and renders bit-identical output. So this fix is spec-compliance, not
         // a rendering fix on THIS implementation: the guarantee spent is that some OTHER device is free to
         // implement smoothstep a different way when edge0 >= edge1, and this file does not ask any device to.
-        const edgeMask = float(1.0).sub(smoothstep(R.sub(EDGE_FEATHER), R, rho));   // 1 inside the disk, 0 outside, antialiased
+        // *** FOR DROPLET THE MASK IS THE SOLVE'S OWN MEMBERSHIP, AND USING THE FIXED-RADIUS ONE WOULD HAVE
+        // HIDDEN THE ENTIRE SPECIES. *** mhBody returns m from the DEFORMED radius Rd with murmur's own two
+        // feather terms added rather than multiplied; clipping that to a circle of radius R_BODY would draw a
+        // wobbling interior inside a perfectly round hole, which is the one thing droplet is not.
+        const edgeMask = species === "droplet"
+            ? bodyMask
+            : float(1.0).sub(smoothstep(R.sub(EDGE_FEATHER), R, rho));   // 1 inside the disk, 0 outside, antialiased
         return vec4(outColor, edgeMask);
     });
 
