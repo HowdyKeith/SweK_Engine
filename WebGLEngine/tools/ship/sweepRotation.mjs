@@ -82,6 +82,41 @@ export function rebuildFinished(file, ledger) {
     return { finished, rebuilt, skipped };
 }
 
+/**
+ * Fold this pass's readings into sweep-timings.json's maps. PURE, and exported, so the claim below can be
+ * driven on a fixture rather than only by running eighty gates for five minutes.
+ *
+ * *** v4556 -- THIS PASS TAKES THE EXACT MEASUREMENT `serial` EXISTS TO HOLD AND FILED IT NOWHERE. ***
+ * The header at the top of this file says "SERIAL ON PURPOSE. The budget is a serial number", and every
+ * reading here is uncontended by construction -- and the merge wrote `timings`, `codes`, `at` and
+ * `finished`, never `serial`. So quickSweep.costOf(), the accessor v4562 built to tell the two measurements
+ * apart, answered `source: "parallel"` for 210 OF THE 237 ROTATION READINGS ON FILE: it labelled the
+ * trustworthy number as the contended one, across the whole exiled pool -- which is the population this
+ * pass exists to serve, and the only population nothing else ever measures alone (quickSweep's serial slice
+ * draws from `sel.run`, and an over-budget gate is by definition not in it).
+ *
+ * The reading now goes in BOTH fields, with `contended: false` saying the copy in `timings` is not a
+ * sample. Writing it to `serial` alone would have been wrong in the other direction: `timings` is still the
+ * membership number every consumer reads, and a rotation that stopped updating it would stop returning
+ * gates to the sweep, which is the whole point of the pass.
+ */
+export function mergeTimings(file, rows, stamp) {
+    const timings = { ...(file.timings || {}) }, codes = { ...(file.codes || {}) }, at = { ...(file.at || {}) };
+    const finished = { ...(file.finished || {}) };
+    const serial = { ...(file.serial || {}) }, serialAt = { ...(file.serialAt || {}) };
+    const contended = { ...(file.contended || {}) };
+    const priorMs = {};
+    for (const r of rows) {
+        priorMs[r.gate] = (file.timings || {})[r.gate];
+        timings[r.gate] = r.ms; codes[r.gate] = r.code; at[r.gate] = stamp;
+        serial[r.gate] = r.ms; serialAt[r.gate] = stamp; contended[r.gate] = false;
+        // Recorded either way: a gate that STOPS finishing must lose its verdict, not keep an old true.
+        finished[r.gate] = !!r.finished;
+    }
+    backfillStamps(timings, at);
+    return { merged: { ...file, timings, codes, at, finished, serial, serialAt, contended }, priorMs };
+}
+
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     const arg = (n, d) => { const i = process.argv.indexOf(n); return i >= 0 ? process.argv[i + 1] : d; };
     const budgetMs = Number(arg("--budget-s", 180)) * 1000;
@@ -159,15 +194,9 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     }
     if (process.argv.includes("--write")) {
         const stamp = new Date().toISOString();
-        const timings = { ...(file.timings || {}) }, codes = { ...(file.codes || {}) }, at = { ...(file.at || {}) };
-        const priorMs = {};
-        const finished = { ...(file.finished || {}) };
-        for (const r of rows) { priorMs[r.gate] = (file.timings || {})[r.gate]; timings[r.gate] = r.ms; codes[r.gate] = r.code; at[r.gate] = stamp;
-            // Recorded either way: a gate that STOPS finishing must lose its verdict, not keep an old true.
-            finished[r.gate] = !!r.finished; }
-        backfillStamps(timings, at);
+        const { merged: mergedTimings, priorMs } = mergeTimings(file, rows, stamp);
         fs.writeFileSync(path.join(ENG, "tools", "ship", "sweep-timings.json"),
-            JSON.stringify({ ...file, timings, codes, at, finished }, null, 1) + "\n");
+            JSON.stringify(mergedTimings, null, 1) + "\n");
         // Its OWN file: quickSweep builds a fresh object each write and erased this ledger the first time it ran.
         // *** v4535 -- MERGED BY GATE, NOT REPLACED WHOLESALE. *** ROTATION_LOST_V4461 records that this ledger
         // "holds only the last run", and said so as a limitation it had to work around. A one-gate --write then

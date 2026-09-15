@@ -139,6 +139,7 @@ import { overNonEmpty, emptyOfNonEmpty } from "./vacuity.mjs";
 import * as QS from "./quickSweep.mjs";
 import * as Q from "./quickSweep.mjs";
 import { gateReport } from "./gateReport.mjs";
+import { mergeTimings } from "./sweepRotation.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -765,19 +766,91 @@ console.log("\n*** THE FILED READING IS A CONTENDED SAMPLE AND THE COST IS A DIF
     // stays outside the ship-time sweep -- a record whose only guardian is over budget is a record nothing
     // checks, which is exactly the population tools/ship/recordReach-selfcheck.mjs counts.
     const t = QS.readTimings(QS.DEFAULTS.timingsFile, ENG);
-    const pairs = Object.keys(t.serial || {})
-        .filter((g) => t.timings[g] > 50 && t.serial[g] > 50)
-        .map((g) => t.timings[g] / t.serial[g]).sort((a, b) => a - b);
+    // *** v4556 -- THIS ROW WAS DIVIDING 164 MEASUREMENTS BY THEMSELVES. *** It took every gate in `serial`
+    // as a pair, and `timings[g]` is NOT always a parallel sample: quickSweep files `r.serialMs ??
+    // r.parallelMs`, so every red and every budget crosser carries THE SAME NUMBER in both fields. Each of
+    // those divides to exactly 1.00. MEASURED on the live file at the time of the repair: 1,262 pairs read
+    // p10 1.00 and median 2.07x; the 1,098 real pairs read p10 1.41 and median 2.17x. THE p10 OF 1.00 WAS
+    // NOT A GATE THAT ESCAPED CONTENTION, IT WAS A GATE COMPARED WITH ITSELF -- and the shortfall against
+    // v4562's 2.41x was being narrated here as sweep-to-sweep variation. The population rule lives in
+    // quickSweep.contentionPairs() rather than here, because a rule about what a field means belongs beside
+    // the writer of the field and this gate is the second place it was spelled out.
+    const cp = QS.contentionPairs(t);
+    const pairs = cp.ratios;
+    const excluded = cp.excluded;   // taken over contentionPairs' OWN eligible set, so the two halves agree
     const med = pairs.length ? pairs[pairs.length >> 1] : null;
     const R = SC.SWEEP_CONTENTION_V4562;
     ok("!! *** THE FILED READING RUNS WELL ABOVE THE COST, ON THE LIVE FILE, RIGHT NOW ***",
        pairs.length > 500 && med > 1.2,
-       `${pairs.length} gates carry both a filed and a serial reading; filed/serial median ` +
+       `${pairs.length} gates carry a CONTENDED filed reading and a separate serial one; filed/serial median ` +
        `${med === null ? "n/a" : med.toFixed(2) + "x"} here against the ${R.ratio.median}x recorded at ` +
        `v4562 from a full 8-worker against 1-worker pair (p10 ${R.ratio.p10}, p90 ${R.ratio.p90}, max ` +
        `${R.ratio.max}). The two need not agree -- the record is one pair of sweeps and this is whatever the ` +
        "last one saw -- and BOTH BEING ABOVE 1 is the claim. Eight workers on four cores is 2x " +
-       "oversubscription: it buys 1.63x of wall clock (230 s against 374 s) and costs this.");
+       `oversubscription: it buys 1.63x of wall clock (230 s against 374 s) and costs this. ${excluded} gate(s) ` +
+       "were EXCLUDED as one measurement filed in two fields, which is what this row used to average in at " +
+       `1.00; ${cp.inferred.length} of the pairs kept have no recorded provenance and were inferred from the ` +
+       "two readings differing, which is the fallback for entries written before `contended` existed.");
+    // *** AND THE EXCLUSION IS DRIVEN, not trusted. *** A population rule that quietly matched nothing would
+    // leave this row reading exactly as it did before the repair, which is the failure mode the repair is
+    // about. Two fixtures: one gate whose readings are one measurement, one whose readings are two.
+    {
+        // *** SABOTAGE S3 WENT 0 RED AGAINST THE FIRST DRAFT OF THIS FIXTURE, AND THE REASON IS THE ROW'S
+        // OWN SENTENCE. *** It read {self: 900/900, real: 2000/1000} and claimed in its detail that the
+        // self-pair "is dropped by its recorded provenance and not by its value" -- which the fixture could
+        // not tell apart, because deleting the provenance branch left the equality fallback to drop the same
+        // gate for the other reason. A fixture where both rules give the same answer cannot grade either.
+        // So the two cases below are the ones where THEY DISAGREE, and nothing else will do:
+        //   twinned  -- two honest readings that landed on the same millisecond. Provenance says KEEP;
+        //               equality says drop. It is kept, and its ratio of 1.00 is a real observation.
+        //   filed    -- a rotation filed ONE uncontended reading into both fields, and a later serial slice
+        //               then refreshed `serial` alone: the two numbers now DIFFER and are BOTH uncontended,
+        //               so their ratio is serial-over-serial and means nothing. Provenance says DROP;
+        //               equality says keep. (A returnee really does travel this path -- the rotation writes
+        //               both, the gate comes back under budget, and the slice draws from the run.)
+        const fix = { timings: { twinned: 1000, filed: 2400, real: 2000 },
+                      serial:  { twinned: 1000, filed: 2200, real: 1000 },
+                      contended: { twinned: true, filed: false, real: true } };
+        const got = QS.contentionPairs(fix);
+        ok("  and the rule is driven on the two cases where provenance and the value DISAGREE",
+           got.pairs.slice().sort().join() === "real,twinned" && got.inferred.length === 0 &&
+           got.excluded === 1 && got.ratios.join() === "1,2",
+           `kept ${JSON.stringify(got.pairs.slice().sort())} at ${JSON.stringify(got.ratios)}, excluded ` +
+           `${got.excluded}. A 1.00 that is REALLY 1.00 stays in the population -- dropping it would bias ` +
+           "the median upward -- and a pair of two UNCONTENDED readings is dropped however far apart its " +
+           "numbers happen to be, because serial over serial is not a contention ratio.");
+        const noProv = QS.contentionPairs({ timings: { self: 900, real: 2000 }, serial: { self: 900, real: 1000 } });
+        ok("  ...and with no provenance on file it falls back to the readings differing, and SAYS how many",
+           noProv.pairs.join() === "real" && noProv.inferred.join() === "real",
+           `kept ${JSON.stringify(noProv.pairs)}, inferred ${JSON.stringify(noProv.inferred)}`);
+    }
+    // *** v4556 -- AND THE ROTATION'S READING REACHES THE FIELD BUILT FOR IT, WHICH IT DID NOT. ***
+    // sweepRotation runs SERIALLY on purpose -- its header says so twice, "the budget is a serial number"
+    // -- and its merge wrote `timings`, `codes`, `at`, `finished` and never `serial`. MEASURED on the file
+    // before the repair: of the 237 rotation readings still filed, costOf() called 210 of them "parallel".
+    // The accessor built to separate the two measurements was wrong about provenance for the whole exiled
+    // pool, and wrong in the direction that matters -- it labelled the good number as the untrustworthy one.
+    // Driven on a fixture rather than by running eighty gates: mergeTimings is pure and exported for it.
+    {
+        const before = { timings: { g: 9000 }, codes: { g: 1 }, at: { g: "old" } };
+        const after = mergeTimings(before, [{ gate: "g", ms: 2500, code: 0, finished: true }], "now").merged;
+        ok("!! *** a rotation reading lands in `serial` AND in `timings`, and says the copy is not a sample ***",
+           after.serial.g === 2500 && after.serialAt.g === "now" && after.contended.g === false &&
+           after.timings.g === 2500,
+           `serial ${after.serial.g}, timings ${after.timings.g}, contended ${after.contended.g}. BOTH, not ` +
+           "either: `timings` is still the membership number, so a rotation that stopped writing it would " +
+           "stop returning gates to the sweep, which is the pass's whole purpose.");
+        ok("  ...so costOf now reports the rotation's own measurement as SERIAL, which it always was",
+           QS.costOf(after, "g").source === "serial" && QS.costOf(after, "g").ms === 2500 &&
+           QS.costOf(before, "g").source === "parallel",
+           `after the repair costOf says ${QS.costOf(after, "g").source}; on the same row written the old ` +
+           `way it says ${QS.costOf(before, "g").source} -- that was 210 of 237 filed readings`);
+        ok("  ...and the merge does not touch a gate this pass did not re-time",
+           mergeTimings({ timings: { a: 1, b: 2 }, serial: { b: 7 }, contended: { b: true } },
+                        [{ gate: "a", ms: 5, code: 0, finished: true }], "now").merged.serial.b === 7,
+           "a merge that rebuilt the maps instead of folding into them is the shape that erased `finished` " +
+           "at v4568 and the rotation ledger at v4461");
+    }
     ok("!! ...and the record's own arithmetic holds, so it cannot drift from itself",
        Math.abs(R.wallMs.workers1 / R.wallMs.workers8 - R.speedup) < 0.01 &&
        R.filedTotalMs.workers8 > R.filedTotalMs.workers1 && R.crossedInOneButNotTheOther === 0 &&

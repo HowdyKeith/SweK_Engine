@@ -68,6 +68,43 @@ export function costOf(t, gate) {
 }
 
 /**
+ * The gates a CONTENTION RATIO may be taken over: those whose filed reading is a genuine contended sample
+ * AND whose serial reading is a separate, uncontended one.
+ *
+ * *** v4556 -- THE LIVE RE-DERIVATION OF v4562'S RATIO WAS DIVIDING 164 MEASUREMENTS BY THEMSELVES. ***
+ * The obvious population is "every gate in `serial`", and it is wrong, because `timings[g]` is not always a
+ * parallel sample: the line that files a row writes `r.serialMs ?? r.parallelMs`, so every gate re-run alone
+ * -- every red, every budget crosser -- has THE SAME NUMBER in both fields. Divided, each one contributes
+ * exactly 1.00 and drags the median down. MEASURED on the live file: 1,262 pairs read p10 1.00, median
+ * 2.07x; excluding the 164 self-pairs, 1,098 pairs read p10 1.41, median 2.17x. The p10 of 1.00 was not a
+ * gate that escaped contention, it was a gate compared with itself, and the gap to v4562's 2.41x was being
+ * narrated as sweep-to-sweep variation.
+ *
+ * `contended` is the provenance this needs and the file did not carry: true when `timings[g]` came from the
+ * parallel phase, false when it is a serial reading filed there. It is RECORDED AT THE MEASUREMENT rather
+ * than inferred, because the only available inference is `timings[g] !== serial[g]` -- which silently drops
+ * a real pair whose two readings happen to land on the same millisecond, and cannot tell a rotation's
+ * uncontended reading from a contended one at all. The inference is still the FALLBACK for entries written
+ * before this field existed, and the count of those is returned rather than folded in.
+ */
+export function contentionPairs(t, { minMs = 50 } = {}) {
+    const T = (t && t.timings) || {}, S = (t && t.serial) || {}, C = (t && t.contended) || {};
+    const pairs = [], inferred = [];
+    // The floor is the one this population has always carried: a ratio of two sub-50ms readings is process
+    // startup divided by process startup. It is a PARAMETER rather than a literal in the caller because the
+    // excluded-count arithmetic below has to be taken over the same floor, and my first draft of this
+    // repair took the two halves over different ones and reported 99 exclusions where there are 164.
+    const eligible = Object.keys(S).filter((g) => T[g] > minMs && S[g] > minMs);
+    for (const g of eligible) {
+        if (C[g] === true) { pairs.push(g); continue; }
+        if (C[g] === false) continue;                       // a serial reading filed in `timings`
+        if (T[g] !== S[g]) { pairs.push(g); inferred.push(g); }   // no provenance on file: infer, and say so
+    }
+    return { pairs, inferred, eligible, excluded: eligible.length - pairs.length,
+             ratios: pairs.map((g) => T[g] / S[g]).sort((a, b) => a - b) };
+}
+
+/**
  * Which gates owe a serial reading, oldest first. Pure so a gate can drive it: an absent reading sorts
  * before any present one, and ties keep enumeration order so the slice is deterministic.
  */
@@ -347,8 +384,14 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
     // that caps a gate must be able to say so, and a sweep that runs one to completion must be able to
     // clear a stale true -- so it is recorded in BOTH directions on every row, never only when it is false.
     const finished = { ...(prior.finished || {}) };
+    const contended = { ...(prior.contended || {}) };
     for (const r of rows) {
         timings[r.gate] = r.serialMs ?? r.parallelMs; codes[r.gate] = r.serialCode ?? 0; at[r.gate] = stamp;
+        // *** v4556 -- WHICH OF THE TWO MEASUREMENTS THIS ENTRY IS, WRITTEN BESIDE IT. *** The line above
+        // files a SERIAL number whenever there was a serial re-run and a PARALLEL one otherwise, and until
+        // now nothing recorded which. See contentionPairs(): the ratio that justifies the whole `serial`
+        // map was being computed over 164 gates whose two readings are one measurement.
+        contended[r.gate] = r.serialMs == null;
         finished[r.gate] = !(r.serialTimedOut ?? r.parallelTimedOut ?? false);
     }
     backfillStamps(timings, at);
@@ -390,7 +433,11 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
                   "on unchanged code. A gate that comes back under loses its count entirely. " +
                   "`serial` (v4562) is the UNCONTENDED cost -- from a phase-2 run or from this sweep's rotating " +
                   "slice -- while `timings` is a sample taken while seven other gates fought for the box and " +
-                  "runs a MEDIAN 2.41x above it. Ask costOf(), not timings[], for what a gate costs.",
+                  "runs a MEDIAN 2.41x above it. Ask costOf(), not timings[], for what a gate costs. " +
+                  "`contended` (v4556) says WHICH of the two `timings[g]` is: true for a parallel sample, " +
+                  "false for a serial reading filed there -- by a red re-run, a budget confirm, or " +
+                  "sweepRotation. A ratio taken without it divides 164 measurements by themselves. Ask " +
+                  "contentionPairs() for the population a contention ratio may be taken over.",
             // *** `finished` IS IN THIS LIST BECAUSE IT WAS NOT, AND THE SWEEP ERASED IT. *** v4568 added the
             // field, wrote it into a local object in the loop above, and left it out of the object actually
             // written -- so the first full sweep after the killed pass silently deleted 140 rows of
@@ -399,7 +446,7 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
             // owned, inputSets.encode dropping a renamed flag, and now this. A writer that spells its fields
             // by hand is a list that has to be maintained in step with every reader of the file, and
             // ROTATION_LOST_V4461 is the same mechanism across two processes rather than inside one.
-            captured: out.at, budgetMs, capMs, timings, codes, at, finished, crossings, serial, serialAt,
+            captured: out.at, budgetMs, capMs, timings, codes, at, finished, crossings, serial, serialAt, contended,
         }, null, 1) + "\n");
     }
     return out;
