@@ -167,6 +167,28 @@ export function mhFlourish(t, lane, slotLen) {
     return { env, u: uc, rand: mhHash1(slot + 1607.0, lane), dur };
 }
 
+/**
+ * kit.ts's mh_drift: an EASED angular travel. rate*t plus a sine whose amplitude is tied to the rate, so the
+ * thing "hurries through part of its lap and dawdles through the rest -- a light going somewhere, not a light
+ * going round. At a constant rate this species was a spinner."
+ *
+ * *** THE 0.72 CAP IS CARRIED, AND THE REASON IS NOT INVENTED FOR IT. *** The first draft of this comment said
+ * the clamp exists because "past that the derivative goes negative and the travel reverses". That is a tidy
+ * story and it is false: d/dt = rate * (1 + k*cos(...)), whose minimum is rate*(1-k), so the travel reverses
+ * at k > 1 and not at 0.72 -- measured, min d/dt is 0.38*rate at murmur's own 0.62 and 0.28*rate at the cap.
+ * So the cap leaves real margin and kit.ts does not say why. Carried as shipped, with the margin recorded and
+ * the reason marked unknown, because a constant explained by a rationale the source never gave is worse than
+ * one left unexplained: the next reader believes it.
+ */
+export function mhDrift(t, rate, wobble, lane) {
+    const k = Math.min(0.72, Math.max(0, wobble));
+    const w2 = 0.137 + 0.0413 * lane;
+    return rate * t + (k * rate / w2) * Math.sin(w2 * t + lane * 1.71);
+}
+
+/** The maximum wobble kit.ts allows. Its reason is NOT stated upstream and is not guessed here -- see mhDrift. */
+export const MH_DRIFT_WOBBLE_CAP = 0.72;
+
 /** kit.ts: two periods whose ratio is irrational enough not to repeat, weighted 0.62/0.38 so the sum is not a sine. */
 export function mhBreath(t, lane) {
     const a = Math.sin(t * 0.668 + lane);
@@ -324,6 +346,46 @@ export function stillGlintPath(fl, drive = 0) {
         side[2] * lateral + dir[2] * along,
     ];
 }
+
+// ---------------------------------------------------------------------------------------------------------
+// LIMN -- the second species. "Near-dark glass whose EDGE is alive."
+// ---------------------------------------------------------------------------------------------------------
+
+/** limn.ts's own four knobs and their shipped defaults, from murmur's src/styles.ts roster. */
+export const LIMN_DEFAULTS = Object.freeze({ rimWidth: 0.4, travel: 0.5, innerHint: 0.3, spread: 0.4 });
+
+/**
+ * *** THE COMMA, AND WHY IT IS TWO VON MISES BUMPS RATHER THAN A GAUSSIAN. *** limn.ts records its own first
+ * cut failing and says exactly how: "one gaussian in the angle, narrow ahead of the head and wide behind it
+ * ... left a razor-thin dark seam down one radius of the body. The two halves do not agree where the wrap
+ * happens: at plus and minus pi the narrow side had fallen to 0.03 and the wide side was still at 0.21, so
+ * the field simply steps. A GAUSSIAN IN A WRAPPED ANGLE IS NOT A PERIODIC FUNCTION and no amount of tuning
+ * makes it one."
+ *
+ * So the profile is exp(k*(cos(x)-1)) -- a function of cos(x) alone, therefore periodic BY CONSTRUCTION. A
+ * tight lobe at the head plus a broad one at 0.52 amplitude offset about a radian behind it. The gate checks
+ * the periodicity as an identity at the wrap rather than trusting the construction.
+ */
+export function vonMises(x, k) { return Math.exp(k * (Math.cos(x) - 1)); }
+
+/** limn's arc profile at angular offset `aw` from the head. kHead/kTail/offT are murmur's own. */
+export function limnArc(aw, { kHead = 9.0, kTail = 1.6, offT = -1.05 } = {}) {
+    return vonMises(aw, kHead) + 0.52 * vonMises(aw - offT, kTail);
+}
+
+/**
+ * The tail's share of the light at this angle -- limn's own hue weight, and its reason is worth carrying:
+ * "the honest measure of how much of what I am seeing here is old light and, unlike the wrapped angle the
+ * first cut used, PERIODIC -- so the hue has no seam either."
+ */
+export function limnTailShare(aw, opts = {}) {
+    const { kHead = 9.0, kTail = 1.6, offT = -1.05 } = opts;
+    const head = vonMises(aw, kHead), tail = 0.52 * vonMises(aw - offT, kTail);
+    return tail / Math.max(head + tail, 1e-4);
+}
+
+/** Wrap an angle to -pi..pi the way limn.ts does it -- subtracting a rounded turn, not an atan round-trip. */
+export function wrapPi(a) { return a - 2 * Math.PI * Math.floor(a / (2 * Math.PI) + 0.5); }
 
 /** still.ts's glint slot length: ~11.5 s at rate 0 down to ~7 s at rate 1, shortened by pace and drive. */
 export function stillGlintSlot(glintRate, { pace = 0, drive = 0 } = {}) {

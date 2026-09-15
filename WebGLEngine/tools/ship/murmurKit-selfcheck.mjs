@@ -367,6 +367,104 @@ sec("6. *** THE PAIR: THE REAL COMPILED SHADER AGAINST THE CPU REFERENCE, BIT FO
     }
 }
 
+// =============================================================================================================
+sec("7. *** LIMN, THE SECOND SPECIES: THE COMMA THAT MUST NEVER CLOSE INTO A RING ***");
+{
+    // *** THE PROFILE IS PERIODIC BY CONSTRUCTION AND THE ROW ASSERTS IT AS AN IDENTITY. *** limn.ts records
+    // its own first cut failing: one gaussian in the wrapped angle "left a razor-thin dark seam down one
+    // radius of the body ... at plus and minus pi the narrow side had fallen to 0.03 and the wide side was
+    // still at 0.21, so the field simply steps. A GAUSSIAN IN A WRAPPED ANGLE IS NOT A PERIODIC FUNCTION."
+    const atPlus = K.limnArc(K.wrapPi(Math.PI)), atMinus = K.limnArc(K.wrapPi(-Math.PI));
+    ok("!! *** THE ARC IS EXACTLY EQUAL AT +pi AND -pi -- no seam, because it is a function of cos alone ***",
+        atPlus === atMinus,
+        `arc(+pi) = arc(-pi) = ${atPlus.toFixed(9)}, bit-identical. A gaussian in the angle is 0.03 against ` +
+        `0.21 across the same wrap, which is the seam murmur shipped once and replaced.`);
+
+    // The far side must stay a dim glow. murmur states the numbers; they are checked against its constants.
+    const truePeak = (o) => { let m = 0; for (let i = 0; i <= 36000; i++) m = Math.max(m, K.limnArc(K.wrapPi(i * Math.PI / 18000), o)); return m; };
+    const wide = { kHead: 9.0, kTail: 1.6, offT: -1.05 };
+    const small = { kHead: 2.2, kTail: 0.95, offT: -1.25 };
+    const r120 = K.limnArc(Math.PI, wide) / truePeak(wide);
+    const r18 = K.limnArc(Math.PI, small) / truePeak(small);
+    say(`far side as a share of peak: ${(r120 * 100).toFixed(1)}% at the 120 pt concentrations, ${(r18 * 100).toFixed(1)}% at 18 pt`);
+    ok("!! *** IT IS A COMMA AND NOT A RING: the far side is 3.8% of the peak, which is limn.ts's own 'four per cent' ***",
+        r120 > 0.03 && r120 < 0.045,
+        `${(r120 * 100).toFixed(1)}% against the "four per cent" its header quotes. The concentrations were ` +
+        `"chosen by looking at where it started to become one", so this is the number the species IS.`);
+    // *** AND THE 18 pt FIGURE DOES NOT REPRODUCE, WHICH IS REPORTED RATHER THAN ROUNDED INTO AGREEMENT. ***
+    ok("...while the 18 pt figure reads 12.5% against the 'eleven' its header names, and the gap is NAMED",
+        r18 > 0.11 && r18 < 0.135,
+        `${(r18 * 100).toFixed(1)}% from murmur's own constants at voice 0 and drive 0, against the 11 its ` +
+        `header states -- a 1.5 point gap. The most likely explanation is that mh_small does not reach 1.0 at ` +
+        `18 pt, so the real concentrations never hit the extremes used here; mh_small is NOT ported, so that ` +
+        `is a hypothesis and is written as one. What is not done is quietly widening this row until 11 fits.`);
+
+    // *** wrapPi WAS UNCHECKED AND THE SABOTAGE SWEEP FOUND IT. *** Every row above evaluates it only at
+    // +/-pi, where a version that rounds DOWN instead of to NEAREST happens to agree -- both map to pi -- so
+    // replacing floor(x + 0.5) with floor(x) left the whole section green. The contract is that any angle,
+    // from any number of turns away, lands in (-pi, pi]; that is what the shader relies on when the arc has
+    // been travelling for minutes and phi0 is in the hundreds of radians.
+    let outOfRange = 0, worstErr = 0;
+    for (let i = -4000; i <= 4000; i++) {
+        const a = i * 0.0197;                       // sweeps about +/-25 turns
+        const w = K.wrapPi(a);
+        if (!(w > -Math.PI - 1e-12 && w <= Math.PI + 1e-12)) outOfRange++;
+        // and it must differ from the input by a whole number of turns, exactly
+        const turns = (a - w) / (2 * Math.PI);
+        worstErr = Math.max(worstErr, Math.abs(turns - Math.round(turns)));
+    }
+    ok("!! *** wrapPi LANDS IN (-pi, pi] FROM ANY NUMBER OF TURNS AWAY, and moves by a whole turn exactly ***",
+        outOfRange === 0 && worstErr < 1e-9,
+        `8,001 angles spanning about +/-25 turns: ${outOfRange} outside the range, worst deviation from a ` +
+        `whole number of turns ${worstErr.toExponential(2)}. A version rounding down instead of to nearest ` +
+        `agrees at exactly +/-pi, which is where every other row in this section happened to look.`);
+
+    // The tail share drives the hue and must be periodic for the same reason the arc is.
+    ok("the tail's share of the light is periodic too, so the hue has no seam either",
+        K.limnTailShare(K.wrapPi(Math.PI)) === K.limnTailShare(K.wrapPi(-Math.PI)),
+        `limn.ts chose it over the wrapped angle for exactly this: "unlike the wrapped angle the first cut ` +
+        `used, PERIODIC -- so the hue has no seam either"`);
+
+    // THE SPECIES, RENDERED. still's rim is even all the way round; limn's is a bright arc with a dim far
+    // side. That is the whole brief, and it is asserted on real pixels rather than on the profile function.
+    const N2 = 48;
+    const shot = async (species) => renderThreeTslToPixels({
+        engineRoot: ENG, moduleImportPath: "/render/aiPresenceOrbTsl.mjs", factoryName: "makeAiPresenceOrbTsl",
+        factoryArgs: { species }, knobs: { time: 2.4, voice: 0.3 }, width: N2, height: N2,
+    });
+    const [sr, lr] = [await shot("still"), await shot("limn")];
+    if (!sr.ok || !lr.ok) {
+        ok("!! limn renders and its rim is asymmetric where still's is not", false,
+            `could not render: still ${sr.reason || "ok"}, limn ${lr.reason || "ok"}`);
+    } else {
+        const lum = (r, x, y) => { const i = (y * N2 + x) * 4; return r.pixels[i] + r.pixels[i + 1] + r.pixels[i + 2]; };
+        const sL = lum(sr, 9, 24), sR = lum(sr, 38, 24);
+        const lL = lum(lr, 9, 24), lR = lum(lr, 38, 24);
+        const sAsym = Math.abs(sL - sR) / Math.max(sL, sR), lAsym = Math.abs(lL - lR) / Math.max(lL, lR);
+        say(`rim luminance L/R -- still ${sL}/${sR} (asym ${(sAsym * 100).toFixed(1)}%), limn ${lL}/${lR} (asym ${(lAsym * 100).toFixed(1)}%)`);
+        ok("!! *** NEVER A FULL EVEN RING: limn's rim is strongly asymmetric and still's is even, on real pixels ***",
+            sAsym < 0.02 && lAsym > 0.25,
+            `still's two rim samples differ by ${(sAsym * 100).toFixed(1)}% -- an even edge, which is what a ` +
+            `plain fresnel rim gives. limn's differ by ${(lAsym * 100).toFixed(1)}%: a bright head on one side ` +
+            `and a dim glow opposite. The species is the asymmetry, so this is the row that would notice limn ` +
+            `quietly becoming a ring.`);
+        ok("...and the two species really are different pictures, not one picture with a different constant",
+            Math.abs(lum(sr, 24, 24) - lum(lr, 24, 24)) > 5 || Math.abs(lL - sL) > 60,
+            `centre ${lum(sr, 24, 24)} vs ${lum(lr, 24, 24)}, lit rim ${sL} vs ${lL}`);
+        // *** AND limn'S DARK SIDE HAS TO BE DARK, WHICH THE ASYMMETRY ROW ABOVE DOES NOT ASK. *** Raising
+        // limn's base rim from murmur's fitted 0.30 to still's 0.85 lifts BOTH sides together, so the ratio
+        // the row above measures barely moves and it stayed green under exactly that sabotage. limn's brief
+        // is that it is the mostly-dark one -- "on a gallery wall it is the one your eye goes to second", "in
+        // a chat UI it is the one that does not compete with the text" -- so the claim worth making is about
+        // the level of the unlit side, not only the contrast across it.
+        ok("!! *** limn IS THE DARK HERO: its unlit side sits well below still's even rim ***",
+            lR < sR * 0.85,
+            `limn's far side ${lR} against still's rim ${sR} -- ${(100 * lR / sR).toFixed(0)}% of it. murmur's ` +
+            `own fitted base rim for limn is 0.30 where still's is 0.85, and still is described in its own ` +
+            `file as carrying "the highest rim and specular in the collection".`);
+    }
+}
+
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nWHAT THIS KIT IS FOR: render/aiPresenceOrbTsl.mjs ships ONE of murmur-web's eighteen species and the " +
     "other seventeen were blocked on this file not existing -- each would otherwise have re-approximated the " +

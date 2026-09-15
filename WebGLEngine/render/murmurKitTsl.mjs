@@ -15,7 +15,7 @@
 // counter already does uint bit-mixing in TSL with .toVar()/.assign()/.bitXor(), and this reads the same way.
 "use strict";
 
-import { MH_R, MH_ETA, MH_EXT, MH_TILT, MH_SCATTER_K, MH_EXIT_CAP } from "./murmurKit.mjs";
+import { MH_R, MH_ETA, MH_EXT, MH_TILT, MH_SCATTER_K, MH_EXIT_CAP, MH_DRIFT_WOBBLE_CAP } from "./murmurKit.mjs";
 
 /**
  * makeMurmurKitTsl(TSL) -> the kit's node builders.
@@ -91,6 +91,13 @@ export function makeMurmurKitTsl(TSL) {
         return TSL.vec4(env, uc, mhHash1(slot.add(1607.0), lane), dur);
     });
 
+    /** kit.ts's mh_drift: eased angular travel, so an arc hurries and dawdles instead of spinning. */
+    const mhDrift = Fn(([t, rate, wobble, lane]) => {
+        const k = clamp(wobble, 0.0, MH_DRIFT_WOBBLE_CAP).toVar();
+        const w2 = float(0.137).add(lane.mul(0.0413)).toVar();
+        return rate.mul(t).add(k.mul(rate).div(w2).mul(sin(w2.mul(t).add(lane.mul(1.71)))));
+    });
+
     const mhBreath = Fn(([t, lane]) =>
         float(0.5).add(float(0.5).mul(
             sin(t.mul(0.668).add(lane)).mul(0.62).add(sin(t.mul(0.427).add(lane.mul(2.3)).add(1.1)).mul(0.38)))));
@@ -140,7 +147,7 @@ export function makeMurmurKitTsl(TSL) {
 
     return {
         MH_R, MH_ETA, MH_EXT, MH_TILT, MH_SCATTER_K, MH_EXIT_CAP,
-        mhHash, mhGrad3, mhNoise3, mhHash1, mhFlourish, mhBreath,
+        mhHash, mhGrad3, mhNoise3, mhHash1, mhFlourish, mhBreath, mhDrift,
         mhRefract, mhLook, mhExit, mhHaze, mhMedium, mhInside, mhTransmit, mhScatter,
         Loop,
     };

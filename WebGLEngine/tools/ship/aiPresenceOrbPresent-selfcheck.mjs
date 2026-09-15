@@ -325,7 +325,20 @@ async function main() {
         const tmpDir = fs.mkdtempSync(path.join(ENG, "tools", "ship", ".sabotage-orbpresent-"));
         try {
             fs.writeFileSync(path.join(tmpDir, "aiPresenceOrbPresent.mjs"), sabotaged);
-            fs.copyFileSync(path.join(ENG, "render", "aiPresenceOrbTsl.mjs"), path.join(tmpDir, "aiPresenceOrbTsl.mjs"));
+            // *** COPIED WITH ITS RELATIVE IMPORTS REWRITTEN, NOT COPIED AND HOPED FOR. *** This line used to
+            // be a plain copyFileSync, which worked for exactly as long as aiPresenceOrbTsl.mjs had no imports
+            // of its own. v4624 gave it two (./murmurKitTsl.mjs and ./murmurKit.mjs) and the sabotage run died
+            // with "Failed to fetch dynamically imported module" -- a red that says nothing about the sabotage.
+            // Copying those two alongside would fix today and break on the next import added, so the copy's
+            // relative specifiers are rewritten to absolute engine paths instead: the dependency is served
+            // REAL from the engine root, which is also the correct scope, since this row sabotages the present
+            // pass's own tone curve and nothing underneath it.
+            const tslSrc = fs.readFileSync(path.join(ENG, "render", "aiPresenceOrbTsl.mjs"), "utf8");
+            const tslRewritten = tslSrc.replace(/from\s+"\.\/([A-Za-z0-9_.-]+\.mjs)"/g, 'from "/render/$1"');
+            fs.writeFileSync(path.join(tmpDir, "aiPresenceOrbTsl.mjs"), tslRewritten);
+            ok("the copied dependency has no relative imports left to resolve from the sabotage directory",
+                !/from\s+"\.\//.test(tslRewritten),
+                `${(tslSrc.match(/from\s+"\.\//g) || []).length} rewritten to absolute /render/ paths`);
             const SCRIPT = `async ({ dir }) => {
                 const THREE = await import("/vendor/three-webgpu/three.webgpu.js");
                 const TSL = await import("/vendor/three-webgpu/three.tsl.js");

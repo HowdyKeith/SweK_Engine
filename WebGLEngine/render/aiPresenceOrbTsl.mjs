@@ -35,12 +35,26 @@
 /** Uniforms in a stable order -- setKnobs() writes by name, nothing depends on iteration order elsewhere. */
 export const ORB_KNOBS = Object.freeze([
     "time", "speed", "glow", "depth", "hueShift", "presence", "clarity", "glintRate", "voice", "aspect",
+    // limn's own four, from murmur's src/styles.ts roster. They sit in the same uniform block rather than a
+    // second one because a species is a different BODY over one shared kit, which is exactly how murmur's own
+    // eighteen are arranged -- each reads c0..c3 out of the same argument list.
+    "rimWidth", "travel", "innerHint", "spread",
 ]);
+
+/** The species this file can build. murmur ships eighteen; these are the two that are ported. */
+export const ORB_SPECIES = Object.freeze(["still", "limn"]);
+
+import { makeMurmurKitTsl } from "./murmurKitTsl.mjs";
+import { MH_EXT, MH_TAPS } from "./murmurKit.mjs";
 
 const R_BODY = 0.62;          // sphere radius in the -1..1 quad
 const EDGE_FEATHER = 0.015;   // antialiased silhouette width, in the same units as R_BODY
-const ETA = 1.0 / 1.2;        // refractive index, murmur's own MH_ETA (deliberately lowered from ~1.45)
-const GLINT_WIDTH = 0.35;
+// *** ETA AND GLINT_WIDTH ARE GONE, AND REMOVING THEM IS THE SAME REPAIR AS THE ONE ABOVE. *** ETA held
+// murmur's MH_ETA and fed the refraction this file computed and discarded; the kit owns that constant now and
+// KIT.mhLook uses it for real. GLINT_WIDTH was the width of the time-only gaussian, which no longer exists.
+// Both were left behind by the same change and both would have read, to the next person, as live tuning knobs
+// for behaviour the file no longer has -- which is exactly how the dead refraction survived a round with a
+// gate written about it.
 const BASE_L = 0.30, BASE_C = 0.09, BASE_H = 3.6;   // OKLab base tone: a deliberately calm blue-violet, this port's own pick (murmur-web's actual per-species palette table was not part of what was fetched)
 
 /**
@@ -56,14 +70,21 @@ const BASE_L = 0.30, BASE_C = 0.09, BASE_H = 3.6;   // OKLab base tone: a delibe
  *
  * Returns { material, scene, camera, uniforms, setKnobs, setTime }.
  */
-export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false } = {}) {
+export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, species = "still" } = {}) {
+    if (!ORB_SPECIES.includes(species)) throw new Error(`aiPresenceOrbTsl: unknown species ${species}`);
     const need = ["Fn", "float", "vec2", "vec3", "vec4", "uv", "dot", "length", "normalize", "max", "min",
                   "clamp", "pow", "exp", "cos", "sin", "sqrt", "abs", "mix", "smoothstep", "select", "uniform", "negate"];
     for (const n of need) if (typeof TSL[n] !== "function") throw new Error(`aiPresenceOrbTsl: the TSL namespace has no ${n}()`);
     const { Fn, float, vec2, vec3, vec4, uv, dot, length, normalize, max, min, clamp, pow, exp, cos, sin, sqrt,
-            abs, mix, smoothstep, select, uniform, negate } = TSL;
+            abs, mix, smoothstep, select, uniform, negate, Loop } = TSL;
+    // *** THE KIT IS IMPORTED RATHER THAN RE-APPROXIMATED, WHICH IS THE WHOLE POINT OF v4623 HAVING BUILT IT. ***
+    // Everything below that used to be an in-file guess at murmur's volume -- a constant floor and a gaussian in
+    // t -- is now the kit's own mh_exit / mh_medium / mh_inside / mh_flourish, graded against render/murmurKit
+    // .mjs by tools/ship/murmurKit-selfcheck.mjs on a real GPU.
+    const KIT = makeMurmurKitTsl(TSL);
 
-    const k0 = { time: 0, speed: 1, glow: 1, depth: 1, hueShift: 0, presence: 0.5, clarity: 0.6, glintRate: 0.3, voice: 0, aspect: 1, ...knobs };
+    const k0 = { time: 0, speed: 1, glow: 1, depth: 1, hueShift: 0, presence: 0.5, clarity: 0.6, glintRate: 0.3, voice: 0, aspect: 1,
+                 rimWidth: 0.4, travel: 0.5, innerHint: 0.3, spread: 0.4, ...knobs };
     const uniforms = {}; for (const n of ORB_KNOBS) uniforms[n] = uniform(float(k0[n])).label(n);
 
     // OKLab -> linear sRGB, cube done as explicit x*x*x (not pow(x,3): l_/m_/s_ can be legitimately negative
@@ -89,14 +110,10 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false } 
         const base = float(0.016).add(uniforms.presence.mul(0.085));
         return base.mul(float(1.0).sub(uniforms.clarity.mul(0.5))).mul(float(1.0).add(uniforms.voice.mul(0.55)));
     });
-    // one periodic glint (still.ts: "one slow internal glint", murmur's stated range ~11.5s at rate 0 down to ~7s at rate 1).
-    const glint = Fn(() => {
-        const period = float(11.5).sub(uniforms.glintRate.mul(4.5));
-        const phase = uniforms.time.mod(period);
-        const centered = select(phase.lessThan(period.mul(0.5)), phase, phase.sub(period));
-        const arg = centered.mul(centered).div(GLINT_WIDTH * GLINT_WIDTH);
-        return exp(negate(arg));
-    });
+    // *** THE TIME-ONLY GLINT IS GONE, NOT KEPT AS A FALLBACK. *** It was exp(-(t mod period)^2 / w^2): one
+    // number per FRAME, the same value at every pixel of the orb, where still.ts puts the light on a path
+    // through the volume and solves it at the ray's closest approach. Leaving it here behind a flag would
+    // leave two answers to one question in the file, and the gate would then be free to check the easy one.
 
     const main = Fn(() => {
         const p = uv().mul(2.0).sub(1.0);   // -1..1, symmetric orb: three's v=0-at-bottom vs device's v=0-at-top makes no visible difference
@@ -119,17 +136,136 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false } 
         const ci = clamp(N.z, 0.0, 1.0);               // = -dot(V, N) since V = (0,0,-1); cos(incidence)
         const fres = float(1.0).sub(ci);               // 0 dead centre, 1 at the silhouette -- see header
 
-        // refraction: Snell's law with a total-internal-reflection guard (kit.ts's own formula, ETA lowered
-        // from the physical ~1.45 on purpose so the interior does not visually swallow the whole sphere).
-        const eta = float(ETA);
-        const kTir = float(1.0).sub(eta.mul(eta).mul(float(1.0).sub(ci.mul(ci))));
-        const refracted = select(kTir.lessThanEqual(0.0), V, normalize(V.mul(eta).add(N.mul(eta.mul(ci).sub(sqrt(max(kTir, 1e-6)))))));
+        // *** THE REFRACTED RAY IS THE DIRECTION THE INTERIOR IS MARCHED ALONG, AND UNTIL v4624 IT WENT
+        // NOWHERE. *** This file computed exactly this vector -- Snell with a TIR guard, matching kit.ts's
+        // mh_refract line for line -- and then never used the variable again, while the gate proved the
+        // guard "analytically unreachable at MH_ETA": a true statement about a value that reached no pixel.
+        // The reason was not carelessness, it was that there was no volume to march: the interior was a
+        // constant floor plus a gaussian in t. Both halves are repaired by the same change.
+        const rd = KIT.mhLook(V, N, vec2(0.0, 0.0));   // tilt is not wired to a uniform here; the kit's exact
+                                                       // zero test returns mh_refract's vector untouched
+        const P = N;                                   // entry point in BODY UNITS -- the sphere is radius 1 there
+        const L = KIT.mhExit(P, rd).toVar();
 
-        // interior contribution -- still.ts's floor plus one glint, scaled by depth (the state machine's own knob)
-        const density = floorAmt().add(glint()).mul(uniforms.depth);
+        // still.ts's GESTURE CLOCK and its glint PATH. The light enters one side of the volume and leaves by
+        // the other along a line hashed per gesture, and it is SOLVED at the ray's closest approach rather
+        // than marched -- still.ts's own reason: "On the only event in the frame, sampling artefacts are the
+        // entire picture, so this one is never marched."
+        const slot = float(11.5).sub(uniforms.glintRate.mul(4.5));
+        const fl = KIT.mhFlourish(uniforms.time, float(5.0), slot).toVar();
+        const ga = fl.z.mul(6.2831853).toVar();
+        const dir = normalize(vec3(cos(ga), sin(ga.mul(1.3)).mul(0.42), sin(ga))).toVar();
+        const side = normalize(vec3(
+            dir.y.mul(0.12).sub(dir.z),
+            dir.z.mul(0.06).sub(dir.x.mul(0.12)),
+            dir.x.sub(dir.y.mul(0.06)))).toVar();
+        const along = float(-0.62).add(smoothstep(float(0.0), float(1.0), fl.y).mul(1.24));
+        const lateral = float(0.34).mul(fl.z.mul(2.0).sub(1.0));
+        const gp = side.mul(lateral).add(dir.mul(along)).toVar();
+        const gw = float(0.085).add(uniforms.glintRate.mul(0.055)).toVar();
+
+        const toG = gp.sub(P).toVar();
+        const sG = dot(toG, rd).toVar();
+        const argG = max(dot(toG, toG).sub(sG.mul(sG)), float(0.0)).div(max(gw.mul(gw), float(1e-6))).toVar();
+        const atG = P.add(rd.mul(sG));
+        const visG = KIT.mhInside(atG).mul(exp(sG.mul(-MH_EXT)));
+        const glintLive = select(sG.greaterThan(0.0).and(sG.lessThan(L)),
+            exp(negate(argG)).mul(1.05).add(KIT.mhScatter(argG, float(0.38))).mul(visG).mul(fl.x),
+            float(0.0));
+
+        // *** THE MARCH. *** still.ts's own loop, in its own order: the contribution is multiplied by the
+        // surviving transmittance BEFORE that transmittance is updated, so the first tap is unattenuated.
+        // Tidying those two lines into the other order changes the result by 1% or more, which is why
+        // murmurKit-selfcheck asserts the ordering rather than trusting it.
+        const acc = float(0.0).toVar();
+        const trans = float(1.0).toVar();
+        const ds = L.div(MH_TAPS).toVar();
+        const fAmt = floorAmt().toVar();
+        Loop({ start: 0, end: MH_TAPS }, ({ i }) => {
+            const sMarch = float(i).add(0.5).mul(ds);
+            const p = P.add(rd.mul(sMarch));
+            const e = KIT.mhMedium(p, uniforms.time, float(1.9)).mul(fAmt).mul(KIT.mhInside(p)).toVar();
+            acc.addAssign(e.mul(trans).mul(ds));
+            trans.assign(trans.mul(exp(e.mul(2.0).add(MH_EXT).mul(ds).negate())));
+        });
+
+        // interior contribution -- the marched medium plus the solved glint, scaled by depth
+        const stillDensity = acc.mul(3.4).add(glintLive).mul(uniforms.depth);
+
+        // =====================================================================================================
+        // *** LIMN -- THE SECOND SPECIES. "Near-dark glass whose EDGE is alive." ***
+        //
+        // Its brief in one line, from limn.ts: NEVER A FULL EVEN RING. Everything else in this block follows
+        // from enforcing that. The arc is a bright head with a soft tail streaming off one side, built so the
+        // FAR side of the ring never rises past a dim glow -- measured from murmur's own constants at
+        // render/murmurKit.mjs's limnArc: 3.8% of peak at the 120 pt concentrations, which is the "four per
+        // cent" limn.ts's own header quotes.
+        //
+        // *** THE PROFILE IS TWO VON MISES BUMPS AND NOT A GAUSSIAN, AND murmur RECORDS WHY IT HAD TO CHANGE. ***
+        // "A gaussian in a wrapped angle is not a periodic function and no amount of tuning makes it one" --
+        // their first cut left "a razor-thin dark seam down one radius of the body", 0.03 on one side of the
+        // wrap against 0.21 on the other. exp(k*(cos(x)-1)) is a function of cos(x) alone and is therefore
+        // periodic by construction. The CPU reference asserts that as an identity at +/-pi rather than
+        // trusting the construction.
+        const phi0 = KIT.mhDrift(uniforms.time,
+            float(0.34).add(uniforms.travel.mul(0.40)).mul(float(1.0).add(uniforms.voice.mul(0.30))),
+            float(0.62), float(1.0)).toVar();
+        const phi = TSL.atan(pc.y, pc.x).toVar();
+        // limn.ts wraps by subtracting a ROUNDED turn, which is exact at the seam; an atan round-trip is not.
+        const aw = phi.sub(phi0).toVar();
+        const awW = aw.sub(float(6.2831853).mul(TSL.floor(aw.div(6.2831853).add(0.5)))).toVar();
+        const kHead = float(9.0).div(float(1.0).add(uniforms.voice.mul(0.60))).toVar();
+        const kTail = float(1.6).div(float(1.0).add(uniforms.voice.mul(0.35))).toVar();
+        const offT = float(-1.05);
+        const headLobe = exp(kHead.mul(cos(awW).sub(1.0))).toVar();
+        const tailLobe = exp(kTail.mul(cos(awW.sub(offT)).sub(1.0))).toVar();
+        const arcProfile = headLobe.add(tailLobe.mul(0.52)).toVar();
+
+        // THE BAND: where the light sits radially, just inside the silhouette, thickening with voice. murmur
+        // gives it a CEILING and says why -- three multipliers stack and at 18 pt with somebody talking they
+        // produced "a solid wedge of light reaching the middle of the sphere", whose boundary at that radius
+        // is a nearly straight line. "A hard edge on an organic form is the one thing this house never ships."
+        const bw = min(float(0.070).add(uniforms.rimWidth.mul(0.055)).mul(float(1.0).add(uniforms.voice.mul(0.55))), float(0.30)).toVar();
+        const dband = rho.div(R).sub(0.965).div(max(bw, float(1e-3))).toVar();
+        const band = exp(negate(dband.mul(dband))).toVar();
+        // Fresnel keeps the light physically ON the edge, so the arc bends around the curvature.
+        const rimlight = band.mul(float(0.30).add(pow(fres, float(1.6)).mul(0.70))).toVar();
+        const rimE = rimlight.mul(arcProfile).mul(float(1.70).add(uniforms.voice.mul(1.15))).toVar();
+
+        // THE INTERIOR HINT: the arc as a direction in three dimensions, the volume glowing faintly where
+        // that light entered. limn.ts: "It costs one line and it is the difference between a rim drawn ON a
+        // dark disc and a rim lighting a dark VOLUME." The exponent is 2.2, down from 3 on murmur's own note
+        // that a lower power is a wider wash.
+        const arcDir = vec3(cos(phi0), sin(phi0), float(0.0)).toVar();
+        const hintAmt = float(0.22).add(uniforms.innerHint.mul(0.38)).mul(float(1.0).add(uniforms.voice.mul(0.9))).toVar();
+        const accL = float(0.0).toVar();
+        const transL = float(1.0).toVar();
+        Loop({ start: 0, end: MH_TAPS }, ({ i }) => {
+            const sM = float(i).add(0.5).mul(ds);
+            const p2 = P.add(rd.mul(sM));
+            const fade = KIT.mhInside(p2).toVar();
+            const lit = pow(clamp(dot(normalize(p2.add(1e-5)), arcDir), 0.0, 1.0), float(2.2));
+            const reach = smoothstep(float(0.10), float(0.85), length(p2));
+            const haze = KIT.mhHaze(p2, uniforms.time, float(2.4)).mul(0.55).add(0.45);
+            // Even the dark hero gets a floor: limn is "near-black GLASS and not a hole in the frame", at
+            // 0.030 -- a third of what the luminous heroes carry.
+            const e2 = lit.mul(reach).mul(haze).mul(hintAmt)
+                .add(KIT.mhMedium(p2, uniforms.time, float(2.4)).mul(0.030)).mul(fade).toVar();
+            accL.addAssign(e2.mul(transL).mul(ds));
+            transL.assign(transL.mul(exp(e2.mul(1.80).add(MH_EXT).mul(ds).negate())));
+        });
+        const limnDensity = accL.mul(3.0).add(rimE).mul(uniforms.depth);
+
+        const density = species === "limn" ? limnDensity : stillDensity;
 
         // surface: fresnel rim + two specular lobes (a tight highlight, a broad soft one), a fixed light direction
-        const rim = pow(fres, 4.5).mul(0.85);
+        // *** LIMN'S BASE RIM IS 0.30 AND still'S IS THE HIGHEST IN THE COLLECTION, AND BOTH ARE FITTED
+        // NUMBERS murmur ARGUES FOR. *** still.ts: "with no interior to protect, the edge and the highlight
+        // are free to be the figure." limn.ts: its first cut set the base rim near zero to stop the comma
+        // becoming a ring, "and it did avoid that -- and produced a crescent moon rather than a dark glass
+        // body with a lit edge. 0.30 is the fitted middle."
+        const rimBase = species === "limn" ? 0.30 : 0.85;
+        const rim = pow(fres, 4.5).mul(rimBase);
         const L_DIR = normalize(vec3(0.45, 0.6, 0.65));
         const H = normalize(negate(V).add(L_DIR));
         const nh = max(dot(N, H), 0.0);

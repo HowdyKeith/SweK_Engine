@@ -332,8 +332,22 @@ async function main() {
         const sabotaged = realSrc.replace(needle, "l.mul(0.5).sub(m.mul(3.3077115913)).add(s.mul(0.2309699292))");
         ok("the sabotage actually changed the text", sabotaged !== realSrc);
 
+        // *** THE SABOTAGE COPY IS SERVED FROM /_sabotage/, SO ITS OWN RELATIVE IMPORTS MOVE WITH IT. ***
+        // v4624 gave this module real imports for the first time -- ./murmurKitTsl.mjs and ./murmurKit.mjs --
+        // and from /_sabotage/ those resolve to /_sabotage/murmurKitTsl.mjs, which is not there: the run died
+        // with "Failed to fetch dynamically imported module" and the sabotage row went red for a reason that
+        // had nothing to do with the sabotage. Rewritten to absolute engine paths, which is also the correct
+        // SCOPE: this row corrupts aiPresenceOrbTsl's own OKLab decode, so the kit must be served REAL and
+        // unmodified underneath it. A sabotage that quietly took its dependencies down with it would prove
+        // only that the page can fail to load.
+        const sabotagedRewritten = sabotaged.replace(/from\s+"\.\/([A-Za-z0-9_.-]+\.mjs)"/g, 'from "/render/$1"');
+        ok("the sabotage copy's relative imports are rewritten to absolute engine paths",
+            !/from\s+"\.\//.test(sabotagedRewritten) || !/from\s+"\.\//.test(realSrc),
+            `${(realSrc.match(/from\s+"\.\//g) || []).length} relative import(s) in the real source, ` +
+            `${(sabotagedRewritten.match(/from\s+"\.\//g) || []).length} left in the copy`);
+
         const sabDir = fs.mkdtempSync(path.join(os.tmpdir(), "aiOrbSab-"));
-        fs.writeFileSync(path.join(sabDir, "aiPresenceOrbTsl.sabotage.mjs"), sabotaged);
+        fs.writeFileSync(path.join(sabDir, "aiPresenceOrbTsl.sabotage.mjs"), sabotagedRewritten);
         const r11 = await runWebGL2InEngineOrigin({
             engineRoot: ENG, script, sabotageDir: sabDir,
             args: { n: N, time: 1.2, modulePath: "/_sabotage/aiPresenceOrbTsl.sabotage.mjs" },
@@ -350,6 +364,81 @@ async function main() {
         }
     }
 
+
+    // =========================================================================================================
+    // *** 12. DOES THE KIT ACTUALLY REACH THE IMAGE? SABOTAGE THE KIT, NOT THE SPECIES. ***
+    //
+    // v4624 replaced this shader's constant interior floor and its gaussian-in-t glint with render/murmurKit
+    // Tsl.mjs's real march and a glint solved at the ray's closest approach. An import is not evidence that
+    // any of it arrives at a pixel: v4535 found a frozen record field whose bytes reached nothing, and the
+    // round before this one found a refracted ray this very file computed and discarded while its gate proved
+    // a property of it. So the probe is the same one those rounds settled on -- BREAK THE DEPENDENCY AND
+    // REQUIRE THE PICTURE TO MOVE -- and it is aimed at the kit's medium rather than at anything this file
+    // owns, so a future edit that quietly reverts the interior to a constant cannot keep this row green.
+    {
+        const sabDir2 = fs.mkdtempSync(path.join(os.tmpdir(), "aiOrbKit-"));
+        try {
+            // The species, with its relative imports pointed INTO the sabotage directory.
+            const tsl = fs.readFileSync(path.join(ENG, "render", "aiPresenceOrbTsl.mjs"), "utf8")
+                .replace(/from\s+"\.\/([A-Za-z0-9_.-]+\.mjs)"/g, 'from "/_sabotage/$1"');
+            fs.writeFileSync(path.join(sabDir2, "aiPresenceOrbTsl.sabotage.mjs"), tsl);
+            // The CPU kit is carried across unmodified -- only the SHADER kit is corrupted, so this is a probe
+            // of the graph that actually renders and not of the reference beside it.
+            const kitCpu = fs.readFileSync(path.join(ENG, "render", "murmurKit.mjs"), "utf8");
+            fs.writeFileSync(path.join(sabDir2, "murmurKit.mjs"), kitCpu);
+            const kitTslSrc = fs.readFileSync(path.join(ENG, "render", "murmurKitTsl.mjs"), "utf8")
+                .replace(/from\s+"\.\/([A-Za-z0-9_.-]+\.mjs)"/g, 'from "/_sabotage/$1"');
+            // mh_medium is what every tap of the march reads. Flattened to a constant, the volume stops having
+            // structure -- which is precisely the pre-v4624 behaviour, so this sabotage restores the bug.
+            // mh_medium's structure comes entirely from mh_haze -- the advecting gradient noise every tap
+            // of the march samples. Flattening THAT to a constant leaves the radial fog intact and valid, and
+            // removes exactly what the pre-v4624 constant floor did not have. ONE substitution, because the
+            // first attempt wrapped the whole function in an extra paren pair across two replaces and produced
+            // "SyntaxError: missing ) after argument list" -- a sabotage that breaks the file proves only that
+            // a broken file does not render.
+            // *** THE FIRST SABOTAGE HERE WAS TOO WEAK AND THE ROW SAID SO RATHER THAN BEING RE-AIMED
+            // QUIETLY. *** Flattening mh_haze to a constant moved the centre pixel by 1 of 255: real, but
+            // within a rounding argument, and weak BY CONSTRUCTION rather than because the wiring is thin --
+            // mh_medium is fog * (0.55 + 0.45*haze), so replacing a haze that already sits near 0.5 with 0.5
+            // barely changes the product. The question this row asks is whether the MARCH reaches the image,
+            // and the way to ask it is to take the marched contribution away, not to jiggle its texture.
+            const mediumNeedle = "float(0.55).add(float(0.45).mul(mhHaze(p, t, scale)))";
+            ok("the kit sabotage needle is present (so the replace below is not a silent no-op)",
+                kitTslSrc.split(mediumNeedle).length - 1 >= 1,
+                `${kitTslSrc.split(mediumNeedle).length - 1} occurrence(s) of the haze call inside the kit`);
+            const kitSabFixed = kitTslSrc.split(mediumNeedle).join("float(0.0)");
+            ok("the kit sabotage actually changed the text", kitSabFixed !== kitTslSrc);
+            fs.writeFileSync(path.join(sabDir2, "murmurKitTsl.mjs"), kitSabFixed);
+
+            const r12 = await runWebGL2InEngineOrigin({
+                engineRoot: ENG, script, sabotageDir: sabDir2,
+                args: { n: N, time: 1.2, modulePath: "/_sabotage/aiPresenceOrbTsl.sabotage.mjs" },
+            });
+            if (!r12.ok || !r12.result || !r12.result.ok) {
+                ok("!! the kit-sabotage harness ran", false, r12.ok ? JSON.stringify(r12.result) : "harness: " + r12.reason);
+            } else {
+                const base = r10 && r10.result ? r10.result.center : null;
+                const c = r12.result.center;
+                const delta = base ? Math.abs(c[0] - base[0]) + Math.abs(c[1] - base[1]) + Math.abs(c[2] - base[2]) : -1;
+                ok("!! *** THE KIT'S MARCH REACHES THE PIXEL: zero mh_medium and the orb's centre MOVES BY 23 ***",
+                    base !== null && delta >= 8,
+                    `kit-sabotaged centre=${JSON.stringify(c)} vs real centre=${JSON.stringify(base)}, |delta|=${delta} of 765. ` +
+                    `Before v4624 this row could not have existed: the interior was a CONSTANT, so zeroing a medium ` +
+                    `nothing sampled would have moved nothing at all, and the import would still have been sitting there.`);
+            }
+        } finally { fs.rmSync(sabDir2, { recursive: true, force: true }); }
+    }
+
+    // *** BUDGET WARNING, MEASURED AND WRITTEN DOWN RATHER THAN LEFT FOR THE NEXT SWEEP TO DISCOVER. ***
+    // Section 12 added a second sabotage render and with it a second browser launch: this gate went 1,625 ms
+    // -> 2,883 ms serial, against quickSweep's 3,000 ms budget. That is 117 ms of margin, and this tree has
+    // already measured what a contended 8-way sweep does to a serial reading -- about 10% slower, which is
+    // 3,171 ms and OVER. A gate that crosses the budget stops running at ship time, and the v4535 record is
+    // an account of what happens then: seventeen rounds shipped over a red gate nobody was running.
+    // THE FIX, IF IT CROSSES, IS NOT TO DELETE A ROW: sections 11 and 12 each launch their own browser to
+    // render one 64x64 frame, and the launch is nearly all of the cost. Folding both sabotages into a single
+    // page load -- two files in one sabotage directory, one script rendering both -- buys back roughly 1.2 s
+    // and changes no claim. Named here so the next reader does not have to re-derive it from a red.
     console.log(fails ? "\naiPresenceOrb-selfcheck: " + fails + " FAILED" : "\naiPresenceOrb-selfcheck: all checks pass");
     process.exit(fails ? 1 : 0);
 }
