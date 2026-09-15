@@ -5085,6 +5085,35 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "it (interior mean 441 against 254); and one sabotage's anchor had gone stale against a " +
                  "multi-line ternary and was reported as green rather than as missing.",
     }),
+    // v4630 -- THE 242nd CLOSING, and a note on why it is a NEW key rather than an edit to since250. The first
+    // attempt overwrote since250's `added` list with this gate's name, which kept the total at 290 and silently
+    // dropped tools/ship/murmurSpecies-selfcheck.mjs from the tally -- the equality below went red by exactly
+    // one and said so. A closing is a dated FACT about a round, not a slot to reuse.
+    since251: Object.freeze({
+        at: "v4630", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/murmurSpecies2-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 2.2 s, real WebGPU, 9 rows. SPLIT OUT of tools/ship/murmurSpecies-selfcheck.mjs and " +
+                 "made BEFORE the species that forced it rather than after -- which is the whole point. That " +
+                 "gate stood at 2,780 ms against a 3,000 ms ceiling with FOUR of murmur's eighteen species " +
+                 "ported, and a species costs about 195 ms (one WGSL compile plus one render), so the fifth " +
+                 "crossed it. reuseInstances was already spent: ten frames built five shaders. A gate over " +
+                 "budget does not run at ship time AT ALL, so the round that adds the species that crosses the " +
+                 "line is the round whose red nobody sees. THE CUT IS BY SUBJECT, NOT ALPHABET: what needs " +
+                 "SEVERAL HEROES IN ONE FRAME SET (the rim ranking, the ring's evenness, the contact glow, the " +
+                 "paper ground) stays next door; what needs ONE HERO AT SEVERAL TIMES (comet's point going " +
+                 "round its orbit, droplet's body wobbling) is here. Those are different frame budgets -- three " +
+                 "shaders at one time each against two shaders at four times and two -- and keeping them apart " +
+                 "is what stops either gate paying for the other's frames. 19 rows before the split and 19 " +
+                 "after, counted: 10 there and 9 here, nothing dropped in the move. The MEASUREMENTS both gates " +
+                 "use live in tools/ship/murmurSpeciesFrames.mjs rather than being copied into each, because " +
+                 "two gates with their own idea of what the light at a point IS eventually disagree about what " +
+                 "they measured -- the defect this tree has repaired in its own census records three times. " +
+                 "Timings after: 1,937 ms there, 2,194 ms here, roughly 800 ms of headroom apiece.",
+    }),
     since249: Object.freeze({
         at: "v4623", swept: 1, green: 1, red: 0,
         added: Object.freeze([

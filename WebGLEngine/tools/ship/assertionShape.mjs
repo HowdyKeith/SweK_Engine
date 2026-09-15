@@ -303,8 +303,11 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // definesOk and nameFirst move with it, which is the same three-rows-together pattern the note above
     // records: one new gate that names its subject first is counted by all four.
     // v4626 -- RE-TAKEN 1670 -> 1671 for tools/ship/murmurSpecies-selfcheck.mjs.
-    gates: 1671, usesOk: 1650, definesOk: 1642, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1543, condFirst: 91, unknownSignature: 16,
+    // v4630 -- RE-TAKEN 1671 -> 1672 for tools/ship/murmurSpecies2-selfcheck.mjs, the species gate split
+    // off BEFORE the fifth species would have crossed the budget. tools/ship/murmurSpeciesFrames.mjs is a
+    // MODULE and not a gate, so it moves runtimeGap's file count by two and this one by one.
+    gates: 1672, usesOk: 1651, definesOk: 1643, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1544, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([
