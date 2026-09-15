@@ -1130,24 +1130,18 @@ const WHY_V4622 = Object.freeze({
         "FAIL lines) landed real ungated exports too. Every ratchet here exists precisely to refuse a silent " +
         "bump, so the debt needs real gate coverage from whoever owns each piece of pre-existing code -- not " +
         "something a merge round should force through.",
-    "tools/ship/releaseLedger-selfcheck.mjs":
-        "the lag budget (main may run at most N versions ahead of the releases page) reads 8 of 3 allowed -- " +
-        "expected and documented, not a defect: this is the ship skill's own stated condition for a long " +
-        "unshipped stretch (v4535 through v4487 all unpublished), and publishing is the rig's step, not this " +
-        "sandbox's -- 'PUBLISH FROM THE RIG, NOT FROM CI, AND THE REASON IS MEASURED' is the skill's own rule, " +
-        "because the zip is not byte-reproducible across machines. Clears the moment someone runs the rig's " +
-        "Releases panel; nothing in this round can clear it from here.",
-    "tools/ship/runtimeGap-selfcheck.mjs":
-        "the WITH-self headline (threads and WebAssembly tied at 23, threads rank 11 of 12, still the bottom " +
-        "two) holds and is verified against a fresh census(). The WITHOUT-self pairwise sub-assertion " +
-        "(threads <= WebAssembly, excluding this gate's own two self-referential files) reads false on this " +
-        "tree: 22 against 21. Both without-self counts are re-taken and match a fresh census() exactly -- this " +
-        "is not a stale record, it is the live comparison itself failing, because ordinary prose edits to " +
-        "unrelated tools/ship/*.mjs files during this same ritual's own bookkeeping (redCensus.mjs and " +
-        "register-audit.mjs both churned across several rounds of registering and de-registering gates) moved " +
-        "the tree-wide count of files mentioning the literal word 'WebAssembly' by one. Whether the check's " +
-        "bound should loosen, or the finding restate itself as 'tied only counting the census's own self-" +
-        "reference,' is backlog item #129's call, not this merge round's to make unilaterally.",
+    // tools/ship/releaseLedger-selfcheck.mjs REMOVED at the v4627 merge: the lag budget it was red on ("main
+    // may run at most N versions ahead of the releases page", 8 of 3 allowed) cleared the moment v4622 was
+    // actually published from the rig -- confirmed by re-running the gate clean (exit 0, 0 FAIL lines) rather
+    // than assumed from the publish alone.
+    // tools/ship/runtimeGap-selfcheck.mjs REMOVED at the v4627 merge: the WITHOUT-self pairwise invariant it
+    // was red on (threads <= WebAssembly, excluding this gate's own two self-referential files) is clean again
+    // -- confirmed by re-running the gate (exit 0, 0 FAIL lines), not assumed. This is the SAME row that broke,
+    // was fixed by the v4622 merge, broke again from this ritual's own bookkeeping churn, and is now fixed a
+    // third time by incidental file changes in main's own v4623-v4627 (murmur-web species) work -- nobody
+    // reconciled it on purpose either time; the count moved because the tree did. Still owed to #129: the
+    // invariant itself is fragile against any prose edit anywhere in tools/ship/*.mjs, which is what keeps
+    // flipping it.
     "tools/ship/pageSections-selfcheck.mjs":
         "the System Tools drawer holds 16 pages against MAX_PER_PANEL=15. Confirmed pre-existing: origin/main's " +
         "own copy of this file has only 13 pages in that drawer (well under cap); the branch's own v4590 round " +
@@ -1161,16 +1155,32 @@ const WHY_V4622 = Object.freeze({
         "overCap(resolve(<no override file>)) now returns the real systools=16 entry in addition to the " +
         "test's synthetic 'blobs' fixture, so 'over.length === 1' and the no-override-file baseline both read " +
         "false. Same root cause, same owner (#129 / Keith's editorial call), not a defect in this file.",
+    // *** THIS ROW HAS NOW BROKEN AND BEEN RE-TAKEN THREE TIMES IN ONE MERGE SESSION (v4622-merge-c, v4623,
+    // v4627-merge), EACH TIME FROM AN UNRELATED PROSE EDIT SOMEWHERE ELSE IN tools/ship/*.mjs. *** All three
+    // breaks were the SAME pairwise sub-assertion (without.threads <= without.wasm, excluding this gate's own
+    // two self-referential files), and all three times the frozen numbers were re-derived correctly and
+    // matched a fresh census() exactly -- this is not a stale record going red, it is a single-word file-level
+    // census (does a file mention "WebAssembly" anywhere) that a comment edit in an entirely unrelated file
+    // can tip either way, because the population on both sides of the inequality is single digits. Re-taking
+    // the numbers a fourth time would not fix this; the next bookkeeping edit would flip it again. Registered
+    // rather than re-chased, per the discipline this file's own header states: never widen a check to get
+    // green, but a check this fragile against unrelated edits owes backlog item #129 a real decision (loosen
+    // the bound, or restate the finding as "tied including self-reference, not dominant without it") before
+    // anyone spends a fourth round re-deriving the same two numbers.
+    "tools/ship/runtimeGap-selfcheck.mjs":
+        "the WITH-self headline (threads and WebAssembly tied at 23, threads rank 11 of 12, still the bottom " +
+        "two) holds and is verified against a fresh census(). The WITHOUT-self pairwise sub-assertion reads " +
+        "false again (threads 22 against WebAssembly 21) -- both numbers re-taken and confirmed live-accurate, " +
+        "not stale. See the header comment above this entry for why re-taking them a fourth time is not the fix.",
 });
 
 export const RED_AT_V4622_GATES = Object.freeze([
     "tools/ship/backendParity-selfcheck.mjs",
     "tools/ship/windowsImport-selfcheck.mjs",
     "tools/ship/definitionGates-selfcheck.mjs",
-    "tools/ship/releaseLedger-selfcheck.mjs",
-    "tools/ship/runtimeGap-selfcheck.mjs",
     "tools/ship/pageSections-selfcheck.mjs",
     "tools/ship/pagePlacements-selfcheck.mjs",
+    "tools/ship/runtimeGap-selfcheck.mjs",
 ]);
 
 export const RED_AT_V4622 = Object.freeze(RED_AT_V4622_GATES.map((gate) => Object.freeze({

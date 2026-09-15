@@ -482,8 +482,13 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // recognized scanner idiom) removed one of the two lines the WebAssembly pattern had matched in that file.
     // v4627 -- RE-TAKEN: esModules 3864 -> 3865, closures 3742 -> 3743, both from the one new fixture file.
     // Everything else held, which is the expected shape for a round whose work landed in existing modules.
+    // v4627-merge -- RE-TAKEN AGAIN: wasm 24 -> 23, on a merge of THIS branch's own bookkeeping edits (removing
+    // repaired-gate prose from redCensus.mjs's WHY_V4622 map, which had mentioned "WebAssembly" enough times to
+    // matter) into this same v4623-v4627 line. Same shape as merge-c before it, same root fragility v4623's own
+    // note already named: a file-level census of one literal word, re-taken by hand every time either branch's
+    // bookkeeping churns. Measured, not assumed: a fresh census() reads wasm 23 on the merged tree.
     esModules: 3865, closures: 3743, asyncAwait: 1464, typedArrays: 1073, promises: 366,
-    fetchXhr: 245, performanceNow: 227, raf: 120, webgl: 151, webgpu: 50, threads: 23, wasm: 24,   // v4623: 23 -> 24, NOT this round's -- see the note on `files` above
+    fetchXhr: 245, performanceNow: 227, raf: 120, webgl: 151, webgpu: 50, threads: 23, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.
@@ -500,7 +505,10 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // the v4622 merge corrected the prose to say WebAssembly had moved to 24 and left BOTH the census row
     // (wasm: 23) and this rank at their pre-merge values. With wasm: 24 the tie at 23 breaks and threads
     // is the smallest of the twelve outright, which is the direction the row's own headline already argued.
-    threadsRank: 12,               // of 12, biggest first -- the SMALLEST gap on the merged tree, no longer tied
+    // v4627-merge -- RE-TAKEN: 12 -> 11. wasm dropped back to 23 (see the note on `wasm` above), re-tying
+    // threads and WebAssembly at 23; the stable sort places WebAssembly (earlier in PATTERNS) at rank 12 and
+    // threads at rank 11, still the bottom two either way.
+    threadsRank: 11,                // of 12, biggest first -- second-smallest on the merged tree (tied with WebAssembly at 23)
     // *** THE MODULE THAT DEFINES THE CENSUS MATCHES EVERY SINGLE ONE OF ITS OWN TWELVE PATTERNS. ***
     // Not five rows -- all twelve. runtimeGap.mjs holds the PATTERNS table, so the literal text of every
     // regex sits in it (`Float32Array`, `new Promise`, `fetch(`, `WebAssembly`, ...), and a regex source is a
@@ -532,7 +540,9 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // never look inconsistent on its own -- which is why it took a gate run on a clean checkout, not a
     // reading of the file, to see that the whole chain was one row behind. Re-measured, not re-derived: the
     // live census reads wasm 24 with this module's own +2, and 22 without it.
-    wasmWithoutSelf: 22,
+    // v4627-merge -- RE-TAKEN: 22 -> 21 (wasm 23 with this module's own +2 self-inflation, see the note on
+    // `wasm` above).
+    wasmWithoutSelf: 21,
     threadsWithoutSelf: 22,       // v4622 -- RE-TAKEN: 21 -> 22 (threads 23 with this round's own +1 self-inflation)
     closuresOverThreads: 163,     // v4622-merge-b -- RE-TAKEN: 161 -> 163 (3738 / 23). A DERIVED ratio, so it moves whenever either row does, which is why it is re-taken rather than pinned once
     // *** ONE, NOT TWO. *** The first draft filed fetch/XHR as an archive claim too; pointing the rows at
