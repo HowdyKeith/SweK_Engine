@@ -48,6 +48,26 @@ const sp = (species, time, voice = VOICE) => ({ factoryArgs: { species }, knobs:
 // row stayed green under exactly that sabotage. At voice 0 the swell is 0 and bodyScale is exactly 1,
 // so the only thing that can move the outline is the deformation this species IS.
 const SIL_VOICE = 0;
+// murmur's own paper ground, the light half of the two the rail is built for.
+const PAPER_INK = [0.97, 0.96, 0.94];
+
+// One 8-bit sRGB channel back to the light it encodes, and a bilinear sample of the three summed. Both live
+// at module scope because sections 3 and 4 each need them: section 3's silhouette measure samples a ring in
+// the light now that the alpha no longer carries the body's edge, and section 4's rim and glow rows sample
+// two more. Duplicating them per section is how the two would drift into measuring subtly different things.
+const lin = (c) => { const v = c / 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+const light = (px, x, y) => { const i = (y * N3 + x) * 4; return lin(px[i]) + lin(px[i + 1]) + lin(px[i + 2]); };
+const bil = (px, x, y) => {
+    const x0 = Math.floor(x), y0 = Math.floor(y), fx = x - x0, fy = y - y0;
+    let v = 0;
+    for (const [dx, dy, w] of [[0, 0, (1 - fx) * (1 - fy)], [1, 0, fx * (1 - fy)],
+                               [0, 1, (1 - fx) * fy], [1, 1, fx * fy]]) {
+        const xx = Math.min(N3 - 1, Math.max(0, x0 + dx)), yy = Math.min(N3 - 1, Math.max(0, y0 + dy));
+        const i = (yy * N3 + xx) * 4;
+        v += w * (lin(px[i]) + lin(px[i + 1]) + lin(px[i + 2]));
+    }
+    return v;
+};
 const run = await renderThreeTslToPixels({
     engineRoot: ENG, moduleImportPath: "/render/aiPresenceOrbTsl.mjs", factoryName: "makeAiPresenceOrbTsl",
     factoryArgs: { species: "still" }, knobs: { time: times[0], voice: VOICE }, width: N3, height: N3,
@@ -56,6 +76,13 @@ const run = await renderThreeTslToPixels({
         ...times.map((t) => sp("comet", t)),
         ...STILL_TIMES.map((t) => sp("still", t)),
         ...DROP_TIMES.map((t) => sp("droplet", t, SIL_VOICE)),
+        // *** ONE FRAME ON A PAPER GROUND, AND IT COSTS A RENDER RATHER THAN A COMPILE. *** Half of
+        // mh_surface only does anything on paper -- the rim gain, the wrap flattening, the exponent
+        // tightening, the environment inversion -- and a composition error that deletes the rim there is
+        // ALGEBRAICALLY INVISIBLE on ink, where dark is exactly 1 and (rim * dark) IS rim. v4629 made the
+        // three colour anchors settable through setKnobs precisely so this frame reuses still's shader
+        // instead of building a second one; as a factoryArgs change it would have cost ~195 ms.
+        { factoryArgs: { species: "still" }, knobs: { time: times[0], voice: VOICE, colors: { ink: PAPER_INK } } },
     ],
     // *** NINE FRAMES, FOUR SHADERS. *** comet is rendered at four times and still and droplet at two each,
     // and until v4627 every one of those rebuilt the NodeMaterial and paid a fresh WGSL compile -- measured
@@ -73,7 +100,18 @@ const run = await renderThreeTslToPixels({
     // and one that does not.
     reuseInstances: true,
 });
-const okRun = run.ok && run.frames && run.frames.length === 2 + times.length + STILL_TIMES.length + DROP_TIMES.length;
+// *** THE BUDGET, RE-MEASURED AT v4629 AND NARROWING. *** sweepRotation --gate reads this gate at 2,780 ms
+// against a 3,000 ms ceiling -- 220 ms of margin, down from 2,415 before the surface landed, because every
+// species' fragment graph grew by mh_surface and the paper frame added a tenth render. reuseInstances is
+// already spent: the ten frames build FIVE shaders (still, limn, comet, droplet, and the paper frame reuses
+// still's), so the only remaining lever of that kind is gone.
+//
+// FOURTEEN SPECIES REMAIN AND THE FIRST OF THEM CROSSES THIS CEILING. A new species costs one compile plus
+// one render, about 195 ms measured, so the next one lands at roughly 2,975 and the one after is over. The
+// fix is the same one v4626 made when the kit gate hit this wall -- a second split, by species rather than
+// by subject -- and it should be made BEFORE the species that needs it, not after, because a gate over
+// budget does not run at ship time at all and that is how a red goes unseen for a round.
+const okRun = run.ok && run.frames && run.frames.length === 3 + times.length + STILL_TIMES.length + DROP_TIMES.length;
 if (!okRun) ok("!! the species render ran", false, `could not render: ${run.reason || "frames " + (run.frames ? run.frames.length : "none")}`);
 
 
@@ -223,8 +261,105 @@ sec("1. *** LIMN, THE SECOND SPECIES: THE COMMA THAT MUST NEVER CLOSE INTO A RIN
             rl.peakOverMin > Math.max(rs.peakOverMin, rc.peakOverMin) * 10.0,
             `limn ${rl.peakOverMin.toFixed(2)} against still ${rs.peakOverMin.toFixed(2)} and comet ` +
             `${rc.peakOverMin.toFixed(2)} -- ${(rl.peakOverMin / Math.max(rs.peakOverMin, rc.peakOverMin)).toFixed(0)}x ` +
-            `the larger of the two, against a limit of 10. murmur's own fitted base rim is 0.30 for limn where ` +
-            `still's is 0.85, and still's file calls its rim "the highest in the collection".`);
+            `the larger of the two, against a limit of 10. murmur's own fitted base rim is 0.30 for limn ` +
+            `against still's 1.15 -- and this sentence used to end "still's file calls its rim the highest in ` +
+            `the collection", which is WRONG and was repeated here from still.ts without checking. abyss ` +
+            `carries 1.70. still holds the highest SPECULAR (1.30), not the highest rim; still.ts bundles the ` +
+            `two in one sentence and is half right. tools/ship/murmurKit-selfcheck.mjs section 9 asserts both ` +
+            `halves over all eighteen call sites rather than quoting either file.`);
+    }
+}
+
+// =============================================================================================================
+sec("4. *** THE SURFACE, ON REAL PIXELS: the contact glow, the roster's rims, and the paper ground ***");
+{
+    if (!okRun) {
+        ok("!! the surface rows have frames to read", false, "the render did not produce them");
+    } else {
+        // *** THE CONTACT GLOW AGAINST THE INK FLOOR, AND ALPHA-NORMALISED -- A FIRST CUT OF THIS ROW WAS
+        // MEASURING NEITHER. *** Two things confound a raw ring sample outside the body. The frames are
+        // alpha-composited and the containment fades the alpha from 255 to 0 across exactly this band, so a
+        // raw reading falls off because the MASK falls off, not because the glow does. And where the glow is
+        // gone the rail does not read zero: at zero energy mh_lit returns the palette's own s0, which IS the
+        // ink, about 0.0094 in linear light -- so a row comparing "just outside" against "far outside" is
+        // comparing the ink floor with itself. Dropping the glow from the composition entirely left the first
+        // version of this row GREEN, and the sabotage sweep is what said so.
+        //
+        // Both are handled: divide by the alpha actually read back, and compare the near band against the
+        // FLOOR that band sits on, which is what the far ring measures once normalised. Baseline 0.01228
+        // against 0.00950; with the glow dropped both read 0.00942 and the ratio is 0.99.
+        const ringNorm = (px, r) => {
+            let sum = 0, alpha = 0, n = 0;
+            for (let a = 0; a < 64; a++) {
+                const th = a * Math.PI / 32;
+                const x = Math.round(N3 / 2 + r * (N3 / 2) * Math.cos(th));
+                const y = Math.round(N3 / 2 + r * (N3 / 2) * Math.sin(th));
+                if (x < 0 || y < 0 || x >= N3 || y >= N3) continue;
+                const i = (y * N3 + x) * 4;
+                sum += light(px, x, y); alpha += px[i + 3]; n++;
+            }
+            return n && alpha ? sum / n / (alpha / n / 255) : 0;
+        };
+        const gNear = ringNorm(run.frames[0], 0.68), gFloor = ringNorm(run.frames[0], 0.90);
+        say(`outside the silhouette, alpha-normalised -- still at 0.68 of the quad ${gNear.toFixed(5)}, at 0.90 (the ink floor) ${gFloor.toFixed(5)}`);
+        ok("!! *** THE CONTACT GLOW REACHES REAL PIXELS OUTSIDE THE SILHOUETTE, above the ink floor it sits on ***",
+            gNear > gFloor * 1.15,
+            `${gNear.toFixed(5)} in linear light just outside the body against a floor of ${gFloor.toFixed(5)} ` +
+            `further out -- ${((gNear / gFloor - 1) * 100).toFixed(0)}% above it, where dropping the glow ` +
+            `from the composition reads 0.99 of the floor. *** AND THE GLOW REACHED NOTHING AT ALL UNTIL THE ` +
+            `ALPHA CHANGED IN THE SAME ROUND: *** this port clipped its alpha at the BODY radius, and the ` +
+            `glow is nonzero only OUTSIDE the silhouette, so the whole term was multiplied by zero. This ring ` +
+            `read a flat 0.00000 and is what found it. All eighteen of murmur's heroes pass a glowK, and ` +
+            `kit.ts's reason is that its job "is to stop the silhouette meeting the ink as a cut line".`);
+
+        // *** THE HEROES' RIMS ARE NOT INTERCHANGEABLE, and the roster says in what order: still 1.15,
+        // comet 0.80, limn 0.30 at rest. *** Read at the 25th PERCENTILE of the edge ring and not its mean,
+        // and that is not a smoothing choice: limn's arc IS at the rim, so its ring maximum is 1.42 against
+        // still's 0.28 and any average puts limn top. A first cut of this row did exactly that and ranked
+        // limn brightest, which is true of limn's head and false of limn's rim. The quarter-point sits in the
+        // dim part of every one of the three, which is where the rim is all there is.
+        const edgeQuartile = (px) => {
+            const vals = [];
+            for (let a = 0; a < 72; a++) {
+                const th = a * 2 * Math.PI / 72;
+                vals.push(bil(px, N3 / 2 + 0.62 * (N3 / 2) * Math.cos(th) - 0.5,
+                                  N3 / 2 + 0.62 * (N3 / 2) * Math.sin(th) - 0.5));
+            }
+            vals.sort((a, b) => a - b);
+            return vals[Math.floor(vals.length / 4)];
+        };
+        const qStill = edgeQuartile(run.frames[0]), qLimn = edgeQuartile(run.frames[1]), qComet = edgeQuartile(run.frames[2]);
+        say(`edge light at the ring's quarter-point -- still ${qStill.toFixed(5)}, comet ${qComet.toFixed(5)}, limn ${qLimn.toFixed(5)}`);
+        ok("!! the three heroes' EDGES rank the way murmur's roster ranks their rims: still > comet > limn",
+            qStill > qComet && qComet > qLimn && qStill / qLimn > 2.5,
+            `still ${qStill.toFixed(5)} > comet ${qComet.toFixed(5)} > limn ${qLimn.toFixed(5)} in linear ` +
+            `light, a still-over-limn ratio of ${(qStill / qLimn).toFixed(2)} against the roster's own ` +
+            `1.15 / 0.30 = 3.83. Measured at 48 px and 64 px before the limits were set: the ordering holds ` +
+            `and the ratio reads 3.73 and 3.77. Until v4629 this file gave every species but limn and comet ` +
+            `the same INVENTED 0.85 rim, and handing all three one hero's knobs -- the sabotage that found ` +
+            `this gap -- left every other row in this gate green.`);
+
+        // *** THE PAPER GROUND, WHERE HALF OF mh_surface LIVES AND WHERE THE COMPOSITION CAN GO WRONG
+        // INVISIBLY. *** On ink dark is exactly 1, so putting the rim under the (* dark) factor is
+        // ALGEBRAICALLY IDENTICAL to leaving it out -- the arrangement murmur's mh_present settles cannot be
+        // told from the wrong one by any ink-ground measurement whatsoever. On paper dark is near zero and
+        // the wrong arrangement deletes the edge.
+        const paperFrame = run.frames[run.frames.length - 1];
+        const pEdge = edgeQuartile(paperFrame), pCentre = light(paperFrame, N3 >> 1, N3 >> 1);
+        say(`paper ground -- edge ${pEdge.toFixed(4)}, centre ${pCentre.toFixed(4)}, ratio ${(pEdge / pCentre).toFixed(4)}`);
+        ok("!! *** ON PAPER THE RIM DARKENS THE EDGE, which is what says it is composed into body and not under (* dark) ***",
+            pEdge > 0 && pEdge / pCentre < 0.95,
+            `the edge reads ${pEdge.toFixed(4)} against a centre of ${pCentre.toFixed(4)}, a ratio of ` +
+            `${(pEdge / pCentre).toFixed(4)} -- DARKER than the page, which is the direction that matters. On ` +
+            `a light ground energy does not become light: it becomes chroma and shadow, "which is what a ` +
+            `tinted transparent object actually does to the light behind it", so more rim means a deeper ` +
+            `edge. murmur's mh_present composes railE = body + (spec + contact) * dark with the RIM inside ` +
+            `body; this file had it under the dark factor until v4629. *** THAT ERROR IS ALGEBRAICALLY ` +
+            `INVISIBLE ON INK *** -- dark is exactly 1 there, so (rim * dark) IS rim and no ink-ground ` +
+            `measurement whatsoever can tell the two arrangements apart, which is why this frame exists. On ` +
+            `paper it moves this ratio from ${(pEdge / pCentre).toFixed(4)} to 1.0287: the edge stops being ` +
+            `darker than the page at all. A first cut asked only that the ratio differ from 1 by 2%, and 1.0287 ` +
+            `does -- so the sabotage passed it. The DIRECTION is the claim, not the difference.`);
     }
 }
 
@@ -315,15 +450,38 @@ sec("2. *** COMET, THE THIRD SPECIES: A TRAIL SOLVED IN CLOSED FORM, AND A HEAD 
                 const i = (y * N3 + x) * 4, v = px[i] + px[i + 1] + px[i + 2];
                 if (v > best) { best = v; bx = x; by = y; }
             }
-            return bx + "," + by;
+            return [bx, by];
+        };
+        // *** THIS ROW COUNTED DISTINCT POSITIONS UNTIL v4629 AND REQUIRED still'S TO BE EXACTLY ONE. ***
+        // That was true only of an approximation. This file's own surface used a FIXED light direction, so
+        // still's catchlight was genuinely motionless; murmur's mh_key DRIFTS -- kit.ts: "enough that the
+        // highlight is never in the same place twice and not enough that anybody watches it move" -- and the
+        // moment the real key was ported the row went red on a species that had become MORE faithful, not
+        // less. A count of distinct positions cannot tell a one-pixel drift from an orbit; it only ever
+        // stood in for the magnitude, so it measures the magnitude now.
+        //
+        // IN BODY RADII RATHER THAN PIXELS, so the figure does not move with the frame size: comet's hotspot
+        // travels 1.150 radii at 48 px and 1.164 at 64, still's 0.067 and 0.071. Stable to 0.014 radii across
+        // a resolution change, and a SIXTEENFOLD separation -- where the old instrument's own margin was one
+        // position against three.
+        const travel = (pts) => {
+            let m = 0;
+            for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++)
+                m = Math.max(m, Math.hypot(pts[i][0] - pts[j][0], pts[i][1] - pts[j][1]));
+            return m / (0.62 * N3 / 2);              // body radii, not pixels
         };
         const cometPts = run.frames.slice(2, 6).map(hotspot);
         const stillPts = [run.frames[0], run.frames[6]].map(hotspot);
-        const cN = new Set(cometPts).size, sN = new Set(stillPts).size;
-        say(`interior hotspot over ${times.length} times -- comet ${cometPts.join(" ")} (${cN} distinct), still ${stillPts.join(" ")} (${sN} distinct)`);
-        ok("!! *** comet'S BRIGHT POINT TRAVELS ITS ORBIT AND still'S CATCHLIGHT DOES NOT MOVE AT ALL ***",
-            cN >= 3 && sN === 1,
-            `comet takes ${cN} distinct hotspot positions across ${times.length} frames; still takes ${sN} across ${stillPts.length}.`);
+        const cT = travel(cometPts), sT = travel(stillPts);
+        say(`interior hotspot travel -- comet ${cometPts.map((q) => q.join(",")).join(" ")} = ${cT.toFixed(3)} radii; still ${stillPts.map((q) => q.join(",")).join(" ")} = ${sT.toFixed(3)} radii`);
+        ok("!! *** comet'S BRIGHT POINT CROSSES THE BODY; still'S CATCHLIGHT ONLY DRIFTS WITH THE KEY LIGHT ***",
+            cT > 0.8 && sT < 0.25 && cT > sT * 5,
+            `comet's hotspot travels ${cT.toFixed(3)} body radii across ${times.length} frames -- further than ` +
+            `the radius itself, which is what an orbiting point does -- against still's ${sT.toFixed(3)}, ` +
+            `${(cT / Math.max(sT, 1e-9)).toFixed(0)}x less. still's is NOT zero and must not be asserted as ` +
+            `zero: murmur's key light drifts about 4.8 degrees over a 29.9 s period, so the catchlight moves ` +
+            `about a pixel over this window and never sits in the same place twice. The limits are set from ` +
+            `two frame sizes (1.150/0.067 at 48 px, 1.164/0.071 at 64), not one.`);
 
         // *** AND THAT ROW ALONE DOES NOT CATCH THE BUG THIS SPECIES ACTUALLY SHIPPED WITH -- the sabotage
         // sweep proved it. *** Deleting the solved head left the row above GREEN, because the TRAIL moves too:
@@ -359,32 +517,42 @@ sec("3. *** DROPLET: THE BODY ITSELF IS THE SPECIES ***");
             const A = (x, y) => { x = Math.max(0, Math.min(N3 - 1, x)); y = Math.max(0, Math.min(N3 - 1, y)); return px[(y * N3 + x) * 4 + 3]; };
             return (A(x0, y0) * (1 - tx) + A(x0 + 1, y0) * tx) * (1 - ty) + (A(x0, y0 + 1) * (1 - tx) + A(x0 + 1, y0 + 1) * tx) * ty;
         };
-        const radii = (px) => {
+        // *** THIS ROW MEASURED THE ALPHA EDGE UNTIL v4629, AND THE ALPHA IS NOT WHERE THE SILHOUETTE LIVES
+        // ANY MORE. *** droplet used to carry the deformed membership as its alpha -- this port's own
+        // invention, not murmur's, which composites all eighteen through one FIXED containment circle and
+        // carries the body's edge in the LIGHT. v4629 moved to murmur's arrangement, because the old one
+        // clipped the contact glow away entirely: the glow is nonzero only outside the silhouette, and an
+        // alpha that reaches zero at the silhouette multiplies all of it by nothing.
+        //
+        // So the wobble is measured where it now lives. FIXED RADIUS, VARYING LIGHT: a wobbling body moves
+        // its own rim in and out past a fixed sampling circle, so the profile ON that circle changes; a
+        // frozen body's does not. No threshold, no bisection, no edge to find -- and that is why it is
+        // stable, where three radius-finding measures tried first were not (a luminance threshold swung
+        // 63-174% on still, the peak-brightness radius 0 to 56% on IDENTICAL pixels between two frame sizes,
+        // because on these species the interior and the specular both outrank the rim on some rays).
+        //
+        // Measured at two frame sizes before the limits were set: droplet 71.5% and 64.3% mean change,
+        // still 0.08% and 0.02%. Roughly EIGHT HUNDRED TIMES apart, with a control that is flat.
+        const profile = (px, r) => {
             const out = [];
             for (let a = 0; a < 64; a++) {
                 const th = a * 2 * Math.PI / 64;
-                let lo = 0.1, hi = 0.98;
-                for (let it = 0; it < 40; it++) {          // bisect the alpha = 128 crossing, subpixel
-                    const mid = (lo + hi) / 2;
-                    if (alphaAt(px, C + mid * C * Math.cos(th), C + mid * C * Math.sin(th)) > 128) lo = mid; else hi = mid;
-                }
-                out.push((lo + hi) / 2);
+                out.push(bil(px, N3 / 2 + r * (N3 / 2) * Math.cos(th) - 0.5,
+                                 N3 / 2 + r * (N3 / 2) * Math.sin(th) - 0.5));
             }
             return out;
         };
         const change = (a, b) => {
-            const A = radii(a), B = radii(b);
+            const A = profile(a, 0.62), B = profile(b, 0.62);
             const mean = A.reduce((x, y) => x + y, 0) / A.length;
             const d = A.map((v, i) => Math.abs(v - B[i]));
             return { max: Math.max(...d) / mean, mean: d.reduce((x, y) => x + y, 0) / d.length / mean };
         };
         const dropCh = change(run.frames[7], run.frames[8]);
         // still at t=2.4 against still at t=3.9 -- the control needs two DIFFERENT times, not the same two
-        // droplet uses, because still's silhouette is time-invariant and any pair proves it. Rendering a
-        // fourth still frame to match droplet's times exactly cost a tenth frame and took this gate to
-        // 3,120 ms, over budget, to establish a zero that frames 0 and 6 already establish.
+        // droplet uses, because still's silhouette is time-invariant and any pair proves it.
         const stillCh = change(run.frames[0], run.frames[6]);
-        say(`silhouette change at voice ${SIL_VOICE} -- droplet (t=${DROP_TIMES[0]} vs ${DROP_TIMES[1]}) max ${(dropCh.max * 100).toFixed(2)}% mean ${(dropCh.mean * 100).toFixed(2)}%; still (t=${times[0]} vs ${STILL_TIMES[0]}) max ${(stillCh.max * 100).toFixed(3)}%`);
+        say(`silhouette at voice ${SIL_VOICE}, light on a FIXED ring -- droplet (t=${DROP_TIMES[0]} vs ${DROP_TIMES[1]}) max ${(dropCh.max * 100).toFixed(1)}% mean ${(dropCh.mean * 100).toFixed(2)}%; still (t=${times[0]} vs ${STILL_TIMES[0]}) max ${(stillCh.max * 100).toFixed(2)}% mean ${(stillCh.mean * 100).toFixed(3)}%`);
         // *** AND THE HEART, WHICH THE SILHOUETTE ROW DOES NOT SEE AT ALL. *** Deleting droplet's solved core
         // left every row here green -- the same hole comet's missing head went through. The peak is no use:
         // it saturates with the heart and without it. What the heart does is LIGHT THE FOG IT SITS IN ("the
@@ -417,13 +585,15 @@ sec("3. *** DROPLET: THE BODY ITSELF IS THE SPECIES ***");
             `be visible, because the only way to see a lens is to see something through it." The peak cannot ` +
             `carry this row: it reads 646 either way.`);
 
-        ok("!! *** THE BODY ITSELF IS THE SPECIES: droplet's SILHOUETTE moves and still's does not move at all ***",
-            dropCh.mean > 0.002 && stillCh.max === 0,
-            `droplet's per-angle radius shifts by ${(dropCh.mean * 100).toFixed(2)}% on average and ` +
-            `${(dropCh.max * 100).toFixed(2)}% at its worst angle; still's shifts by EXACTLY ` +
-            `${(stillCh.max * 100).toFixed(3)}% -- the grid artifact cancels, which is what makes this the one ` +
-            `silhouette measurement here with no floor to argue about. droplet.ts: "the body itself is the ` +
-            `species: a sphere of water in free fall."`);
+        ok("!! *** THE BODY ITSELF IS THE SPECIES: droplet's SILHOUETTE moves and still's barely does ***",
+            dropCh.mean > 0.20 && stillCh.mean < 0.01 && dropCh.mean > stillCh.mean * 50,
+            `the light on a fixed ring at the body radius shifts by ${(dropCh.mean * 100).toFixed(1)}% on ` +
+            `average for droplet and ${(dropCh.max * 100).toFixed(0)}% at its worst angle, against still's ` +
+            `${(stillCh.mean * 100).toFixed(3)}% and ${(stillCh.max * 100).toFixed(2)}% -- ` +
+            `${(dropCh.mean / Math.max(stillCh.mean, 1e-9)).toFixed(0)}x. still's is no longer EXACTLY zero ` +
+            `and is not asserted as zero: murmur's key light drifts, so even a frozen body's rim changes a ` +
+            `little between two times. droplet.ts: "the body itself is the species: a sphere of water in ` +
+            `free fall."`);
     }
 }
 
@@ -433,5 +603,7 @@ console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "round, comet's point travelling its orbit at a steady peak, droplet's silhouette moving where the other " +
     "three are frozen circles -- and not a restatement of the shader that drew them. " +
     "\nWHAT IS NOT CLAIMED HERE: the kit those species stand on, which is tools/ship/murmurKit-selfcheck.mjs's " +
-    "subject, including the deformed body solve droplet is the first to need. Fifteen species remain.");
+    "subject, including the deformed body solve droplet is the first to need and the SURFACE all eighteen " +
+    "share, ported at v4629. FOURTEEN species remain, and they are cheaper than the four that came first: " +
+    "every one of them calls mh_surface, mh_body, mh_palette and mh_present, and all four are in the kit now.");
 process.exit(fails ? 1 : 0);

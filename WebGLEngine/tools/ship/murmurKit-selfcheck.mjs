@@ -314,7 +314,8 @@ const probeRun = await renderThreeTslToPixels({
     engineRoot: ENG, moduleImportPath: "/render/murmurKitTsl.mjs",
     factoryName: "makeMurmurKitProbeTsl", factoryArgs: { mode: "hash", n: N }, width: N, height: N,
     variants: [{ factoryArgs: { mode: "noise", n: N } }, { factoryArgs: { mode: "rail", n: N } },
-               { factoryArgs: { mode: "railLight", n: N } }],
+               { factoryArgs: { mode: "railLight", n: N } },
+               { factoryArgs: { mode: "surface", n: N } }],
 });
 
 sec("6. *** THE PAIR: THE REAL COMPILED SHADER AGAINST THE CPU REFERENCE, BIT FOR BIT ***");
@@ -741,13 +742,290 @@ sec("8. *** THE COLOUR RAIL: mh_palette / mh_shade / mh_tier / mh_lit ***");
         `instrument rather than the kit.`);
 }
 
+// =============================================================================================================
+sec("9. *** THE SURFACE: mh_key / mh_small / mh_surface -- the one piece ALL EIGHTEEN species call ***");
+{
+    const INKS = [0x0A / 255, 0x0A / 255, 0x0B / 255];
+    const PAPERS = [0.97, 0.96, 0.94];
+
+    // ---- mh_key: it MOVES, and it points up-and-LEFT -----------------------------------------------------
+    // *** THE SIGNS ARE THE EASIEST THING IN THIS FILE TO GET BACKWARDS. *** Screen y runs DOWN in a
+    // colorEffect, so "up and to the left" is NEGATIVE in both -- a port that "corrected" them would light
+    // every one of the eighteen from below-right and no single row about brightness would notice.
+    const k0 = K.mhKey(0);
+    ok("!! the key light points up and to the LEFT, which is negative in both -- screen y runs down",
+        k0[0] < 0 && k0[1] < 0 && k0[2] > 0,
+        `mhKey(0) = ${k0.map((v) => v.toFixed(4)).join(", ")}. kit.ts: "The light sits up and to the left ... ` +
+        `Screen y runs DOWN in a colorEffect, so up-left is negative in both." Asserted as SIGNS rather than ` +
+        `as values, because the values drift and the orientation does not.`);
+
+    // "drifts about four degrees over half a minute" -- both halves, and the ambiguity in "four" is named.
+    const KEYN = 4000, KEYT = 30;
+    let mean = [0, 0, 0];
+    const keys = [];
+    for (let i = 0; i < KEYN; i++) {
+        const kk = K.mhKey(i / KEYN * KEYT);
+        keys.push(kk);
+        for (let j = 0; j < 3; j++) mean[j] += kk[j] / KEYN;
+    }
+    const ml = Math.hypot(mean[0], mean[1], mean[2]);
+    mean = mean.map((v) => v / ml);
+    let halfCone = 0, fullCone = 0;
+    for (const kk of keys) halfCone = Math.max(halfCone, Math.acos(Math.min(1, K.dot3(kk, mean))));
+    for (let i = 0; i < KEYN; i += 13) for (let j = i; j < KEYN; j += 13)
+        fullCone = Math.max(fullCone, Math.acos(Math.min(1, K.dot3(keys[i], keys[j]))));
+    const period = 2 * Math.PI / 0.21;
+    ok("!! *** THE KEY DRIFTS ABOUT FOUR DEGREES OVER HALF A MINUTE, and BOTH numbers check out ***",
+        Math.abs(fullCone * 180 / Math.PI - 4.8) < 0.2 && Math.abs(period - 30) < 0.5,
+        `the widest angle between any two key directions is ${(fullCone * 180 / Math.PI).toFixed(2)} degrees ` +
+        `and the drift closes on itself every ${period.toFixed(1)} s. *** "FOUR DEGREES" IS AMBIGUOUS BY A ` +
+        `FACTOR OF TWO AND THE GATE SAYS WHICH IT MEANS: *** the FULL excursion is ` +
+        `${(fullCone * 180 / Math.PI).toFixed(2)} and the half-cone from the mean direction is ` +
+        `${(halfCone * 180 / Math.PI).toFixed(2)}. The full one is what "drifts about four degrees" reads as, ` +
+        `and it is the one asserted; recording both means the next reader does not have to guess which.`);
+
+    // kit.ts: "at (-0.52, -0.60) the highlight lands at about 0.45 of the radius, clear of whatever the hero
+    // has put in the middle." On a sphere the highlight sits where N == H, so its in-plane radius IS |H.xy|.
+    const Hv = [k0[0], k0[1], k0[2] + 1];
+    const hl = Math.hypot(Hv[0], Hv[1], Hv[2]);
+    const hlRad = Math.hypot(Hv[0] / hl, Hv[1] / hl);
+    ok("the highlight lands clear of the middle, at about 0.45 of the radius",
+        hlRad > 0.35 && hlRad < 0.55,
+        `the half-vector puts it at ${hlRad.toFixed(4)} of the radius against kit.ts's "about 0.45" -- a ` +
+        `0.017 gap, reported rather than rounded to the quoted figure. The POINT of the number is that it is ` +
+        `clear of the middle, "clear of whatever the hero has put in the middle", and 0.43 is.`);
+
+    const sphere = (x, y) => {
+        const rho = Math.hypot(x, y);
+        const z = Math.sqrt(Math.max(1 - rho * rho, 0));
+        const N = [x, y, z];
+        const m = 1 - K.smoothstep(1 - 0.018, 1 + 0.018, rho);
+        return { m, P: N, N, Rd: 1, rho, fres: 1 - Math.min(1, Math.max(0, z)) };
+    };
+    const surfAt = (x, y, ink, tilt = [0, 0], rimK = 1.0, specK = 1.0, glowK = 0.15, t = 3.7, small = 0) =>
+        K.mhSurface(sphere(x, y), t, small, ink, tilt, rimK, specK, glowK);
+
+    // ---- mh_small: the size dial, and a stated midpoint that is not its real one -------------------------
+    ok("!! mh_small reads 1 at 18 pt and exactly 0 from 120 pt up",
+        Math.abs(K.mhSmall(18, 18) - 1) < 0.01 && K.mhSmall(120, 120) === 0 && K.mhSmall(400, 400) === 0,
+        `18 pt -> ${K.mhSmall(18, 18).toFixed(4)}, 120 pt -> ${K.mhSmall(120, 120)}, 400 pt -> ` +
+        `${K.mhSmall(400, 400)}. Square sizes ONLY PROVE HALF OF IT and the sabotage sweep said so: swapping ` +
+        `min for max left every row here green, because at 18x18 and 120x120 the two agree. A 200x20 mount ` +
+        `reads ${K.mhSmall(200, 20).toFixed(4)} and a 20x200 the same ${K.mhSmall(20, 200).toFixed(4)} -- the ` +
+        `THIN side decides, and under max both would read ${K.mhSmall(200, 200)}.`);
+    ok("...and it takes the SMALLER side, so a wide thin mount is small in both orientations",
+        K.mhSmall(200, 20) > 0.98 && K.mhSmall(20, 200) > 0.98 && K.mhSmall(200, 200) === 0,
+        `200x20 -> ${K.mhSmall(200, 20).toFixed(4)}, 20x200 -> ${K.mhSmall(20, 200).toFixed(4)}, 200x200 -> ` +
+        `${K.mhSmall(200, 200)}. Stated over a NON-SQUARE pair on purpose: this is the only shape of input on ` +
+        `which min and max differ, so it is the only one that tests which was written.`);
+
+    let lo = 1, hi = 400, mid = 0;
+    for (let i = 0; i < 60; i++) { mid = (lo + hi) / 2; if (K.mhSmall(mid, mid) > 0.5) lo = mid; else hi = mid; }
+    ok("...and its real midpoint is 52 pt where kit.ts says 46 -- carried as shipped, with the gap named",
+        Math.abs(mid - 52) < 0.01,
+        `mh_small crosses a half at ${mid.toFixed(3)} pt. smoothstep(16, 88, x) reaches a half at the ` +
+        `arithmetic middle of its edges, which is 52; kit.ts's header says "the midpoint sits at about 46 pt, ` +
+        `the chip mount". A six-point gap. The CODE is shipped, not the prose -- the same call this tree made ` +
+        `for MH_SCATTER_K's 3.2-versus-0.098 split and droplet's 0.339 arithmetic slip. A port that corrects ` +
+        `its source has stopped being a port.`);
+
+    // *** THE FIRST VERSION OF THIS ROW COMPUTED THE EXPONENT ITSELF AND GRADED ITS OWN ARITHMETIC. ***
+    // It read `96 + (16 - 96) * K.mhSmall(...)` in the gate and asserted the two ends -- so mhSurface was
+    // never called with a different `small` at all, and pinning the exponent at a fixed 96 inside mhSurface
+    // left the row GREEN. Same shape as the hue-rotation row v4627 had to repair. What replaces it measures
+    // the SIZE OF THE HIGHLIGHT mhSurface actually draws: the fraction of the visible disk standing at or
+    // above half the specular's own peak, at small = 0 and small = 1.
+    const specFootprint = (small) => {
+        let peak = 0; const vals = []; const G = 260;
+        for (let i = 0; i < G; i++) for (let j = 0; j < G; j++) {
+            const x = (i + 0.5) / G * 2 - 1, y = (j + 0.5) / G * 2 - 1;
+            if (Math.hypot(x, y) >= 1) continue;
+            const v = surfAt(x, y, INKS, [0, 0], 1.0, 1.0, 0.15, 3.7, small).spec;
+            vals.push(v); if (v > peak) peak = v;
+        }
+        return vals.filter((v) => v >= peak * 0.5).length / vals.length;
+    };
+    const fp120 = specFootprint(0), fp18 = specFootprint(1);
+    ok("!! *** THE TIGHT SPECULAR IS SIZE-ADAPTIVE, AND THE HIGHLIGHT mh_surface DRAWS IS MEASURED, NOT ITS EXPONENT ***",
+        fp18 > fp120 * 3,
+        `the highlight covers ${(fp120 * 100).toFixed(3)}% of the visible disk at 120 pt and ` +
+        `${(fp18 * 100).toFixed(3)}% at 18 pt -- ${(fp18 / fp120).toFixed(2)}x wider, spreading the same ` +
+        `light over more pixels. kit.ts's reason is a pixel count and not a preference: a 96-exponent ` +
+        `highlight "covers about four pixels at 120 pt and a third of one at 18 pt, where it would flicker in ` +
+        `and out as the body wobbled underneath it". And 96 rather than the 58 a first cut used, for the ` +
+        `VALUE HIERARCHY -- at 58 "the glint's saturated core was a tenth of the frame across, a second ` +
+        `bright object competing with the interior".`);
+
+    // ---- mh_surface: the terms that MOVE WITH THE GROUND, each measured on both grounds ------------------
+    // The rim gain rises by a third on paper "because the edge does more work on paper than it ever does on
+    // ink: it is the whole silhouette of an object that is otherwise nearly the colour of the page."
+    // Measured on the DARK side of the rim, where the wrap term is at its floor on both grounds, so the 1.32
+    // is not confounded by the wrap flattening that also happens on paper.
+    // *** THE PAPER RIM GAIN, ISOLATED THROUGH INPUTS RATHER THAN ASSERTED AS A DIRECTION. *** A first cut
+    // of this row only checked that the paper rim is brighter, and the sabotage sweep walked straight through
+    // it: deleting the 1.32 entirely still leaves paper brighter, because the wrap also rises to 0.88 there.
+    // Three factors move with the ground at once, so the row picks the ONE POINT where the other two cannot:
+    // the silhouette at N.y = 0. There fres is exactly 1, so the exponent's move from 3.9 to 5.4 changes
+    // nothing at all (1 to any power is 1), and sky is exactly 0.5, so envRim is 1.0 on both grounds. What is
+    // left is the wrap's 0.88-over-0.840 and the gain itself.
+    const gainI = surfAt(1.0, 0, INKS).rim, gainP = surfAt(1.0, 0, PAPERS).rim;
+    const wrapOnlyAtPoint = 0.88 / (0.55 + 0.45 * 0.42 / Math.hypot(0.42, 0.50));
+    ok("!! the rim gain rises by a third on paper, isolated from the two terms that move with it",
+        Math.abs(gainP / gainI / wrapOnlyAtPoint - 1.32) < 0.01,
+        `at the silhouette with N.y = 0: ink ${gainI.toFixed(6)}, paper ${gainP.toFixed(6)}, a ratio of ` +
+        `${(gainP / gainI).toFixed(4)}. The wrap alone accounts for ${wrapOnlyAtPoint.toFixed(4)} of that, ` +
+        `leaving ${(gainP / gainI / wrapOnlyAtPoint).toFixed(4)} -- murmur's 1.32, recovered rather than ` +
+        `restated. kit.ts: "the edge does more work on paper than it ever does on ink: it is the whole ` +
+        `silhouette of an object that is otherwise nearly the colour of the page. A third more of it, and no ` +
+        `other term changes."`);
+
+    // *** AND THE EXPONENT ITSELF, RECOVERED AS A LOGARITHM. *** Along the +x axis every other factor in the
+    // rim is constant: the wrap's alignment depends on the DIRECTION of N.xy, which is (1,0) for every point
+    // on that ray, and sky is 0.5 throughout, so envRim and m and rimK are fixed. The only thing that varies
+    // is fres, and rim goes as fres to the power the ground selects -- so the ratio of two samples gives the
+    // exponent back exactly. Deleting the mix(3.9, 5.4, paper) passed every other row in this section.
+    const expAt = (ink) => {
+        const a = surfAt(0.80, 0, ink).rim, b = surfAt(0.95, 0, ink).rim;
+        const fa = 1 - Math.sqrt(Math.max(1 - 0.80 * 0.80, 0)), fb = 1 - Math.sqrt(Math.max(1 - 0.95 * 0.95, 0));
+        return Math.log(b / a) / Math.log(fb / fa);
+    };
+    const eInk = expAt(INKS), ePaper = expAt(PAPERS);
+    ok("!! *** THE RIM EXPONENT MOVES WITH THE GROUND: 3.9 ON INK, 5.4 ON PAPER, RECOVERED TO FOUR PLACES ***",
+        Math.abs(eInk - 3.9) < 1e-3 && Math.abs(ePaper - 5.4) < 1e-3,
+        `recovered as log(rim2/rim1)/log(fres2/fres1) along the +x axis, where every other factor is constant: ` +
+        `${eInk.toFixed(4)} on ink and ${ePaper.toFixed(4)} on paper. 3.9 is fitted against a capture rather ` +
+        `than chosen -- kit.ts: "at 3 the rim is a broad wash that reads as the body being lit from behind. ` +
+        `At 3.9 the light lives in the outer eighth and the eye gets a CRISP EDGE with soft content behind ` +
+        `it" -- and it tightens on paper "where a dark edge has to be FINE to read as an edge rather than as ` +
+        `a dirty ring".`);
+
+    // THE RIM IS NOT A RING, and the part of it that flattens on paper flattens EXACTLY.
+    const ringOf = (ink) => {
+        let mn = Infinity, mx = -Infinity;
+        for (let a = 0; a < 180; a++) {
+            const th = a * Math.PI / 90;
+            const v = surfAt(Math.cos(th) * 0.995, Math.sin(th) * 0.995, ink).rim;
+            mn = Math.min(mn, v); mx = Math.max(mx, v);
+        }
+        return { mn, mx, ratio: mx / Math.max(mn, 1e-12) };
+    };
+    const rInk = ringOf(INKS), rPaper = ringOf(PAPERS);
+    // *** THE WRAP IS ISOLATED THROUGH mhSurface ITSELF RATHER THAN RE-COMPUTED HERE. *** A first cut of this
+    // row asserted the whole ring ratio drops by a third on paper and failed on a threshold picked from
+    // intuition: it drops to 0.73 of the ink figure, not 0.65, because TWO terms vary round that edge and only
+    // one of them is meant to flatten. Re-deriving the wrap formula in the gate to separate them is exactly
+    // the mistake v4579 and v4580 shipped, so it is separated by choosing INPUTS instead: two points at the
+    // same height on the silhouette and opposite sides. envRim depends only on N.y and fres and m are equal
+    // there, so the ratio between them is the wrap and nothing else.
+    const wrapRatio = (ink) => surfAt(0.995, 0, ink).rim / surfAt(-0.995, 0, ink).rim;
+    const wInk = wrapRatio(INKS), wPaper = wrapRatio(PAPERS);
+    ok("!! *** THE RIM IS NOT A RING ON INK, AND THE TERM THAT SHOULD FLATTEN ON PAPER FLATTENS EXACTLY ***",
+        rInk.ratio > 1.7 && rPaper.ratio < 1.4 && wInk > 1.4 && Math.abs(wPaper - 1) < 1e-12,
+        `sweeping 180 points round the silhouette: brightest over dimmest is ${rInk.ratio.toFixed(4)} on ink ` +
+        `and ${rPaper.ratio.toFixed(4)} on paper. ISOLATING THE WRAP -- two points at the same height, ` +
+        `opposite sides, where envRim and fres and m are all equal -- it is ${wInk.toFixed(4)} on ink and ` +
+        `${wPaper.toFixed(12)} on paper: EXACTLY one, a perfect ring, because the mix carries it all the way ` +
+        `to the constant 0.88. What is left varying on paper is the ENVIRONMENT term, which is not supposed ` +
+        `to flatten -- it inverts -- and that is the next row. kit.ts: 55 per cent everywhere plus 45 per ` +
+        `cent on the side AWAY from the key, "which is the wrap light every product photograph of a glass ` +
+        `object has", flattening on paper because there "the rim is not lighting at all: it is the refracted ` +
+        `edge of a clear sphere, which goes all the way round". Measured round the WHOLE edge rather than at ` +
+        `two chosen points, which is the mistake v4624's own rim row shipped.`);
+
+    // The environment gradient INVERTS on paper, "so the top of the sphere is the lighter half of its edge on
+    // both grounds". Read at the top and bottom of the silhouette, where sky is 1 and 0.
+    const topInk = surfAt(0, -0.995, INKS).rim, botInk = surfAt(0, 0.995, INKS).rim;
+    const topPap = surfAt(0, -0.995, PAPERS).rim, botPap = surfAt(0, 0.995, PAPERS).rim;
+    ok("!! the environment term INVERTS on paper, so the sphere's top is the lighter edge on BOTH grounds",
+        (topInk / botInk > 1) === (topPap / botPap > 1),
+        `top-over-bottom is ${(topInk / botInk).toFixed(4)} on ink and ${(topPap / botPap).toFixed(4)} on ` +
+        `paper -- the same side wins on both, which is the whole point of the inversion. kit.ts's rule for ` +
+        `this term is that "if you can see it, it is wrong": fourteen per cent, and A VALUE GRADIENT AND NOT ` +
+        `A COLOUR ONE on purpose, because "a second hue arriving through a term nobody dialled would break ` +
+        `the one-hue-family law from underneath".`);
+
+    // ---- the contact glow: OUTSIDE ONLY, and it pools DOWNWARD -------------------------------------------
+    const gCentre = surfAt(0, 0, INKS).glow;
+    const gInside = surfAt(0.5, 0, INKS).glow;
+    const gEdge = surfAt(1.05, 0, INKS).glow;
+    ok("!! *** THE CONTACT GLOW IS OUTSIDE THE SILHOUETTE ONLY -- exactly zero under the body ***",
+        gCentre === 0 && gInside === 0 && gEdge > 0.01,
+        `centre ${gCentre}, half a radius out ${gInside}, and ${gEdge.toFixed(5)} just past the edge. EXACTLY ` +
+        `zero inside and not merely small, because the (1 - m) factor is exactly zero wherever membership is ` +
+        `exactly one. This port had NO contact glow at all before v4629, on any of its four species, and ` +
+        `every one of murmur's eighteen asks for one.`);
+
+    const gBelow = surfAt(0, 1.05, INKS).glow, gAbove = surfAt(0, -1.05, INKS).glow;
+    ok("...and it POOLS DOWNWARD rather than ringing the body evenly",
+        gBelow > gAbove * 1.5,
+        `${gBelow.toFixed(5)} below against ${gAbove.toFixed(5)} above, a ratio of ` +
+        `${(gBelow / gAbove).toFixed(2)} -- screen y runs down, so +y is below. kit.ts: its job "is to stop ` +
+        `the silhouette meeting the ink as a cut line, not to be a halo anybody notices", which is a shadow's ` +
+        `job and not a glow's, and a thing that pools under an object is what a shadow does.`);
+
+    // ---- the roster, and the two files that each claim the same superlative ------------------------------
+    const SKn = K.MH_SURFACE_KNOBS;
+    const names = Object.keys(SKn);
+    const rimAt = (v) => names.map((s) => [s, SKn[s][0] + v * SKn[s][1]]).sort((a, b) => b[1] - a[1]);
+    const specAt = (v) => names.map((s) => [s, SKn[s][2] + v * SKn[s][3]]).sort((a, b) => b[1] - a[1]);
+    const rim0 = rimAt(0), rim1 = rimAt(1), spec0 = specAt(0), spec1 = specAt(1);
+    ok("!! *** TWO OF murmur's FILES EACH CLAIM THE HIGHEST RIM, AND THE ROSTER SETTLES IT: abyss, NOT still ***",
+        rim0[0][0] === "abyss" && rim1[0][0] === "abyss" && spec0[0][0] === "still" && spec1[0][0] === "still",
+        `over all ${names.length} heroes: the highest RIM is ${rim0[0][0]} at ${rim0[0][1].toFixed(2)} at rest ` +
+        `and ${rim1[0][1].toFixed(2)} at full voice (still is ${rim0.find((r) => r[0] === "still")[1].toFixed(2)} ` +
+        `and ${rim1.find((r) => r[0] === "still")[1].toFixed(2)}), and the highest SPECULAR is ${spec0[0][0]} ` +
+        `at ${spec0[0][1].toFixed(2)}, ahead of ${spec0[1][0]} at ${spec0[1][1].toFixed(2)}. still.ts says ` +
+        `"THE HIGHEST RIM AND SPECULAR IN THE COLLECTION"; abyss.ts says "1.70 is the highest in the ` +
+        `collection, which is right: this is the hero with the least else". still.ts bundles the two and is ` +
+        `HALF right -- it has the specular and abyss has the rim -- and this tree repeated the wrong half in ` +
+        `its own gate until v4629.`);
+
+    // ---- AND THE PAIR: THE WHOLE SURFACE ON A REAL GPU ---------------------------------------------------
+    if (!probeRun.ok) {
+        ok("!! *** mh_surface RENDERS ON A REAL GPU AND MATCHES THE CPU REFERENCE ***", false,
+            `could not render: ${probeRun.reason || (probeRun.skipped ? "skipped: " + probeRun.skipped : "unknown")}`);
+    } else {
+        const surf = probeRun.frames[4];
+        const SC = [2.0, 2.0, 0.5];          // the probe's own per-channel scales
+        const gradeS = (flip) => {
+            let worst = 0, sum = 0, at = "", outside = 0;
+            for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+                const bx = (x / N) * 2.4 - 1.2, by = (y / N) * 2.4 - 1.2;
+                const o = K.mhSurface(sphere(bx, by), 3.7, 0, INKS, [0.35, -0.20], 1.15, 1.30, 0.40);
+                const want = [o.rim, o.spec, o.glow].map((v, c) => Math.round(Math.min(1, Math.max(0, v / SC[c])) * 255));
+                const yy = flip ? N - 1 - y : y, i = (yy * N + x) * 4;
+                if (Math.hypot(bx, by) > 1.0) outside++;
+                for (let c = 0; c < 3; c++) {
+                    const d = Math.abs(surf[i + c] - want[c]);
+                    sum += d;
+                    if (d > worst) { worst = d; at = `(${bx.toFixed(2)}, ${by.toFixed(2)}): gpu ${surf[i]},${surf[i + 1]},${surf[i + 2]} against cpu ${want.join(",")}`; }
+                }
+            }
+            return { worst, mean: sum / (N * N * 3), at, outside };
+        };
+        const sF = gradeS(true), sA = gradeS(false);
+        say(`surface over ${N * N} points spanning -1.2..1.2 body units (${sF.outside} of them OUTSIDE the silhouette): flipped worst ${sF.worst}/255 mean ${sF.mean.toFixed(3)}; as read worst ${sA.worst}/255`);
+        ok("!! *** mh_surface RENDERS ON A REAL GPU AND MATCHES THE CPU REFERENCE, RIM SPEC AND GLOW AT ONCE ***",
+            sF.worst <= 2 && sF.mean < 0.05 && sA.worst > 20 && sF.outside > 20,
+            `worst channel error ${sF.worst} of 255 and mean ${sF.mean.toFixed(3)} over ${N * N} points. The ` +
+            `frame deliberately spans -1.2..1.2 rather than the body, so ${sF.outside} sample points are ` +
+            `OUTSIDE the silhouette: the contact glow lives entirely out there, and a probe cropped to the ` +
+            `body would grade it at zero everywhere and call that agreement. Worst at ${sF.at}. The unflipped ` +
+            `orientation is off by ${sA.worst}, so this cannot pass by the symmetry a centred pattern would ` +
+            `have -- and the tilt is a NONZERO (0.35, -0.20) here, so the counter-move term the species ` +
+            `exercise at zero is exercised for real by this row.`);
+    }
+}
+
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nWHAT THIS KIT IS FOR: four of murmur-web's eighteen species are built out of it, and the other fourteen " +
     "would each otherwise have re-approximated the march, the medium, the gesture clock and the hash " +
     "separately. The SPECIES themselves are gated next door in tools/ship/murmurSpecies-selfcheck.mjs -- they " +
     "need real renders and this gate does not, which is a budget fact before it is a tidiness one. " +
-    "\nWHAT IS NOT CLAIMED: mh_surface and mh_present, which render/aiPresenceOrbTsl.mjs still approximates in " +
-    "its own file. THE COLOUR RAIL IS NO LONGER AMONG THEM -- section 8 -- so the four species now wear " +
-    "murmur's own palette walk instead of an OKLab ramp of this port's choosing with white speculars laid " +
-    "over it. The deformed body solve is at section 7, and droplet is the first species to need it.");
+    "\nWHAT IS NOT CLAIMED: mh_present's own tone curve and dither, and the HUE channel every species feeds " +
+    "it -- render/murmurKit.mjs's marchStillInterior returns hueNum and the shader accumulates only the " +
+    "scalar, so the rail's spread axis built at v4627 reaches no pixel and every species passes 0. " +
+    "mh_surface IS claimed now, at section 9: all eighteen heroes call it and this port approximated it with " +
+    "a fixed light, a fixed rim exponent, invented per-species constants and no contact glow at all until " +
+    "v4629. The colour rail is section 8 and the deformed body solve section 7.");
 process.exit(fails ? 1 : 0);

@@ -355,11 +355,84 @@ export function makeMurmurKitTsl(TSL) {
 
     const mhScatter = Fn(([arg, amp]) => amp.mul(exp(arg.mul(-MH_SCATTER_K))));
 
+    // ---- the surface: mh_key / mh_small / mh_surface -----------------------------------------------------
+    // *** ALL EIGHTEEN SPECIES CALL mh_surface AND THIS PORT APPROXIMATED IT UNTIL v4629. *** What stood in
+    // render/aiPresenceOrbTsl.mjs was a fresnel rim at a fixed exponent of 4.5, two lobes off a FIXED light
+    // direction this port chose, a per-species rim constant that matched murmur's roster on two species out of
+    // four, and NO CONTACT GLOW AT ALL. See render/murmurKit.mjs for what each term is and why.
+
+    /**
+     * THE CONTAINMENT: a safety net for the CONTACT GLOW, not the design of the edge. At reach 0.72 the fall
+     * runs from a uv radius of 0.36 to 0.49 while the body's worst case is 0.339, so it sits clear outside
+     * every hero's silhouette -- which is the whole point, since the glow is nonzero only out there.
+     */
+    const mhContainment = Fn(([uvLen, reach]) =>
+        float(1.0).sub(smoothstep(reach, reach.add(0.26), uvLen.mul(2.0))));
+
+    /** THE KEY LIGHT, AND IT MOVES. Up and to the LEFT -- screen y runs down, so both leads are negative. */
+    const mhKey = Fn(([t]) => {
+        const dr = t.mul(0.21).toVar();
+        return normalize(vec3(sin(dr).mul(0.055).sub(0.52),
+                              cos(dr.mul(0.83)).mul(0.045).sub(0.60),
+                              float(0.61)));
+    });
+
+    /** THE SIZE DIAL: 1 at 18 pt, 0 at 120 pt and above. Its real midpoint is 52 pt, not the 46 kit.ts says. */
+    const mhSmall = Fn(([w, h]) => float(1.0).sub(smoothstep(float(16.0), float(88.0), max(min(w, h), float(1.0)))));
+
+    /**
+     * THE SURFACE EVERY HERO SHARES. A JS closure, not an Fn, for the reason the colour rail is one: it takes
+     * a BODY (six nodes) and hands back THREE, and an Fn's parameter list carries single nodes, not sets.
+     *
+     * b: { m, P, N, Rd, rho, fres } as returned alongside mhBody. tilt: a vec2 in [-1,1]^2.
+     * Returns { rim, spec, glow } in the energy units mh_lit consumes.
+     */
+    const mhSurface = (b, t, small, inkRgb, tilt, rimKIn, specK, glowK) => {
+        const paper = mhPaper(inkRgb).toVar();
+        // The edge does more work on paper than on ink -- it is the whole silhouette of an object otherwise
+        // nearly the colour of the page. A third more of it, and no other term changes.
+        const rimK = rimKIn.mul(mix(float(1.0), float(1.32), paper)).toVar();
+
+        // THE BARELY COUNTER-MOVE: the catchlight shifts AGAINST the tilt, because the world stays put while
+        // the object turns. A fifth of what the interior does, and meant to be subliminal.
+        const H = normalize(mhKey(t).sub(vec3(tilt.x, tilt.y, float(0.0)).mul(MH_TILT * 0.20))
+                            .add(vec3(0.0, 0.0, 1.0))).toVar();
+        const nh = clamp(dot(b.N, H), 0.0, 1.0).toVar();
+        // Screen y runs down, so a normal pointing UP has negative y: this is the sky half of the sphere.
+        const sky = float(0.5).sub(clamp(b.N.y, -1.0, 1.0).mul(0.5)).toVar();
+        // SIZE-ADAPTIVE TIGHT LOBE: 96 at 120 pt, 16 at 18 pt, where a 96 highlight would be a third of a
+        // pixel and would flicker in and out as the body moved under it.
+        const tight = mix(float(96.0), float(16.0), small).toVar();
+        const spec = pow(nh, tight).add(pow(nh, float(4.0)).mul(0.09))
+            .mul(b.m).mul(specK).mul(mix(float(0.92), float(1.08), sky)).toVar();
+
+        // THE RIM IS NOT A RING: 55% everywhere plus 45% on the side AWAY from the key. That asymmetry
+        // FLATTENS on paper, where the rim stops being lighting and becomes the refracted edge of a clear
+        // sphere, which goes all the way round.
+        const nxy = normalize(vec2(b.N.x.add(1e-4), b.N.y.add(1e-4))).toVar();
+        const wrap0 = float(0.55).add(clamp(dot(nxy, normalize(vec2(0.42, 0.50))), 0.0, 1.0).mul(0.45)).toVar();
+        const wrap = mix(wrap0, float(0.88), paper).toVar();
+        // THE ENVIRONMENT, and the rule is that if you can see it, it is wrong: 14% on the rim, read off the
+        // normal. A VALUE gradient and not a colour one -- a second hue through a term nobody dialled would
+        // break the one-hue-family law from underneath -- and it INVERTS on paper.
+        const envRim = mix(mix(float(0.86), float(1.14), sky), mix(float(1.14), float(0.86), sky), paper).toVar();
+        const rim = pow(b.fres, mix(float(3.9), float(5.4), paper)).mul(b.m).mul(wrap).mul(rimK).mul(envRim).toVar();
+
+        // OUTSIDE ONLY: (1 - m) is zero under the silhouette and rises through it. It pools DOWNWARD, because
+        // its job is to stop the silhouette meeting the ink as a cut line, not to be a halo anybody notices.
+        const outr = b.rho.sub(b.Rd).div(0.13).toVar();
+        const pool = float(0.55).add(smoothstep(float(-0.25), float(0.85), b.P.y).mul(0.55)).toVar();
+        const glow = exp(outr.mul(outr).negate()).mul(float(1.0).sub(b.m)).mul(pool).mul(glowK).toVar();
+
+        return { rim, spec, glow };
+    };
+
     return {
         MH_R, MH_ETA, MH_EXT, MH_TILT, MH_SCATTER_K, MH_EXIT_CAP,
         mhHash, mhGrad3, mhNoise3, mhHash1, mhFlourish, mhBreath, mhDrift, mhSpin,
         mhRefract, mhLook, mhExit, mhHaze, mhMedium, mhInside, mhTransmit, mhScatter,
         mhDeform, mhBody, MH_AMP_CAP,
+        mhKey, mhSmall, mhSurface, mhContainment,
         mhPaper, mhPalette, mhShade, mhKnee, mhTier, mhLit, mhLchT, labOfSrgb, srgbToLinearT, linearToOklabT, oklabToLinearT,
         Loop,
     };
@@ -415,6 +488,31 @@ export function makeMurmurKitProbeTsl(THREE, TSL, { mode = "hash", n = 16 } = {}
             const lit = K.mhLit(pal, px.div(n).mul(2.0), py.div(n), float(0.0), float(1.0), float(0.34), float(0.0)).toVar();
             const enc = (v) => select(v.lessThanEqual(0.0031308), v.mul(12.92), pow(max(v, float(1e-6)), float(1 / 2.4)).mul(1.055).sub(0.055));
             return vec4(clamp(enc(lit.x), 0.0, 1.0), clamp(enc(lit.y), 0.0, 1.0), clamp(enc(lit.z), 0.0, 1.0), 1.0);
+        }
+        if (mode === "surface") {
+            // *** mh_surface OVER A WHOLE SPHERE, AGAINST THE CPU REFERENCE. *** The frame spans -1.2..1.2 in
+            // body units so the OUTSIDE of the silhouette is in shot: the contact glow lives entirely out
+            // there and a probe cropped to the body would grade it at zero everywhere and call that agreement.
+            //
+            // The body is built here the same way the species' analytic-sphere path builds it, and the gate's
+            // CPU side builds it identically -- so what this pair grades is mh_surface, not two different
+            // opinions about what a sphere is.
+            const bx = px.div(n).mul(2.4).sub(1.2).toVar();
+            const by = py.div(n).mul(2.4).sub(1.2).toVar();
+            const rho = TSL.length(vec2(bx, by)).toVar();
+            const bz = TSL.sqrt(max(float(1.0).sub(rho.mul(rho)), float(0.0))).toVar();
+            const Nb = vec3(bx, by, bz).toVar();
+            const f = float(0.018);
+            const bm = float(1.0).sub(TSL.smoothstep(float(1.0).sub(f), float(1.0).add(f), rho)).toVar();
+            const bodyS = { m: bm, P: Nb, N: Nb, Rd: float(1.0), rho, fres: float(1.0).sub(clamp(Nb.z, 0.0, 1.0)) };
+            // Knobs picked so all three channels are exercised at once and none saturates: still's own rim and
+            // specular, and a glow raised to 0.40 so the outside band is well clear of 8-bit quantisation.
+            const sf = K.mhSurface(bodyS, float(3.7), float(0.0), vec3(0x0A / 255, 0x0A / 255, 0x0B / 255),
+                                   vec2(0.35, -0.20), float(1.15), float(1.30), float(0.40));
+            // Each channel carries its own scale so none of the three clips: rim and spec reach about 1.3,
+            // the glow about 0.4. The gate divides by the same numbers.
+            return vec4(clamp(sf.rim.div(2.0), 0.0, 1.0), clamp(sf.spec.div(2.0), 0.0, 1.0),
+                        clamp(sf.glow.div(0.5), 0.0, 1.0), 1.0);
         }
         if (mode === "noise") {
             // A lattice that deliberately straddles cell boundaries, where a wrong fade or a wrong gradient

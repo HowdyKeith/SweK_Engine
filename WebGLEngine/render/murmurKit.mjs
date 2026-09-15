@@ -513,6 +513,163 @@ export function mhBody(uv, t, px, shIn) {
     return { m, P, N, Rd, rho, fres: 1 - Math.min(1, Math.max(0, N[2])) };
 }
 
+// ---- the surface: mh_key / mh_small / mh_surface ---------------------------------------------------------
+// *** EVERY ONE OF murmur's EIGHTEEN SPECIES CALLS mh_surface, AND UNTIL v4629 THIS PORT APPROXIMATED IT. ***
+// render/aiPresenceOrbTsl.mjs carried its own fresnel rim at a fixed exponent of 4.5, two specular lobes off a
+// FIXED light direction of its own choosing, and no contact glow at all -- against a function whose light
+// drifts, whose rim exponent and asymmetry both move with the ground, whose tight lobe is size-adaptive, and
+// which carries a contact bloom every species asks for. kit.ts calls this "THE SURFACE, shared by every hero".
+
+/**
+ * THE CONTAINMENT, and kit.ts is explicit that it is NOT the design of the edge: "In this family the body has
+ * its own silhouette well inside the circular clip, so this is a safety net FOR THE CONTACT GLOW rather than
+ * the design of the edge -- which is why the span is 0.26 here rather than the 0.31 the other packs use.
+ * Called at 0.72, the fall runs from a uv radius of 0.36 to 0.49, and the body's worst case is 0.339."
+ *
+ * *** THIS PORT CLIPPED AT THE BODY INSTEAD, AND THAT DELETED THE CONTACT GLOW ENTIRELY. *** The species'
+ * alpha was 1 - smoothstep(R - feather, R, rho) with R the body radius, so the mask went to zero exactly
+ * where mh_surface's glow lives -- outside the silhouette, which is the only place it is nonzero. The term
+ * was computed correctly and reached no pixel, which is the same shape of defect as the refracted ray v4624
+ * found this file computing and discarding.
+ */
+export function mhContainment(uvLen, reach = 0.72) {
+    return 1 - smoothstep(reach, reach + 0.26, uvLen * 2.0);
+}
+
+/**
+ * THE KEY LIGHT, AND IT MOVES. kit.ts: "The light sits up and to the left and drifts about four degrees over
+ * half a minute, which is enough that the highlight is never in the same place twice and not enough that
+ * anybody watches it move."
+ *
+ * *** SCREEN Y RUNS DOWN IN A colorEffect, SO UP-LEFT IS NEGATIVE IN BOTH. *** That is why both leading
+ * coefficients are negative, and it is the single easiest thing to get backwards in this whole file -- a port
+ * that "fixed" the signs would light the orb from below-right and every specular in the family would move.
+ *
+ * It is deliberately further out than a beauty light: kit.ts says at (-0.52, -0.60) the highlight lands "at
+ * about 0.45 of the radius, clear of whatever the hero has put in the middle".
+ */
+export function mhKey(t) {
+    const dr = t * 0.21;
+    return norm3([-0.52 + 0.055 * Math.sin(dr), -0.60 + 0.045 * Math.cos(dr * 0.83), 0.61]);
+}
+
+/**
+ * THE SIZE DIAL. kit.ts: "One number, 1 at 18 pt and 0 at 120 pt and above, and every species spends it the
+ * same way: structure counts down, strokes thicken."
+ *
+ * *** ITS STATED MIDPOINT AND ITS REAL ONE DISAGREE, AND THE CODE IS SHIPPED AS WRITTEN. *** The header says
+ * "the midpoint sits at about 46 pt, the chip mount"; smoothstep(16, 88, x) reaches a half at the arithmetic
+ * middle of its edges, which is 52. The gate asserts 52 and reports the gap, the same way MH_SCATTER_K's
+ * prose-versus-code split and droplet's 0.339 arithmetic slip are carried: a port that corrects its source
+ * has stopped being a port.
+ */
+export function mhSmall(w, h) {
+    return 1 - smoothstep(16.0, 88.0, Math.max(Math.min(w, h), 1.0));
+}
+
+/**
+ * THE SURFACE EVERY HERO SHARES: rim, specular, and the contact bloom outside the silhouette.
+ *
+ * `b` is an mhBody result ({m, P, N, Rd, rho, fres}); `tilt` is the device tilt in [-1,1]^2; rimK/specK/glowK
+ * are the species' own three numbers off murmur's roster. Returns { rim, spec, glow } in the same energy
+ * units the colour rail's mh_lit consumes.
+ *
+ * FIVE THINGS THIS DOES THAT THE APPROXIMATION IT REPLACES DID NOT, each a number rather than a flourish:
+ *   - the RIM GAIN rises by a third on paper (mix(1, 1.32, paper)), "because the edge does more work on paper
+ *     than it ever does on ink: it is the whole silhouette of an object that is otherwise nearly the colour of
+ *     the page. A third more of it, and no other term changes."
+ *   - the TIGHT LOBE IS SIZE-ADAPTIVE, mix(96, 16, small): a 96-exponent highlight "covers about four pixels
+ *     at 120 pt and a third of one at 18 pt, where it would flicker in and out as the body wobbled underneath
+ *     it". 96 rather than the 58 a first cut used, and for the VALUE HIERARCHY rather than realism -- at 58
+ *     "the glint's saturated core was a tenth of the frame across, a second bright object competing with the
+ *     interior".
+ *   - the RIM IS NOT A RING: 55 per cent everywhere plus 45 per cent on the side AWAY from the key, "which is
+ *     the wrap light every product photograph of a glass object has" -- and that asymmetry FLATTENS toward
+ *     0.88 on paper, where the rim stops being lighting at all and becomes the refracted edge of a clear
+ *     sphere, which goes all the way round.
+ *   - the RIM EXPONENT MOVES WITH THE GROUND, mix(3.9, 5.4, paper). 3.9 is fitted against a capture rather
+ *     than chosen: "at 3 the rim is a broad wash that reads as the body being lit from behind. At 3.9 the
+ *     light lives in the outer eighth." It tightens on paper "where a dark edge has to be FINE to read as an
+ *     edge rather than as a dirty ring".
+ *   - the ENVIRONMENT term, and kit.ts's rule for it is that "if you can see it, it is wrong": fourteen per
+ *     cent on the rim, read straight off the surface normal. IT IS A VALUE GRADIENT AND NOT A COLOUR ONE, on
+ *     purpose -- "a second hue arriving through a term nobody dialled would break the one-hue-family law from
+ *     underneath" -- AND IT INVERTS ON PAPER, so the top of the sphere is the lighter half of its edge on both
+ *     grounds.
+ *
+ * AND THE CONTACT GLOW, which this port had no equivalent of whatsoever. It lives OUTSIDE the silhouette --
+ * (1 - m) is zero underneath the body and rises through the edge -- and it pools DOWNWARD rather than evenly,
+ * because kit.ts says its job "is to stop the silhouette meeting the ink as a cut line, not to be a halo
+ * anybody notices". 0.13 body units of width, down from 0.20, where "the bloom was wide enough to read as a
+ * second disc around the body".
+ */
+export function mhSurface(b, t, small, inkRgb, tilt, rimKIn, specK, glowK) {
+    const paper = mhPaper(inkRgb);
+    const rimK = rimKIn * (1 + (1.32 - 1) * paper);
+
+    // THE BARELY COUNTER-MOVE: tilting the device turns the ORB relative to the room, so the catchlight shifts
+    // AGAINST the tilt -- the world stays put while the object turns. A fifth of what the interior does, and
+    // kit.ts says it is "meant to be subliminal".
+    const k = mhKey(t);
+    const H = norm3([k[0] - tilt[0] * (MH_TILT * 0.20),
+                     k[1] - tilt[1] * (MH_TILT * 0.20),
+                     k[2] + 1.0]);
+    const nh = Math.min(1, Math.max(0, dot3(b.N, H)));
+    const tight = 96.0 + (16.0 - 96.0) * small;
+    const skyN = 0.5 - 0.5 * Math.min(1, Math.max(-1, b.N[1]));
+    const spec = (Math.pow(nh, tight) + 0.09 * Math.pow(nh, 4.0)) * b.m * specK
+               * (0.92 + (1.08 - 0.92) * skyN);
+
+    const nxy = Math.hypot(b.N[0] + 1e-4, b.N[1] + 1e-4);
+    const kxy = Math.hypot(0.42, 0.50);
+    const align = Math.min(1, Math.max(0, ((b.N[0] + 1e-4) * 0.42 + (b.N[1] + 1e-4) * 0.50) / (nxy * kxy)));
+    let wrap = 0.55 + 0.45 * align;
+    wrap = wrap + (0.88 - wrap) * paper;
+
+    const envRim = (0.86 + (1.14 - 0.86) * skyN) + ((1.14 + (0.86 - 1.14) * skyN) - (0.86 + (1.14 - 0.86) * skyN)) * paper;
+    const rim = Math.pow(b.fres, 3.9 + (5.4 - 3.9) * paper) * b.m * wrap * rimK * envRim;
+
+    const outr = (b.rho - b.Rd) / 0.13;
+    const pool = 0.55 + 0.55 * smoothstep(-0.25, 0.85, b.P[1]);
+    const glow = Math.exp(-outr * outr) * (1 - b.m) * pool * glowK;
+
+    return { rim, spec, glow };
+}
+
+/**
+ * THE SPECIES' OWN THREE SURFACE NUMBERS, transcribed from each hero's own mh_surface call site rather than
+ * invented. Each entry is [rimBase, rimVoice, specBase, specVoice, glowK] so that a species whose rim or
+ * specular rises with voice carries that as data instead of a branch.
+ *
+ * *** TWO OF murmur's FILES EACH CLAIM THE HIGHEST RIM IN THE COLLECTION, AND ONLY ONE OF THEM IS RIGHT. ***
+ * still.ts: "THE HIGHEST RIM AND SPECULAR IN THE COLLECTION: with no interior to protect, the edge and the
+ * highlight are free to be the figure." abyss.ts: "1.70 is the highest in the collection, which is right:
+ * this is the hero with the least else." Measured over this table, abyss wins the rim at every voice (1.70
+ * against 1.15 at rest, 2.25 against 1.60 at full) and still wins the SPECULAR outright (1.30 against
+ * nebula's 0.98). still.ts's sentence bundles the two together and is half wrong; the gate asserts both
+ * halves rather than repeating either file's word for it.
+ */
+export const MH_SURFACE_KNOBS = Object.freeze({
+    aura:    Object.freeze([0.88, 0.40, 0.52, 0.00, 0.16]),
+    droplet: Object.freeze([1.05, 0.35, 0.42, 0.00, 0.16]),   // + 0.55/0.30 * sheenK, added by the species
+    nebula:  Object.freeze([0.78, 0.35, 0.98, 0.00, 0.15]),
+    prism:   Object.freeze([0.80, 0.35, 0.62, 0.25, 0.15]),
+    limn:    Object.freeze([0.30, 0.00, 0.78, 0.35, 0.09]),
+    duet:    Object.freeze([0.80, 0.35, 0.42, 0.00, 0.15]),
+    fathom:  Object.freeze([0.78, 0.35, 0.46, 0.00, 0.14]),
+    arc:     Object.freeze([0.80, 0.35, 0.30, 0.00, 0.14]),
+    opal:    Object.freeze([0.80, 0.35, 0.52, 0.00, 0.14]),
+    comet:   Object.freeze([0.80, 0.35, 0.22, 0.00, 0.15]),
+    still:   Object.freeze([1.15, 0.45, 1.30, 0.35, 0.13]),
+    flux:    Object.freeze([0.80, 0.35, 0.55, 0.00, 0.14]),
+    tempest: Object.freeze([0.80, 0.35, 0.66, 0.00, 0.15]),
+    helix:   Object.freeze([0.60, 0.28, 0.38, 0.00, 0.12]),
+    geode:   Object.freeze([0.74, 0.32, 0.62, 0.00, 0.14]),
+    sol:     Object.freeze([0.70, 0.32, 0.52, 0.00, 0.16]),
+    abyss:   Object.freeze([1.70, 0.55, 0.38, 0.00, 0.11]),
+    chorus:  Object.freeze([0.80, 0.35, 0.50, 0.00, 0.14]),
+});
+
 /** The deformed radius along a direction -- the silhouette itself, which for droplet IS the species. */
 export function mhRadiusAt(n, t, sh) {
     const amp = Math.min(MH_AMP_CAP, Math.max(0, sh.amp));

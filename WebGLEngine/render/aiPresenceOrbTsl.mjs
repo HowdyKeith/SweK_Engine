@@ -62,7 +62,7 @@ export const ORB_COLORS = Object.freeze({
 });
 
 import { makeMurmurKitTsl } from "./murmurKitTsl.mjs";
-import { MH_EXT, MH_TAPS } from "./murmurKit.mjs";
+import { MH_EXT, MH_TAPS, MH_SURFACE_KNOBS } from "./murmurKit.mjs";
 
 const R_BODY = 0.62;          // sphere radius in the -1..1 quad
 const EDGE_FEATHER = 0.015;   // antialiased silhouette width, in the same units as R_BODY
@@ -164,7 +164,7 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // known would slow three species to buy nothing, and would move their gates' pixels for no reason.
         const dN = vec3(0.0, 0.0, 1.0).toVar();
         const dP = vec3(0.0, 0.0, 0.0).toVar();
-        let N, fres, bodyMask;
+        let N, fres, bodyMask, bodyRd, bodyRho;
         if (species === "droplet") {
             // THE INHALE: the breath is the carrier and voice is what fills it, so the swell arrives on a
             // curve. droplet.ts: "a body that follows the raw envelope reads as a VU meter."
@@ -179,13 +179,13 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             const uvM = pc.mul(KIT.MH_R / R_BODY).div(bodyScale).toVar();
             const b = KIT.mhBody(uvM, uniforms.time, float(0.004), wob, float(0.0), float(3.30),
                                  vec3(0.0, 0.0, 1.0), float(0.0), float(0.0), dP, dN).toVar();
-            N = dN; fres = b.w; bodyMask = b.x;
+            N = dN; fres = b.w; bodyMask = b.x; bodyRd = b.y; bodyRho = b.z;
         } else {
             const zArg = max(R.mul(R).sub(rho2), 0.0);   // clamped: outside the disk this would go negative
             const z = sqrt(zArg);
             N = vec3(pc, z).div(R);                      // sphere at the origin: outward normal = position / R
             fres = float(1.0).sub(clamp(N.z, 0.0, 1.0)); // 0 dead centre, 1 at the silhouette -- see header
-            bodyMask = null;
+            bodyMask = null; bodyRd = null; bodyRho = null;
         }
         const ci = clamp(N.z, 0.0, 1.0);               // = -dot(V, N) since V = (0,0,-1); cos(incidence)
 
@@ -445,43 +445,80 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             : species === "comet" ? cometDensity
             : species === "droplet" ? dropletDensity : stillDensity;
 
-        // surface: fresnel rim + two specular lobes (a tight highlight, a broad soft one), a fixed light direction
-        // *** LIMN'S BASE RIM IS 0.30 AND still'S IS THE HIGHEST IN THE COLLECTION, AND BOTH ARE FITTED
-        // NUMBERS murmur ARGUES FOR. *** still.ts: "with no interior to protect, the edge and the highlight
-        // are free to be the figure." limn.ts: its first cut set the base rim near zero to stop the comma
-        // becoming a ring, "and it did avoid that -- and produced a crescent moon rather than a dark glass
-        // body with a lit edge. 0.30 is the fitted middle."
-        // comet is "the dark hero of the luminous three" by its own file -- it needs contrast around its
-        // point more than a filled body, so its rim sits between limn's 0.30 and still's 0.85.
-        const rimBase = species === "limn" ? 0.30 : species === "comet" ? 0.55 : 0.85;
-        const rim = pow(fres, 4.5).mul(rimBase);
-        const L_DIR = normalize(vec3(0.45, 0.6, 0.65));
-        const H = normalize(negate(V).add(L_DIR));
-        const nh = max(dot(N, H), 0.0);
-        // *** comet DROPS ITS SPECULAR AND murmur SAYS WHY, IN THE SAME WORDS THE MEASUREMENT ABOVE FOUND. ***
-        // comet.ts: at 0.40 the highlight "was landing as a second warm light a third of the way in from the
-        // rim and reading as a stray artifact next to a species whose entire brief is one point. At 0.22 it is
-        // a catchlight." That is exactly the failure the missing-head measurement surfaced here -- the
-        // catchlight WAS the brightest thing in the glass -- so the head being solved and the specular coming
-        // down are two halves of one repair, not a fix and a tweak.
-        // droplet spends more energy on the specular than any other hero, and its file says why: "a
-        // wobbling surface is only visibly wobbling if there is a highlight riding it".
-        const specScale = species === "comet" ? 0.22 : species === "droplet" ? 1.25 : 0.9;
-        const specTight = pow(nh, 96.0).mul(specScale);
-        const specBroad = pow(nh, 4.0).mul(0.09);
-
-        // *** THE COLOUR IS murmur's RAIL NOW, NOT THIS PORT'S OWN RAMP. *** What stood here was an OKLab
-        // ramp from a BASE_L / BASE_C / BASE_H chosen by this file, with the rim and both speculars ADDED AS
-        // WHITE on top. murmur's own present pass names that addition as the thing the family forbids -- its
-        // droplet notes a first cut that "rendered as a solid white disc, which is precisely the white overlay
-        // the family law forbids" -- and routes surface and interior through ONE energy-to-colour curve
-        // instead. kit.ts: that curve is "most of what keeps the family reading as one family".
+        // ---- THE SURFACE IS murmur's NOW, NOT THIS FILE'S APPROXIMATION OF IT ------------------------------
+        // *** WHAT STOOD HERE WAS WRONG IN FIVE WAYS AND RIGHT IN TWO, AND THE TWO ARE WHY IT LOOKED FINE. ***
+        // This file carried its own rim at a FIXED exponent of 4.5, two specular lobes off a FIXED light
+        // direction of its own choosing (normalize(vec3(0.45, 0.6, 0.65)) -- up and to the RIGHT), a
+        // per-species rim constant, a per-species spec constant, and no contact glow whatsoever. Against
+        // murmur's roster, read off each hero's own mh_surface call site:
         //
-        // mh_present's own composition, transcribed: railE = body + (spec + contact) * dark, then
-        // mh_lit(pal, railE, glow, base 0, span 1, emis 0.34, hue). The surface does not bypass the rail.
+        //   species   rim (this file)   rim (murmur)            spec (this file)  spec (murmur)      glow
+        //   still     0.85              1.15 + 0.45*voice       0.9               1.30 + 0.35*voice  0.13
+        //   limn      0.30  <- right    0.30                    0.9               0.78 + 0.35*voice  0.09
+        //   comet     0.55              0.80 + 0.35*voice       0.22  <- right    0.22               0.15
+        //   droplet   0.85              1.05 + 0.55*sheen+...   1.25              0.42 + 0.30*sheen  0.16
+        //
+        // The two that matched are exactly the two murmur QUOTES IN PROSE (limn's "0.30 is the fitted middle",
+        // comet's "at 0.22 it is a catchlight") -- so the numbers a reader could find in a sentence were right
+        // and every number that lived only in code was invented. That is the shape of the whole defect, and it
+        // is worth naming: reading a port's prose is not reading its code.
+        //
+        // AND NONE OF THE FOUR HAD A CONTACT GLOW, which all eighteen species ask for.
+        //
+        // *** ONE OF THOSE SENTENCES IS ITSELF WRONG, AND BOTH HALVES ARE NOW CHECKED RATHER THAN REPEATED. ***
+        // still.ts says "THE HIGHEST RIM AND SPECULAR IN THE COLLECTION"; abyss.ts says "1.70 is the highest
+        // in the collection". Over murmur's own eighteen call sites abyss wins the rim at every voice (1.70
+        // against still's 1.15) and still wins the SPECULAR outright (1.30 against nebula's 0.98). still.ts
+        // bundles the two and is half right. This file used to repeat the wrong half.
+        const SK = MH_SURFACE_KNOBS[species];
+        const sheenK = species === "droplet" ? uniforms.sheen : float(0.0);
+        const rimK = float(SK[0]).add(uniforms.voice.mul(SK[1]))
+            .add(species === "droplet" ? sheenK.mul(0.55) : float(0.0)).toVar();
+        const specK = float(SK[2]).add(uniforms.voice.mul(SK[3]))
+            .add(species === "droplet" ? sheenK.mul(0.30) : float(0.0)).toVar();
+
+        // THE BODY STRUCT mh_surface READS. droplet has it from the deformed solve; the other three stand on
+        // the analytic sphere, where the entry point IS the normal, the deformed radius is exactly 1 and the
+        // in-plane radius is rho in body units. Built with murmur's own two-sided feather rather than this
+        // file's one-sided edge mask, so `m` means the same thing on both paths.
+        const bodyFeather = float(Math.max(0.018, 1.3 * 0.004));
+        const rhoBody = rho.div(R).toVar();
+        const sphereM = float(1.0).sub(smoothstep(float(1.0).sub(bodyFeather), float(1.0).add(bodyFeather), rhoBody)).toVar();
+        const surfB = species === "droplet"
+            ? { m: bodyMask, P: dP, N, Rd: bodyRd, rho: bodyRho, fres }
+            : { m: sphereM, P, N, Rd: float(1.0), rho: rhoBody, fres };
+        // tilt is not wired to a uniform in this port (mh_look is given vec2(0,0) above for the same reason),
+        // so the counter-move term is exercised at zero here and by the gate at nonzero.
+        const sf = KIT.mhSurface(surfB, uniforms.time, KIT.mhSmall(float(120.0), float(120.0)),
+                                 uniforms.ink, vec2(0.0, 0.0), rimK, specK, float(SK[4]));
+
+        // *** THE COLOUR IS murmur's RAIL, AND NOW SO IS THE COMPOSITION INTO IT. *** v4627 replaced this
+        // file's invented OKLab ramp with mh_palette/mh_lit but kept its own arrangement of the terms, and the
+        // arrangement was wrong in two ways that mh_present settles exactly:
+        //
+        //   mh_present(body = e - spec - contact, spec, contact, ...) with railE = body + (spec + contact)*dark
+        //
+        // so the RIM belongs in `body`, NOT under the (* dark) factor this file had it under -- on a light
+        // ground the rim is the whole silhouette and multiplying it by (1 - paper) deletes it exactly where it
+        // does the most work. And the CONTACT GLOW belongs with the specular under that factor, which this
+        // file could not get wrong only because it had no glow at all.
+        //
+        // The interior also gains the two terms murmur multiplies it by and this file did not: the membership
+        // b.m and mh_transmit(b.fres), so the marched volume is masked by the silhouette and dimmed by the
+        // glass it is seen through rather than reaching the edge at full strength.
         const pal = KIT.mhPalette(uniforms.ink, uniforms.tone, uniforms.tone2, uniforms.hueShift, uniforms.depth);
         const dark = float(1.0).sub(pal.paper).toVar();
-        const railE = density.add(specTight.add(specBroad).add(rim).mul(dark)).toVar();
+        const interior = density.mul(surfB.m).mul(KIT.mhTransmit(fres)).toVar();
+        const railE = interior.add(sf.rim).add(sf.spec.add(sf.glow).mul(dark)).toVar();
+        // *** THE HUE ARGUMENT IS STILL ZERO, AND THAT IS A KNOWN GAP RATHER THAN A CHOICE. *** murmur's
+        // species each compute hueMix = hue * <their own numerator> / max(e, 1e-4), where `hue` comes from a
+        // SECOND channel their march accumulates: acc.y += e * clamp(p.z,-1,1) * trans * ds, then
+        // hue = acc.y/acc.x * spreadK * MH_SPREAD. render/murmurKit.mjs's marchStillInterior already returns
+        // that channel as `hueNum` -- the CPU reference has had it since v4623 -- and the march in THIS file
+        // accumulates only the scalar, so every species passes 0 and the rail's spread axis, built and gated
+        // at v4627, reaches no pixel. Named here rather than half-wired: it needs each hero's own numerator,
+        // which is four more formulas, and it is what makes opal (spread 0.7, the species that deliberately
+        // runs a third past MH_SPREAD) worth porting at all.
         const colorLinear = max(KIT.mhLit(pal, railE, uniforms.glow, float(0.0), float(1.0), float(0.34), float(0.0)),
                                 vec3(0.0));
         const outColor = linear ? colorLinear : linearToSrgb(colorLinear);
@@ -501,9 +538,28 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // HIDDEN THE ENTIRE SPECIES. *** mhBody returns m from the DEFORMED radius Rd with murmur's own two
         // feather terms added rather than multiplied; clipping that to a circle of radius R_BODY would draw a
         // wobbling interior inside a perfectly round hole, which is the one thing droplet is not.
-        const edgeMask = species === "droplet"
-            ? bodyMask
-            : float(1.0).sub(smoothstep(R.sub(EDGE_FEATHER), R, rho));   // 1 inside the disk, 0 outside, antialiased
+        // *** THE ALPHA IS murmur's CONTAINMENT NOW, AND THE OLD ONE DELETED THE CONTACT GLOW. ***
+        // What stood here clipped at the BODY radius -- for droplet at the deformed membership, for the other
+        // three at R_BODY with a feather. mh_surface's contact glow is nonzero ONLY outside the silhouette,
+        // so an alpha that reaches zero at the silhouette multiplies the entire term by nothing: it was
+        // computed correctly at v4629 and reached no pixel, exactly the way the refracted ray this file
+        // computed and discarded did until v4624. The species gate's own outside-the-body ring read a flat
+        // 0.00000 and is what found it.
+        //
+        // kit.ts says what the mask is for in as many words: "In this family the body has its own silhouette
+        // well inside the circular clip, so this is a safety net FOR THE CONTACT GLOW rather than the design
+        // of the edge." At reach 0.72 it falls from a uv radius of 0.36 to 0.49 against a worst-case body of
+        // 0.339 -- comfortably outside every hero, which is the point.
+        //
+        // *** AND THE WOBBLE DOES NOT LEAVE WITH IT. *** droplet used the deformed membership as its alpha
+        // because a fixed circle "would draw a wobbling interior inside a perfectly round hole". That reason
+        // is discharged rather than ignored: b.m now multiplies the interior (above) and the rim and specular
+        // (inside mh_surface), so the deformed silhouette is carried in the LIGHT, which is where murmur
+        // carries it -- its own present pass composites through this same fixed containment for all eighteen.
+        // The gate's droplet silhouette row measures the luminance edge rather than the alpha edge for the
+        // same reason.
+        const uvLen = length(pc).mul(KIT.MH_R / R_BODY).toVar();   // this quad's radius in murmur's uv units
+        const edgeMask = KIT.mhContainment(uvLen, float(0.72));
         return vec4(outColor, edgeMask);
     });
 
@@ -515,6 +571,20 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
     return {
         material, scene, camera, uniforms,
         setTime(t) { uniforms.time.value = t; },
-        setKnobs(k) { for (const n of ORB_KNOBS) if (k[n] != null) uniforms[n].value = k[n]; },
+        // *** THE THREE COLOUR ANCHORS ARE SETTABLE TOO, AND THAT IS A GATE-COST DECISION AS MUCH AS AN API
+        // ONE. *** They were already uniforms but only readable at build time, through the factory's own
+        // knobs.colors -- so rendering the same species on a PAPER ground meant different factoryArgs, which
+        // means a different cache key, which means a whole second WGSL compile (~195 ms on the box the gates
+        // run on) for a change of three constants. Writing them here makes a paper-ground frame reuse the
+        // shader it already built. It matters because half of mh_surface only does anything on paper: the rim
+        // gain, the wrap flattening, the exponent tightening and the environment inversion are all no-ops on
+        // ink, and a composition error that deletes the rim on paper is ALGEBRAICALLY INVISIBLE on ink, where
+        // dark is exactly 1.
+        setKnobs(k) {
+            for (const n of ORB_KNOBS) if (k[n] != null) uniforms[n].value = k[n];
+            if (k.colors) for (const n of ["ink", "tone", "tone2"]) {
+                if (k.colors[n]) uniforms[n].value.set(...k.colors[n]);
+            }
+        },
     };
 }
