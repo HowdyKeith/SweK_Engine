@@ -4937,6 +4937,176 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "sabotages, all red by name, including a normal taken from a central difference of the samples " +
                  "instead of the bilinear patch the height comes from.",
     }),
+    // v4622-merge -- RENUMBERED since240-since248, from since230-since238: origin/main built its own closings
+    // on the SAME shared ancestor this branch did, both reaching for "the next ordinal" independently, and the
+    // merge did not conflict on it (the two blocks sit at different byte offsets in the file, so git saw no
+    // overlap) -- exactly the collision this file's own "no two closings share an ordinal" check exists to
+    // catch, and it did: DUPLICATE since231, since230 on the first post-merge run. Renumbered rather than
+    // reordered, so the "at" commit/version beside each stays exactly what that round recorded.
+    since248: Object.freeze({
+        at: "v4592", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "physics/spellAmmo-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 3 s: the book pure, then box3d headless for the hits, the race and the duels. THE SPELLBOOK AS AMMUNITION " +
+                 "(task 81): physics/spellAmmo.mjs reads world/spellBook.mjs by reference -- AMMO_NAMES is SPELL_NAMES itself, a " +
+                 "shell's landing is the spell's own row (damage, radius with the dungeon grenade's 1 - d / R, ignite as a Doom Fire " +
+                 "under the target, slow as half throttle for the book's seconds, pool as a caustic patch of the book's dps) -- and " +
+                 "the pickups on the track load a magazine of ENERGY_POOL / manaFor(spell) shells, the book's measured cost turned " +
+                 "around (cataclysm 1, spark 10, novaBurst 100). A spark hit is v4588's 0.743 m/s to the thousandth, a cataclysm hit " +
+                 "9.92; the race on seed 1 has the leader take four pickups and land causticSpray and cataclysm shells, replays from " +
+                 "its log, and the duel without pickups scores 14.558 as at v4590. The gate's first run was red on the plain-shell " +
+                 "pickup (the endless magazine swallowed it); a pickup of spark is a finite one now.",
+    }),
+    since247: Object.freeze({
+        at: "v4591", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "world/buildingTopple-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 18 s: pure rows, box3d headless, seed 1's city rammed building by building, and race-crash.html in its own " +
+                 "browser. BUILDINGS THAT FALL (task 80): world/buildingTopple.mjs. A building stands while its centre of mass is over " +
+                 "what is left of its ground floor: at the topple the block above the ground floor (fracture.js's largest anchored " +
+                 "component) is ONE dynamic box3d body on the remaining ground-floor voxels as static stubs over a slab at the road, and " +
+                 "gravity decides -- no impulse is invented. A 4 x 10 x 4 block on a far-quarter stub lies flat in 3.7 s and shatters into " +
+                 "rubble through its final pose; over a middle stub it stands and stays a body; with no ground floor it drops and " +
+                 "pancakes; over seed 1's 34 buildings with a lane the outcome after 6 s follows the support-polygon prediction on every " +
+                 "one. Seven sabotages A..G; F (the smallest anchored component) went 0 red because every case had one tower, so a " +
+                 "split-tower row was added and holds it. The page rams on load with a demolition charge and names the body.",
+    }),
+    since246: Object.freeze({
+        at: "v4590", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "physics/slick-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in under a second, pure: a flat surface and a pose, no box3d. THE OIL SLICK AND THE DOOM FIRE ON IT (task 79): " +
+                 "physics/slick.mjs drops a 1.8 x 3.4 m patch 2.6 m behind the car along its yaw and WRAPS the surface (slickSurface asks " +
+                 "the track and then the patches: under oil grip x 0.3 and rolling x 0.5, a burning patch is hot road with the road's grip), " +
+                 "so raceCar's carForces takes the oil as any surface and not a line of it changed; ignite lights the owner's newest unlit " +
+                 "patch into render/doomFire.mjs's byte automaton -- the Slug fill's fire -- one per patch, fed for 6 s, burning out on " +
+                 "its own schedule (394 ticks), a burn event a tick for a car standing in it. The gunner grew to 11 -> 8 -> 5 (two facts: " +
+                 "a pursuer inside 14 m behind, a car on my oil; two outputs: drop, ignite) and its gate, the turret's and the windows' " +
+                 "were re-pinned; the shell-speed key runs a chase leg AND a pursued leg because turning the duel around made 8 m/s " +
+                 "hittable. Sabotages A..H, three of them findings fixed in the gate (an axis-aligned patch cannot see the frame's " +
+                 "handedness; a hash of the count alone; a hash without the heat) and six more on the gunner F..K, all red by name.",
+    }),
+    since245: Object.freeze({
+        at: "v4589", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/carViews-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 15 s: the pure cameras headless, then race-brain.html twice in the harness. A VIEW WINDOW PER CAR (task 78): " +
+                 "render/carViews.mjs draws the same scene into a 240 x 160 render target with the car's first-person camera (the " +
+                 "driver's seat, a point 12 m ahead at the window's exact centre) or the turret's sight (along the barrel, turning with " +
+                 "it), reads it back and puts it into a 2D canvas beside the main one -- no second viewport, no new shader -- or draws " +
+                 "the car's two policies' activations (9-8-2 and 9-8-3 through the kernel's twin) as bars: the brain view. A click " +
+                 "cycles the three and the label says which and what it costs. Sabotages red at A..E. Found, measured: on this harness " +
+                 "a presented WebGPU canvas device is lost at its first frame (device.lost, every mapAsync after it fails) while an " +
+                 "offscreen device and a presented WebGL2 canvas read back indefinitely -- so the windows' pixels are held on ?webgl=1 " +
+                 "here (first-person 15 % lit, brain 12 %), the WebGPU boot on what survives the loss, and the page caps its readback " +
+                 "failures at three, says so in the labels and keeps the brain windows live (the first draft stopped those too).",
+    }),
+    since244: Object.freeze({
+        at: "v4588", swept: 3, green: 3, red: 0,
+        added: Object.freeze([
+            "brain/gunnerPolicy-selfcheck.mjs",
+            "physics/turret-selfcheck.mjs",
+            "tools/ship/raceTurret-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 0.3 s, 9 s and 11 s: one headless and pure, one on box3d's wasm headless, one in two harness browsers. " +
+                 "THE TURRET COPILOT (task 77): physics/turret.mjs mounts a turret on the race car's chassis with its own contract " +
+                 "{ yaw, pitch, fire }, vacuum shells and a swept hit test, and an aim solution that is one quartic for a moving gun " +
+                 "and a moving target (iterated to the muzzle's fixed point: two passes left 0.03 deg against ballistics.launchAngles " +
+                 "at 20 m, found by the gate); brain/gunnerPolicy.mjs is a 9 -> 8 -> 3 relu MLP on the turret's aim errors, the " +
+                 "hand gunner as weights (15 of 15 and 16 of 17 hits in 20 s duels, the zero gunner never fires), drivePolicy's ES " +
+                 "on the duel (from zero to a positive score in 10 candidates, deterministic per seed), the race with turrets in " +
+                 "the same lockstep (replayed from a log of both contracts to the same fingerprint and hits), and the shell-speed " +
+                 "knob registered as gunner-shell on the turret-gunner instrument (score 1 / speed, the greedy 8 m/s refused with 0 " +
+                 "hits of 0 shots, 12 and up pass); render/raceTurret.mjs draws domes, barrels and shells as kit fleets and " +
+                 "race-brain.html races with a turret on every car, hits in the standings, and a gunner trainer in idle time. " +
+                 "The browser's race with gunners is node's fingerprint on both backends, and the page boots in half a second in a " +
+                 "browser of its own (inside the harness page that had just drawn the frames it froze past 300 s twice: the " +
+                 "split is the fix). Sabotages red at A..E on the turret, A..E on the gunner, A..D on the page gate; C on the turret " +
+                 "was a 0-red sabotage until the moving-gun row was added, and the gunner's impulse row stepped a world with no " +
+                 "ground until it stood the cars on their suspension. brainTrail's fifty-round row (no brain page in the registry) " +
+                 "re-founded on registryPages: turret-gunner is the first, and the link is derived.",
+    }),
+    since243: Object.freeze({
+        at: "v4587", swept: 3, green: 3, red: 0,
+        added: Object.freeze([
+            "physics/apsidalKnob-selfcheck.mjs",
+            "physics/hologramKnob-selfcheck.mjs",
+            "physics/impactKnob-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 6 s, headless. The three v4586 knob modules got the sibling gate reportDoors asks of a reportLines() " +
+                 "provider (each holds its two routes to each other, the refusal on its own subject, and the derived tolerance), " +
+                 "and physics-lab.html's four status lines were rewritten to what the adjudicators measured: the black hole says " +
+                 "unbound or bound by the energy rather than 'below the ISCO', the neutron star says nothing on its slider plunges, " +
+                 "plasma names the mirror-point estimate's 5-11 % miss and that there is no loss cone, impact prints the capture " +
+                 "radius from the start point (1.703, not 1.732) -- verified in the page. Found: the first draft of apsidalKnob's " +
+                 "gate called the dt-sweep residual a floor and pinned it under 2e-5; it is a slope (5.4e-5, 1.7e-5, 2.6e-6) and " +
+                 "each reading is held under the tolerance derived for its step instead. Found: reportDoors' no-sibling row had been " +
+                 "red since v4584 on fleetRouting and labHome (both gated from tools/ship/), unrecorded by three notes; dated into " +
+                 "NO_GATE_V4587. Sabotages red at A / B / C / D on each of the three, none crashing, none 0-red.",
+    }),
+    since242: Object.freeze({
+        at: "v4586", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "physics/labKnobs-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 0.5 s, headless. The twelve lab scenes the triage never saw: labScenes-selfcheck's page parser matched " +
+                 "only two-space unquoted keys, so 'every scene has a triage row' held over 13 of 25; widened, re-pinned, and twelve " +
+                 "rows written. Four registered with adjudicators that refuse on their own subject (apsidalKnob's black-hole and " +
+                 "neutron-star: the apsidal advance, integration against quadrature, modulo a turn; impactKnob: the capture boundary " +
+                 "from the start point with the pericentre and speed laws either side; hologramKnob: the separation read back from " +
+                 "the fringes), eight refused, plasma and pendulum-wave on a measurement. Three of the page's status lines found wrong. " +
+                 "Sabotages red at A / B / C / D / E; B and D crashed the first draft and report now.",
+    }),
+    since241: Object.freeze({
+        at: "v4585", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/labHome-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 1.6 s, headless plus one page load in the harness browser. The Physics Lab's front door: lab-home.html is " +
+                 "one Initiate button, a 2D live strip (scene, proposer and its pick, the adjudicator's verdicts newest first) with " +
+                 "brain-3d.html a click away, and the curated presets as buttons, each with a line naming the instrument, its key and " +
+                 "where it runs; physics/labHome.mjs derives every one of them from labPresets, labScenes.joinRegistered, " +
+                 "proposers.listProposers, instruments.mjs and the v4584 routing ledger, and the gate grades the derivation against " +
+                 "the live registry. Found: 12 of 25 curated presets name scenes the triage never assessed (their buttons say so), " +
+                 "and no gate had ever held the presets to the triage. Sabotages red at A / B / C / D / E, the gate finishing each time.",
+    }),
+    since240: Object.freeze({
+        at: "v4584", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/fleetRouting-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green headless on box3d's wasm, 0.9 s; no GPU in it. Fleet brain routing, named: brain/fleetRouting.mjs makes a " +
+                 "request { kind, scene, policy, ticks } and a routed row that names the peer that took it, over fleet.js's learned " +
+                 "scheduler fed by the bridge's live registry; POST /ai/brain/route and GET /ai/brain/routed keep the ledger that " +
+                 "server.html's gauge card, report.html's fleet rows and brain-fleet.html's cards read; the trainer's episodes and " +
+                 "the race's lockstep tick ranges are routed the same way and run here, the ranges chaining to the record's " +
+                 "fingerprint. Three corrections found by the gate: an ineligible peer was only slowed, not excluded; the " +
+                 "scheduler's prior ignored the telemetry; the routed row dropped the request's payload. Sabotages red at " +
+                 "A / B / C / D / E, and A crashed the gate's first draft on a null peer before it reported. Built on the branch " +
+                 "as v4531 and relabelled at the merge: main had shipped v4531 to v4583 meanwhile.",
+    }),
     since199: Object.freeze({
         at: "v4543", swept: 1, green: 1, red: 0,
         added: Object.freeze([

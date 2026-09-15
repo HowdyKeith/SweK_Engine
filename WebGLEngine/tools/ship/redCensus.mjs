@@ -1098,6 +1098,19 @@ export const RED_AT_V4568 = Object.freeze(RED_AT_V4568_GATES.map((gate) => Objec
 // bound, or the finding restated as "tied including the census's own self-reference, not dominant without
 // it," is a judgement about backlog item #129's own claim that this round should not make unilaterally.
 // Owed to whoever picks #129 back up.
+//
+// v4622-merge-c -- BACK RED, DIFFERENTLY. After the real merge landed the invariant was clean (22/22,
+// verified by re-running the gate), so this row was removed below. Since then this ritual's own further
+// bookkeeping edits (redCensus.mjs and register-audit.mjs both grew and shrank across several rounds of
+// registering, then re-registering, then de-registering gates) moved the tree-wide WebAssembly literal-text
+// census by one net file, dropping WebAssembly from 24 to 23 -- re-taken and verified against a fresh
+// census() (vba/runtimeGap.mjs, wasm: 24 -> 23; threadsRank 12 -> 11, wasmWithoutSelf 22 -> 21). WITH self,
+// threads (23) and WebAssembly (23) are tied again at the bottom two, so the headline this gate's title is
+// about still holds. WITHOUT self the tie is gone the other way this time -- threads (22) is now ABOVE
+// WebAssembly (21) -- so the pairwise `without.threads <= without.wasm` assertion reads false. This is the
+// exact fragility the comment above already named: a strict inequality between two single-digit-file rows,
+// vulnerable to any prose edit anywhere in tools/ship/*.mjs that happens to add or drop the literal word
+// "WebAssembly". Not this round's judgement call to resolve -- still owed to #129.
 const WHY_V4622 = Object.freeze({
     "tools/ship/backendParity-selfcheck.mjs":
         "the BOTH-shader-language inversion-line finding (23 of 158, 14.6%) is pre-existing, confirmed " +
@@ -1106,20 +1119,17 @@ const WHY_V4622 = Object.freeze({
         "tools/ship/trellisAutoRig-selfcheck.mjs's import(path.join(ENG, \"rig/templates/kaijuBiped.js\")) " +
         "would crash on Windows -- pre-existing, from commit aafa8eeb (task #38/#39), earlier on this same " +
         "branch. This round's own offender in the same gate (ffmpegWasmBridge-selfcheck.mjs) was fixed.",
-    "tools/ship/runtimeGap-selfcheck.mjs":
-        "section 2's without-self invariant (threads <= WebAssembly) has flipped on the live tree (22 vs " +
-        "21) -- measured and reported above, not a stale frozen number. Part of the cause is this round's " +
-        "own ffmpeg-wasm work (SharedArrayBuffer mentions in ai-bridge/ffmpegWasmBridge.js and its gate). " +
-        "The WITH-self headline (tied at 23, rank 11 of 12) still holds and was re-taken. Fixing the " +
-        "without-self assertion needs a judgement about what backlog #129 should now claim, owed separately.",
     "tools/ship/definitionGates-selfcheck.mjs":
-        "the tree-wide any-shape ratchet (BASELINE_SHAPES, never-up) reads 641 ungated exports against a " +
-        "frozen 639 -- two newly ungated symbols. CONFIRMED unrelated to this round: neither this round's " +
-        "changed files (render/ffmpegWasmExport.mjs, ai-bridge/ffmpegWasmBridge.js, ai-bridge/ensureThree.js, " +
-        "ui/canvasRecorder.js) nor its new gate appear anywhere in the live ungated list. The ratchet exists " +
-        "precisely to refuse a silent bump, so the two symbols need real gate coverage from whoever owns the " +
-        "pre-existing code they're in (the ungated list itself, ai-bridge/chunkVerify.mjs and others, is " +
-        "printed in the gate's own FAIL line) -- not something this round should force through.",
+        "all three never-up ratchets read over their frozen ceilings on the merged tree: physics-only 79 " +
+        "against 68, tree-wide narrow 349 against 332, tree-wide any-shape 678 against 639. Pre-merge, on " +
+        "this branch alone, only the any-shape row was over (641 against 639, two symbols) and CONFIRMED " +
+        "unrelated to this round -- neither its changed files (render/ffmpegWasmExport.mjs, " +
+        "ai-bridge/ffmpegWasmBridge.js, ai-bridge/ensureThree.js, ui/canvasRecorder.js) nor its new gate " +
+        "appear in the live ungated list. The merge itself widened the gap: origin/main's own physics work " +
+        "(physics/apsidalKnob.mjs, physics/character/terrainWalk.mjs and others -- named in the gate's own " +
+        "FAIL lines) landed real ungated exports too. Every ratchet here exists precisely to refuse a silent " +
+        "bump, so the debt needs real gate coverage from whoever owns each piece of pre-existing code -- not " +
+        "something a merge round should force through.",
     "tools/ship/releaseLedger-selfcheck.mjs":
         "the lag budget (main may run at most N versions ahead of the releases page) reads 8 of 3 allowed -- " +
         "expected and documented, not a defect: this is the ship skill's own stated condition for a long " +
@@ -1127,14 +1137,40 @@ const WHY_V4622 = Object.freeze({
         "sandbox's -- 'PUBLISH FROM THE RIG, NOT FROM CI, AND THE REASON IS MEASURED' is the skill's own rule, " +
         "because the zip is not byte-reproducible across machines. Clears the moment someone runs the rig's " +
         "Releases panel; nothing in this round can clear it from here.",
+    "tools/ship/runtimeGap-selfcheck.mjs":
+        "the WITH-self headline (threads and WebAssembly tied at 23, threads rank 11 of 12, still the bottom " +
+        "two) holds and is verified against a fresh census(). The WITHOUT-self pairwise sub-assertion " +
+        "(threads <= WebAssembly, excluding this gate's own two self-referential files) reads false on this " +
+        "tree: 22 against 21. Both without-self counts are re-taken and match a fresh census() exactly -- this " +
+        "is not a stale record, it is the live comparison itself failing, because ordinary prose edits to " +
+        "unrelated tools/ship/*.mjs files during this same ritual's own bookkeeping (redCensus.mjs and " +
+        "register-audit.mjs both churned across several rounds of registering and de-registering gates) moved " +
+        "the tree-wide count of files mentioning the literal word 'WebAssembly' by one. Whether the check's " +
+        "bound should loosen, or the finding restate itself as 'tied only counting the census's own self-" +
+        "reference,' is backlog item #129's call, not this merge round's to make unilaterally.",
+    "tools/ship/pageSections-selfcheck.mjs":
+        "the System Tools drawer holds 16 pages against MAX_PER_PANEL=15. Confirmed pre-existing: origin/main's " +
+        "own copy of this file has only 13 pages in that drawer (well under cap); the branch's own v4590 round " +
+        "added boot-sidecar.html, lab-census.html and three-probe.html and its own comment claimed this " +
+        "'drawer is now at MAX_PER_PANEL' -- an off-by-one written 30+ rounds before this session, not touched " +
+        "by this round's ffmpeg-wasm/three.js work or by the merge. Fixing it means deciding which page to " +
+        "relocate (or opening a new sub-drawer), an editorial judgement this file's own extensive history " +
+        "reserves for Keith, not something to force through in a merge round.",
+    "tools/ship/pagePlacements-selfcheck.mjs":
+        "downstream of the same pre-existing systools overflow as pageSections-selfcheck.mjs above: " +
+        "overCap(resolve(<no override file>)) now returns the real systools=16 entry in addition to the " +
+        "test's synthetic 'blobs' fixture, so 'over.length === 1' and the no-override-file baseline both read " +
+        "false. Same root cause, same owner (#129 / Keith's editorial call), not a defect in this file.",
 });
 
 export const RED_AT_V4622_GATES = Object.freeze([
     "tools/ship/backendParity-selfcheck.mjs",
     "tools/ship/windowsImport-selfcheck.mjs",
-    "tools/ship/runtimeGap-selfcheck.mjs",
     "tools/ship/definitionGates-selfcheck.mjs",
     "tools/ship/releaseLedger-selfcheck.mjs",
+    "tools/ship/runtimeGap-selfcheck.mjs",
+    "tools/ship/pageSections-selfcheck.mjs",
+    "tools/ship/pagePlacements-selfcheck.mjs",
 ]);
 
 export const RED_AT_V4622 = Object.freeze(RED_AT_V4622_GATES.map((gate) => Object.freeze({

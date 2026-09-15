@@ -877,6 +877,8 @@ window.addEventListener("load", function () {
             <a href="/fingerprint.html" target="_blank" rel="noopener" title="Fleet Fingerprint: ask every peer for its cross-architecture fingerprint and see who agrees" style="color:#6ee7ff">Fleet Fingerprint</a>
             <a href="/couple.html" target="_blank" rel="noopener" title="Multi-physics coupling bench: pick thermal / plasticity / muscle / fluid, paint the field or drop the fluid, and watch the deterministic solver respond. Every substep is the gated code the fingerprint proves bit-identical across machines."
                style="display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:3px 9px;background:#1a1206;color:#ffb046;border:1px solid #4a3a1a;border-radius:5px;text-decoration:none;">&#128293; Coupling Bench</a>
+            <a href="/lab-home.html" target="_blank" rel="noopener" title="Physics Lab front door (v4585): one Initiate button that runs a registered proposer and shows every verdict; a 2D live strip of the scene, the proposer, its pick and the adjudicator's verdicts as they land, with brain-3d.html a click away; the curated presets as buttons, each with a line naming the instrument, its key and the device or peer that runs it -- every line derived by physics/labHome.mjs from the tree's own records. Gate: tools/ship/labHome-selfcheck.mjs."
+               style="display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:3px 9px;background:#06140c;color:#7fe6b0;border:1px solid #1e4a30;border-radius:5px;text-decoration:none;">&#128682; Lab front door</a>
             <a href="/physics-lab.html" target="_blank" rel="noopener" title="Physics Lab: a 3D showcase of the engine's deterministic solvers -- inflate a balloon (volume constraint), fire a muscle that bulges as it contracts (volume + contractile fibres composed), fly a flag in a sampled wind (windCloth). Each scene runs the same gated code the fingerprint proves bit-identical across machines."
                style="display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:3px 9px;background:#06140c;color:#7fe6b0;border:1px solid #1e4a30;border-radius:5px;text-decoration:none;">&#129514; Physics Lab</a>
             <a href="/catalog.html" target="_blank" rel="noopener" title="Subsystem Catalog: a verified index of every deterministic physics subsystem, in fingerprint order. Each row's hash is the live fingerprint's and its modules the ledger's; catalog-selfcheck.mjs proves the index matches the library."
@@ -1940,6 +1942,15 @@ window.addEventListener("load", function () {
               <div style="font-size:10px;color:var(--dim);">field solver</div>
               <div id="bgSolver" style="font-size:16px;font-weight:bold;color:#8ab4ff;">&mdash;</div>
               <div id="bgSolverNote" style="font-size:10px;color:var(--dim);margin-top:2px;">cpu / gpu / auto / demoted</div>
+            </div>
+            <!-- v4584 -- WHICH PEER TOOK THE LAST REQUEST, AND WHAT IT WAS. /ai/brain/health's `routed` field: the ledger
+                 POST /ai/brain/route fills (brain/fleetRouting.mjs over the live registry). The big value is the peer, the
+                 note is the request (kind, scene, policy, tick range). "none routed yet" is a true reading, not a fault;
+                 an unattributed count above zero reddens the value, because a routed request nobody took is the defect. -->
+            <div style="flex:1;min-width:160px;background:#0a0d12;border:1px solid var(--line);border-radius:6px;padding:8px 10px;">
+              <div style="font-size:10px;color:var(--dim);">last routed request &rarr; peer</div>
+              <div id="bgRouted" style="font-size:16px;font-weight:bold;color:#e0b0ff;">&mdash;</div>
+              <div id="bgRoutedNote" style="font-size:10px;color:var(--dim);margin-top:2px;">none routed yet</div>
             </div>
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px;padding-top:6px;border-top:1px solid var(--line);">
@@ -7585,6 +7596,14 @@ try{const r=await fetch("/self/whoami",{cache:"no-store"});const j=await r.json(
           set("bgSolves", (h.fieldPosts != null ? h.fieldPosts : "\u2014"));
           set("bgSolveAge", h.lastSolveMsAgo != null ? ("last solve " + secs(h.lastSolveMsAgo)) : "no solves yet");
           set("bgExp", (h.experience != null ? h.experience : "\u2014"));
+          // v4584 -- the last routed request: WHICH peer took it (the value) and WHAT it was (the note).
+          var rt = h.routed || null;
+          if (rt && rt.last && rt.last.peer) {
+            set("bgRouted", rt.last.peer.id + " (" + (rt.last.peer.gpu || "?") + ")", rt.unattributed ? COLORS.offline : "#e0b0ff");
+            set("bgRoutedNote", (rt.last.what || "") + " \u2014 " + rt.count + " routed" + (rt.unattributed ? ", " + rt.unattributed + " UNATTRIBUTED" : ""));
+          } else {
+            set("bgRouted", "\u2014", "#6d829a"); set("bgRoutedNote", rt ? "none routed yet" : "bridge predates routing");
+          }
           // v2215 -- which solver produced the last field. Short tag as the big value, full
           // live string as the note; red when a GPU field truncated (same signal the maze uses).
           var sb = h.solverBackend || null;
@@ -7604,6 +7623,7 @@ try{const r=await fetch("/self/whoami",{cache:"no-store"});const j=await r.json(
           set("bgState", "unreachable", COLORS.err);
           set("bgStateDetail", ""); set("bgSolves", "\u2014"); set("bgSolveAge", ""); set("bgExp", "\u2014");
           set("bgSolver", "\u2014", "#6d829a"); set("bgSolverNote", "");
+          set("bgRouted", "\u2014", "#6d829a"); set("bgRoutedNote", "");
         })
         .then(function () { clearTimeout(t); busy = false; });
     }

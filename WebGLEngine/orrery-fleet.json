@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "ce276dffd8af8c9e2308cb1fc8ea21f515a03eb2",
+ "head": "2f1b379357bbbcdac18c3f653aafb9527535e50e",
  "bodies": {
   "box3d": [
    {
@@ -106,8 +106,8 @@
    },
    {
     "path": "tools/ship/artifactWeight.mjs",
-    "bytes": 4876,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "bytes": 6409,
+    "sha": "2f1b379357bbbcdac18c3f653aafb9527535e50e"
    },
    {
     "path": "tools/ship/box3dFilter-selfcheck.mjs",
@@ -340,13 +340,13 @@
    },
    {
     "path": "server.html",
-    "bytes": 865315,
+    "bytes": 867759,
     "sha": "03094e54d3d50b93b26656db6c68f6999920f14a"
    },
    {
     "path": "tools/ship/artifactWeight.mjs",
-    "bytes": 4876,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "bytes": 6409,
+    "sha": "2f1b379357bbbcdac18c3f653aafb9527535e50e"
    },
    {
     "path": "tools/ship/vendoredLicences-selfcheck.mjs",
@@ -362,8 +362,8 @@
    },
    {
     "path": "tools/ship/artifactWeight.mjs",
-    "bytes": 4876,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "bytes": 6409,
+    "sha": "2f1b379357bbbcdac18c3f653aafb9527535e50e"
    }
   ],
   "kenney-city": [
@@ -653,7 +653,7 @@
    {
     "path": "main.js",
     "bytes": 3233647,
-    "sha": "cc2293510dd6de403175380275e7a76a7a4ececf"
+    "sha": "2f1b379357bbbcdac18c3f653aafb9527535e50e"
    },
    {
     "path": "mpm3d.html",
@@ -697,7 +697,7 @@
    },
    {
     "path": "server.html",
-    "bytes": 865315,
+    "bytes": 867759,
     "sha": "03094e54d3d50b93b26656db6c68f6999920f14a"
    },
    {
@@ -747,8 +747,8 @@
    },
    {
     "path": "tools/ship/artifactWeight.mjs",
-    "bytes": 4876,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "bytes": 6409,
+    "sha": "2f1b379357bbbcdac18c3f653aafb9527535e50e"
    },
    {
     "path": "tools/ship/boundaryLint-selfcheck.mjs",

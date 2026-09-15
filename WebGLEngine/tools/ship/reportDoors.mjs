@@ -338,6 +338,20 @@ export const NO_GATE_V4531 = Object.freeze([
 export const NO_GATE_V4565 = Object.freeze([
     "nav/navmesh.mjs",
 ]);
+// *** v4587 -- TWO ARRIVED OVER THREE ROUNDS AND WERE NOT WRITTEN DOWN WHEN THEY ARRIVED, WHICH IS THE FINDING. ***
+// brain/fleetRouting.mjs (v4584, the routing ledger) and physics/labHome.mjs (v4585, the lab's front door) each grew
+// a reportLines() with its gate in tools/ship/ (fleetRouting-selfcheck.mjs, labHome-selfcheck.mjs) and nothing
+// beside the module, so the row below has been red since v4584 -- and the v4584, v4585 and v4586 notes do not say
+// so, because the round that shipped them read the reds it expected (the "no gate anywhere" row, for the three
+// v4586 knob modules) and not this one. Both are gated from tools/ship/, so neither joins UNGATED_ANYWHERE_V4565;
+// they are dated here so the record says WHEN they arrived, and the union keeps its strength: the next arrival
+// still fails until somebody writes it down. The three v4586 knob modules (apsidalKnob, impactKnob,
+// hologramKnob) are NOT here: they got siblings at v4587 (physics/<name>-selfcheck.mjs), which is the other
+// way a name leaves this file.
+export const NO_GATE_V4587 = Object.freeze([
+    "brain/fleetRouting.mjs",
+    "physics/labHome.mjs",
+]);
 
 /**
  * *** SIX OF THE SEVEN "WITHOUT A GATE" HAVE ONE, AND THE DEBT IS THE OTHER TWO. ***
@@ -361,8 +375,8 @@ export const UNGATED_ANYWHERE_V4565 = Object.freeze([
     "tools/ship/morphCounter.mjs",
 ]);
 
-/** Every provider with no gate of its own, across both frozen lists. Derived, so neither list can drift. */
-export const NO_GATE_ALL = Object.freeze([...NO_GATE_V4458, ...NO_GATE_V4531, ...NO_GATE_V4565].sort());
+/** Every provider with no gate BESIDE it, across the four dated lists. Derived, so no list can drift. */
+export const NO_GATE_ALL = Object.freeze([...NO_GATE_V4458, ...NO_GATE_V4531, ...NO_GATE_V4565, ...NO_GATE_V4587].sort());
 
 /** This module's own front door -- it is a member of the population it counts. */
 export function reportLines() {

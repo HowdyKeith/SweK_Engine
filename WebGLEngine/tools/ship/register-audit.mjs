@@ -16,7 +16,7 @@ export const REGISTER_AUDIT = Object.freeze({
   {
    "gate": "tools/ship/shaderRefs-selfcheck.mjs",
    "exit": "timeout",
-   "ms": 120116,
+   "ms": 120054,
    "first": "",
    "all": [],
    "count": 0,
@@ -26,7 +26,7 @@ export const REGISTER_AUDIT = Object.freeze({
   {
    "gate": "tools/ship/backendParity-selfcheck.mjs",
    "exit": 1,
-   "ms": 374,
+   "ms": 425,
    "first": "*** and BOTH stays well under the inversion line: twenty dual shader modules is where an IR would have paid ***   20 modules of 23 dual files, 23 of 158 GLSL-bearing -- 14.6% (the tenth-of-GLSL line of v4270 was crossed at v4473 and is reported, not asserted)",
    "all": [
     "*** and BOTH stays well under the inversion line: twenty dual shader modules is where an IR would have paid ***   20 modules of 23 dual files, 23 of 158 GLSL-bearing -- 14.6% (the tenth-of-GLSL line of v4270 was crossed at v4473 and is reported, not asserted)",
@@ -38,7 +38,7 @@ export const REGISTER_AUDIT = Object.freeze({
   {
    "gate": "tools/ship/windowsImport-selfcheck.mjs",
    "exit": 1,
-   "ms": 535,
+   "ms": 575,
    "first": "!! NO dynamic import is given a raw filesystem path   WOULD CRASH ON WINDOWS: tools/ship/redCensus.mjs -> import(path.join(ENG, \\\"rig/templates/kaijuBiped.js\\\") | tools/ship/register-audit.mjs -> import(path.join(ENG, \\\"rig/templates/kaijuBiped.js\\\") | tools/ship/register-audit.mjs -> import(path.join(ENG, \\\"rig/templates/kaijuBiped.js\\\") | tools/ship/trellisAutoRig-selfcheck.mjs -> import(path.join(ENG, \"rig/templates/kaijuBiped.js\"))",
    "all": [
     "!! NO dynamic import is given a raw filesystem path   WOULD CRASH ON WINDOWS: tools/ship/redCensus.mjs -> import(path.join(ENG, \\\"rig/templates/kaijuBiped.js\\\") | tools/ship/register-audit.mjs -> import(path.join(ENG, \\\"rig/templates/kaijuBiped.js\\\") | tools/ship/register-audit.mjs -> import(path.join(ENG, \\\"rig/templates/kaijuBiped.js\\\") | tools/ship/trellisAutoRig-selfcheck.mjs -> import(path.join(ENG, \"rig/templates/kaijuBiped.js\"))"
@@ -47,38 +47,61 @@ export const REGISTER_AUDIT = Object.freeze({
    "onStderr": false
   },
   {
-   "gate": "tools/ship/runtimeGap-selfcheck.mjs",
+   "gate": "tools/ship/definitionGates-selfcheck.mjs",
    "exit": 1,
-   "ms": 1458,
-   "first": "the census re-derives to what the module recorded, EVERY row of it -- a stale table is a red   drifted: WebAssembly 23 -> 24",
+   "ms": 449,
+   "first": "!! no NEW exported symbol under physics/ has appeared without its gate naming it   GREW to 79: physics/apsidalKnob.mjs:apocentre, physics/apsidalKnob.mjs:measure, physics/apsidalKnob.mjs:adjudicateWith, physics/character/terrainWalk.mjs:functionGround, physics/character/terrainWalk.mjs:autoGround, physics/character/terrainWalk.mjs:projectOnPlane ...",
    "all": [
-    "the census re-derives to what the module recorded, EVERY row of it -- a stale table is a red   drifted: WebAssembly 23 -> 24",
-    "!! *** THREADS ARE THE SMALLEST GAP OF TWELVE ON THE MERGED TREE (second-smallest at v4462), WHICH INVERTS THE ITEM'S SCALE EITHER WAY ***   #129 asks what is missing \"besides threads\"; threads rank 12 of 12, 23 files at 0.6%",
-    "...and the headline survives it: a 2-file distortion in rows of 21 to 3,588, and threads still rank at the bottom   with this round: threads 23 against WebAssembly 24, rank 12 on the stable sort. Without it: 22 against 22. At v4462 the two files made a tie; at the v4526 merge they break one"
+    "!! no NEW exported symbol under physics/ has appeared without its gate naming it   GREW to 79: physics/apsidalKnob.mjs:apocentre, physics/apsidalKnob.mjs:measure, physics/apsidalKnob.mjs:adjudicateWith, physics/character/terrainWalk.mjs:functionGround, physics/character/terrainWalk.mjs:autoGround, physics/character/terrainWalk.mjs:projectOnPlane ...",
+    "!! no NEW exported symbol ANYWHERE IN THE TREE has appeared without its gate naming it   GREW to 349: ai-bridge/chunkVerify.mjs:verifiedPrefix, ai-bridge/chunkVerify.mjs:resumePlan, ai-bridge/chunkVerify.mjs:spliceRanges, ai-bridge/chunkVerify.mjs:chunkAudit, ai-bridge/chunkVerify.mjs:resumeRanges, ai-bridge/deviceWorker.mjs:offThreadDevice ...",
+    "!! *** no NEW exported symbol OF ANY SHAPE has appeared without its gate naming it ***   GREW to 678: ai-bridge/catalogSnapshot.mjs:SNAPSHOT_PATH, ai-bridge/chunkVerify.mjs:verifiedPrefix, ai-bridge/chunkVerify.mjs:resumePlan, ai-bridge/chunkVerify.mjs:spliceRanges, ai-bridge/chunkVerify.mjs:chunkAudit, ai-bridge/chunkVerify.mjs:resumeRanges ..."
    ],
    "count": 3,
    "onStderr": false
   },
   {
-   "gate": "tools/ship/definitionGates-selfcheck.mjs",
-   "exit": 1,
-   "ms": 400,
-   "first": "!! *** no NEW exported symbol OF ANY SHAPE has appeared without its gate naming it ***   GREW to 641: ai-bridge/catalogSnapshot.mjs:SNAPSHOT_PATH, ai-bridge/chunkVerify.mjs:verifiedPrefix, ai-bridge/chunkVerify.mjs:resumePlan, ai-bridge/chunkVerify.mjs:spliceRanges, ai-bridge/chunkVerify.mjs:chunkAudit, ai-bridge/chunkVerify.mjs:resumeRanges ...",
-   "all": [
-    "!! *** no NEW exported symbol OF ANY SHAPE has appeared without its gate naming it ***   GREW to 641: ai-bridge/catalogSnapshot.mjs:SNAPSHOT_PATH, ai-bridge/chunkVerify.mjs:verifiedPrefix, ai-bridge/chunkVerify.mjs:resumePlan, ai-bridge/chunkVerify.mjs:spliceRanges, ai-bridge/chunkVerify.mjs:chunkAudit, ai-bridge/chunkVerify.mjs:resumeRanges ..."
-   ],
-   "count": 1,
-   "onStderr": false
-  },
-  {
    "gate": "tools/ship/releaseLedger-selfcheck.mjs",
    "exit": 1,
-   "ms": 290,
+   "ms": 304,
    "first": "!! *** main runs no more than the budget ahead of the releases page ***   8 of 3 allowed: v4535, v4534, v4533, v4532, v4531, v4504, v4487, v4486. PUBLISH BEFORE SHIPPING AGAIN -- the ship skill's step 7 is the how",
    "all": [
     "!! *** main runs no more than the budget ahead of the releases page ***   8 of 3 allowed: v4535, v4534, v4533, v4532, v4531, v4504, v4487, v4486. PUBLISH BEFORE SHIPPING AGAIN -- the ship skill's step 7 is the how"
    ],
    "count": 1,
+   "onStderr": false
+  },
+  {
+   "gate": "tools/ship/runtimeGap-selfcheck.mjs",
+   "exit": 1,
+   "ms": 1517,
+   "first": "...and the headline survives it: a 2-file distortion in rows of 21 to 3,588, and threads still rank at the bottom   with this round: threads 23 against WebAssembly 23, rank 11 on the stable sort. Without it: 22 against 21. At v4462 the two files made a tie; at the v4526 merge they break one",
+   "all": [
+    "...and the headline survives it: a 2-file distortion in rows of 21 to 3,588, and threads still rank at the bottom   with this round: threads 23 against WebAssembly 23, rank 11 on the stable sort. Without it: 22 against 21. At v4462 the two files made a tie; at the v4526 merge they break one"
+   ],
+   "count": 1,
+   "onStderr": false
+  },
+  {
+   "gate": "tools/ship/pageSections-selfcheck.mjs",
+   "exit": 1,
+   "ms": 1007,
+   "first": "!! no drawer holds more than 15 pages   biggest: 16. A DRAWER OF 25 IS THE FLAT ROW AGAIN WITH A LID ON IT -- which is why the 25 instruments were split three ways rather than filed under one Physics Lab chip. OVER: systools=16",
+   "all": [
+    "!! no drawer holds more than 15 pages   biggest: 16. A DRAWER OF 25 IS THE FLAT ROW AGAIN WITH A LID ON IT -- which is why the 25 instruments were split three ways rather than filed under one Physics Lab chip. OVER: systools=16"
+   ],
+   "count": 1,
+   "onStderr": false
+  },
+  {
+   "gate": "tools/ship/pagePlacements-selfcheck.mjs",
+   "exit": 1,
+   "ms": 97,
+   "first": "!! going over Keith's cap is DETECTED   a drawer of 25 is the flat row with a lid on it (v2513), and *** A CHECKBOX IS A MUCH FASTER WAY TO MAKE ONE THAN EDITING A REGISTRY *** -- so the surface that made it easy owes the check.",
+   "all": [
+    "!! going over Keith's cap is DETECTED   a drawer of 25 is the flat row with a lid on it (v2513), and *** A CHECKBOX IS A MUCH FASTER WAY TO MAKE ONE THAN EDITING A REGISTRY *** -- so the surface that made it easy owes the check.",
+    "the cap is measured against the RESOLVED result, not against SECTIONS   with no overrides nothing is over, because SECTIONS is already within the rule -- so a non-empty report is always about a decision made HERE"
+   ],
+   "count": 2,
    "onStderr": false
   }
  ]

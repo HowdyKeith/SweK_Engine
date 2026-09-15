@@ -45,6 +45,19 @@ export const STAGE_PAGES = {
     replay: { href: "/brain-replay.html", label: "replay" },
 };
 
+/**
+ * v4588 -- THE REGISTRY SUPPLIES A BRAIN PAGE NOW, AND THE LINK COMES FROM THERE. brainTrail-selfcheck's section 4 held for
+ * fifty rounds that physics/instruments.mjs offered no brain-related entry with a page, and promised that when one arrived
+ * "the links should come from there instead". One did: the turret copilot (brain/gunnerPolicy.mjs, task 77) registered
+ * `turret-gunner` with page race-brain.html. So the derivation is here, beside the hand-declared stages: every instrument
+ * whose gate or id is the brain's and that carries a page, as a link. STAGE_PAGES stays hand-declared for the stages no
+ * instrument row names (the fleet, the bench, the live mind, the replay); this is the rest, derived rather than typed.
+ */
+export function registryPages(instruments) {
+    return (instruments || []).filter((i) => i && i.page && /brain|rl\//i.test((i.gate || "") + " " + (i.id || "")))
+        .map((i) => ({ id: i.id, href: "/" + String(i.page).replace(/^\//, ""), label: i.id }));
+}
+
 const age = (ms) => ms == null ? "never" : ms < 1000 ? "now" : ms < 60000 ? Math.round(ms / 1000) + "s" : ms < 3600000 ? Math.round(ms / 60000) + "m" : Math.round(ms / 3600000) + "h";
 
 /**

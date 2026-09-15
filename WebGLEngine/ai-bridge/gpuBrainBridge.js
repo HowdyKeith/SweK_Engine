@@ -471,6 +471,12 @@ function handle(req, res, ctx) {
             // page or read the terminal to see which backend is live. `truncated` reddens it.
             solverBackend: (gpuBrain.field && gpuBrain.field.solver && gpuBrain.field.solver.backend) || null,
             solverTruncated: !!(gpuBrain.field && gpuBrain.field.solver && gpuBrain.field.solver.truncated),
+            // v4584 -- WHICH PEER TOOK THE LAST REQUEST, AND WHAT IT WAS. The ledger POST /ai/brain/route fills; the
+            // gauge caption on server.html reads `routed.last.line`. `unattributed` must read 0: a routed row that
+            // names no peer or no work is the defect this field exists to show.
+            routed: (() => { const rows = routedLedger.rows, last = rows.length ? rows[rows.length - 1] : null; return {
+                count: rows.length, unattributed: rows.filter((r) => !r.attributed).length,
+                last: last ? { peer: last.peer, what: last.what, line: last.line, at: last.at, kind: last.kind } : null }; })(),
         });
         return;
     }
@@ -1994,4 +2000,50 @@ registry.get("/ai/brain/experience", {
     },
 });
 
-module.exports = { owns, handle, gpuBrain, fleetSpeeds };
+// ---------------------------------------------------------------------------------------------------------
+// v4584 -- FLEET BRAIN ROUTING, NAMED. Until this round a "fleet brain request" was a brain's POST landing in the
+// registry above: counted (posts), timed (solveMsEwma), never attributed. server.html's gauge counted brains,
+// brain-fleet.html's pool summed their training, report.html's grid showed each peer's version -- none said WHICH
+// peer took WHICH request. These two routes are the record. POST /ai/brain/route takes requests ({ kind, scene,
+// policy, ticks: [from, to] }) and routes each over the LIVE registry with brain/fleetRouting.mjs (fleet.js's
+// learned scheduler over the registry's own solve times), returning every row with the peer that took it; the
+// rows land in a capped ledger that GET /ai/brain/routed and /ai/brain/health's `routed` field read, which is
+// what the gauge caption, the pool cards and the grid rows show. The router is ESM and this file is CJS, so it is
+// loaded once through a dynamic import; the ledger rows carry their own described lines (`what`, `line`) and an
+// `attributed` flag, so the synchronous health route needs nothing from the module. With no live peer every
+// request is routed to this host and the row says so -- attributed to a name, never to nobody.
+const os = require("os");
+const routedLedger = { rows: [], cap: 200 };
+let _routing = null;
+const routing = () => (_routing || (_routing = import("../brain/fleetRouting.mjs")));
+function liveFleet() { const now = Date.now(); return Array.from(fleet.values()).filter((e) => now - e.lastSeen < 60000); }
+
+registry.post("/ai/brain/route", {
+    check: checks.none,
+    maxBodyBytes: 1024 * 1024,
+    schema: (d) => (d && Array.isArray(d.requests) && d.requests.length > 0 && d.requests.every((r) => r && typeof r.kind === "string"))
+        ? null : "expected {requests: [{kind, scene, policy, ticks: [from, to]}, ...]}",
+    handler: async (d, req, res, ctx) => {
+        const F = await routing();
+        const brains = liveFleet();
+        const { rows, summary } = F.routeAll(brains, d.requests.slice(0, 256), { self: { id: "hub " + os.hostname(), gpu: "local" }, seed: routedLedger.rows.length + 7 });
+        for (const row of rows) {
+            row.what = F.describeRequest(row); row.line = F.describeRow(row); row.attributed = F.isAttributed(row);
+            const { weights, ...slim } = row;   // the ledger keeps the attribution, not a candidate's 98 floats
+            routedLedger.rows.push(slim);
+        }
+        while (routedLedger.rows.length > routedLedger.cap) routedLedger.rows.shift();
+        ctx.sendJson({ ok: true, rows, summary, livePeers: brains.length, routedBy: rows.length ? rows[0].routedBy : null });
+    },
+});
+
+registry.get("/ai/brain/routed", {
+    check: checks.none,
+    handler: async (params, req, res, ctx) => {
+        const F = await routing();
+        const rows = routedLedger.rows, n = Math.max(1, Math.min(200, Number(params.get("last") || 50)));
+        ctx.sendJson({ ok: true, count: rows.length, cap: routedLedger.cap, summary: F.ledgerSummary(rows), rows: rows.slice(-n), livePeers: liveFleet().length });
+    },
+});
+
+module.exports = { owns, handle, gpuBrain, fleetSpeeds, routedLedger };

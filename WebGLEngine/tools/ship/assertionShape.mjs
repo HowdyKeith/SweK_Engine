@@ -282,8 +282,25 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // other five arrived in earlier rounds on the same branch. condFirst, unknownSignature, suspects and
     // distinctDefinitions held at 91, 16, 0 and 41 -- verified against a fresh census() run, independent of
     // the failing gate's own printed numbers.
-    gates: 1656, usesOk: 1635, definesOk: 1627, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1528, condFirst: 91, unknownSignature: 16,
+    // v4584 -- RE-TAKEN on the tree merged with main at v4583 (this history diverged from the branch above at
+    // 1625): one gate (fleetRouting) joined, the same four rows by one.
+    // v4585 -- RE-TAKEN: one gate (labHome) joined, the same four rows by one.
+    // v4586 -- RE-TAKEN: one gate (labKnobs) joined, the same four rows by one.
+    // v4587 -- RE-TAKEN with the three sibling gates of the v4586 knob modules (physics/apsidalKnob-, impactKnob-,
+    // hologramKnob-selfcheck.mjs): 1628 -> 1631 gates, and usesOk, definesOk and nameFirst each by three; nothing else moved.
+    // v4588 -- RE-TAKEN with the turret copilot's three gates (physics/turret-, brain/gunnerPolicy-, tools/ship/raceTurret-selfcheck.mjs):
+    // 1631 -> 1634 gates, and usesOk, definesOk and nameFirst each by three; nothing else moved.
+    // v4589 -- RE-TAKEN: one gate (tools/ship/carViews-selfcheck.mjs) joined, the same four rows by one.
+    // v4590 -- RE-TAKEN: one gate (physics/slick-selfcheck.mjs) joined, the same four rows by one.
+    // v4591 -- RE-TAKEN: one gate (world/buildingTopple-selfcheck.mjs) joined, the same four rows by one.
+    // v4592 -- RE-TAKEN: one gate (physics/spellAmmo-selfcheck.mjs) joined, the same four rows by one.
+    // v4622-merge -- RE-TAKEN on this branch's actual merge of origin/main: the two histories above are BOTH
+    // real, diverged at 1625, and this round's own merge joins them -- so the final reading is neither one
+    // alone but a fresh census() over the merged tree: 1656 -> 1669, usesOk 1635 -> 1648, definesOk 1627 ->
+    // 1640, nameFirst 1528 -> 1541 -- the same three-rows-move-together pattern. importsOk, condFirst,
+    // unknownSignature, suspects and distinctDefinitions held at 0, 91, 16, 0 and 41.
+    gates: 1669, usesOk: 1648, definesOk: 1640, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1541, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

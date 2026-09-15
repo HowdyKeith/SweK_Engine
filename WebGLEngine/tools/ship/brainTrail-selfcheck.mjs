@@ -26,7 +26,7 @@ import http from "node:http";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
-import { buildTrail, layout, STAGE_PAGES, STALE_MS } from "../../ui/brainTrail.js";
+import { buildTrail, layout, STAGE_PAGES, STALE_MS, registryPages } from "../../ui/brainTrail.js";
 import { noComments } from "./sourceScan.mjs";
 
 const require_ = createRequire(import.meta.url);
@@ -132,13 +132,24 @@ console.log("\n4. *** THE PAGE LINKS ARE REAL PAGES, AND instruments.mjs IS WHY 
     // Found at v4565 by re-timing the over-budget pool; this gate was outside the ship-time sweep, so the
     // arrival landed with nothing running the check that watches for it.
     const withPage = brainy.filter((i) => i.page);
-    ok("!! instruments.mjs still offers no brain PAGE, which is the thing the links need -- measured, not assumed",
-        withPage.length === 0,
+    // *** v4588 -- AND IT WENT NON-ZERO, AND THE LINKS COME FROM THERE NOW, AS THIS ROW SAID THEY WOULD. *** The turret
+    // copilot (brain/gunnerPolicy.mjs, task 77) registered `turret-gunner` with page race-brain.html: the first brain-related
+    // instrument that carries a page. ui/brainTrail.js's registryPages derives the link list from exactly that predicate --
+    // brain-related AND a page -- so the row's claim is re-taken once more at the thing it is about: every such entry is
+    // derived into a link whose page exists in this tree, and the entries without a page (brain-kernels) supply none.
+    // STAGE_PAGES stays hand-declared for the stages no registry row names, which is the rest.
+    // SABOTAGES, v4588, applied to ui/brainTrail.js's registryPages and restored: the page filter dropped (brain-kernels, page
+    // null, becomes a link) -> both rows red; every link pointed at a page that does not exist -> the first row red.
+    const derived = registryPages(INSTRUMENTS);
+    ok("!! every brain-related instrument that carries a PAGE is derived into a link, and every such link is a page in this tree",
+        derived.length === withPage.length && derived.every((l) => withPage.some((i) => i.id === l.id && "/" + i.page === l.href) && fs.existsSync(path.join(ENG, l.href.replace(/^\//, "")))),
         (INSTRUMENTS || []).length + " instruments, " + brainy.length + " brain-related, " + withPage.length +
         " of those carrying a page" + (brainy.length ? " (" + brainy.map((i) => i.id + ": page " + JSON.stringify(i.page)).join(", ") + ")" : "") +
-        ". The old row asserted brain-related === 0 and went red when one arrived; a registry entry with no " +
-        "page cannot supply a link, so the count that matters is the second one. Had THAT been non-zero the " +
-        "links should come from there instead, and this check would say so.");
+        "; derived links: " + (derived.map((l) => l.id + " -> " + l.href).join(", ") || "(none)") +
+        ". Fifty rounds of this row said the registry offered no brain page and that the links would come from there when it " +
+        "did; v4588's turret-gunner is the first, and registryPages is that derivation.");
+    ok("...and an entry without a page supplies no link (brain-kernels, page null, is brain-related and absent)",
+        brainy.some((i) => i.id === "brain-kernels" && !i.page) && !derived.some((l) => l.id === "brain-kernels"));
 
     let missing = [];
     for (const k of Object.keys(STAGE_PAGES)) {

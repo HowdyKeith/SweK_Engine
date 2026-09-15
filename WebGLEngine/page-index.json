@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 470,
+ "count": 471,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -1309,7 +1309,7 @@
    "f": "gates.html",
    "t": "SweK Gates",
    "d": "",
-   "g": "physicslab",
+   "g": "systools",
    "p": 0
   },
   {
@@ -1680,6 +1680,13 @@
    "f": "lab-export.html",
    "t": "Lab export -- SweK",
    "d": "",
+   "g": "physicslab",
+   "p": 0
+  },
+  {
+   "f": "lab-home.html",
+   "t": "Physics Lab front door",
+   "d": "The Physics Lab's plain landing page: one Initiate button that runs a registered proposer and shows every verdict; a 2D live strip of the scene, the proposer, its pick and the adjudicator's verdicts as they land, with brain-3d.html a click away; the curated presets as buttons, each with a line naming the instrument, its key and the device or peer that runs it, derived by physics/labHome.mjs from the tree's own records.",
    "g": "physicslab",
    "p": 0
   },

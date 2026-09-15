@@ -463,7 +463,20 @@ export const PROBE_AT_V4536 = Object.freeze({
     // 109/48/184; this module's own two records and their twenty fields are unchanged, so 111/50/204.
     // v4622b -- RE-TAKEN AGAIN, WITHIN THE SAME ROUND, WITH `excluding` above: 109 -> 111 records (this
     // round's own two-record redCensus.mjs registration), so 113/50/204.
-    currentIncludingModule: Object.freeze({ records: 113, withFields: 50, fields: 204 }),
+    // v4584 -- RE-TAKEN with `excluding` below on origin/main, diverged from the branch above at 104/45/172:
+    // 106/47/192 -> 107/48/198. *** AND THE FIRST NOTE HERE WAS WRONG ABOUT WHY. *** It blamed gateSweep's
+    // since230, which the census does not count at all (RECORD_RE wants a version-stamped name).
+    // v4585 measured main's own tree at 4f89c470 in a worktree: 105/46/178 against its recorded 104/45/172 --
+    // the row had gone stale ON MAIN, where the quick sweep skips a gate whose inputs did not change, and the
+    // merged tree's full run was the first to say so. Right numbers, wrong attribution, corrected here rather
+    // than left.
+    // v4587 -- RE-TAKEN with `excluding` below: 107/48/198 -> 108/48/198, the one record (NO_GATE_V4587) and
+    // no field.
+    // v4622-merge -- RE-TAKEN on this branch's actual merge of origin/main: the two histories above both
+    // diverged from 104/45/172 and are both real. The final reading is a fresh census() over the merged tree.
+    // v4622-merge-b -- RE-TAKEN with `excluding` below, after the actual merge landed and NO_GATE_V4587 and
+    // COMMIT_BELT_DRIFT_V4621 arrived with it: 113 -> 114.
+    currentIncludingModule: Object.freeze({ records: 114, withFields: 50, fields: 204 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -522,7 +535,18 @@ export const PROBE_AT_V4536 = Object.freeze({
     // no numeric fields in either (a frozen array and a map of gate->reason string), which is exactly the
     // "record with no numeric field is still a record" shape v4578's note above already names. Editing the
     // register that names a round's own reds is itself something a round does, and this file re-takes it.
-    excluding: Object.freeze({ records: 111, withFields: 48, fields: 184 }),
+    // v4584 -- RE-TAKEN: 104/45/172 -> 105/46/178, on origin/main, diverged from the branch above at that
+    // same 104/45/172. NOT gateSweep's since230, as the first draft of this note said: sinceNNN records are
+    // not version-stamped names and the census never counts them.
+    // v4585 ran the census on main's own tree (4f89c470) and got 105/46/178 there too: the row was stale on
+    // main.
+    // v4587 -- RE-TAKEN: 105/46/178 -> 106/46/178, one record: reportDoors' NO_GATE_V4587, a dated list of
+    // two module names and no numeric field, so records moves by one and withFields and fields do not.
+    // v4622-merge -- RE-TAKEN on this branch's actual merge of origin/main: the two histories above both
+    // diverged from 104/45/172 and are both real. The final reading is a fresh census() over the merged tree.
+    // v4622-merge-b -- RE-TAKEN, after the actual merge landed: 111 -> 112. NO_GATE_V4587 (origin/main's own)
+    // and COMMIT_BELT_DRIFT_V4621 both arrived; neither carries a numeric field.
+    excluding: Object.freeze({ records: 112, withFields: 48, fields: 184 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,

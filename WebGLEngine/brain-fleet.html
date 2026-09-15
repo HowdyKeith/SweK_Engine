@@ -102,7 +102,10 @@ function setLive(state) {
   txt.textContent = state === "ok" ? "live" : state === "err" ? "bridge unreachable" : "connecting";
 }
 
-function render(sum) {
+// v4584 -- WHICH REQUEST EACH BRAIN TOOK. /ai/brain/routed's per-peer summary keyed by brain id; the card's foot says
+// how many and names the last (kind, scene, policy, tick range). A brain with none says "no requests routed".
+function render(sum, routed = null) {
+  const tookOf = (id) => { const p = routed && routed.summary && routed.summary.peers ? routed.summary.peers.find((q) => q.id === id) : null; return p ? `took ${p.count} request${p.count === 1 ? "" : "s"}, last: ${p.last && p.last.what || "?"}` : "no requests routed"; };
   $("m-count").textContent = sum.count;
   $("m-training").textContent = sum.training;
   $("m-steps").textContent = fmt(sum.totalSteps);
@@ -139,6 +142,7 @@ function render(sum) {
           <span class="tag ${r.training ? "on" : "idle"}">${r.training ? "training" : "idle"}</span>
           <span>${r.solveMs == null ? "" : r.solveMs.toFixed(1) + "ms"} &middot; ${age(r.ageMs)}</span>
         </div>
+        <div class="foot took" title="from /ai/brain/routed">${tookOf(r.id)}</div>
       </div>`;
   }).join("");
 }
@@ -146,8 +150,9 @@ function render(sum) {
 async function poll() {
   try {
     const j = await fetch("/ai/brain/fleet", { cache: "no-store" }).then((r) => r.json());
+    let routed = null; try { routed = await fetch("/ai/brain/routed", { cache: "no-store" }).then((r) => r.json()); } catch { routed = null; }
     setLive("ok");
-    render(fleetTrainingSummary(j.brains || []));
+    render(fleetTrainingSummary(j.brains || []), routed);
     $("updated").textContent = "updated " + new Date().toLocaleTimeString();
   } catch (e) {
     setLive("err");
