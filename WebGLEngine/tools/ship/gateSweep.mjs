@@ -3767,6 +3767,47 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since245: Object.freeze({
+        at: "v4588", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsrGPU-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["fx/fsr/fsr.js", "fx/fsr/fsr-selfcheck.mjs", "fsr.html"]),
+        verdict: "green, 3084 ms alone (median of 3132/3084/3017), just over the sweep budget because it spawns a " +
+                 "browser origin and a real adapter and times 60 dispatches inside it. *** THE FSR KERNELS WERE " +
+                 "WRITTEN, VALIDATED, RUN ON A REAL DEVICE AND HELD TO THE CPU REFERENCE TO 3e-7 -- AND NOTHING " +
+                 "OUTSIDE A GATE COULD DISPATCH THEM. *** fx/fsr/fsr-selfcheck.mjs built the buffers, the pipeline " +
+                 "and the dispatch inline, twice, inside a page it spawns itself, and that was the only code in " +
+                 "the tree that ran the WGSL. A gate is not a caller: it proves a kernel and ships nothing. That " +
+                 "gate's own closing named the gap in its own words -- 'no caller in this tree yet uses it' and " +
+                 "'SPEED -- nobody has timed either kernel'. fx/fsr/fsrGPU.js is the caller, through gfx/device.js " +
+                 "and NOT through a second raw-WebGPU dispatcher (fx/anime4k's Anime4KGPU is that, and carries the " +
+                 "comment 'correct-by-construction; no WebGPU headless here' -- a driver nobody has run). *** THREE " +
+                 "THINGS THE KERNEL GATE COULD NOT ASK BECAUSE IT HAD NO RUNNER: *** the two kernels had never been " +
+                 "run BACK TO BACK on the device at all, so fsr1() chains them on one encoder and is asserted " +
+                 "BIT-IDENTICAL to the same two passes with a readback between -- 0 of 49152 channels, and the " +
+                 "sabotage that binds the second pass to the wrong buffer moves 48589 of them. SPEED: 4.6-6.9 ms " +
+                 "chained against 28.8-35.1 ms for fsr1CPU at 64x64 -> 128x128 on this box's software adapter, and " +
+                 "the chain saves 26-37% against the two-call form, which is one 256 KB readback and upload not " +
+                 "taken. THE OVERSHOOT: RCAS_LIMIT keeps the resolve off the pole of 1/(4*lobe+1) and does NOT " +
+                 "bound the range; the kernel gate measured 1.000 -> 1.166 on a synthetic peak and wrote 'no caller " +
+                 "in this tree yet clamps it, because no caller in this tree yet uses it'. There is one now, so it " +
+                 "is measured on an ordinary picture -- 344 channels above 1.0 and 399 below 0.0 of 49152, range " +
+                 "[-0.573, 1.221] -- and the runner REPORTS the range rather than clamping, because clamping in " +
+                 "the pass changes the algorithm for every caller. *** THREE DEFECTS IN THE ROUND'S OWN WORK, ALL " +
+                 "CAUGHT BY THE GATE ON ITS FIRST RUN: *** the runner was written with an options object and " +
+                 "denoise defaulting to TRUE while fsr.js declares positional arguments and FALSE -- a GPU path " +
+                 "that answers a different question from the reference it mirrors, which surfaced as 'worst NaN' " +
+                 "when an object reached fsr1CPU's positional sharpness. The gate's own source check for raw " +
+                 "WebGPU calls went red on the runner's COMMENT explaining that it makes none -- the " +
+                 "absence-check trap, fifth time in this arc, fixed with codeOnly(). And the row next to it then " +
+                 "failed because codeOnly EMPTIES string literals, so `backend !== \"webgpu\"` read as " +
+                 "`backend !== \"\"`: noComments() is the instrument for a quoted literal in live code. Also " +
+                 "corrected next door: fsr-selfcheck's header and closing both said the temporal path was blocked " +
+                 "because 'this tree has NO motion vectors and no previous-frame view-projection matrix anywhere " +
+                 "in it'. All three prerequisites arrived after that was written and fsr.html has been running the " +
+                 "whole chain since v4586 -- a stated limit that outlived the limit, describing a page that " +
+                 "already existed as a rung nobody could reach.",
+    }),
     since244: Object.freeze({
         at: "v4585", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/redAction-selfcheck.mjs"]),

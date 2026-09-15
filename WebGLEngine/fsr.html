@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="demo:title" content="FSR: spatial and temporal, side by side">
-<meta name="demo:desc" content="AMD FidelityFX Super Resolution, reimplemented natively in SweK. EASU+RCAS is the spatial half (one frame in, one out). The temporal half -- jitter, jitter-aware resolve, reprojected accumulation -- is what recovers detail the render resolution cannot carry. Watch it converge frame by frame against a supersampled ground truth, with live PSNR: on a zone plate it beats bilinear by ~6.4 dB static and ~2.1 dB panning, and on smooth content it cannot beat bilinear at all, because there is nothing past Nyquist to recover.">
+<meta name="demo:desc" content="AMD FidelityFX Super Resolution, reimplemented natively in SweK. EASU+RCAS is the spatial half (one frame in, one out). The temporal half -- jitter, jitter-aware resolve, reprojected accumulation -- is what recovers detail the render resolution cannot carry. The spatial half runs on the adapter when there is one -- EASU and RCAS chained on one WebGPU encoder -- and on the CPU reference when there is not; the temporal half is CPU either way. Watch it converge frame by frame against a supersampled ground truth, with live PSNR: on a zone plate it beats bilinear by ~6.4 dB static and ~2.1 dB panning, and on smooth content it cannot beat bilinear at all, because there is nothing past Nyquist to recover.">
 <meta name="demo:category" content="fx">
 <title>FSR Upscaler</title>
 <style>
@@ -53,7 +53,9 @@
     <span class="stat">sharpen <input type="range" id="sharp" min="0" max="1" step="0.05" value="1"><b id="sv">1.00</b></span>
   </div>
   <div class="stat" id="metric">idle</div>
+  <div class="stat" id="engine">spatial engine: starting up</div>
   <div class="stat" id="accstat"></div>
+  <div class="stat" id="over"></div>
 </div>
 <div class="panes">
   <div class="pane"><h2>Ground truth <span class="db">(8&times;8 supersampled)</span></h2><canvas id="cRef"></canvas></div>
@@ -81,6 +83,20 @@
   (11.31 against 10.85) while the neighbourhood clamp fires on 9,239 pixels a frame: the resolve is too soft for the
   3&times;3 box to admit the history it is being handed.
   <br><br>
+  <b>Which engine is running, and what only one of them does.</b> The line under the controls says whether the
+  spatial panes came off an adapter or off the CPU reference. It is the same picture either way &mdash; the
+  kernels are held to the CPU to 2&times;10<sup>&minus;5</sup> on this content, and to 3&times;10<sup>&minus;7</sup>
+  on the kernel gate&rsquo;s easier one &mdash; so the switch buys speed, not a different result. Chained on one
+  encoder the intermediate never returns to the CPU: measured at 64&times;64 &rarr; 128&times;128 on a software
+  adapter, 4.6&ndash;6.9 ms against 28.8&ndash;35.1 ms for the CPU, and a third off the two-call form.
+  <span class="warn">The temporal pane stays on the CPU whatever the adapter does</span>, because the resolve and
+  the accumulation have no WGSL at all.
+  <br><br>
+  <b>RCAS leaves [0,1] and the canvas was hiding it.</b> RCAS_LIMIT keeps the sharpening resolve off the pole of
+  1/(4&middot;lobe+1); it does not bound the range. The line under the counters reports the real range &mdash; on
+  the zone plate it runs to about [&minus;0.23, 1.23] &mdash; and everything outside gets clipped when the
+  picture reaches 8 bits. That clipping was always happening; until this page reported it, nothing said so.
+  <br><br>
   <b>Watch the accumulate counters.</b> They are the diagnostic, not decoration. <i>rejected offscreen</i> should be
   exactly one column &mdash; 192 pixels &mdash; while panning and zero while static; anything else means the motion
   vectors disagree with the camera. This page shipped once with that sign inverted, scoring 11.5 dB while panning,
@@ -96,6 +112,8 @@ import { makeJitterState, jitterCurrent, advanceJitter } from "./render/jitter.m
 import { resolveJitterAwareCPU } from "./render/temporalResolve.mjs";
 import { temporalAccumulateCPU } from "./render/temporalAccumulate.mjs";
 import { easuCPU, rcasCPU, bilinearCPU } from "./fx/fsr/fsr.js";
+import { requestDevice } from "./gfx/device.js";
+import { FSRGPU, rangeOf } from "./fx/fsr/fsrGPU.js";
 
 const D = 192;                                  // display resolution
 const $ = (id) => document.getElementById(id);
@@ -150,7 +168,43 @@ function draw(c, buf) {
 
 let running = false, frame = 0, hist = null, jit = null, ref = null, R = 96, PAN = 0.75;
 
-function reset() {
+// ---- the spatial half runs on the adapter when there is one ------------------------------------------------
+// fx/fsr/fsrGPU.js is the runner; the kernels have been validated against the CPU reference on a device since
+// they were written, and until v4588 nothing outside a gate could dispatch them. The CPU functions stay exactly
+// where they were: they are the reference this page's GPU pane is held to, not a fallback nobody exercises.
+//
+// THE TEMPORAL PANE STAYS ON THE CPU WHATEVER THE ADAPTER DOES, and that is not an oversight this page hides:
+// render/temporalResolve.mjs and render/temporalAccumulate.mjs have no WGSL at all. Only the spatial half --
+// bilinear, EASU, RCAS -- has a device path, so that is the only half this switch moves.
+let gpu = null;
+async function initGPU() {
+    const say = (t) => { $("engine").textContent = "spatial engine: " + t; };
+    if (!navigator.gpu) { say("CPU reference (this browser exposes no WebGPU)"); return; }
+    try {
+        const cv = document.createElement("canvas"); cv.width = 8; cv.height = 8;
+        const dev = await requestDevice(cv, { backend: "webgpu", offscreen: true });
+        gpu = new FSRGPU(dev);
+        const who = (dev.adapterInfo && (dev.adapterInfo.description || dev.adapterInfo.vendor)) || "webgpu";
+        say(`WebGPU compute on ${who} -- EASU and RCAS chained on one encoder`);
+    } catch (e) { gpu = null; say("CPU reference (" + String(e && e.message).slice(0, 80) + ")"); }
+}
+
+/** FSR1 through the device if there is one, through fx/fsr/fsr.js if there is not. Same picture either way. */
+async function fsr1(rgba, rw, rh, dw, dh, sharp) {
+    if (gpu) return gpu.fsr1(rgba, rw, rh, dw, dh, sharp, false);
+    // ...and the CPU branch carries the SAME range, computed with the same function. fx/fsr/fsr.js returns
+    // { data, w, h } and no range; returning one only from the adapter path would make this page honest about
+    // RCAS's overshoot on a rig and silent about it everywhere else, which is worse than not reporting it.
+    const c = rcasCPU(easuCPU(rgba, rw, rh, dw, dh).data, dw, dh, sharp, false);
+    return { ...c, range: rangeOf(c.data, dw * dh) };
+}
+/** RCAS alone, for the temporal pane's sharpen -- the accumulate before it is CPU-only either way. */
+async function rcas(rgba, w, h, sharp) {
+    if (gpu) return gpu.rcas(rgba, w, h, sharp, false);
+    return rcasCPU(rgba, w, h, sharp, false);
+}
+
+async function reset() {
     const kind = $("scene").value, ratio = parseFloat($("ratio").value);
     R = Math.max(8, Math.round(D / ratio));
     jit = makeJitterState(ratio); hist = null; frame = 0;
@@ -158,8 +212,15 @@ function reset() {
     draw(cRef, ref);
     const one = render(R, 0, 0, kind, 0);
     const bil = bilinearCPU(one, R, R, D, D).data;
-    const fsr = rcasCPU(easuCPU(one, R, R, D, D).data, D, D, parseFloat($("sharp").value)).data;
+    const F = await fsr1(one, R, R, D, D, parseFloat($("sharp").value));
+    const fsr = F.data;
     draw(cBil, bil); draw(cFsr, fsr);
+    // *** RCAS OVERSHOOTS AND THIS PAGE IS THE CALLER THAT SAYS SO. *** RCAS_LIMIT keeps the resolve off the
+    // pole of 1/(4*lobe+1); it does NOT bound the range, so a sharpened picture leaves [0,1] at peaks and the
+    // canvas quietly clips it. The count is shown rather than clipped in silence.
+    if (F.range) $("over").textContent = F.range.overshot
+        ? `RCAS range [${F.range.min.toFixed(3)}, ${F.range.max.toFixed(3)}] -- outside [0,1], and the canvas clips it`
+        : `RCAS range [${F.range.min.toFixed(3)}, ${F.range.max.toFixed(3)}]`;
     $("dBil").textContent = psnr(bil, ref).toFixed(2) + " dB";
     $("dFsr").textContent = psnr(fsr, ref).toFixed(2) + " dB";
     $("dTmp").textContent = "--";
@@ -168,7 +229,7 @@ function reset() {
     $("accstat").textContent = "";
 }
 
-function tick() {
+async function tick() {
     if (!running) return;
     const kind = $("scene").value, panning = $("camera").value === "pan";
     const dx = panning ? frame * PAN : 0;
@@ -193,7 +254,7 @@ function tick() {
     hist = acc.data; frame++; advanceJitter(jit);
 
     if (panning) ref = truth(kind, dx);          // the truth moves with the camera
-    const shown = rcasCPU(hist, D, D, parseFloat($("sharp").value)).data;
+    const shown = (await rcas(hist, D, D, parseFloat($("sharp").value))).data;
     draw(cTmp, shown);
     $("dTmp").textContent = psnr(shown, ref).toFixed(2) + " dB";
     $("metric").textContent = `render ${R}x${R} -> display ${D}x${D}   |   frame ${frame}   |   jitter ${jx.toFixed(3)}, ${jy.toFixed(3)}`;
@@ -206,7 +267,8 @@ $("reset").onclick = () => { running = false; $("run").textContent = "Run"; rese
 for (const id of ["scene", "camera", "ratio"]) $(id).onchange = () => { running = false; $("run").textContent = "Run"; reset(); };
 $("alpha").oninput = () => { $("av").textContent = parseFloat($("alpha").value).toFixed(2); };
 $("sharp").oninput = () => { $("sv").textContent = parseFloat($("sharp").value).toFixed(2); };
-reset();
+await initGPU();
+await reset();
 </script>
 </body>
 </html>

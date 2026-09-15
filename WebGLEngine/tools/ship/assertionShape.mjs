@@ -284,8 +284,15 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // twenty-fourth round running that the pre-flight prompted. The other five rows have never moved.
     // v4585 -- RE-TAKEN: one gate (redAction) joined, the same four rows by one, FORTY-FIFTH arrival,
     // twenty-fifth round running that the pre-flight prompted. The other five rows have never moved.
-    gates: 1643, usesOk: 1622, definesOk: 1614, importsOk: 0,
-    distinctDefinitions: 38, nameFirst: 1515, condFirst: 91, unknownSignature: 16,
+    // v4588 -- RE-TAKEN: one gate (fsrGPU) joined, and FIVE rows moved rather than four, because nameFirst is
+    // the fifth. *** THE PRE-FLIGHT PROMPTED THREE OF THEM AND THE GATE FOUND THE FOURTH. *** recordDrift's
+    // assertionShape row compares `gates` and `definesOk` and reports "1644 vs 1644, copies 1615 vs 1615"; this
+    // file's own gate compares ALL NINE and went red with "DRIFTED: nameFirst 1515 -> 1516". The label on that
+    // row already says "not the four this compared", so the narrowness is recorded rather than discovered -- but
+    // it is the same shape v4587 found in the knowledge-index check one round earlier: a cheap pre-view that
+    // answers a smaller question than the gate it previews, read as though it answered the same one.
+    gates: 1644, usesOk: 1623, definesOk: 1615, importsOk: 0,
+    distinctDefinitions: 38, nameFirst: 1516, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

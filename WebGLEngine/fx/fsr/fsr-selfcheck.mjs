@@ -16,8 +16,20 @@
 // this is that, held to a CPU mirror the way anime4k is.
 //
 // SPATIAL ONLY, AND SAID SO: FSR's temporal path (FSR2/3) wants depth, per-pixel motion vectors and a jittered
-// projection with history. This tree has NO motion vectors and no previous-frame view-projection matrix anywhere in
-// it, so the temporal path is a later rung with a prerequisite, not something this file half-does.
+// projection with history. This file is the SPATIAL half and still is.
+//
+// *** THE REASON GIVEN HERE FOR THAT WAS TRUE WHEN IT WAS WRITTEN AND IS NOT NOW, WHICH IS WORSE THAN NO REASON. ***
+// It read: "This tree has NO motion vectors and no previous-frame view-projection matrix anywhere in it, so the
+// temporal path is a later rung with a prerequisite". All three prerequisites arrived after that sentence --
+// render/motionVectors.mjs takes a vpPrev and writes (du, dv, valid, zPrev), render/jitter.mjs exports
+// frameMatrices and a Halton sequence, and render/temporalResolve.mjs and render/temporalAccumulate.mjs do the
+// resolve and the reprojected accumulation -- and fsr.html runs the whole chain every frame, converging past
+// bilinear by 6.4 dB with a static camera and 2.1 dB panning. The closing line at the bottom of this file said
+// the same thing and is corrected with it. A STATED LIMIT THAT OUTLIVED THE LIMIT STILL READS AS CURRENT: this
+// one described a page that already existed as a rung nobody could reach.
+//
+// What is still true is narrower, and is the actual scope line: THIS FILE is EASU and RCAS, one frame in and one
+// frame out. The temporal modules are their own files with their own gates.
 "use strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -311,10 +323,14 @@ else {
 //      the kernel checked on the CPU alone.
 //   No 0-RED among the six.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
-console.log("unchecked here: the TEMPORAL path, which wants depth, per-pixel motion vectors and a jittered projection with history -- this tree has " +
-    "none of those and no previous-frame view-projection matrix anywhere, so that rung has a prerequisite rung before it; " +
+console.log("unchecked here: the TEMPORAL path, which is BUILT rather than blocked as this line used to say -- " +
+    "render/motionVectors.mjs, render/jitter.mjs, render/temporalResolve.mjs and render/temporalAccumulate.mjs all " +
+    "exist and fsr.html runs them every frame, so what is unchecked HERE is that they are other files with other " +
+    "gates, not that the tree lacks them; " +
     "HDR and the colour domain (FSR1 wants perceptual input and this file does not choose a transfer function for a caller); " +
-    "SPEED -- nobody has timed either kernel against bilinear or against anime4k; and RCAS's OVERSHOOT once a caller " +
-    "composites it, since this gate measures that it happens (1.166 from 1.000 at a local peak) and no caller in this " +
-    "tree yet clamps it, because no caller in this tree yet uses it.");
+    "SPEED AGAINST ANIME4K, which is still nobody -- the FSR kernels themselves are timed at v4588 in " +
+    "fx/fsr/fsrGPU-selfcheck.mjs (fsr1 chained 4.6-6.9 ms against fsr1CPU's 28.8-35.1 ms at 64x64 -> 128x128 on a " +
+    "software adapter), and the cross-upscaler comparison is not; and RCAS's OVERSHOOT once a caller composites it, " +
+    "which now HAS a caller: fx/fsr/fsrGPU.js reports the range instead of clamping and fsr.html clamps where the " +
+    "8 bits are, measuring 344 channels above 1.0 and 399 below 0.0 of 49152 on an ordinary picture.");
 process.exit(fails ? 1 : 0);
