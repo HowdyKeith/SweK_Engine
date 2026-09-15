@@ -43,6 +43,7 @@ import * as F from "../../brain/fleetRouting.mjs";
 import * as D from "../../brain/drivePolicy.mjs";
 import { initNode, mod } from "../../physics/box3d/box3dNode.mjs";
 import { worldFromModule } from "../../render/slugTicker.mjs";
+import { gateReport } from "./gateReport.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const require_ = createRequire(import.meta.url);
@@ -50,6 +51,15 @@ let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const report = (m) => console.log("  ----  " + m);
 const sec = (t) => console.log("\n" + t);
+// *** v4558 -- THIS GATE REACHED gateReport'S RATCHET BY THE DETECTOR'S CRUDE PATH AND THE VERDICT WAS STILL
+// RIGHT. *** arguesInNumbers matched the `for (const l of F.reportLines())` at the foot of this file plus a
+// toFixed in an assertion detail -- and fleetRouting.reportLines() returns TWO SENTENCES OF PROSE with no
+// number in them, so on the detector's own terms this is the false positive its header names ("it will
+// count one that formats a single number in a loop"). It is not one in substance. THE ROUTING ARGUMENT IS
+// NUMERIC AND ALWAYS WAS: a 20 ms brain and an 80 ms brain, and which of them the scheduler hands work to.
+// That claim lived in a one-line assertion detail, `gate-fast 4, gate-slow 2`, which is a table with the
+// table taken out. The two below are that argument with its rows back.
+const REPORT = gateReport("tools/ship/fleetRouting-selfcheck.mjs");
 const read = (f) => fs.readFileSync(path.join(ENG, f), "utf8");
 // a row's peer id, or null: the gate must REPORT a row that names no peer, never die on it (sabotage A crashed the first draft at A's fourth check)
 const pid = (row) => (row && row.peer && row.peer.id) || null;
@@ -103,6 +113,14 @@ sec("B. *** THE BRIDGE: POST /ai/brain/route OVER THE LIVE REGISTRY, THE LEDGER 
         r.c + " " + (r.o.rows || []).map((x) => x.line).join(" | "));
     const took = (id) => ((r.o.summary.peers || []).find((p) => p.id === id) || { count: 0 }).count;
     ok("!! ...and the registry's own solve times decide: the 20 ms brain takes more than the 80 ms one", took("gate-fast") > took("gate-slow") && took("gate-slow") >= 1, `gate-fast ${took("gate-fast")}, gate-slow ${took("gate-slow")}`);
+    REPORT.table("the registry's own solve times decide who takes the work",
+                 ["peer", "solve ms (ewma)", "requests taken", "kinds"],
+                 (r.o.summary.peers || []).map((p) => {
+                     const b = (fleet.o.brains || []).find((x) => x.id === p.id) || {};
+                     return [p.id, b.solveMsEwma ?? null, p.count, Array.isArray(p.kinds) ? p.kinds.join(" ") : p.kinds];
+                 }),
+                 "six identical train requests over two registered brains whose only difference is a " +
+                 "reported solve time of 20 ms against 80 ms");
     const g = await call("GET", "/ai/brain/routed?last=3");
     ok("GET /ai/brain/routed reads the ledger: the count, the per-peer summary, the last rows", g.c === 200 && g.o.count === 6 && g.o.rows.length === 3 && g.o.summary.peers.length === 2 && g.o.summary.unattributed === 0 && !("weights" in g.o.rows[0]), JSON.stringify(g.o.summary.peers.map((p) => [p.id, p.count, p.kinds])));
     const h = await call("GET", "/ai/brain/health");
@@ -127,6 +145,11 @@ sec("C. *** THE TRAINER'S EPISODES ROUTED AND RUN: EACH SCORE IS drivePolicy.epi
     const t0 = Date.now(), ran = F.runRoutedTrain(worldFrom, D, rows, { seconds: SECONDS }); const ms = Date.now() - t0;
     const same = ran.map((r) => { const e = D.episode(worldFrom, r.weights, D.surfaceFor(r.seed), { seconds: SECONDS, seed: r.seed }); return r.score === e.score && r.fingerprint === e.fingerprint; });
     ok("!! *** every routed episode's score AND fingerprint equal a direct drivePolicy.episode of the same candidate and seed ***", same.every(Boolean), ran.map((r, i) => `${pid(r)}: ${r.score.toFixed(2)} ${same[i] ? "=" : "!="}`).join(", "));
+    REPORT.table("every routed episode against a direct drivePolicy.episode of the same candidate and seed",
+                 ["peer", "seed", "score", "ms", "equals a direct episode"],
+                 ran.map((x, i) => [pid(x), x.seed, x.score, x.ms, same[i]]),
+                 "routing must not change a result: the score AND the fingerprint have to match the " +
+                 "unrouted call, and the fingerprint is compared but is not a number to table");
     ok("every result says where it ran and keeps its attribution", ran.every((r) => r.ranOn === "this box" && F.isAttributed(r) && r.ms >= 0), `${ran.length} episodes in ${ms} ms`);
     ok("the two candidates score differently (the routed policy reached the car)", new Set(ran.map((r) => r.score.toFixed(3))).size >= 2);
 }
@@ -163,4 +186,5 @@ sec("E. *** THE SURFACES READ THE LEDGER: THE GAUGE CARD, THE GRID ROWS, THE POO
 
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nall checks pass");
 for (const l of F.reportLines()) console.log("  " + l);
+REPORT.write();
 process.exit(fails ? 1 : 0);

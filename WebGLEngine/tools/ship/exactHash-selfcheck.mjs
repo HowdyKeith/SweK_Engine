@@ -30,10 +30,14 @@ import { bcsHash } from "../../render/swiftShaderModel.mjs";
 import * as GM from "../../render/grassModel.mjs";
 import { validateWgsl } from "../../render/wgslSpec.mjs";
 import { codeOnly } from "./sourceScan.mjs";
+import { gateReport } from "./gateReport.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
 const ok = (n, c, d = "") => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
+// *** v4558 -- THE SITE TABLE USED TO DIE WITH THE TERMINAL. *** gateReport-selfcheck's ratchet names every
+// gate that prints rows of numbers and emits nothing a second reader can open; this was one of five arrivals.
+const REPORT = gateReport("tools/ship/exactHash-selfcheck.mjs");
 const f = Math.fround;
 
 console.log("1. *** THE TIE TO THE PROVEN FUNCTION: seed 0 IS bcsHash, not a thing that resembles it ***");
@@ -325,6 +329,10 @@ console.log("\n5e. the five single-implementation sites, recorded rather than re
     });
     for (const r of rows)
         console.log(`     ${r.rel.padEnd(32)} ${r.missing ? "*** NOT ON DISK ***" : r.sites + " site(s)   " + (r.glsl ? "GLSL" : "----") + " " + (r.wgsl ? "WGSL" : "----")}`);
+    REPORT.table("the five sites the record names, and which language each carries the idiom in",
+                 ["path", "on disk", "live sin-hash sites", "GLSL", "WGSL"],
+                 rows.map((r) => [r.rel, !r.missing, r.sites, !!r.glsl, !!r.wgsl]),
+                 "sites counted on non-comment lines; a missing file is a row rather than a throw");
     ok("!! every site the record names is on disk",
        rows.every((r) => !r.missing),
        rows.filter((r) => r.missing).map((r) => r.rel).join(", ") ||
@@ -458,4 +466,5 @@ console.log("unchecked here: the shaders EXECUTING. No GL or WebGPU context is t
     "same arithmetic on a device for the BCS family; the twins here inherit that evidence rather than repeat " +
     "it. Also unchecked: whether the new noise field LOOKS better, which is not a claim this round makes -- a " +
     "different hash is a different pattern, and the trade is that two halves can now be held to one picture.");
+REPORT.write();
 process.exit(fails ? 1 : 0);

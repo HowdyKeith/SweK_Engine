@@ -309,6 +309,28 @@ console.log("\n4b. the indexed format, and the conflict it exists to refuse");
     ok("  and says nothing when the pass did not contradict itself, so the report is not noise",
        conflictReport(encode(agreeing), agreeing) === null);
 
+    // *** v4558 -- AND THE ROUND TRIP IS A FIXED POINT FOR THE CONFLICT LIST, WHICH IT WAS NOT. *** A
+    // conflict is detected by two gates DISAGREEING during encode; after a decode they agree, because both
+    // now read the same stored sentinel. So re-encoding a record kept all 81 file sentinels -- every gate
+    // still correctly refused, no false green -- and declared ZERO conflicts, which made the file's own list
+    // stop describing its own contents and made recordInputs' conflictReport call the pass clean. FOUND by
+    // re-encoding the live record to drop one bad entry and watching the count go 21 -> 0 while the
+    // sentinels stayed. encode() now also adds any path whose STORED value is already the sentinel.
+    {
+        const once = encode({ [g1]: { reads: [g1, "x.mjs"], dirs: [], hashes: { [g1]: hashFile(g1), "x.mjs": "1111111111111111" }, dirHashes: {} },
+                              [g2]: { reads: [g2, "x.mjs"], dirs: [], hashes: { [g2]: hashFile(g2), "x.mjs": "2222222222222222" }, dirHashes: {} } });
+        const twice = encode(decode(once).gates);
+        const thrice = encode(decode(twice).gates);
+        ok("*** re-encoding a decoded record KEEPS the conflict list, so the file never stops describing itself ***",
+           once.conflicts.join() === "x.mjs" && twice.conflicts.join() === "x.mjs" &&
+           thrice.conflicts.join() === "x.mjs" &&
+           twice.hashes[twice.paths.indexOf("x.mjs")] === CONFLICT,
+           `pass 1 ${JSON.stringify(once.conflicts)}, pass 2 ${JSON.stringify(twice.conflicts)}, pass 3 ` +
+           `${JSON.stringify(thrice.conflicts)}. THREE passes, because a bug that loses the list on the ` +
+           "SECOND would look fixed if only the first two were compared -- and the sentinel is checked " +
+           "alongside, since a list restored without the refusal behind it would be worse than no list");
+    }
+
     // round trip: the compact form must mean exactly what the expanded one did
     const round = decode(encode({ "a.mjs": A }));
     ok("*** and encode/decode round-trips: the compact form says exactly what the expanded one said ***",

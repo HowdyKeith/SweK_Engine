@@ -84,8 +84,11 @@ const say = (m) => console.log("  ----  " + m);
         say(`  frame ${String(f).padStart(2)}: reach px ${at[f].map((v) => v.toFixed(1)).join(" ")}`);
     // v4423 -- the same table, emitted rather than only printed. gateReport-selfcheck's rule since v4399: a
     // gate that argues in NUMBERS and emits nothing writes its evidence to a terminal that closes.
-    REPORT.table("how far each fragment gets from where the ship died", ["frame", "reach px, per piece"],
-        Object.keys(at).map((f) => [f, at[f].map((v) => v.toFixed(1)).join("  ")]),
+    // v4558: the frame was a string key and every piece's reach was packed into ONE text cell, so a table of
+    // numbers arrived as a table of sentences. One row per (frame, piece), every value a number -- which also
+    // makes it plottable, which the joined form could never be.
+    REPORT.table("how far each fragment gets from where the ship died", ["frame", "piece", "reach px"],
+        Object.keys(at).flatMap((f) => at[f].map((v, i) => [Number(f), i, v])),
         "The hull never leaving was the defect; a number in pixels is the only thing that answers it.");
 
     const final = at[80];

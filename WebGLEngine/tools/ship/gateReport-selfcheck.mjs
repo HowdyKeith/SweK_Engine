@@ -31,7 +31,7 @@ import { gateFiles } from "./staleness.mjs";
 import { noComments } from "./sourceScan.mjs";
 import { runInEngineOrigin } from "./webgpuHarness.mjs";
 import * as AW from "./artefactWriters.mjs";
-import { gateReport, reports, arguesInNumbers, REPORT_DIR, enabled, TABLE_ATTR, tableSelector } from "./gateReport.mjs";
+import { gateReport, reports, arguesInNumbers, renderedNumbers, REPORT_DIR, enabled, TABLE_ATTR, tableSelector } from "./gateReport.mjs";
 
 const SELF_REPORT = gateReport("tools/ship/gateReport-selfcheck.mjs");
 let probeResult = null;
@@ -186,6 +186,66 @@ const emits = [...new Set([...reports().map((r) => r.gate), SELF])].filter((g) =
        "the terminal it was written to. One line of gateReport in the gate that already has the table fixes it" :
        "nothing new. A COUNT RATCHET COULD NOT ASK THIS: it can only say the total rose, and the round that " +
        "raised it is the round least able to tell which file did");
+
+    // =========================================================================================================
+    // *** v4558 -- THE ONE THING THIS MODULE IS NAMED FOR WAS DRIVEN ON A FIXTURE AND ON NOTHING THAT SHIPS. ***
+    // gateReport's header: "NUMBERS STAY NUMBERS -- a report that stored "6.31e-6" as text would have made the
+    // reader parse a rendering of a number back into a number, which is the exact indirection this whole
+    // thread is about." The row further down that proves it builds its OWN document and asserts on that, so it
+    // has always passed and could never have failed on an artefact. FOUND BY SABOTAGE, on this round's own
+    // work: a live report's rows were replaced with toFixed()'d strings and the whole gate went 0 RED.
+    //
+    // Then measured over the artefacts: 260 of 1,265 values -- 20.6% -- across 13 of the 30 reports. Three
+    // were repaired in the same round to show the debt is payable and not a list of grievances (fireSpread's
+    // whole table was String()/toFixed, retroRaster packed a three-vector into one cell, shipDebris packed a
+    // row of pieces into one), taking it to 148 across 10. The rest are frozen BY NAME, for the reason the
+    // silent population is: a count ratchet can say the total rose and cannot say which file raised it.
+    const RENDERING_AT_V4558 = Object.freeze([
+        "fluid/vorticity-selfcheck.mjs",
+        "physics/render/bssrdfSample-selfcheck.mjs",
+        "physics/render/dielectricWalk-selfcheck.mjs",
+        "physics/render/microsurfaceWalk-selfcheck.mjs",
+        "physics/render/multiScatter-selfcheck.mjs",
+        "physics/render/pathTracerGpu-selfcheck.mjs",
+        "physics/render/rtPipeline-selfcheck.mjs",
+        "tools/ship/closingCoverage-selfcheck.mjs",
+        "tools/ship/reportDoors-selfcheck.mjs",
+        "tools/ship/runtimeGap-selfcheck.mjs",
+    ]);
+    const onDisk = reports().filter((r) => r.gate && !r.broken);
+    const rendering = onDisk.map((r) => ({ gate: r.gate, hits: renderedNumbers(r) })).filter((x) => x.hits.length);
+    const stillRendering = rendering.filter((x) => RENDERING_AT_V4558.includes(x.gate));
+    const newRendering = rendering.filter((x) => !RENDERING_AT_V4558.includes(x.gate));
+    const values = onDisk.reduce((n, r) => n + (r.tables || []).reduce((m, t) => m + (t.rows || []).reduce((k, row) => k + row.length, 0), 0), 0);
+    say(`${onDisk.length} report(s), ${values} value(s); ${rendering.reduce((n, x) => n + x.hits.length, 0)} ` +
+        `stored as a rendering of a number across ${rendering.length} report(s)`);
+    ok("!! *** the named reports holding a RENDERING of a number rather than the number may only SHRINK ***",
+       stillRendering.length <= RENDERING_AT_V4558.length,
+       `${stillRendering.length} of the ${RENDERING_AT_V4558.length} frozen at v4558 still hold one. Each fix ` +
+       "is the toFixed()/String() coming OUT of a row builder in a gate that already has the numbers, and the " +
+       "gate has to be re-run under SWEK_GATE_REPORT=1 for the artefact to catch up -- which is why this is a " +
+       "list and not a sweep");
+    ok("!! ...and NO report may newly store a number as text, which is the thing this module is named for",
+       newRendering.length === 0,
+       newRendering.length
+           ? "NEW: " + newRendering.map((x) => `${x.gate} (${x.hits.length}: ` +
+               x.hits.slice(0, 2).map((h) => `${h.column}=${JSON.stringify(h.value)}`).join(", ") + ")").join("; ")
+           : `nothing new across ${onDisk.length} report(s). THE ROW BELOW THAT PROVES THE ROUND TRIP IS ON A ` +
+             "FIXTURE THIS GATE BUILDS; this one is on what is actually on disk, which is the difference that " +
+             "let 260 values through");
+    // The rule is driven both ways, because a detector that flagged nothing would leave both rows above
+    // reading exactly as they do now. The cases are the ones where a narrower or wider rule would differ.
+    {
+        const hits = renderedNumbers({ tables: [{ title: "t", columns: ["n", "rendered", "label", "unbounded", "packed"],
+            rows: [[0.5, "0.50", "gate-fast", "Infinity", "0.5, 0.25"], [1e-9, "1e-9", "v4485", "NaN", ""]] }] });
+        ok("  and the rule flags a rendering, and ONLY a rendering",
+           hits.length === 2 && hits.every((h) => h.column === "rendered") &&
+           hits.map((h) => h.value).join("|") === "0.50|1e-9",
+           `flagged ${JSON.stringify(hits.map((h) => h.value))}. A label with digits is not a number; ` +
+           "\"Infinity\" and \"NaN\" are excluded because JSON cannot carry them as numbers at all, so " +
+           "flagging them would demand the impossible; and a vector packed into one cell does not parse " +
+           "whole, which is why that shape is caught by the drawable check instead");
+    }
 
     // *** THE BLINDNESS, MEASURED RATHER THAN LEFT AS A CLEAN-LOOKING ZERO. ***
     const seen = AW.toolFiles().filter((f) => /-selfcheck\.mjs$/.test(f));

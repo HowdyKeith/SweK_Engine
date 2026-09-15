@@ -12,6 +12,7 @@
 import { conductorReflectance, conductorF, schlickF, f82Tint, f82TintFromTint, fitF82,
          compareModels, MU_BAR, MU_BAR_TERM, METALS, reportLines } from "./conductorFresnel.mjs";
 import { fresnel } from "./fresnel.mjs";
+import { gateReport } from "../../tools/ship/gateReport.mjs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -164,5 +165,33 @@ console.log("  ----  over (eta, kappa) so the finding does not rest on them.");
 console.log("  ----  NOR THAT ANYTHING IN THE ENGINE USES THIS YET. pathTracer.mjs and microsurfaceWalk.mjs");
 console.log("  ----  still compute Schlick with a three-channel F0. Substituting is a separate round with a");
 console.log("  ----  picture to look at, and the safe default is already proven here: tint = 1 IS Schlick.");
+// *** v4558 -- THE MODULE'S ARGUMENT WAS ALREADY A TABLE AND ALREADY UNREADABLE. *** gateReport-selfcheck's
+// ratchet named this gate as arguing in numbers and emitting nothing, and it reached that list through the
+// one line at the foot of this file that prints conductorFresnel.reportLines(). Those lines are the right
+// table -- twelve rows, four metals by three channels -- rendered to PADDED STRINGS with toFixed and
+// padStart, which is the one shape gateReport refuses: a report holding "0.0431" would make the reader parse
+// a rendering of a number back into a number.
+//
+// SO IT IS RE-DERIVED RATHER THAN SCRAPED. compareModels is already imported by this gate and is where those
+// strings come from; calling it again costs 12 x 2001 evaluations and yields the numbers themselves. Parsing
+// reportLines() would have produced a report that goes stale the day somebody changes a format string, which
+// is the caption problem with an extra parser in front of it.
+const REPORT = gateReport("physics/render/conductorFresnel-selfcheck.mjs");
+{
+    const rows = [];
+    for (const [name, m] of Object.entries(METALS))
+        for (let ch = 0; ch < 3; ch++) {
+            const r = compareModels(m.eta[ch], m.kappa[ch]);
+            rows.push([name, "RGB"[ch], m.eta[ch], m.kappa[ch], r.F0, r.F82,
+                       r.schlickMax, r.schlickAt, r.f82Max, r.f82At, r.ratio, r.dipDepth, r.dipAt]);
+        }
+    REPORT.table("worst absolute error against the exact conductor curve, over 2001 angles",
+                 ["metal", "channel", "eta", "kappa", "F0", "F82", "Schlick worst", "at mu",
+                  "F82-tint worst", "at mu", "ratio", "dip below F0", "at mu"],
+                 rows,
+                 "the same twelve rows conductorFresnel.reportLines() prints, as numbers rather than as a " +
+                 "rendering of them");
+    REPORT.write();
+}
 if (fails) { console.log("\n[conductorFresnel-selfcheck] FAILED " + fails); process.exit(1); }
 console.log("\n[conductorFresnel-selfcheck] all passed");

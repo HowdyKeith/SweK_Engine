@@ -1,20 +1,24 @@
 {
- "built": "2026-09-09",
+ "built": "2026-09-15",
  "reports": [
   "backendRouting-selfcheck.json",
   "bssrdfSample-selfcheck.json",
   "chunk-selfcheck.json",
   "claimEvidence-selfcheck.json",
   "closingCoverage-selfcheck.json",
+  "conductorFresnel-selfcheck.json",
   "detourScale-selfcheck.json",
   "dielectricWalk-selfcheck.json",
+  "exactHash-selfcheck.json",
   "fireSpread-selfcheck.json",
+  "fleetRouting-selfcheck.json",
   "frontDoor-selfcheck.json",
   "gateReport-selfcheck.json",
   "microsurfaceWalk-selfcheck.json",
   "multiScatter-selfcheck.json",
   "pageFxOverlay-selfcheck.json",
   "pathTracerGpu-selfcheck.json",
+  "raceKnob-selfcheck.json",
   "registerDrift-selfcheck.json",
   "reportDoors-selfcheck.json",
   "retroRaster-selfcheck.json",
@@ -24,6 +28,7 @@
   "runtimeGap-selfcheck.json",
   "shipDebris-selfcheck.json",
   "shipyard-selfcheck.json",
+  "skyStars-selfcheck.json",
   "vorticity-selfcheck.json",
   "xatlasRef-selfcheck.json"
  ]

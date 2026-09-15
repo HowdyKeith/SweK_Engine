@@ -1,0 +1,56 @@
+{
+ "gate": "tools/ship/exactHash-selfcheck.mjs",
+ "at": "2026-09-15",
+ "tables": [
+  {
+   "title": "the five sites the record names, and which language each carries the idiom in",
+   "columns": [
+    "path",
+    "on disk",
+    "live sin-hash sites",
+    "GLSL",
+    "WGSL"
+   ],
+   "rows": [
+    [
+     "atmosphere/AtmosphereSystem.js",
+     true,
+     1,
+     true,
+     false
+    ],
+    [
+     "demos_code/ant_colony.js",
+     true,
+     1,
+     true,
+     false
+    ],
+    [
+     "demos_code/slime_mold.js",
+     true,
+     1,
+     true,
+     false
+    ],
+    [
+     "render/CloudVolume.js",
+     true,
+     1,
+     true,
+     false
+    ],
+    [
+     "render/voxelrenderer.js",
+     true,
+     4,
+     true,
+     false
+    ]
+   ],
+   "note": "sites counted on non-comment lines; a missing file is a row rather than a throw"
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

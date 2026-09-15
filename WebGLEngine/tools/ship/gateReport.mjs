@@ -111,6 +111,38 @@ export function gateReport(gateRelPath) {
     };
 }
 
+/**
+ * *** THE ONE THING THIS MODULE'S HEADER PROMISES, CHECKED ON WHAT SHIPS RATHER THAN ON A FIXTURE. ***
+ *
+ * "NUMBERS STAY NUMBERS -- a report that stored "6.31e-6" as text would have made the reader parse a
+ * rendering of a number back into a number, which is the exact indirection this whole thread is about."
+ * gateReport-selfcheck has driven that on a FIXTURE it builds itself since v4394, and on nothing that ships.
+ * MEASURED at v4558 by storing a toFixed()'d row in a live report and re-running the gate: 0 red. Then over
+ * the artefacts themselves -- 260 of 1,265 values, 20.6%, across 13 of the 30 reports, were renderings. The
+ * discipline the module is named for was unchecked in a fifth of what it held.
+ *
+ * A cell is a rendering when it is a STRING that parses whole as a number. The test is deliberately narrow
+ * in three directions, each of which is a thing it must NOT flag:
+ *   * a label that merely contains digits ("gate-fast", "v4485", "RTX-gate") is not a number;
+ *   * "Infinity" and "NaN" are excluded, because JSON cannot carry them as numbers at all -- a report
+ *     needing one has no other option, and flagging it would be demanding the impossible;
+ *   * a genuinely textual column is untouched, because the test is on the VALUE and not on the heading.
+ * What it does flag, correctly, is a vector packed into one cell -- "0.125, 0.500, 0.375" does not parse
+ * whole, so that shape is caught by the DRAWABLE check instead and both were repaired at v4558.
+ */
+const WHOLE_NUMBER = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
+export function renderedNumbers(doc) {
+    const out = [];
+    for (const t of (doc && doc.tables) || [])
+        for (const row of t.rows || [])
+            for (let i = 0; i < row.length; i++) {
+                const v = row[i];
+                if (typeof v === "string" && WHOLE_NUMBER.test(v.trim()))
+                    out.push({ table: t.title, column: (t.columns || [])[i] ?? i, value: v });
+            }
+    return out;
+}
+
 /** Every report currently on disk, for the page and for the census that counts them. */
 export function reports() {
     const dir = path.join(ENG, REPORT_DIR);

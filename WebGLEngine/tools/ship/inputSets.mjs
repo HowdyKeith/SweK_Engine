@@ -163,6 +163,18 @@ export function encode(gates, meta = {}) {
         out[g] = { r, d, ms: e.probeMs, exit: e.exit };
         for (const f of FLAGS) out[g][f] = e[f];
     }
+    // *** v4558 -- encode(decode(x)) LOST THE CONFLICT LIST WHILE KEEPING EVERY SENTINEL. *** A conflict is
+    // detected by two gates DISAGREEING during this encode; after a decode they no longer disagree, because
+    // both now read the same stored `!conflict`. So a record round-tripped through this module kept all 81
+    // sentinels -- 290 gates still correctly refused, no false green -- and declared ZERO conflicts, which
+    // made the file's own list stop describing its own contents and made recordInputs' conflictReport say
+    // the pass was clean. FOUND by re-encoding the live record to drop one bad entry and noticing the count
+    // go 21 -> 0 while the sentinels stayed.
+    //
+    // A STORED SENTINEL IS A CONFLICT WHETHER OR NOT THIS PASS IS THE ONE THAT SAW IT. The disagreement
+    // above adds to the set; so does a value that arrived already refusing.
+    for (let i = 0; i < paths.length; i++)
+        if (hashes[i] === CONFLICT || dirHashes[i] === CONFLICT) conflicts.add(paths[i]);
     return { ...meta, format: FORMAT,
              conflicts: [...conflicts].sort(),
              paths, hashes: hashes.map((h) => h ?? null), dirHashes: dirHashes.map((h) => h ?? null), gates: out };
