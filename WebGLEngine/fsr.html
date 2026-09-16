@@ -43,6 +43,7 @@
     <select id="camera">
       <option value="static">camera: static</option>
       <option value="pan">camera: panning 0.75 px/frame</option>
+      <option value="dolly">camera: dollying (perspective, two planes)</option>
     </select>
     <select id="ratio">
       <option value="2">upscale 2&times;</option>
@@ -55,6 +56,7 @@
   <div class="stat" id="metric">idle</div>
   <div class="stat" id="engine">spatial engine: starting up</div>
   <div class="stat" id="accstat"></div>
+  <div class="stat" id="disstat"></div>
   <div class="stat" id="over"></div>
 </div>
 <div class="panes">
@@ -89,8 +91,13 @@
   on the kernel gate&rsquo;s easier one &mdash; so the switch buys speed, not a different result. Chained on one
   encoder the intermediate never returns to the CPU: measured at 64&times;64 &rarr; 128&times;128 on a software
   adapter, 4.6&ndash;6.9 ms against 28.8&ndash;35.1 ms for the CPU, and a third off the two-call form.
-  <span class="warn">The temporal pane stays on the CPU whatever the adapter does</span>, because the resolve and
-  the accumulation have no WGSL at all.
+  <span class="warn">This paragraph said until v4638 that the temporal pane stays on the CPU whatever the adapter
+  does, &ldquo;because the resolve and the accumulation have no WGSL at all&rdquo;.</span> They have had WGSL since
+  v4552 and a caller since v4590, and the script below has called <code>tgpu.resolveAndAccumulate</code> ever
+  since &mdash; the comment beside that call was corrected in both of the rounds that changed it and this
+  sentence, thirty lines up and the only version a reader sees, was not. The resolve and the accumulation run
+  chained on one encoder when there is an adapter. The one pane that is CPU-only is the new <b>dolly</b>: the
+  reject chain has a WGSL twin and no runner on this page yet, which is the next rung rather than a claim.
   <br><br>
   <b>RCAS leaves [0,1] and the canvas was hiding it.</b> RCAS_LIMIT keeps the sharpening resolve off the pole of
   1/(4&middot;lobe+1); it does not bound the range. The line under the counters reports the real range &mdash; on
@@ -101,8 +108,43 @@
   CPU and on an adapter &mdash; the WGSL kernel counts them in an atomic buffer and the gate holds the two
   <i>equal</i>, not merely close, because they are integers. <i>rejected offscreen</i> should be
   exactly one column &mdash; 192 pixels &mdash; while panning and zero while static; anything else means the motion
-  vectors disagree with the camera. This page shipped once with that sign inverted, scoring 11.5 dB while panning,
+  vectors disagree with the camera. <b>That reading is about the panning camera and does not carry to the dolly</b>,
+  which reads zero: a perspective frustum widens with depth, so at this dolly rate nothing leaves the frame at all. This page shipped once with that sign inverted, scoring 11.5 dB while panning,
   and the counter said so before the picture did.
+  <br><br>
+  <b>The dolly is the one camera that can disocclude anything, and it took both halves to get there.</b> The
+  reject pass in <code>render/temporalReject.mjs</code> asks whether the surface a pixel reprojects onto is the
+  one that was there last frame. For that question to ever have a non-trivial answer two surfaces have to move
+  <i>different</i> screen distances &mdash; that is parallax &mdash; and all four cells were measured before any
+  of this was written: orthographic over a flat scene (this page&rsquo;s pan) <b>0</b>, orthographic over two
+  planes <b>0</b>, perspective over one plane <b>0</b>, perspective over two planes <b>106</b>. The second cell
+  is the one worth reading: an orthographic camera moving parallel to the image plane cannot reveal a
+  disocclusion <i>however much depth the scene has</i>, because the image and the depth buffer translate
+  together. Depth alone is not the condition and perspective alone is not the condition.
+  <br><br>
+  So the dolly puts the pattern on two planes, four and eight units out, and walks the camera sideways. The
+  <i>disocclusion</i> line reads <b>106 genuine</b> &mdash; a one-pixel sliver down the slab&rsquo;s trailing
+  edge, 106 pixels tall &mdash; and <b>0 on every eighth frame</b>, which is not flakiness: the edge advances
+  0.879 display pixels per frame, so in eight frames it crosses seven pixel boundaries and the depth buffer is
+  nearest-sampled. The threshold is <i>derived</i> from the camera, a quarter of the near/far clip-z gap
+  (0.00626 here), because clip z is nonlinear &mdash; the same pair of planes at forty and eighty units apart
+  gives a gap ten times smaller, and a constant tuned here would silently flag nothing there.
+  <br><br>
+  <b>What the reject chain is worth, honestly: nothing you can see, and that is the point.</b> 106 pixels is
+  0.29% of the frame, so switching the chain off moves PSNR from 16.27 dB to 16.26 dB on the zone plate &mdash;
+  the metric cannot see it. The <i>counter</i> can: <i>history discarded</i> goes 106 to 0. This is the same
+  argument the accumulate counters make one paragraph up, and the dolly is where it stops being rhetorical.
+  <br><br>
+  <b>And a sign was wrong again, and again a counter said so first.</b> The dolly jitters its <i>matrix</i>
+  through <code>jitterProjection</code> where the other two cameras jitter the <i>scene sampler</i>, and this
+  page is the first thing in the tree to use <code>jitterProjection</code> and
+  <code>resolveJitterAwareCPU</code> together. They read the same offset in opposite senses &mdash; one moves
+  the image, the other moves the sample &mdash; and <code>render/jitter.mjs</code>&rsquo;s convention block fixed
+  the units and the axes and never said which. Paired without negating one, the zone plate scored
+  <b>11.61 dB</b> and the neighbourhood clamp fired on <b>34,191 of 36,864 pixels</b> on smooth content;
+  negated, <b>16.27 dB</b> and <b>466</b>. Both modules are gated and both are right on their own terms. The
+  clamp counter is what made it visible, three rounds after the same page shipped a motion-vector sign
+  inverted and scored 11.5 dB.
   <br><br>
   <b>PSNR is the wrong metric for EASU and the right one for the temporal path.</b> EASU is an edge-adaptive filter
   meant to look sharp, not to minimise L2 against a supersampled truth; it scores below bilinear even on smooth
@@ -119,7 +161,15 @@ import { describeWebGPU, showOriginBanner } from "/ui/webgpuProbe.mjs";
 import { FSRGPU, rangeOf } from "./fx/fsr/fsrGPU.js";
 import { TemporalGPU } from "./render/temporalGPU.mjs";
 import { MotionVectorsGPU, orthoPanVP } from "./render/motionVectorsGPU.mjs";
-import { motionVectorsCPU, mat4Invert } from "./render/motionVectors.mjs";
+import { motionVectorsCPU, mat4Invert, transform4 } from "./render/motionVectors.mjs";
+// *** v4638 -- THE PAGE GETS A SECOND CAMERA, AND IT IS THE TREE'S OWN. *** render/rasterProbe.js's viewProj is
+// what render/jitter-selfcheck, render/motionVectors-selfcheck, render/motionVectorsGPU-selfcheck and
+// render/temporalRejectGPU-selfcheck all drive as their perspective camera; the page was the last thing in the
+// chain still on an orthographic one. Browser-safe and zero-import by its own line 21, so this costs nothing at
+// module load -- the RasterProbe class in the same file touches WebGL only inside its constructor.
+import { viewProj } from "./render/rasterProbe.js";
+import { jitterProjection } from "./render/jitter.mjs";
+import { disocclusionCPU, historyFactorCPU, rectifiedAccumulateCPU } from "./render/temporalReject.mjs";
 
 const D = 192;                                  // display resolution
 const $ = (id) => document.getElementById(id);
@@ -133,6 +183,109 @@ function scene(u, v, kind) {
     else if (kind === "checker") s = ((Math.floor(u * D) + Math.floor(v * D)) & 1) ? 0.9 : 0.1;
     else                         s = 0.5 + 0.5 * Math.cos(90 * (x * x + y * y));
     return [s, s * 0.8 + 0.1, 1 - s, 1];
+}
+
+// ---- THE PERSPECTIVE SCENE: TWO PLANES, WHICH IS THE SMALLEST THING THAT HAS PARALLAX ----------------------
+//
+// *** WHAT THE REJECT CHAIN NEEDED WAS NEVER GEOMETRY, IT WAS TWO SURFACES AT DIFFERENT DEPTHS SEEN THROUGH A
+// CAMERA THAT DIVIDES BY ONE. *** render/temporalReject.mjs's disocclusion test compares the depth a surface
+// WOULD have had last frame (motion's fourth channel) against the depth actually recorded then. For that
+// comparison to ever be non-zero the two surfaces have to move DIFFERENT screen distances, and that is
+// parallax. Measured here, all four cells, before any of this was written:
+//
+//     camera        scene                     genuine disocclusions
+//     ortho         flat (this page's pan)     0
+//     ortho         two planes                 0      <- du near and du far agree to 0.0e+0
+//     perspective   one plane                  0      <- 192 offscreen, nothing else
+//     perspective   two planes                 106
+//
+// THE SECOND ROW IS THE ONE WORTH READING. An orthographic camera translating parallel to the image plane
+// cannot reveal a disocclusion however much depth the scene has, because the image and the depth field
+// translate together: the slab's edge moves exactly as far as the pixel's reprojection does, so the surface
+// found at the reprojected position is the same surface. Depth alone is not the condition and perspective
+// alone is not the condition. PARALLAX is, and it needs both.
+//
+// The pattern is the same scene() the other two cameras sample; it is laid on each plane in that plane's own
+// coordinates, so the zone plate, the smooth field and the checker all still say what they say.
+const Y_NEAR = -4, Y_FAR = 0;                  // world y of the slab and the background; the eye sits at y = -8
+const SLAB_X = [-1.2, 1.2], SLAB_Z = [-1.2, 1.2];
+const NEAR = 0.1, FAR = 100, TANFOV = Math.tan(0.5), DOLLY = 0.02;   // world units per frame along +x
+
+/** The dolly camera at frame f -- the basis render/jitter-selfcheck.mjs drives, looking down +y. */
+const dollyVP = (f) => viewProj([f * DOLLY, -8, 0], [0, 1, 0], [1, 0, 0], [0, 0, 1], TANFOV, 1, NEAR, FAR);
+
+/** Where this pixel's ray meets the scene: the slab if it covers it, the background otherwise. */
+function hit(inv, u, v) {
+    const nx = 2 * u - 1, ny = 1 - 2 * v;
+    const a = transform4(inv, nx, ny, -1, 1), b = transform4(inv, nx, ny, 1, 1);
+    const ax = a[0] / a[3], ay = a[1] / a[3], az = a[2] / a[3];
+    const bx = b[0] / b[3], by = b[1] / b[3], bz = b[2] / b[3];
+    const at = (py) => { const t = (py - ay) / (by - ay); return [ax + t * (bx - ax), py, az + t * (bz - az)]; };
+    const n = at(Y_NEAR);
+    const onSlab = n[0] >= SLAB_X[0] && n[0] <= SLAB_X[1] && n[2] >= SLAB_Z[0] && n[2] <= SLAB_Z[1];
+    return onSlab ? n : at(Y_FAR);
+}
+
+/** The pattern's (u, v) for a world point on either plane -- each plane carries its own copy at its own scale. */
+const patternUV = (p) => p[1] === Y_NEAR
+    ? [(p[0] - SLAB_X[0]) / (SLAB_X[1] - SLAB_X[0]), (p[2] - SLAB_Z[0]) / (SLAB_Z[1] - SLAB_Z[0])]
+    : [(p[0] + 6) / 12, (p[2] + 6) / 12];
+
+/** Colour at R x R through a (jittered) view-projection. */
+function renderPersp(R, vp, kind) {
+    const inv = mat4Invert(vp);
+    if (!inv) throw new Error("fsr.html: the dolly camera is singular -- mat4Invert returns null, not a matrix");
+    const out = new Float32Array(R * R * 4);
+    for (let y = 0; y < R; y++) for (let x = 0; x < R; x++) {
+        const [pu, pv] = patternUV(hit(inv, (x + 0.5) / R, (y + 0.5) / R));
+        const px = scene(pu, pv, kind);
+        for (let c = 0; c < 4; c++) out[(y * R + x) * 4 + c] = px[c];
+    }
+    return out;
+}
+
+/** Clip-space z at D x D through the UNJITTERED camera -- what motionVectorsCPU and disocclusionCPU read. */
+function renderDepth(vp) {
+    const inv = mat4Invert(vp);
+    const d = new Float32Array(D * D);
+    for (let y = 0; y < D; y++) for (let x = 0; x < D; x++) {
+        const p = hit(inv, (x + 0.5) / D, (y + 0.5) / D);
+        const q = transform4(vp, p[0], p[1], p[2], 1);
+        d[y * D + x] = q[2] / q[3];
+    }
+    return d;
+}
+
+/** The 8x8 supersampled truth through the same camera, so the reference moves with it. */
+function truthPersp(vp, kind) {
+    const inv = mat4Invert(vp);
+    const out = new Float32Array(D * D * 4), N = 8;
+    for (let y = 0; y < D; y++) for (let x = 0; x < D; x++) {
+        const acc = [0, 0, 0, 0];
+        for (let sy = 0; sy < N; sy++) for (let sx = 0; sx < N; sx++) {
+            const [pu, pv] = patternUV(hit(inv, (x + (sx + 0.5) / N) / D, (y + (sy + 0.5) / N) / D));
+            const px = scene(pu, pv, kind);
+            for (let c = 0; c < 4; c++) acc[c] += px[c];
+        }
+        for (let c = 0; c < 4; c++) out[(y * D + x) * 4 + c] = acc[c] / (N * N);
+    }
+    return out;
+}
+
+/**
+ * The threshold, DERIVED from the camera rather than chosen. It is in clip-space z, which is nonlinear, so a
+ * constant tuned at one distance is wrong at another -- the two planes here are 4 and 8 units out and give a
+ * gap of 0.0250250; the same pair at 40 and 80 gives 0.0025025, ten times smaller. A quarter of the gap is
+ * render/temporalRejectGPU-selfcheck.mjs's own choice for this camera.
+ *
+ * *** AND A ZERO GAP THROWS RATHER THAN REPORTING ZERO. *** disocclusionCPU refuses a threshold that is not
+ * positive, so a scene whose two surfaces land at the same clip depth would take the page down instead of
+ * saying "nothing was disoccluded". The guard is here, not there.
+ */
+function dollyThreshold(vp) {
+    const z = (wy) => { const q = transform4(vp, 0, wy, 0, 1); return q[2] / q[3]; };
+    const gap = Math.abs(z(Y_NEAR) - z(Y_FAR));
+    return gap > 1e-4 ? 0.25 * gap : null;
 }
 
 /** One jittered render at R x R, point-sampled -- exactly what a jittered projection does. */
@@ -173,6 +326,11 @@ function draw(c, buf) {
 }
 
 let running = false, frame = 0, hist = null, jit = null, ref = null, R = 96, PAN = 0.75;
+// *** v4638 -- THE SECOND PIECE OF PER-FRAME STATE THE REJECT CHAIN NEEDS, AND THE ONE EASIEST TO FORGET. ***
+// disocclusionCPU compares the depth a surface WOULD have had last frame against the depth RECORDED then, so
+// the page has to keep last frame's depth buffer alongside last frame's colour. Null on the first frame for
+// the same reason `hist` is: there is no previous depth, and a zero-filled one would be believed.
+let prevDepth = null;
 // The scene is flat: it is a function of (u, v) with no z at all, so every pixel sits on one plane and the
 // reprojection is a pure translation. Allocated once -- it never changes.
 const FLAT_DEPTH = new Float32Array(D * D);
@@ -238,11 +396,14 @@ async function rcas(rgba, w, h, sharp) {
 
 async function reset() {
     const kind = $("scene").value, ratio = parseFloat($("ratio").value);
+    const dolly = $("camera").value === "dolly";
     R = Math.max(8, Math.round(D / ratio));
     jit = makeJitterState(ratio); hist = null; frame = 0;
-    ref = truth(kind, 0);
+    prevDepth = null;                            // the depth history goes with the colour history, or frame 1
+                                                 // compares this camera's depths against the last camera's
+    ref = dolly ? truthPersp(dollyVP(0), kind) : truth(kind, 0);
     draw(cRef, ref);
-    const one = render(R, 0, 0, kind, 0);
+    const one = dolly ? renderPersp(R, dollyVP(0), kind) : render(R, 0, 0, kind, 0);
     const bil = bilinearCPU(one, R, R, D, D).data;
     const F = await fsr1(one, R, R, D, D, parseFloat($("sharp").value));
     const fsr = F.data;
@@ -259,14 +420,42 @@ async function reset() {
     cTmp.clearRect(0, 0, D, D);
     $("metric").textContent = `render ${R}x${R} -> display ${D}x${D}   |   frame 0`;
     $("accstat").textContent = "";
+    $("disstat").textContent = "";
 }
 
 async function tick() {
     if (!running) return;
-    const kind = $("scene").value, panning = $("camera").value === "pan";
+    const kind = $("scene").value, cam = $("camera").value;
+    const panning = cam === "pan", dolly = cam === "dolly";
     const dx = panning ? frame * PAN : 0;
     const [jx, jy] = jitterCurrent(jit);
-    const frameSrc = render(R, jx, jy, kind, dx);
+    // *** JITTERED FOR THE RENDER, UNJITTERED FOR THE MOTION -- the pairing render/jitter.mjs exists to enforce
+    // and that this page has never exercised, because until now it jittered the SCENE SAMPLER and not a matrix.
+    // jitterProjection's renderW/renderH are the RENDER resolution: passing D would scale every offset by R/D
+    // and quietly halve the convergence. It is a clip-space translation, so it shifts NDC by exactly (jx, jy)
+    // at every depth -- which is why a perspective camera needs no different treatment here than an ortho one.
+    //
+    // *** AND THE OFFSET IS NEGATED, BECAUSE jitterProjection AND resolveJitterAwareCPU READ THE SAME NUMBER IN
+    // OPPOSITE SENSES, AND THIS PAGE IS THE FIRST THING EVER TO USE BOTH. ***
+    //
+    // render/jitter.mjs fixes the UNITS and the AXES -- "RENDER-RESOLUTION PIXELS, x right and y DOWN" -- and
+    // says nothing about the SENSE: whether a positive jx moves the SAMPLE right or the IMAGE right. Its two
+    // consumers answered that differently and both are self-consistent, so both gates pass:
+    //
+    //   jitterProjection      adds 2*jx/rw to clip x, so a positive jx moves the IMAGE right by jx pixels
+    //   resolveJitterAwareCPU computes `sx = u*rw - 0.5 - jx`, so it assumes a positive jx moved the SAMPLE right
+    //   render() above        samples at (x + 0.5 + jx)/R, which is the resolve's sense -- they agree
+    //
+    // MEASURED on a smooth plane at 64 -> 128, one frame, rms against the unjittered truth: the resolve's own
+    // floor is 8.4187e-4; jitterProjection(+j) resolved with (+j) reads 8.2060e-3, TEN TIMES the floor and not
+    // a reconstruction; negated it reads 1.0318e-3, which is the floor plus a quarter. Nothing in either module
+    // is wrong -- the sentence they share does not say which way the offset points, and until this page there
+    // was no caller of both to find out.
+    const vpCur = dolly ? dollyVP(frame) : null;
+    const vpPrev = dolly ? dollyVP(Math.max(0, frame - 1)) : null;
+    const frameSrc = dolly
+        ? renderPersp(R, jitterProjection(vpCur, -jx, -jy, R, R), kind)
+        : render(R, jx, jy, kind, dx);
 
     // *** THE MOTION FIELD IS DERIVED NOW, AND THIS IS THE LINE THAT COST A ROUND. ***
     //
@@ -287,21 +476,55 @@ async function tick() {
     // field cannot get the sign wrong for free, and render/motionVectorsGPU-selfcheck.mjs drives the reversed
     // camera as a control so that exact mistake fails a row instead of costing a round.
     const tCur = (panning ? frame : 0) * PAN / D, tPrev = (panning ? Math.max(0, frame - 1) : 0) * PAN / D;
-    const motion = mgpu
-        ? (await mgpu.pan({ depth: FLAT_DEPTH, w: D, h: D, tCur, tPrev })).data
-        : motionVectorsCPU(FLAT_DEPTH, D, D, mat4Invert(orthoPanVP(tCur)), orthoPanVP(tPrev)).data;
+    // The dolly builds its depth buffer first, because the motion field is a function OF it: motionVectorsCPU
+    // unprojects each pixel through the current inverse and reprojects through the previous forward, and the
+    // fourth channel it writes -- the depth this surface would have had last frame -- is the whole disocclusion
+    // test. The two matrices are (current INVERSE, previous FORWARD) and swapping them gives motion of exactly
+    // the right magnitude and the wrong sign, which an orthographic pan could not have shown.
+    const depth = dolly ? renderDepth(vpCur) : null;
+    const motion = dolly
+        ? motionVectorsCPU(depth, D, D, mat4Invert(vpCur), vpPrev).data
+        : mgpu
+            ? (await mgpu.pan({ depth: FLAT_DEPTH, w: D, h: D, tCur, tPrev })).data
+            : motionVectorsCPU(FLAT_DEPTH, D, D, mat4Invert(orthoPanVP(tCur)), orthoPanVP(tPrev)).data;
+
+    // *** THE REJECT CHAIN, WHICH NOTHING OUTSIDE A GATE HAS EVER RUN. *** Three steps and the middle one is
+    // the one that gets skipped: DISOCCLUSION writes 1 = "this history is WRONG", RECTIFY reads 1 = "history
+    // TRUSTED", and feeding the mask straight in as the factor discards every pixel's history on every frame.
+    // historyFactorCPU is the inversion, f *= 1 - mask, and it is not optional.
+    let disStats = null, factor = null;
+    const threshold = dolly ? dollyThreshold(vpCur) : null;
+    if (dolly && prevDepth && threshold) {
+        const dis = disocclusionCPU({ motion, prevDepth, w: D, h: D, threshold, nearerIsLess: true });
+        // nearerIsLess: true because rasterProbe.js's viewProj is GL-style forward-Z -- P[10] is
+        // -(far+near)/(far-near) -- so a smaller clip z is nearer. Inverted it reports the exact complement,
+        // which looks like a working feature until something counts it.
+        factor = historyFactorCPU({ disocclusion: dis.data, n: D * D });
+        // flagged counts three different things and only one of them is a disocclusion; noHistory is the other
+        // two (motion invalid, reprojected offscreen), so the genuine count is the difference.
+        disStats = { genuine: dis.flagged - dis.noHistory, noHistory: dis.noHistory, threshold };
+    }
 
     const alpha = parseFloat($("alpha").value);
     // ONE ENCODER on the device: the resolved display-resolution frame never crosses back to the CPU between
     // the two passes. On the CPU it is the same two calls in the same order, and the gate holds them equal.
-    const acc = tgpu
-        ? await tgpu.resolveAndAccumulate({ src: frameSrc, rw: R, rh: R, dw: D, dh: D, jitter: [jx, jy],
-                                            history: hist, motion, alpha, counted: true })
-        : temporalAccumulateCPU({ current: resolveJitterAwareCPU({ src: frameSrc, rw: R, rh: R, dw: D, dh: D, jitter: [jx, jy] }).data,
-                                  history: hist, motion, w: D, h: D, alpha });
+    // *** THE DOLLY TAKES rectifiedAccumulateCPU, WHICH IS A DIFFERENT FUNCTION FROM THE ONE ABOVE. *** It is
+    // the only one that accepts a `factor`, and it carries two counters the plain accumulate has no notion of:
+    // `discarded` (factor exactly 0, history thrown away entirely) and `relaxed`. The other two cameras keep
+    // the path they have always taken, so every number this page's note quotes for them still means what it said.
+    const acc = dolly
+        ? rectifiedAccumulateCPU({ current: resolveJitterAwareCPU({ src: frameSrc, rw: R, rh: R, dw: D, dh: D, jitter: [jx, jy] }).data,
+                                   history: hist, motion, factor, w: D, h: D, alpha, space: "ycocg" })
+        : tgpu
+            ? await tgpu.resolveAndAccumulate({ src: frameSrc, rw: R, rh: R, dw: D, dh: D, jitter: [jx, jy],
+                                                history: hist, motion, alpha, counted: true })
+            : temporalAccumulateCPU({ current: resolveJitterAwareCPU({ src: frameSrc, rw: R, rh: R, dw: D, dh: D, jitter: [jx, jy] }).data,
+                                      history: hist, motion, w: D, h: D, alpha });
     hist = acc.data; frame++; advanceJitter(jit);
+    if (dolly) prevDepth = depth;                // THIS frame's depth is next frame's recorded depth
 
     if (panning) ref = truth(kind, dx);          // the truth moves with the camera
+    if (dolly) ref = truthPersp(vpCur, kind);    // ...and so does the dolly's, through the same matrix
     const shown = (await rcas(hist, D, D, parseFloat($("sharp").value))).data;
     draw(cTmp, shown);
     $("dTmp").textContent = psnr(shown, ref).toFixed(2) + " dB";
@@ -311,8 +534,17 @@ async function tick() {
     // Counted on either engine since v4591 -- and still NULL rather than zeroes if a caller ever asks for an
     // uncounted pass, because a frame that reused nothing and a frame nobody counted must not read the same.
     $("accstat").textContent = acc.stats
-        ? `accumulate: reused ${acc.stats.reused}, rejected offscreen ${acc.stats.rejectedOffscreen}, rejected invalid ${acc.stats.rejectedInvalid}, clamped by the neighbourhood box ${acc.stats.clamped}`
+        ? `accumulate: reused ${acc.stats.reused}, rejected offscreen ${acc.stats.rejectedOffscreen}, rejected invalid ${acc.stats.rejectedInvalid}, clamped by the neighbourhood box ${acc.stats.clamped}` +
+          (acc.stats.discarded !== undefined ? `, history discarded ${acc.stats.discarded}` : "")
         : "accumulate counters: not counted on this pass (not zero: uncounted)";
+    // *** THE COUNTER THIS WHOLE ROUND EXISTS TO MAKE NON-ZERO. *** Null rather than 0 before there is a
+    // previous depth to compare against, for the same reason the accumulate counters are null on an uncounted
+    // pass: a frame that disoccluded nothing and a frame nobody could test must not read the same.
+    $("disstat").textContent = !dolly ? ""
+        : disStats
+            ? `disocclusion: ${disStats.genuine} genuine, ${disStats.noHistory} with no history at all (invalid or offscreen), threshold ${disStats.threshold.toFixed(5)} in clip z`
+            : threshold === null ? "disocclusion: the two planes are at the same clip depth -- no test is possible"
+                                 : "disocclusion: no previous depth yet (frame 0 is not zero disocclusions, it is untestable)";
     requestAnimationFrame(tick);
 }
 

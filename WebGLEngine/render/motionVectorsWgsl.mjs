@@ -1,6 +1,11 @@
 // render/motionVectorsWgsl.mjs -- the WGSL half of render/motionVectors.mjs, mirroring motionVectorsCPU statement by
-// statement over flat buffers, in the shape gfx/device.js runs: depth in, (du, dv, valid, 0) out, matrices in a
-// uniform. Every convention is the module's; read its header before changing a sign here.
+// statement over flat buffers, in the shape gfx/device.js runs: depth in, (du, dv, valid, zPrev) out, matrices
+// in a uniform. Every convention is the module's; read its header before changing a sign here.
+//
+// *** v4638 -- THIS LINE SAID `(du, dv, valid, 0) out` WHILE LINE 38 OF THIS FILE WROTE zPrev. *** The
+// kernel below has been correct since 281f6b5f; the sentence at the top of the file describing what the
+// kernel emits was not, and the two sat thirty-six lines apart. A file that contradicts itself about its
+// own output is the cheapest version of this defect to find and the easiest to walk past.
 "use strict";
 
 const MOTION_WGSL = `

@@ -33,10 +33,18 @@ const WG = 8;
  * The view-projection of a camera that PANS A FLAT SCENE, as a column-major 4x4 -- the camera fsr.html has and
  * could not write down. World (x, y) in [0,1]^2, uv running DOWN while clip runs UP:
  *
- *     ndc.x = 2*(wx - t) - 1        ndc.y = 1 - 2*wy        ndc.z = 0, w = 1
+ *     ndc.x = 2*(wx - t) - 1        ndc.y = 1 - 2*wy        ndc.z = wz        w = 1
  *
  * `t` is the pan in UV units. Two of these, one frame apart, are exactly what motionVectorsCPU and MOTION_WGSL
  * want, and they reproduce the page's hand-written du to 0 and its dv to 2.8e-17.
+ *
+ * *** v4638 -- THIS LINE SAID `ndc.z = 0` AND THE MATRIX'S z ROW IS THE IDENTITY. *** (0, 0, 1, 0) passes the
+ * world z straight through; ndc.z is 0 only when the CALLER's depth is 0, which fsr.html's FLAT_DEPTH is, so
+ * the sentence was true of the one caller and false of the matrix. It matters because the whole question a
+ * reader brings here is what this camera does to DEPTH -- render/temporalReject.mjs's disocclusion test is a
+ * comparison of two clip z values -- and "ndc.z = 0" says this camera destroys it. It does not. What an
+ * orthographic camera destroys is the DIFFERENCE between two depths' screen motion, which is parallax, and
+ * that is a property of the x and y rows rather than of the z one.
  */
 export function orthoPanVP(t) {
     return Float32Array.from([

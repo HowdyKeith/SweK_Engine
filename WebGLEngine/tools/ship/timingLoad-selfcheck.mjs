@@ -39,7 +39,16 @@ let fails = 0;
 const ok = (label, cond, detail) => { if (!cond) fails++; console.log(`  ${cond ? "PASS" : "FAIL"}  ${label}${detail ? "   " + detail : ""}`); };
 const report = (s) => console.log(`  ----  ${s}`);
 
-const G = JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "gate-timings.json"), "utf8")).timings;
+// *** v4638 -- `G` IS THE MAP AND THE NOTE IS ON THE FILE, SO HALF THE UNANSWERABLE GUARD BELOW WAS DEAD. ***
+// `.timings` was taken here and `G.note` read at line 222; a map has no `note`, so that half evaluated
+// `undefined` -- falsy -- and only sweep-timings could ever put this gate into its UNANSWERABLE branch. It
+// held while BOTH files carried the union note. The first quick sweep after v4637 rewrote sweep-timings and
+// dropped its note, the guard went false on the strength of the live half alone, and the ratchet began grading
+// a residual whose other input is still a union AND STILL SAYS SO. Found by this gate going red on a round
+// that added one page gate -- a 13 -> 30 jump that one gate cannot explain, which is what said to look at the
+// guard rather than at the number.
+const GFILE = JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "gate-timings.json"), "utf8"));
+const G = GFILE.timings;
 const S = JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "sweep-timings.json"), "utf8"));
 const med = (a) => { const s = a.slice().sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; };
 
@@ -219,13 +228,16 @@ const undated = real.filter((k) => (S.at || {})[k] === UNKNOWN_AT);
     // under 250 ms against 55% of the population. That enrichment is real but MODEST -- it does not on its own
     // account for 13 -> 31, and saying it did would be the kind of cause-without-a-measurement this arc has
     // convicted twice. Stratifying LOAD by duration is the repair, and it is a round, not a merge repair.
-    const bothAreUnions = /UNION/i.test(String(G.note || "")) || /UNION/i.test(String(S.note || ""));
+    // EITHER side being a union makes the ratio unanswerable, which is why this is an OR; the name is kept
+    // because it is what the v4637 note calls it. GFILE, not G: see the top of this file.
+    const bothAreUnions = /UNION/i.test(String(GFILE.note || "")) || /UNION/i.test(String(S.note || ""));
     if (bothAreUnions) {
         report(`residual ${liveSurvivors} against v4576's ${SURVIVORS_V4576.undated + SURVIVORS_V4576.dated} -- ` +
                `${overRes(undated)} of ${undated.length} undated, ${overRes(dated)} of ${dated.length} dated`);
         ok("*** the residual ratchet is UNANSWERABLE while its two inputs are unions rather than single runs ***",
             true,
-            `gate-timings and sweep-timings are both unions after the v4637 merge and say so in their own notes. ` +
+            `${[["gate-timings", GFILE], ["sweep-timings", S]].filter(([, f]) => /UNION/i.test(String(f.note || ""))).map(([n]) => n).join(" and ")} ` +
+            `still carries the union note from the v4637 merge; the other has been rewritten by a single sweep since. ` +
             `The live residual is ${liveSurvivors}; it is REPORTED and not graded, because a ratio between two ` +
             `unions is not the quantity this row watches. It becomes answerable the moment one full sweep runs ` +
             `over the merged tree and writes both files, and the ratchet resumes from whatever that reads.`);

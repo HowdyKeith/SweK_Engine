@@ -14,6 +14,21 @@
 //
 // CONVENTION: offsets are in RENDER-RESOLUTION PIXELS, x right and y DOWN -- the same orientation
 // render/motionVectors.mjs's uv uses, because two orientations across two modules that must agree is the trap.
+//
+// *** v4638 -- AND THAT SENTENCE FIXES THE UNITS AND THE AXES AND NOT THE SENSE, WHICH IS THE HALF THAT BIT. ***
+// It does not say whether a positive jx moves the SAMPLE right or the IMAGE right, and this module's two
+// consumers answered it in opposite directions. Both are self-consistent, so both gates pass:
+//
+//   jitterProjection (below)              adds 2*jx/renderW to clip x, so a positive jx moves the IMAGE right
+//   render/temporalResolve.mjs's resolve   computes `sx = u*rw - 0.5 - jx`, so a positive jx moved the SAMPLE right
+//
+// A caller that jitters its matrix with jitterProjection and then resolves with the SAME [jx, jy] is shifted by
+// two offsets instead of none. MEASURED on a smooth plane, 64 -> 128, one frame, rms against the unjittered
+// truth: the resolve's own floor is 8.4187e-4, the same-sign pairing reads 8.2060e-3 -- ten times the floor --
+// and negating one of them reads 1.0318e-3. NOTHING HERE IS BEING CHANGED: both senses are in use and each is
+// right for its own gate, and flipping either would move a fixture rather than fix a defect. What was missing
+// is the sentence, because until fsr.html's dolly camera at v4638 there was no caller of BOTH to find out.
+// tools/ship/fsrPage-selfcheck.mjs holds the reconstruction measurement above so the next one cannot.
 "use strict";
 
 /**

@@ -3857,6 +3857,39 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // v4399 for this exact reason, four ordinals ago. Registered rather than done here: a merge is the wrong
     // commit in which to change the shape of the thing being merged.
 
+    since321: Object.freeze({
+        at: "v4638", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/fsrPage-selfcheck.mjs"]),
+        widened: Object.freeze(["fsr.html", "render/jitter.mjs", "render/motionVectorsGPU.mjs",
+                                "render/motionVectorsWgsl.mjs", "render/temporalAccumulate.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE TEMPORAL ARC GOT ITS FIRST CALLER, AND fsr.html HAD NO GATE AT ALL. *** Sixteen rounds " +
+                 "built jitter, resolve, accumulate, motion vectors, disocclusion and rectify; every one is gated " +
+                 "against a fixture and the one page a reader opens was graded by nothing. The page now carries a " +
+                 "third camera -- a perspective dolly over two planes -- and it is the first thing in this tree to " +
+                 "run the reject chain outside a gate: 106 genuine disocclusions, a one-pixel sliver down the slab's " +
+                 "trailing edge, against exactly 0 for the two orthographic cameras. ALL FOUR CELLS WERE MEASURED " +
+                 "BEFORE ANY OF IT WAS WRITTEN and the second one is the finding: an orthographic camera moving " +
+                 "parallel to the image plane reveals nothing HOWEVER MUCH DEPTH THE SCENE HAS, because the image " +
+                 "and the depth buffer translate together. Depth alone is not the condition and perspective alone " +
+                 "is not; parallax is, and it needs both. *** AND THE PAGE IS THE FIRST CALLER OF jitterProjection " +
+                 "AND resolveJitterAwareCPU TOGETHER, WHICH READ ONE OFFSET IN OPPOSITE SENSES. *** jitter.mjs's " +
+                 "convention block fixes the units and the axes and never said which way the offset points; " +
+                 "jitterProjection moves the IMAGE, the resolve assumes the SAMPLE moved. Paired without negating " +
+                 "one, the zone plate scored 11.61 dB and the neighbourhood clamp fired on 34,191 of 36,864 pixels; " +
+                 "negated, 16.27 dB and 466. Both modules are gated and both are right alone. Measured as a " +
+                 "reconstruction: the resolve's own floor is 8.4187e-4 rms, same-sign 8.2060e-3, negated 1.0318e-3. " +
+                 "NEITHER IS CHANGED -- both senses are in use and flipping one moves a fixture rather than fixing a " +
+                 "defect; what was missing is the sentence, and the measurement now lives in a gate. FOUR STALE " +
+                 "CONTRACT COPIES corrected alongside: temporalAccumulate.mjs and motionVectorsWgsl.mjs both " +
+                 "documented the motion buffer as (du, dv, valid, 0) when the producer writes zPrev -- the WGSL " +
+                 "header contradicted its own line 38 -- orthoPanVP's docstring said ndc.z = 0 where its z row is " +
+                 "the identity, and fsr.html's note still told readers the temporal pane is CPU-only, which v4590 " +
+                 "falsified and two rounds corrected in the comment beside the call and not in the prose. FIVE " +
+                 "SABOTAGES, all red by name, and the sharpest is the mask fed straight in as the factor: 36,758 " +
+                 "pixels discarded instead of 106, which is the polarity inversion the reject module's own header " +
+                 "warns about.",
+    }),
     since320: Object.freeze({
         at: "v4595", swept: 0, green: 0, red: 0,
         added: Object.freeze([]),

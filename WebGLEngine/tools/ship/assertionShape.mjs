@@ -458,8 +458,13 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
     // and the readings overlap on everything predating the split, so they are run over the merged tree rather
     // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
-    gates: 1736, usesOk: 1715, definesOk: 1707, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1608, condFirst: 91, unknownSignature: 16,
+    // v4638 -- RE-TAKEN for tools/ship/fsrPage-selfcheck.mjs, the temporal arc's first page gate: 1736 -> 1737,
+    // usesOk 1715 -> 1716, definesOk 1707 -> 1708, nameFirst 1608 -> 1609. One gate arrived and four of the
+    // nine rows moved by one; the five that did not (distinctDefinitions, condFirst, unknownSignature,
+    // importsOk, suspects) are the ones that say the new gate uses the tree's own assertion shape rather than
+    // inventing a tenth. That is what this census is for, and it is the reason the row compares all nine.
+    gates: 1737, usesOk: 1716, definesOk: 1708, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1609, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

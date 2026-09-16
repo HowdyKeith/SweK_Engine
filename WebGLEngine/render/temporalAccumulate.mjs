@@ -41,7 +41,15 @@ export function sampleBilinear(buf, w, h, u, v) {
  * nothing is blended, because there is nothing to blend with. (render/jitter.mjs and render/motionVectors.mjs both
  * carry the same rule; a zero-filled history would be believed and would darken the first frames.)
  *
- * `motion` is w*h*4 as render/motionVectors.mjs writes it: (du, dv, valid, 0).
+ * `motion` is w*h*4 as render/motionVectors.mjs writes it: (du, dv, valid, zPrev).
+ *
+ * *** v4638 -- THIS SAID `(du, dv, valid, 0)` AND THE PRODUCER STOPPED WRITING A 0 THE DAY AFTER IT WAS
+ * WRITTEN. *** The docstring landed at 9bec8866 (2026-09-09), when the fourth channel really was unused;
+ * 281f6b5f (2026-09-10) made motionVectors.mjs:130 write `q[2] / q[3]`, the clip depth this surface would
+ * have had last frame, and nothing came back here. THIS FUNCTION does not read the channel, so nothing went
+ * wrong in the code -- what went wrong is that the sentence a reader consults to learn what the buffer holds
+ * told them it holds nothing. render/temporalReject.mjs's whole disocclusion test is one subtraction from
+ * that channel, so a reader wiring the reject chain from this docstring would conclude it cannot be done.
  */
 export function temporalAccumulateCPU({ current, history, motion, w, h, alpha, clampToNeighbourhood = true }) {
     const out = new Float32Array(w * h * 4);
