@@ -183,6 +183,54 @@ export const PLAYER_BODY_AT_V4549 = Object.freeze({
     // the cost, measured
     canStandAtMicroseconds: 0.115,
     callsPerFrame: 3,
+    // *** v4562 -- THE TEST IS SWEPT NOW, AND THE THING IT FIXES IS A RESONANCE RATHER THAN A THRESHOLD. ***
+    //
+    // v4549 recorded the shape from one side -- a radius below the per-frame step does not reliably block --
+    // and the same arithmetic runs the other way: a STEP long enough to clear the band in which the disc
+    // overlaps the wall crosses a solid voxel with no sample inside it. The band is 1 + 2r wide, so whether
+    // a step skips it depends on WHERE THE BODY STARTED, and the failure is not monotone in the step at all.
+    // Measured over 120 starting offsets per cell, walking straight at one voxel of wall, ONLY the step
+    // changing -- and these are pre-repair readings on the post-repair fixture, so the two halves compare:
+    //
+    //     per-frame step        0.083  0.233   1.0    2.5    4.0    10     100    1000
+    //     straight at a wall        0      0     0     73    120    120    120    120
+    //     45 degrees at a wall      0      0     0      0      0     80    120    120
+    //     a ONE-CELL pillar         0      0     0     73    120    120    120    120
+    //
+    // SEVENTY-THREE OF 120 AT 2.5 AND ZERO AT 3.0 in an earlier sweep of the same shape: a bisection for
+    // "the step at which it breaks" finds an artefact of the start position, and my first attempt did
+    // exactly that and reported 3.45. The diagonal needs a larger step because its per-axis component is
+    // smaller by root two, which is why it is measured separately rather than assumed to be the same case.
+    sweptAtV4562: true,
+    // *** WHICH OF THESE A GATE RE-DERIVES, SAID OUTRIGHT. *** The 2.5 reading is re-taken over 120 phases
+    // on every run of playerGround-selfcheck, because it is the headline and the one that could drift. The
+    // rest were taken ONCE, by hand, and the gate does not reproduce them: re-deriving the 1000 reading
+    // costs a thousand substeps per frame times 1,440 runs, which took the section from 1.0 s to 44 s
+    // before it was sized. A record that does not say which of its numbers are live is a record whose
+    // reader cannot tell a measurement from a memory.
+    tunnelledBeforeOf120: Object.freeze({ "2.5": 73, "4": 120, "10": 120, "100": 120, "1000": 120 }),
+    reDerivedEveryRun: Object.freeze(["2.5"]),
+    tunnelledAfterOf120: 0,                 // every step, every approach, every phase
+    diagonalTunnelledBeforeOf120: Object.freeze({ "10": 80, "100": 120, "1000": 120 }),
+    // *** THE COST IS THE STEP, AND THAT IS THE TRADE RATHER THAN A FOOTNOTE. *** n is
+    // ceil(len / SWEEP_MAX_STEP), so the guarantee is bought in probes in proportion to how far the body
+    // wants to go in one frame. At every shipped speed that is ONE substep and the fix is free; a teleport
+    // of a thousand units would be a thousand. Nothing in the tree teleports THROUGH this method -- _extMove
+    // assigns position directly and never asks -- so the case is named rather than capped, because capping
+    // the substeps would put the tunnel back for exactly the step that needs the sweep most.
+    substepsAreProportionalToTheStep: true,
+    substepsAtAThousandUnitStep: 1000,
+    // *** AND IT COSTS NOTHING WHERE ANYBODY PLAYS. *** One substep at every shipped speed at 60 Hz, which
+    // is the same single pair of tests the destination-only version did. The second substep arrives at 6 fps
+    // for the player's sprint and 10 fps for the kaiju's, which is exactly when it is wanted.
+    substepsAtSixtyHz: 1,
+    substepsAtKaijuSprintSixFps: 3,
+    // *** THE FIXTURE WAS WRONG BEFORE THE MEASUREMENT WAS RIGHT. *** The first harness painted a FINITE
+    // floor, so a body blocked by the wall slid along it, walked off the end, fell, and crossed the wall's x
+    // in MID-AIR BELOW IT -- and the harness scored that as tunnelling, 120 of 120 on the diagonal, against
+    // code that was blocking correctly. The floor and the wall are functions of the coordinate now, so there
+    // is no edge to fall off. A fixture with a boundary measures its own boundary.
+    firstFixtureHadAnEdge: true,
 });
 
 /**
@@ -471,6 +519,12 @@ export class Camera {
      *  describe the same body rather than two numbers nobody compared -- the v4547 lesson applied to a
      *  quantity that did not exist on this side at all. */
     static BODY_RADIUS = 0.4;
+
+    /** *** THE LONGEST HOP _stepHorizontal WILL TAKE WITHOUT LOOKING. *** One cell, because one cell is the
+     *  thinnest thing this world can be made of: the band in which a body's disc overlaps a one-voxel wall is
+     *  1 + 2r wide, so samples this far apart cannot straddle it. Larger would leave a gap a fast body can
+     *  resonate through; smaller would buy nothing and cost probes. */
+    static SWEEP_MAX_STEP = 1.0;
 
     /**
      * *** THE CREATURE'S HEIGHT, ONCE, FOR THE CAMERA AND FOR THE COLLISION. *** v4554 recorded the
@@ -2110,11 +2164,49 @@ export class Camera {
             const t = this._stepTargetAt(nx, nz, feetY);
             return this._bodyFitsAt(nx, t === null ? feetY : t, nz, bodyCells);
         };
-        const wantX = x + dx, wantZ = z + dz;
-        if (fits(wantX, wantZ)) return { x: wantX, z: wantZ };
+        // *** v4562 -- SWEPT, BECAUSE A DESTINATION TEST DOES NOT MISS A WALL BY A LITTLE, IT MISSES IT
+        // ENTIRELY. *** This tested where the body WANTED to be and nothing in between, so a step long
+        // enough to clear the band in which the disc touches the wall passed through a solid voxel with no
+        // sample inside it. v4549 recorded the shape -- "a radius below the per-frame step does not reliably
+        // block" -- for a radius under the step; the same arithmetic applies to the STEP over the wall.
+        //
+        // *** AND THE FAILURE IS A RESONANCE, NOT A THRESHOLD, WHICH IS WHY NO SPEED IS SAFE BY BEING LOW
+        // ENOUGH. *** Measured over 200 starting offsets against one voxel of wall, moving straight at it:
+        //
+        //     per-frame step   1.8   1.9   2.0   2.5   3.0   4.0
+        //     phases through     0     0     0   121     0   200      (of 200)
+        //
+        // 60.5% at 2.5 and ZERO at 3.0. Whether a sample lands inside the band depends on where the body
+        // started, so a bisection for "the step at which it breaks" finds an artefact of the start position
+        // -- my first attempt did exactly that and reported 3.45, which is the phase where 6.5 + 2s lands on
+        // the far edge. This is the same species as the frame-rate CLIFF_DROP v4553 found: a rule whose
+        // outcome moves with something that is not the thing being ruled on.
+        //
+        // THE SUBSTEP IS PROVABLY ENOUGH RATHER THAN CAUTIOUSLY SMALL. The thinnest obstacle a lattice can
+        // hold is ONE CELL, so the band in which the body's disc overlaps it is at least 1.0 wide; consecutive
+        // samples no more than 1.0 apart cannot straddle an interval that wide, because the last sample below
+        // it is within 1.0 of its start. AND IT COSTS NOTHING AT ANY SHIPPED SPEED: the player walks 5 and
+        // sprints 9, the kaiju 8 and 14, so at 60 Hz the step is 0.083 to 0.233 and this is ONE substep, the
+        // same single pair of tests it has always done. Only a big step pays, and it pays in proportion.
+        const len = Math.hypot(dx, dz);
+        const n = Math.max(1, Math.ceil(len / Camera.SWEEP_MAX_STEP));
+        const sx = dx / n, sz = dz / n;
         let ox = x, oz = z;
-        if (fits(wantX, oz)) ox = wantX;
-        if (fits(ox, wantZ)) oz = wantZ;
+        for (let i = 0; i < n; i++) {
+            const wantX = ox + sx, wantZ = oz + sz;
+            if (fits(wantX, wantZ)) { ox = wantX; oz = wantZ; continue; }
+            // Blocked: slide along whichever axis still fits. The second is tested against the FIRST'S
+            // RESULT, which is _moveFP's own sequencing and is load-bearing in an inside corner.
+            let slid = false;
+            if (fits(wantX, oz)) { ox = wantX; slid = true; }
+            if (fits(ox, wantZ)) { oz = wantZ; slid = true; }
+            // Neither axis moved: the body is wedged. THIS IS A COST SAVING AND NOT A GUARD, which the
+            // sabotage that turned it into `continue` established by reddening nothing: every later substep
+            // of the same direction re-tests the same blocked position and returns the same answer, so the
+            // loop is identical in outcome and only slower. Said plainly, because a comment implying a
+            // branch is load-bearing when it is not tells the next reader not to touch it.
+            if (!slid) break;
+        }
         return { x: ox, z: oz };
     }
 

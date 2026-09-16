@@ -716,6 +716,41 @@ export const RED_AT_V4568 = Object.freeze(RED_AT_V4568_GATES.map((gate) => Objec
     get derived() { return !!(auditRow(gate) && auditRow(gate).first); },
 })));
 
+// *** v4562 -- A RED THAT BOOKKEEPING CANNOT CLEAR, MEASURED BEFORE IT WAS REGISTERED. ***
+// sweepCoverage-selfcheck's returnee row takes two branches and NEITHER IS REACHABLE. The first needs every
+// RETURNED_AT_V4529.stillOver entry to appear in RETURNED_AT_V4476.returnable, and THAT ARRAY IS EMPTY, so it
+// is structurally dead. The second needs stillOver to be EMPTY, with every retirement carrying three serial
+// readings under budget. Three serial readings of each, taken on this box at v4562: traderGraph 2545 / 2112 /
+// 2021 and wgslSpec 2880 / 2804 / 2833 HAVE returned; meshLine is 3049 / 3030 / 3080 and HAS NOT. Two of
+// three came back and the record has no shape for that -- retiring meshLine would mean writing a number that
+// is not true, and leaving it means the roll can never empty.
+//
+// THE CAUSE IS THE ONE THE RECORD ITSELF FILED AS ITS OWN ROUND: serial and parallel readings share the
+// `timings` field against one 3,000 ms threshold, so these three oscillate on which ritual step ran last.
+// v4557 gave that field provenance (`contended`) and deliberately did not move the membership decision;
+// moving it is what this needs. *** AND THE REASON IT WENT UNSEEN: *** quickSweep rewrites sweep-timings.json
+// at the END of a run while this gate GRADES that file, so inside the sweep it reads the PREVIOUS run's copy
+// and is structurally one run behind -- it ran with exit code 0 at 00:48:29 during v4560's verify and failed
+// on the file that same sweep then wrote. v4561 shipped with it green for that reason and nothing else.
+const WHY_V4562 = Object.freeze({
+    "tools/ship/sweepCoverage-selfcheck.mjs":
+        "RETURNED_AT_V4529's roll cannot be made honest: branch one needs RETURNED_AT_V4476.returnable, " +
+        "which is EMPTY, and branch two needs the roll empty while meshLine measures 3049 / 3030 / 3080 " +
+        "serially and is genuinely over budget. traderGraph (2545 / 2112 / 2021) and wgslSpec (2880 / 2804 / " +
+        "2833) have returned; two of three is a state the record cannot express. The underlying cause is " +
+        "serial and parallel sharing `timings` against one threshold, which the record filed as its own " +
+        "round and v4557 gave provenance to without moving the decision.",
+});
+export const RED_AT_V4562_GATES = Object.freeze(["tools/ship/sweepCoverage-selfcheck.mjs"]);
+
+export const RED_AT_V4562 = Object.freeze(RED_AT_V4562_GATES.map((gate) => Object.freeze({
+    gate,
+    why: WHY_V4562[gate] || null,
+    get ms() { const r = auditRow(gate); return r ? r.ms : null; },
+    get fails() { const r = auditRow(gate); return r && r.first ? r.first : (UNVERIFIED_LINE[gate] || null); },
+    get derived() { return !!(auditRow(gate) && auditRow(gate).first); },
+})));
+
 export const REGISTER_LISTS = Object.freeze([
     Object.freeze(["RED_AT_V4279", RED_AT_V4279]),
     Object.freeze(["RED_AT_V4408", RED_AT_V4408]),
@@ -725,6 +760,7 @@ export const REGISTER_LISTS = Object.freeze([
     Object.freeze(["RED_AT_V4531", RED_AT_V4531]),
     Object.freeze(["RED_AT_V4535", RED_AT_V4535]),
     Object.freeze(["RED_AT_V4568", RED_AT_V4568]),
+    Object.freeze(["RED_AT_V4562", RED_AT_V4562]),
 ]);
 
 /** Every registered gate, once, with the list that named it. The `entry` is carried rather than spread, so

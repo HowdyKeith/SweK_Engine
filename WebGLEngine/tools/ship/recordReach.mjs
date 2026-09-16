@@ -239,7 +239,11 @@ export const REACH_AT_V4548 = Object.freeze({
     // every round that wrote a record beside the code it describes. The nine are the seven in camera/camera.js
     // from v4545..v4554, plus ADDED_AT_V4403 and MEASURED_AT_V4463, which had been outside every headline
     // either census ever published. The unguarded count does NOT move: all nine are named by a gate.
-    total: 127,
+    // v4562 -- 127 -> 129: registering a standing red in a DATED LIST added RED_AT_V4562_GATES and
+    // RED_AT_V4562, two version-stamped frozen exports. Naming a red is an arrival the census counts, which
+    // is v4540's finding from a new direction; the UNGUARDED count is unmoved because both are read by the
+    // gate in the round that wrote them.
+    total: 129,
     // *** READ OFF THE INSTRUMENT, NOT PREDICTED. *** The first draft of this record guessed 53/21/19/40 from
     // which gates the round had sped up, and was wrong on three of the four: the comment-strip fix below
     // moved two records the other way at the same time, and a guess cannot see two changes at once.
@@ -400,7 +404,7 @@ export const UNGUARDED_SPLIT_V4577 = Object.freeze({
     // v4555 -- RE-TAKEN with `total`: 118 -> 127 for the nine the widened census can now see. UNGUARDED IS
     // STILL 11, and that is the reassuring half of the finding: the records the tree could not SEE were
     // nonetheless all being GUARDED, by the gates written beside them in the same rounds.
-    structural: Object.freeze({ total: 127, unguarded: 11, documentaryOfThose: 11, readByCodeOfThose: 0 }),
+    structural: Object.freeze({ total: 129, unguarded: 11, documentaryOfThose: 11, readByCodeOfThose: 0 }),
     // BEFORE, on the tree this round opened on:
     before: Object.freeze({ total: 104, checked: 72, overBudget: 20, unmeasured: 0, unguarded: 12, unchecked: 32 }),
     // AFTER, as one reading rather than as a constant -- see the note above. Taken with the round's own

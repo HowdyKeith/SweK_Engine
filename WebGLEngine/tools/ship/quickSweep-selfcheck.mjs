@@ -50,7 +50,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as Q from "./quickSweep.mjs";
 import { VERDICT, SWEEP_V4297, REGRESSIONS_REPAIRED } from "./gateSweep.mjs";
-import { RED_AT_V4279, RED_AT_V4408, RED_AT_V4424, RED_AT_V4476, UNCONFIRMED_SLOW , RED_AT_V4484, RED_AT_V4531, RED_AT_V4535} from "./redCensus.mjs";
+import { RED_AT_V4279, RED_AT_V4408, RED_AT_V4424, RED_AT_V4476, UNCONFIRMED_SLOW , RED_AT_V4484, RED_AT_V4531, RED_AT_V4535, RED_AT_V4562} from "./redCensus.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -155,10 +155,18 @@ sec("2. THE REGISTER IS BUILT FROM THE RECORDS IT NAMES, AND THE SIX REGRESSIONS
     // v4531 -- AND IT HAPPENED AGAIN, ON SCHEDULE. RED_AT_V4531 joined for tslSource and this row went red
     // within the minute, before any sweep ran. Adding the list here is the deliberate act the row exists to
     // demand: the register is 91 gates where it held 90 an hour earlier, and the diff is where that is said.
+    // v4562 -- AND AGAIN, WHICH IS THE ROW WORKING AND NOT THE ROW BREAKING. RED_AT_V4562 joined for
+    // sweepCoverage-selfcheck, whose returnee roll cannot be made honest by bookkeeping -- both of its
+    // branches are unreachable, one because RETURNED_AT_V4476.returnable is empty and the other because
+    // meshLine measures 3049 / 3030 / 3080 serially and is genuinely over budget. I first read this row's
+    // hand-spelled union as the maintained-in-step defect this tree keeps convicting and went to derive it
+    // from REGISTER_LISTS; the comments above say plainly that the spelling is DELIBERATE and that adding a
+    // list here is the act the row exists to demand. Deriving it would have removed the only place the
+    // register's growth has to be admitted out loud.
     ok(reg.size === new Set([...RED_AT_V4279.map((e) => e.gate), ...RED_AT_V4408.map((e) => e.gate),
                              ...RED_AT_V4424.map((e) => e.gate), ...RED_AT_V4476.map((e) => e.gate),
                              ...RED_AT_V4484.map((e) => e.gate), ...RED_AT_V4531.map((e) => e.gate),
-                             ...RED_AT_V4535.map((e) => e.gate),
+                             ...RED_AT_V4535.map((e) => e.gate), ...RED_AT_V4562.map((e) => e.gate),
                              ...UNCONFIRMED_SLOW, ...SWEEP_V4297.fromSlowBucket, ...SWEEP_V4297.unmeasured]).size,
        "and the register's size is the union of those lists, nothing typed", `${reg.size} gates`);
     const repaired = Object.keys(REGRESSIONS_REPAIRED.gates).sort();

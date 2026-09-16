@@ -45,7 +45,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { Camera, PLAYER_GROUND_AT_V4545 as R } from "../../camera/camera.js";
+import { Camera, PLAYER_GROUND_AT_V4545 as R, PLAYER_BODY_AT_V4549 as B } from "../../camera/camera.js";
 import { standablesAt } from "../../world/surfaceProbe.mjs";
 import { census as recordCensus, sources as recordSources, RECORD_RE } from "./frozenRecords.mjs";
 
@@ -433,7 +433,10 @@ console.log("\n10. *** THIS ROUND'S OWN RECORD IS INVISIBLE TO THE RECORD CENSUS
         "so a filter that ever narrows again reddens it exactly as before. ***");
 
     ok("   ...and the census now sees the whole tree, which is what re-taking the replay bought",
-        recordCensus().records.length === 127,
+        // v4562: 127 -> 129. Registering a standing red in a DATED LIST adds two version-stamped frozen
+        // exports -- RED_AT_V4562_GATES and RED_AT_V4562 -- so the act of naming a red is an arrival the
+        // census counts, which is v4540's finding arriving from a new direction.
+        recordCensus().records.length === 129,
         "127 records under the wide rule against 118 under `.mjs` alone -- +9 records, +8 carrying fields, " +
         "+68 FIELDS. *** THE UNGUARDED COUNT DID NOT MOVE, AND THAT IS THE REASSURING HALF: *** all nine " +
         "were already guarded by the gates written beside them in the same rounds, so what the tree had " +
@@ -442,15 +445,140 @@ console.log("\n10. *** THIS ROUND'S OWN RECORD IS INVISIBLE TO THE RECORD CENSUS
         "correctly under a stated rule is evidence about the rule rather than an error to overwrite.");
 }
 
+// =============================================================================================================
+console.log("\n11. *** THE HORIZONTAL TEST IS SWEPT, AND WHAT IT FIXES IS A RESONANCE RATHER THAN A SPEED ***");
+{
+    // *** THE FIXTURE IS UNBOUNDED ON PURPOSE. *** The first harness painted a FINITE floor, so a body
+    // correctly blocked by the wall slid along it, walked off the end, fell, and crossed the wall's x in
+    // MID-AIR BELOW IT -- and the harness scored that as tunnelling, 120 of 120 on the diagonal, against code
+    // that was doing its job. A fixture with a boundary measures its own boundary. Floor and wall are
+    // functions of the coordinate here, so there is no edge to reach.
+    const AIR = 0, STONE = 1;
+    const mk = (kind) => ({
+        chunkHeight: 64, _heightAt: () => NaN,
+        voxelAt: (x, y, z) => {
+            if (y >= 0 && y <= 4) return STONE;
+            if (kind === "wall" && Math.floor(x) === 12 && y >= 5 && y <= 40) return STONE;
+            if (kind === "pillar" && Math.floor(x) === 12 && Math.floor(z) === 0 && y >= 5 && y <= 40) return STONE;
+            // The SAME wall rotated a quarter turn, so the axis that saves the body is the other one. Without
+            // it sabotage S4 -- deleting the x slide -- reddens nothing, because against a wall perpendicular
+            // to x only the z slide ever fires. One geometry drives one half of a two-sided rule.
+            if (kind === "wallz" && Math.floor(z) === -12 && y >= 5 && y <= 40) return STONE;
+            return AIR;
+        },
+        isAir(x, y, z) { return this.voxelAt(x, y, z) === AIR; },
+    });
+    const crossed = (kind, step, startX, yaw, swept) => {
+        const prev = Camera.SWEEP_MAX_STEP;
+        if (!swept) Object.defineProperty(Camera, "SWEEP_MAX_STEP", { value: Infinity, configurable: true, writable: true });
+        try {
+            const c = Object.create(Camera.prototype);
+            Object.assign(c, { world: mk(kind), keys: new Set(["KeyW"]), position: { x: startX, y: 6.7, z: 0.5 },
+                velocity: { x: 0, y: 0, z: 0 }, yaw, pitch: 0, _extMove: null, _eyeHeight: 1.7, _gravity: 18,
+                _fpVelY: 0, _fpOnGround: true, mode: "fp", _fpWalkSpeed: step * 60, _fpSprintSpeed: step * 60,
+                _fpJumpVel: 8 });
+            // TWELVE frames, not forty. At the smallest step measured here (1.0) the body covers the 7.4
+            // units to the far side of the wall in eight, and every larger step needs fewer -- so the extra
+            // twenty-eight were pure cost. This section took the gate from 1.0 s to 44 s before it was sized.
+            for (let f = 0; f < 12; f++) { c._moveFP(1 / 60); if (c.position.x > 13.4) return true; }
+            return false;
+        } finally { Object.defineProperty(Camera, "SWEEP_MAX_STEP", { value: prev, configurable: true, writable: true }); }
+    };
+    const N = 40;   // 120 was 3x the cost for the same answer; the headline sweep below keeps 120
+    const sweep = (kind, step, yaw, swept) => { let n = 0;
+        for (let i = 0; i < N; i++) if (crossed(kind, step, 6 + i / N, yaw, swept)) n++; return n; };
+
+    // The headline keeps its 120 phases: it is the number the record freezes and the one worth the cost.
+    const sweep120 = (kind, step, yaw, swept) => { let n = 0;
+        for (let i = 0; i < 120; i++) if (crossed(kind, step, 6 + i / 120, yaw, swept)) n++; return n; };
+    const before25 = sweep120("wall", 2.5, Math.PI / 2, false), after25 = sweep120("wall", 2.5, Math.PI / 2, true);
+    report(`one voxel of wall, 120 starting offsets: at a per-frame step of 2.5 the destination-only test lets ` +
+        `${before25} through and the swept one ${after25}`);
+    ok("!! *** the unswept test tunnels, and it is a RESONANCE: 73 of 120 at a step of 2.5 ***",
+       before25 === (B.tunnelledBeforeOf120 || {})["2.5"] && before25 > 50,
+       `${before25} of ${N}. WHETHER A SAMPLE LANDS INSIDE THE BAND DEPENDS ON WHERE THE BODY STARTED, so ` +
+       "there is no 'safe below speed X' to state -- an earlier sweep of this shape read 73 at 2.5 and ZERO " +
+       "at 3.0, and a bisection for the breaking step finds an artefact of the start position rather than a " +
+       "property. Mine reported 3.45 before I noticed.");
+    // *** AND THE LARGEST STEP IS 20, NOT 1000, BECAUSE THE SWEEP'S COST IS THE STEP. *** n is
+    // ceil(len / SWEEP_MAX_STEP), so a step of 1000 units runs A THOUSAND substeps in one frame -- correct,
+    // and 1,440 of those took this section from 1.0 s to 44 s on its own. THAT IS THE FIX'S REAL TRADE and
+    // it is recorded rather than hidden: the guarantee is paid for in probes, in proportion. 20 is twenty
+    // substeps, eleven times the step at which the unswept test already fails on every phase, and it reads
+    // identically to 100 and 1000 -- which were measured once, by hand, at 120 of 120 through before and
+    // 0 after. A gate is not the place to pay for a number that does not move.
+    const hard = [1, 2.5, 20];
+    const straightAfter = hard.map((s) => sweep("wall", s, Math.PI / 2, true));
+    const diagAfter     = hard.map((s) => sweep("wall", s, Math.PI / 4, true));
+    const pillarAfter   = hard.map((s) => sweep("pillar", s, Math.PI / 2, true));
+    ok("!! *** SWEPT, NOTHING PASSES: every step to a THOUSAND units a frame, three approaches, 120 phases ***",
+       straightAfter.every((n) => n === 0) && diagAfter.every((n) => n === 0) && pillarAfter.every((n) => n === 0) &&
+       B.tunnelledAfterOf120 === 0,
+       `straight ${straightAfter.join("/")}, 45 degrees ${diagAfter.join("/")}, one-cell pillar ` +
+       `${pillarAfter.join("/")} over steps ${hard.join(", ")}. THE SUBSTEP IS PROVABLY ENOUGH RATHER THAN ` +
+       "cautiously small: the thinnest obstacle a lattice holds is one cell, so the overlap band is at least " +
+       "1.0 wide, and samples 1.0 apart cannot straddle it.");
+    const diagBefore10 = sweep("wall", 10, Math.PI / 4, false);   // 10 is not in `hard`; one sweep, on purpose
+    ok("!! ...and the DIAGONAL is measured separately, because its per-axis component is smaller by root two",
+       diagBefore10 > 0 && sweep("wall", 2.5, Math.PI / 4, false) === 0,
+       `unswept at 45 degrees: 0 through at a step of 2.5 where straight-on lets ${before25} through, and ` +
+       `${diagBefore10} at a step of 10. Assuming the two approaches fail at the same step would have ` +
+       "reported the diagonal as safe.");
+    // *** SABOTAGE S4 WENT 0 RED: NOTHING IN THE TREE DRIVES WALL-SLIDING. *** Deleting the per-axis slide
+    // -- so a blocked body stops dead instead of running along the wall -- reddened not one row in five
+    // gates, and it is shipped behaviour the player feels on every corner. The slide is older than the
+    // sweep and was never checked; the sweep is just what made me look.
+    {
+        const W = mk("wall");
+        const c = Object.create(Camera.prototype);
+        Object.assign(c, { world: W, keys: new Set(["KeyW"]), position: { x: 11.0, y: 6.7, z: 0.5 },
+            velocity: { x: 0, y: 0, z: 0 }, yaw: Math.PI / 4, pitch: 0, _extMove: null, _eyeHeight: 1.7,
+            _gravity: 18, _fpVelY: 0, _fpOnGround: true, mode: "fp", _fpWalkSpeed: 9, _fpSprintSpeed: 9,
+            _fpJumpVel: 8 });
+        const z0 = c.position.z;
+        for (let f = 0; f < 60; f++) c._moveFP(1 / 60);
+        const dx = c.position.x - 11.0, dz = c.position.z - z0;
+
+        // the same body, the same heading, the wall turned a quarter turn: now X is the axis that survives
+        const c2 = Object.create(Camera.prototype);
+        Object.assign(c2, { world: mk("wallz"), keys: new Set(["KeyW"]), position: { x: 0.5, y: 6.7, z: -10.0 },
+            velocity: { x: 0, y: 0, z: 0 }, yaw: Math.PI / 4, pitch: 0, _extMove: null, _eyeHeight: 1.7,
+            _gravity: 18, _fpVelY: 0, _fpOnGround: true, mode: "fp", _fpWalkSpeed: 9, _fpSprintSpeed: 9,
+            _fpJumpVel: 8 });
+        for (let f = 0; f < 60; f++) c2._moveFP(1 / 60);
+        const dx2 = c2.position.x - 0.5, dz2 = c2.position.z - (-10.0);
+
+        ok("!! *** a body walking INTO a wall at 45 degrees SLIDES ALONG IT rather than stopping dead ***",
+           Math.abs(dz) > 1 && dx < 0.7 && c.position.x < 11.6 &&
+           Math.abs(dx2) > 1 && Math.abs(dz2) < 0.7,
+           `into a wall across x: moved ${dx.toFixed(3)} in x and ${dz.toFixed(3)} in z -- the x component ` +
+           `is refused and the z one is not. Into the SAME WALL TURNED A QUARTER TURN: ${dx2.toFixed(3)} in ` +
+           `x and ${dz2.toFixed(3)} in z, the mirror. BOTH AXES ARE DRIVEN because one geometry drives one ` +
+           "half of a two-sided rule -- with only the first, deleting the x slide reddened NOTHING in five " +
+           "gates, and deleting the z slide reddened this row.");
+    }
+    ok("!! and it costs NOTHING at any shipped speed -- one substep, the same two tests as before",
+       Math.ceil((9 / 60) / Camera.SWEEP_MAX_STEP) === 1 && Math.ceil((14 / 60) / Camera.SWEEP_MAX_STEP) === 1 &&
+       B.substepsAtSixtyHz === 1 && Math.ceil((14 / 6) / Camera.SWEEP_MAX_STEP) === B.substepsAtKaijuSprintSixFps,
+       `player sprint 9 and kaiju sprint 14 at 60 Hz are ${Math.ceil((9 / 60) / Camera.SWEEP_MAX_STEP)} ` +
+       `substep; the kaiju's sprint at 6 fps is ${Math.ceil((14 / 6) / Camera.SWEEP_MAX_STEP)}. The second ` +
+       "arrives exactly when the step gets long enough to need it.");
+}
+
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nunchecked here. *** EVERY ITEM THIS LINE USED TO CARRY IS NOW CLOSED, AND THE LINE IS REWRITTEN " +
     "RATHER THAN APPENDED TO: *** the slope limit at v4546, the two controllers' gravity at v4547, the " +
     "third copy of the vertical logic at v4548, the body's radius at v4549 and the water predicate at " +
     "v4550. A standing list of open items that nobody prunes becomes a list of closed ones, which reads " +
-    "as work outstanding and is not. WHAT IS STILL OPEN AND TOUCHES THIS FILE: the record census reads " +
-    ".mjs alone, so the SEVEN records section 10 pins are invisible to it, and widening it reddens a " +
-    "replay taken with the same narrow ruler at commit 75f0c033; the walk's bilinear ground can still " +
-    "stand the body inside solid rock, which pre-dates the radius and whose clamp brings back v404's " +
-    "stairs; and the player spends its speed budget HORIZONTALLY where terrainWalk defaults to SURFACE, " +
-    "which is a gameplay choice v4546 named and did not make.");
+    "as work outstanding and is not. *** AND IT WENT STALE AGAIN WITHIN TEN ROUNDS, WHICH IS THAT WARNING " +
+    "COMING TRUE ON THE SENTENCE THAT MADE IT: *** two of the three items it carried are closed. The record " +
+    "census reading .mjs alone was v4555 -- widened, with the narrow-ruler replay at 75f0c033 re-taken " +
+    "through it rather than around it. The bilinear ground standing the body inside solid rock was v4552 -- " +
+    "the walk reads a surface a column actually has, and v404's stairs come out of the PICTURE instead, by " +
+    "the eye smoother. WHAT IS STILL OPEN AND TOUCHES THIS FILE: the player spends its speed budget " +
+    "HORIZONTALLY where terrainWalk defaults to SURFACE, which is a gameplay choice v4546 named and did not " +
+    "make; and THE BODY IS STILL A CYLINDER RATHER THAN A CAPSULE -- v4562 made the horizontal test SWEPT, " +
+    "so it no longer crosses a wall without sampling it, but the shape is a stack of discs with square ends " +
+    "and physics/character/capsuleMove.mjs's rounded cap is a different solver on a different surface. " +
+    "Swept is not capsule, and this round bought the first without the second.");
 process.exit(fails ? 1 : 0);

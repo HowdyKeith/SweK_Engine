@@ -514,7 +514,12 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4561 -- RE-TAKEN with `excluding`: 347 -> 376. THE TWO MOVE TOGETHER BY CONSTRUCTION and the gate
     // asserts the difference is exactly this module's own two records, so moving one and not the other
     // reddens the subset row -- which is what it did when I bumped `excluding` alone and had to come back.
-    currentIncludingModule: Object.freeze({ records: 127, withFields: 65, fields: 376 }),
+    // v4562 -- AND THE RECORD COUNT MOVED FOR A REASON THAT IS ITSELF v4540'S LESSON: 125 -> 127 and
+    // 127 -> 129, because REGISTERING A RED ADDED TWO RECORDS. RED_AT_V4562_GATES and RED_AT_V4562 are
+    // version-stamped frozen exports, so naming a standing red in a dated list is an arrival as surely as
+    // a measurement is. The FIELD counts did not move with them -- neither carries a numeric field -- which
+    // is the exact mirror of v4540's NO_GATE_V4540.
+    currentIncludingModule: Object.freeze({ records: 129, withFields: 65, fields: 380 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -615,7 +620,10 @@ export const PROBE_AT_V4536 = Object.freeze({
     // to records that already existed, which is v4540's case and now v4559's twice over.
     // v4561 -- RE-TAKEN: 344 -> 356, the twelve fields written into KAIJU_GROUND_AT_V4554 when the round
     // gave the driven kaiju its own body height. NO RECORD ARRIVED, for the fourth round running.
-    excluding: Object.freeze({ records: 125, withFields: 63, fields: 356 }),
+    // v4562 -- RE-TAKEN: 356 -> 360, the four fields written into PLAYER_BODY_AT_V4549 when the horizontal
+    // test became swept. BOTH HALVES MOVED TOGETHER THIS TIME: v4561 bumped this one alone and the subset
+    // row caught it within the minute, which is the row doing exactly its job.
+    excluding: Object.freeze({ records: 127, withFields: 63, fields: 360 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,
