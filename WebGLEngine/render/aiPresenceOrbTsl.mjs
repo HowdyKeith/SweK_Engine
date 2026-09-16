@@ -233,6 +233,13 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // Tidying those two lines into the other order changes the result by 1% or more, which is why
         // murmurKit-selfcheck asserts the ordering rather than trusting it.
         const acc = float(0.0).toVar();
+        // *** THE SECOND CHANNEL, AND EVERY SPECIES HAS ONE. *** murmur's marches accumulate a hue NUMERATOR
+        // beside the luminance, and the ratio of the two is where on the rail's spread axis this pixel sits.
+        // render/murmurKit.mjs's marchStillInterior has returned it as `hueNum` since v4623 and this file
+        // accumulated only the scalar, so every species passed hue = 0 to mh_lit and the axis built and gated
+        // at v4627 reached no pixel at all. still.ts weights by DEPTH: p.z is the body's own depth, +1 toward
+        // the viewer, so the near half of the ray goes one way on the hue and the far half the other.
+        const accH = float(0.0).toVar();
         const trans = float(1.0).toVar();
         const ds = L.div(MH_TAPS).toVar();
         const fAmt = floorAmt().toVar();
@@ -241,6 +248,7 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             const p = P.add(rd.mul(sMarch));
             const e = KIT.mhMedium(p, uniforms.time, float(1.9)).mul(fAmt).mul(KIT.mhInside(p)).toVar();
             acc.addAssign(e.mul(trans).mul(ds));
+            accH.addAssign(e.mul(clamp(p.z, -1.0, 1.0)).mul(trans).mul(ds));
             trans.assign(trans.mul(exp(e.mul(2.0).add(MH_EXT).mul(ds).negate())));
         });
 
@@ -275,6 +283,10 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         const headLobe = exp(kHead.mul(cos(awW).sub(1.0))).toVar();
         const tailLobe = exp(kTail.mul(cos(awW.sub(offT)).sub(1.0))).toVar();
         const arcProfile = headLobe.add(tailLobe.mul(0.52)).toVar();
+        // THE TAIL LOBE'S OWN SHARE OF THE LIGHT AT THIS PIXEL, which limn.ts chose over the wrapped angle
+        // for the same reason its arc is a function of cos alone: it is PERIODIC, "so the hue has no seam
+        // either". It is limn's whole hue term -- this hero takes nothing from the march for it.
+        const tailShare = tailLobe.mul(0.52).div(max(headLobe.add(tailLobe.mul(0.52)), float(1e-4))).toVar();
 
         // THE BAND: where the light sits radially, just inside the silhouette, thickening with voice. murmur
         // gives it a CEILING and says why -- three multipliers stack and at 18 pt with somebody talking they
@@ -342,6 +354,9 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         const decay = float(1.30).add(uniforms.trail.mul(2.60)).toVar();
 
         const accC = float(0.0).toVar();
+        // comet weights its hue by the trail's AGE rather than by depth: clamp(age/pi, 0, 1) is 0 at the head
+        // and 1 at the far end of the lap, so the colour drifts along the trail as it cools.
+        const accHC = float(0.0).toVar();
         const transC = float(1.0).toVar();
         Loop({ start: 0, end: MH_TAPS }, ({ i }) => {
             const sM = float(i).add(0.5).mul(ds);
@@ -366,6 +381,7 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             const trail = exp(negate(targ)).add(KIT.mhScatter(targ, float(0.22))).mul(fall).toVar();
             const eC = trail.mul(1.55).add(KIT.mhMedium(p3, uniforms.time, float(2.3)).mul(0.055)).mul(fadeC).toVar();
             accC.addAssign(eC.mul(transC).mul(ds));
+            accHC.addAssign(trail.mul(1.55).mul(fadeC).mul(clamp(age.div(3.1415927), 0.0, 1.0)).mul(transC).mul(ds));
             transC.assign(transC.mul(exp(eC.mul(4.20).add(MH_EXT).mul(ds).negate())));
         });
         // *** THE HEAD IS SOLVED, NOT SAMPLED, AND LEAVING IT OUT GAVE comet A TRAIL AND NO POINT. ***
@@ -422,12 +438,17 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         const coreR = float(0.17).add(float(1.0).sub(uniforms.tension).mul(0.10)).mul(float(1.0).add(swellD.mul(0.22))).toVar();
         const coreBright = float(1.0).add(uniforms.voice.mul(0.85)).toVar();
         const accD = float(0.0).toVar();
+        // droplet weights by depth like still, and carries the `fade` a SECOND time -- its e already includes
+        // mh_inside and the hue term multiplies by it again. That is droplet.ts as written ("the near half of
+        // the ray one way, the far half the other"), ported rather than tidied.
+        const accHD = float(0.0).toVar();
         const transD = float(1.0).toVar();
         Loop({ start: 0, end: MH_TAPS }, ({ i }) => {
             const sM = float(i).add(0.5).mul(ds);
             const pD = P.add(rd.mul(sM));
             const eD = KIT.mhMedium(pD, uniforms.time, float(2.1)).mul(0.090).mul(KIT.mhInside(pD)).toVar();
             accD.addAssign(eD.mul(transD).mul(ds));
+            accHD.addAssign(eD.mul(KIT.mhInside(pD)).mul(clamp(pD.z, -1.0, 1.0)).mul(transD).mul(ds));
             transD.assign(transD.mul(exp(eD.mul(2.40).add(MH_EXT).mul(ds).negate())));
         });
         const toC = coreC.sub(P).toVar();
@@ -519,7 +540,32 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // at v4627, reaches no pixel. Named here rather than half-wired: it needs each hero's own numerator,
         // which is four more formulas, and it is what makes opal (spread 0.7, the species that deliberately
         // runs a third past MH_SPREAD) worth porting at all.
-        const colorLinear = max(KIT.mhLit(pal, railE, uniforms.glow, float(0.0), float(1.0), float(0.34), float(0.0)),
+        // *** AND THE HUE ARGUMENT IS REAL NOW. *** Each hero computes its own, and they are NOT one formula
+        // with four constants -- they differ in what they weight, in sign, and in gain:
+        //   still    +(accH / acc) * spread * MH_SPREAD          weighted by depth
+        //   limn     -tailShare    * spread * MH_SPREAD          the tail lobe's own share of the light, no
+        //                                                        march channel at all, and NEGATIVE
+        //   comet    -(accHC/accC) * spread * MH_SPREAD * 1.4    weighted by the trail's age, negative, gain
+        //   droplet  +(accHD/accD) * spread * MH_SPREAD          depth again, with fade counted twice
+        // The guard is murmur's own: below 1e-4 of accumulated light the ratio is meaningless and the hue is
+        // zero, which is what keeps an empty ray from painting a colour.
+        const spreadK = clamp(uniforms.spread, 0.0, 1.0).toVar();
+        const hueRaw = species === "limn"
+            ? tailShare.negate().mul(spreadK).mul(KIT.MH_SPREAD)
+            : species === "comet"
+                ? select(accC.greaterThan(1e-4), accHC.div(accC), float(0.0)).negate().mul(spreadK).mul(KIT.MH_SPREAD).mul(1.4)
+                : species === "droplet"
+                    ? select(accD.greaterThan(1e-4), accHD.div(accD), float(0.0)).mul(spreadK).mul(KIT.MH_SPREAD)
+                    : select(acc.greaterThan(1e-4), accH.div(acc), float(0.0)).mul(spreadK).mul(KIT.MH_SPREAD);
+        // mh_present's own hueMix: the hue scaled by the share of THIS pixel's energy that the species says
+        // carries colour. still and comet count the interior plus 0.7 of the rim, droplet 0.6 of it, limn the
+        // rim energy plus the interior -- four different numerators, transcribed rather than averaged.
+        const eTotal = interior.add(sf.rim).add(sf.spec).add(sf.glow).toVar();
+        const hueNum = species === "limn" ? rimE.add(interior)
+            : species === "droplet" ? interior.add(sf.rim.mul(0.6))
+            : interior.add(sf.rim.mul(0.7));
+        const hueMix = hueRaw.mul(hueNum).div(max(eTotal, float(1e-4))).toVar();
+        const colorLinear = max(KIT.mhLit(pal, railE, uniforms.glow, float(0.0), float(1.0), float(0.34), hueMix),
                                 vec3(0.0));
         const outColor = linear ? colorLinear : linearToSrgb(colorLinear);
 

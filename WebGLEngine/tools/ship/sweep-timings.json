@@ -1677,8 +1677,8 @@
   "tools/ship/raceTurret-selfcheck.mjs": 10708,
   "world/buildingTopple-selfcheck.mjs": 9513,
   "tools/ship/murmurKit-selfcheck.mjs": 1633,
-  "tools/ship/murmurSpecies-selfcheck.mjs": 1889,
-  "tools/ship/murmurSpecies2-selfcheck.mjs": 2137
+  "tools/ship/murmurSpecies-selfcheck.mjs": 2016,
+  "tools/ship/murmurSpecies2-selfcheck.mjs": 2260
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -5031,8 +5031,8 @@
   "tools/ship/raceTurret-selfcheck.mjs": "2026-09-15T13:49:44.492Z",
   "world/buildingTopple-selfcheck.mjs": "2026-09-15T13:49:44.492Z",
   "tools/ship/murmurKit-selfcheck.mjs": "2026-09-15T23:18:39.754Z",
-  "tools/ship/murmurSpecies-selfcheck.mjs": "2026-09-15T23:52:08.726Z",
-  "tools/ship/murmurSpecies2-selfcheck.mjs": "2026-09-15T23:52:10.976Z"
+  "tools/ship/murmurSpecies-selfcheck.mjs": "2026-09-16T00:06:05.832Z",
+  "tools/ship/murmurSpecies2-selfcheck.mjs": "2026-09-16T00:06:08.206Z"
  },
  "finished": {
   "tools/ship/placementRender-selfcheck.mjs": true,

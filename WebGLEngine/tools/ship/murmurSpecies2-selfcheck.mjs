@@ -15,7 +15,7 @@
 "use strict";
 import * as K from "../../render/murmurKit.mjs";
 import { N3, VOICE, SIL_VOICE, sp, renderSpecies, lin, light, bil, hotspot, interiorPeak,
-         travelRadii, ringChange, interiorMeanLight } from "./murmurSpeciesFrames.mjs";
+         travelRadii, ringChange, interiorMeanLight, hueShift } from "./murmurSpeciesFrames.mjs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -31,14 +31,17 @@ const STILL_TIMES = [2.4, 3.9];
 // seconds, so two frames a second apart would differ by almost nothing and the row would be measuring the
 // instrument. 2.4 and 9.7 are seven seconds apart on those periods.
 const DROP_TIMES = [2.4, 9.7];
+// The last two are droplet's spread pair: one render each, no compile, since `spread` is an ORB_KNOBS name.
 const FRAMES = [...times.map((t) => sp("comet", t)),
                 ...STILL_TIMES.map((t) => sp("still", t)),
-                ...DROP_TIMES.map((t) => sp("droplet", t, SIL_VOICE))];
+                ...DROP_TIMES.map((t) => sp("droplet", t, SIL_VOICE)),
+                sp("droplet", DROP_TIMES[0], VOICE, { spread: 0 }),
+                sp("droplet", DROP_TIMES[0], VOICE, { spread: 1 })];
 const run = await renderSpecies(FRAMES);
 const okRun = run.ok && run.frames && run.frames.length === FRAMES.length;
 if (!okRun) ok("!! the species render ran", false, `could not render: ${run.reason || "frames " + (run.frames ? run.frames.length : "none")}`);
 // Frame map, named once so no row has to count: comet 0..3, still 4..5, droplet 6..7.
-const F = { comet: [0, 1, 2, 3], still: [4, 5], droplet: [6, 7] };
+const F = { comet: [0, 1, 2, 3], still: [4, 5], droplet: [6, 7], dropSpread: [8, 9] };
 
 // =============================================================================================================
 sec("2. *** COMET, THE THIRD SPECIES: A TRAIL SOLVED IN CLOSED FORM, AND A HEAD THAT HAD TO BE SOLVED TOO ***");
@@ -232,6 +235,30 @@ sec("3. *** DROPLET: THE BODY ITSELF IS THE SPECIES ***");
             `free fall."`);
     }
 }
+
+// =============================================================================================================
+sec("4. *** droplet's SHARE OF THE SPREAD AXIS: dispersion through the depth ***");
+{
+    if (!okRun) {
+        ok("!! the spread row has frames to read", false, "the render did not produce them");
+    } else {
+        // droplet.ts calls its spread knob "dispersion through the depth", and that is literally how it is
+        // built: the hue numerator is weighted by clamp(p.z, -1, 1), the body's own depth with +1 toward the
+        // viewer, so the near half of each ray drifts one way and the far half the other. Most of it cancels
+        // along a ray, which is why the mean turn is small -- and small is the claim, not a shortfall: this
+        // is a clear lens, not a prism. The row asserts the KIND of move rather than its size.
+        const hs = hueShift(run.frames[F.dropSpread[0]], run.frames[F.dropSpread[1]]);
+        say(`droplet spread 0 -> 1, mean over the body -- hue ${hs.dHueDeg.toFixed(2)} deg, lightness ${hs.dL.toFixed(4)} (${hs.n} pixels)`);
+        ok("!! *** droplet's SPREAD MOVES HUE AND NOT LIGHTNESS, and it reached no pixel at all until v4630 ***",
+            hs.dHueDeg > 0.8 && hs.dL < 0.02,
+            `the body turns ${hs.dHueDeg.toFixed(2)} degrees of hue while its lightness moves ` +
+            `${hs.dL.toFixed(4)}. Measured at two frame sizes before the limits were set: 1.53 and 1.58 ` +
+            `degrees, 0.0008 both times. Before v4630 this file's march accumulated only a luminance and every ` +
+            `species handed mh_lit a hue of ZERO, so the rail's spread axis -- built and proved exact in ` +
+            `tools/ship/murmurKit-selfcheck.mjs section 8 at v4627 -- reached nothing that anyone could see.`);
+    }
+}
+
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nTHE TWO HEROES WHOSE SUBJECT IS MOTION: comet's point travelling its orbit at a steady peak because " +

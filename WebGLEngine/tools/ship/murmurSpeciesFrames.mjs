@@ -20,6 +20,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { renderThreeTslToPixels } from "./webgpuHarness.mjs";
+import { srgbToLinear, linearToOklab } from "../../render/murmurKit.mjs";
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -35,9 +36,25 @@ export const SIL_VOICE = 0;
 // murmur's own paper ground, the light half of the two the rail is built for.
 export const PAPER_INK = [0.97, 0.96, 0.94];
 
-/** A frame request. `colors` reaches setKnobs, so a paper-ground frame REUSES its species' shader. */
+// murmur's house ink, the dark ground. Named here so EVERY frame can state it -- see sp() below.
+export const INK = [0x0A / 255, 0x0A / 255, 0x0B / 255];
+
+/**
+ * A frame request.
+ *
+ * *** IT ALWAYS NAMES THE INK, AND THAT IS A BUG FIX RATHER THAN A STYLE. *** reuseInstances shares one
+ * compiled shader between frames that differ only in knobs, and render/aiPresenceOrbTsl.mjs's setKnobs writes
+ * only the names PRESENT in its argument -- so a knob one frame sets and the next does not mention KEEPS the
+ * first frame's value. v4629's own note said exactly that and called it the promise a caller turning
+ * reuseInstances on is making. v4630 broke it inside one gate: a paper-ground frame set `colors`, the next
+ * frame did not mention them, and a still-on-ink frame rendered on PAPER. It read as a 0.57 lightness shift
+ * in a row asking whether the spread knob moves lightness -- a real number measuring the wrong two frames.
+ *
+ * So the ink is stated on every frame by default, which makes the knob NAMES identical across frames and the
+ * hazard unreachable rather than merely documented. A caller wanting paper passes it explicitly.
+ */
 export const sp = (species, time, voice = VOICE, extra = {}) =>
-    ({ factoryArgs: { species }, knobs: { time, voice, ...extra } });
+    ({ factoryArgs: { species }, knobs: { time, voice, colors: { ink: INK }, ...extra } });
 
 /**
  * ONE LAUNCH FOR EVERY FRAME A GATE ASKS FOR. The launch is nearly the whole cost, so they share a page, and
@@ -159,4 +176,27 @@ export const interiorMeanLight = (px, r = 0.70) => {
         sum += light(px, x, y); n++;
     }
     return { mean: sum / n, n };
+};
+
+/**
+ * HOW FAR THE COLOUR MOVED, SPLIT INTO LIGHTNESS AND HUE. The rail's spread axis is meant to move one and not
+ * the other -- kit.ts: it "moves the hue while holding lightness and chroma exactly. The unsafe one is
+ * trading chroma for hue, which is how a warm palette turns to mud" -- so a row that only asked whether the
+ * picture CHANGED would pass on exactly the failure the axis exists to rule out.
+ *
+ * Pixels below `minChroma` are skipped because HUE IS UNDEFINED AT ZERO CHROMA: a near-neutral pixel has an
+ * arbitrary angle and averaging it in is averaging in noise.
+ */
+export const hueShift = (a, b, minChroma = 0.01) => {
+    const lab = (f, i) => linearToOklab(srgbToLinear(f[i] / 255), srgbToLinear(f[i + 1] / 255), srgbToLinear(f[i + 2] / 255));
+    let dL = 0, dH = 0, n = 0;
+    for (let i = 0; i < a.length; i += 4) {
+        if (a[i + 3] < 200) continue;
+        const A = lab(a, i), B = lab(b, i);
+        if (Math.hypot(A.a, A.b) < minChroma || Math.hypot(B.a, B.b) < minChroma) continue;
+        let dh = Math.atan2(B.b, B.a) - Math.atan2(A.b, A.a);
+        dh = Math.abs(Math.atan2(Math.sin(dh), Math.cos(dh)));   // the SHORT way round
+        dL += Math.abs(B.L - A.L); dH += dh; n++;
+    }
+    return { dL: dL / n, dHueDeg: dH / n * 180 / Math.PI, n };
 };

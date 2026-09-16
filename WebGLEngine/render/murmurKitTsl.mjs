@@ -428,7 +428,13 @@ export function makeMurmurKitTsl(TSL) {
     };
 
     return {
-        MH_R, MH_ETA, MH_EXT, MH_TILT, MH_SCATTER_K, MH_EXIT_CAP,
+        // *** MH_SPREAD IS IN THIS LIST BECAUSE IT HAS NOW GONE MISSING TWICE, THE SAME CONSTANT BOTH TIMES. ***
+        // v4627: mh_shade used it and this module never imported it, so the whole colour rail rendered black
+        // and the bisect cost most of a round. v4630: it WAS imported here but not handed back, so a species
+        // reading KIT.MH_SPREAD got undefined, multiplied a node by it, and three.js emitted WGSL containing
+        // the literal token `null` -- which the GPU rejected at pipeline creation rather than silently. Both
+        // times the value is one number that half the family's colour depends on and nothing owned it.
+        MH_R, MH_ETA, MH_EXT, MH_TILT, MH_SCATTER_K, MH_SPREAD, MH_EXIT_CAP,
         mhHash, mhGrad3, mhNoise3, mhHash1, mhFlourish, mhBreath, mhDrift, mhSpin,
         mhRefract, mhLook, mhExit, mhHaze, mhMedium, mhInside, mhTransmit, mhScatter,
         mhDeform, mhBody, MH_AMP_CAP,

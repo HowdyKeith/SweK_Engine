@@ -19,7 +19,7 @@
 // keeping them apart is what stops either gate paying for the other's frames.
 "use strict";
 import * as K from "../../render/murmurKit.mjs";
-import { N3, VOICE, PAPER_INK, sp, renderSpecies, lin, light, bil, edgeQuartile, ringNorm }
+import { N3, VOICE, PAPER_INK, sp, renderSpecies, lin, light, bil, edgeQuartile, ringNorm, hueShift }
     from "./murmurSpeciesFrames.mjs";
 
 let fails = 0;
@@ -33,8 +33,14 @@ const times = [2.4];
 // FOUR FRAMES, THREE SHADERS: still, limn and comet at one time each, plus still again on a PAPER ground --
 // which reuses still's shader, because v4629 made the colour anchors settable through setKnobs precisely so
 // a paper frame would cost a render and not a compile. Half of mh_surface only does anything on paper.
-const FRAMES = [sp("still", times[0]), sp("limn", times[0]), sp("comet", times[0]),
-                sp("still", times[0], VOICE, { colors: { ink: PAPER_INK } })];
+// The spread pair costs three RENDERS and no compiles: `spread` is an ORB_KNOBS name, so setKnobs writes it
+// and all six frames of the three heroes share three shaders.
+const FRAMES = [sp("still", times[0], VOICE, { spread: 0 }), sp("limn", times[0], VOICE, { spread: 0 }),
+                sp("comet", times[0], VOICE, { spread: 0 }),
+                sp("still", times[0], VOICE, { colors: { ink: PAPER_INK } }),
+                sp("still", times[0], VOICE, { spread: 1 }), sp("limn", times[0], VOICE, { spread: 1 }),
+                sp("comet", times[0], VOICE, { spread: 1 })];
+const SPREAD0 = { still: 0, limn: 1, comet: 2 }, SPREAD1 = { still: 4, limn: 5, comet: 6 };
 const run = await renderSpecies(FRAMES);
 const okRun = run.ok && run.frames && run.frames.length === FRAMES.length;
 if (!okRun) ok("!! the species render ran", false, `could not render: ${run.reason || "frames " + (run.frames ? run.frames.length : "none")}`);
@@ -246,7 +252,7 @@ sec("2. *** THE SURFACE, ON REAL PIXELS: the contact glow, the roster's rims, an
         // ALGEBRAICALLY IDENTICAL to leaving it out -- the arrangement murmur's mh_present settles cannot be
         // told from the wrong one by any ink-ground measurement whatsoever. On paper dark is near zero and
         // the wrong arrangement deletes the edge.
-        const paperFrame = run.frames[FRAMES.length - 1];
+        const paperFrame = run.frames[3];
         const pEdge = edgeQuartile(paperFrame), pCentre = light(paperFrame, N3 >> 1, N3 >> 1);
         say(`paper ground -- edge ${pEdge.toFixed(4)}, centre ${pCentre.toFixed(4)}, ratio ${(pEdge / pCentre).toFixed(4)}`);
         ok("!! *** ON PAPER THE RIM DARKENS THE EDGE, which is what says it is composed into body and not under (* dark) ***",
@@ -262,6 +268,63 @@ sec("2. *** THE SURFACE, ON REAL PIXELS: the contact glow, the roster's rims, an
             `paper it moves this ratio from ${(pEdge / pCentre).toFixed(4)} to 1.0287: the edge stops being ` +
             `darker than the page at all. A first cut asked only that the ratio differ from 1 by 2%, and 1.0287 ` +
             `does -- so the sabotage passed it. The DIRECTION is the claim, not the difference.`);
+    }
+}
+
+
+// =============================================================================================================
+sec("3. *** THE SPREAD AXIS, END TO END: the knob that reached no pixel until v4630 ***");
+{
+    if (!okRun) {
+        ok("!! the spread rows have frames to read", false, "the render did not produce them");
+    } else {
+        // *** THE COLOUR RAIL'S HUE AXIS WAS BUILT AND GATED AT v4627 AND REACHED NOTHING. *** murmur's
+        // species each accumulate a hue NUMERATOR beside their luminance and hand mh_lit the ratio;
+        // render/murmurKit.mjs's marchStillInterior has returned it as `hueNum` since v4623, and the shader
+        // accumulated only the scalar, so every species passed 0. Section 8 of the kit gate proved the
+        // rotation is exact and no pixel in the tree was using it.
+        //
+        // *** AND THE ROW ASKS WHAT KIND OF MOVE IT IS, NOT WHETHER THE PICTURE CHANGED. *** kit.ts: the
+        // rotation "moves the hue while holding lightness and chroma exactly. The unsafe one is trading
+        // chroma for hue, which is how a warm palette turns to mud, and this cannot do it." A row that only
+        // asked whether spread 0 and spread 1 differ would pass on exactly that failure.
+        const hs = {};
+        for (const k of ["still", "limn", "comet"]) hs[k] = hueShift(run.frames[SPREAD0[k]], run.frames[SPREAD1[k]]);
+        say(`spread 0 -> 1, mean over the body -- ` + ["still", "limn", "comet"]
+            .map((k) => `${k} hue ${hs[k].dHueDeg.toFixed(2)} deg / L ${hs[k].dL.toFixed(4)}`).join(", "));
+        ok("!! *** THE SPREAD KNOB MOVES HUE AND NOT LIGHTNESS, on every hero that carries one ***",
+            ["still", "limn", "comet"].every((k) => hs[k].dHueDeg > 1.0 && hs[k].dL < 0.02),
+            ["still", "limn", "comet"].map((k) => `${k} turns ${hs[k].dHueDeg.toFixed(2)} degrees while its ` +
+            `lightness moves ${hs[k].dL.toFixed(4)}`).join("; ") + `. Pixels below 0.01 chroma are skipped ` +
+            `because HUE IS UNDEFINED THERE and averaging an arbitrary angle in is averaging in noise. ` +
+            `Measured at 48 px and 64 px before the limits were set: the hue figures agree to a tenth of a ` +
+            `degree and the lightness figures to 1e-4.`);
+
+        // *** AND comet CARRIES A 1.4 GAIN THAT NO LOOSE BOUND CAN SEE. *** The first cut of the row above
+        // only asked that every hero turn by more than a degree, and deleting comet's gain leaves it turning
+        // 2.79 -- still over the bar, so the sabotage passed. comet.ts gives its trail that gain on purpose,
+        // and it is the difference between a trail that reads as cooling and one that reads as tinted.
+        // Measured at two frame sizes with the gain and without: 3.713 / 3.694 against 2.787 / 2.743, so the
+        // limit sits between them with about 15% either side and the instrument is stable to 0.02 degrees.
+        ok("!! ...and comet's trail carries a 1.4 gain on its hue, which a bound of 'more than a degree' cannot see",
+            hs.comet.dHueDeg > 3.2 && hs.comet.dHueDeg > hs.still.dHueDeg * 2.3,
+            `comet turns ${hs.comet.dHueDeg.toFixed(3)} degrees, ` +
+            `${(hs.comet.dHueDeg / hs.still.dHueDeg).toFixed(2)}x still's ${hs.still.dHueDeg.toFixed(3)} -- ` +
+            `against 2.787 and 1.99x with the gain deleted. Both halves are asserted because either alone is ` +
+            `a bound a nearby wrong answer fits inside.`);
+
+        // *** limn's OWN HUE TERM SATURATES, AND THAT MAKES ITS MOVE A NUMBER RATHER THAN A DIRECTION. ***
+        // Its hue is -tailShare * spread * MH_SPREAD, and tailShare -- the tail lobe's share of the light --
+        // reaches essentially 1 out along the tail. So at spread 1 limn's tail turns by MH_SPREAD itself,
+        // which is 0.50 rad = 28.65 degrees, and the measured mean over the body lands just under it.
+        ok("!! ...and limn, whose tail share saturates, turns by very nearly MH_SPREAD itself",
+            Math.abs(hs.limn.dHueDeg - 28.65) < 2.0 && hs.limn.dHueDeg > hs.still.dHueDeg * 10,
+            `limn ${hs.limn.dHueDeg.toFixed(2)} degrees against MH_SPREAD's ${(K.MH_SPREAD * 180 / Math.PI).toFixed(2)} ` +
+            `-- and ${(hs.limn.dHueDeg / hs.still.dHueDeg).toFixed(0)}x still's ${hs.still.dHueDeg.toFixed(2)}, ` +
+            `which is the difference between a hero whose hue term is a SHARE that saturates and one whose is ` +
+            `a depth-weighted average over a ray that mostly cancels. The four heroes do not share one ` +
+            `formula: still and droplet weight by depth, comet by the trail's AGE and with a 1.4 gain and a ` +
+            `sign flip, limn takes nothing from the march at all.`);
     }
 }
 
