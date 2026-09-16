@@ -43,6 +43,7 @@
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
+import { noComments } from "./sourceScan.mjs";   // v4637 -- see useSites
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 // *** IMPORTED, NOT SPELLED. *** The first draft walked the tree with its own `/\.(mjs|js|html)$/`, and
@@ -81,7 +82,23 @@ export const classOf = (symbol) =>
 export function useSites(src, sym) {
     const word = new RegExp("\\b" + sym.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b");
     let n = 0;
-    for (const line of String(src).split("\n")) {
+    // *** v4637 -- A LINE-ORIENTED COMMENT TEST CANNOT SEE A TRAILING ONE, AND THE BIGGEST COMMENT IN THIS
+    // TREE IS A TRAILING ONE. *** The loop below skips a line whose FIRST characters are `//`, which is every
+    // comment except the one that matters most: `const ENGINE_VERSION = "vNNNN";   // vNNNN -- <the round
+    // note>`. That line begins with `const`, so the whole round note -- thousands of characters of prose
+    // naming whatever the round was about -- counted as code in main.js.
+    //
+    // FOUND BY THIS ROUND DOING IT TO ITSELF. v4637's note names the five kernels it had just proved
+    // unreachable, and bumping the version made all five reachable again: 27 to 22, RING_PUSH_WGSL, COMP_WGSL,
+    // FRESNEL_WGSL, FURNACE_WGSL and ANISO_WGSL. A census that a round can move by DESCRIBING it.
+    //
+    // main.js's own line 1967 records this mechanism at v3449 -- "THE VERSION MARKER EXTENDED EVERY ROUND
+    // SUPPRESSING A CENSUS, STILL WORKING, IN A FILE TYPE THAT CENSUS COULD NOT SEE" -- and names the answer
+    // it reached then: "A PATH IS TEXT THE CODE CONTAINS; A CHANGELOG IS A COMMENT", solved by noComments().
+    // That is the scanner used here: it tracks strings, template literals, block comments and regex literals,
+    // so it strips a comment wherever it starts rather than only at a line's head.
+    src = noComments(String(src));
+    for (const line of src.split("\n")) {
         if (!word.test(line)) continue;
         if (new RegExp("(export\\s+)?(const|let|var|function)\\s+" + sym + "\\b").test(line)) continue;
         if (/^\s*export\s*\{/.test(line)) continue;
@@ -127,8 +144,14 @@ export async function kernelReach({ producers = null, files = null, read = null,
     for (const p of census) {
         if (p.kind === "file") continue;                 // a bare .wgsl file is shaderRefs' question, not this one
         const cls = classOf(p.symbol);
-        const word = new RegExp("\\b" + p.symbol.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b");
-        const outside = all.filter((f) => f !== p.file && !isGate(f) && !isTool(f) && word.test(srcOf.get(f) || ""));
+        // *** v4637 -- THIS COUNTED A COMMENT AS A CALLER, AND useSites() TWENTY LINES UP ALREADY DOES NOT. ***
+        // `word.test(wholeFileText)` matches the symbol anywhere, prose included. RING_PUSH_WGSL read as
+        // REACHABLE on the strength of a comment in render/ringFloorWgsl.mjs naming it -- the arc's
+        // unreachable-kernel count is SIX, not five, and has been since that comment was written. useSites()
+        // was built for exactly this question on the defining file and skips comment, declaration and
+        // re-export lines; asking it here makes the two halves of the same census agree on what a use is.
+        const outside = all.filter((f) => f !== p.file && !isGate(f) && !isTool(f) &&
+                                          useSites(srcOf.get(f) || "", p.symbol) > 0);
         const inside = useSites(srcOf.get(p.file) || "", p.symbol);
         const modImporters = importersOf(p.file).filter((f) => !isGate(f) && !isTool(f));
         let text = null;

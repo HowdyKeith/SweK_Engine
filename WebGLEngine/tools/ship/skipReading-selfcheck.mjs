@@ -230,10 +230,22 @@ console.log("\n5. *** AND RUNNING THE FIXED WRITER ERASED v4579'S OTHER RECORD, 
         "observed -- precisely the inference-dressed-as-observation that list exists to prevent, caused by the " +
         "mechanism meant to record it. FOUND BY RUNNING THE WRITER: reading it shows a field that is simply absent.");
 
+    // *** v4637 -- `inferred > 1500` WAS CALIBRATED TO A FIVE-GATE RUN. *** It was written the same hour the
+    // writer was fixed, when the only sweep that had run since touched five gates, so 1,620-minus-five was
+    // what the list looked like. A 1,287-gate rotation then swept the tree and the list fell to 444 -- the
+    // row's own upper clause working exactly as intended -- and the lower bound called it the bug returning.
+    // timingKind carried the mirror image of this number (`observed < 50`) and went red on the same sweep.
+    //
+    // The bound that survives a sweep of any size is the CORRESPONDENCE, not the count: a gate this run swept
+    // is out of the list, a gate it did not sweep is in it unless some earlier run watched it. `captured`
+    // names the run, so both directions are checkable here.
+    const swept = Object.keys(S.timings).filter((g) => (S.at || {})[g] === S.captured);
+    const sweptButInferred = swept.filter((g) => (S.kindsInferred || []).includes(g));
     ok("...and a gate this run swept LEAVES the list, because its kind was watched",
-        inferred > 1500 && inferred < kinds,
-        `${inferred} still inferred of ${kinds}. Both bounds matter: a list that emptied would be the bug again, ` +
-        "and one that never shrank would mean sweeping a gate teaches the record nothing.");
+        inferred > 0 && inferred < kinds && swept.length > 0 && sweptButInferred.length === 0,
+        `${inferred} still inferred of ${kinds}; the capture swept ${swept.length} and ${sweptButInferred.length} of ` +
+        "those are still called inferred. Both ends matter: a list that emptied would be the bug again, and one " +
+        "that never shrank would mean sweeping a gate teaches the record nothing.");
 
     ok("...and the three newly-marked skips are among what left it",
         Object.keys(S.kinds).filter((g) => S.kinds[g] === KIND.SKIPPED).every((g) => !(S.kindsInferred || []).includes(g)),

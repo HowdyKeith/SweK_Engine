@@ -450,6 +450,15 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
     // about ENGINE_VERSION, one level down -- so `at` is kept (it is what main ships and what backfillStamps
     // already fills) and tools/ship/budgetExile.mjs was changed to read it.
     const at = { ...(prior.at || {}) };
+    // *** v4637 -- AND THE CAP IN FORCE WHEN IT WAS TAKEN, PER ENTRY, FOR THE SAME REASON `at` IS PER ENTRY.
+    // *** `capMs` is a whole-file field over a file whose rows come from different runs -- exactly the shape
+    // v4408 fixed for dates, left standing for the cap. It did not matter while every killed row came from
+    // the same 20 s sweep; v4637's restore put the killed pass's 90 s readings back beside them, and a reader
+    // asking "is this row a hair above the cap" against ONE number now gets 20,006..90,110 and no answer.
+    // Written only where this run observed it. An entry from a run nothing can name has NO entry here rather
+    // than the file's current cap back-filled onto it, which would be a fabricated number in the field built
+    // to stop one.
+    const capAt = { ...(prior.capAt || {}) };
     // *** v4579 -- WHAT THE MILLISECOND IS, NOT JUST WHAT IT IS. *** The line below files
     const sweptNow = new Set();
     // `serialMs ?? parallelMs`, so an entry is an ALONE reading when a serial run happened and a LOADED one
@@ -470,8 +479,47 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
     // clear a stale true -- so it is recorded in BOTH directions on every row, never only when it is false.
     const finished = { ...(prior.finished || {}) };
     const contended = { ...(prior.contended || {}) };
+    // *** v4637 -- A CAP IS A LOWER BOUND, AND WRITING ONE OVER A MEASUREMENT REPLACES A FACT WITH A WEAKER
+    // STATEMENT ABOUT THE SAME FACT. *** Every field above is careful that a gate's millisecond and its label
+    // come from ONE run. Nothing was careful about the millisecond ITSELF: the line below assigned
+    // unconditionally, so a 20 s cap landed on top of a real reading and the two are indistinguishable
+    // afterwards, both being a number in `timings`.
+    //
+    // *** WHAT IT COST, MEASURED: v4568 SPENT A NINETY-SECOND SERIAL PASS CLEARING THE KILLED BUCKET AND ONE
+    // ROUTINE SWEEP PUT IT BACK. *** The pass ran all 140 and wrote what 103 actually took; at this line's
+    // parent commit the file held ZERO capped readings. A parallel line of development ran an ordinary 20 s
+    // sweep, and 137 gates went real-to-cap -- 134 of them the pass's own -- against 0 going the other way.
+    // 108 of the 137 discarded readings were CONSISTENT with the cap that replaced them (already above it),
+    // so the sweep paid a measurement for a lower bound it already had.
+    //
+    // A cap says "at least capMs" and nothing more. Where the prior entry ALREADY says a larger number the
+    // cap adds no information and the prior entry stands; where the prior says a SMALLER one the cap
+    // contradicts it -- the gate newly exceeds this cap -- and that is news, so it is written.
+    //
+    // *** THE COMPARISON IS AGAINST THE PRIOR NUMBER AND NOT AGAINST "IS THE PRIOR A MEASUREMENT", because
+    // A BIGGER CAP IS A BETTER LOWER BOUND THAN A SMALLER ONE. *** Eleven of the gates above sat at 90,097 ms
+    // from the killed pass's own cap and were overwritten with 20,032 -- seventy seconds of established floor
+    // traded for nothing, on entries a narrower rule would have called "capped either way, let it write".
+    //
+    // On the keep path NOTHING is written for that gate: code, kind, stamp, finished and contended stay the
+    // prior run's alongside the prior millisecond, because a tuple assembled from two runs is exactly the
+    // defect v4579 built `kinds` to prevent. The declined caps are reported instead, so a run never drops an
+    // observation in silence.
+    const supersededByCap = [];
     for (const r of rows) {
+        const priorMs = (prior.timings || {})[r.gate];
+        const newMs = r.serialMs ?? r.parallelMs;
+        const newCode = r.serialCode ?? 0;
+        const newSkipped = r.serialSkipped ?? r.parallelSkipped;
+        const newIsCap = !newSkipped && (newCode === 124 || newMs >= capMs);
+        if (newIsCap && priorMs != null && priorMs >= newMs &&
+            (prior.kinds || {})[r.gate] !== KIND.SKIPPED) {
+            // NOT added to sweptNow: the entry still carries the kind it had, inferred or not.
+            supersededByCap.push({ gate: r.gate, kept: priorMs, cap: newMs });
+            continue;
+        }
         timings[r.gate] = r.serialMs ?? r.parallelMs; codes[r.gate] = r.serialCode ?? 0; at[r.gate] = stamp;
+        capAt[r.gate] = capMs;
         // *** v4556 -- WHICH OF THE TWO MEASUREMENTS THIS ENTRY IS, WRITTEN BESIDE IT. *** The line above
         // files a SERIAL number whenever there was a serial re-run and a PARALLEL one otherwise, and until
         // now nothing recorded which. See contentionPairs(): the ratio that justifies the whole `serial`
@@ -486,8 +534,16 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
         // v4579 built this map to prevent.
         sweptNow.add(r.gate);
         const skipped = r.serialSkipped ?? r.parallelSkipped;
+        // *** v4637 -- "WAS THIS KILLED" IS ANSWERED BY THE FACT, NOT BY COMPARING A NUMBER TO THE CAP. ***
+        // `timings[g] >= capMs` is a proxy, and the same proxy KILLED_PASS_V4568's own note says it got
+        // wrong: "the pass called it finished-and-failed because execFileSync's timeout can leave an exit
+        // STATUS rather than a signal, so 'was this killed' was answered by comparing a number to the cap
+        // instead of by the fact." `finished` IS that fact and has been in this loop since v4568. The proxy
+        // reads a gate that ran 22,156 ms to completion as CAPPED whenever the file's cap is 20,000 -- and
+        // after v4637's restore that describes SIXTY-SEVEN entries, every one of them code 0 and finished.
+        // The cap comparison survives only where nothing observed whether the process finished.
         kinds[r.gate] = skipped ? KIND.SKIPPED
-                      : (r.serialCode ?? 0) === 124 || timings[r.gate] >= capMs ? KIND.CAPPED
+                      : (r.serialCode ?? 0) === 124 || !finished[r.gate] ? KIND.CAPPED
                       : r.serialMs != null ? KIND.ALONE : KIND.LOADED;
         // *** AND `contended` IS NOW A READING OF THE KIND RATHER THAN A SECOND DECISION ABOUT THE SAME
         // FACT. *** It was `r.serialMs == null`, which is true of a CAPPED and of a SKIPPED entry as well --
@@ -505,6 +561,10 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
         // v4566: what an incremental sweep WOULD have skipped. Reported on every run, acted on only under
         // skipUnchanged, so the number earns trust in public before it is allowed to change anything.
         unchangedInputs: (sel.unchanged || []).length, skippedUnchanged: skipUnchanged,
+        // *** v4637 -- THE CAPS THIS RUN DECLINED TO WRITE, NAMED RATHER THAN COUNTED. *** A cap that lands
+        // on a gate whose existing reading is already above it is no observation, and dropping it silently
+        // is the same silence the write itself used to have. The list is what the run saw and did not keep.
+        supersededByCap: supersededByCap.length, supersededGates: supersededByCap.map((x) => x.gate).sort(),
         // *** v4574 -- A SKIPPED RED IS STILL A RED, AND THE COUNT ALONE SAID OTHERWISE. ***
         // The first armed run reported "12 known red" against the full sweep's 19, because seven registered
         // reds had unchanged inputs and were skipped. Nothing was wrong and the output read like seven gates
@@ -566,7 +626,7 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
             // A gate this run swept has an OBSERVED kind and leaves the list. Every other entry keeps whatever
             // it had, because this run learned nothing about it.
             kindsInferred: (prior.kindsInferred || []).filter((g) => !sweptNow.has(g)),
-            captured: out.at, budgetMs, capMs, timings, codes, at, finished, crossings, serial, serialAt, contended, kinds,
+            captured: out.at, budgetMs, capMs, timings, codes, at, capAt, finished, crossings, serial, serialAt, contended, kinds,
         }, null, 1) + "\n");
     }
     return out;

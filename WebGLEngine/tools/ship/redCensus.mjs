@@ -1588,6 +1588,19 @@ export const SLOW_PARTIAL = Object.freeze({
     }
 });
 
+// *** v4637 -- AND THIS RUNNER'S LIMIT IS DECLARED TOO, FOR THE SAME RULE AND THE SAME REASON. ***
+// runnerBudget counted redCensus silent: it spawns a gate under a time limit and neither read the table nor
+// said why not. The answer is in the line below and in this module's own name -- runGate reports RED or NOT
+// RED and returns an exit code. It never returns a duration and nothing here compares one against a budget.
+// 120,000 ms is a SIGKILL ceiling on a serial re-run, chosen so a gate that genuinely needs two minutes is
+// not called red for being slow, and a run it cuts off is reported as `timeout/signal` -- explicitly NOT as
+// a failure, which is the distinction v4568's killed pass exists to make and got wrong by reading a number
+// where it should have read the fact.
+export const budgetIsOwn =
+    "runGate returns an EXIT CODE and never a duration, so gateBudget.MEASURED has nothing to say to it. The " +
+    "120,000 ms limit is a SIGKILL ceiling on a serial re-run, set so a gate that honestly needs two minutes is " +
+    "not mistaken for a red, and a run it cuts off is reported as `timeout/signal` rather than as a failure.";
+
 /** Run one gate and report whether it is red. Nothing here interprets WHY -- only the exit code. */
 // *** v4568 -- THE SAME CHILD LEAK quickSweep HAD, in the runner the rotation uses. ***
 // execFileSync's `timeout` kills the direct child and nothing below it, so a gate that spawned anything of

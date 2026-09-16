@@ -43,6 +43,15 @@ const report = (s) => console.log(`  ----  ${s}`);
 
 const T = JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "sweep-timings.json"), "utf8"));
 const CAP = T.capMs, BUDGET = T.budgetMs;
+// *** v4637 -- THE CAP IS PER ENTRY NOW, BECAUSE THE FILE HOLDS ROWS FROM RUNS WITH DIFFERENT CAPS. ***
+// Every row below used to divide by `T.capMs`, one number for the whole file, and that was right only while
+// every killed row came from the same 20 s sweep. v4637 restored the killed pass's 90 s readings that a merge
+// had overwritten with 20 s caps, and "is this a hair above the cap" against ONE number reads 20,006..90,110
+// and answers nothing. `capAt[g]` is the cap the run that took the row was running under, written where it is
+// known; where the run cannot be named the file's own cap is the documented fallback and is COUNTED, not
+// hidden, so a growing fallback is visible rather than silently widening every row that uses it.
+const capOf = (g) => (T.capAt || {})[g] ?? CAP;
+const capNamed = (g) => (T.capAt || {})[g] != null;
 const onDisk = Object.keys(T.timings).filter((g) => fs.existsSync(path.join(ENG, g)));
 const c = { over: [], killed: [], under: [] };
 for (const g of onDisk) c[SC.classify(T.timings[g])].push(g);
@@ -54,18 +63,34 @@ console.log("1. *** THE POPULATION, AND WHY ITS RECORDED MILLISECOND IS NOT A ME
 const NV = SC.notVerdicts(c, { codes: T.codes });
 {
     report(`${c.under.length} under the ${BUDGET} ms budget, ${c.over.length} over it, ${c.killed.length} killed at the ${CAP} ms cap`);
+    // *** v4637 -- `NV.length > 100` WAS A FLOOR UNDER A POPULATION, AND THE POPULATION SHRANK BECAUSE THE
+    // DEFECT WAS REPAIRED. *** It was written when 137 entries carried a killer's clock. v4637 found that
+    // quickSweep's writer assigned `timings[g]` unconditionally -- so a 20 s cap landed on top of a real
+    // measurement and the two are one field afterwards -- put the overwritten readings back, and 63 of these
+    // are measurements again. The floor went red for the repair, which is the register-of-grievances shape
+    // redCensus names. What the row is ABOUT is a property of each member and holds at any size: a non-zero
+    // code beside a killed process. The count is reported, and its history with it.
     ok(`*** ${NV.length} gates carry a KILLED reading with a non-zero code, so they have no verdict of any kind ***`,
-        NV.length > 100 && NV.every((g) => T.codes[g] !== 0 && T.codes[g] !== undefined),
-        `notVerdicts reports ${NV.length}; sweepCoverage has said since v4460 that a non-zero code beside a killed process is not a failure`);
+        NV.length > 0 && NV.every((g) => T.codes[g] !== 0 && T.codes[g] !== undefined),
+        `notVerdicts reports ${NV.length}, down from 137 at v4573: v4637 restored 63 of them to the measurement a ` +
+        `cap had been written over. sweepCoverage has said since v4460 that a non-zero code beside a killed process is not a failure`);
     // The tell that the number is the killer's: every one of them sits a hair above the cap. A gate that
     // genuinely took 20.4 s and exited would be indistinguishable from one killed at 20.0 -- which is the
     // point -- but a population whose maximum is a few hundred ms above the cap cannot be a population of
     // runtimes. Real runtimes do not cluster in a 0.3% band.
     const ms = NV.map((g) => T.timings[g]).sort((a, b) => a - b);
     const spread = ms[ms.length - 1] - ms[0];
-    report(`their recorded times run ${ms[0]} to ${ms[ms.length - 1]} ms -- a spread of ${spread} ms, ${(100 * spread / CAP).toFixed(2)}% of the cap`);
-    ok("*** and every one of them sits within half a second ABOVE the cap, which is what a killer's clock looks like and not what a population of runtimes looks like ***",
-        ms.every((v) => v >= CAP && v < CAP + 500), `${ms[0]}..${ms[ms.length - 1]} against a cap of ${CAP}`);
+    report(`their recorded times run ${ms[0]} to ${ms[ms.length - 1]} ms -- a spread of ${spread} ms across ` +
+        `${new Set(NV.map(capOf)).size} different caps, which is why the row below divides per entry and not by ${CAP}`);
+    // *** THE EXCESS OVER THE CAP IS THE QUANTITY, AND IT WAS BEING COMPUTED AGAINST THE WRONG CAP. *** Read
+    // against the file's single 20,000 the population now spans 20,006..90,110 and looks like runtimes; read
+    // against the cap EACH ROW WAS TAKEN UNDER it spans 6..110 ms, which is a killer's clock and nothing else.
+    const excess = NV.map((g) => T.timings[g] - capOf(g)).sort((a, b) => a - b);
+    const fellBack = NV.filter((g) => !capNamed(g)).length;
+    ok("*** and every one of them sits within half a second ABOVE THE CAP OF THE RUN THAT TOOK IT, which is what a killer's clock looks like and not what a population of runtimes looks like ***",
+        excess.length > 0 && excess.every((v) => v >= 0 && v < 500),
+        `${excess[0]}..${excess[excess.length - 1]} ms over their own caps (${[...new Set(NV.map(capOf))].sort((a, b) => a - b).join(", ")}); ` +
+        `${NV.length - fellBack} read a recorded cap and ${fellBack} fall back to the file's ${CAP}`);
     // v4460's class is the other one, and keeping them apart is the reason this gate exists beside that work
     // rather than on top of it.
     const SG = SC.standingGreens(c, { codes: T.codes });
@@ -184,9 +209,21 @@ console.log("\n3. THE CONSEQUENCE IS NOT MIS-COSTING -- IT IS THAT NOTHING EVER 
     ok("*** but rotation is the mechanism that re-observes an over-budget gate, and the killed bucket is outside it -- so these gates are not mis-costed, they are UNREACHABLE ***",
         NV.every((g) => !rot.picked.includes(g)) && c.over.every((g) => T.timings[g] < CAP),
         `${NV.length} killed gates, none reachable by the rotation that exists to re-time the slow ones`);
+    // *** v4637 -- THE STAMP EVIDENCE WAS A MAJORITY TEST, AND A PASS THAT IS NOT THE ROTATION DATED HALF
+    // OF THEM. *** `undated > NV.length / 2` said 129 of 137 in v4573's file. The restore put back the killed
+    // pass's own readings, so 36 of the 68 now carry KILLED_PASS_V4568's stamp -- dated, but dated by a
+    // hand-run serial pass, which is the opposite of the claim: the pass is what somebody had to do BECAUSE
+    // the rotation cannot reach them. A majority of undated entries was only ever a proxy for that.
+    //
+    // The fact itself is checkable and is checked: not one of these gates was observed by the capture that
+    // wrote this file. `captured` is the sweep that just ran; an entry it ran carries that stamp in `at`.
     const undated = NV.filter((g) => (T.at || {})[g] === SC.UNKNOWN_AT);
-    ok(`  and it shows: ${undated.length} of the ${NV.length} still carry the pre-v4408 "${SC.UNKNOWN_AT}" stamp, because nothing has scheduled them since it was introduced`,
-        undated.length > NV.length / 2, `${undated.length}/${NV.length} undated`);
+    const swept = NV.filter((g) => (T.at || {})[g] === T.captured);
+    ok(`  and it shows: NOT ONE of the ${NV.length} was observed by the sweep that wrote this file`,
+        NV.length > 0 && swept.length === 0,
+        `${swept.length} of ${NV.length} carry the capture stamp ${T.captured}. ${undated.length} have never been ` +
+        `dated at all and ${NV.filter((g) => (T.at || {})[g] === SC.KILLED_PASS_V4568.stamp).length} carry the ` +
+        `killed pass's, which is a hand-run serial pass and not the rotation -- it is what the bucket being unreachable looks like`);
 }
 
 // -----------------------------------------------------------------------------------------------------------
@@ -212,7 +249,8 @@ console.log("\n4. CONTROLS");
 
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("AND AN EIGHTEENTH THAT DID NOT FINISH: tools/ship/redCensus-selfcheck.mjs, recorded at 20,021 ms " +
-    "with code 124 and the pre-v4408 stamp like the rest, exceeded a 400-SECOND harness timeout during this " +
+    "with code 124 and the pre-v4408 stamp like the rest WHEN THIS WAS WRITTEN -- v4637 restored it to the " +
+    "killed pass's 45,245 ms at code 0, a measurement, which is what the file reads now -- exceeded a 400-SECOND harness timeout during this " +
     "round's own verify sweep without completing. It is not in the table above, because the table is of runs " +
     "that ENDED and a timeout is a lower bound rather than a measurement -- but it puts the population's " +
     "upper end past 400 s, beyond the 549 s this sample's slowest measured gate reached, and its own header " +

@@ -39,6 +39,7 @@ import { runWgslComputeNative, LIVENESS_SENTINEL, headlessGpuSkipReason } from "
 import { runWgslCompute, webgpuSkipReason } from "./webgpuHarness.mjs";
 import { compare, corpus, census, EXCLUDED } from "./wgslCorpus.mjs";
 import { temporalEntries, bindingsOf, TW, TH } from "./temporalCorpus.mjs";
+import { usedNames } from "../../render/wgslSpec.mjs";   // v4637 -- the same question the device asks, see section 5
 import { createRequire } from "node:module";
 
 const requireFn = createRequire(import.meta.url);
@@ -164,18 +165,39 @@ console.log("\n5. *** THE THIRTEEN v4571 NAMED, AND THE BINDINGS READ OUT OF THE
     ok(`*** every WGSL producer the census can see is now in the corpus or excluded with a reason -- ${corpus().length} in corpus, ${EXCLUDED.length} excluded, ${un.length} unaccounted ***`,
         un.length === 0, un.length ? un.map((u) => u.symbol).join(", ") : `was 13 unaccounted at v4571`);
     const te = temporalEntries();
+    // *** v4637 -- `te.length === 13` WAS A RATCHET POINTING THE WRONG WAY. *** The arc adding a kernel WITH a
+    // fixture is the direction this whole gate exists to encourage, and RING_FLOOR_WGSL arriving took the
+    // count to 14 and turned the row red for it. The number that must not move is the compile-only pair --
+    // a fragment is compiled inside a shell precisely because it cannot be dispatched, and a THIRD one
+    // appearing would mean a kernel lost its dispatch, which is the regression worth catching. The dispatched
+    // count is free to grow and is reported.
     ok(`  and the arc contributes ${te.length} of them -- ${te.filter((e) => !e.compileOnly).length} dispatched and ${te.filter((e) => e.compileOnly).length} function fragments compiled inside a shell that CALLS them`,
-        te.length === 13 && te.filter((e) => e.compileOnly).length === 2, `${te.length} entries`);
+        te.length >= 13 && te.filter((e) => e.compileOnly).length === 2,
+        `${te.length} entries, up from the 13 v4571 named; a new kernel arrives here WITH a fixture or temporalEntries() throws`);
     // The claim that makes this safe to extend: no entry restates a binding number.
+    // *** v4637 -- THIS RE-DERIVED WITH THE RULE v4591 REPLACED: WHAT THE SOURCE DECLARES, NOT WHAT THE ENTRY
+    // POINT USES. *** temporalAccumulateWgsl.mjs has TWO entry points, and `stats` at binding 5 belongs to
+    // mainCounted. `main` never touches it, so the corpus does not bind it -- because, in gfx/device.js's own
+    // words at v4466, "a bind group carrying a binding the entry never touches is refused by the API". The
+    // corpus asks usedNames(); this row counted the raw declarations and called the entry short one binding.
+    // A declaration list read as a usage list, which is the shape this arc named at v4629 for exports and
+    // dependencies. It asks usedNames() the same way the corpus and the device do.
+    const bindingsUsedBy = (code) => {
+        const all = bindingsOf(code);
+        const used = new Set(usedNames(code, all.map((b) => ({ ...b })), ["main"]).filter((b) => b.used).map((b) => b.name));
+        return all.filter((b) => used.has(b.name));
+    };
     const derived = te.filter((e) => !e.compileOnly).every((e) => {
-        const bs = bindingsOf(e.opts.code);
+        const bs = bindingsUsedBy(e.opts.code);
         const outOk = bs.some((b) => b.binding === e.opts.outBinding && b.kind.includes("read_write"));
         const uniOk = bs.some((b) => b.binding === e.opts.uniformBinding && b.kind.includes("uniform"));
         const inOk = (e.opts.inputs || []).every((i) => bs.some((b) => b.binding === i.binding));
         return outOk && uniOk && inOk && bs.length === (e.opts.inputs || []).length + 2;
     });
-    ok("*** every dispatched entry's out, uniform and input bindings come from the KERNEL'S OWN SOURCE and account for all of its bindings -- a renumbered shader moves the entry with it ***",
-        derived, `${te.filter((e) => !e.compileOnly).length} kernels re-parsed`);
+    const second = te.filter((e) => !e.compileOnly).filter((e) => bindingsOf(e.opts.code).length > bindingsUsedBy(e.opts.code).length);
+    ok("*** every dispatched entry's out, uniform and input bindings come from the KERNEL'S OWN SOURCE and account for all of the bindings ITS ENTRY POINT USES -- a renumbered shader moves the entry with it ***",
+        derived, `${te.filter((e) => !e.compileOnly).length} kernels re-parsed; ${second.length} declare a binding ` +
+        `main never touches (${second.map((e) => e.id.split(".")[0]).join(", ") || "none"}), which the device would refuse if it were bound`);
     ok("  and a kernel whose buffer was RENAMED fails at construction rather than running against a fixture of zeros",
         (() => { try { bindingsOf("@group(0) @binding(0) var<storage,read_write> notDst:array<f32>;"); } catch { return false; }
                  const bs = bindingsOf("@group(0) @binding(0) var<storage,read_write> notDst:array<f32>;");
@@ -201,7 +223,11 @@ else {
     }
     for (const r of rows) report(`${r.id.padEnd(38)} n=${String(r.n).padStart(4)}  untouched=${String(r.untouched).padStart(3)}  distinct=${String(r.distinct).padStart(4)}`);
     ok(`*** all ${rows.length} dispatched entries write every word of their read-back -- ${rows.reduce((a, r) => a + r.n, 0)} floats, ${rows.reduce((a, r) => a + r.untouched, 0)} untouched ***`,
-        rows.length === 11 && rows.every((r) => r.untouched === 0), `${rows.filter((r) => r.untouched > 0).map((r) => r.id).join(", ") || "none untouched"}`);
+        // `rows.length === 11` was the same wrong-way ratchet as the count above: a kernel gaining a dispatched
+        // fixture is this gate's purpose, and RING_FLOOR arriving made the row red. What must hold is that
+        // EVERY dispatched entry -- however many there are -- writes every word, and that the set is not empty.
+        rows.length >= 11 && rows.every((r) => r.untouched === 0),
+        `${rows.filter((r) => r.untouched > 0).map((r) => r.id).join(", ") || "none untouched"}, across ${rows.length} dispatched entries`);
     ok("*** and none of them writes a CONSTANT, which liveness alone would have let through and did: the disocclusion fixture wrote 256 identical zeros until its own motion field was built to straddle the threshold ***",
         rows.every((r) => r.distinct >= 2), rows.filter((r) => r.distinct < 2).map((r) => r.id).join(", ") || `fewest distinct: ${Math.min(...rows.map((r) => r.distinct))}`);
     ok("  and the three ridge kernels write a MASK, so two distinct values is the whole range there and both branches are reached",

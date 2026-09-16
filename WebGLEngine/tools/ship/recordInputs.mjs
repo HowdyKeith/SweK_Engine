@@ -82,6 +82,26 @@ const readProbe = (dir, rel, ms, status) => {
              net, spawnedNonNode: nonNode, spawnedNode: nodeKids };
 };
 
+// *** v4637 -- THIS RUNNER'S TIME LIMIT IS DECLARED, BECAUSE runnerBudget COUNTED IT AS SILENT. ***
+// The rule is that a module spawning a gate under a time limit either reads gateBudget's table or says why it
+// does not. This module was one of two that did neither -- found when the rotation brought runnerReach back
+// under the ship-time budget and its long-standing red became visible.
+//
+// The honest answer is that neither number here is a per-gate budget. The probe runs a gate ONLY to observe
+// what it reads, opens and spawns; the duration is discarded. So 30,000 ms (and the CLI's --timeout-s, 25 s by
+// default) is a SIGKILL ceiling that stops one slow gate stalling a whole-tree probe, not a claim about how
+// long any gate should take -- gateBudget.MEASURED has nothing to say to it, and a reading it produces would
+// be the killer's clock, which is the distinction v4574 established for quickSweep's cap.
+//
+// NOT CLAIMED: that a probe cut off by this cap is handled correctly. It is not -- a timed-out probe is
+// written as a record that read NOTHING, which is an open item on the backlog, and this declaration is about
+// the number rather than about that.
+export const budgetIsOwn =
+    "neither number here is a per-gate budget. This runner spawns a gate to observe what it READS, opens and " +
+    "spawns, and discards the duration entirely, so gateBudget.MEASURED has nothing to say about either. The " +
+    "30,000 ms default (and --timeout-s, 25 s) is a SIGKILL ceiling so one slow gate cannot stall a whole-tree " +
+    "probe; a reading it produced would be the cap's clock rather than a runtime, and nothing here compares one.";
+
 /** Synchronous, for one gate at a time -- the shape the gate and a --gates run want. */
 export function probeOne(rel, { root = ENG, timeoutMs = 30000 } = {}) {
     const dir = probeDir();

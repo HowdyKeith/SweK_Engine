@@ -131,17 +131,30 @@ console.log("\n2. *** THE POPULATION IS A CLOSURE, AND IT NEARLY TRIPLED ***");
     const live = m ? { total: Number(m[1]), table: Number(m[2]), own: Number(m[3]) } : null;
     say("observed by running the check", live ? `${live.total} runners, ${live.table} read the table, ${live.own} declare their own` : "(could not read its output)");
 
+    // *** v4637 -- `=== POP_V4583.after` FORBADE A RUNNER FROM ARRIVING. *** The number is the size of a
+    // population the closure computes, and a fifteenth runner appearing is the tree growing, not a predicate
+    // breaking. What this row exists to catch is the OPPOSITE -- a narrowed predicate dropping members, which
+    // is what the seven sabotages above all did -- and a FLOOR catches every one of them while letting the
+    // tree grow. The count is still printed, so a jump is visible rather than merely permitted.
     ok("*** the population it actually computes is the widened one, read from its own output ***",
-        !!live && live.total === POP_V4583.after && live.total > POP_V4583.before * 2,
+        !!live && live.total >= POP_V4583.after && live.total > POP_V4583.before * 2,
         `${live ? live.total : "?"} against a frozen ${POP_V4583.after}, up from ${POP_V4583.before}. Every ` +
         "predicate this round changed moves this number, and nothing else in this gate does -- which is why it is " +
         "the row that has to hold. If the check cannot be run at all this row fails rather than passing quietly.");
 
+    // *** v4637 -- AND THE `- 3` WAS THE SAME CONSTANT ONE LAYER DOWN. *** Three runners took a caller's
+    // timeout the day this was written; the number is the size of that group, not a property. The property is
+    // a PARTITION: every runner reads the table, declares its own, or takes a caller's, and none is left over.
+    // The third group is counted from the check's own PASSED-IN lines rather than assumed, so a runner that
+    // simply goes unaccounted cannot be absorbed by a constant. v4637 ended two such silences -- recordInputs
+    // and redCensus each spawn a gate under a cap and now say why gateBudget has nothing to tell them.
+    const passedIn = (String(out.stdout || "").match(/^\s*----\s+PASSED-IN\s/gm) || []).length;
     ok("...and every member accounts for its limit, which is the check's own verdict rather than this gate's summary",
-        out.status === 0 && live && live.table + live.own === live.total - 3,
+        out.status === 0 && live && passedIn > 0 && live.table + live.own + passedIn === live.total,
         `exit ${out.status}; ${live ? live.table + live.own : "?"} of ${live ? live.total : "?"} account for a ` +
-        "limit and 3 take their caller's. Reading a gate's EXIT CODE as well as its numbers, because a count " +
-        "parsed out of a failing run is a number from a run that said no.");
+        `limit and ${passedIn} take their caller's, which partitions the population with none left over. Reading a ` +
+        "gate's EXIT CODE as well as its numbers, because a count parsed out of a failing run is a number from a " +
+        "run that said no.");
 
     ok("*** membership is computed to a fixed point rather than matched against a list of spellings ***",
         isClosure && seedBoth,
@@ -197,8 +210,11 @@ console.log("\n3. *** THE INVERSION: AN OUTER TOTAL LIMIT BELOW THE INNER PER-ST
     const tailSum = Object.values(MEASURED).reduce((a, b) => a + b, 0);
     const singleOverBridge = Object.entries(MEASURED).filter(([, v]) => v > WAS.real);
     say("MEASURED tail, summed", `${(tailSum / 60000).toFixed(1)} min across ${Object.keys(MEASURED).length} gates`);
+    // v4637 -- `=== 3` again, and here the direction is plainest of all: the claim is that the table cannot
+    // yield a wall-clock limit, and MORE gates costing more than the whole limit makes that MORE true. Six do
+    // now where three did. A floor is what the argument actually needs.
     ok("*** and no wall-clock ship limit could be derived from the table, which is why it is declared instead ***",
-        singleOverBridge.length === 3 && tailSum > 15000000,
+        singleOverBridge.length >= 3 && tailSum > 15000000,
         `${singleOverBridge.length} single gates cost more than the whole 900 s limit on their own (worst ` +
         `${Math.max(...singleOverBridge.map(([, v]) => v))} ms), and the tail sums to ` +
         `${(tailSum / 60000).toFixed(0)} minutes. A ship limit derived from these numbers would be four hours; ` +

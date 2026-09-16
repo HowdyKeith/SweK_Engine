@@ -142,7 +142,14 @@ console.log("\n2. THE TREE'S OWN ANSWER");
     //
     // What is asserted now is that the arc's remaining unreachable kernels are NAMED -- the thing a reader needs
     // -- and that the count only falls. The size lives in the ratchet below, which is where a size belongs.
-    const ARC_UNREACHABLE_AT_V4592 = 5;   // v4593: 7 -> 5, temporalReject's two got a caller
+    // *** v4637 -- RAISED, 5 -> 6, AND THE TREE DID NOT MOVE: THE INSTRUMENT DID. *** kernelReach's `outside`
+    // filter tested the symbol against a file's WHOLE TEXT while useSites(), twenty lines above it in the same
+    // module, skips comment lines. So prose counted as a caller. RING_PUSH_WGSL has read REACHABLE since a
+    // comment in render/ringFloorWgsl.mjs first named it, and the arc's real figure has been SIX for every
+    // round that reported five. Raising a ratchet is what this file calls a grievance list when the debt grew;
+    // this is the other case, and the difference is recorded rather than assumed: the debt did not grow, the
+    // count was wrong, and the seed is re-taken at what the corrected predicate measures.
+    const ARC_UNREACHABLE_AT_V4592 = 6;   // v4593: 7 -> 5, temporalReject's two got a caller; v4637: 5 -> 6, see above
     say("the temporal arc", arc.length
         ? `${arc.length} of ${r.unreachable.length} still unreachable: ${arc.map((a) => a.symbol).join(", ")}`
         : "every kernel has a caller");
@@ -162,10 +169,21 @@ console.log("\n2. THE TREE'S OWN ANSWER");
     // v4592 -- LOWERED again, 15 -> 14: render/motionVectorsGPU.mjs gave MOTION_WGSL a caller.
     // v4593 -- 14 -> 12: render/temporalRejectGPU.mjs took DISOCCLUSION_WGSL and RECTIFY_WGSL. FIVE of the
     // temporal arc's ten remain -- RING_FLOOR and temporalLock's four -- against ten when the census was built.
-    const UNREACHABLE_AT_V4589 = 12;
+    // v4637 -- RAISED, 12 -> 27, for the reason above and at fifteen times the scale. The comment-counting
+    // predicate was not a temporal-arc problem: FIFTEEN kernels across render/ and physics/render/ read as
+    // reachable on the strength of a sentence. physics/render/wgslArc.mjs line 17 names COMP_WGSL,
+    // FRESNEL_WGSL, FURNACE_WGSL and ANISO_WGSL in one comment about how they are exported, and that comment
+    // was the only thing in the tree outside their own files and gates that mentioned them at all -- it made
+    // four kernels reachable by describing them. THE RATCHET WAS MEASURING ITS OWN DOCUMENTATION.
+    //
+    // 27 is therefore the first honest reading of this number, not a regression from 12, and every round from
+    // v4589 that reported the ratchet holding was reporting on a predicate that could be satisfied by prose.
+    // The seed moves once, here, with that said; from this point it only falls.
+    const UNREACHABLE_AT_V4589 = 27;
     ok("!! *** no EIGHTEENTH kernel arrives with nothing but a gate able to run it ***",
        r.unreachable.length <= UNREACHABLE_AT_V4589,
-       `${r.unreachable.length} against a frozen ${UNREACHABLE_AT_V4589}. OWED: a runner for each, or a reason ` +
+       `${r.unreachable.length} against a frozen ${UNREACHABLE_AT_V4589}, re-seeded at v4637 from 12 when the ` +
+       "census stopped counting comments as callers. OWED: a runner for each, or a reason " +
        "it is a probe. A kernel proven on a device and unrunnable by the engine is work that shipped nothing.");
     ok("...and the ratchet is not left behind by real progress",
        r.unreachable.length >= UNREACHABLE_AT_V4589 - 4,

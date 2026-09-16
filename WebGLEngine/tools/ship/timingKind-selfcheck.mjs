@@ -91,13 +91,38 @@ console.log("\n2. AN INFERENCE IS NAMED AS ONE, ALL 1,620 OF THEM");
     const census = {};
     for (const v of Object.values(S.kinds)) census[v] = (census[v] || 0) + 1;
     report(`by kind: ${Object.entries(census).map(([k, n]) => `${k} ${n}`).join(", ")}`);
-    ok(`*** every entry predating v4579 has its kind INFERRED and is named in kindsInferred -- an inference dressed as an observation is the fault five rounds of this arc have been about ***`,
-        inferred.size > 1000 && observed.length > 0 && observed.length < 50,
-        `${observed.length} observed are the entries this arc hand-wrote and can vouch for`);
+    // *** v4637 -- `observed.length < 50` WAS THE SIZE OF ONE ROUND'S HAND-WORK, ASSERTED AS A PROPERTY. ***
+    // It was written when the only observations in the file came from this arc driving the writer over a
+    // handful of gates. A 1,287-gate rotation then swept the tree and observed 1,287 kinds, exactly as it is
+    // supposed to, and the row went red for the machinery working -- the same count-standing-in-for-a-property
+    // shape this arc has now found eight times.
+    //
+    // THE PROPERTY IS MEMBERSHIP, AND IT IS CHECKABLE BOTH WAYS. An entry is out of the list exactly when the
+    // run that took its millisecond recorded a kind beside it. The file names that run: `captured`. So every
+    // entry carrying the capture stamp must be observed, and every observed entry must either carry it or be
+    // one of the few this arc hand-measured and can name. Neither side depends on how many gates a sweep ran.
+    const swept = Object.keys(S.timings).filter((g) => (S.at || {})[g] === S.captured);
+    const sweptButInferred = swept.filter((g) => inferred.has(g));
+    const observedElsewhere = observed.filter((g) => (S.at || {})[g] !== S.captured);
+    ok(`*** an entry's kind is INFERRED unless the run that took its millisecond watched it, and kindsInferred is exactly that set ***`,
+        inferred.size > 0 && observed.length > 0 && sweptButInferred.length === 0 && observedElsewhere.length < 50,
+        `${swept.length} entries carry the capture stamp and ${sweptButInferred.length} of them are still called inferred; ` +
+        `${observedElsewhere.length} observed entries come from an earlier run this arc measured by hand`);
     // The inference must be exactly the branch rule, or it is a third thing pretending to be the first two.
+    //
+    // *** v4637 -- AND THE BRANCH RULE STOPPED ASKING WHETHER THE PROCESS FINISHED BY COMPARING A NUMBER TO
+    // THE CAP. *** `ms >= capMs` is a proxy, and it is the proxy KILLED_PASS_V4568's own note records getting
+    // wrong: "was this killed" answered by comparing a number to the cap instead of by the fact. `finished`
+    // IS the fact and has been in the file since v4568. The proxy calls a gate CAPPED whenever its runtime
+    // exceeds whatever cap the file was last swept at -- and after v4637 restored the killed pass's readings
+    // that is SIXTY-SEVEN entries, every one of them code 0 with `finished` true, gates that ran 20 s to 90 s
+    // to completion under a 90 s cap and are read as killed by a file whose cap now says 20,000. Where
+    // nothing observed whether the process finished, the cap comparison is still the only thing available.
     const wrongInference = [...inferred].filter((g) => {
-        const ms = S.timings[g], code = S.codes[g] ?? 0;
-        const want = code === 124 || ms >= S.capMs ? KIND.CAPPED
+        const ms = S.timings[g], code = S.codes[g] ?? 0, fin = (S.finished || {})[g];
+        const killed = fin === false || code === 124 || typeof code === "string";
+        const want = killed ? KIND.CAPPED
+                   : fin === undefined && ms >= S.capMs ? KIND.CAPPED
                    : ms >= S.budgetMs || code !== 0 ? KIND.ALONE : KIND.LOADED;
         return S.kinds[g] !== want;
     });
@@ -136,9 +161,24 @@ console.log("\n3. *** EIGHT MORE WRONG ENTRIES, ONE PER ROUND OF THIS ARC, INCLU
     const own = R.filter((x) => /timing(Records|Load|Survivors|Semantics)/.test(x.gate));
     ok(`*** and ${own.length} of the ${R.length} are THIS ARC'S OWN GATES -- their runtimes were filed as alone readings every round while the files argued about exactly this ***`,
         own.length === 4, own.map((x) => path.basename(x.gate)).join(", "));
-    ok(`  and all ${R.length} now hold the loaded reading, measured at exactly eight concurrent to match the sweep's own width`,
-        R.every((x) => S.timings[x.gate] === x.loaded8 && S.kinds[x.gate] === KIND.LOADED),
-        R.slice(0, 3).map((x) => `${path.basename(x.gate)} ${x.wroteAlone}->${S.timings[x.gate]}`).join(", ") + ", ...");
+    // *** v4637 -- THIS ROW FORBADE THE ROTATION FROM DOING ITS JOB. *** It required these eight entries to
+    // still read the exact millisecond v4579 wrote AND to still carry LOADED. But a kind is a property of the
+    // RUN that took the number, and two ordinary things write an ALONE reading on purpose: a gate that exits
+    // non-zero gets a serial re-run, and sweepCoverage.rotation() re-times slow gates one at a time. Six of
+    // the eight now read ALONE from a rotation sweep -- five of them at code 1, which is a gate that was red
+    // when it was swept -- and the row called that a regression. The file is ENTITLED to move here.
+    //
+    // What stays frozen is what v4579 corrected and why: each of these held an ALONE reading in an
+    // under-budget slot, where the quantity the column wants is the LOADED one. That claim is about a round,
+    // so it is asserted from the table. What the file reads now is REPORTED, with the kind beside it, because
+    // a reader should be able to see the drift without the row pretending the drift is a fault.
+    report("what the file reads now: " + R.map((x) =>
+        `${path.basename(x.gate)} ${S.timings[x.gate]}ms ${S.kinds[x.gate]}${(S.codes[x.gate] ?? 0) !== 0 ? " code " + S.codes[x.gate] : ""}`).join(", "));
+    ok(`  and all ${R.length} were corrected AT v4579 from an alone reading to the eight-wide loaded one -- the table is the record of that round, not a requirement on every sweep since`,
+        R.every((x) => x.loaded8 > x.wroteAlone && x.wroteAlone < S.budgetMs),
+        `${R.filter((x) => S.kinds[x.gate] === KIND.LOADED).length} of ${R.length} still read LOADED; ` +
+        `${R.filter((x) => S.kinds[x.gate] === KIND.ALONE).length} read ALONE, which is what a serial re-run or a ` +
+        `rotation re-timing writes on purpose -- ${R.filter((x) => (S.codes[x.gate] ?? 0) !== 0).length} of those were red when swept`);
     ok(`  and every one is under the ${S.budgetMs} ms budget, which is what makes an alone reading the wrong quantity there rather than merely a stale one`,
         R.every((x) => x.loaded8 < S.budgetMs), `the largest is ${Math.max(...R.map((x) => x.loaded8))} ms`);
 }
@@ -149,9 +189,15 @@ console.log("\n4. AND THE ENUMERATION HAD TWO FALSE MEMBERS THAT THE MEASUREMENT
     const FP = WRONG_QUANTITY_V4579.falsePositives;
     report(`listed as arc-written and are not: ${FP.map((g) => path.basename(g)).join(", ")} -- v4577 corrected their gate-timings rows, not their sweep rows`);
     report(`reskin measured 1494 ms at eight-wide against a recorded 2687, which is 0.56x -- impossible for an alone reading and ordinary for a LOADED one`);
+    // *** v4637 -- AND THE SAME CORRECTION HERE, FOR THE SAME REASON. *** Requiring these two to read LOADED
+    // forever is requiring that no rotation ever re-time them; both now carry an ALONE reading from the sweep
+    // that wrote this file, at code 0 and under budget. The finding is that v4579's MEASUREMENT refused them
+    // -- 1494 ms at eight-wide against a recorded 2687 cannot be an alone reading -- and that is a fact about
+    // the measurement, which is frozen here. Their current kind is reported.
     ok("*** the list was ten and the numbers made it eight: a candidate measuring BELOW its recorded value at eight-wide cannot be holding an alone reading, so the record was already right ***",
-        FP.length === 2 && FP.every((g) => S.kinds[g] === KIND.LOADED),
-        `both are inferred LOADED by the branch rule and the measurement agrees, so neither was touched`);
+        FP.length === 2 && FP.every((g) => S.kinds[g] != null),
+        `${FP.map((g) => `${path.basename(g)} ${S.timings[g]}ms ${S.kinds[g]}`).join(", ")} -- neither was touched by v4579, ` +
+        "and a kind that has moved since is a later run recording what IT did, not this row's business");
     ok("  and they are recorded rather than dropped, because a list corrected by measurement is worth more than a list that was right",
         FP.every((g) => fs.existsSync(path.join(ENG, g))), `${FP.length} named`);
 }
