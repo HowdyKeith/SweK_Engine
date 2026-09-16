@@ -195,21 +195,70 @@ export const PLAYER_WATER_AT_V4550 = Object.freeze({
     predicateCopiesAfter: 1,    // Camera.isSolidToBody
     idsExcludedByCanStandAt: Object.freeze([10, 11]),   // WATER, FLOWING_WATER
     idsExcludedByTheOtherTwo: Object.freeze([]),
-    // (2) THE LIVE WORLD, 5x5 CHUNKS GENERATED IN NODE FROM world/world.js
-    censusColumns: 3721,
-    waterColumns: 146,          // 3.92% -- water is not a hypothetical in this world
-    surfaceWaterColumns: 79,    // water is the topmost non-air voxel: a lake you can walk to
+    // (2) THE LIVE WORLD -- *** v4559: THE WHOLE ISLAND, BECAUSE THE PATCH WAS THE FLATTEST PART OF IT. ***
+    //
+    // v4550 censused x,z in -30..30 and called it "a generated world, 5x5 chunks". The world is not 5x5
+    // chunks: VoxelWorld's constructor runs init() over gridRadius 7, so it is a FINITE 15x15-CHUNK ISLAND
+    // of 240x240 = 57,600 columns, and all of it was already generated and sitting there. The census looked
+    // at 3,721 of them -- 6.46% -- and the gate's own liveWorld() re-generated 25 chunks it already had.
+    //
+    // AND THE PATCH IT PICKED IS NOT A SAMPLE, IT IS AN OUTLIER. Measured over both:
+    //     overhang / multi-surface columns   window 0 of 3,721 (0.00%)   island 8,200 of 57,600 (14.24%)
+    //     water columns                      window 146 (3.92%)          island 14,183 (24.62%)
+    //     worst first-to-last solid spread   window 0                    island 51
+    // The one region of this world with NO overhangs at all, reading a sixth of the water the world has.
+    censusColumns: 57600,               // the island   (3,721 at v4550, the window)
+    censusColumnsAtV4550Window: 3721,
+    overhangColumns: 8200,              // 14.24%   (0 in the v4550 window -- the reason this was re-taken)
+    overhangColumnsAtV4550Window: 0,
+    worstSolidSpread: 51,
+    waterColumns: 14183,        // 24.62% -- water is not a hypothetical in this world   (146 in the window)
+    waterColumnsAtV4550Window: 146,
+    surfaceWaterColumns: 2346,  // water is the topmost non-air voxel: a lake you can walk to   (79)
+    surfaceWaterColumnsAtV4550Window: 79,
     waterDepthRange: Object.freeze([1, 7]),
-    surfaceDepthRange: Object.freeze([1, 3]),
+    surfaceDepthRange: Object.freeze([1, 7]),   // [1, 3] in the v4550 window: the deeper pools are outside it
     // *** THE PLAYER AND THE BOTS AGREED ALL ALONG, WHICH IS THE CORRECTION TO THE FILED ITEM. ***
-    columnsWherePlayerGroundEqualsBotGround: 146,
-    ofWaterColumns: 146,
-    // (3) *** AND THE EXCLUSION WAS ASKED ON ZERO REACHABLE SITES. *** Over every standable column in the
-    // census, the four-neighbour cells holding water anywhere in the body's own two-cell span: none. A lake
-    // surface is level, so the land beside it stands at top+1 and the neighbour's span is the air above the
-    // water. It takes water standing HIGHER than the land next to it -- which the fluid systems level away.
+    // v4559: re-taken over the island's 14,183 water columns rather than the window's 146 -- a NINETY-SEVEN
+    // FOLD wider population for the round's central correction, and still every column.
+    columnsWherePlayerGroundEqualsBotGround: 14183,
+    ofWaterColumns: 14183,
+    columnsWherePlayerGroundEqualsBotGroundAtV4550Window: 146,
+    // (3) *** AND THE EXCLUSION WAS ASKED ON ZERO REACHABLE SITES -- RE-TAKEN AT v4559 AND STILL ZERO. ***
+    //
+    // Over every standable height in the census, the four-neighbour cells holding water anywhere in the
+    // body's own two-cell span: none. A lake surface is level, so the land beside it stands at top+1 and the
+    // neighbour's span is the air above the water. It takes water standing HIGHER than the land next to it
+    // -- which the fluid systems level away.
+    //
+    // *** THE REGION WAS THE FILED COMPLAINT AND IT IS NOT WHERE THE HOLE WAS. *** Widening 3,481 standable
+    // columns to the island's 56,644 -- every one of the 8,200 overhang columns included -- leaves the count
+    // at 0. The instrument was the problem: standHeightAt(w, x, z, {}) returns ONE height per column and it
+    // is the TOPMOST, so a flooded room under an overhang -- the exact case this row's own note says it
+    // would catch -- could not be reached by the probe at all, in a world where 6,913 columns carry more
+    // than one surface. standablesAt() has existed for this since v4542. Asked at all 63,684 standable
+    // heights it is still 0: a SEVENTEENFOLD wider population and the same answer.
     reachableExclusionSites: 0,
     reachabilityIsAFixtureClaim: false,   // taken on the generated world, not on a hand-built one
+    standableColumns: 56644,
+    standableHeights: 63684,              // 3,481 were asked at v4550, one per column
+    columnsWithMoreThanOneSurface: 6913,
+    askedAtEveryStandableHeight: true,    // false at v4550: the topmost surface only
+    // *** AND THE ZERO IS A MEASUREMENT RATHER THAN A DEAD CHECK, WHICH NOTHING ESTABLISHED BEFORE. *** A
+    // census that reports 0 is worth exactly what its ability to report anything else is worth, and v4550
+    // asserted the 0 without ever showing the probe firing. Driven on a hand world -- land topping at y=4,
+    // a wall of water from y=5 to y=9 beside it, which is "somebody floods a room" -- THE SAME PREDICATE
+    // THE ISLAND CENSUS USES counts 8: the four columns either side of the wall, at one standable height
+    // each. The island's 0 is what the world is like, not what the instrument can see.
+    //
+    // *** 8 AND NOT 16, AND THE FIRST NUMBER IS WORTH RECORDING BECAUSE OF HOW IT WAS WRONG. *** The first
+    // draft of the control re-implemented the neighbour test inline and counted every (neighbour, cell) hit
+    // rather than asking once per standable position -- so it read 16, and sabotaging the shipped predicate
+    // to return false left the island row at 0 AND the control at 16, both green. A control grading its own
+    // copy of the thing under test is worth nothing at all, which is the defect this session has now found
+    // in five rounds and the one it was written to rule out.
+    controlSitesOnAFloodedWall: 8,
+    controlSitesWhenTheControlCountedItsOwnCopy: 16,
     // (4) WHERE IT IS REACHABLE, BUILT BY HAND: a wall of water from y=2 to y=9 against land topping at 5
     stoneWallStopsBodyAt: 9.583,          // a radius short of the face at x = 10 -- UNMOVED by v4552
     // *** THE THREE `Before` NUMBERS ARE A COUNTERFACTUAL, AND v4552 MOVED THEM WITHOUT TOUCHING WATER. ***

@@ -85,7 +85,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Camera, PLAYER_WATER_AT_V4550 as R } from "../../camera/camera.js";
-import { standHeightAt } from "../../world/surfaceProbe.mjs";
+import { standHeightAt, standablesAt } from "../../world/surfaceProbe.mjs";
 import { VOXEL } from "../../world/voxelFormat.js";
 import { noComments, prose } from "./sourceScan.mjs";
 
@@ -170,10 +170,14 @@ const beforeV4550 = (c) => {
  */
 async function liveWorld() {
     const { VoxelWorld } = await import("../../world/world.js");
-    const w = new VoxelWorld();
-    for (let cx = -2; cx <= 2; cx++) for (let cz = -2; cz <= 2; cz++) w.generateChunk(cx, cz);
-    return w;
+    // *** v4559 -- THE CONSTRUCTOR ALREADY GENERATED THE WHOLE WORLD, AND THE LOOP THAT USED TO BE HERE
+    // RE-GENERATED 25 CHUNKS IT ALREADY HAD. *** VoxelWorld's init() runs over gridRadius 7, so the world
+    // is a finite 15x15-chunk island of 240x240 columns the moment it exists. v4550's comment called this
+    // "5x5 chunks", which was a description of the discarded loop rather than of the world.
+    return new VoxelWorld();
 }
+/** The island's column bounds, read off the world rather than typed, so a gridRadius change moves them. */
+const islandBounds = (w) => ({ lo: -w.gridRadius * w.chunkSize, hi: (w.gridRadius + 1) * w.chunkSize - 1 });
 const isWet = (v) => v === WATER || v === FLOWING;
 
 console.log("== playerWater-selfcheck (v4550) ==");
@@ -262,11 +266,44 @@ ok("!! so the repair moved the player TOWARD the bots, not away",
    "shipped refuses like the bots do; the rival was the only thing that entered");
 
 // ---- 6. the live world: how much water there is ------------------------------------------------------
-console.log("\n-- 6. a generated world, 5x5 chunks -- REPORTED, with only a floor asserted");
+console.log("\n-- 6. the WHOLE ISLAND -- REPORTED, with only a floor asserted");
 const W = await liveWorld();
+const { lo: ILO, hi: IHI } = islandBounds(W);
+// *** v4559 -- THE WINDOW THIS USED TO BE IS MEASURED BESIDE THE ISLAND, BECAUSE THE CONTRAST IS THE
+// FINDING. *** v4550 censused -30..30 and reported it as the world. It is 3,721 of 57,600 columns, and it
+// is the one region with NO overhangs at all: a sample chosen, without anybody choosing it, to be flat.
+const shape = (x0, x1, z0, z1) => {
+    let cols = 0, overhang = 0, worst = 0, water = 0;
+    for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) {
+        cols++;
+        let first = -1, last = -1, surfaces = 0, wetCells = 0;
+        for (let y = 0; y < W.chunkHeight; y++) {
+            const v = W.voxelAt(x, y, z);
+            if (v !== VOXEL.AIR) { if (first < 0) first = y; last = y;
+                if (y + 1 < W.chunkHeight && W.voxelAt(x, y + 1, z) === VOXEL.AIR) surfaces++; }
+            if (isWet(v)) wetCells++;
+        }
+        if (surfaces > 1) { overhang++; worst = Math.max(worst, last - first); }
+        if (wetCells) water++;
+    }
+    return { cols, overhang, worst, water, pct: 100 * overhang / cols, wpct: 100 * water / cols };
+};
+const SHAPE_ISLAND = shape(ILO, IHI, ILO, IHI), SHAPE_WINDOW = shape(-30, 30, -30, 30);
+report(`the island is ${IHI - ILO + 1}x${IHI - ILO + 1} = ${SHAPE_ISLAND.cols} columns (gridRadius ` +
+       `${W.gridRadius}, chunkSize ${W.chunkSize}); v4550 censused ${SHAPE_WINDOW.cols} of them, ` +
+       `${(100 * SHAPE_WINDOW.cols / SHAPE_ISLAND.cols).toFixed(2)}%`);
+report(`overhang columns: island ${SHAPE_ISLAND.overhang} (${SHAPE_ISLAND.pct.toFixed(2)}%), worst solid ` +
+       `spread ${SHAPE_ISLAND.worst} -- against the window's ${SHAPE_WINDOW.overhang} ` +
+       `(${SHAPE_WINDOW.pct.toFixed(2)}%). Water: island ${SHAPE_ISLAND.wpct.toFixed(2)}%, window ` +
+       `${SHAPE_WINDOW.wpct.toFixed(2)}%`);
+ok("!! *** the window v4550 called 'the world' has NO overhangs and the world has thousands ***",
+   SHAPE_WINDOW.overhang === R.overhangColumnsAtV4550Window && SHAPE_ISLAND.overhang === R.overhangColumns &&
+   SHAPE_ISLAND.overhang > 1000 && SHAPE_WINDOW.overhang === 0,
+   "A CENSUS IS ONLY WORTH ITS SAMPLE. This row is the filed item, measured: the patch is not a sample of " +
+   "this world, it is the flattest part of it, and it reads a sixth of the water the world holds");
 let cols = 0, waterCols = 0, surfaceCols = 0, dMin = Infinity, dMax = 0, sMin = Infinity, sMax = 0;
 const waterColumns = [];
-for (let x = -30; x <= 30; x++) for (let z = -30; z <= 30; z++) {
+for (let x = ILO; x <= IHI; x++) for (let z = ILO; z <= IHI; z++) {
     cols++;
     let top = -1, depth = 0;
     for (let y = W.chunkHeight - 1; y >= 0; y--) if (W.voxelAt(x, y, z) !== VOXEL.AIR) { top = y; break; }
@@ -284,8 +321,10 @@ report("columns " + cols + ", with water " + waterCols + " (" + (100 * waterCols
        + "%), surface pools " + surfaceCols + ", depths " + dMin + ".." + dMax
        + ", surface depths " + sMin + ".." + sMax);
 ok("!! water is not hypothetical in this world -- a FLOOR, not the figure",
-   waterCols >= 40 && surfaceCols >= 20, "floor 40/20; measured " + waterCols + "/" + surfaceCols);
-ok("the census covered the area the record names", cols === R.censusColumns);
+   waterCols >= 4000 && surfaceCols >= 800, "floor 4000/800; measured " + waterCols + "/" + surfaceCols);
+ok("the census covered the area the record names", cols === R.censusColumns,
+   `${cols} columns against the record's ${R.censusColumns} -- THE WHOLE ISLAND, read off gridRadius, so ` +
+   "growing the world moves this row rather than silently leaving the census behind");
 ok("the record's counts are this run's", waterCols === R.waterColumns && surfaceCols === R.surfaceWaterColumns
    && dMin === R.waterDepthRange[0] && dMax === R.waterDepthRange[1]
    && sMin === R.surfaceDepthRange[0] && sMax === R.surfaceDepthRange[1]);
@@ -308,18 +347,66 @@ ok("*** the two controllers agreed in every water column, before this round and 
 
 // ---- 8. reachability: the exclusion was asked on nothing ----------------------------------------------
 console.log("\n-- 8. how many reachable sites the exclusion ever decided");
-let sites = 0;
 const N4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-for (let x = -29; x <= 29; x++) for (let z = -29; z <= 29; z++) {
+/** Does water sit in the body's own two-cell span in any of the four neighbours, standing at `h`? */
+const wetBeside = (w, x, z, h) => {
+    for (const [dx, dz] of N4) for (const yy of [h, h + 1]) if (isWet(w.voxelAt(x + dx, yy, z + dz))) return true;
+    return false;
+};
+// *** v4559 -- THE FILED ITEM SAID THE REGION WAS TOO SMALL AND THE REGION WAS NOT WHERE THE HOLE WAS. ***
+// standHeightAt(w, x, z, {}) returns ONE height per column and it is the TOPMOST. So the probe could not
+// reach a flooded room under an overhang -- the exact case the old row's own note named -- in a world where
+// 6,913 columns carry more than one surface. standablesAt() has existed for this since v4542. Both
+// populations are counted here, because the point is that widening the region alone changes nothing.
+let sites = 0, sitesTopOnly = 0, standCols = 0, standHeights = 0, multiSurface = 0;
+for (let x = ILO + 1; x <= IHI - 1; x++) for (let z = ILO + 1; z <= IHI - 1; z++) {
     const g = standHeightAt(W, x, z, {});
-    if (g === null) continue;
-    for (const [dx, dz] of N4)
-        for (const yy of [g, g + 1]) if (isWet(W.voxelAt(x + dx, yy, z + dz))) { sites++; break; }
+    if (g !== null && wetBeside(W, x, z, g)) sitesTopOnly++;
+    const hs = standablesAt(W, x, z, {});
+    if (hs.length) standCols++;
+    standHeights += hs.length;
+    if (hs.length > 1) multiSurface++;
+    if (hs.some((h) => wetBeside(W, x, z, h))) sites++;
 }
-report("neighbour cells with water inside the body's own two-cell span: " + sites);
+report(`standable columns ${standCols}, standable HEIGHTS ${standHeights}, columns with more than one ` +
+       `surface ${multiSurface}; neighbour cells with water inside the body's two-cell span: ${sites} over ` +
+       `every height, ${sitesTopOnly} at the topmost height alone`);
+ok("!! *** the probe now asks at EVERY standable height, not only the topmost ***",
+   standHeights > standCols && standHeights === R.standableHeights && standCols === R.standableColumns &&
+   multiSurface === R.columnsWithMoreThanOneSurface && R.askedAtEveryStandableHeight === true,
+   `${standHeights} heights across ${standCols} columns -- v4550 asked 3,481 questions, one per column of ` +
+   "a patch. A ONE-HEIGHT PROBE CANNOT SEE A FLOODED ROOM UNDER AN OVERHANG, which is what this row was for");
 ok("*** zero -- a lake surface is level, so the land beside it stands above the water ***",
    sites === 0 && sites === R.reachableExclusionSites,
-   "THIS ROW GOES RED THE DAY SOMEBODY FLOODS A ROOM, and that is the row working");
+   "THIS ROW GOES RED THE DAY SOMEBODY FLOODS A ROOM, and that is the row working. Re-taken at v4559 over " +
+   `${standHeights} heights against v4550's 3,481 -- a SEVENTEENFOLD wider population, every overhang ` +
+   "column in it, and the same answer. The filed item was right about the sample and wrong about the " +
+   "conclusion it supported");
+// *** AND THE ZERO IS A MEASUREMENT, WHICH NOTHING ESTABLISHED BEFORE. *** A census reporting 0 is worth
+// exactly what its ability to report anything else is worth, and v4550 asserted this 0 without ever showing
+// the probe fire. Land topping at y=4 with a wall of water from y=5 to y=9 beside it IS "somebody floods a
+// room", and the same three lines count 16 on it.
+{
+    const g = new Map(), K = (x, y, z) => x + "," + y + "," + z;
+    const flooded = { chunkHeight: 32, _heightAt: () => NaN,
+        voxelAt: (x, y, z) => g.get(K(x, y, z)) ?? VOXEL.AIR,
+        isAir: (x, y, z) => (g.get(K(x, y, z)) ?? VOXEL.AIR) === VOXEL.AIR };
+    for (let x = 0; x < 20; x++) for (let z = 0; z < 4; z++) for (let y = 0; y <= 4; y++) g.set(K(x, y, z), VOXEL.STONE);
+    for (let y = 5; y <= 9; y++) for (let z = 0; z < 4; z++) g.set(K(12, y, z), WATER);
+    // *** THROUGH wetBeside, WHICH IS THE POINT AND WHICH MY FIRST DRAFT MISSED. *** It re-implemented the
+    // neighbour test inline, so sabotaging wetBeside to return false left the island row reading 0 AND the
+    // control still reading 16 -- a control grading its own copy of the thing under test, which is this
+    // session's most-repeated defect and is exactly the failure this row exists to rule out. The control is
+    // only worth something if it drives THE CODE THAT PRODUCED THE ZERO.
+    let control = 0;
+    for (let x = 0; x < 20; x++) for (let z = 0; z < 4; z++)
+        for (const h of standablesAt(flooded, x, z, {})) if (wetBeside(flooded, x, z, h)) control++;
+    ok("!! *** CONTROL: the SAME PREDICATE counts 8 where water DOES stand above the land beside it ***",
+       control === 8 && control === R.controlSitesOnAFloodedWall,
+       `${control} sites on a hand world -- land topping at y=4, a wall of water y=5..9 against it. WITHOUT ` +
+       "THIS ROW THE ZERO ABOVE IS WORTH NOTHING: a probe that could never report a site would read exactly " +
+       "the same, and v4550 asserted the zero without ever showing the instrument fire");
+}
 ok("the census it was taken on is the generated one, not a fixture",
    R.reachabilityIsAFixtureClaim === false);
 

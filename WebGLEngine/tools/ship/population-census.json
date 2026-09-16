@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/populationCensus.mjs",
  "roots": "physics,simulation,fluid",
- "total": 521,
+ "total": 525,
  "areas": {
   "fluid": 8,
   "physics/acoustics": 2,
@@ -10,7 +10,7 @@
   "physics/blackhole": 11,
   "physics/box3d": 5,
   "physics/chaos": 2,
-  "physics/character": 2,
+  "physics/character": 6,
   "physics/control": 4,
   "physics/crypto": 2,
   "physics/crystal": 2,
@@ -122,6 +122,10 @@
   "physics/centrifugeKnob.mjs",
   "physics/chaos/logistic.js",
   "physics/chaos/logisticWgsl.mjs",
+  "physics/character/capsuleGround.mjs",
+  "physics/character/capsuleMove.mjs",
+  "physics/character/fallBody.mjs",
+  "physics/character/groundProbe.mjs",
   "physics/character/kinematic.js",
   "physics/character/terrainWalk.mjs",
   "physics/consistency.mjs",

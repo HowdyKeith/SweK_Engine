@@ -603,7 +603,11 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4548 -- RE-TAKEN with `currentIncludingModule` above: 258 -> 259, the one field described there.
     // v4555 -- RE-TAKEN under the wide rule: 116 / 55 / 259 becomes 125 / 63 / 327. Nine of those records
     // and sixty-eight of those fields were always there; only the census's eyesight changed.
-    excluding: Object.freeze({ records: 125, withFields: 63, fields: 327 }),
+    // v4559 -- RE-TAKEN: 327 -> 339, the twelve fields the round wrote into PLAYER_WATER_AT_V4550 when it
+    // re-took that census over the whole island instead of a 6.5% patch of it. NO RECORD ARRIVED, which is
+    // v4540's case again: a repair that writes integers into an existing record moves this as surely as a
+    // new one does.
+    excluding: Object.freeze({ records: 125, withFields: 63, fields: 339 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,
