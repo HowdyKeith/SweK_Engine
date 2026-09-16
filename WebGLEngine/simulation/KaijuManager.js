@@ -34,6 +34,12 @@ import { getOverride } from "../gpu/assetOverrides.js";
 import { VOXEL } from "../world/voxelFormat.js";   // round 128 — crater carving
 import { makeKaijuRivalry } from "./KaijuRivalry.js";   // round 287
 import { makeKingPack } from "./KingPack.js";            // round 287
+// Task board #89 -- real per-chunk collision geometry for a voxel world, corrects the exact bug
+// world/surfaceProbe.mjs measured (a terrain-height oracle up to 17 voxels off the real voxel surface) and
+// adds lateral wall/overhang awareness _terrainTop below never had, since it only ever answered a height.
+import { hasVoxels } from "../world/surfaceProbe.mjs";
+import { makeWorldColliderBVH } from "../world/worldColliderBVH.mjs";
+import { depenetrateCapsule, probeGround } from "../physics/character/capsuleCollide.mjs";
 
 // Round 52 - skeletal animation clip mapping for kaiju FSM states.
 // Standard glTF rig clip names: rigs ship with "idle"/"walk"/"attack"/
@@ -277,7 +283,7 @@ export class KaijuManager {
                             const target = Math.max(gy, 8);
                             k.position.y += (target - k.position.y) * Math.min(1, delta * 2.0);
                         } else {
-                            k.position.y = gy;
+                            this._resolveGroundKaijuPosition(k, gy);
                         }
                         // v516 — splash + trailing wake when a kaiju wades or
                         // swims through water (terrain top at/below the sea, or a
@@ -2410,6 +2416,65 @@ export class KaijuManager {
         const result = {};
         for (const k of baseKinds) result[k] = true;
         return result;
+    }
+
+    // Task board #89 -- the world's real per-chunk collision geometry, when it has one. Cached against world
+    // object identity, the same shape BotManager.js's own _groundOracle() (task #85) already uses: a world
+    // swap rebuilds it, nothing else does. hasVoxels(w) is the SAME guard surfaceProbe.mjs's own standHeightAt
+    // dispatch already uses -- a world with no voxel grid (no chunks Map, no isAir) gets null here and every
+    // ground kaiju falls straight through to _terrainTop's plain answer, unaffected by any of this.
+    _kaijuColliderBVH() {
+        const w = this.world;
+        if (!hasVoxels(w)) return null;
+        if (this._colliderFor !== w) {
+            this._colliderFor = w;
+            this._collider = makeWorldColliderBVH(w);
+        }
+        return this._collider;
+    }
+
+    // A kaiju's capsule size for collision purposes. config.radius is the SAME size proxy Kaiju.js's own
+    // stride computation already reads (Kaiju.js: `(this.config?.radius ?? 1.5) * 1.6`) -- reused rather than
+    // a second, independently-chosen size constant. config.scale and absorbScale are the two multipliers
+    // KaijuManager.js's own render-scale line already combines (see the absorb-scale sync above: `(k.config?.
+    // scale || 1) * (k.absorbScale || 1)`). Height is 4x radius, a plain creature aspect ratio -- not measured
+    // against a real rig's bounding box (no browser here to check one), so a kaiju's true silhouette may clip
+    // this capsule's ends slightly; the ground/wall resolution below is still correct for whatever the capsule
+    // itself contains, and refining the aspect ratio against a real asset is future polish, not a correctness
+    // gap in the collision math.
+    _kaijuCapsuleRadius(k) {
+        return (k.config?.radius ?? 1.5) * (k.config?.scale || 1) * (k.absorbScale || 1);
+    }
+
+    /**
+     * Task board #89 -- the ground-kind position correction: `gy` (from _terrainTop, already computed by the
+     * caller) is corrected against the REAL voxel surface when this world has a collider, then a bounded
+     * lateral nudge pushes the kaiju's capsule out of anything it newly overlaps (a wall, an overhang) -- the
+     * "real capsule collision" gap this task existed to close, not just a more accurate height snap. Mutates
+     * k.position directly, the same style _terrainTop's own callers already use.
+     *
+     * *** NO PERSISTENT VELOCITY/GRAVITY STATE IS INTRODUCED HERE, ON PURPOSE. *** probeGround/depenetrateCapsule
+     * both run once per tick from the CURRENT position, not from an integrated fall -- so an unmeshed chunk at
+     * the streaming edge (where the collider legitimately finds nothing) can never leave a kaiju free-falling
+     * into the void: bvh === null or hit === null both fall straight back to gy, exactly today's behavior. A
+     * real integrated fall (accelerating off a genuine cliff the old height-only oracle could never represent)
+     * is a larger, riskier change than this task's own gate can verify without a live rig to watch it, and is
+     * left as explicit future work rather than guessed at here.
+     */
+    _resolveGroundKaijuPosition(k, gy) {
+        let resolvedY = gy;
+        const bvh = this._kaijuColliderBVH();
+        if (bvh) {
+            const radius = this._kaijuCapsuleRadius(k);
+            const hit = probeGround([k.position.x, gy + radius * 4 + 8, k.position.z], radius, bvh, { maxDist: radius * 8 + 40 });
+            if (hit) resolvedY = hit.point[1];
+        }
+        k.position.y = resolvedY;
+        if (bvh) {
+            const radius = this._kaijuCapsuleRadius(k);
+            const r = depenetrateCapsule([k.position.x, k.position.y, k.position.z], radius, radius * 4, bvh, { iterations: 2 });
+            k.position.x = r.pos[0]; k.position.y = r.pos[1]; k.position.z = r.pos[2];
+        }
     }
 
     // Scan from y=60 downward for the first non-air voxel — terrain
