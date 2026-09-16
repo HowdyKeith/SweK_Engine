@@ -6789,6 +6789,10 @@ import { Camera }         from "./camera/camera.js";
 import { VOXEL }          from "./world/voxelFormat.js";
 import { buildControllerLabWorld, controllerLabVoxelColumns, SPAWN as CONTROLLER_LAB_SPAWN } from "./world/controllerLabWorld.mjs";   // task board #13's live demo
 import { buildSplatWalkWorld, cloudToParsedSplats, SPAWN as SPLAT_WALK_SPAWN } from "./world/splatWalkWorld.mjs";   // task board #83's live demo
+import { platformWorldAt, ferryTransformAt, turntableTransformAt, onDeck, platformCarryVoxelColumns,
+         FERRY, TURNTABLE, SPAWN as PLATFORM_CARRY_SPAWN, RESPAWN_Y as PLATFORM_CARRY_RESPAWN_Y } from "./world/platformCarryWorld.mjs";   // task board #84's live demo
+import { carryOnPlatform } from "./physics/character/capsuleCollide.mjs";
+import { slabCloud } from "./physics/splat/splatMesh.mjs";
 import * as reproParams  from "./engine/reproParams.js";   // v1986 — ?seed/?cam/?preset deterministic repro
 import { makeGamepadInput } from "./input/gamepadInput.js";   // v1409 — XInput / gamepad
 import { VoxelWorld }     from "./world/world.js";
@@ -16900,6 +16904,143 @@ const DEMO_MODES = [
             const state = camera.movementAnimState();
             const view = camera.viewMode === "third" ? "Third-person" : "First-person";
             hud.textContent = `${view} · ${state.toUpperCase()} · ${camera._fpOnGround ? "grounded" : "airborne"}`;
+        },
+    },
+    {
+        // Task board #84. physics/character/capsuleCollide.mjs's carryOnPlatform() (task #80) has been gated
+        // and correct since it shipped, and called from nowhere -- this demo is the live caller. A ferry
+        // TRANSLATES across a gap, a turntable ROTATES in place; carryOnPlatform's own distinguishing feature
+        // over "just add the platform's position delta" is the rotation half, which a translate-only demo
+        // would never actually exercise. camera.js and capsuleCollide.mjs are both UNMODIFIED by this demo
+        // (see capsuleCollide.mjs's own two-line qConj/qRotate export, the only change either file needed) --
+        // the carry itself runs entirely in this tick(), the same "thin main.js wiring over a gated world
+        // module" shape as controller_lab and splat_walk.
+        id: "platform_carry",
+        autoplay: false,
+        label: "PLATFORM CARRY — moving/rotating platform, real carryOnPlatform()",
+        hint: "task #84: cross a gap on a ferry, then stand on a spinning turntable -- both driven by capsuleCollide.mjs's own carryOnPlatform(), not a hand-waved position copy",
+        controls: [
+            "WASD — walk (capsule-vs-mesh collision) · Mouse — look (click canvas to lock pointer)",
+            "Space — jump · Shift — sprint · V — toggle first/third person",
+            "Walk onto the ferry while it is docked, then STAND STILL -- it carries you across the gap",
+            "Past the gap, a rotating turntable sweeps you around it if you stand off-centre and hold still",
+            "Falling into the gap resets you back to the start pad",
+            "HUD along the top shows the live view mode + movement state (idle/walk/run/jump/fall)",
+            "ESC — exit back to the camera",
+        ],
+        start() {
+            // world.js's own flatten(): floorY >= 0 blanket-fills ONE layer across every chunk, including
+            // under the gap -- exactly the solid-looking-but-not-standable-on floor this demo must not have,
+            // since camera.setWorld({colliderBVH}) makes the voxel terrain physically irrelevant regardless of
+            // what is drawn there. floorY: -1 skips that fill and leaves a clean, fully empty world instead.
+            world.flatten({ floorY: -1 });
+            renderer.meshes.clear();
+            try { persistence.clear(); } catch {}
+            for (const [x, y, z] of platformCarryVoxelColumns()) world.setVoxel(x, y, z, VOXEL.STONE);
+
+            const w = platformWorldAt(0);
+            camera.setWorld({ colliderBVH: w.colliderBVH });
+            camera.setMode("fp");
+            camera.viewMode = "first";
+            camera.position.x = PLATFORM_CARRY_SPAWN.x;
+            camera.position.z = PLATFORM_CARRY_SPAWN.z;
+            camera.position.y = PLATFORM_CARRY_SPAWN.y + camera._eyeHeight;   // SPAWN.y is the start pad's own flat surface (feet), unlike splat_walk's eye-height convention -- the pad's exact height is known, not something to fall and settle onto.
+            camera.yaw = PLATFORM_CARRY_SPAWN.yaw;
+            camera.pitch = 0;
+            camera._fpOnGround = true;
+            camera._fpVelY = 0;
+
+            // The ferry and turntable move and rotate, so (unlike the static pads' voxel stand-in) their
+            // visual is a splatWalkWorld.mjs-style splat deck: loaded once, repositioned every tick() via the
+            // renderer's own per-layer setPosition/setRotation rather than rebuilt -- see world/
+            // platformCarryWorld.mjs's own header for why the collider (no per-instance transform) and the
+            // visual (one) use two different techniques for the same moving geometry.
+            splatScene.loadParsed(cloudToParsedSplats(slabCloud({ halfExtents: FERRY.halfExtents, n: 400 }), { colorLow: [130, 190, 235], colorHigh: [130, 190, 235] }), "platformCarryFerry", "platformCarryFerry");
+            splatScene.loadParsed(cloudToParsedSplats(slabCloud({ halfExtents: TURNTABLE.halfExtents, n: 600 }), { colorLow: [235, 165, 110], colorHigh: [235, 165, 110] }), "platformCarryTurntable", "platformCarryTurntable");
+            splatScene.setPosition(w.ferryXform.p[0], w.ferryXform.p[1], w.ferryXform.p[2], "platformCarryFerry");
+            splatScene.setPosition(w.turntableXform.p[0], w.turntableXform.p[1], w.turntableXform.p[2], "platformCarryTurntable");
+
+            window._platformCarryState = { time: 0, ferryXform: w.ferryXform, turntableXform: w.turntableXform };
+
+            const hud = document.createElement("div");
+            hud.id = "platformCarryHud";
+            hud.style.cssText = "position:fixed; top:70px; left:50%; transform:translateX(-50%); z-index:500; " +
+                "background:rgba(10,14,20,0.85); border:1px solid #345; border-radius:8px; padding:8px 18px; " +
+                "font-family:ui-monospace,monospace; font-size:12px; color:#cde; text-align:center; pointer-events:none;";
+            document.body.appendChild(hud);
+            window._platformCarryHud = hud;
+
+            const escHandler = (e) => {
+                if (e.key === "Escape" && camera.mode === "fp") {
+                    camera.setMode("observer");
+                    camera.setWorld(world);
+                }
+            };
+            window.addEventListener("keydown", escHandler);
+            window._platformCarryEscHandler = escHandler;
+        },
+        stop() {
+            try { if (window._platformCarryEscHandler) window.removeEventListener("keydown", window._platformCarryEscHandler); } catch {}
+            window._platformCarryEscHandler = null;
+            try { window._platformCarryHud?.remove(); } catch {}
+            window._platformCarryHud = null;
+            try { splatScene.removeLayer("platformCarryFerry"); } catch {}
+            try { splatScene.removeLayer("platformCarryTurntable"); } catch {}
+            window._platformCarryState = null;
+            camera.setMode("observer");
+            camera.setWorld(world);
+        },
+        tick(dt) {
+            const st = window._platformCarryState;
+            if (!st) return;
+
+            // The carry itself: while grounded, is the rider's own FEET within either platform's own PREVIOUS
+            // (last-resolved-against) footprint? If so, shift them by that platform's frame-to-frame delta
+            // BEFORE this frame's own gravity/input pass (already run earlier in the frame by camera.update())
+            // gets a chance to integrate on top of it next frame -- the same order tools/ship/
+            // platformCarryWorld-selfcheck.mjs's own stepWorld() helper already verified end to end.
+            if (camera._fpOnGround) {
+                const feet = [camera.position.x, camera.position.y - camera._eyeHeight, camera.position.z];
+                let xform = null;
+                if (onDeck(feet, st.ferryXform, FERRY.halfExtents)) xform = st.ferryXform;
+                else if (onDeck(feet, st.turntableXform, TURNTABLE.halfExtents)) xform = st.turntableXform;
+                if (xform) {
+                    const nextXform = xform === st.ferryXform ? ferryTransformAt(st.time + dt) : turntableTransformAt(st.time + dt);
+                    const carried = carryOnPlatform(feet, xform, nextXform);
+                    camera.position.x = carried[0];
+                    camera.position.y = carried[1] + camera._eyeHeight;
+                    camera.position.z = carried[2];
+                }
+            }
+
+            st.time += dt;
+            const w = platformWorldAt(st.time);
+            camera.setWorld({ colliderBVH: w.colliderBVH });
+            st.ferryXform = w.ferryXform;
+            st.turntableXform = w.turntableXform;
+            try {
+                splatScene.setPosition(w.ferryXform.p[0], w.ferryXform.p[1], w.ferryXform.p[2], "platformCarryFerry");
+                splatScene.setRotation(w.ferryXform.q[3], w.ferryXform.q[0], w.ferryXform.q[1], w.ferryXform.q[2], "platformCarryFerry");
+                splatScene.setPosition(w.turntableXform.p[0], w.turntableXform.p[1], w.turntableXform.p[2], "platformCarryTurntable");
+                splatScene.setRotation(w.turntableXform.q[3], w.turntableXform.q[0], w.turntableXform.q[1], w.turntableXform.q[2], "platformCarryTurntable");
+            } catch {}
+
+            // Fell into the gap -- back to the start pad, same "don't strand the player" safety controller_lab
+            // and splat_walk don't need (neither has a bottomless gap) but this demo's whole premise does.
+            if (camera.position.y - camera._eyeHeight < PLATFORM_CARRY_RESPAWN_Y) {
+                camera.position.x = PLATFORM_CARRY_SPAWN.x;
+                camera.position.y = PLATFORM_CARRY_SPAWN.y + camera._eyeHeight;
+                camera.position.z = PLATFORM_CARRY_SPAWN.z;
+                camera._fpVelY = 0;
+                camera._fpOnGround = true;
+            }
+
+            const hud = window._platformCarryHud;
+            if (hud && camera.mode === "fp") {
+                const state = camera.movementAnimState();
+                const view = camera.viewMode === "third" ? "Third-person" : "First-person";
+                hud.textContent = `${view} · ${state.toUpperCase()} · ${camera._fpOnGround ? "grounded" : "airborne"}`;
+            }
         },
     },
     {

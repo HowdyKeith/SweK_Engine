@@ -23,7 +23,7 @@
  "counts": {
   "page": 471,
   "demo": 49,
-  "builtin": 36
+  "builtin": 37
  },
  "entries": [
   {
@@ -4359,6 +4359,14 @@
    "id": "splat_walk",
    "display": "SPLAT WALK — Walking A Live Gaussian Splat Scene With Capsule Collision",
    "href": "/?go=splat_walk",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "platform_carry",
+   "display": "PLATFORM CARRY — Moving/Rotating Platform, Real CarryOnPlatform()",
+   "href": "/?go=platform_carry",
    "section": null,
    "collision": false
   },

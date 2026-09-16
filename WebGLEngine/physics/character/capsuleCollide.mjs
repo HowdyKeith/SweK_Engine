@@ -35,7 +35,7 @@
 export const GROUND_SUPPORT_NORMAL_Y = 0.5;
 
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+export const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 const scale = (a, s) => [a[0] * s, a[1] * s, a[2] * s];
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
@@ -268,8 +268,11 @@ export function probeGround(center, radius, bvh, opts = {}) {
     return best;
 }
 
-const qConj = (q) => [-q[0], -q[1], -q[2], q[3]];
-function qRotate(q, v) {
+// Exported for world/platformCarryWorld.mjs (task #84): it needs the SAME quaternion rotation this file's own
+// carryOnPlatform uses, to bake a moving/rotating platform's own triangles into world space each frame -- not
+// a second, independently-reinvented rotation function that could quietly disagree with this one.
+export const qConj = (q) => [-q[0], -q[1], -q[2], q[3]];
+export function qRotate(q, v) {
     const [qx, qy, qz, qw] = q;
     const tx = 2 * (qy * v[2] - qz * v[1]), ty = 2 * (qz * v[0] - qx * v[2]), tz = 2 * (qx * v[1] - qy * v[0]);
     return [

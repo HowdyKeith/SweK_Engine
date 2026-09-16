@@ -140,6 +140,30 @@ export function sphereCloud({ n = 2000, radius = 1, centre = [0, 0, 0], scale = 
     return { positions, scales, opacities, count: n };
 }
 
+/** a flat rectangular grid of splats spanning [-halfExtents[0],halfExtents[0]] x [-halfExtents[1],halfExtents[1]] at local
+ *  y=0 -- for a moving/rotating platform's own visual deck (world/platformCarryWorld.mjs, task #84), the same "for gates
+ *  and the lab" role sphereCloud() already plays for a sphere. Deliberately LOCAL space, not world space: the caller
+ *  loads this once and moves it every frame via the renderer's own per-layer setPosition/setRotation, the same way any
+ *  other splat layer is repositioned, rather than rebuilding the cloud itself each frame the way a triangle collider has
+ *  to be (MeshBVH has no per-instance transform to lean on the way a splat layer does). */
+export function slabCloud({ halfExtents = [1, 1], n = 400, scale = 0.3, opacity = 0.9 } = {}) {
+    const [hx, hz] = halfExtents;
+    const cols = Math.max(1, Math.round(Math.sqrt((n * hx) / hz)));
+    const rows = Math.max(1, Math.round(n / cols));
+    const count = cols * rows;
+    const positions = new Float32Array(count * 3), scales = new Float32Array(count * 3), opacities = new Float32Array(count);
+    let i = 0;
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+        positions[i * 3] = hx * (2 * (c + 0.5) / cols - 1);
+        positions[i * 3 + 1] = 0;
+        positions[i * 3 + 2] = hz * (2 * (r + 0.5) / rows - 1);
+        scales[i * 3] = scales[i * 3 + 1] = scales[i * 3 + 2] = scale;
+        opacities[i] = opacity;
+        i++;
+    }
+    return { positions, scales, opacities, count };
+}
+
 /** an analytic solid ball as a density volume: 1 inside, linear ramp to 0 across one cell, for a mesher with a known answer */
 export function ballVolume({ radius = 1, cellSize = 0.1, pad = 2 } = {}) {
     const vol = createVolume({ cellSize }), R = Math.ceil(radius / cellSize) + pad;
