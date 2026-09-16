@@ -5248,6 +5248,54 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "orb-species-block-per-shader; the next orb round starts there.",
     }),
     // v4635 -- THE 247th CLOSING. No gate added: a row added to one that existed, and a 3,561 ms refund.
+    // v4636 -- THE 248th CLOSING: fathom and geode, the two heroes whose interiors are SOLVED, not marched.
+    since257: Object.freeze({
+        at: "v4636", swept: 2, green: 2, red: 0,
+        added: Object.freeze([
+            "tools/ship/murmurSpecies6-selfcheck.mjs",
+            "tools/ship/murmurSpecies7-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 2,435 and 2,146 ms on the rotation, real WebGPU, 8 rows, carrying FATHOM and " +
+                 "GEODE -- the ninth and tenth of murmur's eighteen and the only two that do not build " +
+                 "their interiors out of the five taps of a ray march. fathom intersects three spheres " +
+                 "analytically; geode intersects eight planes by the slab method. geode.ts opens by " +
+                 "rejecting its own first build in terms this port has now met three times: \"A FACET IS A " +
+                 "PLANE, AND THE FIRST BUILD'S WASN'T ... integrating a hard-edged structure through five " +
+                 "samples averages exactly the angularity that was the point.\" *** TWO GATES FOR TWO " +
+                 "SPECIES WHERE THE ROUND BEFORE MANAGED ONE FOR TWO, AND THE SPLIT WAS FORCED BY A " +
+                 "MEASUREMENT RATHER THAN CHOSEN: *** written as one gate the pair came in at 5,064 ms " +
+                 "against a 3,000 ms budget -- 69% over, which is the hazard the file's own header was " +
+                 "about, met by the file itself on its first run. The cost is compiles, priced rather than " +
+                 "guessed: one species and one frame is 931 ms and each additional species about 280. " +
+                 "Trimming the shared ridge control from ten species to five landed at 3,499 and to four at " +
+                 "3,161 -- both still over. FOURTEEN SABOTAGES, THIRTEEN RED BY NAME and the fourteenth " +
+                 "green BY DESIGN (halting one of geode's two rotation angles leaves the stone turning, so " +
+                 "the row must pass). *** TWO OF THE THIRTEEN WERE GREEN ON THE FIRST PASS AND ARE WHY TWO " +
+                 "ROWS CHANGED SHAPE. *** Zeroing fathom's rk constants walked through the layers row " +
+                 "because the row computed its prediction FROM the same table the shader reads -- the " +
+                 "v4579 defect, a gate re-stating the formula it grades -- so the two ratios are now " +
+                 "literals (x0.9600 and x0.8000) with the table checked against them, and the row's result " +
+                 "is that the two visible ridges are the MIDDLE and SMALLEST shells, shell 0 predicting " +
+                 "x1.0857 and missing by 13%. And halting geode's spin drift walked through the faces row, " +
+                 "because mhKey turns with time for every species in this engine: a RIGID stone under a " +
+                 "MOVING KEY gives exactly \"brightness swings, hotspot pinned\". That row now also reads " +
+                 "the FOOTPRINT -- the pixels above the frame's own p90, a set the chord decides and the " +
+                 "key cannot touch -- whose smallest step-to-step change is 0.409 live, 0.167 with the " +
+                 "drift halted and 0.149 with both angles halted. THREE INSTRUMENTS WERE BUILT AND " +
+                 "REJECTED, kept in the source with their numbers: gradient concentration measured " +
+                 "SPARSENESS (still 75.1% and comet 72.1% beat geode's 27.0%), edge width measured the murk " +
+                 "HALO (geode widest of ten at 12.96 px), and hue turn was too small to grade at 2.1 " +
+                 "degrees. AND ONE CLAIM WAS RETRACTED RATHER THAN GRADED: fathom's composite order is its " +
+                 "headline -- outer-in, inner-out, no sort -- and reversing it moves 361 bytes of 248,832 " +
+                 "across 27 frames, every one by exactly 1 of 255, because the leading order-sensitive term " +
+                 "is a SYMMETRIC pair sum. A row for it could only have asserted the frames are nearly the " +
+                 "same either way, which is a row that cannot fail. VERIFIED BY BYTES across all TEN " +
+                 "species and three time-and-knob cases: 30 frames, 0 bytes different -- and the baseline " +
+                 "now carries its own case list, after capture and verify each held a private copy and a " +
+                 "fresh capture failed its own verify on 2 of 30 frames the moment one was edited.",
+    }),
     since256: Object.freeze({
         at: "v4635", swept: 0, green: 0, red: 0,
         added: Object.freeze([]),

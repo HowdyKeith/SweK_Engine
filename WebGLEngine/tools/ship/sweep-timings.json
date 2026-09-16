@@ -1681,7 +1681,9 @@
   "tools/ship/murmurSpecies2-selfcheck.mjs": 1515,
   "tools/ship/murmurSpecies3-selfcheck.mjs": 1828,
   "tools/ship/murmurSpecies4-selfcheck.mjs": 1607,
-  "tools/ship/murmurSpecies5-selfcheck.mjs": 2080
+  "tools/ship/murmurSpecies5-selfcheck.mjs": 2080,
+  "tools/ship/murmurSpecies7-selfcheck.mjs": 2146,
+  "tools/ship/murmurSpecies6-selfcheck.mjs": 2435
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -3361,7 +3363,9 @@
   "tools/ship/murmurSpecies2-selfcheck.mjs": 0,
   "tools/ship/murmurSpecies3-selfcheck.mjs": 0,
   "tools/ship/murmurSpecies4-selfcheck.mjs": 0,
-  "tools/ship/murmurSpecies5-selfcheck.mjs": 0
+  "tools/ship/murmurSpecies5-selfcheck.mjs": 0,
+  "tools/ship/murmurSpecies7-selfcheck.mjs": 0,
+  "tools/ship/murmurSpecies6-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-15T20:01:59.690Z",
@@ -5041,7 +5045,9 @@
   "tools/ship/murmurSpecies2-selfcheck.mjs": "2026-09-16T14:12:10.961Z",
   "tools/ship/murmurSpecies3-selfcheck.mjs": "2026-09-16T14:12:10.961Z",
   "tools/ship/murmurSpecies4-selfcheck.mjs": "2026-09-16T14:12:10.961Z",
-  "tools/ship/murmurSpecies5-selfcheck.mjs": "2026-09-16T14:12:10.961Z"
+  "tools/ship/murmurSpecies5-selfcheck.mjs": "2026-09-16T14:12:10.961Z",
+  "tools/ship/murmurSpecies7-selfcheck.mjs": "2026-09-16T17:17:14.621Z",
+  "tools/ship/murmurSpecies6-selfcheck.mjs": "2026-09-16T17:17:17.167Z"
  },
  "finished": {
   "tools/ship/placementRender-selfcheck.mjs": true,
@@ -6609,7 +6615,9 @@
   "tools/ship/murmurSpecies3-selfcheck.mjs": true,
   "tools/ship/murmurSpecies4-selfcheck.mjs": true,
   "tools/ship/inputSets-selfcheck.mjs": true,
-  "tools/ship/murmurSpecies5-selfcheck.mjs": true
+  "tools/ship/murmurSpecies5-selfcheck.mjs": true,
+  "tools/ship/murmurSpecies7-selfcheck.mjs": true,
+  "tools/ship/murmurSpecies6-selfcheck.mjs": true
  },
  "crossings": {
   "tools/ship/engineSceneBot-selfcheck.mjs": 2,

@@ -315,8 +315,16 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4634 -- RE-TAKEN 1674 -> 1675 for tools/ship/murmurSpecies5-selfcheck.mjs, carrying nebula and
     // tempest. ONE gate for TWO species, which is the shape murmur's own pairing makes possible: the two
     // files call a byte-identical kit set and every row in the gate is a comparison between them.
-    gates: 1675, usesOk: 1654, definesOk: 1646, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1547, condFirst: 91, unknownSignature: 16,
+    // v4636 -- RE-TAKEN 1675 -> 1677 for TWO gates: tools/ship/murmurSpecies6-selfcheck.mjs (fathom) and
+    // tools/ship/murmurSpecies7-selfcheck.mjs (geode). TWO gates for TWO species where the round before
+    // managed one for two, and the difference is arithmetic rather than temperament: nebula and tempest
+    // share a compiled shader's worth of subject matter, while fathom's rows need a three-species ridge
+    // control and geode's need a travelling foil, so the pair written as one gate came in at 5,064 ms
+    // against a 3,000 ms budget. Trimming the control from ten species to five landed at 3,499 and to four
+    // at 3,161 -- still over. THE COUNT OF GATES AND THE COUNT OF SUBJECTS DISAGREE HERE FOR A REASON THE
+    // BUDGET DECIDED, which is the same reason v4632's droplet split made them disagree the other way.
+    gates: 1677, usesOk: 1656, definesOk: 1648, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1549, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

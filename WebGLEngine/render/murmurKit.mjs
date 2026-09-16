@@ -724,6 +724,11 @@ export const MH_SHAPE = Object.freeze({
     // equal rather than that no two spreads are: a row built on the percentage would call these one species.
     nebula: Object.freeze([0.022, 0.008, 1.6, 1.25]),
     tempest: Object.freeze([0.023, 0.009, 9.2, 1.28]),
+    // The two SOLVED-GEOMETRY heroes. They share an amplitude and a breath depth to three decimals and
+    // differ only in lane and gain -- another pair the derived percentage cannot tell apart, and another
+    // reason the row below grades ENTRIES rather than spreads.
+    fathom: Object.freeze([0.021, 0.007, 5.3, 1.20]),
+    geode: Object.freeze([0.021, 0.007, 11.7, 1.22]),
 });
 
 /**
@@ -756,6 +761,60 @@ export const MH_MIST = Object.freeze({
                              drB: 0.070, drK: 0.075, drLane: 3.0, dLo: -0.12, dHi: 0.46,
                              gLo: 0.26, gK: 0.72, gFar: 0.90, absorb: 3.60, emitB: 0.58, emitK: 0.72,
                              gain: 6.20, voiceE: 0.85 }),
+});
+
+/**
+ * FATHOM'S THREE NESTED SHELLS, and the numbers that make them read as measurement rather than as a target.
+ *
+ * fathom.ts: "three legible SURFACES at three radii, each one a thin translucent skin you can see the next
+ * one through. What the eye gets from a cloud is atmosphere; what it gets from nested shells is measurement."
+ *
+ *   R/rk/w      each shell's base radius, its response to the `layers` knob, and its intrinsic weight. The
+ *               weights FALL AWAY INWARD (1.00, 0.74, 0.52) because the outer shell is the one the light
+ *               reaches first -- "equal weights made the innermost read as a solid ball inside two rings".
+ *   rates       the three turning rates, and they are DELIBERATELY UNEQUAL and one of them NEGATIVE: the
+ *               parallax is made of the difference, and "identical rates would be one shell drawn three
+ *               times".
+ *   order       the compositing order, [0,1,2,2,1,0]. A ray entering from outside meets the biggest shell
+ *               first, then the middle, then the smallest, then the smallest again on the way out. The order
+ *               is known in advance and cannot vary, so the transmittance is correct with NO SORTING.
+ *   grazeFloor  the cap on the 1/cos amplification. A crossing near a shell's own limb passes through
+ *               several times as much skin, which is what sells translucency; 0.26 stops it diverging.
+ */
+export const MH_FATHOM = Object.freeze({
+    shells: Object.freeze([
+        Object.freeze({ base: 0.70, rk: 0.06, w: 1.00, rate: 0.085, wob: 0.45, lane: 1.0 }),
+        Object.freeze({ base: 0.50, rk: -0.02, w: 0.74, rate: -0.062, wob: 0.50, lane: 2.0 }),
+        Object.freeze({ base: 0.30, rk: -0.06, w: 0.52, rate: 0.108, wob: 0.40, lane: 3.0 }),
+    ]),
+    order: Object.freeze([0, 1, 2, 2, 1, 0]),
+    rCap: 0.74, thickB: 0.062, thickK: 0.035, foldB: 0.055, foldK: 0.055, grazeFloor: 0.26,
+    litB: 0.40, litK: 0.60, eB: 0.42, eK: 0.58,
+    shellGain: 4.30, murkGain: 3.20, medB: 0.030, medK: 0.075, medAbsorb: 1.80,
+    absorbB: 1.05, absorbK: 1.55,
+});
+
+/**
+ * GEODE'S CONVEX SOLID: four axes, eight planes, and the slab method.
+ *
+ * geode.ts opens by rejecting its own first build: "A FACET IS A PLANE, AND THE FIRST BUILD'S WASN'T. It
+ * partitioned the volume by which of six DIRECTIONS a point was most aligned with ... the partition was then
+ * integrated along the view ray, and integrating a hard-edged structure through five samples averages exactly
+ * the angularity that was the point." Which is the same lesson comet's head and droplet's heart taught this
+ * port, arriving a third time.
+ *
+ * THE OFFSETS DIFFER ON THE TWO SIDES OF EVERY AXIS, which is what makes the gem irregular rather than a
+ * symmetric octahedron, and the AXES ARE OFF THE CARDINALS so the cut never looks machined.
+ */
+export const MH_GEODE = Object.freeze({
+    axes: Object.freeze([Object.freeze([0.92, 0.30, 0.25]), Object.freeze([-0.26, 0.90, 0.35]),
+                         Object.freeze([0.20, -0.34, 0.92]), Object.freeze([0.58, -0.55, 0.60])]),
+    dp: Object.freeze([1.00, 0.92, 0.98]), dm: Object.freeze([0.86, 1.04, 0.88]),
+    o4: 6.0, o4Small: 1.02, o4m: 0.94,
+    scaleB: 0.34, scaleK: 0.12, softB: 0.10, softK: 0.055,
+    sharpB: 1.4, sharpK: 2.6, sharpV: 1.0, litB: 0.10, litK: 1.25,
+    bodyEdge: 0.34, crystalGain: 0.92, medB: 0.048, medS: 0.028, medAbsorb: 2.00, murkGain: 3.20,
+    spinRate: 0.088, spinWob: 0.48, spinLane: 2.0,
 });
 
 /** tempest's lightning: the two lane seeds, their slot lengths, and the radius its depth mask kills at. */

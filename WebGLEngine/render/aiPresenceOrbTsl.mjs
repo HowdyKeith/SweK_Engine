@@ -55,11 +55,17 @@ export const ORB_KNOBS = Object.freeze([
     // shares `drift` between opal and abyss for exactly this reason. c3 is `spread` on both, as it is on
     // seventeen of the eighteen.
     "density", "fold", "glint",
+    // fathom's three and geode's three. NOT shared this time, and the difference from nebula/tempest is the
+    // point: those two read one argument list that means the same thing on both ("how much weather"), while
+    // fathom's c0 sets how far apart its shells sit and geode's cuts its faces harder. Same slot, different
+    // quantity, so the port gives them different names rather than pretending the roster shares more than it
+    // does.
+    "layers", "parallax", "murk", "facet", "glim", "stone",
 ]);
 
 /** The species this file can build. murmur ships eighteen; these are the six that are ported. */
 export const ORB_SPECIES = Object.freeze(["still", "limn", "comet", "droplet", "opal", "abyss",
-                                          "nebula", "tempest"]);
+                                          "nebula", "tempest", "fathom", "geode"]);
 
 /**
  * The three colour anchors the rail is built from, as murmur's own WEB-SPEC names them: ink '#0A0A0B' is the
@@ -74,7 +80,7 @@ export const ORB_COLORS = Object.freeze({
 
 import { makeMurmurKitTsl } from "./murmurKitTsl.mjs";
 import { MH_EXT, MH_TAPS, MH_SURFACE_KNOBS, MH_SHAPE, MH_DROPLET_GAIN, MH_MIST,
-         MH_TEMPEST_BOLT } from "./murmurKit.mjs";
+         MH_TEMPEST_BOLT, MH_FATHOM, MH_GEODE } from "./murmurKit.mjs";
 
 const R_BODY = 0.62;          // sphere radius in the -1..1 quad
 const EDGE_FEATHER = 0.015;   // antialiased silhouette width, in the same units as R_BODY
@@ -123,7 +129,8 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
                  orbitTilt: 0.5, trail: 0.5, pointSize: 0.4,
                  wobble: 0.5, tension: 0.5, sheen: 0.5,
                  flashes: 0.5, softness: 0.6, drift: 0.4, creatures: 0.4, rarity: 0.6,
-                 density: 0.5, fold: 0.5, glint: 0.5, ...knobs };
+                 density: 0.5, fold: 0.5, glint: 0.5,
+                 layers: 0.5, parallax: 0.5, murk: 0.4, facet: 0.5, glim: 0.5, stone: 0.5, ...knobs };
     const uniforms = {}; for (const n of ORB_KNOBS) uniforms[n] = uniform(float(k0[n])).label(n);
     // The rail's three anchors are colours, not scalars, so they sit beside the knob block rather than in it.
     const col0 = { ink: ORB_COLORS.ink, tone: ORB_COLORS.tone, tone2: ORB_COLORS.tone, ...(knobs.colors || {}) };
@@ -790,6 +797,218 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         return { density: mistDensity, accM, accMH };
         };
 
+        // =====================================================================================================
+        // *** FATHOM -- THE NINTH. "Layered translucent depths: nested shells, seen through each other." ***
+        //
+        // NOT MIST, AND THAT IS THE WHOLE DISTINCTION FROM NEBULA, which fathom.ts draws itself: "Nebula's
+        // answer to depth is a cloud whose near folds silhouette against its own glow -- volume without any
+        // surface in it. This species goes the other way: three legible SURFACES at three radii ... What the
+        // eye gets from a cloud is atmosphere; what it gets from nested shells is measurement."
+        //
+        // THE SHELLS ARE SOLVED, NOT MARCHED: each crossing is one quadratic against a sphere, and "a ray
+        // that enters the body crosses every shell it reaches exactly twice".
+        //
+        // *** AND THEY SORT THEMSELVES, WHICH IS WHY THERE IS NO SORT. *** A ray from outside meets the
+        // biggest shell first, then the middle, then the smallest, then the smallest again on the way out,
+        // then the middle, then the biggest. Outer-in, inner-out. The order is known in advance and cannot
+        // vary, so the six contributions are simply written in that sequence and the transmittance is right.
+        //
+        // *** AND IT IS WORTH ONE LEAST-SIGNIFICANT BIT, WHICH IS NOT WHAT THE PARAGRAPH ABOVE SOUNDS LIKE.
+        // *** Reversing MH_FATHOM.order and re-rendering 27 fathom frames -- three murks by three voices by
+        // three times -- moves 361 bytes of 248,832 (0.145%), every one of them by exactly 1 of 255. The
+        // reason is in the algebra: a shell contributes en * trS and then attenuates trS by exp(-absorb*en),
+        // which for small en is 1 - absorb*en, so the composite is (sum of en) minus absorb times the sum of
+        // en_i * en_j over pairs -- and a pair sum is SYMMETRIC, so order cannot reach it. The first term
+        // that can tell the orders apart is third-order in quantities already under 0.1. The sequence stays
+        // as written because it is what the geometry gives and because higher absorption would make it
+        // matter; the claim that it is doing visible work here is retracted, and tools/ship/
+        // murmurSpecies6-selfcheck.mjs declines to grade it for exactly that reason.
+        const buildFathom = () => {
+            const FA = MH_FATHOM;
+            const layersK = clamp(uniforms.layers, 0.0, 1.0).toVar();
+            const parallaxK = clamp(uniforms.parallax, 0.0, 1.0).toVar();
+            const murkK = clamp(uniforms.murk, 0.0, 1.0).toVar();
+            const flF = KIT.mhFlourish(uniforms.time, float(9.0), float(9.4)).toVar();
+            const keyF = KIT.mhKey(uniforms.time).toVar();
+            // Voice and the gesture push the shells APART -- "not brighter, deeper".
+            const spanK = float(1.0).add(uniforms.voice.mul(0.22)).add(flF.x.mul(0.16)).toVar();
+            const third = float(1.0).sub(smoothstep(float(0.28), float(0.68), smallK)).toVar();
+            const thick = float(FA.thickB).add(layersK.mul(FA.thickK)).mul(mix(float(1.0), float(1.90), smallK)).toVar();
+            const foldAmp = float(FA.foldB).add(parallaxK.mul(FA.foldK))
+                .mul(float(1.0).add(uniforms.voice.mul(0.55))).mul(mix(float(1.0), float(0.50), smallK)).toVar();
+            const bq = dot(P, rd).toVar();
+            const PP = dot(P, P).toVar();
+            // THE FOLD HAS TO MOVE THE OUTLINE, or three shells come out as three perfect concentric circles
+            // -- "a target, not a set of folded surfaces". The radius is folded per pixel in the pixel's own
+            // IN-PLANE direction, which is exactly the direction of the shell's limb there: an approximation
+            // away from the limb and exact AT it, which is the right place for the error to be.
+            const limbDir = normalize(vec3(P.x, P.y, 0.02).add(1e-5)).toVar();
+            const ANG = FA.shells.map((sh) =>
+                KIT.mhDrift(uniforms.time, float(sh.rate), float(sh.wob), float(sh.lane)).toVar());
+            const AX = ANG.map((a) => normalize(vec3(cos(a), 0.42, sin(a))).toVar());
+            const R0 = min(float(FA.shells[0].base).add(layersK.mul(FA.shells[0].rk)).mul(spanK), float(FA.rCap)).toVar();
+            const RAD = FA.shells.map((sh, k) => k === 0 ? R0
+                : float(sh.base).add(layersK.mul(sh.rk)).mul(spanK).toVar());
+            const WGT = FA.shells.map((sh, k) => k === 2 ? float(sh.w).mul(third).toVar() : float(sh.w).toVar());
+            const foldOf = (dir, k) => float(0.62).mul(sin(dot(dir, AX[k]).mul(2.30).add(ANG[k].mul(1.7))))
+                .add(float(0.38).mul(sin(dot(dir, vec3(AX[k].z, AX[k].x, AX[k].y)).mul(3.70)
+                    .sub(ANG[k].mul(1.1)).add(2.1))));
+            // Per-shell crossing data: the ray distance, the energy, and the crossing's own outward z, which
+            // is all the hue rail needs of the direction.
+            const sHit = [], eHit = [], zHit = [];
+            for (let k = 0; k < 3; k++) {
+                const R = RAD[k];
+                const RK = R.add(foldAmp.mul(R.div(max(R0, float(1e-3)))).mul(foldOf(limbDir, k))).toVar();
+                const disc = bq.mul(bq).sub(PP).add(RK.mul(RK)).toVar();
+                const sq = sqrt(max(disc, float(0.0))).toVar();
+                for (let h = 0; h < 2; h++) {
+                    const sc = (h === 0 ? bq.negate().sub(sq) : bq.negate().add(sq)).toVar();
+                    const live = disc.greaterThan(0.0).and(sc.greaterThan(0.0)).and(sc.lessThan(L));
+                    const pt = P.add(rd.mul(sc)).toVar();
+                    const dir = normalize(pt.add(1e-5)).toVar();
+                    const g = dot(dir, rd).toVar();
+                    // GRAZING CROSSINGS GLOW, and this is the effect that sells translucency: the material a
+                    // ray meets crossing a thin shell is its thickness over the COSINE of the angle to the
+                    // surface, so a crossing near the limb passes through several times as much skin. Free --
+                    // the cosine is a dot product the crossing already computed -- and floored at 0.26 so the
+                    // amplification cannot diverge.
+                    const graze = thick.div(max(abs(g), float(FA.grazeFloor))).toVar();
+                    const lit = float(FA.litB).add(clamp(dot(dir, keyF), 0.0, 1.0).mul(FA.litK)).toVar();
+                    const en = graze.mul(float(FA.eB).add(foldOf(dir, k).mul(0.5).add(0.5).mul(FA.eK)))
+                        .mul(lit).mul(WGT[k]).toVar();
+                    sHit.push(sc); eHit.push(select(live, en, float(0.0)).toVar()); zHit.push(dir.z);
+                }
+            }
+            // THE MURK BETWEEN THE SHELLS, marched: it is a medium, not a surface.
+            const medAmt = float(FA.medB).add(murkK.mul(FA.medK)).mul(mix(float(1.0), float(0.70), smallK)).toVar();
+            const accF = float(0.0).toVar();
+            const transF = float(1.0).toVar();
+            Loop({ start: 0, end: MH_TAPS }, ({ i }) => {
+                const pF = P.add(rd.mul(float(i).add(0.5).mul(ds)));
+                const eF = KIT.mhMedium(pF, uniforms.time, float(2.0)).mul(medAmt).mul(KIT.mhInside(pF)).toVar();
+                accF.addAssign(eF.mul(transF).mul(ds));
+                transF.assign(transF.mul(exp(eF.mul(FA.medAbsorb).add(MH_EXT).mul(ds).negate())));
+            });
+            // THE SHELLS, FRONT TO BACK, IN THE ORDER GEOMETRY GUARANTEES. A crossing that did not happen
+            // carries zero energy, so it contributes nothing AND leaves the transmittance untouched --
+            // exp(0) is 1 -- which is how a `continue` is written when there are no branches.
+            const shellE = float(0.0).toVar(), shellH = float(0.0).toVar();
+            const trS = float(1.0).toVar();
+            const absorbF = float(FA.absorbB).add(murkK.mul(FA.absorbK)).toVar();
+            FA.order.forEach((k, i) => {
+                const idx = k * 2 + (i < 3 ? 0 : 1);
+                const en = eHit[idx].mul(exp(sHit[idx].mul(-MH_EXT))).toVar();
+                shellE.addAssign(en.mul(trS));
+                // DEPTH CARRIES THE HUE: the near faces one way, the far the other, "so the layers are told
+                // apart by colour as well as by brightness".
+                shellH.addAssign(en.mul(trS).mul(clamp(zHit[idx], -1.0, 1.0)));
+                trS.assign(trS.mul(exp(absorbF.mul(en).negate())));
+            });
+            const fathomDensity = shellE.mul(FA.shellGain).add(accF.mul(FA.murkGain)).mul(uniforms.depth);
+            return { density: fathomDensity, shellE, shellH };
+        };
+
+        // =====================================================================================================
+        // *** GEODE -- THE TENTH. "A cut crystal inside the glass, catching light face by face." ***
+        //
+        // *** ITS OWN FILE OPENS BY REJECTING ITS FIRST BUILD, AND THE REASON IS ONE THIS PORT HAS NOW MET
+        // THREE TIMES. *** geode.ts: "A FACET IS A PLANE, AND THE FIRST BUILD'S WASN'T. It partitioned the
+        // volume by which of six DIRECTIONS a point was most aligned with ... the partition was then
+        // integrated along the view ray, and integrating a hard-edged structure through five samples averages
+        // exactly the angularity that was the point." comet's head fell between the taps; droplet's heart was
+        // solved for the same reason; this is the third.
+        //
+        // SO THE CRYSTAL IS A REAL CONVEX SOLID, INTERSECTED. Four axes make eight planes -- a slab per axis,
+        // with different offsets on the two sides so the gem is irregular rather than a symmetric octahedron
+        // -- and the ray is tested by the slab method: the entry is the LAST plane the ray crosses going in,
+        // the exit the FIRST it crosses coming out, and the solid is hit when the entry precedes the exit.
+        //
+        // AND THE ENTRY PLANE IS THE FACE YOU ARE LOOKING AT, which is the whole species: its normal shades
+        // it against the key, so as the solid turns, faces come up bright one at a time and roll away into
+        // near-darkness. Nothing animates that; the rotation does all of it.
+        const buildGeode = () => {
+            const GE = MH_GEODE;
+            const facetK = clamp(uniforms.facet, 0.0, 1.0).toVar();
+            const glimK = clamp(uniforms.glim, 0.0, 1.0).toVar();
+            const stoneK = clamp(uniforms.stone, 0.0, 1.0).toVar();
+            const flG = KIT.mhFlourish(uniforms.time, float(19.0), float(10.2)).toVar();
+            const ayG = KIT.mhDrift(uniforms.time, float(GE.spinRate), float(GE.spinWob), float(GE.spinLane)).toVar();
+            const axG = float(0.34).add(sin(uniforms.time.mul(0.041)).mul(0.22)).toVar();
+            // THE RAY, IN THE STONE'S FRAME. Rotating the ray IN is one transform; rotating the eight planes
+            // OUT would be eight.
+            const Pc = KIT.mhSpin(P, ayG, axG).toVar();
+            const Rc = KIT.mhSpin(rd, ayG, axG).toVar();
+            // The stone has to sit INSIDE the glass with room around it: at 0.56 it reached the shell and the
+            // containment cut its corners off, "and a crystal whose silhouette is decided by something other
+            // than its own planes has stopped being a crystal".
+            const gScale = float(GE.scaleB).add(stoneK.mul(GE.scaleK)).mul(mix(float(1.0), float(1.20), smallK)).toVar();
+            const fourth = float(1.0).sub(smoothstep(float(0.24), float(0.66), smallK)).toVar();
+            const o4 = mix(float(GE.o4), float(GE.o4Small), fourth).toVar();
+            const tIn = float(-1e9).toVar(), tIn2 = float(-1e9).toVar(), tOut = float(1e9).toVar();
+            const fN = vec3(0.0, 0.0, 1.0).toVar(), fN2 = vec3(0.0, 0.0, 1.0).toVar();
+            for (let k = 0; k < 4; k++) {
+                const A = vec3(...GE.axes[k]).normalize().toVar();
+                const dpK = (k < 3 ? float(GE.dp[k]).mul(gScale) : o4.mul(gScale)).toVar();
+                const dmK = (k < 3 ? float(GE.dm[k]).mul(gScale) : o4.mul(GE.o4m).mul(gScale)).toVar();
+                const na = dot(A, Rc).toVar();
+                const pa = dot(A, Pc).toVar();
+                // A ray PARALLEL to a slab is not a division: it is either inside the slab forever or outside
+                // it forever, so the divisor is made safe and the answer is selected rather than computed.
+                const deg = abs(na).lessThan(1e-5);
+                const naS = select(deg, float(1.0), na).toVar();
+                const t1 = dpK.sub(pa).div(naS).toVar();
+                const t2 = dmK.negate().sub(pa).div(naS).toVar();
+                const outside = pa.greaterThan(dpK).or(pa.lessThan(dmK.negate()));
+                const tn = select(deg, select(outside, float(1e9), float(-1e9)), min(t1, t2)).toVar();
+                const tf = select(deg, select(outside, float(-1e9), float(1e9)), max(t1, t2)).toVar();
+                const nIn = select(t1.lessThan(t2), A, A.negate()).toVar();
+                // The LAST plane in, and the runner-up beside it -- both read from the OLD values before
+                // either is written, which is what keeps the two-deep ranking correct without a sort.
+                const better = tn.greaterThan(tIn);
+                const second = tn.greaterThan(tIn2);
+                const nextIn2 = select(better, tIn, select(second, tn, tIn2)).toVar();
+                const nextN2 = select(better, fN, select(second, nIn, fN2)).toVar();
+                const nextIn = select(better, tn, tIn).toVar();
+                const nextN = select(better, nIn, fN).toVar();
+                tIn2.assign(nextIn2); fN2.assign(nextN2); tIn.assign(nextIn); fN.assign(nextN);
+                tOut.assign(min(tOut, tf));
+            }
+            const sEnter = max(tIn, float(0.0)).toVar();
+            const chord = min(tOut, L).sub(sEnter).toVar();
+            const hit = chord.greaterThan(0.0).and(sEnter.lessThan(L));
+            // THE EDGE, AND IT IS SOFT-EDGED WITHOUT BEING BLURRED. Two entry planes nearly equally last
+            // means the ray is arriving at an EDGE, so the shading normal blends between the two faces over a
+            // narrow band. That is a soft transition across HARD geometry, which is what a blur cannot
+            // imitate -- and the silhouette softens for free, because the chord goes to zero at every edge of
+            // the outline.
+            const soft = float(GE.softB).sub(facetK.mul(GE.softK)).mul(gScale).toVar();
+            const eMix = exp(max(tIn.sub(tIn2), float(0.0)).div(max(soft, float(1e-4))).negate()).toVar();
+            const nrm = normalize(mix(fN, fN2, eMix.mul(0.5)).add(1e-5)).toVar();
+            const keyG = KIT.mhSpin(KIT.mhKey(uniforms.time), ayG, axG).toVar();
+            const sharp = max(float(GE.sharpB).add(facetK.mul(GE.sharpK)).sub(uniforms.voice.mul(GE.sharpV)), float(0.7)).toVar();
+            const face = pow(clamp(dot(nrm, keyG), 0.0, 1.0), sharp).toVar();
+            const litG = float(GE.litB).add(face.mul(GE.litK))
+                .add(flG.x.mul(1.70).mul(pow(clamp(dot(nrm, normalize(vec3(...GE.axes[0]).add(vec3(...GE.axes[2])))), 0.0, 1.0), float(3.0)))).toVar();
+            const bodyG = smoothstep(float(0.0), gScale.mul(GE.bodyEdge), chord).toVar();
+            const visG = KIT.mhInside(P.add(rd.mul(sEnter.add(chord.mul(0.4))))).mul(exp(sEnter.mul(-MH_EXT))).toVar();
+            // A bright line where two faces meet.
+            const edgeG = glimK.mul(float(1.0).sub(smallK)).mul(0.85).mul(eMix).mul(float(1.0).sub(eMix.mul(0.4))).toVar();
+            const crystalE = select(hit, litG.mul(bodyG).add(edgeG.mul(bodyG)).mul(visG), float(0.0)).toVar();
+            // Faces take hue by WHICH WAY THEY POINT, so neighbouring faces of the stone are neighbouring hues.
+            const crystalH = crystalE.mul(clamp(nrm.x.mul(0.7).add(nrm.y.mul(0.5)), -1.0, 1.0)).toVar();
+            const medG = mix(float(GE.medB), float(GE.medS), smallK).toVar();
+            const accG = float(0.0).toVar();
+            const transG = float(1.0).toVar();
+            Loop({ start: 0, end: MH_TAPS }, ({ i }) => {
+                const pG = P.add(rd.mul(float(i).add(0.5).mul(ds)));
+                const eG = KIT.mhMedium(pG, uniforms.time, float(2.0)).mul(medG).mul(KIT.mhInside(pG)).toVar();
+                accG.addAssign(eG.mul(transG).mul(ds));
+                transG.assign(transG.mul(exp(eG.mul(GE.medAbsorb).add(MH_EXT).mul(ds).negate())));
+            });
+            const geodeDensity = accG.mul(GE.murkGain).add(crystalE.mul(GE.crystalGain)).mul(uniforms.depth);
+            return { density: geodeDensity, crystalE, crystalH };
+        };
+
         // *** ONE CALL, AND IT IS THE ONLY SPECIES BLOCK THAT RUNS. *** The seven closures above are
         // declared and six of them are never invoked, so their nodes are never built and never reach the
         // WGSL. Everything below reads `SP`, whose shape is each hero's own contract: always a density, plus
@@ -799,7 +1018,9 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             : species === "droplet" ? buildDroplet()
             : species === "opal" ? buildOpal()
             : species === "abyss" ? buildAbyss()
-            : (species === "nebula" || species === "tempest") ? buildMist() : buildStill();
+            : (species === "nebula" || species === "tempest") ? buildMist()
+            : species === "fathom" ? buildFathom()
+            : species === "geode" ? buildGeode() : buildStill();
         const density = SP.density;
 
         // ---- THE SURFACE IS murmur's NOW, NOT THIS FILE'S APPROXIMATION OF IT ------------------------------
@@ -889,6 +1110,17 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             : species === "abyss"
             // abyss's three lanes take one hue step each: -1, 0, +1 across the spread.
             ? select(SP.glowE.greaterThan(1e-5), SP.glowH.div(SP.glowE), float(0.0)).mul(spreadK).mul(KIT.MH_SPREAD)
+            : species === "fathom"
+            // fathom's hue rides its SHELL CROSSINGS and their own outward z, weighted by the same
+            // transmittance the brightness is -- so a near shell that occludes the one behind it occludes
+            // that shell's hue too. fathom.ts: "the near faces one way, the far the other, so the layers are
+            // told apart by colour as well as by brightness".
+            ? select(SP.shellE.greaterThan(1e-4), SP.shellH.div(SP.shellE), float(0.0)).mul(spreadK).mul(KIT.MH_SPREAD)
+            : species === "geode"
+            // geode's hue is a property of the FACE, not of depth: "faces take hue by which way they point,
+            // so neighbouring faces of the stone are neighbouring hues". It is the only ported hero whose
+            // colour comes from a surface NORMAL rather than from where the light sits in the volume.
+            ? select(SP.crystalE.greaterThan(1e-5), SP.crystalH.div(SP.crystalE), float(0.0)).mul(spreadK).mul(KIT.MH_SPREAD)
             : (species === "nebula" || species === "tempest")
             // *** THE MIST HEROES CARRY THEIR HUE ON DEPTH, WHICH IS THE ONE CHANNEL A CLOUD HAS. ***
             // nebula.ts: "the near folds one way, the deep glow the other, so the cloud has two hues in
@@ -913,6 +1145,9 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             // rather than by the interior, because in both the event IS the colour and the medium is night.
             : species === "opal" ? SP.flashE
             : species === "abyss" ? SP.glowE
+            // geode weights by the CRYSTAL alone at its own gain -- its file spells hueMix with
+            // crystalE * 0.92 as the numerator, not the interior -- while fathom takes the default.
+            : species === "geode" ? SP.crystalE.mul(MH_GEODE.crystalGain)
             // nebula and tempest take the DEFAULT, and that is transcribed rather than fallen into: both
             // their files spell hueMix = hue * (interior + sf.rim * 0.7) / max(e, 1e-4), the same numerator
             // still and comet use. Checked against the source, not assumed from the branch order.
