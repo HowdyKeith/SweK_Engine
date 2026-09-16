@@ -130,6 +130,10 @@ export class WorldPersistence {
             if (bytes.length !== chunk.voxels.length) { skipped++; continue; }
             chunk.voxels.set(bytes);
             chunk.dirty = true;
+            // Task board #89 -- chunk.voxels.set(bytes) is the TYPED-ARRAY bulk copy, not Chunk.prototype.set(),
+            // so it bypasses the voxelGen bump that lives there (world/chunk.js). A restored chunk without this
+            // would keep serving whatever collider was cached under the chunk's PREVIOUS content, if any.
+            chunk.voxelGen = (chunk.voxelGen || 0) + 1;
             chunk._modified = true;
             restored++;
         }

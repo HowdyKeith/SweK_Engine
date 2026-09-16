@@ -21,8 +21,10 @@
 import { meshChunk } from "./chunkMesherCore.js";
 import { writeGlb, glbStats } from "../tools/export/voxelGlb.mjs";
 
-/** The 8 horizontal neighbours in the "dx,dz" shape readVoxel() expects. Missing ones are simply absent. */
-function neighboursOf(chunks, cx, cz) {
+/** The 8 horizontal neighbours in the "dx,dz" shape readVoxel() expects. Missing ones are simply absent.
+ *  Exported for world/worldColliderBVH.mjs (task #89): it needs the exact same neighbour lookup meshChunk()
+ *  requires to mesh a chunk's border faces correctly, and a second hand-copied version could quietly drift. */
+export function neighboursOf(chunks, cx, cz) {
     const n = {};
     for (let dx = -1; dx <= 1; dx++) {
         for (let dz = -1; dz <= 1; dz++) {

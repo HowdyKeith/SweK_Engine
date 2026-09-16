@@ -166,14 +166,20 @@ export class CommandRouter {
             // Sweep all loaded chunks and convert WATER + FLOWING_WATER to AIR.
             let cleared = 0;
             for (const chunk of this.world.chunks.values()) {
+                let touched = false;
                 for (let i = 0; i < chunk.voxels.length; i++) {
                     const v = chunk.voxels[i];
                     if (v === VOXEL_WATER || v === VOXEL_FLOWING_WATER) {
                         chunk.voxels[i] = VOXEL_AIR;
                         cleared++;
+                        touched = true;
                     }
                 }
                 chunk.dirty = true;
+                // Task board #89 -- this writes chunk.voxels directly rather than through Chunk.set(), which
+                // is the one place that already bumps voxelGen (world/chunk.js). A bulk edit that bypasses it
+                // would leave world/worldColliderBVH.mjs's per-chunk cache believing stale geometry is current.
+                if (touched) chunk.voxelGen = (chunk.voxelGen || 0) + 1;
             }
             this._emit("sim:state", { ...this._simState(), cleared });
             return;
