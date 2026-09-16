@@ -142,6 +142,9 @@ import { xpbdDevice } from "./xpbdBind.mjs";                // v3458 - xpbd comp
 // marked "headless-testable" and nothing ever tested it; barehands' gesture vocabulary is what named the
 // invariances worth grading. STATIC IMPORT, for the v3768 reason spelled out in the REGISTRY below.
 import { handsDevice } from "./handsBind.mjs";
+// v4633 -- task #88: capsule depenetration (floor/wall/corner/ramp/empty), the CPU twin the batched GPU kernel
+// (task #86, physics/character/capsuleCollideTsl.mjs) is graded against. STATIC IMPORT, the v3768 reason above.
+import { capsuleDepenetrateDevice } from "./capsuleDepenetrateBind.mjs";
 
 // v4131 -- THE REFUSAL, NAMED. This is the roundhouse's own founding device (shedOnset.mjs, the "#1" question
 // the whole proposer/builder/evaluator pattern was named after), and it predates the planted-error convention
@@ -382,6 +385,7 @@ const REGISTRY = {
     vaporize: async () => vaporizeDevice,
     crystallize: async () => crystallizeDevice,
     blobkelvin: async () => blobKelvinDevice,
+    capsuledepenetrate: async () => capsuleDepenetrateDevice,
     lbm: makeLbmDevice,
 };
 

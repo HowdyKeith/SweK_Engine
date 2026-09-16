@@ -27,7 +27,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
 import { computeShell, transplantCompute } from "../../render/tslSource.mjs";
-import { closestPointOnTriangle, closestSegmentSegment, segmentTriangleClosest, faceNormalToward, GROUND_SUPPORT_NORMAL_Y } from "../../physics/character/capsuleCollide.mjs";
+import { closestPointOnTriangle, closestSegmentSegment, segmentTriangleClosest, faceNormalToward, depenetrateCapsuleFixedTris } from "../../physics/character/capsuleCollide.mjs";
 import { CONTACT_SKIN } from "../../physics/character/capsuleCollideTsl.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -112,34 +112,9 @@ function capsuleScenes() {
     return scenes;
 }
 
-/** capsuleCollide.mjs's own depenetrateCapsule, held to a FIXED candidate list instead of a live BVH re-query
- *  -- the same constraint the GPU kernel is under, stated in capsuleCollideTsl.mjs's own header. Reuses the
- *  REAL segmentTriangleClosest/faceNormalToward, so only the "where do candidates come from" half differs. */
-function depenetrateCapsuleFixedTris(feet, radius, height, triangles, opts = {}) {
-    const { iterations = 4, groundNormalY = GROUND_SUPPORT_NORMAL_Y, maxStepFrac = 0.8 } = opts;
-    const segLo = radius, segHi = Math.max(radius, height - radius);
-    const maxStep = radius * maxStepFrac;
-    let cx = feet[0], cy = feet[1], cz = feet[2];
-    let grounded = false, contacts = 0;
-    const midY = segLo + (segHi - segLo) / 2;
-    for (let iter = 0; iter < iterations; iter++) {
-        const segBot = [cx, cy + segLo, cz], segTop = [cx, cy + segHi, cz];
-        let deepestPen = -Infinity, deepestNormal = null;
-        for (const [a, b, c] of triangles) {
-            const { distSq } = segmentTriangleClosest(segBot, segTop, a, b, c);
-            const dist = Math.sqrt(distSq);
-            if (dist >= radius + CONTACT_SKIN) continue;
-            const pen = radius - dist;
-            if (pen > deepestPen) { deepestPen = pen; deepestNormal = faceNormalToward(a, b, c, cx, cy + midY, cz); }
-        }
-        if (deepestNormal === null) continue;   // a no-find leaves state unchanged either way -- written as continue,
-        const push = Math.max(0, Math.min(deepestPen, maxStep));   // not break, so it is visibly equivalent to the
-        cx += deepestNormal[0] * push; cy += deepestNormal[1] * push; cz += deepestNormal[2] * push;   // GPU kernel's own
-        contacts++;                                                                                    // no-break, guarded-noop loop
-        if (deepestNormal[1] > groundNormalY) grounded = true;
-    }
-    return { pos: [cx, cy, cz], grounded, contacts };
-}
+// depenetrateCapsuleFixedTris (the GPU kernel's CPU twin, held to the same fixed candidate list) now lives in
+// physics/character/capsuleCollide.mjs, imported above -- moved there so tools/roundhouse/
+// capsuleDepenetrateBind.mjs can share the SAME implementation instead of a third copy that could drift.
 
 {
     const skip = webgpuSkipReason();

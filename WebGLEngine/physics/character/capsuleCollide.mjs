@@ -245,6 +245,54 @@ export function depenetrateCapsule(feet, radius, height, bvh, opts = {}) {
 }
 
 /**
+ * depenetrateCapsule above, held to a FIXED candidate list instead of a live bvh.trianglesInBox() re-query --
+ * the CPU twin of physics/character/capsuleCollideTsl.mjs's depenetrateCapsulesNode, which cannot call back to
+ * the CPU mid-dispatch and so resolves against ONE fixed list for every iteration (see that file's own header).
+ * Exported so every caller that needs the GPU kernel's exact semantics -- tools/ship/capsuleCollideTsl-
+ * selfcheck.mjs and tools/roundhouse/capsuleDepenetrateBind.mjs -- shares ONE implementation rather than two or
+ * three that could quietly drift apart.
+ *
+ * Two differences from depenetrateCapsule, both deliberate: (1) `triangles` is a plain array of [a,b,c] vertex
+ * triples rather than a bvh + trianglesInBox() query. (2) a no-find iteration is `continue`, not `break` --
+ * depenetrateCapsule stops early because a live re-query means a later iteration could only ever find the SAME
+ * candidates again once none remain; the fixed-list kernel has no such guarantee against a caller's own list,
+ * and this reference stays behaviourally identical to the GPU kernel's own unconditional iteration count, not
+ * merely equivalent in the common case.
+ *
+ * `opts.plantGroundedFlip`: a KNOB plant, not a nudged constant -- flips the grounded comparison from
+ * `normal.y > groundNormalY` to `normal.y < groundNormalY`, the exact inversion tools/roundhouse/
+ * capsuleDepenetrateBind.mjs's own header sabotage-verifies against. `pos` and `contacts` are BLIND to it (the
+ * push itself never reads the comparison), which is the honest thing to say about it up front rather than
+ * leave a reader to discover by sweeping every observable.
+ */
+export function depenetrateCapsuleFixedTris(feet, radius, height, triangles, opts = {}) {
+    const { iterations = 4, groundNormalY = GROUND_SUPPORT_NORMAL_Y, maxStepFrac = 0.8, plantGroundedFlip = false } = opts;
+    const segLo = radius, segHi = Math.max(radius, height - radius);
+    const maxStep = radius * maxStepFrac;
+    let cx = feet[0], cy = feet[1], cz = feet[2];
+    let grounded = false, contacts = 0;
+    const midY = segLo + (segHi - segLo) / 2;
+    for (let iter = 0; iter < iterations; iter++) {
+        const segBot = [cx, cy + segLo, cz], segTop = [cx, cy + segHi, cz];
+        let deepestPen = -Infinity, deepestNormal = null;
+        for (const [a, b, c] of triangles) {
+            const { distSq } = segmentTriangleClosest(segBot, segTop, a, b, c);
+            const dist = Math.sqrt(distSq);
+            if (dist >= radius + CONTACT_SKIN) continue;
+            const pen = radius - dist;
+            if (pen > deepestPen) { deepestPen = pen; deepestNormal = faceNormalToward(a, b, c, cx, cy + midY, cz); }
+        }
+        if (deepestNormal === null) continue;   // a no-find leaves state unchanged either way -- written as continue,
+        const push = Math.max(0, Math.min(deepestPen, maxStep));   // not break, so it is visibly equivalent to the
+        cx += deepestNormal[0] * push; cy += deepestNormal[1] * push; cz += deepestNormal[2] * push;   // GPU kernel's own
+        contacts++;                                                                                    // no-break, guarded-noop loop
+        const grounds = plantGroundedFlip ? deepestNormal[1] < groundNormalY : deepestNormal[1] > groundNormalY;
+        if (grounds) grounded = true;
+    }
+    return { pos: [cx, cy, cz], grounded, contacts };
+}
+
+/**
  * The reference's ground check: a center raycast down, falling back to a ring of probes at `ringFrac` of the
  * capsule radius for an edge or gap (a stair nosing, the lip of a platform) a single ray would miss. Returns
  * the nearest STANDABLE hit ({ point, normal, dist }), or null if nothing under the capsule qualifies.
