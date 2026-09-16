@@ -180,7 +180,19 @@ export function depenetrateCapsule(feet, radius, height, bvh, opts = {}) {
 
     for (let iter = 0; iter < iterations; iter++) {
         const segBot = [cx, cy + segLo, cz], segTop = [cx, cy + segHi, cz];
-        const lo = [cx - radius, cy, cz - radius], hi = [cx + radius, cy + height, cz + radius];
+        // *** THE QUERY BOX NEEDS THE SAME CONTACT_SKIN MARGIN THE PER-TRIANGLE DISTANCE TEST BELOW ALREADY
+        // HAS, AND MISSING IT HERE REOPENS THE EXACT FLICKER THAT MARGIN EXISTS TO CLOSE. *** A capsule
+        // resting exactly on a surface has its lowest point (cy) exactly AT that surface, with zero margin --
+        // so a triangle sitting exactly at the query box's own edge is one float rounding away from being
+        // ruled OUT by mesh/meshBVH.mjs's trianglesInBox (a strict AABB-vs-AABB test) before the per-triangle
+        // check below ever runs. Measured live: cy computed as position.y - eyeHeight, with position.y itself
+        // computed as an earlier cy + eyeHeight -- 2.7 - 1.7 is 1.0000000000000002 in IEEE 754, not 1.0 --
+        // put cy a hair ABOVE a flat surface at y=1.0 on alternating frames, which is enough for lo[1] > the
+        // touching triangle's own bounding box top and drop it from the candidate list entirely: `grounded`
+        // flickered every other call again, this time from the broad phase rather than the narrow one.
+        const skin = CONTACT_SKIN;
+        const lo = [cx - radius - skin, cy - skin, cz - radius - skin];
+        const hi = [cx + radius + skin, cy + height + skin, cz + radius + skin];
         const tris = bvh.trianglesInBox(lo, hi);
 
         let deepestPen = -Infinity, deepestNormal = null;

@@ -160,6 +160,32 @@ console.log("\n4. depenetrateCapsule -- RESTING ON A FLOOR, BLOCKED BY A WALL, T
     }
     ok("!! *** resting on a floor stays grounded on EVERY call after the first, not every other one ***",
        groundedEveryCall, `20 consecutive calls, feeding each call's own settled y back in as the next call's feet`);
+
+    // *** A SECOND, SEPARATE FLICKER SOURCE: THE BROAD-PHASE QUERY BOX HAD NO SKIN MARGIN AT ALL. ***
+    // Found through the exact round-trip camera.js's _moveFPCapsule performs every frame: position.y =
+    // pos[1] + eyeHeight one frame, feet.y = position.y - eyeHeight the next. 2.7 - 1.7 is
+    // 1.0000000000000002 in IEEE 754, not 1.0 -- close enough that the PER-TRIANGLE distance test (already
+    // skin-margined, and the fix the row above this one covers) still would have counted it as a touch, but
+    // the QUERY BOX passed to trianglesInBox used lo[1] = cy with NO margin at all, so a triangle sitting
+    // exactly at y=1.0 had its own bounding box's top edge (1.0) fall a hair BELOW the query's lower bound
+    // (1.0000000000000002) and was excluded by the broad phase before the narrow phase ever ran --
+    // contacts: 0, grounded: false, on a capsule that had not moved at all. Reproduced here with the SAME
+    // lossy round-trip a caller actually performs, not a hand-picked failing float.
+    const raisedFloor = trianglesFrom(
+        [[-10, 1, -10], [10, 1, -10], [10, 1, 10], [-10, 1, 10]],
+        [[0, 1, 2], [0, 2, 3]],
+    );
+    const raisedFloorBVH = new MeshBVH(raisedFloor);
+    const EYE = 1.7;
+    let restY2 = 1.0, groundedEveryCall2 = true;
+    for (let call = 0; call < 20; call++) {
+        const feetY = (restY2 + EYE) - EYE;   // the exact lossy round-trip _moveFPCapsule performs each frame
+        const r = depenetrateCapsule([0, feetY, 0], radius, height, raisedFloorBVH);
+        if (!r.grounded) groundedEveryCall2 = false;
+        restY2 = r.pos[1];
+    }
+    ok("!! *** the SAME 20-call rest check, but through the lossy +eyeHeight/-eyeHeight round-trip a caller uses ***",
+       groundedEveryCall2, `feetY each call: ${((1.0 + EYE) - EYE).toPrecision(17)} (not exactly 1.0)`);
 }
 
 console.log("\n5. THE maxStep CAP -- A DEEP PENETRATION RESOLVES OVER SEVERAL FRAMES, NOT ONE SNAP");

@@ -6786,6 +6786,8 @@ if (typeof window !== "undefined") {
 
 // ---- Their original imports (unchanged) ------------------------------
 import { Camera }         from "./camera/camera.js";
+import { VOXEL }          from "./world/voxelFormat.js";
+import { buildControllerLabWorld, controllerLabVoxelColumns, SPAWN as CONTROLLER_LAB_SPAWN } from "./world/controllerLabWorld.mjs";   // task board #13's live demo
 import * as reproParams  from "./engine/reproParams.js";   // v1986 — ?seed/?cam/?preset deterministic repro
 import { makeGamepadInput } from "./input/gamepadInput.js";   // v1409 — XInput / gamepad
 import { VoxelWorld }     from "./world/world.js";
@@ -16738,6 +16740,86 @@ const DEMO_MODES = [
         },
         stop() { try { fpsShooter.stop(); } catch {} },
         tick() { /* fpsShooter.tick runs in the main render loop */ },
+    },
+    {
+        // Task board #13's live demo. Everything else that walks in first person in this array (fps,
+        // fp_control) does it on the SAME global voxel world through fpsShooter -- none of them exercise
+        // physics/character/capsuleCollide.mjs (task #80) or terrainWalk.mjs (task #13 Stage A) at all,
+        // because voxel worlds never take those code paths (camera.js's own _capsuleWorldBVH()/
+        // _terrainGroundOracle() both return null whenever world.voxelAt exists). This demo hands the
+        // camera a world with NO voxelAt and a colliderBVH instead, so walking it actually runs the new
+        // code -- see world/controllerLabWorld.mjs's own header for why the visible voxels and the
+        // invisible collider are two separate things built from the same numbers.
+        id: "controller_lab",
+        autoplay: false,
+        label: "CONTROLLER LAB — non-voxel terrain + capsule collision",
+        terrain: true,       // keep the voxel visuals rendered
+        isolation: "quiet",  // a controlled space, no ambient sim competing for attention
+        hint: "task #13's ground-oracle + capsule-collision work, live: a ramp you can climb, one you can't, a wall corner, and a block that needs a jump",
+        controls: [
+            "WASD — walk (capsule-vs-mesh collision, a non-voxel world) · Mouse — look (click canvas to lock pointer)",
+            "Space — jump · Shift — sprint",
+            "V — toggle first/third person",
+            "Walk up the gentle ramp ahead; the steep one beside it refuses you -- same rule, same GROUND_SUPPORT_NORMAL_Y",
+            "The L-shaped wall to your left blocks you and lets you slide around the corner",
+            "The low block needs a jump -- walking into it alone does not get you on top",
+            "HUD along the top shows the live view mode + movement state (idle/walk/run/jump/fall)",
+            "ESC — exit back to the camera",
+        ],
+        start() {
+            world.regenerate();
+            renderer.meshes.clear();
+            try { persistence.clear(); } catch {}
+            world.flatten({ floorY: 0 });
+            for (const [x, y, z] of controllerLabVoxelColumns()) world.setVoxel(x, y, z, VOXEL.STONE);
+
+            const { colliderBVH } = buildControllerLabWorld();
+            camera.setWorld({ colliderBVH });
+            camera.setMode("fp");
+            camera.viewMode = "first";
+            camera.position.x = CONTROLLER_LAB_SPAWN.x;
+            camera.position.z = CONTROLLER_LAB_SPAWN.z;
+            camera.position.y = CONTROLLER_LAB_SPAWN.y + camera._eyeHeight;
+            camera.yaw = CONTROLLER_LAB_SPAWN.yaw;
+            camera.pitch = 0;
+            camera._fpOnGround = true;
+            camera._fpVelY = 0;
+
+            const hud = document.createElement("div");
+            hud.id = "controllerLabHud";
+            hud.style.cssText = "position:fixed; top:70px; left:50%; transform:translateX(-50%); z-index:500; " +
+                "background:rgba(10,14,20,0.85); border:1px solid #345; border-radius:8px; padding:8px 18px; " +
+                "font-family:ui-monospace,monospace; font-size:12px; color:#cde; text-align:center; pointer-events:none;";
+            document.body.appendChild(hud);
+            window._controllerLabHud = hud;
+
+            // No fpsShooter here (it is voxel-coupled -- carve/place, weapons, dungeon spawning, none of
+            // which this demo wants), so ESC-exits-fp is this demo's own responsibility, scoped to itself
+            // and removed in stop() rather than left as a dangling global listener.
+            const escHandler = (e) => {
+                if (e.key === "Escape" && camera.mode === "fp") {
+                    camera.setMode("observer");
+                    camera.setWorld(world);
+                }
+            };
+            window.addEventListener("keydown", escHandler);
+            window._controllerLabEscHandler = escHandler;
+        },
+        stop() {
+            try { if (window._controllerLabEscHandler) window.removeEventListener("keydown", window._controllerLabEscHandler); } catch {}
+            window._controllerLabEscHandler = null;
+            try { window._controllerLabHud?.remove(); } catch {}
+            window._controllerLabHud = null;
+            camera.setMode("observer");
+            camera.setWorld(world);
+        },
+        tick() {
+            const hud = window._controllerLabHud;
+            if (!hud || camera.mode !== "fp") return;
+            const state = camera.movementAnimState();
+            const view = camera.viewMode === "third" ? "Third-person" : "First-person";
+            hud.textContent = `${view} · ${state.toUpperCase()} · ${camera._fpOnGround ? "grounded" : "airborne"}`;
+        },
     },
     {
         // Round 220 — Voice Commander promoted to builtin. Demonstrates
