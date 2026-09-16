@@ -23,24 +23,37 @@
 //   6 isHell        0/1    hellspawn are fanatics
 //   7 isTech        0/1    calculating -- slightly timid
 //   8 isSpace       0/1    aloof -- neutral
-//   9 bias          1.0
+//   9 hazard        0..1   task board #90 -- real capsule-collision pressure at the kaiju's OWN live
+//                          position (simulation/KaijuManager.js's _resolveGroundKaijuPosition, against
+//                          world/worldColliderBVH.mjs's real per-chunk terrain geometry, task #89): wedged
+//                          against a wall/overhang, or standing on ground too unstable for the capsule to
+//                          resolve cleanly. 0 for a kaiju with no real collider under it (flying/swimming
+//                          kinds, or a world with no voxel grid) -- see main.js's snapshot builder.
+//   10 bias         1.0
+//
+// v90 -- hazard is NEW; bias relocates 9 -> 10, the same relocate-to-the-end convention ATK_FEATURES'
+// growth already established (policy.js's own v8/v15 comments below). brain/learn.js's loadWeights is
+// EXACT-LENGTH-ONLY for this single-layer policy (no migration path the way loadDeepWeights has for the
+// attack net) -- a previously-saved 10-length AGGRO_W_PATH file will simply miss and this hand-set 11-
+// length prior takes over at 0 steps, the same graceful fallback an absent or corrupted file already gets.
 
-export const FEATURES = 10;
+export const FEATURES = 11;
 export const HORIZON_CELLS = 24;      // threat/goal normalization horizon
 
 export function buildLayers() {
     // logit = 1.4*energy + 0.8*tier - 1.1*localThreat + 0.6*goalNear
     //       + 0.3*flying + 0.3*water + 0.9*hell - 0.25*tech + 0.0*space
+    //       - 0.7*hazard (wedged-in or unstable footing is a reason to disengage, not press on)
     //       - 0.9 (bias centers a mid-energy, mid-threat kaiju near 0.5)
-    const W = Float32Array.from([1.4, 0.8, -1.1, 0.6, 0.3, 0.3, 0.9, -0.25, 0.0, -0.9]);
+    const W = Float32Array.from([1.4, 0.8, -1.1, 0.6, 0.3, 0.3, 0.9, -0.25, 0.0, -0.7, -0.9]);
     const b = Float32Array.from([0.0]);
     return [{ nIn: FEATURES, nOut: 1, W, b, act: "sigmoid" }];
     // Trained-policy drop-in: return multiple layers here, e.g.
-    // [{nIn:10,nOut:16,W,b,act:"relu"},{nIn:16,nOut:1,W,b,act:"sigmoid"}]
+    // [{nIn:11,nOut:16,W,b,act:"relu"},{nIn:16,nOut:1,W,b,act:"sigmoid"}]
     // -- BatchedMLP handles any depth/width, nothing else changes.
 }
 
-// snapshot kaiju entry: { id, kind, energy, tier, x, z }
+// snapshot kaiju entry: { id, kind, energy, tier, x, z, hazard }
 // threatDistAt(x, z) -> cost-weighted distance to nearest OTHER threat
 // goalDistAt(x, z)   -> euclidean distance to nearest goal (world units)
 export function buildFeatures(k, threatDistAt, goalDistAt, cell) {
@@ -58,6 +71,7 @@ export function buildFeatures(k, threatDistAt, goalDistAt, cell) {
         kind === "hell" ? 1 : 0,
         kind === "tech" ? 1 : 0,
         kind === "space" ? 1 : 0,
+        Math.max(0, Math.min(1, k.hazard ?? 0)),
         1.0,
     ];
 }

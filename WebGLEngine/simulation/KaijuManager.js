@@ -2470,10 +2470,29 @@ export class KaijuManager {
             if (hit) resolvedY = hit.point[1];
         }
         k.position.y = resolvedY;
+        // Task board #90 -- k._hazard, read by main.js's snapshot builder and consumed by brain/policy.js's
+        // aggro feature #9: how much real capsule-collision pressure this kaiju is under RIGHT NOW.
+        k._hazard = 0;
         if (bvh) {
             const radius = this._kaijuCapsuleRadius(k);
-            const r = depenetrateCapsule([k.position.x, k.position.y, k.position.z], radius, radius * 4, bvh, { iterations: 2 });
+            const height = radius * 4;
+            const r = depenetrateCapsule([k.position.x, k.position.y, k.position.z], radius, height, bvh, { iterations: 2 });
             k.position.x = r.pos[0]; k.position.y = r.pos[1]; k.position.z = r.pos[2];
+            // *** A SEPARATE SINGLE-ITERATION PROBE, NOT r.contacts FROM THE POSITION SOLVE ABOVE. *** A first
+            // draft read hazard straight off `r` (the iterations:2 call), on the theory that any contacts
+            // beyond the expected one floor touch meant a wall pressing in. This file's own gate caught it
+            // red-handed: a kaiju standing in open air, nothing else nearby, still read hazard=0.5, because
+            // depenetrateCapsule's SECOND iteration re-touches the SAME already-resolved floor triangle (it
+            // is still within `radius + CONTACT_SKIN` after the first pass settles it there) and counts it as
+            // a second contact -- an iteration-count artifact, not a second surface. One iteration's own
+            // single DEEPEST contact cannot double-count anything: `grounded` true means the nearest thing in
+            // range is floor-like (the ordinary case); found a contact but NOT grounded means the nearest
+            // thing is a wall/overhang outranking the floor -- real lateral pressure; no contact at all means
+            // nothing is holding this kaiju up here. Slightly coarser than a true per-triangle wall count (a
+            // wall that loses to a still-closer floor on this one pass reads as 0, not partial), but never a
+            // false alarm for a kaiju standing in the open, which a fed-forward decision feature cannot afford.
+            const probe = depenetrateCapsule([k.position.x, k.position.y, k.position.z], radius, height, bvh, { iterations: 1 });
+            k._hazard = (probe.contacts === 0 || !probe.grounded) ? 1 : 0;
         }
     }
 

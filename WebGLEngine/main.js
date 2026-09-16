@@ -30491,6 +30491,14 @@ function loop(t, xrFrame) {
                                              emphMode: k._emphMode === true,   // v19 -- rate-emphasis semantics (OGRE only)
                                              tier: k.absorbTier ?? 0, king: !!k.becameKing,
                                              x: k.position.x, z: k.position.z,
+                                             // Task board #90 -- real capsule-collision pressure at this kaiju's
+                                             // own live position, set every tick by KaijuManager.js's
+                                             // _resolveGroundKaijuPosition against the real per-chunk terrain
+                                             // collider (task #89). Undefined for a flying/swimming kind, or any
+                                             // kaiju that hasn't ticked through that path yet -- 0 (no hazard)
+                                             // is the same "nothing to report" default every other optional
+                                             // roster field on this object already gets.
+                                             hazard: k._hazard ?? 0,
                                              tx, tz, attacks: atks, packSize, tgtKid, tspd });
                         }
                     }

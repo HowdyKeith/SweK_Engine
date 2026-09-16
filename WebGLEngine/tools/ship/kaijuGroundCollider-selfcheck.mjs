@@ -21,6 +21,15 @@
 // check in _kaijuColliderBVH (an unconditional rebuild every call) turned section 1's cache-identity check red
 // by name. (3) Dropping the `* (k.absorbScale || 1)` term from _kaijuCapsuleRadius turned section 2's
 // multiplication check red by name. Restored, gate re-confirmed all-green after each of the three.
+//
+// *** A REAL BUG SECTION 5'S OWN FIRST RUN FOUND: k._hazard READ 0.5 FOR A KAIJU STANDING IN OPEN AIR. ***
+// The first draft computed hazard straight from the iterations:2 depenetrateCapsule call that also resolves
+// position, on the theory that any contacts beyond the expected single floor touch meant a wall pressing in.
+// But that call's SECOND iteration re-touches the SAME already-resolved floor triangle -- still within
+// radius+CONTACT_SKIN after the first pass settles it there -- and counts it as contact #2, an iteration-count
+// artifact with no second surface behind it. Fixed by reading hazard off a SEPARATE, single-iteration probe
+// instead (see _resolveGroundKaijuPosition's own comment for the full reasoning); section 5 below is what
+// caught the 0.5-in-open-air reading in the first place.
 "use strict";
 import { KaijuManager } from "../../simulation/KaijuManager.js";
 import { Chunk } from "../../world/chunk.js";
@@ -122,6 +131,46 @@ console.log("\n4. FALLBACK: NEVER WORSE THAN _terrainTop's PLAIN ANSWER");
     KaijuManager.prototype._resolveGroundKaijuPosition.call(fakeVoxel, k2, 5);
     ok("!! *** far outside every loaded chunk -- falls back to gy, not NaN or a crash ***",
         k2.position.y === 5 && Number.isFinite(k2.position.x) && Number.isFinite(k2.position.z), `y=${k2.position.y} x=${k2.position.x}`);
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n5. k._hazard (task board #90): a SINGLE-ITERATION probe, not an iteration-count artifact");
+{
+    const fake = { world: buildVoxelWorld(),
+        _kaijuColliderBVH: KaijuManager.prototype._kaijuColliderBVH,
+        _kaijuCapsuleRadius: KaijuManager.prototype._kaijuCapsuleRadius };
+
+    // Standing on the open floor, far from the wall: exactly one contact (the floor), grounded -- the
+    // baseline "nothing to report" case every kaiju is in most of the time.
+    const kOpen = kaiju(2, 2, 2);
+    KaijuManager.prototype._resolveGroundKaijuPosition.call(fake, kOpen, 3);
+    report("open floor", `hazard=${kOpen._hazard}`);
+    ok("!! *** standing in the open reads hazard=0, not a nonzero 'always some signal' number ***", kOpen._hazard === 0);
+
+    // Half-embedded in the wall (the SAME setup section 3 already proved gets pushed out): the push itself
+    // came from a SECOND contact beyond the floor, so hazard must read strictly above the open-floor case.
+    const radius = KaijuManager.prototype._kaijuCapsuleRadius.call(null, kOpen);
+    const kWall = kaiju(8 - radius * 0.5, 3, 5);
+    KaijuManager.prototype._resolveGroundKaijuPosition.call(fake, kWall, 3);
+    report("wedged against the wall", `hazard=${kWall._hazard}`);
+    ok("!! *** wedged against the wall reads a HIGHER hazard than standing in the open ***", kWall._hazard > kOpen._hazard, `wall=${kWall._hazard} open=${kOpen._hazard}`);
+
+    // Far outside the loaded chunk: the collider exists (this world hasVoxels) but finds nothing at all --
+    // depenetrateCapsule reports grounded=false, contacts=0. That is genuinely unstable footing (nothing is
+    // holding this kaiju up), so it reads as the MAXIMUM hazard, not the 0 a missing-collider world would.
+    const kVoid = kaiju(9000, 0, 9000);
+    KaijuManager.prototype._resolveGroundKaijuPosition.call(fake, kVoid, 5);
+    report("far outside every loaded chunk", `hazard=${kVoid._hazard}`);
+    ok("!! *** nothing found under the capsule at all reads hazard=1 (maximally unstable), not 0 ***", kVoid._hazard === 1);
+
+    // A height-only world (no collider): k._hazard must stay the neutral default, not be left undefined --
+    // main.js's payload builder reads `k._hazard ?? 0`, but the SOURCE of truth should already be a number.
+    const fakeHeightOnly = { world: buildHeightOnlyWorld(),
+        _kaijuColliderBVH: KaijuManager.prototype._kaijuColliderBVH,
+        _kaijuCapsuleRadius: KaijuManager.prototype._kaijuCapsuleRadius };
+    const kNoCollider = kaiju(0, 0, 0);
+    KaijuManager.prototype._resolveGroundKaijuPosition.call(fakeHeightOnly, kNoCollider, 7);
+    ok("!! *** no collider at all -> hazard is exactly 0, a real number not undefined ***", kNoCollider._hazard === 0);
 }
 
 console.log(fails ? `\nkaijuGroundCollider-selfcheck: ${fails} FAILED` : "\nkaijuGroundCollider-selfcheck: all checks pass");
