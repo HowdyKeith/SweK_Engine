@@ -68,11 +68,18 @@ export const ORB_KNOBS = Object.freeze([
     // plane wanders and sol's is how high its three tongues lift. The machinery is shared and the QUANTITIES
     // are not, which is precisely the distinction the fathom/geode note above was drawing.
     "bow", "sway", "pin", "corona", "prom", "simmer",
+    // aura's three and flux's three. *** AND AURA IS THE ONE HERO WHOSE SPREAD IS NOT c3. *** Seventeen of
+    // the eighteen put the hue knob last; aura puts `spread` at c2 and `depth3d` at c3, so a port that
+    // mapped slots positionally would have swapped its colour for its parallax and left every other species
+    // correct. The port names knobs rather than numbering them, which makes that hazard unreachable instead
+    // of merely documented -- and this is the first species in twelve where it would have fired.
+    "ribbon", "swirl", "depth3d", "stream", "bend", "height",
 ]);
 
 /** The species this file can build. murmur ships eighteen; these are the six that are ported. */
 export const ORB_SPECIES = Object.freeze(["still", "limn", "comet", "droplet", "opal", "abyss",
-                                          "nebula", "tempest", "fathom", "geode", "arc", "sol"]);
+                                          "nebula", "tempest", "fathom", "geode", "arc", "sol",
+                                          "aura", "flux"]);
 
 /**
  * The three colour anchors the rail is built from, as murmur's own WEB-SPEC names them: ink '#0A0A0B' is the
@@ -87,7 +94,8 @@ export const ORB_COLORS = Object.freeze({
 
 import { makeMurmurKitTsl } from "./murmurKitTsl.mjs";
 import { MH_EXT, MH_TAPS, MH_SURFACE_KNOBS, MH_SHAPE, MH_DROPLET_GAIN, MH_MIST,
-         MH_TEMPEST_BOLT, MH_FATHOM, MH_GEODE, MH_ARC, MH_SOL, MH_R, mhAa } from "./murmurKit.mjs";
+         MH_TEMPEST_BOLT, MH_FATHOM, MH_GEODE, MH_ARC, MH_SOL, MH_AURA, MH_FLUX,
+         MH_R, mhAa } from "./murmurKit.mjs";
 
 /**
  * THE MOIRE GATE, EVALUATED ON THE CPU BECAUSE THIS PORT HAS ONE MOUNT. kit.ts's mh_aa eases a structure's
@@ -151,7 +159,8 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
                  flashes: 0.5, softness: 0.6, drift: 0.4, creatures: 0.4, rarity: 0.6,
                  density: 0.5, fold: 0.5, glint: 0.5,
                  layers: 0.5, parallax: 0.5, murk: 0.4, facet: 0.5, glim: 0.5, stone: 0.5,
-                 bow: 0.5, sway: 0.5, pin: 0.5, corona: 0.5, prom: 0.5, simmer: 0.5, ...knobs };
+                 bow: 0.5, sway: 0.5, pin: 0.5, corona: 0.5, prom: 0.5, simmer: 0.5,
+                 ribbon: 0.5, swirl: 0.5, depth3d: 0.5, stream: 0.5, bend: 0.5, height: 0.5, ...knobs };
     const uniforms = {}; for (const n of ORB_KNOBS) uniforms[n] = uniform(float(k0[n])).label(n);
     // The rail's three anchors are colours, not scalars, so they sit beside the knob block rather than in it.
     const col0 = { ink: ORB_COLORS.ink, tone: ORB_COLORS.tone, tone2: ORB_COLORS.tone, ...(knobs.colors || {}) };
@@ -1357,6 +1366,221 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             return { density: solDensity, coreE, outer };
         };
 
+        // =====================================================================================================
+        // *** AURA -- THE THIRTEENTH. "Ribbons of coloured light, drifting slowly INSIDE the glass." ***
+        //
+        // *** THE SPECIES IS ABOUT DEPTH, AND ITS TEST IS ONE SENTENCE: *** aura.ts -- "the ribbons cross in
+        // front of and behind one another rather than sliding past each other in a plane."
+        //
+        // WHICH IS WHY THIS HERO GETS THE MARCH IT WOULD OTHERWISE BE APOLOGISING FOR. The three heroes before
+        // it solved their interiors precisely to escape the five taps; this one needs them. "The interior
+        // march then does the rest for FREE -- a tap that lands in a near sheet attenuates what the far ones
+        // contribute behind it, so the crossings resolve as OCCLUSION rather than as ADDITION." A closed form
+        // would have to sort the sheets to get that; a march gets the ordering from the marching.
+        //
+        // AND SHEETS RATHER THAN LOOPS, for the reason the kit's MH_AURA note quotes in full: a band on an
+        // ellipse pinches to nothing twice per turn, and a pinch is a corner. "A sheet has no turns because it
+        // has no ends inside the volume: it enters one side of the glass and leaves the other, the way a
+        // length of silk hanging in water does."
+        const buildAura = () => {
+            const AU = MH_AURA;
+            const ribbonK = clamp(uniforms.ribbon, 0.0, 1.0).toVar();
+            const swirlK = clamp(uniforms.swirl, 0.0, 1.0).toVar();
+            const d3K = clamp(uniforms.depth3d, 0.0, 1.0).toVar();
+
+            // THE COUNT COMES DOWN TWICE RATHER THAN ONCE, and both are crossfades: "a count that pops is a
+            // count the eye catches." The third goes by the knob, the second follows it down to a third of
+            // its weight at the smallest mount.
+            const third = smoothstep(float(AU.thirdIn), float(AU.thirdOut), ribbonK)
+                .mul(float(1.0).sub(smoothstep(float(AU.thirdSmallIn), float(AU.thirdSmallOut), smallK))).toVar();
+            const second = mix(float(1.0), float(AU.secondSmall),
+                smoothstep(float(AU.secondSmallIn), float(AU.secondSmallOut), smallK)).toVar();
+            const w3 = float(AU.w3B).add(ribbonK.mul(AU.w3K)).toVar();
+            const WT = [float(1.0).toVar(), second, third];
+
+            const wh = float(AU.whB).add(ribbonK.mul(AU.whK)).mul(mix(float(1.0), float(AU.whSmall), smallK)).toVar();
+            const bw = float(AU.bwB).add(ribbonK.mul(AU.bwK)).mul(mix(float(1.0), float(AU.bwSmall), smallK)).toVar();
+
+            const rate = float(AU.rateB).add(swirlK.mul(AU.rateK))
+                .mul(float(1.0).add(uniforms.voice.mul(AU.rateVoice))).toVar();
+            // THE RIPPLE IS KEPT LOW DELIBERATELY: "past about 0.3 the sheet folds back on itself along the
+            // view ray and draws a bright seam where a fold is edge-on -- the loop's cusp problem returning by
+            // another road."
+            const amp = float(AU.ampB).add(d3K.mul(AU.ampK))
+                .mul(float(1.0).add(uniforms.voice.mul(AU.ampVoice)))
+                .mul(mix(float(1.0), float(AU.ampSmall), smallK)).toVar();
+
+            // The three frames, built once outside the march rather than three times inside it.
+            const PH = [], RO = [], AY = [], AX = [], OF = [];
+            for (let k = 0; k < 3; k++) {
+                PH.push(KIT.mhDrift(uniforms.time, rate.mul(AU.rateLane[k]), float(AU.driftWob[k]), float(k + 1))
+                    .add(AU.driftPhase[k]).toVar());
+                RO.push(float(AU.rollB[k]).add(sin(uniforms.time.mul(AU.rollRate[k]).add(AU.rollPhase[k])).mul(AU.rollAmp[k])).toVar());
+                AY.push(KIT.mhDrift(uniforms.time, float(AU.yawRate[k]), float(AU.yawWob[k]), float(AU.yawLane[k]))
+                    .add(AU.yawPhase[k]).toVar());
+                AX.push(float(AU.tiltB[k]).add(sin(uniforms.time.mul(AU.tiltRate[k]).add(AU.tiltPhase[k])).mul(AU.tiltAmp[k])).toVar());
+                OF.push(mix(float(AU.offsets[k]), float(AU.offsetsSmall[k]), smallK).toVar());
+            }
+            const shimAmt = float(KIT_AA(AU.shimCycles)).mul(float(1.0).sub(smallK))
+                .mul(float(AU.shimB).add(uniforms.glintRate.mul(AU.shimK))).toVar();
+
+            const accA = float(0.0).toVar(), accAH = float(0.0).toVar();
+            const transA = float(1.0).toVar();
+            Loop({ start: 0, end: MH_TAPS }, ({ i }) => {
+                const pA = P.add(rd.mul(float(i).add(0.5).mul(ds))).toVar();
+                const fade = KIT.mhInside(pA).toVar();
+                // ONE SHEET, THREE TIMES. In the ribbon's own rolled and tilted frame the surface is
+                // q.y = a ripple in q.x and q.z, offset along the frame's normal; dh is the signed distance to
+                // it and q.z is how far across its face this point is. Both go into ONE squared argument, so
+                // the ribbon is a gaussian slab in one direction and a gaussian band in the other, "and every
+                // edge it has is diffuse in both".
+                const E = [];
+                for (let k = 0; k < 3; k++) {
+                    const R = AU.ripple[k];
+                    const q = KIT.mhSpin(KIT.mhRoll(pA, RO[k]), AY[k], AX[k]).toVar();
+                    const dh = q.y.sub(OF[k]).sub(amp.mul(R.am).mul(
+                        sin(q.x.mul(R.fx).add(PH[k]))
+                            .add(sin(q.z.mul(R.fz).sub(PH[k].mul(R.pk)).add(R.ph)).mul(R.cw)))).toVar();
+                    const aK = dh.mul(dh).div(wh.mul(wh))
+                        .add(q.z.mul(q.z).div(bw.mul(bw).mul(AU.faceMul[k]))).toVar();
+                    // THE GRADIENT ALONG THE LENGTH, floored at 0.58 and never zero: "a ribbon that goes fully
+                    // dark has been cut into pieces, and pieces are not silk."
+                    const g = float(AU.gFloor).add(float(AU.gRide).mul(
+                        float(0.5).add(sin(q.x.mul(AU.gFreq[k]).sub(uniforms.time.mul(AU.gRate[k])).add(AU.gPhase[k])).mul(0.5)))).toVar();
+                    E.push(exp(aK.negate()).add(KIT.mhScatter(aK, float(AU.scatterAmp))).mul(g).mul(WT[k]).toVar());
+                }
+                const ribbons = E[0].add(E[1]).add(E[2]).mul(w3)
+                    .mul(float(1.0).add(shimAmt.mul(KIT.mhNoise3(pA.mul(AU.shimScale)
+                        .add(vec3(float(0.0), float(0.0), uniforms.time.mul(AU.shimRate))))))).toVar();
+                // THE HUE CONVERSATION, weighted by which ribbon is actually at this tap, "so a pixel where
+                // two ribbons cross gets the average and the crossing reads as a blend rather than as a hard
+                // seam between two colours".
+                const hueW = E[0].mul(AU.hueW[0]).add(E[1].mul(AU.hueW[1])).add(E[2].mul(AU.hueW[2])).mul(w3).toVar();
+                const med = KIT.mhMedium(pA, uniforms.time, float(AU.medLane)).mul(AU.medAmt).toVar();
+                const eA = ribbons.mul(AU.ribbonGain).add(med).mul(fade).toVar();
+                accA.addAssign(eA.mul(transA).mul(ds));
+                accAH.addAssign(hueW.mul(AU.ribbonGain).mul(fade).mul(transA).mul(ds));
+                // *** RIBBONS OCCLUDE: THIS IS THE LINE THAT TURNS THREE CURVES INTO THREE DEPTHS. *** The
+                // coefficient is fitted against a capture and both its failure modes are named -- "at 9 the
+                // far ribbon vanishes entirely and the body loses its sense of fullness, at 1.5 nothing
+                // occludes anything and it is smoke again."
+                transA.assign(transA.mul(exp(eA.mul(AU.absorb).add(MH_EXT).mul(ds).negate())));
+            });
+            const auraDensity = accA.mul(AU.gain).mul(mix(float(1.0), float(AU.gainSmall), smallK)).mul(uniforms.depth);
+            return { density: auraDensity, accA, accAH };
+        };
+
+        // =====================================================================================================
+        // *** FLUX -- THE FOURTEENTH. "An aurora streaming inside the glass." ***
+        //
+        // *** THE ONE HERO ALLOWED A BROAD FLOWING FIELD, and flux.ts says why the permission is needed: "an
+        // aurora is not an object. Everything else in this collection is something IN the glass; this is the
+        // only one whose interior is a field with a DIRECTION." ***
+        //
+        // AURORAE ARE BRIGHT AT THE BOTTOM AND FADE UPWARD, and that one profile is most of the species: "The
+        // lower edge is where the atmosphere is dense enough to glow hard; above it the light thins out over
+        // several times that height. So the vertical term is a sharp rise at the foot and a long exponential
+        // decay above it, ASYMMETRIC ON PURPOSE -- a symmetric profile reads as a band of light and not as a
+        // curtain hanging."
+        //
+        // *** AND UP IS NEGATIVE Y, WHICH IS A BUG THE SOURCE SHIPPED, FOUND AND WROTE DOWN. *** "A
+        // colorEffect's y runs DOWN the screen, so the body frame's +y is the bottom of the picture -- and the
+        // first cut hung its curtains from that, which put the bright foot along the TOP and the fade going
+        // down. An upside-down aurora is not a subtle mistake; it reads as light pouring in from above rather
+        // than as curtains standing on something." One negation fixes it, and it is the FIRST line of the
+        // march below for exactly that reason.
+        const buildFlux = () => {
+            const FX = MH_FLUX;
+            const streamK = clamp(uniforms.stream, 0.0, 1.0).toVar();
+            const bendK = clamp(uniforms.bend, 0.0, 1.0).toVar();
+            const heightK = clamp(uniforms.height, 0.0, 1.0).toVar();
+            const flX = KIT.mhFlourish(uniforms.time, float(FX.flourishSlot), float(FX.flourishDur)).toVar();
+
+            const ayF = KIT.mhDrift(uniforms.time, float(FX.yawRate), float(FX.yawWob), float(FX.yawLane)).toVar();
+            const axF = float(FX.tiltB).add(sin(uniforms.time.mul(FX.tiltRate)).mul(FX.tiltAmp)).toVar();
+            const flow = KIT.mhDrift(uniforms.time, float(FX.flowB).add(streamK.mul(FX.flowK)),
+                float(FX.flowWob), float(FX.flowLane))
+                .mul(float(1.0).add(uniforms.glintRate.mul(FX.flowPace))).toVar();
+            const bend = float(FX.bendB).add(bendK.mul(FX.bendK))
+                .mul(float(1.0).add(uniforms.glintRate.mul(FX.bendPace)))
+                .mul(mix(float(1.0), float(FX.bendSmall), smallK)).toVar();
+            const wF = float(FX.wB).add(bendK.mul(FX.wK)).mul(mix(float(1.0), float(FX.wSmall), smallK)).toVar();
+            const hi = float(FX.hiB).add(heightK.mul(FX.hiK))
+                .mul(float(1.0).add(uniforms.voice.mul(FX.hiVoice))).toVar();
+            const secondF = float(1.0).sub(smoothstep(float(FX.secondSmallIn), float(FX.secondSmallOut), smallK)).toVar();
+            const thirdF = float(1.0).sub(smoothstep(float(FX.thirdSmallIn), float(FX.thirdSmallOut), smallK)).toVar();
+            const WF = [float(1.0).toVar(), secondF, thirdF];
+            const brightF = float(FX.brightB).add(uniforms.voice.mul(FX.brightVoice)).toVar();
+            const striGate = float(KIT_AA(FX.striCycles)).mul(float(1.0).sub(smallK)).toVar();
+            const medAmtF = mix(float(FX.medB), float(FX.medS), smallK).toVar();
+
+            const accF = float(0.0).toVar(), accFH = float(0.0).toVar();
+            const transF = float(1.0).toVar();
+            Loop({ start: 0, end: MH_TAPS }, ({ i }) => {
+                const pF = P.add(rd.mul(float(i).add(0.5).mul(ds))).toVar();
+                const fadeF = KIT.mhInside(pF).toVar();
+                const q = KIT.mhSpin(pF, ayF, axF).toVar();
+                // *** UP IS POSITIVE Y HERE, AND TRANSCRIBING murmur's NEGATION LITERALLY PUT THE AURORA
+                // UPSIDE DOWN -- the exact bug flux.ts's own comment is about, arrived at from the opposite
+                // direction. *** flux.ts negates because "a colorEffect's y runs DOWN the screen, so the body
+                // frame's +y is the bottom of the picture". THIS PORT'S FRAME IS NOT A colorEffect'S: the quad
+                // is built from three's uv(), whose v is 0 at the BOTTOM (the note on `p` at the top of this
+                // file says so), so +P.y is the TOP of the picture and already means UP.
+                //
+                // MEASURED BEFORE IT WAS BELIEVED: with the negation transcribed, the row-by-row light
+                // profile peaked at y = -0.396 of the half-frame -- the upper third -- and fell away
+                // downward, reading 0.443 as a lower-half-to-upper-half ratio. The foot was along the top.
+                // "An upside-down aurora is not a subtle mistake; it reads as light pouring in from above
+                // rather than as curtains standing on something."
+                //
+                // So the negation is DROPPED, and dropping it is what makes this port agree with murmur's
+                // PICTURE rather than with murmur's SOURCE LINE. A port that copies a frame convention it
+                // does not share has transcribed the letter and lost the thing.
+                const yy = q.y.toVar();
+                // THE VERTICAL PROFILE, shared by all three curtains: a sharp foot and a long fade upward.
+                const foot = smoothstep(float(FX.footIn), float(FX.footOut), yy).toVar();
+                // riseFrom is -0.52, so yy.sub(riseFrom) is the source's (yy + 0.52): how far ABOVE the foot
+                // this tap is, clamped at zero so nothing below the foot decays.
+                const rise = exp(max(yy.sub(float(FX.riseFrom)), float(0.0))
+                    .div(max(hi, float(1e-3))).negate()).toVar();
+                const vert = foot.mul(rise).toVar();
+
+                // THREE SHEETS, AND THE WANDER IS WEIGHTED TOWARD DEPTH RATHER THAN HEIGHT. "A sheet whose
+                // position swings hard with height LEANS, and three leaning sheets read as diagonal streaks
+                // rather than as curtains hanging; the same swing read in z folds the curtain toward and away
+                // from the viewer, which is what an aurora does."
+                const EF = [];
+                for (let k = 0; k < 3; k++) {
+                    const S3 = FX.sheets[k];
+                    const d = q.x.sub(float(S3.x).add(bend.mul(
+                        sin(yy.mul(S3.fy).add(flow.mul(S3.ky)).add(S3.phy)).mul(S3.wy)
+                            .add(sin(q.z.mul(S3.fz).sub(flow.mul(S3.kz)).add(S3.phz)).mul(S3.wz))))).toVar();
+                    const aF = d.mul(d).div(wF.mul(wF).mul(S3.wm)).toVar();
+                    EF.push(exp(aF.negate()).add(KIT.mhScatter(aF, float(FX.scatterAmp))).mul(WF[k]).toVar());
+                }
+                // THE STRIATION: the fine vertical structure real curtains have, gated so it retires itself
+                // "the moment a cycle would be under two pixels".
+                const stri = float(1.0).add(striGate.mul(FX.striK)
+                    .mul(sin(q.z.mul(FX.striZ).add(yy.mul(FX.striY)).sub(flow.mul(FX.striFlow))))).toVar();
+                // THE SURGE: "a brightening surge travels across the curtains from one side to the other.
+                // Auroral substorm, in miniature."
+                const sr = q.x.sub(mix(float(-0.9), float(0.9), flX.y)).div(0.42).toVar();
+                const surge = flX.x.mul(0.85).mul(exp(sr.mul(sr).negate())).toVar();
+
+                const curtains = EF[0].add(EF[1]).add(EF[2]).mul(vert).mul(brightF).mul(stri)
+                    .mul(float(1.0).add(surge)).toVar();
+                const hueWF = EF[0].mul(FX.hueW[0]).add(EF[1].mul(FX.hueW[1])).add(EF[2].mul(FX.hueW[2]))
+                    .mul(vert).mul(brightF).mul(stri).toVar();
+                const medF = KIT.mhMedium(pF, uniforms.time, float(FX.medLane)).mul(medAmtF).toVar();
+                const eF = curtains.mul(FX.curtainGain).add(medF).mul(fadeF).toVar();
+                accF.addAssign(eF.mul(transF).mul(ds));
+                accFH.addAssign(hueWF.mul(FX.curtainGain).mul(fadeF).mul(transF).mul(ds));
+                transF.assign(transF.mul(exp(eF.mul(FX.absorb).add(MH_EXT).mul(ds).negate())));
+            });
+            const fluxDensity = accF.mul(FX.gain).mul(uniforms.depth);
+            return { density: fluxDensity, accF, accFH };
+        };
+
         // *** ONE CALL, AND IT IS THE ONLY SPECIES BLOCK THAT RUNS. *** The seven closures above are
         // declared and six of them are never invoked, so their nodes are never built and never reach the
         // WGSL. Everything below reads `SP`, whose shape is each hero's own contract: always a density, plus
@@ -1372,7 +1596,11 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             // THE TWO LINE-DRAWING HEROES. They share the kit's closed-form tube and nothing else: arc solves
             // ONE filament in a rolled frame, sol solves an analytic disc plus THREE short arches on its limb.
             : species === "arc" ? buildArc()
-            : species === "sol" ? buildSol() : buildStill();
+            : species === "sol" ? buildSol()
+            // THE TWO SHEET HEROES. They are the pair that WANTS the march the three before them were built
+            // to escape: aura's crossings resolve as occlusion because the taps arrive in depth order.
+            : species === "aura" ? buildAura()
+            : species === "flux" ? buildFlux() : buildStill();
         const density = SP.density;
 
         // ---- THE SURFACE IS murmur's NOW, NOT THIS FILE'S APPROXIMATION OF IT ------------------------------
@@ -1500,6 +1728,17 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
                     : species === "sol"
                     ? select(SP.coreE.add(SP.outer).greaterThan(1e-4), SP.outer.div(max(SP.coreE.add(SP.outer), float(1e-4))), float(0.0))
                         .mul(spreadK).mul(KIT.MH_SPREAD)
+                    // *** aura's AND flux's hue rails ARE the family default -- weighted mean of the
+                    // per-sheet offsets over the accumulated light -- and that is transcribed rather than
+                    // fallen into by branch order. Both files spell exactly
+                    // hue = (acc.x > 1e-4 ? acc.y / acc.x : 0.0) * spreadK * MH_SPREAD. What differs is the
+                    // WEIGHTS each sheet carries: aura's ribbons run (-0.70, 0.55, 1.00) and flux's curtains
+                    // (-1.00, 0.15, 1.00), so flux spans the full offset range and puts its middle curtain
+                    // almost on the anchor while aura keeps all three off it.
+                    : species === "aura"
+                    ? select(SP.accA.greaterThan(1e-4), SP.accAH.div(SP.accA), float(0.0)).mul(spreadK).mul(KIT.MH_SPREAD)
+                    : species === "flux"
+                    ? select(SP.accF.greaterThan(1e-4), SP.accFH.div(SP.accF), float(0.0)).mul(spreadK).mul(KIT.MH_SPREAD)
                     : select(SP.acc.greaterThan(1e-4), SP.accH.div(SP.acc), float(0.0)).mul(spreadK).mul(KIT.MH_SPREAD);
         // mh_present's own hueMix: the hue scaled by the share of THIS pixel's energy that the species says
         // carries colour. still and comet count the interior plus 0.7 of the rim, droplet 0.6 of it, limn the
@@ -1521,6 +1760,10 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             // transcribed from each file rather than unified because they share one.
             : species === "arc" ? SP.filE.mul(MH_ARC.filGain)
             : species === "sol" ? interior
+            // aura and flux take the DEFAULT TOO, checked the same way: both files spell
+            // hueMix = hue * (interior + sf.rim * 0.7) / max(e, 1e-4). aura's own comment says why the rim is
+            // in the numerator at all -- "The rim borrows the interior's colour, because it IS the interior
+            // seen edge-on through more glass. The specular does not: it is the key light."
             // nebula and tempest take the DEFAULT, and that is transcribed rather than fallen into: both
             // their files spell hueMix = hue * (interior + sf.rim * 0.7) / max(e, 1e-4), the same numerator
             // still and comet use. Checked against the source, not assumed from the branch order.

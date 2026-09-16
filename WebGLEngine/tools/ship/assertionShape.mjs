@@ -332,8 +332,15 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // FRAMES, not source lines. The count of gates and the count of shared code disagree here in the
     // opposite direction from v4632's droplet split, which is the third distinct way this record has watched
     // those two numbers come apart.
-    gates: 1679, usesOk: 1658, definesOk: 1650, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1551, condFirst: 91, unknownSignature: 16,
+    // v4638 -- RE-TAKEN 1679 -> 1681 for tools/ship/murmurSpecies10-selfcheck.mjs (aura) and …Species11
+    // (flux). A FOURTH consecutive round of two gates for two species -- and the FIRST where the pair was
+    // never going to fit in one for a reason other than the budget: the two gates measure along DIFFERENT
+    // AXES. aura's rows integrate over the whole interior (a sum and two percentiles); flux's read the frame
+    // ROW BY ROW, because its whole claim is vertical. Sharing a file would have meant sharing frames, and
+    // frames chosen for one axis are the wrong frames for the other -- which is the same lesson the
+    // not-graded note in …Species11 records from the other side.
+    gates: 1681, usesOk: 1660, definesOk: 1652, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1553, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

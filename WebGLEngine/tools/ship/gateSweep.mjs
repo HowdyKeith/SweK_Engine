@@ -5248,6 +5248,50 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "orb-species-block-per-shader; the next orb round starts there.",
     }),
     // v4635 -- THE 247th CLOSING. No gate added: a row added to one that existed, and a 3,561 ms refund.
+    // v4638 -- THE 250th CLOSING: aura and flux, the two sheet heroes, and a frame convention that bit.
+    since259: Object.freeze({
+        at: "v4638", swept: 2, green: 2, red: 0,
+        added: Object.freeze([
+            "tools/ship/murmurSpecies10-selfcheck.mjs",
+            "tools/ship/murmurSpecies11-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 1,442 and 1,741 ms on the rotation, real WebGPU, 6 rows, carrying AURA and FLUX -- " +
+                 "the thirteenth and fourteenth of murmur's eighteen and the pair that WANTS the march the " +
+                 "four heroes before them were built to escape. aura.ts: the crossings \"resolve as OCCLUSION " +
+                 "rather than as ADDITION\" because \"a tap that lands in a near sheet attenuates what the far " +
+                 "ones contribute behind it\" -- which a closed form would have to sort for and a march gets " +
+                 "from the marching. *** THE FLAGSHIP ROW IS BRACKETED BY THE SOURCE'S OWN TWO NAMED " +
+                 "FAILURES, which makes it a measurement rather than a threshold: *** aura.ts says of its " +
+                 "occlusion coefficient that \"at 9 the far ribbon vanishes entirely and the body loses its " +
+                 "sense of fullness, at 1.5 nothing occludes anything and it is smoke again\". Both were " +
+                 "rendered. The knob that buys the third sheet multiplies the frame's light x1.886 at 1.5 " +
+                 "(very nearly the x2 of pure addition, which is what \"nothing occludes\" IS when measured), " +
+                 "x1.104 at 9.0 (a ribbon that is not there), and x1.307 at the shipped 4.50. The interior " +
+                 "spread brackets the same way: 10.06x, 1.94x, 3.92x. *** AND THE ROUND'S FINDING IS THAT " +
+                 "THIS PORT GOT flux UPSIDE DOWN BY TRANSCRIBING THE SOURCE CORRECTLY. *** flux.ts negates " +
+                 "its height because \"a colorEffect's y runs DOWN the screen, so the body frame's +y is the " +
+                 "bottom of the picture\", and it names the failure: \"An upside-down aurora is not a subtle " +
+                 "mistake; it reads as light pouring in from above rather than as curtains standing on " +
+                 "something.\" THIS PORT'S FRAME IS NOT A colorEffect'S -- the quad comes from three's uv(), " +
+                 "whose v is 0 at the BOTTOM -- so copying the negation reproduced exactly the bug the " +
+                 "comment is about. Measured row by row, the profile peaked at y = -0.396, the upper third, " +
+                 "and read 0.443 as a lower-to-upper ratio. Dropping the negation gives 2.523, against " +
+                 "nebula's 1.073 and aura's 1.623. A PORT THAT COPIES A FRAME CONVENTION IT DOES NOT SHARE " +
+                 "HAS TRANSCRIBED THE LETTER AND LOST THE THING, and only a pixel measurement says which. " +
+                 "TEN SABOTAGES, EIGHT RED BY NAME. One bound was tightened because a sabotage showed it was " +
+                 "a coincidence rather than a bound: the asymmetry row measured 1.601 against a 1.5 " +
+                 "threshold, seven per cent of headroom, and a plain gaussian of the same scale -- the " +
+                 "literal symmetric profile flux.ts rejects -- reads 0.877, the asymmetry INVERTED, so the " +
+                 "bound moved to 1.25, the middle of the gap rather than one edge. TWO MECHANISMS ARE " +
+                 "TRANSCRIBED AND EXPLICITLY NOT GRADED, each with its number: aura's three depth offsets " +
+                 "(collapsing them moves the frame total 24.21 to 24.76, because aura's own sentence says " +
+                 "the rolls and tilts carry the separation WITH them, and those are untouched) and flux's " +
+                 "three x offsets (moving two together reads 2.523 to 2.438, because every row in that gate " +
+                 "is a VERTICAL measurement and the stacking is horizontal). VERIFIED BY BYTES across all " +
+                 "FOURTEEN species and three time-and-knob cases: 42 frames, 0 bytes different.",
+    }),
     // v4637 -- THE 249th CLOSING: arc and sol, the two heroes that draw a LINE.
     since258: Object.freeze({
         at: "v4637", swept: 2, green: 2, red: 0,

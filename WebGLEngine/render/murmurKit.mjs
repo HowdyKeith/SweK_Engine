@@ -735,6 +735,13 @@ export const MH_SHAPE = Object.freeze({
     // ENTRIES-not-spreads rule needed.
     arc: Object.freeze([0.021, 0.007, 6.1, 1.20]),
     sol: Object.freeze([0.022, 0.008, 12.9, 1.24]),
+    // THE TWO SHEET HEROES, and their breath LANES are the widest-apart pair in the table after arc and sol:
+    // aura's 0.4 against flux's 8.6, a factor of twenty-one. aura's body is asked to do almost nothing --
+    // "This hero's business is inside, and a wobbling shell would compete with the ribbons for the same
+    // attention" -- and its 1.35 gain is the LARGEST of the twelve, which is the same sentence read the other
+    // way: a shell that deforms little needs a firmer edge to still be a shell.
+    aura: Object.freeze([0.022, 0.008, 0.4, 1.35]),
+    flux: Object.freeze([0.022, 0.008, 8.6, 1.22]),
     geode: Object.freeze([0.021, 0.007, 11.7, 1.22]),
 });
 
@@ -925,6 +932,119 @@ export const MH_SOL = Object.freeze({
     // tongue five times over the rail's top, which is why they drew as white slabs instead of as line work."
     promGain: 6.60,
     flourishSlot: 23.0, flourishDur: 12.4,
+});
+
+/**
+ * AURA'S RIBBONS: three open SHEETS, and the numbers that make them cloth rather than glass.
+ *
+ * aura.ts's argument against the obvious shape is worth keeping whole: "WHY SHEETS AND NOT LOOPS. A loop
+ * projects to an ellipse, and a band of finite thickness laid on an ellipse has two places where it turns
+ * edge-on to the viewer and pinches to nearly nothing. Those pinches are corners, and a stroke with a sharp
+ * turn in it IS calligraphy. A sheet has no turns because it has no ends inside the volume: it enters one
+ * side of the glass and leaves the other, the way a length of silk hanging in water does."
+ *
+ * *** AND THE OCCLUSION IS THE SPECIES, WHICH IS WHY absorb IS IN THIS TABLE AND NOT IN THE SHADER. *** "The
+ * interior march then does the rest for free -- a tap that lands in a near sheet attenuates what the far ones
+ * contribute behind it, so the crossings resolve as occlusion rather than as addition." The coefficient is
+ * fitted against a capture and its two failure modes are both named: "at 9 the far ribbon vanishes entirely
+ * and the body loses its sense of fullness, at 1.5 nothing occludes anything and it is smoke again."
+ *
+ * THE RIPPLE USES TWO INCOMMENSURATE WAVES, never one: "One wave is a corrugation and reads as a machined
+ * part; two at 1.7 and 1.1 with different phases give the surface a slow irregular lift that never repeats
+ * along its length, which is what cloth does." And it is kept LOW on purpose -- "past about 0.3 the sheet
+ * folds back on itself along the view ray and draws a bright seam where a fold is edge-on -- the loop's cusp
+ * problem returning by another road."
+ */
+export const MH_AURA = Object.freeze({
+    // thickness to width is about one to four, "which is a ribbon; at one to one it would be a slab".
+    whB: 0.105, whK: -0.020, whSmall: 1.85, bwB: 0.400, bwK: -0.070, bwSmall: 1.25,
+    // Per-ribbon face widths, as multiples of bw -- ribbon 1 wider and ribbon 2 narrower, "because two
+    // identical ribbons at two angles still read as one thing said twice".
+    faceMul: Object.freeze([1.00, 1.30, 0.80]),
+    thirdIn: 0.55, thirdOut: 0.95, thirdSmallIn: 0.22, thirdSmallOut: 0.62,
+    secondSmallIn: 0.52, secondSmallOut: 0.94, secondSmall: 0.34,
+    w3B: 0.55, w3K: 0.45,
+    rateB: 0.17, rateK: 0.24, rateVoice: 0.85, rateLane: Object.freeze([1.00, 0.83, 1.17]),
+    driftWob: Object.freeze([0.40, 0.52, 0.34]), driftPhase: Object.freeze([0.0, 2.1, 4.3]),
+    ampB: 0.098, ampK: 0.130, ampVoice: 0.55, ampSmall: 0.78,
+    // The three sheets' ripple: [along-x frequency, cross-z frequency, cross weight, phase, amp multiplier].
+    ripple: Object.freeze([
+        Object.freeze({ fx: 1.70, fz: 1.10, cw: 0.62, ph: 2.1, pk: 0.8, am: 1.00 }),
+        Object.freeze({ fx: 1.30, fz: 1.55, cw: 0.58, ph: 4.3, pk: 0.7, am: 0.85 }),
+        Object.freeze({ fx: 2.10, fz: 0.90, cw: 0.55, ph: 1.4, pk: 0.9, am: 1.15 }),
+    ]),
+    // THE DEPTH OFFSETS. "Each is displaced along its own frame's normal, and since the frames are rolled and
+    // tilted differently, three displacements along three different directions put three surfaces genuinely
+    // apart in the volume. That separation is what the parallax is made of."
+    offsets: Object.freeze([-0.26, 0.24, 0.02]), offsetsSmall: Object.freeze([-0.20, 0.20, 0.02]),
+    rollB: Object.freeze([0.15, 2.05, 3.85]), rollAmp: Object.freeze([0.22, 0.26, 0.20]),
+    rollRate: Object.freeze([0.031, 0.024, 0.019]), rollPhase: Object.freeze([0.0, 2.2, 4.6]),
+    yawRate: Object.freeze([0.061, 0.047, 0.039]), yawWob: Object.freeze([0.5, 0.6, 0.4]),
+    yawLane: Object.freeze([4.0, 5.0, 6.0]), yawPhase: Object.freeze([0.0, 2.4, 4.7]),
+    tiltB: Object.freeze([0.62, -0.78, 0.06]), tiltAmp: Object.freeze([0.16, 0.14, 0.20]),
+    tiltRate: Object.freeze([0.043, 0.037, 0.029]), tiltPhase: Object.freeze([0.0, 1.9, 3.4]),
+    // THE GRADIENT ALONG THE LENGTH, "the other half of the silk read: a ribbon of even brightness is a stroke
+    // however soft its edges are." FLOORED AT 0.58 AND NEVER ZERO -- "a ribbon that goes fully dark has been
+    // cut into pieces, and pieces are not silk."
+    gFloor: 0.58, gRide: 0.42, gFreq: Object.freeze([2.1, 1.6, 1.3]),
+    gRate: Object.freeze([0.083, 0.061, 0.047]), gPhase: Object.freeze([0.7, 3.9, 1.9]),
+    scatterAmp: 0.17, shimCycles: 7.2, shimB: 0.20, shimK: 0.75, shimScale: 7.2, shimRate: 0.9,
+    hueW: Object.freeze([-0.70, 0.55, 1.00]),
+    medAmt: 0.075, medLane: 2.6, ribbonGain: 1.45,
+    // *** THE OCCLUSION COEFFICIENT. *** See the header: 9 kills the far ribbon, 1.5 is smoke.
+    absorb: 4.50,
+    gain: 2.60, gainSmall: 0.92,
+});
+
+/**
+ * FLUX'S CURTAINS: three vertical sheets, and the asymmetric profile that makes them hang.
+ *
+ * flux.ts: "THE ONE HERO ALLOWED A BROAD FLOWING FIELD, and it needs the permission because an aurora is not
+ * an object. Everything else in this collection is something IN the glass; this is the only one whose
+ * interior is a field with a direction."
+ *
+ * *** THE VERTICAL PROFILE IS ASYMMETRIC ON PURPOSE AND IT IS MOST OF THE SPECIES. *** "AURORAE ARE BRIGHT AT
+ * THE BOTTOM AND FADE UPWARD, and getting that one profile right is most of what makes this read as an aurora
+ * rather than as a vertical smear. The lower edge is where the atmosphere is dense enough to glow hard; above
+ * it the light thins out over several times that height. So the vertical term is a sharp rise at the foot and
+ * a long exponential decay above it, asymmetric on purpose -- a symmetric profile reads as a band of light
+ * and not as a curtain hanging."
+ *
+ * *** AND UP IS NEGATIVE Y, WHICH IS A BUG THE SOURCE SHIPPED AND THEN NAMED. *** "A colorEffect's y runs
+ * DOWN the screen, so the body frame's +y is the bottom of the picture -- and the first cut hung its curtains
+ * from that, which put the bright foot along the TOP and the fade going down. An upside-down aurora is not a
+ * subtle mistake; it reads as light pouring in from above rather than as curtains standing on something."
+ *
+ * THE WANDER IS WEIGHTED TOWARD DEPTH RATHER THAN HEIGHT, and the reason is the same failure helix names:
+ * "a sheet whose position swings hard with height leans, and three leaning sheets read as diagonal streaks
+ * rather than as curtains hanging; the same swing read in z folds the curtain toward and away from the
+ * viewer, which is what an aurora does. So the height terms run at 1.1 and the depth terms carry the larger
+ * share." Every height weight below is 0.55 and every depth weight is 0.90 or more.
+ */
+export const MH_FLUX = Object.freeze({
+    yawRate: 0.047, yawWob: 0.50, yawLane: 2.0,
+    tiltB: 0.16, tiltAmp: 0.10, tiltRate: 0.033,
+    flowB: 0.26, flowK: 0.34, flowWob: 0.45, flowLane: 4.0, flowPace: 0.70,
+    bendB: 0.30, bendK: 0.42, bendPace: 0.45, bendSmall: 0.50,
+    wB: 0.105, wK: 0.030, wSmall: 2.00,
+    // THE REACH ABOVE THE FOOT. hi runs 0.42 -> 0.88 of the body, which is what `height` buys.
+    hiB: 0.42, hiK: 0.46, hiVoice: 0.45,
+    // THE PROFILE: a sharp foot from -0.92 to -0.52 and then an exponential decay upward over hi.
+    footIn: -0.92, footOut: -0.52, riseFrom: -0.52,
+    secondSmallIn: 0.34, secondSmallOut: 0.76, thirdSmallIn: 0.16, thirdSmallOut: 0.54,
+    brightB: 0.80, brightVoice: 0.80,
+    // The three sheets: x offset, then the height and depth wander [freq, weight] and their phases.
+    sheets: Object.freeze([
+        Object.freeze({ x: -0.34, fy: 1.10, wy: 0.55, phy: 0.00, ky: 1.00, fz: 1.15, wz: 0.95, phz: 2.1, kz: 0.7, wm: 1.00 }),
+        Object.freeze({ x: 0.04, fy: 0.85, wy: 0.55, phy: 2.40, ky: 1.18, fz: 1.55, wz: 1.00, phz: 4.3, kz: 0.6, wm: 1.25 }),
+        Object.freeze({ x: 0.40, fy: 1.35, wy: 0.55, phy: 4.70, ky: 0.86, fz: 0.95, wz: 0.90, phz: 1.4, kz: 0.9, wm: 0.85 }),
+    ]),
+    scatterAmp: 0.20,
+    striCycles: 6.5, striK: 0.32, striZ: 6.5, striY: 1.7, striFlow: 1.4,
+    hueW: Object.freeze([-1.00, 0.15, 1.00]),
+    medB: 0.055, medS: 0.030, medLane: 2.1, curtainGain: 0.85,
+    absorb: 2.90, gain: 2.40,
+    flourishSlot: 15.0, flourishDur: 11.3,
 });
 
 /** tempest's lightning: the two lane seeds, their slot lengths, and the radius its depth mask kills at. */
