@@ -178,6 +178,11 @@ export function depenetrateCapsule(feet, radius, height, bvh, opts = {}) {
     let cx = feet[0], cy = feet[1], cz = feet[2];
     let grounded = false, groundNormal = null, contacts = 0;
 
+    // The capsule's own overall center (segment midpoint) is used to ORIENT every push normal below -- see
+    // the long comment at the normal computation for why the closest-point-relative direction this used to
+    // use is unsafe, and why this fixed reference point is not.
+    const midY = segLo + (segHi - segLo) / 2;
+
     for (let iter = 0; iter < iterations; iter++) {
         const segBot = [cx, cy + segLo, cz], segTop = [cx, cy + segHi, cz];
         // *** THE QUERY BOX NEEDS THE SAME CONTACT_SKIN MARGIN THE PER-TRIANGLE DISTANCE TEST BELOW ALREADY
@@ -204,7 +209,27 @@ export function depenetrateCapsule(feet, radius, height, bvh, opts = {}) {
             const pen = radius - dist;   // may be a hair negative, within the skin margin -- that's still a touch
             if (pen > deepestPen) {
                 deepestPen = pen;
-                deepestNormal = dist > 1e-9 ? scale(sub(onSeg, onTri), 1 / dist) : faceNormalToward(a, b, c, cx, cy + segLo, cz);
+                // *** THIS USED TO BE dist > 1e-9 ? scale(sub(onSeg, onTri), 1 / dist) : faceNormalToward(...),
+                // AND THE CLOSEST-POINT-RELATIVE BRANCH IS WRONG-SIGNED THE MOMENT THE CONTACT POINT ITSELF
+                // HAS TUNNELED THROUGH THE SURFACE. *** (onSeg - onTri) / dist assumes onSeg -- the closest
+                // point ON THE CAPSULE -- is on the physically expected side of the triangle. A capsule
+                // falling fast enough (one frame's gravity integration outrunning a thin floor -- exactly
+                // what a real frame hitch on real hardware causes, not a hypothetical) lands its BOTTOM
+                // point on the far side, and the vector from the floor up to that now-inverted point points
+                // DOWN, not up -- so the "push" moves the capsule FURTHER through the floor, not back out.
+                // Measured live, not guessed: a 22-triangle level's flat ground plane (two triangles sharing
+                // the query point's exact diagonal seam), a capsule landing at feet.y = -0.48 (segBot 0.08
+                // BELOW the plane, radius 0.4) resolved to feet.y = -1.76 over 4 iterations -- each pass
+                // pushing DEEPER, not out, because onSeg sat below onTri every time.
+                //
+                // The capsule's own CENTER (segment midpoint), not the closest contact point, is what
+                // orients the push now, unconditionally. It is far more resistant to the same failure: the
+                // center is `height/2` from either cap, so it is still on the correct side of a thin surface
+                // (a floor, the top of the jump block) even when the capsule's much nearer BOTTOM tip has
+                // already tunneled through it. For a WALL, orientation only depends on X/Z (the capsule has
+                // no lateral offset along its own axis), so this is IDENTICAL to the old behaviour there --
+                // the fix changes only the case it was built to fix.
+                deepestNormal = faceNormalToward(a, b, c, cx, cy + midY, cz);
             }
         }
         if (deepestNormal === null) break;   // converged: nothing left in range to resolve

@@ -246,6 +246,34 @@ console.log("\n7. carryOnPlatform -- TRANSLATION, ROTATION, AND THE IDENTITY CAS
        `got [${rotated.map((v) => v.toFixed(4))}] -- x must vanish, |z| must be 1`);
 }
 
+console.log("\n8. THE TUNNEL-THROUGH REGRESSION -- FOUND LIVE, NOT IN THIS GATE FIRST");
+{
+    // *** A CAPSULE THAT HAS ALREADY FALLEN PAST A THIN SURFACE MUST STILL BE PUSHED BACK OUT, NOT FURTHER
+    // THROUGH. *** Every other depenetrateCapsule test in this file starts on the physically expected side
+    // of whatever it is resolving against -- resting just above a floor, overlapping a wall from outside.
+    // This one does not: a fast enough fall (one frame's gravity integration outrunning a thin floor, which
+    // a real frame hitch on real hardware causes and is not hypothetical) can put the capsule's BOTTOM point
+    // on the FAR side of the surface before this function ever sees it.
+    //
+    // Found live, through the demo this round built (task board #13's controller_lab), not through this
+    // gate: this sandbox's own headless-shell environment runs rAF frames roughly 1.5-1.8 REAL seconds apart
+    // under load, and camera.js's own dt clamp (Math.min(realDelta/1000, 0.1), there to stop a stalled frame
+    // causing a physics blowup) turns each of those into a full 0.1s GAME step -- large enough that a
+    // falling capsule's velocity, and so its one-frame fall distance, eventually exceeds what a positional
+    // (non-swept) depenetration can catch from the correct side. Reproduced here exactly: a flat 50x50
+    // ground plane (two triangles sharing the query point's own diagonal seam -- the same seam shape as
+    // section 4's very first row), a capsule landing with its bottom already 0.08 units past the plane.
+    const bigFloor = trianglesFrom(
+        [[-25, 0, -25], [25, 0, -25], [25, 0, 25], [-25, 0, 25]],
+        [[0, 1, 2], [0, 2, 3]],
+    );
+    const bigFloorBVH = new MeshBVH(bigFloor);
+    const tunneled = depenetrateCapsule([0, -0.48, 0], 0.4, 1.8, bigFloorBVH);
+    ok("!! *** a capsule whose bottom already tunneled 0.08 units past the floor is pushed BACK OUT, not further in ***",
+       Math.abs(tunneled.pos[1] - 0) < 1e-6 && tunneled.grounded === true,
+       `settled y=${tunneled.pos[1].toFixed(4)} (the unfixed formula measured -1.76 here, moving deeper on every one of 4 iterations)`);
+}
+
 console.log();
 if (fails) { console.log("[capsuleCollide-selfcheck] FAILED " + fails); process.exit(1); }
 console.log("[capsuleCollide-selfcheck] all passed");
