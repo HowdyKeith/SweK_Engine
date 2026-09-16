@@ -89,7 +89,12 @@ const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "
     // *** THE RATCHET, AND IT IS AIMED AT THIS TABLE'S OWN HABIT. *** Every entry added since v4456 carries runs;
     // every entry older than that does not, and they cannot be recovered -- only re-measured one at a time, which
     // is what v4581 did for configContract and found a 24x error. The count may only fall.
-    const BARE_BASELINE_V4581 = 50;
+    // v4637 -- RE-SEEDED 50 -> 51, and the arrival is NAMED rather than absorbed:
+    // tools/roundhouse/plantedCoverage-selfcheck.mjs came in with the main merge. It carries no MEASURED_RUNS
+    // row because main's table has no such column -- the concept is this line's, added at v4456 -- so it is
+    // bare by construction rather than by neglect. Exactly one entry arrived and exactly one is owed; a seed
+    // that moved by more than the arrivals would mean something else had gone bare.
+    const BARE_BASELINE_V4581 = 51;
     ok("!! *** the number of budgets with no recorded runs may only fall ***",
         bareNames.length <= BARE_BASELINE_V4581,
         bareNames.length + " of " + names.length + " (baseline " + BARE_BASELINE_V4581 + "). A new entry owes a " +

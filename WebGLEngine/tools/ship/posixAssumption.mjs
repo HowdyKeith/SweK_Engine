@@ -162,7 +162,13 @@ export const POSIX_AT_V4485 = Object.freeze({
     // cannot inflate their own census, and that reads 138/188/41/97. A record taken under a different rule
     // from the one that checks it is a number nobody can re-derive -- which is the whole subject of
     // separatorRule beside it.
-    separator: Object.freeze({ callers: 138, calls: 188, normalised: 41, never: 97 }),
+    // v4637 -- RE-TAKEN AT THE main MERGE, under the SAME skip rule the gate compares against (this module and
+    // its own gate excluded, or the census inflates itself): 138/188/41/97 becomes 146/197/43/103. The merge
+    // brought 8 more callers and 9 more calls; 2 of the arrivals normalise and 6 do not. NOTHING WAS
+    // UN-NORMALISED -- normalised rose 41 -> 43 and never rose 97 -> 103, both monotonic, which is the half of
+    // the assertion that distinguishes a population growing from a repair coming undone. A fall in `normalised`
+    // would have meant somebody removed a toPosix() and that is the case this record exists to catch.
+    separator: Object.freeze({ callers: 146, calls: 197, normalised: 43, never: 103 }),
     rulesTried: Object.freeze([53, 74, 90]),
     notClaimed: "that the 90 are defects. A relative path that is only printed is portable already; the ones " +
                 "that bite are compared against a stored form, and three static rules for 'compared against' " +

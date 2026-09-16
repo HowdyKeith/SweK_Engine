@@ -115,6 +115,7 @@ import { resolveJitterAwareCPU } from "./render/temporalResolve.mjs";
 import { temporalAccumulateCPU } from "./render/temporalAccumulate.mjs";
 import { easuCPU, rcasCPU, bilinearCPU } from "./fx/fsr/fsr.js";
 import { requestDevice } from "./gfx/device.js";
+import { describeWebGPU, showOriginBanner } from "/ui/webgpuProbe.mjs";
 import { FSRGPU, rangeOf } from "./fx/fsr/fsrGPU.js";
 import { TemporalGPU } from "./render/temporalGPU.mjs";
 import { MotionVectorsGPU, orthoPanVP } from "./render/motionVectorsGPU.mjs";
@@ -195,7 +196,19 @@ const FLAT_DEPTH = new Float32Array(D * D);
 let gpu = null, tgpu = null, mgpu = null;
 async function initGPU() {
     const say = (t) => { $("engine").textContent = "spatial engine: " + t; };
-    if (!navigator.gpu) { say("CPU reference (this browser exposes no WebGPU)"); return; }
+    // *** v4637 -- THIS SAID "this browser exposes no WebGPU" AND THAT IS AN ATTRIBUTION, NOT A FACT. ***
+    // ui/webgpuOrigin-selfcheck.mjs grades every page that names a CAUSE for a missing navigator.gpu, and the
+    // defect it grades is not the wording: it is telling the reader the absence belongs to their browser,
+    // their settings or their machine without having asked whether the ORIGIN withheld it. The same browser
+    // exposes WebGPU on localhost. This page was the last offender in the tree, and it only became one when
+    // the temporal/FSR arc gave it an adapter path at all -- before that it never claimed a cause.
+    if (!navigator.gpu) {
+        const p = describeWebGPU({ navigator, isSecureContext: window.isSecureContext, location: window.location });
+        showOriginBanner(p);
+        say(p.reason === "insecure-origin" ? "CPU reference -- " + p.message
+            : "CPU reference (this browser exposes no navigator.gpu -- a capability, not a failure)");
+        return;
+    }
     try {
         const cv = document.createElement("canvas"); cv.width = 8; cv.height = 8;
         const dev = await requestDevice(cv, { backend: "webgpu", offscreen: true });

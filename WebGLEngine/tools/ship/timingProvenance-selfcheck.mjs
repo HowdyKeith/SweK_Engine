@@ -433,7 +433,21 @@ console.log("\n9. THE RATCHET, AND WHAT IT CANNOT PROMISE");
 {
     // Frozen at the count this round leaves behind. It may only fall: every full run stamps more entries, and
     // nothing in the tree can invent a kind for an entry it did not produce.
-    const BASELINE_UNPROVENANCED_V4580 = 398;
+    // *** RE-SEEDED AT THE v4637 MERGE, AND A RATCHET THAT GOES UP NEEDS ITS ARITHMETIC SHOWN. ***
+    //
+    // This row is aimed at THIS ARC'S OWN HABIT -- somebody adding a timing by hand, which is how all sixteen of
+    // section 5's corrections were made -- and it cannot tell that apart from a POPULATION that grew. The main
+    // merge brought 298 gates main had timed and this line never had, none of them carrying a kind, because
+    // main's gate-timings.json has no per-entry provenance at all (six top-level keys, none of them per-entry).
+    //
+    // The arithmetic is EXACT and that is the whole argument for moving the seed: 394 unprovenanced here plus
+    // main's 298 arrivals is 692, with nothing left over. A hand-added entry would show as a remainder. If the
+    // sum had not closed I would be looking for a typed number, not editing a baseline.
+    //
+    // It falls from here the moment a full sweep runs on one box: every gate it times gets a kind and a stamp.
+    // What is NOT fixed is the conflation itself -- the row still counts arrivals and hand-edits as one number,
+    // and separating them wants the round that measures it rather than the merge that tripped it.
+    const BASELINE_UNPROVENANCED_V4580 = 692;
     const now = Object.keys(G.timings || {}).filter((g) => !((G.kinds || {})[g])).length;
     say("unprovenanced entries: baseline / now", `${BASELINE_UNPROVENANCED_V4580} / ${now}`);
     ok("*** the count of entries with no provenance may only fall ***",
