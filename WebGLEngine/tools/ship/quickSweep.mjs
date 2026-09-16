@@ -36,6 +36,42 @@ import { skippable, readRecord as readInputRecord } from "./inputSets.mjs";
 import { enumerateGates, classify, VERDICT, SWEEP_V4297, ENG } from "./gateSweep.mjs";
 import { RED_AT_V4279, RED_AT_V4408, RED_AT_V4424, RED_AT_V4476, RED_AT_V4484, RED_AT_V4531, RED_AT_V4535, UNCONFIRMED_SLOW, ALL_REGISTERED } from "./redCensus.mjs";
 
+// *** THE TWO LINES BOTH FOUND THAT A MILLISECOND IN sweep-timings.json IS NOT ONE QUANTITY, AND BOTH FIXED
+// IT -- IN DIFFERENT VOCABULARIES. THE MERGE KEEPS BOTH, BECAUSE THEY ANSWER DIFFERENT HALVES. ***
+//
+// v4556/v4562 (this line) measured the contention -- median 2.41x over 1,098 honest pairs -- and answered it
+// with a SECOND COLUMN: `serial`, an uncontended reading refreshed on a rotation, so costOf() can return what
+// a gate actually costs instead of a label on a number that is wrong.
+//
+// v4579/v4582 (the temporal line) measured the same gap at 1.93x and answered it with a KIND on the one
+// column: loaded / alone / capped / skipped. That is strictly more than this line's `contended` boolean --
+// it separates a reading that is the CAP's clock, and one where the gate DECLINED TO RUN, from a genuine
+// parallel sample. Three gates were filing their skip time as an ordinary measurement.
+//
+// Neither subsumes the other: a kind cannot tell you what the gate costs alone, and a second column cannot
+// tell you that the number in front of you measures a refusal. `contended` is now DERIVED from the kind
+// below rather than decided a second time, so the two cannot disagree.
+
+/**
+ * *** v4579 -- THE THREE THINGS A MILLISECOND IN sweep-timings.json CAN BE. *** Exported so a reader asks by
+ * name instead of re-deriving the branch rule, and so the one place that decides it is the one place that
+ * knows: quickSweep, at the moment it writes the number.
+ */
+// *** v4582 -- A FOURTH KIND, BECAUSE THREE OF THESE ENTRIES WERE A GATE SAYING "I DID NOT RUN". ***
+//
+// LOADED, ALONE and CAPPED all answer "under what conditions was this measured". None of them answers "did the
+// gate run at all", and for three entries the answer was no: render/holoPicture, render/holoAgree and
+// tools/ship/pageFxOverlay skip without their dependency, exit 0 in well under the budget, and were filed as
+// ordinary LOADED readings at 234, 164 and 175 ms -- 2.4x to 3.6x the bare skip cost, so they are loaded
+// measurements of a refusal. tools/ship/selfchecks.mjs has refused to record a skip since v3941, after
+// placementRender was filed at its skip time THREE TIMES; gateBudget.UNRESOLVED names two of these three and
+// says "its former 55ms entry was the SKIP time". THE TREE KNEW, FOR THE OTHER FILE.
+//
+// AND THE KIND MADE IT WORSE BEFORE IT MADE IT BETTER: since v4579 those three carried a confident `loaded`
+// label, which answers a question nobody was asking about a number that measures nothing.
+export const KIND = Object.freeze({ LOADED: "loaded", ALONE: "alone", CAPPED: "capped", SKIPPED: "skipped" });
+
+
 export const DEFAULTS = Object.freeze({ budgetMs: 3000, workers: 8, capMs: 20000, timingsFile: "tools/ship/sweep-timings.json",
                                         serialSliceMs: 15000 });
 
@@ -117,6 +153,28 @@ export function serialSliceOrder(gates, serialAt = {}) {
         return A < B ? -1 : A > B ? 1 : 0;
     });
 }
+
+// *** v4582 -- DECLARED, BECAUSE THIS RUNNER'S TWO NUMBERS ARE NOT gateBudget'S AND NEVER WERE. ***
+//
+// tools/ship/runnerBudget-selfcheck.mjs requires every runner that budgets a gate either to read
+// gateBudget.MEASURED or to say why it does not -- rigRunner was silent from v2559 to v3919 and rig.html reported
+// its number as though it were the table's. THIS FILE WAS OUTSIDE THAT CHECK'S POPULATION BY ACCIDENT: the scan
+// admits a runner that mentions `-selfcheck` outside its own name, and quickSweep happened never to contain the
+// string until v4582's SKIP_LINE regex introduced it. So adding a skip guard revealed an eleven-round silence,
+// which is the same shape as the guard itself -- a rule that held everywhere it looked.
+//
+// AND THE DECLARATION IS EASY TO MAKE HONESTLY, WHICH IS WHY THE SILENCE COST NOTHING TO END. Neither number is a
+// per-gate timeout. `budgetMs` is a MEMBERSHIP THRESHOLD: a gate whose last reading is under 3000 ms is in the
+// ship-time sweep and one over it is not, so the number is a claim about how long the sweep may take in total.
+// `capMs` is a SIGKILL ceiling that exists so one hung gate cannot stop the sweep, and v4574 established that a
+// reading it produces is the killer's clock and not a runtime -- which is why those entries are marked `capped`
+// rather than compared against anything.
+export const budgetIsOwn =
+    "neither of this runner's numbers is a per-gate budget, so gateBudget.MEASURED has nothing to say about " +
+    "either. budgetMs (3000) is a MEMBERSHIP THRESHOLD -- a gate under it is in the ship-time sweep, a gate over " +
+    "it is not -- and is therefore a claim about the sweep's total cost, not about any gate's. capMs (20000) is a " +
+    "SIGKILL ceiling so one hung gate cannot stop the sweep, and a reading it produces is the cap's clock rather " +
+    "than a runtime, which is why such entries are marked `capped` and never compared against a measurement.";
 
 /** The register: every gate whose red is already on record, with the record that names it. */
 export function redRegister() {
@@ -244,6 +302,22 @@ export function reconcile(rows, register = redRegister()) {
     return { known, newRed: fresh, unmeasured };
 }
 
+// The convention every skipping gate in the tree already prints, and which selfchecks.mjs has read since v3941.
+const SKIP_LINE = /-selfcheck:\s*(SKIPPED|skipped)\b/;
+
+// The convention every skipping gate in the tree already prints, and which selfchecks.mjs has read since v3941.
+/**
+ * *** v4582 -- THIS RAN WITH stdio "ignore", WHICH IS WHY THE SKIP GUARD COULD NOT BE HERE. ***
+ *
+ * A skip produces exactly one piece of evidence -- the gate's own printed declaration -- and this runner threw
+ * it away, deliberately, to stay cheap over 1,642 gates. From an exit code alone a skip is indistinguishable
+ * from a fast pass, so the guard was not forgotten so much as unaffordable-looking.
+ *
+ * MEASURED BEFORE PAYING FOR IT: piping and keeping a 4 KB tail costs 1.4 ms a gate over eight gates timed three
+ * times each -- inside the run-to-run noise, with two of the eight coming out FASTER captured -- and at most a
+ * couple of seconds over a full sweep. The tail is bounded rather than accumulated because the whole point of
+ * this runner is that it can afford to run everything.
+ */
 // *** v4568 -- THE CAP KILLED THE GATE AND LEFT ITS CHILDREN RUNNING, AND ONE OF THEM HOLDS A GPU. ***
 //
 // `p.kill("SIGKILL")` signals the direct child only. A gate that spawned anything of its own is SIGKILLed
@@ -263,12 +337,15 @@ export function reconcile(rows, register = redRegister()) {
 function runOneAsync(rel, capMs, root) {
     return new Promise((resolve) => {
         const t0 = Date.now();
-        const p = spawn(process.execPath, [rel], { cwd: root, stdio: "ignore", detached: true });
+        const p = spawn(process.execPath, [rel], { cwd: root, stdio: ["ignore", "pipe", "pipe"], detached: true });
+        let tail = "";
+        const keep = (d) => { tail = (tail + d).slice(-4096); };
+        p.stdout.on("data", keep); p.stderr.on("data", keep);
         const timer = setTimeout(() => {
             try { process.kill(-p.pid, "SIGKILL"); } catch { try { p.kill("SIGKILL"); } catch {} }
         }, capMs);
-        p.on("exit", (code, sig) => { clearTimeout(timer); const ms = Date.now() - t0; resolve({ code: sig ? 124 : (code ?? 1), ms, timedOut: !!sig || ms >= capMs }); });
-        p.on("error", () => { clearTimeout(timer); resolve({ code: 1, ms: Date.now() - t0, timedOut: false }); });
+        p.on("exit", (code, sig) => { clearTimeout(timer); const ms = Date.now() - t0; resolve({ code: sig ? 124 : (code ?? 1), ms, timedOut: !!sig || ms >= capMs, skipped: SKIP_LINE.test(tail) }); });
+        p.on("error", () => { clearTimeout(timer); resolve({ code: 1, ms: Date.now() - t0, timedOut: false, skipped: false }); });
     });
 }
 
@@ -326,14 +403,14 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
             // is filed, which is the same two-phase discipline reds have had since v4297, applied to timings.
             if (p1.ms > budgetMs) {
                 const conf = await runOneAsync(rel, capMs, root);
-                rows.push({ gate: rel, verdict: VERDICT.GREEN, parallelMs: p1.ms, serialMs: conf.ms, serialCode: conf.code, from: "budget-confirm", serialTimedOut: conf.timedOut, parallelTimedOut: p1.timedOut });
-            } else rows.push({ gate: rel, verdict: VERDICT.GREEN, parallelMs: p1.ms, parallelTimedOut: p1.timedOut });
+                rows.push({ gate: rel, verdict: VERDICT.GREEN, parallelMs: p1.ms, serialMs: conf.ms, serialCode: conf.code, parallelSkipped: p1.skipped, serialSkipped: conf.skipped, from: "budget-confirm", serialTimedOut: conf.timedOut, parallelTimedOut: p1.timedOut });
+            } else rows.push({ gate: rel, verdict: VERDICT.GREEN, parallelMs: p1.ms, parallelTimedOut: p1.timedOut, parallelSkipped: p1.skipped });
             continue;
         }
         const p2 = await runOneAsync(rel, capMs, root);
         const serial = { code: p2.code, ms: p2.ms, timedOut: p2.timedOut };
         const c = classify(parallel, serial);   // { verdict, from, note } -- gateSweep's rule, not a copy of it
-        rows.push({ gate: rel, verdict: c.verdict, from: c.from, parallelMs: p1.ms, serialMs: p2.ms, serialCode: p2.code, serialTimedOut: p2.timedOut, parallelTimedOut: p1.timedOut });
+        rows.push({ gate: rel, verdict: c.verdict, from: c.from, parallelMs: p1.ms, serialMs: p2.ms, serialCode: p2.code, parallelSkipped: p1.skipped, serialSkipped: p2.skipped, serialTimedOut: p2.timedOut, parallelTimedOut: p1.timedOut });
     }
     // *** AND A SLICE OF THE TREE IS RE-RUN ALONE, SO THE FILE ACCUMULATES COSTS AND NOT ONLY SAMPLES. ***
     // Phase 2 above already leaves an uncontended reading for every red and every budget crosser; this
@@ -373,6 +450,14 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
     // about ENGINE_VERSION, one level down -- so `at` is kept (it is what main ships and what backfillStamps
     // already fills) and tools/ship/budgetExile.mjs was changed to read it.
     const at = { ...(prior.at || {}) };
+    // *** v4579 -- WHAT THE MILLISECOND IS, NOT JUST WHAT IT IS. *** The line below files
+    const sweptNow = new Set();
+    // `serialMs ?? parallelMs`, so an entry is an ALONE reading when a serial run happened and a LOADED one
+    // when it did not -- two different physical quantities in one column, which v4578 measured at 1.93x apart
+    // and which this arc itself got wrong for nine entries by assuming the column meant one thing. Nothing
+    // marked which until now. `kinds` records it AT THE MOMENT OF WRITING, where it is known for certain
+    // rather than inferred later from which side of the budget the number landed on.
+    const kinds = { ...(prior.kinds || {}) };
     const stamp = out0.at;
     // v4536: a crossing is COUNTED rather than acted on -- see countCrossings, which is exported and pure so
     // a gate can drive the reset on a fixture. It was NOT, in the first draft of this round, and the sabotage
@@ -391,8 +476,26 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
         // files a SERIAL number whenever there was a serial re-run and a PARALLEL one otherwise, and until
         // now nothing recorded which. See contentionPairs(): the ratio that justifies the whole `serial`
         // map was being computed over 164 gates whose two readings are one measurement.
-        contended[r.gate] = r.serialMs == null;
         finished[r.gate] = !(r.serialTimedOut ?? r.parallelTimedOut ?? false);
+
+        // A killed reading is neither quantity -- v4574 established it is the cap's clock and not the gate's.
+        // *** SKIPPED FIRST, BECAUSE IT IS A DIFFERENT QUESTION FROM THE OTHER THREE. *** Those three say under
+        // what conditions the number was taken; this one says the gate declined to run, so the number measures a
+        // refusal. Read from the SAME run that produced the millisecond -- `serialSkipped ?? parallelSkipped`
+        // mirrors `serialMs ?? parallelMs` exactly -- because a label taken from the other run would be the drift
+        // v4579 built this map to prevent.
+        sweptNow.add(r.gate);
+        const skipped = r.serialSkipped ?? r.parallelSkipped;
+        kinds[r.gate] = skipped ? KIND.SKIPPED
+                      : (r.serialCode ?? 0) === 124 || timings[r.gate] >= capMs ? KIND.CAPPED
+                      : r.serialMs != null ? KIND.ALONE : KIND.LOADED;
+        // *** AND `contended` IS NOW A READING OF THE KIND RATHER THAN A SECOND DECISION ABOUT THE SAME
+        // FACT. *** It was `r.serialMs == null`, which is true of a CAPPED and of a SKIPPED entry as well --
+        // so it called the cap's own clock a parallel sample. The kind already separates those three, and two
+        // predicates over one fact are two things that can disagree. Every existing reader of `contended` is
+        // unaffected where the entry is a real sample; what changes is that a capped or skipped reading stops
+        // claiming to be one.
+        contended[r.gate] = kinds[r.gate] === KIND.LOADED;
     }
     backfillStamps(timings, at);
     const dropped = sel.run.filter((g) => (prior.timings || {})[g] != null && timings[g] > budgetMs);
@@ -424,7 +527,12 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
     };
     if (write) {
         fs.writeFileSync(path.join(root, timingsFile), JSON.stringify({
-            note: "OBSERVED at the last quickSweep run: ms per gate (serial where a serial re-run happened) and exit code. Rewritten every run; " +
+            note: "OBSERVED at the last quickSweep run: ms per gate (serial where a serial re-run happened) and exit code. " +
+                  "*** `kinds` (v4579) SAYS WHICH QUANTITY EACH MS IS: `loaded` is a parallel reading taken with " +
+                  "`workers` gates running at once, `alone` is a serial re-run, `capped` is the SIGKILL cap and not a " +
+                  "runtime at all. The two real kinds sit about 1.93x apart (v4578), so comparing a ms against anything " +
+                  "without knowing its kind is comparing two different quantities -- which is how nine entries came to " +
+                  "hold the wrong one. *** Rewritten every run; " +
                   "used only to choose which gates are under the ship-time budget. Not a claim about the tree -- the register is. " +
                   "`at` is PER ENTRY (v4408): the capture that actually observed that gate. `captured` is this run's stamp and " +
                   "applies ONLY to entries whose `at` equals it -- the rest were not run and say so. " +
@@ -446,7 +554,19 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
             // owned, inputSets.encode dropping a renamed flag, and now this. A writer that spells its fields
             // by hand is a list that has to be maintained in step with every reader of the file, and
             // ROTATION_LOST_V4461 is the same mechanism across two processes rather than inside one.
-            captured: out.at, budgetMs, capMs, timings, codes, at, finished, crossings, serial, serialAt, contended,
+            // *** v4582 -- CARRIED FORWARD, MINUS WHAT THIS RUN ACTUALLY OBSERVED. ***
+            //
+            // v4579 wrote `kindsInferred` -- the 1,620 entries whose kind was BACK-DERIVED from the branch rule
+            // rather than watched -- because "an inference dressed as an observation is the fault five rounds of
+            // this arc have been about". It then never taught this writer about the field, so the first real
+            // sweep dropped it: a five-gate run took the list from 1,620 to ZERO and left 1,637 inferred kinds
+            // presenting as observed. MEASURED, not reasoned -- driving this writer on five gates is what
+            // produced the empty array.
+            //
+            // A gate this run swept has an OBSERVED kind and leaves the list. Every other entry keeps whatever
+            // it had, because this run learned nothing about it.
+            kindsInferred: (prior.kindsInferred || []).filter((g) => !sweptNow.has(g)),
+            captured: out.at, budgetMs, capMs, timings, codes, at, finished, crossings, serial, serialAt, contended, kinds,
         }, null, 1) + "\n");
     }
     return out;

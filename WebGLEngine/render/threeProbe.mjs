@@ -2,7 +2,8 @@
 //
 // *** IS THE three 0.178 PIN THE FLEET'S OR THE BUILD BOX'S? *** (docs/TSL-ROADMAP.md step 7 item 17, task 17.) At
 // v4319 three 0.185 was tried and refused on THIS shell's Chromium -- its texture views pass a `swizzle` the browser
-// did not know -- and 0.178 was vendored because it ran unpatched. That is a fact about one headless shell. Whether
+// did not know -- and 0.178 was vendored because it ran unpatched. v4537 probed the BOUNDARY rather than the newest
+// and found 0.184 draws here, so the vendored build is 0.184.0 now. That is still a fact about one headless shell. Whether
 // a rig's Chrome refuses the same build is the question, and nobody can answer it from here. three-probe.html is the
 // instrument: it fetches a named three version's tarball from registry.npmjs.org (CORS *, measured), gunzips it with
 // the browser's DecompressionStream, walks the tar (this file), rewrites the build's two internal imports to blob
@@ -12,8 +13,25 @@
 // tools/ship/three-probe.json is saved from the page.
 "use strict";
 
-export const PROBE_CONTROL = Object.freeze({ label: "vendored 0.178", kind: "local", src: "./vendor/three-webgpu/" });
-export const PROBE_VERSIONS = Object.freeze(["0.185.1"]);          // the newest at v4494; the page takes ?versions=
+export const PROBE_CONTROL = Object.freeze({ label: "vendored 0.184", kind: "local", src: "./vendor/three-webgpu/" });
+
+// *** v4537 -- THE NEWEST VERSION WAS NEVER THE ONE THAT MATTERED, AND THIS LIST HELD ONLY THE NEWEST. ***
+// v4494 probed 0.185.1 because it was the newest, found it refused, and the gate's own closing line named
+// what it had not done: "unchecked here: versions other than 0.185.1". The question a pin actually raises is
+// not "does the newest work" but "WHERE IS THE LINE" -- the oldest version that clears whatever needs it, and
+// the last one before the refusal. Nobody asked, so the tree sat on 0.178 while 0.184 ran here perfectly.
+//
+// Both sides of the line are probed now, and the boundary is the assertion: the version BELOW must draw and
+// the version ABOVE must refuse. A three that starts refusing at 0.184, or one that starts drawing at 0.185,
+// is a changed browser and the row says so instead of the pin quietly meaning something else.
+export const PROBE_BOUNDARY = Object.freeze({
+    at: "v4537",
+    lastGood: "0.184.0",       // vendored since v4537; draws on WebGPU here, rev 184
+    firstRefused: "0.185.1",   // GPUTextureViewDescriptor with `this.swizzle = 'rgba'`; this browser has no such member
+    why: "the refusal is the BROWSER's -- Chromium's WebGPU has no GPUTextureComponentSwizzle -- so a rig whose " +
+         "Chrome knows it will draw 0.185 on this same page, and the pin can move the day it does",
+});
+export const PROBE_VERSIONS = Object.freeze(["0.184.0", "0.185.1"]);   // both sides of the line; the page takes ?versions=
 export const BUILD_FILES = Object.freeze(["three.webgpu.js", "three.core.js", "three.tsl.js"]);
 export const tarballUrl = (version) => `https://registry.npmjs.org/three/-/three-${version}.tgz`;
 
@@ -64,12 +82,23 @@ export function rewriteImports(files, urls) {
 }
 
 /** The page's record: { page: "three-probe.html", at, ua, when, route, results: [{ label, version, revision, backend, ok, error, ms }] }. Refuses lies. */
-export function gradeProbe(j) {
+/**
+ * Grade a probe record. `controlLabel` names the vendored control the record was taken against; it defaults to the
+ * one this tree carries NOW.
+ *
+ * *** v4545 -- A RECORD OUTLIVES THE PIN IT WAS TAKEN AGAINST, AND THE GRADER HAD NO WAY TO SAY SO. *** A rig saved
+ * tools/ship/three-probe.json at v4494, when the vendored control was "vendored 0.178"; v4537 bumped the pin and
+ * PROBE_CONTROL.label became "vendored 0.184", so the record graded as "no vendored control" -- true as written and
+ * useless as a reading. It is not missing a control; it has one, for a build this tree no longer ships. The caller
+ * passes the label the record actually names, grades everything else exactly as before, and reports the staleness
+ * itself, which is a different fact from dishonesty and deserves its own words.
+ */
+export function gradeProbe(j, controlLabel = PROBE_CONTROL.label) {
     const problems = [];
     if (!j || j.page !== "three-probe.html") problems.push("not a three-probe record");
     const rs = Array.isArray(j && j.results) ? j.results : [];
     if (rs.length < 2) problems.push(`only ${rs.length} results (the control and at least one version)`);
-    if (!rs.some((r) => r.label === PROBE_CONTROL.label)) problems.push("no vendored control");
+    if (!rs.some((r) => r.label === controlLabel)) problems.push(`no vendored control (looked for ${JSON.stringify(controlLabel)})`);
     for (const r of rs) {
         if (typeof r.ok !== "boolean") { problems.push(`${r.label}: ok is not a boolean`); break; }
         if (r.ok && r.error) { problems.push(`${r.label}: ok with an error`); break; }
@@ -78,7 +107,7 @@ export function gradeProbe(j) {
         if (r.ok && !(r.backend === "webgpu" || r.backend === "webgl2")) { problems.push(`${r.label}: backend ${r.backend}`); break; }
         if (!(Number.isFinite(r.ms) && r.ms >= 0)) { problems.push(`${r.label}: ms not finite`); break; }
     }
-    const control = rs.find((r) => r.label === PROBE_CONTROL.label);
+    const control = rs.find((r) => r.label === controlLabel);
     if (control && !control.ok) problems.push("the vendored control failed: the box, not the version, is the finding");
-    return { ok: problems.length === 0, problems, route: j && j.route, newest: rs.filter((r) => r.label !== PROBE_CONTROL.label), control };
+    return { ok: problems.length === 0, problems, route: j && j.route, newest: rs.filter((r) => r.label !== controlLabel), control, controlLabel };
 }

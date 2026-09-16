@@ -88,6 +88,36 @@
 // table's own rule; the default budget moves from 309 s to 330 s with this line, and nothing else changes.
 export const SLOWEST_GENERAL = { gate: "tools/roundhouse/opticsBind-selfcheck.mjs", ms: 109899 };
 
+// *** v4580 -- WHAT AN ENTRY IN gate-timings.json IS, WHICH UNTIL NOW NOTHING SAID. ***
+//
+// hostScale-selfcheck has asserted since v3936 that "an entry cannot say whether it is a TIME or a TRUNCATION",
+// and concluded that the fix "is not to detect truncation -- IT CANNOT BE DETECTED FROM HERE". The second half
+// was true of a READER and false of the PRODUCER, and the producer is tools/ship/selfchecks.mjs in this repo. It
+// knows exactly which of the three a run was -- it branches on all three -- and then wrote a bare number that
+// threw the distinction away. v4579 made the same repair on sweep-timings.json a round earlier.
+//
+// TWO MEMBERS, BOTH DECIDABLE. There is no TRUNCATED or SKIPPED member here, and their absence is the point: the
+// runner records neither, so a member no writer can write would be a label nobody could ever check. COMPLETE is
+// what the runner establishes -- exit 0, not a timeout, not a gate that declined to run. UNKNOWN is the reading
+// for the 1289 entries that predate this, and it is a statement about the RECORD rather than about the gate: it
+// means nobody wrote down what this number is, which is not the same as the number being wrong.
+export const TIMING_KIND = Object.freeze({
+    // ONE RUN TO COMPLETION BY THE SUITE RUNNER, AND THAT IS ALL IT CLAIMS: a single sample, taken with a cold
+    // module cache, in whatever state the box was in when the runner reached that gate. It is NOT a median and
+    // not a warm reading. *** v4580 MEASURED WHAT THAT COSTS: one entry in four written by the provenance pass
+    // disagreed with a median of three alone runs by more than 20%, and tools/ship/spacesimStart-selfcheck.mjs
+    // was 1486 ms against a 124 ms median -- 12x over, and its header had already recorded that this exact
+    // number was 10x over when the record last held it. *** A kind that says "completed" and nothing about how
+    // many samples is a better record than a bare integer and still not enough, so the two are named apart.
+    COMPLETE: "complete",
+    // A HAND-TAKEN MEDIAN OF THREE ALONE RUNS -- the procedure this tree's headers have used since v3285 and
+    // which `captured` describes for every cohort it names. Not written by any automatic pass: a human runs the
+    // gate three times with nothing else on the box and records the middle number. It earns a member because it
+    // is what the headers are compared against, and an entry holding it must not be read as a runner sample.
+    MEDIAN3: "median of 3 alone",
+    UNKNOWN: "unknown -- before v4580",
+});
+
 /** The factor selfchecks.mjs's own header already committed to. Kept as a named constant, not a multiplication. */
 export const HEADROOM = 3;
 
@@ -467,12 +497,38 @@ export const MEASURED = {
     // it. OF THE 24 NEWLY-TIMED GATES ONLY THIS ONE IS OVER 46.6s; THE NEXT IS 23s. It is the slow tail, not the
     // population, and the tail is what MEASURED is for. Measured to completion, and it PASSES.
     "physics/sph/materialKnobs-selfcheck.mjs":       179037,
-    // configContract PASSES at 78s here, against 74400 in the timings -- two independent runs agreeing within a
-    // few seconds. IT NEVER NEEDED A BIGGER BUDGET AT ALL: 78s fits inside the 143s default with room, so its
-    // TIMEOUT on the rig was not this gate being slow. Recorded anyway because it was over the general line, and
-    // the larger of the two readings is used -- a budget derived from the faster of two measurements is a budget
-    // that fails on the slower one.
-    "tools/roundhouse/configContract-selfcheck.mjs":  78000,
+    // *** v4581 -- configContract IS GONE FROM THIS TABLE, AND ITS OWN ENTRY SAID SO FROM THE DAY IT ARRIVED. ***
+    //
+    // What stood here, verbatim: "configContract PASSES at 78s here, against 74400 in the timings -- two
+    // independent runs agreeing within a few seconds. IT NEVER NEEDED A BIGGER BUDGET AT ALL: 78s fits inside the
+    // 143s default with room, so its TIMEOUT on the rig was not this gate being slow. Recorded anyway because it
+    // was over the general line, and the larger of the two readings is used -- a budget derived from the faster of
+    // two measurements is a budget that fails on the slower one."
+    //
+    // Three things were true of that entry and only the last one is new.
+    //   (1) IT SAID IT WAS UNNECESSARY IN ITS OWN FIRST SENTENCE and was written anyway.
+    //   (2) It was the only one of the four DUPLICATED keys whose two values differed, 78000 here and 72509 in the
+    //       later cohort. The later one won silently, so THE SMALLER READING WAS IN FORCE -- the exact inversion
+    //       of the rule this note states. Nothing could see it: nothing parses this table.
+    //   (3) *** MEASURED AT v4581: 2997 / 2856 / 3473 ms, three runs alone on this box, every one exit 0 with all
+    //       checks passing and no skip. *** Both recorded readings are roughly TWENTY-FOUR TIMES the gate's cost.
+    //       gate-timings.json has said 4946 ms and sweep-timings.json 5769 ms for some time; hostScale-selfcheck
+    //       has REPORTED it as the worst under-record in the table ("0.068 of its measured runtime") and reporting
+    //       is where it stopped.
+    //
+    // AND THE TABLE'S CONSERVATIVE RULE POINTED THE WRONG WAY HERE. "Take the larger of two readings" is right
+    // when both are current and protects against a fast sample; against two stale readings it entrenches the
+    // staler one, so the accident of the duplicate was LESS wrong than the stated rule. That is not an argument
+    // for the accident -- it is why a rule needs a re-measure and not only a direction.
+    //
+    // Removed rather than corrected to 3473, and the direction is why: this table is the SLOW TAIL ("It is the
+    // slow tail, not the population, and the tail is what MEASURED is for"), and a 3 s gate is the population. On
+    // the default it gets 329,697 ms instead of 145,018 -- REMOVAL RAISES THE BUDGET, which is the safe direction.
+    // Correcting it in place to 3473 x 2 would have handed a gate observed at 5,769 ms under load a 6,946 ms
+    // budget, which is how a timeout gets manufactured out of a gate that is fine.
+    //
+    // The measurement is not thrown away with the entry: it is in gate-timings.json at 2997 ms carrying the
+    // `median of 3 alone` kind v4580 added, which is the record that exists to hold exactly this.
     // *** MEASURED AT v3904 BECAUSE A NEW CHECK TIMED OUT AND THE GATE TURNED OUT TO HAVE BEEN DYING ALL ALONG.
     // 1058s stopwatch-timed on an otherwise idle box, and IT PASSES -- all checks. A contended run earlier the
     // same hour gave 1085s; the SMALLER, cleaner number is recorded here and the larger one is written down
@@ -575,8 +631,18 @@ export const MEASURED = {
     // here instead. Keith has the number and the choice.
     //
     // MEASURED ON THIS BOX, wall-clock, each run to completion:
-    "tools/roundhouse/configContract-selfcheck.mjs":  72509,
-    "tools/roundhouse/compose-selfcheck.mjs":         109896,
+    //
+    // *** v4581 -- THIS COHORT RE-STATED FOUR KEYS THAT WERE ALREADY IN THIS TABLE, AND NOTHING NOTICED FOR
+    // HUNDREDS OF VERSIONS BECAUSE NOTHING PARSES IT. *** configContract, compose, assumptionMap and census each
+    // appeared twice in one object literal. A repeated key in an object literal is not an error: the later one
+    // silently wins. Three of the four re-stated the SAME number and were therefore harmless; configContract
+    // re-stated a DIFFERENT one -- 78000 above, 72509 here -- so one typed budget was being discarded with no
+    // trace, and the survivor was the SMALLER of the two. *** THE ENTRY 300 LINES UP STATES THE OPPOSITE RULE IN
+    // WORDS: *** "the larger of the two readings is used -- a budget derived from the faster of two measurements
+    // is a budget that fails on the slower one." The duplicate silently inverted the table's own rule.
+    //
+    // The four keys are removed from HERE rather than from above, because the earlier sites are the ones carrying
+    // the measurement notes. The notes below stay: they are about the numbers, not about the keys.
     // *** v4136 -- WHERE THIS 278s ACTUALLY GOES, because "either a longer budget or a smaller fixture" is a
     // choice nobody could make without it. Keith's rig TIMED OUT at 557s (this entry x2) with the progress log
     // ending on "80/129 (last: twof)". Timed per device on this box: 250.9s total, and TWOF ALONE IS 178.1s --
@@ -588,8 +654,10 @@ export const MEASURED = {
     // what gets classified, and the classification IS the verdict this gate exists to produce -- a round must
     // not move a verdict it is not about (this table's own rule, stated at the configContract entry above).
     // The measurement is recorded so the choice is informed; the choice is Keith's.
-    "tools/roundhouse/assumptionMap-selfcheck.mjs":  333639,
-    "tools/roundhouse/census-selfcheck.mjs":         761728,
+    //
+    // (v4581: the assumptionMap and census keys that stood here were two of the four duplicates described above.
+    // Their numbers were IDENTICAL to the earlier entries, so removing them changes nothing this table produces
+    // -- which is exactly why they survived. This prose is about assumptionMap's cost and stays where written.)
     // *** NOT GIVEN A BUDGET, AND SAYING SO IS THE POINT: corroborationCensus ran past 1500s and was KILLED
     // rather than finishing, so there is no completion time to double. An entry here would be a guess wearing a
     // measurement's clothes -- the one thing this table exists to refuse. It keeps the default budget and stays

@@ -1526,7 +1526,7 @@
    "name": "three-webgpu",
    "arrived": "2026-09-02",
    "sha": "614dbcf4e48a438ddae6123aa08eb2df45b610cd",
-   "bytes": 3215271,
+   "bytes": 3527206,
    "files": [
     {
      "path": "LICENSE",
@@ -1534,23 +1534,23 @@
     },
     {
      "path": "PROVENANCE.txt",
-     "bytes": 960
+     "bytes": 1188
     },
     {
      "path": "README.md",
-     "bytes": 1061
+     "bytes": 2356
     },
     {
      "path": "three.core.js",
-     "bytes": 1389353
+     "bytes": 1427497
     },
     {
      "path": "three.tsl.js",
-     "bytes": 28536
+     "bytes": 33619
     },
     {
      "path": "three.webgpu.js",
-     "bytes": 1794280
+     "bytes": 2061465
     }
    ]
   },

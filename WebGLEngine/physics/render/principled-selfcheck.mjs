@@ -1,6 +1,9 @@
 // WebGLEngine/physics/render/principled-selfcheck.mjs
 //
-// Run: node physics/render/principled-selfcheck.mjs   (~4s -- MEASURED)
+// Run: node physics/render/principled-selfcheck.mjs   (~1.55s MEASURED at v4580, median of 1530/1563/1552 alone
+//   on this box, superseding a stated ~4s that also said MEASURED -- 2.6x over. Corrected from the MEDIAN, not
+//   from gate-timings.json: that file's fresh runner sample for this gate is 1523 ms and agrees, but a sample is
+//   not a median and one of the four headers corrected this round had a runner sample 12x out.)
 //
 // v4432 -- *** THE COMPOSITION DOUBLE-COUNTS AT THE SEAMS, AND THE FURNACE SAYS BY HOW MUCH: 1.0796. ***
 //

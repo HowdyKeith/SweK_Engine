@@ -41,7 +41,10 @@ import { createRequire } from "node:module";
 import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
 import fs from "node:fs";
 import path from "node:path";   // used by renderThreePassToPixels, which serves the engine tree over HTTP
-import { storageWords } from "./headlessGpu.mjs";   // v4457 -- the storage-input packing both harnesses share
+import { storageWords, LIVENESS_SENTINEL } from "./headlessGpu.mjs";   // v4457 -- the storage-input packing both harnesses share; v4572 -- and the liveness fill, which must be ONE number
+// the software-adapter names live in ONE place -- rewriting the regex here would be a second copy of a
+// list that ui/localModelProbe.js already owns and tools/ship/localModelProbe-selfcheck.mjs already gates
+import { SOFTWARE_HINTS } from "../../ui/localModelProbe.js";
 
 /** The flags that worked, kept as data so a caller can report them and a future box can extend the list. */
 export const LAUNCH_ARGS = Object.freeze(["--enable-unsafe-webgpu"]);
@@ -69,7 +72,8 @@ export function webgpuSkipReason(requireFn = createRequire(import.meta.url)) {
  */
 export async function runWgslCompute({ code, entryPoint = "main", outCount, uniforms = null,
                                        workgroups = 1, compileOnly = false, timeoutMs = 60000,
-                                       inputs = null, outInit = null }) {
+                                       inputs = null, outInit = null,
+                                       outBinding = 0, uniformBinding = 1 }) {
     const requireFn = createRequire(import.meta.url);
     const skip = webgpuSkipReason(requireFn);
     if (skip) return { ok: false, skipped: true, reason: skip, values: [], errors: [] };
@@ -112,16 +116,19 @@ export async function runWgslCompute({ code, entryPoint = "main", outCount, unif
             const outBuf = dev.createBuffer({ size: a.outCount * 4,
                 usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST });
             // v4465 -- outInit: starting contents for a kernel that works in place on binding 0 (headlessGpu takes the same).
+            // v4572 -- the same sentinel fill the native harness uses, so "nothing ran" is a reading here too
+            // and a liveness failure on one side does not read as a DIVERGENCE between the two.
             if (a.outInit) dev.queue.writeBuffer(outBuf, 0, new Uint32Array(a.outInit).subarray(0, a.outCount));
+            else dev.queue.writeBuffer(outBuf, 0, new Float32Array(a.outCount).fill(a.sentinel));
             const readBuf = dev.createBuffer({ size: a.outCount * 4,
                 usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
-            const entries = [{ binding: 0, resource: { buffer: outBuf } }];
+            const entries = [{ binding: a.outBinding, resource: { buffer: outBuf } }];
             let uniBuf = null;
             if (a.uniforms) {
                 uniBuf = dev.createBuffer({ size: Math.max(16, a.uniforms.length * 4),
                     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
                 dev.queue.writeBuffer(uniBuf, 0, new Float32Array(a.uniforms));
-                entries.push({ binding: 1, resource: { buffer: uniBuf } });
+                entries.push({ binding: a.uniformBinding, resource: { buffer: uniBuf } });
             }
             // v4457 -- read-only storage inputs, the same option headlessGpu.runWgslComputeNative takes, so the
             // two harnesses keep one signature (crossBackend-selfcheck's corpus depends on that).
@@ -131,6 +138,9 @@ export async function runWgslCompute({ code, entryPoint = "main", outCount, unif
                 dev.queue.writeBuffer(b, 0, words);
                 entries.push({ binding: inp.binding, resource: { buffer: b } });
             }
+            // v4572 -- the validation error scope the native harness took this round, for the same reason:
+            // a REJECTED bind group left the read-back untouched and this function returned ok:true beside it.
+            dev.pushErrorScope("validation");
             const pipe = dev.createComputePipeline({ layout: "auto",
                 compute: { module: mod, entryPoint: a.entryPoint } });
             const bind = dev.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries });
@@ -140,14 +150,20 @@ export async function runWgslCompute({ code, entryPoint = "main", outCount, unif
             cp.setPipeline(pipe); cp.setBindGroup(0, bind); cp.dispatchWorkgroups(...(Array.isArray(a.workgroups) ? a.workgroups : [a.workgroups])); cp.end();
             enc.copyBufferToBuffer(outBuf, 0, readBuf, 0, a.outCount * 4);
             dev.queue.submit([enc.finish()]);
+            const validation = await dev.popErrorScope();
+            if (validation) return { ok: false, values: [],
+                reason: "the device REJECTED this run -- an empty read-back is not a measurement",
+                errors: [String(validation.message || validation).slice(0, 300)] };
             await readBuf.mapAsync(GPUMapMode.READ);
             const values = Array.from(new Float32Array(readBuf.getMappedRange()));
             readBuf.unmap();
             const ai = adapter.info || {};
             return { ok: true, values, errors: [],
+                     wroteNothing: !a.outInit && a.outCount > 0 && values.every((v) => v === a.sentinel),
                      adapter: { vendor: ai.vendor || null, architecture: ai.architecture || null,
                                 description: ai.description || null } };
         }, { code, entryPoint, outCount, uniforms: uniforms ? Array.from(uniforms) : null, workgroups, compileOnly,
+             outBinding, uniformBinding, sentinel: LIVENESS_SENTINEL,
              inputs: inputs ? inputs.map((i) => ({ binding: i.binding, words: Array.from(storageWords(i.data)) })) : null,
              outInit: outInit ? Array.from(storageWords(outInit)) : null });
         return { skipped: false, errors: [], values: [], ...out };
@@ -635,8 +651,15 @@ export async function runWgslComputeToTexture({ code, entryPoint = "main", n = 6
             cp.setPipeline(pipe); cp.setBindGroup(0, bind); cp.dispatchWorkgroups(...(Array.isArray(a.workgroups) ? a.workgroups : [a.workgroups])); cp.end();
             enc.copyTextureToBuffer({ texture: tex }, { buffer: readBuf, bytesPerRow }, [a.n, a.n]);
             dev.queue.submit([enc.finish()]);
+            // *** v4572 -- THIS SCOPE WAS ALREADY HERE AND ITS FINDING WAS DISCARDED. *** The error was
+            // collected into `errs` and the function returned ok:true beside it, and wgslCorpus.compare's
+            // texture branch gates on `ok` alone -- so a rejected texture run reported a clean comparison
+            // with the reason sitting in a list nobody read. Gathering evidence and not acting on it is the
+            // same fault as never gathering it.
             const scoped = await dev.popErrorScope();
-            if (scoped) errs.push(scoped.message);
+            if (scoped) return { ok: false, raw: null, bytesPerRow: null,
+                reason: "the device REJECTED this run -- an empty read-back is not a measurement",
+                errors: [...errs, String(scoped.message || scoped).slice(0, 300)] };
             await readBuf.mapAsync(GPUMapMode.READ);
             const raw = new Uint8Array(readBuf.getMappedRange()).slice();
             readBuf.unmap();
@@ -692,7 +715,7 @@ export async function runWgslComputeToTexture({ code, entryPoint = "main", n = 6
 export async function runInEngineOrigin({ engineRoot, script, args = null, timeoutMs = 120000 }) {
     const requireFn = createRequire(import.meta.url);
     const skip = webgpuSkipReason(requireFn);
-    if (skip) return { ok: false, skipped: true, reason: skip, result: null, pageErrors: [] };
+    if (skip) return { ok: false, skipped: true, reason: skip, result: null, pageErrors: [], adapter: null, software: null };
     const pw = resolvePlaywright(requireFn);
     const root = path.resolve(engineRoot);
     // v4502: .wasm as application/wasm -- a page smoked here through an iframe loads vendor/box3d through the browser loader, whose
@@ -717,6 +740,28 @@ export async function runInEngineOrigin({ engineRoot, script, args = null, timeo
         page.on("console", (m) => { const t = m.text(); if (t.startsWith("[swek-step] ")) lastStep = t.slice(12, 200); else if (m.type() === "error") pageErrors.push("console: " + t.slice(0, 300)); });
         page.setDefaultTimeout(timeoutMs);
         await page.goto(`http://${SECURE_HOST}:${srv.address().port}/`);
+        // *** WHAT THE ADAPTER ACTUALLY IS, BECAUSE dev.backend SAYS "webgpu" AND MEANS IT ON A CPU TOO. ***
+        // Measured at v4561: every device row this harness has run in this container has been Google's
+        // SwiftShader -- a software rasteriser -- and none of the 109 gates that call this function had any
+        // way to know. Parity claims are unharmed by that; a TIMING claim is not a GPU timing at all, and the
+        // round that went looking for one nearly published a software ratio as a device ratio.
+        // Asked ONCE, here, so no gate has to remember to ask, and never throwing: an adapter that cannot be
+        // described is reported as null rather than failing somebody else's parity run.
+        const adapter = await page.evaluate(async () => {
+            try {
+                if (!navigator.gpu) return null;
+                const a = await navigator.gpu.requestAdapter();
+                if (!a) return null;
+                const i = a.info || (a.requestAdapterInfo ? await a.requestAdapterInfo() : null) || {};
+                return { vendor: i.vendor || null, architecture: i.architecture || null,
+                         device: i.device || null, description: i.description || null,
+                         // the spec's own flag is the right instrument and is ABSENT in this Chromium, so it
+                         // is read when present and the name match is the weaker fallback -- see SOFTWARE_HINTS
+                         isFallback: ("isFallbackAdapter" in a) ? !!a.isFallbackAdapter : null };
+            } catch { return null; }
+        }).catch(() => null);
+        const software = adapter ? (adapter.isFallback === true ||
+            SOFTWARE_HINTS.test([adapter.vendor, adapter.architecture, adapter.device, adapter.description].filter(Boolean).join(" "))) : null;
         // The script is compiled IN the page from its source text: page.evaluate with a string is an expression
         // in some Playwright versions and a callable in others, and a function that returns a function comes
         // back unserialisable as undefined. new Function makes the contract explicit.
@@ -742,8 +787,9 @@ export async function runInEngineOrigin({ engineRoot, script, args = null, timeo
             out.reason += probe == null ? "; the page answered the probe but named no step (set globalThis.__swekStep to be told which)" : "; last step: " + probe;
             if (lastStep != null) out.reason += "; last step logged before that: " + lastStep;
         }
-        return { skipped: false, ok: out.ok, result: out.ok ? out.result : null, reason: out.ok ? null : out.reason, pageErrors };
+        return { skipped: false, ok: out.ok, result: out.ok ? out.result : null, reason: out.ok ? null : out.reason,
+                 pageErrors, adapter, software };
     } catch (e) {
-        return { ok: false, skipped: false, reason: "harness error: " + String(e).slice(0, 300), result: null, pageErrors: [] };
+        return { ok: false, skipped: false, reason: "harness error: " + String(e).slice(0, 300), result: null, pageErrors: [], adapter: null, software: null };
     } finally { try { await browser?.close(); } catch {} srv.close(); }
 }

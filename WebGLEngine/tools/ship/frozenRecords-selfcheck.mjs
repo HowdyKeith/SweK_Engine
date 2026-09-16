@@ -129,18 +129,45 @@ console.log("1. what counts as a record, and who counts as its guardian");
        "directory it sits in is this tree's convention, not a gap. `siblingElsewhere` keeps that fact as a " +
        "number rather than folding it into siblingWrong.");
 
-    // AND THE REMAINING 28 ARE NOT A DEBT EITHER, which is why this row reports rather than ratchets.
+    // AND THE REMAINDER IS NOT A DEBT EITHER, which is why this row reports rather than ratchets.
     const live = census();
+
+    // *** THE 45 WAS A FROZEN CONSTANT AND THE MERGE MADE IT ONE ROUND STALE, SO IT IS DERIVED NOW. ***
+    //
+    // v4563 wrote `=== 45` to prove the split LOSES NOTHING: the two halves must account for exactly what the
+    // one broken number reported. That proof is right and the constant was the wrong way to hold it -- any
+    // round that adds a record moves the total, and the identity then fails for a reason that is not the one
+    // it tests. Merging the temporal/FSR line added seven and it failed on the first run.
+    //
+    // The old rule is six lines, so it is RE-IMPLEMENTED HERE and the sum is checked against what it reports
+    // ON THIS TREE. The row now holds on any tree, and it says what it always meant: the repair reclassified
+    // records, it did not drop any. Measured at the merge -- old rule 52, split 35 + 17 = 52.
+    const relOf = (f) => f.replace(/\\/g, "/").split("/WebGLEngine/").pop();
+    const oldRule = live.records.filter((r) => r.guardians.length &&
+        !r.guardians.map(relOf).includes(relOf(r.file).replace(/\.mjs$/, "-selfcheck.mjs"))).length;
+
+    // *** AND THE MERGE BROUGHT A THIRD MECHANICAL SPECIES THIS LINE HAD NO EXAMPLE OF. *** Eight of the
+    // siblingWrong records LIVE INSIDE A GATE FILE -- tools/ship/timingKind-selfcheck.mjs holds
+    // WRONG_QUANTITY_V4579 -- so the sibling the rule looks for is `X-selfcheck-selfcheck.mjs`, which cannot
+    // exist and is not wanted. That is not "no gate named for this module": the gate IS the module. It is
+    // reported here and NOT yet split out, because the round that splits it should be the round that measures
+    // it, and this one is a merge.
+    const inGate = live.records.filter((r) => r.guardians.length && !r.siblingNamesIt &&
+                                              /-selfcheck\.mjs$/.test(relOf(r.file)));
     say(`live: ${live.siblingWrong} records named by some gate but not by one named for their module, ` +
-           `and ${live.siblingElsewhere} whose own gate lives in another directory (45 and 0 before this ` +
-           "round). The 28 are overwhelmingly records in files that hold SEVERAL SUBJECTS -- camera/camera.js " +
-           "holds seven, each guarded by its own topic gate -- so a camera-selfcheck.mjs neither exists nor " +
-           "should. v4487 settled the principle: a sibling file is not the criterion, the import graph is.");
+           `and ${live.siblingElsewhere} whose own gate lives in another directory (45 and 0 before v4563, ` +
+           `${oldRule} under the old rule on this merged tree). They are overwhelmingly records in files that ` +
+           "hold SEVERAL SUBJECTS -- camera/camera.js holds seven, each guarded by its own topic gate -- so a " +
+           "camera-selfcheck.mjs neither exists nor should. v4487 settled the principle: a sibling file is not " +
+           `the criterion, the import graph is. A THIRD SPECIES ARRIVED WITH THE MERGE: ${inGate.length} of them live ` +
+           `inside a gate file (${inGate.slice(0, 3).map((r) => r.name).join(", ")}...), where the sibling can ` +
+           "only ever be X-selfcheck-selfcheck.mjs.");
     ok("!! the split is REPORTED and only a ceiling is asserted, because it measures layout and not debt",
-       live.siblingWrong < 45 && live.siblingElsewhere > 0 &&
-       live.siblingWrong + live.siblingElsewhere === 45,
-       `${live.siblingWrong} + ${live.siblingElsewhere} = 45, which is exactly what the old rule reported as ` +
-       "one number. A COUNT THAT FOLDS A LAYOUT CONVENTION INTO A DEFECT COUNT IS A COUNT NOBODY CAN ACT ON.");
+       live.siblingWrong < oldRule && live.siblingElsewhere > 0 &&
+       live.siblingWrong + live.siblingElsewhere === oldRule,
+       `${live.siblingWrong} + ${live.siblingElsewhere} = ${oldRule}, which is exactly what the old rule reports ` +
+       "on this tree -- DERIVED here rather than frozen, so the identity survives a round that adds records. " +
+       "A COUNT THAT FOLDS A LAYOUT CONVENTION INTO A DEFECT COUNT IS A COUNT NOBODY CAN ACT ON.");
 }
 {
     const c = run(["lonely"]);

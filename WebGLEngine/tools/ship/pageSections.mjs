@@ -328,7 +328,12 @@ export const SECTIONS = [
               "aquarelle.html", "camera-effects.html", "doom-fire.html", "mesh-line.html",
               "primitive-paint.html", "proc-brush.html",
               // and v4313's shader page, which is a render pass over a Krbn drawing
-              "krbn-lyapunov.html"] },
+              "krbn-lyapunov.html",
+              // FSR joins on this drawer's own stated criterion -- "render/* or fx/* by import" -- and it imports
+              // four: render/jitter, render/temporalResolve, render/temporalAccumulate, fx/fsr/fsr. It is NOT in
+              // the WebGPU drawer beside anime4k because it has no adapter path: it is CPU arithmetic end to end,
+              // and that drawer is at 15 of 15 in any case. 14 of 15 here.
+              "fsr.html"] },
     // v3252 -- amplified-diff joins the render drawer and krbn-compare moves to Arriving: TEN IS THE LIMIT and
     // a comparison tool belongs beside the things it compares. krbn-compare is a SUBJECT comparison; this is the
     // instrument, and Keith can swap them back in one line if that reads wrong on the rig.

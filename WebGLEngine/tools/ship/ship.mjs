@@ -80,6 +80,20 @@ function stage(name, fn) {
 const RUN_TIMEOUT_MS = Number(arg("--step-timeout", "900")) * 1000;
 const run = (cmd, args, opts = {}) => execFileSync(cmd, args, { encoding: "utf8", timeout: RUN_TIMEOUT_MS, ...opts });
 
+// *** v4583 -- DECLARED, AND THE CAP IS PER STEP RATHER THAN PER GATE. ***
+//
+// tools/ship/runnerBudget-selfcheck.mjs requires a runner that budgets a gate either to read gateBudget.MEASURED or
+// to say why not. This ritual was outside that check's population until v4583 -- its scan wanted process.execPath as
+// the literal first argument of a spawn call, and `run` passes it through a helper, so the cap above was never asked
+// for an account of itself even though v3936 records it killing a sweep at 923 seconds.
+export const budgetIsOwn =
+    "RUN_TIMEOUT_MS is a PER-STEP ritual cap, not a per-gate budget, so gateBudget.MEASURED cannot produce it: this " +
+    "runs verify.mjs, packRelease.mjs and the rest as whole steps, and a step contains hundreds of gates whose own " +
+    "budgets that table already sets. It exists so a hung step cannot leave a half-written release, and v3936 " +
+    "records the cost of getting it wrong -- a 923-second ritual against this 900-second cap reported an EMPTY " +
+    "verdict, because a killed child's buffered stdout never flushes. Overridable with --step-timeout for that " +
+    "reason: a cap that cannot be raised on a slower box turns a slow machine into a red tree.";
+
 // Classify what actually happened, because "it threw" covers three different events that deserve three different
 // sentences. NEVER RETURNS AN EMPTY REASON: a refusal that names nothing is indistinguishable from a bug in the
 // refusing code, which is precisely how the v3936 ship read.

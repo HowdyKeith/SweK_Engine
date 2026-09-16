@@ -134,6 +134,62 @@ export function readIndex() {
     try { return JSON.parse(fs.readFileSync(OUT, "utf8")); } catch { return null; }
 }
 
+/**
+ * WHAT CHANGED BETWEEN TWO INDEXES, KEYED BY PATH -- because the checks that compare them could only say
+ * WHETHER, and one of them could not even say that.
+ *
+ * *** v4587 -- THE INDEX WAS STALE FOR THREE ROUNDS AND THE PRE-FLIGHT SAID "index agrees" EVERY TIME. ***
+ * recordDrift's knowledge-index check was `K.gates.length !== onDisk` -- A POPULATION COUNT WEARING THE NAME OF
+ * A CONTENT CHECK. Adding or removing a gate moves the count and it catches that; EDITING A GATE'S HEADER does
+ * not, and the header text is the entire reason this index exists ("one searchable answer to does this already
+ * exist?"). v4585 added redAction-selfcheck with a placeholder runtime line, filled in the real measurement the
+ * same round, and the index kept the placeholder through v4585, v4586 and two commits of v4586's follow-up.
+ * instruments-selfcheck DID compare bytes and was red the whole time -- read below for how that red read.
+ *
+ * *** AND KEYING THIS BY `id` IS THE TRAP THAT MANUFACTURED A PHANTOM FINDING. *** `id` is path.basename, and 25
+ * of them collide across 50 files (physics/X vs tools/roundhouse/X, eighteen times; plus downloadScan, fleet,
+ * frontDoor, fresnel, volume, mpmDevice). A throwaway comparison keyed on `id` built a Map that kept one entry
+ * per basename, reported 26 entries "changed" between two identical builds, and that non-finding was carried
+ * into a round summary as the next round's scope. THE REAL DRIFT WAS ONE ENTRY. Nothing in the tree keys on
+ * `id` -- instruments.html renders it beside `path` and filters on both -- so the uniqueness was never owed;
+ * what was owed was not assuming it. `path` is unique: 1643 entries, 1643 paths.
+ *
+ * Returns { same, added, removed, changed, summary } where changed names the fields that differ, so a red can
+ * say WHAT moved instead of how many things exist.
+ */
+export function diffIndex(a, b) {
+    const byPath = (idx) => new Map(((idx && idx.gates) || []).map((g) => [g.path, g]));
+    const A = byPath(a), B = byPath(b);
+    const added = [...B.keys()].filter((k) => !A.has(k)).sort();
+    const removed = [...A.keys()].filter((k) => !B.has(k)).sort();
+    const changed = [];
+    for (const [k, gb] of B) {
+        const ga = A.get(k);
+        if (!ga) continue;
+        const fields = ["kind", "id", "path", "text"].filter((f) => ga[f] !== gb[f]);
+        if (fields.length) changed.push({ path: k, fields, was: ga.text, now: gb.text });
+    }
+    // The non-gate sections are counted rather than diffed: claims come from one parsed page and findings from a
+    // comment scan, and neither has a stable per-entry key to diff ON. Saying so beats implying a comparison
+    // that is not being made.
+    const others = ["claims", "findings"].map((k) => {
+        const na = ((a && a[k]) || []).length, nb = ((b && b[k]) || []).length;
+        return na === nb ? null : `${k} ${na} -> ${nb}`;
+    }).filter(Boolean);
+    const same = !added.length && !removed.length && !changed.length && !others.length &&
+                 JSON.stringify(a) === JSON.stringify(b);
+    const bits = [];
+    if (added.length) bits.push(`${added.length} added (${added.slice(0, 3).join(", ")}${added.length > 3 ? ", ..." : ""})`);
+    if (removed.length) bits.push(`${removed.length} removed (${removed.slice(0, 3).join(", ")}${removed.length > 3 ? ", ..." : ""})`);
+    if (changed.length) bits.push(`${changed.length} changed: ` +
+        changed.slice(0, 3).map((c) => `${c.path} [${c.fields.join("+")}]`).join(", ") + (changed.length > 3 ? ", ..." : ""));
+    if (others.length) bits.push(others.join("; "));
+    // BYTE-IDENTICAL IS THE CLAIM, so a difference this function cannot name is still a difference: say that
+    // rather than reporting "same" for a file whose bytes disagree.
+    if (!bits.length && !same) bits.push("byte difference outside the gate list, claim count and finding count");
+    return { same, added, removed, changed, summary: same ? "byte-identical" : bits.join("; ") };
+}
+
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     const idx = writeIndex();
     console.log("[knowledge] " + idx.counts.gates + " gates, " + idx.counts.claims + " claims -> knowledge-index.json (" +

@@ -243,6 +243,70 @@ sec("6. WHAT IS NOT SOLVED IS SAID IN THE MODULE, NOT ONLY HERE");
 //
 // A found the diagnosis working, B found that the worst version of this bug kills the instrument, and C found
 // a brittle assertion in the gate itself. None went 0 RED.
+// ================================================================================================
+// *** v4573 -- THE TEXTURE PATH'S ARITHMETIC, WHICH THIS GATE HAS SHIPPED AND NEVER NAMED. ***
+//
+// definitionGates' census found these four exports unmentioned by any gate that imports this module:
+// BYTES_PER_TEXEL, paddedBytesPerRow, halfToDouble and ICD_ROOT. They are not obscure -- they are the
+// arithmetic that turns a read-back texture into numbers, and v4572's closing listed the texture path as the
+// thing it could not check. A wrong bytes-per-row shears the image by a few texels per row, which reads as a
+// shader defect; a wrong half decode reads as a backend divergence. Both are decided here, in eight lines of
+// integer and bit arithmetic that nothing has ever exercised.
+sec("9. THE TEXTURE READ-BACK ARITHMETIC");
+{
+    // BYTES_PER_TEXEL is four channels times the channel width, and saying it that way is the check: the
+    // table is derivable, so a typo in it disagrees with its own definition rather than merely looking odd.
+    ok(HG.BYTES_PER_TEXEL.rgba8unorm === 4 * 1 && HG.BYTES_PER_TEXEL.rgba16float === 4 * 2,
+        "BYTES_PER_TEXEL is four channels times the channel width, not a remembered pair of numbers",
+        `rgba8unorm ${HG.BYTES_PER_TEXEL.rgba8unorm} = 4x1, rgba16float ${HG.BYTES_PER_TEXEL.rgba16float} = 4x2`);
+    // WebGPU requires every copyTextureToBuffer row to start on a 256-byte boundary. The padding is where a
+    // reader shears an image, so the key is the alignment itself plus the smallest row that already meets it.
+    const P = (n, f) => HG.paddedBytesPerRow(n, f);
+    ok([[64, "rgba8unorm", 256], [40, "rgba8unorm", 256], [40, "rgba16float", 512],
+        [32, "rgba16float", 256], [1, "rgba8unorm", 256]].every(([n, f, want]) => P(n, f) === want),
+        "paddedBytesPerRow rounds UP to the 256-byte boundary copyTextureToBuffer requires",
+        `40x rgba8unorm: 160 raw -> ${P(40, "rgba8unorm")}; 40x rgba16float: 320 raw -> ${P(40, "rgba16float")}`);
+    ok([[64, "rgba8unorm"], [32, "rgba16float"]].every(([n, f]) => P(n, f) === n * HG.BYTES_PER_TEXEL[f]),
+        "  and a row that is ALREADY aligned is returned unpadded, so the function is not simply a constant",
+        `64x rgba8unorm and 32x rgba16float are both exactly 256`);
+    // The unknown-format fallback is 4 bytes, and it is invisible at any n where 4 and 8 pad to the same
+    // multiple -- 64 is exactly that n, which is why the distinction is taken at 40.
+    ok(P(40, "nope") === P(40, "rgba8unorm") && P(40, "nope") !== P(40, "rgba16float"),
+        "  and an unknown format falls back to four bytes a texel, checked at a width where four and eight DIFFER",
+        `40: unknown ${P(40, "nope")}, rgba8unorm ${P(40, "rgba8unorm")}, rgba16float ${P(40, "rgba16float")}`);
+    // *** THE HALF DECODE, KEYED ON ITS OWN MANTISSA RATHER THAN ON A PICKED TOLERANCE. *** rgba16float has
+    // ten mantissa bits, so a round trip through it can lose at most one part in 2^11. MEASURED over 2000
+    // values: 4.685e-4 against that bound of 4.883e-4 -- under it, and close enough to it that a decode
+    // reading the exponent one bit wrong could not hide there.
+    let worst = 0, at = 0;
+    for (let i = 0; i < 2000; i++) {
+        const v = (i - 1000) / 137;
+        if (v === 0) continue;
+        const e = Math.abs(HG.halfToDouble(HG.doubleToHalf(v)) - v) / Math.abs(v);
+        if (e > worst) { worst = e; at = v; }
+    }
+    ok(worst < Math.pow(2, -11),
+        "*** halfToDouble inverts doubleToHalf to within the format's OWN mantissa, 2^-11, over 2000 values ***",
+        `worst ${worst.toExponential(3)} at ${at.toFixed(4)}, bound ${Math.pow(2, -11).toExponential(3)}`);
+    ok(HG.halfToDouble(HG.doubleToHalf(0.5)) === 0.5 && HG.halfToDouble(HG.doubleToHalf(-0.5)) === -0.5,
+        "  and it is EXACT for a value the format represents, sign included -- so the bound above is the format's and not the decoder's slack",
+        "0.5 and -0.5 round trip bit for bit");
+    // The three branches an exponent field can take. A decoder that dropped the denormal case would pass
+    // every row above, because the sweep never reaches 2^-14.
+    ok(HG.halfToDouble(1) === Math.pow(2, -14) * (1 / 1024) &&
+       HG.halfToDouble(0x7c00) === Infinity && Number.isNaN(HG.halfToDouble(0x7e00)),
+        "  and all three exponent branches are reached: the denormal at e=0, infinity at e=31 m=0, NaN at e=31 m!=0",
+        `denormal ${HG.halfToDouble(1).toExponential(3)}, ${HG.halfToDouble(0x7c00)}, NaN ${Number.isNaN(HG.halfToDouble(0x7e00))}`);
+    // ICD_ROOT decides where the Vulkan ICD is looked for. It reads an env var with a fallback, and the
+    // fallback is the container's real path -- so the check is the PRECEDENCE, which is the part that breaks.
+    ok(HG.ICD_ROOT === (process.env.PLAYWRIGHT_BROWSERS_PATH || "/opt/pw-browsers"),
+        "ICD_ROOT takes PLAYWRIGHT_BROWSERS_PATH when the environment sets it and falls back to the image's path",
+        `${HG.ICD_ROOT}${process.env.PLAYWRIGHT_BROWSERS_PATH ? " (from the environment)" : " (the fallback)"}`);
+    ok(HG.ICD_LEAF === path.join("chrome-linux", "vk_swiftshader_icd.json"),
+        "  and ICD_LEAF is the path under it that findVulkanIcds joins, named here beside the root it is joined to",
+        HG.ICD_LEAF);
+}
+
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: ANY GPU WORTH THE NAME. Both backends land on the same software rasteriser, so " +
     "nothing above says how Dawn behaves on real hardware, where the driver -- not the harness -- decides the " +

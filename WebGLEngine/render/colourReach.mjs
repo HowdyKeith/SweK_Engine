@@ -204,11 +204,22 @@ export const HOT_UNREGISTERED = Object.freeze([
  * v4523 (Racing city 0): 85 -> 86. The arrival is world/kenneyKit.mjs, whose kitMesh() restates the same [1, 1, 1, 1] beside
  * the colours it bakes from Kenney's colormap (every colour it draws is the kit's own texel, read at load time, not a literal);
  * the kit draws through litSphere's lit pipeline in quat mode, nothing additively; the overlap stays 0.
+ * v4571: 86 -> 87. The arrival is fx/fsr/fsr.js (added at ff463a60), and it is a FALSE POSITIVE of the literal-colour
+ * predicate, which this file's own comment already calls crude. What it matched is EASU's tap accumulator,
+ * `const a = { r: 0, g: 0, b: 0, w: 0 }` -- four running sums, not a colour anybody chose; the `w` beside them is the
+ * weight total, which is the tell. The predicate reads a SHAPE (r:, g:, b: adjacent) and cannot see that. THE PREDICATE IS
+ * NOT CHANGED HERE: narrowing it moves this census and the hot one with it, and that is a round of its own. The count is
+ * re-taken because it is a true count of what the detector detects, and the detector is described accurately.
+ * *** AND IT WAS RED IN THE TREE FOR TWO ROUNDS BEFORE ANYONE LOOKED. *** ff463a60 landed on 2026-09-09; v4569 and v4570
+ * both shipped after it with this gate red, because those rounds' verify sweeps ran the arc they were working in rather
+ * than the directory. recordDrift's six pre-flight checks do not cover this record either -- they know about gates,
+ * modules exporting reportLines, and .mjs file counts, and a per-module census like this one is outside all six. That is
+ * the seventh obligation, and nothing names it.
  */
 export const MEASURED_AT_V4424 = Object.freeze({
     namedRamps: 5,
     drawSiteFiles: 13,
-    literalColourFiles: 86,
+    literalColourFiles: 87,   // v4571: fx/fsr/fsr.js, a false positive of a crude predicate -- see the header
     overlapDrawAndLiteral: 0,
     hotUnregistered: 24,   // v4505: ascii-shape.html arrived (see HOT_UNREGISTERED)   // v4500: slug-fire.html arrived; v4501: slug-morph.html's melt mode; v4502: slug-ticker.html's napalm mode (see HOT_UNREGISTERED)
     // The three Keith named, and what the old detector saw of them.

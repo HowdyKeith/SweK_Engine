@@ -221,6 +221,81 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // arrival. The round's third new file is tools/ship/recordReach.mjs, a module rather than a gate, and it
     // moves none of these -- which is the distinction these nine rows exist to make.
     // v4550 -- RE-TAKEN: one gate (glbConformance) joined, the same four rows by one, FIFTEENTH arrival.
+    // v4551 -- RE-TAKEN, AND FIVE ARRIVALS LATE. *** THE RECORD WAS RED FOR FIVE CONSECUTIVE ROUNDS AND
+    // NOTHING RAN IT. *** The FSR arc (fsr, motionVectors, jitter, temporalAccumulate, temporalResolve) added
+    // one gate per round; each round ran gateSweep, instruments and sweepCoverage and called that the ritual,
+    // and this record is not in that set. So the drift did not announce itself once -- it accumulated to
+    // gates 1605 -> 1610 and was found only because v4551 went looking. That is the SAME fault v4548 recorded
+    // under the title "the ship ritual does not check half its own records"; finding it once did not stop it
+    // recurring, because the repair there was to re-take the records and not to make the ritual reach them.
+    // The four rows moved by FIVE, one per arrival, and the other five rows did not move at all -- across five
+    // gates in five different subsystems (a CPU upscaler, a matrix reprojection, a Halton sequence, a history
+    // blend, a resampling kernel), TWENTIETH arrival running with no gate written in a different shape.
+    // v4552 -- RE-TAKEN: one gate (temporalReject) joined, the same four rows by one, TWENTY-FIRST arrival --
+    // and the first re-taken because a CHECK SAID SO rather than because a round went looking. v4551 added the
+    // sixth row to recordDrift's pre-flight after this record drifted five rounds unnoticed; this round ran it
+    // before the verify and it named all four obligations at once. The other five rows have still never moved.
+    // v4553 -- RE-TAKEN: one gate (temporalLock) joined, the same four rows by one, TWENTY-SECOND arrival,
+    // and the second round running that the pre-flight prompted rather than a search. The other five rows have
+    // still never moved.
+    // v4554 -- RE-TAKEN: one gate (temporalDepthLock) joined, the same four rows by one, TWENTY-THIRD
+    // arrival, third round running that the pre-flight prompted. The other five rows have still never moved.
+    // v4555 -- RE-TAKEN: one gate (temporalCoherentLock) joined, the same four rows by one, TWENTY-FOURTH
+    // arrival, fourth round running that the pre-flight prompted. The other five rows have still never moved.
+    // v4556 -- RE-TAKEN: one gate (temporalRidgePhase) joined, the same four rows by one, TWENTY-FIFTH
+    // arrival, fifth round running that the pre-flight prompted. The other five rows have still never moved.
+    // v4557 -- RE-TAKEN: one gate (temporalRidgeMargin) joined, the same four rows by one, TWENTY-SIXTH
+    // arrival, sixth round running that the pre-flight prompted. The other five rows have still never moved.
+    // v4558 -- RE-TAKEN: one gate (temporalRingFloor) joined, the same four rows by one, TWENTY-SEVENTH
+    // arrival, seventh round running that the pre-flight prompted. The other five rows have still never moved.
+    // v4559 -- RE-TAKEN: one gate (temporalRingContent) joined, the same four rows by one, TWENTY-EIGHTH
+    // arrival, eighth round running that the pre-flight prompted. The other five rows have still never moved.
+    // v4560 -- RE-TAKEN: one gate (ringFloor) joined, the same four rows by one, TWENTY-NINTH arrival, ninth
+    // round running that the pre-flight prompted. The other five rows have still never moved.
+    // v4561 -- RE-TAKEN: one gate (ringFloorCost) joined, the same four rows by one, THIRTIETH arrival, tenth
+    // round running that the pre-flight prompted. The other five rows have still never moved.
+    // v4562 -- RE-TAKEN: one gate (ringFloorPerspective) joined, the same four rows by one, THIRTY-FIRST
+    // arrival, eleventh round running that the pre-flight prompted. The other five rows have never moved.
+    // v4563 -- RE-TAKEN: one gate (ringFloorMargin) joined, the same four rows by one, THIRTY-SECOND
+    // arrival, twelfth round running that the pre-flight prompted. The other five rows have never moved.
+    // v4564 -- RE-TAKEN: one gate (ringFloorControl) joined, the same four rows by one, THIRTY-THIRD
+    // arrival, thirteenth round running that the pre-flight prompted. The other five rows have never moved.
+    // v4565 -- RE-TAKEN: one gate (ringFloorStep) joined, the same four rows by one, THIRTY-FOURTH arrival,
+    // fourteenth round running that the pre-flight prompted. The other five rows have never moved.
+    // v4566 -- RE-TAKEN: one gate (ringFloorLight) joined, the same four rows by one, THIRTY-FIFTH arrival,
+    // fifteenth round running that the pre-flight prompted. The other five rows have never moved.
+    // v4567 -- RE-TAKEN: one gate (ringFloorYaw) joined, the same four rows by one, THIRTY-SIXTH arrival,
+    // sixteenth round running that the pre-flight prompted. The other five rows have never moved.
+    // v4568 -- RE-TAKEN: one gate (ringFloorStat) joined, the same four rows by one, THIRTY-SEVENTH arrival,
+    // seventeenth round running that the pre-flight prompted. The other five rows have never moved.
+    // v4569 -- RE-TAKEN: one gate (ringFloorDevice) joined, the same four rows by one, THIRTY-EIGHTH arrival,
+    // eighteenth round running that the pre-flight prompted. The other five rows have never moved.
+    // v4570 -- RE-TAKEN: one gate (kernelAudit) joined, the same four rows by one, THIRTY-NINTH arrival,
+    // nineteenth round running that the pre-flight prompted. The other five rows have never moved.
+    // v4580 -- RE-TAKEN: one gate (timingProvenance) joined, the same four rows by one, FORTIETH arrival,
+    // twentieth round running that the pre-flight prompted. The other five rows have never moved.
+    // v4581 -- RE-TAKEN: one gate (budgetProvenance) joined, the same four rows by one, FORTY-FIRST arrival,
+    // twenty-first round running that the pre-flight prompted. The other five rows have never moved.
+    // v4582 -- RE-TAKEN: one gate (skipReading) joined, the same four rows by one, FORTY-SECOND arrival,
+    // twenty-second round running that the pre-flight prompted. The other five rows have never moved.
+    // v4583 -- RE-TAKEN: one gate (runnerReach) joined, the same four rows by one, FORTY-THIRD arrival,
+    // twenty-third round running that the pre-flight prompted. The other five rows have never moved.
+    // v4584 -- RE-TAKEN: one gate (walkerParity) joined, the same four rows by one, FORTY-FOURTH arrival,
+    // twenty-fourth round running that the pre-flight prompted. The other five rows have never moved.
+    // v4585 -- RE-TAKEN: one gate (redAction) joined, the same four rows by one, FORTY-FIFTH arrival,
+    // twenty-fifth round running that the pre-flight prompted. The other five rows have never moved.
+    // v4588 -- RE-TAKEN: one gate (fsrGPU) joined, and FIVE rows moved rather than four, because nameFirst is
+    // the fifth. *** THE PRE-FLIGHT PROMPTED THREE OF THEM AND THE GATE FOUND THE FOURTH. *** recordDrift's
+    // assertionShape row compares `gates` and `definesOk` and reports "1644 vs 1644, copies 1615 vs 1615"; this
+    // file's own gate compares ALL NINE and went red with "DRIFTED: nameFirst 1515 -> 1516". The label on that
+    // row already says "not the four this compared", so the narrowness is recorded rather than discovered -- but
+    // it is the same shape v4587 found in the knowledge-index check one round earlier: a cheap pre-view that
+    // answers a smaller question than the gate it previews, read as though it answered the same one.
+    // v4589 -- RE-TAKEN: one gate (kernelReach) joined, the same five rows by one, and the pre-flight named three
+    // while the gate names all nine, the same split recorded a round ago.
+    // v4590 -- RE-TAKEN: one gate (temporalGPU) joined, the same five rows by one.
+    // v4592 -- RE-TAKEN: one gate (motionVectorsGPU) joined, the same five rows by one again.
+    // v4593 -- RE-TAKEN: one gate (temporalRejectGPU) joined. Five rounds running, five rows by one each time.
     // v4552 -- RE-TAKEN: one gate (detourScale) joined, the same four rows by one, SIXTEENTH arrival.
     // v4554 -- RE-TAKEN: one gate (surfaceProbe) joined, the same four rows by one, SEVENTEENTH arrival.
     // v4555 -- RE-TAKEN: one gate (chunk) joined, the same four rows by one, EIGHTEENTH arrival.
@@ -321,8 +396,12 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // 1612, nameFirst 1513.
     // v4554 -- RE-TAKEN for tools/ship/kaijuGround-selfcheck.mjs: 1641 -> 1642, usesOk 1621, definesOk
     // 1613, nameFirst 1514.
-    gates: 1642, usesOk: 1621, definesOk: 1613, importsOk: 0,
-    distinctDefinitions: 40, nameFirst: 1514, condFirst: 91, unknownSignature: 16,
+    // *** BOTH LINES RE-TOOK THIS TABLE AGAINST A TREE THE OTHER COULD NOT SEE, AND THE READINGS BELOW ARE
+    // NEITHER OF THEIRS. *** The sets overlap on everything predating the split, so the two are not summed;
+    // they are RE-DERIVED by running the census over the merged tree. Both note chains are kept, because a
+    // chain that loses a round stops being a history of how the number moved.
+    gates: 1685, usesOk: 1664, definesOk: 1656, importsOk: 0,
+    distinctDefinitions: 40, nameFirst: 1557, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

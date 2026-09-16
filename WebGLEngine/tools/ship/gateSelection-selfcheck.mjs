@@ -69,6 +69,25 @@ const CHANGED = ["physics/statmech/ising.js"];
        s.reachable.length > 20 && s.reachable.includes("physics/statmech/ising-selfcheck.mjs") &&
        s.reachable.includes("physics/consistency-selfcheck.mjs"),
        s.reachable.length + " gates reachable from " + CHANGED[0] + " (including the consistency board, which imports it two levels down)");
+    // *** BOTH LINES REWROTE THIS ROW IN THE SAME WINDOW, EACH HAVING FOUND IT WRONG, AND THEY ARRIVED AT
+    // DIFFERENT INVARIANTS. THE MERGE KEEPS BOTH -- neither is the other in different words. ***
+    //
+    // The band expression is gone either way, and both sides removed it for the same reason: it asserted a
+    // different claim depending on the size of the tree. What replaced it differs. v4571 (this line) asserts
+    // the PARTITION -- the plan is ordered, reachable before unreachable -- which is a property of the
+    // schedule. v4586 (the other line) asserts NON-DISPLACEMENT -- admitting unreachable gates does not change
+    // which reachable gates are selected -- which is a property of the outcome, and it is DRIVEN by running
+    // the selector a second time with includeUnreachable:false rather than argued from the sort.
+    //
+    // A partitioned plan could still displace: nothing in the ordering alone says the greedy fill did not
+    // spend budget a reachable gate wanted. A non-displaced outcome could still be mis-ordered: the same set
+    // could be selected with the tail interleaved, and a truncated run would then lose the change's coverage.
+    // Each row fails a case the other passes, so the merge adds the two moves rather than picking one -- the
+    // rule this tree already applies to its census tables, applied here to an assertion.
+    //
+    // Both sides measured the SAME tree and agree on its numbers: the cheapest missed reachable gate costs
+    // 12,518 ms, and the unreachable tail is cheap residue. That agreement is why both readings can stand.
+
     // *** THE BAND EXPRESSION CHANGED WHAT THIS ROW ASSERTED AS THE TREE GREW, WHICH IS THE FAULT THE v3941
     // NOTE TWO SECTIONS DOWN ALREADY DIAGNOSED IN ITS NEIGHBOUR. *** It read:
     //
@@ -125,6 +144,42 @@ const CHANGED = ["physics/statmech/ising.js"];
        Math.round(onUnreachable) + " ms spent on " + tail.length + " gate(s) the change cannot reach = " +
        Math.round(reclaimable) + " ms -- and it still would not fit. A dropped gate that WOULD have fitted is a " +
        "scheduling defect; one that would not is arithmetic, and only the first is this row's business");
+
+    // *** v4586 -- THIS ROW WAS A FALSE ALARM, AND v4585 GAVE IT A CAUSAL STORY IT HAD NOT MEASURED. ***
+    //
+    // It asserted that the first N entries of `selected` are all reachable. Once the budget truncates that is not a
+    // property the selector ever promised: `ranked` puts every reachable gate ahead of every unreachable one, the
+    // fill is greedy, and CHEAP UNREACHABLE GATES FIT IN THE RESIDUE the expensive reachable ones leave behind. At
+    // 180 s that residue held 22 gates costing 1,079 ms in total, while the cheapest reachable gate the plan skipped
+    // costs 12,518 ms -- so deleting all 22 frees nowhere near enough to admit even one of them.
+    //
+    // v4585 rewrote this row's MESSAGE to say "so a truncated run can miss the change". A truncated run does miss
+    // reachable gates -- 124 reachable, 101 selected at 180 s -- but NOT BECAUSE OF THE 22, and that sentence was a
+    // cause asserted without being measured, written one round after a round about exactly that.
+    //
+    // *** THE REAL INVARIANT IS STRUCTURAL AND IS WHAT IS ASSERTED NOW: admitting unreachable gates cannot change
+    // which reachable gates are selected. *** The sort guarantees it -- at the moment any reachable gate is
+    // considered, `spent` contains no unreachable gate's cost, because none has been reached yet. Driven here
+    // against the selector run both ways, and measured across five budgets at v4586: identical every time.
+    //
+    // SABOTAGED before it was believed, because the row it replaces was a false alarm and a row that cannot fail
+    // would be a second one. Dropping `band(a) - band(b)` from the ranking in gateSelection.mjs -- the one line
+    // that puts reachable gates first -- takes this row RED and names the size: "51 reachable selected with
+    // unreachable admitted against 101 without". THREE OTHER ROWS IN THIS FILE WENT RED WITH IT, which is the
+    // reason to score a mutation against the whole population rather than the row it was aimed at.
+    const noUnreachable = selectGates({ changed: CHANGED, budgetMs: 180000, includeUnreachable: false });
+    const reachSelected = s.selected.filter((g) => s.reachable.includes(g));
+    const identical = reachSelected.length === noUnreachable.selected.length &&
+                      reachSelected.every((g, i) => g === noUnreachable.selected[i]);
+    const riders = s.selected.filter((g) => !s.reachable.includes(g));
+    const ridersMs = riders.reduce((n, g) => n + (s.costs[g] || 0), 0);
+    ok("!! admitting unreachable gates cannot displace a reachable one (the truncated run still covers the change)",
+       identical,
+       identical
+         ? `${reachSelected.length} reachable gates selected, the same set in the same order with unreachable ones ` +
+           `excluded entirely. The ${riders.length} that rode along cost ${ridersMs} ms of residue between them.`
+         : `DISPLACED: ${reachSelected.length} reachable selected with unreachable admitted against ` +
+           `${noUnreachable.selected.length} without -- the greedy fill is spending budget the change needed.`);
 }
 
 // ---- 2. THE PATH-CONVENTION REGRESSION, WHICH THIS FILE EXISTS TO PIN ------------------------------------------------

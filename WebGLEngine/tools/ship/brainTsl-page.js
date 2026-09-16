@@ -36,7 +36,7 @@ async (a) => {
     for (const c of a.cases) {
       const g = B.makeMlpLayerTsl(T, { batch: c.batch, nIn: c.nIn, nOut: c.nOut, act: c.act });
       await renderer.computeAsync(g.node);
-      const emitted = renderer._nodes.getForCompute(g.node).computeShader;
+      const emitted = S.emitCompute(renderer, g.node).wgsl;
       const gen = S.transplantCompute(emitted, S.computeShell(B.MLP_SHELL));
       out.gen.push(await runRaw(gen.wgsl, "main", c, false));
       out.shipped.push(await runRaw(SHIPPED, "k_layer", c, true));

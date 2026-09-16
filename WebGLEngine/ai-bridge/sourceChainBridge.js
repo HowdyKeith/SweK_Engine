@@ -118,6 +118,27 @@ function _versionInTree(root) {
     } catch { return ""; }
 }
 
+// *** v4583 -- THIS RUNS THE WHOLE GATE SUITE WITH NO TIME LIMIT AT ALL, AND THAT IS DELIBERATE NOW. ***
+//
+// _spawnIn spawns tools/ship/verify.mjs inside a freshly cloned tree -- every gate in that tree, under this
+// process. It carries no timeout and never did. tools/ship/runnerBudget-selfcheck.mjs admitted this file into its
+// candidate set only because of an unrelated `timeout: 1500` on an HTTP health probe, then excluded it again for
+// not containing the string "-selfcheck": it spawns the SUITE RUNNER, one level of indirection past that proxy.
+// So the absence was never a decision anybody made; it was invisible from both sides.
+//
+// IT STAYS ABSENT, AND THE REASON IS THE ONE ship.mjs GOT WRONG. A cap here would kill a verify mid-run, and a
+// killed child's buffered stdout never flushes -- ship.mjs's v3936 note records exactly that, a 923-second ritual
+// against a 900-second cap reporting "selfchecks said NO:" with nothing after the colon. This chain's whole job is
+// to say whether a FETCHED tree is green, on a machine nobody has characterised, where gateBudget.MEASURED's tail
+// sums to 266 minutes. A WRONG CAP HERE TURNS A SLOW CLONE INTO A RED VERDICT, which is the one outcome this
+// bridge must never invent. The operator can stop it; the code will not guess.
+const budgetIsOwn =
+    "no time limit, on purpose. This spawns tools/ship/verify.mjs over a freshly cloned tree -- every gate in it " +
+    "-- on a machine whose speed nobody has measured, where gateBudget.MEASURED's tail alone sums to 266 minutes. " +
+    "A cap would kill the verify mid-run and report an unreadable verdict (ship.mjs's v3936 note: a killed child's " +
+    "buffered stdout never flushes), turning a slow clone into a RED tree. That is the exact failure this chain " +
+    "exists to prevent, so the decision is to run to completion and let the operator stop it.";
+
 /** Spawn a node script inside a given tree's WebGLEngine and resolve with its exit code. */
 function _spawnIn(cwd, args, label) {
     return new Promise((resolve) => {
@@ -458,4 +479,4 @@ function running() { return R.phase === "cloning" || R.phase === "verifying" || 
 function busyWhat() { return running() ? "the source chain (" + R.phase + ")" : null; }
 
 module.exports = { status, start, publish, launch, canPublish, owns, handle, running, busyWhat, PREFIX, ENGINE_ROOT,
-    _launchGuard, _freePort, _waitHealthy };
+    _launchGuard, _freePort, _waitHealthy, budgetIsOwn };

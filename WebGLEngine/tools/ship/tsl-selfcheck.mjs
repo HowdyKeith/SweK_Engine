@@ -23,13 +23,24 @@ const ok = (label, cond, detail) => { if (!cond) fails++; console.log(`  ${cond 
 const report = (s) => console.log(`  ----  ${s}`);
 const V = path.join(ENG, "vendor/three-webgpu");
 
-console.log("\n1. THE VENDORED BUILD: three 0.178's WebGPU build and TSL, beside r160, with exactly one edit");
+let threeRev = null;   // v4542: read from the build in section 1, and section 2 holds the RUNNING module to it
+console.log("\n1. THE VENDORED BUILD: the vendored WebGPU build and TSL, beside r160, with exactly one edit");
 {
     const files = ["three.webgpu.js", "three.core.js", "three.tsl.js", "LICENSE", "README.md"];
     ok("vendor/three-webgpu carries the WebGPU build, its core, TSL, the MIT licence and a README", files.every((f) => fs.existsSync(path.join(V, f))), files.filter((f) => !fs.existsSync(path.join(V, f))).join(", ") || "all present");
     const webgpu = fs.readFileSync(path.join(V, "three.webgpu.js"), "utf8"), tsl = fs.readFileSync(path.join(V, "three.tsl.js"), "utf8"), readme = fs.readFileSync(path.join(V, "README.md"), "utf8");
     const rev = (webgpu.match(/REVISION = '(\d+)'/) || webgpu.match(/const REVISION = '(\d+)'/) || [null, null])[1] || (fs.readFileSync(path.join(V, "three.core.js"), "utf8").match(/REVISION = '(\d+)'/) || [])[1];
-    ok(`the build is r178 (the README names 0.178.0), not r160 -- the r160 module stays for main.js and every three.js page`, rev === "178" && /0\.178\.0/.test(readme) && fs.existsSync(path.join(ENG, "vendor/three/three.module.js")), `revision ${rev}`);
+    // v4542 -- THE REVISION WAS TYPED HERE IN TWO PLACES AND THE BUMP MADE BOTH WRONG. What this row is actually
+    // for is that the vendored BUILD, the README's heading and the tarball the README says it came from all name
+    // one revision; a number retyped beside them is a fourth claim nobody rechecks. So all three are read and held
+    // to each other -- which also catches a bump that edits the heading and leaves the tarball URL behind, a drift
+    // a typed constant could never have seen.
+    const readmeRev = (readme.match(/^#\s*three\.js\s+0\.(\d+)\.\d+/m) || [])[1];
+    const tarballRev = (readme.match(/three@0\.(\d+)\.\d+\.tgz|three-0\.(\d+)\.\d+\.tgz/) || []).slice(1).find(Boolean);
+    ok(`the vendored build, the README's heading and the tarball it names are ONE revision (r${rev}), beside r160 -- the r160 module stays for main.js and every three.js page`,
+       !!rev && readmeRev === rev && tarballRev === rev && fs.existsSync(path.join(ENG, "vendor/three/three.module.js")),
+       `build r${rev}, README heading 0.${readmeRev}.x, tarball 0.${tarballRev}.x`);
+    threeRev = rev;
     ok("*** the ONE edit: three.tsl.js imports './three.webgpu.js' instead of the bare 'three/webgpu', and the README says so ***", /from '\.\/three\.webgpu\.js'/.test(tsl) && !/from 'three\/webgpu'/.test(tsl) && /ONE EDIT/.test(readme));
     ok("  three.webgpu.js imports its core by relative path as shipped (no edit)", /from '\.\/three\.core\.js'/.test(webgpu));
     ok("  the licence is three.js's MIT", /MIT License/.test(fs.readFileSync(path.join(V, "LICENSE"), "utf8")) && /three\.js authors/.test(fs.readFileSync(path.join(V, "LICENSE"), "utf8")));
@@ -68,7 +79,11 @@ else {
                 const at = (x, y) => Array.from(px.slice((y * a.N + x) * 4, (y * a.N + x) * 4 + 4));
                 o.backend = renderer.backend.isWebGPUBackend ? "webgpu" : "webgl2"; o.row0 = at(0, 0); o.row0right = at(a.N - 1, 0); o.rowLast = at(0, a.N - 1); o.errs = errs.slice();
                 // CONTROL: three 0.178's WebGPU readback at a width whose row is not 256-byte aligned (32 px): the staging buffer is undersized
-                if (mode === "webgpu") { const rt2 = new THREE.RenderTarget(32, 32); renderer.setRenderTarget(rt2); await renderer.renderAsync(scene, cam); const p2 = await renderer.readRenderTargetPixelsAsync(rt2, 0, 0, 32, 32); o.at32 = { errs: errs.length - o.errs.length, alpha: p2[3] }; }
+                if (mode === "webgpu") { const rt2 = new THREE.RenderTarget(32, 32); renderer.setRenderTarget(rt2); await renderer.renderAsync(scene, cam); const p2 = await renderer.readRenderTargetPixelsAsync(rt2, 0, 0, 32, 32);
+                    const at = (stride, x, y) => Array.from(p2.slice(y * stride + x * 4, y * stride + x * 4 + 4));
+                    o.at32 = { errs: errs.length - o.errs.length, len: p2.length, rowBytes: 32 * 4, paddedRow: 256,
+                               row0: at(128, 0, 0), row0right: at(128, 31, 0),
+                               lastAtWidth: at(128, 0, 31), lastAtPadded: at(256, 0, 31) }; }
             } catch (e) { o.error = String(e && e.message || e).slice(0, 300); }
             out[mode] = o;
         }
@@ -77,13 +92,34 @@ else {
     ok("the harness ran both backends", r.ok && r.result && r.result.webgpu && r.result.webgl2 && !r.result.webgpu.error && !r.result.webgl2.error, r.ok ? JSON.stringify([r.result && r.result.webgpu && r.result.webgpu.error, r.result && r.result.webgl2 && r.result.webgl2.error]) : (r.reason || (r.pageErrors || []).join("; ")));
     if (r.ok && r.result.webgpu && r.result.webgl2) {
         const R = r.result;
-        ok(`three ${R.revision} loads with ${R.tslExports} TSL exports`, R.revision === "178" && R.tslExports > 400);
+        // v4542: held to the build read off disk in section 1, not to a typed "178" -- which also answers a question
+        // the typed form could not, namely whether the page loaded the build this repo vendors or some other one.
+        ok(`the module the PAGE loaded is the build this repo vendors (r${R.revision} == r${threeRev}) and it carries ${R.tslExports} TSL exports`, R.revision === threeRev && R.tslExports > 400, `page r${R.revision}, vendored r${threeRev}, ${R.tslExports} exports`);
         for (const b of ["webgpu", "webgl2"]) { const o = R[b];
             const gradientOk = o.row0 && o.row0[2] === 128 && o.row0right[2] === 128 && Math.abs(o.row0right[0] - 253) <= 2 && o.row0[0] <= 2;
             ok(`*** ${b}: the ${b === "webgpu" ? "WebGPU" : "WebGL2"} backend really is that backend, and a TSL colour node renders the uv gradient (x across, 0.5 in blue) ***`, o.backend === b && gradientOk && (o.errs || []).length === 0, `row 0: ${o.row0 && o.row0.join(",")} .. ${o.row0right && o.row0right.join(",")}; errors ${(o.errs || []).length}`); }
         rowOrder = { webgpu: R.webgpu.row0[1] > 128 ? "top-first" : "bottom-first", webgl2: R.webgl2.row0[1] > 128 ? "top-first" : "bottom-first" };
         ok("MEASURED, not assumed: readRenderTargetPixelsAsync hands rows TOP-first on WebGPU and BOTTOM-first on WebGL2 (v = 1 at row 0 there, v = 0 here) -- a caller comparing the two flips one", rowOrder.webgpu === "top-first" && rowOrder.webgl2 === "bottom-first", `webgpu ${rowOrder.webgpu} (green ${R.webgpu.row0[1]}), webgl2 ${rowOrder.webgl2} (green ${R.webgl2.row0[1]})`);
-        ok("CONTROL: three 0.178's WebGPU readback at 32 px (a 128-byte row, not 256-aligned) raises a validation error and reads nothing -- the gate keeps to widths whose rows are 256-byte aligned, and says so", R.webgpu.at32 && R.webgpu.at32.errs > 0 && R.webgpu.at32.alpha === 0, R.webgpu.at32 ? `${R.webgpu.at32.errs} error(s), alpha ${R.webgpu.at32.alpha}` : "no control ran");
+        // *** v4542 -- THIS ROW ASSERTED A VALIDATION ERROR THAT r184 NO LONGER RAISES, AND THE FIRST REWRITE OF IT
+        // SAID "r184 FIXED IT". THAT WAS WRONG, AND WHAT CAUGHT IT WAS ADDING THE BYTE COUNT. *** At 0.178 a readback
+        // at a width whose row is not 256-byte aligned raised a validation error and read nothing. At 0.184 it raises
+        // NOTHING and returns the 256-byte-PADDED staging buffer with the padding still in it. MEASURED at three
+        // widths: 64 px (a 256-byte row, already aligned) gives w*h*4 exactly; 32 px gives 8,064 bytes and 16 px
+        // gives 3,904, both exactly paddedRow*(h-1) + rowBytes. Row 0 is right either way, which is why sampling it
+        // alone looked like a fix; from row 1 a caller indexing by width*4 walks off into the padding, and the last
+        // row reads [0,0,0,0] against the [4,4,128,255] that is really there.
+        //
+        // So an ERROR became a SILENT WRONG PICTURE, which is worse, and the gate's original conclusion -- keep to
+        // 256-aligned widths -- still stands with its stated reason replaced. The row asserts the padded shape, the
+        // right pixel at the padded stride, and the wrong one at the width stride, because a row that asserted only
+        // "no error" or only row 0 would have passed on exactly the hazard.
+        const c32 = R.webgpu.at32;
+        const grad32 = c32 && c32.row0 && c32.row0[2] === 128 && c32.row0right[2] === 128 && Math.abs(c32.row0right[0] - 250) <= 6 && c32.row0[0] <= 6;
+        const paddedLen = c32 && c32.paddedRow * 31 + c32.rowBytes;
+        ok("*** r184 does NOT fix the unaligned readback -- it stops REPORTING it: at 32 px (a 128-byte row) WebGPU raises no error and hands back the 256-byte-padded buffer, right in row 0 and wrong from row 1, so a caller indexing by width silently misreads. The 256-aligned rule this arc keeps to still holds; only its reason has changed ***",
+           !!c32 && c32.errs === 0 && grad32 && c32.len === paddedLen && c32.len !== 32 * 32 * 4
+           && c32.lastAtPadded[3] === 255 && c32.lastAtPadded[2] === 128 && c32.lastAtWidth.every((v) => v === 0),
+           c32 ? `${c32.errs} error(s), ${c32.len} bytes (padded ${paddedLen}, unpadded ${32 * 32 * 4}); row 0 ${c32.row0.join(",")} .. ${c32.row0right.join(",")}; last row at width-stride ${c32.lastAtWidth.join(",")}, at padded stride ${c32.lastAtPadded.join(",")}` : "no control ran");
     }
 }
 
@@ -177,6 +213,16 @@ else {
 //      cannot show is caught by the text, and the log says which.
 //   D  the TSL Newton started at x = 1 -> exit=1, 4 red: both backends find the trivial root (blue byte 0 for 158 and 90) and
 //      the brightest column is the first -- the same failure the WGSL's sabotage D showed at v4318, in TSL.
+// MEASURED at v4542. Applied, this gate run, red count read, source and README restored and md5-verified. Baseline 0.
+//   BB the README's heading naming a revision the build is not -> 1 red. The revision used to be TYPED here in two
+//      places and the bump made both wrong; the row reads the build, the README's heading and the tarball the README
+//      says it came from, and holds all three to each other -- which also catches a bump that edits the heading and
+//      leaves the tarball URL behind, a drift no typed constant could see.
+//   CC the readback row's two strides made one -> 1 red. Without the padded/unpadded distinction the row could not
+//      tell that r184 hands back a PADDED buffer, which is the whole finding: an earlier draft of this row said
+//      "r184 FIXED the unaligned readback" and was wrong, and what caught it was asserting the byte count as well
+//      as the pixel. Row 0 is right at either stride; only the length and a later row tell them apart.
+//   No 0-RED.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: TSL's OWN noise and effects (mx_noise etc. -- this round writes the tree's arithmetic in TSL, it does not adopt three's); " +
     "presenting to a canvas on WebGPU in this headless shell (the device is lost on present, as gfx/device.js's offscreen flag already knows, so " +

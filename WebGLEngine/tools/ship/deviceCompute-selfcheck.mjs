@@ -82,7 +82,12 @@ console.log("\n2. EVERY RUNNABLE CORPUS ENTRY THROUGH THE DEVICE, HELD TO THE HE
         const pack = (e) => ({ id: e.id, code: e.opts.code, entryPoint: e.opts.entryPoint || "main", outCount: e.opts.outCount, workgroups: e.opts.workgroups || 1,
             uniforms: e.opts.uniforms ? Array.from(e.opts.uniforms) : null,
             inputs: e.opts.inputs ? e.opts.inputs.map((i) => ({ binding: i.binding, words: Array.from(storageWords(i.data)) })) : null,
-            outInit: e.opts.outInit ? Array.from(storageWords(e.opts.outInit)) : null });
+            outInit: e.opts.outInit ? Array.from(storageWords(e.opts.outInit)) : null,
+            // v4572 -- these two travel with the entry now. The temporal arc puts dst at bindings 1 to 4 and
+            // the uniform last, and a packer that drops them hands the page an entry that cannot be bound:
+            // adding the thirteen to the corpus turned this into twelve reds until BOTH this line and the
+            // reconstruction inside the page carried them. A field that exists is not a field that travels.
+            outBinding: e.opts.outBinding ?? 0, uniformBinding: e.opts.uniformBinding ?? 1 });
         const r = await runInEngineOrigin({ engineRoot: ENG, args: { entries: entries.map(pack) }, script: `async (a) => {
             const C = await import("/render/computeRun.mjs"); const { requestDevice } = await import("/gfx/device.js");
             const cv = document.createElement("canvas"); cv.width = 8; cv.height = 8;
@@ -91,7 +96,8 @@ console.log("\n2. EVERY RUNNABLE CORPUS ENTRY THROUGH THE DEVICE, HELD TO THE HE
             const out = {};
             for (const e of a.entries) {
                 const opts = { code: e.code, entryPoint: e.entryPoint, outCount: e.outCount, workgroups: e.workgroups, uniforms: e.uniforms ? new Float32Array(e.uniforms) : null,
-                               inputs: e.inputs ? e.inputs.map((i) => ({ binding: i.binding, data: new Uint32Array(i.words) })) : null, outInit: e.outInit ? new Uint32Array(e.outInit) : null };
+                               inputs: e.inputs ? e.inputs.map((i) => ({ binding: i.binding, data: new Uint32Array(i.words) })) : null, outInit: e.outInit ? new Uint32Array(e.outInit) : null,
+                               outBinding: e.outBinding, uniformBinding: e.uniformBinding };
                 const t0 = performance.now(); const res = await C.runCorpusEntry(dev, opts); const ms = performance.now() - t0;
                 out[e.id] = res.ok ? { ok: true, values: Array.from(res.values), ms } : { ok: false, reason: res.reason };
             }

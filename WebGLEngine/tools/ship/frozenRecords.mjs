@@ -545,7 +545,7 @@ export const PROBE_AT_V4536 = Object.freeze({
     // version-stamped frozen exports, so naming a standing red in a dated list is an arrival as surely as
     // a measurement is. The FIELD counts did not move with them -- neither carries a numeric field -- which
     // is the exact mirror of v4540's NO_GATE_V4540.
-    currentIncludingModule: Object.freeze({ records: 129, withFields: 65, fields: 380 }),
+    currentIncludingModule: Object.freeze({ records: 136, withFields: 65, fields: 381 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -560,6 +560,15 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4550 -- RE-TAKEN: fields 150 -> 151. One field, REACH_AT_V4548.unmeasured, added when a random red in
     // recordReach-selfcheck turned out to be a torn read of the timings file and "never timed" had to be
     // split from "too slow". Records and withFields did not move: a field added to an existing record.
+    // v4551 -- RE-TAKEN: fields 151 -> 152. One field, DRIFT_AT_V4482.cost.runtimeGapCensus, added when
+    // recordDrift gained a sixth check and its cost had to go into the table the gate sums. Records and
+    // withFields did not move: a field added to an existing record, the same shape as v4550. *** AND THE
+    // NOTE ABOVE IS THIS ROUND'S SUBJECT, NOT BACKGROUND. *** It says the tree's two stale-record detectors
+    // sit outside the sweep budget and so get skipped; the FSR arc then drifted FOUR records over five
+    // rounds with nothing reading them, which is that sentence collecting on its debt. The sixth check is
+    // the repair, and it very nearly repeated the fault: it took recordDrift-selfcheck from 1,799 ms to
+    // 6,813 ms and only a memo brought it back to 2,647, inside the 3,000 ms budget with 350 ms to spare.
+    // A control bought at the price of putting its own gate out of the sweep is not a control.
     // v4552 -- RE-TAKEN: 92/39/151 -> 93/40/153. One record, MEASURED_AT_V4552 in nav/detourScale.mjs,
     // holding what the engine's own terrain says about detours. It arrives GUARDED, which is the shape a
     // record should have and often does not: 20 of the 95 in this tree are named by no gate at all.
@@ -649,7 +658,19 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4562 -- RE-TAKEN: 356 -> 360, the four fields written into PLAYER_BODY_AT_V4549 when the horizontal
     // test became swept. BOTH HALVES MOVED TOGETHER THIS TIME: v4561 bumped this one alone and the subset
     // row caught it within the minute, which is the row doing exactly its job.
-    excluding: Object.freeze({ records: 127, withFields: 63, fields: 360 }),
+    // v4563+FSR -- RE-DERIVED AT THE MERGE: 127/63/360 here and 92/39/152 there become 134/63/361,
+    // with currentIncludingModule 129/65/380 -> 136/65/381. BOTH HALVES MOVED TOGETHER, in one run.
+    // Seven records arrive from the temporal/FSR line and they bring ONE countable field between them:
+    // FIELD_RE matches `name: <digits>,` and the arc's records are mostly frozen arrays and strings --
+    // the same miss v4566 stated for wgslCorpus.GENERATED_CASES and v4578 for SHADER_SINHASH_V4578.
+    // Stated rather than left for the next re-take to wonder why records moved by seven and fields by one.
+    // *** THE TWO LINES MERGED HERE, AND BOTH HAD RE-TAKEN THIS CENSUS AGAINST A TREE THE OTHER COULD NOT
+    // SEE. *** This line last read 127/63/360 and the temporal/FSR line last read 92/39/152. Neither is the
+    // merged tree's reading and the two MUST NOT BE ADDED: the sets overlap on every record that predates
+    // the split, so a sum double-counts them. Re-derived by running the census over the merged tree, the way
+    // the v4537 and v4540 merge notes above already require of this file -- "every number here is re-derived
+    // from the merged tree and never summed from the two notes".
+    excluding: Object.freeze({ records: 134, withFields: 63, fields: 361 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,

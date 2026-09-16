@@ -171,6 +171,22 @@ try {
 // v2493 -- the lockstep selfchecks EXISTED and were never gated, so they ran when someone remembered. That is how
 // a protocol that dies at 2% packet loss shipped for 200 versions: the tests that would have caught it were sound,
 // present, and optional. Every check that is not in the gate is a check that is not being run.
+// *** v4583 -- DECLARED, BECAUSE THIS FILE RUNS GATES NOTHING ELSE RUNS AND CHOSE ITS OWN LIMIT FOR THEM. ***
+//
+// tools/ship/runnerBudget-selfcheck.mjs had never seen this file: its scan wanted `spawn(process.execPath` or
+// `execFile(process.execPath`, and the call below is execFileSync destructured from a dynamic import, so the
+// ship's own gate runner sat outside the population that exists to ask exactly this. MEASURED at v4583, the
+// consequence is nil and is stated as nil: the three gates below cost 61, 127 and 112 ms against a 180,000 ms
+// cap. The declaration is owed anyway -- an undeclared number is not excused by being generous today.
+export const budgetIsOwn =
+    "the flat 180 s here (60 s for claimsGate) is a WALL-CLOCK GUARD on a handful of gates this file runs by name, " +
+    "not a budget derived from any of them. gateBudget.MEASURED has no entry for the three lockstep gates -- " +
+    "selfchecks.mjs leaves them to this runner precisely because they need their own result parsing -- so the " +
+    "table's per-gate numbers have nothing to say about them, and the general default it would otherwise grant " +
+    "(329,697 ms) is 1.8x this cap. Measured at v4583 they cost 61, 127 and 112 ms, so the guard is three orders " +
+    "of magnitude clear of the work; if that stops being true the honest move is to measure them into MEASURED " +
+    "and read it here, not to raise this number.";
+
 for (const [file, label] of [
   ["physics/box3d-lockstep-selfcheck.mjs", "lockstep session"],
   ["physics/box3d-lockstep-net-selfcheck.mjs", "lockstep transport"],

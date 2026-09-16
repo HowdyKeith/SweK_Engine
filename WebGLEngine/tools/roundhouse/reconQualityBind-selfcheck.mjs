@@ -1,6 +1,8 @@
 // tools/roundhouse/reconQualityBind-selfcheck.mjs
 //
-// Run: node tools/roundhouse/reconQualityBind-selfcheck.mjs   (~0.4s MEASURED -- two builds on a 96x96 phantom)
+// Run: node tools/roundhouse/reconQualityBind-selfcheck.mjs   (~2.35s MEASURED at v4575, median of
+//   2348/2350/2359 -- superseding a stated ~0.4s that ALSO said MEASURED and was 5.9x under. The old
+//   number described two builds on a 96x96 phantom; whatever it timed, it is not what this gate does now.)
 //
 // THIS GRADES THE BIND. physics/tomography/reconQuality-selfcheck.mjs owns the physics.
 //

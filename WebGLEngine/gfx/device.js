@@ -43,7 +43,7 @@
 "use strict";
 
 import { checkHostUniforms } from "../render/wgslLayout.mjs";
-import { parseBindings } from "../render/wgslSpec.mjs";
+import { parseBindings, usedNames } from "../render/wgslSpec.mjs";
 
 
 // std140-ish uniform layout: compute each uniform's byte offset + the total (padded to 16) so the WebGPU backend can
@@ -53,6 +53,32 @@ import { parseBindings } from "../render/wgslSpec.mjs";
 // aligned to RoundUp(16, its natural alignment). render/wgslLayout.mjs computes the same number from the
 // shader text and agrees with this function exactly; it returns 24 for badTvWgsl's six-f32 struct under the
 // STORAGE rule and 32 under this one. Two files, two right answers, to a question neither had named.
+// ==========================================================================================================
+// *** v4543 -- THE TWO BACKENDS SAMPLED WITH OPPOSITE ADDRESS MODES, AND THE COMMENT SAYING SO WAS WRONG. ***
+// The WebGPU sampler was created with addressModeU/V "repeat" under a comment reading "Repeat addressing ...
+// the WebGL2 backend's texture parameters, which is what makes a pixel diff between the two a comparison of
+// pictures and not of sampler defaults." The WebGL2 backend two hundred lines away had always set
+// CLAMP_TO_EDGE. So the same dev.texture() sampled differently on the two backends at every seam, with no way
+// for a caller to say which -- and a pixel diff between them WAS a comparison of sampler defaults, exactly
+// what the comment claimed it was not.
+//
+// MEASURED at v4540, three against three with no device in it: three's two backends agree with each other on
+// every pixel for the same wrap mode (4096/4096, worst 0, both ways), so the inconsistency was ours. Against
+// the device the difference was exactly the seam -- one row, one pixel per row, worst 127 of 255 -- and there
+// was NO wrap setting that made both backends green, because they disagreed.
+//
+// Now a caller says. The default is CLAMP, which is what WebGL2 has always done, what the mip blit's own
+// sampler does, and what WebGPU's spec default is; "repeat" is reachable by asking. An unknown value is
+// refused by name rather than falling through to whichever mode the backend happens to prefer.
+// ==========================================================================================================
+/** The address modes a caller may ask for. The names are the contract; each backend maps them to its own. */
+const WRAP_MODES = Object.freeze(["clamp", "repeat"]);
+function _wrapMode(d) {
+    const w = (d && d.wrap) == null ? "clamp" : d.wrap;
+    if (!WRAP_MODES.includes(w)) throw new Error(`gfx/device: unknown texture wrap ${JSON.stringify(w)} -- one of ${WRAP_MODES.join(", ")}`);
+    return w;
+}
+
 function _uniformLayout(uniforms) {
     const SZ = { f32: 4, vec2: 8, vec3: 12, vec4: 16, mat4: 64 }, AL = { f32: 4, vec2: 8, vec3: 16, vec4: 16, mat4: 16 };
     let off = 0; const offsets = {};
@@ -160,43 +186,6 @@ function _refuse(backend, what, instead) {
 const CPU_TWIN = "render/gpuDriven.mjs cullLodCpu() produces the same per-LOD instance records on the CPU; draw them with pass.instances() + pass.drawIndexed().";
 
 
-/** v4461 -- which declared bindings the shader statically references; see the WebGPU backend's note at classify(). */
-function usedNames(wgsl, all, entryPoints = null) {
-    let code = wgsl.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " ");
-    code = code.replace(/@group\s*\(\s*\w+\s*\)\s*@binding\s*\(\s*\w+\s*\)\s*var\s*(?:<[^>]*>)?\s*[A-Za-z_]\w*\s*:\s*[^;]+;/g, " ");
-    // v4466 -- PER ENTRY POINT, BECAUSE THE AUTO LAYOUT IS. A module with several @compute entries (physics/mpm's
-    // clear / p2g / grid / g2p share one text and five bindings) gets one layout PER PIPELINE, holding only what that
-    // entry's call graph reaches; a bind group carrying a binding the entry never touches is refused by the API. So
-    // "used" is answered over the functions reachable from the named entry points, falling back to the whole text
-    // when none are named (the null backend, or a module whose functions this scanner cannot delimit).
-    const reach = entryPoints ? _reachableCode(code, entryPoints) : null;
-    const scope = reach == null ? code : reach;
-    for (const b of all) b.used = new RegExp("\\b" + b.name + "\\b").test(scope);
-    return all;
-}
-/** The bodies of every function reachable from `entries`, concatenated; null if an entry is not found. */
-function _reachableCode(code, entries) {
-    const fns = {};
-    const re = /\bfn\s+([A-Za-z_]\w*)\s*\(/g;
-    let m;
-    while ((m = re.exec(code))) {
-        const open = code.indexOf("{", m.index); if (open < 0) return null;
-        let depth = 0, i = open;
-        for (; i < code.length; i++) { const ch = code[i]; if (ch === "{") depth++; else if (ch === "}") { depth--; if (depth === 0) break; } }
-        if (depth !== 0) return null;
-        fns[m[1]] = code.slice(m.index, i + 1);
-    }
-    const seen = new Set(), todo = [...entries].filter((e) => e);
-    if (!todo.length || !todo.every((e) => fns[e])) return null;
-    let out = "";
-    while (todo.length) {
-        const n = todo.pop(); if (seen.has(n)) continue; seen.add(n);
-        const body = fns[n]; out += body + "\n";
-        for (const k of Object.keys(fns)) if (!seen.has(k) && new RegExp("\\b" + k + "\\s*\\(").test(body)) todo.push(k);
-    }
-    return out;
-}
-
 // --- null backend: implements the full interface, records the op stream. Used for tests + as a headless fallback. ----
 function nullBackend(opts = {}) {
     const ops = [];
@@ -272,7 +261,8 @@ function webgl2Backend(canvas, opts = {}) {
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, nearest ? gl.NEAREST_MIPMAP_NEAREST : gl.LINEAR_MIPMAP_LINEAR);
         } else gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, f);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, f);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        const gw = _wrapMode(d) === "repeat" ? gl.REPEAT : gl.CLAMP_TO_EDGE;
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gw); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gw);
     };
     const dev = {
         backend: "webgl2", gl, features: Object.freeze([]),
@@ -304,7 +294,7 @@ function webgl2Backend(canvas, opts = {}) {
         texture: (d) => { const format = _textureFormat(d), mipmaps = _mipmaps(d, format); const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t); upload(t, d, d.nearest, format, mipmaps);
             const w = d.width || (d.source && d.source.width) || 0, h = d.height || (d.source && d.source.height) || 0;
             const tex = { gl: t, w, h, format, mipmaps, levels: mipmaps ? _mipLevels(w, h) : 1, nearest: !!d.nearest || !TEXTURE_FORMATS[format].filterable, render: !!d.render,
-                          update: (nd) => { gl.bindTexture(gl.TEXTURE_2D, t); upload(t, { flipY: d.flipY, width: w, height: h, ...nd }, d.nearest, format, mipmaps); },
+                          update: (nd) => { gl.bindTexture(gl.TEXTURE_2D, t); upload(t, { flipY: d.flipY, wrap: d.wrap, width: w, height: h, ...nd }, d.nearest, format, mipmaps); },
                           destroy: () => { gl.deleteTexture(t); for (const k of ["_fb", "_fbOut"]) if (tex[k]) gl.deleteFramebuffer(tex[k]); if (tex._rb) gl.deleteRenderbuffer(tex._rb); if (tex._scratch) gl.deleteTexture(tex._scratch); } };
             return tex; },
         frame: (fn, o) => {
@@ -472,14 +462,14 @@ async function webgpuBackend(canvas, opts = {}) {
         if (!own || ownW !== w || ownH !== h) { try { own?.destroy(); } catch (e) {} own = gpu.createTexture({ size: [w, h], format: fmt, usage: TU().RENDER_ATTACHMENT | TU().COPY_SRC }); ownW = w; ownH = h; }
         return own; };
     if (!offscreen) ctx.configure({ device: gpu, format: fmt, alphaMode: "premultiplied", usage: TU().RENDER_ATTACHMENT | TU().COPY_SRC });
-    // One sampler per filter mode, made on first use. Repeat addressing and no mip chain: the WebGL2 backend's
-    // texture parameters, which is what makes a pixel diff between the two a comparison of pictures and not of
-    // sampler defaults.
+    // One sampler per filter mode AND address mode, made on first use -- see the v4543 box above for why the
+    // address mode is the caller's to name and why the comment that used to stand here was wrong.
     // v4464 -- a CHAINED texture gets a sampler that filters between levels (mipmapFilter), the WebGPU spelling of
     // LINEAR_MIPMAP_LINEAR / NEAREST_MIPMAP_NEAREST; an unchained one keeps the level-0-only sampler above.
     const samplers = {};
-    const samplerFor = (nearest, mips = false) => { const k = (nearest ? "nearest" : "linear") + (mips ? "+mips" : "");
-        if (!samplers[k]) samplers[k] = gpu.createSampler({ magFilter: nearest ? "nearest" : "linear", minFilter: nearest ? "nearest" : "linear", ...(mips ? { mipmapFilter: nearest ? "nearest" : "linear" } : {}), addressModeU: "repeat", addressModeV: "repeat" }); return samplers[k]; };
+    const samplerFor = (nearest, mips = false, wrap = "clamp") => { const k = (nearest ? "nearest" : "linear") + (mips ? "+mips" : "") + "+" + wrap;
+        const am = wrap === "repeat" ? "repeat" : "clamp-to-edge";
+        if (!samplers[k]) samplers[k] = gpu.createSampler({ magFilter: nearest ? "nearest" : "linear", minFilter: nearest ? "nearest" : "linear", ...(mips ? { mipmapFilter: nearest ? "nearest" : "linear" } : {}), addressModeU: am, addressModeV: am }); return samplers[k]; };
     // v4464 -- THE BLIT THAT STANDS IN FOR generateMipmap. One pipeline per texture format, made on first use: a
     // full-screen triangle whose fragment samples level i-1 with a linear, clamped sampler at the centre of each
     // level-i texel -- which for an even-sized level is exactly the 2x2 box average, the filter GL's generateMipmap
@@ -511,16 +501,17 @@ struct VO { @builtin(position) pos: vec4f, @location(0) uv: vec2f };
         const entries = [];
         const uniformUsed = p.uniformBindings.find((b) => b.binding === p.uniformBinding);
         if (p.ubuf && (!uniformUsed || uniformUsed.used !== false)) entries.push({ binding: p.uniformBinding, resource: { buffer: p.ubuf } });
-        let nearest = null, mips = false;
+        let nearest = null, mips = false, wrapMode = null;
         for (const t of p.texBindings) {
             if (t.used === false) continue;                       // v4461 -- not in the auto layout; see usedNames
             const tex = p._tex[t.name];
             if (!tex || !tex.view) throw new Error(`gfx/device: the shader declares texture "${t.name}" at @group(0) @binding(${t.binding}) and nothing was bound to it -- call pass.texture(${JSON.stringify(t.name)}, tex) before drawing. Drawing anyway would present the effect over nothing.`);
             if (nearest == null) nearest = !!tex.nearest;
+            if (wrapMode == null) wrapMode = tex.wrap || "clamp";   // v4543 -- the first bound texture names it, as `nearest` does
             if (tex.mipmaps) mips = true;                        // v4464 -- the sampler reads the chain when any bound texture has one
             entries.push({ binding: t.binding, resource: tex.view });
         }
-        for (const s of p.samplerBindings) { if (s.used === false) continue; entries.push({ binding: s.binding, resource: samplerFor(!!nearest, mips) }); }
+        for (const s of p.samplerBindings) { if (s.used === false) continue; entries.push({ binding: s.binding, resource: samplerFor(!!nearest, mips, wrapMode || "clamp") }); }
         for (const s of p.storageBindings) {
             if (s.used === false) continue;
             const b = p._stor[s.name];
@@ -683,7 +674,7 @@ struct VO { @builtin(position) pos: vec4f, @location(0) uv: vec2f };
                 if (mipmaps) buildMips(t, format, levels);
             };
             put(d);
-            return { gpu: t, view: t.createView(), w, h, format, mipmaps, levels, nearest: !!d.nearest || !F.filterable, render: !!d.render, update: put, destroy: () => { try { t.destroy(); } catch (e) {} } };
+            return { gpu: t, view: t.createView(), w, h, format, mipmaps, levels, nearest: !!d.nearest || !F.filterable, wrap: _wrapMode(d), render: !!d.render, update: put, destroy: () => { try { t.destroy(); } catch (e) {} } };
         },
         frame: (fn, o) => {
             // Level 13 -- `offscreen` per FRAME: a pick picture is drawn to the owned texture and read back, and the
