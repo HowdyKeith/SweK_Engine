@@ -647,7 +647,14 @@ export class Kaiju {
         const dz = tp.z - this.position.z;
         const dist = Math.hypot(dx, dz);
 
-        if (dist < ENGAGE_RANGE) {
+        // Task #91 adversarial-review fix (post-commit 9ee11ebe) -- dist is horizontal-only (x/z), which was
+        // always safe here because position.y was instantly ground-snapped every tick (#89). #91's real
+        // integrated gravity means a genuinely falling ground kaiju can now sit tens of units above a target
+        // it is horizontally close to, for up to MAX_FALL_S (~3s) at a time. _airborne is set ONLY by
+        // KaijuManager._resolveGroundKaijuPosition's real-fall branch (never by flying/swimming kinds' own
+        // altitude offsets, which are a different, intentional Y gap), so gating on it here does not touch
+        // any kind but the one this task changed.
+        if (dist < ENGAGE_RANGE && !this._airborne) {
             this.target = target;
             this.state = applyEvent(KAIJU_MACHINE, this.state, "engageRange", null);
             return [];
@@ -794,6 +801,13 @@ export class Kaiju {
             this.target = null;
             return [];
         }
+
+        // Task #91 adversarial-review fix (post-commit 9ee11ebe) -- the CONFIRMED-REAL finding: a kaiju that
+        // started falling AFTER already engaging (the surface dropped out from under it mid-combat) kept
+        // landing melee hits every tick it was visibly airborne, since neither this dist check nor
+        // _engageCiv/_engageKaiju look at Y at all. Stay in "engaging" (target kept, no disengage) so combat
+        // resumes the instant it lands, but do not exchange damage while still falling.
+        if (this._airborne) return [];
 
         // Damage exchange — branches on target type
         if (target.type === "civ") {

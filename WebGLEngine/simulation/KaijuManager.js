@@ -2486,6 +2486,20 @@ export class KaijuManager {
      * fallback path degrades to exactly #89's own prior behaviour.
      */
     _resolveGroundKaijuPosition(k, gy, delta) {
+        // *** ADVERSARIAL-REVIEW FIX (task #91, post-commit 9ee11ebe). *** `delta` reaches here from main.js's
+        // own frame-time computation (`dt = Math.min((t-last)/1000, 0.1)`), which has NO lower bound and NO
+        // NaN guard -- a timestamp-ordering hiccup (e.g. switching between window.rAF and XRSession.rAF as
+        // clock sources) can hand this a negative or non-finite value. Both safety-net caps below are plain
+        // numeric comparisons, and NaN compares false against every one of them -- once `k._fallAccumS` or
+        // `k.position.y` goes NaN it silently and PERMANENTLY defeats the "a fall always terminates" guarantee
+        // this whole method exists to provide, exactly the same failure class already found and fixed once
+        // this task (the uninitialized-`_fallAccumS` bug, see the SABOTAGE LOG). A negative delta is a
+        // separate hole: a sign-oscillating +dt/-dt sequence returns k._vy and k._fallAccumS to ~exactly
+        // their pre-pair values every pair (only k.position.y drifts, by G*dt^2 per pair), defeating both caps
+        // for an arbitrarily long real-time span without ever tripping either one. Clamp once, here, rather
+        // than trust every call site to have done it already.
+        if (!Number.isFinite(delta) || delta < 0) delta = 0;
+
         const bvh = this._kaijuColliderBVH();
         k._hazard = 0;
         if (!bvh) {
@@ -2526,8 +2540,23 @@ export class KaijuManager {
             }
         }
 
+        const yBeforeDepen = k.position.y;
         const r = depenetrateCapsule([k.position.x, k.position.y, k.position.z], radius, height, bvh, { iterations: 2 });
         k.position.x = r.pos[0]; k.position.y = r.pos[1]; k.position.z = r.pos[2];
+        // *** ADVERSARIAL-REVIEW FIX (task #91, post-commit 9ee11ebe). *** depenetrateCapsule can push
+        // k.position.y UP (any contact normal with a positive Y component -- an overhang, a corner), entirely
+        // independent of the gravity integration above. Left uncorrected, that upward push silently SHRINKS
+        // `k._fallStartY - k.position.y` every tick it happens (the push moves position.y closer to
+        // fallStartY), eroding MAX_FALL_UNITS's guarantee via geometry the distance cap was never meant to be
+        // sensitive to. Nudging fallStartY UP by the exact same amount keeps the GAP -- and so the cap's
+        // measurement of genuine gravitational fall -- identical to what it was right after gravity's own
+        // integration step, before depenetration touched it: (fallStartY+push) - (position.y+push) ==
+        // fallStartY - position.y, pre-push. (Subtracting here instead would double the erosion, not cancel
+        // it -- push moves position.y closer to fallStartY by `push`; matching that with -= moves fallStartY
+        // closer to position.y too, shrinking the gap by 2*push instead of holding it steady.) Guarded on
+        // k._airborne: if the fall/cap logic above already landed this tick, _fallStartY is already reset to
+        // undefined and there is nothing to correct.
+        if (k._airborne && k.position.y > yBeforeDepen) k._fallStartY += (k.position.y - yBeforeDepen);
         // *** A SEPARATE SINGLE-ITERATION PROBE, NOT r.contacts FROM THE POSITION SOLVE ABOVE. *** A first
         // draft read hazard straight off `r` (the iterations:2 call), on the theory that any contacts
         // beyond the expected one floor touch meant a wall pressing in. This file's own gate caught it

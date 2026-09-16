@@ -50,6 +50,27 @@
 // (4) delaying the landing condition by 5 units (`<= surfaceY - 5`) missed the tick budget section 6's loop
 // allows -- red by name rather than an infinite loop, because the loop itself is bounded (ref.ticks + 20).
 // Restored, gate re-confirmed all-green after each.
+//
+// *** SECTIONS 11-13, ADDED AFTER AN INDEPENDENT ADVERSARIAL-REVIEW WORKFLOW FOUND WHAT THIS FILE'S OWN
+// SABOTAGE-VERIFICATION HAD NOT: commit 9ee11ebe (task #91's first cut) had already shipped when the review
+// ran, and it found 5 CONFIRMED REAL issues this gate's sections 6-10 never exercised, because every sabotage
+// up to that point only ever broke THIS FILE's own logic -- none of them tried an ADVERSARIAL INPUT (delta
+// itself), and none of them checked whether depenetrateCapsule's own side effects could undermine a claim this
+// file makes ("two independent caps") through a mechanism outside the gravity integration entirely. Two real
+// production bugs were fixed as a direct result (see simulation/KaijuManager.js's own inline comments at each
+// fix): a missing Number.isFinite/negative-delta guard (section 11), and depenetration's upward pushes eroding
+// MAX_FALL_UNITS via k._fallStartY never being re-derived (section 12) -- CAUGHT BY THIS SECTION'S OWN FIRST
+// RUN: the initial fix used `k._fallStartY -= push` (subtracting), which section 12's own before/after gap
+// comparison immediately proved BACKWARDS -- it shrank the cap-relevant gap by 2x the push instead of holding
+// it steady (see section 12's own comment for the full sign derivation). Section 13 closes a pure test-
+// coverage gap (GROUND_SNAP_EPS's real boundary was never exercised) with no production change.
+// SABOTAGE LOG, these three sections: (1) removing the `!Number.isFinite(delta) || delta < 0` guard entirely
+// -- section 11 red by name (NaN propagated into y/vy/fallAccumS immediately). (2) reverting the fallStartY
+// compensation's sign back to `-=` (the bug this section's own first run caught) -- section 12 red by name,
+// with the failure detail showing the actual gap LOWER than even the unfixed-naive value, confirming the sign
+// mattered, not just the magnitude. (3) widening GROUND_SNAP_EPS from `radius*0.5` to `radius*2` -- section 13
+// red by name, while section 10 (the only prior GROUND_SNAP_EPS coverage) stayed green throughout, confirming
+// it really was blind to this. Restored, gate re-confirmed all-green after each.
 "use strict";
 import { KaijuManager } from "../../simulation/KaijuManager.js";
 import { Chunk } from "../../world/chunk.js";
@@ -348,6 +369,145 @@ console.log("\n10. REGRESSION: A MINOR STEP (WITHIN GROUND_SNAP_EPS) STILL SNAPS
     KaijuManager.prototype._resolveGroundKaijuPosition.call(fake, k, 3, 1 / 60);
     ok("!! *** a 0.2-unit step snaps in ONE tick, never enters the falling state ***",
         k._airborne === false && Math.abs(k.position.y - 3) < 1e-3, `y=${k.position.y.toFixed(4)} airborne=${k._airborne}`);
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n11. ADVERSARIAL-REVIEW FIX: A NaN OR NEGATIVE delta CANNOT POISON OR STALL THE FALL STATE");
+{
+    // An independent adversarial-review Workflow, run AFTER task #91's own commit (9ee11ebe) had already
+    // shipped, found this gate never exercised `delta` itself as an adversarial input -- every section above
+    // only ever passes a plausible 1/60 or a single large-but-POSITIVE hitch (section 8). main.js's own
+    // dt = Math.min((t-last)/1000, 0.1) has no lower bound and no NaN guard, and main.js switches between
+    // window.requestAnimationFrame and XRSession.requestAnimationFrame as clock sources depending on XR
+    // session state -- a plausible site for a timestamp-ordering hiccup. NaN defeats every >/< comparison
+    // SILENTLY AND FOREVER (NaN compares false against everything, and NaN propagates through all further
+    // arithmetic) -- the exact same bug CLASS already found and fixed once this task (the uninitialized
+    // `_fallAccumS` bug above), now reachable through `delta` itself instead of a KaijuManager.js bug. A
+    // negative delta is a separate hole: a sign-oscillating +dt/-dt sequence returns k._vy and
+    // k._fallAccumS to ~exactly their pre-pair values every pair (only k.position.y drifts, by G*dt^2 per
+    // pair) -- defeating BOTH caps for an arbitrarily long real-time span without ever tripping either one.
+    const fake = { world: buildVoxelWorld(),
+        _kaijuColliderBVH: KaijuManager.prototype._kaijuColliderBVH,
+        _kaijuCapsuleRadius: KaijuManager.prototype._kaijuCapsuleRadius };
+    const DT = 1 / 60;
+    const GY = 5;
+
+    // A NaN tick mid-fall must be a pure no-op, not a poison.
+    const kNaN = kaiju(9000, 200, 9000);
+    KaijuManager.prototype._resolveGroundKaijuPosition.call(fake, kNaN, GY, DT);   // one valid tick, become airborne
+    const before = { y: kNaN.position.y, vy: kNaN._vy, acc: kNaN._fallAccumS };
+    KaijuManager.prototype._resolveGroundKaijuPosition.call(fake, kNaN, GY, NaN);
+    report("one NaN-delta tick mid-fall", `y=${kNaN.position.y} vy=${kNaN._vy} fallAccumS=${kNaN._fallAccumS}`);
+    ok("!! *** a NaN delta is a pure no-op -- position/velocity/accumulator all UNCHANGED, and still finite ***",
+        kNaN.position.y === before.y && kNaN._vy === before.vy && kNaN._fallAccumS === before.acc &&
+        Number.isFinite(kNaN.position.y) && Number.isFinite(kNaN._vy) && Number.isFinite(kNaN._fallAccumS));
+    for (let t = 0; t < 200; t++) KaijuManager.prototype._resolveGroundKaijuPosition.call(fake, kNaN, GY, DT);
+    ok("!! ...and the safety net STILL fires normally afterward -- the NaN tick left nothing poisoned",
+        kNaN.position.y === GY && kNaN._airborne === false, `y=${kNaN.position.y}`);
+
+    // A negative tick must also be a no-op, not a step backward (up).
+    const kNeg = kaiju(9000, 200, 9000);
+    KaijuManager.prototype._resolveGroundKaijuPosition.call(fake, kNeg, GY, DT);
+    const yBefore2 = kNeg.position.y;
+    KaijuManager.prototype._resolveGroundKaijuPosition.call(fake, kNeg, GY, -DT);
+    report("one negative-delta tick mid-fall", `y=${kNeg.position.y}`);
+    ok("!! *** a negative delta is a pure no-op -- does not step the kaiju back UP ***", kNeg.position.y === yBefore2);
+
+    // Sign-oscillating +dt/-dt CANNOT stall the time cap forever: with negative ticks clamped to no-ops, an
+    // alternating sequence advances at HALF rate (every other tick is a genuine no-op), not zero rate -- the
+    // cap still fires, just later, never indefinitely.
+    const kOsc = kaiju(9000, 200, 9000);
+    let tick = 0, cappedAt = -1;
+    while (tick < 1000 && cappedAt < 0) {
+        const d = (tick % 2 === 0) ? DT : -DT;
+        KaijuManager.prototype._resolveGroundKaijuPosition.call(fake, kOsc, GY, d);
+        if (!kOsc._airborne) cappedAt = tick;
+        tick++;
+    }
+    report("adversarial sign-oscillating +dt/-dt sequence", `capped at tick ${cappedAt}`);
+    ok("!! *** an adversarial sign-oscillating delta sequence STILL terminates the fall, not stalled forever ***",
+        cappedAt > 0 && cappedAt < 1000, `cappedAt=${cappedAt}`);
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n12. ADVERSARIAL-REVIEW FIX: DEPENETRATION PUSHING THE CAPSULE UP DOES NOT ERODE MAX_FALL_UNITS");
+{
+    // The review's finding: depenetrateCapsule (iterations:2, run unconditionally after the fall/cap block)
+    // can push k.position.y UP via any contact normal with a positive Y component -- entirely independent of
+    // gravity -- but k._fallStartY was never re-derived after being set once at fall-start, so
+    // `k._fallStartY - k.position.y` silently SHRINKS every tick that happens, undermining the "two
+    // independent caps" claim via geometry the distance cap was never meant to be sensitive to.
+    //
+    // *** MEASURED, NOT ASSUMED: a real (x,y,z) where this genuinely fires. *** A capsule falling on the LOW
+    // side of buildCliffWorld's cliff (x<8, true surface y=3), but positioned right at the boundary (x=7.9,
+    // just inside the low side) and still high in the air (y=42.5, nowhere near its OWN true surface) has its
+    // lateral reach (radius+skin) clip the HIGH PLATEAU's top-face edge (x>=8, top at y=43) even though that
+    // plateau is NOT the surface probeGround found for this column (probeGround's central ray, cast straight
+    // down from x=7.9, correctly finds the low-side floor at y=3, never the plateau) -- exactly the
+    // probeGround/depenetrateCapsule divergence the review's finding describes: one system's single ray
+    // examines only what's directly below the capsule's own column; the other's box query examines everything
+    // within physical reach of the capsule's full swept volume, including a neighboring, unrelated feature
+    // probeGround never looked at. Confirmed empirically before writing this section (not guessed at): this
+    // exact position produces a ~0.5-unit upward push while k._airborne stays true the whole tick.
+    const fake = { world: buildCliffWorld(),
+        _kaijuColliderBVH: KaijuManager.prototype._kaijuColliderBVH,
+        _kaijuCapsuleRadius: KaijuManager.prototype._kaijuCapsuleRadius };
+    const G = 18, DT = 1 / 60;
+    const y0 = 42.5, fallStartY0 = y0 + 100;
+
+    const k = kaiju(7.9, y0, 5);
+    k._airborne = true; k._vy = 0; k._fallAccumS = 0; k._fallStartY = fallStartY0;
+    KaijuManager.prototype._resolveGroundKaijuPosition.call(fake, k, 3, DT);
+    report("one tick clipping the plateau edge while genuinely still falling on the low side",
+        `y=${k.position.y.toFixed(4)} airborne=${k._airborne} fallStartY=${k._fallStartY.toFixed(4)}`);
+    ok("!! *** still genuinely airborne -- this is NOT a legitimate landing, just an unrelated nearby nudge ***",
+        k._airborne === true);
+
+    // The IDEAL gap (what MAX_FALL_UNITS's distance-so-far SHOULD read) is fallStartY minus where gravity
+    // ALONE would have put the capsule this tick -- an independent one-tick reference, same recurrence as
+    // section 6's, never calling the production code.
+    const vy1 = -G * DT;
+    const yGravityOnly = y0 + vy1 * DT;
+    const idealGap = fallStartY0 - yGravityOnly;
+    const actualGap = k._fallStartY - k.position.y;
+    const naiveGap = fallStartY0 - k.position.y;   // what the gap would read WITHOUT this fix's compensation
+    report("gap (MAX_FALL_UNITS's own distance-so-far metric)",
+        `ideal=${idealGap.toFixed(4)} actual=${actualGap.toFixed(4)} naive(unfixed)=${naiveGap.toFixed(4)}`);
+    ok("!! *** the fix holds the gap to within a hair of the gravity-only ideal -- the upward push is fully compensated ***",
+        Math.abs(actualGap - idealGap) < 1e-6, `|actual-ideal|=${Math.abs(actualGap - idealGap)}`);
+    ok("!! *** ...and the erosion this fix closes is not negligible -- the UNFIXED gap would have read meaningfully lower ***",
+        idealGap - naiveGap > 0.1, `ideal-naive=${(idealGap - naiveGap).toFixed(4)}`);
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n13. REGRESSION: THE GROUND_SNAP_EPS BOUNDARY ITSELF, NOT JUST FAR INSIDE IT");
+{
+    // Section 10 only ever exercised a 0.2-unit step, well inside the true GROUND_SNAP_EPS = radius*0.5 =
+    // 0.75 (default radius 1.5) threshold -- the review measured that mutating that multiplier by 4x
+    // (radius*0.5 -> radius*2) left this whole gate green. These two cases straddle the real boundary by
+    // +-0.05 units so a change to the multiplier is caught directly here, not just inferred from section 10.
+    const fake = { world: buildVoxelWorld(),
+        _kaijuColliderBVH: KaijuManager.prototype._kaijuColliderBVH,
+        _kaijuCapsuleRadius: KaijuManager.prototype._kaijuCapsuleRadius };
+    const EPS = 1.5 * 0.5;   // GROUND_SNAP_EPS for the default radius 1.5 -- there is nothing exported to
+                              // derive this from (GROUND_SNAP_EPS is a local const inside the production
+                              // method); that asymmetry is itself the point, not an oversight -- a silent
+                              // change to the production multiplier is exactly what this section exists to
+                              // catch, and it can only catch it by pinning the CURRENT real value here.
+
+    // Just OUTSIDE the threshold: must NOT snap -- must become airborne and fall for at least this tick.
+    const kFall = kaiju(2, 3 + EPS + 0.05, 2);
+    KaijuManager.prototype._resolveGroundKaijuPosition.call(fake, kFall, 3, 1 / 60);
+    report("just above the true snap threshold", `y=${kFall.position.y.toFixed(4)} airborne=${kFall._airborne}`);
+    ok("!! *** a step just OUTSIDE GROUND_SNAP_EPS enters the falling state, does not instant-snap ***",
+        kFall._airborne === true && Math.abs(kFall.position.y - 3) > 1e-3, `y=${kFall.position.y.toFixed(4)} airborne=${kFall._airborne}`);
+
+    // Just INSIDE the threshold: must still snap instantly, exactly today's #89 behaviour.
+    const kSnap = kaiju(2, 3 + EPS - 0.05, 2);
+    KaijuManager.prototype._resolveGroundKaijuPosition.call(fake, kSnap, 3, 1 / 60);
+    report("just below the true snap threshold", `y=${kSnap.position.y.toFixed(4)} airborne=${kSnap._airborne}`);
+    ok("!! *** a step just INSIDE GROUND_SNAP_EPS still snaps instantly, no false-positive fall ***",
+        kSnap._airborne === false && Math.abs(kSnap.position.y - 3) < 1e-3, `y=${kSnap.position.y.toFixed(4)} airborne=${kSnap._airborne}`);
 }
 
 console.log(fails ? `\nkaijuGroundCollider-selfcheck: ${fails} FAILED` : "\nkaijuGroundCollider-selfcheck: all checks pass");
