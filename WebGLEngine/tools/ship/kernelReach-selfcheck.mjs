@@ -142,7 +142,7 @@ console.log("\n2. THE TREE'S OWN ANSWER");
     //
     // What is asserted now is that the arc's remaining unreachable kernels are NAMED -- the thing a reader needs
     // -- and that the count only falls. The size lives in the ratchet below, which is where a size belongs.
-    const ARC_UNREACHABLE_AT_V4592 = 7;
+    const ARC_UNREACHABLE_AT_V4592 = 5;   // v4593: 7 -> 5, temporalReject's two got a caller
     say("the temporal arc", arc.length
         ? `${arc.length} of ${r.unreachable.length} still unreachable: ${arc.map((a) => a.symbol).join(", ")}`
         : "every kernel has a caller");
@@ -159,9 +159,10 @@ console.log("\n2. THE TREE'S OWN ANSWER");
     // the round after they were counted, so the seed follows the tree down rather than sitting where it was
     // convenient. Eight of the temporal arc's ten are still here: temporalLock's four, temporalReject's two,
     // MOTION_WGSL and RING_FLOOR_WGSL.
-    // v4592 -- LOWERED again, 15 -> 14: render/motionVectorsGPU.mjs gave MOTION_WGSL a caller. Seven of the
-    // temporal arc's ten remain (RING_FLOOR, temporalLock's four, temporalReject's two).
-    const UNREACHABLE_AT_V4589 = 14;
+    // v4592 -- LOWERED again, 15 -> 14: render/motionVectorsGPU.mjs gave MOTION_WGSL a caller.
+    // v4593 -- 14 -> 12: render/temporalRejectGPU.mjs took DISOCCLUSION_WGSL and RECTIFY_WGSL. FIVE of the
+    // temporal arc's ten remain -- RING_FLOOR and temporalLock's four -- against ten when the census was built.
+    const UNREACHABLE_AT_V4589 = 12;
     ok("!! *** no EIGHTEENTH kernel arrives with nothing but a gate able to run it ***",
        r.unreachable.length <= UNREACHABLE_AT_V4589,
        `${r.unreachable.length} against a frozen ${UNREACHABLE_AT_V4589}. OWED: a runner for each, or a reason ` +

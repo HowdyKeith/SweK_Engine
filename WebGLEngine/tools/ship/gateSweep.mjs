@@ -3767,6 +3767,31 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since250: Object.freeze({
+        at: "v4593", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/temporalRejectGPU-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/temporalRejectGPU.mjs", "tools/ship/kernelReach-selfcheck.mjs"]),
+        verdict: "green, 1862 ms alone. FIVE of the seventeen: DISOCCLUSION_WGSL and RECTIFY_WGSL have a caller " +
+                 "and the census reads 12, with five of the temporal arc's original ten left. *** AND THE PAGE IS " +
+                 "DELIBERATELY NOT WIRED TO IT, WHICH IS A MEASUREMENT RATHER THAN A SHRUG: *** fsr.html's scene " +
+                 "is a continuous function of (u, v) with no z, so nothing is hidden and nothing can be revealed. " +
+                 "At the page's own size, pan and camera the test flags 192 of 36,864 and ALL 192 ARE THE " +
+                 "OFFSCREEN COLUMN -- genuine disocclusion zero. The same frame with a near slab: 384. Wiring it " +
+                 "would ship a pass whose output is provably the column the accumulate already rejected, on a " +
+                 "page that exists to show things firing, after four rounds spent finding controls that cannot " +
+                 "fail. What a caller needs is occluding geometry, which is a change to what the page IS. *** AND " +
+                 "THE TWO KERNELS CANNOT BE CHAINED, WHICH THE FIRST DRAFT PRETENDED THEY COULD: *** DISOCCLUSION " +
+                 "writes a MASK (1 = history wrong), RECTIFY reads a FACTOR (1 = history trusted), and the thing " +
+                 "that inverts is historyFactorCPU, which has no WGSL anywhere in the tree. The draft dispatched " +
+                 "both, bound an ALL-ZERO factor, and carried a comment claiming it fed the mask in -- code and " +
+                 "comment disagreeing, with the code meaning DISCARD ALL HISTORY on every pixel. Removed, the " +
+                 "reason recorded where the method would have been, and its absence asserted so it cannot come " +
+                 "back quietly -- a sabotage putting it back goes red. Sabotage: 6 mutations, 6 caught, and TWO " +
+                 "OF THEM DID NOT APPLY ON THE FIRST ATTEMPT AND SCORED FAIL=0 -- no-ops, not 0-REDs, which is " +
+                 "v4587's distinction and would otherwise have recorded the threshold refusal and the kernel's " +
+                 "own gap test as exercised while nothing had touched either.",
+    }),
     since249: Object.freeze({
         at: "v4592", swept: 1, green: 1, red: 0,
         added: Object.freeze(["render/motionVectorsGPU-selfcheck.mjs"]),
