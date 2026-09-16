@@ -122,8 +122,10 @@ function triAt(bvh, tri) {
     return [[t[i], t[i + 1], t[i + 2]], [t[i + 3], t[i + 4], t[i + 5]], [t[i + 6], t[i + 7], t[i + 8]]];
 }
 
-/** The triangle's face normal, oriented toward (tx,ty,tz) -- correct for a wall or ceiling, not just a floor. */
-function faceNormalToward(a, b, c, tx, ty, tz) {
+/** The triangle's face normal, oriented toward (tx,ty,tz) -- correct for a wall or ceiling, not just a floor.
+ *  Exported for tools/ship/capsuleCollideTsl-selfcheck.mjs (task #86): the CPU reference a GPU port is graded
+ *  against needs the REAL function, not a second copy that could quietly drift from this one. */
+export function faceNormalToward(a, b, c, tx, ty, tz) {
     let n = cross(sub(b, a), sub(c, a));
     const len = Math.hypot(n[0], n[1], n[2]) || 1;
     n = [n[0] / len, n[1] / len, n[2] / len];
