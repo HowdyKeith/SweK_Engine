@@ -339,8 +339,13 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // ROW BY ROW, because its whole claim is vertical. Sharing a file would have meant sharing frames, and
     // frames chosen for one axis are the wrong frames for the other -- which is the same lesson the
     // not-graded note in …Species11 records from the other side.
-    gates: 1681, usesOk: 1660, definesOk: 1652, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1553, condFirst: 91, unknownSignature: 16,
+    // v4639 -- RE-TAKEN 1681 -> 1683 for tools/ship/murmurSpecies12-selfcheck.mjs (duet) and …Species13
+    // (chorus). SIXTEEN of murmur's eighteen species are now ported and graded, across THIRTEEN species
+    // gates -- and the count of gates has exceeded the count of PAIRS for five rounds running, because since
+    // v4636 no two species have shared one. The reason has changed each time (compiles, then frames, then
+    // measurement axes) and the record keeps both numbers for that reason.
+    gates: 1683, usesOk: 1662, definesOk: 1654, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1555, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

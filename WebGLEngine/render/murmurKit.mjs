@@ -742,6 +742,11 @@ export const MH_SHAPE = Object.freeze({
     // way: a shell that deforms little needs a firmer edge to still be a shell.
     aura: Object.freeze([0.022, 0.008, 0.4, 1.35]),
     flux: Object.freeze([0.022, 0.008, 8.6, 1.22]),
+    // THE LAST TWO OF THE SIXTEEN THIS PORT CARRIES, and they close the table's widest gap: chorus's breath
+    // lane is 15.6 against duet's 3.1, a factor of five, which is a shell that swells once a quarter-minute
+    // against a pair that breathes with its own orbit.
+    duet: Object.freeze([0.023, 0.007, 3.1, 1.25]),
+    chorus: Object.freeze([0.021, 0.008, 15.6, 1.20]),
     geode: Object.freeze([0.021, 0.007, 11.7, 1.22]),
 });
 
@@ -1045,6 +1050,88 @@ export const MH_FLUX = Object.freeze({
     medB: 0.055, medS: 0.030, medLane: 2.1, curtainGain: 0.85,
     absorb: 2.90, gain: 2.40,
     flourishSlot: 15.0, flourishDur: 11.3,
+});
+
+/**
+ * DUET'S TWO BODIES: an orbit that is never face-on and never edge-on, and the occlusion that turns "dimmer"
+ * into "behind".
+ *
+ * duet.ts states the whole species in one paragraph: "TWO THINGS IN ONE VOLUME IS A DEPTH PROBLEM ... Two
+ * bright blobs going round each other on a flat disc is a loading spinner; two bodies passing in front of and
+ * behind one another with the far one visibly dimmer and partly eaten by the near one is a conversation
+ * happening in a space." Three mechanisms produce that and each is one line: the orbit is TILTED and
+ * precesses; the far one is DIMMER, because both bodies are solved at the view ray's closest approach so each
+ * knows how deep into the glass it is; and the near one OCCLUDES the far one -- "that is the cue that turns
+ * dimmer into behind, and without it the pair reads as two lamps at different brightnesses rather than as two
+ * objects at two depths."
+ *
+ * *** AND THE BALANCE IS A SPLIT, NOT A GAIN, WHICH IS THE PART A GATE CAN PROVE. *** brA = 2 * bal and
+ * brB = 2 * (1 - bal), so the two brightnesses always SUM TO TWO however the balance moves. duet.ts: level
+ * "pushes decisively toward one of them: somebody has the floor. Not both brighter, which would say nothing;
+ * brighter THERE and dimmer here."
+ */
+export const MH_DUET = Object.freeze({
+    leanB: 0.62, leanAmp: 0.20, leanRate: 0.037,
+    precRate: 0.064, precWob: 0.45, precLane: 2.0,
+    rNear: 0.30, rFar: 0.50, rSmall: 1.36,
+    rateB: 0.40, rateK: 0.55, orbitWob: 0.40, orbitLane: 3.0,
+    braidDrive: 0.16, braidFlourish: 0.06, braidRate: 3.0,
+    wAB: 0.145, wAK: 0.030, wASmall: 1.50, ratioLo: 0.52, ratioHi: 1.0, ratioSmall: 0.65,
+    swayB: 0.5, swayAmp: 0.15, swayRate: 0.21, swayWob: 0.50, swayLane: 7.0,
+    balVoice: 0.40, balLo: 0.06, balHi: 0.94,
+    // *** THE OCCLUSION COEFFICIENT. *** Whichever body the ray reaches FIRST eats the other by its own
+    // density at this pixel: exp(-2.40 * core). The branch on sA < sB is the only ordering in the species and
+    // it is exact, because both distances are known in closed form rather than sampled.
+    occlude: 2.40,
+    coreGain: 1.05, scatterAmp: 0.30,
+    medB: 0.085, medS: 0.044, medLane: 2.2, medAbsorb: 2.20, medGain: 3.60,
+    // A warm of the anchor, B cool of it -- and the weights are NOT symmetric (0.85 against 1.00), so the
+    // pair's colour conversation leans the way its own file says it does.
+    hueA: 0.85, hueB: -1.00,
+    flourishSlot: 6.0, flourishDur: 8.3,
+});
+
+/**
+ * CHORUS'S SEVEN VOICES: a Fibonacci shell, and the phase relationship that is the actual subject.
+ *
+ * *** THE LICENCE IS NARROW AND chorus.ts SPENDS ITS OPENING ON IT. *** "THE ONE HERO LICENSED A RHYTHM ...
+ * The family's verbs are FLOW and SETTLE, and breathing luminance is banned as a default motif precisely
+ * because it is the first thing everyone reaches for. The carve-out is for a species whose concept literally
+ * IS a rhythm, and an ensemble breathing is that: the thing the species is actually about is not the
+ * breathing at all but the PHASE RELATIONSHIP between the breaths."
+ *
+ * SO THE DESIGN IS SYNC, NOT PULSE: "At rest the voices are scattered across the cycle -- sync at zero
+ * spreads them over a full period -- and what the eye reads is a loose, uncountable shimmer with no beat in
+ * it, because nothing ever coincides. As sync rises they gather, and at one they breathe as a single body."
+ * That is a claim about the ENSEMBLE'S TOTAL OVER TIME rather than about any one voice, which is why the gate
+ * that grades it measures a variance across frames and not a brightness in one.
+ *
+ * KEPT GENTLE, which is the other half of the licence: the breath is floored so "no voice ever goes out and
+ * the ensemble never blinks" -- life runs 1 - breathe + breathe * sin^2, so its floor is 1 - breathe.
+ */
+export const MH_CHORUS = Object.freeze({
+    count: 7,
+    // THE SHELL IS FIBONACCI so the seven "are evenly spread over the sphere without any two ever lining up
+    // into a row or a ring". 2.39996323 is the golden angle in radians.
+    golden: 2.39996323, shellR: 0.54, shellWob: 0.09, shellRate: 0.061, shellRateK: 0.009, shellPhase: 2.2,
+    driftAmp: 0.05, driftRateX: 0.043, driftRateY: 0.037, driftPhaseY: 1.7,
+    turnRate: 0.048, turnWob: 0.45, turnLane: 2.0,
+    midIn: 0.26, midOut: 0.62, farIn: 0.10, farOut: 0.42,
+    // "Small enough to stay separate on a shell this size: at 0.14 against a spacing of about 0.35 the seven
+    // ran together into one lobed mass and the ensemble stopped being countable, WHICH IS THE ONE THING AN
+    // ENSEMBLE HAS TO BE."
+    radB: 0.082, radK: 0.038, radSmall: 1.75,
+    brightB: 0.70, brightK: 0.55,
+    syncK: 0.75, perB: 8.4, perPace: 2.2 * 0.6,
+    breatheB: 0.30, breatheK: 0.45, breatheSmall: 1.35,
+    // The phase ladder sync closes: voice k sits at k * 0.897 of a full turn at sync 0, and at 0 at sync 1.
+    phaseStep: 0.897,
+    // LEVEL PICKS OUT THE NEAREST rather than brightening the ensemble: "An ensemble where the front row
+    // answers is a much better picture of being listened to than one where everybody gets louder."
+    liftB: 0.25, liftFront: 1.15,
+    coreAmp: 0.60, scatterAmp: 0.42,
+    medB: 0.048, medS: 0.028, medLane: 2.1, medAbsorb: 2.00, medGain: 3.30,
+    flourishSlot: 29.0, flourishDur: 11.1,
 });
 
 /** tempest's lightning: the two lane seeds, their slot lengths, and the radius its depth mask kills at. */

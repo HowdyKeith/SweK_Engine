@@ -5248,6 +5248,58 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "orb-species-block-per-shader; the next orb round starts there.",
     }),
     // v4635 -- THE 247th CLOSING. No gate added: a row added to one that existed, and a 3,561 ms refund.
+    // v4639 -- THE 251st CLOSING: duet and chorus, and a headline that measurement would not support.
+    since260: Object.freeze({
+        at: "v4639", swept: 2, green: 2, red: 0,
+        added: Object.freeze([
+            "tools/ship/murmurSpecies12-selfcheck.mjs",
+            "tools/ship/murmurSpecies13-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 1,736 and 2,344 ms on the rotation, real WebGPU, 5 rows, carrying DUET and CHORUS " +
+                 "-- the fifteenth and sixteenth of murmur's eighteen, and the pair that solves its lights at " +
+                 "the ray's CLOSEST APPROACH rather than marching them: duet two of them, chorus seven on a " +
+                 "Fibonacci shell. *** THE ROUND'S FINDING IS THAT CHORUS'S HEADLINE IS NOT WHAT ITS " +
+                 "ARITHMETIC DOES, AND THE GATE REPORTS IT RATHER THAN ASSERTING IT. *** chorus.ts: \"As sync " +
+                 "rises they gather, and at one they breathe as a single body. That transition from many " +
+                 "rhythms to one is the whole species.\" The line that implements it is phase = " +
+                 "mix(fk * 0.897, 0.0, sync) * 2pi -- WHICH SCALES A MODULAR QUANTITY LINEARLY. Phase lives " +
+                 "on a circle, so multiplying the ladder by (1 - sync) does not gather the seven, it " +
+                 "RE-SPACES them, and whether the new spacing clusters them depends on its fractional part. " +
+                 "Computed off the shader's own constants over three breath periods, the ensemble's " +
+                 "modulation runs 9.89%, 6.63%, 14.65%, 2.61%, 8.17%, 42.43% at sync 0, 0.25, 0.50, 0.75, " +
+                 "0.90 and 1.00: NOT MONOTONIC, and the gather is an endpoint effect that happens only AT " +
+                 "1.00. AND THIS PORT CANNOT REACH THAT ENDPOINT: the shader computes sync = " +
+                 "clamp(syncK * 0.75 + 0.85 * drive + 0.55 * complete) and neither drive nor complete is " +
+                 "wired here, so the knob tops out at 0.75 -- the LEAST modulated setting of any sampled. " +
+                 "The first cut of the gate trusted the prose and wrote the row anyway: it read 4.32% at " +
+                 "sync 0 against 3.52% at sync 1, backwards and small enough to pass for noise. The port is " +
+                 "faithful, the constant is murmur's, the clamp is murmur's, and what is reported is a " +
+                 "property of murmur's SOURCE -- reported rather than repaired, because repairing it means " +
+                 "diverging from the source on this port's own authority. TEN SABOTAGES, NINE RED BY NAME. " +
+                 "*** AND ONE OF THEM CAUGHT AN INSTRUMENT THAT WAS NOT MEASURING WHAT ITS ROW CLAIMED. *** " +
+                 "chorus's level row asserts the ensemble gets more UNEQUAL, \"which a uniform gain cannot " +
+                 "do\" -- and the first instrument, brightest-over-dimmest above an 88th-percentile " +
+                 "threshold, was not blind to one: the voices sit on a background that does not scale with " +
+                 "level, so a uniform lift changes WHICH pixels clear the threshold and the ratio grows " +
+                 "anyway. An equal-average uniform lift read 5.00x to 13.11x, indistinguishable from the " +
+                 "real thing. Replaced by local maxima with the frame's median subtracted, which is " +
+                 "genuinely gain-invariant: the real front-weighting now reads x3.828 and the uniform lift " +
+                 "x0.858. WHAT ELSE THE ROWS MEASURE: duet's level multiplies the louder body x4.18 and the " +
+                 "quieter one x0.85 -- it goes DOWN -- taking the pair's ratio 2.384x to 11.686x, because " +
+                 "the weights are 2*bal and 2*(1-bal) and sum to two at every balance; sep moves them 6.1 px " +
+                 "to 10.4 while voice moves them 0.3; and across one full orbit read off the species' own " +
+                 "0.675 rad/s the depth ordering swings 1.07x to 4.77x while the pair never closes under " +
+                 "6 px, which rejects face-on and edge-on at once. chorus's ensemble never falls below 0.375 " +
+                 "of its own peak at the deepest breath. THREE MECHANISMS ARE TRANSCRIBED AND EXPLICITLY NOT " +
+                 "GRADED, each with its number: duet's occlusion (worth 3.9% -- the two bodies are 0.60 of " +
+                 "the body apart and 0.15 wide, so they almost never overlap on screen), chorus's shell " +
+                 "arrangement, and chorus's countability (a voice is about 1.5 px across at this frame size, " +
+                 "so a flood fill finds two or three blobs and not seven -- the FRAME's limit, not the " +
+                 "shader's). VERIFIED BY BYTES across all SIXTEEN species and three cases: 48 frames, 0 " +
+                 "bytes different.",
+    }),
     // v4638 -- THE 250th CLOSING: aura and flux, the two sheet heroes, and a frame convention that bit.
     since259: Object.freeze({
         at: "v4638", swept: 2, green: 2, red: 0,

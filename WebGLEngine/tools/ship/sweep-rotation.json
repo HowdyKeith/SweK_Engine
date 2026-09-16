@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed.",
- "at": "2026-09-16T21:50:59.987Z",
+ "at": "2026-09-16T22:16:42.472Z",
  "budgetMs": 3000,
  "lastRun": 1,
  "rotated": [
@@ -2088,6 +2088,18 @@
    "ms": 1741,
    "code": 0,
    "at": "2026-09-16T21:50:59.987Z"
+  },
+  {
+   "gate": "tools/ship/murmurSpecies12-selfcheck.mjs",
+   "ms": 1736,
+   "code": 0,
+   "at": "2026-09-16T22:16:40.024Z"
+  },
+  {
+   "gate": "tools/ship/murmurSpecies13-selfcheck.mjs",
+   "ms": 2344,
+   "code": 0,
+   "at": "2026-09-16T22:16:42.472Z"
   },
   {
    "gate": "tools/ship/murmurSpecies2-selfcheck.mjs",

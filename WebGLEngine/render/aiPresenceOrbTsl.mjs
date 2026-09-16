@@ -74,12 +74,18 @@ export const ORB_KNOBS = Object.freeze([
     // correct. The port names knobs rather than numbering them, which makes that hazard unreachable instead
     // of merely documented -- and this is the first species in twelve where it would have fired.
     "ribbon", "swirl", "depth3d", "stream", "bend", "height",
+    // duet's three and chorus's three -- the last six, and the sixteenth species closes the roster this
+    // port carries. `breath` rather than chorus's own `depth` because THIS FILE ALREADY HAS a `depth`
+    // uniform, the shared one every species multiplies its density by. Two knobs with one name is the
+    // hazard the naming convention exists to prevent, and it would have fired silently here: chorus's c2
+    // would have been read as the family depth and its breath would have had no knob at all.
+    "sep", "orbit", "ratio", "voices", "sync", "breath",
 ]);
 
 /** The species this file can build. murmur ships eighteen; these are the six that are ported. */
 export const ORB_SPECIES = Object.freeze(["still", "limn", "comet", "droplet", "opal", "abyss",
                                           "nebula", "tempest", "fathom", "geode", "arc", "sol",
-                                          "aura", "flux"]);
+                                          "aura", "flux", "duet", "chorus"]);
 
 /**
  * The three colour anchors the rail is built from, as murmur's own WEB-SPEC names them: ink '#0A0A0B' is the
@@ -94,7 +100,7 @@ export const ORB_COLORS = Object.freeze({
 
 import { makeMurmurKitTsl } from "./murmurKitTsl.mjs";
 import { MH_EXT, MH_TAPS, MH_SURFACE_KNOBS, MH_SHAPE, MH_DROPLET_GAIN, MH_MIST,
-         MH_TEMPEST_BOLT, MH_FATHOM, MH_GEODE, MH_ARC, MH_SOL, MH_AURA, MH_FLUX,
+         MH_TEMPEST_BOLT, MH_FATHOM, MH_GEODE, MH_ARC, MH_SOL, MH_AURA, MH_FLUX, MH_DUET, MH_CHORUS,
          MH_R, mhAa } from "./murmurKit.mjs";
 
 /**
@@ -160,7 +166,8 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
                  density: 0.5, fold: 0.5, glint: 0.5,
                  layers: 0.5, parallax: 0.5, murk: 0.4, facet: 0.5, glim: 0.5, stone: 0.5,
                  bow: 0.5, sway: 0.5, pin: 0.5, corona: 0.5, prom: 0.5, simmer: 0.5,
-                 ribbon: 0.5, swirl: 0.5, depth3d: 0.5, stream: 0.5, bend: 0.5, height: 0.5, ...knobs };
+                 ribbon: 0.5, swirl: 0.5, depth3d: 0.5, stream: 0.5, bend: 0.5, height: 0.5,
+                 sep: 0.5, orbit: 0.5, ratio: 0.5, voices: 0.5, sync: 0.5, breath: 0.5, ...knobs };
     const uniforms = {}; for (const n of ORB_KNOBS) uniforms[n] = uniform(float(k0[n])).label(n);
     // The rail's three anchors are colours, not scalars, so they sit beside the knob block rather than in it.
     const col0 = { ink: ORB_COLORS.ink, tone: ORB_COLORS.tone, tone2: ORB_COLORS.tone, ...(knobs.colors || {}) };
@@ -1581,6 +1588,185 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             return { density: fluxDensity, accF, accFH };
         };
 
+        // =====================================================================================================
+        // *** DUET -- THE FIFTEENTH. "Two lights orbiting a common centre inside the glass: the conversation." ***
+        //
+        // duet.ts: "TWO THINGS IN ONE VOLUME IS A DEPTH PROBLEM, and solving it properly is the whole species.
+        // Two bright blobs going round each other on a flat disc is a loading spinner; two bodies passing in
+        // front of and behind one another with the far one visibly dimmer and partly eaten by the near one is
+        // a conversation happening in a space."
+        //
+        // BOTH BODIES ARE SOLVED AT THE RAY'S CLOSEST APPROACH, which is what lets the occlusion be EXACT
+        // rather than sampled: the two distances sA and sB are known in closed form, so "which is in front"
+        // is a comparison and not a guess. chorus next door solves its seven the same way, which is why the
+        // two ship together.
+        const buildDuet = () => {
+            const DU = MH_DUET;
+            const sepK = clamp(uniforms.sep, 0.0, 1.0).toVar();
+            const orbitK = clamp(uniforms.orbit, 0.0, 1.0).toVar();
+            const ratioK = clamp(uniforms.ratio, 0.0, 1.0).toVar();
+            const flD = KIT.mhFlourish(uniforms.time, float(DU.flourishSlot), float(DU.flourishDur)).toVar();
+
+            // THE PLANE, bounded away from both failures: "Face-on is the spinner; edge-on is a line."
+            const lean = float(DU.leanB).add(sin(uniforms.time.mul(DU.leanRate)).mul(DU.leanAmp)).toVar();
+            const prec = KIT.mhDrift(uniforms.time, float(DU.precRate), float(DU.precWob), float(DU.precLane)).toVar();
+            const e1 = KIT.mhSpin(vec3(1.0, 0.0, 0.0), prec, float(0.0)).toVar();
+            const e2 = KIT.mhSpin(vec3(float(0.0), sin(lean), cos(lean)), prec, float(0.0)).toVar();
+            const nrm = cross(e1, e2).toVar();
+
+            const rSep = mix(float(DU.rNear), float(DU.rFar), sepK)
+                .mul(mix(float(1.0), float(DU.rSmall), smallK))
+                .mul(float(1.0).sub(flD.x.mul(0.30))).toVar();
+            const rate = float(DU.rateB).add(orbitK.mul(DU.rateK))
+                .mul(float(1.0).add(flD.x.mul(0.85))).toVar();
+            const psi = KIT.mhDrift(uniforms.time, rate, float(DU.orbitWob), float(DU.orbitLane)).toVar();
+            // THE BRAID: "two things becoming one line without merging." Off at rest; the gesture alone
+            // reaches it here, because this port has no drive signal wired.
+            const braid = flD.x.mul(DU.braidFlourish).mul(sin(psi.mul(DU.braidRate))).toVar();
+            const spoke = e1.mul(cos(psi)).add(e2.mul(sin(psi))).toVar();
+            const A = spoke.mul(rSep).add(nrm.mul(braid)).toVar();
+            const B = spoke.mul(rSep.negate()).sub(nrm.mul(braid)).toVar();
+
+            const wA = float(DU.wAB).add(sepK.mul(DU.wAK)).mul(mix(float(1.0), float(DU.wASmall), smallK)).toVar();
+            const wB = wA.mul(mix(float(DU.ratioLo), float(DU.ratioHi),
+                mix(ratioK, float(1.0), smallK.mul(DU.ratioSmall)))).toVar();
+
+            // *** THE BALANCE IS A SPLIT AND NOT A GAIN, AND THAT IS THE MEASURABLE FORM OF THE DESIGN. ***
+            // brA + brB is 2 for every value of bal, so voice moves WHICH body has the floor without moving
+            // how much floor there is. duet.ts: "Not both brighter, which would say nothing; brighter THERE
+            // and dimmer here."
+            const sway = float(DU.swayB).add(sin(KIT.mhDrift(uniforms.time, float(DU.swayRate),
+                float(DU.swayWob), float(DU.swayLane))).mul(DU.swayAmp)).toVar();
+            const bal = clamp(sway.add(uniforms.voice.mul(DU.balVoice)), DU.balLo, DU.balHi).toVar();
+            const brA = bal.mul(2.0).toVar(), brB = float(1.0).sub(bal).mul(2.0).toVar();
+
+            // BOTH BODIES, AT THE RAY'S CLOSEST APPROACH. Two dot products each, no march.
+            const toA = A.sub(P).toVar(), toB = B.sub(P).toVar();
+            const sA = dot(toA, rd).toVar(), sB = dot(toB, rd).toVar();
+            const argA = max(dot(toA, toA).sub(sA.mul(sA)), float(0.0)).div(max(wA.mul(wA), float(1e-6))).toVar();
+            const argB = max(dot(toB, toB).sub(sB.mul(sB)), float(0.0)).div(max(wB.mul(wB), float(1e-6))).toVar();
+            const visA = select(sA.greaterThan(0.0).and(sA.lessThan(L)),
+                KIT.mhInside(P.add(rd.mul(sA))).mul(exp(sA.mul(-MH_EXT))), float(0.0)).toVar();
+            const visB = select(sB.greaterThan(0.0).and(sB.lessThan(L)),
+                KIT.mhInside(P.add(rd.mul(sB))).mul(exp(sB.mul(-MH_EXT))), float(0.0)).toVar();
+            const coreA = exp(argA.negate()).mul(visA).toVar();
+            const coreB = exp(argB.negate()).mul(visB).toVar();
+
+            // *** THE OCCLUSION, AND IT IS THE LINE THAT TURNS "DIMMER" INTO "BEHIND". *** Whichever the ray
+            // reaches first eats the other by its own density at this pixel. The branch is written as a pair
+            // of selects because the shader has no branches -- and it is EXACT, because sA and sB are solved
+            // rather than sampled. Without it "the pair reads as two lamps at different brightnesses rather
+            // than as two objects at two depths".
+            const aFirst = sA.lessThan(sB);
+            const occA = select(aFirst, float(1.0), exp(coreB.mul(-DU.occlude))).toVar();
+            const occB = select(aFirst, exp(coreA.mul(-DU.occlude)), float(1.0)).toVar();
+
+            const eA = coreA.mul(DU.coreGain).add(KIT.mhScatter(argA, float(DU.scatterAmp)).mul(visA))
+                .mul(brA).mul(occA).toVar();
+            const eB = coreB.mul(DU.coreGain).add(KIT.mhScatter(argB, float(DU.scatterAmp)).mul(visB))
+                .mul(brB).mul(occB).toVar();
+
+            const medAmtD = mix(float(DU.medB), float(DU.medS), smallK).toVar();
+            const accD = float(0.0).toVar();
+            const transD = float(1.0).toVar();
+            Loop({ start: 0, end: MH_TAPS }, ({ i }) => {
+                const pD = P.add(rd.mul(float(i).add(0.5).mul(ds)));
+                const eD = KIT.mhMedium(pD, uniforms.time, float(DU.medLane)).mul(medAmtD).mul(KIT.mhInside(pD)).toVar();
+                accD.addAssign(eD.mul(transD).mul(ds));
+                transD.assign(transD.mul(exp(eD.mul(DU.medAbsorb).add(MH_EXT).mul(ds).negate())));
+            });
+            const duetDensity = accD.mul(DU.medGain).add(eA).add(eB).mul(uniforms.depth);
+            return { density: duetDensity, eA, eB };
+        };
+
+        // =====================================================================================================
+        // *** CHORUS -- THE SIXTEENTH. "Many faint lights breathing loosely, falling into alignment." ***
+        //
+        // *** THE SPECIES IS NOT THE BREATHING. *** chorus.ts spends its opening refusing that reading: "THE
+        // ONE HERO LICENSED A RHYTHM, and the licence is narrow. The family's verbs are FLOW and SETTLE, and
+        // breathing luminance is banned as a default motif precisely because it is the first thing everyone
+        // reaches for. The carve-out is for a species whose concept literally IS a rhythm ... the thing the
+        // species is actually about is not the breathing at all but the PHASE RELATIONSHIP between the
+        // breaths."
+        //
+        // SO THE DESIGN IS SYNC, NOT PULSE: "At rest the voices are scattered across the cycle ... and what
+        // the eye reads is a loose, uncountable shimmer with no beat in it, because nothing ever coincides. As
+        // sync rises they gather, and at one they breathe as a single body. That transition from many rhythms
+        // to one is the whole species, and it is why the rhythm had to be allowed: you cannot show alignment
+        // without something to align."
+        const buildChorus = () => {
+            const CH = MH_CHORUS;
+            const voicesK = clamp(uniforms.voices, 0.0, 1.0).toVar();
+            const syncKn = clamp(uniforms.sync, 0.0, 1.0).toVar();
+            const depthKn = clamp(uniforms.breath, 0.0, 1.0).toVar();
+            const flC = KIT.mhFlourish(uniforms.time, float(CH.flourishSlot), float(CH.flourishDur)).toVar();
+
+            const sync = clamp(syncKn.mul(CH.syncK), 0.0, 1.0).toVar();
+            const per = float(CH.perB).sub(uniforms.glintRate.mul(CH.perPace)).toVar();
+            const breathe = float(CH.breatheB).add(depthKn.mul(CH.breatheK))
+                .mul(mix(float(1.0), float(CH.breatheSmall), smallK)).toVar();
+            const mid = float(1.0).sub(smoothstep(float(CH.midIn), float(CH.midOut), smallK)).toVar();
+            const far = float(1.0).sub(smoothstep(float(CH.farIn), float(CH.farOut), smallK)).toVar();
+            // THE RADIUS IS SET BY COUNTABILITY, not by taste: "at 0.14 against a spacing of about 0.35 the
+            // seven ran together into one lobed mass and the ensemble stopped being countable, which is the
+            // one thing an ensemble has to be."
+            const rad = float(CH.radB).add(voicesK.mul(CH.radK)).mul(mix(float(1.0), float(CH.radSmall), smallK)).toVar();
+            const brightC = float(CH.brightB).add(voicesK.mul(CH.brightK)).toVar();
+            const turn = KIT.mhDrift(uniforms.time, float(CH.turnRate), float(CH.turnWob), float(CH.turnLane)).toVar();
+
+            const voiceE = float(0.0).toVar(), voiceH = float(0.0).toVar();
+            for (let k = 0; k < CH.count; k++) {
+                const wk = k < 3 ? float(1.0).toVar() : (k < 5 ? mid : far);
+                // A FIBONACCI SHELL: "evenly spread, never in a row or a ring." zc and the golden angle are
+                // compile-time for zc and a node for the angle, because the shell TURNS.
+                const zc = 1.0 - 2.0 * (k + 0.5) / CH.count;
+                const rc = Math.sqrt(Math.max(1 - zc * zc, 0));
+                const ang = turn.add(k * CH.golden).toVar();
+                const dirk = vec3(cos(ang).mul(rc), float(zc), sin(ang).mul(rc)).toVar();
+                const c = dirk.mul(float(CH.shellR).add(
+                        sin(uniforms.time.mul(CH.shellRate + CH.shellRateK * k).add(k * CH.shellPhase)).mul(CH.shellWob)))
+                    .add(vec3(sin(uniforms.time.mul(CH.driftRateX).add(k)).mul(CH.driftAmp),
+                              sin(uniforms.time.mul(CH.driftRateY).add(k * CH.driftPhaseY)).mul(CH.driftAmp),
+                              float(0.0))).toVar();
+
+                // *** THE BREATH, AND THE PHASE LADDER SYNC CLOSES. *** At sync 0 voice k sits at
+                // k * 0.897 of a turn -- seven phases spread over the whole cycle, so nothing ever coincides
+                // and the ensemble's TOTAL barely moves. At sync 1 every phase is 0 and the seven swell
+                // together. FLOORED AT 1 - breathe so "no voice ever goes out and the ensemble never blinks".
+                const phase = mix(float(k * CH.phaseStep), float(0.0), sync).mul(2 * Math.PI).toVar();
+                const sn = sin(uniforms.time.mul(2 * Math.PI).div(max(per, float(1e-3))).add(phase)).toVar();
+                const life = float(1.0).sub(breathe).add(breathe.mul(sn).mul(sn)).toVar();
+                const lifeF = life.add(select(flC.z.mul(6.999).floor().equal(float(k)), flC.x.mul(0.85), float(0.0))).toVar();
+
+                const to = c.sub(P).toVar();
+                const s = dot(to, rd).toVar();
+                const arg = max(dot(to, to).sub(s.mul(s)), float(0.0)).div(max(rad.mul(rad), float(1e-6))).toVar();
+                const vis = KIT.mhInside(P.add(rd.mul(s))).mul(exp(s.mul(-MH_EXT))).toVar();
+                // LEVEL PICKS OUT THE NEAREST rather than brightening everybody: "An ensemble where the front
+                // row answers is a much better picture of being listened to than one where everybody gets
+                // louder."
+                const front = float(0.5).add(clamp(c.z, -1.0, 1.0).mul(0.5)).toVar();
+                const lift = float(1.0).add(uniforms.voice.mul(float(CH.liftB).add(front.mul(CH.liftFront)))).toVar();
+                const eK = exp(arg.negate()).mul(CH.coreAmp).add(KIT.mhScatter(arg, float(CH.scatterAmp)))
+                    .mul(vis).mul(lifeF).mul(lift).mul(brightC).mul(wk).toVar();
+                const liveK = s.greaterThan(0.0).and(s.lessThan(L));
+                voiceE.addAssign(select(liveK, eK, float(0.0)));
+                voiceH.addAssign(select(liveK, eK.mul((k - 3) / 3), float(0.0)));
+            }
+
+            const medAmtC = mix(float(CH.medB), float(CH.medS), smallK).toVar();
+            const accC = float(0.0).toVar();
+            const transC = float(1.0).toVar();
+            Loop({ start: 0, end: MH_TAPS }, ({ i }) => {
+                const pC = P.add(rd.mul(float(i).add(0.5).mul(ds)));
+                const eC = KIT.mhMedium(pC, uniforms.time, float(CH.medLane)).mul(medAmtC).mul(KIT.mhInside(pC)).toVar();
+                accC.addAssign(eC.mul(transC).mul(ds));
+                transC.assign(transC.mul(exp(eC.mul(CH.medAbsorb).add(MH_EXT).mul(ds).negate())));
+            });
+            const chorusDensity = accC.mul(CH.medGain).add(voiceE).mul(uniforms.depth);
+            return { density: chorusDensity, voiceE, voiceH };
+        };
+
         // *** ONE CALL, AND IT IS THE ONLY SPECIES BLOCK THAT RUNS. *** The seven closures above are
         // declared and six of them are never invoked, so their nodes are never built and never reach the
         // WGSL. Everything below reads `SP`, whose shape is each hero's own contract: always a density, plus
@@ -1600,7 +1786,12 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             // THE TWO SHEET HEROES. They are the pair that WANTS the march the three before them were built
             // to escape: aura's crossings resolve as occlusion because the taps arrive in depth order.
             : species === "aura" ? buildAura()
-            : species === "flux" ? buildFlux() : buildStill();
+            : species === "flux" ? buildFlux()
+            // THE LAST TWO, and they close the roster: both solve their lights at the ray's CLOSEST
+            // APPROACH -- duet two of them with an exact depth comparison between, chorus seven of them on
+            // a Fibonacci shell -- so neither marches anything but its medium.
+            : species === "duet" ? buildDuet()
+            : species === "chorus" ? buildChorus() : buildStill();
         const density = SP.density;
 
         // ---- THE SURFACE IS murmur's NOW, NOT THIS FILE'S APPROXIMATION OF IT ------------------------------
@@ -1739,6 +1930,21 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
                     ? select(SP.accA.greaterThan(1e-4), SP.accAH.div(SP.accA), float(0.0)).mul(spreadK).mul(KIT.MH_SPREAD)
                     : species === "flux"
                     ? select(SP.accF.greaterThan(1e-4), SP.accFH.div(SP.accF), float(0.0)).mul(spreadK).mul(KIT.MH_SPREAD)
+                    // *** duet's HUE IS THE ONLY ASYMMETRIC TWO-BODY RAIL IN THE COLLECTION: *** A rides
+                    // +0.85 of the spread and B rides -1.00, so the pair is not a mirror about the anchor.
+                    // Its own file spells hue = (eA * 0.85 - eB * 1.0) / (eA + eB), guarded on the INTERIOR
+                    // but divided by the two bodies -- two different quantities in one expression, which is
+                    // transcribed rather than tidied.
+                    : species === "duet"
+                    ? select(SP.eA.add(SP.eB).greaterThan(1e-4),
+                             SP.eA.mul(MH_DUET.hueA).add(SP.eB.mul(MH_DUET.hueB)).div(max(SP.eA.add(SP.eB), float(1e-4))),
+                             float(0.0)).mul(spreadK).mul(KIT.MH_SPREAD)
+                    // chorus walks its seven across the spread by INDEX -- (k - 3)/3, so voice 0 sits a full
+                    // step cool, voice 3 on the anchor and voice 6 a full step warm. The ensemble is a chord
+                    // in the literal sense, and the guard is 1e-5 rather than the family's 1e-4 because seven
+                    // small lights sum to less than one big one.
+                    : species === "chorus"
+                    ? select(SP.voiceE.greaterThan(1e-5), SP.voiceH.div(SP.voiceE), float(0.0)).mul(spreadK).mul(KIT.MH_SPREAD)
                     : select(SP.acc.greaterThan(1e-4), SP.accH.div(SP.acc), float(0.0)).mul(spreadK).mul(KIT.MH_SPREAD);
         // mh_present's own hueMix: the hue scaled by the share of THIS pixel's energy that the species says
         // carries colour. still and comet count the interior plus 0.7 of the rim, droplet 0.6 of it, limn the
@@ -1758,6 +1964,11 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             // filament's contribution to the interior rather than the interior itself, and sol's is
             // hue * interior / max(e, 1e-4). Two different numerators on two species that share a solver,
             // transcribed from each file rather than unified because they share one.
+            // duet weights by its TWO BODIES alone and chorus by its SEVEN -- neither by the interior, and
+            // neither by the rim. Both transcribed: duet's line is hueMix = hue * (eA + eB) / max(e, 1e-4)
+            // and chorus's is hue * voiceE / max(e, 1e-4).
+            : species === "duet" ? SP.eA.add(SP.eB)
+            : species === "chorus" ? SP.voiceE
             : species === "arc" ? SP.filE.mul(MH_ARC.filGain)
             : species === "sol" ? interior
             // aura and flux take the DEFAULT TOO, checked the same way: both files spell
