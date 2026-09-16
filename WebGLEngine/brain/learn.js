@@ -247,18 +247,26 @@ export async function loadDeepWeights(path, buildDeep) {
             // column moved to the end; the new threat features start at
             // zero, so the migrated net is BIT-EQUIVALENT to the old one
             // until training moves the new columns).
+            //
+            // v88 -- "v15 -- generalized: ANY shorter row" was only half true: the comment said it and the
+            // UPPER bound (oldRow < nInNew) backed it, but the LOWER bound stayed `oldRow >= 13` -- the attack
+            // policy's own pre-v8 feature count, not a structural requirement of the remap itself (which only
+            // needs at least one real column plus a bias, i.e. oldRow >= 2). A caller growing a SMALLER deep
+            // net -- brain/capsuleHazard.js's 6->9 features, task #87's own proof of this exact migration path
+            // -- hit that floor and fell all the way through to "no trained weights found", silently discarding
+            // real training the way this whole mechanism exists to prevent. The floor is now the remap's own
+            // structural minimum, not one policy's history.
             {
                 const nInNew = layers[0].nIn, H = layers[0].nOut;
                 const oldRow = j.layers[0].W.length / H;
-                // v15 -- generalized: ANY shorter row (13->16, 15->16, ...)
-                if (oldRow >= 13 && oldRow < nInNew && j.layers[0].W.length % H === 0) {
+                if (oldRow >= 2 && oldRow < nInNew && j.layers[0].W.length % H === 0) {
                     const Wnew = new Array(H * nInNew).fill(0);
                     for (let o = 0; o < H; o++) {
                         for (let i = 0; i < oldRow - 1; i++) Wnew[o * nInNew + i] = j.layers[0].W[o * oldRow + i];
                         Wnew[o * nInNew + (nInNew - 1)] = j.layers[0].W[o * oldRow + (oldRow - 1)];  // bias column
                     }
                     j.layers[0].W = Wnew;
-                    console.log(`[learn] migrated attack weights ${oldRow} -> ${nInNew} features (bias relocated, threat columns zeroed)`);
+                    console.log(`[learn] migrated deep weights ${oldRow} -> ${nInNew} features (bias relocated, new columns zeroed)`);
                 }
             }
             if (j.layers.length === layers.length &&
