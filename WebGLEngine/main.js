@@ -6788,6 +6788,7 @@ if (typeof window !== "undefined") {
 import { Camera }         from "./camera/camera.js";
 import { VOXEL }          from "./world/voxelFormat.js";
 import { buildControllerLabWorld, controllerLabVoxelColumns, SPAWN as CONTROLLER_LAB_SPAWN } from "./world/controllerLabWorld.mjs";   // task board #13's live demo
+import { buildSplatWalkWorld, cloudToParsedSplats, SPAWN as SPLAT_WALK_SPAWN } from "./world/splatWalkWorld.mjs";   // task board #83's live demo
 import * as reproParams  from "./engine/reproParams.js";   // v1986 — ?seed/?cam/?preset deterministic repro
 import { makeGamepadInput } from "./input/gamepadInput.js";   // v1409 — XInput / gamepad
 import { VoxelWorld }     from "./world/world.js";
@@ -16815,6 +16816,86 @@ const DEMO_MODES = [
         },
         tick() {
             const hud = window._controllerLabHud;
+            if (!hud || camera.mode !== "fp") return;
+            const state = camera.movementAnimState();
+            const view = camera.viewMode === "third" ? "Third-person" : "First-person";
+            hud.textContent = `${view} · ${state.toUpperCase()} · ${camera._fpOnGround ? "grounded" : "airborne"}`;
+        },
+    },
+    {
+        // Task board #83. The SAME cloud buildSplatWalkWorld() rasterises into this demo's own collider (task
+        // #80's capsule-vs-BVH, via camera.js's task #13 Stage B path) is ALSO what gets rendered here, through
+        // render/SplatRenderer.js's real Gaussian-splat pipeline (gpu/SplatScene.js's splatScene singleton,
+        // already drawn every frame regardless of which demo is active) via this module's own
+        // cloudToParsedSplats() bridge -- not a voxel stand-in built from the same numbers (CONTROLLER LAB's
+        // approach, task #82), the literal same point cloud, walkable and visible because it is one dataset.
+        //
+        // No `terrain: true` here (unlike controller_lab) -- there is no voxel visual to keep, and omitting it
+        // already gives a clean, empty stage (main.js's own _applyIsolation: no terrain -> "clean" -- hides the
+        // voxel world/water/grass/kaiju/civ meshes, same effect controller_lab gets from `isolation: "quiet"`,
+        // for free) so the splat shell is the only geometry in view.
+        id: "splat_walk",
+        autoplay: false,
+        label: "SPLAT WALK — walking a live Gaussian-splat scene with capsule collision",
+        hint: "task #83: a hollow sphere of Gaussian splats, walked with the same capsule collision as CONTROLLER LAB -- the collider comes from rasterising the SAME cloud that gets rendered",
+        controls: [
+            "WASD — walk (capsule-vs-mesh collision against a splat-derived surface) · Mouse — look (click canvas to lock pointer)",
+            "Space — jump · Shift — sprint",
+            "V — toggle first/third person",
+            "You spawn falling a few units above the floor -- gravity settles you onto the real (slightly bumpy) rasterised surface",
+            "Walk toward the wall: the curved shell behaves like any other wall until the local slope gets too steep to stand on, then you slide back down",
+            "HUD along the top shows the live view mode + movement state (idle/walk/run/jump/fall)",
+            "ESC — exit back to the camera",
+        ],
+        start() {
+            const { colliderBVH, cloud } = buildSplatWalkWorld();
+            splatScene.loadParsed(cloudToParsedSplats(cloud), "splatWalk", "splatWalkDemo");
+
+            camera.setWorld({ colliderBVH });
+            camera.setMode("fp");
+            camera.viewMode = "first";
+            camera.position.x = SPLAT_WALK_SPAWN.x;
+            camera.position.z = SPLAT_WALK_SPAWN.z;
+            // this module's own SPAWN.y is the camera's EYE height directly (not a feet height + eyeHeight the
+            // way CONTROLLER_LAB_SPAWN is) -- matching exactly what tools/ship/splatWalkWorld-selfcheck.mjs's
+            // own freshCamera() already drives and verifies falls + settles correctly, rather than introducing
+            // an untested offset by analogy to a different demo's convention.
+            camera.position.y = SPLAT_WALK_SPAWN.y;
+            camera.yaw = SPLAT_WALK_SPAWN.yaw;
+            camera.pitch = 0;
+            camera._fpOnGround = false;   // spawns mid-air on purpose -- see world/splatWalkWorld.mjs's own header
+            camera._fpVelY = 0;
+
+            const hud = document.createElement("div");
+            hud.id = "splatWalkHud";
+            hud.style.cssText = "position:fixed; top:70px; left:50%; transform:translateX(-50%); z-index:500; " +
+                "background:rgba(10,14,20,0.85); border:1px solid #345; border-radius:8px; padding:8px 18px; " +
+                "font-family:ui-monospace,monospace; font-size:12px; color:#cde; text-align:center; pointer-events:none;";
+            document.body.appendChild(hud);
+            window._splatWalkHud = hud;
+
+            // Same reasoning as controller_lab: no fpsShooter here, so ESC-exits-fp is this demo's own
+            // responsibility, scoped to itself and removed in stop() rather than left as a dangling listener.
+            const escHandler = (e) => {
+                if (e.key === "Escape" && camera.mode === "fp") {
+                    camera.setMode("observer");
+                    camera.setWorld(world);
+                }
+            };
+            window.addEventListener("keydown", escHandler);
+            window._splatWalkEscHandler = escHandler;
+        },
+        stop() {
+            try { if (window._splatWalkEscHandler) window.removeEventListener("keydown", window._splatWalkEscHandler); } catch {}
+            window._splatWalkEscHandler = null;
+            try { window._splatWalkHud?.remove(); } catch {}
+            window._splatWalkHud = null;
+            try { splatScene.removeLayer("splatWalkDemo"); } catch {}
+            camera.setMode("observer");
+            camera.setWorld(world);
+        },
+        tick() {
+            const hud = window._splatWalkHud;
             if (!hud || camera.mode !== "fp") return;
             const state = camera.movementAnimState();
             const view = camera.viewMode === "third" ? "Third-person" : "First-person";

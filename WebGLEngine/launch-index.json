@@ -21,9 +21,9 @@
   }
  },
  "counts": {
-  "page": 470,
+  "page": 471,
   "demo": 49,
-  "builtin": 34
+  "builtin": 36
  },
  "entries": [
   {
@@ -71,7 +71,7 @@
    "id": "ai-presence-orb.html",
    "display": "Ai Presence Orb",
    "href": "/ai-presence-orb.html",
-   "section": null,
+   "section": "Render TSL",
    "collision": false
   },
   {
@@ -167,7 +167,7 @@
    "id": "ascii-avatar.html",
    "display": "Ascii Avatar",
    "href": "/ascii-avatar.html",
-   "section": null,
+   "section": "Avatars",
    "collision": false
   },
   {
@@ -175,7 +175,7 @@
    "id": "ascii-object.html",
    "display": "Ascii Object",
    "href": "/ascii-object.html",
-   "section": null,
+   "section": "Avatars",
    "collision": false
   },
   {
@@ -183,7 +183,7 @@
    "id": "ascii-shape.html",
    "display": "Ascii Shape",
    "href": "/ascii-shape.html",
-   "section": null,
+   "section": "Avatars",
    "collision": false
   },
   {
@@ -479,7 +479,7 @@
    "id": "boot-sidecar.html",
    "display": "Boot Sidecar",
    "href": "/boot-sidecar.html",
-   "section": null,
+   "section": "System Tools",
    "collision": false
   },
   {
@@ -623,7 +623,7 @@
    "id": "building-lab.html",
    "display": "Building Lab",
    "href": "/building-lab.html",
-   "section": null,
+   "section": "Racing City",
    "collision": false
   },
   {
@@ -999,7 +999,7 @@
    "id": "device-present.html",
    "display": "Device Present",
    "href": "/device-present.html",
-   "section": null,
+   "section": "WebGPU",
    "collision": false
   },
   {
@@ -1447,7 +1447,7 @@
    "id": "fog-of-war.html",
    "display": "Fog Of War",
    "href": "/fog-of-war.html",
-   "section": null,
+   "section": "Toroidal Buffers",
    "collision": false
   },
   {
@@ -1679,7 +1679,7 @@
    "id": "heerich-avatar.html",
    "display": "Heerich Avatar",
    "href": "/heerich-avatar.html",
-   "section": null,
+   "section": "Avatars",
    "collision": false
   },
   {
@@ -1687,7 +1687,7 @@
    "id": "heightfield-vs-volume.html",
    "display": "Heightfield Vs Volume",
    "href": "/heightfield-vs-volume.html",
-   "section": null,
+   "section": "Renders",
    "collision": false
   },
   {
@@ -1799,7 +1799,7 @@
    "id": "ios-tools.html",
    "display": "Ios Tools",
    "href": "/ios-tools.html",
-   "section": null,
+   "section": "Box3D & Cross-Arch",
    "collision": false
   },
   {
@@ -1879,7 +1879,7 @@
    "id": "krbn-avatar.html",
    "display": "Krbn Avatar",
    "href": "/krbn-avatar.html",
-   "section": null,
+   "section": "Avatars",
    "collision": false
   },
   {
@@ -1903,7 +1903,7 @@
    "id": "krbn-rigged.html",
    "display": "Krbn Rigged",
    "href": "/krbn-rigged.html",
-   "section": null,
+   "section": "Avatars",
    "collision": false
   },
   {
@@ -1935,7 +1935,7 @@
    "id": "lab-census.html",
    "display": "Lab Census",
    "href": "/lab-census.html",
-   "section": null,
+   "section": "System Tools",
    "collision": false
   },
   {
@@ -2215,7 +2215,7 @@
    "id": "mpm3d.html",
    "display": "Mpm3d",
    "href": "/mpm3d.html",
-   "section": null,
+   "section": "PL: Fluids",
    "collision": false
   },
   {
@@ -2735,7 +2735,7 @@
    "id": "raymarch-options.html",
    "display": "Raymarch Options",
    "href": "/raymarch-options.html",
-   "section": null,
+   "section": "Voxels",
    "collision": false
   },
   {
@@ -2887,7 +2887,7 @@
    "id": "sandbox-gpu.html",
    "display": "Sandbox Gpu",
    "href": "/sandbox-gpu.html",
-   "section": null,
+   "section": "Voxels",
    "collision": false
   },
   {
@@ -3055,7 +3055,7 @@
    "id": "slug-curved.html",
    "display": "Slug Curved",
    "href": "/slug-curved.html",
-   "section": null,
+   "section": "Slug Text",
    "collision": false
   },
   {
@@ -3063,7 +3063,7 @@
    "id": "slug-device.html",
    "display": "Slug Device",
    "href": "/slug-device.html",
-   "section": null,
+   "section": "Slug Text",
    "collision": false
   },
   {
@@ -3071,7 +3071,7 @@
    "id": "slug-fire.html",
    "display": "Slug Fire",
    "href": "/slug-fire.html",
-   "section": null,
+   "section": "Slug Text",
    "collision": false
   },
   {
@@ -3079,7 +3079,7 @@
    "id": "slug-morph.html",
    "display": "Slug Morph",
    "href": "/slug-morph.html",
-   "section": null,
+   "section": "Slug Text",
    "collision": false
   },
   {
@@ -3087,7 +3087,7 @@
    "id": "slug-projective.html",
    "display": "Slug Projective",
    "href": "/slug-projective.html",
-   "section": null,
+   "section": "Slug Text",
    "collision": false
   },
   {
@@ -3095,7 +3095,7 @@
    "id": "slug-rig.html",
    "display": "Slug Rig",
    "href": "/slug-rig.html",
-   "section": null,
+   "section": "Slug Text",
    "collision": false
   },
   {
@@ -3103,7 +3103,7 @@
    "id": "slug-text.html",
    "display": "Slug Text",
    "href": "/slug-text.html",
-   "section": null,
+   "section": "Slug Text",
    "collision": false
   },
   {
@@ -3111,7 +3111,7 @@
    "id": "slug-ticker.html",
    "display": "Slug Ticker",
    "href": "/slug-ticker.html",
-   "section": null,
+   "section": "Slug Text",
    "collision": false
   },
   {
@@ -3191,7 +3191,7 @@
    "id": "splat-probes.html",
    "display": "Splat Probes",
    "href": "/splat-probes.html",
-   "section": null,
+   "section": "PL: Optics & Imaging",
    "collision": false
   },
   {
@@ -3223,7 +3223,7 @@
    "id": "ssao-compare.html",
    "display": "Ssao Compare",
    "href": "/ssao-compare.html",
-   "section": null,
+   "section": "Renders",
    "collision": false
   },
   {
@@ -3279,7 +3279,7 @@
    "id": "sunshine.html",
    "display": "Sunshine",
    "href": "/sunshine.html",
-   "section": null,
+   "section": "Opt-in: somebody else's work",
    "collision": false
   },
   {
@@ -3335,7 +3335,7 @@
    "id": "thermal-flow.html",
    "display": "Thermal Flow",
    "href": "/thermal-flow.html",
-   "section": null,
+   "section": "PL: Fluids",
    "collision": false
   },
   {
@@ -3343,7 +3343,7 @@
    "id": "thermal3d-cells.html",
    "display": "Thermal3d Cells",
    "href": "/thermal3d-cells.html",
-   "section": null,
+   "section": "PL: Fluids",
    "collision": false
   },
   {
@@ -3351,7 +3351,7 @@
    "id": "three-probe.html",
    "display": "Three Probe",
    "href": "/three-probe.html",
-   "section": null,
+   "section": "System Tools",
    "collision": false
   },
   {
@@ -3375,7 +3375,7 @@
    "id": "toroidal-wave.html",
    "display": "Toroidal Wave",
    "href": "/toroidal-wave.html",
-   "section": null,
+   "section": "Toroidal Buffers",
    "collision": false
   },
   {
@@ -3655,7 +3655,7 @@
    "id": "waveguide.html",
    "display": "Waveguide",
    "href": "/waveguide.html",
-   "section": null,
+   "section": "PL: Electromagnetism",
    "collision": false
   },
   {
@@ -3663,7 +3663,7 @@
    "id": "wear-field.html",
    "display": "Wear Field",
    "href": "/wear-field.html",
-   "section": null,
+   "section": "Toroidal Buffers",
    "collision": false
   },
   {
@@ -4343,6 +4343,22 @@
    "id": "fp_control",
    "display": "First Person CONTROL — Your World (Round 31)",
    "href": "/?go=fp_control",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "controller_lab",
+   "display": "CONTROLLER LAB — Non Voxel Terrain + Capsule Collision",
+   "href": "/?go=controller_lab",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "splat_walk",
+   "display": "SPLAT WALK — Walking A Live Gaussian Splat Scene With Capsule Collision",
+   "href": "/?go=splat_walk",
    "section": null,
    "collision": false
   },

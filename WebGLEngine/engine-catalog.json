@@ -98,6 +98,14 @@
       "label": "First-person CONTROL — your world (Round 31)"
     },
     {
+      "id": "controller_lab",
+      "label": "CONTROLLER LAB — non-voxel terrain + capsule collision"
+    },
+    {
+      "id": "splat_walk",
+      "label": "SPLAT WALK — walking a live Gaussian-splat scene with capsule collision"
+    },
+    {
       "id": "voice_lab",
       "label": "VOICE LAB — VOICE → ENGINE COMMANDS"
     },
