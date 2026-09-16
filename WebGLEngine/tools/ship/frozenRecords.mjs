@@ -387,11 +387,33 @@ export function census({ files = null, read = null, exclude = null } = {}) {
     }
     const rows = all.map(({ r, f }) => {
         const guardians = named.get(r.name);
-        const sib = rel(f).replace(/\.mjs$/, "-selfcheck.mjs");
+        // *** v4563 -- THE SIBLING RULE WAS WRONG IN TWO MECHANICAL WAYS AND THE NUMBER IT PRODUCED WAS
+        // MOSTLY ABOUT THIS TREE'S LAYOUT. ***
+        //
+        // (1) It built the sibling with `.replace(/\.mjs$/, "-selfcheck.mjs")`, WHICH IS A NO-OP ON A .js
+        //     FILE -- so since v4555 widened this census to .js and .cjs, every record in a .js file had its
+        //     sibling computed as THE FILE ITSELF, which no gate can ever be. Nine records, wrong by
+        //     construction, counted as a finding.
+        // (2) It compared FULL PATHS, so it looked for the gate BESIDE the module -- and this tree keeps its
+        //     gates in tools/ship/. MEASURED: 17 of the 45 it flagged are guarded by a gate with exactly the
+        //     right name, every one of them in tools/ship/. The heuristic was looking in the wrong place and
+        //     reporting the answer as a defect.
+        //
+        // So the question is now "does the gate NAMED FOR THIS MODULE name this record, wherever it lives",
+        // which is what the field always claimed. 45 -> 28. AND THE 28 ARE NOT A DEBT EITHER: they are
+        // records in files that hold several subjects -- camera/camera.js holds seven, each guarded by its
+        // own topic gate -- so a `camera-selfcheck.mjs` neither exists nor should. The count is REPORTED
+        // beside the reason, because v4487 settled the principle already: "a sibling file is not the
+        // criterion, the import graph is".
+        const want = rel(f).split("/").pop().replace(/\.(mjs|cjs|js)$/, "-selfcheck.mjs");
+        const sibling = guardians.find((g) => g.split("/").pop() === want) || null;
         return Object.freeze({
             name: r.name, file: rel(f), fields: Object.freeze(r.fields.slice()), bytes: r.bytes, balanced: r.balanced,
             guardians: Object.freeze(guardians.slice()),
-            siblingNamesIt: guardians.includes(sib),
+            siblingNamesIt: sibling !== null,
+            // Where that gate actually lives, when it is not beside the module. The layout fact, kept.
+            siblingElsewhere: sibling && sibling !== rel(f).replace(/\.(mjs|cjs|js)$/, "-selfcheck.mjs")
+                ? sibling : null,
         });
     });
     const out = Object.freeze({
@@ -401,6 +423,10 @@ export function census({ files = null, read = null, exclude = null } = {}) {
         unguarded: Object.freeze(rows.filter((r) => !r.guardians.length).map((r) => r.name)),
         unbalanced: Object.freeze(rows.filter((r) => !r.balanced).map((r) => r.name)),
         siblingWrong: rows.filter((r) => r.guardians.length && !r.siblingNamesIt).length,
+        // The 17: a gate named for the module, living in tools/ship/ rather than beside it. Not a defect --
+        // it is where this tree keeps gates -- and counted so the next reader meets it as a number rather
+        // than as part of siblingWrong.
+        siblingElsewhere: rows.filter((r) => r.siblingElsewhere).length,
     });
     if (memoable) _scanCache.set(key, out);
     return out;

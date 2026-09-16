@@ -58,6 +58,16 @@ const run = (names) => census({
     read: (f) => FIX[path.basename(f).replace(/^__fx_|\.mjs$/g, "")],
     exclude: null,
 });
+// *** v4563 -- A SECOND HARNESS, BECAUSE THE FIRST CANNOT EXPRESS A PATH. *** run() keys its fixtures by bare
+// name and puts every file in the engine root, which is exactly what a rule comparing FULL PATHS cannot be
+// tested with: the sibling of __fx_mod.mjs is __fx_mod-selfcheck.mjs and they are always in the same place.
+// The two defects this round repairs are both about WHERE and WHAT EXTENSION, so the fixture has to carry a
+// real relative path and a real suffix.
+const runAt = (spec) => census({
+    files: Object.keys(spec).map((rel) => path.join(ENG, rel)),
+    read: (f) => spec[path.relative(ENG, f).split(path.sep).join("/")],
+    exclude: null,
+});
 
 // ---- 1. THE ENUMERATION, ON TEXT WHOSE ANSWER IS KNOWN BEFORE THE CODE RUNS -------------------------------------
 console.log("1. what counts as a record, and who counts as its guardian");
@@ -87,6 +97,50 @@ console.log("1. what counts as a record, and who counts as its guardian");
         "RECHECK_V4314 -- read by slowCensus-selfcheck.mjs and probed against redCensus-selfcheck.mjs");
     ok("...and `siblingNamesIt` is reported per record, so the two questions stay apart",
         typeof r.siblingNamesIt === "boolean" && c.siblingWrong === 1);
+}
+// =============================================================================================================
+// *** v4563 -- THE SIBLING RULE WAS WRONG TWICE, AND THE NUMBER IT PRODUCED WAS MOSTLY ABOUT LAYOUT. ***
+{
+    // (1) A .js FILE. The rule built its sibling with .replace(/\.mjs$/, ...), which is a NO-OP on .js, so
+    // since v4555 widened this census every record in a .js file had its sibling computed as THE FILE
+    // ITSELF -- a thing no gate can ever be. Nine records, wrong by construction.
+    const cj = runAt({
+        "deep/mod.js": `${EC}${T}${FR}{\n  alpha: 3,\n});\n`,
+        "deep/mod-selfcheck.mjs": `import { ${T} } from "./mod.js";\nok(${T}.alpha === 3);\n`,
+    });
+    ok("!! *** a record in a .js file finds its sibling, which the .mjs-only replace made impossible ***",
+       cj.records[0].siblingNamesIt === true && cj.siblingWrong === 0,
+       `sibling for ${cj.records[0].file} resolves to mod-selfcheck.mjs. BEFORE THIS ROUND the replace left ` +
+       "the name unchanged, so the rule looked for a gate called mod.js and every .js record counted as a " +
+       "finding -- nine of them, including all seven of camera.js's.");
+
+    // (2) THE GATE IS NOT BESIDE THE MODULE, BECAUSE THIS TREE KEEPS GATES IN tools/ship/. The rule compared
+    // FULL PATHS. Measured on the live tree: 17 of the 45 it flagged are guarded by a gate with exactly the
+    // right name, and every one of those 17 is in tools/ship/. The heuristic was looking in the wrong place
+    // and reporting its own miss as a defect.
+    const cd = runAt({
+        "deep/mod.mjs": `${EC}${T}${FR}{\n  alpha: 3,\n});\n`,
+        "tools/ship/mod-selfcheck.mjs": `import { ${T} } from "../../deep/mod.mjs";\nok(${T}.alpha === 3);\n`,
+    });
+    ok("!! *** and it finds the gate named for the module WHEREVER it lives, which is tools/ship/ here ***",
+       cd.records[0].siblingNamesIt === true && cd.records[0].siblingElsewhere === "tools/ship/mod-selfcheck.mjs" &&
+       cd.siblingElsewhere === 1 && cd.siblingWrong === 0,
+       "a record in deep/mod.mjs guarded by tools/ship/mod-selfcheck.mjs is guarded BY ITS OWN GATE; the " +
+       "directory it sits in is this tree's convention, not a gap. `siblingElsewhere` keeps that fact as a " +
+       "number rather than folding it into siblingWrong.");
+
+    // AND THE REMAINING 28 ARE NOT A DEBT EITHER, which is why this row reports rather than ratchets.
+    const live = census();
+    say(`live: ${live.siblingWrong} records named by some gate but not by one named for their module, ` +
+           `and ${live.siblingElsewhere} whose own gate lives in another directory (45 and 0 before this ` +
+           "round). The 28 are overwhelmingly records in files that hold SEVERAL SUBJECTS -- camera/camera.js " +
+           "holds seven, each guarded by its own topic gate -- so a camera-selfcheck.mjs neither exists nor " +
+           "should. v4487 settled the principle: a sibling file is not the criterion, the import graph is.");
+    ok("!! the split is REPORTED and only a ceiling is asserted, because it measures layout and not debt",
+       live.siblingWrong < 45 && live.siblingElsewhere > 0 &&
+       live.siblingWrong + live.siblingElsewhere === 45,
+       `${live.siblingWrong} + ${live.siblingElsewhere} = 45, which is exactly what the old rule reported as ` +
+       "one number. A COUNT THAT FOLDS A LAYOUT CONVENTION INTO A DEFECT COUNT IS A COUNT NOBODY CAN ACT ON.");
 }
 {
     const c = run(["lonely"]);
