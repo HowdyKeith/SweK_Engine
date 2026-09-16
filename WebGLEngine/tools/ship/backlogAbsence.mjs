@@ -114,11 +114,17 @@ export const CLAIMS = Object.freeze([
              "grades a spelling.",
     }),
     Object.freeze({
-        id: "f" + "82-tint-metal-fresnel", frag: Object.freeze(["edge", "Tint"]), expect: "absent",
-        says: "(the same claim under the name a code identifier would use, which the built module does NOT " +
-              "use -- so this row stays an absence and the pair records that the concept arrived under one " +
-              "of its two names and not the other)",
-        why: "as above.",
+        id: "f" + "82-tint-metal-fresnel", frag: Object.freeze(["edge", "Tint"]), expect: "built",
+        says: "(the same claim under the name a code identifier would use. *** v4637 -- THIS FLIPPED FROM " +
+              "absent TO built, AND THE PAIR'S WHOLE POINT IS WHAT FLIPPED IT. *** The pair existed to record " +
+              "that the concept arrived under ONE of its two names and not the other: this line built the term at " +
+              "v4584 without ever spelling the identifier. main built the same item INDEPENDENTLY at v4575 and " +
+              "DID spell it -- 0 occurrences in this line's physics/render/principled.mjs against 4 in main's " +
+              "-- so the merge is what brought the second name. The asymmetry the pair measured is gone, and " +
+              "it is gone because two rounds closed one backlog item without seeing each other and happened to " +
+              "choose different words for it.) The term itself is NOT spelled in this note: the needles in this register are substrings, so a register that names its own search term lands in the census it takes -- which the self-reference row caught on this very edit, one run after I wrote it.)",
+        why: "as above. The row is kept rather than deleted: a claim that has flipped is evidence about the " +
+             "tree, and a pair whose two halves now agree still says something a single row could not.",
     }),
     // *** THE CONTROL, AND IT MUST FAIL. *** A register whose every row passes is a register that has never
     // been seen to convict, and this one would otherwise be six acquittals. This row restates the claim that
@@ -194,7 +200,25 @@ export const BACKLOG_AT_V4537 = Object.freeze({
     holding: 6,           // v4538: now "as expected" -- five absences that hold, one CLOSED entry whose
                           // absence is expected to be GONE. See the `expect` note in grade().
     failing: 1,           // the control, and a run where this is 0 is a register that cannot convict
-    sentenceFloor: 8,
+    // *** v4637 -- RAISED 8 -> 9, AND THE TRIPWIRE'S OWN RULE IS THAT A RISE FORCES SOMEBODY TO LOOK. ***
+    // Looked. This line carried 7; the main merge brought THREE more and one of this line's left, for 9:
+    //
+    //   (1) "nothing in the tree currently plays the other half, so a body that walks off a ledge stops
+    //       there" -- terrain-controller. About a CALLER, not a token. Ungradeable by construction, which is
+    //       the limit this row's own detail already states.
+    //   (2) "Nothing currently forces this: no gate is red over it and no asset has failed to load" --
+    //       about a WANT. Same: there is no token to look for.
+    //   (3) *** "This tree has NOTHING like it as a rendering feature" -- AND THIS ONE IS THE OFF-BRANCH
+    //       CLAIM THE CONTROL BELOW RESTATES, ARRIVING. *** offBranchConvicted below was recorded as a
+    //       number "so a later round can see it moved, and named in the header as unreachable from here".
+    //       It moved. The entry is in this tree now, so the conviction the control simulates is reachable
+    //       against the real entry rather than a restatement of it.
+    //
+    // The control is KEPT rather than replaced by the live entry: a register needs a row it is watched
+    // convicting, and swapping the simulation for the real thing on the round the real thing arrives would
+    // leave nothing to prove the convicting code still runs. Registering the live entry as a claim beside it
+    // is a round with a measurement in it, not a floor bump.
+    sentenceFloor: 9,
     // The conviction that prompted the round is NOT in the six above: it is on another branch. Recorded
     // here as a number so a later round can see it moved, and named in the header as unreachable from here.
     offBranchConvicted: 1,

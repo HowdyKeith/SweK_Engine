@@ -16,7 +16,7 @@ export const REGISTER_AUDIT = Object.freeze({
   {
    "gate": "tools/ship/shaderRefs-selfcheck.mjs",
    "exit": "timeout",
-   "ms": 120151,
+   "ms": 120124,
    "first": "",
    "all": [],
    "count": 0,
@@ -24,24 +24,41 @@ export const REGISTER_AUDIT = Object.freeze({
    "onStderr": false
   },
   {
+   "gate": "tools/ship/sweepCoverage-selfcheck.mjs",
+   "exit": 1,
+   "ms": 2390,
+   "first": "!! the straddler lists are a RECORD now, not an exemption: nothing needs naming to keep this green   156 measured under budget by the rotation, 91 of them over budget in the timings now, 90 lost and 91 reverted -- with NO gate excluded by name. The 5 entries in the v4535 list survive because they carry the serial readings that show the same file taking 2,638 and 4,026 ms on the same box a day apart, which is the evidence the calibration round needs and not something to delete.",
+   "all": [
+    "!! the straddler lists are a RECORD now, not an exemption: nothing needs naming to keep this green   156 measured under budget by the rotation, 91 of them over budget in the timings now, 90 lost and 91 reverted -- with NO gate excluded by name. The 5 entries in the v4535 list survive because they carry the serial readings that show the same file taking 2,638 and 4,026 ms on the same box a day apart, which is the evidence the calibration round needs and not something to delete.",
+    "!! *** WHAT THE ROTATION MEASURED UNDER BUDGET IS STILL UNDER BUDGET IN THE TIMINGS ***   90 LOST: hunt-transfer-selfcheck.mjs 2662 -> 3763, memory-selfcheck.mjs 1129 -> 3314, maze-walker-selfcheck.mjs 1184 -> 4617, es-arena-selfcheck.mjs 2343 -> 5280",
+    "...and none of them carries the pre-v4408 stamp, which is the fingerprint of a REPLACED file   90 entries the rotation stamped now read \"unknown -- before v4408\"",
+    "!! ...and the gate filed AT THE CAP that runs in 51 ms is back under the ship-time budget   placementRender-selfcheck.mjs reads 20125 ms now against the 20125 ms that exiled it -- 395x. It is the only one of the 140 to rejoin the sweep; the other 34 that beat the old cap are back in the over-budget pool, where the rotation can reach them.",
+    "...and the sixth is recorded as the PASS'S OWN false red, not as a finding   domScope-selfcheck.mjs reads exit 124 at 20142 ms now. It was filed red at 90129 ms because execFileSync's timeout leaves a status rather than a signal -- a proxy read as the fact, by the instrument built to stop exactly that, an hour after the record saying so."
+   ],
+   "count": 5,
+   "onStderr": false
+  },
+  {
    "gate": "tools/ship/backendParity-selfcheck.mjs",
    "exit": 1,
-   "ms": 417,
-   "first": "*** and BOTH stays well under the inversion line: twenty dual shader modules is where an IR would have paid ***   20 modules of 23 dual files, 23 of 158 GLSL-bearing -- 14.6% (the tenth-of-GLSL line of v4270 was crossed at v4473 and is reported, not asserted)",
+   "ms": 449,
+   "first": "wgslBearing matches the recorded baseline   measured 97, recorded 87",
    "all": [
+    "wgslBearing matches the recorded baseline   measured 97, recorded 87",
+    "wgslOnly matches the recorded baseline   measured 74, recorded 64",
     "*** and BOTH stays well under the inversion line: twenty dual shader modules is where an IR would have paid ***   20 modules of 23 dual files, 23 of 158 GLSL-bearing -- 14.6% (the tenth-of-GLSL line of v4270 was crossed at v4473 and is reported, not asserted)",
-    "-- 1 check(s)"
+    "-- 3 check(s)"
    ],
-   "count": 2,
+   "count": 4,
    "onStderr": false
   },
   {
    "gate": "tools/ship/windowsImport-selfcheck.mjs",
    "exit": 1,
-   "ms": 618,
-   "first": "!! NO dynamic import is given a raw filesystem path   WOULD CRASH ON WINDOWS: tools/ship/redCensus.mjs -> import(path.join(ENG, \\\"rig/templates/kaijuBiped.js\\\") | tools/ship/register-audit.mjs -> import(path.join(ENG, \\\"rig/templates/kaijuBiped.js\\\") | tools/ship/register-audit.mjs -> import(path.join(ENG, \\\"rig/templates/kaijuBiped.js\\\") | tools/ship/trellisAutoRig-selfcheck.mjs -> import(path.join(ENG, \"rig/templates/kaijuBiped.js\"))",
+   "ms": 663,
+   "first": "!! NO dynamic import is given a raw filesystem path   WOULD CRASH ON WINDOWS: tools/ship/kernelReach.mjs -> import(path.join(ENG, f)) | tools/ship/redCensus.mjs -> import(path.join(ENG, \\\"rig/templates/kaijuBiped.js\\\") | tools/ship/register-audit.mjs -> import(path.join(ENG, \\\"rig/templates/kaijuBiped.js\\\") | tools/ship/register-audit.mjs -> import(path.join(ENG, \\\"rig/templates/kaijuBiped.js\\\")",
    "all": [
-    "!! NO dynamic import is given a raw filesystem path   WOULD CRASH ON WINDOWS: tools/ship/redCensus.mjs -> import(path.join(ENG, \\\"rig/templates/kaijuBiped.js\\\") | tools/ship/register-audit.mjs -> import(path.join(ENG, \\\"rig/templates/kaijuBiped.js\\\") | tools/ship/register-audit.mjs -> import(path.join(ENG, \\\"rig/templates/kaijuBiped.js\\\") | tools/ship/trellisAutoRig-selfcheck.mjs -> import(path.join(ENG, \"rig/templates/kaijuBiped.js\"))"
+    "!! NO dynamic import is given a raw filesystem path   WOULD CRASH ON WINDOWS: tools/ship/kernelReach.mjs -> import(path.join(ENG, f)) | tools/ship/redCensus.mjs -> import(path.join(ENG, \\\"rig/templates/kaijuBiped.js\\\") | tools/ship/register-audit.mjs -> import(path.join(ENG, \\\"rig/templates/kaijuBiped.js\\\") | tools/ship/register-audit.mjs -> import(path.join(ENG, \\\"rig/templates/kaijuBiped.js\\\")"
    ],
    "count": 1,
    "onStderr": false
@@ -49,20 +66,22 @@ export const REGISTER_AUDIT = Object.freeze({
   {
    "gate": "tools/ship/definitionGates-selfcheck.mjs",
    "exit": 1,
-   "ms": 493,
+   "ms": 1815,
    "first": "!! no NEW exported symbol under physics/ has appeared without its gate naming it   GREW to 79: physics/apsidalKnob.mjs:apocentre, physics/apsidalKnob.mjs:measure, physics/apsidalKnob.mjs:adjudicateWith, physics/character/terrainWalk.mjs:functionGround, physics/character/terrainWalk.mjs:autoGround, physics/character/terrainWalk.mjs:projectOnPlane ...",
    "all": [
     "!! no NEW exported symbol under physics/ has appeared without its gate naming it   GREW to 79: physics/apsidalKnob.mjs:apocentre, physics/apsidalKnob.mjs:measure, physics/apsidalKnob.mjs:adjudicateWith, physics/character/terrainWalk.mjs:functionGround, physics/character/terrainWalk.mjs:autoGround, physics/character/terrainWalk.mjs:projectOnPlane ...",
-    "!! no NEW exported symbol ANYWHERE IN THE TREE has appeared without its gate naming it   GREW to 349: ai-bridge/chunkVerify.mjs:verifiedPrefix, ai-bridge/chunkVerify.mjs:resumePlan, ai-bridge/chunkVerify.mjs:spliceRanges, ai-bridge/chunkVerify.mjs:chunkAudit, ai-bridge/chunkVerify.mjs:resumeRanges, ai-bridge/deviceWorker.mjs:offThreadDevice ...",
-    "!! *** no NEW exported symbol OF ANY SHAPE has appeared without its gate naming it ***   GREW to 678: ai-bridge/catalogSnapshot.mjs:SNAPSHOT_PATH, ai-bridge/chunkVerify.mjs:verifiedPrefix, ai-bridge/chunkVerify.mjs:resumePlan, ai-bridge/chunkVerify.mjs:spliceRanges, ai-bridge/chunkVerify.mjs:chunkAudit, ai-bridge/chunkVerify.mjs:resumeRanges ..."
+    "!! no NEW exported symbol ANYWHERE IN THE TREE has appeared without its gate naming it   GREW to 362: ai-bridge/chunkVerify.mjs:verifiedPrefix, ai-bridge/chunkVerify.mjs:resumePlan, ai-bridge/chunkVerify.mjs:spliceRanges, ai-bridge/chunkVerify.mjs:chunkAudit, ai-bridge/chunkVerify.mjs:resumeRanges, ai-bridge/deviceWorker.mjs:offThreadDevice ...",
+    "!! *** no NEW exported symbol OF ANY SHAPE has appeared without its gate naming it ***   GREW to 700: ai-bridge/catalogSnapshot.mjs:SNAPSHOT_PATH, ai-bridge/chunkVerify.mjs:verifiedPrefix, ai-bridge/chunkVerify.mjs:resumePlan, ai-bridge/chunkVerify.mjs:spliceRanges, ai-bridge/chunkVerify.mjs:chunkAudit, ai-bridge/chunkVerify.mjs:resumeRanges ...",
+    "!! *** no NEW exported symbol is unmentioned by EVERY gate that imports its module ***   GREW to 530: ai-bridge/catalogSnapshot.mjs:SNAPSHOT_PATH, ai-bridge/chunkVerify.mjs:verifiedPrefix, ai-bridge/chunkVerify.mjs:resumePlan, ai-bridge/chunkVerify.mjs:spliceRanges, ai-bridge/chunkVerify.mjs:chunkAudit, ai-bridge/chunkVerify.mjs:resumeRanges ...",
+    "and the wider rule is not a way out of the three ratchets above -- two of them stay red under it, so this is a correction and not an amnesty   physics 51 against 68, tree-wide narrow 262 against 332"
    ],
-   "count": 3,
+   "count": 5,
    "onStderr": false
   },
   {
    "gate": "tools/ship/pageSections-selfcheck.mjs",
    "exit": 1,
-   "ms": 984,
+   "ms": 1034,
    "first": "!! no drawer holds more than 15 pages   biggest: 16. A DRAWER OF 25 IS THE FLAT ROW AGAIN WITH A LID ON IT -- which is why the 25 instruments were split three ways rather than filed under one Physics Lab chip. OVER: systools=16",
    "all": [
     "!! no drawer holds more than 15 pages   biggest: 16. A DRAWER OF 25 IS THE FLAT ROW AGAIN WITH A LID ON IT -- which is why the 25 instruments were split three ways rather than filed under one Physics Lab chip. OVER: systools=16"
@@ -73,24 +92,13 @@ export const REGISTER_AUDIT = Object.freeze({
   {
    "gate": "tools/ship/pagePlacements-selfcheck.mjs",
    "exit": 1,
-   "ms": 102,
+   "ms": 108,
    "first": "!! going over Keith's cap is DETECTED   a drawer of 25 is the flat row with a lid on it (v2513), and *** A CHECKBOX IS A MUCH FASTER WAY TO MAKE ONE THAN EDITING A REGISTRY *** -- so the surface that made it easy owes the check.",
    "all": [
     "!! going over Keith's cap is DETECTED   a drawer of 25 is the flat row with a lid on it (v2513), and *** A CHECKBOX IS A MUCH FASTER WAY TO MAKE ONE THAN EDITING A REGISTRY *** -- so the surface that made it easy owes the check.",
     "the cap is measured against the RESOLVED result, not against SECTIONS   with no overrides nothing is over, because SECTIONS is already within the rule -- so a non-empty report is always about a decision made HERE"
    ],
    "count": 2,
-   "onStderr": false
-  },
-  {
-   "gate": "tools/ship/runtimeGap-selfcheck.mjs",
-   "exit": 1,
-   "ms": 1623,
-   "first": "...and the headline survives it: a 2-file distortion in rows of 21 to 3,588, and threads still rank at the bottom   with this round: threads 23 against WebAssembly 23, rank 11 on the stable sort. Without it: 22 against 21. At v4462 the two files made a tie; at the v4526 merge they break one",
-   "all": [
-    "...and the headline survives it: a 2-file distortion in rows of 21 to 3,588, and threads still rank at the bottom   with this round: threads 23 against WebAssembly 23, rank 11 on the stable sort. Without it: 22 against 21. At v4462 the two files made a tie; at the v4526 merge they break one"
-   ],
-   "count": 1,
    "onStderr": false
   }
  ]

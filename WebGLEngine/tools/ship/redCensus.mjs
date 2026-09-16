@@ -1184,6 +1184,19 @@ const WHY_V4622 = Object.freeze({
     // may run at most N versions ahead of the releases page", 8 of 3 allowed) cleared the moment v4622 was
     // actually published from the rig -- confirmed by re-running the gate clean (exit 0, 0 FAIL lines) rather
     // than assumed from the publish alone.
+    // *** tools/ship/runtimeGap-selfcheck.mjs -- THE REMOVAL ABOVE WAS DESCRIBED AND NOT DONE, AND v4637
+    // FINISHES IT. *** The note said REMOVED at v4627; the name stayed in RED_AT_V4622_GATES and in WHY_V4622,
+    // so the register went on carrying a gate its own prose said had left. registerDrift-selfcheck is what
+    // found it -- "frozen exit 1, now 0 -- re-run", its row for a repaired red hiding behind the freeze, doing
+    // exactly that.
+    //
+    // FOURTH time this one invariant has flipped, and the fourth cause is as incidental as the other three:
+    // the main merge put threads and WebAssembly TIED at 22 without-self, where main's v4622 note had recorded
+    // them INVERTED at 22 against 21. Nobody reconciled it on purpose any of the four times; the count moved
+    // because the tree did. Verified by re-running the gate clean (exit 0, 0 FAIL lines), not assumed from the
+    // arithmetic. The fragility is UNCHANGED and still owed to #129: a strict inequality between two
+    // single-digit-file rows, movable by any prose edit anywhere in tools/ship/*.mjs that says "WebAssembly".
+    // Four flips is the argument for deciding it rather than re-deriving it a fifth time.
     // tools/ship/runtimeGap-selfcheck.mjs REMOVED at the v4627 merge: the WITHOUT-self pairwise invariant it
     // was red on (threads <= WebAssembly, excluding this gate's own two self-referential files) is clean again
     // -- confirmed by re-running the gate (exit 0, 0 FAIL lines), not assumed. This is the SAME row that broke,
@@ -1217,11 +1230,6 @@ const WHY_V4622 = Object.freeze({
     // green, but a check this fragile against unrelated edits owes backlog item #129 a real decision (loosen
     // the bound, or restate the finding as "tied including self-reference, not dominant without it") before
     // anyone spends a fourth round re-deriving the same two numbers.
-    "tools/ship/runtimeGap-selfcheck.mjs":
-        "the WITH-self headline (threads and WebAssembly tied at 23, threads rank 11 of 12, still the bottom " +
-        "two) holds and is verified against a fresh census(). The WITHOUT-self pairwise sub-assertion reads " +
-        "false again (threads 22 against WebAssembly 21) -- both numbers re-taken and confirmed live-accurate, " +
-        "not stale. See the header comment above this entry for why re-taking them a fourth time is not the fix.",
 });
 
 export const RED_AT_V4622_GATES = Object.freeze([
@@ -1230,7 +1238,6 @@ export const RED_AT_V4622_GATES = Object.freeze([
     "tools/ship/definitionGates-selfcheck.mjs",
     "tools/ship/pageSections-selfcheck.mjs",
     "tools/ship/pagePlacements-selfcheck.mjs",
-    "tools/ship/runtimeGap-selfcheck.mjs",
 ]);
 
 export const RED_AT_V4622 = Object.freeze(RED_AT_V4622_GATES.map((gate) => Object.freeze({
