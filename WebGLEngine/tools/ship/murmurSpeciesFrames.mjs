@@ -200,3 +200,83 @@ export const hueShift = (a, b, minChroma = 0.01) => {
     }
     return { dL: dL / n, dHueDeg: dH / n * 180 / Math.PI, n };
 };
+
+/**
+ * THE SAME ROTATION WITH ITS SIGN KEPT, and the sign is the whole reason this exists next to hueShift().
+ *
+ * hueShift() takes an absolute value per pixel, which is right for "did the spread axis turn the body" and
+ * WRONG for "did these two events turn it in OPPOSITE DIRECTIONS". abyss's three lanes take one hue step each
+ * -- -1, 0, +1 -- so a pass by its first lane must turn the body one way and a pass by its third must turn it
+ * the other. Under |dh| those two readings are indistinguishable from each other AND from a species whose
+ * every lane took the same step: all three give a positive number. Measured on real frames, the signed
+ * version reads +17.8 degrees on a third-lane pass and -10.5 on a first-lane pass, and the absolute version
+ * reads 17.8 and 10.5 -- two numbers that agree with the hero and with three sabotages of it equally well.
+ *
+ * The mean is taken over the SIGNED per-pixel rotation, so a body whose halves turned opposite ways would
+ * read near zero here and large under hueShift(); both figures are reported by the rows that use this.
+ */
+export const hueTurn = (a, b, minChroma = 0.01) => {
+    const lab = (f, i) => linearToOklab(srgbToLinear(f[i] / 255), srgbToLinear(f[i + 1] / 255), srgbToLinear(f[i + 2] / 255));
+    let dH = 0, n = 0;
+    for (let i = 0; i < a.length; i += 4) {
+        if (a[i + 3] < 200) continue;
+        const A = lab(a, i), B = lab(b, i);
+        if (Math.hypot(A.a, A.b) < minChroma || Math.hypot(B.a, B.b) < minChroma) continue;
+        const dh = Math.atan2(B.b, B.a) - Math.atan2(A.b, A.a);
+        dH += Math.atan2(Math.sin(dh), Math.cos(dh)); n++;   // the SHORT way round, sign kept
+    }
+    return { deg: n ? dH / n * 180 / Math.PI : 0, n };
+};
+
+/** How far apart two hotspots are, in PIXELS of the rendered frame. */
+export const hotspotMove = (a, b) => {
+    const p = hotspot(a), q = hotspot(b);
+    return Math.hypot(p[0] - q[0], p[1] - q[1]);
+};
+
+/**
+ * THE BEST-FIT RADIAL MAGNIFICATION between two frames: the s for which B's ring profile matches A's read at
+ * r/s, over a band spanning the rim. Each profile is normalised by its own mean first, so a frame that is
+ * simply brighter does not register as a frame that is bigger.
+ *
+ * *** IT DOES NOT MEASURE SCALE ON ITS OWN, AND THE ROW THAT USES IT HAS TO EARN THAT. *** Three
+ * radius-FINDING instruments were already rejected in this module with their numbers recorded; this one is a
+ * fourth measurement that fails the same way if it is read naively. Measured: droplet at a FIXED bodyScale
+ * of exactly 1, with only its deformation amplitude taken from 0.052 to 0.092 by the wobble knob, fits a
+ * "magnification" of 1.0220 -- LARGER than the 1.0085 its real swell produces across a time pair. A bigger
+ * amplitude pushes the rim outward on average, and this fit cannot tell that from a bigger body.
+ *
+ * So it is only a scale when the two frames carry the SAME deformation amplitude. droplet's amplitude and
+ * its bodyScale are both driven by `swell`, but `wobble` moves the amplitude alone -- so trading voice
+ * against wobble holds the amplitude fixed while the scale moves, and the fit then reads 1.0420 against a
+ * bodyScale prediction of 1.04983 from the CPU half, with a species whose bodyScale is always 1 reading
+ * 1.0000 across the same voice change. See tools/ship/murmurSpecies2-selfcheck.mjs section 5.
+ */
+export const radialScale = (a, b, lo = 0.50, hi = 0.80, step = 0.01) => {
+    const radii = [];
+    for (let r = lo; r <= hi + 1e-9; r += step) radii.push(r);
+    const band = (px, r) => {
+        let s = 0;
+        for (let k = 0; k < 96; k++) {
+            const th = k * 2 * Math.PI / 96;
+            s += bil(px, N3 / 2 + r * (N3 / 2) * Math.cos(th) - 0.5, N3 / 2 + r * (N3 / 2) * Math.sin(th) - 0.5);
+        }
+        return s / 96;
+    };
+    const prof = (px) => radii.map((r) => band(px, r));
+    const at = (p, r) => {
+        if (r <= radii[0]) return p[0];
+        if (r >= radii[radii.length - 1]) return p[p.length - 1];
+        const i = Math.min(radii.length - 2, Math.floor((r - radii[0]) / step)), f = (r - radii[i]) / step;
+        return p[i] * (1 - f) + p[i + 1] * f;
+    };
+    const pa = prof(a), pb = prof(b);
+    const na = pa.reduce((x, y) => x + y, 0) / pa.length, nb = pb.reduce((x, y) => x + y, 0) / pb.length;
+    let best = 1, bestErr = Infinity;
+    for (let s = 0.90; s <= 1.10001; s += 0.0005) {
+        let e = 0;
+        for (let i = 0; i < radii.length; i++) e += Math.abs(pb[i] / nb - at(pa, radii[i] / s) / na);
+        if (e < bestErr) { bestErr = e; best = s; }
+    }
+    return best;
+};

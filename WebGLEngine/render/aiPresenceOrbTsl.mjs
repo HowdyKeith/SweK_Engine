@@ -42,13 +42,16 @@ export const ORB_KNOBS = Object.freeze([
     // comet's own three (it shares `spread` with limn, exactly as murmur's roster does -- c3 is `spread` on
     // seventeen of the eighteen species).
     "orbitTilt", "trail", "pointSize",
-    // droplet's own three. It is the FIRST species here whose silhouette moves, so it is also the first to
-    // replace the analytic sphere below with the kit's deformed solve.
+    // droplet's own three. It is the FIRST species here whose silhouette moves ENOUGH TO BE THE SUBJECT --
+    // every one of the eighteen deforms, which v4632 had to find out the hard way.
     "wobble", "tension", "sheen",
+    // opal's three and abyss's three, from the same roster. `drift` is shared between them exactly as
+    // murmur's own roster shares it -- opal spends c1 on it and abyss c2.
+    "flashes", "softness", "drift", "creatures", "rarity",
 ]);
 
-/** The species this file can build. murmur ships eighteen; these are the two that are ported. */
-export const ORB_SPECIES = Object.freeze(["still", "limn", "comet", "droplet"]);
+/** The species this file can build. murmur ships eighteen; these are the six that are ported. */
+export const ORB_SPECIES = Object.freeze(["still", "limn", "comet", "droplet", "opal", "abyss"]);
 
 /**
  * The three colour anchors the rail is built from, as murmur's own WEB-SPEC names them: ink '#0A0A0B' is the
@@ -62,7 +65,7 @@ export const ORB_COLORS = Object.freeze({
 });
 
 import { makeMurmurKitTsl } from "./murmurKitTsl.mjs";
-import { MH_EXT, MH_TAPS, MH_SURFACE_KNOBS } from "./murmurKit.mjs";
+import { MH_EXT, MH_TAPS, MH_SURFACE_KNOBS, MH_SHAPE, MH_DROPLET_GAIN } from "./murmurKit.mjs";
 
 const R_BODY = 0.62;          // sphere radius in the -1..1 quad
 const EDGE_FEATHER = 0.015;   // antialiased silhouette width, in the same units as R_BODY
@@ -109,7 +112,8 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
     const k0 = { time: 0, speed: 1, glow: 1, depth: 1, hueShift: 0, presence: 0.5, clarity: 0.6, glintRate: 0.3, voice: 0, aspect: 1,
                  rimWidth: 0.4, travel: 0.5, innerHint: 0.3, spread: 0.4,
                  orbitTilt: 0.5, trail: 0.5, pointSize: 0.4,
-                 wobble: 0.5, tension: 0.5, sheen: 0.5, ...knobs };
+                 wobble: 0.5, tension: 0.5, sheen: 0.5,
+                 flashes: 0.5, softness: 0.6, drift: 0.4, creatures: 0.4, rarity: 0.6, ...knobs };
     const uniforms = {}; for (const n of ORB_KNOBS) uniforms[n] = uniform(float(k0[n])).label(n);
     // The rail's three anchors are colours, not scalars, so they sit beside the knob block rather than in it.
     const col0 = { ink: ORB_COLORS.ink, tone: ORB_COLORS.tone, tone2: ORB_COLORS.tone, ...(knobs.colors || {}) };
@@ -162,31 +166,52 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // costs two extra mhDeform evaluations per pixel, and at amp = 0 it reduces to exactly this sphere
         // (checked in the gate -- Rd is 1 and the normal matches to f64). Paying for a solve whose answer is
         // known would slow three species to buy nothing, and would move their gates' pixels for no reason.
+        // ---- THE BODY: EVERY SPECIES GETS ITS OWN, AND THREE OF THEM WERE ON A SPHERE -------------------
+        // *** murmur GIVES ALL EIGHTEEN A DEFORMED BODY AND NOT ONE OF THEM HAS amp = 0. *** This file solved
+        // droplet with the kit's mh_body and left still, limn and comet on the analytic sphere, on the
+        // strength of a v4626 note saying the three "are not standing on different geometry -- they are on
+        // the amp = 0 case of this one". That is a true statement about mh_body and a FALSE one about those
+        // species. Read off their own mh_shape calls:
+        //
+        //     still   0.018 + 0.006 * breath(t, 4.2),  gain 1.12
+        //     limn    0.020,                            gain 1.05
+        //     comet   0.024,                            gain 1.30
+        //     opal    0.022 + 0.008 * breath(t, 7.4),   gain 1.22
+        //     abyss   0.019 + 0.006 * breath(t, 14.1),  gain 1.14
+        //     droplet wob (0.052 .. 0.092),             gain 3.30
+        //
+        // Measured over 2,000 directions, the deformed radius strays 3.06% of the radius on still, 3.40% on
+        // limn and 4.08% on comet -- about half a pixel at 48 px, and MOVING, because the three axes turn on
+        // periods of 76, 103 and 134 seconds. Small, real, and not zero. A sphere is not the amp = 0 case of
+        // a body whose amp is 0.018; it is a different body.
+        //
+        // So there is ONE path now. droplet is no longer special-cased: it differs from the others in the
+        // NUMBERS it passes, which is exactly how murmur's own eighteen differ from each other.
         const dN = vec3(0.0, 0.0, 1.0).toVar();
         const dP = vec3(0.0, 0.0, 0.0).toVar();
-        let N, fres, bodyMask, bodyRd, bodyRho;
-        if (species === "droplet") {
-            // THE INHALE: the breath is the carrier and voice is what fills it, so the swell arrives on a
-            // curve. droplet.ts: "a body that follows the raw envelope reads as a VU meter."
-            const swell = float(0.22).add(KIT.mhBreath(uniforms.time, float(0.9)).mul(0.78)).mul(uniforms.voice).toVar();
-            const bodyScale = float(1.0).add(swell.mul(0.050)).toVar();
-            // Tension runs BACKWARDS through the amplitude on purpose, "because that is what tension IS".
-            const wob = float(0.052).add(uniforms.wobble.mul(0.040))
+        // droplet alone scales the whole body with the breath -- its swell is the species, and the others
+        // breathe only through their amplitude.
+        const swell = species === "droplet"
+            ? float(0.22).add(KIT.mhBreath(uniforms.time, float(0.9)).mul(0.78)).mul(uniforms.voice).toVar()
+            : float(0.0).toVar();
+        const bodyScale = float(1.0).add(swell.mul(species === "droplet" ? 0.050 : 0.0)).toVar();
+        // Tension runs BACKWARDS through droplet's amplitude on purpose, "because that is what tension IS".
+        // The five non-droplet shapes come from the kit's own table, so the gate can assert them against
+        // murmur's roster instead of against a copy of this file.
+        const SH = MH_SHAPE[species] || MH_SHAPE.still;
+        const shapeAmp = species === "droplet"
+            ? float(0.052).add(uniforms.wobble.mul(0.040))
                 .mul(float(1.0).sub(uniforms.tension.mul(0.22)))
-                .mul(float(1.0).add(swell.mul(0.30))).toVar();
-            // uv in murmur's own units: this file's quad is -1..1 with the body at R_BODY, murmur's is uv with
-            // the body at MH_R, so the ratio carries one space into the other.
-            const uvM = pc.mul(KIT.MH_R / R_BODY).div(bodyScale).toVar();
-            const b = KIT.mhBody(uvM, uniforms.time, float(0.004), wob, float(0.0), float(3.30),
+                .mul(float(1.0).add(swell.mul(0.30))).toVar()
+            : (SH[1] === 0 ? float(SH[0]).toVar()
+                           : float(SH[0]).add(KIT.mhBreath(uniforms.time, float(SH[2])).mul(SH[1])).toVar());
+        const shapeGain = float(species === "droplet" ? MH_DROPLET_GAIN : SH[3]);
+        // uv in murmur's own units: this file's quad is -1..1 with the body at R_BODY, murmur's is uv with
+        // the body at MH_R, so the ratio carries one space into the other.
+        const uvM = pc.mul(KIT.MH_R / R_BODY).div(bodyScale).toVar();
+        const bodyV = KIT.mhBody(uvM, uniforms.time, float(0.004), shapeAmp, float(0.0), shapeGain,
                                  vec3(0.0, 0.0, 1.0), float(0.0), float(0.0), dP, dN).toVar();
-            N = dN; fres = b.w; bodyMask = b.x; bodyRd = b.y; bodyRho = b.z;
-        } else {
-            const zArg = max(R.mul(R).sub(rho2), 0.0);   // clamped: outside the disk this would go negative
-            const z = sqrt(zArg);
-            N = vec3(pc, z).div(R);                      // sphere at the origin: outward normal = position / R
-            fres = float(1.0).sub(clamp(N.z, 0.0, 1.0)); // 0 dead centre, 1 at the silhouette -- see header
-            bodyMask = null; bodyRd = null; bodyRho = null;
-        }
+        const N = dN, fres = bodyV.w, bodyMask = bodyV.x, bodyRd = bodyV.y, bodyRho = bodyV.z;
         const ci = clamp(N.z, 0.0, 1.0);               // = -dot(V, N) since V = (0,0,-1); cos(incidence)
 
         // *** THE REFRACTED RAY IS THE DIRECTION THE INTERIOR IS MARCHED ALONG, AND UNTIL v4624 IT WENT
@@ -199,7 +224,8 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
                                                        // zero test returns mh_refract's vector untouched
         // Entry point in BODY UNITS. On the sphere that IS the normal; on a deformed body it is not, so
         // droplet takes the point the solve actually returned.
-        const P = species === "droplet" ? dP : N;
+        // The entry point comes from the solve for every species now, not just droplet.
+        const P = dP;
         const L = KIT.mhExit(P, rd).toVar();
 
         // still.ts's GESTURE CLOCK and its glint PATH. The light enters one side of the volume and leaves by
@@ -242,6 +268,10 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         const accH = float(0.0).toVar();
         const trans = float(1.0).toVar();
         const ds = L.div(MH_TAPS).toVar();
+        // THE SIZE DIAL, once, for every species. This port renders at a fixed 120 pt-equivalent (small = 0)
+        // because nothing here is mounted on a chip yet; mh_small is driven for real by the kit gate, and
+        // every species below spends it the same way murmur's do -- structure counts down, strokes thicken.
+        const smallK = KIT.mhSmall(float(120.0), float(120.0)).toVar();
         const fAmt = floorAmt().toVar();
         Loop({ start: 0, end: MH_TAPS }, ({ i }) => {
             const sMarch = float(i).add(0.5).mul(ds);
@@ -462,9 +492,142 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             exp(negate(dC2)).mul(1.65).add(KIT.mhScatter(dC2, float(0.34))).mul(visC), float(0.0)).toVar();
         const dropletDensity = accD.mul(4.20).add(heart).mul(uniforms.depth);
 
+        // =====================================================================================================
+        // *** OPAL -- THE FIFTH SPECIES. "Internal play-of-colour: soft flashes drifting through the volume." ***
+        //
+        // NO STROBE, EVER, and opal.ts says that is the constraint the whole species is built around: play-of-
+        // colour in a real opal "is not a flicker; it is a slow shifting of where the light is coming from as
+        // the stone turns, and the eye reads it as depth rather than as an event". So every flash is BORN AND
+        // ABSORBED SLOWLY -- four lives on periods of 14.3, 17.1, 19.6 and 22.4 seconds, mutually
+        // incommensurate and phase-offset so no two ever arrive together, each a sin SQUARED for flat ends and
+        // each with a FLOOR of 0.16 rather than a zero, "so a flash at its dimmest is still faintly present
+        // and there is no moment of switching on".
+        //
+        // FOUR FLASHES, SOLVED AT CLOSEST APPROACH rather than marched -- the same argument comet's head and
+        // droplet's heart won: "they are compact bodies, so five marched samples would draw the shape of the
+        // sampling; two dot products each draws the shape of the flash".
+        //
+        // *** AND THIS IS THE SPECIES THE SPREAD AXIS WAS WIRED FOR. *** It carries the roster's highest
+        // default (0.7) and the one internal multiplier above the family cap, 1.30, which opal.ts justifies
+        // directly: the four flashes sit at four points across the spread, two either side of the anchor, and
+        // the multiplier "takes the extremes to about thirty-seven degrees of OKLAB hue at spread 1: still
+        // one hue family by the rail's own definition, and the widest this collection ever goes".
+        const opalDrift = float(0.055).add(uniforms.drift.mul(0.075)).toVar();
+        const opalRad = float(0.135).add(uniforms.softness.mul(0.095))
+            .mul(mix(float(1.0), float(1.70), smallK)).mul(float(1.0).add(uniforms.voice.mul(0.30))).toVar();
+        const opalBright = float(0.82).add(uniforms.flashes.mul(0.55)).mul(float(1.0).add(uniforms.voice.mul(0.85))).toVar();
+        // Two of the four crossfade away at the small mounts: "four soft blobs in a thirteen-point bead is a
+        // texture and two is a composition".
+        const pairB = float(1.0).sub(smoothstep(float(0.30), float(0.72), smallK)).toVar();
+        const spreadAmt = clamp(uniforms.spread, 0.0, 1.0).mul(KIT.MH_SPREAD).mul(1.30).toVar();
+        const flO = KIT.mhFlourish(uniforms.time, float(13.0), float(10.6)).toVar();
+        const flashE = float(0.0).toVar();
+        const flashH = float(0.0).toVar();
+        for (let k = 0; k < 4; k++) {
+            const w = k < 2 ? float(1.0) : pairB;
+            const fk = k;
+            // THE LIFE comes from the kit, where the CPU twin can grade it. sin squared for flat ends, on a
+            // floor of 0.16 so nothing ever switches on.
+            const life = KIT.mhOpalLife(float(fk), uniforms.time).toVar();
+            // THE WANDER: three incommensurate rates per flash, so each traces its own slow closed-ish path.
+            const c = vec3(sin(opalDrift.mul(uniforms.time).mul(0.83 + 0.11 * fk).add(fk * 2.1)).mul(0.44),
+                           sin(opalDrift.mul(uniforms.time).mul(0.67 + 0.13 * fk).add(fk * 3.7 + 1.1)).mul(0.40),
+                           sin(opalDrift.mul(uniforms.time).mul(0.95 + 0.09 * fk).add(fk * 1.3 + 2.6)).mul(0.42)).toVar();
+            const rk = opalRad.mul(0.80 + 0.30 * ((fk * 0.37 + 0.21) % 1))
+                .mul(k === 0 ? float(1.0).add(flO.x.mul(0.35)) : float(1.0)).toVar();
+            const to = c.sub(P).toVar();
+            const sO = dot(to, rd).toVar();
+            const argO = max(dot(to, to).sub(sO.mul(sO)), 0.0).div(max(rk.mul(rk), float(1e-6))).toVar();
+            const visO = KIT.mhInside(P.add(rd.mul(sO))).mul(exp(sO.mul(-MH_EXT))).toVar();
+            // The scatter carries most of the light: "a flash in an opal is the glow it throws into the stone
+            // more than it is its own centre".
+            const eO = select(sO.greaterThan(0.0).and(sO.lessThan(L)),
+                exp(negate(argO)).mul(0.55).add(KIT.mhScatter(argO, float(0.46)))
+                    .mul(visO).mul(life).mul(opalBright).mul(w), float(0.0)).toVar();
+            flashE.addAssign(eO);
+            flashH.addAssign(eO.mul((fk - 1.5) / 1.5));   // the four hues, two either side of the anchor
+        }
+        const accO = float(0.0).toVar();
+        const transO = float(1.0).toVar();
+        const medO = mix(float(0.060), float(0.032), smallK).toVar();
+        Loop({ start: 0, end: MH_TAPS }, ({ i }) => {
+            const pO = P.add(rd.mul(float(i).add(0.5).mul(ds)));
+            const eM = KIT.mhMedium(pO, uniforms.time, float(2.1)).mul(medO).mul(KIT.mhInside(pO)).toVar();
+            accO.addAssign(eM.mul(transO).mul(ds));
+            transO.assign(transO.mul(exp(eM.mul(2.0).add(MH_EXT).mul(ds).negate())));
+        });
+        const opalDensity = accO.mul(3.40).add(flashE).mul(uniforms.depth);
+
+        // =====================================================================================================
+        // *** ABYSS -- THE SIXTH SPECIES. "Deep-sea dark glass: rare glows passing through, mostly night." ***
+        //
+        // THE PATIENCE PIECE, and abyss.ts argues for its place in a set of eighteen: "it is the only hero
+        // whose default state is genuinely almost nothing happening. Still is quiet; this one is dark ... at
+        // the default rarity a creature passes roughly every twenty seconds, and between them there is a dark
+        // bead with an edge. Nothing else in this collection asks the viewer to wait, and a set of eighteen
+        // presences needs one that does."
+        //
+        // RARITY IS THE SLOT LENGTH and it runs the intuitive way -- high is rarer. Three lanes on long,
+        // independently jittered clocks (31, 37 and 41 against slot multipliers of 1, 1.37 and 1.81), so the
+        // gaps are never equal and two creatures overlap only occasionally.
+        //
+        // A CREATURE IS A PASSAGE, NOT AN APPEARANCE: it enters one side of the volume and leaves by the
+        // other over the whole life of its gesture, on a line hashed per pass, "so what the eye sees is
+        // something crossing rather than something switching on in place".
+        //
+        // AND IT CARRIES THE COLLECTION'S HIGHEST RIM, 1.70, which abyss.ts argues for against its own first
+        // try: a rim term "peaks around a third of its coefficient once the fresnel and the membership have
+        // taken their share -- so at 0.92 the silhouette was genuinely almost invisible and the species read
+        // as an empty cell rather than as a dark one". Its catchlight comes DOWN to 0.38 for the mirror
+        // reason: at 0.62 "there was a bright point sitting on the shell in every single frame, including the
+        // long dark stretches this species exists for".
+        const abyssBase = KIT.mhAbyssSlot(uniforms.rarity, uniforms.voice, smallK).toVar();
+        const thirdC = float(1.0).sub(smoothstep(float(0.30), float(0.72), smallK)).toVar();
+        const abyssRad = float(0.155).add(uniforms.creatures.mul(0.075)).mul(mix(float(1.0), float(1.80), smallK)).toVar();
+        const abyssBright = float(0.85).add(uniforms.creatures.mul(0.75))
+            .mul(float(1.0).add(uniforms.voice.mul(0.95))).mul(mix(float(1.0), float(1.45), smallK)).toVar();
+        const abyssReach = float(0.62).add(uniforms.drift.mul(0.30)).toVar();
+        const glowE = float(0.0).toVar();
+        const glowH = float(0.0).toVar();
+        for (let k = 0; k < 3; k++) {
+            const seed = [31.0, 37.0, 41.0][k], slot = [1.0, 1.37, 1.81][k];
+            const f = KIT.mhFlourish(uniforms.time, float(seed), abyssBase.mul(slot)).toVar();
+            const wk = k < 2 ? float(1.0) : thirdC;
+            const fk = k;
+            const ga = f.z.mul(6.2831853).add(fk * 1.7).toVar();
+            const dirA = normalize(vec3(cos(ga), sin(ga.mul(1.6).add(fk)).mul(0.40), sin(ga.mul(0.8).add(1.3)))).toVar();
+            const sideA = normalize(TSL.cross(dirA, vec3(0.08, 1.0, 0.14))).toVar();
+            const gp = sideA.mul(f.z.mul(2.0).sub(1.0).mul(0.42))
+                .add(dirA.mul(mix(abyssReach.negate(), abyssReach, smoothstep(float(0.0), float(1.0), f.y)))).toVar();
+            const toA = gp.sub(P).toVar();
+            const sA = dot(toA, rd).toVar();
+            const argA = max(dot(toA, toA).sub(sA.mul(sA)), 0.0).div(max(abyssRad.mul(abyssRad), float(1e-6))).toVar();
+            const visA = KIT.mhInside(P.add(rd.mul(sA))).mul(exp(sA.mul(-MH_EXT))).toVar();
+            // Mostly scatter: "a glow in deep water is the water it lights".
+            const eA = select(sA.greaterThan(0.0).and(sA.lessThan(L)).and(f.x.greaterThan(0.002)),
+                exp(negate(argA)).mul(0.45).add(KIT.mhScatter(argA, float(0.52)))
+                    .mul(visA).mul(f.x).mul(abyssBright).mul(wk), float(0.0)).toVar();
+            glowE.addAssign(eA);
+            glowH.addAssign(eA.mul(fk - 1.0));
+        }
+        // NIGHT: the floor is a third of what the quietest luminous hero carries -- "enough that the far wall
+        // exists, not enough to be a colour".
+        const accA = float(0.0).toVar();
+        const transA = float(1.0).toVar();
+        const medA = mix(float(0.022), float(0.014), smallK).mul(float(1.0).add(uniforms.voice.mul(0.60))).toVar();
+        Loop({ start: 0, end: MH_TAPS }, ({ i }) => {
+            const pA = P.add(rd.mul(float(i).add(0.5).mul(ds)));
+            const eM = KIT.mhMedium(pA, uniforms.time, float(1.9)).mul(medA).mul(KIT.mhInside(pA)).toVar();
+            accA.addAssign(eM.mul(transA).mul(ds));
+            transA.assign(transA.mul(exp(eM.mul(2.0).add(MH_EXT).mul(ds).negate())));
+        });
+        const abyssDensity = accA.mul(3.20).add(glowE).mul(uniforms.depth);
+
         const density = species === "limn" ? limnDensity
             : species === "comet" ? cometDensity
-            : species === "droplet" ? dropletDensity : stillDensity;
+            : species === "droplet" ? dropletDensity
+            : species === "opal" ? opalDensity
+            : species === "abyss" ? abyssDensity : stillDensity;
 
         // ---- THE SURFACE IS murmur's NOW, NOT THIS FILE'S APPROXIMATION OF IT ------------------------------
         // *** WHAT STOOD HERE WAS WRONG IN FIVE WAYS AND RIGHT IN TWO, AND THE TWO ARE WHY IT LOOKED FINE. ***
@@ -502,15 +665,10 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // the analytic sphere, where the entry point IS the normal, the deformed radius is exactly 1 and the
         // in-plane radius is rho in body units. Built with murmur's own two-sided feather rather than this
         // file's one-sided edge mask, so `m` means the same thing on both paths.
-        const bodyFeather = float(Math.max(0.018, 1.3 * 0.004));
-        const rhoBody = rho.div(R).toVar();
-        const sphereM = float(1.0).sub(smoothstep(float(1.0).sub(bodyFeather), float(1.0).add(bodyFeather), rhoBody)).toVar();
-        const surfB = species === "droplet"
-            ? { m: bodyMask, P: dP, N, Rd: bodyRd, rho: bodyRho, fres }
-            : { m: sphereM, P, N, Rd: float(1.0), rho: rhoBody, fres };
+        const surfB = { m: bodyMask, P: dP, N, Rd: bodyRd, rho: bodyRho, fres };
         // tilt is not wired to a uniform in this port (mh_look is given vec2(0,0) above for the same reason),
         // so the counter-move term is exercised at zero here and by the gate at nonzero.
-        const sf = KIT.mhSurface(surfB, uniforms.time, KIT.mhSmall(float(120.0), float(120.0)),
+        const sf = KIT.mhSurface(surfB, uniforms.time, smallK,
                                  uniforms.ink, vec2(0.0, 0.0), rimK, specK, float(SK[4]));
 
         // *** THE COLOUR IS murmur's RAIL, AND NOW SO IS THE COMPOSITION INTO IT. *** v4627 replaced this
@@ -550,7 +708,15 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // The guard is murmur's own: below 1e-4 of accumulated light the ratio is meaningless and the hue is
         // zero, which is what keeps an empty ray from painting a colour.
         const spreadK = clamp(uniforms.spread, 0.0, 1.0).toVar();
-        const hueRaw = species === "limn"
+        const hueRaw = species === "opal"
+            // opal's hue rides its FLASHES, and at 1.30 x MH_SPREAD -- the one internal multiplier in the
+            // collection above the family cap. Its four flashes sit at four points across the spread, two
+            // either side of the anchor, so the extremes reach about 37 degrees of OKLab hue at spread 1.
+            ? select(flashE.greaterThan(1e-4), flashH.div(flashE), float(0.0)).mul(spreadAmt)
+            : species === "abyss"
+            // abyss's three lanes take one hue step each: -1, 0, +1 across the spread.
+            ? select(glowE.greaterThan(1e-5), glowH.div(glowE), float(0.0)).mul(spreadK).mul(KIT.MH_SPREAD)
+            : species === "limn"
             ? tailShare.negate().mul(spreadK).mul(KIT.MH_SPREAD)
             : species === "comet"
                 ? select(accC.greaterThan(1e-4), accHC.div(accC), float(0.0)).negate().mul(spreadK).mul(KIT.MH_SPREAD).mul(1.4)
@@ -563,6 +729,10 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         const eTotal = interior.add(sf.rim).add(sf.spec).add(sf.glow).toVar();
         const hueNum = species === "limn" ? rimE.add(interior)
             : species === "droplet" ? interior.add(sf.rim.mul(0.6))
+            // opal and abyss weight by their OWN event energy alone -- the flashes and the passing glows --
+            // rather than by the interior, because in both the event IS the colour and the medium is night.
+            : species === "opal" ? flashE
+            : species === "abyss" ? glowE
             : interior.add(sf.rim.mul(0.7));
         const hueMix = hueRaw.mul(hueNum).div(max(eTotal, float(1e-4))).toVar();
         const colorLinear = max(KIT.mhLit(pal, railE, uniforms.glow, float(0.0), float(1.0), float(0.34), hueMix),

@@ -355,6 +355,28 @@ export function makeMurmurKitTsl(TSL) {
 
     const mhScatter = Fn(([arg, amp]) => amp.mul(exp(arg.mul(-MH_SCATTER_K))));
 
+    // ---- opal's lives and abyss's clocks -----------------------------------------------------------------
+    // *** THESE LIVE IN THE KIT FOR THE REASON limnArc AND cometFall DO: SO THERE IS A PAIR. *** They are
+    // species-specific arithmetic, not shared technique -- but the CPU twin in render/murmurKit.mjs is only
+    // worth having if something grades the shader against it, and a formula inlined in
+    // render/aiPresenceOrbTsl.mjs has nothing to grade. Written here, the kit gate's probe renders them and
+    // compares. v4632's sabotage sweep is what settled it: with opal's life inline in the species file,
+    // removing its floor, flattening its four periods into one and swapping sin squared for a bare sine ALL
+    // passed every row in the tree.
+
+    /** ONE OF opal's FOUR LIVES. sin SQUARED for flat ends, on a floor of 0.16 -- nothing ever switches on. */
+    const mhOpalLife = Fn(([k, t]) => {
+        const per = float(14.3).add(k.mul(2.7));
+        const sn = sin(t.mul(6.2831853).div(per).add(k.mul(1.97))).toVar();
+        return float(0.16).add(sn.mul(sn).mul(0.84));
+    });
+
+    /** abyss's SLOT LENGTH in seconds. High rarity is rarer; voice and the small mounts both shorten it. */
+    const mhAbyssSlot = Fn(([rarity, voice, small]) =>
+        mix(float(9.0), float(26.0), clamp(rarity, 0.0, 1.0))
+            .div(float(1.0).add(voice.mul(0.55)))
+            .mul(mix(float(1.0), float(0.66), small)));
+
     // ---- the surface: mh_key / mh_small / mh_surface -----------------------------------------------------
     // *** ALL EIGHTEEN SPECIES CALL mh_surface AND THIS PORT APPROXIMATED IT UNTIL v4629. *** What stood in
     // render/aiPresenceOrbTsl.mjs was a fresnel rim at a fixed exponent of 4.5, two lobes off a FIXED light
@@ -438,7 +460,7 @@ export function makeMurmurKitTsl(TSL) {
         mhHash, mhGrad3, mhNoise3, mhHash1, mhFlourish, mhBreath, mhDrift, mhSpin,
         mhRefract, mhLook, mhExit, mhHaze, mhMedium, mhInside, mhTransmit, mhScatter,
         mhDeform, mhBody, MH_AMP_CAP,
-        mhKey, mhSmall, mhSurface, mhContainment,
+        mhKey, mhSmall, mhSurface, mhContainment, mhOpalLife, mhAbyssSlot,
         mhPaper, mhPalette, mhShade, mhKnee, mhTier, mhLit, mhLchT, labOfSrgb, srgbToLinearT, linearToOklabT, oklabToLinearT,
         Loop,
     };
@@ -494,6 +516,15 @@ export function makeMurmurKitProbeTsl(THREE, TSL, { mode = "hash", n = 16 } = {}
             const lit = K.mhLit(pal, px.div(n).mul(2.0), py.div(n), float(0.0), float(1.0), float(0.34), float(0.0)).toVar();
             const enc = (v) => select(v.lessThanEqual(0.0031308), v.mul(12.92), pow(max(v, float(1e-6)), float(1 / 2.4)).mul(1.055).sub(0.055));
             return vec4(clamp(enc(lit.x), 0.0, 1.0), clamp(enc(lit.y), 0.0, 1.0), clamp(enc(lit.z), 0.0, 1.0), 1.0);
+        }
+        if (mode === "opalAbyss") {
+            // x carries opal's life for flash floor(px/4) over a 24 s span; y carries abyss's slot length over
+            // the rarity range at three voices. One frame, both species' clocks, graded against the f64 twin.
+            const k = TSL.floor(px.div(n).mul(4.0)).toVar();
+            const tt = py.div(n).mul(24.0).toVar();
+            const life = K.mhOpalLife(k, tt).toVar();
+            const slot = K.mhAbyssSlot(px.div(n), TSL.floor(py.div(n).mul(3.0)).mul(0.5), float(0.0)).toVar();
+            return vec4(clamp(life, 0.0, 1.0), clamp(slot.div(32.0), 0.0, 1.0), 0.0, 1.0);
         }
         if (mode === "surface") {
             // *** mh_surface OVER A WHOLE SPHERE, AGAINST THE CPU REFERENCE. *** The frame spans -1.2..1.2 in

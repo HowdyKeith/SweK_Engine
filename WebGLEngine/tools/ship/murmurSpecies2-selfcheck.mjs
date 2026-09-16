@@ -2,46 +2,47 @@
 //
 // Run: node tools/ship/murmurSpecies2-selfcheck.mjs
 //
-// GATE TWO OF TWO OVER THE SPECIES: THE TWO HEROES WHOSE SUBJECT IS MOTION. comet's point has to go round
-// its orbit at a steady brightness; droplet's body has to change shape. Both need ONE hero at SEVERAL TIMES,
-// which is a different frame budget from the rim ranking and ring evenness next door in
+// GATE TWO OVER THE SPECIES: COMET, whose subject is a POINT GOING ROUND. It needs one hero at four phases
+// of ONE LAP, which is a different frame budget from the rim ranking and ring evenness next door in
 // tools/ship/murmurSpecies-selfcheck.mjs, where several heroes are needed at one time.
 //
 // *** SPLIT OUT AT v4630, BEFORE THE SPECIES THAT FORCED IT RATHER THAN AFTER. *** One species gate was at
 // 2,780 ms against a 3,000 ms ceiling with four of eighteen ported, and a species costs about 195 ms, so the
-// fifth crossed it. The measurements both gates use live in tools/ship/murmurSpeciesFrames.mjs rather than
+// fifth crossed it. The measurements the gates share live in tools/ship/murmurSpeciesFrames.mjs rather than
 // being copied, because two gates with their own idea of "the light at a point" eventually disagree about
 // what they measured.
+//
+// *** AND SPLIT AGAIN AT v4632, WHEN droplet LEFT FOR tools/ship/murmurSpecies4-selfcheck.mjs. *** This gate
+// held comet and droplet together, and droplet's swell pair cost a PAIRED 206 to 287 ms over four
+// interleaved runs -- taking it from about 2,740 to about 2,980 against the 3,000 ms ceiling. The two heroes
+// never shared a frame anyway: comet needs four phases of a 2.2-second lap, droplet needs two times eight
+// seconds apart on 76-to-134-second periods. What they shared was a `still` control, and each needed its own
+// kind -- comet's two times 1.5 s apart, droplet's the whole window it is measured over.
 "use strict";
 import * as K from "../../render/murmurKit.mjs";
-import { N3, VOICE, SIL_VOICE, sp, renderSpecies, lin, light, bil, hotspot, interiorPeak,
-         travelRadii, ringChange, interiorMeanLight, hueShift } from "./murmurSpeciesFrames.mjs";
+import { N3, VOICE, sp, renderSpecies, lin, light, bil, hotspot, interiorPeak, travelRadii }
+    from "./murmurSpeciesFrames.mjs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const say = (m) => console.log("  ----  " + m);
 const sec = (t) => console.log("\n" + t);
 
-console.log("murmurSpecies2-selfcheck -- comet's orbit and droplet's body\n");
+console.log("murmurSpecies2-selfcheck -- comet's orbit: a trail in closed form and a head that is a solved point\n");
 
-// comet is rendered at four phases of one lap; still twice as the MOTIONLESS control for both sections.
+// comet is rendered at four phases of one lap; still twice as the control for the hotspot row.
 const times = [2.4, 3.2, 3.9, 4.6];
-const STILL_TIMES = [2.4, 3.9];
-// droplet's pair needs two WIDELY separated times: its three modes turn at periods of 76, 103 and 134
-// seconds, so two frames a second apart would differ by almost nothing and the row would be measuring the
-// instrument. 2.4 and 9.7 are seven seconds apart on those periods.
-const DROP_TIMES = [2.4, 9.7];
-// The last two are droplet's spread pair: one render each, no compile, since `spread` is an ORB_KNOBS name.
-const FRAMES = [...times.map((t) => sp("comet", t)),
-                ...STILL_TIMES.map((t) => sp("still", t)),
-                ...DROP_TIMES.map((t) => sp("droplet", t, SIL_VOICE)),
-                sp("droplet", DROP_TIMES[0], VOICE, { spread: 0 }),
-                sp("droplet", DROP_TIMES[0], VOICE, { spread: 1 })];
+// TWO still frames spanning comet's OWN lap, 2.4 to 4.6, so the control is asked the same question over the
+// same window rather than over a shorter one. It read 2.4 to 3.9 until v4632, which was comet's first three
+// phases and not its four. A third frame at 9.7 stood here for droplet's silhouette control, which wanted
+// droplet's OWN eight-second window; that row and its frame left with droplet at v4632.
+const STILL_TIMES = [2.4, 4.6];
+const FRAMES = [...times.map((t) => sp("comet", t)), ...STILL_TIMES.map((t) => sp("still", t))];
 const run = await renderSpecies(FRAMES);
 const okRun = run.ok && run.frames && run.frames.length === FRAMES.length;
 if (!okRun) ok("!! the species render ran", false, `could not render: ${run.reason || "frames " + (run.frames ? run.frames.length : "none")}`);
-// Frame map, named once so no row has to count: comet 0..3, still 4..5, droplet 6..7.
-const F = { comet: [0, 1, 2, 3], still: [4, 5], droplet: [6, 7], dropSpread: [8, 9] };
+// Frame map, named once so no row has to count: comet 0..3, still 4..5.
+const F = { comet: [0, 1, 2, 3], still: [4, 5] };
 
 // =============================================================================================================
 sec("2. *** COMET, THE THIRD SPECIES: A TRAIL SOLVED IN CLOSED FORM, AND A HEAD THAT HAD TO BE SOLVED TOO ***");
@@ -121,21 +122,37 @@ sec("2. *** COMET, THE THIRD SPECIES: A TRAIL SOLVED IN CLOSED FORM, AND A HEAD 
         // stood in for the magnitude, so it measures the magnitude now.
         //
         // IN BODY RADII RATHER THAN PIXELS, so the figure does not move with the frame size: comet's hotspot
-        // travels 1.150 radii at 48 px and 1.164 at 64, still's 0.067 and 0.071. Stable to 0.014 radii across
-        // a resolution change, and a SIXTEENFOLD separation -- where the old instrument's own margin was one
-        // position against three.
+        // travels 1.150 radii at 48 px and 1.169 at 64. Stable to 0.019 across a resolution change.
+        //
+        // *** AND still'S HALF OF THIS ROW WAS WRONG IN BOTH DIRECTIONS UNTIL v4632, WHICH IS WHY IT IS AN
+        // ABSOLUTE NOW AND NOT A RATIO. *** The text here said "still's is NOT zero and must not be asserted
+        // as zero" and quoted 0.067 radii at 48 px and 0.071 at 64. Re-measured, still reads 0.000 at 48 px
+        // and 0.050 at 64 -- neither figure reproduces, and the 48 px one is EXACTLY ZERO. That is the right
+        // answer and not a floor: murmur's key drifts 4.80 degrees over a 29.9 second period (measured on the
+        // CPU in tools/ship/murmurKit-selfcheck.mjs, which is where a claim about the key belongs), so over
+        // comet's 2.2-second lap it turns 0.35 degrees and moves the catchlight a small fraction of one
+        // pixel. A hotspot is an integer pixel; a sub-pixel drift is zero to it, at 48 px, correctly.
+        //
+        // So the ratio clause is gone. cT > sT * 5 against an sT of zero is not a measurement -- it is
+        // satisfied by anything, and it printed "1150352337x less" from its own divide-by-zero guard, which
+        // is a number no reader could use. The row now bounds the two sides SEPARATELY: comet's travel
+        // exceeds the body radius, and still's stays under one pixel of the frame it was measured in.
         const cometPts = F.comet.map((i) => hotspot(run.frames[i]));
-        const stillPts = F.still.map((i) => hotspot(run.frames[i]));
+        const stillPts = [F.still[0], F.still[1]].map((i) => hotspot(run.frames[i]));
         const cT = travelRadii(cometPts), sT = travelRadii(stillPts);
         say(`interior hotspot travel -- comet ${cometPts.map((q) => q.join(",")).join(" ")} = ${cT.toFixed(3)} radii; still ${stillPts.map((q) => q.join(",")).join(" ")} = ${sT.toFixed(3)} radii`);
-        ok("!! *** comet'S BRIGHT POINT CROSSES THE BODY; still'S CATCHLIGHT ONLY DRIFTS WITH THE KEY LIGHT ***",
-            cT > 0.8 && sT < 0.25 && cT > sT * 5,
-            `comet's hotspot travels ${cT.toFixed(3)} body radii across ${times.length} frames -- further than ` +
-            `the radius itself, which is what an orbiting point does -- against still's ${sT.toFixed(3)}, ` +
-            `${(cT / Math.max(sT, 1e-9)).toFixed(0)}x less. still's is NOT zero and must not be asserted as ` +
-            `zero: murmur's key light drifts about 4.8 degrees over a 29.9 s period, so the catchlight moves ` +
-            `about a pixel over this window and never sits in the same place twice. The limits are set from ` +
-            `two frame sizes (1.150/0.067 at 48 px, 1.164/0.071 at 64), not one.`);
+        const PX = 0.62 * N3 / 2;   // one body radius, in pixels of this frame
+        ok("!! *** comet'S BRIGHT POINT CROSSES THE BODY; still'S CATCHLIGHT DOES NOT MOVE A WHOLE PIXEL ***",
+            cT > 0.8 && sT * PX < 1.5,
+            `comet's hotspot travels ${cT.toFixed(3)} body radii across ${times.length} frames -- further ` +
+            `than the radius itself, which is what an orbiting point does -- while still's travels ` +
+            `${sT.toFixed(3)} radii, which is ${(sT * PX).toFixed(2)} of a pixel at this ` +
+            `${N3} px frame. Measured at two frame sizes: comet 1.150 and 1.169, still 0.000 and 0.050. ` +
+            `*** STILL'S FIGURE IS ZERO AT 48 px AND THAT IS CORRECT RATHER THAN A FLOOR: *** murmur's key ` +
+            `drifts 4.80 degrees over a 29.9 s period, so across comet's 2.2 s lap it turns 0.35 degrees, ` +
+            `which is a fraction of one pixel -- and a hotspot is an integer pixel. The two sides are bounded ` +
+            `SEPARATELY because a ratio against zero is satisfied by anything; until v4632 this row carried ` +
+            `cT > sT * 5 and printed "1150352337x less" out of its own divide-by-zero guard.`);
 
         // *** AND THAT ROW ALONE DOES NOT CATCH THE BUG THIS SPECIES ACTUALLY SHIPPED WITH -- the sabotage
         // sweep proved it. *** Deleting the solved head left the row above GREEN, because the TRAIL moves too:
@@ -156,115 +173,13 @@ sec("2. *** COMET, THE THIRD SPECIES: A TRAIL SOLVED IN CLOSED FORM, AND A HEAD 
             `limb it drew a SECOND comet. This is the row that fails when it is left to the march.`);
     }
 }
-// =============================================================================================================
-sec("3. *** DROPLET: THE BODY ITSELF IS THE SPECIES ***");
-{
-    // THE SPECIES, RENDERED. droplet's whole brief is that the BODY moves; the others' silhouettes are frozen
-    // circles. Measured as the CHANGE in the per-angle silhouette radius between two times, which is the one
-    // instrument here with a provably zero floor: a raster samples a circle unevenly, so still reads 5.7%
-    // "out of round" on a single frame -- an artifact of the grid, identical in every frame, and therefore
-    // exactly cancelled by differencing two frames of the same species.
-    if (okRun) {
-        const C = N3 / 2;
-        const alphaAt = (px, fx, fy) => {
-            const x0 = Math.floor(fx), y0 = Math.floor(fy), tx = fx - x0, ty = fy - y0;
-            const A = (x, y) => { x = Math.max(0, Math.min(N3 - 1, x)); y = Math.max(0, Math.min(N3 - 1, y)); return px[(y * N3 + x) * 4 + 3]; };
-            return (A(x0, y0) * (1 - tx) + A(x0 + 1, y0) * tx) * (1 - ty) + (A(x0, y0 + 1) * (1 - tx) + A(x0 + 1, y0 + 1) * tx) * ty;
-        };
-        // *** THIS ROW MEASURED THE ALPHA EDGE UNTIL v4629, AND THE ALPHA IS NOT WHERE THE SILHOUETTE LIVES
-        // ANY MORE. *** droplet used to carry the deformed membership as its alpha -- this port's own
-        // invention, not murmur's, which composites all eighteen through one FIXED containment circle and
-        // carries the body's edge in the LIGHT. v4629 moved to murmur's arrangement, because the old one
-        // clipped the contact glow away entirely: the glow is nonzero only outside the silhouette, and an
-        // alpha that reaches zero at the silhouette multiplies all of it by nothing.
-        //
-        // So the wobble is measured where it now lives. FIXED RADIUS, VARYING LIGHT: a wobbling body moves
-        // its own rim in and out past a fixed sampling circle, so the profile ON that circle changes; a
-        // frozen body's does not. No threshold, no bisection, no edge to find -- and that is why it is
-        // stable, where three radius-finding measures tried first were not (a luminance threshold swung
-        // 63-174% on still, the peak-brightness radius 0 to 56% on IDENTICAL pixels between two frame sizes,
-        // because on these species the interior and the specular both outrank the rim on some rays).
-        //
-        // Measured at two frame sizes before the limits were set: droplet 71.5% and 64.3% mean change,
-        // still 0.08% and 0.02%. Roughly EIGHT HUNDRED TIMES apart, with a control that is flat.
-        const dropCh = ringChange(run.frames[F.droplet[0]], run.frames[F.droplet[1]]);
-        // still at t=2.4 against still at t=3.9 -- the control needs two DIFFERENT times, not the same two
-        // droplet uses, because still's silhouette is time-invariant and any pair proves it.
-        const stillCh = ringChange(run.frames[F.still[0]], run.frames[F.still[1]]);
-        say(`silhouette at voice ${SIL_VOICE}, light on a FIXED ring -- droplet (t=${DROP_TIMES[0]} vs ${DROP_TIMES[1]}) max ${(dropCh.max * 100).toFixed(1)}% mean ${(dropCh.mean * 100).toFixed(2)}%; still (t=${times[0]} vs ${STILL_TIMES[0]}) max ${(stillCh.max * 100).toFixed(2)}% mean ${(stillCh.mean * 100).toFixed(3)}%`);
-        // *** AND THE HEART, WHICH THE SILHOUETTE ROW DOES NOT SEE AT ALL. *** Deleting droplet's solved core
-        // left every row here green -- the same hole comet's missing head went through. The peak is no use:
-        // it saturates with the heart and without it. What the heart does is LIGHT THE FOG IT SITS IN ("the
-        // drop comes out as a lamp inside a lens instead of a disc pasted on ink"), so the measure is the
-        // interior's MEAN.
-        //
-        // *** IN LINEAR LIGHT, AND RE-MEASURED AT v4627 RATHER THAN RESCALED. *** The v4626 limit of 350 was
-        // fitted to an 8-bit sRGB channel sum under this port's own invented ramp: 487 lit against 254 with
-        // the core deleted, a 1.9x separation. Wearing murmur's real rail the same sum reads 199 against 75,
-        // so the old limit would have reddened a CORRECT render -- and the fix is not to divide 350 by the
-        // same factor, because a mean of gamma-encoded bytes is not a mean of anything. Measured in linear
-        // light, lit against core-deleted: 0.3871 / 0.0729 at 48 px and 0.3773 / 0.0687 at 64 px -- stable
-        // across the frame size, and a 5.3x separation where the byte sum shows 2.7x. The limit of 0.20 sits
-        // a factor of 1.9 under the lit figure and 2.7 over the ablated one, at both resolutions.
-        const toLight2 = (c) => { const v = c / 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
-        const lumAt = (px, x, y) => { const i = (y * N3 + x) * 4; return toLight2(px[i]) + toLight2(px[i + 1]) + toLight2(px[i + 2]); };
-        let dSum = 0, dN = 0;
-        for (let y = 0; y < N3; y++) for (let x = 0; x < N3; x++) {
-            const dx = (x + 0.5) / N3 * 2 - 1, dy = (y + 0.5) / N3 * 2 - 1;
-            if (Math.hypot(dx, dy) > 0.62 * 0.70) continue;
-            dSum += lumAt(run.frames[F.droplet[0]], x, y); dN++;
-        }
-        const dropMean = dSum / dN;
-        say(`droplet interior mean linear light ${dropMean.toFixed(4)} over ${dN} pixels`);
-        ok("!! *** THE HEART LIGHTS THE VOLUME AROUND IT: droplet's interior is lit, not a dark shell ***",
-            dropMean > 0.20,
-            `interior mean ${dropMean.toFixed(4)} in linear light; with the solved core deleted the same ` +
-            `measure reads 0.0729, because what is left is haze alone -- a 5.3x separation, measured at two ` +
-            `frame sizes. droplet.ts: "A clear interior is not an empty one -- it is what lets the refraction ` +
-            `be visible, because the only way to see a lens is to see something through it." The peak cannot ` +
-            `carry this row: it reads 646 either way.`);
-
-        ok("!! *** THE BODY ITSELF IS THE SPECIES: droplet's SILHOUETTE moves and still's barely does ***",
-            dropCh.mean > 0.20 && stillCh.mean < 0.01 && dropCh.mean > stillCh.mean * 50,
-            `the light on a fixed ring at the body radius shifts by ${(dropCh.mean * 100).toFixed(1)}% on ` +
-            `average for droplet and ${(dropCh.max * 100).toFixed(0)}% at its worst angle, against still's ` +
-            `${(stillCh.mean * 100).toFixed(3)}% and ${(stillCh.max * 100).toFixed(2)}% -- ` +
-            `${(dropCh.mean / Math.max(stillCh.mean, 1e-9)).toFixed(0)}x. still's is no longer EXACTLY zero ` +
-            `and is not asserted as zero: murmur's key light drifts, so even a frozen body's rim changes a ` +
-            `little between two times. droplet.ts: "the body itself is the species: a sphere of water in ` +
-            `free fall."`);
-    }
-}
-
-// =============================================================================================================
-sec("4. *** droplet's SHARE OF THE SPREAD AXIS: dispersion through the depth ***");
-{
-    if (!okRun) {
-        ok("!! the spread row has frames to read", false, "the render did not produce them");
-    } else {
-        // droplet.ts calls its spread knob "dispersion through the depth", and that is literally how it is
-        // built: the hue numerator is weighted by clamp(p.z, -1, 1), the body's own depth with +1 toward the
-        // viewer, so the near half of each ray drifts one way and the far half the other. Most of it cancels
-        // along a ray, which is why the mean turn is small -- and small is the claim, not a shortfall: this
-        // is a clear lens, not a prism. The row asserts the KIND of move rather than its size.
-        const hs = hueShift(run.frames[F.dropSpread[0]], run.frames[F.dropSpread[1]]);
-        say(`droplet spread 0 -> 1, mean over the body -- hue ${hs.dHueDeg.toFixed(2)} deg, lightness ${hs.dL.toFixed(4)} (${hs.n} pixels)`);
-        ok("!! *** droplet's SPREAD MOVES HUE AND NOT LIGHTNESS, and it reached no pixel at all until v4630 ***",
-            hs.dHueDeg > 0.8 && hs.dL < 0.02,
-            `the body turns ${hs.dHueDeg.toFixed(2)} degrees of hue while its lightness moves ` +
-            `${hs.dL.toFixed(4)}. Measured at two frame sizes before the limits were set: 1.53 and 1.58 ` +
-            `degrees, 0.0008 both times. Before v4630 this file's march accumulated only a luminance and every ` +
-            `species handed mh_lit a hue of ZERO, so the rail's spread axis -- built and proved exact in ` +
-            `tools/ship/murmurKit-selfcheck.mjs section 8 at v4627 -- reached nothing that anyone could see.`);
-    }
-}
-
-
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
-    "\nTHE TWO HEROES WHOSE SUBJECT IS MOTION: comet's point travelling its orbit at a steady peak because " +
-    "its head is SOLVED rather than marched, and droplet's silhouette moving where still's is frozen. Both " +
-    "are measured against still as the motionless control, in the same frames. " +
-    "\nWHAT IS NOT CLAIMED HERE: the surface all eighteen share and limn's edge, which are " +
-    "tools/ship/murmurSpecies-selfcheck.mjs's subject, and the kit underneath, which is " +
-    "tools/ship/murmurKit-selfcheck.mjs's.");
+    "\nTHE HERO WHOSE SUBJECT IS A POINT GOING ROUND: comet's trail solved in closed form against a " +
+    "60,000-sample search, and its head solved at closest approach so it is as bright at the back of its " +
+    "orbit as at the front -- measured against still, whose catchlight only drifts with the key light, in " +
+    "the same frames. " +
+    "\nWHAT IS NOT CLAIMED HERE: the surface all eighteen share and limn's edge " +
+    "(tools/ship/murmurSpecies-selfcheck.mjs), droplet's body (tools/ship/murmurSpecies4-selfcheck.mjs), " +
+    "opal and abyss (tools/ship/murmurSpecies3-selfcheck.mjs), and the kit under all of them " +
+    "(tools/ship/murmurKit-selfcheck.mjs).");
 process.exit(fails ? 1 : 0);

@@ -5114,6 +5114,72 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "they measured -- the defect this tree has repaired in its own census records three times. " +
                  "Timings after: 1,937 ms there, 2,194 ms here, roughly 800 ms of headroom apiece.",
     }),
+    // v4632 -- THE 243rd AND 244th CLOSINGS. New keys, not edits to since251: a closing is a dated fact
+    // about a round.
+    since252: Object.freeze({
+        at: "v4632", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/murmurSpecies3-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 2,357 ms on the rotation, real WebGPU, 9 rows. Carries OPAL and ABYSS, the fifth and sixth " +
+                 "of murmur's eighteen, and it is a third gate rather than more rows next door because these " +
+                 "two need a THIRD frame budget: gate one wants several heroes at one time, gate two one hero " +
+                 "over a SHORT span, and these two one hero over TWENTY SECONDS -- abyss's slot at these " +
+                 "knobs is 16.48 s and opal's four lives run at 14.3 to 22.4, so sampling them in a " +
+                 "2.2-second window would measure nothing. THIRTEEN FRAMES AND TWO SHADERS, and all three " +
+                 "numbers are budget decisions: a first cut at six times and fifteen frames measured 3,097 " +
+                 "ms; four abyss lane frames later took it to 2,956, which is green and is NOT enough margin " +
+                 "when the run-to-run spread is about 100 ms and eviction needs two consecutive crossings; so " +
+                 "the neutral third SPECIES went, costing a WGSL compile as well as a render. What that cost " +
+                 "is named in the file rather than glossed: two rows that read against `still` now read " +
+                 "against opal, the numbers got STRONGER (abyss's edge outruns opal's by 112x where it " +
+                 "outran still's by 10x) and the CLAIM GOT NARROWER -- 'the highest rim in the roster' is a " +
+                 "ranking over eighteen and neither version of that row ever measured it. THE FOUR SAMPLE " +
+                 "TIMES ARE CHOSEN BY THE CPU HALF, not spaced evenly: mhFlourish is the same envelope the " +
+                 "shader runs, so it says which of abyss's three lanes is passing when -- two nights, one " +
+                 "third-lane pass and one first-lane pass -- and that is what lets the hue row name a LANE " +
+                 "instead of a moment. ONE ROW WAS REBALANCED BEFORE SHIPPING: the rarity swing reads 31.8x " +
+                 "at six sample times and 8.8x at four, because the PEAK depends on whether a sample lands on " +
+                 "a pass while the FLOOR is in every frame -- so the limit sits at 4x and the floor plus the " +
+                 "count on it carry the row, rather than a bound set at a lucky maximum.",
+    }),
+    // swept is 1 and not 2, and the gate that would have taken it to 2 is named in the verdict instead:
+    // tools/ship/murmurSpecies2-selfcheck.mjs was RE-swept in this round, not added by it, and `added` is the
+    // list of new gates. gateSweep-selfcheck asserts added.length === swept on every closing precisely so a
+    // re-sweep cannot be counted as coverage of a gate the surplus arithmetic already owns.
+    since253: Object.freeze({
+        at: "v4632", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/murmurSpecies4-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 2,095 ms on the rotation, real WebGPU, 5 rows -- and the gate it was split " +
+                 "OUT of, tools/ship/murmurSpecies2-selfcheck.mjs, re-swept green at 2,000 ms from a " +
+                 "recorded 2,260 and a measured ~2,740 on this box. " +
+                 "*** THE TRIGGER WAS A PAIRED MEASUREMENT, WHICH IS THE ONLY KIND THIS BOX CAN SUPPORT. *** " +
+                 "droplet's swell pair cost 206, 264, 216 and 287 ms over four INTERLEAVED runs of the two " +
+                 "versions of gate two, taking it from about 2,740 to about 2,980 against the 3,000 ms " +
+                 "ceiling. Interleaved because the box is not the box the timings file was written on: gate " +
+                 "one, UNCHANGED this round, reads 2,776 ms against a recorded 2,016, and murmurKit 1,754 " +
+                 "against 1,633 -- so a single before-and-after pair would have blamed the box's drift on the " +
+                 "change or the change on the box. An earlier unpaired attempt did exactly that and read the " +
+                 "four frames as free. THE TWO HEROES NEVER SHARED A FRAME: comet needs four phases of a " +
+                 "2.2-second lap, droplet two times eight seconds apart on 76-to-134-second periods. This is " +
+                 "the third split in the murmur tree and all three were made BEFORE the addition that would " +
+                 "have crossed the line -- v4626 between the kit and the species, v4630 between gate one and " +
+                 "gate two, this one between comet and droplet. TWO ROWS WERE FOUND STATING FIGURES THAT DO " +
+                 "NOT REPRODUCE while moving them: comet's hotspot row claimed still's catchlight travels " +
+                 "0.067 radii at 48 px and 0.071 at 64 and that it 'must not be asserted as zero' -- it reads " +
+                 "0.000 and 0.050, and zero is CORRECT, because the key turns 0.35 degrees across comet's lap " +
+                 "and a hotspot is an integer pixel. Its ratio clause was therefore satisfied by anything and " +
+                 "printed '1150352337x less' out of its own divide-by-zero guard; the two sides are bounded " +
+                 "separately now. droplet's silhouette row quoted 71.3/31.3% against 9.5/3.8% and 'roughly " +
+                 "EIGHT HUNDRED TIMES apart'; on the frames that run it is 74.09/71.03% against " +
+                 "10.977/11.437%, a 6.7x and 6.2x ratio, because still stopped being drawn as a sphere.",
+    }),
     since249: Object.freeze({
         at: "v4623", swept: 1, green: 1, red: 0,
         added: Object.freeze([

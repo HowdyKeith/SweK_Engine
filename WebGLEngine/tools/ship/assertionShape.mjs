@@ -306,8 +306,14 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4630 -- RE-TAKEN 1671 -> 1672 for tools/ship/murmurSpecies2-selfcheck.mjs, the species gate split
     // off BEFORE the fifth species would have crossed the budget. tools/ship/murmurSpeciesFrames.mjs is a
     // MODULE and not a gate, so it moves runtimeGap's file count by two and this one by one.
-    gates: 1672, usesOk: 1651, definesOk: 1643, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1544, condFirst: 91, unknownSignature: 16,
+    // v4632 -- RE-TAKEN 1672 -> 1674 for TWO gates: tools/ship/murmurSpecies3-selfcheck.mjs (opal and abyss)
+    // and tools/ship/murmurSpecies4-selfcheck.mjs (droplet, split out of gate two in the same round because
+    // its swell pair cost a paired 206-287 ms against a 3,000 ms ceiling). The second was NOT a new subject:
+    // its five rows moved out of tools/ship/murmurSpecies2-selfcheck.mjs, so the tree gained one gate FILE
+    // and no new rows -- which is exactly the kind of move that makes a count of gates and a count of claims
+    // disagree, and is why this record carries both.
+    gates: 1674, usesOk: 1653, definesOk: 1645, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1546, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

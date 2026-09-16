@@ -520,6 +520,55 @@ export function mhBody(uv, t, px, shIn) {
 // drifts, whose rim exponent and asymmetry both move with the ground, whose tight lobe is size-adaptive, and
 // which carries a contact bloom every species asks for. kit.ts calls this "THE SURFACE, shared by every hero".
 
+// ---- opal's lives and abyss's clocks ---------------------------------------------------------------------
+// The two species whose subject is TIME, so the two whose defining properties are cheapest to check here and
+// most expensive to check on pixels: a render samples four or five instants, and these are claims about every
+// instant. Both are transcribed from their own files and neither is used by the shader -- the shader inlines
+// the same arithmetic, and tools/ship/murmurSpecies3-selfcheck.mjs grades the PICTURE while the kit gate
+// grades these. That is the same division the march and mh_exit already have.
+
+/** opal's four life periods, seconds. Mutually incommensurate so no two flashes ever arrive together. */
+export const OPAL_PERIODS = Object.freeze([14.3, 17.0, 19.7, 22.4]);
+
+/**
+ * ONE FLASH'S LIFE. opal.ts: "each one rides its own life envelope on a period between fourteen and
+ * twenty-two seconds, out of phase with the others, so no two arrive together and none of them ever appears
+ * or vanishes. The envelope has a floor rather than a zero, so a flash at its dimmest is still faintly
+ * present and there is no moment of switching on."
+ *
+ * sin SQUARED, not |sin|: the square has a ZERO DERIVATIVE at both ends, which is what "flat ends" means and
+ * what stops the arrival reading as an event. A floor of 0.16 rather than 0 is the rest of it.
+ */
+export function opalLife(k, t) {
+    const per = 14.3 + 2.7 * k, ph = k * 1.97;
+    const sn = Math.sin(2 * Math.PI * t / per + ph);
+    return 0.16 + 0.84 * sn * sn;
+}
+
+/** opal's hue key for flash k: -1, -1/3, +1/3, +1 -- four points across the spread, two either side. */
+export function opalHueKey(k) { return (k - 1.5) / 1.5; }
+
+/**
+ * abyss's SLOT LENGTH in seconds -- how long between passes on one lane.
+ *
+ * abyss.ts: "RARITY IS THE SLOT LENGTH and it runs the intuitive way: high is rarer." Voice and drive shorten
+ * it hard ("speak to it and the abyss becomes populated", the one reading of level that suits a species whose
+ * subject is scarcity) and the small mounts shorten it again by a third, "so the species shows itself at a
+ * glance" rather than making a thirteen-point bead sit through its own silence.
+ */
+export function abyssSlot(rarity, voice = 0, pace = 0, drive = 0, small = 0) {
+    const r = Math.min(1, Math.max(0, rarity));
+    const base = (9.0 + (26.0 - 9.0) * r) / (1 + 0.55 * voice + 0.35 * pace + 1.60 * drive);
+    return base * (1 + (0.66 - 1) * small);
+}
+
+/** abyss's three lanes: their seeds and the multipliers on the slot, so the gaps are never equal. */
+export const ABYSS_LANES = Object.freeze([
+    Object.freeze({ seed: 31.0, slot: 1.00 }),
+    Object.freeze({ seed: 37.0, slot: 1.37 }),
+    Object.freeze({ seed: 41.0, slot: 1.81 }),
+]);
+
 /**
  * THE CONTAINMENT, and kit.ts is explicit that it is NOT the design of the edge: "In this family the body has
  * its own silhouette well inside the circular clip, so this is a safety net FOR THE CONTACT GLOW rather than
@@ -649,6 +698,30 @@ export function mhSurface(b, t, small, inkRgb, tilt, rimKIn, specK, glowK) {
  * nebula's 0.98). still.ts's sentence bundles the two together and is half wrong; the gate asserts both
  * halves rather than repeating either file's word for it.
  */
+/**
+ * EACH SPECIES' OWN BODY, transcribed from its mh_shape call rather than assumed.
+ *
+ * *** NOT ONE OF THE EIGHTEEN HAS amp = 0, AND THIS PORT TREATED THREE OF THEM AS SPHERES UNTIL v4632. ***
+ * A v4626 note said still, limn and comet "are not standing on different geometry -- they are on the amp = 0
+ * case of this one". That is a true statement about mh_body and a false one about those species: their amps
+ * are 0.018, 0.020 and 0.024. Measured over 2,000 directions the deformed radius strays 3.06%, 3.40% and
+ * 4.08% of the radius -- about half a pixel at 48 px, and MOVING, since the three axes turn on periods of 76,
+ * 103 and 134 seconds.
+ *
+ * [ampBase, ampBreath, breathPeriod, gain]. A species with ampBreath 0 has a fixed amplitude; droplet is the
+ * one whose amplitude comes from its own knobs instead and is not in this table.
+ */
+export const MH_SHAPE = Object.freeze({
+    still: Object.freeze([0.018, 0.006, 4.2, 1.12]),
+    limn: Object.freeze([0.020, 0.000, 0.0, 1.05]),
+    comet: Object.freeze([0.024, 0.000, 0.0, 1.30]),
+    opal: Object.freeze([0.022, 0.008, 7.4, 1.22]),
+    abyss: Object.freeze([0.019, 0.006, 14.1, 1.14]),
+});
+
+/** droplet's gain, which is nearly three times any other hero's -- "the body itself is the species". */
+export const MH_DROPLET_GAIN = 3.30;
+
 export const MH_SURFACE_KNOBS = Object.freeze({
     aura:    Object.freeze([0.88, 0.40, 0.52, 0.00, 0.16]),
     droplet: Object.freeze([1.05, 0.35, 0.42, 0.00, 0.16]),   // + 0.55/0.30 * sheenK, added by the species

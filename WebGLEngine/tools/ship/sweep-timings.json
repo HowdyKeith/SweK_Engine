@@ -1676,9 +1676,11 @@
   "tools/ship/labHome-selfcheck.mjs": 1812,
   "tools/ship/raceTurret-selfcheck.mjs": 10708,
   "world/buildingTopple-selfcheck.mjs": 9513,
-  "tools/ship/murmurKit-selfcheck.mjs": 1633,
-  "tools/ship/murmurSpecies-selfcheck.mjs": 2016,
-  "tools/ship/murmurSpecies2-selfcheck.mjs": 2260
+  "tools/ship/murmurKit-selfcheck.mjs": 1671,
+  "tools/ship/murmurSpecies-selfcheck.mjs": 2506,
+  "tools/ship/murmurSpecies2-selfcheck.mjs": 2000,
+  "tools/ship/murmurSpecies3-selfcheck.mjs": 2357,
+  "tools/ship/murmurSpecies4-selfcheck.mjs": 2095
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -3355,7 +3357,9 @@
   "world/buildingTopple-selfcheck.mjs": 0,
   "tools/ship/murmurKit-selfcheck.mjs": 0,
   "tools/ship/murmurSpecies-selfcheck.mjs": 0,
-  "tools/ship/murmurSpecies2-selfcheck.mjs": 0
+  "tools/ship/murmurSpecies2-selfcheck.mjs": 0,
+  "tools/ship/murmurSpecies3-selfcheck.mjs": 0,
+  "tools/ship/murmurSpecies4-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-15T20:01:59.690Z",
@@ -5030,9 +5034,11 @@
   "tools/ship/labHome-selfcheck.mjs": "2026-09-15T20:01:59.690Z",
   "tools/ship/raceTurret-selfcheck.mjs": "2026-09-15T13:49:44.492Z",
   "world/buildingTopple-selfcheck.mjs": "2026-09-15T13:49:44.492Z",
-  "tools/ship/murmurKit-selfcheck.mjs": "2026-09-15T23:18:39.754Z",
-  "tools/ship/murmurSpecies-selfcheck.mjs": "2026-09-16T00:06:05.832Z",
-  "tools/ship/murmurSpecies2-selfcheck.mjs": "2026-09-16T00:06:08.206Z"
+  "tools/ship/murmurKit-selfcheck.mjs": "2026-09-16T03:52:32.083Z",
+  "tools/ship/murmurSpecies-selfcheck.mjs": "2026-09-16T03:52:22.771Z",
+  "tools/ship/murmurSpecies2-selfcheck.mjs": "2026-09-16T03:52:22.771Z",
+  "tools/ship/murmurSpecies3-selfcheck.mjs": "2026-09-16T03:52:22.771Z",
+  "tools/ship/murmurSpecies4-selfcheck.mjs": "2026-09-16T03:52:22.771Z"
  },
  "finished": {
   "tools/ship/placementRender-selfcheck.mjs": true,
@@ -6596,7 +6602,9 @@
   "world/buildingTopple-selfcheck.mjs": true,
   "tools/ship/murmurKit-selfcheck.mjs": true,
   "tools/ship/murmurSpecies-selfcheck.mjs": true,
-  "tools/ship/murmurSpecies2-selfcheck.mjs": true
+  "tools/ship/murmurSpecies2-selfcheck.mjs": true,
+  "tools/ship/murmurSpecies3-selfcheck.mjs": true,
+  "tools/ship/murmurSpecies4-selfcheck.mjs": true
  },
  "crossings": {
   "tools/ship/engineSceneBot-selfcheck.mjs": 2,

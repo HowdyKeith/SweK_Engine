@@ -315,7 +315,8 @@ const probeRun = await renderThreeTslToPixels({
     factoryName: "makeMurmurKitProbeTsl", factoryArgs: { mode: "hash", n: N }, width: N, height: N,
     variants: [{ factoryArgs: { mode: "noise", n: N } }, { factoryArgs: { mode: "rail", n: N } },
                { factoryArgs: { mode: "railLight", n: N } },
-               { factoryArgs: { mode: "surface", n: N } }],
+               { factoryArgs: { mode: "surface", n: N } },
+               { factoryArgs: { mode: "opalAbyss", n: N } }],
 });
 
 sec("6. *** THE PAIR: THE REAL COMPILED SHADER AGAINST THE CPU REFERENCE, BIT FOR BIT ***");
@@ -452,6 +453,75 @@ sec("7. *** THE DEFORMED BODY SOLVE -- the half of the kit the first three speci
         `before normalising. Rd is exactly 1; the residue is entirely in the normal and is that epsilon. So ` +
         `the three species that kept the inline sphere are not standing on different geometry -- they are on ` +
         `the amp = 0 case of this one, and paying two mhDeform calls to be told so would buy nothing.`);
+
+    // *** NOT ONE OF THE EIGHTEEN IS A SPHERE, AND THIS PORT DREW THREE OF THEM AS ONE UNTIL v4632. ***
+    // A v4626 note here said still, limn and comet "are not standing on different geometry -- they are on the
+    // amp = 0 case of this one, and paying two mhDeform calls to be told so would buy nothing". The first
+    // clause is true of mh_body and the second is false of those species: their amps are 0.018, 0.020 and
+    // 0.024, read off their own mh_shape calls. The note was right about the function and wrong about the
+    // heroes, and the render followed the note.
+    const deformRange = (amp, gain) => {
+        let mn = Infinity, mx = -Infinity;
+        for (let i = 0; i < 3000; i++) {
+            const th = Math.acos(1 - 2 * ((i + 0.5) / 3000)), ph = i * 2.39996;
+            const n = [Math.sin(th) * Math.cos(ph), Math.sin(th) * Math.sin(ph), Math.cos(th)];
+            const r = K.mhRadiusAt(n, 3.7, { amp, hi: 0, gain });
+            mn = Math.min(mn, r); mx = Math.max(mx, r);
+        }
+        return (mx - mn) * 100;
+    };
+    const shapeRows = Object.entries(K.MH_SHAPE).map(([n, sh]) => [n, sh[0], sh[3], deformRange(sh[0], sh[3])]);
+    const dropAmp = (0.052 + 0.5 * 0.040) * (1 - 0.5 * 0.22);
+    const dropRange = deformRange(dropAmp, K.MH_DROPLET_GAIN);
+    say(`deformed radius spread -- ${shapeRows.map((r) => `${r[0]} ${r[3].toFixed(2)}%`).join(", ")}, droplet ${dropRange.toFixed(2)}%`);
+    ok("!! *** EVERY SPECIES DEFORMS: no amp in the roster is zero, and a sphere is not the amp = 0 case of one ***",
+        shapeRows.every((r) => r[1] > 0.01) && shapeRows.every((r) => r[3] > 2.5 && r[3] < 5),
+        `the five non-droplet heroes carry amps of ` +
+        `${shapeRows.map((r) => `${r[0]} ${r[1]}`).join(", ")}, which put their deformed radius ` +
+        `${shapeRows.map((r) => r[3].toFixed(2) + "%").join(", ")} across 3,000 directions -- about half a ` +
+        `pixel at 48 px, and MOVING, since mh_deform's three axes turn on periods of 76, 103 and 134 seconds. ` +
+        `Small, real, and not zero. Until v4632 this port drew still, limn and comet as analytic spheres.`);
+
+    // *** AND "EVERY SPECIES DEFORMS" IS NOT "EVERY SPECIES HAS ITS OWN SHAPE", which the sabotage sweep
+    // proved by handing limn still's four numbers and watching all four murmur gates stay green. *** The row
+    // above bounds each entry into a band of 2.5 to 5 percent, and two heroes sharing one entry sit in that
+    // band as comfortably as two heroes with their own. The collapse it fails to see is EXACTLY the defect
+    // this port shipped with until v4632, when still, limn and comet were all drawn as the same analytic
+    // sphere -- so the table needs a row about its SHAPE, not only about its values.
+    //
+    // murmur gives each of the eighteen its own mh_shape call, and the six ported ones differ in three ways
+    // that can be asserted without copying the numbers back out of the table they grade: no two entries are
+    // the same, the roster splits into heroes that BREATHE and heroes that are constant in time, and the
+    // breathers' periods are mutually distinct so no two of them swell together.
+    const shapeKeys = Object.keys(K.MH_SHAPE);
+    const asText = shapeKeys.map((n) => K.MH_SHAPE[n].join("/"));
+    const distinct = new Set(asText).size === shapeKeys.length;
+    const breathers = shapeKeys.filter((n) => K.MH_SHAPE[n][1] !== 0);
+    const constant = shapeKeys.filter((n) => K.MH_SHAPE[n][1] === 0);
+    const periods = breathers.map((n) => K.MH_SHAPE[n][2]);
+    const periodsDistinct = new Set(periods).size === periods.length && periods.every((v) => v > 0);
+    say(`shape roster -- ${breathers.length} breathe on lanes ${periods.join(", ")}, ` +
+        `${constant.length} are constant in time (${constant.join(", ")}), ` +
+        `${new Set(asText).size} of ${shapeKeys.length} entries distinct`);
+    ok("!! *** AND EACH HERO HAS ITS OWN SHAPE: no two entries are equal, and the breathers' lanes all differ ***",
+        distinct && periodsDistinct && breathers.length >= 2 && constant.length >= 2,
+        `the ${shapeKeys.length} ported shapes are ${new Set(asText).size} distinct four-tuples; ` +
+        `${breathers.join(", ")} breathe on lanes ${periods.join(", ")} -- all different, so no two of them ` +
+        `swell together -- and ${constant.join(", ")} carry a flat amplitude, which is murmur's own split ` +
+        `and not a tidy one. *** THE ROW ABOVE CANNOT SAY THIS AND THE SABOTAGE SWEEP PROVED IT: *** giving ` +
+        `limn still's four numbers leaves every deformed radius inside the 2.5-to-5% band, so all four murmur ` +
+        `gates stayed green on a roster that had lost a species. That collapse is not hypothetical -- it is ` +
+        `what this port DID until v4632, on a note that was right about mh_body and wrong about the heroes.`);
+
+    ok("...and droplet is the one whose body IS the subject: three and a half times the quietest hero's",
+        dropRange > shapeRows.reduce((m, r) => Math.max(m, r[3]), 0) * 2 && K.MH_DROPLET_GAIN > 2.5,
+        `droplet's default amplitude of ${dropAmp.toFixed(4)} at a gain of ${K.MH_DROPLET_GAIN} gives ` +
+        `${dropRange.toFixed(2)}% against the loudest of the other five at ` +
+        `${shapeRows.reduce((m, r) => Math.max(m, r[3]), 0).toFixed(2)}% -- ` +
+        `${(dropRange / shapeRows.reduce((m, r) => Math.min(m, r[3]), 99)).toFixed(2)}x the quietest. That ` +
+        `gap is the whole distinction between a hero that breathes and the one droplet.ts calls "the body ` +
+        `itself is the species: a sphere of water in free fall". The gain does most of it: 3.30 against the ` +
+        `others' 1.05 to 1.30.`);
 
     // *** murmur'S OWN WORST-CASE ARITHMETIC DOES NOT REPRODUCE, AND IS REPORTED RATHER THAN CORRECTED. ***
     const worstSil = K.dropletWorstSilhouette();
@@ -1014,6 +1084,122 @@ sec("9. *** THE SURFACE: mh_key / mh_small / mh_surface -- the one piece ALL EIG
             `orientation is off by ${sA.worst}, so this cannot pass by the symmetry a centred pattern would ` +
             `have -- and the tilt is a NONZERO (0.35, -0.20) here, so the counter-move term the species ` +
             `exercise at zero is exercised for real by this row.`);
+    }
+}
+
+// =============================================================================================================
+sec("10. *** opal's FOUR LIVES AND abyss's CLOCKS: the two species whose subject is TIME ***");
+{
+    // *** THESE ARE IN THE KIT BECAUSE A FORMULA INLINED IN A SPECIES FILE HAS NOTHING TO GRADE IT. ***
+    // v4632 first wrote opal's life envelope and abyss's slot straight into render/aiPresenceOrbTsl.mjs, and
+    // the sabotage sweep walked through three of them at once: removing the life's FLOOR, flattening its four
+    // periods into ONE, and swapping sin squared for a bare sine all left every row in the tree green. They
+    // are claims about EVERY INSTANT, and a render samples four. Moved into the kit they get the same
+    // treatment as limnArc and cometFall: an f64 twin here and the real shader graded against it below.
+
+    // ---- opal: nothing ever switches on --------------------------------------------------------------
+    let pk = -1, tr = 2, tPk = 0, tTr = 0;
+    for (let i = 0; i < 200000; i++) {
+        const t = i * 0.001, v = K.opalLife(0, t);
+        if (v > pk) { pk = v; tPk = t; }
+        if (v < tr) { tr = v; tTr = t; }
+    }
+    const slope = (t, h = 1e-6) => (K.opalLife(0, t + h) - K.opalLife(0, t - h)) / (2 * h);
+    ok("!! *** opal's LIFE HAS FLAT ENDS AND A FLOOR: it peaks at 1 and troughs at 0.16, both with ZERO slope ***",
+        Math.abs(pk - 1) < 1e-12 && Math.abs(tr - 0.16) < 1e-12 &&
+        Math.abs(slope(tPk)) < 1e-6 && Math.abs(slope(tTr)) < 1e-6,
+        `peak ${pk.toFixed(6)} at t = ${tPk.toFixed(3)} and trough ${tr.toFixed(6)} at t = ${tTr.toFixed(3)}, ` +
+        `with derivatives ${slope(tPk).toExponential(1)} and ${slope(tTr).toExponential(1)}. BOTH HALVES ` +
+        `MATTER AND EITHER ALONE IS PASSABLE: a bare |sin| on the same floor has the same peak and the same ` +
+        `trough and a KINK at the bottom, which is the arrival reading as an event -- exactly the strobe ` +
+        `opal.ts says the species is built to avoid ("play-of-colour in a real opal is not a flicker"). The ` +
+        `slope is what tells the two apart.`);
+
+    let brightestEver = 1, dimmestPeak = 0;
+    for (let i = 0; i < 400000; i++) {
+        const t = i * 0.005;
+        let hi = 0, lo = 1;
+        for (let k = 0; k < 4; k++) { const v = K.opalLife(k, t); hi = Math.max(hi, v); lo = Math.min(lo, v); }
+        brightestEver = Math.min(brightestEver, hi);
+        dimmestPeak = Math.max(dimmestPeak, lo);
+    }
+    ok("!! *** THE STONE IS NEVER DARK AND THE FOUR NEVER ARRIVE TOGETHER, over 2,000 seconds ***",
+        brightestEver > 0.18 && dimmestPeak < 0.99,
+        `across 400,000 samples the BRIGHTEST of the four never falls below ${brightestEver.toFixed(4)} -- so ` +
+        `there is always a flash in the stone -- and the DIMMEST never rises above ${dimmestPeak.toFixed(4)}, ` +
+        `so all four are never lit at once. The periods are mutually incommensurate by construction ` +
+        `(14.3 + 2.7k), which is what makes "no gap between arrivals repeats" true rather than approximately ` +
+        `true, and this row is how a flattening of those four periods into one would show: they would peak ` +
+        `together and the dimmest would reach 1.`);
+
+    // *** AND opal.ts's OWN LIST OF THOSE PERIODS IS OFF BY A TENTH ON TWO OF FOUR. ***
+    const periods = [0, 1, 2, 3].map((k) => 14.3 + 2.7 * k);
+    ok("opal's four periods are 14.3, 17.0, 19.7 and 22.4 -- its header says 17.1 and 19.6, and the code ships",
+        Math.abs(periods[1] - 17.0) < 1e-9 && Math.abs(periods[2] - 19.7) < 1e-9,
+        `14.3 + 2.7k gives ${periods.map((v) => v.toFixed(1)).join(", ")}; opal.ts's header says "Periods ` +
+        `14.3, 17.1, 19.6 and 22.4 seconds". Two of the four are off by a tenth of a second in the PROSE. ` +
+        `Carried as shipped with the gap named, the same call this tree made for MH_SCATTER_K's 3.2 against ` +
+        `0.098, mh_small's 46 against 52, and droplet's 0.339 against 0.34177.`);
+
+    ok("...and the four hue keys are exactly -1, -1/3, +1/3 and +1, so they balance about the anchor",
+        [0, 1, 2, 3].map(K.opalHueKey).reduce((a, b) => a + b, 0) === 0 &&
+        K.opalHueKey(0) === -1 && K.opalHueKey(3) === 1,
+        `${[0, 1, 2, 3].map((k) => K.opalHueKey(k).toFixed(4)).join(", ")}, summing to EXACTLY ` +
+        `${[0, 1, 2, 3].map(K.opalHueKey).reduce((a, b) => a + b, 0)}. opal.ts: "the four flashes sit at four ` +
+        `points across the spread -- two either side of the anchor". A set that did not sum to zero would ` +
+        `drag the whole stone off its own hue family.`);
+
+    // ---- abyss: rarity is the slot length --------------------------------------------------------------
+    const slotDefault = K.abyssSlot(0.6), slotVoice = K.abyssSlot(0.6, 1), slotSmall = K.abyssSlot(0.6, 0, 0, 0, 1);
+    ok("!! *** abyss's DEFAULT SLOT IS ABOUT TWENTY SECONDS, which is its own file's claim for the species ***",
+        Math.abs(slotDefault - 19.2) < 0.1 && slotVoice < slotDefault * 0.7 && slotSmall < slotDefault * 0.7,
+        `at the roster's default rarity of 0.6 the slot is ${slotDefault.toFixed(2)} s, against abyss.ts's "at ` +
+        `the default rarity a creature passes roughly every twenty seconds". Voice takes it to ` +
+        `${slotVoice.toFixed(2)} s -- "speak to it and the abyss becomes populated", the one reading of level ` +
+        `that suits a species whose subject is scarcity -- and the small mounts to ${slotSmall.toFixed(2)} s, ` +
+        `"so the species shows itself at a glance" rather than making a thirteen-point bead sit through its ` +
+        `own silence. RARITY RUNS THE INTUITIVE WAY: ${K.abyssSlot(0).toFixed(1)} s at 0 and ` +
+        `${K.abyssSlot(1).toFixed(1)} s at 1, so high IS rarer.`);
+
+    const lanes = K.ABYSS_LANES.map((l) => l.slot);
+    let nearest = 1;
+    for (const a of lanes) for (const b of lanes) if (a !== b) nearest = Math.min(nearest, Math.abs(b / a - Math.round(b / a)));
+    ok("...and its three lanes run on slots whose ratios are not whole numbers, so the gaps never line up",
+        new Set(lanes).size === 3 && nearest > 0.15,
+        `slot multipliers ${lanes.join(", ")}, with pairwise ratios ${(lanes[1] / lanes[0]).toFixed(4)}, ` +
+        `${(lanes[2] / lanes[0]).toFixed(4)} and ${(lanes[2] / lanes[1]).toFixed(4)}. The TIGHTEST of the six ` +
+        `ratios is ${nearest.toFixed(4)} from a whole number -- that is 1.81 against 2, so lane three fires ` +
+        `roughly every other time lane one does and slips 9.5% of a slot each cycle, realigning only after ` +
+        `about ten. "Never equal" is a statement about drift, not about being far from an integer, and 0.19 ` +
+        `is what the shipped numbers give. A first cut asked for 0.2 and reddened on murmur's own roster. ` +
+        `abyss.ts: "Three lanes on long, independently jittered clocks, so the gaps between passes are never ` +
+        `equal and two creatures overlap only occasionally." Three lanes sharing one clock would make every ` +
+        `pass a triple.`);
+
+    // ---- AND THE PAIR ----------------------------------------------------------------------------------
+    if (!probeRun.ok) {
+        ok("!! *** opal's LIFE AND abyss's SLOT RENDER ON A REAL GPU AND MATCH THE CPU REFERENCE ***", false,
+            `could not render: ${probeRun.reason || (probeRun.skipped ? "skipped: " + probeRun.skipped : "unknown")}`);
+    } else {
+        const oa = probeRun.frames[5];
+        let wLife = 0, wSlot = 0, atL = "";
+        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+            const i = ((N - 1 - y) * N + x) * 4;
+            const kk = Math.floor((x / N) * 4), tt = (y / N) * 24;
+            const wantLife = Math.round(Math.min(1, Math.max(0, K.opalLife(kk, tt))) * 255);
+            const wantSlot = Math.round(Math.min(1, Math.max(0, K.abyssSlot(x / N, Math.floor((y / N) * 3) * 0.5) / 32)) * 255);
+            const dL = Math.abs(oa[i] - wantLife), dS = Math.abs(oa[i + 1] - wantSlot);
+            if (dL > wLife) { wLife = dL; atL = `k=${kk} t=${tt.toFixed(1)}: gpu ${oa[i]} cpu ${wantLife}`; }
+            wSlot = Math.max(wSlot, dS);
+        }
+        say(`opal life and abyss slot over ${N * N} points: worst |gpu - cpu| = ${wLife}/255 on the life, ${wSlot}/255 on the slot`);
+        ok("!! *** opal's LIFE AND abyss's SLOT RENDER ON A REAL GPU AND MATCH THE CPU REFERENCE ***",
+            wLife <= 2 && wSlot <= 2,
+            `worst channel error ${wLife} of 255 on the life across four flashes and 24 seconds, and ${wSlot} ` +
+            `on the slot across the whole rarity range at three voices. Worst life at ${atL}. This is the row ` +
+            `that makes the four CPU rows above mean anything about the PICTURE: without it they describe a ` +
+            `reference implementation nothing draws, which is the shape v4632's sabotage sweep caught when ` +
+            `these formulas lived inline in the species file and three corruptions of them passed everything.`);
     }
 }
 
