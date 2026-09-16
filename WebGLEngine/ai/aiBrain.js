@@ -18,6 +18,8 @@
 // loaded WAD using the same state machine + heatmap + thinking log.
 
 import * as HuntSim from "./aiHuntSim.js";
+import { HUNT_HYSTERESIS_MACHINE } from "./aiHuntSim.js";
+import { applyEvent } from "../ui/machine.mjs";
 import { backoffDelay, onConnectivityRegained } from "../net/wsReconnect.js";
 
 // ---- DOM ----------------------------------------------------------------
@@ -50,10 +52,29 @@ const recentDirs  = [];          // last N directives we sent (for the log panel
 const MAX_RECENT  = 8;
 
 // AI decision thresholds (world units; assume meters-ish based on VBA game)
-const ATTACK_DIST = 4;
-const SEEK_DIST   = 25;
+export const ATTACK_DIST = 4;
+export const SEEK_DIST   = 25;
 const DECIDE_INTERVAL_MS = 250;    // re-decide every 250ms per enemy
 const TURN_SPEED_RAD = 1.5;        // rad/s — caps how fast we tell an enemy to turn
+
+// v4605 -- the condition->event translation for aiTick()'s enemy hysteresis, funnelled through the SAME
+// HUNT_HYSTERESIS_MACHINE aiHuntSim.js's agent-vs-agent combat uses (see that file's own header for why one
+// shared graph is safe across two different distance scales). Factored into a small pure function, same exact
+// operators and branch order as the original if-chain, so the boundary/priority behaviour can be pinned
+// directly in the gate without booting this page's DOM/WebSocket/canvas side effects. This file's own
+// seek-branch guard order is the OPPOSITE of aiHuntSim's (distNear checked BEFORE distFar here, not after) and
+// this path has no LOS concept at all -- both preserved exactly, since the shared graph itself encodes neither.
+export function enemyDecideEvent(state, dist) {
+    if (state === "idle") {
+        if (dist < SEEK_DIST) return "distClose";
+    } else if (state === "seek") {
+        if (dist < ATTACK_DIST) return "distNear";
+        if (dist > SEEK_DIST * 1.3) return "distFar";
+    } else if (state === "attack") {
+        if (dist > ATTACK_DIST * 1.5) return "loseTarget";
+    }
+    return null;
+}
 
 // Round 69 — visible thinking. Player trajectory prediction window:
 // we keep a short ring buffer of player positions and project ahead
@@ -390,21 +411,19 @@ function aiTick() {
         const dist = Math.hypot(dx, dz);
         const desiredYaw = Math.atan2(dz, dx);
 
-        // State machine with hysteresis — enemies don't oscillate at borders
+        // State machine with hysteresis — enemies don't oscillate at borders. Funnelled through the same
+        // HUNT_HYSTERESIS_MACHINE aiHuntSim.js's agent-vs-agent combat uses, via enemyDecideEvent() above.
         const prev = aiState.get(enemy.id) || { state: "idle" };
-        let newState = prev.state;
-        if (newState === "idle") {
-            if (dist < SEEK_DIST) newState = "seek";
-        } else if (newState === "seek") {
-            if (dist < ATTACK_DIST) newState = "attack";
-            else if (dist > SEEK_DIST * 1.3) newState = "idle";
-        } else if (newState === "attack") {
-            if (dist > ATTACK_DIST * 1.5) newState = "seek";
-        }
+        const event = enemyDecideEvent(prev.state, dist);
+        const newState = applyEvent(HUNT_HYSTERESIS_MACHINE, prev.state, event, null);
 
         const transitioned = newState !== prev.state;
         if (transitioned) {
-            think(`#${e.id} ${prev.state || "idle"} → ${newState} (dist ${dist.toFixed(1)})`,
+            // v4605 -- fixed a pre-existing typo: this referenced an undefined `e` (loop var is `enemy`),
+            // throwing a ReferenceError on every real transition in non-sim/VBA-bridge mode and aborting that
+            // tick's remaining enemy processing. Preserving a crash is not "behaviour preservation"; fixed as
+            // a called-out one-line correction rather than folded in silently.
+            think(`#${enemy.id} ${prev.state || "idle"} → ${newState} (dist ${dist.toFixed(1)})`,
                 newState === "attack" ? "attack" :
                 newState === "seek"   ? "seek"   : "idle");
         }

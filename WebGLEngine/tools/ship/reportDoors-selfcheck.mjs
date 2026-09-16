@@ -73,7 +73,7 @@ import { gateReport } from "./gateReport.mjs";
 import { population, classify, contractOf, FORMATTERS, STRICT_FORMATTERS, TOLERANT_FORMATTERS, NEVER_CALL,
          RETURNS_BARE_BECAUSE, CHEAP_STATES, CHEAP_STATES_WITH_SECONDS,
          CALL_COST_V4459 as COST, NO_GATE_ALL as NOGATE, NO_GATE_V4458, NO_GATE_V4531, NO_GATE_V4565,
-         NO_GATE_V4540, UNGATED_ANYWHERE_V4565,
+         NO_GATE_V4540, NO_GATE_V4587, UNGATED_ANYWHERE_V4565,
          reportLines as doorsReport } from "./reportDoors.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -290,9 +290,10 @@ console.log("\n6. who provides the convention and cannot check it");
     ok("!! the modules providing this convention with no gate BESIDE them are named, not counted",
        noGate.length === NOGATE.length && noGate.every((r) => NOGATE.includes(r)),
        `${noGate.length} of ${rows.length}, over ${NO_GATE_V4458.length} frozen at v4458, ` +
-       `${NO_GATE_V4531.length} at v4531, ${NO_GATE_V4565.length} at v4565 and ${NO_GATE_V4540.length} at ` +
-       "v4540 -- that last one arriving through a MERGE rather than through the round that wrote it, which " +
-       "is the case a per-branch ratchet cannot see and a union one can. They are LISTED so that " +
+       `${NO_GATE_V4531.length} at v4531, ${NO_GATE_V4565.length} at v4565, ${NO_GATE_V4540.length} at ` +
+       `v4540 and ${NO_GATE_V4587.length} at v4587 -- the v4540 one arriving through a MERGE rather than ` +
+       "through the round that wrote it, which is the case a per-branch ratchet cannot see and a union one " +
+       "can. They are LISTED so that " +
        "adding a member without a gate fails here " +
        "rather than passing quietly under a number that moved by one -- WHICH IS WHAT HAPPENED: the four at " +
        "v4531 arrived with the Racing-city line and turned this row red, which is the row working. The two " +
@@ -514,6 +515,11 @@ process.exit(fails === 0 ? 0 : 1);
 //      -> exit 1. The assertion is `noGate.length === NOGATE.length && every member included`, so a duplicate
 //      breaks the count while every containment check still passes -- which is the shape that would let a
 //      later edit quietly widen the union.
+//
+// SABOTAGE LOG -- v4587, the same row after two arrivals (brain/fleetRouting.mjs at v4584, physics/labHome.mjs
+// at v4585) were dated into NO_GATE_V4587. The row had been red on them since v4584 and three notes did not say so.
+//   E  physics/labHome.mjs dropped from NO_GATE_V4587      -> exit 1, the row red by name (9 providers, 8 listed).
+//   F  NO_GATE_V4587 spread twice into NO_GATE_ALL          -> exit 1, the row red by name (9 providers, 11 listed).
 //
 // Clean tree: exit 0. *** THE ROW WENT RED ON ITS OWN BEFORE ANY OF THIS, WHICH IS WHY IT IS TRUSTED HERE. ***
 // Four providers arrived with the Racing-city line and section 6 refused; it was not made to fail on purpose

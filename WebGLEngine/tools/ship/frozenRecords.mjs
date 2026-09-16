@@ -493,6 +493,25 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4577 -- RE-TAKEN with `excluding` below: 104/46/189 -> 105/47/192, the one record and its three fields.
     // v4578 -- RE-TAKEN with `excluding` below: 105/47/192 -> 106/47/192, the one record and none of its
     // values being a bare integer.
+    // v4622 -- RE-TAKEN with `excluding` below: the ordinary growth of concurrent rounds took excluding to
+    // 109/48/184; this module's own two records and their twenty fields are unchanged, so 111/50/204.
+    // v4622b -- RE-TAKEN AGAIN, WITHIN THE SAME ROUND, WITH `excluding` above: 109 -> 111 records (this
+    // round's own two-record redCensus.mjs registration), so 113/50/204.
+    // v4584 -- RE-TAKEN with `excluding` below on origin/main, diverged from the branch above at 104/45/172:
+    // 106/47/192 -> 107/48/198. *** AND THE FIRST NOTE HERE WAS WRONG ABOUT WHY. *** It blamed gateSweep's
+    // since230, which the census does not count at all (RECORD_RE wants a version-stamped name).
+    // v4585 measured main's own tree at 4f89c470 in a worktree: 105/46/178 against its recorded 104/45/172 --
+    // the row had gone stale ON MAIN, where the quick sweep skips a gate whose inputs did not change, and the
+    // merged tree's full run was the first to say so. Right numbers, wrong attribution, corrected here rather
+    // than left.
+    // v4587 -- RE-TAKEN with `excluding` below: 107/48/198 -> 108/48/198, the one record (NO_GATE_V4587) and
+    // no field.
+    // v4622-merge -- RE-TAKEN on this branch's actual merge of origin/main: the two histories above both
+    // diverged from 104/45/172 and are both real. The final reading is a fresh census() over the merged tree.
+    // v4622-merge-b -- RE-TAKEN with `excluding` below, after the actual merge landed and NO_GATE_V4587 and
+    // COMMIT_BELT_DRIFT_V4621 arrived with it: 113 -> 114.
+    // v4623 -- RE-TAKEN 114/50/204 -> 115/51/208 alongside the `excluding` pair below, for KIT_AT_V4623
+    // and its four numeric fields. The two readings must stay exactly this module's own two records apart.
     // v4584 -- RE-TAKEN with `excluding` below: 106/47/192 -> 107/48/198, the one record (gateSweep's since230) and its
     // six fields, on the tree merged with main at v4583.
     // v4536 -- RE-TAKEN with `excluding`: 104/46/189 -> 105/47/199, the one new record PARTITION_AT_V4536 and
@@ -545,7 +564,10 @@ export const PROBE_AT_V4536 = Object.freeze({
     // version-stamped frozen exports, so naming a standing red in a dated list is an arrival as surely as
     // a measurement is. The FIELD counts did not move with them -- neither carries a numeric field -- which
     // is the exact mirror of v4540's NO_GATE_V4540.
-    currentIncludingModule: Object.freeze({ records: 136, withFields: 65, fields: 381 }),
+    // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
+    // and the readings overlap on everything predating the split, so they are run over the merged tree rather
+    // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
+    currentIncludingModule: Object.freeze({ records: 144, withFields: 68, fields: 390 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -603,6 +625,28 @@ export const PROBE_AT_V4536 = Object.freeze({
     // every field it carries is a string or a frozen array of paths, and FIELD_RE counts `name: <digits>,`.
     // A record with no numeric field is still a record, and stating that is cheaper than the next re-take
     // wondering why one number moved and two did not.
+    // RE-TAKEN: 104/45/172 -> 108/47/181, from the ordinary growth of concurrent rounds since -- no single
+    // one named here because none of them touched this file; the live census is what the tree holds today.
+    // v4622 -- RE-TAKEN: 108/47/181 -> 109/48/184, from the ordinary growth of concurrent rounds on this
+    // same unshipped branch since -- no single one named here because none of them touched this file; the
+    // live census is what the tree holds today.
+    // v4622b -- RE-TAKEN AGAIN, WITHIN THE SAME ROUND: 109/48/184 -> 111/48/184. This round's own registration
+    // of three reds added RED_AT_V4622_GATES and RED_AT_V4622 to redCensus.mjs -- two more V-stamped records,
+    // no numeric fields in either (a frozen array and a map of gate->reason string), which is exactly the
+    // "record with no numeric field is still a record" shape v4578's note above already names. Editing the
+    // register that names a round's own reds is itself something a round does, and this file re-takes it.
+    // v4584 -- RE-TAKEN: 104/45/172 -> 105/46/178, on origin/main, diverged from the branch above at that
+    // same 104/45/172. NOT gateSweep's since230, as the first draft of this note said: sinceNNN records are
+    // not version-stamped names and the census never counts them.
+    // v4585 ran the census on main's own tree (4f89c470) and got 105/46/178 there too: the row was stale on
+    // main.
+    // v4587 -- RE-TAKEN: 105/46/178 -> 106/46/178, one record: reportDoors' NO_GATE_V4587, a dated list of
+    // two module names and no numeric field, so records moves by one and withFields and fields do not.
+    // v4622-merge -- RE-TAKEN on this branch's actual merge of origin/main: the two histories above both
+    // diverged from 104/45/172 and are both real. The final reading is a fresh census() over the merged tree.
+    // v4622-merge-b -- RE-TAKEN, after the actual merge landed: 111 -> 112. NO_GATE_V4587 (origin/main's own)
+    // and COMMIT_BELT_DRIFT_V4621 both arrived; neither carries a numeric field.
+    // v4623 -- RE-TAKEN 112/48/184 -> 113/49/188 for KIT_AT_V4623, which carries four numeric fields.
     // v4584 -- RE-TAKEN: 104/45/172 -> 105/46/178. ONE record, gateSweep.mjs's since230 (the fleetRouting gate's sweep
     // record, six fields: at, swept, green, red, added, verdict shapes), taken on the tree merged with main at v4583.
     // v4536 -- RE-TAKEN: 102/44/169 -> 103/45/179. ONE record, PARTITION_AT_V4536 in nav/partitionScore.mjs,
@@ -670,7 +714,10 @@ export const PROBE_AT_V4536 = Object.freeze({
     // the split, so a sum double-counts them. Re-derived by running the census over the merged tree, the way
     // the v4537 and v4540 merge notes above already require of this file -- "every number here is re-derived
     // from the merged tree and never summed from the two notes".
-    excluding: Object.freeze({ records: 134, withFields: 63, fields: 361 }),
+    // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
+    // and the readings overlap on everything predating the split, so they are run over the merged tree rather
+    // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
+    excluding: Object.freeze({ records: 142, withFields: 66, fields: 370 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,

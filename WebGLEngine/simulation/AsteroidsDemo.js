@@ -34,6 +34,37 @@ const STAGE_LARGE  = 0;
 const STAGE_MEDIUM = 1;
 const STAGE_SMALL  = 2;
 
+// v4606 -- EXAMINED FOR MIGRATION ONTO ui/machine.mjs's defineMachine()/applyEvent() (the same framework
+// simulation/BossPhaseManager.js, simulation/CSBomb.js, simulation/CSRoundManager.js, simulation/Kaiju.js,
+// simulation/HellgateManager.js, simulation/SatelliteFleet.js, and ai/aiHuntSim.js+ai/aiBrain.js now use)
+// and DELIBERATELY LEFT ALONE. This is a considered no, not an oversight -- see tools/ship/nextRounds.mjs's
+// "npc-decision-framework" entry for the full writeup. The short version: STAGE_INFO[large/medium/small]
+// LOOKS like a transition table on paper -- splitStage chains large -> medium -> small -> -1 -- but
+// asteroid.stage is not a guarded, history-dependent lifecycle field at all. It is written EXACTLY ONCE,
+// in the object literal _spawnAsteroid() builds for a brand-new entity (~line 548), and never reassigned
+// anywhere else in this file (grepped every `.stage` read and write to confirm; every other appearance is
+// a `STAGE_INFO[a.stage]` lookup or an `a.stage === STAGE_LARGE/MEDIUM` ternary — cosmetic/scoring reads,
+// not legality checks). A "stage transition" here is not `ast.stage = next` on a persisting object; it is
+// _breakAsteroid() despawning the parent entity outright and calling _spawnAsteroid() 0, 2, or 3 times
+// (STAGE_INFO[x].splitInto) to construct wholly new child entities, each already carrying its own final
+// stage at birth. ui/machine.mjs's applyEvent(machine, from, event, onEnterMap) is built around a single
+// continuant identity — `from` is documented as the SAME caller's value across ticks, and onEnterMap fires
+// once per real transition on that ONE object — and there is no such identity to thread through it here:
+// the entity that held `from` is gone by the time any "next" stage exists, and machine.next(from, event)
+// can only hand back one target state name, never the 0/2/3-way fan-out a real break produces. There is
+// also no second event type for a from-state to gate: every stage handles the one real event in this file
+// (a bullet within STAGE_INFO[a.stage].baseScale*0.8 of it) identically in KIND — unconditional single-hit
+// break — differing only in the DATA STAGE_INFO supplies (child count, child stage, score, particle burst
+// count). That's CSBomb.js's "per-state data array that stays a plain lookup table" pattern, not RIG_JOB's
+// "table that gates which events are legal" pattern. (hitsToBreak is a red herring pointing the other way:
+// it's copied into every asteroid's .hp at spawn but never read or decremented in tick()'s bullet-collision
+// loop — any single hit breaks any-stage asteroid regardless, so it's dead data, not an active guard.) This
+// is CSBot.js's write-once-vs-reassigned distinction (see its own v4604 note) taken one step further: CSBot's
+// BOT_STATE at least gets recomputed on the SAME bot object every tick; asteroid.stage is never reassigned
+// on an existing object at all — it is immutable per-instance data, full stop.
+// If this ever changes -- e.g. a future "asteroid erosion/damage" mechanic starts mutating an EXISTING
+// asteroid's .stage in place instead of destroying and respawning it -- re-read this note before assuming
+// it still applies.
 const STAGE_INFO = [
     { name: "large",  baseScale: 4.0, splitInto: 2, splitStage: STAGE_MEDIUM, hitsToBreak: 1 },
     { name: "medium", baseScale: 2.5, splitInto: 3, splitStage: STAGE_SMALL,  hitsToBreak: 1 },

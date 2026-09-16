@@ -1,13 +1,13 @@
 {
  "gate": "tools/ship/skyStars-selfcheck.mjs",
- "at": "2026-09-15",
+ "at": "2026-09-12",
  "tables": [
   {
-   "title": "the density knob was multiplying every star's brightness",
+   "title": "brightest star before and after the density-knob fix, at every density main.js uses",
    "columns": [
     "density",
-    "brightest was",
-    "brightest now"
+    "brightest star (old)",
+    "brightest star (now)"
    ],
    "rows": [
     [
@@ -26,76 +26,55 @@
      1
     ]
    ],
-   "note": "densities read out of main.js, not typed here"
+   "note": "the old divisor was a fixed DENSITY_SPAN; the fixed one scales by density * DENSITY_SPAN, so only density 1 was ever right before."
   },
   {
-   "title": "the sin-hash's deficit deepens as the cut deepens",
+   "title": "the sin-hash's deficit against exact_hash3, by depth of cut",
    "columns": [
     "cut",
     "asked %",
     "sin-hash %",
-    "share of asked",
-    "exact %",
-    "1 sd %",
-    "cells"
+    "exact_hash3 %"
    ],
    "rows": [
     [
      0.9,
      9.999999999999998,
      9.880758017492711,
-     0.9880758017492713,
-     10.025072886297377,
-     0.051224083257188295,
-     343000
+     10.025072886297377
     ],
     [
      0.95,
      5.000000000000004,
      4.81399416909621,
-     0.9627988338192411,
-     5.003498542274053,
-     0.03721343373226628,
-     343000
+     5.003498542274053
     ],
     [
      0.99,
      1.0000000000000009,
      0.8822157434402332,
-     0.8822157434402325,
-     1.014868804664723,
-     0.016989106439401977,
-     343000
+     1.014868804664723
     ],
     [
      0.995,
      0.5000000000000004,
      0.4221574344023324,
-     0.844314868804664,
-     0.5049562682215744,
-     0.012043410305159655,
-     343000
+     0.5049562682215744
     ],
     [
      0.997,
      0.30000000000000027,
      0.12682215743440234,
-     0.4227405247813408,
-     0.30903790087463556,
-     0.009338156465853316,
-     343000
+     0.30903790087463556
     ],
     [
      0.999,
      0.10000000000000009,
      0.0239067055393586,
-     0.23906705539358578,
-     0.10029154518950437,
-     0.005396792050050373,
-     343000
+     0.10029154518950437
     ]
    ],
-   "note": "one reading per cut over a 70x70x70 block; `share of asked` is sin-hash / asked"
+   "note": "asked is 100 * (1 - cut); the deficit deepens as the cut deepens because sin(x) * 43758.5453 loses low bits in float32 before fract() runs."
   }
  ],
  "notes": [],

@@ -5,16 +5,19 @@
 // ---- WHY NOT THE WHEEL JOINTS, SAID FIRST ---------------------------------------------------------------------------------------------
 //
 // The plan named box3d's wheel joints (jointDrive KIND.WHEEL, appended at v4398). They exist in physics/box3d/box3d_shim.c and were
-// measured natively at v4398 -- and they are NOT IN vendor/box3d/box3d.wasm: the artifact exports 45 swk_ functions and none of
-// swk_wheel_spin, swk_wheel_steer, swk_wheel_state or swk_body_sphere (physics/box3d/box3dNode.mjs's PENDING_REBUILD says so, and
-// this sandbox has no emsdk to change it). A car on wheel joints would run in a native probe and nowhere the brain, the page or
-// the fleet can reach it. So the car is the tree's OTHER vehicle, the one v4217 built and gated with 56 checks: physics/vehicle.mjs's
+// measured natively at v4398. v01fe7f4e rebuilt vendor/box3d/box3d.wasm off the clang toolchain and the artifact now exports all 77
+// swk_ functions the shim declares -- swk_wheel_spin, swk_wheel_steer, swk_wheel_state and swk_body_sphere among them -- so the
+// capability this section used to name as native-only is reachable from the browser today. That does not change which car this is:
+// physics/wheelJoint-selfcheck.mjs measured the REJECTED alternative's own claim (v4217's "constrained wheels jitter at high mass
+// ratios") and found the mechanism real but its effect four orders of magnitude below what a driver would feel at box3d's own
+// substep count -- which argues the raycast choice was never ABOUT capability, and having the joints now changes nothing it was
+// weighed against. So the car stays the tree's OTHER vehicle, the one v4217 built and gated with 56 checks: physics/vehicle.mjs's
 // raycast model -- one rigid chassis, wheels as downward rays, suspension and tyre forces applied to the single body -- which needs
-// only what the wasm has (a box body, impulses, transforms, velocities, a state hash). And because the phase-1 track is FLAT, the
-// ray needs no physics raycast either (swk_world_cast_ray is another native-only export): the ground under a wheel is a function of
-// (x, z) -- asphalt at ROAD_Y inside the kerbs, the kerb band raised KERB_HEIGHT, grass at the floor's own height, nothing beyond
-// the grid. The day the wasm is rebuilt, the wheel joints are a second car beside this one, not a replacement: the raycast car is
-// what round 3's brain learns on and round 4's lab replays, and both want the cheaper, deterministic body.
+// only what the wasm has always had for this purpose (a box body, impulses, transforms, velocities, a state hash). And because the
+// phase-1 track is FLAT, the ray needs no physics raycast either, even though swk_world_cast_ray is built too: the ground under a
+// wheel is a function of (x, z) -- asphalt at ROAD_Y inside the kerbs, the kerb band raised KERB_HEIGHT, grass at the floor's own
+// height, nothing beyond the grid. The wheel joints are a second car beside this one, not a replacement: the raycast car is what
+// round 3's brain learns on and round 4's lab replays, and both want the cheaper, deterministic body.
 //
 // ---- WHAT box3d GIVES AND WHAT IS DERIVED ----------------------------------------------------------------------------------------------
 //

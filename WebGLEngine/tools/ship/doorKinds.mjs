@@ -252,9 +252,36 @@ export const MEASURED_V3608 = {
             "that key behind an HTTP surface, and a leaked signing key makes every pinned public key in the " +
             "fleet worthless at once. A terminal-only operation, and the 404 now says WHY rather than only " +
             "naming the command.",
+        // ADDED WHEN THE cliOnly BUCKET GREW A THIRD PROSE DOOR: recordInputs.mjs. Its own header calls itself
+        // "the expensive half ... meant to be run rarely: one pass over the tree, serially" -- it spawns EVERY
+        // gate in the tree once via enumerateGates(), the same cost class as tools/ship/verify.mjs, which has
+        // never had a button and is not in this registry either. toolsBridge's own /tools/run route caps every
+        // press at 180s specifically so "a wedged tool" cannot "hold the server all afternoon" -- a button here
+        // would either be killed mid-pass by that cap or be the one press that holds the server for as long as
+        // a full ship verify. A terminal-only operation for the reason the whole-suite runners already are.
+        "tools/ship/recordInputs.mjs": "runs the entire gate tree once, serially -- the same cost class as " +
+            "tools/ship/verify.mjs, which also has no button and is not in this registry. toolsBridge's /tools/run " +
+            "caps every press at 180s precisely so a wedged tool cannot hold the server for the afternoon; this " +
+            "tool's own header calls itself 'the expensive half ... meant to be run rarely', so a button would " +
+            "either be truncated by that cap or be the one press that reproduces the whole-suite cost the cap " +
+            "exists to bound.",
     },
-    genuinelyOwed: { "physics/backend-qa-check.mjs": "needs a rig where box3d's WASM builds; a gate importing " +
-        "its functions is not a door" },
+    genuinelyOwed: {
+        "physics/backend-qa-check.mjs": "needs a rig where box3d's WASM builds; a gate importing " +
+        "its functions is not a door",
+        // TWO MORE cliOnly MEMBERS WITH NO DOOR AND NO PROSE EITHER, FOUND THE SAME ROUND recordInputs WAS.
+        // Both are TOOLS rather than gates for the identical stated reason: a gate must never depend on
+        // something that silently passes on a box without it, so the dependency was pulled out into a
+        // separately-run tool instead of being folded into a gate that could not see its own skip.
+        "tools/ship/verifyLicenceTexts.mjs": "needs live network egress to re-fetch every licence text from its " +
+            "source and diff it byte for byte (its own header: 'needs a network, which a gate must never need; " +
+            "exits 2 if it cannot reach GitHub'). This sandbox's egress proxy blocks the sources it would fetch; " +
+            "it runs where a real network reaches GitHub, which this environment is not.",
+        "tools/ship/wgslDeviceLimits.mjs": "needs a WebGPU-capable browser to read the real device limits it " +
+            "diffs against render/wgslSpec.mjs's DEFAULT_LIMITS (its own header: 'a gate that needs a GPU is a " +
+            "gate that silently passes on every box without one'). LIMITS_PROVENANCE records that the headless " +
+            "shell here exposes no navigator.gpu, so it runs where a rig with a real WebGPU device is reachable.",
+    },
     verdict: "THE WORK LIST OF EIGHT IS 4 DOORS + 2 PROSE DOORS + 1 REFUSAL + 1 GENUINELY OWED. A page row is " +
              "ONE shape of door; a route with a panel is another and a rig job is a third, so a register that " +
              "knows one reports the other two as debt -- v3448's shape, in the register that measures the law.",

@@ -362,7 +362,10 @@ tiltEl.addEventListener("input", () => { orbit = withPitch(orbit, pitchFromTilt(
 // or if it never does, the page says so and draws none rather than pretending.
 let fontDevice = null, labelBatches = [];
 try {
-    const font = parseFont(new Uint8Array(await (await fetch("./vendor/fonts/IBMPlexSerif-Regular.ttf")).arrayBuffer()));
+    const fontUrl = "./vendor/fonts/IBMPlexSerif-Regular.ttf";
+    const fontResp = await fetch(fontUrl);
+    if (!fontResp.ok) throw new Error(`font fetch failed: ${fontResp.status} ${fontUrl}`);
+    const font = parseFont(new Uint8Array(await fontResp.arrayBuffer()));
     fontDevice = new SlugFontDevice(device, font, LABEL_CHARS);
 } catch (e) { document.getElementById("labelled").textContent = "no labels: " + e.message; }
 function drawLabels(cam) {

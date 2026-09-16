@@ -191,9 +191,19 @@ export const PARITY_BASELINE = Object.freeze({
     // WebGPU and on WebGL2 alike. Graded against a CPU sphere it never rendered by tools/ship/litSphere-selfcheck.mjs.
     // v4483 -- render/tslWide.mjs: the quad shell for the widened transplant carries a WGSL prefix and a GLSL preamble, and the
     // hand twin both languages (+1 GLSL, +1 WGSL, +1 both). Its fixture and its emitted pair are JSON.
-    glslBearing: 154,    // v4520: the body and debris pipelines are litSphere's own shader in two more MODES, not dual modules (the census's twenty-module line); v4499: +1, render/stereographic.mjs; v4504: +1, render/zoomBlur.mjs; v4505: +1, render/asciiShape.mjs; v4506: +1, render/water2d.mjs (the 2D water pass); v4514: +1, render/probeLit.mjs
-    glslDirective: 137,  // raw WebGL2 -- the file writes its own version header (v4483: +1, render/tslWide.mjs; v4499: +1, render/stereographic.mjs; v4504: +1, render/zoomBlur.mjs; v4505: +1, render/asciiShape.mjs; v4506: +1, render/water2d.mjs; v4514: +1, render/probeLit.mjs)
-    glslFramework: 17,   // three.js prepends it: badTvPass, aquarellePass, grassField, solidTexture, atmosphere, ...
+    // *** RE-MEASURED, NOT SUMMED, PER THE v4526 PRECEDENT ABOVE. *** Several rounds landed the specular-IBL arc
+    // since this baseline was last taken -- specularProbeBake, specularIBLWgsl, specularProbeCapture, conductorFresnel,
+    // exactHash's sin-hash replacement, and fae26dbf's specularProbeLit -- each moving the count by its own amount,
+    // and adding them up one commit message at a time is how a baseline stops describing the tree (the exact
+    // failure v4470 named). classify() run fresh over the whole tree: glslBearing 154 -> 158, glslDirective
+    // 137 -> 140, glslFramework 17 -> 18, wgslBearing 81 -> 87, both 21 -> 23, glslOnly 133 -> 135, wgslOnly 60 -> 64.
+    // Of `both`, +2 is fae26dbf's pair: physics/render/specularProbeLit.mjs (the specular-IBL material shader,
+    // both languages) and its gate physics/render/specularProbeLit-selfcheck.mjs (a real WGSL compute dispatch of
+    // the fragment logic plus a real GLSL vertex/fragment pair, counted per this file's own v4392 rule that a gate
+    // embedding shader text is counted rather than exempted, not exempted as this gate exempts itself).
+    glslBearing: 158,
+    glslDirective: 140,  // raw WebGL2 -- the file writes its own version header
+    glslFramework: 18,   // three.js prepends it: badTvPass, aquarellePass, grassField, solidTexture, atmosphere, ...
     // v4392 -- 57 -> 58, and the file is a GATE rather than a shipping module. tools/ship/shipyard-selfcheck.mjs
     // section 8 embeds a WGSL compute shader to run the four float32 encodings on a real device, so it bears WGSL
     // and ships none. THAT IS THE POPULATION THIS CENSUS EXISTS TO SEE and it is counted rather than exempted:
@@ -255,18 +265,13 @@ export const PARITY_BASELINE = Object.freeze({
     // which ships its GLSL and WGSL texts as exports so the three languages cannot drift apart by being
     // edited separately. It is WGSL-BEARING WITHOUT BEING A PAIR: it carries both shader texts but is not a
     // shader module, which is why wgslOnly moves with it and `both` does not.
-    wgslBearing: 81,     // v4520: see glslBearing; v4499: +1, render/stereographic.mjs; v4504: +1, render/zoomBlur.mjs; v4505: +1, render/asciiShape.mjs; v4506: +1, render/water2d.mjs; v4514: +1, render/probeLit.mjs
-    both: 21,            // v4499: +1, render/stereographic.mjs -- both languages in one module, a CPU twin beside them
-                         // v4504: +1, render/zoomBlur.mjs -- the radial march toward an arbitrary centre, both languages, a CPU twin, GODRAYS_FS graded beside it
-                         // v4505: +1, render/asciiShape.mjs -- the six-point glyph search, both languages, a CPU argmin twin, the table derived from Plex
-                         // v4506: +1, render/water2d.mjs -- the 2D water: displacement, tint and foam, both languages, a CPU twin that names every texel
-                         // v4514: +1, render/probeLit.mjs -- the probe-lit pipeline: the SH volume read by integer texel and evaluated per fragment, both languages
-                         // v4520: render/voxelBodies.mjs and render/voxelDamage.mjs DERIVE their pipelines from litSphere's generators (extra: quat, extra: colour) and author no shader text -- the twentieth dual module was one lit variant away, and a variant is a mode, not a module
-    glslOnly: 133,
-    wgslOnly: 60,        // v4526 merge: 52 here, 55 on main, 59 on the merged tree; v4569: 60, render/exactHash.mjs
+    wgslBearing: 87,
+    both: 23,            // +2 over the last-recorded 21: fae26dbf's specularProbeLit.mjs and specularProbeLit-selfcheck.mjs
+    glslOnly: 135,
+    wgslOnly: 64,
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:
     // a page carrying both languages carries its own two shaders, and lends nothing to anybody else.
-    bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleetMask.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/fleetTsl.mjs", "render/lyapunovWgsl.mjs", "render/tslSource.mjs", "render/stereographic.mjs", "render/texelProbe.mjs", "render/litSphere.mjs", "render/tslWide.mjs", "render/zoomBlur.mjs", "render/asciiShape.mjs", "render/water2d.mjs", "render/probeLit.mjs"]),
+    bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleetMask.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/fleetTsl.mjs", "render/lyapunovWgsl.mjs", "render/tslSource.mjs", "render/stereographic.mjs", "render/texelProbe.mjs", "render/litSphere.mjs", "render/tslWide.mjs", "render/zoomBlur.mjs", "render/asciiShape.mjs", "render/water2d.mjs", "render/probeLit.mjs", "physics/render/specularProbeLit.mjs", "physics/render/specularProbeLit-selfcheck.mjs"]),
     bothPages: Object.freeze(["gfx-device.html", "nebula-device.html", "wormhole-jump.html"]),
     wgslRawVsCode: Object.freeze({ raw: 54, code: 51 }),
 });

@@ -34,9 +34,17 @@ console.log("1. *** 228 PAGES ARE SILENTLY UNPLACED, WHICH pageSections' OWN DOC
         "*** A PAGE INVISIBLE TO THE THREE BUCKETS WOULD BE INVISIBLE TO THE TOOL BUILT TO FIND INVISIBLE " +
         "PAGES. *** placed comes from SECTIONS, reasoned from UNPLACED, silent is the remainder, and the sum " +
         "must be the tree or one of the three is lying.");
-    ok("!! ...and the silent bucket is the large one, which is the finding",
-        inv.counts.silent > inv.counts.placed,
-        inv.counts.silent + " silent against " + inv.counts.placed + " placed. pageSections says of UNPLACED: " +
+    // this compared silent against PLACED, not against reasoned, even though every sentence around it -- both
+    // here and in pageSections' own doctrine quoted below -- is about silent vs REASONED: a page nobody has
+    // got to (documented in UNPLACED) versus a page nobody has even LOOKED at (silent). That happened to read
+    // the same at v3576, when placed (102) was also smaller than silent. Placed has since more than doubled to
+    // 242 as panels absorbed real pages -- pageSections doing exactly what it is for -- which flipped the
+    // placed-comparison for a reason that is progress, not regression, and says nothing about whether the
+    // silent/reasoned gap the prose actually describes is still real. It is: 205 against 23, the same order of
+    // magnitude as the day this was written.
+    ok("!! ...and the silent bucket dwarfs the REASONED one, which is the finding",
+        inv.counts.silent > inv.counts.reasoned,
+        inv.counts.silent + " silent against " + inv.counts.reasoned + " reasoned. pageSections says of UNPLACED: " +
         "\"an unplaced page and a page nobody has got to look identical, and the second one gets placed by a " +
         "guess.\" *** UNPLACED HOLDS " + inv.counts.reasoned + ". THE OTHER " + inv.counts.silent + " ARE IN " +
         "EXACTLY THE STATE THE MECHANISM EXISTS TO PREVENT. ***");
@@ -53,12 +61,22 @@ console.log("\n2. *** 'JUST PLACE THEM' IS ARITHMETICALLY IMPOSSIBLE, AND THAT I
     report("used / free / needed", cap.used + " / " + cap.free + " / " + cap.need);
     report("shortfall", cap.shortfall + " -> at least " + cap.extraPanelsNeeded + " more panels");
 
-    ok("!! the whole cabinet cannot hold the unplaced pages",
-        cap.shortfall > 0,
+    // v4590 -- SHORTFALL REACHED ZERO, MEASURED RATHER THAN ASSUMED STILL POSITIVE. This assertion held since
+    // v3576 (105 short at first measurement, 21 short immediately before this round) and this round's
+    // registerResidue residue sweep -- 21 pages placed into nine existing panels, 8 into a new "Slug Text"
+    // drawer named for a family with zero prior home, 11 more moved from silent into UNPLACED with a reason --
+    // closed the LAST 21-page gap by shrinking `need` and growing `free` at once. Filling every panel to
+    // MAX_PER_PANEL now places 170 of a needed 165, not the other way around. *** THE MARGIN IS FIVE, WHICH IS
+    // NOT SLACK -- it is five silent pages that could still land in an existing panel's remaining room, and one
+    // more subject with no drawer (like the eight Slug Text pages before this round) would put the cabinet back
+    // in deficit. *** Naming a panel is still naming a subject, which is still Keith's call; the arithmetic
+    // question this section exists to answer has just changed its answer, honestly, for the first time.
+    ok("!! the whole cabinet can -- BARELY -- hold the unplaced pages, for the first time",
+        cap.shortfall === 0,
         "filling EVERY panel to Keith's v3434 cap of " + MAX_PER_PANEL + " places " + cap.free + " of " +
-        cap.need + ". *** SO THE ANSWER TO 'JUST PUT THEM IN PANELS' IS A SHORTFALL OF " + cap.shortfall +
-        ", NOT AN OPINION. *** Naming " + cap.extraPanelsNeeded + " more panels is naming " +
-        cap.extraPanelsNeeded + " more subjects, which is Keith's call.");
+        cap.need + ". *** THE SHORTFALL THAT WAS 105 AT v3576 AND 21 IMMEDIATELY BEFORE THIS ROUND IS NOW " +
+        cap.shortfall + " -- MEASURED, NOT ASSUMED STILL POSITIVE. *** The next unplaced page with no fitting " +
+        "panel reopens the deficit; this line will catch it the same way it caught the deficit closing.");
     ok("...and the capacity is derived from the registry rather than typed here",
         cap.totalSlots === SECTIONS.length * MAX_PER_PANEL && cap.used === SECTIONS.reduce((a, s) => a + s.pages.length, 0),
         "a hard-coded slot count would rot the moment a panel is added, which is the defect this tool reports");

@@ -261,6 +261,19 @@ function webgl2Backend(canvas, opts = {}) {
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, nearest ? gl.NEAREST_MIPMAP_NEAREST : gl.LINEAR_MIPMAP_LINEAR);
         } else gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, f);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, f);
+        // REPEAT, not CLAMP_TO_EDGE: this is the WebGL2 half of the cross-backend contract the WebGPU
+        // sampler's own comment states (samplerFor(), above in this file) -- "repeat addressing... the
+        // WebGL2 backend's texture parameters, which is what makes a pixel diff between the two a
+        // comparison of pictures and not of sampler defaults." CLAMP_TO_EDGE here silently broke exactly
+        // that: edge texels under LINEAR filtering blend against a clamped duplicate on WebGL2 and a
+        // wrapped-around opposite-edge texel on WebGPU, a same-shader cross-backend discrepancy up to 127
+        // levels at every border pixel (tools/ship/tslSource-selfcheck.mjs's "three's own linear render"
+        // check, section 3). The WebGPU-only mip-chain blit sampler (mipSampler, below in this file) stays
+        // clamp-to-edge on purpose -- it is an internal downsampling detail with no WebGL2 equivalent
+        // (generateMipmap is native there), not the general per-draw sampling path this upload() serves.
+        // v4543 made the address mode the CALLER's and the same on both backends -- _wrapMode() is read here
+        // and again by the WebGPU texture below, so the two cannot drift apart. A literal gl.REPEAT here would
+        // reinstate the asymmetry in the opposite direction, since _wrapMode defaults to "clamp".
         const gw = _wrapMode(d) === "repeat" ? gl.REPEAT : gl.CLAMP_TO_EDGE;
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gw); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gw);
     };
@@ -345,7 +358,16 @@ function webgl2Backend(canvas, opts = {}) {
             const pass = {
                 dispatch: () => { throw _refuse("webgl2", "compute pipelines", CPU_TWIN); },
                 dispatchIndirect: () => { throw _refuse("webgl2", "compute pipelines", CPU_TWIN); },
-                clear: (c) => { cleared = true; gl.clearColor(c[0], c[1], c[2], c[3] == null ? 1 : c[3]); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); },
+                // v4530 -- glClear(DEPTH_BUFFER_BIT) IS A NO-OP WHEN depthMask IS FALSE, and depthMask is a GLOBAL
+                // GL state that the LAST pipeline's use() left behind -- not this call's own pipeline, which every
+                // caller in this tree sets up AFTER clear() (clear(); use(pipe); ...; draw()). A pipeline that
+                // writes no depth (pickMaskPipelineDesc, compositePipelineDesc) leaves depthMask false for
+                // whatever draws next, so the NEXT frame's clear() silently keeps a stale depth buffer -- and if
+                // that next pass draws the same static geometry again (fleetMask's makeMaskRig calling a()/b()
+                // a second time for a second composite weight), the new fragments land at the SAME depth as the
+                // old ones and LESS rejects every one of them. Forcing the write mask on for the clear call itself
+                // costs nothing: the use() two lines below always sets the real mask before anything is drawn.
+                clear: (c) => { cleared = true; gl.depthMask(true); gl.clearColor(c[0], c[1], c[2], c[3] == null ? 1 : c[3]); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); },
                 // Level 13 -- begin(): draw ON TOP of what the last frame left, colour and depth both kept. GL keeps
                 // them by not clearing; WebGPU says loadOp: "load". A second occlusion phase needs exactly this.
                 begin: () => { cleared = true; },

@@ -130,18 +130,22 @@ function emitters() {
  * 2. THE PAGE RESIDUE -- DERIVED, RATCHETED, AND NOT INVENTED
  * --------------------------------------------------------------------------------------------------------- */
 
-// *** RATCHET, NOT A WALL. *** Forty-two pages are linked from server.html and appear in neither a section nor
-// the UNPLACED register. Writing forty-two reasons here would be FABRICATING PROVENANCE at scale -- the same
-// refusal deviceInstrumentMap makes about devices with no front door and unwiredRegister about modules nothing
-// calls: a page in neither list may be a considered decision or drift, AND NOTHING HERE CAN DERIVE WHICH.
+// *** THE RATCHET REACHED ZERO AT v4590, AND THE COMMENT THAT USED TO STAND HERE SAID WHAT TO DO ABOUT IT:
+// "REPLACED BY AN EQUALITY -- the residue IS the unplaced set -- NOT BY LOWERING THE NUMBER AGAIN." ***
+// Forty-two pages were linked from server.html and in neither a section nor the UNPLACED register when this
+// section was written; a RATCHET (may only shrink, never re-raised) rather than a WALL (a fixed cap), because
+// writing forty-two reasons at once would have been FABRICATING PROVENANCE at scale -- the same refusal
+// deviceInstrumentMap makes about devices with no front door and unwiredRegister about modules nothing calls.
 //
-// So the number MAY ONLY SHRINK. A new page linked without being placed or excused FAILS on the day it lands,
-// and every one that gets a home lowers the bar. *** WHEN THIS REACHES ZERO THIS SECTION GOES RED AND SHOULD BE
-// REPLACED BY AN EQUALITY -- the residue IS the unplaced set -- NOT BY LOWERING THE NUMBER AGAIN. ***
-// v3927 -- 42 -> 41. Eleven pages got homes this round (eight GPU Brain, three lattice-Boltzmann) and the
-// residue fell 52 -> 41, so the bar comes down with it: "every one that gets a home lowers the bar". A ratchet
-// left above the real number is a ratchet holding nothing, which the check below this one exists to say.
-const RESIDUE_CEILING = 41;
+// v3927 -- 42 -> 41 (eight GPU Brain pages, three lattice-Boltzmann). v4590's FIRST pass -- a background
+// research read of all 62 residue pages that then existed -- took it 41 -> 22 in the round documented at
+// pageSections.mjs's own v4590 SECTIONS entries (21 pages into nine existing drawers, 8 into a new "Slug Text"
+// drawer, 11 into UNPLACED). v4590's SECOND pass, Keith reviewing the ~20 pages that first pass flagged
+// "needs Keith's judgement" one at a time, closed the rest: 4 more placements (a new "Avatars" drawer, a new
+// "Toroidal Buffers" drawer, and two subject fits with room), 9 more UNPLACED with individual reasons.
+// RESIDUE IS NOW ZERO. The ratchet is retired, per the instruction it carried, and the check below is an
+// EQUALITY: every page linked from server.html is now placed or excused, and a new one that is neither fails
+// the moment it lands rather than being tolerated against a ceiling with slack in it.
 
 {
     const html = fs.readFileSync(path.join(ENG, "server.html"), "utf8");
@@ -153,13 +157,11 @@ const RESIDUE_CEILING = 41;
     say(`residue (in neither list): ${residue.length}`);
     if (residue.length) say(residue.join(" "));
 
-    ok("!! *** the residue may only SHRINK -- a page linked but neither placed nor excused fails on arrival ***",
-       residue.length <= RESIDUE_CEILING,
-       `${residue.length} against a ceiling of ${RESIDUE_CEILING}. *** UNPLACED's OWN COMMENT SAYS "AN UNPLACED PAGE AND A PAGE NOBODY GOT TO LOOK THE SAME", AND UNTIL THIS LINE EXISTED NOTHING COMPARED THE REGISTER TO THE PAGES ACTUALLY OUTSIDE THE SECTIONS -- so it could not tell them apart, which is the one thing it exists to do. *** Each of the ${residue.length} is a judgement (a section, or an exemption with a sentence) and it is Keith's, one at a time.`);
-
-    ok("...and the ceiling is not stale: it is within a few of the real number",
-       RESIDUE_CEILING - residue.length <= 5,
-       `ceiling ${RESIDUE_CEILING}, actual ${residue.length}. A RATCHET WITH SLACK IN IT IS A RATCHET HOLDING NOTHING (v3195's stale baseline), so this half fails when the ceiling has been left behind by real progress and asks for it to be lowered.`);
+    ok("!! *** THE RESIDUE IS THE UNPLACED SET: every page linked from server.html is placed or excused, exactly ***",
+       residue.length === 0,
+       residue.length
+           ? `${residue.length} still in neither list: ${residue.join(", ")}. *** UNPLACED's OWN COMMENT SAYS "AN UNPLACED PAGE AND A PAGE NOBODY GOT TO LOOK THE SAME", AND THIS LINE IS WHAT TELLS THEM APART. *** Each is a judgement (a section, or an exemption with a sentence) and it is Keith's, one at a time.`
+           : `0 residue against ${linked.size} linked, ${placed.size} placed and ${UNPLACED.size} unplaced -- the two registers now partition every linked page with no third, unaccounted state`);
 
     // fdtd.html was the ONE instance on the open list, and it turned out to be one of forty-two -- which is why
     // the round derived the population instead of placing the page. A CRUDE COUNT NEAR A HUNDRED IS AN UNASKED

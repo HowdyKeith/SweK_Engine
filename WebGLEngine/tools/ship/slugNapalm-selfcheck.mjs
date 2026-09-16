@@ -34,7 +34,7 @@
 //                                                                                              the frames green for the same reason as C.
 //                   Each restored and the baseline re-run: 0 red.
 //
-// Run: node tools/ship/slugNapalm-selfcheck.mjs      (~90 s)
+// Run: node tools/ship/slugNapalm-selfcheck.mjs      (~13 s)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";

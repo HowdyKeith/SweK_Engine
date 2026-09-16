@@ -47,6 +47,17 @@ const RUNNERS = Object.freeze([
     Object.freeze({ mod: "./githubBridge.js",     what: "a GitHub operation",
                     busy: (m) => !!(m.busy && m.busy()),
                     detail: (m) => (m.busyWhat && m.busyWhat()) || null }),
+    // v4612 -- *** THE ONE RUNNER THAT ANSWERS FROM DISK, BECAUSE THE WORK IT SEES IS NEVER IN THIS PROCESS. ***
+    // Every runner above reports THIS process's own in-memory state -- correct for server.js's own async work,
+    // blind to a SEPARATE node process. verify.mjs/ship.mjs run from a freshly cloned folder as their own
+    // process; no in-process runner could ever see one running. Keith hit exactly this: an already-running
+    // SweK instance's own poller found a real zip in Downloads while his terminal ran `node verify.mjs`
+    // elsewhere, asked this module (which truthfully saw nothing busy), and applied it mid-sweep -- a launch he
+    // never triggered. releaseHold.js is a lock FILE for exactly that reason: verify.mjs/ship.mjs acquire it,
+    // every SweK instance on the box reads the same file regardless of which folder it runs from.
+    Object.freeze({ mod: "./releaseHold.js",      what: "a release build (verify/ship) in progress on this machine",
+                    busy: (m) => !!(m.running && m.running()),
+                    detail: (m) => (m.busyWhat && m.busyWhat()) || null }),
 ]);
 
 /**

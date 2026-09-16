@@ -325,6 +325,95 @@ export function mountGithubPanel() {
                                     "the other four and stops at the first one that fails.");
             w.append(runAllNote);
 
+            // ---- v4623 -- EXPORT, BECAUSE THE BUTTON AND THE PROCESS SERVING THIS PAGE ARE THE SAME PROCESS. ----
+            // "⛓ Clone → verify" runs step 3's sweep IN A CLONE, spawned from this server -- and Keith found the
+            // failure mode that shape has: a sweep that boots its OWN copy of the engine (the headless-browser
+            // gates do, to load pages in it) can collide with the copy that is CURRENTLY SERVING THIS PANEL and
+            // running the publish this button is itself in the middle of. The chain does not need this process
+            // to survive to finish correctly -- it is a spawned child, tailed into a log this panel polls -- but
+            // if the collision takes the parent down, the panel watching it goes down too, mid-publish.
+            //
+            // *** NOTHING NEW IS COMPUTED HERE. *** Every field below is read from state this panel already
+            // holds (the repo box, the branch picker, the version this tree reports, the notes box) -- the same
+            // values steps 3-6 already send to /source-chain/start, /source-chain/publish, /github/ledger/refresh
+            // and /github/ledger/check. This is those same steps, spelled out as the commands a terminal would
+            // run instead of a fetch, so the whole route can be walked from a SECOND process on the same
+            // machine -- one that is not the panel's own server and cannot be taken down by whatever the sweep
+            // running inside it does.
+            const exportBtn = BTN("📋 Export as commands (run these yourself instead)", "#2a3a2a", "#4a6a4a");
+            exportBtn.title = "Prints steps 3-6 (and the two shortcuts) as commands for a terminal, using the repo/" +
+                               "branch/notes already entered above. Nothing here is run by this button.";
+            w.append(exportBtn);
+            const exportNote = NOTE("Use this instead of the buttons below when a sweep might collide with the " +
+                                    "instance serving this page -- these are the same steps, run by hand, in a " +
+                                    "window this panel cannot take down.");
+            w.append(exportNote);
+            const exportBox = E("div", "display:none;flex-direction:column;gap:5px;margin:2px 0 4px;");
+            const exportPre = document.createElement("pre");
+            exportPre.style.cssText = "margin:0;padding:8px 10px;background:#080b10;border:1px solid #1a222e;" +
+                "border-radius:6px;font:10.5px ui-monospace,monospace;color:#bcd;white-space:pre-wrap;" +
+                "word-break:break-word;max-height:320px;overflow:auto;";
+            const exportRow = E("div", "display:flex;gap:6px;");
+            const exportCopy = BTN("Copy", "#2a3a5a", "#4a6a9a");
+            const exportRefresh = BTN("↻ refresh from the fields above", "#22303f", "#3a4a5c");
+            exportRow.append(exportCopy, exportRefresh);
+            exportBox.append(exportPre, exportRow);
+            w.append(exportBox);
+            // The generator is a pure function of state that exists by the time anyone can click these buttons
+            // (repo(), brSel, tag, notes, dr, pr are all declared further down this same closure, before the
+            // panel is ever shown) -- same pattern chainSync/chainPoll already use above.
+            const exportCommands = async () => {
+                let er = repo();
+                if (!er) { try { const s0 = await api("config"); er = ((s0 && s0.engineRepo) || "").trim(); } catch {} }
+                if (!er) er = "owner/repo";
+                const branch = (typeof brSel !== "undefined" && brSel.value) || "";
+                const ver = (tag.value || "").trim() || "vNNNN";
+                const cloneDir = "../" + er.split("/").pop() + "_" + ver + "_clone";
+                const relNotes = (notes.value || "").trim() || ("Engine build " + ver);
+                const flags = [];
+                if (typeof dr !== "undefined" && dr.checked) flags.push("--draft");
+                if (typeof pr !== "undefined" && pr.checked) flags.push("--prerelease");
+                return [
+                    "# ---- step 3: clone the repo beside this one, and verify THE CLONE -------------------",
+                    "git clone --depth 1" + (branch ? " --branch " + branch : "") + " https://github.com/" + er + ".git " + cloneDir,
+                    "cd " + cloneDir + "/WebGLEngine",
+                    "node tools/ship/shipVerdict.mjs --version " + ver + " --markers \"SweK Dictate,/dictate/type\"",
+                    "# must print: [ship] SHIP  --  stop here and do not publish if it does not",
+                    "",
+                    "# ---- step 4: publish the tree that just passed (needs `gh auth login` once) ----------",
+                    "node tools/ship/packRelease.mjs --out ..",
+                    "gh release create " + ver + " ../" + er.split("/").pop() + "_" + ver + ".zip --repo " + er +
+                        " --title " + ver + " --notes " + JSON.stringify(relNotes) + (flags.length ? " " + flags.join(" ") : ""),
+                    "",
+                    "# ---- steps 5 + 6: record the release and ask whether the fleet runs what is built -----",
+                    "# back in the tree that is normally serving this panel, once it is free to run again:",
+                    "node tools/ship/refreshReleases.mjs --write",
+                    "node tools/ship/releaseLedger-selfcheck.mjs",
+                    "",
+                    "# ---- shortcuts (each skips a step above; same warning applies) ------------------------",
+                    "# ⚡ Release current engine  =  step 4 alone, tagging + zipping THIS tree as-is:",
+                    "node tools/ship/packRelease.mjs --out .. && gh release create " + ver + " ../" + er.split("/").pop() +
+                        "_" + ver + ".zip --repo " + er + " --title " + ver + " --notes " + JSON.stringify(relNotes),
+                    "# ⬇ Get newer source  =  step 3's clone alone, no verify:",
+                    "git clone --depth 1" + (branch ? " --branch " + branch : "") + " https://github.com/" + er + ".git " + cloneDir,
+                    "",
+                    "# No credentials are printed here. `gh release create` uses your own `gh auth login` session;",
+                    "# a token-based curl equivalent exists but is deliberately not generated, since a token pasted",
+                    "# into a command a terminal keeps in history is a token that outlives the terminal.",
+                ].join("\n");
+            };
+            exportBtn.onclick = async () => {
+                const show = exportBox.style.display === "none";
+                exportBox.style.display = show ? "flex" : "none";
+                if (show) exportPre.textContent = await exportCommands();
+            };
+            exportRefresh.onclick = async () => { exportPre.textContent = await exportCommands(); };
+            exportCopy.onclick = async () => {
+                try { await navigator.clipboard.writeText(exportPre.textContent); exportCopy.textContent = "✓ copied"; }
+                catch { exportCopy.textContent = "select + copy by hand"; }
+                setTimeout(() => { exportCopy.textContent = "Copy"; }, 1800);
+            };
+
             // ---- 1. push -------------------------------------------------------------------------------
             STEP("Push your work to main. Not a button — do it in git first.",
                  "The tag is created on the repo's DEFAULT BRANCH head; the zip is packed from a local folder. " +

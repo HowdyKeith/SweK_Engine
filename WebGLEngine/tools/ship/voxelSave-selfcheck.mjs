@@ -34,7 +34,7 @@
 //                   D  orbitToCam with the pitch's sign flipped              -> 1 red: the round trip.
 //                   Each restored and the baseline re-run: 0 red.
 //
-// Run: node tools/ship/voxelSave-selfcheck.mjs      (~25 s)
+// Run: node tools/ship/voxelSave-selfcheck.mjs      (~12 s)
 "use strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

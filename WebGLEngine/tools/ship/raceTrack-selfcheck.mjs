@@ -40,7 +40,7 @@
 //                                                                    green, which is why the geometric key exists beside it.
 //   Each restored and the baseline re-run: 0 red.
 //
-// Run: node tools/ship/raceTrack-selfcheck.mjs      (~25 s: headless, then both backends in the browser)
+// Run: node tools/ship/raceTrack-selfcheck.mjs      (~6.7 s: headless, then both backends in the browser)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";

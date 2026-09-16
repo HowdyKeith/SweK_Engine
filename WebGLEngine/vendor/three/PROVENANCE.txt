@@ -4,16 +4,173 @@ author: three.js authors (a collective, not a person -- see LICENSE)
 
 Recorded at v4416.
 
+RE-VENDORED 2026-09-14: r160 -> 0.185.1, backlog "vendor-three-r160-stale" (tools/ship/nextRounds.mjs).
+Same version vendor/three-webgpu already re-vendored to on 2026-09-08 (see that directory's own
+PROVENANCE.txt/README.md, used as this record's template) -- reusing tools/ship/three-probe.json's
+already-vetted number rather than re-opening the version question for a second, unrelated vendor tree.
+three.js's GitHub tags never adopted npm's semver scheme (r160, r180, etc. still resolve on GitHub;
+there is no "0.185.1" tag), so there is no clean 1:1 mapping from the old "rNNN" pin to a git ref --
+fetched instead from the npm registry tarball `three@0.185.1`
+(https://registry.npmjs.org/three/-/three-0.185.1.tgz), which carries build/ and examples/jsm/
+together under one immutable, versioned artefact. Same shape vendor/three-webgpu's own re-vendor used.
+
+WHAT MOVED:
+  - three.module.js (build/three.module.js) -- still the upstream ES module build, now a thin
+    re-export shim over a NEW required file (see next line) rather than one self-contained file.
+  - three.core.js (build/three.core.js, ~1.4 MB) -- NEW FILE, did not exist at r160. This is the
+    split three.module.js -> three.core.js the backlog entry's own research found; without it every
+    `import ... from "three"` throws at module-resolution time. vendor/three-webgpu already vendored
+    its own copy of this same split file, which is how that research first confirmed the split was
+    real and current.
+  - jsm/controls/OrbitControls.js, jsm/loaders/{GLTFLoader,FBXLoader,KTX2Loader}.js,
+    jsm/exporters/GLTFExporter.js, jsm/curves/{NURBSCurve,NURBSUtils}.js,
+    jsm/libs/{fflate.module,ktx-parse.module,zstddec.module,meshopt_decoder.module}.js,
+    jsm/libs/basis/{basis_transcoder.js,basis_transcoder.wasm,README.md}, jsm/utils/WorkerPool.js,
+    jsm/utils/BufferGeometryUtils.js -- each replaced with its 0.185.1 match from the same tarball's
+    examples/jsm/ tree. See jsm/libs/basis/PROVENANCE.txt for that subdirectory's own license
+    evidence (Apache-2.0, BinomialLLC, re-checked at the new file sizes rather than assumed
+    unchanged).
+  - jsm/utils/SkeletonUtils.js -- NEW FILE, did not exist in this directory at r160 (or at any prior
+    vendoring). Upstream's GLTFLoader.js grew a static `import { clone } from '../utils/
+    SkeletonUtils.js'` sometime between r160 and 0.185.1 that r160's GLTFLoader.js did not have --
+    confirmed by grepping the old, still-on-disk-at-the-time r160 file's own `^import` lines, which
+    named only BufferGeometryUtils.js. Without this file GLTFLoader.js's whole module graph fails to
+    resolve (a browser `import()` 404s on the missing relative path and the error surfaces as
+    "Failed to fetch dynamically imported module", not as anything naming SkeletonUtils directly) --
+    caught the same way as the BufferGeometryUtils.js mistake below, by a real gate failure, not by
+    reading the diff. It imports only from 'three' (AnimationClip, AnimationMixer, Matrix4,
+    Quaternion, QuaternionKeyframeTrack, SkeletonHelper, Vector3, VectorKeyframeTrack -- all present
+    in the new export set, checked), so it closes the same way NURBSCurve.js's own chain did.
+  - jsm/math/ColorSpaces.js -- ANOTHER NEW FILE, same shape again: upstream's KTX2Loader.js grew
+    `import { DisplayP3ColorSpace, LinearDisplayP3ColorSpace } from '../math/ColorSpaces.js'` between
+    r160 and 0.185.1 that r160's KTX2Loader.js did not have. This is also the real explanation for two
+    of the twelve "removed" symbols the API-break research below originally flagged --
+    DisplayP3ColorSpace and LinearDisplayP3ColorSpace were never actually removed from three, they
+    moved out of the top-level 'three' re-export into this examples-only submodule, which the export-
+    diff method (comparing only build/three.module.js + build/three.core.js) could not see by
+    construction. Found this time NOT by a gate failure -- gltfKtx2-selfcheck.mjs turned out not to
+    dynamically `import()` KTX2Loader.js in a real browser at all (it calls gpu/gltfKtx2.js's
+    ktx2Loader(null) directly in Node, which throws on the null-renderer guard before ever reaching
+    the browser-only dynamic import, and its "page actually uses it" section only regex-scans
+    glb_viewer.html's source text) -- so this gap would have shipped invisibly to that gate. Found
+    instead by an exhaustive, second-pass scan: every `.js` file under vendor/three/jsm, every
+    relative (`./` or `../`) import specifier in it, resolved against the filesystem and checked to
+    exist -- zero missing, across all 23 files, only after this file was added. Corroborated
+    independently by actually dynamically importing every vendored module (three.module.js,
+    OrbitControls.js, GLTFLoader.js, FBXLoader.js, KTX2Loader.js, GLTFExporter.js,
+    BufferGeometryUtils.js, SkeletonUtils.js, WorkerPool.js, NURBSCurve.js, NURBSUtils.js,
+    ColorSpaces.js, fflate.module.js, ktx-parse.module.js, zstddec.module.js,
+    meshopt_decoder.module.js, meshoptGltf.js, and vendor/draco/DRACOLoader.js) in a real headless
+    Chromium page and confirming all 18 resolve with zero page errors. Imports only from 'three'
+    (LinearTransfer, Matrix3, SRGBTransfer, SRGBColorSpace, ColorManagement -- all present, checked).
+  - LICENSE -- copyright year advanced: "Copyright (c) 2010-2023 three.js authors" (r160) ->
+    "Copyright © 2010-2026 three.js authors" (0.185.1), the same advance vendor/three-webgpu's own
+    PROVENANCE.txt already recorded for this same upstream project.
+
+*** A MISTAKE THIS RECORD USED TO PLAN, CAUGHT BY A GATE AND CORRECTED BEFORE SHIPPING -- NAMED HERE
+RATHER THAN QUIETLY FIXED. *** The plan for this re-vendor, following the backlog entry's own research,
+was to DROP jsm/utils/BufferGeometryUtils.js as dead weight: a grep for callers OUTSIDE vendor/three
+found none, matching the backlog's own claim. That grep was answering the wrong question.
+GLTFLoader.js ITSELF -- at r160 AND at 0.185.1 both, confirmed by reading both files directly --
+carries a static top-level `import { toTrianglesDrawMode } from '../utils/BufferGeometryUtils.js'`,
+used for TRIANGLE_STRIP/TRIANGLE_FAN primitive-mode conversion. A caller inside vendor/three is still
+a real caller; "zero callers outside vendor/three" was true and beside the point. Deleting the file
+during this round broke GLTFLoader.js's module graph outright -- not only for glTF files using
+strip/fan, but for every page that imports GLTFLoader at all, since an ES module import that 404s
+fails the whole graph before any code runs. This was caught by tools/ship/dracoEncode-selfcheck.mjs
+failing "Failed to fetch dynamically imported module" the first time this file was dropped and
+verified against, not assumed safe from the research alone -- see that gate's own section 4. The file
+was restored, re-vendored to 0.185.1 rather than left at r160, and ai-bridge/ensureThree.js's FILES
+list keeps it. jsm/utils/TextureUtils.js is the one genuinely dropped file (see below) -- the
+backlog's underlying instinct (this directory does carry real dead weight) was right about that one,
+just not about both.
+
+DROPPED, not re-vendored -- confirmed zero real callers, both outside AND inside vendor/three, checked
+by grep across the whole tree AND by reading every vendored file's own `^import` lines, not assumed:
+  - jsm/utils/TextureUtils.js -- zero callers anywhere, AND upstream at 0.185.1 no longer ships a
+    matching examples/jsm/utils/TextureUtils.js at all -- confirmed directly in the fetched tarball,
+    it has been split/renamed upstream into examples/jsm/utils/WebGLTextureUtils.js +
+    WebGPUTextureUtils.js, a different API shape. Since nothing here called the old one, there was
+    nothing to port to the new shape either way; deleted rather than left as dead weight. Unlike
+    BufferGeometryUtils.js above, no vendored file's own import lines name it either (grepped
+    directly), so this one drop stands as planned.
+  ai-bridge/ensureThree.js's FILES list was updated: TextureUtils.js removed, three.core.js and
+  jsm/utils/SkeletonUtils.js added, jsm/utils/BufferGeometryUtils.js kept (not removed as first
+  planned -- see above).
+
+LEFT COMPLETELY ALONE -- not an upstream file:
+  - jsm/libs/meshoptGltf.js is this engine's own code (wires EXT_meshopt_compression into
+    GLTFLoader via setMeshoptDecoder), living here for co-location, not something the npm tarball has
+    a matching path for. Not touched by this re-vendor. Its own logic was re-checked against the new
+    GLTFLoader.js's actual setMeshoptDecoder API (unchanged -- see EVIDENCE below) rather than assumed
+    to still apply.
+
+REAL API-BREAK RESEARCH, not skipped: every top-level export present in the r160 build but absent
+from the combined 0.185.1 build/three.module.js + build/three.core.js export set was enumerated by
+diffing both builds' `export { ... }` statements, then grepped for across the entire engine tree
+(HTML, JS, MJS; excluding this directory and vendor/three-webgpu). Twelve symbols were absent from
+that top-level set (DisplayP3ColorSpace, Float64BufferAttribute, LinearDisplayP3ColorSpace,
+LinearEncoding, LuminanceAlphaFormat, LuminanceFormat, P3Primaries, Rec709Primaries,
+TwoPassDoubleSide, WebGL1Renderer, WebGLMultipleRenderTargets, _SRGBAFormat, sRGBEncoding) --
+though, as the mistake note above this one records, two of those twelve (DisplayP3ColorSpace,
+LinearDisplayP3ColorSpace) turned out to have MOVED to jsm/math/ColorSpaces.js rather than been
+truly removed, which this export-diff method could not tell apart from an actual removal by
+construction; the other ten really are gone. Exactly one real call site in the whole engine tree
+used any of the twelve: view.html's `renderer.outputEncoding = THREE.sRGBEncoding` (both `.outputEncoding`
+and `sRGBEncoding` are gone outright at 0.185.1 -- the r152-era deprecation shim that used to
+translate this into `.outputColorSpace` with a console.warn has itself been removed) -- fixed in that
+file to `renderer.outputColorSpace = THREE.SRGBColorSpace`, the modern equivalent, functionally a
+no-op either way since `.outputColorSpace` already defaults to SRGBColorSpace. Every symbol every
+vendored jsm/ file itself imports `from 'three'` (OrbitControls.js, GLTFLoader.js, FBXLoader.js,
+KTX2Loader.js, GLTFExporter.js, NURBSCurve.js, NURBSUtils.js, SkeletonUtils.js,
+BufferGeometryUtils.js -- 213 import names total across the nine files) was independently checked
+present in the new export set: zero missing. OrbitControls'
+base class is confirmed, by reading the actual vendored 0.185.1 file, to still be `class OrbitControls
+extends Controls` where `Controls extends EventDispatcher` -- so `.addEventListener`/`.dispatchEvent`
+call sites (voxearth.html's `controls.addEventListener("change", ...)`, the only such real call site
+found) keep working. GLTFLoader/FBXLoader/KTX2Loader/GLTFExporter's public methods actually called
+elsewhere in this tree (`setDRACOLoader`, `setKTX2Loader`, `setMeshoptDecoder`, `setTranscoderPath`,
+`detectSupport`, `load`, `parse`, `parseAsync`, `.parse(scene, onDone, onError, {binary, animations,
+includeCustomExtensions})`) were confirmed present with the same signatures by reading the vendored
+files directly, not assumed stable. gpu/fbxLoad.js's harder-coded assumptions about FBXLoader's
+internals (interpolation constants 2300/2301/2302, the `<model>.quaternion`/`.position`/`.scale`
+track-naming convention, `new AnimationClip(name, -1, tracks)` triggering `resetDuration()`,
+`PropertyBinding.sanitizeNodeName`) were each re-confirmed by reading the actual vendored
+FBXLoader.js/three.core.js, not re-derived from memory of the old file.
+
 EVIDENCE:
-  - LICENSE reads "Copyright (c) 2010-2023 three.js authors".
-  - three.module.js is the upstream's own ES module build.
-  - github.com/mrdoob/three.js appears 9 times in this directory.
+  - LICENSE reads "Copyright © 2010-2026 three.js authors" (advanced from "2010-2023" at r160).
+  - three.module.js is the upstream's own ES module build; three.core.js is the file it now imports.
+  - github.com/mrdoob/three.js appears 18 times in this directory.
 
-*** AND THE MOST FREQUENT URL HERE IS THE WRONG ONE. *** github.com/KhronosGroup/glTF appears 58
-times -- six times as often -- because the glTF loader cites the specification it implements. A
-scraper picking the commonest URL would file three.js under KhronosGroup. That is why this record
-exists as an attestation with its reasoning, and not as a scan.
+*** AND THE MOST FREQUENT URL HERE IS STILL THE WRONG ONE. *** github.com/KhronosGroup/glTF appears
+64 times -- the glTF loader/exporter cite the specification they implement, at both r160 and 0.185.1.
+A scraper picking the commonest URL would still file three.js under KhronosGroup. That is why this
+record exists as an attestation with its reasoning, and not as a scan.
 
-NOT ESTABLISHED HERE: the version. vendor/three-webgpu/README.md records an npm registry URL for
-the three package; this directory carries no version marker of its own and this file does not
-guess one.
+NOT RE-VENDORED, STATED PLAINLY RATHER THAN LEFT IMPLICIT: examples/jsm/postprocessing/ was never
+vendored at r160 and still is not at 0.185.1 -- a pre-existing gap (ai-bridge/ensureSpark.js's own
+header already documents it, for a different reason: spark's postprocessing imports resolve against
+"/vendor/three/jsm/" and 404 there) that this round did not create and was not asked to close.
+
+---- jsm/loaders/FBXLoader.js + its dependency closure -- vendored at r160, added for backlog
+"fbx-ingest-has-no-loader" (tools/ship/nextRounds.mjs, commit 48488938): .fbx is treated as a
+first-class recognized model extension throughout the tree but nothing ever parsed one. RE-VENDORED
+2026-09-14 along with the rest of this directory (see above); the note this block used to carry --
+that fetching FBXLoader.js from r160 specifically, "not a newer release," meant this addition "cannot
+silently diverge the rest of vendor/three from the version the viewer pages were authored against" --
+is now WRONG and has been removed rather than left stale: FBXLoader.js is 0.185.1 now, same as
+everything else in this directory, by construction of the same single tarball fetch, not by a
+separate claim that needs re-checking each round. ----
+
+FBXLoader.js imports two things beyond three's own core, both vendored alongside it rather than
+left as a dangling import: jsm/libs/fflate.module.js (101arrowz/fflate, MIT, embedded in three's own
+tree at examples/jsm/libs/ -- its own header carries the MIT notice directly, a separately-authored
+library three vendors rather than something three.js authors wrote) for zlib inflate on
+compressed-binary FBX, and jsm/curves/NURBSCurve.js for NURBS surface support, which itself needs
+jsm/curves/NURBSUtils.js. Traced by grep on every file's own `^import` lines at the 0.185.1 re-vendor,
+same as at r160; the chain still terminates there -- NURBSUtils.js imports only from three's core.
+
+NOT WIRED TO A CONVERSION PATH, TEST FIXTURE, OR GATE AT VENDORING TIME -- unchanged from the r160
+note: gpu/fbxLoad.js, gpu/gpuAssetLoader.js and tools/ship/fbxIngest-selfcheck.mjs are the real
+callers and are covered by this round's own gate run, not by this file.

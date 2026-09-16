@@ -366,7 +366,10 @@ console.log("\n5. *** THE REAL BROWSER: NO PILL OVER THE HEAD, NO CAMERA IN THE 
         ok("!! every framed surface the server.html switch mounts carries ?embed=1",
             framed.every((m) => /[?&]embed=1/.test(m.src)),
             framed.map((m) => m.id).join(", "));
-        for (const id of ["thead", "facemuscles"]) {
+        // v4033 removed "facemuscles" from this rotation (swapped for gauges3000 at Keith's request), and it
+        // was the only OTHER framed surface here that ever imported ui/showcaseNav.js -- checked directly
+        // against every current MODES src: thead.html is the sole one left that could grow a pill to leak.
+        for (const id of ["thead"]) {
             const m = MODES.find((x) => x.id === id);
             await pg.goto("http://localhost:8787" + m.src, { waitUntil: "load" }).catch(() => {});
             await pg.waitForTimeout(900);
@@ -454,42 +457,31 @@ console.log("\n5. *** THE REAL BROWSER: NO PILL OVER THE HEAD, NO CAMERA IN THE 
             !!moved && moved.second === true,
             moved ? `second fx-cheer: ${moved.second}` : "");
 
-        // (f) *** KEITH'S ACTUAL PAGE, AND THE ONE THING NOTHING ELSE IN HERE COVERS. *** Everything above posts
-        // the message from the GATE, which proves the frame listens and proves nothing about the host. Deleting
-        // the relay in ui/avatarSwitch.js passed every other check in this file. avatar-server.html does not use
-        // avatarSwitch at all -- server.html does, and server.html is the page Keith named: "we want to hide
-        // camera when it is shown on server.html. server.html is self driven avatars."
+        // (f) *** KEITH'S ACTUAL PAGE, RETIRED FROM UNDER THIS TEST AND NEVER TOLD. *** This used to drive the
+        // WHOLE chain from its real head -- a swek:move CustomEvent on server.html's own window, through
+        // avatarSwitch's relay, into a mounted "facemuscles" iframe, out as blendshapes, back onto the robot as
+        // a cheer -- by calling `window._avatarSwitch.set("facemuscles")` on the live page.
         //
-        // So this drives the WHOLE chain from its real head: a swek:move CustomEvent on server.html's own
-        // window -- the same event ui/swekRobot.js has dispatched since v1690 -- through avatarSwitch's relay,
-        // across the frame boundary, into faceMoves, out as blendshapes, and back onto the robot as a cheer.
-        await pg.goto("http://localhost:8787/server.html", { waitUntil: "domcontentloaded" }).catch(() => {});
-        await pg.waitForTimeout(4000);
-        const chain = await pg.evaluate(async () => {
-            if (!window._avatarSwitch) return { reason: "server.html did not expose _avatarSwitch" };
-            window._avatarSwitch.set("facemuscles");
-            await new Promise((r) => setTimeout(r, 3000));
-            const f = document.querySelector("#dialsRobot iframe"), d = f && f.contentDocument;
-            if (!d) return { reason: "the switch mounted no readable frame" };
-            const mounted = !!d.querySelector("#robot-host > *");
-            const camera = !!d.querySelector("#btn-start") &&
-                getComputedStyle(d.getElementById("btn-start")).display !== "none";
-            // the REAL event, on the REAL host window -- not a postMessage from the test
-            window.dispatchEvent(new CustomEvent("swek:move", { detail: { move: "cheer" } }));
-            await new Promise((r) => setTimeout(r, 900));
-            return { src: f.getAttribute("src"), mounted, camera,
-                     cheering: !!d.querySelector('#robot-host [class*="fx-cheer"]') };
-        });
-        ok("server.html's own avatar switch mounts the face-muscles surface",
-            !!chain && /face-mirror\.html\?embed=1/.test(chain.src || ""), chain && (chain.src || chain.reason));
-        ok("!! *** AND ON SERVER.HTML THERE IS NO CAMERA BUTTON IN THE AVATAR PANEL ***",
-            !!chain && chain.camera === false && chain.mounted === true,
-            chain ? `camera ${chain.camera}, robot mounted ${chain.mounted}` : "");
-        ok("!! *** A REAL swek:move ON SERVER.HTML'S WINDOW REACHES THE FACE THROUGH avatarSwitch'S RELAY ***",
-            !!chain && chain.cheering === true,
-            chain ? `fx-cheer in the frame: ${chain.cheering}` : "");
-        report("this is the only check in this file that exercises the HOST half of the relay -- deleting the " +
-               "window listener in ui/avatarSwitch.js passes every other assertion here");
+        // v4033 REMOVED "facemuscles" FROM ui/avatarSwitch.js'S ROTATION ENTIRELY (Keith: "the last avatar
+        // choice, can we swap out the gauges and avatar scene, and swap in the WebGPU gauges and avatar we
+        // already made? I think that is called Avatar3000" -- facemuscles WAS that last choice, structurally,
+        // and gauges3000 took its place). That commit's own comment says "Section 5 of
+        // tools/ship/avatarServerViews-selfcheck.mjs asserts that" about the embedded-mount behaviour it was
+        // preserving -- and then never came back to update THIS block, which asserts a mode id that no longer
+        // exists. `set("facemuscles")` now falls through modeById's `|| MODES[0]` to the SVG mode, which mounts
+        // no iframe at all, so `document.querySelector("#dialsRobot iframe")` finds nothing and every assertion
+        // below read `undefined` -- not a caught regression, a gate testing a doorway that was bricked over two
+        // rounds earlier.
+        //
+        // NO CURRENT MODE IN THE ROTATION FILLS THIS ROLE: face-mirror.html is the only page that listens for
+        // the relayed swek:move (checked directly above, from a live-mounted frame -- see (e)), and it is no
+        // longer one of the ids server.html's corner switch can reach. So the HOST half of that exact relay --
+        // a real DOM event on server.html's own window, through avatarSwitch's own listener -- has no surface
+        // left to prove it against, and asserting it here would be asserting a mount that cannot happen. What
+        // still can be, and still is, checked: avatarSwitch's relay code itself (section 4, read from source --
+        // targets location.origin, forwards only declared move names) and the full postMessage-to-cheer chain
+        // against a REAL mounted frame (e), which is the same wiring server.html's relay calls into and differs
+        // from it only in which end presses "post".
 
         // (g) THE MEASURED COST. The `heavy` note on both MediaPipe modes says "~12 MB on first use"; with the
         // camera controls hidden, neither embedded mount requests a byte of it. MEASURED, not reasoned about.
@@ -515,9 +507,11 @@ console.log("\n5. *** THE REAL BROWSER: NO PILL OVER THE HEAD, NO CAMERA IN THE 
         const mp = external.filter((h) => /mediapipe|jsdelivr|face_landmarker/i.test(h));
         ok("!! neither embedded MediaPipe view fetches the ~12 MB bundle -- the camera-free face is free",
             mp.length === 0, mp.length ? "FETCHED: " + mp.join(", ") : "zero external MediaPipe requests");
-        report("so the `heavy` note on thead and facemuscles now OVER-warns for the embedded mount. Left " +
-               "standing on purpose: over-warning is the safe direction, and `heavy` also drives v3556's " +
-               "heavy-last ORDERING invariant, which is its own round to unpick");
+        report("so the `heavy` note on thead (and on face-mirror.html's own MediaPipe cost, even though it no " +
+               "longer carries a `heavy` field of its own since v4033 dropped it from avatarSwitch's rotation) " +
+               "now OVER-warns for the embedded mount. Left standing on purpose: over-warning is the safe " +
+               "direction, and `heavy` also drives v3556's heavy-last ORDERING invariant, which is its own " +
+               "round to unpick");
         await ctx2.close();
 
         await ctx.close();

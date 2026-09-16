@@ -39,8 +39,25 @@
 //   bpm.getStats();  // counters for the perf dashboard / debug
 // =============================================================================
 
+import { defineMachine, applyEvent } from "../ui/machine.mjs";
+
 const PHASE_HP_THRESHOLD = 0.5;
 const MINION_COUNT = 3;
+
+// v4601 -- the phase graph, made explicit and auditable rather than left as an if-chain nothing checks for an
+// orphan or dead state. `bossFound` is legal from every phase because a boss that dies mid-fight can be
+// replaced by a DIFFERENT boss entity the very next tick (a different bossId in the same _enemies slot) --
+// the original code's `bossId !== this._bossId` check applied regardless of which phase that was caught in,
+// so the declared graph says the same thing rather than hiding it in a runtime string compare.
+const PHASE_MACHINE = defineMachine({
+    initial: "idle",
+    states: {
+        idle:   { on: { bossFound: "phase1" } },
+        phase1: { on: { bossFound: "phase1", hpThreshold: "phase2", bossGone: "idle" } },
+        phase2: { on: { bossFound: "phase1", minionsCleared: "phase3", bossGone: "idle" } },
+        phase3: { on: { bossFound: "phase1", bossGone: "idle" } },
+    },
+});
 
 // Round 240 — themed minion pools. Each pool is the LOYAL retinue a
 // king-tier kaiju summons in phase 2. Picks favor the boss's origin
@@ -110,6 +127,14 @@ export class BossPhaseManager {
             phase3Triggers: 0,
             minionsSpawned: 0,
         };
+        // v4601 -- one map, one place a reader can see "arriving at phase2 means running _enterPhase2".
+        // phase1 has no entry here: entering it (from idle, or from any phase on a boss swap) needs no side
+        // effect beyond the bossId/minionIds bookkeeping tick() already does inline before the transition.
+        this._onEnter = {
+            phase2: (ctx) => this._enterPhase2(ctx.boss, ctx.bossId),
+            phase3: (ctx) => this._enterPhase3(ctx.boss, ctx.bossId),
+            idle: (ctx) => this._reset(ctx.reason),
+        };
     }
 
     getPhase() { return this._phase; }
@@ -131,32 +156,33 @@ export class BossPhaseManager {
             }
         }
         if (!boss) {
-            // No boss alive — reset if we were tracking one
-            if (this._phase !== "idle") this._reset("boss-gone");
+            // No boss alive — reset if we were tracking one. applyEvent no-ops on a null event, so the
+            // "already idle" case still costs nothing.
+            this._phase = applyEvent(PHASE_MACHINE, this._phase,
+                this._phase !== "idle" ? "bossGone" : null, this._onEnter, { reason: "boss-gone" });
             return;
         }
 
         // First-time discovery — kick into phase 1
         if (this._phase === "idle" || bossId !== this._bossId) {
-            this._phase = "phase1";
             this._bossId = bossId;
             this._minionIds.clear();
+            this._phase = applyEvent(PHASE_MACHINE, this._phase, "bossFound", this._onEnter, {});
         }
 
         // Phase 1 → 2 on HP threshold crossing
         if (this._phase === "phase1") {
             const hpFrac = boss.hp / boss.maxHp;
-            if (hpFrac <= PHASE_HP_THRESHOLD) {
-                this._enterPhase2(boss, bossId);
-            }
+            this._phase = applyEvent(PHASE_MACHINE, this._phase,
+                hpFrac <= PHASE_HP_THRESHOLD ? "hpThreshold" : null, this._onEnter, { boss, bossId });
             return;
         }
 
         // Phase 2 — wait for minions to die
         if (this._phase === "phase2") {
-            if (this._aliveMinions() === 0 && this._minionIds.size > 0) {
-                this._enterPhase3(boss, bossId);
-            }
+            this._phase = applyEvent(PHASE_MACHINE, this._phase,
+                (this._aliveMinions() === 0 && this._minionIds.size > 0) ? "minionsCleared" : null,
+                this._onEnter, { boss, bossId });
             return;
         }
 
@@ -175,7 +201,8 @@ export class BossPhaseManager {
     }
 
     _enterPhase2(boss, bossId) {
-        this._phase = "phase2";
+        // phase assignment itself is owned by the tick()-level applyEvent() call now; this only runs the
+        // side effects arriving at phase2 actually has.
         this._counters.phase2Triggers++;
         // Round 240 — stash the boss kind so _spawnMinions can pick
         // theme-matched minions (Hell King summons hell minions, etc).
@@ -261,7 +288,7 @@ export class BossPhaseManager {
     }
 
     _enterPhase3(boss, bossId) {
-        this._phase = "phase3";
+        // see _enterPhase2's note -- phase assignment lives at the call site now.
         this._counters.phase3Triggers++;
         boss.invulnerable = false;
         const botRec = this.botManager.bots.get(bossId);
@@ -280,12 +307,13 @@ export class BossPhaseManager {
     }
 
     _reset(reason = "manual") {
+        // this._phase is still the PRE-transition phase here -- applyEvent calls onEnter before the caller
+        // assigns the new state -- so this reads exactly what it always did.
         if (this._phase !== "idle") {
             console.log(`[BossPhase] reset (${reason}); phase was ${this._phase}`);
         }
         // Clean up any tracked minion references; don't despawn them —
         // killing them is the player's job
-        this._phase = "idle";
         this._bossId = null;
         this._minionIds.clear();
     }

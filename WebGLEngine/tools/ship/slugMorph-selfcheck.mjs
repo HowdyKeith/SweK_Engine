@@ -33,7 +33,7 @@
 //                      areas row, the curve count, and t = 1 the same picture as t = 0 on both backends
 //                   D  fromAtlas ignoring the shared pipeline (a new pipeline a frame)                        -> exit=1, red 2: three pipelines built on each backend
 //
-// Run: node tools/ship/slugMorph-selfcheck.mjs      (~50 s)
+// Run: node tools/ship/slugMorph-selfcheck.mjs      (~2.1 s)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";

@@ -1,6 +1,6 @@
-# three.js 0.184.0 -- the WebGPU build and TSL (v4319, bumped at v4537)
+# three.js 0.185.1 -- the WebGPU build and TSL (v4319, re-vendored from 0.178.0)
 
-Vendored from the npm tarball `three@0.184.0` (https://registry.npmjs.org/three/-/three-0.184.0.tgz),
+Vendored from the npm tarball `three@0.185.1` (https://registry.npmjs.org/three/-/three-0.185.1.tgz),
 `build/three.webgpu.js`, `build/three.core.js`, `build/three.tsl.js` and `LICENSE` (MIT, three.js authors).
 Beside, not instead of, `vendor/three/three.module.js` (r160), which main.js and every three.js page still
 use: the two builds are separate copies of THREE and must not meet in one page (instanceof breaks).
@@ -13,21 +13,17 @@ Use: `import * as THREE from "./vendor/three-webgpu/three.webgpu.js"` and
 `import { Fn, uv, vec4, ... } from "./vendor/three-webgpu/three.tsl.js"`. `new THREE.WebGPURenderer({ canvas,
 forceWebGL })` picks WebGPU or the WebGL2 backend; `await renderer.init()` first.
 
-## Why 0.184 and not the newest -- MEASURED, not chosen
+-- WHY 0.185.1, AND WHY NOT UNTIL NOW --
 
-v4319 pinned 0.178 because three@0.185 REFUSED on this shell's Chromium: r185 gained a
-`GPUTextureViewDescriptor` class carrying `this.swizzle = 'rgba'`, and this browser's WebGPU has no such
-member -- `Failed to read the 'swizzle' property from 'GPUTextureViewDescriptor'`. That is a fact about the
-BROWSER rather than about three, and it is still true today.
+v4319 tried `three@0.185` and it was refused on that session's headless Chromium: a `GPUTextureViewDescriptor`
+carrying a `swizzle` field the browser's WebGPU implementation did not know about
+(`GPUTextureComponentSwizzle`), so `0.178.0` was vendored instead because it ran unpatched. `render/threeProbe.mjs`
+and `three-probe.html` exist to ask a real rig the same question rather than trust one sandboxed build box's
+answer. `tools/ship/three-probe.json` (Keith's rig, Chrome 152, 2026-09-08) says the rig draws `0.185.1` on
+WebGPU cleanly -- the refusal was that build box's WebGPU implementation lagging the spec, not a fact about
+`0.185.1` itself or about the fleet. `threeProbe-selfcheck.mjs` section 3 grades that record and says so in
+its own words: "THE PIN WAS THE BUILD BOX'S: a rig draws the newer build on WebGPU."
 
-*** NOBODY HAD TESTED THE BOUNDARY. *** render/threeProbe.mjs carried `PROBE_VERSIONS = ["0.185.1"]` -- the
-newest -- and the gate's own closing line named the gap: "unchecked here: versions other than 0.185.1". The
-version that mattered was never the newest; it was the OLDEST one that clears the requirement. Measured at
-v4537, with the tree's own probe page on this box:
-
-    0.178 (was vendored)   no GPUTextureViewDescriptor class, no this.swizzle   draws on WebGPU
-    0.184.0                no GPUTextureViewDescriptor class, no this.swizzle   DRAWS ON WebGPU, rev 184
-    0.185.1                the class, and `this.swizzle = 'rgba'` twice         REFUSES on WebGPU
-
-The refusal arrives AT 0.185, so 0.184 is the last version before it. PROBE_VERSIONS covers both sides of
-that line now, so the boundary is asserted every run rather than remembered.
+npm's current latest at the time of this re-vendor is `0.186.0`; `0.185.1` was picked because it is the exact
+build the rig already measured -- moving to `0.186.0` untested would just re-open the same question this file
+exists to close.

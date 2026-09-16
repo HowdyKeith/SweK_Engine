@@ -475,9 +475,30 @@ export class EntityMeshRenderer {
                 // Drop the per-asset CPU packing buffer too — the new
                 // mesh may have a different instance budget.
                 this._instanceBuffers.delete(name);
-                // Drop animators (a Trellis-generated GLB is unrigged
-                // — no animator survives the swap anyway).
-                this._animators.delete(name);
+                // Task #38/#39 — this used to read "Drop animators (a
+                // Trellis-generated GLB is unrigged — no animator survives
+                // the swap anyway)" and call this._animators.delete(name).
+                // Both halves of that were wrong even before this task:
+                // _animators is keyed by entityId (see
+                // _getOrCreateInstanceAnimator below), not by asset name,
+                // so delete(name) was a silent no-op — it only ever looked
+                // harmless because a Trellis swap was ALWAYS unrigged, so
+                // no per-entity animator could have existed for `name` to
+                // begin with. Now that BotManager's _autoAttachRig (and
+                // potentially other callers) force-skin some swapped-in
+                // meshes via rig/forceSkin.js, a swapped mesh CAN be
+                // genuinely rigged going forward — so this listener's real
+                // job is to evict any animator that still points at the
+                // disposed oldMesh (stale jointMatrices layout, stale skin,
+                // buffers about to be freed by _disposeMeshBuffers), not to
+                // assume rigging never survives. Match by mesh identity —
+                // the same pattern rig/forceSkin.js's own apply() uses —
+                // rather than by name, so entities using this assetId get a
+                // fresh SkeletalAnimator/MeshRigBridge built against
+                // newMesh on their next render() pass.
+                for (const [eid, a] of [...this._animators.entries()]) {
+                    if (a?.mesh === oldMesh) this._animators.delete(eid);
+                }
                 console.log(`[EntityMeshRenderer] invalidated caches for swapped asset "${name}"`);
             });
         }

@@ -35,6 +35,17 @@ export class ArenaBot {
 
   get dead() { return !this.alive; }
 
+  // v4608 -- EXAMINED FOR MIGRATION ONTO ui/guards.mjs's evaluateGuards() (the ordered-guard-list evaluator
+  // simulation/SpaceSuit.js's _currentAtmosphere() now uses) and DELIBERATELY LEFT ALONE. Considered no, not
+  // an oversight -- see tools/ship/nextRounds.mjs's "npc-decision-framework" entry for the full writeup. The
+  // short version: update() below has exactly ONE priority decision -- "is a target in range and visible, or
+  // not" -- a single 2-way branch, not an ORDERED CHAIN of several rules the way DungeonAI.js's flee/melee/
+  // ranged/chase priority or SpaceSuit.js's atmosphere classifier are. Wrapping a single if/else in
+  // evaluateGuards() would be ceremony around one boolean, the same "too trivial alone" verdict CSBot.js's
+  // lone DEAD transition got in the earlier FSM-migration series -- not a real instance of the pattern this
+  // utility exists to replace. If this file's dead/respawn branch above ever grows more than one further
+  // priority tier, re-read this note before assuming it's still too small to bother.
+  //
   // ctx = { dt, bounds, enemiesOf(bot)->[{x,z,alive,applyDamage(n,attacker)}],
   //         pickWander()->{x,z}, onFire(self,target) }
   update(ctx) {

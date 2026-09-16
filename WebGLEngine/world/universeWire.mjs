@@ -169,17 +169,65 @@ export const KEY_DRIFT_V4460 = Object.freeze({
                      "round committed an hour earlier -- and dropping the body entirely gives 6ab551e0. " +
                      "Setting its `sha` to null ALONE leaves the hash at fdc0bd02, so it is `arrived` and " +
                      "not `sha`, which is the same probe shaDoesNotReachTheEconomy records" }),
+        // *** v4535 -- THREE MORE MOVES, NONE OF THEM SEEN UNTIL THIS GATE WAS RE-RUN AGAINST THE LIVE TREE.
+        // *** Same failure mode as v4534/v4560: the gate is still over the ship-time budget (see
+        // unseenBecause), so nothing ran it between fdc0bd02 being committed and now. All three verified
+        // against this repository's actual commits and this tree's actual file sizes, not against the
+        // gate's own failure text -- `git log --format=%H -- WebGLEngine/vendor/<name>` for each body, and
+        // `ls -la` against each changed file, both re-run here.
+        Object.freeze({ version: "v4535", commit: "f100cf68", hash: "9e121456", file: "orrery.json",
+            field: "files", bodiesTouched: 1,
+            cause: "three-webgpu's own commit says \"WIP, DO NOT MERGE: three-webgpu re-vendored to 0.185.1, " +
+                   "breaks the TSL transplant pipeline\" -- it changed byte counts on five ALREADY-LISTED " +
+                   "files (PROVENANCE.txt, README.md, three.core.js, three.tsl.js, three.webgpu.js), no file " +
+                   "added or removed. stockOfFiles still turns each file's bytes into cargo at " +
+                   "Math.max(1, round(bytes / 4096)) per file, so a big enough byte delta crosses that " +
+                   "rounding boundary and moves cargo even with the file list unchanged -- v4416's mechanism, " +
+                   "reached this time by a size change rather than a new entry",
+            control: "on today's tree, reverting three-webgpu's five changed file byte counts (and its " +
+                     "top-level `bytes`) to their pre-f100cf68 values gives cdc34cbb" }),
+        Object.freeze({ version: "v4535", commit: "01fe7f4e", hash: "70cb223f", file: "orrery.json",
+            field: "files", bodiesTouched: 1,
+            cause: "\"box3d: add wasm-opt post-link pass, rebuild\" (Task 42) actually rebuilt box3d.wasm, " +
+                   "973188 bytes to 829117 -- a real recompilation, verified against the file on disk, not a " +
+                   "record edit. stockOfFiles rounds that file's cargo at 4096 bytes: 238 tons before, 202 " +
+                   "after. Same per-file-bytes mechanism as the f100cf68 move above, this time a shrink",
+            control: "on today's tree, reverting box3d's wasm file byte count (and its top-level `bytes`) to " +
+                     "its pre-01fe7f4e value gives e6408d4d" }),
+        Object.freeze({ version: "v4535", commit: "9c1d4e76", hash: "f4cf12e5", file: "orrery.json",
+            field: "bodies", bodiesTouched: 1,
+            cause: "vendor/draco-encoder arrived -- google/draco's own encoder build, vendored for Task 53 " +
+                   "so tools/export/dracoEncode.mjs can compress voxel/welded GLB exports; a distinct body " +
+                   "from vendor/draco (the decoder). A new directory under vendor/ is a new BODY with its " +
+                   "own orbit, stock and prices -- v4504/v4560's field, moving the same way for one more body",
+            control: "on today's tree, dropping the draco-encoder body gives 96f868f7" }),
+        // *** v4621 -- A FOURTH MOVE THE SAME ROUND THIS GATE WAS RE-RUN, AND THE ONLY ONE STILL UNCOMMITTED
+        // AT THE TIME THIS ENTRY WAS WRITTEN. *** "Vendor FBXLoader.js + dependency closure at r160" (b5fccadb)
+        // touched vendor/three on disk; orrery.json's re-bake for it was sitting in the working tree with no
+        // entry here yet, which is exactly the gap this record exists to close before it ships rather than
+        // seventeen rounds after. world/orreryFleet.mjs's COMMIT_BELT_DRIFT_V4621 records the same commit
+        // against the same body, independently, for a different gate.
+        Object.freeze({ version: "v4621", commit: "b5fccadb", hash: "0322b336", file: "orrery.json",
+            field: "files", bodiesTouched: 1,
+            cause: "the FBX loader's dependency closure -- FBXLoader.js, NURBSCurve.js, NURBSUtils.js and " +
+                   "fflate.module.js -- was added to `three`'s file list (four new cargo-bearing files) and " +
+                   "its PROVENANCE.txt grew from 902 to 3001 bytes. v4416's mechanism a third time (after " +
+                   "v4487's merge), this time from an ordinary new-loader vendoring commit",
+            control: "on today's tree, reverting `three`'s file list and PROVENANCE.txt bytes to their " +
+                     "pre-b5fccadb values gives f4cf12e5 -- EXACTLY the previous key, so this move is that " +
+                     "body's files and nothing else" }),
     ]),
-    current: "fdc0bd02",
+    current: "0322b336",
     // *** MEASURED AND NEGATIVE, AND IT CORRECTS MY OWN FIRST WRITING OF THE ENTRY ABOVE. *** The re-bake's
     // diff moved TWO fields on 16 bodies each, `arrived` and `sha`, and I wrote "arrived + sha" into this
     // record straight off that diff -- the exact mistake bytesDoNotReachTheEconomy exists to record, made
     // again in the same file four moves later. `sha` reaches NOTHING: each of the 18 bodies' sha set to
     // forty zeros in turn, one at a time, and the hash never moved. A DIFF NAMES WHAT CHANGED, NOT WHAT
     // COUNTED, and the only way to tell them apart is to run it.
-    shaDoesNotReachTheEconomy: Object.freeze({ bodiesTried: 19, movedTheHash: 0,
-        note: "against `arrived`, the same probe on the same 19 bodies: 19 of 19 moved the hash. 18 at " +
-              "v4534; xatlas made it 19 at v4560 and the probe is re-run rather than the count adjusted" }),
+    shaDoesNotReachTheEconomy: Object.freeze({ bodiesTried: 20, movedTheHash: 0,
+        note: "against `arrived`, the same probe on the same 20 bodies: 20 of 20 moved the hash. 18 at " +
+              "v4534; xatlas made it 19 at v4560; draco-encoder made it 20 at v4535 and the probe is " +
+              "re-run rather than the count adjusted" }),
     // WHY THE 2026-09-07 DRIFT SHIPPED ANYWAY, read from tools/ship/sweep-timings.json rather than argued:
     // the gate is over the ship-time budget, so quickSweep does not run it, so its recorded verdict is a
     // snapshot of a tree that no longer exists. The RELATION (gate slower than budget) is asserted live in
@@ -193,8 +241,10 @@ export const KEY_DRIFT_V4460 = Object.freeze({
     }),
     // MEASURED AND NEGATIVE, kept because it is what corrected this record: `bytes` (and so `radius`) do not
     // reach the economy. 964 bytes added to each of the 15 bodies in turn, one at a time: the hash never moved.
-    bytesDoNotReachTheEconomy: Object.freeze({ bodiesTried: 15, movedTheHash: 0,
-        note: "radiusFor(bytes) sets a body's drawn size and nothing the economy integrates" }),
+    bytesDoNotReachTheEconomy: Object.freeze({ bodiesTried: 20, movedTheHash: 0,
+        note: "radiusFor(bytes) sets a body's drawn size and nothing the economy integrates. 15 at v4460; " +
+              "every arrival since (kenney-city/-racing, morphicons, xatlas, draco-encoder) also defines " +
+              "`bytes`, so re-run against today's 20 bodies rather than left at the old count" }),
     staleFor: 42,             // shipped changelog entries strictly after v4416 up to v4459, COUNTED not subtracted
     // The gate reads the file and compares. Writing is behind --write, and the default mode is asserted to
     // have left the bytes alone -- v3698's rule, the one claimCheck states about itself: A LOOP THAT BOTH

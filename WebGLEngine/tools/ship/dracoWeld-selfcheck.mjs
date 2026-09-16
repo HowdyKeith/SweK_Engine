@@ -359,9 +359,14 @@ console.log("\n*** WELDING IS REACHABLE FROM THE WRITER, NOT ONLY FROM THIS GATE
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
-            "\nunchecked here: an actual Draco-compressed GLB DECODED end to end. Section 7 closes half of what this " +
-            "note used to say -- a real Khronos Draco GLB now routes here, correctly, alongside the same model's " +
-            "plain encoding -- but ROUTING IS NOT DECODING, and the decode still needs the full 12 MB and a " +
-            "browser. This round wrote no encoder either: draco.js DECODES ONLY, and neither it nor glb-shrink " +
-            "ships an encoder we could vendor. The decode path is upstream's, unmodified.");
+            "\n*** BOTH GAPS THIS NOTE USED TO NAME ARE NOW CLOSED, ELSEWHERE, NOT HERE. *** tools/ship/dracoEncode-selfcheck.mjs " +
+            "vendors an encoder (draco3d, Google's own Node build -- three.js r160's own asm.js-era draco_encoder.js " +
+            "was tried first and hung indefinitely; see vendor/draco-encoder/PROVENANCE.txt) and drives a real GLB it " +
+            "wrote through this tree's OWN shipped decode path -- three's real GLTFLoader plus the vendored " +
+            "DRACOLoader.js, in an actual browser -- with the decoded geometry checked corner-for-corner against " +
+            "what was encoded. Section 7 above still only proves ROUTING on the Khronos fixtures (their BIN chunks " +
+            "were never vendored, for the licence reasons stated there); the decode proof itself now exists, just " +
+            "against a file this tree generates rather than one downloaded. This file is left as it was otherwise -- " +
+            "it is still the gate for the WELD half and for ROUTING, and re-stating dracoEncode-selfcheck.mjs's own " +
+            "numbers here would be a second copy of a claim that already has one owner.");
 process.exit(fails ? 1 : 0);

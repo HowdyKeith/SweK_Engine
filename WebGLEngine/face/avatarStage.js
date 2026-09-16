@@ -854,7 +854,15 @@ export function mountStage(canvas, opts = {}){
     if(A._wantPick>=0 && A.carry<0 && Math.abs(A.targetX - A.x) < 0.09){   // arrived → grab
       A.carry=A._wantPick; A._wantPick=-1; A.carryUntil=tSec+3.0;
     }
-    if(A.carry>=0 && tSec>=A.carryUntil && grabbables[A.carry] && grabbables[A.carry]._lift<0.05){   // set down → resume wander
+    // v4304's z-wander gate caught what nothing before it watched long enough to see: `_lift<0.05` never
+    // goes true here. While A.carry===i the ramp loop just above drives THAT SAME `_lift` UP toward 1 (the
+    // held object rising to hand height), so gating "set it down" on it reading back near zero waits on a
+    // number this very block is pushing the other way -- the avatar grabs a dial once and never lets go for
+    // the rest of the session. inPickup then stays true forever, which is why targetZ (line below) also
+    // never left ROAM_Z_HOME: not a depth-wander bug, the pickup it was riding on never ended. The hold is
+    // genuinely timed already (`carryUntil`, set at grab); the lift is a cosmetic ramp for the OTHER
+    // direction (rising while held, settling once let go) and was never a gate `set it down` should wait on.
+    if(A.carry>=0 && tSec>=A.carryUntil && grabbables[A.carry]){   // set down → resume wander
       A.carry=-1; A.pickupAt=tSec+9+Math.random()*7; A.retargetAt=tSec;
     }
     // v1252 — mood paces retargeting: alarmed darts about (short interval), souring

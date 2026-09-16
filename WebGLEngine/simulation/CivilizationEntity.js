@@ -130,6 +130,19 @@ export class CivilizationEntity {
     // ACTIONS — STRUCTURE BUILDS + DECAY
     // ------------------------------------------------------------
 
+    // v4608 -- EXAMINED FOR MIGRATION ONTO ui/guards.mjs's evaluateGuards() (the ordered-guard-list evaluator
+    // simulation/SpaceSuit.js's _currentAtmosphere() now uses) and DELIBERATELY LEFT ALONE. Considered no, not
+    // an oversight -- see tools/ship/nextRounds.mjs's "npc-decision-framework" entry for the full writeup. The
+    // short version: evaluateGuards() is FIRST-MATCH-WINS -- exactly one rule fires per call, the rest are
+    // skipped -- and that is not what this method does. The build check and the decay check below are NOT
+    // exclusive: both can fire in the SAME tick (a civ can build a structure AND chip a decaying voxel on the
+    // same call, whenever _shouldBuild() and energy<0.2 are both true), and both push independently onto the
+    // same `actions` array with no priority between them at all. Forcing this onto a first-match evaluator
+    // would be a behaviour change, not a refactor -- it would silently drop whichever action happened to be
+    // listed second. This is the ADDITIVE shape ui/guards.mjs's own header explicitly does not claim to cover,
+    // not the ordered-priority shape DungeonAI.js's flee/melee/ranged/chase chain or SpaceSuit.js's atmosphere
+    // classifier are. If this ever changes -- e.g. build and decay become mutually exclusive on purpose -- re-
+    // read this note before assuming evaluateGuards() fits.
     _act(world) {
         const actions = [];
 

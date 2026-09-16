@@ -26,7 +26,7 @@
 //                   D  the CPU twin sampling bilinearly (the average of the four texels)                       -> exit=1, red 5: the palette row (12,318 of 19,200 bake
 //                      colours) and all four frames
 //
-// Run: node tools/ship/stereographic-selfcheck.mjs      (~30 s)
+// Run: node tools/ship/stereographic-selfcheck.mjs      (~2 s)
 "use strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

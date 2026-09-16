@@ -77,24 +77,38 @@ const row = (d, m) => c.rows.find((r) => r.device === d && r.mode === m);
         "reaches a single reported number. A physical input with no reported consequence");
 }
 
-// ---- 3. THE FINDING, WHICH IS A HOLE IN THE OTHER CENSUSES -------------------------------------------------------------
+// ---- 3. THE HOLE THIS SECTION FOUND IS NOW CLOSED, AND THE CHECK IS REWRITTEN TO THE SMALLER CLAIM ------------------
 {
-    // lens mapN and mapSpan came back dead in every mode. They are not dead. They are the map mode's knobs, and
-    // MODES has no map mode -- so this sweep never built it, and neither did any of the others.
-    ok("!! the MODES table omits lens.map, and three prior censuses inherited the gap",
-        !MODES.lens.includes("map"),
-        "lens modes swept: " + MODES.lens.join(", ") + ". The map mode is absent, so the v2898 tautology census, " +
-        "the v2904 corroboration census and the v2905 libm sweep have all been skipping it. That is the mode " +
-        "whose peak is graded against sqrt(1+4/rho^2), the mode v2900 converted to strictTrig, and the entire " +
-        "subject of the v2903 magmap kernel. The response census found it only because the map's knobs looked " +
-        "dead -- a coverage hole is invisible until something downstream of it looks wrong");
+    // THIS USED TO ASSERT THE ABSENCE: "MODES has no map mode -- so this sweep never built it, and neither did
+    // any of the others." lensBind.mjs now declares "map" among lens's modes, deviceModeTable() derives it from
+    // there rather than from a typed list, and this census sweeps every declared mode -- so the gap the census
+    // found is closed at its source, not papered over here. v3608's rule for a fixed member applies exactly:
+    // REWRITE TO THE SMALLER CLAIM AND NAME WHAT CHANGED, do not keep the assertion pointed at a state that no
+    // longer holds just to keep the finding.
+    ok("!! the MODES table now carries lens.map, closing the hole three prior censuses had inherited",
+        MODES.lens.includes("map"),
+        "lens modes swept: " + MODES.lens.join(", ") + ". map is present, so this census -- and anything else " +
+        "that sweeps deviceModeTable() rather than a hand-typed list -- now builds the mode whose peak is " +
+        "graded against sqrt(1+4/rho^2), the mode v2900 converted to strictTrig and the entire subject of the " +
+        "v2903 magmap kernel");
 
     const dev = await getDevice("lens");
     const m = await dev.build({ mode: "map" });
-    ok("...and the mode builds fine, so nothing but the table was stopping it",
+    ok("...and the mode builds fine, so nothing but the table was ever stopping it",
         m && Number.isFinite(m.mapPeak),
         "lens.map builds and reports mapPeak = " + m.mapPeak.toFixed(6) + ". It was never broken, never " +
         "deliberately excluded, and never swept");
+
+    // AND THE ORIGINAL FINDING, CHECKED RATHER THAN ASSUMED FIXED: mapN and mapSpan only affect lensBind's
+    // output when mode === "map" (every other mode ignores them), which is exactly why they read dead across
+    // the rest of the device -- and exactly why sweeping the map row is what makes them alive.
+    const mapRow = row("lens", "map");
+    ok("!! ...and now that the census actually sweeps it, mapN and mapSpan are no longer reported dead",
+        !!mapRow && !mapRow.deadKnobs.includes("mapN") && !mapRow.deadKnobs.includes("mapSpan"),
+        mapRow ? "lens/map responds to " + ["mapN", "mapSpan"].filter((k) => !mapRow.deadKnobs.includes(k)).join(" and ") +
+                 " -- these looked dead in EVERY mode this census used to build because the one mode that reads " +
+                 "them was never among them"
+               : "no lens/map row in the census");
 }
 
 // ---- 4. TWO CANDIDATES INSPECTED, TWO FALSE POSITIVES, ONE SHARED CAUSE -------------------------------------------------

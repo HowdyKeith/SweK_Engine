@@ -33,7 +33,7 @@
 //                                                                                 (worst 4 half-texels) and 10,695 bake pixels over 2.
 //                   Each restored and the baseline re-run: 0 red.
 //
-// Run: node tools/ship/water2d-selfcheck.mjs      (~40 s)
+// Run: node tools/ship/water2d-selfcheck.mjs      (~2.3 s)
 "use strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

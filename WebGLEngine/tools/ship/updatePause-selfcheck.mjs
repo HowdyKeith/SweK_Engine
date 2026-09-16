@@ -286,9 +286,13 @@ const uCode = codeOnly(sysadmin), rCode = codeOnly(runBusy);
     const { pathToFileURL } = await import("node:url");
     const req = (await import("node:module")).createRequire(pathToFileURL(path.join(ENG, "ai-bridge", "x.js")).href);
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "swek-updpause-"));
-    fs.writeFileSync(path.join(dir, "SweK_Engine_v4600.zip"), Buffer.alloc(200 * 1024, 7));
-    const sys = req("./sysadminBridge.js"), rb = req("./runBusy.js");
-    const realActive = rb.active;
+    // v4622 -- was v4600, which this round's own version bump overtook (ENGINE_VERSION is v4622 now, so a
+    // fixture build 22 versions BEHIND stopped reading as an update at all). v4999 matches this tree's own
+    // sentinel for "obviously newer than anything real" (see releaseLedger-selfcheck.mjs's identical fixture
+    // shape), so a future version bump does not silently re-break this row's premise the same way.
+    fs.writeFileSync(path.join(dir, "SweK_Engine_v4999.zip"), Buffer.alloc(200 * 1024, 7));
+    const sys = req("./sysadminBridge.js"), rb = req("./runBusy.js"), rh = req("./releaseHold.js");
+    const realActive = rb.active, realReleaseHoldRunning = rh.running;
     try {
         rb.active = () => ({ active: true, what: "the source chain (verifying)" });
         const auto = await sys.updateCheck(true, { silent: true, dir });
@@ -310,16 +314,122 @@ const uCode = codeOnly(sysadmin), rCode = codeOnly(runBusy);
             "the poller calls updateCheck(false) when autoApply is off; deferring the report would hide a " +
             "waiting build behind unrelated work");
         rb.active = realActive;
+        // v4614 -- *** THIS ROW RUNS AS A CHILD OF verify.mjs's OWN QUICK SWEEP, WHICH IS ITSELF A RELEASE BUILD
+        // IN PROGRESS. *** releaseHold.js (a runBusy.js runner since v4612) answers "is a release build running
+        // on this machine" from a lock file, not from this test's rb.active stub -- so restoring rb.active alone
+        // does not produce an idle machine when the process asking is a gate spawned BY verify.mjs, which holds
+        // that exact lock for its whole run. Found by reproducing Keith's Windows report here: the row failed
+        // ONLY when nested inside a real release hold, not when this file runs standalone, which is precisely
+        // how it reached him. Stubbed the same way rb.active already is, for the same reason: an "idle" fixture
+        // has to fake EVERY runner an off state, not just the one this test happens to control directly.
+        rh.running = () => false;
         const idle = await sys.updateCheck(true, { silent: true, dir });
+        rh.running = realReleaseHoldRunning;
         ok("!! *** and with NOTHING running it does not defer -- the guard has an off state ***",
             !!idle && idle.deferred !== true,
             "a deferral that never lifts is an updater that never runs, which is the same outage wearing a " +
             "politer word");
     } finally {
         rb.active = realActive;
+        rh.running = realReleaseHoldRunning;
         try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
     }
 }
+
+// --- 9. *** THE GUARD FROM SECTION 8 HAD A DOOR LEFT OPEN AROUND IT, ON THE CLIENT SIDE *** ------------------
+//
+// v4610. Section 8 proved updateCheck() ASKS runBusy and OBEYS -- and it does, every time opts.force is falsy.
+// But POST /sys/update/apply, the ONE route ui/engineUpdate.js's apply() ever calls, used to pass
+// `{ force: true }` UNCONDITIONALLY, for every caller. Section 8's own manual-apply row above tests
+// updateCheck({force:true}) directly and would stay green either way -- it cannot see which caller reached that
+// code with force set, because by the time it runs the route has already decided. That is this file's own
+// warning from line 276 ("a gate can be green for years about the wrong subject") one layer further out: the
+// SERVER-side automatic triggers (poller/boot-scan/peer-pull) never passed force and were always covered: the
+// CLIENT-side ones (the on-load auto-apply check, and the peer-propagation prompt/auto-confirm) went through
+// this same HTTP route and got force:true every time, bypassing the guard section 8 proves works.
+//
+// Keith, again, on the live rig: hours of relaunch windows during a Clone & Verify + zip, ending in "started
+// the new version of SweK and killed the zip that was running" -- with runBusy.js's guard already in the tree.
+{
+    const eu = noComments(fs.readFileSync(path.join(ENG, "ui", "engineUpdate.js"), "utf8"));
+    ok("!! /sys/update/apply's route no longer hands out force:true unconditionally",
+        !/\/sys\/update\/apply[\s\S]{0,40}updateCheck\(true,\s*\{\s*force:\s*true\s*\}\)/.test(noComments(server)),
+        "that literal shape is exactly what section 8 could not see past -- force decided before the guard ran");
+    ok("...and instead derives it from the request body's own `manual` field",
+        /req\.url === "\/sys\/update\/apply"[\s\S]{0,200}force:\s*!!\(d\s*&&\s*d\.manual\)/.test(noComments(server)),
+        "so a caller must SAY a person clicked, not merely reach the route");
+    ok("apply() sends `manual` in the POST body rather than an empty one",
+        /function apply\(manual\)[\s\S]{0,200}body:\s*JSON\.stringify\(\{\s*manual:\s*!!manual\s*\}\)/.test(eu),
+        "the flag now travels with the request instead of living only in a comment");
+    ok("!! the ONLY call site that passes manual=true is the Settings panel's own button click",
+        /installBtn\.onclick[\s\S]{0,100}_runApply\(setProg, \(\) => \{\},\s*true\)/.test(eu),
+        "the one place a person is watching a live progress readout and pressed the button themselves");
+    const autoSites = [
+        /if \(s\.autoApply\) \{[\s\S]{0,200}_runApply\(\(msg, ok\) => \{[\s\S]{0,150}\}, \(\) => \{\}\);/,          // maybePromptUpdate
+        /if \(!fn\) \{ _runApply\(\(\) => \{\}, \(\) => \{\}\); return; \}/,                                          // _promptApply, no toast surface
+        /onYes: \(\) => _runApply\(\(msg\) => \{[\s\S]{0,150}\}, \(\) => \{\}\),/,                                    // _promptApply, the toast's own button/auto-confirm
+    ];
+    ok("!! and every AUTOMATIC caller (on-load auto-apply, peer-prompt, its no-toast fallback) passes no manual arg at all",
+        autoSites.every((re) => re.test(eu)),
+        "none of these three call sites has a synchronous user gesture behind it -- the toast's own auto-confirm " +
+        "timer can fire onYes with nobody watching, which is exactly why it is grouped with the other two rather " +
+        "than trusted as a click");
+}
+
+// --- 10. *** A GATE-SPAWNED server.js WAS RUNNING THIS BOX'S REAL UPDATE-APPLY, NOT A DOUBLE'S *** -------------
+//
+// v4611. galaxyProfile-selfcheck.mjs and verifiedPolygonIntersection-selfcheck.mjs each boot a REAL
+// ai-bridge/server.js child (on its own dedicated port) to drive a real headless browser against a real bridge --
+// and every one of those boots called sysadminBridge.start() with nothing to say "this is disposable". start()'s
+// boot scan reads the SAME machine-wide ~/.voxelbridge/sysadmin.json a real SweK does and, independent of the
+// `enabled` flag, APPLIES a waiting Downloads zip for real whenever cfg.update.autoApply is on -- extracting a
+// build and spawning a launcher via `cmd /c start`, a real visible window, from a process whose only job was to
+// answer a few HTTP requests for a test. Keith, watching this happen while running `node tools/ship/verify.mjs`
+// BY HAND IN A TERMINAL -- nowhere near the browser-driven Clone & Verify flow the earlier sections in this file
+// are about -- correctly guessed the mechanism before this section existed: "I bet when it gets to 1400 about,
+// it will launch a SweK." It did, because nothing here ever distinguished a gate's throwaway child from the
+// real thing.
+//
+// *** WHY THIS IS STRUCTURAL, NOT BEHAVIOURAL, LIKE SECTION 8. *** start()'s five side-effecting blocks
+// (login-autostart, the poller, the autoFetch boot-pull, the boot-scan apply, autoRemoveOld's prune) are ALL
+// individually gated `isWin || isMac` inside sysadminBridge.js itself -- correctly, since none of them make
+// sense on the Linux boxes gates run on. That means this sandbox cannot drive any of the five to fire AT ALL,
+// with or without the fix, so a behavioural row here would be exercising nothing. What IS platform-independent
+// and provably testable is the ONE thing that matters: that SWEK_TEST_SERVER's early return sits BEFORE every
+// one of those five blocks in source order, so on the platforms where they DO fire, none of them can.
+{
+    const startFn = (uCode.match(/function start\(\)\{[\s\S]*?\n\}/) || [""])[0];
+    ok("!! start() checks SWEK_TEST_SERVER and returns before doing anything else",
+        /function start\(\)\{\s*if\s*\(process\.env\.SWEK_TEST_SERVER\)\s*\{[\s\S]{0,200}return;\s*\}/.test(startFn),
+        "the guard has to be the FIRST statement in the function body -- a guard placed after even one " +
+        "side-effecting call would still let that one call fire");
+    const guardEnd = startFn.indexOf("return;");
+    ok("!! and EVERY side-effecting call in start() sits AFTER that return, not just the ones that inspired it", (() => {
+        if (guardEnd < 0) return false;
+        const after = startFn.slice(guardEnd);
+        const before = startFn.slice(0, guardEnd);
+        const calls = ["loginAutostartSet(true)", "startUpdatePoller()", "githubPull(false)", "updateCheck(", "pruneOldVersions("];
+        return calls.every((c) => after.includes(c)) && calls.every((c) => !before.includes(c));
+    })(), "login-autostart, the poller, the autoFetch pull, the boot-scan apply, and the old-version prune -- all five, not a subset");
+
+    ok("!! SWEK_TEST_SERVER is a real env-var check, not a comment claiming one",
+        /process\.env\.SWEK_TEST_SERVER/.test(uCode), "codeOnly() strips comments, so this cannot pass on prose alone");
+
+    for (const [file, label] of [["galaxyProfile-selfcheck.mjs", "galaxyProfile"], ["verifiedPolygonIntersection-selfcheck.mjs", "verifiedPolygonIntersection"]]) {
+        // noComments, not codeOnly -- the value inside the string is exactly what is under test here (a truthy
+        // "1", not an empty string that would fail the guard's own `if (process.env.SWEK_TEST_SERVER)` check),
+        // and codeOnly() blanks string CONTENT by design, which would make this check pass on "" just as readily.
+        const src = noComments(fs.readFileSync(path.join(ENG, "tools", "ship", file), "utf8"));
+        ok("!! " + label + "-selfcheck.mjs's spawned server.js carries SWEK_TEST_SERVER in its env",
+            /SWEK_TEST_SERVER:\s*"1"/.test(src),
+            "the two known real-server spawners, so a future third one is the thing left to catch by review, not by this gate");
+    }
+}
+// *** WHAT IS STILL NOT COVERED, SAID PLAINLY. *** No gate here proves the Windows apply path is actually
+// suppressed end to end -- that needs a Windows box with a real Downloads zip and cfg.update.autoApply on,
+// which is exactly the rig-only shape this file's other sections already admit to at their own edges. What IS
+// proven is that the return is unconditionally first and every guarded call is unconditionally after it, which
+// makes the platform gates inside those calls redundant rather than load-bearing for this specific claim.
 
 console.log("updatePause-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));
 process.exit(fails ? 1 : 0);

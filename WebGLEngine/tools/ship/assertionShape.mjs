@@ -343,6 +343,61 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // gate by one. NOT THIS ROUND'S GATE -- it arrived on main in commit c3f1fecb (the release zip's pure-Node
     // writer) and is re-taken here because that commit and this one merged, and the tree has to be green for
     // whichever lands second. distinctDefinitions holds at 40 for the NINTH round running.
+    // 2026-09-14 -- RE-TAKEN after a prior session fixed dozens of gates across the tree, adding 25 gates
+    // (1625 -> 1650) between this record and the tree: usesOk 1604 -> 1629, definesOk 1596 -> 1621,
+    // nameFirst 1497 -> 1522 -- the same three-rows-move-together pattern every earlier arrival showed, now
+    // scaled up because many gates landed instead of one. distinctDefinitions ALSO moved, 40 -> 41: one of
+    // the new definitions is not verbatim-identical to an existing one, so it is a forty-first distinct text
+    // rather than reuse. importsOk, condFirst, unknownSignature and suspects held at 0, 91, 16 and 0 --
+    // verified against a fresh `census()` run (node -e importing tools/ship/assertionShape.mjs) before this
+    // edit, independent of the failing gate's own printed numbers.
+    // v4622 -- RE-TAKEN: 1650 -> 1656 (usesOk 1629 -> 1635, definesOk 1621 -> 1627, nameFirst 1522 -> 1528),
+    // the same three-rows-move-together pattern, six gates landing across this branch's own unshipped rounds
+    // since the record above was taken -- tools/ship/ffmpegWasmBridge-selfcheck.mjs is this round's own; the
+    // other five arrived in earlier rounds on the same branch. condFirst, unknownSignature, suspects and
+    // distinctDefinitions held at 91, 16, 0 and 41 -- verified against a fresh census() run, independent of
+    // the failing gate's own printed numbers.
+    // v4584 -- RE-TAKEN on the tree merged with main at v4583 (this history diverged from the branch above at
+    // 1625): one gate (fleetRouting) joined, the same four rows by one.
+    // v4585 -- RE-TAKEN: one gate (labHome) joined, the same four rows by one.
+    // v4586 -- RE-TAKEN: one gate (labKnobs) joined, the same four rows by one.
+    // v4587 -- RE-TAKEN with the three sibling gates of the v4586 knob modules (physics/apsidalKnob-, impactKnob-,
+    // hologramKnob-selfcheck.mjs): 1628 -> 1631 gates, and usesOk, definesOk and nameFirst each by three; nothing else moved.
+    // v4588 -- RE-TAKEN with the turret copilot's three gates (physics/turret-, brain/gunnerPolicy-, tools/ship/raceTurret-selfcheck.mjs):
+    // 1631 -> 1634 gates, and usesOk, definesOk and nameFirst each by three; nothing else moved.
+    // v4589 -- RE-TAKEN: one gate (tools/ship/carViews-selfcheck.mjs) joined, the same four rows by one.
+    // v4590 -- RE-TAKEN: one gate (physics/slick-selfcheck.mjs) joined, the same four rows by one.
+    // v4591 -- RE-TAKEN: one gate (world/buildingTopple-selfcheck.mjs) joined, the same four rows by one.
+    // v4592 -- RE-TAKEN: one gate (physics/spellAmmo-selfcheck.mjs) joined, the same four rows by one.
+    // v4622-merge -- RE-TAKEN on this branch's actual merge of origin/main: the two histories above are BOTH
+    // real, diverged at 1625, and this round's own merge joins them -- so the final reading is neither one
+    // alone but a fresh census() over the merged tree: 1656 -> 1669, usesOk 1635 -> 1648, definesOk 1627 ->
+    // 1640, nameFirst 1528 -> 1541 -- the same three-rows-move-together pattern. importsOk, condFirst,
+    // unknownSignature, suspects and distinctDefinitions held at 0, 91, 16, 0 and 41.
+    // v4623 -- RE-TAKEN 1669 -> 1670 for tools/ship/murmurKit-selfcheck.mjs, the kit's gate. usesOk,
+    // definesOk and nameFirst move with it, which is the same three-rows-together pattern the note above
+    // records: one new gate that names its subject first is counted by all four.
+    // v4626 -- RE-TAKEN 1670 -> 1671 for tools/ship/murmurSpecies-selfcheck.mjs.
+    // v4630 -- RE-TAKEN 1671 -> 1672 for tools/ship/murmurSpecies2-selfcheck.mjs, the species gate split
+    // off BEFORE the fifth species would have crossed the budget. tools/ship/murmurSpeciesFrames.mjs is a
+    // MODULE and not a gate, so it moves runtimeGap's file count by two and this one by one.
+    // v4632 -- RE-TAKEN 1672 -> 1674 for TWO gates: tools/ship/murmurSpecies3-selfcheck.mjs (opal and abyss)
+    // and tools/ship/murmurSpecies4-selfcheck.mjs (droplet, split out of gate two in the same round because
+    // its swell pair cost a paired 206-287 ms against a 3,000 ms ceiling). The second was NOT a new subject:
+    // its five rows moved out of tools/ship/murmurSpecies2-selfcheck.mjs, so the tree gained one gate FILE
+    // and no new rows -- which is exactly the kind of move that makes a count of gates and a count of claims
+    // disagree, and is why this record carries both.
+    // v4634 -- RE-TAKEN 1674 -> 1675 for tools/ship/murmurSpecies5-selfcheck.mjs, carrying nebula and
+    // tempest. ONE gate for TWO species, which is the shape murmur's own pairing makes possible: the two
+    // files call a byte-identical kit set and every row in the gate is a comparison between them.
+    // v4636 -- RE-TAKEN 1675 -> 1677 for TWO gates: tools/ship/murmurSpecies6-selfcheck.mjs (fathom) and
+    // tools/ship/murmurSpecies7-selfcheck.mjs (geode). TWO gates for TWO species where the round before
+    // managed one for two, and the difference is arithmetic rather than temperament: nebula and tempest
+    // share a compiled shader's worth of subject matter, while fathom's rows need a three-species ridge
+    // control and geode's need a travelling foil, so the pair written as one gate came in at 5,064 ms
+    // against a 3,000 ms budget. Trimming the control from ten species to five landed at 3,499 and to four
+    // at 3,161 -- still over. THE COUNT OF GATES AND THE COUNT OF SUBJECTS DISAGREE HERE FOR A REASON THE
+    // BUDGET DECIDED, which is the same reason v4632's droplet split made them disagree the other way.
     // v4584 -- RE-TAKEN on the tree merged with main at v4583: one gate (fleetRouting) joined, the same four rows by one.
     // v4536 -- RE-TAKEN AGAIN AT THE MERGE, for tools/ship/partitionScore-selfcheck.mjs: 1619 -> 1620.
     // *** BOTH LINES RE-TOOK THIS TABLE IN THE SAME WINDOW, TWICE IN TWO ROUNDS, AND THE MERGE HAS TO ADD
@@ -400,8 +455,11 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // NEITHER OF THEIRS. *** The sets overlap on everything predating the split, so the two are not summed;
     // they are RE-DERIVED by running the census over the merged tree. Both note chains are kept, because a
     // chain that loses a round stops being a history of how the number moved.
-    gates: 1685, usesOk: 1664, definesOk: 1656, importsOk: 0,
-    distinctDefinitions: 40, nameFirst: 1557, condFirst: 91, unknownSignature: 16,
+    // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
+    // and the readings overlap on everything predating the split, so they are run over the merged tree rather
+    // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
+    gates: 1736, usesOk: 1715, definesOk: 1707, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1608, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

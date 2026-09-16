@@ -135,7 +135,10 @@ console.log("\n3. HOLE B, against the real tree -- the modules it deleted are no
 {
     const p = plan(ENG, "world");
     const byRel = new Map(p.keep.map((k) => [k.rel, k.why]));
-    const dynOnly = ["world/fireSystem.js", "world/lavaSystem.js", "world/kaijuAttackFx.js"];
+    // world/fireSystem.js dropped from this list: render/fireSpread-selfcheck.mjs now imports it statically
+    // (`FireSystem` gained its first gate), so it is no longer dynamic-only and the old derivation finds it
+    // by the static path alone -- correctly, which is not the hole this fixture demonstrates.
+    const dynOnly = ["world/lavaSystem.js", "world/kaijuAttackFx.js"];
     const kept = dynOnly.filter((r) => byRel.has(r));
     ok("!! the dynamic-only feature modules are in KEEP, not DELETE", kept.length === dynOnly.length,
         kept.length + "/" + dynOnly.length + " kept: " + dynOnly.filter((r) => !byRel.has(r)).join(", ") || "all");

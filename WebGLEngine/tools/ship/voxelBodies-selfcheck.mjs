@@ -44,7 +44,7 @@
 // for the records and writes it every frame, and the gate moves the crate 3 units after the scene is made and reads the red patch
 // 35 pixels to the right on both backends.
 //
-// Run: node tools/ship/voxelBodies-selfcheck.mjs      (~25 s)
+// Run: node tools/ship/voxelBodies-selfcheck.mjs      (~4 s)
 "use strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

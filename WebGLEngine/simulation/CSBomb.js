@@ -22,6 +22,8 @@
 // Defuse default: 5 seconds (kit-equivalent simplification; CS has
 // 5s with kit, 10s without).
 
+import { defineMachine, applyEvent } from "../ui/machine.mjs";
+
 export const BOMB_STATE = Object.freeze({
     IDLE:      "idle",
     HELD:      "held",
@@ -30,6 +32,31 @@ export const BOMB_STATE = Object.freeze({
     DEFUSING:  "defusing",
     EXPLODED:  "exploded",
     DEFUSED:   "defused",
+});
+
+// v4602 -- the graph this file's own top-of-file comment already described in prose, made declared and
+// auditable. Two honest wrinkles this migration did NOT paper over, found by reading the actual guards rather
+// than trusting the header comment that named them:
+//   IDLE is UNREACHABLE through this declared graph, and that is CORRECT, not a bug. The header comment says
+//   "IDLE ... -> pickup(player) -> HELD", but pickup()'s own guard is `this.state !== BOMB_STATE.HELD` --
+//   pickup only ever SUCCEEDS when the state is ALREADY held, so it can never fire FROM idle. IDLE is reached
+//   exclusively through forceIdle(), an administrative override CSRoundManager.js calls from whatever live
+//   state a round happens to end in (_concludeRound's `if (this.bomb.isLive()) this.bomb.forceIdle();`) --
+//   not a domain event this graph should pretend to model. audit()'s own unreachable list is expected to say
+//   exactly ["idle"], and tools/ship/csBomb-selfcheck.mjs asserts that rather than treating it as a defect.
+//   reset() is the SAME kind of override (round restart, valid from any state) and is left outside the graph
+//   for the same reason -- see its own method for why setting `this.state` directly there is correct.
+export const BOMB_MACHINE = defineMachine({
+    initial: "held",
+    states: {
+        idle:     { on: {} },
+        held:     { on: { startPlant: "planting" } },
+        planting: { on: { cancelPlant: "held", completePlant: "planted" } },
+        planted:  { on: { startDefuse: "defusing", fuseExpired: "exploded" } },
+        defusing: { on: { cancelDefuse: "planted", fuseExpired: "exploded", completeDefuse: "defused" } },
+        exploded: { final: true },
+        defused:  { final: true },
+    },
 });
 
 export const PLANT_DURATION_S    = 3.0;
@@ -119,8 +146,12 @@ export class CSBomb {
      * that the position is inside a plant zone (CSRoundManager does this).
      */
     startPlant(x, y, z) {
-        if (this.state !== BOMB_STATE.HELD) return false;
-        this.state = BOMB_STATE.PLANTING;
+        // applyEvent returns `this.state` UNCHANGED when the event does not apply from the current state --
+        // that IS the guard the original `if (this.state !== HELD) return false;` expressed, just checked
+        // against the declared graph instead of a private if.
+        const to = applyEvent(BOMB_MACHINE, this.state, "startPlant", null);
+        if (to === this.state) return false;
+        this.state = to;
         this.x = x; this.y = y; this.z = z;
         this._plantProgress = 0;
         this.lastEvent = `startPlant at (${x|0},${z|0})`;
@@ -128,8 +159,9 @@ export class CSBomb {
     }
 
     cancelPlant() {
-        if (this.state !== BOMB_STATE.PLANTING) return false;
-        this.state = BOMB_STATE.HELD;
+        const to = applyEvent(BOMB_MACHINE, this.state, "cancelPlant", null);
+        if (to === this.state) return false;
+        this.state = to;
         this._plantProgress = 0;
         this.lastEvent = "cancelPlant";
         return true;
@@ -138,8 +170,9 @@ export class CSBomb {
     /** Start defuse — caller validates CT within DEFUSE_RADIUS.
      *  v540 — hasKit shortens the defuse (5s vs 10s). */
     startDefuse(hasKit = false) {
-        if (this.state !== BOMB_STATE.PLANTED) return false;
-        this.state = BOMB_STATE.DEFUSING;
+        const to = applyEvent(BOMB_MACHINE, this.state, "startDefuse", null);
+        if (to === this.state) return false;
+        this.state = to;
         this._defuseProgress = 0;
         this._defuseHasKit = !!hasKit;
         this.lastEvent = "startDefuse";
@@ -147,8 +180,9 @@ export class CSBomb {
     }
 
     cancelDefuse() {
-        if (this.state !== BOMB_STATE.DEFUSING) return false;
-        this.state = BOMB_STATE.PLANTED;
+        const to = applyEvent(BOMB_MACHINE, this.state, "cancelDefuse", null);
+        if (to === this.state) return false;
+        this.state = to;
         this._defuseProgress = 0;
         this.lastEvent = "cancelDefuse";
         return true;
@@ -162,43 +196,53 @@ export class CSBomb {
     tick(dt) {
         if (!this.isLive()) return null;
 
+        // Decide the event from world state (elapsed progress against a duration), exactly what a tick-driven
+        // caller has to do that RIG_JOB's event-driven callers never did -- see ui/machine.mjs's own note on
+        // applyEvent(). The two checks inside DEFUSING stay two separate `if`s, not `if/else if`, ON PURPOSE:
+        // the original used two independent `if` blocks with an early `return` in the first, so a tick large
+        // enough to cross BOTH thresholds at once always resolves to the fuse expiring, never the defuse
+        // completing -- preserved here by checking fuseExpired first and short-circuiting past completeDefuse.
+        let event = null;
         if (this.state === BOMB_STATE.PLANTING) {
             this._plantProgress += dt;
-            if (this._plantProgress >= PLANT_DURATION_S) {
-                this.state = BOMB_STATE.PLANTED;
-                this._fuseRemaining = BOMB_TIMER_S;
-                this._plantProgress = 0;
-                this.lastEvent = "PLANTED";
-                return "planted";
-            }
+            if (this._plantProgress >= PLANT_DURATION_S) event = "completePlant";
         } else if (this.state === BOMB_STATE.PLANTED) {
             this._fuseRemaining -= dt;
-            if (this._fuseRemaining <= 0) {
-                this._fuseRemaining = 0;
-                this.state = BOMB_STATE.EXPLODED;
-                this.lastEvent = "EXPLODED";
-                return "exploded";
-            }
+            if (this._fuseRemaining <= 0) { this._fuseRemaining = 0; event = "fuseExpired"; }
         } else if (this.state === BOMB_STATE.DEFUSING) {
             // Fuse keeps ticking while CT defuses — defuser races the timer
             this._fuseRemaining -= dt;
             this._defuseProgress += dt;
-            if (this._fuseRemaining <= 0) {
-                this._fuseRemaining = 0;
-                this.state = BOMB_STATE.EXPLODED;
-                this.lastEvent = "EXPLODED (during defuse)";
-                return "exploded";
-            }
-            if (this._defuseProgress >= this._defuseDuration()) {
-                this.state = BOMB_STATE.DEFUSED;
-                this.lastEvent = "DEFUSED";
-                return "defused";
-            }
+            if (this._fuseRemaining <= 0) { this._fuseRemaining = 0; event = "fuseExpired"; }
+            else if (this._defuseProgress >= this._defuseDuration()) event = "completeDefuse";
         }
-        return null;
+        if (!event) return null;
+
+        const before = this.state;
+        this.state = applyEvent(BOMB_MACHINE, this.state, event, null);
+        if (this.state === before) return null;   // the guards above only ever raise a legal event, but stay honest rather than assume it
+
+        // Side effects and lastEvent text, matching the original's exact wording per transition -- including
+        // the EXPLODED-vs-"EXPLODED (during defuse)" distinction, which depends on the PRE-transition state
+        // and so cannot live in a target-keyed onEnter map the way BossPhaseManager.js's side effects could.
+        if (this.state === BOMB_STATE.PLANTED) {
+            this._fuseRemaining = BOMB_TIMER_S;
+            this._plantProgress = 0;
+            this.lastEvent = "PLANTED";
+        } else if (this.state === BOMB_STATE.EXPLODED) {
+            this.lastEvent = before === BOMB_STATE.DEFUSING ? "EXPLODED (during defuse)" : "EXPLODED";
+        } else if (this.state === BOMB_STATE.DEFUSED) {
+            this.lastEvent = "DEFUSED";
+        }
+        // the target state name IS the transition label the original hard-coded ("planted"/"exploded"/"defused")
+        return this.state;
     }
 
-    /** Reset to fresh start-of-round state. */
+    /** Reset to fresh start-of-round state.
+     *  v4602 -- an administrative override, valid from ANY state (a round can conclude, and so reset, while
+     *  the bomb is held, planting, planted or defusing), not a domain event the graph declares. BOMB_MACHINE
+     *  intentionally has no "reset" edges -- a graph where every state transitions to "held" on the same
+     *  event would just be this same direct assignment wearing seven redundant declarations. */
     reset(initialHolder = "t") {
         this.state = BOMB_STATE.HELD;
         this.holder = initialHolder;
@@ -217,7 +261,12 @@ export class CSBomb {
 
     /** Force-set to a terminal state. Used by CSRoundManager on
      *  edge cases (e.g. timer expires with no plant — bomb becomes
-     *  irrelevant to the round result but we mark it idle). */
+     *  irrelevant to the round result but we mark it idle).
+     *  v4602 -- the SAME kind of administrative override reset() is: CSRoundManager._concludeRound calls this
+     *  from whatever live state the round happened to end in, not from one specific state a domain event
+     *  would fire from. This is exactly why BOMB_MACHINE declares "idle" with no way IN through the graph --
+     *  the only path to idle really is this override, and the graph says so by leaving it unreachable rather
+     *  than inventing a fictitious event to paper over it. */
     forceIdle() {
         this.state = BOMB_STATE.IDLE;
         this.holder = null;

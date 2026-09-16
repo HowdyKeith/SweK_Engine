@@ -77,26 +77,48 @@ if (!repo) {
 
 console.log("1. *** THE FORM git ACTUALLY PRINTS, WHICH IS NOT THE FORM THE SELECTOR MATCHED ***");
 {
-    // Read off git rather than typed, so the check is about what the tool really emits.
-    const names = execFileSync("git", ["diff", "--name-only", "HEAD~1", "HEAD"],
-                               { cwd: ROOT, encoding: "utf8" }).trim().split("\n").filter(Boolean);
-    ok("CONTROL: git prints repo-root-relative paths, whatever directory it runs in",
-        names.some((n) => n.startsWith(ENGINE_REL + "/")),
-        names.slice(0, 2).join(" "));
-    const fromEng = execFileSync("git", ["diff", "--name-only", "HEAD~1", "HEAD"],
-                                 { cwd: ENG, encoding: "utf8" }).trim();
-    ok("  and the SAME paths from inside the engine -- git does not rebase them on your cwd",
-        fromEng === names.join("\n"), "which is exactly why this could never have worked by accident");
+    // 2026-09-14 -- HEAD~1..HEAD IS NOT ALWAYS A COMMIT THAT TOUCHES A REACHABLE SOURCE FILE. This section's
+    // fixture used to be pinned to exactly that one pair, which is fine as long as the most recent commit
+    // happens to touch something affectedGates() can trace to a gate. It does not always: a run landed here
+    // right after a commit that only rewrote tools/ship/gate-timings.json and three other JSON records (no
+    // gate imports a data file, so `cooked.gates.length` was honestly 0 -- not the bug this section exists to
+    // catch, just a commit with nothing importable in it). Walking back to the nearest commit that DOES touch
+    // something reachable keeps the check reading real git output (the whole point, stated above) without
+    // being at the mercy of whichever commit happens to be HEAD when this runs.
+    let names = null, i = 1;
+    for (; i <= 50; i++) {
+        const cand = execFileSync("git", ["diff", "--name-only", `HEAD~${i}`, `HEAD~${i - 1}`],
+                                  { cwd: ROOT, encoding: "utf8" }).trim().split("\n").filter(Boolean);
+        const engCand = cand.filter((n) => n.startsWith(ENGINE_REL + "/"));
+        if (engCand.length && affectedGates(normaliseChanged(engCand).resolved).gates.length > 0) { names = cand; break; }
+    }
+    if (!names) {
+        report("no commit in the last 50 touched a file affectedGates() can trace to a gate -- refusing " +
+            "rather than asserting on a fixture that does not exist.");
+        ok("*** git's own output selects ZERO gates when passed through unnormalised ***", false, "no usable commit found");
+        ok("*** and a non-zero set once normalised, which is the bug in one line ***", false, "no usable commit found");
+    } else {
+        const pair = [`HEAD~${i}`, `HEAD~${i - 1}`];
+        // Read off git rather than typed, so the check is about what the tool really emits.
+        ok("CONTROL: git prints repo-root-relative paths, whatever directory it runs in",
+            names.some((n) => n.startsWith(ENGINE_REL + "/")),
+            names.slice(0, 2).join(" "));
+        const fromEng = execFileSync("git", ["diff", "--name-only", ...pair],
+                                     { cwd: ENG, encoding: "utf8" }).trim();
+        ok("  and the SAME paths from inside the engine -- git does not rebase them on your cwd",
+            fromEng === names.join("\n"), "which is exactly why this could never have worked by accident");
 
-    const engineFiles = names.filter((n) => n.startsWith(ENGINE_REL + "/"));
-    const raw = affectedGates(engineFiles);
-    const cooked = affectedGates(normaliseChanged(engineFiles).resolved);
-    ok("*** git's own output selects ZERO gates when passed through unnormalised ***", raw.gates.length === 0,
-        `${engineFiles.length} real changed file(s) -> ${raw.gates.length} gates`);
-    ok("*** and a non-zero set once normalised, which is the bug in one line ***", cooked.gates.length > 0,
-        `-> ${cooked.gates.length} gate(s): ${cooked.gates.join(" ")}`);
-    report("this pair is the whole finding. Both calls are given the same real files from the same real " +
-        "commit; only the SPELLING differs, and the spelling git produces is the one that selected nothing.");
+        const engineFiles = names.filter((n) => n.startsWith(ENGINE_REL + "/"));
+        const raw = affectedGates(engineFiles);
+        const cooked = affectedGates(normaliseChanged(engineFiles).resolved);
+        ok("*** git's own output selects ZERO gates when passed through unnormalised ***", raw.gates.length === 0,
+            `${engineFiles.length} real changed file(s) -> ${raw.gates.length} gates`);
+        ok("*** and a non-zero set once normalised, which is the bug in one line ***", cooked.gates.length > 0,
+            `-> ${cooked.gates.length} gate(s): ${cooked.gates.join(" ")}`);
+        report("this pair is the whole finding. Both calls are given the same real files from the same real " +
+            "commit; only the SPELLING differs, and the spelling git produces is the one that selected nothing." +
+            (i > 1 ? ` (walked back ${i} commit(s) from HEAD to find one with a reachable source file)` : ""));
+    }
 }
 
 console.log("\n2. *** A PATH THAT NAMES NOTHING IS A QUESTION, NOT AN ANSWER ***");

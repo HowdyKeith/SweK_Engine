@@ -25,7 +25,7 @@
 //                   C  the page's timing source labelled "gpu" whatever the device granted              -> exit=1, red: the page row holding source to the device's timestamps flag
 //                   D  the front door's anchor removed                                                  -> exit=1, red: the reachability row
 //
-// Run: node tools/ship/slugRig-selfcheck.mjs      (~60 s; section 1 is headless)
+// Run: node tools/ship/slugRig-selfcheck.mjs      (~4.2 s; section 1 is headless)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";

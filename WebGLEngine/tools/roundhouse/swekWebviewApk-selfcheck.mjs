@@ -130,7 +130,9 @@ console.log("\n4. THE SETTINGS GESTURE IS REACHABLE, AND DOCUMENTED BECAUSE IT I
     ok("!! the gesture is written down (an undocumented invisible gesture is no gesture)",
        !!README && /long-press/i.test(README));
     ok("...and a failed load offers the prompt, since that is when the address is usually wrong",
-       !!JAVA && /onReceivedError[\s\S]{0,600}promptForUrl/.test(JAVA));
+       !!JAVA && /onReceivedError[\s\S]{0,600}promptForUrl/.test(javaCode(JAVA)),
+       "asserted against CODE, not raw source -- the WHY-comment between the two grew past the raw text's " +
+       "600-char window while the actual binding (three lines of code) never moved");
 }
 
 console.log("\n5. THE TWO CONFUSIONS THIS PROJECT EXISTS TO NOT REPEAT");

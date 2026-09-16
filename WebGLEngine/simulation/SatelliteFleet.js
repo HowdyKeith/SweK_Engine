@@ -19,6 +19,7 @@
 // to KaijuManager is held for a follow-up round.
 
 import { rng } from "../world/procPlanet.js";   // mulberry32, the same one the orrery's planets are seeded with
+import { defineMachine, applyEvent } from "../ui/machine.mjs";
 
 const WORLD_EDGE      = 200;        // |x| or |z| past which a sat is "off-frame"
 const SAT_ALTITUDE_Y  = 85;         // well above the tallest snow cap (~75)
@@ -79,6 +80,54 @@ export const SATELLITE_TYPES = {
 
 const ALL_TYPE_KEYS = Object.keys(SATELLITE_TYPES);
 
+export const SATELLITE_STATE = Object.freeze({
+    CROSSING: "crossing",
+    ORBITING: "orbiting",
+});
+
+// v4605 -- the per-satellite lifecycle this file's own _tickSat() already gated on `sat.state`, made declared
+// and auditable rather than left as an `if (sat.state === "orbiting")` branch with two hand-written direct
+// assignments as its only transitions. Unlike CSBomb.js's BOMB_MACHINE, there is no administrative override
+// here and so no unreachable-state carve-out to assert: launch() constructs a satellite already CROSSING (an
+// ordinary initial-state construction, same as RIG_JOB/BOMB_MACHINE's own initial states), and every other
+// change to `sat.state` goes through exactly these two transitions -- nothing ever reassigns it directly
+// outside them, and nothing ever moves a satellite to a third "despawned" state (capacity/stop() logic instead
+// deletes the record from the `satellites` Map entirely, which is entity destruction, not a graph transition).
+// Both states are reachable from the other, so audit() reports ok:true with no unreachable/dead states --
+// closer in shape to CSRoundManager.js's clean case than to CSBomb.js's.
+//
+// The two edges are asymmetric on purpose and that asymmetry is exactly what a migration here has to get
+// right, not smooth over:
+//   crossing -on offFrame-> orbiting   fires on a STRICT `>` spatial threshold (|x| or |z| past WORLD_EDGE),
+//     evaluated at the END of the crossing tick -- AFTER that tick's position integration, _applyEffect()
+//     (sensor pings / weapon strikes) and trail-particle emission have already run at the satellite's NEW
+//     position. A satellite sitting exactly AT the edge is still crossing.
+//   orbiting -on orbitElapsed-> crossing   fires on an INCLUSIVE `>=` wall-clock threshold (now >=
+//     orbitEndMs), checked FIRST THING on the orbiting tick -- and the tick returns immediately either way,
+//     so a satellite that just re-entered crossing does not also run this same tick's crossing movement --
+//     it starts moving on the NEXT tick.
+export const SATELLITE_MACHINE = defineMachine({
+    initial: "crossing",
+    states: {
+        crossing: { on: { offFrame: "orbiting" } },
+        orbiting: { on: { orbitElapsed: "crossing" } },
+    },
+});
+
+// v4605 -- bundled into the same migration for consistency, not because it carries any real bug surface on its
+// own: `this.active` is a second, much more trivial guarded-lifecycle field on the fleet itself (not per
+// satellite). start()/stop() were ALREADY self-guarding no-ops when called against the "wrong" current state
+// before this migration -- `if (this.active) return;` / `if (!this.active) return;` -- so this machine mostly
+// documents that guard rather than changing it. `this.active` itself stays the public boolean main.js already
+// reads (`satelliteFleet?.active`); only the internal transition is routed through the declared graph.
+export const FLEET_ACTIVE_MACHINE = defineMachine({
+    initial: "inactive",
+    states: {
+        inactive: { on: { start: "active" } },
+        active:   { on: { stop: "inactive" } },
+    },
+});
+
 let _nextSatId = 1;
 
 export class SatelliteFleet {
@@ -113,23 +162,60 @@ export class SatelliteFleet {
         this._lastLaunchMs = 0;
         this._lastTickMs = (typeof performance !== "undefined") ? performance.now() : 0;
         this._cityCenter = { x: 0, z: 0 };
+
+        // v4605 -- one map per machine, same convention as BossPhaseManager.js's this._onEnter: the state name
+        // arriving is the only thing that decides which side effects run, and applyEvent() guarantees each
+        // runs at most once per REAL transition.
+        this._fleetOnEnter = {
+            active: ({ cityCenterX, cityCenterZ }) => {
+                this._cityCenter.x = cityCenterX;
+                this._cityCenter.z = cityCenterZ;
+                this._lastLaunchMs = (typeof performance !== "undefined") ? performance.now() : 0;
+                console.log("[SatelliteFleet] active — cities will launch satellites");
+            },
+            inactive: () => {
+                for (const sat of this.satellites.values()) this._despawnEntity(sat);
+                this.satellites.clear();
+                console.log("[SatelliteFleet] stopped — all satellites despawned");
+            },
+        };
+        // Per-satellite onEnter -- shared across every satellite in the fleet, since the side effects only
+        // depend on the `sat` record passed in, not on which fleet instance is ticking it.
+        this._satOnEnter = {
+            // Entering orbiting: arm the wait timer BEFORE despawning the entity -- matches the original's
+            // exact statement order (state, then orbitEndMs, then despawn); nothing reads sat.state in
+            // between so the bookkeeping-vs-side-effect reordering applyEvent() introduces is inert here.
+            orbiting: (sat, now) => {
+                sat.orbitEndMs = now + ORBIT_WAIT_MS;
+                this._despawnEntity(sat);
+            },
+            // Entering crossing (always FROM orbiting -- the initial "crossing" is a plain construction in
+            // launch(), never this transition): mirror x/z, THEN recompute velocity from the mirrored
+            // position (one _rnd() draw -- the v4325 seed-stream contract requires exactly this one draw per
+            // orbit-exit, in this order), THEN spawn the entity.
+            crossing: (sat) => {
+                const mirror = (val) => -Math.sign(val) * WORLD_EDGE;   // Math.sign(0)===0 is an existing
+                sat.x = mirror(sat.x);                                   // quirk, reproduced identically, not
+                sat.z = mirror(sat.z);                                   // a bug fixed here.
+                const targetAngle = Math.atan2(-sat.z, -sat.x) + (this._rnd() - 0.5) * 1.4;
+                sat.vx = Math.cos(targetAngle) * SAT_SPEED;
+                sat.vz = Math.sin(targetAngle) * SAT_SPEED;
+                this._spawnEntity(sat);
+            },
+        };
     }
 
     start({ cityCenterX = 0, cityCenterZ = 0 } = {}) {
-        if (this.active) return;
-        this.active = true;
-        this._cityCenter.x = cityCenterX;
-        this._cityCenter.z = cityCenterZ;
-        this._lastLaunchMs = (typeof performance !== "undefined") ? performance.now() : 0;
-        console.log("[SatelliteFleet] active — cities will launch satellites");
+        const from = this.active ? "active" : "inactive";
+        const event = this.active ? null : "start";   // already active -> null -> no-op, same as the old guard
+        this.active = applyEvent(FLEET_ACTIVE_MACHINE, from, event, this._fleetOnEnter,
+            { cityCenterX, cityCenterZ }) === "active";
     }
 
     stop() {
-        if (!this.active) return;
-        this.active = false;
-        for (const sat of this.satellites.values()) this._despawnEntity(sat);
-        this.satellites.clear();
-        console.log("[SatelliteFleet] stopped — all satellites despawned");
+        const from = this.active ? "active" : "inactive";
+        const event = this.active ? "stop" : null;   // already inactive -> null -> no-op, same as the old guard
+        this.active = applyEvent(FLEET_ACTIVE_MACHINE, from, event, this._fleetOnEnter, {}) === "active";
     }
 
     /** Cap on simultaneous live satellites. Cities won't launch past this. */
@@ -174,7 +260,7 @@ export class SatelliteFleet {
             id: _nextSatId++,
             type: typeKey,
             spec,
-            state: "crossing",         // crossing | orbiting
+            state: SATELLITE_STATE.CROSSING,   // ordinary initial-state construction -- not a graph transition
             x: startX, z: startZ,
             y: SAT_ALTITUDE_Y,
             vx, vz,
@@ -223,21 +309,15 @@ export class SatelliteFleet {
     }
 
     _tickSat(sat, dt, now) {
-        if (sat.state === "orbiting") {
-            // Off-frame — wait, then re-emerge from opposite edge
-            if (now >= sat.orbitEndMs) {
-                // Reappear from opposite edge with rough mirror trajectory
-                const mirror = (val) => -Math.sign(val) * WORLD_EDGE;
-                sat.x = mirror(sat.x);
-                sat.z = mirror(sat.z);
-                // Re-pick a velocity heading toward another edge so it
-                // crosses again (not a perfect mirror — feels more alive)
-                const targetAngle = Math.atan2(-sat.z, -sat.x) + (this._rnd() - 0.5) * 1.4;
-                sat.vx = Math.cos(targetAngle) * SAT_SPEED;
-                sat.vz = Math.sin(targetAngle) * SAT_SPEED;
-                sat.state = "crossing";
-                this._spawnEntity(sat);
-            }
+        if (sat.state === SATELLITE_STATE.ORBITING) {
+            // Off-frame — wait, then re-emerge from opposite edge. Inclusive `>=` -- the satellite reappears
+            // on the EXACT tick the timer elapses, not one tick later.
+            const event = (now >= sat.orbitEndMs) ? "orbitElapsed" : null;
+            sat.state = applyEvent(SATELLITE_MACHINE, sat.state, event, this._satOnEnter, sat, now);
+            // Same-tick fallthrough PROHIBITED in this direction: whether or not the transition just fired,
+            // this tick does NOT also run the crossing movement/effect/off-frame-check logic below -- a
+            // newly-crossing satellite only starts actually moving on the NEXT tick, matching the original's
+            // unconditional `return` here.
             return;
         }
 
@@ -264,12 +344,12 @@ export class SatelliteFleet {
             });
         }
 
-        // Check if off-frame → enter orbit
-        if (Math.abs(sat.x) > WORLD_EDGE || Math.abs(sat.z) > WORLD_EDGE) {
-            sat.state = "orbiting";
-            sat.orbitEndMs = now + ORBIT_WAIT_MS;
-            this._despawnEntity(sat);
-        }
+        // Check if off-frame → enter orbit. Strict `>` -- evaluated AFTER this tick's position integration,
+        // _applyEffect() and trail-particle emission already ran at the satellite's NEW position, so the tick
+        // that pushes it off-frame still gets one full tick of in-range behavior first. A satellite sitting
+        // exactly AT the edge is still crossing.
+        const event = (Math.abs(sat.x) > WORLD_EDGE || Math.abs(sat.z) > WORLD_EDGE) ? "offFrame" : null;
+        sat.state = applyEvent(SATELLITE_MACHINE, sat.state, event, this._satOnEnter, sat, now);
     }
 
     _applyEffect(sat, now) {

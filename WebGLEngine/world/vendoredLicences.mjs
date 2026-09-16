@@ -57,6 +57,12 @@ export const VENDORED = Object.freeze([
       upstream: "https://github.com/erincatto/box3d", pin: "v0.1.0 / 8441b4a06d6d09dcfb0b0f704df4d847d1437b92",
       note: "papered at v4256 alongside the vendored headers. PROVENANCE.md records the commit." },
     { path: "vendor/draco",     kind: KIND.THIRD_PARTY, spdx: "MIT",       grant: GRANT.LICENCE_FILE, file: "LICENSE" },
+    { path: "vendor/draco-encoder", kind: KIND.THIRD_PARTY, spdx: "Apache-2.0", grant: GRANT.LICENCE_FILE, file: "LICENSE",
+      upstream: "https://github.com/google/draco", pin: "draco3d@1.5.7 (npm tarball registry.npmjs.org/draco3d/-/draco3d-1.5.7.tgz)",
+      note: "draco_encoder_nodejs.js + draco_encoder.wasm, vendored at v4601 for task #53's mesh-compression " +
+            "export. The tarball itself carries no LICENSE file -- fetched directly from google/draco's own " +
+            "repo root, per package.json's \"license\": \"Apache-2.0\" field. PROVENANCE.txt beside it records " +
+            "the evidence and why the decoder half was left unvendored." },
     // v4486 -- vendor/fonts holds FOUR families now (Plex flat, cinzel/, jetbrains-mono/, source-sans-3/), each with its own
     // <Family>-OFL.txt beside it; this entry papers the directory under the Plex grant as before, and the per-family grants,
     // Reserved Font Names, sources and digests are text/fontRegistry.mjs, held by tools/ship/vendoredFonts-selfcheck.mjs.
@@ -98,13 +104,17 @@ export const VENDORED = Object.freeze([
     { path: "vendor/taichi-js", kind: KIND.THIRD_PARTY, spdx: "MIT",       grant: GRANT.LICENCE_FILE, file: "LICENSE" },
     { path: "vendor/three",     kind: KIND.THIRD_PARTY, spdx: "MIT",       grant: GRANT.LICENCE_FILE, file: "LICENSE" },
     { path: "vendor/three-webgpu", kind: KIND.THIRD_PARTY, spdx: "MIT",    grant: GRANT.LICENCE_FILE, file: "LICENSE",
-      upstream: "https://registry.npmjs.org/three/-/three-0.178.0.tgz", pin: "three@0.178.0",
+      upstream: "https://registry.npmjs.org/three/-/three-0.185.1.tgz", pin: "three@0.185.1",
       note: "*** VENDORED AT v4319 AND UNDECLARED UNTIL v4371 -- FIFTY ROUNDS RED AND NOBODY SAW IT. *** The " +
             "TSL build (three.webgpu.js, three.core.js, three.tsl.js) beside r160, with three's own MIT LICENSE " +
             "copied in the same commit, so nothing was ever unpapered on disk; what was missing was the RECORD, " +
             "which is what this list is for. The gate that says so takes 15 s and is therefore outside verify's " +
             "3 s quick sweep, so it went red on every run and was reported by none of them -- found by a round " +
-            "that ran it by hand for an unrelated reason. A standing red nobody runs is a check nobody has." },
+            "that ran it by hand for an unrelated reason. A standing red nobody runs is a check nobody has. " +
+            "*** RE-VENDORED 2026-09-08, 0.178.0 -> 0.185.1: *** tools/ship/three-probe.json settled the question " +
+            "vendor/three-webgpu/README.md's history section describes -- the 0.185 refusal at v4319 was one " +
+            "build box's WebGPU implementation lagging the spec, not a fact about the fleet. Same pin shape, " +
+            "same one-line edit, same grant." },
     { path: "vendor/wasm",      kind: KIND.FIRST_PARTY, spdx: null,        grant: GRANT.NONE,         file: null,
       note: "*** OURS, NOT SOMEBODY ELSE'S. *** sha256.wasm and graphlayout.wasm are AssemblyScript output " +
             "from sha256.ts and graphlayout.ts in the same directory. A filename census calls this unpapered; " +

@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "models named as whole string literals by non-gate files that import gpu/khronosSamples.mjs",
- "head": "92b6b3fa6b74bd842ca6c8f11313a8278d67c60c",
+ "head": "599fe71bd66233e6851e1dc269cba861d80a6e97",
  "catalogue": 150,
  "coverage": {
   "total": 150,
@@ -41,7 +41,7 @@
   },
   {
    "name": "ABeautifulGame",
-   "hits": 21
+   "hits": 23
   },
   {
    "name": "Cube",
@@ -49,7 +49,7 @@
   },
   {
    "name": "BrainStem",
-   "hits": 17
+   "hits": 18
   },
   {
    "name": "CesiumMan",

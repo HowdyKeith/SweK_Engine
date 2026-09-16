@@ -4,7 +4,8 @@
 // THE CAR ON box3d: physics/raceCar.mjs behind race-car.html, headless through physics/box3d/box3dNode.mjs (the vendored wasm) and then
 // in the browser through box3dLoader on both backends. Section 1, the spec: the four wheels sit over Kenney's TRUCK_PARTS, the chassis
 // density gives the spec's mass through box3d's own box mass, the ride height is half height plus rest length plus wheel radius, and
-// the wasm really lacks the wheel joints this round declined (has() says so, by name). Section 2, the surface: asphalt on the finish
+// the wheel joints this round declined are BUILT since v01fe7f4e's rebuild (has() says so, by name) and still declined -- the raycast
+// choice was never about the capability, per physics/wheelJoint-selfcheck.mjs's own measurement. Section 2, the surface: asphalt on the finish
 // line, the kerb band raised KERB_HEIGHT between HALF_WIDTH and the tile edge, grass on a free cell, void beyond the grid. Section 3,
 // on the skidpad: the car settles at ROAD_Y + rideHeight less the static compression mg / 4k within a centimetre with all four wheels
 // grounded; full throttle passes 10 m/s in three seconds and 20 in ten, straight (yaw and x unmoved); a full brake stops it inside
@@ -72,14 +73,19 @@ const newWorld = () => worldFromModule(m, GRAV);
 const P = (r) => `speed ${r.pose.speed.toFixed(2)}, pos ${r.pose.pos.map((v) => v.toFixed(2)).join(", ")}, yaw ${r.pose.yaw.toFixed(3)}, up.y ${r.pose.up[1].toFixed(3)}`;
 
 // ---------------------------------------------------------------------------------------------------------------------------------
-sec("1. the spec: Kenney's truck as a raycast car, and the wheel joints the wasm has not got");
+sec("1. the spec: Kenney's truck as a raycast car, and the wheel joints declined on their own merits now that the wasm has them");
 {
     const ws = C.carWheels();
     ok("four wheels over TRUCK_PARTS' wheel positions at the chassis bottom: front steerable, rear driven", ws.length === 4 && ws[0].steerable && ws[1].steerable && !ws[2].steerable && ws[2].driven && ws[3].driven && !ws[0].driven && near(ws[0].attach[0], 0.55) && near(ws[0].attach[2], 0.857) && near(ws[2].attach[2], -0.657) && near(ws[0].attach[1], -C.CAR.half[1]));
     ok("the chassis density gives the spec's mass through box3d's own box mass", near(boxMass(C.CAR.half[0], C.CAR.half[1], C.CAR.half[2], C.chassisDensity()), C.CAR.mass, 1e-6), `${C.chassisDensity().toFixed(1)} kg/m^3 for ${C.CAR.mass} kg`);
     ok("the ride height is half height + rest length + wheel radius = 1.0", near(C.rideHeight(), 1.0));
     const missing = ["swk_wheel_spin", "swk_wheel_steer", "swk_wheel_state", "swk_body_sphere", "swk_world_cast_ray"].filter((n) => !has(n));
-    ok("*** the vendored wasm has none of the wheel-joint, sphere or raycast exports -- which is why this car is the raycast model on an analytic ground ***", missing.length === 5, `${missing.length} of 5 absent; ${Object.keys(m).filter((k) => /^_swk_/.test(k)).length} swk_ exports present`);
+    // v01fe7f4e rebuilt vendor/box3d/box3d.wasm and all five now export -- this used to be the reason the car is
+    // the raycast model on an analytic ground; physics/wheelJoint-selfcheck.mjs's jitter measurement is the reason now
+    // (mechanism real, effect four orders below what box3d's own substep count would let a driver feel), so having
+    // the capability changes nothing this design was weighed against. A future absence here would mean a DIFFERENT
+    // wasm shipped, which is exactly what this line still catches.
+    ok("*** the vendored wasm HAS the wheel-joint, sphere and raycast exports -- and this car stays the raycast model on an analytic ground anyway ***", missing.length === 0, `${missing.length} of 5 absent; ${Object.keys(m).filter((k) => /^_swk_/.test(k)).length} swk_ exports present`);
     ok("  ...and it has what the car needs: a box body, impulses, transforms, velocities, a state hash", ["swk_body_box", "swk_body_impulse", "swk_body_ang_impulse", "swk_transforms", "swk_velocities", "swk_state_hash"].every((n) => has(n)));
     ok("clampInput holds the contract: throttle and steer in [-1, 1], brake in [0, 1], missing fields 0", JSON.stringify(C.clampInput({ throttle: 3, steer: -2, brake: 4 })) === JSON.stringify({ throttle: 1, steer: -1, brake: 1 }) && JSON.stringify(C.clampInput({})) === JSON.stringify({ throttle: 0, steer: 0, brake: 0 }));
     const w = C.angularVelocity([0, 0, 0, 1], C.yawQuat(0.1), 0.1);
@@ -228,5 +234,5 @@ sec("6. IN THE BROWSER ON BOTH BACKENDS: the same wasm, the same 30 s, the same 
 }
 
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nall checks pass");
-console.log("unchecked here: the wheel joints themselves (native-only until the wasm is rebuilt with emsdk; physics/wheelJoint.mjs holds their measurement); wheel spin and tyre slip curves (the tyre model is vehicle.mjs's linear-to-saturation one); the car against another car (round 3 races them); the page's live drive (eyeballed).");
+console.log("unchecked here: the wheel joints as a SECOND car (built in the wasm since v01fe7f4e, but nothing puts them on a chassis; physics/wheelJoint.mjs holds their standalone measurement); wheel spin and tyre slip curves (the tyre model is vehicle.mjs's linear-to-saturation one); the car against another car (round 3 races them); the page's live drive (eyeballed).");
 process.exit(fails ? 1 : 0);

@@ -172,7 +172,10 @@ if (qsBg !== "transparent") scene.background = new THREE.Color(0x0a081a);
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: qsBg === "transparent" });
 renderer.setPixelRatio(window.devicePixelRatio || 1);
-renderer.outputEncoding = THREE.sRGBEncoding;
+// outputEncoding/sRGBEncoding were removed outright at three.js 0.185.1 (the deprecated r152 shim that used
+// to translate this into outputColorSpace is gone) -- outputColorSpace already defaults to SRGBColorSpace,
+// so this line is a no-op either way, but it is written in the API this vendored build actually has.
+renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 1000);
 camera.position.set(2, 1.5, 3);

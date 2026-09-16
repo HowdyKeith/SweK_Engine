@@ -257,7 +257,10 @@ const read = (rel) => fs.readFileSync(path.join(ENG, rel), "utf8");
 
     // *** AND THE PROSE MUST CARRY THE TWO BUGS, because the next person to touch this will reach for both. ***
     ok(/false accusation/i.test(prose(read("tools/ship/orreryView-selfcheck.mjs"))), "this gate says in prose what it is guarding against");
-    ok(/water/i.test(prose(draw)) && /polygon|areas/i.test(prose(draw)), "orreryDraw explains why field.water is not a mask");
+    // NOT /water/i -- orreryDraw.js also declares `const WATER = [...]`, a real colour constant, so that
+    // pattern matches the CODE as well as the prose (proseAudit-selfcheck's MISDIRECTED finding). field.water
+    // is the actual claim under test and appears only in the comment, never as code.
+    ok(/field\.water/i.test(prose(draw)) && /polygon|areas/i.test(prose(draw)), "orreryDraw explains why field.water is not a mask");
     ok(/paths/i.test(prose(read("world/orrery.mjs"))) && /files/i.test(prose(read("world/orrery.mjs"))), "orrery.mjs explains why it accepts either shape");
 }
 

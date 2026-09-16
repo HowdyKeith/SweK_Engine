@@ -35,6 +35,7 @@
 //                       two formulas agree at every pixel -- an equivalent spelling, not a blind check; recorded so nobody re-tries it)
 //                   D  computeShell's member array no longer folded into the struct                -> exit=1, 3 red: the planes row and the refusal row in section 1 (refused by name, no throw), and the harness
 //
+// Run: node tools/ship/tslWide-selfcheck.mjs      (~0.97 s; section 1 is CPU-only)
 // Run: node tools/ship/tslWide-selfcheck.mjs      (~20 s; section 1 is CPU-only)
 // MEASURED at v4542 (r184 in the host-shell vertex path). Applied to render/tslSource.mjs, this gate run, red count
 // read, source and emitted json restored and md5-verified. Baseline 0 red.

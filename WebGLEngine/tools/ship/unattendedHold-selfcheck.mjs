@@ -108,7 +108,7 @@ const launcher = fs.readFileSync(path.join(ROOT, "START_NODE_Engine.bat"), "lati
 const freePort = fs.readFileSync(path.join(ENG, "tools", "ship", "swek_free_port.bat"), "latin1");
 
 ok("!! the port-owner refusal still REFUSES -- the fix was to the hold, not the verdict",
-    /ALREADY OWNS PORT 8787/.test(launcher) && /exit \/b 1/.test(launcher) && /swek_hold\.bat/.test(launcher),
+    /ALREADY OWNS PORT %SWEK_PORT%/.test(launcher) && /exit \/b 1/.test(launcher) && /swek_hold\.bat/.test(launcher),
     "it must still decline to fight the owner and still exit nonzero. Making it proceed would restore the " +
     "two-windows-take-turns-forever loop v3256 was built to end");
 

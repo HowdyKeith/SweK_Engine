@@ -117,19 +117,213 @@ these repos:
   expensive difference). Neither is recommended without a specific reason to want it; noted so
   a future round doesn't re-derive "is there a gap here" from scratch.
 
-## The method, for next time
+## Named candidate, not built: Transvoxel (transvoxel.org / EricLengyel/Transvoxel)
 
-Sixteen links in, the split that mattered every time was the one retroRaster already wrote
-down: does the technique have a right answer a gate can fail? Affine warp, vertex snap, and now
-2D-Water's parallax and foam threshold — yes. A vignette's noise pattern, a Shader Graph node's
-wire-routing convenience, a CRT's static texture — no, and no amount of source-reading changes
-that. The second split, just as decisive here, is what a repo actually *is* underneath its
-README: five of sixteen turned out to be Unity-Editor tooling with no shader in them at all,
-and three turned out to be languages/runtimes (Python, Rust+WASM, Rust+CUDA) this tree's
-browser toolchain can't run regardless of licence. Checking `world/reachedLicences.mjs` and
-`world/vendoredLicences.mjs` first would have saved nothing this round — only mmacklin/sandbox
-was ever there — but it's the first thing to check next time, before re-deriving from grep
-that nothing else has been looked at yet.
+Checked, not vendored, not implemented — logged so a future round has this written down instead of
+re-deriving it. Confirmed by fetching the actual repo content (not just the README): `Transvoxel.cpp` is
+MIT (Copyright 2009 Eric Lengyel), and — its own README says so — it is "the data tables used in the
+Transvoxel Algorithm," not a working mesher. `transvoxel.org` itself (the dissertation-level writeup) is
+blocked by this session's egress proxy and was never read.
+
+**What it actually solves, precisely**: not marching cubes, and not heightmap-terrain LOD (already solved
+here — see below) — the seam between two octree cells of a volumetric isosurface meshed at *different
+resolutions*, via a special "transition cell" triangulation on the boundary face.
+
+**Checked against what's here**: `simulation/MarchingCubes.js` (classic MC, Paul Bourke's tables) and
+`physics/mesh/dualContour.mjs` (feature-preserving alternative) both mesh a scalar field at exactly one
+fixed resolution — confirmed by grep, neither function takes a resolution/LOD argument, and there is no
+`octree` anywhere in `world/*.js`. Every one of their ~15 callers (`world/chunkMarchingCubes.js`,
+`physics/soft/fleshSph.js`/`boneField.js`, `simulation/cosmo/zeldovich.js`, `simulation/tomo/volume.js`,
+`AquariumDemo.js`) runs single-resolution. `physics/mesh/manifoldCensus.mjs` already exists as a
+crack/non-manifold detector and is the tool that would grade a Transvoxel port's seams. LOD-crack avoidance
+*is* already solved in this tree, but only for 2.5D heightmap/planet patches — `render/screenSpaceError.js`
+cites Terrain3D's "succumb to your neighbour" edge-matching trick, and `world/planetSurface.js` separately
+guarantees seamless cube-sphere faces "by construction." Neither technique reaches a true 3D volumetric
+isosurface, which is what caves and an overhang-capable planet body actually need.
+
+**Aimed at, per Keith**: cave rendering (`world/terrainGenerator.js`'s `noise3D` cave-carving density field,
+today meshed by `world/chunkMarchingCubes.js` as a fixed-resolution cosmetic pass over the blocky grid, not
+rendered to any distance) and a planet body (a true volumetric/overhang-capable surface, as opposed to the
+heightmap `render/bodyTerrain.mjs` currently draws). Both would need octree-chunked LOD with seamless
+stitching to render at more than close range, which nothing here provides today.
+
+**Not built.** If taken up: the seven lookup tables (`regularCellClass`/`Data`/`VertexData`,
+`transitionCellClass`/`Data`/`CornerData`/`VertexData`) would be vendored as data — the same posture
+`simulation/MarchingCubes.js`'s own header already states for Paul Bourke's tables — with the stitching
+logic hand-written fresh in this tree's style and graded by `manifoldCensus.mjs` for actual watertightness
+across a fine/coarse boundary, not by a picture. Worth a full round of its own rather than a quick add.
+
+## Named candidate, not built: glTF-Asset-Generator (KhronosGroup)
+
+Checked, not vendored, not implemented. Confirmed by fetching the actual repo (LICENSE, README, the
+`Output/` tree), not just the summary: it's a Khronos-official C# tool that generates synthetic glTF 2.0
+conformance assets — sparse accessors, interleaved vertex buffers, every primitive mode, skin/morph
+animation, the full material matrix (metallic-roughness, specular-glossiness, alpha blend/mask,
+double-sided), split into `Positive` (valid, should load) and `Negative` (deliberately invalid, should be
+rejected) categories. MIT, Copyright Khronos Group.
+
+**Two facts that matter, both confirmed rather than assumed:**
+- **The generated assets are not committed in the repo.** `Output/Positive/*` and `Output/Negative/*` hold
+  only per-category READMEs; the actual `.gltf`/`.glb` files ship solely as versioned release zips
+  (`GeneratedAssets-0.6.1.zip`, etc.), not files `raw.githubusercontent.com` serves.
+- **The licensing is materially cleaner than the other Khronos repo already vendored from here.**
+  `gpu/khronosSamples.mjs` exists because `glTF-Sample-Assets` mixes licenses per model (`BrainStem` is a
+  Poser EULA, `Duck` is Sony's SCEA license, `ABeautifulGame` is CC-BY-4.0 requiring attribution) and needs
+  a `mayVendor()` gate that fails closed per model. `glTF-Asset-Generator`'s output is entirely synthetic
+  geometry from Khronos's own MIT tool, not third-party art — one root LICENSE covers everything.
+
+**Checked against what's here.** `gpu/fixtures/` already holds exactly this shape of fixture — two
+header-only, BIN-chunk-stripped GLBs derived from Khronos's `ABeautifulGame` (22 KB/32 KB instead of
+12 MB/43 MB) — and its own `PROVENANCE.md` is explicit about the limit: they prove `gpu/glbLoad.js`'s
+Draco-vs-plain **routing**, and "do NOT prove decoding... the gate says so rather than letting a routing
+pass read as a decode pass." That's routing coverage for one real model's two variants. Grepped for any
+coverage of sparse accessors, interleaved buffers, or skin/morph edge cases in this tree's own code (not
+inside `vendor/three`'s `GLTFLoader.js`, which presumably handles the spec correctly as a mature loader) and
+found none. So the precise gap: nothing here exercises `gpu/GLBParser.js` / `gpu/glbLoad.js`'s own routing
+and parsing logic against the feature matrix this generator exists to test, or against the negative/malformed
+cases at all.
+
+**Not built.** If taken up: pull specific fixtures from a release zip (not raw file content, per above),
+strip them the same header-only way `gpu/fixtures/` already does if only routing needs exercising, or keep
+them whole if decode-level coverage of `GLBParser.js`'s edge-case handling is wanted. Lower-risk than most
+of this sweep — fixtures, not a technique to reimplement, and a licensing story simpler than the Khronos
+repo already vendored from.
+
+## The wider KhronosGroup org sweep
+
+`glTF-Asset-Generator`'s own page links to nothing else (only the glTF spec repo and its own issue
+tracker), so this widened to the full `KhronosGroup` org — 189 repositories as of this sweep. Most of it is
+out of scope by construction: Vulkan/OpenXR/OpenCL/SYCL/ANARI/OpenVX/COLLADA/MoltenVK/SPIR-V tooling is
+native-API or the wrong runtime for a browser engine, and a good third of the remainder is Blender/Unity/
+3ds-Max plugins, or pure spec/registry/documentation repos with no code to port. What's actually in-domain,
+checked against this tree:
+
+- **glTF-IBL-Sampler** — the strongest find. Khronos's reference tool for generating prefiltered
+  environment maps (diffuse irradiance + roughness-convolved specular) for image-based lighting. Grepped
+  for IBL/prefiltered-environment/irradiance-map code anywhere in this tree's own render path and found
+  nothing — confirmed absent. That absence sits right next to work that IS here: `physics/render/
+  microfacetVndf-selfcheck.mjs` (VNDF importance sampling), `physics/render/energyCompensation.mjs` /
+  `energyCompWgsl.mjs` (multi-scatter GGX energy compensation), `physics/render/roughDiffuse.mjs`,
+  `physics/render/dielectricWalk-selfcheck.mjs` — a genuinely research-grade microfacet BRDF stack, already
+  ahead of plain glTF PBR, with no environment lighting to feed it. Not built.
+- **glTF-Sample-Viewer** / **glTF-Sample-Renderer** — Khronos's own PBR reference renderer (WebGL),
+  implementing the glTF metallic-roughness spec exactly. Framed precisely: since this tree's microfacet
+  work is already past the base glTF spec, this isn't a technique upgrade — its value is as a
+  **conformance reference**, the same shape `img2threejs`'s hard-gate rule already gave
+  `render/perceptual.mjs` / `render/silhouette.mjs`: does glTF-spec content render the way Khronos's own
+  implementation says it should, through the vendored `GLTFLoader.js`. Not built.
+- **glTF-Validator** — validates glTF/GLB against the spec. SweK exports GLB from at least
+  `tools/export/sceneGlb.mjs` and `tools/export/voxelGlb.mjs` (both through `vendor/three/jsm/exporters/
+  GLTFExporter.js`), and no spec-conformance check on that output was found anywhere — only that the one
+  loader that made it can also read it back. Not built.
+- **gltf-asset-auditor** — checks glTF attributes (polycount, texture size, etc.) against practical
+  use-case limits. Relevant to the Kenney/Quaternius GLB pipeline (`ui/cityPack.js`, discussed earlier in
+  this sweep) as a QA pass before assets hit the city grid, rather than finding a problem at runtime. Not
+  built.
+- **WebGL** (the official Khronos repo) — includes the canonical WebGL conformance test suite. An obvious
+  resource for validating SweK's own WebGL2 backend, the same spirit as `gpu/khronosSamples.mjs` /
+  `gpu/fixtures/` validating against Khronos assets — never checked against here. Bigger lift than the
+  others above; flagged rather than sized.
+
+**Checked and set aside, lower confidence either way:**
+- `dfdutils` / `KTX-Specification` — only relevant if `gpu/gltfKtx2.js` parses KTX2's data-format
+  descriptor itself; at 96 lines it almost certainly just routes to `vendor/three/jsm/loaders/
+  KTX2Loader.js`, which already handles this, so likely no gap.
+- `basis_universal` — already vendored, via three's own `vendor/three/jsm/libs/basis/
+  basis_transcoder.{js,wasm}`. Not a new find.
+- `ToneMapping` (a collection of tone-mapping operators) — no tone-mapping code found in this tree's render
+  path to compare it against, so this is genuinely unconfirmed rather than a real gap.
+- `glTF-InteractivityGraph-AuthoringTool` / `glTF-Test-Assets-Interactivity` — an emerging KHR_interactivity
+  node-graph spec for embedding behaviour in glTF files. Interesting, speculative, no established want.
+- `MaterialX` — a real, actively-used standard, but a large XML shading-graph system. A bigger idea than a
+  quick candidate; noted rather than sized.
+
+## The CesiumGS org sweep
+
+67 repositories as of this sweep. Same shape as the Khronos org: most is out of scope by construction —
+`cesium-native`/`cesium-unity`/`cesium-unreal`/`cesium-omniverse` and their samples are wrong platform, and
+a large fraction is dev infra, AWS/Terraform tooling, AI-assistant scaffolding, and workshop/sandcastle
+samples with no engine code to check. What's actually in-domain, checked against this tree:
+
+- **spz / spz-loader** — the strongest find. `.spz` is Cesium/Niantic's compressed Gaussian-splat format,
+  "about 10x smaller than the PLY equivalent with virtually no perceptible loss." Precise fit: `engine/
+  plyWriter.mjs`'s own header says this tree "WRITES the Gaussian-splat .ply and .splat formats this tree
+  has only ever READ" — real splat infrastructure already exists (`SplatRenderer`, `SplatLoader`,
+  `splatSort.mjs`, `gaussianSplat.js`, `splatParser.js`) built around exactly the content `.spz` compresses,
+  and grep confirmed no `.spz` support anywhere. `spz-loader` (TS/JS wrapping the reference C++ codec,
+  compiled to WASM via Emscripten) fits this tree's toolchain better than most things checked in this whole
+  sweep — SweK already vendors precompiled WASM artifacts (`box3d.wasm`, the terrain WASM stack), so this
+  isn't the usual C++/wrong-runtime mismatch. Unconfirmed: a LICENSE file exists on both `spz` (Niantic) and
+  `spz-loader` but the actual terms weren't readable from what was fetched — needs checking before anything
+  is decided, same posture as the meshwalk/light-probes situation earlier in this doc. Not built.
+- **meshoptimizer** (mesh simplification/LOD generation) — checked and ruled out: SweK already has this.
+  `engine/quadricDecimate.js` (+selfcheck) is its own quadric-error-metric mesh decimator, same algorithm
+  family. Not a gap.
+- **3d-tiles** (the streaming/LOD spec) — checked and ruled out as a technique gap: `render/
+  screenSpaceError.js` already drives LOD refinement by projected geometric error, the same core mechanism
+  3D Tiles' `geometricError` field expresses. The only open question is data-interop (consuming
+  externally-authored 3D Tiles content), not a missing capability.
+- **xatlas** (UV unwrapping / lightmap chart packing) — confirmed absent by grep, no established want. Would
+  matter if lightmap baking for procedural geometry (the procedural-buildings idea earlier in this
+  conversation) becomes a real goal.
+- **quantized-mesh** (the terrain-streaming quantization spec) — confirmed absent by grep, despite SweK
+  already ingesting real-world terrain (`world/realTerrainStamp.js`, `ai-bridge/terrainBuildBridge.js`). No
+  confirmed need to stream terrain over a network today.
+- **gltf-pipeline** / **obj2gltf** — the one pair in this whole sweep that actually matches SweK's own
+  toolchain exactly (Node.js, Apache-licensed). SweK's own GLB export already goes through three.js's
+  `GLTFExporter`, so these read as a validation reference rather than a gap.
+- **gdal** — the real-world geospatial library SweK's own terrain-ingestion work is conceptually adjacent
+  to, but C/C++ and enormous; not something to vendor, just worth knowing the domain exists.
+- **cesium-materials-pack** — old procedurally-shaded material shaders (brick/wood/noise); minor, could be
+  read for technique, no strong pull.
+- Set aside as wrong language/toolchain or an unneeded format: `tinygltf`, `collada-dom`, `COLLADA2GLTF`,
+  `libjpeg-turbo`, `LAStools`, `glutess`, `libcitygml`, `zstr`, `xerces-c`, `webglreport`.
+
+## An individual profile sweep: github.com/visualbruno
+
+Different flavour from the org sweeps: a specialist in ComfyUI wrapper nodes for 3D-generation AI models,
+plus several from-scratch mesh-processing research tools. Checked against source, not just descriptions:
+
+- **AutoUV** — directly answers the xatlas gap named in the CesiumGS sweep above. MIT, Python, genuinely
+  from-scratch (not a wrapper): KD-tree topology welding, bounded-curvature segmentation with exact
+  normal-cone constraints, LSCM-validated chart merging, LSCM/ARAP flattening, skyline packing. Its own
+  pitch — "better UV than xatlas for low-poly mesh" — fits SweK's actual asset profile (Kenney/Quaternius
+  kits, procedurally-generated voxel meshes), with numbers to back it (810 disconnected components welded to
+  3 in one example; ARAP drops area distortion 0.84 to 0.09). Wrong language for a direct port; a
+  well-specified MIT algorithm worth reading and hand-writing if UV unwrapping becomes a real want. Not
+  built.
+- **Faithful Contouring (FaithC)** — a real, very recent alternative to what `physics/mesh/dualContour.mjs`
+  already does. Implements a genuine Nov-2025 arXiv paper (Imperial College London et al.): operates
+  directly on a raw mesh rather than converting to a distance field, to preserve sharp edges and handle
+  open/non-manifold input without the surface-thickening and jagged-isosurface artifacts SDF methods
+  (marching cubes, dual contouring included) are prone to — directly relevant to the exact problem
+  `dualContour.mjs`'s own header discusses. **CC BY-NC 4.0 — non-commercial only**, same hard block as
+  `SurceBeats/Atlas` earlier in this sweep. The published technique, not the NC-licensed code, is what's
+  reachable here (the keyhunt/mmacklin posture). Not built.
+- **CelloCut** — Apache 2.0, a real arXiv-published algorithm ("Constructive Watertight Remeshing via
+  Tetrahedral Cell Cuts") relevant to `physics/mesh/csg.mjs` / `manifoldCensus.mjs`'s watertightness
+  concerns: embeds a defective mesh into a tetrahedral cell complex and solves a graph-cut interior/exterior
+  labelling, guaranteeing a watertight boundary by construction rather than by boolean-op patching. C++/CUDA
+  plus CGAL/Eigen/libigl — heavy, wrong-toolchain dependency stack, clean licence, a genuinely different
+  approach than ad-hoc CSG repair. Read-the-technique candidate, not built.
+- **CuMesh** — MIT, but honestly a wrapper/aggregation layer (wraps `cubvh` for BVH, **wraps xatlas itself**
+  for UV, adapts an edge-collapse algorithm from elsewhere) rather than a novel algorithm — lower value than
+  the underlying pieces directly. Its remeshing path uses Dual Contouring, an independent confirmation that
+  this tree's own choice of algorithm there is sound and production-used.
+- **AutoRetopo** — PolyForm Noncommercial, same hard block as FaithC. A real, generic four-stage retopology
+  pipeline (occupancy-field voxelisation, curvature-adaptive isotropic remeshing, tangential relaxation +
+  closest-point snap-back) — relevant only if cleaning up AI-generated/scanned meshes becomes a real need,
+  given `ai-bridge/kaggle_templates/` already generates meshes via TripoSR/InstantMesh/etc.
+- **PartUV-Windows** — a Windows fork of `EricWang12/PartUV`, a SIGGRAPH Asia 2025 publication doing
+  part-aware UV unwrapping (segment into semantic parts first, then unwrap per part). License unclear on
+  this fork; a second data point that UV unwrapping is an active 2025 research area if ever prioritised.
+- **The ComfyUI-* wrapper repos** (Trellis2, Hunyuan3D-2.1, Direct3D-S2, HY-Motion, HunyuanVideo-Foley,
+  InvSR, Meshflow, Meshlib, QRemeshify, flux2fun-controlnet) — `ai-bridge/kaggle_templates/` already tracks
+  several of the same underlying models (`trellis2.js`, `hunyuan3d.js`, `direct3d_s2.js`, `rig_anything.js`
+  already exist) via a different orchestration path (Kaggle notebooks, not ComfyUI nodes). Confirms the
+  model roster is current; the wrapper code itself isn't portable (Python, ComfyUI-specific).
+- `AspNet.Security.OAuth.Providers` (C#) — unrelated to this author's graphics work, an old/separate repo.
+  Ignored.
 
 ## Second pass: three more repos (v4505 onward)
 
@@ -341,3 +535,24 @@ face's irradiance by SH is 0.80 % from the direct cosine integral, which is orde
 truncation and is said; the packing round-trips exactly in Float32. The finding: flipping
 the sign of one basis function left every symmetric closed form green. A sign is invisible
 to a symmetric radiance, so the gate projects an x ramp and a y ramp on purpose.
+
+## The method, for next time
+
+Sixteen links in, the split that mattered every time was the one retroRaster already wrote
+down: does the technique have a right answer a gate can fail? Affine warp, vertex snap, and now
+2D-Water's parallax and foam threshold — yes. A vignette's noise pattern, a Shader Graph node's
+wire-routing convenience, a CRT's static texture — no, and no amount of source-reading changes
+that. The second split, just as decisive here, is what a repo actually *is* underneath its
+README: five of sixteen turned out to be Unity-Editor tooling with no shader in them at all,
+and three turned out to be languages/runtimes (Python, Rust+WASM, Rust+CUDA) this tree's
+browser toolchain can't run regardless of licence. Checking `world/reachedLicences.mjs` and
+`world/vendoredLicences.mjs` first would have saved nothing this round — only mmacklin/sandbox
+was ever there — but it's the first thing to check next time, before re-deriving from grep
+that nothing else has been looked at yet.
+
+Restated after the second pass and the org sweeps below it: the split held every time it was
+tried again. splatmesh, three-spark-light-probes, buildingGrammar and asciiShape all shipped
+because each had a right answer a gate could fail; kugiri, Faithful Contouring and AutoRetopo
+were read and not taken because a licence or a missing target stopped them, not because the
+technique was wrong. The registers (`world/reachedLicences.mjs`, `world/vendoredLicences.mjs`)
+are worth checking first now — they no longer come back empty.

@@ -204,6 +204,10 @@ export const HOT_UNREGISTERED = Object.freeze([
  * v4523 (Racing city 0): 85 -> 86. The arrival is world/kenneyKit.mjs, whose kitMesh() restates the same [1, 1, 1, 1] beside
  * the colours it bakes from Kenney's colormap (every colour it draws is the kit's own texel, read at load time, not a literal);
  * the kit draws through litSphere's lit pipeline in quat mode, nothing additively; the overlap stays 0.
+ * v4591 (Racing city 11, task 80): 86 -> 87. The arrival is world/buildingTopple.mjs, whose reservedMesh() restates the same
+ * [1, 1, 1, 1] (gpuDriven's default) on the empty mesh a falling block's fleet is reserved with; the block's own colours are
+ * the mesher's, unpacked per vertex, and it draws through the bodies' lit pipeline in quat mode, nothing additively; the
+ * overlap stays 0.
  * v4571: 86 -> 87. The arrival is fx/fsr/fsr.js (added at ff463a60), and it is a FALSE POSITIVE of the literal-colour
  * predicate, which this file's own comment already calls crude. What it matched is EASU's tap accumulator,
  * `const a = { r: 0, g: 0, b: 0, w: 0 }` -- four running sums, not a colour anybody chose; the `w` beside them is the
@@ -219,7 +223,10 @@ export const HOT_UNREGISTERED = Object.freeze([
 export const MEASURED_AT_V4424 = Object.freeze({
     namedRamps: 5,
     drawSiteFiles: 13,
-    literalColourFiles: 87,   // v4571: fx/fsr/fsr.js, a false positive of a crude predicate -- see the header
+    // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
+    // and the readings overlap on everything predating the split, so they are run over the merged tree rather
+    // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
+    literalColourFiles: 88,   // RE-DERIVED AT THE main MERGE: both lines re-took this at 87 for DIFFERENT arrivals -- fx/fsr/fsr.js here (a false positive of the crude predicate, EASU's tap accumulator) and world/buildingTopple.mjs on main. Two arrivals, one shared baseline of 86, so the merged reading is 88 and not 87
     overlapDrawAndLiteral: 0,
     hotUnregistered: 24,   // v4505: ascii-shape.html arrived (see HOT_UNREGISTERED)   // v4500: slug-fire.html arrived; v4501: slug-morph.html's melt mode; v4502: slug-ticker.html's napalm mode (see HOT_UNREGISTERED)
     // The three Keith named, and what the old detector saw of them.

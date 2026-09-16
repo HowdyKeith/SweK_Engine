@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/shipVerdict-selfcheck.mjs
 //
-// Run: node tools/ship/shipVerdict-selfcheck.mjs   (~2s -- MEASURED)
+// Run: node tools/ship/shipVerdict-selfcheck.mjs   (~0.83s -- MEASURED)
 //
 // v4405 -- *** THE ROUND BEFORE THIS ONE SHIPPED A CONFLICT MARKER ONTO main, PAST A VERIFY THAT SAID
 // "DO NOT SHIP". ***

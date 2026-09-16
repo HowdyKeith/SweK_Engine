@@ -197,7 +197,11 @@ const serverSrc = fs.readFileSync(path.join(ENG, "ai-bridge", "server.js"), "utf
     } else {
         const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "vpi-page-gate-"));
         const GATE_PORT = "19788";
-        const env = Object.assign({}, process.env, { PORT: GATE_PORT, VPI_SRC_DIR: tmp });
+        // v4611 -- SWEK_TEST_SERVER: this is a disposable throwaway instance, not a machine anyone should treat
+        // as real. Without it, sysadminBridge.start() runs its real update-apply boot scan against this box's
+        // real ~/.voxelbridge/sysadmin.json and can extract + launch a real build from inside a gate run --
+        // see sysadminBridge.js's own v4611 note for the incident that found this.
+        const env = Object.assign({}, process.env, { PORT: GATE_PORT, VPI_SRC_DIR: tmp, SWEK_TEST_SERVER: "1" });
         const { spawn } = require_("node:child_process");
         const srv = spawn(process.execPath, [path.join(ENG, "ai-bridge", "server.js")], { env, stdio: ["ignore", "pipe", "pipe"] });
         let port = null, buf = "";

@@ -6,7 +6,7 @@
    "name": "box3d",
    "arrived": "2026-08-19",
    "sha": "66db97c45b5286d98d1c018506effca552f05a23",
-   "bytes": 1226434,
+   "bytes": 1082363,
    "files": [
     {
      "path": "box3d.js",
@@ -14,7 +14,7 @@
     },
     {
      "path": "box3d.wasm",
-     "bytes": 973188
+     "bytes": 829117
     },
     {
      "path": "include/box3d/base.h",
@@ -75,6 +75,30 @@
     {
      "path": "PROVENANCE.txt",
      "bytes": 964
+    }
+   ]
+  },
+  {
+   "name": "draco-encoder",
+   "arrived": "2026-09-10",
+   "sha": "9c1d4e76e2de04a03dd8b50fba410a7d4bb2d237",
+   "bytes": 436554,
+   "files": [
+    {
+     "path": "draco_encoder_nodejs.js",
+     "bytes": 49007
+    },
+    {
+     "path": "draco_encoder.wasm",
+     "bytes": 370188
+    },
+    {
+     "path": "LICENSE",
+     "bytes": 13898
+    },
+    {
+     "path": "PROVENANCE.txt",
+     "bytes": 3461
     }
    ]
   },
@@ -1446,39 +1470,51 @@
    "name": "three",
    "arrived": "2026-08-19",
    "sha": "66db97c45b5286d98d1c018506effca552f05a23",
-   "bytes": 2200075,
+   "bytes": 3344827,
    "files": [
     {
      "path": "jsm/controls/OrbitControls.js",
-     "bytes": 29868
+     "bytes": 40504
+    },
+    {
+     "path": "jsm/curves/NURBSCurve.js",
+     "bytes": 3888
+    },
+    {
+     "path": "jsm/curves/NURBSUtils.js",
+     "bytes": 10802
     },
     {
      "path": "jsm/exporters/GLTFExporter.js",
-     "bytes": 77714
+     "bytes": 92973
     },
     {
      "path": "jsm/libs/basis/basis_transcoder.js",
-     "bytes": 62337
+     "bytes": 57529
     },
     {
      "path": "jsm/libs/basis/basis_transcoder.wasm",
-     "bytes": 499935
+     "bytes": 527333
     },
     {
      "path": "jsm/libs/basis/PROVENANCE.txt",
-     "bytes": 2250
+     "bytes": 2560
     },
     {
      "path": "jsm/libs/basis/README.md",
-     "bytes": 1448
+     "bytes": 1388
+    },
+    {
+     "path": "jsm/libs/fflate.module.js",
+     "bytes": 89384
     },
     {
      "path": "jsm/libs/ktx-parse.module.js",
-     "bytes": 18676
+     "bytes": 19932
     },
     {
      "path": "jsm/libs/meshopt_decoder.module.js",
-     "bytes": 24850
+     "bytes": 29256
     },
     {
      "path": "jsm/libs/meshoptGltf.js",
@@ -1489,24 +1525,32 @@
      "bytes": 39754
     },
     {
+     "path": "jsm/loaders/FBXLoader.js",
+     "bytes": 111266
+    },
+    {
      "path": "jsm/loaders/GLTFLoader.js",
-     "bytes": 108522
+     "bytes": 114959
     },
     {
      "path": "jsm/loaders/KTX2Loader.js",
-     "bytes": 22589
+     "bytes": 36567
+    },
+    {
+     "path": "jsm/math/ColorSpaces.js",
+     "bytes": 4290
     },
     {
      "path": "jsm/utils/BufferGeometryUtils.js",
-     "bytes": 31906
+     "bytes": 37621
     },
     {
-     "path": "jsm/utils/TextureUtils.js",
-     "bytes": 2367
+     "path": "jsm/utils/SkeletonUtils.js",
+     "bytes": 11535
     },
     {
      "path": "jsm/utils/WorkerPool.js",
-     "bytes": 1712
+     "bytes": 3110
     },
     {
      "path": "LICENSE",
@@ -1514,11 +1558,15 @@
     },
     {
      "path": "PROVENANCE.txt",
-     "bytes": 902
+     "bytes": 14694
+    },
+    {
+     "path": "three.core.js",
+     "bytes": 1443056
     },
     {
      "path": "three.module.js",
-     "bytes": 1272972
+     "bytes": 650153
     }
    ]
   },
@@ -1526,7 +1574,7 @@
    "name": "three-webgpu",
    "arrived": "2026-09-02",
    "sha": "614dbcf4e48a438ddae6123aa08eb2df45b610cd",
-   "bytes": 3527206,
+   "bytes": 3654294,
    "files": [
     {
      "path": "LICENSE",
@@ -1534,23 +1582,23 @@
     },
     {
      "path": "PROVENANCE.txt",
-     "bytes": 1188
+     "bytes": 1302
     },
     {
      "path": "README.md",
-     "bytes": 2356
+     "bytes": 2195
     },
     {
      "path": "three.core.js",
-     "bytes": 1427497
+     "bytes": 1443056
     },
     {
      "path": "three.tsl.js",
-     "bytes": 33619
+     "bytes": 34218
     },
     {
      "path": "three.webgpu.js",
-     "bytes": 2061465
+     "bytes": 2172442
     }
    ]
   },

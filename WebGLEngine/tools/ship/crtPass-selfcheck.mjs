@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/crtPass-selfcheck.mjs -- v4119
 //
-// Run: node tools/ship/crtPass-selfcheck.mjs   (~4s; the shader half needs real Chromium)
+// Run: node tools/ship/crtPass-selfcheck.mjs   (~1.8s; the shader half needs real Chromium)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // GATES render/crtModel.js + render/crtPass.js -- the CRT filter Keith parked in August.

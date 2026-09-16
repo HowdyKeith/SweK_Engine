@@ -162,7 +162,10 @@ console.log("sunshineHost-selfcheck -- the host half, and the one surface the cl
         /sunshineBridge\.owns\(req\.url\)/.test(srv) &&
         lines.findIndex((l) => /sunshineBridge\.owns/.test(l)) > declAt);
     ok("...and it is required at the top", /require\("\.\/sunshineBridge\.js"\)/.test(srv));
-    ok("every route the bridge lists is reachable through its own handler", b.ROUTES.length === 7 && b.owns("/sunshine/status") && !b.owns("/sunshineX"));
+    // v4214 added GET /sunshine/apps (the real API, not a link) after this count was written -- 7 -> 8. handle()'s
+    // own if-chain covers all eight (checked by name, not just by count, in section 1's picks and here by size),
+    // so this is the manifest catching up to a route that was already live, not a route quietly going unhandled.
+    ok("every route the bridge lists is reachable through its own handler", b.ROUTES.length === 8 && b.owns("/sunshine/status") && !b.owns("/sunshineX"));
 }
 
 // ---- 6. THE PAGE, AND WHAT IT ADMITS -------------------------------------------------------------------------

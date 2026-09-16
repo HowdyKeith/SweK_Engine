@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/provenanceRecord-selfcheck.mjs
 //
-// Run: node tools/ship/provenanceRecord-selfcheck.mjs   (~2s -- MEASURED)
+// Run: node tools/ship/provenanceRecord-selfcheck.mjs   (~0.08s -- MEASURED)
 //
 // v4416 -- *** PROVENANCE IS ATTESTED, NOT DERIVED -- AND FIVE NARROW PATTERNS IN ONE FUNCTION HID HALF OF
 // WHAT THIS TREE HAD ALREADY WRITTEN DOWN. ***

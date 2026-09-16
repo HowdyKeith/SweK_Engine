@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/patternWidth-selfcheck.mjs
 //
-// Run: node tools/ship/patternWidth-selfcheck.mjs   (~4s -- MEASURED)
+// Run: node tools/ship/patternWidth-selfcheck.mjs   (~0.39s -- MEASURED)
 //
 // v4418 -- *** SIX INSTANCES OF ONE DEFECT SPECIES AND NOTHING HAD EVER LOOKED FOR IT. ***
 //

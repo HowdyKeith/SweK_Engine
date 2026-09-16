@@ -11,6 +11,7 @@ import * as SS from "../../render/skyStars.mjs";
 import { exactHash3 } from "../../render/exactHash.mjs";
 import { gateReport } from "./gateReport.mjs";
 
+const REPORT = gateReport("tools/ship/skyStars-selfcheck.mjs");
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -21,7 +22,6 @@ const f = Math.fround;
 // five arrivals it had caught. The numbers go out AS NUMBERS -- storing "0.131%" as text would make the
 // reader parse a rendering of a number back into a number, which is the indirection that module exists to
 // refuse. Nothing here changes a verdict; the terminal is still the primary surface.
-const REPORT = gateReport("tools/ship/skyStars-selfcheck.mjs");
 const skySrc = fs.readFileSync(path.join(ENG, "render/skyRenderer.js"), "utf8");
 /** The engine's own settings, read off main.js rather than typed here. */
 const DENSITIES = [...fs.readFileSync(path.join(ENG, "main.js"), "utf8")
@@ -37,10 +37,10 @@ console.log("1. brightness, which the density knob was silently multiplying");
     const rows = DENSITIES.map((d) => ({ d, oldMax: oldBright(1, d), nowMax: (1 - SS.cutFor(d)) / (1 - SS.cutFor(d)) }));
     for (const r of rows)
         console.log(`     density ${r.d.toFixed(1)}   brightest star was ${r.oldMax.toFixed(2)}   is now ${r.nowMax.toFixed(2)}`);
-    REPORT.table("the density knob was multiplying every star's brightness",
-                 ["density", "brightest was", "brightest now"],
-                 rows.map((r) => [r.d, r.oldMax, r.nowMax]),
-                 "densities read out of main.js, not typed here");
+    REPORT.table("brightest star before and after the density-knob fix, at every density main.js uses",
+        ["density", "brightest star (old)", "brightest star (now)"], rows.map((r) => [r.d, r.oldMax, r.nowMax]),
+        "the old divisor was a fixed DENSITY_SPAN; the fixed one scales by density * DENSITY_SPAN, so only " +
+        "density 1 was ever right before.");
     ok("!! *** the brightest star is 1.0 at EVERY density the engine uses, not `density` ***",
        rows.every((r) => Math.abs(r.nowMax - 1) < 1e-12) && rows.some((r) => r.oldMax < 0.99),
        `densities ${DENSITIES.join(", ")}, read out of main.js. The old divisor was a fixed ` +
@@ -92,10 +92,11 @@ console.log("\n2. the deficit grows with the depth of the cut, and this site cut
     for (const r of rows)
         console.log(`     cut ${r.cut.toFixed(3)}  asked ${r.want.toFixed(3)}%   sin-hash ${r.old.toFixed(4)}% ` +
                     `(${(r.ratio * 100).toFixed(0)}% of asked)   exact ${r.now.toFixed(4)}%`);
-    REPORT.table("the sin-hash's deficit deepens as the cut deepens",
-                 ["cut", "asked %", "sin-hash %", "share of asked", "exact %", "1 sd %", "cells"],
-                 rows.map((r) => [r.cut, r.want, r.old, r.ratio, r.now, r.sd, r.n]),
-                 "one reading per cut over a 70x70x70 block; `share of asked` is sin-hash / asked");
+    REPORT.table("the sin-hash's deficit against exact_hash3, by depth of cut",
+        ["cut", "asked %", "sin-hash %", "exact_hash3 %"], rows.map((r) => [r.cut, r.want, r.old, r.now]),
+        "asked is 100 * (1 - cut); the deficit deepens as the cut deepens because sin(x) * 43758.5453 loses " +
+        "low bits in float32 before fract() runs.");
+    REPORT.write();
     ok("!! *** the sin-hash's deficit DEEPENS as the cut deepens -- monotone across the range ***",
        rows[0].ratio > rows[rows.length - 1].ratio + 0.4 &&
        rows.every((r, i) => i === 0 || r.ratio < rows[0].ratio),

@@ -41,7 +41,7 @@
 //                   B  the gate's own Jacobi twin written in place (made sequential)  -> exit=1, red: "the Jacobi pass differs"
 //                   C  the gate's copy of the droplet loop with EROSION_RATE 0.31     -> exit=1, red: "the copied loop IS the shipped pass"
 //
-// Run: node tools/ship/erosionMeasure-selfcheck.mjs      (~1 s; ~4 s where the wasm crate is built)
+// Run: node tools/ship/erosionMeasure-selfcheck.mjs      (~0.36 s; ~4 s where the wasm crate is built)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";

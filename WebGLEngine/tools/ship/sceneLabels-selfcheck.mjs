@@ -17,7 +17,7 @@
 //   B  projectToScreen's `visible` ignored                        -> exit=1, 4 red: "behind" and "offscreen" labelled, five of five, and the edge limit
 //   C  orrery-gpu.html's label frame removed                      -> exit=1, 1 red: the begin() frame at rowsFor's placement
 //
-// Run: node tools/ship/sceneLabels-selfcheck.mjs      (~0.2 s, no browser)
+// Run: node tools/ship/sceneLabels-selfcheck.mjs      (~0.05 s, no browser)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";

@@ -34,9 +34,9 @@ import fs from "node:fs";
 import * as R from "./raceKnob.mjs";
 import { gateReport } from "../tools/ship/gateReport.mjs";
 
+const REPORT = gateReport("physics/raceKnob-selfcheck.mjs");
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
-const REPORT = gateReport("physics/raceKnob-selfcheck.mjs");
 const M = R.MEASURED_V4527;
 const gains = M.rows.map((r) => r.speedGain);
 

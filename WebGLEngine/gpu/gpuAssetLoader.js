@@ -347,6 +347,7 @@ export class GPUAssetLoader {
 
         const tryGlb = !fmt || fmt.glb;
         const tryObj = !fmt || fmt.obj;
+        const tryFbx = !fmt || fmt.fbx;
         const tryFolder = !fmt || fmt.folder || fmt.json;   // .json key was the older folder marker
 
         // Round 17 — try direct .glb file at GPU_Assets/<name>.glb
@@ -376,6 +377,21 @@ export class GPUAssetLoader {
                 }
             } catch {
                 // fall through
+            }
+        }
+
+        // v44 (FBX task) — try .fbx after .glb/.obj miss, before falling to the
+        // legacy mesh.json folder format. Mirrors the .glb/.obj HEAD-probe
+        // branches above exactly.
+        if (tryFbx) {
+            const fbxUrl = `${this.basePath}${name}.fbx`;
+            try {
+                const probe = await fetch(fbxUrl, { method: "HEAD" });
+                if (probe.ok) {
+                    return await this._loadFBX(name, fbxUrl);
+                }
+            } catch {
+                // network error, fall through
             }
         }
 
@@ -1061,6 +1077,51 @@ export class GPUAssetLoader {
         return `${stripped} (${kindOrStyle || archetype}): ${body}`;
     }
 
+    // v44 (FBX task) — load an .fbx file via three.js's own vendored FBXLoader
+    // (vendor/three/jsm/loaders/FBXLoader.js), NOT a native FBX2glTF conversion
+    // step (Keith's call — see task #44). The loader is imported dynamically,
+    // NOT at module top level, so pages that never touch an FBX (the vast
+    // majority of this tree's pages) never pay for three.js or the 101 KB
+    // loader. FBXLoader.js itself does `from 'three'` (a bare specifier),
+    // which only resolves in a document that declares
+    // <script type="importmap">{"imports":{"three": "/vendor/three/three.module.js"}}</script>
+    // BEFORE its module graph loads — index.html carries that now (see its
+    // header comment near the importmap tag). A page that dynamic-imports
+    // this path without the importmap gets Chromium's real, unhelped error —
+    // "Failed to resolve module specifier 'three'" — which we catch below and
+    // rethrow naming the actual fix, matching gpu/glbLoad.js's own header:
+    // "A HELPFUL ERROR IS NOT A ROUTE," so the rethrown message names the fix
+    // rather than just describing the symptom.
+    async _loadFBX(name, url) {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status} ${url}`);
+        const buf = await res.arrayBuffer();
+
+        let FBXLoader, parseFbx, normalizeFbxGroup;
+        try {
+            ({ FBXLoader } = await import("/vendor/three/jsm/loaders/FBXLoader.js"));
+            ({ parseFbx, normalizeFbxGroup } = await import("./fbxLoad.js"));
+        } catch (e) {
+            const msg = String(e && e.message || e);
+            if (/Failed to resolve module specifier ['"]three['"]/.test(msg) || /resolve.*three/i.test(msg)) {
+                throw new Error(
+                    `asset "${name}": FBX loading needs a "three" import map before this page's module ` +
+                    `scripts load — add <script type="importmap">{"imports":{"three":"/vendor/three/three.module.js"}}` +
+                    `</script> ahead of the <script type="module"> tag that pulls in gpuAssetLoader.js ` +
+                    `(see index.html for the exact syntax to copy). Underlying error: ${msg}`
+                );
+            }
+            throw e;
+        }
+
+        const group = await parseFbx(buf, FBXLoader, { path: url.replace(/[^/]*$/, "") });
+        const parsed = normalizeFbxGroup(group);   // task #59 -- animations mapped now
+        console.log(`[GPUAssetLoader] FBX "${name}" parsed: ${parsed.positions.length / 3} verts, ${parsed.indices.length} indices` +
+            (parsed.skin ? `, rigged (${parsed.skin.joints.length} joints)` : "") +
+            (parsed.animations ? `, ${parsed.animations.length} clip(s)` : ""));
+        return this._uploadParsedMesh(name, parsed, {});
+    }
+
     async _loadGLB(name, url, opts) {
         const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP ${res.status} ${url}`);
@@ -1091,7 +1152,18 @@ export class GPUAssetLoader {
     //       (v762).
     async _loadGLBFromBytes(name, buf, opts) {
         const parsed = await GLBParser.parse(buf, { baseUrl: opts?.baseUrl });
+        return this._uploadParsedMesh(name, parsed, opts);
+    }
 
+    // v44 (FBX task) — extracted from _loadGLBFromBytes so any already-
+    // parsed mesh in GLBParser.parse()'s exact output shape (see the
+    // field list documented at the top of gpu/GLBParser.js) can go
+    // through the same GPU-upload pipeline, regardless of which parser
+    // produced it. GLBParser.parse() -> _uploadParsedMesh() is the GLB
+    // path; gpu/fbxLoad.js's normalizeFbxGroup() -> _uploadParsedMesh()
+    // is the new FBX path. Nothing below this point knows or cares
+    // which source format `parsed` came from.
+    _uploadParsedMesh(name, parsed, opts) {
         // Round 19 — log rigged GLB detection. If skin + animations
         // are present, the mesh is rigged and stage 2 of the pipeline
         // (skinning shader) will animate it. For now, the data is

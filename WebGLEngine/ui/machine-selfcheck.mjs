@@ -15,7 +15,7 @@
 //   a DEAD state is one the machine can enter and never leave;
 //   an UNDECLARED transition target is the worst of the three, because it is the state that renders as
 //   SOMETHING ELSE, and it is caught AT DEFINITION rather than when a user finds it.
-import { defineMachine, reachable, audit, RIG_JOB } from "./machine.mjs";
+import { defineMachine, reachable, audit, applyEvent, RIG_JOB } from "./machine.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -77,6 +77,43 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
        "silently staying put would hide an event fired in the wrong state");
     ok("a handled event moves", RIG_JOB.next("idle", "start") === "running");
     ok("an unknown state throws rather than guessing", (() => { try { RIG_JOB.next("nope", "start"); return false; } catch { return true; } })());
+}
+
+// ---- 6. v4601 -- applyEvent(), for a caller that DECIDES the event instead of being told it -----------------
+//
+// Every state machine above (RIG_JOB, this file's own sabotage fixtures) is fired by something that already
+// knows which event just happened -- a click, a bridge response. tools/ship/nextRounds.mjs's
+// "npc-decision-framework" entry names 89 files, tree-wide, that DON'T have that luxury: a per-tick
+// creature/bot/boss controller has to look at world state itself and decide. applyEvent is the one piece that
+// IS generic once that decision is made -- fire the transition, and run the target's entry side effect
+// exactly once, never on a no-op. simulation/BossPhaseManager.js (tools/ship/bossPhaseManager-selfcheck.mjs)
+// is the first real caller; this section is the direct unit coverage for the function itself.
+{
+    const M = defineMachine({ initial: "a", states: {
+        a: { on: { go: "b" } }, b: { on: { back: "a", loop: "b" }, final: true },
+    } });
+
+    ok("!! a real transition returns the new state and fires its onEnter exactly once",
+        (() => { let n = 0; const r = applyEvent(M, "a", "go", { b: () => n++ }); return r === "b" && n === 1; })());
+
+    ok("!! args are forwarded to the entry handler, not swallowed",
+        (() => { let seen = null; applyEvent(M, "a", "go", { b: (x, y) => { seen = [x, y]; } }, 1, 2); return seen && seen[0] === 1 && seen[1] === 2; })());
+
+    ok("an event this state does not handle is a no-op: state unchanged, nothing fires",
+        (() => { let fired = false; const r = applyEvent(M, "a", "back", { a: () => { fired = true; } }); return r === "a" && !fired; })());
+
+    ok("!! null (\"nothing happened this tick\") is a no-op too, not a thrown error",
+        (() => { let fired = false; const r = applyEvent(M, "a", null, { a: () => { fired = true; } }); return r === "a" && !fired; })());
+
+    ok("!! a same-state transition (a declared loop, e.g. b--loop-->b) does NOT re-fire onEnter",
+        (() => { let n = 0; const r = applyEvent(M, "b", "loop", { b: () => n++ }); return r === "b" && n === 0; })(),
+        "this is the exact bug a hand-rolled 'if (this._phase !== x) { this._phase = x; sideEffects() }' guard exists to avoid -- reproduced once here instead of once per caller");
+
+    ok("onEnter is optional -- omitting it (or the target having no handler) still moves the state",
+        applyEvent(M, "a", "go", null) === "b" && applyEvent(M, "a", "go", {}) === "b");
+
+    ok("an unknown state to start FROM throws, same as next() alone does",
+        (() => { try { applyEvent(M, "nope", "go", {}); return false; } catch { return true; } })());
 }
 
 console.log(fails ? "\nmachine-selfcheck: " + fails + " FAILED" : "\nmachine-selfcheck: all checks pass");

@@ -150,9 +150,16 @@ console.log("\n3. *** RE-MEASURED ONE AT A TIME, AND EVERY COMPARABLE VERDICT AG
         .map((e) => (typeof e === "string" ? e : e.gate)));
     const filedSet = new Set(RED_AT_V4424.map((e) => e.gate));
     const unaccounted = r.gates.filter((g) => !filedSet.has(g) && !fixedGates.has(g));
+    // *** THE THIRD OF THE THREE IS NOW REPAIRED TOO, WHICH EMPTIED RED_AT_V4424 AND BROKE THE INVARIANT'S OWN
+    // BOUNDARY. *** `noLine.length < RED_AT_V4424.length` asserts "not EVERY filed entry lacks a line" -- a
+    // claim that needs at least one filed entry to mean anything. doorKinds and graveyard joined orphanDisposition
+    // in FIXED_SINCE_V4408 (all three of v4424's reds are repaired now), so RED_AT_V4424 is Object.freeze([]) and
+    // both sides of `<` read 0 -- 0 < 0 is false, so a strict `<` reported an empty register as failing an
+    // invariant about entries it does not have. Vacuously true, the same shape as the census-removed check two
+    // lines above ("vacuously true once the exemption is removed"): nothing filed means nothing to violate it.
     ok("  every one of them is ACCOUNTED FOR -- filed with its reason, or recorded as repaired",
         unaccounted.length === 0 && whyMissing.length === 0 && shortLine.length === 0 &&
-        noLine.length < RED_AT_V4424.length,
+        (RED_AT_V4424.length === 0 || noLine.length < RED_AT_V4424.length),
         unaccounted.length
           ? "ACCOUNTED NOWHERE: " + unaccounted.join(", ")
           : `${r.filed.length} of ${r.gates.length} still in redCensus.RED_AT_V4424, each with why it fails, and ` +

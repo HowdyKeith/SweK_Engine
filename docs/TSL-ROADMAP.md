@@ -1647,10 +1647,277 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         telemetry's own times now; and the routed row dropped the request's payload, so the first routed episode ran
         with no policy at all. NOT BUILT, said plainly: a peer that executes a routed request (the brains post solves;
         none accepts an episode); the ledger surviving a bridge restart; the activity ring learning a fourth kind
-        (brainTrail's census names three, and this round leaves it so). FOUND AND LEFT, said plainly: tools/ship/brainTrail-selfcheck.mjs
-        is red on this branch BEFORE this round -- its section 4 holds that physics/instruments.mjs has zero brain entries, and
-        the brain-kernels instrument (registered by an earlier sidebar round) is one; the gate runs in 3.4 s, over the quick
-        sweep's budget, so no sweep has named it. Its premise is stale, not its subject; re-founding that check is its own round.
+        (brainTrail's census names three, and this round leaves it so). FOUND, AND RESOLVED BY THE MERGE: tools/ship/brainTrail-selfcheck.mjs was
+        red on this branch before this round -- its section 4 held that physics/instruments.mjs has zero brain entries, and
+        brain-kernels (an earlier sidebar round) is one; over the quick sweep's budget, no sweep named it. main's v4565 had
+        already re-founded that check at the property the links depend on (no brain entry carries a PAGE), and the merge at
+        v4584 brought it: the gate is green on the merged tree, measured at v4586, and needed no round of its own.
+     Then (v4585) THE PHYSICS LAB'S FRONT DOOR. lab-home.html is a plain landing page anyone can open, in three bands:
+        THE DOOR -- one Initiate button and one sentence under it saying what pressing it runs right now (the first
+        registered scene, its proposer and knob, and that it PROPOSES and never applies); THE LIVE STRIP -- a 2D view in
+        three columns of what the engine is doing, the scene, the proposer and what it proposed, the adjudicator's
+        verdicts landing newest first, the outcome named (the accepted value and its rank, or that nothing survived), with
+        brain-3d.html one click away; THE PRESETS -- physics/labPresets.js's curated presets as buttons, each with a plain
+        line naming what the Physics AI pulls from: the instrument by id with its gate, the key's first sentence, and the
+        device or peer that runs it. physics/labHome.mjs DERIVES every band from the tree's own records (labPresets,
+        labScenes.joinRegistered, proposers.listProposers, instruments.mjs, the v4584 routing ledger) and the page holds no
+        facts; Initiate runs the same route physics-lab.html's "Initiate AI workers" uses (/roundhouse/lab-scene-run) and
+        nothing on the page can apply a knob. SAID PLAINLY: the proposer runs in the bridge's own node process
+        (fingerprintBridge imports proposers.mjs and calls runProposer in-process), so "the device that runs it" is this
+        hub for every scene; the race is the one scene whose work is routed elsewhere, and its line names the ledger's
+        peers only when the ledger has rows. MEASURED (tools/ship/labHome-selfcheck.mjs, 1.6 s, headless plus one page
+        load in the harness browser): 25 curated presets over 13 triaged scenes, 5 registered (pile, centrifuge,
+        gyroscope, vibrations, race), 26 buttons of which 5 are enabled and one (the race) comes from the registry
+        because no preset names it; every registered scene's line carries its instrument's gate, proposer, knob and key;
+        the race's line names gate-fast (3 training, 2 race) from a ledger and not the field-only peer, and no peer at
+        all without a ledger; gyro-spin's real run fills the strip with 5 verdicts newest first and omega = 80 at rank 5
+        of 6; a route refusal is rendered as one; the page loads with no bridge, paints the 25 presets disabled and says
+        the bridge is unreachable rather than inventing a registry. FOUND: 12 of the 25 curated presets (pendulum-wave
+        through hologram) name scenes labScenes' triage never assessed, so their buttons are disabled and their line
+        says "not assessed"; and physics/labPresets.js's header names a physicsLab-selfcheck.mjs that does not exist --
+        no gate had held the presets to anything, and this one is the first. NOT BUILT, said plainly: the triage of
+        those 12 scenes (a judgement per scene, each its own round); a live strip that polls while a run is in flight
+        (the route answers once, when the run is done); the door on a page without the server (it says so instead).
+     Then (v4586) THE TWELVE SCENES THE TRIAGE NEVER SAW. labScenes-selfcheck's page parser matched two-space, unquoted
+        scene keys, and every scene added after v3587 is four-space and quoted, so "every scene on the page has a triage
+        row" held over 13 of 25 scenes -- the check that exists to notice an untriaged scene could not see the twelve
+        that were. The parser is widened (13 -> 25 pinned) and the twelve rows written, each MEASURED where a measurement
+        exists: FOUR REGISTERED, with adjudicators that refuse a well-formed value on their own subject and preferences
+        the adjudicator overrules (knobRegistry's bar: every greedy pick refused). black-hole and neutron-star
+        (physics/apsidalKnob.mjs): the apsidal advance per radial period, the time integration's apoapsis-to-apoapsis
+        angle against the radial quadrature of the same Paczynski-Wiita potential from the launch's (E, L), modulo a
+        turn, agreeing to parts per million with a tolerance derived from the apoapsis detector's once-per-step sampling
+        (a dt sweep at r0 = 10 reads a floor of 1e-6, not a slope); refused: r0 = 4 UNBOUND at 1.05 x circular speed, and
+        a neutron-star start inside the surface. impact (physics/impactKnob.mjs): the capture boundary FROM THE START
+        POINT, sqrt(2.9) = 1.70294, bisected at 1.70301 by the integration, with the (E, L) pericentre grading a miss and
+        energy conservation at the radius reached grading a hit (residuals 1e-4, flat in dt); refused: an aim inside the
+        boundary's dt-resolution as undecidable. hologram (physics/hologramKnob.mjs): the separation read back from the
+        scene's own screen scan, under a bound derived from the 0.502 pitch; refused: sep < 10, where fewer than three
+        bright fringes fit the screen. EIGHT REFUSED, two on a measurement: plasma's mirror-point law is 5-11 % off at a
+        gyroradius one fifth of the bottle and IDENTICAL across four dt (7.26e-2), so the residual is the adiabatic
+        approximation and a tolerance wide enough to pass is a control that cannot fail; pendulum-wave re-syncs to 1e-13
+        at t = cycle for every k, exact by construction and deaf to the knob. Six on structure: figure-eight (a trail
+        length), solar-system (a planet count), white-dwarf (the scene evaluates the relation it would be graded on),
+        star-catalog (a view blend), distributed-render (equal at every peer count by determinism), render-cluster (the
+        knob is the setpoint the coordinator recovers). *** THREE OF THE PAGE'S OWN STATUS LINES ARE WRONG, MEASURED: ***
+        the black hole's and neutron star's "below the ISCO" describe a circular orbit's stability, not this launch, which
+        never plunges (rMin = r0 down to 5) and escapes below r0 ~ 4.6; the impact's capture radius prints 1.73 because it
+        hands the launch speed at r0 = 20 to the formula as the speed at infinity, and b = 1.71 MISSES where 1.73 says
+        capture; the hologram's slider opens at 8, inside the unreadable region, and the plasma's "IN THE LOSS CONE --
+        escaping" names a cone a bottle whose field grows without bound does not have (every run reflected). Said here and
+        in the rows; the page's prose is not rewritten this round. The near-circular precession formula was tried first
+        and is 90 degrees off at r0 = 6 (130 against 220): the launch is eccentric, and the exact quadrature is the key.
+        Sabotages on physics/labKnobs-selfcheck.mjs red at A / B / C / D / E, and TWO CRASHED THE FIRST DRAFT (a detail
+        string on a residual a refused row does not carry; a run on a proposer the sabotage removed) -- both report now.
+        The door: 25 triaged, 9 registered, 26 buttons of which 9 are enabled. brainTrail (task 76) needed no round: main's
+        v4565 had already re-founded its check and the v4584 merge carried it; measured green and recorded above.
+     Then (v4587) THE STATUS LINES REWRITTEN. The three v4586 findings about physics-lab.html's own prose are fixed on the
+        page: the black hole's status computes the launch's energy and says "UNBOUND at this start radius -- escaping, not
+        plunging" below r0 ~ 4.6 and "bound -- precessing, apoapsis N" above it, with the ISCO named as a circular orbit's
+        limit and the launch as 1.05 x circular; the neutron star's says bound and precessing with the surface (5.32) named
+        below its slider; the impact's capture radius and impact speed are computed FROM THE START POINT (v_inf^2 = v0^2 -
+        2GM/r0), so the line prints 1.703 and 1.703 where it printed 1.73 and 1.73; the plasma's line shows the mirror
+        point as the adiabatic estimate it is (5-11 % off at this gyroradius) and says "mirroring beyond the +-L marks --
+        the field keeps growing, there is no loss cone" where it said "IN THE LOSS CONE -- escaping"; and the hologram's
+        slider minimum moved from 8 to 10, the smallest separation whose fringes the screen can read. Verified in the
+        harness browser: the page's own status element reads each line as written, the hologram's input min reads 10, and
+        the module parses (a first draft left one paren too many on the neutron-star line and the page's script did not
+        load -- caught by the smoke, not by a gate, because no gate reads these lines). Every "the page prints" and "the
+        slider starts at 8" in the v4586 rows, headers and instrument entries is now history and says so. THE ASSETS
+        QUESTION, answered from the pages: race-track.html, race-car.html and race-brain.html draw Kenney's road tiles and
+        truck through world/kenneyKit.mjs's kitScene beside CityGen's procedural voxel blocks; race-replay.html,
+        race-terrain.html and race-crash.html load no kit at all -- baked voxels, the ribbon road over the git terrain with
+        a box car, CityGen's city with a box car. Kenney's city buildings were vendored as REFERENCE only and are drawn
+        nowhere. THE ROUND ALSO OWED THREE GATES AND FOUND TWO THINGS IT HAD SAID WRONG. reportDoors-selfcheck asks a
+        gate named <basename>-selfcheck.mjs of every module that provides reportLines(), and the three v4586 knob modules
+        had none: physics/apsidalKnob-selfcheck.mjs, impactKnob-selfcheck.mjs and hologramKnob-selfcheck.mjs now sit
+        beside them (each holds the module's two routes to each other, its refusal on its own subject, and that its
+        tolerance is derived, not chosen; twelve sabotages, red by name, none crashing, logged in the headers; since233).
+        Correction one: the first draft of apsidalKnob's gate called the dt-sweep residual at r0 = 10 "a floor, not a
+        slope" and pinned it under 2e-5 -- it reads 5.4e-5, 1.7e-5, 2.6e-6 at dt 0.04, 0.02, 0.01, a slope and the
+        detector's own, so the row holds each reading under the tolerance derived for its step (8.3e-4, 4.1e-4, 2.1e-4)
+        and falling with it. Correction two: reportDoors' "no gate BESIDE them" row had been red since v4584 on
+        brain/fleetRouting.mjs and physics/labHome.mjs, both gated from tools/ship/, and the v4584, v4585 and v4586
+        notes above do not say so -- each round read the red it expected and not that one. They are dated into
+        NO_GATE_V4587 with the reason, the ratchet re-sabotaged (a name dropped, the list spread twice: red both ways),
+        and the census rows re-taken: assertionShape 1628 -> 1631 gates, runtimeGap 4087 -> 4090 files, frozenRecords
+        105 -> 106 records excluding its own module, recordReach 107 -> 108. The quick sweep (401 under budget in 374 s
+        on a slow box) found four new reds and every one was this round's own doing: physicsReach and registryOrphans
+        because a physics module with a sibling gate and a reportLines() is a graded module that owes the instruments
+        registry a row -- pileKnob, gyroKnob, centrifugeKnob, vibrationKnob and raceKnob each have one -- so
+        apsidal-knob, impact-knob and hologram-knob are rows now, doored by their sibling gates; recordReach on the
+        record total; recordDrift on the same missing rows. The sweep's own timings were NOT carried: the box ran the
+        sweep three times slower than usual and evicted nine gates, so the committed readings stand and only the three
+        new gates' readings (917, 243 and 115 ms) were added, with the run's capture stamp -- the same repair as v4586,
+        and the one sweepCoverage's ledger is green on.
+     Then (v4588) THE TURRET COPILOT (task 77). Keith asked whether the cars could have a turret copilot; the tree had turrets
+        that draw (render/turretRenderer.js, yaw-only, bound to OgreScenario), turrets that weigh (brain/rl/driveEnv.js's
+        ROOF_TURRET, a 400 kg mass that aims at nothing) and a ballistics module with no owner, and none that mount.
+        physics/turret.mjs mounts one on the race car's roof with its own contract { yaw, pitch, fire } (rates in [-1, 1] and a
+        trigger the reload ignores), vacuum shells flown by ballistics.stepShell under the world's gravity, a swept hit test in
+        the target's body frame (a point test at the end of a tick steps over a chassis at a grazing angle), and an aim solution
+        that is ONE quartic for a moving gun and a moving target -- |w(t)| = v t with w the drop-corrected relative displacement --
+        rather than leadMoving bolted to launchAngles, whose time of flight is wrong by the cosine of the elevation. Found by the
+        gate: two passes of that solve left 0.03 deg against launchAngles' flat root at 20 m because the muzzle moves with the
+        solution; iterated to the muzzle's fixed point the two routes agree to 1e-9. brain/gunnerPolicy.mjs is the copilot: a
+        9 -> 8 -> 3 relu MLP in drivePolicy's layer shape on the turret's aim errors (bearing, pitch, range, closing, lateral,
+        reloading, reachable, aligned), the hand gunner as weights (a proportional turn on two errors, a trigger on the aligned
+        bit), a DUEL as the episode (two hand-driven cars, the candidate in the rear turret, hits minus a waste penalty), the ES on
+        it, and the race with turrets in the same lockstep as the drivers: both contracts per car per tick in one log, the
+        fingerprint folding box3d's state hash AND the turret and shell state, a replay from the log alone reaching it. Measured:
+        the hand gunner lands 15 of 15 and 16 of 17 in 20 s on seeds 1 and 2, the zero gunner never fires, the ES from zero reaches
+        a positive score in 10 candidates and is deterministic per seed, a three-car race with turrets is deterministic and its
+        replay carries the same hits, the browser's race is node's fingerprint on both backends. The knob is the shell speed,
+        gunner-shell on the turret-gunner instrument: the search wants it SLOW (1 / speed, the arc a person can watch) and the
+        key -- the hand gunner's hits in a 20 s duel on the held-out track -- refuses 8 m/s with 0 hits of 0 shots because the
+        target outruns the shell and the gunner never aligns; 12 m/s and up pass. render/raceTurret.mjs draws domes, barrels and
+        shells as kit fleets (the barrel mesh pre-sized to [0, 0.9] along +z so the drawn muzzle is the physics muzzle), and
+        race-brain.html races with a turret on every car, hits in the standings, and a gunner trainer in idle time beside the
+        driver's. Three gates, fourteen sabotages, three findings: the turret gate's sabotage C (the shell without the gun's
+        velocity) reached no assertion until a moving-gun row was added; the gunner gate's impulse row stepped a bare box3d world,
+        which has no ground body, so both cars fell during the shell's flight; the page gate booted race-brain.html inside the
+        harness page that had just drawn two device frames and froze that page's main thread past 300 s twice after passing once
+        -- in a browser of its own it boots in half a second and the whole gate runs in 11 s. And brainTrail-selfcheck's row that
+        said for fifty rounds "instruments.mjs offers no brain page, and when it does the links should come from there" met its
+        first: turret-gunner carries race-brain.html, ui/brainTrail.js derives it (registryPages), the stages stay hand-declared.
+        The quick sweep (404 under budget in 390 s on the slow box again) found one new red that was this round's: browserNodeGuard
+        walks every RELATIVE literal import, static or dynamic, from each page, and race-brain.html reaches
+        brain/gunnerPolicy.mjs relatively, whose ready() lazily imported physics/box3d/box3dNode.mjs -- a module with node:
+        imports at its top. The guard is right that a page must never load that file; ready() now refuses outside node and
+        imports through a specifier the walk cannot follow. Said plainly: physics/raceKnob.mjs carries the identical lazy
+        import and is unflagged only because physics-lab.html and race-replay.html import it by absolute specifiers the walk
+        ignores, not because it is guarded. The sweep's timings were not carried (nine evictions on a slow box, the same
+        repair as v4586 and v4587): the committed readings stand and the three new gates' readings were added (287 ms, 7.0 s
+        and 11.3 s; the two over budget are the racing line's kind, beside drivePolicy's 63 s and raceKnob's 33 s).
+        Census: 1631 -> 1634 gates, 4090 -> 4096 files; since234.
+     Then (v4589) A VIEW WINDOW PER CAR (task 78). Keith asked for a window per car that a click switches between First Person,
+        Turret view and GPU Brain view. The race pages had one inline orbit camera each and no second viewport on the device path
+        (gl.viewport / scissor exist only in the legacy TV wall), and no new shader was wanted for it: gfx/device.js has drawn a
+        whole frame into a texture on both backends since v4318 (frame({ target })) and handed the bytes back row 0 at the top
+        (frame({ read })), so render/carViews.mjs draws the SAME scene into a 240 x 160 render target with that car's camera and
+        puts the readback into a small 2D canvas beside the main one. The first-person camera is the driver's seat looking 12 m
+        along the chassis forward (that point projects to the window's exact centre; a point behind is null); the turret's sight
+        sits just above and behind the pivot looking along the barrel and turns with the turret; the third view is not a camera:
+        the car's driver (9-8-2) and gunner (9-8-3) run layer by layer through the kernel's f32 twin and their features, hidden
+        activations and outputs are drawn as bars, live, for the car in that window -- the GPU Brain's view of the race is the
+        numbers its layer computes this tick. A click cycles the three; the label says which and what it costs (a readback every
+        four main frames). MEASURED ON THE HARNESS, AND SAID PLAINLY: a presented WebGPU canvas device is LOST at its first frame
+        there (device.lost reads "A valid external Instance reference no longer exists" and every mapAsync after it fails), while
+        an offscreen device reads back indefinitely -- which is why every device gate uses offscreen: true -- and a presented
+        WebGL2 canvas keeps reading targets back under a running loop. A page's main canvas cannot be offscreen, so the gate
+        holds the windows' pixels on ?webgl=1 (a first-person window 15 % lit from its readback, the brain window 12 % lit with
+        bars, the click cycling turret then brain with the label saying so) and the WebGPU boot on what survives the loss (the
+        windows, the labels, the cycle, the brain windows live); the page caps its readback failures at three, says so in the
+        labels, and keeps the brain windows refreshing -- the first draft stopped those too, which the WebGPU boot found. Five
+        sabotages red by name. On the rig both backends read back; that claim is the rig's to make, and the page's label will
+        say "view windows off" if it is wrong there. The quick sweep found the one cross-effect: the windows' failure message
+        was written into the gunner's HUD line, which v4588's page gate reads for "hand gunner", so the new code turned the
+        older gate red; the windows have a line of their own now. Census: 1634 -> 1635 gates; since235.
+     Then (v4590) THE OIL SLICK AND THE DOOM FIRE ON IT (task 79). Keith asked whether the turret gunner could also trigger an
+        oil slick, and Doom Fire from the slick. The tree had no oil and no way to change the grip under a wheel at a point:
+        physics/raceCar.mjs's trackSurface.at(x, z) is a pure function of the track's geometry, and the only fire on the ground
+        was world/fireSystem.js's voxel wildfire on grass; render/doomFire.mjs's byte automaton (the Slug fill's fire) had never
+        burned anywhere in a 3D world. physics/slick.mjs: dropSlick puts a 1.8 x 3.4 m patch 2.6 m behind the chassis along its
+        yaw, and slickSurface(base, state) WRAPS the surface rather than rewriting it -- at(x, z) asks the track and then the
+        patches: under an unlit patch the grip is the road's x 0.3 and the rolling resistance x 0.5 and the kind reads "oil"
+        (the driver's off-asphalt feature sees it), under a burning one the kind reads "fire" with the road's own grip (oil that
+        has caught is hot, not slippery) -- so carForces takes the oil as it takes any surface and not a line of raceCar changed.
+        igniteSlick lights the owner's newest unlit patch into a DoomFire of 12 x 8 cells with its source row at the patch's
+        rear edge, stepped every 3 ticks, fed for 6 s and burning out on its own schedule: one patch burns 394 ticks (6.57 s)
+        and is spent; a car whose chassis centre is inside takes a burn event a tick. The gunner (brain/gunnerPolicy.mjs) grew
+        from 9 -> 8 -> 3 to 11 -> 8 -> 5: two facts (a pursuer inside 14 m behind me; a car on my unlit oil) and two outputs
+        (drop, ignite), the hand gunner dropping only when pursued and lighting only with a car on the oil, the reward paying
+        half a hit per second of an opponent on my fire. The duel turned around for it (the gunner PURSUED, so there is
+        someone to oil): pursued, the hand gunner lands 13 of 15 and 12 of 14 with 5 and 4 drops and 223 and 182 burn ticks
+        on the pursuer; the three-car race (hits 23 of 23, 0 of 0, 9 of 20; drops 7, 0, 0; burn ticks 0, 307, 0) is
+        deterministic and replays from its eight-field log to the same fingerprint, hits, drops and burn ticks; the
+        fingerprint folds box3d's state, the turrets, the shells and now the patches. Found on the way: turning the duel
+        around made 8 m/s HITTABLE (a closing target meets the slow shell, 4 of 4), which would have let the shell-speed key's
+        first refusal through -- so adjudicateShell runs a chase leg AND a pursued leg and passes only a speed that lands the
+        bound in both; 8 m/s still fails the chase leg with no solution. Drawn: two more fleets in render/raceTurret.mjs, the
+        patch as a flat dark box in the quat mode and every burning cell as a small box in the lit pipeline's colour mode (the
+        palette on the road, cell for cell); race-brain.html runs the wheels on the wrapped surface, folds the slick hash,
+        shows slicks and burn seconds per car in the standings, and the brain window's gunner rows read 11-8-5. Gates:
+        physics/slick-selfcheck.mjs new (eight sabotages, THREE of them findings fixed in the gate: an axis-aligned patch
+        cannot see the frame's handedness, so an oblique patch holds it; a hash of the count alone already differed on the
+        old row, so the same count lit later or dropped a metre over must differ; a hash without the heat still differed by
+        the ignition tick, so the same patch with its automaton stepped once more must differ), and its first run was red on
+        the burn-events row because the fire steps before the burn check and the tick that burns it out hands out no event
+        (393 of 394); the gunner's gate re-pinned to the grown shape with six more sabotages red by name; the turret's
+        contract widened to { yaw, pitch, fire, drop, ignite }; the windows' gate re-pinned (43 bars). Unchecked: the slick
+        has no lab knob of its own yet (its patch size and burn time are spec constants), and the fire cells are drawn
+        without light of their own. Census: 1635 -> 1636 gates; since236.
+     Then (v4591) BUILDINGS THAT FALL (task 80). Keith asked whether the buildings, which have rebar and take damage, could box3d
+        fall over or turn into debris. Until this round a building at zero hit points vanished: CityGen's _topple rotated its
+        voxel coordinates by arithmetic and stamped a sparsened rubble log in one tick, and crashDamage parked its static box.
+        world/buildingTopple.mjs: A BUILDING STANDS WHILE ITS CENTRE OF MASS IS OVER WHAT IS LEFT OF ITS GROUND FLOOR. When
+        CityGen calls for the topple (hit points at zero; crashDamage charges the rest once the car has taken the ground floor
+        under CRASH.support), the module takes the standing block above the ground floor -- physics/voxel/fracture.js's largest
+        component anchored to the ground floor; a piece cut loose, or a smaller anchored tower, bursts as debris -- and makes it
+        ONE dynamic box3d body, a box of the block's extents with the block's voxel mass (600 kg a voxel), resting on the ground
+        floor's remaining voxels, which become static stubs (rebar and all: the hinge), over a static slab at the road. No
+        impulse is invented: gravity and box3d's contact solver decide. Measured headless: a 4 x 10 x 4 block on a far-quarter
+        stub lies flat within 3.7 s (up.y 0.00, its centre 5.5 m past the face it fell toward, at the height of its half width)
+        and shatters; over a middle stub it stands (up.y 1.000, unmoved) and STAYS a body until something pushes it; with no
+        ground floor left it drops onto the slab and pancakes where it stands; two fresh worlds give one state hash. The
+        prediction is the support polygon -- the convex hull of the stub rectangles (two opposite corner stubs hold a block
+        whose centre is over neither) -- and over seed 1's 34 buildings with a lane, rammed at 25 m/s and left 6 s, the outcome
+        follows it on every one: 3 predicted to stand stood untouched, 12 predicted to fall left their stubs (fell and
+        shattered, or landed leaning on the road), 15 with no ground floor dropped, 4 were crumbs (under 8 voxels above the
+        ground floor: rubble where they stood, no body). The shatter: when a fallen or dropped block comes to rest (or after
+        12 s) its voxels go through the body's final pose -- rotateQ, the quaternion the record is drawn with -- into world
+        cells as RUBBLE, one voxel in three bursts through voxelDebrisSystem, the body is parked, the slots re-mesh; a block
+        that fell toward -x leaves its rubble beyond that face, from the road up, none over the stub column, none higher than
+        it is wide. Drawn: the block is meshed once (the greedy mesher makes a uniform 4 x 9 x 4 block six quads) into a fleet
+        reserved per slot in the crash scene (crashScene's new `extras`, three fleets of 12000 vertices in the bodies' quat
+        mode) and the body's transform is its record each frame, so the windows fall with the wall; race-crash.html installs
+        the topple, shows a HUD line (how many became bodies, stand, lie fallen, dropped, shattered, crumbs) and has a
+        Demolish button (?demolish=1 on load) that charges the nearest standing building to zero from the car's side so the
+        fall can be watched without a dozen rams. Corrected on the way: the first probe shattered a STANDING block after a
+        second because the rest rule did not ask whether it had fallen (only a fallen or dropped block shatters now); the
+        bare-rect path never parked the building's static box, so the block was pushed 4 m out of the box it overlapped and
+        dropped upright (a real bug the gate's first run found: 14 red); bindScene took the crash scene's result for the
+        gpuDriven scene, a silent no-op headless and a TypeError in the page that aborted rebuild() -- the page's HUD read
+        "none yet" for 60 s -- it takes either now. Seven sabotages, six red by name; F (the smallest anchored component) went
+        0 red because every case had one tower, so a split-tower row holds it. Gate world/buildingTopple-selfcheck.mjs beside
+        its module (18 s). Unchecked: the body is the block's bounding box with the block's voxel mass, so its centre stands
+        in for fracture.js's exact centre of mass (reported beside it: the stub voxels pull it 0.04 m); a block leaning on
+        the road or on a neighbour is left leaning; no cascade damage to neighbours from the fall; the page on WebGPU (the
+        presented device is lost on this harness). Census: 1636 -> 1637 gates; since237.
+     Then (v4592) THE SPELLBOOK AS AMMUNITION (task 81). Keith asked whether the car turrets could have the same spellbook
+        ammo as the dungeon spellbook -- reusing the effects and the damage scale -- with power pickups applying toward the ammo
+        choice. physics/spellAmmo.mjs READS THE BOOK, IT DOES NOT COPY IT: AMMO_NAMES is world/spellBook.mjs's SPELL_NAMES itself
+        (the same frozen array), and what a shell does when it lands is the spell's own row -- `damage` (the dungeon's scale: 3
+        for a spark, 40 for a cataclysm) scaling TURRET.hitImpulse over spark's, `radius` as a splash with DungeonDemo's grenade
+        falloff 1 - d / R, `ignite` (ember) as a Doom Fire patch lit under the car it hit through physics/slick.mjs (a patch
+        free of the gunner's reload and cap, centred on the target), `slow` (frostbite) as half throttle for the book's 3 s
+        (DungeonDemo's ai.slow(id, 3.0)), `pool` (causticSpray) as a caustic patch of the book's { 4 s, 1.2 dps } that burns
+        what stands in it (the dungeon's _pools row) -- change a number in the book and the turret changes with it. The plain
+        shell is spark, the spell of least damage, so a spark hit is v4588's 0.743 m/s to the thousandth and every earlier
+        gate keeps its numbers. THE PICKUPS ARE THE COST MODEL TURNED AROUND: a pickup on the track holds ENERGY_POOL /
+        manaFor(spell) shells, the mana the book DERIVES from measured work (v4192), so a cataclysm pickup is one shell, spark
+        ten, and novaBurst -- the book's cheapest spell by measured cost, eight ported particles, though its damage is 12 -- a
+        hundred: the magazine follows the cost, which is the book's own rule and the reason the pickups are not a second
+        balance table. Fifteen pickups sit every 24 m along seed 1's 379 m centreline, 1.5 m off it, all on the asphalt,
+        their spells cycling through the book in cost order from a seeded first, taken within 2.2 m and back after 15 s; the
+        newest pickup is what fires next, the rest wait in the magazine, and at zero the fullest held spell takes over and
+        then the plain shell. The gunner's contract is unchanged (yaw, pitch, fire, drop, ignite): what a shell carries is the
+        turret's state, a pure function of the pickups the car drove over, so the race replays from its eight-field input
+        log and the fingerprint folds the magazines and the pickups (and the shell's spell). Measured headless: a cataclysm
+        hit moves the still car at 9.92 m/s (40 / 3 of the spark's), frostbite sets slowUntil 180 ticks out, ember's patch
+        burns the target, the caustic pool lands 60-odd acid ticks, a quake reaches a second car 3 m from the hit and not one
+        9 m away; the three-car race on seed 1 has the leader take four pickups and land causticSpray and cataclysm shells
+        (the car behind takes 155 damage and 68 acid ticks), deterministic and replayed to the same fingerprint, damage and
+        pickups; the duel without pickups scores 14.558 exactly as at v4590 (the reward pays 0.05 a point only for damage
+        BEYOND the plain shell's), with pickups 16.762 on 89.7 damage. Drawn: shells in the colour of the spell they carry
+        (the book's burst colour, the lit pipeline's colour mode) and a bobbing pickup sphere per spell; race-brain.html's
+        standings read the loaded spell and count, damage dealt and taken, and the gun line counts the pickups on the track;
+        the raceTurret gate's browser race still matches node's fingerprint with the pickups in it. Corrected on the way: the
+        gate's first run was red on a pickup of the plain spell, which the endless magazine (count Infinity) swallowed; a
+        pickup of spark is a finite magazine now. Seven sabotages, all red by name. Gate physics/spellAmmo-selfcheck.mjs
+        beside its module (3 s). Unchecked: quake's and cataclysm's fracture and raymarch rows have no target on the race
+        track's static city (they land as damage and splash only); the gunner does not choose its ammo; the pickups are not
+        yet on race-crash.html. Census: 1637 -> 1638 gates; since238.
 ## The count that says when step 4 matters
 
 tools/ship/shaderCensus-selfcheck.mjs has held, since v3274, that a hand-written pair is cheaper than an

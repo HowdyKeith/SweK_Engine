@@ -191,7 +191,15 @@ const cov = definitionCoverage(ENG);
     // names; the rule was the opposite -- a symbol only counts as closed if breaking it turns its gate RED.
     // AT ZERO THE RATCHET IS AT ITS STRONGEST: any newly exported symbol under physics/ that lands without its
     // gate naming it now reddens this line immediately, which is the state the pin was always ratcheting toward.
-    const BASELINE = 0;    // v3323: 37, v4062: 0 -- the number RATCHETS DOWN, never up
+    // RE-BASELINED at Keith's explicit direction (post-v4297-sweep triage): the zero pin v4062 fought for was
+    // real and is NOT being disowned here -- but 68 genuinely new exports have landed under physics/ without
+    // their gate naming them since then (measured today: 68 of 1904, 3.57%, against 37 of 608 = 6.09% when
+    // the pin was first set -- the RATE fell even though the count grew, this file's own report line already
+    // says so). Unlike v4062's move, this is accepted debt, not paid debt: the choice was between chasing 68
+    // real gaps down one at a time before this round could ship at all, or drawing the line at today's honest
+    // count so it cannot grow further unnoticed while that work happens across future rounds. Ratchets down
+    // from here, never up again without the same explicit call.
+    const BASELINE = 68;    // v3323: 37, v4062: 0, post-v4297-sweep: 68 -- the number RATCHETS DOWN, never up
     // *** v3903 -- THE RATCHET IS VIOLATED AND THE PIN IS NOT MOVING. RECORDING WHAT THE NUMBER MEANS INSTEAD. ***
     // This line has been red for a long time and "GREW to N" does not say whether the tree got worse or merely
     // BIGGER. Both, and the split is measurable, because the comment above records the denominator the pin was
@@ -250,7 +258,11 @@ const cov = definitionCoverage(ENG);
     // v4062: 290 -> 209, and the 81 came off for the RIGHT reason: physics/ paid its whole debt to zero, and
     // because this sweep SUBSUMES the physics-only one, every symbol closed there is a symbol closed here too.
     // Re-frozen at the new floor so the paydown cannot silently reverse.
-    const BASELINE_WIDE = 209;   // v4060: 290, v4062: 209 (physics/ closed to zero) -- ratchets down, never up
+    // RE-BASELINED alongside BASELINE above, same direction and same explicit call: 332 of 3612 exported
+    // symbols tree-wide (726 gated modules) are unmentioned today, against the 209 this was last frozen at.
+    // Accepted debt, not paid debt -- see BASELINE's own comment for why raising rather than chasing was the
+    // choice this round.
+    const BASELINE_WIDE = 332;   // v4060: 290, v4062: 209 (physics/ closed to zero), post-v4297-sweep: 332 -- ratchets down, never up
     const wide = definitionCoverage(ENG, "");
     ok("!! no NEW exported symbol ANYWHERE IN THE TREE has appeared without its gate naming it",
         wide.ungated.length <= BASELINE_WIDE,
@@ -282,7 +294,9 @@ const cov = definitionCoverage(ENG);
     // arrive quietly. It is deliberately not folded into BASELINE_WIDE -- that number was frozen against a
     // population the narrow rule found, and moving the denominator under a frozen number without moving the
     // number is the defect this file's siblings have carried in three places.
-    const BASELINE_SHAPES = 582;   // v4535: tree-wide, all six shapes -- ratchets down, never up
+    // RE-BASELINED alongside BASELINE and BASELINE_WIDE above, same explicit call: 639 of 5105 definitions of
+    // any shape tree-wide are unmentioned today, against the 582 this was last frozen at.
+    const BASELINE_SHAPES = 639;   // v4535: 582, post-v4297-sweep: 639 -- ratchets down, never up
     const shapesWide = definitionCoverage(ENG, "", { shapes: "all" });
     const shapesPhys = definitionCoverage(ENG, "physics", { shapes: "all" });
     ok("!! *** no NEW exported symbol OF ANY SHAPE has appeared without its gate naming it ***",

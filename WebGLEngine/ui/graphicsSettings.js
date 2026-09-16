@@ -12,6 +12,7 @@
 //   - particles   -> particle render skip
 //   - water_ssr   -> water screen-space reflection on/off
 //   - water_refraction -> see-through refraction down to the lakebed
+//   - fxaa        -> screen-space anti-aliasing pass on/off (render/fxaaPass.js), default off
 //
 // Each setting reads/writes window._gfxSettings — main.js's render
 // loop reads from the same object every frame. Cheap; no event bus
@@ -30,6 +31,7 @@ const DEFAULTS = {
     rootarch:  true,      // v4077 — one procedural root/arch landmark, placed once (near-zero per-frame cost)
     slopes:    true,      // v432 — smooth ramps over stair-stepped terrain
     mc_terrain: false,    // v434 — experimental marching-cubes smooth terrain (opt-in)
+    fxaa:      false,     // screen-space anti-aliasing (opt-in -- the retro/CRT look often reads jaggies as in-theme)
 };
 
 export class GraphicsSettings {
@@ -107,6 +109,7 @@ export class GraphicsSettings {
             ["rootarch",  "Root/arch",        "One procedural root/arch landmark near spawn"],
             ["slopes",    "Smooth slopes",    "Ramp over stair-stepped terrain (mountains)"],
             ["mc_terrain","Smooth terrain (MC)","Experimental: round the whole world via marching cubes. Heavier."],
+            ["fxaa",      "Anti-aliasing",    "Smooths jagged edges (FXAA). Off by default -- this engine's retro look often reads aliasing as in-theme."],
         ];
         for (const [key, label, hint] of rows) {
             const row = document.createElement("div");

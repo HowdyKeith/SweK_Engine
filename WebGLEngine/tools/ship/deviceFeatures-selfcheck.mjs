@@ -27,7 +27,7 @@
 //                   C  the render pass's timestampWrites dropped                                                    -> exit=1, red: the timed-frame row (an unwritten pair reads 0.000 ms, and the row holds render above zero)
 //                   D  the WebGL2 refusal removed (timing accepted silently)                                         -> exit=1, red: the WebGL2 refusal row
 //
-// Run: node tools/ship/deviceFeatures-selfcheck.mjs      (~20 s; section 1 is headless)
+// Run: node tools/ship/deviceFeatures-selfcheck.mjs      (~0.55 s; section 1 is headless)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";

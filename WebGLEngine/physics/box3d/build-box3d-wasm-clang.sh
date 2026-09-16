@@ -13,12 +13,21 @@
 #
 # What this produces (measured, not hoped):
 #   49 of 49 box3d v0.1.0 source files compile, zero failures
-#   box3d.wasm, ~948 KB, 43 exports (40 swk_* + malloc + free + memory)
-#   it instantiates, creates a world, adds a body, and steps
+#   box3d.wasm, ~948 KB before the wasm-opt pass below, ~817 KB after, 43 exports (40 swk_* + malloc + free + memory)
+#   it instantiates, creates a world, adds a body, and steps -- checked both before AND after wasm-opt
 #
 # The companion is vendor/box3d/box3d.js -- a drop-in for emscripten's glue, because box3dLoader.js was written
 # against an emcc build and wants _swk_* plus HEAP*/_malloc/_free. See that file for why the loader was not
 # changed instead.
+#
+# STEP 5.5 (below) RUNS wasm-opt -Oz ON THE LINKED BINARY. Measured on the checked-in box3d.wasm before this was
+# added: 973,188 -> 817,360 bytes, 16.0% smaller, with the step-5 self-test passing identically on the optimized
+# output and the export surface (48 exports) byte-identical in name and count. -O3 was measured too and rejected:
+# it links 0.3 percentage points larger (820,518 bytes) and, over five interleaved rounds of a 200-body 5000-step
+# benchmark in this same sandbox, showed no reliable speed advantage over -Oz -- both landed in the same noisy
+# ~250 us/step band, well inside this environment's own run-to-run jitter. -Oz's size win is the only one of the
+# two that survived measurement; -O3's speed rationale did not. See tools/ship/nextRounds.mjs's
+# wasm-opt-box3d-postlink entry for the fuller record.
 set -euo pipefail
 
 BOX3D_TAG="${BOX3D_TAG:-v0.1.0}"
@@ -36,6 +45,14 @@ if ! need clang || ! need wasm-ld || [ ! -d /usr/include/wasm32-wasi ]; then
     echo "    sudo apt-get install -y clang lld wasi-libc libclang-rt-18-dev-wasm32"
     echo "On macOS: brew install llvm  (then use \$(brew --prefix llvm)/bin/clang), plus a wasi-sysroot."
     exit 1
+fi
+# wasm-opt is optional -- its absence does not block a build, it only skips step 5.5's size reduction. Checked
+# separately from the required trio above for that reason: apt-get install -y binaryen is enough to get it.
+if command -v wasm-opt >/dev/null 2>&1; then
+    HAVE_WASM_OPT=1
+else
+    HAVE_WASM_OPT=0
+    echo "   wasm-opt not found -- step 5.5 will be skipped (box3d.wasm ships ~16% larger than it could; apt-get install -y binaryen to get it)."
 fi
 BUILTINS="$(find /usr/lib/llvm-*/lib/clang/*/lib/wasi -name 'libclang_rt.builtins-wasm32.a' 2>/dev/null | head -1)"
 [ -n "$BUILTINS" ] || { echo "MISSING libclang_rt.builtins-wasm32.a -- apt-get install libclang-rt-18-dev-wasm32"; exit 1; }
@@ -82,6 +99,19 @@ for n in $NAMES; do EXPORTS="$EXPORTS --export=$n"; done
 wasm-ld obj/*.o -o box3d.wasm --no-entry --allow-undefined $EXPORTS --export=malloc --export=free \
     -L/usr/lib/wasm32-wasi -lc "$BUILTINS"
 echo "   linked $(echo "$NAMES" | wc -w) swk_* exports"
+
+# ---- 4.5. SHRINK IT -------------------------------------------------------------------------------------------
+# wasm-ld's own output is not the last word on size -- wasm-opt operates on the LINKED module as a whole (dead
+# code elimination across every translation unit at once, instruction-level simplification wasm-ld does not do)
+# and measurably shrinks it further. -Oz over -O3: see this file's header for the measurement that picked -Oz
+# (smaller, and no reliable speed difference in a noisy sandbox). Runs BEFORE the self-test below on purpose --
+# the binary that gets proven to run is the one that actually ships, not an earlier draft of it.
+if [ "$HAVE_WASM_OPT" -eq 1 ]; then
+    BEFORE_OPT=$(stat -c%s box3d.wasm 2>/dev/null || stat -f%z box3d.wasm)
+    wasm-opt -Oz box3d.wasm -o box3d.wasm
+    AFTER_OPT=$(stat -c%s box3d.wasm 2>/dev/null || stat -f%z box3d.wasm)
+    echo "   wasm-opt -Oz: $BEFORE_OPT -> $AFTER_OPT bytes ($(node -e "console.log((($BEFORE_OPT-$AFTER_OPT)/$BEFORE_OPT*100).toFixed(1))")% smaller)"
+fi
 
 # ---- 5. PROVE IT RUNS BEFORE SHIPPING IT ----------------------------------------------------------------------
 # A wasm that links is not a wasm that works. This is the whole difference between a build script and a hope.

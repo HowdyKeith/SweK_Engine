@@ -16,7 +16,7 @@
 //                                                                        pole/edge placement, the dolly's effect on the eye
 //   C  orrery-gpu.html's wheel listener removed                       -> exit=1, 1 red: "the wheel calls dollied()" -- the page's wiring
 //
-// Run: node tools/ship/orbitCamera-selfcheck.mjs      (~0.2 s, no browser)
+// Run: node tools/ship/orbitCamera-selfcheck.mjs      (~0.05 s, no browser)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";

@@ -36,7 +36,12 @@ export const SECTIONS = [
       // on the same reading: LQR/Riccati control, the door onto physics/control/cartPole.mjs, and NOT the GPU
       // Brain drawer the name suggests -- the page mentions no policy, no brain and no /ai/ route at all.
       pages: ["reactor.html", "cartpole.html",
-              "physics-lab.html", "roundhouse.html", "device.html", "models.html", "gates.html",
+              // v4585 -- lab-home.html is the lab's FRONT DOOR (task 71): one Initiate button, the live strip, the presets
+              // with what the Physics AI pulls from; it belongs beside the lab it opens.
+              "lab-home.html",
+              // v4585 -- gates.html MOVED to System Tools: the gate register is "the record" that drawer's note names,
+              // beside gate-plan.html and case-study.html, and lab-home.html took the lab drawer's fifteenth slot.
+              "physics-lab.html", "roundhouse.html", "device.html", "models.html",
               "instruments.html", "instrument-bench.html", "catalog.html", "lab-export.html",
               "run-inspector.html", "frugon.html",
               // v3818 -- THE STATISTICAL-MECHANICS DOOR BELONGS WITH THE LAB, not in a thermal drawer of its
@@ -82,14 +87,23 @@ export const SECTIONS = [
 
     // --- the instruments, split three ways because 25 in one drawer is the flat row with a lid on it
     { id: "optics", tab: "optics", label: "PL: Optics & Imaging", note: "diffraction, interferometry, tomography, reconstruction",
+      // v4590 -- splat-probes.html JOINS, from registerResidue's residue sweep: an irradiance-volume/probe bake, a
+      // direct sibling of splat-lab.html already here. blob-selfie.html fits the same note ("tomography,
+      // reconstruction") but is NOT filed here -- see UNPLACED: it already has a live convenience anchor inside
+      // the fluidgpu panel, and claiming it here would give it two anchors, which pageSectionsReport-selfcheck.mjs
+      // correctly treats as the defect this whole registry exists to prevent.
       pages: ["fresnel.html", "fresnel-join.html", "diffraction.html", "interferometer.html", "ct.html", "fanbeam.html",
-              "tomography.html", "sinogram-gpu.html", "kriging.html", "spatial-agreement.html", "splat-lab.html"] },
+              "tomography.html", "sinogram-gpu.html", "kriging.html", "spatial-agreement.html", "splat-lab.html",
+              "splat-probes.html"] },
     { id: "cosmic", tab: "cosmic", label: "PL: Cosmic & Relativity", note: "black holes, orbits, lensing, special functions",
       // v4031 -- lensing.html and stellar.html JOIN, both by SUBJECT rather than by name. Gravitational
       // MICROLENSING is general relativity, so it sits with kerr/geodesic/pulsar and NOT with optics, whose
       // fresnel/diffraction/tomography pages are wave and imaging optics -- a page called "lensing" filed by its
       // name would have landed in exactly the wrong drawer. Lane-Emden POLYTROPES are stellar structure, the
       // same arc as kepler and pulsar.
+      // v4590 -- cosmic-web.html fits this drawer by subject (Zel'dovich large-scale structure, the same arc as
+      // cosmic-map/warp-map) but is NOT filed here -- see UNPLACED: it already carries a live "Blast Wax"
+      // convenience anchor elsewhere on the page, and claiming it here too would give it two anchors.
       pages: ["lensing.html", "stellar.html",
               "kerr.html", "geodesic.html", "cosmic-map.html", "warp-map.html", "pulsar.html",
               "kepler.html", "meijer-g.html", "elliptic.html", "rmt.html", "landau-zener.html", "hmc.html"] },
@@ -99,7 +113,10 @@ export const SECTIONS = [
     // TAXONOMY DRIFT, not a shortage of room, and widening the cap would have hidden exactly that. They have
     // their own drawer now; cosmic falls to 11 and reads like its note again.
     { id: "em", tab: "em", label: "PL: Electromagnetism", note: "fields, grids, boundaries, and what discretising them costs",
-      pages: ["current-loop.html", "fdtd.html", "skin-depth.html", "grid-refinement.html", "regrid-cost.html"] },
+      // v4590 -- waveguide.html JOINS: physics/em/waveguide.js, literally electromagnetism (waveguide cutoffs),
+      // from registerResidue's residue sweep.
+      pages: ["current-loop.html", "fdtd.html", "skin-depth.html", "grid-refinement.html", "regrid-cost.html",
+              "waveguide.html"] },
     // v3644: THE 15-PAGE RATCHET FIRED AGAIN, AND AGAIN IT WAS REPORTING A TAXONOMY DRIFT RATHER THAN A SHORTAGE
     // OF ROOM -- the same thing it caught at v3633. Eleven pages about REMAPS, LIMITERS, GRADIENTS and MESH RANK
     // had accumulated in the Electromagnetism drawer one round at a time, each defensible because the arc started
@@ -234,7 +251,7 @@ export const SECTIONS = [
       // question, not "shall I install somebody's repo".
       pages: ["webgpu-llm.html",
               "rig.html", "tools.html", "ship.html", "changelog.html", "module-history.html",
-              "page-index.html", "case-study.html", "gate-plan.html", "method-lab.html",
+              "page-index.html", "case-study.html", "gate-plan.html", "gates.html", "method-lab.html",
               // v3813 -- settings.html JOINS, closing an issue open since v3809. Keith: "we need to add this
               // page to the sort list ... most of the settings are connected to other things." It had a TOOLBAR
               // link only -- above the Arriving header, so the mover could not take it and the drawer would have
@@ -250,7 +267,14 @@ export const SECTIONS = [
               // this page links to it; that one is the FLEET picker (every service, every box), this one is the
               // assessment of the two runtimes on THIS box, and merging them would make one page answer two
               // questions.
-              "node-bun.html"] },
+              "node-bun.html",
+              // v4590 -- boot-sidecar.html, lab-census.html and three-probe.html JOIN, from registerResidue's
+              // residue sweep: boot-sidecar is a boot/rig diagnostic report ("the rig, the ship ritual, the
+              // record", this drawer's own note verbatim); lab-census is "THE RECORD" of lab coverage and
+              // computes nothing itself, the same shape; three-probe is the vendored three.js/WebGPU compat
+              // probe for the build box -- operating the rig, like webgpu-llm.html above. This drawer is now at
+              // MAX_PER_PANEL.
+              "boot-sidecar.html", "lab-census.html", "three-probe.html"] },
 
     // v3229 -- sphere-impostor and raymarch-live MOVED HERE OUT OF THE RENDER QA DRAWER. They are not QA
     // TOOLING, they are two of the 315 SUBJECTS render-qa opens, and filing them beside the QA control surface
@@ -276,7 +300,10 @@ export const SECTIONS = [
               // proxy took a -listen flag this engine could point at loopback using upstream's own mechanism;
               // ws-scrcpy calls server.listen(port, cb) with no host argument and ships no auth at all, so the
               // page states the exposure and confirms before every start instead of running a patched fork.
-              "ws-scrcpy.html"] },
+              "ws-scrcpy.html",
+              // v4590 -- sunshine.html JOINS, from registerResidue's residue sweep: an opt-in install of Sunshine
+              // (GPL-3.0), a game-stream host -- the exact pattern this shelf already holds seven of.
+              "sunshine.html"] },
 
     // *** v4321 -- "Voxel & Render" IS TWO DRAWERS WEARING ONE NAME, AND THE AMPERSAND WAS THE TELL. ***
     // Keith: "let's separate Voxel & Render into a Voxels button and a Renders button." A label with an "&" in
@@ -301,8 +328,13 @@ export const SECTIONS = [
     // THROUGH rather than the technique it marches BY, and the reason is written down because the next reader
     // will wonder and would otherwise re-litigate it.
     { id: "voxels", tab: "voxels", label: "Voxels", note: "the DATA: storage, meshing and traversal of voxel volumes",
+      // v4590 -- raymarch-options.html and sandbox-gpu.html JOIN, from registerResidue's residue sweep:
+      // raymarch-options imports voxelRaymarchPass/rleRegionVolume/rleWorldBridge, the same machinery as
+      // raymarch-gl-demo/raymarch-live above; sandbox-gpu is a VoxelWorld plus greedy chunk mesher
+      // (chunkMesherCore), storage/meshing/traversal by this drawer's own note.
       pages: ["voxel-viewer.html", "rle-mesh-demo.html", "ray-march-demo.html",
-              "raymarch-gl-demo.html", "raymarch-live.html", "volume-cache.html"] },
+              "raymarch-gl-demo.html", "raymarch-live.html", "volume-cache.html",
+              "raymarch-options.html", "sandbox-gpu.html"] },
     // *** AND THE POINT OF THE SPLIT IS THE SEVEN PAGES THIS DRAWER CAN NOW HOLD. *** Six render/fx pages have
     // been UNPLACED since v4314 with the reason "Voxel & Render is at 14 of 15, so ONE could go in and five
     // could not, and picking which one would be arbitrary". That sentence is spent: they are in.
@@ -320,7 +352,9 @@ export const SECTIONS = [
     // sweeping it in because it is the third of an old trio would be the subject filing this file warns about.
     { id: "rendertsl", tab: "rendertsl", label: "Render TSL",
       note: "three's node language as a SOURCE for gfx/device.js -- the graphs, the pages that draw them, and the two that owe the rig a number",
-      pages: ["tsl-probe.html", "tsl-rig.html", "orrery-gpu.html", "gpu-rig-check.html"] },
+      // v4590 -- ai-presence-orb.html JOINS, from registerResidue's second (judgement) pass: a TSL shader port
+      // (three.tsl.js) is exactly this drawer's own subject, not a stretch reading.
+      pages: ["tsl-probe.html", "tsl-rig.html", "orrery-gpu.html", "gpu-rig-check.html", "ai-presence-orb.html"] },
     { id: "renders", tab: "renders", label: "Renders", note: "the TECHNIQUE: passes, effects, and how a frame is made",
       pages: ["path-tracer.html", "pom-demo.html", "sphere-impostor.html", "krbn.html", "amplified-diff.html",
               "backend-dom.html",
@@ -329,11 +363,12 @@ export const SECTIONS = [
               "primitive-paint.html", "proc-brush.html",
               // and v4313's shader page, which is a render pass over a Krbn drawing
               "krbn-lyapunov.html",
-              // FSR joins on this drawer's own stated criterion -- "render/* or fx/* by import" -- and it imports
-              // four: render/jitter, render/temporalResolve, render/temporalAccumulate, fx/fsr/fsr. It is NOT in
-              // the WebGPU drawer beside anime4k because it has no adapter path: it is CPU arithmetic end to end,
-              // and that drawer is at 15 of 15 in any case. 14 of 15 here.
-              "fsr.html"] },
+              // v4590 -- heightfield-vs-volume.html and ssao-compare.html JOIN, from registerResidue's residue
+              // sweep: heightfield-vs-volume is built directly on tools/render-qa/amplifiedDiff.mjs, the same
+              // tool amplified-diff.html above already uses; ssao-compare is a two-implementation SSAO
+              // comparison, the same "technique" shape as the rest of this drawer. This drawer is now at
+              // MAX_PER_PANEL.
+              "heightfield-vs-volume.html", "ssao-compare.html"] },
     // v3252 -- amplified-diff joins the render drawer and krbn-compare moves to Arriving: TEN IS THE LIMIT and
     // a comparison tool belongs beside the things it compares. krbn-compare is a SUBJECT comparison; this is the
     // instrument, and Keith can swap them back in one line if that reads wrong on the rig.
@@ -346,10 +381,22 @@ export const SECTIONS = [
       // v3672 -- box3d-contacts.html JOINS, the third and last of pageReach's named invisible pages. It imports
       // physics/box3d/box3dLoader.js, so it is a box3d surface by MECHANISM; its own title says what it is for
       // ("the overlay, and what it may claim"), which is this drawer's question about a solver's own output.
+      // v4590 -- ios-tools.html JOINS, from registerResidue's residue sweep: the companion device tool
+      // (adb-for-iOS) to ios-peer.html's cross-arch peer grading. backend-physics-check.html fits this drawer's
+      // own subject even better ("does the same input give the same answer", the box3d-vs-Jolt adjudicator) but
+      // is NOT filed here -- see UNPLACED: it already has a live "GPU adjudicator" convenience anchor inside
+      // another panel, and claiming it here would give it two anchors, exactly the defect this registry exists
+      // to prevent. android-peer.html, ios-peer.html and steamdeck-peer.html belong to the SAME peer-grading
+      // cluster by subject but also stay in Arriving: their only anchor is the peer-picker toolbar button, not
+      // an Arriving link, so the mover has nothing to move (see UNPLACED).
       pages: ["box3d-replay.html", "box3d-info.html", "box3d-contacts.html", "ragdoll.html",
-              "magmap-android.html", "fingerprint.html", "benchmarks.html", "fleet-bench.html"] },
+              "magmap-android.html", "fingerprint.html", "benchmarks.html", "fleet-bench.html",
+              "ios-tools.html"] },
 
     { id: "blobs", tab: "blobs", label: "Blobs", note: "the authoring surface and the aquarium",
+      // v4590 -- blob-shock.html ("metaballs hit by a shockwave") fits this drawer by subject but is NOT filed
+      // here -- see UNPLACED: it already carries a live "Tomograph" convenience anchor elsewhere on the page,
+      // and claiming it here too would give it two anchors.
       pages: ["blob-studio.html", "blobarium.html", "blobulator.html"] },
 
     { id: "face", tab: "face", label: "Face & Population", note: "landmarks, the mirror, the GPU population field",
@@ -417,7 +464,12 @@ export const SECTIONS = [
               // mpm-gpu.html runs the SAME graded loop mpm.html runs, and mpm-gpu-check.html is to it what
               // euler-gpu-check.html (already here) is to its kernel. Filing the kernel away from the loop it
               // reimplements would put the two halves of one claim behind different chips.
-              "mpm-gpu.html", "mpm-gpu-check.html"] },
+              "mpm-gpu.html", "mpm-gpu-check.html",
+              // v4590 -- mpm3d.html, thermal-flow.html and thermal3d-cells.html JOIN, from registerResidue's
+              // residue sweep: mpm3d is the 3D extension of the mpm/mpm-gpu family already here (step3d.mjs);
+              // thermal-flow and thermal3d-cells are LBM thermal solvers, siblings of lbm-fluid/lbm3d-flow and
+              // lbm3d-gpu already here. This drawer is now at MAX_PER_PANEL.
+              "mpm3d.html", "thermal-flow.html", "thermal3d-cells.html"] },
     // v3434 -- "Cross-Arch" merged into Box3D above.
     // v4109 -- label renamed to "File Transfer Utils" (id/tab stay "nearshare" -- see server.html's tab button
     // for why). Keith: "NearShare is an app, that button could rename to File Transfer Utils, and both could
@@ -468,6 +520,12 @@ export const SECTIONS = [
     { id: "gametheory", tab: "gametheory", label: "Game Theory", note: "appended -- pages with no chip of their own",
       pages: ["wadmap.html", "uvtt.html", "skyrim.html", "slotmachine.html", "pachinko.html", "pipboy-models.html",
               "fallout.html", "flight.html", "fpscontrol.html", "fpsmirror.html", "eve.html"] },
+    // v4590 -- bzflag.html, bzflag-info.html, bzflag-test.html and rocket-league.html are NOT filed here (or
+    // anywhere), despite fitting this drawer by subject -- see UNPLACED. Each already has a hand-written
+    // convenience anchor inside its OWN dedicated gpanel (the "bzflag"/"rocketleague" chips CHIP_GROUPS lifts
+    // into this panel's chip row); claiming the page here as well would give it a second anchor, which
+    // pageSectionsReport-selfcheck.mjs correctly treats as the defect this registry exists to prevent. A chip
+    // lift moves a BUTTON; a SECTIONS claim moves a PAGE LINK, and these four already have their page link.
     // v4327 -- WEBGPU, at Keith's ask: a drawer of "any page it should and would want to click and test".
     //
     // *** THE MEMBERSHIP IS DERIVED, NOT REMEMBERED. *** A drawer named after a CAPABILITY cannot be filled by
@@ -514,6 +572,10 @@ export const SECTIONS = [
           // own note said the render group was waiting on a drawer nobody had named. It has been named.
           // What is left here is the adapter's own benchmark.
           "webgpu-bench.html",
+          // v4590 -- device-present.html JOINS, from registerResidue's residue sweep: it compares three WebGPU
+          // canvas-presentation readbacks, an adapter/device gate exactly like this drawer's own benchmark, and
+          // it fills the drawer's last slot exactly (14 of 15 -> 15 of 15).
+          "device-present.html",
           // Compute: the pages where WebGPU is doing the arithmetic.
           "fluid-webgpu.html", "fluid-webgpu-3d.html", "blobulator-gpu.html", "celltrack-viewer-gpu.html",
           // v4329 -- TWO FLEET KERNEL BENCHES JOIN, at Keith's ask, and they are the "click and test" case in
@@ -532,7 +594,35 @@ export const SECTIONS = [
     // git terrain, the destructible buildings). Filed the round the Arriving row crossed pageReach's 15 % cap (70 links of 465 pages):
     // three racing anchors had gone into Arriving one per round, which is the pile that row exists to prevent.
     { id: "racing", tab: "racing", label: "Racing City", note: "Kenney's kits, the grid track, the car on box3d, and the brains that will drive it",
-      pages: ["kenney-kit.html", "race-track.html", "race-car.html", "race-brain.html", "race-replay.html", "race-terrain.html", "race-crash.html"] },
+      // v4590 -- building-lab.html JOINS, from registerResidue's second (judgement) pass: a seeded building
+      // grammar is exactly "the destructible buildings" this drawer's own note already names as a coming round.
+      pages: ["kenney-kit.html", "race-track.html", "race-car.html", "race-brain.html", "race-replay.html", "race-terrain.html", "race-crash.html",
+              "building-lab.html"] },
+
+    // v4590 -- NEW DRAWER, FROM registerResidue's RESIDUE SWEEP. Eight pages -- slug-curved, slug-device,
+    // slug-fire, slug-morph, slug-projective, slug-rig, slug-text, slug-ticker -- share ONE machinery
+    // (text/slugFont.js, and all but slug-text.html render/slugDevice.mjs too) and had NO drawer at all, unlike
+    // every other cluster this sweep found, which merely lacked room in an existing one. That is the strongest
+    // possible case for naming a panel: not a judgement call about which subject owns them, a family with zero
+    // current home.
+    { id: "slugtext", tab: "slugtext", label: "Slug Text", note: "the Slug GPU text rasteriser -- curves, morphs, rigging, projective and device transplant",
+      pages: ["slug-text.html", "slug-device.html", "slug-curved.html", "slug-projective.html",
+              "slug-morph.html", "slug-rig.html", "slug-fire.html", "slug-ticker.html"] },
+
+    // v4590 -- NEW DRAWER, FROM registerResidue's SECOND (JUDGEMENT) PASS, Keith's explicit yes. Six pages --
+    // ascii-avatar, ascii-object, ascii-shape, krbn-avatar, krbn-rigged, heerich-avatar -- share real machinery
+    // (tools/krbn/glbMesh.js, tools/render-qa/asciify.mjs) and had no drawer, the same shape as Slug Text
+    // (a family with zero prior home) rather than a drift out of an existing one.
+    { id: "avatars", tab: "avatars", label: "Avatars", note: "character rendering: the ASCII cluster and the Krbn/Heerich rig family",
+      pages: ["ascii-avatar.html", "ascii-object.html", "ascii-shape.html",
+              "krbn-avatar.html", "krbn-rigged.html", "heerich-avatar.html"] },
+
+    // v4590 -- NEW DRAWER, FROM registerResidue's SECOND (JUDGEMENT) PASS, Keith's explicit yes. Three pages --
+    // toroidal-wave, wear-field, fog-of-war -- are a literal sequential family (v3837 a wraparound-buffer wave
+    // sim, v3838 persistent accumulation over it, v3839 fog-of-war memory built the same way) with no drawer.
+    // Three pages is the same founding size as Blobs and PetFBI, both real panels today.
+    { id: "toroidal", tab: "toroidal", label: "Toroidal Buffers", note: "a wraparound buffer, what accumulates on it, and what it remembers",
+      pages: ["toroidal-wave.html", "wear-field.html", "fog-of-war.html"] },
 ];
 
 /** Keith's rule. A drawer of 25 is the flat row again with a lid on it. */
@@ -548,6 +638,22 @@ export const MAX_PER_PANEL = 15;
  * look identical, and the second one gets placed by a guess.
  */
 export const UNPLACED = new Map([
+    // *** v4623-merge -- fsr.html, AND THE SENTENCE THIS FILE USED TO CARRY FOR IT IS NOW FALSE. ***
+    //
+    // It was placed in the techniques drawer with the reason "It is NOT in the WebGPU drawer beside anime4k
+    // because it has no adapter path: it is CPU arithmetic end to end". THE TEMPORAL/FSR ARC MADE THAT
+    // UNTRUE while it sat on another branch: fx/fsr/fsrGPU.js (v4588), render/temporalGPU.mjs (v4590),
+    // render/motionVectorsGPU.mjs (v4592) and render/temporalRejectGPU.mjs (v4593) give the page EASU+RCAS,
+    // resolve+accumulate and the motion vectors on an adapter, chained on one encoder.
+    //
+    // So the WebGPU drawer is where it now belongs on this file's own criterion -- and that drawer is at
+    // 15 of 15, as is the techniques drawer once main's heightfield-vs-volume and ssao-compare land. Both
+    // doors are shut, and which page leaves to make room is a judgement about the drawers, not about this
+    // page. Filed here rather than guessed at, because a page in neither a section nor this map is RESIDUE
+    // and would be placed by a guess -- which is the thing this map exists to prevent.
+    ["fsr.html", "has an adapter path since v4588-v4593 so it belongs in the WebGPU drawer, which is at " +
+                 "MAX_PER_PANEL, as is the techniques drawer it used to sit in; placing it means evicting " +
+                 "something and that is a drawer decision, not a merge's"],
     // *** v4314 -- ELEVEN OF THE TWELVE PAGES pageReach CALLED BORN-INVISIBLE, PLUS ONE OF MY OWN. ***
     //
     // They are linked from server.html now, which is what pageReach was asking for. They are ALSO here,
@@ -653,6 +759,43 @@ export const UNPLACED = new Map([
     ["physics-verified.html", "same trio -- and the name says physics louder than it says verify"],
     ["codemap.html", "came OUT of Voxel & Render to make room: a code-city visualisation is not part of a voxel/render pipeline, and ten is the limit"],
     ["wallpaper.html", "came OUT of Voxel & Render for the same reason: a desktop wallpaper engine shares a renderer with that drawer and not a subject"],
+
+    // *** v4590 -- registerResidue's RESIDUE SWEEP, FIRST PASS: THE PLACEMENTS THAT NEEDED NO JUDGEMENT AND ONE
+    // THAT NEEDED CORRECTING. *** A background research pass read all 62 residue pages and proposed a section or
+    // an exemption for each; the confident placements moved into SECTIONS above, and what is here is the pages
+    // that stay unplaced for an honest, checkable reason rather than a guess. The remaining ~20 "needs Keith's
+    // judgement" pages from that same pass are NOT here yet -- they are still residue, on purpose, pending his
+    // review.
+    ["bands.html", "physics/quantum/kronigPenney.js fits PL: Matter & Chaos exactly by subject, but that drawer is at MAX_PER_PANEL (15 of 15) with no slot to give it"],
+    ["turing.html", "Brusselator reaction-diffusion fits PL: Matter & Chaos by subject, same as bands.html -- and the same full drawer"],
+    ["office-floor.html", "the Roundhouse office manager is a textbook Physics Lab fit (an arc's front door, this file's own physicslab precedent), but physicslab is at MAX_PER_PANEL (15 of 15)"],
+    ["excel.html", "the Excel half of the VBA bridge, companion to aibrain.html -- but GPU Brain is at MAX_PER_PANEL (15 of 15)"],
+    ["orbs.html", "ui/stateOrb.js -- a DOM/CSS widget, not a canvas page. Same precedent as odometer.html above: there is no UI drawer in this tree"],
+    ["report.html", "a fleet-version/ledger record page -- the same 'project-record, not an instrument' shape as predict.html and predictions.html above"],
+    ["raycast.html", "v3823 -- Keith explicitly moved this OUT of System Tools back to Unsorted: 'raycast need to be moved out of System Tools and moved to swek engine unsorted.' It left systools' pages[] that round but never got an UNPLACED line of its own, so it read as drifted residue rather than as the deliberate move it was -- correcting that now, not re-litigating it"],
+    ["ascii-video.html", "v3823 -- the SAME request, same round, same page missing its UNPLACED line: 'Ascii video ... need to be moved out of System Tools and moved to swek engine unsorted'"],
+    ["android-peer.html", "box3d's Cross-Arch cluster is the right SUBJECT (peer grading across architectures), but its only anchor is the peer-picker TOOLBAR button (id=\"androidPeerBtn\"), above the Arriving header -- the mover can only move an anchor OUT OF Arriving (v3259's rule, the page-index.html toolbar trap), and there is none to take"],
+    ["ios-peer.html", "same toolbar-only anchor as android-peer.html (id=\"iosPeerBtn\") -- no Arriving anchor exists for box3d to claim, though it is the right subject"],
+    ["steamdeck-peer.html", "same toolbar-only anchor as its two peer siblings (id=\"steamdeckPeerBtn\") -- no Arriving anchor for box3d to claim"],
+    // v4590 -- registerResidue's SECOND (JUDGEMENT) PASS. Nine pages that fit a real drawer by subject but have
+    // no room in it this round, or fit no drawer at all -- reported rather than guessed at.
+    ["beam.html", "elasticity/buckling is matter-shaped (\"dynamics\") but PL: Matter & Chaos is at MAX_PER_PANEL (15 of 15) and, unlike cosmic-web.html, has no cleaner second subject home to try instead"],
+    ["euler-blast.html", "the same euler2d machinery PL: Fluids already holds several pipelines of, but that drawer reached MAX_PER_PANEL (15 of 15) this same round -- a capacity shortfall, not a taxonomy question"],
+    ["little-planet.html", "a stereographic render pass over procPlanet.js -- a clean Renders fit, but Renders reached MAX_PER_PANEL (15 of 15) this same round"],
+    ["render-review.html", "a render-batch review/publish tool -- no existing drawer is about curating and shipping what the engine already produced, and two pages is not yet a family (see youtube-export.html)"],
+    ["skillbook.html", "a deterministic-mock trial/critic/verdict harness -- re-examined on this second pass and still no clean subject fit: not GPU Brain (no policy, no /ai/ route), not PetFBI (no lost-pet workflow)"],
+    ["svg-forge.html", "an SVG-extrude-plus-holofoil shader technique -- a clean Renders fit, but Renders reached MAX_PER_PANEL (15 of 15) this same round"],
+    ["water-2d.html", "a parallax water shader technique -- a clean Renders fit, but Renders reached MAX_PER_PANEL (15 of 15) this same round"],
+    ["youtube-export.html", "a cross-subsystem showcase/export compositor -- no single drawer owns it, and paired with render-review.html it is still only two pages, not yet a family worth naming a drawer for"],
+    ["zoom-blur.html", "a post-fx render pass over procPlanet.js -- a clean Renders fit, but Renders reached MAX_PER_PANEL (15 of 15) this same round"],
+    ["cosmic-web.html", "fits PL: Cosmic & Relativity by subject (Zel'dovich large-scale structure), but already has a hand-written 'Blast Wax' convenience anchor elsewhere on the page -- the same two-anchor conflict pageSectionsReport-selfcheck.mjs caught for blob-selfie.html and backend-physics-check.html earlier this round"],
+    ["blob-shock.html", "fits Blobs by subject ('metaballs hit by a shockwave'), but already has a hand-written 'Tomograph' convenience anchor elsewhere on the page -- same two-anchor conflict as cosmic-web.html"],
+    ["blob-selfie.html", "fits PL: Optics & Imaging by subject (tomography/reconstruction over the blobulator), but already has a hand-written convenience anchor inside the fluidgpu panel -- claiming it in optics too would give it two anchors, which pageSectionsReport-selfcheck.mjs measures and correctly refuses"],
+    ["backend-physics-check.html", "fits Box3D & Cross-Arch by subject (the box3d-vs-Jolt adjudicator), but already has a hand-written 'GPU adjudicator' convenience anchor inside another panel -- same two-anchor conflict as blob-selfie.html"],
+    ["bzflag.html", "fits Game Theory by subject (its own chip is already lifted into this panel's chip row via CHIP_GROUPS), but its Arriving anchor would be a SECOND anchor alongside the 'Drive it' link already inside its own bzflag gpanel -- pageSectionsReport-selfcheck.mjs measures this and refuses it"],
+    ["bzflag-info.html", "same bzflag cluster, same two-anchor conflict: an 'Open BZFlag page' link already sits inside the bzflag gpanel"],
+    ["bzflag-test.html", "same bzflag cluster, same two-anchor conflict: a 'Network test' link already sits inside the bzflag gpanel"],
+    ["rocket-league.html", "fits Game Theory the same way bzflag.html does, and fails the same way: an 'Open full page' link already sits inside its own rocketleague gpanel"],
 ]);
 
 /** Every page claimed by a section, flat. Arriving keeps what is NOT in here. */

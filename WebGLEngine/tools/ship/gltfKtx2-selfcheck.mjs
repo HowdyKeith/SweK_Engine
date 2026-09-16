@@ -25,15 +25,18 @@ let fails = 0;
 const ok = (label, cond, detail) => { if (!cond) fails++; console.log(`  ${cond ? "PASS" : "FAIL"}  ${label}${detail ? "   " + detail : ""}`); };
 const report = (s) => console.log(`  ----  ${s}`);
 
-// Every file taken from three.js r160, with the digest it arrived with. A vendored file that has been edited
+// Every file taken from three.js, with the digest it arrived with. A vendored file that has been edited
 // is a DIFFERENT file wearing an upstream name, and the whole provenance record rests on it not being one.
+// RE-VENDORED at 0.185.1 (backlog "vendor-three-r160-stale", tools/ship/nextRounds.mjs) -- digests below
+// updated to match; zstddec.module.js's is UNCHANGED because that file is byte-identical between r160 and
+// 0.185.1 upstream (re-confirmed directly, not assumed), so its digest carries over rather than moving.
 const VENDORED = {
-    "vendor/three/jsm/loaders/KTX2Loader.js":            "9cca5aa35fdb04b4818c792c8d08fb6e7607dcafc46e7b06a9485e9f25261be7",
-    "vendor/three/jsm/utils/WorkerPool.js":              "94ff7b608caf3b827ffa95bd6092b9d174732b856915b38ed006b4f049f95675",
-    "vendor/three/jsm/libs/ktx-parse.module.js":         "f73948e7bbf8db386076fda0458160bdb50ce2e11e88fa7da0f339e1ec547493",
+    "vendor/three/jsm/loaders/KTX2Loader.js":            "3a3233ce3409443076d3414b78832e1405fcfac5ecb34d367365fd0781127d6c",
+    "vendor/three/jsm/utils/WorkerPool.js":              "5ac7095fd566bc9ae48376055fd66edf27cb9ebbf9e1269dc206bfd4933ae9eb",
+    "vendor/three/jsm/libs/ktx-parse.module.js":         "f40c491f6c44dde511268121f778a0050e73b1a15fd844c1ae2c78c73213eafc",
     "vendor/three/jsm/libs/zstddec.module.js":           "5cbf818e842628a4464e748594a6deae18ceddda3c2f541e7b3a0ff5fc7611e2",
-    "vendor/three/jsm/libs/basis/basis_transcoder.js":   "48a0ef319a28bf0224ee88ded34f74eaf97c175bba9eb18b47fb9720510ad6c4",
-    "vendor/three/jsm/libs/basis/basis_transcoder.wasm": "79ae97d781e10a566659c689b7bb1de91726453f55f9f5e3bcc07a4e3904070f",
+    "vendor/three/jsm/libs/basis/basis_transcoder.js":   "8478b5b6d6b74e7d3082b89f6417321d8d1dc0307f2b30d4484bb11b441696a1",
+    "vendor/three/jsm/libs/basis/basis_transcoder.wasm": "6cf17dc889352c42e9acf8897107978d127005fe3386c36a0e3845e27967630a",
 };
 
 const glb = (o) => {
@@ -58,7 +61,7 @@ const FIX = {
 console.log("gltfKtx2-selfcheck -- the transcoder, and when it is fetched\n");
 
 // =============================================================================================================
-console.log("1. *** EVERY VENDORED FILE IS PRESENT AND BYTE-IDENTICAL TO UPSTREAM r160 ***");
+console.log("1. *** EVERY VENDORED FILE IS PRESENT AND BYTE-IDENTICAL TO UPSTREAM 0.185.1 ***");
 {
     const missing = Object.keys(VENDORED).filter((f) => !fs.existsSync(path.join(ROOT, f)));
     ok("*** all six files the loader needs are here ***", missing.length === 0,

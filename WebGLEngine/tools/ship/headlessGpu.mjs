@@ -88,29 +88,73 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
+import { shellRoots } from "./playwrightResolve.mjs";
 
-// *** ONE PLACE THAT KNOWS, following playwrightResolve.mjs's rule verbatim: three gates each grew their own
-// guess and two went stale on the same box. A second copy of this list is that defect happening again. ***
+// v4615 -- *** THIS LIST WAS ONE SANDBOX'S OWN GLOBAL-INSTALL PATHS, AND IT NEVER MATCHED ANYTHING ELSE. ***
+// The three absolute fallbacks below (/opt/node22, /usr/local, /home/claude/.npm-global) are this specific
+// Claude Code sandbox's own directories -- not a general guess-list, a RECORD of one box. Keith's Windows rig
+// hit exactly this: headlessGpuSkipReason() printed all three verbatim, none of them meaningful on a machine
+// with no /opt or /home at all. `webgpu` (dawn-gpu/node-webgpu) genuinely ships Windows (win64) prebuilt
+// binaries -- confirmed against the package's own npm listing -- so the fix is a real Windows candidate, not a
+// platform exclusion. `require("webgpu")` cannot find a GLOBAL npm install by bare specifier on ANY platform
+// (global installs are not on Node's default resolution path), which is the entire reason this list of
+// absolute paths exists at all; %APPDATA%\npm\node_modules is where `npm i -g webgpu` actually lands one.
 export const WEBGPU_PATHS = Object.freeze([
     "webgpu",
     "/opt/node22/lib/node_modules/webgpu/index.js",
     "/usr/local/lib/node_modules/webgpu/index.js",
     "/home/claude/.npm-global/lib/node_modules/webgpu/index.js",
+    ...(process.env.APPDATA ? [path.join(process.env.APPDATA, "npm", "node_modules", "webgpu", "index.js")] : []),
 ]);
 
-/** Where a Playwright browser bundle keeps its Vulkan driver. */
-export const ICD_ROOT = process.env.PLAYWRIGHT_BROWSERS_PATH || "/opt/pw-browsers";
-export const ICD_LEAF = path.join("chrome-linux", "vk_swiftshader_icd.json");
+// v4615 -- *** THE VULKAN-ICD HALF HAD THE SAME DEFECT ITS OWN HEADER SAID playwrightResolve.mjs ALREADY
+// FIXED. *** ICD_ROOT was ONE root (PLAYWRIGHT_BROWSERS_PATH or a Linux-only literal), and ICD_LEAF was
+// hardcoded to "chrome-linux" -- exactly the single-guess shape playwrightResolve.mjs's header calls out BY
+// NAME as the defect three gates each grew once. That file already carries the fix (shellRoots(): every root
+// a Playwright install puts browsers under, per platform; SHELL_LEAVES: every platform's executable layout) --
+// so this imports it rather than writing a fourth copy, which is the exact warning that file's own header
+// gives about itself.
+/** Where a Playwright browser bundle keeps its Vulkan driver -- every root shellRoots() knows, not one. */
+export function icdRoots(env = process.env) { return shellRoots(env); }
+
+/** Back-compat single root: the first candidate, same value this always returned when PLAYWRIGHT_BROWSERS_PATH
+ * was set (which every gate here runs with) or on a box whose only root is /opt/pw-browsers. */
+export const ICD_ROOT = icdRoots()[0];
+
+/** The ICD manifest's leaf path, per platform layout -- mirrors playwrightResolve.mjs's SHELL_LEAVES exactly;
+ * the manifest's OWN filename does not change across platforms, only the folder Playwright names it under.
+ * v4617 -- chrome-win64 carries this file too (confirmed on Keith's rig, Playwright chromium v1243: it ships
+ * beside chrome.exe in chrome-win64, unlike the headless-shell package which does not need or carry it), the
+ * same folder rename playwrightResolve.mjs's SHELL_LEAVES picked up. */
+export const ICD_LEAVES = Object.freeze([
+    path.join("chrome-linux", "vk_swiftshader_icd.json"),
+    path.join("chrome-win", "vk_swiftshader_icd.json"),
+    path.join("chrome-win64", "vk_swiftshader_icd.json"),
+    path.join("chrome-mac", "vk_swiftshader_icd.json"),
+]);
+export const ICD_LEAF = ICD_LEAVES[0];   // back-compat: the value every existing caller of this name expects
 
 /**
- * Every SwiftShader ICD manifest under the browser root, SORTED so two boxes with the same bundles pick the
- * same one. Returns paths, not a boolean: a gate that cannot say which driver it used cannot be re-diagnosed
- * when the next Playwright version moves the directory -- which it will, the name carries a build number.
+ * Every SwiftShader ICD manifest under ONE browser root, SORTED so two boxes with the same bundles pick the
+ * same one. Single-root signature preserved deliberately (headlessGpu-selfcheck.mjs calls this with an
+ * explicit root, including a nonexistent one, as its own control case) -- multi-root search lives in
+ * configureVulkanIcd/headlessGpuSkipReason, which call this once per icdRoots() candidate instead.
  */
 export function findVulkanIcds(root = ICD_ROOT) {
     let entries = [];
     try { entries = fs.readdirSync(root); } catch { return []; }
-    return entries.map((d) => path.join(root, d, ICD_LEAF)).filter((p) => fs.existsSync(p)).sort();
+    const out = [];
+    for (const d of entries) for (const leaf of ICD_LEAVES) {
+        const p = path.join(root, d, leaf);
+        if (fs.existsSync(p)) out.push(p);
+    }
+    return out.sort();
+}
+
+/** Every ICD manifest across every root a Playwright install might use, first non-empty root wins. */
+function findVulkanIcdsAnyRoot() {
+    for (const root of icdRoots()) { const found = findVulkanIcds(root); if (found.length) return found; }
+    return [];
 }
 
 /**
@@ -120,9 +164,9 @@ export function findVulkanIcds(root = ICD_ROOT) {
  * SwiftShader, a debug driver -- and a helper that silently redirected them to Chromium's copy would make
  * every result a fact about a driver they did not pick.
  */
-export function configureVulkanIcd(root = ICD_ROOT) {
+export function configureVulkanIcd(root) {
     if (process.env.VK_ICD_FILENAMES) return { path: process.env.VK_ICD_FILENAMES, chosen: false, found: [] };
-    const found = findVulkanIcds(root);
+    const found = root != null ? findVulkanIcds(root) : findVulkanIcdsAnyRoot();
     if (!found.length) return { path: "", chosen: false, found };
     process.env.VK_ICD_FILENAMES = found[0];
     return { path: found[0], chosen: true, found };
@@ -141,17 +185,30 @@ export function resolveWebgpu(requireFn) {
 /**
  * Why a caller cannot run, or null when it can. Two independent facts reported on their own evidence rather
  * than collapsed into one guess -- browserSkipReason's rule, for the same reason it exists there.
+ *
+ * v4616 -- *** THE VULKAN-DRIVER REQUIREMENT WAS APPLIED TO EVERY PLATFORM, AND IT ONLY HOLDS ON ONE OF
+ * THEM. *** Measured directly on Keith's Windows rig: mod.create([]).requestAdapter() with NO Vulkan ICD
+ * configured anywhere and VK_ICD_FILENAMES unset returns a REAL adapter and a REAL device. Dawn's default
+ * backend on win32 is D3D12 (macOS: Metal); neither needs SwiftShader or a Vulkan manifest at all -- that
+ * whole discovery mechanism exists because Linux Dawn has ONLY a Vulkan backend, and most Linux CI/sandbox
+ * boxes have no real Vulkan-capable driver, which is exactly what the SwiftShader software fallback answers.
+ * So this function was refusing to even attempt requestAdapter() on Windows, based on a requirement Windows
+ * does not have. The refusal is now Linux-only; win32 and darwin trust node-webgpu's own default adapter
+ * selection rather than second-guessing it with a Linux-shaped check.
  */
 export function headlessGpuSkipReason(requireFn) {
     const { mod } = resolveWebgpu(requireFn);
-    const icds = findVulkanIcds();
-    if (!mod && !icds.length)
-        return "neither node-webgpu (tried: " + WEBGPU_PATHS.join(", ") + ") nor a Vulkan ICD under " + ICD_ROOT;
-    if (!mod)
-        return "node-webgpu is not installed here -- `npm i -g webgpu` (a Vulkan ICD IS present at " + icds[0] + ")";
+    if (!mod) {
+        const icds = process.platform === "linux" ? findVulkanIcdsAnyRoot() : [];
+        if (icds.length) return "node-webgpu is not installed here -- `npm i -g webgpu` (a Vulkan ICD IS present at " + icds[0] + ")";
+        return "node-webgpu did not resolve (tried: " + WEBGPU_PATHS.join(", ") + ")" +
+               (process.platform === "linux" ? ", and no Vulkan ICD was found under " + icdRoots().join(", ") + " either" : "");
+    }
+    if (process.platform !== "linux") return null;   // D3D12 (win32) and Metal (darwin) need no ICD at all
+    const icds = findVulkanIcdsAnyRoot();
     if (!icds.length && !process.env.VK_ICD_FILENAMES)
-        return "node-webgpu resolved but there is no Vulkan driver: no " + ICD_LEAF + " under " + ICD_ROOT +
-               " and VK_ICD_FILENAMES is unset. Dawn will report 'Found no drivers!'";
+        return "node-webgpu resolved but there is no Vulkan driver: no " + ICD_LEAVES.join(" or ") + " under " +
+               icdRoots().join(", ") + " and VK_ICD_FILENAMES is unset. Dawn will report 'Found no drivers!'";
     return null;
 }
 
@@ -244,17 +301,9 @@ export function storageWords(data) {
     return new Uint32Array(out.buffer);
 }
 
-// *** v4572 -- `outBinding` AND `uniformBinding`, BECAUSE 0-AND-1 WAS A HOUSE STYLE MISTAKEN FOR A LAW. ***
-// Every corpus entry until now declared its out buffer at binding 0 and its uniform at 1, and the harness
-// hard-coded that. The temporal arc (v4552-v4571) writes thirteen kernels the other way round -- inputs
-// first, dst next, uniform last -- so running one here bound the READ-BACK buffer where the kernel reads its
-// INPUT. The device is perfectly happy with that: the bind group is valid, the kernel runs, it writes to a
-// buffer nobody reads, and the read-back is whatever it was created as. MEASURED at v4572 with a -999 fill:
-// the harness returned ok:true, no errors, and eight untouched sentinels. NO ERROR SCOPE CATCHES THIS ONE,
-// which is why `outInit` now defaults to a sentinel and a run that leaves it whole is reported as such.
 export async function runWgslComputeNative({ code, entryPoint = "main", outCount, uniforms = null,
                                              workgroups = 1, compileOnly = false, requireFn = null,
-                                             inputs = null, outInit = null,
+                                             inputs = null, outInit = null, texture = null,
                                              outBinding = 0, uniformBinding = 1 } = {}) {
     const skip = headlessGpuSkipReason(requireFn);
     if (skip) return { ok: false, skipped: true, reason: skip, values: [], errors: [] };
@@ -281,6 +330,7 @@ export async function runWgslComputeNative({ code, entryPoint = "main", outCount
         const G = mod.globals || globalThis;
         const U = G.GPUBufferUsage || globalThis.GPUBufferUsage;
         const M = G.GPUMapMode || globalThis.GPUMapMode;
+        const TU = G.GPUTextureUsage || globalThis.GPUTextureUsage;
         const bytes = outCount * 4;
         const outBuf = dev.createBuffer({ size: bytes, usage: U.STORAGE | U.COPY_SRC | U.COPY_DST });
         // v4465 -- `outInit`: the out buffer's starting contents, for a kernel that works IN PLACE on binding 0 (the
@@ -310,6 +360,17 @@ export async function runWgslComputeNative({ code, entryPoint = "main", outCount
             entries.push({ binding: inp.binding, resource: { buffer: b } });
             inBufs.push(b);
         }
+        let tex = null;
+        if (texture) {
+            const { width, height, data, binding, format = "rgba16float" } = texture;
+            if (format !== "rgba16float") throw new Error("headlessGpu: runWgslComputeNative texture only supports rgba16float today (got " + format + ")");
+            const half = new Uint16Array(width * height * 4);
+            for (let i = 0; i < half.length; i++) half[i] = doubleToHalf(data[i] || 0);
+            tex = dev.createTexture({ size: [width, height], format, usage: TU.TEXTURE_BINDING | TU.COPY_DST });
+            dev.queue.writeTexture({ texture: tex }, half, { bytesPerRow: width * 8 }, [width, height]);
+            entries.push({ binding, resource: tex.createView() });
+        }
+
         // *** v4572 -- EVERYTHING FROM HERE IS INSIDE A VALIDATION ERROR SCOPE, AND THE REASON IS THE WORST
         // KIND OF PASS. *** Until this round a bind group the device REJECTED cost nothing: createBindGroup
         // returns an invalid object rather than throwing, the submit is dropped, the read-back is still the
@@ -340,7 +401,7 @@ export async function runWgslComputeNative({ code, entryPoint = "main", outCount
         await readBuf.mapAsync(M.READ);
         const values = Array.from(new Float32Array(readBuf.getMappedRange()));
         readBuf.unmap();
-        outBuf.destroy(); readBuf.destroy(); uniBuf?.destroy();
+        outBuf.destroy(); readBuf.destroy(); uniBuf?.destroy(); tex?.destroy();
         for (const b of inBufs) b.destroy();
         const wroteNothing = !outInit && outCount > 0 && values.every((v) => v === LIVENESS_SENTINEL);
         return { ok: true, skipped: false, values, errors: [], wroteNothing, ...meta };

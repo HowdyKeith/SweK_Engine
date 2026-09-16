@@ -87,9 +87,23 @@ sec("3. A CONTROL FIRST: THE RUNNER CAN REPORT GREEN");
 sec("4. A BOUNDED SUBSET IS RE-RUN, AND A GATE THAT WENT GREEN MAKES THIS RED");
 // ---------------------------------------------------------------------------------------------------------
 {
-    const { gates, costMs } = RC.cheapSubset(4000);
-    ok(gates.length >= 10, "the subset is worth running", `${gates.length} gates, ~${costMs} ms recorded`);
-    ok(JSON.stringify(RC.cheapSubset(4000).gates.map((g) => g.gate)) === JSON.stringify(gates.map((g) => g.gate)),
+    // *** THE BUDGET STOPPED BEING THE INTERESTING NUMBER AT v4590, BECAUSE THE POPULATION IT BUDGETS OVER
+    // COLLAPSED TO ONE. *** This section's design assumed a register with SEVERAL cheap candidates to draw
+    // from -- 10 originally, 3 after the cba0f571 pass, 2 after the post-v4297-sweep drift-fix pass
+    // (definitionGates 503ms, registerResidue 1364ms). The v4590 residue sweep fixed registerResidue for
+    // real (see FIXED_SINCE_V4279), and definitionGates was re-baselined the same round -- the exact two
+    // gates that WERE the entire cheap population, leaving RED_AT_V4279 at length 1: shaderRefs-selfcheck.mjs
+    // alone, at 120,077 ms. A 4,000 ms budget now admits ZERO gates not because nothing is being checked but
+    // because the one gate left is thirty times over that budget -- so "cheap subset" and "the whole
+    // register" are now the SAME set, and the honest move is to check the whole thing rather than keep a
+    // budget line that can never again admit anything. If RED_AT_V4279 grows a second entry cheap enough to
+    // matter, this can go back to being budget-bounded; today it is not, and pretending otherwise would be
+    // exactly the "pin a number that happens to be true" mistake this file's own history keeps naming.
+    const { gates, costMs } = RC.cheapSubset(150000);
+    ok(gates.length === RC.RED_AT_V4279.length && gates.length >= 1,
+       "the subset covers the ENTIRE register, because the register is now small enough that it fits",
+       `${gates.length} of ${RC.RED_AT_V4279.length} gates, ~${costMs} ms recorded`);
+    ok(JSON.stringify(RC.cheapSubset(150000).gates.map((g) => g.gate)) === JSON.stringify(gates.map((g) => g.gate)),
        "and it is DETERMINISTIC, so this gate cannot flap between runs",
        "a random sample would go red on one day and green the next for no reason in the tree");
 
@@ -141,10 +155,11 @@ sec("5. THE RE-CHECK IS RECORDED, INCLUDING THAT NOTHING WAS FIXED");
 //      "every sampled gate is still red" is exactly what a broken runner produces. That is why the control
 //      runs BEFORE the subset and not after it.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
-console.log("unchecked here: THE OTHER 17 ENTRIES. This re-runs twenty of thirty-seven, chosen by cost, so a " +
-    "gate fixed among the seventeen slow ones will not be noticed until somebody re-runs the full list -- " +
-    "which costs 142 s and is a deliberate trade, not an oversight. Also unchecked HERE: whether any gate that " +
-    "was GREEN at v4279 has since gone red. That question was UNKNOWN until v4297; the full 1,366-gate two-phase " +
-    "sweep answered it -- SIX regressions, named in gateSweep.SWEEP_V4297 and reconciled by " +
-    "gateSweep-selfcheck.mjs section 7. This file still cannot see the next one; that needs the sweep re-run.");
+console.log("v4590 -- section 4 now re-runs the WHOLE register, not a bounded slice of it: RED_AT_V4279 fell to " +
+    "one entry (shaderRefs-selfcheck.mjs, ~120 s) once definitionGates and registerResidue -- the entire cheap " +
+    "population -- were fixed the same round. Nothing is 'unchecked here' by cost anymore. Still unchecked HERE: " +
+    "whether any gate that was GREEN at v4279 has since gone red. That question was UNKNOWN until v4297; the " +
+    "full 1,366-gate two-phase sweep answered it -- SIX regressions, named in gateSweep.SWEEP_V4297 and " +
+    "reconciled by gateSweep-selfcheck.mjs section 7. This file still cannot see the next one; that needs the " +
+    "sweep re-run.");
 process.exit(fails ? 1 : 0);

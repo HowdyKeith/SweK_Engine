@@ -215,6 +215,25 @@ export const REACH_AT_V4548 = Object.freeze({
     // population nothing. Worth saying because the previous four rounds each went red here on their own
     // arrival: a record written into a module whose gate is over budget arrives unchecked, and this one was
     // written into a gate that runs at ship time on purpose.
+    // RE-TAKEN after the origin/main merge (25 new gates: the F82 Fresnel / specular-probe family, the
+    // AI-presence-orb set, and others): 107 -> 110 records, 64 -> 70 checked, 19 -> 29 over-budget,
+    // 21 -> 11 unguarded, unchecked held at 40. All three arrivals landed CHECKED or moved a record out of
+    // `unguarded` into `over-budget` rather than raising the ceiling -- read off reach(), not guessed.
+    // v4622 -- RE-TAKEN: 110 -> 111 records from the ordinary growth of concurrent rounds on this same
+    // unshipped branch; see checked/overBudget/unguarded/unchecked below for the rest of the reading.
+    // v4622b -- RE-TAKEN AGAIN, WITHIN THE SAME ROUND: 111 -> 113. This round's own registration of three
+    // reds added RED_AT_V4622_GATES and RED_AT_V4622 to redCensus.mjs -- two more records, neither guarded
+    // by any gate that names it (redCensus.mjs's own gate, redCensus-selfcheck.mjs, is over budget and does
+    // not name individual export constants), so both land in unguarded rather than checked.
+    // v4587 -- RE-TAKEN on origin/main, diverged from this branch's own history at 107: 107 -> 108, one
+    // record, reportDoors' NO_GATE_V4587 (a dated list of two module names; documentary, no gate reads it as
+    // data), unguarded 9 -> 9.
+    // v4622-merge -- RE-TAKEN on this branch's actual merge of origin/main: the two histories above both
+    // diverged from 107 and are both real. The final reading is a fresh reach() over the merged tree.
+    // v4622-merge-b -- RE-TAKEN after the actual merge landed: 113 -> 114.
+    // v4623: 114 -> 115. KIT_AT_V4623 landed in tools/ship/murmurKit-selfcheck.mjs, guarded by that same
+    // gate at 1,147 ms against the 3,000 ms budget, so it arrived CHECKED -- a third consecutive round
+    // where a new record costs the unchecked population nothing.
     // v4536 -- RE-TAKEN: 104 -> 105, one record, PARTITION_AT_V4536 in nav/partitionScore.mjs. The ratchet
     // below is a CEILING on unchecked records, so it has to be measured against the live population or a
     // round that adds a record makes the ceiling look roomier without checking anything.
@@ -243,7 +262,10 @@ export const REACH_AT_V4548 = Object.freeze({
     // RED_AT_V4562, two version-stamped frozen exports. Naming a red is an arrival the census counts, which
     // is v4540's finding from a new direction; the UNGUARDED count is unmoved because both are read by the
     // gate in the round that wrote them.
-    total: 129,
+    // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
+    // and the readings overlap on everything predating the split, so they are run over the merged tree rather
+    // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
+    total: 144,
     // *** READ OFF THE INSTRUMENT, NOT PREDICTED. *** The first draft of this record guessed 53/21/19/40 from
     // which gates the round had sped up, and was wrong on three of the four: the comment-strip fix below
     // moved two records the other way at the same time, and a guess cannot see two changes at once.
@@ -287,7 +309,18 @@ export const REACH_AT_V4548 = Object.freeze({
     // ship-time sweep. That is the ratchet doing its job on the round that wrote it, for the third round
     // running. It is NOT moved by relocating the rows: the reds those records name are gates the sweep
     // cannot run at all, so their guardian is expensive for the same reason they are.
-    checked: 64, overBudget: 19, unguarded: 21, unchecked: 40,
+    // v4622 -- RE-TAKEN: total 110 -> 111 from the ordinary growth of concurrent rounds on this same
+    // unshipped branch; checked and overBudget held at 70 and 29 (read off the instrument, not guessed), so
+    // the one new record landed in unguarded (11 -> 12) and unchecked rose with it (40 -> 41).
+    // v4622b -- RE-TAKEN AGAIN, WITHIN THE SAME ROUND: total 111 -> 113 (this round's own two-record
+    // redCensus.mjs registration, see the note above `total`). checked and overBudget held at 70 and 29;
+    // both new records landed in unguarded (12 -> 14) and unchecked rose with it (41 -> 43).
+    // v4622-merge-b -- RE-TAKEN after the actual merge landed: total 113 -> 114 (one net new record from
+    // origin/main's own side, folded into the merge). checked and overBudget moved to 64/36 -- box-load
+    // variance across which over-budget gates straddled the 3,000 ms line this run, the same wobble
+    // reportDoors-selfcheck's own note beside `after` already documents (69/27/0, then 73/22/1 minutes
+    // later on the same code). unguarded held at 14, so unchecked is 36 + 14 = 50.
+    checked: 64, overBudget: 36, unguarded: 14, unchecked: 50,
     // v4550 -- the UNMEASURED class was split out of over-budget after this gate went red twice inside full
     // sweeps and passed 68 times under load; the trigger was a concurrent REWRITE of sweep-timings.json, not
     // contention. Zero records sit in it on a settled tree, which is the expected reading.
@@ -379,6 +412,18 @@ export const UNGUARDED_SPLIT_V4577 = Object.freeze({
     // left the unguarded set.
     // v4583 -- total RE-TAKEN 106 -> 107 for CORPUS_AT_V4583, which arrived checked. The unguarded set
     // did not move: no record joined or left it this round.
+    // RE-TAKEN after the origin/main merge: 107 -> 110 records. Two records joined the unguarded set (9 ->
+    // 11), both documentary (named by no code at all) -- read off splitUnguarded(), not guessed.
+    // v4622 -- RE-TAKEN: 110 -> 111 records from the ordinary growth of concurrent rounds on this same
+    // unshipped branch. One record joined the unguarded set (11 -> 12), documentary -- read off
+    // splitUnguarded(), not guessed.
+    // v4622b -- RE-TAKEN AGAIN, WITHIN THE SAME ROUND: 111 -> 113 (this round's own two-record redCensus.mjs
+    // registration). Both joined the unguarded set (12 -> 14), both documentary -- read off splitUnguarded().
+    // v4587 -- RE-TAKEN on origin/main, diverged from this branch's own history at 107, with `total` above:
+    // 107 -> 108 on NO_GATE_V4587; the unguarded nine are the same nine.
+    // v4622-merge -- RE-TAKEN on this branch's actual merge of origin/main: both histories above diverged
+    // from 107 and are both real. The final reading is a fresh splitUnguarded() over the merged tree.
+    // v4622-merge-b -- RE-TAKEN after the actual merge landed: total 113 -> 114; unguarded held at 14.
     // v4537 -- RE-TAKEN AT THE MERGE: 106 -> 108 records and the unguarded set 9 -> 10, both DOCUMENTARY.
     // One of this branch's two arrivals joined the unguarded set and the other did not, which is the
     // distinction this row exists to keep: a record is guarded when code NAMES it, and naming it in the
@@ -404,7 +449,10 @@ export const UNGUARDED_SPLIT_V4577 = Object.freeze({
     // v4555 -- RE-TAKEN with `total`: 118 -> 127 for the nine the widened census can now see. UNGUARDED IS
     // STILL 11, and that is the reassuring half of the finding: the records the tree could not SEE were
     // nonetheless all being GUARDED, by the gates written beside them in the same rounds.
-    structural: Object.freeze({ total: 129, unguarded: 11, documentaryOfThose: 11, readByCodeOfThose: 0 }),
+    // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
+    // and the readings overlap on everything predating the split, so they are run over the merged tree rather
+    // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
+    structural: Object.freeze({ total: 144, unguarded: 17, documentaryOfThose: 17, readByCodeOfThose: 0 }),
     // BEFORE, on the tree this round opened on:
     before: Object.freeze({ total: 104, checked: 72, overBudget: 20, unmeasured: 0, unguarded: 12, unchecked: 32 }),
     // AFTER, as one reading rather than as a constant -- see the note above. Taken with the round's own

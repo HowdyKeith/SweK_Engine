@@ -22,7 +22,7 @@
 // Run: node render/cubeBake-selfcheck.mjs   (exit 0 all-pass, 1 on any fail)
 
 import crypto from "node:crypto";
-import { FACES, faceTexelDir, bakeCubemap, bakeCubemapTargets } from "./cubeBake.js";
+import { FACES, faceTexelDir, bakeCubemap, bakeCubemapTargets, dirToFace } from "./cubeBake.js";
 import { bakeNebulaCubemap } from "./nebulaSkybox.js";
 import { bakeStarCubemap } from "./proceduralStar.js";
 import { bakeSurfaceCubemap } from "../world/planetSurface.js";
@@ -163,7 +163,36 @@ const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
        drift.length ? drift.map((k) => `${k}: ${got[k]} != ${KEY[k]}`).join("; ") : "albedo, normal, rough, height all match the pre-move key");
 }
 
-// 7) SABOTAGE -- the checks above have to be able to fail. Each of these is a mistake this move could plausibly
+// 7) dirToFace, THE INVERSE -- v4578, added for physics/render/specularIBLWgsl.mjs's real-time sampler, the
+//    first caller in this tree that is handed a direction and needs a face/texel rather than the other way
+//    round. Round-tripped against faceTexelDir's own forward construction rather than checked by eye.
+{
+    let worst = 0, faceMismatches = 0;
+    for (let f = 0; f < 6; f++) {
+        for (const u of [-0.9, -0.5, -0.1, 0.1, 0.5, 0.9]) for (const v of [-0.9, -0.5, -0.1, 0.1, 0.5, 0.9]) {
+            const d = FACES[f](u, v), inv = 1 / Math.hypot(d[0], d[1], d[2]);
+            const nd = [d[0] * inv, d[1] * inv, d[2] * inv];
+            const r = dirToFace(nd);
+            if (r.face !== f) faceMismatches++;
+            worst = Math.max(worst, Math.abs(r.u - u), Math.abs(r.v - v));
+        }
+    }
+    ok(faceMismatches === 0 && worst < 1e-9,
+       `dirToFace(normalize(FACES[f](u, v))) recovers (f, u, v) across all six faces and 36 (u, v) points each -- worst |error| ${worst.toExponential(2)}, ${faceMismatches} face mismatches`);
+
+    // the six face-CENTRE directions (u=v=0) must each recover their own face with u=v=0 exactly -- the
+    // degenerate case every "dominant axis" algorithm is most likely to get the sign of wrong.
+    let centresOk = true, centreDetail = [];
+    for (let f = 0; f < 6; f++) {
+        const d = FACES[f](0, 0), inv = 1 / Math.hypot(d[0], d[1], d[2]);
+        const r = dirToFace([d[0] * inv, d[1] * inv, d[2] * inv]);
+        if (r.face !== f || Math.abs(r.u) > 1e-12 || Math.abs(r.v) > 1e-12) centresOk = false;
+        centreDetail.push(`f${f}->${r.face}(${r.u.toFixed(3)},${r.v.toFixed(3)})`);
+    }
+    ok(centresOk, "every face-centre direction recovers its own face at exactly u=v=0: " + centreDetail.join(" "));
+}
+
+// 8) SABOTAGE -- the checks above have to be able to fail. Each of these is a mistake this move could plausibly
 //    have made; if any of them still reads as "fine", the corresponding check is decoration.
 {
     // S1: sampling texel CORNERS instead of centres -- the classic off-by-half.
@@ -189,6 +218,22 @@ const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
        "SABOTAGE a per-face term produces different faces (the shape a seam takes)");
     ok(perFace.faces[0].every((v, i) => i % 3 !== 0 || v === perFace.faces[0][0]),
        "SABOTAGE the per-face bake is FLAT within a face -- direction ignored, which is the tell");
+
+    // S4: Z checked against X alone, Y never compared -- a realistic "forgot one branch of the max" bug rather
+    //     than a relabelled tie. This is not a reordering of the same comparisons (which would still pick the
+    //     true max regardless of order): Y is never looked at, so any direction where |z| beats |x| but loses
+    //     to |y| is misrouted to face 4/5 when the true dominant axis is Y.
+    const wrongAxis = (d) => {
+        const ax = Math.abs(d[0]), ay = Math.abs(d[1]), az = Math.abs(d[2]);
+        if (az >= ax) { const ma = az; return d[2] > 0 ? { face: 4, u: d[0] / ma, v: -d[1] / ma } : { face: 5, u: -d[0] / ma, v: -d[1] / ma }; }
+        if (ax >= ay) { const ma = ax; return d[0] > 0 ? { face: 0, u: -d[2] / ma, v: -d[1] / ma } : { face: 1, u: d[2] / ma, v: -d[1] / ma }; }
+        const ma = ay; return d[1] > 0 ? { face: 2, u: d[0] / ma, v: d[2] / ma } : { face: 3, u: d[0] / ma, v: -d[2] / ma };
+    };
+    const d0 = [0.1, 0.8, 0.3]; // |y| > |z| > |x| -- the true dominant axis is Y, and the flawed check never asks
+    const nd0 = (() => { const inv = 1 / Math.hypot(d0[0], d0[1], d0[2]); return [d0[0] * inv, d0[1] * inv, d0[2] * inv]; })();
+    const right = dirToFace(nd0), wrong = wrongAxis(nd0);
+    ok(right.face === 2 && wrong.face === 4,
+       `SABOTAGE comparing Z only against X (never Y) misroutes a Y-dominant direction to +Z: correct face ${right.face}, sabotaged face ${wrong.face}`);
 }
 
 if (fail) { console.error(`\ncubeBake-selfcheck: ${pass} pass, ${fail} FAIL`); process.exit(1); }

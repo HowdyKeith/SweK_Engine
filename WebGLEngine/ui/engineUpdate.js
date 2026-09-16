@@ -15,7 +15,10 @@ const j = async (u, opt) => { try { return await fetch(u, opt).then(r => r.json(
 
 async function status() { return j("/sys/update/status"); }
 async function check()  { return j("/sys/update/check"); }
-async function apply()  { return j("/sys/update/apply", { method: "POST" }); }
+// v4610 -- `manual` distinguishes an actual button click (the ONE case that should bypass the
+// defer-while-busy guard) from every automatic caller. See _runApply's own header for why this
+// matters: /sys/update/apply used to force through that guard unconditionally.
+async function apply(manual) { return j("/sys/update/apply", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ manual: !!manual }) }); }
 async function setAutoApply(on) { return j("/sys/update/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ update: { enabled: !!on, autoApply: !!on } }) }); }
 
 function _btn(label, primary) { const b = document.createElement("button"); b.textContent = label; b.style.cssText = "padding:6px 12px;border-radius:6px;cursor:pointer;font:12px ui-monospace,monospace;" + (primary ? "background:#0bf;color:#012;border:1px solid #2bd6ff;" : "background:#0c1622;color:#cde;border:1px solid #2a3340;"); return b; }
@@ -38,10 +41,20 @@ function _waitForNewVersionThenReload(targetV, onProgress) {
     setTimeout(tick, 3500);   // give the new launcher a moment to kill the old server + bind
 }
 
-function _runApply(onProgress, onDone) {
+// v4610 -- `manual` MUST be true only when a person just clicked a button and is watching (the
+// Settings panel's own "Install & restart"). Every automatic caller (the on-load auto-apply check,
+// the peer-propagation prompt/auto-confirm, and its no-toast-surface fallback) leaves it false, so
+// /sys/update/apply does NOT pass force:true for them and the server's defer-while-busy guard
+// (ai-bridge/runBusy.js) actually gets to run. Before this, /sys/update/apply forced through that
+// guard for every caller, so an auto-triggered relaunch could kill an in-flight release build even
+// though the guard existed and was correct -- the same "guard existed, one caller never asked it"
+// shape runBusy.js's own header already names for the poller/boot-scan/peer-pull trio, just one
+// layer further out, on the CLIENT's own auto-apply paths rather than sysadminBridge's internal ones.
+function _runApply(onProgress, onDone, manual) {
     onProgress && onProgress("Installing \u2014 approve any UAC prompt\u2026", null);
-    apply().then(r => {
+    apply(manual).then(r => {
         if (r && r.launched) { onProgress && onProgress("New version launched. Restarting the engine\u2026", null); _waitForNewVersionThenReload(r.version, onProgress); onDone && onDone(true, r); }
+        else if (r && r.deferred) { onProgress && onProgress("v" + r.version + " is ready but waiting \u2014 " + (r.busy || "something") + " is running. It installs once that finishes.", null); onDone && onDone(false, r); }
         else { onProgress && onProgress("\u2717 " + ((r && r.error) || "apply failed") + (r && r.note ? " \u2014 " + r.note : ""), false); onDone && onDone(false, r); }
     }).catch(e => { onProgress && onProgress("\u2717 " + e.message, false); onDone && onDone(false, null); });
 }
@@ -106,7 +119,7 @@ async function renderPanel(host) {
     removeRow.cb.onchange = async () => { await j("/sys/update/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ update: { autoRemoveOld: removeRow.cb.checked } }) }); setProg(removeRow.cb.checked ? "\u2713 will auto-remove old folders on boot (when their zip is in Downloads)" : "auto-remove off", true); loadPrunePreview(); };
     cleanBtn.onclick = async () => { cleanBtn.disabled = true; try { const r = await j("/sys/update/prune", { method: "POST" }); const n = (r && r.removed || []).length; setProg(n ? ("\u2713 removed " + n + " old folder(s)") : "nothing to remove", true); } catch { setProg("clean failed", false); } cleanBtn.disabled = false; loadPrunePreview(); };
     checkBtn.onclick = refresh;
-    installBtn.onclick = () => { installBtn.disabled = true; checkBtn.disabled = true; _runApply(setProg, () => {}); };
+    installBtn.onclick = () => { installBtn.disabled = true; checkBtn.disabled = true; _runApply(setProg, () => {}, /* manual */ true); };
     autoCb.onchange = async () => { await setAutoApply(autoCb.checked); setProg(autoCb.checked ? "\u2713 auto-install on" : "auto-install off", true); };
     const ghStatus = async () => {
         const g = await j("/sys/update/github");

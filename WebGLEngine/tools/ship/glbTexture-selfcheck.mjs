@@ -356,6 +356,12 @@ function sourcesNaming(needle) {
             if (e.isDirectory()) { walk(p); continue; }
             if (!/\.(js|mjs|html)$/.test(e.name)) continue;
             if (p.includes("glbTexture")) continue;   // a scan must not count the scanner -- orreryFleetScan's rule
+            // nextRounds.mjs is the standing backlog log: its "how"/"why" fields are PROSE ABOUT THE TREE, held
+            // as string literals rather than // comments, so noComments() below cannot strip them. Its v4499
+            // entry on ensureThree.js quotes GLTFLoader's public API -- "setDRACOLoader/setKTX2Loader/..." --
+            // while explaining a diff, and a raw scan reads that quote as a caller. Same fault the v4266 comment
+            // fix exists for, one syntax further from a comment: a round's own prose becoming evidence against it.
+            if (p.endsWith("/tools/ship/nextRounds.mjs")) continue;
             const raw = fs.readFileSync(p, "utf8");
             if (!raw.includes(needle)) continue;
             // *** COMMENTS ARE STRIPPED, BECAUSE THIS ROUND'S OWN CHANGELOG NOTE BROKE THIS CHECK. *** The

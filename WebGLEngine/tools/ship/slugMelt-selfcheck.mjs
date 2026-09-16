@@ -35,7 +35,7 @@
 //                                                                                     fill but this font device's pipeline was built without one").
 //                   Each restored and the baseline re-run: 0 red.
 //
-// Run: node tools/ship/slugMelt-selfcheck.mjs      (~60 s)
+// Run: node tools/ship/slugMelt-selfcheck.mjs      (~1.8 s)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";

@@ -878,6 +878,8 @@ window.addEventListener("load", function () {
             <a href="/fingerprint.html" target="_blank" rel="noopener" title="Fleet Fingerprint: ask every peer for its cross-architecture fingerprint and see who agrees" style="color:#6ee7ff">Fleet Fingerprint</a>
             <a href="/couple.html" target="_blank" rel="noopener" title="Multi-physics coupling bench: pick thermal / plasticity / muscle / fluid, paint the field or drop the fluid, and watch the deterministic solver respond. Every substep is the gated code the fingerprint proves bit-identical across machines."
                style="display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:3px 9px;background:#1a1206;color:#ffb046;border:1px solid #4a3a1a;border-radius:5px;text-decoration:none;">&#128293; Coupling Bench</a>
+            <a href="/lab-home.html" target="_blank" rel="noopener" title="Physics Lab front door (v4585): one Initiate button that runs a registered proposer and shows every verdict; a 2D live strip of the scene, the proposer, its pick and the adjudicator's verdicts as they land, with brain-3d.html a click away; the curated presets as buttons, each with a line naming the instrument, its key and the device or peer that runs it -- every line derived by physics/labHome.mjs from the tree's own records. Gate: tools/ship/labHome-selfcheck.mjs."
+               style="display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:3px 9px;background:#06140c;color:#7fe6b0;border:1px solid #1e4a30;border-radius:5px;text-decoration:none;">&#128682; Lab front door</a>
             <a href="/physics-lab.html" target="_blank" rel="noopener" title="Physics Lab: a 3D showcase of the engine's deterministic solvers -- inflate a balloon (volume constraint), fire a muscle that bulges as it contracts (volume + contractile fibres composed), fly a flag in a sampled wind (windCloth). Each scene runs the same gated code the fingerprint proves bit-identical across machines."
                style="display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:3px 9px;background:#06140c;color:#7fe6b0;border:1px solid #1e4a30;border-radius:5px;text-decoration:none;">&#129514; Physics Lab</a>
             <a href="/catalog.html" target="_blank" rel="noopener" title="Subsystem Catalog: a verified index of every deterministic physics subsystem, in fingerprint order. Each row's hash is the live fingerprint's and its modules the ledger's; catalog-selfcheck.mjs proves the index matches the library."
@@ -917,6 +919,9 @@ window.addEventListener("load", function () {
             <a href="/tsl-probe.html" target="_blank" rel="noopener" title="The first TSL in this tree: three 0.178's WebGPURenderer (vendor/three-webgpu, beside r160) with badTv written once as nodes (render/badTvTsl.mjs); three compiles the graph to WGSL on WebGPU or GLSL on its WebGL2 backend (?webgl=1 forces it), and tools/ship/tsl-selfcheck.mjs holds the picture to the hand-written device pipeline to the byte after the row mirror. Says which backend it is on." style="color:#cfe9d8;text-decoration:none;border:1px solid #2c463a;padding:2px 6px;border-radius:3px;font-size:11px;">&#129680; TSL probe</a>
             <a href="/tsl-rig.html" target="_blank" rel="noopener" title="TSL on THIS machine's GPU: the physics keys (ln 2, the Heidler peak, Wien's root) read off pictures through three's node path and through the transplanted gfx/device.js pipelines, badTv generated vs hand-written to the byte, and the 448-step Lyapunov loop timed on both paths and both backends. Save the JSON as tools/ship/tsl-rig.json; until then the loop's cost on a real GPU is RIG-PENDING." style="color:#cfe9d8;text-decoration:none;border:1px solid #2c463a;padding:2px 6px;border-radius:3px;font-size:11px;">&#129680; TSL on the rig</a>
             <a href="/universe-gpu.html" target="_blank" rel="noopener" title="694 systems and 5,517 stellar objects with 300 haulers trading. In a still world a ship's whole flight is fixed at departure, so its position is a function of the clock alone and a compute pass evaluates that lerp for every ship every frame from eight floats that change only on departure, docking or bankruptcy (render/gpuHaul.mjs, v4300)." style="color:#cfe9d8;text-decoration:none;border:1px solid #2c463a;padding:2px 6px;border-radius:3px;font-size:11px;">&#127756; Universe on the GPU</a>
+            <!-- pageReach found this one born invisible: ui/aiPresenceOrbWidget.js mounts the design into the
+                 live HUD, but the standalone page it is ported from had never been linked here. Linked at birth. -->
+            <a href="/ai-presence-orb.html" target="_blank" rel="noopener" title="krispuckett/murmur-web's AI-presence orb (MIT), hand-ported as a TSL graph (render/aiPresenceOrbTsl.mjs) plus a pure-JS state machine (render/aiPresenceOrbState.mjs): one of 18 material species, 'still' -- a quiet glass sphere with one slow internal glint, driving through idle/listening/thinking/responding/success/error. render/aiPresenceOrbPresent.mjs adds the HDR present pass (exposure/bloom/tone-curve/dither)." style="color:#cfe9d8;text-decoration:none;border:1px solid #2c463a;padding:2px 6px;border-radius:3px;font-size:11px;">&#128302; AI-presence Orb</a>
             <a href="/ising.html" target="_blank" rel="noopener" title="Ising model: a real phase transition. Onsager's exact T_c = 2.269185, Yang's exact magnetisation curve matched to 0.01%, and the UNIVERSAL exponent gamma/nu = 7/4 recovered from scaling alone." style="color:#9fe6c0;text-decoration:none;border:1px solid #2a5a3a;padding:2px 6px;border-radius:3px;font-size:11px;">&#9673; Ising</a>
             <a href="/kepler.html" target="_blank" rel="noopener" title="Two-body orbits, and the instrument grades the INTEGRATOR: symplectic energy error stays BOUNDED forever while RK4 -- more accurate per step -- drifts linearly. Kepler III slope measured 1.500000000000014." style="color:#9fe6c0;text-decoration:none;border:1px solid #2a5a3a;padding:2px 6px;border-radius:3px;font-size:11px;">&#9673; Kepler</a>
             <a href="/schrodinger.html" target="_blank" rel="noopener" title="1D quantum: a square well whose levels go as n^2 and an oscillator whose levels are perfectly even -- OPPOSITE spectra from the same solver on the same grid, plus barrier tunnelling where classical physics says zero." style="color:#9fe6c0;text-decoration:none;border:1px solid #2a5a3a;padding:2px 6px;border-radius:3px;font-size:11px;">&#9673; Schrodinger</a>
@@ -1085,6 +1090,13 @@ window.addEventListener("load", function () {
             <a href="/ev-loader.html" target="_blank" rel="noopener">EV Loader</a>
             <a href="/ev-mission-creator.html" target="_blank" rel="noopener">Mission Authoring Console &middot; SweK EV Engine</a>
             <a href="/ev-sprites.html" target="_blank" rel="noopener">EV Sprite Viewer</a>
+            <!-- ev.html carries the "ev" topic in pageSections.mjs same as its five siblings just above, but
+                 had no Arriving anchor of its own -- the mover had nothing to move, and the endlesssky panel's
+                 unrelated "Fly it" convenience link (the same page, reached from a different game's panel) was
+                 the only anchor on the page, which pageSectionsReport correctly read as filed in the WRONG
+                 drawer. This is the real fix: an anchor the mover can carry into the ev panel, same as its
+                 siblings, not a change to what counts as "home". -->
+            <a href="/ev.html" target="_blank" rel="noopener">EV Stellar Atlas</a>
             <a href="/wadmap.html" target="_blank" rel="noopener">WAD Map &mdash; Engine Companion</a>
             <a href="/uvtt.html" target="_blank" rel="noopener">UVTT dungeon loader</a>
             <a href="/skyrim.html" target="_blank" rel="noopener">&#128009; Skyrim &mdash; SweK Engine</a>
@@ -1211,6 +1223,9 @@ window.addEventListener("load", function () {
              unreachable as the list was before it had a panel at all. -->
         <button class="gtab" data-tab="rigonly"><span class="gtabTog">&#9656;</span><span>&#128296; Only at the rig</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="rendertsl"><span class="gtabTog">&#9656;</span><span>&#128302; Render TSL</span><span class="gtabState"></span></button>
+        <button class="gtab" data-tab="slugtext"><span class="gtabTog">&#9656;</span><span>&#9999;&#65039; Slug Text</span><span class="gtabState"></span></button>
+        <button class="gtab" data-tab="avatars"><span class="gtabTog">&#9656;</span><span>&#128100; Avatars</span><span class="gtabState"></span></button>
+        <button class="gtab" data-tab="toroidal"><span class="gtabTog">&#9656;</span><span>&#127760; Toroidal Buffers</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="box3d"><span class="gtabTog">&#9656;</span><span>&#127922; Box3D</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="blobs"><span class="gtabTog">&#9656;</span><span>&#129514; Blobs</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="face"><span class="gtabTog">&#9656;</span><span>&#128100; Face &amp; Population</span><span class="gtabState"></span></button>
@@ -1786,6 +1801,21 @@ window.addEventListener("load", function () {
           </div>
           <div style="font-size:11px;color:var(--go);margin:8px 0 4px;">&#9656; The pages themselves</div>
           <div data-panel-pages="rendertsl" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
+        </div>
+        <div class="gpanel" data-panel="slugtext" hidden>
+          <div class="gpanelHdr">&#9999;&#65039; Slug Text</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">The Slug GPU text rasteriser: curves, morphs, rigging, projective text and a device-pipeline transplant, all built on text/slugFont.js. Pages in this drawer are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
+          <div data-panel-pages="slugtext" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
+        </div>
+        <div class="gpanel" data-panel="avatars" hidden>
+          <div class="gpanelHdr">&#128100; Avatars</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Character rendering: the ASCII cluster (tools/render-qa/asciify.mjs) and the Krbn/Heerich rig family (tools/krbn/glbMesh.js). Pages in this drawer are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
+          <div data-panel-pages="avatars" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
+        </div>
+        <div class="gpanel" data-panel="toroidal" hidden>
+          <div class="gpanelHdr">&#127760; Toroidal Buffers</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">A wraparound buffer (toroidal-wave.html), what accumulates on it (wear-field.html), and what it remembers (fog-of-war.html) -- one sequential family, built the same way. Pages in this drawer are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
+          <div data-panel-pages="toroidal" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
         <div class="gpanel" data-panel="box3d" hidden>
           <div class="gpanelHdr">&#127922; Box3D</div>
@@ -2410,7 +2440,7 @@ A password fetches a token from the list server; an unregistered callsign needs 
              where best to put it... moved to the alphabetical link buttons for now" / "not sure where best to
              put it, but not a big button. so into alphabet buckets is okay." Neither page carries a
              pageSections.mjs topic assignment, so removing the button does not strand them: pagePlacements.mjs's
-             alphaBuckets() already gives every unclaimed page an A-Z holding panel (rendered in the Arriving
+             pagePlacements.alphaBuckets already gives every unclaimed page an A-Z holding panel (rendered in the Arriving
              section above, `#unsortedBuckets`) precisely so a page nothing has decided a home for yet is still
              one click away rather than unreachable. -->
 

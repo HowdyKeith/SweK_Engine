@@ -35,7 +35,7 @@
 //                   D  tickTicker never wrapping                                                               -> exit=1, red 6: the rest row (bodies past the lane), the conveyor row (no
 //                      wraps), and a blank frame on both backends (every body has left the camera's view by tick 300)
 //
-// Run: node tools/ship/slugTicker-selfcheck.mjs      (~60 s)
+// Run: node tools/ship/slugTicker-selfcheck.mjs      (~6.5 s)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";

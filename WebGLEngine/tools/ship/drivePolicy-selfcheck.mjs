@@ -31,7 +31,7 @@
 // C the tie-break ignoring the fleet -> 1 red (deadbeef orders the same); D replay ignoring the log -> 1 red (fingerprint 455e28d1);
 // E metresBetween returning 0 -> 3 red (no ES acceptance, no climb from zero, the determinism row).
 //
-// Run: node tools/ship/drivePolicy-selfcheck.mjs      (~2 min: the ES is the cost)
+// Run: node tools/ship/drivePolicy-selfcheck.mjs      (~0.83 min: the ES is the cost)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";

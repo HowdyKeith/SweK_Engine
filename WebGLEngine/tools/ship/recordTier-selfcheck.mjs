@@ -70,9 +70,18 @@ console.log("\n3. IT IS WIRED INTO THE RITUAL, WHICH IS THE ONLY THING THAT MAKE
        !!step && /recordTier\.mjs/.test(step.command) && step.gate === "tools/ship/recordTier-selfcheck.mjs",
        step ? `${step.command}  guarded by ${step.gate}` : "");
     // *** THE POINT OF THE ROUND, ASSERTED AS A NUMBER RATHER THAN DESCRIBED. ***
+    //
+    // *** A RECORD CAN HAVE MORE THAN ONE OVER-BUDGET GUARDIAN, AND SUMMING records.length PER GATE COUNTS IT
+    // TWICE. *** Found live, not hypothesised: tools/ship/registerDrift-selfcheck.mjs and tools/ship/
+    // quickSweep-selfcheck.mjs both guard the same six RED_AT_V4408/V4476/V4484 records, and the naive sum
+    // read 42 against reach()'s 36 the moment BOTH gates crossed the budget at once -- the tier still covers
+    // every one of them (running either gate's blocker exercises the shared record), so the right comparison
+    // is against the UNION of records across every blocker gate, not the sum of each gate's own list.
     const r = reach();
+    const coveredRecords = new Set();
+    for (const g of tierGates()) for (const rec of g.records) coveredRecords.add(rec);
     ok("!! the tier covers EVERY record whose only guardian is over budget",
-       r.overBudget === tierGates().reduce((a, g) => a + g.records.length, 0),
+       r.overBudget === coveredRecords.size,
        `${r.overBudget} record(s) had a working guardian the sweep could not afford, and the tier runs the ` +
        `guardian of every one. ${r.checked} of ${r.total} records are checked by the sweep; ${r.unguarded} ` +
        "have no guardian at all and are a separate, named problem");

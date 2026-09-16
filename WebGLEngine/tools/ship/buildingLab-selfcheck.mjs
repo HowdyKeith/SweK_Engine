@@ -26,7 +26,7 @@
 //                                                                                brighter (1,212) instead of darker on both backends.
 //                   Each restored and the baseline re-run: 0 red.
 //
-// Run: node tools/ship/buildingLab-selfcheck.mjs      (~40 s)
+// Run: node tools/ship/buildingLab-selfcheck.mjs      (~2.1 s)
 "use strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

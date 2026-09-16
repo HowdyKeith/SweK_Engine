@@ -32,12 +32,12 @@ import { validateWgsl } from "../../render/wgslSpec.mjs";
 import { codeOnly } from "./sourceScan.mjs";
 import { gateReport } from "./gateReport.mjs";
 
+const REPORT = gateReport("tools/ship/exactHash-selfcheck.mjs");
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
 const ok = (n, c, d = "") => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 // *** v4558 -- THE SITE TABLE USED TO DIE WITH THE TERMINAL. *** gateReport-selfcheck's ratchet names every
 // gate that prints rows of numbers and emits nothing a second reader can open; this was one of five arrivals.
-const REPORT = gateReport("tools/ship/exactHash-selfcheck.mjs");
 const f = Math.fround;
 
 console.log("1. *** THE TIE TO THE PROVEN FUNCTION: seed 0 IS bcsHash, not a thing that resembles it ***");

@@ -68,6 +68,14 @@
   },
   {
    "kind": "page",
+   "id": "ai-presence-orb.html",
+   "display": "Ai Presence Orb",
+   "href": "/ai-presence-orb.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
    "id": "aibrain.html",
    "display": "Aibrain",
    "href": "/aibrain.html",
@@ -1519,7 +1527,7 @@
    "id": "gates.html",
    "display": "Gates",
    "href": "/gates.html",
-   "section": "Physics Lab",
+   "section": "System Tools",
    "collision": false
   },
   {
@@ -1943,6 +1951,14 @@
    "id": "lab-export.html",
    "display": "Lab Export",
    "href": "/lab-export.html",
+   "section": "Physics Lab",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "lab-home.html",
+   "display": "Lab Home",
+   "href": "/lab-home.html",
    "section": "Physics Lab",
    "collision": false
   },

@@ -50,14 +50,17 @@ console.log("1. *** WITH NO FILE, THE ANSWER IS EXACTLY WHAT pageSections ALREAD
 // ---------------------------------------------------------------------------
 console.log("\n2. THE FOUR FACTS ARE INDEPENDENT, AND A PAGE CAN BE IN SEVERAL TOPICS");
 {
+    // "voxelrender" was a real topic id until v4321 split that one drawer into "voxels" and "renders" --
+    // chipOrder-selfcheck.mjs already carries that rename; this fixture did not, so sanitise() was correctly
+    // dropping a topic id no panel has had in a long time, and the fixture was left proving a partition of one.
     const f = tmp();
-    write({ pages: { "cosmic-map.html": { topics: ["cosmic", "voxelrender"], bigButton: true, apps: false } } }, f);
+    write({ pages: { "cosmic-map.html": { topics: ["cosmic", "voxels"], bigButton: true, apps: false } } }, f);
     const res = resolve(f);
     const r = res.get("cosmic-map.html");
     report("cosmic-map.html", JSON.stringify({ topics: r.topics, big: r.bigButton, apps: r.apps, from: r.from }));
 
     ok("!! a page can be listed in TWO topics at once",
-        r.topics.length === 2 && r.topics.includes("cosmic") && r.topics.includes("voxelrender"),
+        r.topics.length === 2 && r.topics.includes("cosmic") && r.topics.includes("voxels"),
         "*** SECTIONS.pages IS A PARTITION AND COULD NOT SAY THIS. *** Keith: \"a page such as Cosmic Map could " +
         "show some or all or none of the sections\" -- so topics is a SET, and the base registry's one-panel-" +
         "per-page shape was a limit of the storage rather than a fact about pages.");

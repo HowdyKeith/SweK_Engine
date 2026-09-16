@@ -59,18 +59,32 @@ echo "Linking shim against: $LIB"
 # The shim (box3d_shim.c, beside this script) exposes a minimal flat API the
 # JS loader binds to: world create/step, body create (box hull), transform
 # readback into a linear Float32Array, and a state hash for lockstep verify.
+#
+# v4385 -- the eight names after _swk_velocities were added because tools/ship/box3dFilter-selfcheck.mjs
+# went RED naming them: two are v4382's raycast, which shipped without ever reaching this list, and six
+# are this round's joint readbacks and drive. That gate exists for exactly this seam -- the clang script
+# SCANS the module for /^swk_/ and needs no edit, this one lists them by hand -- and it caught a round
+# that had already shipped as well as the one adding to it. A hand-maintained list is a ratchet only if
+# something counts it.
+#
+# *** THIS COMMENT BLOCK WAS ITSELF THE BUG IT WARNS ABOUT. *** It sat between two backslash-continued
+# lines of the emcc invocation below, and a bash line continuation joins physical lines BEFORE the shell
+# looks for a `#` -- so `-sEXPORTED_FUNCTIONS=...` and `-o "$OUT/box3d.js"` were never part of the emcc
+# command at all. They ran as their own line afterward and failed with "command not found", so this script
+# could not have produced a working box3d.js on ANY box; nobody had run it since the comment was added
+# because this sandbox has no emcc. Moved above the command it explains, where a comment cannot sever it.
+#
+# v4601 (box3dFilter-selfcheck) -- the joint-drive/filter/raycast names above were kept current; the
+# sensor, continuous-collision, speed-cap and wheel-joint groups added to box3d_shim.c since (documented
+# in physics/box3d/box3dNode.mjs's PENDING_REBUILD as sensorTrigger.mjs's and wheelJoint.mjs's own
+# ADDED_AT_* lists) were never carried into this hardcoded list -- the exact seam this file's own comment
+# names. Added below rather than switching to a scan, which is a wider change than one round's gate fix.
 emcc -O3 -msimd128 \
   "$(dirname "$0")/box3d_shim.c" "$LIB" \
   -I include \
   -sMODULARIZE=1 -sEXPORT_ES6=1 -sEXPORT_NAME=createBox3D \
   -sALLOW_MEMORY_GROWTH=1 -sEXPORTED_RUNTIME_METHODS=HEAPF32,HEAPU8,HEAP32 \
-  # v4385 -- the eight names after _swk_velocities were added because tools/ship/box3dFilter-selfcheck.mjs
-  # went RED naming them: two are v4382's raycast, which shipped without ever reaching this list, and six
-  # are this round's joint readbacks and drive. That gate exists for exactly this seam -- the clang script
-  # SCANS the module for /^swk_/ and needs no edit, this one lists them by hand -- and it caught a round
-  # that had already shipped as well as the one adding to it. A hand-maintained list is a ratchet only if
-  # something counts it.
-  -sEXPORTED_FUNCTIONS=_swk_joint_spherical,_swk_joint_revolute,_swk_joint_weld,_swk_joint_count,_swk_joint_destroy,_swk_record_start,_swk_record_stop,_swk_record_size,_swk_record_copy,_swk_record_free,_swk_validate_replay,_swk_player_create,_swk_player_destroy,_swk_player_step,_swk_player_restart,_swk_player_seek,_swk_player_frame,_swk_player_frame_count,_swk_player_at_end,_swk_player_diverged,_swk_player_diverge_frame,_swk_player_set_workers,_swk_player_info,_swk_player_timestep,_swk_player_body_count,_swk_player_transforms,_swk_body_set_friction,_swk_body_set_restitution,_swk_contact_count,_swk_contacts,_swk_contact_stride,_swk_body_set_filter,_swk_body_get_filter,_swk_joint_set_collide_connected,_swk_joint_get_collide_connected,_swk_world_create,_swk_world_step,_swk_world_destroy,_swk_body_box,_swk_body_count,_swk_transforms,_swk_state_hash,_swk_body_impulse,_swk_body_ang_impulse,_swk_body_set_velocity,_swk_body_set_transform,_swk_body_set_type,_swk_body_ship,_swk_velocities,_swk_world_cast_ray,_swk_ray_stride,_swk_joint_state_stride,_swk_joint_limits_stride,_swk_joint_kind,_swk_joint_state,_swk_joint_limits,_swk_joint_motor,_malloc,_free \
+  -sEXPORTED_FUNCTIONS=_swk_joint_spherical,_swk_joint_revolute,_swk_joint_weld,_swk_joint_count,_swk_joint_destroy,_swk_record_start,_swk_record_stop,_swk_record_size,_swk_record_copy,_swk_record_free,_swk_validate_replay,_swk_player_create,_swk_player_destroy,_swk_player_step,_swk_player_restart,_swk_player_seek,_swk_player_frame,_swk_player_frame_count,_swk_player_at_end,_swk_player_diverged,_swk_player_diverge_frame,_swk_player_set_workers,_swk_player_info,_swk_player_timestep,_swk_player_body_count,_swk_player_transforms,_swk_body_set_friction,_swk_body_set_restitution,_swk_contact_count,_swk_contacts,_swk_contact_stride,_swk_body_set_filter,_swk_body_get_filter,_swk_joint_set_collide_connected,_swk_joint_get_collide_connected,_swk_world_create,_swk_world_step,_swk_world_destroy,_swk_body_box,_swk_body_count,_swk_transforms,_swk_state_hash,_swk_body_impulse,_swk_body_ang_impulse,_swk_body_set_velocity,_swk_body_set_transform,_swk_body_set_type,_swk_body_ship,_swk_velocities,_swk_world_cast_ray,_swk_ray_stride,_swk_joint_state_stride,_swk_joint_limits_stride,_swk_joint_kind,_swk_joint_state,_swk_joint_limits,_swk_joint_motor,_swk_sensor_stride,_swk_body_sensor,_swk_body_is_sensor,_swk_body_enable_sensor_events,_swk_sensor_begin_count,_swk_sensor_end_count,_swk_sensor_begin,_swk_sensor_end,_swk_world_enable_continuous,_swk_world_continuous_enabled,_swk_body_set_bullet,_swk_body_is_bullet,_swk_world_set_max_linear_speed,_swk_world_max_linear_speed,_swk_joint_wheel,_swk_wheel_spin,_swk_wheel_steer,_swk_wheel_state,_swk_wheel_state_stride,_swk_body_sphere,_malloc,_free \
   -o "$OUT/box3d.js"
 
 echo

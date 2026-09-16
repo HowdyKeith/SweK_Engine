@@ -23,7 +23,7 @@
 //                                                                             the blend at 0.5, the other seed, the browser's fields -- every side parts
 //   C  paintField writing the blend byte into green and the id into blue      -> exit=1, 3 red: the channel check, the null-device paint, the browser's bytes
 //
-// Run: node tools/ship/worleyDevice-selfcheck.mjs      (~2 s on Dawn, plus one browser for the device path)
+// Run: node tools/ship/worleyDevice-selfcheck.mjs      (~0.87 s on Dawn, plus one browser for the device path)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";

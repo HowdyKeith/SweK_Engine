@@ -23,7 +23,7 @@
 //                      totals, the largest-texture row
 //                   D  decide() returning 'not-yet' whatever the totals                                      -> exit=1, red: the three-verdicts row
 //
-// Run: node tools/ship/textureBytes-selfcheck.mjs      (~15 s; the JPEG twin opens one headless page)
+// Run: node tools/ship/textureBytes-selfcheck.mjs      (~0.8 s; the JPEG twin opens one headless page)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";

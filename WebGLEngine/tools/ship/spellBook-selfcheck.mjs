@@ -246,8 +246,12 @@ const hash = (o) => crypto.createHash("sha256").update(JSON.stringify(o)).digest
         "*** and the measurer times the ENGINE'S fracture, not a model of it ***");
     ok(/hrtime/.test(codeOnly(cost)), "with a real clock");
     ok(/median/i.test(cost), "and a median rather than one run, which a single GC pause would ruin");
-    ok(/15|fifteen/i.test(prose(model)), "the book records that its first unit prices were typed and one was 15x wrong");
-    ok(/log/i.test(prose(model)) && /0, 0, 0, 0, 0, 100/.test(model),
+    // NOT /15|fifteen/ or /log/ alone -- /15/ also matches the `>>> 15` bit-shift in mulberry32 and other numeric
+    // literals in SPELLS, and /log/i also matches `Math.log(` a few lines below: both patterns match the CODE as
+    // well as the prose (proseAudit-selfcheck's MISDIRECTED finding). The narrower phrases below are the actual
+    // words the prose uses and do not collide with any identifier or literal in the module.
+    ok(/\b15x\b|\bfifteen\b/i.test(prose(model)), "the book records that its first unit prices were typed and one was 15x wrong");
+    ok(/logarithmic/i.test(prose(model)) && /0, 0, 0, 0, 0, 100/.test(model),
         "and records the linear result that sent the mana scale to a log curve");
 }
 

@@ -42,6 +42,9 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
+
+const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 /** Where a playwright install puts its browsers, most specific first. */
 export function shellRoots(env = process.env, home = os.homedir()) {
@@ -61,13 +64,24 @@ export function shellRoots(env = process.env, home = os.homedir()) {
  * The executable inside a browser directory, per platform layout. The headless shell is preferred over the
  * full browser because that is what every caller was launching; both are listed because an install may carry
  * only one.
+ *
+ * v4617 -- *** "chrome-win" STOPPED BEING TRUE THE DAY CHROME-FOR-TESTING'S PACKAGING CHANGED, AND NOTHING
+ * HERE NOTICED. *** Measured directly on Keith's Windows rig, Playwright chromium v1243: the full browser
+ * unpacks to chrome-win64\chrome.exe (folder renamed, binary unchanged) and the headless shell unpacks to
+ * chrome-headless-shell-win64\chrome-headless-shell.exe -- BOTH the folder AND the binary renamed, an entirely
+ * different pattern from the Linux/macOS siblings that still share one folder-naming scheme with a differently
+ * named binary inside. The old "chrome-win" leaves are kept, not replaced -- an older cached Playwright install
+ * elsewhere in the tree's history may still carry the old layout, and this list has always been "every leaf
+ * tried, in order" rather than "the current one".
  */
 export const SHELL_LEAVES = Object.freeze([
     path.join("chrome-linux", "headless_shell"),
     path.join("chrome-win", "headless_shell.exe"),
+    path.join("chrome-headless-shell-win64", "chrome-headless-shell.exe"),
     path.join("chrome-mac", "headless_shell"),
     path.join("chrome-linux", "chrome"),
     path.join("chrome-win", "chrome.exe"),
+    path.join("chrome-win64", "chrome.exe"),
     path.join("chrome-mac", "Chromium.app", "Contents", "MacOS", "Chromium"),
 ]);
 
@@ -137,9 +151,21 @@ export function resolveHeadlessShell({ env = process.env, home = os.homedir(), e
 }
 
 
+// v4618 -- *** THE BARE SPECIFIER CANNOT REACH A SIBLING DIRECTORY'S node_modules, ON ANY PLATFORM. ***
+// Measured directly on Keith's Windows rig: the headless shell resolved (v4617's fix), and the browser LAUNCH
+// still failed with "Cannot read properties of null (reading 'launch')" -- resolvePlaywright() returned
+// chromium: null. playwright is a real, successfully-installed dependency, just not one require("playwright")
+// from THIS file (tools/ship/) can ever see: it lives in tools/render-qa/node_modules/playwright, a SIBLING
+// directory, and Node's bare-specifier resolution only walks UP from the caller, never sideways. The three
+// absolute fallbacks below have the exact same defect WEBGPU_PATHS had before v4615: they are this specific
+// Claude Code sandbox's own global-install locations, meaningless on a machine with no /opt or /home. The
+// fix here is stronger than another global-install guess, because it does not need one: tools/render-qa's own
+// package.json is THIS TREE'S OWN declared dependency, at a path relative to this file that does not change
+// per box the way a global npm root does.
 export const PLAYWRIGHT_PATHS = [
     "playwright",
     "playwright-core",
+    path.join(ENG, "tools", "render-qa", "node_modules", "playwright"),
     "/opt/node22/lib/node_modules/playwright/index.js",
     "/home/claude/.npm-global/lib/node_modules/playwright/index.js",
     "/usr/local/lib/node_modules/playwright/index.js",

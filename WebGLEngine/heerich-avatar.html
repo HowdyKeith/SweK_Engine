@@ -32,6 +32,24 @@
   <input type="file" id="modelFile" accept=".glb,.gltf" style="display:none" />
 </div>
 <div id="msg">loading…</div>
+<script>
+/* ui/avatarSwitch.js mounts this page as "/heerich-avatar.html?glb=...&embed=1" and until now this file
+   contained ZERO occurrences of the word "embed" -- the same defect avatarSwitch-embed-selfcheck.mjs was
+   written against for blob-avatar.html at v3656, caught here by that same gate's per-page census. #ctl (the
+   model select/file-picker) and #msg (the loading/status line) are the local controls that would otherwise
+   sit on top of the voxel SVG inside the 143x210 panel. */
+(function () {
+  try {
+    if (new URLSearchParams(location.search).get("embed") !== "1") return;
+    document.documentElement.setAttribute("data-embed", "1");
+    var st = document.createElement("style");
+    st.textContent =
+      'html[data-embed="1"] #ctl,' +
+      'html[data-embed="1"] #msg { display: none !important; }';
+    document.head.appendChild(st);
+  } catch (e) {}
+})();
+</script>
 <script type="module">
 // heerich-avatar.html
 // -----------------------------------------------------------------------------------------------------------

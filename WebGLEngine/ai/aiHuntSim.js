@@ -27,20 +27,71 @@
 //   simSync(wadMap, wadScale, thinkFn, aiState) → injected each frame
 //                                                  (cheap; just rebinds)
 
+import { defineMachine, applyEvent } from "../ui/machine.mjs";
+
 const SPAWN_COUNT      = 6;
 const AGENT_RADIUS     = 1.0;     // brain world units
 const AGENT_HEALTH     = 3;
 const AGENT_SPEED      = 4.0;     // u/s when seeking
 const AGENT_ATTACK_SPD = 1.5;     // u/s when in attack range (slower; strafing-ish)
 const AGENT_TURN_RATE  = 3.5;     // rad/s
-const ATTACK_DIST      = 8;       // bigger than VBA-mode (4) — ranged combat
-const SEEK_DIST        = 30;
+export const ATTACK_DIST = 8;     // bigger than VBA-mode (4) — ranged combat
+export const SEEK_DIST   = 30;
 const FIRE_COOLDOWN_MS = 700;
 const MAX_FIRE_RANGE   = 28;
 const AIM_TOLERANCE    = 0.30;    // radians
 const RESPAWN_DELAY_MS = 2500;
 const FIRE_FLASH_MS    = 180;
 const FALLBACK_HALF    = 30;      // half-extent for no-WAD spawn box
+
+// v4605 -- the idle/seek/attack hysteresis both this file's agent-vs-agent combat AND aiBrain.js's VBA-bridge
+// enemy-vs-player combat hand-rolled independently, made explicit and SHARED. This is a genuine dedup, not a
+// forced one: both call sites start every decide-tick from the CURRENTLY STORED state and branch off THAT
+// value (idle can only ever become seek; seek can only become idle or attack; attack can only become seek --
+// there is no direct idle<->attack edge in either file), which is the exact opposite of simulation/CSBot.js's
+// BOT_STATE (see that file's own v4604 note) -- a fresh-every-tick priority classification with no gating on
+// the prior tick's value at all. A hysteresis machine is definitionally history-dependent, which is exactly
+// what defineMachine()/applyEvent() is for.
+//
+// Per ui/machine.mjs's own design note ("condition-to-event translation is domain logic and stays the
+// CALLER's job... this file has no opinion on what a boss or a minion is"), the graph below never encodes a
+// distance threshold or the LOS predicate -- only each call site's own if-chain does, just below for this
+// file and in aiBrain.js's aiTick() for the other. That is what makes ONE shared definition safe even though
+// the two files use different SEEK_DIST/ATTACK_DIST constants, a different seek-branch guard ORDER (this file
+// checks distFar before distNear; aiBrain.js checks distNear before distFar), and this file alone has a LOS
+// guard aiBrain.js's VBA-mode path has no equivalent of. No administrative override exists for either call
+// site -- both funnel through exactly one write (this file's `a.state = newState` below; aiBrain.js's
+// `aiState.set(enemy.id, {state: newState, ...})`) -- so unlike CSBomb.js/CSRoundManager.js there is no
+// unreachable-state wrinkle to assert: all three states are reachable and none is dead (see this file's own
+// selfcheck section 1).
+export const HUNT_HYSTERESIS_MACHINE = defineMachine({
+    initial: "idle",
+    states: {
+        idle:   { on: { distClose: "seek" } },
+        seek:   { on: { distFar: "idle", distNear: "attack" } },
+        attack: { on: { loseTarget: "seek" } },
+    },
+});
+
+// The condition->event translation ui/machine.mjs's own design note leaves to the caller (see the header
+// above), factored into a small pure function rather than left inline in simDecideTick() -- same logic, same
+// exact operators and branch order as the original if-chain, just named and exported so the boundary/priority
+// behaviour can be pinned directly in the gate without fighting simSpawn()'s random placement to land two
+// agents at an exact distance. Without LOS, never escalate to attack (would shoot through walls) -- distFar is
+// checked BEFORE distNear in the seek branch, exactly as the original did, so a future threshold retune can't
+// silently flip which guard wins (today SEEK_DIST*1.3 is always well above ATTACK_DIST*1.5, so the two can
+// never both be true in the same call -- but the order is still load-bearing, not incidental).
+export function huntDecideEvent(state, dist, haveLOS) {
+    if (state === "idle") {
+        if (dist < SEEK_DIST) return "distClose";
+    } else if (state === "seek") {
+        if (dist > SEEK_DIST * 1.3) return "distFar";
+        if (haveLOS && dist < ATTACK_DIST) return "distNear";
+    } else if (state === "attack") {
+        if (!haveLOS || dist > ATTACK_DIST * 1.5) return "loseTarget";
+    }
+    return null;
+}
 
 let active = false;
 let agents = [];
@@ -233,20 +284,15 @@ export function simDecideTick() {
         const haveLOS = !!visBest;
         a.targetId = target ? target.id : null;
 
-        // State machine — same hysteresis pattern as the VBA-mode AI.
-        // Without LOS, never escalate to attack (would shoot through walls).
-        let newState = a.state;
-        if (newState === "idle") {
-            if (dist < SEEK_DIST) newState = "seek";
-        } else if (newState === "seek") {
-            if (dist > SEEK_DIST * 1.3) newState = "idle";
-            else if (haveLOS && dist < ATTACK_DIST) newState = "attack";
-        } else if (newState === "attack") {
-            if (!haveLOS || dist > ATTACK_DIST * 1.5) newState = "seek";
-        }
+        // State machine — same hysteresis pattern as the VBA-mode AI, now both funnelled through the shared
+        // HUNT_HYSTERESIS_MACHINE via huntDecideEvent() (see its own header comment for why sharing one graph
+        // across two different distance scales and an LOS guard is safe).
+        const fromState = a.state;
+        const event = huntDecideEvent(fromState, dist, haveLOS);
+        const newState = applyEvent(HUNT_HYSTERESIS_MACHINE, fromState, event, null);
 
-        if (newState !== a.state) {
-            _think(`sim #${a.id} ${a.state} → ${newState}${target ? ` (#${target.id} @ ${dist.toFixed(1)}u${haveLOS ? "" : ", blind"})` : ""}`,
+        if (newState !== fromState) {
+            _think(`sim #${a.id} ${fromState} → ${newState}${target ? ` (#${target.id} @ ${dist.toFixed(1)}u${haveLOS ? "" : ", blind"})` : ""}`,
                 newState === "attack" ? "attack" :
                 newState === "seek"   ? "seek"   : "idle");
         }

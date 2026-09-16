@@ -48,6 +48,7 @@
 // pipeline over [0,0,0,1] and matched the shipped one on every pixel while the transplant carried NO blend state at all (src + 0 is
 // src); the picture is now drawn over a colour, and the transplant carries the shell's blend, depthWrite and depthCompare.
 //
+// Run: node tools/ship/slugTsl-selfcheck.mjs      (~1.1 s; section 1 is CPU-only)
 // Run: node tools/ship/slugTsl-selfcheck.mjs      (~30 s; section 1 is CPU-only)
 // MEASURED at v4541. Applied to render/tslSource.mjs, this gate run, restored and md5-verified. Baseline 0 red.
 //   Z  the host shell's GLSL codes region split back on `// structs` -> 1 red: "shader: ERROR: 0:423: 'main' :

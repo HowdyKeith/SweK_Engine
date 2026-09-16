@@ -342,7 +342,13 @@ export const BVH_AT_V4435 = Object.freeze({
     // ray-triangle BVH from top-level mesh/, which none of the three searched directories can see, so it
     // lands here exactly as the eight before it did. Nothing left the list; the record grew by one and the
     // four rows that read it all went red together, which is one drift wearing four failures.
+    // *** TWO MORE ARRIVALS, NAMED: fx/spritemesh/blueprint.js and its gate fx/spritemesh/blueprint-selfcheck.mjs
+    // (commit 95ed3d7f, "Ship blueprint: true 3D occlusion for hidden-line removal"). *** Both import MeshBVH
+    // and trianglesFrom from mesh/meshBVH.mjs and call bvh.intersectsSegment(...) for real 3D line-of-sight --
+    // grep-verified against the files on disk, not inferred from the commit message -- and fx/ is outside all
+    // three searched directories, the identical shape as splatMesh-selfcheck.mjs above.
     outOfScope: Object.freeze([
+        "fx/spritemesh/blueprint-selfcheck.mjs", "fx/spritemesh/blueprint.js",
         "mesh/meshBVH.mjs", "multiplayer/wadLevelHost.js", "tools/krbn/krbnCompare.js",
         "tools/roundhouse/neighbourBenchBind-selfcheck.mjs", "tools/roundhouse/neighbourBenchBind.mjs",
         "tools/ship/box3dRay-selfcheck.mjs",
@@ -395,7 +401,12 @@ export const BVH_AT_V4435 = Object.freeze({
     // is certain is the count and what it counts; a split is a separate round with a rule somebody defends.
     // The claim the number serves is unharmed either way: item 10 said the tree has no BVH, and thirteen files
     // whose code carries the term refutes that whether five build one or all thirteen do.
-    realImplementations: 13,
+    //
+    // *** 13 -> 15: the same fx/spritemesh/blueprint.js + blueprint-selfcheck.mjs pair named above in outOfScope
+    // also carries the term in CODE (wide.code, tree-wide), so keep(wide.code).length moved by exactly 2 --
+    // grep-verified: neither file appears in `said`, `denial` or the two `exclude` entries, so both land here
+    // as two more consumers of the one implementation, not two more builders.
+    realImplementations: 15,
     why: "the tracer really has no BVH and rtPipeline.mjs says so itself, so the NARROW claim survives. What " +
          "did not survive is the sentence supporting it: it named two files where the tree holds twelve, and " +
          "hid the two that change what the item should DO -- a binned-SAH ray-triangle BVH the tree already " +

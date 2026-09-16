@@ -144,6 +144,12 @@ const isGeneratedRecord = (file, text) => {
 // NOTE: this reason string deliberately avoids spelling out either implementation's literal path -- doing so
 // would recreate the exact bug being excluded, this time inside orphanScan.mjs's own corpus text.
 const REPORT_MODULE = {
+    // v4624 -- the v4623 entry for render/murmurKitTsl.mjs is DELETED here, on its own stated expiry.
+    // It read "delete this entry once aiPresenceOrbTsl.mjs imports it", and that import now exists: the
+    // species marches the kit's volume instead of approximating it, so the module is reached statically
+    // and needs no exemption. Recorded rather than silently removed, because the useful half is that the
+    // expiry was written INTO the entry and then honoured -- an exemption nobody revisits is how a
+    // temporary note becomes a permanent hole.
     "render/ssaoCompare.mjs": "compares the two render/ SSAO implementations named in its own header from " +
         "source; its data table names each by path as documentation and loads neither -- the live one stays " +
         "reached on its own via main.js's real import",

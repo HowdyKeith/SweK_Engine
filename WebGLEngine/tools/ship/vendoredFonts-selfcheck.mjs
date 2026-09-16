@@ -22,7 +22,7 @@
 //                   C  a family's licence file removed                                                       -> exit=1, red: the licence rows for that family
 //                   D  a VARIABLE font (Orbitron[wght].ttf) placed under vendor/fonts/orbitron with a registry entry  -> exit=1, red: the static row (fvar), by name
 //
-// Run: node tools/ship/vendoredFonts-selfcheck.mjs      (~0.5 s, headless)
+// Run: node tools/ship/vendoredFonts-selfcheck.mjs      (~0.09 s, headless)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";

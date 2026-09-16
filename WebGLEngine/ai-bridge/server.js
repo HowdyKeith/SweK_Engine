@@ -16606,6 +16606,40 @@ ${text.replace(/'/g, "''")}
         return;
     }
 
+    // --- ffmpeg.wasm: install button for ffmpegwasm/ffmpeg.wasm (MIT wrapper + GPL-2.0-or-later WASM core), ---
+    // never vendored. v4613 -- a REAL software H.264 encoder compiled to WASM (see tools/ship/nextRounds.mjs's
+    // "ffmpeg-wasm-h264-encode" entry and ai-bridge/ffmpegWasmBridge.js's own header for the full story). Same
+    // /vpi/-shaped three routes, but *** DELIBERATELY NO Cross-Origin-Opener-Policy / Cross-Origin-Embedder-
+    // Policy HERE. *** This round is scoped to the SINGLE-THREAD @ffmpeg/core build only, which the bridge's
+    // own header records was measured to run with crossOriginIsolated:false and no SharedArrayBuffer -- no
+    // COOP/COEP needed. The multi-thread core-mt build WOULD need them (added to server.js's main sendFile()
+    // route, a global change with real side-effect risk on whatever else loads through that route), but that is
+    // a separate, not-yet-decided round -- see ffmpegWasmBridge.js's REFUSED list. Adding the headers here
+    // preemptively, for a build that doesn't need them, is exactly the kind of unscoped change this round was
+    // told not to make.
+    if (req.url.split("?")[0] === "/ffwasm/status" && req.method === "GET") {
+        try { sendJson(require("./ffmpegWasmBridge.js").status()); }
+        catch (e) { sendJson({ ok: false, error: "ffmpeg.wasm bridge unavailable: " + String(e && e.message || e) }); }
+        return;
+    }
+    if (req.url === "/ffwasm/install" && req.method === "POST") {
+        try { sendJson(require("./ffmpegWasmBridge.js").install()); }
+        catch (e) { sendJson({ ok: false, error: "ffmpeg.wasm bridge unavailable: " + String(e && e.message || e) }); }
+        return;
+    }
+    if (req.method === "GET" && req.url.split("?")[0].startsWith("/ffwasm/app/")) {
+        const want = decodeURIComponent(req.url.split("?")[0].slice("/ffwasm/app/".length));
+        let ffwasm = null;
+        try { ffwasm = require("./ffmpegWasmBridge.js"); } catch (e) { res.writeHead(404); res.end("ffmpeg.wasm bridge unavailable"); return; }
+        const buf = ffwasm.readArtefact(want);
+        if (!buf) { res.writeHead(404); res.end("not installed or not a recognized file -- POST /ffwasm/install first"); return; }
+        const ct = /\.wasm$/.test(want) ? "application/wasm" : /\.js$/.test(want) ? "text/javascript; charset=utf-8" :
+                   "application/octet-stream";
+        res.writeHead(200, { "Content-Type": ct, "Content-Length": buf.length, "Cache-Control": "no-cache" });
+        res.end(buf);
+        return;
+    }
+
     // --- ws-scrcpy: install button for NetrisTV/ws-scrcpy (MIT), never vendored -----------------------------
     // v4144 -- browser-based Android screen mirroring and control. Same non-vendoring reasoning as /grdpwasm
     // above, and the same commit pin. *** THE DIFFERENCE FROM grdpwasm IS THAT THE EXPOSURE CANNOT BE FIXED
@@ -17449,7 +17483,12 @@ ${text.replace(/'/g, "''")}
         return;
     }
     if (req.method === "GET" && req.url.split("?")[0] === "/sys/update/check")  { sysadminBridge.updateCheck(false).then(sendJson).catch(e => sendJson({ ok: false, error: String(e) })); return; }
-    if (req.method === "POST" && req.url === "/sys/update/apply")  { sysadminBridge.updateCheck(true, { force: true }).then(sendJson).catch(e => sendJson({ ok: false, error: String(e) })); return; }
+    // v4610 -- force is now the CALLER's claim, not a constant. ui/engineUpdate.js only sets `manual`
+    // true from the Settings panel's own "Install & restart" button click; every automatic caller
+    // (on-load auto-apply, peer-propagation prompt/auto-confirm, its no-toast fallback) leaves it
+    // false, which lets ai-bridge/runBusy.js's defer-while-busy guard actually run for them instead
+    // of being bypassed unconditionally the way this route bypassed it for every caller before.
+    if (req.method === "POST" && req.url === "/sys/update/apply")  { readJson(d => { sysadminBridge.updateCheck(true, { force: !!(d && d.manual) }).then(sendJson).catch(e => sendJson({ ok: false, error: String(e) })); }); return; }
     if (req.method === "GET"  && req.url.split("?")[0] === "/sys/update/github") { sysadminBridge.githubStatus().then(sendJson).catch(e => sendJson({ ok: false, error: String(e) })); return; }
     if (req.method === "GET"  && req.url === "/sys/autostart") { sysadminBridge.loginAutostartStatus().then(sendJson).catch(e => sendJson({ ok: false, error: String(e) })); return; }
     if (req.method === "POST" && req.url === "/sys/autostart") { readJson(d => sysadminBridge.loginAutostartSet(!!(d && d.on)).then(sendJson).catch(e => sendJson({ ok: false, error: String(e) }))); return; }

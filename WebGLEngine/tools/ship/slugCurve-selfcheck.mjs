@@ -31,7 +31,7 @@
 //                   D  setBuilt uploading buildVertices' flat stream instead of the curved one            -> exit=1, red 6: the model matches no fragment (0 over 0), the frame
 //                      off by 255 on both backends, the cost rows
 //
-// Run: node tools/ship/slugCurve-selfcheck.mjs      (~40 s; section 1 is headless)
+// Run: node tools/ship/slugCurve-selfcheck.mjs      (~6.5 s; section 1 is headless)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";

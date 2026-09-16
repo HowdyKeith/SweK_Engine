@@ -40,6 +40,13 @@ const WGSL_TYPES = { "f32": "f32", "vec2<f32>": "vec2", "vec3<f32>": "vec3", "ve
 const GLSL_TYPES = { "float": "f32", "vec2": "vec2", "vec3": "vec3", "vec4": "vec4", "mat4": "mat4", "int": "i32", "uint": "u32",
                      "ivec2": "ivec2", "ivec3": "ivec3", "ivec4": "ivec4",
                      "uvec2": "uvec2", "uvec3": "uvec3", "uvec4": "uvec4" };
+// v4555 -- a local temporary's declared type is not limited to GLSL_TYPES' vocabulary (a uniform's field type):
+// three also declares plain `bool` locals (the flip-flag's own boolean, an integer texel-coordinate `ivec2`) that
+// never cross a binding and so were never in GLSL_TYPES at all. Shared by every GLSL local-declaration regex below
+// (_localDeclLines and the two in-body decl searches in vertexVaryingBlock/vertexDisplacement) so the vocabulary
+// only has to be widened once -- narrowing it to exactly GLSL_TYPES's keys the first time is what let `ivec2
+// nodeVar0;`/`bool nodeVar2;` (the Glyph race's atlas graph) go undeclared silently instead of loudly.
+const GLSL_LOCAL_DECL = "(?:[iu]?vec[234]|float|mat[234]|int|uint|bool)";
 // v4325 -- the names a shell has for what three calls positionLocal, normalLocal, position and normal. A shell that
 // carries no normal (the sprite layout has p, color, uv and nothing else) simply leaves those out, and a displacement
 // that reads one is refused BY NAME rather than renamed into a variable the shell's vertex stage never declared.
@@ -110,269 +117,141 @@ export async function nodeBuilderStateFor(renderer, { scene, camera, mesh }) {
     return ro.getNodeBuilderState();
 }
 
-/**
- * three's own type names -> the device's uniform vocabulary. *** THIS TABLE IS EXACTLY gfx/device.js's ***
- * (_uniformLayout's SZ/AL): f32, vec2, vec3, vec4, mat4 and nothing else. A first draft of it also carried
- * int/uint/ivecN/uvecN, copied from GLSL_TYPES above -- and that was a trap, MEASURED: _uniformLayout packs an
- * unknown type as `SZ[u.type] || 4` with alignment 4, so a `u32` would have come out right BY ACCIDENT and a
- * `uvec2` would have been packed into four bytes with no error anywhere. A reader must not offer the device a
- * word the device does not know; the device's silent fallback would not have said so.
- */
-const DEVICE_UNIFORM_TYPES = Object.freeze({ float: "f32", vec2: "vec2", vec3: "vec3", vec4: "vec4", mat4: "mat4" });
+// *** v4550 -- three@0.185.1 PUTS AN EXTRA FIELD IN THE OBJECT UNIFORM STRUCT THAT THE FRAGMENT NEVER READS,
+// MEASURED ON BOTH BACKENDS. *** Printing the raw emission (fleetTsl's Lyapunov look, two labelled uniforms,
+// `chaos` and `light`) found a third field, `nodeUniform4 : mat4x4<f32>` (WGSL) / `mat4 nodeUniform4` (GLSL),
+// that appears nowhere in the fragment's own executable code -- only in its own declaration line. Absent
+// entirely under r178. It is a per-object matrix three's VERTEX stage now needs for a varying this graph only
+// CONSUMES (normalLocal); vertex and fragment share one binding layout (WGSL's @group(1), GLSL's std140
+// block), so it leaks into the fragment's copy even though only the vertex stage -- which this module never
+// transplants, the device supplies its own -- would read it.
+// *** THE FIRST FIX ATTEMPT DROPPED SUCH FIELDS FROM THE RETURNED LIST AND BROKE TWO OTHER CONSUMERS: *** the
+// vertex-displacement check three lines below reads THIS function's return value to confirm a displacement's
+// own uniform is "in the shell's struct" -- filtering the list here made a legitimately-needed field invisible
+// to a DIFFERENT check with a different question. So the list stays whole; only the THROW is narrowed, and only
+// for the exact type measured (mat4x4<f32> / mat4), so the existing "an unlabelled f32/float always throws"
+// fixture (tslSource-selfcheck.mjs's nodeUniform1 : f32) stays exercised rather than accidentally swallowed by
+// a same-shaped but differently-typed field.
+// *** GLSL WAS LEFT UNCONDITIONAL AT FIRST: A GUESSED REFERENCE TOKEN (`f_<name>`) WAS WRONG. *** v4550 assumed
+// three's r178-era "f_" fragment-uniform prefix still applied and found zero real uniforms with it -- which was
+// also v4551's root cause (uniformFields()'s whole GLSL struct-name/prefix match was stale; see its own header).
+// Once that was fixed, the GLSL fragment turned out to read a labelled uniform BARE (`tint`, not `f_tint`) --
+// r185 dropped the prefix on both stages -- so an unread auto-named field is bare too, and the exception now
+// applies to both languages on the one token each is actually measured to use.
+function _bodyReferences(fragment, structBlock, language, name) {
+    const after = fragment.slice(fragment.indexOf(structBlock) + structBlock.length);
+    return language === "wgsl" ? after.includes(`object.${name}`) : new RegExp(`\\b${name}\\b`).test(after);
+}
 
-/**
- * The bindings three BUILT, read from the state rather than from the shader it printed.
- * Returns { uniforms: [{ name, type, nodeType, labelled }], textures, cameraMatrices } -- or null when the
- * state carries no bindings, which is a fact worth reporting rather than crashing on.
- *
- * `type` is null for a node type the device cannot pack (uint, ivec3, ...); `nodeType` keeps three's own word
- * for it so the refusal can name the thing. This function REFUSES NOTHING -- it is a reader, and the rules
- * that refuse live in uniformFields/textureNames where they already are. It arrives as a second opinion.
- *
- * *** `labelled` IS THE MECHANISM THE `nodeUniform\d+` SPELLING WAS STANDING IN FOR. *** MEASURED at r184 on
- * badTv and the blackbody key, both backends: every uniform the graph labelled answers `node.name === "time"`,
- * and every uniform three allocated for itself answers `node.name === ""`. `nodeUniform6` is not a name three
- * chose -- it is three's STRINGIFICATION of the empty one, and the number in it moves between backends (the
- * same flag is nodeUniform6 in GLSL and absent from WGSL; the object matrix is nodeUniform8 in WGSL and
- * nodeUniform9 in GLSL). A regex on that spelling was testing the printout of the property, not the property.
- */
-export function bindingsFromState(state) {
-    const groups = (state && state.bindings) || null;
-    if (!groups || !groups.length) return null;
-    const out = { uniforms: [], textures: [], cameraMatrices: [] };
-    for (const g of groups) {
-        for (const m of (g.bindings || [])) {
-            if (m.isSampledTexture) { out.textures.push(m.name); continue; }
-            if (!m.isUniformBuffer) continue;
-            for (const u of (m.uniforms || [])) {
-                if (g.name === "render") { out.cameraMatrices.push(u.name); continue; }
-                const nodeType = typeof u.getType === "function" ? u.getType() : null;
-                const node = u.nodeUniform && u.nodeUniform.node;
-                let value = null; try { const v = node && node.value; if (v === null || typeof v !== "object") value = v; } catch { /* a node whose value throws is simply not foldable */ }
-                out.uniforms.push({ name: u.name, type: DEVICE_UNIFORM_TYPES[nodeType] || null, nodeType,
-                                    labelled: !!(node && node.name), value, updateType: (node && node.updateType) || null });
-            }
-        }
+/** Is `u` three's own cross-stage bookkeeping (an unlabelled, unread, mat4x4<f32>/mat4 field in the object uniform struct -- the v4550 case), rather than a real binding failure? Only that one measured shape -- an unlabelled field of any OTHER type, or one the body does read, is still a real refusal. Shared by uniformFields()'s own throw and by every later check that walks its (whole, unfiltered) return list against a shell's struct, so a field excused here does not need to be excused twice. */
+function _unreadBookkeeping(fragment, language, u) {
+    if (u.type !== "mat4" || !/^nodeUniform\d+$/.test(u.name)) return false;
+    const m = language === "wgsl" ? fragment.match(/struct objectStruct \{[\s\S]*?\};/) : fragment.match(/uniform (?:fragment_object|object) \{[\s\S]*?\};/);
+    return !!m && !_bodyReferences(fragment, m[0], language, u.name);
+}
+
+// *** v4555 -- three's GLSL/WebGL BACKEND ALWAYS CARRIES A TEXTURE'S FLIP-Y DECISION AS AN UNLABELLED UNIFORM,
+// MEASURED FROM THE VENDORED SOURCE, NOT GUESSED. *** WebGLBackend's node builder returns isFlipY() === true
+// UNCONDITIONALLY (vendor/three-webgpu/three.webgpu.js, "WebGL needs this method evaluate to true" -- WGSL's own
+// builder returns false, always, the same way) -- so EVERY texture read on GLSL gets a TextureNode._flipYUniform,
+// an unlabelled uint the graph author cannot name (it is not exposed anywhere in TSL's public API) and this
+// transplant would otherwise refuse: referenced, not the unread-bookkeeping shape v4550 already excuses.
+// Three sets its VALUE at render time, in code this transplant never runs (update(), called from three's own
+// render loop, which gfx/device.js's hand-built pipeline replaces): `(texture.image instanceof ImageBitmap &&
+// texture.flipY === true) || texture.isRenderTargetTexture || texture.isFramebufferTexture ||
+// texture.isDepthTexture`. Every texture this codebase hands a TSL graph is a THREE.DataTexture -- none of those
+// four -- so the flag is `false` for every real caller today, a compile-time constant rather than a genuine
+// runtime unknown, and is inlined rather than carried as a binding nothing would ever set correctly.
+// *** THE MATCH IS DELIBERATELY THE NARROWEST ONE THAT STILL FIRES: GLSL, an unlabelled uint, referenced EXACTLY
+// ONCE, and that one reference is `bool(name)` and nothing else. *** A future graph that reads an ImageBitmap or a
+// render target would need this reconsidered -- widening the match to "any unlabelled uint" on the strength of one
+// measured shape would be exactly the mistake v4550's header warns against for the vertex-side bookkeeping field.
+// Verified against tslRace-selfcheck.mjs section 6 (byte-exact against the fleets' own shipped Pixel/Glyph pipeline,
+// GLSL backend): inlining `false` here is what makes that comparison land on EVERY pixel, not just what compiles.
+function _stripGlslFlipFlag(fragment) {
+    const m = fragment.match(/uniform (?:fragment_object|object) \{([\s\S]*?)\};/);
+    if (!m) return fragment;
+    const after = fragment.slice(fragment.indexOf(m[0]) + m[0].length);
+    let out = fragment;
+    for (const fm of m[1].matchAll(/^[ \t]*uint\s+(nodeUniform\d+);/gm)) {
+        const name = fm[1];
+        const uses = [...after.matchAll(new RegExp(`\\b${name}\\b`, "g"))];
+        if (uses.length !== 1 || !new RegExp(`bool\\(\\s*${name}\\s*\\)`).test(after)) continue;
+        out = out.replace(new RegExp(`^[ \\t]*uint\\s+${name};\\n?`, "m"), "").replace(new RegExp(`bool\\(\\s*${name}\\s*\\)`), "false");
     }
     return out;
 }
 
-/** The labelled, device-packable uniforms of the object group, in three's order -- the state's answer to uniformFields(). */
-export function deviceUniformsFromState(state) {
-    const b = bindingsFromState(state);
-    return b ? b.uniforms.filter((u) => u.labelled).map((u) => ({ name: u.name, type: u.type })) : null;
-}
-
-// ---- v4540: THE CONSTANTS THREE FOLDS IN FOR ITSELF -----------------------------------------------------
-// r184's WebGL2 backend emits, into the object block, an unlabelled `uint` the fragment READS:
-//
-//     uint nodeUniform6;                       // ... and, in main():
-//     nodeVar36 = bool( nodeUniform6 );
-//     if ( nodeVar36 ) { nodeVar35 = vec2( nodeVar34.x, 1.0 - nodeVar34.y ); } else { nodeVar35 = nodeVar34; }
-//
-// -- a per-texture flipY switch, MEASURED value false. The transplant refused the whole emit on it and told the
-// caller to "label every uniform node", which is advice NOBODY CAN TAKE: it is three's uniform, not the graph's.
-//
-// *** THIS IS NOT A SPELLING, SO IT IS NOT FIXED BY TEACHING A REGEX ONE. *** It is folded, from the state:
-// the uniform is unlabelled (node.name === ""), its node type is one three uses for a switch, and node.value is
-// a constant -- so its declaration is deleted and its every reading replaced by the literal, leaving the driver
-// to fold the branch. The transplant then sees a fragment that reads no unlabelled uniform, and every rule below
-// applies unchanged. WHY A CONSTANT IS SAFE TO BURN IN: MEASURED, every object-group uniform answers
-// updateType "none", so three never writes this one per frame; it is fixed when the material compiles, and the
-// transplant's output is fixed then too. If the caller changes flipY, three rebuilds the material and re-emits,
-// which is exactly when the transplant runs again.
-//
-// NARROW ON PURPOSE: bool/int/uint only. A float three allocated for itself has not been seen here, and burning
-// in a number the caller might reasonably want to drive is a bigger claim than this measurement supports -- an
-// unlabelled float that is read still refuses, by name, and that refusal is the thing that would tell us.
-const CONST_LITERAL = Object.freeze({
-    bool: (v) => (v ? "true" : "false"),
-    uint: (v) => (Number.isInteger(Number(v)) || typeof v === "boolean" ? `${Math.max(0, Math.trunc(Number(v)))}u` : null),
-    int: (v) => (Number.isInteger(Number(v)) || typeof v === "boolean" ? `${Math.trunc(Number(v))}` : null),
-});
-
-/** The scalar switches three allocated for ITSELF, from the state: [{ name, nodeType, value, literal }]. */
-export function foldableConstants(state) {
-    const b = bindingsFromState(state);
-    if (!b) return [];
-    const out = [];
-    for (const u of b.uniforms) {
-        if (u.labelled || !CONST_LITERAL[u.nodeType]) continue;
-        const literal = CONST_LITERAL[u.nodeType](u.value);
-        if (literal != null) out.push({ name: u.name, nodeType: u.nodeType, value: u.value, literal, updateType: u.updateType });
+// *** v4556 -- three's .compute(N) ALWAYS ADDS ITS OWN DISPATCH BOUNDS GUARD NOW, EVEN WHEN THE GRAPH ALREADY HAS
+// ONE, MEASURED ACROSS EVERY COMPUTE PASS THIS ARC HAS. *** the very first statement of the compute body is always
+// `if ( instanceIndex >= object.nodeUniformN ) { return; }`, an unlabelled u32 -- workgroupSize invocations always
+// dispatch (three, and this transplant, round the dispatch count UP to a whole workgroup), so N is over-dispatch
+// past the count the graph asked for, and this is three's own safety net against it. It cannot be inlined the way
+// v4555's flip flag was: the flip flag is false for every texture this codebase uses, one fixed answer for every
+// caller, but a dispatch count is a different number for every compute pass and this transplant reads shader TEXT
+// alone, with no access to the JS-side count that built the graph.
+// *** SO IT IS REMOVED INSTEAD OF ANSWERED, AND THAT IS SAFE ONLY BECAUSE OF WHAT WAS ALREADY THERE BEFORE R185
+// ADDED IT: every compute pass in this codebase already guards its own real work, by name, without this uniform's
+// help. *** render/tslWide.mjs's planes pass reads `If(float(i).lessThan(info.x), ...)` -- info.x a graph-labelled
+// uniform, so an over-dispatched thread already writes nothing regardless of this check. render/isingTsl.mjs bakes
+// its own bound as a WGSL literal (`instanceIndex < 32u` for L=8) at graph-construction time, for the same reason.
+// Removing three's redundant, unlabelled copy changes nothing an over-dispatched thread does; it only removes a
+// binding nothing in this transplant pipeline has a value for. *** THIS IS A CODEBASE-WIDE OBSERVATION, NOT A LAW
+// OF TSL, AND IS ONLY AS SOUND AS THE NEXT GRAPH THAT USES .compute(). *** A future compute pass that leans on
+// three's own guard INSTEAD of writing its own would have this removed out from under it and over-dispatch into
+// whatever the body does past its real element count -- verify a NEW compute graph's tail behavior at exactly its
+// count before trusting this to have handled it, the same way every pass here was checked byte-exact against a
+// twin (tslWide-selfcheck's planes struct check, tslIsing-selfcheck's zero-tolerance sweep) with the guard gone.
+function _stripComputeDispatchGuard(wgsl) {
+    const m = wgsl.match(/struct objectStruct \{([\s\S]*?)\};/);
+    if (!m) return wgsl;
+    const before = wgsl.slice(0, wgsl.indexOf(m[0]));
+    const after = wgsl.slice(wgsl.indexOf(m[0]) + m[0].length);
+    let structInner = m[1], body = after, changed = false;
+    for (const fm of [...m[1].matchAll(/(nodeUniform\d+)\s*:\s*u32/g)]) {
+        const name = fm[1];
+        const uses = [...after.matchAll(new RegExp(`\\b${name}\\b`, "g"))];
+        const guardRe = new RegExp(`if\\s*\\(\\s*instanceIndex\\s*>=\\s*object\\.${name}\\s*\\)\\s*\\{\\s*return;\\s*\\}`);
+        if (uses.length !== 1 || !guardRe.test(after)) continue;
+        structInner = structInner.split(",").map((s) => s.trim()).filter(Boolean).filter((p) => !new RegExp(`^${name}\\b`).test(p)).join(",\n\t");
+        body = body.replace(guardRe, "");
+        changed = true;
     }
-    return out;
+    return changed ? `${before}struct objectStruct {\n\t${structInner}\n};${body}` : wgsl;
 }
 
-/**
- * Delete each constant's declaration and replace its every reading with the literal. Returns { fragment, folded }.
- * A constant this language did not emit, or that the body never reads, is LEFT ALONE -- an unread unlabelled
- * uniform is already dropped and named by unreadUnlabelledUniforms, and two rules for one hazard is how the
- * r184 disagreement happened in the first place.
- */
-export function foldConstants(fragment, language, constants) {
-    let out = String(fragment); const folded = [];
-    for (const c of constants || []) {
-        const decl = language === "wgsl" ? new RegExp(`^[ \\t]*${c.name}[ \\t]*:[^\\n]*\\n`, "m")
-                                         : new RegExp(`^[ \\t]*\\w+[ \\t]+${F_}${c.name}[ \\t]*;[ \\t]*\\n`, "m");
-        if (!decl.test(out)) continue;
-        // the `object.` / `f_` prefix is part of the reading and must go WITH it -- replacing the bare name
-        // inside `object.nodeUniform6` would leave `object.0u`, which compiles nowhere
-        const ref = () => new RegExp(`\\b(?:object\\.)?${F_}${c.name}\\b`, "g");
-        if (!ref().test(fragmentBody(out))) continue;
-        out = out.replace(decl, "").replace(ref(), c.literal);
-        folded.push({ ...c });
-    }
-    return { fragment: out, folded };
-}
-
-// ---- v4541: THE COMPUTE PATH, AND WHY ITS FOLD IS NOT THE FRAGMENT'S ------------------------------------
-// r184 guards every compute entry it emits with a bound three allocated for itself:
-//
-//     struct objectStruct { nodeUniform2 : u32 };
-//     if ( instanceIndex >= object.nodeUniform2 ) { return; }
-//
-// -- the dispatch count, so a partly-filled last workgroup returns instead of running. r178 emitted no such
-// guard, which means every compute pass this file has transplanted so far has run WITHOUT one, relying on the
-// caller dispatching exactly. That is a real improvement of three's, and the transplant should keep it.
-//
-// *** IT LOOKS LIKE THE flipY FOLD AND IT IS NOT. *** MEASURED: the flipY switch answers updateType "none" --
-// three fixes it when the material compiles and never touches it again. This one answers updateType "object":
-// three writes it per dispatch, because a compute node's count can be changed without rebuilding the graph.
-//
-// It is still folded, and the reason is narrow: the device NEVER BINDS three's uniform buffer. The transplanted
-// module gets the shell's own bindings, so there is no copy of this number for anyone to update -- whatever the
-// transplant does with it is fixed the moment the WGSL is generated. Folding does not freeze something that was
-// live; it makes visible that it was already frozen.
-//
-// *** WHAT FOLDING WOULD HIDE, AND WHAT IS DONE ABOUT IT. *** A caller that re-used one transplanted module at a
-// different dispatch count would get a guard for the old count, silently. The workgroup size has been held to
-// the shell since v4336 for exactly this reason; the count had nowhere to be held. So the bound is READ BACK OUT
-// of the generated module and returned, and a caller that dispatches by a different number can be told so by a
-// check instead of by a wrong picture. dispatchBoundOf is the one reader, used by both entry points.
-/** r184's entry guard, read back out of a compute module: the count it will refuse to run past, or null. */
-export function dispatchBoundOf(wgsl) {
-    const m = String(wgsl).match(/instanceIndex\s*>=\s*(\d+)u/);
-    return m ? Number(m[1]) : null;
-}
-
-/**
- * Ask three for the COMPUTE shader of one node, with three's own constants folded in:
- * { wgsl, folded, foldError, dispatchBound }. The twenty-one call sites that reached for
- * `renderer._nodes.getForCompute(node).computeShader` were each throwing the state away exactly as
- * getShaderAsync does; this keeps it long enough to read the bindings, then hands back the same string.
- */
-export function emitCompute(renderer, node) {
-    const state = renderer._nodes.getForCompute(node);
-    let constants = [], foldError = null;
-    try { constants = foldableConstants(state); } catch (e) { foldError = String((e && e.message) || e); }
-    const f = foldConstants(state.computeShader, "wgsl", constants);
-    return { wgsl: f.fragment, folded: f.folded, foldError, dispatchBound: dispatchBoundOf(f.fragment) };
-}
-
-/**
- * Ask three for the shaders of one mesh, with three's own constants folded in: { language, vertex, fragment, folded }.
- * The strings still come from the PUBLIC debug hook; only the constants come from the state behind it, and if that
- * state is unreachable the fold is skipped and `foldError` says so -- the transplant then refuses exactly as it did
- * before, rather than this file's private-field coupling taking every TSL gate down at once. The gate asserts
- * foldError is null, so a silent fall back to the old behaviour is caught by a check rather than by a picture.
- */
-/**
- * Stamp a written-down emission record with the revision three ITSELF printed at the top of the shader, read out of
- * the record. v4540 found tools/ship/tsl-emitted.json declaring `three: "0.178.0"` over r184 text; v4541 found the
- * same declaration in five more of them. A version typed beside an artifact is a claim nobody rechecks; this one is
- * derived from the artifact, so it cannot drift from what is in the file.
- */
-export function stampThreeRevision(rec) {
-    const m = JSON.stringify(rec).match(/Three\.js\s*(r\d+)/);
-    return { ...rec, three: m ? m[1] : "unknown" };
-}
-
-export async function emitShaders(renderer, { scene, camera, mesh }) {
-    const sh = await renderer.debug.getShaderAsync(scene, camera, mesh);
-    const language = renderer.backend.isWebGPUBackend ? "wgsl" : "glsl";
-    let constants = [], foldError = null;
-    try { constants = foldableConstants(await nodeBuilderStateFor(renderer, { scene, camera, mesh })); }
-    catch (e) { foldError = String((e && e.message) || e); }
-    const f = foldConstants(sh.fragmentShader, language, constants);
-    return { language, vertex: sh.vertexShader, fragment: f.fragment, folded: f.folded, foldError };
-}
-
-/** The fragment with its struct DECLARATIONS removed: what is left is what actually reads a uniform. */
-export function fragmentBody(fragment) {
-    // Both spellings of a declaration: WGSL's `struct X { ... };` and GLSL's `uniform X { ... };`. Leaving the
-    // GLSL block in made its own declaration read as a USE, which is how a uniform nothing touches was
-    // reported as read on one backend and unread on the other for the same graph.
-    return String(fragment).replace(/struct \w+ \{[\s\S]*?\};/g, "").replace(/uniform \w+ \{[\s\S]*?\};/g, "");
-}
-
-// *** v4538 -- r184 RENAMED THE GLSL FRAGMENT UNIFORM BLOCK, AND THAT IS THE WHOLE OF THE SECOND SYMPTOM. ***
-// r178 emitted `uniform fragment_object { ... };` and r184 emits `uniform object { ... };`. The GLSL reader
-// matched the old spelling only, found nothing, and returned an EMPTY uniform list -- which surfaced not as
-// "the block moved" but as "the WGSL and GLSL builders emitted different uniform lists (seedLo,seedHi,rLo,rHi
-// vs )". One rename, two unrecognisable symptoms, on two different backends.
-const GLSL_UNIFORM_BLOCK = /uniform (?:fragment_object|object) \{([\s\S]*?)\};/;
-
-// ...AND r184 ALSO DROPPED THE `f_` PREFIX ON EVERY FIELD IN THAT BLOCK. r178 emitted `float f_seedLo;` and
-// r184 emits `float seedLo;`. The prefix was assumed in six places here -- two that PARSE the block and four
-// that REWRITE `f_name` to the device's `name` -- so the parse found nothing and the rewrites became no-ops.
-// Both spellings are accepted: the rewrite of a name that no longer carries a prefix is simply already done.
-const F_ = "(?:f_)?";
-
-/**
- * *** v4538 -- THE UNLABELLED UNIFORMS THREE DECLARES AND THE EFFECT NEVER READS. ***
- *
- * three r184 emits the object's model matrix into `objectStruct` for a bare NodeMaterial with only a
- * fragmentNode -- r178 did not. MEASURED on badTvTsl, the effect this module was built against:
- *
- *     struct objectStruct { time, speed, distortion, distortion2, rollSpeed, nodeUniform8 : mat4x4<f32> }
- *
- * All five of the effect's uniforms are LABELLED and correct; the sixth is three's, it is a matrix, and the
- * fragment body NEVER READS IT. The rule below refused the whole emit on it, so the bump to 0.184 took the
- * sixteen gates that import this build from 14 green to 4.
- *
- * *** AND THE MODULE ALREADY HELD BOTH HALVES OF THE ANSWER, DISAGREEING WITH ITSELF. *** The camera/object
- * rule below (`/modelViewMatrix|\bobject\.nodeUniform\d+/`) refuses a fragment that READS an object matrix;
- * this one refused a struct that DECLARES an unlabelled field. Two rules about one hazard -- one asking what
- * is read and one what is written down -- and r184 is the first build to make them disagree.
- *
- * The transplant rewrites names for the uniforms it BINDS. A field nobody reads is bound to nothing, so it is
- * dropped and NAMED rather than refused; a field that is read still has no stable name to bind under and is
- * still refused, in the same words. The teeth stay exactly where the transplant can be wrong.
- */
-export function unreadUnlabelledUniforms(fragment, language) {
-    const body = fragmentBody(fragment);
-    const decl = language === "wgsl" ? (fragment.match(/struct objectStruct \{([\s\S]*?)\};/) || [])[1]
-                                     : (fragment.match(GLSL_UNIFORM_BLOCK) || [])[1];
-    if (!decl) return [];
-    const names = language === "wgsl"
-        ? [...decl.matchAll(/^\s*(nodeUniform\d+)\s*:/gm)].map((m) => m[1])
-        : [...decl.matchAll(new RegExp("^\\s*\\w+\\s+" + F_ + "(nodeUniform\\d+)\\s*;?$", "gm"))].map((m) => m[1]);
-    // *** THE PREFIX AGAIN, AND THIS TIME ON THE SIDE THAT DECIDES WHETHER THERE ARE TEETH. *** r178 spells the
-    // field `f_nodeUniform1` in the body; `\bnodeUniform1\b` does NOT match inside it, because `_` is a word
-    // character. So an unlabelled uniform the r178 GLSL genuinely READS was reported as unread and silently
-    // dropped -- the refusal turned off by a spelling, in the one function written to stop that happening.
-    // Found at v4539 by writing the test that makes the fixture's body read it; the row above had stopped
-    // exercising the refusal at all when v4538 narrowed it to what the fragment reads.
-    return names.filter((n) => !new RegExp("\\b" + F_ + n + "\\b").test(body));
-}
-
-/** The fields of three's fragment uniform struct, in order: [{ name, type }] (type in the device's vocabulary). Refuses an unlabelled one THE FRAGMENT READS. */
+/** The fields of three's fragment uniform struct, in order: [{ name, type }] (type in the device's vocabulary). Refuses an unlabelled one THAT THE FRAGMENT BODY ACTUALLY READS (measured, both languages) -- an auto-named field the body never touches is three's own cross-stage bookkeeping, not a binding failure, and stays in the returned list for other checks to read. */
 export function uniformFields(fragment, language) {
     const out = [];
     const unread = new Set(unreadUnlabelledUniforms(fragment, language));
     if (language === "wgsl") {
-        const m = fragment.match(/struct objectStruct \{([\s\S]*?)\};/);
+        const m = fragment.match(/struct objectStruct \{[\s\S]*?\};/);
         if (!m) return out;
-        for (const line of m[1].split("\n")) { const f = line.trim().replace(/,$/, "").match(/^(\w+)\s*:\s*(.+)$/); if (!f) continue; if (unread.has(f[1])) continue; const t = WGSL_TYPES[f[2].trim()]; if (!t) throw new Error(`tslSource: uniform ${f[1]} has type ${f[2]}, which the device's uniform list does not carry`); out.push({ name: f[1], type: t }); }
+        for (const line of m[0].match(/\{([\s\S]*?)\};/)[1].split("\n")) { const f = line.trim().replace(/,$/, "").match(/^(\w+)\s*:\s*(.+)$/); if (!f) continue; const t = WGSL_TYPES[f[2].trim()]; if (!t) throw new Error(`tslSource: uniform ${f[1]} has type ${f[2]}, which the device's uniform list does not carry`); out.push({ name: f[1], type: t }); }
     } else {
-        const m = fragment.match(GLSL_UNIFORM_BLOCK);
+        // v4557 -- STRIPPED HERE TOO, NOT ONLY AT transplantFragment'S OWN CALL SITE. uniformFields() is exported
+        // and called directly by selfchecks that want a fragment's uniform LIST without going through a transplant
+        // (tslRace-selfcheck.mjs section 6, grading three's raw emission before any shell exists) -- a caller with
+        // no reason to know about v4555's GLSL flip-flag quirk hit the exact throw _stripGlslFlipFlag exists to
+        // avoid, because stripping lived only in transplantFragment/emitAndTransplant rather than in the function
+        // that actually does the refusing. Idempotent on already-stripped text (the field is simply gone, so the
+        // "referenced exactly once" match fails to find it) -- calling it twice costs nothing.
+        const scan = _stripGlslFlipFlag(fragment);
+        // v4551 -- three@0.185.1 renamed the fragment's uniform block from "fragment_object" to plain "object" and
+        // dropped the "f_" member prefix (measured: `layout( std140 ) uniform object { vec2 scale; ... };`, where
+        // r178 said `uniform fragment_object { float f_time; ... };`) -- the SAME de-prefixing transplantFragment's
+        // and transplantIntoShell's body rewrites already tolerate (their `\bf_${name}\b` replace is a no-op on an
+        // already-bare token). Matching both block names and an optional "f_" keeps the r178 fixtures this gate's
+        // section 1 still carries (tools/ship/tslSource-fixture.json) working unchanged.
+        const m = scan.match(/uniform (?:fragment_object|object) \{([\s\S]*?)\};/);
         if (!m) return out;
-        for (const line of m[1].split("\n")) { const f = line.trim().replace(/;$/, "").match(new RegExp("^(\\w+)\\s+" + F_ + "(\\w+)$")); if (!f) continue; if (unread.has(f[2])) continue; const t = GLSL_TYPES[f[1]]; if (!t) throw new Error(`tslSource: uniform ${f[2]} has type ${f[1]}, which the device's uniform list does not carry`); out.push({ name: f[2], type: t }); }
+        for (const line of m[1].split("\n")) { const f = line.trim().replace(/;$/, "").match(/^(\w+)\s+(?:f_)?(\w+)$/); if (!f) continue; const t = GLSL_TYPES[f[1]]; if (!t) throw new Error(`tslSource: uniform ${f[2]} has type ${f[1]}, which the device's uniform list does not carry`); out.push({ name: f[2], type: t }); }
     }
-    // Still refused -- and now only when the fragment READS it, which is when the transplant would have to
-    // bind it under a name that is not stable across builds.
-    for (const u of out) if (/^nodeUniform\d+$/.test(u.name)) throw new Error(`tslSource: the emitted ${language.toUpperCase()} carries an UNLABELLED uniform (${u.name}) THAT THE FRAGMENT READS; label every uniform node (uniform(x).label("name")) so the device can bind it by name -- unless three allocated it for ITSELF (r184 emits an unlabelled uint flipY flag into the GLSL object block and branches the v on it), which nobody can label`);
+    for (const u of out) {
+        if (!/^nodeUniform\d+$/.test(u.name)) continue;
+        if (_unreadBookkeeping(fragment, language, u)) continue;
+        throw new Error(`tslSource: the emitted ${language.toUpperCase()} carries an UNLABELLED uniform (${u.name}); label every uniform node (uniform(x).label("name")) so the device can bind it by name`);
+    }
     return out;
 }
 /** The textures three declared: [name]. Refuses an unlabelled one. */
@@ -429,6 +308,8 @@ function assertDeclared(body, decls, language) {
 export function transplantFragment(fragment, language) {
     if (typeof fragment !== "string" || !fragment.includes("Three.js")) throw new Error("tslSource: not a three.js node-system shader");
     if (/\brender\./.test(fragment) || /cameraProjectionMatrix|modelViewMatrix/.test(fragment)) throw new Error("tslSource: the fragment reads camera or object matrices; only a fragment-only effect (uv in, colour out) can be transplanted");
+    // v4555 -- see _stripGlslFlipFlag's own header: GLSL only, before anything else reads this text.
+    if (language === "glsl") fragment = _stripGlslFlipFlag(fragment);
     const uniforms = uniformFields(fragment, language), textures = textureNames(fragment, language);
     if (language === "wgsl") {
         const varying = (fragment.match(/fn main\(\s*@location\(\s*\d+\s*\)\s*(\w+)\s*:\s*vec2<f32>\s*\)/) || [])[1];
@@ -438,6 +319,8 @@ export function transplantFragment(fragment, language) {
         const bodyAll = fragment.split("fn main(")[1]; const body = bodyAll.slice(bodyAll.indexOf("{") + 1, bodyAll.lastIndexOf("}"));
         let b = body.replace(/output\.color\s*=\s*([^;]+);\s*return output;/, "return $1;");
         if (!/return /.test(b)) throw new Error("tslSource: the WGSL main() does not end in output.color = ...; return output;");
+        // v4553 -- a fragment-local temporary (r185's hoisted "// vars") is used here but never declared in this slice; see that fix's own header.
+        const fDecls = _usedFragDecls(fragment, b, "wgsl"); if (fDecls.length) b = fDecls.join("\n") + "\n" + b;
         b = b.replace(new RegExp(`\\b${varying}\\b`, "g"), "uv").replace(/\bobject\.(\w+)/g, "u.$1");
         for (const t of textures) b = b.replace(new RegExp(`\\b${t}_sampler\\b`, "g"), "samp");
         const usesSampler = /\bsamp\b/.test(b) || /\bsamp\b/.test(codes);
@@ -450,15 +333,15 @@ export function transplantFragment(fragment, language) {
     const varying = (fragment.match(/in vec2 (\w+);/) || [])[1];
     if (!varying) throw new Error("tslSource: the GLSL fragment does not take a vec2 varying (the uv)");
     if ((fragment.match(/^in /gm) || []).length > 1) throw new Error("tslSource: the GLSL fragment takes more than one varying");
-    // r178 put `// structs` AFTER `// codes`; r184 puts it above the uniforms, so splitting on it swallowed the
-    // whole of main() -- MEASURED: two `void main` in the transplanted GLSL. The region ends where main BEGINS,
-    // which is the thing that actually delimits it; the shell declares its own output, so any fragment-output
-    // declaration that rides along in the region is dropped by what it IS rather than by where it sat.
-    const codes = (fragment.split("// codes")[1] || "").split("void main()")[0]
-        .replace(/^\s*(?:layout\([^)]*\)\s*)?out\s+\w+\s+\w+\s*;\s*$/gm, "")
-        .replace(CARRIED_DECL.glsl, "").trim();
+    // v4551 -- see transplantIntoShell's identical fix: r185 puts "// structs" BEFORE "// codes", so a fixed-order
+    // split(...)[0] on "// structs" no longer bounds anything and swallows a second copy of "void main() {...}".
+    const afterCodes = fragment.split("// codes")[1] || "";
+    const codesStop = ["// structs", "void main("].map((m) => afterCodes.indexOf(m)).filter((i) => i >= 0);
+    const codes = afterCodes.slice(0, codesStop.length ? Math.min(...codesStop) : afterCodes.length).trim();
     const bodyAll = fragment.split("void main()")[1]; let b = bodyAll.slice(bodyAll.indexOf("{") + 1, bodyAll.lastIndexOf("}"));
     if (!/fragColor\s*=/.test(b)) throw new Error("tslSource: the GLSL main() does not write fragColor");
+    // v4553 -- see transplantFragment's WGSL branch above: a fragment-local temporary hoisted to "// vars" under r185.
+    const fDecls = _usedFragDecls(fragment, b, "glsl"); if (fDecls.length) b = fDecls.join("\n") + "\n" + b;
     b = b.replace(new RegExp(`\\b${varying}\\b`, "g"), "vUv");
     for (const u of uniforms) b = b.replace(new RegExp(`\\bf_${u.name}\\b`, "g"), u.name);
     const decls = carriedDeclarations(fragment, "glsl", b); assertDeclared(b, decls, "glsl");
@@ -473,7 +356,18 @@ export function transplantFragment(fragment, language) {
  */
 export function devicePipelineFromTsl({ wgsl, glsl }) {
     const W = transplantFragment(wgsl, "wgsl"), G = transplantFragment(glsl, "glsl");
-    if (W.uniforms.map((u) => u.name + ":" + u.type).join() !== G.uniforms.map((u) => u.name + ":" + u.type).join()) throw new Error(`tslSource: the WGSL and GLSL builders emitted different uniform lists (${W.uniforms.map((u) => u.name).join(",")} vs ${G.uniforms.map((u) => u.name).join(",")})`);
+    // v4557 -- COMPARED WITH THE SAME BOOKKEEPING EXCLUDED THAT uniformFields() ALREADY DECLINES TO THROW ON. Each
+    // backend counts its own internal nodes independently, so an unread mat4 field (v4550's shape) can legitimately
+    // land on "nodeUniform8" in one backend's emission and "nodeUniform9" in the other's -- same dead field, two
+    // auto-generated names, neither the graph author could ever have labelled. Comparing the FULL lists (as this
+    // used to) reads that as "the two builders disagree", which they do not: they agree on every uniform a shader
+    // actually reads and differ only in the name three's own counter happened to give a field neither reads. The
+    // returned pipeline still carries the FULL, unfiltered list (below) -- a struct's binding layout needs every
+    // declared slot accounted for even when a slot is dead, which is the same reason v4550 kept uniformFields()'s
+    // own return value whole and narrowed only its throw.
+    const real = (list, fragment, language) => list.filter((u) => !_unreadBookkeeping(fragment, language, u));
+    const Wreal = real(W.uniforms, wgsl, "wgsl"), Greal = real(G.uniforms, _stripGlslFlipFlag(glsl), "glsl");
+    if (Wreal.map((u) => u.name + ":" + u.type).join() !== Greal.map((u) => u.name + ":" + u.type).join()) throw new Error(`tslSource: the WGSL and GLSL builders emitted different uniform lists (${W.uniforms.map((u) => u.name).join(",")} vs ${G.uniforms.map((u) => u.name).join(",")})`);
     if (W.textures.join() !== G.textures.join()) throw new Error(`tslSource: the WGSL and GLSL builders emitted different textures (${W.textures.join(",")} vs ${G.textures.join(",")})`);
     return { shaders: { wgsl: W.code, glsl: { vertex: VERTEX_GLSL, fragment: G.code } }, vs: "vs", fs: "fs", attributes: [], stride: 0,
              uniforms: W.uniforms.map((u) => ({ name: u.name, type: u.type })), textures: W.textures, transplant: { wgsl: W, glsl: G } };
@@ -488,21 +382,14 @@ export function varyingSemantics(vertex, language) {
     const out = {};
     // v4483 -- a NAMED varying (varying(node, "vScaled")) is emitted under its label, so the name is any identifier now
     const re = language === "wgsl" ? /varyings\.(\w+)\s*=\s*(\w+);/g : /^\s*(\w+)\s*=\s*(\w+);/gm;
-    // *** v4541 -- THE CLIP-SPACE OUTPUT IS NOT A VARYING, AND UNTIL NOW IT WAS TOLD APART BY ITS NAME. ***
-    // three writes its vertex position into the same struct: r178 spelled that member `Vertex` and this line
-    // skipped it by name; r184 spells it `builtinClipSpace`, so it came through as a fourth varying carrying
-    // "VERTEX_v_modelViewProjection", and every gate row that reads the semantics went red. The GLSL branch never
-    // had the problem because it filters by what the vertex DECLARES as an out, and GLSL writes gl_Position.
-    // So the WGSL branch filters the same way, structurally: a varying is a member the vertex's own return struct
-    // declares at an @location; the clip-space one is declared @builtin(position). The struct is found through
-    // the entry's return type rather than by its name, and the `Vertex` special case is gone with the hazard.
-    let declared;
-    if (language === "wgsl") {
-        const ret = (vertex.match(/fn main\([\s\S]*?\)\s*->\s*(\w+)/) || [])[1];
-        const members = ret ? (vertex.match(new RegExp(`struct\\s+${ret}\\s*\\{([\\s\\S]*?)\\}`)) || [])[1] : null;
-        declared = members == null ? null : new Set([...members.matchAll(/@location\(\s*\d+\s*\)\s*(?:@interpolate\([^)]*\)\s*)?(\w+)\s*:/g)].map((m) => m[1]));
-    } else declared = new Set(Object.keys(varyingDecls(vertex, language)));
-    for (const m of vertex.matchAll(re)) { if (declared && !declared.has(m[1])) continue; out[m[1]] = m[2]; }
+    const declared = language === "wgsl" ? null : new Set(Object.keys(varyingDecls(vertex, language)));
+    // v4554 -- WGSL's builtin clip-space output was `varyings.Vertex = ...` under r178; r185 renamed it
+    // `builtinClipSpace` (measured: `@builtin( position ) builtinClipSpace : vec4<f32>` in VaryingsStruct). It is
+    // the vertex's own required output, not a varying a graph asked for, and was never meant to cross into a
+    // shell -- excluded by the old name only, it leaked through as an extra semantic key under the new one and
+    // failed every "the two languages named the same varyings" comparison (GLSL never had an equivalent to begin
+    // with, since gl_Position is a keyword, not an assignment this regex would ever match).
+    for (const m of vertex.matchAll(re)) { if (declared && !declared.has(m[1])) continue; if (m[1] === "Vertex" || m[1] === "builtinClipSpace") continue; out[m[1]] = m[2]; }
     return out;
 }
 // ---- v4483: COMPUTED VARYINGS, and what three declares for each ------------------------------------------------------
@@ -537,6 +424,51 @@ export const ATTRIBUTE_NAMES = Object.freeze(["uv", "position", "normal", "color
  * the shell's own varyings, mapped by semantic as before.
  * Returns { computed: [{ name, type, flat }], statements, decls, uniforms, matrices, reads } or null when nothing is computed.
  */
+// *** v4551 -- three@0.185.1 HOISTS THE VERTEX STAGE'S TEMPORARIES OUT OF main(), MEASURED. *** Under r178 a
+// temporary like nodeVar0 was declared INSIDE main() (`var nodeVar0 : vec2<f32>;`, right where it is first
+// assigned); under r185 it is declared once at module scope, above main(), in its own "// vars" section --
+// `var<private> nodeVar0 : vec2<f32>;` in WGSL, a bare `vec2 nodeVar0;` in GLSL. vertexVaryingBlock() and
+// vertexDisplacement() only ever searched the FUNCTION BODY for a temporary's declaration line, so under r185
+// the declaration was never found: the assignment (`nodeVar0 = ...`) still got taken into the transplant, its
+// declaration did not, and the generated shader used a name nothing declared. _localDeclLines() searches BOTH
+// shapes -- the body (still what the r178 fixtures in tools/ship/*-fixture.json carry, section 1's CPU-only
+// checks) and the module-scope "// vars" section (what three actually emits now, section 2's live harness) --
+// so a caller does not have to know which vintage of three produced the text it is holding.
+function _localDeclLines(vertex, language) {
+    const after = vertex.split("// vars")[1];
+    if (!after) return [];
+    const isDecl = (l) => language === "wgsl" ? /^var(?:<\w+>)?\s+\w+\s*:\s*/.test(l) : new RegExp("^" + GLSL_LOCAL_DECL + " \\w+;$").test(l);
+    // the declarations sit in one unbroken run right after the marker -- under r185 that run ends at "// codes"; under
+    // r178 (where "// vars" sits INSIDE main(), after "// codes" has already gone by) it ends at "// flow" instead. Rather
+    // than name every marker that could follow, stop at the first line that is not itself a declaration.
+    const out = [];
+    for (const raw of after.split("\n")) { const l = raw.trim(); if (!l) continue; if (!isDecl(l)) break; out.push(l); }
+    return out;
+}
+function _declName(line, language) {
+    return (line.match(language === "wgsl" ? /^var(?:<\w+>)?\s+(\w+)/ : /(\w+);$/) || [])[1];
+}
+// r178's "// vars" sits inside main(), so a caller's own body search and _localDeclLines() can both find the same
+// declaration; keep the first (name-deduped) rather than splice it into the transplant twice.
+function _dedupeDecls(lines, language) {
+    const seen = new Set();
+    return lines.filter((l) => { const n = _declName(l, language); if (!n || seen.has(n)) return false; seen.add(n); return true; });
+}
+// v4553 -- THE SAME HOISTING, ON THE FRAGMENT SIDE. A fragment that needs a local temporary across statements (the
+// Chaos race's Lyapunov loop: nodeVar0/1/2, an iterated bifurcation) had that temporary declared INSIDE main() under
+// r178, where the naive body-slice (bodyAll.indexOf("{")..lastIndexOf("}")) carried it along for free. r185 hoists it
+// to the same module-scope "// vars" section the vertex stage uses (measured: `var<private> nodeVar0 : f32;` WGSL, a
+// bare `float nodeVar0;` GLSL) -- OUTSIDE the slice every fragment-transplant site takes, so the assignment survived
+// and the declaration silently did not ("nodeVar0 undeclared", the same shape as the vertex-side v4551 bug, one layer
+// further down the graph than the ones already fixed). Every site that builds a fragment body must prepend whichever
+// of the fragment's own locals that body actually uses -- _localDeclLines() already finds both shapes; only the
+// caller-specific "is this name referenced" filter and the module-scope-qualifier strip are new here.
+function _usedFragDecls(fragment, body, language) {
+    return _dedupeDecls(_localDeclLines(fragment, language), language)
+        .filter((d) => { const name = _declName(d, language); return name && new RegExp(`\\b${name}\\b`).test(body); })
+        .map((d) => language === "wgsl" ? d.replace(/^var<\w+>\s*/, "var ") : d);
+}
+
 /** The vertex stage's inputs, by name: three's `@location(n) name : type` parameters (WGSL) or `layout(location = n) in type name;` (GLSL). */
 export function attributeNames(vertex, language) {
     if (language === "wgsl") { const sig = (vertex.match(/fn main\(([\s\S]*?)\)\s*->/) || [])[1] || ""; return [...sig.matchAll(/@location\(\s*\d+\s*\)\s*(\w+)\s*:/g)].map((m) => m[1]); }
@@ -579,35 +511,45 @@ export function vertexVaryingBlock(vertex, language) {
         for (const m of l.slice(l.indexOf("=") + 1).matchAll(/\b(nodeVar\d+)\b/g)) need.add(m[1]);
     }
     const statements = taken;
-    // three may have written a temporary (nodeVarN) that a statement in the block reads; declare it too
-    // *** v4542 -- THE r184 DECLARATION MOVE, FOURTH SITE. *** r178 declared these temporaries inside the vertex
-    // entry, so reading them off `lines` found them; r184 declares them at file scope and `used` came out empty,
-    // leaving the shell's {{ASSIGN}} block reading names nothing declares ("unresolved value 'nodeVar0'"). The
-    // file-scope ones are taken too -- and a WGSL `var<private> x : T;` becomes a plain `var x : T;`, because these
-    // land INSIDE the shell's vertex function where the private address space is not spellable.
-    const inBody = lines.filter((l) => language === "wgsl" ? /^var \w+ : /.test(l) : /^(vec[234]|float|mat[234]|int|uint|bool) \w+;$/.test(l));
-    // three's own varyings holder (`var<private> varyings : VaryingsStruct;`) is NOT a temporary: the shell replaces
-    // it with its outVar, and carrying it declared a type the shell does not have ("unresolved type VaryingsStruct").
-    // It is excluded by what it IS -- a variable of the vertex entry's return type -- not by its name.
-    const retType = language === "wgsl" ? (vertex.match(/fn main\([\s\S]*?\)\s*->\s*(\w+)/) || [])[1] : null;
-    const atFileScope = carriedDeclarations(vertex, language, null, language === "wgsl" ? "fn main(" : "void main()")
-        .filter((d) => !(retType && new RegExp(`:\\s*${retType}\\s*;`).test(d)))
-        .map((d) => language === "wgsl" ? d.replace(/^var<private>\s+/, "var ") : d);
-    const declLines = [...new Set([...inBody, ...atFileScope])].filter((l) => !/positionLocal|normalLocal|modelViewMatrix|v_positionView|v_modelViewProjection/.test(l));
-    const used = declLines.filter((d) => { const name = (d.match(language === "wgsl" ? /^var (\w+)/ : /(\w+);$/) || [])[1]; return name && statements.some((st) => new RegExp("\\b" + name + "\\b").test(st)); });
+    // three may have written a temporary (nodeVarN) that a statement in the block reads; declare it too -- wherever
+    // three declared it (the body, r178's shape, or module scope, r185's -- see _localDeclLines())
+    const declLines = _dedupeDecls([...lines.filter((l) => language === "wgsl" ? /^var(?:<\w+>)?\s+\w+\s*:\s*/.test(l) : new RegExp("^" + GLSL_LOCAL_DECL + " \\w+;$").test(l)), ..._localDeclLines(vertex, language)].filter((l) => !/positionLocal|normalLocal|modelViewMatrix|v_positionView|v_modelViewProjection/.test(l)), language);
+    // a decl found in "// vars" (r185's module scope) carries an address space (`var<private>`) that is only legal AT
+    // module scope; spliced into the transplant's fn vs() body it must read plain `var name : type` like a local always has
+    const used = declLines.filter((d) => { const name = _declName(d, language); return name && statements.some((st) => new RegExp("\\b" + name + "\\b").test(st)); }).map((d) => language === "wgsl" ? d.replace(/^var<\w+>\s*/, "var ") : d);
     const text = [...used, ...statements].join(" ");
     const uniforms = [...new Set([...text.matchAll(language === "wgsl" ? /\bobject\.(\w+)/g : /\bv_(?!cameraProjectionMatrix|cameraViewMatrix|modelViewProjection|positionView)(\w+)/g)].map((m) => m[1]))];
     const matrices = [...new Set([...text.matchAll(language === "wgsl" ? /\brender\.(\w+)/g : /\bv_(cameraProjectionMatrix|cameraViewMatrix)\b/g)].map((m) => m[1]))];
     const reads = ATTRIBUTE_NAMES.filter((n) => new RegExp("(^|[^.\\w])" + n + "\\b").test(text.replace(/varyings\./g, "")));
     return { computed: computed.map((n) => ({ name: n, ...decls[n] })), statements, decls: used, uniforms, matrices, reads };
 }
+// v4552 -- names a raw vertex text's "object" uniform struct members, GLSL only: WGSL's object.<name> dot-access is
+// self-marking (uniformFields() needs no cross-reference for it), but r185's bare GLSL names read a vertex-stage
+// uniform identically to a local variable (see _unreadBookkeeping's own header on the dropped "f_" prefix) -- there
+// is no longer a textual marker distinguishing "amp" the uniform from "amp" a local, only the declaration itself.
+function _objectUniformNames(text) {
+    const m = text.match(/uniform (?:fragment_object|object) \{([\s\S]*?)\};/);
+    if (!m) return [];
+    return [...m[1].matchAll(/^\s*\w+\s+(?:f_)?(\w+);/gm)].map((x) => x[1]);
+}
+
 /**
  * v4324 -- THE VERTEX STAGE. A graph with a positionNode makes three's vertex shader compute `positionLocal = position;`
- * then reassign positionLocal from the graph (and normalLocal = normal beside it), BEFORE the varyings and the camera
- * matrices. Those statements -- the displacement -- are what a host shell can take: its own vertex stage keeps its own
- * transform (the fleet's record placement, its turn, the device's viewProj) and splices the displacement in where it
- * says `{{DISPLACE}}`, with three's names rewritten: positionLocal -> pl, normalLocal -> nl, position -> p, normal -> n,
- * object.<u> -> the shell's struct. Three's camera and model matrices never cross: they are the shell's.
+ * then reassign positionLocal from the graph (and normalLocal = normal beside it). Those statements -- the displacement --
+ * are what a host shell can take: its own vertex stage keeps its own transform (the fleet's record placement, its turn,
+ * the device's viewProj) and splices the displacement in where it says `{{DISPLACE}}`, with three's names rewritten:
+ * positionLocal -> pl, normalLocal -> nl, position -> p, normal -> n, object.<u> -> the shell's struct. Three's camera
+ * and model matrices never cross: they are the shell's.
+ * *** v4552 -- BY DEPENDENCY, NOT BY POSITION (measured, the same rule vertexVaryingBlock's own header names). ***
+ * The first draft took "everything between the first `positionLocal = position;` and the next varying/matrix line" as
+ * the displacement -- true under r178, where that bare copy always led the vertex body. Under r185 the bare copy can
+ * land AFTER the camera-transform chain has already started when a graph has NO displacement at all, and that window
+ * then swallowed the ordinary chain as a fake one ("the displacement's uniform \"positionView\" is not in the shell's
+ * struct" on a graph that never moves a vertex). A REAL displacement's actual signature, independent of where anything
+ * sits: positionLocal (or normalLocal) gets ASSIGNED A SECOND TIME, reading the value the bare copy just wrote. Only
+ * that second (and any later) assignment is taken, plus whatever nodeVarN temporaries it transitively reads -- found by
+ * the same backward dependency-closure walk vertexVaryingBlock uses for computed varyings, just run over the whole body
+ * instead of a positional slice, and rooted at "reassigned", not "assigned at all".
  * Returns { statements, decls, uniforms, reads } or null when the vertex only copies (no displacement); `reads` is
  * three's names for the attributes and locals the statements touch, which the shell must have a name for (v4325).
  */
@@ -615,18 +557,28 @@ export function vertexDisplacement(vertex, language) {
     const bodyAll = vertex.split(language === "wgsl" ? "fn main(" : "void main()")[1] || "";
     const body = bodyAll.slice(bodyAll.indexOf("{") + 1, bodyAll.lastIndexOf("}"));
     const lines = body.split("\n").map((l) => l.trim()).filter(Boolean);
-    const start = lines.findIndex((l) => /^positionLocal\s*=\s*position;/.test(l));
-    if (start < 0) return null;
-    // v4483 -- a NAMED varying (varying(node, "vLen")) is assigned by its label, so the stop must know the declared names, or the
-    // displacement window swallows the varying block (measured: vLen and vBand landed in {{DISPLACE}} AND in {{ASSIGN}} on WebGL2)
-    const varyingNames = Object.keys(varyingDecls(vertex, language));
-    const stop = lines.findIndex((l, i) => i > start && (/^varyings\.|^modelViewMatrix|^nodeVarying\d+\s*=|^gl_Position|^v_modelViewProjection/.test(l) || varyingNames.some((n) => new RegExp("^" + n + "\\s*=").test(l))));
-    const mid = lines.slice(start + 1, stop < 0 ? lines.length : stop).filter((l) => !/^normalLocal\s*=\s*normal;/.test(l));
-    const statements = mid.filter((l) => !/^(var |vec[234] |float |mat[234] |int |uint )/.test(l));
+    const assigns = (l) => (l.match(/^(\w+)\s*=/) || [])[1];
+    const firstIndex = {};
+    for (const name of ["positionLocal", "normalLocal"]) { const i = lines.findIndex((l) => assigns(l) === name); if (i >= 0) firstIndex[name] = i; }
+    const targets = ["positionLocal", "normalLocal"].filter((name) => lines.filter((l) => assigns(l) === name).length > 1);
+    if (!targets.length) return null;
+    const need = new Set(), taken = [];
+    for (let i = lines.length - 1; i >= 0; i--) {
+        const l = lines[i], lhs = assigns(l);
+        if (!lhs) continue;
+        const isRewrite = targets.includes(lhs) && i !== firstIndex[lhs];
+        if (!(isRewrite || need.has(lhs))) continue;
+        taken.unshift(l); need.delete(lhs);
+        for (const m of l.slice(l.indexOf("=") + 1).matchAll(/\b(nodeVar\d+)\b/g)) need.add(m[1]);
+    }
+    const statements = taken.filter((l) => !/^(var |vec[234] |float |mat[234] |int |uint )/.test(l));
     if (!statements.length) return null;
-    const decls = lines.filter((l) => language === "wgsl" ? /^var \w+ : /.test(l) : /^(vec[234]|float|mat[234]|int|uint) \w+;$/.test(l)).filter((l) => !/positionLocal|normalLocal|modelViewMatrix|v_positionView|v_modelViewProjection/.test(l));
-    const used = decls.filter((d) => { const name = (d.match(language === "wgsl" ? /^var (\w+)/ : /(\w+);$/) || [])[1]; return name && statements.some((st) => new RegExp("\\b" + name + "\\b").test(st)); });
-    const uniforms = [...new Set([...statements.join(" ").matchAll(language === "wgsl" ? /\bobject\.(\w+)/g : /\bv_(\w+)/g)].map((m) => m[1]))];
+    const decls = _dedupeDecls([...lines.filter((l) => language === "wgsl" ? /^var(?:<\w+>)?\s+\w+\s*:\s*/.test(l) : new RegExp("^" + GLSL_LOCAL_DECL + " \\w+;$").test(l)), ..._localDeclLines(vertex, language)].filter((l) => !/positionLocal|normalLocal|modelViewMatrix|v_positionView|v_modelViewProjection/.test(l)), language);
+    const used = decls.filter((d) => { const name = _declName(d, language); return name && statements.some((st) => new RegExp("\\b" + name + "\\b").test(st)); }).map((d) => language === "wgsl" ? d.replace(/^var<\w+>\s*/, "var ") : d);
+    const stText = statements.join(" ");
+    const uniforms = language === "wgsl"
+        ? [...new Set([...stText.matchAll(/\bobject\.(\w+)/g)].map((m) => m[1]))]
+        : _objectUniformNames(vertex).filter((n) => new RegExp(`\\b${n}\\b`).test(stText));
     const text = [...used, ...statements].join(" ");
     const reads = Object.keys(DEFAULT_LOCALS).filter((n) => new RegExp("\\b" + n + "\\b").test(text));
     return { statements, decls: used, uniforms, reads };
@@ -651,27 +603,33 @@ export function transplantIntoShell({ wgsl, glsl }, shell) {
     for (const language of languages) {
         const em = language === "wgsl" ? wgsl : glsl;
         if (typeof em.fragment !== "string" || typeof em.vertex !== "string") throw new Error(`tslSource: transplantIntoShell needs the emitted { vertex, fragment } for ${language}`);
+        // v4555 -- see _stripGlslFlipFlag's own header: GLSL only, before anything else reads this text. A local
+        // copy, not em.fragment reassigned in place -- em is the CALLER's own emitted-shader object (three's real
+        // output, verbatim), and a caller writing it to the WGSL corpus or diffing it against a fresh emission must
+        // still see what three actually said.
+        const fragment = language === "glsl" ? _stripGlslFlipFlag(em.fragment) : em.fragment;
         // v4483 -- a CAMERA matrix in the fragment crosses when the shell names its own for it (`matrices: { cameraProjectionMatrix: "cam.proj" }`);
         // the model matrix never does: three emits it as an unlabelled object uniform, which has no name to bind under.
-        if (/modelViewMatrix|\bobject\.nodeUniform\d+/.test(em.fragment)) throw new Error("tslSource: the fragment reads the object's model matrix (modelViewMatrix), which three emits unlabelled; a shell transplant carries only what its vertex stage passes and what the shell names");
-        // *** v4542 -- READ, NOT WRITTEN DOWN. THE THIRD TIME THIS FILE HAS HAD TO LEARN IT. *** r184 declares BOTH
-        // camera matrices in the shared `render` group whether the fragment uses them or not; MEASURED on tslWide's
-        // quad graph, the body reads cameraProjectionMatrix alone and cameraViewMatrix appears only as a struct
-        // field. The GLSL scan ran over the WHOLE emitted text, so it saw the declaration and refused a shell that
-        // names every matrix its fragment actually uses. (The WGSL scan was already safe by accident: three writes
-        // `render.cameraProjectionMatrix` at a use and a bare field name at a declaration.) Both now read the BODY,
-        // which is the same correction unreadUnlabelledUniforms got at v4538 -- one rule asking what is read and one
-        // asking what is written down is how r184 broke this file four separate times.
-        const S0 = shell[language] || {}, matricesRead = [...new Set([...fragmentBody(em.fragment).matchAll(language === "wgsl" ? /\brender\.(\w+)/g : new RegExp("\\b" + F_ + "(cameraProjectionMatrix|cameraViewMatrix)\\b", "g"))].map((m) => m[1]))];
+        if (/modelViewMatrix|\bobject\.nodeUniform\d+/.test(fragment)) throw new Error("tslSource: the fragment reads the object's model matrix (modelViewMatrix), which three emits unlabelled; a shell transplant carries only what its vertex stage passes and what the shell names");
+        // v4551 -- r185 dropped the "f_"/"v_" prefix GLSL used to carry a camera matrix reference by (see the codes-
+        // extraction and rename() notes below), so a bare name is now ambiguous with the render struct's OWN field
+        // declaration (`mat4 cameraProjectionMatrix;`, with no prefix either) -- scoping the scan to the body (after
+        // "void main()") keeps this reading USAGE, not the always-present declaration, the way WGSL's `render.<m>`
+        // token already does implicitly (three never writes "render." in front of its own struct's field names).
+        const S0 = shell[language] || {};
+        const matrixScope = language === "wgsl" ? fragment : (fragment.split("void main()")[1] || "");
+        const matricesRead = [...new Set([...matrixScope.matchAll(language === "wgsl" ? /\brender\.(\w+)/g : /\b(?:f_)?(cameraProjectionMatrix|cameraViewMatrix)\b/g)].map((m) => m[1]))];
         for (const m of matricesRead) if (!(S0.matrices && S0.matrices[m])) throw new Error(`tslSource: the fragment reads three's ${m} and the shell "${shell.name}" names no matrix of its own for it (it names ${Object.keys(S0.matrices || {}).join(", ") || "none"})`);
-        const uniforms = uniformFields(em.fragment, language), textures = textureNames(em.fragment, language);
+        const uniforms = uniformFields(fragment, language), textures = textureNames(fragment, language);
         // v4326 -- a texture crosses when the SHELL declares it. The shell lists the names its own prefix binds
         // (`textures`), and the transplant keeps the fragment's name as it is, because the graph labelled the texture
         // node with the shell's binding name. One it does not bind is refused by name rather than left dangling: the
         // device reads the bindings out of the shader and would throw at draw with nothing bound to it.
         const carried = shell.textures || [];
         for (const t of textures) if (!carried.includes(t)) throw new Error(`tslSource: the fragment samples "${t}", which the shell "${shell.name}" does not bind (it binds ${carried.join(", ") || "no textures"})`);
-        for (const u of uniforms) { const h = shell.uniforms.find((x) => x.name === u.name); if (!h) throw new Error(`tslSource: the fragment's uniform "${u.name}" is not in the shell "${shell.name}"'s struct (${shell.uniforms.map((x) => x.name).join(", ")})`); if (h.type !== u.type) throw new Error(`tslSource: uniform "${u.name}" is ${u.type} in the fragment and ${h.type} in the shell`); }
+        // v4550 -- a bookkeeping field excused above by uniformFields() (unread, mat4x4<f32>, WGSL) is not something ANY
+        // shell was ever written to carry -- it crossed nothing, so it needs no seat in the shell's struct either.
+        for (const u of uniforms) { const h = shell.uniforms.find((x) => x.name === u.name); if (!h) { if (_unreadBookkeeping(fragment, language, u)) continue; throw new Error(`tslSource: the fragment's uniform "${u.name}" is not in the shell "${shell.name}"'s struct (${shell.uniforms.map((x) => x.name).join(", ")})`); } if (h.type !== u.type) throw new Error(`tslSource: uniform "${u.name}" is ${u.type} in the fragment and ${h.type} in the shell`); }
         const sem = varyingSemantics(em.vertex, language), S = shell[language];
         // the vertex stage: a displacement crosses only into a shell that says where ({{DISPLACE}} in its vertexTemplate)
         const disp = vertexDisplacement(em.vertex, language);
@@ -706,7 +664,7 @@ export function transplantIntoShell({ wgsl, glsl }, shell) {
                 r = r.replace(/\bvaryings\.(\w+)/g, (_, n) => block.computed.some((c) => c.name === n) ? `${S.outVar}.${n}` : (locals[n] || locals[sem[n]] || `varyings.${n}`));
                 r = Object.keys(locals).sort((a, b) => b.length - a.length).reduce((acc, n) => acc.replace(new RegExp(`(^|[^.\\w])${n}\\b`, "g"), `$1${locals[n]}`), r);
                 if (language === "wgsl") { r = r.replace(/\bobject\.(\w+)/g, `${S.uniformVar}.$1`).replace(/\brender\.(\w+)/g, (_, m) => S.matrices[m]); }
-                else { r = r.replace(/\bv_(cameraProjectionMatrix|cameraViewMatrix)\b/g, (_, m) => S.matrices[m]).replace(/\bv_(\w+)/g, "$1"); r = r.replace(new RegExp("^(" + block.computed.map((c) => c.name).join("|") + ")\\s*="), "$1 ="); }
+                else { r = r.replace(/\b(?:v_)?(cameraProjectionMatrix|cameraViewMatrix)\b/g, (_, m) => S.matrices[m]).replace(/\bv_(\w+)/g, "$1"); r = r.replace(new RegExp("^(" + block.computed.map((c) => c.name).join("|") + ")\\s*="), "$1 ="); }
                 return r;
             };
             if (/\bvaryings\./.test(block.statements.map(rename).join(" "))) throw new Error(`tslSource: a computed varying reads a varying the shell "${shell.name}" has no local for`);
@@ -717,12 +675,15 @@ export function transplantIntoShell({ wgsl, glsl }, shell) {
         } else if (vertexText) vertexText = vertexText.replace("{{ASSIGN}}", "").replace("{{VARYINGS}}", "");
         if (language === "wgsl") {
             // v4483 -- a flat varying carries @interpolate(flat) between its location and its name; the first draft's pattern skipped it SILENTLY
-            const params = [...((em.fragment.match(/fn main\(([\s\S]*?)\)\s*->/) || [])[1] || "").matchAll(/@location\(\s*\d+\s*\)\s*(?:@interpolate\([^)]*\)\s*)?(\w+)\s*:\s*([\w<>]+)/g)].map((m) => ({ name: m[1], type: m[2] }));
+            const params = [...((fragment.match(/fn main\(([\s\S]*?)\)\s*->/) || [])[1] || "").matchAll(/@location\(\s*\d+\s*\)\s*(?:@interpolate\([^)]*\)\s*)?(\w+)\s*:\s*([\w<>]+)/g)].map((m) => ({ name: m[1], type: m[2] }));
             const computedNames = block ? block.computed.map((c) => c.name) : [];
-            const codes = (em.fragment.split("// codes")[1] || "").split("@fragment")[0].trim();
-            const bodyAll = em.fragment.split("fn main(")[1]; let b = bodyAll.slice(bodyAll.indexOf("{") + 1, bodyAll.lastIndexOf("}"));
+            const codes = (fragment.split("// codes")[1] || "").split("@fragment")[0].trim();
+            const bodyAll = fragment.split("fn main(")[1]; let b = bodyAll.slice(bodyAll.indexOf("{") + 1, bodyAll.lastIndexOf("}"));
             b = b.replace(/output\.color\s*=\s*([^;]+);\s*return output;/, "return $1;");
             if (!/return /.test(b)) throw new Error("tslSource: the WGSL main() does not end in output.color = ...; return output;");
+            // v4553 -- a fragment-local temporary (r185's hoisted "// vars", e.g. the Chaos race's Lyapunov loop) is used
+            // here but never declared in this slice; see _usedFragDecls's own header.
+            const fDecls = _usedFragDecls(fragment, b, "wgsl"); if (fDecls.length) b = fDecls.join("\n") + "\n" + b;
             for (const p of params) { if (computedNames.includes(p.name)) { b = b.replace(new RegExp(`\\b${p.name}\\b`, "g"), `${S.varyingParam}.${p.name}`); continue; } const what = sem[p.name]; const to = what && S.varyings[what]; if (!to) throw new Error(`tslSource: the fragment reads varying ${p.name} (${what || "unknown"}), which the shell "${shell.name}" does not carry (it carries ${Object.keys(S.varyings).join(", ")})`); b = b.replace(new RegExp(`\\b${p.name}\\b`, "g"), to); }
             b = b.replace(/\bobject\.(\w+)/g, `${S.uniformVar}.$1`).replace(/\brender\.(\w+)/g, (_, m) => S.matrices[m]);
             for (const t of textures) if (new RegExp(`\\b${t}_sampler\\b`).test(b)) {   // a SAMPLED texture needs the shell's own sampler; a textureLoad does not
@@ -739,20 +700,25 @@ export function transplantIntoShell({ wgsl, glsl }, shell) {
             desc.wgsl = `// transplanted into the ${shell.name} shell from three's WGSL node builder by render/tslSource.mjs\n${prefix}\n${codes}\n${decls.join("\n")}${decls.length ? "\n" : ""}@fragment fn fs(${S.varyingParam}: ${S.varyingType || "VOut"}) -> @location(0) vec4<f32> {${b}}\n`;   // v4484: the shell names its varying struct (Slug's is VSOut)
         } else {
             const computedNames = block ? block.computed.map((c) => c.name) : [];
-            const ins = [...em.fragment.matchAll(/^(?:flat\s+)?in\s+\w+\s+(\w+);/gm)].map((m) => m[1]).filter((n) => !computedNames.includes(n));
-            // v4541 -- `// structs` moved above the uniforms at r184, so this region ran to the end of the file and
-            // emitted main() a second time: "'main' : function already has a body". Same fix as transplantFragment's.
-            const codes = (em.fragment.split("// codes")[1] || "").split("void main()")[0]
-                .replace(/^\s*(?:layout\([^)]*\)\s*)?out\s+\w+\s+\w+\s*;\s*$/gm, "")
-                .replace(CARRIED_DECL.glsl, "").trim();
-            const bodyAll = em.fragment.split("void main()")[1]; let b = bodyAll.slice(bodyAll.indexOf("{") + 1, bodyAll.lastIndexOf("}"));
+            const ins = [...fragment.matchAll(/^(?:flat\s+)?in\s+\w+\s+(\w+);/gm)].map((m) => m[1]).filter((n) => !computedNames.includes(n));
+            // v4551 -- "// codes" (three's helper-function definitions) used to be bounded by the NEXT "// structs"
+            // marker (r178: codes, then structs' `out vec4 fragColor;`, then main); r185 puts "// structs" BEFORE
+            // "// codes" instead, so that marker never recurs and ".split("// structs")[0]" swallowed everything to
+            // EOF -- including a second, full copy of "void main() {...}" (measured: "'main' : function already
+            // has a body"). Stop at whichever of "// structs" or "void main(" comes first instead of assuming an order.
+            const afterCodes = fragment.split("// codes")[1] || "";
+            const codesStop = ["// structs", "void main("].map((m) => afterCodes.indexOf(m)).filter((i) => i >= 0);
+            const codes = afterCodes.slice(0, codesStop.length ? Math.min(...codesStop) : afterCodes.length).trim();
+            const bodyAll = fragment.split("void main()")[1]; let b = bodyAll.slice(bodyAll.indexOf("{") + 1, bodyAll.lastIndexOf("}"));
             if (!/fragColor\s*=/.test(b)) throw new Error("tslSource: the GLSL main() does not write fragColor");
+            // v4553 -- see the WGSL branch above: a fragment-local temporary hoisted to "// vars" under r185.
+            const fDecls = _usedFragDecls(fragment, b, "glsl"); if (fDecls.length) b = fDecls.join("\n") + "\n" + b;
             for (const n of ins) { const what = sem[n]; const to = what && S.varyings[what]; if (!to) throw new Error(`tslSource: the fragment reads varying ${n} (${what || "unknown"}), which the shell "${shell.name}" does not carry`); b = b.replace(new RegExp(`\\b${n}\\b`, "g"), to); }
             for (const u of uniforms) b = b.replace(new RegExp(`\\bf_${u.name}\\b`, "g"), u.name);
-            b = b.replace(new RegExp("\\b" + F_ + "(cameraProjectionMatrix|cameraViewMatrix)\\b", "g"), (_, m) => S.matrices[m]);
-            const gPrefix = S.fragmentPrefix.replace("{{VARYINGS}}", fragInText);
-            const gDecls = carriedDeclarations(em.fragment, "glsl", b).filter((d) => { const n = (d.match(CARRIED_NAME.glsl) || [])[1]; return n && !new RegExp(`\\b${n}\\b`).test(gPrefix); });
-            desc.glsl = { vertex: vertexText || S.vertex, fragment: `${gPrefix}\n${codes}\n${gDecls.join("\n")}${gDecls.length ? "\n" : ""}void main() {${b}}\n` };
+            // v4551 -- r185 drops the "f_" prefix here too (bare `cameraProjectionMatrix`); the optional group keeps
+            // matching r178's `f_cameraProjectionMatrix`.
+            b = b.replace(/\b(?:f_)?(cameraProjectionMatrix|cameraViewMatrix)\b/g, (_, m) => S.matrices[m]);
+            desc.glsl = { vertex: vertexText || S.vertex, fragment: `${S.fragmentPrefix.replace("{{VARYINGS}}", fragInText)}\n${codes}\nvoid main() {${b}}\n` };
         }
     }
     // v4484 -- the shell's BLEND and DEPTH state ride along: a Slug shell is premultiplied with no depth write, and a transplant that dropped them drew the
@@ -850,6 +816,8 @@ export function readStructDecl(wgsl, name) {
  */
 export function transplantCompute(wgsl, shell) {
     if (typeof wgsl !== "string" || !wgsl.includes("Three.js")) throw new Error("tslSource: not a three.js node-system shader");
+    // v4556 -- see _stripComputeDispatchGuard's own header: before anything else reads this text.
+    wgsl = _stripComputeDispatchGuard(wgsl);
     const ENTRY = new RegExp("@" + "compute\\s+@workgroup_size\\(\\s*(\\d+)");
     const at = wgsl.match(ENTRY);
     if (!at) throw new Error("tslSource: that shader has no compute entry point (a fragment or vertex belongs in transplantIntoShell)");
@@ -960,18 +928,27 @@ export function transplantCompute(wgsl, shell) {
     sharedFound.forEach((f, i) => { b = b.replace(new RegExp(`\\b${f.name}\\b`, "g"), wantShared[i].name); });
     b = b.replace(/\bobject\.(\w+)/g, `${shell.uniformVar}.$1`);
     for (const a of memberUA) b = b.replace(new RegExp(`\\b${a.name}\\.value\\b`, "g"), `${shell.uniformVar}.${a.name}`);   // v4483: the array lives in the struct
-    // *** v4541 -- r184 MOVED three's TEMPORARIES OUT OF THE ENTRY POINT HERE TOO. *** The same change that broke
-    // the fragment transplant at v4540 breaks this one: three used to declare `var nodeVar0 : f32;` inside its
-    // compute entry and now declares `var<private> nodeVar0 : f32;` at file scope, so taking the body from
-    // `@compute` onward leaves every one of them behind. MEASURED, the symptom is not a refusal but a device
-    // error -- "the WGSL for this compute pipeline did not compile: unresolved value" -- and then a pass that
-    // reads zero everywhere, which is why tslPhysics-selfcheck's counts all went to 0.
-    // Two things the shell already declares are NOT carried a second time (instanceIndex is the live one): a
-    // duplicate declaration is a compile error, and the shell's is the one the transplant means.
-    const preamble = `${keepSubgroups ? "enable subgroups;\n" : ""}var<private> instanceIndex : u32;\n${shell.prefix}\n`;
-    const decls = carriedDeclarations(wgsl, "wgsl", b, at[0])
-        .filter((d) => { const n = (d.match(CARRIED_NAME.wgsl) || [])[1]; return n && !new RegExp(`\\b${n}\\b`).test(preamble); });
-    assertDeclared(b, [...decls, `var<private> instanceIndex : u32;`], "wgsl");
-    const code = `// transplanted from three's WGSL compute builder by render/tslSource.mjs\n${preamble}${decls.join("\n")}${decls.length ? "\n" : ""}@` + `compute @workgroup_size(${shell.workgroupSize})\n${b}`;
-    return { wgsl: code, shared: wantShared.map((w) => w.name), storage: shell.storage.map((b2) => b2.name), reads: wantR.map((b2) => b2.name), writes: wantW.map((b2) => b2.name), uniforms, uniformArrays: wantUA.map((a) => a.name), workgroupSize: shell.workgroupSize, shell: shell.name, dispatchBound: dispatchBoundOf(code) };
+    // v4556 -- same hoisting as the vertex (v4551) and fragment (v4553) stages: a compute pass's own local temporary
+    // (the planes pass's running minimum, `nodeVar0`) sits in r185's module-scope "// vars", before "fn main(" --
+    // `entry`/`b` above only ever sliced from "fn main(" onward, so it was never carried. Spliced in right after the
+    // function's own opening brace, not prepended to `b` whole (b here is the FULL "fn main() { ... }", signature
+    // included, unlike the fragment sites where the equivalent b was already just the body).
+    const fDecls = _usedFragDecls(wgsl, b, "wgsl");
+    if (fDecls.length) { const braceAt = b.indexOf("{"); b = b.slice(0, braceAt + 1) + "\n" + fDecls.join("\n") + b.slice(braceAt + 1); }
+    const code = `// transplanted from three's WGSL compute builder by render/tslSource.mjs\n${keepSubgroups ? "enable subgroups;\n" : ""}var<private> instanceIndex : u32;\n${shell.prefix}\n@` + `compute @workgroup_size(${shell.workgroupSize})\n${b}`;
+    return { wgsl: code, shared: wantShared.map((w) => w.name), storage: shell.storage.map((b2) => b2.name), reads: wantR.map((b2) => b2.name), writes: wantW.map((b2) => b2.name), uniforms, uniformArrays: wantUA.map((a) => a.name), workgroupSize: shell.workgroupSize, shell: shell.name };
+}
+
+/**
+ * A gate's emitted-artifact record, with `three` read from the SHADER TEXT rather than declared.
+ *
+ * *** THE DECLARED VERSION WENT STALE TWICE WITHOUT ANYTHING NOTICING. *** Gates wrote `three: "0.178.0"` by
+ * hand; the tree then vendored r184, and now r185, and every one of those artifacts went on claiming 0.178.
+ * three prints its own revision at the top of everything it builds, so the record reads it from there and a
+ * re-vendor cannot leave a lie behind. Restored at the v4623 merge, where main's r185 rework of this module
+ * took out the region it sat in while five gates still imported it.
+ */
+export function stampThreeRevision(rec) {
+    const m = JSON.stringify(rec).match(/Three\.js\s*(r\d+)/);
+    return { ...rec, three: m ? m[1] : "unknown" };
 }

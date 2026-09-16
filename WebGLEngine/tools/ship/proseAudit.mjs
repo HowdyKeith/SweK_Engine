@@ -48,11 +48,27 @@ const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..
 // variable stays UNRESOLVED rather than being guessed at, because an audit that invents its own subject is
 // worse than one that admits it cannot see.
 //
+// A FIFTH SHAPE ARRIVED AND THE FOUR-WAY SWITCH DID NOT KNOW IT: `const read = (rel) => fs.readFileSync(path.join
+// (ENG, rel), "utf8")`, a local helper 51 gates define and then call as `read("some/file.js")`. resolveKnownRoot,
+// below, is shared between a direct path.join segment and a helper's closed-over root so the two cannot drift
+// apart, and readTargets resolves each CALL SITE rather than the helper's own (unresolvable, parameter-fed)
+// readFileSync line. The same sharing also made root-name matching CASE-INSENSITIVE: 55 gates spell it lowercase
+// `here` and the original patterns only ever recognised the uppercase form.
+//
 // *** POSITIONED, NOT LAST-WINS, AND THIS AUDITOR REPORTED THREE FALSE FINDINGS BEFORE IT WAS. *** Gates reuse
 // the name `src`: cast-selfcheck reads server.js into it at line 68 and jellyfinBridge.js into it at line 127.
 // A last-wins map graded the early assertions against the late file and called them UNMATCHED -- the auditor
 // accusing sound gates of exactly the vacuity it was built to find. Each assertion now resolves against the
 // NEAREST PRECEDING assignment to its variable.
+// A root-variable NAME resolves the same way whether it appears as a path.join segment or as the root a local
+// read() helper closes over. Matched CASE-INSENSITIVELY: 55 of the tree's gates spell it lowercase `here` and
+// this resolver only ever recognised the uppercase form, so every one of their reads stayed UNRESOLVED.
+function resolveKnownRoot(name, gatePath) {
+    if (/^(here|__dirname|dir|this_dir)$/i.test(name)) return path.dirname(gatePath);
+    if (/^(eng|engine|root|eng_root|engine_root)$/i.test(name)) return ENG;
+    return null;
+}
+
 function readTargets(src, gatePath) {
     const out = [];
     const re = /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*([^;\n]*readFileSync\([^;\n]*)/g;
@@ -69,8 +85,8 @@ function readTargets(src, gatePath) {
             for (const pt of join[1].split(",").map((x) => x.trim())) {
                 const l = pt.match(/^["'`]([^"'`]*)["'`]$/);
                 if (l) { segs.push(l[1]); continue; }
-                if (segs.length === 0 && /^(HERE|__dirname|DIR|THIS_DIR)$/.test(pt)) { segs.push(path.dirname(gatePath)); continue; }
-                if (segs.length === 0 && /^(ENG|ENGINE|ROOT|ENG_ROOT|ENGINE_ROOT)$/.test(pt)) { segs.push(ENG); continue; }
+                const known = segs.length === 0 ? resolveKnownRoot(pt, gatePath) : null;
+                if (known) { segs.push(known); continue; }
                 ok = false; break;
             }
             if (ok && segs.length) rel = path.join(...segs);
@@ -78,6 +94,25 @@ function readTargets(src, gatePath) {
         else if (lit) rel = lit[1];
         if (!rel) continue;
         out.push({ variable: varName, at: m.index, path: path.isAbsolute(rel) ? rel : path.resolve(path.dirname(gatePath), rel) });
+    }
+
+    // A LOCAL `read(rel)` HELPER IS A FIFTH SHAPE THE FOUR-WAY SWITCH ABOVE NEVER KNEW ABOUT: 51 gates define
+    // `const read = (rel) => fs.readFileSync(path.join(ENG, rel), "utf8")` (some wrapped in try/catch) and then
+    // assign its RESULT, e.g. `const src = read("simulation/easing.js")` -- a line with no "readFileSync" on it
+    // at all, invisible to the regex above. The helper's OWN readFileSync call can never resolve on its own
+    // (`rel` is a parameter, not a literal), so instead every CALL SITE with a literal argument is resolved:
+    // the literal combines with the helper's already-known root exactly as a path.join segment would.
+    const readers = new Map();
+    for (const hm of src.matchAll(/(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*\(\s*[A-Za-z_$][\w$]*\s*\)\s*=>/g)) {
+        const call = src.slice(hm.index, hm.index + 240).match(/readFileSync\(\s*path\.join\(\s*([A-Za-z_$][\w$]*)\s*,/);
+        const root = call ? resolveKnownRoot(call[1], gatePath) : null;
+        if (root) readers.set(hm[1], root);
+    }
+    if (readers.size) {
+        for (const cm of src.matchAll(/(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*)\(\s*["'`]([^"'`]+)["'`]\s*\)/g)) {
+            const root = readers.get(cm[2]);
+            if (root) out.push({ variable: cm[1], at: cm.index, path: path.resolve(root, cm[3]) });
+        }
     }
     return out;
 }

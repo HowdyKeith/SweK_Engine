@@ -10,197 +10,13 @@
  * reading stdout. Rewritten by tools/ship/freezeRegisterAudit.mjs.
  */
 export const REGISTER_AUDIT = Object.freeze({
- "at": "v4561",
+ "at": "v4622",
  "capMs": 120000,
  "rows": [
   {
-   "gate": "engine/frameDirtyCensus-selfcheck.mjs",
-   "exit": 1,
-   "ms": 744,
-   "first": "*** every covers list belongs to an addSource call -- none has drifted onto a constructor that would ignore it ***",
-   "all": [
-    "*** every covers list belongs to an addSource call -- none has drifted onto a constructor that would ignore it ***"
-   ],
-   "count": 1,
-   "onStderr": false
-  },
-  {
-   "gate": "tools/roundhouse/swekWebviewApk-selfcheck.mjs",
-   "exit": 1,
-   "ms": 797,
-   "first": "...and a failed load offers the prompt, since that is when the address is usually wrong",
-   "all": [
-    "...and a failed load offers the prompt, since that is when the address is usually wrong"
-   ],
-   "count": 1,
-   "onStderr": false
-  },
-  {
-   "gate": "tools/ship/avatarServerViews-selfcheck.mjs",
-   "exit": 1,
-   "ms": 6096,
-   "first": "!! every framed surface the server.html switch mounts carries ?embed=1   rigged, stickwoman, robotexpressive2, blob, thead, krbn, ascii, heerich, stage3d, gauges3000, blobgpu",
-   "all": [
-    "!! every framed surface the server.html switch mounts carries ?embed=1   rigged, stickwoman, robotexpressive2, blob, thead, krbn, ascii, heerich, stage3d, gauges3000, blobgpu"
-   ],
-   "count": 1,
-   "onStderr": false
-  },
-  {
-   "gate": "tools/ship/bfcache-selfcheck.mjs",
-   "exit": 1,
-   "ms": 888,
-   "first": "!! NO PAGE TEARS THINGS DOWN ON pagehide WITHOUT CHECKING event.persisted   camera-effects.html",
-   "all": [
-    "!! NO PAGE TEARS THINGS DOWN ON pagehide WITHOUT CHECKING event.persisted   camera-effects.html"
-   ],
-   "count": 1,
-   "onStderr": false
-  },
-  {
-   "gate": "tools/ship/boundaryLint-selfcheck.mjs",
-   "exit": 1,
-   "ms": 5416,
-   "first": "!! no response body is read without consulting .ok   see above",
-   "all": [
-    "!! no response body is read without consulting .ok   see above",
-    "!! no NEW reported boundary tell has appeared   93 sites against a baseline of 88; NEW (6): ai-bridge/vbaArchiveBridge.js :: KILL_NOT_VERIFIED (NEW), report.html :: UNCHECKED_JSON_BODY (2 -> 3), tools/ship/quickSweep.mjs :: KILL_NOT_VERIFIED (NEW), tools/ship/recordInputs.mjs :: KILL_NOT_VERIFIED (NEW), tools/ship/redCensus.mjs :: KILL_NOT_VERIFIED (NEW), tools/ship/slowCensus.mjs :: KILL_NOT_VERIFIED (NEW). Counted every run since v3103 and never compared until now -- so a rule could have doubled quietly, and establishing that it had NOT took walking four shipped zips"
-   ],
-   "count": 2,
-   "onStderr": false
-  },
-  {
-   "gate": "tools/ship/canvasFill-selfcheck.mjs",
-   "exit": 1,
-   "ms": 4939,
-   "first": "!! NO PAGE IN THE TREE SHIPS A FIXED, UNGROWABLE CANVAS   POSTAGE STAMPS: device-present.html#c, gpu-rig-check.html#stage, tools/ship/atmosphereHarness.html#c, tools/ship/effectMergeHarness.html#c, tools/ship/perspectiveWarpHarness.html#c, tools/ship/postChainHarness.html#c, tools/ship/solidTextureHarness.html#c",
-   "all": [
-    "!! NO PAGE IN THE TREE SHIPS A FIXED, UNGROWABLE CANVAS   POSTAGE STAMPS: device-present.html#c, gpu-rig-check.html#stage, tools/ship/atmosphereHarness.html#c, tools/ship/effectMergeHarness.html#c, tools/ship/perspectiveWarpHarness.html#c, tools/ship/postChainHarness.html#c, tools/ship/solidTextureHarness.html#c",
-    "!! *** no canvas is stretched with position:absolute + inset alone, with no explicit width/height ***   OFFENDERS: orrery.html -> #stage {position:absolute; inset:0; display:block; cursor:grab;} | orrery.html -> #fx {position:absolute; inset:0; display:none; pointer-events:none;} -- a replaced element with width/height both auto uses its OWN intrinsic size (300x150), not the container's. Add width:100%;height:100% alongside the inset."
-   ],
-   "count": 2,
-   "onStderr": false
-  },
-  {
-   "gate": "tools/ship/definitionGates-selfcheck.mjs",
-   "exit": 1,
-   "ms": 493,
-   "first": "!! no NEW exported symbol under physics/ has appeared without its gate naming it   GREW to 62: physics/character/terrainWalk.mjs:functionGround, physics/character/terrainWalk.mjs:autoGround, physics/character/terrainWalk.mjs:projectOnPlane, physics/character/terrainWalk.mjs:reportLines, physics/crypto/secp256k1.mjs:pointDouble, physics/mesh/meshCSG.mjs:flatness ...",
-   "all": [
-    "!! no NEW exported symbol under physics/ has appeared without its gate naming it   GREW to 62: physics/character/terrainWalk.mjs:functionGround, physics/character/terrainWalk.mjs:autoGround, physics/character/terrainWalk.mjs:projectOnPlane, physics/character/terrainWalk.mjs:reportLines, physics/crypto/secp256k1.mjs:pointDouble, physics/mesh/meshCSG.mjs:flatness ...",
-    "!! no NEW exported symbol ANYWHERE IN THE TREE has appeared without its gate naming it   GREW to 327: ai-bridge/chunkVerify.mjs:verifiedPrefix, ai-bridge/chunkVerify.mjs:resumePlan, ai-bridge/chunkVerify.mjs:spliceRanges, ai-bridge/chunkVerify.mjs:chunkAudit, ai-bridge/chunkVerify.mjs:resumeRanges, ai-bridge/deviceWorker.mjs:offThreadDevice ...",
-    "!! *** no NEW exported symbol OF ANY SHAPE has appeared without its gate naming it ***   GREW to 627: ai-bridge/catalogSnapshot.mjs:SNAPSHOT_PATH, ai-bridge/chunkVerify.mjs:verifiedPrefix, ai-bridge/chunkVerify.mjs:resumePlan, ai-bridge/chunkVerify.mjs:spliceRanges, ai-bridge/chunkVerify.mjs:chunkAudit, ai-bridge/chunkVerify.mjs:resumeRanges ..."
-   ],
-   "count": 3,
-   "onStderr": false
-  },
-  {
-   "gate": "tools/ship/homography-selfcheck.mjs",
-   "exit": 1,
-   "ms": 1386,
-   "first": "!! it is the only homography in the tree",
-   "all": [
-    "!! it is the only homography in the tree"
-   ],
-   "count": 1,
-   "onStderr": false
-  },
-  {
-   "gate": "tools/ship/pagePlacement-selfcheck.mjs",
-   "exit": 1,
-   "ms": 90,
-   "first": "!! ...and the silent bucket is the large one, which is the finding   204 silent against 242 placed. pageSections says of UNPLACED: \"an unplaced page and a page nobody has got to look identical, and the second one gets placed by a guess.\" *** UNPLACED HOLDS 23. THE OTHER 204 ARE IN EXACTLY THE STATE THE MECHANISM EXISTS TO PREVENT. ***",
-   "all": [
-    "!! ...and the silent bucket is the large one, which is the finding   204 silent against 242 placed. pageSections says of UNPLACED: \"an unplaced page and a page nobody has got to look identical, and the second one gets placed by a guess.\" *** UNPLACED HOLDS 23. THE OTHER 204 ARE IN EXACTLY THE STATE THE MECHANISM EXISTS TO PREVENT. ***",
-    "!! box3d-blobs.html goes to Box3D, and the unweighted version sent it to Sampling & Methods   *** \"physics\" APPEARS IN FIVE PANELS AND SAYS NOTHING ABOUT WHICH ONE; \"box3d\" APPEARS IN ONE AND SAYS EVERYTHING. *** Two hits on the common word outscored one hit on the discriminating word and the wrong panel won. This survived the entity fix because \"physics\" is a REAL subject word -- just not a discriminating one, which a raw count cannot tell apart."
-   ],
-   "count": 2,
-   "onStderr": false
-  },
-  {
-   "gate": "tools/ship/pagePlacements-selfcheck.mjs",
-   "exit": 1,
-   "ms": 106,
-   "first": "!! a page can be listed in TWO topics at once   *** SECTIONS.pages IS A PARTITION AND COULD NOT SAY THIS. *** Keith: \"a page such as Cosmic Map could show some or all or none of the sections\" -- so topics is a SET, and the base registry's one-panel-per-page shape was a limit of the storage rather than a fact about pages.",
-   "all": [
-    "!! a page can be listed in TWO topics at once   *** SECTIONS.pages IS A PARTITION AND COULD NOT SAY THIS. *** Keith: \"a page such as Cosmic Map could show some or all or none of the sections\" -- so topics is a SET, and the base registry's one-panel-per-page shape was a limit of the storage rather than a fact about pages.",
-    "...and the packing rule has ONE implementation, on the server side   the browser renders what it is handed. A second copy of the packing in page JavaScript would drift from this one the first time either changed -- the defect this session keeps finding. *** THE FIRST VERSION OF THIS CHECK GREPPED FOR THE WORD AND WENT RED ON THE COMMENT THAT NAMES THE OWNER *** -- a check that punishes a file for SAYING where its logic lives is one that teaches people to stop saying."
-   ],
-   "count": 2,
-   "onStderr": false
-  },
-  {
-   "gate": "tools/ship/pageReflow-selfcheck.mjs",
-   "exit": 1,
-   "ms": 84,
-   "first": "!! *** nothing reads layout after a DOM write inside a loop ***   ui/crtToggle.js:58 getBoundingClientRect, ui/domToTexture.js:137 clientWidth, ui/domToTexture.js:137 clientHeight, ui/textMorph.js:152 getBoundingClientRect",
-   "all": [
-    "!! *** nothing reads layout after a DOM write inside a loop ***   ui/crtToggle.js:58 getBoundingClientRect, ui/domToTexture.js:137 clientWidth, ui/domToTexture.js:137 clientHeight, ui/textMorph.js:152 getBoundingClientRect"
-   ],
-   "count": 1,
-   "onStderr": false
-  },
-  {
-   "gate": "tools/ship/pageSectionsReport-selfcheck.mjs",
-   "exit": 1,
-   "ms": 1302,
-   "first": "!! and no alarm span is drawn at all when nothing is actually wrong    — 1 already linked in another part of the page: ev.html",
-   "all": [
-    "!! and no alarm span is drawn at all when nothing is actually wrong    — 1 already linked in another part of the page: ev.html"
-   ],
-   "count": 1,
-   "onStderr": false
-  },
-  {
-   "gate": "tools/ship/pairlaneBridge-selfcheck.mjs",
-   "exit": 1,
-   "ms": 81,
-   "first": "!! *** the panel's label is RENAMED to what Keith actually asked for, id/tab left untouched ***   renaming the internal id too would touch every existing data-tab/data-panel selector for no reason the request asked for -- the visible label is what changed",
-   "all": [
-    "!! *** the panel's label is RENAMED to what Keith actually asked for, id/tab left untouched ***   renaming the internal id too would touch every existing data-tab/data-panel selector for no reason the request asked for -- the visible label is what changed",
-    "!! the server.html tab button shows the renamed label, not the old one"
-   ],
-   "count": 2,
-   "onStderr": false
-  },
-  {
-   "gate": "tools/ship/proseAudit-selfcheck.mjs",
-   "exit": 1,
-   "ms": 2172,
-   "first": "the audit actually resolved most of its subjects (an audit that cannot see its subjects is not an audit)   44 sound, 7 HTML (not auditable this way, declared), 2 OR-branches, 15 unresolved",
-   "all": [
-    "the audit actually resolved most of its subjects (an audit that cannot see its subjects is not an audit)   44 sound, 7 HTML (not auditable this way, declared), 2 OR-branches, 15 unresolved"
-   ],
-   "count": 1,
-   "onStderr": false
-  },
-  {
-   "gate": "tools/ship/referenceKind-selfcheck.mjs",
-   "exit": 1,
-   "ms": 95068,
-   "first": "!! *** the prose-rescued population may only SHRINK ***   288 against a ceiling of 181. A RISE MEANS A NEW ORPHAN IS BEING HIDDEN BY A SENTENCE. Falling is progress by any of three routes -- wire it, delete it, or teach the census to resolve.",
-   "all": [
-    "!! *** the prose-rescued population may only SHRINK ***   288 against a ceiling of 181. A RISE MEANS A NEW ORPHAN IS BEING HIDDEN BY A SENTENCE. Falling is progress by any of three routes -- wire it, delete it, or teach the census to resolve.",
-    "!! *** no NEW module is hidden from the orphan census by the ship ritual's own sweep closing ***   40 against 2: brain/rl/attribution.mjs, brain/transport/scanTwin.mjs, core/ecs/index.js, engine/loop.js, ev/tools/es-arena.mjs, fx/paintFields.mjs, math/solverFit.mjs, mesh/carve.mjs, physics/render/conductorFresnel.mjs, physics/render/transmission.mjs, physics/render/wgslArc.mjs, render/img2three.mjs, render/panini.js, render/slugTsl.mjs, render/texelProbe.mjs, tools/export/glbConformance.mjs, tools/mutate/mutate.mjs, tools/mutate/shadowedDefaults.mjs, tools/roundhouse/zeroRangeFull.mjs, tools/ship/assertionShape.mjs, tools/ship/claimEvidence.mjs, tools/ship/closingCoverage.mjs, tools/ship/gateReport.mjs, tools/ship/nextRounds.mjs, tools/ship/packFonts.mjs, tools/ship/pngWrite.mjs, tools/ship/recordDrift.mjs, tools/ship/recordInputs.mjs, tools/ship/recordShape.mjs, tools/ship/recordTier.mjs, tools/ship/refusalStack.mjs, tools/ship/reportDoors.mjs, tools/ship/shipRitual.mjs, tools/ship/shipVerdict.mjs, tools/ship/sweepRotation.mjs, tools/ship/textureBytes.mjs, tools/ship/todo.mjs, tools/ship/vacuity.mjs, tools/ship/wgslCorpus.mjs, world/vendoredLicences.mjs. THE CLOSING IS WRITTEN BY THE RITUAL, one per round that adds a gate, and it names the module it guards -- so a round that builds a module, gates it and ships it has documented the module into invisibility without deciding to. The two standing are render/img2three.mjs (a three.js-object-tree flattener whose only caller today is its own gate; no page builds a three tree to flatten) and mesh/carve.mjs. Falling is progress by the three routes this file has always named -- wire it, delete it, or teach the census to resolve."
-   ],
-   "count": 2,
-   "onStderr": false
-  },
-  {
-   "gate": "tools/ship/registerResidue-selfcheck.mjs",
-   "exit": 1,
-   "ms": 1324,
-   "first": "!! *** the residue may only SHRINK -- a page linked but neither placed nor excused fails on arrival ***   61 against a ceiling of 41. *** UNPLACED's OWN COMMENT SAYS \"AN UNPLACED PAGE AND A PAGE NOBODY GOT TO LOOK THE SAME\", AND UNTIL THIS LINE EXISTED NOTHING COMPARED THE REGISTER TO THE PAGES ACTUALLY OUTSIDE THE SECTIONS -- so it could not tell them apart, which is the one thing it exists to do. *** Each of the 61 is a judgement (a section, or an exemption with a sentence) and it is Keith's, one at a time.",
-   "all": [
-    "!! *** the residue may only SHRINK -- a page linked but neither placed nor excused fails on arrival ***   61 against a ceiling of 41. *** UNPLACED's OWN COMMENT SAYS \"AN UNPLACED PAGE AND A PAGE NOBODY GOT TO LOOK THE SAME\", AND UNTIL THIS LINE EXISTED NOTHING COMPARED THE REGISTER TO THE PAGES ACTUALLY OUTSIDE THE SECTIONS -- so it could not tell them apart, which is the one thing it exists to do. *** Each of the 61 is a judgement (a section, or an exemption with a sentence) and it is Keith's, one at a time."
-   ],
-   "count": 1,
-   "onStderr": false
-  },
-  {
    "gate": "tools/ship/shaderRefs-selfcheck.mjs",
    "exit": "timeout",
-   "ms": 120074,
+   "ms": 120151,
    "first": "",
    "all": [],
    "count": 0,
@@ -208,139 +24,71 @@ export const REGISTER_AUDIT = Object.freeze({
    "onStderr": false
   },
   {
-   "gate": "tools/ship/statedRuntime-selfcheck.mjs",
+   "gate": "tools/ship/backendParity-selfcheck.mjs",
    "exit": 1,
-   "ms": 139,
-   "first": "!! *** no NEW header has drifted from what its gate actually does ***   NEW: tools/roundhouse/reconQualityBind-selfcheck.mjs, tools/ship/shaderCensus-selfcheck.mjs, tools/ship/spacesimStart-selfcheck.mjs -- correct the header FROM THE MEASUREMENT in gate-timings.json. DO NOT ADD IT TO THE BASELINE: that is a ratchet growing back, the one thing a ratchet must never do",
+   "ms": 417,
+   "first": "*** and BOTH stays well under the inversion line: twenty dual shader modules is where an IR would have paid ***   20 modules of 23 dual files, 23 of 158 GLSL-bearing -- 14.6% (the tenth-of-GLSL line of v4270 was crossed at v4473 and is reported, not asserted)",
    "all": [
-    "!! *** no NEW header has drifted from what its gate actually does ***   NEW: tools/roundhouse/reconQualityBind-selfcheck.mjs, tools/ship/shaderCensus-selfcheck.mjs, tools/ship/spacesimStart-selfcheck.mjs -- correct the header FROM THE MEASUREMENT in gate-timings.json. DO NOT ADD IT TO THE BASELINE: that is a ratchet growing back, the one thing a ratchet must never do"
+    "*** and BOTH stays well under the inversion line: twenty dual shader modules is where an IR would have paid ***   20 modules of 23 dual files, 23 of 158 GLSL-bearing -- 14.6% (the tenth-of-GLSL line of v4270 was crossed at v4473 and is reported, not asserted)",
+    "-- 1 check(s)"
+   ],
+   "count": 2,
+   "onStderr": false
+  },
+  {
+   "gate": "tools/ship/windowsImport-selfcheck.mjs",
+   "exit": 1,
+   "ms": 618,
+   "first": "!! NO dynamic import is given a raw filesystem path   WOULD CRASH ON WINDOWS: tools/ship/redCensus.mjs -> import(path.join(ENG, \\\"rig/templates/kaijuBiped.js\\\") | tools/ship/register-audit.mjs -> import(path.join(ENG, \\\"rig/templates/kaijuBiped.js\\\") | tools/ship/register-audit.mjs -> import(path.join(ENG, \\\"rig/templates/kaijuBiped.js\\\") | tools/ship/trellisAutoRig-selfcheck.mjs -> import(path.join(ENG, \"rig/templates/kaijuBiped.js\"))",
+   "all": [
+    "!! NO dynamic import is given a raw filesystem path   WOULD CRASH ON WINDOWS: tools/ship/redCensus.mjs -> import(path.join(ENG, \\\"rig/templates/kaijuBiped.js\\\") | tools/ship/register-audit.mjs -> import(path.join(ENG, \\\"rig/templates/kaijuBiped.js\\\") | tools/ship/register-audit.mjs -> import(path.join(ENG, \\\"rig/templates/kaijuBiped.js\\\") | tools/ship/trellisAutoRig-selfcheck.mjs -> import(path.join(ENG, \"rig/templates/kaijuBiped.js\"))"
    ],
    "count": 1,
    "onStderr": false
   },
   {
-   "gate": "tools/ship/sunshineHost-selfcheck.mjs",
+   "gate": "tools/ship/definitionGates-selfcheck.mjs",
    "exit": 1,
-   "ms": 96,
-   "first": "every route the bridge lists is reachable through its own handler",
+   "ms": 493,
+   "first": "!! no NEW exported symbol under physics/ has appeared without its gate naming it   GREW to 79: physics/apsidalKnob.mjs:apocentre, physics/apsidalKnob.mjs:measure, physics/apsidalKnob.mjs:adjudicateWith, physics/character/terrainWalk.mjs:functionGround, physics/character/terrainWalk.mjs:autoGround, physics/character/terrainWalk.mjs:projectOnPlane ...",
    "all": [
-    "every route the bridge lists is reachable through its own handler"
-   ],
-   "count": 1,
-   "onStderr": false
-  },
-  {
-   "gate": "tools/ship/supersededFlag-selfcheck.mjs",
-   "exit": 1,
-   "ms": 72,
-   "first": "...and an UNINVITED launch still refuses, which was always correct   two launchers that both start a server take turns forever; the refusal is not the bug",
-   "all": [
-    "...and an UNINVITED launch still refuses, which was always correct   two launchers that both start a server take turns forever; the refusal is not the bug"
-   ],
-   "count": 1,
-   "onStderr": false
-  },
-  {
-   "gate": "tools/ship/unattendedHold-selfcheck.mjs",
-   "exit": 1,
-   "ms": 55,
-   "first": "!! the port-owner refusal still REFUSES -- the fix was to the hold, not the verdict   it must still decline to fight the owner and still exit nonzero. Making it proceed would restore the two-windows-take-turns-forever loop v3256 was built to end",
-   "all": [
-    "!! the port-owner refusal still REFUSES -- the fix was to the hold, not the verdict   it must still decline to fight the owner and still exit nonzero. Making it proceed would restore the two-windows-take-turns-forever loop v3256 was built to end"
-   ],
-   "count": 1,
-   "onStderr": false
-  },
-  {
-   "gate": "tools/ship/wasmSupport-selfcheck.mjs",
-   "exit": 1,
-   "ms": 2651,
-   "first": "!! 82 files mention .wasm or the WebAssembly API -- the item's number, and it is the loose one   110 mention it",
-   "all": [
-    "!! 82 files mention .wasm or the WebAssembly API -- the item's number, and it is the loose one   110 mention it",
-    "!! ...but 16 of those are comments and prose only; 66 mention it in live code   88 in code, 22 comment-only",
-    "!! ...and only ELEVEN actually call the WebAssembly API, most of them Node-side gates and tools   12 call WebAssembly.instantiate/compile/Module/Instance -- my first grep said 12 and had matched a full stop"
+    "!! no NEW exported symbol under physics/ has appeared without its gate naming it   GREW to 79: physics/apsidalKnob.mjs:apocentre, physics/apsidalKnob.mjs:measure, physics/apsidalKnob.mjs:adjudicateWith, physics/character/terrainWalk.mjs:functionGround, physics/character/terrainWalk.mjs:autoGround, physics/character/terrainWalk.mjs:projectOnPlane ...",
+    "!! no NEW exported symbol ANYWHERE IN THE TREE has appeared without its gate naming it   GREW to 349: ai-bridge/chunkVerify.mjs:verifiedPrefix, ai-bridge/chunkVerify.mjs:resumePlan, ai-bridge/chunkVerify.mjs:spliceRanges, ai-bridge/chunkVerify.mjs:chunkAudit, ai-bridge/chunkVerify.mjs:resumeRanges, ai-bridge/deviceWorker.mjs:offThreadDevice ...",
+    "!! *** no NEW exported symbol OF ANY SHAPE has appeared without its gate naming it ***   GREW to 678: ai-bridge/catalogSnapshot.mjs:SNAPSHOT_PATH, ai-bridge/chunkVerify.mjs:verifiedPrefix, ai-bridge/chunkVerify.mjs:resumePlan, ai-bridge/chunkVerify.mjs:spliceRanges, ai-bridge/chunkVerify.mjs:chunkAudit, ai-bridge/chunkVerify.mjs:resumeRanges ..."
    ],
    "count": 3,
    "onStderr": false
   },
   {
-   "gate": "tools/ship/wiringClaims-selfcheck.mjs",
+   "gate": "tools/ship/pageSections-selfcheck.mjs",
    "exit": 1,
-   "ms": 1991,
-   "first": "!! *** every remaining hit is a CONTRAST LINE, adjudicated by name ***   a sentence that says 'A is unwired while B is live' names two modules and my extractor takes both. REPORTED AS CANDIDATES, NOT FAILED -- and this check names the two rather than loosening the pattern, so a THIRD would show up",
+   "ms": 984,
+   "first": "!! no drawer holds more than 15 pages   biggest: 16. A DRAWER OF 25 IS THE FLAT ROW AGAIN WITH A LID ON IT -- which is why the 25 instruments were split three ways rather than filed under one Physics Lab chip. OVER: systools=16",
    "all": [
-    "!! *** every remaining hit is a CONTRAST LINE, adjudicated by name ***   a sentence that says 'A is unwired while B is live' names two modules and my extractor takes both. REPORTED AS CANDIDATES, NOT FAILED -- and this check names the two rather than loosening the pattern, so a THIRD would show up"
+    "!! no drawer holds more than 15 pages   biggest: 16. A DRAWER OF 25 IS THE FLAT ROW AGAIN WITH A LID ON IT -- which is why the 25 instruments were split three ways rather than filed under one Physics Lab chip. OVER: systools=16"
    ],
    "count": 1,
    "onStderr": false
   },
   {
-   "gate": "tools/ship/box3dFilter-selfcheck.mjs",
+   "gate": "tools/ship/pagePlacements-selfcheck.mjs",
    "exit": 1,
-   "ms": 117,
-   "first": "!! *** EVERY swk_* IN THE SHIM IS IN build-box3d-wasm.sh's HARDCODED EXPORT LIST ***   74 declared, 18 missing. *** THE TWO BUILD SCRIPTS DISAGREE ABOUT HOW EXPORTS ARE CHOSEN: *** the clang one SCANS the compiled module for /^swk_/ and needs no edit ever, while the emcc one -- which is the default -- lists them by hand. So a function added to the shim ships from one script and silently not from the other, and the failure is a missing runtime symbol far from its cause. This check is the seam.",
+   "ms": 102,
+   "first": "!! going over Keith's cap is DETECTED   a drawer of 25 is the flat row with a lid on it (v2513), and *** A CHECKBOX IS A MUCH FASTER WAY TO MAKE ONE THAN EDITING A REGISTRY *** -- so the surface that made it easy owes the check.",
    "all": [
-    "!! *** EVERY swk_* IN THE SHIM IS IN build-box3d-wasm.sh's HARDCODED EXPORT LIST ***   74 declared, 18 missing. *** THE TWO BUILD SCRIPTS DISAGREE ABOUT HOW EXPORTS ARE CHOSEN: *** the clang one SCANS the compiled module for /^swk_/ and needs no edit ever, while the emcc one -- which is the default -- lists them by hand. So a function added to the shim ships from one script and silently not from the other, and the failure is a missing runtime symbol far from its cause. This check is the seam.",
-    "-- 1 check(s)"
+    "!! going over Keith's cap is DETECTED   a drawer of 25 is the flat row with a lid on it (v2513), and *** A CHECKBOX IS A MUCH FASTER WAY TO MAKE ONE THAN EDITING A REGISTRY *** -- so the surface that made it easy owes the check.",
+    "the cap is measured against the RESOLVED result, not against SECTIONS   with no overrides nothing is over, because SECTIONS is already within the rule -- so a non-empty report is always about a decision made HERE"
    ],
    "count": 2,
    "onStderr": false
   },
   {
-   "gate": "tools/ship/doorKinds-selfcheck.mjs",
-   "exit": "timeout",
-   "ms": 120026,
-   "first": "",
-   "all": [],
-   "count": 0,
-   "printedBeforeTheCap": [
-    "!! EVERY MEMBER IS EXPLAINED: a door, a declared refusal, or named as owed   spawn 1  none 5  rig-job 1  import 1  refused 2  prose 2 -- v3608 read 4 doors of 8; v3609 and v3610 gave rows to three more, so the bucket is 12. UNEXPLAINED: tools/ship/orreryAuthorScan.mjs, tools/ship/sweepRotation.mjs, tools/ship/verifyLicenceTexts.mjs, tools/ship/wgslDeviceLimits.mjs",
-    "!! NO PROSE DOOR STANDS UNEXPLAINED (2 at v3608; buildPageIndex given a row, signRelease a refusal)   orreryBake.mjs, recordInputs.mjs"
-   ],
-   "onStderr": false
-  },
-  {
-   "gate": "tools/ship/graveyard-selfcheck.mjs",
+   "gate": "tools/ship/runtimeGap-selfcheck.mjs",
    "exit": 1,
-   "ms": 85317,
-   "first": "!! ORPHANED UTILITIES HAVE NOT INCREASED   159 now vs 93 recorded. These export functions and NOTHING calls them -- wire it, or delete it. This is the number that means something; the total includes analysis records whose consumer is correctly the gate.",
+   "ms": 1623,
+   "first": "...and the headline survives it: a 2-file distortion in rows of 21 to 3,588, and threads still rank at the bottom   with this round: threads 23 against WebAssembly 23, rank 11 on the stable sort. Without it: 22 against 21. At v4462 the two files made a tie; at the v4526 merge they break one",
    "all": [
-    "!! ORPHANED UTILITIES HAVE NOT INCREASED   159 now vs 93 recorded. These export functions and NOTHING calls them -- wire it, or delete it. This is the number that means something; the total includes analysis records whose consumer is correctly the gate."
-   ],
-   "count": 1,
-   "onStderr": false
-  },
-  {
-   "gate": "ui/stageInfo-selfcheck.mjs",
-   "exit": 1,
-   "ms": 6798,
-   "first": "!! *** KEITH'S THIRD ASK: THE PANEL BOX IS THE SAME WIDTH WHATEVER THE VIEWPORT ***   offsetWidth 460 at both 1280 and 1920. *** MEASURED AS LAYOUT WIDTH ON PURPOSE: server.html puts a responsive `zoom` on BODY (0.8 at 1280, 0.9 at 1920), so the BOUNDING RECT reads 368 and 414 and a future reader measuring THAT would think the fix had failed. The zoom scales the whole page equally; the box is 460 in both. ***",
-   "all": [
-    "!! *** KEITH'S THIRD ASK: THE PANEL BOX IS THE SAME WIDTH WHATEVER THE VIEWPORT ***   offsetWidth 460 at both 1280 and 1920. *** MEASURED AS LAYOUT WIDTH ON PURPOSE: server.html puts a responsive `zoom` on BODY (0.8 at 1280, 0.9 at 1920), so the BOUNDING RECT reads 368 and 414 and a future reader measuring THAT would think the fix had failed. The zoom scales the whole page equally; the box is 460 in both. ***"
-   ],
-   "count": 1,
-   "onStderr": false
-  },
-  {
-   "gate": "tools/ship/tslSource-selfcheck.mjs",
-   "exit": 1,
-   "ms": 1747,
-   "first": "webgl2: and three's own linear render, row-mirrored, agrees with the device to a byte or so (two samplers, one filter)   3971/4096 identical, worst 127",
-   "all": [
-    "webgl2: and three's own linear render, row-mirrored, agrees with the device to a byte or so (two samplers, one filter)   3971/4096 identical, worst 127",
-    "-- 1 check(s)"
-   ],
-   "count": 2,
-   "onStderr": false
-  },
-  {
-   "gate": "tools/ship/sweepCoverage-selfcheck.mjs",
-   "exit": 1,
-   "ms": 2709,
-   "first": "!! a returnee that went back over the budget on a later box is NAMED with its serial readings, and is live over   meshLine-selfcheck.mjs 2915 ms on file, 4379 ms recorded; traderGraph-selfcheck.mjs 2389 ms on file, 3008 ms recorded; wgslSpec-selfcheck.mjs 2718 ms on file, 3737 ms recorded -- justified by the RECORDED readings rather than by the filed one, which says which ritual step ran last; see the note above the v4476 row",
-   "all": [
-    "!! a returnee that went back over the budget on a later box is NAMED with its serial readings, and is live over   meshLine-selfcheck.mjs 2915 ms on file, 4379 ms recorded; traderGraph-selfcheck.mjs 2389 ms on file, 3008 ms recorded; wgslSpec-selfcheck.mjs 2718 ms on file, 3737 ms recorded -- justified by the RECORDED readings rather than by the filed one, which says which ritual step ran last; see the note above the v4476 row"
+    "...and the headline survives it: a 2-file distortion in rows of 21 to 3,588, and threads still rank at the bottom   with this round: threads 23 against WebAssembly 23, rank 11 on the stable sort. Without it: 22 against 21. At v4462 the two files made a tie; at the v4526 merge they break one"
    ],
    "count": 1,
    "onStderr": false

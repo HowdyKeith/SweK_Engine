@@ -156,6 +156,23 @@ export class SkeletalAnimator {
         return constraint;
     }
 
+    // -----------------------------------------------------------------
+    // task #40 -- generic constraint registration.
+    //
+    // setLookAt/setTwoBoneIK/setFabrikIK above each build their own constraint object and push it onto
+    // this._poseConstraints directly, from inside this class. There was no PUBLIC way for another module
+    // to register into the same pipeline -- anim/reachIK.mjs (this round's IK orchestration layer, built
+    // on anim/ik.mjs's gated solvers rather than this file's own independent ones) needs exactly that, so
+    // it can compose with a playing clip through the mechanism gameplay already depends on
+    // (simulation/KaijuIK.js) instead of adding a second, competing pipeline. Any object with an
+    // apply(animator) method works, same contract the built-in constraints already use.
+    addConstraint(constraint) {
+        if (!constraint || typeof constraint.apply !== "function") return null;
+        if (!this._poseConstraints) this._poseConstraints = [];
+        this._poseConstraints.push(constraint);
+        return constraint;
+    }
+
     removeConstraint(c) {
         if (!this._poseConstraints || !c) return false;
         const i = this._poseConstraints.indexOf(c);

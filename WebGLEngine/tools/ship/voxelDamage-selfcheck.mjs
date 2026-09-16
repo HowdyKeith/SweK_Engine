@@ -38,7 +38,7 @@
 //                                                                                  backend.
 //                   Each restored and the baseline re-run: 0 red.
 //
-// Run: node tools/ship/voxelDamage-selfcheck.mjs      (~30 s)
+// Run: node tools/ship/voxelDamage-selfcheck.mjs      (~7.4 s)
 "use strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

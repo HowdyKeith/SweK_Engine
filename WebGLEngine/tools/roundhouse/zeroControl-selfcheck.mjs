@@ -1,6 +1,6 @@
 // tools/roundhouse/zeroControl-selfcheck.mjs
 //
-// Run: node tools/roundhouse/zeroControl-selfcheck.mjs   (~2s)
+// Run: node tools/roundhouse/zeroControl-selfcheck.mjs   (~0.28s)
 // Gated by tools/ship/selfchecks.mjs (discovery gate -- this file is found by its name, not by a list).
 //
 // v4477 -- THE REPLACEMENT POSITIVE CONTROL, AND THE ARMS THAT MAKE IT ONE.

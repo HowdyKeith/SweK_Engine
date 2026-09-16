@@ -18,6 +18,7 @@
 //   ai.clear();                          // on teardown / descend
 
 import { WallFollower, dirToward } from "./wallFollow.mjs";   // v4187 -- a hand on the wall when the path is gone
+import { evaluateGuards } from "../ui/guards.mjs";
 
 const KINDS = {
     chaser: { aggro: 14, speed: 3.6, atkR: 1.7, dmg: 6,  cool: 0.8, flees: true },
@@ -92,6 +93,184 @@ export function makeDungeonAI(opts) {
     function aggro(id) { const m = mon.get(id); if (m) m.aggroed = true; }   // force-wake (e.g. when shot)
     function slow(id, secs) { const m = mon.get(id); if (m) m._slowT = Math.max(m._slowT || 0, secs); }   // v1428 — ice slow
 
+    // v4609 -- the flee/melee/ranged-shoot/ranged-hold/chase priority chain below is migrated onto
+    // ui/guards.mjs's evaluateGuards(), the ordered-guard-list evaluator this file's own audit named as the
+    // confirmed next candidate after simulation/SpaceSuit.js proved it on a pure classifier. This one is the
+    // opposite of pure: every guard's `then` drives real side effects (player damage, projectile spawns,
+    // entity movement) and three of the five carry GPU-brain hook amendments (PATCH-B16/B17/B18/B22) layered
+    // on over several rounds — deliberately deferred out of the SpaceSuit.js round for exactly this reason.
+    //
+    // WHAT STAYS OUTSIDE THE GUARD LIST, ON PURPOSE. The aggro pre-filter (below, in update()) is NOT one of
+    // these five guards: it decides whether the chain runs AT ALL this tick, not which of five actions to
+    // take once it does, and it is itself a small history-dependent 2-state machine (asleep/awake, with
+    // hysteresis — wakes at spec.aggro, sleeps at spec.aggro*1.8) rather than a fresh-every-call classification
+    // — a real ui/machine.mjs candidate in its own right, flagged in this round's tools/ship/nextRounds.mjs
+    // writeup and NOT migrated here. Folding it into DUNGEON_GUARDS as a sixth "asleep" guard would have been
+    // the CSBot.js mistake in reverse: gluing a genuinely different shape onto a utility built for a different
+    // one because they happen to sit next to each other in the same function.
+    //
+    // WHAT MOVED, NOT WHAT CHANGED. shootCool's decrement and the hasLOS() line the original computed once
+    // inside `if (m.spec.ranged) { ... }` — regardless of which of the two ranged guards (if either) matched
+    // — are prepared once per monster per tick in update() below, into ctx, the same way SpaceSuit.js's
+    // _findRoom() precomputed a value ALL of ATMOSPHERE_GUARDS' rules could read without each re-deriving it.
+    // hpf (the flee guard's HP fraction) is prepared the same way, and ONLY when m.spec.flees && getHP — an
+    // unconditional read here would call getHP() for monsters that can never flee, which the original never did.
+    function _actFlee(ctx) {
+        const { m, p, dt } = ctx;
+        let ux = m.x - p.x, uz = m.z - p.z, dn = Math.hypot(ux, uz) || 1;
+        // PATCH-B16 -- GPU Brain phase 12: flee along the NEGATED
+        // player-flow (ascend distance-to-player through corridors)
+        // blended 60/40 with straight-away. Straight-away corners
+        // fleeing monsters against walls; the negated field routes
+        // them out through openings. The existing slide fallback
+        // below remains the collision authority. No brain -> the
+        // original v1430 flee, unchanged.
+        if (typeof window !== "undefined" && window.sampleBrainPlayerFlow) {
+            const f = window.sampleBrainPlayerFlow(m.x, m.z);
+            if (f) {
+                const bx = 0.6 * (-f.x) + 0.4 * (ux / dn);
+                const bz = 0.6 * (-f.z) + 0.4 * (uz / dn);
+                const bn = Math.hypot(bx, bz);
+                if (bn > 1e-4) { ux = bx / bn; uz = bz / bn; dn = 1; }
+            }
+        }
+        const sp = m.spec.speed * (m._slowT > 0 ? 0.5 : 1) * dt;
+        const ax = (ux / dn) * sp, az = (uz / dn) * sp;
+        const tryMove = (sx, sz) => { const [ngx, ngz] = worldToCell(sx, sz); if (!isWall(ngx, ngz)) { m.x = sx; m.z = sz; return true; } return false; };
+        if (!tryMove(m.x + ax, m.z + az)) { if (!tryMove(m.x + az, m.z - ax)) tryMove(m.x - az, m.z + ax); }   // away, else slide
+        m.yaw = Math.atan2(-ux, uz);   // face away while fleeing
+        if (moveEntity) moveEntity(m.id, m.x, floorY + 1, m.z, m.yaw);
+    }
+
+    function _actMelee(ctx) {
+        const { m, dxp, dzp, enr } = ctx;
+        if (m.cool <= 0) { m.cool = m.spec.cool * (enr ? 0.6 : 1); if (onHitPlayer) onHitPlayer(m.spec.dmg, m); }
+        m.yaw = Math.atan2(dxp, -dzp);
+        if (moveEntity) moveEntity(m.id, m.x, floorY + 1, m.z, m.yaw);
+    }
+
+    function _actRangedShoot(ctx) {
+        const { m, dxp, dzp, enr } = ctx;
+        // PATCH-B22 -- GPU Brain phase 24: ranged cadence follows the
+        // brain's published boldness (same 1.55-0.9a curve as the
+        // raycaster v1.7), stacked on the enrage multiplier. No
+        // brain / stale map -> stock cadence, unchanged.
+        let cad22 = 1;
+        try {
+            const ag = (typeof window !== "undefined" && window.getBrainAggro) ? window.getBrainAggro("dgn-" + m.id) : null;
+            if (ag != null) cad22 = 1.55 - 0.9 * ag;
+        } catch {}
+        m.shootCool = m.spec.shootCool * (enr ? 0.6 : 1) * cad22;
+        m.yaw = Math.atan2(dxp, -dzp);
+        if (moveEntity) moveEntity(m.id, m.x, floorY + 1, m.z, m.yaw);
+        // PATCH-B17 -- brain-consulted projectile choice (PATCH-B9
+        // pattern): bosses and mages carry a two-attack repertoire
+        // (arrow: fast/low, magic: slow/high); the brain scores both
+        // from the same spec-driven features the kaiju use and its
+        // pick is honored when fresh. No brain -> spec.proj, stock.
+        let projPick = m.spec.proj;
+        m._projSrc = "rotation";   // PATCH-B18 -- provenance (spec default)
+        if ((m.spec.boss || m.kind === "mage") && typeof window !== "undefined" && window.getBrainAttack) {
+            try {
+                const rec = window.getBrainAttack("dgn-" + m.id);
+                if (rec?.name === "arrow" || rec?.name === "magic") {
+                    projPick = rec.name;
+                    m._projSrc = rec.explore ? "brain-explore" : "brain";   // PATCH-B18
+                }
+            } catch {}
+        }
+        if (onRangedAttack) onRangedAttack(m, m.spec.shootDmg, projPick);
+    }
+
+    function _actRangedHold(ctx) {
+        const { m, dxp, dzp } = ctx;
+        m.yaw = Math.atan2(dxp, -dzp);
+        if (moveEntity) moveEntity(m.id, m.x, floorY + 1, m.z, m.yaw);
+    }
+
+    function _actChase(ctx) {
+        const { m, dxp, dzp, dt, enr, pgx, pgz } = ctx;
+        m.repath -= dt;
+        const [mgx, mgz] = worldToCell(m.x, m.z);
+        if (m.repath <= 0 || !m.step) {
+            m.repath = 0.35;
+            m.step = bfsStep(mgx, mgz, pgx, pgz);
+            if (m.step) {
+                // the path is back: take the hand off the wall. The follower is DISCARDED rather than
+                // kept, or the next time the path is lost it would inherit this hunt's visited states
+                // and cry loop on its first honest step.
+                m.follow = null;
+            } else {
+                // *** NO PATH. PUT A HAND ON THE WALL AND WALK. *** This is where a straight line at the
+                // player used to be -- a beeline that fired PRECISELY when a wall was in the way, which
+                // is how a monster ended up 17 frames deep inside solid stone. Refusing the move instead
+                // would only trade a monster that cheats for one standing at the wall waiting to be
+                // killed. Right-hand rule: turn right if you can, else straight, else left, else back.
+                if (!m.follow) {
+                    // *** THE BRAIN PICKS WHICH WAY TO SET OFF, AND THEN THE HAND RULE WALKS. *** This is
+                    // where PATCH-B14's flow field belongs now: the brain's terrain-cost field routes
+                    // corridors the flat BFS grid cannot see, and this is exactly the "BFS found no path"
+                    // case it was written for. But it steers the OPENING DIRECTION ONLY. Blending it into
+                    // every step would be the same mistake v4187 measured and rejected for
+                    // extend-and-choose: a heading that is re-chosen each step abandons the wall, and the
+                    // hand rule's guarantee goes with it. A one-time hint cannot break the guarantee -- at
+                    // worst the follower goes the long way round. No brain -> dirToward, exactly as before.
+                    let openDir = dirToward(dxp, dzp);
+                    if (typeof window !== "undefined" && window.sampleBrainPlayerFlow) {
+                        const f = window.sampleBrainPlayerFlow(m.x, m.z);
+                        if (f && (Math.abs(f.x) > 1e-4 || Math.abs(f.z) > 1e-4)) openDir = dirToward(f.x, f.z);
+                    }
+                    m.follow = new WallFollower(openDir);
+                }
+                const nx = m.follow.next(mgx, mgz, isWall);
+                if (nx) m.step = [nx.gx, nx.gz];
+                else {
+                    // Walled in on all four sides, or the follower PROVED it is going in circles -- the
+                    // right-hand rule's known limit, a detached pillar. Losing the player is a better
+                    // answer than orbiting a column forever.
+                    m.step = null; m.follow = null; m.aggroed = false;
+                    return;
+                }
+            }
+        }
+        // *** AND THERE IS NO STRAIGHT-LINE TARGET ANY MORE. *** With no step there is nothing legitimate
+        // to walk toward; holding still for one frame is honest, and the next repath supplies one.
+        if (!m.step) { if (moveEntity) moveEntity(m.id, m.x, floorY + 1, m.z, m.yaw); return; }
+        const _wc = cellToWorld(m.step[0], m.step[1]);
+        let tx = _wc[0], tz = _wc[1];
+        let ddx = tx - m.x, ddz = tz - m.z, dd = Math.hypot(ddx, ddz) || 1;
+        const adv = Math.min(dd, m.spec.speed * (m._slowT > 0 ? 0.5 : 1) * (enr ? 1.5 : 1) * dt);
+        // *** THE MOVE IS COLLISION-TESTED, THE SAME WAY THE FLEE BRANCH ALREADY DID IT. *** This file
+        // wrote a monster's position in exactly two places and only ONE of them checked isWall: fleeing
+        // was careful, chasing was not. Move if the destination is open, else slide along the wall.
+        const _ax = (ddx / dd) * adv, _az = (ddz / dd) * adv;
+        const tryMove = (sx, sz) => { const [ngx, ngz] = worldToCell(sx, sz); if (!isWall(ngx, ngz)) { m.x = sx; m.z = sz; return true; } return false; };
+        if (!tryMove(m.x + _ax, m.z + _az)) { if (!tryMove(m.x + _az, m.z - _ax)) tryMove(m.x - _az, m.z + _ax); }
+        if (dd < 0.3) m.step = null;   // reached the step cell -> repath
+        m.yaw = Math.atan2(ddx, -ddz);
+        if (moveEntity) moveEntity(m.id, m.x, floorY + 1, m.z, m.yaw);
+    }
+
+    // Exported for tools/ship/dungeonAI-selfcheck.mjs, the same way packagerBridge.js exports otherwise-
+    // private helpers (_skipFile, _zip) specifically so a gate can drive them directly -- DUNGEON_GUARDS
+    // cannot be a module-level export the way SpaceSuit.js's ATMOSPHERE_GUARDS was, since these actions close
+    // over per-instance collaborators (moveEntity, isWall, floorY, ...), not just ctx.
+    const DUNGEON_GUARDS = [
+        // v1430 -- flee: skittish kinds break off and retreat when badly hurt (<30% HP).
+        { name: "flee", when: (ctx) => ctx.m.spec.flees && ctx.hpf != null && ctx.hpf < 0.3, then: _actFlee },
+        // melee attack -- in range + off cooldown
+        { name: "melee", when: (ctx) => ctx.dist <= ctx.m.spec.atkR, then: _actMelee },
+        // v1416 -- ranged attack: archer/mage fire a projectile when in shooting range
+        // (beyond melee) AND in line-of-sight; they KITE to keep their distance.
+        { name: "ranged-shoot", when: (ctx) => ctx.m.spec.ranged && ctx.dist <= ctx.m.spec.shootR && ctx.m.shootCool <= 0 && ctx.seen, then: _actRangedShoot },
+        // hold -- don't crowd the player: once at a comfortable range with a clear
+        // shot, stay put and keep firing (no free-move so it can't drift into a wall).
+        { name: "ranged-hold", when: (ctx) => ctx.m.spec.ranged && ctx.seen && ctx.dist < ctx.m.spec.shootR * 0.6, then: _actRangedHold },
+        // chase -- BFS a step toward the player, advance toward that cell centre. The catch-all fallback:
+        // always matches, so every monster that reaches this point (ranged or not) ends up here.
+        { name: "chase", when: () => true, then: _actChase },
+    ];
+
     function update(dt) {
         const p = getPlayer && getPlayer(); if (!p) return;
         const [pgx, pgz] = worldToCell(p.x, p.z);
@@ -104,6 +283,7 @@ export function makeDungeonAI(opts) {
 
             // aggro gate — wake only when the player is near AND in line-of-sight (no
             // sensing through walls); once provoked, chase around corners until they flee far.
+            // v4609 -- deliberately kept OUTSIDE DUNGEON_GUARDS; see that const's own header for why.
             if (!m.aggroed) {
                 if (dist <= m.spec.aggro && hasLOS(m.x, m.z, p.x, p.z)) m.aggroed = true;
                 else continue;
@@ -111,162 +291,24 @@ export function makeDungeonAI(opts) {
                 m.aggroed = false; continue;
             }
 
-            // v1430 — flee: skittish kinds break off and retreat when badly hurt (<30% HP).
-            if (m.spec.flees && getHP) {
-                const hpf = getHP(m.id); 
-                if (hpf != null && hpf < 0.3) {
-                    let ux = m.x - p.x, uz = m.z - p.z, dn = Math.hypot(ux, uz) || 1;
-                    // PATCH-B16 -- GPU Brain phase 12: flee along the NEGATED
-                    // player-flow (ascend distance-to-player through corridors)
-                    // blended 60/40 with straight-away. Straight-away corners
-                    // fleeing monsters against walls; the negated field routes
-                    // them out through openings. The existing slide fallback
-                    // below remains the collision authority. No brain -> the
-                    // original v1430 flee, unchanged.
-                    if (typeof window !== "undefined" && window.sampleBrainPlayerFlow) {
-                        const f = window.sampleBrainPlayerFlow(m.x, m.z);
-                        if (f) {
-                            const bx = 0.6 * (-f.x) + 0.4 * (ux / dn);
-                            const bz = 0.6 * (-f.z) + 0.4 * (uz / dn);
-                            const bn = Math.hypot(bx, bz);
-                            if (bn > 1e-4) { ux = bx / bn; uz = bz / bn; dn = 1; }
-                        }
-                    }
-                    const sp = m.spec.speed * (m._slowT > 0 ? 0.5 : 1) * dt;
-                    const ax = (ux / dn) * sp, az = (uz / dn) * sp;
-                    const tryMove = (sx, sz) => { const [ngx, ngz] = worldToCell(sx, sz); if (!isWall(ngx, ngz)) { m.x = sx; m.z = sz; return true; } return false; };
-                    if (!tryMove(m.x + ax, m.z + az)) { if (!tryMove(m.x + az, m.z - ax)) tryMove(m.x - az, m.z + ax); }   // away, else slide
-                    m.yaw = Math.atan2(-ux, uz);   // face away while fleeing
-                    if (moveEntity) moveEntity(m.id, m.x, floorY + 1, m.z, m.yaw);
-                    continue;
-                }
-            }
-
-            // melee attack — in range + off cooldown
-            if (dist <= m.spec.atkR) {
-                if (m.cool <= 0) { m.cool = m.spec.cool * (enr ? 0.6 : 1); if (onHitPlayer) onHitPlayer(m.spec.dmg, m); }
-                m.yaw = Math.atan2(dxp, -dzp);
-                if (moveEntity) moveEntity(m.id, m.x, floorY + 1, m.z, m.yaw);
-                continue;
-            }
-
-            // v1416 — ranged attack: archer/mage fire a projectile when in shooting range
-            // (beyond melee) AND in line-of-sight; they KITE to keep their distance.
+            // v4609 -- ctx for DUNGEON_GUARDS. hpf/seen/shootCool's decrement are prepared here, once, exactly
+            // where the original computed them inline -- see DUNGEON_GUARDS's own header for why they moved
+            // here instead of into each guard's own when().
+            const ctx = { m, p, dist, dxp, dzp, enr, dt, pgx, pgz, seen: false, hpf: null };
+            if (m.spec.flees && getHP) ctx.hpf = getHP(m.id);
             if (m.spec.ranged) {
                 m.shootCool = Math.max(0, (m.shootCool || 0) - dt);
-                const seen = hasLOS(m.x, m.z, p.x, p.z);
-                if (dist <= m.spec.shootR && m.shootCool <= 0 && seen) {
-                    // PATCH-B22 -- GPU Brain phase 24: ranged cadence follows the
-                    // brain's published boldness (same 1.55-0.9a curve as the
-                    // raycaster v1.7), stacked on the enrage multiplier. No
-                    // brain / stale map -> stock cadence, unchanged.
-                    let cad22 = 1;
-                    try {
-                        const ag = (typeof window !== "undefined" && window.getBrainAggro) ? window.getBrainAggro("dgn-" + m.id) : null;
-                        if (ag != null) cad22 = 1.55 - 0.9 * ag;
-                    } catch {}
-                    m.shootCool = m.spec.shootCool * (enr ? 0.6 : 1) * cad22;
-                    m.yaw = Math.atan2(dxp, -dzp);
-                    if (moveEntity) moveEntity(m.id, m.x, floorY + 1, m.z, m.yaw);
-                    // PATCH-B17 -- brain-consulted projectile choice (PATCH-B9
-                    // pattern): bosses and mages carry a two-attack repertoire
-                    // (arrow: fast/low, magic: slow/high); the brain scores both
-                    // from the same spec-driven features the kaiju use and its
-                    // pick is honored when fresh. No brain -> spec.proj, stock.
-                    let projPick = m.spec.proj;
-                    m._projSrc = "rotation";   // PATCH-B18 -- provenance (spec default)
-                    if ((m.spec.boss || m.kind === "mage") && typeof window !== "undefined" && window.getBrainAttack) {
-                        try {
-                            const rec = window.getBrainAttack("dgn-" + m.id);
-                            if (rec?.name === "arrow" || rec?.name === "magic") {
-                                projPick = rec.name;
-                                m._projSrc = rec.explore ? "brain-explore" : "brain";   // PATCH-B18
-                            }
-                        } catch {}
-                    }
-                    if (onRangedAttack) onRangedAttack(m, m.spec.shootDmg, projPick);
-                    continue;   // hold + fire this frame
-                }
-                // hold — don't crowd the player: once at a comfortable range with a clear
-                // shot, stay put and keep firing (no free-move so it can't drift into a wall).
-                if (seen && dist < m.spec.shootR * 0.6) {
-                    m.yaw = Math.atan2(dxp, -dzp);
-                    if (moveEntity) moveEntity(m.id, m.x, floorY + 1, m.z, m.yaw);
-                    continue;
-                }
+                ctx.seen = hasLOS(m.x, m.z, p.x, p.z);
             }
-
-            // chase — BFS a step toward the player, advance toward that cell centre
-            m.repath -= dt;
-            const [mgx, mgz] = worldToCell(m.x, m.z);
-            if (m.repath <= 0 || !m.step) {
-                m.repath = 0.35;
-                m.step = bfsStep(mgx, mgz, pgx, pgz);
-                if (m.step) {
-                    // the path is back: take the hand off the wall. The follower is DISCARDED rather than
-                    // kept, or the next time the path is lost it would inherit this hunt's visited states
-                    // and cry loop on its first honest step.
-                    m.follow = null;
-                } else {
-                    // *** NO PATH. PUT A HAND ON THE WALL AND WALK. *** This is where a straight line at the
-                    // player used to be -- a beeline that fired PRECISELY when a wall was in the way, which
-                    // is how a monster ended up 17 frames deep inside solid stone. Refusing the move instead
-                    // would only trade a monster that cheats for one standing at the wall waiting to be
-                    // killed. Right-hand rule: turn right if you can, else straight, else left, else back.
-                    if (!m.follow) {
-                        // *** THE BRAIN PICKS WHICH WAY TO SET OFF, AND THEN THE HAND RULE WALKS. *** This is
-                        // where PATCH-B14's flow field belongs now: the brain's terrain-cost field routes
-                        // corridors the flat BFS grid cannot see, and this is exactly the "BFS found no path"
-                        // case it was written for. But it steers the OPENING DIRECTION ONLY. Blending it into
-                        // every step would be the same mistake v4187 measured and rejected for
-                        // extend-and-choose: a heading that is re-chosen each step abandons the wall, and the
-                        // hand rule's guarantee goes with it. A one-time hint cannot break the guarantee -- at
-                        // worst the follower goes the long way round. No brain -> dirToward, exactly as before.
-                        let openDir = dirToward(dxp, dzp);
-                        if (typeof window !== "undefined" && window.sampleBrainPlayerFlow) {
-                            const f = window.sampleBrainPlayerFlow(m.x, m.z);
-                            if (f && (Math.abs(f.x) > 1e-4 || Math.abs(f.z) > 1e-4)) openDir = dirToward(f.x, f.z);
-                        }
-                        m.follow = new WallFollower(openDir);
-                    }
-                    const nx = m.follow.next(mgx, mgz, isWall);
-                    if (nx) m.step = [nx.gx, nx.gz];
-                    else {
-                        // Walled in on all four sides, or the follower PROVED it is going in circles -- the
-                        // right-hand rule's known limit, a detached pillar. Losing the player is a better
-                        // answer than orbiting a column forever.
-                        m.step = null; m.follow = null; m.aggroed = false; continue;
-                    }
-                }
-            }
-            // *** AND THERE IS NO STRAIGHT-LINE TARGET ANY MORE. *** With no step there is nothing legitimate
-            // to walk toward; holding still for one frame is honest, and the next repath supplies one.
-            if (!m.step) { if (moveEntity) moveEntity(m.id, m.x, floorY + 1, m.z, m.yaw); continue; }
-            const _wc = cellToWorld(m.step[0], m.step[1]);
-            let tx = _wc[0], tz = _wc[1];
-            let ddx = tx - m.x, ddz = tz - m.z, dd = Math.hypot(ddx, ddz) || 1;
-            // *** PATCH-B14 USED TO SIT HERE AND v4187 KILLED IT WITHOUT NOTICING. *** It read
-            // `if (!m.step && window.sampleBrainPlayerFlow)` -- blend the brain's flow field in when BFS found
-            // no path. v4187 added an earlier `if (!m.step) ... continue`, so by this line m.step is ALWAYS
-            // set and the condition could never be true again. Dead code that still looked wired. The hook is
-            // not gone; it MOVED, to where the wall-follower is created above, which is now the branch that
-            // means "BFS found no path". It steers the OPENING DIRECTION only -- see the note there.
-            const adv = Math.min(dd, m.spec.speed * (m._slowT > 0 ? 0.5 : 1) * (enr ? 1.5 : 1) * dt);
-            // *** THE MOVE IS COLLISION-TESTED, THE SAME WAY THE FLEE BRANCH ALREADY DID IT. *** This file
-            // wrote a monster's position in exactly two places and only ONE of them checked isWall: fleeing
-            // was careful, chasing was not. Move if the destination is open, else slide along the wall.
-            const _ax = (ddx / dd) * adv, _az = (ddz / dd) * adv;
-            const tryMove = (sx, sz) => { const [ngx, ngz] = worldToCell(sx, sz); if (!isWall(ngx, ngz)) { m.x = sx; m.z = sz; return true; } return false; };
-            if (!tryMove(m.x + _ax, m.z + _az)) { if (!tryMove(m.x + _az, m.z - _ax)) tryMove(m.x - _az, m.z + _ax); }
-            if (dd < 0.3) m.step = null;   // reached the step cell -> repath
-            m.yaw = Math.atan2(ddx, -ddz);
-            if (moveEntity) moveEntity(m.id, m.x, floorY + 1, m.z, m.yaw);
+            evaluateGuards(DUNGEON_GUARDS, ctx);
         }
     }
 
     // PATCH-B17 -- GPU Brain phase 13: expose the live AI so the snapshot
     // publisher can list ranged monsters in the brain roster.
-    const api = { add, remove, clear, update, count, aggro, slow, canSee, monsters: mon, KINDS };
+    // DUNGEON_GUARDS is exposed for tools/ship/dungeonAI-selfcheck.mjs -- see the const's own header for why
+    // it cannot be a module-level export the way SpaceSuit.js's ATMOSPHERE_GUARDS was.
+    const api = { add, remove, clear, update, count, aggro, slow, canSee, monsters: mon, KINDS, DUNGEON_GUARDS };
     if (typeof window !== "undefined") window._dungeonAI = api;
     return api;
 }

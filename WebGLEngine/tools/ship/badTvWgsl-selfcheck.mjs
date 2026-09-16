@@ -227,9 +227,11 @@ console.log("\n5. THE v4269 CLAIM THIS ROUND WITHDREW");
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: WHETHER IT LOOKS RIGHT. This proves the WGSL computes badTvModel's sample " +
     "coordinates to f32 precision and that the fragment shader compiles -- not that a frame drawn with it " +
-    "resembles a failing television. Nothing renders a texture through it and compares pixels. Also " +
-    "unchecked: the WebGL2 half. render/badTvPass.js is untouched by this round and is still the only " +
-    "version anything in the engine actually draws with; badTvWgsl.mjs has NO CONSUMER yet, which is the " +
-    "orphan shape this tree catches elsewhere and is accepted here only because gfx/device.js has no " +
-    "production consumer either -- wiring both is the next round, not this one.");
+    "resembles a failing television. Nothing renders a texture through it and compares pixels. *** STALE AS " +
+    "OF v4271, CORRECTED HERE: this note used to call the port an orphan with nothing importing it, and to " +
+    "say the same of gfx/device.js. render/badTvDevicePass.mjs (v4271) imports it by real specifier, and " +
+    "ui/orreryPost.mjs -- its own header calls itself gfx/device.js's FIRST NON-DEMO CONSUMER (v4273) -- " +
+    "imports badTvDevicePass.mjs and is itself imported by orrery.html. Both halves of the old claim have " +
+    "been false since v4273; the WGSL path draws in production through that chain, not through this gate. " +
+    "render/badTvPass.js (WebGL2) remains the separate hand-written GLSL sibling.");
 exitCleanly(fails ? 1 : 0);
