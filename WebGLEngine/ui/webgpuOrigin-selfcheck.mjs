@@ -51,6 +51,15 @@
 //     E. (same file) detector forgets the import tell -> *** exit=0 FIRST TIME: NOTHING ASSERTED IT. *** The
 //        widening that fixed gfx-device.html and nebula-device.html could have been undone in silence. An
 //        assertion that runs the classifier on both was added; re-run, exit=1 red by name.
+//   TASK BOARD #75 (section 10), SAME LOG:
+//     F. showOriginBanner's auto-hide timer fired a no-op instead of `remove` -> 1 red naming the exact line:
+//        "gone once the injected timer callback runs" read count=1, not 0.
+//     G. the dismiss link's click handler stopped calling onDismiss -> 1 red: "calls onDismiss exactly once"
+//        read calls=0 -- the banner still disappeared (remove() was untouched), which is why this needed its
+//        own assertion rather than being inferred from the banner's removal.
+//     H. server.html's onDismiss handler wrote a DIFFERENT sessionStorage key than DISMISS_KEY reads ("...
+//        -dismissd" for "...-dismissed") -> 1 red, the exact typo class the assertion's own name warns about:
+//        the banner would have kept reappearing every load and nobody would have seen an error for it.
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -398,6 +407,119 @@ console.log("\n9. *** THE SILENT FALLBACK IN gfx/device.js NOW SAYS WHY ***");
        secure === null,
        "v3981: 'isSecureContext alone would send somebody chasing a certificate they do not need'. Only the " +
        "insecure-origin case is this file's business; a genuine absence of WebGPU is the page's own story");
+}
+
+/* -----------------------------------------------------------------------------------------------------------
+ * 10. *** v4460ish -- TASK BOARD #75: server.html EXPLAINS ITSELF IMMEDIATELY, NOT AFTER THE FIRST SUB-PAGE. ***
+ *
+ * ui/originNotice.js's own banner (sections 1-9 above) is a per-page tag that fires only on a page that asks
+ * for a device -- server.html never does, so it never got one, and Keith met the LAN-address symptom on
+ * server.html itself before ever reaching a page that could explain it. Section 7 already holds that the two
+ * .bat launchers open server.html on localhost on FIRST launch; this section holds the part that covers every
+ * OTHER way to land on the LAN address -- a bookmark, a link from another device, typing the IP by hand.
+ *
+ * The new opts (autoHideMs, dismissible, onDismiss) on the SAME showOriginBanner every other page already
+ * calls have to leave those 16 pages' own behaviour untouched -- proven here by a BYTE-FOR-BYTE regression pin
+ * on the no-opts HTML, not just "still returns something".
+ * -------------------------------------------------------------------------------------------------------- */
+console.log("\n10. TASK BOARD #75: server.html's IMMEDIATE, AUTO-HIDING, DISMISSIBLE BANNER");
+{
+    const k = describeWebGPU({ navigator: {}, isSecureContext: false,
+        location: { protocol: "http:", host: "192.168.50.57:8787", hostname: "192.168.50.57", port: "8787", pathname: "/server.html" } });
+
+    // ---- regression: the 16 existing callers pass no opts, and their HTML must not move a byte -------------
+    const PRE_TASK_75_HTML = '<b>WebGPU needs a secure origin</b>, and this page is not one — so the browser does not expose it here.' +
+        '<br><a href="http://localhost:8787/server.html" style="color:#8fd1ff;font-weight:700">▶ Click here to run it on localhost</a> ' +
+        '<span style="opacity:.72">— same page, same server, but over <code>localhost</code>, which counts as secure. ' +
+        'Only works if you are AT the machine serving this page; from another device use the Public tunnel instead.</span>';
+    ok("!! *** originHelpHtml with NO opts is byte-for-byte what the 16 existing callers already got ***",
+        originHelpHtml(k) === PRE_TASK_75_HTML, "a diff here means an unrelated page's banner just changed shape");
+    ok("!! ...and {dismissible:true} adds the link WITHOUT touching anything else in the string",
+        originHelpHtml(k, { dismissible: true }).replace(
+            ' <a href="#" id="swek-origin-banner-dismiss" style="color:#f0dfb0;text-decoration:underline;opacity:.85">Do not ask me again this session</a>', ""
+        ) === PRE_TASK_75_HTML);
+
+    // A richer fake DOM than section 5's mkDoc(): it needs getElementById to find an element BY ID *inside* an
+    // innerHTML string (the dismiss link), addEventListener/click wiring, and parentNode/removeChild so
+    // "remove the banner" is observable. Built once, for this section only -- section 5's simpler mkDoc() is
+    // left exactly as it was, since its own tests don't need any of this.
+    function mkRichDoc() {
+        const byId = {};
+        function makeEl(tag) {
+            const el = {
+                tag, style: {}, parentNode: null, _listeners: {},
+                appendChild(c) { c.parentNode = el; (el.children || (el.children = [])).push(c); return c; },
+                removeChild(c) { const kids = el.children || []; const i = kids.indexOf(c); if (i >= 0) kids.splice(i, 1); c.parentNode = null; return c; },
+                addEventListener(type, fn) { (el._listeners[type] = el._listeners[type] || []).push(fn); },
+                _fire(type, evt) { for (const fn of (el._listeners[type] || [])) fn(evt); },
+                get id() { return el._id; },
+                set id(v) { el._id = v; if (v) byId[v] = el; },
+                get innerHTML() { return el._html || ""; },
+                set innerHTML(html) {
+                    el._html = html;
+                    const anchors = [];
+                    const re = /<a\b[^>]*>/g; let m;
+                    while ((m = re.exec(html))) {
+                        const a = makeEl("a");
+                        const idm = /id="([\w-]+)"/.exec(m[0]);
+                        if (idm) a.id = idm[1];
+                        anchors.push(a);
+                    }
+                    el._anchors = anchors;
+                },
+                querySelectorAll(sel) { return sel === "a" ? (el._anchors || []) : []; },
+                querySelector(sel) { const all = el.querySelectorAll(sel); return all.length ? all[0] : null; },
+            };
+            return el;
+        }
+        const body = makeEl("body"); body.children = [];
+        return { body, byId, getElementById: (id) => byId[id] || null, createElement: (tag) => makeEl(tag) };
+    }
+
+    // ---- autoHideMs: removes itself, and ONLY when the injected timer actually fires -------------------------
+    {
+        const doc = mkRichDoc();
+        let capturedFn = null, capturedMs = null;
+        const ok1 = showOriginBanner(k, doc, { autoHideMs: 10000, setTimeout: (fn, ms) => { capturedFn = fn; capturedMs = ms; } });
+        ok("!! showOriginBanner reports success with autoHideMs set", ok1 === true);
+        ok("!! *** the auto-hide timer is armed for exactly the requested delay ***", capturedMs === 10000, "capturedMs=" + capturedMs);
+        ok("!! and the banner is still THERE before the timer fires", doc.body.children.length === 1, "count=" + doc.body.children.length);
+        capturedFn();
+        ok("!! *** and gone once the injected timer callback runs ***", doc.body.children.length === 0, "count=" + doc.body.children.length);
+    }
+
+    // ---- dismissible: the link removes the banner AND tells the caller, exactly once -------------------------
+    {
+        const doc = mkRichDoc();
+        let dismissedCalls = 0;
+        showOriginBanner(k, doc, { dismissible: true, onDismiss: () => { dismissedCalls++; } });
+        const link = doc.getElementById("swek-origin-banner-dismiss");
+        ok("!! *** the dismiss link exists in the rendered banner, findable by id ***", !!link);
+        link._fire("click", { preventDefault() {} });
+        ok("!! *** clicking it removes the banner ***", doc.body.children.length === 0, "count=" + doc.body.children.length);
+        ok("!! ...and calls onDismiss exactly once", dismissedCalls === 1, "calls=" + dismissedCalls);
+    }
+
+    // ---- without dismissible, no dismiss link is wired at all (not just hidden) -------------------------------
+    {
+        const doc = mkRichDoc();
+        showOriginBanner(k, doc, {});
+        ok("!! *** no {dismissible:true} -> no dismiss link in the DOM at all ***", doc.getElementById("swek-origin-banner-dismiss") === null);
+    }
+
+    // ---- server.html itself: source-level census, the same shape sections 2/6/7/8 already use ------------------
+    const srv = readFileSync(path.join(ROOT, "server.html"), "utf8");
+    ok("!! *** server.html imports the shared probe, not a rewritten copy of it ***",
+        /import\s*\{\s*describeWebGPU,\s*showOriginBanner\s*\}\s*from\s*"\/ui\/webgpuProbe\.mjs"/.test(srv));
+    ok("!! ...checks the origin BEFORE the body is otherwise usable (no gate behind a sub-page click)",
+        /describeWebGPU\(/.test(srv) && /reason\s*===\s*"insecure-origin"/.test(srv));
+    ok("!! ...passes autoHideMs (Keith did not ask for a banner that never leaves)", /autoHideMs\s*:\s*10000/.test(srv));
+    ok("!! ...passes dismissible:true with an onDismiss that persists the choice", /dismissible\s*:\s*true/.test(srv) && /onDismiss\s*:/.test(srv));
+    ok("!! ...and checks sessionStorage for that same choice BEFORE probing again",
+        /sessionStorage\.getItem\(\s*DISMISS_KEY\s*\)/.test(srv) && /if\s*\(\s*!dismissed\s*\)/.test(srv));
+    ok("!! the write and the read use the SAME key (a typo here would silently never suppress anything)",
+        (srv.match(/DISMISS_KEY\s*=\s*"swek-origin-banner-dismissed"/g) || []).length === 1 &&
+        /sessionStorage\.setItem\(\s*DISMISS_KEY/.test(srv));
 }
 
 console.log("\nwebgpuOrigin-selfcheck: " + (fails ? fails + " FAILED" : "all checks pass"));

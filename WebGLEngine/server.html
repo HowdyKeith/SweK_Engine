@@ -322,6 +322,39 @@ window.addEventListener("load", function () {
 </script><!-- v2771 polling discipline: installs window.SwekPoller (hidden/in-flight/cap guards) -->
 </head>
 <body>
+<script type="module">
+  // Task board #75 -- Keith: server.html serves at the LAN address by default, so navigator.gpu is absent (a
+  // secure-context rule, not a browser bug -- see ui/webgpuProbe.mjs's own header), and every WebGPU page
+  // linked below silently falls back to WebGL or worse and only explains why AFTER you have already clicked
+  // in. The launchers (Start_Everything.bat / Open-Engine.bat) already open THIS page on localhost on first
+  // launch -- ui/webgpuOrigin-selfcheck.mjs section 7 holds that. What they cannot cover is every OTHER way to
+  // land here on the LAN address: a bookmark from before that fix, a link from another device, typing the IP
+  // by hand. So THIS page explains itself immediately, rather than gating the explanation behind the first
+  // WebGPU sub-page's own fallback -- the one thing ui/originNotice.js's per-page banner cannot do, because it
+  // only ever runs on pages that ask for a device, and server.html never does.
+  //
+  // Two things server.html needs that no other page asked for, so they are opt-in parameters on the SAME
+  // showOriginBanner every other page already uses (ui/webgpuOrigin-selfcheck.mjs holds their behaviour
+  // unchanged when these are omitted): it auto-hides after 10s (Keith did not ask for a banner that sits atop
+  // the launcher forever), and it carries a "do not ask again" link that persists for the tab's sessionStorage
+  // lifetime -- a returning visitor who already knows the story is not shown it a second time this session.
+  import { describeWebGPU, showOriginBanner } from "/ui/webgpuProbe.mjs";
+  try {
+    const DISMISS_KEY = "swek-origin-banner-dismissed";
+    let dismissed = false;
+    try { dismissed = sessionStorage.getItem(DISMISS_KEY) === "1"; } catch {}
+    if (!dismissed) {
+      const p = describeWebGPU({ navigator, isSecureContext: window.isSecureContext, location });
+      if (p && p.reason === "insecure-origin") {
+        showOriginBanner(p, document, {
+          autoHideMs: 10000,
+          dismissible: true,
+          onDismiss: () => { try { sessionStorage.setItem(DISMISS_KEY, "1"); } catch {} },
+        });
+      }
+    }
+  } catch (e) { /* a diagnostic that breaks the page it diagnoses is worse than no diagnostic */ }
+</script>
   <header>
     <span class="title">⚙️ <a href="/self/zip" download title="Download this SweK Engine build (.zip from your Downloads)" style="color:inherit;text-decoration:none;border-bottom:1px dotted currentColor;">SweK Engine</a><span id="hdrEngineVer" style="color:var(--go);font-weight:600;"></span><button id="verBtn" title="ONE update control. Idle: check every source -- each LAN peer, the Downloads folder and Google Drive. When a newer build is found this becomes the install button and names the version. While it installs it reports the stage rather than a spinner." style="margin-left:8px;font-size:11px;padding:2px 9px;background:#16211b;color:#cfe9d8;border:1px solid #2c463a;border-radius:5px;cursor:pointer;vertical-align:middle;">Version Check</button> · <span id="hdrPeerName"></span>Server Mode<span id="hdrRuntime"></span> · Peer:</span>
 <!-- v4149 -- THE WORD "Peer" IS SAID ONCE, IN THE HEADER, INSTEAD OF THREE TIMES IN A ROW. Keith: "trying to
