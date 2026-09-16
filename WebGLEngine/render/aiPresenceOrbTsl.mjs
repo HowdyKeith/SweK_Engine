@@ -80,12 +80,18 @@ export const ORB_KNOBS = Object.freeze([
     // hazard the naming convention exists to prevent, and it would have fired silently here: chorus's c2
     // would have been read as the family depth and its breath would have had no knob at all.
     "sep", "orbit", "ratio", "voices", "sync", "breath",
+    // prism's three and helix's three -- and with them ALL EIGHTEEN of murmur's species are named here.
+    // `swing` rather than prism's own `drift` and `strand` rather than helix's `glow`, both for the reason
+    // chorus's `breath` was renamed last round: this file already has a `glow` uniform (mh_present's, which
+    // every species passes to the tone curve) and `drift` reads as the kit's mhDrift. Three renames in
+    // eighteen species, each one a collision that naming rather than numbering made visible.
+    "beams", "split", "swing", "turns", "rise", "strand",
 ]);
 
 /** The species this file can build. murmur ships eighteen; these are the six that are ported. */
 export const ORB_SPECIES = Object.freeze(["still", "limn", "comet", "droplet", "opal", "abyss",
                                           "nebula", "tempest", "fathom", "geode", "arc", "sol",
-                                          "aura", "flux", "duet", "chorus"]);
+                                          "aura", "flux", "duet", "chorus", "prism", "helix"]);
 
 /**
  * The three colour anchors the rail is built from, as murmur's own WEB-SPEC names them: ink '#0A0A0B' is the
@@ -101,7 +107,7 @@ export const ORB_COLORS = Object.freeze({
 import { makeMurmurKitTsl } from "./murmurKitTsl.mjs";
 import { MH_EXT, MH_TAPS, MH_SURFACE_KNOBS, MH_SHAPE, MH_DROPLET_GAIN, MH_MIST,
          MH_TEMPEST_BOLT, MH_FATHOM, MH_GEODE, MH_ARC, MH_SOL, MH_AURA, MH_FLUX, MH_DUET, MH_CHORUS,
-         MH_R, mhAa } from "./murmurKit.mjs";
+         MH_PRISM, MH_HELIX, MH_TAPS_HI, MH_R, mhAa } from "./murmurKit.mjs";
 
 /**
  * THE MOIRE GATE, EVALUATED ON THE CPU BECAUSE THIS PORT HAS ONE MOUNT. kit.ts's mh_aa eases a structure's
@@ -167,7 +173,8 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
                  layers: 0.5, parallax: 0.5, murk: 0.4, facet: 0.5, glim: 0.5, stone: 0.5,
                  bow: 0.5, sway: 0.5, pin: 0.5, corona: 0.5, prom: 0.5, simmer: 0.5,
                  ribbon: 0.5, swirl: 0.5, depth3d: 0.5, stream: 0.5, bend: 0.5, height: 0.5,
-                 sep: 0.5, orbit: 0.5, ratio: 0.5, voices: 0.5, sync: 0.5, breath: 0.5, ...knobs };
+                 sep: 0.5, orbit: 0.5, ratio: 0.5, voices: 0.5, sync: 0.5, breath: 0.5,
+                 beams: 0.5, split: 0.5, swing: 0.5, turns: 0.5, rise: 0.5, strand: 0.5, ...knobs };
     const uniforms = {}; for (const n of ORB_KNOBS) uniforms[n] = uniform(float(k0[n])).label(n);
     // The rail's three anchors are colours, not scalars, so they sit beside the knob block rather than in it.
     const col0 = { ink: ORB_COLORS.ink, tone: ORB_COLORS.tone, tone2: ORB_COLORS.tone, ...(knobs.colors || {}) };
@@ -1767,6 +1774,184 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             return { density: chorusDensity, voiceE, voiceH };
         };
 
+        // =====================================================================================================
+        // *** PRISM -- THE SEVENTEENTH. "Light entering the glass and softly splitting inside it." ***
+        //
+        // *** THE ENTRY POINT IS NOT ARBITRARY, AND IT IS THE SPECIES' ONE NON-NEGOTIABLE. *** prism.ts: "The
+        // shafts begin where the specular highlight is, because that is where the picture already says the
+        // light is coming from, and a prism whose beams enter somewhere else is a prism nobody believes for a
+        // second. mh_key is a shared function for exactly this reason: the highlight and the entry point read
+        // the same direction, including its slow drift." So this hero and mh_surface's specular read ONE
+        // function, and the kit has carried it since v4629 for exactly this arrival.
+        const buildPrism = () => {
+            const PR = MH_PRISM;
+            const beamsK = clamp(uniforms.beams, 0.0, 1.0).toVar();
+            const splitK = clamp(uniforms.split, 0.0, 1.0).toVar();
+            const driftK = clamp(uniforms.swing, 0.0, 1.0).toVar();
+            const flP = KIT.mhFlourish(uniforms.time, float(PR.flourishSlot), float(PR.flourishDur)).toVar();
+
+            const sw = KIT.mhDrift(uniforms.time, float(PR.swRate).add(driftK.mul(PR.swRateK)),
+                float(PR.swWob), float(PR.swLane)).toVar();
+            const O = normalize(KIT.mhKey(uniforms.time).add(
+                vec3(sin(sw), cos(sw.mul(0.83)), sin(sw.mul(0.61)))
+                    .mul(float(PR.entryJitter).add(driftK.mul(PR.entryJitterK))))).mul(PR.entryR).toVar();
+
+            // *** NOT AIMED AT THE CENTRE, AND THAT IS THE DIFFERENCE BETWEEN SHAFTS AND TADPOLES. *** "their
+            // length then foreshortens to barely more than their width and three shafts render as three
+            // blobs."
+            const axis = normalize(vec3(...PR.aim).sub(O)).toVar();
+            // *** THE FAN OPENS ACROSS THE SCREEN BY CONSTRUCTION. *** u1 is the cross of the axis with the
+            // VIEW direction, so it lies in the screen plane whatever the axis does -- "the fan is always
+            // seen side-on and the split is always visible". u2 is then depth, and carries only the wobbles
+            // that keep the three beams from being coplanar.
+            const u1 = normalize(cross(axis, vec3(0.0, 0.0, 1.0)).add(vec3(1e-4, 0.0, 0.0))).toVar();
+            const u2 = normalize(cross(axis, u1)).toVar();
+
+            const div = float(PR.divB).add(splitK.mul(PR.divK)).mul(mix(float(1.0), float(PR.divSmall), smallK))
+                .mul(float(1.0).add(flP.x.mul(PR.divFlourish))).toVar();
+            const wob = (k) => sin(uniforms.time.mul(PR.wobRate[k]).add(PR.wobPhase[k])).mul(PR.wobble[k]);
+            const D = [
+                normalize(axis.sub(u1.mul(div)).add(u2.mul(wob(0)))).toVar(),
+                normalize(axis.add(u2.mul(wob(1)))).toVar(),
+                normalize(axis.add(u1.mul(div)).sub(u2.mul(wob(2)))).toVar(),
+            ];
+
+            // SHAFTS, NEVER RAYS: the width GROWS with distance from the entry. "A beam of constant width is
+            // a laser; a beam that opens as it travels is a shaft of light in a medium."
+            const w0 = float(PR.w0B).add(beamsK.mul(PR.w0K)).mul(mix(float(1.0), float(PR.w0Small), smallK))
+                .mul(float(1.0).add(uniforms.voice.mul(PR.w0Voice))).toVar();
+            const wGrow = float(PR.wGrowB).add(beamsK.mul(PR.wGrowK)).toVar();
+            const third = float(1.0).sub(smoothstep(float(PR.thirdIn), float(PR.thirdOut), smallK)).toVar();
+            const brightP = float(PR.brightB).add(uniforms.voice.mul(PR.brightVoice)).toVar();
+            const shimAmt = float(KIT_AA(PR.shimCycles)).mul(float(1.0).sub(smallK))
+                .mul(uniforms.glintRate.mul(PR.shimK)).toVar();
+            const WT = [float(1.0).toVar(), float(1.0).toVar(), third];
+            const WIDE = [1.0, PR.midWide, 1.0];
+
+            const medAmtP = mix(float(PR.medB), float(PR.medS), smallK).toVar();
+            const accP = float(0.0).toVar(), accPH = float(0.0).toVar();
+            const transP = float(1.0).toVar();
+            Loop({ start: 0, end: MH_TAPS }, ({ i }) => {
+                const pP = P.add(rd.mul(float(i).add(0.5).mul(ds))).toVar();
+                const fadeP = KIT.mhInside(pP).toVar();
+                const v = pP.sub(O).toVar();
+                const vv = dot(v, v).toVar();
+                const E = [], S1 = [];
+                for (let k = 0; k < 3; k++) {
+                    const sk = dot(v, D[k]).toVar();
+                    const ww = w0.mul(WIDE[k]).add(wGrow.mul(max(sk, float(0.0)))).toVar();
+                    const ak = max(vv.sub(sk.mul(sk)), float(0.0)).div(ww.mul(ww)).toVar();
+                    // The beam STARTS after the entry and STOPS before the far wall, so a shaft is a length of
+                    // light rather than a line to the edge of the glass.
+                    const al = smoothstep(float(PR.alphaIn[0]), float(PR.alphaIn[1]), sk)
+                        .mul(float(1.0).sub(smoothstep(float(PR.alphaOut[0]), float(PR.alphaOut[1]), sk))).toVar();
+                    E.push(exp(ak.negate()).add(KIT.mhScatter(ak, float(PR.scatterAmp))).mul(al).mul(WT[k]).toVar());
+                    S1.push(sk);
+                }
+                const run = float(1.0).add(shimAmt.mul(sin(S1[1].mul(PR.runFreq).sub(uniforms.time.mul(PR.runRate))))).toVar();
+                const pr = S1[1].sub(flP.y.mul(PR.pulseFrom)).div(PR.pulseW).toVar();
+                const pulse = flP.x.mul(PR.pulseAmp).mul(exp(pr.mul(pr).negate())).toVar();
+                const beams = E[0].add(E[1]).add(E[2]).mul(brightP).mul(run).mul(float(1.0).add(pulse)).toVar();
+                // THE SPLIT IS THE HUE: outer beams either side of the anchor, the middle one on it.
+                const hueWP = E[0].mul(PR.hueW[0]).add(E[2].mul(PR.hueW[2])).mul(brightP).mul(run).toVar();
+                const medP = KIT.mhMedium(pP, uniforms.time, float(PR.medLane)).mul(medAmtP).toVar();
+                const eP = beams.mul(PR.beamGain).add(medP).mul(fadeP).toVar();
+                accP.addAssign(eP.mul(transP).mul(ds));
+                accPH.addAssign(hueWP.mul(PR.beamGain).mul(fadeP).mul(transP).mul(ds));
+                transP.assign(transP.mul(exp(eP.mul(PR.medAbsorb).add(MH_EXT).mul(ds).negate())));
+            });
+            const prismDensity = accP.mul(PR.gain).mul(uniforms.depth);
+            return { density: prismDensity, accP, accPH };
+        };
+
+        // =====================================================================================================
+        // *** HELIX -- THE EIGHTEENTH, AND THE LAST. "Two strands winding a vertical axis: the double helix." ***
+        //
+        // *** THE GESTALT TEST IS THE SPEC: *** helix.ts -- "somebody says DNA inside three seconds or the
+        // species has failed -- and the first build failed it by being a cousin of flux: broad soft strands on
+        // a leaning axis read as crossing horizontal streaks. Three things were wrong and all three are
+        // structural." The three repairs are the upright, the counted crossing rhythm, and threads instead of
+        // bands -- and all three are in the kit's MH_HELIX note, quoted whole.
+        //
+        // *** THIS IS THE ONE HERO WHOSE FIGURE LIVES IN THE MARCH, so it gets its own tap count. *** murmur
+        // declares a second uniform for it alone: u_tapsHi, "helix's twenty ... its strands ARE the march".
+        // This port transcribes the RATIO rather than the number -- see MH_TAPS_HI -- so helix marches 96
+        // steps where the family marches 24, and "twenty steps is what lets the strand be 0.062 wide instead
+        // of 0.11". arc escaped the march to draw a line; helix pays for a finer one. Both answers are in
+        // this file now, four species apart.
+        const buildHelix = () => {
+            const HX = MH_HELIX;
+            const turnsK = clamp(uniforms.turns, 0.0, 1.0).toVar();
+            const riseK = clamp(uniforms.rise, 0.0, 1.0).toVar();
+            const glowK = clamp(uniforms.strand, 0.0, 1.0).toVar();
+            const flH = KIT.mhFlourish(uniforms.time, float(HX.flourishSlot), float(HX.flourishDur)).toVar();
+
+            // THE UPRIGHT. "Yaw turns the pair to face you; the tilt is a whisper" -- 0.06 + 0.05, which is
+            // 6.3 degrees at most, against the twenty that "is enough to destroy the read".
+            const ayH = KIT.mhDrift(uniforms.time, float(HX.yawRate), float(HX.yawWob), float(HX.yawLane)).toVar();
+            const axH = float(HX.tiltB).add(sin(uniforms.time.mul(HX.tiltRate)).mul(HX.tiltAmp)).toVar();
+
+            // THE CROSSING RHYTHM IS COUNTED: "about one and three quarter turns inside the visible height:
+            // three or four crossings, which is the count the eye reads as a helix rather than as a spring."
+            const turns = float(HX.turnsB).add(turnsK.mul(HX.turnsK)).mul(mix(float(1.0), float(HX.turnsSmall), smallK))
+                .mul(float(1.0).add(flH.x.mul(0.20))).toVar();
+            const climb = KIT.mhDrift(uniforms.time,
+                float(HX.climbB).add(riseK.mul(HX.climbK)).mul(mix(float(1.0), float(HX.climbSmall), smallK)),
+                float(HX.climbWob), float(HX.climbLane)).toVar();
+            const r0 = float(HX.r0B).add(turnsK.mul(HX.r0K)).mul(float(1.0).sub(flH.x.mul(0.10))).toVar();
+            const wH = float(HX.wB).add(glowK.mul(HX.wK)).mul(mix(float(1.0), float(HX.wSmall), smallK))
+                .mul(float(1.0).add(uniforms.voice.mul(HX.wVoice))).toVar();
+            const brightH = float(HX.brightB).add(glowK.mul(HX.brightK))
+                .mul(float(1.0).add(uniforms.voice.mul(HX.brightVoice))).toVar();
+
+            const dsH = L.div(MH_TAPS_HI).toVar();
+            const accH = float(0.0).toVar(), accHH = float(0.0).toVar();
+            const transH = float(1.0).toVar();
+            Loop({ start: 0, end: MH_TAPS_HI }, ({ i }) => {
+                const pH = P.add(rd.mul(float(i).add(0.5).mul(dsH))).toVar();
+                const fadeH = KIT.mhInside(pH).toVar();
+                const q = KIT.mhSpin(pH, ayH, axH).toVar();
+
+                const u = clamp(abs(q.y).div(HX.profSpan), 0.0, 1.0).toVar();
+                const prof = pow(max(float(1.0).sub(u.mul(u)), float(0.0)), float(HX.profPow)).toVar();
+                const wl = wH.mul(float(HX.wlFloor).add(prof.mul(HX.wlRide))).toVar();
+
+                // *** WHERE THE TWO STRANDS ARE AT THIS HEIGHT, AS TWO POINTS IN THE HORIZONTAL PLANE. *** The
+                // phase advances with HEIGHT, which is what makes it a helix rather than a ring; and the
+                // second strand is the NEGATION of the first's offset, so one sincos serves both. That is not
+                // an optimisation with a cost -- exactly antipodal is what a double helix IS. Measuring the
+                // distance in the plane rather than as an angle is what "gave up the atan2" and what makes
+                // ninety-six steps affordable.
+                const phi = turns.mul(q.y).mul(Math.PI).add(climb).toVar();
+                const c0p = vec2(cos(phi), sin(phi)).mul(r0).toVar();
+                const qxz = vec2(q.x, q.z).toVar();
+                const d0v = qxz.sub(c0p).toVar(), d1v = qxz.add(c0p).toVar();
+                const a0 = dot(d0v, d0v).div(wl.mul(wl)).toVar();
+                const a1 = dot(d1v, d1v).div(wl.mul(wl)).toVar();
+                const e0 = exp(a0.negate()).add(KIT.mhScatter(a0, float(HX.scatterAmp))).mul(prof).toVar();
+                const e1 = exp(a1.negate()).add(KIT.mhScatter(a1, float(HX.scatterAmp))).mul(prof).toVar();
+                const eH = e0.add(e1).mul(brightH).mul(HX.strandGain).mul(fadeH).toVar();
+                accH.addAssign(eH.mul(transH).mul(dsH));
+                accHH.addAssign(e1.sub(e0).mul(brightH).mul(HX.strandGain).mul(fadeH).mul(transH).mul(dsH));
+                transH.assign(transH.mul(exp(eH.mul(HX.absorb).add(MH_EXT).mul(dsH).negate())));
+            });
+
+            // THE MEDIUM, AT A THIRD OF THE FAMILY'S USUAL and on the family's OWN tap count, not helix's:
+            // "nothing may compete with two thin lines", and a medium does not need ninety-six steps to be
+            // honest. Two marches, two step counts, which is what murmur's two uniforms are for.
+            const medAmtH = mix(float(HX.medB), float(HX.medS), smallK).toVar();
+            const medE = float(0.0).toVar();
+            const mtrans = float(1.0).toVar();
+            Loop({ start: 0, end: MH_TAPS }, ({ i }) => {
+                const pM = P.add(rd.mul(float(i).add(0.5).mul(ds)));
+                const eM = KIT.mhMedium(pM, uniforms.time, float(HX.medLane)).mul(medAmtH).mul(KIT.mhInside(pM)).toVar();
+                medE.addAssign(eM.mul(mtrans).mul(ds));
+                mtrans.assign(mtrans.mul(exp(eM.mul(HX.medAbsorb).add(MH_EXT).mul(ds).negate())));
+            });
+            const helixDensity = accH.add(medE).mul(HX.gain).mul(uniforms.depth);
+            return { density: helixDensity, accH, accHH };
+        };
+
         // *** ONE CALL, AND IT IS THE ONLY SPECIES BLOCK THAT RUNS. *** The seven closures above are
         // declared and six of them are never invoked, so their nodes are never built and never reach the
         // WGSL. Everything below reads `SP`, whose shape is each hero's own contract: always a density, plus
@@ -1791,7 +1976,12 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             // APPROACH -- duet two of them with an exact depth comparison between, chorus seven of them on
             // a Fibonacci shell -- so neither marches anything but its medium.
             : species === "duet" ? buildDuet()
-            : species === "chorus" ? buildChorus() : buildStill();
+            : species === "chorus" ? buildChorus()
+            // THE LAST TWO, AND THEY CLOSE murmur's EIGHTEEN. Both are marched -- prism's three shafts on
+            // the family's taps, helix's two strands on FOUR TIMES that many, which is the only place in
+            // the collection where a species buys its own march.
+            : species === "prism" ? buildPrism()
+            : species === "helix" ? buildHelix() : buildStill();
         const density = SP.density;
 
         // ---- THE SURFACE IS murmur's NOW, NOT THIS FILE'S APPROXIMATION OF IT ------------------------------
@@ -1945,6 +2135,16 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
                     // small lights sum to less than one big one.
                     : species === "chorus"
                     ? select(SP.voiceE.greaterThan(1e-5), SP.voiceH.div(SP.voiceE), float(0.0)).mul(spreadK).mul(KIT.MH_SPREAD)
+                    // *** prism IS "THE MOST LITERAL USE OF THE KNOB IN THE COLLECTION" -- its own words. ***
+                    // The outer two shafts sit either side of the anchor and the middle one on it, so the
+                    // spread is three neighbouring hues SEPARATED IN SPACE rather than mixed: the split IS
+                    // the colour. helix runs its two strands either side by (e1 - e0), which is the same
+                    // shape duet uses for its two bodies and the same shape the family default uses -- both
+                    // transcribed, not inherited.
+                    : species === "prism"
+                    ? select(SP.accP.greaterThan(1e-4), SP.accPH.div(SP.accP), float(0.0)).mul(spreadK).mul(KIT.MH_SPREAD)
+                    : species === "helix"
+                    ? select(SP.accH.greaterThan(1e-4), SP.accHH.div(SP.accH), float(0.0)).mul(spreadK).mul(KIT.MH_SPREAD)
                     : select(SP.acc.greaterThan(1e-4), SP.accH.div(SP.acc), float(0.0)).mul(spreadK).mul(KIT.MH_SPREAD);
         // mh_present's own hueMix: the hue scaled by the share of THIS pixel's energy that the species says
         // carries colour. still and comet count the interior plus 0.7 of the rim, droplet 0.6 of it, limn the
@@ -1967,6 +2167,10 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             // duet weights by its TWO BODIES alone and chorus by its SEVEN -- neither by the interior, and
             // neither by the rim. Both transcribed: duet's line is hueMix = hue * (eA + eB) / max(e, 1e-4)
             // and chorus's is hue * voiceE / max(e, 1e-4).
+            // prism weights by interior + 0.6 of the rim -- the ONLY species of the eighteen using 0.6 -- and
+            // helix by 0.7, the family's. Two numbers a tidier port would have unified; both transcribed.
+            : species === "prism" ? interior.add(sf.rim.mul(0.6))
+            : species === "helix" ? interior.add(sf.rim.mul(0.7))
             : species === "duet" ? SP.eA.add(SP.eB)
             : species === "chorus" ? SP.voiceE
             : species === "arc" ? SP.filE.mul(MH_ARC.filGain)

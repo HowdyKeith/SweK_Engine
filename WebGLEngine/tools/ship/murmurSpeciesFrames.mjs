@@ -61,10 +61,25 @@ export const sp = (species, time, voice = VOICE, extra = {}) =>
  * reuseInstances means frames differing only in knobs share a compiled shader as well -- nine frames built
  * four shaders when this was one gate, and 0 bytes of 82,944 differed from building nine.
  */
-export async function renderSpecies(frames) {
+/**
+ * *** AND THE FRAME SIZE IS AN ARGUMENT NOW, BECAUSE TWO SPECIES ASKED FOR IT AND ONE OF THEM COULD NOT BE
+ * GRADED WITHOUT IT. *** N3 is 48, which is plenty for a body, a medium and anything that fills them -- and
+ * it is below the resolution of a FIGURE. chorus's seven voices are about one and a half pixels across at 48
+ * and its own file calls being countable "the one thing an ensemble has to be"; helix's strands are 0.062 of
+ * the body wide, which is about one pixel, and its own file sets its whole spec as whether somebody says
+ * "DNA" inside three seconds. Both were recorded as ungradeable at 48 rather than graded by proxy.
+ *
+ * THE COST IS SMALL BECAUSE THE LAUNCH IS THE COST. Measured on this box, the same two-frame helix render
+ * takes 888 ms at 48, 924 ms at 96 and 1,229 ms at 128 -- a 7.1x increase in pixels for 1.38x the time,
+ * because a headless Chromium start dominates everything the GPU then does. A gate that needs to see a figure
+ * should pay the 340 ms rather than measure something else and call it the figure.
+ *
+ * Callers that pass nothing get N3 and are byte-for-byte unaffected.
+ */
+export async function renderSpecies(frames, size = N3) {
     return renderThreeTslToPixels({
         engineRoot: ENG, moduleImportPath: "/render/aiPresenceOrbTsl.mjs", factoryName: "makeAiPresenceOrbTsl",
-        factoryArgs: frames[0].factoryArgs, knobs: frames[0].knobs, width: N3, height: N3,
+        factoryArgs: frames[0].factoryArgs, knobs: frames[0].knobs, width: size, height: size,
         variants: frames.slice(1), reuseInstances: true,
     });
 }

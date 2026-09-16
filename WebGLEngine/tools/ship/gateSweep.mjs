@@ -5248,6 +5248,56 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "orb-species-block-per-shader; the next orb round starts there.",
     }),
     // v4635 -- THE 247th CLOSING. No gate added: a row added to one that existed, and a 3,561 ms refund.
+    // v4640 -- THE 252nd CLOSING: prism and helix, the last two -- and four rows, two of which grade tables.
+    since261: Object.freeze({
+        at: "v4640", swept: 2, green: 2, red: 0,
+        added: Object.freeze([
+            "tools/ship/murmurSpecies14-selfcheck.mjs",
+            "tools/ship/murmurSpecies15-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 1,094 and 1,955 ms on the rotation, real WebGPU, 4 rows, carrying PRISM and HELIX " +
+                 "-- and WITH THEM ALL EIGHTEEN OF murmur-web's SPECIES ARE PORTED, across fifteen species " +
+                 "gates and one kit gate. still, limn, comet, droplet, opal, abyss, nebula, tempest, fathom, " +
+                 "geode, arc, sol, aura, flux, duet, chorus, prism, helix. *** AND THE HONEST HEADLINE OF " +
+                 "THIS ROUND IS THAT HALF ITS ROWS DO NOT GRADE THEIR SHADERS, WHICH TEN SABOTAGES ESTABLISHED " +
+                 "AND WHICH THE ROWS NOW SAY IN THEIR OWN TITLES. *** FIVE OF THE TEN ESCAPED. prism's " +
+                 "perpendicular-fan row and helix's antipodal-strands row are both computed in the gates' own " +
+                 "JS from MH_PRISM and MH_HELIX; they never render. So swapping u1 and u2 in the shader -- " +
+                 "the fan opening INTO the screen, which is the failure prism.ts names by name -- left the " +
+                 "row green, as did replacing the mh_key entry with a fixed direction, as did giving helix's " +
+                 "second strand its own phase instead of the negation. That is the v4579 defect in a new " +
+                 "costume: a check that re-derives the answer rather than reading the subject. BOTH ROWS WERE " +
+                 "RE-TITLED RATHER THAN DELETED OR WEAKENED -- they now say \"the TABLE, not the shader\" and " +
+                 "\"the constants, not the shader that reads them\" -- because what they do assert is true, " +
+                 "exact and worth holding (the worst departure from perpendicular across 1,623 time-and-swing " +
+                 "samples is 5.65e-5, which is the shader's own 1e-4 guard; helix's strand midpoint is 0.000 " +
+                 "from the axis across 9,288 samples). *** AND FIVE PIXEL INSTRUMENTS WERE BUILT TO CLOSE THE " +
+                 "GAP AND ALL FIVE WERE REJECTED, WITH THEIR NUMBERS, so nobody repeats the search. *** " +
+                 "helix's per-row strand midpoint at 128 px scatters 6.10 px at baseline and 2.43 px with the " +
+                 "strands deliberately NOT antipodal -- THE SABOTAGE SCORES BETTER, because two strands at a " +
+                 "fixed offset track each other more steadily than two that cross; an instrument that prefers " +
+                 "the broken shader is not weak, it is wrong. prism's fan width resisted three: the lit " +
+                 "region's principal axis moved the wrong way (3.96 to 4.80 as the fan opened), its x and y " +
+                 "spreads moved the wrong way (sx 2.88 to 2.32) because neither axis aligns with a diagonal " +
+                 "fan, and a profile across the CPU-computed fan direction came back identical at split 0.0, " +
+                 "0.5 and 1.0 -- a registration failure in the probe, since those frames differ by 18% of " +
+                 "total light. And helix's tap count: setting MH_TAPS_HI from MH_TAPS * 4 back to MH_TAPS " +
+                 "makes the strands BRIGHTER (13.12 against 11.72) rather than the \"empty bead\" helix.ts " +
+                 "describes, because a larger ds accumulates more per tap that lands. WHAT THE TWO SURVIVING " +
+                 "SHADER ROWS DO MEASURE: prism's `split` takes the frame's light DOWN 18% while `beams` " +
+                 "takes it UP 49% -- opposite SIGNS, so neither knob is the other, which no single-frame " +
+                 "brightness bound could show; and helix's strands pinch 5 times up the figure at 1.75 turns " +
+                 "and 8 at 2.85, the crossing rhythm counted rather than left to fall out. *** THIS GATE " +
+                 "RENDERS AT 128 PIXELS AND THAT IS A FINDING. *** At 48 a helix strand is about one pixel " +
+                 "across and no row has two peaks to separate -- the same wall chorus's countability hit at " +
+                 "v4639. renderSpecies gained an optional size for it, and the cost is small because the " +
+                 "LAUNCH is the cost: the same two-frame render is 888 ms at 48 and 1,229 ms at 128, a 7.1x " +
+                 "increase in pixels for 1.38x the time. Callers that pass nothing are byte-for-byte " +
+                 "unaffected. VERIFIED BY BYTES across all EIGHTEEN species and three time-and-knob cases: " +
+                 "54 frames, 0 bytes different.",
+    }),
     // v4639 -- THE 251st CLOSING: duet and chorus, and a headline that measurement would not support.
     since260: Object.freeze({
         at: "v4639", swept: 2, green: 2, red: 0,

@@ -344,8 +344,15 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // gates -- and the count of gates has exceeded the count of PAIRS for five rounds running, because since
     // v4636 no two species have shared one. The reason has changed each time (compiles, then frames, then
     // measurement axes) and the record keeps both numbers for that reason.
-    gates: 1683, usesOk: 1662, definesOk: 1654, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1555, condFirst: 91, unknownSignature: 16,
+    // v4640 -- RE-TAKEN 1683 -> 1685 for tools/ship/murmurSpecies14-selfcheck.mjs (prism) and …Species15
+    // (helix). *** WITH THESE TWO ALL EIGHTEEN OF murmur-web's SPECIES ARE PORTED AND GATED, across fifteen
+    // species gates and one kit gate. *** And the last pair is the one where this record's two counts finally
+    // say something uncomfortable: FOUR of that pair's rows are not four claims about shaders. Two grade the
+    // CONSTANT TABLES and say so in their own titles, because sabotaging the shaders left them green. A count
+    // of gates has never been a count of claims; this is the first round where it is not even a count of
+    // SUBJECTS, and the gates carry that in their text rather than in this note alone.
+    gates: 1685, usesOk: 1664, definesOk: 1656, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1557, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

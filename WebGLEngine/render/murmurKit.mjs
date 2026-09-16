@@ -747,6 +747,11 @@ export const MH_SHAPE = Object.freeze({
     // against a pair that breathes with its own orbit.
     duet: Object.freeze([0.023, 0.007, 3.1, 1.25]),
     chorus: Object.freeze([0.021, 0.008, 15.6, 1.20]),
+    // THE LAST TWO, and with them the table carries all eighteen of murmur's heroes. prism's 2.4 is the
+    // fastest breath in the set and helix's 10.4 sits mid-table -- and their gains are IDENTICAL at 1.20,
+    // the fourth pair to share one, which is the last argument the ENTRIES-not-spreads rule ever needed.
+    prism: Object.freeze([0.021, 0.007, 2.4, 1.20]),
+    helix: Object.freeze([0.021, 0.007, 10.4, 1.20]),
     geode: Object.freeze([0.021, 0.007, 11.7, 1.22]),
 });
 
@@ -1132,6 +1137,120 @@ export const MH_CHORUS = Object.freeze({
     coreAmp: 0.60, scatterAmp: 0.42,
     medB: 0.048, medS: 0.028, medLane: 2.1, medAbsorb: 2.00, medGain: 3.30,
     flourishSlot: 29.0, flourishDur: 11.1,
+});
+
+/**
+ * *** HELIX'S OWN TAP COUNT, AND IT IS A SECOND UNIFORM IN murmur RATHER THAN A CONSTANT. *** kit.ts declares
+ * two: "uniform int u_taps; // the family's five, scaled by rendered size" and "uniform int u_tapsHi;
+ * // helix's twenty, likewise: its strands ARE the march". Only helix reads the second one.
+ *
+ * SO THE RATIO IS FOUR, AND THAT IS WHAT THIS PORT TRANSCRIBES rather than the number 20. MH_TAPS here is 24
+ * -- the family's five as the demo scales it -- so the high count is 96 by the same scaling. Writing 20 would
+ * have been transcribing another tree's mount, which is the error v4637 caught on arc's march interval and
+ * which is worth not making twice.
+ *
+ * helix.ts on why the count cannot simply be dropped: "TWENTY STEPS, and they are cheap: one sincos each, no
+ * noise, no atan ... PORT: scaled by rendered size like MH_TAPS, and floored well above zero rather than
+ * switched off, because this is the one hero whose figure lives in the march. Dropping it to nothing leaves
+ * an empty bead." And what the count buys: "twenty steps is what lets the strand be 0.062 wide instead of
+ * 0.11" -- the same trade arc made by escaping the march entirely, made here by paying for a finer one.
+ */
+export const MH_TAPS_HI = MH_TAPS * 4;
+
+/**
+ * PRISM'S THREE SHAFTS: where they enter, where they are aimed, and why the fan opens across the screen.
+ *
+ * *** THE ENTRY POINT IS NOT ARBITRARY AND IT IS THE SPECIES' ONE NON-NEGOTIABLE. *** prism.ts: "The shafts
+ * begin where the specular highlight is, because that is where the picture already says the light is coming
+ * from, and a prism whose beams enter somewhere else is a prism nobody believes for a second. mh_key is a
+ * shared function for exactly this reason: the highlight and the entry point read the same direction,
+ * including its slow drift."
+ *
+ * *** AND THE BUNDLE IS NOT AIMED AT THE CENTRE, WHICH IS THE DIFFERENCE BETWEEN SHAFTS AND TADPOLES. ***
+ * "Pointing it at the centre sends the beams substantially AWAY from the viewer, because the entry is on the
+ * front of the sphere; their length then foreshortens to barely more than their width and three shafts render
+ * as three blobs. Aiming instead at a point low and slightly toward the viewer sends them across the body
+ * from upper left to lower right, almost in the screen plane, so nearly their whole length is visible."
+ *
+ * *** THE FAN OPENS ACROSS THE SCREEN BY CONSTRUCTION, NOT BY LUCK. *** "Taking u1 as the cross of the axis
+ * with the view direction puts it in the screen plane by construction, so the fan is always seen side-on and
+ * the split is always visible." u2 is then the depth direction and carries only small wobbles.
+ *
+ * SHAFTS, NEVER RAYS: each beam's width GROWS with distance from the entry. "A beam of constant width is a
+ * laser; a beam that opens as it travels is a shaft of light in a medium." The opening rate is budgeted
+ * explicitly -- "At 0.155 body units per unit travelled a beam is nearly four tenths wide at the far wall --
+ * three of those plus their scatter is one lit balloon, not a split. At 0.055 a shaft roughly triples in
+ * width crossing the body."
+ */
+export const MH_PRISM = Object.freeze({
+    swRate: 0.048, swRateK: 0.040, swWob: 0.52, swLane: 4.0,
+    entryJitter: 0.06, entryJitterK: 0.10, entryR: 1.03,
+    // The aim point: low, and slightly toward the viewer. Not the centre, for the reason in the header.
+    aim: Object.freeze([0.10, 0.62, 0.28]),
+    divB: 0.17, divK: 0.42, divSmall: 1.35, divFlourish: 0.55,
+    wobble: Object.freeze([0.05, 0.06, 0.05]), wobRate: Object.freeze([0.071, 0.043, 0.059]),
+    wobPhase: Object.freeze([0.0, 1.1, 2.2]),
+    w0B: 0.038, w0K: 0.035, w0Small: 1.85, w0Voice: 0.30, midWide: 1.10,
+    // THE OPENING RATE, and its two rejected neighbours are in the header: 0.155 is a balloon, 0.055 triples.
+    wGrowB: 0.040, wGrowK: 0.035,
+    alphaIn: Object.freeze([0.12, 0.46]), alphaOut: Object.freeze([1.60, 2.35]),
+    thirdIn: 0.30, thirdOut: 0.72,
+    brightB: 0.76, brightVoice: 0.65,
+    shimCycles: 5.4, shimK: 0.55, runFreq: 5.4, runRate: 2.6,
+    pulseFrom: 2.0, pulseW: 0.28, pulseAmp: 1.05,
+    scatterAmp: 0.16, beamGain: 0.95,
+    medB: 0.058, medS: 0.030, medLane: 2.2, medAbsorb: 2.60,
+    gain: 2.45,
+    // The outer beams either side of the anchor and the middle one on it: "three neighbouring hues separated
+    // in SPACE rather than mixed, which is the most literal use of the knob in the collection."
+    hueW: Object.freeze([-1.0, 0.0, 1.0]),
+    flourishSlot: 8.0, flourishDur: 9.1,
+});
+
+/**
+ * HELIX'S TWO STRANDS: an upright that stays upright, a counted crossing rhythm, and threads rather than
+ * streaks.
+ *
+ * *** THE GESTALT TEST IS THE SPEC: *** helix.ts -- "somebody says DNA inside three seconds or the species
+ * has failed -- and the first build failed it by being a cousin of flux: broad soft strands on a leaning axis
+ * read as crossing horizontal streaks. Three things were wrong and all three are structural."
+ *
+ *   THE AXIS IS VERTICAL AND STAYS VERTICAL. "A lean of twenty degrees is enough to destroy the read: a helix
+ *   is legible only against a clear upright, and once the upright tips the crossings stop looking like
+ *   crossings and start looking like a weave." The yaw is kept -- it turns the pair toward and away from the
+ *   viewer without disturbing the upright -- and the tilt is down to about six degrees.
+ *
+ *   THE CROSSING RHYTHM IS COUNTED, not left to fall out. "A double helix seen side-on crosses twice per
+ *   turn, so turns is set to put about one and three quarter turns inside the visible height: three or four
+ *   crossings, which is the count the eye reads as a helix rather than as a spring."
+ *
+ *   THE STRANDS ARE THREADS, "and getting there meant giving up the atan2. The distance to the strand is
+ *   measured IN THE HORIZONTAL PLANE AT THE SAMPLE'S OWN HEIGHT: at height y the strand is one point in that
+ *   plane, so the distance is a subtract. That costs one sincos where the angular form cost an inverse
+ *   tangent, which is what makes twenty steps affordable -- and twenty steps is what lets the strand be 0.062
+ *   wide instead of 0.11."
+ *
+ * AND THE TWO STRANDS ARE EXACTLY ANTIPODAL: one sincos serves both, because the second strand is the
+ * NEGATION of the first's offset. That is not an optimisation with a cost -- it is what a double helix IS.
+ */
+export const MH_HELIX = Object.freeze({
+    yawRate: 0.055, yawWob: 0.50, yawLane: 2.0,
+    // ABOUT SIX DEGREES, and the number is the species: 0.06 + 0.05 is 0.11 rad = 6.3 deg, against the twenty
+    // that "is enough to destroy the read".
+    tiltB: 0.06, tiltAmp: 0.05, tiltRate: 0.031,
+    turnsB: 1.75, turnsK: 1.10, turnsSmall: 0.50,
+    climbB: 0.20, climbK: 0.30, climbSmall: 0.70, climbWob: 0.44, climbLane: 5.0,
+    r0B: 0.42, r0K: 0.10,
+    wB: 0.062, wK: 0.022, wSmall: 1.90, wVoice: 0.25,
+    brightB: 0.80, brightK: 0.65, brightVoice: 0.80,
+    // The spindle, in HEIGHT rather than along a curve: "width and brightness fall together, so each strand
+    // is a stroke laid down with pressure in the middle."
+    profSpan: 0.88, profPow: 0.80, wlFloor: 0.30, wlRide: 0.70,
+    scatterAmp: 0.16, strandGain: 0.80, absorb: 3.00,
+    // THE MEDIUM AT A THIRD OF THE FAMILY'S USUAL: "nothing may compete with two thin lines."
+    medB: 0.020, medS: 0.012, medLane: 2.1, medAbsorb: 2.00,
+    gain: 5.60,
+    flourishSlot: 17.0, flourishDur: 9.3,
 });
 
 /** tempest's lightning: the two lane seeds, their slot lengths, and the radius its depth mask kills at. */
