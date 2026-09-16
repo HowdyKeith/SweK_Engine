@@ -293,8 +293,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // answers a smaller question than the gate it previews, read as though it answered the same one.
     // v4589 -- RE-TAKEN: one gate (kernelReach) joined, the same five rows by one, and the pre-flight named three
     // while the gate names all nine, the same split recorded a round ago.
-    gates: 1645, usesOk: 1624, definesOk: 1616, importsOk: 0,
-    distinctDefinitions: 38, nameFirst: 1517, condFirst: 91, unknownSignature: 16,
+    // v4590 -- RE-TAKEN: one gate (temporalGPU) joined, the same five rows by one.
+    gates: 1646, usesOk: 1625, definesOk: 1617, importsOk: 0,
+    distinctDefinitions: 38, nameFirst: 1518, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

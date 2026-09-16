@@ -1651,7 +1651,8 @@
   "world/spaceStructures-selfcheck.mjs": 440,
   "world/tools/water-attacks-selfcheck.mjs": 118,
   "fx/fsr/fsrGPU-selfcheck.mjs": 3084,
-  "tools/ship/kernelReach-selfcheck.mjs": 25575
+  "tools/ship/kernelReach-selfcheck.mjs": 25575,
+  "render/temporalGPU-selfcheck.mjs": 2766
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -3301,7 +3302,8 @@
   "world/spaceStructures-selfcheck.mjs": 0,
   "world/tools/water-attacks-selfcheck.mjs": 0,
   "fx/fsr/fsrGPU-selfcheck.mjs": 0,
-  "tools/ship/kernelReach-selfcheck.mjs": 0
+  "tools/ship/kernelReach-selfcheck.mjs": 0,
+  "render/temporalGPU-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-08T20:46:53.412Z",
@@ -4951,7 +4953,8 @@
   "world/spaceStructures-selfcheck.mjs": "2026-09-08T20:46:53.412Z",
   "world/tools/water-attacks-selfcheck.mjs": "2026-09-08T20:46:53.412Z",
   "fx/fsr/fsrGPU-selfcheck.mjs": "2026-09-15T18:15:51Z",
-  "tools/ship/kernelReach-selfcheck.mjs": "2026-09-16T01:49:04Z"
+  "tools/ship/kernelReach-selfcheck.mjs": "2026-09-16T01:49:04Z",
+  "render/temporalGPU-selfcheck.mjs": "2026-09-16T02:19:41Z"
  },
  "kinds": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "loaded",
@@ -6601,7 +6604,8 @@
   "world/spaceStructures-selfcheck.mjs": "loaded",
   "world/tools/water-attacks-selfcheck.mjs": "loaded",
   "fx/fsr/fsrGPU-selfcheck.mjs": "alone",
-  "tools/ship/kernelReach-selfcheck.mjs": "alone"
+  "tools/ship/kernelReach-selfcheck.mjs": "alone",
+  "render/temporalGPU-selfcheck.mjs": "alone"
  },
  "crossings": {
   "tools/roundhouse/knobPromotions-selfcheck.mjs": 2,

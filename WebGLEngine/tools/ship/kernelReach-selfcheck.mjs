@@ -140,7 +140,12 @@ console.log("\n2. THE TREE'S OWN ANSWER");
        "dispatch any of them. fsr.html runs the CPU versions of RESOLVE and ACCUMULATE every frame.");
 
     // RATCHET. Seeded at what was measured, may only fall, and the slack half fails if it is left behind.
-    const UNREACHABLE_AT_V4589 = 17;
+    // v4590 -- LOWERED, 17 -> 15, and it is the second half of this row that asked for it: "A RATCHET WITH SLACK
+    // IN IT IS A RATCHET HOLDING NOTHING". render/temporalGPU.mjs gave RESOLVE_WGSL and ACCUMULATE_WGSL a caller
+    // the round after they were counted, so the seed follows the tree down rather than sitting where it was
+    // convenient. Eight of the temporal arc's ten are still here: temporalLock's four, temporalReject's two,
+    // MOTION_WGSL and RING_FLOOR_WGSL.
+    const UNREACHABLE_AT_V4589 = 15;
     ok("!! *** no EIGHTEENTH kernel arrives with nothing but a gate able to run it ***",
        r.unreachable.length <= UNREACHABLE_AT_V4589,
        `${r.unreachable.length} against a frozen ${UNREACHABLE_AT_V4589}. OWED: a runner for each, or a reason ` +

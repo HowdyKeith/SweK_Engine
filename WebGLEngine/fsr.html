@@ -114,6 +114,7 @@ import { temporalAccumulateCPU } from "./render/temporalAccumulate.mjs";
 import { easuCPU, rcasCPU, bilinearCPU } from "./fx/fsr/fsr.js";
 import { requestDevice } from "./gfx/device.js";
 import { FSRGPU, rangeOf } from "./fx/fsr/fsrGPU.js";
+import { TemporalGPU } from "./render/temporalGPU.mjs";
 
 const D = 192;                                  // display resolution
 const $ = (id) => document.getElementById(id);
@@ -173,10 +174,17 @@ let running = false, frame = 0, hist = null, jit = null, ref = null, R = 96, PAN
 // they were written, and until v4588 nothing outside a gate could dispatch them. The CPU functions stay exactly
 // where they were: they are the reference this page's GPU pane is held to, not a fallback nobody exercises.
 //
-// THE TEMPORAL PANE STAYS ON THE CPU WHATEVER THE ADAPTER DOES, and that is not an oversight this page hides:
-// render/temporalResolve.mjs and render/temporalAccumulate.mjs have no WGSL at all. Only the spatial half --
-// bilinear, EASU, RCAS -- has a device path, so that is the only half this switch moves.
-let gpu = null;
+// *** AND THE TEMPORAL PANE RUNS ON THE ADAPTER TOO AS OF v4590, WHICH THIS COMMENT USED TO DENY. ***
+// It said: "render/temporalResolve.mjs and render/temporalAccumulate.mjs have no WGSL at all". They have had
+// WGSL since v4552 -- temporalResolveWgsl.mjs and temporalAccumulateWgsl.mjs -- and what they had no caller.
+// tools/ship/kernelReach.mjs counted 17 kernels in that state tree-wide, ten of them from this arc.
+// render/temporalGPU.mjs is the caller; the resolve and the accumulation now run chained on one encoder.
+//
+// ONE THING IS STILL CPU-ONLY AND IT IS THE COUNTERS. ACCUMULATE_WGSL has no atomics, so reused /
+// rejectedOffscreen / rejectedInvalid / clamped cannot be read off a device run. They are the diagnostic this
+// page leans on -- rejectedOffscreen reading exactly one column is what proved the motion vector sign -- so the
+// page SAYS they are unavailable rather than printing zeroes, and the CPU path still reports them.
+let gpu = null, tgpu = null;
 async function initGPU() {
     const say = (t) => { $("engine").textContent = "spatial engine: " + t; };
     if (!navigator.gpu) { say("CPU reference (this browser exposes no WebGPU)"); return; }
@@ -184,8 +192,10 @@ async function initGPU() {
         const cv = document.createElement("canvas"); cv.width = 8; cv.height = 8;
         const dev = await requestDevice(cv, { backend: "webgpu", offscreen: true });
         gpu = new FSRGPU(dev);
+        try { tgpu = new TemporalGPU(dev); } catch { tgpu = null; }
         const who = (dev.adapterInfo && (dev.adapterInfo.description || dev.adapterInfo.vendor)) || "webgpu";
-        say(`WebGPU compute on ${who} -- EASU and RCAS chained on one encoder`);
+        say(`WebGPU compute on ${who} -- EASU+RCAS and resolve+accumulate, each chained on one encoder` +
+            (tgpu ? "" : " (temporal kernels unavailable; that half stays on the CPU)"));
     } catch (e) { gpu = null; say("CPU reference (" + String(e && e.message).slice(0, 80) + ")"); }
 }
 
@@ -234,7 +244,7 @@ async function tick() {
     const kind = $("scene").value, panning = $("camera").value === "pan";
     const dx = panning ? frame * PAN : 0;
     const [jx, jy] = jitterCurrent(jit);
-    const cur = resolveJitterAwareCPU({ src: render(R, jx, jy, kind, dx), rw: R, rh: R, dw: D, dh: D, jitter: [jx, jy] });
+    const frameSrc = render(R, jx, jy, kind, dx);
 
     // (du, dv, valid, 0) in UV units, uvPrev - uvCurr -- the convention render/motionVectors.mjs writes, and
     // temporalAccumulateCPU reads it as `hu = u + du`. The camera pans by advancing the scene's u argument by
@@ -250,7 +260,14 @@ async function tick() {
     const motion = new Float32Array(D * D * 4);
     for (let i = 0; i < D * D; i++) { motion[i * 4] = panning ? PAN / D : 0; motion[i * 4 + 2] = 1; }
 
-    const acc = temporalAccumulateCPU({ current: cur.data, history: hist, motion, w: D, h: D, alpha: parseFloat($("alpha").value) });
+    const alpha = parseFloat($("alpha").value);
+    // ONE ENCODER on the device: the resolved display-resolution frame never crosses back to the CPU between
+    // the two passes. On the CPU it is the same two calls in the same order, and the gate holds them equal.
+    const acc = tgpu
+        ? await tgpu.resolveAndAccumulate({ src: frameSrc, rw: R, rh: R, dw: D, dh: D, jitter: [jx, jy],
+                                            history: hist, motion, alpha })
+        : temporalAccumulateCPU({ current: resolveJitterAwareCPU({ src: frameSrc, rw: R, rh: R, dw: D, dh: D, jitter: [jx, jy] }).data,
+                                  history: hist, motion, w: D, h: D, alpha });
     hist = acc.data; frame++; advanceJitter(jit);
 
     if (panning) ref = truth(kind, dx);          // the truth moves with the camera
@@ -258,7 +275,11 @@ async function tick() {
     draw(cTmp, shown);
     $("dTmp").textContent = psnr(shown, ref).toFixed(2) + " dB";
     $("metric").textContent = `render ${R}x${R} -> display ${D}x${D}   |   frame ${frame}   |   jitter ${jx.toFixed(3)}, ${jy.toFixed(3)}`;
-    $("accstat").textContent = `accumulate: reused ${acc.stats.reused}, rejected offscreen ${acc.stats.rejectedOffscreen}, rejected invalid ${acc.stats.rejectedInvalid}, clamped by the neighbourhood box ${acc.stats.clamped}`;
+    // *** NULL, NOT ZEROES. *** ACCUMULATE_WGSL counts nothing, so a device run has no counters to show. A
+    // frame that reused nothing and a frame nobody counted must not print the same number.
+    $("accstat").textContent = acc.stats
+        ? `accumulate: reused ${acc.stats.reused}, rejected offscreen ${acc.stats.rejectedOffscreen}, rejected invalid ${acc.stats.rejectedInvalid}, clamped by the neighbourhood box ${acc.stats.clamped}`
+        : "accumulate counters: CPU ONLY -- the WGSL kernel has no atomic counters, so a device run cannot report them (not zero: uncounted)";
     requestAnimationFrame(tick);
 }
 

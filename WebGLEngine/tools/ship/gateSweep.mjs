@@ -3767,6 +3767,34 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since247: Object.freeze({
+        at: "v4590", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/temporalGPU-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/temporalGPU.mjs", "fsr.html", "tools/ship/kernelReach-selfcheck.mjs"]),
+        verdict: "green, 2766 ms alone. *** TWO OF THE SEVENTEEN, AND THE FIRST TWO OF THE TEMPORAL ARC'S TEN. *** " +
+                 "v4589 counted 17 dispatchable kernels reachable only from a gate; render/temporalGPU.mjs is the " +
+                 "caller for RESOLVE_WGSL and ACCUMULATE_WGSL and the census now reads 15, with the ratchet " +
+                 "LOWERED to match rather than left where it was convenient -- its own second half asks for that. " +
+                 "fsr.html's temporal pane runs on the adapter, resolve and accumulate chained on one encoder, and " +
+                 "the comment in that page saying the two modules 'have no WGSL at all' is gone: they have had it " +
+                 "since v4552 and what they had none of was a caller. *** THE PORT LOSES A DIAGNOSTIC AND SAYS SO " +
+                 "RATHER THAN DISCOVERING IT: *** temporalAccumulateCPU returns reused/rejectedOffscreen/" +
+                 "rejectedInvalid/clamped and ACCUMULATE_WGSL counts NOTHING -- no atomics, every rejection an " +
+                 "early return. Those counters are what proved the motion-vector sign at v4586 (rejectedOffscreen " +
+                 "reading exactly one column of 192). So the runner returns stats: NULL with a reason, the page " +
+                 "prints 'CPU ONLY -- not zero: uncounted', and the gate asserts null-rather-than-zeroes: a frame " +
+                 "that reused nothing and a frame nobody counted must not print the same number. Atomics in a " +
+                 "gated kernel are their own rung. Also asserted, and never asked before: resolve THEN accumulate " +
+                 "on one device, which is the order every frame of a temporal upscaler uses and which each " +
+                 "kernel's own gate cannot reach, driving each alone. *** ONE DEFECT IN THE ROUND'S OWN WORK: *** " +
+                 "the no-history row asserted the copy-through path at 1e-6 against the CPU's first frame and went " +
+                 "red at 1.73e-6. The tolerance was not the mistake, the REASONING was -- 'it copies' is exact " +
+                 "only against the buffer it was handed, and comparing to a CPU run measured the RESOLVE's f32 " +
+                 "error and called it the accumulate's. Split into an exact row and a parity row that says what " +
+                 "it is made of. Sabotage: 7 mutations, 7 caught; S3 (stats as zeroes instead of null) is the one " +
+                 "the round is about, and S7 breaks the KERNEL rather than the runner.",
+    }),
     since246: Object.freeze({
         at: "v4589", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/kernelReach-selfcheck.mjs"]),
