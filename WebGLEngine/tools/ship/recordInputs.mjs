@@ -17,7 +17,8 @@ import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 import { enumerateGates } from "./gateSweep.mjs";
-import { ENG, RECORD, hashFile, hashDir, readRecord, encode } from "./inputSets.mjs";
+import { ENG, RECORD, hashFile, hashDir, readRecord, encode, carryForward,
+         markChangedDuringPass } from "./inputSets.mjs";
 import { shortfall } from "./importClosure.mjs";
 
 /** Does this gate's source take fs by NAMED import? The probe patches the builtin's exports object, and a
@@ -146,8 +147,26 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     }
     if (only) gates = gates.filter((g) => g.includes(only));
     if (limit) gates = gates.slice(0, limit);
+    // *** THE PRIOR IS VALIDATED, NOT BLENDED, AND THAT IS v4633's REPAIR OF A 283-GATE LEAK. ***
+    // Seeding with the previous record is right -- `--gates x` must not erase the other 1,300 entries -- but
+    // a carried-over entry's hashes are from the PREVIOUS pass, and encode() folds one hash per path. Fold a
+    // T0 hash with a T1 hash and you get a CONFLICT sentinel, which refuses not just the stale gate but every
+    // gate that shares the path. The shipped record carried 130 such paths; they refused 283 of 1,293 gates
+    // where only 23 had a hash that genuinely differed.
+    //
+    // So each prior entry is asked the question the skip rule would ask it -- has anything it read moved? --
+    // using inputSets' own firstMoved so the recorder and the rule cannot disagree about what stale means. An
+    // entry that still matches the tree is carried: its hashes EQUAL the live ones, so it contributes the
+    // same value every fresh entry does and no conflict can arise. An entry that does not match is DROPPED,
+    // not carried with old hashes: whyRun would have refused it anyway ("changed: x" and "no recorded input
+    // set" both mean the gate runs), and dropping it keeps every hash in the file from ONE instant, which is
+    // what the record's own `at` stamp has always claimed and could not previously support.
     const prior = readRecord();
-    const out = { ...(prior.gates || {}) };
+    const { carried: out, dropped: staleDropped } = carryForward(prior.gates);
+    if (prior.gates && Object.keys(prior.gates).length) {
+        console.log(`[inputs] prior record: ${Object.keys(out).length} entr(ies) still match the tree and ` +
+                    `are carried, ${staleDropped.length} dropped as stale (they would have been re-run anyway)`);
+    }
     let done = 0, trusted = 0, timedOut = 0;
     const t0 = Date.now();
     console.log(`[inputs] probing ${gates.length} gate(s) with ${workers} worker(s), ${timeoutMs / 1000} s cap each`);
@@ -168,6 +187,27 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     const ms = Date.now() - t0;
     console.log(`[inputs] probed ${done} gates in ${(ms / 1000).toFixed(0)} s: ${trusted} with a usable input set, ` +
                 `${timedOut} produced no probe output (timed out, or died before the exit handler)`);
+    // *** THE RACE THE SENTINEL WAS BUILT FOR, WITH A DETECTOR THAT CAN ACTUALLY FIRE. ***
+    // encode()'s note used to justify the CONFLICT sentinel by a mid-pass write -- a gate rewriting a file
+    // another gate had already read. That hazard is real (tslRace-selfcheck rewrites tsl-emitted-race.json on
+    // every run; quickSweep rewrites sweep-timings.json) and encode() cannot see it, because hashFile is
+    // memoised for the whole pass and hands the late gate the EARLY reading. Proven in
+    // tools/ship/inputSets-selfcheck.mjs section 4 rather than argued.
+    //
+    // This is the reading that can see it: clear the memo and hash every recorded path AGAIN, now that the
+    // pass is over. A path whose content differs from what the pass recorded was written WHILE the pass was
+    // reading it, and every gate's reading of it is suspect. Those paths take the CONFLICT sentinel, which is
+    // what the sentinel was always for.
+    //
+    // IT IS BEST-EFFORT AND THE LIMIT IS NAMED: a file written and then restored during the pass reads the
+    // same at both ends and is missed. What this catches is the shape that actually occurs -- a gate that
+    // leaves its output behind.
+    const tRe = Date.now();
+    const { changed: changedDuringPass, observed } = markChangedDuringPass(out);
+    console.log(`[inputs] re-hashed ${observed} recorded path(s) in ${Date.now() - tRe} ms: ` +
+                `${changedDuringPass.length} moved DURING the pass` +
+                (changedDuringPass.length ? " -- " + changedDuringPass.slice(0, 8).join(", ") +
+                 (changedDuringPass.length > 8 ? ` and ${changedDuringPass.length - 8} more` : "") : ""));
     if (process.argv.includes("--write")) {
         // INDEXED, not one path list per gate -- see the note above `FORMAT` in inputSets.mjs. Written
         // compactly rather than with an indent: this is a 4,072-row table with 443,405 references into it,
@@ -193,6 +233,11 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
                   "is still recorded and no longer decides anything: the loader hook reaches those bindings. " +
                   "See tools/ship/inputSets.mjs for the rule.",
             at: new Date().toISOString(), probedMs: ms,
+            // The paths some gate WROTE while the pass was reading them, found by re-hashing after the pass
+            // with the memo cleared. Their hashes above are the CONFLICT sentinel, so every gate that touched
+            // one runs. Distinct from `conflicts`, which is the fold's own ratchet and must be empty -- see
+            // the note above encode() in tools/ship/inputSets.mjs for why those are two different questions.
+            changedDuringPass,
         })) + "\n");
         console.log("[inputs] wrote " + RECORD);
     } else console.log("[inputs] dry run -- pass --write to record");

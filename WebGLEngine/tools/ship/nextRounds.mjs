@@ -22,29 +22,37 @@ export const NEXT_ROUNDS = [
     { id: "population-autopin", state: "CLOSED", note: "DONE at v3553. populationCensus.mjs records the population at ship time and diffs it, and gateReach-selfcheck now reads that record instead of a typed number. The verdicts distinguish routine growth from the thing that should stop a ship: GREW names every addition and reconciles the totals; REMOVALS is treated harder than a gain, because adding physics is routine and physics quietly disappearing is how a deletion ships unnoticed, and the old pin fired identically for both. NO-RECORD is its own verdict rather than a pass. And the gate does NOT rewrite the record it compares against -- writing is a ship step, comparing is the gate, deliberately different programs, because a check that repairs its own expectation can never fail twice." },
     { id: "flip3d-gate", state: "CLOSED", note: "DONE at v3427. Free fall to 1.4e-7, 9216 particles conserved exactly, divergence down 2.1e+4 and -- unlike 2D -- MONOTONICALLY. Two differences from the 2D sibling recorded: the monotone convergence, and that step() is synchronous here while 2D's is async, despite the header calling the pipeline identical." },
     { id: "beer-lambert", state: "CLOSED", note: "DONE at v3426. The exact half holds to 5.6e-17 and optical depths add bit-exactly, which is what makes a line integral the right object for CT. The failing half is measured: with a real spectrum the effective attenuation falls 4.4x with depth and a uniform cylinder cups by 30%. The cost to ct.js is now a number -- 12.0562 against a true line integral of 35.3854 for the same slab." },
-    // ---- found at v4632 by running the cascade by hand, which is the only way anything was going to find it.
+    // ---- found at v4632 by running the cascade by hand, CLOSED at v4633. Kept because the answer overturned
+    // ---- the question: what looked like a race was a merge, and the race it was named for could not fire.
     {
         id: "input-sets-130-conflicts",
-        blocker: "OPEN",
-        what: "tools/ship/inputSets-selfcheck.mjs is RED on main and has been since the v4622 merge: 130 " +
-            "conflicting path(s) across 1293 gates. A conflict is one path that two gates read DIFFERENT " +
-            "content for in the same recording pass, which the record stores as the sentinel \"!conflict\" -- " +
-            "so every gate that touched any of those 130 paths is now un-skippable, and the incremental " +
-            "sweep's whole point is deciding what to skip. Either 130 paths really are written during the " +
-            "sweep (in which case the recording pass is racing the gates it measures, and the sentinel is " +
-            "doing its job) or the merge left two recordings interleaved in one file.",
-        how: "Re-run the recorder (tools/ship/recordInputs.mjs) on a quiet tree and diff the conflict list " +
-            "against the stored one. If the same 130 come back, they are real and the question is WHICH " +
-            "gates write during a sweep -- name them, because a gate that writes into the tree it is " +
-            "measuring is a finding in its own right. If they do not come back, the stored record is a " +
-            "merge artefact and the row was telling the truth about a file rather than about the tree.",
-        why: "*** IT IS RED AND NOTHING HAS SEEN IT, FOR THE EXACT REASON BACKLOG ITEM #14 EXISTS. *** The " +
-            "gate is recorded at 3,027 ms against a 3,000 ms quick-sweep budget -- 27 ms over -- so the sweep " +
-            "skips it and its red has been invisible for every round since v4622. This tree has a name for " +
-            "that shape already: a gate over budget does not run at ship time AT ALL, so the round that " +
-            "pushes one over is the round whose red nobody sees. Found at v4632 only because that round ran " +
-            "its cascade by hand. The row itself is sound -- it says the live record's conflict list is " +
-            "EMPTY, 'measured, not assumed', and it is measuring exactly what it claims.",
+        blocker: "CLOSED",
+        what: "DONE at v4633. tools/ship/inputSets-selfcheck.mjs had been RED on main since the v4622 merge -- " +
+            "130 conflicting paths across 1293 gates -- and nothing had seen it, because the gate was " +
+            "recorded at 3,027 ms against a 3,000 ms quick-sweep budget and the sweep skips what it cannot " +
+            "afford. Both halves are fixed: the conflicts are gone and the gate is 2,535 ms.",
+        how: "*** THE ENTRY ABOVE GUESSED WRONG AND THE MEASUREMENT SAID SO, WHICH IS WHY IT IS KEPT. *** It " +
+            "asked whether 130 paths 'really are written during the sweep (in which case the recording pass " +
+            "is racing the gates it measures)' or whether the merge left two recordings interleaved. The " +
+            "answer is the second, and the first is not merely wrong but IMPOSSIBLE: hashFile is memoised " +
+            "for the life of a pass, so a gate that rewrites a file another gate already read hands the late " +
+            "reader the EARLY hash. Driven on a real file: write, hash, rewrite, hash -- the two readings are " +
+            "equal while the disk says something else, and encode() reports zero conflicts. The sentinel " +
+            "could not fire for the reason its own note gave for six rounds. What it fired on was " +
+            "recordInputs seeding each pass with the previous record, so a carried entry's T0 hashes folded " +
+            "with a fresh pass's T1 hashes; the conflicting paths were exactly what rounds edit (tools/ship, " +
+            "gate-reports, gateSweep.mjs, nextRounds.mjs, runtimeGap.mjs). Re-run with an empty prior on the " +
+            "same tree: 0.",
+        why: "*** THE COST WAS 283 GATES OF SKIPPING, AND THE BLAST RADIUS WAS THE WRONG SHAPE. *** A stale " +
+            "carried entry is ALREADY refused, by itself, by whyRun's own re-hash of that gate's own paths. " +
+            "The sentinel added nothing there -- what it added was poisoning the PATH for every other gate, " +
+            "including gates probed in the same pass whose reading was current. Measured on the shipped " +
+            "record against the tree it shipped with: 283 of 1,293 gates refused by a sentinel against 23 by " +
+            "a hash that genuinely differed, off 58 poisoned paths. The repair is that recordInputs now " +
+            "VALIDATES the prior instead of blending it (carryForward), and the hazard the sentinel was " +
+            "built for got a reading that can actually see it (markChangedDuringPass, which re-hashes after " +
+            "the pass with the memo cleared and found 4 paths on the first real run, two of them gitignored " +
+            "outputs that gates write on every pass).",
     },
     {
         id: "browser-screenshot-floor",

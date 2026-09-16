@@ -5180,6 +5180,40 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "EIGHT HUNDRED TIMES apart'; on the frames that run it is 74.09/71.03% against " +
                  "10.977/11.437%, a 6.7x and 6.2x ratio, because still stopped being drawn as a sphere.",
     }),
+    // v4633 -- THE 245th CLOSING: a gate that was RED for nine rounds because it was 27 ms over budget.
+    // swept is ZERO and that is the honest count, not a formality: this closing ADDED no gate, so it owes
+    // the surplus arithmetic nothing. gateSweep-selfcheck asserts added.length === swept on every closing
+    // precisely so a re-sweep cannot be counted as coverage of a gate the population already owns -- the
+    // same rule that corrected v4632's since253 a round earlier. What this entry records is a VERDICT.
+    since254: Object.freeze({
+        at: "v4633", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** NO GATE WAS ADDED AND THAT IS THE POINT: tools/ship/inputSets-selfcheck.mjs ALREADY " +
+                 "EXISTED, WAS ALREADY RED, AND HAD BEEN SINCE THE v4622 MERGE. *** It was recorded at 3,027 " +
+                 "ms against the 3,000 ms quick-sweep budget -- 27 milliseconds over -- so the sweep skipped " +
+                 "it every round and its red was seen by nobody until v4632 ran the cascade by hand. That is " +
+                 "backlog item #14's own shape, arriving on a gate rather than on a population. Both halves " +
+                 "are repaired: the red is fixed and the gate is 2,052 ms on the rotation, 948 ms of margin. " +
+                 "WHAT THE RED WAS: its own record carried 130 conflicting paths, and a conflicting path is " +
+                 "refused for EVERY gate that touches it -- 283 of 1,293 gates, against 23 refused by a hash " +
+                 "that genuinely differed. The conflicts were not a race in the recording pass, which is " +
+                 "what the code's own note had claimed for six rounds; they were tools/ship/recordInputs.mjs " +
+                 "seeding each pass with the PREVIOUS record, so a carried entry's T0 hashes folded with a " +
+                 "fresh pass's T1 hashes. *** AND THE RACE THE SENTINEL WAS NAMED FOR CANNOT FIRE AT ALL: *** " +
+                 "hashFile is memoised for the life of a pass, so a gate that rewrites a file another gate " +
+                 "already read hands the late reader the EARLY hash -- driven on a real file in the gate, " +
+                 "which reports zero conflicts for a write that demonstrably happened. So the recorder now " +
+                 "VALIDATES its prior instead of blending it, and the real hazard got a reading that can see " +
+                 "it: re-hash every recorded path AFTER the pass with the memo cleared, 630 ms over 13,073 " +
+                 "paths, which finds two gitignored outputs that gates write on every single run. NINE " +
+                 "SABOTAGES, ALL RED. The gate came down from 7,439 ms by measurement rather than by " +
+                 "deletion: a transitive-closure fixture that cost 3,016 ms became one that costs 167 and " +
+                 "names the file it proves (brain/flowfieldCpu.js, reached only through dispatch.js); three " +
+                 "probes of one gate became one; and a section that cloned the 1,302-entry record three " +
+                 "times stopped doing that. Every row it had is still there.",
+    }),
     since249: Object.freeze({
         at: "v4623", swept: 1, green: 1, red: 0,
         added: Object.freeze([
