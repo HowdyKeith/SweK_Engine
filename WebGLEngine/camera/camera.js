@@ -12,6 +12,7 @@
 //   * Projection params (fov, near, far) added as fields.
 
 import { buildViewProj } from "./buildViewProj.js";
+import { autoGround, meshGround, stepTerrainFan, SURFACE } from "../physics/character/terrainWalk.mjs";
 
 export class Camera {
     // The keys the _move* methods consult in EVERY mode that moves. KeyE is deliberately absent: it is
@@ -61,6 +62,7 @@ export class Camera {
         this._fpSprintSpeed = 9;
         this._fpJumpVel = 7.5;
         this._gravity = 18;             // m/s² downward in FP mode
+        this._fpMaxSlopeDeg = 50;       // Round #13 -- walkable limit for the non-voxel ground oracle below
         this._fpFallStartTime = 0;       // diagnostic: time spent airborne
         // Round 31 — energy bar gates sprint. main.js installs ref.
         this.playerEnergy = null;
@@ -662,6 +664,79 @@ export class Camera {
         this.position.z += mz * step;
     }
 
+    // Round #13 (task board) Stage A — the ground oracle terrainWalk.mjs needs, for the FP modes when
+    // the world exposes no voxelAt at all. simulation/BotManager.js's own _groundOracle() does the same
+    // thing for AI movement and is the reason this shape (cache against world identity, build once) is
+    // copied rather than invented: rebuilding the closure every frame would be the expensive part of an
+    // otherwise cheap query. Returns null for a voxel world (this.world.voxelAt truthy) so the existing
+    // _canStandAt / _terrainTopAtBilinear path below is completely untouched -- this is additive, not a
+    // replacement, and the two live voxel FP demos (fps, fp_control) never take this branch.
+    _terrainGroundOracle() {
+        const w = this.world;
+        if (!w || w.voxelAt) return null;
+        if (this._terrainGroundFor !== w) {
+            this._terrainGroundFor = w;
+            if (w.groundBVH) this._terrainGround = meshGround(w.groundBVH);
+            else if (typeof w._heightAt === "function") this._terrainGround = autoGround((x, z) => w._heightAt(x, z));
+            else this._terrainGround = null;
+        }
+        return this._terrainGround;
+    }
+
+    // The non-voxel counterpart of _moveFP's horizontal+vertical block below: same inputs (mx/mz already
+    // the clamped WASD/analog wish, speed already gated by sprint), but the ground comes from terrainWalk's
+    // oracle instead of a voxel-column scan. Kept as a SEPARATE method rather than threaded into the voxel
+    // branch: the two disagree at every point that matters -- a slope limit tested on the surface normal
+    // vs. a step-height auto-climb, a contour-slide refusal vs. an axis-independent wall-slide -- and
+    // merging them would risk exactly what terrainWalk.mjs's own header warns against, a walkability
+    // verdict that quietly depends on which branch happened to run.
+    //
+    // *** THIS IS A GROUND CONTROLLER, NOT A FULL ONE, BY THE SAME SCOPE LIMIT terrainWalk.mjs STATES. ***
+    // The airborne branch below has no wall collision at all -- capsule-vs-arbitrary-geometry depenetration
+    // (walls, ceilings, moving platforms) is tracked separately (task board #80) and is explicitly not
+    // started here, same as it is not started in terrainWalk.mjs itself.
+    _moveFPTerrain(dt, mx, mz, horizLen, speed, ground) {
+        if (this._fpOnGround) {
+            const feetY = this.position.y - this._eyeHeight;
+            const r = stepTerrainFan({
+                pos: [this.position.x, feetY, this.position.z], ground,
+                wish: horizLen > 1e-9 ? [mx, mz] : [0, 0],
+                dt, speed, maxSlopeDeg: this._fpMaxSlopeDeg, convention: SURFACE,
+                stepHeight: 1.2, snapDown: 1.5,
+            });
+            this.position.x = r.pos[0];
+            this.position.z = r.pos[2];
+            if (r.airborne) {
+                this._fpOnGround = false;
+                this._fpVelY = 0;
+                this._fpFallStartTime = performance.now();
+            } else {
+                this.position.y = r.pos[1] + this._eyeHeight;
+            }
+            if (this.keys.has("Space") && this._fpOnGround) {
+                this._fpVelY = this._fpJumpVel;
+                this._fpOnGround = false;
+            }
+        } else {
+            // Airborne -- the same free-fall integration _moveFP's voxel path uses; only the landing
+            // test differs, since the ground height comes from the oracle rather than a voxel scan.
+            this._fpVelY -= this._gravity * dt;
+            this.position.x += mx * speed * dt;
+            this.position.z += mz * speed * dt;
+            this.position.y += this._fpVelY * dt;
+            const g = ground(this.position.x, this.position.z);
+            const targetY = (g ? g.y : 0) + this._eyeHeight;
+            if (this.position.y <= targetY) {
+                this.position.y = targetY;
+                this._fpVelY = 0;
+                this._fpOnGround = true;
+            }
+        }
+        this.velocity.x = mx * speed;
+        this.velocity.y = this._fpVelY;
+        this.velocity.z = mz * speed;
+    }
+
     // Round 28 — first-person walking with gravity, terrain following,
     // 1-voxel auto-step, jump. Uses world.voxelAt for terrain queries.
     _moveFP(dt) {
@@ -696,6 +771,16 @@ export class Camera {
         if (this.playerEnergy) this.playerEnergy.setSprinting(isSprinting && horizLen > 0);
         this._sprinting = isSprinting && horizLen > 0;   // Round 31 — drives the sprint FOV widen
         const speed = isSprinting ? this._fpSprintSpeed : this._fpWalkSpeed;
+
+        // Round #13 Stage A -- a world with no voxelAt at all (a pure heightfield/mesh world -- splat-
+        // derived collision, imported terrain) walks through physics/character/terrainWalk.mjs's oracle
+        // instead of the voxel-column scan below, which returns 0/true unconditionally when voxelAt is
+        // absent and would otherwise let a non-voxel world's FP camera fall through to open air.
+        const terrainGround = this._terrainGroundOracle();
+        if (terrainGround) {
+            this._moveFPTerrain(dt, mx, mz, horizLen, speed, terrainGround);
+            return;
+        }
 
         // Try horizontal move with collision check
         const newX = this.position.x + mx * speed * dt;
