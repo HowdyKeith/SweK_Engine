@@ -310,5 +310,40 @@ ok("the record is frozen", Object.isFrozen(REC) && REC.rounds.every(Object.isFro
 //      that catches it injects a census returning counts no tree could produce.
 //   No 0-RED among the six, once BN's row exists. Cost of the memo, measured: 6,813 -> 2,647 ms.
 
+// ---- 5. THE PRE-FLIGHT HAS A RUNNER ------------------------------------------------------------------------
+console.log("\n5. *** AND SOMETHING ACTUALLY RUNS IT, WHICH FOR FIVE ROUNDS NOTHING DID ***");
+{
+    // *** v4639. *** Everything above grades what recordDrift.mjs ANSWERS. Nothing graded whether the answer is
+    // ever asked for, and it was not: the tree imported that module exactly twice -- from this gate, and from
+    // runtimeGap-selfcheck.mjs for the tree walk it also exports and not for the drift check -- while THIS GATE
+    // runs 4,997 ms against quickSweep's 3,000 ms budget, so the ship-time sweep skips it. A pre-flight whose
+    // only caller is a gate nobody runs is a pre-flight that protects nothing.
+    //
+    // It was found the way it always is, by the round that needed it: adding one page gate moved five
+    // hand-maintained records, recordDrift named the stale one exactly, and it was run by hand after the verify
+    // had already gone red. tools/ship/recordReach-selfcheck.mjs has carried a red row saying this outright and
+    // it sat unread among the reds nobody was working.
+    //
+    // Two runners now, and the rows below hold both, because either one alone is how this was lost.
+    const RD_SRC = fs.readFileSync(path.join(ENG, "tools", "ship", "recordDrift.mjs"), "utf8");
+    ok("*** recordDrift.mjs has a CLI, so the pre-flight can be run on its own rather than only through this gate ***",
+        /import\.meta\.url === pathToFileURL\(process\.argv\[1\]/.test(RD_SRC) && /process\.exit\(stale\.length/.test(RD_SRC),
+        "node tools/ship/recordDrift.mjs prints the report and exits 1 on stale, so a ritual step reads a status " +
+        "rather than grepping a log");
+    const V_SRC = fs.readFileSync(path.join(ENG, "tools", "ship", "verify.mjs"), "utf8");
+    ok("  ...and verify.mjs runs the drift check itself, so a ship cannot skip it by this gate being slow",
+        /recordDrift\.mjs/.test(V_SRC) && /drift\(\)/.test(V_SRC),
+        "the check is 1,776 ms and this gate is 4,997 ms -- the expensive half was the GATE, so the step calls " +
+        "the module in-process instead of waiting for the gate to come back under budget");
+    // The number that made this findable, held so it stays findable: if this gate ever comes back under budget
+    // the row goes red and the reason for the CLI is owed a re-reading, which is the honest direction.
+    const T = JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "sweep-timings.json"), "utf8"));
+    const mine = T.timings["tools/ship/recordDrift-selfcheck.mjs"];
+    ok("  and this gate is STILL over the ship-time budget, which is the fact the two rows above exist for",
+        typeof mine === "number" && mine > T.budgetMs,
+        `${mine} ms against a ${T.budgetMs} ms budget. If this goes green the gate is back in the sweep and the ` +
+        "CLI is belt and braces rather than the only road -- worth knowing either way, which is why it is a row");
+}
+
 console.log(`\nrecordDrift-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);
 process.exit(fails === 0 ? 0 : 1);

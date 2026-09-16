@@ -62,6 +62,36 @@ if (version) {
   } catch (e) { console.log("[verify] NOTE  version preflight could not run: " + String(e.message).slice(0, 100)); }
 }
 
+// 1b. *** THE DRIFT PRE-FLIGHT, WHICH EXISTED AND HAD NO RUNNER. ***
+//
+// tools/ship/recordDrift.mjs answers, before the verify rather than after it, which hand-maintained records a
+// new module invalidates -- assertionShape's census, gateSweep's closings, the knowledge index, the instrument
+// registry, sweep-timings, runtimeGap's twelve capability rows. It works: on the round that added
+// tools/ship/fsrPage-selfcheck.mjs it named runtimeGap stale and listed the seven rows that moved.
+//
+// NOTHING CALLED IT. The tree imports that module twice -- from its own gate, and from runtimeGap-selfcheck
+// for the tree walk it also exports -- and its gate runs 4,997 ms against quickSweep's 3,000 ms budget, so the
+// ship-time sweep skips it. The expensive half was the gate; the check itself is 1,776 ms, which is why this
+// is a step rather than a plea to make the gate faster. tools/ship/recordReach-selfcheck.mjs has carried a red
+// row saying exactly this and it sat unread.
+//
+// It runs in-process rather than as a spawn so the cost is the check's and not a second node start.
+try {
+  const RD = await import("./recordDrift.mjs");
+  const { stale } = await RD.drift();
+  check("derived records a new module invalidates are up to date (the drift pre-flight)",
+        stale.length === 0,
+        stale.length ? stale.map((x) => (x.name || x.key || String(x)) + ": " + (x.detail || x.why || "")).join("; ").slice(0, 300)
+                     : "");
+  // ...and the other way a population moves without anybody editing anything: a gate killed mid-run leaves a
+  // file named like a gate. One of the two is `process.exit(3)`, so it reads as a NEW RED for a file that is
+  // in no commit -- measured at 1738 enumerated against 1737. Named rather than excluded; see TRANSIENT_FIXTURES.
+  const { TRANSIENT_FIXTURES } = await import("./gateSweep.mjs");
+  const left = TRANSIENT_FIXTURES.filter((f) => fs.existsSync(f));
+  check("no transient gate fixture was left on disk by a killed run", left.length === 0,
+        left.length ? left.join(", ") + " -- delete it; it enumerates as a gate and one of them exits 3" : "");
+} catch (e) { console.log("[verify] NOTE  drift pre-flight could not run: " + String(e.message).slice(0, 120)); }
+
 // 1. version marker matches what we claim
 if (version) {
   let mv = null;

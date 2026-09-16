@@ -195,12 +195,32 @@ console.log("\n5. *** THE TWO GATES THIS ROUND WAS ABOUT ARE BACK INSIDE THE BUD
     const cost = Object.fromEntries(pair.map((g) => [g, costOf(t, g)]));
     for (const g of pair) say(`${g}: ${cost[g].ms} ms (${cost[g].source}) against a ${live.budgetMs} ms budget, ` +
         `filed at ${t.timings[g]} ms`);
-    ok("!! *** BOTH STALE-RECORD DETECTORS RUN AT SHIP TIME AGAIN ***",
-        pair.every((g) => t.timings[g] != null && t.timings[g] <= live.budgetMs),
-        pair.map((g) => path.basename(g) + " " + t.timings[g] + " ms").join(", ") +
-        ". They were 3,446 and 3,026, and the tree's ONLY two detectors for a stale record were both outside " +
-        "the ritual that writes records. MEMBERSHIP is decided on the filed reading, so that is what this " +
-        "row asks about -- it is the number the sweep will use next time, contended or not.");
+    // *** v4639 -- THE ROW'S TITLE IS THE PROPERTY AND ITS TEST WAS ONE MECHANISM, AND A SECOND ROAD OPENED. ***
+    //
+    // "Run at ship time" had exactly one road when this was written: be under quickSweep's budget and get
+    // swept. recordDrift-selfcheck went back over it (4,820 ms filed) and this row went red -- correctly, as a
+    // fact about the sweep, and MISLEADINGLY as a fact about the detector, because it read as "the detector is
+    // gone" when what had gone was its gate's membership.
+    //
+    // *** AND THE DETECTOR REALLY WAS GONE, WHICH THIS ROW IS THE ONLY THING THAT SAID. *** tools/ship/
+    // recordDrift.mjs had NO caller but that gate: the whole tree imports it twice, once here-adjacent from
+    // runtimeGap-selfcheck.mjs for the tree walk it also exports, and once from its own gate. So for as long
+    // as this row has been red the pre-flight that names which hand-maintained records a new module
+    // invalidates was unreachable at ship time, and the round that found it found it by breaking five records
+    // with one added gate and reading the verify afterwards.
+    //
+    // v4639 gave the module a CLI and verify.mjs a step that calls drift() in-process -- 1,776 ms, against the
+    // 4,997 ms its GATE costs, which is why the repair is a second road and not a diet. So the row asks the
+    // property: each detector runs at ship time BY SOME ROAD, swept or stepped, and says which.
+    const stepped = (() => { try { return /recordDrift\.mjs/.test(fs.readFileSync(path.join(ENG, "tools", "ship", "verify.mjs"), "utf8")); } catch { return false; } })();
+    const road = (g) => (t.timings[g] != null && t.timings[g] <= live.budgetMs) ? "swept"
+                      : (/recordDrift/.test(g) && stepped) ? "a verify step" : null;
+    ok("!! *** BOTH STALE-RECORD DETECTORS RUN AT SHIP TIME, BY ONE ROAD OR THE OTHER ***",
+        pair.every((g) => road(g) !== null),
+        pair.map((g) => `${path.basename(g)} ${t.timings[g]} ms, ${road(g) || "NO ROAD -- it does not run"}`).join("; ") +
+        ". They were 3,446 and 3,026 when both were outside the ritual that writes records. Being under the " +
+        "budget is one road and a verify step is the other; what must not happen is neither, which is what " +
+        "this row could not distinguish from a slow gate until v4639.");
     // *** THE MARGIN IS READ FROM THE UNCONTENDED COST, WHICH IS THE REPAIR v4562 EXISTS FOR. ***
     // This row used to subtract the FILED reading from the budget, and a filed reading is a sample taken
     // while seven other gates fought for a four-core box: measured across 1,011 gates, a median of 2.41x
@@ -208,11 +228,16 @@ console.log("\n5. *** THE TWO GATES THIS ROUND WAS ABOUT ARE BACK INSIDE THE BUD
     // sweeps of byte-identical code while running 1,201 to 1,219 ms alone -- so this row went red on
     // scheduling luck and said the gate had lost its margin. costOf() prefers the serial reading the sweep
     // now accumulates, and falls back to the filed one while saying so.
-    const margin = Math.min(...pair.map((g) => live.budgetMs - cost[g].ms));
-    ok("!! ...and with real margin, because both are O(tree) and the tree grows every round",
-        margin >= 800 && pair.every((g) => cost[g].source === "serial"),
-        `worst margin ${margin} ms of ${live.budgetMs}, from ` +
-        pair.map((g) => `${path.basename(g)} ${cost[g].ms} ms (${cost[g].source})`).join(" and ") +
+    // The margin argument is about the SWEPT road only: a gate in the sweep must have headroom because the
+    // tree grows under it. A detector that runs as a verify step is not competing for that budget at all, so
+    // demanding margin of it is demanding margin against a number it does not spend. Measured either way and
+    // both are reported; only the swept ones are graded.
+    const swept = pair.filter((g) => road(g) === "swept");
+    const margin = swept.length ? Math.min(...swept.map((g) => live.budgetMs - cost[g].ms)) : live.budgetMs;
+    ok("!! ...and with real margin where the budget is what pays, because a swept gate is O(tree) and the tree grows every round",
+        swept.length > 0 && margin >= 800 && swept.every((g) => cost[g].source === "serial"),
+        `worst margin ${margin} ms of ${live.budgetMs} across the ${swept.length} swept, from ` +
+        pair.map((g) => `${path.basename(g)} ${cost[g].ms} ms (${cost[g].source}, ${road(g) || "no road"})`).join(" and ") +
         `. At the pre-round cost they were 446 ms and 26 ms OVER; 26 ms is close enough that a warm cache ` +
         `and a cold one land on opposite sides, which is how this drifted out unnoticed rather than failing ` +
         `loudly. A serial reading is REQUIRED here rather than merely preferred: falling back to the ` +

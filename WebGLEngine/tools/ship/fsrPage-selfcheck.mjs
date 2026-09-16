@@ -24,6 +24,7 @@
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { noComments } from "./sourceScan.mjs";
 import { viewProj } from "../../render/rasterProbe.js";
@@ -97,7 +98,30 @@ async function drivePage({ scene = "zone", camera = "dolly", ratio = "2", frames
     let pending = null;
     globalThis.requestAnimationFrame = (fn) => { pending = fn; };
     s += "\nglobalThis.__tick = tick; globalThis.__run = (v) => { running = v; };";
-    const tmp = path.join(fs.mkdtempSync(path.join(ENG, ".fsrpage-")), "page.mjs");
+    // *** v4639 -- THE SCRATCH GOES OUTSIDE THE TREE. *** This wrote `.fsrpage-XXXX/page.mjs` INSIDE the engine
+    // root, cleaned up in a finally -- which covers a throw and not a SIGKILL, and quickSweep SIGKILLs a gate at
+    // a 20 s cap (quickSweep.mjs:345, on a detached group). Nothing runs after SIGKILL, so whatever is live at
+    // that instant stays.
+    //
+    // *** AND THE FIRST VERSION OF THIS NOTE CARRIED A MEASUREMENT THAT WAS AN ARTEFACT OF A CACHE. *** It said
+    // "every tree walk in this repo skips dot-directories, so a stray one moves NO census -- enumerateGates
+    // 1737 -> 1737 and recordDrift's sources() 4261 -> 4261". The gate half is true. The sources() half is
+    // FALSE, and it read as true because the probe called sources() TWICE IN ONE PROCESS: treeRead.mjs's
+    // treeFiles() memoises on `root` (treeRead.mjs:155-163, `_cache.get(root)`), so the second call never
+    // walked anything and returned the first call's array. Re-measured one walk per process:
+    //
+    //     recordDrift's sources()   4261 -> 4263   COUNTS both strays -- SKIP is /node_modules|vendor|dist/
+    //                                              (treeRead.mjs:61) and has no dot-directory clause at all
+    //     enumerateGates            1737 -> 1737   immune, it carries `e.name.startsWith(".")` (gateSweep.mjs)
+    //
+    // So the two walker families disagree about dot-directories, and a SIGKILLed gate leaving one .mjs behind
+    // DOES move vba/runtimeGap.mjs's twelve-row census -- which is the record this round had to re-take by
+    // hand anyway, and would have re-taken against a phantom. The wrong reading is kept here rather than
+    // deleted, with how it was taken, because a probe that measures its own cache is the reusable lesson.
+    //
+    // os.tmpdir() ends it at this site: the page source has already had its relative imports rewritten to
+    // absolute paths, so the file does not need to live beside the tree to resolve them.
+    const tmp = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "fsrpage-")), "page.mjs");
     fs.writeFileSync(tmp, s);
     try {
         await import(tmp + "?" + Math.random());

@@ -100,6 +100,13 @@ async function call(url) {
 // 5. a FAILING gate is reported as failing, not swallowed
 {
     const tmp = path.join(ENG, "tools", "ship", "zz-temp-fixture-selfcheck.mjs");
+    // *** v4639 -- CLEARED ON ENTRY AS WELL AS IN THE `finally`, BECAUSE `finally` DOES NOT RUN UNDER SIGKILL.
+    // *** This fixture is named like a real gate on purpose -- gatesBridge only runs what its discovery lists,
+    // so an excluded name would make section 5 test nothing -- which means a leftover IS enumerated: measured
+    // at 1738 against 1737, and its body is `process.exit(3)`, so the next sweep reports a NEW RED for a file
+    // in no commit. quickSweep SIGKILLs at a 20 s cap and this gate spawns a server. Clearing here converges
+    // on the next run; tools/ship/gateSweep.mjs's TRANSIENT_FIXTURES names it so a leftover is caught sooner.
+    try { fs.unlinkSync(tmp); } catch { /* the normal case: nothing left behind */ }
     fs.writeFileSync(tmp, 'console.log("deliberate failure fixture");\nprocess.exit(3);\n');
     try {
         const r = await call("/gates/run?name=tools/ship/zz-temp-fixture-selfcheck.mjs");

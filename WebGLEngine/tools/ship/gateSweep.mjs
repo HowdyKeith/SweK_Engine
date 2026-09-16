@@ -8147,6 +8147,31 @@ export function repairsAgainst(baselineRed, confirmedRed) {
 // both are real, pre-existing, ALREADY-REGISTERED reds, misreported only by the separator. toPosix() is the
 // exact helper this tree already uses in 30+ other files for this exact reason; the fix is that this file
 // join(s the convention instead of being the one population-defining exception to it.
+/**
+ * *** v4639 -- THE NAMES THAT LOOK LIKE GATES, ARE NOT, AND CANNOT BE SPELLED OUT OF THE POPULATION. ***
+ *
+ * Two gates plant a file named `*-selfcheck.mjs` at an ordinary path and delete it in a `finally`:
+ *
+ *   tools/ship/zz-temp-fixture-selfcheck.mjs      gatesBridge-selfcheck.mjs, whose body is `process.exit(3)`
+ *   tools/ship/zz-treeread-fixture-selfcheck.mjs  treeRead-selfcheck.mjs's DECOY
+ *
+ * `finally` does not run under SIGKILL, and quickSweep SIGKILLs a gate at a 20 s cap. MEASURED: with the
+ * first one on disk enumerateGates returns 1738 instead of 1737 AND INCLUDES IT, so the next sweep reports
+ * `zz-temp-fixture-selfcheck.mjs exit 3` as a NEW RED for a gate that is in no commit, and the count moves
+ * four hand-maintained censuses with it.
+ *
+ * *** AND THE OBVIOUS FIX IS WRONG, WHICH IS WHY THIS IS A LIST AND NOT A PREFIX RULE. *** Renaming them to
+ * the `__` convention this enumerator already excludes would break both callers: gatesBridge only runs a name
+ * that appears in its DISCOVERED list ("ONLY a discovered gate may run", gatesBridge.js:107), so an excluded
+ * fixture returns not-a-gate and section 5 stops testing anything; and treeRead's `zz-` file is a DECOY whose
+ * entire job is to be an ORDINARY name, proving the exclusion turns on `__` and not on fixtures generally.
+ * Both must look like real gates WHILE THEY LIVE. So the population is not narrowed -- a LEFTOVER is named.
+ */
+export const TRANSIENT_FIXTURES = Object.freeze([
+    "tools/ship/zz-temp-fixture-selfcheck.mjs",
+    "tools/ship/zz-treeread-fixture-selfcheck.mjs",
+]);
+
 export function enumerateGates(root = ENG) {
     const out = [];
     const skip = new Set(["node_modules", ".git", ".claude", "vendor"]);

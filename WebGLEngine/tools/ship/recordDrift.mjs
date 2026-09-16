@@ -55,7 +55,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import * as TR from "./treeRead.mjs";
 import * as RR from "./recordReach.mjs";   // readTimings: the guarded, shared reader of sweep-timings.json
 
@@ -374,3 +374,44 @@ export const DRIFT_AT_V4482 = Object.freeze({
     // detector whose zero was never driven gets found.
     fifthAddedAt: "v4483",
 });
+
+// ---- CLI ---------------------------------------------------------------------------------------------------
+//
+// *** v4639 -- THE PRE-FLIGHT HAD NO RUNNER, AND HAS NOT HAD ONE SINCE ITS GATE WENT OVER BUDGET. ***
+//
+// This module exists to answer, BEFORE the verify, which hand-maintained records a new module invalidates.
+// It works: on the round that added tools/ship/fsrPage-selfcheck.mjs it named vba/runtimeGap.mjs's census
+// stale and listed the seven rows that moved. Nothing ran it.
+//
+// MEASURED, which is what turned a suspicion into this block:
+//
+//   this module, import + drift() + reportLines()      1,776 ms
+//   tools/ship/recordDrift-selfcheck.mjs, its gate     4,997 ms   against quickSweep's 3,000 ms budget
+//
+// So the gate is excluded from the ship-time sweep for being slow, and the gate was the ONLY caller -- the
+// whole tree imports this file twice, once from that gate and once from runtimeGap-selfcheck.mjs, which takes
+// `sources` and `SOURCE_SKIP` (the tree walk) and never touches the drift check. verify.mjs runs a DIFFERENT
+// pre-flight, versionPreflight.mjs. tools/ship/recordReach-selfcheck.mjs has a red row saying this outright --
+// "BOTH STALE-RECORD DETECTORS RUN AT SHIP TIME AGAIN" against a live 4,820 ms -- and it sat unread among the
+// reds nobody was working.
+//
+// A guard that exists, works, is cheap, and is unreachable is the shape tools/ship/kernelReach.mjs counts on
+// the other side of this tree. The expensive half is the GATE; the check itself is affordable, so it gets a
+// runner of its own rather than waiting for its gate to come back under budget.
+//
+// Exit 1 on stale so a ritual step can read the status rather than grep the log.
+if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
+    const lines = await reportLines();
+    for (const l of lines) console.log(l);
+    const { stale } = await drift();
+    // *** AND A LEFTOVER FIXTURE, WHICH IS THE OTHER WAY A RECORD GOES STALE WITHOUT ANYBODY EDITING IT. ***
+    // Two gates plant a file named like a real gate and delete it in a `finally` that SIGKILL does not run.
+    // Measured: one on disk takes enumerateGates from 1737 to 1738 and INCLUDES it, so the population moves,
+    // four hand-maintained censuses move with it, and gatesBridge's fixture -- whose body is process.exit(3)
+    // -- reads as a NEW RED for a file in no commit. The names cannot be spelled out of the enumerator (see
+    // TRANSIENT_FIXTURES in tools/ship/gateSweep.mjs for why), so a leftover is NAMED instead.
+    const { TRANSIENT_FIXTURES } = await import("./gateSweep.mjs");
+    const left = TRANSIENT_FIXTURES.filter((f) => fs.existsSync(path.join(ENG, f)));
+    for (const f of left) console.log(`  LEFTOVER  ${f} -- a transient fixture a killed gate did not clean up; delete it`);
+    process.exit(stale.length || left.length ? 1 : 0);
+}

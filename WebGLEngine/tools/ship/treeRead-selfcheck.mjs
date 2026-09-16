@@ -186,6 +186,9 @@ console.log("\n7. *** A TRANSIENT FIXTURE IS NOT A SOURCE FILE, AND THE RACE WAS
     const body = "// transient fixture planted by treeRead-selfcheck; delete if you find it.\nexport const x = 1;\n";
     const base = TR.treeFiles(ENG, /node_modules|[/\\]dist[/\\]|[/\\]vendor[/\\]/).length;
     let withFixture = null, withDecoy = null;
+    // v4639 -- cleared on entry too: the decoy is an ORDINARY name by design (that is what it proves), so a
+    // leftover is counted as a gate. See tools/ship/gateSweep.mjs's TRANSIENT_FIXTURES.
+    for (const f of [fixture, decoy]) { try { fs.unlinkSync(f); } catch { /* the normal case */ } }
     try {
         fs.writeFileSync(fixture, body);
         withFixture = TR.treeFiles(ENG, /node_modules|[/\\]dist[/\\]|[/\\]vendor[/\\]/).length;
