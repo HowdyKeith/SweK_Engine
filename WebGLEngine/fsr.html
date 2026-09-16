@@ -117,6 +117,8 @@ import { easuCPU, rcasCPU, bilinearCPU } from "./fx/fsr/fsr.js";
 import { requestDevice } from "./gfx/device.js";
 import { FSRGPU, rangeOf } from "./fx/fsr/fsrGPU.js";
 import { TemporalGPU } from "./render/temporalGPU.mjs";
+import { MotionVectorsGPU, orthoPanVP } from "./render/motionVectorsGPU.mjs";
+import { motionVectorsCPU, mat4Invert } from "./render/motionVectors.mjs";
 
 const D = 192;                                  // display resolution
 const $ = (id) => document.getElementById(id);
@@ -170,6 +172,9 @@ function draw(c, buf) {
 }
 
 let running = false, frame = 0, hist = null, jit = null, ref = null, R = 96, PAN = 0.75;
+// The scene is flat: it is a function of (u, v) with no z at all, so every pixel sits on one plane and the
+// reprojection is a pure translation. Allocated once -- it never changes.
+const FLAT_DEPTH = new Float32Array(D * D);
 
 // ---- the spatial half runs on the adapter when there is one ------------------------------------------------
 // fx/fsr/fsrGPU.js is the runner; the kernels have been validated against the CPU reference on a device since
@@ -187,7 +192,7 @@ let running = false, frame = 0, hist = null, jit = null, ref = null, R = 96, PAN
 // records the four into an atomic buffer, and the gate holds the device's counts EQUAL to the CPU's -- integers,
 // so equality rather than a tolerance. These are the diagnostic this page leans on: rejectedOffscreen reading
 // exactly one column is what proved the motion vector sign at v4586, and it reads that on either engine now.
-let gpu = null, tgpu = null;
+let gpu = null, tgpu = null, mgpu = null;
 async function initGPU() {
     const say = (t) => { $("engine").textContent = "spatial engine: " + t; };
     if (!navigator.gpu) { say("CPU reference (this browser exposes no WebGPU)"); return; }
@@ -196,9 +201,10 @@ async function initGPU() {
         const dev = await requestDevice(cv, { backend: "webgpu", offscreen: true });
         gpu = new FSRGPU(dev);
         try { tgpu = new TemporalGPU(dev); } catch { tgpu = null; }
+        try { mgpu = new MotionVectorsGPU(dev); } catch { mgpu = null; }
         const who = (dev.adapterInfo && (dev.adapterInfo.description || dev.adapterInfo.vendor)) || "webgpu";
-        say(`WebGPU compute on ${who} -- EASU+RCAS and resolve+accumulate, each chained on one encoder` +
-            (tgpu ? "" : " (temporal kernels unavailable; that half stays on the CPU)"));
+        say(`WebGPU compute on ${who} -- EASU+RCAS, resolve+accumulate and the motion vectors` +
+            (tgpu && mgpu ? "" : " (some kernels unavailable; those stay on the CPU)"));
     } catch (e) { gpu = null; say("CPU reference (" + String(e && e.message).slice(0, 80) + ")"); }
 }
 
@@ -249,19 +255,28 @@ async function tick() {
     const [jx, jy] = jitterCurrent(jit);
     const frameSrc = render(R, jx, jy, kind, dx);
 
-    // (du, dv, valid, 0) in UV units, uvPrev - uvCurr -- the convention render/motionVectors.mjs writes, and
-    // temporalAccumulateCPU reads it as `hu = u + du`. The camera pans by advancing the scene's u argument by
-    // +dx/D, so a feature sitting at scene-u s lands at screen-u s - f*PAN/D: it moves LEFT, and last frame it was
-    // to the RIGHT of where it is now. uvPrev - uvCurr is therefore +PAN/D.
+    // *** THE MOTION FIELD IS DERIVED NOW, AND THIS IS THE LINE THAT COST A ROUND. ***
     //
-    // *** THIS WAS -PAN/D UNTIL THE FIRST HEADLESS RUN OF THIS PAGE. *** With the sign backwards the accumulator
-    // fetched history from the wrong side of the motion, so the panning pane scored 11.5 dB against bilinear's
-    // 14.8 and clamped 4,747 pixels a frame. That is the whole of the "panning gains nothing" result this page was
-    // first written to display as an open question -- it was never a property of the accumulator, it was this one
-    // character. Corrected: 16.95 dB and 1,021 clamps. The offscreen count is the tell that the sign is right now:
-    // 192 pixels, exactly the one column of newly revealed screen that has no history, on a 192-tall display.
-    const motion = new Float32Array(D * D * 4);
-    for (let i = 0; i < D * D; i++) { motion[i * 4] = panning ? PAN / D : 0; motion[i * 4 + 2] = 1; }
+    // It used to be written by hand: `motion[i*4] = panning ? PAN / D : 0`. The convention is (du, dv, valid,
+    // zPrev) in UV units and uvPrev - uvCurr, which temporalAccumulateCPU reads as `hu = u + du`. The camera
+    // pans by advancing the scene's u argument by +dx/D, so a feature at scene-u s lands at screen-u s - f*PAN/D
+    // -- it moves LEFT, and last frame it was to the RIGHT. uvPrev - uvCurr is +PAN/D.
+    //
+    // *** IT WAS -PAN/D UNTIL THE FIRST HEADLESS RUN OF THIS PAGE. *** With the sign backwards the accumulator
+    // fetched history from the wrong side, the panning pane scored 11.5 dB against bilinear's 14.8, and 4,747
+    // pixels clamped a frame. That was the whole of the "panning gains nothing" result this page was written to
+    // display as an open question: not a property of the accumulator, one character. Corrected: 16.95 dB, 1,021
+    // clamps, and an offscreen count of exactly 192 -- one column of newly revealed screen on a 192-tall display.
+    //
+    // The constant was right, once corrected. v4592 MEASURED IT AGAINST THE TREE'S OWN PRODUCER and it is exact:
+    // motionVectorsCPU, driven by an orthographic pan camera, reproduces it to 0.000e+0 with dv at 2.8e-17. So
+    // nothing about the picture changes here -- what changes is that the number is no longer a claim. A derived
+    // field cannot get the sign wrong for free, and render/motionVectorsGPU-selfcheck.mjs drives the reversed
+    // camera as a control so that exact mistake fails a row instead of costing a round.
+    const tCur = (panning ? frame : 0) * PAN / D, tPrev = (panning ? Math.max(0, frame - 1) : 0) * PAN / D;
+    const motion = mgpu
+        ? (await mgpu.pan({ depth: FLAT_DEPTH, w: D, h: D, tCur, tPrev })).data
+        : motionVectorsCPU(FLAT_DEPTH, D, D, mat4Invert(orthoPanVP(tCur)), orthoPanVP(tPrev)).data;
 
     const alpha = parseFloat($("alpha").value);
     // ONE ENCODER on the device: the resolved display-resolution frame never crosses back to the CPU between

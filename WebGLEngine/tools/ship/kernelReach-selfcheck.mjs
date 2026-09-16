@@ -133,11 +133,25 @@ console.log("\n2. THE TREE'S OWN ANSWER");
     // *** THE ARC, NAMED, BECAUSE A COUNT DOES NOT SAY WHOSE. ***
     const TEMPORAL = /^render\/(temporal|motionVectors|ringFloor)\w*Wgsl\.mjs$/;
     const arc = r.unreachable.filter((u) => TEMPORAL.test(u.file));
-    ok("!! *** the temporal arc's kernels are all unreachable, which is what this round exists to say ***",
-       arc.length >= 8,
-       `${arc.length} of ${r.unreachable.length}: ${arc.map((a) => a.symbol).join(", ")}. Nineteen rounds of ` +
-       "kernels (v4552-v4570), every one validated on a device by its own gate, and nothing in the engine can " +
-       "dispatch any of them. fsr.html runs the CPU versions of RESOLVE and ACCUMULATE every frame.");
+    // *** v4592 -- THIS ROW WAS A FLOOR AND IT TRIPPED ON ITS OWN SUCCESS. ***
+    //
+    // It read `arc.length >= 8` -- "the temporal arc's kernels are all unreachable" asserted as a SIZE that must
+    // hold. v4590 gave two of the ten a caller and v4592 a third, and the row went red for the work it exists to
+    // prompt. That is the frozen-table fault this lab keeps re-learning in a new costume: a check reporting a
+    // measurement of a record's state must not assert the state it is trying to change.
+    //
+    // What is asserted now is that the arc's remaining unreachable kernels are NAMED -- the thing a reader needs
+    // -- and that the count only falls. The size lives in the ratchet below, which is where a size belongs.
+    const ARC_UNREACHABLE_AT_V4592 = 7;
+    say("the temporal arc", arc.length
+        ? `${arc.length} of ${r.unreachable.length} still unreachable: ${arc.map((a) => a.symbol).join(", ")}`
+        : "every kernel has a caller");
+    ok("!! *** the temporal arc's unreachable kernels are NAMED, and the count only falls ***",
+       arc.length <= ARC_UNREACHABLE_AT_V4592 && arc.every((a) => a.symbol && a.file),
+       `${arc.length} against a frozen ${ARC_UNREACHABLE_AT_V4592}. Nineteen rounds of kernels (v4552-v4570), ` +
+       "every one validated on a device by its own gate, and for the whole of that arc nothing in the engine " +
+       "could dispatch any of them; fsr.html ran the CPU versions of three every frame. RESOLVE and ACCUMULATE " +
+       "got a caller at v4590, MOTION at v4592.");
 
     // RATCHET. Seeded at what was measured, may only fall, and the slack half fails if it is left behind.
     // v4590 -- LOWERED, 17 -> 15, and it is the second half of this row that asked for it: "A RATCHET WITH SLACK
@@ -145,7 +159,9 @@ console.log("\n2. THE TREE'S OWN ANSWER");
     // the round after they were counted, so the seed follows the tree down rather than sitting where it was
     // convenient. Eight of the temporal arc's ten are still here: temporalLock's four, temporalReject's two,
     // MOTION_WGSL and RING_FLOOR_WGSL.
-    const UNREACHABLE_AT_V4589 = 15;
+    // v4592 -- LOWERED again, 15 -> 14: render/motionVectorsGPU.mjs gave MOTION_WGSL a caller. Seven of the
+    // temporal arc's ten remain (RING_FLOOR, temporalLock's four, temporalReject's two).
+    const UNREACHABLE_AT_V4589 = 14;
     ok("!! *** no EIGHTEENTH kernel arrives with nothing but a gate able to run it ***",
        r.unreachable.length <= UNREACHABLE_AT_V4589,
        `${r.unreachable.length} against a frozen ${UNREACHABLE_AT_V4589}. OWED: a runner for each, or a reason ` +

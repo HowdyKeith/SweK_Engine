@@ -294,8 +294,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4589 -- RE-TAKEN: one gate (kernelReach) joined, the same five rows by one, and the pre-flight named three
     // while the gate names all nine, the same split recorded a round ago.
     // v4590 -- RE-TAKEN: one gate (temporalGPU) joined, the same five rows by one.
-    gates: 1646, usesOk: 1625, definesOk: 1617, importsOk: 0,
-    distinctDefinitions: 38, nameFirst: 1518, condFirst: 91, unknownSignature: 16,
+    // v4592 -- RE-TAKEN: one gate (motionVectorsGPU) joined, the same five rows by one again.
+    gates: 1647, usesOk: 1626, definesOk: 1618, importsOk: 0,
+    distinctDefinitions: 38, nameFirst: 1519, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

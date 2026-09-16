@@ -3767,6 +3767,38 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since249: Object.freeze({
+        at: "v4592", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/motionVectorsGPU-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/motionVectorsGPU.mjs", "fsr.html", "tools/ship/kernelReach-selfcheck.mjs"]),
+        verdict: "green, 1618 ms alone. Three of the seventeen: MOTION_WGSL has a caller and the census reads 14. " +
+                 "*** THE ROUND'S PREMISE WAS WRONG AND ITS OWN PRIOR-ART CHECK SAID SO -- THE SECOND HAND-OFF " +
+                 "CLAIM IN FOUR ROUNDS TO DIE THAT WAY. *** v4591 closed by proposing that fsr.html's hand-written " +
+                 "motion vectors were 'a second implementation of motionVectorsCPU'. They were not: that function " +
+                 "takes a depth buffer and two 4x4 matrices, and the page had neither -- it panned a 2D scene and " +
+                 "wrote a constant. What IS true is smaller and worth more: the constant was DECLARED, and it is " +
+                 "DERIVED now. Measured before anything was built, at four frames over 36,864 pixels: an " +
+                 "orthographic pan camera through motionVectorsCPU reproduces the hand-written du at 0.000e+0 with " +
+                 "dv at 2.8e-17. The page's numbers after the change are identical to v4586's -- pan 17.61 dB, " +
+                 "offscreen 192, clamped 914; static 21.56 dB -- which is the point: nothing moved, the number " +
+                 "just stopped being a claim. It HAD been wrong once, the sign, caught by a counter rather than a " +
+                 "check, and the gate now drives a reversed camera as a control so that exact mistake fails a row. " +
+                 "*** SABOTAGE FOUND TWO 0-REDS AND BOTH WERE THIS GATE'S FIXTURES: *** packing dims as [h, w] " +
+                 "moved nothing because every fixture was SQUARE, and forcing every pixel valid moved nothing " +
+                 "because an orthographic pair over a flat scene is all-valid. The obvious repair for the second " +
+                 "-- the eye position the neighbouring gate uses for its single-pixel invalid case -- put the " +
+                 "WHOLE surface behind the camera and compared all-zeros to all-zeros at 0.000e+0: one vacuous " +
+                 "fixture traded for another inside the row added to fix the first. Eight eye positions measured " +
+                 "to find the straddle, and that one is pathological for NUMBERS (|du| to 57 UV units near the " +
+                 "projection singularity), so parity moved to a third well-conditioned camera. Two fixtures, " +
+                 "because one cannot answer both questions and a tolerance wide enough for both is a number " +
+                 "chosen to fit the answer. Also repaired: the device row was written at 1e-9 straight after " +
+                 "reading the CPU row's exact zero -- the same category error as v4590's copy-through row, one " +
+                 "round later. The CPU's zero is f64 doing an exact translation; the kernel is f32 through two " +
+                 "transforms and a divide and lands an ulp away, and the round MEASURED that the ulp does not " +
+                 "move a pixel across the accumulate's offscreen bound rather than dismissing it.",
+    }),
     since248: Object.freeze({
         at: "v4591", swept: 0, green: 0, red: 0,
         added: Object.freeze([]),
