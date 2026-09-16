@@ -3767,6 +3767,34 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since248: Object.freeze({
+        at: "v4591", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/temporalAccumulateWgsl.mjs", "render/temporalGPU.mjs",
+                                "render/temporalGPU-selfcheck.mjs", "render/wgslSpec.mjs", "gfx/device.js",
+                                "tools/ship/temporalCorpus.mjs", "fsr.html"]),
+        verdict: "no gate added; the round closed the gap v4590 SHIPPED AS A DECLARED ABSENCE. ACCUMULATE_WGSL " +
+                 "counted nothing, so the temporal port returned stats: null and fsr.html printed \"CPU ONLY\" -- " +
+                 "and those counters are the diagnostic that proved the motion-vector sign at v4586. The kernel " +
+                 "now has a SECOND ENTRY POINT, mainCounted, recording four atomics, and the device's counts are " +
+                 "asserted EQUAL to the CPU's rather than close: reused 8455, offscreen 89, invalid 672, clamped " +
+                 "8410 on both. *** TWO ENTRY POINTS RATHER THAN A SECOND KERNEL, BECAUSE A COUNTER THAT COULD " +
+                 "DISAGREE WITH THE PASS IT COUNTS IS WORSE THAN NO COUNTER: *** accumulateAt() decides once and " +
+                 "returns what it did, and a sabotage that makes mainCounted write a slightly different blend is " +
+                 "caught by the row asserting counting does not move a pixel. MEASURED BEFORE BUILDING, on this " +
+                 "adapter: a module compiled for `main` does not demand the binding `main` never uses -- which is " +
+                 "what keeps temporalAccumulate-selfcheck.mjs green UNCHANGED. *** AND THE PROBE WAS HALF A " +
+                 "PROBE. *** It proved an unused binding need not be bound; it did not ask whether binding it " +
+                 "anyway is refused. It is -- gfx/device.js's own v4466 note says so in as many words -- and " +
+                 "tools/ship/temporalCorpus.mjs found out by being REFUSED BY THE DEVICE, because it builds an " +
+                 "entry from every binding the SOURCE declares where the device binds by USE. The two agreed " +
+                 "only while no kernel in that corpus had more than one entry point. usedNames() moved from " +
+                 "gfx/device.js into render/wgslSpec.mjs so both can ask the same question; a sabotage that " +
+                 "un-filters it takes the runner's device AND the corpus down together, which is what says the " +
+                 "move was load-bearing. A first attempt papered over it with an inert four-zero fixture and the " +
+                 "device refused that too. Sabotage: 6 mutations, 6 caught.",
+    }),
     since247: Object.freeze({
         at: "v4590", swept: 1, green: 1, red: 0,
         added: Object.freeze(["render/temporalGPU-selfcheck.mjs"]),

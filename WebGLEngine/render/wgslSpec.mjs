@@ -365,3 +365,51 @@ export const LIMITS = Object.freeze([
     "the barrier check follows names bound to invocation builtins one hop; a barrier reached through a helper function, or guarded by a value derived in more steps, is a false negative",
     "the default limits carry LIMITS_PROVENANCE saying they were not verified against the spec or a device from this sandbox",
 ]);
+
+// *** v4591 -- MOVED HERE FROM gfx/device.js, BECAUSE A SECOND READER OF IT NEEDED THE SAME ANSWER. ***
+//
+// This is static analysis over WGSL TEXT and it belongs beside parseBindings and parseEntryPoints rather than
+// inside a device backend. It moved when tools/ship/temporalCorpus.mjs broke: that module builds a corpus entry
+// from every binding the SOURCE declares, and temporalAccumulateWgsl.mjs gained a second entry point whose
+// atomic counter `main` never touches. Binding it anyway is a validation error -- which the comment below,
+// written at v4466, already says in as many words. The corpus was binding by DECLARATION where the device binds
+// by USE, and the two only agreed while no kernel in the corpus had more than one entry point.
+//
+// One definition, imported by both. gfx/device.js re-exports nothing and simply imports it.
+/** v4461 -- which declared bindings the shader statically references; see the WebGPU backend's note at classify(). */
+export function usedNames(wgsl, all, entryPoints = null) {
+    let code = wgsl.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " ");
+    code = code.replace(/@group\s*\(\s*\w+\s*\)\s*@binding\s*\(\s*\w+\s*\)\s*var\s*(?:<[^>]*>)?\s*[A-Za-z_]\w*\s*:\s*[^;]+;/g, " ");
+    // v4466 -- PER ENTRY POINT, BECAUSE THE AUTO LAYOUT IS. A module with several @compute entries (physics/mpm's
+    // clear / p2g / grid / g2p share one text and five bindings) gets one layout PER PIPELINE, holding only what that
+    // entry's call graph reaches; a bind group carrying a binding the entry never touches is refused by the API. So
+    // "used" is answered over the functions reachable from the named entry points, falling back to the whole text
+    // when none are named (the null backend, or a module whose functions this scanner cannot delimit).
+    const reach = entryPoints ? _reachableCode(code, entryPoints) : null;
+    const scope = reach == null ? code : reach;
+    for (const b of all) b.used = new RegExp("\\b" + b.name + "\\b").test(scope);
+    return all;
+}
+/** The bodies of every function reachable from `entries`, concatenated; null if an entry is not found. */
+function _reachableCode(code, entries) {
+    const fns = {};
+    const re = /\bfn\s+([A-Za-z_]\w*)\s*\(/g;
+    let m;
+    while ((m = re.exec(code))) {
+        const open = code.indexOf("{", m.index); if (open < 0) return null;
+        let depth = 0, i = open;
+        for (; i < code.length; i++) { const ch = code[i]; if (ch === "{") depth++; else if (ch === "}") { depth--; if (depth === 0) break; } }
+        if (depth !== 0) return null;
+        fns[m[1]] = code.slice(m.index, i + 1);
+    }
+    const seen = new Set(), todo = [...entries].filter((e) => e);
+    if (!todo.length || !todo.every((e) => fns[e])) return null;
+    let out = "";
+    while (todo.length) {
+        const n = todo.pop(); if (seen.has(n)) continue; seen.add(n);
+        const body = fns[n]; out += body + "\n";
+        for (const k of Object.keys(fns)) if (!seen.has(k) && new RegExp("\\b" + k + "\\s*\\(").test(body)) todo.push(k);
+    }
+    return out;
+}
+

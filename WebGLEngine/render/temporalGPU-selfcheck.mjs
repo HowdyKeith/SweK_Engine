@@ -2,10 +2,26 @@
 // WebGLEngine/render/temporalGPU-selfcheck.mjs -- v4590
 //
 // Run: node render/temporalGPU-selfcheck.mjs
-// RUNTIME 2766 ms ALONE (median of 2779/2766/2712) -- just inside the 3000 ms sweep budget, unlike the FSR
+// RUNTIME 2700 ms ALONE (median of 2710/2700/2673 at v4591; 2766 at v4590 -- the counted entry point adds a
+// second pipeline, four atomics per pixel and a 16-byte readback, and the difference is inside the noise here) -- just inside the 3000 ms sweep budget, unlike the FSR
 // runner's gate, because this one dispatches 8 pictures and times 30 rather than timing 60.
 //
-// SABOTAGE: 7 mutations, 7 caught, no 0-RED. Restored and md5-checked against a sentinel taken first.
+// SABOTAGE v4591 (the counters): 6 mutations, 6 caught, no 0-RED.
+//   T1 the clamped counter also added to the reused bucket -> 3 rows, including the census row at 16865 + 89 +
+//      672, which is what a double-counted total looks like when something checks the sum.
+//   T2 offscreen and invalid categories swapped IN THE KERNEL -> the two equality rows. The picture is
+//      unchanged by that swap, so only the counters could have caught it.
+//   T3 STAT_ORDER reordered in the runner and not in the kernel -> 3 rows. One place names the order and the
+//      kernel's STAT_* consts index the same array; this is what "one place" is worth.
+//   T4 mainCounted writes a slightly different blend -> the counting-does-not-change-the-picture row, plus a
+//      parity row. That is the whole claim of a second entry point over a second kernel.
+//   T5 an uncounted call returns zeroes instead of null -> the row that keeps v4590's rule alive.
+//   T6 usedNames stops filtering by entry point -> the device REFUSES the run ("the shader declares storage
+//      buffer stats at @group(0)...") AND tools/ship/temporalCorpus.mjs throws by name. One mutation, two
+//      independent detectors, which is what says the move into render/wgslSpec.mjs is load-bearing rather than
+//      tidy.
+//
+// SABOTAGE v4590 (the runner): 7 mutations, 7 caught, no 0-RED. Restored and md5-checked against a sentinel taken first.
 //   S1 jx and jy written at each other's offsets in the 32-byte resolve uniform -> 5 rows red at 3.9e-1. A
 //      uniform laid out by hand against a struct declared in another file is the thing most worth breaking.
 //   S2 the chain's accumulate bound to the RAW source instead of the resolved mid -> the bit-identity row alone,
@@ -50,7 +66,7 @@ import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "../tools/ship/webgpuHarness.mjs";
 import { resolveJitterAwareCPU } from "./temporalResolve.mjs";
 import { temporalAccumulateCPU } from "./temporalAccumulate.mjs";
-import { STATS_REASON, RESOLVE_FLAGS, ACCUMULATE_FLAGS } from "./temporalGPU.mjs";
+import { STATS_REASON, STAT_ORDER, RESOLVE_FLAGS, ACCUMULATE_FLAGS } from "./temporalGPU.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 let fails = 0;
@@ -87,10 +103,14 @@ console.log("1. THE RUNNER'S SHAPE, READ BEFORE ANYTHING IS DISPATCHED");
        ACCUMULATE_FLAGS.HAS_HISTORY === 1 && ACCUMULATE_FLAGS.CLAMP === 2,
        "both kernels declare their flags as WGSL consts; these are the same numbers under the same names, and a " +
        "mismatch here is a uniform laid out by hand against a shader nobody re-read");
-    ok("!! *** the lost stats are declared, with a reason, rather than discovered ***",
-       typeof STATS_REASON === "string" && /counts nothing/.test(STATS_REASON) && /atomic/.test(STATS_REASON),
-       "the CPU path returns reused/rejectedOffscreen/rejectedInvalid/clamped and the kernel counts none of " +
-       "them. A port that silently drops a diagnostic is how the diagnostic stops being read.");
+    ok("!! the four counters are NAMED IN ONE PLACE, in the order the kernel and the CPU both use",
+       Array.isArray(STAT_ORDER) && STAT_ORDER.join(",") === "reused,rejectedOffscreen,rejectedInvalid,clamped",
+       `${STAT_ORDER.join(", ")} -- the kernel's STAT_* consts index the same array, so a reordering here and a ` +
+       "reordering there would have to happen together or this row and the parity rows below both fail");
+    ok("...and NOT counting is still an option that returns null rather than zeroes",
+       typeof STATS_REASON === "string" && /not asked for/.test(STATS_REASON) && /counted: true/.test(STATS_REASON),
+       "counting costs an atomic per pixel. A caller that does not want it should not pay for it, and must not " +
+       "be handed zeroes it could read as a measurement.");
 }
 
 console.log("\n2. ON THE DEVICE: both kernels against their CPU references, on every branch");
@@ -109,10 +129,11 @@ else {
         const res = await G.resolve({ src, rw: a.R, rh: a.R, dw: a.D, dh: a.D, jitter: a.JIT });
         const resNoJit = await G.resolve({ src, rw: a.R, rh: a.R, dw: a.D, dh: a.D, jitter: a.JIT, jitterAware: false });
         const accFirst = await G.accumulate({ current: res.data, history: null, motion: null, w: a.D, h: a.D, alpha: 0.1 });
-        const acc = await G.accumulate({ current: res.data, history: hist, motion: mot, w: a.D, h: a.D, alpha: 0.1 });
+        const acc = await G.accumulate({ current: res.data, history: hist, motion: mot, w: a.D, h: a.D, alpha: 0.1, counted: true });
+        const accUncounted = await G.accumulate({ current: res.data, history: hist, motion: mot, w: a.D, h: a.D, alpha: 0.1 });
         const accNoClamp = await G.accumulate({ current: res.data, history: hist, motion: mot, w: a.D, h: a.D, alpha: 0.1, clampToNeighbourhood: false });
         const chain = await G.resolveAndAccumulate({ src, rw: a.R, rh: a.R, dw: a.D, dh: a.D, jitter: a.JIT,
-                                                     history: hist, motion: mot, alpha: 0.1 });
+                                                     history: hist, motion: mot, alpha: 0.1, counted: true });
         let refused = null;
         try { new TemporalGPU({ backend: "webgl2" }); } catch (e) { refused = String(e.message).slice(0, 140); }
 
@@ -124,8 +145,9 @@ else {
 
         return { res: Array.from(res.data), conf: Array.from(res.confidence), resNoJit: Array.from(resNoJit.data),
                  accFirst: Array.from(accFirst.data), acc: Array.from(acc.data), accNoClamp: Array.from(accNoClamp.data),
-                 chain: Array.from(chain.data), chainStats: acc.stats, chainHasReason: typeof acc.statsReason === "string",
-                 statsIsNull: acc.stats === null, refused, errs, backend: dev.backend, msChain, msTwo, reps: REPS,
+                 chain: Array.from(chain.data), accStats: acc.stats, chainStats: chain.stats,
+                 uncountedStats: accUncounted.stats, uncountedReason: accUncounted.statsReason,
+                 accUncountedSame: (() => { for (let i = 0; i < acc.data.length; i++) if (acc.data[i] !== accUncounted.data[i]) return false; return true; })(), refused, errs, backend: dev.backend, msChain, msTwo, reps: REPS,
                  adapter: (dev.adapterInfo && (dev.adapterInfo.description || dev.adapterInfo.vendor)) || "unknown" };
     }` });
 
@@ -190,14 +212,31 @@ else {
            "all -- each gate drives its own alone -- and that order is what every frame of a temporal upscaler " +
            "uses. Same kernels, same order, same device: f32-against-f64 is no excuse and equality is exact.");
 
-        // ---- THE LOST DIAGNOSTIC -----------------------------------------------------------------------
-        ok("!! *** the GPU path reports stats as NULL, not as zeroes ***",
-           G.statsIsNull === true && G.chainStats === null && G.chainHasReason === true,
-           `stats ${JSON.stringify(G.chainStats)}, reason present ${G.chainHasReason}. The CPU call above counted ` +
-           `reused ${cAcc.stats.reused} and clamped ${cAcc.stats.clamped} on this exact fixture. A frame that ` +
-           "reused nothing and a frame nobody counted MUST NOT PRINT THE SAME NUMBER -- fsr.html calls these " +
-           "counters the diagnostic rather than decoration, and rejectedOffscreen reading one column is what " +
-           "proved the motion vector sign at v4586.");
+        // ---- THE COUNTERS, WHICH v4590 COULD ONLY DECLARE MISSING -----------------------------------------
+        const same = (a, b) => STAT_ORDER.every((k) => a && b && a[k] === b[k]);
+        ok("!! *** the device's counters EQUAL the CPU's, exactly, on a fixture that takes all three branches ***",
+           same(G.accStats, cAcc.stats),
+           `device ${JSON.stringify(G.accStats)} against CPU ${JSON.stringify(cAcc.stats)}. These are integers ` +
+           "counted per pixel, so the claim is EQUALITY and not a tolerance -- f32 against f64 buys nothing " +
+           "here, and one pixel taking a different branch on the device would show as a difference of one.");
+        ok("...and the chained form counts the same, so the counter follows the pass and not the call site",
+           same(G.chainStats, cAcc.stats),
+           `chained ${JSON.stringify(G.chainStats)}. The counted entry point is dispatched from two places; a ` +
+           "counter that only worked in one of them would be a counter nobody could trust in the other.");
+        ok("!! ...and the reused + rejected counts account for EVERY pixel, which is what makes them a census",
+           G.accStats && (G.accStats.reused + G.accStats.rejectedOffscreen + G.accStats.rejectedInvalid) === D * D,
+           `${G.accStats && G.accStats.reused} + ${G.accStats && G.accStats.rejectedOffscreen} + ` +
+           `${G.accStats && G.accStats.rejectedInvalid} = ${D * D}. clamped is a SECOND AXIS and is deliberately ` +
+           "not in that sum: a reused pixel can also be clamped, and the CPU counts them separately too.");
+        ok("!! *** counting does not change the picture, which is the whole claim of a second entry point ***",
+           G.accUncountedSame === true,
+           "the counted and uncounted dispatches produced bit-identical output. accumulateAt() decides once and " +
+           "returns what it did; the two entry points differ only in whether they record it. If counting moved " +
+           "a pixel, the counter would be measuring a different pass from the one that ships.");
+        ok("...and an uncounted call still returns null with a reason, not zeroes",
+           G.uncountedStats === null && typeof G.uncountedReason === "string",
+           `stats ${JSON.stringify(G.uncountedStats)}. A frame that reused nothing and a frame nobody counted ` +
+           "must not print the same number -- that rule survives the counters arriving.");
 
         say(`SPEED at ${R}x${R} -> ${D}x${D}, mean of ${G.reps}`,
             `chained ${G.msChain.toFixed(2)} ms, the two separately ${G.msTwo.toFixed(2)} ms ` +
@@ -212,8 +251,10 @@ else {
 }
 
 console.log(fails ? `\ntemporalGPU-selfcheck: ${fails} FAILED` : "\ntemporalGPU-selfcheck: ALL GREEN");
-console.log("unchecked here: the accumulate STATS on the device, which want an atomic counter buffer in a gated " +
-            "kernel and are their own rung -- this gate asserts only that their absence is declared; and the " +
-            "temporal arc's other EIGHT unreachable kernels (temporalLock's four, temporalReject's two, " +
-            "MOTION_WGSL and RING_FLOOR_WGSL), which tools/ship/kernelReach-selfcheck.mjs counts at 15.");
+console.log("unchecked here: the COST of counting -- an atomic per pixel is a real price and nobody has measured " +
+            "it against the uncounted entry point on hardware that contends, which this box's software adapter " +
+            "cannot show; the counters under a RACE, since four atomics over one workgroup-wide dispatch is the " +
+            "easy case and a tiled or multi-pass accumulate would not be; and the temporal arc's other EIGHT " +
+            "unreachable kernels (temporalLock's four, temporalReject's two, MOTION_WGSL and RING_FLOOR_WGSL), " +
+            "which tools/ship/kernelReach-selfcheck.mjs counts at 15.");
 process.exit(fails ? 1 : 0);

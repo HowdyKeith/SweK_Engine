@@ -43,7 +43,7 @@
 "use strict";
 
 import { checkHostUniforms } from "../render/wgslLayout.mjs";
-import { parseBindings } from "../render/wgslSpec.mjs";
+import { parseBindings, usedNames } from "../render/wgslSpec.mjs";
 
 
 // std140-ish uniform layout: compute each uniform's byte offset + the total (padded to 16) so the WebGPU backend can
@@ -185,43 +185,6 @@ function _refuse(backend, what, instead) {
 }
 const CPU_TWIN = "render/gpuDriven.mjs cullLodCpu() produces the same per-LOD instance records on the CPU; draw them with pass.instances() + pass.drawIndexed().";
 
-
-/** v4461 -- which declared bindings the shader statically references; see the WebGPU backend's note at classify(). */
-function usedNames(wgsl, all, entryPoints = null) {
-    let code = wgsl.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " ");
-    code = code.replace(/@group\s*\(\s*\w+\s*\)\s*@binding\s*\(\s*\w+\s*\)\s*var\s*(?:<[^>]*>)?\s*[A-Za-z_]\w*\s*:\s*[^;]+;/g, " ");
-    // v4466 -- PER ENTRY POINT, BECAUSE THE AUTO LAYOUT IS. A module with several @compute entries (physics/mpm's
-    // clear / p2g / grid / g2p share one text and five bindings) gets one layout PER PIPELINE, holding only what that
-    // entry's call graph reaches; a bind group carrying a binding the entry never touches is refused by the API. So
-    // "used" is answered over the functions reachable from the named entry points, falling back to the whole text
-    // when none are named (the null backend, or a module whose functions this scanner cannot delimit).
-    const reach = entryPoints ? _reachableCode(code, entryPoints) : null;
-    const scope = reach == null ? code : reach;
-    for (const b of all) b.used = new RegExp("\\b" + b.name + "\\b").test(scope);
-    return all;
-}
-/** The bodies of every function reachable from `entries`, concatenated; null if an entry is not found. */
-function _reachableCode(code, entries) {
-    const fns = {};
-    const re = /\bfn\s+([A-Za-z_]\w*)\s*\(/g;
-    let m;
-    while ((m = re.exec(code))) {
-        const open = code.indexOf("{", m.index); if (open < 0) return null;
-        let depth = 0, i = open;
-        for (; i < code.length; i++) { const ch = code[i]; if (ch === "{") depth++; else if (ch === "}") { depth--; if (depth === 0) break; } }
-        if (depth !== 0) return null;
-        fns[m[1]] = code.slice(m.index, i + 1);
-    }
-    const seen = new Set(), todo = [...entries].filter((e) => e);
-    if (!todo.length || !todo.every((e) => fns[e])) return null;
-    let out = "";
-    while (todo.length) {
-        const n = todo.pop(); if (seen.has(n)) continue; seen.add(n);
-        const body = fns[n]; out += body + "\n";
-        for (const k of Object.keys(fns)) if (!seen.has(k) && new RegExp("\\b" + k + "\\s*\\(").test(body)) todo.push(k);
-    }
-    return out;
-}
 
 // --- null backend: implements the full interface, records the op stream. Used for tests + as a headless fallback. ----
 function nullBackend(opts = {}) {

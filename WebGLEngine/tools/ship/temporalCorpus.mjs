@@ -22,6 +22,13 @@ import { ACCUMULATE_WGSL } from "../../render/temporalAccumulateWgsl.mjs";
 import { RESOLVE_WGSL } from "../../render/temporalResolveWgsl.mjs";
 import { MOTION_WGSL } from "../../render/motionVectorsWgsl.mjs";
 import { RING_FLOOR_WGSL } from "../../render/ringFloorWgsl.mjs";
+// *** v4591 -- BIND WHAT THE ENTRY POINT USES, NOT WHAT THE SOURCE DECLARES. *** bindingsOf() reads every
+// @group(0) binding in the text, which was the same set as "what a dispatch needs" for as long as every kernel
+// here had exactly one entry point. temporalAccumulateWgsl.mjs now has two, and the counted one's atomic
+// buffer is refused by the API when bound for a pipeline built on `main` -- gfx/device.js's own note at v4466
+// says so: "a bind group carrying a binding the entry never touches is refused by the API". usedNames answers
+// the same question the device asks, and now lives in render/wgslSpec.mjs so both can ask it.
+import { usedNames } from "../../render/wgslSpec.mjs";
 
 /** Every @group(0) binding a kernel declares, in source order: { binding, kind, name }. */
 export function bindingsOf(code) {
@@ -76,6 +83,10 @@ const DATA = {
     depth: scalar((x, y) => 0.3 + 0.004 * (x + y)), prevDepth: scalar((x, y) => 0.3 + 0.004 * (x + y)),
     factor: scalar((x, y) => 0.25 + 0.5 * (((x + y) & 3) / 3)),
     conf: new Float32Array(TW * TH),
+    // NOTE: ACCUMULATE_WGSL's `stats` binding needs NO fixture here. A first attempt added four zeros, and the
+    // device refused the run -- "an empty read-back is not a measurement", which is the harness saying the bind
+    // group did not match the layout. The binding belongs to mainCounted; main never touches it, and the filter
+    // above drops it before a fixture is asked for. An inert fixture would have papered over a real rule.
 };
 
 /**
@@ -146,7 +157,11 @@ export function temporalEntries() {
         const uniB = bs.find((b) => b.kind.includes("uniform"));
         if (!outB) throw new Error(`temporalCorpus: ${k.id} declares no binding named ${JSON.stringify(k.out)} -- the kernel was renamed and this entry was not`);
         if (!uniB) throw new Error(`temporalCorpus: ${k.id} declares no uniform binding`);
-        const inputs = bs.filter((b) => b !== outB && b !== uniB).map((b) => {
+        // ENTRY POINT: every kernel here dispatches `main`, which is what the harnesses run. A binding only a
+        // second entry point touches is not part of this pipeline and must not be bound.
+        const used = new Set(usedNames(k.code, bindingsOf(k.code).map((b) => ({ ...b })), ["main"])
+                             .filter((b) => b.used).map((b) => b.name));
+        const inputs = bs.filter((b) => b !== outB && b !== uniB && used.has(b.name)).map((b) => {
             const data = (k.data && k.data[b.name]) || DATA[b.name];
             if (!data) throw new Error(`temporalCorpus: ${k.id} binds ${JSON.stringify(b.name)} and this module has no fixture for it`);
             return { binding: b.binding, data };

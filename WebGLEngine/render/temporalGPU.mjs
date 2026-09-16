@@ -6,20 +6,21 @@
 // This file is the caller for RESOLVE_WGSL and ACCUMULATE_WGSL, which are the two fsr.html runs on the CPU every
 // frame. It follows fx/fsr/fsrGPU.js (v4588) exactly: gfx/device.js, not a second raw-WebGPU dispatcher.
 //
-// *** AND THE PORT LOSES THE DIAGNOSTIC THAT CAUGHT A REAL BUG, WHICH IS SAID HERE RATHER THAN DISCOVERED. ***
+// *** v4591 -- THE COUNTERS ARE HERE, AND v4590's stats: null IS GONE. ***
 //
-// temporalAccumulateCPU returns stats -- { reused, rejectedOffscreen, rejectedInvalid, clamped }. ACCUMULATE_WGSL
-// counts nothing: it has four storage bindings and a uniform, no atomics, and every rejection is an early
-// `return` that leaves no trace. That is not a detail. fsr.html's own copy says of those counters: "They are the
-// diagnostic, not decoration... This page shipped once with that sign inverted, scoring 11.5 dB while panning,
-// and the counter said so before the picture did." rejectedOffscreen being exactly one column of 192 pixels is
-// what proved the motion vectors had the right sign at v4586.
+// temporalAccumulateCPU returns { reused, rejectedOffscreen, rejectedInvalid, clamped }. Until this round the
+// kernel counted nothing, so this runner returned stats: null with a reason and fsr.html printed "CPU ONLY" --
+// deliberately, because a frame that reused nothing and a frame nobody counted must not print the same number.
+// Those counters are not decoration: rejectedOffscreen reading exactly one column of 192 pixels is what proved
+// the motion vectors had the right sign at v4586.
 //
-// So accumulate() returns `stats: null` and a `statsReason`, and the page says COUNTERS: CPU ONLY when it is on
-// the adapter. The alternative -- returning zeroes, or omitting the field -- would let a reader take "reused 0,
-// clamped 0" for a measurement of a frame that reused nothing. AN UNCOUNTED QUANTITY REPORTED AS ZERO IS THE
-// FAILURE THE COUNTERS EXIST TO CATCH, WEARING THE COUNTERS' OWN CLOTHES. Closing it wants an atomic counter
-// buffer in the kernel, which is a change to a gated kernel and its own rung.
+// ACCUMULATE_WGSL now has a SECOND ENTRY POINT, mainCounted, which records the four into an atomic buffer, and
+// `counted: true` dispatches it. The decision logic is not duplicated -- accumulateAt() decides once and returns
+// what it did, and the two entry points differ only in whether they record it. A counter that could disagree
+// with the pass it counts is worse than no counter.
+//
+// stats is STILL null when `counted` is false, and that is not vestigial: counting costs an atomic per pixel,
+// and a caller that does not want the number should not pay for it or be handed a stale one.
 "use strict";
 import { RESOLVE_WGSL } from "./temporalResolveWgsl.mjs";
 import { ACCUMULATE_WGSL } from "./temporalAccumulateWgsl.mjs";
@@ -32,9 +33,12 @@ export const RESOLVE_FLAGS = Object.freeze({ JITTER_AWARE: 1, DERING: 2 });
 export const ACCUMULATE_FLAGS = Object.freeze({ HAS_HISTORY: 1, CLAMP: 2 });
 
 export const STATS_REASON =
-    "ACCUMULATE_WGSL counts nothing -- it has no atomic counter buffer, and every rejection is an early return. " +
-    "The CPU path's reused/rejectedOffscreen/rejectedInvalid/clamped are not available on the device, and " +
-    "reporting them as zero would be worse than reporting nothing.";
+    "counting was not asked for: pass counted: true to dispatch ACCUMULATE_WGSL's mainCounted entry point, which " +
+    "records reused/rejectedOffscreen/rejectedInvalid/clamped into an atomic buffer. Null rather than zeroes, " +
+    "because a frame that reused nothing and a frame nobody counted must not print the same number.";
+
+/** The four counters, in the order the kernel's STAT_* consts and the CPU's stats object both declare them. */
+export const STAT_ORDER = Object.freeze(["reused", "rejectedOffscreen", "rejectedInvalid", "clamped"]);
 
 export class TemporalGPU {
     constructor(device) {
@@ -45,7 +49,10 @@ export class TemporalGPU {
         this.device = device;
         this.pResolve = device.compute({ wgsl: RESOLVE_WGSL });
         this.pAccum = device.compute({ wgsl: ACCUMULATE_WGSL });
-        for (const [n, p] of [["RESOLVE", this.pResolve], ["ACCUMULATE", this.pAccum]])
+        // a SECOND pipeline over the same text: the auto layout is per entry point, so the counted one carries
+        // the atomic binding and the plain one does not. Built once here rather than per frame.
+        this.pAccumCounted = device.compute({ wgsl: ACCUMULATE_WGSL, entryPoint: "mainCounted" });
+        for (const [n, p] of [["RESOLVE", this.pResolve], ["ACCUMULATE", this.pAccum], ["ACCUMULATE/mainCounted", this.pAccumCounted]])
             if (p && p.error) throw new Error(`render/temporalGPU: the ${n} kernel did not compile -- ${p.error}`);
     }
 
@@ -63,6 +70,13 @@ export class TemporalGPU {
         return this.device.buffer({ data: new Uint8Array(b), usage: "uniform" });
     }
     _f32(v) { return v instanceof Float32Array ? v : new Float32Array(v); }
+    _statsBuf() { return this.device.buffer({ data: new Uint32Array(4), usage: ["storage"] }); }
+    async _readStats(buf) {
+        const raw = new Uint32Array(await this.device.read(buf));
+        const out = {};
+        STAT_ORDER.forEach((k, i) => { out[k] = raw[i]; });
+        return out;
+    }
 
     /**
      * Signature mirrors resolveJitterAwareCPU({ src, rw, rh, dw, dh, jitter, jitterAware, dering }) exactly,
@@ -90,7 +104,7 @@ export class TemporalGPU {
      * Mirrors temporalAccumulateCPU({ current, history, motion, w, h, alpha, clampToNeighbourhood }).
      * `stats` is ALWAYS null here and `statsReason` says why -- see this file's header.
      */
-    async accumulate({ current, history, motion, w, h, alpha, clampToNeighbourhood = true }) {
+    async accumulate({ current, history, motion, w, h, alpha, clampToNeighbourhood = true, counted = false }) {
         const dev = this.device;
         const flags = (history ? ACCUMULATE_FLAGS.HAS_HISTORY : 0) | (clampToNeighbourhood ? ACCUMULATE_FLAGS.CLAMP : 0);
         const n = w * h * 4;
@@ -101,12 +115,19 @@ export class TemporalGPU {
         const bMot = dev.buffer({ data: motion ? this._f32(motion) : new Float32Array(n), usage: ["storage"] });
         const bDst = dev.buffer({ data: new Float32Array(n), usage: ["storage"] });
         const u = this._uAccum(w, h, flags, alpha);
-        this.pAccum.bind("current", bCur).bind("history", bHist).bind("motion", bMot).bind("dst", bDst).bind("u", u);
+        const pipe = counted ? this.pAccumCounted : this.pAccum;
+        const bStats = counted ? this._statsBuf() : null;
+        pipe.bind("current", bCur).bind("history", bHist).bind("motion", bMot).bind("dst", bDst).bind("u", u);
+        // *** ONLY WHEN COUNTED. *** The auto layout is per entry point, so binding the atomic buffer for a
+        // pipeline built on `main` is a validation error, not a harmless extra -- gfx/device.js has said so
+        // since v4466 and tools/ship/temporalCorpus.mjs was refused by the device for doing exactly that.
+        if (counted) pipe.bind("stats", bStats);
         const g = groups(w, h);
-        dev.frame(({ pass }) => { pass.dispatch(this.pAccum, g); pass.clear([0, 0, 0, 1]); }, { offscreen: true });
+        dev.frame(({ pass }) => { pass.dispatch(pipe, g); pass.clear([0, 0, 0, 1]); }, { offscreen: true });
         const data = new Float32Array(await dev.read(bDst));
-        for (const b of [bCur, bHist, bMot, bDst, u]) b.destroy();
-        return { data, w, h, stats: null, statsReason: STATS_REASON };
+        const stats = counted ? await this._readStats(bStats) : null;
+        for (const b of [bCur, bHist, bMot, bDst, u, bStats]) if (b) b.destroy();
+        return { data, w, h, stats, statsReason: counted ? null : STATS_REASON };
     }
 
     /**
@@ -114,7 +135,7 @@ export class TemporalGPU {
      * CPU, which is the difference between a port and two calls. Same construction as fx/fsr/fsrGPU.js's fsr1().
      */
     async resolveAndAccumulate({ src, rw, rh, dw, dh, jitter, jitterAware = true, dering = true,
-                                 history, motion, alpha, clampToNeighbourhood = true }) {
+                                 history, motion, alpha, clampToNeighbourhood = true, counted = false }) {
         const dev = this.device;
         const n = dw * dh * 4;
         const rFlags = (jitterAware ? RESOLVE_FLAGS.JITTER_AWARE : 0) | (dering ? RESOLVE_FLAGS.DERING : 0);
@@ -128,16 +149,20 @@ export class TemporalGPU {
         const uR = this._uResolve(rw, rh, dw, dh, jitter[0], jitter[1], rFlags);
         const uA = this._uAccum(dw, dh, aFlags, alpha);
         this.pResolve.bind("src", bSrc).bind("dst", bMid).bind("conf", bConf).bind("u", uR);
-        this.pAccum.bind("current", bMid).bind("history", bHist).bind("motion", bMot).bind("dst", bDst).bind("u", uA);
+        const pipe = counted ? this.pAccumCounted : this.pAccum;
+        const bStats = counted ? this._statsBuf() : null;
+        pipe.bind("current", bMid).bind("history", bHist).bind("motion", bMot).bind("dst", bDst).bind("u", uA);
+        if (counted) pipe.bind("stats", bStats);
         const g = groups(dw, dh);
         dev.frame(({ pass }) => {
             pass.dispatch(this.pResolve, g);
-            pass.dispatch(this.pAccum, g);
+            pass.dispatch(pipe, g);
             pass.clear([0, 0, 0, 1]);
         }, { offscreen: true });
         const data = new Float32Array(await dev.read(bDst));
         const confidence = new Float32Array(await dev.read(bConf));
-        for (const b of [bSrc, bMid, bConf, bHist, bMot, bDst, uR, uA]) b.destroy();
-        return { data, confidence, w: dw, h: dh, stats: null, statsReason: STATS_REASON };
+        const stats = counted ? await this._readStats(bStats) : null;
+        for (const b of [bSrc, bMid, bConf, bHist, bMot, bDst, uR, uA, bStats]) if (b) b.destroy();
+        return { data, confidence, w: dw, h: dh, stats, statsReason: counted ? null : STATS_REASON };
     }
 }

@@ -97,7 +97,9 @@
   the zone plate it runs to about [&minus;0.23, 1.23] &mdash; and everything outside gets clipped when the
   picture reaches 8 bits. That clipping was always happening; until this page reported it, nothing said so.
   <br><br>
-  <b>Watch the accumulate counters.</b> They are the diagnostic, not decoration. <i>rejected offscreen</i> should be
+  <b>Watch the accumulate counters.</b> They are the diagnostic, not decoration, and they read the same on the
+  CPU and on an adapter &mdash; the WGSL kernel counts them in an atomic buffer and the gate holds the two
+  <i>equal</i>, not merely close, because they are integers. <i>rejected offscreen</i> should be
   exactly one column &mdash; 192 pixels &mdash; while panning and zero while static; anything else means the motion
   vectors disagree with the camera. This page shipped once with that sign inverted, scoring 11.5 dB while panning,
   and the counter said so before the picture did.
@@ -180,10 +182,11 @@ let running = false, frame = 0, hist = null, jit = null, ref = null, R = 96, PAN
 // tools/ship/kernelReach.mjs counted 17 kernels in that state tree-wide, ten of them from this arc.
 // render/temporalGPU.mjs is the caller; the resolve and the accumulation now run chained on one encoder.
 //
-// ONE THING IS STILL CPU-ONLY AND IT IS THE COUNTERS. ACCUMULATE_WGSL has no atomics, so reused /
-// rejectedOffscreen / rejectedInvalid / clamped cannot be read off a device run. They are the diagnostic this
-// page leans on -- rejectedOffscreen reading exactly one column is what proved the motion vector sign -- so the
-// page SAYS they are unavailable rather than printing zeroes, and the CPU path still reports them.
+// *** AND THE COUNTERS CAME BACK AT v4591. *** For one round this page printed "accumulate counters: CPU ONLY"
+// on an adapter, because ACCUMULATE_WGSL counted nothing. It now has a second entry point, mainCounted, that
+// records the four into an atomic buffer, and the gate holds the device's counts EQUAL to the CPU's -- integers,
+// so equality rather than a tolerance. These are the diagnostic this page leans on: rejectedOffscreen reading
+// exactly one column is what proved the motion vector sign at v4586, and it reads that on either engine now.
 let gpu = null, tgpu = null;
 async function initGPU() {
     const say = (t) => { $("engine").textContent = "spatial engine: " + t; };
@@ -265,7 +268,7 @@ async function tick() {
     // the two passes. On the CPU it is the same two calls in the same order, and the gate holds them equal.
     const acc = tgpu
         ? await tgpu.resolveAndAccumulate({ src: frameSrc, rw: R, rh: R, dw: D, dh: D, jitter: [jx, jy],
-                                            history: hist, motion, alpha })
+                                            history: hist, motion, alpha, counted: true })
         : temporalAccumulateCPU({ current: resolveJitterAwareCPU({ src: frameSrc, rw: R, rh: R, dw: D, dh: D, jitter: [jx, jy] }).data,
                                   history: hist, motion, w: D, h: D, alpha });
     hist = acc.data; frame++; advanceJitter(jit);
@@ -277,9 +280,11 @@ async function tick() {
     $("metric").textContent = `render ${R}x${R} -> display ${D}x${D}   |   frame ${frame}   |   jitter ${jx.toFixed(3)}, ${jy.toFixed(3)}`;
     // *** NULL, NOT ZEROES. *** ACCUMULATE_WGSL counts nothing, so a device run has no counters to show. A
     // frame that reused nothing and a frame nobody counted must not print the same number.
+    // Counted on either engine since v4591 -- and still NULL rather than zeroes if a caller ever asks for an
+    // uncounted pass, because a frame that reused nothing and a frame nobody counted must not read the same.
     $("accstat").textContent = acc.stats
         ? `accumulate: reused ${acc.stats.reused}, rejected offscreen ${acc.stats.rejectedOffscreen}, rejected invalid ${acc.stats.rejectedInvalid}, clamped by the neighbourhood box ${acc.stats.clamped}`
-        : "accumulate counters: CPU ONLY -- the WGSL kernel has no atomic counters, so a device run cannot report them (not zero: uncounted)";
+        : "accumulate counters: not counted on this pass (not zero: uncounted)";
     requestAnimationFrame(tick);
 }
 
