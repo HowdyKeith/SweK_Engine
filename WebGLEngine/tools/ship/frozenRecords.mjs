@@ -607,7 +607,10 @@ export const PROBE_AT_V4536 = Object.freeze({
     // re-took that census over the whole island instead of a 6.5% patch of it. NO RECORD ARRIVED, which is
     // v4540's case again: a repair that writes integers into an existing record moves this as surely as a
     // new one does.
-    excluding: Object.freeze({ records: 125, withFields: 63, fields: 339 }),
+    // v4560 -- RE-TAKEN: 339 -> 344, the five fields written into KAIJU_GROUND_AT_V4554 and
+    // CAMERA_FALL_AT_V4548 when the round closed the kaiju double write. NO RECORD ARRIVED: both are repairs
+    // to records that already existed, which is v4540's case and now v4559's twice over.
+    excluding: Object.freeze({ records: 125, withFields: 63, fields: 344 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,

@@ -126,7 +126,12 @@ export const CAMERA_FALL_AT_V4548 = Object.freeze({
     kaijuOrderZeroReachLandsAt: 0,
     kaijuOrderZeroReachFrom: Object.freeze([19.7, 19.8, 19.9, 20.2, 20.5, 21.0, 25.0]),
     // (3) THE KAIJU'S GROUND FLAG WAS A LATCH: only landing set it, only jumping cleared it
-    cliffTop: 40, cliffLeftAtFrame: 42,
+    // v4560 -- 42 -> 45. The drive has a GROUNDED branch now, so it tracks the ground for three more
+    // frames before Camera.walkStep says `leave`; before, the only vertical path was fallBody and the body
+    // left the moment the surface dropped out from under the probe. The PROPERTY this row is about -- the
+    // flag clears the frame the body leaves, and Space does nothing after it -- is unchanged, which is why
+    // the row stayed red on a number rather than on a behaviour.
+    cliffTop: 40, cliffLeftAtFrame: 45, cliffLeftAtFrameBeforeV4560: 42,
     latchStillTrueAtFrame: 89, latchHeightThen: 34.12, latchVelocityThen: -14.40,
     freeJumpVelocity: 10.70,    // Space at frame 90, thirty-four units up and falling
     // (4) A LANDING HAPPENS ON ONE COLUMN, NOT ON AN INTERPOLATION
@@ -365,26 +370,52 @@ export const KAIJU_GROUND_AT_V4554 = Object.freeze({
     driveWritesY: "camera/camera.js _moveKaijuDrive, through fallBody.fallStep",
     clampWritesY: "simulation/KaijuManager.js:280, k.position.y = gy, gated on k.state alone",
     frameOrder: "main.js:29660 camera.update() then main.js:29931 kaijuManager.tick(dt)",
-    framesDriveDiscardedOf300: 300,
-    isPlayerDrivenUsesInManager: 1,      // and it selects an ANIMATION CLIP; it guards no physics
+    framesDriveDiscardedOf300: 300,      // v4554, with the clamp unguarded
+    framesDriveDiscardedOf300AfterV4560: 0,
+    isPlayerDrivenUsesInManager: 2,      // v4554: 1, an ANIMATION CLIP guarding no physics. v4560 added
+                                         // the second, and it is the clamp guard -- so the flag now guards
+                                         // exactly the thing v4554 recorded that it did not.
     // (2) *** AND THE OBVIOUS FIX IS A CATASTROPHE, WHICH IS WHY THE ROUND DOES NOT MAKE IT ***
     lostWithClamp: 0,                    // of 60, five seconds of holding W on the generated world
     lostWithoutClamp: 56,                // ...guarding the clamp with _isPlayerDriven
-    naiveFixIsACatastrophe: true,
+    naiveFixIsACatastrophe: true,        // AT v4554. See below: v4560 built what it said was missing.
     closingItRequires: Object.freeze([
         "a step-up for the drive: its probe is _fallSurface() at reach 0, so it can never name a surface " +
         "ABOVE the body and a driven kaiju has never once gained height",
         "a horizontal collision for the drive: k.position.x += mx * speed * dt is unguarded, and " +
         "_canStandAt has exactly ONE call site in the tree -- _moveFP, the other controller in this class",
     ]),
+    // *** v4560 -- BOTH WERE BUILT AND THE CLAMP IS NO LONGER LOAD-BEARING. *** The same 60 starts, the
+    // same five seconds of holding W, the same generated world, with the clamp guarded by _isPlayerDriven
+    // -- which is the one-line cleanup v4554 measured as a catastrophe and this record still says was one,
+    // because IT WAS, against the drive as it stood:
+    //
+    //                          lost of 60    gained height    max gain    frames inside rock
+    //     v4554, clamp off         56              0            0.000          28.03%
+    //     v4560, clamp off          0             20            8.000           0.00%
+    //
+    // The drive holds its own body up, climbs under its own power, and no longer walks through terrain.
+    // *** AND THE CLAMP IS NOW ACTIVELY WRONG FOR THE DRIVEN BODY, WHICH IS THE PART THAT SURPRISED ME. ***
+    // Left ON beside the repaired drive, frames-inside-rock went UP, 1.59% to 3.63%: the clamp teleports to
+    // _terrainTop, which is h + 1 and a voxel above the model's own stand height, so it kept moving the body
+    // off the surface the walk had chosen. A redundant writer stops being harmless the moment the other
+    // writer becomes right.
+    closedAtV4560: true,
+    lostWithoutClampAfterV4560: 0,
+    gainedHeightOf60AfterV4560: 20,      // 0 of 60 before: the drive could not climb at all
+    maxGainAfterV4560: 8,
+    insideRockPctBeforeV4560: 28.03,     // clamp off, so the drive alone
+    insideRockPctAfterV4560: 0,
+    insideRockPctClampLeftOnAfterV4560: 3.63,   // the clamp is now the thing putting it in rock
+    sharedWithTheWalk: Object.freeze(["_bodyFitsAt", "_stepHorizontal", "Camera.walkStep"]),
     // (3) THE OFF-BY-ONE, MEASURED AND DECLINED
     heightAtIsFirstAirIndex: true,       // 2,240 of 2,240 non-water samples; topmost-solid in 0
     terrainTopAddsOne: true,             // so `return h + 1` is one voxel above the model's own stand height
     terrainTopAboveVoxelTruth: 2240,     // of 2,240 non-water samples: ABOVE in every one of them
     offByOneFixed: false,                // gy feeds flyer clearance, the water line and the wake test
     notClosed: Object.freeze([
-        "the double write itself -- closing it needs the drive to hold a body up alone, which is the " +
-        "player's v4545..v4552 arc repeated for a second body",
+        "CLOSED AT v4560, kept here because the reason it was open is the reason the fix is three shared " +
+        "methods rather than a second copy: the drive now holds a body up alone",
         "the +1 in _terrainTop: correcting it moves every kaiju, every flyer's cruise altitude and the " +
         "water line at once, which is a gameplay decision and not a census's to make",
         "the body height: KAIJU_HEAD_Y is a CAMERA offset and the ground probe asks about 2 cells, but a " +
@@ -405,6 +436,31 @@ export class Camera {
      *  describe the same body rather than two numbers nobody compared -- the v4547 lesson applied to a
      *  quantity that did not exist on this side at all. */
     static BODY_RADIUS = 0.4;
+
+    /** *** THE DRIVEN KAIJU'S BODY, IN CELLS, AND IT IS THE WRONG NUMBER ON PURPOSE. *** The creature
+     *  stands about eight units tall -- KAIJU_HEAD_Y in _moveKaijuDrive is 8 for an obelisk and scale*2 for
+     *  a rigged mesh -- and every ground query about it asks about TWO cells, which is
+     *  world/surfaceProbe.mjs's DEFAULT_BODY. v4554 measured that a body-height fix was INVISIBLE while the
+     *  manager's clamp overwrote y every frame, and deferred it; this round closes the clamp, so the fix
+     *  becomes visible and is the next item rather than this one. The number lives here, named, so that
+     *  round changes ONE constant instead of finding four call sites. */
+    static KAIJU_BODY_CELLS = 2;
+
+    /** A kaiju's stride is 8-14 u/s against the player's 5, so the player's 1.5 trips on ordinary downhill
+     *  at that speed -- and this is MEASURED rather than reasoned, because my first draft of this comment
+     *  asserted figures I had not taken and one of them was false. Over the same 60 five-second drives with
+     *  the manager's clamp off, the ONLY thing changing:
+     *
+     *      cliffDrop 1.5    2 of 60 lost    1.07% of frames inside rock    6.48% airborne
+     *      cliffDrop 3.0    0 lost          0.00%                          0.00%
+     *      cliffDrop 6.0    0 lost          0.00%                          0.00%
+     *
+     *  So the player's number DOES cost bodies here -- I had written that it did not -- and 3.0 against 6.0
+     *  is not distinguished by this terrain at all. 3.0 is the smaller of the two that work, which is the
+     *  only argument for it over 6.0 and is stated as such rather than dressed up. *** AND THE 0.00%
+     *  AIRBORNE IS ITSELF A LIMIT: *** these drives never leave the ground, so the `leave` branch is not
+     *  exercised by them and is driven on a built cliff in the gate instead. */
+    static KAIJU_CLIFF_DROP = 3.0;
 
     /**
      * *** IS THIS VOXEL SOLID TO THE PLAYER'S BODY? THE FILE HELD THREE ANSWERS AND ONE OF THEM DIFFERED.
@@ -1184,18 +1240,13 @@ export class Camera {
         // a body with a radius cannot approach a lip at its current height, because its disc overlaps the
         // column it is about to climb. The step-up and the footprint are one question and this asks it once.
         const feetNow = this.position.y - this._eyeHeight;
-        const canGo = (nx, nz) => {
-            const t = this._stepTargetAt(nx, nz, feetNow);
-            return this._canStandAt(nx, (t === null ? feetNow : t) + this._eyeHeight, nz);
-        };
-        if (canGo(newX, newZ)) {
-            this.position.x = newX;
-            this.position.z = newZ;
-        } else {
-            // Try axes independently — slide along walls
-            if (canGo(newX, this.position.z)) this.position.x = newX;
-            if (canGo(this.position.x, newZ)) this.position.z = newZ;
-        }
+        // v4560 -- THE SLIDE RULE MOVED TO _stepHorizontal so the kaiju drive can ask the same question.
+        // Byte-identical: the whole move if it fits, else each axis alone with the second tested against the
+        // first's result. The four lines this replaces are that method's body.
+        const stepped = this._stepHorizontal(this.position.x, this.position.z,
+                                             mx * speed * dt, mz * speed * dt, feetNow, this._eyeHeight);
+        this.position.x = stepped.x;
+        this.position.z = stepped.z;
 
         // Vertical — gravity + ground snap + jump
         // v404 — bilinear ground sample so walking across sloped voxel
@@ -1270,6 +1321,9 @@ export class Camera {
             // step by leaving the ground, which is the only outcome this branch has.
             const CLIFF_DROP  = 1.5;     // drop bigger than this = walked off a ledge, in ONE frame
             const dy = targetY - this.position.y;
+            // v4560 -- the three outcomes are Camera.walkStep now, so the kaiju drive reaches the same rule
+            // instead of having none. `verdict` is compared below rather than branched on directly, which
+            // keeps each branch's own note attached to the case it explains.
             // *** THE LIMIT IS INCLUSIVE, AND THE TOLERANCE IS A MEASUREMENT RATHER THAN A CUSHION. ***
             // A one-voxel-per-column ramp is 45.0000 degrees by construction and atan2(1, 1) * 180 / PI is
             // EXACTLY 45 -- but the two heights come out of the bilinear blend, which accumulates about
@@ -1283,7 +1337,8 @@ export class Camera {
             // 45.0 against 63.4.
             const tooSteepDown = dy < 0 && slope !== null &&
                                  slope > Camera.MAX_SLOPE_DEG + Camera.SLOPE_EPS_DEG;
-            if (dy > STEP_UP_MAX) {
+            const verdict = Camera.walkStep(dy, { stepUp: STEP_UP_MAX, cliffDrop: CLIFF_DROP, tooSteep: tooSteepDown });
+            if (verdict === "blocked") {
                 // *** UNREACHABLE FROM THE VOXEL PATH, AND v4545 IS THE ROUND THAT MADE THAT TRUE. *** This
                 // read "_canStandAt already blocked the XZ move, so this should be unreachable. Defensive:
                 // stay." -- and _canStandAt returns TRUE at a cave floor, at a tunnel floor and on the lower
@@ -1296,7 +1351,7 @@ export class Camera {
                 // identically. Measured at 0.083333 max over a 260-frame climb of four voxels, 0 firings.
                 // It stays as a total for `dy` rather than being deleted, because _extMove and the kaiju
                 // path can set position.y from outside this function.
-            } else if (dy < -CLIFF_DROP || tooSteepDown) {
+            } else if (verdict === "leave") {
                 // Cliff, or ground too steep to walk down — start falling
                 this._fpOnGround = false;
                 this._fpVelY = 0;
@@ -1535,9 +1590,17 @@ export class Camera {
             k._stamina = Math.max(0, k._stamina - 0.15);
         }
 
-        // Horizontal movement: write directly to kaiju position
-        k.position.x += mx * speed * dt;
-        k.position.z += mz * speed * dt;
+        // *** v4560 -- HORIZONTAL MOVEMENT IS NOW ASKED, NOT ASSERTED. *** These two lines wrote the
+        // kaiju's position with nothing consulted, which is why a driven kaiju walked through terrain on
+        // 28.03% of frames when the manager's clamp was taken away. It asks _stepHorizontal -- the same
+        // rule _moveFP has had since v4549, in one place since this round -- so the body slides along a
+        // wall instead of entering it. The kaiju's position.y IS its feet: there is no eye height on this
+        // side, which is the whole reason _bodyFitsAt takes feet and a body height.
+        const kFeet = k.position.y;
+        const kStep = this._stepHorizontal(k.position.x, k.position.z,
+                                           mx * speed * dt, mz * speed * dt, kFeet, Camera.KAIJU_BODY_CELLS);
+        k.position.x = kStep.x;
+        k.position.z = kStep.z;
         // Heading on the kaiju so the obelisk visual faces the camera.
         // Some renderers/animators read .heading; the obelisk doesn't
         // currently rotate but the field is harmless to set and round
@@ -1568,12 +1631,45 @@ export class Camera {
         //       the whole descent -- at frame 89, 34 units up and falling at 14.4 m/s, it still read true
         //       -- so Space gave a FREE MID-AIR JUMP at any height, gated only by stamina. It is read off
         //       the module's own `airborne` now, which is computed per frame and cannot latch.
-        const kr = fallStep({ pos: [k.position.x, k.position.y, k.position.z], vy: this._kaijuDriveVelY,
-                              surfaceUnder: this._fallSurface(),
-                              dt, gravity: -this._gravity, terminal: -Infinity });
-        k.position.y = kr.pos[1];
-        this._kaijuDriveVelY = kr.vy;
-        this._kaijuDriveOnGround = !kr.airborne;
+        // *** v4560 -- AND A GROUNDED BRANCH, WHICH THIS CONTROLLER HAS NEVER HAD. *** Every frame went
+        // through fallBody, whose probe takes NO reach by contract -- correctly, for a falling body -- so
+        // the drive could not name a surface ABOVE itself and MEASURED OVER 60 DRIVES OF FIVE SECONDS NOT
+        // ONE OF THEM GAINED A SINGLE UNIT OF HEIGHT, maximum 0.000. The climbing was done entirely by
+        // KaijuManager's per-frame `k.position.y = gy`, which is the double write v4554 found and could not
+        // close: take the clamp away and 56 of 60 fell out of the world. A grounded body reads the WALKING
+        // query, which carries STEP_UP_MAX, and Camera.walkStep decides among the same three outcomes the
+        // player's walk has.
+        //
+        // NO SLOPE LIMIT IS APPLIED HERE and that is deliberate rather than forgotten: _fpSlopeDeg is the
+        // player's secant over the player's position, and whether a kaiju may walk down a 60-degree hill is
+        // a gameplay decision this round is not entitled to make. `tooSteep` is left false and said so.
+        if (this._kaijuDriveOnGround) {
+            const groundY = this._walkGroundAt(k.position.x, k.position.z, kFeet);
+            if (groundY === null) {
+                // Nothing under the body within reach: a hole, not a floor.
+                this._kaijuDriveOnGround = false;
+                this._kaijuDriveVelY = 0;
+            } else {
+                const verdict = Camera.walkStep(groundY - k.position.y, { cliffDrop: Camera.KAIJU_CLIFF_DROP });
+                if (verdict === "leave") {
+                    this._kaijuDriveOnGround = false;
+                    this._kaijuDriveVelY = 0;
+                } else if (verdict === "track") {
+                    k.position.y = groundY;
+                }
+                // "blocked": the climb is taller than STEP_UP_MAX, so the body stays at its height. The
+                // horizontal step above has already refused the move that would have put it inside the
+                // wall, so this is the rare case where the ground rose under a body that did not move.
+            }
+        }
+        if (!this._kaijuDriveOnGround) {
+            const kr = fallStep({ pos: [k.position.x, k.position.y, k.position.z], vy: this._kaijuDriveVelY,
+                                  surfaceUnder: this._fallSurface(),
+                                  dt, gravity: -this._gravity, terminal: -Infinity });
+            k.position.y = kr.pos[1];
+            this._kaijuDriveVelY = kr.vy;
+            this._kaijuDriveOnGround = !kr.airborne;
+        }
 
         // Camera position — slightly above the kaiju's "head" + 2u
         // back along the look direction so the kaiju's silhouette is
@@ -1917,24 +2013,77 @@ export class Camera {
         return this._eyeRenderY;
     }
 
-    _canStandAt(x, y, z) {
+    /**
+     * *** v4560 -- THE PREDICATE, GIVEN A BODY RATHER THAN A CAMERA. ***
+     *
+     * _canStandAt has always taken a CAMERA y and subtracted _eyeHeight to find the feet, which is fine for
+     * the one body that has an eye height and useless for the one that does not: the driven kaiju's
+     * position.y IS its feet. So the rule moves here, taking feet and a body height in cells, and
+     * _canStandAt becomes the camera's spelling of it. Nothing about the player's answer changes --
+     * floor(y - eye + 0.1) and floor(y - eye + eye) are the two lines it replaced, exactly.
+     *
+     * THE +0.1 IS THE FEET'S, NOT THE HEAD'S, and it is why this is not symmetric: a body resting exactly
+     * on an integer surface has its feet in the cell ABOVE the solid one, and without the nudge the floor()
+     * picks the solid cell and the body can never stand anywhere.
+     */
+    _bodyFitsAt(x, feetY, z, bodyCells) {
         if (!this.world?.voxelAt) return true;
-        const feetY = Math.floor(y - this._eyeHeight + 0.1);
-        const headY = Math.floor(y);
-        // *** THE CELLS THE BODY'S DISC CAN TOUCH, NOT THE ONE ITS CENTRE IS IN. *** At r < 0.5 that is at
-        // most four, and the distance test below rejects the corners the disc does not actually reach -- so
-        // the footprint is a DISC and not the square its bounds describe. That distinction is the whole
-        // diagonal-gap case: a square footprint would block a body that a disc lets through legitimately.
+        const f = Math.floor(feetY + 0.1);
+        const h = Math.floor(feetY + bodyCells);
         for (const [cx, cz] of this._footprint(x, z)) {
-            for (let yy = feetY; yy <= headY; yy++) {
-                // v4550 -- ONE predicate, shared with _standYAt's shim and _terrainTopAt's scan. This
-                // loop used to carry its own, and its own let water through while the other two stood the
-                // body on it. See Camera.isSolidToBody.
+            for (let yy = f; yy <= h; yy++) {
                 if (Camera.isSolidToBody(this.world.voxelAt(cx, yy, cz))) return false;
             }
         }
         return true;
     }
+
+    /**
+     * One horizontal step for a body of `bodyCells`: the whole move if it fits, else each axis alone so the
+     * body slides along a wall rather than stopping dead against it.
+     *
+     * *** v4560 -- ONE HOME, BECAUSE THE DRIVE HAD NO COPY AT ALL AND THAT WAS THE DEFECT. *** _moveFP has
+     * had this since v4549; _moveKaijuDrive wrote `k.position.x += mx * speed * dt` with nothing asked, so
+     * a driven kaiju walked through terrain on 28.03% of frames. The fix is not a second copy -- v4548
+     * removed the fourth copy of the fall for the same reason -- so the rule is here and both callers ask it.
+     *
+     * THE SECOND AXIS IS TESTED AGAINST THE FIRST AXIS'S RESULT, which is _moveFP's own sequencing and is
+     * load-bearing: a body in an inside corner that slid along x must be asked about z FROM WHERE IT NOW IS,
+     * or it slides diagonally through the corner post. Preserved deliberately rather than tidied.
+     */
+    _stepHorizontal(x, z, dx, dz, feetY, bodyCells) {
+        const fits = (nx, nz) => {
+            const t = this._stepTargetAt(nx, nz, feetY);
+            return this._bodyFitsAt(nx, t === null ? feetY : t, nz, bodyCells);
+        };
+        const wantX = x + dx, wantZ = z + dz;
+        if (fits(wantX, wantZ)) return { x: wantX, z: wantZ };
+        let ox = x, oz = z;
+        if (fits(wantX, oz)) ox = wantX;
+        if (fits(ox, wantZ)) oz = wantZ;
+        return { x: ox, z: oz };
+    }
+
+    /**
+     * What a grounded body does with a ground `dy` above or below it: keep tracking it, refuse the climb, or
+     * leave the ground. PURE, and static, so a gate can drive every branch without a world.
+     *
+     * *** v4560 -- EXTRACTED BECAUSE THE DRIVE NEEDED IT AND HAD NOTHING. *** The three outcomes were inline
+     * in _moveFP. A driven kaiju never reached any of them: its only vertical path was fallBody, whose probe
+     * takes NO reach, so it could not name a surface above the body and -- measured over 60 drives of five
+     * seconds each -- NOT ONE OF THEM GAINED A SINGLE UNIT OF HEIGHT. The clamp in KaijuManager was doing
+     * the climbing, one teleport per frame.
+     */
+    static walkStep(dy, { stepUp = Camera.STEP_UP_MAX, cliffDrop = 1.5, tooSteep = false } = {}) {
+        if (dy > stepUp) return "blocked";          // too tall to climb: the body stays where it is
+        if (dy < -cliffDrop || tooSteep) return "leave";   // a cliff edge, or ground too steep to walk down
+        return "track";                             // up-steps within reach and ordinary downhill
+    }
+
+    _canStandAt(x, y, z) {
+        return this._bodyFitsAt(x, y - this._eyeHeight, z, this._eyeHeight);
+    }
+
 
     getMatrix() {
         return this.viewProj;

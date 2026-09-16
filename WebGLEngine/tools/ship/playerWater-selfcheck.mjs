@@ -142,18 +142,29 @@ const drive = (world, pos, keys, frames, tweak = null) => {
     let airborne = 0;
     for (let i = 0; i < frames; i++) { c._moveFP(1 / 60); if (!c._fpOnGround) airborne++; }
     return { x: +c.position.x.toFixed(3), feet: +(c.position.y - c._eyeHeight).toFixed(3),
-             vy: +c._fpVelY.toFixed(1), onGround: c._fpOnGround, airborne };
+             vy: +c._fpVelY.toFixed(1), onGround: c._fpOnGround, airborne,
+             rivalReached: c._rivalReached ?? null };
 };
 /**
  * THE RULE AS IT SHIPPED BEFORE v4550, WRITTEN OUT RATHER THAN APPROXIMATED. _canStandAt's own copy of
  * the solidity test, carrying the water exclusion the other two sites never had.
  */
+// *** v4560 -- THIS PATCHES _bodyFitsAt, AND THE MOVE IS ITSELF A FINDING. *** It overrode _canStandAt by
+// NAME. v4560 moved the predicate to _bodyFitsAt and made _canStandAt a one-line caller so the driven
+// kaiju could ask it without an eye height -- and this rival went on patching a method the shipped walk no
+// longer calls, so it silently stopped being a rival. The three rows below went red, but only because
+// their NUMBERS moved; nothing said "your override is no longer reached", which is the difference between
+// a gate that caught it and a gate that happened to notice. `reached` is counted for exactly that, and the
+// row beside them asserts it: A FIXTURE THAT OVERRIDES BY NAME IS A FIXTURE ONE RENAME FROM GRADING
+// NOTHING, and this file now says so in the only way a gate can, by measuring.
 const beforeV4550 = (c) => {
-    c._canStandAt = function (x, y, z) {
+    c._rivalReached = 0;
+    c._bodyFitsAt = function (x, feetY, z, bodyCells) {
+        this._rivalReached++;
         if (!this.world?.voxelAt) return true;
-        const feetY = Math.floor(y - this._eyeHeight + 0.1), headY = Math.floor(y);
+        const f = Math.floor(feetY + 0.1), h = Math.floor(feetY + bodyCells);
         for (const [cx, cz] of this._footprint(x, z))
-            for (let yy = feetY; yy <= headY; yy++) {
+            for (let yy = f; yy <= h; yy++) {
                 const v = this.world.voxelAt(cx, yy, cz);
                 if (v !== 0 && v !== undefined && v !== 10 && v !== 11) return false;
             }
@@ -194,8 +205,11 @@ ok("*** the water exclusion is gone from the CODE ***", !/!==\s*1[01]\b/.test(CA
    "no `!== 10` or `!== 11` survives anywhere camera.js executes");
 ok("!! and it survives in the PROSE, which is where a removed rule belongs",
    /!==\s*10\s*&&\s*v\s*!==\s*11/.test(CAM), "the comment records what was taken out");
-ok("_canStandAt no longer writes its own test",
-   /_canStandAt\(x, y, z\)[\s\S]{0,600}?Camera\.isSolidToBody\(this\.world\.voxelAt\(cx, yy, cz\)\)/.test(CAMCODE));
+// v4560 -- the predicate lives in _bodyFitsAt and _canStandAt is a one-line caller over it, so the body
+// the driven kaiju has (feet, no eye height) can ask the same question. The row follows the rule.
+ok("the footprint predicate has ONE body and _canStandAt is a caller of it",
+   /_bodyFitsAt\(x, feetY, z, bodyCells\)[\s\S]{0,600}?Camera\.isSolidToBody\(this\.world\.voxelAt\(cx, yy, cz\)\)/.test(CAMCODE) &&
+   /_canStandAt\(x, y, z\)\s*\{\s*return this\._bodyFitsAt\(/.test(CAMCODE));
 ok("_standYAt's shim no longer writes its own test",
    /isAir:\s*\(xx, yy, zz\)\s*=>\s*!Camera\.isSolidToBody\(v\(xx, yy, zz\)\)/.test(CAMCODE));
 ok("_terrainTopAt's legacy scan no longer writes its own test",
@@ -248,6 +262,12 @@ ok("*** it walked INTO the water ***", rival.x > 10, "ended at x = " + rival.x
 ok("!! it is the record's x", rival.x === R.waterWallBeforeEndedAt);
 ok("*** and then FELL OUT OF THE WORLD ***", rival.feet === R.waterWallBeforeFeetAfter240Frames
    && rival.feet < -50, "feet " + rival.feet + " after 240 frames");
+ok("!! *** and the rival was actually REACHED, which nothing asked until a rename made it matter ***",
+   rival.rivalReached > 0,
+   `the pre-v4550 predicate ran ${rival.rivalReached} time(s) in that drive. IT OVERRIDES BY NAME, so the ` +
+   "day the shipped walk calls something else this fixture stops being a rival and the three rows above " +
+   "grade the SHIPPED rule against the record's counterfactual numbers -- red, but for a reason nobody " +
+   "would guess. v4560 did exactly that rename; this row is what makes the next one say so");
 ok("still accelerating when the drive ended -- nothing catches it",
    rival.vy === R.waterWallBeforeVyAfter240Frames && rival.vy < -50, "vy " + rival.vy);
 ok("and it is not grounded", rival.onGround === false);

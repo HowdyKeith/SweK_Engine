@@ -148,10 +148,18 @@ console.log("\n-- 1. two writers, one quantity, one frame");
        "silence -- the sabotage that drops the `+ 1` from the real method went 0 RED against this gate's " +
        "first draft, which is v4541's sabotage B for the third time in five rounds. This row is the pin.");
 
+    // *** v4560 -- THIS ROW SAID THE FLAG GUARDS NO PHYSICS, AND THAT WAS THE FINDING RATHER THAN THE
+    // DESIGN. *** v4554 measured exactly one use of _isPlayerDriven in the manager, an animation clip, and
+    // convicted camera.js's comment claiming the flag makes "AI tick skip". v4560 added the second use and
+    // it is the ground clamp, so the flag now guards precisely the physics v4554 recorded that it did not.
+    // The row holds the SHAPE rather than the count: the clip is still there, and the new one is the clamp.
     const driven = (KMCODE.match(/_isPlayerDriven/g) || []).length;
-    ok("!! *** _isPlayerDriven HAS EXACTLY ONE USE IN THE MANAGER AND IT IS ANIMATION ***", driven === 1,
-       `${driven} use; it selects a clip at KaijuManager.js:394 and guards no physics at all. ` +
-       `camera/camera.js's own comment says the flag is set "so AI tick skips" -- section 5 convicts it.`);
+    ok("!! *** _isPlayerDriven GUARDS THE GROUND CLAMP NOW, AND AT v4554 IT GUARDED NO PHYSICS AT ALL ***",
+       driven === 2 && driven === R.isPlayerDrivenUsesInManager &&
+       /else if \(k\._isPlayerDriven\)/.test(KMCODE),
+       `${driven} uses: the animation clip v4554 found, and the clamp guard this round added. The one-line ` +
+       "cleanup that dropped 56 of 60 kaiju out of the world is the SAME line -- what changed is that the " +
+       "drive can now hold a body up without it.");
 }
 
 // ---- 2. THE DRIVE'S FALL IS COMPUTED AND THROWN AWAY -----------------------------------------------------
@@ -176,30 +184,89 @@ console.log("\n-- 2. what the drive computes, and what survives the frame");
 // ---- 3. *** AND THE OBVIOUS FIX IS A CATASTROPHE *** ----------------------------------------------------
 console.log("\n-- 3. what happens if you just guard the clamp");
 {
+    let gainedHeight = 0, maxGain = 0, inRockFrames = 0, totalFrames = 0;
     const drive5s = (clampOn) => {
         let lost = 0;
         for (const [x, z] of starts) {
             const k = mkKaiju(x, z), c = mkDrive(k);
-            for (let f = 0; f < 300; f++) frame(c, k, clampOn);
+            const y0 = k.position.y;
+            for (let f = 0; f < 300; f++) {
+                frame(c, k, clampOn);
+                if (clampOn) continue;                      // the drive alone is what these count
+                totalFrames++;
+                const fx = Math.floor(k.position.x), fz = Math.floor(k.position.z);
+                const fy = Math.floor(k.position.y + 0.1);
+                for (let yy = fy; yy <= fy + 1; yy++) if (W.voxelAt(fx, yy, fz) !== 0) { inRockFrames++; break; }
+            }
             if (k.position.y < -20) lost++;
+            if (!clampOn) { const g = k.position.y - y0; if (g > 0.01) gainedHeight++; if (g > maxGain) maxGain = +g.toFixed(3); }
         }
         return lost;
     };
     const withClamp = drive5s(true), without = drive5s(false);
+    const inRockPct = +(100 * inRockFrames / Math.max(1, totalFrames)).toFixed(2);
     report(`five seconds of holding W, 60 starts: clamp ON ${withClamp} lost, clamp OFF ${without} lost`);
     ok("*** with the clamp, no driven kaiju leaves the world ***", withClamp === 0);
-    ok("*** WITHOUT IT, ALMOST ALL OF THEM DO -- the redundant write is load-bearing by accident ***",
-       without >= 50,
-       `${without} of 60 below y = -20. THE ONE-LINE CLEANUP -- guard the clamp with _isPlayerDriven, which ` +
-       `is exactly what "two writers for one quantity" usually deserves -- DROPS ALMOST EVERY DRIVEN KAIJU ` +
-       `OUT OF THE WORLD. This row exists so that nobody ships it as a tidy-up.`);
-    ok("!! and the reason is named rather than left as a mystery: no step-up and no horizontal collision",
-       /_standYAt\(x, z, y, 0\)/.test(CAMCODE) &&
-       (CAMCODE.match(/this\._canStandAt\(/g) || []).length === 1,
-       "the drive's probe is _fallSurface() at reach 0, so it can never name a surface ABOVE the body; and " +
-       "_canStandAt has ONE call site in the whole tree, in _moveFP, the other controller in the same class.");
+    // *** v4560 -- THIS ROW USED TO ASSERT `without >= 50` AND IT WAS RIGHT TO. *** v4554 measured 56 of 60
+    // driven kaiju dropping out of the world when the clamp was guarded, and wrote the row so that nobody
+    // would ship the tidy-up. The tidy-up is now correct, because the two absences it named were built:
+    // the drive has a grounded branch reading the WALKING query (so it can climb) and a horizontal step
+    // through _stepHorizontal (so it cannot enter terrain). The row is INVERTED rather than deleted -- the
+    // property worth holding is the same one, "the drive can hold its own body up", and the number that
+    // expresses it has moved from 56 to 0.
+    ok("!! *** AND WITHOUT IT THEY STAY IN THE WORLD NOW -- 56 of 60 at v4554, 0 at v4560 ***",
+       without === 0 && without === R.lostWithoutClampAfterV4560,
+       `${without} of 60 below y = -20 with the clamp guarded, against v4554's ${R.lostWithoutClamp}. THE ` +
+       "ONE-LINE CLEANUP THAT WAS A CATASTROPHE IS NOW THE FIX, and the difference is not the cleanup -- it " +
+       "is the two mechanisms v4554 recorded as what closing this would require.");
+    ok("!! and the drive can CLIMB, which no measurement of it had ever shown",
+       gainedHeight > 0 && gainedHeight === R.gainedHeightOf60AfterV4560,
+       `${gainedHeight} of 60 end higher than they started under their own power, best ${maxGain}. AT v4554 ` +
+       "IT WAS 0 OF 60 WITH A MAXIMUM GAIN OF 0.000: the drive's only vertical path was fallBody, whose " +
+       "probe takes no reach by contract, so it could not name a surface above the body and every unit of " +
+       "height a driven kaiju ever gained came from the manager's clamp.");
+    ok("!! and it no longer walks through terrain: 28.03% of frames inside rock, now none",
+       inRockPct === 0 && inRockPct === R.insideRockPctAfterV4560,
+       `${inRockPct}% of frames with the body inside a solid cell, against ${R.insideRockPctBeforeV4560}% ` +
+       "at v4554. The horizontal move was `k.position.x += mx * speed * dt` with nothing asked.");
+    ok("!! the two absences v4554 named are both filled, in SHARED code rather than a second copy",
+       /_stepHorizontal\(/.test(CAMCODE) && /_bodyFitsAt\(/.test(CAMCODE) &&
+       /static walkStep\(/.test(CAMCODE) &&
+       (CAMCODE.match(/this\._stepHorizontal\(/g) || []).length === 2 &&
+       (CAMCODE.match(/Camera\.walkStep\(/g) || []).length === 2,
+       "_stepHorizontal and Camera.walkStep each have TWO call sites -- _moveFP and _moveKaijuDrive -- " +
+       "which is the whole point: v4548 removed the FOURTH copy of the fall from this same method, and a " +
+       "second copy of the walk would have been that defect again with a different name.");
+    // *** SABOTAGE M5 WENT 0 RED AND THE BRANCH IS THE REASON. *** Deleting Camera.walkStep's `blocked`
+    // arm -- the one that refuses a climb taller than STEP_UP_MAX -- reddened nothing across six gates,
+    // because NEITHER CALLER CAN REACH IT from the voxel path: both read their ground through
+    // _standYAt(..., STEP_UP_MAX), so the probe cannot name a surface further above the body than the
+    // allowance, and dy <= stepUp identically. _moveFP's own note has said so since v4545 and kept the
+    // branch anyway, for a reason that is still good -- _extMove and the kaiju path can set position.y from
+    // OUTSIDE either function, and then dy is whatever the outside writer made it.
+    //
+    // A BRANCH THAT IS UNREACHABLE FROM THE SHIPPED PATH AND KEPT ON PURPOSE HAS TO BE DRIVEN DIRECTLY, or
+    // it is a rule nothing grades -- which is what M5 proved. walkStep is pure and static exactly so that
+    // this row can exist.
+    {
+        const climb = Camera.walkStep(Camera.STEP_UP_MAX + 0.001);
+        const step  = Camera.walkStep(Camera.STEP_UP_MAX);
+        const walk  = Camera.walkStep(-0.2);
+        const cliff = Camera.walkStep(-1.6);
+        const steep = Camera.walkStep(-0.2, { tooSteep: true });
+        const wide  = Camera.walkStep(-1.6, { cliffDrop: Camera.KAIJU_CLIFF_DROP });
+        ok("!! *** all three of walkStep's outcomes are driven, because the shipped path reaches only two ***",
+           climb === "blocked" && step === "track" && walk === "track" && cliff === "leave" &&
+           steep === "leave" && wide === "track",
+           `dy just over STEP_UP_MAX -> ${climb}; exactly STEP_UP_MAX -> ${step} (the limit is INCLUSIVE); ` +
+           `ordinary downhill -> ${walk}; past the cliff drop -> ${cliff}; too steep -> ${steep}; and the ` +
+           `same drop under the kaiju's wider ${Camera.KAIJU_CLIFF_DROP} -> ${wide}. THE PROBE'S REACH AND ` +
+           "THE WALKER'S ALLOWANCE ARE THE SAME NUMBER, so `blocked` cannot fire from a voxel ground -- it " +
+           "is for a caller that wrote position.y from outside, and this row is the only thing grading it.");
+    }
     ok("the record carries both numbers",
-       R.lostWithClamp === 0 && R.lostWithoutClamp >= 50 && R.naiveFixIsACatastrophe === true);
+       R.lostWithClamp === 0 && R.lostWithoutClamp >= 50 && R.naiveFixIsACatastrophe === true &&
+       R.closedAtV4560 === true);
 }
 
 // ---- 4. THE OFF-BY-ONE, MEASURED AND NOT FIXED ----------------------------------------------------------
