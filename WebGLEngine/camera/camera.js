@@ -13,7 +13,7 @@
 
 import { buildViewProj } from "./buildViewProj.js";
 // v4545 -- the body-aware voxel probe, rather than a third copy of its rule. See _terrainTopAt.
-import { standHeightAt } from "../world/surfaceProbe.mjs";
+import { standHeightAt, DEFAULT_BODY } from "../world/surfaceProbe.mjs";
 // v4548 -- the gated fall, rather than a third and fourth copy of it. See _fallSurface.
 import { fallStep } from "../physics/character/fallBody.mjs";
 
@@ -413,14 +413,49 @@ export const KAIJU_GROUND_AT_V4554 = Object.freeze({
     terrainTopAddsOne: true,             // so `return h + 1` is one voxel above the model's own stand height
     terrainTopAboveVoxelTruth: 2240,     // of 2,240 non-water samples: ABOVE in every one of them
     offByOneFixed: false,                // gy feeds flyer clearance, the water line and the wake test
+    // *** v4561 -- THE BODY HEIGHT, WHICH THIS RECORD FILED AND v4560 LEFT AS A SECOND WRONG NUMBER. ***
+    //
+    // Every ground query in camera.js went to standHeightAt WITHOUT a body, so it answered for
+    // surfaceProbe's DEFAULT_BODY of 2 -- for the player, whose eye is 1.7 up, and for a kaiju eight units
+    // tall alike. v4560 named the kaiju's body as a CONSTANT of 2, which is one wrong number where there
+    // were two. The roster's seven kinds carry scales 2.5 to 4, so heights 5 to 8, and an obelisk with no
+    // rigged mesh is 8: IT IS NOT ONE NUMBER AT ALL. Camera.kaijuHeight is the expression _moveKaijuDrive
+    // already used for the camera offset, named once and read for both -- the camera rides at the head, so
+    // where the head is IS how tall the thing is, which is the conflation this record complained of and the
+    // resolution of it.
+    //
+    // *** AND v4554'S WARNING OVER-READ ITS OWN MEASUREMENT, WHICH IS THE CORRECTION THIS ROUND OWES. ***
+    // It said a naive body-8 probe "drops the creature out of the world in the 1,715 places where an 8-cell
+    // body does not fit". 1,715 is places LOST, not places with nowhere to go: over the whole island there
+    // are 63,684 standable places for a 2-cell body and 58,901 for an 8-cell one, and the number of COLUMNS
+    // left with nowhere at all to stand is ZERO. No creature is dropped out of the world by the body height.
+    // The 1,715 itself is the 9x9-chunk window's figure -- re-measured there it is 1,729, and over the
+    // island it is 4,783 -- which is #34's finding one more time in a number I wrote myself.
+    bodyIsPerKind: true,
+    kaijuHeightRange: Object.freeze([5, 8]),   // scales 2.5..4, times two, floored at 4; obelisk 8
+    standablePlacesBody2: 63684,
+    standablePlacesBody8: 58901,
+    placesLostAtBody8: 4783,
+    placesLostAtBody8In9x9Window: 1729,        // v4554 recorded 1,715 and read it as bodies lost
+    columnsWithNowhereToStandAtBody8: 0,       // the claim v4554's number was used to support
+    // *** WHAT IT ACTUALLY BUYS, MEASURED OVER 240 DRIVES ISLAND-WIDE RATHER THAN 60 ON THE FLAT PATCH. ***
+    // The drive stands on the topmost surface almost always, so the body height is nearly invisible -- but
+    // not entirely, and "nearly" is the honest word rather than "not at all":
+    groundedFramesMeasured: 63756,
+    framesBelowTheTopSolidBefore: 88,          // under something, where headroom is finite
+    framesBelowTheTopSolidAfter: 0,
+    framesWithLessThanEightCellsOfHeadroomBefore: 32,
+    framesWithLessThanEightCellsOfHeadroomAfter: 0,
+    minimumHeadroomBefore: 6,
+    minimumHeadroomAfter: 12,
     notClosed: Object.freeze([
         "CLOSED AT v4560, kept here because the reason it was open is the reason the fix is three shared " +
         "methods rather than a second copy: the drive now holds a body up alone",
         "the +1 in _terrainTop: correcting it moves every kaiju, every flyer's cruise altitude and the " +
         "water line at once, which is a gameplay decision and not a census's to make",
-        "the body height: KAIJU_HEAD_Y is a CAMERA offset and the ground probe asks about 2 cells, but a " +
-        "body-height fix is INVISIBLE until the double write is closed -- measured, and the reason this " +
-        "round reordered itself",
+        "CLOSED AT v4561: the body reaches the probe, and it is the creature's own height rather than a " +
+        "constant. v4554's 'invisible until the double write is closed' was right, and once closed the " +
+        "visible part turned out to be 32 frames of 63,756 -- small, not nothing",
     ]),
 });
 
@@ -437,14 +472,25 @@ export class Camera {
      *  quantity that did not exist on this side at all. */
     static BODY_RADIUS = 0.4;
 
-    /** *** THE DRIVEN KAIJU'S BODY, IN CELLS, AND IT IS THE WRONG NUMBER ON PURPOSE. *** The creature
-     *  stands about eight units tall -- KAIJU_HEAD_Y in _moveKaijuDrive is 8 for an obelisk and scale*2 for
-     *  a rigged mesh -- and every ground query about it asks about TWO cells, which is
-     *  world/surfaceProbe.mjs's DEFAULT_BODY. v4554 measured that a body-height fix was INVISIBLE while the
-     *  manager's clamp overwrote y every frame, and deferred it; this round closes the clamp, so the fix
-     *  becomes visible and is the next item rather than this one. The number lives here, named, so that
-     *  round changes ONE constant instead of finding four call sites. */
-    static KAIJU_BODY_CELLS = 2;
+    /**
+     * *** THE CREATURE'S HEIGHT, ONCE, FOR THE CAMERA AND FOR THE COLLISION. *** v4554 recorded the
+     * conflation this repairs: "KAIJU_HEAD_Y is a CAMERA offset and the ground probe asks about 2 cells".
+     * They are the same quantity read for two purposes -- the camera rides at the head, so where the head is
+     * IS how tall the thing is -- and v4560 left it as a single constant of 2, which is a second wrong
+     * number rather than one.
+     *
+     * *** AND IT IS NOT ONE NUMBER: the roster's seven kinds carry scales 2.5 to 4, so heights 5 to 8. ***
+     * An obelisk with no rigged mesh falls back to 8, which is what _moveKaijuDrive has always used for the
+     * camera. Floored at 2 so a tiny kind can never ask for less headroom than the probe's own default.
+     */
+    static kaijuHeight(k) {
+        return (k && k._meshEntityId != null) ? Math.max(4, (k.config?.scale ?? 3) * 2.0) : 8;
+    }
+
+    /** The same height as a whole number of cells, which is what a voxel probe can answer about. */
+    static kaijuBodyCells(k) {
+        return Math.max(DEFAULT_BODY, Math.ceil(Camera.kaijuHeight(k)));
+    }
 
     /** A kaiju's stride is 8-14 u/s against the player's 5, so the player's 1.5 trips on ordinary downhill
      *  at that speed -- and this is MEASURED rather than reasoned, because my first draft of this comment
@@ -1597,8 +1643,10 @@ export class Camera {
         // wall instead of entering it. The kaiju's position.y IS its feet: there is no eye height on this
         // side, which is the whole reason _bodyFitsAt takes feet and a body height.
         const kFeet = k.position.y;
+        // v4561 -- the body is THIS creature's, not a constant: the roster runs 5 to 8 units by kind.
+        const kBody = Camera.kaijuBodyCells(k);
         const kStep = this._stepHorizontal(k.position.x, k.position.z,
-                                           mx * speed * dt, mz * speed * dt, kFeet, Camera.KAIJU_BODY_CELLS);
+                                           mx * speed * dt, mz * speed * dt, kFeet, kBody);
         k.position.x = kStep.x;
         k.position.z = kStep.z;
         // Heading on the kaiju so the obelisk visual faces the camera.
@@ -1644,7 +1692,7 @@ export class Camera {
         // player's secant over the player's position, and whether a kaiju may walk down a 60-degree hill is
         // a gameplay decision this round is not entitled to make. `tooSteep` is left false and said so.
         if (this._kaijuDriveOnGround) {
-            const groundY = this._walkGroundAt(k.position.x, k.position.z, kFeet);
+            const groundY = this._walkGroundAt(k.position.x, k.position.z, kFeet, kBody);
             if (groundY === null) {
                 // Nothing under the body within reach: a hole, not a floor.
                 this._kaijuDriveOnGround = false;
@@ -1664,7 +1712,7 @@ export class Camera {
         }
         if (!this._kaijuDriveOnGround) {
             const kr = fallStep({ pos: [k.position.x, k.position.y, k.position.z], vy: this._kaijuDriveVelY,
-                                  surfaceUnder: this._fallSurface(),
+                                  surfaceUnder: this._fallSurface(kBody),
                                   dt, gravity: -this._gravity, terminal: -Infinity });
             k.position.y = kr.pos[1];
             this._kaijuDriveVelY = kr.vy;
@@ -1680,9 +1728,10 @@ export class Camera {
         // with scale; head height ~2× scale at typical proportions).
         // For obelisk-only kaiju, fall back to the hardcoded ~8u that
         // matches the obelisk silhouette.
-        const KAIJU_HEAD_Y = (k._meshEntityId != null)
-            ? Math.max(4, (k.config?.scale ?? 3) * 2.0)
-            : 8;
+        // v4561 -- ONE RULE. This expression WAS the creature's height and the ground probe asked about 2
+        // cells regardless; Camera.kaijuHeight is that expression with a name, read here for the camera and
+        // by kaijuBodyCells for the collision, so the two can no longer drift apart.
+        const KAIJU_HEAD_Y = Camera.kaijuHeight(k);
         const BACK_OFFSET  = 2;
         const cyP = Math.cos(this.pitch);
         const fwX = sy * cyP;
@@ -1739,7 +1788,7 @@ export class Camera {
      * makes the gated rule work on every world the camera already accepts; writing the scan out again here
      * would be the third copy of it this session filed as a task.
      */
-    _standYAt(x, z, fromY, reach = Camera.STEP_UP_MAX) {
+    _standYAt(x, z, fromY, reach = Camera.STEP_UP_MAX, body = DEFAULT_BODY) {
         const v = (xx, yy, zz) => this.world.voxelAt(xx, yy, zz);
         const shim = {
             chunkHeight: Number.isFinite(this.world.chunkHeight) ? this.world.chunkHeight : 80,
@@ -1747,7 +1796,11 @@ export class Camera {
             // two other places; the copy in _canStandAt had drifted onto a different answer for water.
             isAir: (xx, yy, zz) => !Camera.isSolidToBody(v(xx, yy, zz)),
         };
-        return standHeightAt(shim, Math.floor(x), Math.floor(z), { y: fromY, stepUp: reach });
+        // *** v4561 -- THE BODY REACHES THE PROBE NOW, AND UNTIL THIS ROUND IT DID NOT. *** Every ground
+        // query in this file went to standHeightAt WITHOUT a body, so it answered for surfaceProbe's
+        // DEFAULT_BODY of 2 -- for the player, whose eye is 1.7 up, and for a kaiju eight units tall alike.
+        // The default here is that same 2, so the player's answer is unchanged by construction.
+        return standHeightAt(shim, Math.floor(x), Math.floor(z), { y: fromY, stepUp: reach, body });
     }
 
     /**
@@ -1810,10 +1863,11 @@ export class Camera {
      * voxelSurface() does, and the reason that function exists. The blend keeps the walking query, where it
      * is right and where the stairs it was added for actually show.
      */
-    _fallSurface() {
+    _fallSurface(body = DEFAULT_BODY) {
         // _standYAt IS that probe, and it already reports NOT-FOUND as null rather than as 0 -- which is
         // the distinction fallBody's contract needs and the one v4545 added this method for.
-        return (x, z, y) => (this.world?.voxelAt ? this._standYAt(x, z, y, 0) : null);
+        // v4561 -- and it takes the falling body's height, so a kaiju does not land in a gap it cannot fit.
+        return (x, z, y) => (this.world?.voxelAt ? this._standYAt(x, z, y, 0, body) : null);
     }
 
     _terrainTopAt(x, z, fromY = null, reach = Camera.STEP_UP_MAX) {
@@ -1962,10 +2016,10 @@ export class Camera {
      * move, because a body is entitled to walk off a cliff and a rule that refused would stop it a radius
      * short of every edge. tools/ship/playerBody-selfcheck.mjs holds both numbers.
      */
-    _stepTargetAt(x, z, feetY) {
+    _stepTargetAt(x, z, feetY, body = DEFAULT_BODY) {
         let best = null;
         for (const [cx, cz] of this._footprint(x, z)) {
-            const g = this._standYAt(cx + 0.5, cz + 0.5, feetY, Camera.STEP_UP_MAX);
+            const g = this._standYAt(cx + 0.5, cz + 0.5, feetY, Camera.STEP_UP_MAX, body);
             if (g !== null && (best === null || g > best)) best = g;
         }
         return best;
@@ -1985,8 +2039,8 @@ export class Camera {
      * in is not a column whose ground is zero, and averaging a not-found corner in as 0 put the body a
      * whole voxel inside the floor and locked it there.
      */
-    _walkGroundAt(x, z, feetY) {
-        return this._stepTargetAt(x, z, feetY);
+    _walkGroundAt(x, z, feetY, body = DEFAULT_BODY) {
+        return this._stepTargetAt(x, z, feetY, body);
     }
 
     /**

@@ -489,7 +489,11 @@ ok("!! every driven number above came out of this run, not out of the record",
 
 // ---- 12. the wiring ------------------------------------------------------------------------------------
 console.log("\n-- 12. wiring");
-ok("camera.js imports the probe the shim feeds", /import \{ standHeightAt \} from "\.\.\/world\/surfaceProbe\.mjs"/.test(CAMCODE));
+// v4561 -- the import gained DEFAULT_BODY, so the pattern asks that standHeightAt is among the named
+// bindings rather than that it is the ONLY one. A row that pins an import list reddens the day anybody
+// imports a second thing from the same module, which is not what it is about.
+ok("camera.js imports the probe the shim feeds",
+   /import \{[^}]*\bstandHeightAt\b[^}]*\} from "\.\.\/world\/surfaceProbe\.mjs"/.test(CAMCODE));
 ok("world/world.js still answers isAir as AIR-only, which is the rule this file adopted",
    /isAir\(x, y, z\)\s*\{\s*return this\.voxelAt\(x, y, z\) === VOXEL\.AIR;/.test(code("world/world.js")));
 ok("!! BotManager still walks its bots on standHeightAt, so the two share one ground rule",

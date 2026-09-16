@@ -531,8 +531,11 @@ console.log("\n-- 10. wiring");
        /if \(this\.mode !== "fp"\)/.test(CAMCODE) &&
        /let camY = this\._eyeRenderY;/.test(CAMCODE),
        "a method rather than six lines inside update(), so the gate drives what ships -- see section 4.");
+    // v4561 -- the signature gained `body = DEFAULT_BODY` so the driven kaiju can ask about its own eight
+    // cells; the pattern matches the NAME and its first three parameters rather than the exact arity, which
+    // is what it was always about. An arity-exact pattern reddens on every parameter anybody adds.
     ok("!! the walk's ground has a NAME for a gate to hook, which is why playerGround stopped going blind",
-       /_walkGroundAt\(x, z, feetY\)/.test(CAMCODE) &&
+       /_walkGroundAt\(x, z, feetY\b/.test(CAMCODE) &&
        /_walkGroundAt/.test(src("tools/ship/playerGround-selfcheck.mjs")));
 }
 

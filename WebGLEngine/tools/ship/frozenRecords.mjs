@@ -511,7 +511,10 @@ export const PROBE_AT_V4536 = Object.freeze({
     // record moves the field count without moving the record count, which is v4540's lesson arriving again
     // and the reason this is re-taken on EDITS and not only on arrivals.
     // v4555 -- RE-TAKEN under the wide rule: 118 / 57 / 279 becomes 127 / 65 / 347.
-    currentIncludingModule: Object.freeze({ records: 127, withFields: 65, fields: 347 }),
+    // v4561 -- RE-TAKEN with `excluding`: 347 -> 376. THE TWO MOVE TOGETHER BY CONSTRUCTION and the gate
+    // asserts the difference is exactly this module's own two records, so moving one and not the other
+    // reddens the subset row -- which is what it did when I bumped `excluding` alone and had to come back.
+    currentIncludingModule: Object.freeze({ records: 127, withFields: 65, fields: 376 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -610,7 +613,9 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4560 -- RE-TAKEN: 339 -> 344, the five fields written into KAIJU_GROUND_AT_V4554 and
     // CAMERA_FALL_AT_V4548 when the round closed the kaiju double write. NO RECORD ARRIVED: both are repairs
     // to records that already existed, which is v4540's case and now v4559's twice over.
-    excluding: Object.freeze({ records: 125, withFields: 63, fields: 344 }),
+    // v4561 -- RE-TAKEN: 344 -> 356, the twelve fields written into KAIJU_GROUND_AT_V4554 when the round
+    // gave the driven kaiju its own body height. NO RECORD ARRIVED, for the fourth round running.
+    excluding: Object.freeze({ records: 125, withFields: 63, fields: 356 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,

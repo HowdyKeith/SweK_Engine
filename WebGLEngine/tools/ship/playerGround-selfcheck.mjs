@@ -238,13 +238,22 @@ console.log("\n8. ONE number, read live by both -- and what that number turns ou
     // second policy about the same number and reddens this.
     const probeSig    = bare(Camera.prototype._standYAt).match(/reach\s*=\s*([A-Za-z_.]+)/) || [];
     const probeReach  = bare(Camera.prototype._standYAt).match(/stepUp\s*:\s*[^ ,}]+/g) || [];
+    // *** v4561 -- THE REACH IS THE FOURTH ARGUMENT, AND THIS USED TO MEAN "THE LAST ONE". *** The pattern
+    // matched `..., 0)` -- the reach only because the reach happened to be last. v4561 gave _standYAt a
+    // FIFTH argument, the body, and the row went red on `_standYAt(x, z, y, 0, body)` while the claim it
+    // makes -- the one override passes ZERO for the reach -- was still exactly true. A row anchored on
+    // argument POSITION survives a new argument; one anchored on "before the close paren" does not, and
+    // that is the same species as a regex anchored on prose.
+    const REACH_ARG = 4;
+    const argsOf = (call) => call.slice(call.indexOf("(") + 1, call.lastIndexOf(")")).split(",").map((a) => a.trim());
     const overrides   = ["_moveFP", "_moveKaijuDrive", "_fallSurface", "_terrainTopAt", "_terrainTopAtBilinear"]
-        .flatMap((m) => (bare(Camera.prototype[m]).match(/_(?:standYAt|terrainTopAt|terrainTopAtBilinear)\([^)]*,\s*(-?[\w.]+)\s*\)/g) || [])
-            .filter((c) => /,\s*-?[\d]/.test(c)).map((c) => m + ": " + c.trim()));
+        .flatMap((m) => (bare(Camera.prototype[m]).match(/_(?:standYAt|terrainTopAt|terrainTopAtBilinear)\([^)]*\)/g) || [])
+            .filter((c) => { const a = argsOf(c); return a.length >= REACH_ARG && /^-?[\d.]+$/.test(a[REACH_ARG - 1]); })
+            .map((c) => m + ": " + c.trim()));
     ok("!! the reach is Camera.STEP_UP_MAX once, and the only caller that overrides it passes ZERO",
         walkAssigns.length === 1 && /=\s*Camera\.STEP_UP_MAX\s*$/.test(walkAssigns[0]) &&
         probeSig[1] === "Camera.STEP_UP_MAX" && probeReach.length === 1 && probeReach[0] === "stepUp: reach" &&
-        overrides.length === 1 && /,\s*0\s*\)/.test(overrides[0]) && /_fallSurface/.test(overrides[0]),
+        overrides.length === 1 && argsOf(overrides[0])[REACH_ARG - 1] === "0" && /_fallSurface/.test(overrides[0]),
         "_moveFP: `" + walkAssigns.join(" | ") + "`; _standYAt(x, z, fromY, reach = " + probeSig[1] +
         ") and `" + probeReach.join(" | ") + "`; overrides: " + (overrides.join(", ") || "none") + ". *** THE " +
         "ONE OVERRIDE IS THE FALL, AND IT IS ZERO, *** which is physics/character/fallBody.mjs's rule -- " +

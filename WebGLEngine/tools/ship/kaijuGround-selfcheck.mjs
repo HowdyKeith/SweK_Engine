@@ -264,6 +264,57 @@ console.log("\n-- 3. what happens if you just guard the clamp");
            "THE WALKER'S ALLOWANCE ARE THE SAME NUMBER, so `blocked` cannot fire from a voxel ground -- it " +
            "is for a caller that wrote position.y from outside, and this row is the only thing grading it.");
     }
+    // =========================================================================================================
+    // *** v4561 -- THE BODY HEIGHT REACHES THE PROBE, AND IT IS THE CREATURE'S OWN. ***
+    {
+        ok("!! *** the creature's height has ONE rule, read by the camera AND by the collision ***",
+           Camera.kaijuHeight({}) === 8 &&
+           Camera.kaijuHeight({ _meshEntityId: 1, config: { scale: 4 } }) === 8 &&
+           Camera.kaijuHeight({ _meshEntityId: 1, config: { scale: 2.5 } }) === 5 &&
+           Camera.kaijuHeight({ _meshEntityId: 1, config: { scale: 1 } }) === 4 &&
+           Camera.kaijuBodyCells({ _meshEntityId: 1, config: { scale: 2.8 } }) === 6 &&
+           /const KAIJU_HEAD_Y = Camera\.kaijuHeight\(k\);/.test(CAMCODE),
+           `an obelisk is ${Camera.kaijuHeight({})}, the roster's smallest kind (scale 2.5) is ` +
+           `${Camera.kaijuHeight({ _meshEntityId: 1, config: { scale: 2.5 } })} and its largest (4) is ` +
+           `${Camera.kaijuHeight({ _meshEntityId: 1, config: { scale: 4 } })}, floored at 4. IT IS NOT ONE ` +
+           "NUMBER, which is what made v4560's single constant of 2 a second wrong number rather than one. " +
+           "The camera offset reads the same call, so the eye and the collision cannot drift apart.");
+        ok("!! *** and the probe is ASKED about that body, which no ground query in this file ever was ***",
+           /_standYAt\(x, z, fromY, reach = Camera\.STEP_UP_MAX, body = DEFAULT_BODY\)/.test(CAMCODE) &&
+           /stepUp: reach, body \}/.test(CAMCODE) &&
+           /_stepTargetAt\(x, z, feetY, body = DEFAULT_BODY\)/.test(CAMCODE) &&
+           /_walkGroundAt\(x, z, feetY, body = DEFAULT_BODY\)/.test(CAMCODE) &&
+           /_fallSurface\(body = DEFAULT_BODY\)/.test(CAMCODE) &&
+           /const kBody = Camera\.kaijuBodyCells\(k\);/.test(CAMCODE),
+           "every one of them went to standHeightAt with no body and got surfaceProbe's DEFAULT_BODY of 2. " +
+           "THE DEFAULT IS STILL 2 AT EVERY HOP, so the player's answer is unchanged by construction rather " +
+           "than by measurement -- and the drive passes the creature's own cells at all three.");
+        // *** THE CONSEQUENCE, MEASURED, AND IT IS SMALL RATHER THAN NOTHING. *** The drive stands on the
+        // topmost surface on almost every frame, where headroom is the sky and no body height can matter.
+        // Under something it is finite, and that is where this is worth anything.
+        ok("!! the number this buys is REPORTED, because it is 32 frames of 63,756 and not a headline",
+           R.framesWithLessThanEightCellsOfHeadroomBefore === 32 &&
+           R.framesWithLessThanEightCellsOfHeadroomAfter === 0 &&
+           R.framesBelowTheTopSolidBefore === 88 && R.framesBelowTheTopSolidAfter === 0 &&
+           R.minimumHeadroomAfter > R.minimumHeadroomBefore,
+           `over 240 island-wide drives: ${R.framesBelowTheTopSolidBefore} grounded frames below the top ` +
+           `solid before and ${R.framesBelowTheTopSolidAfter} after, of which ` +
+           `${R.framesWithLessThanEightCellsOfHeadroomBefore} had under eight cells of headroom and now ` +
+           `${R.framesWithLessThanEightCellsOfHeadroomAfter} do; worst headroom ` +
+           `${R.minimumHeadroomBefore} -> ${R.minimumHeadroomAfter}. A BODY-HEIGHT FIX ON A WORLD WHOSE ` +
+           "DRIVEN CREATURE ALMOST NEVER GOES INDOORS IS WORTH ALMOST NOTHING, and saying so is the point.");
+        ok("!! *** and v4554's 1,715 was places LOST, not creatures dropped -- ZERO columns lose their last ***",
+           R.columnsWithNowhereToStandAtBody8 === 0 &&
+           R.standablePlacesBody2 - R.standablePlacesBody8 === R.placesLostAtBody8 &&
+           R.placesLostAtBody8In9x9Window < R.placesLostAtBody8,
+           `${R.standablePlacesBody2} standable places for a 2-cell body, ${R.standablePlacesBody8} for an ` +
+           `8-cell one, ${R.placesLostAtBody8} lost -- and ${R.columnsWithNowhereToStandAtBody8} columns ` +
+           `left with nowhere at all to stand. v4554 wrote that a naive body-8 probe "drops the creature ` +
+           `out of the world in the 1,715 places where an 8-cell body does not fit"; ${R.placesLostAtBody8In9x9Window} ` +
+           "is that window's figure for places lost, and no creature is dropped by it. THE WINDOW WAS THE " +
+           "9x9 PATCH #34 FOUND, which makes this the same defect in a number I wrote myself.");
+    }
+
     ok("the record carries both numbers",
        R.lostWithClamp === 0 && R.lostWithoutClamp >= 50 && R.naiveFixIsACatastrophe === true &&
        R.closedAtV4560 === true);
