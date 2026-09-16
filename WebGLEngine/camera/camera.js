@@ -13,6 +13,7 @@
 
 import { buildViewProj } from "./buildViewProj.js";
 import { autoGround, meshGround, stepTerrainFan, SURFACE } from "../physics/character/terrainWalk.mjs";
+import { depenetrateCapsule } from "../physics/character/capsuleCollide.mjs";
 
 export class Camera {
     // The keys the _move* methods consult in EVERY mode that moves. KeyE is deliberately absent: it is
@@ -63,6 +64,8 @@ export class Camera {
         this._fpJumpVel = 7.5;
         this._gravity = 18;             // m/s² downward in FP mode
         this._fpMaxSlopeDeg = 50;       // Round #13 -- walkable limit for the non-voxel ground oracle below
+        this._capsuleRadius = 0.4;      // Round #13 Stage B (task board #80) -- capsule-vs-BVH collision size
+        this._capsuleHeight = 1.8;      // close to _eyeHeight (1.7): eyes sit near the top of the capsule
         this._fpFallStartTime = 0;       // diagnostic: time spent airborne
         // Round 31 — energy bar gates sprint. main.js installs ref.
         this.playerEnergy = null;
@@ -664,6 +667,42 @@ export class Camera {
         this.position.z += mz * step;
     }
 
+    // Round #13 Stage B (task board #80) — the world's full triangle-mesh collider, when it has one. Unlike
+    // _terrainGroundOracle()'s height function, a BVH here means walls, ceilings and moving platforms are
+    // real geometry a capsule can be pushed out of, not just a surface to stand on. No caching needed:
+    // this is a direct property read, not a closure to build.
+    _capsuleWorldBVH() {
+        const w = this.world;
+        return (w && w.colliderBVH) ? w.colliderBVH : null;
+    }
+
+    // physics/character/capsuleCollide.mjs's depenetrateCapsule is the port (task board #80); this is the
+    // live-input wiring for it, the same relationship _moveFPTerrain has to terrainWalk.mjs's ground oracle.
+    // Unlike the height-field ground oracle, a BVH collider covers walls and ceilings too, so there is no
+    // separate horizontal-collision step here: depenetrateCapsule resolves horizontal AND vertical
+    // penetration together, which is the entire reason to use a capsule instead of a height function.
+    _moveFPCapsule(dt, mx, mz, horizLen, speed, bvh) {
+        if (!this._fpOnGround) this._fpVelY -= this._gravity * dt;
+        const feet = [
+            this.position.x + mx * speed * dt,
+            this.position.y - this._eyeHeight + this._fpVelY * dt,
+            this.position.z + mz * speed * dt,
+        ];
+        const r = depenetrateCapsule(feet, this._capsuleRadius, this._capsuleHeight, bvh);
+        this.position.x = r.pos[0];
+        this.position.y = r.pos[1] + this._eyeHeight;
+        this.position.z = r.pos[2];
+        this._fpOnGround = r.grounded;
+        if (r.grounded) this._fpVelY = 0;
+        if (this.keys.has("Space") && this._fpOnGround) {
+            this._fpVelY = this._fpJumpVel;
+            this._fpOnGround = false;
+        }
+        this.velocity.x = mx * speed;
+        this.velocity.y = this._fpVelY;
+        this.velocity.z = mz * speed;
+    }
+
     // Round #13 (task board) Stage A — the ground oracle terrainWalk.mjs needs, for the FP modes when
     // the world exposes no voxelAt at all. simulation/BotManager.js's own _groundOracle() does the same
     // thing for AI movement and is the reason this shape (cache against world identity, build once) is
@@ -771,6 +810,16 @@ export class Camera {
         if (this.playerEnergy) this.playerEnergy.setSprinting(isSprinting && horizLen > 0);
         this._sprinting = isSprinting && horizLen > 0;   // Round 31 — drives the sprint FOV widen
         const speed = isSprinting ? this._fpSprintSpeed : this._fpWalkSpeed;
+
+        // Round #13 Stage B (task board #80) -- a world exposing a real triangle-mesh collider (walls,
+        // ceilings, moving platforms, not just a ground height) takes priority over both the height-field
+        // oracle below and the voxel path: capsule-vs-BVH depenetration is the most general of the three
+        // and subsumes what the other two answer for the geometry it is given.
+        const capsuleBVH = this._capsuleWorldBVH();
+        if (capsuleBVH) {
+            this._moveFPCapsule(dt, mx, mz, horizLen, speed, capsuleBVH);
+            return;
+        }
 
         // Round #13 Stage A -- a world with no voxelAt at all (a pure heightfield/mesh world -- splat-
         // derived collision, imported terrain) walks through physics/character/terrainWalk.mjs's oracle
