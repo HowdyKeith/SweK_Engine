@@ -312,8 +312,11 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // its five rows moved out of tools/ship/murmurSpecies2-selfcheck.mjs, so the tree gained one gate FILE
     // and no new rows -- which is exactly the kind of move that makes a count of gates and a count of claims
     // disagree, and is why this record carries both.
-    gates: 1674, usesOk: 1653, definesOk: 1645, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1546, condFirst: 91, unknownSignature: 16,
+    // v4634 -- RE-TAKEN 1674 -> 1675 for tools/ship/murmurSpecies5-selfcheck.mjs, carrying nebula and
+    // tempest. ONE gate for TWO species, which is the shape murmur's own pairing makes possible: the two
+    // files call a byte-identical kit set and every row in the gate is a comparison between them.
+    gates: 1675, usesOk: 1654, definesOk: 1646, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1547, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

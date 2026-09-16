@@ -280,3 +280,28 @@ export const radialScale = (a, b, lo = 0.50, hi = 0.80, step = 0.01) => {
     }
     return best;
 };
+
+/**
+ * THE INTERIOR'S LIGHT AS A DISTRIBUTION rather than as a mean, which is the only way to say "this cloud has
+ * real dark in it" without saying it about the average.
+ *
+ * *** A MEAN CANNOT TELL A CLOUD FROM A GRADIENT, and that is the whole reason this exists. *** murmur's two
+ * volumetric heroes are domain-warped mist whose design question, in nebula.ts's own words, is "whether five
+ * samples down a refracted ray can make a cloud read as a cloud rather than as a soft gradient with noise on
+ * it". A gradient and a cloud can carry the same mean; what separates them is the SPREAD between the dark
+ * gaps and the lit folds. tempest sets its density smoothstep's lower edge further up than nebula's
+ * (-0.12 against -0.20) and absorbs at 3.60 against 3.10, precisely so its cloud has somewhere dark for its
+ * lightning to be seen against -- and that difference is invisible to a mean and plain in the percentiles.
+ */
+export const interiorSpread = (px, r = 0.70) => {
+    const v = [];
+    for (let y = 0; y < N3; y++) for (let x = 0; x < N3; x++) {
+        const dx = (x + 0.5) / N3 * 2 - 1, dy = (y + 0.5) / N3 * 2 - 1;
+        if (Math.hypot(dx, dy) > 0.62 * r) continue;
+        v.push(light(px, x, y));
+    }
+    v.sort((a, b) => a - b);
+    const at = (q) => v[Math.min(v.length - 1, Math.floor(v.length * q))];
+    return { p10: at(0.10), median: at(0.50), p90: at(0.90), n: v.length,
+             contrast: at(0.90) / Math.max(at(0.10), 1e-6) };
+};

@@ -48,10 +48,18 @@ export const ORB_KNOBS = Object.freeze([
     // opal's three and abyss's three, from the same roster. `drift` is shared between them exactly as
     // murmur's own roster shares it -- opal spends c1 on it and abyss c2.
     "flashes", "softness", "drift", "creatures", "rarity",
+    // nebula's three and tempest's three, which are the SAME three -- and sharing them is faithful rather
+    // than thrifty. murmur names c0..c2 per species (nebula reads densityK/foldK/glintK, tempest reads
+    // stormK/churnK/flickerK) but they are one argument list and they mean the same thing on both: how much
+    // weather there is, how hard it turns over, and how strong the thing buried in it is. The port already
+    // shares `drift` between opal and abyss for exactly this reason. c3 is `spread` on both, as it is on
+    // seventeen of the eighteen.
+    "density", "fold", "glint",
 ]);
 
 /** The species this file can build. murmur ships eighteen; these are the six that are ported. */
-export const ORB_SPECIES = Object.freeze(["still", "limn", "comet", "droplet", "opal", "abyss"]);
+export const ORB_SPECIES = Object.freeze(["still", "limn", "comet", "droplet", "opal", "abyss",
+                                          "nebula", "tempest"]);
 
 /**
  * The three colour anchors the rail is built from, as murmur's own WEB-SPEC names them: ink '#0A0A0B' is the
@@ -65,7 +73,8 @@ export const ORB_COLORS = Object.freeze({
 });
 
 import { makeMurmurKitTsl } from "./murmurKitTsl.mjs";
-import { MH_EXT, MH_TAPS, MH_SURFACE_KNOBS, MH_SHAPE, MH_DROPLET_GAIN } from "./murmurKit.mjs";
+import { MH_EXT, MH_TAPS, MH_SURFACE_KNOBS, MH_SHAPE, MH_DROPLET_GAIN, MH_MIST,
+         MH_TEMPEST_BOLT } from "./murmurKit.mjs";
 
 const R_BODY = 0.62;          // sphere radius in the -1..1 quad
 const EDGE_FEATHER = 0.015;   // antialiased silhouette width, in the same units as R_BODY
@@ -113,7 +122,8 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
                  rimWidth: 0.4, travel: 0.5, innerHint: 0.3, spread: 0.4,
                  orbitTilt: 0.5, trail: 0.5, pointSize: 0.4,
                  wobble: 0.5, tension: 0.5, sheen: 0.5,
-                 flashes: 0.5, softness: 0.6, drift: 0.4, creatures: 0.4, rarity: 0.6, ...knobs };
+                 flashes: 0.5, softness: 0.6, drift: 0.4, creatures: 0.4, rarity: 0.6,
+                 density: 0.5, fold: 0.5, glint: 0.5, ...knobs };
     const uniforms = {}; for (const n of ORB_KNOBS) uniforms[n] = uniform(float(k0[n])).label(n);
     // The rail's three anchors are colours, not scalars, so they sit beside the knob block rather than in it.
     const col0 = { ink: ORB_COLORS.ink, tone: ORB_COLORS.tone, tone2: ORB_COLORS.tone, ...(knobs.colors || {}) };
@@ -623,11 +633,134 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         });
         const abyssDensity = accA.mul(3.20).add(glowE).mul(uniforms.depth);
 
+        // =====================================================================================================
+        // *** NEBULA AND TEMPEST -- THE SEVENTH AND EIGHTH, AND THE ONLY TWO OF THE EIGHTEEN WITH NO OBJECT
+        // INSIDE THE GLASS AT ALL. *** nebula.ts: "EVERY OTHER HERO PUTS SOMETHING INSIDE THE BODY and lets
+        // the medium carry it. This one deletes the something. The mist IS the species." They are also the
+        // only two that never call mh_medium -- checked across all eighteen source files -- because the
+        // density field IS the subject rather than the thing a subject sits in.
+        //
+        // tempest.ts names the pairing itself: "NEBULA'S SIBLING AND ITS OPPOSITE TEMPERAMENT. Both are
+        // domain-warped mist and everything else about them differs. Nebula is lit evenly from within and
+        // its business is DEPTH. This one is lit from INSIDE ITS OWN FLASHES, its density runs harder so the
+        // cloud has real dark in it, and its business is ENERGY."
+        //
+        // ONE PATH, TWO SETS OF NUMBERS, which is how murmur's own two files are written: the march below is
+        // structurally identical and every constant that differs is read from the table beside it. The
+        // difference that matters most is the density curve -- nebula smoothsteps the noise over
+        // (-0.20, 0.30) and tempest over (-0.12, 0.46), so tempest's lower edge sits further up and the
+        // cloud gets REAL HOLES for its lightning to be seen against.
+        //
+        // THE FOLD IS A DOMAIN WARP: one noise displaces the coordinates the second is read at. TWO noise
+        // samples per tap, which nebula.ts calls "the entire budget this species gets and the reason it can
+        // afford to be the only hero with real turbulence".
+        // THE NUMBERS COME FROM THE KIT'S OWN TABLE, not from constants typed here: see MH_MIST in
+        // render/murmurKit.mjs for why, and tools/ship/murmurKit-selfcheck.mjs for the rows that grade it.
+        // *** THE FALLBACK IS NOT COSMETIC AND THE HARNESS FOUND OUT WHY. *** Every species' block in this
+        // file is BUILT for every species and selected at the end -- still's shader carries abyss's march and
+        // opal's too -- so this block runs its constructor for all eight. Before v4634 it read a ternary,
+        // which always produced an object; a bare MH_MIST[species] lookup is undefined for the six that are
+        // not mist, and `MIST.scale` then threw inside the TSL builder. three.js CATCHES that, console.errors
+        // it and substitutes a node generating zero, so the render "succeeds" and returns black -- which is
+        // why tools/ship/webgpuHarness.mjs was taught at v4627 to FAIL on page errors. It did: four gates
+        // went red at once with the file and line. The six non-mist species never SELECT mistDensity, so
+        // which table they build against cannot reach a pixel.
+        const MIST = MH_MIST[species] || MH_MIST.nebula;
+        const densityK = clamp(uniforms.density, 0.0, 1.0).toVar();
+        const foldK = clamp(uniforms.fold, 0.0, 1.0).toVar();
+        const glintK = clamp(uniforms.glint, 0.0, 1.0).toVar();
+        // `energy` is tempest's own term and tempest.ts calls it "the deepest reading of cadence in the
+        // collection": it raises the churn, quickens the weather AND shortens both flicker slots at once.
+        // This port has no state machine (mh_state/mh_live are not ported and the port runs as idle), so the
+        // only live input it can honour is voice -- which is named here rather than quietly dropped.
+        const energy = species === "tempest" ? clamp(uniforms.voice.mul(0.85), 0.0, 1.6).toVar() : float(0.0).toVar();
+        const mScale = float(MIST.scale).mul(mix(float(1.0), float(MIST.small), smallK)).toVar();
+        const mWarp = float(MIST.warp).mul(mix(float(1.0), float(0.60), smallK)).toVar();
+        const mFold = float(MIST.foldB).add(foldK.mul(MIST.foldK)).mul(float(1.0).add(energy.mul(0.85)))
+            .mul(mix(float(1.0), float(0.55), smallK)).toVar();
+        const mDr = KIT.mhDrift(uniforms.time, float(MIST.drB).add(foldK.mul(MIST.drK)), float(0.45), float(MIST.drLane))
+            .mul(float(1.0).add(energy.mul(0.95)).add(uniforms.voice.mul(0.35))).toVar();
+        const mAbsorb = float(MIST.absorb).mul(float(0.55).add(densityK.mul(0.85))).toVar();
+        const mEmit = float(MIST.emitB).add(densityK.mul(MIST.emitK)).toVar();
+
+        // THE BURIED GESTURE. nebula gets ONE glint on a 7.2 s slot and no depth mask; tempest gets TWO
+        // lightning lanes on 2.9 and 4.3 s slots that "interleave without ever landing together", each
+        // depth-MASKED to the inner two thirds. That mask is the species' one inviolable rule.
+        const mistRate = float(1.0).div(float(1.0).add(energy.mul(1.30))).toVar();
+        const flA = species === "tempest"
+            ? KIT.mhFlourish(uniforms.time, float(MH_TEMPEST_BOLT.lanes[0].seed),
+                             float(MH_TEMPEST_BOLT.lanes[0].slot).mul(mistRate)).toVar()
+            : KIT.mhFlourish(uniforms.time, float(3.0), float(7.2)).toVar();
+        const flB = KIT.mhFlourish(uniforms.time, float(MH_TEMPEST_BOLT.lanes[1].seed),
+                                   float(MH_TEMPEST_BOLT.lanes[1].slot).mul(mistRate)).toVar();
+        const gAng = flA.z.mul(6.2831853).toVar();
+        const gPosA = species === "tempest"
+            ? vec3(cos(flA.z.mul(6.283)), sin(flA.z.mul(9.1).add(1.1)).mul(0.75), sin(flA.z.mul(5.3).add(2.7))).mul(0.40).toVar()
+            : vec3(cos(gAng), sin(gAng.mul(1.7).add(1.1)).mul(0.72), sin(gAng.mul(0.9).add(2.7))).mul(0.46)
+                .add(vec3(0.0, -0.16, 0.06).mul(flA.y)).toVar();
+        const gPosB = vec3(cos(flB.z.mul(7.7).add(2.2)), sin(flB.z.mul(6.4).add(3.9)).mul(0.75),
+                           sin(flB.z.mul(8.8).add(0.4))).mul(0.40).toVar();
+        const gW = species === "tempest"
+            ? float(0.150).add(glintK.mul(0.070)).mul(mix(float(1.0), float(1.65), smallK)).toVar()
+            : float(0.130).add(glintK.mul(0.045)).mul(mix(float(1.0), float(1.65), smallK)).toVar();
+        const gAmp = species === "tempest"
+            ? float(0.85).add(glintK.mul(2.80)).mul(float(1.0).add(energy.mul(0.45))).toVar()
+            : flA.x.mul(float(0.55).add(glintK.mul(1.35))).mul(mix(float(1.0), float(1.55), smallK)).toVar();
+
+        const accM = float(0.0).toVar();
+        const accMH = float(0.0).toVar();
+        const transM = float(1.0).toVar();
+        Loop({ start: 0, end: MH_TAPS }, ({ i }) => {
+            const pM = P.add(rd.mul(float(i).add(0.5).mul(ds))).toVar();
+            const fade = KIT.mhInside(pM).toVar();
+            // THE FOLD: one noise displaces the coordinates the next is read at.
+            const w = KIT.mhNoise3(pM.mul(mWarp).add(vec3(0.0, mDr.mul(0.70), mDr))).toVar();
+            const q = pM.mul(mScale)
+                .add(w.mul(mFold).mul(species === "tempest" ? vec3(0.90, -0.62, 0.68) : vec3(0.92, -0.58, 0.71)))
+                .add(vec3(0.0, 0.0, mDr)).toVar();
+            const nz = KIT.mhNoise3(q).toVar();
+            const dens = smoothstep(float(MIST.dLo), float(MIST.dHi), nz).mul(fade).toVar();
+            // LIT FROM WITHIN: emission rises toward the middle of the body and absorption does not, so the
+            // dark parts are dark "because something is IN FRONT, not because nothing is there".
+            const rp = length(pM).toVar();
+            const glowIn = float(MIST.gLo).add(float(1.0).sub(smoothstep(float(0.0), float(MIST.gFar), rp)).mul(MIST.gK)).toVar();
+            const eM = dens.mul(glowIn).mul(mEmit).mul(float(1.0).add(uniforms.voice.mul(MIST.voiceE))).toVar();
+            if (species === "tempest") {
+                // THE DEPTH MASK, which is why the flickers never reach the surface. Outside 0.62 of the
+                // radius it is exactly zero, so no flash can light the shell however bright it is.
+                const deep = float(1.0).sub(smoothstep(float(MH_TEMPEST_BOLT.maskIn),
+                                                       float(MH_TEMPEST_BOLT.maskOut), rp)).toVar();
+                const d0 = pM.sub(gPosA).div(max(gW, float(1e-3))).toVar();
+                const d1 = pM.sub(gPosB).div(max(gW, float(1e-3))).toVar();
+                const a0 = dot(d0, d0).toVar(), a1 = dot(d1, d1).toVar();
+                // MOSTLY SCATTER, "much more of it than any other hero's: a flash inside a cloud is seen
+                // almost entirely as the cloud lighting up, not as the flash".
+                const bolt = flA.x.mul(exp(negate(a0)).mul(0.42).add(KIT.mhScatter(a0, float(0.62))))
+                    .add(flB.x.mul(exp(negate(a1)).mul(0.42).add(KIT.mhScatter(a1, float(0.62))))).toVar();
+                // Weighted by the LOCAL DENSITY: lightning lights the cloud, so it is brightest where there
+                // is something for it to light.
+                eM.addAssign(bolt.mul(gAmp).mul(deep).mul(float(0.30).add(dens.mul(0.85))));
+            } else {
+                const dg = pM.sub(gPosA).div(max(gW, float(1e-3))).toVar();
+                const garg = dot(dg, dg).toVar();
+                eM.addAssign(gAmp.mul(exp(negate(garg)).mul(0.75).add(KIT.mhScatter(garg, float(0.22)))));
+            }
+            accM.addAssign(eM.mul(transM).mul(ds));
+            // DEPTH CARRIES THE SPREAD: the near folds one way, the deep glow the other, "so the cloud has
+            // two hues in conversation through its thickness". Same channel still and droplet use.
+            accMH.addAssign(eM.mul(clamp(pM.z, -1.0, 1.0)).mul(transM).mul(ds));
+            // *** THE LINE OF ARITHMETIC. *** nebula.ts: "NEARER FOLDS OCCLUDE FARTHER GLOW, and that
+            // sentence is a coefficient of 3.1." tempest runs it at 3.6, which is what gives it real dark.
+            transM.assign(transM.mul(exp(mAbsorb.mul(dens).add(MH_EXT).mul(ds).negate())));
+        });
+        const mistDensity = accM.mul(MIST.gain).mul(uniforms.depth);
+
         const density = species === "limn" ? limnDensity
             : species === "comet" ? cometDensity
             : species === "droplet" ? dropletDensity
             : species === "opal" ? opalDensity
-            : species === "abyss" ? abyssDensity : stillDensity;
+            : species === "abyss" ? abyssDensity
+            : (species === "nebula" || species === "tempest") ? mistDensity : stillDensity;
 
         // ---- THE SURFACE IS murmur's NOW, NOT THIS FILE'S APPROXIMATION OF IT ------------------------------
         // *** WHAT STOOD HERE WAS WRONG IN FIVE WAYS AND RIGHT IN TWO, AND THE TWO ARE WHY IT LOOKED FINE. ***
@@ -716,6 +849,13 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             : species === "abyss"
             // abyss's three lanes take one hue step each: -1, 0, +1 across the spread.
             ? select(glowE.greaterThan(1e-5), glowH.div(glowE), float(0.0)).mul(spreadK).mul(KIT.MH_SPREAD)
+            : (species === "nebula" || species === "tempest")
+            // *** THE MIST HEROES CARRY THEIR HUE ON DEPTH, WHICH IS THE ONE CHANNEL A CLOUD HAS. ***
+            // nebula.ts: "the near folds one way, the deep glow the other, so the cloud has two hues in
+            // conversation through its thickness". The accumulator is e * clamp(p.z, -1, 1), weighted by the
+            // SAME transmittance the luminance is -- so a fold that occludes the glow behind it occludes
+            // that glow's hue too, which is what stops the far half from tinting a near silhouette.
+            ? select(accM.greaterThan(1e-4), accMH.div(accM), float(0.0)).mul(spreadK).mul(KIT.MH_SPREAD)
             : species === "limn"
             ? tailShare.negate().mul(spreadK).mul(KIT.MH_SPREAD)
             : species === "comet"
@@ -733,6 +873,9 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             // rather than by the interior, because in both the event IS the colour and the medium is night.
             : species === "opal" ? flashE
             : species === "abyss" ? glowE
+            // nebula and tempest take the DEFAULT, and that is transcribed rather than fallen into: both
+            // their files spell hueMix = hue * (interior + sf.rim * 0.7) / max(e, 1e-4), the same numerator
+            // still and comet use. Checked against the source, not assumed from the branch order.
             : interior.add(sf.rim.mul(0.7));
         const hueMix = hueRaw.mul(hueNum).div(max(eTotal, float(1e-4))).toVar();
         const colorLinear = max(KIT.mhLit(pal, railE, uniforms.glow, float(0.0), float(1.0), float(0.34), hueMix),

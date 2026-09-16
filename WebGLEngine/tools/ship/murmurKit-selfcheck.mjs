@@ -513,6 +513,42 @@ sec("7. *** THE DEFORMED BODY SOLVE -- the half of the kit the first three speci
         `gates stayed green on a roster that had lost a species. That collapse is not hypothetical -- it is ` +
         `what this port DID until v4632, on a note that was right about mh_body and wrong about the heroes.`);
 
+    // *** THE TWO VOLUMETRIC HEROES' CONSTANTS, GRADED BECAUSE INLINE THEY WERE NOT. *** v4634's sabotage
+    // sweep changed tempest's absorption from 3.60 to nebula's 3.10 -- the coefficient nebula.ts calls "THE
+    // LINE", the one that makes a near fold a silhouette against the glow behind it -- and every row in
+    // every murmur gate stayed green. Same for swapping its density curve, and same for handing it nebula's
+    // specular. Those are three constants a pixel row could not separate, and the answer is the one v4632
+    // reached for opal's life: a constant a gate can READ is a constant a gate can grade.
+    const NB = K.MH_MIST.nebula, TM = K.MH_MIST.tempest;
+    say(`mist constants -- nebula density curve (${NB.dLo}, ${NB.dHi}) absorb ${NB.absorb} gain ${NB.gain}; ` +
+        `tempest (${TM.dLo}, ${TM.dHi}) absorb ${TM.absorb} gain ${TM.gain}`);
+    ok("!! *** TEMPEST RUNS HARDER THAN NEBULA ON EVERY TERM ITS OWN FILE SAYS IT DOES ***",
+        TM.dLo > NB.dLo && TM.dHi > NB.dHi && TM.absorb > NB.absorb && TM.gain > NB.gain &&
+        TM.scale > NB.scale && TM.foldB > NB.foldB,
+        `its density smoothstep is (${TM.dLo}, ${TM.dHi}) against nebula's (${NB.dLo}, ${NB.dHi}) -- BOTH ` +
+        `edges further up, which is what tempest.ts means by "its density runs harder so the cloud has real ` +
+        `dark in it" -- it absorbs at ${TM.absorb} against ${NB.absorb}, folds at ${TM.foldB} against ` +
+        `${NB.foldB}, reads the mist at ${TM.scale} against ${NB.scale}, and carries a gain of ${TM.gain} ` +
+        `against ${NB.gain}. SIX RELATIONS RATHER THAN SIX VALUES, so the row grades the SHAPE of the ` +
+        `difference murmur designed and not a transcription of numbers against a copy of themselves -- the ` +
+        `v4579 scar this tree keeps re-opening.`);
+
+    // *** AND THE ONE PLACE TEMPEST RUNS QUIETER, which is the half a "harder on everything" row would miss.
+    // *** nebula.ts argues its specular UP: "The catchlight has to punch through weather. At 0.60 the cloud's
+    // own body sat close enough to it that the frame had no cream in it anywhere and the value hierarchy
+    // failed: a nebula is still an object with a lit surface." tempest takes 0.66 instead of 0.98, because
+    // its own light comes from inside. Both are in the roster all eighteen are read from.
+    const sN = K.MH_SURFACE_KNOBS.nebula, sT = K.MH_SURFACE_KNOBS.tempest;
+    ok("!! ...but its CATCHLIGHT is quieter, which is the term nebula argues UP and tempest does not need",
+        sT[2] < sN[2] && sN[2] > 0.9 && sT[0] >= sN[0],
+        `nebula's specular is ${sN[2]} and tempest's ${sT[2]}, on rims of ${sN[0]} and ${sT[0]}. A row ` +
+        `asserting "tempest is the harder hero" everywhere would be red on the real roster, and that is why ` +
+        `this one is here: the two files disagree about the SURFACE in the opposite direction from the ` +
+        `volume. nebula.ts wants 0.98 because "a nebula is still an object with a lit surface"; tempest is ` +
+        `lit from inside its own flashes and does not need the punch. *** THIS IS NOT MEASURABLE ON PIXELS ` +
+        `AT THIS FRAME SIZE: *** both catchlights saturate at 646 of 765 and share a hotspot, so the roster ` +
+        `is where the claim lives.`);
+
     ok("...and droplet is the one whose body IS the subject: three and a half times the quietest hero's",
         dropRange > shapeRows.reduce((m, r) => Math.max(m, r[3]), 0) * 2 && K.MH_DROPLET_GAIN > 2.5,
         `droplet's default amplitude of ${dropAmp.toFixed(4)} at a gain of ${K.MH_DROPLET_GAIN} gives ` +

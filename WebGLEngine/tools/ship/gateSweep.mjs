@@ -5214,6 +5214,39 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "probes of one gate became one; and a section that cloned the 1,302-entry record three " +
                  "times stopped doing that. Every row it had is still there.",
     }),
+    // v4634 -- THE 246th CLOSING: nebula and tempest, the pair murmur's own source names.
+    since255: Object.freeze({
+        at: "v4634", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/murmurSpecies5-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 2,663 ms on the rotation, real WebGPU, 9 rows, carrying NEBULA and TEMPEST -- the " +
+                 "seventh and eighth of murmur's eighteen and the only two with NO OBJECT INSIDE THE GLASS AT " +
+                 "ALL. They ship together because the source pairs them: tempest.ts opens \"NEBULA'S SIBLING " +
+                 "AND ITS OPPOSITE TEMPERAMENT ... Nebula is lit evenly from within and its business is " +
+                 "DEPTH. This one is lit from INSIDE ITS OWN FLASHES ... and its business is ENERGY.\" They " +
+                 "call a BYTE-IDENTICAL kit set (diffed) and are the only two of the eighteen that never " +
+                 "call mh_medium, so the pair needed no new kit. MEASURED: tempest holds its lightning to " +
+                 "the inner two thirds and its rings at 0.62 and 0.78 of the radius move EXACTLY 0.00% under " +
+                 "its own brightness knob, where nebula -- which has no depth mask -- moves 20.08% at the " +
+                 "same radius off the same knob, and tempest's own 0.25 ring moves 246%; its interior runs " +
+                 "12.5x from tenth to ninetieth percentile against nebula's 6.3x. THIRTEEN SABOTAGES, ALL " +
+                 "RED, and FOUR survived the first cut. Three were constants inline in the species file -- " +
+                 "tempest's absorption at 3.60 against nebula's 3.10 (the coefficient nebula.ts calls \"THE " +
+                 "LINE\"), its density curve, its specular -- all changeable with every row green, so they " +
+                 "moved into the kit as MH_MIST and MH_TEMPEST_BOLT and are graded there. *** THE FOURTH WAS " +
+                 "A ROW MEASURING THE TONE CURVE AND REPORTING IT AS THE PHYSICS. *** The density-saturation " +
+                 "row ran at the default glow where nebula peaks at 646 of 765: it read 0.680 on the correct " +
+                 "shader and 0.558 with the absorption DELETED -- passing HARDER on the broken one. At glow " +
+                 "0.15, peak 247, it reads 0.581 against 1.012, and 1.00 is not a threshold anybody chose, " +
+                 "it is what linear-in-emission means. A FIFTH GATE rather than rows next door because gate " +
+                 "one had 494 ms of margin and a species costs about 375. AND THE ROUND LEFT A BLOCKER IT " +
+                 "MEASURED: this file builds every species' block into every species' shader, so the two new " +
+                 "heroes cost gate one a PAIRED 213-288 ms although it renders neither. Logged as " +
+                 "orb-species-block-per-shader; the next orb round starts there.",
+    }),
     since249: Object.freeze({
         at: "v4623", swept: 1, green: 1, red: 0,
         added: Object.freeze([

@@ -1,9 +1,9 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed.",
- "at": "2026-09-16T12:37:17.069Z",
+ "at": "2026-09-16T13:44:17.364Z",
  "budgetMs": 3000,
- "lastRun": 1,
+ "lastRun": 6,
  "rotated": [
   {
    "gate": "ai-bridge/assetSync-perf-selfcheck.mjs",
@@ -2051,37 +2051,45 @@
   },
   {
    "gate": "tools/ship/murmurKit-selfcheck.mjs",
-   "ms": 1671,
+   "ms": 1713,
    "code": 0,
-   "priorMs": 1633,
-   "at": "2026-09-16T03:52:32.083Z"
+   "priorMs": 3217,
+   "at": "2026-09-16T13:44:17.364Z"
   },
   {
    "gate": "tools/ship/murmurSpecies-selfcheck.mjs",
-   "ms": 2506,
+   "ms": 2834,
    "code": 0,
-   "priorMs": 2016,
-   "at": "2026-09-16T03:52:22.771Z"
+   "priorMs": 1105,
+   "at": "2026-09-16T13:44:17.364Z"
   },
   {
    "gate": "tools/ship/murmurSpecies2-selfcheck.mjs",
-   "ms": 2000,
+   "ms": 2256,
    "code": 0,
-   "priorMs": 2260,
-   "at": "2026-09-16T03:52:22.771Z"
+   "priorMs": 1090,
+   "at": "2026-09-16T13:44:17.364Z"
   },
   {
    "gate": "tools/ship/murmurSpecies3-selfcheck.mjs",
-   "ms": 2357,
+   "ms": 2565,
    "code": 0,
-   "priorMs": 2728,
-   "at": "2026-09-16T03:52:22.771Z"
+   "priorMs": 1352,
+   "at": "2026-09-16T13:44:17.364Z"
   },
   {
    "gate": "tools/ship/murmurSpecies4-selfcheck.mjs",
-   "ms": 2095,
+   "ms": 2244,
    "code": 0,
-   "at": "2026-09-16T03:52:22.771Z"
+   "priorMs": 1086,
+   "at": "2026-09-16T13:44:17.364Z"
+  },
+  {
+   "gate": "tools/ship/murmurSpecies5-selfcheck.mjs",
+   "ms": 2663,
+   "code": 0,
+   "priorMs": 3020,
+   "at": "2026-09-16T13:44:17.364Z"
   },
   {
    "gate": "tools/ship/notifyDoor-selfcheck.mjs",

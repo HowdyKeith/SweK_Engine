@@ -717,6 +717,51 @@ export const MH_SHAPE = Object.freeze({
     comet: Object.freeze([0.024, 0.000, 0.0, 1.30]),
     opal: Object.freeze([0.022, 0.008, 7.4, 1.22]),
     abyss: Object.freeze([0.019, 0.006, 14.1, 1.14]),
+    // *** THE TWO VOLUMETRIC HEROES, AND THEIR DEFORMED RADII ARE A WARNING ABOUT THE ROW BELOW THEM. ***
+    // nebula's spread is 3.74% -- the SAME figure opal's carries, to two decimals -- off a different
+    // amplitude, a different breath period and a different gain. Two heroes can agree on the derived number
+    // and be different shapes, which is exactly why murmurKit-selfcheck asserts that no two ENTRIES are
+    // equal rather than that no two spreads are: a row built on the percentage would call these one species.
+    nebula: Object.freeze([0.022, 0.008, 1.6, 1.25]),
+    tempest: Object.freeze([0.023, 0.009, 9.2, 1.28]),
+});
+
+/**
+ * THE TWO VOLUMETRIC HEROES' OWN NUMBERS, in the kit rather than inline in the species file.
+ *
+ * *** INLINE, THESE CANNOT BE GRADED, AND THE SABOTAGE SWEEP PROVED IT TWICE IN ONE ROUND. *** v4634's first
+ * cut kept them beside the march. Changing tempest's absorption from 3.60 to nebula's 3.10 -- the coefficient
+ * nebula.ts calls "THE LINE" -- left every row in every murmur gate green, and so did swapping its density
+ * curve. That is the same finding v4632 made about opal's life and abyss's slot, and the same answer: a
+ * constant a gate can read is a constant a gate can grade.
+ *
+ * Every field is transcribed from murmur's own src/shaders/nebula.ts and tempest.ts:
+ *
+ *   scale/warp    the mist's own frequency, and the frequency of the noise that WARPS it
+ *   foldB/foldK   the warp amplitude, base and knob
+ *   drB/drK/lane  the weather's clock, fed to mh_drift
+ *   dLo/dHi       the density smoothstep. tempest's lower edge sits FURTHER UP, which is what gives its
+ *                 cloud real holes for its lightning to be seen against
+ *   gLo/gK/gFar   lit from within: emission rises toward the middle of the body and absorption does not
+ *   absorb        "NEARER FOLDS OCCLUDE FARTHER GLOW, and that sentence is a coefficient of 3.1"
+ *   emitB/emitK   emission, base and knob
+ *   gain          the interior multiplier
+ */
+export const MH_MIST = Object.freeze({
+    nebula: Object.freeze({ scale: 2.20, warp: 1.30, small: 0.58, foldB: 0.30, foldK: 0.70,
+                            drB: 0.052, drK: 0.055, drLane: 2.0, dLo: -0.20, dHi: 0.30,
+                            gLo: 0.30, gK: 0.95, gFar: 0.88, absorb: 3.10, emitB: 0.62, emitK: 0.85,
+                            gain: 3.30, voiceE: 0.75 }),
+    tempest: Object.freeze({ scale: 2.55, warp: 1.45, small: 0.55, foldB: 0.42, foldK: 0.80,
+                             drB: 0.070, drK: 0.075, drLane: 3.0, dLo: -0.12, dHi: 0.46,
+                             gLo: 0.26, gK: 0.72, gFar: 0.90, absorb: 3.60, emitB: 0.58, emitK: 0.72,
+                             gain: 6.20, voiceE: 0.85 }),
+});
+
+/** tempest's lightning: the two lane seeds, their slot lengths, and the radius its depth mask kills at. */
+export const MH_TEMPEST_BOLT = Object.freeze({
+    lanes: Object.freeze([Object.freeze({ seed: 21.0, slot: 2.9 }), Object.freeze({ seed: 27.0, slot: 4.3 })]),
+    maskIn: 0.35, maskOut: 0.62,
 });
 
 /** droplet's gain, which is nearly three times any other hero's -- "the body itself is the species". */
