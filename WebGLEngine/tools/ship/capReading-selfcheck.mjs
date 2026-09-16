@@ -130,11 +130,35 @@ export const LET_FINISH_V4573 = Object.freeze({
     // The sample must be OF the population, or it says nothing about it. Every gate above must still be on
     // disk and still carry a killed, no-verdict reading -- if one has been re-timed since, this row says so
     // rather than leaving the table quietly describing a tree that has moved.
+    // *** v4637 -- A GATE LEAVING THIS POPULATION IS THE TABLE'S PREDICTION COMING TRUE, NOT THE TABLE GOING
+    // STALE, AND THE OLD ROW COULD NOT TELL THE TWO APART. ***
+    //
+    // It required all seventeen to still be killed-with-no-verdict. The main merge's sweep let two of them
+    // finish -- paintFields and eulerGpu -- so the row reddened on the one outcome this table exists to argue
+    // for: that these gates are green and fast when nothing kills them.
+    //
+    // *** AND THE NUMBERS ARE THE POINT. *** The table said 14496 and 18450 ms. The fresh readings are 14074
+    // and 17904 -- 2.9% and 3.0% apart, on a different sweep, months later. So the departure VINDICATES the
+    // measurement, and the row now says so: every entry is either still in the population, or has a fresh
+    // reading that AGREES with what the table recorded. That is a stronger claim than membership, because it
+    // re-checks the frozen number every time a gate escapes the cap instead of freezing it forever.
+    //
+    // 10% is the tolerance, and it is loose ON PURPOSE: these are whole-process runtimes on a contended box,
+    // where 3% is what two honest readings of the same gate look like and a table that had drifted would be
+    // out by the 41x this sample spans, not by a tenth.
     const stillNV = R.filter((r) => NV.includes(r.gate));
-    ok(`  and every one of the ${R.length} is still in the population it was drawn from, so the table is about today's tree`,
-        stillNV.length === R.length,
+    const left = R.filter((r) => !NV.includes(r.gate));
+    const agreed = left.filter((r) => {
+        const now = (T.timings || {})[r.gate];
+        return typeof now === "number" && Math.abs(now - r.ms) / r.ms <= 0.10;
+    });
+    ok(`  and every one of the ${R.length} is still in the population it was drawn from, or its fresh reading agrees with the table`,
+        stillNV.length + agreed.length === R.length,
         stillNV.length === R.length ? `all ${R.length} still killed-with-no-verdict` :
-            `RE-TIMED SINCE: ${R.filter((r) => !NV.includes(r.gate)).map((r) => r.gate).join(", ")}`);
+            `${stillNV.length} still killed-with-no-verdict; ${agreed.length} LET FINISH SINCE and agreeing -- ` +
+            left.map((r) => `${path.basename(r.gate)} table ${r.ms} now ${(T.timings || {})[r.gate]}`).join(", ") +
+            `. A departure that did NOT agree would mean the table described a tree that has moved; these agree ` +
+            `to within ${left.length ? (Math.max(...left.map((r) => Math.abs(((T.timings || {})[r.gate] || 0) - r.ms) / r.ms)) * 100).toFixed(1) : "0"}%.`);
 }
 
 // -----------------------------------------------------------------------------------------------------------

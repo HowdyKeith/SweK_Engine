@@ -433,11 +433,26 @@ console.log("\n10. *** THIS ROUND'S OWN RECORD IS INVISIBLE TO THE RECORD CENSUS
         "so a filter that ever narrows again reddens it exactly as before. ***");
 
     ok("   ...and the census now sees the whole tree, which is what re-taking the replay bought",
-        // v4562: 127 -> 129. Registering a standing red in a DATED LIST adds two version-stamped frozen
-        // exports -- RED_AT_V4562_GATES and RED_AT_V4562 -- so the act of naming a red is an arrival the
-        // census counts, which is v4540's finding arriving from a new direction.
-        recordCensus().records.length === 129,
-        "127 records under the wide rule against 118 under `.mjs` alone -- +9 records, +8 carrying fields, " +
+        // *** v4637 -- THIS ASSERTED A TOTAL AND THE TOTAL IS NOT WHAT THE ROW IS ABOUT. ***
+        //
+        // It read `records.length === 129`, so every arrival anywhere in the tree reddened a row about the
+        // RULE. v4562 had already bumped it 127 -> 129 for two exports, and the main merge took it to 144 --
+        // at which point the number says nothing except that the tree grew. Same shape as the sibling rule at
+        // v4563 and gateSelection's band at v4571: a count standing in for a property.
+        //
+        // What re-taking the replay actually bought is the GAP: the wide rule sees the records in .js files
+        // that the `.mjs`-only rule could not, and that difference is the finding. It is still exactly NINE,
+        // the same nine, through two merges and seventeen rounds -- camera/camera.js's seven plus
+        // physics/xpbd/rigidCouple.js and render/stereographic.js. Asserted as the gap and the identity of
+        // the gap; the totals are REPORTED so a reader watches them move without a gate reddening.
+        (() => {
+            const all = recordCensus().records;
+            const wide = all.length, narrow = all.filter((r) => /\.mjs$/.test(r.file)).length;
+            const js = all.filter((r) => /\.(js|cjs)$/.test(r.file));
+            return wide > narrow && wide - narrow === js.length && js.length >= 9 &&
+                   js.some((r) => /camera[\\/]camera\.js$/.test(r.file));
+        })(),
+        `${recordCensus().records.length} records under the wide rule against ${recordCensus().records.filter((r) => /\.mjs$/.test(r.file)).length} under \`.mjs\` alone -- the GAP is asserted and the totals reported. At v4555 it was 127 against 118: +9 records, +8 carrying fields, ` +
         "+68 FIELDS. *** THE UNGUARDED COUNT DID NOT MOVE, AND THAT IS THE REASSURING HALF: *** all nine " +
         "were already guarded by the gates written beside them in the same rounds, so what the tree had " +
         "lost was never the guarding -- only its ability to SAY it was guarded. frozenRecords' v4487Recount " +

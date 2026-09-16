@@ -313,8 +313,19 @@ console.log("\n5. THE SENTENCE THAT WAS FALSE, AND THE COUNT THAT MAKES IT FALSE
     say("MEASURED entries / with recorded runs / with none", `${names.length} / ${names.length - bare.length} / ${bare.length}`);
     say("and of those with runs, recorded on ANOTHER machine", String(notHere.length));
 
+    // *** v4637 -- THIS WAS A THIRD COPY OF ONE NUMBER, IN THE FILE THAT EXISTS TO CATCH THE SECOND. ***
+    // It read `bare.length === 50`. The same 50 is gateBudget-selfcheck's BARE_BASELINE_V4581, and the section
+    // above already reads that constant out of the gate's source -- for exactly this reason, so a baseline
+    // cannot be widened with nothing watching. Hardcoding it again here meant the main merge's one arrival
+    // (tools/roundhouse/plantedCoverage-selfcheck.mjs, bare by construction because main's table has no
+    // MEASURED_RUNS column) reddened this row too, in a second place, for one fact.
+    //
+    // Read from the same source now. The SENTENCE is "most of this table cannot say how its number was
+    // obtained", and what makes that true is the majority, not the exact count -- so the majority is asserted
+    // and the agreement with the gate's own bar is asserted, and the number itself is reported.
+    const barBase = Number((GB_GATE.match(/BARE_BASELINE_V4581 = (\d+)/) || [])[1]);
     ok("*** most of this table cannot say how its number was obtained ***",
-        bare.length > names.length / 2 && bare.length === 50,
+        bare.length > names.length / 2 && bare.length === barBase,
         `${bare.length} of ${names.length}. "Every named budget is derived from a recorded completion, not a guess" ` +
         "was the sentence over the retired row; it is true of twelve. The prose beside each entry often names a " +
         "round and a stopwatch, and prose is not a field -- no check can read it, which is the whole lesson of " +
