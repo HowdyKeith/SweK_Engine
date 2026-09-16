@@ -1654,7 +1654,7 @@
   "tools/ship/kernelReach-selfcheck.mjs": 25575,
   "render/temporalGPU-selfcheck.mjs": 2700,
   "render/motionVectorsGPU-selfcheck.mjs": 1618,
-  "render/temporalRejectGPU-selfcheck.mjs": 2573
+  "render/temporalRejectGPU-selfcheck.mjs": 1775
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -4960,7 +4960,7 @@
   "tools/ship/kernelReach-selfcheck.mjs": "2026-09-16T01:49:04Z",
   "render/temporalGPU-selfcheck.mjs": "2026-09-16T03:44:39Z",
   "render/motionVectorsGPU-selfcheck.mjs": "2026-09-16T05:14:36Z",
-  "render/temporalRejectGPU-selfcheck.mjs": "2026-09-16T09:48:48Z"
+  "render/temporalRejectGPU-selfcheck.mjs": "2026-09-16T11:34:16Z"
  },
  "kinds": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "loaded",

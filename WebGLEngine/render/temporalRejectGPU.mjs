@@ -7,19 +7,26 @@
 //
 // ---- AND NO PAGE CALLS THIS YET, WHICH IS MEASURED RATHER THAN GLOSSED --------------------------------------
 //
-// fsr.html cannot use disocclusion today and the reason is not an oversight, it is the content. Its scene is a
-// CONTINUOUS FUNCTION of (u, v) with no z at all -- every pixel sits on one plane -- so nothing is ever hidden
-// behind anything and nothing can be revealed. MEASURED at the page's own size, its own pan, its own camera:
+// fsr.html cannot use disocclusion today, and v4595 CORRECTED WHY. v4593 wrote here that the reason was the
+// CONTENT -- a scene with no z -- and offered "the same frame with a near slab: 384 genuine disocclusion" as the
+// control proving the detector fires. *** THAT 384 WAS THE FIXTURE'S PREV-DEPTH SHIFTED THE WRONG WAY. *** The
+// motion is du = +PAN/D, so last frame every feature sat at HIGHER x; the fixture put the slab at LOWER x, which
+// is a camera panning the other way, and the reprojection landed across the slab's edge and reported a
+// disocclusion that never happened. Measured all three ways: wrong way 384, right way 0, not moving at all 192.
 //
-//     flat scene (what ships)   flagged 192 of 36864, noHistory 192  ->  genuine disocclusion 0
-//     the same frame with a near slab over part of it, panning:     ->  genuine disocclusion 384
+// *** THE REAL REASON IS THE CAMERA, NOT THE CONTENT, AND IT IS A STRONGER STATEMENT: AN ORTHOGRAPHIC
+// PROJECTION HAS NO PARALLAX. *** Every pixel moves the same screen distance whatever its depth, so the depth at
+// the reprojected position always matches and nothing is ever revealed -- occluding geometry or not. Measured at
+// the page's own size, pan and camera, with a slab placed consistently:
 //
-// 192 is exactly the offscreen column the motion vectors already reject. So wiring this to the page as it
-// stands would add a pass whose output is provably the column the accumulate already had -- a feature that
-// cannot fire, on a page that exists to show features firing. This session has spent four rounds on controls
-// that cannot fail; shipping one deliberately would be worse than the ones it found. What a caller needs is
-// OCCLUDING GEOMETRY and a prevDepth buffer, and that is a change to what the page is rather than to how it
-// runs.
+//     flat scene (what ships)          flagged 192, all of it the offscreen column  ->  genuine 0
+//     the same frame WITH a near slab  flagged 192, all of it the offscreen column  ->  genuine 0
+//     a PERSPECTIVE camera, same slab, band projected from world space               ->  genuine 192
+//
+// So adding occluding geometry to the page would change nothing; adding a PERSPECTIVE CAMERA is what it would
+// take, and that is a change to what the page is rather than to how it runs. The corrected measurement and the
+// spurious one are both rows in this file's gate, because a number that shipped into a gate, a header and a
+// closing deserves an erratum somebody can re-run.
 //
 // *** AND THE HOLE BETWEEN THE TWO KERNELS IS CLOSED AS OF v4594. *** This file shipped at v4593 deliberately
 // without a rejectAndAccumulate(), because DISOCCLUSION writes a mask and RECTIFY reads a factor and nothing in

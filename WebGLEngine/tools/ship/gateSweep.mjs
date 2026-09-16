@@ -3767,6 +3767,35 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since252: Object.freeze({
+        at: "v4595", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["render/temporalRejectGPU-selfcheck.mjs", "render/temporalRejectGPU.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "no gate added; a CORRECTION, found by trying to build on a number this arc had already shipped. " +
+                 "*** v4593 ASSERTED THAT fsr.html CANNOT DISOCCLUDE BECAUSE ITS SCENE IS FLAT, AND OFFERED '384 " +
+                 "GENUINE WITH A NEAR SLAB' AS THE CONTROL PROVING THE DETECTOR FIRES. THE 384 WAS THE FIXTURE'S " +
+                 "PREV-DEPTH SHIFTED AGAINST THE MOTION. *** du is +PAN/D, so last frame every feature sat at " +
+                 "HIGHER x; the fixture put the slab at LOWER x -- a camera panning the other way -- and the " +
+                 "reprojection landed across the slab's edge and reported disocclusion that never happened. " +
+                 "Measured all three ways at v4595: wrong way 384, right way 0, slab not moving 192. The number " +
+                 "had gone into a gate ROW, a runner header and this changelog, and the round that found it was " +
+                 "the round that tried to USE it -- the next rung proposed was giving the page occluding " +
+                 "geometry, which the corrected measurement says would have changed nothing. *** THE TRUE REASON " +
+                 "IS STRONGER AND SIMPLER: AN ORTHOGRAPHIC PROJECTION HAS NO PARALLAX. *** Every pixel moves the " +
+                 "same screen distance whatever its depth, so the depth at the reprojected position always " +
+                 "matches and nothing is ever revealed -- with a flat scene or with an occluder, both 0. The " +
+                 "page's CAMERA was the binding constraint, not its content. The valid control is a PERSPECTIVE " +
+                 "camera whose slab band is PROJECTED from world space rather than nudged by a chosen pixel " +
+                 "count -- the nudging is what produced 384 -- and it fires: 192 genuine. Both the corrected and " +
+                 "the spurious measurement are rows now, because an erratum nobody can re-run is a claim about a " +
+                 "claim. Sabotage: 4 mutations, 4 caught, one of them only after the gate STOPPED CRASHING -- " +
+                 "putting the slab at the background's depth zeroes the threshold, disocclusionCPU refuses it, " +
+                 "and the gate exited 1 with no FAIL line, which is no verdict. A degenerate fixture is a real " +
+                 "thing to guard and has a row. Also recorded: this gate's runtime is NOISY at the " +
+                 "few-hundred-millisecond scale (1671-2108 over five samples) and v4594's three-sample median " +
+                 "of 2573 sat at the top of that spread -- three samples were too few to say so.",
+    }),
     since251: Object.freeze({
         at: "v4594", swept: 0, green: 0, red: 0,
         added: Object.freeze([]),

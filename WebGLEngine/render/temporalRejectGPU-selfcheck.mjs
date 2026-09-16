@@ -2,8 +2,23 @@
 // WebGLEngine/render/temporalRejectGPU-selfcheck.mjs -- v4593
 //
 // Run: node render/temporalRejectGPU-selfcheck.mjs
-// RUNTIME 2573 ms ALONE (median of 2569/2711/2573 at v4594; 1862 at v4593 -- the factor kernel adds a third
-// pipeline, four more dispatches and the chain). Still inside the 3000 ms sweep budget.
+// RUNTIME 1775 ms ALONE (median of 2108/1750/1775/1738/1671 at v4595), against 2573 recorded at v4594 and 1862
+// at v4593. *** THE THREE ARE NOT A TREND AND THIS FILE WILL NOT PRETEND THEY ARE. *** v4595 added CPU rows and
+// removed none of the device work, so it cannot have got faster by 800 ms; five samples spread 1671 to 2108,
+// which is 26% on a SOFTWARE ADAPTER with nothing pinned, and v4594's three-sample median sat at the top of
+// that spread. The honest reading is that this gate's timing is noisy at the few-hundred-millisecond scale and
+// a median of three was too few to say so. Still inside the 3000 ms sweep budget on every sample.
+//
+// SABOTAGE v4595 (the correction): 4 mutations, 4 caught -- one of them only after the gate stopped CRASHING.
+//   X1 the occluder fixture put back the wrong way round, which is v4593's own mistake -> the corrected row.
+//   X2 the perspective control's camera stopped moving -> the parallax row. No eye motion, no parallax, no
+//      disocclusion, which is the claim stated as a mutation.
+//   X4 disocclusionCPU stops reading zPrev and compares depth to itself -> 6 rows, including the chain's.
+//   *** X3 put the perspective slab at the BACKGROUND'S depth and the gate EXITED 1 WITH NO FAIL LINE. *** A
+//   zero depth gap makes the threshold zero, disocclusionCPU refuses a non-positive threshold, and the gate
+//   died -- which is no verdict at all, not a catch. The degenerate fixture is a real thing to guard: a "near
+//   slab" at the far plane occludes nothing and the control would read as a parallax demonstration while
+//   demonstrating none. There is a row for it now, and X3 takes two.
 //
 // SABOTAGE v4594 (the factor kernel and the chain): 6 mutations, 6 caught, and TWO WENT 0-RED FIRST.
 //   W1 the kernel uses max() instead of the product -> the row that pins the DECISION. The arithmetic is three
@@ -44,13 +59,13 @@
 // DISOCCLUSION_WGSL and RECTIFY_WGSL get a caller here, taking tools/ship/kernelReach.mjs's census to 12. Two
 // things this gate asks that neither kernel's own gate can:
 //
-//   1. *** THE DETECTOR IS SHOWN FIRING AND SHOWN SILENT, ON THE PAGE'S OWN CONTENT. *** A disocclusion test
-//      over a FLAT scene cannot flag anything -- nothing is hidden, so nothing is revealed -- and fsr.html's
-//      scene is a continuous function of (u, v) with no z at all. Measured at the page's size, pan and camera:
-//      192 flagged of 36,864 and all 192 are the offscreen column, genuine disocclusion ZERO. The same frame
-//      with a near slab over part of it: 384. That pair is why the page is NOT wired to this and the runner
-//      says so in its header, rather than shipping a pass whose output is provably the column the accumulate
-//      already had.
+//   1. *** THE DETECTOR IS SHOWN FIRING AND SHOWN SILENT, AND v4595 CORRECTED WHICH IS WHICH. *** v4593 wrote
+//      that fsr.html's flat scene was the reason nothing disoccludes, with "the same frame with a near slab:
+//      384" as the control. THAT 384 WAS ITS FIXTURE'S PREV-DEPTH SHIFTED AGAINST THE MOTION. Placed
+//      consistently the slab gives ZERO, the same as the flat scene -- because an ORTHOGRAPHIC PROJECTION HAS
+//      NO PARALLAX and every pixel moves the same distance whatever its depth. The page's camera was the
+//      binding constraint all along, not its content. The valid control is a PERSPECTIVE camera with the slab's
+//      screen band PROJECTED from world space, which fires: 192 genuine.
 //   2. THE TWO KERNELS CANNOT BE CHAINED, and the first draft of the runner shipped a method pretending they
 //      could. DISOCCLUSION writes a MASK (1 = history is wrong); RECTIFY reads a FACTOR (1 = history trusted).
 //      The inversion is historyFactorCPU and there is NO WGSL for it in the tree. The draft dispatched both,
@@ -64,6 +79,8 @@ import fs from "node:fs";
 import { runInEngineOrigin, webgpuSkipReason } from "../tools/ship/webgpuHarness.mjs";
 import { motionVectorsCPU, mat4Invert } from "./motionVectors.mjs";
 import { orthoPanVP } from "./motionVectorsGPU.mjs";
+import { transform4 } from "./motionVectors.mjs";
+import { viewProj } from "./rasterProbe.js";
 import { disocclusionCPU, rectifiedAccumulateCPU, historyFactorCPU } from "./temporalReject.mjs";
 import { RECTIFY_FLAGS, FACTOR_FLAGS } from "./temporalRejectGPU.mjs";
 import { codeOnly } from "../tools/ship/sourceScan.mjs";
@@ -80,28 +97,87 @@ const FLAT = new Float32Array(D * D);
 const slab = (sh) => { const d = new Float32Array(D * D);
     for (let y = 0; y < D; y++) for (let x = 0; x < D; x++) d[y * D + x] = ((x + sh) > 60 && (x + sh) < 130) ? 0.2 : 0.8;
     return d; };
-const OCC = slab(0), OCC_PREV = slab(1);
+// slab(sh) puts the slab at x + sh in (60, 130), i.e. at x in (60 - sh, 130 - sh): POSITIVE sh moves it LEFT.
+// The motion is du = +PAN/D, so last frame every feature was at HIGHER x -- which is slab(-1), not slab(+1).
+const OCC = slab(0), OCC_PREV = slab(-1), OCC_WRONG = slab(1);
+const W2 = 96, H2 = 64;
 
 console.log("temporalRejectGPU-selfcheck -- the detector, fired and silent\n");
 
-console.log("1. *** THE PAGE'S OWN CONTENT CANNOT DISOCCLUDE, AND THAT IS WHY IT IS NOT WIRED ***");
+console.log("1. *** AN ORTHOGRAPHIC PAN CANNOT DISOCCLUDE AT ALL -- AND v4593 SAID IT WAS THE CONTENT ***");
 {
+    // *** THE CORRECTION. *** v4593's second row claimed that fsr.html's flat scene was the reason nothing
+    // disoccluded, and offered "the same frame with a near slab: 384 genuine" as the control that proved the
+    // detector fires. THAT 384 WAS AN ARTEFACT OF THE FIXTURE, and it shipped in this gate, in the runner's
+    // header and in the closing.
+    //
+    // The prev-depth buffer was shifted THE WRONG WAY. The motion says du = +PAN/D, so last frame every feature
+    // sat at HIGHER x; the fixture put the slab at LOWER x, which is a camera panning the other way. The
+    // reprojection then lands on the far side of the slab's edge and reports disocclusion that never happened.
+    // Measured all three ways at v4595: slab one step LEFT gives the spurious 384, slab one step RIGHT (the
+    // direction the motion actually implies) gives 0, and a slab that does not move at all gives 192.
+    //
+    // *** AND THE TRUE REASON IS STRONGER AND SIMPLER THAN THE ONE IT REPLACES: AN ORTHOGRAPHIC PROJECTION HAS
+    // NO PARALLAX. *** Every pixel moves by the same screen amount whatever its depth, so the depth at the
+    // reprojected position always matches and NOTHING is ever revealed -- with or without occluding geometry.
+    // The page's scene being flat was never the binding constraint; its CAMERA is.
     const flat = disocclusionCPU({ motion: mvAt(FLAT, 7), prevDepth: FLAT, w: D, h: D, threshold: TH });
     const occ = disocclusionCPU({ motion: mvAt(OCC, 7), prevDepth: OCC_PREV, w: D, h: D, threshold: TH });
-    say("fsr.html's scene, as it ships", `${flat.flagged} flagged, ${flat.noHistory} of them the offscreen column`);
-    say("the same frame with a near slab", `${occ.flagged} flagged, ${occ.noHistory} the column`);
+    say("fsr.html, flat scene", `${flat.flagged} flagged, ${flat.noHistory} of them the offscreen column`);
+    say("fsr.html, WITH a near slab", `${occ.flagged} flagged, ${occ.noHistory} the column`);
 
-    ok("!! *** on a FLAT scene the test flags nothing beyond the offscreen column ***",
-       flat.flagged - flat.noHistory === 0 && flat.noHistory === D,
-       `genuine disocclusion ${flat.flagged - flat.noHistory} of ${D * D}; the ${flat.noHistory} flagged are ` +
-       `exactly one column of ${D}. A continuous function of (u, v) has no z, so nothing is hidden and nothing ` +
-       "is revealed. Wiring this to the page would add a pass whose output is the column the accumulate already " +
-       "rejected -- a control that cannot fire, on a page that exists to show things firing.");
-    ok("!! ...and WITH an occluder it fires, which is what says the row above is about the content",
-       occ.flagged - occ.noHistory === 384,
-       `genuine disocclusion ${occ.flagged - occ.noHistory} -- the two vertical edges of the slab, ${D} rows ` +
-       "each, where background is uncovered as it pans. Without this half, the row above would read as 'the " +
-       "detector finds nothing' rather than 'this content contains nothing to find'.");
+    ok("!! *** an orthographic pan flags nothing beyond the offscreen column -- flat scene OR occluder ***",
+       flat.flagged - flat.noHistory === 0 && flat.noHistory === D &&
+       occ.flagged - occ.noHistory === 0 && occ.noHistory === D,
+       `flat: ${flat.flagged - flat.noHistory} genuine. With an occluder, consistently placed: ` +
+       `${occ.flagged - occ.noHistory} genuine. Both are ${D} flagged and both are the one revealed column. ` +
+       "v4593 asserted 384 for the second and that number was its fixture's prev-depth shifted the wrong way.");
+    ok("!! ...and the SPURIOUS number is reproducible on demand, which is what makes the correction checkable",
+       (() => { const wrong = disocclusionCPU({ motion: mvAt(OCC, 7), prevDepth: OCC_WRONG, w: D, h: D, threshold: TH });
+                return wrong.flagged - wrong.noHistory === 384; })(),
+       "384 again, from a prev-depth shifted against the motion. Kept as a row rather than deleted: the number " +
+       "went into a gate, a header and a closing, and an erratum nobody can re-run is a claim about a claim.");
+
+    // ---- THE VALID CONTROL: A PERSPECTIVE CAMERA, WHERE PARALLAX IS REAL ------------------------------------
+    // Everything here is DERIVED: the slab lives at a world position and its screen band is PROJECTED through
+    // each camera, rather than shifted by a pixel count chosen to look right. That hand-shifting is exactly what
+    // produced the number this section corrects.
+    const TANF = Math.tan(0.5), ASP = W2 / H2, NEAR = 0.1, FAR = 100;
+    const cam = (ex) => viewProj([ex, -2, 0], [0, 1, 0], [1, 0, 0], [0, 0, 1], TANF, ASP, NEAR, FAR);
+    const proj = (vp, wx, wy) => { const q = transform4(vp, wx, wy, 0, 1);
+                                   return { sx: (q[0] / q[3] + 1) * 0.5 * W2, z: q[2] / q[3] }; };
+    const depthFrom = (vp) => {
+        const a = proj(vp, -0.6, 2).sx, b = proj(vp, 0.6, 2).sx;
+        const zN = proj(vp, 0, 2).z, zF = proj(vp, 0, 6).z;
+        const d = new Float32Array(W2 * H2);
+        for (let y = 0; y < H2; y++) for (let x = 0; x < W2; x++)
+            d[y * W2 + x] = (x + 0.5 >= Math.min(a, b) && x + 0.5 < Math.max(a, b)) ? zN : zF;
+        return { d, zN, zF };
+    };
+    const vpC = cam(0), vpP = cam(-0.4);
+    const C = depthFrom(vpC), P = depthFrom(vpP);
+    const pMot = motionVectorsCPU(C.d, W2, H2, mat4Invert(vpC), vpP).data;
+    // *** THE FIXTURE'S OWN DEPTHS MUST DIFFER, AND A SABOTAGE FOUND THAT THE HARD WAY. *** Putting the slab at
+    // the background's depth makes |zN - zF| zero, which makes the threshold zero, which makes disocclusionCPU
+    // THROW -- and a gate that dies is a gate with no verdict, not a gate that caught something. The degenerate
+    // fixture is a real thing to guard: a "near slab" at the far plane is geometry that occludes nothing, and
+    // the control would be testing a scene with no occlusion in it while reading as a parallax demonstration.
+    const zGap = Math.abs(C.zN - C.zF);
+    ok("!! the perspective fixture's two surfaces are at DIFFERENT depths, which is what makes it an occluder",
+       zGap > 1e-4,
+       `clip-z gap ${zGap.toExponential(3)} between the slab at y=2 and the background at y=6. A slab at the ` +
+       "background's depth occludes nothing, and without this row the gate CRASHES on the zero threshold " +
+       "instead of reporting a degenerate fixture -- exit 1 with no FAIL line, which is no verdict at all.");
+    const pers = zGap > 1e-4
+        ? disocclusionCPU({ motion: pMot, prevDepth: P.d, w: W2, h: H2, threshold: zGap * 0.25 })
+        : { flagged: 0, noHistory: 0 };
+    say("a PERSPECTIVE camera, same slab, derived band", `${pers.flagged} flagged, ${pers.noHistory} the column`);
+    ok("!! *** and with PARALLAX the detector fires: this is the control the wrong fixture was standing in for ***",
+       pers.flagged - pers.noHistory > 0,
+       `${pers.flagged - pers.noHistory} genuine disocclusion at ${W2}x${H2}. The near slab's screen band is ` +
+       "PROJECTED from its world extent through each camera rather than nudged by a chosen pixel count -- the " +
+       "nudging is what produced 384. A lateral eye move slides the near band across the far one, and the " +
+       "background it uncovers has no history. THIS is what fsr.html would need: not geometry, a camera.");
     ok("...and the threshold is REQUIRED, not defaulted, on the GPU path as on the CPU",
        (() => { try { disocclusionCPU({ motion: mvAt(FLAT, 7), prevDepth: FLAT, w: D, h: D }); return false; } catch { return true; } })() &&
        /threshold must be a positive depth/.test(fs.readFileSync(path.join(ENG, "render", "temporalRejectGPU.mjs"), "utf8")),
