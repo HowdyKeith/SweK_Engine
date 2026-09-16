@@ -291,8 +291,10 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // row already says "not the four this compared", so the narrowness is recorded rather than discovered -- but
     // it is the same shape v4587 found in the knowledge-index check one round earlier: a cheap pre-view that
     // answers a smaller question than the gate it previews, read as though it answered the same one.
-    gates: 1644, usesOk: 1623, definesOk: 1615, importsOk: 0,
-    distinctDefinitions: 38, nameFirst: 1516, condFirst: 91, unknownSignature: 16,
+    // v4589 -- RE-TAKEN: one gate (kernelReach) joined, the same five rows by one, and the pre-flight named three
+    // while the gate names all nine, the same split recorded a round ago.
+    gates: 1645, usesOk: 1624, definesOk: 1616, importsOk: 0,
+    distinctDefinitions: 38, nameFirst: 1517, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

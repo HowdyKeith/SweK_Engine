@@ -3767,6 +3767,33 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since246: Object.freeze({
+        at: "v4589", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/kernelReach-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/kernelReach.mjs"]),
+        verdict: "green, 25575 ms alone -- it imports 107 producer modules to hash the shader text each yields. " +
+                 "*** v4588 FOUND ONE FILE'S KERNELS UNRUNNABLE OUTSIDE THEIR GATE AND WROTE IT UP AS A STORY. " +
+                 "IT IS A POPULATION: 17 dispatchable kernels in 11 files, and TEN ARE THE TEMPORAL ARC *** -- " +
+                 "MOTION_WGSL, RESOLVE_WGSL, ACCUMULATE_WGSL, RING_FLOOR_WGSL, DISOCCLUSION_WGSL, RECTIFY_WGSL " +
+                 "and temporalLock's four. Nineteen rounds of kernels, v4552 to v4570, every one validated on a " +
+                 "real device by its own gate, and nothing in the engine can dispatch any of them; fsr.html runs " +
+                 "the CPU versions of two every frame. *** AND THE ROUND'S OWN HAND-OFF CLAIM WAS FALSE: *** v4588 " +
+                 "closed by proposing 'the temporal half has no WGSL at all'. temporalResolveWgsl.mjs and " +
+                 "temporalAccumulateWgsl.mjs have existed since v4552 -- the prior-art check refuted the round's " +
+                 "premise in its first two commands, which is the check earning its place rather than a near miss. " +
+                 "*** THE NUMBER WENT 67 -> 41 -> 34 -> 31 -> 17 UNDER ITS AUTHOR'S OWN SCRUTINY, *** and each " +
+                 "step was a KIND of reachability the instrument could not see: probes exist to be dispatched BY a " +
+                 "gate (18 of them); a module can dispatch its own kernel (gpuHaul, gpuOrbits, bloomFused); two " +
+                 "exports can be one shader text (worleyWgsl() and WORLEY_WGSL = worleyWgsl(), one imported and " +
+                 "one looking dead); and a kernel can travel BY DATA rather than by symbol (fleets.mjs puts " +
+                 "HOLO_WGSL in a materials table and never dispatches). Reporting 67 would have been a bigger " +
+                 "headline and a worse measurement. Population imported from wgslCorpus.census() rather than " +
+                 "re-walked -- that walker has been wrong three times for three reasons and every fix lives " +
+                 "there. Sabotage: 6 mutations, 6 caught; the instructive one is M4, counting `export { X }` as a " +
+                 "use site, which would have driven the finding to ZERO because the whole arc re-exports at the " +
+                 "foot of the file.",
+    }),
     since245: Object.freeze({
         at: "v4588", swept: 1, green: 1, red: 0,
         added: Object.freeze(["fx/fsr/fsrGPU-selfcheck.mjs"]),
