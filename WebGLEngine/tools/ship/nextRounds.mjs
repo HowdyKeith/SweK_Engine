@@ -54,30 +54,33 @@ export const NEXT_ROUNDS = [
             "the pass with the memo cleared and found 4 paths on the first real run, two of them gitignored " +
             "outputs that gates write on every pass).",
     },
-    // ---- measured at v4634, and it is the gate on the remaining TEN species rather than a nice-to-have.
+    // ---- measured at v4634, CLOSED at v4635. Kept because the size evidence is the part worth re-reading.
     {
         id: "orb-species-block-per-shader",
-        blocker: "OPEN",
-        what: "render/aiPresenceOrbTsl.mjs BUILDS EVERY SPECIES' BLOCK INTO EVERY SPECIES' SHADER. still's " +
-            "compiled shader carries abyss's three-lane march, opal's four flashes, droplet's solve and now " +
-            "both mist marches; only the final `density` and `hueRaw` selectors pick one. So each species " +
-            "added taxes EVERY murmur gate, including the ones that never render it.",
-        how: "Hoist each species' block into a builder closure and call only the selected one. The blocks " +
-            "already read `species` as a build-time JS constant, so this is plain control flow and not a " +
-            "shader branch -- what stops a naive wrap is that the later selectors reference names the blocks " +
-            "define (flashE, glowE, accM, accMH, tailShare, accC/accHC, accD/accHD), so the closures have to " +
-            "return them and the selectors read from one result object. VERIFY BY BYTES: render all eight " +
-            "species before and after and require 0 of 9,216 bytes to differ per species, which is the check " +
-            "v4634 used when it moved the mist constants into the kit -- and which it ALSO has to be told to " +
-            "run on a species it did not touch, because that round rendered only nebula and tempest, missed " +
-            "that MH_MIST[species] is undefined for the other six, and took four gates red.",
-        why: "*** MEASURED, PAIRED, AND IT IS 122 ms PER SPECIES PER GATE. *** Adding nebula and tempest at " +
-            "v4634 cost tools/ship/murmurSpecies-selfcheck.mjs 231, 288 and 213 ms over three interleaved " +
-            "runs of the two versions -- a gate that renders NEITHER of them. It now sits at 2,834 ms with " +
-            "166 ms of margin against the 3,000 ms quick-sweep budget. TEN SPECIES REMAIN, so the next pair " +
-            "alone puts it at roughly 3,078 and over, and a gate over budget does not run at ship time at " +
-            "all -- which v4633 spent a round proving is not theoretical: it found a gate red for nine " +
-            "rounds because it was 27 ms over. THIS BLOCKS THE NEXT ORB ROUND rather than merely costing it.",
+        blocker: "CLOSED",
+        what: "DONE at v4635. render/aiPresenceOrbTsl.mjs built EVERY species' block into EVERY species' " +
+            "shader -- still's compiled fragment carried abyss's three-lane march, opal's four flashes, " +
+            "droplet's solve and both mist marches -- and only a `density` selector at the bottom picked " +
+            "one. Each block is a closure now and exactly one is invoked.",
+        how: "*** THE EVIDENCE IS THE EMITTED WGSL, NOT THE CLOCK. *** Before: the eight species' fragment " +
+            "shaders spanned 159,447 to 160,185 characters -- a spread of 738, which is 0.5% and is the " +
+            "selector line and nothing else. They were the same shader eight times. After: 41,231 to 56,776, " +
+            "a spread of 15,545, or 38%. still went 160,081 -> 43,613 and the eight together 1,277,983 -> " +
+            "394,231, a 69% cut. Two shared values had to come out of still's stretch first (the march step " +
+            "and the size dial, both read by every hero), which block scope turned into a ReferenceError the " +
+            "moment the wrapping landed -- their own comment already said 'once, for every species'. " +
+            "VERIFIED BY BYTES: 24 frames, eight species across three time-and-knob cases, 0 bytes different.",
+        why: "It is gated in tools/ship/aiPresenceOrb-selfcheck.mjs, on a SECOND WGSL emission that costs " +
+            "nothing (one emission 2,131 ms, two 2,036 -- the bill is the renderer's init). The row asks " +
+            "whether two species' shaders are different SIZES, and bounds still's at 60,000. *** THE BOUND " +
+            "IS ON still ON PURPOSE: *** its shader is the shared kit plus its own body and nothing else, so " +
+            "it does not grow when the remaining ten land, which makes the bound both tight and permanently " +
+            "safe. A first cut bounded 'the larger of the two' at 120,000 and a sabotage that built just TWO " +
+            "extra blocks slipped under it, because both shaders grew together and the SPREAD never moved. " +
+            "WHAT IT BOUGHT, on the rotation: gate one 2,834 -> 1,971 ms, two 2,256 -> 1,515, three 2,565 -> " +
+            "1,828, four 2,244 -> 1,607, five 2,663 -> 2,080 -- 3,561 ms across the five species gates, and " +
+            "gate one went from 166 ms of margin to 1,029. The tax for the NEXT species is now paid only by " +
+            "the gate that renders it.",
     },
     {
         id: "browser-screenshot-floor",

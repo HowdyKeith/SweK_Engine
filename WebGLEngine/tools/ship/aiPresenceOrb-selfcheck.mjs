@@ -266,7 +266,7 @@ const RENDER_SCRIPT = `async ({ n, time, modulePath, modulePaths, skipWgsl }) =>
     // emitShaders() derives the language from renderer.backend.isWebGPUBackend, which forceWebGL sets false by
     // definition. A SEPARATE, non-forced renderer (never rendered through, only asked to compile) is what
     // actually reaches the WGSL builder -- the same instance the earlier throwaway probe used successfully.
-    let wgslOk = false, wgslLen = 0, wgslError = null, gpu = null;
+    let wgslOk = false, wgslLen = 0, wgslLen2 = 0, wgslError = null, gpu = null;
     try {
         if (skipWgsl) throw new Error("skipped by caller");
         const wgslRenderer = new THREE.WebGPURenderer({ canvas: document.createElement("canvas"), forceWebGL: false, antialias: false });
@@ -274,6 +274,13 @@ const RENDER_SCRIPT = `async ({ n, time, modulePath, modulePaths, skipWgsl }) =>
         const fxW = makeAiPresenceOrbTsl(THREE, TSL, {});
         const sh = await S.emitShaders(wgslRenderer, { scene: fxW.scene, camera: fxW.camera, mesh: fxW.scene.children[0] });
         wgslOk = sh.language === "wgsl" && sh.fragment.length > 0; wgslLen = sh.fragment.length;
+        // *** A SECOND SPECIES, EMITTED ON THE RENDERER THIS PAGE ALREADY BUILT, AND IT COSTS NOTHING. ***
+        // Timed: one emission 2,131 ms, two 2,036 -- the bill is the renderer's init and the page launch, not
+        // the compile. What the second one buys is the row in section 10 about what is IN each species'
+        // shader, which no single emission can ask.
+        const fxW2 = makeAiPresenceOrbTsl(THREE, TSL, { species: "tempest" });
+        const sh2 = await S.emitShaders(wgslRenderer, { scene: fxW2.scene, camera: fxW2.camera, mesh: fxW2.scene.children[0] });
+        wgslLen2 = sh2.fragment.length;
 
         // *** AND NOW IT RENDERS, INSTEAD OF BEING BUILT AND THROWN AWAY. *** This renderer was already
         // constructed and initialised here purely to reach three's WGSL builder, and section 10 then opened a
@@ -325,7 +332,7 @@ const RENDER_SCRIPT = `async ({ n, time, modulePath, modulePaths, skipWgsl }) =>
         fxI.setKnobs({ time });
         shots.push(shot(fxI));
     }
-    return { ok: true, wgslOk, wgslLen, wgslError, gpu, center: shots[0].center, farCorner: shots[0].farCorner, shots };
+    return { ok: true, wgslOk, wgslLen, wgslLen2, wgslError, gpu, center: shots[0].center, farCorner: shots[0].farCorner, shots };
 }`;
 
 async function main() {
@@ -341,7 +348,7 @@ async function main() {
         ok("!! the render ran at all", false, r10.ok ? JSON.stringify(r10.result) : "harness: " + r10.reason);
         report("cannot continue past section 10 without a real render");
     } else {
-        const { center, farCorner, wgslOk, wgslLen, wgslError } = r10.result;
+        const { center, farCorner, wgslOk, wgslLen, wgslLen2, wgslError } = r10.result;
         if (r10.pageErrors && r10.pageErrors.length) report("page errors: " + r10.pageErrors.slice(0, 3).join(" | "));
         ok("!! the orb's centre is opaque and not black (alpha>200, some real colour) -- something was actually drawn",
            center[3] > 200 && (center[0] + center[1] + center[2]) > 30, `centre rgba=${JSON.stringify(center)}`);
@@ -349,6 +356,44 @@ async function main() {
            farCorner[3] === 0, `corner rgba=${JSON.stringify(farCorner)}`);
         ok("!! WGSL emission (three's OTHER compiler backend for the same graph) also succeeds, proving the graph is valid on both",
            wgslOk && wgslLen > 500, `wgslOk=${wgslOk} len=${wgslLen} error=${wgslError}`);
+
+        // *** EACH SPECIES' SHADER CARRIES ITS OWN BODY AND NOBODY ELSE'S, AND THE EVIDENCE IS THAT THE TWO
+        // SHADERS ARE DIFFERENT SIZES. ***
+        //
+        // Until v4635 render/aiPresenceOrbTsl.mjs built EVERY species' block into EVERY species' shader:
+        // still's compiled fragment carried abyss's three-lane march, opal's four flashes, droplet's solve
+        // and both mist marches, and only a `density` selector at the bottom picked one. The blocks are
+        // closures now and exactly one is invoked.
+        //
+        // *** THE SIZE SPREAD IS THE INSTRUMENT, AND IT IS THE RIGHT ONE BECAUSE IT CANNOT BE SATISFIED BY
+        // BEING FAST. *** A timing would drift with the box -- this tree has spent two rounds proving that.
+        // What cannot drift is that eight shaders built from one shared body are all THE SAME SIZE. Measured
+        // across all eight before the change: 159,447 to 160,185 characters, a spread of 738 -- 0.5%, which
+        // is the selector and nothing else. After: 41,231 to 56,776, a spread of 15,545 -- 38%. still alone
+        // went 160,081 -> 43,613 and the eight together 1,277,983 -> 394,231, a 69% cut.
+        //
+        // So the row asks whether two species that should differ DO differ, by more than the old shared
+        // build's entire spread. Reintroduce the unconditional blocks and both numbers collapse back onto
+        // each other and this goes red -- which a row asserting only "the shader is smaller than it was"
+        // would not, since it would pass on any two equal-sized shaders that both happened to shrink.
+        // *** THE CEILING IS ON still AND THAT IS THE WHOLE POINT OF WHERE IT SITS. *** still's shader is
+        // the shared kit plus still's own body, and after v4635 that is ALL it is -- so it does not grow when
+        // a species is added, however many arrive. A bound on it is therefore both tight and permanently
+        // safe, where a bound on "the largest of the two" would have to be loosened for every future hero
+        // and would stop catching anything. Measured: a sabotage that built just TWO extra blocks beside the
+        // chosen one left the SPREAD untouched (both shaders grew by the same amount) and slipped under a
+        // 120,000 ceiling -- it takes still from 43,613 to about 82,000, which this refuses.
+        const spread = Math.abs(wgslLen2 - wgslLen), rel = spread / Math.max(wgslLen, wgslLen2);
+        ok("!! *** ONE SPECIES PER SHADER: still's WGSL and tempest's are different SIZES, not the same build ***",
+           wgslLen2 > 500 && rel > 0.10 && wgslLen < 60000,
+           `still emits ${wgslLen} characters of WGSL and tempest ${wgslLen2} -- ${spread} apart, ` +
+           `${(rel * 100).toFixed(0)}% of the larger. When every block was built into every shader the eight ` +
+           `species spanned 159,447 to 160,185, a spread of 738 (0.5%), because they were the same shader ` +
+           `with a different line selected at the end. THE CEILING IS 60,000 ON still, which is fixed for ` +
+           `good: its shader is the shared kit plus its own body and nothing else, so it does not grow when ` +
+           `the remaining ten species land. THE MEASUREMENT IS A SPREAD AND NOT A TIMING on purpose: a compile bill drifts ` +
+           `with the box and this tree has twice been misled by one, while "eight shaders built from one ` +
+           `body are all the same size" is arithmetic.`);
 
         // *** A REAL WebGPU RENDER, NOW EXECUTED -- tools/ship/webgpuHarness.mjs's swizzle workaround closed
         // the gap this section used to report as "NOT executed". *** Same graph, same knobs (time=1.2), same

@@ -5247,6 +5247,31 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "heroes cost gate one a PAIRED 213-288 ms although it renders neither. Logged as " +
                  "orb-species-block-per-shader; the next orb round starts there.",
     }),
+    // v4635 -- THE 247th CLOSING. No gate added: a row added to one that existed, and a 3,561 ms refund.
+    since256: Object.freeze({
+        at: "v4635", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** NO GATE WAS ADDED AND FIVE GOT FASTER: render/aiPresenceOrbTsl.mjs STOPPED BUILDING " +
+                 "EVERY SPECIES' BLOCK INTO EVERY SPECIES' SHADER. *** still's compiled fragment carried " +
+                 "abyss's three-lane march, opal's four flashes, droplet's solve and both mist marches; only " +
+                 "the density selector at the bottom picked one. THE EVIDENCE IS THE EMITTED WGSL RATHER " +
+                 "THAN THE CLOCK: before, the eight species' shaders spanned 159,447 to 160,185 characters " +
+                 "-- a spread of 738, 0.5%, which is the selector line and nothing else, because they were " +
+                 "the same shader eight times. After: 41,231 to 56,776, a spread of 38%, and 1,277,983 -> " +
+                 "394,231 in total, a 69% cut. On the rotation: gate one 2,834 -> 1,971 ms, two 2,256 -> " +
+                 "1,515, three 2,565 -> 1,828, four 2,244 -> 1,607, five 2,663 -> 2,080, and " +
+                 "aiPresenceOrb 2,440 -> 2,234 DESPITE gaining a second WGSL emission. Gate one went from " +
+                 "166 ms of margin to 1,029, which is what unblocks the remaining ten species. VERIFIED BY " +
+                 "BYTES, all eight species across three time-and-knob cases: 24 frames, 0 bytes different -- " +
+                 "and all eight rather than the two touched, which is v4634's lesson wired in, since that " +
+                 "round verified two species and took four gates red on the six it had not rendered. GATED " +
+                 "IN tools/ship/aiPresenceOrb-selfcheck.mjs on a second emission that costs nothing, and the " +
+                 "bound is on STILL because its shader cannot grow when species are added -- a first cut " +
+                 "bounded the larger of two at 120,000 and a sabotage building two extra blocks slipped " +
+                 "under it, since both shaders grew together and the spread never moved.",
+    }),
     since249: Object.freeze({
         at: "v4623", swept: 1, green: 1, red: 0,
         added: Object.freeze([

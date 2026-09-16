@@ -1,9 +1,9 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed.",
- "at": "2026-09-16T13:44:17.364Z",
+ "at": "2026-09-16T14:12:28.578Z",
  "budgetMs": 3000,
- "lastRun": 6,
+ "lastRun": 3,
  "rotated": [
   {
    "gate": "ai-bridge/assetSync-perf-selfcheck.mjs",
@@ -1330,10 +1330,24 @@
   },
   {
    "gate": "tools/ship/aiPresenceOrb-selfcheck.mjs",
-   "ms": 2440,
+   "ms": 2234,
    "code": 0,
-   "priorMs": 2173,
-   "at": "2026-09-15T23:18:45.204Z"
+   "priorMs": 2440,
+   "at": "2026-09-16T14:12:28.578Z"
+  },
+  {
+   "gate": "tools/ship/aiPresenceOrbPresent-selfcheck.mjs",
+   "ms": 2464,
+   "code": 0,
+   "priorMs": 2581,
+   "at": "2026-09-16T14:12:28.578Z"
+  },
+  {
+   "gate": "tools/ship/aiPresenceOrbWidget-selfcheck.mjs",
+   "ms": 12808,
+   "code": 0,
+   "priorMs": 12633,
+   "at": "2026-09-16T14:12:28.578Z"
   },
   {
    "gate": "tools/ship/artefactWriters-selfcheck.mjs",
@@ -2051,45 +2065,45 @@
   },
   {
    "gate": "tools/ship/murmurKit-selfcheck.mjs",
-   "ms": 1713,
+   "ms": 1710,
    "code": 0,
-   "priorMs": 3217,
-   "at": "2026-09-16T13:44:17.364Z"
+   "priorMs": 1713,
+   "at": "2026-09-16T14:12:10.961Z"
   },
   {
    "gate": "tools/ship/murmurSpecies-selfcheck.mjs",
-   "ms": 2834,
+   "ms": 1971,
    "code": 0,
-   "priorMs": 1105,
-   "at": "2026-09-16T13:44:17.364Z"
+   "priorMs": 2834,
+   "at": "2026-09-16T14:12:10.961Z"
   },
   {
    "gate": "tools/ship/murmurSpecies2-selfcheck.mjs",
-   "ms": 2256,
+   "ms": 1515,
    "code": 0,
-   "priorMs": 1090,
-   "at": "2026-09-16T13:44:17.364Z"
+   "priorMs": 2256,
+   "at": "2026-09-16T14:12:10.961Z"
   },
   {
    "gate": "tools/ship/murmurSpecies3-selfcheck.mjs",
-   "ms": 2565,
+   "ms": 1828,
    "code": 0,
-   "priorMs": 1352,
-   "at": "2026-09-16T13:44:17.364Z"
+   "priorMs": 2565,
+   "at": "2026-09-16T14:12:10.961Z"
   },
   {
    "gate": "tools/ship/murmurSpecies4-selfcheck.mjs",
-   "ms": 2244,
+   "ms": 1607,
    "code": 0,
-   "priorMs": 1086,
-   "at": "2026-09-16T13:44:17.364Z"
+   "priorMs": 2244,
+   "at": "2026-09-16T14:12:10.961Z"
   },
   {
    "gate": "tools/ship/murmurSpecies5-selfcheck.mjs",
-   "ms": 2663,
+   "ms": 2080,
    "code": 0,
-   "priorMs": 3020,
-   "at": "2026-09-16T13:44:17.364Z"
+   "priorMs": 2663,
+   "at": "2026-09-16T14:12:10.961Z"
   },
   {
    "gate": "tools/ship/notifyDoor-selfcheck.mjs",

@@ -238,6 +238,26 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         const P = dP;
         const L = KIT.mhExit(P, rd).toVar();
 
+        // THE MARCH STEP AND THE SIZE DIAL ARE SHARED, and they moved up here when the blocks became
+        // closures: both were defined inside still's stretch and read by every other hero, which block scope
+        // turned into a ReferenceError the moment the wrapping landed. Their own comment already said so --
+        // "THE SIZE DIAL, once, for every species" -- so this is the file catching up with what it knew.
+        const ds = L.div(MH_TAPS).toVar();
+        const smallK = KIT.mhSmall(float(120.0), float(120.0)).toVar();
+
+        // *** EACH SPECIES' BLOCK IS A CLOSURE NOW, AND ONLY THE SELECTED ONE IS CALLED. ***
+        // Until v4635 every block below ran for every species: still's compiled shader carried abyss's
+        // three-lane march, opal's four flashes, droplet's solve and both mist marches, and only the
+        // `density` and `hueRaw` selectors at the bottom picked one. MEASURED at v4634, when nebula and
+        // tempest arrived: they cost tools/ship/murmurSpecies-selfcheck.mjs a PAIRED 213, 288 and 213 ms
+        // over three interleaved runs -- a gate that renders NEITHER of them -- and left it at 2,834 ms
+        // against a 3,000 ms budget with TEN species still to port. The tax was about 122 ms per species
+        // per gate, on every gate, forever.
+        //
+        // `species` is a build-time JS constant, so this is plain control flow and not a shader branch.
+        // What each closure returns is the contract the two selectors at the bottom read: a density node,
+        // and whatever energy and hue terms that hero's own hue rail needs.
+        const buildStill = () => {
         // still.ts's GESTURE CLOCK and its glint PATH. The light enters one side of the volume and leaves by
         // the other along a line hashed per gesture, and it is SOLVED at the ray's closest approach rather
         // than marched -- still.ts's own reason: "On the only event in the frame, sampling artefacts are the
@@ -277,11 +297,6 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // the viewer, so the near half of the ray goes one way on the hue and the far half the other.
         const accH = float(0.0).toVar();
         const trans = float(1.0).toVar();
-        const ds = L.div(MH_TAPS).toVar();
-        // THE SIZE DIAL, once, for every species. This port renders at a fixed 120 pt-equivalent (small = 0)
-        // because nothing here is mounted on a chip yet; mh_small is driven for real by the kit gate, and
-        // every species below spends it the same way murmur's do -- structure counts down, strokes thicken.
-        const smallK = KIT.mhSmall(float(120.0), float(120.0)).toVar();
         const fAmt = floorAmt().toVar();
         Loop({ start: 0, end: MH_TAPS }, ({ i }) => {
             const sMarch = float(i).add(0.5).mul(ds);
@@ -294,7 +309,10 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
 
         // interior contribution -- the marched medium plus the solved glint, scaled by depth
         const stillDensity = acc.mul(3.4).add(glintLive).mul(uniforms.depth);
+        return { density: stillDensity, acc, accH };
+        };
 
+        const buildLimn = () => {
         // =====================================================================================================
         // *** LIMN -- THE SECOND SPECIES. "Near-dark glass whose EDGE is alive." ***
         //
@@ -362,7 +380,10 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             transL.assign(transL.mul(exp(e2.mul(1.80).add(MH_EXT).mul(ds).negate())));
         });
         const limnDensity = accL.mul(3.0).add(rimE).mul(uniforms.depth);
+        return { density: limnDensity, tailShare, rimE };
+        };
 
+        const buildComet = () => {
         // =====================================================================================================
         // *** COMET -- THE THIRD SPECIES. "One bright point on a tilted orbit inside the glass, trailing light." ***
         //
@@ -452,7 +473,10 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             exp(negate(harg)).mul(0.92).add(KIT.mhScatter(harg, float(0.30))).mul(headBright).mul(visH),
             float(0.0)).toVar();
         const cometDensity = accC.mul(4.20).add(headE).mul(uniforms.depth);
+        return { density: cometDensity, accC, accHC };
+        };
 
+        const buildDroplet = () => {
         // =====================================================================================================
         // *** DROPLET -- THE FOURTH SPECIES. "A sphere of water in free fall." ***
         //
@@ -501,7 +525,10 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         const heart = select(sC.greaterThan(0.0).and(sC.lessThan(L)),
             exp(negate(dC2)).mul(1.65).add(KIT.mhScatter(dC2, float(0.34))).mul(visC), float(0.0)).toVar();
         const dropletDensity = accD.mul(4.20).add(heart).mul(uniforms.depth);
+        return { density: dropletDensity, accD, accHD };
+        };
 
+        const buildOpal = () => {
         // =====================================================================================================
         // *** OPAL -- THE FIFTH SPECIES. "Internal play-of-colour: soft flashes drifting through the volume." ***
         //
@@ -567,7 +594,10 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             transO.assign(transO.mul(exp(eM.mul(2.0).add(MH_EXT).mul(ds).negate())));
         });
         const opalDensity = accO.mul(3.40).add(flashE).mul(uniforms.depth);
+        return { density: opalDensity, flashE, flashH, spreadAmt };
+        };
 
+        const buildAbyss = () => {
         // =====================================================================================================
         // *** ABYSS -- THE SIXTH SPECIES. "Deep-sea dark glass: rare glows passing through, mostly night." ***
         //
@@ -632,7 +662,10 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             transA.assign(transA.mul(exp(eM.mul(2.0).add(MH_EXT).mul(ds).negate())));
         });
         const abyssDensity = accA.mul(3.20).add(glowE).mul(uniforms.depth);
+        return { density: abyssDensity, glowE, glowH };
+        };
 
+        const buildMist = () => {
         // =====================================================================================================
         // *** NEBULA AND TEMPEST -- THE SEVENTH AND EIGHTH, AND THE ONLY TWO OF THE EIGHTEEN WITH NO OBJECT
         // INSIDE THE GLASS AT ALL. *** nebula.ts: "EVERY OTHER HERO PUTS SOMETHING INSIDE THE BODY and lets
@@ -754,13 +787,20 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             transM.assign(transM.mul(exp(mAbsorb.mul(dens).add(MH_EXT).mul(ds).negate())));
         });
         const mistDensity = accM.mul(MIST.gain).mul(uniforms.depth);
+        return { density: mistDensity, accM, accMH };
+        };
 
-        const density = species === "limn" ? limnDensity
-            : species === "comet" ? cometDensity
-            : species === "droplet" ? dropletDensity
-            : species === "opal" ? opalDensity
-            : species === "abyss" ? abyssDensity
-            : (species === "nebula" || species === "tempest") ? mistDensity : stillDensity;
+        // *** ONE CALL, AND IT IS THE ONLY SPECIES BLOCK THAT RUNS. *** The seven closures above are
+        // declared and six of them are never invoked, so their nodes are never built and never reach the
+        // WGSL. Everything below reads `SP`, whose shape is each hero's own contract: always a density, plus
+        // the energy and hue terms that hero's rail needs and no others.
+        const SP = species === "limn" ? buildLimn()
+            : species === "comet" ? buildComet()
+            : species === "droplet" ? buildDroplet()
+            : species === "opal" ? buildOpal()
+            : species === "abyss" ? buildAbyss()
+            : (species === "nebula" || species === "tempest") ? buildMist() : buildStill();
+        const density = SP.density;
 
         // ---- THE SURFACE IS murmur's NOW, NOT THIS FILE'S APPROXIMATION OF IT ------------------------------
         // *** WHAT STOOD HERE WAS WRONG IN FIVE WAYS AND RIGHT IN TWO, AND THE TWO ARE WHY IT LOOKED FINE. ***
@@ -845,34 +885,34 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             // opal's hue rides its FLASHES, and at 1.30 x MH_SPREAD -- the one internal multiplier in the
             // collection above the family cap. Its four flashes sit at four points across the spread, two
             // either side of the anchor, so the extremes reach about 37 degrees of OKLab hue at spread 1.
-            ? select(flashE.greaterThan(1e-4), flashH.div(flashE), float(0.0)).mul(spreadAmt)
+            ? select(SP.flashE.greaterThan(1e-4), SP.flashH.div(SP.flashE), float(0.0)).mul(SP.spreadAmt)
             : species === "abyss"
             // abyss's three lanes take one hue step each: -1, 0, +1 across the spread.
-            ? select(glowE.greaterThan(1e-5), glowH.div(glowE), float(0.0)).mul(spreadK).mul(KIT.MH_SPREAD)
+            ? select(SP.glowE.greaterThan(1e-5), SP.glowH.div(SP.glowE), float(0.0)).mul(spreadK).mul(KIT.MH_SPREAD)
             : (species === "nebula" || species === "tempest")
             // *** THE MIST HEROES CARRY THEIR HUE ON DEPTH, WHICH IS THE ONE CHANNEL A CLOUD HAS. ***
             // nebula.ts: "the near folds one way, the deep glow the other, so the cloud has two hues in
             // conversation through its thickness". The accumulator is e * clamp(p.z, -1, 1), weighted by the
             // SAME transmittance the luminance is -- so a fold that occludes the glow behind it occludes
             // that glow's hue too, which is what stops the far half from tinting a near silhouette.
-            ? select(accM.greaterThan(1e-4), accMH.div(accM), float(0.0)).mul(spreadK).mul(KIT.MH_SPREAD)
+            ? select(SP.accM.greaterThan(1e-4), SP.accMH.div(SP.accM), float(0.0)).mul(spreadK).mul(KIT.MH_SPREAD)
             : species === "limn"
-            ? tailShare.negate().mul(spreadK).mul(KIT.MH_SPREAD)
+            ? SP.tailShare.negate().mul(spreadK).mul(KIT.MH_SPREAD)
             : species === "comet"
-                ? select(accC.greaterThan(1e-4), accHC.div(accC), float(0.0)).negate().mul(spreadK).mul(KIT.MH_SPREAD).mul(1.4)
+                ? select(SP.accC.greaterThan(1e-4), SP.accHC.div(SP.accC), float(0.0)).negate().mul(spreadK).mul(KIT.MH_SPREAD).mul(1.4)
                 : species === "droplet"
-                    ? select(accD.greaterThan(1e-4), accHD.div(accD), float(0.0)).mul(spreadK).mul(KIT.MH_SPREAD)
-                    : select(acc.greaterThan(1e-4), accH.div(acc), float(0.0)).mul(spreadK).mul(KIT.MH_SPREAD);
+                    ? select(SP.accD.greaterThan(1e-4), SP.accHD.div(SP.accD), float(0.0)).mul(spreadK).mul(KIT.MH_SPREAD)
+                    : select(SP.acc.greaterThan(1e-4), SP.accH.div(SP.acc), float(0.0)).mul(spreadK).mul(KIT.MH_SPREAD);
         // mh_present's own hueMix: the hue scaled by the share of THIS pixel's energy that the species says
         // carries colour. still and comet count the interior plus 0.7 of the rim, droplet 0.6 of it, limn the
         // rim energy plus the interior -- four different numerators, transcribed rather than averaged.
         const eTotal = interior.add(sf.rim).add(sf.spec).add(sf.glow).toVar();
-        const hueNum = species === "limn" ? rimE.add(interior)
+        const hueNum = species === "limn" ? SP.rimE.add(interior)
             : species === "droplet" ? interior.add(sf.rim.mul(0.6))
             // opal and abyss weight by their OWN event energy alone -- the flashes and the passing glows --
             // rather than by the interior, because in both the event IS the colour and the medium is night.
-            : species === "opal" ? flashE
-            : species === "abyss" ? glowE
+            : species === "opal" ? SP.flashE
+            : species === "abyss" ? SP.glowE
             // nebula and tempest take the DEFAULT, and that is transcribed rather than fallen into: both
             // their files spell hueMix = hue * (interior + sf.rim * 0.7) / max(e, 1e-4), the same numerator
             // still and comet use. Checked against the source, not assumed from the branch order.
