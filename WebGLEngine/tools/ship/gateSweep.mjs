@@ -5248,6 +5248,66 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "orb-species-block-per-shader; the next orb round starts there.",
     }),
     // v4635 -- THE 247th CLOSING. No gate added: a row added to one that existed, and a 3,561 ms refund.
+    // v4637 -- THE 249th CLOSING: arc and sol, the two heroes that draw a LINE.
+    since258: Object.freeze({
+        at: "v4637", swept: 2, green: 2, red: 0,
+        added: Object.freeze([
+            "tools/ship/murmurSpecies8-selfcheck.mjs",
+            "tools/ship/murmurSpecies9-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 2,396 and 2,016 ms on the rotation, real WebGPU, 10 rows, carrying ARC and SOL -- " +
+                 "the eleventh and twelfth of murmur's eighteen and the two that draw a LINE. arc.ts opens " +
+                 "with the hardest sentence in the collection: \"THE SPECIES IS A LINE ... Everything else is " +
+                 "either compact enough to solve at the ray's closest approach or broad enough that five " +
+                 "samples average it honestly. A FILAMENT IS NEITHER.\" They ship together because sol.ts " +
+                 "says so in six words -- \"THE PROMINENCES, solved the way arc's filament is\" -- so the " +
+                 "closed-form tube, w * sqrt(pi) / sin(alpha) * exp(-perp^2 / w^2), moved into " +
+                 "render/murmurKit.mjs as mhTube rather than being written twice, alongside mhRoll (the third " +
+                 "rotation, without which every curve's projected ellipse keeps its long axis horizontal) and " +
+                 "mhAa (the moire gate, COMPUTED at this port's one mount rather than baked as the 1 it " +
+                 "returns there). *** AND THE CONSTRAINT THE SPECIES ESCAPES IS ARITHMETIC THAT DIFFERS FROM " +
+                 "murmur's, WHICH IS THE ROUND'S FIRST CORRECTION. *** arc.ts states it at ten taps -- \"the " +
+                 "interval is 0.2, so a tube narrower than that is caught by whichever tap lands in it and " +
+                 "missed otherwise\" -- but this tree marches at MH_TAPS = 24, kit.ts's own demo value, so " +
+                 "the interval here is 0.0833 and the 0.0530 thread is 0.636 of a step rather than 0.265 of " +
+                 "one. Every row computes the step from MH_TAPS instead of quoting 0.2, and the bound is " +
+                 "two-sided so neither inheriting murmur's tap count nor widening the thread until a march " +
+                 "could see it would pass. FIFTEEN SABOTAGES, TWELVE RED BY NAME. *** AND THE SECOND " +
+                 "CORRECTION WAS THE INSTRUMENT, NOT THE SHADER: the first flicker row measured the " +
+                 "FLOURISH. *** At evenly spaced times arc's frame total moved up to 67.85% and averaged " +
+                 "23.36% -- exactly the \"dim, uneven and flickering\" a marched filament gives -- and it was " +
+                 "mh_flourish firing on its own schedule, multiplying brightness by (1 + 0.45 * env) and " +
+                 "adding a travelling pulse. Driving the CPU kit's own mhFlourish finds where it is silent on " +
+                 "BOTH species' lanes, t = 45.0 to 51.1, and in that window arc reads 6.45% max and 3.32% " +
+                 "mean against nebula's 5.55% and 1.44%: a solved filament is as steady as the marched cloud " +
+                 "that cannot flicker. THE OTHER MEASURED RESULTS: half of arc's light lands in 2.16% of the " +
+                 "lit disc against nebula's 17.28%, x8; its centroid never moves a whole pixel between " +
+                 "frames, which is what the parabolic refinement buys over twenty discrete places; `pin` " +
+                 "takes the centre-to-annulus ratio from 0.404 to 21.997, moving light rather than making " +
+                 "it; sol's half-max outline is 4.12% out of round against nebula's 23.13%, one square root " +
+                 "against five samples; `simmer` multiplies the interior's neighbour-to-neighbour difference " +
+                 "by 1.68 while moving its mean 1.1%, which is what a zero-mean noise does and a brightness " +
+                 "cannot; and a tongue appears only when the knob is up AND its own sin-squared phase is up " +
+                 "-- 3.76% to 38.69% of angular asymmetry with one tongue lifted, 2.02% to 1.85% with all " +
+                 "three flat, the corona being unable to fake either because it is a function of radius " +
+                 "alone. *** A SABOTAGE ALSO CAUGHT A FALSE SENTENCE IN A ROW'S OWN TEXT, which is a first " +
+                 "for this session: *** the simmer row claimed it would catch the granulation weighting being " +
+                 "removed, and it does not -- moving it to cover the limb, sol.ts's own named first-build " +
+                 "bug, changes the interior texture response by nothing to three decimals and the outline by " +
+                 "0.01 percentage points, because the term it perturbs carries almost no light out where the " +
+                 "disc is small. That claim is retracted in place. THREE CONSTANTS ARE TRANSCRIBED AND " +
+                 "EXPLICITLY NOT GRADED, each with the measurement that decided it: the granulation " +
+                 "weighting above, arc's grazing floor (3.8% of frame total), and sol's core occlusion (9.0% " +
+                 "of the tongues' contribution at the most favourable moment in 400 s of the species' own " +
+                 "clock, because a lifted tongue arches OUT of the disc where `hidden` is zero). A sabotage " +
+                 "also forced a third conjunct into the bow row: zeroing the span terms so the knob drives " +
+                 "WIDTH alone left the total light and the concentration both up by half, since a closed-form " +
+                 "integral scales with w -- only the stroke's end-to-end reach separates longer from fatter, " +
+                 "and under that sabotage it went the wrong way, x0.901 against the real x1.202. VERIFIED BY " +
+                 "BYTES across all TWELVE species and three time-and-knob cases: 36 frames, 0 bytes different.",
+    }),
     // v4636 -- THE 248th CLOSING: fathom and geode, the two heroes whose interiors are SOLVED, not marched.
     since257: Object.freeze({
         at: "v4636", swept: 2, green: 2, red: 0,

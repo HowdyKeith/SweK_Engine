@@ -16,7 +16,7 @@
 "use strict";
 
 import { MH_R, MH_ETA, MH_EXT, MH_TILT, MH_SCATTER_K, MH_SPREAD, MH_EXIT_CAP, MH_DRIFT_WOBBLE_CAP,
-         MH_AMP_CAP } from "./murmurKit.mjs";
+         MH_AMP_CAP, MH_SQRTPI } from "./murmurKit.mjs";
 
 /**
  * makeMurmurKitTsl(TSL) -> the kit's node builders.
@@ -99,6 +99,25 @@ export function makeMurmurKitTsl(TSL) {
         const cb = cos(ax).toVar(), sb = sin(ax).toVar();
         return vec3(q.x, cb.mul(q.y).sub(sb.mul(q.z)), sb.mul(q.y).add(cb.mul(q.z)));
     });
+
+    /**
+     * kit.ts's mh_roll: the THIRD rotation, in the xy plane about the view axis, applied BEFORE yaw and tilt.
+     * Without it "three ribbons at three yaws and three tilts came out as three horizontal swooshes stacked on
+     * each other, which is one swoosh". The CPU twin's gate asserts it preserves length, as mhSpin's does.
+     */
+    const mhRoll = Fn(([p, a]) => {
+        const c = cos(a).toVar(), s = sin(a).toVar();
+        return vec3(c.mul(p.x).sub(s.mul(p.y)), s.mul(p.x).add(c.mul(p.y)), p.z);
+    });
+
+    /**
+     * *** THE CLOSED-FORM TUBE: w * sqrt(pi) / sin(alpha) * exp(-perp^2 / w^2). *** The whole-ray integral of
+     * a gaussian tube crossed at angle alpha, and the reason arc and sol can draw a LINE where a march cannot
+     * draw one thinner than its own step. sinA is floored by the CALLER -- arc at 0.58, sol at 0.55, each for
+     * its own stated reason -- so nothing is floored here.
+     */
+    const mhTube = Fn(([w, sinA, perp2]) =>
+        w.mul(MH_SQRTPI).div(sinA).mul(exp(perp2.div(w.mul(w)).negate())));
 
     /** kit.ts's mh_drift: eased angular travel, so an arc hurries and dawdles instead of spinning. */
     const mhDrift = Fn(([t, rate, wobble, lane]) => {
@@ -457,7 +476,7 @@ export function makeMurmurKitTsl(TSL) {
         // the literal token `null` -- which the GPU rejected at pipeline creation rather than silently. Both
         // times the value is one number that half the family's colour depends on and nothing owned it.
         MH_R, MH_ETA, MH_EXT, MH_TILT, MH_SCATTER_K, MH_SPREAD, MH_EXIT_CAP,
-        mhHash, mhGrad3, mhNoise3, mhHash1, mhFlourish, mhBreath, mhDrift, mhSpin,
+        mhHash, mhGrad3, mhNoise3, mhHash1, mhFlourish, mhBreath, mhDrift, mhSpin, mhRoll, mhTube, MH_SQRTPI,
         mhRefract, mhLook, mhExit, mhHaze, mhMedium, mhInside, mhTransmit, mhScatter,
         mhDeform, mhBody, MH_AMP_CAP,
         mhKey, mhSmall, mhSurface, mhContainment, mhOpalLife, mhAbyssSlot,

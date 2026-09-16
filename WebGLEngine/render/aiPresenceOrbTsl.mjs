@@ -61,11 +61,18 @@ export const ORB_KNOBS = Object.freeze([
     // quantity, so the port gives them different names rather than pretending the roster shares more than it
     // does.
     "layers", "parallax", "murk", "facet", "glim", "stone",
+    // arc's three and sol's three, also unshared, and this pair is the clearest case yet FOR not sharing.
+    // Both species draw a line with the SAME closed-form integral, so a careless port would have given them
+    // one set of knob names on the strength of the shared machinery. But arc's c0 sets how far round its
+    // single filament goes and sol's sets how far its corona reaches off the limb; arc's c1 is how much its
+    // plane wanders and sol's is how high its three tongues lift. The machinery is shared and the QUANTITIES
+    // are not, which is precisely the distinction the fathom/geode note above was drawing.
+    "bow", "sway", "pin", "corona", "prom", "simmer",
 ]);
 
 /** The species this file can build. murmur ships eighteen; these are the six that are ported. */
 export const ORB_SPECIES = Object.freeze(["still", "limn", "comet", "droplet", "opal", "abyss",
-                                          "nebula", "tempest", "fathom", "geode"]);
+                                          "nebula", "tempest", "fathom", "geode", "arc", "sol"]);
 
 /**
  * The three colour anchors the rail is built from, as murmur's own WEB-SPEC names them: ink '#0A0A0B' is the
@@ -80,7 +87,17 @@ export const ORB_COLORS = Object.freeze({
 
 import { makeMurmurKitTsl } from "./murmurKitTsl.mjs";
 import { MH_EXT, MH_TAPS, MH_SURFACE_KNOBS, MH_SHAPE, MH_DROPLET_GAIN, MH_MIST,
-         MH_TEMPEST_BOLT, MH_FATHOM, MH_GEODE } from "./murmurKit.mjs";
+         MH_TEMPEST_BOLT, MH_FATHOM, MH_GEODE, MH_ARC, MH_SOL, MH_R, mhAa } from "./murmurKit.mjs";
+
+/**
+ * THE MOIRE GATE, EVALUATED ON THE CPU BECAUSE THIS PORT HAS ONE MOUNT. kit.ts's mh_aa eases a structure's
+ * contribution to nothing as it approaches a third of a cycle per pixel. Its arguments are the mount's pixel
+ * size and scale, and this file reads BOTH of those at a fixed nominal 120 pt -- the same 120 that smallK is
+ * read at twelve lines into every species. So the gate is a constant per species, and it is COMPUTED FROM THE
+ * KIT rather than written down as one, so that a reader can check it against kit.ts instead of taking a
+ * transcribed number on trust. At 120 pt both species' structures are comfortably resolved and it returns 1.
+ */
+const KIT_AA = (cycles) => mhAa(2 * Math.PI * cycles / MH_R, 120, 1);
 
 const R_BODY = 0.62;          // sphere radius in the -1..1 quad
 const EDGE_FEATHER = 0.015;   // antialiased silhouette width, in the same units as R_BODY
@@ -114,10 +131,13 @@ const EDGE_FEATHER = 0.015;   // antialiased silhouette width, in the same units
 export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, species = "still" } = {}) {
     if (!ORB_SPECIES.includes(species)) throw new Error(`aiPresenceOrbTsl: unknown species ${species}`);
     const need = ["Fn", "float", "vec2", "vec3", "vec4", "uv", "dot", "length", "normalize", "max", "min",
-                  "clamp", "pow", "exp", "cos", "sin", "sqrt", "abs", "mix", "smoothstep", "select", "uniform", "negate"];
+                  "clamp", "pow", "exp", "cos", "sin", "sqrt", "abs", "mix", "smoothstep", "select", "uniform", "negate",
+                  // cross() arrived with arc and sol: both need the angle between the view ray and a curve's
+                  // own tangent, which is the 1/sin(alpha) term the closed-form tube integral divides by.
+                  "cross"];
     for (const n of need) if (typeof TSL[n] !== "function") throw new Error(`aiPresenceOrbTsl: the TSL namespace has no ${n}()`);
     const { Fn, float, vec2, vec3, vec4, uv, dot, length, normalize, max, min, clamp, pow, exp, cos, sin, sqrt,
-            abs, mix, smoothstep, select, uniform, negate, Loop } = TSL;
+            abs, mix, smoothstep, select, uniform, negate, cross, Loop } = TSL;
     // *** THE KIT IS IMPORTED RATHER THAN RE-APPROXIMATED, WHICH IS THE WHOLE POINT OF v4623 HAVING BUILT IT. ***
     // Everything below that used to be an in-file guess at murmur's volume -- a constant floor and a gaussian in
     // t -- is now the kit's own mh_exit / mh_medium / mh_inside / mh_flourish, graded against render/murmurKit
@@ -130,7 +150,8 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
                  wobble: 0.5, tension: 0.5, sheen: 0.5,
                  flashes: 0.5, softness: 0.6, drift: 0.4, creatures: 0.4, rarity: 0.6,
                  density: 0.5, fold: 0.5, glint: 0.5,
-                 layers: 0.5, parallax: 0.5, murk: 0.4, facet: 0.5, glim: 0.5, stone: 0.5, ...knobs };
+                 layers: 0.5, parallax: 0.5, murk: 0.4, facet: 0.5, glim: 0.5, stone: 0.5,
+                 bow: 0.5, sway: 0.5, pin: 0.5, corona: 0.5, prom: 0.5, simmer: 0.5, ...knobs };
     const uniforms = {}; for (const n of ORB_KNOBS) uniforms[n] = uniform(float(k0[n])).label(n);
     // The rail's three anchors are colours, not scalars, so they sit beside the knob block rather than in it.
     const col0 = { ink: ORB_COLORS.ink, tone: ORB_COLORS.tone, tone2: ORB_COLORS.tone, ...(knobs.colors || {}) };
@@ -1009,6 +1030,333 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             return { density: geodeDensity, crystalE, crystalH };
         };
 
+        // =====================================================================================================
+        // *** ARC -- THE ELEVENTH. "One soft bright filament arcing gently through the volume." ***
+        //
+        // *** THIS IS THE HARDEST THING THE KIT HAS BEEN ASKED TO DRAW, AND ITS OWN FILE SAYS SO IN THE FIRST
+        // PARAGRAPH. *** arc.ts: "THE SPECIES IS A LINE ... Everything else is either compact enough to solve
+        // at the ray's closest approach or broad enough that five samples average it honestly. A FILAMENT IS
+        // NEITHER: thin enough that a march steps straight over it, and extended enough that there is no
+        // closed form for a ray's nearest approach."
+        //
+        // A MARCHED FILAMENT CANNOT BE THINNER THAN ITS MARCH -- the constraint stated as arithmetic: "At ten
+        // steps down a two-unit chord the interval is 0.2, so a tube narrower than that is caught by whichever
+        // tap lands in it and missed otherwise, and the line renders dim, uneven and flickering. Widening it
+        // to 0.125 was the only way to make ten taps honest, and the verdict on that was a fat slug of light."
+        //
+        // SO THE SEARCH RUNS ALONG THE CURVE, NOT ALONG THE RAY, and that inversion is the whole port. For a
+        // point on the curve the ray's closest approach is two dot products; sampling THAT along the curve
+        // finds where the ray passes nearest the filament, and a parabola through the winner and its two
+        // neighbours refines it to well inside a sample interval. The integral is then exact, because locally
+        // the curve is a straight line and a gaussian tube crossed at angle alpha integrates in closed form --
+        // KIT.mhTube, which sol uses too and which is why these two ship in one round.
+        const buildArc = () => {
+            const AR = MH_ARC;
+            const bowK = clamp(uniforms.bow, 0.0, 1.0).toVar();
+            const swayKn = clamp(uniforms.sway, 0.0, 1.0).toVar();
+            const pinK = clamp(uniforms.pin, 0.0, 1.0).toVar();
+            const flA = KIT.mhFlourish(uniforms.time, float(AR.flourishSlot), float(AR.flourishDur)).toVar();
+
+            // THE ARC'S FRAME -- roll FIRST, then yaw and tilt. Roll is the third rotation the kit gained for
+            // this round: without it a curve's projected ellipse keeps its long axis horizontal on screen
+            // however it is yawed and tilted, which is what turned three ribbons into one swoosh.
+            const sway = float(AR.swayB).add(swayKn.mul(AR.swayK)).toVar();
+            const ro = float(AR.rollB).add(sway.mul(AR.rollAmp).mul(
+                sin(KIT.mhDrift(uniforms.time, float(AR.rollRate), float(AR.rollWob), float(AR.rollLane))))).toVar();
+            const ay = KIT.mhDrift(uniforms.time, float(AR.yawRate), float(AR.yawWob), float(AR.yawLane)).toVar();
+            const ax = float(AR.tiltB).add(sway.mul(AR.tiltAmp)
+                .mul(sin(uniforms.time.mul(AR.tiltRate).add(AR.tiltPhase)))).toVar();
+
+            // THE GEOMETRY. The arc's midpoint sits `pin` from the centre on the bow axis and the circle has
+            // radius Rc, so the circle's centre is at (pin - Rc) along that axis. arc.ts on the trade: "A
+            // tighter circle carries more arc before its ends run out to the edge, which is the same trade a
+            // draughtsman makes to get a longer line out of a fixed sheet: the shape it draws is a shallow
+            // catenary U rather than a comma."
+            const pin = mix(float(AR.pinFar), float(AR.pinNear), pinK)
+                .mul(float(1.0).add(uniforms.voice.mul(AR.pinVoice)).add(flA.x.mul(AR.pinFlourish))).toVar();
+            const Rc = float(AR.rcB).add(bowK.mul(AR.rcK)).toVar();
+            const span = float(AR.spanB).add(bowK.mul(AR.spanK))
+                .mul(mix(float(1.0), float(AR.spanSmall), smallK)).toVar();
+            const cz = pin.sub(Rc).toVar();
+
+            // A THREAD, and its width is a FREE DESIGN DECISION now rather than a sampling constraint --
+            // arc.ts: "Once the sampling constraint is gone the width is a free design decision again: 0.052
+            // is five per cent of the sphere's radius, and it is that because that is what reads as
+            // calligraphic." That sentence is the entire justification for the machinery above it.
+            const w = float(AR.wB).add(bowK.mul(AR.wK)).mul(mix(float(1.0), float(AR.wSmall), smallK)).toVar();
+            const bright = float(AR.brightB).add(uniforms.voice.mul(AR.brightVoice))
+                .mul(float(1.0).add(flA.x.mul(AR.brightFlourish))).toVar();
+            // The moire gate, evaluated through the kit rather than baked: at this port's nominal 120 pt mount
+            // arc's 4.2 cycles are comfortably resolved and it returns 1, but it is COMPUTED, so a reader can
+            // check it against kit.ts instead of taking a 1 on trust.
+            const shimAmt = float(KIT_AA(AR.shimCycles)).mul(float(1.0).sub(smallK))
+                .mul(uniforms.glintRate.mul(AR.shimPace)).toVar();
+
+            const Pa = KIT.mhSpin(KIT.mhRoll(P, ro), ay, ax).toVar();
+            const Ra = KIT.mhSpin(KIT.mhRoll(rd, ro), ay, ax).toVar();
+
+            // THE SEARCH, UNROLLED. Twenty samples along the curve; the loop is written out in JS so every
+            // sample's angle is a compile-time constant and the parabola's three-point window can be tracked
+            // beside the winner. *** THE THREE VALUES ARE SELECTED FROM THE OLD ONES BEFORE ANY ASSIGNMENT,
+            // which is the discipline geode's two-deep entry ranking needed for the same reason: a running
+            // argmin written the obvious way reads a value it has just overwritten.
+            // Sample angles are compile-time fractions of `span`, so `span` scales the whole search and the
+            // step between samples is span * 2/(NS-1) -- the node form of arc.ts's dth.
+            const NS = AR.samples;
+            const thOf = (i) => -1 + 2 * (i / (NS - 1));
+            const dthN = span.mul(2 / (NS - 1)).toVar();
+            const gAt = (thNode) => {
+                const C = vec3(Rc.mul(sin(thNode)), cz.add(Rc.mul(cos(thNode))), float(0.0)).toVar();
+                const D = C.sub(Pa).toVar();
+                const sc = dot(D, Ra).toVar();
+                return { g: dot(D, D).sub(sc.mul(sc)).toVar(), sc, C };
+            };
+            const G = [], TH = [];
+            for (let i = 0; i < NS; i++) {
+                const thI = span.mul(thOf(i)).toVar();
+                TH.push(thI); G.push(gAt(thI).g);
+            }
+
+            // TWO CROSSINGS, IN TWO HALVES OF TEN, and the reason is geometric: "a shallow U seen from most
+            // angles is crossed twice, and a global minimum would find only one and break the thread where it
+            // passes over itself."
+            const partE = [], thPick = [];
+            for (let hf = 0; hf < AR.halves; hf++) {
+                const lo = hf * (NS / AR.halves), hi = lo + NS / AR.halves - 1;
+                let bG = G[lo].toVar(), bTh = TH[Math.min(Math.max(lo, 1), NS - 2)].toVar();
+                let bY0 = G[Math.min(Math.max(lo, 1), NS - 2) - 1].toVar();
+                let bY1 = G[Math.min(Math.max(lo, 1), NS - 2)].toVar();
+                let bY2 = G[Math.min(Math.max(lo, 1), NS - 2) + 1].toVar();
+                for (let i = lo + 1; i <= hi; i++) {
+                    const ci = Math.min(Math.max(i, 1), NS - 2);
+                    const better = G[i].lessThan(bG);
+                    const nG = select(better, G[i], bG).toVar();
+                    const nTh = select(better, TH[ci], bTh).toVar();
+                    const n0 = select(better, G[ci - 1], bY0).toVar();
+                    const n1 = select(better, G[ci], bY1).toVar();
+                    const n2 = select(better, G[ci + 1], bY2).toVar();
+                    bG.assign(nG); bTh.assign(nTh); bY0.assign(n0); bY1.assign(n1); bY2.assign(n2);
+                }
+                // Parabolic refinement. A flat triple is a zero denominator, so the offset is selected rather
+                // than divided -- the same safe-divisor shape geode's degenerate slab needed.
+                const den = bY0.sub(bY1.mul(2.0)).add(bY2).toVar();
+                const off = select(abs(den).greaterThan(1e-7),
+                                   clamp(bY0.sub(bY2).mul(0.5).div(select(abs(den).greaterThan(1e-7), den, float(1.0))),
+                                         -1.0, 1.0), float(0.0)).toVar();
+                const th = clamp(bTh.add(off.mul(dthN)), span.negate(), span).toVar();
+
+                const hit = gAt(th);
+                const sc = hit.sc.toVar();
+                const perp2 = max(dot(hit.C.sub(Pa), hit.C.sub(Pa)).sub(sc.mul(sc)), float(0.0)).toVar();
+                const live = sc.greaterThan(0.0).and(sc.lessThan(L));
+
+                // THE SPINDLE, AND IT IS TWO EXPONENTS ON ONE PROFILE. Width rides `prof` linearly and
+                // brightness rides prof^1.35, "so the thread reads as a stroke laid down with pressure in the
+                // middle and lifted at both ends, rather than as a rod of even ink that happens to narrow".
+                // A filament of even width with a fade painted on its ends is a rod that got dimmer.
+                const u = clamp(abs(th).div(max(span, float(1e-3))), 0.0, 1.0).toVar();
+                const prof = pow(max(float(1.0).sub(u.mul(u)), float(0.0)), float(AR.profPow)).toVar();
+                const wl = w.mul(float(AR.wlFloor).add(prof.mul(AR.wlRide))).toVar();
+
+                // The angle between ray and tangent, floored at 0.58 rather than the 0.30 the geometry allows:
+                // "at three and a third it put a bright BULGE wherever the filament leaned toward the viewer,
+                // and a thread with a swelling two thirds along it is not brightest at its centre."
+                const T = vec3(cos(th), sin(th).negate(), float(0.0)).toVar();
+                const sinA = max(length(cross(Ra, T)), float(AR.sinFloor)).toVar();
+
+                const run = float(1.0).add(shimAmt.mul(sin(th.mul(AR.runFreq).sub(uniforms.time.mul(AR.runRate))))).toVar();
+                const pr = th.sub(mix(span.negate(), span, flA.y)).div(0.34).toVar();
+                const pulse = flA.x.mul(0.95).mul(exp(pr.mul(pr).negate())).toVar();
+
+                // THE CLOSED FORM, TWICE: once for the thread and once for its halo. The halo's coefficient is
+                // 0.09 where every marched hero gives its scatter 0.24, and the arithmetic is in the kit's
+                // note on mhTube -- the integral scales with WIDTH, so a halo 3.2x wider carries 3.2x the
+                // light at the same coefficient and stops being a glow around a thread.
+                const ws = wl.div(Math.sqrt(KIT.MH_SCATTER_K)).toVar();
+                const core = KIT.mhTube(wl, sinA, perp2).toVar();
+                const halo = KIT.mhTube(ws, sinA, perp2).mul(AR.haloK).toVar();
+                const vis = KIT.mhInside(Pa.add(Ra.mul(sc))).mul(exp(sc.mul(-MH_EXT))).toVar();
+                const e = core.add(halo).mul(pow(prof, float(AR.brightPow)))
+                    .mul(bright).mul(run).mul(float(1.0).add(pulse)).mul(vis).toVar();
+                partE.push(select(live, e, float(0.0)).toVar());
+                thPick.push(th);
+            }
+
+            // When both halves land in the same place the second is a DUPLICATE of the first, not a second
+            // crossing -- so it is faded out by how far apart the two picks are rather than counted twice.
+            const sep = smoothstep(float(AR.sepIn), float(AR.sepOut), abs(thPick[0].sub(thPick[1]))).toVar();
+            const filE = partE[0].add(partE[1].mul(sep)).toVar();
+            const filH = partE[0].mul(clamp(thPick[0].div(max(span, float(1e-3))), -1.0, 1.0))
+                .add(partE[1].mul(sep).mul(clamp(thPick[1].div(max(span, float(1e-3))), -1.0, 1.0))).toVar();
+
+            // The medium is STILL MARCHED, and arc.ts says why that is not an inconsistency: "it is broad, so
+            // five is honest for it, and it carries the only noise this hero reads."
+            const medAmt = mix(float(AR.medB), float(AR.medS), smallK).toVar();
+            const accA = float(0.0).toVar();
+            const transA = float(1.0).toVar();
+            Loop({ start: 0, end: MH_TAPS }, ({ i }) => {
+                const pA = P.add(rd.mul(float(i).add(0.5).mul(ds)));
+                const eA = KIT.mhMedium(pA, uniforms.time, float(2.0)).mul(medAmt).mul(KIT.mhInside(pA)).toVar();
+                accA.addAssign(eA.mul(transA).mul(ds));
+                transA.assign(transA.mul(exp(eA.mul(AR.medAbsorb).add(MH_EXT).mul(ds).negate())));
+            });
+            const arcDensity = accA.mul(AR.medGain)
+                .add(filE.mul(AR.filGain).mul(mix(float(1.0), float(AR.filSmall), smallK)))
+                .mul(uniforms.depth);
+            return { density: arcDensity, filE, filH };
+        };
+
+        // =====================================================================================================
+        // *** SOL -- THE TWELFTH. "A miniature sun: one composed core, and prominences as calligraphy." ***
+        //
+        // *** IT SHIPS WITH ARC BECAUSE ITS OWN FILE SAYS SO IN SIX WORDS: "THE PROMINENCES, solved the way
+        // arc's filament is." *** Same curve search, same parabolic refinement, same closed-form tube -- which
+        // is why the tube moved into the kit this round instead of being written twice.
+        //
+        // AND THE TWO HALVES OF THIS SPECIES ARE SOLVED DIFFERENTLY ON PURPOSE. sol.ts: "THE CORE IS THE MASS
+        // AND THE PROMINENCES ARE THE LINE. Both are solved rather than sampled, and they are solved
+        // differently because they are different kinds of thing." The core is a perfect disc costing one
+        // square root -- "exactly, analytically round from every angle, at every frame, with no sampling in it
+        // anywhere" -- and the tongues are line integrals.
+        const buildSol = () => {
+            const SO = MH_SOL;
+            const coronaK = clamp(uniforms.corona, 0.0, 1.0).toVar();
+            const promK = clamp(uniforms.prom, 0.0, 1.0).toVar();
+            const simmerK = clamp(uniforms.simmer, 0.0, 1.0).toVar();
+            const flS = KIT.mhFlourish(uniforms.time, float(SO.flourishSlot), float(SO.flourishDur)).toVar();
+
+            const Rs = float(SO.rsB).add(coronaK.mul(SO.rsK)).mul(mix(float(1.0), float(SO.rsSmall), smallK))
+                .mul(float(1.0).add(KIT.mhBreath(uniforms.time, float(SO.rsBreathLane)).sub(0.5).mul(2.0).mul(SO.rsBreath))
+                    .add(uniforms.voice.mul(SO.rsVoice))).toVar();
+
+            // THE RAY'S PERPENDICULAR DISTANCE TO THE CENTRE: the whole core, in three lines and one square
+            // root. Nothing here is sampled, which is what makes the outline exactly circular at every angle.
+            const bqS = dot(P, rd).toVar();
+            const perp2S = max(dot(P, P).sub(bqS.mul(bqS)), float(0.0)).toVar();
+            const perpS = sqrt(perp2S).toVar();
+            const disc = smoothstep(Rs.mul(SO.discOut), Rs.mul(SO.discIn), perpS).toVar();
+            const sFront = bqS.negate().sub(sqrt(max(Rs.mul(Rs).sub(perp2S), float(0.0)))).toVar();
+
+            // THE GRANULATION IS WEIGHTED TO THE DISC'S INTERIOR, and this is not a refinement -- it is the
+            // repair of the one failure this species cannot afford. sol.ts: "Granulation applied across the
+            // limb modulates the very threshold that makes the core round, and the photosphere grew NOTCHES in
+            // its outline -- which on the one hero whose brief is a composed circular core is the worst place
+            // to lose it."
+            const simAmt = float(KIT_AA(SO.simCycles)).mul(float(1.0).sub(smallK))
+                .mul(float(SO.simB).add(simmerK.mul(SO.simK)))
+                .mul(float(SO.simPaceB).add(uniforms.glintRate.mul(SO.simPaceK))).toVar();
+            const sp3 = P.add(rd.mul(max(sFront, float(0.0)))).toVar();
+            const gran = float(1.0).add(simAmt.mul(SO.granK)
+                .mul(smoothstep(float(SO.granIn), float(SO.granOut), disc))
+                .mul(KIT.mhNoise3(sp3.mul(SO.granScale).add(vec3(float(0.0), float(0.0),
+                    uniforms.time.mul(float(SO.granRateB).add(uniforms.glintRate.mul(SO.granRateK))))))))
+                .toVar();
+            const coreE = disc.mul(gran).mul(float(SO.coreB).add(coronaK.mul(SO.coreK))
+                .mul(float(1.0).add(uniforms.voice.mul(SO.coreVoice)))).toVar();
+
+            const coronaW = float(SO.coronaWB).add(coronaK.mul(SO.coronaWK))
+                .mul(float(1.0).add(uniforms.voice.mul(SO.coronaWVoice))).toVar();
+            const coronaE = exp(max(perpS.sub(Rs), float(0.0)).div(max(coronaW, float(1e-3))).negate())
+                .mul(float(1.0).sub(disc.mul(SO.coronaDisc)))
+                .mul(float(SO.coronaB).add(coronaK.mul(SO.coronaK))).toVar();
+
+            // THE PROMINENCES. Three, on periods of 13, 17 and 21 seconds, "each spending most of its cycle
+            // flat against the surface, so the sun is never symmetric and never crowded. The lift is
+            // sin-squared, flat at both ends." The third retires on small mounts.
+            const pairB = float(1.0).sub(smoothstep(float(SO.pairIn), float(SO.pairOut), smallK)).toVar();
+            const promW = float(SO.promWB).add(promK.mul(SO.promWK))
+                .mul(mix(float(1.0), float(SO.promWSmall), smallK)).toVar();
+            const promE = float(0.0).toVar();
+            const NP = SO.samples;
+            for (let k = 0; k < SO.count; k++) {
+                const wk = k < 2 ? float(1.0).toVar() : pairB;
+                const per = SO.perB + SO.perK * k;
+                const sn = sin(uniforms.time.mul(2 * Math.PI / per).add(k * 2.13)).toVar();
+                const lift = sn.mul(sn).toVar();
+                const a1 = uniforms.time.mul(SO.rootA1 + SO.rootA1K * k).add(k * SO.rootPh1).toVar();
+                const a2 = uniforms.time.mul(SO.rootA2 + SO.rootA2K * k).add(k * SO.rootPh2).toVar();
+                const dir = normalize(vec3(cos(a1).mul(cos(a2)), sin(a2), sin(a1).mul(cos(a2)))).toVar();
+                const tang = normalize(cross(dir, vec3(0.13, 0.97, 0.21)).add(1e-4)).toVar();
+                const hk = float(SO.hkB).add(promK.mul(SO.hkK)).mul(lift)
+                    .mul(float(1.0).add(uniforms.voice.mul(SO.hkVoice))).toVar();
+                // A WIDER SWEEP ALONG THE LIMB than the first build's 0.55: "At 0.55 they left radially and
+                // read as antennae; a prominence is a loop rooted at two feet, not a spike."
+                const swp = float(SO.swpB).add(promK.mul(SO.swpK)).toVar();
+
+                // The curve: swept along the limb by +/- swp and lifted radially by a parabola that is exactly
+                // zero at both feet, so a tongue is rooted rather than floating.
+                const curve = (uNode) => {
+                    const an = swp.mul(uNode).toVar();
+                    const C = dir.mul(cos(an)).add(tang.mul(sin(an)))
+                        .mul(Rs.add(hk.mul(float(1.0).sub(uNode.mul(uNode))))).toVar();
+                    const D = C.sub(P).toVar();
+                    const sc = dot(D, rd).toVar();
+                    return { C, D, sc, g: dot(D, D).sub(sc.mul(sc)).toVar(), an };
+                };
+                let bG = null, bU = null;
+                for (let i = 0; i < NP; i++) {
+                    const uc = float(-1 + 2 * (i / (NP - 1))).toVar();
+                    const g = curve(uc).g;
+                    if (bG === null) { bG = g.toVar(); bU = uc.toVar(); }
+                    else {
+                        const better = g.lessThan(bG);
+                        const nG = select(better, g, bG).toVar(), nU = select(better, uc, bU).toVar();
+                        bG.assign(nG); bU.assign(nU);
+                    }
+                }
+                // ONE parabolic refinement, RE-EVALUATING the curve at the winner's two neighbours rather than
+                // reading stored samples -- which is what sol.ts does and what arc.ts does not, because sol's
+                // winner is not clamped into the array's interior and its neighbours may fall outside it.
+                const du = 2 / (NP - 1);
+                const gm = curve(clamp(bU.sub(du), -1.0, 1.0)).g.toVar();
+                const gp = curve(clamp(bU.add(du), -1.0, 1.0)).g.toVar();
+                const denS = gm.sub(bG.mul(2.0)).add(gp).toVar();
+                const offS = select(abs(denS).greaterThan(1e-7),
+                    clamp(gm.sub(gp).mul(0.5).div(select(abs(denS).greaterThan(1e-7), denS, float(1.0))), -1.0, 1.0),
+                    float(0.0)).toVar();
+                const uu = clamp(bU.add(offS.mul(du)), -1.0, 1.0).toVar();
+                const hitS = curve(uu);
+                const scS = hitS.sc.toVar();
+                const pp = max(dot(hitS.D, hitS.D).sub(scS.mul(scS)), float(0.0)).toVar();
+                const liveS = scS.greaterThan(0.0).and(scS.lessThan(L)).and(lift.greaterThan(0.02))
+                    .and(wk.greaterThan(0.002));
+
+                const profS = pow(max(float(1.0).sub(uu.mul(uu).mul(SO.profFall)), float(0.0)), float(SO.profPow)).toVar();
+                const wlS = promW.mul(float(SO.wlFloor).add(profS.mul(SO.wlRide))).toVar();
+                const TS = normalize(dir.mul(sin(hitS.an).negate()).add(tang.mul(cos(hitS.an)))
+                    .mul(Rs.add(hk.mul(float(1.0).sub(uu.mul(uu)))))
+                    .sub(dir.mul(cos(hitS.an)).add(tang.mul(sin(hitS.an))).mul(hk.mul(uu).mul(2.0)))
+                    .add(1e-5)).toVar();
+                const sinAS = max(length(cross(rd, TS)), float(SO.sinFloor)).toVar();
+
+                // *** THE CORE OCCLUDES, and this is the cue that makes it a BODY. *** A tongue whose nearest
+                // point lies behind the core's front surface, within the disc, is hidden -- "which is the cue
+                // that makes the core read as a solid body rather than as a bright patch." At 0.94 rather than
+                // 1.0, so it goes dark rather than absent.
+                const hidden = select(scS.greaterThan(sFront), disc, float(0.0)).toVar();
+                const visS = KIT.mhInside(P.add(rd.mul(scS))).mul(exp(scS.mul(-MH_EXT)))
+                    .mul(float(1.0).sub(hidden.mul(SO.occlude))).toVar();
+                const coreT = KIT.mhTube(wlS, sinAS, pp).toVar();
+                const haloT = KIT.mhTube(wlS.mul(SO.haloW), sinAS, pp.div(SO.haloSpread)).mul(SO.haloK).toVar();
+                promE.addAssign(select(liveS, coreT.add(haloT).mul(profS).mul(lift).mul(visS).mul(wk), float(0.0)));
+            }
+
+            const medAmtS = mix(float(SO.medB), float(SO.medS), smallK).toVar();
+            const accS = float(0.0).toVar();
+            const transS = float(1.0).toVar();
+            Loop({ start: 0, end: MH_TAPS }, ({ i }) => {
+                const pS = P.add(rd.mul(float(i).add(0.5).mul(ds)));
+                const eS = KIT.mhMedium(pS, uniforms.time, float(2.0)).mul(medAmtS).mul(KIT.mhInside(pS)).toVar();
+                accS.addAssign(eS.mul(transS).mul(ds));
+                transS.assign(transS.mul(exp(eS.mul(SO.medAbsorb).add(MH_EXT).mul(ds).negate())));
+            });
+            // THE PROMINENCE GAIN IS 6.60 AND ARC'S IS 35.0, and the five-fold difference is the formula's
+            // meaning rather than a taste setting -- see the kit's note on mhTube.
+            const outer = coronaE.add(promE.mul(SO.promGain)).toVar();
+            const solDensity = accS.mul(SO.medGain).add(coreE).add(outer).mul(uniforms.depth);
+            return { density: solDensity, coreE, outer };
+        };
+
         // *** ONE CALL, AND IT IS THE ONLY SPECIES BLOCK THAT RUNS. *** The seven closures above are
         // declared and six of them are never invoked, so their nodes are never built and never reach the
         // WGSL. Everything below reads `SP`, whose shape is each hero's own contract: always a density, plus
@@ -1020,7 +1368,11 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             : species === "abyss" ? buildAbyss()
             : (species === "nebula" || species === "tempest") ? buildMist()
             : species === "fathom" ? buildFathom()
-            : species === "geode" ? buildGeode() : buildStill();
+            : species === "geode" ? buildGeode()
+            // THE TWO LINE-DRAWING HEROES. They share the kit's closed-form tube and nothing else: arc solves
+            // ONE filament in a rolled frame, sol solves an analytic disc plus THREE short arches on its limb.
+            : species === "arc" ? buildArc()
+            : species === "sol" ? buildSol() : buildStill();
         const density = SP.density;
 
         // ---- THE SURFACE IS murmur's NOW, NOT THIS FILE'S APPROXIMATION OF IT ------------------------------
@@ -1134,6 +1486,20 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
                 ? select(SP.accC.greaterThan(1e-4), SP.accHC.div(SP.accC), float(0.0)).negate().mul(spreadK).mul(KIT.MH_SPREAD).mul(1.4)
                 : species === "droplet"
                     ? select(SP.accD.greaterThan(1e-4), SP.accHD.div(SP.accD), float(0.0)).mul(spreadK).mul(KIT.MH_SPREAD)
+                    // arc's hue runs ALONG THE FILAMENT'S LENGTH -- th/span, signed, so one tip sits warm of
+                    // the anchor and the other cool of it and the stroke carries a gradient rather than a
+                    // colour. Its own file spells hue = (filH / filE) * spreadK * MH_SPREAD, with the ratio
+                    // guarded at 1e-5 rather than the family's 1e-4 because a closed-form line integral
+                    // returns much smaller numbers than a march does.
+                    : species === "arc"
+                    ? select(SP.filE.greaterThan(1e-5), SP.filH.div(SP.filE), float(0.0)).mul(spreadK).mul(KIT.MH_SPREAD)
+                    // *** sol's hue RUNS OUTWARD, and it is the only hero in the port whose hue argument is a
+                    // SHARE rather than a weighted mean: outer / (coreE + outer). *** The core sits on the
+                    // anchor and the corona and the tongues walk to the neighbour, so the colour is a function
+                    // of how far out the light is coming from rather than of which way anything points.
+                    : species === "sol"
+                    ? select(SP.coreE.add(SP.outer).greaterThan(1e-4), SP.outer.div(max(SP.coreE.add(SP.outer), float(1e-4))), float(0.0))
+                        .mul(spreadK).mul(KIT.MH_SPREAD)
                     : select(SP.acc.greaterThan(1e-4), SP.accH.div(SP.acc), float(0.0)).mul(spreadK).mul(KIT.MH_SPREAD);
         // mh_present's own hueMix: the hue scaled by the share of THIS pixel's energy that the species says
         // carries colour. still and comet count the interior plus 0.7 of the rim, droplet 0.6 of it, limn the
@@ -1148,6 +1514,13 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             // geode weights by the CRYSTAL alone at its own gain -- its file spells hueMix with
             // crystalE * 0.92 as the numerator, not the interior -- while fathom takes the default.
             : species === "geode" ? SP.crystalE.mul(MH_GEODE.crystalGain)
+            // arc and sol both spell hueMix with the WHOLE interior as the numerator and no rim share at all
+            // -- arc's own line is hueMix = hue * (filE * 35.0 * smallGain) / max(e, 1e-4), which is the
+            // filament's contribution to the interior rather than the interior itself, and sol's is
+            // hue * interior / max(e, 1e-4). Two different numerators on two species that share a solver,
+            // transcribed from each file rather than unified because they share one.
+            : species === "arc" ? SP.filE.mul(MH_ARC.filGain)
+            : species === "sol" ? interior
             // nebula and tempest take the DEFAULT, and that is transcribed rather than fallen into: both
             // their files spell hueMix = hue * (interior + sf.rim * 0.7) / max(e, 1e-4), the same numerator
             // still and comet use. Checked against the source, not assumed from the branch order.

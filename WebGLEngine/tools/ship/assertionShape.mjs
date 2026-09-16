@@ -323,8 +323,17 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // against a 3,000 ms budget. Trimming the control from ten species to five landed at 3,499 and to four
     // at 3,161 -- still over. THE COUNT OF GATES AND THE COUNT OF SUBJECTS DISAGREE HERE FOR A REASON THE
     // BUDGET DECIDED, which is the same reason v4632's droplet split made them disagree the other way.
-    gates: 1677, usesOk: 1656, definesOk: 1648, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1549, condFirst: 91, unknownSignature: 16,
+    // v4637 -- RE-TAKEN 1677 -> 1679 for TWO gates: tools/ship/murmurSpecies8-selfcheck.mjs (arc) and
+    // tools/ship/murmurSpecies9-selfcheck.mjs (sol). TWO GATES FOR TWO SPECIES AGAIN, and again the split is
+    // arithmetic: written as one, the pair's first draft of the arc half alone already ran 3,030 ms against a
+    // 3,000 ms ceiling. THE TWO SHARE MORE MACHINERY THAN ANY PAIR YET -- sol.ts says its prominences are
+    // "solved the way arc's filament is", and the closed-form tube they both call moved into the kit as
+    // mhTube this round -- and they still could not share a gate, because what a gate costs is COMPILES and
+    // FRAMES, not source lines. The count of gates and the count of shared code disagree here in the
+    // opposite direction from v4632's droplet split, which is the third distinct way this record has watched
+    // those two numbers come apart.
+    gates: 1679, usesOk: 1658, definesOk: 1650, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1551, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

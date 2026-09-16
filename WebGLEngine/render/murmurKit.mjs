@@ -728,6 +728,13 @@ export const MH_SHAPE = Object.freeze({
     // differ only in lane and gain -- another pair the derived percentage cannot tell apart, and another
     // reason the row below grades ENTRIES rather than spreads.
     fathom: Object.freeze([0.021, 0.007, 5.3, 1.20]),
+    // THE TWO LINE-DRAWING HEROES, and they are the widest-apart breath LANES in the table: sol's 12.9 is
+    // more than twice arc's 6.1, which is the difference between a star that swells slowly and a stroke that
+    // is laid down. Their gains, 1.20 and 1.24, are a hundredth apart from fathom's and geode's -- a fourth
+    // and fifth pair the derived-percentage row could not tell from the others, and the last argument the
+    // ENTRIES-not-spreads rule needed.
+    arc: Object.freeze([0.021, 0.007, 6.1, 1.20]),
+    sol: Object.freeze([0.022, 0.008, 12.9, 1.24]),
     geode: Object.freeze([0.021, 0.007, 11.7, 1.22]),
 });
 
@@ -815,6 +822,109 @@ export const MH_GEODE = Object.freeze({
     sharpB: 1.4, sharpK: 2.6, sharpV: 1.0, litB: 0.10, litK: 1.25,
     bodyEdge: 0.34, crystalGain: 0.92, medB: 0.048, medS: 0.028, medAbsorb: 2.00, murkGain: 3.20,
     spinRate: 0.088, spinWob: 0.48, spinLane: 2.0,
+});
+
+/**
+ * ARC'S FILAMENT: the frame it is drawn in, the curve, and the spindle.
+ *
+ * arc.ts opens with the hardest sentence in the collection: "THE SPECIES IS A LINE, and a line is the hardest
+ * thing this kit has been asked to draw. Everything else is either compact enough to solve at the ray's
+ * closest approach or broad enough that five samples average it honestly. A filament is neither."
+ *
+ * THE SEARCH RUNS ALONG THE CURVE, NOT THE RAY, and that inversion is the trick. For a point C on the curve
+ * the ray's closest approach is two dot products; sampling THAT along the curve and taking the smallest finds
+ * where the ray passes nearest the filament. arc.ts on why it is stable: "Searching a smooth one-dimensional
+ * function is what makes this stable: the samples slide continuously as the geometry moves, so nothing pops."
+ *
+ * TWO CROSSINGS, NOT ONE, and the reason is geometric rather than aesthetic: "a shallow U seen from most
+ * angles is crossed twice, and a global minimum would find only one and break the thread where it passes over
+ * itself". So the twenty samples are searched in two halves of ten and both winners are kept.
+ */
+export const MH_ARC = Object.freeze({
+    samples: 20, halves: 2,
+    // The frame. roll first (the xy rotation), then yaw and tilt.
+    rollB: 0.55, rollAmp: 0.9, rollRate: 0.052, rollWob: 0.5, rollLane: 1.0,
+    yawRate: 0.041, yawWob: 0.55, yawLane: 2.0,
+    tiltB: 0.30, tiltAmp: 0.5, tiltRate: 0.037, tiltPhase: 2.2,
+    swayB: 0.30, swayK: 0.60,
+    // The geometry. pin is the arc's closest approach to the centre: "At 1 the filament passes right through
+    // the core; at 0 it bows well clear."
+    pinFar: 0.30, pinNear: 0.05, pinVoice: 0.30, pinFlourish: 0.35,
+    rcB: 0.58, rcK: 0.14, spanB: 1.15, spanK: 0.35, spanSmall: 0.78,
+    // THE THREAD. 0.052 body units at the middle of the knob's range is five per cent of the sphere's radius,
+    // "about five pixels at 120 pt and two at 18 pt. Set purely by what reads as calligraphic, which is what
+    // it should have been set by all along" -- that last clause being the escape from the march constraint.
+    wB: 0.042, wK: 0.022, wSmall: 1.90,
+    brightB: 0.90, brightVoice: 0.85, brightFlourish: 0.45,
+    // THE SPINDLE, and it is TWO exponents on ONE profile, not one. Width rides prof linearly and brightness
+    // rides prof^1.35, "so the thread reads as a stroke laid down with pressure in the middle and lifted at
+    // both ends, rather than as a rod of even ink that happens to narrow".
+    profPow: 0.85, wlFloor: 0.28, wlRide: 0.72, brightPow: 1.35,
+    // The 1/sin(alpha) grazing term, floored at 0.58 rather than the 0.30 the geometry allows: "at three and
+    // a third it put a bright BULGE wherever the filament leaned toward the viewer, and a thread with a
+    // swelling two thirds along it is not brightest at its centre, which is the whole of the brief."
+    sinFloor: 0.58,
+    // The halo's coefficient is 0.09 where the marched heroes give their scatter 0.24, "because this one is
+    // INTEGRATED rather than sampled. The integral scales with width, so a halo 3.2 times wider carries 3.2
+    // times the light at the same coefficient -- it stopped being a glow around a thread and became a wide
+    // band with a thread inside it."
+    haloK: 0.09,
+    shimCycles: 4.2, shimPace: 0.55, runFreq: 4.2, runRate: 2.4,
+    sepIn: 0.16, sepOut: 0.44,
+    medB: 0.055, medS: 0.030, medAbsorb: 2.00, medGain: 3.40,
+    // THE GAIN, AND IT IS 35.0 BECAUSE A CLOSED FORM RETURNS A LENGTH. See mhTube's note: a march returns a
+    // sum of samples times a step and the two are nowhere near the same scale.
+    filGain: 35.0, filSmall: 0.52,
+    flourishSlot: 11.0, flourishDur: 8.1,
+});
+
+/**
+ * SOL'S CORE AND ITS PROMINENCES: a disc solved with one square root, and three tongues solved the way arc's
+ * filament is.
+ *
+ * sol.ts: "THE CORE IS THE MASS AND THE PROMINENCES ARE THE LINE. Both are solved rather than sampled, and
+ * they are solved differently because they are different kinds of thing." The core is "a perfect disc, and it
+ * costs one square root ... exactly, analytically round from every angle, at every frame, with no sampling in
+ * it anywhere". The prominences reuse the curve search, at NINE samples rather than arc's twenty because each
+ * tongue is a short arch rather than a span.
+ *
+ * ONE OR TWO AT A TIME: "Three prominences on periods of 13, 17 and 21 seconds, each spending most of its
+ * cycle flat against the surface, so the sun is never symmetric and never crowded. The lift is sin-squared,
+ * flat at both ends."
+ */
+export const MH_SOL = Object.freeze({
+    samples: 9, count: 3,
+    rsB: 0.30, rsK: 0.09, rsSmall: 1.42, rsBreathLane: 2.7, rsBreath: 0.030, rsVoice: 0.035,
+    // The disc's own threshold. It runs from 1.04 of the radius to 0.86 -- an eased edge on an ANALYTIC
+    // circle, which is a soft edge on hard geometry rather than a blurred one.
+    discOut: 1.04, discIn: 0.86,
+    // The granulation is weighted to the disc's INTERIOR, and the reason is the one failure this species
+    // cannot afford: "Granulation applied across the limb modulates the very threshold that makes the core
+    // round, and the photosphere grew notches in its outline -- which on the one hero whose brief is a
+    // composed circular core is the worst place to lose it."
+    simCycles: 8.5, simB: 0.30, simK: 0.55, simPaceB: 0.55, simPaceK: 0.65,
+    granK: 0.32, granIn: 0.55, granOut: 1.0, granScale: 8.5, granRateB: 0.35, granRateK: 0.75,
+    coreB: 1.20, coreK: 0.45, coreVoice: 0.55,
+    coronaWB: 0.16, coronaWK: 0.15, coronaWVoice: 0.25, coronaDisc: 0.60, coronaB: 0.42, coronaK: 0.30,
+    pairIn: 0.28, pairOut: 0.70,
+    promWB: 0.034, promWK: 0.017, promWSmall: 1.75,
+    perB: 13.0, perK: 4.0, rootA1: 0.048, rootA1K: 0.011, rootA2: 0.037, rootA2K: 0.009,
+    rootPh1: 1.9, rootPh2: 3.1,
+    hkB: 0.24, hkK: 0.28, hkVoice: 0.45,
+    // A WIDER SWEEP ALONG THE LIMB than the first build's: "At 0.55 they left radially and read as antennae;
+    // a prominence is a loop rooted at two feet, not a spike."
+    swpB: 0.85, swpK: 0.30,
+    profFall: 0.85, profPow: 0.70, wlFloor: 0.42, wlRide: 0.58, sinFloor: 0.55,
+    haloK: 0.10, haloW: 3.19, haloSpread: 10.2,
+    // THE CORE OCCLUDES, at 0.94 rather than 1.0 so a tongue behind the star is dark rather than absent:
+    // "which is the cue that makes the core read as a solid body rather than as a bright patch."
+    occlude: 0.94,
+    medB: 0.030, medS: 0.018, medAbsorb: 2.00, medGain: 3.00,
+    // 6.60 against arc's 35.0, and the ratio is the point rather than an accident. sol.ts: "THE PROMINENCE
+    // GAIN IS SMALL, NOT THE 26 A MARCHED HERO WOULD WANT ... Carrying a marched hero's gain across put every
+    // tongue five times over the rail's top, which is why they drew as white slabs instead of as line work."
+    promGain: 6.60,
+    flourishSlot: 23.0, flourishDur: 12.4,
 });
 
 /** tempest's lightning: the two lane seeds, their slot lengths, and the radius its depth mask kills at. */
@@ -1063,6 +1173,62 @@ export function mhSpin(p, ay, ax) {
     const q = [ca * p[0] + sa * p[2], p[1], -sa * p[0] + ca * p[2]];
     const cb = Math.cos(ax), sb = Math.sin(ax);
     return [q[0], cb * q[1] - sb * q[2], sb * q[1] + cb * q[2]];
+}
+
+/**
+ * ROLL -- the THIRD rotation, and kit.ts says exactly what goes wrong without it: "Yaw and tilt alone leave
+ * every loop projecting to an ellipse whose long axis is still horizontal on screen, so three ribbons at
+ * three yaws and three tilts came out as three horizontal swooshes stacked on each other, which is one
+ * swoosh." It is a plain rotation in the xy plane, about the view axis, applied BEFORE yaw and tilt.
+ */
+export function mhRoll(p, a) {
+    const c = Math.cos(a), s = Math.sin(a);
+    return [c * p[0] - s * p[1], s * p[0] + c * p[1], p[2]];
+}
+
+/**
+ * THE MOIRE GATE. kit.ts: a structure eases its CONTRIBUTION to nothing as it approaches a third of a cycle
+ * per pixel, because past that it "stops being a form and becomes moire, which at 18 pt with the form scale
+ * wound down is a real setting and not a theoretical one".
+ *
+ * `cycles` is the structure's wavenumber in radians per uv unit. THIS PORT EVALUATES IT AT ONE MOUNT -- the
+ * nominal 120 pt that mhSmall is also read at in render/aiPresenceOrbTsl.mjs -- so for a given species it is
+ * a constant. It is a FUNCTION here anyway, and not a baked number, for the reason the kit exists at all: a
+ * baked number is a transcription that cannot be checked against the source it came from, and this one can.
+ */
+export function mhAa(cycles, sizeMin, pixelScale) {
+    const px = Math.max(sizeMin, 1) * Math.max(pixelScale, 1);
+    const perPixel = Math.max(cycles, 0) / (2 * Math.PI * px);
+    const u = Math.min(1, Math.max(0, (perPixel - 0.16) / (0.36 - 0.16)));
+    return 1 - u * u * (3 - 2 * u);
+}
+
+/**
+ * *** THE CLOSED-FORM TUBE, WHICH IS WHY ARC AND SOL SHIP TOGETHER. *** A gaussian tube of width w, crossed
+ * by a ray at angle alpha to the tube's own tangent, integrates ALONG THE WHOLE RAY to
+ *
+ *     w * sqrt(pi) / sin(alpha) * exp(-perp^2 / w^2)
+ *
+ * and that is the entire reason either species can draw a line at all. arc.ts states the constraint it
+ * escapes: "A MARCHED FILAMENT CANNOT BE THINNER THAN ITS MARCH. At ten steps down a two-unit chord the
+ * interval is 0.2, so a tube narrower than that is caught by whichever tap lands in it and missed otherwise,
+ * and the line renders dim, uneven and flickering. Widening it to 0.125 was the only way to make ten taps
+ * honest, and the verdict on that was a fat slug of light." sol.ts reaches the same formula from the other
+ * side -- "THE PROMINENCES ... are integrated the way arc's filament is" -- and adds what it costs to get it
+ * wrong in the other direction: "A closed-form line integral returns a LENGTH ... where a march returns a sum
+ * of samples times a step, and the two are nowhere near the same scale. Carrying a marched hero's gain across
+ * put every tongue five times over the rail's top."
+ *
+ * SO THE GAIN IS PART OF THE FORMULA'S MEANING AND NOT A TASTE SETTING, and the two species' gains differ by
+ * more than five times (arc 35.0, sol 6.60) for that reason rather than despite it.
+ *
+ * `sinA` is floored by the CALLER, not here, because the two species floor it differently and for different
+ * stated reasons -- arc at 0.58 because 1/sin at three and a third "put a bright BULGE wherever the filament
+ * leaned toward the viewer", sol at 0.55. A floor baked in here would have silently overridden one of them.
+ */
+export const MH_SQRTPI = 1.7724539;
+export function mhTube(w, sinA, perp2) {
+    return (w * MH_SQRTPI / sinA) * Math.exp(-perp2 / (w * w));
 }
 
 /**
