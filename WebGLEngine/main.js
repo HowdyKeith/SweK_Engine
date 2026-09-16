@@ -16666,6 +16666,7 @@ const DEMO_MODES = [
             "DEMO STARTS IN AUTOPLAY — the AI plays until you press a key or click",
             "WASD — move (FP camera ground-locked + collision)",
             "Mouse — aim (click canvas to engage pointer-lock)",
+            "V — toggle first/third person",
             "Click or Space — fire (HIT_RANGE=50, HIT_RADIUS=2.5)",
             "R — reload (1.5s, magazine of 30)",
             "Walk into health/ammo pickups to collect",
@@ -16726,6 +16727,7 @@ const DEMO_MODES = [
             "Q — fire current weapon · 1–8 — select weapon",
             "Shift — sprint (drains the bar) · C — hold for energy shield",
             "E — ally with a nearby civ · G — bounty shop when near an ally",
+            "V — toggle first/third person",
             "The energy bar recharges when you're not spending; fully spent = brief lockout",
             "ESC — exit back to the camera",
         ],
@@ -29573,6 +29575,10 @@ window.addEventListener("keydown", (e) => {
     } else if (e.code === "KeyX" && camera.mode === "fp" && !e.repeat) {
         // Round 40 — emergency eject + nuclear self-destruct
         ejectSequence.trigger();
+    } else if (e.code === "KeyV" && camera.mode === "fp" && !e.repeat) {
+        // Round #13 Stage C (task board #81) — toggle first/third person.
+        const mode = camera.toggleViewMode();
+        window.toast?.show?.({ text: mode === "third" ? "Third-person" : "First-person", color: "#9cf", durationMs: 1500 });
     }
 });
 

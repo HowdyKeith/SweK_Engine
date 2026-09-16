@@ -66,6 +66,10 @@ export class Camera {
         this._fpMaxSlopeDeg = 50;       // Round #13 -- walkable limit for the non-voxel ground oracle below
         this._capsuleRadius = 0.4;      // Round #13 Stage B (task board #80) -- capsule-vs-BVH collision size
         this._capsuleHeight = 1.8;      // close to _eyeHeight (1.7): eyes sit near the top of the capsule
+        this.viewMode = "first";        // Round #13 Stage C (task board #81) -- "first" | "third", fp mode only
+        this._thirdPersonDistance = 4.5;
+        this._thirdPersonHeight = 1.2;
+        this._thirdPersonSkin = 0.3;    // stop this far short of a wall/ground hit, not exactly on it
         this._fpFallStartTime = 0;       // diagnostic: time spent airborne
         // Round 31 — energy bar gates sprint. main.js installs ref.
         this.playerEnergy = null;
@@ -108,12 +112,17 @@ export class Camera {
         // WASD/Space/Shift work whether or not pointer-lock is engaged.
         this._move(dt);
 
+        // Round #13 Stage C (task board #81) -- in third-person, the RENDER eye sits behind this.position,
+        // which stays the physics anchor _move* writes exactly as it does in first person. Everything below
+        // (shake, FOV kick) applies identically on top of whichever eye this resolves to.
+        const eye = (this.mode === "fp" && this.viewMode === "third") ? this._thirdPersonEye() : this.position;
+
         // Round 28 — shake offset. Random-jitter the position passed to
         // buildViewProj so the matrix is shaken without mutating the
         // logical camera position.
-        let camX = this.position.x;
-        let camY = this.position.y;
-        let camZ = this.position.z;
+        let camX = eye.x;
+        let camY = eye.y;
+        let camZ = eye.z;
         if (this._shakeUntilT && t < this._shakeUntilT) {
             const remain = (this._shakeUntilT - t) / Math.max(1, this._shakeDuration);
             const amp = this._shakeAmp * remain;
@@ -701,6 +710,59 @@ export class Camera {
         this.velocity.x = mx * speed;
         this.velocity.y = this._fpVelY;
         this.velocity.z = mz * speed;
+    }
+
+    // Round #13 Stage C (task board #81) — first/third person, fp mode only. A discrete on-press toggle,
+    // not a held movement key, so it belongs in main.js's own keydown dispatcher (same place KeyQ/B/C/G/E/X
+    // already live for "fp" mode) rather than in consumesKey()/MOVEMENT_KEYS above, which govern the navPad's
+    // held-key guard and nothing else.
+    toggleViewMode() {
+        this.viewMode = this.viewMode === "third" ? "first" : "third";
+        return this.viewMode;
+    }
+
+    // The third-person RENDER eye. this.position stays the physics anchor every _move* method above writes
+    // exactly as it does in first person -- only update()'s view matrix reads this, and only in third person.
+    // Pulls the eye IN (never up and around) when something is in the way, using whichever collision data the
+    // world already offers: a real raycast against the Stage B capsule collider when one exists (so the eye
+    // cannot end up on the far side of a wall behind the player), or the same terrain-sightline-sampling
+    // technique _moveOrbit already uses for a voxel world, for the identical reason stated there. Neither is
+    // available (a bare terrain-ground-oracle world, or no world at all) leaves the eye unclamped -- a real,
+    // named limitation, not a silent one.
+    _thirdPersonEye() {
+        const cp = Math.cos(this.pitch);
+        const bx = -Math.sin(this.yaw) * cp, by = -Math.sin(this.pitch), bz = Math.cos(this.yaw) * cp;   // -forward
+        const pivot = this.position;
+        let dist = this._thirdPersonDistance;
+
+        const bvh = this._capsuleWorldBVH();
+        if (bvh) {
+            const hit = bvh.raycastFirst(pivot.x, pivot.y, pivot.z, bx, by, bz, dist);
+            if (hit && hit.t < dist) dist = Math.max(0, hit.t - this._thirdPersonSkin);
+        } else if (this.world?.voxelAt) {
+            const samples = 4;
+            for (let i = 1; i <= samples; i++) {
+                const t = (dist * i) / samples;
+                const topY = this._terrainTopAtBilinear(pivot.x + bx * t, pivot.z + bz * t);
+                if (pivot.y + by * t + this._thirdPersonHeight < topY + 0.5) { dist = Math.max(0, t - this._thirdPersonSkin); break; }
+            }
+        }
+        return { x: pivot.x + bx * dist, y: pivot.y + by * dist + this._thirdPersonHeight, z: pivot.z + bz * dist };
+    }
+
+    // Round #13 Stage C (task board #81) — "drive walk/run/jump animation clips... from the controller's
+    // movement state" is two halves: deriving the STATE, and driving CLIPS with it. This is the first half,
+    // and it needs no bookkeeping of its own -- _fpOnGround, _fpVelY, velocity and _sprinting are already
+    // written identically by every one of the three movement paths above (voxel, terrain oracle, capsule), so
+    // this reads the same regardless of which one resolved the current frame. No visible player avatar exists
+    // in this engine yet for the second half to attach clips to (fpsShooter is view-only, no body mesh) --
+    // this is the state this engine does not yet have anything wired to consume, named rather than guessed at.
+    movementAnimState() {
+        if (this.mode !== "fp") return "idle";
+        if (!this._fpOnGround) return this._fpVelY > 0 ? "jump" : "fall";
+        const horiz = Math.hypot(this.velocity.x, this.velocity.z);
+        if (horiz < 0.05) return "idle";
+        return this._sprinting ? "run" : "walk";
     }
 
     // Round #13 (task board) Stage A — the ground oracle terrainWalk.mjs needs, for the FP modes when
