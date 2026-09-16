@@ -3767,6 +3767,32 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The limit is stated in the same number it is measured by -- lift one corner of a quad off its plane and the spread " +
                  "goes 0 -> 1.1e-1, which is the input dualContour's quads will actually bring.",
     }),
+    since251: Object.freeze({
+        at: "v4594", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["render/temporalRejectWgsl.mjs", "render/temporalRejectGPU.mjs",
+                                "render/temporalRejectGPU-selfcheck.mjs", "tools/ship/temporalCorpus.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "no gate added; the round closed the hole v4593 MEASURED AND REFUSED TO PAPER OVER. DISOCCLUSION " +
+                 "writes a mask (1 = history wrong), RECTIFY reads a factor (1 = history trusted), and the " +
+                 "inversion -- historyFactorCPU -- had no WGSL anywhere in the tree, so v4593 shipped its runner " +
+                 "deliberately WITHOUT a rejectAndAccumulate() after its own first draft wrote one that bound an " +
+                 "all-zero factor under a comment claiming otherwise. FACTOR_WGSL is that inversion and the chain " +
+                 "is three dispatches on one encoder, asserted bit-identical to the standalone rectify. The " +
+                 "kernel mirrors historyFactorCPU including the part that is a DECISION rather than arithmetic -- " +
+                 "the three reasons MULTIPLY, because each is an independent probability and a max() would let " +
+                 "the strongest hide the others. *** TWO SABOTAGES WENT 0-RED AND THEY FAILED DIFFERENTLY. *** " +
+                 "Dropping the clamp was a MIS-AIMED MUTATION: it hit the disocclusion term, whose mask is 0 or 1 " +
+                 "by construction, so that clamp is unobservable through that input -- a property of the producer, " +
+                 "not a gap. Re-aimed at the reactive term, whose fixture carries 1.4 and -0.2, it takes two " +
+                 "rows. *** THE OTHER WAS A REAL HOLE NOTHING COULD HAVE CAUGHT: *** the corpus hardcoded a 2D " +
+                 "dispatch for every entry, which was right while every kernel in the arc was 8x8 over a picture; " +
+                 "FACTOR_WGSL is the first 1D one, and putting the 2D shape back left half its output untouched " +
+                 "ON BOTH BACKENDS, so crossBackend agreed. A COMPARISON OF TWO BACKENDS CANNOT SEE AN ERROR THEY " +
+                 "SHARE. temporalCorpus now refuses at construction by name, and a pure invocation count would " +
+                 "not have done it -- [2,2] over @workgroup_size(64,1,1) is 256 invocations, exactly the picture, " +
+                 "with the y axis thrown away -- so the axes the SHADER USES decide.",
+    }),
     since250: Object.freeze({
         at: "v4593", swept: 1, green: 1, red: 0,
         added: Object.freeze(["render/temporalRejectGPU-selfcheck.mjs"]),

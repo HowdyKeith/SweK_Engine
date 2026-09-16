@@ -83,6 +83,14 @@ const DATA = {
     depth: scalar((x, y) => 0.3 + 0.004 * (x + y)), prevDepth: scalar((x, y) => 0.3 + 0.004 * (x + y)),
     factor: scalar((x, y) => 0.25 + 0.5 * (((x + y) & 3) / 3)),
     conf: new Float32Array(TW * TH),
+    // *** THREE DISTINCT MASKS, WHICH IS THE POINT. *** FACTOR_WGSL multiplies (1 - clamp(m)) over whichever of
+    // the three its flags admit. Fed identical fixtures, a kernel that read `reactive` where it meant `shading`
+    // would produce exactly the right answer, and the corpus would agree with it on both backends. Each also
+    // carries values OUTSIDE [0,1] in places, because the clamp is part of the rule and an input that never
+    // leaves the range cannot show whether it happens.
+    disocclusion: scalar((x, y) => ((x + y) & 3) === 0 ? 1.2 : 0),
+    reactive: scalar((x) => (x < TW / 2 ? 0.25 : -0.4)),
+    shading: scalar((x, y) => 0.1 * (y % 5)),
     // NOTE: ACCUMULATE_WGSL's `stats` binding needs NO fixture here. A first attempt added four zeros, and the
     // device refused the run -- "an empty read-back is not a measurement", which is the harness saying the bind
     // group did not match the layout. The binding belongs to mainCounted; main never touches it, and the filter
@@ -127,6 +135,10 @@ const KERNELS = [
     { id: "temporalReject.DISOCCLUSION_WGSL", from: "render/temporalRejectWgsl.mjs", code: REJECT.DISOCCLUSION_WGSL, out: "dst",
       why: "the disocclusion test: a reprojected depth fetch compared against a threshold with a sign flag -- a comparison whose two sides come from different buffers, so a mis-bound input reads as a valid verdict",
       data: { motion: MOTION_DISOCC }, uniforms: packU([TW, TH], [0.02]) },
+    { id: "temporalReject.FACTOR_WGSL", from: "render/temporalRejectWgsl.mjs", code: REJECT.FACTOR_WGSL, out: "dst",
+      why: "the history factor: three optional masks inverted and MULTIPLIED into one per-pixel weight -- the only 1D kernel in this corpus, and the one whose flags decide which of its three inputs are read at all",
+      uniforms: packU([TW * TH, 7, 0, 0]),
+      workgroups: [Math.ceil((TW * TH) / 64), 1] },
     { id: "temporalReject.RECTIFY_WGSL", from: "render/temporalRejectWgsl.mjs", code: REJECT.RECTIFY_WGSL, out: "dst",
       why: "the neighbourhood rectification: a YCoCg round trip, an AABB over the 3x3 neighbourhood, a clip of the history toward the current colour and a per-pixel blend factor -- the widest float surface in the arc",
       uniforms: packU([TW, TH], [0.1]).slice(0, 4) },
@@ -145,6 +157,27 @@ const KERNELS = [
 ];
 
 /** dst stride, read off the kernel rather than declared: a kernel writing dst[o] is RGBA, dst[i] is scalar. */
+/**
+ * *** DOES THE DISPATCH ACTUALLY COVER THE PICTURE? *** Asked at construction, because NOTHING ELSE CAN ASK IT.
+ *
+ * v4594 gave this module a per-entry `workgroups` after FACTOR_WGSL arrived as the first 1D kernel here, and a
+ * sabotage put the hardcoded 2D shape back to see what would notice. NOTHING DID: crossBackend compares two
+ * harnesses against each other, so both ran the same short dispatch, both left the same half of the output
+ * untouched, and both agreed. A comparison of two backends cannot see an error they share.
+ *
+ * A pure invocation count would not catch it either -- [2,2] over @workgroup_size(64,1,1) is 256 invocations,
+ * exactly the picture -- because the kernel reads only g.x and the y axis is thrown away. So the axes the
+ * SHADER USES decide: a kernel that never mentions g.y is 1D and only its x extent counts.
+ */
+function coverageOf(code, workgroups) {
+    const m = /@workgroup_size\(\s*(\d+)\s*(?:,\s*(\d+)\s*)?(?:,\s*(\d+)\s*)?\)/.exec(code);
+    if (!m) throw new Error("temporalCorpus: a kernel declares no @workgroup_size, so no dispatch can be checked against it");
+    const size = [Number(m[1]), Number(m[2] || 1), Number(m[3] || 1)];
+    const uses2D = /\bg\.y\b/.test(code);
+    const wg = [workgroups[0] || 1, workgroups[1] || 1];
+    return uses2D ? (wg[0] * size[0]) * (wg[1] * size[1]) : wg[0] * size[0];
+}
+
 const outCountOf = (code, name) =>
     new RegExp(`${name}\\[o`).test(code) ? TW * TH * 4
     : new RegExp(`${name}\\[i \\* F`).test(code) || new RegExp(`${name}\\[i \\* u`).test(code) ? TW * TH * TF
@@ -166,11 +199,24 @@ export function temporalEntries() {
             if (!data) throw new Error(`temporalCorpus: ${k.id} binds ${JSON.stringify(b.name)} and this module has no fixture for it`);
             return { binding: b.binding, data };
         });
+        const wg = k.workgroups || [Math.ceil(TW / 8), Math.ceil(TH / 8)];
+        const covered = coverageOf(k.code, wg);
+        if (covered < TW * TH)
+            throw new Error(`temporalCorpus: ${k.id} dispatches ${wg.join("x")} over ` +
+                `@workgroup_size, reaching ${covered} of ${TW * TH} elements -- the rest of its output would be ` +
+                "compared as untouched on BOTH backends, which is agreement about nothing");
         return { id: k.id, from: k.from, why: k.why,
                  opts: { code: k.code, outCount: outCountOf(k.code, k.out),
                          outBinding: outB.binding, uniformBinding: uniB.binding,
                          uniforms: k.uniforms, inputs,
-                         workgroups: [Math.ceil(TW / 8), Math.ceil(TH / 8)] } };
+                         // *** PER ENTRY, BECAUSE THE ARC STOPPED BEING ALL-8x8. *** This was hardcoded to
+                         // [ceil(TW/8), ceil(TH/8)] for every kernel, which was right while every kernel here
+                         // was @workgroup_size(8,8,1) over a w-by-h picture. FACTOR_WGSL is a per-ELEMENT
+                         // product with no 2D structure at all, declared @workgroup_size(64,1,1), and a [2,2]
+                         // dispatch would have run 128 of its 256 invocations and left the rest of the output
+                         // untouched -- on BOTH backends, so the comparison would have agreed about a buffer
+                         // half of which nobody wrote.
+                         workgroups: wg } };
     });
     // The two fragments: compiled on both backends inside a shell that CALLS them, so a fragment that stopped
     // compiling could not hide behind a splice site that never used it.

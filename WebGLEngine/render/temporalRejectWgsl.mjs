@@ -124,4 +124,44 @@ fn main(@builtin(global_invocation_id) g:vec3<u32>) {
   dst[o] = val.x; dst[o + 1u] = val.y; dst[o + 2u] = val.z; dst[o + 3u] = 1.0;
 }`;
 
-export { DISOCCLUSION_WGSL, RECTIFY_WGSL, YCOCG_WGSL };
+// ---- THE HISTORY FACTOR: the inversion that stopped the other two chaining ---------------------------------
+//
+// *** v4593 MEASURED THE HOLE AND v4594 FILLS IT. *** DISOCCLUSION_WGSL writes a MASK -- 1 where the history is
+// wrong. RECTIFY_WGSL reads a FACTOR -- 1 where the history is TRUSTED. They are opposites, and the thing that
+// inverts one into the other was historyFactorCPU and nothing else: there was no WGSL for it anywhere in the
+// tree, so a device frame wanting both passes paid a readback and an upload between them, which is the exact
+// cost a chain exists to avoid. v4593's runner shipped WITHOUT a rejectAndAccumulate() and said so at the site,
+// because its first draft had one that bound an all-zero factor under a comment claiming otherwise.
+//
+// It mirrors historyFactorCPU statement by statement, including the part that is a DECISION rather than
+// arithmetic: the three reasons MULTIPLY. Each is an independent probability that the history is wrong, so two
+// weak reasons compound; a max() would let the strongest hide the others, which on a disoccluded transparent
+// surface is precisely the case where both are true and the answer must be "certainly not".
+//
+// Three optional inputs, all three BOUND and the flags saying which are real -- the same shape
+// temporalAccumulateWgsl uses for history and motion, and for the same reason: a compute pipeline's bind group
+// is complete or it is nothing.
+const FACTOR_WGSL = `
+struct P { n:u32, flags:u32, pad0:u32, pad1:u32 };
+@group(0) @binding(0) var<storage,read> disocclusion:array<f32>;
+@group(0) @binding(1) var<storage,read> reactive:array<f32>;
+@group(0) @binding(2) var<storage,read> shading:array<f32>;
+@group(0) @binding(3) var<storage,read_write> dst:array<f32>;
+@group(0) @binding(4) var<uniform> u:P;
+
+const FLAG_HAS_DISOCC   : u32 = 1u;
+const FLAG_HAS_REACTIVE : u32 = 2u;
+const FLAG_HAS_SHADING  : u32 = 4u;
+
+@compute @workgroup_size(64,1,1)
+fn main(@builtin(global_invocation_id) g:vec3<u32>) {
+  let i = g.x;
+  if (i >= u.n) { return; }
+  var f = 1.0;
+  if ((u.flags & FLAG_HAS_DISOCC) != 0u)   { f = f * (1.0 - clamp(disocclusion[i], 0.0, 1.0)); }
+  if ((u.flags & FLAG_HAS_REACTIVE) != 0u) { f = f * (1.0 - clamp(reactive[i], 0.0, 1.0)); }
+  if ((u.flags & FLAG_HAS_SHADING) != 0u)  { f = f * (1.0 - clamp(shading[i], 0.0, 1.0)); }
+  dst[i] = f;
+}`;
+
+export { DISOCCLUSION_WGSL, RECTIFY_WGSL, YCOCG_WGSL, FACTOR_WGSL };

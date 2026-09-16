@@ -21,18 +21,26 @@
 // OCCLUDING GEOMETRY and a prevDepth buffer, and that is a change to what the page is rather than to how it
 // runs.
 //
+// *** AND THE HOLE BETWEEN THE TWO KERNELS IS CLOSED AS OF v4594. *** This file shipped at v4593 deliberately
+// without a rejectAndAccumulate(), because DISOCCLUSION writes a mask and RECTIFY reads a factor and nothing in
+// the tree inverted one into the other on a device. FACTOR_WGSL does, and the chain is three dispatches on one
+// encoder with neither intermediate crossing back. What the chain does NOT have is a reactive mask: nothing in
+// this tree produces one, so the argument is accepted and unused by any caller here.
+//
 // *** AND THE zPrev CHANNEL IS WHY THE MOTION ROUND CAME FIRST. *** disocclusionCPU reads motion[i*4 + 3] --
 // the depth that surface WOULD have had last frame -- which render/motionVectorsWgsl.mjs writes and the page
 // threw away while its motion field was a hand-written constant. v4592 made that field derived; this is the
 // consumer that channel exists for.
 "use strict";
-import { DISOCCLUSION_WGSL, RECTIFY_WGSL } from "./temporalRejectWgsl.mjs";
+import { DISOCCLUSION_WGSL, RECTIFY_WGSL, FACTOR_WGSL } from "./temporalRejectWgsl.mjs";
 
 const WG = 8;
 const groups = (w, h) => [Math.ceil(w / WG), Math.ceil(h / WG)];
 
 /** The flag words RECTIFY_WGSL declares, as names, so a caller never passes a bare 7. */
 export const RECTIFY_FLAGS = Object.freeze({ YCOCG: 1, CLAMP: 2, HAS_HIST: 4, HAS_FAC: 8 });
+/** The flag words FACTOR_WGSL declares. */
+export const FACTOR_FLAGS = Object.freeze({ HAS_DISOCC: 1, HAS_REACTIVE: 2, HAS_SHADING: 4 });
 
 export class TemporalRejectGPU {
     constructor(device) {
@@ -43,7 +51,8 @@ export class TemporalRejectGPU {
         this.device = device;
         this.pDisoc = device.compute({ wgsl: DISOCCLUSION_WGSL });
         this.pRect = device.compute({ wgsl: RECTIFY_WGSL });
-        for (const [n, p] of [["DISOCCLUSION", this.pDisoc], ["RECTIFY", this.pRect]])
+        this.pFactor = device.compute({ wgsl: FACTOR_WGSL });
+        for (const [n, p] of [["DISOCCLUSION", this.pDisoc], ["RECTIFY", this.pRect], ["FACTOR", this.pFactor]])
             if (p && p.error) throw new Error(`render/temporalRejectGPU: the ${n} kernel did not compile -- ${p.error}`);
     }
 
@@ -105,22 +114,98 @@ export class TemporalRejectGPU {
     }
 
     /**
-     * *** THERE IS NO rejectAndAccumulate(), AND THAT IS A FINDING RATHER THAN AN OMISSION. ***
+     * Mirrors historyFactorCPU({ disocclusion, reactive, shading, n }) -- 1 where the history is trusted.
      *
-     * Every other runner in this arc chains its two kernels on one encoder -- fsrGPU.fsr1, temporalGPU's
-     * resolveAndAccumulate -- so the intermediate never crosses back to the CPU. THIS PAIR CANNOT BE CHAINED,
-     * and the first draft of this file shipped a method that pretended otherwise: it dispatched both, bound an
-     * all-zero `factor` buffer to the rectify pass, and carried a comment claiming it fed the mask straight in.
-     * The comment and the code disagreed, and the code meant "discard all history, every pixel".
-     *
-     * The hole is structural. DISOCCLUSION_WGSL writes a MASK -- 1 where the history is wrong. RECTIFY_WGSL
-     * reads a FACTOR -- 1 where the history is TRUSTED. They are opposites, and the thing that inverts one into
-     * the other is historyFactorCPU, which also multiplies in the reactive and shading terms. There is no WGSL
-     * for it anywhere in the tree: render/temporalRejectWgsl.mjs exports exactly DISOCCLUSION_WGSL,
-     * RECTIFY_WGSL and the YCoCg fragment, and no other module has a factor kernel.
-     *
-     * So a device frame that wants both passes today costs a readback and an upload between them. Closing it
-     * wants a third kernel -- one dispatch, w*h floats, combining up to three masks the way historyFactorCPU
-     * does -- and that is its own rung, in the file that owns the rule rather than bolted on here.
+     * The three MULTIPLY, which is a decision and not arithmetic: each is an independent probability that the
+     * history is wrong, so two weak reasons compound. All three buffers are bound whether or not they are real,
+     * because a compute pipeline's bind group is complete or it is nothing; `flags` says which to read.
      */
+    async factor({ disocclusion = null, reactive = null, shading = null, n }) {
+        const dev = this.device;
+        const zeros = () => dev.buffer({ data: new Float32Array(n), usage: ["storage"] });
+        const bD = disocclusion ? dev.buffer({ data: this._f32(disocclusion), usage: ["storage"] }) : zeros();
+        const bR = reactive ? dev.buffer({ data: this._f32(reactive), usage: ["storage"] }) : zeros();
+        const bS = shading ? dev.buffer({ data: this._f32(shading), usage: ["storage"] }) : zeros();
+        const bDst = dev.buffer({ data: new Float32Array(n), usage: ["storage"] });
+        const u = dev.buffer({ data: this._uFactor(n, disocclusion, reactive, shading), usage: "uniform" });
+        this.pFactor.bind("disocclusion", bD).bind("reactive", bR).bind("shading", bS).bind("dst", bDst).bind("u", u);
+        dev.frame(({ pass }) => { pass.dispatch(this.pFactor, [Math.ceil(n / 64)]); pass.clear([0, 0, 0, 1]); }, { offscreen: true });
+        const data = new Float32Array(await dev.read(bDst));
+        for (const b of [bD, bR, bS, bDst, u]) b.destroy();
+        return { data, n };
+    }
+
+    /** struct P { n:u32, flags:u32, pad0:u32, pad1:u32 } */
+    _uFactor(n, disocclusion, reactive, shading) {
+        const flags = (disocclusion ? FACTOR_FLAGS.HAS_DISOCC : 0)
+                    | (reactive ? FACTOR_FLAGS.HAS_REACTIVE : 0)
+                    | (shading ? FACTOR_FLAGS.HAS_SHADING : 0);
+        const ub = new ArrayBuffer(16), d = new DataView(ub);
+        d.setUint32(0, n, true); d.setUint32(4, flags, true); d.setUint32(8, 0, true); d.setUint32(12, 0, true);
+        return new Uint8Array(ub);
+    }
+
+    /**
+     * *** THE CHAIN v4593 COULD NOT BUILD: disocclusion -> factor -> rectify, ON ONE ENCODER. ***
+     *
+     * v4593 shipped this runner deliberately WITHOUT a rejectAndAccumulate(), because DISOCCLUSION writes a mask
+     * (1 = history wrong) and RECTIFY reads a factor (1 = history trusted) and the inversion between them --
+     * historyFactorCPU -- had no WGSL. Its own first draft HAD such a method: it dispatched both kernels, bound
+     * an all-zero factor, and carried a comment claiming it fed the mask straight in. Code and comment
+     * disagreed, and the code meant "discard all history, every pixel". FACTOR_WGSL is the missing third
+     * dispatch, and this is the method that was refused until it existed.
+     *
+     * Neither intermediate crosses to the CPU: the mask feeds the factor pass and the factor feeds the rectify,
+     * all on the frame's single encoder. `reactive` and `shading` are accepted here because the factor kernel
+     * takes them; nothing in this tree produces a reactive mask yet, and saying so is cheaper than pretending
+     * the argument does not exist.
+     */
+    async rejectAndAccumulate({ current, history, motion, prevDepth, w, h, alpha, threshold,
+                                reactive = null, shading = null,
+                                nearerIsLess = true, space = "ycocg", clampToNeighbourhood = true }) {
+        if (!(threshold > 0)) throw new Error("temporalRejectGPU.rejectAndAccumulate: threshold must be a positive depth, in the buffer's own units");
+        const dev = this.device;
+        const n = w * h, n4 = n * 4;
+        const bMot = dev.buffer({ data: this._f32(motion), usage: ["storage"] });
+        const bPrev = dev.buffer({ data: this._f32(prevDepth), usage: ["storage"] });
+        const bMask = dev.buffer({ data: new Float32Array(n), usage: ["storage"] });
+        const bReact = reactive ? dev.buffer({ data: this._f32(reactive), usage: ["storage"] })
+                                : dev.buffer({ data: new Float32Array(n), usage: ["storage"] });
+        const bShade = shading ? dev.buffer({ data: this._f32(shading), usage: ["storage"] })
+                               : dev.buffer({ data: new Float32Array(n), usage: ["storage"] });
+        const bFac = dev.buffer({ data: new Float32Array(n), usage: ["storage"] });
+        const bCur = dev.buffer({ data: this._f32(current), usage: ["storage"] });
+        const bHist = dev.buffer({ data: history ? this._f32(history) : new Float32Array(n4), usage: ["storage"] });
+        const bDst = dev.buffer({ data: new Float32Array(n4), usage: ["storage"] });
+
+        const ud = new ArrayBuffer(16), dd = new DataView(ud);
+        dd.setUint32(0, w, true); dd.setUint32(4, h, true);
+        dd.setFloat32(8, threshold, true); dd.setUint32(12, nearerIsLess ? 1 : 0, true);
+        const uDisoc = dev.buffer({ data: new Uint8Array(ud), usage: "uniform" });
+        // the mask is ALWAYS a real input to the factor pass here, which is the whole point of the chain
+        const uFac = dev.buffer({ data: this._uFactor(n, bMask, reactive, shading), usage: "uniform" });
+        const flags = (space === "ycocg" ? RECTIFY_FLAGS.YCOCG : 0)
+                    | (clampToNeighbourhood ? RECTIFY_FLAGS.CLAMP : 0)
+                    | (history ? RECTIFY_FLAGS.HAS_HIST : 0) | RECTIFY_FLAGS.HAS_FAC;
+        const ur = new ArrayBuffer(16), dr = new DataView(ur);
+        dr.setUint32(0, w, true); dr.setUint32(4, h, true);
+        dr.setFloat32(8, alpha, true); dr.setUint32(12, flags, true);
+        const uRect = dev.buffer({ data: new Uint8Array(ur), usage: "uniform" });
+
+        this.pDisoc.bind("motion", bMot).bind("prevDepth", bPrev).bind("dst", bMask).bind("u", uDisoc);
+        this.pFactor.bind("disocclusion", bMask).bind("reactive", bReact).bind("shading", bShade).bind("dst", bFac).bind("u", uFac);
+        this.pRect.bind("cur", bCur).bind("hist", bHist).bind("motion", bMot).bind("factor", bFac).bind("dst", bDst).bind("u", uRect);
+        const g = groups(w, h);
+        dev.frame(({ pass }) => {
+            pass.dispatch(this.pDisoc, g);
+            pass.dispatch(this.pFactor, [Math.ceil(n / 64)]);
+            pass.dispatch(this.pRect, g);
+            pass.clear([0, 0, 0, 1]);
+        }, { offscreen: true });
+        const data = new Float32Array(await dev.read(bDst));
+        const mask = new Float32Array(await dev.read(bMask));
+        const factor = new Float32Array(await dev.read(bFac));
+        for (const b of [bMot, bPrev, bMask, bReact, bShade, bFac, bCur, bHist, bDst, uDisoc, uFac, uRect]) b.destroy();
+        return { data, mask, factor, w, h };
+    }
 }

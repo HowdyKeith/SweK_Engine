@@ -2,9 +2,30 @@
 // WebGLEngine/render/temporalRejectGPU-selfcheck.mjs -- v4593
 //
 // Run: node render/temporalRejectGPU-selfcheck.mjs
-// RUNTIME 1862 ms ALONE (median of 1860/1862/1898) -- inside the 3000 ms sweep budget.
+// RUNTIME 2573 ms ALONE (median of 2569/2711/2573 at v4594; 1862 at v4593 -- the factor kernel adds a third
+// pipeline, four more dispatches and the chain). Still inside the 3000 ms sweep budget.
 //
-// SABOTAGE: 6 mutations, 6 caught, no 0-RED -- but TWO OF THE SIX DID NOT APPLY ON THE FIRST ATTEMPT (a python
+// SABOTAGE v4594 (the factor kernel and the chain): 6 mutations, 6 caught, and TWO WENT 0-RED FIRST.
+//   W1 the kernel uses max() instead of the product -> the row that pins the DECISION. The arithmetic is three
+//      lines; which operator combines them is the thing render/temporalReject.mjs argues for, and a kernel is
+//      free to get it wrong in a way that looks reasonable.
+//   W3 reactive and shading bindings swapped in the runner -> the subset row. This is why the three fixture
+//      masks DIFFER: fed the same values it would have given exactly the right answer.
+//   W4 the chain's rectify reads a fresh zero factor rather than the one the factor pass wrote -> the
+//      bit-identity row at 5.17e-1. That is v4593's original bug, and this row is what it would have failed.
+//   W5 the chain skips the factor dispatch -> two rows, 5952 factor elements differing.
+//   *** W2 dropping the clamp went 0-RED, AND THE MUTATION WAS AIMED WRONG. *** It removed the clamp on the
+//   DISOCCLUSION term, whose mask is 0 or 1 by construction -- disocclusionCPU writes nothing else -- so the
+//   clamp on that line is unobservable through that input, which is a property of the producer rather than a
+//   gap here. Re-aimed at the REACTIVE term, whose fixture carries 1.4 and -0.2: two rows red at 4.0e-1.
+//   *** W6 putting the corpus back to a hardcoded 2D dispatch for the 1D kernel went 0-RED AND NOTHING COULD
+//   HAVE CAUGHT IT. *** crossBackend compares two harnesses against EACH OTHER, so both ran the same short
+//   dispatch, both left the same half of the output untouched, and both agreed -- a comparison of two backends
+//   cannot see an error they share. tools/ship/temporalCorpus.mjs now REFUSES at construction, by name, and a
+//   pure invocation count would not have done it: [2,2] over @workgroup_size(64,1,1) is 256 invocations,
+//   exactly the picture, and the kernel throws the y axis away. The axes the shader USES decide.
+//
+// SABOTAGE v4593: 6 mutations, 6 caught, no 0-RED -- but TWO OF THE SIX DID NOT APPLY ON THE FIRST ATTEMPT (a python
 // quoting error and a wrong anchor) AND SCORED FAIL=0. Those are NO-OPS, NOT 0-REDs, the distinction v4587 paid
 // for; scoring them as caught-nothing would have recorded the threshold refusal and the kernel's own test as
 // exercised when nothing had touched either. Re-applied against the real lines:
@@ -44,7 +65,7 @@ import { runInEngineOrigin, webgpuSkipReason } from "../tools/ship/webgpuHarness
 import { motionVectorsCPU, mat4Invert } from "./motionVectors.mjs";
 import { orthoPanVP } from "./motionVectorsGPU.mjs";
 import { disocclusionCPU, rectifiedAccumulateCPU, historyFactorCPU } from "./temporalReject.mjs";
-import { RECTIFY_FLAGS } from "./temporalRejectGPU.mjs";
+import { RECTIFY_FLAGS, FACTOR_FLAGS } from "./temporalRejectGPU.mjs";
 import { codeOnly } from "../tools/ship/sourceScan.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -88,24 +109,26 @@ console.log("1. *** THE PAGE'S OWN CONTENT CANNOT DISOCCLUDE, AND THAT IS WHY IT
        "repeats the refusal rather than inventing one.");
 }
 
-console.log("\n2. *** THE TWO KERNELS CANNOT BE CHAINED, AND THE ABSENCE IS ASSERTED ***");
+console.log("\n2. *** THE INVERSION THAT WAS MISSING, AND THE CHAIN IT UNBLOCKS ***");
 {
     const src = fs.readFileSync(path.join(ENG, "render", "temporalRejectGPU.mjs"), "utf8");
-    // codeOnly: the header EXPLAINS why there is no such method, so the raw file contains the name. Fifth time
-    // this trap has been paid for in this arc, and the instrument is the same one each time.
-    ok("!! *** no rejectAndAccumulate(): the mask-to-factor inversion has no WGSL ***",
-       !/rejectAndAccumulate\s*\(/.test(codeOnly(src)),
-       "DISOCCLUSION writes 1 where history is WRONG, RECTIFY reads 1 where history is TRUSTED. historyFactorCPU " +
-       "inverts and multiplies in the reactive and shading terms, and there is no kernel for it: " +
-       "render/temporalRejectWgsl.mjs exports DISOCCLUSION_WGSL, RECTIFY_WGSL and a YCoCg fragment, nothing else. " +
-       "The first draft dispatched both and bound an all-zero factor under a comment claiming it fed the mask " +
-       "in -- which meant DISCARD ALL HISTORY on every pixel.");
-    ok("...and the reason is recorded where the method would have been",
-       /no WGSL[\s*]+for it anywhere in the tree/.test(src) && /its own rung/.test(src),
-       "an absent method with no note reads as an oversight, and the next person writes the broken one again.");
+    // codeOnly: the header discusses the method by name, so the raw file contains it either way. Sixth time this
+    // trap has been paid for in the arc, and the instrument is the same one each time.
+    ok("!! *** rejectAndAccumulate() EXISTS NOW, because FACTOR_WGSL closed the hole v4593 measured ***",
+       /rejectAndAccumulate\s*\(/.test(codeOnly(src)) && /async factor\s*\(/.test(codeOnly(src)),
+       "v4593 shipped this runner deliberately without it: DISOCCLUSION writes 1 where history is WRONG, RECTIFY " +
+       "reads 1 where history is TRUSTED, and the inversion -- historyFactorCPU -- had no WGSL anywhere in the " +
+       "tree. Its first draft HAD the method, dispatching both kernels over an all-zero factor under a comment " +
+       "claiming it fed the mask in, which meant DISCARD ALL HISTORY on every pixel. It is three dispatches now.");
+    ok("...and the three MULTIPLY rather than max(), which is a decision the kernel had to copy and not improve",
+       /f \* \(1\.0 - clamp/.test(fs.readFileSync(path.join(ENG, "render", "temporalRejectWgsl.mjs"), "utf8")),
+       "each mask is an independent probability that the history is wrong, so two weak reasons compound. A max() " +
+       "would let the strongest hide the others -- and on a disoccluded transparent surface both are true and " +
+       "the answer must be 'certainly not'. render/temporalReject.mjs argues it; the kernel mirrors it.");
     ok("...and the flag words are named, so a caller never passes a bare 7",
-       RECTIFY_FLAGS.YCOCG === 1 && RECTIFY_FLAGS.CLAMP === 2 && RECTIFY_FLAGS.HAS_HIST === 4 && RECTIFY_FLAGS.HAS_FAC === 8,
-       "the same four the kernel declares as WGSL consts");
+       RECTIFY_FLAGS.YCOCG === 1 && RECTIFY_FLAGS.CLAMP === 2 && RECTIFY_FLAGS.HAS_HIST === 4 && RECTIFY_FLAGS.HAS_FAC === 8 &&
+       FACTOR_FLAGS.HAS_DISOCC === 1 && FACTOR_FLAGS.HAS_REACTIVE === 2 && FACTOR_FLAGS.HAS_SHADING === 4,
+       "four for RECTIFY and three for FACTOR, the same numbers both kernels declare as WGSL consts");
 }
 
 console.log("\n3. ON THE DEVICE: both kernels against their CPU references");
@@ -125,10 +148,16 @@ else {
     }
     const cMask = disocclusionCPU({ motion: MOT, prevDepth: DEP_PREV, w: W, h: H, threshold: TH });
     const FAC = historyFactorCPU({ disocclusion: cMask.data, n: W * H });
+    // two more masks, DIFFERENT from each other and from the disocclusion, and carrying values outside [0,1]:
+    // fed identical inputs a kernel reading `reactive` where it means `shading` gives exactly the right answer,
+    // and a clamp that never fires cannot be shown to fire.
+    const REACT = new Float32Array(W * H), SHADE = new Float32Array(W * H);
+    for (let i = 0; i < W * H; i++) { REACT[i] = (i % 9) < 3 ? 1.4 : -0.2; SHADE[i] = 0.05 * (i % 7); }
 
     const r = await runInEngineOrigin({ engineRoot: ENG, args: {
         W, H, TH, motion: Array.from(MOT), prevDepth: Array.from(DEP_PREV),
-        cur: Array.from(CUR), hist: Array.from(HIS), fac: Array.from(FAC) }, script: `async (a) => {
+        cur: Array.from(CUR), hist: Array.from(HIS), fac: Array.from(FAC),
+        mask: Array.from(cMask.data), react: Array.from(REACT), shade: Array.from(SHADE) }, script: `async (a) => {
         const { requestDevice } = await import("/gfx/device.js");
         const { TemporalRejectGPU } = await import("/render/temporalRejectGPU.mjs");
         const cv = document.createElement("canvas"); cv.width = 8; cv.height = 8;
@@ -142,12 +171,26 @@ else {
         const rect = await G.rectify({ ...base, factor: new Float32Array(a.fac) });
         const rectNoFac = await G.rectify({ ...base });
         const rectRgb = await G.rectify({ ...base, factor: new Float32Array(a.fac), space: "rgb" });
+
+        // the factor kernel alone, in four combinations, so the flag word is exercised rather than assumed
+        const fD = await G.factor({ disocclusion: new Float32Array(a.mask), n: a.W * a.H });
+        const fR = await G.factor({ reactive: new Float32Array(a.react), n: a.W * a.H });
+        const fAll = await G.factor({ disocclusion: new Float32Array(a.mask), reactive: new Float32Array(a.react),
+                                      shading: new Float32Array(a.shade), n: a.W * a.H });
+        const fNone = await G.factor({ n: a.W * a.H });
+
+        // *** THE CHAIN: three dispatches on one encoder, nothing crossing back between them. ***
+        const chain = await G.rejectAndAccumulate({
+            current: new Float32Array(a.cur), history: new Float32Array(a.hist), motion: new Float32Array(a.motion),
+            prevDepth: new Float32Array(a.prevDepth), w: a.W, h: a.H, alpha: 0.1, threshold: a.TH });
         let refused = null, noThreshold = null;
         try { new TemporalRejectGPU({ backend: "webgl2" }); } catch (e) { refused = String(e.message).slice(0, 130); }
         try { await G.disocclusion({ motion: new Float32Array(a.motion), prevDepth: new Float32Array(a.prevDepth), w: a.W, h: a.H }); }
         catch (e) { noThreshold = String(e.message).slice(0, 110); }
         return { mask: Array.from(mask.data), rect: Array.from(rect.data), rectNoFac: Array.from(rectNoFac.data),
                  rectRgb: Array.from(rectRgb.data), refused, noThreshold, errs, backend: dev.backend,
+                 fD: Array.from(fD.data), fR: Array.from(fR.data), fAll: Array.from(fAll.data), fNone: Array.from(fNone.data),
+                 chain: Array.from(chain.data), chainMask: Array.from(chain.mask), chainFactor: Array.from(chain.factor),
                  adapter: (dev.adapterInfo && (dev.adapterInfo.description || dev.adapterInfo.vendor)) || "unknown" };
     }` });
 
@@ -187,6 +230,48 @@ else {
            `worst ${wG.toExponential(3)}, YCoCg against RGB differ by ${worst(G.rect, G.rectRgb).toExponential(2)} on ` +
            "the device. The box FSR rectifies in is the whole reason that flag exists.");
 
+        // ---- THE FACTOR KERNEL, AGAINST historyFactorCPU ------------------------------------------------
+        const fEq = (g, c) => { let w = 0; for (let i = 0; i < W * H; i++) w = Math.max(w, Math.abs(g[i] - c[i])); return w; };
+        const cD = historyFactorCPU({ disocclusion: cMask.data, n: W * H });
+        const cR = historyFactorCPU({ reactive: REACT, n: W * H });
+        const cAll = historyFactorCPU({ disocclusion: cMask.data, reactive: REACT, shading: SHADE, n: W * H });
+        const cNone = historyFactorCPU({ n: W * H });
+        ok(`*** factor() is historyFactorCPU, to ${fEq(G.fAll, cAll).toExponential(2)}, with all three masks ***`,
+           fEq(G.fAll, cAll) < 1e-6,
+           `worst ${fEq(G.fAll, cAll).toExponential(3)} over ${W * H}. The three masks DIFFER from each other and ` +
+           "carry values outside [0,1] -- identical inputs would let a kernel that read the wrong binding give " +
+           "exactly the right answer, and a clamp that never fires cannot be shown to fire.");
+        ok("...and each flag subset gives the CPU's answer for that subset, not for all of them",
+           fEq(G.fD, cD) < 1e-6 && fEq(G.fR, cR) < 1e-6 && fEq(G.fNone, cNone) < 1e-6,
+           `disocclusion only ${fEq(G.fD, cD).toExponential(2)}, reactive only ${fEq(G.fR, cR).toExponential(2)}, ` +
+           `none ${fEq(G.fNone, cNone).toExponential(2)}. Three bound buffers whatever the caller passes, so a ` +
+           "flag read wrongly would silently fold in a mask nobody asked for.");
+        ok("!! ...and the four subsets are actually DIFFERENT, so the rows above are not one answer four times",
+           fEq(G.fAll, G.fD) > 1e-3 && fEq(G.fD, G.fR) > 1e-3 && fEq(G.fNone, G.fD) > 1e-3 &&
+           cNone.every((v) => v === 1),
+           `all-vs-disocclusion ${fEq(G.fAll, G.fD).toExponential(2)}, disocclusion-vs-reactive ` +
+           `${fEq(G.fD, G.fR).toExponential(2)}, none-vs-disocclusion ${fEq(G.fNone, G.fD).toExponential(2)}; ` +
+           "the no-mask case is all ones, which is what 'trust the history entirely' means.");
+
+        // ---- THE CHAIN v4593 REFUSED TO BUILD -----------------------------------------------------------
+        let maskChainDiff = 0, facChainDiff = 0;
+        for (let i = 0; i < W * H; i++) {
+            if (G.chainMask[i] !== G.mask[i]) maskChainDiff++;
+            if (Math.abs(G.chainFactor[i] - G.fD[i]) > 1e-6) facChainDiff++;
+        }
+        const chainWorst = (() => { let w = 0; for (let i = 0; i < W * H * 4; i++) w = Math.max(w, Math.abs(G.chain[i] - G.rect[i])); return w; })();
+        ok("!! *** the chain's mask and factor are what the two passes produce alone ***",
+           maskChainDiff === 0 && facChainDiff === 0,
+           `${maskChainDiff} mask and ${facChainDiff} factor elements differ from the standalone dispatches. ` +
+           "Neither intermediate crosses to the CPU inside the chain, so this is the row that says the second " +
+           "and third passes read what the first two wrote rather than whatever the buffers held.");
+        ok("!! *** and the chained picture is the standalone rectify's, bit for bit ***",
+           chainWorst === 0,
+           `worst ${chainWorst.toExponential(3)} over ${W * H * 4} floats. Same three kernels, same order, same ` +
+           "device -- the only difference is where the mask and the factor live, so f32-against-f64 is no excuse " +
+           "and equality is exact. THE FIRST DRAFT OF THIS METHOD, AT v4593, BOUND AN ALL-ZERO FACTOR: this row " +
+           "is what that would have failed.");
+
         ok("...and the threshold refusal is DRIVEN on the device, not read from the source",
            typeof G.noThreshold === "string" && /threshold/.test(G.noThreshold), G.noThreshold || "it did NOT throw");
         ok("...and the device refusal is DRIVEN: a non-webgpu device throws at construction",
@@ -195,9 +280,12 @@ else {
 }
 
 console.log(fails ? `\ntemporalRejectGPU-selfcheck: ${fails} FAILED` : "\ntemporalRejectGPU-selfcheck: ALL GREEN");
-console.log("unchecked here: the FACTOR KERNEL that does not exist -- inverting a mask and multiplying in the " +
-            "reactive and shading terms is historyFactorCPU's job and has no WGSL, which is what stops these two " +
-            "kernels chaining on one encoder and is its own rung; `relax`, which RECTIFY_WGSL has no binding for " +
-            "and the runner therefore refuses to accept; and the temporal arc's last FIVE unreachable kernels " +
-            "(RING_FLOOR and temporalLock's four), which tools/ship/kernelReach-selfcheck.mjs counts at 12.");
+console.log("unchecked here: the REACTIVE and SHADING masks the factor kernel accepts -- nothing in this tree " +
+            "produces a reactive mask at all, and the shading one is render/temporalLock.mjs's, so the chain is " +
+            "exercised with the disocclusion term alone and the other two are held to historyFactorCPU on " +
+            "fixtures rather than on anything a frame produced; `relax`, which RECTIFY_WGSL has no binding for " +
+            "and the runner therefore refuses to accept rather than lerping on the CPU beside a kernel that does " +
+            "not; the page, which still cannot disocclude and is still not wired to any of this for the reason " +
+            "v4593 measured; and the temporal arc's last FIVE unreachable kernels (RING_FLOOR and temporalLock's " +
+            "four), which tools/ship/kernelReach-selfcheck.mjs counts at 12.");
 process.exit(fails ? 1 : 0);
