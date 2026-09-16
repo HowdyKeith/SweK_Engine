@@ -244,7 +244,22 @@ else {
     if (r.ok && Object.values(r.result).every((v) => !v.error && v.all)) {
         const R = r.result, K = Object.keys(R).sort(), j = (a) => (a || []).map((u) => u.name + ":" + u.type).join(",");
         const one = R["webgpu:badTv"];
-        ok("the state carries eleven fields and three's debug hook keeps two of them -- `bindings` is one of the nine it throws away", one.stateFields.length === 11 && one.stateFields.includes("bindings") && one.keptByDebugHook.slice().sort().join() === "fragmentShader,vertexShader" && !one.keptByDebugHook.includes("bindings"), `state ${one.stateFields.length} fields; hook kept ${one.keptByDebugHook.join(",")}`);
+        // *** THE COUNT WAS THE ASSERTION AND THE COUNT IS three's, NOT THIS TREE'S. *** This row read
+        // `stateFields.length === 11`, and r185 answers 12 -- so a three revision that adds a field to its own
+        // NodeBuilderState turned a row about THE DEBUG HOOK red, naming a number nobody here chose. The same
+        // shape v4571 found in gateSelection's band and v4563 found in the sibling rule: a row anchored on a
+        // count that moves with something outside the tree.
+        //
+        // What this row is actually for: the state CARRIES `bindings`, three's debug hook keeps only the two
+        // shader texts, and `bindings` is among what it throws away -- which is the whole reason section 4 reads
+        // the state directly instead of going through getShaderAsync. Every clause of that is a property. The
+        // count is REPORTED beside it, with the revision it was taken at, so a later reader can see it move
+        // without a gate going red for it.
+        ok("three's debug hook keeps the two shader texts and throws `bindings` away, which is why this section reads the state directly",
+           one.stateFields.includes("bindings") &&
+           one.keptByDebugHook.slice().sort().join() === "fragmentShader,vertexShader" &&
+           !one.keptByDebugHook.includes("bindings"),
+           `state ${one.stateFields.length} fields (11 at r184, 12 at r185 -- REPORTED, not asserted); hook kept ${one.keptByDebugHook.join(",")}; thrown away ${one.stateFields.filter((f) => !one.keptByDebugHook.includes(f)).length}`);
         // where the TEXT reader answers, the STATE reader answers identically -- name, type and order
         const answered = K.filter((k) => !R[k].textRefused), agreed = answered.filter((k) => j(R[k].text) === j(R[k].state));
         ok(`*** where the text reader answers, the state reader answers IDENTICALLY -- same names, same device types, same order (${agreed.length} of ${answered.length}: ${agreed.join(", ")}) ***`,

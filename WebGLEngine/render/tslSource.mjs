@@ -54,7 +54,18 @@ export const DEFAULT_LOCALS = Object.freeze({ positionLocal: "pl", normalLocal: 
 /** Ask three for the shaders of one mesh: { wgsl | glsl: { vertex, fragment }, language }. The renderer must be initialised. */
 export async function emitShaders(renderer, { scene, camera, mesh }) {
     const sh = await renderer.debug.getShaderAsync(scene, camera, mesh);
-    return { language: renderer.backend.isWebGPUBackend ? "wgsl" : "glsl", vertex: sh.vertexShader, fragment: sh.fragmentShader };
+    // v4540, RE-APPLIED ONTO main's r185 BODY. *** three BAKES A BOOLEAN INTO THE GRAPH AND THEN READS IT AS A
+    // UNIFORM, and the fold is what lets the transplant compile. *** main's emitShaders returns three's text raw;
+    // this line folds the constants the node builder already knows and reports what it folded, because
+    // tslSource-selfcheck grades `folded` and `foldError` by name and a missing field reads as a silent pass.
+    // The fold cannot throw the emission away: a failure is CAPTURED as foldError and the raw fragment is still
+    // returned, so a three revision that changes the state shape degrades to "not folded" rather than to nothing.
+    const language = renderer.backend.isWebGPUBackend ? "wgsl" : "glsl";
+    let constants = [], foldError = null;
+    try { constants = foldableConstants(await nodeBuilderStateFor(renderer, { scene, camera, mesh })); }
+    catch (e) { foldError = String((e && e.message) || e); }
+    const f = foldConstants(sh.fragmentShader, language, constants);
+    return { language, vertex: sh.vertexShader, fragment: f.fragment, folded: f.folded, foldError };
 }
 
 // *** v4550 -- three@0.185.1 PUTS AN EXTRA FIELD IN THE OBJECT UNIFORM STRUCT THAT THE FRAGMENT NEVER READS,
@@ -186,12 +197,24 @@ export function uniformFields(fragment, language) {
         if (!m) return out;
         for (const line of m[1].split("\n")) { const f = line.trim().replace(/;$/, "").match(/^(\w+)\s+(?:f_)?(\w+)$/); if (!f) continue; const t = GLSL_TYPES[f[1]]; if (!t) throw new Error(`tslSource: uniform ${f[2]} has type ${f[1]}, which the device's uniform list does not carry`); out.push({ name: f[2], type: t }); }
     }
+    // *** ONE DEFINITION OF "NOBODY READS THIS", RE-APPLIED AT THE v4637 MERGE REPAIR. ***
+    //
+    // main's `_unreadBookkeeping` and this line's exported `unreadUnlabelledUniforms` are the same question asked
+    // twice, and they answered differently: main's is mat4-ONLY (it exists for the object matrix), so an unlabelled
+    // uniform of any other type that nobody reads was REFUSED rather than dropped -- and an unread mat4 was KEPT in
+    // the bound list, which hands gfx/device.js a slot nothing samples.
+    //
+    // This line's rule is read -> REFUSE, unread -> DROP AND NAME, and it is the one tslSource-selfcheck grades.
+    // The exported function is now the single predicate: the refusal loop exempts what it names and the return
+    // drops the same set, so the two cannot disagree. `_unreadBookkeeping` stays as main's r185-aware body-reference
+    // test -- it is what `_bodyReferences` is reached through -- and is asserted against this set below.
+    const unread = new Set(unreadUnlabelledUniforms(fragment, language));
     for (const u of out) {
         if (!/^nodeUniform\d+$/.test(u.name)) continue;
-        if (_unreadBookkeeping(fragment, language, u)) continue;
+        if (unread.has(u.name) || _unreadBookkeeping(fragment, language, u)) continue;
         throw new Error(`tslSource: the emitted ${language.toUpperCase()} carries an UNLABELLED uniform (${u.name}); label every uniform node (uniform(x).label("name")) so the device can bind it by name`);
     }
-    return out;
+    return out.filter((u) => !unread.has(u.name));
 }
 /** The textures three declared: [name]. Refuses an unlabelled one. */
 export function textureNames(fragment, language) {
@@ -824,7 +847,12 @@ export function transplantCompute(wgsl, shell) {
     const fDecls = _usedFragDecls(wgsl, b, "wgsl");
     if (fDecls.length) { const braceAt = b.indexOf("{"); b = b.slice(0, braceAt + 1) + "\n" + fDecls.join("\n") + b.slice(braceAt + 1); }
     const code = `// transplanted from three's WGSL compute builder by render/tslSource.mjs\n${keepSubgroups ? "enable subgroups;\n" : ""}var<private> instanceIndex : u32;\n${shell.prefix}\n@` + `compute @workgroup_size(${shell.workgroupSize})\n${b}`;
-    return { wgsl: code, shared: wantShared.map((w) => w.name), storage: shell.storage.map((b2) => b2.name), reads: wantR.map((b2) => b2.name), writes: wantW.map((b2) => b2.name), uniforms, uniformArrays: wantUA.map((a) => a.name), workgroupSize: shell.workgroupSize, shell: shell.name };
+    return { wgsl: code, shared: wantShared.map((w) => w.name), storage: shell.storage.map((b2) => b2.name), reads: wantR.map((b2) => b2.name), writes: wantW.map((b2) => b2.name), uniforms, uniformArrays: wantUA.map((a) => a.name), workgroupSize: shell.workgroupSize, shell: shell.name,
+             // v4471, re-applied onto main's r185 body: the transplant reads its own folded entry guard back
+             // out, so the trip count baked into the text can be held to the count the graph was built with.
+             // main never had dispatchBoundOf, so taking its transplantCompute whole dropped this field and
+             // tslLoopBound read `transplant undefined` beside an emit of 1024.
+             dispatchBound: dispatchBoundOf(code) };
 }
 
 // ============================================================================================================
