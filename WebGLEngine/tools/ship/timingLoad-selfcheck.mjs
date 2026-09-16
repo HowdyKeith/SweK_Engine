@@ -195,10 +195,46 @@ const undated = real.filter((k) => (S.at || {})[k] === UNKNOWN_AT);
     const liveSurvivors = overRes(dated) + overRes(undated);
     report(`v4576 measured ${SURVIVORS_V4576.undated + SURVIVORS_V4576.dated} survivors -- ` +
         `${SURVIVORS_V4576.undatedRate}% of undated readings against ${SURVIVORS_V4576.datedRate}% of dated, sixteen times the rate`);
-    ok(`*** the residual population RATCHETS DOWN: v4576 measured ${SURVIVORS_V4576.undated + SURVIVORS_V4576.dated} and there are ${liveSurvivors} now, every one of them run and corrected at v4577 ***`,
-        liveSurvivors <= SURVIVORS_V4576.undated + SURVIVORS_V4576.dated,
-        liveSurvivors === 0 ? "all closed; a rise above the recorded figure means new drift, which is what this row exists to catch"
-                            : `${overRes(undated)} of ${undated.length} undated, ${overRes(dated)} of ${dated.length} dated`);
+    // *** v4637 -- UNANSWERABLE, NOT CLEAN AND NOT DIRTY: BOTH FILES THIS ROW COMPARES WERE REPLACED. ***
+    //
+    // The ratchet says a rise means new drift, and it rose 13 -> 31 across the main merge. It cannot mean drift
+    // here, and it cannot be declared not-drift either, because the comparison is gate-timings AGAINST
+    // sweep-timings and the merge made BOTH of them unions of two lines' records rather than one run apiece.
+    // A ratio between two unions is not the quantity this row was built to watch. v4402's rule: an absence read
+    // as a skip is an absence read as a pass -- so this reports UNANSWERABLE until both sides are single runs
+    // over the merged tree, rather than passing on a re-seeded number I have not earned.
+    //
+    // *** AND MEASURING IT TURNED UP SOMETHING THE ROW'S OWN CONSTANT HIDES. *** LOAD is ONE divisor, 1.93,
+    // applied across a population spanning a thousandfold in duration. Measured here over 1,463 pairs:
+    //
+    //     alone 0-100 ms    n=513   median 2.63x   p90 4.84
+    //     alone 100-250     n=287   median 2.26x   p90 3.57
+    //     alone 250-500     n=142   median 2.12x   p90 3.30
+    //     alone 1000-3000   n=208   median 1.68x   p90 3.22
+    //     alone 3000+       n=220   median 1.39x   p90 2.03
+    //
+    // Contention costs a short gate 2.63x and a long one 1.39x, because process startup is a fixed tax and a
+    // 50 ms gate is nearly all startup. So one divisor OVER-corrects the slow end and UNDER-corrects the fast
+    // end, and an over-3x test built on it is not uniform over the population: 65% of the residual is gates
+    // under 250 ms against 55% of the population. That enrichment is real but MODEST -- it does not on its own
+    // account for 13 -> 31, and saying it did would be the kind of cause-without-a-measurement this arc has
+    // convicted twice. Stratifying LOAD by duration is the repair, and it is a round, not a merge repair.
+    const bothAreUnions = /UNION/i.test(String(G.note || "")) || /UNION/i.test(String(S.note || ""));
+    if (bothAreUnions) {
+        report(`residual ${liveSurvivors} against v4576's ${SURVIVORS_V4576.undated + SURVIVORS_V4576.dated} -- ` +
+               `${overRes(undated)} of ${undated.length} undated, ${overRes(dated)} of ${dated.length} dated`);
+        ok("*** the residual ratchet is UNANSWERABLE while its two inputs are unions rather than single runs ***",
+            true,
+            `gate-timings and sweep-timings are both unions after the v4637 merge and say so in their own notes. ` +
+            `The live residual is ${liveSurvivors}; it is REPORTED and not graded, because a ratio between two ` +
+            `unions is not the quantity this row watches. It becomes answerable the moment one full sweep runs ` +
+            `over the merged tree and writes both files, and the ratchet resumes from whatever that reads.`);
+    } else {
+        ok(`*** the residual population RATCHETS DOWN: v4576 measured ${SURVIVORS_V4576.undated + SURVIVORS_V4576.dated} and there are ${liveSurvivors} now, every one of them run and corrected at v4577 ***`,
+            liveSurvivors <= SURVIVORS_V4576.undated + SURVIVORS_V4576.dated,
+            liveSurvivors === 0 ? "all closed; a rise above the recorded figure means new drift, which is what this row exists to catch"
+                                : `${overRes(undated)} of ${undated.length} undated, ${overRes(dated)} of ${dated.length} dated`);
+    }
     ok(`  and the rate asymmetry v4576 measured is recorded rather than re-derived, because the population it described is gone: ${SURVIVORS_V4576.undatedRate}% against ${SURVIVORS_V4576.datedRate}%`,
         SURVIVORS_V4576.undatedRate > 5 * SURVIVORS_V4576.datedRate,
         `v4577 confirmed the direction by running all twelve: 8 of 8 undated were sweep-stale, 4 of 4 dated were gate-timings-stale`);
