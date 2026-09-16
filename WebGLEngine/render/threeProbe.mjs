@@ -11,15 +11,6 @@
 // it with the browser's DecompressionStream, walks the tar (this file), rewrites the build's two internal
 // imports to blob URLs, imports it, starts a WebGPURenderer, renders one TSL gradient into a render target and
 // reads it back -- beside the vendored control through the same steps. tools/ship/threeProbe-selfcheck.mjs runs the
-// *** IS THE three 0.178 PIN THE FLEET'S OR THE BUILD BOX'S? *** (docs/TSL-ROADMAP.md step 7 item 17, task 17.) At
-// v4319 three 0.185 was tried and refused on THIS shell's Chromium -- its texture views pass a `swizzle` the browser
-// did not know -- and 0.178 was vendored because it ran unpatched. v4537 probed the BOUNDARY rather than the newest
-// and found 0.184 draws here, so the vendored build is 0.184.0 now. That is still a fact about one headless shell. Whether
-// a rig's Chrome refuses the same build is the question, and nobody can answer it from here. three-probe.html is the
-// instrument: it fetches a named three version's tarball from registry.npmjs.org (CORS *, measured), gunzips it with
-// the browser's DecompressionStream, walks the tar (this file), rewrites the build's two internal imports to blob
-// URLs, imports it, starts a WebGPURenderer, renders one TSL gradient into a render target and reads it back --
-// beside the vendored 0.178 through the same steps as the control. tools/ship/threeProbe-selfcheck.mjs runs the
 // same page here against a cached tarball and records what THIS box says; the rig's answer is RIG-PENDING until
 // tools/ship/three-probe.json is saved from the page.
 "use strict";
@@ -80,23 +71,12 @@ export function rewriteImports(files, urls) {
 }
 
 /** The page's record: { page: "three-probe.html", at, ua, when, route, results: [{ label, version, revision, backend, ok, error, ms }] }. Refuses lies. */
-/**
- * Grade a probe record. `controlLabel` names the vendored control the record was taken against; it defaults to the
- * one this tree carries NOW.
- *
- * *** v4545 -- A RECORD OUTLIVES THE PIN IT WAS TAKEN AGAINST, AND THE GRADER HAD NO WAY TO SAY SO. *** A rig saved
- * tools/ship/three-probe.json at v4494, when the vendored control was "vendored 0.178"; v4537 bumped the pin and
- * PROBE_CONTROL.label became "vendored 0.184", so the record graded as "no vendored control" -- true as written and
- * useless as a reading. It is not missing a control; it has one, for a build this tree no longer ships. The caller
- * passes the label the record actually names, grades everything else exactly as before, and reports the staleness
- * itself, which is a different fact from dishonesty and deserves its own words.
- */
-export function gradeProbe(j, controlLabel = PROBE_CONTROL.label) {
+export function gradeProbe(j) {
     const problems = [];
     if (!j || j.page !== "three-probe.html") problems.push("not a three-probe record");
     const rs = Array.isArray(j && j.results) ? j.results : [];
     if (rs.length < 2) problems.push(`only ${rs.length} results (the control and at least one version)`);
-    if (!rs.some((r) => r.label === controlLabel)) problems.push(`no vendored control (looked for ${JSON.stringify(controlLabel)})`);
+    if (!rs.some((r) => r.label === PROBE_CONTROL.label)) problems.push("no vendored control");
     for (const r of rs) {
         if (typeof r.ok !== "boolean") { problems.push(`${r.label}: ok is not a boolean`); break; }
         if (r.ok && r.error) { problems.push(`${r.label}: ok with an error`); break; }

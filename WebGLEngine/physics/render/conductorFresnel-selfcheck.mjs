@@ -191,7 +191,6 @@ console.log("  ----  picture to look at, and the safe default is already proven 
 // strings come from; calling it again costs 12 x 2001 evaluations and yields the numbers themselves. Parsing
 // reportLines() would have produced a report that goes stale the day somebody changes a format string, which
 // is the caption problem with an extra parser in front of it.
-const REPORT = gateReport("physics/render/conductorFresnel-selfcheck.mjs");
 {
     const rows = [];
     for (const [name, m] of Object.entries(METALS))
