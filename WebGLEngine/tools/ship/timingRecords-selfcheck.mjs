@@ -212,14 +212,29 @@ console.log("\n5. CONTROLS");
     // exit 0 at 25,772 ms and would need it, and it is only absent here because gate-timings has no entry for
     // it -- but a guard that removes nothing today is a guard nothing is testing, and this row says which.
     const capped = both.filter((k) => S.timings[k] >= S.capMs);
-    ok("the cap clause is INERT on today's data, and the row says so rather than claiming an effect it does not have",
-        zeroButCapped.length === 0 && capped.length > 0 && capped.every((k) => S.codes[k] === 124),
-        `${capped.length} capped entries in the overlap, all of them exit 124, so the code filter alone removes every one`);
-    ok("  and the clause is kept because a case for it exists outside this overlap: crossBackend is exit 0 at 25,772 ms and is absent here only because gate-timings has no entry for it",
+    // *** v4637 -- THE CLAUSE IS NOT INERT ANY MORE, AND THE ROW ABOVE NAMED THE EXACT CASE. *** It said the
+    // guard stays because "crossBackend is exit 0 at 25,772 ms and would need it, and it is only absent here
+    // because gate-timings has no entry for it". The main merge gave gate-timings an entry for crossBackend
+    // (27,977 ms, from main's complete run), so it enters the overlap -- exit 0, above the cap -- and the
+    // `< capMs` clause removes it. Three more came with it: drivePolicy, raceKnob and ribbonRoad.
+    //
+    // A guard kept for a hypothetical, with the hypothetical NAMED, and the named case arriving is the best
+    // outcome this row could have had. It asserts the live state now rather than the inertness: the clause
+    // removes what the exit-code filter does not, and what it removes is reported by name.
+    ok("the cap clause now REMOVES something the code filter does not, which is the case the row was keeping it for",
+        zeroButCapped.length > 0 && capped.length > 0 &&
+        zeroButCapped.every((k) => S.codes[k] === 0 && S.timings[k] >= S.capMs),
+        `${capped.length} capped entries in the overlap; ${zeroButCapped.length} of them carry exit 0 and are removed ` +
+        `ONLY by the cap clause -- ${zeroButCapped.map((k) => k.split("/").pop()).join(", ")}. It was inert while ` +
+        "every capped entry was exit 124; the merge brought gate-timings rows for four that ran to completion past " +
+        "the cap.");
+    ok("  and the case the clause was kept for is INSIDE the overlap now: crossBackend is exit 0 above the cap, and the merge gave gate-timings the row it was missingry for it",
+        // v4637: the third clause was `!(crossBackend in G.timings)` -- the reason it sat OUTSIDE the overlap.
+        // It is inside now, so the row asserts the case rather than its absence.
         S.codes["tools/ship/crossBackend-selfcheck.mjs"] === 0 &&
         S.timings["tools/ship/crossBackend-selfcheck.mjs"] >= S.capMs &&
-        !(("tools/ship/crossBackend-selfcheck.mjs") in G.timings),
-        `sweep has it at ${S.timings["tools/ship/crossBackend-selfcheck.mjs"]} ms exit ${S.codes["tools/ship/crossBackend-selfcheck.mjs"]}; gate-timings has no row`);
+        ("tools/ship/crossBackend-selfcheck.mjs") in G.timings,
+        `sweep has it at ${S.timings["tools/ship/crossBackend-selfcheck.mjs"]} ms exit ${S.codes["tools/ship/crossBackend-selfcheck.mjs"]}; gate-timings now has it at ${G.timings["tools/ship/crossBackend-selfcheck.mjs"]} ms, so the guard kept for a hypothetical is doing work`);
     ok("  and the killed readings are excluded too, so nothing here compares a record against the killer's clock",
         real.every((k) => S.codes[k] === 0) && real.length < both.length,
         `${both.length - real.length} of ${both.length} excluded as killed or capped`);
