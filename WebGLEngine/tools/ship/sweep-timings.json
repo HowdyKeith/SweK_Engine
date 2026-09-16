@@ -1,5 +1,5 @@
 {
- "note": "OBSERVED at the last quickSweep run: ms per gate (serial where a serial re-run happened) and exit code. *** `kinds` (v4579) SAYS WHICH QUANTITY EACH MS IS: `loaded` is a parallel reading taken with `workers` gates running at once, `alone` is a serial re-run, `capped` is the SIGKILL cap and not a runtime at all. The two real kinds sit about 1.93x apart (v4578), so comparing a ms against anything without knowing its kind is comparing two different quantities -- which is how nine entries came to hold the wrong one. *** Rewritten every run; used only to choose which gates are under the ship-time budget. Not a claim about the tree -- the register is. `at` is PER ENTRY (v4408): the capture that actually observed that gate. `captured` is this run's stamp and applies ONLY to entries whose `at` equals it -- the rest were not run and say so. `crossings` (v4536) counts CONSECUTIVE sweeps on which a gate came in over budget, and it takes two to evict: one crossing is a reading from one hour, and this box moves 12-36% between hours on unchanged code. A gate that comes back under loses its count entirely. `serial` (v4562) is the UNCONTENDED cost -- from a phase-2 run or from this sweep's rotating slice -- while `timings` is a sample taken while seven other gates fought for the box and runs a MEDIAN 2.41x above it. Ask costOf(), not timings[], for what a gate costs. `contended` (v4556) says WHICH of the two `timings[g]` is: true for a parallel sample, false for a serial reading filed there -- by a red re-run, a budget confirm, or sweepRotation. A ratio taken without it divides 164 measurements by themselves. Ask contentionPairs() for the population a contention ratio may be taken over.",
+ "note": "OBSERVED at the last quickSweep run: ms per gate (serial where a serial re-run happened) and exit code. *** `kinds` (v4579) SAYS WHICH QUANTITY EACH MS IS: `loaded` is a parallel reading taken with `workers` gates running at once, `alone` is a serial re-run, `capped` is the SIGKILL cap and not a runtime at all. The two real kinds sit about 1.93x apart (v4578), so comparing a ms against anything without knowing its kind is comparing two different quantities -- which is how nine entries came to hold the wrong one. *** Rewritten every run; used only to choose which gates are under the ship-time budget. Not a claim about the tree -- the register is. `at` is PER ENTRY (v4408): the capture that actually observed that gate. `captured` is this run's stamp and applies ONLY to entries whose `at` equals it -- the rest were not run and say so. `crossings` (v4536) counts CONSECUTIVE sweeps on which a gate came in over budget, and it takes two to evict: one crossing is a reading from one hour, and this box moves 12-36% between hours on unchanged code. A gate that comes back under loses its count entirely. `serial` (v4562) is the UNCONTENDED cost -- from a phase-2 run or from this sweep's rotating slice -- while `timings` is a sample taken while seven other gates fought for the box and runs a MEDIAN 2.41x above it. Ask costOf(), not timings[], for what a gate costs. `contended` (v4556) says WHICH of the two `timings[g]` is: true for a parallel sample, false for a serial reading filed there -- by a red re-run, a budget confirm, or sweepRotation. A ratio taken without it divides 164 measurements by themselves. Ask contentionPairs() for the population a contention ratio may be taken over. v4637: 7 entries arriving with the main merge had no kind at all; each is back-derived from its own code/contended fields and named in kindsInferred, because a map that covers most of a file is a partial index nobody can rely on.",
  "kindsInferred": [
   "ai-bridge/deviceOffThread-selfcheck.mjs",
   "ai-bridge/deviceWorker-selfcheck.mjs",
@@ -9,6 +9,7 @@
   "ai-bridge/tools/discovery-selfcheck.mjs",
   "ai-bridge/tools/self-zip-selfcheck.mjs",
   "brain/bench/bandit-selfcheck.mjs",
+  "brain/gunnerPolicy-selfcheck.mjs",
   "brain/rl/dock-hazard-selfcheck.mjs",
   "brain/rl/dock-selfcheck.mjs",
   "brain/rl/hunt-transfer-selfcheck.mjs",
@@ -215,6 +216,7 @@
   "tools/roundhouse/zeroRangeSweep-selfcheck.mjs",
   "tools/ship/__rigprogress-fixture-selfcheck.mjs",
   "tools/ship/affected-selfcheck.mjs",
+  "tools/ship/aiPresenceOrbWidget-selfcheck.mjs",
   "tools/ship/artefactWriters-selfcheck.mjs",
   "tools/ship/asciify-selfcheck.mjs",
   "tools/ship/atmosphereMulti-selfcheck.mjs",
@@ -241,6 +243,7 @@
   "tools/ship/brainTrail-selfcheck.mjs",
   "tools/ship/budgetExile-selfcheck.mjs",
   "tools/ship/canvasFill-selfcheck.mjs",
+  "tools/ship/carViews-selfcheck.mjs",
   "tools/ship/cartPolePage-selfcheck.mjs",
   "tools/ship/carve-selfcheck.mjs",
   "tools/ship/carveGpu-selfcheck.mjs",
@@ -285,6 +288,7 @@
   "tools/ship/exportResolve-selfcheck.mjs",
   "tools/ship/fetchCap-selfcheck.mjs",
   "tools/ship/fetchProgress-selfcheck.mjs",
+  "tools/ship/ffmpegWasmBridge-selfcheck.mjs",
   "tools/ship/firePaint-selfcheck.mjs",
   "tools/ship/firewallBanner-selfcheck.mjs",
   "tools/ship/fleetMask-selfcheck.mjs",
@@ -317,6 +321,7 @@
   "tools/ship/lbmGpu-selfcheck.mjs",
   "tools/ship/lensingPage-selfcheck.mjs",
   "tools/ship/liquefy-selfcheck.mjs",
+  "tools/ship/liveCubeCapture-selfcheck.mjs",
   "tools/ship/loopAccept-selfcheck.mjs",
   "tools/ship/loopMetric-selfcheck.mjs",
   "tools/ship/loopNoise-selfcheck.mjs",
@@ -367,6 +372,7 @@
   "tools/ship/raceKnob-selfcheck.mjs",
   "tools/ship/raceReplayBake-selfcheck.mjs",
   "tools/ship/raceTrack-selfcheck.mjs",
+  "tools/ship/raceTurret-selfcheck.mjs",
   "tools/ship/reactorPage-selfcheck.mjs",
   "tools/ship/realTerrainFlyIn-selfcheck.mjs",
   "tools/ship/rebar-selfcheck.mjs",
@@ -437,6 +443,7 @@
   "tools/ship/xbarPlugin-selfcheck.mjs",
   "tools/ship/zoomBlur-selfcheck.mjs",
   "ui/stageInfo-selfcheck.mjs",
+  "world/buildingTopple-selfcheck.mjs",
   "world/rootArch-selfcheck.mjs"
  ],
  "captured": "2026-09-16T19:30:44.527Z",
@@ -13605,6 +13612,13 @@
   "tools/ship/satelliteFleet-selfcheck.mjs": "loaded",
   "tools/ship/spaceSuit-selfcheck.mjs": "loaded",
   "tools/ship/trellisAutoRig-selfcheck.mjs": "loaded",
-  "ui/guards-selfcheck.mjs": "loaded"
+  "ui/guards-selfcheck.mjs": "loaded",
+  "brain/gunnerPolicy-selfcheck.mjs": "loaded",
+  "tools/ship/aiPresenceOrbWidget-selfcheck.mjs": "loaded",
+  "tools/ship/carViews-selfcheck.mjs": "loaded",
+  "tools/ship/ffmpegWasmBridge-selfcheck.mjs": "loaded",
+  "tools/ship/liveCubeCapture-selfcheck.mjs": "loaded",
+  "tools/ship/raceTurret-selfcheck.mjs": "loaded",
+  "world/buildingTopple-selfcheck.mjs": "loaded"
  }
 }
