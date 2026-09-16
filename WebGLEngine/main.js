@@ -16755,6 +16755,12 @@ const DEMO_MODES = [
         // camera a world with NO voxelAt and a colliderBVH instead, so walking it actually runs the new
         // code -- see world/controllerLabWorld.mjs's own header for why the visible voxels and the
         // invisible collider are two separate things built from the same numbers.
+        //
+        // Task board #85 -- two patrol bots now spawn into the SAME colliderBVH the player walks, via
+        // simulation/BotManager.js's own new _botCapsuleBVH()/_stepBotCapsule() dispatch (mirroring
+        // camera.js's _capsuleWorldBVH(), task #80). Every other bot in this engine still walks the global
+        // world/world.js voxel world via _heightAt, completely unaffected -- botManager.world is swapped to
+        // this demo's own collider only for its own duration and restored in stop().
         id: "controller_lab",
         autoplay: false,
         label: "CONTROLLER LAB — non-voxel terrain + capsule collision",
@@ -16768,6 +16774,7 @@ const DEMO_MODES = [
             "Walk up the gentle ramp ahead; the steep one beside it refuses you -- same rule, same GROUND_SUPPORT_NORMAL_Y",
             "The L-shaped wall to your left blocks you and lets you slide around the corner",
             "The low block needs a jump -- walking into it alone does not get you on top",
+            "Two patrol bots (task #85) navigate the SAME L-corner wall -- watch them route around it, not walk through it",
             "HUD along the top shows the live view mode + movement state (idle/walk/run/jump/fall)",
             "ESC — exit back to the camera",
         ],
@@ -16789,6 +16796,15 @@ const DEMO_MODES = [
             camera.pitch = 0;
             camera._fpOnGround = true;
             camera._fpVelY = 0;
+
+            // Task #85 -- spawned near the L-corner's own inside pocket so their default random patrol
+            // (patrolTargetX/Z, +-8 units from spawn) has a real chance of needing to route around it.
+            window._controllerLabPrevBotWorld = botManager.world;
+            botManager.world = { colliderBVH };
+            window._controllerLabBotIds = [
+                botManager.spawn({ x: -14, z: -14, kind: "bot_grunt" })?.entityId,
+                botManager.spawn({ x: -12, z: -16, kind: "bot_grunt" })?.entityId,
+            ].filter((id) => id != null);
 
             const hud = document.createElement("div");
             hud.id = "controllerLabHud";
@@ -16815,6 +16831,15 @@ const DEMO_MODES = [
             window._controllerLabEscHandler = null;
             try { window._controllerLabHud?.remove(); } catch {}
             window._controllerLabHud = null;
+            // Task #85 -- explicit despawn (belt+suspenders: main.js's own _hardResetEntities already clears
+            // window.bots on every demo switch) and restore botManager.world so every other bot goes back to
+            // navigating the real, persistent voxel world via _heightAt, exactly as before this round.
+            for (const id of (window._controllerLabBotIds || [])) {
+                try { if (botManager.bots.has(id)) botManager._onBotKilled(id); } catch {}
+            }
+            window._controllerLabBotIds = null;
+            botManager.world = window._controllerLabPrevBotWorld ?? world;
+            window._controllerLabPrevBotWorld = null;
             camera.setMode("observer");
             camera.setWorld(world);
         },
@@ -28211,6 +28236,10 @@ ogreScenario._onWaveSpawned = (waveNumber, arena) => {
     _ogreTurretIds = ids || [];
     console.log(`[OgreArena] wave ${waveNumber}: ${_ogreTurretIds.length} turrets deployed`);
 };
+// Task #85 -- the raw manager, not just the wrapped window.bots API below: lets a caller (console, or a
+// live Playwright test) read an individual bot's own x/y/z/vy/onGround, matching how window.splatScene and
+// window.rigSystem already expose their own internals rather than only a curated subset.
+window._botManager = botManager;
 window.bots = {
     spawnAtPlayer: (opts) => botManager.spawnAtPlayer(opts || {}),
     spawn: (opts) => botManager.spawn(opts || {}),
