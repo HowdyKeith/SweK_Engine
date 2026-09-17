@@ -3857,6 +3857,32 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // v4399 for this exact reason, four ordinals ago. Registered rather than done here: a merge is the wrong
     // commit in which to change the shape of the thing being merged.
 
+    since322: Object.freeze({
+        at: "v4640", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/pipeTruncation-selfcheck.mjs"]),
+        widened: Object.freeze(["tools/ship/statedRuntime-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** A GATE THAT CALLS process.exit() DELETES ITS OWN OUTPUT THROUGH A PIPE, AND THE SHIP " +
+                 "RITUAL COUNTS REDS THROUGH A PIPE. *** Node does not flush pending async writes on exit(); a " +
+                 "write to a file is synchronous and a write to a pipe is not. MEASURED on a real gate: " +
+                 "statedRuntime-selfcheck emitted 70,608 bytes to a file and 65,861 through a pipe, twelve lines " +
+                 "became one, and the line that vanished was its only `  FAIL`. The skill's own instruction is " +
+                 "`node <gate> | grep -c '^  FAIL'`, so the prescribed count read ZERO for a failing gate -- IT " +
+                 "READ ZERO FOR ME, and v4639's commit message went out calling that gate 'a crash, not a " +
+                 "verdict'. It was never a crash. The exit CODE was always right, which is why no sweep verdict " +
+                 "was ever wrong and why nothing noticed: what was lost is the evidence, not the judgement. " +
+                 "1,717 of 1,738 gates call process.exit(), but the ones it BITES are those whose output exceeds " +
+                 "the pipe buffer -- measured across a 20-gate sample, exactly one, and it is the one that " +
+                 "misled me. The new gate DRIVES the mechanism rather than asserting it: two scripts identical " +
+                 "but for the last line, 244,000 bytes each, and process.exit() loses 219,905 of them through a " +
+                 "pipe while process.exitCode loses none. *** AND THE FIRST VERSION OF THE REPAIR MADE THE GATE " +
+                 "CONTRADICT ITSELF: *** exitCode does not stop execution and exit() did, so a failing run " +
+                 "printed `1 FAILURES` and then `all checks pass`, which is why the `else` is its own row. THE " +
+                 "NEW GATE ALSO WALKED INTO THE TREE'S OLDEST TRAP ON ITS FIRST RUN -- it scanned its subject's " +
+                 "raw text and found `process.exit(1)` inside the COMMENT explaining the repair, reporting the " +
+                 "gate unrepaired; it reads comment-stripped now. Every record this round owed was named by " +
+                 "v4639's own pre-flight in one command, before the verify, which is what that runner was for.",
+    }),
     since321: Object.freeze({
         at: "v4638", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/fsrPage-selfcheck.mjs"]),

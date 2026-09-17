@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "47369a7386826c2e20469ba751236185dab9f027",
+ "head": "e43d24cd6de1764815d2b04f56320ab986f9a067",
  "bodies": {
   "box3d": [
    {
@@ -282,7 +282,7 @@
    },
    {
     "path": "tools/ship/slugTsl-selfcheck.mjs",
-    "bytes": 20647,
+    "bytes": 20947,
     "sha": "a70d9c786e3bed4679e472630d97c8a05da23a7c"
    },
    {
@@ -894,7 +894,7 @@
    },
    {
     "path": "tools/ship/slugTsl-selfcheck.mjs",
-    "bytes": 20647,
+    "bytes": 20947,
     "sha": "a70d9c786e3bed4679e472630d97c8a05da23a7c"
    },
    {
@@ -934,7 +934,7 @@
    },
    {
     "path": "tools/ship/tslWide-selfcheck.mjs",
-    "bytes": 25071,
+    "bytes": 25204,
     "sha": "a70d9c786e3bed4679e472630d97c8a05da23a7c"
    },
    {

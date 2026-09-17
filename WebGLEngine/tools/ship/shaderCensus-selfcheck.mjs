@@ -1,6 +1,7 @@
 // WebGLEngine/tools/ship/shaderCensus-selfcheck.mjs
 //
-// Run: node tools/ship/shaderCensus-selfcheck.mjs   (~1.83s MEASURED (gate-timings.json), was ~0.24s)
+// SUPERSEDED, v4640: a second `// Run:` line saying ~1.83s from gate-timings.json (before that ~0.24s).
+//   The live figure is below; the scanner reads the first Run line, so this one was shadowing it.
 // Run: node tools/ship/shaderCensus-selfcheck.mjs   (~1.5s MEASURED at v4575, median of 1387/1578/1501 --
 //   superseding a stated ~0.5s that also said MEASURED. gate-timings.json still holds 239 ms for this
 //   gate, which is 6x under what it costs today: the record drifted with the header, not against it.)

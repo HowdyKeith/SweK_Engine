@@ -36,7 +36,8 @@
 //                   D  computeShell's member array no longer folded into the struct                -> exit=1, 3 red: the planes row and the refusal row in section 1 (refused by name, no throw), and the harness
 //
 // Run: node tools/ship/tslWide-selfcheck.mjs      (~0.97 s; section 1 is CPU-only)
-// Run: node tools/ship/tslWide-selfcheck.mjs      (~20 s; section 1 is CPU-only)
+// SUPERSEDED, v4640: a second `// Run:` line saying ~20 s, against gate-timings' 1,156 ms and a 2,899 ms
+//   loaded sweep reading. Same treatment as slugTsl-selfcheck.mjs: if it named a scenario, say so in prose.
 // MEASURED at v4542 (r184 in the host-shell vertex path). Applied to render/tslSource.mjs, this gate run, red count
 // read, source and emitted json restored and md5-verified. Baseline 0 red.
 //   DD the camera-matrix scan back over the WHOLE emitted text -> 1 red: r184 DECLARES both camera matrices in the

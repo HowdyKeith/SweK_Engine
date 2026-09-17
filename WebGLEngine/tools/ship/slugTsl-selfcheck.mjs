@@ -49,7 +49,10 @@
 // src); the picture is now drawn over a colour, and the transplant carries the shell's blend, depthWrite and depthCompare.
 //
 // Run: node tools/ship/slugTsl-selfcheck.mjs      (~1.1 s; section 1 is CPU-only)
-// Run: node tools/ship/slugTsl-selfcheck.mjs      (~30 s; section 1 is CPU-only)
+// SUPERSEDED, v4640: a second `// Run:` line saying ~30 s. Both records disagree with it -- gate-timings
+//   1,448 ms and the sweep 1,154 ms alone -- and the line above matches them. If the 30 s was a DIFFERENT
+//   SCENARIO rather than a stale number, restore it as prose that names the scenario; as a bare second Run
+//   line it was two claims with nothing to tell them apart.
 // MEASURED at v4541. Applied to render/tslSource.mjs, this gate run, restored and md5-verified. Baseline 0 red.
 //   Z  the host shell's GLSL codes region split back on `// structs` -> 1 red: "shader: ERROR: 0:423: 'main' :
 //      function already has a body". r184 moved that marker above the uniforms, so the region ran to the end of the

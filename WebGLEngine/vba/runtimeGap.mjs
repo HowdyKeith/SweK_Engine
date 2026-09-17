@@ -330,7 +330,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
     // and the readings overlap on everything predating the split, so they are run over the merged tree rather
     // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
-    files: 4261,               // RE-DERIVED AT THE main MERGE: 4169 on this branch, 4172 on main, 4260 merged -- LESS than the sum, which is why it is run
+    files: 4262,               // RE-DERIVED AT THE main MERGE: 4169 on this branch, 4172 on main, 4260 merged -- LESS than the sum, which is why it is run
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
                           // RE-TAKEN TWICE IN TWO ROUNDS, and the second time only because the ship gate
@@ -676,7 +676,10 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // tools/ship/freezeRegisterAudit.mjs and has never contained WebAssembly code. This census counts files
     // whose text MATCHES, comment-stripped -- and a string literal is not a comment, which is the known limit
     // recorded at the foot of this record. Re-frozen at 23; nothing is restored, because nothing was lost.
-    esModules: 3961, closures: 3830, asyncAwait: 1506, typedArrays: 1123, promises: 367,
+    // v4640 -- +1 again, for tools/ship/pipeTruncation-selfcheck.mjs: files 4261 -> 4262, ES modules and
+    // closures with it. Three rows this time rather than seven, because that gate spawns children and reads
+    // files and does not touch a typed array, a frame callback or an adapter.
+    esModules: 3962, closures: 3831, asyncAwait: 1506, typedArrays: 1123, promises: 367,
     fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 156, webgpu: 52, threads: 23, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

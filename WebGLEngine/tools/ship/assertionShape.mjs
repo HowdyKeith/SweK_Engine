@@ -463,8 +463,12 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // nine rows moved by one; the five that did not (distinctDefinitions, condFirst, unknownSignature,
     // importsOk, suspects) are the ones that say the new gate uses the tree's own assertion shape rather than
     // inventing a tenth. That is what this census is for, and it is the reason the row compares all nine.
-    gates: 1737, usesOk: 1716, definesOk: 1708, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1609, condFirst: 91, unknownSignature: 16,
+    // v4640 -- RE-TAKEN for tools/ship/pipeTruncation-selfcheck.mjs: 1737 -> 1738, usesOk 1716 -> 1717,
+    // definesOk 1708 -> 1709, nameFirst 1609 -> 1610. Named by the pre-flight BEFORE the verify this time,
+    // which is what v4639 built the runner for -- last round the same six records were found one at a time
+    // across two full sweeps.
+    gates: 1738, usesOk: 1717, definesOk: 1709, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1610, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

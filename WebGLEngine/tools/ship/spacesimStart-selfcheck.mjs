@@ -1,6 +1,9 @@
 // tools/ship/spacesimStart-selfcheck.mjs
 //
-// Run: node tools/ship/spacesimStart-selfcheck.mjs   (~1.36s MEASURED (gate-timings.json), was ~0.17s -- itself a correction of an original ~1s)
+// SUPERSEDED, v4640: this line used to be a second `// Run:` and said ~1.36s, taken from gate-timings.json
+//   (itself a correction of ~0.17s and before that ~1s). The live figure is the one below. TWO timed Run
+//   lines is one too many: the scanner takes the FIRST, so the stale one was the only one anything read,
+//   and statedRuntime-selfcheck reported this gate's header drifted while the header below was exact.
 // Run: node tools/ship/spacesimStart-selfcheck.mjs   (~0.14s MEASURED at v4575, median of 136/126/146 --
 //   superseding a stated ~1.4s, itself taken from gate-timings.json, which is 10x OVER. The first run of a
 //   cold process measured 1181 ms; the median of three is the honest figure and the cold read is noted so

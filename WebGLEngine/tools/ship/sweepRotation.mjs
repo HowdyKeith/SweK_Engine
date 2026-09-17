@@ -100,11 +100,35 @@ export function rebuildFinished(file, ledger) {
  * membership number every consumer reads, and a rotation that stopped updating it would stop returning
  * gates to the sweep, which is the whole point of the pass.
  */
-export function mergeTimings(file, rows, stamp) {
+/**
+ * *** v4640 -- THIS IS THE SECOND WRITER OF sweep-timings.json AND IT WAS WRITING A PARTIAL TUPLE. ***
+ *
+ * Seven maps went out and two did not: `kinds` and `capAt`. So every gate this rotation timed got a
+ * millisecond with NO KIND -- which is exactly the state v4579 built `kinds` to end, in its own words "a ms
+ * without one is two quantities" -- and no record of the cap it ran under, which is the field v4637 added
+ * because one file holds rows from runs with different caps and the rotation is the run most likely to use a
+ * different one (`--cap-s`, 90 s in killed mode against quickSweep's 20).
+ *
+ * FOUND BY THE PRE-FLIGHT REFUSING TO GO GREEN. v4639 gave tools/ship/recordDrift.mjs a runner; adding one
+ * gate this round left it reporting `sweep timings` stale after the rotation had just written that gate's
+ * row, because the row was missing the kind the pre-flight asks for. The instrument worked.
+ *
+ * THE FILE'S OWN HISTORY IS THE PRECEDENT: quickSweep.mjs records that v4568 added `finished`, wrote it into
+ * a local in its loop, left it out of the object it actually persisted, and "the first full sweep after the
+ * killed pass silently deleted 140 rows of it". A writer that spells its fields by hand is a list that has to
+ * be maintained in step with every reader, and this is that same list, one process over.
+ *
+ * The kind is not inferred here: a rotation row is ALWAYS a serial re-run, so it is ALONE when it finished
+ * and CAPPED when it did not, and both are known at the moment of writing rather than derived later from
+ * which side of a budget the number fell on.
+ */
+export function mergeTimings(file, rows, stamp, capMs = null) {
     const timings = { ...(file.timings || {}) }, codes = { ...(file.codes || {}) }, at = { ...(file.at || {}) };
     const finished = { ...(file.finished || {}) };
     const serial = { ...(file.serial || {}) }, serialAt = { ...(file.serialAt || {}) };
     const contended = { ...(file.contended || {}) };
+    const kinds = { ...(file.kinds || {}) }, capAt = { ...(file.capAt || {}) };
+    const inferred = new Set(file.kindsInferred || []);
     const priorMs = {};
     for (const r of rows) {
         priorMs[r.gate] = (file.timings || {})[r.gate];
@@ -112,9 +136,14 @@ export function mergeTimings(file, rows, stamp) {
         serial[r.gate] = r.ms; serialAt[r.gate] = stamp; contended[r.gate] = false;
         // Recorded either way: a gate that STOPS finishing must lose its verdict, not keep an old true.
         finished[r.gate] = !!r.finished;
+        // OBSERVED, not inferred -- so the entry leaves kindsInferred, which is what watching it means.
+        kinds[r.gate] = r.finished ? "alone" : "capped";
+        inferred.delete(r.gate);
+        if (capMs != null) capAt[r.gate] = capMs;
     }
     backfillStamps(timings, at);
-    return { merged: { ...file, timings, codes, at, finished, serial, serialAt, contended }, priorMs };
+    return { merged: { ...file, timings, codes, at, capAt, finished, serial, serialAt, contended, kinds,
+                       kindsInferred: [...inferred].sort() }, priorMs };
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
@@ -194,7 +223,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     }
     if (process.argv.includes("--write")) {
         const stamp = new Date().toISOString();
-        const { merged: mergedTimings, priorMs } = mergeTimings(file, rows, stamp);
+        const { merged: mergedTimings, priorMs } = mergeTimings(file, rows, stamp, capMs);
         fs.writeFileSync(path.join(ENG, "tools", "ship", "sweep-timings.json"),
             JSON.stringify(mergedTimings, null, 1) + "\n");
         // Its OWN file: quickSweep builds a fresh object each write and erased this ledger the first time it ran.

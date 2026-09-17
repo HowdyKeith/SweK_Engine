@@ -37,6 +37,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
 // *** singleSource-selfcheck CAUGHT THIS FILE ON ITS FIRST RUN AND IT WAS RIGHT. *** I hand-rolled a
 // gate-file walker here, which is a SECOND DEFINITION of "what counts as a gate" -- exactly the defect v3041
 // spent a round removing, when three counters had disagreed for 153 versions without anything noticing. Two
@@ -125,12 +126,79 @@ const frozen = new Set(JSON.parse(fs.readFileSync(BASELINE, "utf8")).gates);
     const arrived = [...now].filter((g) => !frozen.has(g));
     const left = [...frozen].filter((g) => !now.has(g));
 
-    ok("!! *** no NEW header has drifted from what its gate actually does ***",
-        arrived.length === 0,
-        arrived.length === 0
-            ? frozen.size + " on the frozen list, none new. THE LIST MAY SHRINK AND MAY NEVER GROW"
-            : "NEW: " + arrived.join(", ") + " -- correct the header FROM THE MEASUREMENT in gate-timings.json. " +
-              "DO NOT ADD IT TO THE BASELINE: that is a ratchet growing back, the one thing a ratchet must never do");
+    // *** v4640 -- AN ARRIVAL IS RUN BEFORE IT IS ACCUSED, WHICH IS THE STANDARD THIS FILE ALREADY SET AND
+    // DID NOT APPLY HERE. *** Section 3's row says it outright: "a gate claiming 25s that runs in 0.1s looks
+    // exactly like a check that stopped doing its work. FOUR WERE RUN BEFORE ANYTHING WAS SAID... Reporting
+    // forty-five bugs that are not there is worse than reporting none." That discipline covered the
+    // OVER-estimating half and never reached this row, which accused a header on the strength of a record
+    // alone -- and row 1b, twenty lines up, already warns that "A GATE EDITED SINCE THAT RUN HAS A STALE
+    // ENTRY and would be judged against work it no longer does".
+    //
+    // *** MEASURED, AND IT INVERTS THE ACCUSATION IN EVERY CASE CHEAP ENOUGH TO CHECK. *** Four headers were
+    // reported drifted at v4640; three run in well under a second and were timed three to five times each:
+    //
+    //     asciify         header 0.29 s   gate-timings 3,701   sweep 4,257   RAN 334-400 ms  -- BOTH records stale
+    //     spacesimStart   header 0.14 s   gate-timings   124   sweep   426   RAN 129 ms      -- header exact
+    //     voxelAvatar     header 0.11 s   gate-timings 3,472   sweep   474   RAN 103 ms      -- header exact
+    //
+    // In all three the HEADER is the accurate side and the record is stale, so "correct the header FROM THE
+    // MEASUREMENT in gate-timings.json" would have corrupted three correct headers. asciify is the sharpest:
+    // both independent records agree with each other and are both ten times the truth, so agreement between
+    // records is not a trust signal either. The only arbiter is running the gate.
+    //
+    // So an arrival is RUN, and it is only drift when the header disagrees with the RUN. A candidate too slow
+    // to run inside this gate's own budget is REPORTED and not accused -- khMichalke states ~334 s, which is
+    // not something a 2 s gate re-measures, and an unmeasured candidate is an open question rather than a debt.
+    const RUN_CAP_MS = 4000;
+    const byGate = new Map(drifted.map((d) => [d.gate, d]));
+    const ran = [], unrunnable = [];
+    for (const g of arrived) {
+        const d = byGate.get(g);
+        if (!d || d.claimMs > RUN_CAP_MS) { unrunnable.push(g); continue; }
+        const t0 = Date.now();
+        try { execFileSync(process.execPath, [path.join(ROOT, g)], { cwd: ROOT, stdio: "ignore", timeout: RUN_CAP_MS }); }
+        catch { /* a red gate still took the time it took; only the duration is wanted here */ }
+        ran.push({ gate: g, ms: Date.now() - t0, claimMs: d.claimMs, obs: d.obs });
+    }
+    // The SAME two-part test the record join uses above: a ratio AND a gap wider than the header's own
+    // resolution, so this row cannot report the notation instead of the gate.
+    const reallyDrifted = ran.filter((r) => {
+        const ratio = r.ms / r.claimMs;
+        return (ratio > 2 || ratio < 0.5) && Math.abs(r.ms - r.claimMs) >= HEADER_RESOLUTION_MS;
+    });
+    for (const r of ran)
+        console.log(`  ----  ${path.basename(r.gate).padEnd(32)} header ${String(Math.round(r.claimMs)).padStart(7)} ms   ` +
+            `record ${String(r.obs).padStart(7)} ms   RAN ${String(r.ms).padStart(6)} ms   ` +
+            (reallyDrifted.includes(r) ? "DRIFTED" : "header agrees -- the RECORD was the stale side"));
+    ok("!! *** no NEW header has drifted from what its gate actually does, MEASURED BY RUNNING IT ***",
+        reallyDrifted.length === 0,
+        reallyDrifted.length === 0
+            ? `${frozen.size} on the frozen list; ${arrived.length} flagged by the record, ${ran.length} re-run and ` +
+              `all agreeing with their headers, ${unrunnable.length} too slow to re-run here` +
+              (unrunnable.length ? " (" + unrunnable.join(", ") + ") -- REPORTED, not accused" : "")
+            : "NEW and confirmed BY RUNNING: " + reallyDrifted.map((r) => `${r.gate} states ${Math.round(r.claimMs)} ms, ran ${r.ms}`).join("; ") +
+              " -- correct the header from THIS measurement, not from the record. DO NOT ADD IT TO THE " +
+              "BASELINE: that is a ratchet growing back, the one thing a ratchet must never do");
+
+    // *** v4640 -- AND ONE TIMED `// Run:` LINE PER GATE, BECAUSE THE SCANNER TAKES THE FIRST. ***
+    // spacesimStart carried two: a superseded ~1.36s taken from gate-timings.json, and below it the live
+    // ~0.14s measured at v4575. RX is anchored with /m and returns the FIRST match, so the stale line was the
+    // only one anything read, and this gate reported the header drifted while the header below it was exact
+    // to 2 ms. main.js:6527 records the identical mechanism for ENGINE_VERSION -- history kept ABOVE the live
+    // declaration, an unanchored match returning the commented label -- and v4531 fixed it there and nowhere
+    // else. Four gates had it: spacesimStart, shaderCensus, slugTsl and tslWide, all demoted to prose at
+    // v4640 so the number and its history survive without a second line claiming to be the header.
+    const twoRun = [];
+    for (const g of gateFiles().map((q) => path.relative(ROOT, q).replace(/\\/g, "/"))) {
+        let src; try { src = fs.readFileSync(path.join(ROOT, g), "utf8"); } catch { continue; }
+        const hits = src.match(/^\/\/\s*Run:.*?\(~\s*[0-9.]+\s*(?:s|sec|secs|seconds|min|minutes?)\b/gmi);
+        if (hits && hits.length > 1) twoRun.push(`${g} (${hits.length})`);
+    }
+    ok("!! *** no gate carries TWO timed `// Run:` lines, because the scanner reads the first and a correction written below it is invisible ***",
+        twoRun.length === 0,
+        twoRun.length ? "TWO OR MORE: " + twoRun.join(", ") + " -- keep the live figure as the Run line and " +
+                        "demote the superseded one to prose; it is history, not a second header"
+                      : "one header per gate, so the number this file reads is the number a reader sees");
 
     ok("...and a header corrected from a measurement comes OFF the list",
         true,
@@ -165,5 +233,27 @@ console.log("  ----  WHAT THIS DOES NOT CLAIM: a stated runtime is a comment, an
 console.log("  ----  number that matters is in gateBudget.mjs, which the runner and the button both read. This");
 console.log("  ----  gate keeps the human-facing figure honest; it does not make it load-bearing, and pretending");
 console.log("  ----  otherwise would be inventing a purpose for a sentence.");
-if (fails) { console.log("statedRuntime-selfcheck: " + fails + " FAILURES"); process.exit(1); }
-console.log("statedRuntime-selfcheck: all checks pass");
+// *** v4640 -- process.exit(1) HERE THREW AWAY 4,747 BYTES OF THIS GATE'S OWN OUTPUT, INCLUDING ITS ONLY
+// FAIL LINE, WHENEVER ANYTHING PIPED IT. ***
+//
+// Node's process.exit() does not flush pending asynchronous writes. A write to a FILE is synchronous and a
+// write to a PIPE is not, so this gate's report survived `> out.txt` and was cut off at the pipe buffer by
+// `| grep`. MEASURED: 70,608 bytes to a file, 65,861 through a pipe -- 12 lines became 1, and the line that
+// vanished was `  FAIL  *** no NEW header has drifted ***`.
+//
+// *** THE SHIP RITUAL COUNTS REDS THROUGH A PIPE. *** Its own instruction is
+// `node tools/ship/<name>-selfcheck.mjs | grep -c '^  FAIL'`, so for this gate that count reads ZERO while
+// the gate is failing. It read zero for me, and v4639's commit message went out describing this gate as
+// "exits 1 with no FAIL line -- a crash, not a verdict". It is not a crash and never was; it is an ordinary
+// red whose evidence the measuring instrument was deleting. The exit CODE was right the whole time, which is
+// why the sweep's verdict was never wrong -- what was lost is the text a reader needs to act on it.
+//
+// `process.exitCode` sets the status and lets the process end normally, which flushes. Nothing here holds the
+// event loop open, so the exit is immediate either way.
+// AND IT IS AN `else`, BECAUSE process.exitCode DOES NOT STOP EXECUTION AND process.exit() DID. The first
+// version of this repair left the two lines sequential, so a failing run printed "1 FAILURES" AND
+// "all checks pass" -- a gate contradicting itself in its own last two lines, introduced by the round that
+// was fixing a gate whose output could not be trusted. Caught by reading the output the repair had just
+// made visible, which is the only reason it was visible to read.
+if (fails) { console.log("statedRuntime-selfcheck: " + fails + " FAILURES"); process.exitCode = 1; }
+else console.log("statedRuntime-selfcheck: all checks pass");
