@@ -467,8 +467,14 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // definesOk 1708 -> 1709, nameFirst 1609 -> 1610. Named by the pre-flight BEFORE the verify this time,
     // which is what v4639 built the runner for -- last round the same six records were found one at a time
     // across two full sweeps.
-    gates: 1738, usesOk: 1717, definesOk: 1709, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1610, condFirst: 91, unknownSignature: 16,
+    // v4641 -- RE-TAKEN for tools/ship/fsrPageDevice-selfcheck.mjs: 1738 -> 1739, usesOk 1717 -> 1718,
+    // definesOk 1709 -> 1710, nameFirst 1610 -> 1611. The same four rows as v4638 and v4640, moving by one,
+    // and the same five standing still -- which is the row's whole point: a new gate that made
+    // distinctDefinitions or unknownSignature move would be one that invented its own assertion shape. This
+    // gate was SPLIT out of fsrPage-selfcheck rather than written from nothing, so it inherited the shape,
+    // and the census cannot tell those two origins apart. It says the shape is right, not where it came from.
+    gates: 1739, usesOk: 1718, definesOk: 1710, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1611, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

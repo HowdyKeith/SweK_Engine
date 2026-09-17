@@ -104,10 +104,46 @@ console.log("\n2. AN INFERENCE IS NAMED AS ONE, ALL 1,620 OF THEM");
     const swept = Object.keys(S.timings).filter((g) => (S.at || {})[g] === S.captured);
     const sweptButInferred = swept.filter((g) => inferred.has(g));
     const observedElsewhere = observed.filter((g) => (S.at || {})[g] !== S.captured);
+    // *** v4641 -- AND `observedElsewhere.length < 50` IS THE SAME DEFECT THE PARAGRAPH ABOVE SAYS IT FIXED. ***
+    // v4637 replaced `observed.length < 50` because a count had been standing in for a property; it wrote
+    // `observedElsewhere.length < 50` one line down -- THE SAME MAGIC FIFTY, ONE VARIABLE OVER. The row then
+    // went red for the ritual doing what the ritual says to do: step 3b rotates the over-budget pool, the
+    // rotation observes those gates' kinds and stamps them with its OWN time, the quick sweep that follows
+    // re-times only the under-budget gates, so every rotated gate becomes "observed with a different stamp".
+    // 42 gates rotated took the count from under fifty to fifty-one and the gate said the bookkeeping was
+    // wrong. It was not: the file was exactly right and the threshold was the size of a habit.
+    //
+    // THE PROPERTY IS MEMBERSHIP, AND THE COMMENT ABOVE ALREADY SAYS SO -- "or be one of the few this arc
+    // hand-measured AND CAN NAME". So they are named. An observed entry is legitimate when the run that took
+    // its millisecond watched it, and there are exactly two such runs: the quick sweep (S.captured) and the
+    // ROTATION, whose own ledger records every gate it re-timed. 48 of the 51 are in that ledger. The three
+    // that are not are named below, and a fourth arriving is a red -- which is what a threshold of fifty
+    // could never say, in either direction.
+    const ROT = (() => { try { return JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "sweep-rotation.json"), "utf8")); }
+                         catch { return null; } })();
+    const rotated = new Set((ROT && ROT.rotated || []).map((r) => r && r.gate).filter(Boolean));
+    // Measured at v4641, and each is an entry the rotation ledger does not carry: observed by a --gate run
+    // whose row a later merge folded away, or by this arc's own hand-driving of the writer before the
+    // rotation had a ledger at all. Named rather than counted, so growth is distinguishable from regression.
+    const HAND_OBSERVED_V4641 = Object.freeze([
+        "tools/ship/duplicateFiles-selfcheck.mjs",
+        "tools/ship/exitBanner-selfcheck.mjs",
+        "tools/ship/kernelReach-selfcheck.mjs",
+    ]);
+    // SABOTAGE v4641: one of the three names removed, so a real entry falls out of the accounted set --
+    // 1 RED, by name, printing the gate it could not account for. The row it replaces would have passed
+    // that mutation at any count below fifty, which is the argument for the shape rather than for the list.
+    const unaccounted = observedElsewhere.filter((g) => !rotated.has(g) && !HAND_OBSERVED_V4641.includes(g));
     ok(`*** an entry's kind is INFERRED unless the run that took its millisecond watched it, and kindsInferred is exactly that set ***`,
-        inferred.size > 0 && observed.length > 0 && sweptButInferred.length === 0 && observedElsewhere.length < 50,
+        inferred.size > 0 && observed.length > 0 && sweptButInferred.length === 0 &&
+        ROT !== null && rotated.size > 0 && unaccounted.length === 0,
         `${swept.length} entries carry the capture stamp and ${sweptButInferred.length} of them are still called inferred; ` +
-        `${observedElsewhere.length} observed entries come from an earlier run this arc measured by hand`);
+        `${observedElsewhere.length} observed entries carry an earlier stamp -- ` +
+        `${observedElsewhere.filter((g) => rotated.has(g)).length} of them are in the rotation's own ledger, ` +
+        `${observedElsewhere.filter((g) => HAND_OBSERVED_V4641.includes(g)).length} are the named hand-observed few, ` +
+        `and ${unaccounted.length} are unaccounted for` +
+        (unaccounted.length ? ": " + unaccounted.join(", ") : "") +
+        ". A COUNT here would go red for the rotation doing its job, which is exactly what it did at v4641.");
     // The inference must be exactly the branch rule, or it is a third thing pretending to be the first two.
     //
     // *** v4637 -- AND THE BRANCH RULE STOPPED ASKING WHETHER THE PROCESS FINISHED BY COMPARING A NUMBER TO

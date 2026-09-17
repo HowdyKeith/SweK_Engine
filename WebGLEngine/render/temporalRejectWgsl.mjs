@@ -23,22 +23,53 @@ struct P { w:u32, h:u32, threshold:f32, nearerIsLess:u32 };
 @group(0) @binding(2) var<storage,read_write> dst:array<f32>;
 @group(0) @binding(3) var<uniform> u:P;
 
-@compute @workgroup_size(8,8,1)
-fn main(@builtin(global_invocation_id) g:vec3<u32>) {
-  if (g.x >= u.w || g.y >= u.h) { return; }
-  let i = g.y * u.w + g.x;
+@group(0) @binding(4) var<storage,read_write> stats:array<atomic<u32>>;
+
+const CLASS_GOOD      : u32 = 0u;   // the history at this pixel is usable
+const CLASS_GENUINE   : u32 = 1u;   // a real disocclusion: something nearer than the reprojection expected
+const CLASS_NOHISTORY : u32 = 2u;   // there is no history to judge: motion invalid, or reprojected offscreen
+
+// *** THE TEST ITSELF, FACTORED OUT SO THE TWO ENTRY POINTS CANNOT DISAGREE. *** dst gets 1.0 for either
+// non-zero class, which is exactly what the mask meant before this split: the mask cannot tell a disocclusion
+// from an offscreen reprojection and never could. That is why the counters below exist -- see mainCounted.
+fn classify(gx:u32, gy:u32) -> u32 {
+  let i = gy * u.w + gx;
   let o = i * 4u;
-  if (motion[o + 2u] == 0.0) { dst[i] = 1.0; return; }          // no reprojection at all
-  let uu = (f32(g.x) + 0.5) / f32(u.w) + motion[o];
-  let vv = (f32(g.y) + 0.5) / f32(u.h) + motion[o + 1u];
-  if (uu < 0.0 || uu >= 1.0 || vv < 0.0 || vv >= 1.0) { dst[i] = 1.0; return; }
+  if (motion[o + 2u] == 0.0) { return CLASS_NOHISTORY; }        // no reprojection at all
+  let uu = (f32(gx) + 0.5) / f32(u.w) + motion[o];
+  let vv = (f32(gy) + 0.5) / f32(u.h) + motion[o + 1u];
+  if (uu < 0.0 || uu >= 1.0 || vv < 0.0 || vv >= 1.0) { return CLASS_NOHISTORY; }
   let px = u32(clamp(floor(uu * f32(u.w)), 0.0, f32(u.w) - 1.0));
   let py = u32(clamp(floor(vv * f32(u.h)), 0.0, f32(u.h) - 1.0));
   let was = prevDepth[py * u.w + px];
   let expect = motion[o + 3u];
   // "nearer than expected by more than the threshold" -- the sign is the whole test
   let gap = select(was - expect, expect - was, u.nearerIsLess != 0u);
-  dst[i] = select(0.0, 1.0, gap > u.threshold);
+  return select(CLASS_GOOD, CLASS_GENUINE, gap > u.threshold);
+}
+
+@compute @workgroup_size(8,8,1)
+fn main(@builtin(global_invocation_id) g:vec3<u32>) {
+  if (g.x >= u.w || g.y >= u.h) { return; }
+  let i = g.y * u.w + g.x;
+  dst[i] = select(0.0, 1.0, classify(g.x, g.y) != CLASS_GOOD);
+}
+
+// *** THE SECOND ENTRY POINT, AND THE REASON THE MASK ALONE WAS NEVER ENOUGH. *** disocclusionCPU returns
+// { flagged, noHistory } and this kernel returned neither, so temporalRejectGPU.disocclusion's own comment told
+// callers to "count them from the mask" -- which recovers flagged and CANNOT recover noHistory, because the mask
+// writes the same 1.0 for a disocclusion and for a reprojection that left the frame. genuine = flagged -
+// noHistory is the number fsr.html prints, and it is unrecoverable from dst by construction. stats[0] is
+// flagged and stats[1] is noHistory, in DISOC_STAT_ORDER. The auto layout is per entry point, so binding 4
+// exists only on this pipeline and main pays no atomic.
+@compute @workgroup_size(8,8,1)
+fn mainCounted(@builtin(global_invocation_id) g:vec3<u32>) {
+  if (g.x >= u.w || g.y >= u.h) { return; }
+  let i = g.y * u.w + g.x;
+  let c = classify(g.x, g.y);
+  dst[i] = select(0.0, 1.0, c != CLASS_GOOD);
+  if (c != CLASS_GOOD)      { atomicAdd(&stats[0], 1u); }
+  if (c == CLASS_NOHISTORY) { atomicAdd(&stats[1], 1u); }
 }`;
 
 // ---- RECTIFIED ACCUMULATE: reproject, clamp in the chosen space, blend by the history factor ----------------
@@ -83,45 +114,89 @@ fn histBilinear(uu:f32, vv:f32, w:u32, h:u32) -> vec3<f32> {
   return out;
 }
 
+@group(0) @binding(6) var<storage,read_write> stats:array<atomic<u32>>;
+
+// The five things rectifiedAccumulateCPU tallies that this kernel can tally, as bits on one word, so the
+// shared body can report them without touching an atomic. Their INDICES in the stats buffer are
+// RECT_STAT_ORDER, which also carries relaxed -- see mainCounted for why that one is 0 and honest.
+const C_REUSED    : u32 = 1u;
+const C_OFFSCREEN : u32 = 2u;
+const C_INVALID   : u32 = 4u;
+const C_CLAMPED   : u32 = 8u;
+const C_DISCARDED : u32 = 16u;
+
+struct R { val:vec3<f32>, counts:u32 };
+
+// *** THE WHOLE BLEND, FACTORED OUT SO A COUNTED RUN AND AN UNCOUNTED ONE COMPUTE THE SAME PICTURE. *** The
+// counters are a by-product of the branches that were already here: usable is exactly the CPU's two rejects
+// in order, and a pixel that reaches the sample is the CPU's reused.
+fn rectifyAt(gx:u32, gy:u32) -> R {
+  let i = gy * u.w + gx;
+  let o = i * 4u;
+  let c = vec3<f32>(cur[o], cur[o + 1u], cur[o + 2u]);
+  var out = R(c, 0u);
+
+  if ((u.flags & FLAG_HAS_HIST) == 0u) { return out; }   // no history: the CPU counts NOTHING here either
+
+  let uu = (f32(gx) + 0.5) / f32(u.w);
+  let vv = (f32(gy) + 0.5) / f32(u.h);
+  let hu = uu + motion[o];
+  let hv = vv + motion[o + 1u];
+  if (motion[o + 2u] == 0.0) { out.counts = C_INVALID; return out; }
+  if (hu < 0.0 || hu >= 1.0 || hv < 0.0 || hv >= 1.0) { out.counts = C_OFFSCREEN; return out; }
+
+  var hs = histBilinear(hu, hv, u.w, u.h);
+  out.counts = C_REUSED;
+  if ((u.flags & FLAG_CLAMP) != 0u) {
+    let yc = (u.flags & FLAG_YCOCG) != 0u;
+    var hv3 = select(hs, rgb2ycocg(hs), yc);
+    var lo = vec3<f32>( 1.0e9);
+    var hi = vec3<f32>(-1.0e9);
+    for (var dy:i32 = -1; dy <= 1; dy = dy + 1) {
+      for (var dx:i32 = -1; dx <= 1; dx = dx + 1) {
+        let s0 = curAt(i32(gx) + dx, i32(gy) + dy, u.w, u.h);
+        let s = select(s0, rgb2ycocg(s0), yc);
+        lo = min(lo, s);
+        hi = max(hi, s);
+      }
+    }
+    let before = hv3;
+    hv3 = clamp(hv3, lo, hi);
+    // exact inequality, as the CPU's hv3[c] !== b is exact: a clamp that moved nothing is not a clamp
+    if (any(hv3 != before)) { out.counts = out.counts | C_CLAMPED; }
+    hs = select(hv3, ycocg2rgb(hv3), yc);
+  }
+  let f = select(1.0, clamp(factor[i], 0.0, 1.0), (u.flags & FLAG_HAS_FAC) != 0u);
+  if (f == 0.0) { out.counts = out.counts | C_DISCARDED; }
+  let a = 1.0 - (1.0 - u.alpha) * f;
+  out.val = hs * (1.0 - a) + c * a;
+  return out;
+}
+
 @compute @workgroup_size(8,8,1)
 fn main(@builtin(global_invocation_id) g:vec3<u32>) {
   if (g.x >= u.w || g.y >= u.h) { return; }
-  let i = g.y * u.w + g.x;
-  let o = i * 4u;
-  let c = vec3<f32>(cur[o], cur[o + 1u], cur[o + 2u]);
-  var val = c;
+  let o = (g.y * u.w + g.x) * 4u;
+  let r = rectifyAt(g.x, g.y);
+  dst[o] = r.val.x; dst[o + 1u] = r.val.y; dst[o + 2u] = r.val.z; dst[o + 3u] = 1.0;
+}
 
-  if ((u.flags & FLAG_HAS_HIST) != 0u) {
-    let uu = (f32(g.x) + 0.5) / f32(u.w);
-    let vv = (f32(g.y) + 0.5) / f32(u.h);
-    let hu = uu + motion[o];
-    let hv = vv + motion[o + 1u];
-    let usable = motion[o + 2u] != 0.0 && hu >= 0.0 && hu < 1.0 && hv >= 0.0 && hv < 1.0;
-    if (usable) {
-      var hs = histBilinear(hu, hv, u.w, u.h);
-      if ((u.flags & FLAG_CLAMP) != 0u) {
-        let yc = (u.flags & FLAG_YCOCG) != 0u;
-        var hv3 = select(hs, rgb2ycocg(hs), yc);
-        var lo = vec3<f32>( 1.0e9);
-        var hi = vec3<f32>(-1.0e9);
-        for (var dy:i32 = -1; dy <= 1; dy = dy + 1) {
-          for (var dx:i32 = -1; dx <= 1; dx = dx + 1) {
-            let s0 = curAt(i32(g.x) + dx, i32(g.y) + dy, u.w, u.h);
-            let s = select(s0, rgb2ycocg(s0), yc);
-            lo = min(lo, s);
-            hi = max(hi, s);
-          }
-        }
-        hv3 = clamp(hv3, lo, hi);
-        hs = select(hv3, ycocg2rgb(hv3), yc);
-      }
-      let f = select(1.0, clamp(factor[i], 0.0, 1.0), (u.flags & FLAG_HAS_FAC) != 0u);
-      let a = 1.0 - (1.0 - u.alpha) * f;
-      val = hs * (1.0 - a) + c * a;
-    }
-  }
-
-  dst[o] = val.x; dst[o + 1u] = val.y; dst[o + 2u] = val.z; dst[o + 3u] = 1.0;
+// *** THE COUNTED ENTRY POINT. *** Five of rectifiedAccumulateCPU's six counters land here. The sixth,
+// relaxed, is 0 -- and that 0 is a MEASUREMENT, not an omission, because this kernel has no relax input at
+// all: the CPU with relax = null never increments it either, so the two agree on the same quantity. The day a
+// relax binding is added to this kernel, C_RELAXED must be added in the same commit or the 0 becomes a lie.
+// The auto layout is per entry point, so binding 6 exists only on this pipeline and main pays no atomic.
+@compute @workgroup_size(8,8,1)
+fn mainCounted(@builtin(global_invocation_id) g:vec3<u32>) {
+  if (g.x >= u.w || g.y >= u.h) { return; }
+  let o = (g.y * u.w + g.x) * 4u;
+  let r = rectifyAt(g.x, g.y);
+  dst[o] = r.val.x; dst[o + 1u] = r.val.y; dst[o + 2u] = r.val.z; dst[o + 3u] = 1.0;
+  if ((r.counts & C_REUSED)    != 0u) { atomicAdd(&stats[0], 1u); }
+  if ((r.counts & C_OFFSCREEN) != 0u) { atomicAdd(&stats[1], 1u); }
+  if ((r.counts & C_INVALID)   != 0u) { atomicAdd(&stats[2], 1u); }
+  if ((r.counts & C_CLAMPED)   != 0u) { atomicAdd(&stats[3], 1u); }
+  if ((r.counts & C_DISCARDED) != 0u) { atomicAdd(&stats[4], 1u); }
 }`;
 
 // ---- THE HISTORY FACTOR: the inversion that stopped the other two chaining ---------------------------------

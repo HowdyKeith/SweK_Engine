@@ -49,6 +49,21 @@ export const RECTIFY_FLAGS = Object.freeze({ YCOCG: 1, CLAMP: 2, HAS_HIST: 4, HA
 /** The flag words FACTOR_WGSL declares. */
 export const FACTOR_FLAGS = Object.freeze({ HAS_DISOCC: 1, HAS_REACTIVE: 2, HAS_SHADING: 4 });
 
+/** DISOCCLUSION_WGSL/mainCounted's two atomics, in the order the kernel writes them and disocclusionCPU names them. */
+export const DISOC_STAT_ORDER = Object.freeze(["flagged", "noHistory"]);
+/**
+ * RECTIFY_WGSL/mainCounted's atomics, in buffer order, and `relaxed` LAST -- the kernel has no relax input, so
+ * it never writes index 5 and the buffer's zero there is the same zero rectifiedAccumulateCPU reports for
+ * relax = null. Named in the order so the two stats objects have the same keys and a gate can compare them whole.
+ */
+export const RECT_STAT_ORDER = Object.freeze(["reused", "rejectedOffscreen", "rejectedInvalid", "clamped", "discarded", "relaxed"]);
+
+/** Said instead of zeroes when nobody asked for counting -- the distinction v4591 paid for on the accumulate side. */
+const STATS_REASON =
+    "counting was not asked for: pass counted: true to dispatch the mainCounted entry points, which record " +
+    "flagged/noHistory and reused/rejectedOffscreen/rejectedInvalid/clamped/discarded into atomic buffers. " +
+    "Null rather than zeroes, because a frame that disoccluded nothing and a frame nobody counted must not read the same.";
+
 export class TemporalRejectGPU {
     constructor(device) {
         if (!device || device.backend !== "webgpu")
@@ -59,20 +74,38 @@ export class TemporalRejectGPU {
         this.pDisoc = device.compute({ wgsl: DISOCCLUSION_WGSL });
         this.pRect = device.compute({ wgsl: RECTIFY_WGSL });
         this.pFactor = device.compute({ wgsl: FACTOR_WGSL });
-        for (const [n, p] of [["DISOCCLUSION", this.pDisoc], ["RECTIFY", this.pRect], ["FACTOR", this.pFactor]])
+        // a SECOND pipeline over each of the same two texts: the auto layout is per entry point, so the counted
+        // one carries the atomic binding and the plain one does not. Built once here rather than per frame --
+        // the same shape render/temporalGPU.mjs uses for ACCUMULATE_WGSL/mainCounted, and for the same reason.
+        this.pDisocCounted = device.compute({ wgsl: DISOCCLUSION_WGSL, entryPoint: "mainCounted" });
+        this.pRectCounted = device.compute({ wgsl: RECTIFY_WGSL, entryPoint: "mainCounted" });
+        for (const [n, p] of [["DISOCCLUSION", this.pDisoc], ["RECTIFY", this.pRect], ["FACTOR", this.pFactor],
+                              ["DISOCCLUSION/mainCounted", this.pDisocCounted], ["RECTIFY/mainCounted", this.pRectCounted]])
             if (p && p.error) throw new Error(`render/temporalRejectGPU: the ${n} kernel did not compile -- ${p.error}`);
     }
 
     _f32(v) { return v instanceof Float32Array ? v : new Float32Array(v); }
+    _statsBuf(order) { return this.device.buffer({ data: new Uint32Array(order.length), usage: ["storage"] }); }
+    async _readStats(buf, order) {
+        const raw = new Uint32Array(await this.device.read(buf));
+        const out = {};
+        order.forEach((k, i) => { out[k] = raw[i]; });
+        return out;
+    }
 
     /**
      * Mirrors disocclusionCPU({ motion, prevDepth, w, h, threshold, nearerIsLess }) -- including the REFUSAL of
      * a missing threshold, which that function makes explicit because no default could be right for both depth
-     * conventions. Returns { data, w, h } and NOT the CPU's { flagged, noHistory } tallies: the kernel counts
-     * nothing, and v4591 settled what to do about that -- an uncounted quantity reported as zero is worse than
-     * reported not at all. Count them from the mask if you want them; it is one pass over w*h floats.
+     * conventions. Returns { data, w, h, stats, statsReason }, and `stats` is null unless you pass counted: true.
+     *
+     * *** THIS COMMENT USED TO SAY "count them from the mask if you want them" AND THAT WAS WRONG. *** flagged
+     * IS one pass over the mask. noHistory is NOT: DISOCCLUSION_WGSL writes the same 1.0 for a real disocclusion,
+     * for an invalid motion vector and for a reprojection that left the frame, so the mask cannot separate them
+     * and never could. genuine = flagged - noHistory is the number fsr.html prints, and until mainCounted
+     * existed there was no way to get it off the device. Recovering it on the CPU means redoing the whole test
+     * from `motion` -- a second implementation of the predicate, free to drift from this one. Hence the atomics.
      */
-    async disocclusion({ motion, prevDepth, w, h, threshold, nearerIsLess = true }) {
+    async disocclusion({ motion, prevDepth, w, h, threshold, nearerIsLess = true, counted = false }) {
         if (!(threshold > 0)) throw new Error("temporalRejectGPU.disocclusion: threshold must be a positive depth, in the buffer's own units");
         const dev = this.device;
         const bMot = dev.buffer({ data: this._f32(motion), usage: ["storage"] });
@@ -83,11 +116,16 @@ export class TemporalRejectGPU {
         dv.setUint32(0, w, true); dv.setUint32(4, h, true);
         dv.setFloat32(8, threshold, true); dv.setUint32(12, nearerIsLess ? 1 : 0, true);
         const u = dev.buffer({ data: new Uint8Array(ub), usage: "uniform" });
-        this.pDisoc.bind("motion", bMot).bind("prevDepth", bPrev).bind("dst", bDst).bind("u", u);
-        dev.frame(({ pass }) => { pass.dispatch(this.pDisoc, groups(w, h)); pass.clear([0, 0, 0, 1]); }, { offscreen: true });
+        const bStats = counted ? this._statsBuf(DISOC_STAT_ORDER) : null;
+        const pipe = counted ? this.pDisocCounted : this.pDisoc;
+        pipe.bind("motion", bMot).bind("prevDepth", bPrev).bind("dst", bDst).bind("u", u);
+        if (counted) pipe.bind("stats", bStats);
+        dev.frame(({ pass }) => { pass.dispatch(pipe, groups(w, h)); pass.clear([0, 0, 0, 1]); }, { offscreen: true });
         const data = new Float32Array(await dev.read(bDst));
+        const stats = counted ? await this._readStats(bStats, DISOC_STAT_ORDER) : null;
         for (const b of [bMot, bPrev, bDst, u]) b.destroy();
-        return { data, w, h };
+        if (bStats) bStats.destroy();
+        return { data, w, h, stats, statsReason: counted ? null : STATS_REASON };
     }
 
     /**
@@ -168,7 +206,7 @@ export class TemporalRejectGPU {
      * the argument does not exist.
      */
     async rejectAndAccumulate({ current, history, motion, prevDepth, w, h, alpha, threshold,
-                                reactive = null, shading = null,
+                                reactive = null, shading = null, counted = false,
                                 nearerIsLess = true, space = "ycocg", clampToNeighbourhood = true }) {
         if (!(threshold > 0)) throw new Error("temporalRejectGPU.rejectAndAccumulate: threshold must be a positive depth, in the buffer's own units");
         const dev = this.device;
@@ -199,20 +237,32 @@ export class TemporalRejectGPU {
         dr.setFloat32(8, alpha, true); dr.setUint32(12, flags, true);
         const uRect = dev.buffer({ data: new Uint8Array(ur), usage: "uniform" });
 
-        this.pDisoc.bind("motion", bMot).bind("prevDepth", bPrev).bind("dst", bMask).bind("u", uDisoc);
+        // *** COUNTED OR NOT, IT IS THE SAME CHAIN ON THE SAME ENCODER. *** The counted entry points compute
+        // the identical mask and the identical picture -- each shares its body with its plain twin -- and pay
+        // one atomic per pixel per counter on top. `stats` mirrors rectifiedAccumulateCPU's six and `disocStats`
+        // mirrors disocclusionCPU's two, so a caller holding this class to the CPU compares objects, not fields.
+        const pDisoc = counted ? this.pDisocCounted : this.pDisoc;
+        const pRect = counted ? this.pRectCounted : this.pRect;
+        const bDisocStats = counted ? this._statsBuf(DISOC_STAT_ORDER) : null;
+        const bRectStats = counted ? this._statsBuf(RECT_STAT_ORDER) : null;
+        pDisoc.bind("motion", bMot).bind("prevDepth", bPrev).bind("dst", bMask).bind("u", uDisoc);
         this.pFactor.bind("disocclusion", bMask).bind("reactive", bReact).bind("shading", bShade).bind("dst", bFac).bind("u", uFac);
-        this.pRect.bind("cur", bCur).bind("hist", bHist).bind("motion", bMot).bind("factor", bFac).bind("dst", bDst).bind("u", uRect);
+        pRect.bind("cur", bCur).bind("hist", bHist).bind("motion", bMot).bind("factor", bFac).bind("dst", bDst).bind("u", uRect);
+        if (counted) { pDisoc.bind("stats", bDisocStats); pRect.bind("stats", bRectStats); }
         const g = groups(w, h);
         dev.frame(({ pass }) => {
-            pass.dispatch(this.pDisoc, g);
+            pass.dispatch(pDisoc, g);
             pass.dispatch(this.pFactor, [Math.ceil(n / 64)]);
-            pass.dispatch(this.pRect, g);
+            pass.dispatch(pRect, g);
             pass.clear([0, 0, 0, 1]);
         }, { offscreen: true });
         const data = new Float32Array(await dev.read(bDst));
         const mask = new Float32Array(await dev.read(bMask));
         const factor = new Float32Array(await dev.read(bFac));
+        const stats = counted ? await this._readStats(bRectStats, RECT_STAT_ORDER) : null;
+        const disocStats = counted ? await this._readStats(bDisocStats, DISOC_STAT_ORDER) : null;
         for (const b of [bMot, bPrev, bMask, bReact, bShade, bFac, bCur, bHist, bDst, uDisoc, uFac, uRect]) b.destroy();
-        return { data, mask, factor, w, h };
+        if (counted) { bDisocStats.destroy(); bRectStats.destroy(); }
+        return { data, mask, factor, w, h, stats, disocStats, statsReason: counted ? null : STATS_REASON };
     }
 }

@@ -31,6 +31,7 @@ import { viewProj } from "../../render/rasterProbe.js";
 import { jitterProjection } from "../../render/jitter.mjs";
 import { resolveJitterAwareCPU } from "../../render/temporalResolve.mjs";
 import { mat4Invert, transform4 } from "../../render/motionVectors.mjs";
+import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -150,6 +151,15 @@ async function drivePage({ scene = "zone", camera = "dolly", ratio = "2", frames
         dolly.discarded === dolly.genuine,
         `history discarded ${dolly.discarded} against ${dolly.genuine} genuine. The mask is 1 = history WRONG and ` +
         "the rectify reads 1 = history TRUSTED; historyFactorCPU is the inversion, and skipping it discards every pixel.");
+    // *** THE OTHER HALF OF SECTION 5's ATTRIBUTION ROW. *** navigator.gpu is absent here, so this IS the CPU
+    // branch, and it has to say so. Section 5 runs the same page on an adapter and requires "the device" from
+    // the same two readouts: one label, two engines, and each side is driven rather than assumed. A page that
+    // printed "the device" unconditionally would pass section 5 and fail here.
+    ok("  ...and with no navigator.gpu the SAME two readouts say the counters came from the CPU",
+        /counted on the CPU/.test(dolly.disstat) && /counted on the CPU/.test(dolly.accstat) &&
+        !/counted on the device/.test(dolly.disstat + dolly.accstat),
+        "both readouts name their engine, because both engines produce the same integers -- the counts alone " +
+        "cannot say which one ran, which is exactly what a silent fallback would hide.");
 
     // *** THE CONTROL. *** Without it the row above says only that some number is positive.
     const pan = await drivePage({ camera: "pan", frames: 2 });
@@ -223,9 +233,31 @@ console.log("\n4. CONTROLS");
 }
 
 console.log(fails ? `\nfsrPage-selfcheck: ${fails} FAILED` : "\nfsrPage-selfcheck: all checks pass");
-console.log("\nunchecked here: the ADAPTER path -- every row above runs with navigator.gpu absent, so the page's " +
-    "WebGPU branch is exercised by render/temporalGPU-selfcheck.mjs and friends and not by this gate; the " +
+console.log("\nunchecked here: the ADAPTER path, which is tools/ship/fsrPageDevice-selfcheck.mjs's -- every row " +
+    "above runs with navigator.gpu absent, so this file is the CPU branch and that is deliberate: the two " +
+    "gates were one file until the device rows put it at 4,744 ms, over the quick sweep's 3,000 ms " +
+    "membership threshold, which would have dropped the page's only gate out of every ship. Split, both " +
+    "are under it and both run every ship; the engine-attribution row above is the CPU half of a claim " +
+    "whose device half lives there; the " +
     "PICTURE, which is PSNR against a supersampled truth and is in the page's own note rather than frozen here " +
     "because it moves with the content; and whether the dolly's two planes are a REPRESENTATIVE scene, which " +
     "they are not -- they are the smallest thing that has parallax.");
-process.exit(fails ? 1 : 0);
+//
+// SABOTAGE LOG -- each applied to the live tree, run, and restored.
+//
+// *** THE HEADER HAS SAID "see the log at the foot of this file" SINCE v4638 AND THERE WAS NO LOG. *** A
+// pointer to a record that does not exist reads exactly like a record until somebody follows it, which is
+// this file's own section 1 complaint about the page turned on the gate. v4638's entries are NOT
+// reconstructed here: I did not run them, and writing down sabotages I did not perform to fill in a table
+// would be worse than the empty table was. What is below is this round's, and it is what I ran.
+//
+//   v4641  fsr.html: the CPU branch's disStats labelled `engine: "the device"`, so the page claims a device
+//          counted numbers the CPU counted.                            1 RED, the attribution row, by name.
+//   v4641  and the DEVICE half of that same claim is sabotaged in tools/ship/fsrPageDevice-selfcheck.mjs --
+//          `if (rgpu)` forced false, the silent fallback -- where it goes 2 RED. Neither half is worth
+//          anything alone: this file cannot tell a page that always says "CPU" from a correct one, and that
+//          file cannot tell a page that always says "device" from a correct one.
+//
+// process.exit() would truncate everything above through a pipe -- see tools/ship/pipeTruncation-selfcheck.mjs,
+// which measured 137 gates losing their tail that way. exitCode lets the buffered writes drain.
+process.exitCode = fails ? 1 : 0;

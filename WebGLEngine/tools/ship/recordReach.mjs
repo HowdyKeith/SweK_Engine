@@ -342,16 +342,30 @@ export const REACH_AT_V4548 = Object.freeze({
     //   transmission-selfcheck 19,395 ms exit 0 -- no longer even over the cap
     // So the list is kept as the POPULATION it always named, and the claim attached to it is corrected:
     // these are expensive, not unjudged, and the repair for expensive is speed rather than a verdict.
+    //
+    // *** v4641 -- A FOURTH, AND IT IS THE FIRST ONE THAT FINISHES RED. *** The ritual's own step 3b rotated
+    // tools/ship/budgetExile-selfcheck.mjs into the cap: 20,023 ms, code "timeout/signal", kind "capped" --
+    // a reading with NO VERDICT, which is the state this whole list exists to name. Re-run in the rotation's
+    // --killed mode at a 90 s cap it FINISHES, at 40,863 ms, AND EXITS 1. So the "expensive, not unjudged"
+    // line above holds for the first three and NOT for this one: it is expensive AND red, and it was red for
+    // as long as the cap kept anyone from finding out. Its two failures are about other gates entirely --
+    // seventeen with a recorded exit code of 0 that exit non-zero when run, and two unregistered reds it
+    // names -- so it is recorded here and left for the round that can afford that pile, not folded into one
+    // that was about a page's camera.
     atCapGates: Object.freeze([
         "tools/ship/redCensus-selfcheck.mjs",
         "physics/render/transmission-selfcheck.mjs",
         "tools/ship/dockFraming-selfcheck.mjs",
+        "tools/ship/budgetExile-selfcheck.mjs",
     ]),
-    // What v4568 measured about them, so the correction is a number rather than a retraction.
-    atCapGatesFinish: Object.freeze({ of: 3, finished: 3, killed: 0,
+    // What v4568 measured about them, so the correction is a number rather than a retraction. v4641 added the
+    // fourth: `finished` still equals `of`, because every one of them DOES end when the cap allows it -- and
+    // `killed: 0` is still true. What changed is that finishing is no longer the same as passing.
+    atCapGatesFinish: Object.freeze({ of: 4, finished: 4, killed: 0,
         ms: Object.freeze({ "tools/ship/redCensus-selfcheck.mjs": 45245,
                             "tools/ship/dockFraming-selfcheck.mjs": 21536,
-                            "physics/render/transmission-selfcheck.mjs": 19395 }) }),
+                            "physics/render/transmission-selfcheck.mjs": 19395,
+                            "tools/ship/budgetExile-selfcheck.mjs": 40863 }) }),
     // *** v4548 -- AND ONE OF THE THREE HAS CROSSED BACK, BY 28 MILLISECONDS. *** The note above says
     // transmission-selfcheck is "no longer even over the cap" at 19,395 ms; one round later the rotation
     // read it at 20,026 and 20,028 and the cap KILLED it, so it moved from graded to cut off -- a 3% spread

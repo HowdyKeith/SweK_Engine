@@ -9,6 +9,17 @@
 // that spread. The honest reading is that this gate's timing is noisy at the few-hundred-millisecond scale and
 // a median of three was too few to say so. Still inside the 3000 ms sweep budget on every sample.
 //
+// SABOTAGE v4641 (the counters): 4 mutations, 4 caught, one red each and no 0-RED.
+//   Y1 DISOCCLUSION_WGSL/mainCounted writing flagged into BOTH atomic slots -> the split row, which read back
+//      device {flagged:192, noHistory:192} against the CPU's 192/64. This is the mutation the whole round is
+//      about: the mask cannot tell those two apart, so nothing but a counter could catch it.
+//   Y2 the rectify never counting a clamp (`if (any(hv3 != before))` -> `if (false)`) -> the six-counter row,
+//      clamped device 0 vs CPU 6080. The other five stayed equal, so the row names the one that moved.
+//   Y3 mainCounted scaling the picture by 0.99 -> the bit-for-bit row, worst 8.571e-3. A counted path that
+//      also drifts the answer is worse than no counter; this is the row that says it does not.
+//   Y4 an uncounted pass returning six zeroes instead of null -> the not-counted row. A frame that counted
+//      nothing and a frame that measured zero must not read the same.
+//
 // SABOTAGE v4595 (the correction): 4 mutations, 4 caught -- one of them only after the gate stopped CRASHING.
 //   X1 the occluder fixture put back the wrong way round, which is v4593's own mistake -> the corrected row.
 //   X2 the perspective control's camera stopped moving -> the parallax row. No eye motion, no parallax, no
@@ -256,9 +267,15 @@ else {
         const fNone = await G.factor({ n: a.W * a.H });
 
         // *** THE CHAIN: three dispatches on one encoder, nothing crossing back between them. ***
-        const chain = await G.rejectAndAccumulate({
+        const chainArgs = {
             current: new Float32Array(a.cur), history: new Float32Array(a.hist), motion: new Float32Array(a.motion),
-            prevDepth: new Float32Array(a.prevDepth), w: a.W, h: a.H, alpha: 0.1, threshold: a.TH });
+            prevDepth: new Float32Array(a.prevDepth), w: a.W, h: a.H, alpha: 0.1, threshold: a.TH };
+        const chain = await G.rejectAndAccumulate({ ...chainArgs });
+        // ...and the same chain through the mainCounted entry points, which is a DIFFERENT PAIR OF PIPELINES
+        // over the same two kernel texts. Same arguments, so the picture below must come back identical.
+        const counted = await G.rejectAndAccumulate({ ...chainArgs, counted: true });
+        const maskCounted = await G.disocclusion({ motion: new Float32Array(a.motion), prevDepth: new Float32Array(a.prevDepth),
+                                                   w: a.W, h: a.H, threshold: a.TH, counted: true });
         let refused = null, noThreshold = null;
         try { new TemporalRejectGPU({ backend: "webgl2" }); } catch (e) { refused = String(e.message).slice(0, 130); }
         try { await G.disocclusion({ motion: new Float32Array(a.motion), prevDepth: new Float32Array(a.prevDepth), w: a.W, h: a.H }); }
@@ -267,6 +284,10 @@ else {
                  rectRgb: Array.from(rectRgb.data), refused, noThreshold, errs, backend: dev.backend,
                  fD: Array.from(fD.data), fR: Array.from(fR.data), fAll: Array.from(fAll.data), fNone: Array.from(fNone.data),
                  chain: Array.from(chain.data), chainMask: Array.from(chain.mask), chainFactor: Array.from(chain.factor),
+                 chainStats: chain.stats, chainReason: chain.statsReason, chainDisocStats: chain.disocStats,
+                 counted: Array.from(counted.data), countedStats: counted.stats, countedDisoc: counted.disocStats,
+                 countedReason: counted.statsReason, maskCountedStats: maskCounted.stats,
+                 maskUncountedStats: mask.stats, maskUncountedReason: mask.statsReason,
                  adapter: (dev.adapterInfo && (dev.adapterInfo.description || dev.adapterInfo.vendor)) || "unknown" };
     }` });
 
@@ -348,6 +369,52 @@ else {
            "and equality is exact. THE FIRST DRAFT OF THIS METHOD, AT v4593, BOUND AN ALL-ZERO FACTOR: this row " +
            "is what that would have failed.");
 
+        // ---- THE COUNTERS, WHICH THE MASK COULD NOT HAVE GIVEN --------------------------------------------
+        //
+        // *** THE PAGE IS WHY THESE EXIST. *** fsr.html prints "N genuine, M with no history at all", and
+        // genuine = flagged - noHistory is UNRECOVERABLE from the mask: DISOCCLUSION_WGSL writes the same 1.0
+        // for a disocclusion, for an invalid motion vector and for a reprojection that left the frame. This
+        // runner's own comment used to tell callers to "count them from the mask", which recovers flagged and
+        // nothing else. Until mainCounted there was no honest GPU path for the dolly camera at all.
+        const cChain = rectifiedAccumulateCPU({ current: CUR, history: HIS, motion: MOT, factor: FAC, w: W, h: H, alpha: 0.1 });
+        const KEYS = ["reused", "rejectedOffscreen", "rejectedInvalid", "clamped", "discarded", "relaxed"];
+        const bad = G.countedStats ? KEYS.filter((k) => G.countedStats[k] !== cChain.stats[k]) : KEYS;
+        ok("!! *** the rectify counters are rectifiedAccumulateCPU's six, EQUAL -- integers, not a tolerance ***",
+           bad.length === 0 && G.countedStats && G.countedStats.reused > 0 && G.countedStats.rejectedOffscreen > 0 &&
+           G.countedStats.clamped > 0 && G.countedStats.discarded > 0,
+           bad.length ? bad.map((k) => `${k}: device ${G.countedStats[k]} vs CPU ${cChain.stats[k]}`).join(", ")
+             : KEYS.map((k) => `${k} ${cChain.stats[k]}`).join(", ") +
+               " -- and four of them are NON-ZERO on this fixture, so the row is not six zeroes agreeing with six zeroes. " +
+               "relaxed is 0 on BOTH sides and that is a measurement: RECTIFY_WGSL has no relax binding and the CPU " +
+               "was given relax = null, which is the same quantity, not an uncounted one.");
+
+        const dBad = G.countedDisoc ? (G.countedDisoc.flagged !== cMask.flagged || G.countedDisoc.noHistory !== cMask.noHistory) : true;
+        ok("!! *** and the disocclusion counters split flagged from noHistory, which the MASK CANNOT ***",
+           !dBad && G.countedDisoc.noHistory > 0 && G.countedDisoc.flagged > G.countedDisoc.noHistory &&
+           G.maskCountedStats && G.maskCountedStats.flagged === cMask.flagged && G.maskCountedStats.noHistory === cMask.noHistory,
+           dBad ? `device ${JSON.stringify(G.countedDisoc)} vs CPU flagged ${cMask.flagged} noHistory ${cMask.noHistory}`
+                : `flagged ${G.countedDisoc.flagged} = ${G.countedDisoc.noHistory} offscreen + ` +
+                  `${G.countedDisoc.flagged - G.countedDisoc.noHistory} genuine, on the device and on the CPU alike; ` +
+                  "disocclusion() counted alone agrees with the chain's. BOTH parts are non-zero here, so a kernel " +
+                  "that wrote flagged into both slots would fail this row.");
+
+        const countWorst = (() => { let w = 0; for (let i = 0; i < W * H * 4; i++) w = Math.max(w, Math.abs(G.counted[i] - G.chain[i])); return w; })();
+        ok("!! *** and counting changed the PICTURE not at all -- bit for bit against the uncounted chain ***",
+           countWorst === 0,
+           `worst ${countWorst.toExponential(3)} over ${W * H * 4} floats. Two different pipelines over the same ` +
+           "two kernel texts: each counted entry point shares its body with its plain twin and adds atomics only. " +
+           "A counted path that also drifted the answer would be worse than no counter -- which is what " +
+           "render/temporalGPU.mjs's header says about the pass it counts, and it is true here too.");
+
+        ok("...and an UNCOUNTED pass says so rather than reporting zeroes",
+           G.chainStats === null && typeof G.chainReason === "string" && /counting was not asked for/.test(G.chainReason) &&
+           G.chainDisocStats === null && G.maskUncountedStats === null && typeof G.maskUncountedReason === "string" &&
+           G.countedReason === null,
+           `uncounted chain stats ${JSON.stringify(G.chainStats)}, disocStats ${JSON.stringify(G.chainDisocStats)}, ` +
+           `reason present: ${typeof G.chainReason === "string"}; counted reason ${JSON.stringify(G.countedReason)}. ` +
+           "A frame that disoccluded nothing and a frame nobody counted must not read the same -- the distinction " +
+           "v4591 paid for on the accumulate side, kept here rather than re-learned.");
+
         ok("...and the threshold refusal is DRIVEN on the device, not read from the source",
            typeof G.noThreshold === "string" && /threshold/.test(G.noThreshold), G.noThreshold || "it did NOT throw");
         ok("...and the device refusal is DRIVEN: a non-webgpu device throws at construction",
@@ -361,7 +428,10 @@ console.log("unchecked here: the REACTIVE and SHADING masks the factor kernel ac
             "exercised with the disocclusion term alone and the other two are held to historyFactorCPU on " +
             "fixtures rather than on anything a frame produced; `relax`, which RECTIFY_WGSL has no binding for " +
             "and the runner therefore refuses to accept rather than lerping on the CPU beside a kernel that does " +
-            "not; the page, which still cannot disocclude and is still not wired to any of this for the reason " +
-            "v4593 measured; and the temporal arc's last FIVE unreachable kernels (RING_FLOOR and temporalLock's " +
-            "four), which tools/ship/kernelReach-selfcheck.mjs counts at 12.");
-process.exit(fails ? 1 : 0);
+            "not; WHETHER THE PAGE USES ANY OF THIS, which is not gradeable from here -- this gate drives the " +
+            "CLASS, and fsr.html's use of it (the construction, the counted: true, the fallback that must not " +
+            "stand in silently) is driven by tools/ship/fsrPage-selfcheck.mjs section 5, which loads the page " +
+            "in an iframe on a device; and the temporal arc's last SIX unreachable kernels (RING_FLOOR, " +
+            "RING_PUSH, SHADING_SHIFT and the three ridges), which tools/ship/kernelReach-selfcheck.mjs counts.");
+// process.exit() would truncate everything above through a pipe -- see tools/ship/pipeTruncation-selfcheck.mjs.
+process.exitCode = fails ? 1 : 0;

@@ -96,8 +96,14 @@
   v4552 and a caller since v4590, and the script below has called <code>tgpu.resolveAndAccumulate</code> ever
   since &mdash; the comment beside that call was corrected in both of the rounds that changed it and this
   sentence, thirty lines up and the only version a reader sees, was not. The resolve and the accumulation run
-  chained on one encoder when there is an adapter. The one pane that is CPU-only is the new <b>dolly</b>: the
-  reject chain has a WGSL twin and no runner on this page yet, which is the next rung rather than a claim.
+  chained on one encoder when there is an adapter.
+  <br><br>
+  <span class="warn">And the sentence that followed it, until v4641, said the <b>dolly</b> was the one pane still
+  CPU-only &mdash; &ldquo;the reject chain has a WGSL twin and no runner on this page yet&rdquo;.</span> It has
+  one now. <code>render/temporalRejectGPU.mjs</code> runs all three reject passes &mdash; disocclusion, history
+  factor, rectify &mdash; on <i>one encoder</i>, with neither intermediate crossing back to the CPU, and this
+  page is the first caller it has ever had outside a gate. The line above the panes names it when it is on. The
+  CPU functions stay where they were: they are the reference the device is held to, not a fallback nobody runs.
   <br><br>
   <b>RCAS leaves [0,1] and the canvas was hiding it.</b> RCAS_LIMIT keeps the sharpening resolve off the pole of
   1/(4&middot;lobe+1); it does not bound the range. The line under the counters reports the real range &mdash; on
@@ -106,7 +112,9 @@
   <br><br>
   <b>Watch the accumulate counters.</b> They are the diagnostic, not decoration, and they read the same on the
   CPU and on an adapter &mdash; the WGSL kernel counts them in an atomic buffer and the gate holds the two
-  <i>equal</i>, not merely close, because they are integers. <i>rejected offscreen</i> should be
+  <i>equal</i>, not merely close, because they are integers. Both readouts end with <i>counted on the device</i>
+  or <i>counted on the CPU</i>, and that tail is there precisely <i>because</i> the two agree: identical
+  integers cannot tell you which engine produced them, so a silent fallback would be invisible without it. <i>rejected offscreen</i> should be
   exactly one column &mdash; 192 pixels &mdash; while panning and zero while static; anything else means the motion
   vectors disagree with the camera. <b>That reading is about the panning camera and does not carry to the dolly</b>,
   which reads zero: a perspective frustum widens with depth, so at this dolly rate nothing leaves the frame at all. This page shipped once with that sign inverted, scoring 11.5 dB while panning,
@@ -135,6 +143,12 @@
   the metric cannot see it. The <i>counter</i> can: <i>history discarded</i> goes 106 to 0. This is the same
   argument the accumulate counters make one paragraph up, and the dolly is where it stops being rhetorical.
   <br><br>
+  On an adapter that 106 is now read out of an <i>atomic buffer</i> rather than counted in JavaScript, and
+  getting it there took a second entry point in each of two kernels. The mask the disocclusion pass writes could
+  not have given it: it stores the same 1.0 for a real disocclusion, for an invalid motion vector and for a
+  reprojection that left the frame, so <i>genuine = flagged &minus; noHistory</i> is unrecoverable from the mask
+  by construction &mdash; and the runner's own comment used to tell callers to count them from it.
+  <br><br>
   <b>And a sign was wrong again, and again a counter said so first.</b> The dolly jitters its <i>matrix</i>
   through <code>jitterProjection</code> where the other two cameras jitter the <i>scene sampler</i>, and this
   page is the first thing in the tree to use <code>jitterProjection</code> and
@@ -161,6 +175,7 @@ import { describeWebGPU, showOriginBanner } from "/ui/webgpuProbe.mjs";
 import { FSRGPU, rangeOf } from "./fx/fsr/fsrGPU.js";
 import { TemporalGPU } from "./render/temporalGPU.mjs";
 import { MotionVectorsGPU, orthoPanVP } from "./render/motionVectorsGPU.mjs";
+import { TemporalRejectGPU } from "./render/temporalRejectGPU.mjs";
 import { motionVectorsCPU, mat4Invert, transform4 } from "./render/motionVectors.mjs";
 // *** v4638 -- THE PAGE GETS A SECOND CAMERA, AND IT IS THE TREE'S OWN. *** render/rasterProbe.js's viewProj is
 // what render/jitter-selfcheck, render/motionVectors-selfcheck, render/motionVectorsGPU-selfcheck and
@@ -351,7 +366,17 @@ const FLAT_DEPTH = new Float32Array(D * D);
 // records the four into an atomic buffer, and the gate holds the device's counts EQUAL to the CPU's -- integers,
 // so equality rather than a tolerance. These are the diagnostic this page leans on: rejectedOffscreen reading
 // exactly one column is what proved the motion vector sign at v4586, and it reads that on either engine now.
-let gpu = null, tgpu = null, mgpu = null;
+//
+// *** AND THE REJECT CHAIN FOLLOWED AT v4641, WHICH IS THE FIRST TIME ITS WGSL HAS RUN OUTSIDE A GATE. ***
+// render/temporalRejectGPU.mjs has been able to dispatch all three passes on one encoder since v4594 and had
+// no caller anywhere but its own selfcheck: the kernels were reachable in the sense that a gate reached them,
+// which is the weakest sense there is. The dolly branch below calls rejectAndAccumulate() with counted: true.
+//
+// counted: true is NOT decoration. Wiring the chain without it would have taken this page's "106 genuine" line
+// to "not counted" the moment a reader opened it on an adapter -- exactly the regression v4591 had to undo for
+// the accumulate pass. Getting the number off the device needed a mainCounted entry point in each of the two
+// kernels, because the mask cannot distinguish a disocclusion from a reprojection that left the frame.
+let gpu = null, tgpu = null, mgpu = null, rgpu = null;
 async function initGPU() {
     const say = (t) => { $("engine").textContent = "spatial engine: " + t; };
     // *** v4637 -- THIS SAID "this browser exposes no WebGPU" AND THAT IS AN ATTRIBUTION, NOT A FACT. ***
@@ -373,9 +398,11 @@ async function initGPU() {
         gpu = new FSRGPU(dev);
         try { tgpu = new TemporalGPU(dev); } catch { tgpu = null; }
         try { mgpu = new MotionVectorsGPU(dev); } catch { mgpu = null; }
+        try { rgpu = new TemporalRejectGPU(dev); } catch { rgpu = null; }
         const who = (dev.adapterInfo && (dev.adapterInfo.description || dev.adapterInfo.vendor)) || "webgpu";
-        say(`WebGPU compute on ${who} -- EASU+RCAS, resolve+accumulate and the motion vectors` +
-            (tgpu && mgpu ? "" : " (some kernels unavailable; those stay on the CPU)"));
+        say(`WebGPU compute on ${who} -- EASU+RCAS, resolve+accumulate, the motion vectors` +
+            (rgpu ? " and the reject chain (disocclusion, factor, rectify) on the dolly" : "") +
+            (tgpu && mgpu && rgpu ? "" : " (some kernels unavailable; those stay on the CPU)"));
     } catch (e) { gpu = null; say("CPU reference (" + String(e && e.message).slice(0, 80) + ")"); }
 }
 
@@ -388,7 +415,9 @@ async function fsr1(rgba, rw, rh, dw, dh, sharp) {
     const c = rcasCPU(easuCPU(rgba, rw, rh, dw, dh).data, dw, dh, sharp, false);
     return { ...c, range: rangeOf(c.data, dw * dh) };
 }
-/** RCAS alone, for the temporal pane's sharpen -- the accumulate before it is CPU-only either way. */
+/** RCAS alone, for the temporal pane's sharpen. The accumulate before it runs on whichever engine the camera
+ *  has a runner for -- tgpu for the two older cameras since v4590, rgpu for the dolly since v4641 -- so this
+ *  comment's old claim that it was "CPU-only either way" has been wrong for two rounds. */
 async function rcas(rgba, w, h, sharp) {
     if (gpu) return gpu.rcas(rgba, w, h, sharp, false);
     return rcasCPU(rgba, w, h, sharp, false);
@@ -482,8 +511,11 @@ async function tick() {
     // test. The two matrices are (current INVERSE, previous FORWARD) and swapping them gives motion of exactly
     // the right magnitude and the wrong sign, which an orthographic pan could not have shown.
     const depth = dolly ? renderDepth(vpCur) : null;
+    // *** AND THE DOLLY'S MOTION COMES OFF THE DEVICE TOO, AS OF v4641. *** motion() is the general form and
+    // pan() is the special case; the dolly needs the general one because its matrices are perspective.
     const motion = dolly
-        ? motionVectorsCPU(depth, D, D, mat4Invert(vpCur), vpPrev).data
+        ? mgpu ? (await mgpu.motion(depth, D, D, mat4Invert(vpCur), vpPrev)).data
+               : motionVectorsCPU(depth, D, D, mat4Invert(vpCur), vpPrev).data
         : mgpu
             ? (await mgpu.pan({ depth: FLAT_DEPTH, w: D, h: D, tCur, tPrev })).data
             : motionVectorsCPU(FLAT_DEPTH, D, D, mat4Invert(orthoPanVP(tCur)), orthoPanVP(tPrev)).data;
@@ -492,28 +524,57 @@ async function tick() {
     // the one that gets skipped: DISOCCLUSION writes 1 = "this history is WRONG", RECTIFY reads 1 = "history
     // TRUSTED", and feeding the mask straight in as the factor discards every pixel's history on every frame.
     // historyFactorCPU is the inversion, f *= 1 - mask, and it is not optional.
-    let disStats = null, factor = null;
+    //
+    // *** AND AS OF v4641 IT RUNS ON THE ADAPTER, WHICH IS THE FIRST TIME THE REJECT WGSL HAS RUN OUTSIDE A
+    // GATE. *** rejectAndAccumulate() is all three dispatches on ONE encoder -- the mask feeds the factor pass
+    // and the factor feeds the rectify without either crossing back -- so the GPU branch below replaces FOUR
+    // CPU calls, not one. The CPU three stay exactly where they were: they are the reference the device is held
+    // to in render/temporalRejectGPU-selfcheck.mjs, not a fallback nobody exercises.
+    const alpha = parseFloat($("alpha").value);
+    let disStats = null, factor = null, rejected = null;
     const threshold = dolly ? dollyThreshold(vpCur) : null;
+    // the resolve is CPU on both branches: rejectAndAccumulate takes a display-resolution `current`, and
+    // wiring tgpu's resolve into it would be a different round's claim.
+    const dollyCurrent = dolly
+        ? resolveJitterAwareCPU({ src: frameSrc, rw: R, rh: R, dw: D, dh: D, jitter: [jx, jy] }).data
+        : null;
     if (dolly && prevDepth && threshold) {
-        const dis = disocclusionCPU({ motion, prevDepth, w: D, h: D, threshold, nearerIsLess: true });
         // nearerIsLess: true because rasterProbe.js's viewProj is GL-style forward-Z -- P[10] is
         // -(far+near)/(far-near) -- so a smaller clip z is nearer. Inverted it reports the exact complement,
-        // which looks like a working feature until something counts it.
-        factor = historyFactorCPU({ disocclusion: dis.data, n: D * D });
-        // flagged counts three different things and only one of them is a disocclusion; noHistory is the other
-        // two (motion invalid, reprojected offscreen), so the genuine count is the difference.
-        disStats = { genuine: dis.flagged - dis.noHistory, noHistory: dis.noHistory, threshold };
+        // which looks like a working feature until something counts it. The device takes the same argument.
+        if (rgpu) {
+            // counted: true dispatches DISOCCLUSION_WGSL/mainCounted and RECTIFY_WGSL/mainCounted. Without it
+            // this page would print "not counted" on an adapter and "106 genuine" on the CPU for the same
+            // frame -- the exact regression v4591 had to undo for the accumulate pass.
+            rejected = await rgpu.rejectAndAccumulate({
+                current: dollyCurrent, history: hist, motion, prevDepth, w: D, h: D, alpha, threshold,
+                nearerIsLess: true, space: "ycocg", counted: true });
+            // genuine = flagged - noHistory, and the SPLIT is why the counters exist: the mask writes the same
+            // 1.0 for all three reasons, so no pass over it could have recovered this number.
+            disStats = { genuine: rejected.disocStats.flagged - rejected.disocStats.noHistory,
+                         noHistory: rejected.disocStats.noHistory, threshold, engine: "the device" };
+        } else {
+            const dis = disocclusionCPU({ motion, prevDepth, w: D, h: D, threshold, nearerIsLess: true });
+            factor = historyFactorCPU({ disocclusion: dis.data, n: D * D });
+            // flagged counts three different things and only one of them is a disocclusion; noHistory is the other
+            // two (motion invalid, reprojected offscreen), so the genuine count is the difference.
+            disStats = { genuine: dis.flagged - dis.noHistory, noHistory: dis.noHistory, threshold, engine: "the CPU" };
+        }
     }
 
-    const alpha = parseFloat($("alpha").value);
     // ONE ENCODER on the device: the resolved display-resolution frame never crosses back to the CPU between
     // the two passes. On the CPU it is the same two calls in the same order, and the gate holds them equal.
     // *** THE DOLLY TAKES rectifiedAccumulateCPU, WHICH IS A DIFFERENT FUNCTION FROM THE ONE ABOVE. *** It is
     // the only one that accepts a `factor`, and it carries two counters the plain accumulate has no notion of:
     // `discarded` (factor exactly 0, history thrown away entirely) and `relaxed`. The other two cameras keep
     // the path they have always taken, so every number this page's note quotes for them still means what it said.
+    // *** FRAME 0 IS CPU ON EITHER ENGINE, AND THAT IS NOT A FALLBACK. *** rejectAndAccumulate needs a previous
+    // depth and a positive threshold to have a disocclusion test at all; before there is one there is nothing
+    // for the chain to do, so the plain rectify runs with factor = null -- which is what the readout below
+    // calls untestable rather than zero.
     const acc = dolly
-        ? rectifiedAccumulateCPU({ current: resolveJitterAwareCPU({ src: frameSrc, rw: R, rh: R, dw: D, dh: D, jitter: [jx, jy] }).data,
+        ? rejected
+        || rectifiedAccumulateCPU({ current: dollyCurrent,
                                    history: hist, motion, factor, w: D, h: D, alpha, space: "ycocg" })
         : tgpu
             ? await tgpu.resolveAndAccumulate({ src: frameSrc, rw: R, rh: R, dw: D, dh: D, jitter: [jx, jy],
@@ -533,16 +594,21 @@ async function tick() {
     // frame that reused nothing and a frame nobody counted must not print the same number.
     // Counted on either engine since v4591 -- and still NULL rather than zeroes if a caller ever asks for an
     // uncounted pass, because a frame that reused nothing and a frame nobody counted must not read the same.
+    // *** AND WHICH ENGINE COUNTED THEM, WHICH THIS LINE DID NOT SAY UNTIL v4641. *** Two engines now produce
+    // this identical set of integers -- that they AGREE is the point of the gates, and it is exactly why the
+    // number alone cannot tell a reader which one ran. Nothing else on the page answers it per-readout.
+    const accEngine = dolly ? (rejected ? "the device" : "the CPU") : (tgpu ? "the device" : "the CPU");
     $("accstat").textContent = acc.stats
         ? `accumulate: reused ${acc.stats.reused}, rejected offscreen ${acc.stats.rejectedOffscreen}, rejected invalid ${acc.stats.rejectedInvalid}, clamped by the neighbourhood box ${acc.stats.clamped}` +
-          (acc.stats.discarded !== undefined ? `, history discarded ${acc.stats.discarded}` : "")
+          (acc.stats.discarded !== undefined ? `, history discarded ${acc.stats.discarded}` : "") +
+          `   -- counted on ${accEngine}`
         : "accumulate counters: not counted on this pass (not zero: uncounted)";
     // *** THE COUNTER THIS WHOLE ROUND EXISTS TO MAKE NON-ZERO. *** Null rather than 0 before there is a
     // previous depth to compare against, for the same reason the accumulate counters are null on an uncounted
     // pass: a frame that disoccluded nothing and a frame nobody could test must not read the same.
     $("disstat").textContent = !dolly ? ""
         : disStats
-            ? `disocclusion: ${disStats.genuine} genuine, ${disStats.noHistory} with no history at all (invalid or offscreen), threshold ${disStats.threshold.toFixed(5)} in clip z`
+            ? `disocclusion: ${disStats.genuine} genuine, ${disStats.noHistory} with no history at all (invalid or offscreen), threshold ${disStats.threshold.toFixed(5)} in clip z   -- counted on ${disStats.engine}`
             : threshold === null ? "disocclusion: the two planes are at the same clip depth -- no test is possible"
                                  : "disocclusion: no previous depth yet (frame 0 is not zero disocclusions, it is untestable)";
     requestAnimationFrame(tick);

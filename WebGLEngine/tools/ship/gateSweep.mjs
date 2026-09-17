@@ -3857,6 +3857,28 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // v4399 for this exact reason, four ordinals ago. Registered rather than done here: a merge is the wrong
     // commit in which to change the shape of the thing being merged.
 
+    since323: Object.freeze({
+        at: "v4641", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/fsrPageDevice-selfcheck.mjs"]),
+        widened: Object.freeze(["fsr.html", "render/temporalRejectWgsl.mjs", "render/temporalRejectGPU.mjs",
+                                "render/temporalRejectGPU-selfcheck.mjs", "tools/ship/fsrPage-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE REJECT CHAIN RUNS FROM A PAGE, AND THE GATE THAT SAYS SO HAD TO BE ITS OWN FILE TO " +
+                 "KEEP RUNNING. *** fsr.html's dolly now calls render/temporalRejectGPU.mjs -- three dispatches " +
+                 "on one encoder, the first time DISOCCLUSION_WGSL, FACTOR_WGSL and RECTIFY_WGSL have run " +
+                 "anywhere but their own selfcheck. It could not be wired as it stood: the runner returned no " +
+                 "tallies and its comment told callers to count them from the mask, which recovers `flagged` and " +
+                 "CANNOT recover `noHistory`, because the kernel writes the same 1.0 for a disocclusion, an " +
+                 "invalid motion vector and a reprojection that left the frame -- and `genuine = flagged - " +
+                 "noHistory` is the number the page prints. Two mainCounted entry points later the device and the " +
+                 "CPU agree on all eight counters as integers. THE GATE IS A SEPARATE FILE FOR A MEASURED " +
+                 "REASON: as section 5 of fsrPage-selfcheck it put that file at 4,744 ms against the sweep's " +
+                 "3,000 ms membership threshold, which would have dropped the page's only gate out of every " +
+                 "ship -- 'over budget means skipped means never re-timed', the failure this file has counted " +
+                 "twice. Split, both are under it: 2,749 / 2,818 / 2,755 ms and 2,230 / 2,201 / 2,191 ms, three " +
+                 "serial runs each. The new one is about 200 ms under and is called a straddler here rather " +
+                 "than left for a later round to find as drift.",
+    }),
     since322: Object.freeze({
         at: "v4640", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/pipeTruncation-selfcheck.mjs"]),

@@ -330,7 +330,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
     // and the readings overlap on everything predating the split, so they are run over the merged tree rather
     // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
-    files: 4262,               // RE-DERIVED AT THE main MERGE: 4169 on this branch, 4172 on main, 4260 merged -- LESS than the sum, which is why it is run
+    files: 4263,               // RE-DERIVED AT THE main MERGE: 4169 on this branch, 4172 on main, 4260 merged -- LESS than the sum, which is why it is run
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
                           // RE-TAKEN TWICE IN TWO ROUNDS, and the second time only because the ship gate
@@ -679,7 +679,26 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4640 -- +1 again, for tools/ship/pipeTruncation-selfcheck.mjs: files 4261 -> 4262, ES modules and
     // closures with it. Three rows this time rather than seven, because that gate spawns children and reads
     // files and does not touch a typed array, a frame callback or an adapter.
-    esModules: 3962, closures: 3831, asyncAwait: 1506, typedArrays: 1123, promises: 367,
+    // v4641 -- ONE new file, tools/ship/fsrPageDevice-selfcheck.mjs: files 4262 -> 4263, ES modules and
+    // closures and async/await with it. No typed array, no frame callback, no adapter of its own -- it drives
+    // a browser through the harness and reads a DOM back.
+    //
+    // *** AND Promises 367 -> 368, WHICH IS AN INSTRUMENT FINDING AND NOT A FILE COUNT. *** The `new Promise`
+    // that moves it sits inside the TEMPLATE LITERAL that gate hands to the browser harness, so the Promise is
+    // constructed in CHROMIUM and never in the Node process this walk is a capability census OF. That is the
+    // string-literal limit recorded at the foot of this record, in its sharpest form yet: not a note string
+    // that merely spells the pattern, but real code for a real runtime that is not the one being censused.
+    // It is recorded at the true reading rather than argued down to 367, because this census is DEFINED as
+    // what the regex matches over comment-stripped text, and a reading adjusted by hand for what the text
+    // MEANS is no longer that measurement.
+    //
+    // *** THIS NOTE FIRST NAMED THE WRONG FILE, AND THE PRE-FLIGHT IS WHY IT DOES NOT NOW. *** It said the
+    // mover was tools/ship/fsrPage-selfcheck.mjs, which was true when it was written and stopped being true
+    // an hour later, when those rows were split into their own gate to keep both under the sweep's budget --
+    // the Promise went with them, fsrPage lost its only one, and the COUNT did not move because one file
+    // gained what another lost. A census note that names a cause rather than a number is exactly the thing a
+    // later round cannot re-derive, and this one was wrong within the same round that wrote it.
+    esModules: 3963, closures: 3832, asyncAwait: 1507, typedArrays: 1123, promises: 368,
     fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 156, webgpu: 52, threads: 23, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

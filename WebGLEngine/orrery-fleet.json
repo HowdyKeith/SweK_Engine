@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "e43d24cd6de1764815d2b04f56320ab986f9a067",
+ "head": "bbd0dd60c9b11513aa6b6f594225ef7d9260d958",
  "bodies": {
   "box3d": [
    {
@@ -283,7 +283,7 @@
    {
     "path": "tools/ship/slugTsl-selfcheck.mjs",
     "bytes": 20947,
-    "sha": "a70d9c786e3bed4679e472630d97c8a05da23a7c"
+    "sha": "bbd0dd60c9b11513aa6b6f594225ef7d9260d958"
    },
    {
     "path": "tools/ship/slugWgsl-selfcheck.mjs",
@@ -895,7 +895,7 @@
    {
     "path": "tools/ship/slugTsl-selfcheck.mjs",
     "bytes": 20947,
-    "sha": "a70d9c786e3bed4679e472630d97c8a05da23a7c"
+    "sha": "bbd0dd60c9b11513aa6b6f594225ef7d9260d958"
    },
    {
     "path": "tools/ship/threeProbe-selfcheck.mjs",
@@ -935,7 +935,7 @@
    {
     "path": "tools/ship/tslWide-selfcheck.mjs",
     "bytes": 25204,
-    "sha": "a70d9c786e3bed4679e472630d97c8a05da23a7c"
+    "sha": "bbd0dd60c9b11513aa6b6f594225ef7d9260d958"
    },
    {
     "path": "tools/ship/webgpuHarness.mjs",
