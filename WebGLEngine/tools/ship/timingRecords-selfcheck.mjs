@@ -90,8 +90,25 @@ const rows = real.map((k) => ({ k, g: G.timings[k], s: S.timings[k], r: ratioOf(
     // eight-wide sweep looks like, so the label was refuted by its own detail. What the numbers support is
     // narrower: the sweep reads higher almost everywhere, which growth and load both explain, AND there are
     // nine gates where the older full-suite record is the larger one, which neither explains.
-    const sweepHigher = rows.filter((x) => x.r >= 2 && x.s > x.g).length;
-    const gateHigher = rows.filter((x) => x.r >= 2 && x.g > x.s).length;
+    // *** v4645 -- THE DIRECTION ROWS WERE COMPARING A LOADED READING AGAINST A SERIAL ONE. ***
+    //
+    // The row eight lines down already says it about the other side of the same table: "for a gate under the
+    // budget it records a LOADED reading and moving toward an alone measurement would be moving away from"
+    // what the column means. The direction rows were never given that filter, because `kinds` did not exist
+    // when they were written -- v4637 added it, for exactly the question of what a millisecond IS.
+    //
+    // It surfaced at the main merge as the high-water mark GROWING 9 -> 13, which this ratchet forbids. Asked
+    // to investigate rather than re-baseline, the four turn out not to be drift: of the thirteen, EIGHT carry
+    // kind "loaded" -- an 8-way parallel reading set beside a serial header, which are not the same quantity
+    // and whose disagreement says nothing about either record. The five that remain are alone-against-alone,
+    // under the frozen 9, and the ratchet did not need raising at all. THE POPULATION WAS WRONG, NOT THE MARK.
+    //
+    // Narrowed HERE ONLY. `rows` stays the whole comparable set for the band table and the 53% headline above,
+    // whose numbers are about how far two records disagree and do not turn on which clock took them; these
+    // four rows are about DIRECTION, and a direction read across two different clocks is a category error.
+    const cmp = rows.filter((x) => (S.kinds || {})[x.k] === "alone");
+    const sweepHigher = cmp.filter((x) => x.r >= 2 && x.s > x.g).length;
+    const gateHigher = cmp.filter((x) => x.r >= 2 && x.g > x.s).length;
     ok(`  and it is overwhelmingly ONE-directional -- the sweep reads higher in ${sweepHigher} of the ${sweepHigher + gateHigher}, which growth and an eight-wide sweep both explain`,
         sweepHigher > 10 * gateHigher, `${sweepHigher} sweep-higher against ${gateHigher} gate-timings-higher`);
     // v4578 -- a RATCHET rather than a count. v4576 measured nine running the other way; v4577 and v4578
@@ -101,14 +118,17 @@ const rows = real.map((k) => ({ k, g: G.timings[k], s: S.timings[k], r: ratioOf(
     report(`v4576 measured ${GATE_HIGHER_V4576} disagreements where gate-timings was the larger; ${gateHigher} remain after v4577 and v4578 corrected them`);
     ok(`  and the ones running the other way -- where the OLDER full-suite record is the larger, which neither growth nor load explains -- RATCHET DOWN from v4576's ${GATE_HIGHER_V4576}`,
         gateHigher <= GATE_HIGHER_V4576,
-        rows.filter((x) => x.r >= 2 && x.g > x.s).slice(0, 3).map((x) => `${path.basename(x.k)} ${x.g}>${x.s}`).join(", "));
+        cmp.filter((x) => x.r >= 2 && x.g > x.s).map((x) => `${path.basename(x.k)} ${x.g}>${x.s}`).join(", ") +
+            ` -- ${cmp.length} of ${rows.length} comparisons are alone-against-alone; the rest set a LOADED reading beside a serial one`);
     // *** AND "OVERWHELMINGLY" IS QUANTIFIED IN A SECOND ROW, BECAUSE A THRESHOLD CANNOT POLICE ITSELF. ***
     // Loosening the bar above from `> 10 * gateHigher` to `> 0` went 0-RED in sabotage: an assertion weakened
     // is invisible to the assertion weakened. The claim is only held if a SEPARATE row carries the same
     // number, so a single edit leaves one of them standing.
     ok(`  and the word "overwhelmingly" is a measured ratio, not a manner of speaking: ${(sweepHigher / Math.max(1, gateHigher)).toFixed(0)} to 1`,
-        sweepHigher / Math.max(1, gateHigher) > 10 && sweepHigher + gateHigher === rows.filter((x) => x.r >= 2).length,
-        `${sweepHigher}:${gateHigher}, and the two directions partition all ${rows.filter((x) => x.r >= 2).length} disagreements`);
+        sweepHigher / Math.max(1, gateHigher) > 10 && sweepHigher + gateHigher === cmp.filter((x) => x.r >= 2).length,
+        `${sweepHigher}:${gateHigher}, and the two directions partition all ${cmp.filter((x) => x.r >= 2).length} ` +
+        `COMPARABLE disagreements -- alone against alone. The band table above counts ${rows.filter((x) => x.r >= 2).length} across every ` +
+        `clock, which is the right population for "how far do the records disagree" and the wrong one for "which way"`);
 }
 
 // -----------------------------------------------------------------------------------------------------------

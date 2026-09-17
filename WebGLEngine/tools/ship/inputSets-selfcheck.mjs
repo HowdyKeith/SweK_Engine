@@ -213,12 +213,39 @@ console.log("\n4b. the indexed format, and the conflict it exists to refuse");
     // by a hash that genuinely differed, off 58 poisoned paths. The recorder now VALIDATES the prior instead
     // of blending it: an entry whose paths still match the tree is carried (it contributes the same hash a
     // fresh one would, so no conflict can arise), and one that does not is dropped rather than carried stale.
-    ok("!! *** the live record's conflict list is EMPTY, and the 130 it carried were a merge artefact ***",
-       Array.isArray(REC.conflicts) && REC.conflicts.length === 0,
-       `${(REC.conflicts || []).length} conflicting path(s) across ${GATES.length} gates. This is not a ` +
-       `design guarantee about the tree -- it is a guarantee about ONE encode() call, because hashFile is ` +
-       `memoised for a whole pass (next row). A nonzero count here means a caller mixed two passes into one ` +
-       `encode(), which is exactly what shipped from v4622 to v4632.`);
+    // *** AND THE ROW BELOW SAID A NONZERO COUNT MEANS ONE THING WHEN IT MEANS TWO. ***
+    //
+    // It required the list to be flatly EMPTY and explained a nonzero count as "a caller mixed two passes
+    // into one encode()". That is one cause. The other is the CONFLICT sentinel doing exactly the job
+    // tools/ship/recordInputs.mjs built it for, inside ONE pass: markChangedDuringPass re-hashes every
+    // recorded path after the pass with the memo cleared, and a path some gate WROTE while another was
+    // reading it gets two genuinely different hashes from two gates in the same fold -- which is a conflict
+    // by encode()'s own rule, correctly.
+    //
+    // *** THE TWO MODULES READ ONE CONVENTION IN OPPOSITE SENSES, AND recordInputs.mjs SAYS SO IN WRITING. ***
+    // Its note beside `changedDuringPass` reads "Distinct from `conflicts`, which is the fold's own ratchet
+    // and must be empty" -- and the mechanism it describes one line earlier is what puts entries INTO
+    // `conflicts`. Measured at v4645 on a full 1,301-gate pass with a validated prior: two paths,
+    // tools/ship/__sweepcov_leaker_fixture.mjs and tools/ship/install-history.json, appeared in BOTH lists,
+    // identically. The first is a fixture a gate leaves behind ON PURPOSE, so the flat-empty form of this row
+    // could never go green on a tree that contains it.
+    //
+    // So the row asks the decidable question instead: a conflict is allowed exactly when the post-pass
+    // re-hash NAMED that path. A conflict on a path nothing wrote during the pass is still the two-pass fold,
+    // and is still red. Zero remains the better number and the detail says which case produced what.
+    // SABOTAGED: a path added to the conflict list that changedDuringPass does not name goes red BY NAME
+    // (UNEXPLAINED: tools/ship/SABOTAGE_NOT_WRITTEN.json), so the row still refuses the case it was
+    // written for and has not been widened into a row that accepts anything.
+    const changed = new Set(REC.changedDuringPass || []);
+    const unexplained = (REC.conflicts || []).filter((p) => !changed.has(p));
+    ok("!! *** every conflicting path was WRITTEN during the pass -- none is the two-pass fold the 130 were ***",
+       Array.isArray(REC.conflicts) && unexplained.length === 0,
+       `${(REC.conflicts || []).length} conflicting path(s) across ${GATES.length} gates, ` +
+       `${(REC.conflicts || []).length - unexplained.length} of them named by changedDuringPass` +
+       (unexplained.length ? ` -- UNEXPLAINED: ${unexplained.join(", ")}` : "") +
+       `. An unexplained conflict means a caller mixed two passes into one encode(), which is exactly what ` +
+       `shipped from v4622 to v4632; an explained one means a gate wrote a file another gate was reading, ` +
+       `which is the sentinel working and costs those gates their skip rather than their correctness.`);
 
     // *** AND THE STALE-ENTRY CASE THE SENTINEL WAS FIRING ON IS ALREADY REFUSED, PER GATE, WITHOUT IT. ***
     // That is why the sentinel's blast radius was the wrong shape: whyRun re-hashes each gate's OWN paths

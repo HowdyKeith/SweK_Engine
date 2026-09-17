@@ -117,7 +117,27 @@ export async function readTimingsWithRetry(root = ENG, attempts = 3, waitMs = 40
     return { rec: null, tries, error };
 }
 
-const CENSUS_MEMO = new Map();
+// *** ONE MEMO FOR EVERY O(TREE) DERIVATION IN THIS FILE, KEYED ON THE FUNCTION THAT DERIVES IT. ***
+//
+// It started as CENSUS_MEMO around runtimeGap's census alone. The other three derivations -- assertionShape's
+// census, its gate-file walk, and the knowledge-index rebuild -- were re-taken on every checks() call, and
+// recordDrift-selfcheck makes three full passes over the tree per run (the live one, the partition fixture,
+// and the filtered fixtures), so the index rebuild alone was paid three times at 310 ms.
+//
+// *** THE KEY IS THE FUNCTION OBJECT, NOT ITS NAME, AND THAT IS WHAT MAKES THE FIXTURES STILL WORK. *** A
+// fixture that hands checks() a different module hands it a different function, so it derives for real; a
+// fixture that spreads the real module and overrides only the RECORDED numbers keeps the same function and
+// reuses the real derivation, which is exactly what such a fixture is asking about. A memo keyed on a string
+// would have silently answered the first kind with the second kind's number.
+//
+// Process-lifetime only: nothing here writes the tree between calls, and the CLI exits after one pass.
+const DERIVED = new Map();
+const once = (fn, make) => {
+    if (DERIVED.has(fn)) return DERIVED.get(fn);
+    const v = make();
+    DERIVED.set(fn, v);
+    return v;
+};
 
 /**
  * *** `only` EXISTS BECAUSE A FIXTURE FOR ONE RECORD WAS RE-DERIVING FOUR. ***
@@ -138,7 +158,7 @@ export async function checks({ load = null, timings = null, only = null } = {}) 
     // import is cheap -- census() is the 147 ms.
     const A = await mod("./assertionShape.mjs");
     if (wanted("assertionShape census")) {
-        const ac = A.census();
+        const ac = once(A.census, () => A.census());
         out.push({
             name: "assertionShape census", owes: OWES.assertion,
             recorded: A.SHAPE_AT_V4480.definesOk, actual: ac.definesOk,
@@ -168,7 +188,7 @@ export async function checks({ load = null, timings = null, only = null } = {}) 
     // is the defect this module avoided by exporting `sources` -- but to check the INPUT and say so, so the
     // registry answer is never read as clean when it was computed from yesterday's tree.
     const gateFiles = (wanted("knowledge index") || wanted("instrument registry") || wanted("sweep timings"))
-        ? A.gateFiles(ENG) : [];
+        ? once(A.gateFiles, () => A.gateFiles(ENG)) : [];
     const onDisk = gateFiles.length;
     const K = JSON.parse(fs.readFileSync(path.join(ENG, "knowledge-index.json"), "utf8"));
     // *** v4587 -- THIS CHECK COMPARED A COUNT AND REPORTED "index agrees". ***
@@ -195,7 +215,7 @@ export async function checks({ load = null, timings = null, only = null } = {}) 
     let idxDiff = null;
     if (wanted("knowledge index") || wanted("instrument registry")) {
         const fresh = await mod("./buildKnowledgeIndex.mjs");
-        idxDiff = fresh.diffIndex(K, fresh.buildIndex());
+        idxDiff = fresh.diffIndex(K, once(fresh.buildIndex, () => fresh.buildIndex()));
     }
     const indexStale = idxDiff ? !idxDiff.same : false;
     if (wanted("knowledge index")) out.push({
@@ -238,35 +258,46 @@ export async function checks({ load = null, timings = null, only = null } = {}) 
     // A torn read is a window of milliseconds, so it is RETRIED rather than either crashing or being passed
     // on nothing. A file still unparseable after three attempts is genuinely broken, and the check then
     // reports UNREADABLE -- stale, named, and not a silent green.
-    if (!wanted("sweep timings")) return out;
-    const read = timings ? { rec: timings, tries: 0, error: null } : await readTimingsWithRetry(ENG);
-    if (!read.rec) {
-        out.push({
-            name: "sweep timings", owes: OWES.timing, recorded: 0, actual: -1, stale: true,
-            detail: `sweep-timings.json UNREADABLE after ${read.tries} attempts (${read.error}) -- a torn read ` +
-                    `from a concurrent quickSweep heals on retry, so this means the file is broken rather ` +
-                    `than busy`,
-        });
-        return out;
-    }
-    const rec = read.rec;
+    // *** v4645 -- THIS EARLY RETURN MADE THE SIXTH CHECK UNREACHABLE BY NAME. *** It read
+    // `if (!wanted("sweep timings")) return out;`, and the runtimeGap census sits BELOW it -- so
+    // `only: "runtimeGap census"` returned an EMPTY array and that census only ever ran as a PASSENGER of
+    // "sweep timings". A filter that silently answers nothing for one of the six is worse than no filter:
+    // the row it should have served reads as absent rather than as unasked, which is the distinction this
+    // whole pre-flight exists to keep. Found by trying to use it -- recordDrift-selfcheck asked for the
+    // runtimeGap row by name and crashed on undefined, which is a louder failure than it deserved and the
+    // only reason this was noticed. Both blocks carry their own guard now and `only` reaches all six.
+    const doTimings = wanted("sweep timings"), doGap = wanted("runtimeGap census");
+    if (!doTimings && !doGap) return out;
+    if (doTimings) {
+        const read = timings ? { rec: timings, tries: 0, error: null } : await readTimingsWithRetry(ENG);
+        if (!read.rec) {
+            out.push({
+                name: "sweep timings", owes: OWES.timing, recorded: 0, actual: -1, stale: true,
+                detail: `sweep-timings.json UNREADABLE after ${read.tries} attempts (${read.error}) -- a torn read ` +
+                        `from a concurrent quickSweep heals on retry, so this means the file is broken rather ` +
+                        `than busy`,
+            });
+            return out;
+        }
+        const rec = read.rec;
 
-    // *** v4579 -- AND A KIND, BECAUSE A MILLISECOND WITHOUT ONE IS TWO DIFFERENT QUANTITIES. *** v4578
-    // measured that the ms column holds a LOADED parallel reading under the budget and an ALONE serial one at
-    // or over it, 1.93x apart, with nothing marking which -- and this arc filled seventeen entries with the
-    // wrong one across four rounds, including the round that found the problem and the gate that reported it.
-    // quickSweep writes `kinds` now. This check is what stops the class coming back: a new gate owes the file
-    // a kind exactly as it owes it a runtime and a stamp, and a reading whose quantity is unknown is not a
-    // reading anybody can compare.
-    const missing = gateFiles
-        .map((p) => path.relative(ENG, p).replace(/\\/g, "/"))
-        .filter((g) => !(g in (rec.timings || {})) || !((rec.at || {})[g]) || !((rec.kinds || {})[g]));
-    out.push({
-        name: "sweep timings", owes: OWES.timing,
-        recorded: 0, actual: missing.length,
-        stale: missing.length > 0,
-        detail: missing.length ? missing.join(", ") : "every gate has a timing, its own capture stamp and a kind",
-    });
+        // *** v4579 -- AND A KIND, BECAUSE A MILLISECOND WITHOUT ONE IS TWO DIFFERENT QUANTITIES. *** v4578
+        // measured that the ms column holds a LOADED parallel reading under the budget and an ALONE serial one at
+        // or over it, 1.93x apart, with nothing marking which -- and this arc filled seventeen entries with the
+        // wrong one across four rounds, including the round that found the problem and the gate that reported it.
+        // quickSweep writes `kinds` now. This check is what stops the class coming back: a new gate owes the file
+        // a kind exactly as it owes it a runtime and a stamp, and a reading whose quantity is unknown is not a
+        // reading anybody can compare.
+        const missing = gateFiles
+            .map((p) => path.relative(ENG, p).replace(/\\/g, "/"))
+            .filter((g) => !(g in (rec.timings || {})) || !((rec.at || {})[g]) || !((rec.kinds || {})[g]));
+        out.push({
+            name: "sweep timings", owes: OWES.timing,
+            recorded: 0, actual: missing.length,
+            stale: missing.length > 0,
+            detail: missing.length ? missing.join(", ") : "every gate has a timing, its own capture stamp and a kind",
+        });
+    }
 
     // ---- *** v4551 -- THE SIXTH CHECK, AND THE OBLIGATION IT READS HAD BEEN DECLARED HERE SINCE v4482 WITH
     // NOTHING BEHIND IT. *** OWES.runtimeGap said "any new .mjs moves vba/runtimeGap.mjs's twelve-row
@@ -293,30 +324,31 @@ export async function checks({ load = null, timings = null, only = null } = {}) 
     // fixture calls can share one result. The key is the census FUNCTION, not a bare flag: every fixture here
     // spreads the real module and overrides only the recorded numbers, but a future fixture that injects a
     // fake census would otherwise be handed the real answer and pass while measuring nothing.
-    const G = await mod("../../vba/runtimeGap.mjs");
-    let gc = CENSUS_MEMO.get(G.census);
-    if (!gc) { gc = G.census(sources()); CENSUS_MEMO.set(G.census, gc); }
-    const M = G.MEASURED_AT_V4462;
-    // *** THE LABEL->FIELD MAP IS IMPORTED, NOT WRITTEN HERE, AND THAT IS A MEASURED CORRECTION. *** The
-    // first draft of this check spelled the twelve labels out in this file and the check's own arrival moved
-    // two of the rows it checks -- performance.now 220 -> 221, requestAnimationFrame 116 -> 117 -- because
-    // the census greps file text and this file is in the walked set. runtimeGap.mjs already contains every
-    // one of those strings in its PATTERNS table, so the map costs nothing there and perturbs nothing.
-    const ROWS = G.CENSUS_FIELDS;
-    // *** ALL THIRTEEN ROWS, NOT THE FILE COUNT. *** A files-only check would have caught this round's drift
-    // and would miss the shape that census exists to show -- v4550 recorded a two-file round that moved four
-    // rows and v4548 a four-file round that moved two, and a check reading one number cannot tell those apart.
-    const gDrift = [];
-    if (M.files !== gc.files) gDrift.push(`files ${M.files} -> ${gc.files}`);
-    for (const [label, field] of Object.entries(ROWS)) {
-        if (M[field] !== gc.counts[label]) gDrift.push(`${label} ${M[field]} -> ${gc.counts[label]}`);
+    if (doGap) {
+        const G = await mod("../../vba/runtimeGap.mjs");
+        const gc = once(G.census, () => G.census(sources()));
+        const M = G.MEASURED_AT_V4462;
+        // *** THE LABEL->FIELD MAP IS IMPORTED, NOT WRITTEN HERE, AND THAT IS A MEASURED CORRECTION. *** The
+        // first draft of this check spelled the twelve labels out in this file and the check's own arrival moved
+        // two of the rows it checks -- performance.now 220 -> 221, requestAnimationFrame 116 -> 117 -- because
+        // the census greps file text and this file is in the walked set. runtimeGap.mjs already contains every
+        // one of those strings in its PATTERNS table, so the map costs nothing there and perturbs nothing.
+        const ROWS = G.CENSUS_FIELDS;
+        // *** ALL THIRTEEN ROWS, NOT THE FILE COUNT. *** A files-only check would have caught this round's drift
+        // and would miss the shape that census exists to show -- v4550 recorded a two-file round that moved four
+        // rows and v4548 a four-file round that moved two, and a check reading one number cannot tell those apart.
+        const gDrift = [];
+        if (M.files !== gc.files) gDrift.push(`files ${M.files} -> ${gc.files}`);
+        for (const [label, field] of Object.entries(ROWS)) {
+            if (M[field] !== gc.counts[label]) gDrift.push(`${label} ${M[field]} -> ${gc.counts[label]}`);
+        }
+        out.push({
+            name: "runtimeGap census", owes: OWES.runtimeGap,
+            recorded: M.files, actual: gc.files,
+            stale: gDrift.length > 0,
+            detail: gDrift.length ? gDrift.join(", ") : `all thirteen rows agree, ${gc.files} files`,
+        });
     }
-    out.push({
-        name: "runtimeGap census", owes: OWES.runtimeGap,
-        recorded: M.files, actual: gc.files,
-        stale: gDrift.length > 0,
-        detail: gDrift.length ? gDrift.join(", ") : `all thirteen rows agree, ${gc.files} files`,
-    });
 
     return out;
 }
@@ -326,8 +358,12 @@ export async function drift(opts = {}) {
     return { all, stale: all.filter((c) => c.stale) };
 }
 
-export async function reportLines() {
-    const d = await drift();
+// *** `pre` EXISTS BECAUSE THE CALLER ALREADY PAID FOR THIS. *** recordDrift-selfcheck ran drift() and then
+// reportLines() on the next line, and reportLines ran drift() a second time: two full six-check passes, 549 ms
+// of them measured, to print a report about the run that had just finished. Callers with a result in hand pass
+// it; callers without one still get the old behaviour.
+export async function reportLines(pre = null) {
+    const d = pre || await drift();
     const L = ["derived records a new module invalidates -- asked before the verify, not after"];
     for (const c of d.all) L.push(`  ${c.stale ? "STALE" : "  ok "}  ${c.name.padEnd(22)} ${c.detail}`);
     L.push(d.stale.length
