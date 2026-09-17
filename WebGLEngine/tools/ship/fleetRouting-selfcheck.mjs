@@ -39,6 +39,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
+import { noComments } from "./sourceScan.mjs";
 import * as F from "../../brain/fleetRouting.mjs";
 import * as D from "../../brain/drivePolicy.mjs";
 import { initNode, mod } from "../../physics/box3d/box3dNode.mjs";
@@ -175,8 +176,18 @@ sec("E. *** THE SURFACES READ THE LEDGER: THE GAUGE CARD, THE GRID ROWS, THE POO
     const server = read("server.html"), rep = read("report.html"), pool = read("brain-fleet.html"), inst = read("physics/instruments.mjs"), bridge = read("ai-bridge/gpuBrainBridge.js");
     ok("server.html's gauge row has the routed card and fills it from health's `routed` (peer as the value, the request as the note)",
         /id="bgRouted"/.test(server) && /id="bgRoutedNote"/.test(server) && /h\.routed/.test(server) && /rt\.last\.peer\.id/.test(server) && /rt\.last\.what/.test(server));
+    // v4642 -- THE ROUTE MAY BE REQUESTED THROUGH A HELPER, AND THE CLAIM IS THE WIRING AND NOT THE SPELLING.
+    // report.html read this route as `await (await fetch(route)).json()`, which is boundaryLint's
+    // UNCHECKED_JSON_BODY: on an HTML error page .json() throws a SyntaxError about a stray "<" and the page
+    // reports the fleet as unreachable for a server that answered with a 500. It goes through a local
+    // getLocalJson() that checks response.ok first, and this row went red on the CALL SYNTAX while the fact it
+    // names -- that the grid requests /ai/brain/routed -- was never in doubt. Both spellings are accepted now,
+    // and the route is looked for in the page's CODE rather than its raw text. noComments and not codeOnly:
+    // codeOnly blanks string CONTENT, and the route IS a string, so it would delete the subject. Written
+    // first without either, the row was satisfied by a commented-out call -- found by sabotage, one line
+    // after a note claiming it would not be.
     ok("report.html's fleet grid fetches /ai/brain/routed and writes 'took N, last <what>' on a peer's row and a line per peer",
-        /fetch\("\/ai\/brain\/routed"/.test(rep) && /took ' \+ p\.count/.test(rep) && /id="fleetRouted"/.test(rep) && /UNATTRIBUTED/.test(rep));
+        /(?:fetch|getLocalJson)\("\/ai\/brain\/routed"/.test(noComments(rep)) && /took ' \+ p\.count/.test(rep) && /id="fleetRouted"/.test(rep) && /UNATTRIBUTED/.test(rep));
     ok("brain-fleet.html's pool cards fetch /ai/brain/routed and say what each brain took",
         /fetch\("\/ai\/brain\/routed"/.test(pool) && /tookOf\(r\.id\)/.test(pool) && /no requests routed/.test(pool));
     ok("the bridge registers both routes through the registry (declared checks, a schema, a body bound) and exports the ledger",

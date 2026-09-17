@@ -174,15 +174,29 @@ console.log("\n4. *** THE CONSEQUENCE: AN INSTRUCTION THAT NAMES ONE RECORD AS '
     // statedRuntime tells a reader to correct a drifted header from gate-timings.json. That is safe only if
     // that file is right, and section 3 says it is right about half the time.
     const sr = fs.readFileSync(path.join(ENG, "tools", "ship", "statedRuntime-selfcheck.mjs"), "utf8");
-    ok("statedRuntime's failure message names gate-timings.json as the thing to correct a header from",
-        // *** v4580 -- CONVERTED TO proseHas FIRST, WHICH BROKE IT, WHICH IS THE ANSWER. *** This site was on
-        // gateQuality-selfcheck's prose-debt list and absent from its frozen baseline, so that gate was red at
-        // HEAD for it. Unwrapping comments made the row FAIL: the phrase is a STRING LITERAL in
-        // statedRuntime-selfcheck's failure message, not a comment, so prose() strips away the very thing being
-        // hunted. gateQuality's own header measured this at v3106 -- 28 of 38 attempted conversions break, and a
-        // regex that breaks when comments are all that is left WAS NEVER HUNTING A COMMENT. A plain substring
-        // test is the honest instrument for a literal, and it is not prose debt at all.
-        sr.includes("correct the header FROM THE MEASUREMENT"), "its instruction to whoever finds the row red");
+    // *** v4645 -- THE INSTRUCTION WAS REPAIRED AND THIS WITNESS ROW WENT RED FOR THE REPAIR. ***
+    //
+    // It asserted that statedRuntime's message still reads "correct the header FROM THE MEASUREMENT in
+    // gate-timings.json", so that section 4's argument had a LIVE subject: an instruction naming ONE record
+    // as the measurement, when section 3 has just shown neither record can correct the other. That is a
+    // witness, and a witness goes red the day somebody fixes what it is witnessing -- the
+    // register-of-grievances shape this tree has now caught in `observed.length < 50`, in `NV.length > 100`,
+    // and in section 5's own cap clause two screens down, whose note says the right answer out loud: "it
+    // asserts the LIVE STATE now rather than the inertness".
+    //
+    // The fix arrived from the fsr line's v4640, which rewrote that message to
+    // "correct the header from THIS measurement, not from the record". So the row asserts the repaired state
+    // and keeps the old spelling as the thing that must NOT come back -- a regression to naming either record
+    // is red, and the section's argument survives as the REASON for the wording rather than as a live defect.
+    const fromRecord = /correct the header FROM THE MEASUREMENT in gate-timings\.json/.test(sr);
+    const fromClock = /correct the header from THIS measurement, not from the record/.test(sr);
+    ok("!! *** statedRuntime tells a reader to correct a header FROM THE CLOCK, not from either record ***",
+        fromClock && !fromRecord,
+        fromClock ? "its message is \"correct the header from THIS measurement, not from the record\" -- which is " +
+                    "the only instruction section 3 supports, since 20 of 39 disagreements are closer to the sweep " +
+                    "and 19 to gate-timings and NEITHER can correct the other"
+                  : "IT NAMES A RECORD AGAIN: " + (fromRecord ? "gate-timings.json, the spelling v4640 removed" :
+                    "and not the clock either -- the message no longer says where to correct a header from"));
     // MEASURED at v4575: shaderCensus stated ~0.5s, gate-timings held 239 ms, a clock said 1501 ms. Following
     // the instruction literally writes 0.24s into a gate that takes 1.5s -- the header was flagged correctly
     // and the file was the stale half. The entry has since been re-timed, so this row pins the LESSON against

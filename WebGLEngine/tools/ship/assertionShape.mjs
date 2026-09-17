@@ -398,83 +398,55 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // against a 3,000 ms budget. Trimming the control from ten species to five landed at 3,499 and to four
     // at 3,161 -- still over. THE COUNT OF GATES AND THE COUNT OF SUBJECTS DISAGREE HERE FOR A REASON THE
     // BUDGET DECIDED, which is the same reason v4632's droplet split made them disagree the other way.
-    // v4584 -- RE-TAKEN on the tree merged with main at v4583: one gate (fleetRouting) joined, the same four rows by one.
-    // v4536 -- RE-TAKEN AGAIN AT THE MERGE, for tools/ship/partitionScore-selfcheck.mjs: 1619 -> 1620.
-    // *** BOTH LINES RE-TOOK THIS TABLE IN THE SAME WINDOW, TWICE IN TWO ROUNDS, AND THE MERGE HAS TO ADD
-    // THE TWO MOVES RATHER THAN PICK ONE: *** each side's note is correct for a tree containing its own new
-    // gate and neither is correct for the tree containing both. Re-derived from the merged tree.
-    // v4537 -- RE-TAKEN for tools/ship/backlogAbsence-selfcheck.mjs: 1620 -> 1621 and the three rows that
-    // follow a gate by one. distinctDefinitions holds at 40 for the fourth round running.
-    // v4537 -- RE-TAKEN AT THE MERGE: 1625 -> 1627, the two gates this branch added. FOURTH MERGE RUNNING
-    // where both lines re-took this table in the same window. distinctDefinitions holds at 40 for the tenth
-    // round; every number here is re-derived from the merged tree and never summed from the two notes.
-    // v4538 -- RE-TAKEN for tools/ship/pathCost-selfcheck.mjs: 1627 -> 1628 and the three rows that follow
-    // a gate by one. distinctDefinitions holds at 40 for the eleventh round running.
-    // v4539 -- RE-TAKEN for tools/ship/groundProbe-selfcheck.mjs: 1628 -> 1629 and the three rows that follow
-    // a gate by one.
-    // v4540 -- RE-TAKEN AT THE MERGE: 1626 -> 1630.
-    // v4541 -- RE-TAKEN for tools/ship/capsuleMove-selfcheck.mjs: 1630 -> 1631 and the three rows that
-    // follow a gate by one -- usesOk 1610, definesOk 1602, nameFirst 1503. The round's second new file is
-    // physics/character/capsuleMove.mjs, a MODULE, and it moves none of these, which is the distinction
-    // these nine rows exist to make. distinctDefinitions holds at 40 for the twelfth round running: the new
-    // gate reuses the ok(name, cond, detail) spelling already counted rather than inventing a forty-first.
-    // v4543 -- RE-TAKEN for tools/ship/capsuleGround-selfcheck.mjs: 1631 -> 1632 and the three rows that
-    // follow a gate by one. The round's second new file is physics/character/capsuleGround.mjs, a MODULE,
-    // and it moves none of these. distinctDefinitions holds at 40 for the thirteenth round running.
-    // v4544 -- RE-TAKEN for tools/ship/fallBody-selfcheck.mjs: 1632 -> 1633 and the three rows that follow
-    // a gate by one. The round's second new file is physics/character/fallBody.mjs, a MODULE, and it moves
-    // none of these. distinctDefinitions holds at 40 for the fourteenth round running.
-    // v4545 -- RE-TAKEN for tools/ship/playerGround-selfcheck.mjs: 1633 -> 1634 and the three rows that
-    // follow a gate by one. The round's other change is to camera/camera.js, an existing MODULE, and a
-    // round that edits a module without adding one moves none of these. distinctDefinitions holds at 40
-    // for the fifteenth round running.
-    // v4546 -- RE-TAKEN for tools/ship/playerSlope-selfcheck.mjs: 1634 -> 1635 and the three rows that
-    // follow a gate by one. The round's other changes are all to existing files -- camera/camera.js and
-    // two gates whose expectations moved -- and a round that edits without adding moves none of these.
-    // distinctDefinitions holds at 40 for the sixteenth round running.
-    // v4547 -- RE-TAKEN for tools/ship/controllerAgreement-selfcheck.mjs: 1635 -> 1636 and the three rows
-    // that follow a gate by one. The round's second new file is tools/ship/controllerAgreement.mjs, a
-    // MODULE, and it moves none of these. distinctDefinitions holds at 40 for the seventeenth round.
-    // v4548 -- RE-TAKEN for tools/ship/cameraFall-selfcheck.mjs: 1636 -> 1637 and the three rows that
-    // follow a gate by one. The round's other change is to camera/camera.js, an existing module -- it
-    // REMOVES code rather than adding a file. distinctDefinitions holds at 40 for the eighteenth round.
-    // v4549 -- RE-TAKEN for tools/ship/playerBody-selfcheck.mjs: 1637 -> 1638 and the three rows that
-    // follow a gate by one. The round's other change is to camera/camera.js, an existing module.
-    // distinctDefinitions holds at 40 for the nineteenth round running.
-    // v4550 -- RE-TAKEN for tools/ship/playerWater-selfcheck.mjs: gates 1638 -> 1639, usesOk 1617 ->
-    // 1618, definesOk 1609 -> 1610, nameFirst 1510 -> 1511. One gate moves four of the nine rows.
-    // v4551 -- RE-TAKEN for tools/ship/voxelAvatarDevice-selfcheck.mjs, the device half split out of
-    // voxelAvatar: 1639 -> 1640, usesOk 1619, definesOk 1611, nameFirst 1512. *** A SPLIT ADDS A GATE TO
-    // THIS CENSUS EVEN THOUGH IT ADDED NO CHECK TO THE TREE *** -- the rows moved files, they did not
-    // arrive -- so this table counts FILES and not coverage, which is worth saying where it is read.
-    // v4552 -- RE-TAKEN for tools/ship/walkGround-selfcheck.mjs: 1640 -> 1641, usesOk 1620, definesOk
-    // 1612, nameFirst 1513.
-    // v4554 -- RE-TAKEN for tools/ship/kaijuGround-selfcheck.mjs: 1641 -> 1642, usesOk 1621, definesOk
-    // 1613, nameFirst 1514.
-    // *** BOTH LINES RE-TOOK THIS TABLE AGAINST A TREE THE OTHER COULD NOT SEE, AND THE READINGS BELOW ARE
-    // NEITHER OF THEIRS. *** The sets overlap on everything predating the split, so the two are not summed;
-    // they are RE-DERIVED by running the census over the merged tree. Both note chains are kept, because a
-    // chain that loses a round stops being a history of how the number moved.
-    // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
-    // and the readings overlap on everything predating the split, so they are run over the merged tree rather
-    // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
-    // v4638 -- RE-TAKEN for tools/ship/fsrPage-selfcheck.mjs, the temporal arc's first page gate: 1736 -> 1737,
-    // usesOk 1715 -> 1716, definesOk 1707 -> 1708, nameFirst 1608 -> 1609. One gate arrived and four of the
-    // nine rows moved by one; the five that did not (distinctDefinitions, condFirst, unknownSignature,
-    // importsOk, suspects) are the ones that say the new gate uses the tree's own assertion shape rather than
-    // inventing a tenth. That is what this census is for, and it is the reason the row compares all nine.
-    // v4640 -- RE-TAKEN for tools/ship/pipeTruncation-selfcheck.mjs: 1737 -> 1738, usesOk 1716 -> 1717,
-    // definesOk 1708 -> 1709, nameFirst 1609 -> 1610. Named by the pre-flight BEFORE the verify this time,
-    // which is what v4639 built the runner for -- last round the same six records were found one at a time
-    // across two full sweeps.
-    // v4641 -- RE-TAKEN for tools/ship/fsrPageDevice-selfcheck.mjs: 1738 -> 1739, usesOk 1717 -> 1718,
-    // definesOk 1709 -> 1710, nameFirst 1610 -> 1611. The same four rows as v4638 and v4640, moving by one,
-    // and the same five standing still -- which is the row's whole point: a new gate that made
-    // distinctDefinitions or unknownSignature move would be one that invented its own assertion shape. This
-    // gate was SPLIT out of fsrPage-selfcheck rather than written from nothing, so it inherited the shape,
-    // and the census cannot tell those two origins apart. It says the shape is right, not where it came from.
-    gates: 1739, usesOk: 1718, definesOk: 1710, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1611, condFirst: 91, unknownSignature: 16,
+    // v4637 -- RE-TAKEN 1677 -> 1679 for TWO gates: tools/ship/murmurSpecies8-selfcheck.mjs (arc) and
+    // tools/ship/murmurSpecies9-selfcheck.mjs (sol). TWO GATES FOR TWO SPECIES AGAIN, and again the split is
+    // arithmetic: written as one, the pair's first draft of the arc half alone already ran 3,030 ms against a
+    // 3,000 ms ceiling. THE TWO SHARE MORE MACHINERY THAN ANY PAIR YET -- sol.ts says its prominences are
+    // "solved the way arc's filament is", and the closed-form tube they both call moved into the kit as
+    // mhTube this round -- and they still could not share a gate, because what a gate costs is COMPILES and
+    // FRAMES, not source lines. The count of gates and the count of shared code disagree here in the
+    // opposite direction from v4632's droplet split, which is the third distinct way this record has watched
+    // those two numbers come apart.
+    // v4638 -- RE-TAKEN 1679 -> 1681 for tools/ship/murmurSpecies10-selfcheck.mjs (aura) and …Species11
+    // (flux). A FOURTH consecutive round of two gates for two species -- and the FIRST where the pair was
+    // never going to fit in one for a reason other than the budget: the two gates measure along DIFFERENT
+    // AXES. aura's rows integrate over the whole interior (a sum and two percentiles); flux's read the frame
+    // ROW BY ROW, because its whole claim is vertical. Sharing a file would have meant sharing frames, and
+    // frames chosen for one axis are the wrong frames for the other -- which is the same lesson the
+    // not-graded note in …Species11 records from the other side.
+    // v4639 -- RE-TAKEN 1681 -> 1683 for tools/ship/murmurSpecies12-selfcheck.mjs (duet) and …Species13
+    // (chorus). SIXTEEN of murmur's eighteen species are now ported and graded, across THIRTEEN species
+    // gates -- and the count of gates has exceeded the count of PAIRS for five rounds running, because since
+    // v4636 no two species have shared one. The reason has changed each time (compiles, then frames, then
+    // measurement axes) and the record keeps both numbers for that reason.
+    // v4641 -- RE-TAKEN 1685 -> 1687 for tools/ship/murmurLive-selfcheck.mjs and …Live2-selfcheck.mjs. The
+    // PAIR count does not move with them and that is the point of keeping both numbers: these two gates have
+    // one subject between them -- mh_live arriving in the picture -- and they are two files only because four
+    // species in one gate measured 2,772 ms against a 3,000 ms ceiling. A count of gates has never been a
+    // count of claims, and here it is not a count of subjects either, in the opposite direction to v4640's.
+    // v4640 -- RE-TAKEN 1683 -> 1685 for tools/ship/murmurSpecies14-selfcheck.mjs (prism) and …Species15
+    // (helix). *** WITH THESE TWO ALL EIGHTEEN OF murmur-web's SPECIES ARE PORTED AND GATED, across fifteen
+    // species gates and one kit gate. *** And the last pair is the one where this record's two counts finally
+    // say something uncomfortable: FOUR of that pair's rows are not four claims about shaders. Two grade the
+    // CONSTANT TABLES and say so in their own titles, because sabotaging the shaders left them green. A count
+    // of gates has never been a count of claims; this is the first round where it is not even a count of
+    // SUBJECTS, and the gates carry that in their text rather than in this note alone.
+    // v4644 -- RE-TAKEN 1687 -> 1689 for tools/ship/murmurIgnite-selfcheck.mjs and …Ignite2-selfcheck.mjs.
+    // The SAME shape as v4641's two: one subject -- the SUCCESS flash arriving in pixels -- split across two
+    // files because a species costs about 195 ms and four of them would have crossed the 3,000 ms ceiling.
+    // What is different this round is that the split carries a claim rather than only a cost: the sibling
+    // holds the two heroes whose SUCCESS is NOT the common case, so the pair is "the rule and the
+    // exceptions" and reads as two subjects even though it is gating one term.
+    // *** v4645 -- RE-DERIVED AT THE main MERGE, which is the only honest way to take this table. *** The two
+    // lines re-took it independently: main's rounds through v4644 and the fsr line's five unshipped rounds,
+    // each note correct for a tree holding its own new gates and NEITHER correct for the tree holding both.
+    // 1689 -> 1751, and the same four rows move together by exactly 62 -- gates, usesOk, definesOk, nameFirst
+    // -- because 62 gates arrived and every one of them uses the tree's own assertion shape. THE FOUR THAT DID
+    // NOT MOVE ARE THE READING: distinctDefinitions holds at 41, condFirst at 91, unknownSignature at 16 and
+    // suspects at 0, so not one of the 62 invented a forty-second spelling of ok(). That is what this census
+    // is for, and it is why the row compares all nine rather than the headline.
+    gates: 1751, usesOk: 1730, definesOk: 1722, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1623, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

@@ -1,9 +1,9 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed.",
- "at": "2026-09-17T02:24:14.327Z",
+ "at": "2026-09-17T15:02:34.456Z",
  "budgetMs": 3000,
- "lastRun": 42,
+ "lastRun": 20,
  "rotated": [
   {
    "gate": "ai-bridge/assetSync-perf-selfcheck.mjs",
@@ -2112,58 +2112,132 @@
    "at": "2026-09-09T12:57:13.333Z"
   },
   {
-   "gate": "tools/ship/murmurKit-selfcheck.mjs",
-   "ms": 1710,
+   "gate": "tools/ship/murmurIgnite-selfcheck.mjs",
+   "ms": 1943,
    "code": 0,
-   "priorMs": 1713,
-   "at": "2026-09-16T14:12:10.961Z"
+   "at": "2026-09-17T15:02:34.456Z"
+  },
+  {
+   "gate": "tools/ship/murmurIgnite2-selfcheck.mjs",
+   "ms": 2019,
+   "code": 0,
+   "at": "2026-09-17T15:02:34.456Z"
+  },
+  {
+   "gate": "tools/ship/murmurKit-selfcheck.mjs",
+   "ms": 1945,
+   "code": 0,
+   "priorMs": 1630,
+   "at": "2026-09-17T15:02:34.456Z"
+  },
+  {
+   "gate": "tools/ship/murmurLive-selfcheck.mjs",
+   "ms": 1919,
+   "code": 0,
+   "at": "2026-09-17T15:02:34.456Z"
+  },
+  {
+   "gate": "tools/ship/murmurLive2-selfcheck.mjs",
+   "ms": 1603,
+   "code": 0,
+   "at": "2026-09-17T15:02:34.456Z"
   },
   {
    "gate": "tools/ship/murmurSpecies-selfcheck.mjs",
-   "ms": 1971,
+   "ms": 1783,
    "code": 0,
-   "priorMs": 2834,
-   "at": "2026-09-16T14:12:10.961Z"
+   "priorMs": 1781,
+   "at": "2026-09-17T15:02:34.456Z"
+  },
+  {
+   "gate": "tools/ship/murmurSpecies10-selfcheck.mjs",
+   "ms": 1487,
+   "code": 0,
+   "at": "2026-09-17T15:02:34.456Z"
+  },
+  {
+   "gate": "tools/ship/murmurSpecies11-selfcheck.mjs",
+   "ms": 1827,
+   "code": 0,
+   "at": "2026-09-17T15:02:34.456Z"
+  },
+  {
+   "gate": "tools/ship/murmurSpecies12-selfcheck.mjs",
+   "ms": 1639,
+   "code": 0,
+   "at": "2026-09-17T15:02:34.456Z"
+  },
+  {
+   "gate": "tools/ship/murmurSpecies13-selfcheck.mjs",
+   "ms": 2231,
+   "code": 0,
+   "at": "2026-09-17T15:02:34.456Z"
+  },
+  {
+   "gate": "tools/ship/murmurSpecies14-selfcheck.mjs",
+   "ms": 1139,
+   "code": 0,
+   "at": "2026-09-17T15:02:34.456Z"
+  },
+  {
+   "gate": "tools/ship/murmurSpecies15-selfcheck.mjs",
+   "ms": 1828,
+   "code": 0,
+   "at": "2026-09-17T15:02:34.456Z"
   },
   {
    "gate": "tools/ship/murmurSpecies2-selfcheck.mjs",
-   "ms": 1515,
+   "ms": 1541,
    "code": 0,
-   "priorMs": 2256,
-   "at": "2026-09-16T14:12:10.961Z"
+   "priorMs": 1507,
+   "at": "2026-09-17T15:02:34.456Z"
   },
   {
    "gate": "tools/ship/murmurSpecies3-selfcheck.mjs",
-   "ms": 1828,
+   "ms": 1964,
    "code": 0,
-   "priorMs": 2565,
-   "at": "2026-09-16T14:12:10.961Z"
+   "priorMs": 1811,
+   "at": "2026-09-17T15:02:34.456Z"
   },
   {
    "gate": "tools/ship/murmurSpecies4-selfcheck.mjs",
-   "ms": 1607,
+   "ms": 1650,
    "code": 0,
-   "priorMs": 2244,
-   "at": "2026-09-16T14:12:10.961Z"
+   "priorMs": 1541,
+   "at": "2026-09-17T15:02:34.456Z"
   },
   {
    "gate": "tools/ship/murmurSpecies5-selfcheck.mjs",
-   "ms": 2080,
+   "ms": 2059,
    "code": 0,
-   "priorMs": 2663,
-   "at": "2026-09-16T14:12:10.961Z"
+   "priorMs": 2005,
+   "at": "2026-09-17T15:02:34.456Z"
   },
   {
    "gate": "tools/ship/murmurSpecies6-selfcheck.mjs",
-   "ms": 2435,
+   "ms": 2413,
    "code": 0,
-   "at": "2026-09-16T17:17:17.167Z"
+   "priorMs": 2257,
+   "at": "2026-09-17T15:02:34.456Z"
   },
   {
    "gate": "tools/ship/murmurSpecies7-selfcheck.mjs",
-   "ms": 2146,
+   "ms": 2125,
    "code": 0,
-   "at": "2026-09-16T17:17:14.621Z"
+   "priorMs": 2067,
+   "at": "2026-09-17T15:02:34.456Z"
+  },
+  {
+   "gate": "tools/ship/murmurSpecies8-selfcheck.mjs",
+   "ms": 2281,
+   "code": 0,
+   "at": "2026-09-17T15:02:34.456Z"
+  },
+  {
+   "gate": "tools/ship/murmurSpecies9-selfcheck.mjs",
+   "ms": 2033,
+   "code": 0,
+   "at": "2026-09-17T15:02:34.456Z"
   },
   {
    "gate": "tools/ship/notifyDoor-selfcheck.mjs",

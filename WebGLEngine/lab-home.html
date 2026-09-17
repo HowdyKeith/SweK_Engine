@@ -90,13 +90,25 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 let RH = null, ROUTED = null, current = null;
 
+// v4642 -- THE RESPONSE IS CHECKED BEFORE IT IS PARSED. The four reads below were
+// `await (await fetch(route)).json()`, which is tools/ship/boundaryLint.mjs's UNCHECKED_JSON_BODY: on an HTML
+// error page .json() throws a SyntaxError about a stray "<", so a server that answered with a 500 is reported
+// as "not reachable" -- the one wrong diagnosis a page whose whole job is reporting the bridge's state can give.
+// BEHAVIOUR ON SUCCESS IS UNCHANGED; all four sites are already inside a try/catch with their own fallback, so
+// only the error TEXT differs, and it now names the status instead of a parse position.
+const getLocalJson = async (route) => {
+  const res = await fetch(route, { cache: "no-store" });
+  if (!res.ok) throw new Error(route + " -> HTTP " + res.status);
+  return res.json();
+};
+
 async function load() {
   try {
-    const j = await (await fetch("/roundhouse/lab-scenes", { cache: "no-store" })).json();
+    const j = await getLocalJson("/roundhouse/lab-scenes");
     if (!j || !j.ok) throw new Error(j && j.error || "bad answer");
     RH = j;
   } catch (e) { RH = null; $("doorLine").textContent = "bridge not reachable: this page reads the live proposer registry from the running server (" + (e && e.message || e) + ")"; }
-  try { ROUTED = await (await fetch("/ai/brain/routed", { cache: "no-store" })).json(); } catch { ROUTED = null; }
+  try { ROUTED = await getLocalJson("/ai/brain/routed"); } catch { ROUTED = null; }
   paint();
 }
 
@@ -132,10 +144,10 @@ $("initiate").onclick = async () => {
   $("initiate").disabled = true; $("liveState").textContent = "(running " + current + "...)";
   const row = H.sceneRow(RH ? RH.scenes : [], current);
   try {
-    const j = await (await fetch("/roundhouse/lab-scene-run?scene=" + encodeURIComponent(current), { cache: "no-store" })).json();
+    const j = await getLocalJson("/roundhouse/lab-scene-run?scene=" + encodeURIComponent(current));
     paintStrip(H.liveStrip(j, row));
   } catch (e) { paintStrip(H.liveStrip({ ok: false, error: String(e && e.message || e) }, row)); }
-  finally { $("initiate").disabled = false; try { ROUTED = await (await fetch("/ai/brain/routed", { cache: "no-store" })).json(); } catch {} }
+  finally { $("initiate").disabled = false; try { ROUTED = await getLocalJson("/ai/brain/routed"); } catch {} }
 };
 load();
 </script>

@@ -63,9 +63,9 @@ export async function mountAiPresenceOrbWidget(opts = {}) {
         statePath = "../render/aiPresenceOrbState.mjs",
     } = opts;
 
-    let THREE, TSL, makeAiPresenceOrbHdrPipeline, createPresenceState;
+    let THREE, TSL, makeAiPresenceOrbHdrPipeline, createPresenceState, STATE_INDEX;
     try {
-        [THREE, TSL, { makeAiPresenceOrbHdrPipeline }, { createPresenceState }] = await Promise.all([
+        [THREE, TSL, { makeAiPresenceOrbHdrPipeline }, { createPresenceState, STATE_INDEX }] = await Promise.all([
             import(/* @vite-ignore */ threePath), import(/* @vite-ignore */ tslPath),
             import(/* @vite-ignore */ presentPath), import(/* @vite-ignore */ statePath),
         ]);
@@ -193,6 +193,18 @@ export async function mountAiPresenceOrbWidget(opts = {}) {
             time: paused ? 0 : (now - t0) / 1000 * p.speed,
             glow: p.glow, depth: p.depth, hueShift: p.hueShift,
             presence: 0.5, clarity: 0.6, glintRate: 0.3, voice: p.voice,
+            // *** THE STATE AND THE CADENCE REACH THE SHADER NOW -- v4641. *** createPresenceState has tracked
+            // both since it was built (getParams returns `activity` and `state`), and this call dropped both
+            // on the floor because the shader had nowhere to put them: it read the raw `voice` at 44 sites and
+            // borrowed still's `glintRate` dial at 8 more. With mh_live wired, handing it a stateIndex of 0
+            // forever would pin the orb in IDLE -- it would never reach the LISTENING lift at all, which is
+            // the one state murmur gives the voice its full weight in.
+            // *** AND stateTau ARRIVES AT v4644, WITH THE FLASH IT DRIVES. *** mh_state turns (stateIndex,
+            // stateTau) into four windows; three of them are wired in the shader now -- `settled` on every
+            // interior and the pair the SUCCESS shell travels on -- so a stateTau pinned at 0 would hold the
+            // orb at the instant of arrival forever: full sweep at the heart, nothing travelling, and the
+            // settle never arriving at all.
+            activity: p.activity, stateIndex: STATE_INDEX[p.state], stateTau: p.stateTau,
             aspect: 1,   // the widget's own canvas is always square, unlike the standalone demo's full window
         });
         pipeline.render(renderer);

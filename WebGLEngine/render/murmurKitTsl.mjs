@@ -16,7 +16,7 @@
 "use strict";
 
 import { MH_R, MH_ETA, MH_EXT, MH_TILT, MH_SCATTER_K, MH_SPREAD, MH_EXIT_CAP, MH_DRIFT_WOBBLE_CAP,
-         MH_AMP_CAP } from "./murmurKit.mjs";
+         MH_AMP_CAP, MH_SQRTPI } from "./murmurKit.mjs";
 
 /**
  * makeMurmurKitTsl(TSL) -> the kit's node builders.
@@ -98,6 +98,92 @@ export function makeMurmurKitTsl(TSL) {
         const q = vec3(ca.mul(p.x).add(sa.mul(p.z)), p.y, sa.negate().mul(p.x).add(ca.mul(p.z))).toVar();
         const cb = cos(ax).toVar(), sb = sin(ax).toVar();
         return vec3(q.x, cb.mul(q.y).sub(sb.mul(q.z)), sb.mul(q.y).add(cb.mul(q.z)));
+    });
+
+    /**
+     * kit.ts's mh_roll: the THIRD rotation, in the xy plane about the view axis, applied BEFORE yaw and tilt.
+     * Without it "three ribbons at three yaws and three tilts came out as three horizontal swooshes stacked on
+     * each other, which is one swoosh". The CPU twin's gate asserts it preserves length, as mhSpin's does.
+     */
+    const mhRoll = Fn(([p, a]) => {
+        const c = cos(a).toVar(), s = sin(a).toVar();
+        return vec3(c.mul(p.x).sub(s.mul(p.y)), s.mul(p.x).add(c.mul(p.y)), p.z);
+    });
+
+    /**
+     * *** THE CLOSED-FORM TUBE: w * sqrt(pi) / sin(alpha) * exp(-perp^2 / w^2). *** The whole-ray integral of
+     * a gaussian tube crossed at angle alpha, and the reason arc and sol can draw a LINE where a march cannot
+     * draw one thinner than its own step. sinA is floored by the CALLER -- arc at 0.58, sol at 0.55, each for
+     * its own stated reason -- so nothing is floored here.
+     */
+    const mhTube = Fn(([w, sinA, perp2]) =>
+        w.mul(MH_SQRTPI).div(sinA).mul(exp(perp2.div(w.mul(w)).negate())));
+
+    /**
+     * *** THE LIVE SIGNALS, CONDITIONED ONCE -- the shader half of murmurKit.mjs's mhLive. ***
+     *
+     * A PLAIN JS CLOSURE AND NOT AN Fn, for the reason this file has hit three times now: Fn() compiles its
+     * body into a single callable node and cannot hand back a JS object of several nodes. Builders that
+     * return a SET are closures; only builders that return one node are Fn.
+     *
+     * The state weights are selects on a float index rather than an integer switch because the index arrives
+     * as a uniform: LISTENING is index 1, and THINKING and RESPONDING are 2 and 3, so `working` is the open
+     * interval (1.5, 3.5) and covers both. The half-unit windows are how murmur's own TS compares them and
+     * they are what makes an index of exactly 1.0 or 3.0 land unambiguously inside one.
+     *
+     * pow(0, 0.65) is 0 here and not a NaN: WGSL evaluates it as exp2(0.65 * log2(0)) = exp2(-inf) = 0, so a
+     * silent level gives a silent voice and no epsilon is needed to protect it. The CPU twin returns exactly
+     * 0 at the same input and murmurKit-selfcheck.mjs grades the pair at level 0 for that reason.
+     */
+    const mhLive = (level, activity, stateIndex) => {
+        const L = clamp(level, 0.0, 1.0).toVar();
+        const A = clamp(activity, 0.0, 1.0).toVar();
+        const idx = float(stateIndex).toVar();
+        const listening = select(idx.greaterThan(0.5).and(idx.lessThan(1.5)), float(1.0), float(0.0));
+        const working = select(idx.greaterThan(1.5).and(idx.lessThan(3.5)), float(1.0), float(0.0));
+        return {
+            voice: pow(L, float(0.65)).mul(float(0.55).add(listening.mul(1.00 - 0.55))),
+            pace: pow(A, float(0.85)).mul(float(0.60).add(working.mul(1.00 - 0.60))),
+        };
+    };
+
+    /**
+     * *** THE STATE READ -- the shader half of murmurKit.mjs's mhState. *** Four scalars, so a closure.
+     *
+     * SUCCESS (index 4) gives `complete`, `sweep` and `settled`; RESPONDING (index 3) gives `drive`; every
+     * other state gives four zeros, which is why the multiply-by-(1 + complete) form murmur uses everywhere
+     * is a no-op outside the flash instead of a thing each species has to guard.
+     *
+     * TSL's smoothstep IS the CPU twin's `ss` -- it clamps to 0..1 and returns u*u*(3-2u) -- so the pair here
+     * is the same curve written twice and not two curves that happen to be close. The one place to be careful
+     * is that `a` and `sweep` divide tau by DIFFERENT windows, 1.20 and 0.95: the ignition's travel finishes
+     * a quarter-second before its breath does, which is what stops the flash reading as a wipe.
+     */
+    const mhState = (stateIndex, stateTau) => {
+        const idx = float(stateIndex).toVar();
+        const tau = max(float(stateTau), 0.0).toVar();
+        const success = select(idx.greaterThan(3.5).and(idx.lessThan(4.5)), float(1.0), float(0.0)).toVar();
+        const responding = select(idx.greaterThan(2.5).and(idx.lessThan(3.5)), float(1.0), float(0.0)).toVar();
+        const a = clamp(tau.div(1.20), 0.0, 1.0).toVar();
+        const sw = clamp(tau.div(0.95), 0.0, 1.0).toVar();
+        return {
+            complete: smoothstep(float(0.0), float(0.30), a)
+                .mul(float(1.0).sub(smoothstep(float(0.36), float(1.0), a))).mul(success),
+            settled: smoothstep(float(0.30), float(1.05), a).mul(success),
+            sweep: smoothstep(float(0.0), float(1.0), sw).mul(success),
+            drive: smoothstep(float(0.0), float(0.55), tau).mul(responding),
+        };
+    };
+
+    /**
+     * *** THE IGNITION SHELL -- the shader half of murmurKit.mjs's mhIgnite. *** A gaussian ring at
+     * mix(lo, hi, sweep), which is how seven of the eighteen species run a SUCCESS along the marched ray.
+     * The species' own gain is NOT folded in; see the CPU twin's note for why nebula and tempest make that
+     * the load-bearing distinction.
+     */
+    const mhIgnite = Fn(([pLen, complete, sweep, lo, hi, width]) => {
+        const sr = pLen.sub(mix(lo, hi, sweep)).div(width).toVar();
+        return complete.mul(exp(sr.mul(sr).negate()));
     });
 
     /** kit.ts's mh_drift: eased angular travel, so an arc hurries and dawdles instead of spinning. */
@@ -250,6 +336,44 @@ export function makeMurmurKitTsl(TSL) {
     /** Identity below the knee, an asymptotic compression above -- so a specular keeps its SHAPE, not a plateau. */
     const mhKnee = (x, knee) => select(x.lessThan(knee), x,
         knee.add(float(1.0).sub(knee).mul(float(1.0).sub(exp(x.sub(knee).div(max(float(1.0).sub(knee), float(1e-3))).negate())))));
+
+    /**
+     * *** mh_present's TAIL -- the shader half of murmurKit.mjs's mhPresentFinish. *** The full reasoning,
+     * murmur's three terms and their numbers, and how the sign of uvY was MEASURED rather than copied, are
+     * all in the CPU twin's doc comment; this is the same arithmetic on a node graph.
+     *
+     * NO BRANCH ON paper, matching the twin: murmur's `if (paper > 0.002)` is an early-out, both weights
+     * carry `paper` as a factor, and dropping it on both sides is what makes the pair agree exactly.
+     *
+     * RETURNS UN-CLAMPED LINEAR LIGHT, also matching mh_present, which hands its result to mh_out and lets
+     * THAT clamp after the encode. The shadow weight reaches 1.11 and the mix is allowed to overshoot.
+     */
+    const mhPresentFinish = (rgb, spec, contact, uvY, pal, inkLinear) =>
+        mhPresentKnee(mhPresentPaper(rgb, spec, contact, uvY, pal, inkLinear), pal.paper);
+
+    /** mh_present's tone knee, which MOVES with the ground: 0.90 on ink, 0.96 on paper. Per channel. */
+    const mhPresentKnee = (rgb, paper) => {
+        const knee = mix(float(0.90), float(0.96), paper).toVar();
+        return vec3(mhKnee(rgb.x, knee), mhKnee(rgb.y, knee), mhKnee(rgb.z, knee));
+    };
+
+    /**
+     * The two GROUND-DEPENDENT terms alone -- the catchlight and the contact shadow -- split from the knee
+     * because in this tree the two belong to different stages. render/aiPresenceOrbPresent.mjs already
+     * applies knee(x, 0.90) on the HDR path, quoting present.wgsl's own "the tone curve ... is written ONCE";
+     * the catchlight and shadow read `paper`, which nothing downstream of the species shader knows about.
+     * The CPU twin's doc comment carries the full reasoning and the gap this leaves.
+     */
+    const mhPresentPaper = (rgb, spec, contact, uvY, pal, inkLinear) => {
+        const paper = pal.paper;
+        const litLab = mhLchT(min(pal.s0.x.mul(1.06).add(0.05), float(1.02)), float(0.012), float(0.9)).toVar();
+        const lit = oklabToLinearT(litLab.x, litLab.y, litLab.z).toVar();
+        const kCatch = smoothstep(float(0.34), float(0.92), spec).mul(paper).toVar();
+        const afterLit = mix(rgb, lit, kCatch).toVar();
+        const below = smoothstep(float(-0.10), float(0.66), uvY.div(MH_R)).toVar();
+        const kShade = clamp(contact.mul(2.60), 0.0, 1.0).mul(float(0.06).add(below.mul(1.05))).mul(paper).toVar();
+        return mix(afterLit, inkLinear.mul(0.55), kShade);
+    };
 
     /** THE VALUE HIERARCHY AS ONE CURVE: the bottom 78% of energy into the rail's first 72%, the rest on the peak. */
     const mhTier = (e) => {
@@ -457,11 +581,11 @@ export function makeMurmurKitTsl(TSL) {
         // the literal token `null` -- which the GPU rejected at pipeline creation rather than silently. Both
         // times the value is one number that half the family's colour depends on and nothing owned it.
         MH_R, MH_ETA, MH_EXT, MH_TILT, MH_SCATTER_K, MH_SPREAD, MH_EXIT_CAP,
-        mhHash, mhGrad3, mhNoise3, mhHash1, mhFlourish, mhBreath, mhDrift, mhSpin,
+        mhHash, mhGrad3, mhNoise3, mhHash1, mhFlourish, mhBreath, mhDrift, mhSpin, mhRoll, mhTube, MH_SQRTPI, mhLive, mhState, mhIgnite,
         mhRefract, mhLook, mhExit, mhHaze, mhMedium, mhInside, mhTransmit, mhScatter,
         mhDeform, mhBody, MH_AMP_CAP,
         mhKey, mhSmall, mhSurface, mhContainment, mhOpalLife, mhAbyssSlot,
-        mhPaper, mhPalette, mhShade, mhKnee, mhTier, mhLit, mhLchT, labOfSrgb, srgbToLinearT, linearToOklabT, oklabToLinearT,
+        mhPaper, mhPalette, mhShade, mhKnee, mhTier, mhPresentFinish, mhPresentPaper, mhPresentKnee, mhLit, mhLchT, labOfSrgb, srgbToLinearT, linearToOklabT, oklabToLinearT,
         Loop,
     };
 }
@@ -480,6 +604,12 @@ export function makeMurmurKitTsl(TSL) {
  * mode: "hash"  -> pixel (x,y) carries mhHash(x, y, 0) packed big-endian across RGBA.
  *       "noise" -> mhNoise3 over a fixed lattice, remapped to 0..1 in R (8-bit, so compared within quantisation).
  *       "exit"  -> mhExit for a ray through the body, in R, scaled by 1/MH_EXIT_CAP.
+ *       "live"  -> mh_live's voice in R and pace in G, over signal (x) by state (y).
+ *       "state" -> mh_state's complete/sweep/settled/drive in RGBA, over tau (x) by state (y).
+ *       "ignite" -> the SUCCESS shell for three species in RGB, over |p| (x) by sweep (y).
+ *       "finishPaper" / "finishInk" / "finishGrey" -> mh_present's tail over specular (x) by height (y);
+ *                the grey case carries a light ground and a mid-grey page, which is where two of its
+ *                constants are observable at all.
  */
 export function makeMurmurKitProbeTsl(THREE, TSL, { mode = "hash", n = 16 } = {}) {
     const K = makeMurmurKitTsl(TSL);
@@ -550,6 +680,98 @@ export function makeMurmurKitProbeTsl(THREE, TSL, { mode = "hash", n = 16 } = {}
             // the glow about 0.4. The gate divides by the same numbers.
             return vec4(clamp(sf.rim.div(2.0), 0.0, 1.0), clamp(sf.spec.div(2.0), 0.0, 1.0),
                         clamp(sf.glow.div(0.5), 0.0, 1.0), 1.0);
+        }
+        if (mode === "finishPaper" || mode === "finishInk" || mode === "finishGrey") {
+            // *** mh_present's TAIL OVER ITS WHOLE INPUT SQUARE, ON BOTH GROUNDS. *** x carries the SPECULAR
+            // 0..1.2 (past the catchlight's 0.92 upper edge, so the saturated end is in shot) and y carries
+            // the vertical position -1.2..1.2 in body units, which is what the shadow's `below` reads -- so
+            // one frame samples the catchlight along one axis and the shadow's pooling along the other.
+            //
+            // THE CONTACT IS HELD AT 0.5 RATHER THAN SWEPT, because clamp(contact * 2.60, 0, 1) saturates at
+            // 0.385 and a third axis would spend half the frame on a constant. The clamp itself is graded by
+            // the CPU rows instead. The incoming rgb is a mid grey, which is the one value that can move UP
+            // toward the catchlight and DOWN toward the shadow and show both.
+            //
+            // BOTH GROUNDS, because every term here except the knee is multiplied by `paper`: on ink this
+            // function is the knee and nothing else, and a probe that only ran on paper could not tell a
+            // correct ink path from one that had quietly applied the paper terms at half strength.
+            // *** AND A THIRD GROUND, BECAUSE TWO OF mh_present's CONSTANTS ARE INVISIBLE ON THE OTHER TWO. ***
+            // Found by sabotage, measured rather than assumed. (1) The catchlight's 1.06 gain is DEAD on the
+            // house paper: s0.L is 0.9701, so 0.9701 * 1.06 + 0.05 = 1.0782 and the 1.02 cap takes it -- the
+            // gain could be 1.12 or 1.5 and the frame would not move. On a LIGHT GREY ground s0.L is 0.8054,
+            // the sum is 0.9038, and the gain is live. (2) The shadow's 0.55 tint multiplies the INK colour,
+            // and the house ink is 0.00304 in linear light: 0.55 of it is 0.00167 against 0.75's 0.00228, a
+            // difference of 0.00061 where one 8-bit step is 0.00392. It cannot be seen on a near-black page
+            // by construction. This case gives it a MID-GREY ink so it can be.
+            const paperGround = mode === "finishPaper";
+            const greyCase = mode === "finishGrey";
+            const ink = greyCase ? vec3(0.45, 0.45, 0.45) : vec3(0x0A / 255, 0x0A / 255, 0x0B / 255);
+            const ground = greyCase ? vec3(0.75, 0.75, 0.75) : (paperGround ? vec3(0.97, 0.96, 0.94) : vec3(0x0A / 255, 0x0A / 255, 0x0B / 255));
+            const TONE = vec3(0x6C / 255, 0x63 / 255, 0xE8 / 255);
+            const pal = K.mhPalette(ground, TONE, TONE, float(0.0), float(1.0));
+            const spec = px.div(n).mul(1.2).toVar();
+            const uvY = py.div(n).mul(2.4).sub(1.2).mul(K.MH_R).toVar();
+            const inkLin = vec3(K.srgbToLinearT(ink.x), K.srgbToLinearT(ink.y), K.srgbToLinearT(ink.z));  // the page, not the ground
+            const outRgb = K.mhPresentFinish(vec3(0.5, 0.5, 0.5), spec, float(0.5), uvY, pal, inkLin).toVar();
+            // Scaled by a half so the catchlight's warm white (near 1.0 linear) and any overshoot below zero
+            // both sit inside the 0..1 an 8-bit channel can carry. The gate divides by the same number.
+            return vec4(clamp(outRgb.mul(0.5), 0.0, 1.0), 1.0);
+        }
+        if (mode === "ignite") {
+            // *** THE SHELL OVER THE WHOLE RAY BY THE WHOLE SWEEP. *** x carries |p| over 0..1.2 -- past the
+            // surface, so the ring's far end is in shot rather than cropped at the body -- and y carries the
+            // sweep 0..1, so one frame is the ring's entire journey from the heart to the surface.
+            //
+            // *** AND THE ALPHA CHANNEL READS THE SAME LATTICE A SECOND WAY, FOR `complete`. *** The first cut
+            // held complete at 1 in all three channels and reasoned that a pure multiplier did not need an
+            // axis of its own. A sabotage then deleted the multiplier from this function and walked through
+            // every row in the gate: the frame is IDENTICAL when complete is 1. So alpha re-reads x as |p|
+            // and y as COMPLETE, with the sweep PINNED at 0.5 -- pinned, and not read off the same y,
+            // because a port that spent `sweep` where `complete` belongs would pass a probe that confounded
+            // the two. complete reaches 0 EXACTLY at row 0, which is the state four of murmur's five are in.
+            //
+            // THREE SPECIES IN THREE CHANNELS, and they are the three that bracket the table: still has the
+            // shortest travel (hi 0.95) and the widest ring (0.26), duet the narrowest (0.22), and tempest
+            // the longest (hi 1.05) with the highest gain. A probe carrying one species could not tell a
+            // correct table from a constant.
+            const pLen = px.div(n).mul(1.2).toVar();
+            const sweep = py.div(n).toVar();
+            const one = float(1.0);
+            const r = K.mhIgnite(pLen, one, sweep, float(0.02), float(0.95), float(0.26));   // still
+            const g = K.mhIgnite(pLen, one, sweep, float(0.02), float(1.00), float(0.22));   // duet
+            const b = K.mhIgnite(pLen, one, sweep, float(0.02), float(1.05), float(0.24));   // tempest
+            const a = K.mhIgnite(pLen, py.div(n), float(0.5), float(0.02), float(0.95), float(0.26));  // still, complete on y
+            return vec4(clamp(r, 0.0, 1.0), clamp(g, 0.0, 1.0), clamp(b, 0.0, 1.0), clamp(a, 0.0, 1.0));
+        }
+        if (mode === "live") {
+            // *** mh_live OVER THE WHOLE INPUT SQUARE, AGAINST THE f64 TWIN. *** x is the raw signal 0..1 and
+            // y is the STATE, floor(y*5), so one frame carries all five of murmur's states rather than the one
+            // a point sample would have picked -- and the two weight windows are different (LISTENING alone
+            // for voice, THINKING and RESPONDING together for pace), so a frame that only saw idle would grade
+            // neither of them.
+            //
+            // x REACHES 0 EXACTLY, on purpose: pow(0, 0.65) is the one input where a WGSL exp2(log2(0)) could
+            // come back NaN instead of 0 on a driver that handles the -inf differently, and a probe whose
+            // lattice started at 1/16 would never ask.
+            const u = px.div(n).toVar();
+            const si = TSL.floor(py.div(n).mul(5.0)).toVar();
+            const lv = K.mhLive(u, u, si);
+            return vec4(clamp(lv.voice, 0.0, 1.0), clamp(lv.pace, 0.0, 1.0), 0.0, 1.0);
+        }
+        if (mode === "state") {
+            // *** mh_state, ALL FOUR OUTPUTS AT ONCE, ACROSS ALL FIVE STATES. *** x is tau over 0..1.4, which
+            // is past the end of SUCCESS's own 1.2 s window so the settled tail is in shot rather than cropped
+            // at the point it is still rising; y is the state index.
+            //
+            // THE THREE STATES THAT PRODUCE NOTHING ARE GRADED TOO, and they are the reason the y axis is here
+            // at all: every species multiplies its interior by (1 + complete), so `complete` being exactly zero
+            // in IDLE is the thing that keeps eighteen shaders from needing eighteen guards. A probe that only
+            // sampled SUCCESS would let a gating bug through as four rows of agreement.
+            const tau = px.div(n).mul(1.4).toVar();
+            const si = TSL.floor(py.div(n).mul(5.0)).toVar();
+            const st = K.mhState(si, tau);
+            return vec4(clamp(st.complete, 0.0, 1.0), clamp(st.sweep, 0.0, 1.0),
+                        clamp(st.settled, 0.0, 1.0), clamp(st.drive, 0.0, 1.0));
         }
         if (mode === "noise") {
             // A lattice that deliberately straddles cell boundaries, where a wrong fade or a wrong gradient

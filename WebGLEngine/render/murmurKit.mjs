@@ -711,6 +711,93 @@ export function mhSurface(b, t, small, inkRgb, tilt, rimKIn, specK, glowK) {
  * [ampBase, ampBreath, breathPeriod, gain]. A species with ampBreath 0 has a fixed amplitude; droplet is the
  * one whose amplitude comes from its own knobs instead and is not in this table.
  */
+/**
+ * *** SUCCESS: THE INTERIOR IGNITES AND SETTLES, AND EVERY ONE OF THE EIGHTEEN DOES IT. *** kit.ts calls this
+ * "this family's flash", and it is the one state whose physics is shared outright: "The light in a success is
+ * NOT an overlay: every species multiplies its own interior energy by (1 + complete), which brightens exactly
+ * what is already there and leaves the dark dark."
+ *
+ * THE SETTLE IS THE TAIL OF IT, and it is the half that is genuinely universal: nineteen sites across the
+ * eighteen sources, each `(1 + k * st.settled)` on an interior, with k drawn from a five-value set. Ported as
+ * a TABLE for the same reason MH_SHAPE is one -- a constant per species, read off each file rather than
+ * averaged, so a gate can assert the roster instead of a copy of this tree's own guess at it.
+ *
+ * TWO OF THE NINETEEN ARE NOT INTERIOR MULTIPLIERS AND ARE CARRIED AS THEMSELVES:
+ *   comet   has TWO -- 0.25 on its headBright, which is the point of light itself, and 0.20 on the interior.
+ *           The species whose subject is one bright point spends its settle on the point first.
+ *   droplet has an ADDITIVE one: coreBright = 1 + 0.85 * live.voice + 0.35 * st.settled, so the settle lands
+ *           beside the voice in a brightness rather than on a marched accumulation. Transcribed, not
+ *           normalised into the others' shape -- droplet is the hero whose body IS the subject and its core
+ *           brightness is not an interior gain.
+ */
+export const MH_SETTLED = Object.freeze({
+    still: 0.22, limn: 0.30, comet: 0.20, droplet: 0.35, opal: 0.22, abyss: 0.26,
+    nebula: 0.20, tempest: 0.20, fathom: 0.20, geode: 0.22, arc: 0.22, sol: 0.20,
+    aura: 0.22, flux: 0.22, duet: 0.20, chorus: 0.22, prism: 0.22, helix: 0.22,
+});
+/** comet's SECOND settle, on the head rather than the interior -- see MH_SETTLED's note. */
+export const MH_SETTLED_COMET_HEAD = 0.25;
+
+/**
+ * *** THE SEVENTEEN WHOSE SETTLE IS AN INTERIOR GAIN, WHICH IS MH_SETTLED MINUS DROPLET. ***
+ *
+ * Derived rather than hand-written so a change to a species' number cannot make the two tables disagree, and
+ * it exists at all because the alternative was a conditional. render/aiPresenceOrbTsl.mjs applies the settle
+ * at the ONE site all eighteen interiors pass through, and droplet has to be excluded there -- its settle is
+ * an ADDITIVE term on coreBright, at its own site. That exclusion first shipped as
+ * `species === "droplet" ? 0.0 : MH_SETTLED[species]`, and a sabotage deleted the conditional and walked
+ * through every gate in the round: droplet would have taken the settle TWICE and no instrument renders
+ * droplet in SUCCESS. A missing key cannot be deleted by a tidying pass the way a ternary can, and a census
+ * row can ask which key is missing and why, which is what tools/ship/murmurLive-selfcheck.mjs now does.
+ */
+export const MH_SETTLED_INTERIOR = Object.freeze(Object.fromEntries(
+    Object.entries(MH_SETTLED).filter(([k]) => k !== "droplet")));
+
+/**
+ * *** THE IGNITION SHELL: A GAUSSIAN RING THAT LEAVES THE HEART AND REACHES THE SURFACE. ***
+ *
+ * kit.ts: "`sweep` is the same window read as a POSITION, 0 to 1 over 0.95 s, and it is what each species runs
+ * the ignition ALONG." Seven of the eighteen run it as a shell down the marched ray, and they run it as ONE
+ * formula with four constants:
+ *
+ *     sr = (|p| - mix(lo, hi, sweep)) / width;   e += complete * gain * exp(-sr * sr)
+ *
+ * so the ring starts at `lo` (the heart) and ends at `hi` (the surface, or just past it), `width` is how thick
+ * the shell is in body units, and `gain` is how much light it carries. The other eleven species spend
+ * `complete` on their own figures instead -- arc on its filament, limn on its rim, aura on its ribbons -- and
+ * those are per-species transcriptions rather than this one shape, which is why they are not in this table.
+ *
+ * *** TWO OF THE SEVEN ALSO PRE-MULTIPLY THE WHOLE MARCH, and that is a different statement from the shell. ***
+ * nebula and tempest do `e *= 1 + preK * complete` BEFORE adding the ring, so the entire cloud brightens and
+ * then the ring travels through it; the other five brighten only along the ring. Carried as `preK`, zero where
+ * the source has none, because a cloud lighting up whole is what those two species ARE.
+ *
+ * `into` records where the ring's light goes: five species add it to the march's own `e`, and droplet puts it
+ * in a separate `shell` term that is summed with the medium before the fade -- its ring is a thing crossing
+ * the water rather than more of the water.
+ */
+export const MH_IGNITE = Object.freeze({
+    still:   Object.freeze({ lo: 0.02, hi: 0.95, width: 0.26, gain: 0.30, preK: 0.00, into: "e" }),
+    opal:    Object.freeze({ lo: 0.02, hi: 1.00, width: 0.24, gain: 0.30, preK: 0.00, into: "e" }),
+    abyss:   Object.freeze({ lo: 0.02, hi: 1.00, width: 0.26, gain: 0.42, preK: 0.00, into: "e" }),
+    droplet: Object.freeze({ lo: 0.05, hi: 1.00, width: 0.20, gain: 0.34, preK: 0.00, into: "shell" }),
+    duet:    Object.freeze({ lo: 0.02, hi: 1.00, width: 0.22, gain: 0.26, preK: 0.00, into: "e" }),
+    nebula:  Object.freeze({ lo: 0.02, hi: 1.05, width: 0.24, gain: 0.50, preK: 0.65, into: "e" }),
+    tempest: Object.freeze({ lo: 0.02, hi: 1.05, width: 0.24, gain: 0.55, preK: 0.70, into: "e" }),
+});
+
+/**
+ * The shell's own profile, WITHOUT the species' gain: complete * exp(-((|p| - mix(lo, hi, sweep)) / width)^2).
+ *
+ * The gain is left to the caller because two of the seven multiply it by their own local density as well
+ * (nebula and tempest spend it `* dens`), and folding a gain in here would make those two look like the other
+ * five with a different number rather than like what they are.
+ */
+export function mhIgnite(pLen, complete, sweep, lo, hi, width) {
+    const sr = (pLen - (lo + (hi - lo) * sweep)) / width;
+    return complete * Math.exp(-sr * sr);
+}
+
 export const MH_SHAPE = Object.freeze({
     still: Object.freeze([0.018, 0.006, 4.2, 1.12]),
     limn: Object.freeze([0.020, 0.000, 0.0, 1.05]),
@@ -728,6 +815,30 @@ export const MH_SHAPE = Object.freeze({
     // differ only in lane and gain -- another pair the derived percentage cannot tell apart, and another
     // reason the row below grades ENTRIES rather than spreads.
     fathom: Object.freeze([0.021, 0.007, 5.3, 1.20]),
+    // THE TWO LINE-DRAWING HEROES, and they are the widest-apart breath LANES in the table: sol's 12.9 is
+    // more than twice arc's 6.1, which is the difference between a star that swells slowly and a stroke that
+    // is laid down. Their gains, 1.20 and 1.24, are a hundredth apart from fathom's and geode's -- a fourth
+    // and fifth pair the derived-percentage row could not tell from the others, and the last argument the
+    // ENTRIES-not-spreads rule needed.
+    arc: Object.freeze([0.021, 0.007, 6.1, 1.20]),
+    sol: Object.freeze([0.022, 0.008, 12.9, 1.24]),
+    // THE TWO SHEET HEROES, and their breath LANES are the widest-apart pair in the table after arc and sol:
+    // aura's 0.4 against flux's 8.6, a factor of twenty-one. aura's body is asked to do almost nothing --
+    // "This hero's business is inside, and a wobbling shell would compete with the ribbons for the same
+    // attention" -- and its 1.35 gain is the LARGEST of the twelve, which is the same sentence read the other
+    // way: a shell that deforms little needs a firmer edge to still be a shell.
+    aura: Object.freeze([0.022, 0.008, 0.4, 1.35]),
+    flux: Object.freeze([0.022, 0.008, 8.6, 1.22]),
+    // THE LAST TWO OF THE SIXTEEN THIS PORT CARRIES, and they close the table's widest gap: chorus's breath
+    // lane is 15.6 against duet's 3.1, a factor of five, which is a shell that swells once a quarter-minute
+    // against a pair that breathes with its own orbit.
+    duet: Object.freeze([0.023, 0.007, 3.1, 1.25]),
+    chorus: Object.freeze([0.021, 0.008, 15.6, 1.20]),
+    // THE LAST TWO, and with them the table carries all eighteen of murmur's heroes. prism's 2.4 is the
+    // fastest breath in the set and helix's 10.4 sits mid-table -- and their gains are IDENTICAL at 1.20,
+    // the fourth pair to share one, which is the last argument the ENTRIES-not-spreads rule ever needed.
+    prism: Object.freeze([0.021, 0.007, 2.4, 1.20]),
+    helix: Object.freeze([0.021, 0.007, 10.4, 1.20]),
     geode: Object.freeze([0.021, 0.007, 11.7, 1.22]),
 });
 
@@ -815,6 +926,418 @@ export const MH_GEODE = Object.freeze({
     sharpB: 1.4, sharpK: 2.6, sharpV: 1.0, litB: 0.10, litK: 1.25,
     bodyEdge: 0.34, crystalGain: 0.92, medB: 0.048, medS: 0.028, medAbsorb: 2.00, murkGain: 3.20,
     spinRate: 0.088, spinWob: 0.48, spinLane: 2.0,
+});
+
+/**
+ * ARC'S FILAMENT: the frame it is drawn in, the curve, and the spindle.
+ *
+ * arc.ts opens with the hardest sentence in the collection: "THE SPECIES IS A LINE, and a line is the hardest
+ * thing this kit has been asked to draw. Everything else is either compact enough to solve at the ray's
+ * closest approach or broad enough that five samples average it honestly. A filament is neither."
+ *
+ * THE SEARCH RUNS ALONG THE CURVE, NOT THE RAY, and that inversion is the trick. For a point C on the curve
+ * the ray's closest approach is two dot products; sampling THAT along the curve and taking the smallest finds
+ * where the ray passes nearest the filament. arc.ts on why it is stable: "Searching a smooth one-dimensional
+ * function is what makes this stable: the samples slide continuously as the geometry moves, so nothing pops."
+ *
+ * TWO CROSSINGS, NOT ONE, and the reason is geometric rather than aesthetic: "a shallow U seen from most
+ * angles is crossed twice, and a global minimum would find only one and break the thread where it passes over
+ * itself". So the twenty samples are searched in two halves of ten and both winners are kept.
+ */
+export const MH_ARC = Object.freeze({
+    samples: 20, halves: 2,
+    // The frame. roll first (the xy rotation), then yaw and tilt.
+    rollB: 0.55, rollAmp: 0.9, rollRate: 0.052, rollWob: 0.5, rollLane: 1.0,
+    yawRate: 0.041, yawWob: 0.55, yawLane: 2.0,
+    tiltB: 0.30, tiltAmp: 0.5, tiltRate: 0.037, tiltPhase: 2.2,
+    swayB: 0.30, swayK: 0.60,
+    // The geometry. pin is the arc's closest approach to the centre: "At 1 the filament passes right through
+    // the core; at 0 it bows well clear."
+    pinFar: 0.30, pinNear: 0.05, pinVoice: 0.30, pinFlourish: 0.35,
+    rcB: 0.58, rcK: 0.14, spanB: 1.15, spanK: 0.35, spanSmall: 0.78,
+    // THE THREAD. 0.052 body units at the middle of the knob's range is five per cent of the sphere's radius,
+    // "about five pixels at 120 pt and two at 18 pt. Set purely by what reads as calligraphic, which is what
+    // it should have been set by all along" -- that last clause being the escape from the march constraint.
+    wB: 0.042, wK: 0.022, wSmall: 1.90,
+    brightB: 0.90, brightVoice: 0.85, brightFlourish: 0.45,
+    // THE SPINDLE, and it is TWO exponents on ONE profile, not one. Width rides prof linearly and brightness
+    // rides prof^1.35, "so the thread reads as a stroke laid down with pressure in the middle and lifted at
+    // both ends, rather than as a rod of even ink that happens to narrow".
+    profPow: 0.85, wlFloor: 0.28, wlRide: 0.72, brightPow: 1.35,
+    // The 1/sin(alpha) grazing term, floored at 0.58 rather than the 0.30 the geometry allows: "at three and
+    // a third it put a bright BULGE wherever the filament leaned toward the viewer, and a thread with a
+    // swelling two thirds along it is not brightest at its centre, which is the whole of the brief."
+    sinFloor: 0.58,
+    // The halo's coefficient is 0.09 where the marched heroes give their scatter 0.24, "because this one is
+    // INTEGRATED rather than sampled. The integral scales with width, so a halo 3.2 times wider carries 3.2
+    // times the light at the same coefficient -- it stopped being a glow around a thread and became a wide
+    // band with a thread inside it."
+    haloK: 0.09,
+    shimCycles: 4.2, shimPace: 0.55, runFreq: 4.2, runRate: 2.4,
+    sepIn: 0.16, sepOut: 0.44,
+    medB: 0.055, medS: 0.030, medAbsorb: 2.00, medGain: 3.40,
+    // THE GAIN, AND IT IS 35.0 BECAUSE A CLOSED FORM RETURNS A LENGTH. See mhTube's note: a march returns a
+    // sum of samples times a step and the two are nowhere near the same scale.
+    filGain: 35.0, filSmall: 0.52,
+    flourishSlot: 11.0, flourishDur: 8.1,
+});
+
+/**
+ * SOL'S CORE AND ITS PROMINENCES: a disc solved with one square root, and three tongues solved the way arc's
+ * filament is.
+ *
+ * sol.ts: "THE CORE IS THE MASS AND THE PROMINENCES ARE THE LINE. Both are solved rather than sampled, and
+ * they are solved differently because they are different kinds of thing." The core is "a perfect disc, and it
+ * costs one square root ... exactly, analytically round from every angle, at every frame, with no sampling in
+ * it anywhere". The prominences reuse the curve search, at NINE samples rather than arc's twenty because each
+ * tongue is a short arch rather than a span.
+ *
+ * ONE OR TWO AT A TIME: "Three prominences on periods of 13, 17 and 21 seconds, each spending most of its
+ * cycle flat against the surface, so the sun is never symmetric and never crowded. The lift is sin-squared,
+ * flat at both ends."
+ */
+export const MH_SOL = Object.freeze({
+    samples: 9, count: 3,
+    rsB: 0.30, rsK: 0.09, rsSmall: 1.42, rsBreathLane: 2.7, rsBreath: 0.030, rsVoice: 0.035,
+    // The disc's own threshold. It runs from 1.04 of the radius to 0.86 -- an eased edge on an ANALYTIC
+    // circle, which is a soft edge on hard geometry rather than a blurred one.
+    discOut: 1.04, discIn: 0.86,
+    // The granulation is weighted to the disc's INTERIOR, and the reason is the one failure this species
+    // cannot afford: "Granulation applied across the limb modulates the very threshold that makes the core
+    // round, and the photosphere grew notches in its outline -- which on the one hero whose brief is a
+    // composed circular core is the worst place to lose it."
+    simCycles: 8.5, simB: 0.30, simK: 0.55, simPaceB: 0.55, simPaceK: 0.65,
+    granK: 0.32, granIn: 0.55, granOut: 1.0, granScale: 8.5, granRateB: 0.35, granRateK: 0.75,
+    coreB: 1.20, coreK: 0.45, coreVoice: 0.55,
+    coronaWB: 0.16, coronaWK: 0.15, coronaWVoice: 0.25, coronaDisc: 0.60, coronaB: 0.42, coronaK: 0.30,
+    pairIn: 0.28, pairOut: 0.70,
+    promWB: 0.034, promWK: 0.017, promWSmall: 1.75,
+    perB: 13.0, perK: 4.0, rootA1: 0.048, rootA1K: 0.011, rootA2: 0.037, rootA2K: 0.009,
+    rootPh1: 1.9, rootPh2: 3.1,
+    hkB: 0.24, hkK: 0.28, hkVoice: 0.45,
+    // A WIDER SWEEP ALONG THE LIMB than the first build's: "At 0.55 they left radially and read as antennae;
+    // a prominence is a loop rooted at two feet, not a spike."
+    swpB: 0.85, swpK: 0.30,
+    profFall: 0.85, profPow: 0.70, wlFloor: 0.42, wlRide: 0.58, sinFloor: 0.55,
+    haloK: 0.10, haloW: 3.19, haloSpread: 10.2,
+    // THE CORE OCCLUDES, at 0.94 rather than 1.0 so a tongue behind the star is dark rather than absent:
+    // "which is the cue that makes the core read as a solid body rather than as a bright patch."
+    occlude: 0.94,
+    medB: 0.030, medS: 0.018, medAbsorb: 2.00, medGain: 3.00,
+    // 6.60 against arc's 35.0, and the ratio is the point rather than an accident. sol.ts: "THE PROMINENCE
+    // GAIN IS SMALL, NOT THE 26 A MARCHED HERO WOULD WANT ... Carrying a marched hero's gain across put every
+    // tongue five times over the rail's top, which is why they drew as white slabs instead of as line work."
+    promGain: 6.60,
+    flourishSlot: 23.0, flourishDur: 12.4,
+});
+
+/**
+ * AURA'S RIBBONS: three open SHEETS, and the numbers that make them cloth rather than glass.
+ *
+ * aura.ts's argument against the obvious shape is worth keeping whole: "WHY SHEETS AND NOT LOOPS. A loop
+ * projects to an ellipse, and a band of finite thickness laid on an ellipse has two places where it turns
+ * edge-on to the viewer and pinches to nearly nothing. Those pinches are corners, and a stroke with a sharp
+ * turn in it IS calligraphy. A sheet has no turns because it has no ends inside the volume: it enters one
+ * side of the glass and leaves the other, the way a length of silk hanging in water does."
+ *
+ * *** AND THE OCCLUSION IS THE SPECIES, WHICH IS WHY absorb IS IN THIS TABLE AND NOT IN THE SHADER. *** "The
+ * interior march then does the rest for free -- a tap that lands in a near sheet attenuates what the far ones
+ * contribute behind it, so the crossings resolve as occlusion rather than as addition." The coefficient is
+ * fitted against a capture and its two failure modes are both named: "at 9 the far ribbon vanishes entirely
+ * and the body loses its sense of fullness, at 1.5 nothing occludes anything and it is smoke again."
+ *
+ * THE RIPPLE USES TWO INCOMMENSURATE WAVES, never one: "One wave is a corrugation and reads as a machined
+ * part; two at 1.7 and 1.1 with different phases give the surface a slow irregular lift that never repeats
+ * along its length, which is what cloth does." And it is kept LOW on purpose -- "past about 0.3 the sheet
+ * folds back on itself along the view ray and draws a bright seam where a fold is edge-on -- the loop's cusp
+ * problem returning by another road."
+ */
+export const MH_AURA = Object.freeze({
+    // thickness to width is about one to four, "which is a ribbon; at one to one it would be a slab".
+    whB: 0.105, whK: -0.020, whSmall: 1.85, bwB: 0.400, bwK: -0.070, bwSmall: 1.25,
+    // Per-ribbon face widths, as multiples of bw -- ribbon 1 wider and ribbon 2 narrower, "because two
+    // identical ribbons at two angles still read as one thing said twice".
+    faceMul: Object.freeze([1.00, 1.30, 0.80]),
+    thirdIn: 0.55, thirdOut: 0.95, thirdSmallIn: 0.22, thirdSmallOut: 0.62,
+    secondSmallIn: 0.52, secondSmallOut: 0.94, secondSmall: 0.34,
+    w3B: 0.55, w3K: 0.45,
+    rateB: 0.17, rateK: 0.24, rateVoice: 0.85, rateLane: Object.freeze([1.00, 0.83, 1.17]),
+    driftWob: Object.freeze([0.40, 0.52, 0.34]), driftPhase: Object.freeze([0.0, 2.1, 4.3]),
+    ampB: 0.098, ampK: 0.130, ampVoice: 0.55, ampSmall: 0.78,
+    // The three sheets' ripple: [along-x frequency, cross-z frequency, cross weight, phase, amp multiplier].
+    ripple: Object.freeze([
+        Object.freeze({ fx: 1.70, fz: 1.10, cw: 0.62, ph: 2.1, pk: 0.8, am: 1.00 }),
+        Object.freeze({ fx: 1.30, fz: 1.55, cw: 0.58, ph: 4.3, pk: 0.7, am: 0.85 }),
+        Object.freeze({ fx: 2.10, fz: 0.90, cw: 0.55, ph: 1.4, pk: 0.9, am: 1.15 }),
+    ]),
+    // THE DEPTH OFFSETS. "Each is displaced along its own frame's normal, and since the frames are rolled and
+    // tilted differently, three displacements along three different directions put three surfaces genuinely
+    // apart in the volume. That separation is what the parallax is made of."
+    offsets: Object.freeze([-0.26, 0.24, 0.02]), offsetsSmall: Object.freeze([-0.20, 0.20, 0.02]),
+    rollB: Object.freeze([0.15, 2.05, 3.85]), rollAmp: Object.freeze([0.22, 0.26, 0.20]),
+    rollRate: Object.freeze([0.031, 0.024, 0.019]), rollPhase: Object.freeze([0.0, 2.2, 4.6]),
+    yawRate: Object.freeze([0.061, 0.047, 0.039]), yawWob: Object.freeze([0.5, 0.6, 0.4]),
+    yawLane: Object.freeze([4.0, 5.0, 6.0]), yawPhase: Object.freeze([0.0, 2.4, 4.7]),
+    tiltB: Object.freeze([0.62, -0.78, 0.06]), tiltAmp: Object.freeze([0.16, 0.14, 0.20]),
+    tiltRate: Object.freeze([0.043, 0.037, 0.029]), tiltPhase: Object.freeze([0.0, 1.9, 3.4]),
+    // THE GRADIENT ALONG THE LENGTH, "the other half of the silk read: a ribbon of even brightness is a stroke
+    // however soft its edges are." FLOORED AT 0.58 AND NEVER ZERO -- "a ribbon that goes fully dark has been
+    // cut into pieces, and pieces are not silk."
+    gFloor: 0.58, gRide: 0.42, gFreq: Object.freeze([2.1, 1.6, 1.3]),
+    gRate: Object.freeze([0.083, 0.061, 0.047]), gPhase: Object.freeze([0.7, 3.9, 1.9]),
+    scatterAmp: 0.17, shimCycles: 7.2, shimB: 0.20, shimK: 0.75, shimScale: 7.2, shimRate: 0.9,
+    hueW: Object.freeze([-0.70, 0.55, 1.00]),
+    medAmt: 0.075, medLane: 2.6, ribbonGain: 1.45,
+    // *** THE OCCLUSION COEFFICIENT. *** See the header: 9 kills the far ribbon, 1.5 is smoke.
+    absorb: 4.50,
+    gain: 2.60, gainSmall: 0.92,
+});
+
+/**
+ * FLUX'S CURTAINS: three vertical sheets, and the asymmetric profile that makes them hang.
+ *
+ * flux.ts: "THE ONE HERO ALLOWED A BROAD FLOWING FIELD, and it needs the permission because an aurora is not
+ * an object. Everything else in this collection is something IN the glass; this is the only one whose
+ * interior is a field with a direction."
+ *
+ * *** THE VERTICAL PROFILE IS ASYMMETRIC ON PURPOSE AND IT IS MOST OF THE SPECIES. *** "AURORAE ARE BRIGHT AT
+ * THE BOTTOM AND FADE UPWARD, and getting that one profile right is most of what makes this read as an aurora
+ * rather than as a vertical smear. The lower edge is where the atmosphere is dense enough to glow hard; above
+ * it the light thins out over several times that height. So the vertical term is a sharp rise at the foot and
+ * a long exponential decay above it, asymmetric on purpose -- a symmetric profile reads as a band of light
+ * and not as a curtain hanging."
+ *
+ * *** AND UP IS NEGATIVE Y, WHICH IS A BUG THE SOURCE SHIPPED AND THEN NAMED. *** "A colorEffect's y runs
+ * DOWN the screen, so the body frame's +y is the bottom of the picture -- and the first cut hung its curtains
+ * from that, which put the bright foot along the TOP and the fade going down. An upside-down aurora is not a
+ * subtle mistake; it reads as light pouring in from above rather than as curtains standing on something."
+ *
+ * THE WANDER IS WEIGHTED TOWARD DEPTH RATHER THAN HEIGHT, and the reason is the same failure helix names:
+ * "a sheet whose position swings hard with height leans, and three leaning sheets read as diagonal streaks
+ * rather than as curtains hanging; the same swing read in z folds the curtain toward and away from the
+ * viewer, which is what an aurora does. So the height terms run at 1.1 and the depth terms carry the larger
+ * share." Every height weight below is 0.55 and every depth weight is 0.90 or more.
+ */
+export const MH_FLUX = Object.freeze({
+    yawRate: 0.047, yawWob: 0.50, yawLane: 2.0,
+    tiltB: 0.16, tiltAmp: 0.10, tiltRate: 0.033,
+    flowB: 0.26, flowK: 0.34, flowWob: 0.45, flowLane: 4.0, flowPace: 0.70,
+    bendB: 0.30, bendK: 0.42, bendPace: 0.45, bendSmall: 0.50,
+    wB: 0.105, wK: 0.030, wSmall: 2.00,
+    // THE REACH ABOVE THE FOOT. hi runs 0.42 -> 0.88 of the body, which is what `height` buys.
+    hiB: 0.42, hiK: 0.46, hiVoice: 0.45,
+    // THE PROFILE: a sharp foot from -0.92 to -0.52 and then an exponential decay upward over hi.
+    footIn: -0.92, footOut: -0.52, riseFrom: -0.52,
+    secondSmallIn: 0.34, secondSmallOut: 0.76, thirdSmallIn: 0.16, thirdSmallOut: 0.54,
+    brightB: 0.80, brightVoice: 0.80,
+    // The three sheets: x offset, then the height and depth wander [freq, weight] and their phases.
+    sheets: Object.freeze([
+        Object.freeze({ x: -0.34, fy: 1.10, wy: 0.55, phy: 0.00, ky: 1.00, fz: 1.15, wz: 0.95, phz: 2.1, kz: 0.7, wm: 1.00 }),
+        Object.freeze({ x: 0.04, fy: 0.85, wy: 0.55, phy: 2.40, ky: 1.18, fz: 1.55, wz: 1.00, phz: 4.3, kz: 0.6, wm: 1.25 }),
+        Object.freeze({ x: 0.40, fy: 1.35, wy: 0.55, phy: 4.70, ky: 0.86, fz: 0.95, wz: 0.90, phz: 1.4, kz: 0.9, wm: 0.85 }),
+    ]),
+    scatterAmp: 0.20,
+    striCycles: 6.5, striK: 0.32, striZ: 6.5, striY: 1.7, striFlow: 1.4,
+    hueW: Object.freeze([-1.00, 0.15, 1.00]),
+    medB: 0.055, medS: 0.030, medLane: 2.1, curtainGain: 0.85,
+    absorb: 2.90, gain: 2.40,
+    flourishSlot: 15.0, flourishDur: 11.3,
+});
+
+/**
+ * DUET'S TWO BODIES: an orbit that is never face-on and never edge-on, and the occlusion that turns "dimmer"
+ * into "behind".
+ *
+ * duet.ts states the whole species in one paragraph: "TWO THINGS IN ONE VOLUME IS A DEPTH PROBLEM ... Two
+ * bright blobs going round each other on a flat disc is a loading spinner; two bodies passing in front of and
+ * behind one another with the far one visibly dimmer and partly eaten by the near one is a conversation
+ * happening in a space." Three mechanisms produce that and each is one line: the orbit is TILTED and
+ * precesses; the far one is DIMMER, because both bodies are solved at the view ray's closest approach so each
+ * knows how deep into the glass it is; and the near one OCCLUDES the far one -- "that is the cue that turns
+ * dimmer into behind, and without it the pair reads as two lamps at different brightnesses rather than as two
+ * objects at two depths."
+ *
+ * *** AND THE BALANCE IS A SPLIT, NOT A GAIN, WHICH IS THE PART A GATE CAN PROVE. *** brA = 2 * bal and
+ * brB = 2 * (1 - bal), so the two brightnesses always SUM TO TWO however the balance moves. duet.ts: level
+ * "pushes decisively toward one of them: somebody has the floor. Not both brighter, which would say nothing;
+ * brighter THERE and dimmer here."
+ */
+export const MH_DUET = Object.freeze({
+    leanB: 0.62, leanAmp: 0.20, leanRate: 0.037,
+    precRate: 0.064, precWob: 0.45, precLane: 2.0,
+    rNear: 0.30, rFar: 0.50, rSmall: 1.36,
+    rateB: 0.40, rateK: 0.55, orbitWob: 0.40, orbitLane: 3.0,
+    braidDrive: 0.16, braidFlourish: 0.06, braidRate: 3.0,
+    wAB: 0.145, wAK: 0.030, wASmall: 1.50, ratioLo: 0.52, ratioHi: 1.0, ratioSmall: 0.65,
+    swayB: 0.5, swayAmp: 0.15, swayRate: 0.21, swayWob: 0.50, swayLane: 7.0,
+    balVoice: 0.40, balLo: 0.06, balHi: 0.94,
+    // *** THE OCCLUSION COEFFICIENT. *** Whichever body the ray reaches FIRST eats the other by its own
+    // density at this pixel: exp(-2.40 * core). The branch on sA < sB is the only ordering in the species and
+    // it is exact, because both distances are known in closed form rather than sampled.
+    occlude: 2.40,
+    coreGain: 1.05, scatterAmp: 0.30,
+    medB: 0.085, medS: 0.044, medLane: 2.2, medAbsorb: 2.20, medGain: 3.60,
+    // A warm of the anchor, B cool of it -- and the weights are NOT symmetric (0.85 against 1.00), so the
+    // pair's colour conversation leans the way its own file says it does.
+    hueA: 0.85, hueB: -1.00,
+    flourishSlot: 6.0, flourishDur: 8.3,
+});
+
+/**
+ * CHORUS'S SEVEN VOICES: a Fibonacci shell, and the phase relationship that is the actual subject.
+ *
+ * *** THE LICENCE IS NARROW AND chorus.ts SPENDS ITS OPENING ON IT. *** "THE ONE HERO LICENSED A RHYTHM ...
+ * The family's verbs are FLOW and SETTLE, and breathing luminance is banned as a default motif precisely
+ * because it is the first thing everyone reaches for. The carve-out is for a species whose concept literally
+ * IS a rhythm, and an ensemble breathing is that: the thing the species is actually about is not the
+ * breathing at all but the PHASE RELATIONSHIP between the breaths."
+ *
+ * SO THE DESIGN IS SYNC, NOT PULSE: "At rest the voices are scattered across the cycle -- sync at zero
+ * spreads them over a full period -- and what the eye reads is a loose, uncountable shimmer with no beat in
+ * it, because nothing ever coincides. As sync rises they gather, and at one they breathe as a single body."
+ * That is a claim about the ENSEMBLE'S TOTAL OVER TIME rather than about any one voice, which is why the gate
+ * that grades it measures a variance across frames and not a brightness in one.
+ *
+ * KEPT GENTLE, which is the other half of the licence: the breath is floored so "no voice ever goes out and
+ * the ensemble never blinks" -- life runs 1 - breathe + breathe * sin^2, so its floor is 1 - breathe.
+ */
+export const MH_CHORUS = Object.freeze({
+    count: 7,
+    // THE SHELL IS FIBONACCI so the seven "are evenly spread over the sphere without any two ever lining up
+    // into a row or a ring". 2.39996323 is the golden angle in radians.
+    golden: 2.39996323, shellR: 0.54, shellWob: 0.09, shellRate: 0.061, shellRateK: 0.009, shellPhase: 2.2,
+    driftAmp: 0.05, driftRateX: 0.043, driftRateY: 0.037, driftPhaseY: 1.7,
+    turnRate: 0.048, turnWob: 0.45, turnLane: 2.0,
+    midIn: 0.26, midOut: 0.62, farIn: 0.10, farOut: 0.42,
+    // "Small enough to stay separate on a shell this size: at 0.14 against a spacing of about 0.35 the seven
+    // ran together into one lobed mass and the ensemble stopped being countable, WHICH IS THE ONE THING AN
+    // ENSEMBLE HAS TO BE."
+    radB: 0.082, radK: 0.038, radSmall: 1.75,
+    brightB: 0.70, brightK: 0.55,
+    syncK: 0.75, perB: 8.4, perPace: 2.2 * 0.6,
+    breatheB: 0.30, breatheK: 0.45, breatheSmall: 1.35,
+    // The phase ladder sync closes: voice k sits at k * 0.897 of a full turn at sync 0, and at 0 at sync 1.
+    phaseStep: 0.897,
+    // LEVEL PICKS OUT THE NEAREST rather than brightening the ensemble: "An ensemble where the front row
+    // answers is a much better picture of being listened to than one where everybody gets louder."
+    liftB: 0.25, liftFront: 1.15,
+    coreAmp: 0.60, scatterAmp: 0.42,
+    medB: 0.048, medS: 0.028, medLane: 2.1, medAbsorb: 2.00, medGain: 3.30,
+    flourishSlot: 29.0, flourishDur: 11.1,
+});
+
+/**
+ * *** HELIX'S OWN TAP COUNT, AND IT IS A SECOND UNIFORM IN murmur RATHER THAN A CONSTANT. *** kit.ts declares
+ * two: "uniform int u_taps; // the family's five, scaled by rendered size" and "uniform int u_tapsHi;
+ * // helix's twenty, likewise: its strands ARE the march". Only helix reads the second one.
+ *
+ * SO THE RATIO IS FOUR, AND THAT IS WHAT THIS PORT TRANSCRIBES rather than the number 20. MH_TAPS here is 24
+ * -- the family's five as the demo scales it -- so the high count is 96 by the same scaling. Writing 20 would
+ * have been transcribing another tree's mount, which is the error v4637 caught on arc's march interval and
+ * which is worth not making twice.
+ *
+ * helix.ts on why the count cannot simply be dropped: "TWENTY STEPS, and they are cheap: one sincos each, no
+ * noise, no atan ... PORT: scaled by rendered size like MH_TAPS, and floored well above zero rather than
+ * switched off, because this is the one hero whose figure lives in the march. Dropping it to nothing leaves
+ * an empty bead." And what the count buys: "twenty steps is what lets the strand be 0.062 wide instead of
+ * 0.11" -- the same trade arc made by escaping the march entirely, made here by paying for a finer one.
+ */
+export const MH_TAPS_HI = MH_TAPS * 4;
+
+/**
+ * PRISM'S THREE SHAFTS: where they enter, where they are aimed, and why the fan opens across the screen.
+ *
+ * *** THE ENTRY POINT IS NOT ARBITRARY AND IT IS THE SPECIES' ONE NON-NEGOTIABLE. *** prism.ts: "The shafts
+ * begin where the specular highlight is, because that is where the picture already says the light is coming
+ * from, and a prism whose beams enter somewhere else is a prism nobody believes for a second. mh_key is a
+ * shared function for exactly this reason: the highlight and the entry point read the same direction,
+ * including its slow drift."
+ *
+ * *** AND THE BUNDLE IS NOT AIMED AT THE CENTRE, WHICH IS THE DIFFERENCE BETWEEN SHAFTS AND TADPOLES. ***
+ * "Pointing it at the centre sends the beams substantially AWAY from the viewer, because the entry is on the
+ * front of the sphere; their length then foreshortens to barely more than their width and three shafts render
+ * as three blobs. Aiming instead at a point low and slightly toward the viewer sends them across the body
+ * from upper left to lower right, almost in the screen plane, so nearly their whole length is visible."
+ *
+ * *** THE FAN OPENS ACROSS THE SCREEN BY CONSTRUCTION, NOT BY LUCK. *** "Taking u1 as the cross of the axis
+ * with the view direction puts it in the screen plane by construction, so the fan is always seen side-on and
+ * the split is always visible." u2 is then the depth direction and carries only small wobbles.
+ *
+ * SHAFTS, NEVER RAYS: each beam's width GROWS with distance from the entry. "A beam of constant width is a
+ * laser; a beam that opens as it travels is a shaft of light in a medium." The opening rate is budgeted
+ * explicitly -- "At 0.155 body units per unit travelled a beam is nearly four tenths wide at the far wall --
+ * three of those plus their scatter is one lit balloon, not a split. At 0.055 a shaft roughly triples in
+ * width crossing the body."
+ */
+export const MH_PRISM = Object.freeze({
+    swRate: 0.048, swRateK: 0.040, swWob: 0.52, swLane: 4.0,
+    entryJitter: 0.06, entryJitterK: 0.10, entryR: 1.03,
+    // The aim point: low, and slightly toward the viewer. Not the centre, for the reason in the header.
+    aim: Object.freeze([0.10, 0.62, 0.28]),
+    divB: 0.17, divK: 0.42, divSmall: 1.35, divFlourish: 0.55,
+    wobble: Object.freeze([0.05, 0.06, 0.05]), wobRate: Object.freeze([0.071, 0.043, 0.059]),
+    wobPhase: Object.freeze([0.0, 1.1, 2.2]),
+    w0B: 0.038, w0K: 0.035, w0Small: 1.85, w0Voice: 0.30, midWide: 1.10,
+    // THE OPENING RATE, and its two rejected neighbours are in the header: 0.155 is a balloon, 0.055 triples.
+    wGrowB: 0.040, wGrowK: 0.035,
+    alphaIn: Object.freeze([0.12, 0.46]), alphaOut: Object.freeze([1.60, 2.35]),
+    thirdIn: 0.30, thirdOut: 0.72,
+    brightB: 0.76, brightVoice: 0.65,
+    shimCycles: 5.4, shimK: 0.55, runFreq: 5.4, runRate: 2.6,
+    pulseFrom: 2.0, pulseW: 0.28, pulseAmp: 1.05,
+    scatterAmp: 0.16, beamGain: 0.95,
+    medB: 0.058, medS: 0.030, medLane: 2.2, medAbsorb: 2.60,
+    gain: 2.45,
+    // The outer beams either side of the anchor and the middle one on it: "three neighbouring hues separated
+    // in SPACE rather than mixed, which is the most literal use of the knob in the collection."
+    hueW: Object.freeze([-1.0, 0.0, 1.0]),
+    flourishSlot: 8.0, flourishDur: 9.1,
+});
+
+/**
+ * HELIX'S TWO STRANDS: an upright that stays upright, a counted crossing rhythm, and threads rather than
+ * streaks.
+ *
+ * *** THE GESTALT TEST IS THE SPEC: *** helix.ts -- "somebody says DNA inside three seconds or the species
+ * has failed -- and the first build failed it by being a cousin of flux: broad soft strands on a leaning axis
+ * read as crossing horizontal streaks. Three things were wrong and all three are structural."
+ *
+ *   THE AXIS IS VERTICAL AND STAYS VERTICAL. "A lean of twenty degrees is enough to destroy the read: a helix
+ *   is legible only against a clear upright, and once the upright tips the crossings stop looking like
+ *   crossings and start looking like a weave." The yaw is kept -- it turns the pair toward and away from the
+ *   viewer without disturbing the upright -- and the tilt is down to about six degrees.
+ *
+ *   THE CROSSING RHYTHM IS COUNTED, not left to fall out. "A double helix seen side-on crosses twice per
+ *   turn, so turns is set to put about one and three quarter turns inside the visible height: three or four
+ *   crossings, which is the count the eye reads as a helix rather than as a spring."
+ *
+ *   THE STRANDS ARE THREADS, "and getting there meant giving up the atan2. The distance to the strand is
+ *   measured IN THE HORIZONTAL PLANE AT THE SAMPLE'S OWN HEIGHT: at height y the strand is one point in that
+ *   plane, so the distance is a subtract. That costs one sincos where the angular form cost an inverse
+ *   tangent, which is what makes twenty steps affordable -- and twenty steps is what lets the strand be 0.062
+ *   wide instead of 0.11."
+ *
+ * AND THE TWO STRANDS ARE EXACTLY ANTIPODAL: one sincos serves both, because the second strand is the
+ * NEGATION of the first's offset. That is not an optimisation with a cost -- it is what a double helix IS.
+ */
+export const MH_HELIX = Object.freeze({
+    yawRate: 0.055, yawWob: 0.50, yawLane: 2.0,
+    // ABOUT SIX DEGREES, and the number is the species: 0.06 + 0.05 is 0.11 rad = 6.3 deg, against the twenty
+    // that "is enough to destroy the read".
+    tiltB: 0.06, tiltAmp: 0.05, tiltRate: 0.031,
+    turnsB: 1.75, turnsK: 1.10, turnsSmall: 0.50,
+    climbB: 0.20, climbK: 0.30, climbSmall: 0.70, climbWob: 0.44, climbLane: 5.0,
+    r0B: 0.42, r0K: 0.10,
+    wB: 0.062, wK: 0.022, wSmall: 1.90, wVoice: 0.25,
+    brightB: 0.80, brightK: 0.65, brightVoice: 0.80,
+    // The spindle, in HEIGHT rather than along a curve: "width and brightness fall together, so each strand
+    // is a stroke laid down with pressure in the middle."
+    profSpan: 0.88, profPow: 0.80, wlFloor: 0.30, wlRide: 0.70,
+    scatterAmp: 0.16, strandGain: 0.80, absorb: 3.00,
+    // THE MEDIUM AT A THIRD OF THE FAMILY'S USUAL: "nothing may compete with two thin lines."
+    medB: 0.020, medS: 0.012, medLane: 2.1, medAbsorb: 2.00,
+    gain: 5.60,
+    flourishSlot: 17.0, flourishDur: 9.3,
 });
 
 /** tempest's lightning: the two lane seeds, their slot lengths, and the radius its depth mask kills at. */
@@ -1010,6 +1533,104 @@ export function mhShade(p, t, hue = 0) {
     return oklabToLinear(lab[0] * lS, y * cS, z * cS);
 }
 
+/**
+ * *** THE FINISH, AND THE ONE PLACE THE TWO GROUNDS ARE TOLD APART -- mh_present's tail, ported at v4643. ***
+ *
+ * kit.ts: "On ink the interior, rim, specular and contact bloom are all light and all belong in one energy.
+ * On paper two of the four STOP BEING LIGHT: THE SPECULAR IS THE ONLY THING BRIGHTER THAN THE PAGE, so it
+ * leaves the energy sum and comes back as a small mix toward a warm white; THE CONTACT BLOOM BECOMES A
+ * CONTACT SHADOW, a soft neutral darkening weighted downward the way a shadow pools under a thing rather
+ * than around it."
+ *
+ * This port had the first half of mh_present since v4627 -- railE = body + (spec + contact) * dark, the rail,
+ * and the containment -- and NONE of the tail. On ink that cost exactly one term, the knee. On paper it cost
+ * three, and two of them are the ones that make paper a different ground at all rather than a lighter one:
+ * without the catchlight the specular is subtracted from the energy by `dark` and never comes back, so a
+ * light ground LOSES its highlight instead of gaining a white one; and without the shadow the object floats.
+ *
+ * THE THREE TERMS, in murmur's own order and with its own numbers:
+ *
+ *   CATCHLIGHT   mix(rgb, lit, smoothstep(0.34, 0.92, spec) * paper), where lit is mh_lch(min(L0*1.06+0.05,
+ *                1.02), 0.012, 0.9) -- "a warm white a whisper past the page, so the knee below turns it into
+ *                a crisp small highlight rather than a soft one". A SMOOTHSTEP AND NOT A CLAMP, because "a
+ *                soft white on a white page has no edge to be soft against, and the broad sheen mixed toward
+ *                white spread the catchlight into a grey smudge half the width of the body".
+ *   SHADOW       mix(rgb, inkLin * 0.55, clamp(contact * 2.60, 0, 1) * (0.06 + 1.05 * below) * paper), with
+ *                below = smoothstep(-0.10, 0.66, uvY / MH_R). 0.06 above the centre line and full below it,
+ *                so "the page is clean over the top of the object and darkens under it". A shadow POOLS, it
+ *                does not ring.
+ *   KNEE         mh_knee per channel at mix(0.90, 0.96, paper). It moves WITH the ground: 0.90 stops a bright
+ *                field becoming flat white paper, but "when the ground already IS paper that same knee spends
+ *                all its headroom on the page", so it opens to 0.96 and the page passes through almost
+ *                untouched while the highlight still compresses rather than clipping.
+ *
+ * *** uvY's SIGN IS MEASURED IN THIS TREE AND NOT COPIED FROM THE SOURCE. *** murmur reads gl_FragCoord,
+ * where y runs DOWN, so its +uv.y is BELOW; this port takes its quad from three's uv(). Rather than reason
+ * about which way that lands after the render target and the readback -- the v4638 flux round is what asking
+ * that question from the source costs -- the direction was read off the contact GLOW, which is the only term
+ * outside the silhouette and which murmur already weights downward. Measured at 128 px over the annulus just
+ * past the body, bottom-over-top light: limn 1.426, still 1.074, abyss 1.015. All above 1, so +y in this
+ * file's body coordinates IS the image bottom and the caller passes uvY unnegated, exactly as murmur spells it.
+ *
+ * WHAT THIS IS NOT: mh_out. The triangular-PDF interleaved-gradient dither is still unported, so the
+ * quantisation this compresses into is still the raw one. Named here rather than implied by the function's
+ * name, which is why it is mhPresentFinish and not mhPresent.
+ */
+export function mhPresentFinish(rgb, spec, contact, uvY, pal, inkLinear) {
+    return mhPresentKnee(mhPresentPaper(rgb, spec, contact, uvY, pal, inkLinear), pal.paper);
+}
+
+/** mh_present's tone knee, which MOVES with the ground: 0.90 on ink, 0.96 on paper. Per channel. */
+export function mhPresentKnee(rgb, paper) {
+    const knee = 0.90 + (0.96 - 0.90) * paper;
+    return [mhKnee(rgb[0], knee), mhKnee(rgb[1], knee), mhKnee(rgb[2], knee)];
+}
+
+/**
+ * *** THE TWO GROUND-DEPENDENT TERMS ALONE, SPLIT OUT FROM THE KNEE BECAUSE THE TWO BELONG TO DIFFERENT
+ * STAGES OF THIS PORT'S PIPELINE. *** In kit.ts they sit in one function and this file's mhPresentFinish
+ * still composes them that way, which is what murmurKit-selfcheck grades. But this tree has something
+ * murmur's Metal path does not: render/aiPresenceOrbPresent.mjs, a port of murmur-web's OWN present.wgsl,
+ * whose header states the shape outright -- "Every species renders radiance into an rgba16float target and
+ * ends here, so exposure, bloom, THE TONE CURVE, the dither and the sRGB encode are WRITTEN ONCE" -- and
+ * which already applies knee(x, 0.90).
+ *
+ * SO THE KNEE IS THE PRESENT PASS'S ON THE HDR PATH AND THE SHADER'S ON THE DIRECT ONE, exactly as the sRGB
+ * encode already was: render/aiPresenceOrbTsl.mjs has ended with `linear ? colorLinear : linearToSrgb(...)`
+ * since the HDR pass was built. The catchlight and the shadow are NOT in that bracket -- present.wgsl has no
+ * notion of `paper`, so nothing downstream can apply them and they belong in the species shader on both paths.
+ *
+ * *** THIS WAS FOUND BY A GATE AND NOT BY READING. *** v4643's first cut applied the whole finish in the
+ * fragment, which put a SECOND knee on the HDR path. tools/ship/aiPresenceOrbPresent-selfcheck.mjs's Y-flip
+ * harness went red on it: the direct render's brightest pixel stayed at (12,12) and the pipeline's moved to
+ * (17,15), because compressing an already-compressed peak flattened the lobe the argmax was reading.
+ *
+ * A GAP THIS LEAVES, NAMED RATHER THAN CLOSED: present.wgsl's knee is a fixed 0.90 and mh_present's moves to
+ * 0.96 on paper. On ink the two agree exactly and nothing is lost; on a PAPER ground the HDR path compresses
+ * at 0.90 where the direct path compresses at 0.96. Closing it means threading `paper` into the present pass,
+ * which is a change to a shared post stage rather than a line here.
+ */
+export function mhPresentPaper(rgb, spec, contact, uvY, pal, inkLinear) {
+    const paper = pal.paper;
+    // *** murmur's `if (paper > 0.002)` IS AN EARLY-OUT AND NOT A BEHAVIOUR, so it is not carried. *** Both
+    // weights below already have `paper` as a FACTOR, so at paper = 0 each mix is the identity and the branch
+    // only saves the arithmetic. Dropping it is what makes this twin and the TSL one agree EXACTLY rather
+    // than agree except on the sliver 0 < paper <= 0.002, where a branch on one side and none on the other
+    // would put the pair a few thousandths apart in a place no gate would think to sample.
+    const lit = oklabToLinear(...mhLch(Math.min(pal.s0[0] * 1.06 + 0.05, 1.02), 0.012, 0.9));
+    const kCatch = smoothstep(0.34, 0.92, spec) * paper;
+    let out = [rgb[0] + (lit[0] - rgb[0]) * kCatch, rgb[1] + (lit[1] - rgb[1]) * kCatch, rgb[2] + (lit[2] - rgb[2]) * kCatch];
+    const below = smoothstep(-0.10, 0.66, uvY / MH_R);
+    // *** THE SHADOW WEIGHT REACHES 1.11 AND THE MIX IS ALLOWED TO OVERSHOOT, which is murmur's own
+    // arithmetic and not a slip: (0.06 + 1.05 * below) is 1.11 at below = 1, and GLSL's mix EXTRAPOLATES
+    // past its endpoint there, taking the page a little darker than 0.55 of the ink. It is left exactly as
+    // spelled. What murmur does NEXT is clamp, in mh_out, after the encode -- so the caller clamps, and this
+    // function returns the un-clamped linear light mh_present hands on.
+    const kShade = Math.min(1, Math.max(0, contact * 2.60)) * (0.06 + 1.05 * below) * paper;
+    const shade = [inkLinear[0] * 0.55, inkLinear[1] * 0.55, inkLinear[2] * 0.55];
+    return [out[0] + (shade[0] - out[0]) * kShade, out[1] + (shade[1] - out[1]) * kShade, out[2] + (shade[2] - out[2]) * kShade];
+}
+
 /** kit.ts's knee: identity below it, an asymptotic compression above, so a specular keeps its shape. */
 export function mhKnee(x, knee) {
     return x < knee ? x : knee + (1 - knee) * (1 - Math.exp(-(x - knee) / Math.max(1 - knee, 1e-3)));
@@ -1063,6 +1684,136 @@ export function mhSpin(p, ay, ax) {
     const q = [ca * p[0] + sa * p[2], p[1], -sa * p[0] + ca * p[2]];
     const cb = Math.cos(ax), sb = Math.sin(ax);
     return [q[0], cb * q[1] - sb * q[2], sb * q[1] + cb * q[2]];
+}
+
+/**
+ * *** THE LIVE SIGNALS, CONDITIONED ONCE -- and until v4641 this port did not have them at all. ***
+ *
+ * kit.ts: "THE LIVE SIGNALS, CONDITIONED ONCE, so 'loud' and 'busy' mean the same thing across the family."
+ * Every one of the eighteen species reads `live.voice` and most read `live.pace`; NONE of them reads a raw
+ * level. This port fed them the raw knob at 44 sites and a STYLE knob (glintRate, which is still's own glint
+ * rate from styles.ts) at 8 more, which is two different substitutions of an unconditioned number for a
+ * conditioned one, in every species that ships.
+ *
+ * THE CURVE, in murmur's own words: "A microphone level mapped linearly spends most of its travel in the top
+ * quarter and reads as a gate. Ordinary speech sits low and its interesting structure is down there, so voice
+ * is raised to 0.65 -- a little stronger than a square root -- which puts a normal speaking level near two
+ * thirds of the response. Cadence gets a gentler 0.85: typing rate arrives already smoothed by the host."
+ *
+ * THE STATE WEIGHTS: "Voice is at full strength in LISTENING and at 0.55 elsewhere. Cadence is at full
+ * strength in THINKING and RESPONDING, where a token stream is the thing actually happening, and at 0.6
+ * elsewhere." So the same microphone level means different things in different states, which is the whole
+ * reason this is a function and not a multiply.
+ *
+ * THE CONSEQUENCE FOR THIS PORT IS NOT SMALL AND IT IS NOT UNIFORM. At the gates' own VOICE of 0.3, in the
+ * idle state, murmur's live.voice is 0.3^0.65 * 0.55 = 0.2504 where this port was passing 0.3000 -- 20% hot.
+ * At 1.0 it is 0.5500 against 1.0000, 45% hot. The error GROWS with the knob, so every species was loudest
+ * exactly where it was least faithful.
+ */
+export function mhLive(level, activity, stateIndex) {
+    const L = Math.min(1, Math.max(0, level));
+    const A = Math.min(1, Math.max(0, activity));
+    const listening = (stateIndex > 0.5 && stateIndex < 1.5) ? 1 : 0;
+    const working = (stateIndex > 1.5 && stateIndex < 3.5) ? 1 : 0;
+    return { voice: Math.pow(L, 0.65) * (0.55 + (1.00 - 0.55) * listening),
+             pace: Math.pow(A, 0.85) * (0.60 + (1.00 - 0.60) * working) };
+}
+
+/**
+ * *** THE STATE READ, SHARED BY EVERY SPECIES -- and this port has none of its four outputs wired yet. ***
+ *
+ * kit.ts: "SUCCESS (index 4) is this family's flash and it is always the same physics: THE INTERIOR IGNITES
+ * AND SETTLES. `complete` is the breath of arrival: in over about a third of a second, out over the rest of
+ * 1.2. `sweep` is the same window read as a position, 0 to 1 over 0.95 s, and it is what each species runs
+ * the ignition ALONG. `settled` is what is left afterwards. The light in a success is NOT an overlay: every
+ * species multiplies its own interior energy by (1 + complete), which brightens exactly what is already there
+ * and leaves the dark dark." And: "RESPONDING (index 3) is decisive drive: `drive` ramps in over half a
+ * second so entering the state is a lean and not a jolt."
+ *
+ * THE SWEEP IS EASED AT BOTH ENDS on purpose: "a flash that starts at full speed and stops dead is a wipe,
+ * and a wipe is a UI transition rather than an arrival travelling through a material."
+ *
+ * *** WHAT THIS ROUND DOES AND DOES NOT DO WITH IT. *** The function is ported here, given a TSL twin in
+ * murmurKitTsl.mjs, and graded against the real compiled shader by tools/ship/murmurKit-selfcheck.mjs. What
+ * is NOT done is calling it from the orb: murmur's eighteen shaders reference st.drive 44 times, st.complete
+ * 49, st.settled 19 and st.sweep 16, and every one of those is a transcription with its own constants.
+ *
+ * SO render/aiPresenceOrbTsl.mjs GAINED `activity` AND `stateIndex` THIS ROUND AND DELIBERATELY NOT
+ * `stateTau`. Both of the two it gained are read -- mh_live takes all three of level, activity and state --
+ * while stateTau is read by nothing until the state terms land, and a uniform nothing reads is a row that
+ * cannot fail. That is the next piece and it is deliberately not this one, because `live` is a CORRECTNESS
+ * fix to what already ships (a raw knob standing in for a conditioned signal) while `state` is an ABSENT
+ * FEATURE, and mixing a fix with a feature makes a round whose verification cannot say which half moved.
+ */
+export function mhState(stateIndex, stateTau) {
+    const o = { complete: 0, sweep: 0, settled: 0, drive: 0 };
+    const tau = Math.max(stateTau, 0);
+    const ss = (e0, e1, x) => { const u = Math.min(1, Math.max(0, (x - e0) / (e1 - e0))); return u * u * (3 - 2 * u); };
+    if (stateIndex > 3.5 && stateIndex < 4.5) {
+        const a = Math.min(1, Math.max(0, tau / 1.20));
+        o.complete = ss(0.0, 0.30, a) * (1 - ss(0.36, 1.0, a));
+        o.settled = ss(0.30, 1.05, a);
+        o.sweep = ss(0.0, 1.0, Math.min(1, Math.max(0, tau / 0.95)));
+    } else if (stateIndex > 2.5 && stateIndex < 3.5) {
+        o.drive = ss(0.0, 0.55, tau);
+    }
+    return o;
+}
+
+/**
+ * ROLL -- the THIRD rotation, and kit.ts says exactly what goes wrong without it: "Yaw and tilt alone leave
+ * every loop projecting to an ellipse whose long axis is still horizontal on screen, so three ribbons at
+ * three yaws and three tilts came out as three horizontal swooshes stacked on each other, which is one
+ * swoosh." It is a plain rotation in the xy plane, about the view axis, applied BEFORE yaw and tilt.
+ */
+export function mhRoll(p, a) {
+    const c = Math.cos(a), s = Math.sin(a);
+    return [c * p[0] - s * p[1], s * p[0] + c * p[1], p[2]];
+}
+
+/**
+ * THE MOIRE GATE. kit.ts: a structure eases its CONTRIBUTION to nothing as it approaches a third of a cycle
+ * per pixel, because past that it "stops being a form and becomes moire, which at 18 pt with the form scale
+ * wound down is a real setting and not a theoretical one".
+ *
+ * `cycles` is the structure's wavenumber in radians per uv unit. THIS PORT EVALUATES IT AT ONE MOUNT -- the
+ * nominal 120 pt that mhSmall is also read at in render/aiPresenceOrbTsl.mjs -- so for a given species it is
+ * a constant. It is a FUNCTION here anyway, and not a baked number, for the reason the kit exists at all: a
+ * baked number is a transcription that cannot be checked against the source it came from, and this one can.
+ */
+export function mhAa(cycles, sizeMin, pixelScale) {
+    const px = Math.max(sizeMin, 1) * Math.max(pixelScale, 1);
+    const perPixel = Math.max(cycles, 0) / (2 * Math.PI * px);
+    const u = Math.min(1, Math.max(0, (perPixel - 0.16) / (0.36 - 0.16)));
+    return 1 - u * u * (3 - 2 * u);
+}
+
+/**
+ * *** THE CLOSED-FORM TUBE, WHICH IS WHY ARC AND SOL SHIP TOGETHER. *** A gaussian tube of width w, crossed
+ * by a ray at angle alpha to the tube's own tangent, integrates ALONG THE WHOLE RAY to
+ *
+ *     w * sqrt(pi) / sin(alpha) * exp(-perp^2 / w^2)
+ *
+ * and that is the entire reason either species can draw a line at all. arc.ts states the constraint it
+ * escapes: "A MARCHED FILAMENT CANNOT BE THINNER THAN ITS MARCH. At ten steps down a two-unit chord the
+ * interval is 0.2, so a tube narrower than that is caught by whichever tap lands in it and missed otherwise,
+ * and the line renders dim, uneven and flickering. Widening it to 0.125 was the only way to make ten taps
+ * honest, and the verdict on that was a fat slug of light." sol.ts reaches the same formula from the other
+ * side -- "THE PROMINENCES ... are integrated the way arc's filament is" -- and adds what it costs to get it
+ * wrong in the other direction: "A closed-form line integral returns a LENGTH ... where a march returns a sum
+ * of samples times a step, and the two are nowhere near the same scale. Carrying a marched hero's gain across
+ * put every tongue five times over the rail's top."
+ *
+ * SO THE GAIN IS PART OF THE FORMULA'S MEANING AND NOT A TASTE SETTING, and the two species' gains differ by
+ * more than five times (arc 35.0, sol 6.60) for that reason rather than despite it.
+ *
+ * `sinA` is floored by the CALLER, not here, because the two species floor it differently and for different
+ * stated reasons -- arc at 0.58 because 1/sin at three and a third "put a bright BULGE wherever the filament
+ * leaned toward the viewer", sol at 0.55. A floor baked in here would have silently overridden one of them.
+ */
+export const MH_SQRTPI = 1.7724539;
+export function mhTube(w, sinA, perp2) {
+    return (w * MH_SQRTPI / sinA) * Math.exp(-perp2 / (w * w));
 }
 
 /**

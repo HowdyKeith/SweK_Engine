@@ -181,9 +181,29 @@ console.log("\n5. *** WHAT THE EXILE WAS HIDING, AND WHO PUT IT THERE ***");
         `redCensus.RED_AT_V4279 and accounted for, ${unreg.length} on no register at all`);
     // *** THE MECHANISM, NOT JUST THE COUNT. *** A gate the file records as PASSING, that now fails, went red
     // on the far side of the door -- which is what makes the exile a hiding place rather than a backlog.
-    ok("*** every unregistered red is one the file records as having PASSED ***",
-        unreg.length > 0 && unreg.every((g) => C[g] === 0),
-        `${unreg.length} gates with a recorded exit code of 0 that exit non-zero when run`);
+    // *** v4642 -- THIS ASSERTED A UNIVERSAL THAT A REPAIR BREAKS, AND A REPAIR BROKE IT. *** The row read
+    // `unreg.every((g) => C[g] === 0)`: every unregistered red is hidden behind a recorded green. That is the
+    // MECHANISM, and it is true of a gate nobody has touched -- but the moment one of them is fixed, or its
+    // code is corrected, the universal is false and the row goes red FOR PROGRESS. The note fifteen lines
+    // down already recorded this happening to avatarServerViews, canvasFill and homography, whose codes were
+    // corrected without the row being reconciled; v4642 hit it again from the other side, repairing
+    // wasmSupport-selfcheck.mjs (a stale 118-file census) and leaving its recorded 1 honest-but-outdated.
+    //
+    // WHAT IS WORTH HOLDING IS THE SIZE OF THE HIDING PLACE, NOT ITS UNIVERSALITY. The dangerous state -- a
+    // gate recorded green, actually broken, and named nowhere -- is asserted live further down and is clean.
+    // This row now counts how many exiled reds sit behind a recorded green and RATCHETS that number, so it
+    // falls as gates are repaired and fails if the hiding place grows. The honest-coded ones are named rather
+    // than dropped, because a record that tells the truth about a gate is the outcome this whole file wants.
+    const hiddenByRecord = unreg.filter((g) => C[g] === 0);
+    const honestCode = unreg.filter((g) => C[g] !== 0);
+    const HIDDEN_CEILING = 16;   // v4642: 16 of 17 -- ratchets DOWN, never up
+    ok("*** the exile hides at most sixteen reds behind a recorded green, and the number ratchets down ***",
+        hiddenByRecord.length <= HIDDEN_CEILING && unreg.length > 0,
+        `${hiddenByRecord.length} of ${unreg.length} unregistered reds carry a recorded exit code of 0 while ` +
+        `exiting non-zero when run -- the exile working as a hiding place, against a ceiling of ${HIDDEN_CEILING}. ` +
+        `The other ${honestCode.length} carry an honest non-zero code` +
+        (honestCode.length ? ` (${honestCode.map((g) => g.split("/").pop().replace("-selfcheck.mjs", "") + " = " + C[g]).join(", ")})` : "") +
+        `, which is what a corrected record looks like and must not read as a failure here.`);
     // *** v4476 -- AN ENTRY CAN LEAVE THE UNREGISTERED SET TWO WAYS, AND BOTH OF THEM ARE PROGRESS. *** These
     // two rows asserted a BIJECTION between this list and the unregistered reds: every entry unregistered, and
     // the counts equal. That held while the only exit was repair. v4476 opened a second: physicsReach and

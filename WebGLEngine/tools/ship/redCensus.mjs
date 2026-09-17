@@ -1232,13 +1232,46 @@ const WHY_V4622 = Object.freeze({
     // anyone spends a fourth round re-deriving the same two numbers.
 });
 
-export const RED_AT_V4622_GATES = Object.freeze([
-    "tools/ship/backendParity-selfcheck.mjs",
-    "tools/ship/windowsImport-selfcheck.mjs",
-    "tools/ship/definitionGates-selfcheck.mjs",
-    "tools/ship/pageSections-selfcheck.mjs",
-    "tools/ship/pagePlacements-selfcheck.mjs",
-]);
+// *** v4642 -- ALL SIX REPAIRED, AND THE LIST IS EMPTY RATHER THAN DELETED. *** Every one of these had been
+// red since the v4622 merge -- nineteen rounds -- and each was carried with a sentence saying why it was
+// somebody else's to fix. Asked to resolve them, four of the six turned out to be THE CHECK AND NOT THE
+// SUBJECT, which is the same four-of-five split v4571 found when it opened RED_AT_V4568:
+//
+//   windowsImport   THE GATE WAS COUNTING ITS OWN FAILURE TEXT. Of its four offenders exactly one was a
+//                   dynamic import (trellisAutoRig-selfcheck.mjs, fixed); the other three were this record's
+//                   own WHY_V4622 entry and the two copies register-audit.mjs keeps of the recorded FAIL
+//                   line. Its scan stripped comments and not strings, so writing the finding down CREATED
+//                   offenders -- a feedback loop in which the count could only grow by being recorded. It
+//                   uses sourceScan's codeOnly now, the lexer the rest of the tree's censuses already use.
+//   backendParity   A SECOND SPELLING OF A POLICY IT DOES NOT OWN. Its own comment retired the duplicate and
+//                   then re-spelt it on a third denominator: it asserted shaderCensus-selfcheck's threshold
+//                   of twenty against `mods`, a population shaderCensus does not measure. Measured today,
+//                   shaderCensus reads 19 of 20 and is GREEN; the copy read 20 and was red. The threshold is
+//                   gone from backendParity and the number is reported; the policy is asserted once, next
+//                   door, over the 9 files that duplicate a COMPUTATION rather than the 20 that merely carry
+//                   two languages -- a set that includes a GATE holding a WGSL shader against its GLSL twin,
+//                   which is evidence the port is checked, not evidence it is hand-written twice.
+//   pageSections    AN OFF-BY-ONE CLAIMED IN PROSE IN THE SAME EDIT THAT MADE IT. v4590 added three pages to
+//   pagePlacements  the System Tools drawer and wrote "this drawer is now at MAX_PER_PANEL" with SIXTEEN in
+//                   it against a cap of fifteen. Nothing re-counted because the comment said the answer.
+//                   three-probe.html moved to Render TSL, whose note ("the two that owe the rig a number")
+//                   is what a three.js/WebGPU compatibility probe is; pagePlacements was downstream of the
+//                   same overflow and cleared with it.
+//   runtimeGap      REAL DRIFT, AND IT WAS v4641's OWN. Three census rows moved with the two gates that
+//                   round added and only `files` was re-taken. A census that moves together has to be
+//                   re-taken together.
+//   definitionGates REAL DEBT, RE-BASELINED BY EXPLICIT CALL at 79/349/678, the third time this file has made
+//                   that call. Measured before moving: ZERO of the 678 come from v4623-v4641, and the split
+//                   is 376 tools/, 198 physics/, 34 brain/. Repairing it also found FOUR ROWS THAT COULD NOT
+//                   FAIL -- the file's only process.exit sat 75 lines from its end, so everything after it
+//                   printed FAIL into a log whose last line said "all checks pass". One of those four held a
+//                   dead ceiling of 37 and had been failing unseen; another asserted a defect that had since
+//                   been FIXED and passed by calling the same function twice; a third was a prose ratchet
+//                   whose regex literal matched ITSELF in the file it read.
+//
+// The list stays, empty, because RED_AT_V4622 is referenced by frozenRecords, gateSweep and recordReach, and
+// because an empty register entry is a stronger record than a deleted one: it says these were red and are not.
+export const RED_AT_V4622_GATES = Object.freeze([]);
 
 export const RED_AT_V4622 = Object.freeze(RED_AT_V4622_GATES.map((gate) => Object.freeze({
     gate,

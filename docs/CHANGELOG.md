@@ -26,6 +26,214 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      of numeric order were moved into it. NO ROUND'S NUMBER, TEXT OR BYTES CHANGED -- only two headings
      gained a tag, and two blocks moved. -->
 
+## v4644 -- the SUCCESS flash reaches pixels: a ring that travels, and a settle that does not
+
+mh_state was ported at v4641 and graded in the kit and **reached no pixel for three rounds**. Its four
+outputs are 128 transcribed references across murmur's eighteen sources, and this round spends three of
+them: `settled` on all eighteen interiors, and the pair `(complete, sweep)` that murmur's SUCCESS shell
+travels on, in the seven marched heroes. `st.drive` — the RESPONDING lean, 45 references — is still
+unported and still named in the row that says so.
+
+THE SHELL IS ONE FORMULA MURMUR WRITES OUT SEVEN TIMES WITH FOUR NUMBERS CHANGED:
+
+    sr = (length(p) - mix(lo, hi, sweep)) / width;   e += complete * gain * exp(-sr * sr)
+
+so the kit owns the profile (`mhIgnite`) and `MH_IGNITE` owns the four numbers, and the orb spells it once
+and calls it from six sites covering seven species. Bit-exact against a real GPU at murmurKit section 13:
+worst |gpu − cpu| **0 of 255** over 16 radii × 16 rows × 3 species, against **255** for the unflipped
+reading, and the ring's measured centre lands within **0.0013** body radii of `mix(lo, hi, sweep)` at every
+sweep — recovered by a log-parabolic fit, because the samples of a gaussian have logarithms on an exact
+parabola.
+
+**AND THE PIXEL GATES ASK THE QUESTION A BRIGHTNESS BOUND CANNOT: WHERE IS THE ADDED LIGHT.** Two new gates
+render the flash and measure the area-weighted radial centroid of what SUCCESS adds to a frame:
+
+| | flash centroid by tau | amplitude, % of the idle frame |
+|---|---|---|
+| still (shell, gain 0.30) | 0.1947 → 0.2572 → 0.3572 → 0.3981 | 23 → 187 → 335 → 113 |
+| abyss (the deepest, 0.42) | 0.1776 → 0.2660 → 0.3914 → 0.4646 | 24 → 366 → 747 → 160 |
+| tempest (preK 0.70) | 0.2801 → 0.3306 → 0.3773 → 0.3237 | 136 → 284 → 391 → 203 |
+| geode (**no shell at all**) | 0.2385 → 0.2185 → 0.2202 → 0.2226 | 0.1 → 2.9 → 8.1 → 16.8 |
+
+The last row is what makes the first three mean anything: geode's added light grows **5.7×** while its
+centroid moves **0.0041**, fifty times less than still's 0.2034. A port that multiplied the whole interior
+by `(1 + k * complete)` and drew no ring would produce geode's signature for every species and pass every
+brightness bound in both files. tempest's row is the *pre-multiply*: at tau 0.20, with the ring still at
+|p| = 0.24 of a body radius, its cloud has already gained 135.5% of its own light, sitting **0.0344** from
+the centroid of the cloud that was already there — a scaling of the existing picture, which is what
+`e *= 1 + 0.70 * complete` does, and a term a port can drop while still drawing a perfectly good ring.
+
+**ALL 72 BASELINE FRAMES ARE BYTE-IDENTICAL** — eighteen species × four cases, 0 bytes differ — because
+`complete` and `settled` are EXACTLY zero outside SUCCESS. That is its own row on both sides (the CPU's
+5,043 samples and the shader's own complete = 0 row) and it is what lets eighteen shaders add the shell
+without a branch. The backlog entry for this work predicted the opposite in as many words: *"EXPECT THE
+BYTE BASELINE TO MOVE FOR REAL THIS TIME … there is no operating point that hides it."* It is wrong, it is
+kept, and the entry now says why: the baseline is captured in IDLE, which is the fact the same entry named
+two paragraphs earlier.
+
+**THREE SABOTAGES GOT THROUGH AND ALL THREE CLOSED SOMETHING REAL.**
+
+- The kit probe held `complete` at 1 in all three colour channels and reasoned a pure multiplier did not
+  deserve an axis. Deleting the multiplier from `mhIgnite` changed nothing anywhere. The alpha channel now
+  re-reads the same lattice with y as COMPLETE and the sweep pinned at 0.5, and a row grades the line: every
+  reading within **0.7** counts of straight, against a measured **54.8** for a squared complete, **26.6**
+  for a smoothstepped one and a flat 233 for a dropped one.
+- A dead `MH_IGNITE` entry draws nothing, so no render can see one. Closed by a census asserting set
+  EQUALITY between the table's keys and the build closures that call the shell — in both directions.
+- droplet's settle is the one in the roster that is not an interior gain (it is additive on `coreBright`),
+  and the exclusion shipped as a ternary. Deleting the ternary gave droplet its settle twice with nothing
+  red, because no gate renders droplet in SUCCESS. The exclusion is now a MISSING KEY in
+  `MH_SETTLED_INTERIOR`, which a tidying pass cannot delete and a census can name.
+
+**AND THE GATE CAUGHT ITS OWN INSTRUMENT.** The quiet-state control compared LISTENING at tau 0.60 against
+IDLE at tau 0 and read 1,934 moved bytes. Those bytes are real and have nothing to do with the flash:
+mh_live weights the microphone 0.55 → 1.00 in LISTENING. Each state is now held against ITSELF at two taus,
+and the 1,934 is still measured, deliberately, so a shader that stopped reading `stateIndex` fails rather
+than passes more easily.
+
+Two gate FILES arrive — `murmurIgnite-selfcheck.mjs` (2,106 ms) and `murmurIgnite2-selfcheck.mjs`
+(2,278 ms), nine rows between them, both green on real WebGPU — so the tree now holds 1689 gates.
+
+Three rows in `murmurLive-selfcheck` were correct when written and this round inverted them. One of the
+three had also been counting its own prose: the conditioned-reader census ran over the raw file, so a
+COMMENT naming `VOICE` scored as a reader. Recorded 44, true 43. It now reads through `sourceScan.codeOnly`
+— the same repair `windowsImport` took at v4642, where three of its four offenders were the finding quoted
+back in a string.
+
+## v4642-v4643 -- the seven standing reds, and mh_present's tail
+
+Two rounds. v4642 cleared every gate on redCensus.RED_AT_V4622, which had been red since that merge --
+nineteen rounds -- each carried with a sentence saying why it was somebody else's to fix. FOUR OF THE SIX
+WERE THE CHECK AND NOT THE SUBJECT, the same split v4571 found when it opened RED_AT_V4568.
+
+`windowsImport` was counting its own failure text: of four offenders exactly ONE was a dynamic import, and
+the other three were the finding quoted back out of redCensus's own record and register-audit's capture of
+the FAIL line. Its scan stripped comments and not strings, so writing the finding down CREATED offenders --
+a loop in which the count could only grow by being recorded. `backendParity` was a second spelling of a
+policy it does not own: its own comment retired the duplicate and then re-spelt it on a third denominator,
+asserting shaderCensus's threshold of twenty against a population shaderCensus does not measure (19 of 20
+and GREEN next door). `pageSections` and `pagePlacements` were an off-by-one claimed in prose in the same
+edit that made it -- "this drawer is now at MAX_PER_PANEL", written with sixteen in a drawer capped at
+fifteen. `runtimeGap` was real drift and it was v4641's own. `definitionGates` was real debt, re-baselined
+by explicit call at 79/349/678 with zero of the 678 from v4623-v4641.
+
+REPAIRING definitionGates FOUND FOUR ROWS THAT COULD NOT FAIL. Its only process.exit sat 75 lines from the
+end, so every row after it printed "  FAIL  " into a log whose last line said "all checks pass" and whose
+exit code was 0. One held a dead ceiling of 37 against a count of 79. One asserted a defect that had since
+been FIXED and passed by calling the same function twice. One was a prose ratchet whose regex literal
+matched ITSELF -- and the first draft of the comment explaining that re-armed it by quoting the guarded
+sentence, caught by the same sabotage a line later.
+
+v4643 PORTED mh_present's TAIL, the last piece of murmur's kit that reaches pixels. v4627 took its
+arrangement and none of its finish. On ink that cost one term, the knee. ON PAPER IT COST THREE, and two of
+them are what make paper a different GROUND rather than a lighter one: `dark` SUBTRACTS the specular from
+the energy on a light ground and murmur adds it back as a mix toward a warm white, so this port did the
+subtracting and not the adding -- a paper orb LOST its highlight instead of gaining a white one -- and
+without the contact shadow the object floats.
+
+The pair is bit-exact on THREE grounds, worst |gpu - cpu| of 0 counts over 16 speculars by 16 heights by 3
+channels each. The three terms are then separated, because an agreement bound does not say which one is
+present: across a specular sweep the paper ground climbs 69 counts of 255 while ink moves 0; at a specular
+of ZERO the page darkens 60 counts from the top of the frame to the bottom while ink moves 0; and the knee
+compresses 1.5 to 0.9998 at ink's 0.90 against 1.0000 at paper's 0.96 while 0.5 passes untouched at both.
+The shadow's SIGN was measured off the contact glow rather than copied from a source that reads
+gl_FragCoord -- limn 1.426 bottom-over-top at 128 px, still 1.074, abyss 1.015.
+
+AND A GATE REFUSED A SECOND TONE CURVE. The first cut applied the whole finish in the fragment shader, but
+render/aiPresenceOrbPresent.mjs -- this tree's port of murmur-web's own present.wgsl -- already applies
+knee(x, 0.90), quoting that file's "exposure, bloom, THE TONE CURVE, the dither and the sRGB encode are
+WRITTEN ONCE". Two knees compressed the peak twice and the Y-flip harness went red: the direct render's
+brightest pixel held at (12,12) and the pipeline's slid to (17,15). The location moving was a second-order
+symptom, so the first-order fact is now its own row -- the two paths must agree about how BRIGHT the peak
+is, 672 against 674 with a bound of 12 of 765. The repair is a split: the two ground-dependent terms run in
+the species shader on both paths, and the knee sits in the same `linear ?` bracket the sRGB encode has been
+in since the HDR pass was built.
+
+TWO OF mh_present's CONSTANTS ARE INVISIBLE ON THE GROUNDS THAT SHIP, found by sabotage: the catchlight's
+1.06 gain is dead on house paper (s0.L 0.9701 puts the sum past the 1.02 cap) and the shadow's 0.55 tint
+multiplies an ink of 0.00304 linear, so 0.55 against 0.75 differ by 0.00061 where an 8-bit step is 0.00392.
+The probe grew a third ground -- light grey with a mid-grey page -- where both bite.
+
+Measured in pixels: on ink the round touches 24 bytes across the eighteen species at the gates' glow of
+0.15, and at the default glow of 1 it moves 50 of 54 baseline frames by at most 4 counts -- the knee doing
+its job. On paper all 18 move. The byte baseline gained a paper case for exactly that reason.
+
+TWO RECORDS HAD OUTLIVED THEIR OWN REPAIR. murmurKit-selfcheck's closing still said the HUE channel
+"reaches no pixel and every species passes 0", closed at v4631 and measured since at 1.57 degrees of hue on
+droplet. render/aiPresenceOrbTsl.mjs carried BOTH the stale note and the one that replaced it, three lines
+apart, for twelve rounds. A closing that under-claims sends the next reader to build what is already there.
+
+Neither round adds a gate FILE -- v4642 repaired six and v4643 added rows to three that existed -- so the
+tree still holds 1687 gates, and the claim is restated here rather than left to the entry above so this
+file's newest entry carries a number tools/ship/claimCheck.mjs can check against the tree.
+
+Still not ported: mh_out's triangular-PDF dither, which is why the kit function is mhPresentFinish and not
+mhPresent; and mh_state is ported, graded bit-exactly, and called by nothing -- 128 transcribed references
+across murmur's eighteen sources, its own round. mh_position is not applicable: it flips gl_FragCoord and
+this port takes its quad from three's uv(). A third gap is named rather than closed: present.wgsl's knee is
+a fixed 0.90 where mh_present's moves to 0.96 on paper.
+
+## v4623-v4641 -- the murmur-web orb: eighteen species over one shared kit, and the signal every one of them reads
+
+Nineteen rounds, written up as one entry because they are one piece of work and because none of them
+wrote their own: v4623 through v4641 shipped straight to main, and this changelog's newest entry stayed
+at v4622 through all of them. `tools/ship/claimCheck.mjs` read that entry as a claim about the present
+build and contradicted its gate count -- 1656 against a tree that had reached 1687 -- which is the drift
+working exactly as designed. The per-round record is `tools/ship/gateSweep.mjs`'s closings, since244
+through since262, and nothing here replaces them.
+
+THE SUBJECT. krispuckett/murmur-web (MIT) is a WebGPU port of a Metal/SwiftUI package: eighteen material
+"species" built over one shared kit. This tree had ONE of them, approximated. All eighteen are ported now
+-- still, limn, comet, droplet, opal, abyss, nebula, tempest, fathom, geode, arc, sol, aura, flux, duet,
+chorus, prism, helix -- across fifteen species gates, a kit gate, and two gates for the live signals.
+The tree went from 1656 to 1687 gates.
+
+THE KIT CAME FIRST, AND THAT WAS THE ROUND'S ONE ARCHITECTURAL CALL. v4623 built `render/murmurKit.mjs`
+(f64 scalar JS) and `render/murmurKitTsl.mjs` (an f32 node graph) as a genuine PAIR rather than one
+implementation and a restatement of it, because v4579 and v4580 had each shipped an "emulation" that
+rebuilt a formula from JS constants, never read the shader, and let three sabotages pass. Thirty-eight of
+kit.ts's forty-one functions are ported and reached; the pair is graded bit-for-bit against a real GPU.
+
+WHAT THE ROUNDS FOUND, which is the part worth keeping:
+
+* A DEAD REFRACTION (v4623-v4624). The orb's refracted ray was computed and went nowhere. The kit made it
+  visible because the kit had somewhere to send it.
+* A BLACK RENDER THAT MEASURED CORRECT IN EVERY PART (v4627). MH_SPREAD was imported by one module and not
+  handed back by another, so a species multiplied a node by `undefined` and three.js emitted WGSL with the
+  literal token `null`. It has now gone missing twice, the same constant both times.
+* EIGHT SPECIES COMPILING INTO ONE SHADER (v4635). Every species' block was built into every species'
+  fragment graph and a selector picked one at the bottom. The eight shaders spanned 159,447 to 160,185
+  characters -- a 0.5% spread, which is the selector line and nothing else. After: 41,231 to 56,776, a 69%
+  cut, and 24 frames byte-identical across the change.
+* A ROW THAT MEASURED THE TONE CURVE AND CALLED IT PHYSICS (v4634). At the default glow a frame peaks near
+  646 of 765, and the density-saturation row read 0.680 on the correct shader against 0.558 with the
+  absorption DELETED -- passing HARDER on the broken one. Every species gate runs at glow 0.15 now.
+* HALF A ROUND'S ROWS GRADING A TABLE, NOT A SHADER (v4640). prism's and helix's flagship rows were pure JS
+  over the constant tables and never rendered, so three shader sabotages walked through them. Both were
+  RE-TITLED rather than deleted, and five pixel instruments were built to close the gap and all five were
+  rejected, with their numbers, so nobody repeats the search.
+* A GATE RED FOR NINE ROUNDS BECAUSE IT WAS 27 MS OVER BUDGET (v4633). A gate over the 3,000 ms ceiling does
+  not run at ship time at all, so the round that crosses the line is the round whose red nobody sees. Three
+  species gates were split off BEFORE crossing it rather than after.
+
+AND THE LAST ROUND WAS A CORRECTNESS FIX TO WHAT ALREADY SHIPPED. Every one of murmur's eighteen shaders
+reads `live.voice`; not one reads a raw level. This port read the raw uniform at 44 sites and, at 8 more,
+read `glintRate` -- still.ts's own STYLE DIAL -- where murmur reads `live.pace`. At the gates' own 0.3 the
+true signal is 0.2504 against 0.3000, 20% hot; at 1.0 it is 0.5500 against 1.0000, 45% hot. The error GREW
+with the knob, so every species was loudest exactly where it was least faithful. v4641 wired mh_live and
+graded it by EQUIVALENCE rather than difference: a level of 0.30 in LISTENING and 0.752598 in IDLE are the
+same conditioned voice, so the two frames must come back byte-identical -- 0 of 9,216 bytes differ -- while
+the 0.991722 a square-root port would need disagrees by 2,443. One instrument pins two constants and a
+state window at once.
+
+WHAT IS NOT DONE, AND IS RECORDED RATHER THAN IMPLIED. mh_state is ported, given a TSL twin and graded
+bit-exactly against a real GPU, and CALLED BY NOTHING -- its four outputs are 128 transcribed references
+across murmur's eighteen sources, which is its own round (`orb-state-terms-wiring`). mh_present's paper
+half is absent: the catchlight, the contact shadow and the final soft knee are all gated on `paper > 0.002`,
+so nothing is missing on the ink ground and three terms are missing on paper. mh_out's triangular-PDF
+dither is absent entirely. mh_position is not applicable -- it flips gl_FragCoord, and this port takes its
+quad from three's `uv()`.
+
 ## v4622 -- ffmpeg.wasm H.264 export, three.js to 0.185.1, and 62 gates of unshipped drift paid down
 
 Wires browser-side H.264 export via ffmpeg.wasm (ai-bridge/ffmpegWasmBridge.js, render/ffmpegWasmExport.mjs) as a platform-independent second road to render/blobRecorder.js's own conclusion -- the existing server-side road (ai-bridge/ffmpegStatic.js) is macOS-only by design, and this one runs in the page's own Worker everywhere. Verified end-to-end in a real headless Chromium: a genuine WebM recording transcodes to an MP4 whose avcC box a hand-written ISO-BMFF walker finds at the correct nested path. Re-vendors vendor/three from r160 to 0.185.1 (three.core.js split from three.module.js, GLTFLoader/FBXLoader/KTX2Loader, the basis/KTX2 chain, OrbitControls, GLTFExporter), with one real API break fixed (view.html's removed outputEncoding/sRGBEncoding to outputColorSpace/SRGBColorSpace) and confirmed via a byte-identical re-fetch plus real-browser screenshots of the four pages that load three directly.

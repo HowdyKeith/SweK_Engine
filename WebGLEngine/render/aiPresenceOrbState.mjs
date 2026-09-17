@@ -83,6 +83,21 @@ export const STATES = Object.freeze({
 });
 export const STATE_NAMES = Object.freeze(Object.keys(STATES));
 
+/**
+ * *** THE STATE'S NUMBER, WHICH murmur's SHADERS INDEX BY AND THIS FILE ALREADY DECIDED WITHOUT SAYING SO. ***
+ *
+ * kit.ts's mh_live and mh_state do not take a state NAME -- they take a float, and they compare it against
+ * half-unit windows: LISTENING is the one state that lifts the voice, THINKING and RESPONDING together are
+ * the ones that lift the cadence, SUCCESS is the only one that ignites, RESPONDING the only one that drives.
+ * Every one of those windows is a statement about this table's ORDER, so the order is load-bearing and is
+ * asserted in tools/ship/aiPresenceOrb-selfcheck.mjs rather than left to the order somebody typed the object.
+ *
+ * DERIVED FROM STATE_NAMES AND NOT TYPED OUT AGAIN, because two copies of one ordering is the shape this tree
+ * has repaired in its own records three times. `error` lands at 5, outside every window murmur defines, which
+ * is the correct reading and not a fallback: an error is neither a listener nor a worker.
+ */
+export const STATE_INDEX = Object.freeze(Object.fromEntries(STATE_NAMES.map((n, i) => [n, i])));
+
 const TRANSITION_DURATION = 0.6;   // seconds, crossfade between two states' params
 
 /** smoothstep, 0..1 in, 0..1 out, clamped -- three's own polynomial ease, used for the state crossfade. */
@@ -219,7 +234,13 @@ export function createPresenceState(initial = "idle") {
             const envAdd = env === swellEnvelope ? env(entryT) : (env === stutterEnvelope ? -env(entryT) : 0);
             return { speed: p.speed, depth: p.depth, hueShift: p.hueShift,
                      glow: Math.max(0, p.glow * envMul + envAdd),
-                     phase, voice: voice.value, activity: activity.value, state: cur };
+                     // *** stateTau IS entryT AND NOT A SECOND CLOCK. *** murmur's mh_state reads "seconds
+                     // since the state changed", which is exactly what entryT has counted since this module
+                     // was written -- it is what the entry envelopes above are evaluated at. Exposing the
+                     // existing one rather than starting another is the whole point: two clocks for one fact
+                     // drift, and the SUCCESS flash and the swell envelope have to agree about when the
+                     // arrival happened or the orb breathes at one moment and ignites at another.
+                     phase, voice: voice.value, activity: activity.value, state: cur, stateTau: entryT };
         },
         get state() { return cur; },
     };

@@ -7926,7 +7926,396 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "heroes cost gate one a PAIRED 213-288 ms although it renders neither. Logged as " +
                  "orb-species-block-per-shader; the next orb round starts there.",
     }),
+    // v4643 -- THE 254th CLOSING: mh_present's tail, and a second tone curve a gate refused.
+    since263: Object.freeze({
+        at: "v4643", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "NO GATE ADDED -- rows added to three that existed, which is why swept is 0. *** mh_present's " +
+                 "TAIL: THE CATCHLIGHT, THE CONTACT SHADOW AND THE KNEE. *** v4627 took mh_present's " +
+                 "arrangement (railE = body + (spec + contact) * dark, the rail, the containment) and stopped " +
+                 "there. ON INK THAT COST ONE TERM, THE KNEE. ON PAPER IT COST THREE, and two of them are what " +
+                 "make paper a different GROUND rather than a lighter one: `dark` SUBTRACTS the specular from " +
+                 "the energy on a light ground and murmur adds it back as a mix toward a warm white, so this " +
+                 "port did the subtracting and not the adding -- a paper orb LOST its highlight instead of " +
+                 "gaining a white one -- and without the contact shadow the object floats. " +
+                 "*** THE PAIR IS BIT-EXACT ON THREE GROUNDS: *** worst |gpu - cpu| is 0 of 255 over 16 " +
+                 "speculars x 16 heights x 3 channels on paper, on ink and on a light grey, against 127 / 0 / " +
+                 "94 for the unflipped reading. THE THREE TERMS ARE THEN SEPARATED, because an agreement bound " +
+                 "does not say which one is present: across a specular sweep of 0 to 1.2 the paper ground " +
+                 "climbs 69 counts of 255 and the ink ground moves 0; at a specular of ZERO the page darkens " +
+                 "60 counts from the top of the frame to the bottom while ink moves 0; and the knee compresses " +
+                 "1.5 to 0.9998 at ink's 0.90 against 1.0000 at paper's 0.96 while 0.5 passes untouched at both. " +
+                 "*** THE SIGN OF THE SHADOW WAS MEASURED, NOT COPIED. *** murmur reads gl_FragCoord, where y " +
+                 "runs DOWN; this port takes its quad from three's uv(). The direction came off the contact " +
+                 "GLOW instead -- the only term outside the silhouette, which murmur already weights downward " +
+                 "-- at 128 px over the annulus past the body: limn 1.426 bottom-over-top, still 1.074, abyss " +
+                 "1.015, all above 1. v4638 is what reading that from the source costs. " +
+                 "*** AND A GATE CAUGHT A SECOND TONE CURVE, WHICH IS THE FINDING OF THE ROUND. *** The first " +
+                 "cut applied the whole finish in the fragment shader. render/aiPresenceOrbPresent.mjs -- this " +
+                 "tree's port of murmur-web's OWN present.wgsl -- already applies knee(x, 0.90), quoting that " +
+                 "file's header verbatim: \"exposure, bloom, THE TONE CURVE, the dither and the sRGB encode " +
+                 "are WRITTEN ONCE\". Two knees compressed the peak twice and " +
+                 "tools/ship/aiPresenceOrbPresent-selfcheck.mjs's Y-FLIP harness went red: the direct render's " +
+                 "brightest pixel held at (12,12) and the pipeline's slid to (17,15), because flattening an " +
+                 "already-flattened lobe reordered the peaks. THE LOCATION MOVING WAS A SECOND-ORDER SYMPTOM, " +
+                 "so the first-order fact is now its own row -- the two paths must agree about how BRIGHT the " +
+                 "brightest pixel is, measured 672 against 674, bound 12 of 765 -- because a double tone curve " +
+                 "that happened not to move an argmax would have left that harness green and the picture wrong. " +
+                 "THE REPAIR IS A SPLIT: mhPresentPaper (the two ground-dependent terms, which read `paper` " +
+                 "and must run in the species shader on BOTH paths) and mhPresentKnee (which goes in the same " +
+                 "`linear ?` bracket the sRGB encode has been in since the HDR pass was built). " +
+                 "*** TWELVE SABOTAGES, ALL TWELVE CAUGHT, AND THREE OF THEM ONLY AFTER THE PROBE GREW A THIRD " +
+                 "GROUND. *** Two of mh_present's constants are INVISIBLE on the two grounds that ship, " +
+                 "measured rather than assumed: the catchlight's 1.06 gain is DEAD on house paper (s0.L is " +
+                 "0.9701, so 0.9701 * 1.06 + 0.05 = 1.0782 and the 1.02 cap takes it -- the gain could be 1.5 " +
+                 "and the frame would not move), and the shadow's 0.55 tint multiplies the INK colour, which " +
+                 "is 0.00304 in linear light, so 0.55 of it against 0.75 of it differ by 0.00061 where one " +
+                 "8-bit step is 0.00392. A light-grey ground with a mid-grey page makes both bite, and the " +
+                 "probe carries it. A THIRTEENTH was added for the direction the pixels cannot see at all: " +
+                 "deleting the knee from the direct path too moves 20 bytes on arc and 4 on sol -- the only " +
+                 "species whose linear light passes 0.90 at 0.9647 and 0.9387 -- and every species gate stayed " +
+                 "GREEN through it, so where the knee is CALLED is held by a source census that says so. " +
+                 "*** AND TWO RECORDS THAT HAD OUTLIVED THEIR OWN REPAIR. *** murmurKit-selfcheck's closing " +
+                 "still said the HUE channel \"reaches no pixel and every species passes 0\" -- closed at " +
+                 "v4631, and murmurSpecies4 measures droplet turning 1.57 degrees of hue against 0.0008 of " +
+                 "lightness. render/aiPresenceOrbTsl.mjs carried BOTH the stale note and the one that replaced " +
+                 "it, three lines apart, for twelve rounds: the round that closed the gap added its paragraph " +
+                 "without deleting the one it contradicted. A closing that UNDER-claims sends the next reader " +
+                 "to build what is already there. " +
+                 "MEASURED IN PIXELS: on ink the whole round touches 24 bytes across the eighteen species at " +
+                 "the gates' glow of 0.15, and at the DEFAULT glow of 1 it moves 50 of 54 baseline frames by " +
+                 "at most 4 counts of 255 -- the knee, compressing bright output, which is its whole job. On " +
+                 "paper all 18 frames move. WHAT IS STILL NOT PORTED: mh_out's triangular-PDF dither, which is " +
+                 "why the kit function is mhPresentFinish and not mhPresent; and present.wgsl's knee is a " +
+                 "fixed 0.90 where mh_present's moves to 0.96 on paper, so the HDR path compresses a paper " +
+                 "ground at the wrong constant. Both named in the kit, neither closed here.",
+    }),
+    // v4644 -- THE 255th CLOSING: the SUCCESS flash, from a constant table to a ring that travels in pixels.
+    since264: Object.freeze({
+        at: "v4644", swept: 2, green: 2, red: 0,
+        added: Object.freeze([
+            "tools/ship/murmurIgnite-selfcheck.mjs",
+            "tools/ship/murmurIgnite2-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 2,106 and 2,278 ms on real WebGPU, 9 rows between them. *** mh_state WAS PORTED AT " +
+                 "v4641 AND GRADED IN THE KIT AND REACHED NO PIXEL FOR THREE ROUNDS. *** This round wires " +
+                 "THREE of its four outputs: `settled` on all eighteen interiors and the pair (complete, " +
+                 "sweep) that murmur's SUCCESS shell travels on, in the seven marched heroes. The fourth, " +
+                 "st.drive, is still unported and still named. " +
+                 "*** THE SHELL IS ONE FORMULA murmur WRITES OUT SEVEN TIMES WITH FOUR NUMBERS CHANGED: *** " +
+                 "sr = (length(p) - mix(lo, hi, sweep)) / width; e += complete * gain * exp(-sr*sr). The kit " +
+                 "owns the profile (mhIgnite) and MH_IGNITE owns the four numbers, so the orb spells it ONCE " +
+                 "and calls it from six sites covering seven species. Bit-exact against a real GPU at " +
+                 "murmurKit section 13: worst |gpu - cpu| 0 of 255 over 16 radii x 16 rows x 3 species, " +
+                 "against 255 unflipped, and the ring's measured centre lands within 0.0013 body radii of " +
+                 "mix(lo, hi, sweep) at every sweep. " +
+                 "*** AND THE PIXEL GATES ASK THE QUESTION A BRIGHTNESS BOUND CANNOT: WHERE IS THE ADDED " +
+                 "LIGHT. *** still's flash centroid climbs 0.1947 -> 0.3981 monotonically while its amplitude " +
+                 "goes 23% -> 187% -> 335% -> 113% of the whole idle frame, so the centroid is tracking " +
+                 "position and not brightness; geode, which has NO shell, grows 5.7x over the same taus and " +
+                 "its centroid moves 0.0041 -- fifty times less. abyss travels 0.2870 and tempest's " +
+                 "pre-multiplied cloud gains 135.5% at tau 0.20 within 0.0344 of its own centroid, which is " +
+                 "the term a port can drop while still drawing a perfectly good ring. " +
+                 "*** ALL 72 BASELINE FRAMES ARE BYTE-IDENTICAL: *** eighteen species x four cases, 0 bytes " +
+                 "differ, because complete and settled are EXACTLY zero outside SUCCESS -- which is what lets " +
+                 "eighteen shaders add the shell without a branch, and is its own row on both sides. " +
+                 "*** TWO SABOTAGES WALKED THROUGH AND BOTH WERE TABLE-VERSUS-WIRING DRIFT NO RENDER CAN " +
+                 "SEE. *** A dead MH_IGNITE entry draws nothing; droplet's settle doubled needs droplet " +
+                 "rendered in SUCCESS, which no gate does. The first is closed by a census asserting set " +
+                 "EQUALITY between MH_IGNITE's keys and the closures that call the shell; the second by " +
+                 "making droplet's exclusion a MISSING KEY in MH_SETTLED_INTERIOR rather than a ternary a " +
+                 "tidying pass can delete. A THIRD was caught by the gate itself: the quiet-state control " +
+                 "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
+                 "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
+    }),
+    // v4641 -- THE 253rd CLOSING: mh_live, the function all eighteen species read and none of them had.
+    since262: Object.freeze({
+        at: "v4641", swept: 2, green: 2, red: 0,
+        added: Object.freeze([
+            "tools/ship/murmurLive-selfcheck.mjs",
+            "tools/ship/murmurLive2-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 1,932 and 1,606 ms on real WebGPU, 10 rows between them, and a correctness fix " +
+                 "rather than a new species. *** EVERY ONE OF murmur's EIGHTEEN SHADERS READS live.voice AND " +
+                 "NOT ONE READS A RAW LEVEL; THIS PORT READ THE RAW UNIFORM AT 44 SITES AND STILL's OWN STYLE " +
+                 "DIAL glintRate AT 8 MORE. *** kit.ts conditions both signals once -- voice^0.65 weighted " +
+                 "1.00 in LISTENING and 0.55 elsewhere, cadence^0.85 weighted 1.00 in THINKING and RESPONDING " +
+                 "and 0.60 elsewhere -- \"so 'loud' and 'busy' mean the same thing across the family\". The " +
+                 "error was not uniform and that is the worst of it: at the species gates' own 0.3 the true " +
+                 "signal is 0.2504 against 0.3000, 20% hot; at 1.0 it is 0.5500 against 1.0000, 45% hot. IT " +
+                 "GROWS WITH THE KNOB, so every species was loudest exactly where it was least faithful and " +
+                 "no single scale factor anywhere could have absorbed it. Measured in the pixels over all " +
+                 "eighteen: at a raw voice of 0 the frames are byte-identical (mean byte change 0.0000), at " +
+                 "0.3 the mean byte falls 51.062 -> 50.837, at 1.0 it falls 56.547 -> 54.479. " +
+                 "*** THE INSTRUMENT IS AN EQUIVALENCE AND NOT A DIFFERENCE, WHICH IS WHY IT COULD BE TIGHT " +
+                 "ENOUGH TO PIN FOUR CONSTANTS. *** A level of 0.30 in LISTENING and 0.752598 in IDLE are the " +
+                 "same conditioned voice, so the two frames must come back BYTE-IDENTICAL -- 0 of 9,216 bytes " +
+                 "differ on arc, still and droplet -- while the 0.991722 a square-root port would need " +
+                 "disagrees by 2,443. Same construction on the cadence (0.729556 against 0.40) and 0 bytes " +
+                 "again on arc and chorus. THINKING and RESPONDING at identical knobs give 0 differing bytes " +
+                 "and LISTENING differs from THINKING by 5,728, which is the two windows being two windows. " +
+                 "still, which murmur gives no cadence, moves EXACTLY 0 bytes across activity 0 to 1 where " +
+                 "arc moves 5,236 and chorus 2,016. *** AND ONE SPECIES' SILHOUETTE WAS WRONG, NOT ITS " +
+                 "EXPOSURE: *** droplet's voice drives mh_shape's swell, which scales the whole body, so its " +
+                 "footprint reads 229 px at the conditioned voice against 221 at the raw one. " +
+                 "*** THE ROUND SPLIT INTO TWO GATES ON A MEASUREMENT AND NOT A PREFERENCE: *** all four " +
+                 "species in one file came back ALL GREEN at 2,772 ms against a 3,000 ms ceiling, 8% of " +
+                 "margin on a box the tree measures 10% slower under a contended sweep. A species costs about " +
+                 "280 ms (one WGSL compile) and a frame about 25, so dropping frames would have bought " +
+                 "nothing. Rendering all eighteen costs 6,439 ms, measured, which is why the all-eighteen row " +
+                 "is a SOURCE CENSUS that says so in its own title -- the v4640 lesson, applied on purpose " +
+                 "this time rather than found by sabotage. *** EIGHTEEN SABOTAGES, ALL EIGHTEEN CAUGHT, *** " +
+                 "including both exponents, both weights, both windows, the state gating of all four mh_state " +
+                 "outputs, the CPU f64 twin, a single species re-routed to the raw knob, the cadence sprayed " +
+                 "onto a species that has none, still's own glintRate dial deleted, and the state table " +
+                 "REORDERED -- which is load-bearing now that a float index picks the window, and which " +
+                 "nothing asserted until this round. *** AND THE SPECIES GATES DID NOT MOVE A BYTE. *** " +
+                 "murmurSpeciesFrames.mjs states its operating point as the CONDITIONED pair and inverts " +
+                 "mh_live for the raw knobs, so all eighteen species render byte-identically to v4640 at " +
+                 "their gates' own point: the alternative was holding the raw knob, which put four gates " +
+                 "below their bounds (abyss's creature, droplet's swell, sol's granulation, and flux, which " +
+                 "stopped finding a half-height at all and CRASHED) and repairing that by lowering four " +
+                 "bounds is indistinguishable from budgeting a red down to green. THE FIRST CUT OF THAT " +
+                 "INVERSION WAS ITSELF WRONG -- it used the RATIO formula that belongs to the equivalence " +
+                 "rows, put the conditioned voice at 0.457 instead of 0.300 and moved all eighteen species -- " +
+                 "and a sabotage then showed droplet's and tempest's gates tolerate a 17% shift in silence, " +
+                 "so the round-trip is now its own f64 row that also requires the two numbers to DIFFER. " +
+                 "*** WHAT IS NOT DONE, DELIBERATELY: *** mh_state is ported, given a TSL twin and graded " +
+                 "bit-exactly against the GPU (worst 0 of 255 over 1,024 samples), and CALLED BY NOTHING. Its " +
+                 "four outputs are 128 transcribed references across murmur's eighteen sources and they are " +
+                 "their own round; the orb therefore gained `activity` and `stateIndex` and NOT `stateTau`, " +
+                 "because a uniform nothing reads is a row that cannot fail. Logged as " +
+                 "orb-state-terms-wiring; the next orb round starts there. " +
+                 "*** AND THE TIMINGS FILE CARRIES TWO HAND-WRITTEN ENTRIES THIS ROUND, WHICH IS THE ESCAPE " +
+                 "budgetExile.mjs NAMES AND NOT A SHORTCUT TAKEN QUIETLY. *** Four full quickSweep passes in " +
+                 "one session left this container about 26% slower than it started, and it did not recover: " +
+                 "tools/ship/murmurKit-selfcheck ran 1,679-1,784 ms early in the session against its recorded " +
+                 "1,710, and 2,124-2,172 ms afterwards at a load average of 0.29. Every sweep taken in that " +
+                 "state wrote inflated costs, and each one evicted a different set of ten to twelve gates -- " +
+                 "including murmurSpecies8 and murmurSpecies13, which had run at 2,382 and 2,438 ms an hour " +
+                 "earlier. budgetExile.mjs's own header is the reason that was refused rather than shipped: " +
+                 "\"ONCE A GATE'S TIME CROSSES THE BUDGET, IT STAYS ACROSS FOREVER. A single slow " +
+                 "observation -- eight-way contention, a cold cache, one unlucky minute -- exiles a gate from " +
+                 "every future ship sweep, permanently.\" So sweep-timings.json was restored to v4640 and the " +
+                 "two new gates alone were added, at the uncontended readings taken BEFORE the box degraded " +
+                 "(1,932 and 1,606 ms, the slowest of three and two runs respectively) -- on the same scale " +
+                 "as the other 1,685 entries, which is the only scale on which a shared budget means " +
+                 "anything. The alternative was to permanently exile ten gates as a side effect of a round " +
+                 "about a voice curve. Logged as sweep-timings-box-drift.",
+    }),
     // v4635 -- THE 247th CLOSING. No gate added: a row added to one that existed, and a 3,561 ms refund.
+    // v4640 -- THE 252nd CLOSING: prism and helix, the last two -- and four rows, two of which grade tables.
+    since261: Object.freeze({
+        at: "v4640", swept: 2, green: 2, red: 0,
+        added: Object.freeze([
+            "tools/ship/murmurSpecies14-selfcheck.mjs",
+            "tools/ship/murmurSpecies15-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 1,094 and 1,955 ms on the rotation, real WebGPU, 4 rows, carrying PRISM and HELIX " +
+                 "-- and WITH THEM ALL EIGHTEEN OF murmur-web's SPECIES ARE PORTED, across fifteen species " +
+                 "gates and one kit gate. still, limn, comet, droplet, opal, abyss, nebula, tempest, fathom, " +
+                 "geode, arc, sol, aura, flux, duet, chorus, prism, helix. *** AND THE HONEST HEADLINE OF " +
+                 "THIS ROUND IS THAT HALF ITS ROWS DO NOT GRADE THEIR SHADERS, WHICH TEN SABOTAGES ESTABLISHED " +
+                 "AND WHICH THE ROWS NOW SAY IN THEIR OWN TITLES. *** FIVE OF THE TEN ESCAPED. prism's " +
+                 "perpendicular-fan row and helix's antipodal-strands row are both computed in the gates' own " +
+                 "JS from MH_PRISM and MH_HELIX; they never render. So swapping u1 and u2 in the shader -- " +
+                 "the fan opening INTO the screen, which is the failure prism.ts names by name -- left the " +
+                 "row green, as did replacing the mh_key entry with a fixed direction, as did giving helix's " +
+                 "second strand its own phase instead of the negation. That is the v4579 defect in a new " +
+                 "costume: a check that re-derives the answer rather than reading the subject. BOTH ROWS WERE " +
+                 "RE-TITLED RATHER THAN DELETED OR WEAKENED -- they now say \"the TABLE, not the shader\" and " +
+                 "\"the constants, not the shader that reads them\" -- because what they do assert is true, " +
+                 "exact and worth holding (the worst departure from perpendicular across 1,623 time-and-swing " +
+                 "samples is 5.65e-5, which is the shader's own 1e-4 guard; helix's strand midpoint is 0.000 " +
+                 "from the axis across 9,288 samples). *** AND FIVE PIXEL INSTRUMENTS WERE BUILT TO CLOSE THE " +
+                 "GAP AND ALL FIVE WERE REJECTED, WITH THEIR NUMBERS, so nobody repeats the search. *** " +
+                 "helix's per-row strand midpoint at 128 px scatters 6.10 px at baseline and 2.43 px with the " +
+                 "strands deliberately NOT antipodal -- THE SABOTAGE SCORES BETTER, because two strands at a " +
+                 "fixed offset track each other more steadily than two that cross; an instrument that prefers " +
+                 "the broken shader is not weak, it is wrong. prism's fan width resisted three: the lit " +
+                 "region's principal axis moved the wrong way (3.96 to 4.80 as the fan opened), its x and y " +
+                 "spreads moved the wrong way (sx 2.88 to 2.32) because neither axis aligns with a diagonal " +
+                 "fan, and a profile across the CPU-computed fan direction came back identical at split 0.0, " +
+                 "0.5 and 1.0 -- a registration failure in the probe, since those frames differ by 18% of " +
+                 "total light. And helix's tap count: setting MH_TAPS_HI from MH_TAPS * 4 back to MH_TAPS " +
+                 "makes the strands BRIGHTER (13.12 against 11.72) rather than the \"empty bead\" helix.ts " +
+                 "describes, because a larger ds accumulates more per tap that lands. WHAT THE TWO SURVIVING " +
+                 "SHADER ROWS DO MEASURE: prism's `split` takes the frame's light DOWN 18% while `beams` " +
+                 "takes it UP 49% -- opposite SIGNS, so neither knob is the other, which no single-frame " +
+                 "brightness bound could show; and helix's strands pinch 5 times up the figure at 1.75 turns " +
+                 "and 8 at 2.85, the crossing rhythm counted rather than left to fall out. *** THIS GATE " +
+                 "RENDERS AT 128 PIXELS AND THAT IS A FINDING. *** At 48 a helix strand is about one pixel " +
+                 "across and no row has two peaks to separate -- the same wall chorus's countability hit at " +
+                 "v4639. renderSpecies gained an optional size for it, and the cost is small because the " +
+                 "LAUNCH is the cost: the same two-frame render is 888 ms at 48 and 1,229 ms at 128, a 7.1x " +
+                 "increase in pixels for 1.38x the time. Callers that pass nothing are byte-for-byte " +
+                 "unaffected. VERIFIED BY BYTES across all EIGHTEEN species and three time-and-knob cases: " +
+                 "54 frames, 0 bytes different.",
+    }),
+    // v4639 -- THE 251st CLOSING: duet and chorus, and a headline that measurement would not support.
+    since260: Object.freeze({
+        at: "v4639", swept: 2, green: 2, red: 0,
+        added: Object.freeze([
+            "tools/ship/murmurSpecies12-selfcheck.mjs",
+            "tools/ship/murmurSpecies13-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 1,736 and 2,344 ms on the rotation, real WebGPU, 5 rows, carrying DUET and CHORUS " +
+                 "-- the fifteenth and sixteenth of murmur's eighteen, and the pair that solves its lights at " +
+                 "the ray's CLOSEST APPROACH rather than marching them: duet two of them, chorus seven on a " +
+                 "Fibonacci shell. *** THE ROUND'S FINDING IS THAT CHORUS'S HEADLINE IS NOT WHAT ITS " +
+                 "ARITHMETIC DOES, AND THE GATE REPORTS IT RATHER THAN ASSERTING IT. *** chorus.ts: \"As sync " +
+                 "rises they gather, and at one they breathe as a single body. That transition from many " +
+                 "rhythms to one is the whole species.\" The line that implements it is phase = " +
+                 "mix(fk * 0.897, 0.0, sync) * 2pi -- WHICH SCALES A MODULAR QUANTITY LINEARLY. Phase lives " +
+                 "on a circle, so multiplying the ladder by (1 - sync) does not gather the seven, it " +
+                 "RE-SPACES them, and whether the new spacing clusters them depends on its fractional part. " +
+                 "Computed off the shader's own constants over three breath periods, the ensemble's " +
+                 "modulation runs 9.89%, 6.63%, 14.65%, 2.61%, 8.17%, 42.43% at sync 0, 0.25, 0.50, 0.75, " +
+                 "0.90 and 1.00: NOT MONOTONIC, and the gather is an endpoint effect that happens only AT " +
+                 "1.00. AND THIS PORT CANNOT REACH THAT ENDPOINT: the shader computes sync = " +
+                 "clamp(syncK * 0.75 + 0.85 * drive + 0.55 * complete) and neither drive nor complete is " +
+                 "wired here, so the knob tops out at 0.75 -- the LEAST modulated setting of any sampled. " +
+                 "The first cut of the gate trusted the prose and wrote the row anyway: it read 4.32% at " +
+                 "sync 0 against 3.52% at sync 1, backwards and small enough to pass for noise. The port is " +
+                 "faithful, the constant is murmur's, the clamp is murmur's, and what is reported is a " +
+                 "property of murmur's SOURCE -- reported rather than repaired, because repairing it means " +
+                 "diverging from the source on this port's own authority. TEN SABOTAGES, NINE RED BY NAME. " +
+                 "*** AND ONE OF THEM CAUGHT AN INSTRUMENT THAT WAS NOT MEASURING WHAT ITS ROW CLAIMED. *** " +
+                 "chorus's level row asserts the ensemble gets more UNEQUAL, \"which a uniform gain cannot " +
+                 "do\" -- and the first instrument, brightest-over-dimmest above an 88th-percentile " +
+                 "threshold, was not blind to one: the voices sit on a background that does not scale with " +
+                 "level, so a uniform lift changes WHICH pixels clear the threshold and the ratio grows " +
+                 "anyway. An equal-average uniform lift read 5.00x to 13.11x, indistinguishable from the " +
+                 "real thing. Replaced by local maxima with the frame's median subtracted, which is " +
+                 "genuinely gain-invariant: the real front-weighting now reads x3.828 and the uniform lift " +
+                 "x0.858. WHAT ELSE THE ROWS MEASURE: duet's level multiplies the louder body x4.18 and the " +
+                 "quieter one x0.85 -- it goes DOWN -- taking the pair's ratio 2.384x to 11.686x, because " +
+                 "the weights are 2*bal and 2*(1-bal) and sum to two at every balance; sep moves them 6.1 px " +
+                 "to 10.4 while voice moves them 0.3; and across one full orbit read off the species' own " +
+                 "0.675 rad/s the depth ordering swings 1.07x to 4.77x while the pair never closes under " +
+                 "6 px, which rejects face-on and edge-on at once. chorus's ensemble never falls below 0.375 " +
+                 "of its own peak at the deepest breath. THREE MECHANISMS ARE TRANSCRIBED AND EXPLICITLY NOT " +
+                 "GRADED, each with its number: duet's occlusion (worth 3.9% -- the two bodies are 0.60 of " +
+                 "the body apart and 0.15 wide, so they almost never overlap on screen), chorus's shell " +
+                 "arrangement, and chorus's countability (a voice is about 1.5 px across at this frame size, " +
+                 "so a flood fill finds two or three blobs and not seven -- the FRAME's limit, not the " +
+                 "shader's). VERIFIED BY BYTES across all SIXTEEN species and three cases: 48 frames, 0 " +
+                 "bytes different.",
+    }),
+    // v4638 -- THE 250th CLOSING: aura and flux, the two sheet heroes, and a frame convention that bit.
+    since259: Object.freeze({
+        at: "v4638", swept: 2, green: 2, red: 0,
+        added: Object.freeze([
+            "tools/ship/murmurSpecies10-selfcheck.mjs",
+            "tools/ship/murmurSpecies11-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 1,442 and 1,741 ms on the rotation, real WebGPU, 6 rows, carrying AURA and FLUX -- " +
+                 "the thirteenth and fourteenth of murmur's eighteen and the pair that WANTS the march the " +
+                 "four heroes before them were built to escape. aura.ts: the crossings \"resolve as OCCLUSION " +
+                 "rather than as ADDITION\" because \"a tap that lands in a near sheet attenuates what the far " +
+                 "ones contribute behind it\" -- which a closed form would have to sort for and a march gets " +
+                 "from the marching. *** THE FLAGSHIP ROW IS BRACKETED BY THE SOURCE'S OWN TWO NAMED " +
+                 "FAILURES, which makes it a measurement rather than a threshold: *** aura.ts says of its " +
+                 "occlusion coefficient that \"at 9 the far ribbon vanishes entirely and the body loses its " +
+                 "sense of fullness, at 1.5 nothing occludes anything and it is smoke again\". Both were " +
+                 "rendered. The knob that buys the third sheet multiplies the frame's light x1.886 at 1.5 " +
+                 "(very nearly the x2 of pure addition, which is what \"nothing occludes\" IS when measured), " +
+                 "x1.104 at 9.0 (a ribbon that is not there), and x1.307 at the shipped 4.50. The interior " +
+                 "spread brackets the same way: 10.06x, 1.94x, 3.92x. *** AND THE ROUND'S FINDING IS THAT " +
+                 "THIS PORT GOT flux UPSIDE DOWN BY TRANSCRIBING THE SOURCE CORRECTLY. *** flux.ts negates " +
+                 "its height because \"a colorEffect's y runs DOWN the screen, so the body frame's +y is the " +
+                 "bottom of the picture\", and it names the failure: \"An upside-down aurora is not a subtle " +
+                 "mistake; it reads as light pouring in from above rather than as curtains standing on " +
+                 "something.\" THIS PORT'S FRAME IS NOT A colorEffect'S -- the quad comes from three's uv(), " +
+                 "whose v is 0 at the BOTTOM -- so copying the negation reproduced exactly the bug the " +
+                 "comment is about. Measured row by row, the profile peaked at y = -0.396, the upper third, " +
+                 "and read 0.443 as a lower-to-upper ratio. Dropping the negation gives 2.523, against " +
+                 "nebula's 1.073 and aura's 1.623. A PORT THAT COPIES A FRAME CONVENTION IT DOES NOT SHARE " +
+                 "HAS TRANSCRIBED THE LETTER AND LOST THE THING, and only a pixel measurement says which. " +
+                 "TEN SABOTAGES, EIGHT RED BY NAME. One bound was tightened because a sabotage showed it was " +
+                 "a coincidence rather than a bound: the asymmetry row measured 1.601 against a 1.5 " +
+                 "threshold, seven per cent of headroom, and a plain gaussian of the same scale -- the " +
+                 "literal symmetric profile flux.ts rejects -- reads 0.877, the asymmetry INVERTED, so the " +
+                 "bound moved to 1.25, the middle of the gap rather than one edge. TWO MECHANISMS ARE " +
+                 "TRANSCRIBED AND EXPLICITLY NOT GRADED, each with its number: aura's three depth offsets " +
+                 "(collapsing them moves the frame total 24.21 to 24.76, because aura's own sentence says " +
+                 "the rolls and tilts carry the separation WITH them, and those are untouched) and flux's " +
+                 "three x offsets (moving two together reads 2.523 to 2.438, because every row in that gate " +
+                 "is a VERTICAL measurement and the stacking is horizontal). VERIFIED BY BYTES across all " +
+                 "FOURTEEN species and three time-and-knob cases: 42 frames, 0 bytes different.",
+    }),
+    // v4637 -- THE 249th CLOSING: arc and sol, the two heroes that draw a LINE.
+    since258: Object.freeze({
+        at: "v4637", swept: 2, green: 2, red: 0,
+        added: Object.freeze([
+            "tools/ship/murmurSpecies8-selfcheck.mjs",
+            "tools/ship/murmurSpecies9-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 2,396 and 2,016 ms on the rotation, real WebGPU, 10 rows, carrying ARC and SOL -- " +
+                 "the eleventh and twelfth of murmur's eighteen and the two that draw a LINE. arc.ts opens " +
+                 "with the hardest sentence in the collection: \"THE SPECIES IS A LINE ... Everything else is " +
+                 "either compact enough to solve at the ray's closest approach or broad enough that five " +
+                 "samples average it honestly. A FILAMENT IS NEITHER.\" They ship together because sol.ts " +
+                 "says so in six words -- \"THE PROMINENCES, solved the way arc's filament is\" -- so the " +
+                 "closed-form tube, w * sqrt(pi) / sin(alpha) * exp(-perp^2 / w^2), moved into " +
+                 "render/murmurKit.mjs as mhTube rather than being written twice, alongside mhRoll (the third " +
+                 "rotation, without which every curve's projected ellipse keeps its long axis horizontal) and " +
+                 "mhAa (the moire gate, COMPUTED at this port's one mount rather than baked as the 1 it " +
+                 "returns there). *** AND THE CONSTRAINT THE SPECIES ESCAPES IS ARITHMETIC THAT DIFFERS FROM " +
+                 "murmur's, WHICH IS THE ROUND'S FIRST CORRECTION. *** arc.ts states it at ten taps -- \"the " +
+                 "interval is 0.2, so a tube narrower than that is caught by whichever tap lands in it and " +
+                 "missed otherwise\" -- but this tree marches at MH_TAPS = 24, kit.ts's own demo value, so " +
+                 "the interval here is 0.0833 and the 0.0530 thread is 0.636 of a step rather than 0.265 of " +
+                 "one. Every row computes the step from MH_TAPS instead of quoting 0.2, and the bound is " +
+                 "two-sided so neither inheriting murmur's tap count nor widening the thread until a march " +
+                 "could see it would pass. FIFTEEN SABOTAGES, TWELVE RED BY NAME. *** AND THE SECOND " +
+                 "CORRECTION WAS THE INSTRUMENT, NOT THE SHADER: the first flicker row measured the " +
+                 "FLOURISH. *** At evenly spaced times arc's frame total moved up to 67.85% and averaged " +
+                 "23.36% -- exactly the \"dim, uneven and flickering\" a marched filament gives -- and it was " +
+                 "mh_flourish firing on its own schedule, multiplying brightness by (1 + 0.45 * env) and " +
+                 "adding a travelling pulse. Driving the CPU kit's own mhFlourish finds where it is silent on " +
+                 "BOTH species' lanes, t = 45.0 to 51.1, and in that window arc reads 6.45% max and 3.32% " +
+                 "mean against nebula's 5.55% and 1.44%: a solved filament is as steady as the marched cloud " +
+                 "that cannot flicker. THE OTHER MEASURED RESULTS: half of arc's light lands in 2.16% of the " +
+                 "lit disc against nebula's 17.28%, x8; its centroid never moves a whole pixel between " +
+                 "frames, which is what the parabolic refinement buys over twenty discrete places; `pin` " +
+                 "takes the centre-to-annulus ratio from 0.404 to 21.997, moving light rather than making " +
+                 "it; sol's half-max outline is 4.12% out of round against nebula's 23.13%, one square root " +
+                 "against five samples; `simmer` multiplies the interior's neighbour-to-neighbour difference " +
+                 "by 1.68 while moving its mean 1.1%, which is what a zero-mean noise does and a brightness " +
+                 "cannot; and a tongue appears only when the knob is up AND its own sin-squared phase is up " +
+                 "-- 3.76% to 38.69% of angular asymmetry with one tongue lifted, 2.02% to 1.85% with all " +
+                 "three flat, the corona being unable to fake either because it is a function of radius " +
+                 "alone. *** A SABOTAGE ALSO CAUGHT A FALSE SENTENCE IN A ROW'S OWN TEXT, which is a first " +
+                 "for this session: *** the simmer row claimed it would catch the granulation weighting being " +
+                 "removed, and it does not -- moving it to cover the limb, sol.ts's own named first-build " +
+                 "bug, changes the interior texture response by nothing to three decimals and the outline by " +
+                 "0.01 percentage points, because the term it perturbs carries almost no light out where the " +
+                 "disc is small. That claim is retracted in place. THREE CONSTANTS ARE TRANSCRIBED AND " +
+                 "EXPLICITLY NOT GRADED, each with the measurement that decided it: the granulation " +
+                 "weighting above, arc's grazing floor (3.8% of frame total), and sol's core occlusion (9.0% " +
+                 "of the tongues' contribution at the most favourable moment in 400 s of the species' own " +
+                 "clock, because a lifted tongue arches OUT of the disc where `hidden` is zero). A sabotage " +
+                 "also forced a third conjunct into the bow row: zeroing the span terms so the knob drives " +
+                 "WIDTH alone left the total light and the concentration both up by half, since a closed-form " +
+                 "integral scales with w -- only the stroke's end-to-end reach separates longer from fatter, " +
+                 "and under that sabotage it went the wrong way, x0.901 against the real x1.202. VERIFIED BY " +
+                 "BYTES across all TWELVE species and three time-and-knob cases: 36 frames, 0 bytes different.",
+    }),
     // v4636 -- THE 248th CLOSING: fathom and geode, the two heroes whose interiors are SOLVED, not marched.
     since257: Object.freeze({
         at: "v4636", swept: 2, green: 2, red: 0,

@@ -25,6 +25,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { codeOnly } from "./sourceScan.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ENG = path.join(HERE, "..", "..");
@@ -49,7 +50,27 @@ function walk(dir, out = []) {
     const offenders = [], loaderOffenders = [];
     for (const f of files) {
         let src = ""; try { src = fs.readFileSync(f, "utf8"); } catch { continue; }
-        const code = src.replace(/^\s*\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
+        // *** PRE-FILTERED ON THE RAW TEXT BEFORE LEXING, AND THAT IS A BUDGET FACT, NOT A TIDY-UP. ***
+        // codeOnly is a character-by-character lexer. Running it over all 4,117 files took this gate from
+        // 639 ms to 3,390 -- past the 3,000 ms ceiling, which would have stopped it running at ship time at
+        // all and made the repair strictly worse than the defect it fixed. "import(" is a NECESSARY condition
+        // for every offender the regex below can find, and skipping the files without it costs one indexOf.
+        if (!src.includes("import(")) continue;
+        // *** codeOnly AND NOT TWO REGEXES, AND THIS FILE'S OWN HEADER ALREADY KNEW WHY. *** Section 3 below
+        // assembles its fixture from fragments rather than spelling it out, because "spelling the crashing
+        // line out literally makes THIS FILE an offender in its own whole-tree scan", and it names that as
+        // the third sighting of one mistake: prose read as code in a comment, then in a string, then in a
+        // test fixture. The whole-tree scan here stripped COMMENTS and not STRINGS, so the fourth sighting
+        // was this gate counting its own failure text. Of the four offenders it reported from v4622 to
+        // v4641, exactly ONE was a dynamic import: trellisAutoRig-selfcheck.mjs, fixed in the same round as
+        // this. The other three were the finding itself, quoted back -- redCensus.mjs's WHY_V4622 entry
+        // explaining it, and the two copies register-audit.mjs keeps of the recorded FAIL line. THAT IS A
+        // FEEDBACK LOOP AND NOT A MISCOUNT: recording the finding CREATED offenders, so the number could
+        // only ever grow by being written down, and no amount of fixing real code could reach zero.
+        // tools/ship/sourceScan.mjs's codeOnly is the tree's own lexer for exactly this -- it blanks string
+        // CONTENT as well as comments, keeping the quotes and the escapes -- and it is what the rest of the
+        // tree's censuses already use.
+        const code = codeOnly(src);
         // import( path.join(...) )  or  import( someAbsolutePathVariable )
         for (const m of code.matchAll(/import\(\s*(path\.(?:join|resolve)\([^)]*\)|[A-Za-z_$][\w$]*(?:Path|File|Dir|Full|Abs))\s*\)/g)) {
             // v4620 -- *** THIS CHECK EXISTS FOR NODE'S OWN ESM LOADER, AND A BROWSER HAS A DIFFERENT ONE. ***
@@ -83,7 +104,11 @@ function walk(dir, out = []) {
     // shape under a name that said all of them.
     for (const f of files) {
         let src = ""; try { src = fs.readFileSync(f, "utf8"); } catch { continue; }
-        const code = src.replace(/^\s*\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
+        // Same lexer as section 1 above, and the same budget reason -- see the note there. Pre-filtered on
+        // THIS section's own necessary condition: the ARG regex below cannot match unless one of the two flag
+        // spellings appears literally, so the lexer only runs on a file that could produce a finding.
+        if (!src.includes("--import") && !src.includes("--experimental-loader")) continue;
+        const code = codeOnly(src);
         // THE CALL FORM IS LISTED FIRST so `pathToFileURL(HOOK).href` matches as one expression rather than
         // as the bare identifier `pathToFileURL` -- which is exactly what the first version of this check did,
         // and it duly reported the line this round had just FIXED. A checker that cannot read the correct form

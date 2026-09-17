@@ -316,7 +316,13 @@ const probeRun = await renderThreeTslToPixels({
     variants: [{ factoryArgs: { mode: "noise", n: N } }, { factoryArgs: { mode: "rail", n: N } },
                { factoryArgs: { mode: "railLight", n: N } },
                { factoryArgs: { mode: "surface", n: N } },
-               { factoryArgs: { mode: "opalAbyss", n: N } }],
+               { factoryArgs: { mode: "opalAbyss", n: N } },
+               { factoryArgs: { mode: "live", n: N } },
+               { factoryArgs: { mode: "state", n: N } },
+               { factoryArgs: { mode: "finishPaper", n: N } },
+               { factoryArgs: { mode: "finishInk", n: N } },
+               { factoryArgs: { mode: "finishGrey", n: N } },
+               { factoryArgs: { mode: "ignite", n: N } }],
 });
 
 sec("6. *** THE PAIR: THE REAL COMPILED SHADER AGAINST THE CPU REFERENCE, BIT FOR BIT ***");
@@ -1239,15 +1245,470 @@ sec("10. *** opal's FOUR LIVES AND abyss's CLOCKS: the two species whose subject
     }
 }
 
+// =============================================================================================================
+// =============================================================================================================
+sec("11. *** mh_live AND mh_state: THE TWO SIGNALS EVERY SPECIES READS AND THIS PORT DID NOT HAVE ***");
+{
+    const r = probeRun;
+    if (!r.ok) {
+        ok("!! mh_live and mh_state match a real GPU render", false, `could not render: ${r.reason || "unknown"}`);
+    } else {
+        // THE SAME ROW FLIP SECTION 6 MEASURED: three's uv has v=0 at the BOTTOM and this readback is
+        // top-row-first, so shader row y arrives at readback row N-1-y. Both probes put the STATE on y, so
+        // getting this backwards would grade LISTENING against SUCCESS -- which is how the first cut of this
+        // section read, with the voice lift landing at readback row 3. It is asserted rather than assumed:
+        // every row below also reports what the UNFLIPPED reading would have scored.
+        const ry = (ysh) => N - 1 - ysh;
+        const sIdx = (ysh) => Math.floor((ysh / N) * 5);
+        // The middle readback row of a state's band, which is where a state's three rows are unambiguous.
+        const bandRow = (si) => ry(Math.floor(((si + 0.5) / 5) * N));
+
+        // ---- the f64 twin, so the CPU export is load-bearing rather than merely present ---------------------
+        // *** THREE IMPLEMENTATIONS, NOT TWO. *** render/murmurKit.mjs's mhLive and mhState are the f64 scalar
+        // reference; render/murmurKitTsl.mjs's are an f32 node graph on a GPU; and the expectations written out
+        // by hand below are murmur's numbers transcribed a third time. Without this row the CPU pair would be an
+        // export nothing reads -- which is how a reference drifts away from the shader it is supposed to be the
+        // reference FOR, and the shape three of this tree's repaired records had.
+        {
+            let wc = 0, at = "";
+            for (let si = 0; si <= 4; si++) for (let k = 0; k <= 40; k++) {
+                const u = k / 40;
+                const lvC = K.mhLive(u, u, si);
+                const wantV = Math.pow(u, 0.65) * (0.55 + 0.45 * (si === 1 ? 1 : 0));
+                const wantP = Math.pow(u, 0.85) * (0.60 + 0.40 * ((si === 2 || si === 3) ? 1 : 0));
+                for (const [g, w, nm] of [[lvC.voice, wantV, "voice"], [lvC.pace, wantP, "pace"]]) {
+                    const d = Math.abs(g - w);
+                    if (d > wc) { wc = d; at = `${nm} at ${u.toFixed(3)} state ${si}: ${g} vs ${w}`; }
+                }
+                const tau = (k / 40) * 1.4, stC = K.mhState(si, tau);
+                const succ = si === 4 ? 1 : 0, resp = si === 3 ? 1 : 0;
+                const a = Math.min(1, tau / 1.20), sw = Math.min(1, tau / 0.95);
+                const ssq = (e0, e1, x) => { const uu = Math.min(1, Math.max(0, (x - e0) / (e1 - e0))); return uu * uu * (3 - 2 * uu); };
+                const wantS = { complete: ssq(0, 0.30, a) * (1 - ssq(0.36, 1.0, a)) * succ, sweep: ssq(0, 1, sw) * succ,
+                                settled: ssq(0.30, 1.05, a) * succ, drive: ssq(0, 0.55, tau) * resp };
+                for (const nm of ["complete", "sweep", "settled", "drive"]) {
+                    const d = Math.abs(stC[nm] - wantS[nm]);
+                    if (d > wc) { wc = d; at = `${nm} at tau ${tau.toFixed(3)} state ${si}: ${stC[nm]} vs ${wantS[nm]}`; }
+                }
+            }
+            ok("!! the f64 CPU twin of mh_live and mh_state agrees with the hand-written curves to f64 rounding",
+                wc < 1e-15,
+                `worst |cpu - hand-written| = ${wc.toExponential(2)} over 205 points x 6 outputs` +
+                `${at ? " (worst at " + at + ")" : ""}. This is the row that makes render/murmurKit.mjs's export ` +
+                `load-bearing: the GPU rows below grade the SHADER against the same hand-written numbers, so ` +
+                `without this one the CPU reference could drift and nothing would notice.`);
+        }
+
+        // ---- mh_live ----------------------------------------------------------------------------------------
+        // *** THE CONSTANTS ARE SPELLED OUT HERE AND NOT READ OUT OF THE SUBJECT. *** This tree has the v4579
+        // scar for a gate that re-stated the formula it was grading, and half of v4640's rows had to be
+        // re-titled for grading a table instead of a shader. So the CPU side below is murmur's four numbers
+        // written out by hand -- 0.65 and 0.55 for voice, 0.85 and 0.60 for pace, with the LISTENING window on
+        // one and the THINKING-plus-RESPONDING window on the other -- and if render/murmurKit.mjs's mhLive is
+        // edited to disagree with kit.ts, BOTH this row and the pixel rows in the orb's own gate go red rather
+        // than moving together in silence.
+        const lv = r.frames[6];
+        const liveWant = (u, si) => [
+            Math.round(Math.min(1, Math.pow(u, 0.65) * (0.55 + 0.45 * (si === 1 ? 1 : 0))) * 255),
+            Math.round(Math.min(1, Math.pow(u, 0.85) * (0.60 + 0.40 * ((si === 2 || si === 3) ? 1 : 0))) * 255)];
+        let wV = 0, wP = 0, atV = "", atP = "", wFlat = 0;
+        for (let ysh = 0; ysh < N; ysh++) for (let x = 0; x < N; x++) {
+            const u = x / N, si = sIdx(ysh), want = liveWant(u, si);
+            const i = (ry(ysh) * N + x) * 4, iFlat = (ysh * N + x) * 4;
+            const dV = Math.abs(lv[i] - want[0]), dP = Math.abs(lv[i + 1] - want[1]);
+            if (dV > wV) { wV = dV; atV = `signal ${u.toFixed(4)} state ${si}: gpu ${lv[i]} cpu ${want[0]}`; }
+            if (dP > wP) { wP = dP; atP = `signal ${u.toFixed(4)} state ${si}: gpu ${lv[i + 1]} cpu ${want[1]}`; }
+            wFlat = Math.max(wFlat, Math.abs(lv[iFlat] - want[0]), Math.abs(lv[iFlat + 1] - want[1]));
+        }
+        say(`mh_live over ${N} signals x 5 states: worst |gpu - cpu| = ${wV}/255 on voice, ${wP}/255 on pace ` +
+            `(unflipped, ${wFlat}/255)`);
+        ok("!! *** mh_live RENDERS ON A REAL GPU AND MATCHES THE HAND-WRITTEN CURVE ***",
+            wV <= 2 && wP <= 2 && wFlat > 20,
+            `worst voice error ${wV} of 255 (${atV || "no disagreement"}), worst pace error ${wP} of 255 ` +
+            `(${atP || "no disagreement"}); the unflipped orientation scores ${wFlat}, so this cannot pass by ` +
+            `the symmetry a state-independent curve would have. The exponents are what make the bound hard to ` +
+            `meet by accident: 0.65 read as a square root is within 3% of it at the top of the range but 21 ` +
+            `counts of 255 at the bottom, so the lattice has to reach down there -- and it starts at 0.`);
+
+        // pow(0, 0.65) is the one input a driver could hand back NaN for -- named as its own row because a
+        // NaN would clamp to 0 in some paths and to 1 in others and the error bound above would barely move.
+        let zeroBad = 0;
+        for (let y = 0; y < N; y++) { const i = (y * N + 0) * 4; if (lv[i] !== 0 || lv[i + 1] !== 0) zeroBad++; }
+        ok("!! a silent signal gives a silent voice and pace in every state -- pow(0, 0.65) is 0, not NaN",
+            zeroBad === 0,
+            `all ${N} rows read exactly 0 in both channels at signal 0. WGSL evaluates pow as ` +
+            `exp2(e2 * log2(e1)), so this is exp2(-inf) and not a special case anybody wrote -- and the probe's ` +
+            `lattice deliberately starts AT zero rather than at 1/${N} so the question gets asked at all.`);
+
+        // *** THE TWO WINDOWS ARE DIFFERENT AND THE ROW SAYS SO WITH THE FRAME'S OWN NUMBERS. *** voice is
+        // lifted in LISTENING alone; pace in THINKING and RESPONDING. A port that gave them one shared window
+        // would pass every error bound above at four of the five states.
+        const col = (ch, si) => lv[(bandRow(si) * N + (N - 1)) * 4 + ch];
+        const vByState = [0, 1, 2, 3, 4].map((si) => col(0, si));
+        const pByState = [0, 1, 2, 3, 4].map((si) => col(1, si));
+        say(`at the top signal, voice by state = [${vByState}], pace by state = [${pByState}]`);
+        const allEq = (a, ix) => ix.every((k) => a[k] === a[ix[0]]);
+        ok("!! *** VOICE IS LIFTED IN LISTENING ALONE AND PACE IN THINKING AND RESPONDING -- TWO WINDOWS ***",
+            vByState[1] > vByState[0] && allEq(vByState, [0, 2, 3, 4]) &&
+            pByState[2] > pByState[0] && pByState[2] === pByState[3] && allEq(pByState, [0, 1, 4]),
+            `voice reads ${vByState[1]} in LISTENING against ${vByState[0]} in the other four, which are all ` +
+            `equal to each other; pace reads ${pByState[2]} in THINKING and RESPONDING alike against ` +
+            `${pByState[0]} in the other three. kit.ts: "the same microphone level means different things in ` +
+            `different states", and RESPONDING is inside one window and outside the other -- which is exactly ` +
+            `the pair a single shared window would collapse, at the one state where it is cheapest to get wrong.`);
+
+        // ---- mh_state ---------------------------------------------------------------------------------------
+        const st = r.frames[7];
+        const ss = (e0, e1, x) => { const u = Math.min(1, Math.max(0, (x - e0) / (e1 - e0))); return u * u * (3 - 2 * u); };
+        const NAME = ["complete", "sweep", "settled", "drive"];
+        const stateWant = (tau, si) => {
+            const succ = si === 4 ? 1 : 0, resp = si === 3 ? 1 : 0;
+            const a = Math.min(1, tau / 1.20), sw = Math.min(1, tau / 0.95);
+            return [Math.round(ss(0, 0.30, a) * (1 - ss(0.36, 1.0, a)) * succ * 255),
+                    Math.round(ss(0, 1, sw) * succ * 255),
+                    Math.round(ss(0.30, 1.05, a) * succ * 255),
+                    Math.round(ss(0, 0.55, tau) * resp * 255)];
+        };
+        let wS = 0, atS = "", wSFlat = 0;
+        for (let ysh = 0; ysh < N; ysh++) for (let x = 0; x < N; x++) {
+            const tau = (x / N) * 1.4, si = sIdx(ysh), want = stateWant(tau, si);
+            const i = (ry(ysh) * N + x) * 4, iFlat = (ysh * N + x) * 4;
+            for (let c = 0; c < 4; c++) {
+                const d = Math.abs(st[i + c] - want[c]);
+                if (d > wS) { wS = d; atS = `${NAME[c]} at tau ${tau.toFixed(3)} state ${si}: gpu ${st[i + c]} cpu ${want[c]}`; }
+                wSFlat = Math.max(wSFlat, Math.abs(st[iFlat + c] - want[c]));
+            }
+        }
+        // The two windows that are easy to write as one number: complete's 1.20 against sweep's 0.95. Read off
+        // the SUCCESS band at the tau nearest 1.0 second, which is where they are furthest apart.
+        const xTau1 = Math.round((1.0 / 1.4) * N), iT1 = (bandRow(4) * N + xTau1) * 4;
+        say(`mh_state over ${N} taus x 5 states x 4 outputs: worst |gpu - cpu| = ${wS}/255 (unflipped, ${wSFlat}/255)`);
+        ok("!! *** mh_state's FOUR OUTPUTS RENDER ON A REAL GPU AND MATCH THE HAND-WRITTEN CURVES ***",
+            wS <= 2 && wSFlat > 20,
+            `worst error ${wS} of 255 (${atS || "no disagreement"}) across all ${N * N * 4} samples, against ` +
+            `${wSFlat} unflipped. At tau = ${(xTau1 / N * 1.4).toFixed(3)} s in SUCCESS, complete reads ` +
+            `${st[iT1]} of 255 and sweep ${st[iT1 + 1]} -- the breath is already most of the way out while the ` +
+            `travel is still finishing, which is the whole reason the two windows are 1.20 and 0.95 and not one ` +
+            `number. kit.ts: "a flash that starts at full speed and stops dead is a wipe, and a wipe is a UI ` +
+            `transition rather than an arrival travelling through a material."`);
+
+        // The three quiet states are the load-bearing half of mh_state: every species multiplies its interior
+        // by (1 + complete), so `complete` at exactly zero outside SUCCESS is what spares eighteen shaders a guard.
+        let leak = 0, leakAt = "";
+        for (let ysh = 0; ysh < N; ysh++) {
+            const si = sIdx(ysh); if (si === 3 || si === 4) continue;
+            for (let x = 0; x < N; x++) { const i = (ry(ysh) * N + x) * 4;
+                for (let c = 0; c < 4; c++) if (st[i + c] !== 0) { leak++; leakAt = leakAt || `${NAME[c]} nonzero in state ${si}`; } }
+        }
+        // ...and the two loud states have to be loud, or "four zeros everywhere" would pass the line above.
+        const iS = (bandRow(4) * N + N - 1) * 4, iR = (bandRow(3) * N + N - 1) * 4;
+        const loud = st[iS + 2] > 200 && st[iS + 1] > 200 && st[iR + 3] > 200;
+        ok("!! *** IDLE, LISTENING AND THINKING PRODUCE EXACTLY FOUR ZEROS -- AND SUCCESS AND RESPONDING DO NOT ***",
+            leak === 0 && loud,
+            `${leak} nonzero samples across the three quiet states${leakAt ? " (" + leakAt + ")" : ""}, while at ` +
+            `the far tau SUCCESS reaches ${st[iS + 2]} of 255 on settled and ${st[iS + 1]} on sweep, and ` +
+            `RESPONDING ${st[iR + 3]} on drive. The second half is what stops a shader returning four zeros ` +
+            `unconditionally from passing the first -- which is the shape of every "cannot fail" row this tree ` +
+            `has had to repair.`);
+
+        // *** WHAT THIS SECTION DOES NOT CLAIM. *** mh_state is ported and graded; it is not CALLED by
+        // render/aiPresenceOrbTsl.mjs. murmur's eighteen sources reference st.drive 44 times, st.complete 49,
+        // st.settled 19 and st.sweep 16, and every one is a transcription with its own constants. The orb
+        // therefore gained `activity` and `stateIndex` at v4641 and deliberately NOT `stateTau`: a uniform
+        // nothing reads is a row that cannot fail. tools/ship/aiPresenceOrb-selfcheck.mjs is where mh_live's
+        // arrival in the PICTURE is graded, and there is no such section for mh_state yet, by design.
+    }
+}
+// =============================================================================================================
+sec("12. *** mh_present's TAIL: THE CATCHLIGHT, THE CONTACT SHADOW AND THE KNEE -- the finish, on both grounds ***");
+{
+    const r = probeRun;
+    if (!r.ok) {
+        ok("!! mh_present's finish matches a real GPU render", false, `could not render: ${r.reason || "unknown"}`);
+    } else {
+        const ry = (ysh) => N - 1 - ysh;   // the same row flip section 11 measures and asserts
+        const INK = [0x0A / 255, 0x0A / 255, 0x0B / 255], PAPER = [0.97, 0.96, 0.94];
+        const TONE = [0x6C / 255, 0x63 / 255, 0xE8 / 255];
+
+        const GREY_GROUND = [0.75, 0.75, 0.75], GREY_INK = [0.45, 0.45, 0.45];
+        for (const [name, frame, ground, page] of [["paper", r.frames[8], PAPER, INK], ["ink", r.frames[9], INK, INK],
+                                                   ["light grey", r.frames[10], GREY_GROUND, GREY_INK]]) {
+            const pal = K.mhPalette(ground, TONE, TONE, 0.0, 1.0);
+            const inkLin = page.map((c) => K.srgbToLinear(c));
+            let worst = 0, at = "", worstFlat = 0;
+            for (let ysh = 0; ysh < N; ysh++) for (let x = 0; x < N; x++) {
+                const spec = (x / N) * 1.2, uvY = ((ysh / N) * 2.4 - 1.2) * K.MH_R;
+                const want = K.mhPresentFinish([0.5, 0.5, 0.5], spec, 0.5, uvY, pal, inkLin)
+                    .map((v) => Math.round(Math.min(1, Math.max(0, v * 0.5)) * 255));
+                const i = (ry(ysh) * N + x) * 4, iFlat = (ysh * N + x) * 4;
+                for (let c = 0; c < 3; c++) {
+                    const d = Math.abs(frame[i + c] - want[c]);
+                    if (d > worst) { worst = d; at = `spec ${spec.toFixed(3)} uvY ${uvY.toFixed(3)} ch ${c}: gpu ${frame[i + c]} cpu ${want[c]}`; }
+                    worstFlat = Math.max(worstFlat, Math.abs(frame[iFlat + c] - want[c]));
+                }
+            }
+            say(`mh_present's finish on ${name}, ${N} speculars x ${N} heights x 3 channels: worst |gpu - cpu| = ` +
+                `${worst}/255 (unflipped, ${worstFlat}/255)`);
+            ok(`!! *** mh_present's FINISH RENDERS ON A REAL GPU AND MATCHES THE CPU REFERENCE -- ${name} ground ***`,
+                worst <= 2 && (name === "ink" || worstFlat > 10),
+                `worst channel error ${worst} of 255 (${at || "no disagreement"})` +
+                (name === "ink" ? ". On ink this function IS the knee and nothing else -- every other term is " +
+                    "multiplied by `paper` -- so this row is what would catch the paper terms leaking onto the " +
+                    "dark ground, where murmur applies none of them."
+                 : `, against ${worstFlat} unflipped, so it cannot pass by the symmetry a height-independent ` +
+                   `finish would have.`));
+        }
+
+        // *** THE THREE TERMS, SEPARATED, BECAUSE AN AGREEMENT BOUND DOES NOT SAY WHICH ONE IS PRESENT. ***
+        // Two implementations of the same wrong formula agree perfectly. These read the PICTURE the probe drew.
+        const pap = r.frames[8], ink = r.frames[9];
+        const at = (f, xsh, ysh, c) => f[(ry(ysh) * N + xsh) * 4 + c];
+        const midY = Math.floor(N / 2);
+        const specLo = at(pap, 1, midY, 0), specHi = at(pap, N - 1, midY, 0);
+        const inkLo = at(ink, 1, midY, 0), inkHi = at(ink, N - 1, midY, 0);
+        say(`at mid height, red channel across the specular sweep -- paper ${specLo} -> ${specHi}, ink ${inkLo} -> ${inkHi}`);
+        ok("!! *** THE CATCHLIGHT IS ON PAPER AND ON PAPER ONLY: the specular lifts the page and does nothing on ink ***",
+            specHi - specLo > 40 && Math.abs(inkHi - inkLo) <= 1,
+            `across a specular of 0 to 1.2 the paper ground climbs ${specHi - specLo} counts of 255 while the ink ` +
+            `ground moves ${Math.abs(inkHi - inkLo)}. kit.ts: on paper "THE SPECULAR IS THE ONLY THING BRIGHTER ` +
+            `THAN THE PAGE, so it leaves the energy sum and comes back as a small mix toward a warm white" -- and ` +
+            `on ink it never left the sum, so there is nothing here to add back. BOTH HALVES ARE THE CLAIM: the ` +
+            `lift alone would pass for a port that applied the catchlight on both grounds.`);
+
+        // The shadow is read DOWN the frame at a specular of zero, so the catchlight cannot be what moved it.
+        const top = at(pap, 0, 2, 0), bottom = at(pap, 0, N - 3, 0);
+        const topInk = at(ink, 0, 2, 0), bottomInk = at(ink, 0, N - 3, 0);
+        say(`at specular 0, red channel top-of-frame vs bottom -- paper ${top} -> ${bottom}, ink ${topInk} -> ${bottomInk}`);
+        ok("!! *** THE CONTACT SHADOW POOLS DOWNWARD AND ONLY ON PAPER: a shadow pools, it does not ring ***",
+            top - bottom > 20 && Math.abs(topInk - bottomInk) <= 1,
+            `the page darkens ${top - bottom} counts from the top of the frame to the bottom at a specular of ` +
+            `ZERO -- so it is the shadow and not the catchlight -- while the ink ground moves ` +
+            `${Math.abs(topInk - bottomInk)}. kit.ts: "at 0.06 above the centre line and full below it, the page ` +
+            `is clean over the top of the object and darkens under it". *** THE SIGN OF THAT IS THE ONE THING ` +
+            `HERE NOT COPIED FROM THE SOURCE: *** murmur reads gl_FragCoord, where y runs DOWN, and this port ` +
+            `takes its quad from three's uv(). The direction was measured off the contact GLOW instead -- the ` +
+            `only term outside the silhouette, which murmur already weights downward -- at 128 px over the ` +
+            `annulus past the body: limn 1.426 bottom-over-top, still 1.074, abyss 1.015, all above 1. v4638 ` +
+            `is what asking that question from the source rather than the pixels costs.`);
+
+        // The knee is the one term that is NOT gated on paper, so ink is where it is visible alone.
+        const kneeCpu = (x, k) => K.mhKnee(x, k);
+        say(`the knee alone, on ink: mhKnee(1.5, 0.90) = ${kneeCpu(1.5, 0.90).toFixed(6)}, and on paper ` +
+            `mhKnee(1.5, 0.96) = ${kneeCpu(1.5, 0.96).toFixed(6)}`);
+        ok("!! ...and the KNEE is the one term that is not gated on paper -- it MOVES with the ground rather than switching",
+            kneeCpu(1.5, 0.90) < kneeCpu(1.5, 0.96) && kneeCpu(0.5, 0.90) === 0.5 && kneeCpu(0.5, 0.96) === 0.5,
+            `a linear light of 1.5 compresses to ${kneeCpu(1.5, 0.90).toFixed(4)} at the ink knee of 0.90 and ` +
+            `${kneeCpu(1.5, 0.96).toFixed(4)} at the paper knee of 0.96, while 0.5 passes through untouched at ` +
+            `both. kit.ts: 0.90 "stops a bright field becoming flat white paper, but when the ground already IS ` +
+            `paper that same knee spends all its headroom on the page", so it opens to 0.96 where "the page ` +
+            `passes through almost untouched and the highlight still compresses rather than clipping hard".`);
+
+        // *** WHAT SECTION 12 DOES NOT CLAIM. *** mh_out. The triangular-PDF interleaved-gradient dither is
+        // still unported, so this is mh_present's finish MINUS its last line, and the function is named
+        // mhPresentFinish rather than mhPresent for exactly that reason.
+    }
+}
+
+
+sec("13. *** mh_ignite: THE SUCCESS SHELL -- a ring that LEAVES the heart and REACHES the surface ***");
+{
+    const r = probeRun;
+    if (!r.ok) {
+        ok("!! mh_ignite matches a real GPU render", false, `could not render: ${r.reason || "unknown"}`);
+    } else {
+        const ry = (ysh) => N - 1 - ysh;   // the same row flip sections 11 and 12 measure and assert
+        const ig = r.frames[11];
+        // The three species the probe carries, in the three channels, with murmur's constants written out by
+        // hand -- NOT read out of MH_IGNITE. If the table is edited to disagree with the source, this section
+        // and the table part ways instead of moving together, which is the v4579 lesson in one line.
+        const CH = [["still", 0.02, 0.95, 0.26, 0], ["duet", 0.02, 1.00, 0.22, 1], ["tempest", 0.02, 1.05, 0.24, 2]];
+        const pOf = (x) => (x / N) * 1.2;          // the probe's |p| axis
+        const sOf = (ysh) => ysh / N;              // the probe's sweep axis
+
+        // ---- the f64 twin, so the CPU export is load-bearing rather than merely present -------------------
+        {
+            let wc = 0, at = "";
+            for (const [nm, lo, hi, width] of CH) for (let a = 0; a <= 24; a++) for (let b = 0; b <= 24; b++) {
+                const pl = (a / 24) * 1.2, sw = b / 24, cm = 0.37;
+                const g = K.mhIgnite(pl, cm, sw, lo, hi, width);
+                const centre = lo + (hi - lo) * sw;             // mix(lo, hi, sweep), written out
+                const q = (pl - centre) / width;
+                const want = cm * Math.exp(-(q * q));
+                const d = Math.abs(g - want);
+                if (d > wc) { wc = d; at = `${nm} at |p| ${pl.toFixed(3)} sweep ${sw.toFixed(3)}: ${g} vs ${want}`; }
+            }
+            ok("!! the f64 CPU twin of mh_ignite agrees with the hand-written gaussian to f64 rounding",
+                wc < 1e-15,
+                `worst |cpu - hand-written| = ${wc.toExponential(2)} over 3 species x 625 points` +
+                `${at ? " (worst at " + at + ")" : ""}. complete is held at 0.37 and not at 1 here, so a port ` +
+                `that dropped the multiplier entirely would show up as 0.63 of error rather than as nothing.`);
+        }
+
+        // ---- the compiled shader, against the same hand-written gaussian ----------------------------------
+        // Alpha is the FOURTH reading of the same lattice and it is graded here with the other three: x is
+        // still |p|, y is COMPLETE, and the sweep is pinned at 0.5. Without it `complete` is unexercised --
+        // see the probe's own note, and the sabotage that deleted the multiplier and passed every row.
+        const ALL = CH.concat([["still, complete on y", 0.02, 0.95, 0.26, 3]]);
+        let worst = 0, at = "", worstFlat = 0;
+        for (const [nm, lo, hi, width, c] of ALL) {
+            for (let ysh = 0; ysh < N; ysh++) for (let x = 0; x < N; x++) {
+                const cm = c === 3 ? sOf(ysh) : 1, sw = c === 3 ? 0.5 : sOf(ysh);
+                const centre = lo + (hi - lo) * sw, q = (pOf(x) - centre) / width;
+                const want = Math.round(Math.min(1, cm * Math.exp(-(q * q))) * 255);
+                const i = (ry(ysh) * N + x) * 4 + c, iFlat = (ysh * N + x) * 4 + c;
+                const d = Math.abs(ig[i] - want);
+                if (d > worst) { worst = d; at = `${nm} at |p| ${pOf(x).toFixed(3)} y ${sOf(ysh).toFixed(3)}: gpu ${ig[i]} cpu ${want}`; }
+                worstFlat = Math.max(worstFlat, Math.abs(ig[iFlat] - want));
+            }
+        }
+        say(`mh_ignite over ${N} radii x ${N} rows x 3 species plus alpha's complete axis: worst |gpu - cpu| ` +
+            `= ${worst}/255 (unflipped, ${worstFlat}/255)`);
+        ok("!! *** mh_ignite RENDERS ON A REAL GPU AND MATCHES THE HAND-WRITTEN GAUSSIAN ***",
+            worst <= 2 && worstFlat > 20,
+            `worst channel error ${worst} of 255 (${at || "no disagreement"}); the unflipped orientation ` +
+            `scores ${worstFlat}, which is what says this frame is not symmetric in sweep -- a shell that sat ` +
+            `still would read the same either way up and this row could not tell.`);
+
+        // ---- WHERE THE RING IS, not merely how bright the frame is ----------------------------------------
+        // *** AN AGREEMENT BOUND DOES NOT SAY THE RING MOVES. *** Two implementations of a shell pinned at
+        // the surface agree with each other perfectly, and a frame of the right average brightness can be
+        // drawn without a travelling ring at all. These rows read the PICTURE and ask where its peak is.
+        //
+        // The centre is recovered to well under one cell by a log-parabolic fit: the samples are exp(-q^2),
+        // so their logarithms lie on an exact parabola and three of them locate its vertex. At the probe's
+        // spacing the three samples read around 250/255, where one 8-bit step is 0.4%, which puts the fit's
+        // noise near 0.0015 in |p| -- thirty times finer than the 0.047 that separates the three species at
+        // the end of the sweep. Integer argmax alone would have called duet and tempest the same shell.
+        const centreOf = (frame, ysh, c) => {
+            let bi = -1, bv = -1;
+            for (let x = 0; x < N; x++) { const v = frame[(ry(ysh) * N + x) * 4 + c]; if (v > bv) { bv = v; bi = x; } }
+            if (bi <= 0 || bi >= N - 1) return null;
+            const l = Math.log(frame[(ry(ysh) * N + bi - 1) * 4 + c]), m = Math.log(bv),
+                  h = Math.log(frame[(ry(ysh) * N + bi + 1) * 4 + c]);
+            const den = l - 2 * m + h;
+            if (!(den < -1e-6) || !isFinite(l) || !isFinite(h)) return null;
+            return pOf(bi + 0.5 * (l - h) / den);
+        };
+        for (const [nm, lo, hi, width, c] of CH) {
+            let prev = -1, monotone = true, wPos = 0, atPos = "", seen = 0, first = null, last = null;
+            for (let ysh = 1; ysh < N; ysh++) {
+                const got = centreOf(ig, ysh, c);
+                if (got === null) continue;
+                seen++; if (first === null) first = got; last = got;
+                if (got <= prev) monotone = false;
+                prev = got;
+                const want = lo + (hi - lo) * sOf(ysh);
+                const d = Math.abs(got - want);
+                if (d > wPos) { wPos = d; atPos = `sweep ${sOf(ysh).toFixed(4)}: measured ${got.toFixed(4)}, mix(lo,hi,sweep) ${want.toFixed(4)}`; }
+            }
+            say(`${nm}: the ring's measured centre runs ${first === null ? "n/a" : first.toFixed(4)} -> ` +
+                `${last === null ? "n/a" : last.toFixed(4)} over ${seen} sweep rows, worst |measured - mix| ${wPos.toFixed(4)}`);
+            ok(`!! *** THE SHELL TRAVELS: ${nm}'s ring leaves the heart and arrives at mix(lo, hi, sweep) ***`,
+                seen >= 12 && monotone && wPos < 0.012 && last !== null && first !== null && last - first > 0.70,
+                `over ${seen} sweep rows the peak advances monotonically ${first === null ? "n/a" : first.toFixed(4)} -> ` +
+                `${last === null ? "n/a" : last.toFixed(4)} -- a journey of ` +
+                `${(first === null || last === null) ? "n/a" : (last - first).toFixed(4)} body radii -- and lands ` +
+                `within ${wPos.toFixed(4)} of lo + (hi - lo) * sweep everywhere (${atPos || "no disagreement"}). ` +
+                `kit.ts: sweep "is the same window read as a POSITION, 0 to 1 over 0.95 s, and it is what each ` +
+                `species runs the ignition ALONG". A shell parked at the surface would satisfy every ` +
+                `brightness bound above this one and fail here.`);
+        }
+
+        // The three species must arrive in DIFFERENT places, or the table's per-species hi is decoration.
+        const endS = centreOf(ig, N - 1, 0), endD = centreOf(ig, N - 1, 1), endT = centreOf(ig, N - 1, 2);
+        say(`at the last sweep row the three rings sit at still ${endS === null ? "n/a" : endS.toFixed(4)}, ` +
+            `duet ${endD === null ? "n/a" : endD.toFixed(4)}, tempest ${endT === null ? "n/a" : endT.toFixed(4)}`);
+        ok("!! ...and the three species do NOT arrive together -- hi is per-species, not one shared surface",
+            endS !== null && endD !== null && endT !== null && endD - endS > 0.030 && endT - endD > 0.030,
+            `still stops ${(endD - endS).toFixed(4)} short of duet and duet ${(endT - endD).toFixed(4)} short ` +
+            `of tempest, against hi values of 0.95, 1.00 and 1.05 and a fit noise near 0.0015. This is the row ` +
+            `a single-species probe could not have: one channel cannot tell a correct table from a constant.`);
+
+        // A RING, not a front. This is the shape a smoothstep port gets wrong while passing "it moves".
+        {
+            const mid = 8, c = 0;
+            const heart = ig[(ry(mid) * N + 0) * 4 + c], edge = ig[(ry(mid) * N + N - 1) * 4 + c];
+            let peak = 0; for (let x = 0; x < N; x++) peak = Math.max(peak, ig[(ry(mid) * N + x) * 4 + c]);
+            say(`still at sweep ${sOf(mid).toFixed(3)}: heart ${heart}/255, peak ${peak}/255, far edge ${edge}/255`);
+            ok("!! *** IT IS A RING AND NOT A FRONT: the light falls off on BOTH sides of the peak ***",
+                peak > 200 && heart < peak / 8 && edge < peak / 8,
+                `mid-sweep the peak reads ${peak} of 255 while the heart behind it reads ${heart} and the far ` +
+                `edge ahead of it reads ${edge}. A smoothstep-shaped ignition -- the obvious wrong port, and a ` +
+                `one-character difference in a shader -- would leave everything BEHIND the front lit and would ` +
+                `pass every travel row above: it moves, it is monotone, and its half-height even lands on ` +
+                `mix(lo, hi, sweep). Only the falloff behind the peak separates them.`);
+        }
+
+        // ---- `complete` IS A LIVE MULTIPLIER, and this is the pair the first cut of this section did not have.
+        // *** A SABOTAGE THAT DELETED complete FROM mh_ignite PASSED EVERY ROW ABOVE. *** The probe held it
+        // at 1 in all three colour channels, where a multiplier is invisible by construction, and the note
+        // saying so reasoned that a scale did not deserve an axis. It does: complete is the term that makes
+        // the flash ABSENT in four of murmur's five states, and absent is most of the orb's life.
+        {
+            // The ring's crest at sweep 0.5 is |p| = 0.485, which is 6.47 cells; cells 6 and 7 bracket it.
+            const crest = 7, alphaAt = (ysh) => ig[(ry(ysh) * N + crest) * 4 + 3];
+            const vals = []; for (let ysh = 0; ysh < N; ysh++) vals.push(alphaAt(ysh));
+            // The line is drawn through the LAST row and not through complete = 1: the probe's top row is
+            // complete = (N-1)/N, because the lattice samples cell CENTRES from 0, and a line drawn to 1
+            // would be 6.25% steep and this row would be measuring the arithmetic rather than the shader.
+            const top = vals[N - 1], topC = sOf(N - 1);
+            let wLin = 0, atLin = "";
+            for (let ysh = 0; ysh < N; ysh++) {
+                const line = (sOf(ysh) / topC) * top;
+                const d = Math.abs(vals[ysh] - line);
+                if (d > wLin) { wLin = d; atLin = `complete ${sOf(ysh).toFixed(4)}: read ${vals[ysh]}, linear ${line.toFixed(1)}`; }
+            }
+            say(`alpha at the crest, against complete 0 -> ${sOf(N - 1).toFixed(4)}: ${vals.join(", ")} of 255`);
+            ok("!! *** complete SCALES THE SHELL LINEARLY ON THE GPU -- it is a live multiplier, not a constant 1 ***",
+                top > 200 && wLin <= 1.5,
+                `the crest climbs 0 -> ${top} of 255 as complete runs 0 -> ${topC.toFixed(4)}, and every ` +
+                `one of the ${N} readings sits within ${wLin.toFixed(1)} counts of the straight line through the top ` +
+                `(${atLin}). The bound is 1.5 counts and the three near misses were MEASURED rather than ` +
+                `guessed: a SQUARED complete bows this line by 54.8 counts (62 read against 116.8 at the ` +
+                `halfway mark), a SMOOTHSTEPPED one by 26.6, and a DROPPED one flattens it to ${top} at every ` +
+                `row -- which is the sabotage that walked through the first cut of this section, when all ` +
+                `three colour channels held complete at 1 and a multiplier of 1 is not a multiplier at all.`);
+
+            let nzGpu = 0; for (let x = 0; x < N; x++) if (ig[(ry(0) * N + x) * 4 + 3] !== 0) nzGpu++;
+            let nz = 0;
+            for (const [, lo, hi, width] of CH) for (let a = 0; a <= 40; a++) for (let b = 0; b <= 40; b++)
+                if (K.mhIgnite((a / 40) * 1.2, 0, b / 40, lo, hi, width) !== 0) nz++;
+            ok("!! complete = 0 gives EXACTLY zero on BOTH sides -- which is what lets eighteen shaders add this without a branch",
+                nz === 0 && nzGpu === 0,
+                `all ${3 * 41 * 41} CPU samples are exactly 0 when complete is 0 -- not 1e-40, zero -- and so ` +
+                `are all ${N} alpha cells of the shader's own complete = 0 row. mh_state returns complete = 0 ` +
+                `in four of murmur's five states, so this is the frame the orb spends almost all of its life ` +
+                `in, and an epsilon here would be a permanent ghost ring nobody ordered.`);
+        }
+
+        // *** WHAT SECTION 13 DOES NOT CLAIM. *** The per-species GAIN, the two pre-multiplies and where each
+        // ring's light lands are wiring, not physics: MH_IGNITE carries them and the orb's own gate is where
+        // they have to reach pixels. mhIgnite deliberately returns the profile WITHOUT the gain, because
+        // nebula and tempest spend theirs `* dens` and folding it in here would make those two look like the
+        // other five with a different number rather than like what they are.
+    }
+}
+
+
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nWHAT THIS KIT IS FOR: four of murmur-web's eighteen species are built out of it, and the other fourteen " +
     "would each otherwise have re-approximated the march, the medium, the gesture clock and the hash " +
     "separately. The SPECIES themselves are gated next door in tools/ship/murmurSpecies-selfcheck.mjs -- they " +
     "need real renders and this gate does not, which is a budget fact before it is a tidiness one. " +
-    "\nWHAT IS NOT CLAIMED: mh_present's own tone curve and dither, and the HUE channel every species feeds " +
-    "it -- render/murmurKit.mjs's marchStillInterior returns hueNum and the shader accumulates only the " +
-    "scalar, so the rail's spread axis built at v4627 reaches no pixel and every species passes 0. " +
+    "\nWHAT IS NOT CLAIMED: mh_out, the triangular-PDF interleaved-gradient dither -- which is why section 12 " +
+    "grades mhPresentFinish and not mhPresent. mh_present's own TONE CURVE and its two ground-dependent terms " +
+    "ARE claimed now, at section 12, bit-exactly on three grounds: the catchlight, the contact shadow and the " +
+    "knee that moves 0.90 -> 0.96 with the ground. AND THIS SENTENCE CARRIED A STALE CLAIM FOR TWELVE ROUNDS: " +
+    "it said the HUE channel \"reaches no pixel and every species passes 0\", which v4631 closed -- every " +
+    "hero computes its own numerator, hueMix reaches mhLit, and murmurSpecies4 measures droplet turning 1.57 " +
+    "degrees of hue against 0.0008 of lightness. A closing that UNDER-claims is the same defect as one that " +
+    "over-claims: it sends the next reader to build something that is already there. " +
     "mh_surface IS claimed now, at section 9: all eighteen heroes call it and this port approximated it with " +
     "a fixed light, a fixed rim exponent, invented per-species constants and no contact glow at all until " +
-    "v4629. The colour rail is section 8 and the deformed body solve section 7.");
+    "v4629. The colour rail is section 8 and the deformed body solve section 7. " +
+    "\nSECTION 13 CLAIMS THE SUCCESS SHELL'S PHYSICS AND NOT ITS WIRING: mh_ignite's travelling gaussian is " +
+    "bit-exact against a real GPU, its peak lands within 0.0013 body radii of mix(lo, hi, sweep) at every " +
+    "sweep, and complete scales it to within 0.7 counts of a straight line. WHAT IT DOES NOT CLAIM is that " +
+    "any species DRAWS it -- the per-species gain, nebula and tempest's pre-multiply, and droplet's separate " +
+    "shell term are wiring, and wiring has to reach pixels in the orb's own gate to be claimed at all.");
 process.exit(fails ? 1 : 0);

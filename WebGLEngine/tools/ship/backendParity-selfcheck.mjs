@@ -112,9 +112,37 @@ console.log("\n3. THE MEASUREMENT");
     // shader MODULES is where an IR would have paid (v3274's own word). Two lines for one concern is a gate that fires
     // first on whichever denominator moved, so this now holds the MODULES to that same twenty and reports the fraction
     // beside it rather than failing on it. Not a widening of a red register: a second spelling of a policy, retired.
-    const INVERSION = 20;
-    ok("*** and BOTH stays well under the inversion line: twenty dual shader modules is where an IR would have paid ***", mods.length < INVERSION,
-        `${mods.length} modules of ${N.both} dual files, ${N.both} of ${N.glslBearing} GLSL-bearing -- ${(100 * N.both / N.glslBearing).toFixed(1)}% (the tenth-of-GLSL line of v4270 was crossed at v4473 and is reported, not asserted)`);
+    //
+    // ---- *** v4642 -- AND THAT RETIREMENT DID NOT HAPPEN. IT WAS RE-SPELT ON A THIRD DENOMINATOR. *** ----------
+    //
+    // The paragraph above diagnoses the defect exactly -- "two lines for one concern is a gate that fires first on
+    // whichever denominator moved" -- and then does it again: it took shaderCensus-selfcheck's threshold of twenty
+    // and asserted it against `mods`, a population shaderCensus does not measure. The two counters were never the
+    // same number. Measured today: shaderCensus's `c.both` is 19 and ITS row is GREEN at 19 of 20; this file's
+    // `mods` is 20 and its row was RED. One policy, two counts, and the copy tripped first -- which is precisely
+    // the failure its own comment predicted, one denominator later.
+    //
+    // *** AND shaderCensus IS THE ONE HOLDING THE RIGHT POPULATION, NOT MERELY THE ORIGINAL ONE. *** v3274's
+    // argument is about DUPLICATED WORK -- "hand-writing the pair stops being cheaper than lowering to an IR" --
+    // and shaderCensus measures that directly: 9 files duplicate a COMPUTATION across the two languages. `mods`
+    // counts files that merely CARRY both languages, which includes physics/render/specularProbeLit-selfcheck.mjs,
+    // a gate whose whole job is to hold a WGSL shader against its GLSL twin. A gate comparing two implementations
+    // is evidence the tree is checking its port, not evidence the port is being hand-written twice; counting it
+    // toward "an IR would have paid" argues for an IR on the strength of the thing that makes an IR unnecessary.
+    //
+    // So the threshold is GONE from this file rather than moved to 21, and the number is REPORTED. Moving it to 21
+    // would have kept a second spelling alive to trip again on whichever of the three denominators moved next. The
+    // policy is asserted once, next door, on the population it was calibrated for, and this row now says what it
+    // actually knows: how far the dual-language surface reaches.
+    ok("*** BOTH's reach is REPORTED here and the inversion policy is asserted next door, on its own population ***",
+        mods.length === N.both - pages.length && N.both <= N.glslBearing,
+        `${mods.length} modules of ${N.both} dual files, ${N.both} of ${N.glslBearing} GLSL-bearing -- ` +
+        `${(100 * N.both / N.glslBearing).toFixed(1)}%. THE THRESHOLD LIVES IN tools/ship/shaderCensus-selfcheck` +
+        `.mjs, which counts the 9 files that duplicate a COMPUTATION and holds THOSE to v3274's twenty. This row ` +
+        `asserts only that the split is arithmetically sound -- modules plus pages is the whole of BOTH, and BOTH ` +
+        `cannot exceed the GLSL-bearing set it is drawn from -- so it still fails on a miscount and no longer ` +
+        `fails on a policy it does not own. The tenth-of-GLSL line of v4270 was crossed at v4473 and is reported, ` +
+        `not asserted, for the same reason.`);
     ok("of the BOTH files, the pages are the ones the baseline names",
         pages.length === PARITY_BASELINE.bothPages.length &&
         pages.every((p) => PARITY_BASELINE.bothPages.includes(p)), pages.join(" "));

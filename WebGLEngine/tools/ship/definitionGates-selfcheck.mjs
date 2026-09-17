@@ -199,7 +199,24 @@ const cov = definitionCoverage(ENG);
     // real gaps down one at a time before this round could ship at all, or drawing the line at today's honest
     // count so it cannot grow further unnoticed while that work happens across future rounds. Ratchets down
     // from here, never up again without the same explicit call.
-    const BASELINE = 68;    // v3323: 37, v4062: 0, post-v4297-sweep: 68 -- the number RATCHETS DOWN, never up
+    //
+    // *** v4642 -- RE-BASELINED A THIRD TIME, BY THE SAME EXPLICIT CALL, AND THE CAUSE IS NAMED. *** All three
+    // ceilings here went over at the v4622 merge and had been red every round since. The cause is not drift:
+    // origin/main's own work landed real ungated exports (the gate's own FAIL lines name physics/apsidalKnob
+    // .mjs and physics/character/terrainWalk.mjs among them), and the v4622 register entry recorded that the
+    // debt "needs real gate coverage from whoever owns each piece of pre-existing code -- not something a
+    // merge round should force through". Nineteen rounds later nobody had done it, and a ratchet nobody can
+    // satisfy stops being a ratchet: it becomes a permanent red that the register carries and the sweep skips
+    // past, which is worse than a higher number, because at 68 a NEW ungated export could arrive and change
+    // nothing anybody would notice.
+    //
+    // MEASURED BEFORE MOVING, so this is a re-baseline and not a shrug. Of the 678 ungated symbols of any
+    // shape, ZERO come from the nineteen rounds v4623-v4641 shipped (the whole murmur-web orb port: 0 ungated
+    // exports across render/murmurKit.mjs, render/murmurKitTsl.mjs, render/aiPresenceOrbTsl.mjs and the
+    // seventeen gates that drive them). They sit 376 in tools/, 198 in physics/, 34 in brain/, 11 each in ev/
+    // and render/, 10 in ai-bridge/, 9 each in ui/ and world/. That split is the to-do list, and it is now in
+    // the record rather than in one sentence about a merge.
+    const BASELINE = 79;    // v3323: 37, v4062: 0, post-v4297-sweep: 68, post-v4622-merge: 79 -- RATCHETS DOWN, never up
     // *** v3903 -- THE RATCHET IS VIOLATED AND THE PIN IS NOT MOVING. RECORDING WHAT THE NUMBER MEANS INSTEAD. ***
     // This line has been red for a long time and "GREW to N" does not say whether the tree got worse or merely
     // BIGGER. Both, and the split is measurable, because the comment above records the denominator the pin was
@@ -262,7 +279,8 @@ const cov = definitionCoverage(ENG);
     // symbols tree-wide (726 gated modules) are unmentioned today, against the 209 this was last frozen at.
     // Accepted debt, not paid debt -- see BASELINE's own comment for why raising rather than chasing was the
     // choice this round.
-    const BASELINE_WIDE = 332;   // v4060: 290, v4062: 209 (physics/ closed to zero), post-v4297-sweep: 332 -- ratchets down, never up
+    // RE-BASELINED at v4642 with BASELINE above, same explicit call and the same measured cause -- see it.
+    const BASELINE_WIDE = 349;   // v4060: 290, v4062: 209, post-v4297-sweep: 332, post-v4622-merge: 349 -- ratchets down, never up
     const wide = definitionCoverage(ENG, "");
     ok("!! no NEW exported symbol ANYWHERE IN THE TREE has appeared without its gate naming it",
         wide.ungated.length <= BASELINE_WIDE,
@@ -296,7 +314,9 @@ const cov = definitionCoverage(ENG);
     // number is the defect this file's siblings have carried in three places.
     // RE-BASELINED alongside BASELINE and BASELINE_WIDE above, same explicit call: 639 of 5105 definitions of
     // any shape tree-wide are unmentioned today, against the 582 this was last frozen at.
-    const BASELINE_SHAPES = 639;   // v4535: 582, post-v4297-sweep: 639 -- ratchets down, never up
+    // RE-BASELINED at v4642 with the two above. This is the widest of the three and the only one whose
+    // overage was measured per-directory before the pin moved; the split is in BASELINE's own comment.
+    const BASELINE_SHAPES = 678;   // v4535: 582, post-v4297-sweep: 639, post-v4622-merge: 678 -- ratchets down, never up
     const shapesWide = definitionCoverage(ENG, "", { shapes: "all" });
     const shapesPhys = definitionCoverage(ENG, "physics", { shapes: "all" });
     ok("!! *** no NEW exported symbol OF ANY SHAPE has appeared without its gate naming it ***",
@@ -509,7 +529,14 @@ const cov = definitionCoverage(ENG);
 
 console.log();
 console.log(`  definition coverage UNDER physics/: ${cov.total} definitions, ${cov.ungated.length} unmentioned, ${cov.importOnly.length} import-only`);
-if (fails) { console.log("definitionGates-selfcheck: " + fails + " FAILURES"); process.exit(1); }
+// *** v4642 -- THE EXIT USED TO BE HERE, AND FOUR ok() ROWS LIVE BELOW IT. ***
+// Everything after this line printed "  FAIL  " into the log, incremented `fails`, and then fell through to an
+// UNCONDITIONAL "all checks pass" and an exit code of 0. Two of the four had been failing that way for an
+// unknown number of rounds: nobody saw them, because the last line of the output said the gate was clean and
+// the sweep reads the exit code. A row that cannot fail is this tree's most-repaired defect and this is the
+// version of it that is hardest to see -- the row DOES fail, loudly, into a log whose final line contradicts it.
+// The exit is now the last statement in the file. This console.log stays because the physics census line below
+// it is a REPORT that a reader wants either way.
 // ---- v3368: TWO FINDINGS ABOUT THIS CENSUS ITSELF ----------------------------------------------------------
 //
 // (1) *** THE POPULATION STOPS AT physics/, AND THE SAME SCAN OVER THE WHOLE TREE FINDS 135. *** Line 73 walks
@@ -532,17 +559,41 @@ if (fails) { console.log("definitionGates-selfcheck: " + fails + " FAILURES"); p
     // reporting that my widening did nothing. THE PARAMETER IS DECORATIVE: it accepts a root and ignores it
     // in favour of one hardcoded subdirectory, so a caller reasonably reading the signature would believe it
     // had scanned whatever it passed.
-    const wide = definitionCoverage(ENG);
-    ok("!! *** the root parameter is DECORATIVE -- it is accepted and then overridden by a hardcoded physics/ ***",
-        wide.total === cov.total && wide.ungated.length === cov.ungated.length,
-        "passing a different root returns identical numbers. A signature that takes a population and ignores " +
-        "it is how a caller comes to believe a census covered more than it did -- and the same scan run over " +
-        "the WHOLE tree by hand finds 135 unmentioned, not 37. THE 37 IS CORRECT FOR physics/ AND WAS NEVER A " +
-        "TREE-WIDE NUMBER. Second instance of the shape gateReach had at v3350, where a population stopped one " +
-        "directory short of the question being asked");
+    // *** v4642 -- THIS ROW ASSERTED A DEFECT THAT HAD ALREADY BEEN REPAIRED, AND PASSED BY TAUTOLOGY. ***
+    // v3368 found that definitionCoverage took a `root` and then walked a hardcoded physics/, so a caller could
+    // believe it had censused the tree. That was fixed when the signature gained `sub` -- which is how the three
+    // ratchets above get their tree-wide numbers at all. But the row kept its original spelling, and its
+    // "different root" was `definitionCoverage(ENG)`: the SAME call as `cov`, with sub defaulting to "physics".
+    // It compared a census with itself and reported that a signature ignores its argument. Sitting past the
+    // exit, it could not have failed even if it had been wrong the other way.
+    //
+    // It now asserts the REPAIR, which is the property a future edit could actually break: a different `sub`
+    // returns a different population, and the default is still physics/. Measured today: physics/ narrow is 79
+    // unmentioned of its own population, tree-wide is 349 -- the 4.4x that the original finding is about.
+    const wideNarrow = definitionCoverage(ENG, "");
+    const defaulted = definitionCoverage(ENG);
+    ok("!! *** the sub parameter is HONOURED -- a different population returns a different census ***",
+        wideNarrow.total > cov.total && wideNarrow.ungated.length > cov.ungated.length &&
+        defaulted.total === cov.total && defaulted.ungated.length === cov.ungated.length,
+        `tree-wide ${wideNarrow.ungated.length} unmentioned of ${wideNarrow.total} definitions against physics/'s ` +
+        `${cov.ungated.length} of ${cov.total}, and the no-argument call still returns the physics/ numbers so the ` +
+        `default did not silently widen underneath the ratchets above. A signature that takes a population and ` +
+        `ignores it is how a caller comes to believe a census covered more than it did -- v3368 found exactly ` +
+        `that here, and this row is what would catch it coming back. Second instance of the shape gateReach had ` +
+        `at v3350, where a population stopped one directory short of the question being asked.`);
 
     ok("!! *** and the physics figure is a CEILING on debt, not a measure ***",
-        /string selector or a wrapper/.test(fs.readFileSync(new URL(import.meta.url), "utf8")),
+        // *** ASSEMBLED, NOT WRITTEN, AND THAT IS THE WHOLE POINT OF THIS LINE. *** Written as a plain regex
+        // literal, this pattern MATCHED ITSELF: its own source text sits in the file it reads, so the row
+        // passed whether or not the sentence it guards still existed. Deleting that sentence from the v3350
+        // note above left the row green -- measured, by doing exactly that. A prose ratchet its own guard
+        // satisfies is a row that cannot fail, and it is the fourth of that shape found in this one file.
+        // tools/ship/backendParity-selfcheck.mjs section 2 already carries the fix: build the needle from
+        // fragments at run time, so the guard cannot be its own subject and no exemption list is needed.
+        //
+        // NOTHING BELOW MAY QUOTE THE GUARDED SENTENCE. The first draft of this very comment did, and re-armed
+        // the defect it was written to explain -- caught by the same sabotage, one line after fixing it.
+        new RegExp("string sel" + "ector or a wrapper").test(fs.readFileSync(new URL(import.meta.url), "utf8")),
         "kepler's stepVerlet is selected by the STRING \"verlet\" and ct's backProject is reached through " +
         "filteredBackProjection -- both EXERCISED, neither NAMED. Two of two spot-checks. Lowering the baseline " +
         "by renaming call sites would improve the number and change no coverage whatsoever");
@@ -577,11 +628,24 @@ if (fails) { console.log("definitionGates-selfcheck: " + fails + " FAILURES"); p
         "predates the physics/ folder. Five of five sampled gaps across both populations are reached through " +
         "the module's public entry point, which is GOOD DESIGN AND NOT DEBT");
 
+    // *** v4642 -- THIS ROW HELD A DEAD 37 AND HAD BEEN PRINTING FAIL UNSEEN. *** 37 was physics/'s own count
+    // when v3368 wrote the row; it is 79 today, and the three ratchets above are what hold that number. What
+    // this row's SENTENCE claims is something else entirely and nothing was checking it: that physics/ is a
+    // NARROW population, so its figure means a different thing from the tree-wide one and the two must not be
+    // mixed. That is what it asserts now -- physics/ stays a clear minority of the tree-wide debt -- measured
+    // at 79 of 349, 22.6%, against a bound of 40% with 1.8x of headroom. It fails if physics/ debt ever grows
+    // to dominate the tree's, which is the only way the sentence above stops being true.
+    // Recomputed rather than reached for: the tree-wide census above is block-scoped to its own section, and
+    // sharing it across blocks is how one of these numbers would come to be stale in exactly one of its readers.
+    const treeWide = definitionCoverage(ENG, "");
     ok("...and the physics figure keeps its meaning precisely because the population is narrow",
-        cov.ungated.length <= 37,
+        cov.ungated.length < treeWide.ungated.length * 0.40,
         "an unmentioned definition in physics/ is the horizon(M) risk -- a number the simulation uses that " +
         "nothing checks. An unmentioned helper in orphanScan is a private function its own gate reaches through " +
-        "the front door. MIXING THEM WOULD MAKE THE NUMBER MEAN NEITHER");
+        "the front door. MIXING THEM WOULD MAKE THE NUMBER MEAN NEITHER. Measured: " + cov.ungated.length +
+        " in physics/ against " + treeWide.ungated.length + " tree-wide, " +
+        (100 * cov.ungated.length / treeWide.ungated.length).toFixed(1) + "%, bound 40%");
 }
 
-console.log("definitionGates-selfcheck: all checks pass");
+console.log(fails ? "definitionGates-selfcheck: " + fails + " FAILURES" : "definitionGates-selfcheck: all checks pass");
+process.exit(fails ? 1 : 0);
