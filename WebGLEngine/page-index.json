@@ -2912,7 +2912,7 @@
    "f": "three-probe.html",
    "t": "three Probe",
    "d": "Fetches a named three version from the npm registry in the browser, imports its WebGPU build beside the vendored 0.178, renders one TSL gradient with each and reads it back: whether the newer build runs on THIS machine's Chrome, with the exact error when it does not. Save the JSON as tools/ship/three-probe.json.",
-   "g": "systools",
+   "g": "rendertsl",
    "p": 0
   },
   {

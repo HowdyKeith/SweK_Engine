@@ -823,7 +823,11 @@ export const NEXT_ROUNDS = [
             "permanently.\" Its recorded escapes are \"raising --budget, or editing the file by hand. " +
             "Nothing automatic\". v4641 took the hand-edit for its own two new gates and restored the rest, " +
             "because permanently exiling ten gates as a side effect of a round about a voice curve is a " +
-            "worse outcome than a documented two-line escape. THAT IS A WORKAROUND AND NOT A FIX.",
+            "worse outcome than a documented two-line escape. THAT IS A WORKAROUND AND NOT A FIX. v4642 took " +
+            "it a third time, for tools/ship/windowsImport-selfcheck.mjs, whose cost genuinely moved: 639 -> " +
+            "1,192 ms when its scan was switched from two regexes to sourceScan's codeOnly lexer. That one is " +
+            "a real re-measurement rather than a restoration, and it still had to be written by hand for the " +
+            "same reason -- a sweep taken on the degraded box would have rewritten 400 other entries with it.",
         upstream: "The fix is a relative budget, which task #16 already built the reference workload for: " +
             "price a gate against a calibration gate measured in the same pass rather than against a fixed " +
             "3,000 ms wall, so a slower box shifts every gate together and evicts none. A cheaper interim " +

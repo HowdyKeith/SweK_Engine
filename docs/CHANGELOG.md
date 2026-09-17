@@ -26,6 +26,67 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      of numeric order were moved into it. NO ROUND'S NUMBER, TEXT OR BYTES CHANGED -- only two headings
      gained a tag, and two blocks moved. -->
 
+## v4623-v4641 -- the murmur-web orb: eighteen species over one shared kit, and the signal every one of them reads
+
+Nineteen rounds, written up as one entry because they are one piece of work and because none of them
+wrote their own: v4623 through v4641 shipped straight to main, and this changelog's newest entry stayed
+at v4622 through all of them. `tools/ship/claimCheck.mjs` read that entry as a claim about the present
+build and contradicted its gate count -- 1656 against a tree that had reached 1687 -- which is the drift
+working exactly as designed. The per-round record is `tools/ship/gateSweep.mjs`'s closings, since244
+through since262, and nothing here replaces them.
+
+THE SUBJECT. krispuckett/murmur-web (MIT) is a WebGPU port of a Metal/SwiftUI package: eighteen material
+"species" built over one shared kit. This tree had ONE of them, approximated. All eighteen are ported now
+-- still, limn, comet, droplet, opal, abyss, nebula, tempest, fathom, geode, arc, sol, aura, flux, duet,
+chorus, prism, helix -- across fifteen species gates, a kit gate, and two gates for the live signals.
+The tree went from 1656 to 1687 gates.
+
+THE KIT CAME FIRST, AND THAT WAS THE ROUND'S ONE ARCHITECTURAL CALL. v4623 built `render/murmurKit.mjs`
+(f64 scalar JS) and `render/murmurKitTsl.mjs` (an f32 node graph) as a genuine PAIR rather than one
+implementation and a restatement of it, because v4579 and v4580 had each shipped an "emulation" that
+rebuilt a formula from JS constants, never read the shader, and let three sabotages pass. Thirty-eight of
+kit.ts's forty-one functions are ported and reached; the pair is graded bit-for-bit against a real GPU.
+
+WHAT THE ROUNDS FOUND, which is the part worth keeping:
+
+* A DEAD REFRACTION (v4623-v4624). The orb's refracted ray was computed and went nowhere. The kit made it
+  visible because the kit had somewhere to send it.
+* A BLACK RENDER THAT MEASURED CORRECT IN EVERY PART (v4627). MH_SPREAD was imported by one module and not
+  handed back by another, so a species multiplied a node by `undefined` and three.js emitted WGSL with the
+  literal token `null`. It has now gone missing twice, the same constant both times.
+* EIGHT SPECIES COMPILING INTO ONE SHADER (v4635). Every species' block was built into every species'
+  fragment graph and a selector picked one at the bottom. The eight shaders spanned 159,447 to 160,185
+  characters -- a 0.5% spread, which is the selector line and nothing else. After: 41,231 to 56,776, a 69%
+  cut, and 24 frames byte-identical across the change.
+* A ROW THAT MEASURED THE TONE CURVE AND CALLED IT PHYSICS (v4634). At the default glow a frame peaks near
+  646 of 765, and the density-saturation row read 0.680 on the correct shader against 0.558 with the
+  absorption DELETED -- passing HARDER on the broken one. Every species gate runs at glow 0.15 now.
+* HALF A ROUND'S ROWS GRADING A TABLE, NOT A SHADER (v4640). prism's and helix's flagship rows were pure JS
+  over the constant tables and never rendered, so three shader sabotages walked through them. Both were
+  RE-TITLED rather than deleted, and five pixel instruments were built to close the gap and all five were
+  rejected, with their numbers, so nobody repeats the search.
+* A GATE RED FOR NINE ROUNDS BECAUSE IT WAS 27 MS OVER BUDGET (v4633). A gate over the 3,000 ms ceiling does
+  not run at ship time at all, so the round that crosses the line is the round whose red nobody sees. Three
+  species gates were split off BEFORE crossing it rather than after.
+
+AND THE LAST ROUND WAS A CORRECTNESS FIX TO WHAT ALREADY SHIPPED. Every one of murmur's eighteen shaders
+reads `live.voice`; not one reads a raw level. This port read the raw uniform at 44 sites and, at 8 more,
+read `glintRate` -- still.ts's own STYLE DIAL -- where murmur reads `live.pace`. At the gates' own 0.3 the
+true signal is 0.2504 against 0.3000, 20% hot; at 1.0 it is 0.5500 against 1.0000, 45% hot. The error GREW
+with the knob, so every species was loudest exactly where it was least faithful. v4641 wired mh_live and
+graded it by EQUIVALENCE rather than difference: a level of 0.30 in LISTENING and 0.752598 in IDLE are the
+same conditioned voice, so the two frames must come back byte-identical -- 0 of 9,216 bytes differ -- while
+the 0.991722 a square-root port would need disagrees by 2,443. One instrument pins two constants and a
+state window at once.
+
+WHAT IS NOT DONE, AND IS RECORDED RATHER THAN IMPLIED. mh_state is ported, given a TSL twin and graded
+bit-exactly against a real GPU, and CALLED BY NOTHING -- its four outputs are 128 transcribed references
+across murmur's eighteen sources, which is its own round (`orb-state-terms-wiring`). mh_present's paper
+half is absent: the catchlight, the contact shadow and the final soft knee are all gated on `paper > 0.002`,
+so nothing is missing on the ink ground and three terms are missing on paper. mh_out's triangular-PDF
+dither is absent entirely. mh_position is not applicable -- it flips gl_FragCoord, and this port takes its
+quad from three's `uv()`.
+
 ## v4622 -- ffmpeg.wasm H.264 export, three.js to 0.185.1, and 62 gates of unshipped drift paid down
 
 Wires browser-side H.264 export via ffmpeg.wasm (ai-bridge/ffmpegWasmBridge.js, render/ffmpegWasmExport.mjs) as a platform-independent second road to render/blobRecorder.js's own conclusion -- the existing server-side road (ai-bridge/ffmpegStatic.js) is macOS-only by design, and this one runs in the page's own Worker everywhere. Verified end-to-end in a real headless Chromium: a genuine WebM recording transcodes to an MP4 whose avcC box a hand-written ISO-BMFF walker finds at the correct nested path. Re-vendors vendor/three from r160 to 0.185.1 (three.core.js split from three.module.js, GLTFLoader/FBXLoader/KTX2Loader, the basis/KTX2 chain, OrbitControls, GLTFExporter), with one real API break fixed (view.html's removed outputEncoding/sRGBEncoding to outputColorSpace/SRGBColorSpace) and confirmed via a byte-identical re-fetch plus real-browser screenshots of the four pages that load three directly.

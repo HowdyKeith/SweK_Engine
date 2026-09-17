@@ -274,7 +274,21 @@ export const SECTIONS = [
               // computes nothing itself, the same shape; three-probe is the vendored three.js/WebGPU compat
               // probe for the build box -- operating the rig, like webgpu-llm.html above. This drawer is now at
               // MAX_PER_PANEL.
-              "boot-sidecar.html", "lab-census.html", "three-probe.html"] },
+              //
+              // *** v4642 -- three-probe.html LEAVES, FOR Render TSL, AND THAT SENTENCE ABOVE IS WHY. *** "This
+              // drawer is now at MAX_PER_PANEL" was written with SIXTEEN pages in it against a cap of fifteen:
+              // an off-by-one, claimed in prose in the same edit that broke it, and it held both
+              // pageSections-selfcheck and pagePlacements-selfcheck red for every round from v4590 to v4641.
+              // Nothing re-counted the list because the comment said the answer.
+              //
+              // three-probe is the one of the three that has another true home rather than the one that was
+              // easiest to move. Render TSL's own note is "three's node language as a SOURCE for gfx/device.js
+              // -- the graphs, the pages that draw them, and the two that owe the rig a number", and a vendored
+              // three.js/WebGPU compatibility probe is the second half of that sentence exactly; that drawer
+              // already took ai-presence-orb.html at v4590 on the same reading. boot-sidecar and lab-census
+              // have no such home -- both are records of the ship ritual, which is this drawer's subject and
+              // nowhere else's -- so moving either would have been filing a page by where there was ROOM.
+              "boot-sidecar.html", "lab-census.html"] },
 
     // v3229 -- sphere-impostor and raymarch-live MOVED HERE OUT OF THE RENDER QA DRAWER. They are not QA
     // TOOLING, they are two of the 315 SUBJECTS render-qa opens, and filing them beside the QA control surface
@@ -354,7 +368,11 @@ export const SECTIONS = [
       note: "three's node language as a SOURCE for gfx/device.js -- the graphs, the pages that draw them, and the two that owe the rig a number",
       // v4590 -- ai-presence-orb.html JOINS, from registerResidue's second (judgement) pass: a TSL shader port
       // (three.tsl.js) is exactly this drawer's own subject, not a stretch reading.
-      pages: ["tsl-probe.html", "tsl-rig.html", "orrery-gpu.html", "gpu-rig-check.html", "ai-presence-orb.html"] },
+      // v4642 -- three-probe.html JOINS, out of System Tools, which was one over MAX_PER_PANEL from v4590.
+      // It is the vendored three.js/WebGPU compatibility probe: "the two that owe the rig a number" in this
+      // drawer's own note, and the same reading that brought ai-presence-orb.html here.
+      pages: ["tsl-probe.html", "tsl-rig.html", "orrery-gpu.html", "gpu-rig-check.html", "ai-presence-orb.html",
+              "three-probe.html"] },
     { id: "renders", tab: "renders", label: "Renders", note: "the TECHNIQUE: passes, effects, and how a frame is made",
       pages: ["path-tracer.html", "pom-demo.html", "sphere-impostor.html", "krbn.html", "amplified-diff.html",
               "backend-dom.html",

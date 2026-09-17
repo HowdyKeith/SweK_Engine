@@ -546,7 +546,13 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // (…murmurSpecies12-selfcheck.mjs and …Species13, duet and chorus). Three rows move, nine hold.
     // v4640 -- RE-TAKEN: esModules 3878 -> 3880, closures 3756 -> 3758, asyncAwait 1477 -> 1479, TWO files
     // (…murmurSpecies14-selfcheck.mjs and …Species15, prism and helix -- the last two of the eighteen).
-    esModules: 3880, closures: 3758, asyncAwait: 1479, typedArrays: 1073, promises: 366,
+    // v4641 -- RE-TAKEN: esModules 3880 -> 3882, closures 3758 -> 3760, asyncAwait 1479 -> 1481, TWO files
+    // (tools/ship/murmurLive-selfcheck.mjs and …Live2). Three rows move, nine hold, webgpu stays 50 for the
+    // sixth round running -- and this pair is the sharpest case of WHY: both gates render on a real GPU
+    // through tools/ship/webgpuHarness.mjs, so neither file names a WebGPU API and the census is right not to
+    // count them. `files` was updated in the v4641 commit and these three were not, which is what left this
+    // gate red on its own round: a census that moves together has to be re-taken together.
+    esModules: 3882, closures: 3760, asyncAwait: 1481, typedArrays: 1073, promises: 366,
     fetchXhr: 245, performanceNow: 227, raf: 120, webgl: 151, webgpu: 50, threads: 23, wasm: 24,   // v4628: 23 -> 24, re-measured -- see the note above
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

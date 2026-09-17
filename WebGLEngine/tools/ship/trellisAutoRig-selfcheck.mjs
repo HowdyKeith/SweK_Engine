@@ -58,7 +58,7 @@
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -178,7 +178,11 @@ if (skip) {
     // inverse-distance weights 1/sqrt(d2+1e-6), normalized to sum 1) against the REAL KAIJU_BIPED_RIG bone
     // list, imported from the shipped file rather than retyped — a transcription error in a hand-copied bone
     // table would otherwise silently validate itself.
-    const { KAIJU_BIPED_RIG } = await import(path.join(ENG, "rig/templates/kaijuBiped.js"));
+    // pathToFileURL, not the bare path: Node's ESM loader rejects a raw filesystem path on Windows with
+    // ERR_UNSUPPORTED_ESM_URL_SCHEME (a drive letter reads as a scheme), and tools/ship/windowsImport-
+    // selfcheck.mjs is the gate that says so. This was that gate's ONE genuine offender -- its other three
+    // were its own failure text, quoted back at it out of a record.
+    const { KAIJU_BIPED_RIG } = await import(pathToFileURL(path.join(ENG, "rig/templates/kaijuBiped.js")).href);
     function autoBindOracle(positions, bones) {
         const n = positions.length / 3, b = bones.length;
         const joints = new Array(n * 4).fill(0), weights = new Array(n * 4).fill(0);
