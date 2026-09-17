@@ -5247,6 +5247,83 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "heroes cost gate one a PAIRED 213-288 ms although it renders neither. Logged as " +
                  "orb-species-block-per-shader; the next orb round starts there.",
     }),
+    // v4641 -- THE 253rd CLOSING: mh_live, the function all eighteen species read and none of them had.
+    since262: Object.freeze({
+        at: "v4641", swept: 2, green: 2, red: 0,
+        added: Object.freeze([
+            "tools/ship/murmurLive-selfcheck.mjs",
+            "tools/ship/murmurLive2-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 1,932 and 1,606 ms on real WebGPU, 10 rows between them, and a correctness fix " +
+                 "rather than a new species. *** EVERY ONE OF murmur's EIGHTEEN SHADERS READS live.voice AND " +
+                 "NOT ONE READS A RAW LEVEL; THIS PORT READ THE RAW UNIFORM AT 44 SITES AND STILL's OWN STYLE " +
+                 "DIAL glintRate AT 8 MORE. *** kit.ts conditions both signals once -- voice^0.65 weighted " +
+                 "1.00 in LISTENING and 0.55 elsewhere, cadence^0.85 weighted 1.00 in THINKING and RESPONDING " +
+                 "and 0.60 elsewhere -- \"so 'loud' and 'busy' mean the same thing across the family\". The " +
+                 "error was not uniform and that is the worst of it: at the species gates' own 0.3 the true " +
+                 "signal is 0.2504 against 0.3000, 20% hot; at 1.0 it is 0.5500 against 1.0000, 45% hot. IT " +
+                 "GROWS WITH THE KNOB, so every species was loudest exactly where it was least faithful and " +
+                 "no single scale factor anywhere could have absorbed it. Measured in the pixels over all " +
+                 "eighteen: at a raw voice of 0 the frames are byte-identical (mean byte change 0.0000), at " +
+                 "0.3 the mean byte falls 51.062 -> 50.837, at 1.0 it falls 56.547 -> 54.479. " +
+                 "*** THE INSTRUMENT IS AN EQUIVALENCE AND NOT A DIFFERENCE, WHICH IS WHY IT COULD BE TIGHT " +
+                 "ENOUGH TO PIN FOUR CONSTANTS. *** A level of 0.30 in LISTENING and 0.752598 in IDLE are the " +
+                 "same conditioned voice, so the two frames must come back BYTE-IDENTICAL -- 0 of 9,216 bytes " +
+                 "differ on arc, still and droplet -- while the 0.991722 a square-root port would need " +
+                 "disagrees by 2,443. Same construction on the cadence (0.729556 against 0.40) and 0 bytes " +
+                 "again on arc and chorus. THINKING and RESPONDING at identical knobs give 0 differing bytes " +
+                 "and LISTENING differs from THINKING by 5,728, which is the two windows being two windows. " +
+                 "still, which murmur gives no cadence, moves EXACTLY 0 bytes across activity 0 to 1 where " +
+                 "arc moves 5,236 and chorus 2,016. *** AND ONE SPECIES' SILHOUETTE WAS WRONG, NOT ITS " +
+                 "EXPOSURE: *** droplet's voice drives mh_shape's swell, which scales the whole body, so its " +
+                 "footprint reads 229 px at the conditioned voice against 221 at the raw one. " +
+                 "*** THE ROUND SPLIT INTO TWO GATES ON A MEASUREMENT AND NOT A PREFERENCE: *** all four " +
+                 "species in one file came back ALL GREEN at 2,772 ms against a 3,000 ms ceiling, 8% of " +
+                 "margin on a box the tree measures 10% slower under a contended sweep. A species costs about " +
+                 "280 ms (one WGSL compile) and a frame about 25, so dropping frames would have bought " +
+                 "nothing. Rendering all eighteen costs 6,439 ms, measured, which is why the all-eighteen row " +
+                 "is a SOURCE CENSUS that says so in its own title -- the v4640 lesson, applied on purpose " +
+                 "this time rather than found by sabotage. *** EIGHTEEN SABOTAGES, ALL EIGHTEEN CAUGHT, *** " +
+                 "including both exponents, both weights, both windows, the state gating of all four mh_state " +
+                 "outputs, the CPU f64 twin, a single species re-routed to the raw knob, the cadence sprayed " +
+                 "onto a species that has none, still's own glintRate dial deleted, and the state table " +
+                 "REORDERED -- which is load-bearing now that a float index picks the window, and which " +
+                 "nothing asserted until this round. *** AND THE SPECIES GATES DID NOT MOVE A BYTE. *** " +
+                 "murmurSpeciesFrames.mjs states its operating point as the CONDITIONED pair and inverts " +
+                 "mh_live for the raw knobs, so all eighteen species render byte-identically to v4640 at " +
+                 "their gates' own point: the alternative was holding the raw knob, which put four gates " +
+                 "below their bounds (abyss's creature, droplet's swell, sol's granulation, and flux, which " +
+                 "stopped finding a half-height at all and CRASHED) and repairing that by lowering four " +
+                 "bounds is indistinguishable from budgeting a red down to green. THE FIRST CUT OF THAT " +
+                 "INVERSION WAS ITSELF WRONG -- it used the RATIO formula that belongs to the equivalence " +
+                 "rows, put the conditioned voice at 0.457 instead of 0.300 and moved all eighteen species -- " +
+                 "and a sabotage then showed droplet's and tempest's gates tolerate a 17% shift in silence, " +
+                 "so the round-trip is now its own f64 row that also requires the two numbers to DIFFER. " +
+                 "*** WHAT IS NOT DONE, DELIBERATELY: *** mh_state is ported, given a TSL twin and graded " +
+                 "bit-exactly against the GPU (worst 0 of 255 over 1,024 samples), and CALLED BY NOTHING. Its " +
+                 "four outputs are 128 transcribed references across murmur's eighteen sources and they are " +
+                 "their own round; the orb therefore gained `activity` and `stateIndex` and NOT `stateTau`, " +
+                 "because a uniform nothing reads is a row that cannot fail. Logged as " +
+                 "orb-state-terms-wiring; the next orb round starts there. " +
+                 "*** AND THE TIMINGS FILE CARRIES TWO HAND-WRITTEN ENTRIES THIS ROUND, WHICH IS THE ESCAPE " +
+                 "budgetExile.mjs NAMES AND NOT A SHORTCUT TAKEN QUIETLY. *** Four full quickSweep passes in " +
+                 "one session left this container about 26% slower than it started, and it did not recover: " +
+                 "tools/ship/murmurKit-selfcheck ran 1,679-1,784 ms early in the session against its recorded " +
+                 "1,710, and 2,124-2,172 ms afterwards at a load average of 0.29. Every sweep taken in that " +
+                 "state wrote inflated costs, and each one evicted a different set of ten to twelve gates -- " +
+                 "including murmurSpecies8 and murmurSpecies13, which had run at 2,382 and 2,438 ms an hour " +
+                 "earlier. budgetExile.mjs's own header is the reason that was refused rather than shipped: " +
+                 "\"ONCE A GATE'S TIME CROSSES THE BUDGET, IT STAYS ACROSS FOREVER. A single slow " +
+                 "observation -- eight-way contention, a cold cache, one unlucky minute -- exiles a gate from " +
+                 "every future ship sweep, permanently.\" So sweep-timings.json was restored to v4640 and the " +
+                 "two new gates alone were added, at the uncontended readings taken BEFORE the box degraded " +
+                 "(1,932 and 1,606 ms, the slowest of three and two runs respectively) -- on the same scale " +
+                 "as the other 1,685 entries, which is the only scale on which a shared budget means " +
+                 "anything. The alternative was to permanently exile ten gates as a side effect of a round " +
+                 "about a voice curve. Logged as sweep-timings-box-drift.",
+    }),
     // v4635 -- THE 247th CLOSING. No gate added: a row added to one that existed, and a 3,561 ms refund.
     // v4640 -- THE 252nd CLOSING: prism and helix, the last two -- and four rows, two of which grade tables.
     since261: Object.freeze({

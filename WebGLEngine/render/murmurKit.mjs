@@ -1502,6 +1502,80 @@ export function mhSpin(p, ay, ax) {
 }
 
 /**
+ * *** THE LIVE SIGNALS, CONDITIONED ONCE -- and until v4641 this port did not have them at all. ***
+ *
+ * kit.ts: "THE LIVE SIGNALS, CONDITIONED ONCE, so 'loud' and 'busy' mean the same thing across the family."
+ * Every one of the eighteen species reads `live.voice` and most read `live.pace`; NONE of them reads a raw
+ * level. This port fed them the raw knob at 44 sites and a STYLE knob (glintRate, which is still's own glint
+ * rate from styles.ts) at 8 more, which is two different substitutions of an unconditioned number for a
+ * conditioned one, in every species that ships.
+ *
+ * THE CURVE, in murmur's own words: "A microphone level mapped linearly spends most of its travel in the top
+ * quarter and reads as a gate. Ordinary speech sits low and its interesting structure is down there, so voice
+ * is raised to 0.65 -- a little stronger than a square root -- which puts a normal speaking level near two
+ * thirds of the response. Cadence gets a gentler 0.85: typing rate arrives already smoothed by the host."
+ *
+ * THE STATE WEIGHTS: "Voice is at full strength in LISTENING and at 0.55 elsewhere. Cadence is at full
+ * strength in THINKING and RESPONDING, where a token stream is the thing actually happening, and at 0.6
+ * elsewhere." So the same microphone level means different things in different states, which is the whole
+ * reason this is a function and not a multiply.
+ *
+ * THE CONSEQUENCE FOR THIS PORT IS NOT SMALL AND IT IS NOT UNIFORM. At the gates' own VOICE of 0.3, in the
+ * idle state, murmur's live.voice is 0.3^0.65 * 0.55 = 0.2504 where this port was passing 0.3000 -- 20% hot.
+ * At 1.0 it is 0.5500 against 1.0000, 45% hot. The error GROWS with the knob, so every species was loudest
+ * exactly where it was least faithful.
+ */
+export function mhLive(level, activity, stateIndex) {
+    const L = Math.min(1, Math.max(0, level));
+    const A = Math.min(1, Math.max(0, activity));
+    const listening = (stateIndex > 0.5 && stateIndex < 1.5) ? 1 : 0;
+    const working = (stateIndex > 1.5 && stateIndex < 3.5) ? 1 : 0;
+    return { voice: Math.pow(L, 0.65) * (0.55 + (1.00 - 0.55) * listening),
+             pace: Math.pow(A, 0.85) * (0.60 + (1.00 - 0.60) * working) };
+}
+
+/**
+ * *** THE STATE READ, SHARED BY EVERY SPECIES -- and this port has none of its four outputs wired yet. ***
+ *
+ * kit.ts: "SUCCESS (index 4) is this family's flash and it is always the same physics: THE INTERIOR IGNITES
+ * AND SETTLES. `complete` is the breath of arrival: in over about a third of a second, out over the rest of
+ * 1.2. `sweep` is the same window read as a position, 0 to 1 over 0.95 s, and it is what each species runs
+ * the ignition ALONG. `settled` is what is left afterwards. The light in a success is NOT an overlay: every
+ * species multiplies its own interior energy by (1 + complete), which brightens exactly what is already there
+ * and leaves the dark dark." And: "RESPONDING (index 3) is decisive drive: `drive` ramps in over half a
+ * second so entering the state is a lean and not a jolt."
+ *
+ * THE SWEEP IS EASED AT BOTH ENDS on purpose: "a flash that starts at full speed and stops dead is a wipe,
+ * and a wipe is a UI transition rather than an arrival travelling through a material."
+ *
+ * *** WHAT THIS ROUND DOES AND DOES NOT DO WITH IT. *** The function is ported here, given a TSL twin in
+ * murmurKitTsl.mjs, and graded against the real compiled shader by tools/ship/murmurKit-selfcheck.mjs. What
+ * is NOT done is calling it from the orb: murmur's eighteen shaders reference st.drive 44 times, st.complete
+ * 49, st.settled 19 and st.sweep 16, and every one of those is a transcription with its own constants.
+ *
+ * SO render/aiPresenceOrbTsl.mjs GAINED `activity` AND `stateIndex` THIS ROUND AND DELIBERATELY NOT
+ * `stateTau`. Both of the two it gained are read -- mh_live takes all three of level, activity and state --
+ * while stateTau is read by nothing until the state terms land, and a uniform nothing reads is a row that
+ * cannot fail. That is the next piece and it is deliberately not this one, because `live` is a CORRECTNESS
+ * fix to what already ships (a raw knob standing in for a conditioned signal) while `state` is an ABSENT
+ * FEATURE, and mixing a fix with a feature makes a round whose verification cannot say which half moved.
+ */
+export function mhState(stateIndex, stateTau) {
+    const o = { complete: 0, sweep: 0, settled: 0, drive: 0 };
+    const tau = Math.max(stateTau, 0);
+    const ss = (e0, e1, x) => { const u = Math.min(1, Math.max(0, (x - e0) / (e1 - e0))); return u * u * (3 - 2 * u); };
+    if (stateIndex > 3.5 && stateIndex < 4.5) {
+        const a = Math.min(1, Math.max(0, tau / 1.20));
+        o.complete = ss(0.0, 0.30, a) * (1 - ss(0.36, 1.0, a));
+        o.settled = ss(0.30, 1.05, a);
+        o.sweep = ss(0.0, 1.0, Math.min(1, Math.max(0, tau / 0.95)));
+    } else if (stateIndex > 2.5 && stateIndex < 3.5) {
+        o.drive = ss(0.0, 0.55, tau);
+    }
+    return o;
+}
+
+/**
  * ROLL -- the THIRD rotation, and kit.ts says exactly what goes wrong without it: "Yaw and tilt alone leave
  * every loop projecting to an ellipse whose long axis is still horizontal on screen, so three ribbons at
  * three yaws and three tilts came out as three horizontal swooshes stacked on each other, which is one

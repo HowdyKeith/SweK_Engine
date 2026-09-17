@@ -27,7 +27,43 @@ export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".
 // 48 rather than 64: every claim below is a separation of threefold or more and the instruments sweep 64 or
 // 72 angles either way, so the frame size buys nothing but readback.
 export const N3 = 48;
-export const VOICE = 0.3;
+
+/**
+ * *** THE OPERATING POINT IS STATED AS THE CONDITIONED SIGNAL NOW, AND THE RAW KNOBS ARE DERIVED FROM IT. ***
+ *
+ * Until v4641 render/aiPresenceOrbTsl.mjs handed the raw `voice` uniform straight to 44 species sites and the
+ * STYLE knob `glintRate` to 8 more, so setting voice = 0.3 put 0.3 into the shader. It now calls the kit's
+ * mh_live first, exactly as murmur's eighteen do, and 0.3 idle conditions to 0.3^0.65 * 0.55 = 0.2504.
+ *
+ * SO THESE TWO CONSTANTS ANSWER A QUESTION THE ROUND HAD TO ANSWER: hold the RAW knob and let every species
+ * row see a 20% smaller signal, or hold the CONDITIONED one and let the rows keep the calibration they were
+ * measured at? Holding the raw knob would have moved four gates below their bounds -- abyss's creature row,
+ * droplet's swell, sol's granulation and flux's curtains, the last of which stopped finding a half-height at
+ * all -- and repairing that by lowering four bounds is indistinguishable from budgeting a red down to green.
+ * Holding the CONDITIONED signal instead leaves ALL EIGHTEEN species BYTE-IDENTICAL to
+ * v4640, which is the strongest thing a correctness fix to the wiring can say for itself: the signal the
+ * species see is the same signal, and only the path it arrives by changed.
+ *
+ * VOICE and ACTIVITY are therefore the raw knob values that PRODUCE the conditioned pair below, and gates
+ * whose CPU half predicts what the shader will do must use VOICE_LIVE and PACE_LIVE rather than these. The
+ * inversion here is not a grading of mh_live -- tools/ship/murmurLive-selfcheck.mjs does that, against the
+ * four constants written out by hand -- it is only how this file names where it stands.
+ *
+ * PACE_LIVE is 0.30 because that is what the eight borrowed sites were reading: glintRate's own default out of
+ * murmur's styles.ts roster. Choosing any other number would have moved six species for a reason unrelated to
+ * the fix.
+ */
+export const VOICE_LIVE = 0.30;
+export const PACE_LIVE = 0.30;
+//
+// BOTH ARE A GENUINE INVERSE AND NOT A RATIO, which is worth the line because the first cut of this file got
+// exactly that wrong: it wrote VOICE_LIVE * 0.55^(-1/0.65), which is the factor between two LEVELS that
+// condition to the same signal in two different states -- the right formula for the equivalence rows in
+// tools/ship/murmurLive-selfcheck.mjs and the wrong one for an operating point. It put the conditioned voice
+// at 0.457 instead of 0.300, and all eighteen species moved rather than the six with a cadence site. The
+// inverse of v = L^e * w is L = (v / w)^(1/e).
+export const VOICE = Math.pow(VOICE_LIVE / 0.55, 1 / 0.65);       // 0.3935693
+export const ACTIVITY = Math.pow(PACE_LIVE / 0.60, 1 / 0.85);     // 0.4424325
 // *** THE SILHOUETTE PAIR RUNS AT VOICE ZERO, AND THAT IS WHAT GIVES ITS ROW A ZERO FLOOR. *** With voice up,
 // droplet's breath scales the WHOLE body between two frames, so the outline changes even when the deformation
 // is switched off -- measured, an amp of 0 still moved it 0.36% and the row stayed green under exactly that
@@ -54,7 +90,12 @@ export const INK = [0x0A / 255, 0x0A / 255, 0x0B / 255];
  * hazard unreachable rather than merely documented. A caller wanting paper passes it explicitly.
  */
 export const sp = (species, time, voice = VOICE, extra = {}) =>
-    ({ factoryArgs: { species }, knobs: { time, voice, colors: { ink: INK }, ...extra } });
+    ({ factoryArgs: { species },
+       // activity and stateIndex are named on EVERY frame for the same reason the ink is: setKnobs writes only
+       // the names present in its argument, so a knob one frame sets and the next does not mention keeps the
+       // previous frame's value. They are also the two knobs a species gate never wants to vary -- a row here
+       // grades a SPECIES, and tools/ship/murmurLive-selfcheck.mjs is where the live signals are the subject.
+       knobs: { time, voice, activity: ACTIVITY, stateIndex: 0, colors: { ink: INK }, ...extra } });
 
 /**
  * ONE LAUNCH FOR EVERY FRAME A GATE ASKS FOR. The launch is nearly the whole cost, so they share a page, and

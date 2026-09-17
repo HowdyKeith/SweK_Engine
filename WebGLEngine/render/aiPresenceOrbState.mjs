@@ -83,6 +83,21 @@ export const STATES = Object.freeze({
 });
 export const STATE_NAMES = Object.freeze(Object.keys(STATES));
 
+/**
+ * *** THE STATE'S NUMBER, WHICH murmur's SHADERS INDEX BY AND THIS FILE ALREADY DECIDED WITHOUT SAYING SO. ***
+ *
+ * kit.ts's mh_live and mh_state do not take a state NAME -- they take a float, and they compare it against
+ * half-unit windows: LISTENING is the one state that lifts the voice, THINKING and RESPONDING together are
+ * the ones that lift the cadence, SUCCESS is the only one that ignites, RESPONDING the only one that drives.
+ * Every one of those windows is a statement about this table's ORDER, so the order is load-bearing and is
+ * asserted in tools/ship/aiPresenceOrb-selfcheck.mjs rather than left to the order somebody typed the object.
+ *
+ * DERIVED FROM STATE_NAMES AND NOT TYPED OUT AGAIN, because two copies of one ordering is the shape this tree
+ * has repaired in its own records three times. `error` lands at 5, outside every window murmur defines, which
+ * is the correct reading and not a fallback: an error is neither a listener nor a worker.
+ */
+export const STATE_INDEX = Object.freeze(Object.fromEntries(STATE_NAMES.map((n, i) => [n, i])));
+
 const TRANSITION_DURATION = 0.6;   // seconds, crossfade between two states' params
 
 /** smoothstep, 0..1 in, 0..1 out, clamped -- three's own polynomial ease, used for the state crossfade. */

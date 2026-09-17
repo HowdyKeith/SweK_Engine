@@ -25,7 +25,7 @@
 // found tools/ship/inputSets-selfcheck.mjs red for nine rounds because it was 27 ms over.
 "use strict";
 import * as K from "../../render/murmurKit.mjs";
-import { N3, VOICE, sp, renderSpecies, interiorMeanLight, interiorSpread, interiorPeak, edgeQuartile,
+import { N3, VOICE, VOICE_LIVE, sp, renderSpecies, interiorMeanLight, interiorSpread, interiorPeak, edgeQuartile,
          ringChange, hueShift } from "./murmurSpeciesFrames.mjs";
 
 let fails = 0;
@@ -37,7 +37,10 @@ console.log("murmurSpecies5-selfcheck -- nebula's depth and tempest's energy, th
 
 // *** THE THREE TIMES ARE READ OFF tempest's OWN CLOCKS, NOT SPACED EVENLY -- the lesson gate three learned
 // on abyss. *** render/murmurKit.mjs's mhFlourish is the same envelope the shader runs, so the CPU half says
-// exactly which lightning lane is firing when. At VOICE the energy term is 0.85 * voice = 0.255, so the two
+// exactly which lightning lane is firing when. At the CONDITIONED voice the energy term is 0.85 * 0.30 =
+// 0.255 -- VOICE_LIVE and not VOICE, because since v4641 the frames set a RAW knob that mh_live conditions
+// before any species sees it, and a prediction built on the raw number would name lanes the shader is not
+// firing. Grading against it read the interior at 0.4067 where the row wanted the calm frame dimmest. So the two
 // slots run at 2.9 and 4.3 seconds scaled by 1/(1 + 1.30 * energy) = 0.751 -- 2.178 s and 3.229 s:
 //
 //     t = 0.7    lane 0 at 0.000, lane 1 at 0.000   -- calm, the state this species is built to sit in
@@ -45,7 +48,7 @@ console.log("murmurSpecies5-selfcheck -- nebula's depth and tempest's energy, th
 //     t = 5.2    lane 0 at 0.000, lane 1 at 0.992   -- ONE flash, the OTHER lane
 //
 // An evenly spaced set would also have given three moments, with no way to say which lane made any of them.
-const RATE = 1 / (1 + 1.30 * 0.85 * VOICE);
+const RATE = 1 / (1 + 1.30 * 0.85 * VOICE_LIVE);
 const SLOT0 = 2.9 * RATE, SLOT1 = 4.3 * RATE;
 const TIMES = [0.7, 3.6, 5.2];
 const CALM = 0, LANE0 = 1, LANE1 = 2;

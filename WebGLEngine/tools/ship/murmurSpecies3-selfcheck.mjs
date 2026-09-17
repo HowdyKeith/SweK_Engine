@@ -14,7 +14,7 @@
 // periods of 14.3 to 22.4. Sampling those in a gate built for a 2.2-second window would measure nothing.
 "use strict";
 import * as K from "../../render/murmurKit.mjs";
-import { N3, VOICE, sp, renderSpecies, lin, light, bil, edgeQuartile, interiorMeanLight, hueShift,
+import { N3, VOICE, VOICE_LIVE, sp, renderSpecies, lin, light, bil, edgeQuartile, interiorMeanLight, hueShift,
          hueTurn, hotspotMove, interiorPeak } from "./murmurSpeciesFrames.mjs";
 
 let fails = 0;
@@ -145,8 +145,12 @@ sec("1. *** ABYSS: THE PATIENCE PIECE -- rare glows passing through, mostly nigh
         const eAb = edgeQuartile(run.frames[F.abyss[NIGHT]]), eOp = edgeQuartile(run.frames[F.opal[NIGHT]]);
         const rAb = eAb / ab[NIGHT], rOp = eOp / op[NIGHT];
         say(`edge over interior on a night frame -- abyss ${rAb.toFixed(3)}, opal ${rOp.toFixed(3)}`);
-        const rimAb = K.MH_SURFACE_KNOBS.abyss[0] + K.MH_SURFACE_KNOBS.abyss[1] * VOICE;
-        const rimOp = K.MH_SURFACE_KNOBS.opal[0] + K.MH_SURFACE_KNOBS.opal[1] * VOICE;
+        // VOICE_LIVE and not VOICE: the frames set a RAW knob that mh_live conditions before mh_surface sees
+        // it (v4641), so the rim gain the SHADER computes is the roster's coefficient times the conditioned
+        // signal. The row stayed green through the change because its bound is a RANKING, but the two numbers
+        // it prints are quoted as the species' rims and a rim read off the wrong signal is the wrong rim.
+        const rimAb = K.MH_SURFACE_KNOBS.abyss[0] + K.MH_SURFACE_KNOBS.abyss[1] * VOICE_LIVE;
+        const rimOp = K.MH_SURFACE_KNOBS.opal[0] + K.MH_SURFACE_KNOBS.opal[1] * VOICE_LIVE;
         ok("!! *** abyss's EDGE OUTWEIGHS ITS INTERIOR, where opal's is swamped by it -- the roster's two rim extremes ***",
             rAb > 2 && rAb > rOp * 4 && rimAb > rimOp,
             `abyss's edge is ${rAb.toFixed(2)}x its own interior against opal's ${rOp.toFixed(2)}x -- ` +

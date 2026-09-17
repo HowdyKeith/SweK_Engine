@@ -110,6 +110,26 @@ sec("7. *** THE STATE TABLE AND THE ORCHESTRATOR: EXACT VALUES, AND A REAL TRANS
     ok("idle/listening/responding declare none (only arrival at thinking/success/error is an EVENT worth flashing)",
        ST.STATES.idle.entry === null && ST.STATES.listening.entry === null && ST.STATES.responding.entry === null);
 
+    // *** THE ORDER OF THAT TABLE IS LOAD-BEARING SINCE v4641, AND NOTHING SAID SO UNTIL NOW. ***
+    // kit.ts's mh_live and mh_state take a state NUMBER and compare it against half-unit windows: the voice is
+    // lifted on (0.5, 1.5) alone, the cadence on (1.5, 3.5), the ignition on (3.5, 4.5) and the drive on
+    // (2.5, 3.5). Every one of those is a claim about which state sits at which index, and STATE_INDEX is
+    // derived from Object.keys(STATES) -- so reordering that object literal, which reads like a formatting
+    // choice, would silently move LISTENING out of the voice window and RESPONDING out of the cadence one.
+    // ui/aiPresenceOrbWidget.js feeds STATE_INDEX straight into the shader, so this is not hypothetical.
+    const IX = ST.STATE_INDEX;
+    ok("!! *** THE FIVE INDICES murmur's WINDOWS ARE CUT FOR: idle 0, listening 1, thinking 2, responding 3, success 4 ***",
+       IX.idle === 0 && IX.listening === 1 && IX.thinking === 2 && IX.responding === 3 && IX.success === 4 && IX.error === 5,
+       `idle ${IX.idle}, listening ${IX.listening}, thinking ${IX.thinking}, responding ${IX.responding}, ` +
+       `success ${IX.success}, error ${IX.error}. error at 5 is OUTSIDE every window murmur defines, which is ` +
+       `the correct reading rather than a fallback: an error is neither a listener nor a worker, so it gets the ` +
+       `resting weights on both signals and ignites nothing.`);
+    ok("...and the index is DERIVED from the one ordering rather than typed out a second time",
+       ST.STATE_NAMES.every((n, i) => IX[n] === i) && Object.keys(IX).length === ST.STATE_NAMES.length,
+       `all ${ST.STATE_NAMES.length} names map to their own position in STATE_NAMES and there is no sixth ` +
+       `spelling of the order anywhere. Two copies of one ordering is the shape this tree has repaired in its ` +
+       `own records three times.`);
+
     const p = ST.createPresenceState("idle");
     ok("starts in idle", p.state === "idle");
     p.setState("thinking");

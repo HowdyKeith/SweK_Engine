@@ -119,6 +119,62 @@ export function makeMurmurKitTsl(TSL) {
     const mhTube = Fn(([w, sinA, perp2]) =>
         w.mul(MH_SQRTPI).div(sinA).mul(exp(perp2.div(w.mul(w)).negate())));
 
+    /**
+     * *** THE LIVE SIGNALS, CONDITIONED ONCE -- the shader half of murmurKit.mjs's mhLive. ***
+     *
+     * A PLAIN JS CLOSURE AND NOT AN Fn, for the reason this file has hit three times now: Fn() compiles its
+     * body into a single callable node and cannot hand back a JS object of several nodes. Builders that
+     * return a SET are closures; only builders that return one node are Fn.
+     *
+     * The state weights are selects on a float index rather than an integer switch because the index arrives
+     * as a uniform: LISTENING is index 1, and THINKING and RESPONDING are 2 and 3, so `working` is the open
+     * interval (1.5, 3.5) and covers both. The half-unit windows are how murmur's own TS compares them and
+     * they are what makes an index of exactly 1.0 or 3.0 land unambiguously inside one.
+     *
+     * pow(0, 0.65) is 0 here and not a NaN: WGSL evaluates it as exp2(0.65 * log2(0)) = exp2(-inf) = 0, so a
+     * silent level gives a silent voice and no epsilon is needed to protect it. The CPU twin returns exactly
+     * 0 at the same input and murmurKit-selfcheck.mjs grades the pair at level 0 for that reason.
+     */
+    const mhLive = (level, activity, stateIndex) => {
+        const L = clamp(level, 0.0, 1.0).toVar();
+        const A = clamp(activity, 0.0, 1.0).toVar();
+        const idx = float(stateIndex).toVar();
+        const listening = select(idx.greaterThan(0.5).and(idx.lessThan(1.5)), float(1.0), float(0.0));
+        const working = select(idx.greaterThan(1.5).and(idx.lessThan(3.5)), float(1.0), float(0.0));
+        return {
+            voice: pow(L, float(0.65)).mul(float(0.55).add(listening.mul(1.00 - 0.55))),
+            pace: pow(A, float(0.85)).mul(float(0.60).add(working.mul(1.00 - 0.60))),
+        };
+    };
+
+    /**
+     * *** THE STATE READ -- the shader half of murmurKit.mjs's mhState. *** Four scalars, so a closure.
+     *
+     * SUCCESS (index 4) gives `complete`, `sweep` and `settled`; RESPONDING (index 3) gives `drive`; every
+     * other state gives four zeros, which is why the multiply-by-(1 + complete) form murmur uses everywhere
+     * is a no-op outside the flash instead of a thing each species has to guard.
+     *
+     * TSL's smoothstep IS the CPU twin's `ss` -- it clamps to 0..1 and returns u*u*(3-2u) -- so the pair here
+     * is the same curve written twice and not two curves that happen to be close. The one place to be careful
+     * is that `a` and `sweep` divide tau by DIFFERENT windows, 1.20 and 0.95: the ignition's travel finishes
+     * a quarter-second before its breath does, which is what stops the flash reading as a wipe.
+     */
+    const mhState = (stateIndex, stateTau) => {
+        const idx = float(stateIndex).toVar();
+        const tau = max(float(stateTau), 0.0).toVar();
+        const success = select(idx.greaterThan(3.5).and(idx.lessThan(4.5)), float(1.0), float(0.0)).toVar();
+        const responding = select(idx.greaterThan(2.5).and(idx.lessThan(3.5)), float(1.0), float(0.0)).toVar();
+        const a = clamp(tau.div(1.20), 0.0, 1.0).toVar();
+        const sw = clamp(tau.div(0.95), 0.0, 1.0).toVar();
+        return {
+            complete: smoothstep(float(0.0), float(0.30), a)
+                .mul(float(1.0).sub(smoothstep(float(0.36), float(1.0), a))).mul(success),
+            settled: smoothstep(float(0.30), float(1.05), a).mul(success),
+            sweep: smoothstep(float(0.0), float(1.0), sw).mul(success),
+            drive: smoothstep(float(0.0), float(0.55), tau).mul(responding),
+        };
+    };
+
     /** kit.ts's mh_drift: eased angular travel, so an arc hurries and dawdles instead of spinning. */
     const mhDrift = Fn(([t, rate, wobble, lane]) => {
         const k = clamp(wobble, 0.0, MH_DRIFT_WOBBLE_CAP).toVar();
@@ -476,7 +532,7 @@ export function makeMurmurKitTsl(TSL) {
         // the literal token `null` -- which the GPU rejected at pipeline creation rather than silently. Both
         // times the value is one number that half the family's colour depends on and nothing owned it.
         MH_R, MH_ETA, MH_EXT, MH_TILT, MH_SCATTER_K, MH_SPREAD, MH_EXIT_CAP,
-        mhHash, mhGrad3, mhNoise3, mhHash1, mhFlourish, mhBreath, mhDrift, mhSpin, mhRoll, mhTube, MH_SQRTPI,
+        mhHash, mhGrad3, mhNoise3, mhHash1, mhFlourish, mhBreath, mhDrift, mhSpin, mhRoll, mhTube, MH_SQRTPI, mhLive, mhState,
         mhRefract, mhLook, mhExit, mhHaze, mhMedium, mhInside, mhTransmit, mhScatter,
         mhDeform, mhBody, MH_AMP_CAP,
         mhKey, mhSmall, mhSurface, mhContainment, mhOpalLife, mhAbyssSlot,
@@ -499,6 +555,8 @@ export function makeMurmurKitTsl(TSL) {
  * mode: "hash"  -> pixel (x,y) carries mhHash(x, y, 0) packed big-endian across RGBA.
  *       "noise" -> mhNoise3 over a fixed lattice, remapped to 0..1 in R (8-bit, so compared within quantisation).
  *       "exit"  -> mhExit for a ray through the body, in R, scaled by 1/MH_EXIT_CAP.
+ *       "live"  -> mh_live's voice in R and pace in G, over signal (x) by state (y).
+ *       "state" -> mh_state's complete/sweep/settled/drive in RGBA, over tau (x) by state (y).
  */
 export function makeMurmurKitProbeTsl(THREE, TSL, { mode = "hash", n = 16 } = {}) {
     const K = makeMurmurKitTsl(TSL);
@@ -569,6 +627,36 @@ export function makeMurmurKitProbeTsl(THREE, TSL, { mode = "hash", n = 16 } = {}
             // the glow about 0.4. The gate divides by the same numbers.
             return vec4(clamp(sf.rim.div(2.0), 0.0, 1.0), clamp(sf.spec.div(2.0), 0.0, 1.0),
                         clamp(sf.glow.div(0.5), 0.0, 1.0), 1.0);
+        }
+        if (mode === "live") {
+            // *** mh_live OVER THE WHOLE INPUT SQUARE, AGAINST THE f64 TWIN. *** x is the raw signal 0..1 and
+            // y is the STATE, floor(y*5), so one frame carries all five of murmur's states rather than the one
+            // a point sample would have picked -- and the two weight windows are different (LISTENING alone
+            // for voice, THINKING and RESPONDING together for pace), so a frame that only saw idle would grade
+            // neither of them.
+            //
+            // x REACHES 0 EXACTLY, on purpose: pow(0, 0.65) is the one input where a WGSL exp2(log2(0)) could
+            // come back NaN instead of 0 on a driver that handles the -inf differently, and a probe whose
+            // lattice started at 1/16 would never ask.
+            const u = px.div(n).toVar();
+            const si = TSL.floor(py.div(n).mul(5.0)).toVar();
+            const lv = K.mhLive(u, u, si);
+            return vec4(clamp(lv.voice, 0.0, 1.0), clamp(lv.pace, 0.0, 1.0), 0.0, 1.0);
+        }
+        if (mode === "state") {
+            // *** mh_state, ALL FOUR OUTPUTS AT ONCE, ACROSS ALL FIVE STATES. *** x is tau over 0..1.4, which
+            // is past the end of SUCCESS's own 1.2 s window so the settled tail is in shot rather than cropped
+            // at the point it is still rising; y is the state index.
+            //
+            // THE THREE STATES THAT PRODUCE NOTHING ARE GRADED TOO, and they are the reason the y axis is here
+            // at all: every species multiplies its interior by (1 + complete), so `complete` being exactly zero
+            // in IDLE is the thing that keeps eighteen shaders from needing eighteen guards. A probe that only
+            // sampled SUCCESS would let a gating bug through as four rows of agreement.
+            const tau = px.div(n).mul(1.4).toVar();
+            const si = TSL.floor(py.div(n).mul(5.0)).toVar();
+            const st = K.mhState(si, tau);
+            return vec4(clamp(st.complete, 0.0, 1.0), clamp(st.sweep, 0.0, 1.0),
+                        clamp(st.settled, 0.0, 1.0), clamp(st.drive, 0.0, 1.0));
         }
         if (mode === "noise") {
             // A lattice that deliberately straddles cell boundaries, where a wrong fade or a wrong gradient

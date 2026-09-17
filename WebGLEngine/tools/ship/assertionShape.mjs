@@ -344,6 +344,11 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // gates -- and the count of gates has exceeded the count of PAIRS for five rounds running, because since
     // v4636 no two species have shared one. The reason has changed each time (compiles, then frames, then
     // measurement axes) and the record keeps both numbers for that reason.
+    // v4641 -- RE-TAKEN 1685 -> 1687 for tools/ship/murmurLive-selfcheck.mjs and …Live2-selfcheck.mjs. The
+    // PAIR count does not move with them and that is the point of keeping both numbers: these two gates have
+    // one subject between them -- mh_live arriving in the picture -- and they are two files only because four
+    // species in one gate measured 2,772 ms against a 3,000 ms ceiling. A count of gates has never been a
+    // count of claims, and here it is not a count of subjects either, in the opposite direction to v4640's.
     // v4640 -- RE-TAKEN 1683 -> 1685 for tools/ship/murmurSpecies14-selfcheck.mjs (prism) and …Species15
     // (helix). *** WITH THESE TWO ALL EIGHTEEN OF murmur-web's SPECIES ARE PORTED AND GATED, across fifteen
     // species gates and one kit gate. *** And the last pair is the one where this record's two counts finally
@@ -351,8 +356,8 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // CONSTANT TABLES and say so in their own titles, because sabotaging the shaders left them green. A count
     // of gates has never been a count of claims; this is the first round where it is not even a count of
     // SUBJECTS, and the gates carry that in their text rather than in this note alone.
-    gates: 1685, usesOk: 1664, definesOk: 1656, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1557, condFirst: 91, unknownSignature: 16,
+    gates: 1687, usesOk: 1666, definesOk: 1658, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1559, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

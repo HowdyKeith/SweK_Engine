@@ -49,7 +49,14 @@ const DROP_TIMES = [2.4, SWELL_T];
 // 0 the amplitude is (0.052)(1 - 0.22*tension)(1 + 0.30*swell); the wobble that reproduces exactly that at
 // voice 0 is solved for here, and the two frames then differ in bodyScale and in NOTHING ELSE about the body.
 const swellAt = (v, t) => (0.22 + K.mhBreath(t, 0.9) * 0.78) * v;
-const SWELL_HI = swellAt(1, SWELL_T);
+// *** THE VOICE THE SHADER SEES, NOT THE KNOB THE FRAME SETS -- v4641. *** The swell frame is rendered at a
+// raw voice of 1.0, and until v4641 render/aiPresenceOrbTsl.mjs handed that 1.0 straight to mh_shape. It now
+// calls the kit's mh_live first, exactly as murmur's eighteen do, so the body sees 1.0^0.65 * 0.55 = 0.5500.
+// Leaving the 1.0 here would have made this row grade the shader against a prediction for a signal the shader
+// never receives -- the fit came back 1.0270 against a predicted 1.04983 and the row went red, correctly.
+// mhLive is the f64 twin murmurKit-selfcheck.mjs section 11 grades bit-for-bit against the GPU, so calling it
+// here is the same reference this file already uses for mhBreath and not a second opinion about it.
+const SWELL_HI = swellAt(K.mhLive(1.0, 0, 0).voice, SWELL_T);
 // (0.052 + 0.040*w) = 0.052 * (1 + 0.30*SWELL_HI) -- the tension factor is common to both sides and cancels.
 const SWELL_WOBBLE = (0.052 * (1 + SWELL_HI * 0.30) - 0.052) / 0.040;
 // EIGHT FRAMES AND TWO SHADERS. The silhouette pair runs at SIL_VOICE so that bodyScale is exactly 1 in both

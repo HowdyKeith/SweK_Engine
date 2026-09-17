@@ -316,7 +316,9 @@ const probeRun = await renderThreeTslToPixels({
     variants: [{ factoryArgs: { mode: "noise", n: N } }, { factoryArgs: { mode: "rail", n: N } },
                { factoryArgs: { mode: "railLight", n: N } },
                { factoryArgs: { mode: "surface", n: N } },
-               { factoryArgs: { mode: "opalAbyss", n: N } }],
+               { factoryArgs: { mode: "opalAbyss", n: N } },
+               { factoryArgs: { mode: "live", n: N } },
+               { factoryArgs: { mode: "state", n: N } }],
 });
 
 sec("6. *** THE PAIR: THE REAL COMPILED SHADER AGAINST THE CPU REFERENCE, BIT FOR BIT ***");
@@ -1236,6 +1238,181 @@ sec("10. *** opal's FOUR LIVES AND abyss's CLOCKS: the two species whose subject
             `that makes the four CPU rows above mean anything about the PICTURE: without it they describe a ` +
             `reference implementation nothing draws, which is the shape v4632's sabotage sweep caught when ` +
             `these formulas lived inline in the species file and three corruptions of them passed everything.`);
+    }
+}
+
+// =============================================================================================================
+// =============================================================================================================
+sec("11. *** mh_live AND mh_state: THE TWO SIGNALS EVERY SPECIES READS AND THIS PORT DID NOT HAVE ***");
+{
+    const r = probeRun;
+    if (!r.ok) {
+        ok("!! mh_live and mh_state match a real GPU render", false, `could not render: ${r.reason || "unknown"}`);
+    } else {
+        // THE SAME ROW FLIP SECTION 6 MEASURED: three's uv has v=0 at the BOTTOM and this readback is
+        // top-row-first, so shader row y arrives at readback row N-1-y. Both probes put the STATE on y, so
+        // getting this backwards would grade LISTENING against SUCCESS -- which is how the first cut of this
+        // section read, with the voice lift landing at readback row 3. It is asserted rather than assumed:
+        // every row below also reports what the UNFLIPPED reading would have scored.
+        const ry = (ysh) => N - 1 - ysh;
+        const sIdx = (ysh) => Math.floor((ysh / N) * 5);
+        // The middle readback row of a state's band, which is where a state's three rows are unambiguous.
+        const bandRow = (si) => ry(Math.floor(((si + 0.5) / 5) * N));
+
+        // ---- the f64 twin, so the CPU export is load-bearing rather than merely present ---------------------
+        // *** THREE IMPLEMENTATIONS, NOT TWO. *** render/murmurKit.mjs's mhLive and mhState are the f64 scalar
+        // reference; render/murmurKitTsl.mjs's are an f32 node graph on a GPU; and the expectations written out
+        // by hand below are murmur's numbers transcribed a third time. Without this row the CPU pair would be an
+        // export nothing reads -- which is how a reference drifts away from the shader it is supposed to be the
+        // reference FOR, and the shape three of this tree's repaired records had.
+        {
+            let wc = 0, at = "";
+            for (let si = 0; si <= 4; si++) for (let k = 0; k <= 40; k++) {
+                const u = k / 40;
+                const lvC = K.mhLive(u, u, si);
+                const wantV = Math.pow(u, 0.65) * (0.55 + 0.45 * (si === 1 ? 1 : 0));
+                const wantP = Math.pow(u, 0.85) * (0.60 + 0.40 * ((si === 2 || si === 3) ? 1 : 0));
+                for (const [g, w, nm] of [[lvC.voice, wantV, "voice"], [lvC.pace, wantP, "pace"]]) {
+                    const d = Math.abs(g - w);
+                    if (d > wc) { wc = d; at = `${nm} at ${u.toFixed(3)} state ${si}: ${g} vs ${w}`; }
+                }
+                const tau = (k / 40) * 1.4, stC = K.mhState(si, tau);
+                const succ = si === 4 ? 1 : 0, resp = si === 3 ? 1 : 0;
+                const a = Math.min(1, tau / 1.20), sw = Math.min(1, tau / 0.95);
+                const ssq = (e0, e1, x) => { const uu = Math.min(1, Math.max(0, (x - e0) / (e1 - e0))); return uu * uu * (3 - 2 * uu); };
+                const wantS = { complete: ssq(0, 0.30, a) * (1 - ssq(0.36, 1.0, a)) * succ, sweep: ssq(0, 1, sw) * succ,
+                                settled: ssq(0.30, 1.05, a) * succ, drive: ssq(0, 0.55, tau) * resp };
+                for (const nm of ["complete", "sweep", "settled", "drive"]) {
+                    const d = Math.abs(stC[nm] - wantS[nm]);
+                    if (d > wc) { wc = d; at = `${nm} at tau ${tau.toFixed(3)} state ${si}: ${stC[nm]} vs ${wantS[nm]}`; }
+                }
+            }
+            ok("!! the f64 CPU twin of mh_live and mh_state agrees with the hand-written curves to f64 rounding",
+                wc < 1e-15,
+                `worst |cpu - hand-written| = ${wc.toExponential(2)} over 205 points x 6 outputs` +
+                `${at ? " (worst at " + at + ")" : ""}. This is the row that makes render/murmurKit.mjs's export ` +
+                `load-bearing: the GPU rows below grade the SHADER against the same hand-written numbers, so ` +
+                `without this one the CPU reference could drift and nothing would notice.`);
+        }
+
+        // ---- mh_live ----------------------------------------------------------------------------------------
+        // *** THE CONSTANTS ARE SPELLED OUT HERE AND NOT READ OUT OF THE SUBJECT. *** This tree has the v4579
+        // scar for a gate that re-stated the formula it was grading, and half of v4640's rows had to be
+        // re-titled for grading a table instead of a shader. So the CPU side below is murmur's four numbers
+        // written out by hand -- 0.65 and 0.55 for voice, 0.85 and 0.60 for pace, with the LISTENING window on
+        // one and the THINKING-plus-RESPONDING window on the other -- and if render/murmurKit.mjs's mhLive is
+        // edited to disagree with kit.ts, BOTH this row and the pixel rows in the orb's own gate go red rather
+        // than moving together in silence.
+        const lv = r.frames[6];
+        const liveWant = (u, si) => [
+            Math.round(Math.min(1, Math.pow(u, 0.65) * (0.55 + 0.45 * (si === 1 ? 1 : 0))) * 255),
+            Math.round(Math.min(1, Math.pow(u, 0.85) * (0.60 + 0.40 * ((si === 2 || si === 3) ? 1 : 0))) * 255)];
+        let wV = 0, wP = 0, atV = "", atP = "", wFlat = 0;
+        for (let ysh = 0; ysh < N; ysh++) for (let x = 0; x < N; x++) {
+            const u = x / N, si = sIdx(ysh), want = liveWant(u, si);
+            const i = (ry(ysh) * N + x) * 4, iFlat = (ysh * N + x) * 4;
+            const dV = Math.abs(lv[i] - want[0]), dP = Math.abs(lv[i + 1] - want[1]);
+            if (dV > wV) { wV = dV; atV = `signal ${u.toFixed(4)} state ${si}: gpu ${lv[i]} cpu ${want[0]}`; }
+            if (dP > wP) { wP = dP; atP = `signal ${u.toFixed(4)} state ${si}: gpu ${lv[i + 1]} cpu ${want[1]}`; }
+            wFlat = Math.max(wFlat, Math.abs(lv[iFlat] - want[0]), Math.abs(lv[iFlat + 1] - want[1]));
+        }
+        say(`mh_live over ${N} signals x 5 states: worst |gpu - cpu| = ${wV}/255 on voice, ${wP}/255 on pace ` +
+            `(unflipped, ${wFlat}/255)`);
+        ok("!! *** mh_live RENDERS ON A REAL GPU AND MATCHES THE HAND-WRITTEN CURVE ***",
+            wV <= 2 && wP <= 2 && wFlat > 20,
+            `worst voice error ${wV} of 255 (${atV || "no disagreement"}), worst pace error ${wP} of 255 ` +
+            `(${atP || "no disagreement"}); the unflipped orientation scores ${wFlat}, so this cannot pass by ` +
+            `the symmetry a state-independent curve would have. The exponents are what make the bound hard to ` +
+            `meet by accident: 0.65 read as a square root is within 3% of it at the top of the range but 21 ` +
+            `counts of 255 at the bottom, so the lattice has to reach down there -- and it starts at 0.`);
+
+        // pow(0, 0.65) is the one input a driver could hand back NaN for -- named as its own row because a
+        // NaN would clamp to 0 in some paths and to 1 in others and the error bound above would barely move.
+        let zeroBad = 0;
+        for (let y = 0; y < N; y++) { const i = (y * N + 0) * 4; if (lv[i] !== 0 || lv[i + 1] !== 0) zeroBad++; }
+        ok("!! a silent signal gives a silent voice and pace in every state -- pow(0, 0.65) is 0, not NaN",
+            zeroBad === 0,
+            `all ${N} rows read exactly 0 in both channels at signal 0. WGSL evaluates pow as ` +
+            `exp2(e2 * log2(e1)), so this is exp2(-inf) and not a special case anybody wrote -- and the probe's ` +
+            `lattice deliberately starts AT zero rather than at 1/${N} so the question gets asked at all.`);
+
+        // *** THE TWO WINDOWS ARE DIFFERENT AND THE ROW SAYS SO WITH THE FRAME'S OWN NUMBERS. *** voice is
+        // lifted in LISTENING alone; pace in THINKING and RESPONDING. A port that gave them one shared window
+        // would pass every error bound above at four of the five states.
+        const col = (ch, si) => lv[(bandRow(si) * N + (N - 1)) * 4 + ch];
+        const vByState = [0, 1, 2, 3, 4].map((si) => col(0, si));
+        const pByState = [0, 1, 2, 3, 4].map((si) => col(1, si));
+        say(`at the top signal, voice by state = [${vByState}], pace by state = [${pByState}]`);
+        const allEq = (a, ix) => ix.every((k) => a[k] === a[ix[0]]);
+        ok("!! *** VOICE IS LIFTED IN LISTENING ALONE AND PACE IN THINKING AND RESPONDING -- TWO WINDOWS ***",
+            vByState[1] > vByState[0] && allEq(vByState, [0, 2, 3, 4]) &&
+            pByState[2] > pByState[0] && pByState[2] === pByState[3] && allEq(pByState, [0, 1, 4]),
+            `voice reads ${vByState[1]} in LISTENING against ${vByState[0]} in the other four, which are all ` +
+            `equal to each other; pace reads ${pByState[2]} in THINKING and RESPONDING alike against ` +
+            `${pByState[0]} in the other three. kit.ts: "the same microphone level means different things in ` +
+            `different states", and RESPONDING is inside one window and outside the other -- which is exactly ` +
+            `the pair a single shared window would collapse, at the one state where it is cheapest to get wrong.`);
+
+        // ---- mh_state ---------------------------------------------------------------------------------------
+        const st = r.frames[7];
+        const ss = (e0, e1, x) => { const u = Math.min(1, Math.max(0, (x - e0) / (e1 - e0))); return u * u * (3 - 2 * u); };
+        const NAME = ["complete", "sweep", "settled", "drive"];
+        const stateWant = (tau, si) => {
+            const succ = si === 4 ? 1 : 0, resp = si === 3 ? 1 : 0;
+            const a = Math.min(1, tau / 1.20), sw = Math.min(1, tau / 0.95);
+            return [Math.round(ss(0, 0.30, a) * (1 - ss(0.36, 1.0, a)) * succ * 255),
+                    Math.round(ss(0, 1, sw) * succ * 255),
+                    Math.round(ss(0.30, 1.05, a) * succ * 255),
+                    Math.round(ss(0, 0.55, tau) * resp * 255)];
+        };
+        let wS = 0, atS = "", wSFlat = 0;
+        for (let ysh = 0; ysh < N; ysh++) for (let x = 0; x < N; x++) {
+            const tau = (x / N) * 1.4, si = sIdx(ysh), want = stateWant(tau, si);
+            const i = (ry(ysh) * N + x) * 4, iFlat = (ysh * N + x) * 4;
+            for (let c = 0; c < 4; c++) {
+                const d = Math.abs(st[i + c] - want[c]);
+                if (d > wS) { wS = d; atS = `${NAME[c]} at tau ${tau.toFixed(3)} state ${si}: gpu ${st[i + c]} cpu ${want[c]}`; }
+                wSFlat = Math.max(wSFlat, Math.abs(st[iFlat + c] - want[c]));
+            }
+        }
+        // The two windows that are easy to write as one number: complete's 1.20 against sweep's 0.95. Read off
+        // the SUCCESS band at the tau nearest 1.0 second, which is where they are furthest apart.
+        const xTau1 = Math.round((1.0 / 1.4) * N), iT1 = (bandRow(4) * N + xTau1) * 4;
+        say(`mh_state over ${N} taus x 5 states x 4 outputs: worst |gpu - cpu| = ${wS}/255 (unflipped, ${wSFlat}/255)`);
+        ok("!! *** mh_state's FOUR OUTPUTS RENDER ON A REAL GPU AND MATCH THE HAND-WRITTEN CURVES ***",
+            wS <= 2 && wSFlat > 20,
+            `worst error ${wS} of 255 (${atS || "no disagreement"}) across all ${N * N * 4} samples, against ` +
+            `${wSFlat} unflipped. At tau = ${(xTau1 / N * 1.4).toFixed(3)} s in SUCCESS, complete reads ` +
+            `${st[iT1]} of 255 and sweep ${st[iT1 + 1]} -- the breath is already most of the way out while the ` +
+            `travel is still finishing, which is the whole reason the two windows are 1.20 and 0.95 and not one ` +
+            `number. kit.ts: "a flash that starts at full speed and stops dead is a wipe, and a wipe is a UI ` +
+            `transition rather than an arrival travelling through a material."`);
+
+        // The three quiet states are the load-bearing half of mh_state: every species multiplies its interior
+        // by (1 + complete), so `complete` at exactly zero outside SUCCESS is what spares eighteen shaders a guard.
+        let leak = 0, leakAt = "";
+        for (let ysh = 0; ysh < N; ysh++) {
+            const si = sIdx(ysh); if (si === 3 || si === 4) continue;
+            for (let x = 0; x < N; x++) { const i = (ry(ysh) * N + x) * 4;
+                for (let c = 0; c < 4; c++) if (st[i + c] !== 0) { leak++; leakAt = leakAt || `${NAME[c]} nonzero in state ${si}`; } }
+        }
+        // ...and the two loud states have to be loud, or "four zeros everywhere" would pass the line above.
+        const iS = (bandRow(4) * N + N - 1) * 4, iR = (bandRow(3) * N + N - 1) * 4;
+        const loud = st[iS + 2] > 200 && st[iS + 1] > 200 && st[iR + 3] > 200;
+        ok("!! *** IDLE, LISTENING AND THINKING PRODUCE EXACTLY FOUR ZEROS -- AND SUCCESS AND RESPONDING DO NOT ***",
+            leak === 0 && loud,
+            `${leak} nonzero samples across the three quiet states${leakAt ? " (" + leakAt + ")" : ""}, while at ` +
+            `the far tau SUCCESS reaches ${st[iS + 2]} of 255 on settled and ${st[iS + 1]} on sweep, and ` +
+            `RESPONDING ${st[iR + 3]} on drive. The second half is what stops a shader returning four zeros ` +
+            `unconditionally from passing the first -- which is the shape of every "cannot fail" row this tree ` +
+            `has had to repair.`);
+
+        // *** WHAT THIS SECTION DOES NOT CLAIM. *** mh_state is ported and graded; it is not CALLED by
+        // render/aiPresenceOrbTsl.mjs. murmur's eighteen sources reference st.drive 44 times, st.complete 49,
+        // st.settled 19 and st.sweep 16, and every one is a transcription with its own constants. The orb
+        // therefore gained `activity` and `stateIndex` at v4641 and deliberately NOT `stateTau`: a uniform
+        // nothing reads is a row that cannot fail. tools/ship/aiPresenceOrb-selfcheck.mjs is where mh_live's
+        // arrival in the PICTURE is graded, and there is no such section for mh_state yet, by design.
     }
 }
 
