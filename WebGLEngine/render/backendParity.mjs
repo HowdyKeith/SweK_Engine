@@ -201,6 +201,18 @@ export const PARITY_BASELINE = Object.freeze({
     // both languages) and its gate physics/render/specularProbeLit-selfcheck.mjs (a real WGSL compute dispatch of
     // the fragment logic plus a real GLSL vertex/fragment pair, counted per this file's own v4392 rule that a gate
     // embedding shader text is counted rather than exempted, not exempted as this gate exempts itself).
+    // *** v4645 -- RE-DERIVED AT THE main MERGE: wgslBearing 87 -> 97 and wgslOnly 64 -> 74, THE SAME TEN. ***
+    // main's baseline was correct for main's tree, which is why v4642 could repair this gate there and why it
+    // goes red here: the merge brought ten WGSL-bearing files main does not have, every one of them this
+    // line's temporal/FSR arc, and every one WGSL-ONLY -- which is why the two rows move together by the same
+    // amount and `both`, glslBearing, glslDirective and glslFramework do not move at all. Named rather than
+    // counted, per v4470's rule that a baseline which stops naming its population stops describing the tree:
+    //   fx/fsr/fsrKernels.js, render/motionVectorsWgsl.mjs, render/ringFloorWgsl.mjs,
+    //   render/temporalAccumulateWgsl.mjs, render/temporalLockWgsl.mjs, render/temporalRejectWgsl.mjs,
+    //   render/temporalResolveWgsl.mjs, tools/ship/harnessLiveness-selfcheck.mjs,
+    //   tools/ship/kernelReach-selfcheck.mjs, tools/ship/temporalCorpus.mjs.
+    // The last three are GATES and a CORPUS bearing shader text, counted rather than exempted -- v4392's rule,
+    // which this file has now applied four times and which is most of the WGSL this tree owns.
     glslBearing: 158,
     glslDirective: 140,  // raw WebGL2 -- the file writes its own version header
     glslFramework: 18,   // three.js prepends it: badTvPass, aquarellePass, grassField, solidTexture, atmosphere, ...
@@ -265,10 +277,10 @@ export const PARITY_BASELINE = Object.freeze({
     // which ships its GLSL and WGSL texts as exports so the three languages cannot drift apart by being
     // edited separately. It is WGSL-BEARING WITHOUT BEING A PAIR: it carries both shader texts but is not a
     // shader module, which is why wgslOnly moves with it and `both` does not.
-    wgslBearing: 87,
+    wgslBearing: 97,
     both: 23,            // +2 over the last-recorded 21: fae26dbf's specularProbeLit.mjs and specularProbeLit-selfcheck.mjs
     glslOnly: 135,
-    wgslOnly: 64,
+    wgslOnly: 74,
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:
     // a page carrying both languages carries its own two shaders, and lends nothing to anybody else.
     bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleetMask.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/fleetTsl.mjs", "render/lyapunovWgsl.mjs", "render/tslSource.mjs", "render/stereographic.mjs", "render/texelProbe.mjs", "render/litSphere.mjs", "render/tslWide.mjs", "render/zoomBlur.mjs", "render/asciiShape.mjs", "render/water2d.mjs", "render/probeLit.mjs", "physics/render/specularProbeLit.mjs", "physics/render/specularProbeLit-selfcheck.mjs"]),

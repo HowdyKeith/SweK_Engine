@@ -45,7 +45,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { noComments } from "./sourceScan.mjs";   // v4637 -- see useSites
 import crypto from "node:crypto";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 // *** IMPORTED, NOT SPELLED. *** The first draft walked the tree with its own `/\.(mjs|js|html)$/`, and
 // tools/ship/shaderRefs.mjs counts hand-spelled copies of exactly that set: 18 of them, under the note "as
 // callers import SOURCE_EXT this number FALLS -- DO NOT RAISE IT past 11". *** MY COPY DID NOT SHOW UP IN THE
@@ -132,7 +132,11 @@ export async function kernelReach({ producers = null, files = null, read = null,
     const all = files || treeFiles();
     const rd = read || ((f) => { try { return fs.readFileSync(path.join(ENG, f), "utf8"); } catch { return ""; } });
     const srcOf = new Map(all.map((f) => [f, rd(f)]));
-    const imp = importModule || (async (f) => import(path.join(ENG, f)));
+    // pathToFileURL, not the bare path: Node's ESM loader rejects a raw filesystem path on Windows, where
+    // C:\\... reads as a URL scheme. Caught by tools/ship/windowsImport-selfcheck.mjs at the v4645 merge --
+    // main's v4642 repaired the same shape in trellisAutoRig-selfcheck and this one arrived from the other
+    // line in the same window, which is what a tree-wide scan is for and a per-file fix is not.
+    const imp = importModule || (async (f) => import(pathToFileURL(path.join(ENG, f)).href));
 
     const importersOf = (file) => {
         const b = file.split("/").pop().replace(/\.(mjs|js)$/, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

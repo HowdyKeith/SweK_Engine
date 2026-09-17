@@ -717,7 +717,25 @@ export const PROBE_AT_V4536 = Object.freeze({
     // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
     // and the readings overlap on everything predating the split, so they are run over the merged tree rather
     // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
-    excluding: Object.freeze({ records: 142, withFields: 66, fields: 370 }),
+    // *** v4645 -- RE-TAKEN AGAIN AND IT MOVED BY EXACTLY ONE FIELD, WHICH TURNED OUT TO BE ABOUT THIS
+    // INSTRUMENT AND NOT ABOUT THE TREE: 370 -> 371. *** records and withFields did not move, so nothing
+    // arrived -- one existing record grew a field. MY FIRST ATTRIBUTION WAS WRONG AND IS RECORDED AS WRONG: I
+    // wrote that it was HAND_OBSERVED_V4641 in tools/ship/timingKind-selfcheck.mjs, this line's replacement of
+    // a magic-fifty threshold with a named set, and then checked -- that symbol is not in the census at all.
+    //
+    // Diffed record by record against the pre-merge tree, the mover is vba/runtimeGap.mjs's MEASURED_AT_V4462,
+    // 9 fields to 10, and the arrival is `threadsWithoutSelf`. Nothing declared it and nothing deleted it.
+    // THIS LINE WROTE IT ON THE SAME LINE AS ITS NEIGHBOUR -- `wasmWithoutSelf: 22, threadsWithoutSelf: 22,` --
+    // and main writes the two on separate lines. This census reads fields per LINE, so a second field sharing
+    // a line with the first is invisible to it: `threadsWithoutSelf` has been a frozen field on this line for
+    // as long as it has existed and was counted by nothing, in the instrument whose whole job is counting
+    // frozen fields. The merge did not add a field; it adopted a formatting that lets one be seen.
+    //
+    // Recorded at 371, the live reading, because that is what the census measures. The LIMIT is named rather
+    // than repaired here -- a per-line reader is the same species as the 6,000-character window this file's
+    // own v4535 note records, and how many other records hide a field behind a comma is a question this round
+    // did not ask and the next one should.
+    excluding: Object.freeze({ records: 142, withFields: 66, fields: 371 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,

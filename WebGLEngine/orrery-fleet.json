@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "9589941458203be21870a50c70ae58bf1fb28c9c",
+ "head": "850ab6cc8e4827c5a01c6373152cfa14651f457f",
  "bodies": {
   "box3d": [
    {
@@ -859,13 +859,13 @@
    },
    {
     "path": "tools/ship/aiPresenceOrb-selfcheck.mjs",
-    "bytes": 44621,
-    "sha": "809653b35ec84bc6f32042a2e2ab2c0c9eca6382"
+    "bytes": 46514,
+    "sha": "c5d89bfc82287a33e9f46097096e3965b09a7e57"
    },
    {
     "path": "tools/ship/aiPresenceOrbPresent-selfcheck.mjs",
-    "bytes": 28278,
-    "sha": "716d33d59fc1cff461d26a001838d27d0746104b"
+    "bytes": 30399,
+    "sha": "5798b40753b8ed3e57f618df36c7f3f29d992ab9"
    },
    {
     "path": "tools/ship/brainTsl-page.js",
@@ -954,8 +954,8 @@
    },
    {
     "path": "ui/aiPresenceOrbWidget.js",
-    "bytes": 13989,
-    "sha": "94ecfafa001dfb52bba8f732bf2d7d5fba29fa20"
+    "bytes": 15207,
+    "sha": "e78aec8dfd2d2005cfcf52920606ac43d4f955db"
    }
   ],
   "wasm": [

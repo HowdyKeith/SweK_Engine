@@ -7927,7 +7927,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "orb-species-block-per-shader; the next orb round starts there.",
     }),
     // v4643 -- THE 254th CLOSING: mh_present's tail, and a second tone curve a gate refused.
-    since263: Object.freeze({
+    since329: Object.freeze({
         at: "v4643", swept: 0, green: 0, red: 0,
         added: Object.freeze([]),
         redOnArrival: Object.freeze([]),
@@ -7993,7 +7993,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "ground at the wrong constant. Both named in the kit, neither closed here.",
     }),
     // v4644 -- THE 255th CLOSING: the SUCCESS flash, from a constant table to a ring that travels in pixels.
-    since264: Object.freeze({
+    since330: Object.freeze({
         at: "v4644", swept: 2, green: 2, red: 0,
         added: Object.freeze([
             "tools/ship/murmurIgnite-selfcheck.mjs",
@@ -8033,7 +8033,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
     // v4641 -- THE 253rd CLOSING: mh_live, the function all eighteen species read and none of them had.
-    since262: Object.freeze({
+    since328: Object.freeze({
         at: "v4641", swept: 2, green: 2, red: 0,
         added: Object.freeze([
             "tools/ship/murmurLive-selfcheck.mjs",
@@ -8111,7 +8111,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     }),
     // v4635 -- THE 247th CLOSING. No gate added: a row added to one that existed, and a 3,561 ms refund.
     // v4640 -- THE 252nd CLOSING: prism and helix, the last two -- and four rows, two of which grade tables.
-    since261: Object.freeze({
+    since327: Object.freeze({
         at: "v4640", swept: 2, green: 2, red: 0,
         added: Object.freeze([
             "tools/ship/murmurSpecies14-selfcheck.mjs",
@@ -8161,7 +8161,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "54 frames, 0 bytes different.",
     }),
     // v4639 -- THE 251st CLOSING: duet and chorus, and a headline that measurement would not support.
-    since260: Object.freeze({
+    since326: Object.freeze({
         at: "v4639", swept: 2, green: 2, red: 0,
         added: Object.freeze([
             "tools/ship/murmurSpecies12-selfcheck.mjs",
@@ -8213,7 +8213,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "bytes different.",
     }),
     // v4638 -- THE 250th CLOSING: aura and flux, the two sheet heroes, and a frame convention that bit.
-    since259: Object.freeze({
+    since325: Object.freeze({
         at: "v4638", swept: 2, green: 2, red: 0,
         added: Object.freeze([
             "tools/ship/murmurSpecies10-selfcheck.mjs",
@@ -8257,7 +8257,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "FOURTEEN species and three time-and-knob cases: 42 frames, 0 bytes different.",
     }),
     // v4637 -- THE 249th CLOSING: arc and sol, the two heroes that draw a LINE.
-    since258: Object.freeze({
+    // *** v4645 -- SEVEN ORDINALS COLLIDED AT THE main MERGE, AND v4535 SAW IT COMING IN THIS FILE. ***
+    // That round wrote, of exactly this key space: "An ordinal-keyed object hands two concurrent lines a
+    // shared namespace with no allocator and a silent failure mode; a LIST gives them append-only entries
+    // that cannot collide at all -- which is the shape `closings` itself was given at v4399 for this exact
+    // reason." It then declined to change the shape mid-merge, for the same reason this round declines to:
+    // "a merge is the wrong commit in which to change the shape of the thing being merged."
+    //
+    // The failure mode arrived as predicted. This line used since258-264 at v4537-v4545; main's Murmur Orb
+    // rounds independently used since258-264 at v4637-v4644. The later declaration wins, JS says nothing,
+    // and SEVEN of this line's rounds lost their swept counts -- which surfaced two screens away as "7 STILL
+    // UNSWEPT", a number that looked like missing gates and was actually missing CLOSINGS. Renumbered
+    // FORWARD, which is the rule the changelog header states for version ordinals and applies here too: the
+    // arrivals move, the incumbents keep the keys anything older might name. THE SHAPE IS STILL WRONG and
+    // this is now the SIXTH collision; a list is still the answer and is still owed its own round.
+    since324: Object.freeze({
         at: "v4637", swept: 2, green: 2, red: 0,
         added: Object.freeze([
             "tools/ship/murmurSpecies8-selfcheck.mjs",
