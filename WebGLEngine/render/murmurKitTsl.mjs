@@ -326,6 +326,44 @@ export function makeMurmurKitTsl(TSL) {
     const mhKnee = (x, knee) => select(x.lessThan(knee), x,
         knee.add(float(1.0).sub(knee).mul(float(1.0).sub(exp(x.sub(knee).div(max(float(1.0).sub(knee), float(1e-3))).negate())))));
 
+    /**
+     * *** mh_present's TAIL -- the shader half of murmurKit.mjs's mhPresentFinish. *** The full reasoning,
+     * murmur's three terms and their numbers, and how the sign of uvY was MEASURED rather than copied, are
+     * all in the CPU twin's doc comment; this is the same arithmetic on a node graph.
+     *
+     * NO BRANCH ON paper, matching the twin: murmur's `if (paper > 0.002)` is an early-out, both weights
+     * carry `paper` as a factor, and dropping it on both sides is what makes the pair agree exactly.
+     *
+     * RETURNS UN-CLAMPED LINEAR LIGHT, also matching mh_present, which hands its result to mh_out and lets
+     * THAT clamp after the encode. The shadow weight reaches 1.11 and the mix is allowed to overshoot.
+     */
+    const mhPresentFinish = (rgb, spec, contact, uvY, pal, inkLinear) =>
+        mhPresentKnee(mhPresentPaper(rgb, spec, contact, uvY, pal, inkLinear), pal.paper);
+
+    /** mh_present's tone knee, which MOVES with the ground: 0.90 on ink, 0.96 on paper. Per channel. */
+    const mhPresentKnee = (rgb, paper) => {
+        const knee = mix(float(0.90), float(0.96), paper).toVar();
+        return vec3(mhKnee(rgb.x, knee), mhKnee(rgb.y, knee), mhKnee(rgb.z, knee));
+    };
+
+    /**
+     * The two GROUND-DEPENDENT terms alone -- the catchlight and the contact shadow -- split from the knee
+     * because in this tree the two belong to different stages. render/aiPresenceOrbPresent.mjs already
+     * applies knee(x, 0.90) on the HDR path, quoting present.wgsl's own "the tone curve ... is written ONCE";
+     * the catchlight and shadow read `paper`, which nothing downstream of the species shader knows about.
+     * The CPU twin's doc comment carries the full reasoning and the gap this leaves.
+     */
+    const mhPresentPaper = (rgb, spec, contact, uvY, pal, inkLinear) => {
+        const paper = pal.paper;
+        const litLab = mhLchT(min(pal.s0.x.mul(1.06).add(0.05), float(1.02)), float(0.012), float(0.9)).toVar();
+        const lit = oklabToLinearT(litLab.x, litLab.y, litLab.z).toVar();
+        const kCatch = smoothstep(float(0.34), float(0.92), spec).mul(paper).toVar();
+        const afterLit = mix(rgb, lit, kCatch).toVar();
+        const below = smoothstep(float(-0.10), float(0.66), uvY.div(MH_R)).toVar();
+        const kShade = clamp(contact.mul(2.60), 0.0, 1.0).mul(float(0.06).add(below.mul(1.05))).mul(paper).toVar();
+        return mix(afterLit, inkLinear.mul(0.55), kShade);
+    };
+
     /** THE VALUE HIERARCHY AS ONE CURVE: the bottom 78% of energy into the rail's first 72%, the rest on the peak. */
     const mhTier = (e) => {
         const x = clamp(e, 0.0, 1.0).toVar();
@@ -536,7 +574,7 @@ export function makeMurmurKitTsl(TSL) {
         mhRefract, mhLook, mhExit, mhHaze, mhMedium, mhInside, mhTransmit, mhScatter,
         mhDeform, mhBody, MH_AMP_CAP,
         mhKey, mhSmall, mhSurface, mhContainment, mhOpalLife, mhAbyssSlot,
-        mhPaper, mhPalette, mhShade, mhKnee, mhTier, mhLit, mhLchT, labOfSrgb, srgbToLinearT, linearToOklabT, oklabToLinearT,
+        mhPaper, mhPalette, mhShade, mhKnee, mhTier, mhPresentFinish, mhPresentPaper, mhPresentKnee, mhLit, mhLchT, labOfSrgb, srgbToLinearT, linearToOklabT, oklabToLinearT,
         Loop,
     };
 }
@@ -557,6 +595,9 @@ export function makeMurmurKitTsl(TSL) {
  *       "exit"  -> mhExit for a ray through the body, in R, scaled by 1/MH_EXIT_CAP.
  *       "live"  -> mh_live's voice in R and pace in G, over signal (x) by state (y).
  *       "state" -> mh_state's complete/sweep/settled/drive in RGBA, over tau (x) by state (y).
+ *       "finishPaper" / "finishInk" / "finishGrey" -> mh_present's tail over specular (x) by height (y);
+ *                the grey case carries a light ground and a mid-grey page, which is where two of its
+ *                constants are observable at all.
  */
 export function makeMurmurKitProbeTsl(THREE, TSL, { mode = "hash", n = 16 } = {}) {
     const K = makeMurmurKitTsl(TSL);
@@ -627,6 +668,42 @@ export function makeMurmurKitProbeTsl(THREE, TSL, { mode = "hash", n = 16 } = {}
             // the glow about 0.4. The gate divides by the same numbers.
             return vec4(clamp(sf.rim.div(2.0), 0.0, 1.0), clamp(sf.spec.div(2.0), 0.0, 1.0),
                         clamp(sf.glow.div(0.5), 0.0, 1.0), 1.0);
+        }
+        if (mode === "finishPaper" || mode === "finishInk" || mode === "finishGrey") {
+            // *** mh_present's TAIL OVER ITS WHOLE INPUT SQUARE, ON BOTH GROUNDS. *** x carries the SPECULAR
+            // 0..1.2 (past the catchlight's 0.92 upper edge, so the saturated end is in shot) and y carries
+            // the vertical position -1.2..1.2 in body units, which is what the shadow's `below` reads -- so
+            // one frame samples the catchlight along one axis and the shadow's pooling along the other.
+            //
+            // THE CONTACT IS HELD AT 0.5 RATHER THAN SWEPT, because clamp(contact * 2.60, 0, 1) saturates at
+            // 0.385 and a third axis would spend half the frame on a constant. The clamp itself is graded by
+            // the CPU rows instead. The incoming rgb is a mid grey, which is the one value that can move UP
+            // toward the catchlight and DOWN toward the shadow and show both.
+            //
+            // BOTH GROUNDS, because every term here except the knee is multiplied by `paper`: on ink this
+            // function is the knee and nothing else, and a probe that only ran on paper could not tell a
+            // correct ink path from one that had quietly applied the paper terms at half strength.
+            // *** AND A THIRD GROUND, BECAUSE TWO OF mh_present's CONSTANTS ARE INVISIBLE ON THE OTHER TWO. ***
+            // Found by sabotage, measured rather than assumed. (1) The catchlight's 1.06 gain is DEAD on the
+            // house paper: s0.L is 0.9701, so 0.9701 * 1.06 + 0.05 = 1.0782 and the 1.02 cap takes it -- the
+            // gain could be 1.12 or 1.5 and the frame would not move. On a LIGHT GREY ground s0.L is 0.8054,
+            // the sum is 0.9038, and the gain is live. (2) The shadow's 0.55 tint multiplies the INK colour,
+            // and the house ink is 0.00304 in linear light: 0.55 of it is 0.00167 against 0.75's 0.00228, a
+            // difference of 0.00061 where one 8-bit step is 0.00392. It cannot be seen on a near-black page
+            // by construction. This case gives it a MID-GREY ink so it can be.
+            const paperGround = mode === "finishPaper";
+            const greyCase = mode === "finishGrey";
+            const ink = greyCase ? vec3(0.45, 0.45, 0.45) : vec3(0x0A / 255, 0x0A / 255, 0x0B / 255);
+            const ground = greyCase ? vec3(0.75, 0.75, 0.75) : (paperGround ? vec3(0.97, 0.96, 0.94) : vec3(0x0A / 255, 0x0A / 255, 0x0B / 255));
+            const TONE = vec3(0x6C / 255, 0x63 / 255, 0xE8 / 255);
+            const pal = K.mhPalette(ground, TONE, TONE, float(0.0), float(1.0));
+            const spec = px.div(n).mul(1.2).toVar();
+            const uvY = py.div(n).mul(2.4).sub(1.2).mul(K.MH_R).toVar();
+            const inkLin = vec3(K.srgbToLinearT(ink.x), K.srgbToLinearT(ink.y), K.srgbToLinearT(ink.z));  // the page, not the ground
+            const outRgb = K.mhPresentFinish(vec3(0.5, 0.5, 0.5), spec, float(0.5), uvY, pal, inkLin).toVar();
+            // Scaled by a half so the catchlight's warm white (near 1.0 linear) and any overshoot below zero
+            // both sit inside the 0..1 an 8-bit channel can carry. The gate divides by the same number.
+            return vec4(clamp(outRgb.mul(0.5), 0.0, 1.0), 1.0);
         }
         if (mode === "live") {
             // *** mh_live OVER THE WHOLE INPUT SQUARE, AGAINST THE f64 TWIN. *** x is the raw signal 0..1 and

@@ -2078,15 +2078,15 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         const dark = float(1.0).sub(pal.paper).toVar();
         const interior = density.mul(surfB.m).mul(KIT.mhTransmit(fres)).toVar();
         const railE = interior.add(sf.rim).add(sf.spec.add(sf.glow).mul(dark)).toVar();
-        // *** THE HUE ARGUMENT IS STILL ZERO, AND THAT IS A KNOWN GAP RATHER THAN A CHOICE. *** murmur's
-        // species each compute hueMix = hue * <their own numerator> / max(e, 1e-4), where `hue` comes from a
-        // SECOND channel their march accumulates: acc.y += e * clamp(p.z,-1,1) * trans * ds, then
-        // hue = acc.y/acc.x * spreadK * MH_SPREAD. render/murmurKit.mjs's marchStillInterior already returns
-        // that channel as `hueNum` -- the CPU reference has had it since v4623 -- and the march in THIS file
-        // accumulates only the scalar, so every species passes 0 and the rail's spread axis, built and gated
-        // at v4627, reaches no pixel. Named here rather than half-wired: it needs each hero's own numerator,
-        // which is four more formulas, and it is what makes opal (spread 0.7, the species that deliberately
-        // runs a third past MH_SPREAD) worth porting at all.
+        // *** THE HUE ARGUMENT WAS ZERO UNTIL v4631, AND THIS NOTE STAYED PAST ITS OWN REPAIR. *** It read
+        // "THE HUE ARGUMENT IS STILL ZERO, AND THAT IS A KNOWN GAP" -- true when written, and contradicted
+        // three lines later by the paragraph below, which the round that CLOSED the gap added without
+        // deleting the one it replaced. Both were in the file for twelve rounds, the stale one first.
+        // Kept in this shortened form because the gap it describes is real history and the numerator work
+        // below is what closed it: murmur's species each compute hueMix = hue * <their own numerator> /
+        // max(e, 1e-4), where `hue` comes from a SECOND channel the march accumulates (acc.y += e *
+        // clamp(p.z,-1,1) * trans * ds, then hue = acc.y/acc.x * spreadK * MH_SPREAD), and this file
+        // accumulated only the scalar.
         // *** AND THE HUE ARGUMENT IS REAL NOW. *** Each hero computes its own, and they are NOT one formula
         // with four constants -- they differ in what they weight, in sign, and in gain:
         //   still    +(accH / acc) * spread * MH_SPREAD          weighted by depth
@@ -2218,8 +2218,45 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             // still and comet use. Checked against the source, not assumed from the branch order.
             : interior.add(sf.rim.mul(0.7));
         const hueMix = hueRaw.mul(hueNum).div(max(eTotal, float(1e-4))).toVar();
-        const colorLinear = max(KIT.mhLit(pal, railE, uniforms.glow, float(0.0), float(1.0), float(0.34), hueMix),
-                                vec3(0.0));
+        const railColor = max(KIT.mhLit(pal, railE, uniforms.glow, float(0.0), float(1.0), float(0.34), hueMix),
+                              vec3(0.0));
+        // *** AND NOW mh_present's TAIL, WHICH THIS FILE HAD NONE OF UNTIL v4643. *** v4627 took mh_present's
+        // arrangement -- railE = body + (spec + contact) * dark, the rail, the containment -- and stopped
+        // there. On ink that cost exactly one term, the knee. ON PAPER IT COST THREE, and two of them are
+        // what make paper a different GROUND rather than a lighter one:
+        //
+        //   THE CATCHLIGHT. `dark` subtracts the specular from the energy on a light ground, and murmur adds
+        //   it back as a small mix toward a warm white. This file did the subtracting and not the adding, so
+        //   a paper-ground orb LOST its highlight instead of gaining a white one -- measured below as the
+        //   page climbing 69 counts of 255 across the specular sweep where it used to climb none.
+        //   THE CONTACT SHADOW. Without it the object floats: mh_surface's contact bloom is light, and on
+        //   paper murmur turns it into a neutral darkening pooled beneath.
+        //   THE KNEE, which is the one term NOT gated on paper and so the one this file was missing on BOTH
+        //   grounds -- a bright field ran straight into the encode instead of compressing into it.
+        //
+        // THE ARGUMENTS ARE murmur's OWN, in murmur's own units: uv.y in the uv space where the body sits at
+        // MH_R, which this quad reaches by the same MH_R/R_BODY scale the containment below uses. The sign is
+        // NOT taken from the source -- see the kit twin's comment for how it was measured off the contact
+        // glow instead, and v4638 for what the other way costs.
+        const inkLin = vec3(KIT.srgbToLinearT(uniforms.ink.x), KIT.srgbToLinearT(uniforms.ink.y),
+                            KIT.srgbToLinearT(uniforms.ink.z));
+        const uvY = pc.y.mul(KIT.MH_R / R_BODY).toVar();
+        // max(.., 0) HERE and not inside the kit: mh_present hands un-clamped light to mh_out and lets THAT
+        // clamp after the encode, and the shadow's weight legitimately reaches 1.11 and overshoots past its
+        // endpoint. The twin is faithful and the clamp lives at the call site, which is where murmur's is.
+        //
+        // *** AND THE KNEE IS IN THE SAME BRACKET AS THE sRGB ENCODE, WHICH A GATE HAD TO TEACH THIS ROUND. ***
+        // mh_present's finish is catchlight, shadow, knee. The first two read `paper` and must happen here,
+        // because nothing downstream of this shader knows which ground it is on. THE KNEE IS DIFFERENT: on the
+        // `linear` path this shader feeds render/aiPresenceOrbPresent.mjs, a port of murmur-web's own
+        // present.wgsl, whose header says the shape outright -- "exposure, bloom, THE TONE CURVE, the dither
+        // and the sRGB encode are WRITTEN ONCE" -- and which already applies knee(x, 0.90). Applying it here
+        // too put a SECOND knee on that path. tools/ship/aiPresenceOrbPresent-selfcheck.mjs's Y-flip harness
+        // is what found it: the direct render's brightest pixel held at (12,12) while the pipeline's moved to
+        // (17,15), because compressing an already-compressed peak flattened the lobe the argmax was reading.
+        // So the knee goes exactly where linearToSrgb already goes, and for the same reason.
+        const litPaper = KIT.mhPresentPaper(railColor, sf.spec, sf.glow, uvY, pal, inkLin);
+        const colorLinear = max(linear ? litPaper : KIT.mhPresentKnee(litPaper, pal.paper), vec3(0.0));
         const outColor = linear ? colorLinear : linearToSrgb(colorLinear);
 
         // *** smoothstep(edge0, edge1, x) NEEDS edge0 < edge1 -- "results are undefined" otherwise (GLSL spec,

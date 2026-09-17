@@ -5247,6 +5247,72 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "heroes cost gate one a PAIRED 213-288 ms although it renders neither. Logged as " +
                  "orb-species-block-per-shader; the next orb round starts there.",
     }),
+    // v4643 -- THE 254th CLOSING: mh_present's tail, and a second tone curve a gate refused.
+    since263: Object.freeze({
+        at: "v4643", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "NO GATE ADDED -- rows added to three that existed, which is why swept is 0. *** mh_present's " +
+                 "TAIL: THE CATCHLIGHT, THE CONTACT SHADOW AND THE KNEE. *** v4627 took mh_present's " +
+                 "arrangement (railE = body + (spec + contact) * dark, the rail, the containment) and stopped " +
+                 "there. ON INK THAT COST ONE TERM, THE KNEE. ON PAPER IT COST THREE, and two of them are what " +
+                 "make paper a different GROUND rather than a lighter one: `dark` SUBTRACTS the specular from " +
+                 "the energy on a light ground and murmur adds it back as a mix toward a warm white, so this " +
+                 "port did the subtracting and not the adding -- a paper orb LOST its highlight instead of " +
+                 "gaining a white one -- and without the contact shadow the object floats. " +
+                 "*** THE PAIR IS BIT-EXACT ON THREE GROUNDS: *** worst |gpu - cpu| is 0 of 255 over 16 " +
+                 "speculars x 16 heights x 3 channels on paper, on ink and on a light grey, against 127 / 0 / " +
+                 "94 for the unflipped reading. THE THREE TERMS ARE THEN SEPARATED, because an agreement bound " +
+                 "does not say which one is present: across a specular sweep of 0 to 1.2 the paper ground " +
+                 "climbs 69 counts of 255 and the ink ground moves 0; at a specular of ZERO the page darkens " +
+                 "60 counts from the top of the frame to the bottom while ink moves 0; and the knee compresses " +
+                 "1.5 to 0.9998 at ink's 0.90 against 1.0000 at paper's 0.96 while 0.5 passes untouched at both. " +
+                 "*** THE SIGN OF THE SHADOW WAS MEASURED, NOT COPIED. *** murmur reads gl_FragCoord, where y " +
+                 "runs DOWN; this port takes its quad from three's uv(). The direction came off the contact " +
+                 "GLOW instead -- the only term outside the silhouette, which murmur already weights downward " +
+                 "-- at 128 px over the annulus past the body: limn 1.426 bottom-over-top, still 1.074, abyss " +
+                 "1.015, all above 1. v4638 is what reading that from the source costs. " +
+                 "*** AND A GATE CAUGHT A SECOND TONE CURVE, WHICH IS THE FINDING OF THE ROUND. *** The first " +
+                 "cut applied the whole finish in the fragment shader. render/aiPresenceOrbPresent.mjs -- this " +
+                 "tree's port of murmur-web's OWN present.wgsl -- already applies knee(x, 0.90), quoting that " +
+                 "file's header verbatim: \"exposure, bloom, THE TONE CURVE, the dither and the sRGB encode " +
+                 "are WRITTEN ONCE\". Two knees compressed the peak twice and " +
+                 "tools/ship/aiPresenceOrbPresent-selfcheck.mjs's Y-FLIP harness went red: the direct render's " +
+                 "brightest pixel held at (12,12) and the pipeline's slid to (17,15), because flattening an " +
+                 "already-flattened lobe reordered the peaks. THE LOCATION MOVING WAS A SECOND-ORDER SYMPTOM, " +
+                 "so the first-order fact is now its own row -- the two paths must agree about how BRIGHT the " +
+                 "brightest pixel is, measured 672 against 674, bound 12 of 765 -- because a double tone curve " +
+                 "that happened not to move an argmax would have left that harness green and the picture wrong. " +
+                 "THE REPAIR IS A SPLIT: mhPresentPaper (the two ground-dependent terms, which read `paper` " +
+                 "and must run in the species shader on BOTH paths) and mhPresentKnee (which goes in the same " +
+                 "`linear ?` bracket the sRGB encode has been in since the HDR pass was built). " +
+                 "*** TWELVE SABOTAGES, ALL TWELVE CAUGHT, AND THREE OF THEM ONLY AFTER THE PROBE GREW A THIRD " +
+                 "GROUND. *** Two of mh_present's constants are INVISIBLE on the two grounds that ship, " +
+                 "measured rather than assumed: the catchlight's 1.06 gain is DEAD on house paper (s0.L is " +
+                 "0.9701, so 0.9701 * 1.06 + 0.05 = 1.0782 and the 1.02 cap takes it -- the gain could be 1.5 " +
+                 "and the frame would not move), and the shadow's 0.55 tint multiplies the INK colour, which " +
+                 "is 0.00304 in linear light, so 0.55 of it against 0.75 of it differ by 0.00061 where one " +
+                 "8-bit step is 0.00392. A light-grey ground with a mid-grey page makes both bite, and the " +
+                 "probe carries it. A THIRTEENTH was added for the direction the pixels cannot see at all: " +
+                 "deleting the knee from the direct path too moves 20 bytes on arc and 4 on sol -- the only " +
+                 "species whose linear light passes 0.90 at 0.9647 and 0.9387 -- and every species gate stayed " +
+                 "GREEN through it, so where the knee is CALLED is held by a source census that says so. " +
+                 "*** AND TWO RECORDS THAT HAD OUTLIVED THEIR OWN REPAIR. *** murmurKit-selfcheck's closing " +
+                 "still said the HUE channel \"reaches no pixel and every species passes 0\" -- closed at " +
+                 "v4631, and murmurSpecies4 measures droplet turning 1.57 degrees of hue against 0.0008 of " +
+                 "lightness. render/aiPresenceOrbTsl.mjs carried BOTH the stale note and the one that replaced " +
+                 "it, three lines apart, for twelve rounds: the round that closed the gap added its paragraph " +
+                 "without deleting the one it contradicted. A closing that UNDER-claims sends the next reader " +
+                 "to build what is already there. " +
+                 "MEASURED IN PIXELS: on ink the whole round touches 24 bytes across the eighteen species at " +
+                 "the gates' glow of 0.15, and at the DEFAULT glow of 1 it moves 50 of 54 baseline frames by " +
+                 "at most 4 counts of 255 -- the knee, compressing bright output, which is its whole job. On " +
+                 "paper all 18 frames move. WHAT IS STILL NOT PORTED: mh_out's triangular-PDF dither, which is " +
+                 "why the kit function is mhPresentFinish and not mhPresent; and present.wgsl's knee is a " +
+                 "fixed 0.90 where mh_present's moves to 0.96 on paper, so the HDR path compresses a paper " +
+                 "ground at the wrong constant. Both named in the kit, neither closed here.",
+    }),
     // v4641 -- THE 253rd CLOSING: mh_live, the function all eighteen species read and none of them had.
     since262: Object.freeze({
         at: "v4641", swept: 2, green: 2, red: 0,

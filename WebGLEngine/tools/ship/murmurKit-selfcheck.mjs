@@ -318,7 +318,10 @@ const probeRun = await renderThreeTslToPixels({
                { factoryArgs: { mode: "surface", n: N } },
                { factoryArgs: { mode: "opalAbyss", n: N } },
                { factoryArgs: { mode: "live", n: N } },
-               { factoryArgs: { mode: "state", n: N } }],
+               { factoryArgs: { mode: "state", n: N } },
+               { factoryArgs: { mode: "finishPaper", n: N } },
+               { factoryArgs: { mode: "finishInk", n: N } },
+               { factoryArgs: { mode: "finishGrey", n: N } }],
 });
 
 sec("6. *** THE PAIR: THE REAL COMPILED SHADER AGAINST THE CPU REFERENCE, BIT FOR BIT ***");
@@ -1415,15 +1418,110 @@ sec("11. *** mh_live AND mh_state: THE TWO SIGNALS EVERY SPECIES READS AND THIS 
         // arrival in the PICTURE is graded, and there is no such section for mh_state yet, by design.
     }
 }
+// =============================================================================================================
+sec("12. *** mh_present's TAIL: THE CATCHLIGHT, THE CONTACT SHADOW AND THE KNEE -- the finish, on both grounds ***");
+{
+    const r = probeRun;
+    if (!r.ok) {
+        ok("!! mh_present's finish matches a real GPU render", false, `could not render: ${r.reason || "unknown"}`);
+    } else {
+        const ry = (ysh) => N - 1 - ysh;   // the same row flip section 11 measures and asserts
+        const INK = [0x0A / 255, 0x0A / 255, 0x0B / 255], PAPER = [0.97, 0.96, 0.94];
+        const TONE = [0x6C / 255, 0x63 / 255, 0xE8 / 255];
+
+        const GREY_GROUND = [0.75, 0.75, 0.75], GREY_INK = [0.45, 0.45, 0.45];
+        for (const [name, frame, ground, page] of [["paper", r.frames[8], PAPER, INK], ["ink", r.frames[9], INK, INK],
+                                                   ["light grey", r.frames[10], GREY_GROUND, GREY_INK]]) {
+            const pal = K.mhPalette(ground, TONE, TONE, 0.0, 1.0);
+            const inkLin = page.map((c) => K.srgbToLinear(c));
+            let worst = 0, at = "", worstFlat = 0;
+            for (let ysh = 0; ysh < N; ysh++) for (let x = 0; x < N; x++) {
+                const spec = (x / N) * 1.2, uvY = ((ysh / N) * 2.4 - 1.2) * K.MH_R;
+                const want = K.mhPresentFinish([0.5, 0.5, 0.5], spec, 0.5, uvY, pal, inkLin)
+                    .map((v) => Math.round(Math.min(1, Math.max(0, v * 0.5)) * 255));
+                const i = (ry(ysh) * N + x) * 4, iFlat = (ysh * N + x) * 4;
+                for (let c = 0; c < 3; c++) {
+                    const d = Math.abs(frame[i + c] - want[c]);
+                    if (d > worst) { worst = d; at = `spec ${spec.toFixed(3)} uvY ${uvY.toFixed(3)} ch ${c}: gpu ${frame[i + c]} cpu ${want[c]}`; }
+                    worstFlat = Math.max(worstFlat, Math.abs(frame[iFlat + c] - want[c]));
+                }
+            }
+            say(`mh_present's finish on ${name}, ${N} speculars x ${N} heights x 3 channels: worst |gpu - cpu| = ` +
+                `${worst}/255 (unflipped, ${worstFlat}/255)`);
+            ok(`!! *** mh_present's FINISH RENDERS ON A REAL GPU AND MATCHES THE CPU REFERENCE -- ${name} ground ***`,
+                worst <= 2 && (name === "ink" || worstFlat > 10),
+                `worst channel error ${worst} of 255 (${at || "no disagreement"})` +
+                (name === "ink" ? ". On ink this function IS the knee and nothing else -- every other term is " +
+                    "multiplied by `paper` -- so this row is what would catch the paper terms leaking onto the " +
+                    "dark ground, where murmur applies none of them."
+                 : `, against ${worstFlat} unflipped, so it cannot pass by the symmetry a height-independent ` +
+                   `finish would have.`));
+        }
+
+        // *** THE THREE TERMS, SEPARATED, BECAUSE AN AGREEMENT BOUND DOES NOT SAY WHICH ONE IS PRESENT. ***
+        // Two implementations of the same wrong formula agree perfectly. These read the PICTURE the probe drew.
+        const pap = r.frames[8], ink = r.frames[9];
+        const at = (f, xsh, ysh, c) => f[(ry(ysh) * N + xsh) * 4 + c];
+        const midY = Math.floor(N / 2);
+        const specLo = at(pap, 1, midY, 0), specHi = at(pap, N - 1, midY, 0);
+        const inkLo = at(ink, 1, midY, 0), inkHi = at(ink, N - 1, midY, 0);
+        say(`at mid height, red channel across the specular sweep -- paper ${specLo} -> ${specHi}, ink ${inkLo} -> ${inkHi}`);
+        ok("!! *** THE CATCHLIGHT IS ON PAPER AND ON PAPER ONLY: the specular lifts the page and does nothing on ink ***",
+            specHi - specLo > 40 && Math.abs(inkHi - inkLo) <= 1,
+            `across a specular of 0 to 1.2 the paper ground climbs ${specHi - specLo} counts of 255 while the ink ` +
+            `ground moves ${Math.abs(inkHi - inkLo)}. kit.ts: on paper "THE SPECULAR IS THE ONLY THING BRIGHTER ` +
+            `THAN THE PAGE, so it leaves the energy sum and comes back as a small mix toward a warm white" -- and ` +
+            `on ink it never left the sum, so there is nothing here to add back. BOTH HALVES ARE THE CLAIM: the ` +
+            `lift alone would pass for a port that applied the catchlight on both grounds.`);
+
+        // The shadow is read DOWN the frame at a specular of zero, so the catchlight cannot be what moved it.
+        const top = at(pap, 0, 2, 0), bottom = at(pap, 0, N - 3, 0);
+        const topInk = at(ink, 0, 2, 0), bottomInk = at(ink, 0, N - 3, 0);
+        say(`at specular 0, red channel top-of-frame vs bottom -- paper ${top} -> ${bottom}, ink ${topInk} -> ${bottomInk}`);
+        ok("!! *** THE CONTACT SHADOW POOLS DOWNWARD AND ONLY ON PAPER: a shadow pools, it does not ring ***",
+            top - bottom > 20 && Math.abs(topInk - bottomInk) <= 1,
+            `the page darkens ${top - bottom} counts from the top of the frame to the bottom at a specular of ` +
+            `ZERO -- so it is the shadow and not the catchlight -- while the ink ground moves ` +
+            `${Math.abs(topInk - bottomInk)}. kit.ts: "at 0.06 above the centre line and full below it, the page ` +
+            `is clean over the top of the object and darkens under it". *** THE SIGN OF THAT IS THE ONE THING ` +
+            `HERE NOT COPIED FROM THE SOURCE: *** murmur reads gl_FragCoord, where y runs DOWN, and this port ` +
+            `takes its quad from three's uv(). The direction was measured off the contact GLOW instead -- the ` +
+            `only term outside the silhouette, which murmur already weights downward -- at 128 px over the ` +
+            `annulus past the body: limn 1.426 bottom-over-top, still 1.074, abyss 1.015, all above 1. v4638 ` +
+            `is what asking that question from the source rather than the pixels costs.`);
+
+        // The knee is the one term that is NOT gated on paper, so ink is where it is visible alone.
+        const kneeCpu = (x, k) => K.mhKnee(x, k);
+        say(`the knee alone, on ink: mhKnee(1.5, 0.90) = ${kneeCpu(1.5, 0.90).toFixed(6)}, and on paper ` +
+            `mhKnee(1.5, 0.96) = ${kneeCpu(1.5, 0.96).toFixed(6)}`);
+        ok("!! ...and the KNEE is the one term that is not gated on paper -- it MOVES with the ground rather than switching",
+            kneeCpu(1.5, 0.90) < kneeCpu(1.5, 0.96) && kneeCpu(0.5, 0.90) === 0.5 && kneeCpu(0.5, 0.96) === 0.5,
+            `a linear light of 1.5 compresses to ${kneeCpu(1.5, 0.90).toFixed(4)} at the ink knee of 0.90 and ` +
+            `${kneeCpu(1.5, 0.96).toFixed(4)} at the paper knee of 0.96, while 0.5 passes through untouched at ` +
+            `both. kit.ts: 0.90 "stops a bright field becoming flat white paper, but when the ground already IS ` +
+            `paper that same knee spends all its headroom on the page", so it opens to 0.96 where "the page ` +
+            `passes through almost untouched and the highlight still compresses rather than clipping hard".`);
+
+        // *** WHAT SECTION 12 DOES NOT CLAIM. *** mh_out. The triangular-PDF interleaved-gradient dither is
+        // still unported, so this is mh_present's finish MINUS its last line, and the function is named
+        // mhPresentFinish rather than mhPresent for exactly that reason.
+    }
+}
+
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nWHAT THIS KIT IS FOR: four of murmur-web's eighteen species are built out of it, and the other fourteen " +
     "would each otherwise have re-approximated the march, the medium, the gesture clock and the hash " +
     "separately. The SPECIES themselves are gated next door in tools/ship/murmurSpecies-selfcheck.mjs -- they " +
     "need real renders and this gate does not, which is a budget fact before it is a tidiness one. " +
-    "\nWHAT IS NOT CLAIMED: mh_present's own tone curve and dither, and the HUE channel every species feeds " +
-    "it -- render/murmurKit.mjs's marchStillInterior returns hueNum and the shader accumulates only the " +
-    "scalar, so the rail's spread axis built at v4627 reaches no pixel and every species passes 0. " +
+    "\nWHAT IS NOT CLAIMED: mh_out, the triangular-PDF interleaved-gradient dither -- which is why section 12 " +
+    "grades mhPresentFinish and not mhPresent. mh_present's own TONE CURVE and its two ground-dependent terms " +
+    "ARE claimed now, at section 12, bit-exactly on three grounds: the catchlight, the contact shadow and the " +
+    "knee that moves 0.90 -> 0.96 with the ground. AND THIS SENTENCE CARRIED A STALE CLAIM FOR TWELVE ROUNDS: " +
+    "it said the HUE channel \"reaches no pixel and every species passes 0\", which v4631 closed -- every " +
+    "hero computes its own numerator, hueMix reaches mhLit, and murmurSpecies4 measures droplet turning 1.57 " +
+    "degrees of hue against 0.0008 of lightness. A closing that UNDER-claims is the same defect as one that " +
+    "over-claims: it sends the next reader to build something that is already there. " +
     "mh_surface IS claimed now, at section 9: all eighteen heroes call it and this port approximated it with " +
     "a fixed light, a fixed rim exponent, invented per-species constants and no contact glow at all until " +
     "v4629. The colour rail is section 8 and the deformed body solve section 7.");

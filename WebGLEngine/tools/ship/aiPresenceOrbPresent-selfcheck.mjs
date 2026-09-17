@@ -212,7 +212,7 @@ async function main() {
                     const i = (y * size + x) * 4, lum = buf[i] + buf[i + 1] + buf[i + 2];
                     if (lum > best) { best = lum; bx = x; by = y; }
                 }
-                return { bx, by };
+                return { bx, by, best };
             }
             async function mkRenderer(size) {
                 const canvas = document.createElement("canvas");
@@ -250,6 +250,27 @@ async function main() {
             ok("!! the two-pass HDR pipeline's brightest pixel lands at the SAME (x,y) a direct single-pass render does",
                R.direct.bx === R.viaPipeline.bx && R.direct.by === R.viaPipeline.by,
                `direct=(${R.direct.bx},${R.direct.by}) viaPipeline=(${R.viaPipeline.bx},${R.viaPipeline.by})`);
+        // *** AND THEIR PEAK VALUES AGREE, WHICH IS THE HALF THAT CAUGHT A SECOND TONE CURVE. *** The row
+        // above is a Y-FLIP harness: it asks where the brightest pixel is, and a flip moves it. It went red at
+        // v4643 for a different reason entirely -- mh_present's finish had just been ported into the species
+        // shader, knee included, and this path's present pass ALREADY applies knee(x, 0.90) quoting
+        // present.wgsl's own "the tone curve ... is written ONCE". Two knees compressed the peak twice, the
+        // top lobe flattened, and the argmax slid to a neighbouring one at (17,15). The LOCATION moving was a
+        // second-order symptom of a first-order fact: the two paths no longer agreed about how bright the
+        // brightest pixel was. That fact is now its own row, because a double tone curve that happened not to
+        // move the argmax would have left the harness green and the picture wrong.
+        //
+        // THE BOUND IS 12 OF 765 and the measured gap is 3 (672 against 669) -- the two paths differ in
+        // intermediate precision (rgba16float against a straight sRGB write) and a few counts is that, not a
+        // curve. A second knee at 0.90 costs far more: it took the pipeline's peak down by enough to reorder
+        // the lobes. Held at four times the observed noise so it fails on a stage and not on a rounding.
+        ok("!! ...and they agree about how bright it IS, so a SECOND tone curve on one path cannot hide here",
+               Math.abs(R.direct.best - R.viaPipeline.best) <= 12,
+               `direct peak ${R.direct.best} of 765, viaPipeline ${R.viaPipeline.best}, apart by ` +
+               `${Math.abs(R.direct.best - R.viaPipeline.best)} against a bound of 12. render/murmurKit.mjs's ` +
+               `mhPresentPaper and mhPresentKnee are split for exactly this: the catchlight and the contact ` +
+               `shadow read \`paper\` and must happen in the species shader on BOTH paths, and the knee sits ` +
+               `in the same bracket as the sRGB encode -- the present pass owns it on the HDR path.`);
         }
     }
 

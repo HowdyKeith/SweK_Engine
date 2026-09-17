@@ -26,6 +26,79 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      of numeric order were moved into it. NO ROUND'S NUMBER, TEXT OR BYTES CHANGED -- only two headings
      gained a tag, and two blocks moved. -->
 
+## v4642-v4643 -- the seven standing reds, and mh_present's tail
+
+Two rounds. v4642 cleared every gate on redCensus.RED_AT_V4622, which had been red since that merge --
+nineteen rounds -- each carried with a sentence saying why it was somebody else's to fix. FOUR OF THE SIX
+WERE THE CHECK AND NOT THE SUBJECT, the same split v4571 found when it opened RED_AT_V4568.
+
+`windowsImport` was counting its own failure text: of four offenders exactly ONE was a dynamic import, and
+the other three were the finding quoted back out of redCensus's own record and register-audit's capture of
+the FAIL line. Its scan stripped comments and not strings, so writing the finding down CREATED offenders --
+a loop in which the count could only grow by being recorded. `backendParity` was a second spelling of a
+policy it does not own: its own comment retired the duplicate and then re-spelt it on a third denominator,
+asserting shaderCensus's threshold of twenty against a population shaderCensus does not measure (19 of 20
+and GREEN next door). `pageSections` and `pagePlacements` were an off-by-one claimed in prose in the same
+edit that made it -- "this drawer is now at MAX_PER_PANEL", written with sixteen in a drawer capped at
+fifteen. `runtimeGap` was real drift and it was v4641's own. `definitionGates` was real debt, re-baselined
+by explicit call at 79/349/678 with zero of the 678 from v4623-v4641.
+
+REPAIRING definitionGates FOUND FOUR ROWS THAT COULD NOT FAIL. Its only process.exit sat 75 lines from the
+end, so every row after it printed "  FAIL  " into a log whose last line said "all checks pass" and whose
+exit code was 0. One held a dead ceiling of 37 against a count of 79. One asserted a defect that had since
+been FIXED and passed by calling the same function twice. One was a prose ratchet whose regex literal
+matched ITSELF -- and the first draft of the comment explaining that re-armed it by quoting the guarded
+sentence, caught by the same sabotage a line later.
+
+v4643 PORTED mh_present's TAIL, the last piece of murmur's kit that reaches pixels. v4627 took its
+arrangement and none of its finish. On ink that cost one term, the knee. ON PAPER IT COST THREE, and two of
+them are what make paper a different GROUND rather than a lighter one: `dark` SUBTRACTS the specular from
+the energy on a light ground and murmur adds it back as a mix toward a warm white, so this port did the
+subtracting and not the adding -- a paper orb LOST its highlight instead of gaining a white one -- and
+without the contact shadow the object floats.
+
+The pair is bit-exact on THREE grounds, worst |gpu - cpu| of 0 counts over 16 speculars by 16 heights by 3
+channels each. The three terms are then separated, because an agreement bound does not say which one is
+present: across a specular sweep the paper ground climbs 69 counts of 255 while ink moves 0; at a specular
+of ZERO the page darkens 60 counts from the top of the frame to the bottom while ink moves 0; and the knee
+compresses 1.5 to 0.9998 at ink's 0.90 against 1.0000 at paper's 0.96 while 0.5 passes untouched at both.
+The shadow's SIGN was measured off the contact glow rather than copied from a source that reads
+gl_FragCoord -- limn 1.426 bottom-over-top at 128 px, still 1.074, abyss 1.015.
+
+AND A GATE REFUSED A SECOND TONE CURVE. The first cut applied the whole finish in the fragment shader, but
+render/aiPresenceOrbPresent.mjs -- this tree's port of murmur-web's own present.wgsl -- already applies
+knee(x, 0.90), quoting that file's "exposure, bloom, THE TONE CURVE, the dither and the sRGB encode are
+WRITTEN ONCE". Two knees compressed the peak twice and the Y-flip harness went red: the direct render's
+brightest pixel held at (12,12) and the pipeline's slid to (17,15). The location moving was a second-order
+symptom, so the first-order fact is now its own row -- the two paths must agree about how BRIGHT the peak
+is, 672 against 674 with a bound of 12 of 765. The repair is a split: the two ground-dependent terms run in
+the species shader on both paths, and the knee sits in the same `linear ?` bracket the sRGB encode has been
+in since the HDR pass was built.
+
+TWO OF mh_present's CONSTANTS ARE INVISIBLE ON THE GROUNDS THAT SHIP, found by sabotage: the catchlight's
+1.06 gain is dead on house paper (s0.L 0.9701 puts the sum past the 1.02 cap) and the shadow's 0.55 tint
+multiplies an ink of 0.00304 linear, so 0.55 against 0.75 differ by 0.00061 where an 8-bit step is 0.00392.
+The probe grew a third ground -- light grey with a mid-grey page -- where both bite.
+
+Measured in pixels: on ink the round touches 24 bytes across the eighteen species at the gates' glow of
+0.15, and at the default glow of 1 it moves 50 of 54 baseline frames by at most 4 counts -- the knee doing
+its job. On paper all 18 move. The byte baseline gained a paper case for exactly that reason.
+
+TWO RECORDS HAD OUTLIVED THEIR OWN REPAIR. murmurKit-selfcheck's closing still said the HUE channel
+"reaches no pixel and every species passes 0", closed at v4631 and measured since at 1.57 degrees of hue on
+droplet. render/aiPresenceOrbTsl.mjs carried BOTH the stale note and the one that replaced it, three lines
+apart, for twelve rounds. A closing that under-claims sends the next reader to build what is already there.
+
+Neither round adds a gate FILE -- v4642 repaired six and v4643 added rows to three that existed -- so the
+tree still holds 1687 gates, and the claim is restated here rather than left to the entry above so this
+file's newest entry carries a number tools/ship/claimCheck.mjs can check against the tree.
+
+Still not ported: mh_out's triangular-PDF dither, which is why the kit function is mhPresentFinish and not
+mhPresent; and mh_state is ported, graded bit-exactly, and called by nothing -- 128 transcribed references
+across murmur's eighteen sources, its own round. mh_position is not applicable: it flips gl_FragCoord and
+this port takes its quad from three's uv(). A third gap is named rather than closed: present.wgsl's knee is
+a fixed 0.90 where mh_present's moves to 0.96 on paper.
+
 ## v4623-v4641 -- the murmur-web orb: eighteen species over one shared kit, and the signal every one of them reads
 
 Nineteen rounds, written up as one entry because they are one piece of work and because none of them

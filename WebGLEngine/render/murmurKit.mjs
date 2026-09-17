@@ -1446,6 +1446,104 @@ export function mhShade(p, t, hue = 0) {
     return oklabToLinear(lab[0] * lS, y * cS, z * cS);
 }
 
+/**
+ * *** THE FINISH, AND THE ONE PLACE THE TWO GROUNDS ARE TOLD APART -- mh_present's tail, ported at v4643. ***
+ *
+ * kit.ts: "On ink the interior, rim, specular and contact bloom are all light and all belong in one energy.
+ * On paper two of the four STOP BEING LIGHT: THE SPECULAR IS THE ONLY THING BRIGHTER THAN THE PAGE, so it
+ * leaves the energy sum and comes back as a small mix toward a warm white; THE CONTACT BLOOM BECOMES A
+ * CONTACT SHADOW, a soft neutral darkening weighted downward the way a shadow pools under a thing rather
+ * than around it."
+ *
+ * This port had the first half of mh_present since v4627 -- railE = body + (spec + contact) * dark, the rail,
+ * and the containment -- and NONE of the tail. On ink that cost exactly one term, the knee. On paper it cost
+ * three, and two of them are the ones that make paper a different ground at all rather than a lighter one:
+ * without the catchlight the specular is subtracted from the energy by `dark` and never comes back, so a
+ * light ground LOSES its highlight instead of gaining a white one; and without the shadow the object floats.
+ *
+ * THE THREE TERMS, in murmur's own order and with its own numbers:
+ *
+ *   CATCHLIGHT   mix(rgb, lit, smoothstep(0.34, 0.92, spec) * paper), where lit is mh_lch(min(L0*1.06+0.05,
+ *                1.02), 0.012, 0.9) -- "a warm white a whisper past the page, so the knee below turns it into
+ *                a crisp small highlight rather than a soft one". A SMOOTHSTEP AND NOT A CLAMP, because "a
+ *                soft white on a white page has no edge to be soft against, and the broad sheen mixed toward
+ *                white spread the catchlight into a grey smudge half the width of the body".
+ *   SHADOW       mix(rgb, inkLin * 0.55, clamp(contact * 2.60, 0, 1) * (0.06 + 1.05 * below) * paper), with
+ *                below = smoothstep(-0.10, 0.66, uvY / MH_R). 0.06 above the centre line and full below it,
+ *                so "the page is clean over the top of the object and darkens under it". A shadow POOLS, it
+ *                does not ring.
+ *   KNEE         mh_knee per channel at mix(0.90, 0.96, paper). It moves WITH the ground: 0.90 stops a bright
+ *                field becoming flat white paper, but "when the ground already IS paper that same knee spends
+ *                all its headroom on the page", so it opens to 0.96 and the page passes through almost
+ *                untouched while the highlight still compresses rather than clipping.
+ *
+ * *** uvY's SIGN IS MEASURED IN THIS TREE AND NOT COPIED FROM THE SOURCE. *** murmur reads gl_FragCoord,
+ * where y runs DOWN, so its +uv.y is BELOW; this port takes its quad from three's uv(). Rather than reason
+ * about which way that lands after the render target and the readback -- the v4638 flux round is what asking
+ * that question from the source costs -- the direction was read off the contact GLOW, which is the only term
+ * outside the silhouette and which murmur already weights downward. Measured at 128 px over the annulus just
+ * past the body, bottom-over-top light: limn 1.426, still 1.074, abyss 1.015. All above 1, so +y in this
+ * file's body coordinates IS the image bottom and the caller passes uvY unnegated, exactly as murmur spells it.
+ *
+ * WHAT THIS IS NOT: mh_out. The triangular-PDF interleaved-gradient dither is still unported, so the
+ * quantisation this compresses into is still the raw one. Named here rather than implied by the function's
+ * name, which is why it is mhPresentFinish and not mhPresent.
+ */
+export function mhPresentFinish(rgb, spec, contact, uvY, pal, inkLinear) {
+    return mhPresentKnee(mhPresentPaper(rgb, spec, contact, uvY, pal, inkLinear), pal.paper);
+}
+
+/** mh_present's tone knee, which MOVES with the ground: 0.90 on ink, 0.96 on paper. Per channel. */
+export function mhPresentKnee(rgb, paper) {
+    const knee = 0.90 + (0.96 - 0.90) * paper;
+    return [mhKnee(rgb[0], knee), mhKnee(rgb[1], knee), mhKnee(rgb[2], knee)];
+}
+
+/**
+ * *** THE TWO GROUND-DEPENDENT TERMS ALONE, SPLIT OUT FROM THE KNEE BECAUSE THE TWO BELONG TO DIFFERENT
+ * STAGES OF THIS PORT'S PIPELINE. *** In kit.ts they sit in one function and this file's mhPresentFinish
+ * still composes them that way, which is what murmurKit-selfcheck grades. But this tree has something
+ * murmur's Metal path does not: render/aiPresenceOrbPresent.mjs, a port of murmur-web's OWN present.wgsl,
+ * whose header states the shape outright -- "Every species renders radiance into an rgba16float target and
+ * ends here, so exposure, bloom, THE TONE CURVE, the dither and the sRGB encode are WRITTEN ONCE" -- and
+ * which already applies knee(x, 0.90).
+ *
+ * SO THE KNEE IS THE PRESENT PASS'S ON THE HDR PATH AND THE SHADER'S ON THE DIRECT ONE, exactly as the sRGB
+ * encode already was: render/aiPresenceOrbTsl.mjs has ended with `linear ? colorLinear : linearToSrgb(...)`
+ * since the HDR pass was built. The catchlight and the shadow are NOT in that bracket -- present.wgsl has no
+ * notion of `paper`, so nothing downstream can apply them and they belong in the species shader on both paths.
+ *
+ * *** THIS WAS FOUND BY A GATE AND NOT BY READING. *** v4643's first cut applied the whole finish in the
+ * fragment, which put a SECOND knee on the HDR path. tools/ship/aiPresenceOrbPresent-selfcheck.mjs's Y-flip
+ * harness went red on it: the direct render's brightest pixel stayed at (12,12) and the pipeline's moved to
+ * (17,15), because compressing an already-compressed peak flattened the lobe the argmax was reading.
+ *
+ * A GAP THIS LEAVES, NAMED RATHER THAN CLOSED: present.wgsl's knee is a fixed 0.90 and mh_present's moves to
+ * 0.96 on paper. On ink the two agree exactly and nothing is lost; on a PAPER ground the HDR path compresses
+ * at 0.90 where the direct path compresses at 0.96. Closing it means threading `paper` into the present pass,
+ * which is a change to a shared post stage rather than a line here.
+ */
+export function mhPresentPaper(rgb, spec, contact, uvY, pal, inkLinear) {
+    const paper = pal.paper;
+    // *** murmur's `if (paper > 0.002)` IS AN EARLY-OUT AND NOT A BEHAVIOUR, so it is not carried. *** Both
+    // weights below already have `paper` as a FACTOR, so at paper = 0 each mix is the identity and the branch
+    // only saves the arithmetic. Dropping it is what makes this twin and the TSL one agree EXACTLY rather
+    // than agree except on the sliver 0 < paper <= 0.002, where a branch on one side and none on the other
+    // would put the pair a few thousandths apart in a place no gate would think to sample.
+    const lit = oklabToLinear(...mhLch(Math.min(pal.s0[0] * 1.06 + 0.05, 1.02), 0.012, 0.9));
+    const kCatch = smoothstep(0.34, 0.92, spec) * paper;
+    let out = [rgb[0] + (lit[0] - rgb[0]) * kCatch, rgb[1] + (lit[1] - rgb[1]) * kCatch, rgb[2] + (lit[2] - rgb[2]) * kCatch];
+    const below = smoothstep(-0.10, 0.66, uvY / MH_R);
+    // *** THE SHADOW WEIGHT REACHES 1.11 AND THE MIX IS ALLOWED TO OVERSHOOT, which is murmur's own
+    // arithmetic and not a slip: (0.06 + 1.05 * below) is 1.11 at below = 1, and GLSL's mix EXTRAPOLATES
+    // past its endpoint there, taking the page a little darker than 0.55 of the ink. It is left exactly as
+    // spelled. What murmur does NEXT is clamp, in mh_out, after the encode -- so the caller clamps, and this
+    // function returns the un-clamped linear light mh_present hands on.
+    const kShade = Math.min(1, Math.max(0, contact * 2.60)) * (0.06 + 1.05 * below) * paper;
+    const shade = [inkLinear[0] * 0.55, inkLinear[1] * 0.55, inkLinear[2] * 0.55];
+    return [out[0] + (shade[0] - out[0]) * kShade, out[1] + (shade[1] - out[1]) * kShade, out[2] + (shade[2] - out[2]) * kShade];
+}
+
 /** kit.ts's knee: identity below it, an asymptotic compression above, so a specular keeps its shape. */
 export function mhKnee(x, knee) {
     return x < knee ? x : knee + (1 - knee) * (1 - Math.exp(-(x - knee) / Math.max(1 - knee, 1e-3)));

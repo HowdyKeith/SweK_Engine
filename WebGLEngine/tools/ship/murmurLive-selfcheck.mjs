@@ -246,6 +246,27 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
             `test of the form "these two agree" that does not also require them to differ.`);
     }
 
+    // *** WHERE mh_present's KNEE IS CALLED, WHICH IS A STRUCTURAL FACT NO PIXEL ROW IN THIS TREE CATCHES. ***
+    // The catchlight and the contact shadow read `paper` and must run in the species shader on both paths;
+    // the KNEE must run on the direct path and NOT on the HDR one, where render/aiPresenceOrbPresent.mjs
+    // already applies knee(x, 0.90) quoting present.wgsl's "the tone curve ... is written ONCE".
+    //
+    // THE DOUBLE-KNEE DIRECTION IS CAUGHT IN PIXELS, by aiPresenceOrbPresent-selfcheck's peak-agreement row,
+    // which is what found it. THE MISSING-KNEE DIRECTION IS NOT, and that was measured rather than assumed:
+    // deleting the knee from the direct path too moves 20 bytes of 9,216 on arc and 4 on sol -- the only two
+    // species whose linear light passes 0.90 at all (0.9647 and 0.9387) -- and every species gate stayed
+    // GREEN through it. So this row grades the FILE, and says so, because the alternative is a term that
+    // could quietly leave and take 24 bytes with it.
+    const kneeCalls = (src.match(/KIT\.mhPresentKnee\(/g) || []).length;
+    const paperCalls = (src.match(/KIT\.mhPresentPaper\(/g) || []).length;
+    const kneeLine = (src.split("\n").find((l) => l.includes("KIT.mhPresentKnee(")) || "").trim();
+    ok("!! *** THE KNEE SITS IN THE SAME `linear ?` BRACKET AS THE sRGB ENCODE, AND THE PAPER TERMS DO NOT ***",
+        kneeCalls === 1 && paperCalls === 1 && /linear \?[^\n]*KIT\.mhPresentKnee\(/.test(src) &&
+        !/linear \?[^\n]*KIT\.mhPresentPaper\(/.test(src),
+        `one call to each: the knee is ${kneeLine} -- inside the bracket, beside linearToSrgb -- and the two ` +
+        `ground-dependent terms are outside it, unconditional. On the HDR path the present pass owns the tone ` +
+        `curve; nothing downstream of this shader knows what ground it is on, so it owns the other two.`);
+
     ok("!! stateTau is deliberately absent: mh_state is ported, graded in the kit, and not yet called here",
         !/uniforms\.stateTau/.test(src) && !/\bST\.(complete|sweep|settled|drive)\b/.test(src),
         `no stateTau uniform and no reader of mh_state's four outputs. murmur's eighteen sources reference ` +
