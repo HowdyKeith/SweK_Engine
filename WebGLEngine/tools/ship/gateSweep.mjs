@@ -5313,6 +5313,46 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "fixed 0.90 where mh_present's moves to 0.96 on paper, so the HDR path compresses a paper " +
                  "ground at the wrong constant. Both named in the kit, neither closed here.",
     }),
+    // v4644 -- THE 255th CLOSING: the SUCCESS flash, from a constant table to a ring that travels in pixels.
+    since264: Object.freeze({
+        at: "v4644", swept: 2, green: 2, red: 0,
+        added: Object.freeze([
+            "tools/ship/murmurIgnite-selfcheck.mjs",
+            "tools/ship/murmurIgnite2-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 2,106 and 2,278 ms on real WebGPU, 9 rows between them. *** mh_state WAS PORTED AT " +
+                 "v4641 AND GRADED IN THE KIT AND REACHED NO PIXEL FOR THREE ROUNDS. *** This round wires " +
+                 "THREE of its four outputs: `settled` on all eighteen interiors and the pair (complete, " +
+                 "sweep) that murmur's SUCCESS shell travels on, in the seven marched heroes. The fourth, " +
+                 "st.drive, is still unported and still named. " +
+                 "*** THE SHELL IS ONE FORMULA murmur WRITES OUT SEVEN TIMES WITH FOUR NUMBERS CHANGED: *** " +
+                 "sr = (length(p) - mix(lo, hi, sweep)) / width; e += complete * gain * exp(-sr*sr). The kit " +
+                 "owns the profile (mhIgnite) and MH_IGNITE owns the four numbers, so the orb spells it ONCE " +
+                 "and calls it from six sites covering seven species. Bit-exact against a real GPU at " +
+                 "murmurKit section 13: worst |gpu - cpu| 0 of 255 over 16 radii x 16 rows x 3 species, " +
+                 "against 255 unflipped, and the ring's measured centre lands within 0.0013 body radii of " +
+                 "mix(lo, hi, sweep) at every sweep. " +
+                 "*** AND THE PIXEL GATES ASK THE QUESTION A BRIGHTNESS BOUND CANNOT: WHERE IS THE ADDED " +
+                 "LIGHT. *** still's flash centroid climbs 0.1947 -> 0.3981 monotonically while its amplitude " +
+                 "goes 23% -> 187% -> 335% -> 113% of the whole idle frame, so the centroid is tracking " +
+                 "position and not brightness; geode, which has NO shell, grows 5.7x over the same taus and " +
+                 "its centroid moves 0.0041 -- fifty times less. abyss travels 0.2870 and tempest's " +
+                 "pre-multiplied cloud gains 135.5% at tau 0.20 within 0.0344 of its own centroid, which is " +
+                 "the term a port can drop while still drawing a perfectly good ring. " +
+                 "*** ALL 72 BASELINE FRAMES ARE BYTE-IDENTICAL: *** eighteen species x four cases, 0 bytes " +
+                 "differ, because complete and settled are EXACTLY zero outside SUCCESS -- which is what lets " +
+                 "eighteen shaders add the shell without a branch, and is its own row on both sides. " +
+                 "*** TWO SABOTAGES WALKED THROUGH AND BOTH WERE TABLE-VERSUS-WIRING DRIFT NO RENDER CAN " +
+                 "SEE. *** A dead MH_IGNITE entry draws nothing; droplet's settle doubled needs droplet " +
+                 "rendered in SUCCESS, which no gate does. The first is closed by a census asserting set " +
+                 "EQUALITY between MH_IGNITE's keys and the closures that call the shell; the second by " +
+                 "making droplet's exclusion a MISSING KEY in MH_SETTLED_INTERIOR rather than a ternary a " +
+                 "tidying pass can delete. A THIRD was caught by the gate itself: the quiet-state control " +
+                 "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
+                 "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
+    }),
     // v4641 -- THE 253rd CLOSING: mh_live, the function all eighteen species read and none of them had.
     since262: Object.freeze({
         at: "v4641", swept: 2, green: 2, red: 0,

@@ -32,17 +32,20 @@
 // which this gate renders as well and requires to DISAGREE. Same construction for pace, whose numbers are
 // 0.85 and 0.60 and whose window covers two states rather than one.
 //
-// WHAT IS NOT CLAIMED HERE: mh_state. It is ported and graded in the kit, and it is not called by the orb --
-// murmur's eighteen sources reference st.drive 44 times, st.complete 49, st.settled 19 and st.sweep 16, each
-// a transcription with its own constants, and that is its own round. The orb therefore gained `activity` and
-// `stateIndex` and deliberately NOT `stateTau`: a uniform nothing reads is a row that cannot fail.
+// WHAT IS NOT CLAIMED HERE, AND THIS NOTE HAS BEEN HALF-DISCHARGED: mh_state was ported and graded in the kit
+// and NOT called by the orb, so v4641 added `activity` and `stateIndex` and deliberately not `stateTau`.
+// v4644 wired three of its four outputs -- `settled` on all eighteen interiors, and the pair (complete,
+// sweep) the SUCCESS shell travels on, in the seven marched heroes -- so `stateTau` is a uniform now and the
+// row that said it was absent has inverted into one that says what reads it. The FOURTH, st.drive (the
+// RESPONDING lean, 45 references across murmur's eighteen sources), is still absent and still named.
 "use strict";
 
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { renderSpecies, ENG, VOICE, ACTIVITY, VOICE_LIVE, PACE_LIVE } from "./murmurSpeciesFrames.mjs";
-import { mhLive } from "../../render/murmurKit.mjs";
+import { mhLive, MH_SETTLED, MH_SETTLED_INTERIOR, MH_IGNITE } from "../../render/murmurKit.mjs";
+import { codeOnly } from "./sourceScan.mjs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -180,22 +183,54 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
     const src = fs.readFileSync(path.join(ENG, "render", "aiPresenceOrbTsl.mjs"), "utf8");
     const count = (re) => (src.match(re) || []).length;
 
-    const rawV = count(/uniforms\.voice\b/g), rawA = count(/uniforms\.activity\b/g), rawS = count(/uniforms\.stateIndex\b/g);
+    const rawV = count(/uniforms\.voice\b/g), rawA = count(/uniforms\.activity\b/g),
+          rawS = count(/uniforms\.stateIndex\b/g), rawT = count(/uniforms\.stateTau\b/g);
     const callLine = (src.split("\n").find((l) => l.includes("KIT.mhLive(")) || "").trim();
-    ok("!! *** EACH RAW LIVE UNIFORM IS READ EXACTLY ONCE IN THE WHOLE FILE, AND ALL THREE BY THE SAME CALL ***",
-        rawV === 1 && rawA === 1 && rawS === 1 &&
-        /KIT\.mhLive\(uniforms\.voice,\s*uniforms\.activity,\s*uniforms\.stateIndex\)/.test(src),
-        `uniforms.voice ${rawV}, uniforms.activity ${rawA}, uniforms.stateIndex ${rawS}, and the one reader of ` +
-        `all three is: ${callLine} -- so there is no second path by which a raw level could reach a species. ` +
-        `Before v4641 that first count was 44.`);
+    const stLine = (src.split("\n").find((l) => l.includes("KIT.mhState(")) || "").trim();
+    // *** stateIndex IS READ TWICE NOW AND THAT IS THE CLAIM, NOT A RELAXATION. *** v4644 wired mh_state, and
+    // murmur hands the same state to both conditioners: mh_live weights the microphone by it and mh_state
+    // turns it plus the elapsed tau into four windows. The row names BOTH call sites in full rather than
+    // loosening the count to "at most a few", which is how a census stops being one.
+    ok("!! *** THE FOUR RAW LIVE UNIFORMS REACH NO SPECIES: TWO CONDITIONING CALLS ARE THEIR ONLY READERS ***",
+        rawV === 1 && rawA === 1 && rawS === 2 && rawT === 1 &&
+        /KIT\.mhLive\(uniforms\.voice,\s*uniforms\.activity,\s*uniforms\.stateIndex\)/.test(src) &&
+        /KIT\.mhState\(uniforms\.stateIndex,\s*uniforms\.stateTau\)/.test(src),
+        `uniforms.voice ${rawV}, uniforms.activity ${rawA}, uniforms.stateIndex ${rawS}, uniforms.stateTau ` +
+        `${rawT}; the readers are ${callLine} and ${stLine} -- so there is no second path by which a raw level ` +
+        `could reach a species. Before v4641 the voice count was 44 and there was no activity knob at all; ` +
+        `before v4644 there was no stateTau and stateIndex was read once.`);
 
-    const decl = count(/const VOICE = /g) + count(/const PACE = /g);
-    const readV = count(/\bVOICE\b/g) - 1, readP = count(/\bPACE\b/g) - 1;
-    ok("!! the conditioned pair is declared once each and read 44 and 8 times",
-        decl === 2 && readV === 44 && readP === 8,
-        `${readV} readers of the conditioned voice and ${readP} of the conditioned cadence. Those are the same ` +
-        `two counts the defect had: 44 sites took the raw knob and 8 took glintRate, and every one of the 52 ` +
-        `was moved rather than a subset.`);
+    // *** THIS CENSUS COUNTED ITS OWN PROSE UNTIL v4644, AND ITS RECORDED NUMBER WAS ONE TOO HIGH BECAUSE OF
+    // IT. *** The counts ran over the raw file, so a COMMENT naming VOICE scored as a reader -- and one did,
+    // in the declaration's own note. Recorded 44, true 43. It went unnoticed for three rounds because a
+    // census that counts a mention of itself is only wrong when the prose changes, and then it is wrong in
+    // the direction that looks like a real edit. Same defect as windowsImport's, which at v4642 found three
+    // of its four offenders were the finding quoted back in a string. The fix is the same one: read through
+    // sourceScan's codeOnly, which is one walker and not a second regex that drifts from the first.
+    const code = codeOnly(src);
+    const cc = (re) => (code.match(re) || []).length;
+    const decl = cc(/const VOICE = /g) + cc(/const PACE = /g);
+    const readV = cc(/\bVOICE\b/g) - 1, readP = cc(/\bPACE\b/g) - 1;
+    ok("!! the conditioned pair is declared once each and read 43 and 8 times, counting CODE and not comments",
+        decl === 2 && readV === 43 && readP === 8,
+        `${readV} readers of the conditioned voice and ${readP} of the conditioned cadence, with comments and ` +
+        `strings stripped. The 43 is a REPAIR of a recorded 44, not a regression: v4641 moved 44 raw-knob ` +
+        `sites and 8 glintRate sites, and one of the 44 collapsed into a shared expression while the census ` +
+        `kept scoring the comment that named it. The pixel rows above are what say the move was real; this ` +
+        `row says nothing was left behind.`);
+
+    // mh_state's three wired outputs, on the same terms. `drive` is deliberately absent and has its own row.
+    const declS = cc(/const SETTLED = /g) + cc(/const COMPLETE = /g) + cc(/const SWEEP = /g);
+    const readSe = cc(/\bSETTLED\b/g) - 1, readC = cc(/\bCOMPLETE\b/g) - 1, readSw = cc(/\bSWEEP\b/g) - 1;
+    const igAt = cc(/\bigniteAt\b/g) - 1, igMist = cc(/\bigniteMist\b/g) - 1;
+    ok("!! *** mh_state's THREE WIRED OUTPUTS ARE DECLARED ONCE EACH AND LAND ON EXACTLY THE SITES murmur HAS ***",
+        declS === 3 && readSe === 3 && readC === 2 && readSw === 1 && igAt === 6 && igMist === 2,
+        `settled ${readSe} readers -- the shared interior factor, comet's headBright and droplet's coreBright, ` +
+        `which is murmur's nineteen sites collapsed onto the three shapes they take; complete ${readC} -- the ` +
+        `shell and the mist pair's pre-multiply; sweep ${readSw} -- the shell alone. The shell itself is ` +
+        `spelled ONCE, as igniteAt, called from ${igAt} sites covering seven species because nebula and ` +
+        `tempest share igniteMist, which is called ${igMist} times. murmur writes those four lines out seven ` +
+        `times with four numbers changed; this file writes them once and reads the numbers from MH_IGNITE.`);
 
     // Per-species, so the census names WHICH six carry a cadence instead of only how many sites there are.
     const lines = src.split("\n");
@@ -267,20 +302,85 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
         `ground-dependent terms are outside it, unconditional. On the HDR path the present pass owns the tone ` +
         `curve; nothing downstream of this shader knows what ground it is on, so it owns the other two.`);
 
-    ok("!! stateTau is deliberately absent: mh_state is ported, graded in the kit, and not yet called here",
-        !/uniforms\.stateTau/.test(src) && !/\bST\.(complete|sweep|settled|drive)\b/.test(src),
-        `no stateTau uniform and no reader of mh_state's four outputs. murmur's eighteen sources reference ` +
-        `st.drive 44 times, st.complete 49, st.settled 19 and st.sweep 16, each a transcription with its own ` +
-        `constants -- an ABSENT FEATURE, where live was a CORRECTNESS fix to what already ships. A uniform ` +
-        `nothing reads is a row that cannot fail, so this round did not add one.`);
+    // *** THE ROW THIS REPLACES SAID stateTau WAS DELIBERATELY ABSENT, AND IT WAS RIGHT FOR THREE ROUNDS. ***
+    // A knob nothing reads is a row that cannot fail, so v4641 did not add one. v4644 wires the flash, so the
+    // knob arrives with the pixels it moves and the row inverts: it now has to say the uniform is READ, and
+    // by what, or a future edit could delete the wiring and leave a dead knob behind the same green.
+    const drive = (code.match(/\bDRIVE\b|STATE\.drive/g) || []).length;
+    ok("!! *** stateTau IS A UNIFORM NOW BECAUSE SOMETHING READS IT -- and `drive` still is not, by design ***",
+        rawT === 1 && /KIT\.mhState\(uniforms\.stateIndex,\s*uniforms\.stateTau\)/.test(src) &&
+        readSe === 3 && readC === 2 && readSw === 1 && drive === 0,
+        `stateTau is read ${rawT} time, by mh_state, and three of mh_state's four outputs reach ${readSe + readC + readSw} ` +
+        `sites between them. The FOURTH -- st.drive, the RESPONDING lean, 45 references across murmur's ` +
+        `eighteen sources -- is read ${drive} times here and is the next round. That half is still an ABSENT ` +
+        `FEATURE and is named as one rather than left for a reader to discover, which is the shape this row ` +
+        `had when the whole of mh_state was absent.`);
+
+    // The per-species tables have to be READ and not merely imported, or MH_IGNITE is a table the shader
+    // agrees with by coincidence. Seven entries, eleven species without one, and the eleven build no nodes.
+    const speciesWithShell = Object.keys(MH_IGNITE).length, settledEntries = Object.keys(MH_SETTLED).length;
+    ok("!! ...and the two tables are read by the shader builder rather than sitting beside it",
+        settledEntries === 18 && speciesWithShell === 7 &&
+        /MH_SETTLED_INTERIOR\[species\]/.test(code) && /MH_IGNITE\[species\]/.test(code) &&
+        /MH_SETTLED\.droplet/.test(code) && /MH_SETTLED_COMET_HEAD/.test(code),
+        `MH_SETTLED has ${settledEntries} entries and MH_IGNITE ${speciesWithShell}, and the builder indexes ` +
+        `both by the species it is compiling -- MH_SETTLED_INTERIOR for the seventeen whose settle is an ` +
+        `interior gain, MH_IGNITE for the seven with a shell. The two named exceptions are spelled out ` +
+        `rather than indexed: ` +
+        `MH_SETTLED.droplet is an ADDITIVE term on coreBright and not an interior gain -- the only entry in ` +
+        `that table that is not -- and MH_SETTLED_COMET_HEAD is comet's SECOND settle, 0.25 on the point of ` +
+        `light against 0.20 on the body around it.`);
+
+    // *** THESE TWO ROWS ARE HERE BECAUSE TWO SABOTAGES WALKED THROUGH THE PIXEL GATES AND NOTHING ELSE
+    // COULD SEE THEM. *** Both are table-versus-wiring drift, which no render can catch: a dead MH_IGNITE
+    // entry draws nothing, and droplet's doubled settle needs droplet rendered in SUCCESS, which no gate
+    // does. A source census is the WEAKER instrument and it is the right one for a question about which
+    // names exist, so long as it says which question it is answering.
+    const interiorKeys = Object.keys(MH_SETTLED_INTERIOR), settledKeys = Object.keys(MH_SETTLED);
+    const missing = settledKeys.filter((k) => !interiorKeys.includes(k));
+    ok("!! *** droplet's EXCLUSION FROM THE SHARED INTERIOR SETTLE IS A MISSING KEY, NOT A CONDITIONAL ***",
+        interiorKeys.length === 17 && missing.length === 1 && missing[0] === "droplet" &&
+        /MH_SETTLED_INTERIOR\[species\]/.test(code) && !/species === "droplet" \? 0\.0/.test(code),
+        `MH_SETTLED_INTERIOR has ${interiorKeys.length} of MH_SETTLED's ${settledKeys.length} keys and the one ` +
+        `it is missing is ${missing.join(", ")}. THE SHAPE IS THE POINT: the exclusion first shipped as ` +
+        `species === "droplet" ? 0.0 : MH_SETTLED[species], a sabotage deleted the ternary, droplet took its ` +
+        `settle TWICE -- once on coreBright and once on the interior -- and every gate in the round stayed ` +
+        `green, because no instrument renders droplet in SUCCESS. A key that is not there cannot be deleted ` +
+        `by a tidying pass, and this row can name which one is missing.`);
+
+    // Which species' build closures actually call the shell. The set has to EQUAL MH_IGNITE's keys: an entry
+    // nothing calls is a constant pretending to be wiring, which is the whole defect class this file exists
+    // for one level up (a knob nothing reads is a row that cannot fail).
+    const codeLines = code.split("\n");
+    const bmarks = [];
+    codeLines.forEach((l, i) => { const m = /^\s*const build([A-Z]\w*) = \(\) => \{/.exec(l); if (m) bmarks.push([i, m[1].toLowerCase()]); });
+    bmarks.push([codeLines.length, "(end)"]);
+    const shelled = [];
+    for (let k = 0; k < bmarks.length - 1; k++) {
+        const blk = codeLines.slice(bmarks[k][0], bmarks[k + 1][0]).join("\n");
+        if (/\bigniteAt\(|\bigniteMist\(/.test(blk)) shelled.push(bmarks[k][1]);
+    }
+    // buildMist compiles as nebula OR tempest, so its one closure stands for two of MH_IGNITE's keys.
+    const reached = shelled.flatMap((n) => (n === "mist" ? ["nebula", "tempest"] : [n])).sort();
+    const want = Object.keys(MH_IGNITE).sort();
+    ok("!! *** EVERY MH_IGNITE ENTRY IS CALLED BY A SPECIES, AND NO SPECIES OUTSIDE THE TABLE CALLS ONE ***",
+        reached.join(",") === want.join(","),
+        `the closures that call the shell are ${reached.join(", ")}; MH_IGNITE's keys are ${want.join(", ")}. ` +
+        `EQUALITY IN BOTH DIRECTIONS, and each direction has a failure behind it: adding a table entry for a ` +
+        `species whose closure never calls igniteAt draws nothing at all and was the sabotage this row was ` +
+        `written for, while a closure calling one for a species with no entry would read lo and hi off null. ` +
+        `buildMist counts as two, because it is the one closure that compiles as either of murmur's two ` +
+        `volumetric heroes.`);
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nWHAT THIS GATE IS FOR: mh_live is the one function every species in murmur's family reads and this port " +
     "did not have. The kit's own gate proves the FUNCTION is right on a real GPU; this one proves the ORB " +
     "CALLS IT, which is the half a correct-and-unwired port would pass in silence." +
-    "\nWHAT IS NOT CLAIMED: mh_state's four outputs reach no pixel -- ported and graded in the kit, not wired, " +
-    "by design. The pixel rows here cover TWO of the eighteen species, arc and still, chosen as the largest " +
+    "\nWHAT IS NOT CLAIMED: st.drive, the fourth of mh_state's outputs -- ported and graded in the kit, not " +
+    "wired, by design and named in its own row. Its three siblings ARE wired at v4644 and the source census " +
+    "below counts where they land; whether the flash reaches PIXELS is graded next door, in " +
+    "tools/ship/murmurIgnite-selfcheck.mjs, on renders rather than on a reader count. The pixel rows here cover TWO of the eighteen species, arc and still, chosen as the largest " +
     "cadence response in the family and the one that has none at all; chorus and droplet are the other two " +
     "and they are in tools/ship/murmurLive2-selfcheck.mjs. The remaining fourteen are covered by the source " +
     "census at section 5 -- which grades the FILE and not the picture, and says so in its own title -- and by " +

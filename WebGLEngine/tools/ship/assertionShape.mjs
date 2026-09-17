@@ -356,8 +356,14 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // CONSTANT TABLES and say so in their own titles, because sabotaging the shaders left them green. A count
     // of gates has never been a count of claims; this is the first round where it is not even a count of
     // SUBJECTS, and the gates carry that in their text rather than in this note alone.
-    gates: 1687, usesOk: 1666, definesOk: 1658, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1559, condFirst: 91, unknownSignature: 16,
+    // v4644 -- RE-TAKEN 1687 -> 1689 for tools/ship/murmurIgnite-selfcheck.mjs and …Ignite2-selfcheck.mjs.
+    // The SAME shape as v4641's two: one subject -- the SUCCESS flash arriving in pixels -- split across two
+    // files because a species costs about 195 ms and four of them would have crossed the 3,000 ms ceiling.
+    // What is different this round is that the split carries a claim rather than only a cost: the sibling
+    // holds the two heroes whose SUCCESS is NOT the common case, so the pair is "the rule and the
+    // exceptions" and reads as two subjects even though it is gating one term.
+    gates: 1689, usesOk: 1668, definesOk: 1660, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1561, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

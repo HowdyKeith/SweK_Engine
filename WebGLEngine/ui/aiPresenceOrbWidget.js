@@ -199,7 +199,12 @@ export async function mountAiPresenceOrbWidget(opts = {}) {
             // borrowed still's `glintRate` dial at 8 more. With mh_live wired, handing it a stateIndex of 0
             // forever would pin the orb in IDLE -- it would never reach the LISTENING lift at all, which is
             // the one state murmur gives the voice its full weight in.
-            activity: p.activity, stateIndex: STATE_INDEX[p.state],
+            // *** AND stateTau ARRIVES AT v4644, WITH THE FLASH IT DRIVES. *** mh_state turns (stateIndex,
+            // stateTau) into four windows; three of them are wired in the shader now -- `settled` on every
+            // interior and the pair the SUCCESS shell travels on -- so a stateTau pinned at 0 would hold the
+            // orb at the instant of arrival forever: full sweep at the heart, nothing travelling, and the
+            // settle never arriving at all.
+            activity: p.activity, stateIndex: STATE_INDEX[p.state], stateTau: p.stateTau,
             aspect: 1,   // the widget's own canvas is always square, unlike the standalone demo's full window
         });
         pipeline.render(renderer);

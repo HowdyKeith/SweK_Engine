@@ -42,6 +42,12 @@ export const ORB_KNOBS = Object.freeze([
     // v4641 `voice` went in raw at 44 sites and there was no `activity` at all, so eight species read
     // still's STYLE knob `glintRate` where murmur reads live.pace.
     "activity", "stateIndex",
+    // *** AND `stateTau` -- SECONDS SINCE THE STATE CHANGED, which v4644 made a uniform because something
+    // finally reads it. *** mh_state turns the pair (stateIndex, stateTau) into four windows and this round
+    // wires two of them: `settled` on all eighteen interiors and the ignition shell on the seven marched
+    // heroes. The comment that stood here said a knob nothing reads is a row that cannot fail, and that was
+    // right: the knob arrives in the same round as the pixels it moves, not before them.
+    "stateTau",
     // limn's own four, from murmur's src/styles.ts roster. They sit in the same uniform block rather than a
     // second one because a species is a different BODY over one shared kit, which is exactly how murmur's own
     // eighteen are arranged -- each reads c0..c3 out of the same argument list.
@@ -114,7 +120,8 @@ export const ORB_COLORS = Object.freeze({
 import { makeMurmurKitTsl } from "./murmurKitTsl.mjs";
 import { MH_EXT, MH_TAPS, MH_SURFACE_KNOBS, MH_SHAPE, MH_DROPLET_GAIN, MH_MIST,
          MH_TEMPEST_BOLT, MH_FATHOM, MH_GEODE, MH_ARC, MH_SOL, MH_AURA, MH_FLUX, MH_DUET, MH_CHORUS,
-         MH_PRISM, MH_HELIX, MH_TAPS_HI, MH_R, mhAa } from "./murmurKit.mjs";
+         MH_PRISM, MH_HELIX, MH_TAPS_HI, MH_R, MH_SETTLED, MH_SETTLED_INTERIOR, MH_SETTLED_COMET_HEAD, MH_IGNITE,
+         mhAa } from "./murmurKit.mjs";
 
 /**
  * THE MOIRE GATE, EVALUATED ON THE CPU BECAUSE THIS PORT HAS ONE MOUNT. kit.ts's mh_aa eases a structure's
@@ -171,7 +178,7 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
     // .mjs by tools/ship/murmurKit-selfcheck.mjs on a real GPU.
     const KIT = makeMurmurKitTsl(TSL);
 
-    const k0 = { time: 0, speed: 1, glow: 1, depth: 1, hueShift: 0, presence: 0.5, clarity: 0.6, glintRate: 0.3, voice: 0, aspect: 1, activity: 0, stateIndex: 0,
+    const k0 = { time: 0, speed: 1, glow: 1, depth: 1, hueShift: 0, presence: 0.5, clarity: 0.6, glintRate: 0.3, voice: 0, aspect: 1, activity: 0, stateIndex: 0, stateTau: 0,
                  rimWidth: 0.4, travel: 0.5, innerHint: 0.3, spread: 0.4,
                  orbitTilt: 0.5, trail: 0.5, pointSize: 0.4,
                  wobble: 0.5, tension: 0.5, sheen: 0.5,
@@ -229,13 +236,32 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // the next reader. Here both vars are declared in main's outermost scope, before the first species
         // line, so every reader sees the same one.
         //
-        // mh_state IS PORTED IN THE KIT AND IS NOT CALLED HERE. Its four outputs (complete, sweep, settled,
-        // drive) are 128 transcribed references across murmur's eighteen sources and they are their own round.
-        // `stateTau` is therefore NOT a uniform yet: a knob nothing reads is a row that cannot fail, and this
-        // file has paid for that shape before. `stateIndex` IS one, because mh_live genuinely reads it.
+        // *** AND mh_state IS CALLED HERE NOW, FOR THE SAME REASON AND ON THE SAME TERMS -- v4644. *** Its
+        // four outputs are 128 transcribed references across murmur's eighteen sources; this round spends
+        // TWO of them, `settled` and the pair (complete, sweep) the ignition shell runs on, and leaves
+        // `drive` -- the RESPONDING lean, 45 references -- for its own round. SETTLED and COMPLETE are
+        // declared as vars for the same reason VOICE and PACE are: several readers sit inside a Loop body.
         const LIVE = KIT.mhLive(uniforms.voice, uniforms.activity, uniforms.stateIndex);
         const VOICE = LIVE.voice.toVar();
         const PACE = LIVE.pace.toVar();
+        const STATE = KIT.mhState(uniforms.stateIndex, uniforms.stateTau);
+        const SETTLED = STATE.settled.toVar();
+        const COMPLETE = STATE.complete.toVar();
+        const SWEEP = STATE.sweep.toVar();
+        // Each hero's own ignition constants, or null for the eleven that spend `complete` on their own
+        // figures instead. Read at BUILD time off the kit's table, so a species without an entry builds no
+        // shell nodes at all rather than building one multiplied by zero.
+        const IG = MH_IGNITE[species] || null;
+        // *** THE SHELL, IN ONE PLACE, BECAUSE SEVEN SPECIES SPELL IT IDENTICALLY. *** murmur writes it out
+        // per file as sr = (length(p) - mix(lo, hi, st.sweep)) / width; e += st.complete * gain * exp(-sr*sr)
+        // -- the same four lines seven times with four numbers changed. The kit owns the profile and the gain
+        // stays here, because nebula and tempest spend theirs `* dens` and folding it into mh_ignite would
+        // make those two look like the other five with a different number rather than like what they are.
+        //
+        // TAKES THE RADIUS AND NOT THE POINT: the two mist heroes already have length(p) in hand as `rp`, and
+        // a second length() in the same loop body is a square root per tap per species for nothing.
+        const igniteAt = (lenNode) => KIT.mhIgnite(lenNode, COMPLETE, SWEEP,
+            float(IG.lo), float(IG.hi), float(IG.width)).mul(IG.gain);
         const p = uv().mul(2.0).sub(1.0);   // -1..1, symmetric orb: three's v=0-at-bottom vs device's v=0-at-top makes no visible difference
         // *** MEASURED, NOT ASSUMED CIRCULAR: A FULL-VIEWPORT ORTHOGRAPHIC QUAD STRETCHES ON A NON-SQUARE
         // CANVAS. *** A first render (900x600, a perfectly ordinary browser window) came back visibly
@@ -386,7 +412,18 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         Loop({ start: 0, end: MH_TAPS }, ({ i }) => {
             const sMarch = float(i).add(0.5).mul(ds);
             const p = P.add(rd.mul(sMarch));
-            const e = KIT.mhMedium(p, uniforms.time, float(1.9)).mul(fAmt).mul(KIT.mhInside(p)).toVar();
+            // *** SUCCESS: "a soft bloom out of the middle. The quietest arrival here." *** still.ts adds the
+            // shell to `e` before the accumulation, so the ring is absorbed and hue-weighted like the medium
+            // around it rather than composited over the top -- which is the whole difference between an
+            // arrival travelling through a material and a white overlay, the thing the family law forbids.
+            //
+            // ONE TRANSCRIPTION NOTE THAT APPLIES TO ALL SEVEN, AND IT PREDATES THIS ROUND: murmur skips a
+            // tap outright when mh_inside(p) <= 0.001 and leaves `e` unattenuated otherwise; this file has
+            // always multiplied by the membership instead, a soft mask where the source has a hard cut. The
+            // shell goes INSIDE that multiply, with the medium, so both terms are masked the same way -- the
+            // alternative would have let the ring escape the silhouette at exactly the radius it ends at.
+            const e = KIT.mhMedium(p, uniforms.time, float(1.9)).mul(fAmt)
+                .add(igniteAt(length(p))).mul(KIT.mhInside(p)).toVar();
             acc.addAssign(e.mul(trans).mul(ds));
             accH.addAssign(e.mul(clamp(p.z, -1.0, 1.0)).mul(trans).mul(ds));
             trans.assign(trans.mul(exp(e.mul(2.0).add(MH_EXT).mul(ds).negate())));
@@ -553,7 +590,13 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // peak is that far above the rail's knee is flat over most of its width: what draws is a disc of
         // constant cream with a step at its rim." At 0.92 the peak lands just into cream and the light that
         // was in the core is spent on the scatter instead -- ten times the area, dimming with depth.
-        const headBright = float(1.0).add(VOICE.mul(1.30));
+        // comet's SECOND settle, and the reason MH_SETTLED_COMET_HEAD exists as its own constant: comet.ts
+        // spends 0.25 here, on the point of light, and 0.20 on the interior -- the species whose subject IS
+        // one bright point settles the point harder than the body around it. The (1 + 2.2 * st.complete)
+        // factor its file also carries is comet's OWN ignition figure, not the shared shell, and belongs to
+        // the per-species round that follows this one.
+        const headBright = float(1.0).add(VOICE.mul(1.30))
+            .mul(float(1.0).add(SETTLED.mul(MH_SETTLED_COMET_HEAD)));
         const headE = select(sH.greaterThan(0.0).and(sH.lessThan(L)),
             exp(negate(harg)).mul(0.92).add(KIT.mhScatter(harg, float(0.30))).mul(headBright).mul(visH),
             float(0.0)).toVar();
@@ -585,7 +628,12 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // lamp with a shade." At a quarter of the radius it occupies a sixtieth of the volume, leaving the
         // rest for the refraction to be visible in -- and the refraction is the species.
         const coreR = float(0.17).add(float(1.0).sub(uniforms.tension).mul(0.10)).mul(float(1.0).add(swellD.mul(0.22))).toVar();
-        const coreBright = float(1.0).add(VOICE.mul(0.85)).toVar();
+        // *** THE ONE SETTLE IN THE ROSTER THAT IS NOT AN INTERIOR GAIN. *** droplet.ts:
+        // coreBright = 1.0 + 0.85 * live.voice + 0.35 * st.settled -- ADDED beside the voice rather than
+        // multiplying a marched accumulation, so it is transcribed here and droplet is excluded from the
+        // shared interior factor at the bottom of main. Normalising it into the others' shape would have been
+        // tidier and would have been a different species.
+        const coreBright = float(1.0).add(VOICE.mul(0.85)).add(SETTLED.mul(MH_SETTLED.droplet)).toVar();
         const accD = float(0.0).toVar();
         // droplet weights by depth like still, and carries the `fade` a SECOND time -- its e already includes
         // mh_inside and the hue term multiplies by it again. That is droplet.ts as written ("the near half of
@@ -595,7 +643,13 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         Loop({ start: 0, end: MH_TAPS }, ({ i }) => {
             const sM = float(i).add(0.5).mul(ds);
             const pD = P.add(rd.mul(sM));
-            const eD = KIT.mhMedium(pD, uniforms.time, float(2.1)).mul(0.090).mul(KIT.mhInside(pD)).toVar();
+            // droplet.ts: "a shell of light leaves the heart and reaches the surface. It is a TRAVELLING term
+            // only -- the first cut added a flat lift alongside it and success rendered as a solid white
+            // disc, which is precisely the white overlay the family law forbids." Its `e = (shell + med) *
+            // fade` is the one of the seven where the source ALSO multiplies the shell by the membership,
+            // which is the shape this file already had for all seven.
+            const eD = KIT.mhMedium(pD, uniforms.time, float(2.1)).mul(0.090)
+                .add(igniteAt(length(pD))).mul(KIT.mhInside(pD)).toVar();
             accD.addAssign(eD.mul(transD).mul(ds));
             accHD.addAssign(eD.mul(KIT.mhInside(pD)).mul(clamp(pD.z, -1.0, 1.0)).mul(transD).mul(ds));
             transD.assign(transD.mul(exp(eD.mul(2.40).add(MH_EXT).mul(ds).negate())));
@@ -674,7 +728,8 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         const medO = mix(float(0.060), float(0.032), smallK).toVar();
         Loop({ start: 0, end: MH_TAPS }, ({ i }) => {
             const pO = P.add(rd.mul(float(i).add(0.5).mul(ds)));
-            const eM = KIT.mhMedium(pO, uniforms.time, float(2.1)).mul(medO).mul(KIT.mhInside(pO)).toVar();
+            const eM = KIT.mhMedium(pO, uniforms.time, float(2.1)).mul(medO)
+                .add(igniteAt(length(pO))).mul(KIT.mhInside(pO)).toVar();
             accO.addAssign(eM.mul(transO).mul(ds));
             transO.assign(transO.mul(exp(eM.mul(2.0).add(MH_EXT).mul(ds).negate())));
         });
@@ -742,7 +797,8 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         const medA = mix(float(0.022), float(0.014), smallK).mul(float(1.0).add(VOICE.mul(0.60))).toVar();
         Loop({ start: 0, end: MH_TAPS }, ({ i }) => {
             const pA = P.add(rd.mul(float(i).add(0.5).mul(ds)));
-            const eM = KIT.mhMedium(pA, uniforms.time, float(1.9)).mul(medA).mul(KIT.mhInside(pA)).toVar();
+            const eM = KIT.mhMedium(pA, uniforms.time, float(1.9)).mul(medA)
+                .add(igniteAt(length(pA))).mul(KIT.mhInside(pA)).toVar();
             accA.addAssign(eM.mul(transA).mul(ds));
             transA.assign(transA.mul(exp(eM.mul(2.0).add(MH_EXT).mul(ds).negate())));
         });
@@ -843,6 +899,23 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             const rp = length(pM).toVar();
             const glowIn = float(MIST.gLo).add(float(1.0).sub(smoothstep(float(0.0), float(MIST.gFar), rp)).mul(MIST.gK)).toVar();
             const eM = dens.mul(glowIn).mul(mEmit).mul(float(1.0).add(VOICE.mul(MIST.voiceE))).toVar();
+            // *** THE TWO CLOUDS IGNITE WHOLE AND THEN THE RING TRAVELS THROUGH WHAT IS ALREADY LIT. ***
+            // nebula.ts: "the cloud ignites from the inside and a front travels out through it, brightening
+            // what is already there" -- which is two statements, e *= 1 + preK * complete and then the shell,
+            // and it is why nebula and tempest are the only two of the seven with a preK at all. The ring is
+            // weighted by the LOCAL DENSITY for the same reason tempest's lightning is: a front inside a cloud
+            // is seen as the cloud lighting up.
+            //
+            // *** AND THE TWO PUT IT ON OPPOSITE SIDES OF THEIR OWN GESTURE, WHICH IS NOT A TIDYING MATTER. ***
+            // nebula's ignition block sits ABOVE its gesture (nebula.ts lines 111-117, gesture at 119) and
+            // tempest's sits BELOW its bolts (tempest.ts line 120, ignition at 123), so tempest's pre-multiply
+            // brightens its lightning and nebula's does not. Transcribed as shipped: normalising the two onto
+            // one order would have been one line shorter and would have moved tempest's brightest pixels.
+            const igniteMist = () => {
+                eM.mulAssign(float(1.0).add(COMPLETE.mul(IG.preK)));
+                eM.addAssign(igniteAt(rp).mul(dens));
+            };
+            if (species === "nebula") igniteMist();
             if (species === "tempest") {
                 // THE DEPTH MASK, which is why the flickers never reach the surface. Outside 0.62 of the
                 // radius it is exactly zero, so no flash can light the shell however bright it is.
@@ -858,6 +931,7 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
                 // Weighted by the LOCAL DENSITY: lightning lights the cloud, so it is brightest where there
                 // is something for it to light.
                 eM.addAssign(bolt.mul(gAmp).mul(deep).mul(float(0.30).add(dens.mul(0.85))));
+                igniteMist();   // BELOW the bolts, per tempest.ts -- see igniteMist's note
             } else {
                 const dg = pM.sub(gPosA).div(max(gW, float(1e-3))).toVar();
                 const garg = dot(dg, dg).toVar();
@@ -1712,7 +1786,8 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             const transD = float(1.0).toVar();
             Loop({ start: 0, end: MH_TAPS }, ({ i }) => {
                 const pD = P.add(rd.mul(float(i).add(0.5).mul(ds)));
-                const eD = KIT.mhMedium(pD, uniforms.time, float(DU.medLane)).mul(medAmtD).mul(KIT.mhInside(pD)).toVar();
+                const eD = KIT.mhMedium(pD, uniforms.time, float(DU.medLane)).mul(medAmtD)
+                    .add(igniteAt(length(pD))).mul(KIT.mhInside(pD)).toVar();
                 accD.addAssign(eD.mul(transD).mul(ds));
                 transD.assign(transD.mul(exp(eD.mul(DU.medAbsorb).add(MH_EXT).mul(ds).negate())));
             });
@@ -2076,7 +2151,27 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // glass it is seen through rather than reaching the edge at full strength.
         const pal = KIT.mhPalette(uniforms.ink, uniforms.tone, uniforms.tone2, uniforms.hueShift, uniforms.depth);
         const dark = float(1.0).sub(pal.paper).toVar();
-        const interior = density.mul(surfB.m).mul(KIT.mhTransmit(fres)).toVar();
+        // *** THE SETTLE, AT THE ONE SITE ALL EIGHTEEN INTERIORS PASS THROUGH -- v4644. *** Seventeen of
+        // murmur's eighteen spell it identically, as the last factor on `interior`:
+        //
+        //     interior = acc.x * GAIN * b.m * mh_transmit(b.fres) * (1.0 + K * st.settled)
+        //
+        // and K is the hero's own number (0.20 to 0.30 across the roster, in MH_SETTLED). `density` already
+        // carries that hero's GAIN, so appending the factor here is that line and not an approximation of it.
+        //
+        // *** DROPLET IS THE ONE EXCEPTION AND IT IS DELIBERATELY NOT HERE. *** droplet.ts spends its settle
+        // on `coreBright = 1.0 + 0.85 * live.voice + 0.35 * st.settled` -- an ADDITIVE term beside the voice,
+        // in the brightness of the core itself, with no interior factor anywhere in the file. It is wired at
+        // its own site inside buildDroplet. MH_SETTLED.droplet is 0.35 and it is the only entry in that table
+        // that is not an interior gain, which is a trap for the next reader and is why both the table's note
+        // and this one say so. comet has TWO and the second one -- 0.25 on its headBright, the point of light
+        // itself -- is likewise at its own site.
+        // MH_SETTLED_INTERIOR is MH_SETTLED without droplet, and the exclusion is a MISSING KEY rather than a
+        // conditional here on purpose -- see that table's own note, and the sabotage that deleted the ternary
+        // this line used to be and gave droplet its settle twice with nothing red.
+        const settleK = MH_SETTLED_INTERIOR[species] ?? 0.0;
+        const settleF = settleK === 0.0 ? float(1.0) : float(1.0).add(SETTLED.mul(settleK));
+        const interior = density.mul(surfB.m).mul(KIT.mhTransmit(fres)).mul(settleF).toVar();
         const railE = interior.add(sf.rim).add(sf.spec.add(sf.glow).mul(dark)).toVar();
         // *** THE HUE ARGUMENT WAS ZERO UNTIL v4631, AND THIS NOTE STAYED PAST ITS OWN REPAIR. *** It read
         // "THE HUE ARGUMENT IS STILL ZERO, AND THAT IS A KNOWN GAP" -- true when written, and contradicted

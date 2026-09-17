@@ -868,6 +868,26 @@ export const NEXT_ROUNDS = [
             "v4641's species frames did not move at all once the operating point was held, but a state term " +
             "arriving is new light in the frame and there is no operating point that hides it.",
         upstream: "None. The kit half is done, graded and green; this is transcription and gating.",
+        note: "PART DONE at v4644, and the part that is done is the SHARED physics rather than a slice of " +
+            "the eighteen. `settled` is wired at all eighteen interiors and the ignition SHELL at the seven " +
+            "marched heroes, on the kit's own mhIgnite and MH_IGNITE table -- murmur writes those four lines " +
+            "out seven times with four numbers changed and this port writes them ONCE, called from six sites. " +
+            "tools/ship/murmurIgnite-selfcheck.mjs and …Ignite2 grade it in pixels: still's flash centroid " +
+            "climbs 0.1947 -> 0.3981 monotonically while its amplitude goes up and back down, and geode -- " +
+            "which has no shell -- grows 5.7x with its centroid moving 0.0041.\n\n" +
+            "*** WHAT IS STILL OPEN, AND IT IS MOST OF THE 128. *** st.drive, the RESPONDING lean, is 45 " +
+            "references and completely unwired; so are the other eleven species' own `complete` figures -- " +
+            "arc's filament, limn's rim, aura's ribbons, comet's (1 + 2.2 * complete) head and still's own " +
+            "(1 + 0.85 * complete) glint. Those are per-species transcriptions, not one shape, which is why " +
+            "they are not in MH_IGNITE and why this entry stays OPEN.\n\n" +
+            "*** AND THIS ENTRY MADE A PREDICTION THAT THE ROUND FALSIFIED, KEPT HERE RATHER THAN EDITED " +
+            "AWAY. *** It said to EXPECT THE BYTE BASELINE TO MOVE FOR REAL THIS TIME, because \"a state " +
+            "term arriving is new light in the frame and there is no operating point that hides it\". All 72 " +
+            "baseline frames are byte-identical -- eighteen species by four cases, 0 bytes. The reasoning " +
+            "missed that the baseline is captured in IDLE and mh_state returns EXACTLY zero there, which is " +
+            "the same fact this entry's own `how` names two paragraphs earlier as what spares eighteen " +
+            "shaders a guard. The prediction and the fact that contradicts it were both already written down " +
+            "here; what was missing was putting them beside each other.",
     },
     // ---- logged from a review of Jakubantalik/thinking-orbs (MIT): a companion axis to ai-presence-orb-widget's
     // own 18 material "species" above -- BEHAVIOR states, not visual materials, and genuinely absent from what

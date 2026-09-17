@@ -26,6 +26,80 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      of numeric order were moved into it. NO ROUND'S NUMBER, TEXT OR BYTES CHANGED -- only two headings
      gained a tag, and two blocks moved. -->
 
+## v4644 -- the SUCCESS flash reaches pixels: a ring that travels, and a settle that does not
+
+mh_state was ported at v4641 and graded in the kit and **reached no pixel for three rounds**. Its four
+outputs are 128 transcribed references across murmur's eighteen sources, and this round spends three of
+them: `settled` on all eighteen interiors, and the pair `(complete, sweep)` that murmur's SUCCESS shell
+travels on, in the seven marched heroes. `st.drive` — the RESPONDING lean, 45 references — is still
+unported and still named in the row that says so.
+
+THE SHELL IS ONE FORMULA MURMUR WRITES OUT SEVEN TIMES WITH FOUR NUMBERS CHANGED:
+
+    sr = (length(p) - mix(lo, hi, sweep)) / width;   e += complete * gain * exp(-sr * sr)
+
+so the kit owns the profile (`mhIgnite`) and `MH_IGNITE` owns the four numbers, and the orb spells it once
+and calls it from six sites covering seven species. Bit-exact against a real GPU at murmurKit section 13:
+worst |gpu − cpu| **0 of 255** over 16 radii × 16 rows × 3 species, against **255** for the unflipped
+reading, and the ring's measured centre lands within **0.0013** body radii of `mix(lo, hi, sweep)` at every
+sweep — recovered by a log-parabolic fit, because the samples of a gaussian have logarithms on an exact
+parabola.
+
+**AND THE PIXEL GATES ASK THE QUESTION A BRIGHTNESS BOUND CANNOT: WHERE IS THE ADDED LIGHT.** Two new gates
+render the flash and measure the area-weighted radial centroid of what SUCCESS adds to a frame:
+
+| | flash centroid by tau | amplitude, % of the idle frame |
+|---|---|---|
+| still (shell, gain 0.30) | 0.1947 → 0.2572 → 0.3572 → 0.3981 | 23 → 187 → 335 → 113 |
+| abyss (the deepest, 0.42) | 0.1776 → 0.2660 → 0.3914 → 0.4646 | 24 → 366 → 747 → 160 |
+| tempest (preK 0.70) | 0.2801 → 0.3306 → 0.3773 → 0.3237 | 136 → 284 → 391 → 203 |
+| geode (**no shell at all**) | 0.2385 → 0.2185 → 0.2202 → 0.2226 | 0.1 → 2.9 → 8.1 → 16.8 |
+
+The last row is what makes the first three mean anything: geode's added light grows **5.7×** while its
+centroid moves **0.0041**, fifty times less than still's 0.2034. A port that multiplied the whole interior
+by `(1 + k * complete)` and drew no ring would produce geode's signature for every species and pass every
+brightness bound in both files. tempest's row is the *pre-multiply*: at tau 0.20, with the ring still at
+|p| = 0.24 of a body radius, its cloud has already gained 135.5% of its own light, sitting **0.0344** from
+the centroid of the cloud that was already there — a scaling of the existing picture, which is what
+`e *= 1 + 0.70 * complete` does, and a term a port can drop while still drawing a perfectly good ring.
+
+**ALL 72 BASELINE FRAMES ARE BYTE-IDENTICAL** — eighteen species × four cases, 0 bytes differ — because
+`complete` and `settled` are EXACTLY zero outside SUCCESS. That is its own row on both sides (the CPU's
+5,043 samples and the shader's own complete = 0 row) and it is what lets eighteen shaders add the shell
+without a branch. The backlog entry for this work predicted the opposite in as many words: *"EXPECT THE
+BYTE BASELINE TO MOVE FOR REAL THIS TIME … there is no operating point that hides it."* It is wrong, it is
+kept, and the entry now says why: the baseline is captured in IDLE, which is the fact the same entry named
+two paragraphs earlier.
+
+**THREE SABOTAGES GOT THROUGH AND ALL THREE CLOSED SOMETHING REAL.**
+
+- The kit probe held `complete` at 1 in all three colour channels and reasoned a pure multiplier did not
+  deserve an axis. Deleting the multiplier from `mhIgnite` changed nothing anywhere. The alpha channel now
+  re-reads the same lattice with y as COMPLETE and the sweep pinned at 0.5, and a row grades the line: every
+  reading within **0.7** counts of straight, against a measured **54.8** for a squared complete, **26.6**
+  for a smoothstepped one and a flat 233 for a dropped one.
+- A dead `MH_IGNITE` entry draws nothing, so no render can see one. Closed by a census asserting set
+  EQUALITY between the table's keys and the build closures that call the shell — in both directions.
+- droplet's settle is the one in the roster that is not an interior gain (it is additive on `coreBright`),
+  and the exclusion shipped as a ternary. Deleting the ternary gave droplet its settle twice with nothing
+  red, because no gate renders droplet in SUCCESS. The exclusion is now a MISSING KEY in
+  `MH_SETTLED_INTERIOR`, which a tidying pass cannot delete and a census can name.
+
+**AND THE GATE CAUGHT ITS OWN INSTRUMENT.** The quiet-state control compared LISTENING at tau 0.60 against
+IDLE at tau 0 and read 1,934 moved bytes. Those bytes are real and have nothing to do with the flash:
+mh_live weights the microphone 0.55 → 1.00 in LISTENING. Each state is now held against ITSELF at two taus,
+and the 1,934 is still measured, deliberately, so a shader that stopped reading `stateIndex` fails rather
+than passes more easily.
+
+Two gate FILES arrive — `murmurIgnite-selfcheck.mjs` (2,106 ms) and `murmurIgnite2-selfcheck.mjs`
+(2,278 ms), nine rows between them, both green on real WebGPU — so the tree now holds 1689 gates.
+
+Three rows in `murmurLive-selfcheck` were correct when written and this round inverted them. One of the
+three had also been counting its own prose: the conditioned-reader census ran over the raw file, so a
+COMMENT naming `VOICE` scored as a reader. Recorded 44, true 43. It now reads through `sourceScan.codeOnly`
+— the same repair `windowsImport` took at v4642, where three of its four offenders were the finding quoted
+back in a string.
+
 ## v4642-v4643 -- the seven standing reds, and mh_present's tail
 
 Two rounds. v4642 cleared every gate on redCensus.RED_AT_V4622, which had been red since that merge --

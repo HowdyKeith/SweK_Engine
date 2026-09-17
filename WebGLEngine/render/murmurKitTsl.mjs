@@ -175,6 +175,17 @@ export function makeMurmurKitTsl(TSL) {
         };
     };
 
+    /**
+     * *** THE IGNITION SHELL -- the shader half of murmurKit.mjs's mhIgnite. *** A gaussian ring at
+     * mix(lo, hi, sweep), which is how seven of the eighteen species run a SUCCESS along the marched ray.
+     * The species' own gain is NOT folded in; see the CPU twin's note for why nebula and tempest make that
+     * the load-bearing distinction.
+     */
+    const mhIgnite = Fn(([pLen, complete, sweep, lo, hi, width]) => {
+        const sr = pLen.sub(mix(lo, hi, sweep)).div(width).toVar();
+        return complete.mul(exp(sr.mul(sr).negate()));
+    });
+
     /** kit.ts's mh_drift: eased angular travel, so an arc hurries and dawdles instead of spinning. */
     const mhDrift = Fn(([t, rate, wobble, lane]) => {
         const k = clamp(wobble, 0.0, MH_DRIFT_WOBBLE_CAP).toVar();
@@ -570,7 +581,7 @@ export function makeMurmurKitTsl(TSL) {
         // the literal token `null` -- which the GPU rejected at pipeline creation rather than silently. Both
         // times the value is one number that half the family's colour depends on and nothing owned it.
         MH_R, MH_ETA, MH_EXT, MH_TILT, MH_SCATTER_K, MH_SPREAD, MH_EXIT_CAP,
-        mhHash, mhGrad3, mhNoise3, mhHash1, mhFlourish, mhBreath, mhDrift, mhSpin, mhRoll, mhTube, MH_SQRTPI, mhLive, mhState,
+        mhHash, mhGrad3, mhNoise3, mhHash1, mhFlourish, mhBreath, mhDrift, mhSpin, mhRoll, mhTube, MH_SQRTPI, mhLive, mhState, mhIgnite,
         mhRefract, mhLook, mhExit, mhHaze, mhMedium, mhInside, mhTransmit, mhScatter,
         mhDeform, mhBody, MH_AMP_CAP,
         mhKey, mhSmall, mhSurface, mhContainment, mhOpalLife, mhAbyssSlot,
@@ -595,6 +606,7 @@ export function makeMurmurKitTsl(TSL) {
  *       "exit"  -> mhExit for a ray through the body, in R, scaled by 1/MH_EXIT_CAP.
  *       "live"  -> mh_live's voice in R and pace in G, over signal (x) by state (y).
  *       "state" -> mh_state's complete/sweep/settled/drive in RGBA, over tau (x) by state (y).
+ *       "ignite" -> the SUCCESS shell for three species in RGB, over |p| (x) by sweep (y).
  *       "finishPaper" / "finishInk" / "finishGrey" -> mh_present's tail over specular (x) by height (y);
  *                the grey case carries a light ground and a mid-grey page, which is where two of its
  *                constants are observable at all.
@@ -704,6 +716,32 @@ export function makeMurmurKitProbeTsl(THREE, TSL, { mode = "hash", n = 16 } = {}
             // Scaled by a half so the catchlight's warm white (near 1.0 linear) and any overshoot below zero
             // both sit inside the 0..1 an 8-bit channel can carry. The gate divides by the same number.
             return vec4(clamp(outRgb.mul(0.5), 0.0, 1.0), 1.0);
+        }
+        if (mode === "ignite") {
+            // *** THE SHELL OVER THE WHOLE RAY BY THE WHOLE SWEEP. *** x carries |p| over 0..1.2 -- past the
+            // surface, so the ring's far end is in shot rather than cropped at the body -- and y carries the
+            // sweep 0..1, so one frame is the ring's entire journey from the heart to the surface.
+            //
+            // *** AND THE ALPHA CHANNEL READS THE SAME LATTICE A SECOND WAY, FOR `complete`. *** The first cut
+            // held complete at 1 in all three channels and reasoned that a pure multiplier did not need an
+            // axis of its own. A sabotage then deleted the multiplier from this function and walked through
+            // every row in the gate: the frame is IDENTICAL when complete is 1. So alpha re-reads x as |p|
+            // and y as COMPLETE, with the sweep PINNED at 0.5 -- pinned, and not read off the same y,
+            // because a port that spent `sweep` where `complete` belongs would pass a probe that confounded
+            // the two. complete reaches 0 EXACTLY at row 0, which is the state four of murmur's five are in.
+            //
+            // THREE SPECIES IN THREE CHANNELS, and they are the three that bracket the table: still has the
+            // shortest travel (hi 0.95) and the widest ring (0.26), duet the narrowest (0.22), and tempest
+            // the longest (hi 1.05) with the highest gain. A probe carrying one species could not tell a
+            // correct table from a constant.
+            const pLen = px.div(n).mul(1.2).toVar();
+            const sweep = py.div(n).toVar();
+            const one = float(1.0);
+            const r = K.mhIgnite(pLen, one, sweep, float(0.02), float(0.95), float(0.26));   // still
+            const g = K.mhIgnite(pLen, one, sweep, float(0.02), float(1.00), float(0.22));   // duet
+            const b = K.mhIgnite(pLen, one, sweep, float(0.02), float(1.05), float(0.24));   // tempest
+            const a = K.mhIgnite(pLen, py.div(n), float(0.5), float(0.02), float(0.95), float(0.26));  // still, complete on y
+            return vec4(clamp(r, 0.0, 1.0), clamp(g, 0.0, 1.0), clamp(b, 0.0, 1.0), clamp(a, 0.0, 1.0));
         }
         if (mode === "live") {
             // *** mh_live OVER THE WHOLE INPUT SQUARE, AGAINST THE f64 TWIN. *** x is the raw signal 0..1 and

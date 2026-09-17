@@ -711,6 +711,93 @@ export function mhSurface(b, t, small, inkRgb, tilt, rimKIn, specK, glowK) {
  * [ampBase, ampBreath, breathPeriod, gain]. A species with ampBreath 0 has a fixed amplitude; droplet is the
  * one whose amplitude comes from its own knobs instead and is not in this table.
  */
+/**
+ * *** SUCCESS: THE INTERIOR IGNITES AND SETTLES, AND EVERY ONE OF THE EIGHTEEN DOES IT. *** kit.ts calls this
+ * "this family's flash", and it is the one state whose physics is shared outright: "The light in a success is
+ * NOT an overlay: every species multiplies its own interior energy by (1 + complete), which brightens exactly
+ * what is already there and leaves the dark dark."
+ *
+ * THE SETTLE IS THE TAIL OF IT, and it is the half that is genuinely universal: nineteen sites across the
+ * eighteen sources, each `(1 + k * st.settled)` on an interior, with k drawn from a five-value set. Ported as
+ * a TABLE for the same reason MH_SHAPE is one -- a constant per species, read off each file rather than
+ * averaged, so a gate can assert the roster instead of a copy of this tree's own guess at it.
+ *
+ * TWO OF THE NINETEEN ARE NOT INTERIOR MULTIPLIERS AND ARE CARRIED AS THEMSELVES:
+ *   comet   has TWO -- 0.25 on its headBright, which is the point of light itself, and 0.20 on the interior.
+ *           The species whose subject is one bright point spends its settle on the point first.
+ *   droplet has an ADDITIVE one: coreBright = 1 + 0.85 * live.voice + 0.35 * st.settled, so the settle lands
+ *           beside the voice in a brightness rather than on a marched accumulation. Transcribed, not
+ *           normalised into the others' shape -- droplet is the hero whose body IS the subject and its core
+ *           brightness is not an interior gain.
+ */
+export const MH_SETTLED = Object.freeze({
+    still: 0.22, limn: 0.30, comet: 0.20, droplet: 0.35, opal: 0.22, abyss: 0.26,
+    nebula: 0.20, tempest: 0.20, fathom: 0.20, geode: 0.22, arc: 0.22, sol: 0.20,
+    aura: 0.22, flux: 0.22, duet: 0.20, chorus: 0.22, prism: 0.22, helix: 0.22,
+});
+/** comet's SECOND settle, on the head rather than the interior -- see MH_SETTLED's note. */
+export const MH_SETTLED_COMET_HEAD = 0.25;
+
+/**
+ * *** THE SEVENTEEN WHOSE SETTLE IS AN INTERIOR GAIN, WHICH IS MH_SETTLED MINUS DROPLET. ***
+ *
+ * Derived rather than hand-written so a change to a species' number cannot make the two tables disagree, and
+ * it exists at all because the alternative was a conditional. render/aiPresenceOrbTsl.mjs applies the settle
+ * at the ONE site all eighteen interiors pass through, and droplet has to be excluded there -- its settle is
+ * an ADDITIVE term on coreBright, at its own site. That exclusion first shipped as
+ * `species === "droplet" ? 0.0 : MH_SETTLED[species]`, and a sabotage deleted the conditional and walked
+ * through every gate in the round: droplet would have taken the settle TWICE and no instrument renders
+ * droplet in SUCCESS. A missing key cannot be deleted by a tidying pass the way a ternary can, and a census
+ * row can ask which key is missing and why, which is what tools/ship/murmurLive-selfcheck.mjs now does.
+ */
+export const MH_SETTLED_INTERIOR = Object.freeze(Object.fromEntries(
+    Object.entries(MH_SETTLED).filter(([k]) => k !== "droplet")));
+
+/**
+ * *** THE IGNITION SHELL: A GAUSSIAN RING THAT LEAVES THE HEART AND REACHES THE SURFACE. ***
+ *
+ * kit.ts: "`sweep` is the same window read as a POSITION, 0 to 1 over 0.95 s, and it is what each species runs
+ * the ignition ALONG." Seven of the eighteen run it as a shell down the marched ray, and they run it as ONE
+ * formula with four constants:
+ *
+ *     sr = (|p| - mix(lo, hi, sweep)) / width;   e += complete * gain * exp(-sr * sr)
+ *
+ * so the ring starts at `lo` (the heart) and ends at `hi` (the surface, or just past it), `width` is how thick
+ * the shell is in body units, and `gain` is how much light it carries. The other eleven species spend
+ * `complete` on their own figures instead -- arc on its filament, limn on its rim, aura on its ribbons -- and
+ * those are per-species transcriptions rather than this one shape, which is why they are not in this table.
+ *
+ * *** TWO OF THE SEVEN ALSO PRE-MULTIPLY THE WHOLE MARCH, and that is a different statement from the shell. ***
+ * nebula and tempest do `e *= 1 + preK * complete` BEFORE adding the ring, so the entire cloud brightens and
+ * then the ring travels through it; the other five brighten only along the ring. Carried as `preK`, zero where
+ * the source has none, because a cloud lighting up whole is what those two species ARE.
+ *
+ * `into` records where the ring's light goes: five species add it to the march's own `e`, and droplet puts it
+ * in a separate `shell` term that is summed with the medium before the fade -- its ring is a thing crossing
+ * the water rather than more of the water.
+ */
+export const MH_IGNITE = Object.freeze({
+    still:   Object.freeze({ lo: 0.02, hi: 0.95, width: 0.26, gain: 0.30, preK: 0.00, into: "e" }),
+    opal:    Object.freeze({ lo: 0.02, hi: 1.00, width: 0.24, gain: 0.30, preK: 0.00, into: "e" }),
+    abyss:   Object.freeze({ lo: 0.02, hi: 1.00, width: 0.26, gain: 0.42, preK: 0.00, into: "e" }),
+    droplet: Object.freeze({ lo: 0.05, hi: 1.00, width: 0.20, gain: 0.34, preK: 0.00, into: "shell" }),
+    duet:    Object.freeze({ lo: 0.02, hi: 1.00, width: 0.22, gain: 0.26, preK: 0.00, into: "e" }),
+    nebula:  Object.freeze({ lo: 0.02, hi: 1.05, width: 0.24, gain: 0.50, preK: 0.65, into: "e" }),
+    tempest: Object.freeze({ lo: 0.02, hi: 1.05, width: 0.24, gain: 0.55, preK: 0.70, into: "e" }),
+});
+
+/**
+ * The shell's own profile, WITHOUT the species' gain: complete * exp(-((|p| - mix(lo, hi, sweep)) / width)^2).
+ *
+ * The gain is left to the caller because two of the seven multiply it by their own local density as well
+ * (nebula and tempest spend it `* dens`), and folding a gain in here would make those two look like the other
+ * five with a different number rather than like what they are.
+ */
+export function mhIgnite(pLen, complete, sweep, lo, hi, width) {
+    const sr = (pLen - (lo + (hi - lo) * sweep)) / width;
+    return complete * Math.exp(-sr * sr);
+}
+
 export const MH_SHAPE = Object.freeze({
     still: Object.freeze([0.018, 0.006, 4.2, 1.12]),
     limn: Object.freeze([0.020, 0.000, 0.0, 1.05]),

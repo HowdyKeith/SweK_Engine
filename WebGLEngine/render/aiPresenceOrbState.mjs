@@ -234,7 +234,13 @@ export function createPresenceState(initial = "idle") {
             const envAdd = env === swellEnvelope ? env(entryT) : (env === stutterEnvelope ? -env(entryT) : 0);
             return { speed: p.speed, depth: p.depth, hueShift: p.hueShift,
                      glow: Math.max(0, p.glow * envMul + envAdd),
-                     phase, voice: voice.value, activity: activity.value, state: cur };
+                     // *** stateTau IS entryT AND NOT A SECOND CLOCK. *** murmur's mh_state reads "seconds
+                     // since the state changed", which is exactly what entryT has counted since this module
+                     // was written -- it is what the entry envelopes above are evaluated at. Exposing the
+                     // existing one rather than starting another is the whole point: two clocks for one fact
+                     // drift, and the SUCCESS flash and the swell envelope have to agree about when the
+                     // arrival happened or the orb breathes at one moment and ignites at another.
+                     phase, voice: voice.value, activity: activity.value, state: cur, stateTau: entryT };
         },
         get state() { return cur; },
     };
