@@ -98,7 +98,7 @@ import path from "node:path";
 import os from "node:os";
 import { execFileSync } from "node:child_process";
 import { ledgerState, readLedger, engineVersion, shippedVersions, num, LEDGER, ENG, ROOT } from "./releaseLedger.mjs";
-import { rowsFrom } from "./refreshReleases.mjs";
+import { rowsFrom, ledgerUpdate } from "./refreshReleases.mjs";
 import VM from "../../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
 
 let fails = 0;
@@ -408,6 +408,89 @@ console.log("\n4. THE REFRESH DECIDES WHAT COUNTS AS PUBLISHED, AND IT IS DRIVEN
         "build releases/latest will never hand out");
     ok("...and the result is sorted newest-first like the ledger it writes",
         rows.map((r) => r.tag).join(",") === "v4438,v4400,v4296");
+}
+
+// SABOTAGE v4641 (section 4b): 5 mutations, 5 caught, no 0-RED.
+//   H  ledgerUpdate stops raising the floors (the exact pre-v4641 behaviour) -> 2 red, the raise row and the
+//      monotonic row. Both, because a floor that never rises is also a floor nothing can be shown to hold.
+//   I  the raise made non-monotonic (rows.length instead of Math.max) -> 1 red, the monotonic row alone: the
+//      raise still happens, so only the row about SHRINKING catches it. That split is the reason for two rows.
+//   J  `via` dropped from `source` -> 1 red, the provenance row.
+//   K  --from stops requiring --via -> 1 red, the driven refusal row, which then sees the file's own parse
+//      error instead of the refusal and says so.
+//   L  releaseLedger.mjs's supersededBy = max(floor, latest) cut to `floor` -> 5 red across sections 3 and 4b,
+//      including the two v4461 wrote. The stale-ledger row rides on the same mechanism, which is the point:
+//      a stale `latest` and a broken supersede are the same failure arriving by different routes.
+console.log("\n4b. *** THE REFRESH THAT COULD NOT RUN, AND WHAT A STALE LEDGER DOES TO THE RATCHET ***");
+{
+    // *** v4641 -- THE LEDGER WAS ELEVEN DAYS AND THREE RELEASES STALE AND THE GATE READ THAT AS DEBT. ***
+    // refreshReleases' fetch gets HTTP 401 through this sandbox's proxy, so releases.json stayed at v4485,
+    // read 2026-09-06, while v4486, v4487 and v4622 were published. That is not merely "the ledger is behind":
+    // releaseLedger.mjs computes supersededBy = max(floor, latest), so a STALE LATEST INFLATES THE OWED LIST.
+    // The gate reported "9 of 3 allowed -- PUBLISH BEFORE SHIPPING AGAIN" and the true answer was ZERO owed,
+    // with releases/latest ALREADY equal to the tree. A ratchet built to force a publish was refusing to ship
+    // because it could not see the publish. The rows below drive that mechanism rather than describing it.
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "swek-ledger-"));
+    const real = readLedger() || {};
+    const writeLed = (name, doc) => { const f = path.join(tmp, name); fs.writeFileSync(f, JSON.stringify(doc, null, 2)); return f; };
+    const withLatest = (through) => Object.assign({}, real, {
+        releases: (real.releases || []).filter((r) => num(r.tag) <= through) });
+
+    const fresh = ledgerState({ file: writeLed("fresh.json", real) });
+    const stale = ledgerState({ file: writeLed("stale.json", withLatest(4485)) });
+    ok("!! *** a STALE `latest` does not under-report the debt, it INVENTS it ***",
+        stale.owed.length > fresh.owed.length && stale.supersededBy < fresh.supersededBy,
+        `the same tree and the same main, read against a ledger truncated at v4485, owes ` +
+        `${stale.owed.length} (${stale.owed.slice(0, 9).map((v) => "v" + v).join(", ")}) and against the live ` +
+        `ledger owes ${fresh.owed.length}. supersededBy v${stale.supersededBy} vs v${fresh.supersededBy}. ` +
+        "EVERY ONE of the invented names is a version BELOW a release that exists -- superseded, not owed -- " +
+        "which is the distinction v4461 built supersededBy for and a stale ledger silently undoes.");
+    ok("  ...and the floor it moves can only be raised BY PUBLISHING, which is why this is not an escape hatch",
+        fresh.supersededBy >= fresh.latest && fresh.latest > 0,
+        `supersededBy v${fresh.supersededBy} = max(baseline v${fresh.floor}, latest v${fresh.latest}). The ` +
+        "baseline is a number a person types and the latest is an observed publish; only one of the two can " +
+        "be moved by editing a file, and it is not this one.");
+    fs.rmSync(tmp, { recursive: true, force: true });
+
+    // ---- THE RATCHET RAISE THE RECORD HAS CLAIMED SINCE v4461 -------------------------------------------
+    // releases.json's own ratchet.note reads: "These two numbers may only RISE, and refreshReleases raises
+    // them when it writes." It did not. ledgerUpdate assigned `releases` and passed `ratchet` through from
+    // prev untouched, so every refresh that added a release left the floor slack by exactly that much -- in
+    // the record that polices shipping, a claim about what a tool does that the tool did not do.
+    const prev = { releases: [{ tag: "v100" }], ratchet: { minReleases: 1, minLatest: 100, note: "kept" } };
+    const grew = ledgerUpdate({ rows: [{ tag: "v300" }, { tag: "v200" }, { tag: "v100" }], prev, repo: "o/r", now: new Date(0) });
+    ok("!! *** a refresh RAISES the ratchet floors, which releases.json has always said it does ***",
+        grew.out.ratchet.minReleases === 3 && grew.out.ratchet.minLatest === 300 &&
+        grew.raised.minReleases === true && grew.raised.minLatest === true,
+        `minReleases 1 -> ${grew.out.ratchet.minReleases}, minLatest 100 -> ${grew.out.ratchet.minLatest}. ` +
+        "Until v4641 both stayed at 1 and 100 forever, so 'a release the fleet was already running must not " +
+        "vanish' was guarded at whatever the count happened to be the first time anybody typed it.");
+    const shrank = ledgerUpdate({ rows: [{ tag: "v100" }], prev: grew.out, repo: "o/r", now: new Date(0) });
+    ok("!! ...and it is MONOTONIC: a ledger that came back SHORT cannot lower the floor it fails",
+        shrank.out.ratchet.minReleases === 3 && shrank.out.ratchet.minLatest === 300 &&
+        shrank.raised.minReleases === false && shrank.out.releases.length === 1,
+        `one row in, floors still ${shrank.out.ratchet.minReleases}/${shrank.out.ratchet.minLatest} with ` +
+        `${shrank.out.releases.length} release recorded -- so the ledger FAILS the floor rather than moving ` +
+        "it. A ratchet that its own writer can relax is the escape hatch this file has caught three times.");
+    ok("  ...and the note beside those numbers survives the raise",
+        shrank.out.ratchet.note === "kept", "a raise that dropped the argument would leave a bound with no reason");
+
+    // ---- PROVENANCE: --via IS RECORDED, AND REQUIRED --------------------------------------------------
+    const withVia = ledgerUpdate({ rows: [{ tag: "v100" }], prev: {}, repo: "o/r", now: new Date(0), via: "some other route" });
+    const noVia = ledgerUpdate({ rows: [{ tag: "v100" }], prev: {}, repo: "o/r", now: new Date(0) });
+    ok("!! *** an INGESTED ledger says so in `source`, rather than claiming a GET this process never made ***",
+        /ingested via some other route/.test(withVia.out.source) && !/ingested via/.test(noVia.out.source),
+        `with via: ${JSON.stringify(withVia.out.source)}; without: ${JSON.stringify(noVia.out.source)}. The ` +
+        "ledger's provenance is the only thing a later reader has to judge it by -- see v4400 one directory " +
+        "over, where a tool typed its own version into an audit and the audit lied about its age for twenty rounds.");
+    let refusal = "";
+    try {
+        execFileSync("node", [path.join(ENG, "tools", "ship", "refreshReleases.mjs"), "--from", "/dev/null"],
+                     { cwd: ENG, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+    } catch (e) { refusal = String((e.stderr || "") + (e.stdout || "")); }
+    ok("!! ...and the refusal is DRIVEN: --from without --via exits non-zero and writes nothing",
+        /--from requires --via/.test(refusal),
+        refusal ? refusal.split("\n")[0].slice(0, 170) : "IT DID NOT REFUSE -- an ingest with no provenance would have been written");
 }
 
 console.log("\n5. WHAT THIS DOES NOT CHECK, STATED RATHER THAN IMPLIED");

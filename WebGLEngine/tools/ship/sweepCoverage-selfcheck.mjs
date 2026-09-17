@@ -191,7 +191,7 @@ console.log("\n2. a killed process's nonzero exit code is NOT counted as a red")
 {
     const codes = FILE.codes || {};
     const reds = SC.standingReds(C, { codes });
-    const notV = SC.notVerdicts(C, { codes });
+    const notV = SC.notVerdicts(C, { codes, finished: FILE.finished || {} });
     ok("!! *** the cap-hitters are counted as NO VERDICT, not as failures ***", notV.every((g) => !reds.includes(g)),
         `${notV.length} entry(ies) nonzero AFTER being killed at the cap, and none of them is reported red. ` +
         "v4392's rule, sitting in a data file: A COUNT OF FAILURES IS NOT A VERDICT UNLESS THE PROCESS FINISHED");
@@ -964,14 +964,23 @@ console.log("\n*** THE FIRST BULK PASS AT THE EXILED POOL (v4565): HALF THE 3-8 
     // classify() files anything over CAP_MS as `killed`, and the tree reads that bucket as unjudged -- which
     // is right for a process that was cut off and wrong for one that ran to completion in 50 s. `finished`
     // is written by the runner from what the process DID, so the two are told apart by a recorded fact.
-    ok("!! *** `killed` SPLITS INTO GRADED AND NO-VERDICT, and the split is a recorded fact not a threshold ***",
+    // *** v4641 -- AND THIS ROW ASSERTED THE ONE-FIELD DEFINITION, SO IT DEFENDED THE DEFECT. *** It required
+    // graded to be exactly `finished === true`, which is the split that put 23 KILLED processes on the graded
+    // side: each of them carries code 124 or the "timeout/signal" string beside `finished: true`, a pair that
+    // cannot both be true, all of them written by a runner older than per-entry stamping. The row is now
+    // asserted against wasKilled -- the same disjunction v4637 established for this question -- and it still
+    // holds the partition, which is the part that was never wrong.
+    const killedNow = (g) => SC.wasKilled(g, { codes: (t.codes || {}), finished: (t.finished || {}) });
+    const liars = c.killed.filter((g) => (t.finished || {})[g] === true && killedNow(g));
+    ok("!! *** `killed` SPLITS INTO GRADED AND NO-VERDICT, and the split is a recorded FACT rather than one FIELD ***",
        (c.graded || []).length + (c.noVerdict || []).length === c.killed.length &&
-       (c.graded || []).every((g) => (t.finished || {})[g] === true) &&
-       (c.noVerdict || []).every((g) => (t.finished || {})[g] !== true),
+       (c.graded || []).every((g) => !killedNow(g)) &&
+       (c.noVerdict || []).every((g) => killedNow(g)),
        `${c.killed.length} over the cap: ${(c.graded || []).length} FINISHED and therefore have a verdict, ` +
        `${(c.noVerdict || []).length} were cut off and have none. Before v4568 the file could not tell those ` +
        "apart, so a gate that ran green in 50 s and a gate killed at 20 s were the same entry -- and so was " +
-       "a gate that ran RED.");
+       `a gate that ran RED. ${liars.length} entries claim finished:true BESIDE a kill code and are filed as ` +
+       "cut off on the strength of the code, which is the contradiction v4641 found by trusting the field alone.");
 
     // The reds that were hiding in it. Empty is a legitimate answer -- but only once something has run them.
     const hidden = SC.gradedReds(c, t);

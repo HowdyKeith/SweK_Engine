@@ -63,6 +63,16 @@ export function classify(ms, { budgetMs = BUDGET_MS, capMs = CAP_MS } = {}) {
  * `killed` still holds everything over the cap, so `partitions` and every existing consumer still hold --
  * and the split lives INSIDE it as `noVerdict` and `graded`.
  */
+// SABOTAGE v4641: 2 mutations, 2 caught, each by a DIFFERENT row, which is why both exist.
+//   M  wasKilled cut back to `finished[g] === false` -- the one-field definition this round replaced -> 1 red
+//      in capReading-selfcheck's frozen-table row: the 23 contradictory entries move back onto the graded
+//      side, three of them leave the notVerdicts population, and their "fresh readings" are cap readings.
+//   N  notVerdicts stops calling wasKilled at all -- the exact v4568 gap -> 1 red in capReading's POPULATION
+//      row instead: budgetExile returns to a bucket it does not belong in and the excess over the cap runs
+//      negative by 49 seconds. A killer's clock cannot fire before the cap, and that is the whole tell.
+export const wasKilled = (g, { codes = {}, finished = {} } = {}) =>
+    finished[g] === false || codes[g] === 124 || typeof codes[g] === "string";
+
 export function census(gates, { timings = {}, codes = {}, at = {}, finished = {} } = {}, opts = {}) {
     const set = new Set(gates);
     const buckets = { under: [], over: [], killed: [], never: [] };
@@ -70,8 +80,18 @@ export function census(gates, { timings = {}, codes = {}, at = {}, finished = {}
     const ghosts = Object.keys(timings).filter((k) => !set.has(k));
     const sum = buckets.under.length + buckets.over.length + buckets.killed.length + buckets.never.length;
     // The split inside `killed`: a gate whose process finished HAS a verdict, however expensive it was.
-    const graded = buckets.killed.filter((g) => finished[g] === true);
-    const noVerdict = buckets.killed.filter((g) => finished[g] !== true);
+    //
+    // *** v4641 -- AND THE SPLIT READ ONE FIELD WHERE THE FACT TAKES THREE, WHICH PUT 23 KILLED PROCESSES ON
+    // THE GRADED SIDE. *** Measured on the live file: 138 entries over the cap, 91 with `finished: true`, and
+    // TWENTY-THREE of those 91 carry `code: 124` or the "timeout/signal" string beside it. A row cannot both
+    // have exited on its own and have been shot by the killer. Every one of the 23 is stamped
+    // "unknown -- before v4408", written by a runner older than per-entry stamping, and `finished` is simply
+    // wrong for them. The consequence was downstream and loud: gradedReds reported "24 of 91 graded
+    // cap-hitters are RED" when ONE of them is red -- the other 23 are killed processes whose nonzero code is
+    // not a verdict, which is the error standingReds' own comment four lines down exists to warn about.
+    // Under wasKilled the numbers are 68 graded, 1 red, and the one is tools/ship/budgetExile-selfcheck.mjs.
+    const graded = buckets.killed.filter((g) => !wasKilled(g, { codes, finished }));
+    const noVerdict = buckets.killed.filter((g) => wasKilled(g, { codes, finished }));
     return { ...buckets, graded, noVerdict, ghosts, enumerated: gates.length, sum, partitions: sum === gates.length,
              ageOf: (g) => at[g] || UNKNOWN_AT, codeOf: (g) => codes[g], msOf: (g) => timings[g] };
 }
@@ -86,8 +106,46 @@ export function gradedReds(c, { codes = {} } = {}) {
 export function standingReds(c, { codes = {} } = {}) {
     return c.over.filter((g) => codes[g] !== 0 && codes[g] !== undefined);
 }
-export function notVerdicts(c, { codes = {} } = {}) {
-    return c.killed.filter((g) => codes[g] !== 0 && codes[g] !== undefined);
+/*
+ * *** v4641 -- v4568 BUILT THE SPLIT AND THIS FUNCTION NEVER LEARNED IT. ***
+ *
+ * The block above says it in so many words: "a gate cut off at 20,000 ms and a gate that ran happily to
+ * completion in 50,214 ms are the same entry", and `finished` was added so the split would be a RECORDED FACT
+ * rather than an inference from the number. census() honours it -- `graded` and `noVerdict` live inside
+ * `killed`. This function did not. It returned the WHOLE killed bucket, so a gate that finished and exited
+ * NON-ZERO -- a red with a real verdict -- was reported as having "no verdict of any kind".
+ *
+ * It stayed invisible because gradedReds' own comment says why: "Empty until something runs them." Nothing
+ * ran them. v4641's round before this one ran `sweepRotation --killed` on ONE gate to give recordReach the
+ * numbers it was asking for, tools/ship/budgetExile-selfcheck.mjs finished at 40,863 ms and exited 1 at a
+ * 90 s cap, and the first graded member of that bucket in the tree's history immediately walked into this.
+ * capReading-selfcheck went red on the population row -- excess over the cap ran -49,137..187 ms, and a
+ * NEGATIVE excess is the tell: a killer's clock cannot fire 49 seconds before the cap.
+ *
+ * That is the same proxy timingKind's own comment names -- "was this killed" answered by comparing a number
+ * to the cap instead of by the fact -- caught in the file that the fact was added to.
+ */
+/*
+ * *** AND `finished` ALONE IS NOT THE FACT EITHER, WHICH THE FIRST DRAFT OF THIS REPAIR ASSUMED. ***
+ *
+ * Trusting it by itself pulled THREE entries out of this population that belong in it --
+ * detectionFloor-selfcheck, text/slug-selfcheck and loopTrace-selfcheck -- each recorded `finished: true`
+ * BESIDE `code: 124`, which is the timeout kill. A row cannot both have exited on its own and have been shot
+ * by the killer; the map is simply wrong for those three, all of them stamped "unknown -- before v4408" and
+ * so written by a runner older than per-entry stamping. capReading's frozen table caught it within a minute:
+ * the three left this population and their "fresh readings" were 20,105 / 20,014 / 20,021 ms, cap readings
+ * to the millisecond, disagreeing with the table's real measurements by exactly the amount a cap differs
+ * from a runtime.
+ *
+ * So the test is the one v4637 already established for exactly this question, and it is a DISJUNCTION
+ * because each clause catches a different generation of writer: `finished === false` is the recorded fact
+ * where a modern runner wrote one; `code === 124` is the kill signal; and a STRING code is the
+ * "timeout/signal" sentinel, which v4637 found inflating a restore count by 45 because a numeric-only test
+ * missed it. Any one of the three means the process did not finish.
+ */
+
+export function notVerdicts(c, { codes = {}, finished = {} } = {}) {
+    return c.killed.filter((g) => codes[g] !== 0 && codes[g] !== undefined && wasKilled(g, { codes, finished }));
 }
 
 // *** v4460 -- standingReds HAD NO MIRROR, AND THE MIRROR IS WHERE THE TREE'S RED GATES WERE HIDING. ***

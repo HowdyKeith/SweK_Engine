@@ -60,7 +60,10 @@ console.log("capReading-selfcheck -- the number beside a killed gate is the cap,
 
 // -----------------------------------------------------------------------------------------------------------
 console.log("1. *** THE POPULATION, AND WHY ITS RECORDED MILLISECOND IS NOT A MEASUREMENT ***");
-const NV = SC.notVerdicts(c, { codes: T.codes });
+// finished: T.finished -- v4641. Without it this population includes gates that RAN TO COMPLETION over
+// the cap, whose recorded millisecond IS a measurement, and the row below (every reading a hair above the
+// cap) is false of them by tens of seconds. See sweepCoverage.notVerdicts for the whole finding.
+const NV = SC.notVerdicts(c, { codes: T.codes, finished: T.finished });
 {
     report(`${c.under.length} under the ${BUDGET} ms budget, ${c.over.length} over it, ${c.killed.length} killed at the ${CAP} ms cap`);
     // *** v4637 -- `NV.length > 100` WAS A FLOOR UNDER A POPULATION, AND THE POPULATION SHRANK BECAUSE THE
