@@ -70,6 +70,24 @@ export const SKIP_AGREE = Object.freeze({
     recordDrift: /node_modules|\/vendor\/|\/dist\//,
 });
 
+// *** v4646 -- "THEY AGREE BY COINCIDENCE" WAS RIGHT, AND THE COINCIDENCE IS A PLATFORM. ***
+//
+// recordDrift's rule is written with a literal forward slash, so it cannot see a Windows path separator at
+// all. On a posix tree both rules select the same 4,275 files and the gate above has said so every round.
+// MEASURED ON KEITH'S WINDOWS RIG, v4645: unified 4,275, frozenRecords' rule 4,275, recordDrift's rule
+// 4,392 -- 117 vendor files leaking into a census, on one platform, silently.
+//
+// *** AND IT WAS PROVABLE HERE THE WHOLE TIME. *** The gate compared the two rules by RUNNING THEM ON THE
+// LOCAL TREE, and a local tree only ever produces one separator, so the comparison could only exercise the
+// host's own. Two lines against literal strings settle it on any box:
+//     /\/vendor\//.test("a\\vendor\\b")        === false
+//     /[\\/]vendor[\\/]/.test("a\\vendor\\b")  === true
+// The gate now asserts that, which is a fact about the REGEXES rather than about whoever is running it.
+//
+// SKIP_AGREE keeps both rules verbatim because it is the archive of what was unified -- rewriting the
+// history to match the present would make the comparison vacuous, two identical patterns trivially agreeing.
+// What changed is that recordDrift.mjs's live SOURCE_SKIP no longer points at the separator-blind one.
+
 /**
  * *** COMMONJS IS A RUNTIME SOURCE FILE AND THIS RULE DID NOT THINK SO. ***
  *

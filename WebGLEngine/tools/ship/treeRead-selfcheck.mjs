@@ -79,12 +79,37 @@ console.log("\n3. *** THE THREE WALKERS THIS REPLACED SELECTED THE SAME FILES, A
     const byFrozen = TR.treeFiles(ENG, TR.SKIP_AGREE.frozenRecords).map((f) => f.path).sort();
     const byDrift = TR.treeFiles(ENG, TR.SKIP_AGREE.recordDrift).map((f) => f.path).sort();
     say(`unified ${unified.length}, frozenRecords' old rule ${byFrozen.length}, recordDrift's old rule ${byDrift.length}`);
-    ok("!! *** THE TWO OLD SKIP RULES STILL AGREE WITH THE UNIFIED ONE, FILE FOR FILE ***",
-        unified.length === byFrozen.length && unified.every((p, i) => p === byFrozen[i]) &&
-        unified.length === byDrift.length && unified.every((p, i) => p === byDrift[i]),
-        "they were two different regexes written by two authors -- /[\\\\/]vendor[\\\\/]/ against /\\/vendor\\// " +
-        "-- and they agree by coincidence rather than by construction, which is why both are kept in " +
-        "SKIP_AGREE and compared here instead of a note claiming they matched once.");
+    // *** THIS ROW SAID "BY COINCIDENCE RATHER THAN BY CONSTRUCTION" AND THE COINCIDENCE WAS THE PLATFORM. ***
+    //
+    // It walked the LOCAL tree with each rule and compared the selections -- and a local tree only ever
+    // produces its own host's separator, so the comparison could exercise exactly one of the two cases the
+    // rules differ on. Green here every round since it was written; on Keith's Windows rig at v4645 it read
+    // unified 4,275, frozenRecords 4,275, recordDrift 4,392, because /\/vendor\// matches no Windows path.
+    //
+    // The walk comparison is kept and now runs on separator-NORMALISED paths, so it still asks the question
+    // it was built for -- do the two authors' rules still pick the same files? -- instead of re-discovering
+    // the host's separator on one platform and never on the other. The literal test below is the one that
+    // would have caught it here, and it is a fact about the regexes rather than about who is running them.
+    const norm = (a) => a.map((q) => q.replace(/\\/g, "/"));
+    const [uN, fN, dN] = [norm(unified), norm(byFrozen), norm(byDrift)];
+    ok("!! *** THE TWO OLD SKIP RULES STILL SELECT THE SAME FILES AS THE UNIFIED ONE, FILE FOR FILE ***",
+        uN.length === fN.length && uN.every((p, i) => p === fN[i]) &&
+        uN.length === dN.length && uN.every((p, i) => p === dN[i]),
+        "compared on normalised paths: this row is about whether two authors' rules still agree on WHICH " +
+        "files, not about which separator the host writes -- that is the row below, and conflating them is " +
+        "what let a separator-blind rule read as agreement for as long as nobody ran the gate on Windows.");
+    // *** THE ROW THAT DOES NOT DEPEND ON WHO IS RUNNING IT. ***
+    // Driven against literal strings, both separators, so a posix box reaches the Windows case and vice versa.
+    const POSIX = "WebGLEngine/vendor/three/three.module.js";
+    const WIN32 = "WebGLEngine\\vendor\\three\\three.module.js";
+    ok("!! *** the UNIFIED rule skips a vendor path written with EITHER separator -- checked as literals ***",
+        TR.SKIP.test(POSIX) && TR.SKIP.test(WIN32),
+        `posix ${TR.SKIP.test(POSIX)}, win32 ${TR.SKIP.test(WIN32)} -- [\\\\/] is what makes it portable`);
+    ok("  ...and the archived recordDrift rule is SEPARATOR-BLIND, which is why nothing walks with it any more",
+        TR.SKIP_AGREE.recordDrift.test(POSIX) && !TR.SKIP_AGREE.recordDrift.test(WIN32),
+        "posix true, win32 FALSE. Kept in SKIP_AGREE as the archive of what was unified, and recordDrift.mjs's " +
+        "live SOURCE_SKIP points at TR.SKIP instead -- measured leak before that change: 117 vendor files into " +
+        "the census on Windows, none on posix, which is how it survived every green run this gate ever had");
     // A rule that selects a different set must be VISIBLE as different, or the row above proves nothing.
     const narrower = TR.treeFiles(ENG, /node_modules|[\\/](vendor|dist|physics)[\\/]/).map((f) => f.path);
     ok("...and a rule that really differs is seen to differ, so the agreement above is a finding",

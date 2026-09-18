@@ -73,7 +73,13 @@ export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".
 // 3,026 ms it measured at put it OVER the 3,000 ms ship-time budget, so the tree's own drift detector was
 // the thing the ritual could not afford to run. treeRead memoises one read per process. The name and shape
 // here are unchanged, so nothing that imports sources() had to know.
-export const SOURCE_SKIP = TR.SKIP_AGREE.recordDrift;
+// *** v4646 -- THIS POINTED AT SKIP_AGREE.recordDrift, WHICH CANNOT SEE A WINDOWS PATH SEPARATOR. ***
+// That entry is the ARCHIVE of the rule this module used before treeRead unified the three walkers, kept
+// so treeRead-selfcheck can go on comparing them; it is not the rule anything should still walk with.
+// runtimeGap-selfcheck.mjs imports this as its own SKIP, so on Windows both it and this module were
+// filtering with a pattern that matched no vendor path at all -- 117 files into the census, measured on
+// the rig at v4645. The live export is the unified, separator-agnostic rule; the archive stays archived.
+export const SOURCE_SKIP = TR.SKIP;
 export function sources(dir = ENG) { return TR.treeFiles(dir); }
 
 /** What each record owes, and what makes a module owe it. Named, so a report says WHY not just WHAT. */
