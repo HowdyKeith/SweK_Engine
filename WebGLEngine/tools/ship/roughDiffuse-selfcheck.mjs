@@ -159,10 +159,17 @@ console.log("\n5. IT HAS A CONSUMER, AND THE GATE FINDS IT RATHER THAN BEING TOL
         }
         return out;
     };
+    // *** NORMALISED AT THE BOUNDARY: path.relative RETURNS THE HOST'S SEPARATOR AND EVERY COMPARISON
+    // BELOW IS A FORWARD-SLASH LITERAL. *** On posix that is invisible; on Windows the literals match
+    // nothing and the partition collapses silently. Measured on Keith's rig at v4645, this gate's own
+    // detail line read "6 consumer(s), 0 gate(s)" while LISTING two tools\\ship\\ gates among the
+    // consumers. Same defect class as treeRead's /\\/vendor\\// at c00f2ec3; normalising where the path
+    // is produced fixes every comparison downstream at once rather than one literal at a time.
+    const rel = (p) => path.relative(ENG, p).replace(/\\/g, "/");
     const importers = walk(ENG).filter((p) => {
-        if (p.endsWith("physics/render/roughDiffuse.mjs")) return false;      // itself
+        if (rel(p) === "physics/render/roughDiffuse.mjs") return false;      // itself
         return /^\s*import\s[^;]*["'][^"']*roughDiffuse\.mjs["']/m.test(fs.readFileSync(p, "utf8"));
-    }).map((p) => path.relative(ENG, p));
+    }).map(rel);
     const gates = importers.filter((p) => p.startsWith("tools/"));
     const real  = importers.filter((p) => !p.startsWith("tools/"));
     ok("CONTROL: the walk finds THIS gate, so it is looking at the right thing",
