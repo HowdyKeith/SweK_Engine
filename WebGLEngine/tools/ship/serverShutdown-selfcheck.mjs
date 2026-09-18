@@ -166,10 +166,33 @@ console.log("\n4. *** IT CANNOT HANG, BECAUSE A TEARDOWN THAT HANGS IS WORSE THA
     const t0 = Date.now();
     const r = await drainChildren(300, 25);
     const ms = Date.now() - t0;
-    ok("!! *** it returns on its budget instead of spinning on a child that will not die ***",
-        r.drained === false && ms < 2000, ms + "ms against a 300ms budget");
-    ok("...and NAMES what outlasted it, so the caller can assert on something", r.still.includes("ChildProcess"),
-        r.still.join(", ") || "nothing reported");
+    // *** THE FIXTURE CANNOT BE BUILT ON WINDOWS, AND SAYING SO BEATS GOING RED ABOUT IT. ***
+    //
+    // The stubborn child is stubborn because it INSTALLS A SIGTERM HANDLER AND IGNORES IT, which is a POSIX
+    // sentence. Windows has no POSIX signals: ChildProcess.kill() there ends in TerminateProcess, which a
+    // process cannot decline. So on win32 the child dies on the first kill, nothing outlasts the budget, and
+    // both rows below fail -- not because the teardown is wrong but because the thing they need to happen
+    // CANNOT happen. Measured on Keith's rig at v4645: "31ms against a 300ms budget" and "nothing reported",
+    // which is the teardown working perfectly and the gate calling it a failure.
+    //
+    // The property is "give up rather than hang", and it is only observable where a process can refuse to
+    // die. That is a fact about the platform, so it is DERIVED from process.platform and reported, not
+    // waved through: the rows still run everywhere they can run, and where they cannot the reason is printed
+    // in the same place the verdict would have been. A skip that does not say what it skipped is how a red
+    // becomes invisible, so the population is named either way.
+    const CAN_REFUSE_TO_DIE = process.platform !== "win32";
+    if (CAN_REFUSE_TO_DIE) {
+        ok("!! *** it returns on its budget instead of spinning on a child that will not die ***",
+            r.drained === false && ms < 2000, ms + "ms against a 300ms budget");
+        ok("...and NAMES what outlasted it, so the caller can assert on something", r.still.includes("ChildProcess"),
+            r.still.join(", ") || "nothing reported");
+    } else {
+        report(`NOT EXERCISABLE on ${process.platform}: the fixture's child ignores SIGTERM, and kill() here is ` +
+            `TerminateProcess, which cannot be ignored -- so nothing can outlast the budget. Measured anyway ` +
+            `and reported rather than asserted: drained=${r.drained}, ${ms}ms against 300ms, still=[${r.still.join(", ")}]. ` +
+            `The budget-return half IS still covered on this platform by the earlier sections, which drain real ` +
+            `servers; what is lost here is only the refuses-to-die case.`);
+    }
     stubborn.kill("SIGKILL");
     await drainChildren(3000);
 }
