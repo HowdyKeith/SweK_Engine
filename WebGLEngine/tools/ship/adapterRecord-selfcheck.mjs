@@ -77,6 +77,11 @@ console.log("\n4. *** THE DIRECTION, BECAUSE SEVEN HAND-WRITTEN COMPARATORS ARE 
     ok("  and the slack widens in the direction the row is asserted in, never the other way",
        boundFrom("max", 4) === 4 * SLACK && boundFrom("min", 4) === 4 / SLACK,
        `SLACK=${SLACK}: a max-row's ceiling rises, a min-row's floor drops`);
+    ok("!! *** an INTEGER reading keeps an INTEGER bound, rounded the permissive way ***",
+       boundFrom("min", 19) === 9 && boundFrom("max", 19) === 38 && boundFrom("min", 36) === 18,
+       "19 lanes gave a floor of 9.5 on the first real --record run -- a bound a discrete quantity can never sit on");
+    ok("  ...and a fractional reading is NOT rounded, because nothing about it is discrete",
+       boundFrom("min", 19.5) === 9.75 && boundFrom("max", 1.5e-7) === 3e-7);
     ok("  ...and a non-finite measurement is passed through rather than turned into a number",
        Number.isNaN(boundFrom("max", NaN)) && boundFrom("min", Infinity) === Infinity,
        "a bound computed from NaN would be a bound nothing can ever fail");

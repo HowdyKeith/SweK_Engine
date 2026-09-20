@@ -286,10 +286,50 @@ if (R) {
     ok(`  ...and HOW FAR off this adapter's cos runs is its own number, not a universal [${vCos.state}]`,
         vCos.ok,
         describe(vCos).slice(0, 150));
+    // *** THE DURABLE HALF IS THE AMPLIFICATION, NOT THE DIRECTION AND NOT THE SIZE. *** The subtraction turns
+    // a small relative error in cos into a large one in (1 - c2); that is the mechanism, it is true of any
+    // adapter whose cos is not exact, and it is a RATIO OF TWO MEASUREMENTS ON ONE LANE rather than a number
+    // somebody has to believe. Which way it goes, and how far, are the adapter's.
+    // *** THE AMPLIFICATION IS A PREDICTED FACTOR WITH NO FREE PARAMETER, AND THE FIRST DRAFT OF THIS ROW
+    // ASSERTED SOMETHING NOTHING COULD EVER REFUSE. *** It said `amp > 100`. Near theta = 0 the true (1 - c2)
+    // is sin^2 theta ~ theta^2 while an absolute cos error d moves it by 2d, so the relative error is 2d/theta^2
+    // against cos's own d -- an amplification of 2/theta^2, which is a fact about the GRID and is enormous on
+    // any adapter whose cos is not bit-exact. An adapter whose cos WAS exact gives cosRel = 0 and an infinite
+    // ratio, which also passes. There is no device that fails `amp > 100`, so it was decoration.
+    //
+    // Measured instead against the prediction: 5.19e+7 against 2/theta^2 = 5.19e+7, ratio 1.000000. That is
+    // the shape this file already uses for the missing Jacobian -- a number with nothing tuned in it.
+    //
+    // *** AND IT HAS A SECOND REGIME THIS BOX CANNOT PRODUCE, WHICH IS WHY THE BRANCH IS MEASURED AND NOT
+    // ASSUMED. *** The first-order model holds only while the subtraction still has something left. Once the
+    // device's cos rounds to exactly 1.0 in f32, (1 - c2) is exactly ZERO, the relative error is exactly 1 by
+    // arithmetic rather than by approximation, and 2/theta^2 says nothing about it. Which regime an adapter is
+    // in is READ FROM THE MEASUREMENT, not guessed: SwiftShader is in the first. If Keith's gen-9 reading of
+    // 1.000 is the collapse, it lands in the second and this row still holds -- that is the point of splitting
+    // it rather than tightening the prediction and going red on better silicon.
+    const collapsed = R.trig.devOMCAtWorst === 0;
+    const amp = R.trig.cosRelAtWorst > 0 ? R.trig.worstOneMinusC2Rel / R.trig.cosRelAtWorst : Infinity;
+    const pred = 2 / (R.trig.thetaAtWorst ** 2);
+    ok(`  and the mechanism is a PREDICTED FACTOR: catastrophic cancellation amplifies cos's error by 2/theta^2${collapsed ? " -- or collapses (1 - c2) to zero outright" : ""}`,
+        collapsed ? R.trig.worstOneMinusC2Rel === 1
+                  : Math.abs(amp / pred - 1) < 1e-3,
+        collapsed
+            ? `(1 - c2) computed from the device's cos is EXACTLY 0 at theta = ${R.trig.thetaAtWorst.toExponential(3)}, so the relative error is exactly 1 by arithmetic: this adapter's cos rounds to 1.0 in f32 and the subtraction has nothing left to lose. The extreme of the same mechanism, not a different one`
+            : `on the worst lane cos is off by ${R.trig.cosRelAtWorst.toExponential(2)} relatively and (1 - c2) by ${R.trig.worstOneMinusC2Rel.toExponential(2)} -- amplification ${amp.toExponential(2)} against the predicted 2/theta^2 = ${pred.toExponential(2)} at theta = ${R.trig.thetaAtWorst.toExponential(3)}, ratio ${(amp / pred).toFixed(6)}. Nothing in that is tuned`);
+    report(`  (this box is in the ${collapsed ? "COLLAPSED" : "FIRST-ORDER"} regime; the other branch is UNEXERCISED here and is not counted as covered)`);
     const vPole = held("oneMinusC2Min", R.trig.worstOneMinusC2Rel, "min");
-    ok(`  and the mechanism is named rather than inferred: (1 - c2) reads too large near the pole [${vPole.state}]`,
+    ok(`    ...and how far, and WHICH WAY, is this adapter's own number [${vPole.state}]`,
         vPole.ok,
-        `worst relative error in (1.0 - c2) computed from the device's cos: ${R.trig.worstOneMinusC2Rel.toExponential(2)}x the true value near theta = 0. D goes as 1/t^2, so a t that is 4% large is a D that is 8% small`);
+        `${describe(vPole)} -- the departure is ${R.trig.signedAtWorst > 0 ? "POSITIVE, so (1 - c2) reads TOO LARGE" : "NEGATIVE, so (1 - c2) reads TOO SMALL"} at ${R.trig.signedAtWorst.toExponential(3)}. SwiftShader reads +26.8 and a magnitude of exactly 1.0 would mean the computed value collapsed to zero, which is the other direction entirely`);
+    // *** AND THE DIRECTION IS CHECKED, NOT ONLY PRINTED, BECAUSE A SABOTAGE THAT FLIPPED IT WENT 0 RED. ***
+    // The row above went from asserting a direction nothing measured to MEASURING one nothing asserted, which
+    // is the same defect one layer down: negating signedAtWorst made every row print "TOO SMALL" and the gate
+    // stayed green. The check needs no tolerance and no record, because it is an arithmetic identity: c2 is
+    // monotone in c, so (1 - c2) moves OPPOSITE to cos on the same lane. It holds in the collapsed regime too
+    // -- cos rounding UP to 1.0 is what drives (1 - c2) DOWN to zero.
+    ok(`    ...and that direction is the OPPOSITE of the cos error's on the same lane, which is what makes it the cancellation`,
+        Math.sign(R.trig.signedAtWorst) === -Math.sign(R.trig.cosSignedAtWorst) && R.trig.cosSignedAtWorst !== 0,
+        `cos is ${R.trig.cosSignedAtWorst > 0 ? "TOO LARGE" : "TOO SMALL"} by ${R.trig.cosSignedAtWorst.toExponential(3)} and (1 - c2) is ${R.trig.signedAtWorst > 0 ? "TOO LARGE" : "TOO SMALL"} -- c2 is monotone in c, and anything else would mean the subtraction is not what moved it. This row does NOT establish that the two readings come from the SAME lane: taking the cos error from the NEXT lane leaves it green, because neighbouring lanes share a sign. The amplification row above is the lane check, and it goes red on a 1% error in exactly this quantity`);
 }
 
 console.log("\n4. THE TWO ANALYTIC KEYS AND THE MEASURED CURVE, ON A DEVICE");
@@ -513,14 +553,34 @@ async function run() {
 
     const dth = fr(fr(fr(Math.PI) / 2) / fr(N_NDF));
     let worstCosAbs = 0, worstOneMinusC2Rel = 0;
+    // *** THE DIRECTION IS NOW MEASURED, BECAUSE THE ROW ABOVE ASSERTED ONE AND THIS LOOP NEVER TOOK IT. ***
+    // worstOneMinusC2Rel is an ABSOLUTE value; the row it feeds was titled "(1 - c2) reads TOO LARGE near the
+    // pole", which is a signed claim. On SwiftShader the departure is +26.8 (too large, the prose is right);
+    // on Keith's gen-9 the magnitude came back 1.000, and a relative departure of exactly 1 is what you get
+    // when the computed value is ZERO -- the opposite direction. An unsigned magnitude standing in for a
+    // signed property is the same species as a count standing in for one, and it was invisible for as long as
+    // one adapter supplied both.
+    let signedAtWorst = 0, cosRelAtWorst = 0, thetaAtWorst = 0, devOMCAtWorst = 0, cosSignedAtWorst = 0;
     for (let k = 0; k < 64; k++) {
         const th = fr(fr(fr(k) + 0.5) * dth);
         const cd = r.result.trigRaw[k * 2 + 1], ct = Math.cos(th);
         worstCosAbs = Math.max(worstCosAbs, Math.abs(cd - ct));
         const trueOMC = Math.sin(th) ** 2, devOMC = fr(1 - fr(cd * cd));
-        if (trueOMC > 0) worstOneMinusC2Rel = Math.max(worstOneMinusC2Rel, Math.abs(devOMC - trueOMC) / trueOMC);
+        if (trueOMC > 0) {
+            const rel = Math.abs(devOMC - trueOMC) / trueOMC;
+            if (rel > worstOneMinusC2Rel) {
+                worstOneMinusC2Rel = rel;
+                signedAtWorst = (devOMC - trueOMC) / trueOMC;
+                // What the SAME lane's cos was worth relatively, so "the subtraction amplifies" is a ratio of
+                // two measurements on one lane rather than two numbers from different places.
+                cosRelAtWorst = ct === 0 ? 0 : Math.abs(cd - ct) / Math.abs(ct);
+                thetaAtWorst = th;
+                devOMCAtWorst = devOMC;
+                cosSignedAtWorst = cd - ct;
+            }
+        }
     }
-    return { ...r.result, trig: { worstCosAbs, worstOneMinusC2Rel } };
+    return { ...r.result, trig: { worstCosAbs, worstOneMinusC2Rel, signedAtWorst, cosRelAtWorst, thetaAtWorst, devOMCAtWorst, cosSignedAtWorst } };
 }
 
 console.log(fails ? `\n${fails} FAILURE(S)` : "\nALL GREEN");
@@ -549,11 +609,17 @@ if (R) {
             const values = {};
             for (const v of owed) values[v.name] = boundFrom(v.dir, v.measured);
             const r = recordReading(GATE, AKEY, values, { frozen: DEVICE_AT_V4646 });
+            // *** THE PATH IS PRINTED AS THE COMMAND THAT COMMITS IT, RELATIVE TO WHERE THE GATE IS RUN. ***
+            // The first real --record run printed an absolute Windows path, the instruction that went with it
+            // named the wrong directory, and the `git add` failed. A record nobody can commit is a record
+            // nobody has, so the copy-pasteable form is what gets printed.
+            const rel = path.relative(process.cwd(), READINGS_PATH).replace(/\\/g, "/");
             report(r.wrote
-                ? `--record: WROTE ${owed.length} reading(s) for ${AKEY} into ${READINGS_PATH} at the ` +
-                  `${SLACK}x slack convention -- ${owed.map((v) => `${v.name} ${v.measured.toPrecision(4)} -> ${boundFrom(v.dir, v.measured).toPrecision(4)} (${v.dir})`).join(", ")}. ` +
-                  `Commit that file FROM THIS BOX: it is the reading, and a retyped one is not.`
+                ? `--record: WROTE ${owed.length} reading(s) for ${AKEY} at the ${SLACK}x slack convention -- ` +
+                  `${owed.map((v) => `${v.name} ${v.measured.toPrecision(4)} -> ${String(boundFrom(v.dir, v.measured))} (${v.dir})`).join(", ")}.`
                 : `--record: REFUSED -- ${r.why}`);
+            if (r.wrote) report(`--record: commit it FROM THIS BOX -- it is the reading, and a retyped one is not:  ` +
+                                `git add ${rel} && git commit -m "${GATE}: ${AKEY} readings, recorded on that box" && git push`);
         }
     } else if (c.owed > 0) {
         report(`--record is how ${c.owed} OWED reading(s) stop being owed, and it is not on: nothing was written.`);

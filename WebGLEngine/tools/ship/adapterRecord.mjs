@@ -120,10 +120,19 @@ export function compareFor(name, dir) {
     return (have, measured) => (dir === "max" ? measured <= have[name] : measured >= have[name]);
 }
 
-/** The bound a fresh reading becomes, with the slack applied in the direction the row is asserted in. */
+/**
+ * The bound a fresh reading becomes, with the slack applied in the direction the row is asserted in.
+ *
+ * *** AN INTEGER READING KEEPS AN INTEGER BOUND. *** A lane count of 19 became a floor of 9.5 on the first
+ * real --record run, and "at least 9.5 of 64 lanes" is a bound no run can ever sit on: the quantity is
+ * discrete and the bound was not. Rounded in the PERMISSIVE direction on both sides -- floor for a minimum,
+ * ceiling for a maximum -- because the slack exists to be permissive, and rounding it the other way would
+ * quietly make a recorded bound tighter than the convention says it is.
+ */
 export function boundFrom(dir, measured) {
     if (!Number.isFinite(measured)) return measured;
-    return dir === "max" ? measured * SLACK : measured / SLACK;
+    const b = dir === "max" ? measured * SLACK : measured / SLACK;
+    return Number.isInteger(measured) ? (dir === "max" ? Math.ceil(b) : Math.floor(b)) : b;
 }
 
 /**
