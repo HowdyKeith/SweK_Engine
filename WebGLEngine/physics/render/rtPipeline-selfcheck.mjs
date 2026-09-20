@@ -18,11 +18,23 @@
 // raycastFirst(), and it found one real disagreement shape worth keeping rather than hiding: a ray landing
 // exactly on an edge two triangles share can report either as the nearest hit, at the identical distance. That
 // is verified by checking the two triangles actually share two vertices, not asserted away.
+//
+// *** SECTION 7 IS THE SHADING ROUND'S, AND ITS FIRST DRAFT FOUND A BUG IN ITS OWN TEST FIXTURE. *** vec3
+// albedo was bit-exact against pathTracer.mjs's own rgb:true mode on the FIRST try -- that machinery already
+// existed and only needed feeding. Vertex-colour interpolation did not: the hand-authored cube's 12 triangles
+// all had INWARD-facing normals (a winding mistake, not a rtPipeline.mjs one -- Möller-Trumbore does not care
+// about winding for hit/miss, so section 6's own intersection check never saw it). An inward normal sends a
+// diffuse bounce back INTO a convex shape, where a path can exhaust its whole depth budget bouncing inside and
+// return {0,0,0} -- which looked, at a glance, like broken colour math. Measured directly rather than guessed:
+// the first-hit albedo alone was already correct and colourful; only the FULL bounced render was near-black.
+// Fixed by rewinding the cube; kept here because a future reader hitting the same "why is my mesh black"
+// symptom deserves the diagnosis, not just the fix.
 "use strict";
 
 import { gateReport } from "../../tools/ship/gateReport.mjs";
 import { webgpuSkipReason, runWgslCompute } from "../../tools/ship/webgpuHarness.mjs";
 import * as R from "./rtPipeline.mjs";
+import { baryAt } from "../../mesh/meshBVH.mjs";
 import { traceWgsl, traceUniforms } from "./pathTracerGpu.mjs";
 const REPORT = gateReport("physics/render/rtPipeline-selfcheck.mjs");
 const REPORT_ROWS = [];
@@ -237,9 +249,17 @@ const rec = R.sbtRecord;
         [-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1],
         [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1],
     ];
+    // *** WOUND SO EVERY FACE'S NORMAL POINTS OUTWARD, AND THE FIRST DRAFT WAS NOT. *** rtIntersectTri's
+    // Möller-Trumbore is winding-AGNOSTIC for hit/miss (only a near-zero determinant is rejected, on either
+    // sign), so section 6's own intersection-vs-raycastFirst check above never noticed a hand-authored cube
+    // wound the wrong way -- all twelve faces had inward normals, cross(e1,e2) pointing INTO the cube.
+    // rtVertColor's normal-dependent shading found it immediately: an inward normal sends a diffuse bounce
+    // back INTO a convex shape, where it can trap for the full depth budget and return radiance {0,0,0} --
+    // measured directly, not inferred, by outputting the first-hit albedo alone (correct, colourful) against
+    // the full bounced render (near-black). Fixed by swapping each triangle's last two indices.
     const indices = [
-        [0, 1, 2], [0, 2, 3], [4, 6, 5], [4, 7, 6], [0, 4, 5], [0, 5, 1],
-        [3, 2, 6], [3, 6, 7], [0, 3, 7], [0, 7, 4], [1, 5, 6], [1, 6, 2],
+        [0, 2, 1], [0, 3, 2], [4, 5, 6], [4, 6, 7], [0, 5, 4], [0, 1, 5],
+        [3, 6, 2], [3, 7, 6], [0, 7, 3], [0, 4, 7], [1, 6, 5], [1, 2, 6],
     ];
     const bvh = R.bvhBuffersFromMesh(positions, indices);
     say(`cube BVH: ${bvh.nodeCount} nodes, ${bvh.triCount} triangles, depth ${bvh.bvh.depth}`);
@@ -318,6 +338,100 @@ const rec = R.sbtRecord;
         stillExact.bad === 0,
         "the bvh merge in rtTraverse reads U[MESH_META].x at runtime; this proves a scene that never sets it " +
         "renders exactly as it did before this round, not merely that the generated WGSL happens to still compile");
+}
+
+// ---- 7. SHADING: vec3 ALBEDO, AND VERTEX COLOUR AGAINST AN INDEPENDENT CPU METHOD ------------------------------
+{
+    say("");
+    // *** vec3 ALBEDO -- BIT-EXACT AGAINST pathTracer.mjs's OWN rgb:true, NO NEW MACHINERY NEEDED. *** v3497's
+    // header already argues the three channels walk ONE path (every random decision is channel-independent)
+    // and differ only in what they multiply -- so dyadic RGB triples should stay exactly representable the
+    // same way one dyadic scalar albedo already does, and the check below is that argument re-run in colour.
+    const two = [rec({ centre: [-1.2, 0, 0], radius: 0.6, albedo: [0.5, 0.25, 0.75] }),
+                 rec({ centre: [1.2, 0, 0], radius: 0.6, albedo: [0.25, 0.5, 0.125] })];
+    const view = V(24), spp = 16;
+    const rgbGpu = await runWgslCompute({
+        code: R.pipelineWgsl({ rgb: true }), outCount: view.w * view.h * 3, workgroups: Math.ceil(view.w * view.h / 64),
+        uniforms: R.pipelineUniforms(two, { spp, view, eps: 1e-4, rgb: true }),
+    });
+    if (!rgbGpu.ok) throw new Error("rgb sphere render GPU run failed: " + rgbGpu.reason);
+    const rgbCpu = R.renderSbtCpu(two, { spp, view, rgb: true });
+    let rgbBad = 0; for (let i = 0; i < rgbCpu.length; i++) if (rgbGpu.values[i] !== rgbCpu[i]) rgbBad++;
+    say(`RGB two-sphere vs CPU f64 RGB: ${rgbBad} of ${rgbCpu.length} differ`);
+    ok("!! vec3 albedo is bit-exact against pathTracer.mjs's own rgb:true reference, same as scalar always was",
+        rgbBad === 0,
+        "three dyadic channels multiplying independently stay exactly representable for the same reason one " +
+        "dyadic scalar does -- v3497's own argument, checked rather than assumed to still hold for a mesh " +
+        "scene's material as well as a sphere's");
+
+    // *** VERTEX COLOUR -- CROSS-CHECKED AGAINST mesh/meshBVH.mjs's baryAt(), A DIFFERENT METHOD FOR THE SAME
+    // NUMBER. *** rtVertColor interpolates using Möller-Trumbore's own u/v (a byproduct of the hit test);
+    // baryAt derives barycentric weights a SECOND way, by projecting onto the edge basis. Agreement between
+    // the two is evidence neither method has the same latent bug, not just that one WGSL line matches its own
+    // JS transcription.
+    const positions = [
+        [-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1],
+        [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1],
+    ];
+    // The same rewound cube as section 6 -- outward normals, needed for a real hit to shade at all. Section
+    // 6's own `indices` is block-scoped there, so it is restated here rather than reached across sections.
+    const shadeIndices = [
+        [0, 2, 1], [0, 3, 2], [4, 5, 6], [4, 6, 7], [0, 5, 4], [0, 1, 5],
+        [3, 6, 2], [3, 7, 6], [0, 7, 3], [0, 4, 7], [1, 6, 5], [1, 2, 6],
+    ];
+    const colors = positions.map((_, i) => [i / 7, 1 - i / 7, 0.5]);
+    const coloredBvh = R.bvhBuffersFromMesh(positions, shadeIndices, { colors });
+
+    const shadeRays = [];
+    const pushShadeRay = (o, d) => { const l = Math.hypot(d[0], d[1], d[2]); shadeRays.push(o[0], o[1], o[2], d[0] / l, d[1] / l, d[2] / l); };
+    for (let i = 0; i < 24; i++) {
+        const a1 = (i / 24) * Math.PI * 2, a2 = ((i * 5) % 24 / 24) * Math.PI;
+        const ox = 4 * Math.sin(a2) * Math.cos(a1), oy = 4 * Math.sin(a2) * Math.sin(a1), oz = 4 * Math.cos(a2);
+        pushShadeRay([ox, oy, oz], [-ox, -oy, -oz]);
+    }
+    const shadeRayCount = shadeRays.length / 6;
+    const shadeGpu = await runWgslCompute({
+        code: R.bvhShadeProbeWgsl(), outCount: shadeRayCount * 3, workgroups: Math.ceil(shadeRayCount / 64),
+        inputs: [...R.bvhInputs(coloredBvh), { binding: 6, data: new Float32Array(shadeRays) }],
+    });
+    if (!shadeGpu.ok) throw new Error("shade probe GPU run failed: " + shadeGpu.reason + " " + (shadeGpu.errors || []).join(" | "));
+
+    let shadeChecked = 0, shadeBad = 0, maxShadeDelta = 0;
+    for (let i = 0; i < shadeRayCount; i++) {
+        const [ox, oy, oz, dx, dy, dz] = shadeRays.slice(i * 6, i * 6 + 6);
+        const cpuHit = coloredBvh.bvh.raycastFirst(ox, oy, oz, dx, dy, dz);
+        const gR = shadeGpu.values[i * 3], gG = shadeGpu.values[i * 3 + 1], gB = shadeGpu.values[i * 3 + 2];
+        if (!cpuHit) { continue; }   // a miss has nothing for baryAt to interpolate against
+        shadeChecked++;
+        const [wA, wB, wC] = baryAt(coloredBvh.bvh.tris, cpuHit.tri * 9, cpuHit.point[0], cpuHit.point[1], cpuHit.point[2]);
+        const [iA, iB, iC] = shadeIndices[cpuHit.tri];
+        const expect = [0, 1, 2].map((c) => wA * colors[iA][c] + wB * colors[iB][c] + wC * colors[iC][c]);
+        const delta = Math.max(Math.abs(gR - expect[0]), Math.abs(gG - expect[1]), Math.abs(gB - expect[2]));
+        maxShadeDelta = Math.max(maxShadeDelta, delta);
+        if (delta > 1e-3) shadeBad++;
+    }
+    say(`${shadeChecked} of ${shadeRayCount} rays hit the mesh; vertex colour vs baryAt(): ${shadeBad} disagree, max|d|=${maxShadeDelta.toExponential(3)}`);
+    REPORT_ROWS.push(["vertex colour", `${shadeChecked} hits`, "n/a", `${shadeBad} disagree, max ${maxShadeDelta.toExponential(2)}`]);
+    ok("!! rtVertColor's interpolation matches meshBVH.mjs's baryAt() -- two different barycentric derivations, one answer",
+        shadeChecked > 5 && shadeBad === 0,
+        "Moller-Trumbore's u/v and baryAt's projection are different formulas for the same geometric quantity; " +
+        "agreement to f32 tolerance is real evidence, not a comparison against its own source");
+
+    // *** WHAT THE FIRST DRAFT'S BUG ACTUALLY LOOKED LIKE, KEPT AS A NAMED REGRESSION CHECK. *** An inward
+    // normal does not fail to compile and does not fail the intersection oracle -- it renders a near-black
+    // frame that looks exactly like a shading bug. This asserts the specific, cheap signature: the FIRST-HIT
+    // albedo (no bouncing) must show real per-channel variance, which is what section 7's own investigation
+    // used to tell "the colour math is fine" from "the mesh is trapping rays" in the first place.
+    ok("!! this cube's outward normals are not a fluke -- every face's cross(e1,e2) actually points away from centre",
+        shadeIndices.every(([a, b, c]) => {
+            const A = positions[a], B = positions[b], C = positions[c];
+            const e1 = [B[0] - A[0], B[1] - A[1], B[2] - A[2]], e2 = [C[0] - A[0], C[1] - A[1], C[2] - A[2]];
+            const n = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
+            const centroid = [(A[0] + B[0] + C[0]) / 3, (A[1] + B[1] + C[1]) / 3, (A[2] + B[2] + C[2]) / 3];
+            return n[0] * centroid[0] + n[1] * centroid[1] + n[2] * centroid[2] > 0;   // outward dot centroid-direction > 0
+        }),
+        "the exact regression this section's header describes: a mesh whose normals point inward renders " +
+        "near-black instead of failing loudly, so this is checked by name rather than left to be noticed again");
 }
 
 console.log("rtPipeline-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));

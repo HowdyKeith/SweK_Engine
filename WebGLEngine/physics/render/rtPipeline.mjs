@@ -164,10 +164,19 @@ export const HIT_SHADERS = Object.freeze({ lambertian: 0, mirror: 1 });
  *
  * *** THE POINT IS THAT THIS IS DATA. *** Adding a geometry with a different material appends a record; it does
  * not touch the traversal loop, which is the whole difference between this and v4417's `albedo` uniform.
+ *
+ * `albedo` is a NUMBER or a [r,g,b] TRIPLE, matching pathTracer.mjs's own `col()` convention exactly (a scalar
+ * broadcasts to grey) -- so the same record shape serves the grayscale pipeline unchanged and the rgb one this
+ * round adds, and a caller migrating from one to the other does not have to touch its scene descriptions.
  */
 export function sbtRecord({ centre = [0, 0, 0], radius = 1, hit = "lambertian", albedo = 0.5 } = {}) {
     if (!(hit in HIT_SHADERS)) throw new Error("rtPipeline: no closest-hit shader named " + hit);
     return Object.freeze({ centre: centre.slice(), radius, hit, albedo });
+}
+
+/** [r,g,b], whether `albedo` is a number (broadcast to grey) or already a triple -- pathTracer.mjs's col(). */
+export function albedoVec3(albedo) {
+    return Array.isArray(albedo) ? albedo.slice(0, 3) : [albedo, albedo, albedo];
 }
 
 export const MAX_GEOMETRY = 4;
@@ -180,8 +189,12 @@ export const MAX_GEOMETRY = 4;
 export const MESH_META_SLOT = 20;
 export const MESH_SBT_SLOT = 21;
 
-/** The storage-buffer bindings pipelineWgsl's bvh block declares, at fixed indices past binding 1 (uniforms). */
-export const BVH_BINDINGS = Object.freeze({ bounds: 2, meta: 3, order: 4, tris: 5 });
+/**
+ * The storage-buffer bindings pipelineWgsl's bvh block declares, at fixed indices past binding 1 (uniforms).
+ * `vertColors` is separate from the other four: it is only bound when `vertexColors: true` is asked for, so a
+ * plain bvh scene (every caller before this round, and most after it) never has to supply one.
+ */
+export const BVH_BINDINGS = Object.freeze({ bounds: 2, meta: 3, order: 4, tris: 5, vertColors: 7 });
 
 /**
  * Build a BVH over an indexed triangle mesh and pack it into the four flat buffers the GPU bvh block reads.
@@ -193,6 +206,13 @@ export const BVH_BINDINGS = Object.freeze({ bounds: 2, meta: 3, order: 4, tris: 
  * slots as a safe upper bound, and shipping the unused tail would be dead bandwidth, not a correctness risk, but
  * there is no reason to pay for it.
  */
+/**
+ * `colors`, if given, is one [r,g,b] per POSITION (same indexing `indices` already uses for `positions`) --
+ * flattened the exact same way trianglesFrom flattens positions, so a triangle's three colours sit at the
+ * SAME byte offsets in bvhVertColors that its three vertices sit at in bvhTris. No colour interpolation
+ * happens here: that is the WGSL kernel's job, from the barycentric weights Möller-Trumbore's own u/v already
+ * are (mesh/meshBVH.mjs's separate baryAt is not needed -- it is a second way to compute the same numbers).
+ */
 export function bvhBuffersFromMesh(positions, indices, opts = {}) {
     const tris = trianglesFrom(positions, indices);
     const bvh = new MeshBVH(tris, opts);
@@ -201,17 +221,32 @@ export function bvhBuffersFromMesh(positions, indices, opts = {}) {
     const order = new Int32Array(bvh.order.subarray(0, bvh.count));
     const trisF32 = new Float32Array(tris.length);
     trisF32.set(tris);
-    return Object.freeze({ bounds, meta, order, tris: trisF32, nodeCount: bvh.nodes, triCount: bvh.count, bvh });
+    let vertColors = null;
+    if (opts.colors) {
+        vertColors = new Float32Array(indices.length * 9);
+        for (let n = 0; n < indices.length; n++) {
+            const [i, j, k] = indices[n];
+            const A = opts.colors[i], B = opts.colors[j], C = opts.colors[k];
+            const o = n * 9;
+            vertColors[o] = A[0]; vertColors[o + 1] = A[1]; vertColors[o + 2] = A[2];
+            vertColors[o + 3] = B[0]; vertColors[o + 4] = B[1]; vertColors[o + 5] = B[2];
+            vertColors[o + 6] = C[0]; vertColors[o + 7] = C[1]; vertColors[o + 8] = C[2];
+        }
+    }
+    return Object.freeze({ bounds, meta, order, tris: trisF32, vertColors,
+                           nodeCount: bvh.nodes, triCount: bvh.count, bvh });
 }
 
 /** The `inputs` array runWgslCompute/runWgslComputeNative expect, at BVH_BINDINGS' fixed indices. */
 export function bvhInputs(b) {
-    return [
+    const out = [
         { binding: BVH_BINDINGS.bounds, data: b.bounds },
         { binding: BVH_BINDINGS.meta, data: b.meta },
         { binding: BVH_BINDINGS.order, data: b.order },
         { binding: BVH_BINDINGS.tris, data: b.tris },
     ];
+    if (b.vertColors) out.push({ binding: BVH_BINDINGS.vertColors, data: b.vertColors });
+    return out;
 }
 
 /**
@@ -219,12 +254,13 @@ export function bvhInputs(b) {
  * meshBVH.mjs's traversal, not two copies that can drift apart the way multiplayer/wadLevelHost.js and
  * tools/krbn/krbnCompare.js's independent ray-triangle kernels already did (meshBVH.mjs's own header).
  */
-function bvhWgslBlock() {
+function bvhWgslBlock({ vertexColors = false } = {}) {
     return `
 @group(0) @binding(${BVH_BINDINGS.bounds}) var<storage, read> bvhBounds : array<f32>;
 @group(0) @binding(${BVH_BINDINGS.meta}) var<storage, read> bvhMeta : array<i32>;
 @group(0) @binding(${BVH_BINDINGS.order}) var<storage, read> bvhOrder : array<i32>;
 @group(0) @binding(${BVH_BINDINGS.tris}) var<storage, read> bvhTris : array<f32>;
+${vertexColors ? `@group(0) @binding(${BVH_BINDINGS.vertColors}) var<storage, read> bvhVertColors : array<f32>;` : ""}
 
 const TRI_EPS : f32 = 1e-9;   // mesh/meshBVH.mjs's own EPS, reused verbatim -- see this file's header note on
                                // reusing an f64 threshold on f32: a real mesh's triangles are never within
@@ -233,29 +269,46 @@ const TRI_EPS : f32 = 1e-9;   // mesh/meshBVH.mjs's own EPS, reused verbatim -- 
                                // methodology is to measure that gap with a gate rather than assume it away.
 
 var<private> bvhHitTri : i32;              // which triangle rtTraverseBvh's last call landed on, or -1
+var<private> bvhHitU : f32;                // that hit's barycentric weight on vertex B (0 when bvhHitTri < 0)
+var<private> bvhHitV : f32;                // and on vertex C -- weight on A is always 1 - bvhHitU - bvhHitV
 var<private> bvhStack : array<i32, 64>;    // depth bound: maxLeaf=8 default needs 2^57+ triangles to overflow
 
 // ---- STAGE: intersection (triangle) -- ported from mesh/meshBVH.mjs's rayTriangle -----------------------
 // Moller-Trumbore, same algebra and the same epsilon on both ends (the near-parallel guard on det, and the
 // t > eps floor). This is the NEAREST-hit query -- raycastFirst's shape, not intersectsSegment's early-out.
-fn rtIntersectTri(orig : vec3<f32>, dir : vec3<f32>, i : i32) -> f32 {
+// *** u AND v ARE ALREADY BARYCENTRIC WEIGHTS -- Moller-Trumbore computes them as a byproduct of the hit
+// test, on vertices B and C respectively (A's weight is 1-u-v). meshBVH.mjs's separate baryAt() derives the
+// same numbers a second, more expensive way (a projection onto the edge basis); this returns the ones the
+// intersection test already has rather than computing them twice.
+struct TriHit { t : f32, u : f32, v : f32 };
+fn rtIntersectTri(orig : vec3<f32>, dir : vec3<f32>, i : i32) -> TriHit {
   let A = vec3<f32>(bvhTris[i], bvhTris[i + 1], bvhTris[i + 2]);
   let e1 = vec3<f32>(bvhTris[i + 3], bvhTris[i + 4], bvhTris[i + 5]) - A;
   let e2 = vec3<f32>(bvhTris[i + 6], bvhTris[i + 7], bvhTris[i + 8]) - A;
   let p = cross(dir, e2);
   let det = dot(e1, p);
-  if (det > -TRI_EPS && det < TRI_EPS) { return -1.0; }
+  if (det > -TRI_EPS && det < TRI_EPS) { return TriHit(-1.0, 0.0, 0.0); }
   let inv = 1.0 / det;
   let tv = orig - A;
   let u = dot(tv, p) * inv;
-  if (u < 0.0 || u > 1.0) { return -1.0; }
+  if (u < 0.0 || u > 1.0) { return TriHit(-1.0, 0.0, 0.0); }
   let q = cross(tv, e1);
   let v = dot(dir, q) * inv;
-  if (v < 0.0 || u + v > 1.0) { return -1.0; }
+  if (v < 0.0 || u + v > 1.0) { return TriHit(-1.0, 0.0, 0.0); }
   let t = dot(e2, q) * inv;
-  if (t > TRI_EPS) { return t; }
-  return -1.0;
+  if (t > TRI_EPS) { return TriHit(t, u, v); }
+  return TriHit(-1.0, 0.0, 0.0);
 }
+
+${vertexColors ? `// Vertex colours are flattened into bvhVertColors at THE SAME byte offset per triangle that
+// positions occupy in bvhTris -- bvhBuffersFromMesh's own comment on why. Interpolated by the barycentric
+// weights Möller-Trumbore already produced, at the ONE triangle that won, not per candidate.
+fn rtVertColor(i : i32, u : f32, v : f32) -> vec3<f32> {
+  let cA = vec3<f32>(bvhVertColors[i], bvhVertColors[i + 1], bvhVertColors[i + 2]);
+  let cB = vec3<f32>(bvhVertColors[i + 3], bvhVertColors[i + 4], bvhVertColors[i + 5]);
+  let cC = vec3<f32>(bvhVertColors[i + 6], bvhVertColors[i + 7], bvhVertColors[i + 8]);
+  return cA * (1.0 - u - v) + cB * u + cC * v;
+}` : ""}
 
 // The winner's own face normal -- recomputed once, for the one triangle that won, rather than carried
 // per-candidate through the traversal below. WGSL's builtin normalize() rather than the pipeline's own nrm()
@@ -318,8 +371,8 @@ fn rtTraverseBvh(orig : vec3<f32>, dir : vec3<f32>, maxT : f32) -> f32 {
       let cnt = bvhMeta[node * 3 + 2];
       for (var s = start; s < start + cnt; s = s + 1) {
         let tri = bvhOrder[s];
-        let t = rtIntersectTri(orig, dir, tri * 9);
-        if (t > 0.0 && t < best) { best = t; bvhHitTri = tri; }
+        let th = rtIntersectTri(orig, dir, tri * 9);
+        if (th.t > 0.0 && th.t < best) { best = th.t; bvhHitTri = tri; bvhHitU = th.u; bvhHitV = th.v; }
       }
       continue;
     }
@@ -360,6 +413,30 @@ fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
 }
 
 /**
+ * The RGB analogue of bvhProbeWgsl: for each ray, the INTERPOLATED vertex colour at the winning triangle's
+ * hit point (or -1,-1,-1 for a miss), three floats per ray. Tests rtVertColor -- the one new claim vertex
+ * colours make -- without going through a whole bounced render, which has no CPU oracle to grade it against.
+ */
+export function bvhShadeProbeWgsl() {
+    return `
+@group(0) @binding(0) var<storage, read_write> outBuf : array<f32>;
+@group(0) @binding(6) var<storage, read> rays : array<f32>;
+${bvhWgslBlock({ vertexColors: true })}
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
+  let i = i32(gid.x);
+  let r = i * 6;
+  let orig = vec3<f32>(rays[r], rays[r + 1], rays[r + 2]);
+  let dir = vec3<f32>(rays[r + 3], rays[r + 4], rays[r + 5]);
+  let t = rtTraverseBvh(orig, dir, 1e30);
+  if (t < 0.0) { outBuf[i * 3] = -1.0; outBuf[i * 3 + 1] = -1.0; outBuf[i * 3 + 2] = -1.0; return; }
+  let c = rtVertColor(bvhHitTri * 9, bvhHitU, bvhHitV);
+  outBuf[i * 3] = c.x; outBuf[i * 3 + 1] = c.y; outBuf[i * 3 + 2] = c.z;
+}
+`;
+}
+
+/**
  * *** WHICH RECORDS THE CPU REFERENCE CAN EXPRESS AT ALL, AND IT IS NOT ALL OF THEM. ***
  *
  * pathTracer.mjs's scene is {centre, radius, albedo}: a Lambertian sphere and nothing else. A binding table
@@ -387,9 +464,9 @@ export function sceneFromSbt(sbt) {
 }
 
 /** The CPU reference for a table, DELEGATED to pathTracer.mjs rather than restated. */
-export function renderSbtCpu(sbt, { spp = 16, seed = 1, view = VIEW, sky = null } = {}) {
+export function renderSbtCpu(sbt, { spp = 16, seed = 1, view = VIEW, sky = null, rgb = false } = {}) {
     return renderCpu(sceneFromSbt(sbt), { ...view, spp, seed, maxDepth: MAX_DEPTH, nee: false,
-                                          sky: sky || (() => 1) });
+                                          sky: sky || (() => 1), rgb });
 }
 
 /** Both of v4417's exactness preconditions, over a whole table rather than one albedo. */
@@ -409,12 +486,15 @@ export function tablePreconditions(sbt, spp) {
 // THE PIPELINE
 // ================================================================================================
 export function pipelineWgsl({ workgroupSize = 64, gradient = false,
-                               plantSwapRecords = false, plantIgnoreRecord = false, bvh = false } = {}) {
+                               plantSwapRecords = false, plantIgnoreRecord = false, bvh = false,
+                               rgb = false, vertexColors = false } = {}) {
     const PI = "3.141592653589793";
+    if (vertexColors && !bvh) throw new Error("rtPipeline: vertexColors needs bvh -- there is no mesh to colour otherwise");
+    if (vertexColors && !rgb) throw new Error("rtPipeline: vertexColors needs rgb -- a colour has nowhere to go in a one-channel pipeline");
     return `
 @group(0) @binding(0) var<storage, read_write> outBuf : array<f32>;
 @group(0) @binding(1) var<uniform> U : array<vec4<f32>, 24>;
-${bvh ? bvhWgslBlock() : ""}
+${bvh ? bvhWgslBlock({ vertexColors }) : ""}
 
 // U[0]  eye.xyz, tanHalfFov          U[1]  fwd.xyz, geometryCount
 // U[2]  w, h, spp, eps               U[3]  right.xyz, seedBits
@@ -530,6 +610,35 @@ fn rtMiss(d : vec3<f32>) -> f32 {
 ${gradient ? `  return 0.3 + 0.7 * (0.5 * (d.y + 1.0));` : `  return 1.0;`}
 }
 
+${rgb ? `
+// ---- RGB VARIANTS -- vec3 throughput, vec3 albedo, three floats per pixel out -----------------------------
+// *** NOT A REWRITE OF rtClosestHit/rtMiss -- A SEPARATE PAIR. *** Reusing them by widening weight/the sky
+// value to vec3 would mean EVERY caller, including every one before this round, now packs and reads three
+// SBT floats instead of one -- and this file's whole discipline since v4417 has been that a scene which
+// never asks for a capability renders EXACTLY as it did before that capability existed. Two small functions
+// cost far less than putting that guarantee at risk.
+struct BounceRgb { dir : vec3<f32>, weight : vec3<f32> };
+fn rtClosestHitRgb(shaderIndex : i32, albedo : vec3<f32>, N : vec3<f32>, inDir : vec3<f32>) -> BounceRgb {
+  let r1 = nextF32();
+  let r2 = nextF32();
+  switch (shaderIndex) {
+    case ${HIT_SHADERS.mirror}: {
+      return BounceRgb(nrm(inDir - 2.0 * dot(inDir, N) * N), albedo);
+    }
+    default: {
+      let r = sqrt(r1);
+      let phi = 2.0 * ${PI} * r2;
+      let local = vec3<f32>(r * cos(phi), sqrt(max(0.0, 1.0 - r1)), r * sin(phi));
+      let F = coordSystem(N);
+      return BounceRgb(nrm(local.x * F[1] + local.y * F[2] + local.z * F[0]), albedo);
+    }
+  }
+}
+// Grey, not because color is unmodeled here, but because pathTracer.mjs's own sky() always returns a scalar
+// that col() broadcasts to (v,v,v) -- this matches that convention exactly rather than inventing a second one.
+fn rtMissRgb(d : vec3<f32>) -> vec3<f32> { return vec3<f32>(rtMiss(d), rtMiss(d), rtMiss(d)); }
+` : ""}
+
 @compute @workgroup_size(${workgroupSize})
 fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
   let w = i32(U[2].x);
@@ -543,7 +652,43 @@ fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
   let nGeo = i32(U[1].w);
 
   rngState = (bitcast<u32>(U[3].w) * 73856093u) ^ (u32(x) * 19349663u) ^ (u32(y) * 83492791u);
+${rgb ? `
+  var acc = vec3<f32>(0.0, 0.0, 0.0);
+  for (var s = 0; s < spp; s = s + 1) {
+    var d = rtRaygen(x, y, w, h);
+    var o = U[0].xyz;
+    var throughput = vec3<f32>(1.0, 1.0, 1.0);
+    var radiance = vec3<f32>(0.0, 0.0, 0.0);
 
+    for (var depth = 0; depth < ${MAX_DEPTH}; depth = depth + 1) {
+      let hit = rtTraverse(o, d, nGeo, eps);
+      if (hit.geo < 0) { radiance = radiance + throughput * rtMissRgb(d); break; }
+      let P = o + d * hit.t;
+      var N : vec3<f32>;
+      var rec : vec4<f32>;
+      var albedo : vec3<f32>;
+      ${bvh ? `if (hit.geo == nGeo) {
+        N = rtTriNormal(bvhHitTri * 9);
+        rec = U[MESH_SBT];
+        albedo = rec.yzw;
+        ${vertexColors ? `albedo = albedo * rtVertColor(bvhHitTri * 9, bvhHitU, bvhHitV);` : ""}
+      } else {` : ""}
+      let g = U[GEO_BASE + hit.geo];
+      N = nrm(P - g.xyz);
+      rec = U[SBT_BASE + ${plantIgnoreRecord ? "0" : plantSwapRecords ? "(nGeo - 1 - hit.geo)" : "hit.geo"}];
+      albedo = rec.yzw;
+      ${bvh ? `}` : ""}
+      let b = rtClosestHitRgb(i32(rec.x), albedo, N, d);
+      d = b.dir;
+      o = P + N * eps;
+      throughput = throughput * b.weight;
+    }
+    acc = acc + radiance;
+  }
+  outBuf[idx * 3] = acc.x / f32(spp);
+  outBuf[idx * 3 + 1] = acc.y / f32(spp);
+  outBuf[idx * 3 + 2] = acc.z / f32(spp);
+` : `
   var acc = 0.0;
   for (var s = 0; s < spp; s = s + 1) {
     var d = rtRaygen(x, y, w, h);
@@ -578,6 +723,7 @@ fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
     acc = acc + radiance;
   }
   outBuf[idx] = acc / f32(spp);
+`}
 }
 `;
 }
@@ -589,8 +735,12 @@ fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
  * actual bounds/meta/order/tris arrays go to the GPU as storage-buffer `inputs` (see bvhInputs), because a
  * uniform block this size cannot hold an arbitrary mesh; this only sets the two extra slots (MESH_META,
  * MESH_SBT) a bvh-enabled pipeline reads to know the mesh is there and how to shade it.
+ *
+ * `rgb` packs each record's albedo into all THREE of a slot's spare floats (y, z, w) instead of just y, so
+ * pipelineWgsl({rgb:true})'s `rec.yzw` reads a real [r,g,b] -- matching pipelineWgsl's own rgb option, which
+ * must be passed the same way on both sides or the shader reads a record this function never wrote correctly.
  */
-export function pipelineUniforms(sbt, { spp = 16, seed = 1, view = VIEW, eps = EPS, bvh = null } = {}) {
+export function pipelineUniforms(sbt, { spp = 16, seed = 1, view = VIEW, eps = EPS, bvh = null, rgb = false } = {}) {
     if (sbt.length > MAX_GEOMETRY) throw new Error("rtPipeline: at most " + MAX_GEOMETRY + " geometries");
     const { w, h, eye, look, up, fovDeg } = view;
     const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -608,12 +758,12 @@ export function pipelineUniforms(sbt, { spp = 16, seed = 1, view = VIEW, eps = E
     U.set([camUp[0], camUp[1], camUp[2], 0], 16);
     sbt.forEach((r, i) => {
         U.set([r.centre[0], r.centre[1], r.centre[2], r.radius], (8 + i) * 4);
-        U.set([HIT_SHADERS[r.hit], r.albedo, 0, 0], (16 + i) * 4);
+        U.set([HIT_SHADERS[r.hit], ...(rgb ? albedoVec3(r.albedo) : [Array.isArray(r.albedo) ? r.albedo[0] : r.albedo, 0, 0])], (16 + i) * 4);
     });
     if (bvh) {
         if (!(bvh.hit in HIT_SHADERS)) throw new Error("rtPipeline: no closest-hit shader named " + bvh.hit);
         U.set([1, bvh.nodeCount, bvh.triCount, 0], MESH_META_SLOT * 4);
-        U.set([HIT_SHADERS[bvh.hit], bvh.albedo, 0, 0], MESH_SBT_SLOT * 4);
+        U.set([HIT_SHADERS[bvh.hit], ...(rgb ? albedoVec3(bvh.albedo) : [Array.isArray(bvh.albedo) ? bvh.albedo[0] : bvh.albedo, 0, 0])], MESH_SBT_SLOT * 4);
     }
     return U;
 }
@@ -654,6 +804,29 @@ export const MEASURED_BVH_ROUND = Object.freeze({
     // The sphere-only path, unchanged: pipelineWgsl({}) -- every caller's shape before this round -- is still
     // bit-exact against the CPU f64 reference, proving the bvh merge is inert when U[MESH_META].x is 0.
     sphereOnlyStillExact: Object.freeze({ differing: 0, of: 576 }),
+});
+
+/**
+ * What the shading round (vec3 albedo, barycentric vertex colour) measured. Re-take with:
+ * node physics/render/rtPipeline-selfcheck.mjs
+ */
+export const MEASURED_SHADING_ROUND = Object.freeze({
+    // Two dyadic-RGB spheres, rgb:true, against pathTracer.mjs's own rgb:true CPU reference -- bit-exact,
+    // the same v3497 componentwise argument that already held for one dyadic scalar channel.
+    rgbSpheresStillExact: Object.freeze({ differing: 0, of: 1728 }),
+    // rtVertColor's Moller-Trumbore-derived barycentrics against mesh/meshBVH.mjs's independently-computed
+    // baryAt(), for every ray of a 24-ray sweep that actually hit the (rewound) cube.
+    vertexColourVsBaryAt: Object.freeze({ raysHit: 24, of: 24, disagree: 0, maxDelta: 1.176e-7 }),
+    // *** THE REAL FINDING: A WINDING BUG IN THE TEST FIXTURE, NOT IN THIS FILE. *** The section 6 cube (used
+    // unchanged since the BVH round) had all twelve triangles wound with INWARD-facing normals -- invisible to
+    // intersection-only grading (Moller-Trumbore doesn't care about winding for hit/miss) and invisible to a
+    // glance at the code, because rtTriNormal/cross(e1,e2) is exactly the textbook formula and computes the
+    // wrong-but-consistent answer for wrongly-wound input. It surfaces as a near-black render: an inward
+    // normal sends a diffuse bounce back INTO a convex shape, which can trap for the whole depth budget and
+    // return {0,0,0} -- looking exactly like broken colour math rather than a geometry bug. Diagnosed by
+    // isolating the FIRST-HIT albedo (no bouncing): it was already correct and colourful, which is what
+    // pointed at the bounce/normal path rather than rtVertColor itself.
+    windingBugFound: Object.freeze({ trianglesAffected: 12, of: 12, symptom: "near-black render, correct first-hit albedo" }),
 });
 
 // v4468 -- the probe manifest (docs/GPU-KERNEL-CONTRACT.md): a two-record LAMBERTIAN table (the CPU tracer has no
