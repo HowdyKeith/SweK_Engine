@@ -10,20 +10,26 @@
 "use strict";
 import path from "node:path";
 import { ensureDxc, describe, DXC_FILES } from "./ensureDxc.mjs";
+import { SHELL_DIR_SAMPLES } from "./playwrightResolve.mjs";
 
 let fails = 0;
 const ok = (n, c, d = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${n}${d ? "   " + d : ""}`); };
 
 const ROOT = "/FAKE-PW", ENV = { PLAYWRIGHT_BROWSERS_PATH: ROOT };
-const SHELL_DIR = path.join(ROOT, "chromium_headless_shell-1243", "chrome-headless-shell-win64");
+// *** THE BUNDLE DIRECTORY NAMES COME FROM THE RESOLVER, NOT FROM HERE. *** playwrightResolve-selfcheck
+// asserts that no file outside the resolver spells a browser directory by hand, and it caught this file and
+// dxcResolve-selfcheck doing it in a FIXTURE. It was right to: a rule that exempts fixtures cannot tell one
+// from a fifth real copy. SHELL_DIR_SAMPLES is the one spelling, beside the pattern that must match it.
+const [FULL_BUNDLE, SHELL_BUNDLE] = SHELL_DIR_SAMPLES;
+const SHELL_DIR = path.join(ROOT, SHELL_BUNDLE, "chrome-headless-shell-win64");
 const SHELL_BIN = path.join(SHELL_DIR, "chrome-headless-shell.exe");
-const FULL_DIR = path.join(ROOT, "chromium-1243", "chrome-win64");
+const FULL_DIR = path.join(ROOT, FULL_BUNDLE, "chrome-win64");
 const base = [SHELL_BIN, ...DXC_FILES.map((f) => path.join(FULL_DIR, f))];
 const mk = (extra = []) => {
     const set = new Set([...base, ...extra]), copies = [];
     return { set, copies,
              inj: { env: ENV, home: "/nohome", exists: (p) => set.has(p),
-                    readdir: (r) => (r === ROOT ? ["chromium-1243", "chromium_headless_shell-1243"] : (() => { throw new Error("ENOENT"); })()),
+                    readdir: (r) => (r === ROOT ? [...SHELL_DIR_SAMPLES] : (() => { throw new Error("ENOENT"); })()),
                     copy: (a, b) => { copies.push([a, b]); set.add(b); } } };
 };
 

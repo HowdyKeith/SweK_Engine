@@ -31,8 +31,37 @@ export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".
 const read = (f) => fs.readFileSync(path.join(ENG, f), "utf8");
 
 /** The modules that own a character-physics rule. A new one arriving unlisted is the gap this cannot see. */
-export const MODULES = Object.freeze(["capsuleGround.mjs", "capsuleMove.mjs", "fallBody.mjs",
-                                      "groundProbe.mjs", "kinematic.js", "terrainWalk.mjs"]);
+// v4647 -- capsuleSettle.mjs arrived at v4646 (the Murmur Orb physics port) and SIX ROUNDS PASSED before
+// anything re-took this census. The row that catches it is section 6's, and it is the reason that row exists:
+// "a new controller landing with its own gravity and nobody re-taking this census". It went red on both boxes
+// the first time a full verify was run.
+export const MODULES = Object.freeze(["capsuleGround.mjs", "capsuleMove.mjs", "capsuleSettle.mjs",
+                                      "fallBody.mjs", "groundProbe.mjs", "kinematic.js", "terrainWalk.mjs"]);
+
+// *** AND THE ARRIVAL BROUGHT A SEVENTH QUANTITY WITH IT, WHICH IS THE THING THE COUNT CANNOT SEE. ***
+// section 6's own prose says so: "It cannot tell you that a listed module grew a SEVENTH quantity, which is
+// the gap that remains". It did. physics/character/ now spells HOW STEEP GROUND MAY BE AND STILL SUPPORT A
+// BODY in two places, in two units, and they do not agree:
+//
+//     capsuleGround.mjs   maxSlopeDeg = 45              -> a contact normal of y >= 0.7071
+//     capsuleSettle.mjs   GROUND_SUPPORT_NORMAL_Y = 0.5 -> a slope of up to 60.0 degrees
+//
+// FIFTEEN DEGREES APART, and capsuleSettle's own header warns against exactly this ("a constant restated for
+// convenience is exactly how this tree ended up with two skip rules that agreed only by coincidence") while
+// introducing it.
+//
+// *** WHAT IS NOT CLAIMED: THAT EITHER NUMBER IS WRONG. *** They are different CONTRACTS -- capsuleGround
+// asks "can the body STAND here", capsuleSettle asks "does this contact SUPPORT the body while it is being
+// pushed out of geometry" -- and a body can legitimately be depenetrated along a face it could not stand on.
+// What has never been established is whether 0.5 was CHOSEN for that difference or inherited from the ported
+// kernel and never compared. Recorded as a DISAGREEMENT rather than reconciled, because reconciling two
+// numbers whose relationship nobody has measured is how a real distinction gets deleted.
+export const GROUND_LIMIT_AT_V4647 = Object.freeze({
+    standDeg: 45, standNormalY: Math.cos(45 * Math.PI / 180),
+    settleNormalY: 0.5, settleDeg: Math.acos(0.5) * 180 / Math.PI,
+    agree: false, apartDeg: Math.acos(0.5) * 180 / Math.PI - 45,
+    why: "two contracts, two units, never compared until the census caught the module's arrival",
+});
 
 /**
  * Every site the tree spells a character-physics number at. `ships` is true when a RUNNING body reads it:
@@ -128,7 +157,7 @@ export const AGREEMENT_AT_V4547 = Object.freeze({
     sites: 19,
     quantities: 6,
     shippingSites: 12,
-    modules: 6,
+    modules: 7,   // v4647 -- capsuleSettle.mjs; see MODULES above and the seventh quantity it brought
     // *** THE COUNTS ABOVE CANNOT CATCH A NUMBER MOVING, AND THE SABOTAGE BATTERY IS WHAT SAID SO. ***
     // Moving terrainWalk's NON-shipping snapDown default from 0.5 left the whole census green, because
     // every verdict here is about SHIPPING values and that default ships to nobody. It is still a number

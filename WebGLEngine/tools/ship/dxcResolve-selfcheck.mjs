@@ -17,7 +17,8 @@
 "use strict";
 import path from "node:path";
 import fsSync from "node:fs";
-import { resolveDxcDir, launchEnv, dxcAdvice, DXC_FAULT, DXC_LEAVES } from "./playwrightResolve.mjs";
+import { resolveDxcDir, launchEnv, dxcAdvice, DXC_FAULT, DXC_LEAVES,
+         SHELL_DIR_SAMPLES } from "./playwrightResolve.mjs";
 
 let fails = 0;
 const ok = (n, c, d = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${n}${d ? "   " + d : ""}`); };
@@ -25,12 +26,15 @@ const ok = (n, c, d = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "F
 const ROOT = "/FAKE-PW";
 const ENV = { PLAYWRIGHT_BROWSERS_PATH: ROOT };
 // Keith's rig exactly: the shell bundle has the binary and no DXC; the full browser has both.
-const SHELL_BIN = path.join(ROOT, "chromium_headless_shell-1243", "chrome-headless-shell-win64", "chrome-headless-shell.exe");
-const FULL_DXIL = path.join(ROOT, "chromium-1243", "chrome-win64", "dxil.dll");
+// The bundle names come from the resolver -- see SHELL_DIR_SAMPLES. Spelling them here put this file on
+// playwrightResolve-selfcheck's re-spellers list, correctly: a fixture copy is still a second spelling.
+const [FULL_BUNDLE, SHELL_BUNDLE] = SHELL_DIR_SAMPLES;
+const SHELL_BIN = path.join(ROOT, SHELL_BUNDLE, "chrome-headless-shell-win64", "chrome-headless-shell.exe");
+const FULL_DXIL = path.join(ROOT, FULL_BUNDLE, "chrome-win64", "dxil.dll");
 const tree = new Set([SHELL_BIN, FULL_DXIL]);
 const fs_ = {
     exists: (p) => tree.has(p),
-    readdir: (r) => (r === ROOT ? ["chromium-1243", "chromium_headless_shell-1243", "ffmpeg-1011"] : (() => { throw new Error("ENOENT"); })()),
+    readdir: (r) => (r === ROOT ? [...SHELL_DIR_SAMPLES, "ffmpeg-1011"] : (() => { throw new Error("ENOENT"); })()),
 };
 const inj = { env: ENV, home: "/nohome", ...fs_ };
 

@@ -337,7 +337,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
     // and the readings overlap on everything predating the split, so they are run over the merged tree rather
     // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
-    files: 4275,               // v4645 -- RE-DERIVED AT THE main MERGE over the merged tree. RE-DERIVED AT THE main MERGE: 4169 on this branch, 4172 on main, 4260 merged -- LESS than the sum, which is why it is run
+    files: 4286,               // v4647 -- RE-DERIVED after this session's own eleven files; see the note below. v4645 -- RE-DERIVED AT THE main MERGE over the merged tree. RE-DERIVED AT THE main MERGE: 4169 on this branch, 4172 on main, 4260 merged -- LESS than the sum, which is why it is run
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
                           // RE-TAKEN TWICE IN TWO ROUNDS, and the second time only because the ship gate
@@ -644,8 +644,21 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // rounds re-froze the audit, so the recorded line is gone and the file stops matching. The count fell
     // because a defect was fixed. Verified at both ends rather than argued: main's register-audit.mjs matches
     // the pattern after stripComments and this tree's does not.
-    esModules: 3975, closures: 3844, asyncAwait: 1519, typedArrays: 1123, promises: 368,
-    fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 156, webgpu: 52, threads: 23, wasm: 23,
+    // *** v4647 -- RE-TAKEN AFTER THIS SESSION'S OWN ROUNDS, AND FIVE OF THIRTEEN MOVED. *** files
+    // 4275 -> 4286 (eleven arrivals: six gates and five modules -- capsuleSettle, colliderFromGLB,
+    // adapterRecord, ensureDxc, failLines and their gates, plus dxcResolve-selfcheck), ES modules
+    // 3975 -> 3986, closures as values 3844 -> 3853, async/await 1519 -> 1521, typed arrays 1123 -> 1125,
+    // WebGPU 52 -> 53. The other eight did not move, which is the shape that says the patterns discriminate
+    // rather than tracking the tree's size -- this module's own v4478 note makes that argument and it holds
+    // again here: eleven files arrived and Promises, fetch/XHR, performance.now, rAF, WebGL, threads and wasm
+    // are all unchanged.
+    //
+    // *** AND NOTHING NOTICED FOR SIX ROUNDS. *** Its own comment above says this is "a number every round
+    // that adds a module must re-take, which is the cost of pinning it". Six rounds added modules and none
+    // re-took it. It went red on BOTH boxes, and Keith's verify named it in the drift pre-flight -- which is
+    // precisely the instrument for this and only helps somebody who runs it.
+    esModules: 3986, closures: 3853, asyncAwait: 1521, typedArrays: 1125, promises: 368,
+    fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 156, webgpu: 53, threads: 23, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.

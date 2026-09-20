@@ -445,8 +445,20 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // NOT MOVE ARE THE READING: distinctDefinitions holds at 41, condFirst at 91, unknownSignature at 16 and
     // suspects at 0, so not one of the 62 invented a forty-second spelling of ok(). That is what this census
     // is for, and it is why the row compares all nine rather than the headline.
-    gates: 1751, usesOk: 1730, definesOk: 1722, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1623, condFirst: 91, unknownSignature: 16,
+    // *** v4647 -- RE-DERIVED AFTER THIS SESSION'S OWN SIX GATES, AND THE SIGNATURE IS THE ONE ABOVE AGAIN. ***
+    // adapterRecord, capsuleSettle, colliderFromGLB, dxcResolve, ensureDxc and failLines arrived across the
+    // v4646-v4647 rounds. The same four rows move together by exactly 6 -- gates, usesOk, definesOk,
+    // nameFirst -- and THE FOUR READING ROWS DO NOT MOVE AT ALL: distinctDefinitions holds at 41, condFirst
+    // at 91, unknownSignature at 16, suspects at 0. So not one of the six invented a forty-second spelling
+    // of ok(), which is the thing this census is actually for.
+    //
+    // *** AND THE ROUNDS THAT ADDED THEM NEVER LOOKED. *** This row was red on BOTH boxes when a full verify
+    // was finally run: red here, and red in Keith's gen-9 sweep, where the drift pre-flight named it in so
+    // many words -- "assertionShape census: gates 1751 vs 1756". The gates were added one round at a time,
+    // each round running the gates it touched, and nothing ran the census that counts them. That is what a
+    // pre-flight is for and it only helps somebody who runs it.
+    gates: 1757, usesOk: 1736, definesOk: 1728, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1629, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

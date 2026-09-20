@@ -32,7 +32,7 @@
 "use strict";
 import { shellRoots, resolveHeadlessShell, SHELL_LEAVES, SHELL_DIR, HEADLESS_SHELL,
          HEADLESS_SHELL_TRIED, PLAYWRIGHT_PATHS, browserSkipReason, askPlaywright,
-         resolvePlaywright } from "./playwrightResolve.mjs";
+         resolvePlaywright, SHELL_DIR_SAMPLES } from "./playwrightResolve.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -166,6 +166,20 @@ console.log("\n4. one definition, counted rather than asked for");
         !NEEDLE.test(fs.readFileSync(HERE, "utf8")),
         "v4480 found five suspects in the gate that hunted them, for exactly this reason");
     ok("the walk really reaches the tree rather than a corner of it", walk(ENG).length > 3000);
+    // *** v4647 -- THE SAMPLES ARE ONLY HONEST IF THE PATTERN ACCEPTS THEM. *** Two v4646 gates spelled a
+    // bundle directory in their injected filesystems and this row caught them, correctly: "it is only a
+    // fixture" is the exemption that lets a fifth real copy in. They import SHELL_DIR_SAMPLES now -- so the
+    // sample must be a name SHELL_DIR would really match, or the one spelling is one spelling of the wrong
+    // thing and every fixture built on it is testing a directory the resolver would skip.
+    ok("!! *** every SHELL_DIR_SAMPLES name is one the resolver's own pattern accepts ***",
+        SHELL_DIR_SAMPLES.length >= 2 && SHELL_DIR_SAMPLES.every((d) => SHELL_DIR.test(d)) &&
+        SHELL_DIR_SAMPLES.some((d) => d.includes("_headless_shell")) &&
+        SHELL_DIR_SAMPLES.some((d) => !d.includes("_headless_shell")),
+        SHELL_DIR_SAMPLES.join(", ") + " against " + String(SHELL_DIR) +
+        " -- both bundle shapes, because a fixture that only ever names one cannot tell the shell from the full browser");
+    ok("  CONTROL: the pattern still REFUSES a directory that is neither",
+        !SHELL_DIR.test("ffmpeg-1011") && !SHELL_DIR.test("chromium") && !SHELL_DIR.test("chromium-"),
+        "a pattern that accepted everything would make the samples vacuous rather than shared");
 }
 
 // ---- 4b. *** v4486 -- THE AUTHORITY AND THE GUESS NAME DIFFERENT BINARIES *** ------------------------------------

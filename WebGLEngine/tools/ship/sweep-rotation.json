@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed.",
- "at": "2026-09-20T14:05:21.931Z",
+ "at": "2026-09-20T14:48:03.365Z",
  "budgetMs": 3000,
  "lastRun": 1,
  "rotated": [
@@ -1399,6 +1399,13 @@
    "at": "2026-09-09T12:57:13.333Z"
   },
   {
+   "gate": "tools/ship/assertionShape-selfcheck.mjs",
+   "ms": 477,
+   "code": 0,
+   "priorMs": 1047,
+   "at": "2026-09-20T14:47:31.287Z"
+  },
+  {
    "gate": "tools/ship/atmosphereMulti-selfcheck.mjs",
    "ms": 3700,
    "code": 0,
@@ -1566,6 +1573,13 @@
    "at": "2026-09-09T12:57:13.333Z"
   },
   {
+   "gate": "tools/ship/closingCoverage-selfcheck.mjs",
+   "ms": 317,
+   "code": 0,
+   "priorMs": 592,
+   "at": "2026-09-20T14:47:35.324Z"
+  },
+  {
    "gate": "tools/ship/clothSoak-selfcheck.mjs",
    "ms": 3909,
    "code": 0,
@@ -1605,6 +1619,13 @@
    "code": 0,
    "priorMs": 6212,
    "at": "2026-09-09T12:57:13.333Z"
+  },
+  {
+   "gate": "tools/ship/controllerAgreement-selfcheck.mjs",
+   "ms": 96,
+   "code": 0,
+   "priorMs": 400,
+   "at": "2026-09-20T14:47:33.847Z"
   },
   {
    "gate": "tools/ship/coverageTriage-selfcheck.mjs",
@@ -1776,10 +1797,10 @@
   },
   {
    "gate": "tools/ship/dxcResolve-selfcheck.mjs",
-   "ms": 51,
+   "ms": 47,
    "code": 0,
-   "priorMs": 47,
-   "at": "2026-09-20T12:13:37.889Z"
+   "priorMs": 51,
+   "at": "2026-09-20T14:47:34.687Z"
   },
   {
    "gate": "tools/ship/effectLegibility-selfcheck.mjs",
@@ -1797,9 +1818,10 @@
   },
   {
    "gate": "tools/ship/ensureDxc-selfcheck.mjs",
-   "ms": 48,
+   "ms": 53,
    "code": 0,
-   "at": "2026-09-20T12:13:37.719Z"
+   "priorMs": 46,
+   "at": "2026-09-20T14:48:03.365Z"
   },
   {
    "gate": "tools/ship/eulerGpu-selfcheck.mjs",
@@ -1890,6 +1912,13 @@
    "code": 0,
    "priorMs": 20039,
    "at": "2026-09-09T23:00:39.847Z"
+  },
+  {
+   "gate": "tools/ship/gateSweep-selfcheck.mjs",
+   "ms": 180,
+   "code": 0,
+   "priorMs": 416,
+   "at": "2026-09-20T14:47:33.608Z"
   },
   {
    "gate": "tools/ship/gatesBridge-selfcheck.mjs",
@@ -2433,6 +2462,13 @@
    "at": "2026-09-09T12:57:13.333Z"
   },
   {
+   "gate": "tools/ship/playwrightResolve-selfcheck.mjs",
+   "ms": 517,
+   "code": 0,
+   "priorMs": 1380,
+   "at": "2026-09-20T14:47:34.504Z"
+  },
+  {
    "gate": "tools/ship/polyBrush-selfcheck.mjs",
    "ms": 3688,
    "code": 0,
@@ -2669,6 +2705,13 @@
    "code": 0,
    "priorMs": 3358,
    "at": "2026-09-20T12:11:44.194Z"
+  },
+  {
+   "gate": "tools/ship/runtimeGap-selfcheck.mjs",
+   "ms": 1873,
+   "code": 0,
+   "priorMs": 1832,
+   "at": "2026-09-20T14:47:33.294Z"
   },
   {
    "gate": "tools/ship/shaderRefs-selfcheck.mjs",

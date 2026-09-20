@@ -100,6 +100,19 @@ export function askPlaywright(requireFn) {
 /** A browser directory, with NO build number pinned -- 1194 was, and that is a date stamp on a constant. */
 export const SHELL_DIR = /^chromium(_headless_shell)?-\d+$/;
 
+// *** v4647 -- ONE SPELLING, FOR THE FIXTURES TOO, BECAUSE "IT IS ONLY A FIXTURE" IS HOW THE FOURTH COPY
+// GETS IN. *** playwrightResolve-selfcheck asserts that NO FILE OUTSIDE THIS ONE spells a browser directory
+// by hand, after four gates had quietly copied the list underneath a header warning about exactly that. The
+// v4646 round then wrote two new gates whose INJECTED filesystems name "chromium_headless_shell-1243"
+// directly -- fixtures, not real paths, and the rule caught them anyway. It was right to: a rule that
+// exempts fixtures is a rule that cannot tell a fixture from a fifth copy, and the exemption is what the
+// next author would reach for.
+//
+// So the sample directory names live HERE, beside the pattern that has to match them, and a fixture imports
+// them. The gate asserts SHELL_DIR accepts both -- which also makes the pattern's own claim checkable
+// without a real playwright install.
+export const SHELL_DIR_SAMPLES = Object.freeze(["chromium-1243", "chromium_headless_shell-1243"]);
+
 /**
  * Try every root, every chromium build in it, every platform leaf, and return the first that exists plus
  * WHERE it came from -- the "plus where" is the same rule resolvePlaywright follows, and for the same reason:

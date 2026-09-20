@@ -35,7 +35,7 @@
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
-import { census, characterModules, SITES, MODULES, ENG,
+import { census, characterModules, SITES, MODULES, ENG, GROUND_LIMIT_AT_V4647 as G,
          AGREEMENT_AT_V4547 as R } from "./controllerAgreement.mjs";
 import { Camera } from "../../camera/camera.js";
 import { noComments } from "./sourceScan.mjs";
@@ -259,6 +259,23 @@ console.log("\n6. WHAT A DECLARED LIST CANNOT SEE, AND THE GUARD FOR IT");
         "catch the commoner thing, a new controller landing with its own gravity and nobody re-taking " +
         "this census. camera/camera.js and simulation/BotManager.js are controllers outside that " +
         "directory and are covered by their sites rather than by this count.");
+
+    // *** THE SEVENTH QUANTITY THE ARRIVAL BROUGHT, WHICH THE COUNT ABOVE CANNOT SEE. *** The row above
+    // catches a module landing; this one catches what it landed WITH. Both numbers are read from the
+    // shipping source, so the row goes red the day either moves -- which is the only way a disagreement
+    // recorded as deliberate stays honest.
+    const gSrc = fs.readFileSync(path.join(ENG, "physics", "character", "capsuleGround.mjs"), "utf8");
+    const sSrc = fs.readFileSync(path.join(ENG, "physics", "character", "capsuleSettle.mjs"), "utf8");
+    const standDeg = Number((gSrc.match(/maxSlopeDeg\s*=\s*([\d.]+)/) || [])[1]);
+    const settleY = Number((sSrc.match(/export const GROUND_SUPPORT_NORMAL_Y\s*=\s*([\d.]+)/) || [])[1]);
+    ok("!! *** physics/character/ spells 'how steep may ground be' TWICE, in two units, and they DISAGREE ***",
+        standDeg === G.standDeg && settleY === G.settleNormalY &&
+        Math.abs((Math.acos(settleY) * 180 / Math.PI) - standDeg - G.apartDeg) < 1e-9 && G.agree === false,
+        `capsuleGround maxSlopeDeg ${standDeg} (normal.y >= ${Math.cos(standDeg * Math.PI / 180).toFixed(4)}) ` +
+        `against capsuleSettle GROUND_SUPPORT_NORMAL_Y ${settleY} (up to ${(Math.acos(settleY) * 180 / Math.PI).toFixed(1)} deg) ` +
+        `-- ${G.apartDeg.toFixed(1)} degrees apart. NOT reconciled: they are different contracts (stand vs ` +
+        `depenetrate) and nobody has established whether 0.5 was chosen for that or inherited from the ported ` +
+        `kernel. Recorded so it cannot drift further in silence`);
 
     ok("   the one quantity the shipping controllers already agree on is named, and it agrees",
         qOf("stepUp").shippedAgree && qOf("stepUp").shippedValues.length === 1 &&

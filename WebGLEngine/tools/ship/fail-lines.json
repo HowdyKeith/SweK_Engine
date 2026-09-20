@@ -1,0 +1,431 @@
+{
+ "generatedFrom": "tools/ship/failLines.mjs",
+ "at": "2026-09-20T14:42:14.645Z",
+ "platform": "linux",
+ "summary": {
+  "of": 48,
+  "GREEN": 36,
+  "RED": 12,
+  "CRASHED": 0,
+  "ODD": 0,
+  "totalFailRows": 20
+ },
+ "gates": [
+  {
+   "gate": "ai-bridge/rigRunner-selfcheck.mjs",
+   "exit": 0,
+   "ms": 525,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "ai-bridge/tools/range-selfcheck.mjs",
+   "exit": 0,
+   "ms": 237,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "physics/render/microfacetSampleWgsl-selfcheck.mjs",
+   "exit": 0,
+   "ms": 3094,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "physics/stepperMeter-selfcheck.mjs",
+   "exit": 0,
+   "ms": 98,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "physics/upAxis-selfcheck.mjs",
+   "exit": 0,
+   "ms": 46,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "render/temporalResolve-selfcheck.mjs",
+   "exit": 0,
+   "ms": 1181,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "tools/mesh/xatlasRef-selfcheck.mjs",
+   "exit": 0,
+   "ms": 2428,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "tools/roundhouse/magmapDefault-selfcheck.mjs",
+   "exit": 0,
+   "ms": 782,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "tools/roundhouse/magmapDevice-selfcheck.mjs",
+   "exit": 0,
+   "ms": 1181,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "tools/roundhouse/magmapTaichiRun-selfcheck.mjs",
+   "exit": 0,
+   "ms": 1114,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "tools/ship/absenceScope-selfcheck.mjs",
+   "exit": 1,
+   "ms": 4108,
+   "fails": 5,
+   "lines": [
+    "FAIL  out of scope -- real BVH code the three directories could not reach",
+    "FAIL  the tree holds files whose code carries the term where the claim named two, and the record says how many   27 files carry it (15 at v4435 plus 10 named arrivals) against 2 the claim named -- not all of them build one, which the field's name does not say and its comment now does",
+    "FAIL  BVH_AT_V4435.outOfScope still equals what the tree holds",
+    "FAIL  realImplementations agrees with a fresh grade once the named arrivals are added   15 at v4435 + 6 in-scope + 4 out-of-scope named arrivals = 27 now, and every out-of-scope arrival is also named in outOfScope -- the two lists cannot drift apart without this row saying so",
+    "FAIL  excluding the whole outOfScope list would make the claim read SOUND -- which is why the list is asserted"
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/aiPresenceOrb-selfcheck.mjs",
+   "exit": 0,
+   "ms": 2664,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "tools/ship/assertionShape-selfcheck.mjs",
+   "exit": 1,
+   "ms": 494,
+   "fails": 1,
+   "lines": [
+    "FAIL  !! *** the recorded census is what the code reports now -- ALL NINE ROWS, not the four this compared ***   DRIFTED: gates 1751 -> 1757, usesOk 1730 -> 1736, definesOk 1722 -> 1728, nameFirst 1623 -> 1629"
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/atmosphere-selfcheck.mjs",
+   "exit": 0,
+   "ms": 1585,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "tools/ship/brainTsl-selfcheck.mjs",
+   "exit": 0,
+   "ms": 866,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "tools/ship/buildingLab-selfcheck.mjs",
+   "exit": 0,
+   "ms": 2596,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "tools/ship/capReading-selfcheck.mjs",
+   "exit": 1,
+   "ms": 71,
+   "fails": 1,
+   "lines": [
+    "FAIL    and every one of the 17 is still in the population it was drawn from, or its fresh reading agrees with the table   9 still killed-with-no-verdict; 7 LET FINISH SINCE and agreeing -- paintFields-selfcheck.mjs table 14496 now 13340, eulerGpu-selfcheck.mjs table 18450 now 14806, baselineHygiene-selfcheck.mjs table 30812 now 31199, kuramoto-selfcheck.mjs table 31417 now 32825, floors-selfcheck.mjs table 36886 now 36052, tiltPower-selfcheck.mjs table 61615 now 57173, gateSelection-selfcheck.mjs table 67823 now 69346, settleCurve-selfcheck.mjs table 87507 now 85506. A departure that did NOT agree would mean the table described a tree that has moved; these agree to within 19.8%."
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/citedSources-selfcheck.mjs",
+   "exit": 1,
+   "ms": 1231,
+   "fails": 1,
+   "lines": [
+    "FAIL  !! *** THE DEBT IS EXACTLY 52, AND THE BASELINE MUST EQUAL IT (51) ***   a ratchet rather than a demand. Importing 52 entries would mean inventing grantorHoldsRights, licenceExists and a `why` for each -- judgements, one source at a time -- and fabricating them to clear a number is worse than owing it. A round that takes an idea from a new source and records it moves this down; one that takes without recording moves it UP and goes red."
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/controllerAgreement-selfcheck.mjs",
+   "exit": 1,
+   "ms": 107,
+   "fails": 1,
+   "lines": [
+    "FAIL  !! a seventh character controller cannot arrive in silence   physics/character/ holds 7: capsuleGround.mjs, capsuleMove.mjs, capsuleSettle.mjs, fallBody.mjs, groundProbe.mjs, kinematic.js, terrainWalk.mjs. *** THE SITE LIST IS A LIST AND THIS ROW IS THE DISCOVERY BESIDE IT. *** It cannot tell you that a listed module grew a SEVENTH quantity, which is the gap that remains and is stated rather than papered over; it does catch the commoner thing, a new controller landing with its own gravity and nobody re-taking this census. camera/camera.js and simulation/BotManager.js are controllers outside that directory and are covered by their sites rather than by this count."
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/definitionGates-selfcheck.mjs",
+   "exit": 1,
+   "ms": 2154,
+   "fails": 3,
+   "lines": [
+    "FAIL  !! no NEW exported symbol ANYWHERE IN THE TREE has appeared without its gate naming it   GREW to 364: ai-bridge/chunkVerify.mjs:verifiedPrefix, ai-bridge/chunkVerify.mjs:resumePlan, ai-bridge/chunkVerify.mjs:spliceRanges, ai-bridge/chunkVerify.mjs:chunkAudit, ai-bridge/chunkVerify.mjs:resumeRanges, ai-bridge/deviceWorker.mjs:offThreadDevice ...",
+    "FAIL  !! *** no NEW exported symbol OF ANY SHAPE has appeared without its gate naming it ***   GREW to 711: ai-bridge/catalogSnapshot.mjs:SNAPSHOT_PATH, ai-bridge/chunkVerify.mjs:verifiedPrefix, ai-bridge/chunkVerify.mjs:resumePlan, ai-bridge/chunkVerify.mjs:spliceRanges, ai-bridge/chunkVerify.mjs:chunkAudit, ai-bridge/chunkVerify.mjs:resumeRanges ...",
+    "FAIL  !! *** no NEW exported symbol is unmentioned by EVERY gate that imports its module ***   GREW to 535: ai-bridge/catalogSnapshot.mjs:SNAPSHOT_PATH, ai-bridge/chunkVerify.mjs:verifiedPrefix, ai-bridge/chunkVerify.mjs:resumePlan, ai-bridge/chunkVerify.mjs:spliceRanges, ai-bridge/chunkVerify.mjs:chunkAudit, ai-bridge/chunkVerify.mjs:resumeRanges ..."
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/devicePresent-selfcheck.mjs",
+   "exit": 0,
+   "ms": 637,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "tools/ship/fsrPage-selfcheck.mjs",
+   "exit": 0,
+   "ms": 1987,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "tools/ship/gateSweep-selfcheck.mjs",
+   "exit": 1,
+   "ms": 180,
+   "fails": 1,
+   "lines": [
+    "FAIL  !! !! *** every gate in the tree has been swept by v4297 or by the round that closed its surplus ***   1757 in the tree = 1366 swept at v4297 + this gate + 14 swept since + 370 across 321 closing(s). 6 STILL UNSWEPT -- name them and run them; a surplus that is only counted goes stale the way the equality it replaced did"
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/glbTexture-selfcheck.mjs",
+   "exit": 0,
+   "ms": 752,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "tools/ship/importClosure-selfcheck.mjs",
+   "exit": 0,
+   "ms": 2611,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "tools/ship/inputSets-selfcheck.mjs",
+   "exit": 0,
+   "ms": 2138,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "tools/ship/meshLine-selfcheck.mjs",
+   "exit": 0,
+   "ms": 3127,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "tools/ship/noisePrecision-selfcheck.mjs",
+   "exit": 0,
+   "ms": 1119,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "tools/ship/ntfsMounter-selfcheck.mjs",
+   "exit": 0,
+   "ms": 78,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "tools/ship/orreryEjecta-selfcheck.mjs",
+   "exit": 1,
+   "ms": 2596,
+   "fails": 1,
+   "lines": [
+    "FAIL    three          78 dependants   ARRIVED: tools/ship/treeRead-selfcheck.mjs."
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/pathTracerWgsl-selfcheck.mjs",
+   "exit": 0,
+   "ms": 231,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "tools/ship/perspectiveWarp-selfcheck.mjs",
+   "exit": 0,
+   "ms": 1251,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "tools/ship/pipeTruncation-selfcheck.mjs",
+   "exit": 1,
+   "ms": 507,
+   "fails": 1,
+   "lines": [
+    "FAIL  *** process.exit() LOSES output through a pipe that survives to a file -- the two differ by more than a pipe buffer ***   50447 bytes of 244000 never reached the reader. Both scripts print the identical 244000 bytes; the only difference between them is the last line."
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/playwrightResolve-selfcheck.mjs",
+   "exit": 1,
+   "ms": 519,
+   "fails": 1,
+   "lines": [
+    "FAIL  !! *** NO FILE OUTSIDE THE RESOLVER SPELLS THE BROWSER PATH BY HAND ***   RE-SPELT BY: tools/ship/dxcResolve-selfcheck.mjs, tools/ship/ensureDxc-selfcheck.mjs"
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/reachedLicences-selfcheck.mjs",
+   "exit": 0,
+   "ms": 1517,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "tools/ship/recordDrift-selfcheck.mjs",
+   "exit": 1,
+   "ms": 1891,
+   "fails": 3,
+   "lines": [
+    "FAIL  ...and the OTHER checks are unaffected by that fixture   sabotage F: marking everything stale is as useless as marking nothing stale (baseline 2)",
+    "FAIL  !! a capability row that drifted is found, and the ROW is named -- not just 'the census moved'   sabotage: a files-only check passes this fixture, and a files-only check is what v4550 and v4548 both show is not enough -- a two-file round moved four rows and a four-file round moved two",
+    "FAIL  ...while the untouched census is clean, so neither is simply always true   this is the record the FSR arc drifted for five rounds with nothing reading it"
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/releaseLedger-selfcheck.mjs",
+   "exit": 0,
+   "ms": 666,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "tools/ship/runtimeGap-selfcheck.mjs",
+   "exit": 1,
+   "ms": 1857,
+   "fails": 1,
+   "lines": [
+    "FAIL  the census re-derives to what the module recorded, EVERY row of it -- a stale table is a red   files 4275 -> 4286; drifted: ES modules 3975 -> 3986, closures as values 3844 -> 3853, async/await 1519 -> 1521, typed arrays 1123 -> 1125, WebGPU 52 -> 53"
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/shaderPairs-selfcheck.mjs",
+   "exit": 0,
+   "ms": 1030,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "tools/ship/slugFill-selfcheck.mjs",
+   "exit": 0,
+   "ms": 1727,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "tools/ship/slugMelt-selfcheck.mjs",
+   "exit": 0,
+   "ms": 2111,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "tools/ship/slugMorph-selfcheck.mjs",
+   "exit": 0,
+   "ms": 2428,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "tools/ship/slugReupload-selfcheck.mjs",
+   "exit": 0,
+   "ms": 3216,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "tools/ship/statedRuntime-selfcheck.mjs",
+   "exit": 0,
+   "ms": 622,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "tools/ship/threeProbe-selfcheck.mjs",
+   "exit": 0,
+   "ms": 2192,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "tools/ship/traderGraph-selfcheck.mjs",
+   "exit": 0,
+   "ms": 2296,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "tools/ship/treeRead-selfcheck.mjs",
+   "exit": 0,
+   "ms": 2780,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "tools/ship/wgslSpec-selfcheck.mjs",
+   "exit": 0,
+   "ms": 2764,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  }
+ ]
+}

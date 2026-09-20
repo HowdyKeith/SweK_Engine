@@ -7993,6 +7993,32 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "ground at the wrong constant. Both named in the kit, neither closed here.",
     }),
     // v4644 -- THE 255th CLOSING: the SUCCESS flash, from a constant table to a ring that travels in pixels.
+    // *** since331 -- SIX GATES ARRIVED ACROSS SIX ROUNDS AND NOT ONE ROUND CLOSED THEM. ***
+    // Every one was written, sabotaged and run singly in the round that added it; what none of those rounds
+    // did was run the censuses that COUNT gates. This surplus was found only when a full verify was finally
+    // run -- on Keith's gen-9 box and then here -- and it was red on BOTH, alongside assertionShape's
+    // 1751 -> 1757 and runtimeGap's 4275 -> 4286, which are the same six arrivals seen from two other
+    // instruments. The surplus mechanism worked exactly as designed; nobody looked at it for six rounds.
+    since331: Object.freeze({
+        at: "v4647", swept: 6, green: 6, red: 0,
+        added: Object.freeze([
+            "tools/ship/adapterRecord-selfcheck.mjs",
+            "tools/ship/capsuleSettle-selfcheck.mjs",
+            "tools/ship/colliderFromGLB-selfcheck.mjs",
+            "tools/ship/dxcResolve-selfcheck.mjs",
+            "tools/ship/ensureDxc-selfcheck.mjs",
+            "tools/ship/failLines-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "all 6 green, run singly on this box (47 ms to 117 ms -- none launches a browser). " +
+                 "capsuleSettle and colliderFromGLB are the Murmur-Orb physics port; adapterRecord is the " +
+                 "HELD/OWED record that let a second adapter's readings be written BY the gate ON that box; " +
+                 "dxcResolve and ensureDxc are the dxil.dll work, where the PATH route was falsified on real " +
+                 "hardware and the file-beside-the-binary route measured to work; failLines turns another " +
+                 "machine's exit codes into assertion lines, which is what found this surplus.",
+    }),
+
     since330: Object.freeze({
         at: "v4644", swept: 2, green: 2, red: 0,
         added: Object.freeze([
