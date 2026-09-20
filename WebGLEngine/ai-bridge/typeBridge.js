@@ -1,7 +1,8 @@
 // ai-bridge/typeBridge.js — v1975
 // Types text into whatever window currently has focus (the missing half of a FluidVoice-style
 // dictation flow: whisper.cpp already turns mic audio into text; this puts that text into the app
-// you're actually working in). No native module to compile — each OS gets a built-in tool:
+// you're actually working in). No native module to compile for the KEYSTROKE half — each OS gets a
+// built-in tool:
 //
 //   Windows : PowerShell + System.Windows.Forms.SendKeys.SendWait  (ships with Windows)
 //   macOS   : osascript -> System Events `keystroke`               (needs Accessibility permission)
@@ -11,6 +12,17 @@
 // fall back to the CLIPBOARD route: stash the text on the clipboard and paste (Ctrl/Cmd+V). That's
 // also faster for long dictations. Caller can force either mode. All paths shell out with the text
 // passed via stdin/temp file (never interpolated into the command line) so quotes/newlines are safe.
+//
+// *** CLIPBOARD SET, THOUGH, IS A NATIVE MODULE ON LINUX -- @napi-rs/clipboard, LAZILY REQUIRED. ***
+// Windows' Set-Clipboard and macOS' pbcopy both ship with the OS; Linux's xclip does not (a separate
+// `apt install xclip` this file never checked for -- see status()'s own history below). A quick spike
+// (npm install in a scratch dir, this box has neither X server nor xclip) confirmed @napi-rs/clipboard
+// resolves a prebuilt native binary for linux-x64-gnu with zero extra system packages, loads and calls
+// cleanly, and fails with the SAME class of error ("X11 server connection timed out") xclip would hit
+// in the same headless environment -- i.e. it cannot do better than xclip with no display, but it does
+// not need a separate binary installed when a display IS present. Optional dependency, same discipline
+// as sharpBridge.js's own lazy `require(...)` calls: a tree/npm-install missing it still boots, and
+// Linux silently falls back to the original xclip shell-out unchanged.
 const { spawn } = require("child_process");
 const fs = require("fs");
 const os = require("os");
@@ -42,7 +54,35 @@ function _clipboardCmd() {
     return null;
 }
 
+// Lazy singleton for @napi-rs/clipboard (Linux only -- Win/Mac already have zero-install built-ins,
+// see the file header). Loaded and constructed at most once; a missing/failed-to-resolve optional
+// dependency is memoized as `false` so every call afterward skips straight to the xclip fallback
+// instead of re-attempting require() on the hot path.
+let _nativeClip; // undefined = not yet tried, false = unavailable, object = ready
+function _nativeClipboard() {
+    if (_nativeClip !== undefined) return _nativeClip;
+    if (!LINUX) return (_nativeClip = false);
+    try { _nativeClip = new (require("@napi-rs/clipboard").Clipboard)(); }
+    catch { _nativeClip = false; /* optional dep missing or unbuildable on this platform/arch */ }
+    return _nativeClip;
+}
+
 async function _setClipboard(text) {
+    if (LINUX) {
+        const nc = _nativeClipboard();
+        // Only fall through to xclip when the native module itself failed to LOAD (missing optional
+        // dependency, unsupported platform/arch) -- xclip is a genuinely different code path that might
+        // still work there. A native module that loaded fine but whose setText() call throws at runtime
+        // (e.g. "X11 server connection timed out", proven live by this task's own spike in this sandbox)
+        // is an environment problem xclip would hit identically -- falling back in THAT case would waste
+        // a spawn and swap a specific, useful error for a generic "xclip ENOENT" or a duplicate X11
+        // failure, exactly the kind of silently-worse diagnostic this file's own status() rewrite was
+        // written to stop doing.
+        if (nc) {
+            try { nc.setText(text); return { ok: true, tool: "@napi-rs/clipboard" }; }
+            catch (e) { return { ok: false, tool: "@napi-rs/clipboard", error: String(e && e.message || e) }; }
+        }
+    }
     const c = _clipboardCmd();
     if (!c) return { ok: false, error: "no clipboard tool for this OS" };
     return _run(c.set[0], c.set[1], text);
@@ -105,6 +145,12 @@ async function typeText(text, opts) {
 }
 
 // Report which mechanism is available on this box (for the UI to show honest capability).
+// `available`/`tool`/`note` keep their original meaning (xdotool presence on Linux, the keystroke-send
+// half every mode needs) for dictation.html's existing reader; `clipboard` is new and additive, reporting
+// the OTHER half auto-mode actually depends on for most real dictation (anything non-ASCII or >120 chars
+// goes through paste mode, which needs a working clipboard SETTER, not just xdotool -- a gap this file
+// never reported honestly before: `available` only ever checked xdotool, so a box with xdotool but no
+// xclip and no native module would show "ready" and then fail the moment a real dictation used paste mode).
 async function status() {
     let tool = WIN ? "SendKeys (built-in)" : MAC ? "osascript keystroke" : LINUX ? "xdotool" : "unsupported";
     let available = WIN || MAC;   // Win/Mac use built-ins; Linux needs xdotool
@@ -115,7 +161,21 @@ async function status() {
         if (!available) note = "install xdotool: sudo apt install xdotool";
     }
     if (MAC) note = "needs Accessibility permission (System Settings -> Privacy -> Accessibility) for the bridge's runtime (Terminal/node)";
-    return { ok: true, platform: process.platform, tool, available, note };
+
+    let clipboard;
+    if (WIN) clipboard = { tool: "Set-Clipboard (built-in)", available: true };
+    else if (MAC) clipboard = { tool: "pbcopy (built-in)", available: true };
+    else if (LINUX) {
+        if (_nativeClipboard()) clipboard = { tool: "@napi-rs/clipboard", available: true };
+        else {
+            const r = await _run("which", ["xclip"]);
+            const xclipOk = r.ok && !!r.out;
+            clipboard = { tool: "xclip", available: xclipOk,
+                note: xclipOk ? "" : "no clipboard setter found -- paste mode (used for non-ASCII or long dictation) will fail; install xclip (sudo apt install xclip) or the optional @napi-rs/clipboard native dependency will cover this automatically once installed" };
+        }
+    } else clipboard = { tool: "unsupported", available: false };
+
+    return { ok: true, platform: process.platform, tool, available, note, clipboard };
 }
 
 module.exports = { typeText, status };
