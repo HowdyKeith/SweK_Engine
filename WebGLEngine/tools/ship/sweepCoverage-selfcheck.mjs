@@ -164,9 +164,63 @@ const FILE = SC.readFile();
 const overInSomeReading = (x) => [x.hereMs, x.recordedWas, x.overMs, x.v4476Ms, x.v4461Ms,
                                   ...(x.serialMs || []), ...(x.quietMs || []), ...(x.serialNow || [])]
     .filter(Number.isFinite).some((v) => v > SC.BUDGET_MS);
+// *** v4647m -- THE GUARD READ `timings[]`, WHICH IS WHICHEVER RUN HAPPENED LAST. ***
+//
+// The comment above ends "Filed as its own round: two fields in the timings file, one per measurement."
+// This is that round, and the two fields now exist -- `serial` (v4562) and `contended` (v4556) landed after
+// that sentence was written.
+//
+// `timings[g]` is `serialMs ?? parallelMs`. For an oscillator those are DIFFERENT QUANTITIES: meshLine is
+// 2,963-3,146 alone and 7,259 eight-way; traderGraph 2,245-2,437 alone and 3,003; wgslSpec 2,688-2,927 and
+// 7,087. So the clause `timings[g] > 0.8 * budget` asked one field that holds both, and its answer moved
+// with the ORDERING of runs rather than with anything about the gate. The roll's own note says exactly
+// that: "these gates oscillate every round forever and the rows over them go red on the ordering rather
+// than on anything being wrong."
+//
+// MEASURED: with all three clauses evaluated per gate, the ONLY failing one was traderGraph at
+// `timings[] = 2312 < 2400`, and 2,312 is its SERIAL number -- filed because the last thing that ran it ran
+// it alone. Nothing about the gate had changed.
+//
+// The two halves are asked separately now, and each is ordering-stable:
+//
+//   ALONE   `serial[g]` is only ever written by a serial run, so it cannot be clobbered by a sweep.
+//   LOADED  `timings[g]` only when `contended[g] === true` -- a genuine parallel sample, or nothing.
+//
+// An entry is justified while it is CHEAP ALONE and the record states a LOADED reading over budget. The
+// retirement path the old clause existed for is kept and sharpened: if a live CONTENDED sample says the
+// gate is under budget under load too, it is fast everywhere and falls off the roll -- which is a fact
+// about the gate rather than about which run was most recent.
+const aloneMs = (g, F = FILE) => {
+    const s = (F.serial || {})[g];
+    if (typeof s === "number") return s;
+    return (F.contended || {})[g] === false ? (F.timings || {})[g] : null;
+};
+const liveLoadedMs = (g, F = FILE) => ((F.contended || {})[g] === true ? (F.timings || {})[g] : null);
+// *** AND ONE PREDICATE WAS CERTIFYING TWO POPULATIONS WITH OPPOSITE PROPERTIES. ***
+// There are two stillOver rolls and they hold different kinds of claim:
+//
+//   RETURNED_AT_V4476  crossBackend-selfcheck.mjs, live 25,772 ms -- GENUINELY OVER, by 8x. Nothing
+//                      subtle: it belongs out of the sweep in every reading anybody has taken.
+//   RETURNED_AT_V4529  meshLine / traderGraph / wgslSpec -- OSCILLATORS. Cheap alone (2,245-3,146) and
+//                      over under load (3,003-7,259). Their whole content is that the two differ.
+//
+// `justifiedOver` was asked to certify both with one rule, which is why it needed a fudge factor: 0.8 of
+// the budget is low enough to admit a straddler and high enough to look like a bar. It is not one property
+// and no threshold makes it one. Two predicates, and `justifiedOver` is their union so the callers that
+// grade the combined roll keep working.
+const stillGenuinelyOver = (x, F = FILE) => (aloneMs(x.gate, F) ?? (F.timings || {})[x.gate] ?? 0) > SC.BUDGET_MS;
+const oscillates = (x, F = FILE) => {
+    // The record must state the loaded side as a NUMBER. It used to live in the prose ("8-way it is 7,259"),
+    // where nothing could read it -- a claim in a sentence is a claim no gate keeps honest.
+    if (!Number.isFinite(x.loadedMs) || x.loadedMs <= SC.BUDGET_MS) return false;
+    const alone = aloneMs(x.gate, F);
+    if (alone == null || alone > SC.BUDGET_MS * 1.15) return false;   // not cheap alone: not an oscillator
+    const loaded = liveLoadedMs(x.gate, F);
+    return loaded == null || loaded > SC.BUDGET_MS;                   // a live loaded sample may retire it
+};
 const justifiedOver = (x) => overInSomeReading(x) &&
-    ((FILE.timings || {})[x.gate] || 0) > SC.BUDGET_MS * 0.8 &&
-    typeof x.why === "string" && x.why.length > 40;
+    typeof x.why === "string" && x.why.length > 40 &&
+    (stillGenuinelyOver(x) || oscillates(x));
 const GATES = enumerateGates(ENG);
 const C = SC.census(GATES, FILE);
 
@@ -477,7 +531,10 @@ console.log("\n7. *** THE MIRROR standingReds NEVER HAD: A ZERO IS AS OLD AS THE
     const V29ret = [...(SC.RETURNED_AT_V4529.returnedAt_v4535 || []), ...(SC.RETURNED_AT_V4529.returnedAt_v4565 || []),
                     ...(SC.RETURNED_AT_V4529.returnedAt_v4545 || [])];
     ok("!! a returnee that went back over the budget on a later box is NAMED with its serial readings, and is live over",
-       overNonEmpty(SC.RETURNED_AT_V4529.stillOver, (x) => justifiedOver(x) && x.hereMs > SC.BUDGET_MS && back.some((b) => b.gate === x.gate)) ||
+       // v4647m: this roll is the OSCILLATOR roll, so it is graded by the oscillator predicate rather than
+       // by the union -- an entry here that were merely over everywhere would be on the wrong roll.
+       overNonEmpty(SC.RETURNED_AT_V4529.stillOver, (x) => overInSomeReading(x) && oscillates(x) &&
+                    x.hereMs > SC.BUDGET_MS && back.some((b) => b.gate === x.gate)) ||
        (emptyOfNonEmpty(SC.RETURNED_AT_V4529.stillOver, V29ret) &&
         overNonEmpty(V29ret, (x) => (FILE.timings || {})[x.gate] < SC.BUDGET_MS && x.overMs > SC.BUDGET_MS &&
                                     typeof x.why === "string" && x.why.length > 40 &&
@@ -1290,6 +1347,101 @@ console.log("\n*** v4647j -- THE FIVE RED ROWS ABOVE WERE RIGHT FOR FIVE WEEKS, 
     ok("!! restoreLost does not mutate the file it is handed",
        JSON.stringify(before) === snapshot,
        "the caller spreads the original and overrides two maps; a mutated input would write the change twice");
+}
+
+// =============================================================================================================
+// v4647m SABOTAGES, RESULTS BY NAME:
+//   ZA. aloneMs reads timings[] again, the field with two quantities  -> 1 RED
+//   ZB. the loaded side is no longer required to be a number          -> 1 RED
+//   ZC. a gate that is slow ALONE counts as an oscillator             -> 1 RED
+//   ZD. a live contended sample under budget no longer retires it     -> 1 RED
+//   ZE. the oscillator roll is graded by the UNION again              -> 0 RED  (see below)
+//   ZF. a merely-slow gate is admitted to the oscillator roll         -> 2 RED
+//
+// *** ZA MEASURED ZERO ON ITS FIRST FIXTURE, AND THE FIXTURE WAS THE REASON. *** It used traderGraph's
+// pair, 2,312 alone against 3,003 loaded -- and BOTH clear the "cheap alone" bar, so reading the wrong
+// field changed no answer. meshLine's pair is 3,010 against 7,259 and does discriminate. A fixture whose
+// two quantities are close enough to agree cannot test that they are told apart.
+//
+// *** ZE IS ZERO AND IS LEFT THAT WAY, STATED RATHER THAN PAPERED OVER. *** Today all three entries on the
+// oscillator roll satisfy BOTH predicates -- meshLine is 3,010 alone, which is over the budget outright --
+// so the union and the specific predicate give the same answer and the sabotage is invisible. What
+// protects the roll is ZF's row: the moment an entry that is merely slow everywhere is added, the
+// disjointness row fails. Verified by doing it, not argued: inserting crossBackend (25,772 ms, no cheap
+// side) into the oscillator roll turns that row red.
+
+console.log("\n*** v4647m -- THE VERDICT MUST NOT DEPEND ON WHICH RUN HAPPENED LAST ***");
+// =============================================================================================================
+// The roll's own note says these gates "oscillate every round forever and the rows over them go red on the
+// ordering rather than on anything being wrong". That is the property, so it is stated as one: the same
+// gate, the same record, two files differing ONLY in whether the most recent write was serial or parallel,
+// must get the same answer. The old `timings[g] > 0.8 * budget` clause could not, because `timings[g]` is
+// `serialMs ?? parallelMs` -- one field holding two quantities.
+{
+    // traderGraph's REAL pair, because it is the gate that actually flipped: 2,312 filed by a serial run,
+    // 3,003 filed by the next 8-way sweep. Its own entry calls that "THREE MILLISECONDS OVER".
+    const OSC = { gate: "osc", loadedMs: 3003, hereMs: 3008, why: "x".repeat(50) };
+    // The SAME gate, written twice: once by a serial run, once by a parallel one.
+    const afterSerial   = { timings: { osc: 2312 }, serial: { osc: 2312 }, contended: { osc: false } };
+    const afterParallel = { timings: { osc: 3003 }, serial: { osc: 2312 }, contended: { osc: true } };
+    ok("!! *** the same oscillator is judged the same way whichever run wrote last ***",
+       oscillates(OSC, afterSerial) === true && oscillates(OSC, afterParallel) === true,
+       "serial -> " + oscillates(OSC, afterSerial) + ", parallel -> " + oscillates(OSC, afterParallel) +
+       ". Under the old clause the parallel write passed and the serial write FAILED, on 2,312 against a " +
+       "2,400 bar -- and 2,312 was traderGraph's serial number, filed because the last thing to run it ran " +
+       "it alone. Nothing about the gate had changed.");
+    // And the old rule really did flip. Stated as the counter-example rather than asserted from memory.
+    const oldRule = (F) => ((F.timings || {})[OSC.gate] || 0) > SC.BUDGET_MS * 0.8;
+    ok("!! ...and the rule it replaced DID flip on the same pair, which is why this row exists",
+       oldRule(afterSerial) === false && oldRule(afterParallel) === true,
+       "`timings[] > 0.8 * budget`: false after a serial write, true after a parallel one, same gate, same " +
+       "minute. A threshold cannot fix that -- the field holds two different quantities.");
+
+    // *** meshLine's REAL pair, because traderGraph's does not discriminate. *** Its serial and 8-way
+    // numbers are 3,010 and 7,259, so reading the wrong field puts the gate 2.4x over the "cheap alone"
+    // bar instead of just under it. Sabotage ZA -- aloneMs reading `timings[]` again -- went ZERO RED on
+    // the traderGraph fixture, where the two numbers are 2,312 and 3,003 and BOTH clear the bar. A fixture
+    // whose two quantities are close enough to agree cannot test that they are told apart.
+    const MESH = { gate: "mesh", loadedMs: 7259, hereMs: 4379, why: "x".repeat(50) };
+    const meshSerial   = { timings: { mesh: 3010 }, serial: { mesh: 3010 }, contended: { mesh: false } };
+    const meshParallel = { timings: { mesh: 7259 }, serial: { mesh: 3010 }, contended: { mesh: true } };
+    ok("!! *** the ALONE cost is read from `serial`, so a parallel write cannot clobber it ***",
+       oscillates(MESH, meshSerial) === true && oscillates(MESH, meshParallel) === true &&
+       aloneMs("mesh", meshParallel) === 3010,
+       `aloneMs after a parallel write is ${aloneMs("mesh", meshParallel)}, not ${meshParallel.timings.mesh}. ` +
+       "`serial` is only ever written by a serial run; `timings` is whichever ran last");
+
+    // The two rolls hold opposite claims, so no entry belongs on both. This is what keeps a merely-slow gate
+    // off the oscillator roll, whatever any single row happens to call.
+    ok("!! *** every entry on the OSCILLATOR roll is an oscillator, and no entry on the other roll is ***",
+       SC.RETURNED_AT_V4529.stillOver.every((x) => oscillates(x)) &&
+       SC.RETURNED_AT_V4476.stillOver.every((x) => !oscillates(x) && stillGenuinelyOver(x)),
+       `${SC.RETURNED_AT_V4529.stillOver.length} oscillators, ${SC.RETURNED_AT_V4476.stillOver.length} ` +
+       "genuinely over. A gate cheap alone and slow loaded is a different claim from a gate slow everywhere, " +
+       "and one predicate for both is what forced the 0.8 fudge factor this round removed.");
+
+    ok("!! a live CONTENDED sample that is UNDER budget retires the entry: it is fast everywhere now",
+       oscillates(OSC, { timings: { osc: 2500 }, serial: { osc: 2400 }, contended: { osc: true } }) === false,
+       "the retirement path the old clause existed for, kept and sharpened -- a fact about the gate rather " +
+       "than about which run was most recent");
+    ok("!! ...and a gate that is not cheap ALONE is not an oscillator, whatever the record says",
+       oscillates(OSC, { timings: { osc: 9000 }, serial: { osc: 9000 }, contended: { osc: false } }) === false,
+       "9,000 ms alone against a 3,000 ms budget: genuinely slow, and it belongs on the other roll");
+    ok("!! ...and the loaded side must be a NUMBER in the record, not a sentence",
+       oscillates({ ...OSC, loadedMs: undefined }, afterSerial) === false &&
+       oscillates({ ...OSC, loadedMs: 2000 }, afterSerial) === false,
+       "it used to live in the prose -- \"8-way it is 7,259\" -- where nothing could read it. A missing " +
+       "number refuses, and so does one that does not clear the budget");
+
+    // The OTHER roll, whose entries make the opposite claim. One predicate for both is what forced the fudge.
+    const OVER = { gate: "slow", hereMs: 25772, why: "x".repeat(50) };
+    ok("!! *** and a genuinely-over entry is certified by the OTHER predicate, with no loadedMs at all ***",
+       stillGenuinelyOver(OVER, { timings: { slow: 25772 } }) === true &&
+       oscillates(OVER, { timings: { slow: 25772 } }) === false &&
+       stillGenuinelyOver(OVER, { timings: { slow: 1000 } }) === false,
+       "crossBackend-selfcheck.mjs sits at 25,772 ms -- over by 8x in every reading anybody has taken, and " +
+       "it carries no loadedMs because it has no cheap side. Requiring one of it was this round's own first " +
+       "draft, and it reddened two rows that had nothing to do with the oscillation.");
 }
 
 REPORT.write();

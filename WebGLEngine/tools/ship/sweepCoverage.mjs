@@ -256,7 +256,7 @@ export const RETURNED_AT_V4529 = Object.freeze({
     // them go red on the ordering rather than on anything being wrong. Filed as its own round; what
     // belongs HERE is the pair going back on the roll with both readings, which is what this roll is for.
     stillOver: Object.freeze([
-        Object.freeze({ gate: "tools/ship/meshLine-selfcheck.mjs", recordedWas: 4404, v4476Ms: 2929, hereMs: 4379,
+        Object.freeze({ loadedMs: 7259, gate: "tools/ship/meshLine-selfcheck.mjs", recordedWas: 4404, v4476Ms: 2929, hereMs: 4379,
             quietMs: Object.freeze([2515, 2480, 2757]),
             why: "retired at v4535 on quiet readings and back within a day; retired again at v4546 on " +
                  "2,691 / 2,700 / 2,717 / 2,772 taken serially on a LOADED box, and back within ONE " +
@@ -264,7 +264,7 @@ export const RETURNED_AT_V4529 = Object.freeze({
                  "3,146 -- and 8-way it is 7,259. Three retirements and three returns: the gate is not " +
                  "moving, the measurement is, and the roll keeps it with every set of numbers rather than " +
                  "moving it a fourth time" }),
-        Object.freeze({ gate: "tools/ship/traderGraph-selfcheck.mjs", recordedWas: 3368, v4461Ms: 2793, hereMs: 3008,
+        Object.freeze({ loadedMs: 3003, gate: "tools/ship/traderGraph-selfcheck.mjs", recordedWas: 3368, v4461Ms: 2793, hereMs: 3008,
             quietMs: Object.freeze([2729, 2344, 2659]),
             serialNow: Object.freeze([2245, 2308, 2319, 2437]),
             why: "*** THE CLEAREST ILLUSTRATION ON THIS ROLL: THE VERIFY FILED IT AT 3,003 MS. THREE " +
@@ -273,7 +273,7 @@ export const RETURNED_AT_V4529 = Object.freeze({
                  "had; and the very next 8-way sweep filed 3,003 and flipped the row that reads this roll. " +
                  "A gate whose two measurements sit either side of the budget cannot be retired by taking " +
                  "one of them, however carefully, and this is the third attempt to prove otherwise" }),
-        Object.freeze({ gate: "tools/ship/wgslSpec-selfcheck.mjs", recordedWas: 5162, hereMs: 3737,
+        Object.freeze({ loadedMs: 7087, gate: "tools/ship/wgslSpec-selfcheck.mjs", recordedWas: 5162, hereMs: 3737,
             serialMs: Object.freeze([2688, 2698, 2927]),
             why: "v4541 called it the least ambiguous on this roll and said no reading had ever been " +
                  "under 3,000; v4546 retired it at 2,505-2,688 and falsified that, correctly. It is at " +
