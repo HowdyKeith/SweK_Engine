@@ -16481,6 +16481,30 @@ ${text.replace(/'/g, "''")}
         return;
     }
 
+    // qrBridge wiring — local, server-side QR render for fabric.html's HOP 3 "remote viewer" button,
+    // which used to send the live tunnel URL to the external api.qrserver.com just to draw a QR image. Lazily
+    // required, same discipline as /sharp/*: a tree missing qrBridge.js (or @napi-rs/canvas) still
+    // boots. 503 on any failure (canvas unavailable, encode failure) is deliberate, not 404/500 —
+    // fabric.html's <img onerror> treats any non-2xx the same, so 503 ("this optional feature isn't up
+    // right now") reads correctly there and in a browser network tab alike, the same signal
+    // /immich/thumb already gives its own <img> consumer for the identical "upstream not available"
+    // shape. `data` is untrusted, GET, reachable from any origin — validated before qrBridge is ever
+    // asked to encode it: missing/empty and over-length are both a plain 400, no encode attempted.
+    if (req.method === "GET" && req.url.split("?")[0] === "/qr.png") {
+        let qrBridge;
+        try { qrBridge = require("./qrBridge.js"); }
+        catch (e) { sendJson({ ok: false, error: "qr bridge unavailable: " + String(e && e.message || e) }, 503); return; }
+        const q = new URLSearchParams(req.url.split("?")[1] || "");
+        const data = q.get("data") || "";
+        if (!data) { sendJson({ ok: false, error: "missing data" }, 400); return; }
+        if (data.length > qrBridge.MAX_DATA_LEN) { sendJson({ ok: false, error: "data too long (max " + qrBridge.MAX_DATA_LEN + " chars)" }, 400); return; }
+        qrBridge.renderQrPng(data).then(r => {
+            if (r && r.ok) { res.writeHead(200, { "Content-Type": "image/png", "Content-Length": r.png.length, "Cache-Control": "no-store" }); res.end(r.png); }
+            else { sendJson(r || { ok: false, error: "qr render failed" }, 503); }
+        }).catch(e => { try { sendJson({ ok: false, error: String(e && e.message || e) }, 503); } catch {} });
+        return;
+    }
+
     // --- voxtral: the install button for voxtral.html's engine -------------------------------------
     // v4116 -- Keith: "we have a button to do the install?" v4115 shipped the page with the clone-and-copy
     // written out as two shell lines, and a feature whose setup is a paste-this-into-a-terminal is one most

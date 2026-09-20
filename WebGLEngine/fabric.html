@@ -164,10 +164,17 @@ $("h3btn").onclick = () => {
     return;
   }
   const url = SELF.tunnel.replace(/\/+$/,"") + "/fabric.html";
-  const qr = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=" + encodeURIComponent(url);
+  // qrBridge.js — prefer this box's own LOCAL, server-side QR render (@napi-rs/canvas + the same
+  // vendored qrcode.mjs ui/phoneConnectQR.js already uses browser-side) over sending the live tunnel
+  // URL to the external api.qrserver.com just to draw a QR image. <img onerror> falls back to that
+  // same external URL automatically, so a box without @napi-rs/canvas installed (or a transient local
+  // render failure — qrBridge answers with 503/400, never a silent hang) keeps working exactly as
+  // this hop always did.
+  const qrLocal = "/qr.png?data=" + encodeURIComponent(url);
+  const qrExternal = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=" + encodeURIComponent(url);
   $("h3out").innerHTML = 'This exact page is live at your public URL — no deploy:<br><a href="'+esc(url)+'" target="_blank">'+esc(url)+'</a>'+
     '<div class="prov ok">a remote viewer sees the same fabric — open it off-wifi on your phone</div>'+
-    '<div class="qr"><img src="'+esc(qr)+'" alt="QR to the public fabric page" width="150" height="150"></div>';
+    '<div class="qr"><img src="'+esc(qrLocal)+'" data-fallback="'+esc(qrExternal)+'" onerror="this.onerror=null;this.src=this.dataset.fallback;" alt="QR to the public fabric page" width="150" height="150"></div>';
 };
 
 // HOP 4 — shared control channel
