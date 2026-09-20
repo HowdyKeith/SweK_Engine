@@ -70,7 +70,7 @@ function act(cmd) {
     if (!cmd) return;
     const { url, mode } = cmd;
     if (mode === "close") { closeAll(); return; }
-    if (mode === "tab") { try { openedTab = window.open(url, "_blank"); } catch {} return; }
+    if (mode === "tab") { try { openedTab = window.open(url, "_blank", "noopener"); } catch {} return; }
     if (mode === "download") { triggerDownload(url); return; }
     showOverlay(url);                          // "iframe" (default)
 }

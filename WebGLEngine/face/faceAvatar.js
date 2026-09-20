@@ -250,6 +250,7 @@ const _myVoice = (() => {
     catch { return null; }
 })();
 window.addEventListener("message", (e) => {
+    if (e.origin !== window.location.origin) return;
     const m = e?.data;
     if (!m || typeof m !== "object" || !m.type) return;
     if (_myVoice && m.voice && m.voice !== _myVoice) return;

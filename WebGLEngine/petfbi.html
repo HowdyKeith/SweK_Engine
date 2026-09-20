@@ -128,7 +128,7 @@ async function load(){
   if (!reports.length) { rows.innerHTML = '<tr><td colspan="4" style="color:var(--dim);padding:24px;text-align:center">' + (mineOnly ? "No reports for your towns." : "No reports yet. Add one above.") + '</td></tr>'; return; }
   for (const r of reports) {
     const tr = document.createElement("tr"); if (r.status==="posted") tr.className="posted";
-    const title = esc(r.title) + (r.petType?(' <span style="color:var(--dim)">· '+esc(r.petType)+'</span>'):'') + (r.link?(' · <a href="'+esc(r.link)+'" target="_blank">link</a>'):'') + (r.loc&&r.loc.lat!=null?(' <span title="'+esc((r.loc.address)||'')+'">📍</span>'):'');
+    const title = esc(r.title) + (r.petType?(' <span style="color:var(--dim)">· '+esc(r.petType)+'</span>'):'') + (r.link?(' · <a href="'+esc(r.link)+'" target="_blank" rel="noopener">link</a>'):'') + (r.loc&&r.loc.lat!=null?(' <span title="'+esc((r.loc.address)||'')+'">📍</span>'):'');
     const whoTxt = r.status==="posted" ? ("posted by "+esc(r.postedBy||"?")) : (r.claimedBy?("claimed by "+esc(r.claimedBy)):"—");
     const acts = document.createElement("td"); acts.className="acts";
     const mk = (label, cls, fn, dis) => { const b=document.createElement("button"); b.className="btn "+(cls||""); b.textContent=label; b.disabled=!!dis; b.onclick=fn; return b; };
@@ -226,7 +226,7 @@ async function fbPost(id){
     status.textContent=msg;
     if(groups.length>1){
       const extra=document.createElement("div"); extra.style.cssText="margin-top:8px;font-size:12px";
-      extra.innerHTML="<b>Open the other groups:</b> "+groups.slice(1).map(g=>'<a href="'+esc(g.url)+'" target="_blank" style="margin-right:8px">'+esc(g.name)+'</a>').join(" ");
+      extra.innerHTML="<b>Open the other groups:</b> "+groups.slice(1).map(g=>'<a href="'+esc(g.url)+'" target="_blank" rel="noopener" style="margin-right:8px">'+esc(g.name)+'</a>').join(" ");
       status.appendChild(extra);
     }
   }
@@ -274,12 +274,12 @@ function postKitHtml(r){
       +'<button class="btn good" style="font-weight:600" onclick="fbPost(\''+r.id+'\')" title="One click: copies the caption, downloads the pet photo + map as ready-to-attach files, and opens Facebook. Then just paste and drag the two images in.">\uD83D\uDCD8 Post to Facebook</button>'
       +'<button class="btn" onclick="copyText(document.getElementById(\''+pid+'\').textContent)">Copy text</button></div>'
       +'<pre id="'+pid+'" style="white-space:pre-wrap;background:#08111d;padding:8px;border-radius:4px;margin:0 0 8px;font-size:12px">'+esc(r.post)+'</pre>'; }
-  const links=[]; if(r.imageUrl) links.push('<a href="'+esc(r.imageUrl)+'" target="_blank">pet photo</a>'); if(r.mapUrl) links.push('<a href="'+esc(r.mapUrl)+'" target="_blank">map</a>');
+  const links=[]; if(r.imageUrl) links.push('<a href="'+esc(r.imageUrl)+'" target="_blank" rel="noopener">pet photo</a>'); if(r.mapUrl) links.push('<a href="'+esc(r.mapUrl)+'" target="_blank" rel="noopener">map</a>');
   if(links.length) h+='<div style="font-size:12px;margin-bottom:8px">'+links.join(' · ')+'</div>';
   if(g.length){
     h+='<b style="color:var(--blue)">Groups for '+esc(rt.town||'')+', '+esc(rt.state||'')+' ('+g.length+')</b>';
     h+='<ul style="margin:4px 0 8px;padding-left:18px;font-size:12px">';
-    for(const x of g) h+='<li><span style="color:var(--dim)">['+esc(x.kind)+']</span> <a href="'+esc(x.url)+'" target="_blank">'+esc(x.name)+'</a></li>';
+    for(const x of g) h+='<li><span style="color:var(--dim)">['+esc(x.kind)+']</span> <a href="'+esc(x.url)+'" target="_blank" rel="noopener">'+esc(x.name)+'</a></li>';
     h+='</ul><div style="font-size:11px;color:var(--dim);line-height:1.5"><div><b>Admin:</b> '+esc(rt.adminShare||'')+'</div><div><b>Editor:</b> '+esc(rt.editorSteps||'')+'</div></div>';
   } else if(r.groupsNote) h+='<div style="font-size:11px;color:var(--dim)">'+esc(r.groupsNote)+'</div>';
   if(r.email && (r.email.to||[]).length){
