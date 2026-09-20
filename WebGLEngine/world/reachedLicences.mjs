@@ -1261,6 +1261,52 @@ export const REACHED_SOURCES = Object.freeze([
              "would be a second declaration of something the tree already declares, which is the rule " +
              "physics/render/pathTracer.mjs states.",
     },
+    {
+        // v4647q -- cited in mesh/colliderFromGLB.mjs since v4629 and registered by nobody, which took the
+        // ratchet to 52 and the gate red. Cleared by cloning the upstream and reading its licence first-hand,
+        // the same method v4461 used. THE EARLIER NOTE ON THIS ENTRY SAID THE READING WAS UNAVAILABLE
+        // -- api.github.com answered 403 through that session's proxy -- and it was wrong about the route
+        // rather than about the wall: a shallow git clone of the same repository goes through and always did.
+        // What was blocked was ONE HOST, and the fact I could not read the licence through it was recorded as
+        // though the licence could not be read at all. A blocked route is not an absent fact.
+        repo: "hh-hang/collider-forge", sourceUrl: "https://github.com/hh-hang/collider-forge",
+        grantorHoldsRights: true, licenceExists: true, publisher: "hh-hang", year: 2026,
+        spdx: "MIT", licence: null,
+        licenceNote: "MIT. READ FIRST-HAND at v4647q from a shallow clone at 8bf41bab: LICENSE, 21 lines, " +
+             "sha256 69dac344832b50d7f5f22e1c35fee62ca39cbbcdc04c60b01de71fbf1a3a722a, unmodified MIT text. " +
+             "*** TWO WAYS THIS IS WEAKER EVIDENCE THAN THE GLSL-PathTracer ENTRY ABOVE, NAMED RATHER THAN " +
+             "GLOSSED: *** (1) the copyright line reads `(c) 2026 collider-forge contributors` and names no " +
+             "person, so it does not match the HEAD commit author (hh-hang <2452327415qh@gmail.com>) the way " +
+             "Asif Ali\'s did -- the repository owner and the grantor are the same handle, and that is the whole " +
+             "chain. (2) The file actually read, src/collider.ts (131 lines, sha256 " +
+             "2b4143a76c83fdcfd547d286d981106a76e5d282e840c4beee93f6ed5e860843), carries NO licence block of " +
+             "its own, so its grant is INHERITED from the repository root rather than repeated in the file. " +
+             "package.json also says \"license\": \"MIT\", and that is not what this entry rests on: the " +
+             "isaac-mason entry above records licenceExists:false for exactly that, on the grounds that a field " +
+             "in a manifest is a statement of intent and not a grant with the text beside it. Here the text is " +
+             "beside it, which is why this one is true.",
+        redistributable: true, posture: POSTURE.REACHED,
+        taken: "A DESCRIPTION OF A PIPELINE, and most of it turned out to be already built for another reason. " +
+             "src/collider.ts traverses the loaded scene graph, bakes each mesh\'s matrixWorld into its geometry, " +
+             "drops the index, merges everything with three.js\'s own BufferGeometryUtils.mergeGeometries, and " +
+             "does NOT decimate, hull or voxelize. gpu/GLBParser.js already did the walk, the bake and the weld " +
+             "-- to hand the renderer one draw-friendly buffer, not to make anything collidable. What entered " +
+             "the tree is the BRIDGE from a parsed GLB to a MeshBVH, plus the decision to match that scope " +
+             "exactly. No TypeScript was translated and no bytes were taken.",
+        takenPaths: ["mesh/colliderFromGLB.mjs"],
+        citedPaths: ["tools/ship/colliderFromGLB-selfcheck.mjs"],
+        why: "*** grantorHoldsRights IS true HERE FOR THE MIRROR OF THE REASON IT IS false FOR DaveFace ABOVE. " +
+             "*** That entry came back false because the author\'s own Credits section attributed the two " +
+             "techniques v4442 wanted to a third party. This repository has a Credits section too -- three.js, " +
+             "3d-tiles-renderer, Spark, Open3D, draco -- and a THIRD_PARTY_NOTICES.md, and BOTH WERE CHECKED " +
+             "AGAINST WHAT WAS ACTUALLY TAKEN. The notices scope third-party code to prebuilt decoder binaries " +
+             "under public/libs (Draco and Basis Universal, Apache-2.0); none of that was read. The one credited " +
+             "dependency that IS a technique rather than a library is Open3D\'s Poisson reconstruction, and it " +
+             "lives in tools/3dgs-collider/ as a separate Windows native tool with Open3D DLLs beside it -- " +
+             "which is precisely the path mesh/colliderFromGLB.mjs\'s header names as NOT taken, for reasons " +
+             "that predate this reading. So the part credited to a third party and the part taken are disjoint, " +
+             "and src/collider.ts is the author\'s own code over a three.js utility.",
+    },
 ]);
 
 /** Everything wrong with one entry. Empty means it can be trusted as a record. */
@@ -1296,30 +1342,27 @@ export const REACHED_SOURCES = Object.freeze([
 // party are exactly the two v4442 declined to take for an unrelated reason. knightcrawler25/GLSL-PathTracer came
 // back clean, with the MIT block repeated inside the one file that was actually read. Back to 49, and the number
 // has now been up as well as down, which is what makes it evidence rather than decoration.
-// *** v4647p -- THE DEBT IS 52 AND THE BASELINE STAYS 51, ON PURPOSE. ***
+// *** v4647p SAID THE LICENCE "COULD NOT BE OBSERVED", AND v4647q READ IT IN ONE COMMAND. ***
 //
-// tools/ship/citedSources-selfcheck.mjs is RED because one source was cited without being registered:
+// v4629 cited hh-hang/collider-forge (MIT) in mesh/colliderFromGLB.mjs and registered nothing, so the debt
+// went to 52 against a baseline of 51 and citedSources went red -- the ratchet doing exactly what its row
+// says. v4647p was right to refuse to fabricate the entry and right to refuse to raise the baseline. What it
+// got wrong is the sentence it wrote instead:
 //
-//     hh-hang/collider-forge (MIT)   cited in mesh/colliderFromGLB.mjs, added at v4629
+//     "api.github.com returns 403 through this session's proxy, so the observation is not available here."
 //
-// That is the ratchet doing exactly what its row says it does -- "one that takes without recording moves it
-// UP and goes red". The header in colliderFromGLB.mjs is careful (read, not copied; scope matched to the
-// reference's own; most of the port found to be already present for unrelated reasons), so what is missing
-// is the REGISTER entry, not the attribution.
+// The first clause is true and the second does not follow. api.github.com is ONE HOST; the method this
+// register already records for exactly this job is v4461's, "cloning the two upstreams and reading their
+// licence files first-hand", and `git clone --depth 1 https://github.com/hh-hang/collider-forge` goes
+// through and always did. *** A BLOCKED ROUTE WAS WRITTEN DOWN AS AN ABSENT FACT, *** which is the same
+// species as a count standing in for a property: the thing measured (one host answered 403) was recorded as
+// the thing wanted (the licence is unreadable). The owed entry sat there for a round over a wall that was
+// never in front of it.
 //
-// *** IT IS NOT REGISTERED HERE BECAUSE THE FACTS THE REGISTER DEMANDS COULD NOT BE OBSERVED. ***
-// `licenceExists` in this file means a licence TEXT was looked at: the isaac-mason/three-spark-light-probes
-// entry above records `licenceExists: false` for a repository whose package.json says "MIT", on the grounds
-// that "a field in a manifest is a statement of intent, not a grant with the text beside it". Meeting that
-// standard means reading the repository. api.github.com returns 403 through this session's proxy, so the
-// observation is not available here.
-//
-// The row's own instruction is that "fabricating them to clear a number is worse than owing it", so the
-// number is owed and the arrival is named. Closing it needs one look at the repository's licence text by a
-// session that can reach it; everything else is assembled above.
-//
-// The baseline is NOT raised to 52. Raising it is how a ratchet stops being one -- the red IS the record,
-// until the entry exists.
+// v4647q clears it. The entry is in REACHED_SOURCES above with the LICENSE's sha256, its line count, the
+// HEAD commit, and two named ways the evidence is WEAKER than the GLSL-PathTracer entry's -- the copyright
+// line names no person, and the file actually read carries no licence block of its own. The debt is 51
+// again, which equals the baseline, and the baseline has still never been raised.
 export const UNREGISTERED_CITED_BASELINE = 51;
 
 export function validateEntry(e) {
