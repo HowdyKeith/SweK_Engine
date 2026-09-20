@@ -129,6 +129,53 @@ export function scan({ files = null, read = (f) => fs.readFileSync(f, "utf8"), s
 }
 
 /** What the rig measured, kept verbatim, because a repair is only checkable against the failure it repairs. */
+/**
+ * *** v4647 -- THE raw-separator CLASS HAS A SHAPE THIS MODULE'S DETECTOR CANNOT SEE, AND A SECOND BOX FOUND
+ * BOTH LIVE INSTANCES WHILE THE SCAN REPORTED NOTHING. ***
+ *
+ * CLASSES already names it: "a path built by path.join or path.relative is compared against, or recorded
+ * beside, a stored '/' form -- true on the box it was written on and false on Windows". The DETECTOR counts
+ * files that call path.relative and asks whether the file mentions a normaliser ANYWHERE, which is a
+ * file-level proxy and is reported rather than asserted, deliberately, per the header.
+ *
+ * Keith's gen-9 run turned up two, in OPPOSITE directions:
+ *
+ *   gateSweep-selfcheck   the PRODUCER normalises (enumerateGates pushes toPosix) and the expectation was
+ *                         built with path.join. Cross-FILE: nothing in the gate's own text is wrong.
+ *   meshLine-selfcheck    the EXPECTATION is a posix literal table in the same file and the scan used a bare
+ *                         path.relative. Cross-FUNCTION, one file.
+ *
+ * *** A NARROW RULE WAS TRIED AND FALSIFIED RATHER THAN SHIPPED. *** The obvious detector is "a file that
+ * uses toPosix AND still builds an expectation with path.join" -- mixed spelling within one file. Measured
+ * against the ten known sites: NEITHER DEFECT USED toPosix BEFORE ITS FIX, so the rule separates nothing. It
+ * would have found 0 of 2 and is not in this file.
+ *
+ * WHAT THE CENSUS ACTUALLY SAYS, read producer by producer rather than by regex:
+ *   10 comparison sites in the gates spell an expectation with path.join
+ *    8 are CORRECT -- their producer is path.relative, also native, so both sides move together. A
+ *      find-and-replace to posix literals would have broken every one of them.
+ *    2 were defective, both found by running on Windows and neither by any static rule here.
+ *
+ * So the instrument for this class is A SECOND BOX, and that is the finding rather than a gap to be closed
+ * with a better regex. What a reader should take from it: path.join in a comparison is not a defect. A
+ * MISMATCH between the two sides is, and only the producer says which you have.
+ */
+export const SEPARATOR_SITES_AT_V4647 = Object.freeze({
+    at: "v4647", found: 10, correct: 8, defective: 2,
+    defects: Object.freeze([
+        Object.freeze({ gate: "tools/ship/gateSweep-selfcheck.mjs", where: "cross-file",
+            saw: 'produced "real/z-selfcheck.mjs", expected path.join -> "real\\z-selfcheck.mjs" on win32' }),
+        Object.freeze({ gate: "tools/ship/meshLine-selfcheck.mjs", where: "cross-function",
+            saw: "NAMED keys are posix, the scan was a bare path.relative; five files in the table read as unexpected" }),
+    ]),
+    ruleTriedAndFalsified: "a file that uses toPosix AND builds an expectation with path.join -- 0 of 2, " +
+                           "because neither defect's file mentioned toPosix at all before its repair",
+    instrument: "a run on a Windows box; no static rule in this module found either",
+    // The census counts an INLINE comparison. Hoisting the expectation into a const hides it -- measured by
+    // sabotage, not assumed: reverting one repair's VALUE went 0 red and reverting its SHAPE went 3 red.
+    censusSeesShapeNotProperty: "`x === path.join(...)` is counted; `const E = path.join(...); x === E` is not",
+});
+
 export const POSIX_AT_V4485 = Object.freeze({
     at: "v4485",
     rig: "Windows, node v24.17.0, the v4477 archive unzipped at C:/Intel/SweK_Engine_v4477",

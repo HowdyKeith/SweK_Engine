@@ -27,7 +27,8 @@
 // module's header gives: three static rules for "compared against a stored form" gave 53, 74 and 90 in one
 // sitting, and shipping any of them would be shipping the one that happened to be written last.
 "use strict";
-import { toPosix, scan, CLASSES, POSIX_TOOLS, reportLines, POSIX_AT_V4485 as REC, ENG }
+import { toPosix, scan, CLASSES, POSIX_TOOLS, reportLines, POSIX_AT_V4485 as REC,
+         SEPARATOR_SITES_AT_V4647 as SEP, sources, ENG }
     from "./posixAssumption.mjs";
 import fs from "node:fs";
 import path from "node:path";
@@ -208,6 +209,53 @@ ok("!! and this gate is not in its own census, so the fixtures above cannot infl
     !live.shellTool.some((x) => x.file.includes("posixAssumption")) &&
     !live.pathSpecifier.some((x) => x.file.includes("posixAssumption")),
     "v4409's rule arriving through a string, which this session has now paid for four times");
+
+console.log("\n*** THE raw-separator SITES, RE-DERIVED -- AND THE RULE THAT DID NOT WORK, KEPT AS A CONTROL ***");
+{
+    // The record says 10 comparison sites, 8 correct, 2 defective. A record nothing re-derives is a number
+    // somebody typed, so the population is counted here on every run and the two repairs are checked in the
+    // tree rather than trusted.
+    const SITE = /(===\s*path\.join\(|path\.join\([^)]*\)\s*===|\.includes\(path\.join\(|\.startsWith\(path\.join\()/;
+    // *** THE HUNTER CANNOT COUNT ITSELF, AND IT DID. *** The comment above SPELLS the shape it is looking
+    // for, so this file matched its own regex and the census read 9 against a recorded 8 -- while the
+    // mixed-spelling control fired too, since this file uses toPosix as well. That is the third round running
+    // in which prose about a text census became census-visible text: last round it was the licence tokens in
+    // failLines, and playwrightResolve-selfcheck already carries the rule ("spelled as a literal it would
+    // find THIS FILE and the census would be measuring its own text"), where it builds its needle by
+    // concatenation. Excluded by PATH here rather than by spelling, because the explanation is worth keeping
+    // and a census that quietly avoids words is a census nobody can read.
+    const HERE = toPosix(path.relative(ENG, fileURLToPath(import.meta.url)));
+    const gates = sources().filter((f) => f.endsWith("-selfcheck.mjs"))
+                           .filter((f) => toPosix(path.relative(ENG, f)) !== HERE);
+    const hits = gates.filter((f) => SITE.test(fs.readFileSync(f, "utf8")))
+                      .map((f) => toPosix(path.relative(ENG, f)));
+    ok("!! *** the surviving path.join comparison sites are the 8 this record calls CORRECT ***",
+       hits.length === SEP.correct,
+       `${hits.length} site(s) today against ${SEP.correct} recorded correct, of ${SEP.found} found at v4647. ` +
+       `The two defects no longer match because their expectations are posix literals now`);
+    // *** WHAT THIS REGEX CANNOT SEE, FOUND BY SABOTAGING IT. *** Reverting gateSweep's EXPECTED to a
+    // path.join went 0 RED, because the repair moved the expectation into a NAMED CONST and `const x =
+    // path.join(...)` is not a comparison. Only the ORIGINAL inline form -- `found[0] === path.join(...)` --
+    // is visible here, and restoring that puts this row red at 9 against 8. So this counts a SHAPE, not the
+    // property: an expectation hoisted into a variable is invisible to it, which is one more reason the
+    // record above names a Windows run as the instrument rather than any rule in this file.
+    ok("  ...and neither repaired gate is among them, which is what says the two were really fixed",
+       !hits.includes("tools/ship/gateSweep-selfcheck.mjs") && !hits.includes("tools/ship/meshLine-selfcheck.mjs"),
+       hits.join(", "));
+
+    // *** THE FALSIFIED RULE IS KEPT AS A CONTROL, NOT DELETED. *** "A file that uses toPosix AND builds an
+    // expectation with path.join" is the detector anybody would reach for next. Measured at v4647 it found
+    // 0 of the 2 real defects, because neither file mentioned toPosix before its repair. Asserting that it
+    // STILL finds nothing keeps the record honest: if it ever starts finding something, the census above is
+    // out of date and this row says so before somebody rebuilds the same failed instrument.
+    const mixed = gates.filter((f) => { const c = fs.readFileSync(f, "utf8"); return SITE.test(c) && /toPosix\(/.test(c); });
+    ok("!! CONTROL: the mixed-spelling rule still separates nothing -- 0 of the 8, as it found 0 of the 2",
+       mixed.length === 0,
+       SEP.ruleTriedAndFalsified + (mixed.length ? " -- BUT IT NOW MATCHES: " + mixed.join(", ") : ""));
+    console.log(`  ----  ${SEP.instrument}. path.join in a comparison is NOT a defect: a MISMATCH between the ` +
+                `two sides is, and only the producer says which you have. A find-and-replace over these ${SEP.correct} ` +
+                `would have broken every one.`);
+}
 
 console.log(`\nposixAssumption-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);
 process.exit(fails === 0 ? 0 : 1);
