@@ -32,6 +32,9 @@ import os from "node:os";
 import path from "node:path";
 import * as GS from "./gateSweep.mjs";
 import * as RC from "./redCensus.mjs";
+import { toPosix } from "./posixAssumption.mjs";
+import { fileURLToPath } from "node:url";
+import { ENG as ENG_ROOT } from "./gateSweep.mjs";
 
 let fails = 0;
 const ok = (c, name, detail) => {
@@ -69,9 +72,53 @@ sec("1. THE POPULATION IS ENUMERATED FROM THE TREE, NOT FROM A LIST SOMEBODY TYP
             fs.writeFileSync(path.join(tmp, rel), "");
         }
         const found = GS.enumerateGates(tmp);
-        ok(found.length === 1 && found[0] === path.join("real", "z-selfcheck.mjs"),
+        // *** v4647b -- THE EXPECTATION WAS BUILT WITH path.join AND THE PRODUCER NORMALISES TO POSIX. ***
+        // enumerateGates pushes toPosix(path.relative(root, full)), deliberately, so its output is
+        // "real/z-selfcheck.mjs" on every platform. This row compared that against path.join("real", ...),
+        // which is "real\\z-selfcheck.mjs" on win32 -- so the row was red on Keith's box while the walk was
+        // doing exactly the right thing. FOURTH SIGHTING of the separator family in this session, after
+        // v4646 fixed three and found SKIP_AGREE.recordDrift leaking 117 vendor files on win32.
+        //
+        // *** AND THE DETAIL STRING PRINTED THE CORRECT ANSWER WHILE THE ROW SAID IT WAS WRONG. *** His
+        // output read `found ["real/z-selfcheck.mjs"] out of six planted files` -- one file, the right one,
+        // forward slashes -- and it was filed as "the walk descends into node_modules on Windows". Reading a
+        // FAIL line is not a diagnosis; this is the second consecutive round that mistake was made.
+        const EXPECTED = "real/z-selfcheck.mjs";   // the producer's own spelling, not this platform's
+        ok(found.length === 1 && found[0] === EXPECTED,
            "*** planted under node_modules, .claude and vendor, and the walk descends into NONE of them ***",
-           `found ${JSON.stringify(found)} out of six planted files`);
+           `found ${JSON.stringify(found)} out of six planted files, against ${JSON.stringify(EXPECTED)}`);
+        // The contract itself, asserted rather than assumed, so the expectation above cannot drift from the
+        // producer again: a separator is part of what enumerateGates PROMISES, not an accident of the box.
+        ok(found.every((r) => !r.includes("\\")) && found.every((r) => r === toPosix(r)),
+           "!! *** and enumerateGates PROMISES posix separators, on every platform -- that is why the row above does not use path.join ***",
+           `${JSON.stringify(found)} -- two boxes comparing swept paths need one spelling, and the walk is where it is chosen`);
+        // *** AND BOTH HALVES ARE DRIVEN WITH win32 SHAPES, BECAUSE THIS BOX CANNOT PRODUCE ONE. ***
+        // Three sabotages on the repair above went 0 RED here -- the expectation put back to path.join, the
+        // producer's toPosix removed, and meshLine's boundary un-normalised -- for the honest reason that on
+        // posix path.join and toPosix are both the identity. A separator defect is INVISIBLE on this box,
+        // which is exactly why these two rows were only ever red on Keith's. dxcResolve-selfcheck reaches its
+        // win32 branch from here by injection; this reaches it with literals.
+        ok(EXPECTED === "real/z-selfcheck.mjs" && EXPECTED !== path.win32.join("real", "z-selfcheck.mjs"),
+           "!! *** the expectation is separator-STABLE: it is what the producer spells, and NOT what this platform's join would build on win32 ***",
+           `${JSON.stringify(EXPECTED)} against path.win32.join = ${JSON.stringify(path.win32.join("real", "z-selfcheck.mjs"))} ` +
+           `-- the old row compared the producer's posix output against THIS, which is why it passed here and failed there`);
+        ok(toPosix(path.win32.join("real", "z-selfcheck.mjs")) === EXPECTED,
+           "  ...and toPosix really converts a win32 spelling, so the producer's promise is one this box can check",
+           "the contract row above is only worth anything if the normaliser is exercised on the shape it exists for");
+        // The producer's own source, because on posix its normalisation cannot be observed from its output.
+        // A fourth sabotage -- putting EXPECTED back to path.join -- survives every row above, because on
+        // posix path.join IS the literal. What distinguishes them is not a value but a SPELLING, so the
+        // spelling is what gets checked. Same reason the producer's seam is read from source below.
+        const mySrc = fs.readFileSync(fileURLToPath(import.meta.url), "utf8");
+        ok(/const EXPECTED = "real\/z-selfcheck\.mjs";/.test(mySrc) &&
+           !/const EXPECTED = path\.join\(/.test(mySrc),
+           "!! *** and EXPECTED is a LITERAL in this file's source, not a path.join -- the difference is invisible in its VALUE here ***",
+           "path.join('real','z-selfcheck.mjs') on posix returns exactly the literal, so no comparison of values " +
+           "can tell the repaired row from the broken one. Only the source can");
+        const gsSrc = fs.readFileSync(path.join(ENG_ROOT, "tools", "ship", "gateSweep.mjs"), "utf8");
+        ok(/out\.push\(toPosix\(path\.relative\(/.test(gsSrc),
+           "!! *** and enumerateGates NORMALISES AT ITS PUSH SITE, read from source -- removing it is a no-op here ***",
+           "deleting the toPosix changes nothing any row on this box can see, so the seam is asserted where it lives");
         ok(!found.some((r) => r.endsWith("notes.mjs") || r.endsWith("-selfcheck.js")),
            "and a near-miss name is not a gate either", "notes.mjs and d-selfcheck.js were both refused");
     } finally { fs.rmSync(tmp, { recursive: true, force: true }); }

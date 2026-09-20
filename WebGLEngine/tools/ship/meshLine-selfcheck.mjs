@@ -15,6 +15,11 @@ import {
     MESHLINE_VS, MESHLINE_FS,
 } from "../../render/meshLine.mjs";
 import { codeOnly, noComments } from "./sourceScan.mjs";
+// v4647b -- ONE SPELLING FOR THIS FILE'S PATHS. Its NAMED table and countIn() are written in posix
+// and its scan was not normalised, so on win32 every relative path came back with backslashes,
+// matched no table key, and the "nothing outside them draws a one-pixel line" row named FIVE files
+// that are all in NAMED. Normalised AT THE BOUNDARY, which is where the tree has settled this.
+import { toPosix } from "./posixAssumption.mjs";
 import { createRequire } from "node:module";
 import fs from "node:fs";
 import path from "node:path";
@@ -256,17 +261,17 @@ console.log("\n7. the claim about the gap, kept honest");
         }
     })(ROOT);
     const miterers = files.filter((f) => /miterFactor|shouldBevel/.test(codeOnly(fs.readFileSync(f, "utf8"))))
-        .map((f) => path.relative(ROOT, f)).filter((f) => !f.includes("selfcheck"));
+        .map((f) => toPosix(path.relative(ROOT, f))).filter((f) => !f.includes("selfcheck"));
     ok("!! exactly one module in the tree computes a miter, and it is this one",
-        miterers.length === 1 && miterers[0] === path.join("render", "meshLine.mjs"), miterers.join(", ") || "none");
+        miterers.length === 1 && miterers[0] === "render/meshLine.mjs", miterers.join(", ") || "none");
     // COUNT CALL SITES, NOT FILES, AND EXCLUDE THIS ONE. Two files draw twice, and this gate contains the
     // string in order to check for it -- so a naive file count says 6 where the module header says seven
     // places. The header is right; the first version of this check was counting itself.
-    const SELF = path.join("tools", "ship", "meshLine-selfcheck.mjs");
+    const SELF = "tools/ship/meshLine-selfcheck.mjs";   // posix, like every other path in this file
     let sites = 0;
     const users = [];
     for (const f of files) {
-        const rel = path.relative(ROOT, f);
+        const rel = toPosix(path.relative(ROOT, f));
         if (rel === SELF) continue;
         const n = (codeOnly(fs.readFileSync(f, "utf8")).match(/gl\.LINES|gl\.LINE_STRIP|gl\.LINE_LOOP/g) || []).length;
         if (n) { sites += n; users.push(`${rel}${n > 1 ? " x" + n : ""}`); }
@@ -335,6 +340,22 @@ console.log("\n7. the claim about the gap, kept honest");
         countIn("gfx/device.js") === 1 && !("gfx/device.js" in NAMED),
         `countIn("gfx/device.js") = ${countIn("gfx/device.js")} while NAMED has no entry for it. A counter ` +
         `that returned the expected value would say 0 here and agree with every other check in this section`);
+
+    // *** THE BOUNDARY IS ASSERTED, BECAUSE ON THIS BOX REMOVING IT CHANGES NOTHING. *** Un-normalising the
+    // scan above went 0 RED here: path.relative already returns forward slashes on posix, so toPosix is the
+    // identity and the defect is invisible. It is not invisible on win32 -- every key of NAMED is posix and
+    // every scanned path was native, so the row below named FIVE files that are all IN the table. Driven
+    // with a win32 literal, and the file's own source checked at the boundary, the way dxcResolve-selfcheck
+    // reaches its win32 branch from here.
+    ok("!! *** every path in this file is POSIX, so the NAMED table and the scan can be compared at all ***",
+        toPosix(path.win32.join("demos", "p3d", "p3dDemo.js")) === "demos/p3d/p3dDemo.js" &&
+        "demos/p3d/p3dDemo.js" in NAMED && users.every((u) => !u.includes("\\")),
+        `NAMED is written in posix and the scan is normalised to match. On win32 without this, ` +
+        `${JSON.stringify(path.win32.join("demos", "p3d", "p3dDemo.js"))} matches no key and every drawing ` +
+        `file reads as unexpected -- which is what Keith's box reported`);
+    ok("  ...and the normalisation is AT THE BOUNDARY, read from this file's own source",
+        /const rel = toPosix\(path\.relative\(ROOT, f\)\)/.test(fs.readFileSync(fileURLToPath(import.meta.url), "utf8")),
+        "removing it is a no-op on posix, so the seam is asserted rather than measured");
 
     const normalisedRel = (u) => u.replace(/ x\d+$/, "");
     const unexpected = users.map(normalisedRel).filter((r) => !(r in NAMED) && !GENERIC_PATHS.includes(r));
