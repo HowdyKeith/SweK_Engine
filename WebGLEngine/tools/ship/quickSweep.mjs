@@ -458,7 +458,8 @@ function runOneAsync(rel, capMs, root) {
  */
 export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DEFAULTS.workers, capMs = DEFAULTS.capMs,
                                       timingsFile = DEFAULTS.timingsFile, root = ENG, gates = null, write = true, onProgress = null,
-                                      serialSliceMs = DEFAULTS.serialSliceMs, skipUnchanged = false } = {}) {
+                                      serialSliceMs = DEFAULTS.serialSliceMs, skipUnchanged = false,
+                                      log = (m) => console.log(m) } = {}) {
     const t00 = Date.now();
     const all = gates || enumerateGates(root);
     const prior = readTimings(timingsFile, root);
@@ -705,7 +706,10 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
     if (write) {
         // v4647 -- whose stopwatch. A foreign box writes its own file rather than overwriting this one.
         const target = timingsTarget(prior, { file: timingsFile });
-        if (target.foreign) console.log(`[sweep] NOT writing ${timingsFile}: ${target.why}`);
+        // v4647h: through the caller's sink. This line fires on a FOREIGN box -- the only kind whose
+        // result gets carried to another machine -- so under --json it was the line most likely to
+        // land inside the capture and the least likely to be noticed by the box that wrote it.
+        if (target.foreign) log(`[sweep] NOT writing ${timingsFile}: ${target.why}`);
         fs.writeFileSync(path.join(root, target.file), JSON.stringify({
             host: target.host,
             note: "OBSERVED at the last quickSweep run: ms per gate (serial where a serial re-run happened) and exit code. " +
@@ -783,6 +787,72 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
 // round because it is EXERCISED ON EVERY SHIP -- which is precisely what the --json branch was not, and why
 // that one rotted while this one stayed correct. A second copy that runs every time is a maintenance cost; a
 // second copy that runs only when somebody redirects to a file is a trap.
+// ---- READING A FILE SOMETHING ELSE WROTE ----------------------------------------------------------------
+//
+// *** v4647h -- `--read` CRASHED ON THE FIRST REAL FILE IT WAS POINTED AT. *** Keith pulled v4647g, ran
+// `--read w4.json`, and got a bare `SyntaxError: Unexpected token 'q'` and a stack trace. The file starts
+//
+//     [quickSweep] 1/427
+//     [quickSweep] 43/427
+//     {
+//      "at": ...
+//
+// TENTH crash-instead-of-a-finding this session, in the function I wrote TWO ROUNDS AGO whose entire job is
+// to make a saved run readable. `JSON.parse` of a file a shell redirect produced, with no guard at all.
+//
+// *** AND THE CONTAMINATION IS THE TOOL'S OWN FAULT, NOT THE SHELL'S. *** `--json > file` was my
+// instruction, and a redirect captures whatever lands on stdout -- including `[sweep] NOT writing
+// <timings>: ...`, a console.log INSIDE runQuickSweep that fires on exactly one kind of box: a FOREIGN one,
+// which is the only kind that would be sending a result to another machine to be read. The one line most
+// likely to be in the capture is the one only the capturing box prints. So:
+//
+//   - `--out <file>` writes the JSON itself. No redirect, nothing to contaminate, identical on cmd,
+//     PowerShell and bash. A tool that needs a shell feature to produce its output owns the bug when the
+//     shell feature does something else.
+//   - the sweep's own console.log is now a `log` sink the caller supplies.
+//   - and this reader RECOVERS rather than throwing -- saying out loud what it skipped, because a silent
+//     recovery is how a corrupt file becomes a confident wrong answer.
+const TAG_LINE = /^\[[A-Za-z][\w-]*\] /;
+const REQUIRED = ["ran", "enumerated", "budgetMs", "green", "knownRed", "newRed", "unmeasured", "dropped"];
+
+/**
+ * Parse a saved --json result out of `text`. NEVER THROWS.
+ *
+ * Returns { result, skipped, error }. `skipped` is the tool-tag lines dropped to get there -- reported by
+ * the caller, never swallowed. `error` is a sentence naming what the file actually looks like.
+ */
+export function readSaved(text) {
+    const direct = tryParse(text);
+    if (direct) return { result: direct, skipped: [], error: null };
+    // A pretty-printed result never puts a raw newline inside a string, so dropping whole lines cannot cut
+    // through one. That is a property of JSON.stringify(x, null, 1) and is why this is safe HERE and would
+    // not be for arbitrary JSON.
+    const lines = String(text).split(/\r?\n/);
+    const skipped = [];
+    let i = 0;
+    while (i < lines.length && (TAG_LINE.test(lines[i]) || lines[i].trim() === "")) {
+        if (lines[i].trim()) skipped.push(lines[i]);
+        i++;
+    }
+    const rest = lines.slice(i).filter((l) => !TAG_LINE.test(l));
+    for (const l of lines.slice(i)) if (TAG_LINE.test(l)) skipped.push(l);
+    const salvaged = tryParse(rest.join("\n"));
+    if (salvaged) return { result: salvaged, skipped, error: null };
+    const first = (lines.find((l) => l.trim()) || "").slice(0, 80);
+    return { result: null, skipped,
+             error: first ? `not a quickSweep --json result; it starts "${first}"` : "the file is empty" };
+}
+
+function tryParse(text) {
+    let v;
+    try { v = JSON.parse(text); } catch { return null; }
+    if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+    // *** A SHAPE CHECK, BECAUSE "IT PARSED" IS NOT "IT IS ONE OF MINE". *** package.json parses. So does a
+    // half-written file from a run that was killed. reportLines would then read undefined.length and throw,
+    // which is the same crash one layer further in.
+    return REQUIRED.every((k) => k in v) ? v : null;
+}
+
 export function reportLines(r) {
     const out = [];
     out.push(`[quickSweep] ${r.ran} of ${r.enumerated} gates under ${r.budgetMs} ms ran in ${(r.ms / 1000).toFixed(0)} s: ` +
@@ -830,11 +900,21 @@ export function reportLines(r) {
 // the silent way and the note on --gate/--gates, two spellings of one idea live in this directory.
 export const CLI = Object.freeze({
     values: Object.freeze({ "--budget": "number", "--workers": "number", "--cap": "number",
-                            "--timings": "path", "--read": "path" }),
+                            "--timings": "path", "--read": "path",
+                            // v4647h -- THE TOOL WRITES ITS OWN FILE. `--json > file` was my instruction and
+                            // it produced a file that was not JSON, because a redirect captures whatever
+                            // lands on stdout and the sweep had a console.log of its own. A tool that needs
+                            // a shell feature to produce its output owns the bug when the shell does
+                            // something else -- and cmd, PowerShell and bash do not agree about redirects.
+                            "--out": "path" }),
     // v4574: `--incremental` parses and means nothing, deliberately -- a flag in somebody's muscle memory or
     // a script should not become an error the day the default changes. That is the OPPOSITE of an unknown
     // option: this one is KNOWN to be a no-op, and being known is the whole difference.
-    flags: Object.freeze(["--json", "--full", "--incremental"]),
+    // v4647h -- `--no-write` exists so a run can be driven WITHOUT mutating sweep-timings.json. The gate for
+    // --out needs a real command line (a source row passes on a build whose CLI never calls it -- that is how
+    // the --json branch rotted), and a gate that rewrites the tree's timings file every time it runs is worse
+    // than the row is worth.
+    flags: Object.freeze(["--json", "--full", "--incremental", "--no-write"]),
 });
 
 // ---- CLI ------------------------------------------------------------------------------------------------
@@ -848,8 +928,25 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     if (readFrom) {
         // A SAVED RUN IS STILL A RUN. The measurement that decides #53 -- do the cap kills collapse at four
         // workers -- was taken on Keith's box and then sat in a file nothing could print.
-        const saved = JSON.parse(fs.readFileSync(path.resolve(readFrom), "utf8"));
-        for (const line of reportLines(saved)) console.log(line);
+        let text;
+        try { text = fs.readFileSync(path.resolve(readFrom), "utf8"); }
+        catch (e) { console.error(`[quickSweep] cannot read ${readFrom}: ${e.message}`); process.exit(2); }
+        const { result, skipped, error } = readSaved(text);
+        if (!result) {
+            console.error(`[quickSweep] ${readFrom} is ${error}`);
+            console.error(`[quickSweep] a result comes from --out <file>, or from --json redirected to one. ` +
+                          `Nothing was read.`);
+            process.exit(2);
+        }
+        // SAID OUT LOUD. A recovery nobody is told about is how a contaminated file becomes a confident
+        // wrong answer, and these lines are the evidence that the capture was contaminated at all.
+        if (skipped.length) {
+            console.error(`[quickSweep] ${readFrom} had ${skipped.length} non-JSON line(s) in it, skipped:`);
+            for (const l of skipped.slice(0, 3)) console.error(`[quickSweep]   ${l.slice(0, 90)}`);
+            if (skipped.length > 3) console.error(`[quickSweep]   ... ${skipped.length - 3} more`);
+            console.error(`[quickSweep] that is a redirect capturing this tool's own stdout. Use --out <file>.`);
+        }
+        for (const line of reportLines(result)) console.log(line);
         process.exit(0);
     }
     // No Number() here: parseArgs already refused anything that is not a positive finite number, so a value
@@ -868,11 +965,17 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     // `--incremental` still parses and now means nothing, because a flag in somebody's muscle memory or a
     // script should not become an error the day the default changes.
     opts.skipUnchanged = !cli.flags.has("--full");
+    if (cli.flags.has("--no-write")) opts.write = false;
+    // The sweep's own chatter goes wherever the report goes, never into a capture.
+    const outFile = arg("--out", null);
+    const quiet = cli.flags.has("--json") || !!outFile;
+    opts.log = quiet ? ((m) => process.stderr.write(m + "\n")) : ((m) => console.log(m));
     const r = await runQuickSweep({ ...opts, onProgress: (d, t) => { const pct = Math.floor(100 * d / t); if (pct !== lastPct && pct % 10 === 0) { lastPct = pct; process.stderr.write(`[quickSweep] ${d}/${t}\n`); } } })
         .catch((e) => { console.error("[quickSweep] runner failed: " + (e && e.message)); process.exit(2); });
     // THE REPORT IS PRINTED EITHER WAY. Under --json it goes to stderr so that `--json > file` still captures
     // clean JSON on stdout -- a redirect that swallows the reading is how w4.json came to be unreadable.
-    const sink = cli.flags.has("--json") ? ((s) => process.stderr.write(s + "\n")) : ((s) => console.log(s));
+    const sink = quiet ? ((s) => process.stderr.write(s + "\n")) : ((s) => console.log(s));
+    if (outFile) { fs.writeFileSync(path.resolve(outFile), JSON.stringify(r, null, 1) + "\n"); process.stderr.write(`[quickSweep] wrote ${outFile}\n`); }
     if (cli.flags.has("--json")) console.log(JSON.stringify(r, null, 1));
     for (const line of reportLines(r)) sink(line);
     process.exit(r.newRed.length ? 1 : 0);

@@ -43,6 +43,26 @@
 //
 // Run: node tools/ship/quickSweep-selfcheck.mjs
 //
+// ---- v4647h SABOTAGES, RESULTS BY NAME ------------------------------------------------------------------
+//
+//   UA. readSaved JSON.parses with no recovery (the crash Keith hit)  -> 5 RED
+//   UB. the skipped lines are swallowed, so the recovery is silent    -> 2 RED
+//   UC. the shape check is dropped -- anything that parses is ours    -> 1 RED
+//   UD. --out writes the file AND leaves the JSON on stdout           -> 2 RED
+//   UE. the sweep prints its own line to stdout again                 -> 1 RED
+//   UF. --no-write writes the timings file anyway                     -> 1 RED
+//
+// *** UA WAS MEASURED FIRST AT EXIT 1 WITH ZERO `^  FAIL` LINES, FOR THE SAME REASON AS SA ABOVE. *** The
+// rows called Q.readSaved directly, so restoring the bare JSON.parse killed the gate instead of failing it.
+// ELEVENTH crash-instead-of-a-finding this session and the THIRD ROUND RUNNING that I have made it inside a
+// gate -- after `lines()` in section 8 and `run()` in cliArgs-selfcheck. Writing the rule down twice did not
+// stop me writing the third one; every call to a never-throws function goes through a wrapper here now.
+//
+// *** AND UF DID REAL DAMAGE WHILE PROVING ITS ROW. *** With --no-write disarmed the run wrote
+// `budgetMs: 1` into tools/ship/sweep-timings.json -- the tree's membership list, set to a budget that
+// selects nothing. Restored from HEAD. That is exactly the harm --no-write exists to prevent, demonstrated
+// by removing it, which is what a sabotage is for.
+//
 // ---- v4647f SABOTAGES, RESULTS BY NAME ------------------------------------------------------------------
 //
 //   SA. the two bare identifiers put back (`${capMs}`, `${workers}`)     -> 6 RED
@@ -481,12 +501,117 @@ sec("8b. --json NO LONGER SWALLOWS THE READING, AND A SAVED RUN CAN BE RE-READ")
     // Source-level, because the routing is what the redirect sees and no in-process row can observe it.
     const src = fs.readFileSync(path.join(ENG, "tools", "ship", "quickSweep.mjs"), "utf8");
     const cli = src.slice(src.indexOf("// ---- CLI ---"));
-    ok(/const sink = cli\.flags\.has\("--json"\) \? \(\(s\) => process\.stderr\.write/.test(cli),
-       "!! under --json the report goes to STDERR, so `--json > file` still captures clean JSON",
-       "a redirect that swallows the reading is how w4.json came to be unreadable");
+    // v4647h -- the same sink, widened: `quiet` is --json OR --out, and it now carries the SWEEP'S OWN
+    // chatter as well as the report. Keeping stdout clean under --json was necessary and NOT sufficient;
+    // `[sweep] NOT writing ...` still landed in the capture, which is what made w4.json unparseable.
+    ok(/const quiet = cli\.flags\.has\("--json"\) \|\| !!outFile;/.test(cli) &&
+       /const sink = quiet \? \(\(s\) => process\.stderr\.write/.test(cli) &&
+       /opts\.log = quiet \?/.test(cli),
+       "!! under --json or --out, the report AND the sweep's own lines go to STDERR",
+       "a redirect that swallows the reading is how w4.json came to be unreadable -- and the line that " +
+       "actually contaminated it was the sweep's, not the report's");
     ok(/for \(const line of reportLines\(r\)\) sink\(line\);/.test(cli) && !/\belse \{/.test(cli),
        "!! ...and there is ONE report path, not a json branch and a human branch",
        "the human branch was the only one exercised, so the json branch was free to rot -- and did");
+}
+
+// ---------------------------------------------------------------------------------------------------------
+sec("8c. A FILE SOMETHING ELSE WROTE IS READ, OR REFUSED -- NEVER THROWN ON");
+// ---------------------------------------------------------------------------------------------------------
+// *** v4647h -- `--read` CRASHED ON THE FIRST REAL FILE IT WAS EVER POINTED AT. *** Keith pulled v4647g,
+// ran `--read w4.json`, and got a bare `SyntaxError: Unexpected token 'q'` with a stack trace. TENTH
+// crash-instead-of-a-finding this session, in the function written TWO ROUNDS AGO whose whole job is to
+// make a saved run readable: a JSON.parse of a file produced by a shell redirect, with no guard at all.
+//
+// *** AND THE CONTAMINATION WAS THE TOOL'S OWN. *** `--json > file` was my instruction. A redirect captures
+// whatever lands on stdout, and runQuickSweep had a console.log of its own -- `[sweep] NOT writing ...` --
+// which fires on a FOREIGN box, the only kind whose result gets carried to another machine to be read. The
+// line most likely to be in the capture was the one only the capturing box prints.
+{
+    // *** THROUGH A WRAPPER, BECAUSE THE CONTRACT UNDER TEST IS "NEVER THROWS". ***
+    // The first draft of this section called Q.readSaved directly, and sabotage UA -- restoring the bare
+    // JSON.parse -- produced exit 1 with ZERO `^  FAIL` lines: the gate DIED instead of reporting. ELEVENTH
+    // crash-instead-of-a-finding this session and the third round running that I have made it in a gate,
+    // after `lines()` in section 8 and `run()` in cliArgs-selfcheck. A row that can only be reached by code
+    // that does not throw cannot grade code that throws, and writing that sentence twice did not stop me
+    // writing the third one.
+    const saved = (text) => { try { return Q.readSaved(text); } catch (e) { return { result: null, skipped: [], error: "THREW: " + (e && e.message), threw: true }; } };
+    const capped = { gate: "a/b-selfcheck.mjs", parallelMs: 20000, serialMs: 900, capped: true, parallelCode: 124, ratio: null };
+    const good = { ran: 3, enumerated: 3, budgetMs: 3000, capMs: 20000, workers: 8, ms: 1000, green: 2,
+                   knownRed: [], knownRedSkipped: 0, newRed: [], unmeasured: [], skippedOverBudget: 0,
+                   newGates: [], dropped: [], unchangedInputs: 0, skippedUnchanged: false, falseReds: 1,
+                   falseRedList: [capped] };
+    const json = JSON.stringify(good, null, 1);
+
+    const clean = saved(json);
+    ok(!clean.threw && clean.result && clean.result.ran === 3 && clean.skipped.length === 0 && !clean.error,
+       "!! CONTROL: a clean result reads with nothing skipped, and readSaved does not throw on it either",
+       "without this the recovery rows below would pass on a reader that always claims to have repaired something");
+
+    // Keith's file, exactly: the progress writer's lines ahead of the JSON.
+    const dirty = saved("[quickSweep] 1/427\n[quickSweep] 43/427\n" + json);
+    ok(!dirty.threw && dirty.result && dirty.result.ran === 3,
+       "!! *** a capture with the tool's own lines in it is RECOVERED, not thrown on ***",
+       dirty.error || "32 minutes of somebody else's box is in that file, and a stack trace threw it away");
+    ok(dirty.skipped.length === 2 && /1\/427/.test(dirty.skipped[0]),
+       "!! ...and the lines it skipped are NAMED, so the recovery is evidence and not a silence",
+       `${dirty.skipped.length} skipped. A recovery nobody is told about is how a contaminated file becomes ` +
+       `a confident wrong answer`);
+
+    // The line that actually did it, in the position it actually appears -- after the JSON has begun.
+    const mid = saved(json.replace('\n "ran"', '\n[sweep] NOT writing tools/ship/sweep-timings.json: foreign\n "ran"'));
+    ok(mid.result && mid.result.ran === 3 && mid.skipped.length === 1,
+       "!! ...including a tool line INSIDE the JSON, which is where this one lands",
+       "`[sweep] NOT writing ...` is printed part-way through the run, so it interleaves rather than leading");
+
+    ok(!saved('{"name":"x","version":"1"}').result &&
+       /not a quickSweep --json result/.test(saved('{"name":"x"}').error || ""),
+       "!! *** a file that PARSES but is not one of ours is refused, and says what it is ***",
+       "package.json parses. So does a half-written result from a killed run, and reportLines would then " +
+       "read undefined.length -- the same crash one layer further in");
+    ok(!saved("").result && /empty/.test(saved("").error || ""),
+       "...and an empty file says it is empty", "a zero-byte capture is what a redirect leaves when the run died early");
+    ok(!saved("[quickSweep] 1/427\n[quickSweep] 43/427\n").result,
+       "...and a capture that is ONLY tool lines is a refusal, not an empty success",
+       "stripping every line and finding nothing left must not read as a clean parse of nothing");
+}
+
+// ---------------------------------------------------------------------------------------------------------
+sec("8d. --out: THE TOOL WRITES ITS OWN FILE, SO THERE IS NOTHING FOR A REDIRECT TO GET WRONG");
+// ---------------------------------------------------------------------------------------------------------
+// Driven through the REAL command line at a 1 ms budget -- 0 gates run, 0.7 s -- with --no-write, so the
+// tree's timings file is not touched. A source row would pass on a build whose CLI never calls it, which is
+// exactly how the --json branch came to rot two rounds ago in this same tool.
+{
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "qs-out-"));
+    const out = path.join(tmp, "r.json");
+    const timings = path.join(ENG, "tools", "ship", "sweep-timings.json");
+    const before = fs.existsSync(timings) ? fs.statSync(timings).mtimeMs : null;
+    const r = spawnSync(process.execPath,
+        [path.join(ENG, "tools", "ship", "quickSweep.mjs"), "--budget", "1", "--no-write", "--out", out],
+        { cwd: ENG, encoding: "utf8", timeout: 120000 });
+    ok(r.status === 0 && fs.existsSync(out),
+       "!! *** --out writes the result itself, with no shell redirect anywhere ***",
+       `exit ${r.status}. cmd, PowerShell and bash do not agree about redirects; a tool that needs one to ` +
+       `produce its output owns the bug when the shell does something else`);
+    ok((r.stdout || "") === "",
+       "!! ...and stdout is EMPTY, so there is nothing a capture could pick up",
+       `${(r.stdout || "").length} byte(s) on stdout. The report and the sweep's own chatter both went to stderr`);
+    const rd = (t) => { try { return Q.readSaved(t); } catch (e) { return { result: null, skipped: [], threw: true }; } };
+    const parsed = fs.existsSync(out) ? rd(fs.readFileSync(out, "utf8")) : { result: null, skipped: [] };
+    ok(!!parsed.result && parsed.skipped.length === 0,
+       "!! ...and what it wrote reads back with NOTHING to skip",
+       "the round trip is the claim: this tool's own writer against this tool's own reader");
+    ok(before === null || fs.statSync(timings).mtimeMs === before,
+       "!! --no-write leaves sweep-timings.json untouched",
+       "a gate that rewrites the tree's timings file every run is worse than the row it buys");
+    fs.rmSync(tmp, { recursive: true, force: true });
+
+    const src = fs.readFileSync(path.join(ENG, "tools", "ship", "quickSweep.mjs"), "utf8");
+    ok(/if \(target\.foreign\) log\(/.test(src) && !/if \(target\.foreign\) console\.log\(/.test(src),
+       "!! *** the sweep's own console.log is a caller-supplied sink now ***",
+       "it fires on a FOREIGN box -- the only kind whose result is carried elsewhere to be read -- so under " +
+       "--json it was the line most likely to land inside the capture and least likely to be noticed");
 }
 
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
