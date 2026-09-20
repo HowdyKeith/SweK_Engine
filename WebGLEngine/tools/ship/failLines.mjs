@@ -29,6 +29,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import { boxId } from "./hostScale.mjs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -75,6 +76,32 @@ export function runOne(rel, { root = ENG, timeoutMs = 120000, spawn = spawnSync 
                                : (lines.length ? "RED" : "CRASHED");
     return { gate: rel, exit, ms, fails: lines.length, lines, verdict,
              ...(r.signal ? { signal: r.signal } : {}) };
+}
+
+/**
+ * *** WHICH TREE THESE READINGS WERE TAKEN AGAINST, BECAUSE A CAPTURE THAT CANNOT SAY IS NOT COMPARABLE. ***
+ *
+ * v4647 spent a round on sweep-timings.json having fifteen keys and none naming its box, and this file --
+ * written the round before -- recorded `at` and `platform` and not the COMMIT. The first real capture proved
+ * why that matters: it was taken at 58603dcf and lands in a commit whose parent is 0bd8ff5d, so the file
+ * would read as a measurement of a tree in which five of its reds had already been repaired.
+ *
+ * Best-effort by design: a capture on a box with no git, or in a tree with uncommitted work, is still a
+ * capture. `dirty` is recorded rather than refused, because a red found on a modified tree is still a red
+ * and hiding it would be worse than qualifying it.
+ */
+export function treeStamp({ root = ENG, run = spawnSync } = {}) {
+    const git = (args) => {
+        try {
+            const r = run("git", args, { cwd: root, encoding: "utf8", timeout: 10000 });
+            return r.status === 0 ? String(r.stdout || "").trim() : null;
+        } catch { return null; }
+    };
+    const commit = git(["rev-parse", "HEAD"]);
+    if (!commit) return { commit: null, branch: null, dirty: null, why: "git could not answer here" };
+    const status = git(["status", "--porcelain"]);
+    return { commit: commit.slice(0, 12), branch: git(["rev-parse", "--abbrev-ref", "HEAD"]),
+             dirty: status == null ? null : status.length > 0 };
 }
 
 export function summarise(rows) {
@@ -126,11 +153,16 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     }
     console.log(describe(rows));
     if (process.argv.includes("--write")) {
+        const stamp = treeStamp();
         const payload = { generatedFrom: "tools/ship/failLines.mjs", at: new Date().toISOString(),
-                          platform: process.platform, summary: summarise(rows), gates: rows };
+                          platform: process.platform, box: boxId(), tree: stamp,
+                          summary: summarise(rows), gates: rows };
         fs.writeFileSync(path.join(ENG, OUT_FILE), JSON.stringify(payload, null, 1) + "\n");
-        console.log(`[failLines] wrote ${OUT_FILE} -- commit it FROM THIS BOX and the reds can be compared ` +
-                    `against another machine's by assertion rather than by exit code`);
+        const st = treeStamp();
+        console.log(`[failLines] wrote ${OUT_FILE} for ${boxId()} at ${st.commit || "an unknown commit"}` +
+                    `${st.dirty ? " (WORKING TREE DIRTY -- these reds include uncommitted changes)" : ""} -- ` +
+                    `commit it FROM THIS BOX and the reds can be compared against another machine's by ` +
+                    `assertion rather than by exit code`);
     } else {
         console.log("[failLines] nothing written; pass --write to record this run");
     }

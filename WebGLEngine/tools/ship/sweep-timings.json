@@ -2160,7 +2160,7 @@
   "tools/ship/adapterRecord-selfcheck.mjs": 117,
   "tools/ship/dxcResolve-selfcheck.mjs": 47,
   "tools/ship/ensureDxc-selfcheck.mjs": 53,
-  "tools/ship/failLines-selfcheck.mjs": 54
+  "tools/ship/failLines-selfcheck.mjs": 63
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -5684,7 +5684,7 @@
   "tools/ship/adapterRecord-selfcheck.mjs": "2026-09-20T13:51:44.176Z",
   "tools/ship/dxcResolve-selfcheck.mjs": "2026-09-20T14:47:34.687Z",
   "tools/ship/ensureDxc-selfcheck.mjs": "2026-09-20T14:48:03.365Z",
-  "tools/ship/failLines-selfcheck.mjs": "2026-09-20T14:03:46.384Z"
+  "tools/ship/failLines-selfcheck.mjs": "2026-09-20T14:54:29.911Z"
  },
  "capAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 20000,
@@ -10376,7 +10376,7 @@
   "tools/ship/adapterRecord-selfcheck.mjs": 117,
   "tools/ship/dxcResolve-selfcheck.mjs": 47,
   "tools/ship/ensureDxc-selfcheck.mjs": 53,
-  "tools/ship/failLines-selfcheck.mjs": 54
+  "tools/ship/failLines-selfcheck.mjs": 63
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-16T22:48:41.155Z",
@@ -11915,7 +11915,7 @@
   "tools/ship/adapterRecord-selfcheck.mjs": "2026-09-20T13:51:44.176Z",
   "tools/ship/dxcResolve-selfcheck.mjs": "2026-09-20T14:47:34.687Z",
   "tools/ship/ensureDxc-selfcheck.mjs": "2026-09-20T14:48:03.365Z",
-  "tools/ship/failLines-selfcheck.mjs": "2026-09-20T14:03:46.384Z"
+  "tools/ship/failLines-selfcheck.mjs": "2026-09-20T14:54:29.911Z"
  },
  "contended": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": true,

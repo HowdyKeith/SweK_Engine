@@ -9,7 +9,7 @@
 // process is a parameter, every verdict is reached from a fixture, and the classification is measured rather
 // than described.
 "use strict";
-import { FAIL_LINE, gatesFromVerify, runOne, summarise, describe } from "./failLines.mjs";
+import { FAIL_LINE, gatesFromVerify, runOne, summarise, describe, treeStamp } from "./failLines.mjs";
 
 let fails = 0;
 const ok = (n, c, d = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${n}${d ? "   " + d : ""}`); };
@@ -102,6 +102,36 @@ console.log("\n5. THE SUMMARY SEPARATES WHAT A PERSON HAS TO READ FROM WHAT THEY
        /CRASHED: exit non-zero with no failing row/.test(text) && /Read these first/.test(text));
     ok("  and a green gate contributes no lines to read, because there is nothing to read",
        !/green\.mjs/.test(text), "the report is what is left to do, not a transcript");
+}
+
+console.log("\n6. *** WHICH TREE THE READINGS WERE TAKEN AGAINST -- v4647 ***");
+{
+    // The first real capture was taken at 58603dcf and would have landed in a commit whose parent is
+    // 0bd8ff5d, reading as a measurement of a tree in which five of its own reds had already been repaired.
+    // That is the sweep-timings defect one round later, in the tool written to fix the diagnosis problem.
+    const fake = (out, status = 0) => (cmd, args) => ({ stdout: out(args), status, stderr: "" });
+    const st = treeStamp({ run: fake((a) => a[0] === "rev-parse" && a[1] === "HEAD" ? "abcdef0123456789\n"
+                                       : a[0] === "rev-parse" ? "some-branch\n" : "") });
+    ok("!! *** the commit is recorded, short and comparable ***",
+       st.commit === "abcdef012345" && st.branch === "some-branch" && st.dirty === false,
+       JSON.stringify(st));
+    const dirty = treeStamp({ run: fake((a) => a[0] === "status" ? " M a.mjs\n" : "abcdef0123456789\n") });
+    ok("!! *** a DIRTY tree is recorded, not refused -- a red found on a modified tree is still a red ***",
+       dirty.dirty === true, "refusing would hide a finding; qualifying it does not");
+    const noGit = treeStamp({ run: () => ({ status: 128, stdout: "", stderr: "not a repository" }) });
+    ok("!! CONTROL: a box with no git still captures, and says the stamp is missing rather than inventing one",
+       noGit.commit === null && /could not answer/.test(noGit.why),
+       "the capture is the point; the stamp is how it is compared later");
+    // *** AND THIS ROW HAS TO CATCH, WHICH A SABOTAGE TAUGHT ME FOR THE SECOND TIME THIS SESSION. ***
+    // The first draft called treeStamp straight inside the condition. Removing the catch it exists to test
+    // then threw out of ok() and took the gate down: exit 1 with ZERO failing rows, which is the very
+    // verdict THIS FILE defines a whole category for. A row whose claim is "this does not throw" asserts it
+    // by assuming it unless the row itself catches.
+    const survives = (run) => { try { return treeStamp({ run }).commit === null; } catch { return false; } };
+    ok("  ...and a git that THROWS is the same case, not a crash",
+       survives(() => { throw new Error("ENOENT"); }),
+       "this runs at the end of a diagnosis that has already done its work -- SEVENTH instance of the " +
+       "crash-instead-of-a-finding species in this tree, written into the row about it");
 }
 
 console.log(`\nfailLines-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);
