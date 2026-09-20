@@ -76,6 +76,65 @@ export const VERDICT = Object.freeze({
  * `parallel` and `serial` are each {code, ms, timedOut} or null. The whole discipline of the two-phase method
  * lives in the four lines below, which is the reason it is a function and not a comment.
  */
+/**
+ * *** v4647i -- AN EXIT CODE THE OPERATING SYSTEM PRODUCED IS NOT A VERDICT THE GATE PRODUCED. ***
+ *
+ * Keith's gen-9 sweep filed three gates as NEW RED at `exit 3221226505`, in the same list as thirty-odd
+ * gates that exited 1 because they had found something:
+ *
+ *     NEW    ai-bridge/tools/localModelResolve-selfcheck.mjs  exit 3221226505 in 872 ms
+ *     NEW    ai-bridge/tools/range-selfcheck.mjs              exit 3221226505 in 724 ms
+ *     NEW    physics/box3d/box3dConformance-selfcheck.mjs     exit 3221226505 in 509 ms
+ *
+ * 3221226505 is 0xC0000409, STATUS_STACK_BUFFER_OVERRUN -- Windows fail-fast. The process was KILLED before
+ * it could print a thing. All three pass on this box in under 350 ms, so there is nothing here to read as a
+ * finding, and `grep -c '^  FAIL'` over their output returns ZERO. TWELFTH crash-instead-of-a-finding this
+ * session, and the first one that is not mine: it is in the gates, reported by a sweep that cannot tell the
+ * two apart.
+ *
+ * *** AND THE TREE ALREADY HAD AN INSTRUMENT THAT COULD. *** tools/ship/failLines.mjs -- written five rounds
+ * ago for exactly this -- classifies RED / CRASHED / TIMEOUT by whether any `^  FAIL` line was printed.
+ * classify() below, in the same directory, returns RED for every non-zero code. Two modules reading one
+ * convention in opposite senses, which is the species this session has now met in posixAssumption's
+ * separators, the two ground-limit contracts, and --gate against --gates.
+ *
+ * THE VERDICT DOES NOT CHANGE. A crashed gate is still red and still fails the ship -- softening that would
+ * be the opposite of the point. What changes is that the report no longer sends a reader hunting for a FAIL
+ * line that was never printed.
+ *
+ * The table is Windows NTSTATUS values as Node surfaces them. They are decided by RANGE and not by a list of
+ * three: any code above 255 is not something a harness in this tree chose, because POSIX masks an exit
+ * status to 8 bits and every gate here exits 0 or 1. A name is offered where one is known.
+ */
+export const OS_KILL_CODES = Object.freeze({
+    3221225477: "STATUS_ACCESS_VIOLATION (0xC0000005)",
+    3221225495: "STATUS_NO_MEMORY (0xC0000017)",
+    3221225725: "STATUS_STACK_OVERFLOW (0xC00000FD)",
+    3221225786: "STATUS_CONTROL_C_EXIT (0xC000013A)",
+    3221225794: "STATUS_DLL_INIT_FAILED (0xC0000142)",
+    3221226505: "STATUS_STACK_BUFFER_OVERRUN (0xC0000409)",
+});
+
+export const EXIT_KIND = Object.freeze({ PASS: "pass", FINDING: "finding", OS_KILL: "os-kill", TIMEOUT: "timeout" });
+
+/**
+ * What KIND of thing an exit code is. Never throws; an unrecognised code above 255 is still an os-kill,
+ * because the alternative -- reading it as a finding -- is the conflation this exists to end.
+ */
+export function exitKind(code, { timedOut = false } = {}) {
+    if (timedOut) return EXIT_KIND.TIMEOUT;
+    if (code === 0) return EXIT_KIND.PASS;
+    // 124 is this sweep's own stand-in for "killed by signal" (runOneAsync), so it is a timeout, not a kill.
+    if (code === 124) return EXIT_KIND.TIMEOUT;
+    return Number(code) > 255 ? EXIT_KIND.OS_KILL : EXIT_KIND.FINDING;
+}
+
+/** The human name for a code, or a hex rendering, or null when it is an ordinary exit status. */
+export function exitName(code) {
+    if (exitKind(code) !== EXIT_KIND.OS_KILL) return null;
+    return OS_KILL_CODES[code] || `0x${(Number(code) >>> 0).toString(16).toUpperCase()}`;
+}
+
 export function classify(parallel, serial = null) {
     if (!parallel) throw new Error("classify: a phase-1 result is required");
     if (parallel.code === 0 && !parallel.timedOut)
@@ -85,9 +144,14 @@ export function classify(parallel, serial = null) {
                  note: parallel.timedOut ? "timed out under -P 8; not a verdict" : "parallel red is a hypothesis" };
     if (serial.timedOut)
         return { verdict: VERDICT.UNCONFIRMED, from: "serial", note: "timed out alone on an idle box; still unmeasured" };
-    return serial.code === 0
-        ? { verdict: VERDICT.GREEN, from: "serial", note: "false red -- starved in phase 1" }
-        : { verdict: VERDICT.RED, from: "serial", note: "confirmed" };
+    if (serial.code === 0) return { verdict: VERDICT.GREEN, from: "serial", note: "false red -- starved in phase 1" };
+    // v4647i -- `kind` is ADDITIVE. The verdict stays RED for an os-kill: a gate the OS killed is still a
+    // gate that did not pass, and every existing consumer reads `verdict` and is unaffected.
+    const kind = exitKind(serial.code);
+    return { verdict: VERDICT.RED, from: "serial", kind, name: exitName(serial.code),
+             note: kind === EXIT_KIND.OS_KILL
+                 ? `confirmed, but the OS killed it: ${exitName(serial.code)}. There is no FAIL line to read`
+                 : "confirmed" };
 }
 
 /**

@@ -624,5 +624,47 @@ console.log("\n*** THE FALSE REDS ARE ROWS IN BOTH MODULES NOW, NOT A COUNT IN O
        `finalize: ${viaFinalize.join(", ")} | quickSweep: ${got.map((f) => f.gate).sort().join(", ")}`);
 }
 
+// ---------------------------------------------------------------------------------------------------------
+// *** v4647i -- AN EXIT CODE THE OS PRODUCED IS NOT A VERDICT THE GATE PRODUCED ***
+// ---------------------------------------------------------------------------------------------------------
+// Keith's gen-9 sweep filed three gates as NEW RED at `exit 3221226505` -- 0xC0000409, Windows fail-fast --
+// in the same list as thirty-odd gates that exited 1 because they had FOUND something. All three pass on
+// this box in under 350 ms and print no `^  FAIL` line at all, because the process was killed before it
+// could print one. classify() returned RED for both, identically.
+{
+    const kind = (c, o) => { try { return GS.exitKind(c, o); } catch (e) { return "THREW: " + (e && e.message); } };
+    ok(kind(1) === GS.EXIT_KIND.FINDING && kind(0) === GS.EXIT_KIND.PASS,
+       "!! an ordinary exit status is a finding, and zero is a pass",
+       "exit 1 is a gate that ran and disagreed -- the only kind worth reading a FAIL line for");
+    ok(kind(3221226505) === GS.EXIT_KIND.OS_KILL &&
+       /STATUS_STACK_BUFFER_OVERRUN/.test(GS.exitName(3221226505) || ""),
+       "!! *** 3221226505 is an OS KILL and is named, where it used to read as `exit 3221226505` ***",
+       GS.exitName(3221226505) + " -- the exact code three gates returned on gen-9");
+    ok(kind(999999) === GS.EXIT_KIND.OS_KILL && /0xF423F/.test(GS.exitName(999999) || ""),
+       "!! ...and an UNRECOGNISED code above 255 is still an os-kill, with a hex rendering",
+       "decided by RANGE, not by a list of six: POSIX masks an exit status to 8 bits and every gate in this " +
+       "tree exits 0 or 1, so nothing here chose a code that large. Reading it as a finding is the conflation");
+    ok(kind(255) === GS.EXIT_KIND.FINDING,
+       "CONTROL: 255 is still a finding, so the rule is a boundary and not 'anything unusual'",
+       "without this the row above passes on a classifier that calls every non-zero code a crash");
+    ok(kind(124) === GS.EXIT_KIND.TIMEOUT && kind(1, { timedOut: true }) === GS.EXIT_KIND.TIMEOUT,
+       "a signal kill is a TIMEOUT, not an os-kill", "124 is this sweep's own stand-in for a signal (runOneAsync)");
+    ok(GS.exitName(1) === null && GS.exitName(0) === null,
+       "CONTROL: an ordinary status gets no name", "a name offered for every code carries no information");
+
+    // classify() itself: the verdict must NOT soften, and the kind must arrive.
+    const c = GS.classify({ code: 1, timedOut: false }, { code: 3221226505, timedOut: false });
+    ok(c.verdict === GS.VERDICT.RED,
+       "!! *** a crashed gate is STILL RED -- the ship must still fail ***",
+       "softening this would be the opposite of the point: a gate the OS killed did not pass");
+    ok(c.kind === GS.EXIT_KIND.OS_KILL && /no FAIL line to read/.test(c.note),
+       "!! ...and the note says there is no FAIL line to look for",
+       c.note);
+    const f = GS.classify({ code: 1, timedOut: false }, { code: 1, timedOut: false });
+    ok(f.verdict === GS.VERDICT.RED && f.kind === GS.EXIT_KIND.FINDING && f.note === "confirmed",
+       "CONTROL: an ordinary red is unchanged, note and all",
+       "every existing consumer reads `verdict`; `kind` is additive and must not disturb them");
+}
+
 console.log(fails === 0 ? "\nALL GREEN" : `\n${fails} FAILED`);
 process.exit(fails ? 1 : 0);

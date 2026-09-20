@@ -34,7 +34,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { backfillStamps } from "./sweepCoverage.mjs";
 import { boxId } from "./hostScale.mjs";
 import { skippable, readRecord as readInputRecord } from "./inputSets.mjs";
-import { enumerateGates, classify, VERDICT, SWEEP_V4297, ENG } from "./gateSweep.mjs";
+import { enumerateGates, classify, VERDICT, SWEEP_V4297, ENG, exitKind, exitName, EXIT_KIND } from "./gateSweep.mjs";
 import { parseArgs, refusalLines } from "./cliArgs.mjs";
 import { RED_AT_V4279, RED_AT_V4408, RED_AT_V4424, RED_AT_V4476, RED_AT_V4484, RED_AT_V4531, RED_AT_V4535, UNCONFIRMED_SLOW, ALL_REGISTERED } from "./redCensus.mjs";
 
@@ -387,6 +387,12 @@ export function reconcile(rows, register = redRegister()) {
         if (r.verdict === VERDICT.UNCONFIRMED) { unmeasured.push(r.gate); continue; }   // timed out alone: not a verdict
         if (r.verdict !== VERDICT.RED) continue;
         if (register.has(r.gate)) known.push({ gate: r.gate, record: register.get(r.gate), ms: r.serialMs });
+        // *** v4647i -- NO `kind` FIELD HERE, AND THAT IS A MEASURED CORRECTION. *** The first draft stored
+        // `kind` and `name` on the row. Sabotage VG deleted both and NOTHING went red in either gate: the
+        // report derives the classification from `code`, so the stored copy was never read. A second
+        // spelling of one rule is the defect this session has spent rounds on -- and removing it buys a
+        // property worth more than the field, which is that a result saved by ANY version of this tool
+        // classifies identically, because the code is the only input.
         else fresh.push({ gate: r.gate, code: r.serialCode, ms: r.serialMs });
     }
     return { known, newRed: fresh, unmeasured };
@@ -853,11 +859,21 @@ function tryParse(text) {
     return REQUIRED.every((k) => k in v) ? v : null;
 }
 
+// *** DERIVED FROM THE CODE WHEN THE ROW DOES NOT CARRY A KIND. *** Keith's w4b.json was written by v4647h,
+// before `kind` existed, and it is the very file this round is about -- a reader that only understood rows
+// written after the fix would be unable to say anything about the run that produced the finding. The code
+// is in every saved result this tool has ever written, so the classification is available for all of them.
+const killed = (n) => !!n && exitKind(n.code) === EXIT_KIND.OS_KILL;
+
+/** How many of a result's NEW reds are OS kills rather than findings. Works on results saved before v4647i. */
+export function crashCount(r) { return ((r && r.newRed) || []).filter(killed).length; }
+
 export function reportLines(r) {
     const out = [];
     out.push(`[quickSweep] ${r.ran} of ${r.enumerated} gates under ${r.budgetMs} ms ran in ${(r.ms / 1000).toFixed(0)} s: ` +
         `${r.green} green, ${r.knownRed.length} known red${r.knownRedSkipped ? " (+" + r.knownRedSkipped + " skipped, still red)" : ""}, ` +
-        `${r.newRed.length} NEW red, ${r.falseReds} false red, ${r.unmeasured.length} unmeasured; ` +
+        `${r.newRed.length} NEW red${crashCount(r) ? " (" + crashCount(r) + " KILLED BY THE OS, not findings)" : ""}, ` +
+        `${r.falseReds} false red, ${r.unmeasured.length} unmeasured; ` +
         `${r.skippedOverBudget} over budget skipped, ${r.newGates.length} new gates measured, ${r.dropped.length} dropped from budget`);
     // v4647 -- whose membership list this was. A foreign box runs the owning box's selection and then finds
     // out how much of it is over budget there; that is by design (budgetIsOwn) and is no longer silent.
@@ -883,7 +899,11 @@ export function reportLines(r) {
                             + "here that is silent, and tools/ship/importClosure.mjs is what bounds it"
                             : "were RUN (--full)"));
     for (const k of r.knownRed) out.push(`  known  ${k.gate}  (${k.record})`);
-    for (const n of r.newRed) out.push(`  NEW    ${n.gate}  exit ${n.code} in ${n.ms} ms`);
+    // A CRASH IS NOT A FINDING, AND THE LIST USED TO SPELL THEM THE SAME. `exit 3221226505` sends a reader
+    // looking for a FAIL line that was never printed; naming the kill says where to look instead.
+    for (const n of r.newRed) out.push(killed(n)
+        ? `  CRASH  ${n.gate}  KILLED BY THE OS: ${exitName(n.code) || n.code} after ${n.ms} ms -- no FAIL line was printed`
+        : `  NEW    ${n.gate}  exit ${n.code} in ${n.ms} ms`);
     for (const d of r.dropped) out.push(`  slower ${d}  now over budget`);
     return out;
 }

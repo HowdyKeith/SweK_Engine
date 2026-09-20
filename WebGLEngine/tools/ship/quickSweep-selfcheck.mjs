@@ -43,6 +43,24 @@
 //
 // Run: node tools/ship/quickSweep-selfcheck.mjs
 //
+// ---- v4647i SABOTAGES, RESULTS BY NAME (gateSweep-selfcheck / quickSweep-selfcheck) ---------------------
+//
+//   VA. every non-zero code is a finding again           -> 3 / 4 RED
+//   VB. every non-zero code is an os-kill                -> 4 / 4 RED
+//   VC. an os-kill softens the verdict to GREEN          -> 1 / 0 RED
+//   VD. the report spells a crash NEW again              -> 0 / 2 RED
+//   VE. crashCount ignores a row with no kind            -> 0 / 4 RED
+//   VF. a name is offered for every exit code            -> 1 / 0 RED
+//   VG. reconcile stores a kind contradicting the code   -> 0 / 1 RED
+//   VH. killed() trusts a stored kind over the code      -> 0 / 1 RED
+//
+// *** VG'S FIRST MEASUREMENT WENT ZERO RED IN BOTH GATES, AND IT WAS RIGHT TO. *** The first draft stored
+// `kind` and `name` on every reconcile row; deleting both changed no output anywhere, because the report
+// derives the classification from `code`. A second spelling of one rule, unreadable by any test -- so the
+// fields were REMOVED rather than given a row, and VG/VH now guard their absence. What that buys is a
+// property the extra fields could not: a result saved by ANY version of this tool classifies identically,
+// because the exit code is the only input. Keith's w4b.json, written before `kind` existed, reads correctly.
+//
 // ---- v4647h SABOTAGES, RESULTS BY NAME ------------------------------------------------------------------
 //
 //   UA. readSaved JSON.parses with no recovery (the crash Keith hit)  -> 5 RED
@@ -612,6 +630,67 @@ sec("8d. --out: THE TOOL WRITES ITS OWN FILE, SO THERE IS NOTHING FOR A REDIRECT
        "!! *** the sweep's own console.log is a caller-supplied sink now ***",
        "it fires on a FOREIGN box -- the only kind whose result is carried elsewhere to be read -- so under " +
        "--json it was the line most likely to land inside the capture and least likely to be noticed");
+}
+
+// ---------------------------------------------------------------------------------------------------------
+sec("8e. A CRASH IN THE NEW-RED LIST, SPELLED AS A CRASH");
+// ---------------------------------------------------------------------------------------------------------
+// *** v4647i -- THREE GATES ON GEN-9 CAME BACK `exit 3221226505` AND WERE FILED AS NEW RED. *** 0xC0000409
+// is Windows fail-fast: the process was killed before it printed anything. All three pass on this box in
+// under 350 ms, so `grep -c '^  FAIL'` over their output returns ZERO -- the sweep sent a reader hunting
+// for a line that was never written. Twelfth crash-instead-of-a-finding this session and the first that is
+// NOT mine: it is in the gates, reported by a sweep that could not tell a kill from a verdict.
+//
+// tools/ship/failLines.mjs, in this same directory, has told RED from CRASHED since v4647d. Two instruments,
+// one convention, opposite senses -- the species this session met in posixAssumption's separators, the two
+// ground-limit contracts, and --gate against --gates.
+{
+    const base = { ran: 431, enumerated: 1758, budgetMs: 3000, capMs: 20000, workers: 4, ms: 2125000, green: 390,
+                   knownRed: [], knownRedSkipped: 0, unmeasured: [], skippedOverBudget: 451, newGates: [],
+                   dropped: [], unchangedInputs: 0, skippedUnchanged: false, falseReds: 0, falseRedList: [] };
+    const killedRow = { gate: "ai-bridge/tools/range-selfcheck.mjs", code: 3221226505, ms: 724 };
+    const findingRow = { gate: "tools/ship/capReading-selfcheck.mjs", code: 1, ms: 474 };
+    const ls = (r) => { try { return Q.reportLines(r); } catch (e) { return ["THREW: " + (e && e.message)]; } };
+
+    const mixed = ls({ ...base, newRed: [killedRow, findingRow] });
+    ok(mixed.some((l) => /^  CRASH  ai-bridge\/tools\/range-selfcheck\.mjs/.test(l)),
+       "!! *** the OS kill is spelled CRASH, not NEW ***",
+       mixed.find((l) => /range-selfcheck/.test(l)) || "(absent)");
+    ok(mixed.some((l) => /STATUS_STACK_BUFFER_OVERRUN/.test(l) && /no FAIL line was printed/.test(l)),
+       "!! ...and the row names the kill and says why there is nothing to read",
+       "`exit 3221226505` is a number nobody can act on; the name says where to look instead");
+    ok(mixed.some((l) => /^  NEW    tools\/ship\/capReading-selfcheck\.mjs  exit 1 in 474 ms$/.test(l)),
+       "CONTROL: an ordinary red is unchanged, byte for byte",
+       "without this the rows above pass on a report that calls every red a crash");
+    ok(/2 NEW red \(1 KILLED BY THE OS, not findings\)/.test(mixed[0] || ""),
+       "!! and the summary counts them apart, where it used to count them together",
+       mixed[0] || "(no summary)");
+    ok(!/KILLED BY THE OS/.test(ls({ ...base, newRed: [findingRow] })[0] || ""),
+       "CONTROL: a run with no kills says nothing about kills",
+       "a parenthesis printed every time is a parenthesis nobody reads");
+
+    // *** READ OFF A RESULT SAVED BEFORE `kind` EXISTED, because that is the file this round is about. ***
+    // Keith's w4b.json was written by v4647h. A classifier that only understood rows written after the fix
+    // could say nothing about the run that produced the finding.
+    ok(Q.crashCount({ newRed: [killedRow, findingRow] }) === 1 && Q.crashCount({ newRed: [findingRow] }) === 0,
+       "!! *** a result saved BEFORE this change is classified from the code alone ***",
+       "the exit code is in every result this tool has ever written, so every saved run can be re-read");
+    ok(Q.crashCount({}) === 0 && Q.crashCount(null) === 0,
+       "...and a result with no newRed at all is zero rather than a throw",
+       "reportLines is called on files somebody else wrote; see section 8c");
+    // *** THE CODE IS THE ONLY INPUT, AND SABOTAGE VG IS WHY. *** The first draft also stored `kind` and
+    // `name` on each reconcile row; deleting both went ZERO RED in both gates, because nothing read them.
+    // The field is gone, and this row is what keeps it gone: a row carrying a contradictory kind must be
+    // classified by its code regardless, so a saved result from any version reads the same.
+    ok(Q.crashCount({ newRed: [{ ...killedRow, kind: "finding", name: null }] }) === 1 &&
+       Q.crashCount({ newRed: [{ ...findingRow, kind: "os-kill", name: "MADE UP" }] }) === 0,
+       "!! *** the exit code decides, and a stored kind cannot override it ***",
+       "one derivation, not two spellings of it -- reconcile stores no kind at all, and sabotage VG " +
+       "(deleting the fields) is what showed the stored copy was never read");
+    const src = fs.readFileSync(path.join(ENG, "tools", "ship", "quickSweep.mjs"), "utf8");
+    ok(/else fresh\.push\(\{ gate: r\.gate, code: r\.serialCode, ms: r\.serialMs \}\);/.test(src),
+       "...and reconcile really does store only gate, code and ms",
+       "a field nothing reads is a field that will disagree with the thing that does");
 }
 
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
