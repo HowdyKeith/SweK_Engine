@@ -14,6 +14,13 @@ import { unpack, decodePlanFor, seekCostOf, describe } from "./afContainer.mjs";
  * and vp09 are supported both ways. So a clip encoded on one machine can be undecodable on another, and the
  * failure mode of not checking is a black rectangle with no error anywhere: configure() succeeds, decode()
  * queues, and nothing ever comes out. This asks first and says which codec was refused.
+ *
+ * The "and encode" half of that claim was, at the time this was written, only ever tested via
+ * VideoDecoder.isConfigSupported() below -- reasonable to assume (a licensing-gated codec that's absent is
+ * usually absent both ways), but not independently checked. It has since been: see render/ffmpegWasmExport.
+ * mjs's own header for a real VideoEncoder.isConfigSupported() run (three avc1 profile/level strings, all
+ * supported:false; vp8/vp09/av01 all supported:true) against the same class of build this file targets --
+ * the encode half of this file's own opening claim is now independently confirmed, not just inferred.
  */
 export async function codecSupported(manifest) {
     if (typeof VideoDecoder === "undefined") return { ok: false, why: "this browser has no WebCodecs VideoDecoder" };
