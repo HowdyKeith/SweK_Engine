@@ -577,6 +577,16 @@ if (process.env.SWEK_QUICKSWEEP !== "0") {
     console.log(`[verify] quick sweep: ${r.ran} of ${r.enumerated} gates under ${budgetMs} ms in ${(r.ms / 1000).toFixed(0)} s -- ${r.green} green, ` +
       `${r.knownRed.length} known red, ${r.newRed.length} NEW red, ${r.falseReds} false red, ${r.unmeasured.length} unmeasured, ${r.dropped.length} now over budget`);
     for (const k of r.knownRed) console.log(`[verify]   known red  ${k.gate}  (${k.record})`);
+    // *** v4647c -- THE FALSE REDS ARE NAMED HERE, BECAUSE A SECOND BOX REPORTED 143 AND COULD NAME NONE. ***
+    // Keith's gen-9 sweep read "143 false red" -- 11% of the swept population against the 7 of 46 redCensus
+    // measured on this box -- and the count was the whole of it. A gate that is red under -P and green alone
+    // is STARVED, and which gates starve is a fact about the runner that only this line can carry off the box.
+    // Worst ratio first: parallel time over serial time is how much the other workers cost that gate, and a
+    // ratio near 1 is a gate that was never slowed at all.
+    for (const f of (r.falseRedList || []).slice(0, 20))
+      console.log(`[verify]   false red  ${String(f.ratio ?? "?").padStart(6)}x  ${f.gate}  ${f.parallelMs} ms loaded -> ${f.serialMs} ms alone`);
+    if ((r.falseRedList || []).length > 20)
+      console.log(`[verify]   false red  ... ${r.falseRedList.length - 20} more (quickSweep --json carries all of them)`);
     for (const d of r.dropped) console.log(`[verify]   over budget now  ${d}`);
     check("quick sweep: no gate outside the red register is red", r.newRed.length === 0,
       r.newRed.length ? "NEW RED: " + r.newRed.map((n) => n.gate + " exit " + n.code).join(", ") + " -- fix it or register it in redCensus.mjs with a reason" : `${r.ran} gates, ${r.knownRed.length} known reds on record`);

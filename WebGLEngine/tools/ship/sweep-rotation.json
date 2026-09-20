@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed.",
- "at": "2026-09-20T15:25:15.504Z",
+ "at": "2026-09-20T15:35:50.126Z",
  "budgetMs": 3000,
  "lastRun": 1,
  "rotated": [
@@ -1832,10 +1832,10 @@
   },
   {
    "gate": "tools/ship/failLines-selfcheck.mjs",
-   "ms": 77,
+   "ms": 78,
    "code": 0,
-   "priorMs": 63,
-   "at": "2026-09-20T15:02:19.692Z"
+   "priorMs": 77,
+   "at": "2026-09-20T15:35:50.126Z"
   },
   {
    "gate": "tools/ship/fetchCap-selfcheck.mjs",
@@ -1915,10 +1915,10 @@
   },
   {
    "gate": "tools/ship/gateSweep-selfcheck.mjs",
-   "ms": 190,
+   "ms": 200,
    "code": 0,
-   "priorMs": 180,
-   "at": "2026-09-20T15:17:07.971Z"
+   "priorMs": 190,
+   "at": "2026-09-20T15:29:25.368Z"
   },
   {
    "gate": "tools/ship/gatesBridge-selfcheck.mjs",

@@ -35,6 +35,7 @@ import * as RC from "./redCensus.mjs";
 import { toPosix } from "./posixAssumption.mjs";
 import { fileURLToPath } from "node:url";
 import { ENG as ENG_ROOT } from "./gateSweep.mjs";
+import { falseRedsOf } from "./quickSweep.mjs";
 
 let fails = 0;
 const ok = (c, name, detail) => {
@@ -561,6 +562,42 @@ sec("7. THE v4297 RECORD RECONCILES, NAMES ITS REGRESSIONS, AND EVERY NAME STILL
        "pass over a walker that never applied it");
     ok(!fs.existsSync(planted), "...and this check does not leave a gate behind either",
        "gateActivity's own rule: a gate that leaves a gate behind grows the population it measures");
+}
+
+console.log("\n*** THE FALSE REDS ARE ROWS IN BOTH MODULES NOW, NOT A COUNT IN ONE OF THEM -- v4647c ***");
+{
+    // finalize() has kept the full list since it was written; quickSweep -- the one verify actually runs --
+    // took `.length` and binned the rows. So Keith's gen-9 sweep could report 143 FALSE RED, 11% of its swept
+    // population against the 7 of 46 measured on this box, AND NAME NOT ONE. One concept, two modules, and
+    // the module that mattered was the one throwing the evidence away.
+    //
+    // Driven on a fixture because the live tree produces a false red only under contention nobody can summon
+    // on demand: an empty list is what the mapping returns when it is broken AND when the box is quiet.
+    const rows = [
+        { gate: "starved.mjs",  verdict: GS.VERDICT.GREEN, from: "serial",   parallelMs: 9000, serialMs: 900 },
+        { gate: "mild.mjs",     verdict: GS.VERDICT.GREEN, from: "serial",   parallelMs: 1200, serialMs: 1000 },
+        { gate: "cleanly.mjs",  verdict: GS.VERDICT.GREEN, from: "parallel", parallelMs: 100,  serialMs: 100 },
+        { gate: "reallyRed.mjs",verdict: GS.VERDICT.RED,   from: "serial",   parallelMs: 500,  serialMs: 480 },
+    ];
+    const got = falseRedsOf(rows, new Map([["starved.mjs", { code: 1 }]]));
+    ok(got.length === 2 && got[0].gate === "starved.mjs" && got[1].gate === "mild.mjs",
+       "!! *** quickSweep NAMES its false reds, worst starvation first -- a population nobody can list is not a finding ***",
+       `${got.map((f) => f.gate + " " + f.ratio + "x").join(", ")} -- ordered by parallel/serial, which is what the other workers cost each gate`);
+    ok(got[0].ratio === 10 && got[0].parallelMs === 9000 && got[0].serialMs === 900 && got[0].parallelCode === 1,
+       "  ...and each row carries BOTH timings and the parallel exit, so the starvation claim can be re-read later",
+       "the same thing gateSweep's own falseRedList row asserts -- one shape, two modules");
+    ok(!got.some((f) => f.gate === "cleanly.mjs") && !got.some((f) => f.gate === "reallyRed.mjs"),
+       "!! CONTROL: a gate green in PARALLEL is not a false red, and one that is red ALONE is really red",
+       "a mapping that took every green, or every serial row, would report the whole sweep as starvation");
+    // The two modules must agree, or a reader comparing two boxes is comparing two rules.
+    const viaFinalize = GS.finalize(rows.map((r) => ({
+        gate: r.gate,
+        parallel: { code: r.from === "serial" ? 1 : 0, ms: r.parallelMs, timedOut: false },
+        serial: { code: r.verdict === GS.VERDICT.RED ? 1 : 0, ms: r.serialMs, timedOut: false },
+    }))).falseReds.map((f) => f.gate).sort();
+    ok(viaFinalize.join(",") === got.map((f) => f.gate).sort().join(","),
+       "!! *** and finalize() SELECTS THE SAME GATES from the same runs -- one rule, not two spellings of it ***",
+       `finalize: ${viaFinalize.join(", ")} | quickSweep: ${got.map((f) => f.gate).sort().join(", ")}`);
 }
 
 console.log(fails === 0 ? "\nALL GREEN" : `\n${fails} FAILED`);

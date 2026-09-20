@@ -304,6 +304,29 @@ export function countCrossings(prior, rows, budgetMs) {
  * When the number has been watched long enough to be boring, turning it on is a one-line change with a
  * measured history behind it instead of an argument.
  */
+/**
+ * *** THE FALSE REDS, AS ROWS. A NAMED FUNCTION BECAUSE AN INLINE `.length` IS WHAT THIS REPLACED. ***
+ *
+ * A gate that is RED under -P and GREEN alone was starved by the other workers -- redCensus's two-phase rule,
+ * and the reason phase 2 exists. It was counted and the rows discarded, so Keith's gen-9 run could report
+ * "143 false red", 11% of its swept population against 7 of 46 measured here, AND NAME NOT ONE OF THEM.
+ *
+ * Exported so a fixture can drive it: an empty list proves nothing about a mapping, and the live tree
+ * produces false reds only under contention nobody can summon on demand.
+ *
+ * `ratio` is parallel time over serial time -- how much the other workers cost that gate. It is the evidence
+ * that these ARE starvation: a ratio near 1 is a gate that was never slowed, and a list of those would mean
+ * the verdict is coming from somewhere else.
+ */
+export function falseRedsOf(rows, phase1 = new Map()) {
+    return (rows || [])
+        .filter((r) => r.verdict === VERDICT.GREEN && r.from === "serial")
+        .map((r) => ({ gate: r.gate, parallelMs: r.parallelMs, serialMs: r.serialMs,
+                       parallelCode: (phase1.get(r.gate) || {}).code ?? null,
+                       ratio: r.parallelMs && r.serialMs ? +(r.parallelMs / r.serialMs).toFixed(2) : null }))
+        .sort((a, b) => (b.ratio || 0) - (a.ratio || 0));
+}
+
 export function selectGates(all, timings, budgetMs, { crossings = null, minCrossings = MIN_CROSSINGS_TO_EVICT,
                                                       inputRecord = null, skipUnchanged = false } = {}) {
     const run = [], skipped = [], unmeasured = [], onProbation = [];
@@ -476,7 +499,20 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
     const out0 = { at: new Date().toISOString() };
     const rec = reconcile(rows);
     const green = rows.filter((r) => r.verdict === VERDICT.GREEN).length;
-    const falseReds = rows.filter((r) => r.verdict === VERDICT.GREEN && r.from === "serial").length;   // red under -P, green alone
+    // *** v4647c -- THIS WAS `.length` AND THE ROWS WENT IN THE BIN, WHICH IS THE DEFECT THIS TREE NAMES
+    // MOST OFTEN: A COUNT STANDING IN FOR A PROPERTY, IN THE SWEEP ITSELF. *** Keith's gen-9 run reported
+    // "143 false red" -- 11% of the swept population, twenty times the number redCensus measured here -- and
+    // NOTHING COULD SAY WHICH GATES. A population of 143 nobody can list is not a finding anybody can act on.
+    //
+    // gateSweep.finalize has kept the full list since it was written (out.falseReds.push(rec), with both
+    // timings) and gateSweep-selfcheck asserts "each false red carries both timings, so the starvation claim
+    // can be re-read later". One concept, two modules, and the one verify actually runs was the one that
+    // threw the evidence away.
+    //
+    // `falseReds` STAYS A NUMBER because verify.mjs and the report line below both read it as one; the list
+    // arrives beside it under gateSweep's own field name, so the two cannot drift into different spellings.
+    const falseRedList = falseRedsOf(rows, phase1);
+    const falseReds = falseRedList.length;
     // the timings file, rewritten with what was just seen (serial time where there was one)
     // v4408 -- *** PER-ENTRY PROVENANCE. *** This file used to stamp ONE `captured` date on all 1,440 entries
     // while rewriting only the ones it ran, so 502 readings carried a date they did not earn -- and the budget
@@ -616,7 +652,7 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
         // reader to notice.
         knownRedSkipped: skipUnchanged
             ? (() => { const reg = redRegister(); return (sel.unchanged || []).filter((g) => reg.has(g)).length; })() : 0,
-        green, falseReds, knownRed: rec.known, newRed: rec.newRed, unmeasured: rec.unmeasured, dropped,
+        green, falseReds, falseRedList, knownRed: rec.known, newRed: rec.newRed, unmeasured: rec.unmeasured, dropped,
         // v4408: green gates whose PARALLEL time crossed the budget and were re-run alone before being filed,
         // and how many of those the serial reading brought back under. The second number is the starvation.
         budgetConfirmed: rows.filter((r) => r.from === "budget-confirm").length,
@@ -702,6 +738,16 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         console.log(`[quickSweep] ${r.ran} of ${r.enumerated} gates under ${r.budgetMs} ms ran in ${(r.ms / 1000).toFixed(0)} s: ` +
             `${r.green} green, ${r.knownRed.length} known red${r.knownRedSkipped ? " (+" + r.knownRedSkipped + " skipped, still red)" : ""}, ${r.newRed.length} NEW red, ${r.falseReds} false red, ${r.unmeasured.length} unmeasured; ` +
             `${r.skippedOverBudget} over budget skipped, ${r.newGates.length} new gates measured, ${r.dropped.length} dropped from budget`);
+        // *** NAMED, NOT ONLY COUNTED. *** A box that reports 143 of these and cannot list one has measured
+        // nothing anybody can act on. Ordered by how much the parallelism cost each gate, because that is the
+        // evidence that they ARE starvation and not a flake -- a ratio near 1 is a gate that was never slowed.
+        if (r.falseRedList && r.falseRedList.length) {
+            const top = r.falseRedList.slice(0, 12);
+            console.log(`[quickSweep] ${r.falseReds} FALSE RED (red under -P, green alone), worst starvation first:`);
+            for (const f of top) console.log(`[quickSweep]   ${String(f.ratio ?? "?").padStart(6)}x  ${f.gate}  ` +
+                `${f.parallelMs} ms loaded -> ${f.serialMs} ms alone` + (f.parallelCode != null ? `, exit ${f.parallelCode}` : ""));
+            if (r.falseRedList.length > top.length) console.log(`[quickSweep]   ... ${r.falseRedList.length - top.length} more; --json carries all of them`);
+        }
         if (r.unchangedInputs) console.log(`[quickSweep] ${r.unchangedInputs} of those had NO CHANGED INPUT and ` +
             (r.skippedUnchanged ? "were SKIPPED. Pass --full to run them: a wrongly skipped gate is the one failure "
                                 + "here that is silent, and tools/ship/importClosure.mjs is what bounds it"

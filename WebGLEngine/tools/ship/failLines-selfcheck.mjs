@@ -59,13 +59,26 @@ console.log("\n3. A KILLED CHILD IS A CRASH, NOT A PASS");
     // spawnSync returns status null when the child is killed. Reading that as 0 would turn a timeout into a
     // green, which is the single most expensive mistake this whole file exists to avoid.
     const killed = runOne("x.mjs", { spawn: child("1. STARTED\n", null, { signal: "SIGTERM" }) });
-    ok("!! *** status null with a signal is exit 124 and CRASHED, never 0 ***",
-       killed.exit === 124 && killed.verdict === "CRASHED" && killed.signal === "SIGTERM",
+    ok("!! *** status null with a signal is exit 124 and never 0 -- a timeout read as success is the worst shape here ***",
+       killed.exit === 124 && killed.verdict === "TIMEOUT" && killed.signal === "SIGTERM",
        `exit=${killed.exit}, verdict=${killed.verdict} -- a timeout read as success is a false green with a ` +
        `clock behind it`);
     const nullNoSignal = runOne("x.mjs", { spawn: child("", null) });
     ok("  and status null with no signal is still non-zero rather than assumed fine",
        nullNoSignal.exit === 1 && nullNoSignal.verdict === "CRASHED");
+    // *** v4647c -- AND A KILLED CHILD IS ITS OWN VERDICT, BECAUSE CALLING IT A CRASH SENT ME TO READ THE
+    // WRONG THING WITHIN AN HOUR OF THIS TOOL EXISTING. *** redCensus-selfcheck came back CRASHED at 120,107
+    // ms with SIGTERM, and the report said to read it FIRST because what it checked was UNKNOWN. It was not:
+    // that gate re-runs other gates and needs longer than the default cap. A crash means read the code; a
+    // timeout means raise --timeout-s. The two lead to different work and must not share a word.
+    ok("!! *** a gate KILLED at the cap is TIMEOUT, not CRASHED -- they send a reader to different places ***",
+       killed.verdict === "TIMEOUT" && runOne("x.mjs", { spawn: child("Error: boom", 1) }).verdict === "CRASHED",
+       `SIGTERM at the cap -> ${killed.verdict}; exit 1 with no row -> CRASHED. One means "raise the cap", ` +
+       `the other means "read the code"`);
+    ok("  ...and the summary names the timeouts separately, so they are not read as findings",
+       /TIMED OUT at this tool's cap -- not a finding about the/.test(describe([killed])) &&
+       /TIMED OUT at the cap/.test(describe([killed])),
+       "a count that folds them into CRASHED tells everybody to go and read a gate that is simply slow");
 }
 
 console.log("\n4. THE VERIFY OUTPUT IS PARSED FROM ITS OWN WORDS");

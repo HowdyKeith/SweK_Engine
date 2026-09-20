@@ -97,8 +97,16 @@ export function runOne(rel, { root = ENG, timeoutMs = 120000, spawn = spawnSync 
     // A killed gate has status null and a signal; that is a CRASH by any reading, and reporting it as exit 0
     // would turn a timeout into a pass.
     const exit = r.status == null ? (r.signal ? 124 : 1) : r.status;
-    const verdict = exit === 0 ? (lines.length ? "ODD" : "GREEN")
-                               : (lines.length ? "RED" : "CRASHED");
+    // *** v4647c -- A TIMEOUT IS NOT A CRASH, AND CALLING IT ONE SENT ME TO READ THE WRONG THING. ***
+    // redCensus-selfcheck came back "CRASHED, exit 3221226505"-shaped -- exit 124, SIGTERM, 120,107 ms -- and
+    // the report told me to read it first because what it was checking was UNKNOWN. It was not unknown: that
+    // gate RE-RUNS other gates and simply needs longer than this tool's default cap. A crash means read the
+    // code; a timeout means raise --timeout-s. Conflating them costs a detour every time, and it cost one
+    // within an hour of the tool existing.
+    const killed = r.status == null && !!r.signal;
+    const verdict = killed ? "TIMEOUT"
+                   : exit === 0 ? (lines.length ? "ODD" : "GREEN")
+                                : (lines.length ? "RED" : "CRASHED");
     return { gate: rel, exit, ms, fails: lines.length, lines, verdict,
              ...(r.signal ? { signal: r.signal } : {}) };
 }
@@ -130,7 +138,7 @@ export function treeStamp({ root = ENG, run = spawnSync } = {}) {
 }
 
 export function summarise(rows) {
-    const by = { GREEN: 0, RED: 0, CRASHED: 0, ODD: 0 };
+    const by = { GREEN: 0, RED: 0, CRASHED: 0, ODD: 0, TIMEOUT: 0 };
     for (const r of rows) by[r.verdict]++;
     return { of: rows.length, ...by, totalFailRows: rows.reduce((a, r) => a + r.fails, 0) };
 }
@@ -138,12 +146,14 @@ export function summarise(rows) {
 export function describe(rows) {
     const s = summarise(rows);
     const out = [`[failLines] ${s.of} gate(s) run ALONE: ${s.GREEN} green, ${s.RED} red with rows, ` +
-                 `${s.CRASHED} CRASHED with no row at all, ${s.ODD} exited 0 while printing a failing row. ` +
-                 `${s.totalFailRows} failing row(s) in total.`];
+                 `${s.CRASHED} CRASHED with no row at all, ${s.TIMEOUT} TIMED OUT at the cap, ` +
+                 `${s.ODD} exited 0 while printing a failing row. ${s.totalFailRows} failing row(s) in total.`];
     if (s.GREEN) out.push(`[failLines] the ${s.GREEN} green one(s) were red in the sweep and pass alone -- ` +
                           `contention, not a finding. That is redCensus's two-phase rule doing its job.`);
     if (s.CRASHED) out.push(`[failLines] *** ${s.CRASHED} CRASHED: exit non-zero with no failing row, so what ` +
                             `they were checking is UNKNOWN rather than false. Read these first.`);
+    if (s.TIMEOUT) out.push(`[failLines] ${s.TIMEOUT} TIMED OUT at this tool's cap -- not a finding about the ` +
+                            `gate. Re-run those with a larger --timeout-s before reading anything into them.`);
     for (const r of rows) {
         if (r.verdict === "GREEN") continue;
         out.push(`  ${r.verdict.padEnd(7)} ${r.gate}  exit ${r.exit}${r.signal ? " (" + r.signal + ")" : ""}  ${r.ms} ms  ${r.fails} row(s)`);
