@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed.",
- "at": "2026-09-20T12:13:56.630Z",
+ "at": "2026-09-20T12:26:12.144Z",
  "budgetMs": 3000,
  "lastRun": 1,
  "rotated": [
@@ -413,10 +413,10 @@
   },
   {
    "gate": "physics/render/microfacetWgsl-selfcheck.mjs",
-   "ms": 1383,
+   "ms": 1145,
    "code": 0,
-   "priorMs": 2706,
-   "at": "2026-09-20T07:51:49.610Z"
+   "priorMs": 1383,
+   "at": "2026-09-20T12:26:12.144Z"
   },
   {
    "gate": "physics/render/misWgsl-selfcheck.mjs",
@@ -1344,9 +1344,10 @@
   },
   {
    "gate": "tools/ship/adapterRecord-selfcheck.mjs",
-   "ms": 57,
+   "ms": 50,
    "code": 0,
-   "at": "2026-09-18T15:52:36.969Z"
+   "priorMs": 57,
+   "at": "2026-09-20T12:26:10.876Z"
   },
   {
    "gate": "tools/ship/affected-selfcheck.mjs",

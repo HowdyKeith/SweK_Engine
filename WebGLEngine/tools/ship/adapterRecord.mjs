@@ -70,3 +70,100 @@ export function owedCount(verdicts) {
     const owed = verdicts.filter((v) => v.state === "OWED");
     return { owed: owed.length, of: verdicts.length, keys: [...new Set(owed.map((v) => v.key))].sort() };
 }
+
+// *** v4647 -- A READING TYPED IN FROM A TERMINAL IS NOT A READING THE GATE TOOK. ***
+//
+// microfacetWgsl's own record says so in as many words: Keith's Pascal numbers were left OWED on purpose
+// because they arrived as a paste. That rule was right and it left no way to ever pay the debt, because the
+// only person who can run the gate on that box is not the person editing the file. The whole point of OWED is
+// that it shrinks.
+//
+// So the gate writes its own reading, on the box that took it, into tools/ship/adapter-readings.json -- the
+// same shape sweep-timings.json has and for the same reason: a number written by the thing that measured it,
+// carrying a stamp it earned. What lands in a commit is then a machine-written file from that machine, not a
+// transcription.
+//
+// *** THE FROZEN IN-FILE RECORD WINS, ALWAYS, AND THAT DIRECTION IS THE SAFETY. *** If the JSON could override
+// a frozen bound then `--record` would be a way to make a red gate green by running it, which is the one thing
+// this must not be. recordReading REFUSES an adapter the frozen record already names and says so. The JSON can
+// only ever cover an adapter that had NO reading -- it turns OWED into HELD and can never turn HELD into
+// something laxer.
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+export const READINGS_PATH = path.join(HERE, "adapter-readings.json");
+
+/**
+ * *** THE SLACK IS A CONVENTION AND IS LABELLED ONE, BUT IT IS NOT A GUESS ABOUT NOISE. ***
+ * microfacetWgsl was run four times on one adapter and all EIGHT of its recorded readings came back
+ * BIT-IDENTICAL, to the last digit of a double (coarseFall 0.8415621515000709 on every run) -- these are
+ * deterministic f32 reductions over a fixed grid, so there is no run-to-run jitter for a slack to absorb.
+ *
+ * NOT EVERY NUMBER IN THAT GATE IS LIKE THAT, and the distinction is the point rather than a footnote: its
+ * strong-test curve moved between runs in the same session (0.9994199 then 0.9994505 at alpha 0.02), which is
+ * why those rows carry tolerances and are NOT recorded here. What is recorded is the subset measured to be
+ * reproducible; a jittering quantity does not belong behind a per-adapter bound at all.
+ *
+ * What the slack absorbs is therefore a DRIVER UPDATE on the same silicon, which nobody here can measure, so
+ * 2 is a chosen number for a thing that cannot be derived. It is stated rather than buried: wide enough that a
+ * recompiled shader does not go red, narrow enough that an order of magnitude does. Measured against the nine
+ * bounds a person hand-picked for SwiftShader, it is mostly TIGHTER -- cosAbsMin 2.99e-5 where the hand-picked
+ * bound was 1e-7, hostRatio 3256 against 1000 -- and looser on exactly one, worstGap 3.07e-7 against 2e-7.
+ */
+export const SLACK = 2;
+
+/** "max": the measurement must stay AT OR BELOW the bound. "min": at or above. */
+export function compareFor(name, dir) {
+    if (dir !== "max" && dir !== "min") throw new Error(`adapterRecord: direction must be "max" or "min", got ${JSON.stringify(dir)}`);
+    return (have, measured) => (dir === "max" ? measured <= have[name] : measured >= have[name]);
+}
+
+/** The bound a fresh reading becomes, with the slack applied in the direction the row is asserted in. */
+export function boundFrom(dir, measured) {
+    if (!Number.isFinite(measured)) return measured;
+    return dir === "max" ? measured * SLACK : measured / SLACK;
+}
+
+/**
+ * *** THE ONE PLACE THE PRECEDENCE LIVES, BECAUSE A SPREAD WRITTEN THE WRONG WAY ROUND IN A GATE IS INVISIBLE. ***
+ * The frozen in-file record WINS. A reading written by --record can only ever cover an adapter the frozen
+ * record does not name -- it turns OWED into HELD and can never turn HELD into something laxer. Written as a
+ * named function rather than an inline `{ ...recorded, ...frozen }` so a fixture can drive it: inverted in
+ * place, the spread is a one-character difference that no live run on a box with an empty readings file can
+ * tell apart, which is exactly how it was caught here.
+ */
+export function mergeRecords(frozen, recorded) {
+    return { ...(recorded || {}), ...(frozen || {}) };
+}
+
+/** Everything on file for one gate, or {} -- a missing or broken file is NO readings, never a throw: a gate
+ *  whose record file is absent must behave exactly like a gate whose adapter is unrecorded. */
+export function readReadings(gate, { file = READINGS_PATH, read = fs.readFileSync } = {}) {
+    try { return (JSON.parse(read(file, "utf8")).gates || {})[gate] || {}; } catch { return {}; }
+}
+
+/**
+ * Write one adapter's readings for one gate. Returns { wrote, why } -- it refuses rather than throws, because
+ * this runs at the end of a gate that has already said everything it has to say.
+ * `frozen` is the gate's in-file record; an adapter it names is refused.
+ */
+export function recordReading(gate, key, values, { file = READINGS_PATH, frozen = null, stamp = null,
+                                                   read = fs.readFileSync, write = fs.writeFileSync } = {}) {
+    if (!key || key === "unknown/unknown") {
+        return { wrote: false, why: "the adapter would not say what it is, so the reading has no owner -- " +
+                                    "an unnamed key would be shared by every future unidentified adapter" };
+    }
+    if (frozen && Object.prototype.hasOwnProperty.call(frozen, key)) {
+        return { wrote: false, why: `${key} is already in the gate's own frozen record, which wins -- ` +
+                                    "recording here could only ever loosen it, so it is refused" };
+    }
+    let doc = { gates: {} };
+    try { doc = JSON.parse(read(file, "utf8")); } catch { /* first write */ }
+    if (!doc.gates) doc.gates = {};
+    if (!doc.gates[gate]) doc.gates[gate] = {};
+    doc.gates[gate][key] = { ...values, at: stamp || new Date().toISOString() };
+    write(file, JSON.stringify(doc, null, 1) + "\n");
+    return { wrote: true, why: `${gate} / ${key}: ${Object.keys(values).length} reading(s)`, doc };
+}
