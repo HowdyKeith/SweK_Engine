@@ -35,6 +35,7 @@ import { backfillStamps } from "./sweepCoverage.mjs";
 import { boxId } from "./hostScale.mjs";
 import { skippable, readRecord as readInputRecord } from "./inputSets.mjs";
 import { enumerateGates, classify, VERDICT, SWEEP_V4297, ENG } from "./gateSweep.mjs";
+import { parseArgs, refusalLines } from "./cliArgs.mjs";
 import { RED_AT_V4279, RED_AT_V4408, RED_AT_V4424, RED_AT_V4476, RED_AT_V4484, RED_AT_V4531, RED_AT_V4535, UNCONFIRMED_SLOW, ALL_REGISTERED } from "./redCensus.mjs";
 
 // *** THE TWO LINES BOTH FOUND THAT A MILLISECOND IN sweep-timings.json IS NOT ONE QUANTITY, AND BOTH FIXED
@@ -817,9 +818,32 @@ export function reportLines(r) {
     return out;
 }
 
+// ---- THE COMMAND LINE, WHICH USED TO ACCEPT ANYTHING ----------------------------------------------------
+//
+// *** v4647g -- AN UNKNOWN OPTION WAS IGNORED IN SILENCE, AND THE SILENCE COST 1,914 SECONDS. ***
+// Keith ran `--read w4.json` on a tree that did not yet have --read. The old `arg()` is
+// `process.argv.indexOf(name)`, so an option this build does not know about matches nothing, returns its
+// default, AND THE RUN PROCEEDS -- for 427 gates and 1,914 s, ending in the ReferenceError v4647f had just
+// repaired, having answered a question he did not ask. The same line refuses in 81 ms now.
+//
+// The parser lives in tools/ship/cliArgs.mjs, with the census of the five tools that still take arguments
+// the silent way and the note on --gate/--gates, two spellings of one idea live in this directory.
+export const CLI = Object.freeze({
+    values: Object.freeze({ "--budget": "number", "--workers": "number", "--cap": "number",
+                            "--timings": "path", "--read": "path" }),
+    // v4574: `--incremental` parses and means nothing, deliberately -- a flag in somebody's muscle memory or
+    // a script should not become an error the day the default changes. That is the OPPOSITE of an unknown
+    // option: this one is KNOWN to be a no-op, and being known is the whole difference.
+    flags: Object.freeze(["--json", "--full", "--incremental"]),
+});
+
 // ---- CLI ------------------------------------------------------------------------------------------------
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
-    const arg = (n, d) => { const i = process.argv.indexOf(n); return i >= 0 ? process.argv[i + 1] : d; };
+    // *** REFUSE BEFORE SPENDING ANYTHING. *** This block runs before a single gate is enumerated, because
+    // the whole finding is that the old command line spent 1,914 s answering a question nobody asked.
+    const cli = parseArgs(process.argv.slice(2), CLI);
+    if (cli.errors.length) { for (const l of refusalLines("quickSweep", cli.errors, CLI)) console.error(l); process.exit(2); }
+    const arg = (n, d) => (n in cli.values ? cli.values[n] : d);
     const readFrom = arg("--read", null);
     if (readFrom) {
         // A SAVED RUN IS STILL A RUN. The measurement that decides #53 -- do the cap kills collapse at four
@@ -828,8 +852,10 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         for (const line of reportLines(saved)) console.log(line);
         process.exit(0);
     }
-    const opts = { budgetMs: Number(arg("--budget", DEFAULTS.budgetMs)), workers: Number(arg("--workers", DEFAULTS.workers)),
-                   capMs: Number(arg("--cap", DEFAULTS.capMs)), timingsFile: arg("--timings", DEFAULTS.timingsFile) };
+    // No Number() here: parseArgs already refused anything that is not a positive finite number, so a value
+    // that reaches this line is one. Converting at the point of use is how `--budget --json` became NaN.
+    const opts = { budgetMs: arg("--budget", DEFAULTS.budgetMs), workers: arg("--workers", DEFAULTS.workers),
+                   capMs: arg("--cap", DEFAULTS.capMs), timingsFile: arg("--timings", DEFAULTS.timingsFile) };
     let lastPct = -1;
     // *** v4574 -- ARMED. THE DEFAULT IS NOW TO SKIP, AND --full IS HOW YOU TURN IT OFF. ***
     // v4566 shipped this disarmed on a sentence -- "an input set is what a gate read on ONE RUN, a sample and
@@ -841,13 +867,13 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     //
     // `--incremental` still parses and now means nothing, because a flag in somebody's muscle memory or a
     // script should not become an error the day the default changes.
-    opts.skipUnchanged = !process.argv.includes("--full");
+    opts.skipUnchanged = !cli.flags.has("--full");
     const r = await runQuickSweep({ ...opts, onProgress: (d, t) => { const pct = Math.floor(100 * d / t); if (pct !== lastPct && pct % 10 === 0) { lastPct = pct; process.stderr.write(`[quickSweep] ${d}/${t}\n`); } } })
         .catch((e) => { console.error("[quickSweep] runner failed: " + (e && e.message)); process.exit(2); });
     // THE REPORT IS PRINTED EITHER WAY. Under --json it goes to stderr so that `--json > file` still captures
     // clean JSON on stdout -- a redirect that swallows the reading is how w4.json came to be unreadable.
-    const sink = process.argv.includes("--json") ? ((s) => process.stderr.write(s + "\n")) : ((s) => console.log(s));
-    if (process.argv.includes("--json")) console.log(JSON.stringify(r, null, 1));
+    const sink = cli.flags.has("--json") ? ((s) => process.stderr.write(s + "\n")) : ((s) => console.log(s));
+    if (cli.flags.has("--json")) console.log(JSON.stringify(r, null, 1));
     for (const line of reportLines(r)) sink(line);
     process.exit(r.newRed.length ? 1 : 0);
 }

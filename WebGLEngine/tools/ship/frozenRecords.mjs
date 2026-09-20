@@ -571,7 +571,10 @@ export const PROBE_AT_V4536 = Object.freeze({
     // census run twice and they have to move together -- the row below asserts the difference between
     // them is EXACTLY this module's own two records, so re-taking one and not the other turns a stale
     // number into a contradiction. Read off census() and census({exclude:/frozenRecords/}), not adjusted.
-    currentIncludingModule: Object.freeze({ records: 146, withFields: 69, fields: 392 }),
+    // v4647g -- RE-TAKEN alongside `excluding`: 146 / 69 / 392 -> 147 / 70 / 393. The two halves are one
+    // census run twice and must move together, because the row below asserts their difference is EXACTLY
+    // this module's own two records.
+    currentIncludingModule: Object.freeze({ records: 147, withFields: 70, fields: 393 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -748,7 +751,11 @@ export const PROBE_AT_V4536 = Object.freeze({
     // point". It did not, and the gate is what said so.
     //
     // One of the two carries fields (withFields 66 -> 67, fields 371 -> 372); the other is a flat list.
-    excluding: Object.freeze({ records: 144, withFields: 67, fields: 372 }),
+    // v4647g -- RE-TAKEN: 144 / 67 / 372 -> 145 / 68 / 373. One arrival, SILENT_AT_V4647G in
+    // tools/ship/cliArgs.mjs -- a record with fields, so all three move by one. Re-taken in the round that
+    // added it: the two before it were found by a red gate four rounds late, which is the whole argument
+    // for the line this row already carried -- a round that adds a record re-takes this.
+    excluding: Object.freeze({ records: 145, withFields: 68, fields: 373 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,

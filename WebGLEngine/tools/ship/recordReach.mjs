@@ -281,7 +281,12 @@ export const REACH_AT_V4548 = Object.freeze({
     // between two runs of the same code is how a gate becomes a coin toss.
     //
     // Neither arrival raised `unguarded`: both are named by the gate in the file that defines them.
-    total: 146,
+    // v4647g -- 146 -> 147: SILENT_AT_V4647G in tools/ship/cliArgs.mjs, the derived census of the tools
+    // that still ignore an unknown option. It arrives GUARDED -- tools/ship/cliArgs-selfcheck.mjs names it
+    // and runs at 574 ms, under the budget -- so `unguarded` is unmoved at 17 and `unchecked` does not rise.
+    // That is what adding a record properly looks like, and it is re-taken in the round that added it
+    // rather than four rounds later, which is how the previous two came to be found by a red gate.
+    total: 147,
     // *** READ OFF THE INSTRUMENT, NOT PREDICTED. *** The first draft of this record guessed 53/21/19/40 from
     // which gates the round had sped up, and was wrong on three of the four: the comment-strip fix below
     // moved two records the other way at the same time, and a guess cannot see two changes at once.
@@ -485,7 +490,9 @@ export const UNGUARDED_SPLIT_V4577 = Object.freeze({
     // v4647f -- 144 -> 146, the same two arrivals re-taken above. `unguarded` does NOT move: both new
     // records are named by the gate in their own defining file, which is what a record arriving properly
     // looks like. The other three fields are structural and unchanged.
-    structural: Object.freeze({ total: 146, unguarded: 17, documentaryOfThose: 17, readByCodeOfThose: 0 }),
+    // v4647g -- 146 -> 147, the one arrival re-taken above. `unguarded` does not move: the new record is
+    // named by the gate in its own defining file's sibling.
+    structural: Object.freeze({ total: 147, unguarded: 17, documentaryOfThose: 17, readByCodeOfThose: 0 }),
     // BEFORE, on the tree this round opened on:
     before: Object.freeze({ total: 104, checked: 72, overBudget: 20, unmeasured: 0, unguarded: 12, unchecked: 32 }),
     // AFTER, as one reading rather than as a constant -- see the note above. Taken with the round's own

@@ -7999,6 +7999,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // run -- on Keith's gen-9 box and then here -- and it was red on BOTH, alongside assertionShape's
     // 1751 -> 1757 and runtimeGap's 4275 -> 4286, which are the same six arrivals seen from two other
     // instruments. The surplus mechanism worked exactly as designed; nobody looked at it for six rounds.
+    since332: Object.freeze({
+        at: "v4647g", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/cliArgs-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 574 ms run alone on this box -- under the 3,000 ms membership threshold, so it arrives " +
+                 "INSIDE the ship-time sweep rather than outside it. It gates tools/ship/cliArgs.mjs, the " +
+                 "argument parser written because an option seven tools did not recognise was IGNORED and the " +
+                 "run proceeded for 1,914 s. Eight sabotages red by name (7/3/1/2/1/5/3/1). Two of its rows " +
+                 "drive REAL command lines through spawnSync, bounded at 20,000 ms: a refusal is 81 ms, so " +
+                 "anything slower is the tool failing to refuse -- and the first, unbounded, draft HUNG when " +
+                 "the sabotage sent it into a genuine 32-minute sweep. A hang is not a verdict.",
+    }),
     since331: Object.freeze({
         at: "v4647", swept: 6, green: 6, red: 0,
         added: Object.freeze([

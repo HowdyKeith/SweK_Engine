@@ -337,7 +337,12 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
     // and the readings overlap on everything predating the split, so they are run over the merged tree rather
     // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
-    files: 4286,               // v4647 -- RE-DERIVED after this session's own eleven files; see the note below. v4645 -- RE-DERIVED AT THE main MERGE over the merged tree. RE-DERIVED AT THE main MERGE: 4169 on this branch, 4172 on main, 4260 merged -- LESS than the sum, which is why it is run
+    // v4647g -- RE-DERIVED: 4286 -> 4288 for tools/ship/cliArgs.mjs and its gate. THREE of the thirteen
+    // rows moved and the shape is the point: ES modules +2 and closures +2 (both files are modules and
+    // both hold arrow functions), but async/await only +1 -- the gate awaits an import, the parser does
+    // not await anything. A files-only check would call this a two-file round and miss that the two files
+    // are not alike, which is the distinction the twelve rows beside the count exist to make.
+    files: 4288,               // v4647 -- RE-DERIVED after this session's own eleven files; see the note below. v4645 -- RE-DERIVED AT THE main MERGE over the merged tree. RE-DERIVED AT THE main MERGE: 4169 on this branch, 4172 on main, 4260 merged -- LESS than the sum, which is why it is run
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
                           // RE-TAKEN TWICE IN TWO ROUNDS, and the second time only because the ship gate
@@ -657,7 +662,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // that adds a module must re-take, which is the cost of pinning it". Six rounds added modules and none
     // re-took it. It went red on BOTH boxes, and Keith's verify named it in the drift pre-flight -- which is
     // precisely the instrument for this and only helps somebody who runs it.
-    esModules: 3986, closures: 3853, asyncAwait: 1521, typedArrays: 1125, promises: 368,
+    esModules: 3988, closures: 3855, asyncAwait: 1522, typedArrays: 1125, promises: 368,
     fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 156, webgpu: 53, threads: 23, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

@@ -375,7 +375,9 @@ console.log("\n6. *** THE FILED NUMBER IS A CONTENDED SAMPLE AND THE COST IS A D
     ok(!!sig && /skipUnchanged = false/.test(sig[0]),
        "!! *** runQuickSweep does NOT skip unless its caller asks -- the dangerous default is never inherited ***",
        "a programmatic caller that says nothing gets a full sweep. Nine call sites in this tree say nothing");
-    ok(/opts\.skipUnchanged = !process\.argv\.includes\("--full"\)/.test(src),
+    // v4647g: the flag is read off the PARSED command line now, not off raw argv -- an unknown option is
+    // refused before this line runs. The property is unchanged: the command line skips, the function does not.
+    ok(/opts\.skipUnchanged = !cli\.flags\.has\("--full"\)/.test(src),
        "!! ...and the command line skips by default, which is the whole point of arming it",
        "the saving is for a human sweeping while working: 1,258 gates and 409 s becomes 332 and 233 s");
     const vsrc = fs.readFileSync(path.join(ENG, "tools", "ship", "verify.mjs"), "utf8");
@@ -479,7 +481,7 @@ sec("8b. --json NO LONGER SWALLOWS THE READING, AND A SAVED RUN CAN BE RE-READ")
     // Source-level, because the routing is what the redirect sees and no in-process row can observe it.
     const src = fs.readFileSync(path.join(ENG, "tools", "ship", "quickSweep.mjs"), "utf8");
     const cli = src.slice(src.indexOf("// ---- CLI ---"));
-    ok(/const sink = process\.argv\.includes\("--json"\) \? \(\(s\) => process\.stderr\.write/.test(cli),
+    ok(/const sink = cli\.flags\.has\("--json"\) \? \(\(s\) => process\.stderr\.write/.test(cli),
        "!! under --json the report goes to STDERR, so `--json > file` still captures clean JSON",
        "a redirect that swallows the reading is how w4.json came to be unreadable");
     ok(/for \(const line of reportLines\(r\)\) sink\(line\);/.test(cli) && !/\belse \{/.test(cli),

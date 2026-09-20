@@ -590,8 +590,19 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // WHICH SLOT holds the condition, so on ev/esFlight3dMath-selfcheck.mjs -- `function ok(cond, msg)`, read
     // as nameFirst -- it reported every CORRECT call as a swap. Found by this gate on the new shape's first
     // live run, and the shape now refuses to run at all on an unknown signature.
-    gates: 1757, usesOk: 1736, definesOk: 1728, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1630, condFirst: 95, unknownSignature: 11,
+    // *** v4647g -- RE-TAKEN, AND FOR THE FIRST TIME IN FIFTEEN ARRIVALS IT IS condFirst THAT MOVED. ***
+    // tools/ship/cliArgs-selfcheck.mjs joined: gates 1757 -> 1758, usesOk 1736 -> 1737, definesOk 1728 ->
+    // 1729 as usual -- but nameFirst HELD at 1630 and condFirst went 95 -> 96, because the new gate defines
+    // `const ok = (c, name, detail)`. Every note above this one says "the same four rows by one" and names
+    // nameFirst as the fourth; this arrival is the counter-example those notes were waiting for, and the
+    // census reported it without being asked. That is exactly what the five steady rows exist to do: say
+    // that a gate turned up written in a DIFFERENT shape. distinctDefinitions, unknownSignature, importsOk
+    // and suspects did not move, so the new file is the minority shape and not a new shape.
+    //
+    // It is left in that shape deliberately. 96 files is a live population, SHAPE.stringAsCondition covers
+    // the swap under condFirst, and rewriting a file to make a census duller is the wrong direction.
+    gates: 1758, usesOk: 1737, definesOk: 1729, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1630, condFirst: 96, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

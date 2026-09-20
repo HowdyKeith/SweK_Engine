@@ -21,6 +21,7 @@ import { runGate } from "./redCensus.mjs";
 // v4647 -- whose stopwatch. A box that does not own the record writes its own file rather than
 // overwriting one produced on different silicon. See quickSweep.timingsTarget.
 import { timingsTarget } from "./quickSweep.mjs";
+import { parseArgs, refusalLines } from "./cliArgs.mjs";
 
 export function runSlice(picked, { capMs = CAP_MS, onProgress = null } = {}) {
     const rows = [];
@@ -150,16 +151,32 @@ export function mergeTimings(file, rows, stamp, capMs = null) {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
-    const arg = (n, d) => { const i = process.argv.indexOf(n); return i >= 0 ? process.argv[i + 1] : d; };
-    const budgetMs = Number(arg("--budget-s", 180)) * 1000;
-    const slots = Number(arg("--slots", 24));
+    // *** v4647g -- THIS IS THE TOOL MY TYPO RAN. *** I meant one gate and typed `--gates`, which is
+    // failLines' and recordInputs' spelling of a LIST. The old `indexOf` arg reader matched nothing,
+    // returned null, and the ROTATION RAN -- 21 gates instead of the one asked for -- and recorded eulerGpu
+    // at the 20,000 ms cap, a cap reading filed as a runtime, which budgetIsOwn forty lines into quickSweep
+    // says must never happen. The two spellings are NOT unified (a list and one gate are different asks);
+    // `--gates` is now refused here and told that this tool's option is `--gate`, which nearestOption gives
+    // for an edit distance of one.
+    //
+    // This file WRITES sweep-timings.json, so an argument it misreads becomes a number the tree carries.
+    const CLI = Object.freeze({
+        values: Object.freeze({ "--budget-s": "number", "--slots": "number", "--gate": "path",
+                                "--cap-s": "number", "--band": "string" }),
+        flags: Object.freeze(["--rebuild-finished", "--write", "--killed"]),
+    });
+    const cli = parseArgs(process.argv.slice(2), CLI);
+    if (cli.errors.length) { for (const l of refusalLines("rotation", cli.errors, CLI)) console.error(l); process.exit(2); }
+    const arg = (n, d) => (n in cli.values ? cli.values[n] : d);
+    const budgetMs = arg("--budget-s", 180) * 1000;
+    const slots = arg("--slots", 24);
     const file = readFile();
-    if (process.argv.includes("--rebuild-finished")) {
+    if (cli.flags.has("--rebuild-finished")) {
         const led = JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "sweep-rotation.json"), "utf8"));
         const { finished, rebuilt, skipped } = rebuildFinished(file, led);
         console.log(`[rotation] --rebuild-finished: ${rebuilt} row(s) restored from this file's own ledger, ` +
             `${skipped} skipped because the timings no longer describe the run the ledger recorded`);
-        if (process.argv.includes("--write")) {
+        if (cli.flags.has("--write")) {
             const t = timingsTarget(file);
             if (t.foreign) console.log(`[rotation] NOT writing sweep-timings.json: ${t.why}`);
             fs.writeFileSync(path.join(ENG, t.file),
@@ -190,8 +207,8 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     // sweep, behind a door with no handle", because rotation() walked c.over and c.killed is a different
     // bucket. Re-running them AT the cap they died on can only reproduce the death, so this mode takes its
     // own, larger cap. Everything else is the same slice runner, classifier, writer and per-entry stamp.
-    const killedMode = process.argv.includes("--killed");
-    const capMs = Number(arg("--cap-s", killedMode ? 90 : CAP_MS / 1000)) * 1000;
+    const killedMode = cli.flags.has("--killed");
+    const capMs = arg("--cap-s", killedMode ? 90 : CAP_MS / 1000) * 1000;
     const band = arg("--band", null);   // "3000-8000", in the units the timings file uses
     const inBand = (g) => {
         if (!band) return true;
@@ -226,7 +243,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
             `${rows.length - fin.length} did not finish even at ${capMs / 1000} s`);
         for (const r of fin.filter((x) => x.ms < CAP_MS)) console.log(`[rotation]   under the old cap  ${r.gate}  ${r.ms} ms exit ${r.code}`);
     }
-    if (process.argv.includes("--write")) {
+    if (cli.flags.has("--write")) {
         const stamp = new Date().toISOString();
         const { merged: mergedTimings, priorMs } = mergeTimings(file, rows, stamp, capMs);
         const target = timingsTarget(file);
