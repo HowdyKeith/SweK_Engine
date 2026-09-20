@@ -2157,7 +2157,8 @@
   "tools/ship/murmurSpecies9-selfcheck.mjs": 1940,
   "tools/ship/colliderFromGLB-selfcheck.mjs": 68,
   "tools/ship/capsuleSettle-selfcheck.mjs": 55,
-  "tools/ship/adapterRecord-selfcheck.mjs": 57
+  "tools/ship/adapterRecord-selfcheck.mjs": 57,
+  "tools/ship/dxcResolve-selfcheck.mjs": 47
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -3916,7 +3917,8 @@
   "tools/ship/murmurSpecies9-selfcheck.mjs": 0,
   "tools/ship/colliderFromGLB-selfcheck.mjs": 0,
   "tools/ship/capsuleSettle-selfcheck.mjs": 0,
-  "tools/ship/adapterRecord-selfcheck.mjs": 0
+  "tools/ship/adapterRecord-selfcheck.mjs": 0,
+  "tools/ship/dxcResolve-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-17T16:44:13.404Z",
@@ -5675,7 +5677,8 @@
   "tools/ship/murmurSpecies9-selfcheck.mjs": "2026-09-17T16:44:13.404Z",
   "tools/ship/colliderFromGLB-selfcheck.mjs": "2026-09-18T15:21:26.414Z",
   "tools/ship/capsuleSettle-selfcheck.mjs": "2026-09-18T15:30:32.992Z",
-  "tools/ship/adapterRecord-selfcheck.mjs": "2026-09-18T15:52:36.969Z"
+  "tools/ship/adapterRecord-selfcheck.mjs": "2026-09-18T15:52:36.969Z",
+  "tools/ship/dxcResolve-selfcheck.mjs": "2026-09-20T12:00:30.840Z"
  },
  "capAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 20000,
@@ -7132,7 +7135,8 @@
   "tools/ship/murmurSpecies9-selfcheck.mjs": 20000,
   "tools/ship/colliderFromGLB-selfcheck.mjs": 20000,
   "tools/ship/capsuleSettle-selfcheck.mjs": 20000,
-  "tools/ship/adapterRecord-selfcheck.mjs": 20000
+  "tools/ship/adapterRecord-selfcheck.mjs": 20000,
+  "tools/ship/dxcResolve-selfcheck.mjs": 20000
  },
  "finished": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": true,
@@ -8782,7 +8786,8 @@
   "tools/ship/murmurSpecies9-selfcheck.mjs": true,
   "tools/ship/colliderFromGLB-selfcheck.mjs": true,
   "tools/ship/capsuleSettle-selfcheck.mjs": true,
-  "tools/ship/adapterRecord-selfcheck.mjs": true
+  "tools/ship/adapterRecord-selfcheck.mjs": true,
+  "tools/ship/dxcResolve-selfcheck.mjs": true
  },
  "crossings": {
   "tools/ship/engineSceneBot-selfcheck.mjs": 2,
@@ -10358,7 +10363,8 @@
   "tools/ship/murmurSpecies9-selfcheck.mjs": 1940,
   "tools/ship/colliderFromGLB-selfcheck.mjs": 68,
   "tools/ship/capsuleSettle-selfcheck.mjs": 55,
-  "tools/ship/adapterRecord-selfcheck.mjs": 57
+  "tools/ship/adapterRecord-selfcheck.mjs": 57,
+  "tools/ship/dxcResolve-selfcheck.mjs": 47
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-16T22:48:41.155Z",
@@ -11894,7 +11900,8 @@
   "tools/ship/murmurSpecies9-selfcheck.mjs": "2026-09-17T16:43:57.997Z",
   "tools/ship/colliderFromGLB-selfcheck.mjs": "2026-09-18T15:21:26.414Z",
   "tools/ship/capsuleSettle-selfcheck.mjs": "2026-09-18T15:30:32.992Z",
-  "tools/ship/adapterRecord-selfcheck.mjs": "2026-09-18T15:52:36.969Z"
+  "tools/ship/adapterRecord-selfcheck.mjs": "2026-09-18T15:52:36.969Z",
+  "tools/ship/dxcResolve-selfcheck.mjs": "2026-09-20T12:00:30.840Z"
  },
  "contended": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": true,
@@ -13430,7 +13437,8 @@
   "tools/ship/murmurSpecies9-selfcheck.mjs": false,
   "tools/ship/colliderFromGLB-selfcheck.mjs": false,
   "tools/ship/capsuleSettle-selfcheck.mjs": false,
-  "tools/ship/adapterRecord-selfcheck.mjs": false
+  "tools/ship/adapterRecord-selfcheck.mjs": false,
+  "tools/ship/dxcResolve-selfcheck.mjs": false
  },
  "kinds": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "loaded",
@@ -15189,6 +15197,7 @@
   "tools/ship/murmurSpecies9-selfcheck.mjs": "alone",
   "tools/ship/colliderFromGLB-selfcheck.mjs": "alone",
   "tools/ship/capsuleSettle-selfcheck.mjs": "alone",
-  "tools/ship/adapterRecord-selfcheck.mjs": "alone"
+  "tools/ship/adapterRecord-selfcheck.mjs": "alone",
+  "tools/ship/dxcResolve-selfcheck.mjs": "alone"
  }
 }

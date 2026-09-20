@@ -217,5 +217,67 @@ const RESOLVED = resolveHeadlessShell();
  * caller passes it to browserSkipReason first, which refuses on "" -- so an empty value can never reach a
  * launch.
  */
+// *** v4646 -- DAWN'S D3D12 BACKEND NEEDS dxil.dll AND THE HEADLESS SHELL BUNDLE DOES NOT SHIP IT. ***
+//
+// Measured on Keith's Windows rig at v4645: chrome-headless-shell-win64 carries NO dx*.dll, while the full
+// chrome-win64 bundle of the SAME Chrome for Testing build (153.0.8010.12) carries dxcompiler.dll and
+// dxil.dll. resolveHeadlessShell sorts the shell ahead of the full browser -- deliberately, see v4486 above,
+// because 96 gates were calibrated against the shell -- so HEADLESS_SHELL lands on the bundle without them
+// and every browser-side requestDevice dies with "DynamicLib.Open: dxil.dll Windows Error: 87". About a
+// hundred gates inherited that in one sweep.
+//
+// *** NOTHING IS COPIED, AND THAT IS THE POINT. *** Copying the two DLLs into the shell's directory works and
+// was proven to (headlessGpu-selfcheck went 3 FAIL to ALL GREEN that way) -- and then it did not travel: the
+// next run was under a different Windows user, a different %LOCALAPPDATA%, and the fault was back verbatim.
+// A per-machine file copy outside the repo is a fix that has to be re-done by hand on every box and is wiped
+// by the next `playwright install`.
+//
+// Dawn calls DynamicLib::Open("dxil.dll") with a BARE NAME, and on Windows LoadLibrary resolves a bare name
+// against the child process's PATH. So the browser is launched with the DXC-carrying directory prepended to
+// its PATH and finds the compiler where it already sits. No file moves, and the 96 gates still launch the
+// same binary they were calibrated against.
+export const DXC_LEAVES = Object.freeze([
+    path.join("chrome-win64", "dxil.dll"),
+    path.join("chrome-win", "dxil.dll"),
+    path.join("chrome-headless-shell-win64", "dxil.dll"),
+]);
+
+/** The directory holding dxil.dll, found the same way the shell is: every root, every build, newest first. */
+export function resolveDxcDir({ env = process.env, home = os.homedir(), exists = fs.existsSync,
+                               readdir = fs.readdirSync } = {}) {
+    const tried = [];
+    for (const root of shellRoots(env, home)) {
+        let dirs = [];
+        try { dirs = readdir(root).filter((d) => SHELL_DIR.test(d)); } catch { continue; }
+        dirs.sort((a, b) => (parseInt(b.split("-").pop(), 10) || 0) - (parseInt(a.split("-").pop(), 10) || 0));
+        for (const d of dirs) for (const leaf of DXC_LEAVES) {
+            const q = path.join(root, d, leaf);
+            tried.push(q);
+            if (exists(q)) return { dir: path.dirname(q), from: q, tried };
+        }
+    }
+    return { dir: "", from: "", tried };
+}
+
+/**
+ * The env a browser launch should carry, or undefined when it should carry the ordinary one.
+ *
+ * DECIDABLE FROM THE FILESYSTEM, not from a platform name alone: the PATH is extended only when this really
+ * is a platform whose Dawn backend loads DXC, the chosen binary really does NOT have dxil.dll beside it, and
+ * some other bundle really does. Any of those failing returns undefined and nothing changes -- so a box that
+ * already works keeps working, and a box with no DXC anywhere gets the same honest failure it had before
+ * rather than a PATH full of nothing.
+ */
+export function launchEnv({ platform = process.platform, env = process.env, shell = undefined,
+                            exists = fs.existsSync, ...rest } = {}) {
+    if (platform !== "win32") return undefined;
+    const bin = shell === undefined ? HEADLESS_SHELL : shell;
+    if (!bin) return undefined;
+    if (exists(path.join(path.dirname(bin), "dxil.dll"))) return undefined;   // already beside the binary
+    const { dir } = resolveDxcDir({ env, exists, ...rest });
+    if (!dir) return undefined;
+    return { ...env, PATH: dir + path.delimiter + (env.PATH || "") };
+}
+
 export const HEADLESS_SHELL = RESOLVED.shell;
 export const HEADLESS_SHELL_TRIED = Object.freeze(RESOLVED.tried);

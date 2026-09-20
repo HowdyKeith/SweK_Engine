@@ -45,6 +45,10 @@ import { storageWords, LIVENESS_SENTINEL } from "./headlessGpu.mjs";   // v4457 
 // the software-adapter names live in ONE place -- rewriting the regex here would be a second copy of a
 // list that ui/localModelProbe.js already owns and tools/ship/localModelProbe-selfcheck.mjs already gates
 import { SOFTWARE_HINTS } from "../../ui/localModelProbe.js";
+// v4646 -- the DXC directory on the child's PATH, so Dawn's D3D12 backend can load dxil.dll on a box
+// whose headless-shell bundle does not ship it. undefined everywhere else, so nothing else changes.
+import { launchEnv } from "./playwrightResolve.mjs";
+const LAUNCH_ENV = launchEnv();
 
 // *** WINDOWS NEEDS A SECOND FLAG, MEASURED ON KEITH'S RIG, NOT GUESSED. *** --enable-unsafe-webgpu alone is
 // sufficient on Linux (this file's own header measurement) but on win32 headless_shell requestAdapter() came
@@ -144,7 +148,7 @@ export async function runWgslCompute({ code, entryPoint = "main", outCount, unif
 
     let browser = null;
     try {
-        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...LAUNCH_ARGS] });
+        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...LAUNCH_ARGS], env: LAUNCH_ENV });
         const page = await browser.newPage();
         await page.goto(url);
         const out = await page.evaluate(async (a) => {
@@ -270,7 +274,7 @@ export async function renderWgslToPixels({ code, width = 64, height = 64, srcSiz
     await new Promise((r) => srv.listen(0, SECURE_HOST, r));
     let browser = null;
     try {
-        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...LAUNCH_ARGS] });
+        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...LAUNCH_ARGS], env: LAUNCH_ENV });
         const page = await browser.newPage();
         await page.goto(`http://${SECURE_HOST}:${srv.address().port}/`);
         const out = await page.evaluate(async (a) => {
@@ -397,7 +401,7 @@ export async function renderGlslToPixels({ vertex, fragment, width = 64, height 
 
     let browser = null;
     try {
-        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"], env: LAUNCH_ENV });
         const page = await browser.newPage();
         const out = await page.evaluate(async (a) => {
             const c = document.createElement("canvas"); c.width = a.width; c.height = a.height;
@@ -565,7 +569,7 @@ export async function renderThreePassToPixels({ engineRoot, passModule, passFact
 
     let browser = null;
     try {
-        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"], env: LAUNCH_ENV });
         const page = await browser.newPage();
         const pageErrors = [];
         page.on("pageerror", (e) => pageErrors.push(String(e).slice(0, 200)));
@@ -660,7 +664,7 @@ export async function runWgslComputeToTexture({ code, entryPoint = "main", n = 6
 
     let browser = null;
     try {
-        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...LAUNCH_ARGS] });
+        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...LAUNCH_ARGS], env: LAUNCH_ENV });
         const page = await browser.newPage();
         page.setDefaultTimeout(timeoutMs);
         await page.goto(url);
@@ -788,7 +792,7 @@ export async function runInEngineOrigin({ engineRoot, script, args = null, timeo
     await new Promise((r) => srv.listen(0, SECURE_HOST, r));
     let browser = null;
     try {
-        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...LAUNCH_ARGS] });
+        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...LAUNCH_ARGS], env: LAUNCH_ENV });
         const page = await browser.newPage();
         const pageErrors = [];
         page.on("pageerror", (e) => pageErrors.push(String(e).slice(0, 300)));
