@@ -85,13 +85,70 @@ export const SIG = Object.freeze({ nameFirst: "nameFirst", condFirst: "condFirst
  * parameter called `c` proves nothing -- what settles it is whether the first parameter is the one branched on.
  */
 export function signatureOf(src) {
-    const m = src.match(/^[ \t]*(?:const|let)\s+ok\s*=\s*(?:async\s*)?\(\s*([A-Za-z_$][\w$]*)\s*,\s*([A-Za-z_$][\w$]*)/m);
+    // *** v4647e -- THE `function ok(...)` FORM WAS NEVER RECOGNISED, AND IT IS NOT RARE. *** This matched
+    // only `const|let ok = (a, b`, so ev/esFlight3dMath-selfcheck.mjs -- which writes
+    // `function ok(cond, msg) { ... }` and is perfectly ordinary condition-first code -- classified as
+    // UNKNOWN. Harmless while the only shapes needed a string literal first; the moment boolAsName arrived it
+    // meant every correct call in such a file was scanned under the WRONG ORDER and reported as a swap. Found
+    // by the gate on the first live run of the new shape, which is what the gate is for.
+    const m = src.match(/^[ \t]*(?:const|let)\s+ok\s*=\s*(?:async\s*)?\(\s*([A-Za-z_$][\w$]*)\s*,\s*([A-Za-z_$][\w$]*)/m)
+           || src.match(/^[ \t]*(?:async\s+)?function\s+ok\s*\(\s*([A-Za-z_$][\w$]*)\s*,\s*([A-Za-z_$][\w$]*)/m);
     if (!m) return /^import\s*\{[^}]*\bok\b[^}]*\}\s*from/m.test(src) ? SIG.unknown
          : /\bok\s*\(/.test(src) ? SIG.unknown : SIG.none;
     const body = src.slice(src.indexOf(m[0]), src.indexOf(m[0]) + 300);
     const firstIsCond = new RegExp(`(if\\s*\\(\\s*!?${m[1]}\\b)|(\\b${m[1]}\\s*\\?)`).test(body);
     const secondIsCond = new RegExp(`(if\\s*\\(\\s*!?${m[2]}\\b)|(\\b${m[2]}\\s*\\?)`).test(body);
     return firstIsCond ? SIG.condFirst : secondIsCond ? SIG.nameFirst : SIG.unknown;
+}
+
+/**
+ * String and template BODIES replaced by filler of the same length, so offsets are preserved and nothing
+ * inside a literal can be mistaken for code. Quotes are kept, which is what lets looksLikeCondition go on
+ * recognising "this argument is a name" by its opening character.
+ */
+export function maskStrings(src) {
+    let out = "", i = 0;
+    while (i < src.length) {
+        const ch = src[i];
+        if (ch === '"' || ch === "'" || ch === "`") {
+            const q = ch; out += q; i++;
+            let body = "";
+            while (i < src.length && src[i] !== q) {
+                if (src[i] === "\\") { body += "xx"; i += 2; continue; }
+                body += src[i] === "\n" ? "\n" : "x";     // newlines kept so line offsets survive
+                i++;
+            }
+            out += body;
+            if (i < src.length) { out += q; i++; }
+            continue;
+        }
+        // *** AND REGEX LITERALS, BECAUSE ONE OF THEM BROKE THE BALANCER ON THE FIRST REAL TEST. ***
+        // ok(!/scaled\(/.test(q), "name") was MISSED: the `\(` inside the pattern counted as an open paren,
+        // so firstArgOf never found the top-level comma. Two of my own three swaps were caught and this was
+        // the third. A `/` starting a literal is told from division by what precedes it -- after an operator
+        // or an opening bracket a regex can start and a division cannot.
+        if (ch === "/" && /[([{,;=!&|?:+\-*%~^<>]|^$/.test(prevSignificant(out))) {
+            out += "/"; i++;
+            let body = "", inClass = false;
+            while (i < src.length && (inClass || src[i] !== "/")) {
+                if (src[i] === "\\") { body += "xx"; i += 2; continue; }
+                if (src[i] === "[") inClass = true; else if (src[i] === "]") inClass = false;
+                if (src[i] === "\n") break;                 // an unterminated literal is not one
+                body += "x"; i++;
+            }
+            out += body;
+            if (i < src.length && src[i] === "/") { out += "/"; i++; }
+            continue;
+        }
+        out += ch; i++;
+    }
+    return out;
+}
+
+/** The last non-whitespace character emitted so far, or "" -- what tells a regex literal from a division. */
+function prevSignificant(out) {
+    for (let k = out.length - 1; k >= 0; k--) if (!/\s/.test(out[k])) return out[k];
+    return "";
 }
 
 const stripComments = (s) => s
@@ -103,7 +160,50 @@ export const SHAPE = Object.freeze({
     arrowNotInvoked: "arrowNotInvoked",     // ok(msg, () => ...)          -- a function object, always truthy
     asyncIife: "asyncIife",                 // ok(msg, async () => {...}()) -- a promise, always truthy
     stringAsCondition: "stringAsCondition", // ok("msg", cond) under condFirst -- a string, always truthy
+    // *** v4647e -- THE MIRROR, WHICH WAS MISSING FOR THE 1,629 FILES THAT ARE nameFirst. ***
+    // stringAsCondition catches the swap under condFirst -- 91 files. Under nameFirst, suspectCalls only ever
+    // looked for the two ARROW shapes and ASSUMED the first argument was a name; a call written
+    // ok(cond, "name") sailed through, printing "PASS true" forever. The census read suspects: 0 while THREE
+    // shipped in one session, all in nameFirst files, all mine. The detector covered the smaller population
+    // by a factor of eighteen and its zero was read as an all-clear.
+    boolAsName: "boolAsName",               // ok(cond, "msg") under nameFirst -- the name slot holds a boolean
 });
+
+/**
+ * The first argument of a call, by BALANCING to the top-level comma rather than by a regex guess -- the same
+ * discipline the arrow walk below uses and for the same reason: layout must not decide a verdict.
+ * Returns null when the call does not close.
+ */
+export function firstArgOf(code, openParenIndex) {
+    let depth = 0, i = openParenIndex;
+    const start = openParenIndex + 1;
+    for (; i < code.length; i++) {
+        const ch = code[i];
+        if (ch === "\"" || ch === "'" || ch === "`") {          // skip a string whole
+            const q = ch; i++;
+            while (i < code.length && code[i] !== q) { if (code[i] === "\\") i++; i++; }
+            continue;
+        }
+        if (ch === "(" || ch === "[" || ch === "{") depth++;
+        else if (ch === ")" || ch === "]" || ch === "}") { if (--depth === 0) return code.slice(start, i); }
+        else if (ch === "," && depth === 1) return code.slice(start, i);
+    }
+    return null;
+}
+
+/** Does this argument text look like a CONDITION rather than a name? Conservative on purpose: a name in this
+ *  tree is a string or template literal, sometimes concatenated, and never a comparison. */
+export function looksLikeCondition(arg) {
+    const t = String(arg || "").trim();
+    if (!t) return false;
+    if (/^["'`]/.test(t)) return false;                       // a literal name, concatenated or not
+    // *** A NAME CAN BE BUILT, AND THE TREE BUILDS ONE. *** glbConformance-selfcheck writes
+    // ok((code.startsWith(...) ? "!! " : "   ") + code + " -- " + what, hit, ...) -- a ternary CHOOSING A
+    // PREFIX, concatenated into a name. It was the only survivor of the first tree-wide run and it is not a
+    // defect. Anything joined to a string literal is a name being assembled, whatever decided its parts.
+    if (/\+\s*["'`]|["'`]\s*\+/.test(t)) return false;
+    return /===|!==|==|!=|<=|>=|&&|\|\||\.test\(|\.includes\(|\.every\(|\.some\(|^!/.test(t);
+}
 
 /**
  * Call sites where a non-boolean provably reaches the condition slot. `src` is passed in rather than read, so
@@ -117,6 +217,29 @@ export function suspectCalls(src, signature = SIG.nameFirst) {
         let m;
         while ((m = re.exec(code))) found.push({ shape: SHAPE.stringAsCondition, at: m.index, text: m[0].replace(/\s+/g, " ") });
         return found;
+    }
+    // *** THE MIRROR OF stringAsCondition, FOR THE 1,629 nameFirst FILES. *** Everything below assumes the
+    // first argument is a string literal, because the regex requires one -- so a call written the other way
+    // round was never examined at all. Balanced rather than pattern-matched, and conservative: a name here is
+    // a string or template literal, never a comparison.
+    // *** MASKED FIRST, BECAUSE THE FIRST RUN OVER THE TREE FOUND SIX AND FOUR WERE TEXT IN A STRING. ***
+    // gateQuality-selfcheck PINS example calls as data -- pinned("ok(\\"five knobs...\\", ... === 5)") -- and a
+    // scan that reads source as one flat string counts those as calls. Same species as a census matching its
+    // own prose, which this tree has now met three rounds running. String bodies are replaced with filler of
+    // the SAME LENGTH so every offset below still points at the real source.
+    // *** AND IT DOES NOT RUN ON AN UNKNOWN SIGNATURE, WHICH IS THE WHOLE SAFETY. *** This shape is entirely
+    // a claim about WHICH SLOT the condition is in. A file whose order could not be read is one where that
+    // claim cannot be made, and guessing nameFirst there turns every correct condition-first call into a
+    // reported swap -- a flood, in a detector running over sixteen hundred files. The arrow shapes below are
+    // safe under a guess because they require a string literal first; this one is not.
+    const masked = signature === SIG.nameFirst ? maskStrings(code) : "";
+    for (const m0 of masked.matchAll(/\bok\(/g)) {
+        const open = m0.index + m0[0].length - 1;
+        const arg = firstArgOf(masked, open);
+        if (arg !== null && looksLikeCondition(arg)) {
+            found.push({ shape: SHAPE.boolAsName, at: m0.index,
+                         text: ("ok(" + arg.replace(/\s+/g, " ")).slice(0, 80) });
+        }
     }
     // *** WHETHER THE ARROW IS INVOKED IS DECIDED BY BALANCING, NOT BY A REGEX GUESS. *** The first version
     // tested the tail against two hopeful patterns and got `}()` wrong -- it read an async IIFE as an
@@ -457,8 +580,18 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // many words -- "assertionShape census: gates 1751 vs 1756". The gates were added one round at a time,
     // each round running the gates it touched, and nothing ran the census that counts them. That is what a
     // pre-flight is for and it only helps somebody who runs it.
+    // *** v4647e -- FIVE FILES STOPPED BEING UNREADABLE, WHICH IS THE REPAIR'S WHOLE MEASURABLE EFFECT. ***
+    // signatureOf matched only `const|let ok = (a, b` and never the `function ok(a, b)` declaration, so five
+    // files carrying perfectly ordinary helpers classified as UNKNOWN. unknownSignature 16 -> 11, of which
+    // four are condFirst (91 -> 95) and one nameFirst (1629 -> 1630).
+    //
+    // IT WAS HARMLESS UNTIL THIS ROUND AND THEN IT WAS NOT. While every shape needed a string literal in the
+    // first slot, scanning an unknown file under the wrong order found nothing. boolAsName is a claim about
+    // WHICH SLOT holds the condition, so on ev/esFlight3dMath-selfcheck.mjs -- `function ok(cond, msg)`, read
+    // as nameFirst -- it reported every CORRECT call as a swap. Found by this gate on the new shape's first
+    // live run, and the shape now refuses to run at all on an unknown signature.
     gates: 1757, usesOk: 1736, definesOk: 1728, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1629, condFirst: 91, unknownSignature: 16,
+    distinctDefinitions: 41, nameFirst: 1630, condFirst: 95, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

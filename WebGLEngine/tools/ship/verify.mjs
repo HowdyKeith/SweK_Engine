@@ -583,6 +583,13 @@ if (process.env.SWEK_QUICKSWEEP !== "0") {
     // is STARVED, and which gates starve is a fact about the runner that only this line can carry off the box.
     // Worst ratio first: parallel time over serial time is how much the other workers cost that gate, and a
     // ratio near 1 is a gate that was never slowed at all.
+    // *** WHOSE LIST THIS WAS. *** The membership comes from a record owned by one box; a second machine runs
+    // that list and finds part of it over budget locally. Saying so is the difference between "the sweep is
+    // green" meaning the same thing on two machines and meaning two different things in silence.
+    if (r.foreignTimings) console.log(`[verify]   NOTE: the membership list came from ${r.timingsHost}, not this ` +
+      `box (${r.box}). ${r.dropped.length} of the ${r.ran} gates it named are over the ${budgetMs} ms budget HERE, ` +
+      `which is this machine being slower rather than those gates growing. budgetMs is a total-cost threshold ` +
+      `and is deliberately not scaled per box -- a slower machine should run FEWER gates, not be given longer`);
     if (r.falseRedSplit) console.log(`[verify]   false red  ${r.falseRedSplit.capped} were KILLED AT THE CAP and ` +
       `${r.falseRedSplit.slowed} were genuinely slower -- a cap kill is the box refusing to run that many at once, ` +
       `and its parallel figure is the killer's clock rather than a runtime`);

@@ -347,6 +347,28 @@ console.log("\n*** WHOSE STOPWATCH WROTE sweep-timings.json -- v4647 ***");
                         "apart, and one of them dropping the field is exactly how v4567 turned every spawning " +
                         "gate skippable while the count looked like success");
 
+    // *** AND WHOSE MEMBERSHIP LIST A SWEEP RAN IS REPORTED, WHICH IS THE OTHER HALF OF ONE BOX OWNING THE
+    // RECORD. *** budgetMs is deliberately NOT scaled per box -- budgetIsOwn calls it a claim about the
+    // sweep's TOTAL COST, so a slower machine should run FEWER gates rather than be granted a longer budget,
+    // and scaling it would defeat the threshold. That is right. What it leaves is a second machine running
+    // the FIRST machine's list: Keith's gen-9 sweep found 219 of 1,306 of them over budget there, 17%,
+    // against a handful here. Reported rather than corrected -- a foreign box has nowhere to write a
+    // corrected membership, and inventing one per box would make "the sweep is green" mean two different
+    // things on two machines. It no longer means them differently in silence.
+    const vSrc = fs.readFileSync(path.join(ROOT, "tools", "ship", "verify.mjs"), "utf8");
+    ok("!! *** verify SAYS SO when the membership list came from another box, and names how many are over budget HERE ***",
+       /r\.foreignTimings/.test(vSrc) && /the membership list came from/.test(vSrc),
+       "a sweep that runs one machine's list on another and reports only a verdict is two claims wearing one word");
+    const qSrc = fs.readFileSync(path.join(ROOT, "tools", "ship", "quickSweep.mjs"), "utf8");
+    ok("  ...and 'foreign' is decided by the record's own host against this box, not by a flag somebody passes",
+       /foreignTimings = !!timingsHost && timingsHost !== boxId\(\)/.test(qSrc),
+       "the same boxId the record is stamped with, so the two cannot disagree about which machine this is");
+    ok("!! CONTROL: the sweep does NOT scale its budget per box, and that is deliberate",
+       !/scaled\(/.test(qSrc),
+       "hostScale's scaled() grows a per-gate TIMEOUT on a slow machine, which is a different question. " +
+       "Growing a membership threshold would make the sweep take proportionally longer on the box least able " +
+       "to afford it -- the opposite of what the threshold is for");
+
     // NOT a row: `ok(..., true)` is a control that cannot fail, and the first draft of this block had one
     // here -- which is the exact thing ringFloorCost-selfcheck's section 4 says in so many words. A limit is
     // reported; it is not asserted.

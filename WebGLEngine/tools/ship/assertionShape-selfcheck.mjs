@@ -108,6 +108,57 @@ console.log("\n2. the three shapes, each demonstrated before the tree is reporte
         "78 gates in this tree take the condition first; a line pasted from the other 1,403 always passes");
 }
 {
+    // *** THE MIRROR, WHICH WAS MISSING FOR 1,637 FILES AGAINST 91 -- v4647e. ***
+    // The row above catches the swap under condFirst. Under nameFirst, suspectCalls only ever looked for the
+    // two ARROW shapes and ASSUMED the first argument was a name, so ok(cond, "name") printed "PASS true"
+    // forever. The census read suspects: 0 while THREE shipped in one session, all in nameFirst files, all
+    // mine -- the detector covered the smaller population by a factor of eighteen and its zero was read as an
+    // all-clear.
+    const swaps = [
+        ['a regex .test in the name slot',            NAME_FIRST + '\nok(/a/.test(v) && /b/.test(v), "n", "d");'],
+        ['a comparison in the name slot',             NAME_FIRST + '\nok(EXPECTED === "a" && EXPECTED !== "b", "n", "d");'],
+        // *** THIS ONE WAS MISSED BY THE FIRST DRAFT AND IS WHY THE MASKER NOW KNOWS REGEX LITERALS. ***
+        // The `\(` inside the pattern counted as an open paren, so the balancer never found the top-level
+        // comma. Two of the three real swaps were caught and this was the third.
+        ['a regex literal CONTAINING a paren',        NAME_FIRST + '\nok(!/scaled\\(/.test(q), "n", "d");'],
+    ];
+    for (const [label, src] of swaps) {
+        const f = suspectCalls(src, SIG.nameFirst);
+        ok("!! *** " + label + " is caught under nameFirst ***",
+            f.length === 1 && f[0].shape === SHAPE.boolAsName,
+            f.length ? f[0].text.slice(0, 70) : "NOT FOUND -- this is the shape that prints PASS true forever");
+    }
+    // The controls matter more than the catches here: this shape runs over 1,637 files, and a false positive
+    // in a detector nobody can silence is worse than the hole it closed.
+    const legit = [
+        ['a correct row',                             NAME_FIRST + '\nok("a correct row", x === 1, "d");'],
+        // glbConformance-selfcheck really writes this: a ternary CHOOSING A PREFIX, concatenated into a name.
+        // It was the only survivor of the first tree-wide run and it is not a defect.
+        ['a name BUILT by a ternary and concatenation', NAME_FIRST + '\nok((f ? "!! " : "  ") + code + " -- " + what, hit, "d");'],
+        ['a division, which is not a regex',          NAME_FIRST + '\nok("n", a / b > 2, "d");'],
+        // gateQuality-selfcheck PINS example calls as data. Four of the first run's six hits were this.
+        ['an example call quoted as DATA',            NAME_FIRST + '\npinned("ok(\\"five knobs\\", Object.keys(K).length === 5)");'],
+    ];
+    // *** AND THE UNKNOWN-SIGNATURE GUARD IS DRIVEN, BECAUSE THE TREE NO LONGER EXERCISES IT. ***
+    // Before signatureOf learned the `function ok(a, b)` form, ev/esFlight3dMath-selfcheck.mjs was UNKNOWN
+    // and this shape reported every correct call in it as a swap. Fixing signatureOf removed the only live
+    // example -- so removing the guard now goes 0 RED against the tree, and the property is a fixture.
+    const UNREADABLE = 'const helper = makeOk();\nok(a === 1, "n");\nok(b !== 2, "n");';
+    ok("!! *** an UNKNOWN signature yields NO suspects: a shape about WHICH SLOT cannot run without the order ***",
+        signatureOf(UNREADABLE) === SIG.unknown && suspectCalls(UNREADABLE, SIG.unknown).length === 0,
+        "guessing nameFirst there turns every correct condition-first call into a reported swap -- a flood, " +
+        "in a detector running over sixteen hundred files");
+    ok("  ...and the SAME source under a known condFirst order is still clean, so the guard is not hiding a catch",
+        suspectCalls(UNREADABLE, SIG.condFirst).length === 0,
+        "the calls are correct; it is only the ORDER that was unreadable");
+
+    for (const [label, src] of legit) {
+        ok("  CONTROL: " + label + " is NOT flagged",
+            suspectCalls(src, SIG.nameFirst).length === 0,
+            "a detector over 1,637 files earns its keep by what it leaves alone");
+    }
+}
+{
     const good = [
         OK + '("a real check", 1 === 1);',
         OK + '("an invoked IIFE, which is the CORRECT idiom", (() => { return 1 === 1; })());',

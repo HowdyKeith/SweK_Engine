@@ -657,8 +657,22 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
     }
     backfillStamps(timings, at);
     const dropped = sel.run.filter((g) => (prior.timings || {})[g] != null && timings[g] > budgetMs);
+    // *** v4647e -- WHOSE MEMBERSHIP LIST DID THIS SWEEP JUST RUN? *** budgetMs is a MEMBERSHIP THRESHOLD and
+    // is deliberately NOT scaled per box (see budgetIsOwn: it is a claim about the sweep's TOTAL COST, so a
+    // slower machine should include FEWER gates, not be granted a longer budget). That is right, and it has a
+    // consequence nobody was stating: the membership comes from sweep-timings.json, which since v4647 belongs
+    // to ONE box -- so a second machine runs the first machine's list and then discovers how much of it is
+    // over budget there. Keith's gen-9 run: 219 of 1,306, seventeen per cent, against a handful here.
+    //
+    // Reported rather than corrected. A foreign box cannot write that record (by design -- two machines'
+    // runtimes in one set of fields is whichever ran last) so it has nowhere to put a corrected membership,
+    // and inventing one per box would make two boxes' "the sweep is green" mean different things silently.
+    // What changes is that it no longer means them differently in SILENCE.
+    const timingsHost = prior.host || null;
+    const foreignTimings = !!timingsHost && timingsHost !== boxId();
     const out = {
         at: out0.at, budgetMs, workers, capMs, ms: Date.now() - t00,
+        timingsHost, foreignTimings, box: boxId(),
         enumerated: all.length, ran: sel.run.length, skippedOverBudget: sel.skipped.length, newGates: sel.unmeasured,
         // v4566: what an incremental sweep WOULD have skipped. Reported on every run, acted on only under
         // skipUnchanged, so the number earns trust in public before it is allowed to change anything.
