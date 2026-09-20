@@ -57,7 +57,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "../../tools/ship/webgpuHarness.mjs";
-import { adapterKey, verdict, describe, owedCount, compareFor, boundFrom,
+import { adapterKey, verdict, describe, owedCount, coverage, compareFor, boundFrom,
          readReadings, recordReading, mergeRecords, READINGS_PATH, SLACK } from "../../tools/ship/adapterRecord.mjs";
 import { buildWgsl, glslFnToWgsl, plantedGlsl, packParams, reduce, trigTable, ndfEmulated, dEmulated,
          MODE, FAULT, TRIG_ABS_ERR } from "./microfacetWgsl.mjs";
@@ -304,9 +304,17 @@ if (R) {
     // ASSUMED. *** The first-order model holds only while the subtraction still has something left. Once the
     // device's cos rounds to exactly 1.0 in f32, (1 - c2) is exactly ZERO, the relative error is exactly 1 by
     // arithmetic rather than by approximation, and 2/theta^2 says nothing about it. Which regime an adapter is
-    // in is READ FROM THE MEASUREMENT, not guessed: SwiftShader is in the first. If Keith's gen-9 reading of
-    // 1.000 is the collapse, it lands in the second and this row still holds -- that is the point of splitting
-    // it rather than tightening the prediction and going red on better silicon.
+    // in is READ FROM THE MEASUREMENT, not guessed: SwiftShader is in the first.
+    //
+    // *** AND THE SECOND REGIME IS NOT HYPOTHETICAL -- IT IS DERIVED FROM A COMMITTED READING. *** gen-9's
+    // adapter-readings.json entry carries oneMinusC2Min 0.5, which at the 2x slack convention is a measurement
+    // of EXACTLY 1. |devOMC - trueOMC| / trueOMC == 1 exactly requires devOMC == 0 exactly (the other root,
+    // devOMC == 2 * trueOMC, is not a value a float subtraction lands on by accident), so that adapter's cos
+    // rounds to 1.0 in f32 at its worst lane and the subtraction has nothing left. Derived from the record
+    // rather than from a terminal paste, which is the difference this whole mechanism exists to make.
+    //
+    // THIS BOX STILL CANNOT EXECUTE THAT BRANCH, and the report below says so on every run rather than letting
+    // a green gate imply both halves were taken.
     const collapsed = R.trig.devOMCAtWorst === 0;
     const amp = R.trig.cosRelAtWorst > 0 ? R.trig.worstOneMinusC2Rel / R.trig.cosRelAtWorst : Infinity;
     const pred = 2 / (R.trig.thetaAtWorst ** 2);
@@ -590,6 +598,9 @@ console.log(fails ? `\n${fails} FAILURE(S)` : "\nALL GREEN");
 // one line rather than inferred by counting brackets.
 if (R) {
     const c = owedCount(VERDICTS);
+    const cov = coverage(RECORD);
+    report(`the record now covers ${cov.count} adapter(s): ${cov.keys.join(", ")} -- a register of the unmeasured ` +
+           `is only worth keeping if the number moves, and this one moved when a box that was not this one ran --record.`);
     report(c.owed === 0
         ? `adapter ${AKEY}: all ${c.of} magnitude readings HELD against the record on file.`
         : `adapter ${AKEY}: ${c.owed} of ${c.of} magnitude readings are OWED -- this adapter has no reading on ` +
