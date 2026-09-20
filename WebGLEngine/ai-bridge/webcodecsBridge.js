@@ -87,10 +87,13 @@
 // is a real cost, not a footnote.
 //
 // *** WHAT THIS FILE DOES NOT DO. *** No wiring into exportBridge.js or server.js -- this is a
-// standalone spike, exactly as scoped. encodeH264Spike() below is the ONE minimal real exercise of the
-// pipe (synthesize a few frames -> encode -> mux -> hand back the bytes plus independently-derived
-// facts about them), not a replacement for transcodeToMp4/framesToMp4.
+// standalone spike, exactly as scoped. encodeH264Spike() below is a minimal real exercise of the pipe
+// (synthesize a few frames -> encode -> mux -> hand back the bytes plus independently-derived facts
+// about them) -- see "SPIKE #2" further down for a second, more realistic exercise against real files
+// on disk -- neither is a replacement for transcodeToMp4/framesToMp4.
 "use strict";
+const fs = require("fs");
+const path = require("path");
 
 // *** ADVERSARIAL-REVIEW FIX (same session, this task's own review pass). *** The file header above
 // claimed the licensing finding was surfaced "the same way sharpBridge.js surfaces apple/ml-sharp's
@@ -309,4 +312,425 @@ async function encodeH264Spike(width, height, frameCount) {
     };
 }
 
-module.exports = { status, encodeH264Spike, _verifyMp4, LICENCE };
+// =====================================================================================================
+// *** SPIKE #2, SAME FILE, SAME "SPIKE, NOT A FEATURE" DISCIPLINE AS THE FILE HEADER ABOVE. ***
+//
+// encodeH264Spike() above only ever exercised the encode+mux pipe on toy, in-memory, non-file-based
+// frames (synthetic solid-color bars, constructed directly as Uint8Array RGBA, never touching a disk).
+// That proves the encoder/muxer works; it does NOT prove this package could serve exportBridge.js's real
+// production consumer shape -- see exportBridge.js's real framesToMp4(pattern, mp4Path, opts) around
+// line 143: an ffmpeg-style printf pattern (e.g. "frame-%05d.png"), a directory of real numbered PNG
+// files written by a real Playwright capture (tools/export/captureLive.mjs / captureHeadless.mjs, not
+// runnable in this sandbox), optionally an audio track, shelled out to an external ffmpeg CLI binary.
+//
+// What follows is deliberately scoped to prove the ENCODE side of that exact shape against REAL files:
+// a printf-pattern expander that reads real numbered files off disk in order (_expandFrameSequence),
+// encodeFramesDirToMp4(dir, pattern, opts) that decodes each REAL PNG file's bytes back into raw pixels
+// (via @napi-rs/canvas's own loadImage()+getImageData() -- never assuming the frames are already RGBA in
+// memory) and feeds them through the identical VideoEncoder/Mp4Muxer pipe encodeH264Spike already proved,
+// plus _renderAnimatedSequenceToDisk() -- a small TEST-FIXTURE generator (not the deliverable) that
+// produces a genuinely-animated (moving/growing circle, real per-frame 2D drawing operations) sequence of
+// real PNG files, because this sandbox has no Playwright/browser capture available to produce real game
+// footage. This is a real demonstration of this session's two spiked native modules working together
+// (canvas renders real frames -> webcodecs encodes them) -- worth noting, but the deliverable being
+// proven here is the ENCODE side reading real files, not the rendering side.
+//
+// *** DOES NOT TOUCH exportBridge.js, server.js, OR ANY HTTP ROUTE. *** No wiring, exactly as scoped.
+// encodeH264Spike, _verifyMp4, _walkBoxes, status(), and LICENCE above are all UNCHANGED -- everything
+// below is purely additive.
+//
+// *** AUDIO IS EXPLICITLY OUT OF SCOPE. *** exportBridge.js's real framesToMp4() can optionally mux an
+// audio track; @napi-rs/webcodecs' AudioEncoder has never been touched anywhere in this session, and
+// bolting it on here unproven would misrepresent what was actually verified. encodeFramesDirToMp4()
+// below rejects an `opts.audio` argument outright rather than silently ignoring it.
+// =====================================================================================================
+
+// Separate lazily-required, memoized @napi-rs/canvas singleton -- NOT a reuse of canvasBridge.js's
+// internal `_canvasMod` (that variable is module-private to canvasBridge.js and canvasBridge.js is
+// read-only scope for this task, exporting no decode primitive besides its own renderPngSpike()/status()
+// -- there is nothing there to import). Required directly here, same lazy/try-catch/memoize discipline
+// as canvasBridge.js's own _canvas() and this file's own _webcodecs() above.
+let _frameCanvasMod; // undefined = not yet tried, false = unavailable, module object = ready
+function _frameCanvas() {
+    if (_frameCanvasMod !== undefined) return _frameCanvasMod;
+    try { _frameCanvasMod = require("@napi-rs/canvas"); }
+    catch { _frameCanvasMod = false; /* optional dep missing, or no prebuilt binary for this platform/arch/libc */ }
+    return _frameCanvasMod;
+}
+
+/**
+ * Parse an ffmpeg-style printf frame pattern into its zero-padding pieces. Deliberately NOT a general
+ * printf parser -- this task asked for just enough to handle the "%0Nd" form exportBridge.js's own
+ * pattern strings actually use (e.g. "frame-%05d.png"); anything else (bare %d, %5d with no leading
+ * zero, multiple specifiers, etc.) degrades to {ok:false} rather than being guessed at.
+ */
+function _parseFramePattern(pattern) {
+    if (typeof pattern !== "string" || !pattern) return { ok: false, error: "pattern must be a non-empty string" };
+    const m = /^(.*)%0(\d{1,2})d(.*)$/.exec(pattern);
+    if (!m) return { ok: false, error: "pattern must be an ffmpeg-style zero-padded printf pattern, e.g. \"frame-%05d.png\" (only the %0Nd form is supported, matching exportBridge.js's own real pattern strings) -- got: " + JSON.stringify(pattern) };
+    const width = +m[2];
+    if (!(width >= 1 && width <= 12)) return { ok: false, error: "pattern's zero-padding width must be between 1 and 12 -- got %0" + m[2] + "d" };
+    return { ok: true, prefix: m[1], width, suffix: m[3] };
+}
+function _frameFileName(parsed, index) { return parsed.prefix + String(index).padStart(parsed.width, "0") + parsed.suffix; }
+
+/**
+ * Expand `pattern` against REAL files in `dir`, in index order -- reads each candidate filename's stat
+ * off disk, never trusting a directory listing's own ordering or presuming file content. Two modes: an
+ * explicit opts.frameCount reads exactly that many consecutive indices and hard-fails naming the first
+ * missing one (the caller asked for a specific count, so a gap is not tolerated); otherwise this
+ * auto-discovers by reading consecutive indices until the first missing file, mirroring how ffmpeg's own
+ * -i pattern reading works (it does not glob the directory either -- it just keeps incrementing until a
+ * read fails).
+ *
+ * *** WHY opts.startIndex DEFAULTS TO 0, NOT 1. *** This task's own background note asserted the default
+ * should be 1, "matching ffmpeg's own default -i pattern convention". That claim was checked against
+ * THIS repo's actual real production capture code before being taken on faith -- tools/export/
+ * captureHeadless.mjs line 18-21 and captureLive.mjs line 15 BOTH write their first frame as index 0
+ * (`for (let i = 0; i < frames; i++) ... "frame-" + String(i).padStart(5, "0")` -- frame-00000.png is
+ * the first file on disk, not frame-00001.png), which is also ffmpeg's own actual default start_number
+ * (0, for both the image2 muxer and demuxer) -- exportBridge.js's framesToMp4() passes the pattern to
+ * ffmpeg with no -start_number override at all, relying on that same default. So THIS file's default is
+ * 0, matching the REAL files this spike was asked to prove against, not the background note's claim of
+ * 1 -- overridable via opts.startIndex for a caller that genuinely has a 1-indexed sequence.
+ */
+function _expandFrameSequence(dir, pattern, opts = {}) {
+    // *** ADVERSARIAL-REVIEW FIX (same session, this task's own review pass). *** `opts = {}` as a
+    // default parameter only covers the argument being omitted or literally `undefined` -- an explicit
+    // `opts: null` still reached `opts.startIndex`/`opts.frameCount` below and threw uncaught. This
+    // function is exported and called directly (not only through encodeFramesDirToMp4's wrapping
+    // try/catch), so the gap was real, not just theoretical -- same fix as qrBridge.js's identical
+    // opts-null gap found and fixed earlier this session.
+    opts = opts || {};
+    const parsed = _parseFramePattern(pattern);
+    if (!parsed.ok) return parsed;
+    if (typeof dir !== "string" || !dir) return { ok: false, error: "dir must be a non-empty string" };
+
+    let dirStat;
+    try { dirStat = fs.statSync(dir); }
+    catch (e) { return { ok: false, error: "frame directory not readable: " + String(e && e.message || e) }; }
+    if (!dirStat.isDirectory()) return { ok: false, error: "not a directory: " + dir };
+
+    const startIndex = Number.isInteger(opts.startIndex) ? opts.startIndex : 0;
+    const HARD_CAP = 2000; // safety bound against a runaway/unbroken sequence -- same spirit as encodeH264Spike's frameCount clamp
+    const files = [];
+
+    const statIsFile = (p) => { try { return fs.statSync(p).isFile(); } catch { return false; } };
+
+    if (Number.isInteger(opts.frameCount) && opts.frameCount > 0) {
+        // *** ADVERSARIAL-REVIEW FIX (same session, this task's own review pass). *** This branch's own
+        // docstring says an explicit frameCount "hard-fails naming the first missing one... a gap is not
+        // tolerated" -- but silently clamping a request above HARD_CAP to HARD_CAP frames (via
+        // Math.min, with no signal in the return value) is itself a silent gap between what was asked
+        // for and what was delivered, the same class of dishonesty that guarantee exists to rule out.
+        if (opts.frameCount > HARD_CAP) return { ok: false, error: "frameCount=" + opts.frameCount + " exceeds the hard safety cap of " + HARD_CAP + " frames" };
+        const n = opts.frameCount;
+        for (let i = 0; i < n; i++) {
+            const idx = startIndex + i;
+            const fpath = path.join(dir, _frameFileName(parsed, idx));
+            if (!statIsFile(fpath)) return { ok: false, error: "explicit frameCount=" + opts.frameCount + " but frame index " + idx + " is missing: " + fpath, missingIndex: idx, missingPath: fpath, foundSoFar: files.length };
+            files.push({ index: idx, path: fpath });
+        }
+    } else {
+        for (let i = 0; i < HARD_CAP; i++) {
+            const idx = startIndex + i;
+            const fpath = path.join(dir, _frameFileName(parsed, idx));
+            if (!statIsFile(fpath)) break; // first missing index stops the sequence, mirroring ffmpeg's own -i pattern reading
+            files.push({ index: idx, path: fpath });
+        }
+        if (!files.length) return { ok: false, error: "no frames found matching pattern " + JSON.stringify(pattern) + " starting at index " + startIndex + " in " + dir };
+    }
+    return { ok: true, dir, pattern, startIndex, count: files.length, files };
+}
+
+/**
+ * TEST-FIXTURE GENERATOR, NOT THE DELIVERABLE. This sandbox has no Playwright/browser capture available
+ * (tools/export/captureLive.mjs / captureHeadless.mjs are rig-only), so real captured game footage is not
+ * obtainable here -- but encodeH264Spike's synthetic solid-color bars are not a real step up either. This
+ * renders a short, genuinely-animated sequence (a growing/moving circle -- real per-frame ctx.arc()/
+ * ctx.fill() calls with a different position/radius each frame, not a static fill) to REAL numbered PNG
+ * files on disk via @napi-rs/canvas, exactly the way canvasBridge.js's own renderPngSpike() draws
+ * (createCanvas -> getContext("2d") -> draw -> toBuffer("image/png")), so encodeFramesDirToMp4() below has
+ * real files with real per-frame visual variation to read back -- the same disk-based shape production
+ * would actually hand it, not an in-memory shortcut.
+ */
+function _renderAnimatedSequenceToDisk(dir, pattern, frameCount, width, height, opts = {}) {
+    // Same opts-null fix as _expandFrameSequence above -- see that function's comment.
+    opts = opts || {};
+    const parsed = _parseFramePattern(pattern);
+    if (!parsed.ok) return parsed;
+    const mod = _frameCanvas();
+    if (!mod) return { ok: false, error: "canvas unavailable for frame rendering: @napi-rs/canvas is not installed or has no prebuilt native binary for " + process.platform + "-" + process.arch };
+
+    const n = Math.max(1, Math.min(60, +frameCount || 8));
+    const w = Math.max(4, Math.min(512, +width || 64));
+    const h = Math.max(4, Math.min(512, +height || 64));
+    const startIndex = Number.isInteger(opts.startIndex) ? opts.startIndex : 0;
+
+    try { fs.mkdirSync(dir, { recursive: true }); }
+    catch (e) { return { ok: false, error: "could not create/access frame directory: " + String(e && e.message || e) }; }
+
+    const written = [];
+    for (let i = 0; i < n; i++) {
+        try {
+            const canvas = mod.createCanvas(w, h);
+            const ctx = canvas.getContext("2d");
+            ctx.fillStyle = "#101018";
+            ctx.fillRect(0, 0, w, h);
+            const t = n === 1 ? 0 : i / (n - 1);
+            const cx = 4 + t * (w - 8);
+            const r = 2 + t * (Math.min(w, h) / 2 - 4);
+            ctx.fillStyle = "#ffaa33";
+            ctx.beginPath();
+            ctx.arc(cx, h / 2, Math.max(1, r), 0, Math.PI * 2);
+            ctx.fill();
+            const buf = canvas.toBuffer("image/png");
+            const fpath = path.join(dir, _frameFileName(parsed, startIndex + i));
+            fs.writeFileSync(fpath, buf);
+            written.push(fpath);
+        } catch (e) {
+            return { ok: false, error: "frame " + i + " render/write failed: " + String(e && e.message || e), written };
+        }
+    }
+    return { ok: true, dir, pattern, startIndex, count: written.length, files: written };
+}
+
+/**
+ * THE DELIVERABLE. The realistic-consumer-shape sibling of encodeH264Spike(): instead of synthesizing
+ * in-memory RGBA frames, this reads a REAL numbered PNG sequence off disk (mirroring exportBridge.js's
+ * real framesToMp4(pattern, mp4Path, opts) -- see that file's header, around line 143, for the production
+ * shape this proves against), independently decodes each real PNG file's REAL bytes back into raw pixels
+ * via @napi-rs/canvas's own loadImage()+getImageData() (the same decode mechanism this session's QR
+ * gate's independent-verification step already proved -- the frames are NEVER assumed to already be RGBA
+ * in memory), and feeds those genuinely-decoded pixels into VideoFrame/VideoEncoder/Mp4Muxer exactly as
+ * encodeH264Spike already does. Returns the muxed bytes plus everything independently re-derived about
+ * them via _verifyMp4() -- same bar, not the encoder/muxer's own claims.
+ *
+ * Every fallible step below has its own try/catch, held to the exact same discipline encodeH264Spike
+ * above already uses (file-not-found, an empty directory, a pattern with no matches, and a PNG that
+ * fails to decode AT ALL all degrade to {ok:false, error:...}, never an uncaught throw or unhandled
+ * rejection) -- this is the bug class that has bitten three times this session (canvasBridge.js's
+ * _readPngHeader, this file's own _verifyMp4/_walkBoxes, qrBridge.js's data-normalization line): a
+ * hand-parsing/verification/input-normalization helper called OUTSIDE its caller's try/catch, able to
+ * throw uncaught instead of degrading honestly.
+ *
+ * *** WHAT "MALFORMED PNG" ACTUALLY COVERS HERE -- NARROWER THAN IT MIGHT SOUND. *** Only decode
+ * FAILURES are caught (garbage bytes with no valid PNG structure at all -- loadImage() itself throws).
+ * A REALISTICALLY truncated real PNG -- a valid signature and IHDR, but the compressed IDAT data cut
+ * off partway through, the shape an interrupted capture write would actually produce -- is NOT caught:
+ * @napi-rs/canvas's decoder accepts it and silently zero-fills the undecoded portion (reads back as
+ * black), with `ok:true` and nothing in the result to distinguish it from a correct frame. This is the
+ * decoder's own leniency, not something this file's error handling can intercept, and is stated plainly
+ * here rather than papered over by the broader "malformed PNG is rejected" claim this docblock used to
+ * make before this review pass checked it against a genuinely truncated (not just garbage) file.
+ */
+async function encodeFramesDirToMp4(dir, pattern, opts = {}) {
+    if (opts && opts.audio) return { ok: false, error: "audio muxing is out of scope for this spike -- @napi-rs/webcodecs' AudioEncoder has not been exercised anywhere in this session; pass no `audio` option" };
+
+    const mod = _webcodecs();
+    if (!mod) return { ok: false, error: "webcodecs unavailable: " + status().note };
+    const canvasMod = _frameCanvas();
+    if (!canvasMod) return { ok: false, error: "canvas unavailable for frame decode: @napi-rs/canvas is not installed or has no prebuilt native binary for " + process.platform + "-" + process.arch };
+
+    let seq;
+    try { seq = _expandFrameSequence(dir, pattern, opts); }
+    catch (e) { return { ok: false, error: "frame sequence expansion threw: " + String(e && e.message || e) }; }
+    if (!seq.ok) return seq;
+
+    const fps = Math.max(1, Math.min(60, +opts.fps || 10));
+    const n = seq.count;
+
+    // Decode every real PNG file's bytes back into raw pixels FIRST, independently of the encode loop
+    // below -- so a malformed/truncated PNG at frame k, or a size mismatch between frames, is caught and
+    // reported by name (including which frame index) before any encoder/muxer state exists that would
+    // need cleaning up.
+    const decoded = [];
+    let width = 0, height = 0;
+    for (const f of seq.files) {
+        let buf;
+        try { buf = fs.readFileSync(f.path); }
+        catch (e) { return { ok: false, error: "could not read frame file " + f.path + ": " + String(e && e.message || e), frameIndex: f.index }; }
+        try {
+            const img = await canvasMod.loadImage(buf); // real PNG decode, not an in-memory shortcut
+            const w = img.width, h = img.height;
+            if (!width) { width = w; height = h; }
+            if (w !== width || h !== height) return { ok: false, error: "frame " + f.path + " decoded as " + w + "x" + h + ", expected " + width + "x" + height + " (every frame in a sequence must match) -- frame index " + f.index, frameIndex: f.index };
+            const canvas = canvasMod.createCanvas(width, height);
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0);
+            const id = ctx.getImageData(0, 0, width, height); // real decode -> raw RGBA pixels, independent of the source encoder
+            decoded.push({ index: f.index, path: f.path, rgba: new Uint8Array(id.data.buffer, id.data.byteOffset, id.data.byteLength) });
+        } catch (e) {
+            return { ok: false, error: "frame " + f.path + " failed to decode as a real PNG: " + String(e && e.message || e), frameIndex: f.index };
+        }
+    }
+    if (!decoded.length) return { ok: false, error: "no frames decoded" };
+
+    const { VideoEncoder, VideoFrame, Mp4Muxer } = mod;
+    let desc, encodedChunks = 0, keyFrames = 0, trackAdded = false, encodeErr = null;
+
+    let muxer;
+    try {
+        // *** ADVERSARIAL-REVIEW FIX (same session, this task's own review pass). *** encodeH264Spike's
+        // identical `new Mp4Muxer(...)` call also sits outside its own try/catch -- not fixed there since
+        // that function is unchanged, pre-existing, already-reviewed code this task was told not to touch
+        // -- but there is no reason to carry the same gap into NEW code, so it is wrapped here.
+        muxer = new Mp4Muxer({ fastStart: true });
+        const encoder = new VideoEncoder({
+            output: (chunk, metadata) => {
+                encodedChunks++;
+                if (chunk.type === "key") keyFrames++;
+                if (!trackAdded) {
+                    if (metadata && metadata.decoderConfig && metadata.decoderConfig.description) desc = metadata.decoderConfig.description;
+                    muxer.addVideoTrack({ codec: "avc1.42001f", width, height, description: desc });
+                    trackAdded = true;
+                }
+                muxer.addVideoChunk(chunk, metadata);
+            },
+            error: (e) => { encodeErr = e; },
+        });
+        encoder.configure({ codec: "avc1.42001f", width, height, bitrate: (+opts.bitrate || 500_000), framerate: fps });
+
+        for (let i = 0; i < decoded.length; i++) {
+            const frame = new VideoFrame(decoded[i].rgba, { format: "RGBA", codedWidth: width, codedHeight: height, timestamp: Math.round((i * 1_000_000) / fps) });
+            encoder.encode(frame, { keyFrame: i === 0 });
+            frame.close();
+        }
+        await encoder.flush();
+        encoder.close();
+    } catch (e) {
+        return { ok: false, error: "encode/mux failed: " + String(e && e.message || e) };
+    }
+    if (encodeErr) return { ok: false, error: "encoder reported an error: " + String(encodeErr && encodeErr.message || encodeErr) };
+    if (encodedChunks !== n) return { ok: false, error: "encoder produced " + encodedChunks + " chunks for " + n + " real frames read from disk -- partial output, not treating as success", encodedChunks, requested: n };
+
+    let mp4Bytes;
+    try { mp4Bytes = muxer.finalize(); }
+    catch (e) { return { ok: false, error: "mux finalize failed: " + String(e && e.message || e), encodedChunks }; }
+    // Same fix shape as encodeH264Spike above: finalize() already produced the real bytes at this point --
+    // a close() failure afterward is cleanup-only and must not discard mp4Bytes or be mislabeled as "finalize failed".
+    let closeErr = null;
+    try { muxer.close(); } catch (e) { closeErr = String(e && e.message || e); }
+
+    const buf = Buffer.from(mp4Bytes);
+    // _verifyMp4 exists specifically to catch a corrupt/truncated mux result -- it must never itself be
+    // the thing that throws uncaught out of this function (same fix shape as encodeH264Spike above).
+    let v;
+    try { v = _verifyMp4(buf); }
+    catch (e) { return { ok: false, error: "mp4 structural verification threw: " + String(e && e.message || e), encodedChunks, bytes: buf.length }; }
+    const structurallyValid = v.haveFtyp && v.haveMoov && v.haveMdat && v.boxSizesMatchFileLength && v.mdatWalkExact && v.nalUnits >= n;
+    if (!structurallyValid) {
+        return { ok: false, error: "muxed output failed independent structural verification (see verify field)", encodedChunks, keyFrames, bytes: buf.length, verify: v };
+    }
+
+    return {
+        ok: true, tool: "@napi-rs/webcodecs", width, height, dir, pattern, framesRead: n,
+        encodedChunks, keyFrames, bytes: buf.length, mp4: buf,
+        verify: v, // independently re-derived from the bytes -- see _verifyMp4()
+        closeWarning: closeErr,
+        note: "video-only -- exportBridge.js's real framesToMp4() can optionally mux in an audio track; " +
+              "this spike does not attempt that (@napi-rs/webcodecs' AudioEncoder is unproven in this " +
+              "session). Use _verifyDecodedFramesDiffer(result.mp4) for a stronger, decode-side check " +
+              "that the encoded content genuinely varies frame to frame, beyond this structural check.",
+    };
+}
+
+/**
+ * GOES BEYOND _verifyMp4()'s structural check: actually DECODES the muxed MP4 back into frames using
+ * @napi-rs/webcodecs' own Mp4Demuxer + VideoDecoder, and confirms the decoded output is not silently
+ * blank/static/corrupted by sampling the same pixel position across the decoded frames and checking they
+ * are not all identical. This is possible ON THIS BOX specifically because @napi-rs/webcodecs bundles its
+ * own decoder (no external ffmpeg/ffprobe binary is needed or used here -- `which ffmpeg ffprobe` still
+ * fails on this box, confirmed unchanged from the file header's original finding); a general environment
+ * without a working decode path would have to stop at the structural check alone, which is why this is a
+ * SEPARATE, explicitly-additional function rather than folded into encodeFramesDirToMp4()'s always-run
+ * path -- a full decode pass is real extra cost that the core deliverable (proving the encode side) does
+ * not require to succeed.
+ *
+ * *** USES THE for-await-of ASYNC ITERATOR, NOT plain demux()/demuxAsync(). *** This file's own header
+ * already documents a real race found in this same session: the README's demux() example is not actually
+ * synchronous, and even demuxAsync() is that same call with an await bolted on top of the identical
+ * underlying race, not a different code path. The demuxer's `for await (const chunk of demuxer)` async
+ * iterator (index.d.ts lines ~117-150) is a genuinely different mechanism -- each chunk is yielded only
+ * once actually demuxed -- and was verified live during this spike's own development to demux and decode
+ * every packet with zero loss (see the report for the real prototype output), unlike demux()/demuxAsync().
+ *
+ * Decoded VideoFrame output on this box is I420 (planar YUV 4:2:0), NOT RGBA -- confirmed live, not
+ * assumed -- so pixel sampling reads the Y (luma) plane, where the source RGBA frames' real per-frame
+ * motion still shows up as a genuine byte-level difference.
+ */
+async function _verifyDecodedFramesDiffer(mp4Buf, opts = {}) {
+    // Same opts-null fix as _expandFrameSequence above -- see that function's comment. This one matters
+    // more than the other two: encodeFramesDirToMp4's own returned `note` field explicitly recommends
+    // calling this function directly for a stronger check, inviting exactly the unwrapped external call
+    // an explicit `opts: null` would have crashed.
+    opts = opts || {};
+    const mod = _webcodecs();
+    if (!mod) return { ok: false, error: "webcodecs unavailable: " + status().note };
+    if (!Buffer.isBuffer(mp4Buf) && !(mp4Buf instanceof Uint8Array)) return { ok: false, error: "mp4Buf must be a Buffer or Uint8Array" };
+
+    const { Mp4Demuxer, VideoDecoder } = mod;
+    const maxSamples = Math.max(2, Math.min(64, +opts.maxSamples || 8));
+    let demuxer, decoder;
+    const samples = [];
+    const pendingCopies = [];
+    try {
+        demuxer = new Mp4Demuxer({ videoOutput: () => {}, error: () => {} }); // init requires callbacks; the for-await loop below is what's actually used
+        await demuxer.loadBuffer(mp4Buf instanceof Uint8Array ? mp4Buf : new Uint8Array(mp4Buf));
+    } catch (e) {
+        // *** ADVERSARIAL-REVIEW FIX (same session, this task's own review pass). *** This branch
+        // returned without closing `demuxer` on a loadBuffer() failure (construction can succeed while
+        // loadBuffer() still throws) -- every OTHER failure path in this function does close what it
+        // opened; this one didn't. `demuxer` may still be undefined if the constructor itself is what
+        // threw, hence the guard.
+        try { if (demuxer) demuxer.close(); } catch {}
+        return { ok: false, error: "demuxer failed to load muxed bytes: " + String(e && e.message || e) };
+    }
+    try {
+        demuxer.selectVideoTrack(0);
+        const vdConfig = demuxer.videoDecoderConfig;
+        if (!vdConfig) { try { demuxer.close(); } catch {} return { ok: false, error: "no video decoder config on the muxed track -- nothing to decode" }; }
+
+        decoder = new VideoDecoder({
+            output: (frame) => {
+                const p = (async () => {
+                    try {
+                        const size = frame.allocationSize();
+                        const out = new Uint8Array(size);
+                        await frame.copyTo(out);
+                        const w = frame.codedWidth, h = frame.codedHeight;
+                        const yIdx = Math.floor(h / 2) * w + Math.floor(w / 2); // I420: Y plane is the first w*h bytes
+                        if (samples.length < maxSamples) samples.push({ timestamp: frame.timestamp, format: frame.format, yByte: out[yIdx] });
+                    } finally { frame.close(); }
+                })();
+                pendingCopies.push(p);
+            },
+            error: () => {},
+        });
+        decoder.configure(vdConfig);
+
+        let videoChunks = 0;
+        for await (const chunk of demuxer) {
+            if (chunk.chunkType === "video" && chunk.videoChunk) { decoder.decode(chunk.videoChunk); videoChunks++; }
+        }
+        await decoder.flush();
+        await Promise.all(pendingCopies);
+        try { decoder.close(); } catch {}
+        try { demuxer.close(); } catch {}
+
+        if (!samples.length) return { ok: false, error: "demuxed " + videoChunks + " video chunks but decoded 0 frames -- decode produced nothing to sample" };
+        samples.sort((a, b) => a.timestamp - b.timestamp);
+        const allSame = samples.every(s => s.yByte === samples[0].yByte);
+        return { ok: true, videoChunksDemuxed: videoChunks, decodedFramesSampled: samples.length, samples, framesDiffer: !allSame };
+    } catch (e) {
+        try { if (decoder) decoder.close(); } catch {}
+        try { if (demuxer) demuxer.close(); } catch {}
+        return { ok: false, error: "decode-side verification threw: " + String(e && e.message || e) };
+    }
+}
+
+module.exports = {
+    status, encodeH264Spike, _verifyMp4, LICENCE,
+    _parseFramePattern, _expandFrameSequence, _renderAnimatedSequenceToDisk,
+    encodeFramesDirToMp4, _verifyDecodedFramesDiffer,
+};
