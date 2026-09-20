@@ -1,6 +1,12 @@
 // WebGLEngine/tools/ship/adapterRecord.mjs -- v4646
 //
-// *** A DEVICE READING IS A READING OF ONE ADAPTER, AND ABOUT FIFTEEN GATES HAD FORGOTTEN THAT. ***
+// *** A DEVICE READING IS A READING OF ONE ADAPTER, AND 161 GATES HAD FORGOTTEN THAT. ***
+//
+// v4647: this header said "about fifteen" and that number was never measured -- it was an impression,
+// repeated for several rounds as fact. adapterRecord-selfcheck section 6 counts it from the tree on
+// every run instead: 161 gates import the browser harness, 1 reads a per-adapter record. 160 is the
+// POPULATION and not the debt, because a gate asserting parity or shape is adapter-independent and
+// needs no record; only a run on a second adapter can say which of them assert a magnitude.
 //
 // Every WGSL gate in this tree froze its numbers on the only adapter it had ever met: SwiftShader, which is
 // what the Playwright bundle ships and what the sandbox runs. Measured at v4646 on Keith's Windows rig, an

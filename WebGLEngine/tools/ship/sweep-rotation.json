@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed.",
- "at": "2026-09-20T12:34:24.367Z",
+ "at": "2026-09-20T12:39:53.256Z",
  "budgetMs": 3000,
  "lastRun": 1,
  "rotated": [
@@ -655,6 +655,13 @@
    "code": 0,
    "priorMs": 20211,
    "at": "2026-09-09T17:59:42.840Z"
+  },
+  {
+   "gate": "render/ringFloorCost-selfcheck.mjs",
+   "ms": 1302,
+   "code": 0,
+   "priorMs": 1292,
+   "at": "2026-09-20T12:39:52.283Z"
   },
   {
    "gate": "rig/cinematicShot-selfcheck.mjs",
@@ -1344,10 +1351,10 @@
   },
   {
    "gate": "tools/ship/adapterRecord-selfcheck.mjs",
-   "ms": 45,
+   "ms": 112,
    "code": 0,
-   "priorMs": 50,
-   "at": "2026-09-20T12:32:42.577Z"
+   "priorMs": 45,
+   "at": "2026-09-20T12:39:50.847Z"
   },
   {
    "gate": "tools/ship/affected-selfcheck.mjs",
@@ -1939,6 +1946,13 @@
    "code": "timeout/signal",
    "priorMs": 20057,
    "at": "2026-09-09T17:59:42.840Z"
+  },
+  {
+   "gate": "tools/ship/headlessGpu-selfcheck.mjs",
+   "ms": 832,
+   "code": 0,
+   "priorMs": 2637,
+   "at": "2026-09-20T12:39:53.256Z"
   },
   {
    "gate": "tools/ship/hiZ-selfcheck.mjs",

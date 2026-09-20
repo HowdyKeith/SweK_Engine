@@ -5,6 +5,9 @@
 // the rows below drive all three outcomes and the CONTROL is that a HELD disagreement still fails -- an
 // OWED state that swallowed real regressions would be worse than the reds it replaces.
 "use strict";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { adapterKey, verdict, describe, coverage, owedCount,
          compareFor, boundFrom, SLACK, readReadings, recordReading, mergeRecords } from "./adapterRecord.mjs";
 
@@ -148,6 +151,63 @@ console.log("\n5. *** --record WRITES, AND WHAT IT REFUSES TO WRITE IS THE WHOLE
     ok("!! CONTROL: an ABSENT or unparseable file is no readings, never a throw",
        empty(() => { throw new Error("ENOENT"); }) && empty(() => "{{{ not json"),
        "a gate whose record file is missing must behave exactly like a gate whose adapter is unrecorded");
+}
+
+console.log("\n6. *** THE POPULATION, COUNTED RATHER THAN REMEMBERED ***");
+{
+    // *** "ABOUT FIFTEEN GATES" WAS NEVER MEASURED. *** adapterRecord.mjs's own header says "about fifteen",
+    // this session repeated it as "~14" for several rounds, and neither number came from anywhere. Counted
+    // here instead, from the tree, every run -- so the debt cannot quietly be understated and cannot stay the
+    // same number while the tree grows. What it counts is deliberately NOT "gates that would go red on other
+    // silicon": that is only answerable by running them on other silicon, and this row would be guessing.
+    const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+    const SKIP = /node_modules|[\\/]vendor[\\/]|[\\/]dist[\\/]/;
+    const gates = [];
+    (function walk(d) {
+        let ents = [];
+        try { ents = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
+        for (const e of ents) {
+            const f = path.join(d, e.name);
+            if (SKIP.test(f)) continue;
+            if (e.isDirectory()) walk(f);
+            else if (e.name.endsWith("-selfcheck.mjs")) gates.push(f);
+        }
+    })(ENG);
+    const deviceGates = [], convertedGates = [];
+    for (const f of gates) {
+        let src = "";
+        try { src = fs.readFileSync(f, "utf8"); } catch { continue; }
+        if (!/webgpuHarness\.mjs/.test(src)) continue;
+        deviceGates.push(f);
+        if (/adapterRecord\.mjs/.test(src)) convertedGates.push(path.basename(f));
+    }
+    const device = deviceGates.length, converted = convertedGates.length;
+    ok("!! *** the device-gate population is COUNTED, and it is far larger than the figure that was being repeated ***",
+       device > 100 && converted >= 1 && converted <= device,
+       `${device} gates import the browser harness; ${converted} read a per-adapter record (${convertedGates.join(", ")}). ` +
+       `"About fifteen" was never a measurement`);
+    // *** THE COUNT IS ANCHORED AT BOTH ENDS, BECAUSE A BOUND OF "at least one, at most all" CANNOT TELL 1
+    // FROM 161. *** A sabotage that counted EVERY device gate as converted went 0 red against the row above.
+    // The positive anchor is a named witness; the negative one is `converted < device`, which is the
+    // emptyOfNonEmpty shape this tree already uses -- it goes red on the day task #60 is actually finished,
+    // which is a correct red and announces itself rather than needing somebody to remember.
+    ok("!! CONTROL: a NAMED witness is in the converted set, and at least one device gate is still outside it",
+       convertedGates.includes("microfacetWgsl-selfcheck.mjs") && converted < device,
+       `microfacetWgsl is converted and ${device - converted} are not. If this row ever goes red because ` +
+       `converted === device, #60 is done and this control is what says so`);
+    ok("  CONTROL: the walk really reached the tree rather than an empty directory",
+       gates.length > device && device > 0,
+       `${gates.length} selfchecks in all, ${device} of them device gates -- a walk that found nothing would ` +
+       `report 0 converted of 0 and read as complete`);
+    // *** AND ${device - converted} IS THE POPULATION, NOT THE DEBT -- v4487'S OWN DISTINCTION, KEPT. *** A gate
+    // that imports the harness and asserts PARITY between two implementations, or the SHAPE of a result, is
+    // adapter-independent and needs no record at all; only a gate that asserts a MAGNITUDE the silicon
+    // produced does. Which of the 160 are which is not answerable by reading imports, and the cheapest honest
+    // instrument for it is a full sweep on a second adapter, which now exists.
+    console.log(`  ----  ${device - converted} device gate(s) hold whatever numbers they froze on the one adapter that ` +
+                `produced them. That is the POPULATION of task #60 taken from the tree rather than from memory -- ` +
+                `not its debt: a parity or shape claim needs no record, and only a run on a second adapter can ` +
+                `say which of them assert a magnitude.`);
 }
 
 console.log(`\nadapterRecord-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);

@@ -18,6 +18,11 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import * as HG from "./headlessGpu.mjs";
 import { runWgslCompute, webgpuSkipReason } from "./webgpuHarness.mjs";
+// v4647 -- the adapter's nature is READ, not asserted: this file said "a software rasteriser on both
+// sides" in two places, unconditionally, and on Keith's Intel gen-9 through D3D12 both of those are
+// false. The list lives in ONE place and is gated there (localModelProbe-selfcheck), so it is imported
+// rather than copied.
+import { SOFTWARE_HINTS } from "../../ui/localModelProbe.js";
 import { lcgWgsl, lcgUniforms, lcgStatesCpu, lcgValuesCpu, unpackState, bracketsF64 }
     from "../../physics/render/pathTracerWgsl.mjs";
 
@@ -89,6 +94,7 @@ const tNative0 = Date.now();
 const native = await HG.runWgslComputeNative({ code: CODE, outCount: OUT, uniforms: UNI, workgroups: WG });
 const tNative = Date.now() - tNative0;
 let browser = null, tBrowser = 0;
+let SOFT = null, ADAPTER_NAME = "(unread)";
 {
     ok(native.ok, "the native backend runs", native.ok
         ? `${native.adapter.vendor}/${native.adapter.architecture} -- ${native.adapter.description}`
@@ -106,6 +112,11 @@ let browser = null, tBrowser = 0;
        native.adapter.architecture === browser.adapter?.architecture,
        "*** both report the SAME ADAPTER -- it is one rasteriser reached two ways ***",
        `${native.adapter.vendor}/${native.adapter.architecture}`);
+
+    // Read ONCE, from the adapter both backends agreed on, and used by the timing note and the closing line.
+    ADAPTER_NAME = `${native.adapter.vendor}/${native.adapter.architecture}`;
+    SOFT = SOFTWARE_HINTS.test([native.adapter.vendor, native.adapter.architecture,
+                                native.adapter.device, native.adapter.description].filter(Boolean).join(" "));
 
     let same = 0, firstDiff = -1;
     for (let i = 0; i < OUT; i++) {
@@ -207,7 +218,8 @@ sec("5. NOW THE TIMING, WHICH IS OVERHEAD AND NOT GPU WORK");
        `${tNative} ms native vs ${tBrowser} ms browser`);
     ok(HG.MEASURED.whatIsTimed.includes("not GPU work"),
        "and the record says plainly that this is HARNESS overhead",
-       "the adapter is a software rasteriser on both sides, so a GPU timing here would mean nothing");
+       `the adapter is ${SOFT ? "a software rasteriser" : "real silicon (" + ADAPTER_NAME + ")"} on both sides, so this number is harness overhead either way -- ` +
+       `on a software adapter a GPU timing would mean nothing, and on real silicon it would be a driver's number rather than this harness's`);
     ok(Math.min(...HG.MEASURED.chromiumPerCallMs) > Math.max(...HG.MEASURED.nativeColdProcessMs),
        "the recorded ranges do not overlap: the slowest native cold process beats the fastest browser call",
        `browser ${Math.min(...HG.MEASURED.chromiumPerCallMs)}-${Math.max(...HG.MEASURED.chromiumPerCallMs)} ms, ` +
@@ -328,9 +340,9 @@ sec("9. THE TEXTURE READ-BACK ARITHMETIC");
 }
 
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
-console.log("unchecked here: ANY GPU WORTH THE NAME. Both backends land on the same software rasteriser, so " +
-    "nothing above says how Dawn behaves on real hardware, where the driver -- not the harness -- decides the " +
-    "numbers. Also unchecked: every WGSL gate in the tree still calls the browser harness; this round builds " +
+console.log(`unchecked here: ${SOFT ? "ANY GPU WORTH THE NAME. Both backends land on the same SOFTWARE rasteriser (" + ADAPTER_NAME + "), so nothing above says how Dawn behaves on real hardware, where the driver -- not the harness -- decides the numbers."
+                                : "HOW THIS COMPARES TO A SOFTWARE RASTERISER. Both backends land on REAL SILICON here (" + ADAPTER_NAME + "), which is the case the first sixteen rounds of this file never saw; what is now unread is the software side it was written against."} ` +
+    "Also unchecked: every WGSL gate in the tree still calls the browser harness; this round builds " +
     "the second backend and proves it agrees, and moving the callers over is a separate change with its own " +
     "risk. And WebGL2 is untouched: the GLSL gates need a browser and still launch one.");
 HG.exitCleanly(fails ? 1 : 0);

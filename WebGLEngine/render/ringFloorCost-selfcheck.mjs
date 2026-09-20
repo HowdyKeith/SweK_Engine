@@ -16,6 +16,7 @@
  * threshold picked to pass is a declared number wearing a measurement's clothes; the op-count prediction is
  * derived from what the two functions actually do, and the interesting result is the size of the gap.
  */
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "../tools/ship/webgpuHarness.mjs";
@@ -162,14 +163,43 @@ else {
         report(`dev.backend says "${r.result.backend}"; the adapter says ${JSON.stringify(r.adapter)}`);
         // *** THE LABEL AND THE THING ARE DIFFERENT WORDS. *** Every device row in this arc has printed
         // "webgpu" and every one of them has run on a CPU.
-        ok(`*** dev.backend reads "${r.result.backend}" and the adapter is ${r.adapter.architecture} -- a SOFTWARE rasteriser -- so every device row this arc has written was a CPU running WGSL, and none of the ten had any way to know ***`,
-            r.software === true && SOFTWARE_HINTS.test(blob),
-            `software=${r.software}, isFallbackAdapter ${r.adapter.isFallback === null ? "ABSENT in this Chromium, so the name match is the instrument" : r.adapter.isFallback}`);
+        // *** v4647 -- TWO OF THESE THREE ROWS ASSERTED WHAT THE BOX IS, AND WENT RED WHEN THE BOX GOT BETTER. ***
+        // They read `r.software === true`. On Keith's Intel gen-9 through D3D12 that is FALSE, so the gate
+        // that exists to say "nobody asked what this runs on" failed for being answered. The finding they
+        // were written for is real and is NOT retracted -- every device row in this arc had been a CPU
+        // running WGSL -- but a finding is a thing that HAPPENED, and an assertion is a thing that must keep
+        // happening. Those are different, and this section had them the same.
+        //
+        // What is durable is that the harness's verdict MATCHES what the adapter calls itself, on any adapter
+        // -- both true on SwiftShader, both false on gen-9.
+        //
+        // *** AND IT IS NOT TWO INSTRUMENTS, WHICH IS WHAT THE FIRST DRAFT OF THIS COMMENT CLAIMED. *** A
+        // sabotage said so: removing swiftshader from SOFTWARE_HINTS went 0 RED here where the old rows gave
+        // 4. webgpuHarness computes `software` as `isFallback === true || SOFTWARE_HINTS.test(blob)`, and
+        // isFallbackAdapter is ABSENT in this Chromium, so on this box `software` IS the name match -- one
+        // instrument read twice, and a corruption that moves both cannot be seen from here at all.
+        //
+        // So this row checks the DERIVATION (that the harness still computes and reports it from the strings
+        // it has), not the CLASSIFICATION. The list itself is gated where it lives: the same sabotage puts
+        // tools/ship/localModelProbe-selfcheck.mjs 2 red against a fixture. Those 4 reds were mostly this
+        // gate duplicating somebody else's property, and the coverage survives in the right place.
+        report(`this box is ${r.software ? "a SOFTWARE rasteriser" : "REAL SILICON"}: ${blob || "(unnamed)"}`);
+        ok(`*** the harness still DERIVES \`software\` from the adapter's own names and reports it -- not the list's own check, which lives in localModelProbe-selfcheck ***`,
+            r.software === SOFTWARE_HINTS.test(blob),
+            `software=${r.software}, name match=${SOFTWARE_HINTS.test(blob)}, isFallbackAdapter ${r.adapter.isFallback === null ? "ABSENT in this Chromium, so the name match is the instrument" : r.adapter.isFallback}`);
         ok("  the harness now returns it for all 109 gates that call runInEngineOrigin, so no gate has to remember to ask",
             typeof r.software === "boolean" && r.adapter.vendor != null, `software=${r.software}, vendor=${r.adapter.vendor}`);
-        // *** AND THIS IS WHY THIS SECTION HAS NO TIMING IN IT. ***
-        ok(`*** and THEREFORE this gate does not time the kernel: a dispatch ratio measured here would be SwiftShader's, and this round measured one (0.68 at 128x128, against ${(R[128].median).toFixed(2)} on the CPU) before checking, which would have shipped a software number as a device number ***`,
-            r.software === true, "the 0.68 is recorded in the closing as a software measurement and is not asserted here as a device one");
+        // *** AND THIS IS WHY THIS SECTION HAS NO TIMING IN IT -- CHECKED ON THE SOURCE, NOT ON THE ADAPTER. ***
+        // The old row asserted `r.software === true` to justify the absence of a timing claim, which tested
+        // the box rather than the choice: on real silicon it went red while the gate still published no
+        // timing, so the assertion had nothing to do with the property. The property is that THIS SECTION'S
+        // PAGE SCRIPT DOES NOT TIME ANYTHING, and that is readable from the file itself. Someone adding a
+        // dispatch timer here in future goes red and has to confront the adapter question first.
+        const mySrc = fs.readFileSync(new URL(import.meta.url), "utf8");
+        const section4 = mySrc.slice(mySrc.indexOf("const r = await runInEngineOrigin"), mySrc.indexOf("// NOT a row:"));
+        ok(`*** and THEREFORE this gate does not time the kernel -- its page script carries no timing primitive at all ***`,
+            !/performance\s*\.\s*now|Date\s*\.\s*now|timestamp-query|writeTimestamp/.test(section4),
+            `a dispatch ratio measured here would be whatever this box is, and this round measured one (0.68 at 128x128, against ${(R[128].median).toFixed(2)} on the CPU) before checking. The 0.68 is recorded in the closing as a SOFTWARE measurement and is not asserted here as a device one`);
     }
     // NOT a row: `ok(..., true)` is a control that cannot fail, and the first draft of this section had one
     // here. What a device parity row claims is UNHARMED -- agreement between two implementations is agreement
@@ -181,12 +211,21 @@ else {
 // three gates -- this one, ringFloor-selfcheck and localModelProbe-selfcheck, whose regex this round reuses
 // rather than copies -- with v4557's crash rule applied.
 //   JA  the harness stops reporting the adapter (the state all 109 gates were in)    1 red
-//   JB  the harness reports it but always calls it hardware                          2 red
-//   JC  SOFTWARE_HINTS quietly loses swiftshader                                     4 red
+//   JB  the harness reports it but always calls it hardware                          2 red (v4647: 1)
+//   JC  SOFTWARE_HINTS quietly loses swiftshader                                     4 red (v4647: 0 -- see below)
 //   JD  the estimator's y-axis dropped -- half the work, blind to a horizontal edge  2 red
 //   JE  the estimator sampled every fourth pixel, the optimisation section 3 refuses 5 red
 //   JF  the per-pixel field left unwritten while `worst` stays right                12 red
 //   JG  the range stencil narrowed from five taps to three                           2 red
+//
+// *** v4647 RE-RAN JB AND JC AGAINST THE REPAIRED SECTION 4, PLUS ONE NEW SABOTAGE. ***
+//   JH  a timing primitive added to section 4's page script                          1 red
+// JB stays red at 1 rather than 2, because one of its two victims is now a REPORT: what the box is belongs
+// in the output, not in an assertion. JC drops to 0 and that is the finding, not the regression -- the old
+// rows read `software === true`, so corrupting the list made them fail for the wrong reason. `software` is
+// DERIVED from SOFTWARE_HINTS whenever isFallbackAdapter is absent, which it is in this Chromium, so this
+// gate never had a second instrument to catch the list with. The list's own gate does, on a fixture:
+// localModelProbe-selfcheck goes 2 red on the same sabotage. Four of those reds were duplicated coverage.
 //
 // *** JG WENT 0-RED ON THE FIRST SWEEP AND THAT WAS THE ROUND'S BEST FINDING. *** Narrowing the range
 // stencil changed NOTHING any gate could see, because all four of v4560's contents classify identically
