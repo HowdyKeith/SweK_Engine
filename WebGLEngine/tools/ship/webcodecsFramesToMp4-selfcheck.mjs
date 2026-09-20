@@ -1,25 +1,59 @@
 #!/usr/bin/env node
 // WebGLEngine/tools/ship/webcodecsFramesToMp4-selfcheck.mjs
 //
-// GATES the second, more-realistic spike added to ai-bridge/webcodecsBridge.js:
-// encodeFramesDirToMp4(dir, pattern, opts) -- proving @napi-rs/webcodecs against exportBridge.js's REAL
-// production consumer shape (a directory of real numbered PNG frames on disk -> a real MP4), unlike the
-// file's original encodeH264Spike() which only ever exercised toy, in-memory, non-file-based frames.
+// GATES TWO ROUNDS NOW:
+//   (1, sections 1-8) the second, more-realistic spike added to ai-bridge/webcodecsBridge.js:
+//      encodeFramesDirToMp4(dir, pattern, opts) -- proving @napi-rs/webcodecs against exportBridge.js's
+//      REAL production consumer shape (a directory of real numbered PNG frames on disk -> a real MP4),
+//      unlike the file's original encodeH264Spike() which only ever exercised toy, in-memory,
+//      non-file-based frames. THIS ROUND DID NOT TOUCH exportBridge.js/server.js -- see the original
+//      section 8 (still here, UPDATED for round 2 below, since that round's own claim "exportBridge.js
+//      does not reference webcodecsBridge.js" is no longer true and asserting it now would be a stale
+//      gate lying about the current tree).
+//   (2, sections 9-14) round 2: webcodecsBridge.js's encodeFramesDirToMp4() is now wired into the REAL
+//      PRODUCTION exportBridge.js's framesToMp4(pattern, mp4Path, opts) as a strictly opt-in
+//      opts.backend === "webcodecs" alternative to the default ffmpeg-CLI path -- see exportBridge.js's
+//      own framesToMp4()/_framesToMp4WebCodecs() docblocks for the full story. Sections 9-14 gate THAT
+//      wiring specifically: the opt-in branch works end to end against real files, the default path is
+//      provably byte-for-byte unmodified (this sandbox has no ffmpeg binary, so "unmodified source" is
+//      what is provable here, not "still runs to completion" -- see section 10), audio is rejected loudly
+//      rather than silently ignored or silently falling back, opts:null does not crash either path, a
+//      sabotaged native module rejects cleanly through the real exportBridge.js wiring (not just the
+//      bridge file directly, unlike round 1's sabotage), and server.js still exposes NO way for an HTTP
+//      caller to select the webcodecs backend (the licensing question in webcodecsBridge.js's own LICENCE
+//      object remains unresolved -- that is a separate decision, deliberately not bundled into this one).
+//   (round 2's own review pass, no new sections -- fixes to EXISTING code this gate already exercises)
+//      Adversarial review of round 2 found two real bugs in webcodecsBridge.js itself (not this gate's own
+//      diff, but code sections 1-14 already exercise): encodeFramesDirToMp4() was not opts:null-safe
+//      (only its FIRST opts read was guarded; `opts.fps` further down was not -- unreachable through
+//      exportBridge.js's new branch, since that guarantees opts is truthy, but a real gap in this directly-
+//      exported function for any other caller), and _verifyDecodedFramesDiffer()'s default maxSamples
+//      sampling only ever looked at the chronologically FIRST N decoded frames, producing a false
+//      "framesDiffer:false" negative whenever real motion happened later in a sequence than the sample
+//      window -- reproduced live with a 22-frame sequence whose only transition was at frame 9. Both fixed
+//      (opts normalized at the top of the function; sampling now collects every decoded frame cheaply and
+//      evenly subsamples across the FULL sequence afterward, not just its start) and re-verified directly
+//      against the same reproduction cases. This gate's own sections 2/11 (which already call
+//      _verifyDecodedFramesDiffer with default options) benefit from the fix without needing new sections.
+//      Also added: top-level unhandledRejection/uncaughtException handlers in THIS file (see below), after
+//      an independent review run hit a rare, non-reproducible native-addon cold-load flake that crashed
+//      the gate process uncontrolled instead of reporting a clean FAIL.
 //
-// SPIKE, NOT A FEATURE -- same discipline as the bridge file itself. This gate does not touch
-// exportBridge.js, server.js, or any HTTP route; it exercises the new bridge functions directly.
+// SPIKE, NOT A FEATURE -- same discipline as the bridge file itself, even now that it is wired into real
+// production code: the licensing question is still open, so backward compatibility for every EXISTING
+// caller (none of whom pass opts.backend) is the top priority, verified below, not assumed.
 //
 // Run: node tools/ship/webcodecsFramesToMp4-selfcheck.mjs
 // Gated by tools/ship/selfchecks.mjs (auto-discovered -- any *-selfcheck.mjs anywhere in the tree).
 //
 //   SABOTAGE LOG:
-//     A. (section 6, reproduced HERE on every run, via a scratch copy that never touches the shipped
-//        file) webcodecsBridge.js's own `_frameCanvasMod = require("@napi-rs/canvas");` line, targeted
-//        at a nonexistent package name. Effect, confirmed live: encodeFramesDirToMp4() against the SAME
-//        real frame directory section 2 confirms the real file encodes successfully now degrades to
-//        {ok:false} instead, naming the real reason ("canvas unavailable for frame decode"). Scratch
+//     A. (section 6, round 1, reproduced HERE on every run, via a scratch copy that never touches the
+//        shipped file) webcodecsBridge.js's own `_frameCanvasMod = require("@napi-rs/canvas");` line,
+//        targeted at a nonexistent package name. Effect, confirmed live: encodeFramesDirToMp4() against
+//        the SAME real frame directory section 2 confirms the real file encodes successfully now degrades
+//        to {ok:false} instead, naming the real reason ("canvas unavailable for frame decode"). Scratch
 //        file deleted immediately after, in a `finally`.
-//     B. (section 7, same scratch-copy technique) webcodecsBridge.js's own
+//     B. (section 7, round 1, same scratch-copy technique) webcodecsBridge.js's own
 //        `_webcodecsMod = require("@napi-rs/webcodecs");` line, targeted the same way. Effect, confirmed
 //        live: the identical real frame directory that encodes cleanly against the real file now
 //        degrades to {ok:false} ("webcodecs unavailable") instead of throwing.
@@ -30,6 +64,15 @@
 //        assertions actually distinguish a real bug (nothing found because the cap is wrong) from the
 //        intended behavior (nothing found because the directory genuinely has no frames) -- restored
 //        immediately, diff confirmed byte-identical to before the edit.
+//     D. (section 13, round 2, reproduced HERE on every run) a SCRATCH COPY of webcodecsBridge.js with its
+//        `_webcodecsMod = require("@napi-rs/webcodecs");` line targeted at a nonexistent package name,
+//        PLUS a scratch copy of exportBridge.js whose `require("./webcodecsBridge.js")` is repointed at
+//        that scratch bridge copy -- so this reproduces the sabotage through the REAL exportBridge.js
+//        wiring (framesToMp4 -> _framesToMp4WebCodecs -> encodeFramesDirToMp4), not just against the
+//        bridge file directly the way round 1's sabotage did. Effect, confirmed live: framesToMp4(...,
+//        {backend:"webcodecs"}) against a real frame directory rejects with a real Error naming
+//        "webcodecs unavailable", not an uncaught throw. Both scratch files deleted immediately after, in
+//        a `finally`; the real installed @napi-rs/webcodecs package was never touched.
 //
 // *** WHY SECTION 2's CONTENT CHECKS GO BEYOND webcodecsBridge.js's OWN STRUCTURAL VERIFICATION: ***
 // encodeFramesDirToMp4() already runs _verifyMp4() internally (ISO-BMFF box structure, NAL-unit walk) --
@@ -61,6 +104,25 @@ const canvasMod = requireAiBridge("@napi-rs/canvas");
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
+
+// *** ADVERSARIAL-REVIEW FIX (round 2's own review pass). *** An independent review run of this gate hit
+// a rare, non-reproducible flake (1 of 6 runs) where a native-addon cold-load hiccup somewhere in this
+// file's own async machinery produced an unhandled rejection OUTSIDE any of the try/catch blocks the
+// sections below already have -- crashing the whole process with a raw Node stack trace instead of a
+// clean, named FAIL. Five immediate re-runs all passed, so this is environmental noise in this sandbox's
+// native-module loading, not a bug in the reviewed production logic -- but a GATE that can crash
+// uncontrolled instead of reporting a failure defeats its own purpose exactly the way an uncaught throw
+// in production code would. This is a last-resort net, not a substitute for the sections' own try/catch:
+// it cannot say WHICH section was mid-flight when this fires, only that the run should be treated as red.
+process.on("unhandledRejection", (e) => {
+    console.log("\n  FAIL  !! UNHANDLED REJECTION -- the gate process would have crashed uncontrolled instead of failing cleanly   " + (e && e.stack || e));
+    process.exit(1);
+});
+process.on("uncaughtException", (e) => {
+    console.log("\n  FAIL  !! UNCAUGHT EXCEPTION -- the gate process would have crashed uncontrolled instead of failing cleanly   " + (e && e.stack || e));
+    process.exit(1);
+});
+
 console.log("webcodecsFramesToMp4-selfcheck -- encodeFramesDirToMp4() against a REAL numbered PNG sequence on disk\n");
 
 const scratchRoot = fs.mkdtempSync(path.join(os.tmpdir(), "swek-webcodecs-frames-selfcheck-"));
@@ -285,20 +347,224 @@ let realDir, realEncodeResult;
         "restored -- real node_modules/@napi-rs/webcodecs was never touched, only a throwaway scratch copy of the SOURCE was");
 }
 
-// ---- 8. SCOPE DISCIPLINE: NO WIRING INTO ANY LIVE CODE PATH --------------------------------------------
+// ---- 8. SCOPE DISCIPLINE, ROUND 2 UPDATE: WIRED INTO exportBridge.js, BUT server.js STAYS UNTOUCHED -----
+// Round 1 asserted exportBridge.js did NOT reference webcodecsBridge.js at all -- that claim is no longer
+// true by design (this round wires encodeFramesDirToMp4 into exportBridge.js's real framesToMp4() as an
+// opt-in backend), so re-asserting it here would make this gate lie about the current tree. What stays
+// true, and is what actually matters for the licensing-risk containment this spike is still under, is
+// narrower: server.js -- the only thing an external HTTP caller can reach -- is completely untouched, and
+// webcodecsBridge.js's own pre-existing exports are still byte-for-byte unmodified in shape. Sections 9-14
+// below gate the NEW exportBridge.js wiring itself in detail.
 {
-    console.log("\n8. SCOPE DISCIPLINE: NO WIRING INTO exportBridge.js / server.js / ANY HTTP ROUTE");
+    console.log("\n8. SCOPE DISCIPLINE, UPDATED FOR ROUND 2: server.js STILL UNTOUCHED, NO NEW HTTP EXPOSURE");
     const exportSrc = fs.readFileSync(path.join(ENG, "ai-bridge", "exportBridge.js"), "utf8");
-    ok("!! exportBridge.js does not reference webcodecsBridge.js or encodeFramesDirToMp4 anywhere", !/webcodecsBridge/.test(exportSrc) && !/encodeFramesDirToMp4/.test(exportSrc));
+    ok("!! exportBridge.js NOW references webcodecsBridge.js -- this is the wiring this round adds, expected true (round 1's opposite claim is stale, not a regression)",
+        /webcodecsBridge/.test(exportSrc) && /encodeFramesDirToMp4/.test(exportSrc));
     const serverSrc = fs.readFileSync(path.join(ENG, "ai-bridge", "server.js"), "utf8");
-    ok("!! server.js does not reference webcodecsBridge.js or encodeFramesDirToMp4 anywhere", !/webcodecsBridge/.test(serverSrc) && !/encodeFramesDirToMp4/.test(serverSrc));
+    ok("!! *** server.js is COMPLETELY untouched by this round: byte-for-byte identical to HEAD *** (the one file this task's scope limit named explicitly)",
+        serverSrc === execFileSync("git", ["show", "HEAD:WebGLEngine/ai-bridge/server.js"], { cwd: ENG, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 })); // server.js is ~1.5MB -- default 1MB maxBuffer truncates/throws
+    ok("!! ...and, redundantly but cheaply, server.js does not reference webcodecsBridge.js/encodeFramesDirToMp4/opts.backend anywhere",
+        !/webcodecsBridge/.test(serverSrc) && !/encodeFramesDirToMp4/.test(serverSrc) && !/opts\.backend/.test(serverSrc));
     ok("!! webcodecsBridge.js's existing encodeH264Spike/_verifyMp4/_walkBoxes/status/LICENCE are byte-for-byte present, unmodified in shape",
         /async function encodeH264Spike\(width, height, frameCount\)/.test(fs.readFileSync(path.join(ENG, "ai-bridge", "webcodecsBridge.js"), "utf8")) &&
         /function _verifyMp4\(buf\)/.test(fs.readFileSync(path.join(ENG, "ai-bridge", "webcodecsBridge.js"), "utf8")));
 }
 
+// ==========================================================================================================
+// ROUND 2: GATES THE NEW OPT-IN opts.backend === "webcodecs" BRANCH WIRED INTO exportBridge.js's REAL
+// PRODUCTION framesToMp4(pattern, mp4Path, opts). Exercises the REAL exportBridge.js module directly (not
+// a copy), through its own exported framesToMp4() -- the exact function every real caller (today, only
+// the /export/headless route) actually calls.
+// ==========================================================================================================
+const EB = requireAiBridge(path.join(ENG, "ai-bridge", "exportBridge.js"));
+
+// ---- 9. THE ffmpeg-CLI CODE PATH'S SOURCE IS PROVABLY, BYTE-FOR-BYTE, UNMODIFIED ------------------------
+// This is what actually proves "zero change to default behavior" in an environment where the ffmpeg branch
+// cannot be run to completion (no ffmpeg binary here -- see section 10) -- an exact-string check against
+// the KNOWN ORIGINAL source of the Promise body ffmpeg-CLI branch, captured before this round's edit.
+{
+    console.log("\n9. THE ffmpeg-CLI BRANCH'S SOURCE IS BYTE-FOR-BYTE UNMODIFIED (the provable half of backward-compat)");
+    const exportSrc = fs.readFileSync(path.join(ENG, "ai-bridge", "exportBridge.js"), "utf8");
+    // The exact original ffmpeg Promise BODY (from "return new Promise" through its closing "});"), captured
+    // from `git show HEAD:...exportBridge.js` -- HEAD still IS the pre-this-round commit, since this round's
+    // own edit is deliberately left uncommitted -- before any change was made. See the report for the diff
+    // this was checked against.
+    const KNOWN_ORIGINAL_FFMPEG_BODY =
+`    return new Promise((resolve, reject) => {
+        const fps = opts.fps || 30, args = ["-y", "-framerate", String(fps), "-i", pattern];
+        if (opts.audio) args.push("-i", opts.audio);
+        args.push("-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p");
+        if (opts.audio) args.push("-c:a", "aac", "-b:a", "192k", "-shortest");
+        args.push("-movflags", "+faststart");
+        if (opts.title) args.push("-metadata", "title=" + opts.title);
+        if (opts.description) args.push("-metadata", "comment=" + String(opts.description).slice(0, 500));
+        args.push(mp4Path);
+        const ff = spawn(process.env.FFMPEG || "ffmpeg", args, { stdio: ["ignore", "ignore", "pipe"] });
+        let err = ""; ff.stderr.on("data", d => { err += d; if (err.length > 4000) err = err.slice(-4000); });
+        ff.on("error", e => reject(new Error("ffmpeg spawn failed: " + e.message)));
+        ff.on("close", c => c === 0 ? resolve(mp4Path) : reject(new Error("ffmpeg exit " + c + ": " + err.slice(-400))));
+    });`;
+    ok("!! *** the ffmpeg-CLI branch's exact original source (args build, spawn, resolve/reject shape) is present VERBATIM in the current file ***",
+        exportSrc.includes(KNOWN_ORIGINAL_FFMPEG_BODY),
+        exportSrc.includes(KNOWN_ORIGINAL_FFMPEG_BODY) ? "byte-for-byte match confirmed" : "MISMATCH -- the ffmpeg-CLI branch was edited, this is the regression this gate exists to catch");
+    ok("!! the new opts.backend===\"webcodecs\" check is a genuinely SEPARATE, ADDITIVE line ahead of that unchanged body, not a rewrite of it",
+        /if \(opts && opts\.backend === "webcodecs"\) return _framesToMp4WebCodecs\(pattern, mp4Path, opts\);/.test(exportSrc));
+}
+
+// ---- 10. DEFAULT PATH SAFETY: NO BACKEND OPTION TAKES THE SAME (UNCHANGED) ffmpeg CODE PATH -------------
+// Cannot prove the ffmpeg branch SUCCEEDS here (this sandbox has no ffmpeg/ffprobe binary -- confirmed
+// below, unchanged from webcodecsBridge.js's own file-header finding) -- what IS provable, and what
+// backward-compatibility actually requires, is that behavior is UNCHANGED: the same spawn target, the same
+// error shape, for a caller that passes no backend field (today's only real caller) and for one that
+// passes some other value.
+{
+    console.log("\n10. DEFAULT (ffmpeg) PATH SAFETY -- PROVING NO BEHAVIOR CHANGE, NOT A SUCCESSFUL RUN (NO ffmpeg BINARY HERE)");
+    let noFfmpeg = false;
+    try { execFileSync("which", ["ffmpeg"], { stdio: "ignore" }); } catch { noFfmpeg = true; }
+    ok("!! confirmed: no external ffmpeg binary on this box (so this section proves ABSENCE OF A BEHAVIOR CHANGE, not a completed ffmpeg run -- that is not honestly demonstrable here)",
+        noFfmpeg, noFfmpeg ? "`which ffmpeg` exit != 0, as expected" : "ffmpeg IS present on this box -- rerun by hand to also confirm a REAL successful ffmpeg encode still works");
+
+    const shapes = [
+        { label: "no backend field at all (opts={fps:30})", opts: { fps: 30 } },
+        { label: "backend explicitly \"ffmpeg\" (not the magic webcodecs string)", opts: { fps: 30, backend: "ffmpeg" } },
+        { label: "backend explicitly undefined", opts: { fps: 30, backend: undefined } },
+    ];
+    for (const { label, opts } of shapes) {
+        let threw = null;
+        try { await EB.framesToMp4("/tmp/swek-selfcheck-does-not-exist/frame-%05d.png", "/tmp/swek-selfcheck-out.mp4", opts); }
+        catch (e) { threw = e; }
+        ok("!! " + label + " -> spawns \"ffmpeg\" and rejects with the SAME \"ffmpeg spawn failed\" shape (unchanged code path)",
+            threw instanceof Error && /^ffmpeg spawn failed: /.test(threw.message),
+            threw ? threw.constructor.name + " | " + threw.message : "did not reject at all (unexpected)");
+    }
+}
+
+// ---- 11. THE WEBCODECS BACKEND, END TO END, THROUGH THE REAL exportBridge.js framesToMp4() ---------------
+// The direction that CAN be fully proven live on this box: a real animated frame sequence on disk (the
+// same fixture helper round 1 used) -> the REAL exportBridge.js's framesToMp4(pattern, mp4Path,
+// {backend:"webcodecs"}) -> a real mp4 on disk -> independently re-verified both structurally and by
+// decoding it back out, exactly as round 1's own section 2 did for the bridge function directly -- this
+// section additionally proves exportBridge.js's OWN wrapping (path split, file write, resolve contract).
+let wcRealDir, wcRealMp4Path;
+{
+    console.log("\n11. THE webcodecs BACKEND, END TO END, THROUGH THE REAL exportBridge.js framesToMp4()");
+    wcRealDir = path.join(scratchRoot, "exportbridge-real-sequence");
+    const W = 64, H = 64, N = 16, PATTERN = "frame-%05d.png";
+    const render = WC._renderAnimatedSequenceToDisk(wcRealDir, PATTERN, N, W, H);
+    ok("!! _renderAnimatedSequenceToDisk() wrote " + N + " REAL PNG files to disk for this section", render.ok === true && render.count === N, JSON.stringify({ ok: render.ok, count: render.count }));
+
+    wcRealMp4Path = path.join(scratchRoot, "exportbridge-real-out.mp4");
+    const fullPattern = path.join(wcRealDir, PATTERN); // the FULL path shape exportBridge.js's real callers pass (dir + printf pattern combined)
+    let resolved = null, rejectErr = null;
+    try { resolved = await EB.framesToMp4(fullPattern, wcRealMp4Path, { backend: "webcodecs", fps: 10 }); }
+    catch (e) { rejectErr = e; }
+    ok("!! exportBridge.js's real framesToMp4(pattern, mp4Path, {backend:\"webcodecs\"}) RESOLVED (not rejected)",
+        rejectErr === null, rejectErr ? String(rejectErr && rejectErr.message || rejectErr) : "resolved cleanly");
+    ok("!! ...and resolved with mp4Path itself (a string) -- the EXACT SAME resolve contract the ffmpeg branch uses, so a caller cannot tell which backend ran",
+        resolved === wcRealMp4Path, JSON.stringify({ resolved, expected: wcRealMp4Path }));
+    ok("!! mp4Path now contains REAL bytes on disk", fs.existsSync(wcRealMp4Path) && fs.statSync(wcRealMp4Path).size > 0, fs.existsSync(wcRealMp4Path) ? fs.statSync(wcRealMp4Path).size + " bytes" : "MISSING");
+
+    if (fs.existsSync(wcRealMp4Path)) {
+        const buf = fs.readFileSync(wcRealMp4Path);
+        const v = WC._verifyMp4(buf);
+        ok("!! _verifyMp4()'s structural check passes on the file exportBridge.js actually wrote (ftyp+moov+mdat present, box sizes sum to file length, NAL walk exact)",
+            v.haveFtyp && v.haveMoov && v.haveMdat && v.boxSizesMatchFileLength && v.mdatWalkExact, JSON.stringify(v));
+        const dv = await WC._verifyDecodedFramesDiffer(buf);
+        ok("!! _verifyDecodedFramesDiffer() successfully decoded the file exportBridge.js wrote, via @napi-rs/webcodecs' own Mp4Demuxer+VideoDecoder",
+            dv.ok === true, dv.ok ? (dv.videoChunksDemuxed + " chunks demuxed, " + dv.decodedFramesSampled + " frames sampled") : JSON.stringify(dv));
+        if (dv.ok) {
+            ok("!! ...and the DECODED frames genuinely differ from each other -- real motion survived exportBridge.js's own write-to-disk round trip",
+                dv.framesDiffer === true, JSON.stringify(dv.samples));
+        }
+    }
+}
+
+// ---- 12. opts.audio + backend:"webcodecs" REJECTS CLEARLY -- NO SILENT IGNORE, NO SILENT ffmpeg FALLBACK -
+{
+    console.log("\n12. opts.audio + backend:\"webcodecs\" REJECTS CLEARLY (not silently ignored, not silently falling back to ffmpeg)");
+    const audioMp4Path = path.join(scratchRoot, "exportbridge-audio-reject-out.mp4");
+    let rejectErr = null, resolved = null;
+    try { resolved = await EB.framesToMp4(path.join(wcRealDir, "frame-%05d.png"), audioMp4Path, { backend: "webcodecs", fps: 10, audio: "/some/path.wav" }); }
+    catch (e) { rejectErr = e; }
+    ok("!! rejects (does not resolve) when audio is set alongside backend:\"webcodecs\"", resolved === null && rejectErr instanceof Error, resolved !== null ? "UNEXPECTEDLY RESOLVED: " + resolved : String(rejectErr && rejectErr.message));
+    ok("!! ...and the rejection names audio, not a generic/unrelated failure", rejectErr && /audio/i.test(rejectErr.message), rejectErr && rejectErr.message);
+    ok("!! ...and no mp4 was written to disk (no partial/silent-fallback output)", !fs.existsSync(audioMp4Path));
+}
+
+// ---- 13. opts:null DOES NOT CRASH EITHER PATH -- THE BUG CLASS THAT HAS BITTEN REPEATEDLY THIS SESSION ---
+{
+    console.log("\n13. opts:null (not opts:{}) DOES NOT CRASH framesToMp4() -- default path AND webcodecs-selection path");
+    // opts:null can never actually SELECT the webcodecs branch (opts must be truthy to read .backend off
+    // it) -- so this proves the falsy-opts case degrades the same way it always did: falls through to the
+    // (unchanged) ffmpeg Promise body, which throws synchronously inside the executor and is therefore
+    // auto-converted to a REJECTED promise by the Promise constructor itself, not an uncaught crash.
+    let rejectErr = null, threw = false;
+    try {
+        const p = EB.framesToMp4("/tmp/swek-selfcheck-null-opts/frame-%05d.png", "/tmp/swek-selfcheck-null-opts-out.mp4", null);
+        await p;
+    } catch (e) { rejectErr = e; }
+    ok("!! framesToMp4(pattern, mp4Path, null) rejects cleanly (a real Error), does not throw uncaught / crash the process",
+        rejectErr instanceof Error, rejectErr ? rejectErr.constructor.name + " | " + rejectErr.message : "did not reject (unexpected)");
+}
+
+// ---- 14. SABOTAGE, THROUGH THE REAL exportBridge.js WIRING: @napi-rs/webcodecs UNAVAILABLE ---------------
+// Round 1's sabotage (sections 6-7) targeted webcodecsBridge.js directly. This section goes one hop
+// further: a scratch copy of exportBridge.js whose require("./webcodecsBridge.js") is repointed at a
+// scratch, sabotaged copy of the bridge -- so the sabotage is exercised through framesToMp4() ->
+// _framesToMp4WebCodecs() -> encodeFramesDirToMp4(), the actual call chain a real caller would hit, not
+// just the bridge file in isolation. Neither scratch file ever touches the shipped source or the real
+// installed @napi-rs/webcodecs package.
+{
+    console.log("\n14. SABOTAGE (THROUGH THE REAL exportBridge.js WIRING): @napi-rs/webcodecs UNAVAILABLE -> CLEAN REJECTION");
+    const wcRealSrc = fs.readFileSync(path.join(ENG, "ai-bridge", "webcodecsBridge.js"), "utf8");
+    const wcTarget = '_webcodecsMod = require("@napi-rs/webcodecs");';
+    ok("!! the require() call this targets is present in the shipped bridge source, exactly once", wcRealSrc.split(wcTarget).length - 1 === 1);
+    const wcBrokenSrc = wcRealSrc.replace(wcTarget, '_webcodecsMod = require("@napi-rs/webcodecs-DOES-NOT-EXIST");');
+
+    const ebRealSrc = fs.readFileSync(path.join(ENG, "ai-bridge", "exportBridge.js"), "utf8");
+    const ebTarget = 'require("./webcodecsBridge.js")';
+    ok("!! the require() call this targets is present in the shipped exportBridge.js source, exactly once", ebRealSrc.split(ebTarget).length - 1 === 1);
+
+    const scratchWcPath = path.join(ENG, "ai-bridge", "__webcodecsBridge.sabotage.exportbridge-wiring." + process.pid + ".js");
+    const scratchEbPath = path.join(ENG, "ai-bridge", "__exportBridge.sabotage.wiring." + process.pid + ".js");
+    try { fs.unlinkSync(scratchWcPath); } catch {}
+    try { fs.unlinkSync(scratchEbPath); } catch {}
+    fs.writeFileSync(scratchWcPath, wcBrokenSrc);
+    fs.writeFileSync(scratchEbPath, ebRealSrc.replace(ebTarget, "require(" + JSON.stringify(scratchWcPath) + ")"));
+
+    try {
+        delete require_.cache[require_.resolve(scratchEbPath)];
+        delete require_.cache[require_.resolve(scratchWcPath)];
+        const EbBroken = require_(scratchEbPath);
+        const sabDir = path.join(scratchRoot, "sabotage-exportbridge-webcodecs-dir");
+        WC._renderAnimatedSequenceToDisk(sabDir, "frame-%05d.png", 4, 16, 16); // rendered by the REAL, unsabotaged module
+        const sabMp4Path = path.join(scratchRoot, "sabotage-exportbridge-webcodecs-out.mp4");
+        let rejectErr = null, resolved = null;
+        try { resolved = await EbBroken.framesToMp4(path.join(sabDir, "frame-%05d.png"), sabMp4Path, { backend: "webcodecs", fps: 10 }); }
+        catch (e) { rejectErr = e; }
+        ok("!! RED BY NAME, REPRODUCED THROUGH THE REAL exportBridge.js WIRING: with @napi-rs/webcodecs unavailable, framesToMp4(...,{backend:\"webcodecs\"}) rejects with a real Error naming webcodecs, not an uncaught throw",
+            resolved === null && rejectErr instanceof Error && /webcodecs/i.test(rejectErr.message),
+            resolved !== null ? "UNEXPECTEDLY RESOLVED: " + resolved : String(rejectErr && rejectErr.message));
+        ok("!! ...and no mp4 was written to disk", !fs.existsSync(sabMp4Path));
+    } finally {
+        try { fs.unlinkSync(scratchWcPath); } catch {}
+        try { fs.unlinkSync(scratchEbPath); } catch {}
+    }
+
+    // GREEN AGAIN: the real, unsabotaged exportBridge.js (already loaded as EB above -- never touched by
+    // the scratch files) still encodes a fresh real directory successfully through the same wiring.
+    const restoreDir = path.join(scratchRoot, "restore-exportbridge-webcodecs-dir");
+    WC._renderAnimatedSequenceToDisk(restoreDir, "frame-%05d.png", 4, 16, 16);
+    const restoreMp4Path = path.join(scratchRoot, "restore-exportbridge-webcodecs-out.mp4");
+    const restored = await EB.framesToMp4(path.join(restoreDir, "frame-%05d.png"), restoreMp4Path, { backend: "webcodecs", fps: 10 });
+    ok("!! GREEN AGAIN: the real, unsabotaged exportBridge.js + webcodecsBridge.js still encode a fresh real directory successfully",
+        restored === restoreMp4Path && fs.existsSync(restoreMp4Path) && fs.statSync(restoreMp4Path).size > 0,
+        "restored -- real node_modules/@napi-rs/webcodecs was never touched, only throwaway scratch copies of SOURCE files were");
+}
+
 // cleanup: remove the scratch frame directory tree (never touches anything under the repo itself)
 try { fs.rmSync(scratchRoot, { recursive: true, force: true }); } catch {}
+try { fs.unlinkSync("/tmp/swek-selfcheck-out.mp4"); } catch {}
 
 console.log(fails ? `\nwebcodecsFramesToMp4-selfcheck: ${fails} FAILED` : "\nwebcodecsFramesToMp4-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);

@@ -525,7 +525,15 @@ function _renderAnimatedSequenceToDisk(dir, pattern, frameCount, width, height, 
  * make before this review pass checked it against a genuinely truncated (not just garbage) file.
  */
 async function encodeFramesDirToMp4(dir, pattern, opts = {}) {
-    if (opts && opts.audio) return { ok: false, error: "audio muxing is out of scope for this spike -- @napi-rs/webcodecs' AudioEncoder has not been exercised anywhere in this session; pass no `audio` option" };
+    // *** ADVERSARIAL-REVIEW FIX (same session, a later review pass -- exportBridge.js's own new
+    // webcodecs branch never triggers this, since its `opts && opts.backend === "webcodecs"` guard
+    // guarantees opts is truthy by construction; found instead by directly fuzzing this function, which
+    // is its own module.exports entry any OTHER caller can reach). The `opts && opts.audio` check below
+    // only guarded ITS OWN read -- `opts.fps` further down stayed unguarded, an explicit `opts: null`
+    // throwing an uncaught TypeError instead of this function's own documented {ok:false} contract. Same
+    // bug class, same fix, as the three sibling helpers already carry an identical comment for.
+    opts = opts || {};
+    if (opts.audio) return { ok: false, error: "audio muxing is out of scope for this spike -- @napi-rs/webcodecs' AudioEncoder has not been exercised anywhere in this session; pass no `audio` option" };
 
     const mod = _webcodecs();
     if (!mod) return { ok: false, error: "webcodecs unavailable: " + status().note };
@@ -672,7 +680,19 @@ async function _verifyDecodedFramesDiffer(mp4Buf, opts = {}) {
     const { Mp4Demuxer, VideoDecoder } = mod;
     const maxSamples = Math.max(2, Math.min(64, +opts.maxSamples || 8));
     let demuxer, decoder;
-    const samples = [];
+    // *** ADVERSARIAL-REVIEW FIX (same session, a later review pass). *** This used to cap COLLECTION
+    // itself at maxSamples (`if (samples.length < maxSamples) samples.push(...)`), which -- because
+    // decode order is chronological -- meant only ever the FIRST maxSamples frames were ever looked at,
+    // never a spread across the sequence. Reproduced live: an animated real sequence whose only visible
+    // transition happened after frame 8 read back framesDiffer:false (a false negative) at the default
+    // maxSamples=8, while the identical bytes correctly read framesDiffer:true once ALL frames were
+    // sampled. At realistic production frame counts (hundreds of frames at 15-60fps), the default would
+    // only ever examine well under a second of output -- a real "froze partway through" defect could pass
+    // this check silently. Fixed by collecting a cheap one-byte-plus-timestamp sample for EVERY decoded
+    // frame (trivial memory cost even for hundreds of frames) and evenly subsampling down to maxSamples
+    // AFTER decoding completes, so the returned samples genuinely spread across the whole sequence
+    // regardless of where in it real motion happens to occur.
+    const allSamples = [];
     const pendingCopies = [];
     try {
         demuxer = new Mp4Demuxer({ videoOutput: () => {}, error: () => {} }); // init requires callbacks; the for-await loop below is what's actually used
@@ -700,7 +720,7 @@ async function _verifyDecodedFramesDiffer(mp4Buf, opts = {}) {
                         await frame.copyTo(out);
                         const w = frame.codedWidth, h = frame.codedHeight;
                         const yIdx = Math.floor(h / 2) * w + Math.floor(w / 2); // I420: Y plane is the first w*h bytes
-                        if (samples.length < maxSamples) samples.push({ timestamp: frame.timestamp, format: frame.format, yByte: out[yIdx] });
+                        allSamples.push({ timestamp: frame.timestamp, format: frame.format, yByte: out[yIdx] });
                     } finally { frame.close(); }
                 })();
                 pendingCopies.push(p);
@@ -718,10 +738,15 @@ async function _verifyDecodedFramesDiffer(mp4Buf, opts = {}) {
         try { decoder.close(); } catch {}
         try { demuxer.close(); } catch {}
 
-        if (!samples.length) return { ok: false, error: "demuxed " + videoChunks + " video chunks but decoded 0 frames -- decode produced nothing to sample" };
-        samples.sort((a, b) => a.timestamp - b.timestamp);
+        if (!allSamples.length) return { ok: false, error: "demuxed " + videoChunks + " video chunks but decoded 0 frames -- decode produced nothing to sample" };
+        allSamples.sort((a, b) => a.timestamp - b.timestamp);
+        // Evenly spread maxSamples indices across the FULL decoded sequence (not just its start) -- see
+        // the fix comment above. Index 0 and the last index are always included so the spread genuinely
+        // spans the sequence rather than clustering away from either end.
+        const samples = allSamples.length <= maxSamples ? allSamples
+            : Array.from({ length: maxSamples }, (_, i) => allSamples[Math.round(i * (allSamples.length - 1) / (maxSamples - 1))]);
         const allSame = samples.every(s => s.yByte === samples[0].yByte);
-        return { ok: true, videoChunksDemuxed: videoChunks, decodedFramesSampled: samples.length, samples, framesDiffer: !allSame };
+        return { ok: true, videoChunksDemuxed: videoChunks, decodedFramesTotal: allSamples.length, decodedFramesSampled: samples.length, samples, framesDiffer: !allSame };
     } catch (e) {
         try { if (decoder) decoder.close(); } catch {}
         try { if (demuxer) demuxer.close(); } catch {}
