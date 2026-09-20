@@ -56,6 +56,22 @@ const onDisk = Object.keys(T.timings).filter((g) => fs.existsSync(path.join(ENG,
 const c = { over: [], killed: [], under: [] };
 for (const g of onDisk) c[SC.classify(T.timings[g])].push(g);
 
+// ---- v4647l SABOTAGES, RESULTS BY NAME ------------------------------------------------------------------
+//
+//   YA. a moved entry is excused with no confirming runs        -> 3 RED
+//   YB. the confirming runs contradict the filed reading        -> 3 RED
+//   YC. excusedBy accepts the name without checking the runs    -> 1 RED
+//   YD. a disagreeing gate NOT in the roll passes anyway        -> 1 RED
+//   YE. the report names no gate, only counts                   -> 1 RED
+//   YF. the report lists `left` while counting `agreed`         -> 1 RED
+//
+// *** YC AND YD BOTH MEASURED ZERO FIRST, AND THEY ARE THE TWO THAT MATTER. *** The row checking the
+// corroboration was calling the very function under test -- a check grading its own copy, which this tree
+// already has on record at v4443 and v4445 -- and "not in the roll" was unreachable from live data, because
+// today there is exactly ONE disagreeing gate and it IS in the roll. The rule is a pure `excusedBy` now,
+// driven on hand-made input through every branch that refuses. A rule tested only against today's tree is
+// tested against one sample of it.
+
 console.log("capReading-selfcheck -- the number beside a killed gate is the cap, not the gate\n");
 
 // -----------------------------------------------------------------------------------------------------------
@@ -174,19 +190,117 @@ export const LET_FINISH_V4573 = Object.freeze({
     // 10% is the tolerance, and it is loose ON PURPOSE: these are whole-process runtimes on a contended box,
     // where 3% is what two honest readings of the same gate look like and a table that had drifted would be
     // out by the 41x this sample spans, not by a tenth.
+    //
+    // *** v4647l -- THAT 3% CAME FROM A SAMPLE OF TWO, AND THE FIRST GATE TO DISAGREE DISAGREED BY SIX TIMES
+    // IT. *** The sentence above was written at v4637 from the only two gates that had left the population,
+    // both agreeing to 2.9% and 3.0%. One of those two, eulerGpu, now reads 19.8% from the table -- and it
+    // is the SAME gate whose agreement produced the number.
+    //
+    // MEASURED RATHER THAN ARGUED, three runs in one minute on an idle box:
+    //
+    //     15,003 / 15,136 / 16,459 ms   median 15,136, within-minute spread 9.7%
+    //     table 18,450 -> 18.0% from that median; the filed 14,806 -> 2.2% from it
+    //
+    // So TWO things are true at once and the old row could express neither. The gate really did move -- it
+    // was 17,904 at v4637 and it is ~15,100 now, confirmed three times -- AND a 10% bound sits inside this
+    // gate's own within-minute spread, so a single pair of readings cannot tell drift from noise at all.
+    //
+    // *** A DEPARTURE THAT DISAGREES IS NOW A ROLL, NOT A RED. *** The same shape sweepCoverage uses for
+    // straddlers and quickSweep uses for crossings: one reading is a hypothesis, and it takes more than one
+    // to move a record. A gate whose fresh reading disagrees passes only when it is NAMED here with the runs
+    // that confirm it; anything else is still red. The table's historical number is KEPT -- it was true when
+    // it was taken, and deleting it would destroy the evidence this whole file exists to hold.
+    const MOVED_AT_V4647L = Object.freeze([
+        Object.freeze({ gate: "tools/ship/eulerGpu-selfcheck.mjs", table: 18450, now: 14806,
+            runs: Object.freeze([15003, 15136, 16459]),
+            why: "18,450 at the cap pass, 17,904 at v4637 (3.0% -- the reading that set this row's tolerance), " +
+                 "and ~15,100 now across three runs in one minute. The 14,806 filed in sweep-timings came from " +
+                 "a serial re-run this session after a `--gates` typo recorded it AT the 20,000 ms cap; it is " +
+                 "2.2% from the median of the three, so the filed number is sound and the TABLE is the stale " +
+                 "one. Kept rather than re-taken: 18,450 is what the gate cost when the cap was hiding it.",
+        }),
+    ]);
+    // A roll entry earns its exemption only if its own runs corroborate the FILED reading -- otherwise
+    // "named in the record" would be a way to excuse any number at all, which is the exemption-list shape
+    // sweepCoverage spent three rounds getting out of.
+    const median = (xs) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
+    // *** PURE, AND DRIVEN ON FIXTURES BELOW, BECAUSE THE FIRST DRAFT'S ROWS COULD NOT SEE IT BREAK. ***
+    // Sabotage YC made this return `true` unconditionally and sabotage YD dropped the roll from the
+    // partition, and BOTH went zero red: the row that checks the corroboration was calling this very
+    // function (a check grading its own copy -- v4443 and v4445 in this tree), and the live data has exactly
+    // one disagreeing gate which IS in the roll, so "not in the roll" was never exercised by anything.
+    const excusedBy = (roll, gate, now, bound = 0.10) => {
+        const e = roll.find((m) => m.gate === gate);
+        if (!e || !Array.isArray(e.runs) || e.runs.length < 3 || typeof now !== "number") return false;
+        return Math.abs(median(e.runs) - now) / now <= bound;
+    };
+    const movedOk = (r) => excusedBy(MOVED_AT_V4647L, r.gate, (T.timings || {})[r.gate]);
     const stillNV = R.filter((r) => NV.includes(r.gate));
     const left = R.filter((r) => !NV.includes(r.gate));
     const agreed = left.filter((r) => {
         const now = (T.timings || {})[r.gate];
         return typeof now === "number" && Math.abs(now - r.ms) / r.ms <= 0.10;
     });
+    // *** THE COUNT AND THE LIST WERE DIFFERENT POPULATIONS, AND THE ONE THAT MATTERED WAS UNNAMED. ***
+    // The old detail printed `agreed.length` and then listed `left` -- "7 LET FINISH SINCE and agreeing"
+    // followed by EIGHT names -- and never said which one disagreed. Same species as the sweep that counted
+    // 143 starved gates and named none. The disagreeing gates are named first now, with their percentages.
+    const off = (r) => Math.abs(((T.timings || {})[r.gate] || 0) - r.ms) / r.ms;
+    const disagreed = left.filter((r) => !agreed.includes(r));
+    const moved = disagreed.filter(movedOk);
+    const loose = disagreed.filter((r) => !movedOk(r));
+    const show = (r) => `${path.basename(r.gate)} table ${r.ms} now ${(T.timings || {})[r.gate]} (${(off(r) * 100).toFixed(1)}%)`;
+    // The detail is a VALUE so a row can grade it. The defect that started this round was in the detail --
+    // it printed `agreed.length` and then listed `left`, "7 LET FINISH SINCE and agreeing" over EIGHT names,
+    // and never said which one disagreed. A sentence nothing reads is a sentence nothing keeps honest.
+    const detail = stillNV.length === R.length ? `all ${R.length} still killed-with-no-verdict` :
+            `${stillNV.length} still killed-with-no-verdict; ${agreed.length} let finish since and AGREEING; ` +
+            `${moved.length} let finish since and MOVED, named in MOVED_AT_V4647L with confirming runs` +
+            (moved.length ? ` -- ${moved.map(show).join(", ")}` : "") +
+            (loose.length ? `; ${loose.length} DISAGREEING AND UNNAMED -- ${loose.map(show).join(", ")}` : "") +
+            `. Agreeing to within ${agreed.length ? (Math.max(...agreed.map(off)) * 100).toFixed(1) : "0"}%; ` +
+            `a departure beyond ${10}% is a hypothesis until a round runs it again and records the readings.`;
     ok(`  and every one of the ${R.length} is still in the population it was drawn from, or its fresh reading agrees with the table`,
-        stillNV.length + agreed.length === R.length,
-        stillNV.length === R.length ? `all ${R.length} still killed-with-no-verdict` :
-            `${stillNV.length} still killed-with-no-verdict; ${agreed.length} LET FINISH SINCE and agreeing -- ` +
-            left.map((r) => `${path.basename(r.gate)} table ${r.ms} now ${(T.timings || {})[r.gate]}`).join(", ") +
-            `. A departure that did NOT agree would mean the table described a tree that has moved; these agree ` +
-            `to within ${left.length ? (Math.max(...left.map((r) => Math.abs(((T.timings || {})[r.gate] || 0) - r.ms) / r.ms)) * 100).toFixed(1) : "0"}%.`);
+        stillNV.length + agreed.length + moved.length === R.length, detail);
+    ok("!! ...and the sentence NAMES every gate that disagreed, which is the defect that opened this round",
+        disagreed.every((r) => detail.includes(path.basename(r.gate))) &&
+        (!disagreed.length || /MOVED|DISAGREEING/.test(detail)),
+        `${disagreed.length} disagreeing, ${disagreed.filter((r) => detail.includes(path.basename(r.gate))).length} ` +
+        "named. The old sentence counted one population and listed another, so the one gate that mattered " +
+        "was the one it did not mention -- the same shape as the sweep that counted 143 starved gates and " +
+        "named none.");
+    // Computed HERE rather than through movedOk: a row that asks the function under test whether the
+    // function under test is right cannot fail when the function is wrong.
+    ok("!! ...and a MOVED entry is only excused by runs that corroborate the FILED reading",
+        MOVED_AT_V4647L.every((e) => e.runs.length >= 3) &&
+        MOVED_AT_V4647L.every((e) => {
+            const now = (T.timings || {})[e.gate];
+            return typeof now === "number" && Math.abs(median(e.runs) - now) / now <= 0.10;
+        }),
+        MOVED_AT_V4647L.map((e) => `${path.basename(e.gate)} ${e.runs.join("/")} -> median ` +
+            `${median(e.runs)} against ${(T.timings || {})[e.gate]} filed`).join("; ") +
+            ". Naming a gate must not be a way to excuse any number at all -- that is the exemption list " +
+            "sweepCoverage spent three rounds getting out of.");
+    // *** THE RULE, DRIVEN ON HAND-MADE INPUT. *** The live data has ONE disagreeing gate and it is in the
+    // roll, so every branch that refuses is unreachable from the tree as it stands. A rule tested only
+    // against today's tree is tested against one sample of it.
+    const FX = [Object.freeze({ gate: "fx", table: 1000, now: 800, runs: Object.freeze([790, 800, 810]) })];
+    ok("!! *** in the roll AND corroborated by three runs -> excused; and every other branch refuses ***",
+        excusedBy(FX, "fx", 800) === true &&
+        excusedBy(FX, "notInRoll", 800) === false &&
+        excusedBy([{ gate: "fx", runs: [790] }], "fx", 800) === false &&
+        excusedBy([{ gate: "fx", runs: [1600, 1610, 1620] }], "fx", 800) === false &&
+        excusedBy(FX, "fx", undefined) === false,
+        "named-and-corroborated passes; NOT NAMED refuses; fewer than three runs refuses; runs that " +
+        "contradict the filed reading refuse; no filed reading at all refuses. Sabotage YD replaced `moved` " +
+        "with `disagreed` in the partition and nothing went red, because today the two sets are equal");
+
+    ok("!! ...and the 10% bound is at this population's NOISE FLOOR, which is why one reading cannot move a record",
+        MOVED_AT_V4647L.every((e) => (Math.max(...e.runs) - Math.min(...e.runs)) / Math.min(...e.runs) > 0.05),
+        MOVED_AT_V4647L.map((e) => `${path.basename(e.gate)} spread ` +
+            `${(((Math.max(...e.runs) - Math.min(...e.runs)) / Math.min(...e.runs)) * 100).toFixed(1)}% in one minute`).join("; ") +
+            ". The 3% this row's tolerance was argued from was a sample of TWO agreeing readings, and one of " +
+            "those two is the entry above.");
 }
 
 // -----------------------------------------------------------------------------------------------------------
