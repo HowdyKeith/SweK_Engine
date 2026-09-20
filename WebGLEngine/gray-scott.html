@@ -149,6 +149,7 @@ document.getElementById("btnReseed").addEventListener("click", () => sim.reseed 
         } catch (e) {}
     }
     window.addEventListener("message", (e) => {
+        if (e.origin !== window.location.origin) return;
         const d = e.data;
         if (!d || typeof d !== "object") return;
         if (d.type === "demo:set") {
