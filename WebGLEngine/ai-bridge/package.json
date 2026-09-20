@@ -26,6 +26,7 @@
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@napi-rs/canvas": "^1.0.9",
     "@napi-rs/clipboard": "^1.1.4",
+    "@napi-rs/webcodecs": "^1.4.1",
     "ffmpeg-static": "^5.2.0",
     "puppeteer-core": "^24.0.0"
   },
