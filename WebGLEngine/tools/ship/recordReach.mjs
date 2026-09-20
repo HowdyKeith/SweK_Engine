@@ -265,7 +265,23 @@ export const REACH_AT_V4548 = Object.freeze({
     // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
     // and the readings overlap on everything predating the split, so they are run over the merged tree rather
     // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
-    total: 144,
+    // *** v4647f -- RE-TAKEN: 144 -> 146, AND THE ROUND THAT ADDED THE TWO RECORDS LEFT THIS GATE RED. ***
+    // GROUND_LIMIT_AT_V4647 (tools/ship/controllerAgreement.mjs) and SEPARATOR_SITES_AT_V4647
+    // (tools/ship/posixAssumption.mjs) arrived in earlier rounds of this session and nothing re-took the
+    // population, so recordReach-selfcheck was a NEW red on the branch -- found by running the gates that
+    // read quickSweep's source after an unrelated repair, not by the round that caused it. FIFTH time this
+    // session that a census stopped matching its own prose, and the first where the census was RIGHT and the
+    // round that moved the tree was the thing at fault.
+    //
+    // ONLY `total` MOVES HERE. It is structural -- how many frozen records the tree holds -- and no clock
+    // enters it. The timing-dependent fields below are NOT re-taken even though this box now reads
+    // 104 checked / 25 over-budget against the 64/36 filed: this record's own note two paragraphs down says
+    // those two wobble with box load across the 3,000 ms line, and `unchecked` is a CEILING (live 42 against
+    // the 50 recorded, so the ratchet is satisfied with room). Lowering a ceiling onto a reading that moves
+    // between two runs of the same code is how a gate becomes a coin toss.
+    //
+    // Neither arrival raised `unguarded`: both are named by the gate in the file that defines them.
+    total: 146,
     // *** READ OFF THE INSTRUMENT, NOT PREDICTED. *** The first draft of this record guessed 53/21/19/40 from
     // which gates the round had sped up, and was wrong on three of the four: the comment-strip fix below
     // moved two records the other way at the same time, and a guess cannot see two changes at once.
@@ -466,7 +482,10 @@ export const UNGUARDED_SPLIT_V4577 = Object.freeze({
     // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
     // and the readings overlap on everything predating the split, so they are run over the merged tree rather
     // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
-    structural: Object.freeze({ total: 144, unguarded: 17, documentaryOfThose: 17, readByCodeOfThose: 0 }),
+    // v4647f -- 144 -> 146, the same two arrivals re-taken above. `unguarded` does NOT move: both new
+    // records are named by the gate in their own defining file, which is what a record arriving properly
+    // looks like. The other three fields are structural and unchanged.
+    structural: Object.freeze({ total: 146, unguarded: 17, documentaryOfThose: 17, readByCodeOfThose: 0 }),
     // BEFORE, on the tree this round opened on:
     before: Object.freeze({ total: 104, checked: 72, overBudget: 20, unmeasured: 0, unguarded: 12, unchecked: 32 }),
     // AFTER, as one reading rather than as a constant -- see the note above. Taken with the round's own

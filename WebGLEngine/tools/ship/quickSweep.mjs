@@ -752,9 +752,82 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
     return out;
 }
 
+// ---- THE REPORT, AS A VALUE ---------------------------------------------------------------------------
+//
+// *** v4647f -- THE LINE THAT NAMES THE FALSE REDS THREW THE MOMENT THERE WERE ANY. *** v4647d added the
+// block that finally names them (the round before, the sweep counted 143 starved gates and named none), and
+// wrote `${capMs} ms CAP` and `${workers} of these at once` into it. Neither name exists at module scope:
+// the command line holds them as `opts.capMs` and `opts.workers`, so the template literal was a
+// ReferenceError -- and the block runs ONLY when `r.falseRedList.length`, which is to say ONLY when there is
+// something to report. A green sweep printed fine. A sweep with a finding died before naming it.
+//
+// MEASURED, by running the CLI tail byte-identical with a synthetic result carrying one false red:
+//
+//     [quickSweep] 3 of 3 gates ... 1 false red        <- the summary line printed
+//     ReferenceError: capMs is not defined  at 784:20  <- and then it died, exit 1
+//
+// EIGHTH crash-instead-of-a-finding this session and the purest of them: the error path and the finding path
+// were the same path. `grep -c '^  FAIL'` cannot see this and neither can a green run, which is why the
+// repair is not "declare capMs" -- it is to make the report A VALUE A GATE CAN CALL. reportLines() takes
+// every number from the result object, so there is no scope it can reach past, and
+// tools/ship/quickSweep-selfcheck.mjs calls it on a result WITH false reds.
+//
+// *** AND THE SAME BLOCK WAS UNREACHABLE A SECOND WAY. *** `--json` printed JSON INSTEAD of the report, so
+// the run that saves the data is the run that discards the reading. Keith ran `--workers 4 --json > w4.json`
+// on my instruction and was left with a pretty-printed file and a `findstr` that matched the key and none of
+// the values -- my instruction, and the wrong one. Under --json the report now goes to STDERR (so the
+// redirect still captures clean JSON) and `--read <file>` prints it from a saved run.
+// NOT THE ONLY COPY, AND SAYING SO RATHER THAN PRETENDING OTHERWISE: tools/ship/verify.mjs prints this same
+// reading again, by hand, with a `[verify]` prefix and twenty rows instead of twelve. It is left alone this
+// round because it is EXERCISED ON EVERY SHIP -- which is precisely what the --json branch was not, and why
+// that one rotted while this one stayed correct. A second copy that runs every time is a maintenance cost; a
+// second copy that runs only when somebody redirects to a file is a trap.
+export function reportLines(r) {
+    const out = [];
+    out.push(`[quickSweep] ${r.ran} of ${r.enumerated} gates under ${r.budgetMs} ms ran in ${(r.ms / 1000).toFixed(0)} s: ` +
+        `${r.green} green, ${r.knownRed.length} known red${r.knownRedSkipped ? " (+" + r.knownRedSkipped + " skipped, still red)" : ""}, ` +
+        `${r.newRed.length} NEW red, ${r.falseReds} false red, ${r.unmeasured.length} unmeasured; ` +
+        `${r.skippedOverBudget} over budget skipped, ${r.newGates.length} new gates measured, ${r.dropped.length} dropped from budget`);
+    // v4647 -- whose membership list this was. A foreign box runs the owning box's selection and then finds
+    // out how much of it is over budget there; that is by design (budgetIsOwn) and is no longer silent.
+    if (r.foreignTimings) out.push(`[quickSweep] NOTE: the membership came from ${r.timingsHost} and this is ${r.box}. ` +
+        `${r.skippedOverBudget} gates were skipped as over budget by THAT box's stopwatch, not this one's.`);
+    // *** NAMED, NOT ONLY COUNTED. *** A box that reports 143 of these and cannot list one has measured
+    // nothing anybody can act on. Ordered by how much the parallelism cost each gate, because that is the
+    // evidence that they ARE starvation and not a flake -- a ratio near 1 is a gate that was never slowed.
+    if (r.falseRedList && r.falseRedList.length) {
+        const sp = falseRedSplit(r.falseRedList);
+        out.push(`[quickSweep] ${r.falseReds} FALSE RED (red under -P, green alone): ${sp.capped} KILLED AT THE ` +
+            `${r.capMs} ms CAP, ${sp.slowed} genuinely slower. Different causes -- a gate killed at the cap while ` +
+            `finishing in seconds alone is a box that cannot run ${r.workers} of these at once, not one fighting for CPU.`);
+        const top = r.falseRedList.slice(0, 12);
+        for (const f of top) out.push(`[quickSweep]   ` +
+            (f.capped ? "CAPPED".padStart(7) : (String(f.ratio ?? "?") + "x").padStart(7)) +
+            `  ${f.gate}  ${f.parallelMs} ms loaded -> ${f.serialMs} ms alone` +
+            (f.parallelCode != null ? `, exit ${f.parallelCode}` : ""));
+        if (r.falseRedList.length > top.length) out.push(`[quickSweep]   ... ${r.falseRedList.length - top.length} more; --json carries all of them`);
+    }
+    if (r.unchangedInputs) out.push(`[quickSweep] ${r.unchangedInputs} of those had NO CHANGED INPUT and ` +
+        (r.skippedUnchanged ? "were SKIPPED. Pass --full to run them: a wrongly skipped gate is the one failure "
+                            + "here that is silent, and tools/ship/importClosure.mjs is what bounds it"
+                            : "were RUN (--full)"));
+    for (const k of r.knownRed) out.push(`  known  ${k.gate}  (${k.record})`);
+    for (const n of r.newRed) out.push(`  NEW    ${n.gate}  exit ${n.code} in ${n.ms} ms`);
+    for (const d of r.dropped) out.push(`  slower ${d}  now over budget`);
+    return out;
+}
+
 // ---- CLI ------------------------------------------------------------------------------------------------
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     const arg = (n, d) => { const i = process.argv.indexOf(n); return i >= 0 ? process.argv[i + 1] : d; };
+    const readFrom = arg("--read", null);
+    if (readFrom) {
+        // A SAVED RUN IS STILL A RUN. The measurement that decides #53 -- do the cap kills collapse at four
+        // workers -- was taken on Keith's box and then sat in a file nothing could print.
+        const saved = JSON.parse(fs.readFileSync(path.resolve(readFrom), "utf8"));
+        for (const line of reportLines(saved)) console.log(line);
+        process.exit(0);
+    }
     const opts = { budgetMs: Number(arg("--budget", DEFAULTS.budgetMs)), workers: Number(arg("--workers", DEFAULTS.workers)),
                    capMs: Number(arg("--cap", DEFAULTS.capMs)), timingsFile: arg("--timings", DEFAULTS.timingsFile) };
     let lastPct = -1;
@@ -771,33 +844,10 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     opts.skipUnchanged = !process.argv.includes("--full");
     const r = await runQuickSweep({ ...opts, onProgress: (d, t) => { const pct = Math.floor(100 * d / t); if (pct !== lastPct && pct % 10 === 0) { lastPct = pct; process.stderr.write(`[quickSweep] ${d}/${t}\n`); } } })
         .catch((e) => { console.error("[quickSweep] runner failed: " + (e && e.message)); process.exit(2); });
+    // THE REPORT IS PRINTED EITHER WAY. Under --json it goes to stderr so that `--json > file` still captures
+    // clean JSON on stdout -- a redirect that swallows the reading is how w4.json came to be unreadable.
+    const sink = process.argv.includes("--json") ? ((s) => process.stderr.write(s + "\n")) : ((s) => console.log(s));
     if (process.argv.includes("--json")) console.log(JSON.stringify(r, null, 1));
-    else {
-        console.log(`[quickSweep] ${r.ran} of ${r.enumerated} gates under ${r.budgetMs} ms ran in ${(r.ms / 1000).toFixed(0)} s: ` +
-            `${r.green} green, ${r.knownRed.length} known red${r.knownRedSkipped ? " (+" + r.knownRedSkipped + " skipped, still red)" : ""}, ${r.newRed.length} NEW red, ${r.falseReds} false red, ${r.unmeasured.length} unmeasured; ` +
-            `${r.skippedOverBudget} over budget skipped, ${r.newGates.length} new gates measured, ${r.dropped.length} dropped from budget`);
-        // *** NAMED, NOT ONLY COUNTED. *** A box that reports 143 of these and cannot list one has measured
-        // nothing anybody can act on. Ordered by how much the parallelism cost each gate, because that is the
-        // evidence that they ARE starvation and not a flake -- a ratio near 1 is a gate that was never slowed.
-        if (r.falseRedList && r.falseRedList.length) {
-            const sp = falseRedSplit(r.falseRedList);
-            console.log(`[quickSweep] ${r.falseReds} FALSE RED (red under -P, green alone): ${sp.capped} KILLED AT THE ` +
-                `${capMs} ms CAP, ${sp.slowed} genuinely slower. Different causes -- a gate killed at the cap while ` +
-                `finishing in seconds alone is a box that cannot run ${workers} of these at once, not one fighting for CPU.`);
-            const top = r.falseRedList.slice(0, 12);
-            for (const f of top) console.log(`[quickSweep]   ` +
-                (f.capped ? "CAPPED".padStart(7) : (String(f.ratio ?? "?") + "x").padStart(7)) +
-                `  ${f.gate}  ${f.parallelMs} ms loaded -> ${f.serialMs} ms alone` +
-                (f.parallelCode != null ? `, exit ${f.parallelCode}` : ""));
-            if (r.falseRedList.length > top.length) console.log(`[quickSweep]   ... ${r.falseRedList.length - top.length} more; --json carries all of them`);
-        }
-        if (r.unchangedInputs) console.log(`[quickSweep] ${r.unchangedInputs} of those had NO CHANGED INPUT and ` +
-            (r.skippedUnchanged ? "were SKIPPED. Pass --full to run them: a wrongly skipped gate is the one failure "
-                                + "here that is silent, and tools/ship/importClosure.mjs is what bounds it"
-                                : "were RUN (--full)"));
-        for (const k of r.knownRed) console.log(`  known  ${k.gate}  (${k.record})`);
-        for (const n of r.newRed) console.log(`  NEW    ${n.gate}  exit ${n.code} in ${n.ms} ms`);
-        for (const d of r.dropped) console.log(`  slower ${d}  now over budget`);
-    }
+    for (const line of reportLines(r)) sink(line);
     process.exit(r.newRed.length ? 1 : 0);
 }

@@ -103,10 +103,24 @@ console.log("\n2. handed a stale record, each check names it");
     // stale" and went red -- because this round's own new gate had already made three records stale, which is
     // the very cost the file exists to surface. A control that assumes a clean tree is a control that only
     // works on a tree nobody is working on.
-    const baseline = live.stale.filter((c) => c.name !== "assertionShape census").length;
-    ok("...and the OTHER checks are unaffected by that fixture",
-        d.filter((c) => c.stale).length === baseline + 1,
-        `sabotage F: marking everything stale is as useless as marking nothing stale (baseline ${baseline})`);
+    //
+    // *** v4647f -- AND THE FIX FOR THAT WAS ITSELF UNABLE TO SEE WHAT IT NAMED. *** The row read "the OTHER
+    // checks are unaffected by that fixture" and compared `d.filter(stale).length` against `baseline + 1`,
+    // where `d` came from a call carrying `only: "assertionShape census"` -- ONE check. `d` can therefore
+    // only ever hold 1 stale, so the row passed exactly when `baseline` was 0 and went red the instant
+    // anything in the tree had drifted, whatever the fixture did. FOUND BY MEASUREMENT: this gate was red
+    // with `baseline 2` while the two stale records were the knowledge index and the instrument registry,
+    // both moved by the round that was running -- the same shape v4647 already recorded here, where three
+    // reds meant the TREE had drifted and were filed as the gate being broken.
+    //
+    // So the row now asserts what a one-check run CAN establish: that `only` narrows to the check it names.
+    // The claim about the other checks is made in section 4, which calls drift() over the FULL set against
+    // the same live baseline and is the row that can actually make it. Re-running all six here would cost a
+    // second full drift pass in a gate that is 2.6 s against a 3,000 ms membership threshold.
+    ok("!! ...and `only` runs the check it names and no other, which is all a one-check run can establish",
+        d.length === 1 && d[0].name === "assertionShape census",
+        `${d.length} check(s) ran. The "other checks are unaffected" claim lives in section 4, over the ` +
+        `full set -- a row cannot grade what it did not run, and this one used to try`);
 }
 {
     // closingCoverage: a gate no closing names

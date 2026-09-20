@@ -567,7 +567,11 @@ export const PROBE_AT_V4536 = Object.freeze({
     // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
     // and the readings overlap on everything predating the split, so they are run over the merged tree rather
     // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
-    currentIncludingModule: Object.freeze({ records: 144, withFields: 68, fields: 390 }),
+    // v4647f -- RE-TAKEN alongside `excluding`: 144 / 68 / 390 -> 146 / 69 / 392. The two halves are one
+    // census run twice and they have to move together -- the row below asserts the difference between
+    // them is EXACTLY this module's own two records, so re-taking one and not the other turns a stale
+    // number into a contradiction. Read off census() and census({exclude:/frozenRecords/}), not adjusted.
+    currentIncludingModule: Object.freeze({ records: 146, withFields: 69, fields: 392 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -735,7 +739,16 @@ export const PROBE_AT_V4536 = Object.freeze({
     // than repaired here -- a per-line reader is the same species as the 6,000-character window this file's
     // own v4535 note records, and how many other records hide a field behind a comma is a question this round
     // did not ask and the next one should.
-    excluding: Object.freeze({ records: 142, withFields: 66, fields: 371 }),
+    // *** v4647f -- RE-TAKEN: 142 / 66 / 371 -> 144 / 67 / 372. *** The same two arrivals that left
+    // recordReach red: GROUND_LIMIT_AT_V4647 in tools/ship/controllerAgreement.mjs and
+    // SEPARATOR_SITES_AT_V4647 in tools/ship/posixAssumption.mjs, both written earlier in this session by
+    // rounds that never re-took either census. TWO censuses of the same arrivals, in two files, both stale
+    // and both red on the branch -- which is the argument for a census that is DERIVED every run over one
+    // that is filed. This row says so itself: "a round that adds a record re-takes this, and that is the
+    // point". It did not, and the gate is what said so.
+    //
+    // One of the two carries fields (withFields 66 -> 67, fields 371 -> 372); the other is a flat list.
+    excluding: Object.freeze({ records: 144, withFields: 67, fields: 372 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,

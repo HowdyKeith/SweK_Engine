@@ -42,6 +42,27 @@
 // on the row whose name it belongs to.
 //
 // Run: node tools/ship/quickSweep-selfcheck.mjs
+//
+// ---- v4647f SABOTAGES, RESULTS BY NAME ------------------------------------------------------------------
+//
+//   SA. the two bare identifiers put back (`${capMs}`, `${workers}`)     -> 6 RED
+//   SB. the FALSE RED line emitted unconditionally                       -> 1 RED  (the control)
+//   SC. `--read` drops the saved false-red list                          -> 2 RED
+//   SD. `--json` routes the report back to stdout, into the redirect     -> 1 RED
+//   SE. the report printed only on the non-json branch, as before        -> 1 RED
+//   SF. the foreign-timings NOTE printed unconditionally                 -> 1 RED  (the control)
+//   SG. the per-gate rows lose the gate name                             -> 3 RED
+//
+// *** SA WAS MEASURED FIRST AT EXIT 1 WITH ZERO `^  FAIL` LINES. *** The gate DIED on the ReferenceError
+// instead of reporting it -- the exact species section 8 is about, reproduced one level up, in the gate
+// written to catch it. The rows now call reportLines through a `lines()` wrapper that turns a throw into a
+// FAIL line, and SA lands on six named rows.
+//
+// *** AND THE HARNESS ATE THE ROUND'S OWN WORK ONCE. *** The first sabotage script restored with
+// `git checkout -- <file>`, which reverts to HEAD -- so the first sabotage silently deleted the UNCOMMITTED
+// repair it was testing, and SB then ran against the original file and reported 0 red as though the control
+// were dead. Sabotage restores from a copy now. A harness that cannot tell "the fix is absent" from "the fix
+// does not work" is the same defect as a sweep that cannot tell a crash from a green.
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -362,6 +383,108 @@ console.log("\n6. *** THE FILED NUMBER IS A CONTENDED SAMPLE AND THE COST IS A D
        "!! *** and the SHIP-TIME sweep passes skipUnchanged: false explicitly, belt and braces ***",
        "the saving buys iteration speed and spends a small measured chance that a gate which should have run " +
        "did not. The one run this tree must not spend that on is the one whose output is ALL GREEN");
+}
+
+// ---------------------------------------------------------------------------------------------------------
+sec("8. THE REPORT IS A VALUE, AND IT IS EXERCISED WITH SOMETHING TO REPORT");
+// ---------------------------------------------------------------------------------------------------------
+// *** v4647f -- THE BLOCK THAT NAMES THE FALSE REDS THREW EXACTLY WHEN THERE WERE FALSE REDS. ***
+// v4647d fixed "the sweep counted 143 starved gates and named none" and v4647e wrote `${capMs} ms CAP` and
+// `${workers} of these at once` into the new block. Neither identifier exists at module scope -- the command
+// line holds them as `opts.capMs` and `opts.workers` -- so the block was a ReferenceError, and it is guarded
+// by `if (r.falseRedList.length)`. A green sweep printed. A sweep with a finding died at the line that would
+// have named it. MEASURED by running the CLI tail byte-identical with a synthetic result: the summary line
+// printed, then `ReferenceError: capMs is not defined`, exit 1.
+//
+// Eighth crash-instead-of-a-finding this session and the purest: the error path WAS the finding path. So the
+// rows below drive reportLines() WITH false reds in hand -- the state that used to be fatal -- and the
+// control beside them is a result with none, because a row that only ever passes an empty list is the same
+// blindness in a gate instead of in a sweep.
+//
+// *** AND THEY CALL IT THROUGH `lines()`, WHICH TURNS A THROW INTO A FAIL LINE. *** Restoring the defect as
+// a sabotage was measured FIRST at exit 1 with ZERO `^  FAIL` lines -- the gate died on the ReferenceError
+// instead of reporting it, which is the very species the section is about, reproduced one level up. A row
+// that can only be reached by code that does not throw cannot grade code that throws.
+{
+    const lines = (r) => { try { return Q.reportLines(r); } catch (e) { return ["THREW: " + (e && e.message)]; } };
+    const threw = (ls) => ls.length === 1 && ls[0].startsWith("THREW: ");
+    const capped = { gate: "a/b-selfcheck.mjs", parallelMs: 20000, serialMs: 900, capped: true, parallelCode: 124, ratio: null };
+    const slowed = { gate: "c/d-selfcheck.mjs", parallelMs: 4100, serialMs: 1200, capped: false, parallelCode: 1, ratio: 3.42 };
+    const base = { ran: 3, enumerated: 3, budgetMs: 3000, capMs: 20000, workers: 8, ms: 1000, green: 2, knownRed: [],
+                   knownRedSkipped: 0, newRed: [], unmeasured: [], skippedOverBudget: 0, newGates: [], dropped: [],
+                   unchangedInputs: 0, skippedUnchanged: false };
+    const withFalse = lines({ ...base, falseReds: 2, falseRedList: [capped, slowed] });
+    const none = lines({ ...base, falseReds: 0, falseRedList: [] });
+
+    ok(!threw(withFalse),
+       "!! *** reporting a result that HAS false reds does not throw -- the state that used to be fatal ***",
+       threw(withFalse) ? withFalse[0] : "reportLines takes every number from the result object, so there is " +
+       "no enclosing scope for it to reach past and miss");
+    ok(withFalse.some((l) => l.includes("a/b-selfcheck.mjs")) && withFalse.some((l) => l.includes("c/d-selfcheck.mjs")),
+       "!! ...and both false reds are NAMED", "a box that reports 143 of these and can list none has measured nothing");
+    const capLine = withFalse.find((l) => l.includes("FALSE RED"));
+    ok(!!capLine && capLine.includes("20000 ms CAP") && capLine.includes("8 of these at once"),
+       "!! ...and the cap and the worker count -- the two names that did not exist -- are in the line",
+       "a gate killed at the cap is a box that cannot run that many at once; a gate merely slowed is CPU " +
+       "contention. Two causes, and the numbers are what tell them apart");
+    ok(withFalse.some((l) => l.includes("CAPPED") && l.includes("a/b-selfcheck.mjs")) &&
+       withFalse.some((l) => l.includes("3.42x") && l.includes("c/d-selfcheck.mjs")),
+       "!! ...and each row says WHICH of the two it was: CAPPED, or the ratio it was slowed by",
+       "budgetIsOwn: a cap reading is the cap's clock and never a runtime, so it gets no ratio at all");
+    ok(!threw(none) && !none.some((l) => l.includes("FALSE RED")) && none.length >= 1,
+       "CONTROL: a result with no false reds prints no FALSE RED line, and still prints its summary",
+       "without this the rows above would pass on a reportLines that emitted the cap sentence unconditionally");
+
+    // A sweep whose membership came from another box's stopwatch says so. Reported, not corrected: a foreign
+    // box has nowhere to put a corrected membership (v4647), and the point is that it is no longer silent.
+    const foreign = lines({ ...base, falseReds: 0, falseRedList: [], foreignTimings: true,
+                            timingsHost: "linux-x64-4c-16096mb-142c0d", box: "win32-x64-8c-7908mb-fe8d9a", skippedOverBudget: 219 });
+    ok(foreign.some((l) => l.includes("NOTE:") && l.includes("linux-x64-4c-16096mb-142c0d") && l.includes("win32-x64-8c-7908mb-fe8d9a")),
+       "a foreign-timings run names BOTH boxes in the report", "219 gates skipped by a stopwatch that is not this box's");
+    ok(!none.some((l) => l.includes("NOTE:")),
+       "CONTROL: and the owning box gets no such note", "the note means something only where it is not always printed");
+}
+
+// ---------------------------------------------------------------------------------------------------------
+sec("8b. --json NO LONGER SWALLOWS THE READING, AND A SAVED RUN CAN BE RE-READ");
+// ---------------------------------------------------------------------------------------------------------
+// *** THE SECOND WAY THE SAME BLOCK WAS UNREACHABLE. *** `--json` printed the JSON INSTEAD of the report, so
+// the run that SAVES the data is the run that DISCARDS the reading. Keith ran `--workers 4 --json > w4.json`
+// -- my instruction -- and was left with a pretty-printed file and a `findstr` that matched the key and none
+// of the values. The measurement that decides #53 existed and could not be looked at.
+//
+// Driven through the REAL command line, because the defect was in the command line and a row that calls
+// reportLines() directly would have passed on the broken build.
+{
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "qs-read-"));
+    const saved = path.join(tmp, "saved.json");
+    fs.writeFileSync(saved, JSON.stringify({
+        ran: 1306, enumerated: 1757, budgetMs: 3000, capMs: 20000, workers: 4, ms: 412000, green: 1150,
+        knownRed: [], knownRedSkipped: 0, newRed: [], unmeasured: [], skippedOverBudget: 219, newGates: [],
+        dropped: [], unchangedInputs: 0, skippedUnchanged: false, falseReds: 1,
+        falseRedList: [{ gate: "a/b-selfcheck.mjs", parallelMs: 20000, serialMs: 900, capped: true, parallelCode: 124, ratio: null }],
+    }, null, 1));
+    const r = spawnSync(process.execPath, [path.join(ENG, "tools", "ship", "quickSweep.mjs"), "--read", saved],
+                        { cwd: ENG, encoding: "utf8", timeout: 60000 });
+    ok(r.status === 0 && /FALSE RED/.test(r.stdout || "") && /a\/b-selfcheck\.mjs/.test(r.stdout || ""),
+       "!! *** `--read <file>` prints the report from a run saved on another box, and exits 0 ***",
+       `exit ${r.status}; ${String(r.stdout || "").split("\n").length} lines. A JSON file needs a JSON reader ` +
+       "and the tool that wrote it is the one that has one");
+    ok(/1306 of 1757/.test(r.stdout || "") && /20000 ms CAP/.test(r.stdout || ""),
+       "...and the numbers are the SAVED run's, not this box's defaults",
+       "capMs, workers and the budget all come out of the file -- reading a saved run must not silently " +
+       "re-label it with the reader's own settings");
+    fs.rmSync(tmp, { recursive: true, force: true });
+
+    // Source-level, because the routing is what the redirect sees and no in-process row can observe it.
+    const src = fs.readFileSync(path.join(ENG, "tools", "ship", "quickSweep.mjs"), "utf8");
+    const cli = src.slice(src.indexOf("// ---- CLI ---"));
+    ok(/const sink = process\.argv\.includes\("--json"\) \? \(\(s\) => process\.stderr\.write/.test(cli),
+       "!! under --json the report goes to STDERR, so `--json > file` still captures clean JSON",
+       "a redirect that swallows the reading is how w4.json came to be unreadable");
+    ok(/for \(const line of reportLines\(r\)\) sink\(line\);/.test(cli) && !/\belse \{/.test(cli),
+       "!! ...and there is ONE report path, not a json branch and a human branch",
+       "the human branch was the only one exercised, so the json branch was free to rot -- and did");
 }
 
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");

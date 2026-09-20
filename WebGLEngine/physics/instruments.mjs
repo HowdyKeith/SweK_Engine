@@ -1454,6 +1454,16 @@ export const INSTRUMENTS = [
       gate: "tools/ship/composePropose-selfcheck.mjs",
       measures: "Proposes a scene composition from the registered avatars, scenes, pets, rooms, gauges and props.",
       key: "A proposal naming a part that is not registered is REFUSED at proposal time -- the 6 slots are filled from the registries rather than a typed list, so a composition cannot name something that does not exist." },
+    // *** v4647f -- A THIRD page: null ROW, AND THE TREE ASKED FOR IT RATHER THAN THE OTHER WAY ROUND. ***
+    // Factoring quickSweep's human report out of its command line into `reportLines(r)` made the module
+    // follow the v3327 split, registryOrphans put it in `narrow` within the minute, and recordDrift reported
+    // the registry stale. It takes a required result, so it is a FORMATTER like officeManager and
+    // composePropose above -- page: null, because a bench page calling it with nothing would throw.
+    { id: "quick-sweep", area: "method", name: "The ship-time sweep, and the two ways a red can be false",
+      page: null,
+      gate: "tools/ship/quickSweep-selfcheck.mjs",
+      measures: "Runs every gate under the ship-time budget in parallel, re-runs each red ALONE to confirm it, and reports the gates that only fail under contention.",
+      key: "A false red has two causes and the count conflates them: of 127 on an 8-core box, nineteen of the worst twenty were SIGKILLED at the 20,000 ms cap while finishing in under 2,000 ms alone -- a box that cannot run 8 browser gates at once, not one fighting for CPU. A cap reading is the cap's clock and is given no ratio at all." },
     { id: "compose-validate", area: "method", name: "A composition is six named slots, and anything else is refused",
       page: "instrument-bench.html",
       gate: "tools/ship/composeValidate-selfcheck.mjs",
