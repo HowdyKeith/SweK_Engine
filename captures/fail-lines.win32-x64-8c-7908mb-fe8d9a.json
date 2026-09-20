@@ -1,0 +1,505 @@
+{
+ "generatedFrom": "tools/ship/failLines.mjs",
+ "at": "2026-09-20T15:06:13.884Z",
+ "platform": "win32",
+ "box": "win32-x64-8c-7908mb-fe8d9a",
+ "tree": {
+  "commit": "2e7ee818c2d0",
+  "branch": "claude/code-review-nr3a0i",
+  "dirty": true
+ },
+ "summary": {
+  "of": 48,
+  "GREEN": 8,
+  "RED": 35,
+  "CRASHED": 5,
+  "ODD": 0,
+  "totalFailRows": 65
+ },
+ "gates": [
+  {
+   "gate": "ai-bridge/rigRunner-selfcheck.mjs",
+   "exit": 0,
+   "ms": 1220,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "ai-bridge/tools/range-selfcheck.mjs",
+   "exit": 3221226505,
+   "ms": 650,
+   "fails": 0,
+   "lines": [],
+   "verdict": "CRASHED"
+  },
+  {
+   "gate": "physics/render/microfacetSampleWgsl-selfcheck.mjs",
+   "exit": 1,
+   "ms": 4553,
+   "fails": 1,
+   "lines": [
+    "FAIL  !! and the rate is the SAME at f64, so this is not a precision question and the port changes nothing about it   23.1% on the device against 10.8% at f64. A round that reported only the f32 number would have blamed the hardware for arithmetic that does the same thing everywhere -- which is the mirror image of v4408, where the model was right about f32 and wrong about the transcendental"
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "physics/stepperMeter-selfcheck.mjs",
+   "exit": 1,
+   "ms": 161,
+   "fails": 1,
+   "lines": [
+    "FAIL  !! the SHIPPED shmRun path is bit-identical to the pristine v3604 extract   captured BEFORE classifyEnvelope was extracted -- a refactor that 'cannot change anything' is the kind that does"
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "physics/upAxis-selfcheck.mjs",
+   "exit": 0,
+   "ms": 109,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "render/temporalResolve-selfcheck.mjs",
+   "exit": 1,
+   "ms": 3230,
+   "fails": 1,
+   "lines": [
+    "FAIL    and the device's CONFIDENCE buffer matches to 1.07e-6 on all 2304 pixels   worst 1.073e-6"
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/mesh/xatlasRef-selfcheck.mjs",
+   "exit": 1,
+   "ms": 4945,
+   "fails": 1,
+   "lines": [
+    "FAIL  !! the vendored source and the harness are the ones the record was taken from   3 hashed inputs, 3 changed, 3 unrecorded. Pinned at f700c7790aaa. This module's own hash is deliberately NOT among them: a staleness signal that fires on a comment edit is one people learn to regenerate past, so what the fixtures contribute is hashed as mesh DATA instead."
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/roundhouse/magmapDefault-selfcheck.mjs",
+   "exit": 1,
+   "ms": 1960,
+   "fails": 0,
+   "lines": [],
+   "verdict": "CRASHED"
+  },
+  {
+   "gate": "tools/roundhouse/magmapDevice-selfcheck.mjs",
+   "exit": 1,
+   "ms": 2576,
+   "fails": 2,
+   "lines": [
+    "FAIL  *** the SHIPPED variant ran (magmap.wgsl/wg128-shared) and its worst cell against the f64 reference is 3.788e-6 -- inside the corrected floor of 4.500e-6, and OVER the 4.385e-6 that was recorded ***   a device sides with the STORE-rounded emulator (4.4196e-6), not with cellMag's 4.385e-6. This is the measurement the old constant could not have",
+    "FAIL  *** AND THE ARCHITECTURE'S CLAIM HOLDS ON HARDWARE: the device's worst cell of 441 is cell 3, and the centre is 220 ***   v2903 chose that rule -- the GPU may propose the MAP, the PEAK is recomputed on the CPU, always -- from an emulated version of this. It is a device's answer now"
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/roundhouse/magmapTaichiRun-selfcheck.mjs",
+   "exit": 1,
+   "ms": 2094,
+   "fails": 2,
+   "lines": [
+    "FAIL  !! *** the taichi kernel COMPILES AND RUNS *** -- the claim the lane shipped without ever testing   -  [thrown: Cannot read properties of null (reading 'features')]",
+    "FAIL  !! *** the batched path runs, and runs REPEATEDLY ***   -  [thrown: Cannot read properties of null (reading 'createBuffer')]"
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/absenceScope-selfcheck.mjs",
+   "exit": 1,
+   "ms": 6860,
+   "fails": 5,
+   "lines": [
+    "FAIL  out of scope -- real BVH code the three directories could not reach",
+    "FAIL  the tree holds files whose code carries the term where the claim named two, and the record says how many   27 files carry it (15 at v4435 plus 10 named arrivals) against 2 the claim named -- not all of them build one, which the field's name does not say and its comment now does",
+    "FAIL  BVH_AT_V4435.outOfScope still equals what the tree holds",
+    "FAIL  realImplementations agrees with a fresh grade once the named arrivals are added   15 at v4435 + 6 in-scope + 4 out-of-scope named arrivals = 27 now, and every out-of-scope arrival is also named in outOfScope -- the two lists cannot drift apart without this row saying so",
+    "FAIL  excluding the whole outOfScope list would make the claim read SOUND -- which is why the list is asserted"
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/aiPresenceOrb-selfcheck.mjs",
+   "exit": 1,
+   "ms": 4641,
+   "fails": 2,
+   "lines": [
+    "FAIL  !! WGSL emission (three's OTHER compiler backend for the same graph) also succeeds, proving the graph is valid on both   wgslOk=false len=43571 error=null",
+    "FAIL  !! a real WebGPU render of this graph executes in headless Chromium   RENDER_SCRIPT returned no WebGPU shot; wgslError=null"
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/assertionShape-selfcheck.mjs",
+   "exit": 0,
+   "ms": 1171,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "tools/ship/atmosphere-selfcheck.mjs",
+   "exit": 1,
+   "ms": 2641,
+   "fails": 0,
+   "lines": [],
+   "verdict": "CRASHED"
+  },
+  {
+   "gate": "tools/ship/brainTsl-selfcheck.mjs",
+   "exit": 1,
+   "ms": 2268,
+   "fails": 2,
+   "lines": [
+    "FAIL  *** the generated pass is BIT-IDENTICAL to the shipped kernel, on every activation ***   56 differing cells across 4 layer shapes -- the graph and the kernel are computing different numbers",
+    "FAIL  *** none and relu are bit-identical to the f32 CPU mirror too ***   56 differing cells. +, * and max are exactly rounded in WGSL, so a Math.fround mirror can reproduce the device and the claim is a bit claim"
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/buildingLab-selfcheck.mjs",
+   "exit": 1,
+   "ms": 4537,
+   "fails": 2,
+   "lines": [
+    "FAIL    webgpu: the palette is on the picture (3 distinct red-to-green ratios among lit pixels; corners, walls, stairs and roof caps face the camera)",
+    "FAIL    webgl2: the palette is on the picture (3 distinct red-to-green ratios among lit pixels; corners, walls, stairs and roof caps face the camera)"
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/capReading-selfcheck.mjs",
+   "exit": 1,
+   "ms": 376,
+   "fails": 1,
+   "lines": [
+    "FAIL    and every one of the 17 is still in the population it was drawn from, or its fresh reading agrees with the table   9 still killed-with-no-verdict; 7 LET FINISH SINCE and agreeing -- paintFields-selfcheck.mjs table 14496 now 13340, eulerGpu-selfcheck.mjs table 18450 now 14806, baselineHygiene-selfcheck.mjs table 30812 now 31199, kuramoto-selfcheck.mjs table 31417 now 32825, floors-selfcheck.mjs table 36886 now 36052, tiltPower-selfcheck.mjs table 61615 now 57173, gateSelection-selfcheck.mjs table 67823 now 69346, settleCurve-selfcheck.mjs table 87507 now 85506. A departure that did NOT agree would mean the table described a tree that has moved; these agree to within 19.8%."
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/citedSources-selfcheck.mjs",
+   "exit": 1,
+   "ms": 3959,
+   "fails": 1,
+   "lines": [
+    "FAIL  !! *** THE DEBT IS EXACTLY 52, AND THE BASELINE MUST EQUAL IT (51) ***   a ratchet rather than a demand. Importing 52 entries would mean inventing grantorHoldsRights, licenceExists and a `why` for each -- judgements, one source at a time -- and fabricating them to clear a number is worse than owing it. A round that takes an idea from a new source and records it moves this down; one that takes without recording moves it UP and goes red."
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/controllerAgreement-selfcheck.mjs",
+   "exit": 0,
+   "ms": 189,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "tools/ship/definitionGates-selfcheck.mjs",
+   "exit": 1,
+   "ms": 7736,
+   "fails": 2,
+   "lines": [
+    "FAIL  !! no NEW exported symbol ANYWHERE IN THE TREE has appeared without its gate naming it   GREW to 364: ai-bridge/chunkVerify.mjs:verifiedPrefix, ai-bridge/chunkVerify.mjs:resumePlan, ai-bridge/chunkVerify.mjs:spliceRanges, ai-bridge/chunkVerify.mjs:chunkAudit, ai-bridge/chunkVerify.mjs:resumeRanges, ai-bridge/deviceWorker.mjs:offThreadDevice ...",
+    "FAIL  !! *** no NEW exported symbol OF ANY SHAPE has appeared without its gate naming it ***   GREW to 709: ai-bridge/catalogSnapshot.mjs:SNAPSHOT_PATH, ai-bridge/chunkVerify.mjs:verifiedPrefix, ai-bridge/chunkVerify.mjs:resumePlan, ai-bridge/chunkVerify.mjs:spliceRanges, ai-bridge/chunkVerify.mjs:chunkAudit, ai-bridge/chunkVerify.mjs:resumeRanges ..."
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/devicePresent-selfcheck.mjs",
+   "exit": 1,
+   "ms": 1940,
+   "fails": 1,
+   "lines": [
+    "FAIL  *** WebGPU presents on this box, and all three readbacks agree with the pattern ***   webgpu: presented -- A canvas readback 0 of 2048 differ (worst 0); B offscreen 0 of 2048 differ (worst 0); C compositor copy 2048 of 2048 differ (worst 255); A vs B 0 of 2048 differ (worst 0); A vs C 2048 of 2048 differ (worst 255)"
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/fsrPage-selfcheck.mjs",
+   "exit": 1,
+   "ms": 216,
+   "fails": 0,
+   "lines": [],
+   "verdict": "CRASHED"
+  },
+  {
+   "gate": "tools/ship/gateSweep-selfcheck.mjs",
+   "exit": 1,
+   "ms": 1122,
+   "fails": 1,
+   "lines": [
+    "FAIL  !! *** planted under node_modules, .claude and vendor, and the walk descends into NONE of them ***   found [\"real/z-selfcheck.mjs\"] out of six planted files"
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/glbTexture-selfcheck.mjs",
+   "exit": 1,
+   "ms": 2138,
+   "fails": 1,
+   "lines": [
+    "FAIL  !! *** and the tree attaches one now -- lazily, only after reading the header ***   glb_viewer.html, gpu/gltfKtx2.js, tools/ship/gltfKtx2-selfcheck.mjs, tools/ship/nextRounds.mjs -- gpu/gltfKtx2.js decides from the GLB or glTF header and the page obeys, which is gltfDraco's shape for a 256 KB decoder applied to a 562 KB transcoder. Until v4475 this line asserted the opposite and was right to"
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/importClosure-selfcheck.mjs",
+   "exit": 0,
+   "ms": 13414,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "tools/ship/inputSets-selfcheck.mjs",
+   "exit": 1,
+   "ms": 4736,
+   "fails": 3,
+   "lines": [
+    "FAIL  *** a gate reading through a NAMED fs import is recorded -- the hole v4566 could only disqualify ***   reads 2, dirs 0; main.js seen: false",
+    "FAIL  *** what a NODE CHILD read lands in the parent's set: the probe travels in NODE_OPTIONS ***   2 process(es), 1 node child(ren); index.html in the parent's set: false",
+    "FAIL  *** a node child handed its OWN env is still probed -- NODE_OPTIONS is merged in, not assumed ***   2 process(es); main.js in the parent's set: false. Without the merge this reads 1 process and the child's read is simply absent."
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/meshLine-selfcheck.mjs",
+   "exit": 1,
+   "ms": 6170,
+   "fails": 1,
+   "lines": [
+    "FAIL    and nothing outside them draws a one-pixel line, except the device layer's topology switch   NEW: demos\\p3d\\p3dDemo.js, ev\\galaxyMap.js, gfx\\device.js, render\\entityDebugRenderer.js, render\\voxelhighlight.js, rig\\RigSystem.js -- a new one-pixel draw, which is the thing render/meshLine.mjs exists to stop being necessary"
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/noisePrecision-selfcheck.mjs",
+   "exit": 1,
+   "ms": 2537,
+   "fails": 1,
+   "lines": [
+    "FAIL  !! *** snoise3f32 REPRODUCES THE GPU AT EVERY SINGLE POINT ***   0 of 9216 points agree to better than 1e-3, worst deviation 4.83e+0 -- which is the 24-bit readback's own resolution, not a disagreement."
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/ntfsMounter-selfcheck.mjs",
+   "exit": 1,
+   "ms": 457,
+   "fails": 1,
+   "lines": [
+    "FAIL  !! *** SABOTAGE: a volume named \"'; touch ... #\" is printed as TEXT, never executed ***   echoed literally, marker absent"
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/orreryEjecta-selfcheck.mjs",
+   "exit": 1,
+   "ms": 4320,
+   "fails": 1,
+   "lines": [
+    "FAIL    three          78 dependants   ARRIVED: tools/ship/treeRead-selfcheck.mjs."
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/pathTracerWgsl-selfcheck.mjs",
+   "exit": 1,
+   "ms": 872,
+   "fails": 3,
+   "lines": [
+    "FAIL  !! *** and computing tan() in the shader is two orders of magnitude worse ***   1.416e-6 vs 1.105e-7 -- 13x",
+    "FAIL  !! which carries straight into the hit distances   relative t 1.897e-5 vs 1.422e-5",
+    "FAIL  !! PLANT_COST matches the planted run   recorded 1.366e-5, measured 1.416e-6"
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/perspectiveWarp-selfcheck.mjs",
+   "exit": 1,
+   "ms": 2167,
+   "fails": 0,
+   "lines": [],
+   "verdict": "CRASHED"
+  },
+  {
+   "gate": "tools/ship/pipeTruncation-selfcheck.mjs",
+   "exit": 1,
+   "ms": 908,
+   "fails": 1,
+   "lines": [
+    "FAIL  *** process.exit() LOSES output through a pipe that survives to a file -- the two differ by more than a pipe buffer ***   0 bytes of 244000 never reached the reader. Both scripts print the identical 244000 bytes; the only difference between them is the last line."
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/playwrightResolve-selfcheck.mjs",
+   "exit": 0,
+   "ms": 1345,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "tools/ship/reachedLicences-selfcheck.mjs",
+   "exit": 1,
+   "ms": 10223,
+   "fails": 3,
+   "lines": [
+    "FAIL  no file outside the register or its own credited takings mentions codrops -- render\\asciiShape.mjs, tools\\ship\\easingCurves-selfcheck.mjs, tools\\ship\\namedNotChecked-selfcheck.mjs, tools\\ship\\reachedLicences-selfcheck.mjs, world\\namedNotChecked.mjs",
+    "FAIL  no file outside the register or its own credited takings mentions beez/zengularity -- tools\\ship\\reachedLicences-selfcheck.mjs, world\\reachedLicences.mjs",
+    "FAIL  no file outside the register or its own credited takings mentions ChuckClose-SparkAR -- render\\chuckCloseModel.mjs, tools\\ship\\namedNotChecked-selfcheck.mjs, tools\\ship\\reachedLicences-selfcheck.mjs, tools\\ship\\vendoredLicences-selfcheck.mjs, ui\\gazeDwell.mjs"
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/recordDrift-selfcheck.mjs",
+   "exit": 0,
+   "ms": 4835,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "tools/ship/releaseLedger-selfcheck.mjs",
+   "exit": 1,
+   "ms": 1110,
+   "fails": 1,
+   "lines": [
+    "FAIL  !! ...and the refusal is DRIVEN: --from without --via exits non-zero and writes nothing   IT DID NOT REFUSE -- an ingest with no provenance would have been written"
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/runtimeGap-selfcheck.mjs",
+   "exit": 0,
+   "ms": 3028,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
+  },
+  {
+   "gate": "tools/ship/shaderPairs-selfcheck.mjs",
+   "exit": 1,
+   "ms": 2121,
+   "fails": 4,
+   "lines": [
+    "FAIL  !! and two of the five are ALREADY authored once -- in JavaScript -- and mirrored by hand into both   both files say so in their own headers: the nebula is \"from the CPU reference in nebula.js (same hash/vnoise/fbm/palette/parallax/stars)\" and the wormhole's nebula is \"defined ONCE and mirrored into GLSL + WGSL\". THE AUTHOR-ONCE DISCIPLINE IS ALREADY THERE; what is missing is a machine to do the mirroring, which is a narrower thing than a compiler",
+    "FAIL  *** render/tslSource.mjs is counted as a dual-language file BECAUSE IT EMITS BOTH LANGUAGES ***    are in shaderCensus.both. An emitter necessarily contains text in every language it emits -- so BUILDING THE IR RAISES THE COUNT THE TRIGGER READS. The instrument fires harder the more the problem is solved",
+    "FAIL  !! *** so the answer and the tools about the question are inside the population the trigger reads ***   both emitters, and 0 of 3 tools, inside a population of 19. v4380 saw the number climb and said \"the TSL rounds of this session put some of them there\" -- correct, and the reason is that a TSL round ADDS an emitter, which is the opposite of what the climbing number was taken to mean. THE EMITTERS ARE ASSERTED AND THE TOOLS ARE NOT: an emitter is in `both` for a reason no detector fix can remove -- it really does contain both languages -- while a tool was only ever there by mistake",
+    "FAIL  !! ...and the reason is no longer the count, because the count was never measuring the claim   the trigger reads 19 files and the decision rests on 9; every one of the 9 is inside the 19, and 10 MORE are too -- 10 that duplicate nothing plus 0 EMITTER(S), . THE FINDING IS THE INSTRUMENT, not the verdict: a trigger that would have fired at twenty was reading a strict superset of what it needed, one that GROWS when you solve the problem and shrinks when somebody fixes the language detector -- neither of which is a fact about whether to build an IR"
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/slugFill-selfcheck.mjs",
+   "exit": 1,
+   "ms": 3986,
+   "fails": 4,
+   "lines": [
+    "FAIL    webgpu: CONTROL -- the plain 8 is slugEval through the model within 2 of 255 (the fill flag changed nothing for a plain pipeline)   worst 16",
+    "FAIL  *** webgpu: the filled 8 is colour x fill x coverage within 2 of 255 on every pixel but texel-boundary neighbours (fewer than 0.2%, each the key with an adjacent fire texel) ***   worst 15, 3 boundary, 57 unexplained, 680 lit",
+    "FAIL    webgl2: CONTROL -- the plain 8 is slugEval through the model within 2 of 255 (the fill flag changed nothing for a plain pipeline)   worst 16",
+    "FAIL  *** webgl2: the filled 8 is colour x fill x coverage within 2 of 255 on every pixel but texel-boundary neighbours (fewer than 0.2%, each the key with an adjacent fire texel) ***   worst 15, 3 boundary, 57 unexplained, 680 lit"
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/slugMelt-selfcheck.mjs",
+   "exit": 1,
+   "ms": 4017,
+   "fails": 6,
+   "lines": [
+    "FAIL  *** webgpu: the t = 0 frame is coverage x the fire's nearest texel within 2 of 255 on every pixel but texel-boundary neighbours (fewer than 0.5%) ***",
+    "FAIL  *** webgpu: the t = 0.5 frame is coverage x the fire's nearest texel within 2 of 255 on every pixel but texel-boundary neighbours (fewer than 0.5%) ***",
+    "FAIL  *** webgpu: the t = 1 frame is coverage x the fire's nearest texel within 2 of 255 on every pixel but texel-boundary neighbours (fewer than 0.5%) ***",
+    "FAIL  *** webgl2: the t = 0 frame is coverage x the fire's nearest texel within 2 of 255 on every pixel but texel-boundary neighbours (fewer than 0.5%) ***",
+    "FAIL  *** webgl2: the t = 0.5 frame is coverage x the fire's nearest texel within 2 of 255 on every pixel but texel-boundary neighbours (fewer than 0.5%) ***",
+    "FAIL  *** webgl2: the t = 1 frame is coverage x the fire's nearest texel within 2 of 255 on every pixel but texel-boundary neighbours (fewer than 0.5%) ***"
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/slugMorph-selfcheck.mjs",
+   "exit": 1,
+   "ms": 4535,
+   "fails": 2,
+   "lines": [
+    "FAIL  *** webgpu: the t = 0.5 frame is within 2 of 255 of slugEval on the morphed atlas through the rasteriser model (834 lit) -- the intermediate shape, self-intersections and all, is what Slug says it is ***   worst 15, 205 over",
+    "FAIL  *** webgl2: the t = 0.5 frame is within 2 of 255 of slugEval on the morphed atlas through the rasteriser model (834 lit) -- the intermediate shape, self-intersections and all, is what Slug says it is ***   worst 15, 205 over"
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/slugReupload-selfcheck.mjs",
+   "exit": 1,
+   "ms": 4250,
+   "fails": 1,
+   "lines": [
+    "FAIL    webgl2: draw-only is not slower than reuse, and reuse is not slower than recreate by more than a millisecond (the order the design predicts, within this box's noise)   7.30 <= 1.20 <= 2.30"
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/statedRuntime-selfcheck.mjs",
+   "exit": 1,
+   "ms": 2255,
+   "fails": 1,
+   "lines": [
+    "FAIL  !! *** no NEW header has drifted from what its gate actually does, MEASURED BY RUNNING IT ***   NEW and confirmed BY RUNNING: tools/ship/asciify-selfcheck.mjs states 290 ms, ran 640 -- correct the header from THIS measurement, not from the record. DO NOT ADD IT TO THE BASELINE: that is a ratchet growing back, the one thing a ratchet must never do"
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/threeProbe-selfcheck.mjs",
+   "exit": 1,
+   "ms": 4996,
+   "fails": 2,
+   "lines": [
+    "FAIL  *** webgpu: THIS BOX REFUSES three@0.185.1 ON WebGPU BY NAME -- it drew ***   v4319's finding reproduced: the browser's GPUTextureViewDescriptor has no swizzle; the pin is at least the build box's",
+    "FAIL  *** webgpu: AND THE VENDORED CONTROL -- THE SAME BUILD -- REFUSES THE SAME WAY, WHICH IS WHY THIS IS NOT \"the box, not the version\" ***   control drew (unexpected post-re-vendor)"
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/traderGraph-selfcheck.mjs",
+   "exit": 1,
+   "ms": 2174,
+   "fails": 2,
+   "lines": [
+    "FAIL  !! *** THE 403s COME FROM THE SANDBOX, NOT FROM GITHUB -- SO THEY SAY NOTHING ABOUT GITHUB ***   0 of 2 public paths refused by the runner. users/but0n and repos/but0n/vixel are PUBLIC on GitHub; what answered was the proxy in front of it. NOT CLAIMED: that GitHub would answer 200 -- nothing here can reach it unproxied, so the premise is UNSUPPORTED, not disproved.",
+    "FAIL  CONTROL: the network is up, so the refusals are refusals and not a dead link   rate_limit answers 200 on the same connection -- and its limit is 15000, which is an AUTHENTICATED limit, so this control has always been measuring a credentialed proxied connection"
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/treeRead-selfcheck.mjs",
+   "exit": 1,
+   "ms": 5754,
+   "fails": 1,
+   "lines": [
+    "FAIL  !! *** THE TWO OLD SKIP RULES STILL SELECT THE SAME FILES AS THE UNIFIED ONE, FILE FOR FILE ***   compared on normalised paths: this row is about whether two authors' rules still agree on WHICH files, not about which separator the host writes -- that is the row below, and conflating them is what let a separator-blind rule read as agreement for as long as nobody ran the gate on Windows."
+   ],
+   "verdict": "RED"
+  },
+  {
+   "gate": "tools/ship/wgslSpec-selfcheck.mjs",
+   "exit": 1,
+   "ms": 4516,
+   "fails": 1,
+   "lines": [
+    "FAIL  and across 4764 of THIS TREE'S files requiredLimits appears 3 times -- every device in this tree runs at the defaults, so a 1024-wide workgroup is not merely unportable, it cannot be created here"
+   ],
+   "verdict": "RED"
+  }
+ ]
+}
