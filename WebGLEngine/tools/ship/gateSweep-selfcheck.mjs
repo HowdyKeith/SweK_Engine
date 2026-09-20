@@ -35,7 +35,7 @@ import * as RC from "./redCensus.mjs";
 import { toPosix } from "./posixAssumption.mjs";
 import { fileURLToPath } from "node:url";
 import { ENG as ENG_ROOT } from "./gateSweep.mjs";
-import { falseRedsOf } from "./quickSweep.mjs";
+import { falseRedsOf, falseRedSplit } from "./quickSweep.mjs";
 
 let fails = 0;
 const ok = (c, name, detail) => {
@@ -589,6 +589,30 @@ console.log("\n*** THE FALSE REDS ARE ROWS IN BOTH MODULES NOW, NOT A COUNT IN O
     ok(!got.some((f) => f.gate === "cleanly.mjs") && !got.some((f) => f.gate === "reallyRed.mjs"),
        "!! CONTROL: a gate green in PARALLEL is not a false red, and one that is red ALONE is really red",
        "a mapping that took every green, or every serial row, would report the whole sweep as starvation");
+    // *** A CAPPED RUN GETS NO RATIO, BECAUSE THE CAP IS NOT A RUNTIME -- quickSweep's own budgetIsOwn says
+    // so and v4647c broke it one round after writing this. *** Keith's gen-9 output is the fixture: nineteen
+    // of the twenty worst "starved" gates had a parallel figure of 20,123-23,704 ms against a 20,000 ms cap.
+    // They were KILLED. Dividing the killer's clock by a real serial time ranked the FASTEST gates as the
+    // most starved, and put the one genuine slowdown sixteenth.
+    const real = [
+        { gate: "webgpuProbe.mjs", verdict: GS.VERDICT.GREEN, from: "serial", parallelMs: 20124, serialMs: 1263, parallelTimedOut: true },
+        { gate: "splatSort.mjs",   verdict: GS.VERDICT.GREEN, from: "serial", parallelMs: 11566, serialMs: 1715, parallelTimedOut: false },
+        { gate: "barely.mjs",      verdict: GS.VERDICT.GREEN, from: "serial", parallelMs: 1200,  serialMs: 1000, parallelTimedOut: false },
+    ];
+    const fr = falseRedsOf(real);
+    ok(fr[0].gate === "webgpuProbe.mjs" && fr[0].capped === true && fr[0].ratio === null,
+       "!! *** a gate KILLED at the cap carries NO ratio -- the cap's clock is never divided by a measurement ***",
+       `20124 ms against a 20000 ms cap is the killer's clock. The old ratio said 15.93x, which is just ` +
+       `20000/1263 and ranks the FASTEST gate as the most starved`);
+    ok(fr[1].gate === "splatSort.mjs" && fr[1].capped === false && fr[1].ratio === 6.74,
+       "  ...while a gate that really WAS slowed keeps its ratio, and it is a measurement of two runtimes",
+       "11566 ms loaded against 1715 ms alone -- both real readings, so the quotient means something");
+    const sp = falseRedSplit(fr);
+    ok(sp.capped === 1 && sp.slowed === 2 && sp.of === 3,
+       "!! *** and the two populations are COUNTED APART, because they have different causes ***",
+       "a gate slowed 6x is fighting for CPU; a gate killed at 20 s while finishing in 2 s alone is a box " +
+       "that cannot run that many at once. One number for both answers neither");
+
     // The two modules must agree, or a reader comparing two boxes is comparing two rules.
     const viaFinalize = GS.finalize(rows.map((r) => ({
         gate: r.gate,

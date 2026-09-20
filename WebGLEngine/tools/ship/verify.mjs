@@ -583,8 +583,12 @@ if (process.env.SWEK_QUICKSWEEP !== "0") {
     // is STARVED, and which gates starve is a fact about the runner that only this line can carry off the box.
     // Worst ratio first: parallel time over serial time is how much the other workers cost that gate, and a
     // ratio near 1 is a gate that was never slowed at all.
+    if (r.falseRedSplit) console.log(`[verify]   false red  ${r.falseRedSplit.capped} were KILLED AT THE CAP and ` +
+      `${r.falseRedSplit.slowed} were genuinely slower -- a cap kill is the box refusing to run that many at once, ` +
+      `and its parallel figure is the killer's clock rather than a runtime`);
     for (const f of (r.falseRedList || []).slice(0, 20))
-      console.log(`[verify]   false red  ${String(f.ratio ?? "?").padStart(6)}x  ${f.gate}  ${f.parallelMs} ms loaded -> ${f.serialMs} ms alone`);
+      console.log(`[verify]   false red  ` + (f.capped ? "CAPPED".padStart(7) : (String(f.ratio ?? "?") + "x").padStart(7)) +
+        `  ${f.gate}  ${f.parallelMs} ms loaded -> ${f.serialMs} ms alone`);
     if ((r.falseRedList || []).length > 20)
       console.log(`[verify]   false red  ... ${r.falseRedList.length - 20} more (quickSweep --json carries all of them)`);
     for (const d of r.dropped) console.log(`[verify]   over budget now  ${d}`);

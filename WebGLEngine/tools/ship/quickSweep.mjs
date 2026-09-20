@@ -314,17 +314,41 @@ export function countCrossings(prior, rows, budgetMs) {
  * Exported so a fixture can drive it: an empty list proves nothing about a mapping, and the live tree
  * produces false reds only under contention nobody can summon on demand.
  *
- * `ratio` is parallel time over serial time -- how much the other workers cost that gate. It is the evidence
- * that these ARE starvation: a ratio near 1 is a gate that was never slowed, and a list of those would mean
- * the verdict is coming from somewhere else.
+ * `ratio` is parallel time over serial time -- how much the other workers cost that gate.
+ *
+ * *** AND IT IS null FOR A CAPPED RUN, WHICH v4647c GOT WRONG ONE ROUND AFTER BUILDING THIS. *** This file's
+ * own budgetIsOwn declaration, forty lines up, says it plainly: capMs is a SIGKILL ceiling and "a reading it
+ * produces is the cap's clock rather than a runtime, which is why such entries are marked `capped` and NEVER
+ * COMPARED AGAINST A MEASUREMENT". The first version divided that clock by a real serial time and printed the
+ * quotient as starvation.
+ *
+ * Keith's gen-9 run is what showed it. Of the twenty worst by that bogus ratio, NINETEEN had a parallel time
+ * of 20,123-23,704 ms against a cap of 20,000 -- they were KILLED, not slowed -- and the "ratio" was really
+ * 20000/serialMs, so it ranked the FASTEST gates as the most starved. One was a genuine slowdown
+ * (splatSort, 11,566 -> 1,715 ms) and it sorted sixteenth.
+ *
+ * So `capped` is its own field, read from the phase-1 timeout the row already carried, and a capped row gets
+ * no ratio at all. The two populations answer different questions: a gate SLOWED 6x is fighting for CPU, a
+ * gate KILLED at 20 s while taking 2 s alone is on a box that cannot run this many at once.
  */
 export function falseRedsOf(rows, phase1 = new Map()) {
     return (rows || [])
         .filter((r) => r.verdict === VERDICT.GREEN && r.from === "serial")
-        .map((r) => ({ gate: r.gate, parallelMs: r.parallelMs, serialMs: r.serialMs,
-                       parallelCode: (phase1.get(r.gate) || {}).code ?? null,
-                       ratio: r.parallelMs && r.serialMs ? +(r.parallelMs / r.serialMs).toFixed(2) : null }))
-        .sort((a, b) => (b.ratio || 0) - (a.ratio || 0));
+        .map((r) => {
+            const capped = !!r.parallelTimedOut;
+            return { gate: r.gate, parallelMs: r.parallelMs, serialMs: r.serialMs, capped,
+                     parallelCode: (phase1.get(r.gate) || {}).code ?? null,
+                     ratio: !capped && r.parallelMs && r.serialMs ? +(r.parallelMs / r.serialMs).toFixed(2) : null };
+        })
+        // capped first -- they are the louder finding -- then real slowdowns worst-first. Never one ordering
+        // over two quantities, which is what mixing a cap into a ratio produced.
+        .sort((a, b) => (b.capped - a.capped) || ((b.ratio || 0) - (a.ratio || 0)));
+}
+
+/** The two populations, counted apart, because they have different causes and different answers. */
+export function falseRedSplit(list) {
+    const capped = (list || []).filter((f) => f.capped);
+    return { capped: capped.length, slowed: (list || []).length - capped.length, of: (list || []).length };
 }
 
 export function selectGates(all, timings, budgetMs, { crossings = null, minCrossings = MIN_CROSSINGS_TO_EVICT,
@@ -652,7 +676,7 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
         // reader to notice.
         knownRedSkipped: skipUnchanged
             ? (() => { const reg = redRegister(); return (sel.unchanged || []).filter((g) => reg.has(g)).length; })() : 0,
-        green, falseReds, falseRedList, knownRed: rec.known, newRed: rec.newRed, unmeasured: rec.unmeasured, dropped,
+        green, falseReds, falseRedList, falseRedSplit: falseRedSplit(falseRedList), knownRed: rec.known, newRed: rec.newRed, unmeasured: rec.unmeasured, dropped,
         // v4408: green gates whose PARALLEL time crossed the budget and were re-run alone before being filed,
         // and how many of those the serial reading brought back under. The second number is the starvation.
         budgetConfirmed: rows.filter((r) => r.from === "budget-confirm").length,
@@ -742,10 +766,15 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         // nothing anybody can act on. Ordered by how much the parallelism cost each gate, because that is the
         // evidence that they ARE starvation and not a flake -- a ratio near 1 is a gate that was never slowed.
         if (r.falseRedList && r.falseRedList.length) {
+            const sp = falseRedSplit(r.falseRedList);
+            console.log(`[quickSweep] ${r.falseReds} FALSE RED (red under -P, green alone): ${sp.capped} KILLED AT THE ` +
+                `${capMs} ms CAP, ${sp.slowed} genuinely slower. Different causes -- a gate killed at the cap while ` +
+                `finishing in seconds alone is a box that cannot run ${workers} of these at once, not one fighting for CPU.`);
             const top = r.falseRedList.slice(0, 12);
-            console.log(`[quickSweep] ${r.falseReds} FALSE RED (red under -P, green alone), worst starvation first:`);
-            for (const f of top) console.log(`[quickSweep]   ${String(f.ratio ?? "?").padStart(6)}x  ${f.gate}  ` +
-                `${f.parallelMs} ms loaded -> ${f.serialMs} ms alone` + (f.parallelCode != null ? `, exit ${f.parallelCode}` : ""));
+            for (const f of top) console.log(`[quickSweep]   ` +
+                (f.capped ? "CAPPED".padStart(7) : (String(f.ratio ?? "?") + "x").padStart(7)) +
+                `  ${f.gate}  ${f.parallelMs} ms loaded -> ${f.serialMs} ms alone` +
+                (f.parallelCode != null ? `, exit ${f.parallelCode}` : ""));
             if (r.falseRedList.length > top.length) console.log(`[quickSweep]   ... ${r.falseRedList.length - top.length} more; --json carries all of them`);
         }
         if (r.unchangedInputs) console.log(`[quickSweep] ${r.unchangedInputs} of those had NO CHANGED INPUT and ` +
