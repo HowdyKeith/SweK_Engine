@@ -42,11 +42,36 @@ const compareAgainst = (was, now) => {
 sec("1. THE CENSUS IS REAL, AND ITS POPULATION IS DERIVED RATHER THAN LISTED");
 {
     const reads = recordsGatesRead();
-    ok("!! the records under check are the ones gates ACTUALLY read, from the input-sets probe",
-       reads.length > 100 && reads.includes("tools/ship/sweep-timings.json"),
-       reads.length + " JSON records are read by at least one gate, " + Object.keys(live).length +
-       " of them have a shape to hold. A hand-written list is the thing that goes short, which is what " +
-       "tools/ship/frozenRecords.mjs's own header records about the five it started from");
+    // *** v4647 -- THIS ROW ASSERTED ON A NUMBER A TARGETED PROBE RUN CAN SHRINK. *** recordsGatesRead()
+    // derives its list from tools/ship/input-sets.json, which is a SKIP LEDGER: every stale entry is dropped
+    // on each write. `recordInputs --gates microfacetWgsl --write` took that file from 1,341 entries to 1,020,
+    // the observed-reads list fell from over a hundred to 37, and this gate went 0 red to 2 -- including
+    // CASE 1 below, which asserted against tsl-emitted-race.json after it had dropped out of the census.
+    //
+    // census() is monotone now (see recordShape.mjs): observed reads UNION everything that already has a
+    // recorded shape. The assertion moves onto that, because it is the population whose shapes must hold. The
+    // ledger-derived count is still printed -- it is the DISCOVERY signal, and watching it collapse is useful
+    // -- but nothing is asserted about a number that falls when somebody probes one gate.
+    ok("!! the records under check are every record a gate has been observed to read, and they do not leave",
+       Object.keys(live).length > 100 && "tools/ship/sweep-timings.json" in live,
+       Object.keys(live).length + " records under check (observed reads UNION recorded shapes); the probe " +
+       "currently observes " + reads.length + " of them being read. A hand-written list is the thing that " +
+       "goes short, which is what tools/ship/frozenRecords.mjs's own header records about the five it started from");
+    // *** BOTH HALVES OF THE UNION ARE DRIVEN, BECAUSE EACH CAN FAIL SILENTLY IN ITS OWN DIRECTION. ***
+    // Losing the RECORDED half makes the census shrink with the skip ledger (the 2-red failure above).
+    // Losing the OBSERVED half stops discovery, which is invisible while nothing new exists -- so it is a
+    // fixture: a record no shapes file has ever seen must appear in the census the moment a gate reads it.
+    {
+        const NEW = "tools/ship/sweep-timings.json";   // a real, parseable record, injected as newly-observed
+        const discovered = census(undefined, { reads: () => [NEW], shapes: () => ({ shapes: {} }) });
+        ok("!! *** the OBSERVED-READS half really discovers: a record no shapes file knows still enters the census ***",
+           NEW in discovered, `injected one observed read against an EMPTY shapes record and got ` +
+           `${Object.keys(discovered).length} entr(ies). A union that kept only the recorded half would get 0`);
+        const kept = census(undefined, { reads: () => [], shapes: () => ({ shapes: { [NEW]: { top: [], entry: [] } } }) });
+        ok("!! *** and the RECORDED half really holds: a record the probe no longer sees stays under check ***",
+           NEW in kept, "which is the whole repair -- the skip ledger losing sight of a reader is not a reason " +
+           "to stop holding that record's shape");
+    }
     ok("  and the recorded shapes exist and cover the live census",
        !!rec && Object.keys(rec.shapes || {}).length > 100,
        rec ? Object.keys(rec.shapes).length + " recorded against " + Object.keys(live).length + " live"

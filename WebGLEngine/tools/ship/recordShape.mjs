@@ -86,9 +86,30 @@ export function shapeOf(json) {
     return { top, entry: [...entry].sort() };
 }
 
-export function census(root = ENG) {
+/**
+ * *** v4647 -- THE CENSUS IS MONOTONE NOW, BECAUSE ITS POPULATION CAME FROM A LEDGER THAT CAN SHRINK. ***
+ *
+ * recordsGatesRead derives the population from tools/ship/input-sets.json, which is a SKIP LEDGER rather than
+ * a census of the tree: carryForward drops every stale entry on each write (v4633, and dropping is right --
+ * whyRun refuses them either way). Measured at v4647: `recordInputs --gates microfacetWgsl --write` took that
+ * file from 1,341 entries to 1,020, and this gate went from 0 red to 2 -- because the gates that read
+ * tools/ship/tsl-emitted-race.json were among the dropped, so the record vanished from the census and CASE 1
+ * asserted against a record it could no longer see.
+ *
+ * A record does not stop needing its shape held because the probe temporarily lost sight of its reader. So
+ * the population is the UNION of what gates are currently observed to read and what already HAS a recorded
+ * shape. That can only grow, which is the direction a census of things-not-to-lose should move in, and it
+ * still discovers new records the moment a gate reads one.
+ */
+// The two halves are INJECTABLE, and the reason is a sabotage: dropping the observed-reads half entirely --
+// so the census is the recorded shapes and nothing else, and no new record is ever discovered -- went 0 RED,
+// because nothing new happens to exist at this instant. A discovery mechanism that has stopped discovering
+// is silent by construction, so it is driven on a fixture instead of waited for.
+export function census(root = ENG, { reads = recordsGatesRead, shapes = readShapes } = {}) {
     const out = {};
-    for (const rel of recordsGatesRead(root)) {
+    const known = Object.keys((shapes(root) || {}).shapes || {});
+    const population = [...new Set([...reads(root), ...known])].sort();
+    for (const rel of population) {
         let j = null;
         try { j = JSON.parse(fs.readFileSync(path.join(root, rel), "utf8")); } catch { continue; }
         const s = shapeOf(j);

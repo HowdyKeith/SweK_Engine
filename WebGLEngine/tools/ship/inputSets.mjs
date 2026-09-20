@@ -114,8 +114,11 @@ export const CONFLICT = "!conflict";
 // pre-rename name here and the skip count ROSE from 956 to 1,121, which read as the round succeeding.
 // tools/ship/recordShape.mjs now ratchets the record's own key set for exactly that reason, and
 // `reachesUnrecorded` was added to this list and to entryFor() in the same edit.
+// v4647 adds `noProbeOutput`. It is added HERE IN THE SAME EDIT as entryFor(), which is the whole discipline
+// this list encodes: a field the recorder produces and this list omits is written as undefined and read as
+// false, which is exactly how v4567 turned every spawning gate skippable while the count looked like success.
 export const FLAGS = Object.freeze(["spawnedNonNode", "spawnedNode", "procs", "net", "namedFsImport",
-                                   "reachesUnrecorded"]);
+                                   "reachesUnrecorded", "noProbeOutput"]);
 
 /** Decode the indexed on-disk form into the {gate: {reads, dirs, hashes, dirHashes, ...}} shape the rule wants. */
 export function decode(raw) {
@@ -235,6 +238,11 @@ export function whyRun(gate, rec, root = ENG) {
     // about: such a gate recorded an EMPTY set, not a partial one. A module.register() loader hook redirects
     // node:fs to a shim, so the named bindings ARE the recording functions. The field is still recorded so
     // the population can be counted; it no longer decides anything.
+    // *** BEFORE EVERY OTHER DISQUALIFIER, BECAUSE IT IS THE ONLY ONE THAT MEANS "THERE IS NO SET". *** The
+    // others describe a set that exists and cannot be trusted; this one says the probe never produced one.
+    // Placed after the `!e` check and before the rest, a killed probe on a real gate was reporting "reaches a
+    // module its recorded set does not carry" -- true of an empty set in a vacuous way, and the wrong story.
+    if (e.noProbeOutput) return "the probe produced no output, so nothing was recorded (killed at the cap, or died before its exit handler)";
     if (e.spawnedNonNode) return "spawned a child the probe could not follow";
     if (e.net) return "opens a socket or fetches";
     // *** v4573 -- THE DISQUALIFIER THAT ANSWERS THE REASON THIS WAS SHIPPED DISARMED. ***
@@ -255,6 +263,10 @@ export function whyRun(gate, rec, root = ENG) {
     // it is the price of the skip being a structural claim rather than a sample of one run.
     if (e.reachesUnrecorded) return "reaches a module its recorded set does not carry";
     const reads = e.reads || [], dirs = e.dirs || [];
+    // "We failed to look" and "there is nothing there" are different and this said the second; the specific
+    // reason is checked above, before the disqualifiers. Both refuse the skip, so the VERDICT was never
+    // wrong -- the reason was, and the reason is what the skip histogram groups by, so a pass full of killed
+    // probes read as a tree full of gates that touch no files.
     if (!reads.length && !dirs.length) return "recorded an empty input set";
     if (!reads.includes(gate)) return "its own source is not in its recorded set";
     const moved = firstMoved(e, root);
@@ -297,6 +309,18 @@ export function carryForward(priorGates, root = ENG) {
     clearHashCache();
     const carried = {}, dropped = [];
     for (const [g, e] of Object.entries(priorGates || {})) {
+        // *** v4647 -- AN ENTRY THAT RECORDED NOTHING IS IMMORTAL UNDER THE RULE ABOVE, AND THAT IS THE
+        // UNHANDLED HALF OF THE TIMED-OUT PROBE. *** firstMoved walks the entry's reads and dirs; an entry
+        // with neither has nothing that can move, so it returns null and the entry is carried -- forever,
+        // through every pass, never dropped as stale and never re-probed unless a run names that gate by
+        // hand. A failed measurement that can never expire is worse than no measurement, because the slot
+        // being occupied is what stops the next full pass from filling it.
+        //
+        // Dropped on the STRUCTURAL condition rather than on the new flag, so records written before v4647
+        // are covered too: an entry carrying no reads and no dirs cannot be validated by any means this
+        // function has, whatever wrote it. Dropping costs nothing -- whyRun refuses it either way -- and it
+        // is what makes the next pass re-probe the gate.
+        if (!(e.reads || []).length && !(e.dirs || []).length) { dropped.push(g); continue; }
         if (firstMoved(e, root) === null) carried[g] = e; else dropped.push(g);
     }
     return { carried, dropped };

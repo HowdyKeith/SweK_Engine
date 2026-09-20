@@ -9,7 +9,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { ENG, analyse, shortfall, resolveSpec, OUTSIDE } from "./importClosure.mjs";
-import { readRecord, whyRun, FLAGS } from "./inputSets.mjs";
+import { readRecord, whyRun, firstMoved, FLAGS } from "./inputSets.mjs";
+import { treePaths } from "./treeRead.mjs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -17,6 +18,7 @@ const sec = (s) => console.log("\n" + s);
 
 const rec = readRecord();
 const gates = Object.keys(rec.gates || {});
+const TREE_GATES = treePaths().filter((f) => f.endsWith("-selfcheck.mjs")).length;
 
 sec("1. STATIC AND DYNAMIC ARE DIFFERENT CLAIMS, AND THE FIRST INSTRUMENT CONFLATED THEM");
 {
@@ -42,23 +44,103 @@ sec("1. STATIC AND DYNAMIC ARE DIFFERENT CLAIMS, AND THE FIRST INSTRUMENT CONFLA
 
 sec("2. *** THE PROPERTY THAT IS PROVEN: NO GATE MISSES A STATIC IMPORT ***");
 {
-    let sMiss = 0, dMiss = 0, outside = 0, clean = 0;
-    const missNames = [];
+    // *** v4647 -- THIS ROW WAS COMPARING A T0 MEASUREMENT AGAINST A T1 FILE FOR A QUARTER OF THE RECORD. ***
+    // An entry whose own source has since been edited is STALE by the record's own rule: firstMoved names the
+    // moved path and whyRun returns "changed: x", so the gate always runs. Its recorded set was taken against
+    // a version of the code that no longer exists, and walking TODAY's import graph against YESTERDAY's set
+    // is the species this tree keeps finding -- a claim asserted against a live file that has moved.
+    //
+    // MEASURED at v4647 over 1,341 entries: 1,019 fresh, 322 stale, and the static misses are 0 of 1,019
+    // fresh and 1 of 322 stale -- microfacetWgsl-selfcheck, stale because v4646 gave it a new import and no
+    // pass has re-probed it since. The row went red for a record being old, not for the property failing.
+    //
+    // *** AND PARTITIONING IS NOT A LOOSENING, WHICH IS THE PART THAT HAD TO BE CHECKED RATHER THAN ARGUED. ***
+    // The property protects the SKIP: a set that covers everything is safe to skip on. A stale entry is never
+    // skipped -- asserted directly below rather than reasoned about -- so nothing that could be skipped is
+    // outside the assertion. What the partition removes from the row is exactly the population the row could
+    // never have been protecting.
+    // *** AND THE PARTITION COSTS NOTHING, BECAUSE IT IS ONLY ASKED WHERE IT DECIDES SOMETHING. ***
+    // The first draft called firstMoved for every entry -- and again in the guard row below. Profiled: 491 ms
+    // for one pass over 1,344 entries (13,112 file hashes), against this gate's 2,214 ms baseline, of which
+    // 2,121 ms is the import-graph walk it cannot avoid. That took it to 3,226 ms, across the 3,000 ms
+    // quick-sweep budget -- which is a MEMBERSHIP THRESHOLD, not a warning: a gate over it drops out of every
+    // ship. A row added for honesty would have cost the whole gate its place in the sweep.
+    //
+    // Freshness only decides anything for an entry that HAS a static miss, and there is one. So it is asked
+    // there and nowhere else, and the two rows that needed the full partition are re-aimed at the population
+    // whose exclusion actually has to be justified.
+    // *** THE DECISION IS A NAMED PREDICATE SO A FIXTURE CAN DRIVE IT, BECAUSE ON A HEALTHY TREE THE BRANCH
+    // NEVER RUNS. *** Two sabotages -- "always assert" and "always exclude" -- both went 0 RED, for the honest
+    // reason that there are no static misses right now, so nothing reaches the classification at all. A
+    // repair that is only exercised when the tree is neglected is not a repair anybody can rely on.
+    const EXCLUDED = (e) => firstMoved(e) !== null;
+    let sMiss = 0, dMiss = 0, outside = 0, clean = 0, examined = 0, sMissStale = 0;
+    const missNames = [], staleMissNames = [], staleMissGates = [];
     for (const [g, e] of Object.entries(rec.gates || {})) {
         const s = shortfall(g, e.reads || []);
-        if (!s) { clean++; continue; }
-        if (s.staticMiss.length) { sMiss++; missNames.push(g + " -> " + s.staticMiss.slice(0, 2).join(", ")); }
+        if (!s) { clean++; examined++; continue; }
+        if (s.staticMiss.length) {
+            // The ONLY place freshness changes an answer: an entry whose own source has moved describes code
+            // that no longer exists, so walking TODAY's import graph against it compares T0 to T1 -- the
+            // species this tree keeps finding. Measured at v4647: 0 static misses among the entries that still
+            // match the tree, 1 among those that do not (microfacetWgsl-selfcheck, whose imports v4646 moved).
+            if (EXCLUDED(e)) { sMissStale++; staleMissNames.push(g.split("/").pop()); staleMissGates.push(g); }
+            else { sMiss++; examined++; missNames.push(g + " -> " + s.staticMiss.slice(0, 2).join(", ")); }
+        } else examined++;
         if (s.dynMiss.length) dMiss++;
         if (s.outsideStatic) outside++;
     }
     // A STATIC miss means the recorded set is WRONG -- the file loads whenever the gate loads, so the probe
     // must have seen it. Anything else is a defect in the probe or in this walk, and either way the gate is
     // not safe to skip.
-    ok("!! *** no gate's recorded set misses a file its code loads UNCONDITIONALLY ***",
+    ok("!! *** no CURRENT recorded set misses a file its code loads UNCONDITIONALLY ***",
        sMiss === 0,
        sMiss ? "MISSING: " + missNames.slice(0, 4).join(" | ")
-             : gates.length + " recorded gates, " + clean + " whose set covers everything their code can " +
-               "reach at all. A static miss would mean the probe did not see a module that loads every time");
+             : examined + " of " + gates.length + " entries asserted over, " + clean + " of them with a set " +
+               "covering everything their code can reach at all. A static miss would mean the probe did not " +
+               "see a module that loads every time");
+    // *** THE VACUITY GUARD, BECAUSE A PARTITION IS THE EASIEST WAY TO ASSERT ABOUT NOTHING. *** A sabotage
+    // that classed every entry as stale went 0 RED: the asserted set emptied, sMiss over nothing is 0, and the
+    // row passed while covering no gate at all. Free here, because `examined` is counted in the same loop.
+    ok("!! CONTROL: the row above is asserted over a MAJORITY of the record, not over a sliver the partition left",
+       examined > 0 && examined >= gates.length * 0.5,
+       `${examined} of ${gates.length} entries asserted over; the record holds ${gates.length} of ${TREE_GATES} ` +
+       `gates in the tree. If this goes red the partition has swallowed the population and the row above is green ` +
+       `about nothing`);
+    // And the excluded population -- exactly the entries held back from the row above -- is justified rather
+    // than assumed: each is refused by whyRun, so nothing that could be SKIPPED was excluded. Aimed at those
+    // entries alone, which is both the honest scope and free.
+    ok("!! ...and every entry the partition EXCLUDED is refused by whyRun, so nothing skippable was excused",
+       staleMissGates.every((g) => whyRun(g, rec) !== null),
+       staleMissGates.length
+           ? `${staleMissGates.length} excluded: ${staleMissGates.map((g) => g.split("/").pop()).join(", ")}, ` +
+             `each refused. If one were skippable the row above would be excusing the exact case it exists to catch`
+           : "none excluded on this tree -- every entry with a static miss would have to be stale for that to happen");
+    // The classification itself, driven on two fixtures: a stale entry is EXCLUDED, a current one is ASSERTED
+    // OVER. Between them they are what the two 0-red sabotages were reaching for.
+    {
+        const v = gates[0], e = rec.gates[v];
+        const bent = { ...e, hashes: { ...e.hashes, [v]: "0000000000000000" } };
+        ok("!! *** the classification is driven: a STALE entry is excluded and a CURRENT one is asserted over ***",
+           EXCLUDED(bent) === true && EXCLUDED(e) === false,
+           `bent one hash of ${v.split("/").pop()} and it flips. Without this, "always exclude" and "always ` +
+           `assert" are both green on any tree with no static misses -- which is every healthy tree`);
+    }
+    // *** AND ON A HEALTHY TREE THE EXCLUSION ROW IS VACUOUS, WHICH IS SAID RATHER THAN LEFT TO BE NOTICED. *** With
+    // the record freshly probed nothing is excluded, so `every` over an empty list is true by arithmetic. The
+    // property is driven on a fixture as well, so it is load-bearing on every tree rather than only on a
+    // neglected one: an entry whose own source has moved must be refused, whatever else it carries.
+    {
+        const victim = gates[0];
+        const bent = { ...rec.gates[victim], hashes: { ...rec.gates[victim].hashes, [victim]: "0000000000000000" } };
+        ok("  ...driven on a fixture too, so it holds when the live population is empty",
+           whyRun(victim, { ...rec, gates: { [victim]: bent } }) === "changed: " + victim,
+           `a stale entry is refused BY NAME. Without this the row above passes on any tree where the record ` +
+           `happens to be current, which is exactly when nobody is looking`);
+    }
+    if (sMissStale) console.log(`  ----  ${sMissStale} STALE entr(ies) also miss a static import -- ` +
+        `${staleMissNames.slice(0, 4).join(", ")} -- which means their gate's imports moved and no pass has ` +
+        `re-probed them. Not a violation: their sets describe code that no longer exists, and those gates run anyway.`);
     ok("!! ...and the DYNAMIC population is counted rather than assumed away",
        dMiss > 0,
        dMiss + " gates carry a dynamic import to a file their set does not carry. That is the narrow branch " +

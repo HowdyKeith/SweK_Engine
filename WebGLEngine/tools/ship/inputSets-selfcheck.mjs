@@ -34,6 +34,8 @@ import { ENG, RECORD, FORMAT, hashFile, hashDir, readRecord, whyRun, skippable, 
 import { usesNamedFsImport, probeOne, entryFor } from "./recordInputs.mjs";
 import { selectGates } from "./quickSweep.mjs";
 import { noComments } from "./sourceScan.mjs";
+// v4647 -- the tree's own gate population, from the walk that owns it rather than a second copy.
+import { treePaths } from "./treeRead.mjs";
 
 let fails = 0;
 const ok = (name, cond, detail = "") => { console.log((cond ? "  PASS  " : "  FAIL  ") + name + (detail ? "   " + detail : "")); if (!cond) fails++; };
@@ -42,8 +44,27 @@ const REC = readRecord();
 const GATES = Object.keys(REC.gates || {});
 
 console.log("1. the record exists and says what it is");
-ok("tools/ship/input-sets.json is present and holds entries for the sweep's population",
-   GATES.length > 800, `${GATES.length} gate(s) recorded`);
+// *** v4647 -- THE RECORD IS A SKIP LEDGER AND ITS SIZE WAS BEING READ AS A CENSUS OF THE TREE. ***
+// `> 800` is a floor somebody picked, and what it was standing in for is COVERAGE. A targeted
+// `recordInputs --gates x --write` carries the entries that still match and DROPS the stale ones by design
+// (v4633, and dropping is right -- whyRun refuses them either way). Measured at v4647: one such run took the
+// record from 1,341 entries to 1,020, a 24% shrink in a pass that probed exactly one gate. Nothing was
+// broken by that and nothing said it had happened.
+//
+// So the number is stated as a FRACTION OF THE TREE, from treeRead's own walk rather than a second copy of
+// it, and the floor is about coverage rather than about a count that means nothing on its own.
+const TREE_GATES = treePaths().filter((f) => f.endsWith("-selfcheck.mjs")).length;
+const COVER = GATES.length / TREE_GATES;
+ok("tools/ship/input-sets.json covers a majority of the tree's gates, stated as a fraction rather than a count",
+   COVER > 0.5, `${GATES.length} of ${TREE_GATES} gate(s) in the tree -- ${(COVER * 100).toFixed(0)}% covered. ` +
+   `A targeted --write drops every stale entry, so this falls whenever the tree has moved and nobody has re-probed`);
+// *** A RATIO IS TWO NUMBERS AND ONLY ONE OF THEM WAS ANCHORED. *** Faking TREE_GATES to 1 makes coverage
+// 1020/1 and the row above passes, which a sabotage showed within a minute. The denominator gets its own
+// floor: this tree has had over a thousand gates since v4535 and a walk that returns fewer has failed, not
+// shrunk.
+ok("  CONTROL: the denominator is a real walk of the tree, not a number that makes the ratio look good",
+   TREE_GATES > 1000 && TREE_GATES >= GATES.length,
+   `${TREE_GATES} gates found by treeRead's walk. A record cannot cover more gates than exist`);
 ok("  and its note names the disqualifiers that remain, so the file explains its own refusals",
    /spawnedNonNode/.test(REC.note) && /net/.test(REC.note), (REC.note || "").slice(0, 60) + "...");
 ok("  every entry carries a hash for every path it recorded -- a path with no hash cannot be compared",
@@ -135,10 +156,34 @@ console.log("\n3. *** THE PROBE, AGAINST A GATE WHOSE INPUTS ARE KNOWN BY OTHER 
     // on gates small enough to state the whole expected answer for.
     const walker = Object.entries(REC.gates)
         .map(([g, e]) => [g, (e.reads || []).length]).sort((a, b) => b[1] - a[1])[0];
-    ok("  a gate that walks the tree records a set the size of the tree, and is therefore never skippable in practice",
-       walker && walker[1] > 1000 && whyRun(walker[0], REC) !== null,
-       `the widest recorded set is ${walker[0]} at ${walker[1]} paths, and whyRun says ` +
-       `"${whyRun(walker[0], REC)}" -- the mechanism does not pretend a whole-tree walk is a small dependency`);
+    // *** v4647 -- THIS ROW ASSERTED THE STATE OF THE TREE AND CALLED IT A PROPERTY, AND BOTH HALVES BROKE
+    // THE MOMENT THE RECORD WAS REFRESHED. *** It required the widest set to be over 1,000 paths AND its gate
+    // to be refused by whyRun, on the reasoning that a whole-tree walker is "never skippable in practice".
+    // Re-probing ONE gate dropped 321 stale entries (v4633 carryForward, working as designed) and the widest
+    // surviving set is 780; and with a record twenty minutes old, none of those 780 files has moved, so that
+    // gate IS skippable -- correctly, because nothing it reads has changed.
+    //
+    // "Never skippable in practice" was an observation about a tree that had moved since the last pass, not a
+    // fact about the mechanism. What IS durable is that the set is wide and that ANY ONE of its paths moving
+    // refuses the gate, and the second half is driven on a fixture rather than waited for.
+    const sizes = Object.entries(REC.gates).map(([, e]) => (e.reads || []).length).sort((a, b) => a - b);
+    const median = sizes[Math.floor(sizes.length / 2)] || 1;
+    ok("  a gate that walks the tree records a set the size of the tree, not a small dependency",
+       walker && walker[1] > median * 20,
+       `the widest recorded set is ${walker[0]} at ${walker[1]} paths against a median of ${median} -- ` +
+       `${(walker[1] / Math.max(median, 1)).toFixed(0)}x. A record that under-counted a whole-tree walk would ` +
+       `let it be skipped on a tree that had changed underneath it`);
+    ok("!! *** and ANY ONE of those paths moving refuses it -- driven on a fixture, not waited for ***",
+       (() => {
+           const e = REC.gates[walker[0]];
+           const victim = (e.reads || []).find((r) => r !== walker[0]);
+           const bent = { ...e, hashes: { ...e.hashes, [victim]: "0000000000000000" } };
+           return whyRun(walker[0], { format: FORMAT, gates: { [walker[0]]: bent } }) === "changed: " + victim;
+       })(),
+       `one of its ${walker[1]} recorded hashes bent, and the reason NAMES that path. This is the claim the ` +
+       `old row was reaching for; it was asserting that the tree happened to have moved instead`);
+    console.log(`  ----  whether that gate is skippable RIGHT NOW is a fact about the tree, not about the rule: whyRun says ` +
+           `"${whyRun(walker[0], REC) === null ? "skippable -- none of its 780 paths has moved since the record was written" : whyRun(walker[0], REC)}"`);
 }
 
 console.log("\n4. *** A FILE THAT DID NOT EXIST AT RECORD TIME AND NOW DOES ***");
@@ -577,6 +622,37 @@ console.log("\n8. the record's field list, because a hand-spelled serialiser alr
     ok("  and FLAGS names every non-path field the rule reads, so the list has one home",
        FLAGS.includes("spawnedNonNode") && FLAGS.includes("net") && FLAGS.every((f) => f in e),
        FLAGS.join(", "));
+
+    // *** v4647 -- A PROBE THAT PRODUCED NOTHING MUST NOT BECOME AN IMMORTAL ENTRY. ***
+    // readProbe returns procs 0 when the probe directory came back empty -- the gate was SIGKILLed at the
+    // cap, or died before its exit handler. entryFor wrote that as reads:[] hashes:{}, byte-identical to a
+    // gate that genuinely reads nothing, and firstMoved then returned null forever because an entry with no
+    // paths has nothing that can move. So carryForward carried it through every subsequent pass: never
+    // dropped as stale, never re-probed unless a run named that gate by hand.
+    //
+    // WHAT WAS NOT WRONG, checked before repairing: it never caused a false skip. whyRun refuses an empty
+    // set, so the gate runs. The damage was that the slot stayed occupied by a measurement that had failed.
+    const killed = entryFor({ gate: "tools/ship/vacuity-selfcheck.mjs", ms: 25000, code: 124, ok: false,
+                              procs: 0, reads: [], dirs: [], execs: [], net: false,
+                              spawnedNonNode: false, spawnedNode: 0 });
+    ok("!! *** a probe that produced no output is MARKED as one, not written as a gate that reads nothing ***",
+       killed.noProbeOutput === true && killed.exit === 124,
+       `noProbeOutput=${killed.noProbeOutput}, exit=${killed.exit}, procs=${killed.procs} -- exit and procs ` +
+       `were always stored and nothing read either`);
+    ok("!! *** and carryForward DROPS it, so the next pass re-probes instead of inheriting the failure ***",
+       carryForward({ "tools/ship/vacuity-selfcheck.mjs": killed }).dropped.length === 1,
+       "firstMoved returns null on an entry with no paths, so the old rule carried it forever");
+    ok("  ...dropped on the STRUCTURAL condition, so a record written before the flag existed is covered too",
+       carryForward({ "x/y-selfcheck.mjs": { reads: [], dirs: [], hashes: {}, dirHashes: {} } }).dropped.length === 1,
+       "no reads and no dirs cannot be validated by any means this function has, whatever wrote it");
+    ok("!! CONTROL: a real entry is still CARRIED -- the drop is aimed at the empty one, not at everything",
+       carryForward({ "tools/ship/vacuity-selfcheck.mjs": entryFor(VACUITY) }).dropped.length === 0,
+       "a rule that dropped every entry would re-probe the whole tree on every targeted run and look like caution");
+    ok("  and whyRun names the failure rather than calling it an empty set",
+       /probe produced no output/.test(whyRun("tools/ship/vacuity-selfcheck.mjs",
+           { format: FORMAT, gates: { "tools/ship/vacuity-selfcheck.mjs": killed } }) || ""),
+       "the reason is what the skip histogram groups by: a pass full of killed probes read as a tree full of " +
+       "gates that touch no files");
 }
 
 console.log(fails ? `\nFAIL -- ${fails} check(s)` : "\nALL GREEN");

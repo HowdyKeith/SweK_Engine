@@ -144,10 +144,26 @@ export function entryFor(p, { root = ENG } = {}) {
     // branch -- which is the exact worry v4566 shipped this machinery disarmed for). Walking the import graph
     // costs 2.1 s for the whole tree ONCE here; asking it inside whyRun would pay it on every partition.
     const short = shortfall(p.gate, p.reads, root);
+    // *** v4647 -- A PROBE THAT PRODUCED NO OUTPUT IS MARKED AS ONE, BECAUSE THE RECORD COULD NOT SAY SO. ***
+    // readProbe returns ok:false with procs 0 when the probe directory came back empty -- the gate was
+    // SIGKILLed at the cap, or died before the exit handler ran. entryFor then wrote reads:[] and hashes:{},
+    // which is byte-for-byte what a gate that genuinely reads nothing would produce. `exit` and `procs` were
+    // already stored and nothing read either.
+    //
+    // MEASURED before repairing, because the backlog item claimed more than this: such an entry does NOT
+    // produce a false skip. whyRun refuses an empty set outright, so the gate runs. And importClosure-
+    // selfcheck's `sMiss === 0` row goes RED on it -- shortfall(gate, []) reports every static import as
+    // missing, 5 of them for populationCensus-selfcheck -- so the tree does notice. What was NOT handled is
+    // below, in carryForward.
+    // Emitted UNCONDITIONALLY, like every other FLAG. The first draft spread it in only when true, and
+    // inputSets-selfcheck went red on `FLAGS.every((f) => f in e)` -- the row that exists because v4567's
+    // renamed flag vanished on write. A field that is sometimes absent is the fragility that row guards, and
+    // it caught this within a minute of the edit.
     return { reads: p.reads, dirs: p.dirs, hashes, dirHashes,
              spawnedNonNode: p.spawnedNonNode, spawnedNode: p.spawnedNode, procs: p.procs,
              net: p.net, namedFsImport: usesNamedFsImport(p.gate, root),
-             reachesUnrecorded: short !== null, probeMs: p.ms, exit: p.code };
+             reachesUnrecorded: short !== null, probeMs: p.ms, exit: p.code,
+             noProbeOutput: p.procs === 0 };
 }
 
 /**

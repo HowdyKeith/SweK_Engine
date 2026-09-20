@@ -7,7 +7,7 @@
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { treePaths } from "./treeRead.mjs";
 import { adapterKey, verdict, describe, coverage, owedCount,
          compareFor, boundFrom, SLACK, readReadings, recordReading, mergeRecords } from "./adapterRecord.mjs";
 
@@ -160,19 +160,14 @@ console.log("\n6. *** THE POPULATION, COUNTED RATHER THAN REMEMBERED ***");
     // here instead, from the tree, every run -- so the debt cannot quietly be understated and cannot stay the
     // same number while the tree grows. What it counts is deliberately NOT "gates that would go red on other
     // silicon": that is only answerable by running them on other silicon, and this row would be guessing.
-    const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-    const SKIP = /node_modules|[\\/]vendor[\\/]|[\\/]dist[\\/]/;
-    const gates = [];
-    (function walk(d) {
-        let ents = [];
-        try { ents = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
-        for (const e of ents) {
-            const f = path.join(d, e.name);
-            if (SKIP.test(f)) continue;
-            if (e.isDirectory()) walk(f);
-            else if (e.name.endsWith("-selfcheck.mjs")) gates.push(f);
-        }
-    })(ENG);
+    // *** v4647 -- treeRead's WALK, NOT A SECOND COPY OF IT. *** The first draft of this row hand-rolled a
+    // readdir recursion with its own SKIP regex, which is this tree's single most repeated defect and the
+    // exact one v4646 spent a round on: treeRead.SKIP_AGREE.recordDrift had drifted from the unified pattern
+    // and leaked 117 vendor files on Windows. One walk, memoised, with one definition of what to skip.
+    // treePaths returns ABSOLUTE paths -- joining them onto the root again produced 1,756 unreadable names
+    // and 0 device gates, which the CONTROL row below caught on the first run. That row exists because a walk
+    // that finds nothing reports "0 converted of 0" and reads exactly like finished work.
+    const gates = treePaths().filter((f) => f.endsWith("-selfcheck.mjs"));
     const deviceGates = [], convertedGates = [];
     for (const f of gates) {
         let src = "";
