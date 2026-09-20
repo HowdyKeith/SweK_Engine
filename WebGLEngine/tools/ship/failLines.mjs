@@ -33,7 +33,32 @@ import { boxId } from "./hostScale.mjs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-export const OUT_FILE = "tools/ship/fail-lines.json";
+// *** v4647b -- ONE PATH AND TWO BOXES WAS THE WHOLE DEFECT THE PREVIOUS ROUND FIXED, REBUILT HERE. ***
+//
+// The first version wrote tools/ship/fail-lines.json. Both boxes then wrote it, this one committed it, and
+// Keith's `git pull` aborted -- "untracked working tree files would be overwritten by merge" -- which is the
+// sweep-timings failure verbatim, in the tool built to make cross-box comparison possible, one round after
+// that lesson. His capture and this one are DIFFERENT MEASUREMENTS of different machines and must not share
+// a name.
+//
+// *** AND A CAPTURE OF GATE OUTPUT IS NOT ENGINE SOURCE, WHICH THE TREE PROVED WITHIN A MINUTE. ***
+// The record quotes failing rows verbatim. reachedLicences-selfcheck walks every .js/.mjs/.glsl/.html/.css/
+// .json under WebGLEngine looking for publisher names a vendored copy would carry -- and Keith's capture,
+// which quotes THAT GATE'S OWN FAILING ROWS, carried all three of its tokens. The record was flagged as an
+// unlicensed copy of the thing it was reporting on. That is v4480's "five suspects in the gate that hunted
+// them" arriving from the other direction, and it would hit every text census in the tree, not just this one.
+//
+// *** AND WRITING THAT PARAGRAPH REPRODUCED IT. *** The first draft SPELLED the three tokens to explain the
+// failure, so this file and its gate were flagged next -- prose about a text census is census-visible text.
+// playwrightResolve-selfcheck learned the same thing and builds its needle by concatenation "per v4409's
+// rule that a fixture is not a gate". Here the answer is simpler: the tokens are described, never spelled.
+//
+// So captures live OUTSIDE the engine tree, at the repository root, one file per box. Every census walks from
+// WebGLEngine down, so nothing has to be taught to skip them -- which matters because those SKIP rules are
+// copied per gate rather than shared, and widening the shared one would re-drift every census this session
+// just re-derived.
+export const CAPTURE_DIR = "captures";
+export function captureFile(id = boxId()) { return path.join(CAPTURE_DIR, `fail-lines.${id}.json`); }
 
 // The ritual's rule, in code: a failing ROW starts the line. "FAIL" inside prose is not a finding, and
 // counting it is how a gate with one red row and four mentions of the word reads as five failures.
@@ -154,12 +179,15 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     console.log(describe(rows));
     if (process.argv.includes("--write")) {
         const stamp = treeStamp();
+        const REPO = path.resolve(ENG, "..");
+        const out = path.join(REPO, captureFile());
+        fs.mkdirSync(path.dirname(out), { recursive: true });
         const payload = { generatedFrom: "tools/ship/failLines.mjs", at: new Date().toISOString(),
                           platform: process.platform, box: boxId(), tree: stamp,
                           summary: summarise(rows), gates: rows };
-        fs.writeFileSync(path.join(ENG, OUT_FILE), JSON.stringify(payload, null, 1) + "\n");
-        const st = treeStamp();
-        console.log(`[failLines] wrote ${OUT_FILE} for ${boxId()} at ${st.commit || "an unknown commit"}` +
+        fs.writeFileSync(out, JSON.stringify(payload, null, 1) + "\n");
+        const st = stamp;
+        console.log(`[failLines] wrote ${captureFile()} for ${boxId()} at ${st.commit || "an unknown commit"}` +
                     `${st.dirty ? " (WORKING TREE DIRTY -- these reds include uncommitted changes)" : ""} -- ` +
                     `commit it FROM THIS BOX and the reds can be compared against another machine's by ` +
                     `assertion rather than by exit code`);

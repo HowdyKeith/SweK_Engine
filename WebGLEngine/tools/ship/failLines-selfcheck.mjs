@@ -9,7 +9,11 @@
 // process is a parameter, every verdict is reached from a fixture, and the classification is measured rather
 // than described.
 "use strict";
-import { FAIL_LINE, gatesFromVerify, runOne, summarise, describe, treeStamp } from "./failLines.mjs";
+import fs from "node:fs";
+import path from "node:path";
+import { FAIL_LINE, gatesFromVerify, runOne, summarise, describe, treeStamp,
+         CAPTURE_DIR, captureFile } from "./failLines.mjs";
+import { ENG } from "./gateSweep.mjs";
 
 let fails = 0;
 const ok = (n, c, d = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${n}${d ? "   " + d : ""}`); };
@@ -132,6 +136,29 @@ console.log("\n6. *** WHICH TREE THE READINGS WERE TAKEN AGAINST -- v4647 ***");
        survives(() => { throw new Error("ENOENT"); }),
        "this runs at the end of a diagnosis that has already done its work -- SEVENTH instance of the " +
        "crash-instead-of-a-finding species in this tree, written into the row about it");
+}
+
+console.log("\n7. *** WHERE A CAPTURE GOES, WHICH TOOK TWO SEPARATE FAILURES TO GET RIGHT ***");
+{
+    // ONE: both boxes wrote tools/ship/fail-lines.json, this one committed it, and Keith's pull aborted --
+    // the sweep-timings defect verbatim, in the tool built for cross-box comparison, one round after fixing
+    // it there. TWO: the record quotes failing rows, and reachedLicences-selfcheck walks every .json under
+    // WebGLEngine for publisher names a vendored copy would carry. His capture quotes THAT GATE'S OWN rows,
+    // so it carried all three tokens and was flagged as an unlicensed copy of the thing it was reporting on.
+    // The first draft of this comment SPELLED them and was flagged in turn -- prose about a text census is
+    // census-visible text -- so they are described here and never written out.
+    ok("!! *** the capture is named for its BOX, so two machines never write one file ***",
+       /fail-lines\..+\.json$/.test(captureFile("win32-x64-16c-32000mb-abcdef")) &&
+       captureFile("a") !== captureFile("b"),
+       captureFile("win32-x64-16c-32000mb-abcdef"));
+    ok("!! *** and it lives OUTSIDE the engine tree, because a capture of gate output is not engine source ***",
+       !captureFile().startsWith("WebGLEngine") && CAPTURE_DIR === "captures" &&
+       !path.resolve(ENG, "..", captureFile()).startsWith(ENG + path.sep),
+       `${path.resolve(ENG, "..", captureFile())} is not under ${ENG} -- every census walks from WebGLEngine ` +
+       `down, so nothing has to be taught to skip it`);
+    ok("  CONTROL: the engine tree no longer carries the old shared path",
+       !fs.existsSync(path.join(ENG, "tools", "ship", "fail-lines.json")),
+       "a record quoting gate output inside the scanned tree re-enters every text census as if it were source");
 }
 
 console.log(`\nfailLines-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);
