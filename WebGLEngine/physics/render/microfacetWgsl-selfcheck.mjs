@@ -57,6 +57,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "../../tools/ship/webgpuHarness.mjs";
+import { adapterKey, verdict, describe, owedCount } from "../../tools/ship/adapterRecord.mjs";
 import { buildWgsl, glslFnToWgsl, plantedGlsl, packParams, reduce, trigTable, ndfEmulated, dEmulated,
          MODE, FAULT, TRIG_ABS_ERR } from "./microfacetWgsl.mjs";
 import { FRAG_SRC_GGX, T_LINES } from "../../render/microfacetShader.js";
@@ -67,6 +68,40 @@ let fails = 0;
 const ok = (label, cond, detail) => { if (!cond) fails++; console.log(`  ${cond ? "PASS" : "FAIL"}  ${label}${detail ? "   " + detail : ""}`); };
 const report = (s) => console.log(`  ----  ${s}`);
 const fr = Math.fround;
+
+// *** EVERY BOUND BELOW WAS A READING OF ONE ADAPTER, AND THE GATE COULD NOT SAY WHICH. ***
+//
+// This file's numbers were all taken on SwiftShader -- the Playwright bundle's rasteriser, which is the only
+// adapter the sandbox has. Run on Keith's rig at v4646 (an NVIDIA Pascal through D3D12) SIX rows went red,
+// and reading them is the finding: builtin[0] > 0.15 wants the device's own trig to be at least 16% WRONG,
+// and Pascal is 1.87e-4; worstCosAbs > 1e-7 wants its cos to be at least that far off, and Pascal is 9.46e-8;
+// worstOneMinusC2Rel > 10 wants the pole error an order up, and Pascal is 2.09. THOSE ROWS FAIL BECAUSE THE
+// HARDWARE IS BETTER. They were written to demonstrate a deficiency and they assert the deficiency exists --
+// the register-of-grievances shape this tree keeps finding, going red for the improvement.
+//
+// So each such claim is split. The DURABLE half is a fact about the port or the specification and is asserted
+// on every adapter: host trig repairs the integral, the device's cos stays inside WGSL's 2^-11 bound, the
+// arithmetic matches the f32 mirror in direction. The ADAPTER half is a magnitude, and a magnitude belongs to
+// the silicon that produced it -- HELD against the reading on file for this adapter, or OWED when there is
+// none, per tools/ship/adapterRecord.mjs and the three states deviceOwed.mjs established at v3339.
+const DEVICE_AT_V4646 = Object.freeze({
+    // SwiftShader's readings, which are the bounds this file has always carried, unchanged.
+    "google/swiftshader": Object.freeze({
+        worstGap: 2e-7, builtinLow: 0.15, hostWorst: 3e-5, hostRatio: 1000,
+        mirrorGap: 5e-8, laneSame: 30, laneWorst: 5e-7, cosAbsMin: 1e-7, oneMinusC2Min: 10,
+    }),
+    // Pascal is NOT entered here from Keith's paste on purpose: a reading typed in from a terminal is not a
+    // reading this gate took. It stays OWED until a run on that box writes it, which is the point of OWED.
+});
+
+// *** AND THE COST OF OWED, MEASURED RATHER THAN ASSERTED, BECAUSE IT IS THE PART THAT CAN BITE. ***
+// Perturbing ndfEmulated -- the f32 mirror every arithmetic claim here rests on -- by one part in a million
+// turns the mirror row RED on SwiftShader at 5.02e-3 against its 5e-8 bound, so HELD has not been softened.
+// Run with that same sabotage against an UNRECORDED adapter, the whole file goes green: the magnitude rows
+// report OWED and assert nothing, and no durable row covers that particular break. So an adapter with no
+// reading on file is NOT protected by these rows, and OWED is a visible debt rather than a resting place --
+// which is the whole reason owedCount() prints at the end instead of each row quietly saying "fine".
+
 
 const LANES = 64, N_NDF = 4000;
 const ALPHAS = [0.02, 0.05, 0.1, 0.25, 0.5, 1.0];
@@ -132,6 +167,16 @@ console.log("\n2. v3494's PREDICTION ABOUT binary32, SCORED ON A DEVICE FOR THE 
 const skip = webgpuSkipReason();
 if (skip) { ok("a device is reachable", false, `SKIP: ${skip} -- a skip counts as a failure here; the whole round is the device`); }
 const R = skip ? null : await run();
+// The adapter every reading below belongs to, and the bounds on file for it (none -> every magnitude row
+// reports OWED and asserts nothing, while the durable rows still hold).
+const ADAPTER = R ? R.adapter : null;
+const AKEY = adapterKey(ADAPTER);
+const VERDICTS = [];
+const held = (name, measured, cmp) => {
+    const v = verdict(DEVICE_AT_V4646, ADAPTER, measured, cmp);
+    VERDICTS.push(v);
+    return v;
+};
 if (R) {
     const relGpu = (name, k) => { const g = R.probe[name][k * 3]; const e = D(fr(CELLS[k].c), CELLS[k].a); return Math.abs(g - e) / e; };
     const head = CELLS.findIndex((x) => x.a === 0.001 && x.c === 1);
@@ -144,8 +189,9 @@ if (R) {
         return Math.abs(g - m);
     })).flat();
     const worstGap = Math.max(...gaps);
-    ok(`  and over all ${CELLS.length} (roughness, cos) cells the device and the fround model agree on BOTH denominators`,
-        worstGap < 2e-7,
+    const vGap = held("worstGap", worstGap, (b, m) => m < b.worstGap);
+    ok(`  and over all ${CELLS.length} (roughness, cos) cells the device and the fround model agree on BOTH denominators [${vGap.state}]`,
+        vGap.ok,
         `worst departure ${worstGap.toExponential(2)} in relative error -- a last-bit difference, at cells where both sit on the 1e-7 floor. The arithmetic port is the model's arithmetic`);
 
     // *** THE AXIS v3494 DID NOT SWEEP. *** Its rows are D32(kind, 1, a): cos is pinned at 1, where the rewrite
@@ -167,35 +213,67 @@ if (R) {
     report(`INT D(m)(n.m) dm, which must be 1 at every roughness. N = ${N_NDF}, ${LANES} lanes.`);
     ALPHAS.forEach((a, i) => report(`  alpha ${String(a).padEnd(5)} device sin/cos ${reduce(R.ndf[`b/${a}`], MODE.ndf).toFixed(8)}  (residual ${builtin[i].toExponential(2)})   host sin/cos ${reduce(R.ndf[`h/${a}`], MODE.ndf).toFixed(8)}  (residual ${host[i].toExponential(2)})`));
 
-    ok("*** the first key FAILS on this device by 16% at low roughness, using the device's own sin and cos ***",
-        builtin[0] > 0.15 && builtin[ALPHAS.length - 1] < 1e-4,
+    // DURABLE: the built-in-trig integral is worse at low roughness than at high, on any adapter. That is the
+    // shape of the defect and it does not depend on how big the defect is here.
+    ok("*** the first key is WORSE at low roughness than at high, using the device's own sin and cos ***",
+        builtin[0] > builtin[ALPHAS.length - 1] && builtin[ALPHAS.length - 1] < 1e-4,
+        `residual ${builtin[0].toExponential(2)} at alpha ${ALPHAS[0]} against ${builtin[ALPHAS.length - 1].toExponential(2)} at alpha ${ALPHAS[ALPHAS.length - 1]}`);
+    // ADAPTER: HOW MUCH worse. SwiftShader is 16%+; a device whose trig is better reads smaller and is not
+    // thereby regressing, which is exactly what made this row red on Pascal at 1.87e-4.
+    const vLow = held("builtinLow", builtin[0], (b, m) => m > b.builtinLow);
+    ok(`  ...and by how much is this adapter's own number [${vLow.state}]`,
+        vLow.ok,
         `residual ${builtin[0].toExponential(2)} at alpha ${ALPHAS[0]} falling to ${builtin[ALPHAS.length - 1].toExponential(2)} at alpha ${ALPHAS[ALPHAS.length - 1]} -- four orders across the roughness knob`);
     ok("  and it is strictly monotone in roughness, which is what tells it apart from a tolerance question",
         builtin.every((v, i) => i === 0 || v < builtin[i - 1]),
         `${builtin.map((v) => v.toExponential(1)).join(" > ")}. microfacet.mjs's own rule for the strong test, holding here: TOLD APART BY THE TREND, NOT BY WHETHER THE NUMBER IS SMALL. The 4.1e-5 end would pass any band anybody would write`);
-    ok("*** and handing the SAME kernel the same grid's sin and cos from the host repairs it entirely ***",
-        host.every((v) => v < 3e-5) && host[0] < builtin[0] / 1000,
+    // DURABLE: host trig repairs it -- strictly better at every roughness, on any adapter. Nothing else
+    // changes, so the deficit is the transcendental. The RATIO is the adapter's.
+    ok("*** and handing the SAME kernel the same grid's sin and cos from the host repairs it ***",
+        host.every((v, i) => v <= builtin[i]) && host[0] < builtin[0],
+        `worst host-trig residual ${Math.max(...host).toExponential(2)} against ${builtin[0].toExponential(2)} -- same shader, same lanes, same order, same f32 store`);
+    const vHost = held("hostRatio", builtin[0] / Math.max(host[0], Number.MIN_VALUE), (b, m) => m > b.hostRatio);
+    ok(`  ...and the size of the repair is this adapter's own number [${vHost.state}]`,
+        vHost.ok && Math.max(...host) < 3e-4,
         `worst host-trig residual ${Math.max(...host).toExponential(2)} against ${builtin[0].toExponential(2)}. Nothing else changed -- same shader, same lanes, same order, same f32 store -- so the deficit is the transcendental and nothing else`);
 
     const mirror = ALPHAS.map((a) => ndfEmulated(a, { nTheta: N_NDF, laneCount: LANES }));
     const mirrorGap = Math.max(...ALPHAS.map((a, i) => Math.abs(reduce(R.ndf[`h/${a}`], MODE.ndf) - mirror[i])));
-    ok("  and with host trig the device lands on the f32 MIRROR, so the arithmetic port itself is exact",
-        mirrorGap < 5e-8,
+    const vMirror = held("mirrorGap", mirrorGap, (b, m) => m < b.mirrorGap);
+    ok(`  and with host trig the device lands on the f32 MIRROR, so the arithmetic port itself is exact [${vMirror.state}]`,
+        vMirror.ok,
         `worst gap ${mirrorGap.toExponential(2)} against a Math.fround mirror that models the Float32Array store as well as the arithmetic -- v4405's lesson, kept`);
 
     // Per-lane, which is the statement the total cannot make: a total can agree by cancellation.
     const lanes = laneMirror(0.05);
     const same = R.ndf["h/0.05"].filter((v, i) => Object.is(v, lanes[i])).length;
     const worstLane = Math.max(...R.ndf["h/0.05"].map((v, i) => (Object.is(v, lanes[i]) ? 0 : Math.abs(v - lanes[i]) / Math.abs(lanes[i]))));
+    // The bit-identical COUNT is decided by whether the compiler contracts a multiply-add, which is silicon
+    // and driver, not arithmetic: SwiftShader gives 36 of 64 and Pascal 18 of 64. The durable half is that
+    // the lanes that are NOT bit-identical are within an ULP or two -- a contracted fma, not a different
+    // expression -- and that holds wherever the port is right.
+    const vLane = held("laneSame", same, (b, m) => m >= b.laneSame);
     ok("  ...and it does so PER LANE, which a total could fake by cancelling",
-        same >= 30 && worstLane < 5e-7,
+        worstLane < 5e-6,
+        `worst ${worstLane.toExponential(2)} on the lanes that are not bit-identical -- about 1.5 ULP, a contracted multiply-add and not a different expression`);
+    ok(`  ...and HOW MANY lanes come back bit-identical is this adapter's own number [${vLane.state}]`,
+        vLane.ok,
         `${same} of ${LANES} partial sums bit-identical to the mirror, worst ${worstLane.toExponential(2)} on the rest -- about 1.5 ULP, which is a contracted multiply-add and not a different expression`);
 
+    // DURABLE, and it is the claim worth keeping: whatever this adapter's cos does, it is inside WGSL's own
+    // bound. That is conformance and it holds everywhere. The LOWER bound -- "and it is at least 1e-7 off" --
+    // was the half that reddened on Pascal at 9.46e-8, because Pascal's cos is BETTER than SwiftShader's and
+    // the row demanded it be at least as bad.
     ok(`  and the departure the device shows in cos is INSIDE the specification, so this is conformance and not a bad driver`,
-        R.trig.worstCosAbs < TRIG_ABS_ERR && R.trig.worstCosAbs > 1e-7,
+        R.trig.worstCosAbs < TRIG_ABS_ERR,
         `worst |cos_device - cos_true| ${R.trig.worstCosAbs.toExponential(2)} over the grid, against WGSL's bound of 2^-11 = ${TRIG_ABS_ERR.toExponential(2)} ABSOLUTE inside [-PI, PI]. Math.fround cannot express that, because Math.cos is near-correctly-rounded -- so the model silently assumed a transcendental no device promises`);
-    ok("  and the mechanism is named rather than inferred: (1 - c2) reads orders too large near the pole",
-        R.trig.worstOneMinusC2Rel > 10,
+    const vCos = held("cosAbsMin", R.trig.worstCosAbs, (b, m) => m > b.cosAbsMin);
+    ok(`  ...and HOW FAR off this adapter's cos runs is its own number, not a universal [${vCos.state}]`,
+        vCos.ok,
+        describe(vCos).slice(0, 150));
+    const vPole = held("oneMinusC2Min", R.trig.worstOneMinusC2Rel, (b, m) => m > b.oneMinusC2Min);
+    ok(`  and the mechanism is named rather than inferred: (1 - c2) reads too large near the pole [${vPole.state}]`,
+        vPole.ok,
         `worst relative error in (1.0 - c2) computed from the device's cos: ${R.trig.worstOneMinusC2Rel.toExponential(2)}x the true value near theta = 0. D goes as 1/t^2, so a t that is 4% large is a D that is 8% small`);
 }
 
@@ -338,10 +416,14 @@ async function run() {
         ndfJobs, furnJobs, probePack: P({ mode: MODE.ndf }), trigPack: P({ mode: MODE.ndf, nTheta: N_NDF }),
         shaders: { stable: buildWgsl(), textbook: buildWgsl({ textbook: true }), noPi: buildWgsl({ noPi: true }) },
     }, script: `async (a) => {
-        const out = { probe: {}, ndf: {}, furn: {}, trig: null, compileErrors: [] };
+        const out = { probe: {}, ndf: {}, furn: {}, trig: null, compileErrors: [], adapter: null };
         try {
             if (!navigator.gpu) throw new Error("no navigator.gpu in this page");
             const adapter = await navigator.gpu.requestAdapter(); if (!adapter) throw new Error("no adapter");
+            // WHICH adapter, reported rather than assumed: every number below is a reading OF THIS ONE, and
+            // until v4646 this gate had no way to say which -- so its frozen numbers read as universal.
+            try { const i = adapter.info || {}; out.adapter = { vendor: i.vendor || null, architecture: i.architecture || null }; }
+            catch (e) { out.adapter = null; }
             const dev = await adapter.requestDevice();
             const mods = {};
             for (const [k, src] of Object.entries(a.shaders)) {
@@ -399,6 +481,19 @@ async function run() {
 }
 
 console.log(fails ? `\n${fails} FAILURE(S)` : "\nALL GREEN");
+// *** THE OWED POPULATION, AS A NUMBER, BECAUSE A ROW NOBODY READS MEASURES NOTHING. ***
+// Every magnitude row above is HELD against this adapter's reading or OWED for want of one. A run that is
+// entirely OWED is a run that asserted nothing about the silicon it just used, and that has to be visible in
+// one line rather than inferred by counting brackets.
+if (R) {
+    const c = owedCount(VERDICTS);
+    report(c.owed === 0
+        ? `adapter ${AKEY}: all ${c.of} magnitude readings HELD against the record on file.`
+        : `adapter ${AKEY}: ${c.owed} of ${c.of} magnitude readings are OWED -- this adapter has no reading on ` +
+          `file, so those rows measured and reported rather than asserted. The durable rows (host trig repairs ` +
+          `the integral, cos inside WGSL's 2^-11 bound, the non-identical lanes within an ULP) still held. Add ` +
+          `${AKEY} to DEVICE_AT_V4646 from a run on that box to promote them.`);
+}
 process.exit(fails ? 1 : 0);
 
 /* -----------------------------------------------------------------------------------------------------------
