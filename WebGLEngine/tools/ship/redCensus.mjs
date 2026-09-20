@@ -1102,7 +1102,17 @@ const WHY_V4562 = Object.freeze({
         "serial and parallel sharing `timings` against one threshold, which the record filed as its own " +
         "round and v4557 gave provenance to without moving the decision.",
 });
-export const RED_AT_V4562_GATES = Object.freeze(["tools/ship/sweepCoverage-selfcheck.mjs"]);
+// *** v4647o -- RETIRED. THE CURE THIS ENTRY PRESCRIBED IS THE ONE THAT WAS APPLIED. ***
+// The note above ends "v4557 gave that field provenance (`contended`) and deliberately did not move the
+// membership decision; MOVING IT IS WHAT THIS NEEDS." v4647m moved it: the guard asks `serial` for the
+// uncontended cost and `timings` only where `contended === true`, so the verdict no longer turns on which
+// ritual step ran last. meshLine, traderGraph and wgslSpec are all judged the same way whichever run wrote
+// last, and sweepCoverage-selfcheck has run green since.
+//
+// The list stays, EMPTY, because it is referenced elsewhere and because an entry that names its own cure
+// and then has it applied is worth more as history than as a deletion. WHY_V4562 above is kept for the
+// same reason: it is the diagnosis that turned out to be right.
+export const RED_AT_V4562_GATES = Object.freeze([]);
 
 export const RED_AT_V4562 = Object.freeze(RED_AT_V4562_GATES.map((gate) => Object.freeze({
     gate,
