@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed.",
- "at": "2026-09-20T19:13:28.185Z",
+ "at": "2026-09-20T20:54:09.597Z",
  "budgetMs": 3000,
  "lastRun": 1,
  "rotated": [
@@ -203,10 +203,10 @@
   },
   {
    "gate": "physics/hmc/inference-selfcheck.mjs",
-   "ms": 2924,
+   "ms": 2679,
    "code": 0,
    "priorMs": 4698,
-   "at": "2026-09-09T12:57:13.333Z"
+   "at": "2026-09-20T20:53:51.981Z"
   },
   {
    "gate": "physics/jolt/jolt-ragdoll-vs-wall-selfcheck.mjs",
@@ -245,10 +245,10 @@
   },
   {
    "gate": "physics/mesh/dualContour-selfcheck.mjs",
-   "ms": 1786,
+   "ms": 1100,
    "code": 0,
-   "priorMs": 3346,
-   "at": "2026-09-09T12:57:13.333Z"
+   "priorMs": 1247,
+   "at": "2026-09-20T20:53:53.232Z"
   },
   {
    "gate": "physics/mesh/featurePreserve-selfcheck.mjs",
@@ -266,10 +266,10 @@
   },
   {
    "gate": "physics/mesh/marchingCubes-selfcheck.mjs",
-   "ms": 1802,
+   "ms": 1320,
    "code": 0,
-   "priorMs": 3279,
-   "at": "2026-09-09T12:57:13.333Z"
+   "priorMs": 1411,
+   "at": "2026-09-20T20:53:54.688Z"
   },
   {
    "gate": "physics/mesh/quadraticWall-selfcheck.mjs",
@@ -742,10 +742,10 @@
   },
   {
    "gate": "tools/fingerprint/fingerprint-selfcheck.mjs",
-   "ms": 2695,
+   "ms": 2041,
    "code": 0,
-   "priorMs": 4461,
-   "at": "2026-09-09T12:57:13.333Z"
+   "priorMs": 2091,
+   "at": "2026-09-20T20:53:56.866Z"
   },
   {
    "gate": "tools/fingerprint/libmTripwire-selfcheck.mjs",
@@ -777,10 +777,10 @@
   },
   {
    "gate": "tools/mcp/physicsAi-selfcheck.mjs",
-   "ms": 577,
+   "ms": 880,
    "code": 0,
-   "priorMs": 3363,
-   "at": "2026-09-09T12:57:13.333Z"
+   "priorMs": 864,
+   "at": "2026-09-20T20:53:57.885Z"
   },
   {
    "gate": "tools/render-qa/referenceScan-selfcheck.mjs",
@@ -1071,10 +1071,10 @@
   },
   {
    "gate": "tools/roundhouse/landauZener-selfcheck.mjs",
-   "ms": 986,
+   "ms": 898,
    "code": 0,
    "priorMs": 4351,
-   "at": "2026-09-09T12:57:13.333Z"
+   "at": "2026-09-20T20:53:58.922Z"
   },
   {
    "gate": "tools/roundhouse/libmControl-selfcheck.mjs",
@@ -1127,10 +1127,10 @@
   },
   {
    "gate": "tools/roundhouse/mpmRefineBind-selfcheck.mjs",
-   "ms": 2872,
+   "ms": 2157,
    "code": 0,
-   "priorMs": 3417,
-   "at": "2026-09-09T12:57:13.333Z"
+   "priorMs": 2145,
+   "at": "2026-09-20T20:54:01.217Z"
   },
   {
    "gate": "tools/roundhouse/multigrid3dBind-selfcheck.mjs",
@@ -1386,10 +1386,10 @@
   },
   {
    "gate": "tools/ship/artefactWriters-selfcheck.mjs",
-   "ms": 2600,
+   "ms": 2022,
    "code": 0,
-   "priorMs": 3216,
-   "at": "2026-09-09T12:57:13.333Z"
+   "priorMs": 1972,
+   "at": "2026-09-20T20:54:03.384Z"
   },
   {
    "gate": "tools/ship/asciify-selfcheck.mjs",
@@ -1747,10 +1747,10 @@
   },
   {
    "gate": "tools/ship/domAnimation-selfcheck.mjs",
-   "ms": 1239,
+   "ms": 918,
    "code": 0,
-   "priorMs": 5329,
-   "at": "2026-09-09T12:57:13.333Z"
+   "priorMs": 888,
+   "at": "2026-09-20T20:54:04.453Z"
   },
   {
    "gate": "tools/ship/domScope-selfcheck.mjs",
@@ -1963,10 +1963,10 @@
   },
   {
    "gate": "tools/ship/gpuGitTime-selfcheck.mjs",
-   "ms": 1160,
+   "ms": 905,
    "code": 0,
-   "priorMs": 5769,
-   "at": "2026-09-09T12:57:13.333Z"
+   "priorMs": 877,
+   "at": "2026-09-20T20:54:05.498Z"
   },
   {
    "gate": "tools/ship/gpuOrbits-selfcheck.mjs",
@@ -2833,10 +2833,10 @@
   },
   {
    "gate": "tools/ship/solidTexture-selfcheck.mjs",
-   "ms": 2733,
+   "ms": 2084,
    "code": 0,
-   "priorMs": 7311,
-   "at": "2026-09-09T12:57:13.333Z"
+   "priorMs": 2169,
+   "at": "2026-09-20T20:54:07.725Z"
   },
   {
    "gate": "tools/ship/solverFit-selfcheck.mjs",
@@ -2973,10 +2973,10 @@
   },
   {
    "gate": "tools/ship/tslRig-selfcheck.mjs",
-   "ms": 2786,
+   "ms": 1732,
    "code": 0,
-   "priorMs": 6717,
-   "at": "2026-09-09T12:57:13.333Z"
+   "priorMs": 1882,
+   "at": "2026-09-20T20:54:09.597Z"
   },
   {
    "gate": "tools/ship/tunnelSpawn-selfcheck.mjs",

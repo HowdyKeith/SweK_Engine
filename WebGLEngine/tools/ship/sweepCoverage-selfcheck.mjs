@@ -139,7 +139,7 @@ import { overNonEmpty, emptyOfNonEmpty } from "./vacuity.mjs";
 import * as QS from "./quickSweep.mjs";
 import * as Q from "./quickSweep.mjs";
 import { gateReport } from "./gateReport.mjs";
-import { mergeTimings } from "./sweepRotation.mjs";
+import { mergeTimings, restoreLost, CORROBORATION_BAND, UNDATED } from "./sweepRotation.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -892,15 +892,31 @@ console.log("\n*** THE FIRST BULK PASS AT THE EXILED POOL (v4565): HALF THE 3-8 
     const byGate = new Map((led.rotated || []).map((r) => [r.gate, r]));
     const unaccounted = R.ranGates.filter((g) => { const r = byGate.get(g); return !r || r.at < R.stamp; });
     const reTimedLater = R.ranGates.filter((g) => (byGate.get(g) || {}).at > R.stamp);
+    // *** v4647j -- `back` WAS THE ONE CLAUSE STILL COUNTING ROWS UNDER THE OLD STAMP, AND IT DECAYED. ***
+    // Above it, `pass.length` was already converted to a gate-by-gate check because "the row went red at 156
+    // of 210 with nothing wrong" -- a rotation re-times gates by name, they leave the old stamp, the count
+    // falls, and nothing is wrong. `back` was left reading `pass`, so it had the SAME defect: this round
+    // re-timed twelve gates by name (the honest answer to twelve disagreeing readings) and the count went
+    // 104 -> 92 against a floor of 95. MEASURED both ways on the live ledger: old rule 92, gate-by-gate 108.
+    //
+    // A returnee is a GATE, not a row under one stamp. The UPPER bound goes with the change: it read
+    // `back.length <= R.returnees`, and gate by gate a gate the pass found OVER budget that a later
+    // re-timing finds under legitimately joins -- 108 against the pass's 105 is three of those. The comment
+    // below already says a returnee crossing back is the file working; capping it made that an error. The
+    // floor stays, because that is what it was always for: a COLLAPSE means the ledger was rewritten.
+    const backGates = R.ranGates.filter((g) => { const r = byGate.get(g); return r && r.ms <= SC.BUDGET_MS; });
     ok("!! *** THE PASS'S OWN LEDGER STILL SHOWS THE RETURNEES, GATE BY GATE ***",
        R.ranGates.length === R.ran - 1 && unaccounted.length === 0 &&
        pass.length + reTimedLater.length === R.ranGates.length && pass.length <= R.ran &&
-       back.length <= R.returnees && back.length >= R.returnees * 0.9 &&
+       backGates.length >= R.returnees * 0.9 &&
        pass.every((r) => r.priorMs > R.band[0] && r.priorMs <= R.band[1]),
        `every one of the ${R.ranGates.length} named gates is still in the ledger: ${pass.length} under the ` +
        `pass stamp ${R.stamp} and ${reTimedLater.length} re-timed by name since, ${unaccounted.length} ` +
-       `unaccounted. ${back.length} of the stamped rows read at or under the ${SC.BUDGET_MS} ms budget, ` +
-       `against ${R.returnees} returnees recorded. ${leftTheGroup} row(s) have left the group, which is the ` +
+       `unaccounted. ${backGates.length} of them read at or under the ${SC.BUDGET_MS} ms budget in the ` +
+       `ledger TODAY -- counted GATE BY GATE across every stamp, not row by row under the pass's -- against ` +
+       `${R.returnees} recorded at the pass and a floor of ${Math.ceil(R.returnees * 0.9)}; ${back.length} ` +
+       `under the pass stamp alone, which is the number that used to be asserted and which falls every time ` +
+       `a gate is legitimately re-timed by name. ${leftTheGroup} row(s) have left the group, which is the ` +
        "ledger's merge-by-gate rule and not a loss -- the group can only shrink, never grow, and a COLLAPSE " +
        "of it would mean the ledger had been rewritten wholesale, which is exactly what `unaccounted` " +
        `catches now that the names are frozen rather than a fraction of a count. Every row still in the ` +
@@ -1158,6 +1174,122 @@ console.log("\n*** THE CAP KILLED THE GATE AND LEFT ITS CHILDREN RUNNING (v4568)
        "makes the gate a process-GROUP leader and a negative pid signals the whole group. The fallback to " +
        "the old form is deliberate -- a group kill can fail if the child never formed one, and a cap that " +
        "throws instead of killing is worse than one that leaks.");
+}
+
+// =============================================================================================================
+console.log("\n*** v4647j -- THE FIVE RED ROWS ABOVE WERE RIGHT FOR FIVE WEEKS, AND THIS IS WHAT THEY MEANT ***");
+// v4647j SABOTAGES, RESULTS BY NAME (baseline 5 live reds, so a sabotage shows as 6 or 7):
+//   WA. the stamp written is today's, not the surviving reading's   -> +2
+//   WB. restored with no second witness, from the ledger alone      -> +2
+//   WC. the corroboration band is removed                           -> +2
+//   WD. a DATED entry is restored over                              -> +2
+//   WE. a gate both readings call SLOW is restored                  -> +2
+//   WF. a gate the rotation ran RED is restored                     -> +2
+//   WG. a CAP reading is restored over as a stale runtime           -> +2
+//   WH. measuredUnder ignores the exit code again                   -> +1
+//
+// *** WG AND WH FIRST MEASURED AT ZERO. *** Both change real behaviour and no row moved: the fixture had no
+// capped entry, and rotationHeld's own filter was never driven on a red row. Two rows were added for them
+// and both sabotages now land. A sabotage that costs nothing is a row that is not there.
+// =============================================================================================================
+// Measured on the live file before anything was written: 98 gates sit OVER the 3,000 ms budget in `timings`
+// and UNDER it in `serial`; 98 of 98 carry at[g] === "unknown -- before v4408", so no run ever dated the
+// membership number; 98 of 98 are in sweep-rotation.json, all rotated 2026-09-09; and the ledger reading
+// agrees with the LATER serial-slice reading at a median of 0.91x, 83 of 98 within 20%.
+//
+// So the rotation measured them alone, wrote `timings` and `at`, and that write was lost when the file was
+// replaced -- which is exactly what the returnee rows and the "fingerprint of a REPLACED file" row have been
+// saying. SECOND TIME THIS SESSION A RECORD-CHECKING GATE WAS RIGHT AND WAS FILED AS BROKEN.
+//
+// restoreLost() is driven HERE ON FIXTURES, not on the live file: the property is about the rule, and a rule
+// tested against whatever the tree happens to hold today is tested against one sample of it.
+{
+    const S = (over) => ({
+        budgetMs: 3000,
+        timings: { keep: 1000, lost: over, dated: over, nowit: over, disagree: over, slow: over, red: over, capd: over },
+        kinds: { capd: "capped" },
+        at: { keep: UNDATED, lost: UNDATED, dated: "2026-09-18T00:00:00.000Z", nowit: UNDATED, disagree: UNDATED,
+              slow: UNDATED, red: UNDATED, capd: UNDATED },
+        codes: { keep: 0, lost: 0, dated: 0, nowit: 0, disagree: 0, slow: 0, red: 1, capd: 124 },
+        serial:   { keep: 900, lost: 2000, dated: 2000, disagree: 900, slow: 9000, red: 2000, capd: 2000 },
+        serialAt: { keep: "2026-09-16T00:00:00.000Z", lost: "2026-09-16T00:00:00.000Z", dated: "2026-09-16T00:00:00.000Z",
+                    disagree: "2026-09-16T00:00:00.000Z", slow: "2026-09-16T00:00:00.000Z", red: "2026-09-16T00:00:00.000Z",
+                    capd: "2026-09-16T00:00:00.000Z" },
+    });
+    const L = { rotated: [{ gate: "keep", ms: 1000, code: 0 }, { gate: "lost", ms: 2050, code: 0 },
+                          { gate: "dated", ms: 2050, code: 0 }, { gate: "nowit", ms: 2000, code: 0 },
+                          { gate: "disagree", ms: 2000, code: 0 }, { gate: "slow", ms: 9100, code: 0 },
+                          { gate: "red", ms: 2000, code: 1 },
+                          { gate: "capd", ms: 2050, code: 0 }] };
+    const r = restoreLost(S(5000), L);
+    const M = r.merged;
+    const names = (xs) => xs.map((x) => x.gate || x).sort().join(",");
+
+    ok("!! *** a membership number nothing ever dated is restored from a reading that exists TWICE ***",
+       names(r.restored) === "lost" && M.timings.lost === 2000 && M.at.lost === "2026-09-16T00:00:00.000Z",
+       `restored ${names(r.restored)} -> ${M.timings.lost} ms. The ledger alone is the file that was already ` +
+       `replaced; the corroborating serial reading is what earns the write`);
+    ok("!! ...and the stamp written is the SURVIVING reading's date, not today's and not the ledger's",
+       M.at.lost === S(5000).serialAt.lost,
+       "a number written by something other than the thing that measured it, carrying a stamp it did not " +
+       "earn, is the 2026-09-03 fault this whole file is built around");
+    ok("!! a DATED entry is an observation and is left alone, however much the ledger disagrees",
+       M.timings.dated === 5000 && !names(r.restored).includes("dated"),
+       "something looked at it after the loss. Restoring over that would be the replacement fault again, " +
+       "pointing the other way");
+    ok("!! a row with NO second witness is not restored -- it is listed as unwitnessed",
+       r.unwitnessed.includes("nowit") && M.timings.nowit === 5000,
+       `one reading is an assertion; two independent ones days apart are evidence`);
+    ok("!! two readings that DISAGREE beyond the band are refused and named, not averaged",
+       r.refused.some((x) => x.gate === "disagree" && !x.why) && M.timings.disagree === 5000,
+       `900 against 2000 is ${(900 / 2000).toFixed(2)}x, outside ${CORROBORATION_BAND}. One of the two is ` +
+       `wrong and this cannot say which -- 28 live rows land here and are told to re-time with --gate`);
+    ok("!! a gate both readings agree is SLOW stays out, which is the rule working",
+       r.refused.some((x) => x.gate === "slow" && x.why === "over budget") && M.timings.slow === 5000,
+       "9,000 ms against a 3,000 ms budget: correctly outside the sweep, and restoring it would be the " +
+       "opposite of a repair");
+    ok("!! a gate the rotation found RED is refused, whatever its clock said",
+       r.refused.some((x) => x.gate === "red" && x.why === "not green") && M.timings.red === 5000,
+       "membership is for gates that PASS in the time recorded; a red gate under the budget is still red, " +
+       "and restoring its number would put it in the sweep on the strength of how fast it failed");
+    ok("!! *** the maps are written by mergeTimings, so a restored row carries ALL of them ***",
+       M.codes.lost === 0 && M.kinds.lost === "alone" && M.contended.lost === false &&
+       M.serial.lost === 2000 && M.finished.lost === true && !(M.kindsInferred || []).includes("lost"),
+       "the first draft wrote two maps by hand and timingKind went red; then four, and skipReading went " +
+       "red on a 45 ms reading carrying exit 124. mergeTimings is the one list of fields this file has");
+    ok("!! *** a CAP reading is not a stale runtime, so there is nothing to restore -- it needs a RUN ***",
+       r.refused.some((x) => x.gate === "capd" && /not a runtime/.test(String(x.why))) && M.timings.capd === 5000,
+       "budgetIsOwn: a cap reading is the killer's clock and is NEVER compared against a measurement. The " +
+       "first draft restored over one and tools/ship/placementRender-selfcheck.mjs came out holding 45 ms " +
+       "with kind ALONE -- a gate that PRINTS `skipped (jsdom absent)` in 53 ms. skipReading-selfcheck went " +
+       "red naming it, and was right: only the sweep reads a gate's OUTPUT, so only the sweep can say SKIPPED");
+
+    // *** rotationHeld's OWN filter, driven here, because sabotage WH changed it and NOTHING went red. ***
+    const heldFile = { budgetMs: 3000, timings: { g: 5000 }, at: { g: UNDATED } };
+    const heldRed = SC.rotationHeld(heldFile, { at: "2026-09-09T00:00:00.000Z", rotated: [{ gate: "g", ms: 2000, code: 1, at: "2026-09-09T00:00:00.000Z" }] });
+    const heldGreen = SC.rotationHeld(heldFile, { at: "2026-09-09T00:00:00.000Z", rotated: [{ gate: "g", ms: 2000, code: 0, at: "2026-09-09T00:00:00.000Z" }] });
+    ok("!! *** a gate the rotation ran RED is not 'measured under budget' -- that number is how long it took to FAIL ***",
+       heldRed.measuredUnder === 0 && heldRed.lost.length === 0 && heldGreen.measuredUnder === 1 && heldGreen.lost.length === 1,
+       `red ${heldRed.measuredUnder} measured / ${heldRed.lost.length} lost, green ${heldGreen.measuredUnder} / ` +
+       `${heldGreen.lost.length}. Four live rows survived the restore as LOST on ledger code 1 -- a count ` +
+       `standing in for a property, which is this session's most-met species`);
+
+    ok("CONTROL: a gate already inside the sweep is untouched and unreported",
+       M.timings.keep === 1000 && !names(r.restored).includes("keep") &&
+       !names(r.refused).includes("keep") && !r.unwitnessed.includes("keep"),
+       "without this every row above passes on a function that rewrites the whole file");
+    ok("!! CONTROL: nothing is restored when no entry is over budget, so the rule is not 'always write'",
+       restoreLost(S(1200), L).restored.length === 0,
+       "the same fixture with the disputed entries UNDER budget yields an empty restore");
+
+    // PURE: the input must not be mutated, because the caller writes `{ ...file, timings, at }` and a
+    // half-mutated `file` would carry the change twice under two different stamps.
+    const before = S(5000);
+    const snapshot = JSON.stringify(before);
+    restoreLost(before, L);
+    ok("!! restoreLost does not mutate the file it is handed",
+       JSON.stringify(before) === snapshot,
+       "the caller spreads the original and overrides two maps; a mutated input would write the change twice");
 }
 
 REPORT.write();

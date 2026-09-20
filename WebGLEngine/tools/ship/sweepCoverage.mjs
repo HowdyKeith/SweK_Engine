@@ -462,7 +462,17 @@ export const STALE_GREENS_V4460 = Object.freeze({
 export function rotationHeld(file, rot, { budgetMs = BUDGET_MS } = {}) {
     const timings = (file && file.timings) || {}, at = (file && file.at) || {};
     const rows = (rot && rot.rotated) || [];
-    const measuredUnder = rows.filter((r) => r && typeof r.ms === "number" && r.ms < budgetMs);
+    // *** v4647j -- `code` WAS NOT IN THIS FILTER, SO A RED GATE COUNTED AS "MEASURED UNDER BUDGET". ***
+    // Four rows survived the v4647j restore as LOST -- brainTrail, proseAudit, registerResidue, wasmSupport
+    // -- and all four carry ledger code 1: the rotation ran them and they FAILED, in 2,052 / 2,380 / 1,446 /
+    // 2,921 ms. That number is how long the gate took to fail. It is not a cost, it is not evidence that the
+    // gate is cheap when it passes, and the gate is not a membership candidate at all while it is red.
+    //
+    // A COUNT STANDING IN FOR A PROPERTY, which is the species this whole session has been about: "ran in
+    // under 3,000 ms" was being read as "belongs in the ship-time sweep". restoreLost refuses these four for
+    // exactly this reason, and the two rules disagreeing over one ledger is the OTHER recurring species --
+    // so they are one rule now.
+    const measuredUnder = rows.filter((r) => r && typeof r.ms === "number" && r.ms < budgetMs && r.code === 0);
     // *** v4531 -- A ROTATION READING IS ONE SAMPLE, AND A GATE WHOSE TRUE COST STRADDLES THE BUDGET WILL
     // CROSS IT BY LUCK. *** This row fired on physics/render/misWgsl-selfcheck.mjs, rotation 2966 against a
     // 3000 ms budget and 3480 in the timings -- and re-measured SERIALLY, three runs in a row, it takes 3075,

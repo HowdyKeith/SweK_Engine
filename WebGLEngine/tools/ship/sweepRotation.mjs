@@ -20,7 +20,7 @@ import { ENG, census, rotation, readFile, backfillStamps, BUDGET_MS, CAP_MS } fr
 import { runGate } from "./redCensus.mjs";
 // v4647 -- whose stopwatch. A box that does not own the record writes its own file rather than
 // overwriting one produced on different silicon. See quickSweep.timingsTarget.
-import { timingsTarget } from "./quickSweep.mjs";
+import { timingsTarget, KIND } from "./quickSweep.mjs";
 import { parseArgs, refusalLines } from "./cliArgs.mjs";
 
 export function runSlice(picked, { capMs = CAP_MS, onProgress = null } = {}) {
@@ -73,6 +73,96 @@ export function classifyRows(rows, { budgetMs = BUDGET_MS, priorMs = {}, capMs =
  * timings file still describe THE SAME RUN: same ms, same code. A gate re-timed since carries a different
  * reading and is left alone, because the ledger no longer knows anything about its current state.
  */
+/**
+ * *** v4647j -- NINETY-EIGHT GATES ARE OUTSIDE THE SHIP-TIME SWEEP ON A NUMBER NOTHING HAS EVER DATED. ***
+ *
+ * tools/ship/sweepCoverage-selfcheck.mjs has been FIVE RED on clean HEAD for weeks, and it was right every
+ * time. Its returnee rows say the rotation's readings were lost and that the entries now carry the
+ * pre-v4408 stamp -- "the fingerprint of a file that was REPLACED rather than updated". Measured:
+ *
+ *   98 gates sit over the 3,000 ms budget in `timings` and under it in `serial`
+ *   98 of 98 carry at[g] === "unknown -- before v4408"      <- no run ever dated the membership number
+ *   98 of 98 are in sweep-rotation.json, all rotated 2026-09-09
+ *   the ledger reading and the LATER serial-slice reading agree: median 0.91x, 83 of 98 within 20%
+ *
+ * So the 2026-09-09 rotation measured them alone and wrote `timings` and `at`; that write was lost when the
+ * file was replaced; the ledger kept it; a later serial slice re-measured them into `serial` and confirmed
+ * it. Only the membership field still holds the original undated number, which is 1.5x to 5x larger.
+ *
+ * SECOND TIME THIS SESSION A RECORD-CHECKING GATE WAS RIGHT AND WAS FILED AS BROKEN (recordDrift was the
+ * first). Five red rows, five weeks, one real fault underneath all of them.
+ *
+ * *** THIS IS NOT A MEMBERSHIP CHANGE. *** quickSweep.costOf()'s own contract says "timings[] remains the
+ * membership number it always was", and that stands. What is restored is the membership number itself, from
+ * a measurement that exists twice -- and the stamp written is `serialAt`, the date of the run that actually
+ * took the surviving reading, never today's and never the ledger's. A number written by something other
+ * than the thing that measured it, carrying a stamp it did not earn, is the 2026-09-03 fault this file is
+ * built around; restoring one by hand-editing the JSON would have been that fault exactly.
+ *
+ * REFUSES rather than guesses. A row whose two independent readings disagree by more than `band` is left
+ * alone and NAMED: one of the two is wrong and this function cannot say which.
+ */
+export const CORROBORATION_BAND = 0.2;
+export const UNDATED = "unknown -- before v4408";
+
+export function restoreLost(file, ledger, { budgetMs = BUDGET_MS, band = CORROBORATION_BAND } = {}) {
+    // *** IT PRODUCES ROWS AND HANDS THEM TO mergeTimings, AND THAT IS A MEASURED CORRECTION. ***
+    // The first draft wrote `timings` and `at` by hand. timingKind-selfcheck went red -- 83 entries claiming
+    // a LOADED kind while holding a serial number. So it also wrote `kinds` and `contended`. Then
+    // skipReading-selfcheck went red -- placementRender at 45 ms carrying code 124, a killer's clock's exit
+    // status against a runtime. FOUR MAPS, THREE ROUNDS OF WHACK-A-MOLE, and the sweep's own writer has
+    // warned about this shape three times already: "a writer that spells its fields by hand is a list that
+    // has to be maintained in step with every reader of the file".
+    //
+    // mergeTimings is that list, in one place, and it already writes all nine maps plus kindsInferred. A
+    // restored reading IS a row: a gate, a serial ms, its exit code, and finished. So the restore decides
+    // WHICH gates and mergeTimings decides what a row means -- one writer, and the next map somebody adds
+    // arrives here for free.
+    const timings = file.timings || {}, at = file.at || {};
+    const serial = file.serial || {}, serialAt = file.serialAt || {};
+    const led = new Map((ledger.rotated || []).map((r) => [r.gate, r]));
+    const rows = [], refused = [], unwitnessed = [], restored = [];
+    for (const [gate, row] of led) {
+        const now = timings[gate];
+        if (now == null || now <= budgetMs) continue;              // already in the sweep; nothing lost
+        if (String(at[gate] || UNDATED) !== UNDATED) continue;     // a DATED reading is an observation, not a loss
+        // *** A CAP OR A SKIP IS NOT A STALE RUNTIME -- IT IS NO RUNTIME AT ALL, AND THERE IS NOTHING TO
+        // RESTORE. *** The first draft restored over both, and tools/ship/placementRender-selfcheck.mjs came
+        // out of it holding 45 ms with kind ALONE. It runs in 52-54 ms and PRINTS
+        // "placementRender-selfcheck: skipped (jsdom absent)" -- so the number is right and the kind is a
+        // lie, and neither this function nor mergeTimings can write KIND.SKIPPED, because only the sweep
+        // reads a gate's OUTPUT and only output says a gate declined. tools/ship/skipReading-selfcheck.mjs
+        // went red naming it, and it was right.
+        //
+        // budgetIsOwn already says what a cap reading is: "a reading it produces is the cap's clock rather
+        // than a runtime, and is NEVER COMPARED AGAINST A MEASUREMENT". A gate whose membership number is a
+        // cap has never been measured, so it needs a RUN -- `--gate` -- and not a restore. This function
+        // restores STALE RUNTIMES, which is a smaller and honest claim.
+        const priorKind = (file.kinds || {})[gate];
+        if (priorKind === KIND.CAPPED || priorKind === KIND.SKIPPED) {
+            refused.push({ gate, ledger: row.ms, serial: serial[gate] ?? null, ratio: null, why: `prior reading is a ${priorKind}, not a runtime` });
+            continue;
+        }
+        // A gate the rotation found RED is not a membership candidate, whatever its clock said.
+        if (row.code !== 0) { refused.push({ gate, ledger: row.ms, serial: serial[gate] ?? null, ratio: null, why: "not green" }); continue; }
+        const s = serial[gate];
+        // One reading is an assertion; two independent ones days apart are evidence. Without the second, the
+        // ledger alone does not get to move a membership number -- it is the file that was already replaced.
+        if (s == null || !serialAt[gate]) { unwitnessed.push(gate); continue; }
+        const ratio = s / row.ms;
+        if (!(ratio > 1 - band && ratio < 1 + band)) { refused.push({ gate, ledger: row.ms, serial: s, ratio: +ratio.toFixed(2) }); continue; }
+        if (s > budgetMs) { refused.push({ gate, ledger: row.ms, serial: s, ratio: +ratio.toFixed(2), why: "over budget" }); continue; }
+        rows.push({ gate, ms: s, code: 0, finished: true, stamp: serialAt[gate] });
+        restored.push({ gate, from: now, to: s, at: serialAt[gate], ledger: row.ms, ratio: +ratio.toFixed(2) });
+    }
+    // *** ONE ROW AT A TIME, EACH UNDER ITS OWN STAMP. *** mergeTimings takes one stamp for a whole pass,
+    // which is right for a pass; these readings come from different serial slices days apart, and giving
+    // them all one date would be the 2026-09-03 fault -- a stamp the reading did not earn.
+    let merged = file;
+    for (const r of rows) merged = mergeTimings(merged, [r], r.stamp).merged;
+    return { merged, restored, refused, unwitnessed };
+}
+
 export function rebuildFinished(file, ledger) {
     const timings = file.timings || {}, codes = file.codes || {};
     const finished = { ...(file.finished || {}) };
@@ -163,7 +253,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     const CLI = Object.freeze({
         values: Object.freeze({ "--budget-s": "number", "--slots": "number", "--gate": "path",
                                 "--cap-s": "number", "--band": "string" }),
-        flags: Object.freeze(["--rebuild-finished", "--write", "--killed"]),
+        flags: Object.freeze(["--rebuild-finished", "--restore-lost", "--write", "--killed"]),
     });
     const cli = parseArgs(process.argv.slice(2), CLI);
     if (cli.errors.length) { for (const l of refusalLines("rotation", cli.errors, CLI)) console.error(l); process.exit(2); }
@@ -171,6 +261,30 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     const budgetMs = arg("--budget-s", 180) * 1000;
     const slots = arg("--slots", 24);
     const file = readFile();
+    if (cli.flags.has("--restore-lost")) {
+        const led = JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "sweep-rotation.json"), "utf8"));
+        const { merged, restored, refused, unwitnessed } = restoreLost(file, led);
+        console.log(`[rotation] --restore-lost: ${restored.length} membership number(s) restored from a reading ` +
+            `that exists TWICE -- the 2026-09-09 ledger and a later serial slice -- against ${refused.length} refused ` +
+            `and ${unwitnessed.length} with no second witness`);
+        for (const r of restored.slice(0, 10))
+            console.log(`[rotation]   + ${r.gate}  ${r.from} -> ${r.to} ms  @${String(r.at).slice(0, 16)}  (ledger ${r.ledger}, ratio ${r.ratio})`);
+        if (restored.length > 10) console.log(`[rotation]   ... ${restored.length - 10} more`);
+        const disagreed = refused.filter((x) => !x.why);
+        console.log(`[rotation]   ${refused.length - disagreed.length} refused because BOTH readings are over budget ` +
+            `(correctly outside the sweep), ${disagreed.length} because the two readings disagree by more than ` +
+            `${Math.round(CORROBORATION_BAND * 100)}% and this cannot say which is wrong`);
+        for (const x of disagreed.slice(0, 6))
+            console.log(`[rotation]   ? ${x.gate}  ledger ${x.ledger} vs serial ${x.serial} (${x.ratio}x) -- re-time it with --gate`);
+        if (cli.flags.has("--write")) {
+            const t = timingsTarget(file);
+            if (t.foreign) console.log(`[rotation] NOT writing sweep-timings.json: ${t.why}`);
+            fs.writeFileSync(path.join(ENG, t.file),
+                JSON.stringify({ ...merged, host: t.host }, null, 1) + "\n");
+            console.log(`[rotation] wrote ${t.file}`);
+        } else console.log("[rotation] dry run -- pass --write to record");
+        process.exit(0);
+    }
     if (cli.flags.has("--rebuild-finished")) {
         const led = JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "sweep-rotation.json"), "utf8"));
         const { finished, rebuilt, skipped } = rebuildFinished(file, led);
