@@ -8063,6 +8063,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // run -- on Keith's gen-9 box and then here -- and it was red on BOTH, alongside assertionShape's
     // 1751 -> 1757 and runtimeGap's 4275 -> 4286, which are the same six arrivals seen from two other
     // instruments. The surplus mechanism worked exactly as designed; nobody looked at it for six rounds.
+    since333: Object.freeze({
+        at: "v4647p", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/sweepRotation-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 84 ms alone -- inside the 3,000 ms ship-time budget. It gates the module that " +
+                 "WRITES sweep-timings.json, which had no gate at all: definitionGates counts exports no " +
+                 "gate names and all SEVEN of sweepRotation's were on that list, three of them added by me " +
+                 "two rounds after I noticed the absence out loud. Writing it found a defect on the first " +
+                 "run: classifyRows put a gate that exited 1 in 800 ms into `returnees`, because the filter " +
+                 "asked the clock and never the exit code -- the same defect, in the same words, that " +
+                 "sweepCoverage's measuredUnder had two rounds earlier.",
+    }),
     since332: Object.freeze({
         at: "v4647g", swept: 1, green: 1, red: 0,
         added: Object.freeze([

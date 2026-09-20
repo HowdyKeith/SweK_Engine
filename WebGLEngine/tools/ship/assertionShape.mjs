@@ -601,8 +601,11 @@ export const SHAPE_AT_V4480 = Object.freeze({
     //
     // It is left in that shape deliberately. 96 files is a live population, SHAPE.stringAsCondition covers
     // the swap under condFirst, and rewriting a file to make a census duller is the wrong direction.
-    gates: 1758, usesOk: 1737, definesOk: 1729, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1630, condFirst: 96, unknownSignature: 11,
+    // v4647p -- RE-TAKEN: tools/ship/sweepRotation-selfcheck.mjs joined. gates/usesOk/definesOk by one and
+    // nameFirst by one -- the ordinary shape, and the counter-example to v4647g's condFirst arrival two
+    // rounds ago. The other five rows did not move.
+    gates: 1759, usesOk: 1738, definesOk: 1730, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1631, condFirst: 96, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

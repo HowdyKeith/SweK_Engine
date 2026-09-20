@@ -1296,6 +1296,30 @@ export const REACHED_SOURCES = Object.freeze([
 // party are exactly the two v4442 declined to take for an unrelated reason. knightcrawler25/GLSL-PathTracer came
 // back clean, with the MIT block repeated inside the one file that was actually read. Back to 49, and the number
 // has now been up as well as down, which is what makes it evidence rather than decoration.
+// *** v4647p -- THE DEBT IS 52 AND THE BASELINE STAYS 51, ON PURPOSE. ***
+//
+// tools/ship/citedSources-selfcheck.mjs is RED because one source was cited without being registered:
+//
+//     hh-hang/collider-forge (MIT)   cited in mesh/colliderFromGLB.mjs, added at v4629
+//
+// That is the ratchet doing exactly what its row says it does -- "one that takes without recording moves it
+// UP and goes red". The header in colliderFromGLB.mjs is careful (read, not copied; scope matched to the
+// reference's own; most of the port found to be already present for unrelated reasons), so what is missing
+// is the REGISTER entry, not the attribution.
+//
+// *** IT IS NOT REGISTERED HERE BECAUSE THE FACTS THE REGISTER DEMANDS COULD NOT BE OBSERVED. ***
+// `licenceExists` in this file means a licence TEXT was looked at: the isaac-mason/three-spark-light-probes
+// entry above records `licenceExists: false` for a repository whose package.json says "MIT", on the grounds
+// that "a field in a manifest is a statement of intent, not a grant with the text beside it". Meeting that
+// standard means reading the repository. api.github.com returns 403 through this session's proxy, so the
+// observation is not available here.
+//
+// The row's own instruction is that "fabricating them to clear a number is worse than owing it", so the
+// number is owed and the arrival is named. Closing it needs one look at the repository's licence text by a
+// session that can reach it; everything else is assembled above.
+//
+// The baseline is NOT raised to 52. Raising it is how a ratchet stops being one -- the red IS the record,
+// until the entry exists.
 export const UNREGISTERED_CITED_BASELINE = 51;
 
 export function validateEntry(e) {

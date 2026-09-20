@@ -53,7 +53,16 @@ export function runSlice(picked, { capMs = CAP_MS, onProgress = null } = {}) {
 // `finished` on the row is the fact itself and is preferred wherever it is present.
 export function classifyRows(rows, { budgetMs = BUDGET_MS, priorMs = {}, capMs = CAP_MS } = {}) {
     const cut = (r) => (r.finished === undefined ? r.ms >= capMs : !r.finished);
-    const returnees = rows.filter((r) => r.ms <= budgetMs && !cut(r));
+    // *** v4647p -- `code === 0` WAS NOT IN HERE, SO A GATE THAT FAILED FAST WAS A "RETURNEE". ***
+    // Found by writing this module's first gate: a row exiting 1 in 800 ms landed in BOTH `returnees` and
+    // `reds`, and the command line prints the first as "now UNDER budget" with its before-and-after. 800 ms
+    // is how long the gate took to FAIL; it is not a cost, and a gate that does not pass is not rejoining
+    // the ship-time sweep on the strength of how quickly it failed.
+    //
+    // THE SAME DEFECT, THE SAME WORDS, TWO ROUNDS AGO: sweepCoverage's `measuredUnder` filtered on time and
+    // ignored `code`, and four rows survived a restore as LOST because of it. A count standing in for a
+    // property is this session's most-met species and it was sitting in the sibling function.
+    const returnees = rows.filter((r) => r.ms <= budgetMs && r.code === 0 && !cut(r));
     const reds = rows.filter((r) => r.code !== 0 && !cut(r));
     const killed = rows.filter(cut);
     const slower = rows.filter((r) => priorMs[r.gate] != null && r.ms > priorMs[r.gate] * 1.5);

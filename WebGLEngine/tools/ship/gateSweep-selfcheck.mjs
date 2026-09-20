@@ -649,6 +649,14 @@ console.log("\n*** THE FALSE REDS ARE ROWS IN BOTH MODULES NOW, NOT A COUNT IN O
        "without this the row above passes on a classifier that calls every non-zero code a crash");
     ok(kind(124) === GS.EXIT_KIND.TIMEOUT && kind(1, { timedOut: true }) === GS.EXIT_KIND.TIMEOUT,
        "a signal kill is a TIMEOUT, not an os-kill", "124 is this sweep's own stand-in for a signal (runOneAsync)");
+    // v4647p -- OS_KILL_CODES was the one export of this round that no gate NAMED, which definitionGates
+    // counts. Named here by being GRADED: the table's keys must agree with the rule that reads them, and
+    // every value must say what the code is rather than repeat the number.
+    ok(Object.keys(GS.OS_KILL_CODES).every((c) => GS.exitKind(Number(c)) === GS.EXIT_KIND.OS_KILL) &&
+       Object.entries(GS.OS_KILL_CODES).every(([c, v]) => /^STATUS_[A-Z_]+ \(0x[0-9A-F]+\)$/.test(v) && !v.includes(c)),
+       "!! every code in the table classifies as an os-kill, and every name is a NAME rather than the number again",
+       `${Object.keys(GS.OS_KILL_CODES).length} codes, each rendered "STATUS_... (0x...)". A table whose ` +
+       "entries disagreed with the rule that reads it would be a second spelling of one convention");
     ok(GS.exitName(1) === null && GS.exitName(0) === null,
        "CONTROL: an ordinary status gets no name", "a name offered for every code carries no information");
 

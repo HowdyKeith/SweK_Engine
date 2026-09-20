@@ -336,6 +336,22 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "tools/roundhouse/magmapTaichiRun-selfcheck.mjs",
     ]),
     "three": Object.freeze([
+        // *** v4647p -- A FIXTURE, AND THE CENSUS CANNOT TELL IT FROM A REAL PATH DEPENDENCY. ***
+        // This gate holds `const POSIX = "WebGLEngine/vendor/three/three.module.js"` and its Windows twin as
+        // test data for the separator work at c00f2ec3. Nothing imports, loads or joins them; ejecting three
+        // would leave the strings naming a path that does not exist, which is already true of the Windows
+        // spelling on this box. By the meaning of this list -- what breaks if the body is ejected -- it does
+        // not belong here.
+        //
+        // IT IS LISTED ANYWAY, BECAUSE A DISCRIMINATOR WAS LOOKED FOR AND MEASURED NOT TO EXIST. A first
+        // draft added a `fixtureOnly()` rule: no import occurrence, no load occurrence, no path.join of the
+        // name. Run against physics/box3d/box3dLoader.js -- a real dependant that reaches its body through a
+        // runtime path -- it returned TRUE. The two are the same shape to importPosition: both classify as
+        // `path`, both have zero import and zero load occurrences. Telling them apart means knowing whether
+        // the constant is ever USED to reach the file, which a textual census cannot answer, so the rule was
+        // deleted rather than shipped wrong. The list is what the census MEASURES -- files naming a vendor
+        // path in a quoted specifier -- and this entry says where that differs from what it MEANS.
+        "tools/ship/treeRead-selfcheck.mjs",
         "ai-bridge/ensureThree.js",
         "ai-bridge/server.js",
         "aquarelle.html",

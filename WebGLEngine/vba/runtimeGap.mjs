@@ -342,7 +342,9 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // both hold arrow functions), but async/await only +1 -- the gate awaits an import, the parser does
     // not await anything. A files-only check would call this a two-file round and miss that the two files
     // are not alike, which is the distinction the twelve rows beside the count exist to make.
-    files: 4288,               // v4647 -- RE-DERIVED after this session's own eleven files; see the note below. v4645 -- RE-DERIVED AT THE main MERGE over the merged tree. RE-DERIVED AT THE main MERGE: 4169 on this branch, 4172 on main, 4260 merged -- LESS than the sum, which is why it is run
+    // v4647p -- 4288 -> 4289: tools/ship/sweepRotation-selfcheck.mjs. ES modules and closures by one
+    // each; async/await unmoved, because the gate awaits nothing.
+    files: 4289,               // v4647 -- RE-DERIVED after this session's own eleven files; see the note below. v4645 -- RE-DERIVED AT THE main MERGE over the merged tree. RE-DERIVED AT THE main MERGE: 4169 on this branch, 4172 on main, 4260 merged -- LESS than the sum, which is why it is run
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
                           // RE-TAKEN TWICE IN TWO ROUNDS, and the second time only because the ship gate
@@ -662,7 +664,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // that adds a module must re-take, which is the cost of pinning it". Six rounds added modules and none
     // re-took it. It went red on BOTH boxes, and Keith's verify named it in the drift pre-flight -- which is
     // precisely the instrument for this and only helps somebody who runs it.
-    esModules: 3988, closures: 3855, asyncAwait: 1522, typedArrays: 1125, promises: 368,
+    esModules: 3989, closures: 3856, asyncAwait: 1522, typedArrays: 1125, promises: 368,
     fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 156, webgpu: 53, threads: 23, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
