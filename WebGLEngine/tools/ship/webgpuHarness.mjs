@@ -45,9 +45,11 @@ import { storageWords, LIVENESS_SENTINEL } from "./headlessGpu.mjs";   // v4457 
 // the software-adapter names live in ONE place -- rewriting the regex here would be a second copy of a
 // list that ui/localModelProbe.js already owns and tools/ship/localModelProbe-selfcheck.mjs already gates
 import { SOFTWARE_HINTS } from "../../ui/localModelProbe.js";
-// v4646 -- the DXC directory on the child's PATH, so Dawn's D3D12 backend can load dxil.dll on a box
-// whose headless-shell bundle does not ship it. undefined everywhere else, so nothing else changes.
-import { launchEnv } from "./playwrightResolve.mjs";
+// v4646 -- launchEnv() returns undefined ALWAYS. It put the DXC directory on the child's PATH for one draft;
+// Keith's rig measured the PATH arriving and the dxil.dll failure surviving it unchanged, so the function is
+// kept as the falsification's home and the launch sites still pass what it returns (nothing). The remedy that
+// IS measured to work is named by dxcAdvice, below, at the site where the symptom is actually seen.
+import { launchEnv, dxcAdvice } from "./playwrightResolve.mjs";
 const LAUNCH_ENV = launchEnv();
 
 // *** WINDOWS NEEDS A SECOND FLAG, MEASURED ON KEITH'S RIG, NOT GUESSED. *** --enable-unsafe-webgpu alone is
@@ -862,10 +864,16 @@ export async function runInEngineOrigin({ engineRoot, script, args = null, timeo
             out.reason += probe == null ? "; the page answered the probe but named no step (set globalThis.__swekStep to be told which)" : "; last step: " + probe;
             if (lastStep != null) out.reason += "; last step logged before that: " + lastStep;
         }
-        return { skipped: false, ok: out.ok, result: out.ok ? out.result : null, reason: out.ok ? null : out.reason,
+        // The DXC remedy rides on the reason ONLY when Dawn's own message is present, in the failure text or in
+        // a page error -- a symptom read, never an inference from a missing file. See dxcAdvice.
+        const advice = out.ok ? "" : dxcAdvice([out.reason, ...pageErrors]);
+        return { skipped: false, ok: out.ok, result: out.ok ? out.result : null,
+                 reason: out.ok ? null : (advice ? out.reason + " -- " + advice : out.reason),
                  pageErrors, adapter, software };
     } catch (e) {
-        return { ok: false, skipped: false, reason: "harness error: " + String(e).slice(0, 300), result: null, pageErrors: [], adapter: null, software: null };
+        const why = "harness error: " + String(e).slice(0, 300);
+        const advice = dxcAdvice(why);
+        return { ok: false, skipped: false, reason: advice ? why + " -- " + advice : why, result: null, pageErrors: [], adapter: null, software: null };
     } finally { try { await browser?.close(); } catch {} srv.close(); }
 }
 

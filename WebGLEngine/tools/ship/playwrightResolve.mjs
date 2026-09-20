@@ -260,24 +260,50 @@ export function resolveDxcDir({ env = process.env, home = os.homedir(), exists =
 }
 
 /**
- * The env a browser launch should carry, or undefined when it should carry the ordinary one.
+ * *** THIS RETURNS undefined ALWAYS, AND THE REASON IS A MEASUREMENT THAT KILLED THE ROUND THAT WROTE IT. ***
  *
- * DECIDABLE FROM THE FILESYSTEM, not from a platform name alone: the PATH is extended only when this really
- * is a platform whose Dawn backend loads DXC, the chosen binary really does NOT have dxil.dll beside it, and
- * some other bundle really does. Any of those failing returns undefined and nothing changes -- so a box that
- * already works keeps working, and a box with no DXC anywhere gets the same honest failure it had before
- * rather than a PATH full of nothing.
+ * v4646 shipped this putting the DXC directory on the launched browser's PATH, reasoning that Dawn calls
+ * DynamicLib::Open("dxil.dll") with a bare name and that LoadLibrary resolves a bare name against PATH.
+ * Measured on Keith's rig immediately afterwards: dxcResolve-selfcheck reported "this box (win32) resolves
+ * launchEnv() to a PATH -- DXC dir prepended", the launch site really does pass it (runInEngineOrigin's own
+ * chromium.launch carries env), AND microfacetWgsl STILL DIED with the identical
+ * "DynamicLib.Open: dxil.dll Windows Error: 87". The PATH reached the browser and changed nothing.
+ *
+ * HYPOTHESIS, NOT ESTABLISHED HERE, because this box cannot run Windows: Chromium hardens its DLL search
+ * early (SetDefaultDllDirectories with LOAD_LIBRARY_SEARCH_SYSTEM32), which removes PATH and the current
+ * directory from bare-name resolution altogether -- and ERROR_INVALID_PARAMETER (87) is what a LoadLibraryEx
+ * whose search flags cannot be satisfied returns, rather than the ERROR_MOD_NOT_FOUND (126) a plain missing
+ * file would give. What IS established is only the first sentence: the PATH is passed and it does not help.
+ *
+ * The one thing measured to work is the DLL sitting in the executable's OWN directory, which the loader
+ * searches first under every hardening mode. tools/ship/ensureDxc.mjs does that, as a command rather than a
+ * silent side effect of running a gate. This function is kept, returning undefined, so the falsification has
+ * somewhere to live and nobody re-derives the PATH idea from first principles a third time.
  */
-export function launchEnv({ platform = process.platform, env = process.env, shell = undefined,
-                            exists = fs.existsSync, ...rest } = {}) {
-    if (platform !== "win32") return undefined;
-    const bin = shell === undefined ? HEADLESS_SHELL : shell;
-    if (!bin) return undefined;
-    if (exists(path.join(path.dirname(bin), "dxil.dll"))) return undefined;   // already beside the binary
-    const { dir } = resolveDxcDir({ env, exists, ...rest });
-    if (!dir) return undefined;
-    return { ...env, PATH: dir + path.delimiter + (env.PATH || "") };
-}
+export function launchEnv() { return undefined; }
 
 export const HEADLESS_SHELL = RESOLVED.shell;
 export const HEADLESS_SHELL_TRIED = Object.freeze(RESOLVED.tried);
+
+/**
+ * *** THE REMEDY IS NAMED WHERE THE SYMPTOM IS SEEN, NOT WHERE A FILE IS MISSING. ***
+ *
+ * browserSkipReason above is deliberately NOT extended for this: on a Windows box with the DXC-less shell the
+ * browser resolves and launches fine, so a skip there would report "not applicable on this box" for a box that
+ * is merely misconfigured -- and would turn ~96 gates that currently FAIL loudly into silent skips. That is the
+ * count-standing-in-for-a-property trade this tree keeps paying for.
+ *
+ * So the test is the SYMPTOM ITSELF. Dawn's message is distinctive; when it appears in a page error or a
+ * failure reason, the one command measured to fix it is appended to that reason. When it does not appear,
+ * nothing is added and nothing is claimed.
+ */
+export const DXC_FAULT = /DynamicLib\.Open|dxil\.dll|dxcompiler\.dll/i;
+
+/** @param {string|string[]} text a reason, or the reason plus pageErrors */
+export function dxcAdvice(text) {
+    const joined = Array.isArray(text) ? text.filter(Boolean).join("\n") : String(text || "");
+    if (!DXC_FAULT.test(joined)) return "";
+    return "Dawn could not load the DXC compiler. This browser bundle ships without dxil.dll; "
+         + "run `node tools/ship/ensureDxc.mjs --write` from WebGLEngine to copy it next to the executable "
+         + "(the PATH route was tried at v4646 and measured NOT to work -- see launchEnv above).";
+}
