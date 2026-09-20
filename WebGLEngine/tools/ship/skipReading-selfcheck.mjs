@@ -64,33 +64,90 @@ const S = JSON.parse(fs.readFileSync(path.join(HERE, "sweep-timings.json"), "utf
 const G = JSON.parse(fs.readFileSync(path.join(HERE, "gate-timings.json"), "utf8"));
 const QS = fs.readFileSync(path.join(HERE, "quickSweep.mjs"), "utf8");
 const SC = fs.readFileSync(path.join(HERE, "selfchecks.mjs"), "utf8");
+// v4647k -- the THIRD runner. tools/ship/sweepRotation.mjs runs every rotation through
+// redCensus.runGate, into the SAME sweep-timings.json quickSweep writes.
+const RC = fs.readFileSync(path.join(HERE, "redCensus.mjs"), "utf8");
+import * as RCmod from "./redCensus.mjs";
+import * as SR from "./sweepRotation.mjs";
 
 // The convention, written once here and compared against BOTH runners rather than restated in each row.
 const SKIP_LINE = /-selfcheck:\s*(SKIPPED|skipped)\b/;
 
+// ---- v4647k SABOTAGES, RESULTS BY NAME ------------------------------------------------------------------
+//
+//   XA. runGate goes back to stdio "ignore"              -> 2 RED  (source row + the run)
+//   XB. runGate calls every clean exit a skip            -> 2 RED  (source row + the control)
+//   XC. the third runner uses a DIFFERENT pattern        -> 1 RED
+//   XD. mergeTimings forgets the skip and writes `alone` -> 1 RED
+//
+// *** XD FIRST MEASURED AT ZERO, AND XA/XB AT ONE. *** Section 1 compared SOURCE TEXT, which is right for
+// "do the three agree" and is not enough: deleting the skip branch from the rotation's writer -- the line
+// that actually puts `skipped` in the record -- changed no row, because no row ran it. A source row grades
+// a spelling. Three rows were added that DRIVE runGate and mergeTimings, and all four sabotages now land.
+
 console.log("skipReading-selfcheck -- a gate that declined to run is not a measurement of that gate\n");
 
 // ---------------------------------------------------------------------------
-console.log("1. *** BOTH RUNNERS READ THE SAME DECLARATION, WHICH ONLY ONE OF THEM USED TO ***");
+console.log("1. *** ALL THREE RUNNERS READ THE SAME DECLARATION, AND THE THIRD WAS COUNTED BY NOBODY ***");
 {
     // Compared as SOURCE TEXT because the two runners cannot be made to agree by inspection of their output: one
     // writes gate-timings and one writes sweep-timings, and the whole defect was that the rule lived in one.
     const scGuard = codeHas(SC, /const declinedToRun = SKIP_LINE\.test/);
     const qsGuard = codeHas(QS, /skipped: SKIP_LINE\.test\(tail\)/);
+    // *** v4647k -- THERE ARE THREE RUNNERS AND THIS SECTION COUNTED TWO. ***
+    // redCensus.runGate is the third, and tools/ship/sweepRotation.mjs writes sweep-timings.json through it
+    // -- the same file quickSweep writes. So one writer of that record could see a gate decline and the
+    // other could not, which is the two-modules-one-convention defect a level up from the one this section
+    // was written about. It had already cost something: the 2026-09-09 rotation filed placementRender at
+    // 56 ms code 0, a green runtime, for a gate that prints "skipped (jsdom absent)" in 53.
+    //
+    // A CENSUS OF RUNNERS THAT MISSES A RUNNER is the same shape as this session's four stale censuses, and
+    // it was invisible for the same reason every time: the number was typed, not derived.
+    const rcGuard = codeHas(RC, /skipped: r\.status === 0 && SKIP_LINE\.test\(tail\)/);
     const qsConst = (QS.match(/const SKIP_LINE = (\/[^\n]*\/)/) || [])[1];
     const scConst = (SC.match(/const SKIP_LINE = (\/[^\n]*\/)/) || [])[1];
+    const rcConst = (RC.match(/const SKIP_LINE = (\/[^\n]*\/)/) || [])[1];
     say("selfchecks.mjs SKIP_LINE", String(scConst));
     say("quickSweep.mjs  SKIP_LINE", String(qsConst));
+    say("redCensus.mjs   SKIP_LINE", String(rcConst));
 
     ok("*** the sweep now reads the skip declaration, as the suite runner has since v3941 ***",
         scGuard && qsGuard,
         "eleven rounds of this arc have read sweep-timings.json as a record of runtimes while three of its entries " +
         "measured a gate refusing to start.");
-    ok("...and the two runners test the SAME pattern, character for character",
-        qsConst && scConst && qsConst === scConst,
-        `${qsConst} in both. Two spellings of one convention is the two-constants-one-name defect, and this tree ` +
-        "has it on record in gateBudget/androidRunner's DEFAULT_BUDGET_MS. Not shared as a module: each runner is " +
-        "standalone by design, so they are checked equal instead.");
+    ok("!! *** ...and so does the THIRD runner, which writes the same record as the sweep ***",
+        rcGuard,
+        "redCensus.runGate ran with `stdio: \"ignore\"` -- the identical blindness, in the runner " +
+        "tools/ship/sweepRotation.mjs writes sweep-timings.json through. From an exit code a skip is a fast " +
+        "pass, so the guard was not forgotten, it was INVISIBLE from where the writer stood.");
+    ok("!! ...and all THREE runners test the SAME pattern, character for character",
+        qsConst && scConst && rcConst && qsConst === scConst && qsConst === rcConst,
+        `${qsConst} in all three. Two spellings of one convention is the two-constants-one-name defect, and this ` +
+        "tree has it on record in gateBudget/androidRunner's DEFAULT_BUDGET_MS. Not shared as a module: each " +
+        "runner is standalone by design, so they are checked equal instead -- and the count of them is now " +
+        "three, because a census that misses a member is this session's most-repeated fault.");
+    // *** DRIVEN, NOT ONLY READ. *** The rows above compare SOURCE TEXT, which is right for "do the three
+    // agree" and is not enough: sabotage XD deleted the skip branch from mergeTimings -- the line that
+    // actually writes `skipped` into the record -- and NOTHING went red, because no row ran it. A source row
+    // grades a spelling; these grade what the writer does.
+    const skipRun = RCmod.runGate("tools/ship/placementRender-selfcheck.mjs", { timeoutMs: 60000 });
+    const passRun = RCmod.runGate("tools/ship/timingSemantics-selfcheck.mjs", { timeoutMs: 60000 });
+    ok("!! *** runGate REPORTS the skip, run here rather than read out of the source ***",
+        skipRun.skipped === true && skipRun.code === 0,
+        `placementRender exits ${skipRun.code} and declines; timingSemantics exits ${passRun.code} and does not`);
+    ok("!! CONTROL: and a gate that really runs is not called a skip",
+        passRun.skipped === false,
+        "without this, `skipped: true` for everything passes the row above and marks the whole tree");
+
+    const merged = SR.mergeTimings({ timings: {}, kinds: {} },
+        [{ gate: "g", ms: 53, code: 0, finished: true, skipped: true }], "2026-09-20T00:00:00.000Z").merged;
+    const mergedRun = SR.mergeTimings({ timings: {}, kinds: {} },
+        [{ gate: "g", ms: 53, code: 0, finished: true, skipped: false }], "2026-09-20T00:00:00.000Z").merged;
+    ok("!! *** and the ROTATION'S WRITER turns that into kind `skipped`, where it had no word for one ***",
+        merged.kinds.g === KIND.SKIPPED && mergedRun.kinds.g === "alone",
+        `skipped -> ${merged.kinds.g}, ran -> ${mergedRun.kinds.g}. The rule is quickSweep's character for ` +
+        "character: a declaration beats everything, because a gate that declined did not run");
+
     ok("...and this gate tests the same one, so its own census cannot be measuring something narrower",
         String(SKIP_LINE) === qsConst,
         `${String(SKIP_LINE)} -- a census run with a looser pattern would report skips the runners never see, and ` +
@@ -156,9 +213,18 @@ console.log("\n3. *** THE CENSUS, DRIVEN BY RUNNING THE GATES RATHER THAN BY REA
             { gate: "render/holoPicture-selfcheck.mjs", sweepWas: 234, skipMs: 69 },
             { gate: "tools/ship/pageFxOverlay-selfcheck.mjs", sweepWas: 175, skipMs: 49 },
         ]),
-        // The fourth skipper is not in that list and the reason matters: its sweep entry is the KILLER'S CLOCK,
-        // already marked `capped`, so nothing read it as a runtime. v4574 established that distinction.
-        cappedInstead: "tools/ship/placementRender-selfcheck.mjs",
+        // *** v4647k -- THE FOURTH SKIPPER IS MARKED NOW, AND WHAT PROTECTED IT BEFORE WAS AN ACCIDENT. ***
+        // It used to sit at 20,125 ms, code 124 -- the KILLER'S CLOCK, already marked `capped` -- and v4582
+        // recorded that as safe, because nothing reads a cap as a runtime. True, and it was luck: the
+        // protection came from the gate having been EXILED, not from anything knowing it declines.
+        //
+        // That accident then cost something. The 2026-09-09 rotation filed the same gate at 56 ms, code 0 --
+        // a green runtime -- because runGate ran with `stdio: "ignore"` and could not see the declaration.
+        // THE THIRD RUNNER HAD THE DEFECT SECTION 1 ABOVE FIXED IN THE OTHER TWO, and it is the runner the
+        // rotation writes sweep-timings.json through. v4647j could not close sweepCoverage's last three rows
+        // because of that one entry; v4647k gave runGate eyes, re-timed the gate at 53 ms, and the record
+        // now says `skipped` because a writer watched it decline.
+        markedSince_v4647k: "tools/ship/placementRender-selfcheck.mjs",
     });
     for (const c of CENSUS_V4582.contaminated)
         say(c.gate.split("/").pop().padEnd(34), `sweep held ${c.sweepWas} ms against a ${c.skipMs} ms skip -- ${(c.sweepWas / c.skipMs).toFixed(1)}x`);
@@ -174,11 +240,14 @@ console.log("\n3. *** THE CENSUS, DRIVEN BY RUNNING THE GATES RATHER THAN BY REA
         "the load factor applied to a gate that never started. Even as skip times they were wrong -- the sweep " +
         "measured eight-way-contended process startup for a check that does nothing.");
 
-    ok("...and the fourth skipper was already safe, because a CAP is not a runtime and was already marked one",
-        (S.kinds || {})[CENSUS_V4582.cappedInstead] === KIND.CAPPED,
-        `${CENSUS_V4582.cappedInstead} sits at ${(S.timings || {})[CENSUS_V4582.cappedInstead]} ms, code ` +
-        `${(S.codes || {})[CENSUS_V4582.cappedInstead]}. v4574 separated the killer's clock from a runtime and ` +
-        "that separation did its job here without anybody aiming it at skips.");
+    ok("!! *** the fourth skipper is MARKED now, where it used to be protected by having been exiled ***",
+        (S.kinds || {})[CENSUS_V4582.markedSince_v4647k] === KIND.SKIPPED,
+        `${CENSUS_V4582.markedSince_v4647k} sits at ${(S.timings || {})[CENSUS_V4582.markedSince_v4647k]} ms, ` +
+        `code ${(S.codes || {})[CENSUS_V4582.markedSince_v4647k]}, kind ` +
+        `${(S.kinds || {})[CENSUS_V4582.markedSince_v4647k]}. It was 20,125 ms at the cap -- safe by accident, ` +
+        "because an exiled gate's number is nobody's runtime. The 2026-09-09 rotation then filed it at 56 ms " +
+        "code 0 through a runner that could not see the declaration, and THAT is the entry that kept " +
+        "sweepCoverage red. A gate is safe when a writer watched it decline, not when it happens to be out.");
 }
 
 // ---------------------------------------------------------------------------
@@ -188,10 +257,13 @@ console.log("\n4. AND THE RECORD SAYS SO NOW, IN A KIND THE BRANCH RULE CANNOT P
     const inferred = new Set(S.kindsInferred || []);
     say("entries marked skipped", `${skipped.length}: ${skipped.map((g) => g.split("/").pop()).join(", ")}`);
 
-    ok("*** every gate that declines here is marked skipped, and nothing else is ***",
-        skipped.length === 3 && skipped.every((g) => SKIP_LINE.test(runTail(g))),
-        "re-run in this process, not trusted from the record: each of the three prints the declaration and any " +
-        "fourth would show up as a mismatch here rather than as a quiet relabelling.");
+    // v4647k: THREE became FOUR, and the row is what noticed. It was written saying "any fourth would show
+    // up as a mismatch here rather than as a quiet relabelling", and a fourth did -- not a new skipper, but
+    // the one v4582 recorded as protected-by-exile, now marked because a writer finally watched it decline.
+    ok("!! *** every gate that declines here is marked skipped, and nothing else is ***",
+        skipped.length === 4 && skipped.every((g) => SKIP_LINE.test(runTail(g))),
+        `${skipped.length} marked, each re-run in this process and each printing the declaration -- not ` +
+        "trusted from the record. Any fifth shows up here as a mismatch rather than as a quiet relabelling.");
 
     ok("...and none of them is marked by INFERENCE, because ms-and-code cannot see a skip",
         skipped.every((g) => !inferred.has(g)),

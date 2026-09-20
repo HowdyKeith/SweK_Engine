@@ -28,15 +28,18 @@ export function runSlice(picked, { capMs = CAP_MS, onProgress = null } = {}) {
     for (let i = 0; i < picked.length; i++) {
         const g = picked[i];
         const t0 = Date.now();
-        let code = 1;
-        try { code = runGate(g, { timeoutMs: capMs }).code; } catch { code = 1; }
+        let code = 1, skipped = false;
+        // v4647k -- `skipped` comes from the SAME run that produced the millisecond, exactly as the sweep's
+        // `serialSkipped ?? parallelSkipped` mirrors `serialMs ?? parallelMs`. A label taken from another
+        // run is the drift kindsInferred exists to prevent.
+        try { const r = runGate(g, { timeoutMs: capMs }); code = r.code; skipped = !!r.skipped; } catch { code = 1; }
         const ms = Date.now() - t0;
         // *** v4568 -- WHETHER THE PROCESS FINISHED IS RECORDED, NOT INFERRED FROM THE NUMBER. ***
         // The whole defect in the killed bucket is that "at or over the cap" was read as "no verdict", so a
         // gate that ran to completion in 50 s and a gate cut off at 20 s were the same entry. runGate returns
         // "timeout/signal" as its code for a kill, which is the fact itself rather than a threshold test on
         // the clock -- a gate finishing 3 ms under the cap is finished, and a slow box does not change that.
-        rows.push({ gate: g, ms, code, finished: code !== "timeout/signal" });
+        rows.push({ gate: g, ms, code, finished: code !== "timeout/signal", skipped });
         if (onProgress) onProgress(i + 1, picked.length, rows[rows.length - 1]);
     }
     return rows;
@@ -231,7 +234,12 @@ export function mergeTimings(file, rows, stamp, capMs = null) {
         // Recorded either way: a gate that STOPS finishing must lose its verdict, not keep an old true.
         finished[r.gate] = !!r.finished;
         // OBSERVED, not inferred -- so the entry leaves kindsInferred, which is what watching it means.
-        kinds[r.gate] = r.finished ? "alone" : "capped";
+        // *** v4647k -- A SKIP IS NOT A RUNTIME, AND THIS WRITER USED TO HAVE NO WORD FOR ONE. ***
+        // The rule is quickSweep's, character for character: a declaration beats everything, because a gate
+        // that declined did not run and its millisecond is the cost of declining. Without this the rotation
+        // filed placementRender at 56 ms `alone` -- and that entry is why v4647j could not close
+        // sweepCoverage's last three rows.
+        kinds[r.gate] = r.skipped ? "skipped" : r.finished ? "alone" : "capped";
         inferred.delete(r.gate);
         if (capMs != null) capAt[r.gate] = capMs;
     }

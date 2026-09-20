@@ -1641,14 +1641,43 @@ export const budgetIsOwn =
 // a child on purpose; one such orphan was found holding a device for forty-four minutes on this box, which
 // slows every GPU gate that runs afterwards -- and a gate slowed past the cap is killed, orphaning more.
 // spawnSync exposes the pid execFileSync does not, so the group can be signalled after a timeout.
+// *** v4647k -- THE THIRD RUNNER WAS STILL BLIND TO A SKIP, AND IT IS THE ONE THE ROTATION USES. ***
+//
+// tools/ship/skipReading-selfcheck.mjs's first section is headed "BOTH RUNNERS READ THE SAME DECLARATION,
+// WHICH ONLY ONE OF THEM USED TO", and it checks selfchecks.mjs against quickSweep.mjs. THERE ARE THREE.
+// This one is `runGate`, and tools/ship/sweepRotation.mjs runs every rotation through it -- into the SAME
+// sweep-timings.json quickSweep writes. So one writer of that file could see a gate decline and the other
+// could not, which is two modules reading one convention in opposite senses for the fourth time this
+// session (posixAssumption's separators, the two ground-limit contracts, --gate against --gates).
+//
+// AND IT HAD ALREADY COST SOMETHING. The 2026-09-09 rotation filed
+// tools/ship/placementRender-selfcheck.mjs at 56 ms, code 0 -- a green runtime. The gate prints
+// "placementRender-selfcheck: skipped (jsdom absent)" and 56 ms is how long it takes to DECLINE. That entry
+// is why v4647j could not close the gate's last three red rows: the number was a skip cost wearing a
+// runtime's clothes, and no writer in the tree could say so.
+//
+// `stdio: "ignore"` was the whole reason, exactly as it was for the sweep before v4582: from an exit code a
+// skip is indistinguishable from a fast pass, so the guard was not forgotten, it was INVISIBLE from where
+// the writer stood. The tail is bounded at 4 KB like the sweep's, and the skip line is printed last, so a
+// bounded tail is the same evidence with a ceiling on memory. skipReading measured the cost of looking at
+// 1.4 ms a gate -- within noise, and stated as a ceiling rather than a value.
+//
+// THE PATTERN IS DECLARED HERE, NOT IMPORTED, because each runner is standalone by design -- and
+// skipReading-selfcheck asserts all THREE are equal character for character, where it used to assert two.
+const SKIP_LINE = /-selfcheck:\s*(SKIPPED|skipped)\b/;
+
 export function runGate(rel, { timeoutMs = 120000 } = {}) {
-    const r = spawnSync(process.execPath, [rel], { cwd: ENG, timeout: timeoutMs, stdio: "ignore", detached: true });
+    const r = spawnSync(process.execPath, [rel], { cwd: ENG, timeout: timeoutMs, stdio: ["ignore", "pipe", "pipe"], detached: true,
+                                                  maxBuffer: 4 * 1024 * 1024 });
     // The group is signalled whether or not this timed out: a gate that EXITS having left a child behind
     // leaks exactly as much as one that was killed, and the exit code says nothing about its children.
     if (r.pid) { try { process.kill(-r.pid, "SIGKILL"); } catch {} }
-    if (r.error) return { red: true, code: "timeout/signal" };
-    if (r.signal) return { red: true, code: "timeout/signal" };
-    return { red: r.status !== 0, code: r.status };
+    // A killed process may still have printed; a declaration from a gate that was then cut off is not a
+    // skip, because the run did not finish. `skipped` is therefore only read on a clean exit.
+    if (r.error) return { red: true, code: "timeout/signal", skipped: false };
+    if (r.signal) return { red: true, code: "timeout/signal", skipped: false };
+    const tail = String((r.stdout || "") + (r.stderr || "")).slice(-4096);
+    return { red: r.status !== 0, code: r.status, skipped: r.status === 0 && SKIP_LINE.test(tail) };
 }
 
 /** Total cost of re-verifying the whole census, in ms, from the recorded per-gate times. */
