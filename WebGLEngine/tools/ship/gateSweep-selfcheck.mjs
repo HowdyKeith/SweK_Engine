@@ -674,5 +674,65 @@ console.log("\n*** THE FALSE REDS ARE ROWS IN BOTH MODULES NOW, NOT A COUNT IN O
        "every existing consumer reads `verdict`; `kind` is additive and must not disturb them");
 }
 
+// ---------------------------------------------------------------------------------------------------------
+sec("THE TWO EXPORTS NO GATE NAMED, CLOSED BY ASSERTION (v4647q)");
+// ---------------------------------------------------------------------------------------------------------
+// definitionGates counts an exported symbol no gate mentions, and two of this module's were on that list:
+// repairsAgainst and runOnce. runOnce is the one that matters -- it is the shape BOTH sweep phases record,
+// so every timing in the tree comes out of it, and nothing graded it. Closed BY ASSERTION rather than by
+// mention: each row calls the function and grades the answer.
+{
+    // repairsAgainst is regressionsAgainst run the other way, and the direction that rots a register into
+    // fiction: a gate red on the register and green now is an entry that will never fire again. The pair
+    // must be EXACT opposites over the same inputs, or one of them is describing a different question.
+    const was = ["b-selfcheck.mjs", "a-selfcheck.mjs", "c-selfcheck.mjs"];
+    const now = ["c-selfcheck.mjs", "d-selfcheck.mjs"];
+    ok(GS.repairsAgainst(was, now).join(",") === "a-selfcheck.mjs,b-selfcheck.mjs",
+       "!! *** repairsAgainst names the gates the register still calls red and the tree calls green ***",
+       `[${GS.repairsAgainst(was, now).join(", ")}] -- sorted, so two boxes print the same list. These are ` +
+       `the entries that rot a register into fiction: a row nothing can fail is a row nobody re-reads`);
+    ok(GS.regressionsAgainst(was, now).join(",") === "d-selfcheck.mjs",
+       "...and regressionsAgainst over the SAME two inputs names the other direction, and only it",
+       `[${GS.regressionsAgainst(was, now).join(", ")}]. c is red in both and belongs to neither list`);
+    ok(GS.repairsAgainst(was, was).length === 0 && GS.regressionsAgainst(was, was).length === 0,
+       "CONTROL: a register that matches the tree produces neither list",
+       "without this both rows above would pass on a function that returned its first argument");
+
+    // runOnce: the shape phase 1 and phase 2 both record, so every millisecond in sweep-timings.json came
+    // out of here. The fixtures are written OUTSIDE the tree and under names enumerateGates does not match,
+    // because a gate that plants a *-selfcheck.mjs file grows the population it measures -- the v4639 race.
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "runonce-"));
+    try {
+        const green = path.join(tmp, "green.mjs"), red = path.join(tmp, "red.mjs"), hang = path.join(tmp, "hang.mjs");
+        fs.writeFileSync(green, "process.exit(0);\n");
+        fs.writeFileSync(red, "console.log('  FAIL  x');\nprocess.exit(1);\n");
+        fs.writeFileSync(hang, "setTimeout(() => {}, 60000);\n");
+
+        const g = GS.runOnce(green, { timeoutMs: 30000 });
+        ok(g.code === 0 && g.timedOut === false && typeof g.ms === "number" && g.ms > 0,
+           "!! *** runOnce returns { code, ms, timedOut } for a gate that passes, and the ms is a real reading ***",
+           `code ${g.code}, ${g.ms} ms. Every number in sweep-timings.json came out of this function and no ` +
+           `gate named it until now`);
+
+        const r = GS.runOnce(red, { timeoutMs: 30000 });
+        ok(r.code === 1 && r.timedOut === false,
+           "!! ...and a FINDING comes back as its exit code rather than as a throw",
+           `code ${r.code}. execFileSync throws on a non-zero exit; a sweep that let that escape would stop ` +
+           `at the first red gate instead of recording it and going on`);
+
+        // A bounded hang, not an unbounded one: a harness that can hang is not a verdict.
+        const h = GS.runOnce(hang, { timeoutMs: 700 });
+        ok(h.timedOut === true,
+           "!! *** a gate that outlives its timeout is marked timedOut, not filed as a measurement ***",
+           `code ${h.code}, ${h.ms} ms against a 700 ms bound. v4574: a reading the killer produced is the ` +
+           `killer's clock and not the gate's runtime, and timedOut is the fact every downstream kind rests on`);
+        ok(g.timedOut === false && r.timedOut === false,
+           "CONTROL: neither gate that finished is marked timedOut",
+           "a flag that is true of everything says nothing about the one case it exists for");
+    } finally {
+        fs.rmSync(tmp, { recursive: true, force: true });
+    }
+}
+
 console.log(fails === 0 ? "\nALL GREEN" : `\n${fails} FAILED`);
 process.exit(fails ? 1 : 0);

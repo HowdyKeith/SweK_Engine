@@ -693,6 +693,82 @@ sec("8e. A CRASH IN THE NEW-RED LIST, SPELLED AS A CRASH");
        "a field nothing reads is a field that will disagree with the thing that does");
 }
 
+// ---------------------------------------------------------------------------------------------------------
+sec("8f. THE FIVE EXPORTS NO GATE NAMED, CLOSED BY ASSERTION");
+// ---------------------------------------------------------------------------------------------------------
+// definitionGates counts an exported symbol that no gate mentions, and five of this module's were on that
+// list: contentionPairs, timingsTarget, readTimings, falseRedsOf and falseRedSplit. Three arrived during
+// this session -- falseRedsOf and falseRedSplit at v4647d, timingsTarget at v4647 -- which is to say I added
+// them to a module whose gate I was editing in the same round and did not notice the gate never called them.
+//
+// Closed the way the physics baseline went from 81 to 0: BY ASSERTION, not by mention. Each row calls the
+// function and grades the answer, so a broken one fails here instead of being listed.
+{
+    // costOf's own note: `timings` is a contended sample and `serial` an uncontended one. contentionPairs is
+    // the population a ratio may be taken over -- the gates where the two are genuinely DIFFERENT readings.
+    // My first draft of this row asserted an ARRAY OF ROWS and read `pairs[0].gate`, which threw. It returns
+    // a REPORT -- { pairs, inferred, eligible, excluded, ratios } -- and pairs holds gate NAMES. Same mistake
+    // as section 2's first draft against classifyRows: I asserted a shape I had guessed at instead of reading
+    // the one the function returns. The fixture below exercises every branch rather than the one I assumed.
+    const file = { timings: { par: 2000, both: 1000, noprov: 3000, same: 1000, tiny: 40 },
+                   serial:  { par:  800, both: 1000, noprov: 1000, same: 1000, tiny: 20 },
+                   contended: { par: true, both: false } };
+    const cp = Q.contentionPairs(file);
+    ok(Array.isArray(cp.pairs) && cp.pairs.join(",") === "par,noprov",
+       "!! *** contentionPairs takes only the gates whose two readings are DIFFERENT quantities ***",
+       `pairs: [${cp.pairs.join(", ")}]. "both" has the SAME number filed in each field -- a serial reading ` +
+       `copied into timings -- and dividing it by itself contributes exactly 1.00 and drags a median down, ` +
+       `which is the defect v4556 measured across 164 entries`);
+    ok(cp.inferred.join(",") === "noprov" && cp.eligible.length === 4 && cp.excluded === 2,
+       "!! ...and it SAYS which of them had no provenance on file, and counts the exclusions over the same floor",
+       `eligible ${cp.eligible.length}, pairs ${cp.pairs.length}, excluded ${cp.excluded}, inferred ` +
+       `[${cp.inferred.join(", ")}]. "tiny" is under the 50 ms floor in both fields and is not eligible at ` +
+       `all -- a ratio of two sub-50ms readings is process startup divided by process startup. The first ` +
+       `draft of the repair took the two halves over DIFFERENT floors and reported 99 exclusions where the ` +
+       `live record has 164, which is why the floor is a parameter and not a literal in each half`);
+    ok(cp.ratios.length === 2 && cp.ratios[0] === 2.5 && cp.ratios[1] === 3,
+       "...and the ratios come back sorted ASCENDING, one per pair, so a median may be taken over them",
+       `[${cp.ratios.join(", ")}] -- par is 2000/800 and noprov is 3000/1000. My first draft asserted 2.5 ` +
+       `LAST, having not checked which way the sort runs; a median taken off the wrong end is the same ` +
+       `class of error as the two-floors one above`);
+
+    // timingsTarget: whose stopwatch may write this record. A foreign box writes its own file instead.
+    const own = Q.timingsTarget({ host: "boxA" }, { file: "t.json", id: "boxA" });
+    const foreign = Q.timingsTarget({ host: "boxA" }, { file: "t.json", id: "boxB" });
+    ok(own.foreign === false && own.file === "t.json" &&
+       foreign.foreign === true && foreign.file === Q.LOCAL_TIMINGS && /boxA/.test(foreign.why),
+       "!! *** timingsTarget sends a FOREIGN box's readings to its own file, and says whose record it is ***",
+       `own -> ${own.file}; foreign -> ${foreign.file}. Two machines' runtimes in one set of fields is not a ` +
+       `record, it is whichever ran last`);
+    ok(Q.timingsTarget({}, { file: "t.json", id: "boxB" }).foreign === false,
+       "...and a record with NO host is not foreign to anybody, so a first write is not refused",
+       "an unstamped file is the state before any box has claimed it");
+
+    // readTimings: the reader every consumer goes through, including on a file that is not there.
+    const missing = Q.readTimings("tools/ship/__no_such_timings__.json", ENG);
+    ok(missing && typeof missing === "object" && Object.keys(missing.timings || {}).length === 0,
+       "!! readTimings answers with an EMPTY record rather than throwing when the file is absent",
+       "a missing record makes selectGates run everything once, which is the first-run behaviour; a throw " +
+       "would make the sweep unrunnable on a fresh checkout");
+    const real = Q.readTimings(Q.DEFAULTS.timingsFile, ENG);
+    ok(real && Object.keys(real.timings || {}).length > 100,
+       "...and it reads the live record, so the row above is not passing on a reader that always returns nothing",
+       `${Object.keys((real || {}).timings || {}).length} entries`);
+
+    // falseRedsOf / falseRedSplit are graded in full in section 6 above, through the report; these rows name
+    // them and check the two agree about one row, which is what the report's two halves rest on.
+    const rows = [{ gate: "g", verdict: VERDICT.GREEN, from: "serial", parallelMs: 20000, serialMs: 900, parallelTimedOut: true }];
+    const list = Q.falseRedsOf(rows, new Map([["g", { code: 124 }]]));
+    const split = Q.falseRedSplit(list);
+    ok(list.length === 1 && list[0].capped === true && list[0].ratio === null && list[0].parallelCode === 124,
+       "!! *** falseRedsOf marks a CAP KILL as capped and gives it NO ratio ***",
+       "budgetIsOwn: a reading the cap produced is the killer's clock and is never compared against a measurement");
+    ok(split.capped === 1 && split.slowed === 0 && split.of === 1,
+       "!! ...and falseRedSplit counts the two causes apart, over the same list",
+       `${split.capped} capped, ${split.slowed} slowed, of ${split.of} -- a gate killed at the cap is a box ` +
+       `that cannot run that many at once, not one fighting for CPU`);
+}
+
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the gates over the budget THE ROTATION HAS NOT REACHED YET. v4408 answered the older " +
     "version of this line -- that a regression in a 40-second gate is found by the full sweep and by nothing at " +

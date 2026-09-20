@@ -45,6 +45,7 @@
 import {
     gateFiles, signatureOf, suspectCalls, census, reportLines, SIG, SHAPE,
     SHAPE_AT_V4480 as REC, ENG,
+    maskStrings, firstArgOf, looksLikeCondition,
 } from "./assertionShape.mjs";
 import fs from "fs";
 import path from "path";
@@ -246,6 +247,89 @@ ok("...and each recorded shape is one this file can actually find", (() => {
     });
 })(), "a record naming a shape the detector cannot find would be a claim about nothing");
 ok("the record is frozen", Object.isFrozen(REC) && REC.writtenThisSession.every(Object.isFrozen));
+
+// ---------------------------------------------------------------------------------------------------------
+// THE THREE PARTS boolAsName IS BUILT OUT OF, GRADED APART (v4647q)
+// ---------------------------------------------------------------------------------------------------------
+// definitionGates counts an exported symbol no gate names, and maskStrings, firstArgOf and looksLikeCondition
+// were on that list: NOTHING in the tree named them, not this gate and not any other. They were graded only
+// THROUGH suspectCalls, which is the composition of all three -- so a fault in one could be cancelled by a
+// second and the end-to-end row would stay green. Each is graded here on its own, against the cases the
+// module's own comments record it getting WRONG, because those are the ones that actually happened.
+{
+    // maskStrings: offsets must survive, or every `at` this detector reports points at the wrong place.
+    const src = 'ok(a === b, "a === b");';
+    const m = maskStrings(src);
+    ok("!! *** maskStrings replaces a string BODY with filler of the SAME LENGTH ***",
+       m.length === src.length && m.indexOf('"') === src.indexOf('"'),
+       `${m.length} against ${src.length}. Every at-offset suspectCalls reports is an index into the masked copy ` +
+       `and is printed against the real source; a mask that changed a length would move every one of them`);
+    ok("!! ...and the masked copy no longer contains the condition that was INSIDE the literal",
+       !/a === b/.test(m.slice(src.indexOf('"'))) && /a === b/.test(m.slice(0, src.indexOf('"'))),
+       `masked: ${m}. gateQuality-selfcheck PINS example calls as data, and the first tree-wide run counted ` +
+       `four of those as real calls -- a census matching its own prose, the third time this tree met it`);
+    // The regex case is the one that broke the balancer on the first real test, and it is not hypothetical.
+    const rx = 'ok(!/scaled\\(/.test(q), "name");';
+    const mrx = maskStrings(rx);
+    ok("!! *** a REGEX literal is masked too, so an escaped paren inside a pattern cannot open a depth ***",
+       mrx.length === rx.length && !/scaled/.test(mrx),
+       `masked: ${mrx}. This exact call was MISSED: the \\( inside the pattern counted as an open paren, so ` +
+       `firstArgOf never found the top-level comma. Two of my own three swaps were caught and this was the third`);
+    ok("CONTROL: code outside any literal is returned untouched",
+       maskStrings("const x = a + b;") === "const x = a + b;",
+       "a masker that altered ordinary code would corrupt the thing being scanned");
+
+    // firstArgOf: BALANCED, not pattern-matched -- layout must not decide a verdict.
+    const open = (t) => t.indexOf("(");
+    ok("!! *** firstArgOf balances to the top-level comma, through nested calls and commas ***",
+       firstArgOf("ok(f(a, b) === c, \"n\")", open("ok(")) === "f(a, b) === c",
+       `got ${JSON.stringify(firstArgOf("ok(f(a, b) === c, \"n\")", 2))} -- the comma inside f(a, b) is at ` +
+       `depth 2 and is not the argument boundary. A regex to the first comma would cut this in half and ` +
+       `hand looksLikeCondition the text "f(a"`);
+    ok("...and a call with ONE argument yields that argument, up to its closing paren",
+       firstArgOf("ok(done)", 2) === "done", "the boundary is whichever comes first, comma or close");
+    ok("!! *** a call that never closes returns null rather than a truncated guess ***",
+       firstArgOf("ok(a === b", 2) === null,
+       "null is the one honest answer for text that does not parse; a partial slice would be graded as though " +
+       "it were the whole argument");
+    ok("...and a comma inside a STRING does not end the argument either",
+       firstArgOf('ok("a, b" === c, "n")', 2) === '"a, b" === c',
+       "firstArgOf skips a literal whole, so it is correct on raw source as well as on a masked copy");
+
+    // looksLikeCondition: conservative on purpose, and the one survivor of the first tree-wide run is a NAME.
+    ok("!! *** a comparison is a condition ***",
+       ["a === b", "a !== b", "x <= 1", "a && b", "!ok", "s.includes(x)", "xs.every(f)"].every(looksLikeCondition),
+       "these are the shapes that put a boolean in the name slot");
+    // *** THE THIRD CASE HERE IS THE REAL CALL, AND MY FIRST DRAFT'S WAS A CONTROL THAT COULD NOT FAIL. ***
+    // I first wrote `(cond ? "!! " : "   ") + code + " -- " + what`, which contains no comparison operator at
+    // all -- so deleting the concatenation guard entirely (sabotage SA-3) left this row GREEN and only the
+    // tree-wide scan went red. The text below is glbConformance-selfcheck:275 verbatim, which carries BOTH a
+    // concatenation and `||` and `===`, so it is rescued by the guard and by nothing else.
+    const builtName = '(code.startsWith("ACCESSOR_MIN") || code.startsWith("ACCESSOR_MAX") || ' +
+                      'code === "ACCESSOR_INDEX_OOB" ? "!! " : "   ") + code + " -- " + what';
+    ok("!! *** a string literal is a NAME, however it was assembled ***",
+       !looksLikeCondition('"a name"') && !looksLikeCondition('`a ${x} name`') &&
+       !looksLikeCondition(builtName),
+       "the third is the ONLY survivor of the first tree-wide run -- glbConformance-selfcheck:275 builds a " +
+       "name from a ternary CHOOSING A PREFIX, and the ternary's own test carries || and ===. It is not a " +
+       "defect, and a detector that called it one would have made its own first result a false positive");
+    ok("CONTROL: the same text WITHOUT the concatenation reads as a condition",
+       looksLikeCondition('code.startsWith("ACCESSOR_MIN") || code === "ACCESSOR_INDEX_OOB"'),
+       "without this the row above passes on a function that calls nothing a condition -- which is exactly " +
+       "how my first draft of it passed under a sabotage that deleted the guard it was written to check");
+    ok("CONTROL: empty and absent argument text is not a condition",
+       !looksLikeCondition("") && !looksLikeCondition(null) && !looksLikeCondition(undefined),
+       "firstArgOf returns null on text that does not parse, and null must not read as a finding");
+
+    // And the composition still agrees with its parts, so grading them apart did not replace the end-to-end row.
+    const swapped = "ok(a === b, \"a name\");";
+    const found = suspectCalls(swapped, SIG.nameFirst);
+    ok("!! *** the three compose: suspectCalls finds the swap its parts predict ***",
+       found.some((f) => f.shape === SHAPE.boolAsName) &&
+       looksLikeCondition(firstArgOf(maskStrings(swapped), swapped.indexOf("("))),
+       `${found.length} found. Grading the parts apart is only worth anything if the whole still agrees with ` +
+       `them -- otherwise this section is a second spelling of the detector rather than a check on it`);
+}
 
 console.log(`\nassertionShape-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);
 process.exit(fails === 0 ? 0 : 1);

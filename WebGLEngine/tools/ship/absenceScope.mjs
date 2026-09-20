@@ -306,6 +306,16 @@ export const INSCOPE_ARRIVALS_SINCE_V4435 = Object.freeze([
  * is a second list rather than a fudged total.
  */
 export const OUTOFSCOPE_ARRIVALS_SINCE_V4435 = Object.freeze([
+    // *** v4647q -- THE BRANCH'S OWN BVH BRIDGE, AND ITS GATE. ***
+    Object.freeze({ file: "mesh/colliderFromGLB.mjs", at: "v4629",
+        why: "the bridge from a parsed GLB to a MeshBVH, written for TASK BOARD #79. It lives in top-level " +
+             "mesh/ beside meshBVH.mjs itself, so the three directories the v4432 claim searched -- physics, " +
+             "render, world -- could no more reach it than they could reach meshBVH. A real implementation, " +
+             "outside the scope the claim gave itself" }),
+    Object.freeze({ file: "tools/ship/colliderFromGLB-selfcheck.mjs", at: "v4629",
+        why: "its gate, which builds the BVH it grades rather than importing a built one, so the term is in " +
+             "its code and not only in its subject. Same asymmetry the fallBody pair records: module and " +
+             "gate are judged one at a time, and here BOTH carry it" }),
     Object.freeze({ file: "tools/ship/fallBody-selfcheck.mjs", at: "v4544",
         why: "the gate of terrain-controller piece (1). The MODULE it gates carries the term nowhere at all " +
              "-- fallBody takes injected oracles and imports neither the voxel probe nor the mesh one -- but " +
@@ -349,6 +359,9 @@ export const BVH_AT_V4435 = Object.freeze({
     // three searched directories, the identical shape as splatMesh-selfcheck.mjs above.
     outOfScope: Object.freeze([
         "fx/spritemesh/blueprint-selfcheck.mjs", "fx/spritemesh/blueprint.js",
+        // v4647q -- the collider-forge bridge at v4629 and its gate. Both carry the term in CODE and
+        // both sit OUTSIDE physics/, render/ and world/, which is what this list is for.
+        "mesh/colliderFromGLB.mjs",
         "mesh/meshBVH.mjs", "multiplayer/wadLevelHost.js", "tools/krbn/krbnCompare.js",
         "tools/roundhouse/neighbourBenchBind-selfcheck.mjs", "tools/roundhouse/neighbourBenchBind.mjs",
         "tools/ship/box3dRay-selfcheck.mjs",
@@ -361,6 +374,7 @@ export const BVH_AT_V4435 = Object.freeze({
         // like against this claim, and the two lists are compared SORTED, so position is not decoration.
         "tools/ship/capsuleGround-selfcheck.mjs",
         "tools/ship/capsuleMove-selfcheck.mjs",
+        "tools/ship/colliderFromGLB-selfcheck.mjs",
         "tools/ship/fallBody-selfcheck.mjs",
         "tools/ship/groundProbe-selfcheck.mjs",
         "tools/ship/meshBVH-selfcheck.mjs",
