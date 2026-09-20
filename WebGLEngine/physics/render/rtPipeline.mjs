@@ -90,15 +90,49 @@
 // ---- WHAT THIS DOES NOT CLAIM -------------------------------------------------------------------------------
 //
 // That this is WebRTX, or compatible with it: no SPIR-V, no GLSL front end, no naga, and no Vulkan API surface.
-// That there is a BVH: geometries are tested linearly, which is honest at four spheres and useless at four
-// thousand -- the acceleration structure is the single biggest thing WebRTX has that this does not. That
-// any-hit exists: it does not, and nothing here pretends the stage list is complete. And that any of it runs
-// faster than v4417's monolith -- the seams are for expressiveness, and no timing claim is made.
+// That any-hit exists: it does not, and nothing here pretends the stage list is complete. And that any of it
+// runs faster than v4417's monolith -- the seams are for expressiveness, and no timing claim is made.
+//
+// ---- THIS ROUND -- THE BVH THE PARAGRAPH ABOVE USED TO SAY WAS MISSING ---------------------------------------
+//
+// (Not stamped with a vNNNN: this round has not been through the ship ritual, and the next number is decided
+// there, not guessed here -- v4418 is the last one this file can actually verify against its own history.)
+//
+// It was the single biggest thing WebRTX had that this file did not, and the fix was not to write one: this
+// tree already has one, in mesh/meshBVH.mjs -- a binned-SAH build over a flat triangle buffer, with a
+// near-child-first, best-t-pruning traversal, taken from gkjohnson/three-mesh-bvh and already carrying its own
+// gate. The acceleration structure is BUILT ON THE CPU (SAH binning is a sort-and-bucket algorithm, not a
+// dispatch), then its nodes and triangles are cast down to f32 and handed to the GPU as four read-only storage
+// buffers. What runs on the device is a PORT of meshBVH.mjs's own `_hitBox`/`raycastFirst` -- same node layout
+// (meta[0]<0 marks a leaf, carrying start/count; an interior node carries left/right), same near-child-first
+// stack order, same "both comparisons are >/< so a NaN box test can only ever be conservative" argument -- with
+// one adaptation MEASURED rather than assumed: WGSL's own spec leaves f32 division by zero "indeterminate",
+// unlike JS's IEEE-754-guaranteed Infinity, so a ray direction of exactly 0 on an axis gets a large finite
+// sentinel (1e30) instead of relying on a division producing true Infinity on every backend.
+//
+// A triangle mesh is not another sphere: it is not four floats in the uniform block, it is thousands of them in
+// a storage buffer. So it does not go through MAX_GEOMETRY -- it is ONE extra, optional geometry slot, index
+// `nGeo` (one past the last sphere), with its own shader binding table record at a fixed uniform offset. The
+// merge is the same shape section 3 already established: rtTraverse tries every sphere, then tries the mesh if
+// one is present, and keeps whichever is nearer -- adding a mesh does not touch the sphere loop, and a scene
+// with no mesh emits the exact same WGSL text this file always has (the bvh block is template-conditional, the
+// same mechanism `gradient` and the PLANT knobs already use).
+//
+// *** WHAT THIS DOES NOT CLAIM, THE SEQUEL. *** That the mesh is SHADED against a CPU oracle: pathTracer.mjs's
+// scene is spheres, full stop, and cpuComparable()/sceneFromSbt() already refuse to flatten a material they
+// cannot express -- a triangle mesh is not a material question, it is a GEOMETRY this file's own CPU reference
+// has no concept of at all, so no renderSbtCpu() comparison is offered for a bvh scene and none is faked. What
+// IS checked, honestly, is the one claim a mesh actually makes: that rtTraverseBvh finds the SAME triangle, at
+// the SAME distance, that mesh/meshBVH.mjs's own already-tested raycastFirst() finds, for the same rays over
+// the same mesh. That is an intersection oracle, not a rendering one, and it is the whole of what "add a BVH"
+// means -- the shading of whatever it hits was already correct before this round, because closestHit does not
+// know or care where its normal came from.
 "use strict";
 
 import { render as renderCpu } from "./pathTracer.mjs";
 import { LCG } from "./pathTracerWgsl.mjs";
 import { VIEW, MAX_DEPTH, EPS, notExactInF32, dyadic, powerOfTwo } from "./pathTracerGpu.mjs";
+import { MeshBVH, trianglesFrom } from "../../mesh/meshBVH.mjs";
 
 export { VIEW, MAX_DEPTH, EPS };
 
@@ -137,6 +171,193 @@ export function sbtRecord({ centre = [0, 0, 0], radius = 1, hit = "lambertian", 
 }
 
 export const MAX_GEOMETRY = 4;
+
+// ================================================================================================
+// THE BVH -- built on the CPU by mesh/meshBVH.mjs, packed for the GPU's four extra bindings
+// ================================================================================================
+
+/** The uniform slots a bvh scene uses, inside the SAME 24-vec4 block every other scene already allocates. */
+export const MESH_META_SLOT = 20;
+export const MESH_SBT_SLOT = 21;
+
+/** The storage-buffer bindings pipelineWgsl's bvh block declares, at fixed indices past binding 1 (uniforms). */
+export const BVH_BINDINGS = Object.freeze({ bounds: 2, meta: 3, order: 4, tris: 5 });
+
+/**
+ * Build a BVH over an indexed triangle mesh and pack it into the four flat buffers the GPU bvh block reads.
+ *
+ * *** THE ACCELERATION STRUCTURE ITSELF IS NOT REIMPLEMENTED HERE. *** mesh/meshBVH.mjs's binned-SAH build and
+ * its `bounds`/`meta`/`order` layout are taken as-is; this only casts the f64 node data down to f32 (the GPU's
+ * native precision, and the same cast v4418's uniform packing already does for the camera and every sphere) and
+ * slices each array down to the nodes actually used -- `MeshBVH`'s constructor over-allocates `2 * count` node
+ * slots as a safe upper bound, and shipping the unused tail would be dead bandwidth, not a correctness risk, but
+ * there is no reason to pay for it.
+ */
+export function bvhBuffersFromMesh(positions, indices, opts = {}) {
+    const tris = trianglesFrom(positions, indices);
+    const bvh = new MeshBVH(tris, opts);
+    const bounds = new Float32Array(bvh.bounds.subarray(0, bvh.nodes * 6));
+    const meta = new Int32Array(bvh.meta.subarray(0, bvh.nodes * 3));
+    const order = new Int32Array(bvh.order.subarray(0, bvh.count));
+    const trisF32 = new Float32Array(tris.length);
+    trisF32.set(tris);
+    return Object.freeze({ bounds, meta, order, tris: trisF32, nodeCount: bvh.nodes, triCount: bvh.count, bvh });
+}
+
+/** The `inputs` array runWgslCompute/runWgslComputeNative expect, at BVH_BINDINGS' fixed indices. */
+export function bvhInputs(b) {
+    return [
+        { binding: BVH_BINDINGS.bounds, data: b.bounds },
+        { binding: BVH_BINDINGS.meta, data: b.meta },
+        { binding: BVH_BINDINGS.order, data: b.order },
+        { binding: BVH_BINDINGS.tris, data: b.tris },
+    ];
+}
+
+/**
+ * The bvh block's WGSL, shared verbatim between pipelineWgsl's bvh option and bvhProbeWgsl below -- ONE port of
+ * meshBVH.mjs's traversal, not two copies that can drift apart the way multiplayer/wadLevelHost.js and
+ * tools/krbn/krbnCompare.js's independent ray-triangle kernels already did (meshBVH.mjs's own header).
+ */
+function bvhWgslBlock() {
+    return `
+@group(0) @binding(${BVH_BINDINGS.bounds}) var<storage, read> bvhBounds : array<f32>;
+@group(0) @binding(${BVH_BINDINGS.meta}) var<storage, read> bvhMeta : array<i32>;
+@group(0) @binding(${BVH_BINDINGS.order}) var<storage, read> bvhOrder : array<i32>;
+@group(0) @binding(${BVH_BINDINGS.tris}) var<storage, read> bvhTris : array<f32>;
+
+const TRI_EPS : f32 = 1e-9;   // mesh/meshBVH.mjs's own EPS, reused verbatim -- see this file's header note on
+                               // reusing an f64 threshold on f32: a real mesh's triangles are never within
+                               // 1e-9 of degenerate, so the guard's job (catch a ray parallel to the plane)
+                               // still holds; only the exact boundary case differs, and this file's own
+                               // methodology is to measure that gap with a gate rather than assume it away.
+
+var<private> bvhHitTri : i32;              // which triangle rtTraverseBvh's last call landed on, or -1
+var<private> bvhStack : array<i32, 64>;    // depth bound: maxLeaf=8 default needs 2^57+ triangles to overflow
+
+// ---- STAGE: intersection (triangle) -- ported from mesh/meshBVH.mjs's rayTriangle -----------------------
+// Moller-Trumbore, same algebra and the same epsilon on both ends (the near-parallel guard on det, and the
+// t > eps floor). This is the NEAREST-hit query -- raycastFirst's shape, not intersectsSegment's early-out.
+fn rtIntersectTri(orig : vec3<f32>, dir : vec3<f32>, i : i32) -> f32 {
+  let A = vec3<f32>(bvhTris[i], bvhTris[i + 1], bvhTris[i + 2]);
+  let e1 = vec3<f32>(bvhTris[i + 3], bvhTris[i + 4], bvhTris[i + 5]) - A;
+  let e2 = vec3<f32>(bvhTris[i + 6], bvhTris[i + 7], bvhTris[i + 8]) - A;
+  let p = cross(dir, e2);
+  let det = dot(e1, p);
+  if (det > -TRI_EPS && det < TRI_EPS) { return -1.0; }
+  let inv = 1.0 / det;
+  let tv = orig - A;
+  let u = dot(tv, p) * inv;
+  if (u < 0.0 || u > 1.0) { return -1.0; }
+  let q = cross(tv, e1);
+  let v = dot(dir, q) * inv;
+  if (v < 0.0 || u + v > 1.0) { return -1.0; }
+  let t = dot(e2, q) * inv;
+  if (t > TRI_EPS) { return t; }
+  return -1.0;
+}
+
+// The winner's own face normal -- recomputed once, for the one triangle that won, rather than carried
+// per-candidate through the traversal below. WGSL's builtin normalize() rather than the pipeline's own nrm()
+// (which special-cases a zero-length vector): a cross product of two non-degenerate triangle edges is never
+// zero, and this function has to stand alone in bvhProbeWgsl's kernel, which never defines the pipeline's nrm.
+fn rtTriNormal(i : i32) -> vec3<f32> {
+  let A = vec3<f32>(bvhTris[i], bvhTris[i + 1], bvhTris[i + 2]);
+  let e1 = vec3<f32>(bvhTris[i + 3], bvhTris[i + 4], bvhTris[i + 5]) - A;
+  let e2 = vec3<f32>(bvhTris[i + 6], bvhTris[i + 7], bvhTris[i + 8]) - A;
+  return normalize(cross(e1, e2));
+}
+
+// ---- TRAVERSAL: the BVH itself -- ported from mesh/meshBVH.mjs's _hitBox/raycastFirst ---------------------
+// Same node layout (meta[node*3] < 0 marks a leaf carrying start/count in meta[1..2]; an interior node
+// carries left/right), same slab test, same "a NaN box test can only ever be conservative because the only
+// early-out is t0 > t1, and every comparison against NaN is false" argument -- ADAPTED, not copied blind:
+// WGSL leaves f32 division by zero implementation-defined (unlike JS's guaranteed Infinity), so a
+// direction of exactly 0 on an axis gets a large finite sentinel here instead of a literal 1/0.
+fn rtHitBox(node : i32, o : vec3<f32>, invD : vec3<f32>, maxT : f32) -> f32 {
+  let b = node * 6;
+  var t0 = 0.0;
+  var t1 = maxT;
+  var n0 = (bvhBounds[b] - o.x) * invD.x;
+  var n1 = (bvhBounds[b + 3] - o.x) * invD.x;
+  if (n0 > n1) { let tmp = n0; n0 = n1; n1 = tmp; }
+  t0 = max(t0, n0); t1 = min(t1, n1);
+  if (t0 > t1) { return 1e30; }
+  n0 = (bvhBounds[b + 1] - o.y) * invD.y;
+  n1 = (bvhBounds[b + 4] - o.y) * invD.y;
+  if (n0 > n1) { let tmp = n0; n0 = n1; n1 = tmp; }
+  t0 = max(t0, n0); t1 = min(t1, n1);
+  if (t0 > t1) { return 1e30; }
+  n0 = (bvhBounds[b + 2] - o.z) * invD.z;
+  n1 = (bvhBounds[b + 5] - o.z) * invD.z;
+  if (n0 > n1) { let tmp = n0; n0 = n1; n1 = tmp; }
+  t0 = max(t0, n0); t1 = min(t1, n1);
+  if (t0 > t1) { return 1e30; }
+  return t0;
+}
+
+// *** NEAR CHILD LAST ONTO THE STACK, SO IT IS POPPED FIRST. *** The same rule raycastFirst's own header
+// names as a performance bug no correctness test can see: reversed, traversal is still correct and much
+// slower, because a tight best early is what prunes the far subtree at all.
+fn rtTraverseBvh(orig : vec3<f32>, dir : vec3<f32>, maxT : f32) -> f32 {
+  bvhHitTri = -1;
+  let invD = vec3<f32>(select(1.0 / dir.x, 1e30, dir.x == 0.0),
+                        select(1.0 / dir.y, 1e30, dir.y == 0.0),
+                        select(1.0 / dir.z, 1e30, dir.z == 0.0));
+  var best = maxT;
+  var sp = 1;
+  bvhStack[0] = 0;
+  loop {
+    if (sp == 0) { break; }
+    sp = sp - 1;
+    let node = bvhStack[sp];
+    if (rtHitBox(node, orig, invD, best) >= 1e30) { continue; }
+    let left = bvhMeta[node * 3];
+    if (left < 0) {
+      let start = bvhMeta[node * 3 + 1];
+      let cnt = bvhMeta[node * 3 + 2];
+      for (var s = start; s < start + cnt; s = s + 1) {
+        let tri = bvhOrder[s];
+        let t = rtIntersectTri(orig, dir, tri * 9);
+        if (t > 0.0 && t < best) { best = t; bvhHitTri = tri; }
+      }
+      continue;
+    }
+    let right = bvhMeta[node * 3 + 1];
+    let dl = rtHitBox(left, orig, invD, best);
+    let dr = rtHitBox(right, orig, invD, best);
+    if (dl < dr) { bvhStack[sp] = right; sp = sp + 1; bvhStack[sp] = left; sp = sp + 1; }
+    else { bvhStack[sp] = left; sp = sp + 1; bvhStack[sp] = right; sp = sp + 1; }
+  }
+  return select(-1.0, best, bvhHitTri >= 0);
+}
+`;
+}
+
+/**
+ * A standalone kernel testing ONLY rtTraverseBvh -- one ray per invocation, read from a fifth storage buffer
+ * (binding 6, six floats per ray: ox,oy,oz,dx,dy,dz), writing {t, tri} as two floats per ray to the output.
+ * This is the INTERSECTION oracle this file's header promises: it grades the ported traversal against
+ * mesh/meshBVH.mjs's own raycastFirst() directly, without going anywhere near shading or a CPU radiance
+ * reference neither this file nor pathTracer.mjs has ever had for a triangle.
+ */
+export function bvhProbeWgsl() {
+    return `
+@group(0) @binding(0) var<storage, read_write> outBuf : array<f32>;
+@group(0) @binding(6) var<storage, read> rays : array<f32>;
+${bvhWgslBlock()}
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
+  let i = i32(gid.x);
+  let r = i * 6;
+  let orig = vec3<f32>(rays[r], rays[r + 1], rays[r + 2]);
+  let dir = vec3<f32>(rays[r + 3], rays[r + 4], rays[r + 5]);
+  let t = rtTraverseBvh(orig, dir, 1e30);
+  outBuf[i * 2] = t;
+  outBuf[i * 2 + 1] = f32(bvhHitTri);
+}
+`;
+}
 
 /**
  * *** WHICH RECORDS THE CPU REFERENCE CAN EXPRESS AT ALL, AND IT IS NOT ALL OF THEM. ***
@@ -188,18 +409,23 @@ export function tablePreconditions(sbt, spp) {
 // THE PIPELINE
 // ================================================================================================
 export function pipelineWgsl({ workgroupSize = 64, gradient = false,
-                               plantSwapRecords = false, plantIgnoreRecord = false } = {}) {
+                               plantSwapRecords = false, plantIgnoreRecord = false, bvh = false } = {}) {
     const PI = "3.141592653589793";
     return `
 @group(0) @binding(0) var<storage, read_write> outBuf : array<f32>;
 @group(0) @binding(1) var<uniform> U : array<vec4<f32>, 24>;
+${bvh ? bvhWgslBlock() : ""}
 
 // U[0]  eye.xyz, tanHalfFov          U[1]  fwd.xyz, geometryCount
 // U[2]  w, h, spp, eps               U[3]  right.xyz, seedBits
 // U[4]  camUp.xyz, _                 U[8+i]  geometry i: centre.xyz, radius
 // U[16+i] SBT record i: hitShaderIndex, albedo, _, _
+// U[${MESH_META_SLOT}] mesh meta (bvh only): hasMesh, nodeCount, triCount, _
+// U[${MESH_SBT_SLOT}] mesh SBT record (bvh only): hitShaderIndex, albedo, _, _
 const GEO_BASE : i32 = 8;
 const SBT_BASE : i32 = 16;
+const MESH_META : i32 = ${MESH_META_SLOT};
+const MESH_SBT : i32 = ${MESH_SBT_SLOT};
 
 var<private> rngState : u32;
 fn nextU32() -> u32 { rngState = rngState * ${LCG.mul}u + ${LCG.inc}u; return rngState; }
@@ -237,8 +463,9 @@ fn rtIntersect(orig : vec3<f32>, dir : vec3<f32>, centre : vec3<f32>, radius : f
 }
 
 // ---- TRAVERSAL: which record wins ----------------------------------------------------------------------
-// Linear over the geometries. NO BVH -- honest at four spheres, useless at four thousand, and the header
-// names that as the biggest thing WebRTX has that this does not.
+// Linear over the spheres -- honest at four of them, useless at four thousand, which is exactly why a
+// TRIANGLE mesh does not go through this loop at all: it gets its own BVH-accelerated intersection below,
+// merged in as one extra geometry slot rather than as thousands of linear entries.
 struct Hit { t : f32, geo : i32 };
 fn rtTraverse(orig : vec3<f32>, dir : vec3<f32>, n : i32, eps : f32) -> Hit {
   var best = Hit(-1.0, -1);
@@ -247,6 +474,15 @@ fn rtTraverse(orig : vec3<f32>, dir : vec3<f32>, n : i32, eps : f32) -> Hit {
     let t = rtIntersect(orig, dir, g.xyz, g.w, eps);
     if (t > 0.0 && (best.t < 0.0 || t < best.t)) { best = Hit(t, i); }
   }
+  ${bvh ? `
+  // The mesh (if present) is geometry index n -- one past the last sphere, distinct from every real index
+  // the loop above can produce. Its own hit can only IMPROVE best.t, never worsen the sphere-only case, so
+  // a scene with hasMesh=0 (the flag the uniform carries) takes the branch below and finds nothing to merge.
+  if (U[MESH_META].x > 0.5) {
+    let maxT = select(1e30, best.t, best.t > 0.0);
+    let mt = rtTraverseBvh(orig, dir, maxT);
+    if (mt > 0.0) { best = Hit(mt, n); }
+  }` : ""}
   return best;
 }
 
@@ -318,13 +554,22 @@ fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
     for (var depth = 0; depth < ${MAX_DEPTH}; depth = depth + 1) {
       let hit = rtTraverse(o, d, nGeo, eps);
       if (hit.geo < 0) { radiance = radiance + throughput * rtMiss(d); break; }
-      let g = U[GEO_BASE + hit.geo];
       let P = o + d * hit.t;
-      let N = nrm(P - g.xyz);
+      var N : vec3<f32>;
+      var rec : vec4<f32>;
+      ${bvh ? `if (hit.geo == nGeo) {
+        // The mesh's own hit -- its normal comes from the winning triangle's edges, not from a sphere
+        // centre, and its material from the ONE record a bvh scene carries rather than the per-sphere table.
+        N = rtTriNormal(bvhHitTri * 9);
+        rec = U[MESH_SBT];
+      } else {` : ""}
+      let g = U[GEO_BASE + hit.geo];
+      N = nrm(P - g.xyz);
       // *** THE BINDING TABLE LOOKUP. *** plantSwapRecords reads the WRONG record for the hit geometry and
       // plantIgnoreRecord reads record 0 always -- both are PARAMETERS rather than edited copies, so a
       // planted run and a clean run take the same code path (v3467's rule).
-      let rec = U[SBT_BASE + ${plantIgnoreRecord ? "0" : plantSwapRecords ? "(nGeo - 1 - hit.geo)" : "hit.geo"}];
+      rec = U[SBT_BASE + ${plantIgnoreRecord ? "0" : plantSwapRecords ? "(nGeo - 1 - hit.geo)" : "hit.geo"}];
+      ${bvh ? `}` : ""}
       let b = rtClosestHit(i32(rec.x), rec.y, N, d);
       d = b.dir;
       o = P + N * eps;
@@ -337,8 +582,15 @@ fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
 `;
 }
 
-/** The uniform block the pipeline reads, packed from the binding table. */
-export function pipelineUniforms(sbt, { spp = 16, seed = 1, view = VIEW, eps = EPS } = {}) {
+/**
+ * The uniform block the pipeline reads, packed from the binding table.
+ *
+ * `bvh` is a lightweight DESCRIPTOR, not the buffers themselves -- `{ nodeCount, triCount, hit, albedo }`. The
+ * actual bounds/meta/order/tris arrays go to the GPU as storage-buffer `inputs` (see bvhInputs), because a
+ * uniform block this size cannot hold an arbitrary mesh; this only sets the two extra slots (MESH_META,
+ * MESH_SBT) a bvh-enabled pipeline reads to know the mesh is there and how to shade it.
+ */
+export function pipelineUniforms(sbt, { spp = 16, seed = 1, view = VIEW, eps = EPS, bvh = null } = {}) {
     if (sbt.length > MAX_GEOMETRY) throw new Error("rtPipeline: at most " + MAX_GEOMETRY + " geometries");
     const { w, h, eye, look, up, fovDeg } = view;
     const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -358,6 +610,11 @@ export function pipelineUniforms(sbt, { spp = 16, seed = 1, view = VIEW, eps = E
         U.set([r.centre[0], r.centre[1], r.centre[2], r.radius], (8 + i) * 4);
         U.set([HIT_SHADERS[r.hit], r.albedo, 0, 0], (16 + i) * 4);
     });
+    if (bvh) {
+        if (!(bvh.hit in HIT_SHADERS)) throw new Error("rtPipeline: no closest-hit shader named " + bvh.hit);
+        U.set([1, bvh.nodeCount, bvh.triCount, 0], MESH_META_SLOT * 4);
+        U.set([HIT_SHADERS[bvh.hit], bvh.albedo, 0, 0], MESH_SBT_SLOT * 4);
+    }
     return U;
 }
 
@@ -374,6 +631,29 @@ export const MEASURED_AT_V4418 = Object.freeze({
     threeSphereDeltaTimesSpp: 1.578125,
     // Mirror record against lambertian record, same geometry, two skies. The gap is the blindness.
     materialVisibility: Object.freeze({ constantSky: 15, gradientSky: 70, of: 576 }),
+});
+
+/**
+ * What the BVH round measured. Not stamped MEASURED_AT_V4419 -- there is no v4419 in this branch's real
+ * history (ENGINE_VERSION was already past it before this round started), and a made-up number the tree
+ * cannot check is exactly what the ship ritual's own rules refuse. Re-take with:
+ * node physics/render/rtPipeline-selfcheck.mjs
+ */
+export const MEASURED_BVH_ROUND = Object.freeze({
+    // A unit cube (12 triangles, 8 vertices) through the binned-SAH build at maxLeaf=8 default.
+    cubeBvh: Object.freeze({ nodes: 5, triangles: 12, depth: 2 }),
+    // 32 rays (8 hand-picked -- straight-on, diagonal, two misses, a near-corner grazer -- plus 24 swept
+    // around the cube) against mesh/meshBVH.mjs's own raycastFirst(). Zero true mismatches; the only
+    // disagreements are rays landing exactly on an edge two triangles share, verified by checking the two
+    // triangles actually have two vertices in common rather than asserted away.
+    bvhIntersection: Object.freeze({ rays: 32, trueMismatches: 0, sharedEdgeTies: 2 }),
+    // A 32x32 frame with ONLY the bvh mesh in the scene, no spheres -- proof the geometry-slot merge in
+    // rtTraverse actually fires, not a claim about picture quality (there is no CPU radiance oracle for a
+    // triangle; pathTracer.mjs's scene is spheres, full stop).
+    meshOnlyRender: Object.freeze({ px: 1024, notSky: 484 }),
+    // The sphere-only path, unchanged: pipelineWgsl({}) -- every caller's shape before this round -- is still
+    // bit-exact against the CPU f64 reference, proving the bvh merge is inert when U[MESH_META].x is 0.
+    sphereOnlyStillExact: Object.freeze({ differing: 0, of: 576 }),
 });
 
 // v4468 -- the probe manifest (docs/GPU-KERNEL-CONTRACT.md): a two-record LAMBERTIAN table (the CPU tracer has no

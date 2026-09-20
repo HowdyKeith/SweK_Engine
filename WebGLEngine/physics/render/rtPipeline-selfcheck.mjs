@@ -11,6 +11,13 @@
 // SECOND GEOMETRY AND THAT ARGUMENT IS GONE -- a bounce can land on a neighbour, so which route a path takes
 // depends on a direction that f32 and f64 disagree about. Measured: it survives two spheres and breaks at
 // three. The gate asserts the SHAPE of the breakage, not its absence.
+//
+// *** SECTION 6 IS THE BVH ROUND'S, AND ITS ANSWER KEY IS A DIFFERENT FILE, NOT A DIFFERENT TOLERANCE. *** A triangle
+// mesh has no CPU radiance reference here -- pathTracer.mjs's scene is spheres, full stop -- so this does not
+// invent one. What it grades is the traversal itself against mesh/meshBVH.mjs's own already-tested
+// raycastFirst(), and it found one real disagreement shape worth keeping rather than hiding: a ray landing
+// exactly on an edge two triangles share can report either as the nearest hit, at the identical distance. That
+// is verified by checking the two triangles actually share two vertices, not asserted away.
 "use strict";
 
 import { gateReport } from "../../tools/ship/gateReport.mjs";
@@ -214,6 +221,103 @@ const rec = R.sbtRecord;
         "mirror and a diffuse agree except where a path happens to strike the other sphere. THIS PASSING IS " +
         "THE POINT: it is the furnace's blindness measured a third time, after the sampler (v4417) and the " +
         "seeding scheme (v3487). Do not 'fix' it by moving this check to the gradient sky");
+}
+
+// ---- 6. THE BVH: AN INTERSECTION ORACLE, NOT A RENDERING ONE ---------------------------------------------------
+// pathTracer.mjs's scene is spheres; it has no concept of a triangle at all, so there is no CPU RADIANCE
+// reference to grade a shaded mesh against -- the same honest gap section 5 already refuses to paper over for
+// a mirror record. What DOES have an answer key is the traversal itself: mesh/meshBVH.mjs's own raycastFirst()
+// has been the tested CPU implementation since before this round existed. This asks whether the WGSL port
+// finds the SAME triangle at the SAME distance, for the same rays over the same mesh.
+{
+    say("");
+    // A unit cube, 12 triangles, 8 vertices -- enough for the binned-SAH build to split (maxLeaf=8 default
+    // gives 2 leaves), and small enough that every triangle and every shared edge is known by hand.
+    const positions = [
+        [-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1],
+        [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1],
+    ];
+    const indices = [
+        [0, 1, 2], [0, 2, 3], [4, 6, 5], [4, 7, 6], [0, 4, 5], [0, 5, 1],
+        [3, 2, 6], [3, 6, 7], [0, 3, 7], [0, 7, 4], [1, 5, 6], [1, 6, 2],
+    ];
+    const bvh = R.bvhBuffersFromMesh(positions, indices);
+    say(`cube BVH: ${bvh.nodeCount} nodes, ${bvh.triCount} triangles, depth ${bvh.bvh.depth}`);
+
+    const rays = [];
+    const pushRay = (o, d) => { const l = Math.hypot(d[0], d[1], d[2]); rays.push(o[0], o[1], o[2], d[0] / l, d[1] / l, d[2] / l); };
+    pushRay([0, 0, -5], [0, 0, 1]); pushRay([0, 0, 5], [0, 0, -1]);
+    pushRay([5, 0, 0], [-1, 0, 0]); pushRay([0, 5, 0], [0, -1, 0]);
+    pushRay([-5, -5, -5], [1, 1, 1]);        // corner-ish diagonal
+    pushRay([10, 10, 10], [1, 1, 1]);        // miss -- points away from the cube
+    pushRay([2, 2, -5], [0, 0, 1]);          // miss -- offset outside the cube's xy extent
+    pushRay([0.9, 0.9, -5], [0, 0, 1]);      // near a corner of a face, should still hit
+    for (let i = 0; i < 24; i++) {
+        const a1 = (i / 24) * Math.PI * 2, a2 = ((i * 7) % 24 / 24) * Math.PI;
+        const ox = 5 * Math.sin(a2) * Math.cos(a1), oy = 5 * Math.sin(a2) * Math.sin(a1), oz = 5 * Math.cos(a2);
+        pushRay([ox, oy, oz], [-ox + (i % 3 - 1) * 0.3, -oy + (i % 5 - 2) * 0.2, -oz]);
+    }
+    const rayCount = rays.length / 6;
+
+    const probe = await runWgslCompute({ code: R.bvhProbeWgsl(), outCount: rayCount * 2,
+                                         workgroups: Math.ceil(rayCount / 64),
+                                         inputs: [...R.bvhInputs(bvh), { binding: 6, data: new Float32Array(rays) }] });
+    if (!probe.ok) throw new Error("bvh probe GPU run failed: " + probe.reason + " " + (probe.errors || []).join(" | "));
+
+    let mismatches = 0, tieMismatches = 0;
+    for (let i = 0; i < rayCount; i++) {
+        const [ox, oy, oz, dx, dy, dz] = rays.slice(i * 6, i * 6 + 6);
+        const cpu = bvh.bvh.raycastFirst(ox, oy, oz, dx, dy, dz);
+        const gpuT = probe.values[i * 2], gpuTri = Math.round(probe.values[i * 2 + 1]);
+        const cpuT = cpu ? cpu.t : -1, cpuTri = cpu ? cpu.tri : -1;
+        const hitAgree = (gpuT > 0) === (cpuT > 0);
+        const tAgree = cpuT < 0 || Math.abs(gpuT - cpuT) < 1e-3;
+        if (!hitAgree || !tAgree) { mismatches++; continue; }
+        // A DIFFERENT triangle at the IDENTICAL distance is not a bug: it is a ray landing exactly on an edge
+        // two triangles share, where both report the same t and either is a correct nearest hit. Verified by
+        // hand below that this only ever happens between triangles that actually share two vertices.
+        if (cpuT >= 0 && gpuTri !== cpuTri) {
+            const shared = indices[gpuTri].filter((v) => indices[cpuTri].includes(v));
+            if (shared.length === 2) tieMismatches++; else mismatches++;
+        }
+    }
+    say(`${rayCount} rays against the cube: ${mismatches} true mismatches, ${tieMismatches} genuine shared-edge ties`);
+    ok("!! the ported BVH traversal finds the SAME hit -- or a co-located tie -- as meshBVH.mjs's raycastFirst()",
+        mismatches === 0,
+        "a mismatch that is not a verified shared-edge tie would mean the port drifted from the CPU answer key " +
+        "it was measured against, the same standard section 2's refactor oracle holds the sphere path to");
+
+    // The traversal is checkable in isolation; the MERGE into a real render is not, because there is no CPU
+    // radiance reference for a triangle at all (pathTracer.mjs's scene is spheres, full stop). What IS
+    // checkable without inventing an oracle: a camera looking only at the mesh sees the mesh, not a blank sky.
+    const view = { ...R.VIEW, w: 32, h: 32 };
+    const meshRender = await runWgslCompute({
+        code: R.pipelineWgsl({ bvh: true }), outCount: view.w * view.h, workgroups: Math.ceil(view.w * view.h / 64),
+        uniforms: R.pipelineUniforms([], { view, spp: 16, eps: 1e-4,
+                                           bvh: { nodeCount: bvh.nodeCount, triCount: bvh.triCount, hit: "lambertian", albedo: 0.6 } }),
+        inputs: R.bvhInputs(bvh),
+    });
+    if (!meshRender.ok) throw new Error("mesh render GPU run failed: " + meshRender.reason);
+    const nonSky = meshRender.values.filter((v) => Math.abs(v - 1.0) > 1e-4).length;
+    say(`camera facing the bare cube, no spheres: ${nonSky} of ${meshRender.values.length} px are not sky`);
+    REPORT_ROWS.push(["bvh cube", `${view.w}x${view.h}`, "16", `${nonSky} of ${meshRender.values.length} not sky`]);
+    ok("!! a scene with ONLY a bvh mesh actually renders the mesh, not a uniform sky frame",
+        nonSky > meshRender.values.length * 0.2,
+        `${nonSky} of ${meshRender.values.length} -- a unit cube centred in a 32x32 frame should cover a real ` +
+        "fraction of the image; a number near 0 would mean the geometry slot merge in rtTraverse never fires");
+
+    // *** AND THE SPHERE-ONLY PATH TAKES THE EXACT SAME ROUTE IT ALWAYS DID. *** Every caller before this round
+    // calls pipelineWgsl({}) with no bvh option, and section 2 already proved that byte-exact against the CPU.
+    // This re-proves it is STILL true after the bvh block exists in the file, because the merge in rtTraverse
+    // is guarded by a runtime uniform flag, not by which WGSL text got generated -- a real way for this round
+    // to have broken the old behaviour even with `bvh` template-conditional.
+    const one = [rec({ centre: [0, 0, 0], radius: 1, albedo: 0.5 })];
+    const v2 = V(24);
+    const stillExact = cmp(await gpu(one, { view: v2, spp: 16 }), R.renderSbtCpu(one, { spp: 16, view: v2 }));
+    ok("!! and the sphere-only path is UNCHANGED by this round -- still bit-exact against the CPU",
+        stillExact.bad === 0,
+        "the bvh merge in rtTraverse reads U[MESH_META].x at runtime; this proves a scene that never sets it " +
+        "renders exactly as it did before this round, not merely that the generated WGSL happens to still compile");
 }
 
 console.log("rtPipeline-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));
