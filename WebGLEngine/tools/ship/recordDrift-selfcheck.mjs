@@ -9,6 +9,30 @@
 // filesystem clause, v4478's rows-that-worked count -- and the pattern is always the same: the zero was never
 // driven.
 //
+// ---- *** v4647 -- THREE RED HERE MEANT THE TREE HAD DRIFTED, AND IT WAS FILED AS THIS GATE BEING BROKEN ***
+//
+// A full verify found this gate 3 red on BOTH boxes, and the reds were opened as a backlog item reading "its
+// own sabotage rows are what fail" -- because the FAIL text names sabotage F and a fixture, so it READ like a
+// detector whose controls had stopped discriminating. That is the failure mode the header above is about, and
+// it was the wrong diagnosis. THE GATE WAS EXACTLY RIGHT: three derived records really had gone stale, all
+// three created by the rounds that were reading its output.
+//
+// *** SETTLED BY AN EXPERIMENT RATHER THAN BY READING, AND THE EXPERIMENT IS THE POINT. *** Each stale record
+// was restored independently and this gate re-run:
+//
+//     assertionShape's census stale alone           -> 0 red   (not the cause at all)
+//     vba/runtimeGap's census stale alone           -> 2 red
+//     both stale together                           -> 2 red
+//     all three, including the missing sweep closing -> 3 red, the state it was filed in
+//
+// So the third row was the closing ledger -- which the verify pre-flight had named in plain words ("sweep
+// closings: 5 gate(s) no closing names") in the same output the reds were read from. Restoring the three
+// records takes this gate green with nothing here touched.
+//
+// WHAT TO DO WHEN IT IS RED AGAIN: read the drift pre-flight's line first, and restore each named record one
+// at a time. This gate's prose describes its FIXTURES, so a red always reads like a fixture failing; what it
+// is reporting is the tree.
+//
 // ---- *** SIX SABOTAGES, AND TWO OF THEM WENT ZERO-RED FIRST *** ------------------------------------------------
 //
 //  A. `drift` reports every record fresh                  -> 0 RED, THEN 1 RED AFTER THE REPAIR
