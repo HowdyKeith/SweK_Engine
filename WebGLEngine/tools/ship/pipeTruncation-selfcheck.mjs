@@ -25,6 +25,49 @@
 // for their last line, so the row cannot rot when Node changes and cannot pass by describing a belief.
 //
 // SABOTAGES: see the log at the foot of this file.
+//
+// ---- v4647n -- IT WAS FILED AS "FLAKY: 1 RED IN 5" AND IT WAS RED 11 TIMES IN 12 ------------------------
+//
+// The phenomenon is not flaky. Re-measured over 25 runs of the identical pair, process.exit() lost output
+// in 25 of 25 and process.exitCode lost exactly 0 in 25 of 25. What was flaky was this file's THRESHOLD:
+// the row demanded the loss exceed 65,536 bytes, and the loss is bimodal -- 19,520 / 36,905 / 48,983 /
+// 49,959 / 50,081 against 172,386 / 233,081 / 233,325 -- so the bound sat between the two modes and held
+// in 8 of 25. Nothing about Node moved; the backlog's "1 in 5" was a reading of the same coin toss.
+//
+// THE BOUND ALSO EXCLUDED THE CASE THIS FILE WAS WRITTEN ABOUT. The header above records statedRuntime
+// losing 4,747 bytes -- its only FAIL line. Against 65,536 this row would have called that no loss at all.
+//
+// The threshold is GONE rather than widened. How much is stranded depends on how far the reader got before
+// the writer exited; that is scheduling and no constant describes it. The claim is a CONTRAST and needs no
+// bound.
+//
+// *** AND IT IS NOT AT ZERO, WHICH IS SAID HERE RATHER THAN ROUNDED AWAY. *** After the change: 550 runs,
+// 2 reds -- about 0.4%, against 11 in 12 before. NEITHER RED WAS CAPTURED. Both landed in batches run
+// immediately after a file write; 320 consecutive runs with the output kept on failure did not reproduce
+// one, so there is no line of evidence saying which row went and no hypothesis worth writing down. The
+// threshold was the dominant cause and is settled; the remainder is a separate, unexplained thing and the
+// backlog keeps it. Stating "fixed" on a 0.4% residual nobody has seen fail is how "flaky: 1 red in 5"
+// came to be written about a gate that was red 92% of the time.
+//
+// v4647n SABOTAGES, RESULTS BY NAME (ten runs each, because the subject is a flake):
+//   NA. the 65,536 bound is restored                        -> RED in 9 of 10
+//   NB. the control's test becomes `lostOnCode >= 0`        -> 0 of 10   (see below)
+//   NC. the control script also calls process.exit          -> RED in 10 of 10
+//   ND. A prints twice as much as B                         -> RED in 10 of 10
+//   NE. the premise row is deleted along with its clause    -> 0 of 10   (see below)
+//
+// *** ND MEASURED ZERO UNTIL A ROW WAS ADDED FOR IT. *** `fA === fB` -- the premise that makes the two pipe
+// readings comparable at all -- was a clause inside the main row, and deleting it while making one script
+// print twice as much changed no verdict, because `lostOnExit > 0` is still true of two scripts that have
+// nothing to do with each other. It is its own row now. (A first attempt at ND also measured zero for a
+// different reason: it appended a second copy of the body AFTER process.exit(1), which never runs. A
+// sabotage that does not change the subject is not a sabotage.)
+//
+// *** NB AND NE ARE ZERO AND CANNOT BE OTHERWISE, WHICH IS A LIMIT OF THE METHOD RATHER THAN A GAP. ***
+// Both replace an assertion with something that cannot fail -- a tautology, or nothing. Running the gate
+// cannot detect that its own row was deleted. Those are caught by reading a diff, and they are recorded
+// here as zero rather than left out, because a sabotage log that lists only the ones that worked is an
+// advertisement.
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -66,10 +109,45 @@ let lostOnExit = 0, lostOnCode = 0;
         lostOnExit = fA - pA; lostOnCode = fB - pB;
         report(`process.exit(1)       file ${fA}  pipe ${pA}  lost ${lostOnExit}`);
         report(`process.exitCode = 1  file ${fB}  pipe ${pB}  lost ${lostOnCode}`);
-        ok("*** process.exit() LOSES output through a pipe that survives to a file -- the two differ by more than a pipe buffer ***",
-            fA === fB && lostOnExit > 65536,
+        // *** v4647n -- THE BOUND WAS 65,536 AND IT EXCLUDED THE CASE THIS FILE WAS WRITTEN ABOUT. ***
+        //
+        // The header twenty lines up records the real instance: statedRuntime-selfcheck emitted 70,608 bytes
+        // to a file and 65,861 through a pipe -- 4,747 gone, and the line that vanished was its only FAIL.
+        // The row demanded the loss exceed 65,536. Against its own motivating measurement it would have
+        // said "no loss here".
+        //
+        // And it made the gate a coin toss. MEASURED, 25 runs of the identical pair on an idle box:
+        //
+        //     process.exit()      lost 19,520 / 36,905 / 48,983 / 49,959 / 50,081 / 172,386 / 233,081 / 233,325
+        //                         min 19,520, median 50,081, max 233,325 -- LOSS IN 25 OF 25
+        //     process.exitCode    lost 0, in 25 of 25, exactly
+        //     above the old bound 8 of 25
+        //
+        // So the PHENOMENON reproduces 100% of the time and the THRESHOLD reproduces 32% of the time. The
+        // gate was filed as "flaky: 1 red in 5"; re-measured it is red 11 times in 12, because the loss
+        // distribution is bimodal and the bound sits between the two modes. Nothing about Node moved.
+        //
+        // *** THE THRESHOLD IS GONE, NOT WIDENED. *** How much is stranded depends on how far the reader
+        // got before the writer exited -- it is scheduling, and no constant describes it. What the file
+        // claims is a CONTRAST, and the contrast needs no bound: the same 244,000 bytes, the same reader,
+        // two scripts differing only in their last line, one losing output and the other losing none. A
+        // Node that flushed on exit would make `lostOnExit` zero and fail this row; a Node that lost
+        // everything would fail the next one. The magnitude is REPORTED, because it is a reading and not a
+        // property.
+        // *** THE PREMISE, ASSERTED SEPARATELY, BECAUSE SABOTAGE ND SHOWED IT WAS NOT. *** The whole
+        // comparison rests on the two scripts writing the SAME bytes -- otherwise a difference between the
+        // pipe readings says nothing about exit(). It was a clause inside the row below; deleting it and
+        // making one script print twice as much went ZERO RED across ten runs, because the surviving clause
+        // (`lostOnExit > 0`) is still true of two scripts that have nothing to do with each other.
+        ok("*** the two scripts write the IDENTICAL number of bytes to a file, which is what makes the pipe readings comparable ***",
+            fA === fB && fA > 0,
+            `${fA} bytes each, to a file, where nothing is lost either way. They differ only in their last ` +
+            "line; if they differed in output the comparison below would be measuring the scripts, not exit()");
+        ok("*** process.exit() LOSES output through a pipe that survives to a file, and the control loses none ***",
+            fA === fB && lostOnExit > 0,
             `${lostOnExit} bytes of ${fA} never reached the reader. Both scripts print the identical ${fA} bytes; ` +
-            "the only difference between them is the last line.");
+            "the only difference between them is the last line. The amount is scheduling -- 19,520 to 233,325 " +
+            "across 25 runs here -- so it is reported and the row asserts the contrast instead.");
         ok("  ...and process.exitCode loses NOTHING, so the repair is the line and not the volume",
             lostOnCode === 0,
             `${fB} bytes written, ${pB} read. Setting the code lets the process end normally, and a normal end flushes.`);
