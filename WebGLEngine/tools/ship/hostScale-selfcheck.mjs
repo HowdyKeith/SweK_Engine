@@ -18,6 +18,7 @@ import path from "node:path";
 import { hostScale, scaled, recordRun, boxId, hostFacts, SCALE_FLOOR, SCALE_CEILING } from "./hostScale.mjs";
 import { timingsTarget, LOCAL_TIMINGS, DEFAULTS } from "./quickSweep.mjs";
 import { ENG as ROOT } from "./gateSweep.mjs";
+import { noComments } from "./sourceScan.mjs";
 import { MEASURED, budgetFor } from "./gateBudget.mjs";
 
 import { fileURLToPath } from "node:url";
@@ -355,7 +356,12 @@ console.log("\n*** WHOSE STOPWATCH WROTE sweep-timings.json -- v4647 ***");
     // against a handful here. Reported rather than corrected -- a foreign box has nowhere to write a
     // corrected membership, and inventing one per box would make "the sweep is green" mean two different
     // things on two machines. It no longer means them differently in silence.
-    const vSrc = fs.readFileSync(path.join(ROOT, "tools", "ship", "verify.mjs"), "utf8");
+    // *** v4647o -- READ THROUGH noComments(), BECAUSE THE RAW MATCH WAS PROSE-MATCHING DEBT. ***
+    // tools/ship/gateQuality-selfcheck.mjs counts rows that test an English sentence against raw source:
+    // rewrap the comment and the row goes red while nothing has changed. It named this one as a NEW
+    // offender -- mine, written two rounds ago -- and it was right. The sentence being matched is a string
+    // in CODE, so stripping comments keeps it and removes the way it could be broken by reflowing prose.
+    const vSrc = noComments(fs.readFileSync(path.join(ROOT, "tools", "ship", "verify.mjs"), "utf8"));
     ok("!! *** verify SAYS SO when the membership list came from another box, and names how many are over budget HERE ***",
        /r\.foreignTimings/.test(vSrc) && /the membership list came from/.test(vSrc),
        "a sweep that runs one machine's list on another and reports only a verdict is two claims wearing one word");

@@ -124,6 +124,12 @@ export const FORMATTERS = Object.freeze([
     // options -- a mesh, a ground function -- which is why Function.length reports them as requiring one.
     "nav/navmesh.mjs",                    // v4543: reportLines(mesh, path) -- arity 2, the widest here
     "physics/character/terrainWalk.mjs",  // v4544: reportLines(ground) -- refuses bare with "g is not a function"
+    // *** A THIRD ARRIVAL FROM A ROUND THAT DID NOT REGISTER ITSELF HERE, AND IT IS MINE. *** v4647f
+    // factored quickSweep's human report out of its command line into `reportLines(r)` so a gate could call
+    // it -- and registered it in physics/instruments.mjs, which is a DIFFERENT registry, while leaving this
+    // one alone. The note above was written about exactly this and it did not stop me: the round that adds
+    // a formatter is the round least likely to remember there are two lists of them.
+    "tools/ship/quickSweep.mjs",          // v4647f: reportLines(r) -- renders a sweep result, bare call throws
 ]);
 
 // *** AND Function.length CANNOT TELL THE LAST TWO FROM THE FIRST FOUR EITHER, WHICH IS THE THIRD INSTRUMENT
@@ -166,6 +172,9 @@ export const STRICT_FORMATTERS = Object.freeze([
     // physics/character/terrainWalk.mjs with "g is not a function". Neither fabricates a report.
     "nav/navmesh.mjs",
     "physics/character/terrainWalk.mjs",
+    // v4647o -- measured the same way, by CALLING it bare: "Cannot read properties of undefined (reading
+    // 'ran')". It refuses, so it is strict; it does not fabricate a report out of nothing.
+    "tools/ship/quickSweep.mjs",
 ]);
 export const TOLERANT_FORMATTERS = Object.freeze([
     "tools/roundhouse/curriculum.mjs",

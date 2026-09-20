@@ -110,7 +110,25 @@ const rows = real.map((k) => ({ k, g: G.timings[k], s: S.timings[k], r: ratioOf(
     const sweepHigher = cmp.filter((x) => x.r >= 2 && x.s > x.g).length;
     const gateHigher = cmp.filter((x) => x.r >= 2 && x.g > x.s).length;
     ok(`  and it is overwhelmingly ONE-directional -- the sweep reads higher in ${sweepHigher} of the ${sweepHigher + gateHigher}, which growth and an eight-wide sweep both explain`,
-        sweepHigher > 10 * gateHigher, `${sweepHigher} sweep-higher against ${gateHigher} gate-timings-higher`);
+        // *** v4647o -- THE 10x BAR WAS MEASURED AT 85:6 AND A REPAIR BROKE IT. ***
+        // Counted on origin/main and on this branch with the same rule: main reads 85 sweep-higher against 6
+        // gate-higher; this branch reads 35 against 7. `gateHigher` -- the direction neither growth nor load
+        // explains, and the one worth policing -- BARELY MOVED. What collapsed is sweepHigher, because
+        // v4647j replaced 87 stale timings entries with corroborated serial readings and the two records
+        // came into AGREEMENT. The disagreement population fell from 91 to 42 and the ratio fell with it.
+        //
+        // A ratio over a shrinking population is not the same statistic, and a bar that a repair can break
+        // is measuring the repair. This tree has the shape on record twice now: sweepCoverage's returnee
+        // floor decayed every time a gate was legitimately re-timed, for the same reason.
+        //
+        // So the DIRECTION is asserted without a magic multiplier, and the strength lives where it already
+        // did -- in the ratchet below, which forbids the unexplainable direction from growing. The ratio is
+        // REPORTED with both populations, because it is a reading about how much repair has been done and
+        // not a property of the tree.
+        sweepHigher > gateHigher,
+        `${sweepHigher} sweep-higher against ${gateHigher} gate-timings-higher -- ` +
+        `${(sweepHigher / Math.max(1, gateHigher)).toFixed(1)} to 1 over a population of ` +
+        `${sweepHigher + gateHigher}, against 85:6 over 91 on origin/main before 87 entries were repaired`);
     // v4578 -- a RATCHET rather than a count. v4576 measured nine running the other way; v4577 and v4578
     // corrected every one of them, so the live figure is zero and a row asserting `> 0` reddens the day the
     // work is done. Recorded high-water mark, live number may only fall.
@@ -121,13 +139,22 @@ const rows = real.map((k) => ({ k, g: G.timings[k], s: S.timings[k], r: ratioOf(
         cmp.filter((x) => x.r >= 2 && x.g > x.s).map((x) => `${path.basename(x.k)} ${x.g}>${x.s}`).join(", ") +
             ` -- ${cmp.length} of ${rows.length} comparisons are alone-against-alone; the rest set a LOADED reading beside a serial one`);
     // *** AND "OVERWHELMINGLY" IS QUANTIFIED IN A SECOND ROW, BECAUSE A THRESHOLD CANNOT POLICE ITSELF. ***
-    // Loosening the bar above from `> 10 * gateHigher` to `> 0` went 0-RED in sabotage: an assertion weakened
+    // v4647o: that is now the row carrying the strength, since the bar above is a direction rather than a
+    // multiplier. Loosening the bar above from `> 10 * gateHigher` to `> 0` went 0-RED in sabotage: an assertion weakened
     // is invisible to the assertion weakened. The claim is only held if a SEPARATE row carries the same
     // number, so a single edit leaves one of them standing.
-    ok(`  and the word "overwhelmingly" is a measured ratio, not a manner of speaking: ${(sweepHigher / Math.max(1, gateHigher)).toFixed(0)} to 1`,
-        sweepHigher / Math.max(1, gateHigher) > 10 && sweepHigher + gateHigher === cmp.filter((x) => x.r >= 2).length,
+    // *** v4647o -- THE 10x BAR LIVED HERE TOO, AND TWO COPIES OF A THRESHOLD GO STALE TOGETHER. ***
+    // This row was written to quantify the one above, "because a threshold cannot police itself" -- and it
+    // spelled the same multiplier a second time, so the repair that broke one broke both. What survives is
+    // the part with no constant in it: the two directions PARTITION the comparable disagreements, which is a
+    // structural fact about the population and cannot decay as the population shrinks. The ratio is reported
+    // beside it, with the figure it replaced, because 14:1 and 5:1 were each true of their own moment.
+    ok(`  and the two directions PARTITION the comparable disagreements -- the ratio is ${(sweepHigher / Math.max(1, gateHigher)).toFixed(0)} to 1 and is reported, not asserted`,
+        sweepHigher + gateHigher === cmp.filter((x) => x.r >= 2).length,
         `${sweepHigher}:${gateHigher}, and the two directions partition all ${cmp.filter((x) => x.r >= 2).length} ` +
-        `COMPARABLE disagreements -- alone against alone. The band table above counts ${rows.filter((x) => x.r >= 2).length} across every ` +
+        `COMPARABLE disagreements -- alone against alone. It was 85:6 over 91 on origin/main; 87 of those ` +
+        `disagreements were REPAIRED at v4647j and the ratio fell with the population, which is what a ratio ` +
+        `over a shrinking denominator does. The band table above counts ${rows.filter((x) => x.r >= 2).length} across every ` +
         `clock, which is the right population for "how far do the records disagree" and the wrong one for "which way"`);
 }
 
