@@ -15,7 +15,9 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { hostScale, scaled, recordRun, SCALE_FLOOR, SCALE_CEILING } from "./hostScale.mjs";
+import { hostScale, scaled, recordRun, boxId, hostFacts, SCALE_FLOOR, SCALE_CEILING } from "./hostScale.mjs";
+import { timingsTarget, LOCAL_TIMINGS, DEFAULTS } from "./quickSweep.mjs";
+import { ENG as ROOT } from "./gateSweep.mjs";
 import { MEASURED, budgetFor } from "./gateBudget.mjs";
 
 import { fileURLToPath } from "node:url";
@@ -286,6 +288,73 @@ say("reference for " + GATE.split("/").pop() + ": MEASURED " + REF + "ms, budget
        /host-timings\.local\.json/.test(gi),
        "gate-timings.json is the shipped REFERENCE and this is one box's comparison against it. Shipping the " +
        "comparison would be the same defect one level up: another machine's stopwatch, presented as a fact");
+}
+
+console.log("\n*** WHOSE STOPWATCH WROTE sweep-timings.json -- v4647 ***");
+{
+    // This module's own v4580 header says of gate-timings.json: "NOTHING IN IT SAYS WHICH MACHINE PRODUCED ANY
+    // OF THEM". sweep-timings.json had the same hole, in a file REWRITTEN EVERY RUN and COMMITTED, and it
+    // began biting the moment a second box ran the sweep for real: Keith's Windows rig could not `git pull`
+    // at all -- its verify run dirties that file and git refuses to overwrite it -- which blocked four pulls
+    // in one session. And had it ever committed, its readings would have landed in the SAME fields as this
+    // box's with nothing to tell them apart: his sweep puts 231 gates over the 3,000 ms budget and this one
+    // puts a handful, which is two machines disagreeing rather than a number moving.
+    const ME = boxId();
+    ok("boxId is stable within a run and shaped for a filename, not for quoting",
+       ME === boxId() && /^[a-z0-9]+-[a-z0-9]+-\d+c-\d+mb-[0-9a-f]{6}$/.test(ME), ME);
+
+    const mine = timingsTarget({ host: ME });
+    ok("!! *** the box that OWNS the record writes the shared file ***",
+       mine.file === DEFAULTS.timingsFile && mine.foreign === false, mine.why);
+    const fresh = timingsTarget({});
+    ok("!! an UNCLAIMED record is adopted -- every record written before v4647 names no box",
+       fresh.file === DEFAULTS.timingsFile && fresh.foreign === false && fresh.host === ME, fresh.why);
+    const theirs = timingsTarget({ host: "win32-x64-16c-32000mb-abcdef" });
+    ok("!! *** CONTROL: a DIFFERENT box writes its own file and NEVER the shared one ***",
+       theirs.file === LOCAL_TIMINGS && theirs.file !== DEFAULTS.timingsFile && theirs.foreign === true,
+       theirs.why);
+    ok("  ...and the refusal names BOTH boxes, because 'wrong machine' is not a thing anybody can act on",
+       theirs.why.includes("win32-x64-16c-32000mb-abcdef") && theirs.why.includes(ME));
+    ok("  the local file follows this tree's existing per-machine convention rather than inventing one",
+       /\.local\.json$/.test(LOCAL_TIMINGS),
+       "host-timings.local.json, vba-archive.local.json, services.local.json -- and .gitignore carries it, so " +
+       "a second box's runtimes cannot travel and cannot block its pull");
+
+    // The live record, which is the thing that actually has to carry it.
+    let live = null;
+    try { live = JSON.parse(fs.readFileSync(path.join(ROOT, DEFAULTS.timingsFile), "utf8")); } catch {}
+    ok("!! *** and the SHIPPED record names its box, so a reading can be attributed at all ***",
+       !!live && typeof live.host === "string" && live.host.length > 0,
+       live ? `sweep-timings.json was written by ${live.host}` : "NO RECORD");
+    // *** AND EVERY WRITER IS CHECKED, NOT JUST THE FILE. *** A sabotage removed `host` from quickSweep's
+    // write and this gate stayed green: it reads the live file, which sweepRotation had already written with
+    // the field. That is the v4567 defect exactly -- a writer that spells its fields by hand drops one, the
+    // record gets smaller, and nothing looks wrong. THREE writers touch this record and all three are read
+    // here, from source, because a record with one honest writer and two silent ones is not attributable.
+    const writers = [["tools/ship/quickSweep.mjs", 1], ["tools/ship/sweepRotation.mjs", 2]];
+    const missing = [];
+    for (const [rel, n] of writers) {
+        let src = "";
+        try { src = fs.readFileSync(path.join(ROOT, rel), "utf8"); } catch { missing.push(rel + " (unreadable)"); continue; }
+        const writes = (src.match(/writeFileSync\([^)]*?(?:timingsFile|t\.file|target\.file)/g) || []).length;
+        const hosts = (src.match(/host: (?:target|t)\.host/g) || []).length;
+        if (writes < n || hosts < n) missing.push(`${rel}: ${writes} timings write(s), ${hosts} carrying host`);
+    }
+    ok("!! *** all THREE write sites stamp the host, checked in their source rather than in the file ***",
+       missing.length === 0,
+       missing.length ? "NOT STAMPED: " + missing.join(" | ")
+                      : "quickSweep 1 + sweepRotation 2. Reading the file alone cannot tell three writers " +
+                        "apart, and one of them dropping the field is exactly how v4567 turned every spawning " +
+                        "gate skippable while the count looked like success");
+
+    // NOT a row: `ok(..., true)` is a control that cannot fail, and the first draft of this block had one
+    // here -- which is the exact thing ringFloorCost-selfcheck's section 4 says in so many words. A limit is
+    // reported; it is not asserted.
+    console.log("  ----  WHAT IS NOT CLAIMED: that the fifteen modules reading this record are host-aware. They " +
+                "are not. On a foreign box they read THIS box's timings, which is the gap hostScale exists to " +
+                "absorb by scaling a budget from what the local machine has actually done. What changed is only " +
+                "that a foreign box can no longer silently overwrite the shared record, and that the record says " +
+                "who wrote it. Making fifteen readers host-aware is its own round.");
 }
 
 console.log(failed ? "\nhostScale-selfcheck: " + failed + " FAILED" : "\nhostScale-selfcheck: all checks pass");

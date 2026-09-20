@@ -105,6 +105,9 @@ WebGLEngine/tools/ship/host-timings.local.json
 # (the transmitter, the OpenGL render engine and the connector workbook ship separately); this file only says
 # where a copy of it lives here. Deleting it unlinks the archive and changes nothing else.
 WebGLEngine/tools/ship/vba-archive.local.json
+# v4647 -- a box that does not OWN sweep-timings.json writes here instead, so a second machine's
+# runtimes never overwrite the shared record and never block its `git pull`. See quickSweep.timingsTarget.
+WebGLEngine/tools/ship/sweep-timings.local.json
 # v3951 -- install-history.json is the SAME KIND OF THING one line up: ai-bridge/installHistory.js writes THIS
 # box's boot timings into it (installToReadyMs, bootAt, downMs), so it is a per-machine measurement and not
 # source. It appeared untracked during a routine round; committing it would have exported a sandbox's boot times

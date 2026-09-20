@@ -32,6 +32,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { backfillStamps } from "./sweepCoverage.mjs";
+import { boxId } from "./hostScale.mjs";
 import { skippable, readRecord as readInputRecord } from "./inputSets.mjs";
 import { enumerateGates, classify, VERDICT, SWEEP_V4297, ENG } from "./gateSweep.mjs";
 import { RED_AT_V4279, RED_AT_V4408, RED_AT_V4424, RED_AT_V4476, RED_AT_V4484, RED_AT_V4531, RED_AT_V4535, UNCONFIRMED_SLOW, ALL_REGISTERED } from "./redCensus.mjs";
@@ -196,6 +197,47 @@ export function redRegister() {
 }
 
 /** Read a timings file: { captured, timings: {gate:ms}, codes: {gate:exitCode}, observed: {gate:iso|null} }. Missing -> empty. */
+// *** v4647 -- sweep-timings.json HAS FIFTEEN TOP-LEVEL KEYS AND NOT ONE SAYS WHOSE STOPWATCH IT WAS. ***
+//
+// hostScale.mjs's own v4580 header names this defect about gate-timings.json -- "NOTHING IN IT SAYS WHICH
+// MACHINE PRODUCED ANY OF THEM" -- and it sits unrepaired here, in a file that is REWRITTEN EVERY RUN and
+// COMMITTED. It began biting the moment a second box started running the sweep for real:
+//
+//   * Keith's Windows rig cannot `git pull`. Its verify run rewrites this file, git refuses to overwrite a
+//     dirty working copy, and the pull aborts. That has now blocked four pulls in one session, each time
+//     costing a round of confusion about why a fix had not arrived.
+//   * Worse than the conflict: if that box ever committed, its readings would land in the SAME fields as this
+//     one's with nothing to tell them apart. His sweep puts 231 gates over the 3,000 ms budget; this box puts
+//     a handful. Those are two machines disagreeing, and the record cannot express that -- so whichever ran
+//     last would simply be the truth.
+//
+// So the record names its box, and a DIFFERENT box writes its own file instead of overwriting this one. That
+// is the tree's existing convention rather than a new idea: `.local.json` is per-machine state (see
+// host-timings.local.json, vba-archive.local.json, services.local.json) and is gitignored.
+//
+// *** THE READERS ARE DELIBERATELY NOT REDIRECTED, AND THAT IS A LIMIT RATHER THAN AN OVERSIGHT. *** Fifteen
+// modules read this file. On a foreign box they go on reading THIS box's timings, which is wrong in a way
+// hostScale already exists to absorb (it scales a budget by what the local machine has actually done). What
+// changes here is only that a foreign box can no longer silently overwrite the shared record, and that the
+// record says who wrote it. Making fifteen readers host-aware is a different round with a different risk.
+export const LOCAL_TIMINGS = "tools/ship/sweep-timings.local.json";
+
+/**
+ * Where THIS box's timings belong, and why. Returns { file, host, foreign, why }.
+ *
+ * An UNCLAIMED record (no host, which is every record written before v4647) is adopted by the next box to
+ * write it. That is right rather than convenient: the numbers in it were produced by whichever box has been
+ * running the sweep, and that is the box about to write.
+ */
+export function timingsTarget(prior, { file = DEFAULTS.timingsFile, local = LOCAL_TIMINGS, id = boxId() } = {}) {
+    const was = prior && prior.host;
+    if (!was) return { file, host: id, foreign: false, why: `no box was named in the record; ${id} adopts it` };
+    if (was === id) return { file, host: id, foreign: false, why: `this box (${id}) owns the record` };
+    return { file: local, host: id, foreign: true,
+             why: `the record belongs to ${was} and this box is ${id} -- writing ${local} instead, because two ` +
+                  `machines' runtimes in one set of fields is not a record, it is whichever ran last` };
+}
+
 export function readTimings(file = DEFAULTS.timingsFile, root = ENG) {
     try { return JSON.parse(fs.readFileSync(path.join(root, file), "utf8")); } catch { return { captured: null, timings: {}, codes: {}, observed: {} }; }
 }
@@ -586,7 +628,11 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
         evictable: Object.keys(crossings).filter((g) => crossings[g] >= MIN_CROSSINGS_TO_EVICT).length,
     };
     if (write) {
-        fs.writeFileSync(path.join(root, timingsFile), JSON.stringify({
+        // v4647 -- whose stopwatch. A foreign box writes its own file rather than overwriting this one.
+        const target = timingsTarget(prior, { file: timingsFile });
+        if (target.foreign) console.log(`[sweep] NOT writing ${timingsFile}: ${target.why}`);
+        fs.writeFileSync(path.join(root, target.file), JSON.stringify({
+            host: target.host,
             note: "OBSERVED at the last quickSweep run: ms per gate (serial where a serial re-run happened) and exit code. " +
                   "*** `kinds` (v4579) SAYS WHICH QUANTITY EACH MS IS: `loaded` is a parallel reading taken with " +
                   "`workers` gates running at once, `alone` is a serial re-run, `capped` is the SIGKILL cap and not a " +

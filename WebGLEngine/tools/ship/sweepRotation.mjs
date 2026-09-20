@@ -18,6 +18,9 @@ import { pathToFileURL } from "node:url";
 import { enumerateGates } from "./gateSweep.mjs";
 import { ENG, census, rotation, readFile, backfillStamps, BUDGET_MS, CAP_MS } from "./sweepCoverage.mjs";
 import { runGate } from "./redCensus.mjs";
+// v4647 -- whose stopwatch. A box that does not own the record writes its own file rather than
+// overwriting one produced on different silicon. See quickSweep.timingsTarget.
+import { timingsTarget } from "./quickSweep.mjs";
 
 export function runSlice(picked, { capMs = CAP_MS, onProgress = null } = {}) {
     const rows = [];
@@ -157,9 +160,11 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         console.log(`[rotation] --rebuild-finished: ${rebuilt} row(s) restored from this file's own ledger, ` +
             `${skipped} skipped because the timings no longer describe the run the ledger recorded`);
         if (process.argv.includes("--write")) {
-            fs.writeFileSync(path.join(ENG, "tools", "ship", "sweep-timings.json"),
-                JSON.stringify({ ...file, finished }, null, 1) + "\n");
-            console.log("[rotation] wrote sweep-timings.json");
+            const t = timingsTarget(file);
+            if (t.foreign) console.log(`[rotation] NOT writing sweep-timings.json: ${t.why}`);
+            fs.writeFileSync(path.join(ENG, t.file),
+                JSON.stringify({ ...file, host: t.host, finished }, null, 1) + "\n");
+            console.log(`[rotation] wrote ${t.file}`);
         } else console.log("[rotation] dry run -- pass --write to record");
         process.exit(0);
     }
@@ -224,8 +229,10 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     if (process.argv.includes("--write")) {
         const stamp = new Date().toISOString();
         const { merged: mergedTimings, priorMs } = mergeTimings(file, rows, stamp, capMs);
-        fs.writeFileSync(path.join(ENG, "tools", "ship", "sweep-timings.json"),
-            JSON.stringify(mergedTimings, null, 1) + "\n");
+        const target = timingsTarget(file);
+        if (target.foreign) console.log(`[rotation] NOT writing sweep-timings.json: ${target.why}`);
+        fs.writeFileSync(path.join(ENG, target.file),
+            JSON.stringify({ ...mergedTimings, host: target.host }, null, 1) + "\n");
         // Its OWN file: quickSweep builds a fresh object each write and erased this ledger the first time it ran.
         // *** v4535 -- MERGED BY GATE, NOT REPLACED WHOLESALE. *** ROTATION_LOST_V4461 records that this ledger
         // "holds only the last run", and said so as a limitation it had to work around. A one-gate --write then
@@ -262,7 +269,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
                   "measured that row, and a row survives until its own gate is re-timed.",
             at: stamp, budgetMs: BUDGET_MS, lastRun: rows.length, rotated: merged,
         }, null, 1) + "\n");
-        console.log(`[rotation] wrote ${rows.length} entries with at=${stamp}`);
+        console.log(`[rotation] wrote ${rows.length} entries with at=${stamp} to ${target.file}`);
     } else console.log("[rotation] dry run -- pass --write to record");
     process.exit(k.reds.length ? 1 : 0);
 }
