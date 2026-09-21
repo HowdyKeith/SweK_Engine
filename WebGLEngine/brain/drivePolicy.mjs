@@ -2,12 +2,36 @@
 //
 // A DRIVING POLICY IN THE GPU BRAIN'S OWN SHAPE, TRAINED BY THE TREE'S OWN (1+1)-ES, JUDGED THE WAY brain/blobAutoTrain.mjs JUDGES.
 //
-// The policy is two MLP layers -- FEATURES (9) -> HIDDEN (8, relu) -> 2 (none), then tanh -- run through render/brainTsl.mjs's
-// mlpLayerCpu, which is the f32 twin of brain/mlp.js's WGSL layer in the kernel's own summation order. So the numbers a car gets
-// here are the numbers the GPU Brain's kernel would give for the same weights (tools/ship/brainKernels-selfcheck.mjs holds that
-// twin bit for bit), and a race page that runs N brains through BatchedMLP on the device is a change of runtime, not of policy.
-// The two outputs are the controller contract physics/raceCar.mjs takes: steer in [-1, 1], and a signed drive whose negative half
-// is the brake.
+// The policy is FEATURES (9) -> HIDDEN (encoder, relu) -> a masked-recurrent core -> 2 (decoder, none), then tanh -- run through
+// render/brainTsl.mjs's mlpLayerCpu, which is the f32 twin of brain/mlp.js's WGSL layer in the kernel's own summation order. So
+// the numbers a car gets here are the numbers the GPU Brain's kernel would give for the same weights
+// (tools/ship/brainKernels-selfcheck.mjs holds that twin bit for bit), and a race page that runs N brains through BatchedMLP on
+// the device is a change of runtime, not of policy. The two outputs are the controller contract physics/raceCar.mjs takes: steer
+// in [-1, 1], and a signed drive whose negative half is the brake.
+//
+// THE HIDDEN LAYER IS brain/epgTopology.mjs: A REAL FLY'S COMPASS CIRCUIT, NOT AN INVENTED SHAPE. Instead of a dense 8-unit layer,
+// the 9 features are encoded (dense, learned, no biological claim here -- there is no real neuron whose synapses happen to be
+// "heading error") into HIDDEN units -- one per real traced neuron of Janelia's male-cns E-PG ("compass") ring, the central
+// complex's heading/ring-attractor circuit (vendor/male-cns/, PROVENANCE.md), in the SAME order the vendored data lists them, so
+// a hidden unit's identity is a real, citable bodyId rather than an anonymous slot. Those units then run REC_STEPS (3)
+// weight-tied recurrent steps through a masked HIDDEN x HIDDEN matrix whose only trainable entries are the circuit's own real
+// synapses -- every other connection is PERMANENTLY zero, a structural constraint the search can never route around, not an
+// initial value it could wander away from (expandRecurrent() below, the same technique brain/gunnerPolicy.mjs already proved out
+// on the Giant Fiber Circuit). The decoder back to 2 outputs is dense again, for the same reason the encoder is: there is no real
+// "motor neuron" in this data that means "steer left". What is real, traceable, and load-bearing is the SHAPE in the middle --
+// which artificial units may influence which others is exactly the fly's own measured wiring, not a guess. A heading/compass
+// circuit steering a car (which way am I pointed against the road, which way should I turn) is a natural fit for what this
+// circuit actually computes in the fly, though the weights on top of that real wiring are entirely learned, not transplanted.
+//
+// THE HAND DRIVER PROVES IT ADDS NOTHING BY DEFAULT. handWeights() below routes its rule through 8 of the HIDDEN channels and
+// leaves the recurrent core's weights at zero -- and with every recurrent weight zero, expandRecurrent()'s matrix is the
+// identity, so REC_STEPS steps of relu(I @ h) reproduce h exactly (h is already >=0 out of the encoder's own relu). The hand
+// rule reaches the decoder completely unchanged; the connectome core is there for a TRAINED driver to use, not forced onto this
+// one -- byte-identical to the old plain 9 -> 8 -> 2 net's behavior. tools/ship/drivePolicy-selfcheck.mjs measures this rather
+// than assuming it. This identity property is also why brain/gunnerPolicy.mjs's own duels (which drive both cars with
+// D.handWeights() by default) and its gate's fingerprints are unaffected by this rewiring: the hand driver's outputs are
+// unchanged for every input, so nothing downstream that only consumes drivePolicy's forward()/handWeights() contract can tell
+// the difference.
 //
 // The features are what a driver can see from the pose and the track: the speed, where the car is across the road, how it is
 // pointed against the road, where the road goes next (the heading change 6, 12 and 20 m ahead), and whether it is off the asphalt.
@@ -35,26 +59,62 @@
 import { mlpLayerCpu } from "../render/brainTsl.mjs";
 import * as T from "../world/raceTrack.mjs";
 import * as C from "../physics/raceCar.mjs";
+import * as Topo from "./epgTopology.mjs";
 
 /** blobTrainer.mjs's mulberry32, restated here because that module imports node:url and this one runs in the browser. */
 export function mulberry(seed) { let a = seed >>> 0; return () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 
-export const FEATURES = 9, HIDDEN = 8, OUTPUTS = 2;
+export const FEATURES = 9, HIDDEN = Topo.NEURON_ORDER.length, OUTPUTS = 2;
+export const REC_STEPS = 3;                              // weight-tied recurrent relaxation steps through the masked core
+export const REC_EDGES = Topo.EDGES.length;               // one trainable weight per real EPG synapse -- 842, measured from brain/epgTopology.mjs, not typed
 export const FEATURE_NAMES = Object.freeze(["bias", "speed", "across", "heading", "toLookahead", "turn6", "turn12", "turn20", "offRoad"]);
-export const WEIGHT_COUNT = FEATURES * HIDDEN + HIDDEN + HIDDEN * OUTPUTS + OUTPUTS;   // 72 + 8 + 16 + 2 = 98
+export const WEIGHT_COUNT = FEATURES * HIDDEN + HIDDEN + REC_EDGES + HIDDEN * OUTPUTS + OUTPUTS;   // 414 + 46 + 842 + 92 + 2 = 1396
 
 /** The all-zero policy: stands still (drive 0, steer 0). What every trained policy is measured against. */
 export const zeroWeights = () => new Float32Array(WEIGHT_COUNT);
 
-/** Split a flat weight vector into the two layers mlpLayerCpu takes. */
-export function layersOf(w) {
-    let o = 0; const W1 = w.subarray(o, o += FEATURES * HIDDEN), b1 = w.subarray(o, o += HIDDEN), W2 = w.subarray(o, o += HIDDEN * OUTPUTS), b2 = w.subarray(o, o += OUTPUTS);
-    return [{ nIn: FEATURES, nOut: HIDDEN, W: W1, b: b1, act: "relu" }, { nIn: HIDDEN, nOut: OUTPUTS, W: W2, b: b2, act: "none" }];
+const ZERO_HIDDEN = new Float32Array(HIDDEN);
+
+/**
+ * Expand the compact per-edge recurrent weights into a HIDDEN x HIDDEN matrix: the identity on the diagonal (so a plain
+ * relu-matmul computes relu(h + Wm@h), the residual step, with no special case in mlpLayerCpu) plus each real EPG edge's own
+ * trainable weight at [toIdx*HIDDEN+fromIdx]. Every other entry is permanently, structurally zero -- THIS is the wiring
+ * constraint, not an initial value a search could wander away from. Same technique, same no-clamping rationale and the same
+ * measured overflow bound as brain/gunnerPolicy.mjs's own expandRecurrent() (see that file's header) -- restated per-module
+ * rather than shared, since each masks a different circuit with a different edge count.
+ */
+function expandRecurrent(Wrec) {
+    const Wm = new Float32Array(HIDDEN * HIDDEN);
+    for (let i = 0; i < HIDDEN; i++) Wm[i * HIDDEN + i] = 1;
+    Topo.EDGES.forEach(([toIdx, fromIdx], k) => { Wm[toIdx * HIDDEN + fromIdx] += Wrec[k]; });
+    return Wm;
 }
 
-/** The forward pass: features -> [steer, drive] in [-1, 1], through the GPU kernel's f32 twin. */
+/**
+ * Split a flat weight vector into the sequence mlpLayerCpu applies in order: the encoder (9 -> HIDDEN, dense, relu),
+ * REC_STEPS weight-tied copies of the connectome-masked recurrent layer (HIDDEN -> HIDDEN, relu), and the decoder
+ * (HIDDEN -> 2, none). forward() below and render/carViews.mjs's activationsOf() both walk this same array rather than
+ * assuming a fixed depth, so either can grow or shrink REC_STEPS with no second edit.
+ */
+export function layersOf(w) {
+    let o = 0;
+    const W1 = w.subarray(o, o += FEATURES * HIDDEN), b1 = w.subarray(o, o += HIDDEN);
+    const Wrec = w.subarray(o, o += REC_EDGES);
+    const W2 = w.subarray(o, o += HIDDEN * OUTPUTS), b2 = w.subarray(o, o += OUTPUTS);
+    const rec = { nIn: HIDDEN, nOut: HIDDEN, W: expandRecurrent(Wrec), b: ZERO_HIDDEN, act: "relu" };
+    return [
+        { nIn: FEATURES, nOut: HIDDEN, W: W1, b: b1, act: "relu" },
+        ...Array(REC_STEPS).fill(rec),
+        { nIn: HIDDEN, nOut: OUTPUTS, W: W2, b: b2, act: "none" },
+    ];
+}
+
+/** The forward pass: features -> [steer, drive] in [-1, 1], through the encoder, the connectome-masked recurrent core, and the decoder. */
 export function forward(w, x) {
-    const [l1, l2] = layersOf(w), h = mlpLayerCpu(l1, Float32Array.from(x), 1), y = mlpLayerCpu(l2, h, 1);
+    const layers = layersOf(w);
+    let h = Float32Array.from(x);
+    for (let i = 0; i < layers.length - 1; i++) h = mlpLayerCpu(layers[i], h, 1);
+    const y = mlpLayerCpu(layers[layers.length - 1], h, 1);
     return [Math.tanh(y[0]), Math.tanh(y[1])];
 }
 
@@ -141,9 +201,14 @@ export const TRAIN_SEEDS = Object.freeze([1, 4]), HELD_OUT_SEEDS = Object.freeze
  * corner rather than stalling in it (the first numbers, 0.6 - 0.5 |turn| - 0.9 speed, stalled at every corner: 13 m in 60 s on three of
  * four seeds) and settles near 13 m/s on a straight. It is what linearPolicy.js's schemas call the hand policy:
  * the start the ES improves from, and the driver a brain trained from zero must beat before it is worth anything.
+ *
+ * Routed through 8 of the HIDDEN real channels (indices 0-7; which specific bodyId lands there is an accident of the vendored
+ * EPG data's own neuron order, not a biological claim). The recurrent core's weights are left at zeroWeights()'s default of 0,
+ * which makes the core a provable identity (see expandRecurrent() and this file's own header) -- the rule below reaches the
+ * decoder exactly as it would through the old plain 9 -> 8 -> 2 net.
  */
 export function handWeights({ toLook = 3.0, heading = 1.0, drive0 = 0.8, turn = 0.35, speed = 1.2 } = {}) {
-    const w = zeroWeights(), W1 = (h, k, v) => { w[h * FEATURES + k] = v; }, W2 = (o, h, v) => { w[FEATURES * HIDDEN + HIDDEN + o * HIDDEN + h] = v; };
+    const w = zeroWeights(), W1 = (h, k, v) => { w[h * FEATURES + k] = v; }, outBase = FEATURES * HIDDEN + HIDDEN + REC_EDGES, W2 = (o, h, v) => { w[outBase + o * HIDDEN + h] = v; };
     const F = { bias: 0, speed: 1, heading: 3, toLook: 4, turn12: 6 };
     W1(0, F.heading, 1); W1(1, F.heading, -1); W1(2, F.toLook, 1); W1(3, F.toLook, -1); W1(4, F.turn12, 1); W1(5, F.turn12, -1); W1(6, F.bias, 1); W1(7, F.speed, 1);
     W2(0, 0, heading); W2(0, 1, -heading); W2(0, 2, toLook); W2(0, 3, -toLook);                 // steer = heading (h0 - h1) + toLook (h2 - h3)
