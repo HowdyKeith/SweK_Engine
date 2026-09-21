@@ -8032,6 +8032,46 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4653 -- THE 263rd CLOSING: the census was counting fixture source as rows of the tree.
+    since338: Object.freeze({
+        at: "v4653", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** THE 216 BARE `true` ROWS v4651 COUNTED AND DID NOT RATCHET WERE NOT ALL ROWS. *** " +
+                 "Several gates BUILD gate source as string literals -- tools/ship/gateMutation-selfcheck.mjs " +
+                 "plants a decoy that 'counts failures and never reports them' to prove its probe catches " +
+                 "one -- and tools/ship/constantRows.mjs read those through noComments, which keeps string " +
+                 "CONTENTS. That file read as 8 always-true rows out of 17, a 47% INFLATION, and all eight " +
+                 "were lines in a string being written to a temporary file. The aggregate hid it completely: " +
+                 "216 of 29,134 is 0.74%, and the worst gate was at 47%. " +
+                 "*** READING codeOnly INSTEAD IS THE FIX: *** it blanks string contents and regex bodies " +
+                 "while keeping delimiters and line structure, so a fixture's ok( disappears and a real one " +
+                 "does not. alwaysTrue 216 -> 208, population 29,134 -> 29,125, and the gate now drives a " +
+                 "probe holding BOTH halves -- the planted line must be walked past AND the real row beside " +
+                 "it must still be seen, because an extractor that simply refused string-bearing files would " +
+                 "pass the first half and lose the tree. " +
+                 "*** AND codeOnly REVEALED A GENUINE ELEVENTH ROW THAT STRING-STRIPPING ALONE COULD NOT. *** " +
+                 "freeIdentifiers stripped strings and not REGEX BODIES, so /[\\/]vendor/.test(\"...\") read " +
+                 "as though `vendor` were an identifier carrying a value. It is not; a pattern's own words " +
+                 "are text exactly as a string's are. That row is changedPaths-selfcheck's, labelled CONTROL " +
+                 "and deliberate, and the seed moves 10 -> 11. " +
+                 "*** THE REPAIR'S FIRST DRAFT WAS A REGEX FOR FINDING REGEX LITERALS, ONE ROUND AFTER v4652 " +
+                 "SHIPPED A ROUND ABOUT EXACTLY THAT. *** Requiring at least one body character, it skipped " +
+                 "the EMPTY regexes codeOnly leaves behind and then matched from the first slash to the LAST, " +
+                 "eating every identifier between them: `//.test(noComments(hb)) && codeHas(hb, //)` read as " +
+                 "constant with three real values erased. NINE false positives, 11 rows becoming 20. " +
+                 "Importing sourceScan.mjs's regexAllowedHere and regexBody was the fix for the SECOND TIME " +
+                 "IN TWO ROUNDS, and three rows hold that boundary now on both sides: a regex against a " +
+                 "LITERAL is constant, a regex against a VARIABLE is not, and ordinary division is not a " +
+                 "regex at all. " +
+                 "ALSO CHECKED AND NOT THE SAME THING: tools/ship/gateMutation.mjs (v3312) asks whether a " +
+                 "gate PROCESS reports failures at all, by injecting one and watching the exit code. That is " +
+                 "the harness; this is the row. With vacuity.mjs they are three members of one family and " +
+                 "none of them subsumes another. " +
+                 "Four sabotages, all four caught. No gate added; runtime 2,152 -> 1,960 ms, because codeOnly " +
+                 "walks past fixture source instead of tokenising it.",
+    }),
     // v4652 -- THE 262nd CLOSING: no gate added, and the round before it accused the wrong file.
     since337: Object.freeze({
         at: "v4652", swept: 0, green: 0, red: 0,

@@ -33,7 +33,7 @@
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
-import { noComments, regexAllowedHere, regexBody } from "./sourceScan.mjs";
+import { codeOnly, regexAllowedHere, regexBody } from "./sourceScan.mjs";
 
 /**
  * Identifiers that carry no information from the tree.
@@ -75,7 +75,26 @@ const KEYWORDS = new Set(["new", "return", "const", "let", "var", "function", "a
  * first draft report 56 rows instead of 5, because every `Math.max(...vs)` lost its `vs`.
  */
 export function freeIdentifiers(cond) {
-    const noStrings = cond.replace(/"[^"]*"|'[^']*'|`[^`]*`/g, " ");
+    // *** REGEX BODIES GO TOO, AND THE FIRST ATTEMPT AT THIS WAS A REGEX -- ONE ROUND AFTER v4652 SHIPPED A
+    // ROUND ABOUT NOT DOING THAT. *** A pattern's own words are TEXT, exactly as a string's are:
+    // `/[\\/]vendor/.test(path)` no more depends on something called `vendor` than `"vendor".length` does.
+    // But a REGEX cannot find a regex literal. Written as `/ ... body ... /`, requiring at least one body
+    // character, it skipped the EMPTY regexes codeOnly leaves behind and then matched from the first slash to
+    // the last -- so `//.test(noComments(hb)) && codeHas(hb, //)` had `noComments`, `hb` and `codeHas` eaten
+    // and read as constant. Nine false positives, 11 rows becoming 20, every one of them a row that does
+    // depend on the tree.
+    //
+    // sourceScan.mjs exports the two primitives that answer this, and this is the second time in two rounds
+    // that importing them rather than re-deriving them was the fix.
+    let noRegex = "", k = 0;
+    while (k < cond.length) {
+        if (cond[k] === "/" && regexAllowedHere(noRegex)) {
+            const r = regexBody(cond, k);
+            if (r) { noRegex += " "; k = r.end; continue; }
+        }
+        noRegex += cond[k]; k++;
+    }
+    const noStrings = noRegex.replace(/"[^"]*"|'[^']*'|`[^`]*`/g, " ");
     const noProps = noStrings.replace(/(^|[^.])\.\s*[A-Za-z_$][A-Za-z0-9_$]*/g, "$1 ");
     return [...new Set(noProps.match(/[A-Za-z_$][A-Za-z0-9_$]*/g) || [])].filter((x) => !KEYWORDS.has(x));
 }
@@ -111,7 +130,26 @@ export function isParsable(cond) {
     // -- which is a perfectly good expression and a syntax error inside a non-async function. Reporting those
     // as "could not be read" would be blaming the tree for a limit of the test, which is the same mistake
     // this file's own isParsable docstring records one level up.
-    try { new Function(`return (async () => (${cond}));`); return true; } catch { return false; }
+    // codeOnly leaves a regex literal as `//` plus its flags -- delimiters kept, body blanked -- and `//`
+    // opens a LINE COMMENT to any JavaScript parser, so the rest of the condition would vanish and every row
+    // containing a regex would read as unparsable. An empty regex literal cannot occur in real source (`//`
+    // is always a comment there), so restoring a one-character body is unambiguous rather than a guess.
+    // Done as a SCAN and not a regex: the first attempt was a lookahead over slashes and it took the
+    // unresolved count from 59 to 5,444, because it could not tell an empty regex from a division or from
+    // the slash inside a path. regexAllowedHere and regexBody already answer exactly that question.
+    let parseable = "", k = 0;
+    while (k < cond.length) {
+        if (cond[k] === "/" && regexAllowedHere(parseable)) {
+            const r = regexBody(cond, k);
+            if (r) {
+                const body = cond.slice(k + 1, r.closeAt);
+                parseable += "/" + (body === "" ? "x" : body) + cond.slice(r.closeAt, r.end);
+                k = r.end; continue;
+            }
+        }
+        parseable += cond[k]; k++;
+    }
+    try { new Function(`return (async () => (${parseable}));`); return true; } catch { return false; }
 }
 
 /**
@@ -120,7 +158,19 @@ export function isParsable(cond) {
  * commas, which describes most rows in this tree.
  */
 export function conditionsOf(src) {
-    const t = noComments(src);
+    // *** codeOnly, NOT noComments, AND THE DIFFERENCE IS 216 ROWS THAT WERE NEVER IN THE TREE. ***
+    //
+    // noComments keeps STRING CONTENTS, which is right for finding text a file mentions and wrong for finding
+    // calls a file MAKES. Several gates build gate source as string literals -- tools/ship/gateMutation-
+    // selfcheck.mjs plants a decoy that "counts failures and never reports them" to prove its probe catches
+    // one -- and every ok(...) inside such a fixture was counted here as a row of the tree. MEASURED, that
+    // file read as 8 always-true rows out of 17, a 47% inflation, and every one of the eight was a line in a
+    // string being written to a temporary file.
+    //
+    // codeOnly blanks string contents and regex bodies, keeping the delimiters and the line structure, so a
+    // fixture's ok( disappears and a real one does not. The cost is that a regex literal becomes `//`, which
+    // isParsable has to know about -- see its note.
+    const t = codeOnly(src);
     const out = [];
     const re = /\bok\(\s*(`|"|')/g;
     let m;

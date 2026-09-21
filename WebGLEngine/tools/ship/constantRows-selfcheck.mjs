@@ -2,7 +2,8 @@
 // WebGLEngine/tools/ship/constantRows-selfcheck.mjs -- v4651
 //
 // Run: node tools/ship/constantRows-selfcheck.mjs
-// RUNTIME: 2,152 ms median of five (2,091 2,128 2,152 2,154 2,369), under the sweep's 3,000 ms threshold.
+// RUNTIME: 1,960 ms median of three (1,948 1,960 2,025) -- faster than v4652's 2,152 because codeOnly
+// blanks string contents, so the scanner walks past fixture source instead of tokenising it.
 //
 // *** A FIFTH MECHANISM FOR tools/ship/vacuity.mjs's LIST, AND THE ONE CASE WHERE THAT FILE'S REFUSAL TO
 // SCAN DOES NOT APPLY. ***
@@ -149,6 +150,47 @@ console.log("\n5. THE DETECTOR'S OWN FALSE-POSITIVE MODES, EACH DRIVEN");
 // MORE conditions -- 29,032 to 29,134 -- and none of them is constant, so the seed does not move.
 const CAT = "o" + "k(";
 const catProbe = constantRows([{ path: "probe", text: `${CAT}"part one " +\n  "part two", 2 + 2 === 4, "note");` }]);
+// *** SOURCE INSIDE A STRING LITERAL IS NOT A ROW OF THIS TREE, AND UNTIL v4653 IT WAS COUNTED AS ONE. ***
+// Several gates BUILD gate source as string literals. tools/ship/gateMutation-selfcheck.mjs plants a decoy
+// that "counts failures and never reports them" to prove its probe catches one, and every ok(...) inside
+// that fixture was counted here -- it read as 8 always-true rows out of 17, a 47% inflation, and all eight
+// were lines in a string being written to a temporary file. The extractor reads codeOnly now, which blanks
+// string CONTENTS while noComments keeps them: right for finding text a file mentions, wrong for finding
+// calls a file MAKES.
+const FIX = "o" + "k(";
+const fixtureProbe = constantRows([{ path: "probe",
+    text: `const decoy = ['${FIX}"planted", true);']; ${FIX}"real", 2 + 2 === 4, "note");` }]);
+ok("!! *** an ok() inside a STRING LITERAL is not counted as a row ***",
+   fixtureProbe.scanned === 1 && fixtureProbe.alwaysTrue.length === 0 && fixtureProbe.expr.length === 1,
+   `scanned ${fixtureProbe.scanned} (the real one), alwaysTrue ${fixtureProbe.alwaysTrue.length}, expr ` +
+   `${fixtureProbe.expr.length}. The planted line is a fixture this census must walk past and the row beside ` +
+   "it is a real one it must still see -- both halves, because an extractor that simply stopped reading " +
+   "string-bearing files would pass the first half and lose the tree.");
+// *** AND BLANKING REGEX BODIES REVEALED A ROW THAT STRING-STRIPPING ALONE COULD NOT. *** freeIdentifiers
+// strips string literals but not regex bodies, so /[\\/]vendor/.test("...") read as though `vendor` were an
+// identifier carrying a value. It is not: a regex literal tested against a string literal is arithmetic over
+// constants. That row is tools/ship/changedPaths-selfcheck.mjs's, it is labelled CONTROL and deliberate, and
+// it is the eleventh.
+ok("!! ...and a regex literal's BODY is not an identifier either",
+   isConstantCondition('/[\\/]vendor/.test("/x/tools/ship/vendoredLicences-selfcheck.mjs")') === true,
+   "the pattern's own words looked like free identifiers to a census that stripped strings and nothing else, " +
+   "which hid a genuinely constant row until the extractor moved to codeOnly");
+// *** THE THREE ROWS THAT HOLD THE REGEX BOUNDARY. *** The first attempt at stripping regex bodies from
+// freeIdentifiers was written AS A REGEX -- one round after v4652 shipped a round about not re-deriving
+// sourceScan.mjs's lexer -- and a regex cannot find a regex literal. Requiring at least one body character,
+// it skipped the EMPTY regexes codeOnly leaves behind and then matched from the first slash to the last,
+// eating every identifier between them. Nine false positives, 11 rows becoming 20, each one a row that does
+// read the tree. These hold both sides of the line.
+ok("!! ...but a regex against a VARIABLE still depends on the tree",
+   isConstantCondition("/[x]vendor/.test(somePath)") === false,
+   "the row above must not be satisfied by deleting identifiers wholesale");
+ok("!! ...and two BLANKED regexes do not swallow what lies between them",
+   isConstantCondition("//.test(noComments(hb)) && codeHas(hb, //)") === false,
+   "the exact shape the regex-based stripper mis-read: noComments, hb and codeHas all eaten, and a row that " +
+   "reads three real values reported as one that reads none. Nine rows arrived that way.");
+ok("...and ordinary DIVISION is not mistaken for a regex",
+   freeIdentifiers("a / b > c / d").join(",") === "a,b,c,d",
+   "regexAllowedHere knows a value cannot be followed by a regex; a hand-rolled test does not");
 ok("!! a label split across concatenated strings is FOUND, not skipped",
    catProbe.scanned === 1 && catProbe.expr.length === 1 && catProbe.expr[0].cond === "2 + 2 === 4",
    `scanned ${catProbe.scanned}, flagged ${catProbe.expr.length}. This is a FALSE NEGATIVE row: what it ` +
@@ -188,8 +230,8 @@ console.log("\n6. THE RATCHET");
 // Seeded at what was measured. It may only fall, and the slack half fails if it is left behind -- the
 // two-sided shape tools/ship/kernelReach-selfcheck.mjs uses, and which went red there on the same run a
 // round's work landed, which is the behaviour a ratchet is for.
-const EXPR_AT_V4651 = 10;
-ok("!! *** no ELEVENTH constant-expression row arrives unnoticed ***",
+const EXPR_AT_V4651 = 11;
+ok("!! *** no TWELFTH constant-expression row arrives unnoticed ***",
    R.expr.length <= EXPR_AT_V4651,
    `${R.expr.length} against a frozen ${EXPR_AT_V4651}. OWED for each: a row that reaches the module, or a ` +
    "note saying the language guarantee IS the subject. Several of the ten are the second kind and are " +
@@ -234,6 +276,26 @@ console.log("unchecked here: whether each of the ten IS a defect, which is a jud
 //   Z3  regex literals not skipped at all                1 RED, the import.meta row
 //   Z4  string literals not skipped in the splitter      1 RED, the import.meta row
 //   Z5  the concatenated-label loop removed              0-RED at first; now 1 RED
+//   -- v4653, after the extractor moved to codeOnly --
+//   W1  back to noComments, so fixtures count again       1 RED, the string-literal row
+//   W2  regex bodies not stripped in freeIdentifiers      1 RED, the regex-body row
+//   W3  the empty regex not restored before parsing       1 RED, the import.meta row
+//   W4  regexAllowedHere ignored, every slash a regex     2 RED (the division row, and the ratchet at 12)
+//
+// *** v4653 -- THE CENSUS WAS COUNTING FIXTURE SOURCE AS ROWS OF THE TREE. *** Several gates BUILD gate
+// source as string literals: tools/ship/gateMutation-selfcheck.mjs plants a decoy that "counts failures and
+// never reports them" to prove its probe catches one. noComments keeps string CONTENTS, so every ok(...)
+// inside such a fixture was a row here -- that file read as 8 always-true rows out of 17, a 47% inflation,
+// and all eight were lines in a string being written to a temporary file. Reading codeOnly instead takes
+// alwaysTrue from 216 to 208 and the population from 29,134 to 29,125.
+//
+// *** AND THE REPAIR'S FIRST DRAFT WAS A REGEX FOR FINDING REGEX LITERALS, ONE ROUND AFTER v4652 SHIPPED A
+// ROUND ABOUT EXACTLY THAT. *** Requiring at least one body character, it skipped the EMPTY regexes codeOnly
+// leaves behind and matched from the first slash to the last, eating every identifier between them: nine
+// false positives, 11 rows becoming 20, each a row that does read the tree. Importing sourceScan.mjs's two
+// primitives was the fix for the second time in two rounds. Three rows hold that boundary now, on both
+// sides -- a regex against a literal IS constant, a regex against a variable is NOT, and ordinary division
+// is not a regex at all.
 //
 // *** Z5 WAS A NO-OP BEFORE IT WAS A 0-RED, WHICH IS A DISTINCTION WORTH KEEPING. *** The first attempt
 // mutated the `+` out of the label-skipping character class and nothing moved -- not because the gate was

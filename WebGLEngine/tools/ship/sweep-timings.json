@@ -2160,7 +2160,7 @@
   "render/visibilityGPU-selfcheck.mjs": 870,
   "tools/ship/fsrPageObjects-selfcheck.mjs": 3358,
   "render/edgeReveal-selfcheck.mjs": 53,
-  "tools/ship/constantRows-selfcheck.mjs": 2152
+  "tools/ship/constantRows-selfcheck.mjs": 1960
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -5684,7 +5684,7 @@
   "render/visibilityGPU-selfcheck.mjs": "2026-09-21T00:00:00.000Z",
   "tools/ship/fsrPageObjects-selfcheck.mjs": "2026-09-21T12:00:00.000Z",
   "render/edgeReveal-selfcheck.mjs": "2026-09-21T18:00:00.000Z",
-  "tools/ship/constantRows-selfcheck.mjs": "2026-09-22T00:00:00.000Z"
+  "tools/ship/constantRows-selfcheck.mjs": "2026-09-22T06:00:00.000Z"
  },
  "capAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 20000,
@@ -10364,7 +10364,7 @@
   "render/visibilityGPU-selfcheck.mjs": 870,
   "tools/ship/fsrPageObjects-selfcheck.mjs": 3358,
   "render/edgeReveal-selfcheck.mjs": 53,
-  "tools/ship/constantRows-selfcheck.mjs": 2152
+  "tools/ship/constantRows-selfcheck.mjs": 1960
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-16T22:48:41.155Z",
