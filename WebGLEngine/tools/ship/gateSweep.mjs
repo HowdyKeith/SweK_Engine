@@ -8032,6 +8032,52 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4657 -- THE 267th CLOSING: the factor pass's third input, a binding with no source since v4594.
+    since342: Object.freeze({
+        at: "v4657", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/reactiveGPU-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 1,054 ms on real WebGPU, 15 rows. *** THE FACTOR KERNEL MULTIPLIES THREE " +
+                 "INDEPENDENT REASONS THE HISTORY MIGHT BE WRONG AND ONLY TWO HAD PRODUCERS. *** " +
+                 "DISOCCLUSION got one at v4593 and SHADING at v4654; REACTIVE has been a binding with no " +
+                 "source since v4594, with fsr.html passing null and every gate passing zeroes, and " +
+                 "temporalRejectGPU's own closing line saying so. " +
+                 "*** THE DEPTH GATE IS THE DESIGN AND WITHOUT IT THIS IS A SECOND DISOCCLUSION DETECTOR. *** " +
+                 "A pixel is reactive where the colour disagrees with its reprojected history AND the depth " +
+                 "says the reprojection was sound. Where the surface really changed the colour disagrees " +
+                 "too, so an ungated mask reports a disocclusion under another name and multiplies one " +
+                 "reason into the factor twice. The fixture carries all four cases in separate bands and " +
+                 "they separate exactly: reactive 0.4000, unchanged 0.0000, DISOCCLUDED 0.0000 -- with the " +
+                 "same 0.40 colour difference as the reactive band -- and no-history 0.0000. A row confirms " +
+                 "disocclusionCPU claims every one of the 1,536 pixels this mask declined, so the silence is " +
+                 "a division of labour and not a coincidence. " +
+                 "*** AND IT IS NOT THE SHADING MASK, WHICH IS A DIFFERENT INSTRUMENT ON PURPOSE. *** That " +
+                 "one compares halves of a jitter-free LUMA ring over 2*period frames -- slow, sustained " +
+                 "change in the light. This is ONE frame and all THREE channels. The reactive band moves " +
+                 "only BLUE, so a luma-only detector reads almost nothing there, and the sabotage that " +
+                 "swaps three channels for luma goes red on exactly that. Neither contains the other, which " +
+                 "is why the factor pass multiplies rather than maxes. " +
+                 "*** NO HISTORY MEANS 0 AND NOT 1, ON BOTH SIDES. *** The disocclusion mask already writes " +
+                 "1 for a pixel with no reprojection; a second 1 here discards a history the chain had " +
+                 "already decided to discard. And `hasHistory` is a FLAG rather than an inference -- the " +
+                 "history buffer is still bound on frame one, because a bind group is complete or it is " +
+                 "nothing, and a kernel inferring 'no history' from a zeroed buffer would read every pixel " +
+                 "as maximally reactive against black. " +
+                 "*** THE v4654 RATCHET CAUGHT THIS ROUND ON THE ROUND THAT CAUSED IT, WHICH IS WHAT IT IS " +
+                 "FOR. *** runnerCallers-selfcheck went red at 3 against a frozen 2 the moment reactiveGPU " +
+                 "existed with only its gate to construct it -- this session's own instrument catching this " +
+                 "session's own habit, two rounds after being built for exactly that. fsr.html calls it now " +
+                 "and the census is back at 2. " +
+                 "Six sabotages, six caught, NO 0-RED. Parity with the CPU is EXACT (0.00e+0 over 6,144 " +
+                 "pixels) through a gate, a bilinear fetch and a three-channel max. " +
+                 "ONE ERRATUM RECORDED IN THE GATE: its RUNTIME line first read '807 ms median of five' with " +
+                 "five plausible samples, written before the gate was timed. The real figure is 1,054. " +
+                 "fsrPageObjects-selfcheck carries the identical erratum from v4649, so twice is a habit and " +
+                 "it is written down as one rather than quietly swapped.",
+    }),
     // v4656 -- THE 266th CLOSING: the question v4655 named unestablished, answered by pairing.
     since341: Object.freeze({
         at: "v4656", swept: 0, green: 0, red: 0,

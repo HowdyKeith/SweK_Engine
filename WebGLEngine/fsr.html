@@ -184,6 +184,7 @@ import { TemporalGPU } from "./render/temporalGPU.mjs";
 import { MotionVectorsGPU, orthoPanVP } from "./render/motionVectorsGPU.mjs";
 import { ObjectMotionGPU } from "./render/objectMotionGPU.mjs";
 import { TemporalLockGPU } from "./render/temporalLockGPU.mjs";
+import { ReactiveGPU } from "./render/reactiveGPU.mjs";
 import { buildObjectMatrices, objectMotionCPU } from "./render/objectMotion.mjs";
 import { TemporalRejectGPU } from "./render/temporalRejectGPU.mjs";
 import { motionVectorsCPU, mat4Invert, transform4 } from "./render/motionVectors.mjs";
@@ -421,7 +422,7 @@ const FLAT_DEPTH = new Float32Array(D * D);
 // to "not counted" the moment a reader opened it on an adapter -- exactly the regression v4591 had to undo for
 // the accumulate pass. Getting the number off the device needed a mainCounted entry point in each of the two
 // kernels, because the mask cannot distinguish a disocclusion from a reprojection that left the frame.
-let gpu = null, tgpu = null, mgpu = null, rgpu = null, ogpu = null, lgpu = null;
+let gpu = null, tgpu = null, mgpu = null, rgpu = null, ogpu = null, lgpu = null, xgpu = null;
 // The lock ring lives across frames and belongs to one camera and one size, so it is torn
 // down whenever reset() changes either. A ring carried across a resolution change would be
 // read with the wrong stride and would look like content rather than like a mistake.
@@ -450,6 +451,7 @@ async function initGPU() {
         try { rgpu = new TemporalRejectGPU(dev); } catch { rgpu = null; }
         try { ogpu = new ObjectMotionGPU(dev); } catch { ogpu = null; }
         try { lgpu = new TemporalLockGPU(dev); } catch { lgpu = null; }
+        try { xgpu = new ReactiveGPU(dev); } catch { xgpu = null; }
         const who = (dev.adapterInfo && (dev.adapterInfo.description || dev.adapterInfo.vendor)) || "webgpu";
         say(`WebGPU compute on ${who} -- EASU+RCAS, resolve+accumulate, the motion vectors` +
             (rgpu ? " and the reject chain (disocclusion, factor, rectify) on the dolly" : "") +
@@ -671,6 +673,15 @@ async function tick() {
     // it, run again, and difference the two lists FRAME BY FRAME. Differencing the means instead throws the
     // pairing away and hands back the 2.12 dB spread.
     const shadingOn = $("shading").value !== "off";
+    // *** THE FACTOR PASS'S THIRD INPUT, WIRED AT v4657 AND PREVIOUSLY A BINDING WITH NO SOURCE. ***
+    // A pixel is reactive where the colour disagrees with its reprojected history AND the depth says the
+    // reprojection was sound. The depth gate is what keeps it from being a second disocclusion detector:
+    // where the surface really changed, the colour differs too, and firing there would multiply one reason
+    // into the factor twice. render/reactive.mjs's header has the full argument.
+    //
+    // It needs the same prevDepth the disocclusion test does, so it runs in the same branch and is null
+    // wherever that one is -- on frame one, and on any camera without a depth buffer.
+    let reactiveMask = null;
     let shadingMask = null, lockStat = null;
     if (objects && lgpu && dollyCurrent) {
         const period = jitterPhaseCount(parseFloat($("ratio").value));
@@ -698,6 +709,12 @@ async function tick() {
         lockStat = { pushes: lockRing.pushes, need: lockRing.F,
                      p50: q(0.50), p90: q(0.90), p99: q(0.99), peak: sorted[sorted.length - 1], over };
     }
+    if (objects && xgpu && dollyCurrent && prevDepth && threshold) {
+        // scale 1 is this page's colour range; strength 1 leaves the detector's own units alone, which is
+        // render/reactive.mjs's rule about `scale` being the caller's.
+        reactiveMask = (await xgpu.reactive({ current: dollyCurrent, history: hist, motion, prevDepth,
+                                              w: D, h: D, threshold, nearerIsLess: true, scale: 1, strength: 1 })).data;
+    }
     if (dolly && prevDepth && threshold) {
         // nearerIsLess: true because rasterProbe.js's viewProj is GL-style forward-Z -- P[10] is
         // -(far+near)/(far-near) -- so a smaller clip z is nearer. Inverted it reports the exact complement,
@@ -709,6 +726,7 @@ async function tick() {
             rejected = await rgpu.rejectAndAccumulate({
                 current: dollyCurrent, history: hist, motion, prevDepth, w: D, h: D, alpha, threshold,
                 shading: shadingOn ? shadingMask : null,   // the switch above; null on every other camera
+                reactive: reactiveMask,     // null on every camera but "objects", and on frame one
                 nearerIsLess: true, space: "ycocg", counted: true });
             // genuine = flagged - noHistory, and the SPLIT is why the counters exist: the mask writes the same
             // 1.0 for all three reasons, so no pass over it could have recovered this number.

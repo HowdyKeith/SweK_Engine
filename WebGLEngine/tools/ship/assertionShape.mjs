@@ -468,8 +468,10 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // whether its condition can be influenced by anything in the tree.
     // v4654 -- 1757 -> 1758 for tools/ship/runnerCallers-selfcheck.mjs, the census of compute runners that
     // only a gate imports. Sixth round running with the same four rows moving by one and the other four held.
-    gates: 1758, usesOk: 1737, definesOk: 1729, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1630, condFirst: 91, unknownSignature: 16,
+    // v4657 -- 1758 -> 1759 for render/reactiveGPU-selfcheck.mjs, the factor pass's third input.
+    // Seventh round running with the same four rows by one and the other four held.
+    gates: 1759, usesOk: 1738, definesOk: 1730, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1631, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([
