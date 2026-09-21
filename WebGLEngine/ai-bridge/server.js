@@ -5220,8 +5220,8 @@ const server = http.createServer((req, res) => {
           // rule that could drift from it.
           if (req.method === "POST" && req.url === "/brain/publish") {
               _readBody((j) => {
-                  Promise.all([_impESM("../brain/peerBrain.mjs"), _impESM("../brain/drivePolicy.mjs"), _impESM("../brain/gunnerPolicy.mjs")]).then(([PB, D, GP]) => {
-                      const blob = j.blob, descriptors = { drivePolicy: PB.describePolicy("drivePolicy", D), gunnerPolicy: PB.describePolicy("gunnerPolicy", GP) };
+                  Promise.all([_impESM("../brain/peerBrain.mjs"), _impESM("../brain/drivePolicy.mjs"), _impESM("../brain/gunnerPolicy.mjs"), _impESM("../brain/pilotPolicy.mjs")]).then(([PB, D, GP, PP]) => {
+                      const blob = j.blob, descriptors = { drivePolicy: PB.describePolicy("drivePolicy", D), gunnerPolicy: PB.describePolicy("gunnerPolicy", GP), pilotPolicy: PB.describePolicy("pilotPolicy", PP) };
                       const desc = blob && descriptors[blob.policy];
                       res.writeHead(200, { "Content-Type": "application/json" });
                       if (!desc) { res.end(JSON.stringify({ ok: false, error: "no such policy: " + JSON.stringify(blob && blob.policy) })); return; }

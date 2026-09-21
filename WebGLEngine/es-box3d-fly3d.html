@@ -47,8 +47,23 @@
   <button id="arriveBtn" title="Arrival (v4054): warp in across the system inside the fold tunnel, then descend onto the planet -- two chained legs whose seam is DERIVED, so the camera cannot cut between them. One-shot" style="background:#2a2140;color:#c7b3ff;border:1px solid #4a3f6c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">&#127756; Arrive</button>
   <button id="descendBtn" title="Cinematic descent (v4053): fly from orbit down onto the planet's surface on a parametric shot -- logarithmic distance (constant perceived zoom rate) and a singularity-free rig that does not roll over at the poles. One-shot" style="background:#152c3a;color:#9fd8ff;border:1px solid #2f6c8c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">&#128640; Descend</button>
   <button id="jumpBtn" title="Fold/warp jump tunnel: the swept-spine tube down a fold spine, viewed from inside, ring pattern scrolling via a fract wrap; ramps in and out. One-shot" style="background:#2a2140;color:#c7b3ff;border:1px solid #4a3f6c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">&#9889; Jump</button>
+  <button id="brainBtn" title="Fly-brain pilot (task 4 of the fly-connectome integration): team A flies on brain/pilotPolicy.mjs -- a connectome-masked MLP through the real male-cns Giant Fiber Circuit, drop-in for stepAI3d's own {turn,pitch,thrust,firing} contract -- instead of the scripted AI. Team B always stays scripted, so this is a live brain-vs-scripted dogfight. Off = both sides scripted (stepAI3d)" style="background:#152136;color:#b9d4ff;border:1px solid #2f486c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">&#129504; Brain pilot</button>
+  <button id="pilotPanelBtn" title="Export/import/publish this brain, or pull one flying on another box in the fleet (ai-bridge/server.js's /brain/publish, the same peer-sharing transport race-brain.html uses)" style="background:#152136;color:#b9d4ff;border:1px solid #2f486c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">&#128279; Pilot brain</button>
 </div>
 <div id="modelsPanel" style="position:fixed;top:40px;right:10px;z-index:3;display:none;background:#0a1220;border:1px solid #2f486c;border-radius:8px;padding:10px;max-width:520px;max-height:80vh;overflow:auto;box-shadow:0 8px 30px #000a;"></div>
+<div id="pilotPanel" style="position:fixed;top:40px;right:440px;z-index:3;display:none;background:#0a1220;border:1px solid #2f486c;border-radius:8px;padding:10px;max-width:420px;box-shadow:0 8px 30px #000a;color:#b9d4ff;font:11px ui-monospace,monospace;">
+  <div id="pilotLine" style="margin-bottom:8px;">no pilot brain loaded -- team A (when Brain pilot is on) flies brain/pilotPolicy.mjs's handWeights()</div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+    <button id="exportPilot" style="background:#152136;color:#b9d4ff;border:1px solid #2f486c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">Export</button>
+    <button id="importPilotBtn" style="background:#152136;color:#b9d4ff;border:1px solid #2f486c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">Import</button>
+    <input id="importPilotFile" type="file" accept="application/json" style="display:none;">
+    <button id="clearPilot" style="background:#152136;color:#b9d4ff;border:1px solid #2f486c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;" disabled>Clear</button>
+    <button id="publishPilot" style="background:#152136;color:#b9d4ff;border:1px solid #2f486c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">Publish</button>
+    <button id="findPilots" style="background:#152136;color:#b9d4ff;border:1px solid #2f486c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">Find peer brains</button>
+  </div>
+  <div id="pilotFleetStatus"></div>
+  <div id="pilotFleetList"></div>
+</div>
 <div id="hint">drag to orbit &middot; scroll to zoom &middot; ships pitch, climb and dive &mdash; collisions are the x-z projection (box3d owns the plane, altitude flies free)</div>
 
 <script type="importmap">
@@ -63,6 +78,9 @@ import { createESBox3D } from "/physics/esBox3d.js";
 import { box3d } from "/physics/box3d/box3dLoader.js";
 import { planarFallbackWorld } from "/physics/planarFallbackWorld.js";
 import { forward3d, stepAI3d } from "/ev/flightModel3d.js";
+import * as PP from "/brain/pilotPolicy.mjs";   // task 4 of the fly-connectome integration -- the brain pilots this dogfight
+import * as PB from "/brain/peerBrain.mjs";      // the same portable export/import/fleet-share format race-brain.html uses
+import { weightsHash } from "/brain/drivePolicy.mjs";   // FNV-1a over the weight bytes, for the export filename (race-brain.html's own convention)
 import { bakeNebulaCubemap } from "/render/nebulaSkybox.js";   // v3833 -- baked nebula/star backdrop
 import { resampleByArcLength, rotationMinimizingFrames, profileRing, buildRingIndex, packStrand, placeVertex } from "/render/sweptSpine.js";   // v3834 -- swept-spine engine trails
 import { bakeStarCubemap } from "/render/proceduralStar.js";   // v3835 -- procedural star from the skybox generator
@@ -102,14 +120,17 @@ function makeFleet(team, center, count, rng) {
 // snapshot carries ALTITUDE so the 3D AI can aim pitch and measure 3D range.
 function snapshot(fleet) { const o = []; for (const e of fleet) if (!e.dead) o.push({ id: e.id, x: e.x, y: e.y, alt: e.alt || 0, team: e.team, shield: e.shield, armor: e.armor, maxShield: e.maxShield, maxArmor: e.maxArmor, dps: e.dps, dead: false }); return o; }
 
-function sideDriveShots(mine, foes, weights, esbx, dt, nowMs) {
+// v4610 (task 4, fly-connectome integration) -- `aiFn`, optional: a drop-in for stepAI3d's own (ship, target, opts) ->
+// {turn, pitch, thrust, firing} contract. brain/pilotPolicy.mjs's pilotFor(w) is exactly that shape, so passing it here
+// swaps a whole side's steering from the scripted AI to a trained connectome-masked MLP with no other change below.
+function sideDriveShots(mine, foes, weights, esbx, dt, nowMs, aiFn) {
   const shots = [];
   for (const e of mine) {
     if (e.dead) continue;
     const d = tacticsDecide(e, foes, weights, { lastTargetId: e._tgtId, wasFleeing: e._fleeing, range: 1400 });
     e._fleeing = !!d.fleeing; e._tgtId = (d.target && !d.target._flee) ? d.target.id : null;
     if (!d.target) continue;
-    const ai = stepAI3d(e, d.target, { range: 1400, standoff: d.fleeing ? 0 : 160 });   // 3D steering
+    const ai = (aiFn || stepAI3d)(e, d.target, { range: 1400, standoff: d.fleeing ? 0 : 160 });   // 3D steering
     e._turn = ai.turn;
     esbx.driveShip(e._bx, { turn: ai.turn, pitch: ai.pitch, thrust: ai.thrust }, dt);
     if (ai.firing && d.engaging && nowMs >= (e._cool || 0)) {
@@ -650,8 +671,8 @@ function frame() {
   const liveA = A.some((e) => !e.dead), liveB = B.some((e) => !e.dead);
   if (!liveA || !liveB) { if (liveA) wins.A++; else if (liveB) wins.B++; newBattle(); }
   else {
-    const sA = sideDriveShots(A, snapshot(B), W_A, esbx, dt, nowMs);
-    const sB = sideDriveShots(B, snapshot(A), W_B, esbx, dt, nowMs);
+    const sA = sideDriveShots(A, snapshot(B), W_A, esbx, dt, nowMs, brainPilotOn ? PP.pilotFor(pilotWeights || PP.handWeights()) : null);
+    const sB = sideDriveShots(B, snapshot(A), W_B, esbx, dt, nowMs);   // team B is always the scripted AI -- brain vs. scripted, not brain vs. brain
     if (collide3dOn) esbx.collide3d({ rH: 120, rV: 80 });   // v3832 -- altitude-band collision, after drive so box3d integrates it
     esbx.step(dt); esbx.sync();
     shots = advanceShots(shots.concat(sA, sB), A.concat(B), dt); t += dt;
@@ -767,6 +788,74 @@ document.getElementById("collideBtn").onclick = (e) => {
   collide3dOn = !collide3dOn;
   e.target.style.background = collide3dOn ? "#1d3a2a" : "#152136";
   e.target.style.color = collide3dOn ? "#9fe6c0" : "#b9d4ff";
+};
+// task 4 of the fly-connectome integration -- brain/pilotPolicy.mjs flies TEAM A in place of the scripted stepAI3d
+// when on; team B is always scripted, so this is a live brain-vs-scripted dogfight, not brain-vs-brain. `pilotWeights`
+// is null (fly handWeights(), the module's own hand-tuned baseline) until a brain is imported or pulled from the fleet.
+const PILOT_DESC = PB.describePolicy("pilotPolicy", PP);
+let brainPilotOn = false, pilotWeights = null, pilotMeta = null;
+function pilotLine() {
+  document.getElementById("pilotLine").textContent = pilotWeights
+    ? `pilot brain ${weightsHash(pilotWeights)}` + (pilotMeta && pilotMeta.score != null ? `: score ${pilotMeta.score}` : "") + (pilotMeta && pilotMeta.by ? ` (from ${pilotMeta.by})` : "") + (pilotMeta && pilotMeta.citation ? ` -- ${pilotMeta.citation}` : "") + " -- team A flies this when Brain pilot is on"
+    : "no pilot brain loaded -- team A (when Brain pilot is on) flies brain/pilotPolicy.mjs's handWeights()";
+  document.getElementById("clearPilot").disabled = !pilotWeights;
+}
+document.getElementById("brainBtn").onclick = (e) => {
+  brainPilotOn = !brainPilotOn;
+  e.target.style.background = brainPilotOn ? "#1d3a2a" : "#152136";
+  e.target.style.color = brainPilotOn ? "#9fe6c0" : "#b9d4ff";
+};
+const pilotPanel = document.getElementById("pilotPanel");
+document.getElementById("pilotPanelBtn").onclick = () => { pilotPanel.style.display = pilotPanel.style.display === "none" ? "block" : "none"; };
+function downloadJSON(name, obj) {   // race-brain.html's own helper, restated here rather than imported (no shared module for it)
+  const blob = new Blob([JSON.stringify(obj)], { type: "application/json" }), url = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href = url; a.download = name; a.click(); URL.revokeObjectURL(url);
+}
+function readJSONFile(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => { try { resolve(JSON.parse(r.result)); } catch (e) { reject("not valid JSON: " + e.message); } };
+    r.onerror = () => reject("could not read the file");
+    r.readAsText(file);
+  });
+}
+document.getElementById("exportPilot").onclick = () => {
+  const w = pilotWeights || PP.handWeights();
+  const blob = PB.exportBrain(PILOT_DESC, w, { score: pilotMeta ? pilotMeta.score : null, citation: "male-cns Giant Fiber Circuit (Janelia FlyEM, vendor/male-cns/PROVENANCE.md) -- see brain/pilotPolicy.mjs's own header for why the escape circuit, not the compass ring" });
+  downloadJSON(`swek-pilotPolicy-${weightsHash(w)}.json`, blob);
+};
+document.getElementById("importPilotBtn").onclick = () => document.getElementById("importPilotFile").click();
+document.getElementById("importPilotFile").addEventListener("change", async (e) => {
+  const file = e.target.files[0]; e.target.value = ""; if (!file) return;
+  let blob; try { blob = await readJSONFile(file); } catch (msg) { document.getElementById("pilotLine").textContent = "import failed: " + msg; return; }
+  const r = PB.importBrain(PILOT_DESC, blob);
+  if (r.ok) { pilotWeights = r.weights; pilotMeta = r.meta; pilotLine(); } else document.getElementById("pilotLine").textContent = "import refused: " + r.reason;
+});
+document.getElementById("clearPilot").onclick = () => { pilotWeights = null; pilotMeta = null; pilotLine(); };
+document.getElementById("publishPilot").onclick = async () => {
+  const w = pilotWeights || PP.handWeights();
+  const blob = PB.exportBrain(PILOT_DESC, w, { score: pilotMeta ? pilotMeta.score : null, citation: "male-cns Giant Fiber Circuit (Janelia FlyEM, vendor/male-cns/PROVENANCE.md)" });
+  const status = document.getElementById("pilotFleetStatus"); status.textContent = "publishing the pilot brain to the fleet…";
+  try {
+    const r = await fetch("/brain/publish", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ blob }) }).then((x) => x.json());
+    status.textContent = r.ok ? `published the pilot brain -- other peers can find it under Find peer brains` : "publish refused: " + (r.error || "unknown reason");
+  } catch (e) { status.textContent = "publish failed: this box has no local bridge listening, or it's unreachable (" + (e && e.message) + ")"; }
+};
+document.getElementById("findPilots").onclick = async () => {
+  const status = document.getElementById("pilotFleetStatus"), list = document.getElementById("pilotFleetList");
+  status.textContent = "asking the fleet…"; list.textContent = "";
+  let j; try { j = await fetch("/brain/fleet", { cache: "no-store" }).then((r) => r.json()); } catch (e) { status.textContent = "could not reach this box's own bridge (" + (e && e.message) + ")"; return; }
+  if (!j.ok) { status.textContent = "the fleet request failed"; return; }
+  const rows = j.peers.flatMap((p) => p.brains.filter((b) => b.policy === "pilotPolicy").map((b) => ({ peer: p.peer, blob: b })));
+  if (!rows.length) { status.textContent = "no peers are publishing a pilot brain right now (Publish to the fleet on another box first)"; return; }
+  status.textContent = `${rows.length} pilot brain(s) from ${new Set(rows.map((r) => r.peer)).size} peer(s):`;
+  for (const { peer, blob } of rows) {
+    const row = document.createElement("div");
+    const btn = document.createElement("button"); btn.textContent = `Import ${peer}${blob.score != null ? ` (score ${blob.score})` : ""}`;
+    btn.style = "background:#152136;color:#b9d4ff;border:1px solid #2f486c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;margin:2px 0;";
+    btn.addEventListener("click", () => { const r = PB.importBrain(PILOT_DESC, blob); if (r.ok) { pilotWeights = r.weights; pilotMeta = r.meta; pilotLine(); status.textContent = `imported from ${peer}`; } else status.textContent = "import refused: " + r.reason; });
+    row.appendChild(btn); list.appendChild(row);
+  }
 };
 document.getElementById("nebulaBtn").onclick = (e) => {
   nebulaOn = !nebulaOn;
