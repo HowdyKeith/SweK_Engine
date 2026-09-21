@@ -719,7 +719,14 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // Second quiet round running, and for the same reason: this pair reads SOURCE TEXT. No device, no typed
     // arrays, no async. Two rounds of that in a row is a useful reminder of what the headline `files` number
     // is and is not -- it counts files, and the thirteen rows under it count which APIs their text names.
-    esModules: 3990, closures: 3855, asyncAwait: 1526, typedArrays: 1131, promises: 369,
+    //
+    // *** v4652 -- ONE ROW MOVES AND NO FILE WAS ADDED: async/await 1526 -> 1527. *** The whole delta is
+    // tools/ship/constantRows.mjs gaining the word `async`, because isParsable's wrapper became
+    // `new Function("return (async () => (...))")` -- the repair that took that census's unresolved count
+    // from 957 to 59. `files` holds at 4290. This is the narrowest this table has ever moved and it is a
+    // useful demonstration of what it measures: not capability, not behaviour, but which API names a file's
+    // text contains. One word in one string literal, and the census is right to see it.
+    esModules: 3990, closures: 3855, asyncAwait: 1527, typedArrays: 1131, promises: 369,
     fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 159, webgpu: 52, threads: 23, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

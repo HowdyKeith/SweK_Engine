@@ -49,7 +49,7 @@
 // vacuous is a fact about xs AT RUN TIME. Neither holds here: the predicate is SYNTACTIC (every free
 // identifier in the condition is a built-in global) and the population is TEN. tools/ship/constantRows.mjs
 // is that census. The looser predicate a reader would try first was measured and rejected on this file's own
-// grounds: "the condition names no IMPORTED symbol" flags 21,533 of 28,916, 75%.
+// grounds: "the condition names no IMPORTED symbol" flags 21,800 of 28,827, 76%.
 //
 // This does not weaken the refusal. Mechanisms 1-4 remain unscannable for the reasons given, and the fifth is
 // scannable because it is a different kind of thing -- which is worth saying plainly, since a later reader

@@ -8032,6 +8032,51 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4652 -- THE 262nd CLOSING: no gate added, and the round before it accused the wrong file.
+    since337: Object.freeze({
+        at: "v4652", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** v4651 BLAMED A SHARED INSTRUMENT FOR ITS OWN EXTRACTOR'S MISTAKE, AND SHIPPED THE " +
+                 "ACCUSATION IN THREE PLACES. *** That round wrote -- in tools/ship/constantRows.mjs, in its " +
+                 "gate, and in this file's since336 -- that its 957 unparsable conditions were caused by " +
+                 "'sourceScan.mjs's noComments cutting a regex literal containing an escaped slash'. IT WAS " +
+                 "NEVER RUN. noComments handles regex literals explicitly through regexAllowedHere and " +
+                 "regexBody, and MEASURED on the exact shape accused -- a pattern containing an escaped " +
+                 "slash -- it returns the source byte for byte. A wrong attribution against a shared " +
+                 "instrument is the worst kind: it sends the next reader to repair a file that is not broken " +
+                 "and leaves the one that is. " +
+                 "*** AND THE FILE THAT WAS BROKEN HAD HAND-ROLLED THE EXACT HEURISTIC sourceScan.mjs " +
+                 "EXPORTS TWO PRIMITIVES TO PREVENT. *** Its header says so in as many words -- 'Rewriting " +
+                 "this heuristic a second time would be exactly the 179-files-mis-lexed-the-same-way defect " +
+                 "this file's own header is about' -- and v4651 wrote the third copy. The copy was worse " +
+                 "than the original in three ways it had no idea about: it did not know that a closing brace " +
+                 "CAN precede a regex, that `return /x/` is a regex because return starts an expression, or " +
+                 "that `<` is unsafe because .html source contains a closing tag. Every one of those was a " +
+                 "condition the census mis-read. " +
+                 "*** THE NUMBER: 957 -> 59, A 94% CUT, WITH THE SEED UNMOVED AT TEN. *** Importing the two " +
+                 "primitives took it to 235; making isParsable's wrapper ASYNC took it to 59, because most " +
+                 "rows that await something put the await inside the condition and that is a syntax error in " +
+                 "a non-async function -- reporting those as unreadable was blaming the tree for a limit of " +
+                 "the test. All 59 that remain contain import.meta, which new Function cannot parse at all, " +
+                 "and the gate now asserts that the WHOLE remainder is that one cause so no reader goes " +
+                 "hunting for a bug that is not there. " +
+                 "*** AND A SABOTAGE FOUND 102 ROWS THE CENSUS HAD NEVER SEEN. *** Mutating the label " +
+                 "scanner's handling of concatenated strings scored ZERO -- a NO-OP and not a 0-RED, because " +
+                 "the code was already inert: it skipped a `+` and then required a comma, which is not what " +
+                 "follows a `+` in ok(\"a \" + \"b\", cond). Every such row was dropped. DEAD CODE DEFENDED BY " +
+                 "A COMMENT DESCRIBING WHAT IT DOES NOT DO is worse than no code, because a reader checking " +
+                 "whether the case is handled finds a sentence saying yes. Repaired, the population goes " +
+                 "29,032 -> 29,134 and none of the new rows is constant. " +
+                 "SECOND ROUND RUNNING THAT A FALSE NEGATIVE HAD TO BE CLOSED BY A DIRECT ROW: v4651's " +
+                 "string-stripping hid one row, this hid 102, and neither is visible to a ceiling ratchet " +
+                 "because both make the number go DOWN. A census needs a row asserting it can still SEE " +
+                 "something, not only rows asserting it has not started seeing too much. " +
+                 "Five sabotages against the repaired extractor, all five caught. No gate was added; " +
+                 "tools/ship/vacuity.mjs's quoted figure was re-derived on the fixed extractor (21,800 of " +
+                 "28,827, 76%) rather than left at the number the broken one produced.",
+    }),
     // v4651 -- THE 261st CLOSING: a fifth mechanism for vacuity.mjs, and the one that can be scanned for.
     since336: Object.freeze({
         at: "v4651", swept: 1, green: 1, red: 0,

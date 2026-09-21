@@ -2,7 +2,7 @@
 // WebGLEngine/tools/ship/constantRows-selfcheck.mjs -- v4651
 //
 // Run: node tools/ship/constantRows-selfcheck.mjs
-// RUNTIME: 2,205 ms median of five (2,125 2,129 2,205 2,212 2,233), under the sweep's 3,000 ms threshold.
+// RUNTIME: 2,152 ms median of five (2,091 2,128 2,152 2,154 2,369), under the sweep's 3,000 ms threshold.
 //
 // *** A FIFTH MECHANISM FOR tools/ship/vacuity.mjs's LIST, AND THE ONE CASE WHERE THAT FILE'S REFUSAL TO
 // SCAN DOES NOT APPLY. ***
@@ -22,9 +22,9 @@
 //          swapping edgeColumn's ceil for Math.round scored ZERO failing rows.
 //
 // -- and it IS mechanically detectable, because the predicate is syntactic rather than a fact about a
-// collection at run time. The number is what earns the scan: ELEVEN rows tree-wide, not 3,206. The obvious
+// collection at run time. The number is what earns the scan: TEN rows tree-wide, not 3,206. The obvious
 // looser predicate was measured and rejected on vacuity.mjs's own grounds -- "the condition names no
-// IMPORTED symbol" flags 21,533 of 28,916, 75%, because most rows legitimately test a local holding a
+// IMPORTED symbol" flags 21,800 of 28,827, 76%, because most rows legitimately test a local holding a
 // module's result.
 //
 // *** AND MOST OF THE ELEVEN ARE NOT DEFECTS. *** A gate whose module depends on a language guarantee is
@@ -120,14 +120,41 @@ ok("`false` as a condition is a DELIBERATE idiom here, so it is counted rather t
    `${R.alwaysFalse.length} rows. It is the forced red a gate prints when its subject could not be reached ` +
    "at all -- '*** NOT A PASS. *** The adapter path has not run' -- and a census that called those defects " +
    "would be asking gates to report a skip as a pass.");
+// *** v4652 -- THIS ROW'S EXPLANATION WAS WRONG AND THE NUMBER FELL 957 -> 59 WHEN THE REAL CAUSE WAS
+// FIXED. *** It said the cause was "upstream: sourceScan.mjs's noComments cuts a regex literal containing an
+// escaped slash". That was never tested and is false -- noComments handles regex literals through
+// regexAllowedHere and regexBody, and on the exact shape accused it returns the source byte for byte. The
+// fault was in this census's own extractor, which hand-rolled a regex heuristic instead of importing those
+// two, and in isParsable, which wrapped conditions in a NON-ASYNC function so every `(await x).y === z`
+// read as unparsable. Both repaired; the accusation is recorded at constantRows.mjs's own site.
+const metaOnly = R.unresolved.filter((x) => /import\.meta/.test(x.cond)).length;
 ok("!! ...and UNRESOLVED conditions are named rather than dropped, which is kernelReach.mjs's rule",
    R.unresolved.length > 0 && R.unresolved.every((x) => !isParsable(x.cond)),
-   `${R.unresolved.length} of ${R.scanned} (${(100 * R.unresolved.length / R.scanned).toFixed(1)}%) could not ` +
-   "be parsed as expressions. The cause is known and is upstream: sourceScan.mjs's noComments cuts a regex " +
-   "literal containing an escaped slash, because \\/ ends with the two characters that start a line comment. " +
-   "Treating those fragments as constant is what made the first draft report nine rows, six of them shrapnel.");
+   `${R.unresolved.length} of ${R.scanned} (${(100 * R.unresolved.length / R.scanned).toFixed(1)}%), down from ` +
+   "957 at v4651 when this census blamed a shared instrument for its own extractor's mistake.");
+ok("!! ...and EVERY remaining one is import.meta, which is module-only syntax and not a defect in anything",
+   metaOnly === R.unresolved.length && R.unresolved.length > 0,
+   `${metaOnly} of ${R.unresolved.length} contain import.meta. new Function cannot parse it at all -- "Cannot ` +
+   "use 'import.meta' outside a module' -- so these are a limit of the TEST and not a fault in the tree or " +
+   "in the extractor. Naming the whole remainder is what stops the next reader looking for a bug that is " +
+   "not there, which is exactly what v4651's wrong attribution did.");
 
 console.log("\n5. THE DETECTOR'S OWN FALSE-POSITIVE MODES, EACH DRIVEN");
+// *** A LABEL SPLIT ACROSS CONCATENATED STRINGS, WHICH THIS CENSUS SILENTLY SKIPPED UNTIL v4652. *** The
+// extractor claimed to handle it -- the character class it skipped included `+`, with a comment saying "a
+// label may be several strings concatenated" -- and then required a COMMA, which is not what follows a `+`.
+// Every such row was dropped. A sabotage removing the `+` scored ZERO because the code was already inert:
+// dead code defended by a comment describing what it does not do, which is worse than no code, since a
+// reader checking whether the case is handled finds a sentence saying yes. Repaired, the census finds 102
+// MORE conditions -- 29,032 to 29,134 -- and none of them is constant, so the seed does not move.
+const CAT = "o" + "k(";
+const catProbe = constantRows([{ path: "probe", text: `${CAT}"part one " +\n  "part two", 2 + 2 === 4, "note");` }]);
+ok("!! a label split across concatenated strings is FOUND, not skipped",
+   catProbe.scanned === 1 && catProbe.expr.length === 1 && catProbe.expr[0].cond === "2 + 2 === 4",
+   `scanned ${catProbe.scanned}, flagged ${catProbe.expr.length}. This is a FALSE NEGATIVE row: what it ` +
+   "guards against is the census quietly measuring a smaller population than the tree has, which no ceiling " +
+   "ratchet can see because the number only goes DOWN. Second round running that this failure mode has had " +
+   "to be closed by a direct row -- v4651's string-stripping was the first.");
 ok("a SPREAD is not a property access",
    isConstantCondition("Math.max(...vs) > 3") === false,
    "`...vs` looks like `.vs` to a naive property stripper, and stripping it erased the only identifier that " +
@@ -176,14 +203,24 @@ ok("...and the population is not degenerate, which would make every row above va
    `${new Set(R.expr.map((x) => x.file)).size} different files, so this is not one gate's habit.`);
 
 console.log(fails ? `\nconstantRows-selfcheck: ${fails} FAILED` : "\nconstantRows-selfcheck: ALL GREEN");
-console.log("unchecked here: whether each of the eleven IS a defect, which is a judgement about intent and " +
+console.log("unchecked here: whether each of the ten IS a defect, which is a judgement about intent and " +
             "not a fact this file can derive -- several are language-contract rows paired with a row that " +
             "uses the module, and the census names them so a reader can decide; the 216 `true` rows, which " +
             "are the same mechanism in a blunter form and are counted but NOT ratcheted, because a bare " +
             "`true` is sometimes a placeholder a later row supersedes and sorting those out is a round of " +
-            "its own; the 957 UNRESOLVED conditions, whose real repair is in sourceScan.mjs's comment " +
-            "stripper rather than here; and vacuity.mjs's other four mechanisms, which remain undetectable " +
+            "its own; the 59 UNRESOLVED conditions, every one of them an import.meta this parse test cannot " +
+            "read at all rather than a defect anywhere; and vacuity.mjs's other four mechanisms, which remain undetectable " +
             "by scanning for the reason that file gives and which this one does not dispute.");
+//
+// *** v4652 -- THE ROUND THAT CORRECTED THIS FILE'S ACCOUNT OF ITS OWN UNRESOLVED COUNT. ***
+// v4651 shipped, here and in its closing and its commit message, the claim that sourceScan.mjs's noComments
+// mangles regex literals. It does not, and the claim was never run. The extractor below hand-rolled a regex
+// heuristic that sourceScan.mjs EXPORTS two primitives to prevent -- its header says "Rewriting this
+// heuristic a second time would be exactly the '179 files mis-lexed the same way' defect this file's own
+// header is about" -- and the copy was worse than the original in three ways it had no idea about: it did
+// not know a `}` can precede a regex, that `return /x/` is a regex, or that `<` is unsafe because .html
+// source contains `</tag>`. Importing them, and making isParsable's wrapper async, took the unresolved count
+// from 957 to 59, every one of which is import.meta.
 //
 // SABOTAGE LOG -- each applied to tools/ship/constantRows.mjs, run, and restored.
 //   Y1  globalThis back in the constant set              2 RED (its own row, and the ratchet at 11)
@@ -191,6 +228,23 @@ console.log("unchecked here: whether each of the eleven IS a defect, which is a 
 //   Y3  `of` filtered as a keyword again                 2 RED (its own row, and the ratchet at 14)
 //   Y4  string literals not stripped                     0-RED at first; now 1 RED
 //   Y5  unparsable conditions counted as constant        2 RED (the unresolved row, and the ratchet at 22)
+//   -- v4652, against the repaired extractor --
+//   Z1  back to the hand-rolled regex heuristic          1 RED, the import.meta row
+//   Z2  isParsable's wrapper back to non-async           1 RED, the import.meta row
+//   Z3  regex literals not skipped at all                1 RED, the import.meta row
+//   Z4  string literals not skipped in the splitter      1 RED, the import.meta row
+//   Z5  the concatenated-label loop removed              0-RED at first; now 1 RED
+//
+// *** Z5 WAS A NO-OP BEFORE IT WAS A 0-RED, WHICH IS A DISTINCTION WORTH KEEPING. *** The first attempt
+// mutated the `+` out of the label-skipping character class and nothing moved -- not because the gate was
+// blind but because THE CODE WAS ALREADY INERT: it skipped `+` and then required a comma, which is not what
+// follows a `+` in `ok("a " + "b", cond)`. Every concatenated-label row was being dropped. Repaired, the
+// census finds 102 MORE conditions and none of them is constant, so the seed holds at ten.
+//
+// *** AND THAT IS THE SECOND ROUND RUNNING THAT A FALSE NEGATIVE HAD TO BE CLOSED BY A DIRECT ROW. ***
+// v4651's string-stripping hid one row; this hid 102. Neither is visible to a ceiling ratchet, because both
+// make the number go DOWN. A census needs a row asserting it can still SEE something, not only rows
+// asserting it has not started seeing too much.
 //
 // *** Y4 IS THE INTERESTING ONE AND IT IS THIS FILE'S OWN SUBJECT LOOKING BACK AT IT. *** The row meant to
 // catch it drove a REGEX -- `isConstantCondition('/Math/.test(label)')` -- where `label` is a free

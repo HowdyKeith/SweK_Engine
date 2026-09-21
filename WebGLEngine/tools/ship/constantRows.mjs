@@ -33,7 +33,7 @@
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
-import { noComments } from "./sourceScan.mjs";
+import { noComments, regexAllowedHere, regexBody } from "./sourceScan.mjs";
 
 /**
  * Identifiers that carry no information from the tree.
@@ -89,18 +89,29 @@ export function isConstantCondition(cond) {
 /**
  * Whether `cond` is a complete JavaScript expression, decided by asking the parser rather than by a heuristic.
  *
- * *** THIS EXISTS BECAUSE THE EXTRACTION IS NOT RELIABLE AND PRETENDING OTHERWISE PRODUCED NINE ROWS, SIX OF
- * THEM SHRAPNEL. *** sourceScan.mjs's noComments cuts a regex literal containing an escaped slash -- `\/` ends
- * with the two characters that start a line comment -- so conditions like `/\|\|""\//.test(x)` arrive here
- * truncated to `/\|\|""\`. A fragment has no identifiers left, so it reads as constant, and the census
- * reported `/61`, `/3` and `/470` as rows that cannot fail.
+ * *** THIS EXISTS BECAUSE THE EXTRACTION IS NOT RELIABLE, AND v4651 BLAMED THE WRONG FILE FOR IT. ***
  *
- * Those are not findings about the tree; they are findings about the scanner. They are counted as UNRESOLVED
- * and named, which is kernelReach.mjs's rule for producers it cannot import: a census that quietly drops what
- * it could not read is reporting a smaller number than it measured.
+ * That round wrote here -- and in its gate, its closing and its commit message -- that "sourceScan.mjs's
+ * noComments cuts a regex literal containing an escaped slash". *** THAT IS FALSE AND IT WAS NEVER TESTED. ***
+ * noComments handles regex literals explicitly, through regexAllowedHere and regexBody, and MEASURED on the
+ * exact shape accused -- `/\|\|""\//.test(s)` -- it returns the source unchanged, byte for byte.
+ *
+ * The fault was in conditionsOf below, which hand-rolled its own regex heuristic instead of importing those
+ * two. A wrong attribution against a SHARED instrument is the worst kind: it sends the next reader to repair
+ * a file that is not broken, and leaves the one that is. The correction is recorded here rather than quietly
+ * swapped, because the claim shipped.
+ *
+ * Conditions this scanner still cannot parse are counted as UNRESOLVED and named, which is kernelReach.mjs's
+ * rule for producers it cannot import: a census that quietly drops what it could not read is reporting a
+ * smaller number than it measured.
  */
 export function isParsable(cond) {
-    try { new Function(`return (${cond});`); return true; } catch { return false; }
+    // *** THE WRAPPER IS ASYNC, AND A PLAIN ONE MIS-REPORTED 235 CONDITIONS AS UNPARSABLE. *** Most rows in
+    // this tree that await something put the await INSIDE the condition -- `(await probe(...)).error === "x"`
+    // -- which is a perfectly good expression and a syntax error inside a non-async function. Reporting those
+    // as "could not be read" would be blaming the tree for a limit of the test, which is the same mistake
+    // this file's own isParsable docstring records one level up.
+    try { new Function(`return (async () => (${cond}));`); return true; } catch { return false; }
 }
 
 /**
@@ -118,15 +129,36 @@ export function conditionsOf(src) {
         let i = m.index + m[0].length;
         while (i < t.length) { if (t[i] === "\\") { i += 2; continue; } if (t[i] === q) break; i++; }
         i++;
-        while (i < t.length && /[\s+]/.test(t[i])) i++;      // a label may be several strings concatenated
+        // *** A LABEL MAY BE SEVERAL STRINGS CONCATENATED, AND THE FIRST VERSION OF THIS ONLY CLAIMED TO
+        // HANDLE THAT. *** It skipped whitespace and `+` and then required a COMMA -- but after the `+` comes
+        // the NEXT STRING, not a comma, so every such row was silently skipped and the `+` in that character
+        // class did nothing at all. A sabotage removing it scored zero because the code was already inert.
+        // Dead code defended by a comment describing what it does not do is worse than no code, because a
+        // reader checking whether the case is handled finds a sentence saying yes.
+        for (;;) {
+            while (i < t.length && /\s/.test(t[i])) i++;
+            if (t[i] !== "+") break;
+            i++;
+            while (i < t.length && /\s/.test(t[i])) i++;
+            const q3 = t[i];
+            if (q3 !== '"' && q3 !== "'" && q3 !== "`") break;
+            i++;
+            while (i < t.length) { if (t[i] === "\\") { i += 2; continue; } if (t[i] === q3) break; i++; }
+            i++;
+        }
+        while (i < t.length && /\s/.test(t[i])) i++;
         if (t[i] !== ",") continue;
         i++;
         let depth = 0; const start = i;
-        // *** REGEX LITERALS AND STRINGS ARE SKIPPED WHOLE, AND THE FIRST DRAFT DID NEITHER. *** A condition
-        // like `/\|\|""/.test(x)` contains quotes, brackets and commas that are TEXT; balancing through them
-        // cut conditions mid-pattern and the fragments -- `/61`, `/3`, `!/"fluid\/multigridGPU\.js"` -- had
-        // no identifiers left and so read as constant. The census reported nine rows, four of them shrapnel.
-        // A slash starts a regex when the previous meaningful character cannot end an expression.
+        // *** STRINGS AND REGEX LITERALS ARE SKIPPED WHOLE, USING sourceScan.mjs's OWN TWO PRIMITIVES. ***
+        //
+        // The first draft hand-rolled the regex test as `prev is not )]} and not alphanumeric`. That is a
+        // THIRD copy of a heuristic sourceScan.mjs exports precisely so there is one, and its header says why
+        // in as many words: "Rewriting this heuristic a second time would be exactly the '179 files mis-lexed
+        // the same way' defect this file's own header is about". The copy was also worse than the original in
+        // three ways it had no idea about -- regexAllowedHere knows that a `}` CAN precede a regex, that
+        // `return /x/` is a regex because `return` is in its keyword list, and that `<` is not a safe opener
+        // because .html source contains `</tag>`. Every one of those was a condition this census mis-read.
         let prev = "";
         while (i < t.length) {
             const c = t[i];
@@ -135,19 +167,9 @@ export function conditionsOf(src) {
                 while (i < t.length) { if (t[i] === "\\") { i += 2; continue; } if (t[i] === q2) break; i++; }
                 i++; prev = q2; continue;
             }
-            if (c === "/" && !"])}".includes(prev) && !/[A-Za-z0-9_$]/.test(prev)) {
-                i++;
-                let cls = false;
-                while (i < t.length) {
-                    if (t[i] === "\\") { i += 2; continue; }
-                    if (t[i] === "[") cls = true;
-                    else if (t[i] === "]") cls = false;
-                    else if (t[i] === "/" && !cls) break;
-                    i++;
-                }
-                i++;
-                while (i < t.length && /[a-z]/.test(t[i])) i++;    // flags
-                prev = "/"; continue;
+            if (c === "/" && regexAllowedHere(t.slice(start, i))) {
+                const r = regexBody(t, i);
+                if (r) { i = r.end; prev = "/"; continue; }
             }
             if ("([{".includes(c)) depth++;
             else if (")]}".includes(c)) { if (depth === 0) break; depth--; }
