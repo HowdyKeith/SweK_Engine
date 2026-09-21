@@ -61,9 +61,15 @@ async function startBridge(port) {
     let out = "";
     cp.stdout.on("data", (d) => { out += d; });
     cp.stderr.on("data", (d) => { out += d; });
+    // !! each attempt carries its OWN AbortSignal.timeout, not just the outer deadline -- found by adversarial
+    // review: a port that accepts a TCP connection but never answers HTTP (measured directly: a bare listener
+    // that accepts and never responds) hung the bare `fetch()` call indefinitely, so the outer while-loop's
+    // Date.now() check was never reached again and the intended 15 s deadline did nothing. A refused connection
+    // (the port simply not listening) already failed fast on its own; only the accepts-but-never-responds case
+    // needed this.
     const deadline = Date.now() + 15000;
     while (Date.now() < deadline) {
-        try { const r = await fetch(`http://127.0.0.1:${port}/health`); if (r.ok) { const j = await r.json(); if (j.ok) return { cp, out: () => out }; } } catch {}
+        try { const r = await fetch(`http://127.0.0.1:${port}/health`, { signal: AbortSignal.timeout(2000) }); if (r.ok) { const j = await r.json(); if (j.ok) return { cp, out: () => out }; } } catch {}
         await new Promise((res) => setTimeout(res, 250));
     }
     try { cp.kill("SIGKILL"); } catch {}
@@ -71,7 +77,27 @@ async function startBridge(port) {
 }
 function stopBridge(b) { try { b.cp.kill("SIGKILL"); } catch {} }
 
+// !! SIGINT/SIGTERM cleanup -- found missing by adversarial review, which reproduced real, permanent damage from
+// its absence: a plain Ctrl-C (SIGINT) during section 2's peers-file-modified window skipped this file's
+// try/finally entirely (Node's default SIGINT disposition is immediate termination, not a JS-level unwind) and
+// left ~/.voxelbridge/sync-peers.json permanently holding the injected test peer entry; the same run also
+// orphaned both bridge child processes. Handlers here restore the file and kill the children before exiting.
+// *** THIS DOES NOT AND CANNOT COVER SIGKILL. *** No process in any language can catch or run any code in
+// response to SIGKILL -- it is the OS unconditionally freeing the process's memory, not a signal delivered to
+// it. The review's SIGKILL repro is real and is an accepted, structural limit of this approach, not a bug left
+// unfixed; SIGINT/SIGTERM (an impatient Ctrl-C, a CI runner's graceful-shutdown signal) are the realistic cases
+// this can and does now cover.
 let bridgeA = null, bridgeB = null;
+let peersCleanup = null;   // set only while section 2 has the real peers file in a modified state; see there
+function emergencyCleanup(signal) {
+    try { if (peersCleanup) { fs.writeFileSync(peersCleanup.path, peersCleanup.backup === null ? "" : peersCleanup.backup); if (peersCleanup.backup === null) { try { fs.unlinkSync(peersCleanup.path); } catch {} } console.error(`\n[${signal}] restored ${peersCleanup.path} before exiting`); } } catch (e) { console.error(`[${signal}] FAILED to restore ${peersCleanup && peersCleanup.path}: ${e.message} -- check it by hand`); }
+    if (bridgeA) stopBridge(bridgeA);
+    if (bridgeB) stopBridge(bridgeB);
+    process.exit(130);
+}
+process.on("SIGINT", () => emergencyCleanup("SIGINT"));
+process.on("SIGTERM", () => emergencyCleanup("SIGTERM"));
+
 try {
     sec("1. /brain/publish + /brain/mine, ON A REAL RUNNING BRIDGE, OVER REAL LOOPBACK HTTP");
     {
@@ -115,6 +141,7 @@ try {
             const existing = peersBackup ? JSON.parse(peersBackup) : { peers: [] };
             const testPeerUrl = `http://127.0.0.2:${PORT_B}`;
             fs.mkdirSync(path.dirname(PEERS_FILE), { recursive: true });
+            peersCleanup = { path: PEERS_FILE, backup: peersBackup };   // the file is about to be modified -- see emergencyCleanup above
             fs.writeFileSync(PEERS_FILE, JSON.stringify({ ...existing, peers: [...(existing.peers || []), testPeerUrl] }, null, 2));
 
             const fleet = await fetch(`http://127.0.0.1:${PORT_A}/brain/fleet`).then((r) => r.json());
@@ -126,6 +153,7 @@ try {
         } finally {
             if (peersBackup !== null) { fs.writeFileSync(PEERS_FILE, peersBackup); report(`restored ${PEERS_FILE} to its original bytes`); }
             else { try { fs.unlinkSync(PEERS_FILE); } catch {} report(`removed the test-created ${PEERS_FILE} (none existed before this gate)`); }
+            peersCleanup = null;   // restored -- emergencyCleanup no longer needs to touch this file
             const after = fs.existsSync(PEERS_FILE) ? fs.readFileSync(PEERS_FILE, "utf8") : null;
             ok("!! the real peer config is EXACTLY as this gate found it, verified byte-for-byte after restoring", after === peersBackup);
         }

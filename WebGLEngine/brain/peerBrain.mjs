@@ -42,7 +42,13 @@ export function exportBrain(policy, weights, { score = null, by = null, citation
  * Validate and unpack an imported blob against a policy descriptor. Returns { ok: true, weights: Float32Array, meta }
  * or { ok: false, reason } -- never throws. Refuses: the wrong format tag, a policy id mismatch (a gunner blob fed
  * to a driver importer), a weight-count mismatch (including a stale export from before a topology re-vendor changed
- * WEIGHT_COUNT), a wrong array shape, and any non-finite value.
+ * WEIGHT_COUNT), a wrong array shape, and any weight that is not finite -- checked AFTER the Float32Array cast,
+ * not just on the raw JSON double. Found by adversarial review: a value like 1e40 is a perfectly finite float64
+ * (Number.isFinite(1e40) === true, well under Number.MAX_VALUE) but OVERFLOWS to Infinity once narrowed to
+ * float32 (Float32Array.from([1e40])[0] === Infinity, float32's max magnitude being ~3.4e38) -- so a
+ * pre-cast-only check let a value through that the ACTUAL runtime representation (a Float32Array, everywhere
+ * downstream) already held as non-finite. A peer does not need a training accident to produce this, only to
+ * publish one such number on purpose, so this is checked on what the policy will actually compute with.
  */
 export function importBrain(policy, blob) {
     if (!policy || !policy.id || !Number.isFinite(policy.WEIGHT_COUNT)) return { ok: false, reason: "no policy descriptor to import into" };
@@ -51,7 +57,9 @@ export function importBrain(policy, blob) {
     if (blob.policy !== policy.id) return { ok: false, reason: `this brain is for ${JSON.stringify(blob.policy)}, not ${JSON.stringify(policy.id)}` };
     if (!Array.isArray(blob.weights) || blob.weights.length !== policy.WEIGHT_COUNT) return { ok: false, reason: `weight count ${blob.weights && blob.weights.length} does not match ${policy.id}'s current ${policy.WEIGHT_COUNT} (a stale export from before a topology change?)` };
     if (blob.weights.some((v) => typeof v !== "number" || !Number.isFinite(v))) return { ok: false, reason: "a weight is not a finite number" };
-    return { ok: true, weights: Float32Array.from(blob.weights), meta: { score: blob.score ?? null, by: blob.by ?? null, citation: blob.citation ?? null, exportedAt: blob.exportedAt ?? null } };
+    const weights = Float32Array.from(blob.weights);
+    for (let i = 0; i < weights.length; i++) if (!Number.isFinite(weights[i])) return { ok: false, reason: `weight ${i} (${blob.weights[i]}) is finite as JSON but overflows to ${weights[i]} as float32` };
+    return { ok: true, weights, meta: { score: blob.score ?? null, by: blob.by ?? null, citation: blob.citation ?? null, exportedAt: blob.exportedAt ?? null } };
 }
 
 /** The { id, FEATURES, HIDDEN, OUTPUTS, WEIGHT_COUNT } descriptor exportBrain/importBrain need, read off a live policy module. */

@@ -73,6 +73,12 @@ sec("3. IMPORTBRAIN NEVER THROWS AND REFUSES EVERY MALFORMED SHAPE AT THE DOOR")
     tryImport("a NaN weight", { ...goodBlob, weights: goodBlob.weights.map((v, i) => (i === 3 ? NaN : v)) });
     tryImport("an Infinity weight", { ...goodBlob, weights: goodBlob.weights.map((v, i) => (i === 3 ? Infinity : v)) });
     tryImport("weights as a non-array (an object)", { ...goodBlob, weights: { 0: 1, length: goodBlob.weights.length } });
+    // !! found by adversarial review: 1e40 is a perfectly finite float64 (Number.isFinite(1e40) === true), so a
+    // check performed on the raw JSON value alone lets it through -- but Float32Array.from([1e40])[0] === Infinity
+    // (float32's max magnitude is ~3.4e38), the ACTUAL representation the policy computes with. A malicious peer
+    // does not need a training accident to produce this, only to publish one such number on purpose.
+    tryImport("a weight that is finite as JSON but overflows to Infinity as float32 (1e40)", { ...goodBlob, weights: goodBlob.weights.map((v, i) => (i === 3 ? 1e40 : v)) });
+    tryImport("  ...and the same for -1e40 (overflows to -Infinity)", { ...goodBlob, weights: goodBlob.weights.map((v, i) => (i === 3 ? -1e40 : v)) });
     ok("!! ...and a genuinely valid blob is still accepted (the checks above aren't just refusing everything)", PB.importBrain(DRIVE, goodBlob).ok);
 }
 
