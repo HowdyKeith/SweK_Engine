@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // WebGLEngine/tools/ship/inputSets-selfcheck.mjs -- v4566
 //
-// GATES tools/ship/inputSets.mjs, tools/ship/inputProbe.mjs and tools/ship/recordInputs.mjs.
+// GATES tools/ship/inputSets.mjs, tools/ship/inputProbe.mjs, tools/ship/recordInputs.mjs and
+// tools/ship/fixtureLitter.mjs.
 //
 // *** THE SWEEP RE-ANSWERS 1,253 QUESTIONS EVERY RUN AND A ROUND MOVES FIVE TO FIFTEEN FILES. ***
 // v4548 measured where the 525 s of gate time goes and ruled out the obvious levers: the shared tree walk is
@@ -37,48 +38,19 @@ import { selectGates } from "./quickSweep.mjs";
 import { noComments } from "./sourceScan.mjs";
 // v4647 -- the tree's own gate population, from the walk that owns it rather than a second copy.
 import { treePaths } from "./treeRead.mjs";
+import { FIXTURE_DIR, FIXTURE_PREFIX, LIVE_FIXTURES, fixtureAbs, writeFixture, dropFixture,
+         reclaimStranded, armExitSweep, PROBE_REG, PROBE_RAW } from "./fixtureLitter.mjs";
 
 let fails = 0;
 const ok = (name, cond, detail = "") => { console.log((cond ? "  PASS  " : "  FAIL  ") + name + (detail ? "   " + detail : "")); if (!cond) fails++; };
 
 // *** v4649 -- THE FIXTURES THIS GATE WRITES INTO THE TREE OUTLIVED THE RUN THAT WROTE THEM. ***
-// Three sections below write `__inputsets_*` files into tools/ship and unlink each one on a later line.
-// Every one of those unlinks is reachable only on the happy path. probeOne THROWS on Windows (task #62), so
-// the run that found that died between a write and its unlink and left the fixture in the tree -- which is
-// why the capture of the next sweep on that box came back stamped WORKING TREE DIRTY over 44 reds that had
-// nothing to do with it. A gate that litters the tree it grades manufactures its own false signal.
-// So two mechanisms, because they answer two different deaths:
-//   * every fixture is REGISTERED as it is written and dropped on exit -- which covers the exit an uncaught
-//     throw takes, since Node runs `exit` listeners for one.
-//   * and the run OPENS by removing what is already there, because a Windows fail-fast (0xC0000409, task
-//     #65) runs no handler at all and the only process that can clean up after it is the next one.
-const FIXTURE_DIR = "tools/ship";
-const FIXTURE_PREFIX = "__inputsets_";
-const LIVE_FIXTURES = new Set();
-const fixtureAbs = (rel) => path.join(ENG, rel);
-const writeFixture = (rel, src) => { LIVE_FIXTURES.add(rel); fs.writeFileSync(fixtureAbs(rel), src); return rel; };
-const dropFixture = (rel) => { try { fs.unlinkSync(fixtureAbs(rel)); } catch {} LIVE_FIXTURES.delete(rel); };
-// Prefix-scoped on purpose: this deletes files out of a SOURCE directory, so the names it will remove are
-// spelled here rather than left to a glob somebody widens later. Section 9 drives that scoping too.
-function reclaimStranded() {
-    let names = [];
-    try { names = fs.readdirSync(fixtureAbs(FIXTURE_DIR)); } catch { return []; }
-    const stranded = names.filter((n) => n.startsWith(FIXTURE_PREFIX));
-    for (const n of stranded) { try { fs.unlinkSync(fixtureAbs(FIXTURE_DIR + "/" + n)); } catch {} }
-    return stranded;
-}
+// Section 7 writes five `__inputsets_*` files into tools/ship and unlinks each on a later line -- every one
+// of those unlinks on the happy path, and probeOne THROWS on Windows (task #62). The mechanism that answers
+// both that death and the handler-less ones (a SIGKILL at the cap, a fail-fast) is fixtureLitter.mjs, and
+// section 9 drives it on real children of THAT module.
 const STRANDED = reclaimStranded();
-process.on("exit", () => { for (const rel of Array.from(LIVE_FIXTURES)) dropFixture(rel); });
-
-// The probe section 9 drives: a REAL child of this file, stranded the two ways that matter. A second copy of
-// the sweep, graded by the copy that wrote it, would pass on a mechanism that never ran.
-if (process.env.SWEK_INPUTSETS_LITTER_PROBE) {
-    const raw = process.env.SWEK_INPUTSETS_LITTER_PROBE === "raw";
-    const probeRel = FIXTURE_DIR + "/" + FIXTURE_PREFIX + (raw ? "rawprobe" : "litterprobe") + "_fixture.txt";
-    if (raw) fs.writeFileSync(fixtureAbs(probeRel), "unregistered\n");
-    else writeFixture(probeRel, "registered\n");
-    throw new Error("litter probe: dying with a fixture on disk");
-}
+armExitSweep();
 
 const REC = readRecord();
 const GATES = Object.keys(REC.gates || {});
@@ -696,28 +668,28 @@ console.log("\n8. the record's field list, because a hand-spelled serialiser alr
 }
 
 
-console.log("\n9. *** THE FIXTURES ARE RECLAIMED WHEN THE RUN DIES, DRIVEN ON REAL CHILDREN OF THIS FILE ***");
+console.log("\n9. *** THE FIXTURES ARE RECLAIMED WHEN THE RUN DIES, DRIVEN ON REAL CHILDREN OF fixtureLitter.mjs ***");
 {
-    // Both deaths, on the gate itself rather than on a re-implementation of the sweep graded by whoever
-    // wrote it: a THROW, which is the death task #62 dies and which still runs exit handlers; and a death
-    // that runs NO handler (0xC0000409, task #65), whose only possible cleaner is the NEXT run.
-    const SELF = fileURLToPath(import.meta.url);
-    const REG_REL = FIXTURE_DIR + "/" + FIXTURE_PREFIX + "litterprobe_fixture.txt";
-    const RAW_REL = FIXTURE_DIR + "/" + FIXTURE_PREFIX + "rawprobe_fixture.txt";
+    // Both deaths, on the shipping module rather than on a re-implementation graded by whoever wrote it: a
+    // THROW, which is the death task #62 dies and which still runs exit handlers; and a death that runs NO
+    // handler (a SIGKILL at the cap, 0xC0000409), whose only possible cleaner is the NEXT run.
+    // The child is fixtureLitter.mjs and not this file because a child of THIS file pays the whole import
+    // graph -- three of them added ~6 s on the rig and pushed the gate past the 20 s cap, which is a gate
+    // turning its own fix into a timeout.
+    const LITTER = fileURLToPath(new URL("./fixtureLitter.mjs", import.meta.url));
     const KEEP_REL = FIXTURE_DIR + "/zz_not_an_inputsets_fixture.txt";
-    const run = (mode) => spawnSync(process.execPath, [SELF],
-        { env: { ...process.env, SWEK_INPUTSETS_LITTER_PROBE: mode }, encoding: "utf8" });
+    const run = (...args) => spawnSync(process.execPath, [LITTER, ...args], { encoding: "utf8" });
     const there = (rel) => fs.existsSync(fixtureAbs(rel));
 
-    const reg = run("1");
-    const leftReg = there(REG_REL);
+    const reg = run();
+    const leftReg = there(PROBE_REG);
     ok("*** a fixture stranded by an uncaught THROW is gone when the process is ***",
        reg.status !== 0 && !leftReg,
        `child exited ${reg.status}; fixture on disk afterwards: ${leftReg}. Before this the tree kept it, and ` +
        "the next capture taken on that box came back stamped dirty over reds it had nothing to do with");
 
     const rawRun = run("raw");
-    const leftRaw = there(RAW_REL);
+    const leftRaw = there(PROBE_RAW);
     ok("!! CONTROL: the same child writing the same way but NOT registering leaves its fixture behind",
        rawRun.status !== 0 && leftRaw,
        `child exited ${rawRun.status}; fixture on disk afterwards: ${leftRaw}. Were this green alongside the ` +
@@ -726,14 +698,14 @@ console.log("\n9. *** THE FIXTURES ARE RECLAIMED WHEN THE RUN DIES, DRIVEN ON RE
     // That leftover is exactly what a handler-less death leaves, so the next child is driven on it rather
     // than on a file this process planted to be found.
     fs.writeFileSync(fixtureAbs(KEEP_REL), "a neighbour that is not a fixture\n");
-    const next = run("1");
-    const clearedRaw = !there(RAW_REL), keptNeighbour = there(KEEP_REL);
+    run();
+    const clearedRaw = !there(PROBE_RAW), keptNeighbour = there(KEEP_REL);
     try { fs.unlinkSync(fixtureAbs(KEEP_REL)); } catch {}
-    dropFixture(RAW_REL);
+    dropFixture(PROBE_RAW);
     ok("*** and the NEXT run reclaims it on the way in, which is the only cleanup a fail-fast leaves possible ***",
-       clearedRaw && !there(REG_REL),
+       clearedRaw && !there(PROBE_REG),
        `the stranded fixture was ${clearedRaw ? "reclaimed" : "STILL THERE"} after a later run opened; that run's ` +
-       `own fixture on disk: ${there(REG_REL)}. This run opened having reclaimed ${STRANDED.length}`);
+       `own fixture on disk: ${there(PROBE_REG)}. This run opened having reclaimed ${STRANDED.length}`);
     ok("!! CONTROL: a neighbouring file that is NOT a fixture survives that reclaim -- prefix-scoped, not a wildcard",
        keptNeighbour,
        "the sweep unlinks inside a SOURCE directory, so a glob widened here one day would delete source files");

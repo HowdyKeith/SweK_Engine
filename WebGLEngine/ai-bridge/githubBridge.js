@@ -433,6 +433,25 @@ function _run(cmd, args, opts) {
 
 // v4451 -- wrapped so the updater can see it; the body is unchanged and is now _cloneEngineSourceInner.
 async function cloneEngineSource(a) { return _tracked("a source clone", () => _cloneEngineSourceInner(a || {})); }
+/**
+ * Make `parent` usable as the directory a clone lands in, and SAY WHICH OF THE THREE CASES IT WAS.
+ * { ok: true, made: false } it was already a directory and nothing was called -- the Windows fix.
+ * { ok: true, made: true }  it did not exist and was created recursively.
+ * { ok: false, error }      something that is not a directory sits there, or the create failed.
+ * Returning `made` rather than a bare boolean is what lets a gate prove the mkdir was SKIPPED rather than
+ * prove that a regex for the guard appears in this file.
+ */
+function _ensureCloneParent(parent) {
+    try {
+        let here = null;
+        try { here = fs.statSync(parent); } catch { here = null; }
+        if (here && !here.isDirectory()) return { ok: false, error: parent + " exists and is not a directory" };
+        if (here) return { ok: true, made: false };
+        fs.mkdirSync(parent, { recursive: true });
+        return { ok: true, made: true };
+    } catch (e) { return { ok: false, error: "cannot create " + parent + ": " + ((e && e.message) || e) }; }
+}
+
 async function _cloneEngineSourceInner({ repo, ref, targetDir, prefix } = {}) {
     const c = loadCfg();
     repo = (repo || c.engineRepo || c.defaultRepo || "").trim();
@@ -464,12 +483,10 @@ async function _cloneEngineSourceInner({ repo, ref, targetDir, prefix } = {}) {
     // The recursive create is still wanted for a targetDir somebody passes that does NOT exist yet, so the
     // call is kept and only the already-there case is skipped. Checked with statSync rather than existsSync
     // so a FILE sitting at that path is refused by name instead of read as "fine, it exists".
-    try {
-        let here = null;
-        try { here = fs.statSync(parent); } catch { here = null; }
-        if (here && !here.isDirectory()) return { ok: false, error: parent + " exists and is not a directory" };
-        if (!here) fs.mkdirSync(parent, { recursive: true });
-    } catch (e) { return { ok: false, error: "cannot create " + parent + ": " + ((e && e.message) || e) }; }
+    // v4649 -- lifted into _ensureCloneParent so the gate can DRIVE it. Its three answers were graded by
+    // matching this function's own source text, which is a check reading the code instead of running it.
+    const par = _ensureCloneParent(parent);
+    if (!par.ok) return { ok: false, error: par.error };
 
     const tmp = path.join(parent, "." + pfx + "_clone.tmp");
     try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {}
@@ -1144,4 +1161,4 @@ async function _tracked(what, fn) {
 function busy() { return _ghBusy > 0; }
 function busyWhat() { return _ghBusy > 0 ? _ghWhat : null; }
 
-module.exports = { busy, busyWhat, ledgerRefresh, ledgerCheck, _apiErrorText, _errorDetail, repoShapeError, _parseEngineVersion, _versionInTree, cloneEngineSource, previewFolder, publishFolder, setConfig, status, listRepos, repoPreview, latestRelease, versionCheck, denoVersionCheck, createRelease, uploadAsset, publishVersion, publishEngineBuild, fetchEngineBuild, engineVersion, whoami, rateLimit, createRepo, updateRepo, deleteRepo, listReleases, deleteRelease, listIssues, createIssue, closeIssue, listCommits, listBranches, listSourceBranches, getFile, putFile, peerConfig, setPeerConfig, addMonitorRepo, removeMonitorRepo, peerRepos, updates, markUpdatesSeen , pagesFor, checkPages, pagesUrl};
+module.exports = { _ensureCloneParent, busy, busyWhat, ledgerRefresh, ledgerCheck, _apiErrorText, _errorDetail, repoShapeError, _parseEngineVersion, _versionInTree, cloneEngineSource, previewFolder, publishFolder, setConfig, status, listRepos, repoPreview, latestRelease, versionCheck, denoVersionCheck, createRelease, uploadAsset, publishVersion, publishEngineBuild, fetchEngineBuild, engineVersion, whoami, rateLimit, createRepo, updateRepo, deleteRepo, listReleases, deleteRelease, listIssues, createIssue, closeIssue, listCommits, listBranches, listSourceBranches, getFile, putFile, peerConfig, setPeerConfig, addMonitorRepo, removeMonitorRepo, peerRepos, updates, markUpdatesSeen , pagesFor, checkPages, pagesUrl};

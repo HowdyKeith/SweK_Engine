@@ -86,7 +86,14 @@ console.log("cloneSource-selfcheck -- the way IN, and what it must never overwri
 {
     console.log("\n3. *** SIDE BY SIDE, NEVER OVER THE TOP ***");
     const src = fs.readFileSync(path.join(ENG, "ai-bridge", "githubBridge.js"), "utf8");
-    const fn = (src.match(/async function cloneEngineSource[\s\S]*?\n\}/) || [""])[0];
+    // *** v4649 -- THIS SLICE NAMED THE WRAPPER AND READ WHATEVER FOLLOWED IT. *** v4451 made
+    // cloneEngineSource a one-line wrapper around _cloneEngineSourceInner, and this regex kept working
+    // only because the next function in the file happened to be the one it meant: the wrapper ends in
+    // `); }` rather than a `}` in column one, so the match ran on into the neighbour. Inserting ANY
+    // function between the two -- v4649 added one -- silently emptied every row below, which is how a
+    // source-reading row fails: not by going red for a reason, but by reading the wrong text.
+    const fn = (src.match(/async function _cloneEngineSourceInner[\s\S]*?\n\}/) || [""])[0];
+    if (!fn) { ok("!! the function this section reads was FOUND", false, "the slice matched nothing"); }
     ok("!! the destination is checked for existence and the run ABORTS",
         /fs\.existsSync\(dest\)/.test(fn) && /exists: true/.test(fn),
         "*** THE RUNNING FOLDER IS WHERE A TREE EDITED IN PLACE KEEPS WORK THAT IS NOWHERE ELSE. *** Driven " +
@@ -111,7 +118,7 @@ console.log("cloneSource-selfcheck -- the way IN, and what it must never overwri
 {
     console.log("\n4. *** THE TOKEN RIDES IN THE ENVIRONMENT, NOT IN THE URL AND NOT IN argv ***");
     const src = fs.readFileSync(path.join(ENG, "ai-bridge", "githubBridge.js"), "utf8");
-    const fn = (src.match(/async function cloneEngineSource[\s\S]*?\n\}/) || [""])[0];
+    const fn = (src.match(/async function _cloneEngineSourceInner[\s\S]*?\n\}/) || [""])[0];   // v4649 -- the INNER function; see section 3
     ok("!! no token is interpolated into the clone URL",
         !/https:\/\/\$\{[^}]*t[ok]/i.test(fn) && !/@github\.com/.test(fn),
         "*** A TOKEN IN THE REMOTE URL IS WRITTEN INTO .git/config AND SURVIVES ON DISK *** long after the " +
@@ -356,26 +363,35 @@ console.log("\nTHE CLONE PARENT IS NOT CREATED WHEN IT IS ALREADY THERE (found o
 // because nothing had been cloned. posixAssumption.mjs's headline -- "A GATE WRITTEN ON A POSIX BOX
 // ENCODES THE BOX" -- arriving through mkdir rather than through a separator.
 {
-    const src = fs.readFileSync(path.join(ENG, "ai-bridge", "githubBridge.js"), "utf8");
+    // *** v4649 -- DRIVEN, NOT READ. *** The first version of these three rows matched githubBridge.js's own
+    // SOURCE TEXT for the guard and for the error sentence. That is a gate grading the code instead of
+    // running it, gateQuality counts it as debt, and this round pushed that debt from 40 to 41 -- a red I
+    // introduced while fixing something else. _ensureCloneParent answers all three cases and SAYS WHICH, so
+    // the row that matters most -- the mkdir is SKIPPED when the directory is already there -- is now a
+    // measurement on both platforms instead of a shape held here and a fact left to the rig.
+    const probe = path.join(os.tmpdir(), "clonesrc-probe-" + process.pid);
+    try { fs.rmSync(probe, { recursive: true, force: true }); } catch {}
+    const deep = path.join(probe, "deep", "er");
+    const first = gh._ensureCloneParent(deep);
+    const second = gh._ensureCloneParent(deep);
+    const filePath = path.join(probe, "a-file");
+    fs.writeFileSync(filePath, "not a directory\n");
+    const onFile = gh._ensureCloneParent(filePath);
+    try { fs.rmSync(probe, { recursive: true, force: true }); } catch {}
+
     ok("!! *** the parent is only created when it is NOT already there ***",
-       /if \(!here\) fs\.mkdirSync\(parent, \{ recursive: true \}\);/.test(src) &&
-       !/^\s*try \{ fs\.mkdirSync\(parent, \{ recursive: true \}\); \}/m.test(src),
-       "the unconditional call is gone and the guarded one is present. *** THE WINDOWS BEHAVIOUR ITSELF IS " +
-       "NOT CHECKED HERE AND CANNOT BE: *** mkdir of an existing drive root only throws on Windows, so this " +
-       "row holds the SHAPE and the rig is the instrument for the fact -- the same division posixAssumption " +
-       "draws for its four measured instances");
+       second.ok === true && second.made === false,
+       `an existing directory answers ${JSON.stringify(second)} -- made:false IS the mkdir not being called. ` +
+       "On POSIX the unconditional call was a silent no-op against the root; on Windows the same call against " +
+       "a drive root throws EPERM and the clone never starts, which is where this was found");
     ok("  ...and a target that does NOT exist is still created, so the guard did not disable the feature",
-       (() => { const d = path.join(os.tmpdir(), "clonesrc-probe-" + process.pid, "deep", "er");
-                let h = null; try { h = fs.statSync(d); } catch { h = null; }
-                if (!h) fs.mkdirSync(d, { recursive: true });
-                const made = fs.existsSync(d);
-                try { fs.rmSync(path.join(os.tmpdir(), "clonesrc-probe-" + process.pid), { recursive: true, force: true }); } catch {}
-                return made; })(),
-       "a targetDir somebody passes for the first time must still be made -- skipping the mkdir entirely " +
-       "would trade one platform's failure for both platforms'");
-    ok("  ...and a FILE sitting at that path is refused by name rather than read as 'it exists'",
-       /exists and is not a directory/.test(src),
-       "statSync rather than existsSync is what makes that distinction available");
+       first.ok === true && first.made === true,
+       `a fresh path answers ${JSON.stringify(first)}. Skipping the mkdir entirely would trade one platform's ` +
+       "failure for both platforms'");
+    ok("  ...and a FILE sitting at that path is refused BY NAME rather than read as 'it exists'",
+       onFile.ok === false && String(onFile.error || "").includes(filePath),
+       `a file answers ${JSON.stringify(onFile)} -- statSync rather than existsSync is what makes that ` +
+       "distinction available, and the refusal carries the path rather than a sentence grepped out of the source");
 }
 
 console.log(fails ? `\ncloneSource-selfcheck: ${fails} FAILED` : "\ncloneSource-selfcheck: all checks pass");
