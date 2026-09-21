@@ -143,11 +143,43 @@ let lostOnExit = 0, lostOnCode = 0;
             fA === fB && fA > 0,
             `${fA} bytes each, to a file, where nothing is lost either way. They differ only in their last ` +
             "line; if they differed in output the comparison below would be measuring the scripts, not exit()");
-        ok("*** process.exit() LOSES output through a pipe that survives to a file, and the control loses none ***",
-            fA === fB && lostOnExit > 0,
-            `${lostOnExit} bytes of ${fA} never reached the reader. Both scripts print the identical ${fA} bytes; ` +
-            "the only difference between them is the last line. The amount is scheduling -- 19,520 to 233,325 " +
-            "across 25 runs here -- so it is reported and the row asserts the contrast instead.");
+        // *** v4649 -- THE LOSS IS A POSIX PROPERTY, AND ON WINDOWS THIS ROW WAS A SABOTAGE THAT MEASURED
+        // ZERO. *** Keith's rig reported "0 bytes of 244000 never reached the reader" and the row went red
+        // for it. That is not a failure to lose output: Node's stdout contract says pipes and sockets are
+        // ASYNCHRONOUS on POSIX and SYNCHRONOUS on Windows, so exit() cannot strand a pipe write there. The
+        // row was asserting one platform's scheduling as a universal.
+        //
+        // It is not skipped on Windows and it is not weakened. It asserts the OTHER fact -- that nothing is
+        // lost -- from the same measurement, so a Node that made Windows pipes asynchronous goes red on that
+        // box, which is exactly when somebody needs to know: the ship ritual counts reds through a pipe, and
+        // that counting is SAFE on Windows for this reason and UNSAFE on POSIX, which is why statedRuntime
+        // had to be repaired in the first place.
+        const POSIX = process.platform !== "win32";
+        ok(POSIX
+            ? "*** process.exit() LOSES output through a pipe that survives to a file, and the control loses none ***"
+            : "*** win32: process.exit() loses NOTHING through a pipe, because pipe writes are synchronous here ***",
+            fA === fB && (POSIX ? lostOnExit > 0 : lostOnExit === 0),
+            POSIX
+              ? `${lostOnExit} bytes of ${fA} never reached the reader. Both scripts print the identical ${fA} ` +
+                "bytes; the only difference between them is the last line. The amount is scheduling -- 19,520 " +
+                "to 233,325 across 25 runs here -- so it is reported and the row asserts the contrast instead. " +
+                "THE CONSEQUENCE: counting reds through `| grep -c` loses evidence on this platform"
+              : `${lostOnExit} bytes of ${fA} lost, and ZERO is the right answer on this platform -- Node's ` +
+                "stdout contract makes pipes and sockets synchronous on Windows and asynchronous on POSIX. " +
+                "The same script strands tens of thousands of bytes on a POSIX box. If this ever reads " +
+                "non-zero here, the ritual's `| grep -c '^  FAIL'` has started losing rows on this box too");
+        // *** AND THE ARM THIS BOX DOES NOT TAKE IS ASSERTED FALSE, SO NEITHER IS A WAY OUT. *** A row that
+        // changes its claim by platform can hide a vacuous branch: if the win32 arm were reached on a box
+        // that DOES lose output it would simply be wrong, and nothing would say so. Checking the other arm
+        // against this same reading is what keeps both honest -- and on POSIX it is also the instrument for
+        // task #51's residual, the 0.4% of runs that lost nothing and were never captured. If that happens
+        // here, this row names it instead of leaving a mystery red.
+        ok("!! CONTROL: the arm this platform does NOT take is FALSE of this box's own measurement",
+            (POSIX ? lostOnExit === 0 : lostOnExit > 0) === false,
+            POSIX ? `lost ${lostOnExit} on ${process.platform}, so the win32 claim (lose nothing) is false here ` +
+                    "-- the two arms are not interchangeable and this box cannot pass under the wrong one. " +
+                    "A red on THIS row with a POSIX platform is the unexplained residual, captured at last"
+                  : `lost ${lostOnExit} on win32, so the POSIX claim (lose something) is false here`);
         ok("  ...and process.exitCode loses NOTHING, so the repair is the line and not the volume",
             lostOnCode === 0,
             `${fB} bytes written, ${pB} read. Setting the code lets the process end normally, and a normal end flushes.`);

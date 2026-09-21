@@ -148,10 +148,67 @@ const serverSrc = fs.readFileSync(path.join(ENG, "ai-bridge", "server.js"), "utf
     let quoteOut = "";
     try { quoteOut = String(execFileSync("bash", [probe], { timeout: 10000, encoding: "utf8" })); } catch (e) { quoteOut = String(e.message || ""); }
     const pwned = fs2.existsSync(marker);
+    const echoed = quoteOut.includes("touch " + marker);
+    // *** v4649 -- ON A BOX WITH NO bash THIS ROW REPORTED AN INJECTION DEFENCE FAILURE, AND ITS DETAIL
+    // PRINTED BOTH HALVES OF A PASS. *** On Keith's rig execFileSync("bash") throws, quoteOut becomes the
+    // ERROR MESSAGE, `echoed` is false -- and the row went red printing "echoed literally, marker absent",
+    // which is what a reader sees when everything is fine. A missing shell is not a quoting bug, and a
+    // detail that describes the conjunct that PASSED is how a red gets read as the wrong finding. Both are
+    // fixed here: the claim is what it can be on this box, and the detail names every half either way.
+    const bashRan = /You picked/.test(quoteOut);
     ok("!! *** SABOTAGE: a volume named \"'; touch ... #\" is printed as TEXT, never executed ***",
-        !pwned && quoteOut.includes("touch " + marker),
-        pwned ? "INJECTION FIRED -- the marker file was created" : "echoed literally, marker absent");
+        !pwned && (echoed || !bashRan),
+        `injection fired: ${pwned}; payload echoed as text: ${echoed}; bash actually ran here: ${bashRan}. ` +
+        (pwned ? "INJECTION FIRED -- the marker file was created, which is the only unconditional failure here"
+         : bashRan ? "bash ran and printed the payload rather than executing it, which is the measurement"
+         : "NOT A PASS ON EVIDENCE: bash did not run on this box (" +
+           quoteOut.replace(/\s+/g, " ").slice(0, 60) + "), so the BEHAVIOUR is unmeasured here -- the " +
+           "quoting SHAPE is asserted by the row above and the .command launcher this defends is generated " +
+           "only on macOS. What is still asserted on every box is that no marker file appeared"));
     try { fs2.rmSync(probe, { force: true }); fs2.rmSync(marker, { force: true }); } catch {}
+
+    // *** AND THE PAYLOAD THAT ROW HAS BEEN DRIVING SINCE IT WAS WRITTEN CANNOT FIRE IN THE POSITION IT IS
+    // DRIVEN IN -- WHICH IS HOW A REAL INJECTION SURVIVED UNDERNEATH IT. ***
+    //
+    // The launcher's line is `echo " You picked <name> in SweK -- ..."`, so the name lands inside DOUBLE
+    // quotes. There `;` and `#` are ordinary characters: MEASURED, "'; touch ... #" creates no marker even
+    // with the quoting removed entirely. The row wearing SABOTAGE and PWNED could never go red, on any
+    // platform, and v4649 found that by sabotaging it and measuring zero.
+    //
+    // What DOES expand inside double quotes is COMMAND SUBSTITUTION -- and single quotes do not stop it
+    // there, because they are ordinary characters too. So a volume named `$(...)` EXECUTED when the .command
+    // was double-clicked, with shellQuote applied and doing nothing in that position. Fixed in the bridge by
+    // putting the name in a variable as a single-quoted literal and printing it with printf %s, and driven
+    // here on the bridge's OWN text via pickedLines rather than on an imitation of it.
+    const subMarker = path2.join(os2.tmpdir(), "swek-ntfs-sub-" + process.pid);
+    const fire = (bashLines) => {
+        try { fs2.rmSync(subMarker, { force: true }); } catch {}
+        const f = path2.join(os2.tmpdir(), "swek-ntfs-sub-probe-" + process.pid + ".sh");
+        fs2.writeFileSync(f, "#!/usr/bin/env bash\n" + bashLines + "\n");
+        let out = "";
+        try { out = String(execFileSync("bash", [f], { timeout: 10000, encoding: "utf8" })); }
+        catch (e) { out = String((e && e.message) || e); }
+        const hit = fs2.existsSync(subMarker);
+        try { fs2.rmSync(f, { force: true }); fs2.rmSync(subMarker, { force: true }); } catch {}
+        return { hit, out };
+    };
+    const subPayload = "$(touch " + subMarker + ")";
+    const shipped = bashRan ? fire(bridge.pickedLines(subPayload)) : null;
+    // The shape the launcher carried until v4649, rebuilt here so the fix is measured against the defect
+    // rather than against nothing. This is the positive control: if it does NOT fire, the probe is blind and
+    // the row above means nothing.
+    const oldShape = bashRan
+        ? fire('echo " You picked ' + bridge.shellQuote(subPayload) + ' in SweK -- choose that one."') : null;
+    ok("!! *** the SHIPPING line prints a $(...) volume name as TEXT -- driven on the bridge's own pickedLines ***",
+        !bashRan || (shipped.hit === false && shipped.out.includes("$(touch ")),
+        bashRan ? `marker created: ${shipped.hit}; the launcher printed: ${shipped.out.trim().slice(0, 78)}`
+                : "NOT A PASS ON EVIDENCE: bash did not run on this box, so this is unmeasured here");
+    ok("!! CONTROL: the shape the launcher carried BEFORE v4649 executes that same name",
+        !bashRan || oldShape.hit === true,
+        bashRan ? `the old double-quoted echo created the marker: ${oldShape.hit}. A volume named $(...) ran ` +
+                  "when the .command was double-clicked, with shellQuote applied and powerless in that " +
+                  "position. If this row ever goes green the probe has gone blind and the one above is decoration"
+                : "NOT A PASS ON EVIDENCE: bash did not run on this box");
 
     // The generator itself is macOS-guarded, so on Linux assert the guard; on a Mac, generate and bash -n it.
     if (!bridge.IS_MAC) {
