@@ -599,6 +599,22 @@ if (process.env.SWEK_QUICKSWEEP !== "0") {
     if ((r.falseRedList || []).length > 20)
       console.log(`[verify]   false red  ... ${r.falseRedList.length - 20} more (quickSweep --json carries all of them)`);
     for (const d of r.dropped) console.log(`[verify]   over budget now  ${d}`);
+    // *** v4649 -- THE ROWS A NEW RED PRINTED, IN THIS LOG, RATHER THAN IN A SECOND RUN. ***
+    // quickSweep has carried each new red's FAIL lines since v4648 and nothing ever printed them, so every
+    // round so far has cost a separate failLines pass on the other box to find out what a red actually said.
+    // And for the seven that print NO failing row -- the Windows fail-fasts -- what travels is the last
+    // thing they printed before dying, which names the last row that ran.
+    for (const n of r.newRed) {
+        if (n.fail && n.fail.length) {
+            console.log(`[verify]   new red  ${n.gate}  exit ${n.code}`);
+            for (const l of n.fail) console.log(`[verify]      ${String(l).slice(0, 200)}`);
+        } else if (n.died && n.died.length) {
+            console.log(`[verify]   new red  ${n.gate}  exit ${n.code}  -- NO FAILING ROW: it died rather than found something. Last output before it went:`);
+            for (const l of n.died) console.log(`[verify]      ${String(l).slice(0, 200)}`);
+        } else {
+            console.log(`[verify]   new red  ${n.gate}  exit ${n.code}  -- no failing row and nothing on the tail either`);
+        }
+    }
     check("quick sweep: no gate outside the red register is red", r.newRed.length === 0,
       r.newRed.length ? "NEW RED: " + r.newRed.map((n) => n.gate + " exit " + n.code).join(", ") + " -- fix it or register it in redCensus.mjs with a reason" : `${r.ran} gates, ${r.knownRed.length} known reds on record`);
     check("quick sweep: nothing timed out alone under the cap", r.unmeasured.length === 0, r.unmeasured.join(", ") || "");

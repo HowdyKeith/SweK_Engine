@@ -11,6 +11,7 @@
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import { FAIL_LINE, gatesFromVerify, runOne, summarise, describe, treeStamp,
          CAPTURE_DIR, captureFile } from "./failLines.mjs";
 import { ENG } from "./gateSweep.mjs";
@@ -203,6 +204,46 @@ console.log("\n7. *** WHERE A CAPTURE GOES, WHICH TOOK TWO SEPARATE FAILURES TO 
     ok("  treeStamp records WHEN HEAD was committed, not only which commit it is",
        st.commit == null || typeof st.committedAt === "string",
        st.committedAt ? `${st.commit} committed ${st.committedAt}` : "git could not answer here");
+}
+
+// ---- A GATE THAT DIES PRINTS NO ROW, AND THE LAST THING IT SAID IS THE ONLY DIAGNOSIS THERE IS ---------
+{
+    console.log("\nCRASHED: WHAT IT PRINTED BEFORE IT WENT");
+    // Seven gates on Keith's box exit non-zero with ZERO failing rows -- five of them with a Windows
+    // fail-fast, which writes nothing to stderr at all. CRASHED already says the subject is unknown. What it
+    // could not say, for three rounds, is WHERE: the last line a dying gate printed names the last row that
+    // ran, and that is a section to read instead of a file.
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "faillines-crash-"));
+    const write = (name, body) => { fs.writeFileSync(path.join(dir, name), body); return name; };
+    const dying = write("zz-dying-selfcheck.mjs",
+        'console.log("1. THE FIRST SECTION");\n' +
+        'console.log("  PASS  something that worked");\n' +
+        'console.log("2. THE SECTION IT DIES IN");\n' +
+        'process.exit(7);\n');
+    const failing = write("zz-failing-selfcheck.mjs",
+        'console.log("  FAIL  a row that says what is wrong   detail");\n' +
+        'console.log("after the row");\n' +
+        'process.exit(1);\n');
+    const d = runOne(dying, { root: dir });
+    const f = runOne(failing, { root: dir });
+    fs.rmSync(dir, { recursive: true, force: true });
+
+    ok("*** a CRASHED gate carries the last thing it printed, which names the last row that ran ***",
+        d.verdict === "CRASHED" && Array.isArray(d.died) && d.died[d.died.length - 1] === "2. THE SECTION IT DIES IN",
+        `verdict ${d.verdict}, died ${JSON.stringify(d.died)}. A fail-fast writes nothing to stderr, so this ` +
+        "is the whole diagnosis available on that box");
+    ok("!! CONTROL: a gate that DID find something carries no death tail, so a normal red does not double in size",
+        f.verdict === "RED" && f.fails === 1 && !f.died,
+        `verdict ${f.verdict}, ${f.fails} row(s), died ${JSON.stringify(f.died || null)}. The rows are the ` +
+        "finding; the tail is only for the gates that have none");
+    ok("  and the report PRINTS it, rather than carrying it where only a JSON reader would find it",
+        /NO FAILING ROW: it died rather than found something/.test(describe([d])) &&
+        /2\. THE SECTION IT DIES IN/.test(describe([d])),
+        "v4648 wired a red gate's FAIL lines into the sweep and verify never printed them -- carried and not " +
+        "shown is the same as not carried, one layer further in");
+    ok("!! CONTROL: the failing gate's report shows its ROW and no death tail",
+        /a row that says what is wrong/.test(describe([f])) && !/NO FAILING ROW/.test(describe([f])),
+        "the two verdicts have to read differently or the distinction is decoration");
 }
 
 console.log(`\nfailLines-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);

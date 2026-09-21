@@ -409,7 +409,13 @@ export function reconcile(rows, register = redRegister()) {
         // tools/ship/sweepCoverage-selfcheck.mjs exit 1" and nothing else. That gate is green when run
         // alone, so the evidence existed for the length of one process and was discarded. A whole round
         // went into inferring the cause from concurrent copies and got it wrong twice.
-        else fresh.push({ gate: r.gate, code: r.serialCode, ms: r.serialMs, fail: failLinesOf(r.serialTail) });
+        else {
+            const fail = failLinesOf(r.serialTail);
+            // A gate with no failing row did not FIND anything -- it DIED. What it printed last is the only
+            // thing anybody on another box has to go on, so it travels with the verdict.
+            fresh.push({ gate: r.gate, code: r.serialCode, ms: r.serialMs, fail,
+                         died: fail.length ? null : deathTail(r.serialTail) });
+        }
     }
     return { known, newRed: fresh, unmeasured };
 }
@@ -859,6 +865,30 @@ export function failLinesOf(tail, { max = 4 } = {}) {
         : all.slice(0, max).concat(`  ... and ${all.length - max} more FAIL line(s)`);
 }
 
+/**
+ * *** WHAT A GATE THAT PRINTED NO FAILING ROW SAID BEFORE IT DIED. ***
+ *
+ * v4649. Seven gates on Keith's box exit non-zero having printed ZERO "  FAIL" lines -- five with a Windows
+ * fail-fast (0xC0000409), one with an access violation, the rest with a bare exit 1. failLines reports them
+ * as CRASHED and says what they were checking is UNKNOWN, which is true and is as far as anyone has got in
+ * three rounds.
+ *
+ * But the run already keeps a 4 KB tail, and for a gate that dies mid-way THE LAST LINE IT PRINTED NAMES THE
+ * LAST THING THAT RAN. A fail-fast writes nothing to stderr at all, so that line is the entire diagnosis
+ * available -- it turns "contactOverlay crashed" into "contactOverlay crashed after the row about X", which
+ * is a section to read instead of a file.
+ *
+ * Bounded and last-N because the tail is a tail: the interesting end is the end.
+ */
+export function deathTail(tail, { max = 3 } = {}) {
+    return String(tail || "")
+        .split(/\r?\n/)
+        .map((l) => l.trimEnd())
+        .filter((l) => l.trim() && !FAIL_LINE.test(l))
+        .slice(-max)
+        .map((l) => l.slice(0, 200));
+}
+
 const REQUIRED = ["ran", "enumerated", "budgetMs", "green", "knownRed", "newRed", "unmeasured", "dropped"];
 
 /**
@@ -949,8 +979,15 @@ export function reportLines(r) {
     // Absent where the run captured nothing -- a crash prints no FAIL line, and saying so is the finding.
     for (const n of r.newRed) {
         const lines = (n && n.fail) || [];
-        if (!lines.length) continue;
-        for (const l of lines) out.push("       " + l.replace(/^\s+/, ""));
+        if (lines.length) { for (const l of lines) out.push("       " + l.replace(/^\s+/, "")); continue; }
+        // *** v4649 -- AND WHERE IT GOT TO, FOR THE ONES THAT PRINTED NO ROW AT ALL. *** "no FAIL line was
+        // printed" is true and stops one step short: the last line the gate DID print names the last row
+        // that ran. On a Windows fail-fast, which writes nothing to stderr, that is the only diagnosis
+        // anybody on that box can send back.
+        const died = (n && n.died) || [];
+        if (!died.length) continue;
+        out.push("       no failing row -- the last thing it printed before it went:");
+        for (const l of died) out.push("         " + String(l).replace(/^\s+/, ""));
     }
     for (const d of r.dropped) out.push(`  slower ${d}  now over budget`);
     return out;

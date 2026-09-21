@@ -107,7 +107,16 @@ export function runOne(rel, { root = ENG, timeoutMs = 120000, spawn = spawnSync 
     const verdict = killed ? "TIMEOUT"
                    : exit === 0 ? (lines.length ? "ODD" : "GREEN")
                                 : (lines.length ? "RED" : "CRASHED");
+    // *** v4649 -- WHAT A GATE THAT PRINTED NO FAILING ROW SAID BEFORE IT DIED. *** CRASHED already tells a
+    // reader the subject is UNKNOWN. The last lines it printed name the last thing that RAN, and on a
+    // Windows fail-fast -- which writes nothing to stderr at all -- that is the only diagnosis there is.
+    // Carried only for the verdicts where there are no rows, so a capture of 44 reds does not double in size.
+    const died = (verdict === "CRASHED" || verdict === "TIMEOUT")
+        ? text.split(/\r?\n/).map((l) => l.trimEnd()).filter((l) => l.trim() && !FAIL_LINE.test(l))
+              .slice(-4).map((l) => l.slice(0, 200))
+        : null;
     return { gate: rel, exit, ms, fails: lines.length, lines, verdict,
+             ...(died && died.length ? { died } : {}),
              ...(r.signal ? { signal: r.signal } : {}) };
 }
 
@@ -177,6 +186,10 @@ export function describe(rows, since = null) {
         out.push(`  ${r.verdict.padEnd(7)} ${r.gate}  exit ${r.exit}${r.signal ? " (" + r.signal + ")" : ""}  ${r.ms} ms  ${r.fails} row(s)`);
         for (const l of r.lines.slice(0, 6)) out.push(`      ${l.slice(0, 200)}`);
         if (r.lines.length > 6) out.push(`      ... ${r.lines.length - 6} more`);
+        if (!r.lines.length && r.died && r.died.length) {
+            out.push("      NO FAILING ROW: it died rather than found something. Last output before it went:");
+            for (const l of r.died) out.push(`        ${l}`);
+        }
     }
     return out.join("\n");
 }

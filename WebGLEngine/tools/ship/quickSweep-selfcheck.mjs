@@ -695,10 +695,38 @@ sec("8e. A CRASH IN THE NEW-RED LIST, SPELLED AS A CRASH");
     // length of that process -- and section 8g drives reportLines and requires it to be PRINTED. So the row
     // moves with the claim instead of being deleted with it: the stored set is exactly these four, and the
     // new one is read.
-    ok(/else fresh\.push\(\{ gate: r\.gate, code: r\.serialCode, ms: r\.serialMs, fail: failLinesOf\(r\.serialTail\) \}\);/.test(src),
-       "...and reconcile stores exactly gate, code, ms and fail -- no fifth field arriving unread",
-       "a field nothing reads is a field that will disagree with the thing that does; 8g is what makes " +
-       "`fail` the other kind, by failing if the report stops printing it");
+    // *** v4649 -- DRIVEN, NOT MATCHED. *** This row was a regex over the exact text of one line in
+    // quickSweep.mjs, so adding a fifth field broke it for the wrong reason: it went red because the source
+    // changed, not because anything arrived unread. gateQuality counts that shape as debt. The claim is
+    // about the OBJECT, so the object is what it reads now -- and the fifth field, `died`, is the one that
+    // carries where a gate that printed no row got to before it died.
+    const storeRows = [
+        { gate: "withrows.mjs", verdict: VERDICT.RED, serialMs: 3, serialCode: 1,
+          serialTail: "1. A SECTION\n  FAIL  the row that broke   detail\n" },
+        { gate: "died.mjs", verdict: VERDICT.RED, serialMs: 4, serialCode: 3221226505,
+          serialTail: "1. THE FIRST SECTION\n  PASS  fine\n2. THE SECTION IT DIES IN\n" },
+    ];
+    const stored = Q.reconcile(storeRows, new Map()).newRed;
+    const keysOf = (o) => Object.keys(o).sort().join(",");
+    ok(stored.length === 2 && keysOf(stored[0]) === "code,died,fail,gate,ms",
+       "...and reconcile stores exactly gate, code, ms, fail and died -- no sixth field arriving unread",
+       `stored ${keysOf(stored[0] || {})}. A field nothing reads is a field that will disagree with the ` +
+       "thing that does; 8g is what makes these the other kind, by failing if the report stops printing them");
+    // The `died &&` is not defensive noise: without it, a `died` that comes back null makes THIS ROW THROW
+    // and the gate exits 1 having printed no failing row -- a crash instead of a finding, in the row whose
+    // whole subject is telling those two apart. Measured by sabotaging `died` to null and getting exit 1
+    // with zero FAIL lines.
+    const lastDied = (x) => (x && x.died && x.died.length) ? x.died[x.died.length - 1] : null;
+    ok(stored[0].fail.length === 1 && stored[0].died === null &&
+       stored[1].fail.length === 0 && lastDied(stored[1]) === "2. THE SECTION IT DIES IN",
+       "*** a red with rows carries its ROWS and no tail; a red with none carries WHERE IT GOT TO ***",
+       `${JSON.stringify(stored[1] && stored[1].died)} -- five gates on the Windows rig die with a fail-fast that writes ` +
+       "nothing to stderr at all, so the last line they printed is the only diagnosis that exists");
+    ok(/no failing row -- the last thing it printed before it went/.test(Q.reportLines({
+           ran: 2, enumerated: 2, budgetMs: 3000, ms: 1, green: 0, knownRed: [], newRed: stored,
+           falseReds: 0, unmeasured: [], dropped: [], newGates: [], skippedOverBudget: 0 }).join("\n")),
+       "  and the report PRINTS it -- carried and not shown is the same as not carried",
+       "v4648 wired a red gate's FAIL lines into this record and verify never printed them for a round");
 }
 
 // ---------------------------------------------------------------------------------------------------------

@@ -105,6 +105,13 @@ export const VERDICT = Object.freeze({
  * The table is Windows NTSTATUS values as Node surfaces them. They are decided by RANGE and not by a list of
  * three: any code above 255 is not something a harness in this tree chose, because POSIX masks an exit
  * status to 8 bits and every gate here exits 0 or 1. A name is offered where one is known.
+ *
+ * *** v4649 -- AND ONE OF THOSE NAMES SENDS A READER TO THE WRONG PLACE. *** STATUS_STACK_BUFFER_OVERRUN
+ * is what Windows raises for __fastfail, and V8 calls __fastfail for an OOM abort and for a failed CHECK
+ * as well as for a smashed stack cookie. Five gates on Keith's 7908 MB box die with it and the set is
+ * different every run, which is not the shape of five buffer overruns. The name is kept because it is
+ * what the OS said; what it MEANS is written down here so nobody spends a round reading those gates for
+ * a memory bug that is not in them.
  */
 export const OS_KILL_CODES = Object.freeze({
     3221225477: "STATUS_ACCESS_VIOLATION (0xC0000005)",
