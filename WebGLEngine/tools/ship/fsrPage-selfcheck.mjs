@@ -232,6 +232,66 @@ console.log("\n4. CONTROLS");
         "disocclusionCPU compares the depth a surface WOULD have had against the depth RECORDED then");
 }
 
+// -----------------------------------------------------------------------------------------------------------
+console.log("\n5. *** THE OBJECT-MOTION CAMERA (v4649): THE FIRST TIME THIS PAGE'S MOTION IS NOT PURELY THE CAMERA'S ***");
+{
+    // Every number this page has printed came from a scene where only the camera moved -- and on such a scene
+    // render/objectMotion.mjs is EXACTLY render/motionVectors.mjs, because every model matrix is the identity.
+    // v4646 measured the gap on a synthetic fixture and v4648 on a rasterised one; neither was a frame.
+    ok("the page offers a camera whose OBJECT moves, and imports the arc's object-motion pair for it",
+        /value="objects"/.test(src) && /objectMotionGPU\.mjs/.test(src) && /objectMotion\.mjs/.test(src)
+        && /ObjectMotionGPU/.test(src) && /buildObjectMatrices/.test(src),
+        "a fourth camera rather than a change to the dolly, so the dolly's own numbers cannot move");
+    ok("!! *** the id buffer is DERIVED FROM hit(), not rasterised and not declared ***",
+        /function renderIds\(/.test(src) && /function renderIds\([\s\S]{0,500}hit\(inv[\s\S]{0,80}\)\[1\] === Y_NEAR/.test(src),
+        "v4648 built a compute rasteriser because nothing in the tree produced an id buffer. This page needs " +
+        "none: hit() returns where the ray met the scene and its y says which surface that was -- the same " +
+        "comparison patternUV has made on every dolly frame since that camera existed. The identity was " +
+        "computed and discarded on the next line. The producer here is a `return`, and a row that let this " +
+        "become a second traversal of the scene would be letting the page recompute what it already knew.");
+    ok("!! ...and the SLAB'S PATTERN travels with the slab, so a moving surface is not sliding under a fixed texture",
+        /patternUV = \(p, sx = 0\)/.test(src) && /p\[0\] - sx - SLAB_X\[0\]/.test(src),
+        "a slab that moved in the depth and id buffers and stood still in the picture is a scene no motion " +
+        "vector can be right about, and every row below would be measuring that instead of the reprojection");
+    // *** THE ADDITIVITY IS A SOURCE CLAIM BECAUSE IT HAS TO SURVIVE WITHOUT THE BASELINE FILE. ***
+    // It was VERIFIED numerically when the change was made -- the pre-change page was served alongside the
+    // new one and all three older cameras produced identical dTmp, dFsr, disocclusion and accumulate lines
+    // over five frames -- but that control needed a copy of the old page on disk and cannot ship. What can
+    // ship is the reason it held: every sampler takes the slab offset with a default of 0, and the three
+    // older cameras pass none.
+    const samplers = ["function hit\\(inv, u, v, sx = 0\\)", "function renderPersp\\(R, vp, kind, sx = 0\\)",
+                      "function renderDepth\\(vp, sx = 0\\)", "function truthPersp\\(vp, kind, sx = 0\\)",
+                      "function renderIds\\(vp, sx = 0\\)"];
+    const missing = samplers.filter((r) => !new RegExp(r).test(src));
+    ok("!! ...and EVERY sampler defaults its slab offset to zero, which is what keeps the three older cameras untouched",
+        missing.length === 0,
+        `${samplers.length} samplers, ${missing.length} without a zero default${missing.length ? ": " + missing.join(", ") : ""}. ` +
+        "Verified numerically when the change was made, by serving the pre-change page beside it: static, pan " +
+        "and dolly produced IDENTICAL stat lines over five frames. That control needed the old page on disk " +
+        "and cannot ship; this is the property that made it true.");
+    ok("  ...and the slab offset reaches the samplers ONLY on the objects camera",
+        /const sxCur = objects \? frame \* SLAB_DX : 0/.test(src)
+        && /const sxPrev = objects \? Math\.max\(0, frame - 1\) \* SLAB_DX : 0/.test(src),
+        "zero on every other camera, so a default that was quietly dropped would still be a no-op there");
+    ok("!! ...and the page reports the gap WITH ITS CONTROL -- the background, whose model matrix is the identity",
+        /objGap[\s\S]{0,900}ids\[i\] === 1[\s\S]{0,200}offSlab/.test(src) && /on the background/.test(src),
+        "the background number is the control: object-aware and camera-only are the same computation where " +
+        "the model matrix is the identity, so a field that moved BOTH would be a mislabelled id buffer " +
+        "rather than working object matrices. A single number could not tell those apart.");
+    // DERIVED, not quoted: the gap the page prints must be the slab's own screen motion, because camera-only
+    // predicts zero object motion and so its error IS the object's screen displacement.
+    const TANFOV = Math.tan(0.5), DIST = 4, D = 192;
+    const m = /const SLAB_DX = ([\d.]+);/.exec(src);
+    const dx = m ? Number(m[1]) : NaN;
+    const predicted = dx / (2 * DIST * TANFOV) * D;
+    report(`SLAB_DX ${dx} world units/frame -> ${predicted.toFixed(3)} display px/frame at the slab plane`);
+    ok("!! ...and that predicted motion is the 2.42 px the page prints, which is what makes the number a DERIVATION",
+        Math.abs(predicted - 2.42) < 0.01,
+        `${predicted.toFixed(3)} px from the geometry against 2.42 px measured on a device. Camera-only ` +
+        "predicts ZERO object motion, so its error is exactly the object's screen displacement -- the page's " +
+        "headline number is forced by the scene's dimensions and is not free to be anything else.");
+}
+
 console.log(fails ? `\nfsrPage-selfcheck: ${fails} FAILED` : "\nfsrPage-selfcheck: all checks pass");
 console.log("\nunchecked here: the ADAPTER path, which is tools/ship/fsrPageDevice-selfcheck.mjs's -- every row " +
     "above runs with navigator.gpu absent, so this file is the CPU branch and that is deliberate: the two " +

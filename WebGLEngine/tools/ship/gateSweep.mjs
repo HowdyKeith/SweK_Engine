@@ -8032,6 +8032,74 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4649 -- THE 259th CLOSING: fsr.html's first motion vector that is not purely the camera's.
+    since334: Object.freeze({
+        at: "v4649", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/fsrPageObjects-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 3,358 ms on real WebGPU, 9 rows, and that runtime is OVER the sweep's 3,000 ms " +
+                 "threshold -- stated below rather than tuned away. *** fsr.html HAS A FOURTH CAMERA AND ITS " +
+                 "OBJECT MOVES. *** Every number this page ever printed came from a scene where only the " +
+                 "camera did, and on such a scene render/objectMotion.mjs IS render/motionVectors.mjs because " +
+                 "every model matrix is the identity. v4646 measured the gap on a synthetic fixture and v4648 " +
+                 "on a rasterised one; neither was a frame. " +
+                 "*** AND THE PRODUCER IS A `return`, NOT A RASTERISER. *** v4648 built a compute rasteriser " +
+                 "because nothing in the tree made an id buffer. This page needs none: hit() returns where " +
+                 "the ray met the scene and its y says which surface that was -- the comparison patternUV has " +
+                 "made on every dolly frame since that camera existed. The identity was computed every frame " +
+                 "and discarded on the next line. " +
+                 "*** ADDITIVE, AND VERIFIED AS SUCH RATHER THAN ASSERTED. *** Every sampler takes a slab " +
+                 "offset defaulting to zero and the three older cameras pass none. Checked by serving the " +
+                 "PRE-CHANGE PAGE ALONGSIDE THE NEW ONE: static, pan and dolly produced IDENTICAL dTmp, " +
+                 "dFsr, disocclusion and accumulate lines over five frames. That control needed the old page " +
+                 "on disk and cannot ship; the zero defaults that made it true are a gate row. " +
+                 "*** THE HEADLINE IS DERIVED: 2.42 px. *** Camera-only predicts ZERO object motion, so its " +
+                 "error IS the slab's screen displacement -- SLAB_DX over the visible span at the slab plane " +
+                 "gives 2.416 px/frame from the geometry against 2.42 measured on a device, and the number is " +
+                 "not free to be anything else. " +
+                 "*** THE ROUND'S FIRST ANSWER WAS WRONG AND THE PRODUCT MEASUREMENT IS WHAT FOUND IT. *** " +
+                 "Object-aware motion scored WORSE than camera-only at every frame -- 13.56 dB against 15.00 " +
+                 "-- and the temporal pane decayed monotonically, 30.94 dB at frame 2 to 19.56 by frame 10. " +
+                 "That would have shipped as a finding about object motion. It was neither: " +
+                 "`ref = truthPersp(vpCur, kind)` did not take the slab's offset, so a moving slab was scored " +
+                 "against a truth that still held it still and the PSNR measured how far it had WALKED. " +
+                 "Corrected, the camera runs 35-43 dB like the dolly's 38-41 and object-aware BEATS " +
+                 "camera-only by up to 4.6 dB. Ruling out a sign error first is what kept it from being " +
+                 "believed: the swapped wiring scored 13.40 against 13.39, so both orientations lost equally " +
+                 "and the fault was not in the motion at all. " +
+                 "*** SABOTAGE: EIGHT MUTATIONS, ALL EIGHT CAUGHT, AND THE FIELD ROWS CAUGHT ONLY FIVE. *** " +
+                 "Swapping the model matrices, letting the depth buffer ignore the slab, and letting the " +
+                 "RENDER ignore it all produce a camera-vs-object gap of exactly the right MAGNITUDE, " +
+                 "because that magnitude is forced by SLAB_DX and the scene's dimensions whatever else is " +
+                 "wrong. Only the reconstructed picture separates them -- and only on the SMOOTH scene: on " +
+                 "the zone plate, detail past Nyquist leaves the temporal pane near 16 dB whatever the " +
+                 "vectors say, and two of them scored zero there. A reconstruction row has to run on content " +
+                 "that can be reconstructed. A ninth defect, the control taking a maximum over an EMPTY SET " +
+                 "and printing a perfect zero, was found by a mutation labelling every pixel the slab; both " +
+                 "populations are counted now. " +
+                 "*** THE BOUND IS PLACED BY MEASURING EVERY WRONG WIRING. *** At frame 6 on smooth: correct " +
+                 "39.92 dB, swapped matrices 35.81, depth ignoring the slab 37.15, camera-only 36.12, fsr1 " +
+                 "34.11. The floor sits at 38.5. A bound at fsr1 would have passed all four, which is what it " +
+                 "did until these were taken. " +
+                 "*** AND THE GATE IS OVER BUDGET, WHICH IS A COST AND NOT A DEFECT. *** These rows took " +
+                 "fsrPageDevice-selfcheck from 2,448 ms to 4,872, so they were SPLIT OUT -- the third split " +
+                 "in this tree for the sweep's threshold and the third taken before the addition landed. That " +
+                 "gate is back to 2,418 and keeps its place; this one runs at 3,358 and does not. The cheap " +
+                 "fix was measured and rejected: at frame 4 the gate costs 2,828 ms and fits, and the four " +
+                 "wirings land inside 0.4 dB of each other because the accumulator has not converged. A gate " +
+                 "that fits the budget and cannot tell a correct wiring from a wrong one is not the cheaper " +
+                 "version of this gate. ALSO PINNED THIS ROUND: the dolly's '106 genuine', which this page " +
+                 "quotes in its own prose and four files repeat, and which no gate held -- the row asked only " +
+                 "for genuine > 0. " +
+                 "NAMED UNCHECKED: why the disocclusion count ALTERNATES 212/106 on the new camera while the " +
+                 "dolly's is a flat 106, measured over frames 2-6 and left unexplained rather than given a " +
+                 "plausible story; and the ZONE PLATE on this camera, where the reconstruction row cannot " +
+                 "separate a correct wiring from a wrong one, so the page's own default scene is the one " +
+                 "case the new gate does not grade.",
+    }),
     // v4648 -- THE 258th CLOSING: the id buffer v4646 consumed and nothing produced.
     since333: Object.freeze({
         at: "v4648", swept: 1, green: 1, red: 0,

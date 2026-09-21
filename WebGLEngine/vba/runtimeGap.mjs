@@ -337,7 +337,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
     // and the readings overlap on everything predating the split, so they are run over the merged tree rather
     // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
-    files: 4285,               // v4645 -- RE-DERIVED AT THE main MERGE over the merged tree. RE-DERIVED AT THE main MERGE: 4169 on this branch, 4172 on main, 4260 merged -- LESS than the sum, which is why it is run
+    files: 4286,               // v4645 -- RE-DERIVED AT THE main MERGE over the merged tree. RE-DERIVED AT THE main MERGE: 4169 on this branch, 4172 on main, 4260 merged -- LESS than the sum, which is why it is run
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
                           // RE-TAKEN TWICE IN TWO ROUNDS, and the second time only because the ship gate
@@ -693,7 +693,17 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // gate ends on a refusal row that builds a webgl2 device to prove the runner throws on one. Three rounds
     // is a pattern rather than a quirk, and it says plainly what this table measures: TEXT IN CODE. A reader
     // taking `webgpu: 52` as a count of this tree's WebGPU work would be wrong by the whole temporal arc.
-    esModules: 3985, closures: 3851, asyncAwait: 1525, typedArrays: 1131, promises: 368,
+    //
+    // *** v4649 -- RE-TAKEN, ONE new file, and it BREAKS the pattern the last note called a pattern. ***
+    // files 4285 -> 4286, ES modules 3985 -> 3986, closures 3851 -> 3852, async/await 1525 -> 1526, and
+    // Promises 368 -> 369. WebGL does NOT move and neither does WebGPU.
+    //     tools/ship/fsrPageObjects-selfcheck.mjs   ES modules, closures, async/await, Promises
+    // Three rounds running the WebGL row moved, and v4648's note said that was a pattern rather than a quirk.
+    // It was -- but the cause was NARROWER than the note implied: it is the REFUSAL ROW, which builds a
+    // webgl2 device to prove a runner throws on one. This gate drives a PAGE and has no such row, so the
+    // WebGL row holds. The reading stands and is now better bounded: this table measures text in code, and
+    // the arc's WebGPU work registers as WebGL exactly when it proves it is not WebGL, not otherwise.
+    esModules: 3986, closures: 3852, asyncAwait: 1526, typedArrays: 1131, promises: 369,
     fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 159, webgpu: 52, threads: 23, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

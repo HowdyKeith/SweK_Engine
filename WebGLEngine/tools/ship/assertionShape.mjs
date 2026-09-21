@@ -458,8 +458,10 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // running under render/ and the same four rows move by one while the other four hold, which is now the
     // shape this census reports rather than a coincidence: distinctDefinitions 41, condFirst 91,
     // unknownSignature 16, suspects 0.
-    gates: 1754, usesOk: 1733, definesOk: 1725, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1626, condFirst: 91, unknownSignature: 16,
+    // v4649 -- 1754 -> 1755 for tools/ship/fsrPageObjects-selfcheck.mjs, fsr.html's object-motion camera,
+    // split out of fsrPageDevice-selfcheck for the sweep budget. Same four rows by one; the other four hold.
+    gates: 1755, usesOk: 1734, definesOk: 1726, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1627, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

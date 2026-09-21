@@ -44,6 +44,7 @@
       <option value="static">camera: static</option>
       <option value="pan">camera: panning 0.75 px/frame</option>
       <option value="dolly">camera: dollying (perspective, two planes)</option>
+      <option value="objects">camera: dollying + the slab MOVES (object motion)</option>
     </select>
     <select id="ratio">
       <option value="2">upscale 2&times;</option>
@@ -57,6 +58,7 @@
   <div class="stat" id="engine">spatial engine: starting up</div>
   <div class="stat" id="accstat"></div>
   <div class="stat" id="disstat"></div>
+  <div class="stat" id="objstat"></div>
   <div class="stat" id="over"></div>
 </div>
 <div class="panes">
@@ -175,6 +177,8 @@ import { describeWebGPU, showOriginBanner } from "/ui/webgpuProbe.mjs";
 import { FSRGPU, rangeOf } from "./fx/fsr/fsrGPU.js";
 import { TemporalGPU } from "./render/temporalGPU.mjs";
 import { MotionVectorsGPU, orthoPanVP } from "./render/motionVectorsGPU.mjs";
+import { ObjectMotionGPU } from "./render/objectMotionGPU.mjs";
+import { buildObjectMatrices, objectMotionCPU } from "./render/objectMotion.mjs";
 import { TemporalRejectGPU } from "./render/temporalRejectGPU.mjs";
 import { motionVectorsCPU, mat4Invert, transform4 } from "./render/motionVectors.mjs";
 // *** v4638 -- THE PAGE GETS A SECOND CAMERA, AND IT IS THE TREE'S OWN. *** render/rasterProbe.js's viewProj is
@@ -229,30 +233,65 @@ const NEAR = 0.1, FAR = 100, TANFOV = Math.tan(0.5), DOLLY = 0.02;   // world un
 /** The dolly camera at frame f -- the basis render/jitter-selfcheck.mjs drives, looking down +y. */
 const dollyVP = (f) => viewProj([f * DOLLY, -8, 0], [0, 1, 0], [1, 0, 0], [0, 0, 1], TANFOV, 1, NEAR, FAR);
 
+// *** v4649 -- THE SLAB CAN MOVE NOW, AND `sx` DEFAULTS TO ZERO SO THE THREE OLDER CAMERAS ARE UNTOUCHED. ***
+// Every sampler below threads a slab offset through; every existing caller passes none and gets exactly the
+// picture, depth and truth it got before. That is deliberate rather than tidy: this page's dolly numbers --
+// 106 genuine disocclusions, the 192-pixel offscreen column -- are quoted in its own prose and in four gates,
+// and a round that moved them while adding a feature would be indistinguishable from a round that broke them.
+const SLAB_DX = 0.055;                         // world units per frame, along +x, on the "objects" camera
+// The two model matrices the "objects" camera needs, column-major to match render/rasterProbe.js's viewProj
+// and everything downstream of it. The background's is the identity ON PURPOSE and not as a placeholder: it
+// is what makes the background pixels a control rather than a second unknown.
+const IDENT4 = Float32Array.from([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+const translate4 = (tx) => Float32Array.from([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, tx, 0, 0, 1]);
+
 /** Where this pixel's ray meets the scene: the slab if it covers it, the background otherwise. */
-function hit(inv, u, v) {
+function hit(inv, u, v, sx = 0) {
     const nx = 2 * u - 1, ny = 1 - 2 * v;
     const a = transform4(inv, nx, ny, -1, 1), b = transform4(inv, nx, ny, 1, 1);
     const ax = a[0] / a[3], ay = a[1] / a[3], az = a[2] / a[3];
     const bx = b[0] / b[3], by = b[1] / b[3], bz = b[2] / b[3];
     const at = (py) => { const t = (py - ay) / (by - ay); return [ax + t * (bx - ax), py, az + t * (bz - az)]; };
     const n = at(Y_NEAR);
-    const onSlab = n[0] >= SLAB_X[0] && n[0] <= SLAB_X[1] && n[2] >= SLAB_Z[0] && n[2] <= SLAB_Z[1];
+    const onSlab = n[0] >= SLAB_X[0] + sx && n[0] <= SLAB_X[1] + sx && n[2] >= SLAB_Z[0] && n[2] <= SLAB_Z[1];
     return onSlab ? n : at(Y_FAR);
 }
 
+/**
+ * *** THE ID BUFFER, AND IT IS ONE COMPARISON ON A VALUE THIS PAGE ALREADY HAD. ***
+ *
+ * render/objectMotion.mjs has wanted a per-pixel object id since v4646 and v4648 built a rasteriser to make
+ * one. This page needs neither: hit() returns the point where the ray met the scene, and its y says which
+ * surface that was -- patternUV has branched on exactly that comparison since the dolly camera was added.
+ * The identity was computed every frame and discarded on the next line. So the producer here is not a
+ * rasteriser, it is a `return`.
+ *
+ * 0 is the background and 1 is the slab, matching the order of the model tables in tick().
+ */
+function renderIds(vp, sx = 0) {
+    const inv = mat4Invert(vp);
+    const ids = new Uint32Array(D * D);
+    for (let y = 0; y < D; y++) for (let x = 0; x < D; x++) {
+        ids[y * D + x] = hit(inv, (x + 0.5) / D, (y + 0.5) / D, sx)[1] === Y_NEAR ? 1 : 0;
+    }
+    return ids;
+}
+
 /** The pattern's (u, v) for a world point on either plane -- each plane carries its own copy at its own scale. */
-const patternUV = (p) => p[1] === Y_NEAR
-    ? [(p[0] - SLAB_X[0]) / (SLAB_X[1] - SLAB_X[0]), (p[2] - SLAB_Z[0]) / (SLAB_Z[1] - SLAB_Z[0])]
+// The slab's pattern travels WITH the slab: subtracting sx keeps the texture fixed to the surface rather than
+// to the world. A slab that slid under a stationary texture would move in the depth and id buffers and stand
+// still in the picture, which is a scene no motion vector can be right about.
+const patternUV = (p, sx = 0) => p[1] === Y_NEAR
+    ? [(p[0] - sx - SLAB_X[0]) / (SLAB_X[1] - SLAB_X[0]), (p[2] - SLAB_Z[0]) / (SLAB_Z[1] - SLAB_Z[0])]
     : [(p[0] + 6) / 12, (p[2] + 6) / 12];
 
 /** Colour at R x R through a (jittered) view-projection. */
-function renderPersp(R, vp, kind) {
+function renderPersp(R, vp, kind, sx = 0) {
     const inv = mat4Invert(vp);
     if (!inv) throw new Error("fsr.html: the dolly camera is singular -- mat4Invert returns null, not a matrix");
     const out = new Float32Array(R * R * 4);
     for (let y = 0; y < R; y++) for (let x = 0; x < R; x++) {
-        const [pu, pv] = patternUV(hit(inv, (x + 0.5) / R, (y + 0.5) / R));
+        const [pu, pv] = patternUV(hit(inv, (x + 0.5) / R, (y + 0.5) / R, sx), sx);
         const px = scene(pu, pv, kind);
         for (let c = 0; c < 4; c++) out[(y * R + x) * 4 + c] = px[c];
     }
@@ -260,11 +299,11 @@ function renderPersp(R, vp, kind) {
 }
 
 /** Clip-space z at D x D through the UNJITTERED camera -- what motionVectorsCPU and disocclusionCPU read. */
-function renderDepth(vp) {
+function renderDepth(vp, sx = 0) {
     const inv = mat4Invert(vp);
     const d = new Float32Array(D * D);
     for (let y = 0; y < D; y++) for (let x = 0; x < D; x++) {
-        const p = hit(inv, (x + 0.5) / D, (y + 0.5) / D);
+        const p = hit(inv, (x + 0.5) / D, (y + 0.5) / D, sx);
         const q = transform4(vp, p[0], p[1], p[2], 1);
         d[y * D + x] = q[2] / q[3];
     }
@@ -272,13 +311,13 @@ function renderDepth(vp) {
 }
 
 /** The 8x8 supersampled truth through the same camera, so the reference moves with it. */
-function truthPersp(vp, kind) {
+function truthPersp(vp, kind, sx = 0) {
     const inv = mat4Invert(vp);
     const out = new Float32Array(D * D * 4), N = 8;
     for (let y = 0; y < D; y++) for (let x = 0; x < D; x++) {
         const acc = [0, 0, 0, 0];
-        for (let sy = 0; sy < N; sy++) for (let sx = 0; sx < N; sx++) {
-            const [pu, pv] = patternUV(hit(inv, (x + (sx + 0.5) / N) / D, (y + (sy + 0.5) / N) / D));
+        for (let sy = 0; sy < N; sy++) for (let ssx = 0; ssx < N; ssx++) {
+            const [pu, pv] = patternUV(hit(inv, (x + (ssx + 0.5) / N) / D, (y + (sy + 0.5) / N) / D, sx), sx);
             const px = scene(pu, pv, kind);
             for (let c = 0; c < 4; c++) acc[c] += px[c];
         }
@@ -376,7 +415,7 @@ const FLAT_DEPTH = new Float32Array(D * D);
 // to "not counted" the moment a reader opened it on an adapter -- exactly the regression v4591 had to undo for
 // the accumulate pass. Getting the number off the device needed a mainCounted entry point in each of the two
 // kernels, because the mask cannot distinguish a disocclusion from a reprojection that left the frame.
-let gpu = null, tgpu = null, mgpu = null, rgpu = null;
+let gpu = null, tgpu = null, mgpu = null, rgpu = null, ogpu = null;
 async function initGPU() {
     const say = (t) => { $("engine").textContent = "spatial engine: " + t; };
     // *** v4637 -- THIS SAID "this browser exposes no WebGPU" AND THAT IS AN ATTRIBUTION, NOT A FACT. ***
@@ -399,6 +438,7 @@ async function initGPU() {
         try { tgpu = new TemporalGPU(dev); } catch { tgpu = null; }
         try { mgpu = new MotionVectorsGPU(dev); } catch { mgpu = null; }
         try { rgpu = new TemporalRejectGPU(dev); } catch { rgpu = null; }
+        try { ogpu = new ObjectMotionGPU(dev); } catch { ogpu = null; }
         const who = (dev.adapterInfo && (dev.adapterInfo.description || dev.adapterInfo.vendor)) || "webgpu";
         say(`WebGPU compute on ${who} -- EASU+RCAS, resolve+accumulate, the motion vectors` +
             (rgpu ? " and the reject chain (disocclusion, factor, rectify) on the dolly" : "") +
@@ -425,7 +465,9 @@ async function rcas(rgba, w, h, sharp) {
 
 async function reset() {
     const kind = $("scene").value, ratio = parseFloat($("ratio").value);
-    const dolly = $("camera").value === "dolly";
+    // "objects" IS the dolly camera -- same matrices, same projection, same threshold -- plus a slab that
+    // translates. Everything the dolly branch does, it does; what it adds is a second model matrix.
+    const dolly = $("camera").value === "dolly" || $("camera").value === "objects";
     R = Math.max(8, Math.round(D / ratio));
     jit = makeJitterState(ratio); hist = null; frame = 0;
     prevDepth = null;                            // the depth history goes with the colour history, or frame 1
@@ -450,12 +492,18 @@ async function reset() {
     $("metric").textContent = `render ${R}x${R} -> display ${D}x${D}   |   frame 0`;
     $("accstat").textContent = "";
     $("disstat").textContent = "";
+    $("objstat").textContent = "";
 }
 
 async function tick() {
     if (!running) return;
     const kind = $("scene").value, cam = $("camera").value;
-    const panning = cam === "pan", dolly = cam === "dolly";
+    const objects = cam === "objects";
+    const panning = cam === "pan", dolly = cam === "dolly" || objects;
+    // the slab's world x this frame and last -- zero on every camera but "objects", so the three older
+    // cameras take the same code path with the same numbers they always did
+    const sxCur = objects ? frame * SLAB_DX : 0;
+    const sxPrev = objects ? Math.max(0, frame - 1) * SLAB_DX : 0;
     const dx = panning ? frame * PAN : 0;
     const [jx, jy] = jitterCurrent(jit);
     // *** JITTERED FOR THE RENDER, UNJITTERED FOR THE MOTION -- the pairing render/jitter.mjs exists to enforce
@@ -483,7 +531,7 @@ async function tick() {
     const vpCur = dolly ? dollyVP(frame) : null;
     const vpPrev = dolly ? dollyVP(Math.max(0, frame - 1)) : null;
     const frameSrc = dolly
-        ? renderPersp(R, jitterProjection(vpCur, -jx, -jy, R, R), kind)
+        ? renderPersp(R, jitterProjection(vpCur, -jx, -jy, R, R), kind, sxCur)
         : render(R, jx, jy, kind, dx);
 
     // *** THE MOTION FIELD IS DERIVED NOW, AND THIS IS THE LINE THAT COST A ROUND. ***
@@ -510,15 +558,54 @@ async function tick() {
     // fourth channel it writes -- the depth this surface would have had last frame -- is the whole disocclusion
     // test. The two matrices are (current INVERSE, previous FORWARD) and swapping them gives motion of exactly
     // the right magnitude and the wrong sign, which an orthographic pan could not have shown.
-    const depth = dolly ? renderDepth(vpCur) : null;
+    const depth = dolly ? renderDepth(vpCur, sxCur) : null;
     // *** AND THE DOLLY'S MOTION COMES OFF THE DEVICE TOO, AS OF v4641. *** motion() is the general form and
     // pan() is the special case; the dolly needs the general one because its matrices are perspective.
-    const motion = dolly
+    //
+    // *** AND AS OF v4649 THERE IS A THIRD BRANCH, WHICH IS THE FIRST TIME THIS PAGE HAS HAD A MOTION VECTOR
+    // THAT IS NOT PURELY THE CAMERA'S. *** Every number this page has ever printed came from a scene where
+    // only the camera moved -- and on such a scene render/objectMotion.mjs is EXACTLY render/motionVectors.mjs,
+    // because every model matrix is the identity. v4646 measured the gap on a synthetic fixture (2.51 px) and
+    // v4648 on a rasterised one (4.22 px); neither was a frame anyone could look at. This is.
+    //
+    // The id buffer costs a function call: renderIds() is hit() again with its y compared to Y_NEAR, which is
+    // the comparison patternUV has made on every dolly frame since that camera existed.
+    const ids = objects ? renderIds(vpCur, sxCur) : null;
+    const objMats = objects ? buildObjectMatrices({
+        vpCur, vpPrev,
+        models:     [IDENT4, translate4(sxCur)],     // 0 = background (never moves), 1 = the slab
+        prevModels: [IDENT4, translate4(sxPrev)],
+    }) : null;
+    const motion = objects
+        ? ogpu ? (await ogpu.motion({ depth, ids, w: D, h: D, invMVPCur: objMats.invMVPCur, mvpPrev: objMats.mvpPrev })).data
+               : objectMotionCPU({ depth, ids, w: D, h: D, invMVPCur: objMats.invMVPCur, mvpPrev: objMats.mvpPrev }).data
+        : dolly
         ? mgpu ? (await mgpu.motion(depth, D, D, mat4Invert(vpCur), vpPrev)).data
                : motionVectorsCPU(depth, D, D, mat4Invert(vpCur), vpPrev).data
         : mgpu
             ? (await mgpu.pan({ depth: FLAT_DEPTH, w: D, h: D, tCur, tPrev })).data
             : motionVectorsCPU(FLAT_DEPTH, D, D, mat4Invert(orthoPanVP(tCur)), orthoPanVP(tPrev)).data;
+
+    // *** WHAT THE OBJECT-AWARE PATH BOUGHT, IN PIXELS, ON THIS FRAME. *** The camera-only field is computed
+    // alongside -- it is the field this page would have used before v4649 -- and the two are differenced on
+    // the slab's pixels and on the background's separately. The background number is the control: object 0's
+    // model matrix is the identity, so the two paths are the same computation there and a non-zero reading
+    // means the id buffer is mislabelling rather than the object matrices working.
+    let objGap = null;
+    if (objects) {
+        const camOnly = motionVectorsCPU(depth, D, D, mat4Invert(vpCur), vpPrev).data;
+        // *** BOTH POPULATIONS ARE COUNTED, AND THAT IS A SABOTAGE FINDING. *** The first draft counted only
+        // the slab's pixels. A mutation labelling EVERY pixel as the slab then left `offSlab` at its initial
+        // zero -- the control read a perfect zero because it had visited nothing -- and only a disocclusion
+        // row elsewhere caught it. That is v4402's rule in its usual costume: an absence read as a pass. A
+        // maximum over an empty set is not a small number, it is no number, and it must not print as one.
+        let onSlab = 0, offSlab = 0, nSlab = 0, nBg = 0;
+        for (let i = 0; i < D * D; i++) {
+            const g = Math.hypot(camOnly[i * 4] - motion[i * 4], camOnly[i * 4 + 1] - motion[i * 4 + 1]);
+            if (ids[i] === 1) { nSlab++; onSlab = Math.max(onSlab, g); } else { nBg++; offSlab = Math.max(offSlab, g); }
+        }
+        objGap = { onSlab, offSlab, nSlab, nBg };
+    }
 
     // *** THE REJECT CHAIN, WHICH NOTHING OUTSIDE A GATE HAS EVER RUN. *** Three steps and the middle one is
     // the one that gets skipped: DISOCCLUSION writes 1 = "this history is WRONG", RECTIFY reads 1 = "history
@@ -585,7 +672,13 @@ async function tick() {
     if (dolly) prevDepth = depth;                // THIS frame's depth is next frame's recorded depth
 
     if (panning) ref = truth(kind, dx);          // the truth moves with the camera
-    if (dolly) ref = truthPersp(vpCur, kind);    // ...and so does the dolly's, through the same matrix
+    // *** THE REFERENCE TAKES THE SLAB'S OFFSET TOO, AND OMITTING IT COST THIS ROUND ITS HEADLINE NUMBER. ***
+    // This line read truthPersp(vpCur, kind) when the objects camera was added -- the moving slab was rendered
+    // at its new position and scored against a truth that still held it at its old one. The PSNR then measures
+    // how far the slab has walked, so it DECAYS MONOTONICALLY whatever the motion vectors do: 30.94 dB at
+    // frame 2 falling to 19.56 by frame 10, while the plain dolly sat at a stable 38-41 through the same
+    // frames. Every comparison taken against that reference was measuring the mistake and not the method.
+    if (dolly) ref = truthPersp(vpCur, kind, sxCur);
     const shown = (await rcas(hist, D, D, parseFloat($("sharp").value))).data;
     draw(cTmp, shown);
     $("dTmp").textContent = psnr(shown, ref).toFixed(2) + " dB";
@@ -611,6 +704,17 @@ async function tick() {
             ? `disocclusion: ${disStats.genuine} genuine, ${disStats.noHistory} with no history at all (invalid or offscreen), threshold ${disStats.threshold.toFixed(5)} in clip z   -- counted on ${disStats.engine}`
             : threshold === null ? "disocclusion: the two planes are at the same clip depth -- no test is possible"
                                  : "disocclusion: no previous depth yet (frame 0 is not zero disocclusions, it is untestable)";
+    // *** WHAT THE OBJECT-AWARE PATH BOUGHT, ON THE FRAME IN FRONT OF YOU. *** Two numbers, and the second
+    // is the one that makes the first mean anything: the background's model matrix is the identity, so
+    // object-aware and camera-only are the same computation there and must agree to the round trip. A field
+    // that moved BOTH would be a mislabelled id buffer, not a working one.
+    $("objstat").textContent = !objects ? ""
+        : objGap
+            ? `object motion: camera-only is off by ${(objGap.onSlab * D).toFixed(2)} px on the slab's ` +
+              `${objGap.nSlab} pixels and by ${(objGap.offSlab * D).toExponential(1)} px on the background's ` +
+              `${objGap.nBg} -- the second is the control, and it is the identity model matrix agreeing with ` +
+              `itself   -- computed on ${ogpu ? "the device" : "the CPU"}`
+            : "object motion: no gap computed";
     requestAnimationFrame(tick);
 }
 

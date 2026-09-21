@@ -2140,9 +2140,9 @@
   "world/spaceStructures-selfcheck.mjs": 297,
   "world/surfaceProbe-selfcheck.mjs": 168,
   "world/tools/water-attacks-selfcheck.mjs": 131,
-  "tools/ship/fsrPage-selfcheck.mjs": 1946,
+  "tools/ship/fsrPage-selfcheck.mjs": 1795,
   "tools/ship/pipeTruncation-selfcheck.mjs": 1380,
-  "tools/ship/fsrPageDevice-selfcheck.mjs": 2448,
+  "tools/ship/fsrPageDevice-selfcheck.mjs": 2418,
   "tools/ship/murmurIgnite-selfcheck.mjs": 1924,
   "tools/ship/murmurIgnite2-selfcheck.mjs": 2011,
   "tools/ship/murmurLive-selfcheck.mjs": 1923,
@@ -2157,7 +2157,8 @@
   "tools/ship/murmurSpecies9-selfcheck.mjs": 1940,
   "render/objectMotionGPU-selfcheck.mjs": 779,
   "render/temporalLockGPU-selfcheck.mjs": 2110,
-  "render/visibilityGPU-selfcheck.mjs": 870
+  "render/visibilityGPU-selfcheck.mjs": 870,
+  "tools/ship/fsrPageObjects-selfcheck.mjs": 3358
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -3916,7 +3917,8 @@
   "tools/ship/murmurSpecies9-selfcheck.mjs": 0,
   "render/objectMotionGPU-selfcheck.mjs": 0,
   "render/temporalLockGPU-selfcheck.mjs": 0,
-  "render/visibilityGPU-selfcheck.mjs": 0
+  "render/visibilityGPU-selfcheck.mjs": 0,
+  "tools/ship/fsrPageObjects-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-17T16:44:13.404Z",
@@ -5658,9 +5660,9 @@
   "world/spaceStructures-selfcheck.mjs": "2026-09-17T16:44:13.404Z",
   "world/surfaceProbe-selfcheck.mjs": "2026-09-17T16:44:13.404Z",
   "world/tools/water-attacks-selfcheck.mjs": "2026-09-17T16:44:13.404Z",
-  "tools/ship/fsrPage-selfcheck.mjs": "2026-09-17T16:44:13.404Z",
+  "tools/ship/fsrPage-selfcheck.mjs": "2026-09-21T12:00:00.000Z",
   "tools/ship/pipeTruncation-selfcheck.mjs": "2026-09-17T16:44:13.404Z",
-  "tools/ship/fsrPageDevice-selfcheck.mjs": "2026-09-17T16:44:13.404Z",
+  "tools/ship/fsrPageDevice-selfcheck.mjs": "2026-09-21T12:00:00.000Z",
   "tools/ship/murmurIgnite-selfcheck.mjs": "2026-09-17T16:44:13.404Z",
   "tools/ship/murmurIgnite2-selfcheck.mjs": "2026-09-17T16:44:13.404Z",
   "tools/ship/murmurLive-selfcheck.mjs": "2026-09-17T16:44:13.404Z",
@@ -5675,7 +5677,8 @@
   "tools/ship/murmurSpecies9-selfcheck.mjs": "2026-09-17T16:44:13.404Z",
   "render/objectMotionGPU-selfcheck.mjs": "2026-09-20T00:00:00.000Z",
   "render/temporalLockGPU-selfcheck.mjs": "2026-09-21T00:00:00.000Z",
-  "render/visibilityGPU-selfcheck.mjs": "2026-09-21T00:00:00.000Z"
+  "render/visibilityGPU-selfcheck.mjs": "2026-09-21T00:00:00.000Z",
+  "tools/ship/fsrPageObjects-selfcheck.mjs": "2026-09-21T12:00:00.000Z"
  },
  "capAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 20000,
@@ -10335,9 +10338,9 @@
   "tools/ship/runnerReach-selfcheck.mjs": 3358,
   "tools/ship/redAction-selfcheck.mjs": 20026,
   "fx/fsr/fsrGPU-selfcheck.mjs": 2631,
-  "tools/ship/fsrPage-selfcheck.mjs": 1946,
+  "tools/ship/fsrPage-selfcheck.mjs": 1795,
   "tools/ship/pipeTruncation-selfcheck.mjs": 506,
-  "tools/ship/fsrPageDevice-selfcheck.mjs": 2448,
+  "tools/ship/fsrPageDevice-selfcheck.mjs": 2418,
   "tools/ship/murmurIgnite-selfcheck.mjs": 1924,
   "tools/ship/murmurIgnite2-selfcheck.mjs": 2011,
   "tools/ship/murmurLive-selfcheck.mjs": 1923,
@@ -10352,7 +10355,8 @@
   "tools/ship/murmurSpecies9-selfcheck.mjs": 1940,
   "render/objectMotionGPU-selfcheck.mjs": 779,
   "render/temporalLockGPU-selfcheck.mjs": 2110,
-  "render/visibilityGPU-selfcheck.mjs": 870
+  "render/visibilityGPU-selfcheck.mjs": 870,
+  "tools/ship/fsrPageObjects-selfcheck.mjs": 3358
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-16T22:48:41.155Z",
@@ -13421,7 +13425,8 @@
   "tools/ship/murmurSpecies9-selfcheck.mjs": false,
   "render/objectMotionGPU-selfcheck.mjs": false,
   "render/temporalLockGPU-selfcheck.mjs": false,
-  "render/visibilityGPU-selfcheck.mjs": false
+  "render/visibilityGPU-selfcheck.mjs": false,
+  "tools/ship/fsrPageObjects-selfcheck.mjs": false
  },
  "kinds": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "loaded",
@@ -15180,6 +15185,7 @@
   "tools/ship/murmurSpecies9-selfcheck.mjs": "alone",
   "render/objectMotionGPU-selfcheck.mjs": "alone",
   "render/temporalLockGPU-selfcheck.mjs": "alone",
-  "render/visibilityGPU-selfcheck.mjs": "alone"
+  "render/visibilityGPU-selfcheck.mjs": "alone",
+  "tools/ship/fsrPageObjects-selfcheck.mjs": "alone"
  }
 }

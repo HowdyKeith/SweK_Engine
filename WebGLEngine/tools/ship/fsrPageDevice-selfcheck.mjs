@@ -104,6 +104,16 @@ console.log("fsrPageDevice-selfcheck -- fsr.html on a real adapter, loaded as a 
                /counted on the device/.test(G.acc || "") && /reused \d+/.test(G.acc || "") &&
                !/not counted/.test(G.acc || ""),
                G.acc || "(empty)");
+            // *** v4649 -- THE 106 IS PINNED NOW, AND IT WAS NOT BEFORE. *** The row above asked only for
+            // genuine > 0. fsr.html's own prose quotes "106 genuine" and calls it a one-pixel sliver down the
+            // slab's trailing edge; four files repeat it. A number a page states in prose and no gate holds
+            // is a number free to drift, and the round that added a fourth camera is exactly the round with
+            // a reason to move it by accident.
+            ok("!! *** ...and the dolly's genuine count is the 106 this page's own prose quotes ***",
+               !!m && Number(m[1]) === 106,
+               `${m ? m[1] : "(none)"} against a documented 106. MEASURED FLAT across frames 2-6 on the ` +
+               "dolly -- 106 every frame -- so this is a constant of that camera and not a sample.");
+
         }
     }
 }
@@ -116,7 +126,11 @@ console.log("\nunchecked here: the two OLDER cameras' GPU branches -- this drive
     "implementation and not real hardware, and no timing claim may be read off it; the PICTURE, which is " +
     "never compared here -- this gate reads the page's counters and its engine attribution, and the pictures " +
     "are held equal by render/temporalRejectGPU-selfcheck.mjs on a fixture; and everything fsrPage-selfcheck " +
-    "checks about the page as a SOURCE, which is deliberately not repeated here.");
+    "checks about the page as a SOURCE, which is deliberately not repeated here; and the OBJECT-MOTION camera, which is " +
+    "tools/ship/fsrPageObjects-selfcheck.mjs's -- split out at v4649 for the reason this file was itself " +
+    "split from fsrPage-selfcheck: driving a second camera to six frames took this gate from 2,448 ms to " +
+    "4,872, over the sweep's 3,000 ms membership threshold, and a gate outside the sweep is a gate nobody " +
+    "runs. Third split in this tree for that reason and the third taken BEFORE the addition landed.");
 //
 // SABOTAGE LOG -- each applied to the live tree, run, and restored.
 //   v4641  fsr.html: `if (rgpu)` forced false, so the runner is CONSTRUCTED and the page uses the CPU anyway
