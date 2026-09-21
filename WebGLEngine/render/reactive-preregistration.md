@@ -45,8 +45,9 @@ opposite direction refutes H even if it is large and significant.
 * **Statistic.** Welch's two-sample t-test on `delta`, WIDE group against NARROW group,
   **one-sided** in the predicted direction (narrow > wide).
 * **Threshold.** p < 0.05. Anything above it does not confirm H.
-* **Frames.** 54 onward, disjoint from the 3-53 that produced the lead. The exact upper bound
-  is set by the design probe (below) and written in before the outcome is collected.
+* **Frames.** **54 to 98 inclusive -- 45 frames**, disjoint from the 3-53 that produced the
+  lead. Fixed by the design probe below and written here BEFORE any outcome was collected; see
+  `git log` for the ordering. 21 of them are narrow and 24 wide, so neither group is a handful.
 * **Scene / camera.** `smooth` and `objects` -- the same content v4659 measured, deliberately,
   so that the only thing changed is which frames.
 
@@ -63,13 +64,29 @@ opposite direction refutes H even if it is large and significant.
 * The jitter hypothesis, which v4659 refuted (r = +0.17, wrong direction) and which is recorded
   in `render/reactive.mjs`'s header.
 
-## THE DESIGN PROBE
+## THE DESIGN PROBE -- RUN, AND ITS RESULT
 
-Before the run, one probe collects the GROUPING variable only -- the declined counts over the
-fresh frames -- and never reads `dTmp`. Its question is whether the two groups still exist past
-frame 53 at all (the slab is moving, and if it leaves the frame the groups collapse). That is a
-question about whether the design is valid, not about the effect, and looking at it does not
-spend the test. The probe's output is recorded below with the outcome.
+One probe collected the GROUPING variable only -- the declined counts over frames 54-163 -- and
+never read `dTmp`. Its question is whether the two groups still exist past frame 53 at all (the
+slab is moving, and if it leaves the frame the groups collapse). That is a question about
+whether the design is valid, not about the effect, and looking at it does not spend the test.
+
+**Result, over frames 54-163:**
+
+    declined = 212   24 frames
+    declined = 106   21 frames
+    declined = 0     65 frames
+    invalid or offscreen non-zero on any frame:  NO
+
+The two groups survive to **frame 98** and then the count falls to zero and stays there: the
+slab has walked out of the depth gate's reach, so past that point the grouping variable does not
+exist and there is nothing to split. The 65 zero-count frames are therefore excluded -- by the
+rule the section above already fixed ("a frame whose count is neither of those two values is
+excluded"), on a variable collected without looking at any outcome, and not by a choice made
+after seeing which way the deltas fell.
+
+The alternation is also still near-perfect here (212 106 212 106 ... with the occasional
+doubled run), a hundred frames after v4649 first recorded it and still with no measured cause.
 
 ## OUTCOME
 
