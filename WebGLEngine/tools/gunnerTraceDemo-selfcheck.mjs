@@ -78,7 +78,10 @@ if (data) {
 }
 
 console.log("\n3. *** RE-DERIVED FROM SCRATCH: THE SAME BAKE, RUN AGAIN, MUST MATCH THE COMMITTED FILE EXACTLY ***");
-{
+if (!data) {
+    console.log("  FAIL  brain/gunnerTraceDemo.json is missing -- section 1 already said so; nothing to re-derive against");
+    fails++;
+} else {
     const st = await initNode();
     if (!st.ready) { console.log("  FAIL  box3d wasm: " + st.reason + " -- the wasm is the substrate this trace was recorded on"); fails++; }
     else {
@@ -100,16 +103,19 @@ console.log("\n3. *** RE-DERIVED FROM SCRATCH: THE SAME BAKE, RUN AGAIN, MUST MA
         };
         const trained = G.train(worldFrom, { seed: TRAIN_SEED, iters: TRAIN_ITERS, seconds: TRAIN_SECONDS });
         const freshHand = recordDuel(G.handWeights()), freshTrained = recordDuel(trained.weights);
+        const bakedHand = data.traces.find((t) => t.label === "hand"), bakedTrained = data.traces.find((t) => t.label === "trained");
 
         const sameTicks = (a, b) => a.length === b.length && a.every((tk, i) => tk.hidden.every((v, k) => v === b[i].hidden[k]) && tk.output.every((v, k) => v === b[i].output[k]));
-        ok("!! the hand duel re-run reaches the SAME fingerprint and hit count as the baked trace implies",
-            freshHand.result.hits === data.traces.find((t) => t.label === "hand").hits && freshHand.result.shots === data.traces.find((t) => t.label === "hand").shots);
-        ok("!! ...and its full per-tick activation trace is BYTE-IDENTICAL to what's committed, not just the summary", sameTicks(freshHand.ticks, data.traces.find((t) => t.label === "hand").ticks));
+        ok("!! the hand duel re-run reaches the SAME fingerprint, hit count and shot count as the baked trace",
+            freshHand.result.fingerprint === bakedHand.fingerprint && freshHand.result.hits === bakedHand.hits && freshHand.result.shots === bakedHand.shots,
+            `${freshHand.result.fingerprint} vs ${bakedHand.fingerprint}`);
+        ok("!! ...and its full per-tick activation trace is BYTE-IDENTICAL to what's committed, not just the summary", sameTicks(freshHand.ticks, bakedHand.ticks));
         // A byte-identical trained trace already IMPLIES the ES retrained to the identical weights (a different
         // weight vector would almost certainly produce a different activation sequence) -- a separate weight-hash
         // comparison would be redundant with this, not an extra guarantee, so it is not asserted twice.
-        ok("!! the trained duel re-run's full activation trace is BYTE-IDENTICAL to what's committed -- which is only possible if the ES retrained to the identical weights AND the duel replayed identically",
-            sameTicks(freshTrained.ticks, data.traces.find((t) => t.label === "trained").ticks));
+        ok("!! the trained duel re-run reaches the SAME fingerprint as the baked trace", freshTrained.result.fingerprint === bakedTrained.fingerprint, `${freshTrained.result.fingerprint} vs ${bakedTrained.fingerprint}`);
+        ok("!! ...and its full per-tick activation trace is BYTE-IDENTICAL to what's committed -- which is only possible if the ES retrained to the identical weights AND the duel replayed identically",
+            sameTicks(freshTrained.ticks, bakedTrained.ticks));
     }
 }
 

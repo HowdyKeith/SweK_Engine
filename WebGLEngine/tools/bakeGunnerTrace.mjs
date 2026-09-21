@@ -54,12 +54,14 @@ async function main() {
         let sumAbs = 0, nAbs = 0;
         for (const tk of ticks) tk.hidden.forEach((v, i) => { if (Math.abs(v) > 1e-3) { nonzeroUnits.add(i); sumAbs += Math.abs(v); nAbs++; } });
         // meanActivation: the mean magnitude of every nonzero hidden value in this trace, baked in as the
-        // per-trace color scale -- the hand and trained traces differ by ~270x in raw magnitude (the hand
-        // gunner's recurrent core is an identity, so its hidden values never leave the ~[0,1] range its
-        // encoder's own feature inputs live in; the trained gunner's core amplifies them into the hundreds),
-        // and a single fixed color scale would leave one of the two traces looking flat. render/maleCnsLoader.mjs's
-        // activationColor() takes this as its `scale` option so each trace's own typical activation reads as
-        // clearly lit, not just whichever trace happens to be closer to a hardcoded number.
+        // per-trace color scale. TWO DIFFERENT RATIOS, NOT ONE -- worth keeping apart: the hand gunner's
+        // recurrent core is an identity, so its hidden values never leave the ~[0,1] range its encoder's own
+        // feature inputs live in, while the trained gunner's core amplifies them into the hundreds. Measured
+        // on this baked file: the two traces' PEAK values differ by ~263x (1.0 vs 263.285), but the MEAN of
+        // nonzero values -- the number actually baked here and used as activationColor()'s `scale` -- differs
+        // by ~126x (0.662 vs 83.512). Either way a single fixed color scale would leave one trace looking
+        // flat; this baked mean, not the peak, is what render/maleCnsLoader.mjs's activationColor() actually
+        // takes as `scale` so each trace's own TYPICAL activation reads as clearly lit.
         const meanActivation = nAbs ? ROUND(sumAbs / nAbs) : 1;
         console.log(`[bakeGunnerTrace] ${label}: ${result.hits} hits of ${result.shots} shots, ${result.drops} drops, ${ticks.length} ticks, ${nonzeroUnits.size}/${G.HIDDEN} hidden units ever nonzero, mean|activation| ${meanActivation}`);
         return { label, hits: result.hits, shots: result.shots, drops: result.drops, burned: result.burned, score: ROUND(result.score), fingerprint: result.fingerprint, nonzeroUnitCount: nonzeroUnits.size, meanActivation, ticks };

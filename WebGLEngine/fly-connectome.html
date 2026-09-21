@@ -263,6 +263,9 @@ async function main() {
     function selectTrace(label) {
         traceHandBtn.classList.toggle("sel", label === "hand");
         traceTrainedBtn.classList.toggle("sel", label === "trained");
+        // Self-correcting race, not a real bug: clicking a trace button before ensureGunnerData()'s first
+        // fetch resolves toggles the button highlight above, then this returns early -- the highlight is
+        // reset when that fetch's .then() calls selectTrace("hand") once the data actually arrives.
         if (!gunnerData) return;
         activeTrace = gunnerData.traces.find((t) => t.label === label);
         currentTick = 0; playing = false; playPauseBtn.innerHTML = "&#9654; Play";

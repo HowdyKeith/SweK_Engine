@@ -37,6 +37,11 @@ export function colorForType(type) {
  * hundreds (measured directly while baking tools/bakeGunnerTrace.mjs's demo trace), and a linear map would
  * leave everything below a handful of units looking identical while one runaway unit saturates the display.
  * `activation` is assumed >= 0 (every hidden value here comes out of a relu); a negative input is clamped.
+ * NOT clamped: the output color components. With `dim <= 1`, `hot` components in [0,1], and `baseColor`
+ * components in [0,1] -- true of every caller in this codebase today -- the result stays in [0,1] by
+ * construction (each component is a convex combination of two [0,1] values). A caller that ever passes
+ * `dim > 1` or a `hot`/`baseColor` component above 1 would get an out-of-range value with nothing here to
+ * catch it.
  */
 export function activationColor(baseColor, activation, { scale = 30, dim = 0.15, hot = [1, 1, 1] } = {}) {
     const t = Math.tanh(Math.max(0, activation) / scale);

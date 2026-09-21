@@ -167,7 +167,7 @@ console.log("\n4. *** activationColor -- fly-connectome.html's gunner-replay mod
     })());
     ok("!! a negative activation (should never happen -- every real hidden value here comes out of a relu) clamps to the same floor as 0, rather than going darker or inverting",
         (() => { const c0 = activationColor(base, 0, { scale: 10 }), cn = activationColor(base, -50, { scale: 10 }); return c0.every((v, i) => close(v, cn[i])); })());
-    ok("!! the SAME activation reads brighter under a smaller scale -- this is why tools/bakeGunnerTrace.mjs bakes a per-trace scale rather than sharing one fixed number across a hand gunner (activations ~[0,1]) and a trained one (~[0,260])",
+    ok("!! the SAME activation reads brighter under a smaller scale -- this is why tools/bakeGunnerTrace.mjs bakes each trace's own MEAN nonzero activation as its scale (~0.66 hand vs ~83.5 trained, ~126x apart) rather than sharing one fixed number across a hand gunner (peak ~1) and a trained one (peak ~263)",
         (() => { const wide = activationColor(base, 5, { scale: 100 }), narrow = activationColor(base, 5, { scale: 2 }); return (narrow[0] + narrow[1] + narrow[2]) > (wide[0] + wide[1] + wide[2]); })());
 }
 
