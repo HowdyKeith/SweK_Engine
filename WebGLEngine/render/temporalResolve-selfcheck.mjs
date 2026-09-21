@@ -23,12 +23,27 @@ import { lanczos2, resolveJitterAwareCPU } from "./temporalResolve.mjs";
 import { RESOLVE_WGSL } from "./temporalResolveWgsl.mjs";
 import { temporalAccumulateCPU } from "./temporalAccumulate.mjs";
 import { jitterSequence } from "./jitter.mjs";
+import { adapterKey, verdict, describe, owedCount, coverage, compareFor, boundFrom,
+         readReadings, recordReading, mergeRecords, READINGS_PATH, SLACK } from "../tools/ship/adapterRecord.mjs";
 import { easuCPU, bilinearCPU } from "../fx/fsr/fsr.js";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 let fails = 0;
 const ok = (label, cond, detail) => { if (!cond) fails++; console.log(`  ${cond ? "PASS" : "FAIL"}  ${label}${detail ? "   " + detail : ""}`); };
 const report = (s) => console.log(`  ----  ${s}`);
+
+// *** v4649 -- 1e-6 WAS ONE ADAPTER'S CONFIDENCE ERROR, ASSERTED AS A TOLERANCE. ***
+// SwiftShader reads 3.576e-7 against the CPU reference; Keith's box reads 1.073e-6 and went red on a bound
+// nothing derived -- a 7% overshoot of a number somebody picked. The row above states its own error in the
+// unit the picture is displayed in (an 8-bit LSB) and says why; this one had a bare constant.
+// So the universal bound is stated in that same unit -- LSB/50, the sibling row's own convention -- and the
+// old 1e-6 survives as SwiftShader's RECORDED reading, so nothing about this adapter got laxer.
+const DEVICE_AT_V4649 = Object.freeze({
+    "google/swiftshader": Object.freeze({ confWorst: 1e-6 }),
+});
+const GATE = "temporalResolve";
+const VERDICTS = [];
+let AKEY_SEEN = null, RECORD_SEEN = null;
 
 const R = 24, D = 48;   // a 2x upscale
 function scene(u, v) {
@@ -156,7 +171,12 @@ else {
             dev.frame(({ pass }) => { pass.dispatch(p, [groups, groups]); pass.clear([0, 0, 0, 1]); }, { offscreen: true });
             return { out: Array.from(new Float32Array(await dev.read(dst))), conf: Array.from(new Float32Array(await dev.read(conf))) };
         };
-        return { aware: await go(3), blind: await go(2), raw: await go(1), errs, backend: dev.backend };
+        // The adapter these readings belong to. A second requestAdapter is free and is the only way to get
+        // the identity out of gfx/device.js, which reports a BACKEND and not a vendor.
+        let adapterInfo = null;
+        try { const ad = await navigator.gpu.requestAdapter(); const i = (ad && ad.info) || {};
+              adapterInfo = { vendor: i.vendor || null, architecture: i.architecture || null }; } catch { adapterInfo = null; }
+        return { aware: await go(3), blind: await go(2), raw: await go(1), errs, backend: dev.backend, adapterInfo };
     }` });
     ok("the harness ran the kernel on a real WebGPU device", r.ok && r.result && r.result.backend === "webgpu" && r.result.errs.length === 0,
        r.ok ? `${r.result && r.result.backend}; errors ${(r.result && r.result.errs || []).join(" | ")}` : (r.reason || (r.pageErrors || []).join("; ")));
@@ -169,7 +189,24 @@ else {
         ok(`*** the device's resolve is the CPU reference's on all three paths -- worst ${worst.toExponential(2)}, which is ${(worst / LSB).toExponential(1)} of an 8-bit LSB (jitter-aware ${wa.toExponential(2)}, jitter-blind ${wb.toExponential(2)}, undered ${wr.toExponential(2)}) ***`,
            worst < LSB / 50, `aware ${wa.toExponential(3)}, blind ${wb.toExponential(3)}, raw ${wr.toExponential(3)}; LSB ${LSB.toExponential(2)}`);
         let wc = 0; for (let i = 0; i < D * D; i++) wc = Math.max(wc, Math.abs(r.result.aware.conf[i] - CPU.aware.confidence[i]));
-        ok(`  and the device's CONFIDENCE buffer matches to ${wc.toExponential(2)} on all ${D * D} pixels`, wc < 1e-6, `worst ${wc.toExponential(3)}`);
+        const ADAPTER = (r.result && r.result.adapterInfo) || null;
+        const RECORD = mergeRecords(DEVICE_AT_V4649, readReadings(GATE));
+        AKEY_SEEN = adapterKey(ADAPTER); RECORD_SEEN = RECORD;
+        const held = (name, measured, dir) => {
+            const v = verdict(RECORD, ADAPTER, measured, compareFor(name, dir));
+            VERDICTS.push({ ...v, name, dir });
+            return v;
+        };
+        // DURABLE, in the unit the row above already uses: a confidence error a viewer could never see. The
+        // bare 1e-6 it replaced was a reading, and the adapter that missed it by 7% missed nothing a person
+        // could look at -- 1.073e-6 is 3.6e-4 of one 8-bit level.
+        ok(`  and the device's CONFIDENCE buffer matches to ${wc.toExponential(2)} on all ${D * D} pixels, far inside one display level`,
+            wc < LSB / 50,
+            `worst ${wc.toExponential(3)} = ${(wc / LSB).toExponential(1)} of an 8-bit LSB (${(LSB / 50).toExponential(2)} is the bound)`);
+        const vConf = held("confWorst", wc, "max");
+        ok(`  ...and HOW FAR it is off is this adapter's own number [${vConf.state}]`, vConf.ok,
+            describe(vConf) + " -- SwiftShader reads 3.576e-7 and an Intel gen-9 reads 1.073e-6. The 1e-6 this " +
+            "row used to carry was the first of those rounded up, and the second missed it by 7%");
         // the device's OWN output must show the dering property, not inherit it from the CPU
         let lo = 9, hi = -9, loR = 9, hiR = -9;
         for (let i = 0; i < D * D; i++) { lo = Math.min(lo, r.result.aware.out[i * 4]); hi = Math.max(hi, r.result.aware.out[i * 4]);
@@ -204,6 +241,31 @@ else {
 //      whole texel from the sample and the confidence is exactly the distance between them.
 //   No 0-RED among the seven. BF is the thin one and it survives only because the identity row is bit-exact; if that
 //   row is ever loosened, the normalisation stops being covered.
+// *** THE OWED POPULATION, AS A NUMBER. ***
+if (AKEY_SEEN) {
+    const c = owedCount(VERDICTS), cov = coverage(RECORD_SEEN);
+    report(`the record covers ${cov.count} adapter(s): ${cov.keys.join(", ")}`);
+    report(c.owed === 0
+        ? `adapter ${AKEY_SEEN}: all ${c.of} per-adapter reading(s) HELD against the record on file.`
+        : `adapter ${AKEY_SEEN}: ${c.owed} of ${c.of} per-adapter reading(s) OWED -- no reading on file for ` +
+          `this adapter, so those rows measured and reported rather than asserted. Every universal row still ` +
+          `held. Re-run with --record ON THAT BOX to write them; do not type them in from this output.`);
+    if (process.argv.includes("--record")) {
+        const owed = VERDICTS.filter((v) => v.state === "OWED" && Number.isFinite(v.measured));
+        if (!owed.length) {
+            report(`--record: nothing OWED for ${AKEY_SEEN} -- every reading is already HELD.`);
+        } else {
+            const values = {};
+            for (const v of owed) values[v.name] = boundFrom(v.dir, v.measured);
+            const w = recordReading(GATE, AKEY_SEEN, values, { frozen: DEVICE_AT_V4649 });
+            const rel = path.relative(process.cwd(), READINGS_PATH).replace(/\\/g, "/");
+            report(w.wrote
+                ? `--record: WROTE ${owed.length} reading(s) for ${AKEY_SEEN} at the ${SLACK}x slack convention. Commit it: git add ${rel}`
+                : `--record: REFUSED -- ${w.why}`);
+        }
+    }
+}
+
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: a MOVING scene at ratio > 1 -- the accumulation rows hold camera and world still, so " +
     "reprojection is the identity and the resolve is the only thing being measured; DISOCCLUSION and the locks FSR keeps " +
