@@ -71,6 +71,17 @@ const ZERO_HIDDEN = new Float32Array(HIDDEN);
  * (so a plain relu-matmul computes relu(h + Wm@h), the residual step, with no special case in mlpLayerCpu)
  * plus each real GFC edge's own trainable weight at [toIdx*HIDDEN+fromIdx]. Every other entry is permanently,
  * structurally zero -- THIS is the wiring constraint, not an initial value a search could wander away from.
+ *
+ * NO CLAMPING ON PURPOSE, WITH A MEASURED BOUND ON WHY THAT IS SAFE HERE. relu(h + Wm@h) over REC_STEPS steps
+ * can grow: measured directly, a uniform hidden state of 1 with every edge weight at 5 (well inside what
+ * perturb()'s sigma<=1.0 random walk could reach) drives max(h) to 1 -> 96 -> 5216 -> ~3.0e5 over 3 steps.
+ * Reaching actual float32 overflow at this in-degree needs edge weights around 1e11 -- astronomically outside
+ * any sigma this file ever uses (train() starts at 0.5, caps at 1.0) -- but if it ever happened, 0 * Infinity
+ * = NaN in IEEE-754 means the structural zero-mask would NOT contain it: mlpLayerCpu sums over every input
+ * regardless of its weight, so one runaway channel would NaN-contaminate the whole hidden state, not just
+ * itself. train()'s `score > bestScore` silently rejects a NaN-scoring candidate (NaN comparisons are always
+ * false), so the ES loop degrades gracefully rather than crashing -- but a future reader who raises sigma or
+ * REC_STEPS should re-measure this bound rather than assume it still holds.
  */
 function expandRecurrent(Wrec) {
     const Wm = new Float32Array(HIDDEN * HIDDEN);

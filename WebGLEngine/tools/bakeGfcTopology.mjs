@@ -27,6 +27,16 @@ const data = JSON.parse(fs.readFileSync(IN_PATH, "utf8"));
 const neurons = data.neurons;
 const indexOf = new Map(neurons.map((n, i) => [n.bodyId, i]));
 
+// Two things this bake deliberately does NOT re-derive, both worth naming rather than leaving a reader to wonder:
+// (1) the from/to direction is trusted as-is from vendor/male-cns/giant-fiber-circuit.json, which trusts it from
+//     the raw Neuprint fetch's own [from, to] pair (Neuprint's :ConnectsTo semantics, per PROVENANCE.md) -- that
+//     fetch ran on the maintainer's own machine and its script isn't vendored, so a from/to swap upstream would
+//     transpose every edge in this bake and nothing in this repo would catch it. An untestable trust boundary,
+//     not a defect.
+// (2) each edge's real Neuprint synapse .weight (aggregated connection strength) is fetched and vendored but
+//     THROWN AWAY here -- only which pairs are wired survives into EDGES, not how strongly. Deliberate: the ES
+//     trains its own weight for each real edge on top of the real topology, so a fixed biological strength would
+//     only fight the search, not inform it. What is real here is the WIRING, not the weights.
 const edgeSet = new Set();
 const edges = [];
 for (const [from, to] of data.edges) {
