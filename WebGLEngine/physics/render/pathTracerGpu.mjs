@@ -119,7 +119,10 @@
 "use strict";
 
 import { render as renderCpu } from "./pathTracer.mjs";
-import { LCG } from "./pathTracerWgsl.mjs";
+// lcgConstants.mjs, not pathTracerWgsl.mjs: that file's own node:fs import (it reads furnace.mjs off disk to
+// derive LCG) made this whole module -- and rtPipeline.mjs, which imports VIEW/EPS/etc. from here -- impossible
+// to load in a browser. See lcgConstants.mjs's header.
+import { LCG } from "./lcgConstants.mjs";
 
 /** The furnace, and the camera pathTracer.mjs renders it with. */
 export const FURNACE = Object.freeze({ centre: [0, 0, 0], radius: 1, albedo: 0.5 });

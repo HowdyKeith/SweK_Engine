@@ -119,6 +119,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseLcg as parseLcgSrc, parseEps as parseEpsSrc } from "./lcgConstants.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const FURNACE_PATH = path.join(HERE, "furnace.mjs");
@@ -132,6 +133,10 @@ export const OCCLUSION_PATH = path.join(HERE, "occlusion.mjs");
 // then be comparing this file against itself while furnace.mjs drifted underneath both. Same rule bloomFused
 // follows for the blur weights. A parse that fails RAISES rather than falling back to a remembered value: a
 // default would let the constants diverge silently, which is the exact failure the parse exists to prevent.
+//
+// The regexes themselves live in lcgConstants.mjs now (found this round: this file's own node:fs import made
+// it impossible to import even one field, like LCG, from a browser page -- see that file's header). This file
+// is still the one that actually reads the disk; only the parsing logic moved.
 
 function readOr(file) {
     try { return fs.readFileSync(file, "utf8"); } catch (e) {
@@ -140,18 +145,10 @@ function readOr(file) {
 }
 
 /** The LCG's three constants, lifted from furnace.mjs's one-line body. */
-export function parseLcg(src = readOr(FURNACE_PATH)) {
-    const m = src.match(/Math\.imul\(\s*s\s*,\s*(\d+)\s*\)\s*\+\s*(\d+)\s*\)\s*>>>\s*0\s*;\s*return\s+s\s*\/\s*(\d+)/);
-    if (!m) throw new Error("pathTracerWgsl: furnace.mjs rng body did not parse -- the generator moved");
-    return { mul: Number(m[1]), inc: Number(m[2]), div: Number(m[3]) };
-}
+export function parseLcg(src = readOr(FURNACE_PATH)) { return parseLcgSrc(src); }
 
 /** raySphere's surface epsilon, lifted from occlusion.mjs's signature. */
-export function parseEps(src = readOr(OCCLUSION_PATH)) {
-    const m = src.match(/export\s+function\s+raySphere\s*\([^)]*eps\s*=\s*([0-9.eE+-]+)/);
-    if (!m) throw new Error("pathTracerWgsl: occlusion.mjs raySphere eps did not parse");
-    return Number(m[1]);
-}
+export function parseEps(src = readOr(OCCLUSION_PATH)) { return parseEpsSrc(src); }
 
 export const LCG = parseLcg();
 export const EPS = parseEps();

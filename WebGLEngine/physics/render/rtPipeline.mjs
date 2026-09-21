@@ -130,7 +130,9 @@
 "use strict";
 
 import { render as renderCpu } from "./pathTracer.mjs";
-import { LCG } from "./pathTracerWgsl.mjs";
+// lcgConstants.mjs, not pathTracerWgsl.mjs -- see that file's header. render/rtViewer.mjs (RTX round 3) is the
+// first caller to import this module from inside a browser page rather than from Node.
+import { LCG } from "./lcgConstants.mjs";
 import { VIEW, MAX_DEPTH, EPS, notExactInF32, dyadic, powerOfTwo } from "./pathTracerGpu.mjs";
 import { MeshBVH, trianglesFrom } from "../../mesh/meshBVH.mjs";
 
