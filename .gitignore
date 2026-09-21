@@ -127,6 +127,14 @@ WebGLEngine/tools/ship/install-history.json
 WebGLEngine/tools/ship/last-refusal-*.log
 WebGLEngine/tools/ship/last-selfchecks-full.log
 
+# v4649 -- THE BRIDGE'S OWN LOG, WHICH MADE EVERY `git status` ON THE RIG READ DIRTY.
+# ai-bridge/server.js writes debug.log (NDJSON, rotating to debug.log.1) beside itself. On a box where the
+# bridge is up -- which on the rig means nine hours at a stretch -- the tree is untracked-dirty the whole
+# time, and the capture a sweep writes is stamped WORKING TREE DIRTY over reds that have nothing to do with
+# any edit. Same class as the refusal log above: a claim about one run on one machine, not about the tree.
+WebGLEngine/ai-bridge/debug.log
+WebGLEngine/ai-bridge/debug.log.1
+
 # v4408 -- A LOCKFILE THIS TREE HAS NEVER TRACKED, WRITTEN BY A GATE.
 # ai-bridge/bun.lock appeared untracked mid-ritual: a selfcheck runs `bun install` and bun writes the lockfile
 # as a side effect, which is the same class as the sweep rewriting sweep-timings.json -- a gate finishing
