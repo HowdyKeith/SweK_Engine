@@ -2,16 +2,35 @@
 //
 // Run: node brain/gunnerPolicy-selfcheck.mjs
 //
-// THE SIBLING GATE OF brain/gunnerPolicy.mjs: the shape (an 11 -> 8 -> 5 relu MLP through the kernel's f32 twin, held to a plain
-// MLP written here), the features against physics/turret.mjs's aim errors and physics/slick.mjs's two facts (a pursuer close
-// behind, a car on my oil), the hand gunner's rule read off its outputs (fire only aligned, drop only pursued, ignite only with a
-// car on the oil), THE DUEL (the hand gunner hits, drops and burns the pursuer; the zero gunner never fires or drops; both
-// deterministic; without slicks nothing drops), the shell-speed knob (the slowest candidate refused by the CHASE leg, the greedy
-// pick the first refusal; a passing speed passes both legs), LEARNING (the ES from zero climbs and is deterministic per seed), and
-// THE RACE WITH GUNNERS (deterministic per seed, replayed from its log -- eight fields per car per tick -- to the same fingerprint
-// with the same hits, drops and burn ticks). box3d's wasm is loaded
-// headless through physics/box3d/box3dNode.mjs, as tools/ship/drivePolicy-selfcheck.mjs loads it; without it this gate FAILS
-// rather than skips, because the wasm is the substrate.
+// THE SIBLING GATE OF brain/gunnerPolicy.mjs: the shape (11 -> 34 encoder -> a connectome-masked recurrent core -> 5 decoder,
+// through the kernel's f32 twin, held to a plain MLP written here), the MASK ITSELF (section 1b: every recurrent weight outside
+// the real 313 GFC synapses is structurally zero, and brain/gfcTopology.mjs is re-measured against the vendored citation on
+// every run rather than trusted from a baked number), the features against physics/turret.mjs's aim errors and physics/slick.mjs's
+// two facts (a pursuer close behind, a car on my oil), the hand gunner's rule read off its outputs (fire only aligned, drop only
+// pursued, ignite only with a car on the oil) -- and the WHOLE POINT of the rewiring: the hand rule reaches the decoder completely
+// unchanged by the connectome core, so every behavioral threshold below is the SAME one the plain 11 -> 8 -> 5 net was held to.
+// THE DUEL (the hand gunner hits, drops and burns the pursuer; the zero gunner never fires or drops; both deterministic; without
+// slicks nothing drops), the shell-speed knob (the slowest candidate refused by the CHASE leg, the greedy pick the first refusal;
+// a passing speed passes both legs), LEARNING (the ES from zero climbs and is deterministic per seed), and THE RACE WITH GUNNERS
+// (deterministic per seed, replayed from its log -- eight fields per car per tick -- to the same fingerprint with the same hits,
+// drops and burn ticks). box3d's wasm is loaded headless through physics/box3d/box3dNode.mjs, as tools/ship/drivePolicy-selfcheck.mjs
+// loads it; without it this gate FAILS rather than skips, because the wasm is the substrate.
+//
+// THE REWIRING (task 2 of the fly-connectome integration): the gunner's hidden layer was a plain dense 8-unit layer; it is now
+// 34 units, one per real traced neuron of Janelia's male-cns Giant Fiber Circuit (vendor/male-cns/, PROVENANCE.md), running
+// REC_STEPS=3 weight-tied recurrent steps through a matrix masked to the circuit's own 313 real synapses -- every other
+// connection permanently zero. MEASURED, NOT ASSUMED: re-running this gate immediately after the rewiring reproduced the
+// PRE-REWIRING hit counts on both duel seeds exactly (13/15 and 12/14), because handWeights() routes through 8 of the 34
+// channels with the recurrent core's weights left at zero, which expandRecurrent() turns into the identity matrix -- see
+// gunnerPolicy.mjs's own header for the proof. Every threshold in sections 2-6 below is therefore the ORIGINAL bound, not a
+// relaxed one for the new shape.
+// SABOTAGE LOG -- the rewiring itself, each applied to brain/gunnerPolicy.mjs or brain/gfcTopology.mjs, the gate run, restored.
+//   L  expandRecurrent() leaking one value into a confirmed-forbidden slot (Wm[12] = 999, row 0 col 12 --
+//      neither a real edge nor the diagonal)                                        -> 2 red: the structural-mask check (1 of
+//      809 forbidden slots nonzero) and the "Wrec=0 -> exact identity" check (the leak survives Wrec=0 too).
+//   M  gfcTopology.mjs's EDGES carrying one extra invented edge ([0, 12], not in the vendored file) -> 3 red, not 1 as a first
+//      guess assumed: the edge-set check itself, AND WEIGHT_COUNT (314 edges now, not 313, so 897 != 896), AND reportLines'
+//      weight-count line -- a fabricated edge is not a local defect, it inflates the parameter count downstream.
 //
 // SABOTAGE LOG -- v4588, each applied to brain/gunnerPolicy.mjs, the gate run (box3d loaded), the module restored.
 //   A  the hand gunner's trigger never gated by alignment (the aligned weight zeroed)   -> 4 red: the hand rule, the duel's
@@ -34,11 +53,13 @@
 //   J  the adjudicator running the pursued leg twice and never the chase                 -> 2 red: 8 m/s refused, 28 m/s on both legs.
 //   K  the features dropping the slick tail (always 0, 0)                                -> 3 red: the tail row, the duel's drops, the race's drops.
 "use strict";
+import fs from "node:fs";
 import { initNode, mod } from "../physics/box3d/box3dNode.mjs";
 import { worldFromModule } from "../render/slugTicker.mjs";
 import * as G from "./gunnerPolicy.mjs";
 import * as D from "./drivePolicy.mjs";
 import * as U from "../physics/turret.mjs";
+import * as Topo from "./gfcTopology.mjs";
 
 let fails = 0;
 const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
@@ -52,22 +73,57 @@ if (!st.ready) { console.log("  FAIL  box3d wasm: " + st.reason + " -- the wasm 
 const m = mod(), worldFrom = () => worldFromModule(m, [0, -9.81, 0]);
 const timed = (f) => { const t0 = performance.now(); const r = f(); return { r, ms: performance.now() - t0 }; };
 
-console.log("1. THE SHAPE: 11 -> 8 -> 5 THROUGH THE KERNEL'S TWIN, THE ZERO AND THE HAND");
+console.log("1. THE SHAPE: 11 -> 34 (ENCODER) -> CONNECTOME-MASKED RECURRENT CORE -> 5 (DECODER), THE ZERO AND THE HAND");
 {
-    ok("141 weights: 11 x 8 + 8 + 8 x 5 + 5", G.WEIGHT_COUNT === 141 && G.zeroWeights().length === 141 && G.FEATURE_NAMES.length === G.FEATURES && G.FEATURES === 11 && G.OUTPUTS === 5 && G.OUTPUT_NAMES.join() === "yaw,pitch,fire,drop,ignite" && G.FEATURE_NAMES.slice(9).join() === "pursuerNear,onMyOil");
-    const [l1, l2] = G.layersOf(G.zeroWeights());
-    ok("layersOf splits them into 11 -> 8 relu and 8 -> 5 none", l1.nIn === 11 && l1.nOut === 8 && l1.act === "relu" && l1.W.length === 88 && l2.nIn === 8 && l2.nOut === 5 && l2.act === "none" && l2.W.length === 40);
+    ok("896 weights: 11 x 34 + 34 + 313 + 34 x 5 + 5", G.WEIGHT_COUNT === 896 && G.zeroWeights().length === 896 && G.HIDDEN === 34 && G.REC_EDGES === 313 && G.REC_STEPS === 3 && G.FEATURE_NAMES.length === G.FEATURES && G.FEATURES === 11 && G.OUTPUTS === 5 && G.OUTPUT_NAMES.join() === "yaw,pitch,fire,drop,ignite" && G.FEATURE_NAMES.slice(9).join() === "pursuerNear,onMyOil");
+    const layers = G.layersOf(G.zeroWeights());
+    ok("layersOf splits them into an 11->34 relu encoder, REC_STEPS=3 weight-tied 34->34 relu recurrent layers (the SAME matrix object each time), and a 34->5 none decoder",
+        layers.length === 5 && layers[0].nIn === 11 && layers[0].nOut === 34 && layers[0].act === "relu" && layers[0].W.length === 374 &&
+        layers.slice(1, 4).every((l) => l.nIn === 34 && l.nOut === 34 && l.act === "relu" && l.W.length === 34 * 34 && l.W === layers[1].W) &&
+        layers[4].nIn === 34 && layers[4].nOut === 5 && layers[4].act === "none" && layers[4].W.length === 170);
+
+    // THE MASK IS STRUCTURAL, NOT A HABIT OF THE HAND WEIGHTS: at large RANDOM weights (not the hand baseline's
+    // convenient zeros), the expanded recurrent matrix must still be exactly zero everywhere except the real
+    // 313 edges and the identity diagonal.
+    const rw = G.perturb(G.zeroWeights(), 3, (() => { let s = 99; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; })());
+    const Wm = G.layersOf(rw)[1].W;
+    const allowed = new Set(Topo.EDGES.map(([to, from]) => to * G.HIDDEN + from));
+    for (let i = 0; i < G.HIDDEN; i++) allowed.add(i * G.HIDDEN + i);
+    let offMask = 0;
+    for (let i = 0; i < Wm.length; i++) if (!allowed.has(i) && Wm[i] !== 0) offMask++;
+    ok("!! *** THE RECURRENT MASK IS STRUCTURAL: at large random weights, EVERY entry outside the real 313 GFC edges (plus the identity diagonal) is exactly 0 ***", offMask === 0, `${offMask} of ${Wm.length - allowed.size} forbidden slots nonzero`);
+    ok("...and with Wrec at zeroWeights()'s default (what handWeights() leaves it at), the expanded matrix is EXACTLY the identity -- nothing more, nothing less",
+        Array.from(G.layersOf(G.handWeights())[1].W).every((v, i) => v === (i % (G.HIDDEN + 1) === 0 ? 1 : 0)));
+
     const w = G.perturb(G.zeroWeights(), 0.7, () => 0.37), x = [1, 0.3, -0.2, 0.5, -0.4, 0.2, 0, 1, 0, 1, 0];
-    const plain = (() => { const f = Math.fround, [a, b] = G.layersOf(w), h = []; for (let o = 0; o < 8; o++) { let acc = f(a.b[o]); for (let k = 0; k < 11; k++) acc = f(acc + f(f(x[k]) * f(a.W[o * 11 + k]))); h.push(f(Math.max(0, acc))); } const y = []; for (let o = 0; o < 5; o++) { let acc = f(b.b[o]); for (let k = 0; k < 8; k++) acc = f(acc + f(h[k] * f(b.W[o * 8 + k]))); y.push(Math.tanh(acc)); } return y; })();
+    const plain = (() => {
+        const f = Math.fround, ls = G.layersOf(w);
+        const dense = (l, xin) => { const y = []; for (let o = 0; o < l.nOut; o++) { let acc = f(l.b[o]); for (let k = 0; k < l.nIn; k++) acc = f(acc + f(f(xin[k]) * f(l.W[o * l.nIn + k]))); y.push(l.act === "relu" ? f(Math.max(0, acc)) : acc); } return y; };
+        let h = dense(ls[0], x);
+        for (let s = 1; s < ls.length - 1; s++) h = dense(ls[s], h);
+        return dense(ls[ls.length - 1], h).map((v) => Math.tanh(v));
+    })();
     const got = G.forward(w, x);
-    ok("!! forward equals a plain float32 relu MLP written here, then tanh, on all five outputs", got.length === 5 && got.every((v, i) => near(v, plain[i], 1e-6)), `${got.map((v) => v.toFixed(5))} vs ${plain.map((v) => v.toFixed(5))}`);
+    ok("!! forward equals a plain float32 relu MLP written here (encoder, REC_STEPS recurrent steps, decoder), then tanh, on all five outputs", got.length === 5 && got.every((v, i) => near(v, plain[i], 1e-6)), `${got.map((v) => v.toFixed(5))} vs ${plain.map((v) => v.toFixed(5))}`);
+
     const zc = G.gunnerFor(G.zeroWeights())({ pos: [0, 1, 0], quat: [0, 0, 0, 1], yaw: 0, vel: [0, 0, 0] }, U.createTurret(), null);
     ok("the zero gunner answers five zeros and its fire, drop and ignite (tanh 0, not positive) are 0", G.forward(G.zeroWeights(), x).every((v) => v === 0) && zc.fire === 0 && zc.drop === 0 && zc.ignite === 0 && Object.keys(zc).join() === "yaw,pitch,fire,drop,ignite");
     const hand = G.handWeights(), b = 0.02;
     const h0 = G.forward(hand, [1, b, 0, 0.5, 0, 0, 0, 1, 0, 0, 0]), h1 = G.forward(hand, [1, 0, -0.05, 0.5, 0, 0, 0, 1, 1, 0, 0]);
-    ok("!! the hand gunner's rule reads off its outputs: yaw = tanh(12 x bearing), pitch = tanh(8 x pitch error), fire only when aligned", near(h0[0], Math.tanh(12 * b)) && near(h0[1], 0) && h0[2] < 0 && near(h1[1], Math.tanh(8 * -0.05)) && near(h1[2], Math.tanh(2)) && h1[2] > 0, `${h0.map((v) => v.toFixed(4))} / ${h1.map((v) => v.toFixed(4))}`);
+    ok("!! the hand gunner's rule reads off its outputs UNCHANGED BY THE CONNECTOME CORE: yaw = tanh(12 x bearing), pitch = tanh(8 x pitch error), fire only when aligned", near(h0[0], Math.tanh(12 * b)) && near(h0[1], 0) && h0[2] < 0 && near(h1[1], Math.tanh(8 * -0.05)) && near(h1[2], Math.tanh(2)) && h1[2] > 0, `${h0.map((v) => v.toFixed(4))} / ${h1.map((v) => v.toFixed(4))}`);
     const h2 = G.forward(hand, [1, 0, 0, 0.5, 0, 0, 0, 1, 0, 1, 0]), h3 = G.forward(hand, [1, 0, 0, 0.5, 0, 0, 0, 1, 0, 0, 1]);
     ok("!! ...and the slick half of it: drop = tanh(4 x pursuerNear - 2), ignite = tanh(4 x onMyOil - 2) -- each positive only on its own fact, negative otherwise", h0[3] < 0 && h0[4] < 0 && near(h2[3], Math.tanh(2)) && h2[4] < 0 && near(h3[4], Math.tanh(2)) && h3[3] < 0 && near(h2[3], -h0[3]) , `${h2.slice(3).map((v) => v.toFixed(4))} / ${h3.slice(3).map((v) => v.toFixed(4))}`);
+}
+console.log("\n1b. THE HIDDEN LAYER IS A REAL, CITABLE FLY CIRCUIT -- MEASURED AGAINST THE VENDORED DATA DIRECTLY, NOT A BAKED NUMBER TRUSTED ON FAITH");
+{
+    const raw = JSON.parse(fs.readFileSync(new URL("../vendor/male-cns/giant-fiber-circuit.json", import.meta.url), "utf8"));
+    ok("!! brain/gfcTopology.mjs's neuron order (the hidden-unit index <-> real bodyId mapping) matches vendor/male-cns/giant-fiber-circuit.json's own neurons array exactly",
+        Topo.NEURON_ORDER.length === raw.neurons.length && Topo.NEURON_ORDER.every((id, i) => id === raw.neurons[i].bodyId) && Topo.NEURON_TYPES.every((t, i) => t === raw.neurons[i].type) && Topo.NEURON_INSTANCES.every((v, i) => v === raw.neurons[i].instance));
+    const idIndex = new Map(raw.neurons.map((n, i) => [n.bodyId, i]));
+    const rawEdgeSet = new Set(raw.edges.map(([from, to]) => `${idIndex.get(to)},${idIndex.get(from)}`));
+    ok("!! ...and its 313 edges are exactly the vendored file's own edges: none dropped, none invented, none a self-loop",
+        Topo.EDGES.length === raw.edges.length && Topo.EDGES.every(([to, from]) => rawEdgeSet.has(`${to},${from}`)) && Topo.EDGES.every(([to, from]) => to !== from));
+    report("this is the whole point of task 2: a hidden unit's identity and the recurrent core's shape are the fly's own measured wiring, re-derived from the vendored citation on every run rather than typed once and trusted");
 }
 console.log("\n2. THE FEATURES ARE THE TURRET'S AIM ERRORS AND THE SLICK'S TWO FACTS");
 {
@@ -166,7 +222,8 @@ console.log("\n6. THE RACE WITH GUNNERS: LOCKSTEP, DETERMINISTIC, REPLAYED FROM 
 console.log("\n7. THE FRONT DOOR");
 {
     const L = G.reportLines();
-    ok("reportLines names the shape, the reward (the burn), the knob and the wasm state", L.length === 4 && /11 -> 8 -> 5/.test(L[0]) && /141 weights/.test(L[1]) && /drop, ignite/.test(L[1]) && /on my fire/.test(L[2]) && /1 \/ speed/.test(L[2]) && /ready/.test(L[3]));
+    ok("reportLines names the shape (the connectome core), the weight count, the reward (the burn), the knob and the wasm state",
+        L.length === 4 && /11 -> 34/.test(L[0]) && /connectome-masked recurrent/.test(L[0]) && /313 real GFC synapses/.test(L[0]) && /896 weights/.test(L[1]) && /drop, ignite/.test(L[1]) && /on my fire/.test(L[2]) && /1 \/ speed/.test(L[2]) && /ready/.test(L[3]));
 }
 console.log(fails ? `\ngunnerPolicy-selfcheck: ${fails} FAILED` : "\ngunnerPolicy-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);

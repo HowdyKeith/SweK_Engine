@@ -64,13 +64,14 @@ sec("2. THE BRAIN VIEW IS THE POLICIES' ACTIVATIONS THROUGH THE KERNEL'S TWIN");
 {
     const w = D.handWeights(), x = [1, 0.3, -0.2, 0.1, -0.4, 0.2, 0.5, -0.1, 0], a = CV.activationsOf(D, w, x), f = D.forward(w, x);
     ok("!! the driver's activations end in exactly forward()'s outputs, with 8 hidden values between", a.hidden.length === 8 && a.output.length === 2 && near(a.output[0], f[0]) && near(a.output[1], f[1]), `${Array.from(a.output).map((v) => v.toFixed(4))} vs ${f.map((v) => v.toFixed(4))}`);
-    const gw = GP.handWeights(), gx = [1, 0.02, 0, 0.5, 0, 0, 0, 1, 1, 0, 0], ga = CV.activationsOf(GP, gw, gx), gf = GP.forward(gw, gx);   // v4590: 11 features, 5 outputs
+    const gw = GP.handWeights(), gx = [1, 0.02, 0, 0.5, 0, 0, 0, 1, 1, 0, 0], ga = CV.activationsOf(GP, gw, gx), gf = GP.forward(gw, gx);   // 11 features, 34 hidden (brain/gfcTopology.mjs's connectome core), 5 outputs
     ok("...and the gunner's likewise, five outputs", ga.output.length === 5 && ga.output.every((v, i) => near(v, gf[i])));
+    ok("!! the gunner's reported hidden state is the TRUE post-recurrence value (34 units) that actually feeds the decoder, not a pre-recurrence read", ga.hidden.length === 34 && GP.HIDDEN === 34);
     const rows = CV.brainRows({ driver: { act: a, names: D.FEATURE_NAMES }, gunner: { act: ga, names: GP.FEATURE_NAMES } });
-    ok("six rows: features, hidden, outputs for each policy, with their names (the gunner's five outputs since v4590)", rows.length === 6 && rows.map((r) => r.values.length).join() === "9,8,2,11,8,5" && rows[0].names === D.FEATURE_NAMES && rows[5].names.join() === "yaw,pitch,fire,drop,ignite" && rows[3].names === GP.FEATURE_NAMES);
+    ok("six rows: features, hidden, outputs for each policy, with their names (the gunner's 34-unit connectome-masked hidden layer, five outputs)", rows.length === 6 && rows.map((r) => r.values.length).join() === "9,8,2,11,34,5" && rows[0].names === D.FEATURE_NAMES && rows[5].names.join() === "yaw,pitch,fire,drop,ignite" && rows[3].names === GP.FEATURE_NAMES);
     const calls = []; const ctx = { fillStyle: "", font: "", fillRect: (...q) => calls.push(q), fillText: () => {} };
     const bars = CV.drawBrainPanel(ctx, W, H, rows, { title: "t" });
-    ok("!! the panel draws one bar per value (43) plus the background, inside the window", bars === 43 && calls.length === 44 && calls.slice(1).every((q) => q[0] >= 0 && q[0] + q[2] <= W && q[1] >= 0 && q[1] + q[3] <= H + 1));
+    ok("!! the panel draws one bar per value (69) plus the background, inside the window", bars === 69 && calls.length === 70 && calls.slice(1).every((q) => q[0] >= 0 && q[0] + q[2] <= W && q[1] >= 0 && q[1] + q[3] <= H + 1));
     ok("the label says which view and what it costs", /first-person/.test(CV.windowLabel(0, "hand", "first-person")) && /read back every/.test(CV.windowLabel(0, "hand", "first-person")) && /activations/.test(CV.windowLabel(1, "zero", "brain")));
 }
 sec("3. THE PAGE: ONE WINDOW PER CAR, A CLICK CYCLES IT, THE PIXELS ARE THERE");

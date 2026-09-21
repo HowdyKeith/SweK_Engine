@@ -58,9 +58,18 @@ export function projectTo(vp, p, W, H) {
     return [(x / w * 0.5 + 0.5) * W, (1 - (y / w * 0.5 + 0.5)) * H];
 }
 
-/** A policy's activations layer by layer through the kernel's f32 twin: { input, hidden, output } for a module with layersOf(w). */
+/**
+ * A policy's activations through the kernel's f32 twin: { input, hidden, output } for a module with layersOf(w) --
+ * an N-stage sequence, not a fixed 2. `hidden` is the state right before the LAST stage (the output projection),
+ * so a 2-stage policy (drivePolicy: encoder, decoder) reads exactly as before, and an N-stage one (gunnerPolicy's
+ * encoder + weight-tied recurrent steps + decoder) reports the TRUE post-recurrence state that actually feeds the
+ * decoder -- not the pre-recurrence value a hardcoded 2-layer read would have shown.
+ */
 export function activationsOf(policy, w, x) {
-    const [l1, l2] = policy.layersOf(w), input = Float32Array.from(x), hidden = mlpLayerCpu(l1, input, 1), raw = mlpLayerCpu(l2, hidden, 1);
+    const layers = policy.layersOf(w), input = Float32Array.from(x);
+    let hidden = input;
+    for (let i = 0; i < layers.length - 1; i++) hidden = mlpLayerCpu(layers[i], hidden, 1);
+    const raw = mlpLayerCpu(layers[layers.length - 1], hidden, 1);
     return { input, hidden, output: Float32Array.from(raw, (v) => Math.tanh(v)) };
 }
 

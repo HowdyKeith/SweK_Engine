@@ -9,7 +9,8 @@
 <title>Race brain on the GPU</title>
 <style>
   html,body { margin:0; height:100%; background:#050805; color:#9fb2d4; font:12px ui-monospace,Menlo,monospace; }
-  #c { display:block; width:100%; }
+  #raceRow { display:flex; align-items:stretch; }
+  #c { display:block; flex:1 1 auto; min-width:0; }
   #hud { padding:10px 14px; }
   #cap { color:#f6a623; letter-spacing:.14em; text-transform:uppercase; }
   #be { color:#59d1ff; font-size:14px; margin-top:4px; }
@@ -17,9 +18,10 @@
   .bad { color:#ff9a9a; }
   a { color:#59d1ff; }
   input[type=number] { width:48px; background:#0c140f; color:#9fb2d4; border:1px solid #2a3a30; font:inherit; }
-  #views { display:flex; flex-wrap:wrap; gap:8px; padding:6px 14px; }
+  #viewsCol { flex:0 0 260px; overflow-y:auto; }
+  #views { display:flex; flex-direction:column; gap:8px; padding:6px 14px; }
   .carWin { display:flex; flex-direction:column; gap:2px; }
-  .carView { background:#000; border:1px solid #2a3a30; cursor:pointer; display:block; }
+  .carView { background:#000; border:1px solid #2a3a30; cursor:pointer; display:block; max-width:100%; }
   .viewLabel { color:#5f7aa0; font-size:10px; max-width:240px; line-height:1.3; }
 </style>
 </head>
@@ -31,9 +33,13 @@
     &middot; <a href="?webgl=1">force WebGL2</a><br>
     <span id="tick">loading the racing kit and box3d&hellip;</span><br><span id="brain">no stored brain: the hand policy drives</span><br><span id="gun">turrets: the hand gunner on every car (v4588, task 77); it drops oil on a pursuer and lights it under them (v4590, task 79)</span> <button id="trainGun">Train the gunner in idle time</button> <button id="stopGun" disabled>Stop</button> <button id="forgetGun">Forget the stored gunner</button><br><span id="racing"></span><br><button id="labReplay">Replay the lab's accepted driver</button> <span id="lab">the Physics Lab's race scene stores the driver its adjudicator accepted; this plays that log back, not real time</span> &middot; drag to orbit, wheel to dolly</div>
 </div>
-<canvas id="c"></canvas>
-<div id="views"></div>
-<div id="viewsNote" class="viewLabel" style="padding:0 14px 8px"></div>
+<div id="raceRow">
+  <canvas id="c"></canvas>
+  <div id="viewsCol">
+    <div id="views"></div>
+    <div id="viewsNote" class="viewLabel" style="padding:0 14px 8px"></div>
+  </div>
+</div>
 <script type="module" src="/ui/originNotice.js"></script>
 <script type="module">
 import { requestDevice } from "./gfx/device.js";
@@ -156,7 +162,7 @@ async function refreshViews(poses) {
         const j = GP.nearestOther(i, poses), pose = poses[i];
         const dAct = CV.activationsOf(D, driverWeights[i], D.features(surface, pose, cars[i].last && cars[i].last.wheels.every((q) => q.kind === "asphalt") ? "asphalt" : "off"));
         const gAct = CV.activationsOf(GP, gunnerWeights[i], GP.features(pose, turrets[i], j === null ? null : { pose: poses[j] }, GP.pursuerInfo(i, poses, slicks)));
-        CV.drawBrainPanel(v.ctx, v.canvas.width, v.canvas.height, CV.brainRows({ driver: { act: dAct, names: D.FEATURE_NAMES }, gunner: { act: gAct, names: GP.FEATURE_NAMES } }), { title: `${names[i] || "car"}: driver 9-8-2, gunner 11-8-5` });
+        CV.drawBrainPanel(v.ctx, v.canvas.width, v.canvas.height, CV.brainRows({ driver: { act: dAct, names: D.FEATURE_NAMES }, gunner: { act: gAct, names: GP.FEATURE_NAMES } }), { title: `${names[i] || "car"}: driver 9-8-2, gunner 11-34-5 (connectome core)` });
         continue;
       }
       if (viewFailures >= 3) continue;   // the 3D windows are off after three failed readbacks; the brain windows above stay live

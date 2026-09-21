@@ -1,13 +1,29 @@
 // WebGLEngine/brain/gunnerPolicy.mjs -- v4588 (task 77): the gunner, a second GPU Brain policy beside the driver
 //
 // THE COPILOT. brain/drivePolicy.mjs is a 9 -> 8 -> 2 relu MLP that drives the race car through { throttle, steer, brake }; this
-// is a 9 -> 8 -> 3 relu MLP in the same layer shape (render/brainTsl.mjs's mlpLayerCpu, the f32 twin of brain/mlp.js's kernel)
-// that works the turret physics/turret.mjs mounts on the same chassis, through the turret's own contract { yaw, pitch, fire }.
-// The two policies share nothing but the car: the driver never sees the turret, the gunner never sees the road. Its nine
-// features are the turret's errors against physics/turret.mjs's exact aim solution for the nearest other car -- the bearing
-// and pitch still to turn, the range, the closing and lateral speeds, whether the gun is reloading, whether the target is
-// reachable at all, and whether the gun is aligned inside ALIGN_TOL -- so the hand gunner is a proportional controller on two
-// errors and a trigger on the alignment bit, written into weights the way drivePolicy.handWeights writes the hand driver.
+// works the turret physics/turret.mjs mounts on the same chassis, through the turret's own contract { yaw, pitch, fire, drop,
+// ignite }. The two policies share nothing but the car: the driver never sees the turret, the gunner never sees the road. Its
+// eleven features are the turret's errors against physics/turret.mjs's exact aim solution for the nearest other car plus the
+// slick's two facts -- the bearing and pitch still to turn, the range, the closing and lateral speeds, whether the gun is
+// reloading, whether the target is reachable at all, whether the gun is aligned inside ALIGN_TOL, whether a car is close
+// behind, and whether one stands on this car's own unlit oil.
+//
+// THE HIDDEN LAYER IS brain/gfcTopology.mjs: A REAL FLY'S ESCAPE CIRCUIT, NOT AN INVENTED SHAPE. Instead of a dense N-unit
+// layer, the 11 features are encoded (dense, learned, no biological claim here -- there is no real neuron whose synapses
+// happen to be "bearing error") into 34 hidden units -- one per real traced neuron of Janelia's male-cns Giant Fiber Circuit
+// (vendor/male-cns/, PROVENANCE.md), in the SAME order the vendored data lists them, so a hidden unit's identity is a real,
+// citable bodyId rather than an anonymous slot. Those 34 units then run REC_STEPS (3) weight-tied recurrent steps through a
+// masked 34x34 matrix whose only trainable entries are the circuit's own 313 real synapses -- every other connection is
+// PERMANENTLY zero, a structural constraint the search can never route around, not an initial value it could wander away
+// from (expandRecurrent() below). The decoder back to 5 outputs is dense again, for the same reason the encoder is: there is
+// no real "motor neuron" in this data that means "fire the gun". What is real, traceable, and load-bearing is the SHAPE in
+// the middle -- which artificial units may influence which others is exactly the fly's own measured wiring, not a guess.
+//
+// THE HAND GUNNER PROVES IT ADDS NOTHING BY DEFAULT. handWeights() below routes its rule through 8 of the 34 channels and
+// leaves the recurrent core's weights at zero -- and with every recurrent weight zero, expandRecurrent()'s matrix is the
+// identity, so REC_STEPS steps of relu(I @ h) reproduce h exactly (h is already >=0 out of the encoder's own relu). The hand
+// rule reaches the decoder completely unchanged; the connectome core is there for a TRAINED gunner to use, not forced onto
+// this one. gunnerPolicy-selfcheck.mjs section 1 measures this rather than assuming it.
 //
 // TRAINED THE SAME WAY, RACED IN THE SAME LOCKSTEP. trainGunner is drivePolicy's (1+1)-ES on a DUEL: two cars on the track, a
 // hand driver in each, the candidate gunner in the rear car's turret, scored by hits minus a waste penalty per shot over the
@@ -25,6 +41,7 @@
 // MEASURED (brain/gunnerPolicy-selfcheck.mjs, this box): see the gate's header; every number there is re-derived, none typed.
 "use strict";
 import { mlpLayerCpu } from "../render/brainTsl.mjs";
+import * as Topo from "./gfcTopology.mjs";
 import * as T from "../world/raceTrack.mjs";
 import * as C from "../physics/raceCar.mjs";
 import * as D from "./drivePolicy.mjs";
@@ -35,25 +52,59 @@ import { worldFromModule } from "../render/slugTicker.mjs";
 
 // v4590 (task 79) -- two more features and two more outputs: the gunner sees whether a car is close BEHIND (the slick's target)
 // and whether one is standing on its own unlit oil (the match's moment), and its contract grew drop and ignite.
-export const FEATURES = 11, HIDDEN = 8, OUTPUTS = 5;
+export const FEATURES = 11, HIDDEN = Topo.NEURON_ORDER.length, OUTPUTS = 5;
+export const REC_STEPS = 3;                             // weight-tied recurrent relaxation steps through the masked core
+export const REC_EDGES = Topo.EDGES.length;              // one trainable weight per real GFC synapse -- 313, measured from brain/gfcTopology.mjs, not typed
 export const FEATURE_NAMES = Object.freeze(["bias", "bearing", "pitch", "range", "closing", "lateral", "reloading", "reachable", "aligned", "pursuerNear", "onMyOil"]);
 export const OUTPUT_NAMES = Object.freeze(["yaw", "pitch", "fire", "drop", "ignite"]);
-export const WEIGHT_COUNT = FEATURES * HIDDEN + HIDDEN + HIDDEN * OUTPUTS + OUTPUTS;   // 88 + 8 + 40 + 5 = 141
+export const WEIGHT_COUNT = FEATURES * HIDDEN + HIDDEN + REC_EDGES + HIDDEN * OUTPUTS + OUTPUTS;   // 374 + 34 + 313 + 170 + 5 = 896
 export const REWARD = Object.freeze({ hit: 1, waste: 0.02, burn: 0.5, damage: 0.05 });  // a shot costs 2 % of a hit; an opponent's second on my fire pays half a hit; v4592: a twentieth per point of damage BEYOND the plain shell's
 export const DROP_RANGE = 14;                                                          // m: a pursuer inside this is worth a slick
 
 /** The all-zero gunner: never turns, never fires (tanh 0 is not > 0). What every trained gunner is measured against. */
 export const zeroWeights = () => new Float32Array(WEIGHT_COUNT);
 
-/** Split a flat weight vector into the two layers mlpLayerCpu takes. */
-export function layersOf(w) {
-    let o = 0; const W1 = w.subarray(o, o += FEATURES * HIDDEN), b1 = w.subarray(o, o += HIDDEN), W2 = w.subarray(o, o += HIDDEN * OUTPUTS), b2 = w.subarray(o, o += OUTPUTS);
-    return [{ nIn: FEATURES, nOut: HIDDEN, W: W1, b: b1, act: "relu" }, { nIn: HIDDEN, nOut: OUTPUTS, W: W2, b: b2, act: "none" }];
+const ZERO_HIDDEN = new Float32Array(HIDDEN);
+
+/**
+ * Expand the compact per-edge recurrent weights into a HIDDEN x HIDDEN matrix: the identity on the diagonal
+ * (so a plain relu-matmul computes relu(h + Wm@h), the residual step, with no special case in mlpLayerCpu)
+ * plus each real GFC edge's own trainable weight at [toIdx*HIDDEN+fromIdx]. Every other entry is permanently,
+ * structurally zero -- THIS is the wiring constraint, not an initial value a search could wander away from.
+ */
+function expandRecurrent(Wrec) {
+    const Wm = new Float32Array(HIDDEN * HIDDEN);
+    for (let i = 0; i < HIDDEN; i++) Wm[i * HIDDEN + i] = 1;
+    Topo.EDGES.forEach(([toIdx, fromIdx], k) => { Wm[toIdx * HIDDEN + fromIdx] += Wrec[k]; });
+    return Wm;
 }
 
-/** The forward pass: features -> [yaw rate, pitch rate, fire, drop, ignite] in [-1, 1]; a trigger is honoured when its output is positive. */
+/**
+ * Split a flat weight vector into the sequence mlpLayerCpu applies in order: the encoder (11 -> 34, dense,
+ * relu), REC_STEPS weight-tied copies of the connectome-masked recurrent layer (34 -> 34, relu), and the
+ * decoder (34 -> 5, none). forward() below and render/carViews.mjs's activationsOf() both walk this same
+ * array rather than assuming a fixed depth, so either can grow or shrink REC_STEPS with no second edit.
+ */
+export function layersOf(w) {
+    let o = 0;
+    const Win = w.subarray(o, o += FEATURES * HIDDEN), bin = w.subarray(o, o += HIDDEN);
+    const Wrec = w.subarray(o, o += REC_EDGES);
+    const Wout = w.subarray(o, o += HIDDEN * OUTPUTS), bout = w.subarray(o, o += OUTPUTS);
+    const rec = { nIn: HIDDEN, nOut: HIDDEN, W: expandRecurrent(Wrec), b: ZERO_HIDDEN, act: "relu" };
+    return [
+        { nIn: FEATURES, nOut: HIDDEN, W: Win, b: bin, act: "relu" },
+        ...Array(REC_STEPS).fill(rec),
+        { nIn: HIDDEN, nOut: OUTPUTS, W: Wout, b: bout, act: "none" },
+    ];
+}
+
+/** The forward pass: features -> [yaw rate, pitch rate, fire, drop, ignite] in [-1, 1], through the encoder, the
+ *  connectome-masked recurrent core, and the decoder; a trigger is honoured when its output is positive. */
 export function forward(w, x) {
-    const [l1, l2] = layersOf(w), h = mlpLayerCpu(l1, Float32Array.from(x), 1), y = mlpLayerCpu(l2, h, 1);
+    const layers = layersOf(w);
+    let h = Float32Array.from(x);
+    for (let i = 0; i < layers.length - 1; i++) h = mlpLayerCpu(layers[i], h, 1);
+    const y = mlpLayerCpu(layers[layers.length - 1], h, 1);
     return [Math.tanh(y[0]), Math.tanh(y[1]), Math.tanh(y[2]), Math.tanh(y[3]), Math.tanh(y[4])];
 }
 
@@ -89,9 +140,16 @@ export function gunnerFor(w) {
     return (pose, turret, target, extra = null) => { const [yaw, pitch, fire, drop, ignite] = forward(w, features(pose, turret, target, extra)); return { yaw, pitch, fire: fire > 0 ? 1 : 0, drop: drop > 0 ? 1 : 0, ignite: ignite > 0 ? 1 : 0 }; };
 }
 
-/** The hand gunner: turn at `turn` x the bearing error, lift at `lift` x the pitch error, fire when aligned, drop oil when a car is close behind, light it when one is on it. */
+/**
+ * The hand gunner: turn at `turn` x the bearing error, lift at `lift` x the pitch error, fire when aligned,
+ * drop oil when a car is close behind, light it when one is on it -- routed through 8 of the 34 real hidden
+ * channels (indices 0-7; which specific bodyId lands there is an accident of vendor/male-cns's own neuron
+ * order, not a biological claim). The recurrent core's weights are left at zeroWeights()'s default of 0,
+ * which makes the core a provable identity (see expandRecurrent() and this file's own header) -- the rule
+ * below reaches the decoder exactly as it would through the old plain 11 -> 8 -> 5 net.
+ */
 export function handWeights({ turn = 12, lift = 8, fireOn = 4, dropOn = 4, igniteOn = 4 } = {}) {
-    const w = zeroWeights(), W1 = (h, k, v) => { w[h * FEATURES + k] = v; }, W2 = (o, h, v) => { w[FEATURES * HIDDEN + HIDDEN + o * HIDDEN + h] = v; };
+    const w = zeroWeights(), W1 = (h, k, v) => { w[h * FEATURES + k] = v; }, outBase = FEATURES * HIDDEN + HIDDEN + REC_EDGES, W2 = (o, h, v) => { w[outBase + o * HIDDEN + h] = v; };
     const F = { bias: 0, bearing: 1, pitch: 2, aligned: 8, pursuerNear: 9, onMyOil: 10 };
     W1(0, F.bearing, 1); W1(1, F.bearing, -1); W1(2, F.pitch, 1); W1(3, F.pitch, -1); W1(4, F.aligned, 1); W1(5, F.bias, 1); W1(6, F.pursuerNear, 1); W1(7, F.onMyOil, 1);
     W2(0, 0, turn); W2(0, 1, -turn);              // yaw = turn x bearing
@@ -302,8 +360,8 @@ export function adjudicateShell(v, opts = {}) {
 /** The front door. */
 export function reportLines() {
     return [
-        "[gunnerPolicy] the gunner: an 11 -> 8 -> 5 relu MLP on the turret's aim errors and the slick's two facts, the hand gunner as weights, the duel, the ES, the race with turrets and oil, the shell-speed knob",
-        `  ${WEIGHT_COUNT} weights (${FEATURES} x ${HIDDEN} + ${HIDDEN} + ${HIDDEN} x ${OUTPUTS} + ${OUTPUTS}); features ${FEATURE_NAMES.join(", ")}; outputs ${OUTPUT_NAMES.join(", ")}`,
+        `[gunnerPolicy] the gunner: ${FEATURES} -> ${HIDDEN} (encoder) -> ${REC_STEPS}x connectome-masked recurrent (${REC_EDGES} real GFC synapses, brain/gfcTopology.mjs) -> ${OUTPUTS} (decoder) on the turret's aim errors and the slick's two facts, the hand gunner as weights, the duel, the ES, the race with turrets and oil, the shell-speed knob`,
+        `  ${WEIGHT_COUNT} weights (${FEATURES} x ${HIDDEN} + ${HIDDEN} + ${REC_EDGES} + ${HIDDEN} x ${OUTPUTS} + ${OUTPUTS}); features ${FEATURE_NAMES.join(", ")}; outputs ${OUTPUT_NAMES.join(", ")}`,
         `  reward: ${REWARD.hit} per hit, -${REWARD.waste} per shot, ${REWARD.burn} per second of an opponent on my fire, ${REWARD.damage} per point of spell damage beyond the plain shell's (physics/spellAmmo.mjs, v4592); knob ${KNOB} over [${SHELL_CANDIDATES.join(", ")}] m/s, score 1 / speed, key ${HIT_BOUND} hits in ${KEY_SECONDS} s on seed ${KEY_SEED}`,
         `  box3d ${MOD ? "ready" : "not loaded here (ready() in node, setModule() in a page)"}`,
     ];
