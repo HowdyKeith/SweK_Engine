@@ -1162,7 +1162,28 @@ console.log("\n*** THE CAP KILLED THE GATE AND LEFT ITS CHILDREN RUNNING (v4568)
     // Driven on a real capped run rather than on the source text, because "the code says detached" is the
     // claim, and whether the orphan survives is the fact.
     const fixture = path.join(ENG, "tools", "ship", "__sweepcov_leaker_fixture.mjs");
-    const MARK = "swek-orphan-probe-" + process.pid;
+    // *** v4648 -- THE MARKER IS TERMINATED, BECAUSE AN UNANCHORED pid IS A PREFIX OF ANOTHER pid. ***
+    // This was "swek-orphan-probe-" + process.pid, matched with includes(). A run whose pid is 7579 then
+    // matches the marker of a run whose pid is 75790 -- and counts that stranger's child as ITS OWN
+    // survivor. MEASURED: six copies of this gate run concurrently, 2 of 6 went red with "1 survivor(s)
+    // before the capped run, 0 after" -- a survivor counted BEFORE this run had spawned anything, which is
+    // the tell. It is why sweepCoverage came back NEW RED inside the v4648 verify sweep and GREEN every
+    // time it was run alone afterwards, and it blocked a ship.
+    //
+    // *** AND IT IS THE SPECIES winPathGuard's OWN ITEM 3 ALREADY NAMES: *** "an UNANCHORED endsWith is
+    // wrong even once the split is fixed". Same defect, different file, and I made it twice myself this
+    // session with `pgrep -f`, which matched the bash wrapper running the pgrep.
+    //
+    // The trailing "~" makes the token self-terminating: no pid can be a prefix of another pid PLUS a
+    // character that cannot occur in a pid.
+    // *** AND A pid IS NOT AN IDENTITY EITHER, WHICH THE SECOND MEASUREMENT SHOWED. ***
+    // Terminating the token took 8 concurrent copies from 2-of-6 red to 1-of-8 -- better and not fixed,
+    // because pids are REUSED. Run A spawns a child carrying A's pid; A exits leaving the child orphaned;
+    // run B is handed A's old pid and now shares A's marker exactly, so B counts A's orphan as its own
+    // survivor BEFORE it has spawned anything. Identity has to be unique across TIME, not just across the
+    // processes alive at one instant, so the token carries a clock and a nonce as well.
+    const MARK = "swek-orphan-probe-" + process.pid + "-" + Date.now().toString(36) +
+                 "-" + Math.random().toString(36).slice(2, 10) + "~";
     // *** THE FIXTURE IS BUILT WITH JSON.stringify AT EVERY LEVEL, AND ITS FIRST DRAFT WAS NOT. ***
     // It interpolated a double-quoted mark INSIDE a double-quoted `-e` script inside a template literal, so
     // the file it wrote was a SyntaxError, the fixture never spawned anything, and this row read "0 before,

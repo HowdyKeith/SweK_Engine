@@ -1,9 +1,9 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed.",
- "at": "2026-09-21T01:57:38.909Z",
+ "at": "2026-09-21T02:12:45.124Z",
  "budgetMs": 3000,
- "lastRun": 44,
+ "lastRun": 3,
  "rotated": [
   {
    "gate": "ai-bridge/assetSync-perf-selfcheck.mjs",
@@ -371,10 +371,10 @@
   },
   {
    "gate": "physics/render/energyCompWgsl-selfcheck.mjs",
-   "ms": 9485,
+   "ms": 9759,
    "code": 0,
-   "priorMs": 9518,
-   "at": "2026-09-21T00:42:35.656Z"
+   "priorMs": 9485,
+   "at": "2026-09-21T02:12:45.124Z"
   },
   {
    "gate": "physics/render/fresnelWgsl-selfcheck.mjs",
@@ -1642,10 +1642,10 @@
   },
   {
    "gate": "tools/ship/crashDamage-selfcheck.mjs",
-   "ms": 9067,
+   "ms": 9229,
    "code": 0,
-   "priorMs": 8869,
-   "at": "2026-09-21T00:42:35.656Z"
+   "priorMs": 9067,
+   "at": "2026-09-21T02:12:45.124Z"
   },
   {
    "gate": "tools/ship/crossBackend-selfcheck.mjs",
@@ -2103,10 +2103,10 @@
   },
   {
    "gate": "tools/ship/liveCubeCapture-selfcheck.mjs",
-   "ms": 9934,
+   "ms": 10329,
    "code": 0,
-   "priorMs": 9272,
-   "at": "2026-09-21T00:42:35.656Z"
+   "priorMs": 9934,
+   "at": "2026-09-21T02:12:45.124Z"
   },
   {
    "gate": "tools/ship/loopAccept-selfcheck.mjs",
