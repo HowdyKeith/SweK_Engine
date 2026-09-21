@@ -53,6 +53,8 @@ import { buildSampleWgsl, packSampleParams, meanOf, MODE, FAULT, SAMPLER, PATTER
     from "./microfacetSampleWgsl.mjs";
 import { sampleVisibleNormal, visibleNormalDirPdf, visibleBounceWeight, sampleHalfVector,
          bounceWeight, bsdfEval, G1, G2, furnaceIntegral } from "./microfacet.mjs";
+import { adapterKey, verdict, describe, owedCount, coverage, compareFor, boundFrom,
+         readReadings, recordReading, mergeRecords, READINGS_PATH, SLACK } from "../../tools/ship/adapterRecord.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 let fails = 0;
@@ -132,9 +134,33 @@ ok("*** f cos_i / pdf collapses to G2 / G1(wo) -- the ENTIRE lobe cancels, and b
     cpuId.worst < 1e-14,
     `worst gap ${cpuId.worst.toExponential(3)} over ${cpuId.n} directions at f64. v4409's NDF weight still carried |wo.wh| / (cos_o cos_h); this carries nothing but the masking-shadowing ratio, which is the reason the sampler exists`);
 
+// *** v4649 -- THE BACKFACING COUNT IS A READING OF ONE ADAPTER, AND THIS GATE ASSERTED IT AS A LAW. ***
+// The row below demanded `devBack > 0` -- "nearly exact rather than exact" -- which is SwiftShader's 19 of
+// 786,432 raised to a universal. Keith's rig answers 0 of 786,432: that adapter's f32 rounds the other way
+// and the sampler is EXACT there, which is BETTER than the claim, and the gate called it a failure. An
+// adapter that beats the bound going red is the clearest possible sign the bound was a reading.
+// So: the ceiling stays universal and unconditional, the count itself is HELD against this adapter's record
+// or OWED for want of one, per tools/ship/adapterRecord.mjs and the three states deviceOwed.mjs set at
+// v3339. This is the second gate on that mechanism; 160 more import the harness and do not use it.
+const DEVICE_AT_V4649 = Object.freeze({
+    // Measured here on this run: 19 of 786432 = 2.4155e-5, bounded at the SLACK convention.
+    "google/swiftshader": Object.freeze({ backRate: 4.831e-5 }),
+});
+const GATE = "microfacetVndf";
+const VERDICTS = [];
+
 const skip = webgpuSkipReason();
 if (skip) ok("a device is reachable", false, `SKIP: ${skip} -- a skip counts as a failure; the round is the device`);
 const R = skip ? null : await run();
+const ADAPTER = R ? R.adapter : null;
+const AKEY = adapterKey(ADAPTER);
+// The readings other boxes WROTE, merged UNDER the frozen record so the frozen one always wins.
+const RECORD = mergeRecords(DEVICE_AT_V4649, readReadings(GATE));
+const held = (name, measured, dir) => {
+    const v = verdict(RECORD, ADAPTER, measured, compareFor(name, dir));
+    VERDICTS.push({ ...v, name, dir });
+    return v;
+};
 
 if (R) {
     const gap = (key) => {
@@ -255,9 +281,20 @@ if (R) {
     ok("*** the visible-normal sampler proposes a backfacing facet EXACTLY NEVER at f64 -- a count, not a tolerance ***",
         cpuBack === 0 && rows.some((r) => r.n.b > NSAMP * 0.1),
         `${cpuBack} of ${cpuN} over the same twelve configurations at double precision, while the plain sampler wastes up to ${Math.max(...rows.map((r) => r.n.b))} of ${NSAMP}. That is the property Heitz's construction buys and it is structural`);
-    ok("!! and at f32 it is nearly exact rather than exact, which is the honest version of the same claim",
-        devBack > 0 && devBack < devN * 1e-4,
-        `${devBack} of ${devN} on the device, ${(devBack / devN).toExponential(1)} of all samples. Those are facets whose dot(wo, wh) is a tiny positive in exact arithmetic and rounds to zero or below in binary32 -- the construction is exact, the arithmetic is not, and a check asserting a flat 0 here would be asserting f64 of an f32 machine`);
+    // DURABLE, on any adapter: whatever its f32 does, the sampler must not propose backfacing facets at any
+    // rate worth noticing. ZERO PASSES THIS, because zero is the exact answer and an adapter that reaches it
+    // is better than one that does not -- the previous form demanded a non-zero count and so went red on the
+    // adapter that got it right.
+    const backRate = devBack / devN;
+    ok("*** at f32 the backfacing rate stays negligible on ANY adapter, and EXACTLY ZERO is the best case ***",
+        backRate < 1e-4,
+        `${devBack} of ${devN} on the device, ${backRate.toExponential(1)} of all samples. Those are facets whose dot(wo, wh) is a tiny positive in exact arithmetic and rounds to zero or below in binary32 -- the construction is exact, the arithmetic is not, and a check asserting a flat 0 here would be asserting f64 of an f32 machine`);
+    const vBack = held("backRate", backRate, "max");
+    ok(`  ...and HOW MANY it proposes is this adapter's own number, not a law [${vBack.state}]`,
+        vBack.ok,
+        describe(vBack) + " -- SwiftShader reads 19 of 786432 and an NVIDIA Pascal through D3D12 reads 0. " +
+        "Both are correct answers to what f32 does with a tiny positive dot product; only one of them was " +
+        "ever written down, and the row that demanded it called the better adapter a failure");
     ok("!! *** AND IT DOES NOT STOP BELOW-HORIZON REFLECTIONS, WHICH IS THE PART USUALLY MIS-STATED ***",
         rows.some((r) => r.v.h > NSAMP * 0.3),
         `at roughness 1 the visible-normal sampler still sends ${Math.max(...rows.filter((r) => r.a === 1).map((r) => r.v.h))} of ${NSAMP} below the horizon. It guarantees the FACET faces the viewer; whether the reflection off that facet clears the surface is a different question and the sampler does not answer it`);
@@ -356,6 +393,8 @@ async function run() {
         try {
             if (!navigator.gpu) throw new Error("no navigator.gpu in this page");
             const adapter = await navigator.gpu.requestAdapter(); if (!adapter) throw new Error("no adapter");
+            try { const i = adapter.info || {}; out.adapter = { vendor: i.vendor || null, architecture: i.architecture || null }; }
+            catch { out.adapter = null; }
             const dev = await adapter.requestDevice();
             const m = dev.createShaderModule({ code: a.wgsl });
             const info = await m.getCompilationInfo?.();
@@ -388,6 +427,36 @@ async function run() {
     let vdcExact = true;
     for (let i = 0; i < vdc.length; i++) if (vdc[i] !== rev16(i) / 65536) vdcExact = false;
     return { ...r.result, vdc, vdcN: vdc.length, vdcExact };
+}
+
+// *** THE OWED POPULATION, AS A NUMBER. *** A run that is entirely OWED asserted nothing about the silicon
+// it just used, and that has to be visible in one line rather than inferred.
+if (R) {
+    const c = owedCount(VERDICTS), cov = coverage(RECORD);
+    report(`the record covers ${cov.count} adapter(s): ${cov.keys.join(", ")}`);
+    report(c.owed === 0
+        ? `adapter ${AKEY}: all ${c.of} per-adapter reading(s) HELD against the record on file.`
+        : `adapter ${AKEY}: ${c.owed} of ${c.of} per-adapter reading(s) OWED -- no reading on file for this ` +
+          `adapter, so those rows measured and reported rather than asserted. Every universal row above still ` +
+          `held. Re-run with --record ON THAT BOX to write them; do not type them in from this output.`);
+    // --record runs AFTER every row has reported, so the write cannot change this run's verdicts -- only the
+    // next run's, on this same adapter.
+    if (process.argv.includes("--record")) {
+        const owed = VERDICTS.filter((v) => v.state === "OWED" && Number.isFinite(v.measured));
+        if (!owed.length) {
+            report(`--record: nothing OWED for ${AKEY} -- every reading is already HELD, and --record never touches one.`);
+        } else {
+            const values = {};
+            for (const v of owed) values[v.name] = boundFrom(v.dir, v.measured);
+            const r = recordReading(GATE, AKEY, values, { frozen: DEVICE_AT_V4649 });
+            const rel = path.relative(process.cwd(), READINGS_PATH).replace(/\\/g, "/");
+            report(r.wrote
+                ? `--record: WROTE ${owed.length} reading(s) for ${AKEY} at the ${SLACK}x slack convention -- ` +
+                  `${owed.map((v) => `${v.name} ${v.measured.toPrecision(4)} -> ${String(boundFrom(v.dir, v.measured))} (${v.dir})`).join(", ")}. ` +
+                  `Commit it: git add ${rel}`
+                : `--record: REFUSED -- ${r.why}`);
+        }
+    }
 }
 
 console.log(fails ? `\n${fails} FAILURE(S)` : "\nALL GREEN");
