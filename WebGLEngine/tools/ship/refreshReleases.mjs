@@ -163,7 +163,26 @@ if (raised.minReleases || raised.minLatest)
                 " -> " + out.ratchet.minReleases + ", minLatest " + ((prevLed.ratchet || {}).minLatest || 0) +
                 " -> " + out.ratchet.minLatest + " (monotonic: a refresh can only tighten it)");
 
-if (!write) { console.log("[refreshReleases] dry run -- pass --write to update " + LEDGER); process.exit(0); }
-fs.writeFileSync(LEDGER, JSON.stringify(out, null, 2) + "\n");
-console.log("[refreshReleases] wrote " + LEDGER);
+// *** FOUND ON THE RIG JUST AFTER v4648 -- NO process.exit(0) HERE, IT ABORTS ON WINDOWS. ***
+// (Unstamped on purpose: this is not yet in a shipped version, and a stamp naming one that does not
+// exist is the same claim-about-a-moment this tree keeps having to unpick.)
+// The dry run used to exit(0) on this line. fetch()'s sockets are still open at that point, and tearing
+// the libuv async handle down mid-close trips
+//
+//     Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src\win\async.c, line 94
+//
+// on Keith's rig -- AFTER the output, so the work was done and the process aborted anyway. The --write
+// path below never called exit() and exited cleanly, which is the asymmetry that named the cause.
+//
+// *** IT IS A v4648 BUG ONLY IN THE SENSE THAT v4648 MADE IT REACHABLE. *** This whole CLI was dead on
+// Windows until the main-module comparison was repaired, so the first Windows run of the dry path is also
+// the first sighting. A fix that opens a door finds what was behind it.
+//
+// Nothing needs an explicit exit: the branch just does not write, and Node drains and leaves 0.
+if (write) {
+    fs.writeFileSync(LEDGER, JSON.stringify(out, null, 2) + "\n");
+    console.log("[refreshReleases] wrote " + LEDGER);
+} else {
+    console.log("[refreshReleases] dry run -- pass --write to update " + LEDGER);
+}
 }
