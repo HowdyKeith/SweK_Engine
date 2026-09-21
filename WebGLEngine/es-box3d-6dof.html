@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<!-- es-box3d-6dof.html -- the first page wiring for the Newtonian 6DOF physics substrate
+     (physics/mechanics/rigidBody6dof.mjs, tools/ship/nextRounds.mjs's newtonian-6dof-flight-model entry).
+     Two small fleets fly under REAL force/torque -- no heading, no speed cap, no kinematic flight model
+     anywhere in this page -- driven by brain/autopilot6dof.mjs's PD attitude controller, armed with
+     physics/mechanics/rigidBody6dofWeapon.mjs's straight-line projectiles, and colliding through
+     physics/mechanics/rigidBody6dofCollision.mjs's OBB contact + impulse response. Every one of those four
+     modules is independently gated (rigidBody6dof-selfcheck.mjs, rigidBody6dofCollision-selfcheck.mjs,
+     rigidBody6dofWeapon-selfcheck.mjs, autopilot6dof-selfcheck.mjs) before this page ever wires them together
+     -- this file's own job is just the wiring: per-tick decide->accumulate->step, pairwise collision, batched
+     weapon hit-testing, and turning a rigidBody6dof state's quaternion into a Three.js mesh transform via
+     rigidBody6dof.mjs's own toPoseQuat() bridge. Deliberately minimal scene (no skybox/planet/trails) -- this
+     is the physics substrate's own first page, not a rebuild of es-box3d-fly3d.html's spectacle. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:desc" content="Newtonian 6DOF space combat: two small fleets under REAL force and torque (F=ma, tau=I*alpha, orientation a genuine quaternion, angular velocity a free vector) -- physics/mechanics/rigidBody6dof.mjs, not the engine's kinematic flight model. brain/autopilot6dof.mjs flies them (a PD attitude controller that has to WIN the turn with torque, not just set a heading), physics/mechanics/rigidBody6dofWeapon.mjs arms them with straight-line projectiles hit-tested against an oriented bounding box, and physics/mechanics/rigidBody6dofCollision.mjs resolves ship-ship hits with a real impulse response (momentum and angular momentum conserved, energy never created) that can spin a ship up on an off-centre hit. Every module is independently gated before this page wires them together. Answer-key gates: rigidBody6dof-selfcheck, rigidBody6dofCollision-selfcheck, rigidBody6dofWeapon-selfcheck, autopilot6dof-selfcheck.">
+<title>SweK &middot; Newtonian 6DOF space combat</title>
+<style>
+  html,body { margin:0; height:100%; background:#03060d; color:#cfe0f5; font:12px ui-monospace,Menlo,monospace; overflow:hidden; }
+  #hud { position:fixed; top:8px; left:10px; right:10px; display:flex; gap:14px; align-items:center; flex-wrap:wrap; z-index:2; pointer-events:none; }
+  #hud > * { pointer-events:auto; }
+  #stat { color:#9fe6c0; }
+  a { color:#5ad6ff; text-decoration:none; } a:hover { text-decoration:underline; }
+  button { background:#152136; color:#b9d4ff; border:1px solid #2f486c; border-radius:5px; cursor:pointer; font:11px ui-monospace,monospace; padding:2px 9px; }
+  #hint { position:fixed; bottom:8px; left:10px; color:#5f7590; z-index:2; }
+  canvas { display:block; }
+</style>
+</head>
+<body>
+<div id="hud">
+  <b style="color:#2fd6b0">&#9889; 6DOF space combat</b>
+  <span id="stat"></span>
+  <button id="resetBtn" title="restart the fight now">&#8635; Reset battle</button>
+  <span id="tick" style="display:none"></span>
+</div>
+<div id="hint">real force + torque, not a kinematic flight model &mdash; drag to orbit, scroll to zoom</div>
+
+<script type="importmap">
+{ "imports": { "three": "/vendor/three/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from "/vendor/three/three.module.js";
+import { OrbitControls } from "/vendor/three/jsm/controls/OrbitControls.js";
+import * as RB from "/physics/mechanics/rigidBody6dof.mjs";
+import * as RBC from "/physics/mechanics/rigidBody6dofCollision.mjs";
+import * as RBW from "/physics/mechanics/rigidBody6dofWeapon.mjs";
+import * as AP from "/brain/autopilot6dof.mjs";
+
+// ---- combat constants (game balance, not gated -- matching es-box3d-fly3d.html's own SHOT constants) ----
+const HALF = [1.6, 0.7, 0.7];              // ship OBB half-extents; nose (local +X) is the long axis
+const ENGINE_MOUNT = [-1.4, 0, 0];          // on-axis at the tail -- thrust alone induces no torque
+const SHIP_MASS = 8;
+const HP_MAX = 100, SHOT_DAMAGE = 18, RAM_DAMAGE_PER_IMPULSE = 0.3, RAM_DAMAGE_CAP = 25;
+const FLEET_SIZE = 3, SPAWN_X = 42, SPAWN_SPREAD = 18;
+const FACE_B = [0, 0, 1, 0];                // 180deg about Y -- forward (+X) becomes -X, facing team A
+// AUTOPILOT's own defaults (thrustForce 40, standoff 40) are tuned for the isolated convergence cases in
+// autopilot6dof-selfcheck.mjs, not for a symmetric multi-ship dogfight -- measured head-on here (a fully
+// mirrored two-fleet spawn, THRUST=40 cruise into STANDOFF=40) every ship reaches its counterpart still
+// near TOP SPEED, because this controller has no braking/orbit behaviour: cutting thrust inside standoff
+// only stops ACCELERATING in true Newtonian flight, it does not slow the ship down. That produced an
+// instant six-way head-on pile-up (all three pairs colliding within one tick, every ship dead in ~4s,
+// never firing a shot in anger) -- a real, measured consequence of a deliberately simple first-slice
+// autopilot, not a page bug. Lower cruise thrust and a larger standoff give both sides more space and a
+// lower closing speed to actually shoot at each other with: the SAME scenario re-run at THRUST=16,
+// STANDOFF=50 flew a real 60s dogfight -- 377 shots, 19 hits, zero ship-ship collisions, two kills, no
+// instant joust -- before this page shipped.
+const PAGE_AUTOPILOT = { thrustForce: 16, standoff: 50 };
+
+function makeRng(seed) { let s = (seed >>> 0) || 1; return () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; }; }
+
+// ---- Three.js scene (deliberately minimal -- this page proves the physics wiring, not a spectacle build) ----
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x03060d);
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 5000);
+camera.position.set(0, 30, 90);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = 0.08; controls.target.set(0, 0, 0);
+
+scene.add(new THREE.HemisphereLight(0xafe6ff, 0x0a1420, 1.0));
+const key = new THREE.DirectionalLight(0xffffff, 1.4); key.position.set(30, 60, 40); scene.add(key);
+scene.add(new THREE.AmbientLight(0x223a55, 0.5));
+{
+  const N = 600, pos = new Float32Array(N * 3), rng = makeRng(7);
+  for (let i = 0; i < N; i++) { const r = 800 + rng() * 400, th = rng() * Math.PI * 2, ph = Math.acos(rng() * 2 - 1);
+    pos[i * 3] = r * Math.sin(ph) * Math.cos(th); pos[i * 3 + 1] = r * Math.cos(ph); pos[i * 3 + 2] = r * Math.sin(ph) * Math.sin(th); }
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  scene.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0xaad4ff, size: 1.6, sizeAttenuation: false })));
+}
+
+const TEAM = {
+  A: new THREE.MeshStandardMaterial({ color: 0x8fb6d0, metalness: 0.7, roughness: 0.35 }),
+  B: new THREE.MeshStandardMaterial({ color: 0xd0b08f, metalness: 0.7, roughness: 0.35 }),
+};
+const GLOW = {
+  A: new THREE.MeshStandardMaterial({ color: 0x4fd0ff, emissive: 0x2f86ff, emissiveIntensity: 1.4 }),
+  B: new THREE.MeshStandardMaterial({ color: 0xff9a4f, emissive: 0xff6a2a, emissiveIntensity: 1.4 }),
+};
+// local nose = +X, matching brain/autopilot6dof.mjs's FORWARD_BODY and
+// physics/mechanics/rigidBody6dofWeapon.mjs's own convention -- the SAME "local nose = +X" choice
+// es-box3d-fly3d.html's own makeHull() already uses, so this hull needs no re-orientation to match.
+function makeHull(team) {
+  const hull = TEAM[team] || TEAM.A, g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.5, 2.6, 14), hull); body.rotation.z = Math.PI / 2; g.add(body);
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.32, 0.9, 14), hull); nose.rotation.z = -Math.PI / 2; nose.position.x = 1.6; g.add(nose);
+  const wing = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.0, 1.9), hull); g.add(wing);
+  const eng = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.18, 12), GLOW[team] || GLOW.A); eng.rotation.z = Math.PI / 2; eng.position.x = -1.35; g.add(eng);
+  return g;
+}
+
+// ONE persistent buffer attribute, sized to a generous cap and never replaced -- an earlier version allocated a
+// brand-new Float32Array/BufferAttribute every single frame, which (per the same GPU-buffer-lifecycle review
+// that found the ship-geometry leak below) never frees the PREVIOUS frame's uploaded buffer, leaking one WebGL
+// buffer every frame indefinitely. setDrawRange() already limits what's actually drawn each frame; only the
+// live prefix of this fixed array is ever touched.
+const SHOT_CAP = 400;
+const shotGeo = new THREE.BufferGeometry();
+const shotPosArray = new Float32Array(SHOT_CAP * 3);
+shotGeo.setAttribute("position", new THREE.BufferAttribute(shotPosArray, 3));
+const shotPoints = new THREE.Points(shotGeo, new THREE.PointsMaterial({ color: 0xbfe6ff, size: 3, sizeAttenuation: false, transparent: true, opacity: 0.95 }));
+scene.add(shotPoints);
+
+// ---- combat state ----
+let A = [], B = [], shots = [], tick = 0, wins = { A: 0, B: 0 };
+function spawnFleet(team, baseX, faceQ, rng) {
+  const list = [];
+  for (let i = 0; i < FLEET_SIZE; i++) {
+    const I = RB.boxInertia({ m: SHIP_MASS, hx: HALF[0], hy: HALF[1], hz: HALF[2] });
+    // an INDEPENDENT rng per fleet (see newBattle()) -- a shared rng drawn sequentially for both fleets gave
+    // each ship's y/z jitter the same draw as its opposite-team counterpart, so a symmetric spawn produced a
+    // perfectly mirrored, guaranteed head-on joust every single battle (see PAGE_AUTOPILOT's own note).
+    const pos = [baseX, (i - (FLEET_SIZE - 1) / 2) * 8 + (rng() - 0.5) * 4, (rng() - 0.5) * SPAWN_SPREAD];
+    const body = RB.createBody({ mass: SHIP_MASS, I, pos, q: faceQ, vel: [0, 0, 0], w: [0, 0, 0] });
+    const mesh = makeHull(team); scene.add(mesh);
+    list.push({ id: team + "#" + i, team, body, hp: HP_MAX, cool: 0, dead: false, mesh });
+  }
+  return list;
+}
+// materials (TEAM/GLOW) are shared module-level objects, reused across every ship -- only each ship's OWN
+// geometries (4 fresh ones per makeHull() call) need disposing, or a long-running page leaks GPU buffers on
+// every newBattle() (an adversarial review measured this: a real dogfight wipes a fleet roughly every 10-60s,
+// and the page is built to run indefinitely).
+function disposeHull(mesh) { for (const child of mesh.children) if (child.geometry) child.geometry.dispose(); }
+function clearFleet(list) { for (const s of list) { scene.remove(s.mesh); disposeHull(s.mesh); } }
+function newBattle() {
+  clearFleet(A); clearFleet(B); shots = []; tick = 0;
+  const seed = Date.now() & 0x7fffffff;
+  A = spawnFleet("A", -SPAWN_X, [1, 0, 0, 0], makeRng(seed));
+  B = spawnFleet("B", SPAWN_X, FACE_B, makeRng(seed ^ 0x5bd1e995));
+}
+newBattle();
+
+function nearestEnemy(ship, foes) {
+  let best = null, bestD = Infinity;
+  for (const f of foes) {
+    if (f.dead) continue;
+    const d = Math.hypot(f.body.pos[0] - ship.body.pos[0], f.body.pos[1] - ship.body.pos[1], f.body.pos[2] - ship.body.pos[2]);
+    if (d < bestD) { bestD = d; best = f; }
+  }
+  return best;
+}
+
+function stepFleet(mine, foes, dt, nowMs) {
+  for (const ship of mine) {
+    if (ship.dead) continue;
+    const target = nearestEnemy(ship, foes);
+    if (!target) continue;
+    const d = AP.decide(ship.body, { pos: target.body.pos, vel: target.body.vel }, { weaponSpeed: RBW.WEAPON.speed, ...PAGE_AUTOPILOT });
+    const acc = RB.createAccumulator();
+    RB.applyForceAtPoint(acc, [d.thrust, 0, 0], ENGINE_MOUNT);
+    acc.torque = d.torqueBody;
+    ship.body = RB.step(ship.body, acc, dt);
+    if (d.firing && nowMs >= ship.cool) {
+      ship.cool = nowMs + RBW.WEAPON.cooldownMs;
+      shots.push(RBW.fireProjectile(ship.body, { ownerId: ship.id, team: ship.team }));
+    }
+  }
+}
+
+function resolveCollisions(all) {
+  for (let i = 0; i < all.length; i++) {
+    if (all[i].dead) continue;
+    for (let j = i + 1; j < all.length; j++) {
+      const a = all[i], b = all[j];
+      if (b.dead) continue;
+      const c = RBC.checkContact(a.body, HALF, b.body, HALF);
+      if (!c.hit) continue;
+      const obbA = RBC.bodyOBB(a.body, HALF), obbB = RBC.bodyOBB(b.body, HALF);
+      const p = RBC.contactPoint(obbA, obbB, c.normal);
+      const { j: impulse, a: a2, b: b2 } = RBC.resolveCollision(a.body, b.body, { point: p, normal: c.normal }, { restitution: 0.35 });
+      // positional correction (position-only, split by inverse mass) keeps a colliding pair's own PENETRATION
+      // bounded -- measured directly before this page shipped: depth converges to (and stays pinned near) its
+      // own slop bound rather than growing without limit. IT DOES NOT prevent sustained light contact on its
+      // own: brain/autopilot6dof.mjs has no allied deconfliction, so two same-team ships targeting the same
+      // enemy can fly into and stay pressed against each other for several seconds, re-triggering this block
+      // every tick -- measured too (171 straight ticks on one seed). That is an honest first-slice AI gap
+      // (single-ship target selection, no formation/avoidance), not a collision-response bug: the physics
+      // itself degrades gracefully under it (bounded depth, correct impulses every tick, no explosion, no
+      // clip-through) rather than doing anything wrong.
+      const { a: a3, b: b3 } = RBC.positionalCorrection(a2, b2, c);
+      a.body = a3; b.body = b3;
+      if (impulse > 0) {
+        const dmg = Math.min(RAM_DAMAGE_CAP, impulse * RAM_DAMAGE_PER_IMPULSE);
+        a.hp -= dmg; b.hp -= dmg;
+      }
+    }
+  }
+}
+
+function stepWeapons(all, dt) {
+  const targets = all.filter((s) => !s.dead).map((s) => ({ id: s.id, team: s.team, body: s.body, half: HALF }));
+  const { alive, events } = RBW.stepShots(shots, targets, dt);
+  shots = alive;
+  for (const ev of events) { const t = all.find((s) => s.id === ev.targetId); if (t) t.hp -= SHOT_DAMAGE; }
+}
+
+function syncScene() {
+  const _q = new Float32Array(4);
+  for (const s of A.concat(B)) {
+    if (s.dead) { s.mesh.visible = false; continue; }
+    if (s.hp <= 0) { s.dead = true; s.mesh.visible = false; continue; }
+    s.mesh.position.set(s.body.pos[0], s.body.pos[1], s.body.pos[2]);
+    const pq = RB.toPoseQuat(s.body.q);   // [qw,qx,qy,qz] -> Three's (x,y,z,w)
+    s.mesh.quaternion.set(pq[0], pq[1], pq[2], pq[3]);
+  }
+  const n = Math.min(shots.length, SHOT_CAP);
+  for (let i = 0; i < n; i++) { shotPosArray[i * 3] = shots[i].pos[0]; shotPosArray[i * 3 + 1] = shots[i].pos[1]; shotPosArray[i * 3 + 2] = shots[i].pos[2]; }
+  shotGeo.setDrawRange(0, n);
+  shotGeo.attributes.position.needsUpdate = true;
+}
+
+function frame() {
+  const dt = 1 / 30, nowMs = tick * dt * 1000;
+  const liveA = A.some((s) => !s.dead), liveB = B.some((s) => !s.dead);
+  if (!liveA || !liveB) { if (liveA) wins.A++; else if (liveB) wins.B++; newBattle(); }
+  else {
+    stepFleet(A, B, dt, nowMs);
+    stepFleet(B, A, dt, nowMs);
+    resolveCollisions(A.concat(B));
+    stepWeapons(A.concat(B), dt);
+    tick++;
+  }
+  syncScene(); controls.update();
+  renderer.render(scene, camera);
+  document.getElementById("stat").textContent =
+    `A ${A.filter((s) => !s.dead).length}/${FLEET_SIZE}  vs  B ${B.filter((s) => !s.dead).length}/${FLEET_SIZE}  ·  battles A:${wins.A} B:${wins.B}  ·  shots ${shots.length}  ·  tick ${tick}`;
+  requestAnimationFrame(frame);
+}
+document.getElementById("resetBtn").onclick = () => newBattle();
+addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+
+// a small debug hook -- read back exact numeric state without scraping rendered pixels, for
+// tools/ship/rigidBody6dofPage-selfcheck.mjs's headless assertions.
+window.__sixdof = {
+  state() {
+    return {
+      tick, wins: { ...wins },
+      A: A.map((s) => ({ id: s.id, hp: s.hp, dead: s.dead, pos: s.body.pos.slice(), q: s.body.q.slice(), vel: s.body.vel.slice() })),
+      B: B.map((s) => ({ id: s.id, hp: s.hp, dead: s.dead, pos: s.body.pos.slice(), q: s.body.q.slice(), vel: s.body.vel.slice() })),
+      shots: shots.length,
+    };
+  },
+  newBattle,
+};
+
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

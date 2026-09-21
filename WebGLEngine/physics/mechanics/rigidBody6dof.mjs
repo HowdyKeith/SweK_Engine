@@ -44,12 +44,28 @@
 // axes would need a full off-diagonal tensor and a rotation to its principal frame, which neither file attempts.
 // Mass is constant (no fuel-burn mass loss modelled).
 "use strict";
-import { pathToFileURL } from "node:url";
 import { boxInertia, eulerDeriv, stepQuat, rotateByQuat, energy, momentumBody, momentumMag } from "./freeRotation.mjs";
 
 export { boxInertia, rotateByQuat, energy, momentumBody, momentumMag };   // re-exported: a caller or gate measuring
                                                                             // this module's angular state needs the
                                                                             // same helpers freeRotation.mjs already defines
+
+// toPoseQuat() BRIDGES TWO INCOMPATIBLE CONVENTIONS THAT SHARE A NAME. This file's q (and freeRotation.mjs's own
+// rotateByQuat, re-exported above) is [qw,qx,qy,qz] -- the Hamilton convention. physics/voxelPose.js's OWN
+// rotateByQuat -- used by physics/obbOverlap.js's obbFromPosed(), and matching THREE.Quaternion.set(x,y,z,w) --
+// takes [qx,qy,qz,qw]. Passing a rigidBody6dof.mjs state.q into either of those unconverted silently rotates by
+// the WRONG axis-angle (component [0] read as x instead of w) rather than throwing -- a landmine, not a formality.
+// This is a plain component reorder, proven equivalent (not assumed) against voxelPose.js's own rotateByQuat
+// across random quaternions and vectors in this file's own gate, section 9.
+export function toPoseQuat(q) { return [q[1], q[2], q[3], q[0]]; }
+
+/** World-to-body rotation: the inverse of rotateByQuat(q, ·). The conjugate of a unit quaternion is its inverse,
+ * so this is exact wherever the caller's own q is unit -- the same requirement this module's own quaternion
+ * renormalisation (freeRotation.mjs's stepQuat) already maintains every step. Shared by
+ * rigidBody6dofCollision.mjs (contact-normal-to-body-frame for the impulse solver) and brain/autopilot6dof.mjs
+ * (orientation-error-to-body-frame for its torque controller) -- a general primitive of this module's own
+ * quaternion convention, not specific to either consumer. */
+export function worldToBody(q, v) { return rotateByQuat([q[0], -q[1], -q[2], -q[3]], v); }
 
 const add3 = (a, b, s = 1) => [a[0] + b[0] * s, a[1] + b[1] * s, a[2] + b[2] * s];
 const scale3 = (a, s) => [a[0] * s, a[1] * s, a[2] * s];
@@ -135,7 +151,17 @@ export function reportLines() {
     ];
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
-    for (const l of reportLines()) console.log(l);
-    process.exit(0);
+// GUARDED (this tree's established idiom -- see physics/stabilityMeter.mjs's own v3900/v3951 notes and
+// tools/ship/browserSafety-selfcheck.mjs, the gate that exists because of exactly this bug): this module is
+// loaded by a PAGE as well as run as a CLI, and `process` at module top level is a ReferenceError in a
+// browser -- not a caught failure, an EVALUATION failure, so the whole module fails to load and every page
+// that imports it dies with it. The node:url import itself must be INSIDE the guard too, dynamically -- a
+// bare top-level `import ... from "node:url"` is resolved before this line ever runs, so an unguarded import
+// crashes the browser before the guard below would even get a chance to skip it.
+if (typeof process !== "undefined" && Array.isArray(process.argv)) {
+    const { pathToFileURL } = await import("node:url");
+    if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
+        for (const l of reportLines()) console.log(l);
+        process.exit(0);
+    }
 }

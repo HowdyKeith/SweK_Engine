@@ -44,8 +44,21 @@
 //      cross3(pointBody, forceBody) -- r x F computed as F x r, the negation of the correct torque)  -> 1 red:
 //      the direct r x F check (point [1,0,0], force [0,2,0] must give torque [0,0,2] by the right-hand rule;
 //      swapped, it gives [0,0,-2]).
+//   D  toPoseQuat() reduced to the identity reorder (return [q[0],q[1],q[2],q[3]] -- i.e. NOT reordered at all)
+//      -> 2 red: section 9's direct rotateByQuat comparison (worst component diff jumps from ~1e-15 to ~5,
+//      i.e. an entirely different rotation) and the identity-quaternion mapping check (identity [1,0,0,0]
+//      no longer maps to voxelPose.js's own identity [0,0,0,1]).
+//   E  worldToBody() stopped conjugating altogether (return rotateByQuat(q, v), the forward rotation, instead
+//      of rotateByQuat([q[0],-q[1],-q[2],-q[3]], v)) -> 1 red: the round-trip inverse check (rotating a vector
+//      forward then "back" by the same q, not its conjugate, does not return the original vector). Checked
+//      directly rather than assumed: negating a quaternion's SCALAR component ALONE, [-q[0],q[1],q[2],q[3]],
+//      is algebraically -conj(q) -- and because rotateByQuat is degree-2 homogeneous in q (the standard
+//      double-cover property, q and -q represent the same rotation), that variant is numerically INERT and
+//      would have been a useless sabotage; verified empirically before being ruled out, not assumed from the
+//      textbook fact alone.
 "use strict";
 import { boxInertia, distinctMoments, stepOmega, energy, momentumMag } from "./freeRotation.mjs";
+import { rotateByQuat as rotateByQuatPose } from "../voxelPose.js";
 import * as RB from "./rigidBody6dof.mjs";
 
 let fails = 0;
@@ -175,6 +188,40 @@ console.log("\n8. THE FRONT DOOR");
     const L = RB.reportLines();
     ok("reportLines names the module and shows a real off-centre-thrust run inducing spin", L.length === 6 && /6DOF/.test(L[0]) && /freeRotation\.mjs/.test(L[1]) && /off-axis/.test(L[3]) && /induced real spin/.test(L[5]));
     ok("...and no report line stringifies a missing field as the literal word \"undefined\"", L.every((l) => !/\bundefined\b/.test(l)));
+}
+
+console.log("\n9. *** toPoseQuat() BRIDGES THIS MODULE'S [qw,qx,qy,qz] TO physics/voxelPose.js's [qx,qy,qz,qw] -- PROVEN, NOT ASSUMED ***");
+{
+    // two functions named rotateByQuat exist in this tree with OPPOSITE component orders (see toPoseQuat's own
+    // header comment in rigidBody6dof.mjs). Random quaternions/vectors: rotating by this module's own q must
+    // match rotating by voxelPose.js's rotateByQuat(toPoseQuat(q), v), or the collision/render wiring that
+    // consumes toPoseQuat's output would be rotating every ship by the wrong axis-angle.
+    let s = 987654321 >>> 0;
+    const rnd = () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
+    const randUnit = () => { let x, y, z, w, n2; do { x = rnd() * 2 - 1; y = rnd() * 2 - 1; z = rnd() * 2 - 1; w = rnd() * 2 - 1; n2 = x * x + y * y + z * z + w * w; } while (n2 < 1e-6); const n = Math.sqrt(n2); return [w / n, x / n, y / n, z / n]; };
+    let worst = 0;
+    for (let trial = 0; trial < 200; trial++) {
+        const q = randUnit();
+        const v = [rnd() * 4 - 2, rnd() * 4 - 2, rnd() * 4 - 2];
+        const viaFreeRotation = RB.rotateByQuat(q, v);
+        const viaVoxelPose = rotateByQuatPose(RB.toPoseQuat(q), v);
+        for (let i = 0; i < 3; i++) worst = Math.max(worst, Math.abs(viaFreeRotation[i] - viaVoxelPose[i]));
+    }
+    ok("!! 200 random (quaternion, vector) pairs: freeRotation.mjs's rotateByQuat(q,v) === voxelPose.js's rotateByQuat(toPoseQuat(q),v)", worst < 1e-12, `worst component diff = ${worst.toExponential(2)}`);
+    ok("identity quaternion maps to voxelPose.js's own identity convention [0,0,0,1]", RB.toPoseQuat([1, 0, 0, 0]).every((v, i) => v === [0, 0, 0, 1][i]));
+
+    // worldToBody() is the OTHER bridge this module exports: the inverse rotation, shared by
+    // rigidBody6dofCollision.mjs and brain/autopilot6dof.mjs. Proven directly as rotateByQuat's true inverse,
+    // not assumed from the conjugate formula alone.
+    let worstInv = 0;
+    for (let trial = 0; trial < 200; trial++) {
+        const q = randUnit();
+        const v = [rnd() * 4 - 2, rnd() * 4 - 2, rnd() * 4 - 2];
+        const roundTrip = RB.worldToBody(q, RB.rotateByQuat(q, v));
+        const roundTrip2 = RB.rotateByQuat(q, RB.worldToBody(q, v));
+        for (let i = 0; i < 3; i++) { worstInv = Math.max(worstInv, Math.abs(roundTrip[i] - v[i]), Math.abs(roundTrip2[i] - v[i])); }
+    }
+    ok("!! worldToBody() is the TRUE inverse of rotateByQuat() both ways round, 200 random trials", worstInv < 1e-9, `worst round-trip error = ${worstInv.toExponential(2)}`);
 }
 
 console.log(fails ? `\nrigidBody6dof-selfcheck: ${fails} FAILED` : "\nrigidBody6dof-selfcheck: all checks pass");
