@@ -30,6 +30,24 @@ export function colorForType(type) {
     return TYPE_COLORS[type] || DEFAULT_COLOR;
 }
 
+/**
+ * A neuron's display color for a given real activation value: dim at its base type color when inactive,
+ * blending toward `hot` (white by default) as activation rises. Squashed with tanh(activation / scale) rather
+ * than a linear map -- brain/gunnerPolicy.mjs's own recurrent core can produce activations from 0 into the
+ * hundreds (measured directly while baking tools/bakeGunnerTrace.mjs's demo trace), and a linear map would
+ * leave everything below a handful of units looking identical while one runaway unit saturates the display.
+ * `activation` is assumed >= 0 (every hidden value here comes out of a relu); a negative input is clamped.
+ */
+export function activationColor(baseColor, activation, { scale = 30, dim = 0.15, hot = [1, 1, 1] } = {}) {
+    const t = Math.tanh(Math.max(0, activation) / scale);
+    return [
+        baseColor[0] * dim * (1 - t) + hot[0] * t,
+        baseColor[1] * dim * (1 - t) + hot[1] * t,
+        baseColor[2] * dim * (1 - t) + hot[2] * t,
+        baseColor[3] ?? 1,
+    ];
+}
+
 /** Bounding box, center and a uniform scale that fits the whole circuit's longest axis to TARGET_EXTENT. */
 export function maleCnsBounds(data) {
     const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];

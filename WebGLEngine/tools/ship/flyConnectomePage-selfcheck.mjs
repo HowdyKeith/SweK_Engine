@@ -23,6 +23,9 @@
 // truth broke identically to the code under test and still agreed with it. Fixed by hardcoding the 4
 // expected RGB byte-triples as an independent literal; re-sabotaged the same way and it correctly failed on
 // GFC2/GFC3/GFC4 while GFC1 (the color everything collapsed to) still read true. Reverted.
+// Section 5b was tested by the same sabotage tools/maleCnsLoader-selfcheck.mjs's own log records
+// (activationColor's interpolation factor hardcoded to 0) -- the trained trace's brightest recorded tick,
+// which normally paints 777 near-white pixels, painted 0. Caught independently by both files. Reverted.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -58,6 +61,8 @@ console.log("1. *** THE PAGE EXISTS, DECLARES ITSELF, AND PARSES ***");
 console.log("\n2. *** IT IMPORTS THE LOADER AND DEVICE, AND OWNS NEITHER ***");
 {
     ok("!! imports render/maleCnsLoader.mjs", /from "\/render\/maleCnsLoader\.mjs"/.test(src));
+    ok("!! imports activationColor (not a private brightness formula) for the gunner-replay mode", /activationColor/.test(src));
+    ok("!! fetches the baked gunner trace rather than embedding a copy of it", /brain\/gunnerTraceDemo\.json/.test(src));
     ok("!! imports gfx/device.js's requestDevice", /from "\/gfx\/device\.js"/.test(src) && /requestDevice/.test(code));
     ok("!! imports render/gpuDriven.mjs's camera helpers rather than a private mat4", /from "\/render\/gpuDriven\.mjs"/.test(src));
     ok("!! fetches the vendored data rather than embedding a copy of it",
@@ -119,6 +124,39 @@ console.log("\n4. *** THE REAL BROWSER: THE PAGE (DOM) AND THE PIPELINE (PIXELS)
             ok("!! clicking a neuron fills the detail panel with its type/instance/synapse fields",
                 /type/.test(detail) && /instance/.test(detail) && /pre-synapses/.test(detail) && /post-synapses/.test(detail), detail.slice(0, 120));
         }
+
+        // ---- 4b. GUNNER REPLAY: brain/gunnerPolicy.mjs's OWN hidden layer is these same 34 neurons ----------
+        console.log("\n4b. *** GUNNER REPLAY MODE: A REAL DUEL'S REAL ACTIVATIONS, NOT A SIMULATED SIMULATION ***");
+        await pg.click("#modeReplay");
+        await pg.waitForTimeout(800);
+        ok("!! switching modes swaps the sidebar: explore hidden, replay shown", await pg.$eval("#exploreSidebar", (el) => el.style.display) === "none" && await pg.$eval("#replaySidebar", (el) => el.style.display) === "flex");
+        const handSummary = await pg.$eval("#replaySummary", (el) => el.textContent);
+        ok("!! the hand trace's summary shows real numbers, not placeholders", /hits/.test(handSummary) && /\d+ of \d+/.test(handSummary) && /units ever active/.test(handSummary), handSummary);
+        ok("...and it is the identity-core trace: exactly 8 of 34 units, by its own baked count", /8 of 34/.test(handSummary), handSummary);
+
+        await pg.click("#traceTrained");
+        await pg.waitForTimeout(300);
+        const trainedSummary = await pg.$eval("#replaySummary", (el) => el.textContent);
+        ok("!! switching to the trained trace changes the summary, and reaches MORE units than the hand trace -- the connectome core, actually exercised",
+            trainedSummary !== handSummary && (() => { const m = /(\d+) of 34/.exec(trainedSummary); return m && +m[1] > 8; })(), trainedSummary);
+
+        await pg.evaluate(() => { const el = document.getElementById("scrub"); el.value = "100"; el.dispatchEvent(new Event("input")); });
+        await pg.waitForTimeout(150);
+        const scrubbedTick = await pg.$eval("#tickReadout", (el) => el.textContent);
+        ok("!! scrubbing moves the tick readout to exactly the scrubbed tick", /^tick 100 \//.test(scrubbedTick), scrubbedTick);
+
+        await pg.click("#playPause");
+        const beforePlay = await pg.$eval("#tickReadout", (el) => el.textContent);
+        await pg.waitForTimeout(1000);
+        const afterPlay = await pg.$eval("#tickReadout", (el) => el.textContent);
+        const tickOf = (s) => +(/tick (\d+)/.exec(s) || [0, 0])[1];
+        ok("!! pressing play actually advances the tick over real time, roughly at the recorded 60 Hz rate (not stalled, not a free-running blur)",
+            tickOf(afterPlay) > tickOf(beforePlay) && tickOf(afterPlay) - tickOf(beforePlay) < 120, `${beforePlay} -> ${afterPlay}`);
+
+        await pg.click("#modeExplore");
+        await pg.waitForTimeout(200);
+        const backItems = await pg.$$(".item");
+        ok("!! switching back to Explore restores the picker -- the replay mode did not leave it broken", backItems.length === 34);
 
         // ---- 5. THE PIPELINE, RENDERED OFFSCREEN (see the header comment for why not the live canvas) -----
         console.log("\n5. *** THE SAME PIPELINE, RENDERED OFFSCREEN, ACTUALLY DRAWS THE FOUR GFC COLORS ***");
@@ -202,6 +240,78 @@ void main() { fragColor = color; }`;
             pixelResult.nonBg > 500, `${pixelResult.nonBg} of ${pixelResult.totalPixels} pixels`);
         ok("!! ...and all four GFC type colors appear on screen, not just one", pixelResult.foundGFC1 && pixelResult.foundGFC2 && pixelResult.foundGFC3 && pixelResult.foundGFC4,
             JSON.stringify({ GFC1: pixelResult.foundGFC1, GFC2: pixelResult.foundGFC2, GFC3: pixelResult.foundGFC3, GFC4: pixelResult.foundGFC4 }));
+
+        // ---- 5b. THE GUNNER REPLAY'S ACTIVATION COLORING, OFFSCREEN, THE SAME WAY -------------------------
+        console.log("\n5b. *** THE GUNNER REPLAY'S REAL ACTIVATIONS ALSO REACH REAL PIXELS ***");
+        const actPixels = await pg.evaluate(async () => {
+            const { requestDevice } = await import("/gfx/device.js");
+            const { maleCnsBounds, maleCnsNeuronMeshes, colorForType, activationColor } = await import("/render/maleCnsLoader.mjs");
+            const { perspective, lookAt, multiply } = await import("/render/gpuDriven.mjs");
+
+            const canvas = document.createElement("canvas");
+            canvas.width = 256; canvas.height = 256;
+            const device = await requestDevice(canvas, { offscreen: true });
+
+            const circuit = await (await fetch("/vendor/male-cns/giant-fiber-circuit.json")).json();
+            const trace = (await (await fetch("/brain/gunnerTraceDemo.json")).json()).traces.find((t) => t.label === "trained");
+            const bounds = maleCnsBounds(circuit);
+            const neurons = maleCnsNeuronMeshes(circuit, bounds);
+
+            // the tick where SOME unit is closest to the trace's own max -- the brightest moment on record,
+            // so if activation coloring reaches the GPU at all, this is where a near-white pixel must appear
+            let bestTick = 0, bestVal = -1;
+            trace.ticks.forEach((tk, t) => { const m = Math.max(...tk.hidden); if (m > bestVal) { bestVal = m; bestTick = t; } });
+
+            const WGSL = `struct Uniforms { viewProj: mat4x4<f32>, color: vec4<f32> };
+@group(0) @binding(0) var<uniform> U: Uniforms;
+struct VO { @builtin(position) pos: vec4<f32> };
+@vertex fn vs(@location(0) p: vec3<f32>) -> VO { var o: VO; o.pos = U.viewProj * vec4<f32>(p, 1.0); return o; }
+@fragment fn fs() -> @location(0) vec4<f32> { return U.color; }`;
+            const GLSL_VERTEX = `#version 300 es
+precision highp float;
+in vec3 p;
+uniform mat4 viewProj;
+void main() { gl_Position = viewProj * vec4(p, 1.0); }`;
+            const GLSL_FRAGMENT = `#version 300 es
+precision highp float;
+uniform vec4 color;
+out vec4 fragColor;
+void main() { fragColor = color; }`;
+            const pipe = device.pipeline({
+                shaders: { wgsl: WGSL, glsl: { vertex: GLSL_VERTEX, fragment: GLSL_FRAGMENT } },
+                attributes: [{ name: "p", size: 3, offset: 0 }], stride: 12,
+                uniforms: [{ name: "viewProj", type: "mat4" }, { name: "color", type: "vec4" }],
+                topology: "line-list",
+            });
+            const gpuNeurons = neurons.map((n) => ({
+                type: n.type,
+                posBuf: device.buffer({ data: n.mesh.positions, usage: "vertex" }),
+                idxBuf: device.buffer({ data: n.mesh.indices, usage: "index" }),
+                indexCount: n.mesh.indices.length,
+            }));
+            const eye = [2.61, 1.96, 3.10];
+            const viewProj = multiply(perspective(45 * Math.PI / 180, 1, 0.1, 100), lookAt(eye, [0, 0, 0], [0, 1, 0]));
+            const hidden = trace.ticks[bestTick].hidden;
+
+            const out = await device.frame(({ pass }) => {
+                pass.clear([0.02, 0.024, 0.04, 1]);
+                pass.use(pipe);
+                pass.uniform("viewProj", viewProj);
+                for (let i = 0; i < gpuNeurons.length; i++) {
+                    const n = gpuNeurons[i];
+                    pass.uniform("color", activationColor(colorForType(n.type), hidden[i], { scale: trace.meanActivation }));
+                    pass.vertices(n.posBuf, 0); pass.indices(n.idxBuf); pass.drawIndexed(n.indexCount);
+                }
+            }, { read: true });
+
+            const px = out.pixels;
+            let nearWhite = 0;
+            for (let i = 0; i < px.length; i += 4) if (px[i] > 220 && px[i + 1] > 220 && px[i + 2] > 220) nearWhite++;
+            return { bestTick, bestVal, nearWhite, totalPixels: px.length / 4, pipeError: pipe.error };
+        });
+        ok("!! the offscreen pipeline compiled with the activation-colored draw call too", !actPixels.pipeError, String(actPixels.pipeError));
+        ok("!! *** THE TRAINED TRACE'S BRIGHTEST RECORDED MOMENT ACTUALLY PAINTS NEAR-WHITE PIXELS -- THE ACTIVATION REACHES THE GPU, NOT JUST A JS VARIABLE ***",
+            actPixels.nearWhite > 0, `tick ${actPixels.bestTick} (max activation ${actPixels.bestVal}): ${actPixels.nearWhite} of ${actPixels.totalPixels} pixels near-white`);
 
         await ctx.close();
         await b.close();

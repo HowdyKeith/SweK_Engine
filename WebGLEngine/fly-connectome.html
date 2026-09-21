@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="demo:title" content="Fly Connectome: the Giant Fiber Circuit">
-<meta name="demo:desc" content="34 real neurons from Janelia's male-cns connectome -- the fruit fly's Giant Fiber escape circuit, the fastest reflex in the animal's nervous system -- drawn as their own traced skeletons (not a stylized model) from a one-time Neuprint fetch. Orbit the circuit, pick a neuron, and see its actual synaptic connections to the rest of the circuit.">
+<meta name="demo:desc" content="34 real neurons from Janelia's male-cns connectome -- the fruit fly's Giant Fiber escape circuit, the fastest reflex in the animal's nervous system -- drawn as their own traced skeletons (not a stylized model) from a one-time Neuprint fetch. Orbit the circuit, pick a neuron, and see its actual synaptic connections to the rest of the circuit. A second mode replays brain/gunnerPolicy.mjs's real turret-gunner AI -- these same 34 neurons ARE its hidden layer -- coloring each one by its real per-tick activation from a recorded duel, hand-tuned versus ES-trained.">
 <meta name="demo:category" content="science">
 <title>SweK &middot; Fly Connectome</title>
 <style>
@@ -35,6 +35,16 @@
   .bar { width:200px; height:6px; background:#1c2942; border-radius:3px; overflow:hidden; }
   .bar i { display:block; height:100%; background:var(--cyan); width:0%; }
   .err { color:#ff7a7a; }
+  .modes { padding:0 18px 8px; display:flex; gap:6px; }
+  .modeBtn { background:var(--panel); border:1px solid var(--line); color:var(--dim); padding:4px 10px; border-radius:4px; cursor:pointer; font:inherit; font-size:11px; }
+  .modeBtn.sel { color:var(--amber); border-color:var(--amber); }
+  .traceRow { display:flex; gap:6px; }
+  .playRow { display:flex; gap:8px; align-items:center; }
+  #scrub { width:100%; }
+  .outputs { display:flex; flex-wrap:wrap; gap:6px; font-size:11px; }
+  .outVal { background:#12182a; border:1px solid var(--line); border-radius:4px; padding:3px 6px; color:var(--dim); }
+  .outVal.on { color:#04060b; background:var(--amber); border-color:var(--amber); }
+  .replayNote { color:var(--dim); font-size:11px; line-height:1.6; }
   .note { padding:6px 18px 24px; color:#55617a; max-width:900px; line-height:1.7; }
   .note a { color:var(--cyan); }
   code { color:var(--cyan); }
@@ -48,6 +58,10 @@
     traced skeleton, fetched once via Neuprint and vendored into this repo; nothing here is a stylized model. Drag to
     orbit, scroll to zoom, and click a neuron on the right to see its own synaptic connections within the circuit.</p>
 </header>
+<div class="modes">
+  <button id="modeExplore" class="modeBtn sel">Explore</button>
+  <button id="modeReplay" class="modeBtn">Gunner replay</button>
+</div>
 <main>
   <div class="stage">
     <canvas id="c" width="640" height="520"></canvas>
@@ -56,11 +70,28 @@
       <div class="bar"><i id="progressBar"></i></div>
     </div>
   </div>
-  <div class="sidebar">
+  <div class="sidebar" id="exploreSidebar">
     <div class="legend" id="legend"></div>
     <div class="list" id="list"></div>
     <div class="detail" id="detail">Click a neuron to see its type, synapse counts, and connections within this
       circuit.</div>
+  </div>
+  <div class="sidebar" id="replaySidebar" style="display:none">
+    <p class="replayNote">brain/gunnerPolicy.mjs's turret gunner has these same 34 neurons as its hidden layer.
+      This replays two real duels through real box3d physics, coloring each neuron by its own real activation,
+      tick by tick -- not a simulation of a simulation.</p>
+    <div class="traceRow">
+      <button id="traceHand" class="modeBtn sel">Hand-tuned</button>
+      <button id="traceTrained" class="modeBtn">ES-trained</button>
+    </div>
+    <p class="replayNote" id="traceNote"></p>
+    <div class="playRow">
+      <button id="playPause" class="modeBtn">&#9654; Play</button>
+      <span id="tickReadout" class="replayNote"></span>
+    </div>
+    <input type="range" id="scrub" min="0" max="0" value="0">
+    <div class="detail" id="replaySummary"></div>
+    <div class="outputs" id="outputs"></div>
   </div>
 </main>
 <div class="hint" style="padding:0 18px;">drag to orbit &middot; scroll to zoom</div>
@@ -74,7 +105,7 @@
 </div>
 <script type="module">
 import { requestDevice } from "/gfx/device.js";
-import { maleCnsBounds, maleCnsNeuronMeshes, maleCnsConnections, colorForType } from "/render/maleCnsLoader.mjs";
+import { maleCnsBounds, maleCnsNeuronMeshes, maleCnsConnections, colorForType, activationColor } from "/render/maleCnsLoader.mjs";
 import { perspective, lookAt, multiply } from "/render/gpuDriven.mjs";
 import { fetchWithProgress } from "/net/fetchProgress.js";
 import { progressLine } from "/ui/localModelRun.js";
@@ -192,6 +223,86 @@ async function main() {
             `<div style="margin-top:6px;">${rows || '<span style="color:var(--dim)">none within this circuit slice</span>'}</div>`;
     }
 
+    // ---- mode toggle: static exploration vs a real gunner's real activations ------------------------------------
+    const modeExploreBtn = $("modeExplore"), modeReplayBtn = $("modeReplay");
+    const exploreSidebar = $("exploreSidebar"), replaySidebar = $("replaySidebar");
+    let mode = "explore";
+    function setMode(m) {
+        mode = m;
+        modeExploreBtn.classList.toggle("sel", m === "explore");
+        modeReplayBtn.classList.toggle("sel", m === "replay");
+        exploreSidebar.style.display = m === "explore" ? "flex" : "none";
+        replaySidebar.style.display = m === "replay" ? "flex" : "none";
+        if (m === "replay") ensureGunnerData();
+        // Leaving replay mode while playing must stop playback, not just stop drawing it: the frame loop
+        // already gates ticking on mode === "replay", so leaving it just freezes playStartWall/playStartTick
+        // mid-flight -- returning to replay later would read a full Explore-mode's worth of real wall-clock
+        // time as "elapsed playback" and jump the tick far ahead (or straight to the end-of-trace loop reset).
+        else if (playing) { playing = false; playPauseBtn.innerHTML = "&#9654; Play"; }
+    }
+    modeExploreBtn.addEventListener("click", () => setMode("explore"));
+    modeReplayBtn.addEventListener("click", () => setMode("replay"));
+
+    // ---- gunner replay: brain/gunnerPolicy.mjs's own hidden layer IS these 34 neurons, so a recorded duel's real
+    // per-tick activation (tools/bakeGunnerTrace.mjs) can color the same meshes the picker above uses -------------
+    const traceHandBtn = $("traceHand"), traceTrainedBtn = $("traceTrained");
+    const scrub = $("scrub"), playPauseBtn = $("playPause"), tickReadout = $("tickReadout"), replaySummary = $("replaySummary"), outputsEl = $("outputs"), traceNote = $("traceNote");
+    let gunnerData = null, gunnerDataPromise = null, activeTrace = null, currentTick = 0, playing = false, playStartWall = 0, playStartTick = 0;
+
+    function ensureGunnerData() {
+        if (gunnerData || gunnerDataPromise) return gunnerDataPromise;
+        traceNote.textContent = "loading brain/gunnerTraceDemo.json…";
+        gunnerDataPromise = fetch("/brain/gunnerTraceDemo.json").then((r) => {
+            if (!r.ok) throw new Error("HTTP " + r.status);
+            return r.json();
+        }).then((d) => { gunnerData = d; selectTrace("hand"); })
+          .catch((e) => { traceNote.textContent = "Could not load the gunner trace: " + e.message; });
+        return gunnerDataPromise;
+    }
+
+    function selectTrace(label) {
+        traceHandBtn.classList.toggle("sel", label === "hand");
+        traceTrainedBtn.classList.toggle("sel", label === "trained");
+        if (!gunnerData) return;
+        activeTrace = gunnerData.traces.find((t) => t.label === label);
+        currentTick = 0; playing = false; playPauseBtn.innerHTML = "&#9654; Play";
+        scrub.max = String(activeTrace.ticks.length - 1); scrub.value = "0";
+        replaySummary.innerHTML = `<div class="row"><span>hits</span><b>${activeTrace.hits} of ${activeTrace.shots}</b></div>` +
+            `<div class="row"><span>drops</span><b>${activeTrace.drops}</b></div>` +
+            `<div class="row"><span>burn ticks</span><b>${activeTrace.burned}</b></div>` +
+            `<div class="row"><span>score</span><b>${activeTrace.score}</b></div>` +
+            `<div class="row"><span>units ever active</span><b>${activeTrace.nonzeroUnitCount} of ${gunnerData.hiddenCount}</b></div>`;
+        traceNote.textContent = label === "hand"
+            ? "Hand-tuned: its recurrent core weights are all zero, which brain/gunnerPolicy.mjs's own header proves is an exact identity -- only 8 of the 34 units ever light up, always the same 8."
+            : "ES-trained (30 iterations, a fixed seed): free to use the connectome-masked core, and it does -- more units light up than the hand-tuned baseline, though 30 iterations wasn't enough to out-hit it.";
+        updateReadout();
+    }
+    traceHandBtn.addEventListener("click", () => selectTrace("hand"));
+    traceTrainedBtn.addEventListener("click", () => selectTrace("trained"));
+
+    function updateReadout() {
+        if (!activeTrace) return;
+        const tk = activeTrace.ticks[currentTick];
+        tickReadout.textContent = `tick ${currentTick} / ${activeTrace.ticks.length - 1} (${(currentTick * gunnerData.dt).toFixed(2)}s)`;
+        scrub.value = String(currentTick);
+        const [yaw, pitch, fire, drop, ignite] = tk.output;
+        outputsEl.innerHTML =
+            `<span class="outVal">yaw ${yaw.toFixed(2)}</span><span class="outVal">pitch ${pitch.toFixed(2)}</span>` +
+            `<span class="outVal ${fire > 0 ? "on" : ""}">fire</span><span class="outVal ${drop > 0 ? "on" : ""}">drop</span>` +
+            `<span class="outVal ${ignite > 0 ? "on" : ""}">ignite</span>`;
+    }
+    playPauseBtn.addEventListener("click", () => {
+        if (!activeTrace) return;
+        playing = !playing;
+        playPauseBtn.innerHTML = playing ? "&#10074;&#10074; Pause" : "&#9654; Play";
+        if (playing) { playStartWall = performance.now(); playStartTick = currentTick; }
+    });
+    scrub.addEventListener("input", () => {
+        playing = false; playPauseBtn.innerHTML = "&#9654; Play";
+        currentTick = Math.max(0, Math.min(activeTrace ? activeTrace.ticks.length - 1 : 0, +scrub.value));
+        updateReadout();
+    });
+
     // ---- orbit camera (same pointer-capture pattern as rtx-viewer.html) ---------------------------------------
     let yaw = 0.7, pitch = 0.45, dist = 4.5, dragging = null;
     cvs.addEventListener("pointerdown", (e) => { dragging = [e.clientX, e.clientY]; cvs.setPointerCapture(e.pointerId); });
@@ -213,14 +324,32 @@ async function main() {
         const proj = perspective(45 * Math.PI / 180, w / h, 0.1, 100);
         const viewProj = multiply(proj, view);
 
+        if (mode === "replay" && activeTrace && playing) {
+            const elapsedTicks = Math.floor((performance.now() - playStartWall) / 1000 / gunnerData.dt);
+            let t = playStartTick + elapsedTicks;
+            if (t >= activeTrace.ticks.length) { playStartWall = performance.now(); playStartTick = 0; t = 0; } // loop the demo
+            currentTick = t;
+            updateReadout();
+        }
+
         device.frame(({ pass }) => {
             pass.clear([0.02, 0.024, 0.04, 1]);
             pass.use(pipe);
             pass.uniform("viewProj", viewProj);
-            for (const n of gpuNeurons) {
-                const base = n.mesh.color;
-                const dim = selected != null && n.bodyId !== selected;
-                pass.uniform("color", dim ? [base[0] * DIM, base[1] * DIM, base[2] * DIM, base[3]] : base);
+            const activation = mode === "replay" && activeTrace ? activeTrace.ticks[currentTick].hidden : null;
+            for (let i = 0; i < gpuNeurons.length; i++) {
+                const n = gpuNeurons[i];
+                let color;
+                if (activation) {
+                    // scale: the trace's OWN mean nonzero activation magnitude (baked, not guessed) -- the hand
+                    // and trained traces differ by ~270x in raw scale, and a fixed scale would leave one flat.
+                    color = activationColor(colorForType(n.type), activation[i], { scale: activeTrace.meanActivation });
+                } else {
+                    const base = n.mesh.color;
+                    const dim = selected != null && n.bodyId !== selected;
+                    color = dim ? [base[0] * DIM, base[1] * DIM, base[2] * DIM, base[3]] : base;
+                }
+                pass.uniform("color", color);
                 pass.vertices(n.posBuf, 0);
                 pass.indices(n.idxBuf);
                 pass.drawIndexed(n.indexCount);

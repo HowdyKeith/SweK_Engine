@@ -212,7 +212,7 @@ export function turretTick(world, cars, turrets, shells, poses, cmds, t, spec, s
  * seed }. A world is made and destroyed here. v4590 turned the duel around: until then the candidate sat behind a target it
  * could only shoot, and a slick dropped behind a rear car meets nobody.
  */
-export function duel(worldFrom, w, { seed = 1, seconds = 20, gap = 10, shellSpeed = U.TURRET.shellSpeed, driver = null, otherDriver = null, slicks: withSlicks = true, geometry = "pursued", pickups: withPickups = false } = {}) {
+export function duel(worldFrom, w, { seed = 1, seconds = 20, gap = 10, shellSpeed = U.TURRET.shellSpeed, driver = null, otherDriver = null, slicks: withSlicks = true, geometry = "pursued", pickups: withPickups = false, onTick = null } = {}) {
     // "pursued": the candidate in the FRONT car, the other car behind it (the slick's geometry, the trainer's default);
     // "chase": the candidate BEHIND a car that pulls away (v4588's original duel), where a slow shell never catches the target
     const me = geometry === "chase" ? 1 : 0, other = 1 - me;
@@ -227,7 +227,12 @@ export function duel(worldFrom, w, { seed = 1, seconds = 20, gap = 10, shellSpee
     for (let t = 0; t < ticks; t++) {
         const xf = world.readTransforms(), vel = world.readVelocities(), poses = cars.map((c) => C.carPose(world, c, xf, vel));
         const inputs = poses.map((p, i) => { const u = C.clampInput(drivers[i](p)); return { ...u, throttle: u.throttle * A.throttleFactor(turrets[i], t) }; });
-        const cmds = [idle, idle]; cmds[me] = U.clampGun(gunner(poses[me], turrets[me], { pose: poses[other] }, pursuerInfo(me, poses, slicks)));
+        const extra = pursuerInfo(me, poses, slicks);
+        const cmds = [idle, idle]; cmds[me] = U.clampGun(gunner(poses[me], turrets[me], { pose: poses[other] }, extra));
+        // v4593 -- onTick: the SAME 11 features gunnerFor's own closure just fed forward(), recomputed here (a pure
+        // function, no different from calling it twice) so a caller can capture the real per-tick activation trace
+        // without duel() itself carrying the weight of that instrumentation on every ordinary run.
+        if (onTick) onTick(t, features(poses[me], turrets[me], { pose: poses[other] }, extra), cmds[me]);
         const tt = turretTick(world, cars, turrets, shells, poses, cmds, t, spec, slicks, field);
         for (const b of tt.burns) if (b.kind === "burn" && b.car === other && b.owner === me) burned++;
         C.stepCars(world, cars, surf, inputs, C.CAR.dt);

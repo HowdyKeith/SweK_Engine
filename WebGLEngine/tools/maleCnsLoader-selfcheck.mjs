@@ -16,11 +16,17 @@
 // `n.xyz[p * 3]` (the parent's own position) to `n.xyz[i * 3]` (the child's, a plausible copy-paste of the
 // line just above it) -- every edge collapsed to a zero-length segment at the child's own position, and both
 // "transformed positions are EXACTLY the hand-computed..." checks went red as expected. Reverted.
+// Section 4 (activationColor) was tested by hardcoding its interpolation factor `t` to 0 (activation never
+// reaches `hot`, always the dim floor) -- 3 of section 4's 6 checks went red (saturation, custom-hot, and the
+// scale-sensitivity check), and separately tools/ship/flyConnectomePage-selfcheck.mjs's own real-GPU-pixel
+// check for the gunner replay's brightest recorded moment went red too (0 near-white pixels instead of the
+// expected 777) -- the same sabotage caught by a pure-function test and by an independent offscreen render.
+// Reverted.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { maleCnsBounds, maleCnsNeuronMeshes, maleCnsConnections, maleCnsNeuronByBodyId, colorForType } from "../render/maleCnsLoader.mjs";
+import { maleCnsBounds, maleCnsNeuronMeshes, maleCnsConnections, maleCnsNeuronByBodyId, colorForType, activationColor } from "../render/maleCnsLoader.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 let fails = 0;
@@ -144,6 +150,25 @@ console.log("\n3. *** A HAND-BUILT FIXTURE WHERE EVERY OUTPUT NUMBER IS KNOWN IN
 
     ok("maleCnsNeuronByBodyId finds the right raw neuron by id", maleCnsNeuronByBodyId(fixture, 1002).instance === "B");
     ok("...and returns null for a bodyId that is not in the set", maleCnsNeuronByBodyId(fixture, 9999) === null);
+}
+
+console.log("\n4. *** activationColor -- fly-connectome.html's gunner-replay mode colors these same meshes by real activation ***");
+{
+    const base = [0.3, 0.75, 0.95, 1], close = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
+
+    ok("!! activation 0 is EXACTLY base color x dim (no color component escapes the floor)",
+        (() => { const c = activationColor(base, 0, { scale: 10, dim: 0.2 }); return close(c[0], base[0] * 0.2) && close(c[1], base[1] * 0.2) && close(c[2], base[2] * 0.2) && c[3] === base[3]; })());
+    ok("!! a very large activation saturates toward `hot`, not past it", (() => { const c = activationColor(base, 1e9, { scale: 10, hot: [1, 1, 1] }); return c.every((v, i) => i === 3 || close(v, 1, 1e-6)); })());
+    ok("!! a custom hot color is reached at saturation, not always white", (() => { const c = activationColor(base, 1e9, { scale: 10, hot: [1, 0, 0] }); return close(c[0], 1, 1e-6) && close(c[1], 0, 1e-6) && close(c[2], 0, 1e-6); })());
+    ok("monotonic in activation: more activation is never a dimmer color", (() => {
+        let prev = -1;
+        for (const a of [0, 1, 5, 10, 30, 100, 1000]) { const c = activationColor(base, a, { scale: 10 }); const bright = c[0] + c[1] + c[2]; if (bright < prev - 1e-9) return false; prev = bright; }
+        return true;
+    })());
+    ok("!! a negative activation (should never happen -- every real hidden value here comes out of a relu) clamps to the same floor as 0, rather than going darker or inverting",
+        (() => { const c0 = activationColor(base, 0, { scale: 10 }), cn = activationColor(base, -50, { scale: 10 }); return c0.every((v, i) => close(v, cn[i])); })());
+    ok("!! the SAME activation reads brighter under a smaller scale -- this is why tools/bakeGunnerTrace.mjs bakes a per-trace scale rather than sharing one fixed number across a hand gunner (activations ~[0,1]) and a trained one (~[0,260])",
+        (() => { const wide = activationColor(base, 5, { scale: 100 }), narrow = activationColor(base, 5, { scale: 2 }); return (narrow[0] + narrow[1] + narrow[2]) > (wide[0] + wide[1] + wide[2]); })());
 }
 
 console.log("\n" + (fails ? `${fails} FAILED` : "ALL PASS"));
