@@ -167,11 +167,39 @@ export const FIELD_RE = /\n\s+([A-Za-z_][A-Za-z0-9_]*):\s*\d+\s*,/g;
 // would answer a different question than the one asked. A caller passing its own `files` or `read` -- which
 // is how the gate injects fixtures -- bypasses the memo entirely and gets the old path.
 const _scanCache = new Map();      // String(exclude) -> frozen census
+// *** v4647r -- THE COMMENT STRIP WAS THE COST, AND IT WAS RE-TAKEN THREE TIMES OVER. ***
+// MEASURED on this tree: stripComments over the 1,759 gates is ~150 ms and over all 4,289 .mjs files is
+// ~424 ms, and census() does BOTH -- once for the guardian search and once for the derivation walk below --
+// so every gate file was stripped twice inside a single census. frozenRecords-selfcheck then takes TWO
+// censuses with different `exclude` keys, which do not share the _scanCache, so the whole thing happened
+// again: ~1,100 ms of a ~2,200 ms gate, spent re-deriving a pure function of a file that had not changed.
+//
+// That cost took recordReach-selfcheck's margin row red at v4647q (768 ms of headroom against the 800 it
+// requires) and the row was RIGHT -- "a swept gate is O(tree) and the tree grows every round". The threshold
+// was not touched; the work was.
+const _stripCache = new Map();     // absolute path -> comment-stripped source
+/**
+ * The stripped source of one file. CACHED ONLY WHEN THE READ IS THE REAL ONE: a census handed an injected
+ * `read` is looking at a fixture, and a fixture's content is not a property of its path -- serving it from a
+ * path-keyed cache is how a gate comes to grade a copy of something else.
+ */
+function strippedOf(f, read, cacheable) {
+    if (cacheable) { const hit = _stripCache.get(f); if (hit !== undefined) return hit; }
+    const out = stripComments(read(f));
+    if (cacheable) _stripCache.set(f, out);
+    return out;
+}
 const _recCache = new Map();       // path -> the record rows in it, guardians not yet attached
 
-function recordsIn(f, read) {
-    const hit = _recCache.get(f);
-    if (hit) return hit;
+// *** v4647r -- `cacheable` IS NEW, AND THE BYPASS IT REPLACES DID NOT BYPASS. *** census() called this as
+// `memoable ? recordsIn(f, rd) : recordsIn.call(null, f, rd)`, which is the SAME CALL written two ways --
+// `.call(null, ...)` changes nothing about which cache the body reaches. So a census handed an injected
+// `read` was served, and could populate, a path-keyed cache of REAL file contents. Nothing has caught it
+// because the fixtures use __fx_ paths that no real file occupies; the hazard is a fixture, or a written
+// file, REUSING a path with new content and being answered from the old one -- which is exactly the
+// staleness clearScanCache() exists to let the gate disprove.
+function recordsIn(f, read, cacheable = true) {
+    if (cacheable) { const hit = _recCache.get(f); if (hit) return hit; }
     const src = read(f);
     const out = [];
     RECORD_RE.lastIndex = 0;
@@ -183,12 +211,12 @@ function recordsIn(f, read) {
         FIELD_RE.lastIndex = 0;
         out.push({ name: m[1], fields: [...body.matchAll(FIELD_RE)].map((x) => x[1]), bytes: body.length, balanced });
     }
-    _recCache.set(f, out);
+    if (cacheable) _recCache.set(f, out);
     return out;
 }
 
 /** Drop both memos. The gate needs a cold scan to prove the warm one is not simply answering from a stale copy. */
-export function clearScanCache() { _scanCache.clear(); _recCache.clear(); _importCache.clear(); }
+export function clearScanCache() { _scanCache.clear(); _recCache.clear(); _importCache.clear(); _stripCache.clear(); }
 
 /**
  * *** WHICH LOCAL NAMES A GATE COULD CALL `fn` BY, IF IT IMPORTS IT FROM `target` -- AND [] IF IT DOES NOT. ***
@@ -286,6 +314,11 @@ export function readSites(names, { root = ENG } = {}) {
 
 export function census({ files = null, read = null, exclude = null } = {}) {
     const memoable = files === null && read === null;
+    // A REAL read is what makes a path-keyed cache sound; an injected one is a fixture and must not touch it.
+    // This is deliberately NOT `memoable`: a census over an explicit `files` list of real paths (section 9's
+    // written fixtures go through one) still reads real bytes, and still may not be served the whole-census
+    // memo. The two questions are different and were one flag before.
+    const cacheable = read === null;
     const key = String(exclude);
     if (memoable && _scanCache.has(key)) return _scanCache.get(key);
     const rd = read || ((f) => TR.textOf(f));
@@ -302,7 +335,7 @@ export function census({ files = null, read = null, exclude = null } = {}) {
     // were prose ABOUT threads"), in the column that decides whether a record is protected at all.
     // Record DETECTION is left on the raw text and that is deliberate: a declaration only appears in code,
     // and stripping first was measured to find the same 94 records, so it would be cost without effect.
-    const gateSrc = gates.map((g) => [rel(g), stripComments(rd(g))]);
+    const gateSrc = gates.map((g) => [rel(g), strippedOf(g, rd, cacheable)]);
     // *** v4555 -- THIS LINE READ `/\.mjs$/` AND THE WALK ABOVE ALREADY ACCEPTS .mjs, .cjs AND .js. ***
     // Every frozen record in a .js file was therefore invisible to this census AND to recordReach, which
     // derives its whole population from here -- so both under-reported, and not randomly: what they missed
@@ -317,7 +350,7 @@ export function census({ files = null, read = null, exclude = null } = {}) {
     // once per record's turn through the loop.
     const named = new Map();       // name -> [gate rel]
     const all = [];
-    for (const f of mjs) for (const r of (memoable ? recordsIn(f, rd) : recordsIn.call(null, f, rd)))
+    for (const f of mjs) for (const r of recordsIn(f, rd, cacheable))
         { all.push({ r, f }); if (!named.has(r.name)) named.set(r.name, []); }
     for (const [g, src] of gateSrc) for (const [name, list_] of named) if (src.includes(name)) list_.push(g);
     // *** v4576 -- ONE LEVEL OF DERIVATION, BECAUSE A RECORD READ ONLY THROUGH ANOTHER ONE READ AS UNGUARDED. ***
@@ -332,9 +365,13 @@ export function census({ files = null, read = null, exclude = null } = {}) {
     // never touch its value, which is how a coverage number becomes a story. The edge has to be visible in the
     // defining module's own text, which is the same standard the NAME search uses.
     for (const f of mjs) {
-        const src = stripComments(rd(f));
+        // *** THE STRIP MOVED BELOW THE TEST, AND THAT IS MOST OF THIS ROUND'S SAVING. *** It used to run
+        // FIRST, on every one of the 4,289 files, and the very next line discards all but the handful that
+        // declare two or more records -- so the comment strip was paid in full for files this loop then
+        // refused to look at. Pure reordering: stripComments has no effect but its return value.
         const here = all.filter((x) => x.f === f).map((x) => x.r.name);
         if (here.length < 2) continue;
+        const src = strippedOf(f, rd, cacheable);
         for (const r of here) {
             const at = src.indexOf("export const " + r + " = Object.freeze(");
             if (at < 0) continue;
@@ -361,9 +398,11 @@ export function census({ files = null, read = null, exclude = null } = {}) {
     // that imports it, which is how a coverage number stops meaning anything.
     const DEFAULT_ARG = /(?:export\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(([^)]*)\)/g;
     for (const f of mjs) {
-        const src = stripComments(rd(f));
+        // Same reordering as the loop above, same reason: the strip was paid for every file in the tree and
+        // this line throws away everything that declares no record at all.
         const here = new Set(all.filter((x) => x.f === f).map((x) => x.r.name));
         if (!here.size) continue;
+        const src = strippedOf(f, rd, cacheable);
         const target = rel(f);
         for (const m of src.matchAll(DEFAULT_ARG)) {
             const fn = m[1];

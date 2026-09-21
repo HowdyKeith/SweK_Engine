@@ -25,7 +25,7 @@
 // already moved it, which is why the frozen number is compared against nothing live.
 "use strict";
 import { census, reportLines, sources, RECORD_RE, recordBody, FIELD_RE,
-         PROBE_AT_V4487 as OLD, PROBE_AT_V4536 as REC, ENG }
+         PROBE_AT_V4487 as OLD, PROBE_AT_V4536 as REC, ENG, clearScanCache }
     from "./frozenRecords.mjs";
 import fs from "node:fs";
 import { execFileSync } from "node:child_process";
@@ -602,6 +602,87 @@ console.log("\n4. what was closed, checked against the files rather than claimed
         /buildsWhereNothingMoved <= REC\.builds/.test(taint) && /NOT a re-derivation/.test(taint),
         "the sweep those numbers came from is 40 builds, so a gate cannot re-run it -- and a consistency " +
         "check that pretended to be a re-derivation would be the worse of the two failures");
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// THE CACHES, GRADED -- BECAUSE THREE SABOTAGES OF THEM WENT ZERO RED (v4647r)
+// ---------------------------------------------------------------------------------------------------------
+// v4647r made census() cheaper by caching the comment-stripped source per file, which took this gate from
+// ~2195 ms to ~1650 ms and gave recordReach's margin row its headroom back. Then the repair was sabotaged
+// three ways and ALL THREE WENT ZERO RED:
+//
+//   SB-1  strippedOf() ignores `cacheable`, so an injected read is served the real file's text   0 red
+//   SB-2  clearScanCache() stops clearing the new cache, so a cold scan is not cold              0 red
+//   SB-3  the derivation loop's `here.length < 2` becomes `< 1`                                  0 red
+//
+// SB-3 is a BAD SABOTAGE and is recorded as one rather than counted: a file declaring ONE record has no
+// OTHER record for it to be defined from, so the loop it now enters adds no edge. It does not change the
+// subject, and "a sabotage that does not change the subject is not a sabotage".
+//
+// SB-1 and SB-2 are real, and they went zero for the plainest reason available: clearScanCache() is EXPORTED,
+// its docstring says "the gate needs a cold scan to prove the warm one is not simply answering from a stale
+// copy", AND NO GATE HAS EVER CALLED IT. The caches -- the record memo as much as this round's new one --
+// have never been graded at all. This section is that check, and it is deliberately built on a ONE-FILE
+// census rather than a tree-wide one, because a row that costs two full censuses to prove a saving of two
+// full censuses would give the saving straight back.
+{
+    const MOD  = path.join(ENG, "__fx_cache_mod.mjs");
+    const GATE = path.join(ENG, "__fx_cache-selfcheck.mjs");   // __ prefix: enumerateGates skips it (v4639)
+    const NAME = "CACHE_PROBE_AT_V4647R";
+    // FIELD_RE is /\n\s+(name):\s*\d+\s*,/ -- a NEWLINE, indentation and a TRAILING COMMA. My first
+    // fixture declared the record on one line, so RECORD_RE found it, the guardian search found it, and
+    // `fields` came back EMPTY: the record was real and carried nothing to compare. Written the way the
+    // tree's own records are written, because that is the shape the instrument reads.
+    const decl = (field) => `export const ${NAME} = Object.freeze({\n    ${field}: 1,\n});\n`;
+    const names = (yes) => yes ? `import { ${NAME} } from "./__fx_cache_mod.mjs";\nconsole.log(${NAME});\n`
+                               : `console.log("this gate names no record at all");\n`;
+    const guardiansOf = (c) => ((c.records.find((r) => r.name === NAME) || {}).guardians || []);
+    const fieldsOf    = (c) => ((c.records.find((r) => r.name === NAME) || {}).fields || []);
+    try {
+        fs.writeFileSync(MOD, decl("alpha"));
+        fs.writeFileSync(GATE, names(true));
+        const cold1 = census({ files: [MOD, GATE], exclude: null });
+        ok("!! the one-file census sees the record and its guardian to begin with",
+           fieldsOf(cold1).join(",") === "alpha" && guardiansOf(cold1).some((g) => /__fx_cache-selfcheck/.test(g)),
+           `fields [${fieldsOf(cold1).join(", ")}], guardians [${guardiansOf(cold1).join(", ")}] -- without ` +
+           `this the rows below could pass on a census that never found anything`);
+
+        // Both files change on disk. WITHOUT a clear, the caches must still answer with the OLD text --
+        // that is what proves a cache is actually in play and these rows are not testing a no-op.
+        fs.writeFileSync(MOD, decl("beta"));
+        fs.writeFileSync(GATE, names(false));
+        const warm = census({ files: [MOD, GATE], exclude: null });
+        ok("CONTROL: with no clear, the WARM caches still answer with the superseded text",
+           fieldsOf(warm).join(",") === "alpha" && guardiansOf(warm).length === guardiansOf(cold1).length,
+           `fields [${fieldsOf(warm).join(", ")}] -- still the pre-rewrite answer. If this row went the other ` +
+           `way the caches would not be caching, and every row below would pass for the wrong reason`);
+
+        clearScanCache();
+        const cold2 = census({ files: [MOD, GATE], exclude: null });
+        ok("!! *** clearScanCache() really does make the next scan COLD -- records AND stripped source ***",
+           fieldsOf(cold2).join(",") === "beta" && !guardiansOf(cold2).some((g) => /__fx_cache-selfcheck/.test(g)),
+           `fields [${fieldsOf(cold2).join(", ")}], guardians [${guardiansOf(cold2).join(", ") || "none"}]. ` +
+           `The FIELD comes from the record memo and the GUARDIAN from the comment-stripped source, so this ` +
+           `row needs BOTH caches cleared -- sabotage SB-2 dropped only the strip cache from the clear and ` +
+           `this is the row that now refuses it`);
+
+        // An INJECTED read is a fixture, and a fixture's content is not a property of its path.
+        clearScanCache();
+        census({ files: [MOD, GATE], exclude: null });          // warm the path caches from the real files
+        const injected = census({ files: [MOD, GATE], exclude: null,
+                                  read: (f) => (f === MOD ? decl("gamma") : names(true)) });
+        ok("!! *** a census handed its own `read` is NOT served from the path-keyed caches ***",
+           fieldsOf(injected).join(",") === "gamma" &&
+           guardiansOf(injected).some((g) => /__fx_cache-selfcheck/.test(g)),
+           `fields [${fieldsOf(injected).join(", ")}], guardians [${guardiansOf(injected).join(", ") || "none"}] ` +
+           `-- the injected text, not the file's. Before v4647r the bypass was written ` +
+           `\`memoable ? recordsIn(f, rd) : recordsIn.call(null, f, rd)\`, which is the SAME CALL twice: ` +
+           `.call(null, ...) changes nothing about which cache the body reaches. It was a bypass that did ` +
+           `not bypass, and sabotage SB-1 is the strip cache repeating it`);
+    } finally {
+        for (const f of [MOD, GATE]) { try { fs.unlinkSync(f); } catch { /* reported by the rows above */ } }
+        clearScanCache();   // never leave the tree's real entries shadowed by a fixture's
+    }
 }
 
 console.log(`\nfrozenRecords-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);

@@ -342,7 +342,14 @@ ok("the record is frozen", Object.isFrozen(REC) && REC.writtenThisSession.every(
     // prefixed __, because a gate that plants a gate grows the population it measures -- gateSweep's v4639
     // race, which this tree has already paid for once.
     const FIXTURE = path.join(ENG, "tools", "ship", "__assertionshape-swap-fixture.mjs");
-    const full = census();
+    // *** `c` IS THE CENSUS SECTION 3 ALREADY TOOK, AND TAKING A SECOND ONE PUT THIS GATE OVER BUDGET. ***
+    // My first draft called census() again here. This file already pays for TWO full walks -- section 3's `c`
+    // and the one reportLines() takes inside itself -- and a third took the gate to 3119 ms against the
+    // 3,000 ms sweep budget, which the very next sweep reported as "slower ... now over budget" and DROPPED
+    // it from the swept set. A gate that falls out of the budget stops running at ship time, so an added
+    // check bought with an extra tree walk can cost more coverage than it adds. Reusing the existing result
+    // is free and identical: census() is pure over an unchanged tree.
+    const full = c;
     const lean = census({ shapes: false });
     ok("!! *** shapes:false returns the SAME structural counts as the full census ***",
        lean.gates === full.gates && lean.usesOk === full.usesOk && lean.definesOk === full.definesOk &&
