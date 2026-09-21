@@ -88,6 +88,55 @@ after seeing which way the deltas fell.
 The alternation is also still near-perfect here (212 106 212 106 ... with the occasional
 doubled run), a hundred frames after v4649 first recorded it and still with no measured cause.
 
-## OUTCOME
+## OUTCOME -- H IS CONFIRMED
 
-NOT YET COLLECTED. Appended in a later commit, whichever way it falls.
+Collected after everything above was committed. Frames 54-98, both arms, 45 frames kept and
+none excluded.
+
+    NARROW (106)   n=21   mean +0.7457 dB   sd 0.6446   19 up / 1 down
+    WIDE   (212)   n=24   mean +0.4029 dB   sd 0.3552   22 up / 2 down
+
+    difference (narrow - wide)  =  +0.3428 dB
+    Welch t = 2.166   df = 30.2   ONE-SIDED p = 0.0192
+
+**H is confirmed at the pre-declared threshold**, and the effect size replicates almost exactly:
+
+    v4659, frames  3-53 (discovery)   narrow 0.586   wide 0.235   difference 0.351 dB
+    v4660, frames 54-98 (confirming)  narrow 0.746   wide 0.403   difference 0.343 dB
+
+Two disjoint samples, two nearly identical differences, the second from a test that did no
+searching. The wide/narrow split is a real property of this content and not the residue of
+trying eight predictors.
+
+## AND IT DOES NOT EXPLAIN WHAT IT WAS FOUND WHILE LOOKING FOR
+
+This search began at v4659 with one question: **why does the reactive mask make 14 of 51 frames
+WORSE, one by 1.22 dB?** H was confirmed. That question is still open, and the confirming sample
+is what makes it clear:
+
+    frames 3-53   14 of 51 harmed, worst -1.22 dB
+    frames 54-98   3 of 45 harmed, worst -0.50 dB
+
+The harm nearly vanishes in the later segment **while the wide/narrow effect stays exactly the
+same size.** So the split predicts a difference in how much the mask HELPS, which is present in
+both segments; it does not predict the HARM, which is concentrated in the early frames and is
+still unaccounted for. A round that reported "confirmed, p = 0.019" and stopped would have left
+a reader believing the original defect had been explained. It has not been.
+
+The obvious next suspicion is that the early frames are the ones where the accumulator has not
+yet converged, so the history the mask is judging is itself poor. That is a story, not a
+measurement, and it is written here as a candidate for the next test and not as a conclusion --
+the same restraint `tools/ship/fsrPageObjects-selfcheck.mjs` asks for around the 212/106
+alternation, whose cause this file also does not claim to know.
+
+## WHAT THIS DOES NOT ESTABLISH
+
+* **Why the count alternates.** Confirming H says the alternation PREDICTS the size of the
+  benefit. It says nothing about what causes a 2:1 alternation, which v4649 measured and left
+  unexplained and which this file does not claim to have solved.
+* **A different scene.** The 45 confirming frames are a later segment of the SAME trajectory
+  through the SAME content. That is a genuine out-of-sample test of the hypothesis on frames
+  that played no part in forming it -- it is not a replication on independent content, and the
+  two are not the same claim.
+* **The other direction.** The test was one-sided by declaration. It could only ever confirm
+  narrow > wide; a large effect the other way would have been reported as a refutation.

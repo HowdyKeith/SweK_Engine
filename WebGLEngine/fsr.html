@@ -702,6 +702,25 @@ async function tick() {
     // with it than without, one by 1.22 dB. The shading mask never once loses. Both are real; only one is
     // safe to turn on and forget.
     //
+    // *** v4660 -- HOW MUCH IT HELPS DEPENDS ON THE WIDTH OF ITS OWN DEPTH-GATED SET, AND THAT WAS
+    // CONFIRMED BY A TEST DECLARED BEFORE THE DATA EXISTED. *** The readout below prints how many pixels the
+    // depth gate turned away; on this camera that count alternates between 106 and 212 every frame. Frames
+    // at the NARROW count gain more from the mask than frames at the WIDE one:
+    //
+    //     frames  3-53 (where the effect was FOUND)   narrow +0.586 dB   wide +0.235   difference 0.351
+    //     frames 54-98 (where it was CONFIRMED)       narrow +0.746 dB   wide +0.403   difference 0.343
+    //
+    // One-sided Welch on the second sample: t = 2.17, df 30.2, p = 0.019. The first sample's 0.056 was the
+    // best of EIGHT predictors tried and was worth nothing on its own -- render/reactive-preregistration.md
+    // fixed the hypothesis, the direction, the statistic and the frame range in a commit that contains no
+    // data, and git log is what makes that ordering checkable rather than asserted.
+    //
+    // *** AND IT IS NOT AN EXPLANATION OF THE FOURTEEN HARMED FRAMES, WHICH IS WHAT THE SEARCH WAS FOR. ***
+    // Over frames 54-98 only THREE of 45 are harmed, worst -0.50 dB, while the wide/narrow difference stays
+    // the same size. So the split predicts how much the mask HELPS and not WHETHER IT HURTS, and v4658's
+    // defect is still open. The jitter hypothesis for it was refuted at v4659 (r = +0.17, wrong direction);
+    // render/reactive.mjs's header carries that measurement.
+    //
     // *** AND THE FIRST SAMPLE WAS TOO SMALL, WHICH IS RECORDED BECAUSE EITHER ANSWER WOULD HAVE BEEN
     // REPORTABLE. *** At twenty-one frames the mean read +0.293, the t-test cleared 0.05 (t = 2.49) and the
     // SIGN TEST DID NOT (15/21, p = 0.08). Two tests, two verdicts, and a round could have quoted whichever

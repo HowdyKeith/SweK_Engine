@@ -8032,6 +8032,41 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4660 -- THE 270th CLOSING: the lead confirmed, and the question it was found chasing still open.
+    since345: Object.freeze({
+        at: "v4660", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** H IS CONFIRMED, BY A TEST DECLARED IN A COMMIT THAT CONTAINED NO DATA. *** v4659 found " +
+                 "that frames with the wider (212-pixel) depth-gated set gain less from the reactive mask " +
+                 "than frames with the narrow (106) one -- p = 0.056, the BEST OF EIGHT predictors tried " +
+                 "against the same 51 frames, and worth nothing on its own. render/reactive-preregistration" +
+                 ".md fixed the hypothesis, its DIRECTION, the statistic (one-sided Welch), the threshold " +
+                 "and the frame range BEFORE the data existed; git log holds the ordering. A design probe " +
+                 "collected the GROUPING variable only -- never dTmp -- and found the two groups survive to " +
+                 "frame 98 and then vanish when the slab leaves the depth gate's reach, which fixed the " +
+                 "range at 54-98 and was also committed before any outcome. " +
+                 "RESULT over 45 fresh frames: narrow +0.7457 dB (n=21), wide +0.4029 (n=24), difference " +
+                 "+0.3428, Welch t = 2.17, df 30.2, one-sided p = 0.0192. AND THE EFFECT SIZE REPLICATES " +
+                 "ALMOST EXACTLY: the discovery sample's difference was 0.351 dB, this one's 0.343. Two " +
+                 "disjoint samples, two near-identical differences, the second from a test that did no " +
+                 "searching. " +
+                 "*** AND IT DOES NOT EXPLAIN WHAT IT WAS FOUND WHILE LOOKING FOR, WHICH IS THE PART A " +
+                 "ROUND WOULD BE TEMPTED TO LEAVE OUT. *** The search began at v4659 with one question: why " +
+                 "does the mask make 14 of 51 frames WORSE, one by 1.22 dB? Over 54-98 only THREE of 45 are " +
+                 "harmed, worst -0.50 dB, WHILE THE WIDE/NARROW DIFFERENCE HOLDS ITS SIZE. So the split " +
+                 "predicts how much the mask HELPS and not whether it HURTS, and v4658's defect is still " +
+                 "open -- its jitter explanation refuted at v4659, this one confirmed and beside the point. " +
+                 "Both the page and the record say so in as many words, and a gate row holds that they do: " +
+                 "'confirmed, p = 0.019' printed alone would read as closing a question it does not touch. " +
+                 "Section 7 of fsrPage-selfcheck cross-checks the six figures across the two hand-written " +
+                 "documents and re-derives each stated difference from the means beside it. " +
+                 "Six sabotages, six caught, ONE REPAIR: the subtraction row was first written as " +
+                 "Math.abs((0.586 - 0.235) - 0.351) < 5e-4 -- arithmetic on three literals typed into the " +
+                 "gate, unable to fail unless the gate itself is edited, and the third row of this shape " +
+                 "this session has caught. The figures are parsed out of the record now. No gate added.",
+    }),
     // v4659 -- THE 269th CLOSING: one counter was three answers, and the name fitted two of them.
     since344: Object.freeze({
         at: "v4659", swept: 0, green: 0, red: 0,

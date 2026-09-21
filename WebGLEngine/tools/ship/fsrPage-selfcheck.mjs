@@ -405,6 +405,59 @@ console.log("\n6. *** THE SHADING MASK REACHES THE CHAIN (v4655), AND THIS IS A 
 }
 
 console.log(fails ? `\nfsrPage-selfcheck: ${fails} FAILED` : "\nfsrPage-selfcheck: all checks pass");
+console.log("\n7. *** THE PRE-REGISTERED TEST (v4660): TWO DOCUMENTS, ONE SET OF NUMBERS ***");
+// *** v4659's LEAD WAS THE BEST OF EIGHT PREDICTORS AND WORTH NOTHING ON ITS OWN. *** v4660 fixed the
+// hypothesis, its DIRECTION, the statistic, the threshold and the frame range in a file committed BEFORE the
+// data existed, then collected it. What a gate can hold is not that the ordering happened -- git log holds
+// that -- but that the two places quoting the result still quote the SAME result. fsr.html's prose and the
+// pre-registration are written by hand, months apart from each other in edit time, and a figure corrected in
+// one and not the other is how a measured claim quietly becomes a remembered one.
+{
+    const PRE = path.resolve(path.dirname(PAGE), "render", "reactive-preregistration.md");
+    const pre = fs.existsSync(PRE) ? fs.readFileSync(PRE, "utf8") : "";
+    ok("the pre-registration exists and its OUTCOME is filled in",
+       pre.length > 0 && /## OUTCOME/.test(pre) && !/NOT YET COLLECTED/.test(pre),
+       PRE.replace(/.*WebGLEngine./, ""));
+    // the four things it had to fix in advance for the test to mean anything
+    const declared = [["a predicted DIRECTION", /\*\*H:\*\*/], ["one-sided Welch", /one-sided/i],
+                      ["a threshold", /p < 0\.05/], ["a frame range", /54 to 98 inclusive/]];
+    ok("...and it declares a direction, a statistic, a threshold and a frame range",
+       declared.every(([, re]) => re.test(pre)),
+       declared.filter(([, re]) => !re.test(pre)).map(([n]) => n).join(", ") || "all four present");
+    // *** THE ROW THAT MATTERS: the numbers must agree across the two documents. ***
+    const FIGS = ["0.586", "0.235", "0.351", "0.746", "0.403", "0.343"];
+    const missingPre = FIGS.filter((f) => !pre.includes(f));
+    const missingPage = FIGS.filter((f) => !raw.includes(f));
+    ok("!! *** both samples' six figures appear in BOTH the page and the pre-registration ***",
+       missingPre.length === 0 && missingPage.length === 0,
+       `discovery 0.586/0.235 (diff 0.351), confirming 0.746/0.403 (diff 0.343). ` +
+       `Missing from the record: ${missingPre.join(" ") || "none"}; from the page: ${missingPage.join(" ") || "none"}. ` +
+       "Two hand-written documents, one measurement: an edit to either that the other does not get is what " +
+       "this row exists to catch.");
+    // *** PARSED OUT OF THE RECORD, NOT WRITTEN INTO THIS FILE. *** The first draft of this row read
+    // `Math.abs((0.586 - 0.235) - 0.351) < 5e-4` -- arithmetic on three literals typed HERE, which cannot
+    // fail unless somebody edits this gate, and says nothing whatever about the document it claims to check.
+    // It is the same shape as v4650's Math.round row and v4655's regex-on-a-regex: a row that tests the
+    // language. The numbers have to come FROM the record for the check to be about the record.
+    //
+    // (\d+\.\d+) and not [\d.]+ deliberately: a character class containing the dot swallows a sentence's
+    // full stop, which is how v4659's `peak` column became a column of NaN.
+    const pairs = [...pre.matchAll(/narrow (\d+\.\d+)\s+wide (\d+\.\d+)\s+difference (\d+\.\d+)/g)]
+        .map((m) => [Number(m[1]), Number(m[2]), Number(m[3])]);
+    ok("!! ...and each difference the record states IS the subtraction of the two means beside it",
+       pairs.length === 2 && pairs.every(([n, w, d]) => Math.abs((n - w) - d) < 1e-3),
+       pairs.length !== 2 ? `found ${pairs.length} mean/mean/difference lines, expected 2`
+           : pairs.map(([n, w, d]) => `${n} - ${w} = ${(n - w).toFixed(3)} vs stated ${d}`).join("; ") +
+             ". A pair of group means and their difference are three numbers where two would do, and the " +
+             "third is the one a later edit gets wrong.");
+    // *** AND THE THING THE CONFIRMATION DID NOT DO, WHICH A READER WILL OTHERWISE ASSUME IT DID. ***
+    ok("!! ...and both documents still say the confirmed effect does NOT explain the harm it was found chasing",
+       /does not explain|not an explanation/i.test(pre) && /NOT AN EXPLANATION OF THE FOURTEEN HARMED FRAMES/.test(raw),
+       "3 of 45 frames are harmed over 54-98 against 14 of 51 over 3-53, while the wide/narrow difference " +
+       "holds its size. The split predicts how much the mask HELPS, not whether it HURTS, and v4658's " +
+       "defect is open. A round that printed 'confirmed, p = 0.019' and stopped would read as closing it.");
+}
+
 console.log("\nunchecked here: the ADAPTER path, which is tools/ship/fsrPageDevice-selfcheck.mjs's -- every row " +
     "above runs with navigator.gpu absent, so this file is the CPU branch and that is deliberate: the two " +
     "gates were one file until the device rows put it at 4,744 ms, over the quick sweep's 3,000 ms " +
@@ -416,6 +469,17 @@ console.log("\nunchecked here: the ADAPTER path, which is tools/ship/fsrPageDevi
     "they are not -- they are the smallest thing that has parallax.");
 //
 // SABOTAGE LOG -- each applied to the live tree, run, and restored.
+//   v4660  the record's OUTCOME reverted to uncollected                     1 RED.
+//   v4660  the record drops its declared frame range                         1 RED.
+//   v4660  one confirming mean edited in the record and not the page         2 RED -- which is the whole
+//          point of section 7: two hand-written documents, one measurement.
+//   v4660  the record restates a difference that is not its means subtracted 2 RED -- AFTER A REPAIR. The
+//          first draft of that row read Math.abs((0.586 - 0.235) - 0.351) < 5e-4: arithmetic on three
+//          literals typed into THIS file, which cannot fail unless somebody edits this gate and says
+//          nothing about the document it claims to check. Same shape as v4650's Math.round row and
+//          v4655's regex-on-a-regex. The numbers are now parsed out of the record.
+//   v4660  the page drops "this does not explain the harm"                   1 RED.
+//   v4660  the record drops its does-not-explain section                     1 RED.
 //   v4659  fsr.html: the reactive mask asked for without counted: true        1 RED -- AFTER A REPAIR.
 //          The first draft of that row tested /counted: true/ against the whole page and scored ZERO,
 //          because rejectAndAccumulate's own `counted: true` two dozen lines below satisfied it. The row
