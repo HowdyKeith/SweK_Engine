@@ -285,5 +285,33 @@ ok("the live resolution agrees with the filesystem, whichever way it went",
 ok("...and every leaf the resolver knows is a platform-shaped path rather than a bare name",
     SHELL_LEAVES.length >= 6 && SHELL_LEAVES.every((l) => l.includes(path.sep)));
 
+// ---------------------------------------------------------------------------------------------------------
+console.log("\nTHE HARNESS GUARD THAT COULD NOT FIRE (found on the rig, after v4648)");
+// ---------------------------------------------------------------------------------------------------------
+// webgpuHarness.webgpuSkipReason asked `if (!resolvePlaywright(requireFn))`. resolvePlaywright returns
+// { chromium, from } -- AN OBJECT, truthy whether or not it found anything -- so the negation was always
+// false and that guard never fired once. A box with the browser installed but not the npm package sailed
+// past it and died at `pw.chromium.launch` with "Cannot read properties of null (reading 'launch')": a
+// harness error instead of a skip, in every gate that touches a device. 129 NEW red on Keith's rig, about
+// 120 of them this one line, and a fresh clone is all it takes -- the package lives in
+// tools/render-qa/node_modules and nothing installs it for you.
+//
+// browserSkipReason already existed for exactly this, and says so in its own header. The guess is gone.
+{
+    const missing = () => { throw new Error("Cannot find module"); };
+    const said = await import("./webgpuHarness.mjs").then((m) => m.webgpuSkipReason(missing)).catch((e) => "THREW " + e.message);
+    ok("!! *** a box with NO playwright package gets a REASON, not a null-deref ***",
+       typeof said === "string" && /not installed/.test(said),
+       String(said).slice(0, 150));
+    ok("!! ...and the reason NAMES every path that was tried, so it can be acted on",
+       typeof said === "string" && PLAYWRIGHT_PATHS.every((p) => said.includes(p)),
+       `${PLAYWRIGHT_PATHS.length} paths; a message that says only "not resolvable" sends a reader looking ` +
+       `in the wrong place, which is what the old text did`);
+    ok("CONTROL: the negation the old guard used really is always false, which is why nothing caught it",
+       !resolvePlaywright(missing) === false && resolvePlaywright(missing).chromium === null,
+       "an object is truthy; `!obj` cannot distinguish a found package from a missing one. THIS ROW IS THE " +
+       "ONE THAT WOULD HAVE CAUGHT IT -- a guard whose refusal is never driven is vacuity.mjs's cause one");
+}
+
 console.log(`\nplaywrightResolve-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);
 process.exit(fails === 0 ? 0 : 1);

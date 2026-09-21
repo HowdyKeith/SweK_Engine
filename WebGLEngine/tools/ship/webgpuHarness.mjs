@@ -38,7 +38,7 @@
 
 import http from "node:http";
 import { createRequire } from "node:module";
-import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
 import fs from "node:fs";
 import path from "node:path";   // used by renderThreePassToPixels, which serves the engine tree over HTTP
 import { storageWords, LIVENESS_SENTINEL } from "./headlessGpu.mjs";   // v4457 -- the storage-input packing both harnesses share; v4572 -- and the liveness fill, which must be ONE number
@@ -117,10 +117,27 @@ export function installSwizzleWorkaround() {
 /**
  * Why a caller cannot run, or null when it can. Checked in the order a reader would want to act on.
  */
+// *** THE SECOND LINE OF THIS FUNCTION COULD NOT FAIL, AND ~120 GATES PAID FOR IT. ***
+//
+// It read `if (!resolvePlaywright(requireFn))`. resolvePlaywright returns { chromium, from } -- AN OBJECT,
+// which is truthy whether or not it found anything, so the negation was ALWAYS false and the guard never
+// fired once in its life. A box with the browser installed but not the npm package therefore sailed past
+// this check and died later at `pw.chromium.launch` with
+//
+//     TypeError: Cannot read properties of null (reading 'launch')
+//
+// -- a harness error rather than a skip, in every gate that touches a device. Measured on Keith's rig: 129
+// NEW red, of which about 120 were this one line. A fresh clone is all it takes; the package lives in
+// tools/render-qa/node_modules and nothing installs it for you.
+//
+// *** AND THE MESSAGE THE TREE WANTED WAS ALREADY WRITTEN. *** playwrightResolve.browserSkipReason exists
+// precisely for this and says so in its own header: "Two independent facts -- 'chromium is on disk' and
+// 'playwright resolves' -- are reported on their own evidence rather than collapsed into one guess about
+// which is missing." This function was the guess. It now asks that function, so a missing package names
+// itself and names every path that was tried.
 export function webgpuSkipReason(requireFn = createRequire(import.meta.url)) {
-    if (!fs.existsSync(HEADLESS_SHELL)) return `no headless shell at ${HEADLESS_SHELL}`;
-    if (!resolvePlaywright(requireFn)) return "playwright not resolvable -- see tools/ship/playwrightResolve.mjs";
-    return null;
+    const { chromium, from } = resolvePlaywright(requireFn);
+    return browserSkipReason(chromium, from, HEADLESS_SHELL) || null;
 }
 
 /**
