@@ -8032,6 +8032,33 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4658 -- THE 268th CLOSING: the reactive mask measured, and the sample that was too small.
+    since343: Object.freeze({
+        at: "v4658", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** THE REACTIVE MASK HELPS BY +0.400 dB, AND IT IS THE OPPOSITE SHAPE OF EFFECT FROM THE " +
+                 "SHADING MASK'S. *** Fifty-one paired frames, same content and camera, mask attached and " +
+                 "detached: mean difference +0.4004 dB, sd 0.6563, 37 frames UP and 14 DOWN, one by 1.22 dB, " +
+                 "t = 4.36, sign-test p = 1.8e-3. Against v4656's shading measurement -- +0.117 dB, sd " +
+                 "0.054, 21 of 21 up, t = 10.05 -- this one helps MORE ON AVERAGE and far LESS RELIABLY. " +
+                 "Both are real; only one is safe to turn on and forget, and a round reporting a single " +
+                 "mean would have said they were the same kind of thing. " +
+                 "*** AND THE FIRST SAMPLE WAS TOO SMALL, WHICH IS RECORDED BECAUSE EITHER ANSWER WOULD HAVE " +
+                 "BEEN REPORTABLE. *** At TWENTY-ONE frames the mean read +0.293, the t-test cleared 0.05 " +
+                 "(t = 2.49) and THE SIGN TEST DID NOT (15/21, p = 0.08). Two tests, two verdicts, and this " +
+                 "round could have quoted whichever it preferred -- a real and ordinary way to be wrong, and " +
+                 "the reason the disagreement is written down rather than resolved by choosing. Taking more " +
+                 "samples is what settled it; at fifty-one both agree. " +
+                 "The page gained a second control arm so that number is re-measurable, and the switch is " +
+                 "what made taking more samples possible at all. " +
+                 "Four sabotages, all four caught after ONE REPAIR that was two 0-REDs: the 'defaults to ON' " +
+                 "row named only the SHADING select, so reordering the reactive one scored zero; and nothing " +
+                 "asserted the mask was COMPUTED, only that it was switched -- at the frames any gate runs, " +
+                 "a null mask and a computed-but-ignored one produce identical frames, so the assignment " +
+                 "itself is what had to be held. No gate added.",
+    }),
     // v4657 -- THE 267th CLOSING: the factor pass's third input, a binding with no source since v4594.
     since342: Object.freeze({
         at: "v4657", swept: 1, green: 1, red: 0,

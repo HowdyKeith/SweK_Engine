@@ -50,6 +50,10 @@
       <option value="on">shading mask: ON</option>
       <option value="off">shading mask: OFF (the control)</option>
     </select>
+    <select id="reactive">
+      <option value="on">reactive mask: ON</option>
+      <option value="off">reactive mask: OFF (the control)</option>
+    </select>
     <select id="ratio">
       <option value="2">upscale 2&times;</option>
       <option value="1.5">upscale 1.5&times;</option>
@@ -681,6 +685,27 @@ async function tick() {
     //
     // It needs the same prevDepth the disocclusion test does, so it runs in the same branch and is null
     // wherever that one is -- on frame one, and on any camera without a depth buffer.
+    // *** AND THE REACTIVE MASK HAS ITS OWN ARM, FOR v4656's REASON. *** That round measured the shading
+    // mask at +0.117 dB against a frame-to-frame spread of 2.12 -- eighteen times smaller than the noise it
+    // sits in, and invisible unless the two arms are differenced FRAME BY FRAME. A second mask with no
+    // switch would be a second claim nobody could check, so it gets the same treatment. Unlike the shading
+    // ring this one works from frame TWO, because it needs a previous depth and a history and nothing more.
+    //
+    // *** MEASURED AT v4658, AND IT IS A DIFFERENT KIND OF EFFECT FROM THE SHADING MASK'S. ***
+    //
+    //     mask        mean diff    sd of diff    frames up/down    t       sign test
+    //     shading     +0.117 dB      0.054         21 / 0        10.05     p = 4.8e-7
+    //     reactive    +0.400 dB      0.656         37 / 14        4.36      p = 1.8e-3
+    //
+    // The reactive mask helps MORE ON AVERAGE and far less RELIABLY: fourteen frames of fifty-one are worse
+    // with it than without, one by 1.22 dB. The shading mask never once loses. Both are real; only one is
+    // safe to turn on and forget.
+    //
+    // *** AND THE FIRST SAMPLE WAS TOO SMALL, WHICH IS RECORDED BECAUSE EITHER ANSWER WOULD HAVE BEEN
+    // REPORTABLE. *** At twenty-one frames the mean read +0.293, the t-test cleared 0.05 (t = 2.49) and the
+    // SIGN TEST DID NOT (15/21, p = 0.08). Two tests, two verdicts, and a round could have quoted whichever
+    // it preferred. Fifty-one frames is what settled it, and both agree there.
+    const reactiveOn = $("reactive").value !== "off";
     let reactiveMask = null;
     let shadingMask = null, lockStat = null;
     if (objects && lgpu && dollyCurrent) {
@@ -726,7 +751,7 @@ async function tick() {
             rejected = await rgpu.rejectAndAccumulate({
                 current: dollyCurrent, history: hist, motion, prevDepth, w: D, h: D, alpha, threshold,
                 shading: shadingOn ? shadingMask : null,   // the switch above; null on every other camera
-                reactive: reactiveMask,     // null on every camera but "objects", and on frame one
+                reactive: reactiveOn ? reactiveMask : null,   // the switch above; null on frame one
                 nearerIsLess: true, space: "ycocg", counted: true });
             // genuine = flagged - noHistory, and the SPLIT is why the counters exist: the mask writes the same
             // 1.0 for all three reasons, so no pass over it could have recovered this number.

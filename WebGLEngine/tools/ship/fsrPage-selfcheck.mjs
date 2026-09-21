@@ -358,8 +358,26 @@ console.log("\n6. *** THE SHADING MASK REACHES THE CHAIN (v4655), AND THIS IS A 
         && /const shadingOn = \$\("shading"\)\.value !== "off"/.test(src),
         "an A/B on a page nobody can flip is a claim about a build that no longer exists; this one is a " +
         "select, and the readout names which arm is running so a screenshot cannot be mistaken for the other");
-    ok("  ...and it defaults to ON, so the page shows the wired path unless somebody asks otherwise",
-        /<option value="on">shading mask: ON<\/option>\s*<option value="off"/.test(raw),
+    // *** v4658 -- THE REACTIVE MASK HAS AN ARM TOO, AND ITS RESULT IS THE OPPOSITE SHAPE. *** Measured
+    // over fifty-one paired frames: mean +0.400 dB, sd 0.656, 37 frames up and 14 DOWN, t = 4.36, sign-test
+    // p = 1.8e-3. It helps more on average than the shading mask and far less reliably -- that one is
+    // +0.117 dB and never once loses. Both switches exist so both numbers are re-measurable.
+    // *** AND THE MASK MUST BE COMPUTED, NOT ONLY SWITCHED. *** A sabotage leaving `reactiveMask` null
+    // while the switch and the argument both stayed scored ZERO: at the frames any gate runs, a null mask
+    // and a computed-but-ignored one produce identical frames, so only the assignment itself can be held.
+    ok("!! the reactive mask has a control arm as well, and it is the one whose result NEEDED it",
+        /<select id="reactive">/.test(raw) && /reactive:\s*reactiveOn \? reactiveMask : null/.test(src)
+        && /const reactiveOn = \$\("reactive"\)\.value !== "off"/.test(src)
+        && /reactiveMask = \(await xgpu\.reactive\(\{/.test(src),
+        "at TWENTY-ONE frames this mask's t-test cleared 0.05 and its sign test did not -- two tests, two " +
+        "verdicts, and a round could have quoted whichever it preferred. Fifty-one settled it. A switch is " +
+        "what makes taking more samples possible at all.");
+    // BOTH selects, because the first version of this row named only the shading one and a sabotage
+    // reordering the REACTIVE options scored zero against it. A control arm running by default would make
+    // every other number on this page the control's, and that is true of whichever arm it is.
+    ok("  ...and BOTH masks default to ON, so the page shows the wired path unless somebody asks otherwise",
+        /<option value="on">shading mask: ON<\/option>\s*<option value="off"/.test(raw)
+        && /<option value="on">reactive mask: ON<\/option>\s*<option value="off"/.test(raw),
         "the first option is the selected one, and a control arm that ran by default would make every other " +
         "number on this page the control's");
     ok("  ...and the ring is torn down on reset, so it cannot be read at a stride it was not built for",
