@@ -331,5 +331,64 @@ ok("the record is frozen", Object.isFrozen(REC) && REC.writtenThisSession.every(
        `them -- otherwise this section is a second spelling of the detector rather than a check on it`);
 }
 
+// ---------------------------------------------------------------------------------------------------------
+// shapes:false -- THE PARAMETER MUST BE HONOURED, AND MUST CHANGE NOTHING ELSE (v4647q)
+// ---------------------------------------------------------------------------------------------------------
+// definitionGates' own gate states the rule this section exists for: "a signature that takes a population and
+// ignores it is how a caller comes to believe a census covered more than it did". census({shapes:false}) is
+// exactly such a signature, and recordDrift now depends on it for 379 ms.
+{
+    // A real file on disk with a real swap in it, written and removed here. NOT named *-selfcheck.mjs and
+    // prefixed __, because a gate that plants a gate grows the population it measures -- gateSweep's v4639
+    // race, which this tree has already paid for once.
+    const FIXTURE = path.join(ENG, "tools", "ship", "__assertionshape-swap-fixture.mjs");
+    const full = census();
+    const lean = census({ shapes: false });
+    ok("!! *** shapes:false returns the SAME structural counts as the full census ***",
+       lean.gates === full.gates && lean.usesOk === full.usesOk && lean.definesOk === full.definesOk &&
+       lean.importsOk === full.importsOk && lean.distinctDefinitions === full.distinctDefinitions &&
+       JSON.stringify(lean.bySignature) === JSON.stringify(full.bySignature),
+       `gates ${lean.gates}, definesOk ${lean.definesOk}, distinct ${lean.distinctDefinitions} -- identical ` +
+       `to the full census. recordDrift reads definesOk and gates off the lean one, so if skipping the scan ` +
+       `moved either of them it would be silently comparing a different number against a frozen record`);
+    ok("!! *** ...and the skipped scan is null, NOT an empty list ***",
+       lean.suspects === null && lean.byShape === null,
+       "[] would mean THE SCAN RAN AND FOUND NOTHING, which is this file's headline result and the thing a " +
+       "reader would act on. null means nobody looked. Same distinction reachedLicences draws with " +
+       "licenceExists and world/orrery.mjs draws between UNPAPERED and unchecked");
+    // *** THE WORK IS COUNTED, NOT THE FLAG -- AND TWO SABOTAGES ARE WHY. *** The first draft of these rows
+    // asserted `shapesScanned === false`, which is the ARGUMENT echoed back, and a `byShape !== null` control.
+    // SA-9 (accept shapes:false and scan anyway) went 0 RED: nulling the output preserves the contract while
+    // still paying the 379 ms this whole change exists to save. SA-10 (delete the scan entirely) went 0 RED
+    // too: [] is still an array and byShape over nothing is still an object. A control that cannot fail, for
+    // the second time in one session. filesScanned is incremented INSIDE the scan, so both now go red.
+    ok("!! *** shapes:false does not merely NULL the answer, it does not do the WORK ***",
+       lean.filesScanned === 0 && full.filesScanned === full.gates,
+       `lean scanned ${lean.filesScanned} files, full scanned ${full.filesScanned} of ${full.gates}. This is ` +
+       `the row that pays: recordDrift is a SWEPT gate and the scan it no longer runs is 379 ms of its ` +
+       `3,000 ms budget, spent on a result it never read`);
+    // The fixture is written, read and removed here, and is NOT named *-selfcheck.mjs and IS prefixed __,
+    // because a gate that plants a gate grows the population it measures -- gateSweep's v4639 race, which
+    // this tree has already paid for once. It is passed to census() explicitly, so it never has to be found.
+    let planted = null;
+    try {
+        // The helper must be UNAMBIGUOUSLY name-first: suspectCalls refuses to run the masked nameFirst
+        // scan on an `unknown` signature, and says why in its own comment -- guessing there would turn every
+        // correct condition-first call in the tree into a reported swap. My first fixture's helper body was
+        // `=> c`, which branches on nothing, so it classified unknown and this control failed for the right
+        // reason. Reusing the NAME_FIRST shape from section 1, which signatureOf is already graded against.
+        fs.writeFileSync(FIXTURE, NAME_FIRST + "\n" + OK + '(a === b, "a name");\n');
+        planted = census({ files: [FIXTURE] });
+    } finally {
+        try { fs.unlinkSync(FIXTURE); } catch { /* the row below fails on a null census, which is the report */ }
+    }
+    ok("CONTROL: the DEFAULT census really does still find a planted swap",
+       !!planted && planted.filesScanned === 1 && (planted.suspects || []).length >= 1 &&
+       (planted.suspects || []).some((x) => x.shape === SHAPE.boolAsName),
+       `${planted ? (planted.suspects || []).map((x) => x.shape).join(", ") || "nothing found" : "no census"}` +
+       ` -- a positive control over a file with a KNOWN swap in it. Without this, deleting the detector ` +
+       `outright leaves every row above green, which is exactly what sabotage SA-10 measured`);
+}
+
 console.log(`\nassertionShape-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);
 process.exit(fails === 0 ? 0 : 1);

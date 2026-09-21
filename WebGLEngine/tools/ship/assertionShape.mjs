@@ -275,12 +275,38 @@ export function suspectCalls(src, signature = SIG.nameFirst) {
 }
 
 /** The tree-wide census. Members where it matters, counts where the members are the whole tree. */
-export function census({ root = ENG, files = null } = {}) {
+// *** v4647q -- `shapes: false` EXISTS BECAUSE ONE CALLER WAS PAYING FOR A DERIVATION IT NEVER READ. ***
+//
+// The swap scan below (suspectCalls, per gate) is the expensive half of this census: it masks every string
+// and regex literal in all 1,631 nameFirst files character by character. recordDrift.mjs's "assertionShape
+// census" check calls census() and reads exactly TWO fields off it, `definesOk` and `gates` -- neither of
+// which the scan contributes to. It paid for the whole walk and threw the result away.
+//
+// MEASURED: the census costs 648 ms with the scan and 269 ms without, and recordDrift-selfcheck is a SWEPT
+// gate, so that 379 ms comes straight off the 3,000 ms budget it has to finish inside. It had gone 1803 ms
+// on main to 2711 ms here and taken recordReach-selfcheck's 800 ms margin row red with it.
+//
+// *** AND THIS IS THE SAME SHAPE THE ROUND BEFORE LAST FOUND IN quickSweep's reconcile, *** where `kind` and
+// `name` were stored on every row and read by nothing -- established by deleting them and watching two gates
+// stay green. A derivation nobody reads is not free here; it is 379 ms on a clock somebody else is spending.
+//
+// null RATHER THAN []: `suspects: []` means "the scan ran and found nothing", which is this file's whole
+// headline result and must stay distinguishable from "the scan did not run". Same distinction world/orrery.mjs
+// draws between UNPAPERED and unchecked, and reachedLicences draws with licenceExists. A caller that reads
+// .suspects off a shapes:false census gets null and cannot mistake it for a clean bill.
+export function census({ root = ENG, files = null, shapes = true } = {}) {
     const gates = files || gateFiles(root);
     const bySig = { [SIG.nameFirst]: 0, [SIG.condFirst]: 0, [SIG.unknown]: 0, [SIG.none]: 0 };
     const definitions = new Map();
     const suspects = [];
     let usesOk = 0, definesOk = 0, importsOk = 0;
+    // *** COUNTED INSIDE THE LOOP, BECAUSE TWO SABOTAGES PROVED A FLAG CANNOT REPORT ON ITSELF. ***
+    // The first draft returned `shapesScanned: shapes` -- the ARGUMENT, echoed back. Sabotaging census to
+    // accept shapes:false and scan anyway went ZERO RED, because nulling `suspects` on the way out preserves
+    // the output contract while paying the whole 379 ms; and sabotaging it to skip the scan ALWAYS also went
+    // zero, because an empty array is still an array. A flag that reports the flag measures nothing. This
+    // counts the files the scan actually walked, so "was the work done" is answered by the work.
+    let filesScanned = 0;
     for (const g of gates) {
         const src = TR.textOf(g);   // v4548: out of the shared memo, not a fourth read of the same file
         if (/\bok\s*\(/.test(src)) usesOk++;
@@ -289,14 +315,20 @@ export function census({ root = ENG, files = null } = {}) {
         else if (/^import\s*\{[^}]*\bok\b[^}]*\}\s*from/m.test(src)) importsOk++;
         const sig = signatureOf(src);
         bySig[sig] = (bySig[sig] || 0) + 1;
-        for (const s of suspectCalls(src, sig)) suspects.push({ file: path.relative(root, g), ...s });
+        if (shapes) {
+            filesScanned++;
+            for (const s of suspectCalls(src, sig)) suspects.push({ file: path.relative(root, g), ...s });
+        }
     }
     return {
         gates: gates.length, usesOk, definesOk, importsOk,
         distinctDefinitions: definitions.size,
         bySignature: bySig,
-        suspects,
-        byShape: Object.fromEntries(Object.values(SHAPE).map((s) => [s, suspects.filter((x) => x.shape === s).length])),
+        filesScanned,
+        suspects: shapes ? suspects : null,
+        byShape: shapes
+            ? Object.fromEntries(Object.values(SHAPE).map((s) => [s, suspects.filter((x) => x.shape === s).length]))
+            : null,
     };
 }
 

@@ -164,7 +164,10 @@ export async function checks({ load = null, timings = null, only = null } = {}) 
     // import is cheap -- census() is the 147 ms.
     const A = await mod("./assertionShape.mjs");
     if (wanted("assertionShape census")) {
-        const ac = once(A.census, () => A.census());
+        // *** shapes:false -- THIS CHECK READS `definesOk` AND `gates` AND NOTHING ELSE. *** The swap scan
+        // census() runs by default costs 379 ms and contributes to neither field, and this gate is SWEPT, so
+        // that was 379 ms off a 3,000 ms budget for an answer nobody here looks at. See census()'s own note.
+        const ac = once(A.census, () => A.census({ shapes: false }));
         out.push({
             name: "assertionShape census", owes: OWES.assertion,
             recorded: A.SHAPE_AT_V4480.definesOk, actual: ac.definesOk,
