@@ -665,7 +665,10 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // re-took it. It went red on BOTH boxes, and Keith's verify named it in the drift pre-flight -- which is
     // precisely the instrument for this and only helps somebody who runs it.
     esModules: 3990, closures: 3857, asyncAwait: 1523, typedArrays: 1125, promises: 368,
-    fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 156, webgpu: 53, threads: 23, wasm: 23,
+    fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 156, webgpu: 54, threads: 23, wasm: 23,
+    // v4649r -- webgpu 53 -> 54: render/temporalResolve-selfcheck gained a navigator.gpu call when its
+    // confidence bound was moved onto the per-adapter record. ONE row moved and eleven did not, which is
+    // the shape that says the patterns discriminate rather than track the tree's size.
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.
