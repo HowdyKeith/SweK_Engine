@@ -97,7 +97,8 @@ const FLOOR_DB = 38.5;
                           fsr1: ($("dFsr") || {}).textContent || "",
                           obj: ($("objstat") || {}).textContent || "",
                           lock: ($("lockstat") || {}).textContent || "",
-                          dis: ($("disstat") || {}).textContent || "" };
+                          dis: ($("disstat") || {}).textContent || "",
+                          react: ($("reactstat") || {}).textContent || "" };
             try { $("run").click(); } catch {}
             return out;
         }` });
@@ -191,6 +192,44 @@ const FLOOR_DB = 38.5;
                "fsrPageDevice-selfcheck pins. The slab's trailing edge reveals background the camera alone " +
                "never uncovered.");
 
+            // *** v4659 -- THE REACTIVE MASK'S OWN COUNTERS, AND THE ONE THAT WAS MISNAMED IN PRODUCTION. ***
+            // Until this round the mask reported a single `noHistory`, and on this camera EVERY pixel in it
+            // is depth-gated: invalid 0, offscreen 0. So the one number the page could have printed would
+            // have said "pixels with no history" about a set in which every pixel HAS a history, sound and
+            // reprojected, declined on purpose because the disagreement is disocclusion's to report. The
+            // misnomer was not a theoretical risk, it was the whole of the number here.
+            const rx = /examined (\d+) of (\d+) pixels, (\d+) of them/.exec(G.react || "");
+            const rd = /Declined (\d+): (\d+) no motion, (\d+) reprojected off the frame, (\d+) turned away/.exec(G.react || "");
+            say(`reactive: ${rx ? `${rx[1]} of ${rx[2]} examined, ${rx[3]} at or above 0.05` : "(unparsed)"}` +
+                `; ${rd ? `declined ${rd[1]} = ${rd[2]} invalid + ${rd[3]} offscreen + ${rd[4]} depth-gated` : "(unparsed)"}`);
+            ok("!! the reactive mask PRINTS what it did, and its three declines add up to the total it declined",
+               !!rd && Number(rd[1]) === Number(rd[2]) + Number(rd[3]) + Number(rd[4]) && Number(rd[1]) > 0,
+               "counted on the device as the branches are taken. Every one of these pixels writes the same " +
+               "0.0 to the mask that a pixel in perfect agreement writes, so no pass over the finished mask " +
+               "could recover the split -- or even how many pixels were looked at.");
+            ok("!! *** and on THIS camera every declined pixel is DEPTH-GATED, which is what makes `noHistory` the wrong name ***",
+               !!rd && Number(rd[2]) === 0 && Number(rd[3]) === 0 && Number(rd[4]) === Number(rd[1]),
+               `invalid ${rd ? rd[2] : "?"}, offscreen ${rd ? rd[3] : "?"}, depth-gated ${rd ? rd[4] : "?"}. ` +
+               "A depth-gated pixel has a history and the history is sound. The single counter this replaces " +
+               "would have been 100% wrong about its own contents here, not merely imprecise.");
+            // *** TWO KERNELS, ONE PREDICATE. *** DISOCCLUSION_WGSL's classify and REACTIVE_WGSL's evaluate
+            // apply the same depth test with the same threshold and the same nearerIsLess, written
+            // separately and dispatched separately. `genuine` is the disocclusion counter with its
+            // no-history share already removed, so it is the depth-gap set on both sides and they must be
+            // the SAME INTEGER. Neither number is derived from the other, which is the only reason this row
+            // is worth anything.
+            ok("!! *** the reactive mask's depth-gated count IS the disocclusion counter's `genuine`, from a separate kernel ***",
+               !!rd && !!od && Number(rd[4]) === Number(od[1]),
+               `${rd ? rd[4] : "?"} against ${od ? od[1] : "?"}. Two independently written depth tests on two ` +
+               "dispatches agreeing to the pixel -- and it is also the 212/106 alternation this gate's " +
+               "closing line has left unexplained since v4649, now visible in a second place. " +
+               "*** AND IT PINS THE PREDICATE AND THE SIGN, NOT THE THRESHOLD, WHICH WAS MEASURED RATHER " +
+               "THAN ASSUMED. *** Handing the reactive mask a threshold 1.6x the chain's moved NOTHING -- a " +
+               "0-RED -- and so did 1.8x, 2x, 2.5x and 3x; only at 4x does the count fall, and then it falls " +
+               "straight to ZERO. The slab's silhouette is a CLIFF: its 212 pixels sit somewhere past 3x the " +
+               "threshold and every other pixel far below it, with nothing in between for a threshold to " +
+               "sort. A reader must not take this row for agreement on the NUMBER.");
+
             console.log("\n3. THE PICTURE, which is the only thing the three wiring sabotages could not fool");
             const dB = (t) => { const m = /([\d.]+) dB/.exec(t || ""); return m ? Number(m[1]) : NaN; };
             const e = dB(G.tmpEarly), l = dB(G.tmpLate), f1 = dB(G.fsr1);
@@ -236,6 +275,19 @@ console.log("\nunchecked here: the DOLLY and the two older cameras, which are fs
 //   v4649  fsr.html: the RENDER ignores the slab's offset                      1 RED, the reconstruction row.
 //   v4649  fsr.html: the REFERENCE ignores the slab's offset                   1 RED, the decay half.
 //          This one was not a sabotage first -- it was the round's own defect, found by measuring the product.
+//   v4659  fsr.html: the reactive mask asked for without counted: true         3 RED, all three v4659 rows.
+//   v4659  REACTIVE_WGSL: a depth-gate decline bucketed as OFFSCREEN           2 RED.
+//   v4659  fsr.html: the readout hard-codes the two zero declines              0 RED HERE, 1 RED in
+//          fsrPage-selfcheck. Honest complementary coverage rather than a repair: on THIS camera the true
+//          breakdown really is 0 invalid + 0 offscreen + all depth-gated, so a readout that prints two
+//          literal zeroes is indistinguishable from a working one at runtime, and only the SOURCE can tell.
+//   v4659  fsr.html: the reactive mask given 1.6x the chain's threshold        *** 0 RED ***
+//          Not repaired, MEASURED. 1.8x, 2x, 2.5x and 3x are also 0-RED; 4x reds two rows and takes the
+//          count straight from 212 to 0. The slab's silhouette is a cliff -- its pixels sit past 3x the
+//          threshold and everything else far below, with nothing in between for a threshold to sort -- so
+//          the two-kernels row pins the PREDICATE and the SIGN and not the number. The row now says so.
+//          Content with a graded depth ramp would pin it; this page has none, and inventing one to make a
+//          row look stronger would be moving the fixture to fit the claim.
 //
 // *** RUNTIME: 4,204 ms median of three (4,178 4,204 4,252) -- OVER the sweep's 3,000 ms membership
 // threshold, and that is stated rather than tuned away. v4654 added ~850 ms by giving the page a luma

@@ -368,10 +368,28 @@ console.log("\n6. *** THE SHADING MASK REACHES THE CHAIN (v4655), AND THIS IS A 
     ok("!! the reactive mask has a control arm as well, and it is the one whose result NEEDED it",
         /<select id="reactive">/.test(raw) && /reactive:\s*reactiveOn \? reactiveMask : null/.test(src)
         && /const reactiveOn = \$\("reactive"\)\.value !== "off"/.test(src)
-        && /reactiveMask = \(await xgpu\.reactive\(\{/.test(src),
+        && /const rx = await xgpu\.reactive\(\{/.test(src) && /reactiveMask = rx\.data/.test(src),
         "at TWENTY-ONE frames this mask's t-test cleared 0.05 and its sign test did not -- two tests, two " +
         "verdicts, and a round could have quoted whichever it preferred. Fifty-one settled it. A switch is " +
         "what makes taking more samples possible at all.");
+    // *** v4659 -- AND THE PAGE MUST SAY WHAT THE MASK DID, NOT ONLY WHAT IT MOVED. *** For two rounds this
+    // page computed the reactive mask, switched it, reported the PSNR it shifted, and printed NOTHING about
+    // the mask's own behaviour -- while the shading mask beside it got quantiles at v4655 for exactly that
+    // reason. Nothing is recoverable after the fact: every pixel the mask DECLINED writes the same 0.0 that
+    // a pixel it examined and found in perfect agreement writes, so the counts exist only at the moment the
+    // branch is taken. Hence counted: true, which is the half of this row a reader would otherwise drop.
+    ok("!! the reactive mask's own behaviour is COUNTED and printed, not just its effect on the PSNR",
+        // *** ANCHORED TO THE reactive() CALL, because /counted: true/ ALONE MATCHED THE WRONG ONE. *** The
+        // first draft of this row tested that substring against the whole page; the sabotage that sets the
+        // reactive call to counted: false scored ZERO against it, because rejectAndAccumulate's own
+        // `counted: true` two dozen lines below satisfied it. A row that passes on a page where the thing it
+        // names is switched off is decoration, and only the mutation found it.
+        /xgpu\.reactive\(\{[\s\S]{0,500}?counted: true/.test(src) && /reactStat = \{ \.\.\.rx\.stats/.test(src)
+        && /id="reactstat"/.test(raw) && /\$\("reactstat"\)\.textContent/.test(src)
+        && /declinedInvalid/.test(src) && /declinedOffscreen/.test(src) && /declinedDepth/.test(src),
+        "counted: true dispatches REACTIVE_WGSL/mainCounted, whose atomics are the only place the three " +
+        "declines exist -- a pass over the finished mask cannot recover one of them, or even how many pixels " +
+        "were looked at. Without it reactStat would be a spread of undefined and the readout would print it.");
     // BOTH selects, because the first version of this row named only the shading one and a sabotage
     // reordering the REACTIVE options scored zero against it. A control arm running by default would make
     // every other number on this page the control's, and that is true of whichever arm it is.
@@ -398,6 +416,12 @@ console.log("\nunchecked here: the ADAPTER path, which is tools/ship/fsrPageDevi
     "they are not -- they are the smallest thing that has parallax.");
 //
 // SABOTAGE LOG -- each applied to the live tree, run, and restored.
+//   v4659  fsr.html: the reactive mask asked for without counted: true        1 RED -- AFTER A REPAIR.
+//          The first draft of that row tested /counted: true/ against the whole page and scored ZERO,
+//          because rejectAndAccumulate's own `counted: true` two dozen lines below satisfied it. The row
+//          named the reactive call and matched a different one. Anchored to xgpu.reactive({...}) it reds.
+//   v4659  fsr.html: the readout hard-codes its two zero declines              1 RED (and 0 RED in the LIVE
+//          gate, which cannot see it: on that camera the true values ARE zero).
 //
 // *** THE HEADER HAS SAID "see the log at the foot of this file" SINCE v4638 AND THERE WAS NO LOG. *** A
 // pointer to a record that does not exist reads exactly like a record until somebody follows it, which is

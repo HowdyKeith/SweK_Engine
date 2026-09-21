@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// WebGLEngine/render/reactiveGPU-selfcheck.mjs -- v4657
+// WebGLEngine/render/reactiveGPU-selfcheck.mjs -- v4657, section 4 at v4659
 //
 // Run: node render/reactiveGPU-selfcheck.mjs
 // RUNTIME: recorded at the foot of this file.
@@ -38,7 +38,12 @@ const THRESH = 0.02, SCALE = 1;
 // reprojection, which render/motionVectors-selfcheck owns.
 const cur = new Float32Array(N * 4), hist = new Float32Array(N * 4);
 const motion = new Float32Array(N * 4), prevDepth = new Float32Array(N);
-const BAND = (y) => (y < 16 ? "same" : y < 32 ? "reactive" : y < 48 ? "disoccluded" : "nohistory");
+// *** THE LAST BAND IS TWO BANDS SINCE v4659, BECAUSE noHistory WAS ONE COUNTER FOR THREE EVENTS. *** The
+// fixture had no OFF-SCREEN case at all -- every pixel reprojected to itself -- so `declinedOffscreen` would
+// have shipped as a counter no row could move. The two halves sum to the sixteen rows the old band had, so
+// every figure section 1 quotes is unchanged.
+const BAND = (y) => (y < 16 ? "same" : y < 32 ? "reactive" : y < 48 ? "disoccluded" : y < 56 ? "invalid" : "offscreen");
+const NOHIST = ["invalid", "offscreen"];
 for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const i = y * W + x, o = i * 4;
     const base = 0.30 + 0.20 * Math.sin(x * 0.21);
@@ -55,20 +60,32 @@ for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
         // the surface changed: what was there last frame was NEARER than this pixel expects
         prevDepth[i] = 0.50 - 0.10;
         for (let c = 0; c < 3; c++) cur[o + c] = base + 0.40;    // and so the colour differs too
-    } else if (band === "nohistory") {
+    } else if (band === "invalid") {
         motion[o + 2] = 0;                                       // no reprojection at all
+        for (let c = 0; c < 3; c++) cur[o + c] = base + 0.40;
+    } else if (band === "offscreen") {
+        // VALID motion that reprojects clean off the left edge. It must stay valid, or it never reaches the
+        // bounds test and counts as invalid instead -- which is precisely the confusion this band exists for.
+        motion[o] = -2;
         for (let c = 0; c < 3; c++) cur[o + c] = base + 0.40;
     }
 }
 const R = reactiveCPU({ current: cur, history: hist, motion, prevDepth, w: W, h: H, threshold: THRESH, scale: SCALE });
 const bandMean = (name) => {
+    const want = Array.isArray(name) ? name : [name];
     let s = 0, n = 0;
-    for (let y = 0; y < H; y++) if (BAND(y) === name) for (let x = 0; x < W; x++) { s += R.data[y * W + x]; n++; }
+    for (let y = 0; y < H; y++) if (want.includes(BAND(y))) for (let x = 0; x < W; x++) { s += R.data[y * W + x]; n++; }
     return s / n;
+};
+const bandSize = (name) => {
+    const want = Array.isArray(name) ? name : [name];
+    let n = 0;
+    for (let y = 0; y < H; y++) if (want.includes(BAND(y))) n += W;
+    return n;
 };
 
 console.log("\n1. THE FOUR CASES, TOLD APART");
-say("band means", ["same", "reactive", "disoccluded", "nohistory"].map((b) => `${b} ${bandMean(b).toFixed(4)}`).join(", "));
+say("band means", ["same", "reactive", "disoccluded", "invalid", "offscreen"].map((b) => `${b} ${bandMean(b).toFixed(4)}`).join(", "));
 say("counts", `flagged ${R.flagged}, noHistory ${R.noHistory} of ${N}`);
 ok("!! *** the REACTIVE band fires: same surface, sound reprojection, different colour ***",
    bandMean("reactive") > 0.3,
@@ -92,8 +109,8 @@ ok("  ...and disocclusionCPU really does claim that band, so the row above is a 
        return inBand === 16 * W;
    })(), "every pixel this mask declined, the other one took");
 ok("!! ...and the NO-HISTORY band reads 0 and not 1, which is the same rule",
-   bandMean("nohistory") < 1e-6 && R.noHistory >= 16 * W,
-   `${bandMean("nohistory").toExponential(2)} mean, noHistory ${R.noHistory}. A pixel with no reprojection ` +
+   bandMean(NOHIST) < 1e-6 && R.noHistory >= 16 * W,
+   `${bandMean(NOHIST).toExponential(2)} mean, noHistory ${R.noHistory}. A pixel with no reprojection ` +
    "is already fully handled by the disocclusion mask's 1; writing 1 here as well discards a history the " +
    "chain had decided to discard, twice.");
 
@@ -129,12 +146,17 @@ const r = await runInEngineOrigin({ engineRoot: ENG, args: {
                      prevDepth: new Float32Array(a.prevDepth), w: a.W, h: a.H, threshold: a.THRESH, scale: a.SCALE };
     const withHist = await g.reactive({ ...common, history: new Float32Array(a.hist) });
     const noHist = await g.reactive({ ...common, history: null });
+    const counted = await g.reactive({ ...common, history: new Float32Array(a.hist), counted: true });
+    const countedNoHist = await g.reactive({ ...common, history: null, counted: true });
     const refuse = async (fn) => { try { await fn(); return null; } catch (e) { return String(e.message).slice(0, 150); } };
     const rThresh = await refuse(() => g.reactive({ ...common, history: new Float32Array(a.hist), threshold: 0 }));
     let rBackend = null;
     try { const c2 = document.createElement("canvas"); const d2 = await requestDevice(c2, { backend: "webgl2", offscreen: true }); new ReactiveGPU(d2); }
     catch (e) { rBackend = String(e.message).slice(0, 150); }
-    return { backend: dev.backend, errs, withHist: Array.from(withHist.data), noHist: Array.from(noHist.data), rThresh, rBackend };
+    return { backend: dev.backend, errs, withHist: Array.from(withHist.data), noHist: Array.from(noHist.data),
+             rThresh, rBackend,
+             stats: counted.stats, statsNoHist: countedNoHist.stats, countedData: Array.from(counted.data),
+             uncountedStats: withHist.stats, uncountedReason: withHist.statsReason, countedReason: counted.statsReason };
 }` });
 
 ok("the kernel ran on a real WebGPU device",
@@ -157,6 +179,62 @@ if (r.ok && r.result) {
        /positive depth/.test(r.result.rThresh || ""), r.result.rThresh || "NOT REFUSED");
     ok("...and a non-webgpu device throws at construction",
        /needs a gfx\/device\.js device on the webgpu backend/.test(r.result.rBackend || ""), r.result.rBackend || "NOT REFUSED");
+
+    console.log("\n4. ONE COUNTER WAS THREE ANSWERS");
+    // *** WHAT `noHistory` WAS HIDING. *** Until v4659 the three declines shared one counter and one name, and
+    // the name fits two of them: a DEPTH-GATED pixel has a history, the history is sound, and this module
+    // turned it away because the disagreement is disocclusion's to report. A caller reading the sum cannot
+    // tell a frame where the reprojection collapsed from a frame where the gate did its job.
+    const nInv = bandSize("invalid"), nOff = bandSize("offscreen"), nDep = bandSize("disoccluded");
+    say("the three declines", `invalid ${R.declinedInvalid}, offscreen ${R.declinedOffscreen}, ` +
+        `depth-gated ${R.declinedDepth}  (bands: ${nInv}, ${nOff}, ${nDep})`);
+    ok("!! *** the three declines are three DIFFERENT numbers, each the size of the band that causes it ***",
+       R.declinedInvalid === nInv && R.declinedOffscreen === nOff && R.declinedDepth === nDep,
+       `A single counter cannot be wrong about this and a split one can, which is the point. The OFF-SCREEN ` +
+       `band is new this round: the fixture had no such case at all, so a counter for it would have shipped ` +
+       `unmovable.`);
+    ok("!! ...and noHistory is exactly their sum, so the split did not half-land",
+       R.noHistory === R.declinedInvalid + R.declinedOffscreen + R.declinedDepth,
+       `${R.noHistory} === ${R.declinedInvalid} + ${R.declinedOffscreen} + ${R.declinedDepth}. It is DERIVED ` +
+       `from the three and never accumulated beside them -- a fourth increment at the same three sites is a ` +
+       `fourth chance to miss one.`);
+    // *** AND THIS IS WHY THEY MUST BE COUNTED AS THEY HAPPEN. *** Every decline writes 0.0 to the mask, and
+    // so does a pixel examined and found in perfect agreement. A reader who tried to recover the declined set
+    // by counting zeroes gets the WHOLE quiet half of the image.
+    let zeros = 0;
+    for (let i = 0; i < N; i++) if (R.data[i] === 0) zeros++;
+    say("  recovering it from the mask", `${zeros} pixels read 0.0, against ${R.noHistory} actually declined`);
+    ok("!! *** counting zeroes in the mask does NOT recover the declined set, and is wrong by a whole band ***",
+       zeros !== R.noHistory && zeros - R.noHistory === bandSize("same"),
+       `${zeros} - ${R.noHistory} = ${zeros - R.noHistory}, which is exactly the SAME band: ${bandSize("same")} ` +
+       `pixels the mask examined and found in perfect agreement. An absence is not a pass, and here the two ` +
+       `are the same float. Only the moment the branch is taken knows which happened -- hence the atomics.`);
+
+    const g = r.result.stats;
+    say("  the device's own count", g ? `flagged ${g.flagged}, invalid ${g.declinedInvalid}, offscreen ` +
+        `${g.declinedOffscreen}, depth ${g.declinedDepth}, noHistory ${g.noHistory}` : "MISSING");
+    ok("!! *** mainCounted's atomics agree with reactiveCPU on all five figures ***",
+       !!g && g.flagged === R.flagged && g.declinedInvalid === R.declinedInvalid &&
+       g.declinedOffscreen === R.declinedOffscreen && g.declinedDepth === R.declinedDepth &&
+       g.noHistory === R.noHistory,
+       "Two implementations of the same five counts, one of them 6144 concurrent atomicAdds. The 0.05 that " +
+       "defines `flagged` is hard-coded in BOTH mirrors on purpose: it is not a threshold the mask applies, " +
+       "it is the one number the two must agree to report, and a uniform would let a caller move it on one side.");
+    ok("!! ...and the counted entry point leaves the mask itself bit-identical to main's",
+       !!r.result.countedData && r.result.countedData.every((v, i) => v === r.result.withHist[i]),
+       "the predicate is factored into one `evaluate` the two entry points share, so a fix to one cannot miss " +
+       "the other -- and main pays no atomic, because the auto layout is per entry point.");
+    ok("!! ...and a NULL history counts every pixel as INVALID, not as offscreen or depth-gated",
+       !!r.result.statsNoHist && r.result.statsNoHist.declinedInvalid === N &&
+       r.result.statsNoHist.declinedOffscreen === 0 && r.result.statsNoHist.declinedDepth === 0 &&
+       r.result.statsNoHist.noHistory === N,
+       "There is no motion to follow anywhere on frame one, which is not the same as following it off the " +
+       "frame. reactiveCPU's early return buckets it the same way.");
+    ok("!! ...and stats is NULL without counted: true, with a reason, rather than five zeroes",
+       r.result.uncountedStats === null && /Null rather than zeroes/.test(r.result.uncountedReason || "") &&
+       r.result.countedReason === null,
+       `A frame where the mask examined every pixel and found nothing and a frame nobody counted must not ` +
+       `read the same. Reason given when absent, null when present: ${JSON.stringify(String(r.result.uncountedReason || "").slice(0, 60))}`);
 }
 }
 
@@ -179,7 +257,24 @@ console.log("unchecked here: whether the mask IMPROVES a reconstruction, which i
 // Six mutations, six caught, no 0-RED. The chromatic band is what makes S4 fail: only blue moves there, so
 // a luma-only detector reads almost nothing, which is precisely the case the arc's OTHER mask cannot see.
 //
-// RUNTIME: 1,054 ms median of five (1,043 1,043 1,054 1,062 1,148).
+// v4659, for section 4 -- each applied to the live tree, run, and restored:
+//   S7   the CPU counts an OFFSCREEN decline as INVALID        2 RED, and the SUM ROW STAYED GREEN
+//   S8   mainCounted drops the CLS_OFFSCREEN atomic            1 RED, device parity
+//   S9   the runner derives noHistory from two of three        1 RED, device parity
+//   S10  mainCounted writes a mask main would not              1 RED, the bit-identical row
+//   S11  the runner returns five zeroes instead of null        1 RED, the null-stats row
+//   S12  the fixture's OFF-SCREEN band reprojects on-screen    2 RED (and it is this round's own new band)
+//   S13  noHistory accumulated beside the three, missing one   3 RED
+//   S14  the fixture's SAME band nudged off exact agreement    2 RED
+// Eight more, eight caught, no 0-RED; every row added this round is moved by at least one.
+//
+// *** S7 IS THE ONE WORTH READING. *** It mis-buckets a decline and the SUM IS STILL RIGHT, so the identity
+// row -- noHistory === the three added up -- stays GREEN through it. That row is real (S13 reds it) but it
+// cannot see a mis-bucketing, which is the likeliest way this split goes wrong. The row that catches S7 is
+// the one that pins each counter to the SIZE OF THE BAND THAT CAUSES IT. A conservation law and an identity
+// are not the same check, and shipping only the identity would have looked like coverage.
+//
+// RUNTIME: 1,138 ms median of five (1,110 1,125 1,138 1,153 1,198), timed after the section was written.
 //
 // This line first read "807 ms median of five" with five plausible samples beside it, written before the
 // gate was timed. Recorded rather than silently swapped: it is the same defect as inventing a measurement,

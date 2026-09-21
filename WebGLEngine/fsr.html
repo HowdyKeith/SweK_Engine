@@ -68,6 +68,7 @@
   <div class="stat" id="disstat"></div>
   <div class="stat" id="objstat"></div>
   <div class="stat" id="lockstat"></div>
+  <div class="stat" id="reactstat"></div>
   <div class="stat" id="over"></div>
 </div>
 <div class="panes">
@@ -706,7 +707,7 @@ async function tick() {
     // SIGN TEST DID NOT (15/21, p = 0.08). Two tests, two verdicts, and a round could have quoted whichever
     // it preferred. Fifty-one frames is what settled it, and both agree there.
     const reactiveOn = $("reactive").value !== "off";
-    let reactiveMask = null;
+    let reactiveMask = null, reactStat = null;
     let shadingMask = null, lockStat = null;
     if (objects && lgpu && dollyCurrent) {
         const period = jitterPhaseCount(parseFloat($("ratio").value));
@@ -737,8 +738,22 @@ async function tick() {
     if (objects && xgpu && dollyCurrent && prevDepth && threshold) {
         // scale 1 is this page's colour range; strength 1 leaves the detector's own units alone, which is
         // render/reactive.mjs's rule about `scale` being the caller's.
-        reactiveMask = (await xgpu.reactive({ current: dollyCurrent, history: hist, motion, prevDepth,
-                                              w: D, h: D, threshold, nearerIsLess: true, scale: 1, strength: 1 })).data;
+        // *** counted: true, BECAUSE NOTHING ABOUT THIS MASK IS RECOVERABLE FROM THE MASK. *** Every pixel
+        // the mask declined writes 0.0, and so does every pixel it examined and found in perfect agreement.
+        // Until v4659 this page computed the mask, switched it on and off, reported the PSNR it moved, and
+        // never once said what the mask DID -- while the shading mask beside it got quantiles in v4655 for
+        // exactly that reason. A control whose effect is measured and whose behaviour is not is half an
+        // instrument.
+        const rx = await xgpu.reactive({ current: dollyCurrent, history: hist, motion, prevDepth,
+                                         w: D, h: D, threshold, nearerIsLess: true, scale: 1, strength: 1,
+                                         counted: true });
+        reactiveMask = rx.data;
+        // The same quantile treatment the shading mask takes, and for the same reason v4655 had to learn:
+        // this is a CONTINUOUS detector, so a count of pixels above ZERO counts the arithmetic.
+        const rsorted = Float32Array.from(reactiveMask).sort();
+        const rq = (f) => rsorted[Math.min(rsorted.length - 1, Math.floor(f * rsorted.length))];
+        reactStat = { ...rx.stats, p50: rq(0.50), p90: rq(0.90), p99: rq(0.99),
+                      peak: rsorted[rsorted.length - 1], n: D * D };
     }
     if (dolly && prevDepth && threshold) {
         // nearerIsLess: true because rasterProbe.js's viewProj is GL-style forward-Z -- P[10] is
@@ -839,6 +854,24 @@ async function tick() {
                 `above 0.05. The QUANTILES are the reading -- a count of pixels above ZERO counts the ` +
                 `arithmetic, because this detector is continuous and nothing is ever exactly unchanged.`)
             : "shading mask: not computed on this camera";
+    // *** WHAT THE REACTIVE MASK DID, WHICH THIS PAGE MEASURED THE EFFECT OF BEFORE IT COULD STATE. ***
+    // The three declines are separate because they are three different events and the middle name fits two
+    // of them: a DEPTH-GATED pixel has a sound history and was handed to the disocclusion mask on purpose,
+    // which is the gate working, while a collapse in `invalid` or `offscreen` is the reprojection failing.
+    // Read as one sum those want opposite reactions.
+    $("reactstat").textContent = !objects ? ""
+        : reactStat
+            ? `reactive mask [${reactiveOn ? "ON" : "OFF -- control"}]: examined ` +
+              `${reactStat.n - reactStat.noHistory} of ${reactStat.n} pixels, ${reactStat.flagged} of them ` +
+              `at or above 0.05; median ${reactStat.p50.toFixed(4)}, p90 ${reactStat.p90.toFixed(4)}, p99 ` +
+              `${reactStat.p99.toFixed(4)}, peak ${reactStat.peak.toFixed(3)}. Declined ${reactStat.noHistory}: ` +
+              `${reactStat.declinedInvalid} no motion, ${reactStat.declinedOffscreen} reprojected off the ` +
+              `frame, ${reactStat.declinedDepth} turned away by the DEPTH GATE -- and that last third is not ` +
+              `"no history" at all, it is this mask declining to report a disocclusion under another name. ` +
+              `COUNTED ON THE DEVICE as the branches are taken: every one of these pixels writes the same ` +
+              `0.0 to the mask that a pixel in perfect agreement writes, so no pass over it could recover ` +
+              `a single one of these numbers.`
+            : "reactive mask: not computed on this frame (it needs a previous depth and a positive threshold)";
     $("objstat").textContent = !objects ? ""
         : objGap
             ? `object motion: camera-only is off by ${(objGap.onSlab * D).toFixed(2)} px on the slab's ` +

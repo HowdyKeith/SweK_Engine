@@ -8032,6 +8032,60 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4659 -- THE 269th CLOSING: one counter was three answers, and the name fitted two of them.
+    since344: Object.freeze({
+        at: "v4659", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** THE HYPOTHESIS THIS ROUND SET OUT TO TEST IS REFUTED, AND IN THE WRONG DIRECTION. *** " +
+                 "v4658 measured the reactive mask making 14 of 51 frames WORSE, one by 1.22 dB, and did not " +
+                 "explain it. The stated suspicion was JITTER: the mask compares one frame against history " +
+                 "with no jitter compensation, unlike the shading mask, whose ring spans whole phase periods " +
+                 "so the jitter cancels. Tested by pairing each frame's PSNR delta with the offset the page " +
+                 "itself prints for that frame: r = +0.17 (p = 0.54) against |j|, and the harmed frames " +
+                 "average a SMALLER offset (0.343) than the helped ones (0.401). The frame-to-frame step is " +
+                 "weaker still, r = +0.06. The sign is the opposite of the hypothesis and the magnitude is " +
+                 "nothing. Recorded as the round's finding rather than quietly replaced by whatever was " +
+                 "found next. " +
+                 "*** WHAT THE SEARCH FOUND INSTEAD WAS THAT THE MASK COULD NOT BE ASKED. *** fsr.html " +
+                 "computed the reactive mask, switched it, reported the PSNR it moved, and printed NOTHING " +
+                 "about the mask's own behaviour -- while the shading mask beside it got quantiles at v4655 " +
+                 "for exactly that reason. Worse, nothing was recoverable after the fact: every pixel the " +
+                 "mask DECLINED writes the same 0.0 that a pixel examined and found in perfect agreement " +
+                 "writes. MEASURED on the gate's own fixture: counting zeroes in the finished mask reports " +
+                 "4,608 declined where 3,072 were, overstating by an entire band of contented pixels. " +
+                 "REACTIVE_WGSL gained a mainCounted entry point on the idiom DISOCCLUSION_WGSL already " +
+                 "uses, and the page a readout. " +
+                 "*** AND reactiveCPU's ONE `noHistory` WAS THREE EVENTS UNDER A NAME THAT FITS TWO. *** A " +
+                 "pixel with invalid motion, a pixel reprojected off the frame, and a pixel the DEPTH GATE " +
+                 "turned away are different things, and the third is not 'no history' at all: that pixel HAS " +
+                 "a history, the history is sound, and the mask declined it because the disagreement is " +
+                 "disocclusion's to report. Split into declinedInvalid/declinedOffscreen/declinedDepth with " +
+                 "noHistory DERIVED as their sum on both mirrors. ON THE PAGE THE MISNOMER WAS THE WHOLE " +
+                 "NUMBER: invalid 0, offscreen 0, depth-gated all 106 or 212 of them, every frame. " +
+                 "*** TWO KERNELS, ONE PREDICATE, AND A MEASURED LIMIT ON WHAT THAT PROVES. *** The new " +
+                 "declinedDepth equals the disocclusion counter's `genuine` to the pixel (212 against 212) " +
+                 "from a separately written kernel on a separate dispatch -- and it is the 212/106 " +
+                 "alternation fsrPageObjects-selfcheck has left unexplained since v4649, now visible in a " +
+                 "second place. But handing the reactive mask 1.6x the chain's threshold is a 0-RED, and so " +
+                 "are 1.8x, 2x, 2.5x and 3x; only 4x reds it, and then the count falls straight to zero. The " +
+                 "slab's silhouette is a cliff, so the row pins the predicate and the sign and NOT the " +
+                 "number. Stated on the row rather than repaired by inventing a graded fixture. " +
+                 "*** AND THE LEAD IS NOT A FINDING, BECAUSE OF HOW IT WAS FOUND. *** Frames with the wider " +
+                 "(212-pixel) depth-gated set average +0.235 dB against +0.586 for the narrow (106) ones, " +
+                 "Welch t = 1.97, p = 0.056, and 10 of the 14 harmed frames sit in the wide group. That p " +
+                 "was the BEST of EIGHT predictors tried, and under eight tests the smallest p from pure " +
+                 "noise averages near 0.11 -- so 0.056 is barely better than chance and must not be quoted " +
+                 "as a result. The confirmation is a single pre-declared test on frames not used to find it. " +
+                 "The same gate's closing line already warns that the pixel-boundary story for this " +
+                 "alternation is UNMEASURED and that 2:1 is not what 2.42 px/frame would obviously give; " +
+                 "that warning is honoured here rather than talked past. " +
+                 "Fourteen sabotages, thirteen caught, ONE REPAIR and ONE RECORDED 0-RED. The repair: the " +
+                 "row asserting the page asks for counted: true tested that substring against the WHOLE " +
+                 "page, and rejectAndAccumulate's own `counted: true` satisfied it -- the row named the " +
+                 "reactive call and matched a different one, and only the mutation found it. No gate added.",
+    }),
     // v4658 -- THE 268th CLOSING: the reactive mask measured, and the sample that was too small.
     since343: Object.freeze({
         at: "v4658", swept: 0, green: 0, red: 0,
