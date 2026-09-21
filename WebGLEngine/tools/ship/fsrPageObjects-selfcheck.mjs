@@ -138,13 +138,32 @@ const FLOOR_DB = 38.5;
             //
             // THAT IS WHY THE PAGE PRINTS THE FILL STATE RATHER THAN THE MASK ALONE. A mask of zeros because
             // the detector found nothing and a mask of zeros because it has not looked yet are the same
-            // picture, and v4402's rule is that an absence must not read as a pass. MEASURED past the fill
-            // point on a real adapter at v4654: at frame 64 the ring is full and 0 pixels are shifted; at
-            // frame 70 it is 36,862 of 36,864 at peak 0.192 -- so it engages, and on this content it marks
-            // very nearly EVERY pixel, which makes it a global damper rather than a selective mask. Whether
-            // that helps is NOT established: the temporal pane reads 43.21 dB there against a 39.6-42.8
-            // spread over the frames before it, which is the same order as the variation.
+            // picture, and v4402's rule is that an absence must not read as a pass.
+            //
+            // *** v4655 -- v4654 MEASURED THIS WITH A THRESHOLD OF ZERO AND GOT THE ANSWER BACKWARDS. ***
+            // That round reported "36,862 of 36,864 pixels shading-shifted" and concluded the mask "marks
+            // very nearly EVERY pixel, which makes it a global damper rather than a selective mask". The
+            // count was `mask[i] > 0`. SHADING_SHIFT is CONTINUOUS -- clamp(strength * |newer - older| /
+            // scale, 0, 1) -- so on real content almost every pixel differs from its own history by
+            // SOMETHING, and counting floats above zero counts the arithmetic rather than the signal.
+            //
+            // RE-MEASURED as a distribution, three frames past the fill point:
+            //     frame 66   median 0.0009   p90 0.0844   p99 0.1739   peak 0.197   5,956 at or above 0.05
+            //     frame 72   median 0.0008   p90 0.0818   p99 0.1698   peak 0.191   5,902
+            //     frame 80   median 0.0005   p90 0.0763   p99 0.1592   peak 0.178   6,110
+            //
+            // The median is a THOUSANDTH of the scale. About 16% of the frame reaches 0.05 and the top
+            // percentile carries 0.16-0.17. *** THE MASK IS SELECTIVE, AND v4654's CONCLUSION WAS THE
+            // OPPOSITE OF WHAT ITS OWN NUMBER MEASURED. *** Whether it HELPS is still not established: the
+            // temporal pane reads 42.68 / 43.45 / 45.91 dB at those frames against a 39.6-42.8 spread
+            // before the ring filled, which is suggestive and is not a control.
             const lk = /ring (\d+)\/(\d+) frames/.exec(G.lock || "");
+            // *** THE DISTRIBUTION ROW LIVED HERE FOR ONE ROUND AND COULD NOT FAIL. *** It read
+            // `/median /.test(lock) || /NOT YET FILLED/.test(lock)`, and at the six frames this gate runs the
+            // second half is always true -- so the quantile half was never tested. A sabotage replacing the
+            // sorted array with a constant scored ZERO against it. That is the very defect
+            // tools/ship/constantRows.mjs censuses, written by the round that shipped the census's fifth
+            // mechanism, and it moved to fsrPage-selfcheck section 6 where the SOURCE can be held instead.
             ok("!! *** the shading mask says it is NOT YET FILLED rather than reading as a clean frame ***",
                !!lk && Number(lk[1]) === G.frames && Number(lk[2]) === 64 && /NOT YET FILLED/.test(G.lock || ""),
                (G.lock || "(empty)").slice(0, 200) + "   ||  the ring is 2 x jitterPhaseCount(2) = 64 slots " +

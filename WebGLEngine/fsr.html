@@ -664,9 +664,18 @@ async function tick() {
         // v4402's rule, an absence is not a pass -- and the ring is 2*period slots, so at ratio 2 it takes
         // SIXTY-FOUR frames before a single pixel can report anything. A reader watching the first few
         // frames would see a mask of zeros and conclude the detector found nothing; it has not looked yet.
-        let nz = 0, peak = 0;
-        for (let i = 0; i < D * D; i++) if (shadingMask[i] > 0) { nz++; if (shadingMask[i] > peak) peak = shadingMask[i]; }
-        lockStat = { pushes: lockRing.pushes, need: lockRing.F, nz, peak };
+        // *** THE COUNT USED TO BE `> 0` AND THAT WAS NOT A MEASUREMENT. *** v4654 reported "36,862 of
+        // 36,864 pixels shading-shifted" and concluded the mask "marks very nearly EVERY pixel", making it a
+        // global damper rather than a selective one. THE THRESHOLD WAS ZERO. SHADING_SHIFT is a continuous
+        // detector -- clamp(strength * |newer - older| / scale, 0, 1) -- so on real content almost every
+        // pixel differs from its own history by SOMETHING, and counting floats above zero counts the
+        // arithmetic rather than the signal. A quantile says what a threshold cannot guess at.
+        const sorted = Float32Array.from(shadingMask).sort();
+        const q = (f) => sorted[Math.min(sorted.length - 1, Math.floor(f * sorted.length))];
+        let over = 0;
+        for (let i = 0; i < D * D; i++) if (shadingMask[i] >= 0.05) over++;   // 5% of the caller's scale
+        lockStat = { pushes: lockRing.pushes, need: lockRing.F,
+                     p50: q(0.50), p90: q(0.90), p99: q(0.99), peak: sorted[sorted.length - 1], over };
     }
     if (dolly && prevDepth && threshold) {
         // nearerIsLess: true because rasterProbe.js's viewProj is GL-style forward-Z -- P[10] is
@@ -761,7 +770,10 @@ async function tick() {
                   ? ` -- NOT YET FILLED, so every pixel reads 0 and the factor pass is unchanged. The ring is `
                     + `2 x jitterPhaseCount because both halves must span the same jitter phases; that is the `
                     + `mechanism, not a warm-up that can be shortened.`
-                  : `, ${lockStat.nz} pixels shading-shifted, peak ${lockStat.peak.toFixed(3)}`)
+                  : `: median ${lockStat.p50.toFixed(4)}, p90 ${lockStat.p90.toFixed(4)}, p99 ` +
+                `${lockStat.p99.toFixed(4)}, peak ${lockStat.peak.toFixed(3)}; ${lockStat.over} pixels at or ` +
+                `above 0.05. The QUANTILES are the reading -- a count of pixels above ZERO counts the ` +
+                `arithmetic, because this detector is continuous and nothing is ever exactly unchanged.`)
             : "shading mask: not computed on this camera";
     $("objstat").textContent = !objects ? ""
         : objGap

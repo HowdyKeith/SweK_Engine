@@ -8032,6 +8032,42 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4655 -- THE 265th CLOSING: v4654 counted a continuous field with a threshold of zero.
+    since340: Object.freeze({
+        at: "v4655", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** v4654 REPORTED '36,862 OF 36,864 PIXELS SHADING-SHIFTED' AND CONCLUDED THE OPPOSITE OF " +
+                 "WHAT ITS OWN NUMBER MEASURED. *** It called the mask 'a global damper rather than a " +
+                 "selective mask' and shipped that in the page, the gate, the closing and the commit " +
+                 "message. THE THRESHOLD WAS ZERO. SHADING_SHIFT is continuous -- clamp(strength * |newer - " +
+                 "older| / scale, 0, 1) -- so on real content almost every pixel differs from its own " +
+                 "history by SOMETHING, and counting floats above zero counts the arithmetic rather than the " +
+                 "signal. " +
+                 "RE-MEASURED AS A DISTRIBUTION, three frames past the ring's fill point: median 0.0009 / " +
+                 "0.0008 / 0.0005, p90 0.0844 / 0.0818 / 0.0763, p99 0.1739 / 0.1698 / 0.1592, peak 0.197 / " +
+                 "0.191 / 0.178, with 5,956 / 5,902 / 6,110 pixels at or above 0.05. The median is a " +
+                 "THOUSANDTH of the scale and about 16% of the frame clears 0.05. *** THE MASK IS " +
+                 "SELECTIVE. *** Whether it HELPS is still not established and is said so: 42.68 / 43.45 / " +
+                 "45.91 dB against a 39.6-42.8 spread before the ring filled is suggestive and is not a " +
+                 "control. " +
+                 "*** AND THE DEVICE GATE STRUCTURALLY CANNOT HOLD ANY OF THIS, WHICH THREE SABOTAGES " +
+                 "PROVED. *** The mask is exactly zero until its ring fills at frame 64 and " +
+                 "fsrPageObjects-selfcheck runs six, so `shading: null`, a constant ring period and a faked " +
+                 "quantile array are all byte-identical there and all scored ZERO. Driving 65 frames costs " +
+                 "~25 s, eight times that gate's budget. The rows moved to fsrPage-selfcheck's new section 6 " +
+                 "and are LABELLED as declaration checks, which this tree rates below behavioural ones -- " +
+                 "runnerReach's header records six sabotages walking past that exact shape -- so each " +
+                 "asserts the VALUE and not the word. " +
+                 "*** ONE OF THIS ROUND'S OWN ROWS WAS A 0-RED AND IT WAS THE CENSUSED DEFECT AGAIN. *** The " +
+                 "first distribution row read `/median /.test(lock) || /NOT YET FILLED/.test(lock)`, and at " +
+                 "six frames the second half is always true, so the quantile half could never fail. That is " +
+                 "tools/ship/constantRows.mjs's fifth mechanism, written by the session that shipped the " +
+                 "census. It is on the source now, where faking the quantiles and reinstating the " +
+                 "count-above-zero both go red. " +
+                 "Seven sabotages, all seven caught after two repairs. No gate added.",
+    }),
     // v4654 -- THE 264th CLOSING: closing a reachability gap by adding a caller only a gate calls.
     since339: Object.freeze({
         at: "v4654", swept: 1, green: 1, red: 0,

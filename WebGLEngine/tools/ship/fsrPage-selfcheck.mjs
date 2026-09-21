@@ -21,6 +21,14 @@
 //      rather than rasterising"
 //
 // SABOTAGES: see the log at the foot of this file.
+//
+// *** v4655 -- SECTION 6 EXISTS BECAUSE THE DEVICE GATE STRUCTURALLY CANNOT REACH IT. *** The shading mask
+// is exactly zero until its ring fills at frame 64, and fsrPageObjects-selfcheck runs six, so the wired and
+// unwired pages are byte-identical there. Three sabotages proved it: `shading: null`, a constant ring
+// period, and a faked quantile array all scored ZERO against the device rows. They are held on the SOURCE
+// here and labelled as declaration checks, which this tree rates below behavioural ones -- runnerReach's
+// header records six sabotages walking past exactly that shape -- so each row asserts the VALUE rather than
+// the word: `shading: null` fails, and reinstating the count-above-zero fails.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -290,6 +298,47 @@ console.log("\n5. *** THE OBJECT-MOTION CAMERA (v4649): THE FIRST TIME THIS PAGE
         `${predicted.toFixed(3)} px from the geometry against 2.42 px measured on a device. Camera-only ` +
         "predicts ZERO object motion, so its error is exactly the object's screen displacement -- the page's " +
         "headline number is forced by the scene's dimensions and is not free to be anything else.");
+}
+
+// -----------------------------------------------------------------------------------------------------------
+console.log("\n6. *** THE SHADING MASK REACHES THE CHAIN (v4655), AND THIS IS A DECLARATION CHECK ON PURPOSE ***");
+{
+    // *** A SABOTAGE SETTING `shading: null` SCORED ZERO AGAINST THE DEVICE GATE AND THIS IS WHY. ***
+    // SHADING_SHIFT writes 0 at every pixel until the ring fills, and the ring is 2 x jitterPhaseCount --
+    // SIXTY-FOUR frames at ratio 2. tools/ship/fsrPageObjects-selfcheck.mjs runs six, so passing the mask and
+    // passing null produce byte-identical frames there and no behavioural row can tell them apart. Driving 65
+    // frames costs about 25 seconds, which is eight times that gate's whole budget.
+    //
+    // So the wiring is held HERE, on the source, and labelled as what it is. This tree's own rule is that a
+    // declaration check is weaker than a behavioural one -- runnerReach-selfcheck's header records SIX
+    // sabotages walking past rows that tested for a declaration while the behaviour changed. The mitigation
+    // is that the row asserts the ARGUMENT IS THE COMPUTED MASK rather than merely that the word appears:
+    // `shading: null` and a missing line both fail it.
+    ok("!! the reject chain is handed the computed shading mask, not null and not nothing",
+        /shading:\s*shadingMask\b/.test(src) && /shadingMask = \(await lgpu\.shadingShift\(/.test(src),
+        "a device row cannot see this: the mask is exactly zero for 64 frames, so at the six that gate runs " +
+        "the wired and unwired pages are byte-identical. Stated as a declaration check rather than dressed " +
+        "up as a behavioural one.");
+    ok("  ...and the ring's period is the JITTER's phase count, which is the mechanism and not a tuning knob",
+        /jitterPhaseCount\(parseFloat\(\$\("ratio"\)\.value\)\)/.test(src),
+        "both halves of the ring must span the same jitter phases or the difference carries a residue of the " +
+        "sampling and reports it as shading; a shorter ring would fill sooner and measure the wrong thing");
+    // *** AND THE MASK IS SUMMARISED AS A DISTRIBUTION, WHICH IS THE ROUND'S WHOLE SUBJECT. *** v4654
+    // reported a count of pixels above ZERO and concluded the opposite of what its own number measured. The
+    // device gate cannot hold this either -- the quantile branch only runs once the ring fills at frame 64 --
+    // so it is held here, and the row names the wrong statistic explicitly so that reinstating it fails.
+    ok("!! the page summarises the mask by QUANTILES, and not by a count above zero",
+        /p50: q\(0\.50\)/.test(src) && /p90: q\(0\.90\)/.test(src) && /p99: q\(0\.99\)/.test(src)
+        && /Float32Array\.from\(shadingMask\)\.sort\(\)/.test(src)
+        && !/shadingMask\[i\] > 0\b/.test(src),
+        "SHADING_SHIFT is continuous, so on real content almost every pixel differs from its history by " +
+        "something and a count above zero counts the arithmetic. MEASURED at v4655: median 0.0009, p90 " +
+        "0.0844, p99 0.1739 -- about 16% of the frame reaches 0.05, so the mask is SELECTIVE, which is the " +
+        "opposite of what v4654 concluded from the same field.");
+    ok("  ...and the ring is torn down on reset, so it cannot be read at a stride it was not built for",
+        /lgpu\.destroyRing\(lockRing\)/.test(src) && /lockRing = null/.test(src),
+        "a ring carried across a resolution or camera change would be read with the wrong stride and would " +
+        "look like content rather than like a mistake");
 }
 
 console.log(fails ? `\nfsrPage-selfcheck: ${fails} FAILED` : "\nfsrPage-selfcheck: all checks pass");
