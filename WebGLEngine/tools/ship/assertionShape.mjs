@@ -460,8 +460,10 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // unknownSignature 16, suspects 0.
     // v4649 -- 1754 -> 1755 for tools/ship/fsrPageObjects-selfcheck.mjs, fsr.html's object-motion camera,
     // split out of fsrPageDevice-selfcheck for the sweep budget. Same four rows by one; the other four hold.
-    gates: 1755, usesOk: 1734, definesOk: 1726, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1627, condFirst: 91, unknownSignature: 16,
+    // v4650 -- 1755 -> 1756 for render/edgeReveal-selfcheck.mjs, the explanation of v4649's alternation.
+    // Four rows by one, four hold. Fourth round running with that shape.
+    gates: 1756, usesOk: 1735, definesOk: 1727, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1628, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

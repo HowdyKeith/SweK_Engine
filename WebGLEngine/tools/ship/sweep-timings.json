@@ -2158,7 +2158,8 @@
   "render/objectMotionGPU-selfcheck.mjs": 779,
   "render/temporalLockGPU-selfcheck.mjs": 2110,
   "render/visibilityGPU-selfcheck.mjs": 870,
-  "tools/ship/fsrPageObjects-selfcheck.mjs": 3358
+  "tools/ship/fsrPageObjects-selfcheck.mjs": 3358,
+  "render/edgeReveal-selfcheck.mjs": 53
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -3918,7 +3919,8 @@
   "render/objectMotionGPU-selfcheck.mjs": 0,
   "render/temporalLockGPU-selfcheck.mjs": 0,
   "render/visibilityGPU-selfcheck.mjs": 0,
-  "tools/ship/fsrPageObjects-selfcheck.mjs": 0
+  "tools/ship/fsrPageObjects-selfcheck.mjs": 0,
+  "render/edgeReveal-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-17T16:44:13.404Z",
@@ -5678,7 +5680,8 @@
   "render/objectMotionGPU-selfcheck.mjs": "2026-09-20T00:00:00.000Z",
   "render/temporalLockGPU-selfcheck.mjs": "2026-09-21T00:00:00.000Z",
   "render/visibilityGPU-selfcheck.mjs": "2026-09-21T00:00:00.000Z",
-  "tools/ship/fsrPageObjects-selfcheck.mjs": "2026-09-21T12:00:00.000Z"
+  "tools/ship/fsrPageObjects-selfcheck.mjs": "2026-09-21T12:00:00.000Z",
+  "render/edgeReveal-selfcheck.mjs": "2026-09-21T18:00:00.000Z"
  },
  "capAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 20000,
@@ -10356,7 +10359,8 @@
   "render/objectMotionGPU-selfcheck.mjs": 779,
   "render/temporalLockGPU-selfcheck.mjs": 2110,
   "render/visibilityGPU-selfcheck.mjs": 870,
-  "tools/ship/fsrPageObjects-selfcheck.mjs": 3358
+  "tools/ship/fsrPageObjects-selfcheck.mjs": 3358,
+  "render/edgeReveal-selfcheck.mjs": 53
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-16T22:48:41.155Z",
@@ -13426,7 +13430,8 @@
   "render/objectMotionGPU-selfcheck.mjs": false,
   "render/temporalLockGPU-selfcheck.mjs": false,
   "render/visibilityGPU-selfcheck.mjs": false,
-  "tools/ship/fsrPageObjects-selfcheck.mjs": false
+  "tools/ship/fsrPageObjects-selfcheck.mjs": false,
+  "render/edgeReveal-selfcheck.mjs": false
  },
  "kinds": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "loaded",
@@ -15186,6 +15191,7 @@
   "render/objectMotionGPU-selfcheck.mjs": "alone",
   "render/temporalLockGPU-selfcheck.mjs": "alone",
   "render/visibilityGPU-selfcheck.mjs": "alone",
-  "tools/ship/fsrPageObjects-selfcheck.mjs": "alone"
+  "tools/ship/fsrPageObjects-selfcheck.mjs": "alone",
+  "render/edgeReveal-selfcheck.mjs": "alone"
  }
 }

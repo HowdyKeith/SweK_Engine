@@ -8032,6 +8032,57 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4650 -- THE 260th CLOSING: the alternation v4649 measured and could not explain.
+    since335: Object.freeze({
+        at: "v4650", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/edgeReveal-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 53 ms, CPU only, 14 rows. *** v4649 LEFT A QUESTION IN ITS CLOSING LINE AND THIS " +
+                 "ANSWERS IT. *** That round's object-motion camera reported a genuine disocclusion count " +
+                 "alternating 212, 106, 212, 106 while the same camera with a static slab read a flat 106. It " +
+                 "named that unexplained rather than offering a plausible story, which is the only reason it " +
+                 "was still there to be answered. The law is exact and holds on ALL TEN frames the page " +
+                 "produced, phase slip included:   genuine(f) = H * (E(f-1) - E(f-2))   where H is the " +
+                 "occluder's screen height in whole pixels and E(f) the integer column of its trailing edge. " +
+                 "A disocclusion is one column of newly uncovered background down that edge, so the count is " +
+                 "the height times the boundaries crossed. *** THE ALTERNATION IS AN INTEGER SAMPLING OF A " +
+                 "NON-INTEGER SPEED AND NOT A PROPERTY OF THE DISOCCLUSION TEST AT ALL: *** the edge advances " +
+                 "1.538 px/frame, which lies between 1 and 2. And H is 106 exactly -- the same 106 the page's " +
+                 "prose calls 'a one-pixel sliver', now derived: from the world size it would be 105.4, so " +
+                 "the continuous figure is 0.6% out and the buffer's count is not. " +
+                 "*** TWO WRONG ANSWERS WERE WRITTEN FIRST, BOTH DEFENDED IN PROSE, AND THE SECOND " +
+                 "CORRECTION CORRECTED THE FIRST. *** floor(p) for the edge column, with a paragraph citing " +
+                 "temporalLockWgsl's floor: 5 of 11 against the page's own hit(), where ceil(p - 0.5) is 11 " +
+                 "of 11 -- the analogy was false, since that floor picks the texel a uv falls inside while " +
+                 "this picks the first column whose CENTRE is inside a region. Then, at length, 'the SPEED " +
+                 "model cannot produce this sequence'. *** THAT IS ALSO FALSE. *** Searching every phase, " +
+                 "floor(f*v + 0.237) - floor((f-1)*v + 0.237) reproduces all ten frames, doubled 212 " +
+                 "included, and such a difference repeats values perfectly happily. It could hardly be " +
+                 "otherwise: the edge's position is LINEAR in f, so the two forms are the same function " +
+                 "written twice. The first attempt left the phase at ZERO and blamed the formula. The module " +
+                 "earns its place on two narrower grounds instead, both now driven: it DERIVES the phase " +
+                 "(which is the edge's sub-pixel offset, so a caller supplying it would be doing the module's " +
+                 "job to call it), and it does not assume a constant speed -- an ACCELERATING occluder gives " +
+                 "four distinct step sizes where any phased constant-speed model gives at most two. " +
+                 "*** SABOTAGE: SEVEN MUTATIONS, ALL SEVEN CAUGHT, TWO ONLY AFTER THE GATE WAS REPAIRED. *** " +
+                 "Swapping ceil for Math.round scored ZERO, because the row meant to catch it read " +
+                 "`Math.round(2.5) !== Math.ceil(2.5 - 0.5)` -- a fact about JavaScript, asserted without " +
+                 "ever calling edgeColumn, and the page's frames never land on an exact tie. THAT IS v4648's " +
+                 "SHIFT ROW IN A NEW COSTUME, the second time in three rounds that a row has tested the " +
+                 "language instead of the module. It drives edgeColumn at a CONSTRUCTED tie now, every value " +
+                 "a power of two so p is exactly 2.5. The other 0-RED was plainer: every comparison started " +
+                 "at index 1, so nothing looked at frame 0, and a frame 0 claiming a full column's reveal " +
+                 "passed. " +
+                 "NAMED UNCHECKED: a VERTICALLY or diagonally moving occluder, where the reveal unit is no " +
+                 "longer a column; ROTATION, which changes H frame to frame and breaks the single height the " +
+                 "law is written around; the LEADING edge, which occludes rather than reveals; and the page's " +
+                 "ten numbers themselves, which are RECORDED here from a v4650 adapter run rather than " +
+                 "re-driven -- fsrPageObjects-selfcheck is what holds the page to still producing them, and " +
+                 "if it ever stops, this gate would go on agreeing with a memory.",
+    }),
     // v4649 -- THE 259th CLOSING: fsr.html's first motion vector that is not purely the camera's.
     since334: Object.freeze({
         at: "v4649", swept: 1, green: 1, red: 0,
