@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "9e28bfc7ebdec3ac2407a8373eee9ef27be0ef15",
+ "head": "dbc352edf3829f0e0a204ae9223810deccf833e4",
  "bodies": {
   "box3d": [
    {
@@ -242,18 +242,18 @@
    },
    {
     "path": "tools/ship/slugFill-selfcheck.mjs",
-    "bytes": 19085,
-    "sha": "a70d9c786e3bed4679e472630d97c8a05da23a7c"
+    "bytes": 20828,
+    "sha": "6fe62b77cb84ed92d9164c7f773223098449e64f"
    },
    {
     "path": "tools/ship/slugMelt-selfcheck.mjs",
-    "bytes": 19125,
-    "sha": "a70d9c786e3bed4679e472630d97c8a05da23a7c"
+    "bytes": 19512,
+    "sha": "6fe62b77cb84ed92d9164c7f773223098449e64f"
    },
    {
     "path": "tools/ship/slugMorph-selfcheck.mjs",
-    "bytes": 18917,
-    "sha": "a70d9c786e3bed4679e472630d97c8a05da23a7c"
+    "bytes": 19162,
+    "sha": "6fe62b77cb84ed92d9164c7f773223098449e64f"
    },
    {
     "path": "tools/ship/slugNapalm-selfcheck.mjs",
@@ -652,8 +652,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3372552,
-    "sha": "180cdd5306e15438e4bd49ea7eb269844ef081da"
+    "bytes": 3376764,
+    "sha": "6e8b35aaeea60ff30ca911b8beb0e2df0bd61334"
    },
    {
     "path": "mpm3d.html",
@@ -792,8 +792,8 @@
    },
    {
     "path": "tools/ship/webgpuHarness.mjs",
-    "bytes": 72690,
-    "sha": "ee217420cdc6fdde0dea58edbeb1263d381f4660"
+    "bytes": 73911,
+    "sha": "69e5f823af8508073367c25a636fe43a18a323f6"
    },
    {
     "path": "toroidal-wave.html",
@@ -874,8 +874,8 @@
    },
    {
     "path": "tools/ship/brainTsl-page.js",
-    "bytes": 3258,
-    "sha": "52d94d962f84f15a9a0ac8941e8db848faf2f7f1"
+    "bytes": 3585,
+    "sha": "18ea73eb1f323342a2909c351aee386dec744af4"
    },
    {
     "path": "tools/ship/carveGpu-selfcheck.mjs",
@@ -944,8 +944,8 @@
    },
    {
     "path": "tools/ship/webgpuHarness.mjs",
-    "bytes": 72690,
-    "sha": "ee217420cdc6fdde0dea58edbeb1263d381f4660"
+    "bytes": 73911,
+    "sha": "69e5f823af8508073367c25a636fe43a18a323f6"
    },
    {
     "path": "tsl-probe.html",
