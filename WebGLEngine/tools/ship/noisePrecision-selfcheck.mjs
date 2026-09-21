@@ -126,6 +126,32 @@ if (skip) {
     await pg.goto("http://127.0.0.1:" + srv.address().port + "/tools/ship/solidTextureHarness.html", { waitUntil: "load", timeout: 45000 });
     await pg.waitForFunction(() => window.__ready === true, { timeout: 30000 }).catch(() => {});
     const O = [-1.5, -1.0, 0.25], U = [3, 0, 0], V = [0, 2, 0];
+    // *** v4649 -- ASK THE READBACK FIRST, BECAUSE A COMPARISON AGAINST A CORRUPTED ONE MEASURES THE
+    // COMPOSITOR. *** Keith's box reports 0 of 9216 points agreeing with EITHER mirror, worst 4.83 on a
+    // quantity whose whole range is 8. Rounding does not do that. This probe writes bytes that are a pure
+    // function of the pixel address -- no noise, no float comparison -- so the next two rows are only worth
+    // reading if this one holds.
+    const probe = await pg.evaluate(() => window.__render([0, 0, 0], [1, 0, 0], [0, 1, 0], false, false, true), []);
+    {
+        let bad = 0, firstBad = null;
+        const n = probe.n;
+        for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+            const i = (y * n + x) * 4;
+            // gl_FragCoord.y counts up from the BOTTOM and readPixels row 0 is also the bottom, so the two
+            // agree without a flip -- which this row would catch if it were ever untrue.
+            if (probe.px[i] !== x || probe.px[i + 1] !== y || probe.px[i + 2] !== 128) {
+                bad++;
+                if (!firstBad) firstBad = `(${x},${y}) read [${probe.px[i]},${probe.px[i + 1]},${probe.px[i + 2]}]`;
+            }
+        }
+        ok("!! *** the readback returns the exact bytes the shader wrote -- BEFORE any noise is compared ***",
+            bad === 0,
+            bad === 0 ? `${n * n} pixels, byte for byte, with no noise in the path` :
+            `${bad} of ${n * n} pixels came back changed; first ${firstBad}. The 24-bit value the rows below ` +
+            "decode is packed ACROSS those bytes, so a colour-managed or dithered readback makes every one of " +
+            "them disagree with every mirror at once -- which is what a worst deviation of 4.83 on a range of " +
+            "8 looks like. Read this row before reading those");
+    }
     const raw = await pg.evaluate(([o, u, v]) => window.__render(o, u, v, false, true), [O, U, V]);
     await b.close(); srv.close();
 

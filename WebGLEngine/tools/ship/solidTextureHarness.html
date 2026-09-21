@@ -34,7 +34,18 @@ ${SNOISE3.join("\n")}
 ${FBM3_FN}
 ${CONCRETE_FN}
 uniform float uRaw;
+uniform float uProbe;
 void main() {
+    // *** v4649 -- THE READBACK PATH, ON ITS OWN, WITH NO NOISE IN IT. ***
+    // Keith's box reports 0 of 9216 points agreeing with EITHER mirror and a worst deviation of 4.83 on a
+    // quantity whose whole range is 8. That is not rounding; it is the picture arriving different. This mode
+    // writes bytes that are a pure function of the pixel address, so the gate can ask whether readPixels
+    // returns what was written before it asks anything about noise -- a comparison against a corrupted
+    // readback measures the compositor, not the shader.
+    if (uProbe > 0.5) {
+        fragColor = vec4(floor(gl_FragCoord.x) / 255.0, floor(gl_FragCoord.y) / 255.0, 128.0 / 255.0, 1.0);
+        return;
+    }
     vec3 p = uOrigin + uDU * vUV.x + uDV * vUV.y;
     if (uRaw > 0.5) {
         // RAW snoise, encoded across rgb at 24 bits so the readback is not the limiting precision. This mode
@@ -75,7 +86,7 @@ catch (e) { window.__err = String(e && e.message || e); }
  * stands for, so the CPU reference can be evaluated at the same coordinates rather than at coordinates the
  * gate reconstructed and hoped were the same.
  */
-window.__render = (origin, du, dv, weathered, raw) => {
+window.__render = (origin, du, dv, weathered, raw, probe) => {
     if (!prog) return { ok: false, error: window.__err };
     gl.viewport(0, 0, N, N);
     gl.useProgram(prog);
@@ -84,6 +95,7 @@ window.__render = (origin, du, dv, weathered, raw) => {
     gl.uniform3f(gl.getUniformLocation(prog, "uDV"), dv[0], dv[1], dv[2]);
     gl.uniform1f(gl.getUniformLocation(prog, "uWeathered"), weathered ? 1 : 0);
     gl.uniform1f(gl.getUniformLocation(prog, "uRaw"), raw ? 1 : 0);
+    gl.uniform1f(gl.getUniformLocation(prog, "uProbe"), probe ? 1 : 0);
     for (const [k, v] of [["uScale", CONCRETE.scale], ["uAggregate", CONCRETE.aggregate],
                           ["uStoneLight", CONCRETE.stoneLight], ["uGrain", CONCRETE.grain]]) {
         gl.uniform1f(gl.getUniformLocation(prog, k), v);
