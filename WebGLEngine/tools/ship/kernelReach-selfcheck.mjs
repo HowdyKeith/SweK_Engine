@@ -149,7 +149,14 @@ console.log("\n2. THE TREE'S OWN ANSWER");
     // round that reported five. Raising a ratchet is what this file calls a grievance list when the debt grew;
     // this is the other case, and the difference is recorded rather than assumed: the debt did not grow, the
     // count was wrong, and the seed is re-taken at what the corrected predicate measures.
-    const ARC_UNREACHABLE_AT_V4592 = 6;   // v4593: 7 -> 5, temporalReject's two got a caller; v4637: 5 -> 6, see above
+    // *** v4647 -- LOWERED TO ZERO. THE TEMPORAL ARC HAS NO UNREACHABLE KERNELS LEFT. ***
+    // render/temporalLockGPU.mjs took the last six -- RING_PUSH, SHADING_SHIFT, RIDGE, FIELD_RIDGE,
+    // COHERENT_RIDGE and RING_FLOOR -- and the arc that began at ten in v4589's census is done. Zero is a
+    // seed like any other and it ratchets the same way: an eleventh kernel arriving with only a gate able to
+    // run it fails this row on the round it arrives, which is the earliest it can be cheap to fix. What the
+    // row does NOT claim is that anything DISPATCHES them at runtime; that is named in the closing line of
+    // this file and is the next rung, not this one.
+    const ARC_UNREACHABLE_AT_V4592 = 0;   // v4593: 7 -> 5; v4637: 5 -> 6 (instrument, not tree); v4647: 6 -> 0
     say("the temporal arc", arc.length
         ? `${arc.length} of ${r.unreachable.length} still unreachable: ${arc.map((a) => a.symbol).join(", ")}`
         : "every kernel has a caller");
@@ -179,7 +186,13 @@ console.log("\n2. THE TREE'S OWN ANSWER");
     // 27 is therefore the first honest reading of this number, not a regression from 12, and every round from
     // v4589 that reported the ratchet holding was reporting on a predicate that could be satisfied by prose.
     // The seed moves once, here, with that said; from this point it only falls.
-    const UNREACHABLE_AT_V4589 = 27;
+    // v4647 -- LOWERED, 27 -> 21, and it is the SECOND HALF of this row that asked for it, exactly as v4590's
+    // note said it would: "A RATCHET WITH SLACK IN IT IS A RATCHET HOLDING NOTHING". render/temporalLockGPU.mjs
+    // gave six kernels a caller and the slack half went red on the same run that the arc row went green, which
+    // is the behaviour a two-sided ratchet is for -- progress is not allowed to sit in the gap unrecorded.
+    // The twenty-one that remain are outside the temporal arc: physics/xpbd's three, the voxel pair, bloom's
+    // fused pass, lyapunov, tslWide's quad and the rest. Each still owes a runner or a reason it is a probe.
+    const UNREACHABLE_AT_V4589 = 21;
     ok("!! *** no EIGHTEENTH kernel arrives with nothing but a gate able to run it ***",
        r.unreachable.length <= UNREACHABLE_AT_V4589,
        `${r.unreachable.length} against a frozen ${UNREACHABLE_AT_V4589}, re-seeded at v4637 from 12 when the ` +

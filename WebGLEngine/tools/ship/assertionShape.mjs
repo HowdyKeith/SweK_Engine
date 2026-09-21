@@ -450,8 +450,12 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // nameFirst -- while distinctDefinitions holds at 41, condFirst at 91, unknownSignature at 16 and suspects
     // at 0. It is a gate under render/ rather than tools/ship/, which is where this census's walk has found
     // most of its population, and it spells ok() the same way anyway: the shape is the tree's, not a folder's.
-    gates: 1752, usesOk: 1731, definesOk: 1723, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1624, condFirst: 91, unknownSignature: 16,
+    // v4647 -- 1752 -> 1753 for render/temporalLockGPU-selfcheck.mjs, the runner for the temporal arc's last
+    // six kernels. One gate, the same four rows moving by one, and the other four holding: distinctDefinitions
+    // 41, condFirst 91, unknownSignature 16, suspects 0. Two rounds running under render/ rather than
+    // tools/ship/ and no forty-second spelling of ok() either time.
+    gates: 1753, usesOk: 1732, definesOk: 1724, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1625, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

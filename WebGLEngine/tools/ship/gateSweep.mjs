@@ -8032,6 +8032,59 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4647 -- THE 257th CLOSING: the temporal arc's last six kernels got a caller, and its census reads zero.
+    since332: Object.freeze({
+        at: "v4647", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/temporalLockGPU-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 2,110 ms on real WebGPU, 21 rows. *** tools/ship/kernelReach.mjs's TEMPORAL ARC NOW " +
+                 "READS ZERO. *** The census counts kernels the ENGINE cannot dispatch -- reachable only from a " +
+                 "gate. The arc stood at ten when the census was built, and v4590 took RESOLVE and ACCUMULATE, " +
+                 "v4592 MOTION, v4593 DISOCCLUSION and RECTIFY. render/temporalLockGPU.mjs takes the last six: " +
+                 "RING_PUSH, SHADING_SHIFT, RIDGE, FIELD_RIDGE, COHERENT_RIDGE and RING_FLOOR. Both ratchets " +
+                 "move -- the arc's 6 -> 0 and the tree's 27 -> 21 -- and the SECOND HALF of the tree ratchet " +
+                 "is what asked, going red on the same run the arc row went green, exactly as v4590's note " +
+                 "predicted it would: a ratchet with slack in it is a ratchet holding nothing. " +
+                 "*** WHAT WAS WRONG WAS REACH, NOT COVERAGE, AND THE GATE COUNTS RATHER THAN ASSERTS IT. *** " +
+                 "ELEVEN gates already drove these kernels on a real device, from FOURTEEN hand-rolled dispatch " +
+                 "sites -- and every one of those sites lives inside a runInEngineOrigin script STRING, where " +
+                 "no import graph, validator or rename reaches it. The twelve copies AGREE, which is recorded " +
+                 "because a drift would have been the better story; the one exception is deliberate rather " +
+                 "than drift (temporalRingContent's tie probe packs a one-row strip on purpose). The one cost " +
+                 "that is a NUMBER: all four RING_PUSH frame-loop copies call dev.compute INSIDE the loop, so " +
+                 "an N-frame ring compiles the kernel N times -- free to a gate, impossible for a frame loop, " +
+                 "and the reason the class builds all six pipelines in its constructor. " +
+                 "*** THE HEADER'S OWN NUMBER WAS WRONG AND THE GATE CAUGHT IT ON THE FIRST RUN. *** The " +
+                 "module claimed twelve sites across nine gates, from a grep counting FILES per kernel; the " +
+                 "census counts SITES and found fourteen across eleven. The wrong figure is left recorded " +
+                 "beside the right one, because a number in a header that nothing derives is a number nothing " +
+                 "can correct. " +
+                 "*** SABOTAGE: EIGHT MUTATIONS, ALL EIGHT CAUGHT -- AFTER THE FIXTURE WAS REPAIRED TWICE. *** " +
+                 "Three were 0-REDs on the first pass and all three were the fixture. Swapping scale with " +
+                 "strength did nothing because both were 1. Swapping maxBand with maxPlateau did nothing " +
+                 "because both were 2 -- AND GIVING THEM DISTINCT VALUES WAS NOT ENOUGH: with every feature " +
+                 "one pixel wide, a band of 1 is under either bound and the plateau walk decides at its first " +
+                 "step, so neither word was ever consulted. And the coherence row itself was vacuous, reading " +
+                 "101 coherent of 101 raw at every setting tried, which a kernel that copied the ridge mask " +
+                 "and skipped the band scan would have passed. The repair is a COMB -- alternating depth, " +
+                 "which is pixel-scale texture and exactly what the band test exists to refuse -- taking 303 " +
+                 "raw ridges to 93. THE FIRST OF THE THREE IS A3's Y1 ONE ROUND LATER, where a moving " +
+                 "object's model matrix was written translate(0), which IS the identity. Two rounds running, " +
+                 "so it is written down as a rule: a fixture tests that two parameters are distinct only if " +
+                 "it gives them distinct VALUES, and distinct values are not enough when the content makes " +
+                 "the parameter inert. " +
+                 "TWO of the eight (the dropped ping-pong swap, two kernels sharing a pipeline) are caught by " +
+                 "the DEVICE-ERROR row rather than by parity, which is a weaker catch and is labelled as one " +
+                 "rather than counted the same. " +
+                 "NAMED UNCHECKED: whether any PAGE calls this -- fsr.html still runs the CPU lock path and a " +
+                 "runner existing does not change that; v4559's bounds divergence at an exact texel tie, " +
+                 "deliberately avoided by the fixture's irrational speed and owned by temporalRingContent; and " +
+                 "a per-pixel margin FIELD, which ridgesCPU accepts and every one of these kernels takes as a " +
+                 "scalar uniform, so the runner cannot offer it and says so by not having the argument.",
+    }),
     // v4646 -- THE 256th CLOSING: the temporal arc's motion vectors stopped being camera-only.
     since331: Object.freeze({
         at: "v4646", swept: 1, green: 1, red: 0,

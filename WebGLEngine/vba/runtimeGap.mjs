@@ -337,7 +337,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
     // and the readings overlap on everything predating the split, so they are run over the merged tree rather
     // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
-    files: 4279,               // v4645 -- RE-DERIVED AT THE main MERGE over the merged tree. RE-DERIVED AT THE main MERGE: 4169 on this branch, 4172 on main, 4260 merged -- LESS than the sum, which is why it is run
+    files: 4281,               // v4645 -- RE-DERIVED AT THE main MERGE over the merged tree. RE-DERIVED AT THE main MERGE: 4169 on this branch, 4172 on main, 4260 merged -- LESS than the sum, which is why it is run
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
                           // RE-TAKEN TWICE IN TWO ROUNDS, and the second time only because the ship gate
@@ -664,8 +664,23 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // backend name is a live string in code rather than prose. A census that stripped strings as well as
     // comments would read this file as touching neither API, which is the sharpest illustration this table
     // has of what it actually measures: text in code, not capability.
-    esModules: 3979, closures: 3846, asyncAwait: 1521, typedArrays: 1126, promises: 368,
-    fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 157, webgpu: 52, threads: 23, wasm: 23,
+    //
+    // *** v4647 -- RE-TAKEN, the two new files NAMED as v4628's rule asks. *** Six rows moved again:
+    // files 4279 -> 4281, ES modules 3979 -> 3981, closures 3846 -> 3848, async/await 1521 -> 1523, typed
+    // arrays 1126 -> 1128, WebGL 157 -> 158.
+    //     render/temporalLockGPU.mjs            ES modules, closures, async/await, typed arrays
+    //     render/temporalLockGPU-selfcheck.mjs  ES modules, closures, async/await, typed arrays, WebGL
+    // Every delta accounted for by that list exactly -- 2 + 2 + 2 + 2 + 2 + 1.
+    //
+    // AND IT IS THE SAME WebGL ROW AND THE SAME CAUSE AS v4646, which is the point of naming rather than
+    // counting: the pattern is visible across rounds. Both gates drive SIX and FIVE WebGPU kernels
+    // respectively and neither moves the webgpu row, because they reach the device through gfx/device.js and
+    // tools/ship/webgpuHarness.mjs and name no WebGPU API. Both move the WEBGL row, because each ends on a
+    // REFUSAL row that builds a webgl2 device to prove the runner throws on one -- a live string in code.
+    // Twice now, so it is not a quirk of one file: this table measures TEXT IN CODE, not capability, and the
+    // arc's WebGPU work registers here as WebGL every time it proves it is not WebGL.
+    esModules: 3981, closures: 3848, asyncAwait: 1523, typedArrays: 1128, promises: 368,
+    fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 158, webgpu: 52, threads: 23, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.
