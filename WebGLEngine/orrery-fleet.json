@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "d46259b48fbfb6809a1a6b1b4b4946f42e177b57",
+ "head": "1b2bf48282da9920f8dcecbdf676c8c978554a7d",
  "bodies": {
   "box3d": [
    {
@@ -652,8 +652,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3361388,
-    "sha": "c2d228b9a1b888cf7e1c778db200245e5ba74c58"
+    "bytes": 3367020,
+    "sha": "590050b5ea65b9c60be25a122e8d0557f152c6cc"
    },
    {
     "path": "mpm3d.html",
@@ -781,14 +781,19 @@
     "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
+    "path": "tools/ship/treeRead-selfcheck.mjs",
+    "bytes": 16652,
+    "sha": "c00f2ec3ee87d270bc2361e7731c1da1c7d5a5e8"
+   },
+   {
     "path": "tools/ship/tsl-selfcheck.mjs",
     "bytes": 26481,
     "sha": "85925bd438c78d222bef6fa257fa2fe10adb4e33"
    },
    {
     "path": "tools/ship/webgpuHarness.mjs",
-    "bytes": 71616,
-    "sha": "a8a557390a39d282b878901e576d32eeb6891226"
+    "bytes": 72690,
+    "sha": "ee217420cdc6fdde0dea58edbeb1263d381f4660"
    },
    {
     "path": "toroidal-wave.html",
@@ -939,8 +944,8 @@
    },
    {
     "path": "tools/ship/webgpuHarness.mjs",
-    "bytes": 71616,
-    "sha": "a8a557390a39d282b878901e576d32eeb6891226"
+    "bytes": 72690,
+    "sha": "ee217420cdc6fdde0dea58edbeb1263d381f4660"
    },
    {
     "path": "tsl-probe.html",
