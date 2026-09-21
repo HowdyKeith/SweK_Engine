@@ -215,7 +215,15 @@ export const POSIX_AT_V4485 = Object.freeze({
     // UN-NORMALISED -- normalised rose 41 -> 43 and never rose 97 -> 103, both monotonic, which is the half of
     // the assertion that distinguishes a population growing from a repair coming undone. A fall in `normalised`
     // would have meant somebody removed a toPosix() and that is the case this record exists to catch.
-    separator: Object.freeze({ callers: 146, calls: 197, normalised: 43, never: 103 }),
+    // v4649 -- RE-TAKEN, under the same skip rule again: 146/197/43/103 becomes 154/207/54/100. This round
+    // added eight callers and ten calls, and REPAIRED three: `never` FELL 103 -> 100 while `normalised`
+    // rose 43 -> 54, which is the direction this record exists to confirm. The three are reachedLicences
+    // (a walk whose allowance was keyed on forward slashes and matched nothing on Windows), the xbar
+    // plugin generator (path.join put backslashes inside a file:// URL destined for macOS), and
+    // fixtureLitter's own reclaim. The tolerance the gate compares by is +/- 4 callers; this round moved
+    // eight, which is why it went red rather than because anything was undone -- and re-taking rather
+    // than widening that tolerance is the point, since the tolerance is what catches a silent drift.
+    separator: Object.freeze({ callers: 154, calls: 207, normalised: 54, never: 100 }),
     rulesTried: Object.freeze([53, 74, 90]),
     notClaimed: "that the 90 are defects. A relative path that is only printed is portable already; the ones " +
                 "that bite are compared against a stored form, and three static rules for 'compared against' " +
