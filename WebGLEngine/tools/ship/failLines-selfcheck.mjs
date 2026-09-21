@@ -174,5 +174,36 @@ console.log("\n7. *** WHERE A CAPTURE GOES, WHICH TOOK TWO SEPARATE FAILURES TO 
        "a record quoting gate output inside the scanned tree re-enters every text census as if it were source");
 }
 
+// ---- THE GREEN-ALONE SENTENCE NAMES A CAUSE, SO IT HAS TO BE ABLE TO RULE THE OTHER ONE OUT ------------
+{
+    console.log("\nGREEN ALONE: CONTENTION OR A FIX, AND THE TOOL MUST NOT GUESS");
+    // *** MEASURED, NOT IMAGINED: *** three gates in Keith's second rig run came back green alone -- and the
+    // reason was that the round had FIXED them between the sweep and the rerun. The tool said "contention,
+    // not a finding. That is redCensus's two-phase rule doing its job", which is a confident sentence about
+    // the wrong cause. The discriminator is cheap: the log's mtime against HEAD's commit date.
+    const green = { gate: "x-selfcheck.mjs", exit: 0, ms: 10, fails: 0, lines: [], verdict: "GREEN" };
+    const swept = Date.parse("2026-09-21T02:00:00Z");
+    const moved = describe([green], { sweptAtMs: swept, headAtMs: swept + 3600e3, headCommit: "beb547f4e338" });
+    const still = describe([green], { sweptAtMs: swept, headAtMs: swept - 3600e3, headCommit: "0bd8ff5daaaa" });
+    ok("!! *** a HEAD newer than the log says THE TREE MOVED, and names the commit rather than blaming the runner ***",
+       /THE TREE MOVED/.test(moved) && /beb547f4e338/.test(moved) && !/contention, not a finding/.test(moved),
+       "a fix that lands between the sweep and the rerun is indistinguishable from contention by exit code alone");
+    ok("!! CONTROL: with HEAD OLDER than the log the sentence is the contention one, unchanged",
+       /contention, not a finding/.test(still) && !/THE TREE MOVED/.test(still),
+       "the two-phase rule is real and this must not stop saying so on the runs where it applies");
+    ok("  and with no `since` at all it claims neither, because nothing was passed that could tell them apart",
+       /contention, not a finding/.test(describe([green])) === true,
+       "the old call sites keep their sentence; only a caller that KNOWS the two timestamps gets the stronger one");
+    ok("  a run with no green rows says nothing about either",
+       !/THE TREE MOVED|contention/.test(describe([{ gate: "y.mjs", exit: 1, ms: 1, fails: 1,
+           lines: ["  FAIL  a row"], verdict: "RED" }])),
+       "the sentence is about the green ones and appears only when there are some");
+    // The stamp has to CARRY the commit date for any of that to be available at a call site.
+    const st = treeStamp();
+    ok("  treeStamp records WHEN HEAD was committed, not only which commit it is",
+       st.commit == null || typeof st.committedAt === "string",
+       st.committedAt ? `${st.commit} committed ${st.committedAt}` : "git could not answer here");
+}
+
 console.log(`\nfailLines-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);
 process.exit(fails === 0 ? 0 : 1);

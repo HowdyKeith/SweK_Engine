@@ -133,8 +133,13 @@ export function treeStamp({ root = ENG, run = spawnSync } = {}) {
     const commit = git(["rev-parse", "HEAD"]);
     if (!commit) return { commit: null, branch: null, dirty: null, why: "git could not answer here" };
     const status = git(["status", "--porcelain"]);
+    // v4649 -- WHEN, not just WHICH. The green-alone sentence below used to name contention as the cause
+    // with no way to rule out the other one: that somebody FIXED those gates between the sweep and this
+    // rerun. Three of them had been, in the very round that added this note.
+    const at = git(["log", "-1", "--format=%cI"]);
     return { commit: commit.slice(0, 12), branch: git(["rev-parse", "--abbrev-ref", "HEAD"]),
-             dirty: status == null ? null : status.length > 0 };
+             dirty: status == null ? null : status.length > 0,
+             committedAt: at || null };
 }
 
 export function summarise(rows) {
@@ -143,13 +148,26 @@ export function summarise(rows) {
     return { of: rows.length, ...by, totalFailRows: rows.reduce((a, r) => a + r.fails, 0) };
 }
 
-export function describe(rows) {
+/**
+ * `since` is what the reader needs to tell two explanations apart when a gate is red in the sweep and green
+ * alone: CONTENTION (the sweep ran it beside 1,400 others) or a FIX that landed in between. Pass
+ * { sweptAtMs, headAtMs, headCommit } and a HEAD newer than the log says the tree moved, so contention is
+ * no longer the only account. Absent it the sentence says what it can prove and no more.
+ */
+export function describe(rows, since = null) {
     const s = summarise(rows);
     const out = [`[failLines] ${s.of} gate(s) run ALONE: ${s.GREEN} green, ${s.RED} red with rows, ` +
                  `${s.CRASHED} CRASHED with no row at all, ${s.TIMEOUT} TIMED OUT at the cap, ` +
                  `${s.ODD} exited 0 while printing a failing row. ${s.totalFailRows} failing row(s) in total.`];
-    if (s.GREEN) out.push(`[failLines] the ${s.GREEN} green one(s) were red in the sweep and pass alone -- ` +
-                          `contention, not a finding. That is redCensus's two-phase rule doing its job.`);
+    if (s.GREEN) {
+        const moved = since && since.sweptAtMs && since.headAtMs && since.headAtMs > since.sweptAtMs;
+        out.push(moved
+            ? `[failLines] the ${s.GREEN} green one(s) were red in the sweep and pass alone -- but THE TREE ` +
+              `MOVED between that log and this rerun (HEAD ${since.headCommit || "?"} is newer than the log), ` +
+              `so a FIX is as good an account as contention. Name which before recording it as either.`
+            : `[failLines] the ${s.GREEN} green one(s) were red in the sweep and pass alone -- ` +
+              `contention, not a finding. That is redCensus's two-phase rule doing its job.`);
+    }
     if (s.CRASHED) out.push(`[failLines] *** ${s.CRASHED} CRASHED: exit non-zero with no failing row, so what ` +
                             `they were checking is UNKNOWN rather than false. Read these first.`);
     if (s.TIMEOUT) out.push(`[failLines] ${s.TIMEOUT} TIMED OUT at this tool's cap -- not a finding about the ` +
@@ -186,14 +204,23 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         rows.push(r);
         process.stderr.write(`[failLines] ${rows.length}/${gates.length}  ${r.verdict.padEnd(7)} ${g}  ${r.fails} row(s)  ${r.ms} ms\n`);
     }
-    console.log(describe(rows));
+    // The log's own mtime is when the sweep finished writing it; HEAD's commit date is when the tree last
+    // moved. Nothing else here can tell a fix from contention.
+    const stampNow = treeStamp();
+    let sweptAtMs = null;
+    if (from) { try { sweptAtMs = fs.statSync(path.isAbsolute(from) ? from : path.join(ENG, from)).mtimeMs; } catch {} }
+    const headAtMs = stampNow.committedAt ? Date.parse(stampNow.committedAt) : null;
+    console.log(describe(rows, { sweptAtMs, headAtMs, headCommit: stampNow.commit }));
     if (process.argv.includes("--write")) {
-        const stamp = treeStamp();
+        const stamp = stampNow;
         const REPO = path.resolve(ENG, "..");
         const out = path.join(REPO, captureFile());
         fs.mkdirSync(path.dirname(out), { recursive: true });
         const payload = { generatedFrom: "tools/ship/failLines.mjs", at: new Date().toISOString(),
                           platform: process.platform, box: boxId(), tree: stamp,
+                          sweptFrom: from ? { log: path.basename(from),
+                                              writtenAt: sweptAtMs ? new Date(sweptAtMs).toISOString() : null,
+                                              treeMovedSince: !!(sweptAtMs && headAtMs && headAtMs > sweptAtMs) } : null,
                           summary: summarise(rows), gates: rows };
         fs.writeFileSync(out, JSON.stringify(payload, null, 1) + "\n");
         const st = stamp;
