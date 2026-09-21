@@ -149,6 +149,26 @@ sec("5. THE EXPORT SURFACE IS COVERED, WHICH IS WHY THIS FILE EXISTS");
 }
 
 console.log(fails ? `\nsweepRotation-selfcheck: ${fails} FAILED` : "\nsweepRotation-selfcheck: all checks pass");
+// ---------------------------------------------------------------------------------------------------------
+console.log("\nTHE SERIAL RING: THE LAST THREE READINGS, BECAUSE ONE WAS STANDING IN FOR A PROPERTY (v4648)");
+// ---------------------------------------------------------------------------------------------------------
+{
+    let f = { timings: {}, serial: {}, serialRing: {} };
+    const row = (ms) => [{ gate: "g-selfcheck.mjs", ms, code: 0, finished: true, skipped: false }];
+    for (const ms of [100, 200, 300]) f = mergeTimings(f, row(ms), "2026-01-01T00:00:00.000Z").merged;
+    ok("the ring accumulates readings across merges rather than replacing one",
+       JSON.stringify(f.serialRing["g-selfcheck.mjs"]) === "[100,200,300]",
+       JSON.stringify(f.serialRing["g-selfcheck.mjs"]));
+    f = mergeTimings(f, row(400), "2026-01-01T00:00:00.000Z").merged;
+    ok("!! *** and it is BOUNDED at three: the oldest falls off, so a gate that really slows is seen ***",
+       JSON.stringify(f.serialRing["g-selfcheck.mjs"]) === "[200,300,400]",
+       `${JSON.stringify(f.serialRing["g-selfcheck.mjs"])} -- an unbounded ring would average a real ` +
+       `regression into the past forever, which is the opposite failure from the one this fixes`);
+    ok("...and `serial` still holds the LATEST reading, so no existing consumer changed",
+       f.serial["g-selfcheck.mjs"] === 400 && f.timings["g-selfcheck.mjs"] === 400,
+       "the ring is additive; costOf and every budget comparison read exactly what they read before");
+}
+
 console.log("\nunchecked here: runSlice and the command line, both of which spawn gates. The CLI's argument " +
     "handling is gated by tools/ship/cliArgs-selfcheck.mjs, which drives `--gates` against this tool's real " +
     "command line and watches it be refused; the slice runner itself is exercised every time a rotation runs.");

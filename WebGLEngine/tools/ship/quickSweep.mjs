@@ -516,8 +516,22 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
     // 230 s sweep that is 6.5% of the run and about 40 gates, so a 1,150-gate tree turns over in roughly
     // thirty sweeps. Set serialSliceMs to 0 to skip it entirely.
     const serial = { ...(prior.serial || {}) }, serialAt = { ...(prior.serialAt || {}) };
+    // *** v4648 -- THE LAST FEW READINGS, BECAUSE ONE SAMPLE WAS STANDING IN FOR A PROPERTY. ***
+    // `serial[g]` is the MOST RECENT uncontended reading and every consumer treats it as the gate's cost.
+    // It is not: measured on recordDrift-selfcheck across consecutive sweeps on one box, 2092 / 2150 / 2233
+    // -- a 7% spread, and recordReach's margin row compares it against a hard 2,200 ms cutoff, so the row
+    // flipped red and green on which sweep wrote last. THAT IS THE SAME DEFECT v4536 RECORDED FOR THE BUDGET
+    // ITSELF ("a single crossing is a reading from one hour and not a property of the gate") and answered
+    // there with MIN_CROSSINGS_TO_EVICT; the budget refuses to act on one reading and this row did not.
+    //
+    // The ring is deliberately SHORT. Three readings is enough to take a median that ignores one hot sweep,
+    // and short enough that a gate which genuinely gets slower is reported within three sweeps rather than
+    // averaged into the past forever -- the ratchet still ratchets.
+    const serialRing = { ...(prior.serialRing || {}) };
+    const SERIAL_RING = 3;
+    const ring = (g, ms) => { serialRing[g] = (serialRing[g] || []).concat(ms).slice(-SERIAL_RING); };
     const sliceStamp = new Date().toISOString();
-    for (const r of rows) if (r.serialMs != null) { serial[r.gate] = r.serialMs; serialAt[r.gate] = sliceStamp; }
+    for (const r of rows) if (r.serialMs != null) { serial[r.gate] = r.serialMs; serialAt[r.gate] = sliceStamp; ring(r.gate, r.serialMs); }
     let sliced = 0;
     if (serialSliceMs > 0) {
         const owed = serialSliceOrder(sel.run.filter((g) => serialAt[g] !== sliceStamp), serialAt);
@@ -525,7 +539,7 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
         for (const rel of owed) {
             if (Date.now() >= until) break;
             const one = await runOneAsync(rel, capMs, root);
-            serial[rel] = one.ms; serialAt[rel] = sliceStamp; sliced++;
+            serial[rel] = one.ms; serialAt[rel] = sliceStamp; ring(rel, one.ms); sliced++;
         }
     }
     const out0 = { at: new Date().toISOString() };
@@ -757,7 +771,7 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
             // A gate this run swept has an OBSERVED kind and leaves the list. Every other entry keeps whatever
             // it had, because this run learned nothing about it.
             kindsInferred: (prior.kindsInferred || []).filter((g) => !sweptNow.has(g)),
-            captured: out.at, budgetMs, capMs, timings, codes, at, capAt, finished, crossings, serial, serialAt, contended, kinds,
+            captured: out.at, budgetMs, capMs, timings, codes, at, capAt, finished, crossings, serial, serialAt, serialRing, contended, kinds,
         }, null, 1) + "\n");
     }
     return out;

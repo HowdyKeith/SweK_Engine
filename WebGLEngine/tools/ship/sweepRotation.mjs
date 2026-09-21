@@ -232,6 +232,10 @@ export function mergeTimings(file, rows, stamp, capMs = null) {
     const timings = { ...(file.timings || {}) }, codes = { ...(file.codes || {}) }, at = { ...(file.at || {}) };
     const finished = { ...(file.finished || {}) };
     const serial = { ...(file.serial || {}) }, serialAt = { ...(file.serialAt || {}) };
+    // The rotation's readings are serial too, and are the CLEANEST in the file -- taken alone, deliberately,
+    // rather than at the tail of a 1,398-gate sweep. A ring the rotation did not feed would record only the
+    // noisiest half of the evidence. See quickSweep's SERIAL_RING note for why it is three.
+    const serialRing = { ...(file.serialRing || {}) };
     const contended = { ...(file.contended || {}) };
     const kinds = { ...(file.kinds || {}) }, capAt = { ...(file.capAt || {}) };
     const inferred = new Set(file.kindsInferred || []);
@@ -240,6 +244,7 @@ export function mergeTimings(file, rows, stamp, capMs = null) {
         priorMs[r.gate] = (file.timings || {})[r.gate];
         timings[r.gate] = r.ms; codes[r.gate] = r.code; at[r.gate] = stamp;
         serial[r.gate] = r.ms; serialAt[r.gate] = stamp; contended[r.gate] = false;
+        serialRing[r.gate] = (serialRing[r.gate] || []).concat(r.ms).slice(-3);
         // Recorded either way: a gate that STOPS finishing must lose its verdict, not keep an old true.
         finished[r.gate] = !!r.finished;
         // OBSERVED, not inferred -- so the entry leaves kindsInferred, which is what watching it means.
@@ -253,7 +258,7 @@ export function mergeTimings(file, rows, stamp, capMs = null) {
         if (capMs != null) capAt[r.gate] = capMs;
     }
     backfillStamps(timings, at);
-    return { merged: { ...file, timings, codes, at, capAt, finished, serial, serialAt, contended, kinds,
+    return { merged: { ...file, timings, codes, at, capAt, finished, serial, serialAt, serialRing, contended, kinds,
                        kindsInferred: [...inferred].sort() }, priorMs };
 }
 

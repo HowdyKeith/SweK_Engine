@@ -233,11 +233,43 @@ console.log("\n5. *** THE TWO GATES THIS ROUND WAS ABOUT ARE BACK INSIDE THE BUD
     // demanding margin of it is demanding margin against a number it does not spend. Measured either way and
     // both are reported; only the swept ones are graded.
     const swept = pair.filter((g) => road(g) === "swept");
-    const margin = swept.length ? Math.min(...swept.map((g) => live.budgetMs - cost[g].ms)) : live.budgetMs;
+    // *** v4648 -- THE MARGIN IS TAKEN OVER THE LAST FEW READINGS, BECAUSE ONE WAS NOT A PROPERTY. ***
+    //
+    // This row compared `cost[g].ms` -- the single MOST RECENT uncontended reading -- against a hard cutoff
+    // of budgetMs - 800. Measured on recordDrift-selfcheck across consecutive sweeps on ONE box: 2092 /
+    // 2150 / 2233 ms, a 7% spread straddling the 2,200 ms cutoff. The row therefore went red or green on
+    // which sweep happened to write last, and v4647 shipped with it red for exactly that reason: the ship's
+    // own verify sweep filed 2233 AFTER this gate had already run and passed on 2092.
+    //
+    // *** THE TREE ALREADY SETTLED THIS QUESTION FOR THE BUDGET AND THIS ROW WAS NOT USING THE ANSWER. ***
+    // quickSweep.MIN_CROSSINGS_TO_EVICT is 2, and its note says why: "a gate that straddles crosses about
+    // half the time". The budget refuses to evict on one reading. This row was stricter than the thing it
+    // guards AND less evidenced, which is the worst of both.
+    //
+    // So the cost is the MEDIAN of the readings the record now keeps (quickSweep and sweepRotation both feed
+    // a three-deep serialRing). A median of three ignores one hot sweep and still moves within three sweeps
+    // if the gate genuinely slows -- this is corroboration, NOT a widened threshold. The 800 ms is untouched,
+    // and a gate that is really over it fails exactly as before; what can no longer happen is a verdict that
+    // depends on which of three readings landed last.
+    // `t` is the TIMINGS RECORD; `live` is reach()'s own summary and carries no serialRing. My first draft
+    // read live.serialRing, got undefined, and the row passed anyway on the single-reading fallback while
+    // PRINTING "the ring has 0" -- a change that was inert and still green, which is the shape this session
+    // has now caught four times. The row below is what makes the fallback visible instead of silent.
+    const RING = (t.serialRing || {});
+    const median = (xs) => { const a = xs.slice().sort((x, y) => x - y); return a[(a.length - 1) >> 1]; };
+    const costMs = (g) => {
+        const r = (RING[g] || []).filter((n) => typeof n === "number" && n > 0);
+        return r.length >= 2 ? { ms: median(r), n: r.length } : { ms: cost[g].ms, n: r.length };
+    };
+    const margin = swept.length ? Math.min(...swept.map((g) => live.budgetMs - costMs(g).ms)) : live.budgetMs;
     ok("!! ...and with real margin where the budget is what pays, because a swept gate is O(tree) and the tree grows every round",
         swept.length > 0 && margin >= 800 && swept.every((g) => cost[g].source === "serial"),
         `worst margin ${margin} ms of ${live.budgetMs} across the ${swept.length} swept, from ` +
-        pair.map((g) => `${path.basename(g)} ${cost[g].ms} ms (${cost[g].source}, ${road(g) || "no road"})`).join(" and ") +
+        pair.map((g) => { const c = costMs(g);
+            return `${path.basename(g)} ${c.ms} ms (` +
+                   (c.n >= 2 ? `median of ${c.n} serial readings [${(RING[g] || []).join(", ")}]`
+                             : `${cost[g].source}, ONE reading -- the ring has ${c.n}`) +
+                   `, ${road(g) || "no road"})`; }).join(" and ") +
         `. At the pre-round cost they were 446 ms and 26 ms OVER; 26 ms is close enough that a warm cache ` +
         `and a cold one land on opposite sides, which is how this drifted out unnoticed rather than failing ` +
         `loudly. A serial reading is REQUIRED here rather than merely preferred: falling back to the ` +
