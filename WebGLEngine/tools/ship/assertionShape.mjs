@@ -454,8 +454,12 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // six kernels. One gate, the same four rows moving by one, and the other four holding: distinctDefinitions
     // 41, condFirst 91, unknownSignature 16, suspects 0. Two rounds running under render/ rather than
     // tools/ship/ and no forty-second spelling of ok() either time.
-    gates: 1753, usesOk: 1732, definesOk: 1724, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1625, condFirst: 91, unknownSignature: 16,
+    // v4648 -- 1753 -> 1754 for render/visibilityGPU-selfcheck.mjs, the id buffer's producer. Third round
+    // running under render/ and the same four rows move by one while the other four hold, which is now the
+    // shape this census reports rather than a coincidence: distinctDefinitions 41, condFirst 91,
+    // unknownSignature 16, suspects 0.
+    gates: 1754, usesOk: 1733, definesOk: 1725, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1626, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

@@ -8032,6 +8032,67 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4648 -- THE 258th CLOSING: the id buffer v4646 consumed and nothing produced.
+    since333: Object.freeze({
+        at: "v4648", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/visibilityGPU-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 870 ms on real WebGPU, 20 rows. *** v4646 SHIPPED A CONSUMER WITH NO PRODUCER AND " +
+                 "SAID SO. *** render/objectMotionGPU.mjs takes a per-pixel object id; its gate's closing line " +
+                 "named the gap -- 'where the ID BUFFER COMES FROM'. Measured before this round started, over " +
+                 "every .mjs and .js outside vendor: ZERO files mention an object id, primitive id or " +
+                 "visibility buffer, and render/rasterProbe.js -- the tree's only rasteriser -- is a WebGL2 " +
+                 "vertex/fragment pair writing colour and depth and no identity at all. " +
+                 "*** A COMPUTE RASTERISER INTO A STORAGE BUFFER, ONE PACKED WORD PER PIXEL, RESOLVED BY " +
+                 "atomicMin -- THE FIRST atomicMin IN THIS TREE. *** The packing is the correctness argument " +
+                 "and not a saving: the naive form keeps two buffers, atomicMins the depth and has each " +
+                 "triangle write its id where its own depth matched, which is a RACE -- two surfaces at " +
+                 "bit-identical depth both match and the survivor is whichever thread ran last. Depth in the " +
+                 "high 20 bits and id in the low 12 makes one atomicMin decide both: nearest wins, and on an " +
+                 "exact tie the LOWER ID wins on every device, which is more determinism than hardware " +
+                 "offers. Gated three ways -- reversing the triangle list gives the same buffer bit for bit " +
+                 "on the CPU and on a device under real contention, two identical dispatches agree, and " +
+                 "1,600 coincident pixels all resolve to the lower id with the higher id's triangles listed " +
+                 "FIRST. " +
+                 "*** THE QUANTISATION IS STATED AS A NUMBER AND THEN CORRECTED BY ITS OWN MEASUREMENT. *** " +
+                 "The depth step is 9.537e-7, which is 6,560 times below fsr.html's derived disocclusion " +
+                 "threshold. The row asserting the two mirrors therefore land in the same bucket at every " +
+                 "pixel was written before it was run and IS FALSE: 186 of 6,144 words differ, by exactly one " +
+                 "step. What is true, and is the better fact, is that ZERO of the IDS differ -- a one-step " +
+                 "wobble moves the high bits while the surface it competes against is thousands of steps " +
+                 "away, so the winner never changes. " +
+                 "*** THE PAYOFF ROW IS THE ROUND: 4.22 px. *** The ids are fed straight into objectMotionCPU " +
+                 "and camera-only is wrong by 4.22 px on the moving slab and by 0.00 px on the static " +
+                 "background. v4646 measured 2.51 px on a fixture that DECLARED its own id buffer; this is " +
+                 "the same statement with the ids rasterised from geometry by the module under test, and the " +
+                 "second half is what proves the buffer SELECTS rather than perturbs -- a random labelling " +
+                 "would move both numbers. " +
+                 "*** SABOTAGE: NINE MUTATIONS. EIGHT ARE DEFECTS AND ALL EIGHT ARE CAUGHT; THE NINTH IS NOT " +
+                 "A DEFECT. *** Rewriting the JS packer's multiply as a shift plus >>> 0 changed nothing -- " +
+                 "bit-identical at five depths across the range -- so it is a NO-OP and not a 0-RED, and what " +
+                 "it found is that render/visibility.mjs's header was wrong: the load-bearing part is the " +
+                 "unsigned coercion, not the multiply. Drop the >>> 0 and three rows fail. The header is " +
+                 "corrected at its own site rather than quietly rewritten. " +
+                 "THREE MUTATIONS WERE 0-REDS ON THE FIRST PASS AND ALL THREE WERE THE FIXTURE, ALL THE SAME " +
+                 "SHAPE: an axis with no structure on it. Both quads were fronto-parallel, so depth was " +
+                 "CONSTANT across each (spread 0.00e+0 over 2,368 and 3,776 pixels) and flat depth was " +
+                 "indistinguishable from interpolated. The slab spanned the frame's full height, so the id " +
+                 "buffer was exactly y-symmetric (0 of 6,144 differ under a vertical flip) and dropping the " +
+                 "ndc y flip was invisible. Nothing in the DEVICE fixture crossed the eye, so the rejection " +
+                 "count was compared 0 against 0 -- two agreeing absences. THIRD ROUND RUNNING that sabotage " +
+                 "found the fixture rather than the code (v4646's translate(0), v4647's scale = strength and " +
+                 "its one-pixel features), so it has earned a name: A CONTROL IS ONLY A CONTROL ALONG AN AXIS " +
+                 "THE FIXTURE ACTUALLY VARIES. " +
+                 "NAMED UNCHECKED: the THREAD IMBALANCE, since one thread per triangle lets a big triangle's " +
+                 "thread outlive its workgroup and the fix is a tiled binning pass; CLIPPING, which this " +
+                 "REFUSES and counts rather than performs; whether any PAGE calls it -- fsr.html builds its " +
+                 "scene analytically and its hit() already knows which plane it struck, so the page's next " +
+                 "rung is to stop THROWING THAT AWAY rather than to rasterise; and multisampling, absent by " +
+                 "design since the consumer wants the id of the surface at the pixel centre.",
+    }),
     // v4647 -- THE 257th CLOSING: the temporal arc's last six kernels got a caller, and its census reads zero.
     since332: Object.freeze({
         at: "v4647", swept: 1, green: 1, red: 0,

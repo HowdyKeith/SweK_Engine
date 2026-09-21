@@ -2156,7 +2156,8 @@
   "tools/ship/murmurSpecies8-selfcheck.mjs": 2277,
   "tools/ship/murmurSpecies9-selfcheck.mjs": 1940,
   "render/objectMotionGPU-selfcheck.mjs": 779,
-  "render/temporalLockGPU-selfcheck.mjs": 2110
+  "render/temporalLockGPU-selfcheck.mjs": 2110,
+  "render/visibilityGPU-selfcheck.mjs": 870
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -3914,7 +3915,8 @@
   "tools/ship/murmurSpecies8-selfcheck.mjs": 0,
   "tools/ship/murmurSpecies9-selfcheck.mjs": 0,
   "render/objectMotionGPU-selfcheck.mjs": 0,
-  "render/temporalLockGPU-selfcheck.mjs": 0
+  "render/temporalLockGPU-selfcheck.mjs": 0,
+  "render/visibilityGPU-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-17T16:44:13.404Z",
@@ -5672,7 +5674,8 @@
   "tools/ship/murmurSpecies8-selfcheck.mjs": "2026-09-17T16:44:13.404Z",
   "tools/ship/murmurSpecies9-selfcheck.mjs": "2026-09-17T16:44:13.404Z",
   "render/objectMotionGPU-selfcheck.mjs": "2026-09-20T00:00:00.000Z",
-  "render/temporalLockGPU-selfcheck.mjs": "2026-09-21T00:00:00.000Z"
+  "render/temporalLockGPU-selfcheck.mjs": "2026-09-21T00:00:00.000Z",
+  "render/visibilityGPU-selfcheck.mjs": "2026-09-21T00:00:00.000Z"
  },
  "capAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 20000,
@@ -10348,7 +10351,8 @@
   "tools/ship/murmurSpecies8-selfcheck.mjs": 2277,
   "tools/ship/murmurSpecies9-selfcheck.mjs": 1940,
   "render/objectMotionGPU-selfcheck.mjs": 779,
-  "render/temporalLockGPU-selfcheck.mjs": 2110
+  "render/temporalLockGPU-selfcheck.mjs": 2110,
+  "render/visibilityGPU-selfcheck.mjs": 870
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-16T22:48:41.155Z",
@@ -13416,7 +13420,8 @@
   "tools/ship/murmurSpecies8-selfcheck.mjs": false,
   "tools/ship/murmurSpecies9-selfcheck.mjs": false,
   "render/objectMotionGPU-selfcheck.mjs": false,
-  "render/temporalLockGPU-selfcheck.mjs": false
+  "render/temporalLockGPU-selfcheck.mjs": false,
+  "render/visibilityGPU-selfcheck.mjs": false
  },
  "kinds": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "loaded",
@@ -15174,6 +15179,7 @@
   "tools/ship/murmurSpecies8-selfcheck.mjs": "alone",
   "tools/ship/murmurSpecies9-selfcheck.mjs": "alone",
   "render/objectMotionGPU-selfcheck.mjs": "alone",
-  "render/temporalLockGPU-selfcheck.mjs": "alone"
+  "render/temporalLockGPU-selfcheck.mjs": "alone",
+  "render/visibilityGPU-selfcheck.mjs": "alone"
  }
 }
