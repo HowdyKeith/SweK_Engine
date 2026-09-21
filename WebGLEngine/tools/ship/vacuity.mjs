@@ -34,6 +34,26 @@
 //
 // SO THE INSTRUMENT IS THE SABOTAGE, WHICH THE TREE ALREADY REQUIRES, AND WHAT THIS FILE ADDS IS THE READING:
 // a 0-RED result names one of four different repairs, and picking the wrong one leaves the guard decorative.
+//
+// ---- *** v4651 -- A FIFTH MECHANISM, AND THE ONE CASE WHERE THE REFUSAL ABOVE DOES NOT APPLY *** -----------
+//
+//   5. THE CONDITION TESTS THE LANGUAGE, NOT THE MODULE. v4648 held render/visibility.mjs's packer to an
+//      unsigned result with `near > 0 && near < 4294967296 && shifted < 0`, where `shifted` was computed in
+//      the gate. v4650 held render/edgeReveal.mjs's rounding convention with
+//      `Math.round(2.5) !== Math.ceil(2.5 - 0.5)` and never called the module at all -- a mutation swapping
+//      edgeColumn's ceil for Math.round scored 0 RED. Repair: drive the module AT the case, which for the
+//      second meant constructing a fixture that lands on an exact tie.
+//
+// *** AND THIS ONE IS MECHANICALLY DETECTABLE, WHICH THE FOUR ABOVE ARE NOT. *** The refusal above rests on a
+// number -- 3,206 candidates across 64% of gates -- and on the observation that whether `xs.every(p)` is
+// vacuous is a fact about xs AT RUN TIME. Neither holds here: the predicate is SYNTACTIC (every free
+// identifier in the condition is a built-in global) and the population is TEN. tools/ship/constantRows.mjs
+// is that census. The looser predicate a reader would try first was measured and rejected on this file's own
+// grounds: "the condition names no IMPORTED symbol" flags 21,533 of 28,916, 75%.
+//
+// This does not weaken the refusal. Mechanisms 1-4 remain unscannable for the reasons given, and the fifth is
+// scannable because it is a different kind of thing -- which is worth saying plainly, since a later reader
+// finding a scanner in the tree could otherwise take it as evidence that this header was wrong.
 "use strict";
 
 /**

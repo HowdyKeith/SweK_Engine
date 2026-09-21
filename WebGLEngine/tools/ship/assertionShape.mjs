@@ -462,8 +462,12 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // split out of fsrPageDevice-selfcheck for the sweep budget. Same four rows by one; the other four hold.
     // v4650 -- 1755 -> 1756 for render/edgeReveal-selfcheck.mjs, the explanation of v4649's alternation.
     // Four rows by one, four hold. Fourth round running with that shape.
-    gates: 1756, usesOk: 1735, definesOk: 1727, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1628, condFirst: 91, unknownSignature: 16,
+    // v4651 -- 1756 -> 1757 for tools/ship/constantRows-selfcheck.mjs, the census of rows that cannot fail.
+    // Fifth round running with the same four rows moving by one. THIS ONE IS A SIBLING OF THIS FILE: both
+    // walk every gate and read its ok() calls -- this census asks what SHAPE the call has, that one asks
+    // whether its condition can be influenced by anything in the tree.
+    gates: 1757, usesOk: 1736, definesOk: 1728, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1629, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

@@ -1,0 +1,203 @@
+#!/usr/bin/env node
+// WebGLEngine/tools/ship/constantRows-selfcheck.mjs -- v4651
+//
+// Run: node tools/ship/constantRows-selfcheck.mjs
+// RUNTIME: 2,205 ms median of five (2,125 2,129 2,205 2,212 2,233), under the sweep's 3,000 ms threshold.
+//
+// *** A FIFTH MECHANISM FOR tools/ship/vacuity.mjs's LIST, AND THE ONE CASE WHERE THAT FILE'S REFUSAL TO
+// SCAN DOES NOT APPLY. ***
+//
+// vacuity.mjs (v4459) names four ways a control stops being able to fail, and then REFUSES to build a
+// scanner for them, with the number as its reason: a census of assertions resting on `.every(`, `.length ===
+// 0` or `!xs.length` finds 3,206 of them in 948 of 1,482 gates -- 64% -- and "a scanner that cried wolf
+// three thousand times would be switched off in a week". That reasoning is correct and this file accepts it.
+//
+// The fifth mechanism is different in kind: THE CONDITION TESTS THE LANGUAGE INSTEAD OF THE MODULE. This
+// session wrote two in three rounds and found both by sabotage rather than by reading --
+//
+//   v4648  a row meant to hold render/visibility.mjs's packer to an unsigned result asserted
+//          `near > 0 && near < 4294967296 && shifted < 0`, with `shifted` computed in the gate.
+//   v4650  a row meant to hold render/edgeReveal.mjs's rounding convention read
+//          `Math.round(2.5) !== Math.ceil(2.5 - 0.5)` and never called the module at all. A mutation
+//          swapping edgeColumn's ceil for Math.round scored ZERO failing rows.
+//
+// -- and it IS mechanically detectable, because the predicate is syntactic rather than a fact about a
+// collection at run time. The number is what earns the scan: ELEVEN rows tree-wide, not 3,206. The obvious
+// looser predicate was measured and rejected on vacuity.mjs's own grounds -- "the condition names no
+// IMPORTED symbol" flags 21,533 of 28,916, 75%, because most rows legitimately test a local holding a
+// module's result.
+//
+// *** AND MOST OF THE ELEVEN ARE NOT DEFECTS. *** A gate whose module depends on a language guarantee is
+// entitled to assert it, and several do, each paired with a row that uses the module. The census NAMES and
+// RATCHETS; it does not condemn. What it makes impossible is a row of this shape arriving unnoticed, which
+// is the only thing that actually went wrong.
+//
+// *** THE ONE UNAMBIGUOUS DEFECT AMONG THEM WAS REPAIRED IN THIS ROUND. *** tools/ship/ollamaReadiness-
+// selfcheck.mjs carried `ok("a no-model-pinned fleet is still READY but says what that means", (() => {
+// return true; })())` -- a label making a claim and a condition that could not fail. The very next row
+// makes that claim properly against a real unpinned fleet, so the repair was a deletion. The census found
+// ELEVEN candidates and exactly one of them was that; the seed below is the ten that remain.
+//
+// SABOTAGES: see the log at the foot of this file.
+"use strict";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { constantRows, conditionsOf, freeIdentifiers, isConstantCondition, isParsable, readGates,
+         CONSTANT_GLOBALS } from "./constantRows.mjs";
+import { gateFiles } from "./assertionShape.mjs";
+import { VACUITY_AT_V4459 } from "./vacuity.mjs";
+
+const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+let fails = 0;
+const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
+const say = (l, n = "") => console.log(`  ----  ${l}${n ? "   " + n : ""}`);
+
+const gates = gateFiles(ENG);
+const R = constantRows(readGates(gates, ENG));
+
+console.log("\n1. THE CENSUS");
+say("scanned", `${R.scanned} ok() conditions across ${gates.length} gates`);
+say("classes", `expr ${R.expr.length}, alwaysTrue ${R.alwaysTrue.length}, alwaysFalse ${R.alwaysFalse.length}, unresolved ${R.unresolved.length}`);
+for (const x of R.expr) say(`  ${path.basename(x.file)}`, x.cond.replace(/\s+/g, " ").slice(0, 96));
+
+// *** THE ROW THAT MAKES THIS FILE WORTH ANYTHING. *** A detector validated only against the tree it was
+// written on is a description of that tree. This drives it against the EXACT text of v4650's defective row
+// and against the text that replaced it, and demands opposite answers.
+console.log("\n2. IT CATCHES THE ROW IT WAS BUILT FOR, AND NOT THE REPAIR");
+// *** THE PROBES ARE ASSEMBLED AT RUN TIME AND THAT IS NOT FUSSINESS. *** Written as plain literals they
+// were SOURCE, in a file this census scans, and the census duly found v4650's defective row inside this
+// gate's own fixture -- twelve rows where eleven live in the tree. Excluding this file from the population
+// would have been the other repair and it is worse: a detector with a blind spot over itself is the shape
+// recordDrift.mjs's own header warns about, where a check's arrival moves the rows it checks. Concatenated,
+// the text never appears as a call and the census keeps scanning this gate like any other.
+const CALL = "o" + "k(";
+const BROKEN = `${CALL}"...and Math.round is NOT the same spelling", Math.round(2.5) !== Math.ceil(2.5 - 0.5), "note");`;
+const FIXED = `${CALL}"...and AT AN EXACT TIE edgeColumn takes the lower column", tieP === 2.5 && edgeColumn(TIE) === 2 && Math.round(tieP) === 3, "note");`;
+const brokenOut = constantRows([{ path: "probe", text: BROKEN }]);
+const fixedOut = constantRows([{ path: "probe", text: FIXED }]);
+ok("!! *** v4650's defective row is flagged, verbatim ***",
+   brokenOut.expr.length === 1 && /Math\.round\(2\.5\)/.test(brokenOut.expr[0].cond),
+   `flagged ${brokenOut.expr.length}: ${brokenOut.expr[0] ? brokenOut.expr[0].cond : "(none)"}. A mutation ` +
+   "swapping render/edgeReveal.mjs's ceil for Math.round scored zero failing rows against that row, which " +
+   "is how it was found -- by sabotage, three rounds after the same shape appeared at v4648.");
+ok("!! *** ...and the row that REPLACED it is not, so this is not a rule against mentioning Math ***",
+   fixedOut.expr.length === 0,
+   `flagged ${fixedOut.expr.length}. The repair still names Math.round twice; what it adds is edgeColumn and ` +
+   "a value computed from the fixture. A detector that condemned both would be a style rule wearing a " +
+   "correctness row's clothes, which is exactly what the row it caught was.");
+
+console.log("\n3. THE LOOSER PREDICATE, MEASURED AND REJECTED ON vacuity.mjs's OWN GROUNDS");
+// "the condition names no IMPORTED symbol" -- run here rather than described, because a number that
+// justifies a design decision has to be reproducible or it is a memory.
+const impRe = /import\s*(?:\{([^}]*)\}|(\w+))\s*from/g;
+let loose = 0, looseScanned = 0;
+for (const f of readGates(gates, ENG)) {
+    const syms = new Set(); let m; impRe.lastIndex = 0;
+    while ((m = impRe.exec(f.text))) for (const s of (m[1] || m[2] || "").split(","))
+        { const n = s.trim().split(/\s+as\s+/).pop().trim(); if (n) syms.add(n); }
+    if (!syms.size) continue;
+    for (const { cond } of conditionsOf(f.text)) {
+        looseScanned++;
+        if (![...syms].some((sy) => new RegExp(`\\b${sy.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(cond))) loose++;
+    }
+}
+say("loose predicate", `${loose} of ${looseScanned} (${(100 * loose / looseScanned).toFixed(1)}%)`);
+ok("!! *** the obvious predicate flags most of the tree, which is the objection vacuity.mjs raises ***",
+   loose > looseScanned * 0.5 && R.expr.length < 50,
+   `${(100 * loose / looseScanned).toFixed(1)}% against this file's ${R.expr.length} rows. vacuity.mjs " +
+   "refused a scanner because its own candidate predicate found 3,206 across 64% of gates and "a scanner " +
+   "that cried wolf three thousand times would be switched off in a week". That refusal stands; this " +
+   "predicate is narrow enough to answer it, and the comparison is RUN rather than quoted.`.replace(/"/g, "'"));
+ok("  ...and vacuity.mjs's four mechanisms are still four -- this is a FIFTH, not a re-statement",
+   VACUITY_AT_V4459.mechanisms.length === 4
+   && !VACUITY_AT_V4459.mechanisms.some((m) => /language|built-?in|constant/i.test(m.kind)),
+   `${VACUITY_AT_V4459.mechanisms.length} recorded there: ${VACUITY_AT_V4459.mechanisms.map((m) => m.kind).join("; ")}. ` +
+   "None of them is 'the condition never reaches the module', which is what these eleven are.");
+
+console.log("\n4. THE OTHER CLASSES, COUNTED AND NOT CONDEMNED");
+ok("`false` as a condition is a DELIBERATE idiom here, so it is counted rather than flagged",
+   R.alwaysFalse.length > 50 && !R.expr.some((x) => x.cond === "false"),
+   `${R.alwaysFalse.length} rows. It is the forced red a gate prints when its subject could not be reached ` +
+   "at all -- '*** NOT A PASS. *** The adapter path has not run' -- and a census that called those defects " +
+   "would be asking gates to report a skip as a pass.");
+ok("!! ...and UNRESOLVED conditions are named rather than dropped, which is kernelReach.mjs's rule",
+   R.unresolved.length > 0 && R.unresolved.every((x) => !isParsable(x.cond)),
+   `${R.unresolved.length} of ${R.scanned} (${(100 * R.unresolved.length / R.scanned).toFixed(1)}%) could not ` +
+   "be parsed as expressions. The cause is known and is upstream: sourceScan.mjs's noComments cuts a regex " +
+   "literal containing an escaped slash, because \\/ ends with the two characters that start a line comment. " +
+   "Treating those fragments as constant is what made the first draft report nine rows, six of them shrapnel.");
+
+console.log("\n5. THE DETECTOR'S OWN FALSE-POSITIVE MODES, EACH DRIVEN");
+ok("a SPREAD is not a property access",
+   isConstantCondition("Math.max(...vs) > 3") === false,
+   "`...vs` looks like `.vs` to a naive property stripper, and stripping it erased the only identifier that " +
+   "carried a value. That mistake alone took the census from 5 rows to 56.");
+ok("...and `of` is an identifier, not only a keyword",
+   isConstantCondition('of("A_WGSL").reach && of("A_WGSL").via === "symbol"') === false,
+   "tools/ship/kernelReach-selfcheck.mjs names a local helper `of`; filtering it by NAME erased what four of " +
+   "its rows read and reported them as constant.");
+ok("...and globalThis is a source of information, not a literal",
+   isConstantCondition("globalThis.__uintAuto === true") === false,
+   "it is how this tree's browser-side gates hand values back, so listing it as a constant global made every " +
+   "gate that stashes a result on it look vacuous -- tools/ship/brickShader-selfcheck.mjs was the instance.");
+// *** THIS ROW USED TO DRIVE A REGEX AND SO TESTED NOTHING. *** It read
+// `isConstantCondition('/Math/.test(label)') === false` -- but `label` is a free identifier either way, so
+// removing the string-stripping entirely left it green. MEASURED, that removal is a FALSE NEGATIVE worth one
+// row: "vendor/box3d/LICENSE".startsWith("vendor/") stops being flagged because the string's own words --
+// vendor, box3d, LICENSE -- read as identifiers that are not built-ins. The ratchet's slack half could not
+// see a single row going missing either. So the property is asserted directly, and in the direction that
+// breaks: the detector must say YES here.
+ok("!! ...and a string literal's CONTENTS are not identifiers, which is worth a row of its own",
+   isConstantCondition('"vendor/box3d/LICENSE".startsWith("vendor/")') === true
+   && freeIdentifiers('"vendor/box3d/LICENSE".startsWith("vendor/")').length === 0,
+   "without stripping them the census reads vendor, box3d and LICENSE as free identifiers, decides the " +
+   "condition depends on the tree, and silently drops a real row -- 10 becomes 9 with no row firing. A " +
+   "false NEGATIVE is the failure mode a ratchet is worst at seeing, since the number only goes down.");
+ok("...and a genuinely constant expression IS flagged, so the four rows above are not vacuous themselves",
+   isConstantCondition("2 + 2 === 4") && isConstantCondition("Number.isNaN(0 * Infinity)"),
+   "four rows asserting a detector says NO are worth nothing without one asserting it ever says YES");
+
+console.log("\n6. THE RATCHET");
+// Seeded at what was measured. It may only fall, and the slack half fails if it is left behind -- the
+// two-sided shape tools/ship/kernelReach-selfcheck.mjs uses, and which went red there on the same run a
+// round's work landed, which is the behaviour a ratchet is for.
+const EXPR_AT_V4651 = 10;
+ok("!! *** no ELEVENTH constant-expression row arrives unnoticed ***",
+   R.expr.length <= EXPR_AT_V4651,
+   `${R.expr.length} against a frozen ${EXPR_AT_V4651}. OWED for each: a row that reaches the module, or a ` +
+   "note saying the language guarantee IS the subject. Several of the ten are the second kind and are " +
+   "paired with a row that uses the module on the next line.");
+ok("...and the ratchet is not left behind by real progress",
+   R.expr.length >= EXPR_AT_V4651 - 3,
+   `${R.expr.length} against ${EXPR_AT_V4651}. A ratchet with slack in it is a ratchet holding nothing.`);
+ok("...and the population is not degenerate, which would make every row above vacuous",
+   R.scanned > 20000 && gates.length > 1500 && new Set(R.expr.map((x) => x.file)).size > 5,
+   `${R.scanned} conditions across ${gates.length} gates; the ten sit in ` +
+   `${new Set(R.expr.map((x) => x.file)).size} different files, so this is not one gate's habit.`);
+
+console.log(fails ? `\nconstantRows-selfcheck: ${fails} FAILED` : "\nconstantRows-selfcheck: ALL GREEN");
+console.log("unchecked here: whether each of the eleven IS a defect, which is a judgement about intent and " +
+            "not a fact this file can derive -- several are language-contract rows paired with a row that " +
+            "uses the module, and the census names them so a reader can decide; the 216 `true` rows, which " +
+            "are the same mechanism in a blunter form and are counted but NOT ratcheted, because a bare " +
+            "`true` is sometimes a placeholder a later row supersedes and sorting those out is a round of " +
+            "its own; the 957 UNRESOLVED conditions, whose real repair is in sourceScan.mjs's comment " +
+            "stripper rather than here; and vacuity.mjs's other four mechanisms, which remain undetectable " +
+            "by scanning for the reason that file gives and which this one does not dispute.");
+//
+// SABOTAGE LOG -- each applied to tools/ship/constantRows.mjs, run, and restored.
+//   Y1  globalThis back in the constant set              2 RED (its own row, and the ratchet at 11)
+//   Y2  spread treated as a property access              2 RED (its own row, and the ratchet at 45)
+//   Y3  `of` filtered as a keyword again                 2 RED (its own row, and the ratchet at 14)
+//   Y4  string literals not stripped                     0-RED at first; now 1 RED
+//   Y5  unparsable conditions counted as constant        2 RED (the unresolved row, and the ratchet at 22)
+//
+// *** Y4 IS THE INTERESTING ONE AND IT IS THIS FILE'S OWN SUBJECT LOOKING BACK AT IT. *** The row meant to
+// catch it drove a REGEX -- `isConstantCondition('/Math/.test(label)')` -- where `label` is a free
+// identifier whether strings are stripped or not, so the row was green either way. That is not quite the
+// fifth mechanism (it did call the module) but it is the same failure: the fixture could not reach the
+// behaviour the label named. And the damage it hid is the kind a ratchet is worst at seeing -- a FALSE
+// NEGATIVE, 10 rows becoming 9, a number that only goes DOWN and so never trips a ceiling. The row asserts
+// the property directly now, in the direction that breaks.
+//
+process.exitCode = fails ? 1 : 0;

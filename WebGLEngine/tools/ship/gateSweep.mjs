@@ -8032,6 +8032,61 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4651 -- THE 261st CLOSING: a fifth mechanism for vacuity.mjs, and the one that can be scanned for.
+    since336: Object.freeze({
+        at: "v4651", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/constantRows-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 2,205 ms, CPU only, 16 rows. *** THIS SESSION WROTE TWO ROWS THAT TESTED THE " +
+                 "LANGUAGE INSTEAD OF THE MODULE, THREE ROUNDS APART, AND FOUND BOTH BY SABOTAGE RATHER THAN " +
+                 "BY READING. *** v4648's packer row asserted `near > 0 && near < 4294967296 && shifted < 0` " +
+                 "with `shifted` computed in the gate; v4650's rounding row read `Math.round(2.5) !== " +
+                 "Math.ceil(2.5 - 0.5)` and never called edgeColumn at all, so swapping the module's ceil for " +
+                 "Math.round scored ZERO failing rows. Twice is a pattern and the tree had no detector. " +
+                 "*** THE PRIOR ART IS tools/ship/vacuity.mjs AND IT REFUSES SCANNERS OF THIS KIND. *** That " +
+                 "file (v4459) names four mechanisms and then declines to build a census, with the number as " +
+                 "its reason: 3,206 candidates across 64% of gates, and 'a scanner that cried wolf three " +
+                 "thousand times would be switched off in a week'. That reasoning is accepted, not disputed. " +
+                 "This is a FIFTH mechanism and it is different in kind -- the predicate is SYNTACTIC rather " +
+                 "than a fact about a collection at run time -- and the number is what earns it: TEN rows " +
+                 "tree-wide out of 28,932 conditions. The looser predicate a reader would try first was " +
+                 "measured and rejected on vacuity's own grounds and the comparison is RUN in the gate rather " +
+                 "than quoted: 'names no imported symbol' flags 21,533, 75%. vacuity.mjs now records the " +
+                 "fifth mechanism and says plainly why the refusal still stands for the other four. " +
+                 "*** THE CENSUS NAMES AND RATCHETS; IT DOES NOT CONDEMN. *** Most of the ten are " +
+                 "language-contract rows a gate is entitled to make -- 0 * Infinity is NaN, ^ and imul " +
+                 "truncate past 2^32 -- each paired with a row that uses the module on the next line. EXACTLY " +
+                 "ONE was an unambiguous defect and it was repaired in this round: " +
+                 "tools/ship/ollamaReadiness-selfcheck.mjs carried a row whose label claimed 'a " +
+                 "no-model-pinned fleet is still READY but says what that means' and whose condition was " +
+                 "`(() => { return true; })()`. The very next row makes that claim properly against a real " +
+                 "unpinned fleet, so the repair was a deletion. Eleven candidates, one defect, seed of ten. " +
+                 "*** THE DETECTOR FOUND ITSELF FIRST, WHICH IS WHY ITS PROBES ARE ASSEMBLED AT RUN TIME. *** " +
+                 "Written as plain literals, the gate's own fixture for v4650's defective row WAS source in a " +
+                 "file this census scans, and it reported twelve where eleven lived. Excluding the file was " +
+                 "the other repair and is worse -- a detector blind to itself is the shape recordDrift.mjs " +
+                 "warns about. Four more false-positive modes were found and each is now a driven row: a " +
+                 "SPREAD read as a property access (5 rows became 56), `of` filtered as a keyword when " +
+                 "kernelReach-selfcheck names a local helper `of` (4 false positives), globalThis listed as a " +
+                 "constant when it is how browser-side gates hand values back, and unparsable fragments -- " +
+                 "sourceScan.mjs's noComments cuts a regex containing an escaped slash, since backslash-slash " +
+                 "ends with the two characters that open a line comment -- counted as constant, which made " +
+                 "the first draft report nine rows, six of them shrapnel. Those 957 are UNRESOLVED and named, " +
+                 "which is kernelReach.mjs's rule. " +
+                 "*** SABOTAGE: FIVE MUTATIONS, ALL FIVE CAUGHT, ONE ONLY AFTER A REPAIR -- AND IT WAS THIS " +
+                 "FILE'S OWN SUBJECT LOOKING BACK AT IT. *** Removing the string-literal stripping scored " +
+                 "ZERO, because the row meant to catch it drove a REGEX where the identifier survived either " +
+                 "way. The damage it hid is the kind a ratchet is worst at seeing: a FALSE NEGATIVE, ten rows " +
+                 "becoming nine, a number that only goes DOWN and so never trips a ceiling. " +
+                 "NAMED UNCHECKED: whether each of the ten IS a defect, which is a judgement about intent and " +
+                 "not a fact this census can derive; the 216 bare `true` rows, the same mechanism in a " +
+                 "blunter form, counted but NOT ratcheted because a placeholder a later row supersedes is a " +
+                 "round of its own; and the 957 unresolved conditions, whose real repair is in " +
+                 "sourceScan.mjs's comment stripper rather than here.",
+    }),
     // v4650 -- THE 260th CLOSING: the alternation v4649 measured and could not explain.
     since335: Object.freeze({
         at: "v4650", swept: 1, green: 1, red: 0,
