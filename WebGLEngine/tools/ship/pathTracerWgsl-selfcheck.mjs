@@ -31,6 +31,8 @@ import { fileURLToPath } from "node:url";
 import { runWgslComputeNative as runWgslCompute, headlessGpuSkipReason as webgpuSkipReason,
          exitCleanly } from "./headlessGpu.mjs";
 import * as PT from "../../physics/render/pathTracerWgsl.mjs";
+import { adapterKey, verdict, describe, owedCount, coverage as adapterCoverage, compareFor, boundFrom,
+         readReadings, recordReading, mergeRecords, READINGS_PATH, SLACK } from "./adapterRecord.mjs";
 import { render, coverage, cameraBasis, pixelRay } from "../../physics/render/pathTracer.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -169,21 +171,48 @@ async function shoot(shaderTan) {
         for (let k = 0; k < 3; k++) maxDir = Math.max(maxDir, Math.abs(a.dir[k] - b.dir[k]));
         if (a.hit && b.hit) maxRelT = Math.max(maxRelT, Math.abs(b.t - a.t) / a.t);
     }
-    return { maskDiff, maxDir, maxRelT, gpuHits, gpu };
+    return { maskDiff, maxDir, maxRelT, gpuHits, gpu, adapter: r.adapter || null };
 }
 const clean = await shoot(false);
 const plant = await shoot(true);
+// *** v4649 -- THREE OF THE ROWS BELOW ARE READINGS OF ONE ADAPTER'S tan(). ***
+// WGSL specifies sin/cos/tan only to an absolute error near 2^-11, so HOW MUCH worse a shader-side tan() is
+// than a uniform is a property of the driver, not of the code. SwiftShader: 144x on the ray directions,
+// 19.7x on the hit distances, and a planted cost of 1.366e-5. Keith's box: 12.8x, 1.33x, and 1.416e-6 -- all
+// three red against numbers that were one adapter's. What does NOT move is the DIRECTION: computing tan in
+// the shader is worse, everywhere, and that is what the durable rows assert.
+const PLANT_AT_V4649 = Object.freeze({
+    "google/swiftshader": Object.freeze({ dirRatio: 20, relTRatio: 5, plantMaxDir: PT.PLANT_COST.plantMaxDirErr }),
+});
+const GATE = "pathTracerWgsl";
+const VERDICTS = [];
+const ADAPTER = (plant && plant.adapter) || (clean && clean.adapter) || null;
+const AKEY = adapterKey(ADAPTER);
+const PLANT_RECORD = mergeRecords(PLANT_AT_V4649, readReadings(GATE));
+const heldP = (name, measured, dir, compare) => {
+    const v = verdict(PLANT_RECORD, ADAPTER, measured, compare || compareFor(name, dir));
+    VERDICTS.push({ ...v, name, dir });
+    return v;
+};
 {
     ok(clean && plant, "both camera variants compile and run");
     if (!clean || !plant) { console.log("\nFAIL -- " + (++fails) + " check(s)"); process.exit(1); }
     const ULP = 1.1920929e-7;
     ok(clean.maxDir < ULP, "*** with scale passed in, every ray direction is within ONE f32 ulp ***",
        `max component error ${e(clean.maxDir)} vs ulp ${e(ULP)}`);
-    ok(plant.maxDir > clean.maxDir * 20,
-       "*** and computing tan() in the shader is two orders of magnitude worse ***",
-       `${e(plant.maxDir)} vs ${e(clean.maxDir)} -- ${(plant.maxDir / clean.maxDir).toFixed(0)}x`);
-    ok(plant.maxRelT > clean.maxRelT * 5, "which carries straight into the hit distances",
-       `relative t ${e(plant.maxRelT)} vs ${e(clean.maxRelT)}`);
+    // DURABLE on any adapter: computing tan() in the shader is WORSE. The direction is the finding; the size
+    // is the driver's, because WGSL bounds tan only to an absolute error near 2^-11.
+    const dirRatio = plant.maxDir / clean.maxDir, relTRatio = plant.maxRelT / clean.maxRelT;
+    ok(dirRatio > 1 && relTRatio > 1,
+       "*** computing tan() in the shader is worse on BOTH measures, on any adapter ***",
+       `ray directions ${dirRatio.toFixed(1)}x worse, hit distances ${relTRatio.toFixed(1)}x. A per-frame ` +
+       "constant belongs in a uniform whatever the driver's tan happens to cost");
+    const vDir = heldP("dirRatio", dirRatio, "min");
+    ok(vDir.ok, `  ...and BY HOW MUCH on the ray directions is this adapter's own number [${vDir.state}]`,
+       `${e(plant.maxDir)} vs ${e(clean.maxDir)} -- ${dirRatio.toFixed(0)}x. ` + describe(vDir));
+    const vT = heldP("relTRatio", relTRatio, "min");
+    ok(vT.ok, `  ...and by how much on the hit distances [${vT.state}]`,
+       `relative t ${e(plant.maxRelT)} vs ${e(clean.maxRelT)} -- ${relTRatio.toFixed(1)}x. ` + describe(vT));
     ok(plant.maskDiff === 0,
        "*** and the coverage mask is IDENTICAL under both, so a mask diff tests nothing about a camera ***",
        "144x worse rays, zero mask disagreements -- this is why sections 6 and 7 are two checks and not one");
@@ -272,8 +301,11 @@ sec("9. THE RECORDS SAY WHAT THIS RUN SAYS");
     ok(PT.MASK.disagreements === clean.maskDiff, "MASK.disagreements matches the run", `${PT.MASK.disagreements}`);
     ok(near(PT.MASK.maxDirErr, clean.maxDir, 0.25), "MASK.maxDirErr is within a quarter of the measured value",
        `recorded ${e(PT.MASK.maxDirErr)}, measured ${e(clean.maxDir)}`);
-    ok(near(PT.PLANT_COST.plantMaxDirErr, plant.maxDir, 0.25), "PLANT_COST matches the planted run",
-       `recorded ${e(PT.PLANT_COST.plantMaxDirErr)}, measured ${e(plant.maxDir)}`);
+    // A two-sided window rather than a bound, so the comparator is passed in: the recorded cost is a
+    // MEASUREMENT and a planted run that came back an order of magnitude either way is not the same run.
+    const vPlant = heldP("plantMaxDir", plant.maxDir, "near", (have, m) => near(have.plantMaxDir, m, 0.25));
+    ok(vPlant.ok, `PLANT_COST matches the planted run on this adapter [${vPlant.state}]`,
+       `recorded ${e(PT.PLANT_COST.plantMaxDirErr)}, measured ${e(plant.maxDir)}. ` + describe(vPlant));
     ok(PT.SILHOUETTE.direction.includes("LARGER"), "SILHOUETTE records the direction section 7 measured");
     ok(PT.BUILTIN_ACCURACY.looselySpecified.includes("tan") && PT.BUILTIN_ACCURACY.tightlySpecified.includes("sqrt"),
        "BUILTIN_ACCURACY separates what WGSL pins down from what it does not");
@@ -306,6 +338,30 @@ sec("9. THE RECORDS SAY WHAT THIS RUN SAYS");
 // a row where the sharpest sabotage came back with the same answer, and the useful reading is that a constant
 // threaded end to end through a pipeline is exactly as untested as one nobody wired up, unless some input
 // actually lands near it.
+// *** THE OWED POPULATION, AS A NUMBER. ***
+{
+    const c = owedCount(VERDICTS), cov = adapterCoverage(PLANT_RECORD);
+    console.log(`  ----  the record covers ${cov.count} adapter(s): ${cov.keys.join(", ")}`);
+    console.log(c.owed === 0
+        ? `  ----  adapter ${AKEY}: all ${c.of} per-adapter reading(s) HELD against the record on file.`
+        : `  ----  adapter ${AKEY}: ${c.owed} of ${c.of} per-adapter reading(s) OWED -- no reading on file ` +
+          `for this adapter, so those rows measured and reported rather than asserted. The durable row -- ` +
+          `tan() in the shader is worse on both measures -- still held. Re-run with --record ON THAT BOX.`);
+    if (process.argv.includes("--record")) {
+        const owed = VERDICTS.filter((v) => v.state === "OWED" && Number.isFinite(v.measured));
+        if (!owed.length) { console.log(`  ----  --record: nothing OWED for ${AKEY}.`); }
+        else {
+            const values = {};
+            // A "near" reading records the MEASUREMENT, with no slack: the window is the comparator's.
+            for (const v of owed) values[v.name] = v.dir === "near" ? v.measured : boundFrom(v.dir, v.measured);
+            const w = recordReading(GATE, AKEY, values, { frozen: PLANT_AT_V4649 });
+            const rel = path.relative(process.cwd(), READINGS_PATH).replace(/\\/g, "/");
+            console.log(w.wrote ? `  ----  --record: WROTE ${owed.length} reading(s) for ${AKEY}. Commit it: git add ${rel}`
+                                : `  ----  --record: REFUSED -- ${w.why}`);
+        }
+    }
+}
+
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: THE TRACER ITSELF. `trace` is ~300 lines of MIS, microfacet lobes, Fresnel, " +
     "energy compensation and roulette assembled from six separately-graded modules, and NONE of it runs on a " +
