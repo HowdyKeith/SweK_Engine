@@ -35,6 +35,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
+import { mutateFile, restoreMutation, reclaimMutations } from "../tools/ship/fixtureLitter.mjs";
 
 const require = createRequire(import.meta.url);
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -74,20 +75,43 @@ const ok = (name, cond, detail) => {
     // back" check below caught it. A CRASH AND A FAILURE ARE BOTH RED AND THEY ARE NOT THE SAME RED: a crash
     // tells you nothing about the physics, and a page that cannot tell them apart would report a broken import
     // as a broken world.
+    // *** v4649 -- THE finally BELOW USED TO BE THE WHOLE GUARANTEE, AND IT COST TWO ROUNDS. ***
+    // A finally covers a throw. It does not cover a SIGKILL at the sweep's cap, and Keith's box took 241 of
+    // those in one run. One killed run left upAxis sabotaged, so upAxis read RED in every sweep afterwards --
+    // and the NEXT run of this gate snapshotted the already-sabotaged file as its `orig`, found its own
+    // sabotage string missing, threw, and its finally wrote the sabotage straight back. Self-perpetuating,
+    // survived a hand restore, and read for two rounds as a Windows physics finding on a world whose physics
+    // was right the whole time. The mutation is now ledgered OUTSIDE the tree before it is made, so any
+    // death leaves a record the next process can undo.
+    const TARGET = "physics/upAxis-selfcheck.mjs";
+    const reclaimed = reclaimMutations();
+    ok("!! *** the tree carries no gate left mutated by a killed run ***", reclaimed.length === 0,
+       reclaimed.length ? "RECLAIMED " + reclaimed.join(", ") + " -- a previous run died between a sabotage " +
+           "and its restore. The tree is repaired now and this row is how you find out it happened; a run " +
+           "that swallowed it would hand the next sweep a red gate with no author"
+         : "nothing stranded -- the ledger outside the engine tree is empty");
     const target = path.join(here, "..", "physics", "upAxis-selfcheck.mjs");
     const orig = fs.readFileSync(target, "utf8");
-    try {
-        const sab = orig.replace("Math.abs(w.readTransforms()[1] - 5) < 0.3", "false");
-        if (sab === orig) throw new Error("sabotage did not match -- the check below would be testing nothing");
-        fs.writeFileSync(target, sab);
-        const bad = await new Promise((res) => runOne("physics/upAxis-selfcheck.mjs", res));
-        ok("A SABOTAGED CHECK COMES BACK RED (the page can fail)", bad.ok === false && bad.code !== 0,
-           "exit " + bad.code + " -- if this were green the whole page would be decoration");
-        ok("...and it FAILED rather than crashed (the failure text comes back to the browser)",
-           bad.out.includes("FAIL") && bad.out.includes("RISES"),
-           "a red row can be READ, not just counted -- and a crash would have printed nothing, which is a different red");
-    } finally {
-        fs.writeFileSync(target, orig);
+    const sab = orig.replace("Math.abs(w.readTransforms()[1] - 5) < 0.3", "false");
+    // A red row rather than a throw: throwing here is what welded the sabotage in, because the finally still
+    // ran and still wrote back the poisoned snapshot.
+    ok("!! the gate this one sabotages is in the state it expects before anything is written", sab !== orig,
+       sab !== orig ? "the assertion this replaces is present, so the sabotage below changes the subject"
+                    : "THE SABOTAGE STRING IS ABSENT -- " + TARGET + " is not what this gate expects, so " +
+                      "nothing was written and nothing was restored. Check it against HEAD before reading " +
+                      "anything else here");
+    if (sab !== orig) {
+        try {
+            mutateFile(TARGET, sab);
+            const bad = await new Promise((res) => runOne("physics/upAxis-selfcheck.mjs", res));
+            ok("A SABOTAGED CHECK COMES BACK RED (the page can fail)", bad.ok === false && bad.code !== 0,
+               "exit " + bad.code + " -- if this were green the whole page would be decoration");
+            ok("...and it FAILED rather than crashed (the failure text comes back to the browser)",
+               bad.out.includes("FAIL") && bad.out.includes("RISES"),
+               "a red row can be READ, not just counted -- and a crash would have printed nothing, which is a different red");
+        } finally {
+            restoreMutation(TARGET);
+        }
     }
     const back = await new Promise((res) => runOne("physics/upAxis-selfcheck.mjs", res));
     ok("...and the sabotage was undone", back.ok === true, "exit " + back.code);

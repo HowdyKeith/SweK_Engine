@@ -140,6 +140,8 @@ import * as QS from "./quickSweep.mjs";
 import * as Q from "./quickSweep.mjs";
 import { gateReport } from "./gateReport.mjs";
 import { mergeTimings, restoreLost, CORROBORATION_BAND, UNDATED } from "./sweepRotation.mjs";
+import { writeFixture, dropFixture, armExitSweep } from "./fixtureLitter.mjs";
+armExitSweep();   // v4649 -- a throw between the write below and its unlink drops the fixture anyway
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -1191,7 +1193,9 @@ console.log("\n*** THE CAP KILLED THE GATE AND LEFT ITS CHILDREN RUNNING (v4568)
     // twice, which is the only reason it was found: a row that cannot fail is exactly what this gate's
     // sibling assertionShape-selfcheck exists to catch, arriving in a row about leaks.
     const childScript = `/*${MARK}*/setTimeout(()=>{},600000)`;
-    fs.writeFileSync(fixture, [
+    // v4649 -- written through the registry, so a throw on the way to the unlink below drops it anyway and
+    // a kill leaves it for the next run's reclaim. This fixture was found stranded in Keith's tree.
+    writeFixture(path.relative(ENG, fixture), [
         'import { spawn } from "node:child_process";',
         `spawn(process.execPath, ["-e", ${JSON.stringify(childScript)}], { stdio: "ignore" });`,
         "setTimeout(() => {}, 600000);",
@@ -1241,7 +1245,7 @@ console.log("\n*** THE CAP KILLED THE GATE AND LEFT ITS CHILDREN RUNNING (v4568)
     const after = survivors();
     // Whatever the outcome, do not leave the probe's own children behind.
     reap();
-    try { fs.unlinkSync(fixture); } catch {}
+    dropFixture(path.relative(ENG, fixture));
     ok("!! *** A GATE KILLED AT THE CAP TAKES ITS CHILDREN WITH IT -- the group is signalled, not the process ***",
        POSIX ? after === before : (before === null && after === null),
        (POSIX ? `${before} survivor(s) before the capped run, ${after} after.`

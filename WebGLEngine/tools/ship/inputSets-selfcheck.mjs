@@ -28,6 +28,7 @@
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { ENG, RECORD, FORMAT, hashFile, hashDir, readRecord, whyRun, skippable, partition, reasonHistogram,
@@ -39,7 +40,8 @@ import { noComments } from "./sourceScan.mjs";
 // v4647 -- the tree's own gate population, from the walk that owns it rather than a second copy.
 import { treePaths } from "./treeRead.mjs";
 import { FIXTURE_DIR, FIXTURE_PREFIX, LIVE_FIXTURES, fixtureAbs, writeFixture, dropFixture,
-         reclaimStranded, armExitSweep, PROBE_REG, PROBE_RAW } from "./fixtureLitter.mjs";
+         reclaimStranded, armExitSweep, PROBE_REG, PROBE_RAW,
+         mutateFile, restoreMutation, reclaimMutations, MUTATION_LEDGER } from "./fixtureLitter.mjs";
 
 let fails = 0;
 const ok = (name, cond, detail = "") => { console.log((cond ? "  PASS  " : "  FAIL  ") + name + (detail ? "   " + detail : "")); if (!cond) fails++; };
@@ -709,6 +711,37 @@ console.log("\n9. *** THE FIXTURES ARE RECLAIMED WHEN THE RUN DIES, DRIVEN ON RE
     ok("!! CONTROL: a neighbouring file that is NOT a fixture survives that reclaim -- prefix-scoped, not a wildcard",
        keptNeighbour,
        "the sweep unlinks inside a SOURCE directory, so a glob widened here one day would delete source files");
+
+    // *** AND THE OTHER THING A KILLED RUN LEAVES: A GATE HALF-WAY THROUGH BEING SABOTAGED. ***
+    // rigRunner-selfcheck edits physics/upAxis-selfcheck.mjs to prove the rig page can go red, and restored
+    // it in a `finally` -- which covers a throw and not a SIGKILL. One killed run on Keith's box left that
+    // gate sabotaged, every sweep after it read RED, and the next rigRunner run snapshotted the sabotage as
+    // its own original and wrote it back. Driven here on a real SIGKILL rather than on a simulated one.
+    const scratch = path.join(os.tmpdir(), "inputsets-mutprobe-" + process.pid + ".txt");
+    const ORIGINAL = "ORIGINAL CONTENT\n";
+    fs.writeFileSync(scratch, ORIGINAL);
+    const killed = run("mutate-kill", scratch);
+    const duringKill = fs.readFileSync(scratch, "utf8");
+    const reclaimedMut = reclaimMutations();
+    ok("*** a gate left MUTATED by a SIGKILL is put back by the next run, from a ledger outside the tree ***",
+       killed.signal === "SIGKILL" && duringKill !== ORIGINAL &&
+       reclaimedMut.includes(scratch) && fs.readFileSync(scratch, "utf8") === ORIGINAL,
+       `the child died on ${killed.signal} with the file changed, and the reclaim restored ${reclaimedMut.length} ` +
+       "of them byte for byte. A finally cannot run in this death -- that is the whole reason the ledger exists");
+
+    fs.writeFileSync(scratch, ORIGINAL);
+    const rawKilled = run("rawmutate-kill", scratch);
+    const rawReclaimed = reclaimMutations();
+    const rawAfter = fs.readFileSync(scratch, "utf8");
+    try { fs.unlinkSync(scratch); } catch {}
+    ok("!! CONTROL: the same child writing the same bytes WITHOUT ledgering is NOT put back",
+       rawKilled.signal === "SIGKILL" && rawReclaimed.length === 0 && rawAfter !== ORIGINAL,
+       `reclaimed ${rawReclaimed.length}, file still ${JSON.stringify(rawAfter.slice(0, 24))}. This is what the ` +
+       "code did before the ledger, and it is exactly the state Keith's tree was left in");
+    ok("  and the ledger is gone once it has been acted on, so a repaired tree does not report itself forever",
+       !fs.existsSync(MUTATION_LEDGER) && reclaimMutations().length === 0,
+       `${MUTATION_LEDGER} -- outside the engine tree, beside the captures, because a record quoting source ` +
+       "inside the scanned tree re-enters every text census as if it were source");
 
     const leftovers = fs.readdirSync(fixtureAbs(FIXTURE_DIR)).filter((n) => n.startsWith(FIXTURE_PREFIX));
     ok("  and every fixture this run wrote is gone, with the registry agreeing with the directory",
