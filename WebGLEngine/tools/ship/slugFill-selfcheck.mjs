@@ -36,6 +36,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { whereWorst } from "./pixelWorst.mjs";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
 import { nullBackend } from "../../gfx/device.js";
 import { parseFont } from "../../text/slugFont.js";
@@ -137,13 +138,21 @@ sec("2. THE FRAME, ON BOTH BACKENDS: the fire inside an 8 against slugEval x the
                 const o = r.result[bk];
                 ok(`${bk}: the page's rectangle is the glyph's em bbox`, o.rect.every((v, i) => Math.abs(v - rect[i]) < 1e-9), o.rect.map((v) => v.toFixed(3)).join(","));
                 let worstP = 0, overP = 0, worstF = 0, overF = 0, litF = 0, exactF = 0, tinted = 0, boundary = 0;
+                // *** v4649 -- WHERE, NOT JUST HOW FAR. *** Keith's box reports "worst 16" and nothing else,
+                // and 16 of 255 against a CPU rasterisation model is not rounding -- it is a coverage rule,
+                // a sample position or a filter differing. Which of those it is depends entirely on WHICH
+                // pixel it is: an edge pixel at low coverage is an anti-aliasing rule, the glyph interior is
+                // something else. Recording 16 as this adapter's number would have buried that.
+                let atP = null, atF = null;
                 for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
                     const t = texAt(i + 0.5, j + 0.5), o4 = (j * W + i) * 4;
                     const cov = t ? slugRender(fd.atlas, e, t.tx, t.ty, t.fw) : 0;
-                    const wantP = Math.round(cov * 255), dP = Math.abs(o.plain[o4] - wantP); if (dP > TOL) overP++; if (dP > worstP) worstP = dP;
+                    const wantP = Math.round(cov * 255), dP = Math.abs(o.plain[o4] - wantP); if (dP > TOL) overP++;
+                    if (dP > worstP) { worstP = dP; atP = { i, j, cov, want: wantP, got: o.plain[o4] }; }
                     const fill = t ? sampleFill(fire.rgba, fire.w, fire.h, t.tx, t.ty, rect) : [0, 0, 0, 1], key = fillKey(cov, COLOUR, fill);
                     let dF = 0; for (let c = 0; c < 3; c++) dF = Math.max(dF, Math.abs(o.filled[o4 + c] - Math.round(key[c] * 255)));
-                    if (cov > 0.02) { litF++; if (o.filled[o4] !== o.filled[o4 + 2]) tinted++; } if (dF === 0) exactF++; if (dF > worstF) worstF = dF;
+                    if (cov > 0.02) { litF++; if (o.filled[o4] !== o.filled[o4 + 2]) tinted++; } if (dF === 0) exactF++;
+                    if (dF > worstF) { worstF = dF; atF = { i, j, cov, want: Math.round(key[0] * 255), got: o.filled[o4] }; }
                     if (dF > TOL) {
                         // a nearest sample that f32 lands across a texel boundary from f64: the device's value must then be the key with one of
                         // the four NEIGHBOURING texels (a fire colour, not a blend) -- the stereographic gate's finding, the same arithmetic
@@ -153,9 +162,10 @@ sec("2. THE FRAME, ON BOTH BACKENDS: the fire inside an 8 against slugEval x the
                         if (matched) boundary++; else overF++;
                     }
                 }
-                ok(`  ${bk}: CONTROL -- the plain 8 is slugEval through the model within ${TOL} of 255 (the fill flag changed nothing for a plain pipeline)`, overP === 0, `worst ${worstP}`);
+                ok(`  ${bk}: CONTROL -- the plain 8 is slugEval through the model within ${TOL} of 255 (the fill flag changed nothing for a plain pipeline)`,
+                    overP === 0, `worst ${worstP}, ${overP} pixel(s) over ${TOL}; ${whereWorst(atP)}`);
                 report(`${bk}: ${exactF} of ${W * H} exact, ${boundary} texel-boundary neighbours (the key with the next texel over), ${overF} unexplained`);
-                ok(`*** ${bk}: the filled 8 is colour x fill x coverage within ${TOL} of 255 on every pixel but texel-boundary neighbours (fewer than 0.2%, each the key with an adjacent fire texel) ***`, overF === 0 && boundary < W * H * 0.002 && litF > 400, `worst ${worstF}, ${boundary} boundary, ${overF} unexplained, ${litF} lit`);
+                ok(`*** ${bk}: the filled 8 is colour x fill x coverage within ${TOL} of 255 on every pixel but texel-boundary neighbours (fewer than 0.2%, each the key with an adjacent fire texel) ***`, overF === 0 && boundary < W * H * 0.002 && litF > 400, `worst ${worstF}, ${boundary} boundary, ${overF} unexplained, ${litF} lit; ${whereWorst(atF)}`);
                 ok(`  ${bk}: the fill is a fire, not a tint: lit pixels where red and blue differ`, tinted > litF * 0.3, `${tinted} of ${litF}`);
             }
             let po = 0, pw = 0; for (let i = 0; i < W * H; i++) for (let c = 0; c < 3; c++) { const d = Math.abs(r.result.webgpu.filled[i * 4 + c] - r.result.webgl2.filled[i * 4 + c]); if (d > TOL) { po++; break; } if (d > pw) pw = d; }
@@ -163,6 +173,19 @@ sec("2. THE FRAME, ON BOTH BACKENDS: the fire inside an 8 against slugEval x the
         }
         if (r && r.pageErrors && r.pageErrors.length) report("page errors: " + r.pageErrors.slice(0, 3).join(" | "));
     }
+}
+
+// ---- the classifier above, driven, because on this adapter no pixel is ever off -------------------------
+{
+    const edge = whereWorst({ i: 3, j: 4, cov: 0.004, want: 1, got: 17 });
+    const inside = whereWorst({ i: 40, j: 40, cov: 0.5, want: 128, got: 144 });
+    ok("!! the worst-pixel report tells an EDGE pixel from the glyph INTERIOR, which is the whole diagnosis",
+        /EDGE pixel/.test(edge) && /INSIDE the glyph/.test(inside) && /\(40,40\)/.test(inside),
+        "on this adapter nothing is ever off by more than 0 and the report is never exercised, so it is " +
+        "driven here: " + inside);
+    ok("!! CONTROL: with no worst pixel it says so rather than inventing a location",
+        whereWorst(null) === "no pixel over 0",
+        "a formatter that printed (0,0) for 'nothing was wrong' would read as a defect at the corner");
 }
 
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nall checks pass");

@@ -40,6 +40,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { whereWorst } from "./pixelWorst.mjs";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
 import { parseFont } from "../../text/slugFont.js";
 import { slugRender } from "../../text/slugEval.js";
@@ -153,7 +154,10 @@ sec("2. THE FRAME, ON BOTH BACKENDS: t = 0, 0.5, 1 through fromAtlas with one sh
                     const g = gradeFilled(o.frames["t" + t], W, H, texAt, (tx, ty, fw) => slugRender(atlas, e, tx, ty, fw), fire, m.rect, COLOUR, TOL);
                     stats[t] = g;
                     report(`${bk} t = ${t}: ${g.exact} of ${W * H} exact, ${g.boundary} texel-boundary neighbours, ${g.unexplained} unexplained, worst ${g.worst}, ${g.lit} lit`);
-                    ok(`*** ${bk}: the t = ${t} frame is coverage x the fire's nearest texel within ${TOL} of 255 on every pixel but texel-boundary neighbours (fewer than 0.5%) ***`, g.unexplained === 0 && g.boundary < W * H * 0.005 && g.lit > 20);
+                    ok(`*** ${bk}: the t = ${t} frame is coverage x the fire's nearest texel within ${TOL} of 255 on every pixel but texel-boundary neighbours (fewer than 0.5%) ***`, g.unexplained === 0 && g.boundary < W * H * 0.005 && g.lit > 20,
+                        // v4649 -- this row had NO detail at all, so a red on another box arrived as a
+                        // headline and nothing else. worst, the counts, and WHERE the worst pixel is.
+                        `worst ${g.worst}, ${g.boundary} boundary, ${g.unexplained} unexplained, ${g.lit} lit; ${whereWorst(g.at)}`);
                 }
                 let above = 0, lit1 = 0; for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) if (o.frames.t1[(j * W + i) * 4] > 32) { lit1++; if (j + 0.5 < topPx - 1 || j + 0.5 > floorPx + 1) above++; }
                 ok(`  ${bk}: the puddle's ink lies within its height of the floor (rows ${topPx.toFixed(1)}..${floorPx.toFixed(1)}), none above or below by more than a pixel`, above === 0 && lit1 > 100, `${lit1} lit, ${above} outside`);

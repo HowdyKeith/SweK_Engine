@@ -38,6 +38,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { whereWorst } from "./pixelWorst.mjs";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
 import { nullBackend } from "../../gfx/device.js";
 import { parseFont } from "../../text/slugFont.js";
@@ -146,6 +147,7 @@ sec("2. THE FRAME, ON BOTH BACKENDS: t = 0, 0.5, 1 packed per frame through from
                 const atlas = packMorphed(m.at(0.5).contours, { logWidth: o.logWidth }); const e = atlas.glyphs.get(0);
                 const ent = o["entry0.5"]; ok(`  ${bk}: the atlas packed here at t = 0.5 is the atlas the page packed (same loc, bands, transform, curves)`, ent.loc[0] === e.loc[0] && ent.loc[1] === e.loc[1] && ent.curveCount === e.curveCount && ent.transform.every((v, i) => Math.abs(v - e.transform[i]) < 1e-6));
                 const bb = e.bbox, s = SIZE, [ox, oy] = ORIGIN; let over = 0, worst = 0, litK = 0;
+                let at = null;   // v4649 -- WHERE the worst pixel is, not just how far: see tools/ship/pixelWorst.mjs
                 const C = [[bb.x0, bb.y0, -1, -1], [bb.x1, bb.y0, 1, -1], [bb.x1, bb.y1, 1, 1], [bb.x0, bb.y1, -1, 1]].map(([ex, ey, nx, ny]) => ({ sx: Math.round((ox + ex * s + 0.5 * nx) * 16) / 16, sy: Math.round((oy - (ey * s + 0.5 * ny)) * 16) / 16, tx: ex + 0.5 * nx / s, ty: ey + 0.5 * ny / s }));
                 for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
                     const x = i + 0.5, y = j + 0.5; let acc = 0;
@@ -157,9 +159,10 @@ sec("2. THE FRAME, ON BOTH BACKENDS: t = 0, 0.5, 1 packed per frame through from
                         const txdx = dx("tx"), txdy = dy("tx"), tydx = dx("ty"), tydy = dy("ty");
                         const tx = A.tx + txdx * (x - A.sx) + txdy * (y - A.sy), ty = A.ty + tydx * (x - A.sx) + tydy * (y - A.sy);
                         acc = slugRender(atlas, e, tx, ty, [Math.abs(txdx) + Math.abs(txdy), Math.abs(tydx) + Math.abs(tydy)]); break; }
-                    const want = Math.round(acc * 255), got = o.frames["t0.5"][(j * W + i) * 4], d = Math.abs(got - want); if (want > 5) litK++; if (d > TOL) over++; if (d > worst) worst = d;
+                    const want = Math.round(acc * 255), got = o.frames["t0.5"][(j * W + i) * 4], d = Math.abs(got - want); if (want > 5) litK++; if (d > TOL) over++;
+                    if (d > worst) { worst = d; at = { i, j, cov: acc, want, got }; }
                 }
-                ok(`*** ${bk}: the t = 0.5 frame is within ${TOL} of 255 of slugEval on the morphed atlas through the rasteriser model (${litK} lit) -- the intermediate shape, self-intersections and all, is what Slug says it is ***`, over === 0 && litK > 300, `worst ${worst}, ${over} over`);
+                ok(`*** ${bk}: the t = 0.5 frame is within ${TOL} of 255 of slugEval on the morphed atlas through the rasteriser model (${litK} lit) -- the intermediate shape, self-intersections and all, is what Slug says it is ***`, over === 0 && litK > 300, `worst ${worst}, ${over} over; ${whereWorst(at)}`);
             }
             for (const key of ["t0", "t0.5", "t1"]) { let po = 0, pw = 0; for (let i = 0; i < W * H; i++) { const d = Math.abs(r.result.webgpu.frames[key][i * 4] - r.result.webgl2.frames[key][i * 4]); if (d > TOL) po++; if (d > pw) pw = d; }
                 ok(`  ${key}: the two backends agree within ${TOL} of 255`, po === 0, `worst ${pw}`); }

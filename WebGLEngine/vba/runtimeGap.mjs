@@ -344,7 +344,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // are not alike, which is the distinction the twelve rows beside the count exist to make.
     // v4647p -- 4288 -> 4289: tools/ship/sweepRotation-selfcheck.mjs. ES modules and closures by one
     // each; async/await unmoved, because the gate awaits nothing.
-    files: 4290,               // v4649 -- RE-DERIVED: tools/ship/fixtureLitter.mjs arrived, one ES module using closures and one await (a dynamic import in playwrightResolve-selfcheck at v4648r) -- four rows moved, eight held. v4647 -- RE-DERIVED after this session's own eleven files; see the note below. v4645 -- RE-DERIVED AT THE main MERGE over the merged tree. RE-DERIVED AT THE main MERGE: 4169 on this branch, 4172 on main, 4260 merged -- LESS than the sum, which is why it is run
+    files: 4291,               // v4649r -- RE-DERIVED: tools/ship/pixelWorst.mjs arrived, one ES module with no closure, no await and no device call in it -- TWO rows moved and ten held. v4649 -- RE-DERIVED: tools/ship/fixtureLitter.mjs arrived, one ES module using closures and one await (a dynamic import in playwrightResolve-selfcheck at v4648r) -- four rows moved, eight held. v4647 -- RE-DERIVED after this session's own eleven files; see the note below. v4645 -- RE-DERIVED AT THE main MERGE over the merged tree. RE-DERIVED AT THE main MERGE: 4169 on this branch, 4172 on main, 4260 merged -- LESS than the sum, which is why it is run
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
                           // RE-TAKEN TWICE IN TWO ROUNDS, and the second time only because the ship gate
@@ -664,7 +664,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // that adds a module must re-take, which is the cost of pinning it". Six rounds added modules and none
     // re-took it. It went red on BOTH boxes, and Keith's verify named it in the drift pre-flight -- which is
     // precisely the instrument for this and only helps somebody who runs it.
-    esModules: 3990, closures: 3857, asyncAwait: 1523, typedArrays: 1125, promises: 368,
+    esModules: 3991, closures: 3857, asyncAwait: 1523, typedArrays: 1125, promises: 368,
     fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 156, webgpu: 54, threads: 23, wasm: 23,
     // v4649r -- webgpu 53 -> 54: render/temporalResolve-selfcheck gained a navigator.gpu call when its
     // confidence bound was moved onto the per-adapter record. ONE row moved and eleven did not, which is

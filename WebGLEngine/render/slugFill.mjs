@@ -78,13 +78,17 @@ export function flatModel(bbox, size, origin) {
  */
 export function gradeFilled(pixels, W, H, texAt, coverageAt, fire, rect, colour, tol = 2) {
     let exact = 0, boundary = 0, unexplained = 0, worst = 0, lit = 0, tinted = 0;
+    // v4649 -- WHERE the worst pixel is. A single number cannot tell an anti-aliasing rule from a
+    // rasterisation difference, and a gate on another box has nothing else to send back.
+    let at = null;
     for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
         const t = texAt(i + 0.5, j + 0.5), o4 = (j * W + i) * 4;
         const cov = t ? coverageAt(t.tx, t.ty, t.fw) : 0;
         const fill = t ? sampleFill(fire.rgba, fire.w, fire.h, t.tx, t.ty, rect) : [0, 0, 0, 1], key = fillKey(cov, colour, fill);
         let d = 0; for (let c = 0; c < 3; c++) d = Math.max(d, Math.abs(pixels[o4 + c] - Math.round(key[c] * 255)));
         if (cov > 0.02) { lit++; if (pixels[o4] !== pixels[o4 + 2]) tinted++; }
-        if (d === 0) exact++; if (d > worst) worst = d;
+        if (d === 0) exact++;
+        if (d > worst) { worst = d; at = { i, j, cov, want: Math.round(key[0] * 255), got: pixels[o4] }; }
         if (d > tol) {
             const [u, v] = fillUv(t.tx, t.ty, rect), [x0, y0] = nearestTexel(u, v, fire.w, fire.h); let matched = false;
             for (const [ddx, ddy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
@@ -96,5 +100,5 @@ export function gradeFilled(pixels, W, H, texAt, coverageAt, fire, rect, colour,
             if (matched) boundary++; else unexplained++;
         }
     }
-    return { exact, boundary, unexplained, worst, lit, tinted };
+    return { exact, boundary, unexplained, worst, lit, tinted, at };
 }
