@@ -126,6 +126,40 @@ export function mlpLayerCpu(layer, x, batch) {
 }
 
 /**
+ * *** THE SAME LAYER WITH THE ONE FREEDOM WGSL GIVES A COMPILER TAKEN: acc + x*W CONTRACTED INTO AN FMA. ***
+ *
+ * v4649. brainTsl-selfcheck asserted the generated pass is BIT-IDENTICAL to the shipped kernel and to the
+ * mirror above, and on SwiftShader it is. On Keith's box 56 cells differ, and "bit-identical" was never a
+ * property of the arithmetic -- it is a property of a compiler that does not fuse. WGSL permits a
+ * multiply-add to be contracted, which rounds ONCE instead of twice, so two kernels built from source text
+ * that differs only in shape can legitimately produce different numbers on a driver that takes that freedom.
+ *
+ * So the disagreement is EXPLAINED rather than tolerated: every differing cell has to equal this mirror or
+ * the unfused one. Exact, not approximate -- for f32 operands the product x*W is representable in a double
+ * and so is the sum, so ONE Math.fround of the double expression IS the fma result, bit for bit. There is no
+ * tolerance anywhere in this file and this does not add one.
+ */
+export function mlpLayerCpuFma(layer, x, batch) {
+    const { nIn, nOut } = layer;
+    const act = String(layer.act ?? "none");
+    const f = Math.fround;
+    const y = new Float32Array(batch * nOut);
+    for (let r = 0; r < batch; r++) {
+        const xoff = r * nIn;
+        for (let o = 0; o < nOut; o++) {
+            const woff = o * nIn;
+            let acc = f(layer.b[o]);
+            // ONE rounding for the whole multiply-add, which is what an fma does.
+            for (let k = 0; k < nIn; k++) acc = f(f(x[xoff + k]) * f(layer.W[woff + k]) + acc);
+            if (act === "relu") acc = f(Math.max(acc, 0));
+            else if (act === "sigmoid") acc = f(1 / f(1 + f(Math.exp(f(-acc)))));
+            y[r * nOut + o] = acc;
+        }
+    }
+    return y;
+}
+
+/**
  * The SAME layer, summed in a different order: products first from zero, bias added at the end. Algebraically
  * identical to mlpLayerCpu and under no obligation to be bit-identical. This exists to be MEASURED against
  * the kernel's order, not to be used -- v4370's lesson, where a re-association the header called observable
