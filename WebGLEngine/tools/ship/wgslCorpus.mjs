@@ -499,7 +499,7 @@ export function corpus() {
               const rays = new Float32Array([0, 0, -5, 0, 0, 1, 0, 0, 5, 0, 0, -1, 5, 0, 0, -1, 0, 0, 0, 5, 0, 0, -1, 0,
                                              -5, -5, -5, 1, 1, 1, 10, 10, 10, 1, 1, 1, 2, 2, -5, 0, 0, 1, 0.9, 0.9, -5, 0, 0, 1]);
               const rayCount = rays.length / 6;
-              return { code: R.bvhProbeWgsl(), outCount: rayCount * 2, workgroups: Math.ceil(rayCount / 64),
+              return { code: R.bvhProbeWgsl(rayCount), outCount: rayCount * 2, workgroups: Math.ceil(rayCount / 64),
                        inputs: [...R.bvhInputs(bvh), { binding: 6, data: rays }] };
           })() },
         { id: "rtPipeline.bvhShadeProbeWgsl", from: "physics/render/rtPipeline.mjs",
@@ -512,8 +512,33 @@ export function corpus() {
               const rays = new Float32Array([0, 0, -5, 0, 0, 1, 0, 0, 5, 0, 0, -1, 5, 0, 0, -1, 0, 0, 0, 5, 0, 0, -1, 0,
                                              -3, -3, -3, 1, 1, 1, 3, -3, -3, -1, 1, 1, 3, 3, -3, -1, -1, 1, -3, 3, -3, 1, -1, 1]);
               const rayCount = rays.length / 6;
-              return { code: R.bvhShadeProbeWgsl(), outCount: rayCount * 3, workgroups: Math.ceil(rayCount / 64),
+              return { code: R.bvhShadeProbeWgsl(rayCount), outCount: rayCount * 3, workgroups: Math.ceil(rayCount / 64),
                        inputs: [...R.bvhInputs(bvh), { binding: 6, data: rays }] };
+          })() },
+        // *** RTX ROUND 4 -- THE THIRD PROBE, AND THE FIX THE FIRST TWO WERE MISSING. *** bvhProbeWgsl and
+        // bvhShadeProbeWgsl above used to take no ray count at all: @workgroup_size(64) always launches 64
+        // invocations, and every existing caller (here included -- 8 rays, both entries above) supplied fewer,
+        // so the excess threads read past `rays` and WROTE past `outBuf`. WebGPU clamps an out-of-range STORE
+        // into the buffer rather than fault, which piled every excess write onto the LAST real ray's own slot --
+        // physics/render/rtPipeline-selfcheck.mjs's 32-ray sweep had this invisibly wrong for two rounds, masked
+        // because the corrupted answer happened to land on a triangle sharing two vertices with the true one,
+        // which its own "genuine shared-edge tie" tolerance (written for an honest case) absorbed without
+        // complaint. Fixed at the source: all three probes now take a required `rayCount`, baked as a WGSL
+        // const, guarding `if (gid.x >= RAY_COUNT) { return; }` before touching either buffer -- see
+        // bvhProbeWgsl's own header in physics/render/rtPipeline.mjs for the measurement that found it.
+        { id: "rtPipeline.bvhMaterialProbeWgsl", from: "physics/render/rtPipeline.mjs",
+          why: "the multi-material SBT offset, alone: bvhMatIdx[bvhHitTri] into bvhSbt, over the same cube with alternating materials one triangle apart -- graded against the caller's own materialIndex/records arrays by rtPipeline-selfcheck.mjs; here for the second backend",
+          opts: (() => {
+              const positions = [[-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1], [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]];
+              const indices = [[0, 2, 1], [0, 3, 2], [4, 5, 6], [4, 6, 7], [0, 5, 4], [0, 1, 5], [3, 6, 2], [3, 7, 6], [0, 7, 3], [0, 4, 7], [1, 6, 5], [1, 2, 6]];
+              const materialIndex = indices.map((_, i) => i % 2);
+              const bvh = R.bvhBuffersFromMesh(positions, indices, { materialIndex });
+              const sbtBuf = R.meshSbtBuffer([{ hit: "lambertian", albedo: 0.9 }, { hit: "lambertian", albedo: 0.1 }], { rgb: true });
+              const rays = new Float32Array([0, 0, -5, 0, 0, 1, 0, 0, 5, 0, 0, -1, 5, 0, 0, -1, 0, 0, 0, 5, 0, 0, -1, 0,
+                                             -3, -3, -3, 1, 1, 1, 3, -3, -3, -1, 1, 1, 3, 3, -3, -1, -1, 1, -3, 3, -3, 1, -1, 1]);
+              const rayCount = rays.length / 6;
+              return { code: R.bvhMaterialProbeWgsl(rayCount), outCount: rayCount * 3, workgroups: Math.ceil(rayCount / 64),
+                       inputs: [...R.bvhInputs(bvh), { binding: 6, data: rays }, { binding: R.BVH_BINDINGS.meshSbt, data: sbtBuf }] };
           })() },
         // accumulateWgsl works IN PLACE on binding 0 (outInit is the running mean's PRIOR value) -- the same
         // convention xpbdWgsl.solveWgsl already established in this corpus.

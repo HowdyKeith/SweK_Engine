@@ -194,9 +194,12 @@ export const MESH_SBT_SLOT = 21;
 /**
  * The storage-buffer bindings pipelineWgsl's bvh block declares, at fixed indices past binding 1 (uniforms).
  * `vertColors` is separate from the other four: it is only bound when `vertexColors: true` is asked for, so a
- * plain bvh scene (every caller before this round, and most after it) never has to supply one.
+ * plain bvh scene (every caller before this round, and most after it) never has to supply one. `matIndex` and
+ * `meshSbt` are RTX round 4's own pair, bound only when `meshMaterials: true` is asked for -- the per-triangle
+ * material index and the per-material SBT record table it indexes into (Vulkan's own SBT-offset idiom, applied
+ * within a single BLAS: a triangle maps to a material, and the material to a record).
  */
-export const BVH_BINDINGS = Object.freeze({ bounds: 2, meta: 3, order: 4, tris: 5, vertColors: 7 });
+export const BVH_BINDINGS = Object.freeze({ bounds: 2, meta: 3, order: 4, tris: 5, vertColors: 7, matIndex: 8, meshSbt: 9 });
 
 /**
  * Build a BVH over an indexed triangle mesh and pack it into the four flat buffers the GPU bvh block reads.
@@ -214,6 +217,14 @@ export const BVH_BINDINGS = Object.freeze({ bounds: 2, meta: 3, order: 4, tris: 
  * SAME byte offsets in bvhVertColors that its three vertices sit at in bvhTris. No colour interpolation
  * happens here: that is the WGSL kernel's job, from the barycentric weights Möller-Trumbore's own u/v already
  * are (mesh/meshBVH.mjs's separate baryAt is not needed -- it is a second way to compute the same numbers).
+ *
+ * `materialIndex`, if given (RTX round 4), is one integer per TRIANGLE, in the same order as `indices` -- which
+ * record of a separate SBT array (see meshSbtBuffer below) that triangle's closest-hit reads. It can be indexed
+ * directly by a triangle's OWN index with no remapping: `bvhHitTri` (what the traversal below and every WGSL
+ * mesh-hit branch actually reports) is always the ORIGINAL 0-based position in `indices`, never a SAH-reordered
+ * one -- the BVH build only swaps VALUES between POSITIONS in its own `order` array (mesh/meshBVH.mjs's own
+ * partitioning), it never relabels a triangle's identity, so `order`'s positions move under the build and the
+ * value at any position is always the triangle it always was.
  */
 export function bvhBuffersFromMesh(positions, indices, opts = {}) {
     const tris = trianglesFrom(positions, indices);
@@ -235,7 +246,12 @@ export function bvhBuffersFromMesh(positions, indices, opts = {}) {
             vertColors[o + 6] = C[0]; vertColors[o + 7] = C[1]; vertColors[o + 8] = C[2];
         }
     }
-    return Object.freeze({ bounds, meta, order, tris: trisF32, vertColors,
+    let matIndex = null;
+    if (opts.materialIndex) {
+        matIndex = new Int32Array(indices.length);
+        matIndex.set(opts.materialIndex);
+    }
+    return Object.freeze({ bounds, meta, order, tris: trisF32, vertColors, matIndex,
                            nodeCount: bvh.nodes, triCount: bvh.count, bvh });
 }
 
@@ -248,6 +264,25 @@ export function bvhInputs(b) {
         { binding: BVH_BINDINGS.tris, data: b.tris },
     ];
     if (b.vertColors) out.push({ binding: BVH_BINDINGS.vertColors, data: b.vertColors });
+    if (b.matIndex) out.push({ binding: BVH_BINDINGS.matIndex, data: b.matIndex });
+    return out;
+}
+
+/**
+ * The mesh's PER-MATERIAL SBT records (RTX round 4), packed as a flat storage buffer -- one vec4 per record, in
+ * the exact shape pipelineUniforms already packs the single-material MESH_SBT_SLOT record in
+ * ([hitShaderIndex, albedo, 0, 0] or [hitShaderIndex, ...albedoVec3] under rgb). Bound at BVH_BINDINGS.meshSbt
+ * and indexed by BVH_BINDINGS.matIndex[bvhHitTri] in the WGSL mesh-hit branch when
+ * pipelineWgsl({ meshMaterials: true }) -- a SEPARATE storage buffer rather than more uniform-block slots
+ * because the 24-vec4 block already reaches MESH_SBT_SLOT=21 and has room for at most two more records, nowhere
+ * near enough for an arbitrary material count.
+ */
+export function meshSbtBuffer(records, { rgb = false } = {}) {
+    const out = new Float32Array(records.length * 4);
+    records.forEach((r, i) => {
+        if (!(r.hit in HIT_SHADERS)) throw new Error("rtPipeline: no closest-hit shader named " + r.hit);
+        out.set([HIT_SHADERS[r.hit], ...(rgb ? albedoVec3(r.albedo) : [Array.isArray(r.albedo) ? r.albedo[0] : r.albedo, 0, 0])], i * 4);
+    });
     return out;
 }
 
@@ -256,13 +291,16 @@ export function bvhInputs(b) {
  * meshBVH.mjs's traversal, not two copies that can drift apart the way multiplayer/wadLevelHost.js and
  * tools/krbn/krbnCompare.js's independent ray-triangle kernels already did (meshBVH.mjs's own header).
  */
-function bvhWgslBlock({ vertexColors = false } = {}) {
+function bvhWgslBlock({ vertexColors = false, meshMaterials = false } = {}) {
     return `
 @group(0) @binding(${BVH_BINDINGS.bounds}) var<storage, read> bvhBounds : array<f32>;
 @group(0) @binding(${BVH_BINDINGS.meta}) var<storage, read> bvhMeta : array<i32>;
 @group(0) @binding(${BVH_BINDINGS.order}) var<storage, read> bvhOrder : array<i32>;
 @group(0) @binding(${BVH_BINDINGS.tris}) var<storage, read> bvhTris : array<f32>;
 ${vertexColors ? `@group(0) @binding(${BVH_BINDINGS.vertColors}) var<storage, read> bvhVertColors : array<f32>;` : ""}
+${meshMaterials ? `// RTX round 4 -- one material index per triangle, and the SBT records it selects among.
+@group(0) @binding(${BVH_BINDINGS.matIndex}) var<storage, read> bvhMatIdx : array<i32>;
+@group(0) @binding(${BVH_BINDINGS.meshSbt}) var<storage, read> bvhSbt : array<vec4<f32>>;` : ""}
 
 const TRI_EPS : f32 = 1e-9;   // mesh/meshBVH.mjs's own EPS, reused verbatim -- see this file's header note on
                                // reusing an f64 threshold on f32: a real mesh's triangles are never within
@@ -395,14 +433,31 @@ fn rtTraverseBvh(orig : vec3<f32>, dir : vec3<f32>, maxT : f32) -> f32 {
  * This is the INTERSECTION oracle this file's header promises: it grades the ported traversal against
  * mesh/meshBVH.mjs's own raycastFirst() directly, without going anywhere near shading or a CPU radiance
  * reference neither this file nor pathTracer.mjs has ever had for a triangle.
+ *
+ * *** RTX ROUND 4 -- `rayCount` IS REQUIRED, AND IT WAS MISSING FOR TWO ROUNDS. *** @workgroup_size(64) always
+ * launches 64 invocations regardless of `workgroups: Math.ceil(rayCount / 64)`'s intent -- a caller with fewer
+ * than 64 real rays (every existing caller: 32, 24, 8) leaves threads i >= rayCount reading PAST the end of
+ * `rays` and writing PAST the end of `outBuf`. WebGPU's bounds behaviour for an out-of-range STORE is to CLAMP
+ * the index into the buffer rather than fault -- measured directly: with 32 rays this clamps every excess
+ * thread's write onto the LAST valid ray's own slot, overwriting a real result with garbage from a phantom ray.
+ * It was invisible because it happened to land on tri=6 where the true answer was tri=11 -- triangles 6 and 11
+ * of the shared cube fixture share two vertices, so physics/render/rtPipeline-selfcheck.mjs's own "genuine
+ * shared-edge tie" tolerance (written for an honest ray-on-an-edge case) absorbed it as one. Confirmed by
+ * padding the same 32-ray call to a full 64 with far-away miss rays: the corruption disappears and ray 31
+ * reads the CPU's own tri=11, not the tolerated tie. The fix is not padding (that only hides the same fragility
+ * behind a bigger buffer) -- it is a guard, the same `if (i >= N) { return; }` shape render/rtViewer.mjs's own
+ * accumulateWgsl already uses for the identical reason.
  */
-export function bvhProbeWgsl() {
+export function bvhProbeWgsl(rayCount) {
+    if (!(rayCount > 0)) throw new Error("rtPipeline: bvhProbeWgsl needs the real ray count, to guard the invocations @workgroup_size(64) launches beyond it");
     return `
 @group(0) @binding(0) var<storage, read_write> outBuf : array<f32>;
 @group(0) @binding(6) var<storage, read> rays : array<f32>;
 ${bvhWgslBlock()}
+const RAY_COUNT : u32 = ${rayCount}u;
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
+  if (gid.x >= RAY_COUNT) { return; }
   let i = i32(gid.x);
   let r = i * 6;
   let orig = vec3<f32>(rays[r], rays[r + 1], rays[r + 2]);
@@ -418,14 +473,18 @@ fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
  * The RGB analogue of bvhProbeWgsl: for each ray, the INTERPOLATED vertex colour at the winning triangle's
  * hit point (or -1,-1,-1 for a miss), three floats per ray. Tests rtVertColor -- the one new claim vertex
  * colours make -- without going through a whole bounced render, which has no CPU oracle to grade it against.
+ * `rayCount` is required for the same reason bvhProbeWgsl's own header explains -- see there.
  */
-export function bvhShadeProbeWgsl() {
+export function bvhShadeProbeWgsl(rayCount) {
+    if (!(rayCount > 0)) throw new Error("rtPipeline: bvhShadeProbeWgsl needs the real ray count, to guard the invocations @workgroup_size(64) launches beyond it");
     return `
 @group(0) @binding(0) var<storage, read_write> outBuf : array<f32>;
 @group(0) @binding(6) var<storage, read> rays : array<f32>;
 ${bvhWgslBlock({ vertexColors: true })}
+const RAY_COUNT : u32 = ${rayCount}u;
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
+  if (gid.x >= RAY_COUNT) { return; }
   let i = i32(gid.x);
   let r = i * 6;
   let orig = vec3<f32>(rays[r], rays[r + 1], rays[r + 2]);
@@ -434,6 +493,36 @@ fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
   if (t < 0.0) { outBuf[i * 3] = -1.0; outBuf[i * 3 + 1] = -1.0; outBuf[i * 3 + 2] = -1.0; return; }
   let c = rtVertColor(bvhHitTri * 9, bvhHitU, bvhHitV);
   outBuf[i * 3] = c.x; outBuf[i * 3 + 1] = c.y; outBuf[i * 3 + 2] = c.z;
+}
+`;
+}
+
+/**
+ * RTX round 4's own probe: for each ray, the SELECTED MATERIAL's raw albedo at the winning triangle -- not the
+ * shaded/bounced radiance, the record bvhMatIdx[bvhHitTri] names in bvhSbt (or -1,-1,-1 for a miss). Tests the
+ * multi-material SBT offset lookup ALONE, exactly, without going through a bounced render that has no CPU
+ * oracle for a mesh's radiance at all (the note above); a wrong material index or a wrong record layout shows
+ * up here as the wrong three numbers, checked against what the caller's own materialIndex/records arrays say
+ * they should be, rather than being invisible inside an averaged, noisy picture.
+ */
+export function bvhMaterialProbeWgsl(rayCount) {
+    if (!(rayCount > 0)) throw new Error("rtPipeline: bvhMaterialProbeWgsl needs the real ray count, to guard the invocations @workgroup_size(64) launches beyond it -- see bvhProbeWgsl's header");
+    return `
+@group(0) @binding(0) var<storage, read_write> outBuf : array<f32>;
+@group(0) @binding(6) var<storage, read> rays : array<f32>;
+${bvhWgslBlock({ meshMaterials: true })}
+const RAY_COUNT : u32 = ${rayCount}u;
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
+  if (gid.x >= RAY_COUNT) { return; }
+  let i = i32(gid.x);
+  let r = i * 6;
+  let orig = vec3<f32>(rays[r], rays[r + 1], rays[r + 2]);
+  let dir = vec3<f32>(rays[r + 3], rays[r + 4], rays[r + 5]);
+  let t = rtTraverseBvh(orig, dir, 1e30);
+  if (t < 0.0) { outBuf[i * 3] = -1.0; outBuf[i * 3 + 1] = -1.0; outBuf[i * 3 + 2] = -1.0; return; }
+  let rec = bvhSbt[bvhMatIdx[bvhHitTri]];
+  outBuf[i * 3] = rec.y; outBuf[i * 3 + 1] = rec.z; outBuf[i * 3 + 2] = rec.w;
 }
 `;
 }
@@ -489,14 +578,18 @@ export function tablePreconditions(sbt, spp) {
 // ================================================================================================
 export function pipelineWgsl({ workgroupSize = 64, gradient = false,
                                plantSwapRecords = false, plantIgnoreRecord = false, bvh = false,
-                               rgb = false, vertexColors = false } = {}) {
+                               rgb = false, vertexColors = false, meshMaterials = false } = {}) {
     const PI = "3.141592653589793";
     if (vertexColors && !bvh) throw new Error("rtPipeline: vertexColors needs bvh -- there is no mesh to colour otherwise");
     if (vertexColors && !rgb) throw new Error("rtPipeline: vertexColors needs rgb -- a colour has nowhere to go in a one-channel pipeline");
+    // RTX round 4 -- meshMaterials needs bvh for the same reason vertexColors does: no mesh, nowhere to look up
+    // a per-triangle record. It does NOT need rgb -- HIT_SHADERS' scalar path reads rec.y exactly as the single-
+    // record MESH_SBT path always has; only the SOURCE of `rec` changes (bvhSbt[bvhMatIdx[...]] vs U[MESH_SBT]).
+    if (meshMaterials && !bvh) throw new Error("rtPipeline: meshMaterials needs bvh -- there is no mesh to look up a per-triangle material on otherwise");
     return `
 @group(0) @binding(0) var<storage, read_write> outBuf : array<f32>;
 @group(0) @binding(1) var<uniform> U : array<vec4<f32>, 24>;
-${bvh ? bvhWgslBlock({ vertexColors }) : ""}
+${bvh ? bvhWgslBlock({ vertexColors, meshMaterials }) : ""}
 
 // U[0]  eye.xyz, tanHalfFov          U[1]  fwd.xyz, geometryCount
 // U[2]  w, h, spp, eps               U[3]  right.xyz, seedBits
@@ -671,7 +764,7 @@ ${rgb ? `
       var albedo : vec3<f32>;
       ${bvh ? `if (hit.geo == nGeo) {
         N = rtTriNormal(bvhHitTri * 9);
-        rec = U[MESH_SBT];
+        ${meshMaterials ? `rec = bvhSbt[bvhMatIdx[bvhHitTri]];` : `rec = U[MESH_SBT];`}
         albedo = rec.yzw;
         ${vertexColors ? `albedo = albedo * rtVertColor(bvhHitTri * 9, bvhHitU, bvhHitV);` : ""}
       } else {` : ""}
@@ -706,9 +799,10 @@ ${rgb ? `
       var rec : vec4<f32>;
       ${bvh ? `if (hit.geo == nGeo) {
         // The mesh's own hit -- its normal comes from the winning triangle's edges, not from a sphere
-        // centre, and its material from the ONE record a bvh scene carries rather than the per-sphere table.
+        // centre, and its material from the ONE record a bvh scene carries rather than the per-sphere table
+        // (RTX round 4's meshMaterials: PER-TRIANGLE, via bvhMatIdx -- Vulkan's own SBT-offset idiom).
         N = rtTriNormal(bvhHitTri * 9);
-        rec = U[MESH_SBT];
+        ${meshMaterials ? `rec = bvhSbt[bvhMatIdx[bvhHitTri]];` : `rec = U[MESH_SBT];`}
       } else {` : ""}
       let g = U[GEO_BASE + hit.geo];
       N = nrm(P - g.xyz);
@@ -742,7 +836,7 @@ ${rgb ? `
  * pipelineWgsl({rgb:true})'s `rec.yzw` reads a real [r,g,b] -- matching pipelineWgsl's own rgb option, which
  * must be passed the same way on both sides or the shader reads a record this function never wrote correctly.
  */
-export function pipelineUniforms(sbt, { spp = 16, seed = 1, view = VIEW, eps = EPS, bvh = null, rgb = false } = {}) {
+export function pipelineUniforms(sbt, { spp = 16, seed = 1, view = VIEW, eps = EPS, bvh = null, rgb = false, meshMaterials = false } = {}) {
     if (sbt.length > MAX_GEOMETRY) throw new Error("rtPipeline: at most " + MAX_GEOMETRY + " geometries");
     const { w, h, eye, look, up, fovDeg } = view;
     const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -763,9 +857,15 @@ export function pipelineUniforms(sbt, { spp = 16, seed = 1, view = VIEW, eps = E
         U.set([HIT_SHADERS[r.hit], ...(rgb ? albedoVec3(r.albedo) : [Array.isArray(r.albedo) ? r.albedo[0] : r.albedo, 0, 0])], (16 + i) * 4);
     });
     if (bvh) {
-        if (!(bvh.hit in HIT_SHADERS)) throw new Error("rtPipeline: no closest-hit shader named " + bvh.hit);
         U.set([1, bvh.nodeCount, bvh.triCount, 0], MESH_META_SLOT * 4);
-        U.set([HIT_SHADERS[bvh.hit], ...(rgb ? albedoVec3(bvh.albedo) : [Array.isArray(bvh.albedo) ? bvh.albedo[0] : bvh.albedo, 0, 0])], MESH_SBT_SLOT * 4);
+        // RTX round 4 -- under meshMaterials, the WGSL mesh-hit branch reads bvhSbt[bvhMatIdx[bvhHitTri]]
+        // instead of U[MESH_SBT] (pipelineWgsl's own `meshMaterials` option decides which text it generates),
+        // so a single mesh-wide bvh.hit/bvh.albedo has nowhere to go and is not required here -- the per-
+        // material records live in a separate storage buffer, built by meshSbtBuffer() and bound by the caller.
+        if (!meshMaterials) {
+            if (!(bvh.hit in HIT_SHADERS)) throw new Error("rtPipeline: no closest-hit shader named " + bvh.hit);
+            U.set([HIT_SHADERS[bvh.hit], ...(rgb ? albedoVec3(bvh.albedo) : [Array.isArray(bvh.albedo) ? bvh.albedo[0] : bvh.albedo, 0, 0])], MESH_SBT_SLOT * 4);
+        }
     }
     return U;
 }
@@ -829,6 +929,42 @@ export const MEASURED_SHADING_ROUND = Object.freeze({
     // isolating the FIRST-HIT albedo (no bouncing): it was already correct and colourful, which is what
     // pointed at the bounce/normal path rather than rtVertColor itself.
     windingBugFound: Object.freeze({ trianglesAffected: 12, of: 12, symptom: "near-black render, correct first-hit albedo" }),
+});
+
+/**
+ * What RTX round 4 measured -- multi-material SBT offset (Vulkan's own idiom, within one BLAS) and the
+ * statistical gate the original gameplan called for and the shading round explicitly deferred. Re-take with:
+ * node physics/render/rtPipeline-selfcheck.mjs
+ */
+export const MEASURED_MATERIALS_ROUND = Object.freeze({
+    // Twelve triangles, alternating materials one apart, each probed at its own centroid -- an off-by-one
+    // OFFSET (reading the adjacent triangle's record) would fail every pair rather than averaging away.
+    multiMaterialProbe: Object.freeze({ triangles: 12, wrongRecord: 0 }),
+    // *** THE REAL FINDING: A LATENT BUG IN THE TWO PROBES BEFORE THIS ROUND'S OWN, TWO ROUNDS OLD. ***
+    // bvhProbeWgsl/bvhShadeProbeWgsl took no ray count; @workgroup_size(64) always launches 64 invocations, and
+    // every caller supplied fewer. The excess threads' out-of-bounds writes clamped onto the LAST real ray's
+    // slot (WebGPU's own out-of-range STORE behaviour), corrupting it -- invisible in the BVH round's own
+    // 32-ray sweep because the corrupted answer happened to share two vertices with the true one, which the
+    // "genuine shared-edge tie" tolerance (written for an honest case) absorbed without complaint. Fixed with a
+    // required `rayCount` on all three probes, guarding `if (gid.x >= RAY_COUNT) { return; }`.
+    probeBoundsBugFound: Object.freeze({ affectedProbes: 2, roundsLatent: 2, sharedEdgeTiesBefore: 2, sharedEdgeTiesAfter: 1 }),
+    // The concave open-box scene (10 triangles, a genuine cavity), a CPU mesh tracer pathTracer.mjs did not
+    // have before this round (intersect() alone grew a mesh branch; trace() needed no changes) against
+    // rtPipeline.mjs's own GPU kernel, 8 independently-seeded runs per side, GPU offset +2000 from CPU so the
+    // two share no random draws (physics/render/samplerCheck.mjs's own "a shared sampler agrees perfectly and
+    // is perfectly wrong" warning, applied to inputs rather than to a sampler).
+    concaveStatisticalGate: Object.freeze({
+        seeds: 8, cpuMean: 0.229534, cpuRelSd: 0.0105, gpuMean: 0.227655, gpuRelSd: 0.0117,
+        ratio: 0.991814, deviationFromOne: 0.008186, threeSigmaBound: 0.016654,
+    }),
+    // *** AND THE SECOND REAL FINDING: THE STATISTICAL GATE CANNOT SEE A BUG BOTH SIDES SHARE. *** Sabotaging
+    // the open box's own winding (one face reverted to the OUTWARD, closed-hull convention) failed the
+    // dedicated winding-direction assertion by name -- but the statistical comparison above PASSED, because a
+    // mesh-data bug is wrong on BOTH the CPU's triNormal() and the GPU's rtTriNormal() identically (the same
+    // cross(e1,e2) formula, same input), so the two renderers still agree with each other about the resulting
+    // wrong scene. This is why the winding check stays a separate, explicit assertion rather than being folded
+    // into "the statistical gate covers geometry too" -- measured to be structurally unable to, not assumed.
+    statisticalGateBlindToSharedMeshBugs: Object.freeze({ found: true, caughtInstead: "the winding-direction assertion" }),
 });
 
 // v4468 -- the probe manifest (docs/GPU-KERNEL-CONTRACT.md): a two-record LAMBERTIAN table (the CPU tracer has no

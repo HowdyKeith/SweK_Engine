@@ -25,6 +25,9 @@
 import { rng, cosineSampleHemisphere, createCoordinateSystem, toWorld } from "./furnace.mjs";
 import { raySphere } from "./occlusion.mjs";
 import { sampleCone, conePdf, capHalfAngle } from "./nee.mjs";
+// RTX round 4 -- the CPU reference gains eyes for a triangle mesh (mesh/meshBVH.mjs's own raycastFirst and
+// triNormal), so a concave BVH scene has an independent estimator to be held to statistically. See intersect().
+import { triNormal } from "../../mesh/meshBVH.mjs";
 // v3493 -- THE THREE MODULES THAT WERE GRADED AND UNCALLED. microfacet (v3490), fresnel (v3491) and
 // energyCompensation (v3492) each shipped with an exact key and NO CONSUMER, which is v3473's nee.mjs shape
 // three times over. This is the round that gives them one.
@@ -56,10 +59,26 @@ const cmul = (a, b) => [a[0] * b[0], a[1] * b[1], a[2] * b[2]];
 const cscale = (a, s) => [a[0] * s, a[1] * s, a[2] * s];
 const cadd = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 
-/** Nearest hit among the spheres, or null. Uses v3469's intersection -- the one with the `t > 0` test. */
-export function intersect(orig, dir, spheres) {
+/**
+ * Nearest hit among the scene's entries, or null. Uses v3469's intersection -- the one with the `t > 0` test --
+ * for a sphere, and, since RTX round 4, mesh/meshBVH.mjs's own raycastFirst() for an entry that carries `.bvh`
+ * (a MeshBVH instance) instead of `.centre`/`.radius`. THE MESH BRANCH REUSES THE SAME `hit.sphere` SHAPE A
+ * SPHERE HIT ALREADY RETURNS -- {t, P, N, sphere} -- so trace() below, which only ever reads hit.P/hit.N and
+ * material fields off hit.sphere, needs NO changes at all to shade a mesh entry: the mesh's own scene object
+ * (carrying `.albedo` and no `.centre`/`.radius`/`.emit`) simply becomes `sphere` for the rest of the path. The
+ * normal comes from mesh/meshBVH.mjs's triNormal() -- the SAME cross(e1,e2) formula rtPipeline.mjs's WGSL
+ * rtTriNormal() computes on the device, not a second derivation of it.
+ */
+export function intersect(orig, dir, scene) {
     let best = null;
-    for (const s of spheres) {
+    for (const s of scene) {
+        if (s.bvh) {
+            const hit = s.bvh.raycastFirst(orig[0], orig[1], orig[2], dir[0], dir[1], dir[2]);
+            if (hit && (best === null || hit.t < best.t)) {
+                best = { t: hit.t, P: hit.point, N: triNormal(s.bvh.tris, hit.tri * 9), sphere: s };
+            }
+            continue;
+        }
         const t = raySphere(orig, dir, s.centre, s.radius);
         if (t !== null && (best === null || t < best.t)) {
             const P = add(orig, mul(dir, t));

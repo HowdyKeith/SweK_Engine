@@ -59,6 +59,22 @@ export function baryAt(tris, i, px, py, pz) {
     return [1 - v - w, v, w];
 }
 
+/**
+ * The triangle's own face normal: cross(e1, e2), normalized. The SAME formula physics/render/rtPipeline.mjs's
+ * WGSL rtTriNormal() computes on the GPU (its own header names the same restatement for rtVertColor/baryAt --
+ * a shared formula on both sides of the CPU/GPU boundary, not a second declaration of a shared algorithm).
+ * Exported here so a CPU reference tracer that walks this class's own raycastFirst() can shade what it hits
+ * without a second, drifting copy of the cross product.
+ */
+export function triNormal(tris, i) {
+    const ax = tris[i], ay = tris[i + 1], az = tris[i + 2];
+    const e1x = tris[i + 3] - ax, e1y = tris[i + 4] - ay, e1z = tris[i + 5] - az;
+    const e2x = tris[i + 6] - ax, e2y = tris[i + 7] - ay, e2z = tris[i + 8] - az;
+    const nx = e1y * e2z - e1z * e2y, ny = e1z * e2x - e1x * e2z, nz = e1x * e2y - e1y * e2x;
+    const l = Math.hypot(nx, ny, nz) || 1;
+    return [nx / l, ny / l, nz / l];
+}
+
 /** Flatten an indexed mesh -- positions as [[x,y,z],...] and triangles as [[i,j,k],...] -- into the buffer. */
 export function trianglesFrom(positions, indices) {
     const out = new Float64Array(indices.length * 9);

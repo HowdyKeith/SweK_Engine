@@ -29,13 +29,85 @@
 // the first-hit albedo alone was already correct and colourful; only the FULL bounced render was near-black.
 // Fixed by rewinding the cube; kept here because a future reader hitting the same "why is my mesh black"
 // symptom deserves the diagnosis, not just the fix.
+//
+// *** SECTION 8 IS RTX ROUND 4'S FIRST HALF -- MULTI-MATERIAL, THE SBT-OFFSET IDIOM WITHIN ONE BLAS. *** A
+// triangle picks its own material via bvhMatIdx[bvhHitTri], indexing a separate bvhSbt record array rather than
+// the single mesh-wide MESH_SBT_SLOT sections 6-7 used. Graded EXACTLY, by a dedicated probe
+// (bvhMaterialProbeWgsl) rather than through a bounced render -- there is still no CPU radiance oracle for a
+// mesh, and a deterministic per-triangle claim does not need one.
+//
+// *** AND BUILDING THAT PROBE FOUND A REAL BUG IN THE TWO PROBES BEFORE IT, TWO ROUNDS OLD. *** bvhProbeWgsl and
+// bvhShadeProbeWgsl took no ray count; @workgroup_size(64) always launches 64 invocations, and every caller here
+// supplied fewer. The excess threads read past `rays` and wrote past `outBuf`, and WebGPU's out-of-range STORE
+// clamps into the buffer rather than faulting -- which piled every excess write onto the LAST real ray's own
+// slot. It was invisible in THIS section's own 32-ray sweep because the corrupted answer (tri 6) happened to
+// share two vertices with the true one (tri 11), so the "genuine shared-edge tie" tolerance below -- written
+// for an honest case -- absorbed it without complaint. Confirmed by padding the same call to a full 64 threads
+// with far-away miss rays: the corruption disappeared and ray 31 read the CPU's own answer, not the tolerated
+// tie. Fixed at the source (physics/render/rtPipeline.mjs: all three probes now take a required `rayCount`,
+// guarding `if (gid.x >= RAY_COUNT) { return; }`) rather than by padding every call site, which would only have
+// hidden the same fragility behind a bigger buffer. The tie count below dropped from 2 to 1 the moment the fix
+// landed -- the other one is real, and stays tolerated.
+//
+// *** SECTION 9 IS ROUND 4'S SECOND HALF -- THE STATISTICAL GATE THE ORIGINAL GAMEPLAN CALLED FOR AND SECTIONS
+// 6-7 EXPLICITLY DEFERRED. *** A mesh is concave once it has a real cavity (an open-top box: a ray can bounce
+// off one wall and land on another), so f32 and f64 can disagree about WHICH triangle a bounce lands on --
+// section 4's own argument, one level down. There is still no CPU radiance oracle to be bit-exact against, so
+// this round gives pathTracer.mjs one: intersect() now tests a `.bvh` scene entry through
+// mesh/meshBVH.mjs's own raycastFirst(), shaded with the SAME triNormal() rtPipeline.mjs's WGSL rtTriNormal()
+// computes -- trace() itself needed no changes at all, since every material read goes through hit.sphere, and a
+// mesh entry simply supplies one.
+//
+// *** THE COMPARISON USES DIFFERENT SEEDS ON EACH SIDE, DELIBERATELY. *** physics/render/samplerCheck.mjs's own
+// header names the trap: "GPU-versus-CPU is not two independent paths when both run the SAME sampler". CPU and
+// GPU here run the IDENTICAL LCG (rtPipeline.mjs's LCG constants ARE furnace.mjs's, parsed rather than
+// retyped) from the IDENTICAL per-pixel seed formula, so the SAME seed draws the SAME raw randoms on both
+// sides -- a shared-formula bug in the intersection or shading math could agree with itself and hide. The CPU
+// side draws seeds 1..N, the GPU side seeds 2001..2000+N: same scene, same camera, genuinely UNCORRELATED
+// noise, so what agrees is the RADIANCE ESTIMATE and not a shared random tape.
+//
+// *** THE BOUND IS samplerCheck.mjs's OWN METHOD, EXTENDED FROM ONE NOISY ESTIMATOR TO TWO. *** Its own
+// `agreement()`/`noiseOf()` compare a noisy Monte Carlo estimator against a DETERMINISTIC quadrature reference,
+// so only the MC side's measured relSd enters the bound. Neither side here is deterministic -- pathTracer.mjs
+// and rtPipeline.mjs are both Monte Carlo -- so this measures EACH side's own relSd across N independent seeds
+// and combines them in quadrature (the standard first-order variance of a ratio of two independent, roughly-
+// unbiased estimators: relVar(A/B) ~= relVar(A) + relVar(B) for a ratio near 1), and because the comparison is
+// between the MEAN of N seeded runs on each side rather than one single run, the bound uses the STANDARD ERROR
+// of that mean (relSd / sqrt(N)), not the per-run relSd itself -- averaging N independent seeds genuinely
+// tightens the bound, and a formula that used the per-run relSd here would be a looser bound than the evidence
+// supports.
+//
+// SABOTAGE LOG (this round) -- each applied to the real file, gate run, exit read, file restored byte for byte:
+//   A  bvhMaterialProbeWgsl's lookup replaced with a hardcoded `bvhSbt[0]`
+//        -> exit=1, section 8's own check: 12 of 12 triangles read the WRONG record -- not just the 6 whose
+//           true material happened to differ from record 0, all 12, because removing the only read of
+//           bvhMatIdx made it statically unused and WebGPU's layout:"auto" dropped its binding from the
+//           derived layout, misaligning the bind group (the same "an unused binding silently vanishes from the
+//           layout" fact section 7's own debugging history already found once, here from the opposite side).
+//   B  pathTracer.mjs's mesh intersect() branch: the triNormal() result negated before use
+//        -> exit=1, section 9: cpu mean collapses to EXACTLY 0.600000 (the albedo itself) with 0.00% relSd
+//           across all 8 seeds -- a flipped normal sends every bounce through the (zero-thickness) wall to the
+//           OUTSIDE, where it escapes to sky on its very next segment, every time, deterministically. |ratio-1|
+//           0.6206 against a bound of 0.0124 -- fifty times over, not a borderline miss.
+//   C  the open box's OWN winding: the back face's indices reverted to section 7's outward (hull) convention
+//        -> exit=1, but NOT on section 9's statistical check -- section 8's winding-direction assertion catches
+//           it by name (FAIL) while the statistical comparison PASSES (ratio 0.9987, comfortably inside bound).
+//        *** THIS IS THE FINDING WORTH KEEPING, NOT JUST A THIRD RED. *** A winding bug lives in the MESH DATA,
+//        which both renderers read identically -- CPU's triNormal() and the WGSL's rtTriNormal() are the same
+//        cross(e1,e2) formula, so a wrong triangle winding is wrong on BOTH sides the SAME way, and the two
+//        renderers still agree with each other on the resulting (wrong) scene. This is samplerCheck.mjs's own
+//        "a shared bug agrees perfectly and is perfectly wrong" warning, one level up: not a shared SAMPLER this
+//        time, a shared INPUT. It is exactly why the winding-direction assertion stays a SEPARATE, explicit
+//        check rather than being folded into "the statistical gate covers geometry too" -- it structurally
+//        cannot, and this sabotage is the proof rather than an assumption.
 "use strict";
 
 import { gateReport } from "../../tools/ship/gateReport.mjs";
 import { webgpuSkipReason, runWgslCompute } from "../../tools/ship/webgpuHarness.mjs";
 import * as R from "./rtPipeline.mjs";
-import { baryAt } from "../../mesh/meshBVH.mjs";
+import { baryAt, MeshBVH, trianglesFrom } from "../../mesh/meshBVH.mjs";
 import { traceWgsl, traceUniforms } from "./pathTracerGpu.mjs";
+import { render as renderCpuMesh } from "./pathTracer.mjs";
 const REPORT = gateReport("physics/render/rtPipeline-selfcheck.mjs");
 const REPORT_ROWS = [];
 
@@ -279,7 +351,7 @@ const rec = R.sbtRecord;
     }
     const rayCount = rays.length / 6;
 
-    const probe = await runWgslCompute({ code: R.bvhProbeWgsl(), outCount: rayCount * 2,
+    const probe = await runWgslCompute({ code: R.bvhProbeWgsl(rayCount), outCount: rayCount * 2,
                                          workgroups: Math.ceil(rayCount / 64),
                                          inputs: [...R.bvhInputs(bvh), { binding: 6, data: new Float32Array(rays) }] });
     if (!probe.ok) throw new Error("bvh probe GPU run failed: " + probe.reason + " " + (probe.errors || []).join(" | "));
@@ -391,7 +463,7 @@ const rec = R.sbtRecord;
     }
     const shadeRayCount = shadeRays.length / 6;
     const shadeGpu = await runWgslCompute({
-        code: R.bvhShadeProbeWgsl(), outCount: shadeRayCount * 3, workgroups: Math.ceil(shadeRayCount / 64),
+        code: R.bvhShadeProbeWgsl(shadeRayCount), outCount: shadeRayCount * 3, workgroups: Math.ceil(shadeRayCount / 64),
         inputs: [...R.bvhInputs(coloredBvh), { binding: 6, data: new Float32Array(shadeRays) }],
     });
     if (!shadeGpu.ok) throw new Error("shade probe GPU run failed: " + shadeGpu.reason + " " + (shadeGpu.errors || []).join(" | "));
@@ -432,6 +504,168 @@ const rec = R.sbtRecord;
         }),
         "the exact regression this section's header describes: a mesh whose normals point inward renders " +
         "near-black instead of failing loudly, so this is checked by name rather than left to be noticed again");
+}
+
+// ---- 8. MULTI-MATERIAL: THE SBT OFFSET, PER TRIANGLE, WITHIN ONE BLAS -----------------------------------------
+{
+    say("");
+    const positions = [
+        [-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1],
+        [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1],
+    ];
+    // The same rewound (outward-normal) cube sections 6-7 use.
+    const indices = [
+        [0, 2, 1], [0, 3, 2], [4, 5, 6], [4, 6, 7], [0, 5, 4], [0, 1, 5],
+        [3, 6, 2], [3, 7, 6], [0, 7, 3], [0, 4, 7], [1, 6, 5], [1, 2, 6],
+    ];
+    // Alternating materials, one triangle apart -- so a wrong OFFSET (reading the previous or next triangle's
+    // material) is caught by every adjacent pair, not just averaged away.
+    const materialIndex = indices.map((_, i) => i % 2);
+    const records = [{ hit: "lambertian", albedo: 0.9 }, { hit: "lambertian", albedo: 0.1 }];
+    const bvh = R.bvhBuffersFromMesh(positions, indices, { materialIndex });
+    const sbtBuf = R.meshSbtBuffer(records, { rgb: true });
+
+    // One ray per triangle, straight at its own centroid from 5x out (exactly on the line through the origin,
+    // so it lands on the centroid with no edge ambiguity) -- reused from bvhShadeProbeWgsl's own convention.
+    const matRays = [];
+    for (const [a, b, c] of indices) {
+        const cx = (positions[a][0] + positions[b][0] + positions[c][0]) / 3;
+        const cy = (positions[a][1] + positions[b][1] + positions[c][1]) / 3;
+        const cz = (positions[a][2] + positions[b][2] + positions[c][2]) / 3;
+        const ox = cx * 5, oy = cy * 5, oz = cz * 5;
+        const dx = -ox, dy = -oy, dz = -oz, l = Math.hypot(dx, dy, dz);
+        matRays.push(ox, oy, oz, dx / l, dy / l, dz / l);
+    }
+    const matRayCount = matRays.length / 6;
+    const matProbe = await runWgslCompute({
+        code: R.bvhMaterialProbeWgsl(matRayCount), outCount: matRayCount * 3, workgroups: Math.ceil(matRayCount / 64),
+        inputs: [...R.bvhInputs(bvh), { binding: 6, data: new Float32Array(matRays) },
+                 { binding: R.BVH_BINDINGS.meshSbt, data: sbtBuf }],
+    });
+    if (!matProbe.ok) throw new Error("material probe GPU run failed: " + matProbe.reason + " " + (matProbe.errors || []).join(" | "));
+
+    let matBad = 0;
+    for (let t = 0; t < indices.length; t++) {
+        const expected = records[materialIndex[t]].albedo;
+        const r = matProbe.values[t * 3], g = matProbe.values[t * 3 + 1], b = matProbe.values[t * 3 + 2];
+        if (Math.abs(r - expected) > 1e-5 || Math.abs(g - expected) > 1e-5 || Math.abs(b - expected) > 1e-5) matBad++;
+    }
+    say(`${indices.length} triangles, alternating materials: ${matBad} read the wrong record`);
+    REPORT_ROWS.push(["multi-material probe", `${indices.length} tris`, "n/a", `${matBad} wrong of ${indices.length}`]);
+    ok("!! every triangle reads its OWN assigned material through bvhMatIdx[bvhHitTri] -> bvhSbt, not its neighbour's",
+        matBad === 0,
+        "materials alternate one triangle apart specifically so an off-by-one OFFSET -- reading the adjacent " +
+        "triangle's record -- fails on every pair rather than being averaged into a plausible-looking mean");
+
+    // *** THE SINGLE-MATERIAL PATH IS UNCHANGED. *** meshMaterials defaults to false, and pipelineUniforms still
+    // writes MESH_SBT_SLOT exactly as it always has when it is omitted -- this re-proves sections 6-7's own
+    // single-record scenes render identically, the same regression discipline section 6 already applies to the
+    // sphere-only path.
+    const singleBvh = R.bvhBuffersFromMesh(positions, indices);
+    const singleView = { ...R.VIEW, w: 24, h: 24 };
+    const singleUniforms = R.pipelineUniforms([], { spp: 16, view: singleView, eps: 1e-4,
+        bvh: { nodeCount: singleBvh.nodeCount, triCount: singleBvh.triCount, hit: "lambertian", albedo: 0.6 } });
+    const singleGpu = await runWgslCompute({
+        code: R.pipelineWgsl({ bvh: true }), outCount: singleView.w * singleView.h, workgroups: Math.ceil(singleView.w * singleView.h / 64),
+        uniforms: singleUniforms, inputs: R.bvhInputs(singleBvh),
+    });
+    if (!singleGpu.ok) throw new Error("single-material control GPU run failed: " + singleGpu.reason);
+    const singleNonSky = singleGpu.values.filter((v) => Math.abs(v - 1.0) > 1e-4).length;
+    ok("!! and the single-record mesh path (meshMaterials omitted) still renders the mesh, unchanged by this round",
+        singleNonSky > singleGpu.values.length * 0.2,
+        `${singleNonSky} of ${singleGpu.values.length} not sky -- the same shape section 6's own single-material check asserts`);
+}
+
+// ---- 9. THE STATISTICAL GATE -- A CONCAVE MESH, HELD TO A CPU MESH TRACER THAT DID NOT EXIST BEFORE THIS ROUND
+{
+    say("");
+    // An open-top box: the cube's 8 vertices, the +y face omitted, each remaining face's winding flipped so
+    // cross(e1,e2) points INTO the cavity (hand-verified: every face's normal dotted with -centroid is positive,
+    // the same check section 7's own regression test runs, inverted for a cavity rather than a hull).
+    const positions = [
+        [-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1],
+        [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1],
+    ];
+    const indices = [
+        [0, 1, 2], [0, 2, 3],       // back z=-1
+        [4, 6, 5], [4, 7, 6],       // front z=+1
+        [0, 4, 5], [0, 5, 1],       // bottom y=-1
+        [0, 3, 7], [0, 7, 4],       // left x=-1
+        [1, 5, 6], [1, 6, 2],       // right x=+1
+    ];
+    ok("!! every inner face's cross(e1,e2) points INTO the cavity, not away from it -- the inverse of section 7's own check",
+        indices.every(([a, b, c]) => {
+            const A = positions[a], B = positions[b], C = positions[c];
+            const e1 = [B[0] - A[0], B[1] - A[1], B[2] - A[2]], e2 = [C[0] - A[0], C[1] - A[1], C[2] - A[2]];
+            const n = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
+            const centroid = [(A[0] + B[0] + C[0]) / 3, (A[1] + B[1] + C[1]) / 3, (A[2] + B[2] + C[2]) / 3];
+            return -(n[0] * centroid[0] + n[1] * centroid[1] + n[2] * centroid[2]) > 0;
+        }),
+        "the exact mirror of section 7's regression: a cavity whose normals face OUTWARD (the closed-hull " +
+        "convention) would let a bounce escape on its first try, same as looking at a convex shape from outside " +
+        "-- there would be no interreflection to compare");
+
+    const cpuBvh = new MeshBVH(trianglesFrom(positions, indices));
+    const gpuBvh = R.bvhBuffersFromMesh(positions, indices);
+    const W = 12, H = 12, SPP = 64, ALBEDO = 0.6, N = 8;
+    // Looking straight down through the opening from just outside it, at a narrow FOV: at eye height 1.5 and a
+    // 30-degree FOV, the frustum's edge reaches the opening's own y=1 plane at |0.5*tan(15deg)| = 0.134, well
+    // inside the opening's [-1,1] extent -- every primary ray enters the cavity, none can skim the outer hull
+    // or reach the sky, which is what makes "no NEE, sky=1" measure interreflection ALONE with nothing else
+    // mixed in (no silhouette antialiasing to mask out, unlike a convex shape viewed from outside).
+    const view = { w: W, h: H, eye: [0, 1.5, 0], look: [0, -1, 0], up: [0, 0, -1], fovDeg: 30 };
+
+    const cpuMeanAt = (seed) => {
+        const img = renderCpuMesh([{ bvh: cpuBvh, albedo: ALBEDO }],
+            { ...view, spp: SPP, seed, maxDepth: 8, sky: () => 1, nee: false });
+        let sum = 0; for (const v of img) sum += v;
+        return sum / img.length;
+    };
+    const gpuMeanAt = async (seed) => {
+        const uniforms = R.pipelineUniforms([], { spp: SPP, seed, view, eps: R.EPS,
+            bvh: { nodeCount: gpuBvh.nodeCount, triCount: gpuBvh.triCount, hit: "lambertian", albedo: ALBEDO } });
+        const r = await runWgslCompute({ code: R.pipelineWgsl({ bvh: true }), outCount: W * H,
+            workgroups: Math.ceil(W * H / 64), uniforms, inputs: R.bvhInputs(gpuBvh) });
+        if (!r.ok) throw new Error("concave GPU render failed: " + r.reason);
+        let sum = 0; for (const v of r.values) sum += v;
+        return sum / r.values.length;
+    };
+
+    // *** PROOF THE MEAN IS ACTUALLY MEASURING INTERREFLECTION, NOT A SILHOUETTE OR A CAMERA MISTAKE. *** With
+    // maxDepth=1 no bounce ever happens, so a non-trivial mean at maxDepth=8 can only come from radiance that
+    // travelled through at least one bounce among the mesh's own triangles -- the one thing a convex shape
+    // viewed from outside can never produce (section 4's whole reason bit-exactness held there).
+    const noBounce = renderCpuMesh([{ bvh: cpuBvh, albedo: ALBEDO }], { ...view, spp: 16, seed: 1, maxDepth: 1, sky: () => 1, nee: false });
+    const noBounceMean = noBounce.reduce((a, b) => a + b, 0) / noBounce.length;
+    ok("!! every primary ray enters the cavity -- maxDepth=1 (no bounce) reads ~0, since there is no sky to see directly",
+        noBounceMean < 1e-6, `maxDepth=1 mean ${noBounceMean.toExponential(3)}`);
+
+    const cpuVals = [], gpuVals = [];
+    for (let s = 1; s <= N; s++) cpuVals.push(cpuMeanAt(s));
+    // *** DIFFERENT SEEDS ON PURPOSE -- see this file's header. *** Same LCG, same per-pixel seed formula, so
+    // the SAME seed would draw the SAME raw randoms on both sides; offsetting the GPU's seed range is what
+    // makes the two sides genuinely independent estimators rather than one sampler graded against its own echo.
+    for (let s = 1; s <= N; s++) gpuVals.push(await gpuMeanAt(2000 + s));
+
+    const meanOf = (v) => v.reduce((a, b) => a + b, 0) / v.length;
+    const sdOf = (v, m) => Math.sqrt(v.reduce((a, b) => a + (b - m) ** 2, 0) / (v.length - 1));
+    const cpuMean = meanOf(cpuVals), cpuRelSd = sdOf(cpuVals, cpuMean) / cpuMean;
+    const gpuMean = meanOf(gpuVals), gpuRelSd = sdOf(gpuVals, gpuMean) / gpuMean;
+    const ratio = gpuMean / cpuMean;
+    // The bound is on the MEAN of N seeds, so it is the standard ERROR (relSd / sqrt(N)) that enters it, not
+    // the per-run relSd -- this file's own header explains why a looser, per-run bound would be wrong here.
+    const bound = 3 * Math.sqrt((cpuRelSd / Math.sqrt(N)) ** 2 + (gpuRelSd / Math.sqrt(N)) ** 2);
+
+    say(`cpu (${N} seeds): mean ${cpuMean.toFixed(6)}, relSd ${(cpuRelSd * 100).toFixed(2)}%`);
+    say(`gpu (${N} seeds, offset +2000): mean ${gpuMean.toFixed(6)}, relSd ${(gpuRelSd * 100).toFixed(2)}%`);
+    say(`ratio ${ratio.toFixed(6)}, |ratio-1| ${Math.abs(ratio - 1).toFixed(6)}, 3-sigma bound ${bound.toFixed(6)}`);
+    REPORT_ROWS.push(["concave open box", `${W}x${H}`, `${SPP} spp x ${N} seeds`,
+        `cpu ${cpuMean.toFixed(5)} vs gpu ${gpuMean.toFixed(5)}, |ratio-1|=${Math.abs(ratio - 1).toExponential(2)}, bound=${bound.toExponential(2)}`]);
+    ok("!! the GPU's concave mesh render agrees with a genuinely independent CPU mesh tracer, within 3 MEASURED standard errors",
+        Math.abs(ratio - 1) < bound,
+        "not bit-exact -- this scene is concave (section 4's own argument for why bit-exactness cannot survive " +
+        "multi-geometry interreflection), so the claim is a STATISTICAL one, and the bound comes from each " +
+        "side's own measured noise rather than a number somebody picked");
 }
 
 console.log("rtPipeline-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));
