@@ -499,6 +499,19 @@ export function render(scene, { w = 48, h = 48, spp = 64, seed = 1, eye = [0, 0,
     const nStrat = Math.round(Math.sqrt(spp));
     if ((strat || pathStrat) && nStrat * nStrat !== spp)
         throw new Error("pathTracer: strat needs a square spp, got " + spp + " (nearest square " + nStrat * nStrat + ")");
+    // RTX round 4 -- A MESH ENTRY WITH NO ALBEDO OR WITH emit SET FAILS LOUD HERE INSTEAD OF LATE AND UNLABELLED.
+    // Without this, a missing `.albedo` throws a bare "Cannot read properties of undefined" deep inside alb()/cmul()
+    // on the FIRST bounce that reaches it, and `.emit` on a mesh entry reaches the NEE cone-sampling code (written
+    // for a spherical light's centre/radius, `capHalfAngle`/`conePdf`) and throws there instead -- both real
+    // crashes, neither naming what was actually wrong. Refused up front, the same discipline sceneFromSbt already
+    // uses for a record it cannot express: a mesh emitter is a geometry this tracer's NEE has no light-sampling
+    // shape for, not (yet) a material question, and intersect()'s own mesh branch was built for the concave-cavity
+    // round only -- extending it to emitters is a round of its own.
+    for (const s of scene) {
+        if (!s.bvh) continue;
+        if (s.emit) throw new Error("pathTracer: a mesh scene entry cannot emit -- NEE's cone sampling has no shape for a mesh light, only a spherical one");
+        if (s.albedo === undefined) throw new Error("pathTracer: a mesh scene entry needs an albedo");
+    }
     const CH = rgb ? 3 : 1;
     const out = new Float64Array(R.w * R.h * CH);
     for (let y = R.y0; y < R.y0 + R.h; y++) {

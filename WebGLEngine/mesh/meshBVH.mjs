@@ -65,6 +65,12 @@ export function baryAt(tris, i, px, py, pz) {
  * a shared formula on both sides of the CPU/GPU boundary, not a second declaration of a shared algorithm).
  * Exported here so a CPU reference tracer that walks this class's own raycastFirst() can shade what it hits
  * without a second, drifting copy of the cross product.
+ *
+ * NAME COLLISION, NOTED RATHER THAN HIDDEN: physics/mesh/uvLscm.mjs exports its own `triNormal(P, T)` -- a
+ * DIFFERENT signature (nested [x,y,z] positions plus a separate triangle index triple, returning {n, area2})
+ * for a different caller. No import ever collides (nothing imports both under the same name), but a reader
+ * grepping "triNormal" will find two; `i` here is always a FLOAT OFFSET into a flat buffer, matching
+ * rayTriangle/baryAt's own convention in this file, never a positions/indices pair.
  */
 export function triNormal(tris, i) {
     const ax = tris[i], ay = tris[i + 1], az = tris[i + 2];

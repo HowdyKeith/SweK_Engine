@@ -90,8 +90,9 @@
 //           OUTSIDE, where it escapes to sky on its very next segment, every time, deterministically. |ratio-1|
 //           0.6206 against a bound of 0.0124 -- fifty times over, not a borderline miss.
 //   C  the open box's OWN winding: the back face's indices reverted to section 7's outward (hull) convention
-//        -> exit=1, but NOT on section 9's statistical check -- section 8's winding-direction assertion catches
-//           it by name (FAIL) while the statistical comparison PASSES (ratio 0.9987, comfortably inside bound).
+//        -> exit=1, but NOT on section 9's statistical check -- section 9's OWN winding-direction assertion
+//           (the first check in the section, before the statistical comparison) catches it by name (FAIL)
+//           while the statistical comparison further down the SAME section PASSES (ratio 0.9987, well inside bound).
 //        *** THIS IS THE FINDING WORTH KEEPING, NOT JUST A THIRD RED. *** A winding bug lives in the MESH DATA,
 //        which both renderers read identically -- CPU's triNormal() and the WGSL's rtTriNormal() are the same
 //        cross(e1,e2) formula, so a wrong triangle winding is wrong on BOTH sides the SAME way, and the two
@@ -378,6 +379,17 @@ const rec = R.sbtRecord;
         mismatches === 0,
         "a mismatch that is not a verified shared-edge tie would mean the port drifted from the CPU answer key " +
         "it was measured against, the same standard section 2's refactor oracle holds the sphere path to");
+    // *** RTX ROUND 4 -- THE TIE COUNT ITSELF IS NOW BOUNDED, NOT JUST PRINTED. *** It was not before: a
+    // "shared two vertices" tie absorbs a mismatch WITHOUT counting against `mismatches` at all, which is
+    // exactly what let the probes' missing ray-count guard (this round's own MEASURED_MATERIALS_ROUND.
+    // probeBoundsBugFound) inflate this count from 1 to 2 for two whole rounds with nothing here noticing. A
+    // regression that widens tieMismatches further -- corrupting more rays in a way that keeps landing on
+    // adjacent triangles -- would pass exactly as silently. MEASURED_BVH_ROUND.bvhIntersection.sharedEdgeTies
+    // (re-taken this round, 1) is the number this fixture actually produces; bounding a little above it catches
+    // a widening tie count without demanding bit-for-bit reproduction of which specific rays tie.
+    ok("!! and the tie count itself stays small -- a widening tie count is itself a regression, not free coverage",
+        tieMismatches <= 2,
+        `${tieMismatches} of ${rayCount} -- MEASURED_BVH_ROUND.bvhIntersection.sharedEdgeTies=${R.MEASURED_BVH_ROUND.bvhIntersection.sharedEdgeTies} is what this exact fixture produces today`);
 
     // The traversal is checkable in isolation; the MERGE into a real render is not, because there is no CPU
     // radiance reference for a triangle at all (pathTracer.mjs's scene is spheres, full stop). What IS
@@ -557,12 +569,48 @@ const rec = R.sbtRecord;
         "materials alternate one triangle apart specifically so an off-by-one OFFSET -- reading the adjacent " +
         "triangle's record -- fails on every pair rather than being averaged into a plausible-looking mean");
 
-    // *** THE SINGLE-MATERIAL PATH IS UNCHANGED. *** meshMaterials defaults to false, and pipelineUniforms still
-    // writes MESH_SBT_SLOT exactly as it always has when it is omitted -- this re-proves sections 6-7's own
-    // single-record scenes render identically, the same regression discipline section 6 already applies to the
-    // sphere-only path.
+    // *** THE PROBE ABOVE TESTS THE LOOKUP ALONE. THIS TESTS THE REAL RENDER PATH -- pipelineWgsl's ACTUAL
+    // main() closest-hit branches, bounced light and all, which nothing before this check ever compiled or
+    // dispatched. *** Three full renders of the SAME alternating-material cube: one with every triangle forced
+    // to material 0 (bright, albedo 0.9), one with every triangle forced to material 1 (dark, albedo 0.1), and
+    // the real alternating assignment. If bvhMatIdx[bvhHitTri] genuinely reaches the bounced closest-hit branch
+    // (rtPipeline.mjs's `${meshMaterials ? "rec = bvhSbt[bvhMatIdx[bvhHitTri]];" : ...}` inside main()'s own
+    // loop, not just the probe's copy of the same expression), the alternating render's mean must land STRICTLY
+    // BETWEEN the two uniform renders -- brighter than all-dark, darker than all-bright.
+    const allZeroIdx = indices.map(() => 0), allOneIdx = indices.map(() => 1);
+    const matView = { ...R.VIEW, w: 20, h: 20 };
+    const renderMatScene = async (idx) => {
+        const b = R.bvhBuffersFromMesh(positions, indices, { materialIndex: idx });
+        const u = R.pipelineUniforms([], { spp: 16, view: matView, eps: 1e-4, rgb: true, meshMaterials: true,
+            bvh: { nodeCount: b.nodeCount, triCount: b.triCount } });
+        const r = await runWgslCompute({
+            code: R.pipelineWgsl({ bvh: true, rgb: true, meshMaterials: true }),
+            outCount: matView.w * matView.h * 3, workgroups: Math.ceil(matView.w * matView.h / 64),
+            uniforms: u, inputs: [...R.bvhInputs(b), { binding: R.BVH_BINDINGS.meshSbt, data: sbtBuf }],
+        });
+        if (!r.ok) throw new Error("meshMaterials full render failed: " + r.reason + " " + (r.errors || []).join(" | "));
+        let sum = 0; for (const v of r.values) sum += v;
+        return sum / r.values.length;
+    };
+    const meanAllBright = await renderMatScene(allZeroIdx);
+    const meanAllDark = await renderMatScene(allOneIdx);
+    const meanAlternating = await renderMatScene(materialIndex);
+    say(`full render (bounced, rgb) through the REAL meshMaterials render path: all-bright ${meanAllBright.toFixed(5)}, alternating ${meanAlternating.toFixed(5)}, all-dark ${meanAllDark.toFixed(5)}`);
+    REPORT_ROWS.push(["multi-material full render", `${matView.w}x${matView.h}`, "16 spp",
+        `bright ${meanAllBright.toFixed(4)} > alt ${meanAlternating.toFixed(4)} > dark ${meanAllDark.toFixed(4)}`]);
+    ok("!! the alternating render is STRICTLY between the two uniform renders -- the real bounced render path, not just the probe, reaches bvhMatIdx",
+        meanAllDark < meanAlternating && meanAlternating < meanAllBright,
+        `${meanAllDark.toFixed(5)} < ${meanAlternating.toFixed(5)} < ${meanAllBright.toFixed(5)} -- if pipelineWgsl's main() ignored bvhMatIdx ` +
+        "and fell back to always reading material 0, the alternating render would equal the all-bright one exactly, not sit between the two");
+
+    // *** THE SINGLE-MATERIAL PATH IS UNCHANGED, CHECKED AGAINST THE EXACT NUMBER SECTION 6 ALREADY ESTABLISHED,
+    // NOT A FRESH THRESHOLD. *** A coverage threshold ("more than 20% not sky") would pass on almost any
+    // non-degenerate frame, including a WRONG one -- it does not prove nothing moved. Re-running section 6's
+    // OWN view (32x32, spp 16, eps 1e-4, albedo 0.6) and demanding the SAME notSky count MEASURED_BVH_ROUND
+    // already froze (484) is a real regression check: any change this round made to pipelineUniforms or
+    // pipelineWgsl that altered the meshMaterials-omitted path's behaviour would move this number away from 484.
     const singleBvh = R.bvhBuffersFromMesh(positions, indices);
-    const singleView = { ...R.VIEW, w: 24, h: 24 };
+    const singleView = { ...R.VIEW, w: 32, h: 32 };
     const singleUniforms = R.pipelineUniforms([], { spp: 16, view: singleView, eps: 1e-4,
         bvh: { nodeCount: singleBvh.nodeCount, triCount: singleBvh.triCount, hit: "lambertian", albedo: 0.6 } });
     const singleGpu = await runWgslCompute({
@@ -571,9 +619,9 @@ const rec = R.sbtRecord;
     });
     if (!singleGpu.ok) throw new Error("single-material control GPU run failed: " + singleGpu.reason);
     const singleNonSky = singleGpu.values.filter((v) => Math.abs(v - 1.0) > 1e-4).length;
-    ok("!! and the single-record mesh path (meshMaterials omitted) still renders the mesh, unchanged by this round",
-        singleNonSky > singleGpu.values.length * 0.2,
-        `${singleNonSky} of ${singleGpu.values.length} not sky -- the same shape section 6's own single-material check asserts`);
+    ok("!! and the single-record mesh path (meshMaterials omitted) reads the EXACT same notSky count section 6 froze -- not just \"some\" coverage",
+        singleNonSky === R.MEASURED_BVH_ROUND.meshOnlyRender.notSky,
+        `${singleNonSky} vs MEASURED_BVH_ROUND.meshOnlyRender.notSky=${R.MEASURED_BVH_ROUND.meshOnlyRender.notSky} -- same view, same scene, so an exact match is the right bar, not a threshold`);
 }
 
 // ---- 9. THE STATISTICAL GATE -- A CONCAVE MESH, HELD TO A CPU MESH TRACER THAT DID NOT EXIST BEFORE THIS ROUND
@@ -654,6 +702,22 @@ const rec = R.sbtRecord;
     const ratio = gpuMean / cpuMean;
     // The bound is on the MEAN of N seeds, so it is the standard ERROR (relSd / sqrt(N)) that enters it, not
     // the per-run relSd -- this file's own header explains why a looser, per-run bound would be wrong here.
+    //
+    // *** TWO LIMITS OF THIS METHOD, NAMED RATHER THAN LEFT FOR SOMEBODY ELSE TO DISCOVER. ***
+    //   POWER. This bound widens with N=8's own sampling noise (Bessel's correction on an 8-point sd, a
+    //   t-distribution rather than a normal one at 7 degrees of freedom) -- it can reliably catch a SYSTEMATIC
+    //   disagreement of roughly this scene's own measured relSd or larger, not an arbitrarily small one. A
+    //   real ~0.8% bias (this run's own |ratio-1|) sits at 1.5 measured standard ERRORS, not 3 -- inside the
+    //   bound and correctly so, but it means a genuinely real, smaller-than-noise offset could hide here for
+    //   many rounds before N grew large enough to catch it. Widening N is the fix if that is ever suspected;
+    //   physics/render/samplerCheck.mjs's own refineLadder() is the tree's existing instrument for exactly
+    //   that question (does a number move as the estimator is pushed harder) and is not wired in here.
+    //   SYMMETRY. The open box (missing only its +y face) has the SAME four-fold symmetry about the y-axis a
+    //   square cross-section always does, and the camera looks straight down that axis -- so a camera-basis
+    //   bug that permutes the picture under that symmetry (swapped right/up, a sign flip, a transpose) would
+    //   leave the FRAME MEAN this section compares unchanged. Neither limit is exercised by anything else in
+    //   this file; both are real, and both are left for the round that needs the extra power rather than
+    //   solved speculatively here.
     const bound = 3 * Math.sqrt((cpuRelSd / Math.sqrt(N)) ** 2 + (gpuRelSd / Math.sqrt(N)) ** 2);
 
     say(`cpu (${N} seeds): mean ${cpuMean.toFixed(6)}, relSd ${(cpuRelSd * 100).toFixed(2)}%`);
@@ -661,6 +725,17 @@ const rec = R.sbtRecord;
     say(`ratio ${ratio.toFixed(6)}, |ratio-1| ${Math.abs(ratio - 1).toFixed(6)}, 3-sigma bound ${bound.toFixed(6)}`);
     REPORT_ROWS.push(["concave open box", `${W}x${H}`, `${SPP} spp x ${N} seeds`,
         `cpu ${cpuMean.toFixed(5)} vs gpu ${gpuMean.toFixed(5)}, |ratio-1|=${Math.abs(ratio - 1).toExponential(2)}, bound=${bound.toExponential(2)}`]);
+    // *** THE BOUND WIDENS WITH EITHER SIDE'S OWN NOISE, WHICH MEANS A DEGENERATE RENDER CAN PASS FOR THE WRONG
+    // REASON. *** A GPU kernel that silently ignored its seed (returning the SAME frame every time) would read
+    // gpuRelSd=0, SHRINKING the bound rather than widening it in this particular case -- but nothing here stops
+    // a future scene/resolution where the opposite happens, and the review that found this named it precisely:
+    // relSd=0 is not evidence of agreement, it is evidence the estimator never varied at all. Checked directly
+    // rather than trusted: real Monte Carlo noise at spp=64 measures in the low single-digit percent on both
+    // sides (cpuRelSd ~1.0%, gpuRelSd ~1.2%, this run); either side reading near-zero would mean the seed
+    // never reached the render, not that the two renderers agree.
+    ok("!! both sides show REAL per-seed noise -- neither relSd is near zero, which would mean a seed never reached the render",
+        cpuRelSd > 1e-4 && gpuRelSd > 1e-4,
+        `cpuRelSd ${(cpuRelSd * 100).toFixed(3)}%, gpuRelSd ${(gpuRelSd * 100).toFixed(3)}% -- both comfortably above the floor`);
     ok("!! the GPU's concave mesh render agrees with a genuinely independent CPU mesh tracer, within 3 MEASURED standard errors",
         Math.abs(ratio - 1) < bound,
         "not bit-exact -- this scene is concave (section 4's own argument for why bit-exactness cannot survive " +

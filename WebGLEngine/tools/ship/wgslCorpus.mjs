@@ -527,18 +527,25 @@ export function corpus() {
         // const, guarding `if (gid.x >= RAY_COUNT) { return; }` before touching either buffer -- see
         // bvhProbeWgsl's own header in physics/render/rtPipeline.mjs for the measurement that found it.
         { id: "rtPipeline.bvhMaterialProbeWgsl", from: "physics/render/rtPipeline.mjs",
-          why: "the multi-material SBT offset, alone: bvhMatIdx[bvhHitTri] into bvhSbt, over the same cube with alternating materials one triangle apart -- graded against the caller's own materialIndex/records arrays by rtPipeline-selfcheck.mjs; here for the second backend",
+          why: "the multi-material SBT offset, alone: bvhMatIdx[bvhHitTri] into bvhSbt, one ray straight at each of the cube's 12 triangle centroids (not the 8-ray sweep the other two probes share, which lands on shared edges/vertices and resolves to only 4 distinct triangles -- a centroid ray is inside its OWN triangle by construction, so all 12 are distinctly exercised) -- graded against the caller's own materialIndex/records arrays by rtPipeline-selfcheck.mjs; here for the second backend",
           opts: (() => {
               const positions = [[-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1], [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]];
               const indices = [[0, 2, 1], [0, 3, 2], [4, 5, 6], [4, 6, 7], [0, 5, 4], [0, 1, 5], [3, 6, 2], [3, 7, 6], [0, 7, 3], [0, 4, 7], [1, 6, 5], [1, 2, 6]];
               const materialIndex = indices.map((_, i) => i % 2);
               const bvh = R.bvhBuffersFromMesh(positions, indices, { materialIndex });
               const sbtBuf = R.meshSbtBuffer([{ hit: "lambertian", albedo: 0.9 }, { hit: "lambertian", albedo: 0.1 }], { rgb: true });
-              const rays = new Float32Array([0, 0, -5, 0, 0, 1, 0, 0, 5, 0, 0, -1, 5, 0, 0, -1, 0, 0, 0, 5, 0, 0, -1, 0,
-                                             -3, -3, -3, 1, 1, 1, 3, -3, -3, -1, 1, 1, 3, 3, -3, -1, -1, 1, -3, 3, -3, 1, -1, 1]);
-              const rayCount = rays.length / 6;
+              const rays = [];
+              for (const [a, b, c] of indices) {
+                  const cx = (positions[a][0] + positions[b][0] + positions[c][0]) / 3;
+                  const cy = (positions[a][1] + positions[b][1] + positions[c][1]) / 3;
+                  const cz = (positions[a][2] + positions[b][2] + positions[c][2]) / 3;
+                  const ox = cx * 5, oy = cy * 5, oz = cz * 5, dx = -ox, dy = -oy, dz = -oz, l = Math.hypot(dx, dy, dz);
+                  rays.push(ox, oy, oz, dx / l, dy / l, dz / l);
+              }
+              const rayF32 = new Float32Array(rays);
+              const rayCount = rayF32.length / 6;
               return { code: R.bvhMaterialProbeWgsl(rayCount), outCount: rayCount * 3, workgroups: Math.ceil(rayCount / 64),
-                       inputs: [...R.bvhInputs(bvh), { binding: 6, data: rays }, { binding: R.BVH_BINDINGS.meshSbt, data: sbtBuf }] };
+                       inputs: [...R.bvhInputs(bvh), { binding: 6, data: rayF32 }, { binding: R.BVH_BINDINGS.meshSbt, data: sbtBuf }] };
           })() },
         // accumulateWgsl works IN PLACE on binding 0 (outInit is the running mean's PRIOR value) -- the same
         // convention xpbdWgsl.solveWgsl already established in this corpus.

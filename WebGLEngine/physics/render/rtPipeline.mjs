@@ -181,6 +181,18 @@ export function albedoVec3(albedo) {
     return Array.isArray(albedo) ? albedo.slice(0, 3) : [albedo, albedo, albedo];
 }
 
+/**
+ * One SBT record's four floats -- [hitShaderIndex, albedo, 0, 0] scalar, or [hitShaderIndex, ...albedoVec3]
+ * under rgb -- the ONE place this shape is written down. `pipelineUniforms` packs a sphere's record and a
+ * single-mesh record with it; `meshSbtBuffer` packs a whole per-material table with it. Before this round the
+ * same four-element array literal was written out three times, in a file whose own bvhWgslBlock doc argues
+ * explicitly against exactly that ("not two copies that can drift apart").
+ */
+function sbtRecordFloats(r, { rgb = false } = {}) {
+    if (!(r.hit in HIT_SHADERS)) throw new Error("rtPipeline: no closest-hit shader named " + r.hit);
+    return [HIT_SHADERS[r.hit], ...(rgb ? albedoVec3(r.albedo) : [Array.isArray(r.albedo) ? r.albedo[0] : r.albedo, 0, 0])];
+}
+
 export const MAX_GEOMETRY = 4;
 
 // ================================================================================================
@@ -248,6 +260,11 @@ export function bvhBuffersFromMesh(positions, indices, opts = {}) {
     }
     let matIndex = null;
     if (opts.materialIndex) {
+        // A short array would silently zero-fill every unmapped triangle to record 0 (Int32Array.set's own
+        // behaviour) -- indistinguishable from sabotage A's own symptom (physics/render/rtPipeline-selfcheck.mjs's
+        // sabotage log) except that nobody sabotaged anything. Refused rather than risked.
+        if (opts.materialIndex.length !== indices.length) throw new Error(
+            "rtPipeline: materialIndex must have one entry per triangle (" + indices.length + "), got " + opts.materialIndex.length);
         matIndex = new Int32Array(indices.length);
         matIndex.set(opts.materialIndex);
     }
@@ -279,10 +296,7 @@ export function bvhInputs(b) {
  */
 export function meshSbtBuffer(records, { rgb = false } = {}) {
     const out = new Float32Array(records.length * 4);
-    records.forEach((r, i) => {
-        if (!(r.hit in HIT_SHADERS)) throw new Error("rtPipeline: no closest-hit shader named " + r.hit);
-        out.set([HIT_SHADERS[r.hit], ...(rgb ? albedoVec3(r.albedo) : [Array.isArray(r.albedo) ? r.albedo[0] : r.albedo, 0, 0])], i * 4);
-    });
+    records.forEach((r, i) => out.set(sbtRecordFloats(r, { rgb }), i * 4));
     return out;
 }
 
@@ -835,6 +849,19 @@ ${rgb ? `
  * `rgb` packs each record's albedo into all THREE of a slot's spare floats (y, z, w) instead of just y, so
  * pipelineWgsl({rgb:true})'s `rec.yzw` reads a real [r,g,b] -- matching pipelineWgsl's own rgb option, which
  * must be passed the same way on both sides or the shader reads a record this function never wrote correctly.
+ *
+ * `meshMaterials` MUST ALSO MATCH pipelineWgsl's own option, the same way and for the same reason -- and here
+ * the mismatch is quieter than rgb's, because the two directions fail differently rather than both landing on
+ * "reads the wrong bytes":
+ *   - meshMaterials here, NOT in pipelineWgsl: this function skips both the `bvh.hit` validation and the
+ *     MESH_SBT_SLOT write (there is nowhere for a single mesh-wide record to go once the caller says there are
+ *     several), but the generated WGSL still reads U[MESH_SBT] -- an all-zero slot nobody wrote. The mesh
+ *     renders solid black, with no thrown error on either side to say why.
+ *   - meshMaterials in pipelineWgsl, NOT here: the WGSL reads bvhSbt[bvhMatIdx[bvhHitTri]] from storage buffers
+ *     this function never touches at all (they are built separately -- see meshSbtBuffer -- and bound by the
+ *     caller, not packed into U). Whatever the caller left bound there is what shades the mesh.
+ * Both are silent. Pass the identical `meshMaterials` value to both calls, the same discipline `rgb` already
+ * asks for.
  */
 export function pipelineUniforms(sbt, { spp = 16, seed = 1, view = VIEW, eps = EPS, bvh = null, rgb = false, meshMaterials = false } = {}) {
     if (sbt.length > MAX_GEOMETRY) throw new Error("rtPipeline: at most " + MAX_GEOMETRY + " geometries");
@@ -854,7 +881,7 @@ export function pipelineUniforms(sbt, { spp = 16, seed = 1, view = VIEW, eps = E
     U.set([camUp[0], camUp[1], camUp[2], 0], 16);
     sbt.forEach((r, i) => {
         U.set([r.centre[0], r.centre[1], r.centre[2], r.radius], (8 + i) * 4);
-        U.set([HIT_SHADERS[r.hit], ...(rgb ? albedoVec3(r.albedo) : [Array.isArray(r.albedo) ? r.albedo[0] : r.albedo, 0, 0])], (16 + i) * 4);
+        U.set(sbtRecordFloats(r, { rgb }), (16 + i) * 4);
     });
     if (bvh) {
         U.set([1, bvh.nodeCount, bvh.triCount, 0], MESH_META_SLOT * 4);
@@ -862,10 +889,7 @@ export function pipelineUniforms(sbt, { spp = 16, seed = 1, view = VIEW, eps = E
         // instead of U[MESH_SBT] (pipelineWgsl's own `meshMaterials` option decides which text it generates),
         // so a single mesh-wide bvh.hit/bvh.albedo has nowhere to go and is not required here -- the per-
         // material records live in a separate storage buffer, built by meshSbtBuffer() and bound by the caller.
-        if (!meshMaterials) {
-            if (!(bvh.hit in HIT_SHADERS)) throw new Error("rtPipeline: no closest-hit shader named " + bvh.hit);
-            U.set([HIT_SHADERS[bvh.hit], ...(rgb ? albedoVec3(bvh.albedo) : [Array.isArray(bvh.albedo) ? bvh.albedo[0] : bvh.albedo, 0, 0])], MESH_SBT_SLOT * 4);
-        }
+        if (!meshMaterials) U.set(sbtRecordFloats(bvh, { rgb }), MESH_SBT_SLOT * 4);
     }
     return U;
 }
@@ -896,9 +920,15 @@ export const MEASURED_BVH_ROUND = Object.freeze({
     cubeBvh: Object.freeze({ nodes: 5, triangles: 12, depth: 2 }),
     // 32 rays (8 hand-picked -- straight-on, diagonal, two misses, a near-corner grazer -- plus 24 swept
     // around the cube) against mesh/meshBVH.mjs's own raycastFirst(). Zero true mismatches; the only
-    // disagreements are rays landing exactly on an edge two triangles share, verified by checking the two
+    // disagreement is a ray landing exactly on an edge two triangles share, verified by checking the two
     // triangles actually have two vertices in common rather than asserted away.
-    bvhIntersection: Object.freeze({ rays: 32, trueMismatches: 0, sharedEdgeTies: 2 }),
+    //
+    // *** RTX ROUND 4 CORRECTED THIS FIELD FROM 2 TO 1. *** It was never really 2 -- bvhProbeWgsl's own missing
+    // ray-count guard (fixed this round; see MEASURED_MATERIALS_ROUND.probeBoundsBugFound) corrupted the LAST
+    // of the 32 rays' results, and the corrupted answer happened to land on a triangle sharing two vertices
+    // with the true one, so it read as a second "genuine" tie rather than as the bug it was. The number here
+    // was wrong for two whole rounds; recorded honestly rather than left standing now that it is known.
+    bvhIntersection: Object.freeze({ rays: 32, trueMismatches: 0, sharedEdgeTies: 1 }),
     // A 32x32 frame with ONLY the bvh mesh in the scene, no spheres -- proof the geometry-slot merge in
     // rtTraverse actually fires, not a claim about picture quality (there is no CPU radiance oracle for a
     // triangle; pathTracer.mjs's scene is spheres, full stop).
