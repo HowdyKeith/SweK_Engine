@@ -450,7 +450,26 @@ async function _cloneEngineSourceInner({ repo, ref, targetDir, prefix } = {}) {
     const pfx = (prefix || "").trim() ||
         (sysadmin && typeof sysadmin.preferredPrefix === "function" ? sysadmin.preferredPrefix() : "SweK_Engine");
 
-    try { fs.mkdirSync(parent, { recursive: true }); } catch (e) { return { ok: false, error: "cannot create " + parent + ": " + ((e && e.message) || e) }; }
+    // *** A DIRECTORY THAT ALREADY EXISTS IS NOT CREATED, AND ON WINDOWS THAT IS THE DIFFERENCE BETWEEN
+    // WORKING AND EPERM. *** `parent` is normally a DRIVE ROOT: the engine lives at <root>\SweK_Engine\
+    // WebGLEngine, so three levels up from ai-bridge/ is C:\. On POSIX mkdirSync("/", {recursive:true})
+    // succeeds silently because the path is already there; on Windows the same call against C:\ throws
+    //
+    //     EPERM: operation not permitted, mkdir 'C:\'
+    //
+    // and the clone never starts. Keith's rig: "cannot create C:\", with publish then correctly refusing
+    // because nothing had been cloned. A gate written on a POSIX box encodes the box -- posixAssumption.mjs's
+    // own headline, arriving here through mkdir rather than through a separator.
+    //
+    // The recursive create is still wanted for a targetDir somebody passes that does NOT exist yet, so the
+    // call is kept and only the already-there case is skipped. Checked with statSync rather than existsSync
+    // so a FILE sitting at that path is refused by name instead of read as "fine, it exists".
+    try {
+        let here = null;
+        try { here = fs.statSync(parent); } catch { here = null; }
+        if (here && !here.isDirectory()) return { ok: false, error: parent + " exists and is not a directory" };
+        if (!here) fs.mkdirSync(parent, { recursive: true });
+    } catch (e) { return { ok: false, error: "cannot create " + parent + ": " + ((e && e.message) || e) }; }
 
     const tmp = path.join(parent, "." + pfx + "_clone.tmp");
     try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {}

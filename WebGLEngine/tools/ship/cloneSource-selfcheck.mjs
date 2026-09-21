@@ -342,5 +342,41 @@ console.log("cloneSource-selfcheck -- the way IN, and what it must never overwri
     }
 }
 
+// ---------------------------------------------------------------------------------------------------------
+console.log("\nTHE CLONE PARENT IS NOT CREATED WHEN IT IS ALREADY THERE (found on the rig, after v4648)");
+// ---------------------------------------------------------------------------------------------------------
+// The clone lands beside the engine, so `parent` is normally a DRIVE ROOT -- the engine sits at
+// <root>/SweK_Engine/WebGLEngine and the bridge resolves three levels up from ai-bridge/. The code called
+// fs.mkdirSync(parent, {recursive:true}) unconditionally. On POSIX that is a silent no-op against "/",
+// which is why it survived every run here. ON WINDOWS THE SAME CALL AGAINST C:\ THROWS:
+//
+//     EPERM: operation not permitted, mkdir 'C:\'
+//
+// and the chain returned {"ok":false,"error":"cannot create C:\\"} with publish then correctly refusing
+// because nothing had been cloned. posixAssumption.mjs's headline -- "A GATE WRITTEN ON A POSIX BOX
+// ENCODES THE BOX" -- arriving through mkdir rather than through a separator.
+{
+    const src = fs.readFileSync(path.join(ENG, "ai-bridge", "githubBridge.js"), "utf8");
+    ok("!! *** the parent is only created when it is NOT already there ***",
+       /if \(!here\) fs\.mkdirSync\(parent, \{ recursive: true \}\);/.test(src) &&
+       !/^\s*try \{ fs\.mkdirSync\(parent, \{ recursive: true \}\); \}/m.test(src),
+       "the unconditional call is gone and the guarded one is present. *** THE WINDOWS BEHAVIOUR ITSELF IS " +
+       "NOT CHECKED HERE AND CANNOT BE: *** mkdir of an existing drive root only throws on Windows, so this " +
+       "row holds the SHAPE and the rig is the instrument for the fact -- the same division posixAssumption " +
+       "draws for its four measured instances");
+    ok("  ...and a target that does NOT exist is still created, so the guard did not disable the feature",
+       (() => { const d = path.join(os.tmpdir(), "clonesrc-probe-" + process.pid, "deep", "er");
+                let h = null; try { h = fs.statSync(d); } catch { h = null; }
+                if (!h) fs.mkdirSync(d, { recursive: true });
+                const made = fs.existsSync(d);
+                try { fs.rmSync(path.join(os.tmpdir(), "clonesrc-probe-" + process.pid), { recursive: true, force: true }); } catch {}
+                return made; })(),
+       "a targetDir somebody passes for the first time must still be made -- skipping the mkdir entirely " +
+       "would trade one platform's failure for both platforms'");
+    ok("  ...and a FILE sitting at that path is refused by name rather than read as 'it exists'",
+       /exists and is not a directory/.test(src),
+       "statSync rather than existsSync is what makes that distinction available");
+}
+
 console.log(fails ? `\ncloneSource-selfcheck: ${fails} FAILED` : "\ncloneSource-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);
