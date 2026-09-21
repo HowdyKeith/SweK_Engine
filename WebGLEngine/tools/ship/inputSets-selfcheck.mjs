@@ -28,6 +28,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
 import { ENG, RECORD, FORMAT, hashFile, hashDir, readRecord, whyRun, skippable, partition, reasonHistogram,
          encode, decode, clearHashCache, CONFLICT, FLAGS, firstMoved, markChangedDuringPass,
          carryForward } from "./inputSets.mjs";
@@ -39,6 +40,45 @@ import { treePaths } from "./treeRead.mjs";
 
 let fails = 0;
 const ok = (name, cond, detail = "") => { console.log((cond ? "  PASS  " : "  FAIL  ") + name + (detail ? "   " + detail : "")); if (!cond) fails++; };
+
+// *** v4649 -- THE FIXTURES THIS GATE WRITES INTO THE TREE OUTLIVED THE RUN THAT WROTE THEM. ***
+// Three sections below write `__inputsets_*` files into tools/ship and unlink each one on a later line.
+// Every one of those unlinks is reachable only on the happy path. probeOne THROWS on Windows (task #62), so
+// the run that found that died between a write and its unlink and left the fixture in the tree -- which is
+// why the capture of the next sweep on that box came back stamped WORKING TREE DIRTY over 44 reds that had
+// nothing to do with it. A gate that litters the tree it grades manufactures its own false signal.
+// So two mechanisms, because they answer two different deaths:
+//   * every fixture is REGISTERED as it is written and dropped on exit -- which covers the exit an uncaught
+//     throw takes, since Node runs `exit` listeners for one.
+//   * and the run OPENS by removing what is already there, because a Windows fail-fast (0xC0000409, task
+//     #65) runs no handler at all and the only process that can clean up after it is the next one.
+const FIXTURE_DIR = "tools/ship";
+const FIXTURE_PREFIX = "__inputsets_";
+const LIVE_FIXTURES = new Set();
+const fixtureAbs = (rel) => path.join(ENG, rel);
+const writeFixture = (rel, src) => { LIVE_FIXTURES.add(rel); fs.writeFileSync(fixtureAbs(rel), src); return rel; };
+const dropFixture = (rel) => { try { fs.unlinkSync(fixtureAbs(rel)); } catch {} LIVE_FIXTURES.delete(rel); };
+// Prefix-scoped on purpose: this deletes files out of a SOURCE directory, so the names it will remove are
+// spelled here rather than left to a glob somebody widens later. Section 9 drives that scoping too.
+function reclaimStranded() {
+    let names = [];
+    try { names = fs.readdirSync(fixtureAbs(FIXTURE_DIR)); } catch { return []; }
+    const stranded = names.filter((n) => n.startsWith(FIXTURE_PREFIX));
+    for (const n of stranded) { try { fs.unlinkSync(fixtureAbs(FIXTURE_DIR + "/" + n)); } catch {} }
+    return stranded;
+}
+const STRANDED = reclaimStranded();
+process.on("exit", () => { for (const rel of Array.from(LIVE_FIXTURES)) dropFixture(rel); });
+
+// The probe section 9 drives: a REAL child of this file, stranded the two ways that matter. A second copy of
+// the sweep, graded by the copy that wrote it, would pass on a mechanism that never ran.
+if (process.env.SWEK_INPUTSETS_LITTER_PROBE) {
+    const raw = process.env.SWEK_INPUTSETS_LITTER_PROBE === "raw";
+    const probeRel = FIXTURE_DIR + "/" + FIXTURE_PREFIX + (raw ? "rawprobe" : "litterprobe") + "_fixture.txt";
+    if (raw) fs.writeFileSync(fixtureAbs(probeRel), "unregistered\n");
+    else writeFixture(probeRel, "registered\n");
+    throw new Error("litter probe: dying with a fixture on disk");
+}
 
 const REC = readRecord();
 const GATES = Object.keys(REC.gates || {});
@@ -192,8 +232,7 @@ console.log("\n4. *** A FILE THAT DID NOT EXIST AT RECORD TIME AND NOW DOES ***"
     // records nothing about y when x is absent, so x appearing could be skipped straight past. existsSync
     // records x as a dir-shaped entry hashing to null, so the appearance IS a change. Measured, not assumed.
     const tmp = "tools/ship/__inputsets_fixture__.json";
-    const abs = path.join(ENG, tmp);
-    try { fs.unlinkSync(abs); } catch {}
+    dropFixture(tmp);
     // Through encode()/decode() for the reason section 2 gives at length: hand-spelled in the decoded
     // shape, this fixture answered "no usable input record" from v4574 onward and the row below reported
     // that sentence as though it were about the appearing file. `spawned` was the pre-v4567 spelling and
@@ -204,12 +243,12 @@ console.log("\n4. *** A FILE THAT DID NOT EXIST AT RECORD TIME AND NOW DOES ***"
     const rec = { format: FORMAT, gates: { "tools/ship/inputSets.mjs": entry } };
     ok("with the file absent -- exactly as it was when the entry was recorded -- the gate is skippable",
        whyRun("tools/ship/inputSets.mjs", rec) === null, `recorded dirHash ${JSON.stringify(entry.dirHashes[tmp])}`);
-    fs.writeFileSync(abs, "{}\n");
+    writeFixture(tmp, "{}\n");
     // clearHashCache, because this gate WRITES between two questions and the memoisation would otherwise
     // answer the second from the first. partition() clears it for the same reason; a bare whyRun does not.
     clearHashCache();
     const why = whyRun("tools/ship/inputSets.mjs", rec);
-    try { fs.unlinkSync(abs); } catch {}
+    dropFixture(tmp);
     observed.push(why);   // the DIRECTORY arm of `changed:`, which section 2 drives on a file
     ok("*** and the moment the file APPEARS the same entry says RUN, naming it -- an absence is a dependency ***",
        why === "changed: " + tmp, why || "(skippable -- which would be the silent false green)");
@@ -345,11 +384,10 @@ console.log("\n4b. the indexed format, and the conflict it exists to refuse");
     // better tree instead of red on an improvement: what is asserted is that the two readings agree with each
     // other WHEN the cache is not cleared, and that clearing it gives the truth.
     const raceRel = "tools/ship/__inputsets_race_fixture__.txt";
-    const raceAbs = path.join(ENG, raceRel);
     clearHashCache();
-    fs.writeFileSync(raceAbs, "what the early gate read\n");
+    writeFixture(raceRel, "what the early gate read\n");
     const earlyRead = hashFile(raceRel);
-    fs.writeFileSync(raceAbs, "what a later gate in the same pass wrote\n");
+    writeFixture(raceRel, "what a later gate in the same pass wrote\n");
     const lateRead = hashFile(raceRel);          // no clearHashCache -- this IS the pass
     clearHashCache();
     const truth = hashFile(raceRel);
@@ -387,9 +425,9 @@ console.log("\n4b. the indexed format, and the conflict it exists to refuse");
     // cache the row passed whether that clear was there or not: the sabotage sweep deleted it and every gate
     // stayed green. So the fixture puts the memo in the state the recorder leaves it in -- holding the EARLY
     // reading while the disk says something else -- which is the only state in which the clear does work.
-    fs.writeFileSync(raceAbs, "what the early gate read\n");
+    writeFixture(raceRel, "what the early gate read\n");
     hashFile(raceRel);                                                        // the pass reads it, and memoises
-    fs.writeFileSync(raceAbs, "what a later gate in the same pass wrote\n");   // a later gate overwrites it
+    writeFixture(raceRel, "what a later gate in the same pass wrote\n");   // a later gate overwrites it
     const det = markChangedDuringPass(marked);
     const detRec = decode(encode(marked));
     clearHashCache();
@@ -406,12 +444,12 @@ console.log("\n4b. the indexed format, and the conflict it exists to refuse");
     // during the pass reads the same at both ends and is missed. That is a real limit of comparing two
     // instants, it is not fixable by hashing harder, and a row that did not say so would be claiming the
     // record proves something it does not.
-    fs.writeFileSync(raceAbs, "what the early gate read\n");   // put it back, as a churning gate would
+    writeFixture(raceRel, "what the early gate read\n");   // put it back, as a churning gate would
     clearHashCache();
     const restored = markChangedDuringPass({
         [g1]: { reads: [g1, raceRel], dirs: [], hashes: { [g1]: hashFile(g1), [raceRel]: earlyRead }, dirHashes: {} },
     });
-    try { fs.unlinkSync(raceAbs); } catch {}
+    dropFixture(raceRel);
     clearHashCache();
     ok("  ...and a file written and then RESTORED during the pass is MISSED, which is the limit of two instants",
        !restored.changed.includes(raceRel),
@@ -511,8 +549,10 @@ console.log("\n7. *** THE TWO MECHANISMS v4567 ADDED, EACH DRIVEN ON A FIXTURE T
 {
     // Fixtures written into the tree under a `__` prefix, which gateSweep's walk does not enumerate as a
     // gate (asserted there, on a really-written file, for exactly this reason).
-    const mk = (name, src) => { const rel = "tools/ship/" + name; fs.writeFileSync(path.join(ENG, rel), src); return rel; };
-    const rm = (rel) => { try { fs.unlinkSync(path.join(ENG, rel)); } catch {} };
+    // Registered as they are written (see the guard at the top): every rm below sits on the happy path,
+    // and probeOne is the call that throws on Windows.
+    const mk = (name, src) => writeFixture("tools/ship/" + name, src);
+    const rm = (rel) => dropFixture(rel);
 
     // (1) A NAMED IMPORT OF A BUILTIN. v4566 patched the fs default-export object and disqualified 102 gates
     // written this way, on the theory that a named binding is resolved at link time and might not route
@@ -653,6 +693,56 @@ console.log("\n8. the record's field list, because a hand-spelled serialiser alr
            { format: FORMAT, gates: { "tools/ship/vacuity-selfcheck.mjs": killed } }) || ""),
        "the reason is what the skip histogram groups by: a pass full of killed probes read as a tree full of " +
        "gates that touch no files");
+}
+
+
+console.log("\n9. *** THE FIXTURES ARE RECLAIMED WHEN THE RUN DIES, DRIVEN ON REAL CHILDREN OF THIS FILE ***");
+{
+    // Both deaths, on the gate itself rather than on a re-implementation of the sweep graded by whoever
+    // wrote it: a THROW, which is the death task #62 dies and which still runs exit handlers; and a death
+    // that runs NO handler (0xC0000409, task #65), whose only possible cleaner is the NEXT run.
+    const SELF = fileURLToPath(import.meta.url);
+    const REG_REL = FIXTURE_DIR + "/" + FIXTURE_PREFIX + "litterprobe_fixture.txt";
+    const RAW_REL = FIXTURE_DIR + "/" + FIXTURE_PREFIX + "rawprobe_fixture.txt";
+    const KEEP_REL = FIXTURE_DIR + "/zz_not_an_inputsets_fixture.txt";
+    const run = (mode) => spawnSync(process.execPath, [SELF],
+        { env: { ...process.env, SWEK_INPUTSETS_LITTER_PROBE: mode }, encoding: "utf8" });
+    const there = (rel) => fs.existsSync(fixtureAbs(rel));
+
+    const reg = run("1");
+    const leftReg = there(REG_REL);
+    ok("*** a fixture stranded by an uncaught THROW is gone when the process is ***",
+       reg.status !== 0 && !leftReg,
+       `child exited ${reg.status}; fixture on disk afterwards: ${leftReg}. Before this the tree kept it, and ` +
+       "the next capture taken on that box came back stamped dirty over reds it had nothing to do with");
+
+    const rawRun = run("raw");
+    const leftRaw = there(RAW_REL);
+    ok("!! CONTROL: the same child writing the same way but NOT registering leaves its fixture behind",
+       rawRun.status !== 0 && leftRaw,
+       `child exited ${rawRun.status}; fixture on disk afterwards: ${leftRaw}. Were this green alongside the ` +
+       "row above, something other than the registry -- the OS, the spawn, a temp dir -- would be doing the tidying");
+
+    // That leftover is exactly what a handler-less death leaves, so the next child is driven on it rather
+    // than on a file this process planted to be found.
+    fs.writeFileSync(fixtureAbs(KEEP_REL), "a neighbour that is not a fixture\n");
+    const next = run("1");
+    const clearedRaw = !there(RAW_REL), keptNeighbour = there(KEEP_REL);
+    try { fs.unlinkSync(fixtureAbs(KEEP_REL)); } catch {}
+    dropFixture(RAW_REL);
+    ok("*** and the NEXT run reclaims it on the way in, which is the only cleanup a fail-fast leaves possible ***",
+       clearedRaw && !there(REG_REL),
+       `the stranded fixture was ${clearedRaw ? "reclaimed" : "STILL THERE"} after a later run opened; that run's ` +
+       `own fixture on disk: ${there(REG_REL)}. This run opened having reclaimed ${STRANDED.length}`);
+    ok("!! CONTROL: a neighbouring file that is NOT a fixture survives that reclaim -- prefix-scoped, not a wildcard",
+       keptNeighbour,
+       "the sweep unlinks inside a SOURCE directory, so a glob widened here one day would delete source files");
+
+    const leftovers = fs.readdirSync(fixtureAbs(FIXTURE_DIR)).filter((n) => n.startsWith(FIXTURE_PREFIX));
+    ok("  and every fixture this run wrote is gone, with the registry agreeing with the directory",
+       leftovers.length === 0 && LIVE_FIXTURES.size === 0,
+       `${leftovers.length} left in ${FIXTURE_DIR}${leftovers.length ? ": " + leftovers.join(", ") : ""}; ` +
+       `the registry holds ${LIVE_FIXTURES.size}`);
 }
 
 console.log(fails ? `\nFAIL -- ${fails} check(s)` : "\nALL GREEN");
