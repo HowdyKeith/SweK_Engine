@@ -2154,7 +2154,8 @@
   "tools/ship/murmurSpecies14-selfcheck.mjs": 1193,
   "tools/ship/murmurSpecies15-selfcheck.mjs": 1998,
   "tools/ship/murmurSpecies8-selfcheck.mjs": 2277,
-  "tools/ship/murmurSpecies9-selfcheck.mjs": 1940
+  "tools/ship/murmurSpecies9-selfcheck.mjs": 1940,
+  "render/objectMotionGPU-selfcheck.mjs": 779
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -3910,7 +3911,8 @@
   "tools/ship/murmurSpecies14-selfcheck.mjs": 0,
   "tools/ship/murmurSpecies15-selfcheck.mjs": 0,
   "tools/ship/murmurSpecies8-selfcheck.mjs": 0,
-  "tools/ship/murmurSpecies9-selfcheck.mjs": 0
+  "tools/ship/murmurSpecies9-selfcheck.mjs": 0,
+  "render/objectMotionGPU-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-17T16:44:13.404Z",
@@ -5666,7 +5668,8 @@
   "tools/ship/murmurSpecies14-selfcheck.mjs": "2026-09-17T16:44:13.404Z",
   "tools/ship/murmurSpecies15-selfcheck.mjs": "2026-09-17T16:44:13.404Z",
   "tools/ship/murmurSpecies8-selfcheck.mjs": "2026-09-17T16:44:13.404Z",
-  "tools/ship/murmurSpecies9-selfcheck.mjs": "2026-09-17T16:44:13.404Z"
+  "tools/ship/murmurSpecies9-selfcheck.mjs": "2026-09-17T16:44:13.404Z",
+  "render/objectMotionGPU-selfcheck.mjs": "2026-09-20T00:00:00.000Z"
  },
  "capAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 20000,
@@ -10340,7 +10343,8 @@
   "tools/ship/murmurSpecies14-selfcheck.mjs": 1193,
   "tools/ship/murmurSpecies15-selfcheck.mjs": 1998,
   "tools/ship/murmurSpecies8-selfcheck.mjs": 2277,
-  "tools/ship/murmurSpecies9-selfcheck.mjs": 1940
+  "tools/ship/murmurSpecies9-selfcheck.mjs": 1940,
+  "render/objectMotionGPU-selfcheck.mjs": 779
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-16T22:48:41.155Z",
@@ -13406,7 +13410,8 @@
   "tools/ship/murmurSpecies14-selfcheck.mjs": false,
   "tools/ship/murmurSpecies15-selfcheck.mjs": false,
   "tools/ship/murmurSpecies8-selfcheck.mjs": false,
-  "tools/ship/murmurSpecies9-selfcheck.mjs": false
+  "tools/ship/murmurSpecies9-selfcheck.mjs": false,
+  "render/objectMotionGPU-selfcheck.mjs": false
  },
  "kinds": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "loaded",
@@ -15162,6 +15167,7 @@
   "tools/ship/murmurSpecies14-selfcheck.mjs": "alone",
   "tools/ship/murmurSpecies15-selfcheck.mjs": "alone",
   "tools/ship/murmurSpecies8-selfcheck.mjs": "alone",
-  "tools/ship/murmurSpecies9-selfcheck.mjs": "alone"
+  "tools/ship/murmurSpecies9-selfcheck.mjs": "alone",
+  "render/objectMotionGPU-selfcheck.mjs": "alone"
  }
 }

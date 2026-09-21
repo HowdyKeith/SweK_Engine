@@ -8032,6 +8032,50 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4646 -- THE 256th CLOSING: the temporal arc's motion vectors stopped being camera-only.
+    since331: Object.freeze({
+        at: "v4646", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/objectMotionGPU-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 779 ms on real WebGPU, 13 rows. *** EVERY MOTION VECTOR IN THIS TREE WAS A CAMERA " +
+                 "MOTION VECTOR. *** render/motionVectors.mjs reprojects depth through the camera's two " +
+                 "matrices, which is exact for a surface that did not move and quietly wrong for one that " +
+                 "did -- the vector stays finite and valid and points at the wrong pixel. MEASURED BEFORE " +
+                 "THE MODULE WAS WRITTEN, three fixtures: static camera with a slab translating 0.30 per " +
+                 "frame is 2.615e-2 uv = 2.51 px from the truth; camera panning with the slab still is " +
+                 "1.676e-8 = 0.00 px; both moving is 2.51 px again. The middle row is why this is an " +
+                 "ADDITION and not a repair -- the old path is exact on its whole domain, and the new one " +
+                 "is held to being BIT-IDENTICAL to it with identity models: 0 of 24,576 floats and 0 of " +
+                 "6,144 valid flags differ. On the moving fixture the object-aware answer is 4.521e-10 uv, " +
+                 "which is the f64 round trip through a matrix inverse rather than a method. " +
+                 "THREE MODULES, the arc's usual three: render/objectMotion.mjs (the CPU truth and the " +
+                 "matrix tables), render/objectMotionWgsl.mjs (six bindings, two of them array<mat4x4<f32>> " +
+                 "indexed by a per-pixel id) and render/objectMotionGPU.mjs (through gfx/device.js, never " +
+                 "raw WebGPU). Device against CPU: 5.960e-8 over 24,576 floats at 96x64. " +
+                 "*** AN ID OFF THE END OF THE TABLE IS REJECTED AND COUNTED, NOT CLAMPED, *** on both " +
+                 "sides: clamping hands the pixel object 0's motion, a well-formed vector for the wrong " +
+                 "surface, which is the exact class of wrongness the module exists to remove. Mismatched " +
+                 "model/prevModel counts and a singular model matrix are refused at build time and say " +
+                 "which object. " +
+                 "*** THE SABOTAGE'S ONE 0-RED WAS THE FIXTURE, NOT THE KERNEL. *** Seven mutations, six " +
+                 "caught at once; the seventh -- the kernel reading invMVPCur[0] instead of invMVPCur[id] " +
+                 "-- passed all thirteen rows, because the first draft gave the two objects models " +
+                 "[IDENT, translate(0)] and translate(0) IS the identity, so both current matrices were " +
+                 "the same matrix and the id lookup was never exercised. The same net motion split across " +
+                 "BOTH frames makes both tables vary by id, and the mutation now takes parity from 5.96e-8 " +
+                 "to 1.31e-2. A TABLE INDEXED BY AN ID IS ONLY UNDER TEST IF ITS ENTRIES DIFFER, and an " +
+                 "identity spelled as an operation that happens to be the identity looks like it differs. " +
+                 "A SECOND WEAK ROW WAS CAUGHT BEFORE the sabotage rather than by it: 'the two objects get " +
+                 "different vectors' first compared each pixel against a wrapped-around neighbour, which is " +
+                 "nearly trivially true; it now reads mean du per object -- 9.387e-3 against -8.717e-3, a " +
+                 "gap of 1.810e-2 -- against the widest within-object spread, 7.451e-8. " +
+                 "NAMED UNCHECKED: where the id buffer COMES FROM -- nothing in the tree rasterises one " +
+                 "yet, which is why fsr.html still runs the camera-only path -- and SKINNED geometry, whose " +
+                 "motion is per-VERTEX and cannot be carried by a per-object matrix at all.",
+    }),
     // v4641 -- THE 253rd CLOSING: mh_live, the function all eighteen species read and none of them had.
     since328: Object.freeze({
         at: "v4641", swept: 2, green: 2, red: 0,

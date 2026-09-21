@@ -445,8 +445,13 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // NOT MOVE ARE THE READING: distinctDefinitions holds at 41, condFirst at 91, unknownSignature at 16 and
     // suspects at 0, so not one of the 62 invented a forty-second spelling of ok(). That is what this census
     // is for, and it is why the row compares all nine rather than the headline.
-    gates: 1751, usesOk: 1730, definesOk: 1722, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1623, condFirst: 91, unknownSignature: 16,
+    // v4646 -- 1751 -> 1752 for render/objectMotionGPU-selfcheck.mjs, the arc's object-aware motion vectors.
+    // One gate, and the four rows that move together move by exactly one again -- gates, usesOk, definesOk,
+    // nameFirst -- while distinctDefinitions holds at 41, condFirst at 91, unknownSignature at 16 and suspects
+    // at 0. It is a gate under render/ rather than tools/ship/, which is where this census's walk has found
+    // most of its population, and it spells ok() the same way anyway: the shape is the tree's, not a folder's.
+    gates: 1752, usesOk: 1731, definesOk: 1723, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1624, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

@@ -337,7 +337,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
     // and the readings overlap on everything predating the split, so they are run over the merged tree rather
     // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
-    files: 4275,               // v4645 -- RE-DERIVED AT THE main MERGE over the merged tree. RE-DERIVED AT THE main MERGE: 4169 on this branch, 4172 on main, 4260 merged -- LESS than the sum, which is why it is run
+    files: 4279,               // v4645 -- RE-DERIVED AT THE main MERGE over the merged tree. RE-DERIVED AT THE main MERGE: 4169 on this branch, 4172 on main, 4260 merged -- LESS than the sum, which is why it is run
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
                           // RE-TAKEN TWICE IN TWO ROUNDS, and the second time only because the ship gate
@@ -644,8 +644,28 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // rounds re-froze the audit, so the recorded line is gone and the file stops matching. The count fell
     // because a defect was fixed. Verified at both ends rather than argued: main's register-audit.mjs matches
     // the pattern after stripComments and this tree's does not.
-    esModules: 3975, closures: 3844, asyncAwait: 1519, typedArrays: 1123, promises: 368,
-    fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 156, webgpu: 52, threads: 23, wasm: 23,
+    //
+    // *** v4646 -- RE-TAKEN, AND THE FOUR NEW FILES ARE NAMED RATHER THAN COUNTED, which is v4628's rule and
+    // the only reason its WebAssembly row took a minute instead of a round. *** Six of the thirteen moved:
+    // files 4275 -> 4279, ES modules 3975 -> 3979, closures 3844 -> 3846, async/await 1519 -> 1521, typed
+    // arrays 1123 -> 1126, WebGL 156 -> 157. The four, with what each one matches after stripComments:
+    //     render/objectMotion.mjs               ES modules, typed arrays
+    //     render/objectMotionWgsl.mjs           ES modules
+    //     render/objectMotionGPU.mjs            ES modules, closures, async/await, typed arrays
+    //     render/objectMotionGPU-selfcheck.mjs  ES modules, closures, async/await, typed arrays, WebGL
+    // Every one of the six deltas is accounted for by that list exactly -- 4 + 4 + 2 + 2 + 3 + 1 -- so the
+    // table is corroborated per file and not just re-typed from the pre-flight's diff.
+    //
+    // *** THE WebGL ROW IS THE INTERESTING ONE AND IT IS NOT AN ACCIDENT. *** Three of the four are WebGPU
+    // modules and none of them moves the webgpu row, for the sixth-plus round running and for v4641's reason:
+    // they reach the device through gfx/device.js and tools/ship/webgpuHarness.mjs, so no WebGPU API name
+    // appears in their text. The gate moves the WEBGL row because its last claim is a REFUSAL -- it builds a
+    // webgl2 device to prove objectMotionGPU throws on one, since there is no compute stage there -- and that
+    // backend name is a live string in code rather than prose. A census that stripped strings as well as
+    // comments would read this file as touching neither API, which is the sharpest illustration this table
+    // has of what it actually measures: text in code, not capability.
+    esModules: 3979, closures: 3846, asyncAwait: 1521, typedArrays: 1126, promises: 368,
+    fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 157, webgpu: 52, threads: 23, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.
