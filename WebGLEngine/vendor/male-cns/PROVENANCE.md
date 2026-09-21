@@ -12,7 +12,7 @@ The token was never stored in this repo, committed, or used from within any Clau
 ran on the maintainer's own machine, outside the sandboxed environment that requested it, because that
 environment's network policy blocks `neuprint.janelia.org` outright.
 
-## Circuit
+## Circuit: Giant Fiber Circuit (GFC)
 
 The **Giant Fiber Circuit** (cell types `GFC1`–`GFC4`) — the fly's fast visual/mechanosensory
 escape-response pathway. 34 neurons, 313 within-circuit synaptic edges (`:ConnectsTo`, aggregated
@@ -26,14 +26,42 @@ of the ~150k-neuron male-cns connectome.
 | GFC3 | 13 |
 | GFC4 | 8 |
 
+`giant-fiber-circuit.json` — baked from the raw Neuprint fetch by `tools/maleCnsBake.mjs`. Per neuron:
+`bodyId`, `type`, `instance`, `pre`/`post` synapse counts, and its SWC skeleton as parallel flat arrays
+(`xyz`, `radius`, `kind` — the SWC structure-identifier column, `parent` — a 0-based index into that
+same neuron's own arrays, `-1` for a root point). `edges` is a flat list of `[from, to, weight]` triples
+over the same 34 `bodyId`s. Coordinates are in the dataset's native (nm-scale) voxel space, uncentered —
+the loader is responsible for centering/scaling for display.
+
+## Circuit: Ellipsoid Body Compass (EPG)
+
+The **E-PG ("compass") neurons** of the central complex — the fly's heading/ring-attractor circuit
+(Seelig & Jayaraman 2015 and follow-ups). Each EPG neuron innervates one protocerebral-bridge (PB)
+glomerulus and a corresponding ellipsoid-body wedge; as a population they tile the full ring. Fetched
+uncapped (`--max-neurons 60` against 50 real matches, so nothing was truncated) after an earlier
+40-neuron capped fetch looked anatomically incomplete — that looked like a single-glomerulus slice from
+the `instance` labels alone (`EPG(PB08)_*` for every neuron), but checking real skeleton centroids
+per `_L1`–`_L8`/`_R1`–`_R8` position on the uncapped fetch shows `(PB08)` is a fixed dataset/schema tag
+shared by every core EPG instance, not a literal glomerulus id — the position varies smoothly and
+systematically with the `_L#`/`_R#` suffix (a clean arc in x/y across all 16 positions), confirming this
+is genuine full-ring coverage, not a truncation artifact.
+
+50 neurons fetched: 46 `EPG` (the core ring, 16 PB-glomerulus positions × 2–4 neurons each, 8 per
+hemisphere) + 4 `EPGt` (a distinct tangential subtype at a 9th, anatomically separate PB position —
+confirmed by z-centroid, ~26000 vs ~22000 for the core ring). 893 within-fetch synaptic edges.
+
+| type | instance positions | count |
+|---|---|---|
+| EPG | `(PB08)_L1`–`_L8`, `_R1`–`_R8` | 46 |
+| EPGt | `(PB09)_L9`, `_R9` | 4 |
+
+`epg-compass-circuit.json` — baked the same way as the GFC file, same shape, over all 50 fetched
+neurons (core ring + tangential). A consumer wiring this circuit's topology into a policy decides for
+itself whether to include the 4 `EPGt` neurons or restrict to the 46-neuron core ring.
+
 ## Contents
 
-- `giant-fiber-circuit.json` — baked from the raw Neuprint fetch by `tools/maleCnsBake.mjs`. Per neuron:
-  `bodyId`, `type`, `instance`, `pre`/`post` synapse counts, and its SWC skeleton as parallel flat arrays
-  (`xyz`, `radius`, `kind` — the SWC structure-identifier column, `parent` — a 0-based index into that
-  same neuron's own arrays, `-1` for a root point). `edges` is a flat list of `[from, to, weight]` triples
-  over the same 34 `bodyId`s. Coordinates are in the dataset's native (nm-scale) voxel space, uncentered —
-  the loader is responsible for centering/scaling for display.
+- `giant-fiber-circuit.json`, `epg-compass-circuit.json` — see the circuit sections above.
 - `PROVENANCE.md` — this file.
 
 Re-running the fetch (e.g. for a different circuit, or a refreshed dataset version) uses the same fetch
