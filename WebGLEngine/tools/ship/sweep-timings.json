@@ -2162,7 +2162,8 @@
   "render/edgeReveal-selfcheck.mjs": 53,
   "tools/ship/constantRows-selfcheck.mjs": 1960,
   "tools/ship/runnerCallers-selfcheck.mjs": 1872,
-  "render/reactiveGPU-selfcheck.mjs": 1054
+  "render/reactiveGPU-selfcheck.mjs": 1054,
+  "tools/ship/fsrPageClocks-selfcheck.mjs": 11830
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -3926,7 +3927,8 @@
   "render/edgeReveal-selfcheck.mjs": 0,
   "tools/ship/constantRows-selfcheck.mjs": 0,
   "tools/ship/runnerCallers-selfcheck.mjs": 0,
-  "render/reactiveGPU-selfcheck.mjs": 0
+  "render/reactiveGPU-selfcheck.mjs": 0,
+  "tools/ship/fsrPageClocks-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-17T16:44:13.404Z",
@@ -5690,7 +5692,8 @@
   "render/edgeReveal-selfcheck.mjs": "2026-09-21T18:00:00.000Z",
   "tools/ship/constantRows-selfcheck.mjs": "2026-09-22T06:00:00.000Z",
   "tools/ship/runnerCallers-selfcheck.mjs": "2026-09-22T12:00:00.000Z",
-  "render/reactiveGPU-selfcheck.mjs": "2026-09-23T06:00:00.000Z"
+  "render/reactiveGPU-selfcheck.mjs": "2026-09-23T06:00:00.000Z",
+  "tools/ship/fsrPageClocks-selfcheck.mjs": "2026-09-21T00:00:00.000Z"
  },
  "capAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 20000,
@@ -10372,7 +10375,8 @@
   "render/edgeReveal-selfcheck.mjs": 53,
   "tools/ship/constantRows-selfcheck.mjs": 1960,
   "tools/ship/runnerCallers-selfcheck.mjs": 1872,
-  "render/reactiveGPU-selfcheck.mjs": 1054
+  "render/reactiveGPU-selfcheck.mjs": 1054,
+  "tools/ship/fsrPageClocks-selfcheck.mjs": 11830
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-16T22:48:41.155Z",
@@ -13446,7 +13450,8 @@
   "render/edgeReveal-selfcheck.mjs": false,
   "tools/ship/constantRows-selfcheck.mjs": false,
   "tools/ship/runnerCallers-selfcheck.mjs": false,
-  "render/reactiveGPU-selfcheck.mjs": false
+  "render/reactiveGPU-selfcheck.mjs": false,
+  "tools/ship/fsrPageClocks-selfcheck.mjs": false
  },
  "kinds": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "loaded",
@@ -15210,6 +15215,7 @@
   "render/edgeReveal-selfcheck.mjs": "alone",
   "tools/ship/constantRows-selfcheck.mjs": "alone",
   "tools/ship/runnerCallers-selfcheck.mjs": "alone",
-  "render/reactiveGPU-selfcheck.mjs": "alone"
+  "render/reactiveGPU-selfcheck.mjs": "alone",
+  "tools/ship/fsrPageClocks-selfcheck.mjs": "alone"
  }
 }

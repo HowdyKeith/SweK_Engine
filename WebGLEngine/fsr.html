@@ -54,6 +54,9 @@
       <option value="on">reactive mask: ON</option>
       <option value="off">reactive mask: OFF (the control)</option>
     </select>
+    <label>scene starts at frame
+      <input id="startframe" type="number" min="0" max="4096" step="1" value="0" style="width:5em">
+    </label>
     <select id="ratio">
       <option value="2">upscale 2&times;</option>
       <option value="1.5">upscale 1.5&times;</option>
@@ -392,6 +395,24 @@ function draw(c, buf) {
 }
 
 let running = false, frame = 0, hist = null, jit = null, ref = null, R = 96, PAN = 0.75;
+// *** v4661 -- TWO CLOCKS, WHERE THERE WAS ONE DOING TWO JOBS. ***
+// `frame` counted the accumulations AND fixed the scene: sxCur = frame * SLAB_DX, dollyVP(frame),
+// dx = frame * PAN. reset() zeroed it, so the only way to get an EMPTY history was to also put the scene
+// back to its start, and the only way to reach scene time 54 was to carry 54 frames of history there. They
+// are perfectly confounded, and the open question from v4658 is exactly which of the two the harm follows:
+// over frames 3-53 the reactive mask loses on 14 of 51, over 54-98 on 3 of 45, and nothing in this page
+// could say whether that is the AGE OF THE HISTORY or WHERE THE SLAB HAS GOT TO.
+//
+// `frame` keeps its old meaning -- the number of accumulated frames, the history's age -- and every scene
+// site now reads sceneT() instead. AT startFrame = 0 THE TWO ARE THE SAME EXPRESSION, so every number this
+// page quotes and every gate that reads it is untouched; that is v4649's `sx` discipline, for the same
+// reason: a round that moved the existing figures while adding a control could not be told from a round
+// that broke them.
+let startFrame = 0;
+const sceneT = () => frame + startFrame;
+// The previous scene time, floored at the start: on the very first frame there is no previous, and prev ==
+// cur is what `Math.max(0, frame - 1)` gave before. At startFrame = 0 this IS that expression.
+const sceneTPrev = () => Math.max(startFrame, frame + startFrame - 1);
 // *** v4638 -- THE SECOND PIECE OF PER-FRAME STATE THE REJECT CHAIN NEEDS, AND THE ONE EASIEST TO FORGET. ***
 // disocclusionCPU compares the depth a surface WOULD have had last frame against the depth RECORDED then, so
 // the page has to keep last frame's depth buffer alongside last frame's colour. Null on the first frame for
@@ -486,15 +507,40 @@ async function reset() {
     // "objects" IS the dolly camera -- same matrices, same projection, same threshold -- plus a slab that
     // translates. Everything the dolly branch does, it does; what it adds is a second model matrix.
     const dolly = $("camera").value === "dolly" || $("camera").value === "objects";
+    const objectsCam = $("camera").value === "objects";
     R = Math.max(8, Math.round(D / ratio));
     jit = makeJitterState(ratio); hist = null; frame = 0;
+    // *** AND THE JITTER PHASE GOES WITH THE SCENE, NOT WITH THE HISTORY, OR THE CONTROL IS A CONFOUND. ***
+    // The sequence is cyclic with period jitterPhaseCount(ratio) -- 32 at ratio 2 -- and the page advances it
+    // once per accumulated frame. A run starting the scene at 54 with a fresh jitter state would render scene
+    // time 54 through phase 0, where the original run rendered it through phase 54 % 32 = 22. The sub-pixel
+    // offset would differ, the rendered frame would differ, and every comparison between the two runs would
+    // be measuring the phase as well as the thing it meant to isolate. Set from the SCENE clock so the same
+    // scene time always gets the same offset.
+    // *** A NUMBER INPUT AND NOT A SELECT, AND THAT WAS MEASURED RATHER THAN PREFERRED. *** The first draft
+    // offered a <select> with four options. Assigning a value a select has no option for leaves its value
+    // EMPTY, so Number("") || 0 fell back to 0 and the control silently did nothing -- a crossover run asking
+    // for scene time 8 produced the scene's first four frames to the last decimal place, and would have been
+    // read as "starting later changes nothing". A control that accepts a value it cannot honour and says so
+    // nowhere is worse than no control. The clamp below is what a free input needs in exchange.
+    startFrame = Math.max(0, Math.min(4096, Math.round(Number($("startframe").value) || 0)));
+    jit.index = startFrame % jit.phaseCount;
     if (lockRing && lgpu) { try { lgpu.destroyRing(lockRing); } catch {} }
     lockRing = null;                             // see the declaration: a ring outlives a frame, not a reset
     prevDepth = null;                            // the depth history goes with the colour history, or frame 1
                                                  // compares this camera's depths against the last camera's
-    ref = dolly ? truthPersp(dollyVP(0), kind) : truth(kind, 0);
+    // *** THESE THREE READ THE SCENE CLOCK TOO, AND THEY DID NOT IN THE FIRST DRAFT OF THIS CHANGE. ***
+    // reset() draws the reference and the one unjittered frame for the SPATIAL panes. Written as dollyVP(0)
+    // they would show the scene at time zero while the temporal pane ran at time 54, so the three still
+    // panes and the moving one would be different scenes -- and dBil and dFsr would be scored against a
+    // truth the temporal pane never sees. At startFrame = 0 sceneT() is 0 and nothing moves.
+    // dx0 is in the SAME units the tick loop's `dx` uses, so the still panes and the moving one agree; on
+    // every camera but "pan" it is zero, and at startFrame = 0 it is zero on that one too.
+    const t0 = startFrame, sx0 = objectsCam ? t0 * SLAB_DX : 0;
+    const dx0 = $("camera").value === "pan" ? t0 * PAN : 0;
+    ref = dolly ? truthPersp(dollyVP(t0), kind, sx0) : truth(kind, dx0);
     draw(cRef, ref);
-    const one = dolly ? renderPersp(R, dollyVP(0), kind) : render(R, 0, 0, kind, 0);
+    const one = dolly ? renderPersp(R, dollyVP(t0), kind, sx0) : render(R, 0, 0, kind, dx0);
     const bil = bilinearCPU(one, R, R, D, D).data;
     const F = await fsr1(one, R, R, D, D, parseFloat($("sharp").value));
     const fsr = F.data;
@@ -509,7 +555,8 @@ async function reset() {
     $("dFsr").textContent = psnr(fsr, ref).toFixed(2) + " dB";
     $("dTmp").textContent = "--";
     cTmp.clearRect(0, 0, D, D);
-    $("metric").textContent = `render ${R}x${R} -> display ${D}x${D}   |   frame 0`;
+    $("metric").textContent = `render ${R}x${R} -> display ${D}x${D}   |   frame 0` +
+        (startFrame ? `   |   scene time ${startFrame} (history EMPTY -- the two clocks are apart)` : "");
     $("accstat").textContent = "";
     $("disstat").textContent = "";
     $("objstat").textContent = "";
@@ -523,9 +570,9 @@ async function tick() {
     const panning = cam === "pan", dolly = cam === "dolly" || objects;
     // the slab's world x this frame and last -- zero on every camera but "objects", so the three older
     // cameras take the same code path with the same numbers they always did
-    const sxCur = objects ? frame * SLAB_DX : 0;
-    const sxPrev = objects ? Math.max(0, frame - 1) * SLAB_DX : 0;
-    const dx = panning ? frame * PAN : 0;
+    const sxCur = objects ? sceneT() * SLAB_DX : 0;
+    const sxPrev = objects ? sceneTPrev() * SLAB_DX : 0;
+    const dx = panning ? sceneT() * PAN : 0;
     const [jx, jy] = jitterCurrent(jit);
     // *** JITTERED FOR THE RENDER, UNJITTERED FOR THE MOTION -- the pairing render/jitter.mjs exists to enforce
     // and that this page has never exercised, because until now it jittered the SCENE SAMPLER and not a matrix.
@@ -549,8 +596,8 @@ async function tick() {
     // a reconstruction; negated it reads 1.0318e-3, which is the floor plus a quarter. Nothing in either module
     // is wrong -- the sentence they share does not say which way the offset points, and until this page there
     // was no caller of both to find out.
-    const vpCur = dolly ? dollyVP(frame) : null;
-    const vpPrev = dolly ? dollyVP(Math.max(0, frame - 1)) : null;
+    const vpCur = dolly ? dollyVP(sceneT()) : null;
+    const vpPrev = dolly ? dollyVP(sceneTPrev()) : null;
     const frameSrc = dolly
         ? renderPersp(R, jitterProjection(vpCur, -jx, -jy, R, R), kind, sxCur)
         : render(R, jx, jy, kind, dx);
@@ -573,7 +620,7 @@ async function tick() {
     // nothing about the picture changes here -- what changes is that the number is no longer a claim. A derived
     // field cannot get the sign wrong for free, and render/motionVectorsGPU-selfcheck.mjs drives the reversed
     // camera as a control so that exact mistake fails a row instead of costing a round.
-    const tCur = (panning ? frame : 0) * PAN / D, tPrev = (panning ? Math.max(0, frame - 1) : 0) * PAN / D;
+    const tCur = (panning ? sceneT() : 0) * PAN / D, tPrev = (panning ? sceneTPrev() : 0) * PAN / D;
     // The dolly builds its depth buffer first, because the motion field is a function OF it: motionVectorsCPU
     // unprojects each pixel through the current inverse and reprojects through the previous forward, and the
     // fourth channel it writes -- the depth this surface would have had last frame -- is the whole disocclusion
@@ -903,7 +950,7 @@ async function tick() {
 
 $("run").onclick = () => { running = !running; $("run").textContent = running ? "Pause" : "Run"; if (running) tick(); };
 $("reset").onclick = () => { running = false; $("run").textContent = "Run"; reset(); };
-for (const id of ["scene", "camera", "ratio"]) $(id).onchange = () => { running = false; $("run").textContent = "Run"; reset(); };
+for (const id of ["scene", "camera", "ratio", "startframe"]) $(id).onchange = () => { running = false; $("run").textContent = "Run"; reset(); };
 $("alpha").oninput = () => { $("av").textContent = parseFloat($("alpha").value).toFixed(2); };
 $("sharp").oninput = () => { $("sv").textContent = parseFloat($("sharp").value).toFixed(2); };
 await initGPU();

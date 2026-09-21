@@ -278,9 +278,11 @@ console.log("\n5. *** THE OBJECT-MOTION CAMERA (v4649): THE FIRST TIME THIS PAGE
         "and dolly produced IDENTICAL stat lines over five frames. That control needed the old page on disk " +
         "and cannot ship; this is the property that made it true.");
     ok("  ...and the slab offset reaches the samplers ONLY on the objects camera",
-        /const sxCur = objects \? frame \* SLAB_DX : 0/.test(src)
-        && /const sxPrev = objects \? Math\.max\(0, frame - 1\) \* SLAB_DX : 0/.test(src),
-        "zero on every other camera, so a default that was quietly dropped would still be a no-op there");
+        /const sxCur = objects \? sceneT\(\) \* SLAB_DX : 0/.test(src)
+        && /const sxPrev = objects \? sceneTPrev\(\) \* SLAB_DX : 0/.test(src),
+        "zero on every other camera, so a default that was quietly dropped would still be a no-op there. " +
+        "The clock these read is v4661's sceneT(), not `frame`; at startFrame = 0 the two are the same " +
+        "expression, which is what keeps every figure above meaning what it meant.");
     ok("!! ...and the page reports the gap WITH ITS CONTROL -- the background, whose model matrix is the identity",
         /objGap[\s\S]{0,900}ids\[i\] === 1[\s\S]{0,200}offSlab/.test(src) && /on the background/.test(src),
         "the background number is the control: object-aware and camera-only are the same computation where " +
@@ -405,6 +407,49 @@ console.log("\n6. *** THE SHADING MASK REACHES THE CHAIN (v4655), AND THIS IS A 
 }
 
 console.log(fails ? `\nfsrPage-selfcheck: ${fails} FAILED` : "\nfsrPage-selfcheck: all checks pass");
+console.log("\n8. *** TWO CLOCKS (v4661): THE SCENE'S TIME AND THE HISTORY'S AGE ***");
+// *** ONE VARIABLE WAS DOING TWO JOBS AND reset() ZEROED BOTH. *** `frame` counted the accumulations and
+// also fixed the scene, so an EMPTY history could only ever be seen at the scene's start, and scene time 54
+// could only ever be reached carrying 54 frames of history. v4658's open question is precisely which of the
+// two the reactive mask's harm follows -- 14 of 51 frames lost over 3-53, 3 of 45 over 54-98 -- and no
+// experiment this page could run would have separated them.
+{
+    // *** THE CENSUS, not a list: every site that fixes the SCENE must read a clock function, and none may
+    // read bare `frame`. A list of three sites is a list somebody adds a fourth to. ***
+    const sceneSites = [...src.matchAll(/^\s*const (sxCur|sxPrev|dx|vpCur|vpPrev|tCur) =.*$/gm)].map((m) => m[0]);
+    const bareFrame = sceneSites.filter((l) => /\bframe\b/.test(l));
+    ok("!! *** every scene site reads the SCENE clock, and not one of them reads `frame` ***",
+        sceneSites.length === 6 && bareFrame.length === 0,
+        `${sceneSites.length} scene sites found, ${bareFrame.length} still reading \`frame\`` +
+        (bareFrame.length ? ": " + bareFrame.map((l) => l.trim().slice(0, 60)).join(" | ") : "") +
+        ". `frame` keeps its old meaning -- the history's age -- and nothing that positions the camera, the " +
+        "slab or the pan is allowed to ask it.");
+    // *** AND THE TWO CLOCKS COINCIDE AT startFrame 0, WHICH IS THE WHOLE REASON THE OLD NUMBERS SURVIVE. ***
+    ok("!! ...and at startFrame 0 the two clocks are the SAME expression, so every figure above is untouched",
+        /const sceneT = \(\) => frame \+ startFrame;/.test(src)
+        && /const sceneTPrev = \(\) => Math\.max\(startFrame, frame \+ startFrame - 1\);/.test(src),
+        "frame + 0 is frame, and Math.max(0, frame + 0 - 1) is Math.max(0, frame - 1) -- the two expressions " +
+        "these replaced. v4649's `sx` discipline: a round that moved this page's quoted figures while adding " +
+        "a control could not be told from a round that broke them.");
+    // *** THE CONFOUND THE CONTROL WOULD OTHERWISE HAVE BEEN. ***
+    ok("!! ...and the JITTER PHASE is set from the scene clock, or the control measures the phase too",
+        /jit\.index = startFrame % jit\.phaseCount/.test(src),
+        "the sequence is cyclic with period jitterPhaseCount(ratio) -- 32 at ratio 2 -- so a run starting the " +
+        "scene at 54 with a fresh jitter state renders it through phase 0 where the original used 54 % 32 = " +
+        "22. A different sub-pixel offset is a different rendered frame, and every comparison between the two " +
+        "runs would carry it.");
+    ok("  ...and reset()'s own still panes follow the scene clock, so they are not a different scene",
+        /const t0 = startFrame/.test(src) && /truthPersp\(dollyVP\(t0\), kind, sx0\)/.test(src)
+        && /renderPersp\(R, dollyVP\(t0\), kind, sx0\)/.test(src),
+        "reset() draws the reference and the one unjittered frame. Left at dollyVP(0) they would show time " +
+        "zero while the temporal pane ran at 54, and dBil/dFsr would be scored against a truth the temporal " +
+        "pane never sees.");
+    ok("  ...and the control is a SELECT on the page, so the experiment is re-runnable rather than a build that once existed",
+        /<input id="startframe" type="number"/.test(raw) && /\["scene", "camera", "ratio", "startframe"\]/.test(src),
+        "and it is in the reset list, because a scene clock changed without rebuilding the history is two " +
+        "scenes in one accumulator");
+}
+
 console.log("\n7. *** THE PRE-REGISTERED TEST (v4660): TWO DOCUMENTS, ONE SET OF NUMBERS ***");
 // *** v4659's LEAD WAS THE BEST OF EIGHT PREDICTORS AND WORTH NOTHING ON ITS OWN. *** v4660 fixed the
 // hypothesis, its DIRECTION, the statistic, the threshold and the frame range in a file committed BEFORE the

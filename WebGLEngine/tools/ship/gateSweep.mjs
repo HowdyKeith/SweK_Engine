@@ -8032,6 +8032,58 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4661 -- THE 271st CLOSING: one variable was two clocks, and reset() zeroed both.
+    since346: Object.freeze({
+        at: "v4661", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/fsrPageClocks-selfcheck.mjs"]),
+        // EMPTY, and that is the field's meaning rather than a tidy-up: the ledger's own invariant is
+        // red === redOnArrival.length, so this names gates LEFT red, not gates that were briefly red while
+        // being written. This one failed its first run on a bound this round invented and then derived; it
+        // ships green. The story is in the verdict, which is where it belongs.
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** fsr.html's `frame` COUNTED THE ACCUMULATIONS AND ALSO FIXED THE SCENE. *** sxCur = " +
+                 "frame * SLAB_DX, dollyVP(frame), dx = frame * PAN -- and reset() zeroed it, so an EMPTY " +
+                 "history could only be seen at the scene's start and scene time 54 could only be reached " +
+                 "carrying fifty-four frames of history. v4658's open question is exactly which of the two " +
+                 "the reactive mask's harm follows (14 of 51 frames lost over 3-53, 3 of 45 over 54-98) and " +
+                 "no experiment this page could run would have separated them. Six scene sites now read " +
+                 "sceneT() = frame + startFrame; at startFrame 0 that IS the expression it replaced, and the " +
+                 "page reproduces v4659's page EXACTLY over six frames, driven from git rather than from a " +
+                 "second copy on disk. " +
+                 "*** THE CROSSOVER IS THE ROW, AND IT NEEDS BOTH HALVES. *** At history age k the scene is " +
+                 "at time K+k-1, and the disocclusion count -- fixed by two consecutive scene times, with no " +
+                 "colour history in it -- agrees ACROSS the two configurations to the pixel, while the PSNR " +
+                 "does not and the younger accumulator loses at every age. A control that silently did " +
+                 "nothing passes the first and fails the second; one that moved the scene to the wrong place " +
+                 "passes the second and fails the first. " +
+                 "*** AND THE FIRST CONTROL SILENTLY DID NOTHING. *** It was a <select> with four options, " +
+                 "and assigning a value a select has no option for leaves its value EMPTY -- so the page " +
+                 "fell back to 0 and a crossover asking for scene time 8 produced the scene's first four " +
+                 "frames TO THE LAST DECIMAL PLACE. That reads exactly like 'starting later changes " +
+                 "nothing', which is a conclusion, and it would have been wrong. A number input now, and a " +
+                 "row that reads the value back off the element. " +
+                 "*** RED ON ARRIVAL, ON AN INVENTED BOUND OF MY OWN. *** The row holding that the " +
+                 "reconstruction DIFFERS first read `> 0.5 dB`, a level chosen because the first two ages " +
+                 "cleared it; the third reads 0.34 and the gate failed on its threshold rather than on the " +
+                 "page. Both replacements are derived: the floor is 0.01 dB, which is what the readout " +
+                 "PRINTS, and the direction (younger history is worse) is the half with content. " +
+                 "Five sabotages, three caught here and two caught only by fsrPage-selfcheck -- C4 changes " +
+                 "the previous scene time on the first tick alone, where nothing consumes it, and C5 breaks " +
+                 "still panes this gate does not read. Both stated rather than papered over. " +
+                 "*** C2 WAS A 0-RED THAT CAUGHT A FALSE SENTENCE. *** A note claimed the crossover already " +
+                 "held the jitter phase, 'since the depths it counts are rendered through the offset'. " +
+                 "Setting jit.index = 0 scored ZERO. It is false -- renderDepth takes the UNJITTERED matrix, " +
+                 "because motion vectors and the depths they are tested against are jitter-free by " +
+                 "convention -- so the count cannot depend on the phase and never could. A plausible " +
+                 "paragraph was standing where a row belonged; the row now reads the offsets the page prints " +
+                 "and compares them across configurations. " +
+                 "RUNTIME 11,830 ms, out of the quick sweep and stated: three page drives is what a " +
+                 "behavioural claim about two configurations costs. It was 14,544 ms against a 20,000 ms " +
+                 "SIGKILL ceiling, which is a gate that dies on a busy box, and two of the three guesses " +
+                 "about where the time went were wrong -- collapsing twelve resets into three bought 1 s; " +
+                 "the ticks are the cost.",
+    }),
     // v4660 -- THE 270th CLOSING: the lead confirmed, and the question it was found chasing still open.
     since345: Object.freeze({
         at: "v4660", swept: 0, green: 0, red: 0,
