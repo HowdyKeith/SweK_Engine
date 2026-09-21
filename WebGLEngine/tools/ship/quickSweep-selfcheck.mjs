@@ -688,9 +688,17 @@ sec("8e. A CRASH IN THE NEW-RED LIST, SPELLED AS A CRASH");
        "one derivation, not two spellings of it -- reconcile stores no kind at all, and sabotage VG " +
        "(deleting the fields) is what showed the stored copy was never read");
     const src = fs.readFileSync(path.join(ENG, "tools", "ship", "quickSweep.mjs"), "utf8");
-    ok(/else fresh\.push\(\{ gate: r\.gate, code: r\.serialCode, ms: r\.serialMs \}\);/.test(src),
-       "...and reconcile really does store only gate, code and ms",
-       "a field nothing reads is a field that will disagree with the thing that does");
+    // *** v4648 -- THIS ROW SAID "only gate, code and ms" AND reconcile NOW STORES A FOURTH. ***
+    // The rule it was written for is not "three fields"; it is "no field that nothing reads", which is what
+    // sabotage VG established by deleting `kind` and `name` and watching two gates stay green. `fail` is the
+    // opposite case: it cannot be derived from anything -- it is the gate's own output, alive only for the
+    // length of that process -- and section 8g drives reportLines and requires it to be PRINTED. So the row
+    // moves with the claim instead of being deleted with it: the stored set is exactly these four, and the
+    // new one is read.
+    ok(/else fresh\.push\(\{ gate: r\.gate, code: r\.serialCode, ms: r\.serialMs, fail: failLinesOf\(r\.serialTail\) \}\);/.test(src),
+       "...and reconcile stores exactly gate, code, ms and fail -- no fifth field arriving unread",
+       "a field nothing reads is a field that will disagree with the thing that does; 8g is what makes " +
+       "`fail` the other kind, by failing if the report stops printing it");
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -767,6 +775,59 @@ sec("8f. THE FIVE EXPORTS NO GATE NAMED, CLOSED BY ASSERTION");
        "!! ...and falseRedSplit counts the two causes apart, over the same list",
        `${split.capped} capped, ${split.slowed} slowed, of ${split.of} -- a gate killed at the cap is a box ` +
        `that cannot run that many at once, not one fighting for CPU`);
+}
+
+// ---------------------------------------------------------------------------------------------------------
+sec("8g. WHAT THE RED GATE SAID, CARRIED INTO THE REPORT (v4648)");
+// ---------------------------------------------------------------------------------------------------------
+// The v4648 ship stopped on "NEW RED tools/ship/sweepCoverage-selfcheck.mjs exit 1" and nothing else. That
+// gate is GREEN run alone, so the evidence existed for the length of one process and was thrown away --
+// runOneAsync has captured a 4 KB tail since v4582 and used it only to test for a skip line. A whole round
+// went into inferring the cause and got it wrong twice. failLines.mjs's own header is about this exact
+// problem one layer out: "AN EXIT CODE IS NOT A FINDING".
+{
+    const tail = "  PASS  ok\n  FAIL  !! the row that broke   detail\n  FAIL  second row\nALL GREEN\n";
+    ok(JSON.stringify(Q.failLinesOf(tail)) === JSON.stringify(["  FAIL  !! the row that broke   detail", "  FAIL  second row"]),
+       "!! *** the FAIL lines are pulled out of the tail the run already captured ***",
+       "a path and an exit code cannot be acted on, compared between boxes, or told apart from the same " +
+       "gate failing for a different reason");
+    ok(!Q.failLinesOf(tail).some((l) => /PASS/.test(l)) && Q.failLinesOf("  PASS  all fine\n").length === 0,
+       "CONTROL: a PASS line is not a FAIL line, and a clean tail yields nothing",
+       "without this the row above passes on a function that returns every line it is given");
+    const many = Array.from({ length: 9 }, (_, i) => `  FAIL  row ${i}`).join("\n");
+    const cut = Q.failLinesOf(many);
+    ok(cut.length === 5 && /and 5 more FAIL line\(s\)/.test(cut[4]),
+       "!! ...and it is BOUNDED, saying how many it did not print rather than pasting forty",
+       `${cut.length} lines for 9 FAILs -- a silent truncation would read as "that was all of them", which ` +
+       `is the shape this file spent the session removing`);
+    const R = (newRed) => ({ ran: 1, enumerated: 1, budgetMs: 3000, green: 0, knownRed: [], unmeasured: [],
+                             dropped: [], falseRedList: [], falseRedSplit: { capped: 0, slowed: 0, of: 0 },
+                             elapsedS: 1, skippedOverBudget: 0, newGates: [], newRed });
+    const said = Q.reportLines(R([{ gate: "g-selfcheck.mjs", code: 1, ms: 9, fail: Q.failLinesOf(tail) }]));
+    ok(said.some((l) => /the row that broke/.test(l)),
+       "!! *** and the report PRINTS them under the NEW row ***",
+       "this is what makes the field different from the `kind` and `name` that sabotage VG deleted with " +
+       "nothing going red: those were derived from `code` elsewhere, and these exist nowhere else");
+    ok(Q.reportLines(R([{ gate: "g-selfcheck.mjs", code: 1, ms: 9 }])).some((l) => /NEW/.test(l)),
+       "CONTROL: a result saved by an OLDER version, with no `fail` field, still reports rather than throwing",
+       "--read is pointed at captures from other boxes and earlier builds; see section 8c");
+
+    // *** END TO END, BECAUSE SABOTAGE SF-3 WENT ZERO RED ON THE ROWS ABOVE. *** Deleting `tail` from
+    // runOneAsync's resolve -- putting the file back in the exact state that made the v4648 ship
+    // undiagnosable -- changed nothing any row could see, because every row above hands reportLines a
+    // SYNTHETIC tail. The component was tested and the CONNECTION was not, which is the species this tree
+    // names most. This row runs a REAL gate through the REAL sweep and requires its words to come back.
+    const FX = path.join(ENG, "tools", "ship", "__failline_fixture-selfcheck.mjs");
+    let through = null;
+    try {
+        fs.writeFileSync(FX, 'console.log("  FAIL  a planted assertion line");\nprocess.exit(1);\n');
+        through = await Q.runQuickSweep({ gates: ["tools/ship/__failline_fixture-selfcheck.mjs"],
+                                          capMs: 8000, write: false, workers: 1, root: ENG });
+    } finally { try { fs.unlinkSync(FX); } catch { /* the row below fails on a null result */ } }
+    const row = ((through || {}).newRed || [])[0];
+    ok(!!row && (row.fail || []).some((l) => /a planted assertion line/.test(l)),
+       "!! *** a REAL gate's FAIL line survives the whole path: spawn -> tail -> reconcile -> report ***",
+       row ? `fail: ${JSON.stringify(row.fail)}` : "no newRed row came back at all");
 }
 
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");

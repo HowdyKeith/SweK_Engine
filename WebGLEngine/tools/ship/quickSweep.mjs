@@ -33,6 +33,11 @@ import { spawn } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { backfillStamps } from "./sweepCoverage.mjs";
 import { boxId } from "./hostScale.mjs";
+// The FAIL-line rule is IMPORTED, not re-spelled. tools/ship/failLines.mjs owns "what an assertion line
+// looks like" and its own header is about exactly this problem -- "AN EXIT CODE IS NOT A FINDING". Two
+// copies of that regex is how one of them quietly stops matching, which is the defect this file has spent
+// the session removing from its own record.
+import { FAIL_LINE } from "./failLines.mjs";
 import { skippable, readRecord as readInputRecord } from "./inputSets.mjs";
 import { enumerateGates, classify, VERDICT, SWEEP_V4297, ENG, exitKind, exitName, EXIT_KIND } from "./gateSweep.mjs";
 import { parseArgs, refusalLines } from "./cliArgs.mjs";
@@ -393,7 +398,18 @@ export function reconcile(rows, register = redRegister()) {
         // spelling of one rule is the defect this session has spent rounds on -- and removing it buys a
         // property worth more than the field, which is that a result saved by ANY version of this tool
         // classifies identically, because the code is the only input.
-        else fresh.push({ gate: r.gate, code: r.serialCode, ms: r.serialMs });
+        // *** v4648 -- `fail` IS CARRIED, AND THE v4647i NOTE ABOVE IS WHY THIS ONE IS DIFFERENT. ***
+        // `kind` and `name` were removed because the report DERIVED them from `code`, so the stored copy
+        // was a second spelling of one rule and sabotage VG proved nothing read it. These lines cannot be
+        // derived from anything: they are the gate's own output, captured by the run that produced the
+        // verdict and available nowhere else once the process is gone. reportLines prints them, so the
+        // sabotage that deletes this field turns the report blank rather than leaving it identical.
+        //
+        // THE COST OF NOT HAVING THEM, MEASURED: v4648's ship stopped on "NEW RED
+        // tools/ship/sweepCoverage-selfcheck.mjs exit 1" and nothing else. That gate is green when run
+        // alone, so the evidence existed for the length of one process and was discarded. A whole round
+        // went into inferring the cause from concurrent copies and got it wrong twice.
+        else fresh.push({ gate: r.gate, code: r.serialCode, ms: r.serialMs, fail: failLinesOf(r.serialTail) });
     }
     return { known, newRed: fresh, unmeasured };
 }
@@ -440,8 +456,8 @@ function runOneAsync(rel, capMs, root) {
         const timer = setTimeout(() => {
             try { process.kill(-p.pid, "SIGKILL"); } catch { try { p.kill("SIGKILL"); } catch {} }
         }, capMs);
-        p.on("exit", (code, sig) => { clearTimeout(timer); const ms = Date.now() - t0; resolve({ code: sig ? 124 : (code ?? 1), ms, timedOut: !!sig || ms >= capMs, skipped: SKIP_LINE.test(tail) }); });
-        p.on("error", () => { clearTimeout(timer); resolve({ code: 1, ms: Date.now() - t0, timedOut: false, skipped: false }); });
+        p.on("exit", (code, sig) => { clearTimeout(timer); const ms = Date.now() - t0; resolve({ code: sig ? 124 : (code ?? 1), ms, timedOut: !!sig || ms >= capMs, skipped: SKIP_LINE.test(tail), tail }); });
+        p.on("error", () => { clearTimeout(timer); resolve({ code: 1, ms: Date.now() - t0, timedOut: false, skipped: false, tail: "" }); });
     });
 }
 
@@ -507,7 +523,7 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
         const p2 = await runOneAsync(rel, capMs, root);
         const serial = { code: p2.code, ms: p2.ms, timedOut: p2.timedOut };
         const c = classify(parallel, serial);   // { verdict, from, note } -- gateSweep's rule, not a copy of it
-        rows.push({ gate: rel, verdict: c.verdict, from: c.from, parallelMs: p1.ms, serialMs: p2.ms, serialCode: p2.code, parallelSkipped: p1.skipped, serialSkipped: p2.skipped, serialTimedOut: p2.timedOut, parallelTimedOut: p1.timedOut });
+        rows.push({ gate: rel, verdict: c.verdict, from: c.from, parallelMs: p1.ms, serialMs: p2.ms, serialCode: p2.code, parallelSkipped: p1.skipped, serialSkipped: p2.skipped, serialTimedOut: p2.timedOut, parallelTimedOut: p1.timedOut, serialTail: p2.tail });
     }
     // *** AND A SLICE OF THE TREE IS RE-RUN ALONE, SO THE FILE ACCUMULATES COSTS AND NOT ONLY SAMPLES. ***
     // Phase 2 above already leaves an uncontended reading for every red and every budget crosser; this
@@ -833,6 +849,16 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
 //   - and this reader RECOVERS rather than throwing -- saying out loud what it skipped, because a silent
 //     recovery is how a corrupt file becomes a confident wrong answer.
 const TAG_LINE = /^\[[A-Za-z][\w-]*\] /;
+/**
+ * The assertion lines a red gate printed, from the tail the run already captured. Bounded on purpose: a
+ * report is read by a person, and a gate that fails forty rows should say so rather than paste them.
+ */
+export function failLinesOf(tail, { max = 4 } = {}) {
+    const all = String(tail || "").split("\n").filter((l) => FAIL_LINE.test(l)).map((l) => l.trimEnd());
+    return all.length <= max ? all
+        : all.slice(0, max).concat(`  ... and ${all.length - max} more FAIL line(s)`);
+}
+
 const REQUIRED = ["ran", "enumerated", "budgetMs", "green", "knownRed", "newRed", "unmeasured", "dropped"];
 
 /**
@@ -918,6 +944,14 @@ export function reportLines(r) {
     for (const n of r.newRed) out.push(killed(n)
         ? `  CRASH  ${n.gate}  KILLED BY THE OS: ${exitName(n.code) || n.code} after ${n.ms} ms -- no FAIL line was printed`
         : `  NEW    ${n.gate}  exit ${n.code} in ${n.ms} ms`);
+    // *** AND WHAT THE GATE ACTUALLY SAID, WHICH IS THE WHOLE POINT. *** A path and an exit code cannot be
+    // acted on, compared between boxes, or told apart from the same gate failing for a different reason.
+    // Absent where the run captured nothing -- a crash prints no FAIL line, and saying so is the finding.
+    for (const n of r.newRed) {
+        const lines = (n && n.fail) || [];
+        if (!lines.length) continue;
+        for (const l of lines) out.push("       " + l.replace(/^\s+/, ""));
+    }
     for (const d of r.dropped) out.push(`  slower ${d}  now over budget`);
     return out;
 }
