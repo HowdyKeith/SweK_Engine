@@ -671,7 +671,7 @@ function frame() {
   const liveA = A.some((e) => !e.dead), liveB = B.some((e) => !e.dead);
   if (!liveA || !liveB) { if (liveA) wins.A++; else if (liveB) wins.B++; newBattle(); }
   else {
-    const sA = sideDriveShots(A, snapshot(B), W_A, esbx, dt, nowMs, brainPilotOn ? PP.pilotFor(pilotWeights || PP.handWeights()) : null);
+    const sA = sideDriveShots(A, snapshot(B), W_A, esbx, dt, nowMs, brainPilotOn ? PP.pilotFor(pilotWeights || defaultPilotWeights || PP.handWeights()) : null);
     const sB = sideDriveShots(B, snapshot(A), W_B, esbx, dt, nowMs);   // team B is always the scripted AI -- brain vs. scripted, not brain vs. brain
     if (collide3dOn) esbx.collide3d({ rH: 120, rV: 80 });   // v3832 -- altitude-band collision, after drive so box3d integrates it
     esbx.step(dt); esbx.sync();
@@ -790,16 +790,38 @@ document.getElementById("collideBtn").onclick = (e) => {
   e.target.style.color = collide3dOn ? "#9fe6c0" : "#b9d4ff";
 };
 // task 4 of the fly-connectome integration -- brain/pilotPolicy.mjs flies TEAM A in place of the scripted stepAI3d
-// when on; team B is always scripted, so this is a live brain-vs-scripted dogfight, not brain-vs-brain. `pilotWeights`
-// is null (fly handWeights(), the module's own hand-tuned baseline) until a brain is imported or pulled from the fleet.
+// when on; team B is always scripted, so this is a live brain-vs-scripted dogfight, not brain-vs-brain.
+//
+// THREE LAYERS, IN PRIORITY ORDER: `pilotWeights` (an explicit import -- a file, or a peer pulled from the fleet)
+// beats `defaultPilotWeights` (brain/pilotWeightsDefault.json, fetched once at load -- the demo's own shipped,
+// pre-trained pilot: (1+1)-ES over ev/flightModel3d.js's stepAI3d, 2000 iterations warm-started from an earlier
+// round, measured at a 50% win rate against that same scripted AI over 30 held-out duels, see the file's own
+// "by" field for the exact recipe) beats brain/pilotPolicy.mjs's handWeights() (the hand-tuned, provably-identity
+// baseline every trained pilot is judged against -- the true last resort if the shipped default fails to load).
+// Clear only ever clears the EXPLICIT layer, so it reverts to the shipped default, not all the way to hand.
 const PILOT_DESC = PB.describePolicy("pilotPolicy", PP);
 let brainPilotOn = false, pilotWeights = null, pilotMeta = null;
+let defaultPilotWeights = null, defaultPilotMeta = null, defaultLoadError = null;
+fetch("/brain/pilotWeightsDefault.json").then((r) => r.json()).then((blob) => {
+  const r = PB.importBrain(PILOT_DESC, blob);
+  if (r.ok) { defaultPilotWeights = r.weights; defaultPilotMeta = r.meta; } else { defaultLoadError = r.reason; }
+  pilotLine();
+  // a malformed or missing default is not fatal to FLIGHT -- pilotWeights || defaultPilotWeights || PP.handWeights()
+  // below already falls all the way back to the hand baseline -- but it IS surfaced here (defaultLoadError), found
+  // by adversarial review: every OTHER failure in this panel says something ("import refused: ...", "publish
+  // failed: ..."); a silently swallowed default-load failure was the one path that left the panel showing stale,
+  // pre-three-layer copy forever with no visible error and no console diagnostic.
+}).catch((e) => { defaultLoadError = "could not fetch it (" + (e && e.message) + ")"; pilotLine(); });
 function pilotLine() {
-  document.getElementById("pilotLine").textContent = pilotWeights
-    ? `pilot brain ${weightsHash(pilotWeights)}` + (pilotMeta && pilotMeta.score != null ? `: score ${pilotMeta.score}` : "") + (pilotMeta && pilotMeta.by ? ` (from ${pilotMeta.by})` : "") + (pilotMeta && pilotMeta.citation ? ` -- ${pilotMeta.citation}` : "") + " -- team A flies this when Brain pilot is on"
-    : "no pilot brain loaded -- team A (when Brain pilot is on) flies brain/pilotPolicy.mjs's handWeights()";
+  const eff = pilotWeights ? { weights: pilotWeights, meta: pilotMeta, label: "pilot brain" } : defaultPilotWeights ? { weights: defaultPilotWeights, meta: defaultPilotMeta, label: "default pilot brain" } : null;
+  document.getElementById("pilotLine").textContent = eff
+    ? `${eff.label} ${weightsHash(eff.weights)}` + (eff.meta && eff.meta.score != null ? `: score ${eff.meta.score}` : "") + (eff.meta && eff.meta.by ? ` (from ${eff.meta.by})` : "") + (eff.meta && eff.meta.citation ? ` -- ${eff.meta.citation}` : "") + " -- team A flies this when Brain pilot is on"
+    : defaultLoadError
+      ? `the shipped default failed to load (${defaultLoadError}) -- team A (when Brain pilot is on) falls back to brain/pilotPolicy.mjs's handWeights()`
+      : "loading the shipped default pilot brain… -- team A (when Brain pilot is on) flies brain/pilotPolicy.mjs's handWeights() until it resolves";
   document.getElementById("clearPilot").disabled = !pilotWeights;
 }
+pilotLine();   // overwrite the static placeholder immediately, from the SAME code path the fetch updates later -- one source of truth, not two copies of similar text that could drift
 document.getElementById("brainBtn").onclick = (e) => {
   brainPilotOn = !brainPilotOn;
   e.target.style.background = brainPilotOn ? "#1d3a2a" : "#152136";
@@ -819,9 +841,10 @@ function readJSONFile(file) {
     r.readAsText(file);
   });
 }
+function effectivePilotMeta() { return pilotWeights ? pilotMeta : defaultPilotWeights ? defaultPilotMeta : null; }
 document.getElementById("exportPilot").onclick = () => {
-  const w = pilotWeights || PP.handWeights();
-  const blob = PB.exportBrain(PILOT_DESC, w, { score: pilotMeta ? pilotMeta.score : null, citation: "male-cns Giant Fiber Circuit (Janelia FlyEM, vendor/male-cns/PROVENANCE.md) -- see brain/pilotPolicy.mjs's own header for why the escape circuit, not the compass ring" });
+  const w = pilotWeights || defaultPilotWeights || PP.handWeights(), m = effectivePilotMeta();
+  const blob = PB.exportBrain(PILOT_DESC, w, { score: m ? m.score : null, by: m ? m.by : null, citation: (m && m.citation) || "male-cns Giant Fiber Circuit (Janelia FlyEM, vendor/male-cns/PROVENANCE.md) -- see brain/pilotPolicy.mjs's own header for why the escape circuit, not the compass ring" });
   downloadJSON(`swek-pilotPolicy-${weightsHash(w)}.json`, blob);
 };
 document.getElementById("importPilotBtn").onclick = () => document.getElementById("importPilotFile").click();
@@ -833,8 +856,8 @@ document.getElementById("importPilotFile").addEventListener("change", async (e) 
 });
 document.getElementById("clearPilot").onclick = () => { pilotWeights = null; pilotMeta = null; pilotLine(); };
 document.getElementById("publishPilot").onclick = async () => {
-  const w = pilotWeights || PP.handWeights();
-  const blob = PB.exportBrain(PILOT_DESC, w, { score: pilotMeta ? pilotMeta.score : null, citation: "male-cns Giant Fiber Circuit (Janelia FlyEM, vendor/male-cns/PROVENANCE.md)" });
+  const w = pilotWeights || defaultPilotWeights || PP.handWeights(), m = effectivePilotMeta();
+  const blob = PB.exportBrain(PILOT_DESC, w, { score: m ? m.score : null, by: m ? m.by : null, citation: (m && m.citation) || "male-cns Giant Fiber Circuit (Janelia FlyEM, vendor/male-cns/PROVENANCE.md)" });
   const status = document.getElementById("pilotFleetStatus"); status.textContent = "publishing the pilot brain to the fleet…";
   try {
     const r = await fetch("/brain/publish", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ blob }) }).then((x) => x.json());

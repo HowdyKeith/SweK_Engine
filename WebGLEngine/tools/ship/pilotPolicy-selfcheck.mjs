@@ -61,11 +61,23 @@
 //      header) -- prints the literal string "undefined" rather than throwing              -> 1 red, the check added
 //      directly below section 5's existing reportLines assertion (no earlier check here ever read L[2]'s full text
 //      closely enough to notice a stringified undefined).
+//
+// SECTION 6 (the shipped default, added when es-box3d-fly3d.html started flying it by default) -- both sabotaged
+// on brain/pilotWeightsDefault.json itself, the gate run, the file restored byte for byte (diffed to confirm):
+//   H  the weights array truncated to 10 entries (a stand-in for any shape corruption -- a bad edit, a stale
+//      export from before WEIGHT_COUNT changed)                                          -> 1 red: the import check,
+//      by name, from peerBrain.mjs's own weight-count message -- the SAME validation es-box3d-fly3d.html's page
+//      load runs, so this is proof the page's own fallback-to-handWeights() path would have fired too.
+//   I  the shipped file swapped for a validly-shaped but worthless policy (zeroWeights(), which imports fine and
+//      duels at -1.56 against a fresh sample)                                             -> 1 red: the quality
+//      guard, by name -- a file that PASSES import validation can still be a regression, which is exactly why
+//      shape-only validation (section H) is not enough on its own.
 "use strict";
 import * as P from "../../brain/pilotPolicy.mjs";
 import * as FM from "../../ev/flightModel3d.js";
 import * as Topo from "../../brain/gfcTopology.mjs";
 import * as D from "../../brain/drivePolicy.mjs";
+import * as PB from "../../brain/peerBrain.mjs";
 import { planarFallbackWorld } from "../../physics/planarFallbackWorld.js";
 import fs from "node:fs";
 
@@ -201,7 +213,25 @@ console.log("\n5. THE FRONT DOOR");
     // found by adversarial review: reportLines' third line referenced REWARD.died, a field REWARD no longer has
     // (dropped on purpose -- see train()'s own header), which JS renders as the literal string "undefined" rather
     // than throwing. No earlier check here ever read L[2]'s full text closely enough to notice.
-    ok("!! no report line stringifies a missing field as the literal word \"undefined\"", L.every((l) => !/\bundefined\b/.test(l)), L[2]);
+    ok("!! no report line stringifies a literal word \"undefined\"", L.every((l) => !/\bundefined\b/.test(l)), L[2]);
+}
+console.log("\n6. THE SHIPPED DEFAULT: brain/pilotWeightsDefault.json IS A REAL, VALID, TRAINED PILOT -- MEASURED AGAINST HAND, NOT ASSUMED FROM THE FILE'S OWN CLAIMED SCORE");
+{
+    // es-box3d-fly3d.html fetches this file at page load and flies team A on it by default (pilotWeights ||
+    // defaultPilotWeights || handWeights()) -- a corrupted or stale file degrades gracefully there (the fallback
+    // chain still reaches handWeights()), but this gate exists so a bad file is caught here, not discovered by a
+    // demo that quietly flies worse than it should.
+    const raw = fs.readFileSync(new URL("../../brain/pilotWeightsDefault.json", import.meta.url), "utf8");
+    const blob = JSON.parse(raw);
+    const desc = { id: "pilotPolicy", FEATURES: P.FEATURES, HIDDEN: P.HIDDEN, OUTPUTS: P.OUTPUTS, WEIGHT_COUNT: P.WEIGHT_COUNT };
+    const r = PB.importBrain(desc, blob);
+    ok("!! the shipped default imports cleanly through the SAME peerBrain.mjs validation the page uses: right format, right policy tag, 725 finite weights", r.ok, r.ok ? "" : r.reason);
+    if (r.ok) {
+        const SEEDS = Array.from({length: 15}, (_, i) => 9000 + i);   // fresh, fast (15 seeds x 25s duels runs in well under a second)
+        const shipped = P.evaluate(worldFrom, r.weights, SEEDS, { seconds: 25 });
+        const hand = P.evaluate(worldFrom, P.handWeights(), SEEDS, { seconds: 25 });
+        ok("!! the shipped default duels measurably BETTER than the hand baseline it defaults to on any failure -- a regression guard against ever shipping a worse-than-hand default", shipped.score > hand.score, `shipped ${shipped.score.toFixed(3)} vs hand ${hand.score.toFixed(3)}`);
+    }
 }
 console.log(fails ? `\npilotPolicy-selfcheck: ${fails} FAILED` : "\npilotPolicy-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);
