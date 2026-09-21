@@ -799,6 +799,12 @@ function pushComfyuiLog(stream, text) {
 // in the demo-chrome gauges.
 const gaugeState = {};
 let currentAvatarUrl = null, avatarTs = 0;   // v927 — engine-published current avatar (phone mirrors it)
+// peer brain sharing ("fly peer vs fly peer"): a peer's currently-published trained drivePolicy/gunnerPolicy
+// weight vector, in brain/peerBrain.mjs's portable format -- the SAME format race-brain.html's Export button
+// already writes to a file. Keyed by policy id ("drivePolicy"/"gunnerPolicy"); one entry per policy, latest
+// publish wins (no server-side ratchet -- the client already decides what its current best is before
+// publishing). Transient in-memory mailbox, resets on bridge restart, same pattern as fpsPose above.
+const publishedBrains = new Map();
 // v1257 (#6) — FPS control path, Option C: the WebGL2 engine owns the first-person
 // camera + enemy AI (authoritative) and PUBLISHES its pose here; VBA (and any other
 // surface) MIRRORS it by reading /fps/state. Transient in-memory mailbox, latest wins.
@@ -5202,6 +5208,46 @@ const server = http.createServer((req, res) => {
                       res.end(JSON.stringify({ ok: true, makespan: out.makespan, assign: out.assign, results: out.results, peers }));
                   }).catch(_fail);
               });
+              return;
+          }
+          // v_epg — peer brain sharing ("fly peer vs fly peer"): a peer PUBLISHES its currently-trained
+          // drivePolicy/gunnerPolicy weight vector in brain/peerBrain.mjs's portable format (the SAME format
+          // race-brain.html's Export button already writes to a file, now POSTed instead of downloaded); other
+          // peers ask what a given peer is offering (/brain/mine), and /brain/fleet aggregates that across every
+          // known peer the same way /fleet/fingerprint-check above aggregates /fingerprint/master. Validated
+          // server-side through peerBrain.mjs's own importBrain() against the real drivePolicy.mjs/gunnerPolicy.mjs
+          // shape -- the SAME check the browser already runs before it ever gets here, not a second copy of the
+          // rule that could drift from it.
+          if (req.method === "POST" && req.url === "/brain/publish") {
+              _readBody((j) => {
+                  Promise.all([_impESM("../brain/peerBrain.mjs"), _impESM("../brain/drivePolicy.mjs"), _impESM("../brain/gunnerPolicy.mjs")]).then(([PB, D, GP]) => {
+                      const blob = j.blob, descriptors = { drivePolicy: PB.describePolicy("drivePolicy", D), gunnerPolicy: PB.describePolicy("gunnerPolicy", GP) };
+                      const desc = blob && descriptors[blob.policy];
+                      res.writeHead(200, { "Content-Type": "application/json" });
+                      if (!desc) { res.end(JSON.stringify({ ok: false, error: "no such policy: " + JSON.stringify(blob && blob.policy) })); return; }
+                      const r = PB.importBrain(desc, blob);
+                      if (!r.ok) { res.end(JSON.stringify({ ok: false, error: r.reason })); return; }
+                      publishedBrains.set(blob.policy, blob);
+                      res.end(JSON.stringify({ ok: true, policy: blob.policy }));
+                  }).catch(_fail);
+              });
+              return;
+          }
+          if (req.method === "GET" && req.url === "/brain/mine") {
+              res.writeHead(200, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ ok: true, brains: [...publishedBrains.values()] }));
+              return;
+          }
+          if (req.method === "GET" && req.url === "/brain/fleet") {
+              (async () => {
+                  const peers = _announcePeers().map((u) => String(u).replace(/\/+$/, ""));
+                  const out = [];
+                  await Promise.all(peers.map(async (peer) => {
+                      try { const r = await _peerJSON(peer, "/brain/mine", "GET", null, 5000); if (r && r.ok && r.brains && r.brains.length) out.push({ peer, brains: r.brains }); } catch {}
+                  }));
+                  res.writeHead(200, { "Content-Type": "application/json" });
+                  res.end(JSON.stringify({ ok: true, peers: out }));
+              })().catch(_fail);
               return;
           }
       }

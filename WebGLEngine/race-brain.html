@@ -23,6 +23,9 @@
   .carWin { display:flex; flex-direction:column; gap:2px; }
   .carView { background:#000; border:1px solid #2a3a30; cursor:pointer; display:block; max-width:100%; }
   .viewLabel { color:#5f7aa0; font-size:10px; max-width:240px; line-height:1.3; }
+  #fleetList { display:flex; flex-direction:column; gap:2px; margin:2px 0; }
+  .fleetRow { display:flex; align-items:center; gap:6px; }
+  .fleetRow button { font-size:11px; }
 </style>
 </head>
 <body>
@@ -31,7 +34,7 @@
   <div id="be">requesting a device&hellip;</div>
   <div id="sub">seed <input id="seed" type="number" value="1" min="1"> &middot; <button id="train">Train in idle time</button> <button id="stopTrain" disabled>Stop</button> &middot; <button id="race">Race</button> &middot; <button id="forget">Forget the stored brain</button>
     &middot; <a href="?webgl=1">force WebGL2</a><br>
-    <span id="tick">loading the racing kit and box3d&hellip;</span><br><span id="brain">no stored brain: the hand policy drives</span> <button id="exportBrain">Export brain</button><br><span id="gun">turrets: the hand gunner on every car (v4588, task 77); it drops oil on a pursuer and lights it under them (v4590, task 79)</span> <button id="trainGun">Train the gunner in idle time</button> <button id="stopGun" disabled>Stop</button> <button id="forgetGun">Forget the stored gunner</button> <button id="exportGun">Export gunner</button><br><span id="peer">no peer brain loaded -- the fourth car (purple) drives the zero policy</span> <button id="importBrainBtn">Import a peer's brain</button> <button id="clearPeer" disabled>Clear peer brain</button> <input id="importBrainFile" type="file" accept="application/json" style="display:none"><br><span id="peerGun">no peer gunner loaded -- car 0's turret uses the hand gunner (or the stored one)</span> <button id="importGunBtn">Import a peer's gunner</button> <button id="clearPeerGun" disabled>Clear peer gunner</button> <input id="importGunFile" type="file" accept="application/json" style="display:none"><br><span id="racing"></span><br><button id="labReplay">Replay the lab's accepted driver</button> <span id="lab">the Physics Lab's race scene stores the driver its adjudicator accepted; this plays that log back, not real time</span> &middot; drag to orbit, wheel to dolly</div>
+    <span id="tick">loading the racing kit and box3d&hellip;</span><br><span id="brain">no stored brain: the hand policy drives</span> <button id="exportBrain">Export brain</button> <button id="publishBrain">Publish to the fleet</button><br><span id="gun">turrets: the hand gunner on every car (v4588, task 77); it drops oil on a pursuer and lights it under them (v4590, task 79)</span> <button id="trainGun">Train the gunner in idle time</button> <button id="stopGun" disabled>Stop</button> <button id="forgetGun">Forget the stored gunner</button> <button id="exportGun">Export gunner</button> <button id="publishGun">Publish to the fleet</button><br><span id="peer">no peer brain loaded -- the fourth car (purple) drives the zero policy</span> <button id="importBrainBtn">Import a peer's brain</button> <button id="clearPeer" disabled>Clear peer brain</button> <input id="importBrainFile" type="file" accept="application/json" style="display:none"><br><span id="peerGun">no peer gunner loaded -- car 0's turret uses the hand gunner (or the stored one)</span> <button id="importGunBtn">Import a peer's gunner</button> <button id="clearPeerGun" disabled>Clear peer gunner</button> <input id="importGunFile" type="file" accept="application/json" style="display:none"><br><button id="findPeers">Find peer brains on the fleet</button> <span id="fleetStatus"></span><div id="fleetList"></div><br><span id="racing"></span><br><button id="labReplay">Replay the lab's accepted driver</button> <span id="lab">the Physics Lab's race scene stores the driver its adjudicator accepted; this plays that log back, not real time</span> &middot; drag to orbit, wheel to dolly</div>
 </div>
 <div id="raceRow">
   <canvas id="c"></canvas>
@@ -121,6 +124,17 @@ function readJSONFile(file) {
     r.onerror = () => reject("could not read the file");
     r.readAsText(file);
   });
+}
+
+/** Import a blob for "drivePolicy" or "gunnerPolicy" into the matching peer slot (file, fleet pick -- same path either way); returns the import result. */
+function importBlobInto(policyKind, blob) {
+  const r = PB.importBrain(policyKind === "drivePolicy" ? DRIVE_DESC : GUNNER_DESC, blob);
+  if (r.ok) {
+    if (policyKind === "drivePolicy") { peerBrain = r.weights; peerBrainMeta = r.meta; peerLine(); }
+    else { peerGunnerBrain = r.weights; peerGunnerMeta = r.meta; peerGunLine(); }
+    setupRace();
+  }
+  return r;
 }
 
 function setupRace() {
@@ -292,11 +306,19 @@ async function main() {
   $("importBrainFile").addEventListener("change", async (e) => {
     const file = e.target.files[0]; e.target.value = ""; if (!file) return;
     let blob; try { blob = await readJSONFile(file); } catch (msg) { $("peer").textContent = "import failed: " + msg; return; }
-    const r = PB.importBrain(DRIVE_DESC, blob);
-    if (!r.ok) { $("peer").textContent = "import refused: " + r.reason; return; }
-    peerBrain = r.weights; peerBrainMeta = r.meta; peerLine(); setupRace();
+    const r = importBlobInto("drivePolicy", blob);
+    if (!r.ok) $("peer").textContent = "import refused: " + r.reason;
   });
   $("clearPeer").addEventListener("click", () => { peerBrain = null; peerBrainMeta = null; peerLine(); setupRace(); });
+  $("publishBrain").addEventListener("click", async () => {
+    const cur = store.current(), w = cur ? cur.weights : D.handWeights();
+    const blob = PB.exportBrain(DRIVE_DESC, w, { score: cur ? cur.score : null, citation: "male-cns E-PG compass circuit (Janelia FlyEM, vendor/male-cns/PROVENANCE.md)" });
+    $("fleetStatus").textContent = "publishing the brain to the fleet…";
+    try {
+      const r = await fetch("/brain/publish", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ blob }) }).then((x) => x.json());
+      $("fleetStatus").textContent = r.ok ? `published the brain (${D.weightsHash(w)}) -- other peers can find it under Find peer brains` : "publish refused: " + (r.error || "unknown reason");
+    } catch (e) { $("fleetStatus").textContent = "publish failed: this box has no local bridge listening, or it's unreachable (" + (e && e.message) + ")"; }
+  });
   $("train").addEventListener("click", () => {
     if (!store.current()) { const hand = D.handWeights(); store.offer({ weights: hand, score: D.evaluate(worldFrom, hand, D.HELD_OUT_SEEDS, { seconds: 45 }).score, by: "hand" }); }
     trainer = trainer || D.createAutoTrainer(worldFrom, { store, itersPerAttempt: 8, seconds: 45 });
@@ -320,11 +342,35 @@ async function main() {
   $("importGunFile").addEventListener("change", async (e) => {
     const file = e.target.files[0]; e.target.value = ""; if (!file) return;
     let blob; try { blob = await readJSONFile(file); } catch (msg) { $("peerGun").textContent = "import failed: " + msg; return; }
-    const r = PB.importBrain(GUNNER_DESC, blob);
-    if (!r.ok) { $("peerGun").textContent = "import refused: " + r.reason; return; }
-    peerGunnerBrain = r.weights; peerGunnerMeta = r.meta; peerGunLine(); setupRace();
+    const r = importBlobInto("gunnerPolicy", blob);
+    if (!r.ok) $("peerGun").textContent = "import refused: " + r.reason;
   });
   $("clearPeerGun").addEventListener("click", () => { peerGunnerBrain = null; peerGunnerMeta = null; peerGunLine(); setupRace(); });
+  $("publishGun").addEventListener("click", async () => {
+    const cur = gunStore.current(), w = cur ? cur.weights : GP.handWeights();
+    const blob = PB.exportBrain(GUNNER_DESC, w, { score: cur ? cur.score : null, citation: "male-cns Giant Fiber Circuit (Janelia FlyEM, vendor/male-cns/PROVENANCE.md)" });
+    $("fleetStatus").textContent = "publishing the gunner to the fleet…";
+    try {
+      const r = await fetch("/brain/publish", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ blob }) }).then((x) => x.json());
+      $("fleetStatus").textContent = r.ok ? `published the gunner (${D.weightsHash(w)}) -- other peers can find it under Find peer brains` : "publish refused: " + (r.error || "unknown reason");
+    } catch (e) { $("fleetStatus").textContent = "publish failed: this box has no local bridge listening, or it's unreachable (" + (e && e.message) + ")"; }
+  });
+  $("findPeers").addEventListener("click", async () => {
+    $("fleetStatus").textContent = "asking the fleet…"; $("fleetList").textContent = "";
+    let j; try { j = await fetch("/brain/fleet", { cache: "no-store" }).then((r) => r.json()); } catch (e) { $("fleetStatus").textContent = "could not reach this box's own bridge (" + (e && e.message) + ")"; return; }
+    if (!j.ok) { $("fleetStatus").textContent = "the fleet request failed"; return; }
+    const rows = j.peers.flatMap((p) => p.brains.map((b) => ({ peer: p.peer, blob: b })));
+    if (!rows.length) { $("fleetStatus").textContent = "no peers are publishing a brain right now (Publish to the fleet on another box first)"; return; }
+    $("fleetStatus").textContent = `${rows.length} brain(s) from ${j.peers.length} peer(s):`;
+    for (const { peer, blob } of rows) {
+      const row = document.createElement("div"); row.className = "fleetRow";
+      const label = document.createElement("span"); label.className = "viewLabel";
+      label.textContent = `${blob.policy} from ${peer}${blob.score != null ? `, score ${blob.score}` : ""}${blob.by ? ` (${blob.by})` : ""}`;
+      const btn = document.createElement("button"); btn.textContent = "Import";
+      btn.addEventListener("click", () => { const r = importBlobInto(blob.policy, blob); $("fleetStatus").textContent = r.ok ? `imported ${blob.policy} from ${peer}` : "import refused: " + r.reason; });
+      row.appendChild(label); row.appendChild(btn); $("fleetList").appendChild(row);
+    }
+  });
   cvs.addEventListener("pointerdown", (e) => { dragging = [e.clientX, e.clientY]; });
   addEventListener("pointerup", () => { dragging = null; });
   addEventListener("pointermove", (e) => { if (!dragging) return; yaw += (e.clientX - dragging[0]) * 0.006; pitch = Math.max(0.05, Math.min(1.5, pitch + (e.clientY - dragging[1]) * 0.006)); dragging = [e.clientX, e.clientY]; });
