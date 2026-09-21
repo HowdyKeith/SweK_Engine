@@ -164,6 +164,15 @@ const FLOOR_DB = 38.5;
             // sorted array with a constant scored ZERO against it. That is the very defect
             // tools/ship/constantRows.mjs censuses, written by the round that shipped the census's fifth
             // mechanism, and it moved to fsrPage-selfcheck section 6 where the SOURCE can be held instead.
+            // *** v4656 -- THE READOUT NAMES WHICH ARM IS RUNNING, AND A SABOTAGE REMOVING THAT SCORED
+            // ZERO UNTIL THIS ROW. *** The page gained a shading ON/OFF control so the +0.117 dB it buys
+            // could be measured paired rather than asserted; a readout that did not say which arm produced
+            // it would make every screenshot and every recorded number ambiguous between the two. This is
+            // behavioural and cheap -- the arm is named on frame one, long before the ring fills.
+            ok("!! ...and the readout NAMES the arm, so a number cannot be mistaken for its own control",
+               /shading mask \[(ON|OFF -- control)\]/.test(G.lock || ""),
+               (G.lock || "(empty)").slice(0, 90) + "   ||  the whole point of the control arm is that two " +
+               "runs produce two lists of numbers; unlabelled, they are one list twice.");
             ok("!! *** the shading mask says it is NOT YET FILLED rather than reading as a clean frame ***",
                !!lk && Number(lk[1]) === G.frames && Number(lk[2]) === 64 && /NOT YET FILLED/.test(G.lock || ""),
                (G.lock || "(empty)").slice(0, 200) + "   ||  the ring is 2 x jitterPhaseCount(2) = 64 slots " +

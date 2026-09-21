@@ -314,8 +314,12 @@ console.log("\n6. *** THE SHADING MASK REACHES THE CHAIN (v4655), AND THIS IS A 
     // sabotages walking past rows that tested for a declaration while the behaviour changed. The mitigation
     // is that the row asserts the ARGUMENT IS THE COMPUTED MASK rather than merely that the word appears:
     // `shading: null` and a missing line both fail it.
+    // v4656 -- the argument became conditional when the control arm landed, so this row follows it there
+    // rather than being relaxed: `shading: null` outright still fails, and so does a switch that never
+    // reaches the mask.
     ok("!! the reject chain is handed the computed shading mask, not null and not nothing",
-        /shading:\s*shadingMask\b/.test(src) && /shadingMask = \(await lgpu\.shadingShift\(/.test(src),
+        /shading:\s*shadingOn \? shadingMask : null/.test(src)
+        && /shadingMask = \(await lgpu\.shadingShift\(/.test(src),
         "a device row cannot see this: the mask is exactly zero for 64 frames, so at the six that gate runs " +
         "the wired and unwired pages are byte-identical. Stated as a declaration check rather than dressed " +
         "up as a behavioural one.");
@@ -335,6 +339,29 @@ console.log("\n6. *** THE SHADING MASK REACHES THE CHAIN (v4655), AND THIS IS A 
         "something and a count above zero counts the arithmetic. MEASURED at v4655: median 0.0009, p90 " +
         "0.0844, p99 0.1739 -- about 16% of the frame reaches 0.05, so the mask is SELECTIVE, which is the " +
         "opposite of what v4654 concluded from the same field.");
+    // *** v4656 -- THE MASK HAS A SWITCH, AND THAT IS WHAT TURNED v4655's OPEN QUESTION INTO A NUMBER. ***
+    //
+    // v4655 said whether the mask HELPS was not established. It was right to: the effect is +0.117 dB and
+    // the frame-to-frame spread is 2.12 dB, so UNPAIRED it is eighteen times smaller than the noise it sits
+    // in, and no number of samples taken one way makes it visible. PAIRED it is unambiguous -- twenty-one
+    // frames past the ring's fill point, same content, same camera, mask attached and detached:
+    //
+    //     mean difference  +0.1171 dB      sd of the difference  0.0534
+    //     positive frames  21 of 21        sign-test p = 4.8e-7        t = 10.05
+    //
+    // Every frame improves, the smallest by 0.02 dB and the largest by 0.22. The switch is what made that
+    // measurable and what makes it RE-measurable on a rig, which is the difference between a finding and a
+    // sentence in a comment. Verified through the switch itself afterwards: eleven frames, eleven positive,
+    // values identical to the manual pass.
+    ok("!! the shading mask has a CONTROL ARM, so the +0.117 dB is re-measurable rather than asserted",
+        /<select id="shading">/.test(raw) && /shading:\s*shadingOn \? shadingMask : null/.test(src)
+        && /const shadingOn = \$\("shading"\)\.value !== "off"/.test(src),
+        "an A/B on a page nobody can flip is a claim about a build that no longer exists; this one is a " +
+        "select, and the readout names which arm is running so a screenshot cannot be mistaken for the other");
+    ok("  ...and it defaults to ON, so the page shows the wired path unless somebody asks otherwise",
+        /<option value="on">shading mask: ON<\/option>\s*<option value="off"/.test(raw),
+        "the first option is the selected one, and a control arm that ran by default would make every other " +
+        "number on this page the control's");
     ok("  ...and the ring is torn down on reset, so it cannot be read at a stride it was not built for",
         /lgpu\.destroyRing\(lockRing\)/.test(src) && /lockRing = null/.test(src),
         "a ring carried across a resolution or camera change would be read with the wrong stride and would " +

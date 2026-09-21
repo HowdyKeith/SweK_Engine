@@ -46,6 +46,10 @@
       <option value="dolly">camera: dollying (perspective, two planes)</option>
       <option value="objects">camera: dollying + the slab MOVES (object motion)</option>
     </select>
+    <select id="shading">
+      <option value="on">shading mask: ON</option>
+      <option value="off">shading mask: OFF (the control)</option>
+    </select>
     <select id="ratio">
       <option value="2">upscale 2&times;</option>
       <option value="1.5">upscale 1.5&times;</option>
@@ -650,6 +654,23 @@ async function tick() {
     // mechanism is that both halves span the same set of phases; a shorter ring would leave a residue of the
     // jitter in the difference and report sampling as shading. That makes the ring 2*period slots per pixel,
     // which is why it is built once and pushed rather than rebuilt, and why it is on THIS camera only.
+    // *** THE MASK HAS A SWITCH, BECAUSE A NUMBER NOBODY CAN RE-MEASURE IS A CLAIM. ***
+    //
+    // v4655 said whether the shading mask HELPS was not established, and it was right to: the effect is
+    // +0.117 dB and the frame-to-frame spread is 2.12, so unpaired it is EIGHTEEN TIMES smaller than the
+    // noise it sits in and no number of samples taken one way makes it visible.
+    //
+    // PAIRED it is unambiguous. Twenty-one frames past the ring's fill point, the same content and the same
+    // camera, with the mask attached and detached:
+    //
+    //     mean difference  +0.1171 dB      sd of the difference  0.0534
+    //     positive frames  21 of 21        sign-test p = 4.8e-7        t = 10.05
+    //
+    // Every frame improves, the smallest by 0.02 dB and the largest by 0.22. This switch is what made that
+    // measurable and is what makes it re-measurable on a rig: run to frame 66, record dTmp per frame, flip
+    // it, run again, and difference the two lists FRAME BY FRAME. Differencing the means instead throws the
+    // pairing away and hands back the 2.12 dB spread.
+    const shadingOn = $("shading").value !== "off";
     let shadingMask = null, lockStat = null;
     if (objects && lgpu && dollyCurrent) {
         const period = jitterPhaseCount(parseFloat($("ratio").value));
@@ -687,7 +708,7 @@ async function tick() {
             // frame -- the exact regression v4591 had to undo for the accumulate pass.
             rejected = await rgpu.rejectAndAccumulate({
                 current: dollyCurrent, history: hist, motion, prevDepth, w: D, h: D, alpha, threshold,
-                shading: shadingMask,       // null on every camera but "objects" -- see the block above
+                shading: shadingOn ? shadingMask : null,   // the switch above; null on every other camera
                 nearerIsLess: true, space: "ycocg", counted: true });
             // genuine = flagged - noHistory, and the SPLIT is why the counters exist: the mask writes the same
             // 1.0 for all three reasons, so no pass over it could have recovered this number.
@@ -765,7 +786,7 @@ async function tick() {
     // that is zero because nothing happened are the same picture and must not be the same sentence.
     $("lockstat").textContent = !objects ? ""
         : lockStat
-            ? `shading mask: ring ${lockStat.pushes}/${lockStat.need} frames` +
+            ? `shading mask [${shadingOn ? "ON" : "OFF -- control"}]: ring ${lockStat.pushes}/${lockStat.need} frames` +
               (lockStat.pushes < lockStat.need
                   ? ` -- NOT YET FILLED, so every pixel reads 0 and the factor pass is unchanged. The ring is `
                     + `2 x jitterPhaseCount because both halves must span the same jitter phases; that is the `

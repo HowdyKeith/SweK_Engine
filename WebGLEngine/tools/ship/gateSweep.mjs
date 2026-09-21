@@ -8032,6 +8032,36 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4656 -- THE 266th CLOSING: the question v4655 named unestablished, answered by pairing.
+    since341: Object.freeze({
+        at: "v4656", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** v4655 SAID WHETHER THE SHADING MASK HELPS WAS NOT ESTABLISHED. IT DOES, BY +0.117 dB, " +
+                 "AND PAIRING IS THE ONLY REASON THAT IS KNOWABLE. *** The effect is 0.117 dB and the " +
+                 "frame-to-frame spread is 2.12, so UNPAIRED it is EIGHTEEN TIMES smaller than the noise it " +
+                 "sits in and no number of samples taken one way makes it visible -- which is exactly why " +
+                 "two rounds looked at it and could not say. PAIRED over twenty-one frames past the ring's " +
+                 "fill point, same content and same camera, mask attached and detached: mean difference " +
+                 "+0.1171 dB, sd of the difference 0.0534, POSITIVE ON 21 OF 21 FRAMES, sign-test " +
+                 "p = 4.8e-7, t = 10.05. The smallest improvement is 0.02 dB and the largest 0.22. " +
+                 "*** AND THE PAGE GOT THE SWITCH THAT MADE IT MEASURABLE, WHICH IS THE DELIVERABLE. *** An " +
+                 "A/B nobody can flip is a claim about a build that no longer exists. fsr.html has a " +
+                 "shading ON/OFF control now, defaulting to ON, and its readout NAMES the arm -- two runs " +
+                 "produce two lists of numbers, and unlabelled they are one list twice. Verified through " +
+                 "the switch itself after it landed: eleven frames, eleven positive, values identical to " +
+                 "the manual pass. " +
+                 "*** THE METHODOLOGICAL POINT IS THE ROUND'S REAL CONTENT AND IS RECORDED AT THE PAGE: *** " +
+                 "differencing the MEANS throws the pairing away and hands back the 2.12 dB spread. The " +
+                 "measurement is written down as a procedure a person on a rig can repeat -- run to frame " +
+                 "66, record dTmp per frame, flip the switch, run again, difference the two lists FRAME BY " +
+                 "FRAME -- rather than as a number to be believed. " +
+                 "Four sabotages, all four caught after one repair: removing the arm's NAME from the readout " +
+                 "scored 0-RED, because the row claiming a screenshot could not be mistaken for its control " +
+                 "was prose and not a check. It is behavioural now, at frame one, long before the ring " +
+                 "fills. No gate added.",
+    }),
     // v4655 -- THE 265th CLOSING: v4654 counted a continuous field with a threshold of zero.
     since340: Object.freeze({
         at: "v4655", swept: 0, green: 0, red: 0,
