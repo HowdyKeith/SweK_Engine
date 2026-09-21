@@ -350,5 +350,5 @@ export function reportLines() {
 }
 
 if (typeof process !== "undefined" && process.argv?.[1] &&
-    import.meta.url === new URL(`file://${process.argv[1]}`).href)
+    import.meta.url.endsWith("/" + process.argv[1].split(/[\/]/).pop()))
     for (const l of reportLines()) console.log(l);

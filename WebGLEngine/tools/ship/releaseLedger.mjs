@@ -43,7 +43,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import VM from "../../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -215,7 +215,7 @@ export function ledgerState({ root = ROOT, eng = ENG, file = LEDGER, readMain = 
     };
 }
 
-if (process.argv[1] && import.meta.url === "file://" + process.argv[1]) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     const s = ledgerState();
     console.log("[releaseLedger] tree " + s.tree + "  latest release " + (s.latestTag || "(none)") +
                 "  behind " + (s.behind === null ? "?" : s.behind));

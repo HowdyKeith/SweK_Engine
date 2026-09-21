@@ -33,6 +33,7 @@
 "use strict";
 import fs from "node:fs";
 import { LEDGER, readLedger } from "./releaseLedger.mjs";
+import { pathToFileURL } from "node:url";
 
 /**
  * *** THE PARSE IS A PURE FUNCTION SO IT CAN BE GRADED WITHOUT THE NETWORK, AND THAT IS NOT TIDINESS. ***
@@ -53,7 +54,7 @@ export function rowsFrom(apiJson) {
         .sort((a, b) => (+b.tag.slice(1)) - (+a.tag.slice(1)));
 }
 
-const RUN = process.argv[1] && import.meta.url === "file://" + process.argv[1];
+const RUN = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1] || "").href;
 if (!RUN) { /* imported for rowsFrom() -- no network, no exit */ }
 
 const REPO = process.env.SWEK_ENGINE_REPO || "HowdyKeith/SweK_Engine";

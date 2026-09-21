@@ -157,7 +157,7 @@ const BLOB_MESH = ${JSON.stringify(mesh)};
 // THE BROWSER HAS NO `process`, AND THIS LINE RAN AT MODULE TOP LEVEL. Importing this module into a page
 // threw "process is not defined" BEFORE ANY OF ITS EXPORTS COULD BE USED -- the module was Node-only BY
 // ACCIDENT, in three characters, and nothing said so until a browser tried.
-if (typeof process !== "undefined" && import.meta.url === "file://" + process.argv[1]) {
+if (typeof process !== "undefined" && import.meta.url.endsWith("/" + process.argv[1].split(/[\/]/).pop())) {
     const blobs = makeBlobs(7, 20260715);
     const mesh = blobMeshInput(blobs);
     process.stdout.write(krbnScene(blobs, mesh));

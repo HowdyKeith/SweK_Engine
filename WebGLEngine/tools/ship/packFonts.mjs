@@ -15,7 +15,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseFont } from "../../text/slugFont.js";
 import { packFont, encodePack } from "../../text/slugPack.mjs";
 import { FONTS, CHAR_SETS, fontPath, packPath } from "../../text/fontRegistry.mjs";
@@ -41,7 +41,7 @@ export function packAll() {
     return out;
 }
 
-if (import.meta.url === new URL(`file://${process.argv[1]}`).href || process.argv[1].endsWith("packFonts.mjs")) {
+if (import.meta.url === pathToFileURL(process.argv[1] || "").href || process.argv[1].endsWith("packFonts.mjs")) {
     const packs = packAll();
     let bad = 0;
     for (const p of packs) {

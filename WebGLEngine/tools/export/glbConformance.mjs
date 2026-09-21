@@ -879,7 +879,7 @@ export async function reportLines(result = null) {
 // ---- CLI: node tools/export/glbConformance.mjs <file-or-dir> ... --------------------------------------------
 // On-demand use, because the round that built this could wire it into three gates and not into every future
 // place somebody drops a GLB. Exit code is the number of files carrying an ERROR, capped at 125.
-if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+if (process.argv[1] && import.meta.url.endsWith("/" + process.argv[1].split(/[\/]/).pop())) {
     const fs = await import("node:fs");
     const path = await import("node:path");
     const targets = process.argv.slice(2);

@@ -37,7 +37,7 @@
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import * as FR from "./frozenRecords.mjs";
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -555,5 +555,5 @@ export function reportLines() {
     return out;
 }
 
-if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href)
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1] || "").href)
     for (const l of reportLines()) console.log(l);
