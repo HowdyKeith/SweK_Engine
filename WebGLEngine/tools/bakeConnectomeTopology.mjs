@@ -17,8 +17,11 @@
 // --include-types restricts which vendored neurons become hidden units at all -- e.g. a circuit's raw fetch
 // may include a related-but-distinct subtype (male-cns's EPG fetch also pulled 4 EPGt tangential neurons at
 // a separate PB position) that a caller may want excluded from a clean recurrent-ring story. Edges where
-// EITHER endpoint falls outside the included set are dropped, same as edges to a bodyId outside the fetch
-// entirely (both cases mean "this hidden layer doesn't have a slot for that neuron").
+// EITHER endpoint falls outside the included set are dropped (this hidden layer has no slot for that neuron,
+// by the caller's own choice) -- but an edge referencing a bodyId the vendored file never contains AT ALL is
+// a DIFFERENT thing, a genuinely dangling reference, and throws (mirroring tools/bakeGfcTopology.mjs's own
+// original rule): found missing by adversarial review, where a synthetic dangling-bodyId edge silently landed
+// in the same "dropped" counter as a legitimate type exclusion instead of failing loudly.
 //
 // NEURON_ORDER fixes the hidden-unit index <-> real bodyId mapping (index i is always the i'th included
 // neuron, in vendored-file order) so a hidden unit's identity is traceable back to a real, citable neuron.
@@ -51,6 +54,14 @@ const data = JSON.parse(fs.readFileSync(IN_PATH, "utf8"));
 const neurons = includeTypes ? data.neurons.filter((n) => includeTypes.has(n.type)) : data.neurons;
 if (neurons.length === 0) throw new Error(`bakeConnectomeTopology: --include-types ${includeTypesArg} matched no neurons in ${inArg}`);
 const indexOf = new Map(neurons.map((n, i) => [n.bodyId, i]));
+// Every bodyId the vendored file itself knows about, filtered or not -- distinguishes a LEGITIMATE --include-types
+// exclusion (a real neuron, just not one this bake keeps a slot for) from a bodyId the file never vendored AT ALL,
+// which tools/bakeGfcTopology.mjs (the original this tool was generalized from) hard-fails on and this one, before
+// this fix, silently lumped into the same "dropped" counter as a type exclusion -- found by adversarial review: a
+// synthetic edge to a bodyId outside the vendored neuron set entirely produced 0 red here, where the original threw
+// immediately. A future circuit's fetch-script bug producing a genuinely dangling bodyId deserves the same loud
+// failure the original gave it, not a silent line in a counter indistinguishable from an expected exclusion.
+const allBodyIds = new Set(data.neurons.map((n) => n.bodyId));
 
 // Two things this bake deliberately does NOT re-derive, mirroring tools/bakeGfcTopology.mjs's own header:
 // (1) the from/to direction is trusted as-is from the vendored file, which trusts it from the raw Neuprint
@@ -64,8 +75,9 @@ const edgeSet = new Set();
 const edges = [];
 let droppedOutsideInclude = 0;
 for (const [from, to] of data.edges) {
+    if (!allBodyIds.has(from) || !allBodyIds.has(to)) throw new Error(`bakeConnectomeTopology: edge ${from}->${to} references a bodyId outside ${inArg}'s own neuron set entirely -- not merely excluded by --include-types, genuinely dangling`);
     const fromIdx = indexOf.get(from), toIdx = indexOf.get(to);
-    if (fromIdx === undefined || toIdx === undefined) { droppedOutsideInclude++; continue; }
+    if (fromIdx === undefined || toIdx === undefined) { droppedOutsideInclude++; continue; }   // a real neuron, legitimately excluded by --include-types
     if (fromIdx === toIdx) throw new Error(`bakeConnectomeTopology: edge ${from}->${to} is a self-loop -- the recurrent core's identity term already covers self-persistence, and this bake has never seen one in the real data, so treat it as a surprise, not a case to silently absorb`);
     const key = toIdx * neurons.length + fromIdx;
     if (!edgeSet.has(key)) { edgeSet.add(key); edges.push([toIdx, fromIdx]); }

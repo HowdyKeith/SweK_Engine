@@ -54,6 +54,14 @@
 // -> ANOTHER GENUINE FINDING: the original 1b check ("same length, every Topo edge is a real one") stayed GREEN, because a duplicate
 // satisfies both conditions trivially. Fixed by comparing topoEdgeSet.size (catches the duplicate directly) against both
 // Topo.EDGES.length and rawEdgeSet.size -- a true three-way set-equality rather than a weaker length-plus-membership check.
+// E (found by adversarial review, not this file's own author) REC_STEPS changed 3 -> 1 -> ALL 41 CHECKS STAYED GREEN, end to
+// end, re-verified here before fixing: every OTHER check in section 1 reads D.REC_STEPS FROM THE MODULE UNDER TEST to build
+// its own expectation (`layers.length === 2 + D.REC_STEPS`), so none of them can catch REC_STEPS itself changing; and unlike
+// the mask checks, no hand-policy behavioral check can catch it either -- identity-composed-with-itself is the identity for
+// ANY step count when Wrec=0, and the ES-training assertions use loose bounds a shallower-but-still-functional core also
+// satisfies (in the review's run it even trained FASTER: 7 accepted vs 4). Fixed with a check against the hardcoded literal
+// 3, the one place in this file a shape number is asserted without reading it back from the module it is supposed to hold
+// to account.
 //
 // Run: node tools/ship/drivePolicy-selfcheck.mjs      (~2.1 min, measured: the ES is the cost, and the recurrent core makes each
 // forward pass heavier than the old plain 9 -> 8 -> 2 net's, so this gate now runs longer than the ~0.83 min the pre-rewiring
@@ -88,7 +96,14 @@ const timed = (f) => { const t0 = performance.now(); const r = f(); return { r, 
 // ---------------------------------------------------------------------------------------------------------------------------------
 sec("1. the shape: 9 -> 46 (encoder) -> connectome-masked recurrent core -> 2 (decoder), through the GPU kernel's f32 twin, the zero and the hand");
 {
-    ok("1396 weights: 9 x 46 + 46 + 842 + 46 x 2 + 2", D.WEIGHT_COUNT === 1396 && D.zeroWeights().length === 1396 && D.FEATURE_NAMES.length === D.FEATURES && D.HIDDEN === 46 && D.REC_EDGES === 842);
+    // !! REC_STEPS is checked against the HARDCODED LITERAL 3, not just internally-consistent with itself: every
+    // other check in this section reads D.REC_STEPS FROM THE MODULE UNDER TEST to build its own expectation (e.g.
+    // `layers.length === 2 + D.REC_STEPS` below), which can never catch REC_STEPS changing -- and unlike the mask
+    // checks, no hand-policy behavioral check can catch it either, since identity-composed-with-itself is the
+    // identity for ANY number of steps (relu(I@h)=h regardless of REC_STEPS when Wrec=0), and the ES-training
+    // assertions use loose bounds a shallower-but-still-functional core can also satisfy. Found by adversarial
+    // review: REC_STEPS=1 left every other check in this file GREEN end to end (re-verified here before fixing).
+    ok("1396 weights: 9 x 46 + 46 + 842 + 46 x 2 + 2; REC_STEPS is 3", D.WEIGHT_COUNT === 1396 && D.zeroWeights().length === 1396 && D.FEATURE_NAMES.length === D.FEATURES && D.HIDDEN === 46 && D.REC_EDGES === 842 && D.REC_STEPS === 3);
     const layers = D.layersOf(D.zeroWeights());
     ok("layersOf splits them into an 9->46 relu encoder, REC_STEPS=3 weight-tied 46->46 relu recurrent layers (the SAME matrix object each time), and a 46->2 none decoder",
         layers.length === 2 + D.REC_STEPS && layers[0].nIn === 9 && layers[0].nOut === 46 && layers[0].act === "relu" && layers[0].W.length === 9 * 46 && layers[0].b.length === 46 &&
