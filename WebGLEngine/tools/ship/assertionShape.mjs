@@ -466,8 +466,10 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // Fifth round running with the same four rows moving by one. THIS ONE IS A SIBLING OF THIS FILE: both
     // walk every gate and read its ok() calls -- this census asks what SHAPE the call has, that one asks
     // whether its condition can be influenced by anything in the tree.
-    gates: 1757, usesOk: 1736, definesOk: 1728, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1629, condFirst: 91, unknownSignature: 16,
+    // v4654 -- 1757 -> 1758 for tools/ship/runnerCallers-selfcheck.mjs, the census of compute runners that
+    // only a gate imports. Sixth round running with the same four rows moving by one and the other four held.
+    gates: 1758, usesOk: 1737, definesOk: 1729, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1630, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

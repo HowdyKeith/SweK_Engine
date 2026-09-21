@@ -59,6 +59,7 @@
   <div class="stat" id="accstat"></div>
   <div class="stat" id="disstat"></div>
   <div class="stat" id="objstat"></div>
+  <div class="stat" id="lockstat"></div>
   <div class="stat" id="over"></div>
 </div>
 <div class="panes">
@@ -168,7 +169,7 @@
   number.
 </div>
 <script type="module">
-import { makeJitterState, jitterCurrent, advanceJitter } from "./render/jitter.mjs";
+import { makeJitterState, jitterCurrent, advanceJitter, jitterPhaseCount } from "./render/jitter.mjs";
 import { resolveJitterAwareCPU } from "./render/temporalResolve.mjs";
 import { temporalAccumulateCPU } from "./render/temporalAccumulate.mjs";
 import { easuCPU, rcasCPU, bilinearCPU } from "./fx/fsr/fsr.js";
@@ -178,6 +179,7 @@ import { FSRGPU, rangeOf } from "./fx/fsr/fsrGPU.js";
 import { TemporalGPU } from "./render/temporalGPU.mjs";
 import { MotionVectorsGPU, orthoPanVP } from "./render/motionVectorsGPU.mjs";
 import { ObjectMotionGPU } from "./render/objectMotionGPU.mjs";
+import { TemporalLockGPU } from "./render/temporalLockGPU.mjs";
 import { buildObjectMatrices, objectMotionCPU } from "./render/objectMotion.mjs";
 import { TemporalRejectGPU } from "./render/temporalRejectGPU.mjs";
 import { motionVectorsCPU, mat4Invert, transform4 } from "./render/motionVectors.mjs";
@@ -415,7 +417,11 @@ const FLAT_DEPTH = new Float32Array(D * D);
 // to "not counted" the moment a reader opened it on an adapter -- exactly the regression v4591 had to undo for
 // the accumulate pass. Getting the number off the device needed a mainCounted entry point in each of the two
 // kernels, because the mask cannot distinguish a disocclusion from a reprojection that left the frame.
-let gpu = null, tgpu = null, mgpu = null, rgpu = null, ogpu = null;
+let gpu = null, tgpu = null, mgpu = null, rgpu = null, ogpu = null, lgpu = null;
+// The lock ring lives across frames and belongs to one camera and one size, so it is torn
+// down whenever reset() changes either. A ring carried across a resolution change would be
+// read with the wrong stride and would look like content rather than like a mistake.
+let lockRing = null;
 async function initGPU() {
     const say = (t) => { $("engine").textContent = "spatial engine: " + t; };
     // *** v4637 -- THIS SAID "this browser exposes no WebGPU" AND THAT IS AN ATTRIBUTION, NOT A FACT. ***
@@ -439,6 +445,7 @@ async function initGPU() {
         try { mgpu = new MotionVectorsGPU(dev); } catch { mgpu = null; }
         try { rgpu = new TemporalRejectGPU(dev); } catch { rgpu = null; }
         try { ogpu = new ObjectMotionGPU(dev); } catch { ogpu = null; }
+        try { lgpu = new TemporalLockGPU(dev); } catch { lgpu = null; }
         const who = (dev.adapterInfo && (dev.adapterInfo.description || dev.adapterInfo.vendor)) || "webgpu";
         say(`WebGPU compute on ${who} -- EASU+RCAS, resolve+accumulate, the motion vectors` +
             (rgpu ? " and the reject chain (disocclusion, factor, rectify) on the dolly" : "") +
@@ -470,6 +477,8 @@ async function reset() {
     const dolly = $("camera").value === "dolly" || $("camera").value === "objects";
     R = Math.max(8, Math.round(D / ratio));
     jit = makeJitterState(ratio); hist = null; frame = 0;
+    if (lockRing && lgpu) { try { lgpu.destroyRing(lockRing); } catch {} }
+    lockRing = null;                             // see the declaration: a ring outlives a frame, not a reset
     prevDepth = null;                            // the depth history goes with the colour history, or frame 1
                                                  // compares this camera's depths against the last camera's
     ref = dolly ? truthPersp(dollyVP(0), kind) : truth(kind, 0);
@@ -493,6 +502,7 @@ async function reset() {
     $("accstat").textContent = "";
     $("disstat").textContent = "";
     $("objstat").textContent = "";
+    $("lockstat").textContent = "";
 }
 
 async function tick() {
@@ -625,6 +635,39 @@ async function tick() {
     const dollyCurrent = dolly
         ? resolveJitterAwareCPU({ src: frameSrc, rw: R, rh: R, dw: D, dh: D, jitter: [jx, jy] }).data
         : null;
+    // *** THE SHADING MASK, WHICH THE REJECT CHAIN HAS ACCEPTED SINCE v4594 AND NOTHING HAS EVER SUPPLIED. ***
+    //
+    // rejectAndAccumulate takes `reactive` and `shading` beside the disocclusion mask, and this page has
+    // passed null for both since the chain was wired. render/temporalRejectGPU.mjs's own closing line names
+    // that gap -- "nothing in this tree produces a reactive mask at all, and the shading one is
+    // render/temporalLock.mjs's" -- and v4647 gave temporalLock a runner while leaving it with no caller
+    // outside its gate. This is the caller, and the mask it makes is exactly the one the factor pass wants:
+    // SHADING_SHIFT compares the newer half of a luma ring against the older half, both spanning the same
+    // jitter phases so the jitter cancels exactly, and reports where the LIGHT on a surface changed rather
+    // than where the surface moved. History is wrong at those pixels for a reason motion cannot see.
+    //
+    // *** THE RING'S PERIOD IS THE JITTER'S PHASE COUNT AND MAY NOT BE CHOSEN FOR COST. *** The whole
+    // mechanism is that both halves span the same set of phases; a shorter ring would leave a residue of the
+    // jitter in the difference and report sampling as shading. That makes the ring 2*period slots per pixel,
+    // which is why it is built once and pushed rather than rebuilt, and why it is on THIS camera only.
+    let shadingMask = null, lockStat = null;
+    if (objects && lgpu && dollyCurrent) {
+        const period = jitterPhaseCount(parseFloat($("ratio").value));
+        if (!lockRing) lockRing = lgpu.makeRing(D, D, period);
+        lgpu.pushRing(lockRing, { current: dollyCurrent, motion });
+        // scale is the luma range this page's content actually spans; strength 1 leaves the detector's own
+        // units alone. A detector normalised by something the page invented is one nobody can reason about,
+        // which is render/temporalLock.mjs's own rule about `scale` being the caller's.
+        shadingMask = (await lgpu.shadingShift(lockRing, { scale: 1, strength: 1 })).data;
+        // *** THE MASK IS EXACTLY ZERO UNTIL THE RING FILLS, AND THAT MUST BE SAID RATHER THAN LOOKED LIKE
+        // "NOTHING IS SHADING-SHIFTED". *** SHADING_SHIFT writes 0 at a pixel whose ring is not yet full --
+        // v4402's rule, an absence is not a pass -- and the ring is 2*period slots, so at ratio 2 it takes
+        // SIXTY-FOUR frames before a single pixel can report anything. A reader watching the first few
+        // frames would see a mask of zeros and conclude the detector found nothing; it has not looked yet.
+        let nz = 0, peak = 0;
+        for (let i = 0; i < D * D; i++) if (shadingMask[i] > 0) { nz++; if (shadingMask[i] > peak) peak = shadingMask[i]; }
+        lockStat = { pushes: lockRing.pushes, need: lockRing.F, nz, peak };
+    }
     if (dolly && prevDepth && threshold) {
         // nearerIsLess: true because rasterProbe.js's viewProj is GL-style forward-Z -- P[10] is
         // -(far+near)/(far-near) -- so a smaller clip z is nearer. Inverted it reports the exact complement,
@@ -635,6 +678,7 @@ async function tick() {
             // frame -- the exact regression v4591 had to undo for the accumulate pass.
             rejected = await rgpu.rejectAndAccumulate({
                 current: dollyCurrent, history: hist, motion, prevDepth, w: D, h: D, alpha, threshold,
+                shading: shadingMask,       // null on every camera but "objects" -- see the block above
                 nearerIsLess: true, space: "ycocg", counted: true });
             // genuine = flagged - noHistory, and the SPLIT is why the counters exist: the mask writes the same
             // 1.0 for all three reasons, so no pass over it could have recovered this number.
@@ -708,6 +752,17 @@ async function tick() {
     // is the one that makes the first mean anything: the background's model matrix is the identity, so
     // object-aware and camera-only are the same computation there and must agree to the round trip. A field
     // that moved BOTH would be a mislabelled id buffer, not a working one.
+    // The lock ring's own state, beside the object line, because a mask that is zero for a reason and a mask
+    // that is zero because nothing happened are the same picture and must not be the same sentence.
+    $("lockstat").textContent = !objects ? ""
+        : lockStat
+            ? `shading mask: ring ${lockStat.pushes}/${lockStat.need} frames` +
+              (lockStat.pushes < lockStat.need
+                  ? ` -- NOT YET FILLED, so every pixel reads 0 and the factor pass is unchanged. The ring is `
+                    + `2 x jitterPhaseCount because both halves must span the same jitter phases; that is the `
+                    + `mechanism, not a warm-up that can be shortened.`
+                  : `, ${lockStat.nz} pixels shading-shifted, peak ${lockStat.peak.toFixed(3)}`)
+            : "shading mask: not computed on this camera";
     $("objstat").textContent = !objects ? ""
         : objGap
             ? `object motion: camera-only is off by ${(objGap.onSlab * D).toFixed(2)} px on the slab's ` +

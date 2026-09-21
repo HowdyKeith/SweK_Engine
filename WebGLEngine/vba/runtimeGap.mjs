@@ -337,7 +337,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
     // and the readings overlap on everything predating the split, so they are run over the merged tree rather
     // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
-    files: 4290,               // v4645 -- RE-DERIVED AT THE main MERGE over the merged tree. RE-DERIVED AT THE main MERGE: 4169 on this branch, 4172 on main, 4260 merged -- LESS than the sum, which is why it is run
+    files: 4292,               // v4645 -- RE-DERIVED AT THE main MERGE over the merged tree. RE-DERIVED AT THE main MERGE: 4169 on this branch, 4172 on main, 4260 merged -- LESS than the sum, which is why it is run
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
                           // RE-TAKEN TWICE IN TWO ROUNDS, and the second time only because the ship gate
@@ -726,7 +726,14 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // from 957 to 59. `files` holds at 4290. This is the narrowest this table has ever moved and it is a
     // useful demonstration of what it measures: not capability, not behaviour, but which API names a file's
     // text contains. One word in one string literal, and the census is right to see it.
-    esModules: 3990, closures: 3855, asyncAwait: 1527, typedArrays: 1131, promises: 369,
+    //
+    // *** v4654 -- THREE ROWS, TWO NEW FILES: files 4290 -> 4292, ES modules 3990 -> 3992, closures 3855 ->
+    // 3857. *** tools/ship/runnerCallers.mjs and its gate, both ES modules using closures as values and
+    // nothing else -- no device, no typed arrays, no async, because they read source text. THIRD QUIET ROUND
+    // RUNNING and the pattern is now worth naming: this session's instrument rounds move three rows and its
+    // RENDER rounds move six. The table is reading the difference between a file that parses source and a
+    // file that drives a GPU, which is exactly what a text census can see and the only thing it can.
+    esModules: 3992, closures: 3857, asyncAwait: 1527, typedArrays: 1131, promises: 369,
     fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 159, webgpu: 52, threads: 23, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

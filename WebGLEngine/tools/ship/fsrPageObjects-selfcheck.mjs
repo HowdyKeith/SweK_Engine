@@ -96,6 +96,7 @@ const FLOOR_DB = 38.5;
                           tmpEarly, tmpLate: ($("dTmp") || {}).textContent || "",
                           fsr1: ($("dFsr") || {}).textContent || "",
                           obj: ($("objstat") || {}).textContent || "",
+                          lock: ($("lockstat") || {}).textContent || "",
                           dis: ($("disstat") || {}).textContent || "" };
             try { $("run").click(); } catch {}
             return out;
@@ -128,6 +129,27 @@ const FLOOR_DB = 38.5;
                "   ||  object-aware and camera-only are the SAME computation where the model matrix is the " +
                "identity, so this is f32 on the device against f64 in JS and nothing else. A mislabelled id " +
                "buffer would move BOTH numbers, which is why one number could not carry this claim.");
+            // *** v4654 -- THE SHADING MASK, AND THE HONEST THING IT SAYS ABOUT ITSELF. ***
+            // The reject chain has accepted a `shading` argument since v4594 and nothing ever supplied one.
+            // fsr.html now builds a luma ring through render/temporalLockGPU.mjs and feeds SHADING_SHIFT's
+            // output in. SHADING_SHIFT writes 0 at any pixel whose ring is not yet full, and the ring is
+            // 2 x jitterPhaseCount slots -- SIXTY-FOUR frames at ratio 2 -- so for the whole of this gate's
+            // six frames the mask is exactly zero and the factor pass is unchanged.
+            //
+            // THAT IS WHY THE PAGE PRINTS THE FILL STATE RATHER THAN THE MASK ALONE. A mask of zeros because
+            // the detector found nothing and a mask of zeros because it has not looked yet are the same
+            // picture, and v4402's rule is that an absence must not read as a pass. MEASURED past the fill
+            // point on a real adapter at v4654: at frame 64 the ring is full and 0 pixels are shifted; at
+            // frame 70 it is 36,862 of 36,864 at peak 0.192 -- so it engages, and on this content it marks
+            // very nearly EVERY pixel, which makes it a global damper rather than a selective mask. Whether
+            // that helps is NOT established: the temporal pane reads 43.21 dB there against a 39.6-42.8
+            // spread over the frames before it, which is the same order as the variation.
+            const lk = /ring (\d+)\/(\d+) frames/.exec(G.lock || "");
+            ok("!! *** the shading mask says it is NOT YET FILLED rather than reading as a clean frame ***",
+               !!lk && Number(lk[1]) === G.frames && Number(lk[2]) === 64 && /NOT YET FILLED/.test(G.lock || ""),
+               (G.lock || "(empty)").slice(0, 200) + "   ||  the ring is 2 x jitterPhaseCount(2) = 64 slots " +
+               "and this gate runs 6 frames, so zero is the correct answer and the page has to say which " +
+               "kind of zero it is.");
             ok("!! ...and the object camera is computed ON THE DEVICE, not silently on the CPU",
                /computed on the device/.test(G.obj || ""), G.obj || "(empty)");
             // MEASURED across frames 2-6 when this row was written: the dolly is a flat 106 every frame and
@@ -187,8 +209,10 @@ console.log("\nunchecked here: the DOLLY and the two older cameras, which are fs
 //   v4649  fsr.html: the REFERENCE ignores the slab's offset                   1 RED, the decay half.
 //          This one was not a sabotage first -- it was the round's own defect, found by measuring the product.
 //
-// *** RUNTIME: 3,358 ms median of five (3,301 3,346 3,358 3,385 3,387) -- OVER the sweep's 3,000 ms
-// membership threshold, and that is stated rather than tuned away. ***
+// *** RUNTIME: 4,204 ms median of three (4,178 4,204 4,252) -- OVER the sweep's 3,000 ms membership
+// threshold, and that is stated rather than tuned away. v4654 added ~850 ms by giving the page a luma
+// ring: 2 x jitterPhaseCount slots per pixel, pushed every frame, which is the cost of the mechanism and
+// not of this gate. It was 3,358 ms before that. ***
 //
 // This line first read "2,530 ms median of five" with five plausible samples beside it. That number was
 // written before the gate was run. It is left described here rather than quietly replaced, because inventing

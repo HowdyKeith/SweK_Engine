@@ -8032,6 +8032,52 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4654 -- THE 264th CLOSING: closing a reachability gap by adding a caller only a gate calls.
+    since339: Object.freeze({
+        at: "v4654", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/runnerCallers-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 1,872 ms, CPU only, 12 rows. *** kernelReach.mjs's OWN CLOSING LINE NAMES THIS AND " +
+                 "CANNOT ANSWER IT: 'a module imported but never called would still read as reachable'. *** A " +
+                 "WGSL kernel becomes reachable the moment a RUNNER imports it, so v4647 closed the temporal " +
+                 "arc's kernel census at zero and v4648 added a rasteriser the same way -- and a runner only " +
+                 "its own gate constructs has MOVED the debt up a level rather than paid it. MEASURED " +
+                 "tree-wide: 15 modules build and dispatch a compute pipeline, and THREE were imported by " +
+                 "nothing but their own selfcheck. Two of the three were this session's. " +
+                 "*** THE ROUND PAYS ONE OF THEM, AND THAT IS HOW THE CENSUS IS KNOWN TO MOVE AT ALL: 3 -> 2. " +
+                 "*** fsr.html now constructs TemporalLockGPU, pushes a luma ring on the objects camera and " +
+                 "feeds SHADING_SHIFT's output to rejectAndAccumulate's `shading` argument -- which that " +
+                 "chain has accepted since v4594 and which NOTHING had ever supplied. " +
+                 "*** AND THE MASK IS EXACTLY ZERO FOR SIXTY-FOUR FRAMES, WHICH THE PAGE SAYS RATHER THAN " +
+                 "LOOKS LIKE. *** SHADING_SHIFT writes 0 at any pixel whose ring is not full, and the ring is " +
+                 "2 x jitterPhaseCount slots because both halves must span the same jitter phases -- that is " +
+                 "the mechanism and not a warm-up that can be shortened. A mask of zeros because the detector " +
+                 "found nothing and one because it has not looked yet are the same picture, so the page " +
+                 "prints the fill state beside it (v4402's rule). MEASURED past the fill point on a real " +
+                 "adapter: at frame 64 the ring is full and 0 pixels are shifted; at frame 70 it is 36,862 " +
+                 "OF 36,864 at peak 0.192. So it engages -- and on this content it marks very nearly EVERY " +
+                 "pixel, which makes it a global history damper rather than a selective mask. WHETHER THAT " +
+                 "HELPS IS NOT ESTABLISHED and is said so: the temporal pane reads 43.21 dB there against a " +
+                 "39.6-42.8 spread over the frames before, which is the same order as the variation. " +
+                 "*** THE TWO SOURCE READERS ARE OPPOSITE CHOICES HERE AND PICKING WRONG IN EACH DIRECTION " +
+                 "IS HOW THAT SECTION WAS EARNED. *** An import PATH is a string, so the import scan reads " +
+                 "noComments -- built on codeOnly it reported all fifteen runners gate-only, including the " +
+                 "five fsr.html plainly imports. A RUNNER is an idiom, so the runner test reads codeOnly -- " +
+                 "built on raw text a header describing a runner reads as one. sourceScan.mjs's docstring " +
+                 "says which answers which, and this round needed both halves of that sentence. " +
+                 "*** PERFORMANCE WAS A CORRECTNESS PROBLEM AT THE SWEEP'S EDGE. *** The first draft stripped " +
+                 "comments once per (runner, file) pair and ran in THIRTY-SIX SECONDS, past the 20,000 ms " +
+                 "SIGKILL cap and not merely the 3,000 ms budget -- and a gate the sweep KILLS reports " +
+                 "nothing at all. Memoise, pre-filter on a raw substring, memoise on top of the filter: " +
+                 "36 s -> 6.5 -> 3.45 -> 1.87, with the census verified identical at every step. The " +
+                 "pre-filters are SOUND rather than approximate, because codeOnly and noComments only ever " +
+                 "REMOVE characters, and two sabotages narrow each past soundness and go red. " +
+                 "Eight sabotages, all eight caught. fsrPageObjects-selfcheck goes 3,358 -> 4,204 ms for the " +
+                 "ring push, which is the cost of the mechanism and is recorded rather than tuned away.",
+    }),
     // v4653 -- THE 263rd CLOSING: the census was counting fixture source as rows of the tree.
     since338: Object.freeze({
         at: "v4653", swept: 0, green: 0, red: 0,

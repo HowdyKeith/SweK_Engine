@@ -2158,9 +2158,10 @@
   "render/objectMotionGPU-selfcheck.mjs": 779,
   "render/temporalLockGPU-selfcheck.mjs": 2110,
   "render/visibilityGPU-selfcheck.mjs": 870,
-  "tools/ship/fsrPageObjects-selfcheck.mjs": 3358,
+  "tools/ship/fsrPageObjects-selfcheck.mjs": 4204,
   "render/edgeReveal-selfcheck.mjs": 53,
-  "tools/ship/constantRows-selfcheck.mjs": 1960
+  "tools/ship/constantRows-selfcheck.mjs": 1960,
+  "tools/ship/runnerCallers-selfcheck.mjs": 1872
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -3922,7 +3923,8 @@
   "render/visibilityGPU-selfcheck.mjs": 0,
   "tools/ship/fsrPageObjects-selfcheck.mjs": 0,
   "render/edgeReveal-selfcheck.mjs": 0,
-  "tools/ship/constantRows-selfcheck.mjs": 0
+  "tools/ship/constantRows-selfcheck.mjs": 0,
+  "tools/ship/runnerCallers-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-17T16:44:13.404Z",
@@ -5682,9 +5684,10 @@
   "render/objectMotionGPU-selfcheck.mjs": "2026-09-20T00:00:00.000Z",
   "render/temporalLockGPU-selfcheck.mjs": "2026-09-21T00:00:00.000Z",
   "render/visibilityGPU-selfcheck.mjs": "2026-09-21T00:00:00.000Z",
-  "tools/ship/fsrPageObjects-selfcheck.mjs": "2026-09-21T12:00:00.000Z",
+  "tools/ship/fsrPageObjects-selfcheck.mjs": "2026-09-22T12:00:00.000Z",
   "render/edgeReveal-selfcheck.mjs": "2026-09-21T18:00:00.000Z",
-  "tools/ship/constantRows-selfcheck.mjs": "2026-09-22T06:00:00.000Z"
+  "tools/ship/constantRows-selfcheck.mjs": "2026-09-22T06:00:00.000Z",
+  "tools/ship/runnerCallers-selfcheck.mjs": "2026-09-22T12:00:00.000Z"
  },
  "capAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 20000,
@@ -10362,9 +10365,10 @@
   "render/objectMotionGPU-selfcheck.mjs": 779,
   "render/temporalLockGPU-selfcheck.mjs": 2110,
   "render/visibilityGPU-selfcheck.mjs": 870,
-  "tools/ship/fsrPageObjects-selfcheck.mjs": 3358,
+  "tools/ship/fsrPageObjects-selfcheck.mjs": 4204,
   "render/edgeReveal-selfcheck.mjs": 53,
-  "tools/ship/constantRows-selfcheck.mjs": 1960
+  "tools/ship/constantRows-selfcheck.mjs": 1960,
+  "tools/ship/runnerCallers-selfcheck.mjs": 1872
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-16T22:48:41.155Z",
@@ -13436,7 +13440,8 @@
   "render/visibilityGPU-selfcheck.mjs": false,
   "tools/ship/fsrPageObjects-selfcheck.mjs": false,
   "render/edgeReveal-selfcheck.mjs": false,
-  "tools/ship/constantRows-selfcheck.mjs": false
+  "tools/ship/constantRows-selfcheck.mjs": false,
+  "tools/ship/runnerCallers-selfcheck.mjs": false
  },
  "kinds": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "loaded",
@@ -15198,6 +15203,7 @@
   "render/visibilityGPU-selfcheck.mjs": "alone",
   "tools/ship/fsrPageObjects-selfcheck.mjs": "alone",
   "render/edgeReveal-selfcheck.mjs": "alone",
-  "tools/ship/constantRows-selfcheck.mjs": "alone"
+  "tools/ship/constantRows-selfcheck.mjs": "alone",
+  "tools/ship/runnerCallers-selfcheck.mjs": "alone"
  }
 }
