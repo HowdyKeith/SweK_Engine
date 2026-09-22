@@ -213,8 +213,8 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
     const cc = (re) => (code.match(re) || []).length;
     const decl = cc(/const VOICE = /g) + cc(/const PACE = /g);
     const readV = cc(/\bVOICE\b/g) - 1, readP = cc(/\bPACE\b/g) - 1;
-    ok("!! the conditioned pair is declared once each and read 43 and 8 times, counting CODE and not comments",
-        decl === 2 && readV === 43 && readP === 8,
+    ok("!! the conditioned pair is declared once each and read 42 and 11 times, counting CODE and not comments",
+        decl === 2 && readV === 42 && readP === 11,
         `${readV} readers of the conditioned voice and ${readP} of the conditioned cadence, with comments and ` +
         `strings stripped. The 43 is a REPAIR of a recorded 44, not a regression: v4641 moved 44 raw-knob ` +
         `sites and 8 glintRate sites, and one of the 44 collapsed into a shared expression while the census ` +
@@ -246,13 +246,33 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
         if ((blk.match(/\bVOICE\b/g) || []).length) voiced.push(marks[k][1]);
     }
     // `mist` is the shared builder nebula and tempest are both drawn by, which is why 17 builders cover 18 species.
-    const WANT_PACED = ["arc", "sol", "aura", "flux", "chorus", "prism"];
+    // *** THIS ROW ASSERTED SOMETHING FALSE ABOUT murmur FOR THIRTEEN ROUNDS, AND v4654 MEASURED IT. ***
+    // It read "THE SIX SPECIES WITH A CADENCE ARE murmur's SIX ... A port that routed the cadence to every
+    // species would draw a shimmer on eleven bodies murmur leaves still." Counted in murmur's own eighteen
+    // sources, live.pace appears in ALL EIGHTEEN -- still 1, limn 1, comet 2, droplet 1, opal 1, abyss 1,
+    // nebula 2, tempest 1, fathom 1, geode 1, arc 1, sol 2, aura 2, flux 2, duet 2, chorus 1, prism 1,
+    // helix 1. There is no species murmur leaves still.
+    //
+    // The six were never murmur's six. They were the six this PORT happened to reach when v4641 moved eight
+    // borrowed glintRate sites onto the cadence, and the row wrote that subset down as if it were the
+    // design. A record that over-claims sends the next reader to build what is already there; this one did
+    // the opposite and told them there was nothing left to build.
+    //
+    // So the row inverts: it names how many of the eighteen this port has reached and REQUIRES THE NUMBER TO
+    // BE SHORT, with the missing ones listed, until it is not.
+    const MURMUR_PACED = 18;   // counted in murmur's sources; see the note above
+    const ALL = marks.slice(0, -1).map((m) => m[1]);
+    const unpaced = ALL.filter((n) => !paced.includes(n));
     say(`builders reading the conditioned cadence: ${paced.join(", ")}; reading the conditioned voice: ${voiced.length} of ${marks.length - 1}`);
-    ok("!! *** THE SIX SPECIES WITH A CADENCE ARE murmur's SIX, NAMED, AND THE OTHER ELEVEN BUILDERS HAVE NONE ***",
-        paced.length === WANT_PACED.length && WANT_PACED.every((s) => paced.includes(s)),
-        `exactly ${paced.join(", ")} -- and no other builder reads it. These are the eight glintRate sites the ` +
-        `defect had, gathered by species: sol and flux carry two each, the other four one. A port that routed ` +
-        `the cadence to every species would draw a shimmer on eleven bodies murmur leaves still.`);
+    say(`builders with NO cadence, which murmur gives one to: ${unpaced.join(", ")}`);
+    ok("!! *** murmur GIVES A CADENCE TO ALL EIGHTEEN AND THIS PORT REACHES EIGHT -- the ten missing are named ***",
+        paced.length === 8 && ["arc", "sol", "aura", "flux", "chorus", "prism", "comet", "limn"].every((x) => paced.includes(x)) &&
+        unpaced.length === (marks.length - 1) - 8,
+        `${paced.length} of murmur's ${MURMUR_PACED}: ${paced.join(", ")}. STILL WITHOUT ONE: ` +
+        `${unpaced.join(", ")}. comet and limn arrive at v4654 -- comet's orbital rate was reading VOICE where ` +
+        `murmur reads live.pace and its closure never touched the cadence at all, and limn had the smaller of ` +
+        `murmur's two terms and not the larger. THE ROW USED TO SAY SIX WAS THE WHOLE DESIGN. It is a count of ` +
+        `what this port has reached and it goes red when that count moves, in either direction.`);
 
     const stillGlint = count(/uniforms\.glintRate\b/g);
     const stillBlk = (() => { const k = marks.findIndex((m) => m[1] === "still");

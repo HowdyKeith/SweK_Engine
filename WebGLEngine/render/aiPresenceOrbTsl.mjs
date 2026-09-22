@@ -48,6 +48,13 @@ export const ORB_KNOBS = Object.freeze([
     // heroes. The comment that stood here said a knob nothing reads is a row that cannot fail, and that was
     // right: the knob arrives in the same round as the pixels it moves, not before them.
     "stateTau",
+    // *** THE THREE SIGNAL INTEGRALS -- v4654, and they are what let a modulated clock exist at all. ***
+    // murmur's species build a local rate out of the live signals and hand it to mh_drift, whose phase is
+    // rate * t. A rate that MOVES makes that expression jump by t * dRate -- no ceiling, growing with how
+    // long the orb has been on screen -- which is the defect v4650 repaired one level up on this same orb.
+    // A shader has no memory, so the host supplies the running integrals instead and the secular phase
+    // becomes base * (t + a*P + b*V + c*D), which is the exact integral and costs three numbers.
+    "paceInt", "voiceInt", "driveInt",
     // limn's own four, from murmur's src/styles.ts roster. They sit in the same uniform block rather than a
     // second one because a species is a different BODY over one shared kit, which is exactly how murmur's own
     // eighteen are arranged -- each reads c0..c3 out of the same argument list.
@@ -179,7 +186,7 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
     // .mjs by tools/ship/murmurKit-selfcheck.mjs on a real GPU.
     const KIT = makeMurmurKitTsl(TSL);
 
-    const k0 = { time: 0, speed: 1, glow: 1, depth: 1, hueShift: 0, presence: 0.5, clarity: 0.6, glintRate: 0.3, voice: 0, aspect: 1, activity: 0, stateIndex: 0, stateTau: 0,
+    const k0 = { time: 0, speed: 1, glow: 1, depth: 1, hueShift: 0, presence: 0.5, clarity: 0.6, glintRate: 0.3, voice: 0, aspect: 1, activity: 0, stateIndex: 0, stateTau: 0, paceInt: 0, voiceInt: 0, driveInt: 0,
                  rimWidth: 0.4, travel: 0.5, innerHint: 0.3, spread: 0.4,
                  orbitTilt: 0.5, trail: 0.5, pointSize: 0.4,
                  wobble: 0.5, tension: 0.5, sheen: 0.5,
@@ -260,6 +267,15 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // entering RESPONDING after a minute of idle moved it 2.902 s in one frame. That needs a decision
         // about faithfulness rather than a transcription, and it is recorded in tools/ship/nextRounds.mjs.
         const DRIVE = STATE.drive.toVar();
+        // *** THE MODULATED CLOCK'S SECULAR PHASE -- v4654. *** base * (t + a*P + b*V + c*D) is the EXACT
+        // integral of base * (1 + a*pace + b*voice + c*drive), because base and the coefficients come from
+        // style knobs and do not move. It reduces to murmur's own base * (1 + a*pace) * t wherever the
+        // signals are held, so it changes nothing at a fixed operating point and everything while a signal
+        // is in motion -- which is the only place murmur's spelling is wrong. See render/murmurKit.mjs's
+        // mhRatePhase for the factoring and the 28.14-radian measurement behind it.
+        const ratePhase = (base, kPace, kVoice, kDrive) => KIT.mhRatePhase(
+            base, uniforms.time, float(kPace), uniforms.paceInt,
+            float(kVoice), uniforms.voiceInt, float(kDrive), uniforms.driveInt);
         const HEAD = MH_DRIVE_HEADING[species] || null;
         const FORM = MH_DRIVE_FORM[species] || null;
         // The heading target as the shader will read it: murmur pre-normalizes sol's and droplet's and not
@@ -499,9 +515,21 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // wrap against 0.21 on the other. exp(k*(cos(x)-1)) is a function of cos(x) alone and is therefore
         // periodic by construction. The CPU reference asserts that as an identity at +/-pi rather than
         // trusting the construction.
-        const phi0 = KIT.mhDrift(uniforms.time,
-            float(0.34).add(uniforms.travel.mul(0.40)).mul(float(1.0).add(VOICE.mul(0.30))),
-            float(0.62), float(1.0)).toVar();
+        // limn.ts: rate = (0.34 + 0.40*travelK) * (1 + 0.95*live.pace + 0.30*live.voice) * (1 + 1.05*drive).
+        // This file had the VOICE term and not the PACE one -- and pace carries the LARGER coefficient, so
+        // the dominant half of limn's cadence response was missing. The sum factor is repaired and
+        // integrated here.
+        //
+        // *** THE DRIVE FACTOR IS STILL DEFERRED AND THE REASON IS SPECIFIC: limn's rate is a PRODUCT of two
+        // modulated factors, not a sum. *** Expanding it gives cross terms in pace*drive and voice*drive, and
+        // the factoring this round rests on needs the integral of each PRODUCT, not of each signal -- two
+        // more accumulators for one species. It is the only rate in the roster shaped this way.
+        const limnBase = float(0.34).add(uniforms.travel.mul(0.40)).toVar();
+        const limnRate = limnBase.mul(float(1.0).add(PACE.mul(0.95)).add(VOICE.mul(0.30))).toVar();
+        const phi0 = KIT.mhDriftPhase(
+            KIT.mhRatePhase(limnBase, uniforms.time, float(0.95), uniforms.paceInt,
+                float(0.30), uniforms.voiceInt, float(0.0), uniforms.driveInt),
+            limnRate, float(0.62), float(1.0), uniforms.time).toVar();
         const phi = TSL.atan(pc.y, pc.x).toVar();
         // limn.ts wraps by subtracting a ROUNDED turn, which is exact at the seam; an atan round-trip is not.
         const aw = phi.sub(phi0).toVar();
@@ -579,8 +607,19 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         const e2 = KIT.mhSpin(vec3(float(0.0), sin(tau), cos(tau)), prec, float(0.0)).toVar();
         const nrm = TSL.cross(e1, e2).toVar();
         const r0 = clamp(float(0.54).mul(float(1.0).sub(VOICE.mul(0.24))), 0.20, 0.70).toVar();
-        const rate = float(1.05).mul(float(1.0).add(VOICE.mul(0.85))).toVar();
-        const psi = KIT.mhDrift(uniforms.time, rate, float(0.38), float(3.0)).toVar();
+        // *** THIS CLOCK WAS ON THE WRONG SIGNAL, AND THE WHOLE CLOSURE NEVER READ PACE ONCE. *** comet.ts:
+        // "float rate = 1.05 * (1.0 + 0.85 * live.pace + 0.95 * st.drive)" -- no voice term at all. This
+        // file read VOICE at 0.85 and had no cadence and no drive, so the one hero whose subject is a point
+        // TRAVELLING sped up when the user spoke and ignored how busy the exchange was. v4641 moved eight
+        // sites off still's glintRate onto PACE and could not have caught this one: it was not reading
+        // glintRate, it was reading the wrong live signal, which that round's census had no row for.
+        //
+        // AND THE REPAIR HAD TO WAIT FOR THE MECHANISM. Adding a cadence term to rate * t would have shipped
+        // a NEW teleport -- pace moves constantly -- so the integrated form is not a refinement on top of the
+        // fix, it is what makes the fix safe to make.
+        const rate = float(1.05).mul(float(1.0).add(PACE.mul(0.85)).add(DRIVE.mul(0.95))).toVar();
+        const psi = KIT.mhDriftPhase(ratePhase(float(1.05), 0.85, 0.0, 0.95),
+            rate, float(0.38), float(3.0), uniforms.time).toVar();
         // Head width: comet.ts's first cut ran at 0.086 and "the head was a soft blob half the size of the core
         // it was supposed to be orbiting inside: a point of light has to be a POINT or the trail behind it has
         // nothing to have come from." The tube is deliberately WIDER than the nucleus -- true of comets, and
@@ -1590,8 +1629,16 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             const wh = float(AU.whB).add(ribbonK.mul(AU.whK)).mul(mix(float(1.0), float(AU.whSmall), smallK)).toVar();
             const bw = float(AU.bwB).add(ribbonK.mul(AU.bwK)).mul(mix(float(1.0), float(AU.bwSmall), smallK)).toVar();
 
-            const rate = float(AU.rateB).add(swirlK.mul(AU.rateK))
-                .mul(float(1.0).add(VOICE.mul(AU.rateVoice))).toVar();
+            // aura.ts: rate = (0.17 + 0.24*swirlK) * (1 + 0.85*live.voice + 0.45*live.pace + 1.05*st.drive).
+            // This file carried the voice term alone, so the ribbons answered a raised voice and not a busy
+            // exchange. The base is the same for all three lanes and each lane scales it, so ONE secular
+            // phase is built and scaled the same way -- which is also why the three stay in formation.
+            const rateBase = float(AU.rateB).add(swirlK.mul(AU.rateK)).toVar();
+            const rate = rateBase.mul(float(1.0).add(VOICE.mul(AU.rateVoice))
+                .add(PACE.mul(AU.ratePace)).add(DRIVE.mul(AU.rateDrive))).toVar();
+            const rateSec = KIT.mhRatePhase(rateBase, uniforms.time,
+                float(AU.ratePace), uniforms.paceInt, float(AU.rateVoice), uniforms.voiceInt,
+                float(AU.rateDrive), uniforms.driveInt).toVar();
             // THE RIPPLE IS KEPT LOW DELIBERATELY: "past about 0.3 the sheet folds back on itself along the
             // view ray and draws a bright seam where a fold is edge-on -- the loop's cusp problem returning by
             // another road."
@@ -1602,8 +1649,8 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             // The three frames, built once outside the march rather than three times inside it.
             const PH = [], RO = [], AY = [], AX = [], OF = [];
             for (let k = 0; k < 3; k++) {
-                PH.push(KIT.mhDrift(uniforms.time, rate.mul(AU.rateLane[k]), float(AU.driftWob[k]), float(k + 1))
-                    .add(AU.driftPhase[k]).toVar());
+                PH.push(KIT.mhDriftPhase(rateSec.mul(AU.rateLane[k]), rate.mul(AU.rateLane[k]),
+                    float(AU.driftWob[k]), float(k + 1), uniforms.time).add(AU.driftPhase[k]).toVar());
                 RO.push(float(AU.rollB[k]).add(sin(uniforms.time.mul(AU.rollRate[k]).add(AU.rollPhase[k])).mul(AU.rollAmp[k])).toVar());
                 AY.push(KIT.mhDrift(uniforms.time, float(AU.yawRate[k]), float(AU.yawWob[k]), float(AU.yawLane[k]))
                     .add(AU.yawPhase[k]).toVar());

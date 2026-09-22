@@ -8070,6 +8070,51 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // run -- on Keith's gen-9 box and then here -- and it was red on BOTH, alongside assertionShape's
     // 1751 -> 1757 and runtimeGap's 4275 -> 4286, which are the same six arrivals seen from two other
     // instruments. The surplus mechanism worked exactly as designed; nobody looked at it for six rounds.
+    // v4654 -- THE 337th CLOSING: the species' own clocks, and this port's one deliberate divergence.
+    since336: Object.freeze({
+        at: "v4654", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/murmurClock-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 1,611 ms on real WebGPU, 10 rows in four sections, plus a new section 15 in " +
+                 "tools/ship/murmurKit-selfcheck.mjs. *** v4653 DEFERRED THE RATE FAMILY AND NAMED THE " +
+                 "DECISION; THE OWNER CHOSE TO DIVERGE FROM murmur RATHER THAN INHERIT ITS JUMP. *** A " +
+                 "species builds a rate from the live signals and hands it to mh_drift, whose phase is " +
+                 "rate * t; a moving rate makes that jump by t * dRate, with no ceiling. MEASURED on comet's " +
+                 "orbit as the cadence rises: 0.1676 rad in one frame after 5 s of running and 57.7341 " +
+                 "after 1800 -- NINE FULL TURNS OF THE ORBIT IN 16.7 ms -- growing 344x for 360x the wait. " +
+                 "The integrated form advances 0.00793 rad and varies by 4e-16 across the same five " +
+                 "sessions: it does not depend on the session at all. " +
+                 "*** THE REPAIR IS EXACT AND COSTS THREE NUMBERS, BECAUSE THE INTEGRAL FACTORS: *** base " +
+                 "and the coefficients come from style knobs and do not move, so integral(base * (1 + " +
+                 "a*pace + b*voice + c*drive)) is base * (t + a*P + b*V + c*D). The host accumulates the " +
+                 "three in SHADER time -- against the tempo integral, not wall seconds -- and it reduces to " +
+                 "murmur's own expression wherever a signal is held, to 9.1e-13 out to an hour. THAT ROW IS " +
+                 "WHAT MADE THE DIVERGENCE SAFE and it is not theory: HEAD read limn's hue turn at 26.84 " +
+                 "degrees and the integrated clock with no other change read 26.84, identical. " +
+                 "*** AND THE ROUND FOUND THREE SIGNAL-ROUTING DEFECTS IT HAD TO FIX FIRST. *** comet's " +
+                 "orbital rate read VOICE where comet.ts reads live.pace, and its whole closure never " +
+                 "touched the cadence; limn carried the SMALLER of murmur's two rate terms and not the " +
+                 "larger; aura carried the voice term alone where aura.ts has voice, pace and drive. Adding " +
+                 "a cadence term to rate * t would have shipped three NEW teleports, so the mechanism was " +
+                 "not a refinement on top of the fix -- it is what made the fix safe to make. " +
+                 "*** A GATE ROW WAS ASSERTING SOMETHING FALSE ABOUT murmur FOR THIRTEEN ROUNDS: *** " +
+                 "\"THE SIX SPECIES WITH A CADENCE ARE murmur's SIX ... a port that routed the cadence to " +
+                 "every species would draw a shimmer on eleven bodies murmur leaves still.\" Counted in " +
+                 "murmur's own sources, live.pace appears in ALL EIGHTEEN. The six were never murmur's -- " +
+                 "they were the six this port happened to reach at v4641 -- and the row now counts how many " +
+                 "of the eighteen are reached (eight) and NAMES THE TEN THAT ARE NOT. " +
+                 "TWELVE SABOTAGES, ALL CAUGHT, THREE AFTER REPAIR: the kit probe passed 0 for two of " +
+                 "mhRatePhase's four coefficients, so deleting a term from the TSL twin moved no pixel (a " +
+                 "coefficient of zero grades nothing); aura's per-lane scale on the secular phase was " +
+                 "ungraded because no section renders aura; and nothing checked that the shared frame " +
+                 "helper DERIVES the three integrals rather than defaulting them -- which is not " +
+                 "hypothetical, it went red on limn at 26.45 the moment the clock landed. " +
+                 "ONE RECORDED BOUND WAS DROPPED RATHER THAN RE-FITTED: limn's hue centre moved 26.84 -> " +
+                 "25.12 because murmur's missing pace term runs its arc 28.5% faster, so the row now asserts " +
+                 "the PHYSICS -- a saturating share approaches MH_SPREAD from below -- instead of a centre " +
+                 "fitted to wherever the arc happened to be.",
+    }),
     // v4653 -- THE 336th CLOSING: st.drive, the last of mh_state's four, and the half of it that is safe.
     since335: Object.freeze({
         at: "v4653", swept: 2, green: 2, red: 0,

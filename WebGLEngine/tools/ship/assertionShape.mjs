@@ -648,8 +648,12 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // of margin is over once a contended sweep's 10% is allowed for -- and two measure about 2,300. What is
     // different this time is that the pair carries a real division of subject as well: one gate holds a
     // GEOMETRY claim graded in f64 and the other holds the half a frame can actually show.
-    gates: 1762, usesOk: 1741, definesOk: 1733, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1634, condFirst: 96, unknownSignature: 11,
+    // v4654 -- RE-TAKEN 1762 -> 1763 for tools/ship/murmurClock-selfcheck.mjs. ONE gate, not the pairs the
+    // last three orb rounds needed, and the reason is the same one murmurTempo had: the subject is a NUMBER
+    // the host computes, so three of its four sections are pure CPU and the fourth renders a single species.
+    // A round whose claim is arithmetic does not pay a WGSL compile per species to make it.
+    gates: 1763, usesOk: 1742, definesOk: 1734, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1635, condFirst: 96, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

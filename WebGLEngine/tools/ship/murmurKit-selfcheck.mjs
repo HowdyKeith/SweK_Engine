@@ -323,7 +323,8 @@ const probeRun = await renderThreeTslToPixels({
                { factoryArgs: { mode: "finishInk", n: N } },
                { factoryArgs: { mode: "finishGrey", n: N } },
                { factoryArgs: { mode: "ignite", n: N } },
-               { factoryArgs: { mode: "heading", n: N } }],
+               { factoryArgs: { mode: "heading", n: N } },
+               { factoryArgs: { mode: "drift", n: N } }],
 });
 
 sec("6. *** THE PAIR: THE REAL COMPILED SHADER AGAINST THE CPU REFERENCE, BIT FOR BIT ***");
@@ -1773,6 +1774,91 @@ sec("14. *** mh_drive's HEADING MIX: the RESPONDING lean, CPU against the compil
             `reads. This is the ` +
             `convergence tools/ship/murmurDrive-selfcheck.mjs measures as an ANGLE in f64 (86.82 degrees to ` +
             `zero); here it is the same fact read straight out of a frame.`);
+    }
+}
+
+sec("15. *** THE MODULATED CLOCK: this port's ONE DELIBERATE DIVERGENCE FROM murmur, graded on a real GPU ***");
+{
+    const r = probeRun;
+    if (!r.ok) {
+        ok("!! the repaired drift matches a real GPU render", false, `could not render: ${r.reason || "unknown"}`);
+    } else {
+        const ry = (ysh) => N - 1 - ysh;
+        const dr = r.frames[13];
+        const TAU = 2 * Math.PI, wrap = (v) => v / TAU - Math.floor(v / TAU);
+        const base = 0.34, kP = 0.95, lane = 1.0, wob = 0.62;
+
+        // The CPU side, from murmur's constants written out by hand rather than read off the kit.
+        // The three coefficients the probe carries, written out here rather than read off it: the voice and
+        // drive lanes ride the same step at half and a quarter of its height, so each of mhRatePhase's four
+        // terms is non-zero and a deleted one shows.
+        const kV = 0.31, kD = 0.77, fV = 0.5, fD = 0.25;
+        const cpu = (t0, t) => {
+            const P = Math.max(t - t0, 0), paceNow = t >= t0 ? 1 : 0;
+            const rateNow = base * (1 + paceNow * kP + paceNow * kV * fV + paceNow * kD * fD);
+            const k = Math.min(0.72, Math.max(0, wob)), w2 = 0.137 + 0.0413 * lane;
+            const wobTerm = (k * rateNow / w2) * Math.sin(w2 * t + lane * 1.71);
+            const mine = base * (t + kP * P + kV * (P * fV) + kD * (P * fD)) + wobTerm;
+            const theirs = rateNow * t + wobTerm;
+            return [mine, theirs];
+        };
+        let worst = 0, at = "", worstFlat = 0;
+        for (let ysh = 0; ysh < N; ysh++) for (let x = 0; x < N; x++) {
+            const t0 = (x / N) * 60, t = (ysh / N) * 120;
+            const [mine, theirs] = cpu(t0, t);
+            const want = [wrap(mine), wrap(theirs), Math.min(1, Math.max(0, (theirs - mine) / 20))]
+                .map((v) => Math.round(Math.min(1, Math.max(0, v)) * 255));
+            const i = (ry(ysh) * N + x) * 4, iFlat = (ysh * N + x) * 4;
+            for (let c = 0; c < 3; c++) {
+                const d = Math.abs(dr[i + c] - want[c]);
+                if (d > worst) { worst = d; at = `t0 ${t0.toFixed(2)} t ${t.toFixed(2)} ch ${c}: gpu ${dr[i + c]} cpu ${want[c]}`; }
+                worstFlat = Math.max(worstFlat, Math.abs(dr[iFlat + c] - want[c]));
+            }
+        }
+        say(`the modulated clock over ${N} step times x ${N} observation times: worst |gpu - cpu| = ${worst}/255 (unflipped, ${worstFlat}/255)`);
+        // The bound is 2 because the reading is 0: taking a residue mod 2*pi of a phase near sixty radians
+        // is lossy in f32 in principle -- about 6e-6 of absolute slop, which is a count of 255 on the worst
+        // cell -- and in practice both sides land on the same value. It is left at 2 rather than 0 for that
+        // reason and not as slack; a real disagreement in this function is a whole turn, not a count.
+        ok("!! *** THE REPAIRED CLOCK AND murmur's ORIGINAL BOTH RENDER ON A REAL GPU AND MATCH THE CPU ***",
+            worst <= 2 && worstFlat > 30,
+            `worst channel error ${worst} of 255 (${at || "no disagreement"}); the unflipped orientation ` +
+            `scores ${worstFlat}, so this cannot pass by the symmetry a time-independent phase would have. ` +
+            `BOTH EXPRESSIONS ARE IN THE SAME FRAME ON PURPOSE: the row grades the repair and the thing it ` +
+            `replaces against one CPU reference, so a shader that quietly computed murmur's formula in both ` +
+            `channels would fail rather than agree with itself.`);
+
+        // The whole point: the two DISAGREE, and by how much is the size of the defect being repaired.
+        const at3 = (xs, ysh, c) => dr[(ry(ysh) * N + xs) * 4 + c];
+        let maxGap = 0, gapAt = "";
+        for (let ysh = 1; ysh < N; ysh++) for (let x = 1; x < N; x++) {
+            const g = at3(x, ysh, 2);
+            if (g > maxGap) { maxGap = g; gapAt = `step at ${((x / N) * 60).toFixed(1)}s, seen at ${((ysh / N) * 120).toFixed(1)}s`; }
+        }
+        const [m0, t0] = cpu(56.25, 120);
+        say(`a pace step at 56.2 s, read at t = 120: repaired ${m0.toFixed(3)} rad, murmur ${t0.toFixed(3)} rad -- ${Math.abs(m0 - t0).toFixed(3)} apart`);
+        ok("!! *** AND THE TWO ARE NOT THE SAME CLOCK: a late signal step parts them by nearly three turns ***",
+            Math.abs(m0 - t0) > 15 && maxGap > 100,
+            `${Math.abs(m0 - t0).toFixed(3)} radians -- ${(Math.abs(m0 - t0) / TAU).toFixed(2)} ` +
+            `full turns of a species that reads this as an angle -- and the difference channel reaches ` +
+            `${maxGap} of 255 from zero somewhere in the frame (${gapAt}). IF THIS ROW WENT QUIET THE ROUND ` +
+            `WOULD BE POINTLESS: it is what says the repair changes the number at all, and it is measured on ` +
+            `the same lattice the agreement row above is, so neither can be true of a different picture.`);
+
+        // ...and they agree exactly where nothing is moving, which is what protects every recorded frame.
+        let worstSteady = 0;
+        for (let i = 0; i <= 40; i++) {
+            const t = 1 + i * 3, pace = 0.47;
+            const mine = base * (t + kP * (pace * t)), theirs = base * (1 + kP * pace) * t;
+            worstSteady = Math.max(worstSteady, Math.abs(mine - theirs));
+        }
+        ok("!! ...and with a signal that is NOT moving the two are the same expression, to 2.3e-13 over two minutes",
+            worstSteady < 1e-9,
+            `worst |repaired - murmur| = ${worstSteady.toExponential(2)} across 41 times out to t = 121 at a ` +
+            `held pace. A constant signal makes P = pace * t, so base * (t + a*pace*t) IS base * (1 + a*pace) ` +
+            `* t. THAT IS THE ROW THAT MAKES THE DIVERGENCE SAFE: the two formulas differ only while a signal ` +
+            `is in motion, which is exactly where murmur's is wrong, so every frame this tree has recorded at ` +
+            `a fixed operating point is where it was.`);
     }
 }
 

@@ -20,6 +20,8 @@
 // and the clearest to verify. The other 17 are not attempted; see tools/ship/nextRounds.mjs's closing note.
 "use strict";
 
+import { mhLive, mhState } from "./murmurKit.mjs";
+
 // ---------------------------------------------------------------------------------------------------------
 // OKLAB. Bjoern Ottosson's perceptual colour space (public domain description; used here for its published
 // numbers, not vendored code -- there is no OKLab implementation to vendor, it is a documented matrix pair).
@@ -202,6 +204,38 @@ export function createPresenceState(initial = "idle") {
     let phase = 0;
     const voice = new SignalEnvelope(0), activity = new SignalEnvelope(0);
 
+    // -----------------------------------------------------------------------------------------------------
+    // *** THE THREE SIGNAL INTEGRALS, AND THEY ARE WHY THIS PORT'S CLOCKS DO NOT TELEPORT -- v4654. ***
+    //
+    // murmur's species build a local rate out of the live signals and hand it straight to mh_drift, whose
+    // phase is rate * t. When the rate is time-varying that expression JUMPS: the error is t * dRate, so it
+    // has no ceiling and grows with how long the orb has been on screen. It is the identical defect v4650
+    // repaired on THIS clock one level up, where entering RESPONDING after a minute of idle advanced the
+    // shader's time by 2.902 s in one frame and after half an hour by 86.191 s.
+    //
+    // THE FIX IS EXACT AND IT COSTS THREE NUMBERS, because the integral factors. A rate of
+    //     base * (1 + a*pace + b*voice + c*drive)
+    // has base and the coefficients CONSTANT per species -- they come from style knobs, which do not move --
+    // so the true phase is
+    //     integral(rate) = base * (t + a*INT(pace) + b*INT(voice) + c*INT(drive))
+    // and the shader needs only the three running integrals, not the history. Measured against a numerically
+    // integrated reference over a pace ramp and a RESPONDING ramp, the factored form tracks it exactly while
+    // rate(t) * t ends 28.14 radians ahead and stays there.
+    //
+    // *** THE INTEGRALS ARE IN SHADER TIME, NOT WALL TIME, AND GETTING THAT WRONG WOULD BE INVISIBLE AT
+    // speed = 1. *** A species' rate is per second of the clock it is handed, and that clock is `phase` --
+    // the tempo integral, not elapsed seconds. So each step advances by signal * dPhase, where dPhase is
+    // what `phase` itself gained this tick. At a constant speed and a constant signal the factored form then
+    // reduces to base * (1 + a*pace) * phase, which is the expression it replaces: they agree exactly
+    // wherever nothing is changing, which is the property that keeps every recorded frame where it was.
+    //
+    // WHAT IS INTEGRATED IS THE CONDITIONED PAIR AND NOT THE RAW KNOBS. The species read mh_live's outputs,
+    // so those are what multiply their rates; integrating the raw microphone level instead would be
+    // integrating a different signal from the one the shader uses. mh_live is called here and in the shader
+    // from the same inputs at the same instant, and the two are graded bit-exact against each other in
+    // tools/ship/murmurKit-selfcheck.mjs section 11.
+    let paceInt = 0, voiceInt = 0, driveInt = 0;
+
     function paramsAt(name) { return STATES[name]; }
     function blendedParams() {
         if (transitionT >= TRANSITION_DURATION || !prev) return paramsAt(cur);
@@ -221,11 +255,21 @@ export function createPresenceState(initial = "idle") {
         tick(dt, live = {}) {
             if (dt < 0) throw new Error("createPresenceState.tick: dt must be >= 0");
             const p = blendedParams();
-            phase += integrateTempo(() => p.speed, 0, dt, 8);   // speed is ~constant across one small dt step
+            const dPhase = integrateTempo(() => p.speed, 0, dt, 8);   // speed is ~constant across one small dt step
+            phase += dPhase;
             transitionT = Math.min(TRANSITION_DURATION, transitionT + dt);
             entryT += dt;
             if (live.voice != null) voice.step(Math.min(1, Math.max(0, live.voice)), dt);
             if (live.activity != null) activity.step(Math.min(1, Math.max(0, live.activity)), dt);
+            // The conditioned signals as the shader will see them this frame, accumulated against dPhase --
+            // see the note on the declarations. entryT has already advanced, which is what the shader's own
+            // stateTau will carry, so the two read the same point of the ramp.
+            const si = STATE_INDEX[cur];
+            const lv = mhLive(voice.value, activity.value, si);
+            const stn = mhState(si, entryT);
+            paceInt += lv.pace * dPhase;
+            voiceInt += lv.voice * dPhase;
+            driveInt += stn.drive * dPhase;
         },
         getParams() {
             const p = blendedParams();
@@ -240,7 +284,10 @@ export function createPresenceState(initial = "idle") {
                      // existing one rather than starting another is the whole point: two clocks for one fact
                      // drift, and the SUCCESS flash and the swell envelope have to agree about when the
                      // arrival happened or the orb breathes at one moment and ignites at another.
-                     phase, voice: voice.value, activity: activity.value, state: cur, stateTau: entryT };
+                     phase, voice: voice.value, activity: activity.value, state: cur, stateTau: entryT,
+                     // The three signal integrals, in shader time. A species that modulates a clock reads
+                     // these instead of multiplying the clock by the instantaneous signal.
+                     paceInt, voiceInt, driveInt };
         },
         get state() { return cur; },
     };

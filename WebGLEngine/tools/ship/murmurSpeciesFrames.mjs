@@ -20,7 +20,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { renderThreeTslToPixels } from "./webgpuHarness.mjs";
-import { srgbToLinear, linearToOklab } from "../../render/murmurKit.mjs";
+import { srgbToLinear, linearToOklab, mhLive, mhState } from "../../render/murmurKit.mjs";
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -89,13 +89,36 @@ export const INK = [0x0A / 255, 0x0A / 255, 0x0B / 255];
  * So the ink is stated on every frame by default, which makes the knob NAMES identical across frames and the
  * hazard unreachable rather than merely documented. A caller wanting paper passes it explicitly.
  */
-export const sp = (species, time, voice = VOICE, extra = {}) =>
-    ({ factoryArgs: { species },
+/**
+ * *** THE THREE SIGNAL INTEGRALS ARE DERIVED FROM THE FRAME'S OWN KNOBS AND NOT DEFAULTED -- v4654. ***
+ *
+ * A species that modulates a clock now reads the running INTEGRAL of a live signal rather than the signal's
+ * current value, so a frame that sets `voice` and leaves `voiceInt` at its default describes an impossible
+ * history: a signal that is loud right now and has been silent for all of time. The clock then runs as if
+ * the signal had never been raised, and the species renders at its resting rate with its knob turned up.
+ *
+ * THAT IS NOT HYPOTHETICAL. It went red the moment the integrated clock landed: limn's hue turn read 26.45
+ * degrees against a recorded 28.6, because limn's rate lost its voice term entirely for exactly this reason.
+ *
+ * A SPECIES GATE'S FRAME IS A STEADY STATE -- one instant, one fixed operating point, a signal that has been
+ * held since zero -- so the consistent integral is signal * time, and that is what this computes. It is also
+ * precisely the case where the integrated form reduces to murmur's own base * (1 + a*signal) * t, which is
+ * why supplying it leaves every recorded frame exactly where it was rather than merely close to it.
+ */
+export const sp = (species, time, voice = VOICE, extra = {}) => {
+    // The CONDITIONED pair, because that is what multiplies a rate -- see the operating-point note above.
+    const si = extra.stateIndex != null ? extra.stateIndex : 0;
+    const lv = mhLive(voice, extra.activity != null ? extra.activity : ACTIVITY, si);
+    const st = mhState(si, extra.stateTau != null ? extra.stateTau : 0);
+    return { factoryArgs: { species },
        // activity and stateIndex are named on EVERY frame for the same reason the ink is: setKnobs writes only
        // the names present in its argument, so a knob one frame sets and the next does not mention keeps the
        // previous frame's value. They are also the two knobs a species gate never wants to vary -- a row here
        // grades a SPECIES, and tools/ship/murmurLive-selfcheck.mjs is where the live signals are the subject.
-       knobs: { time, voice, activity: ACTIVITY, stateIndex: 0, colors: { ink: INK }, ...extra } });
+       knobs: { time, voice, activity: ACTIVITY, stateIndex: 0,
+                paceInt: lv.pace * time, voiceInt: lv.voice * time, driveInt: st.drive * time,
+                colors: { ink: INK }, ...extra } };
+};
 
 /**
  * ONE LAUNCH FOR EVERY FRAME A GATE ASKS FOR. The launch is nearly the whole cost, so they share a page, and

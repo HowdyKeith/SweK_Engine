@@ -277,9 +277,17 @@ sec("4. *** WHAT 2.902 SECONDS LOOKS LIKE: the jump, in pixels, against one hone
         for (const r of rows) say(`${r.s.padEnd(7)} one honest frame (+${D_OK}s): ${r.ok.pct.toFixed(1)}% of bytes move, mean ${r.ok.mean.toFixed(3)}, worst ${r.ok.mx}`);
         for (const r of rows) say(`${r.s.padEnd(7)} the SHIPPED frame (+${D_BAD}s): ${r.bad.pct.toFixed(1)}% of bytes move, mean ${r.bad.mean.toFixed(3)}, worst ${r.bad.mx}`);
         const ratios = rows.map((r) => r.bad.mean / Math.max(r.ok.mean, 1e-9));
-        ok("!! *** THE JUMPED FRAME MOVES 73 AND 99 TIMES THE LIGHT OF AN HONEST ONE, ON TWO UNLIKE SPECIES ***",
-            ratios.every((v) => v > 25) && rows.every((r) => r.bad.mx > 25) && rows.every((r) => r.ok.mx <= 20),
-            `${rows.map((r, i) => r.s + " " + ratios[i].toFixed(0) + "x").join(", ")} by mean channel difference; ` +
+        // *** THE SECOND HALF IS A RATIO NOW AND NOT A FITTED COUNT, AND v4654 IS WHY. *** It read
+        // `r.ok.mx <= 20`, which was limn's honest frame at 18 of 255 -- for as long as limn's rate was
+        // MISSING murmur's pace term. Restoring it runs limn's arc 28.5% faster, an honest frame moves 24,
+        // and the row went red on a number that had nothing to do with tempo. The claim was never "an
+        // honest frame moves less than twenty counts", it was "the jump moves far more light than an honest
+        // frame does", and that survives any legitimate change to how fast a species runs.
+        ok("!! *** THE JUMPED FRAME MOVES TENS OF TIMES THE LIGHT OF AN HONEST ONE, ON TWO UNLIKE SPECIES ***",
+            ratios.every((v) => v > 25) && rows.every((r) => r.bad.mx > 25) &&
+            rows.every((r) => r.bad.mx > 8 * r.ok.mx),
+            `${rows.map((r, i) => r.s + " " + ratios[i].toFixed(0) + "x").join(", ")} by mean channel difference, ` +
+            `and ${rows.map((r) => (r.bad.mx / Math.max(r.ok.mx, 1)).toFixed(0) + "x").join(" / ")} by worst channel; ` +
             `the worst single channel goes ${rows.map((r) => r.ok.mx).join("/")} of 255 on an honest frame to ` +
             `${rows.map((r) => r.bad.mx).join("/")} on the jumped one. THE TWO FAIL DIFFERENTLY, which is why ` +
             `they are the pair: limn's arc is a POSITION, so a jumped clock puts the sweep somewhere else and ` +

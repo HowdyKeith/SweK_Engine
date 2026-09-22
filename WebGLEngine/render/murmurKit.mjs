@@ -195,6 +195,51 @@ export function mhDrift(t, rate, wobble, lane) {
     return rate * t + (k * rate / w2) * Math.sin(w2 * t + lane * 1.71);
 }
 
+/**
+ * *** THE SECULAR PHASE OF A SIGNAL-MODULATED RATE, WHICH IS WHERE THIS PORT DIVERGES FROM murmur ON
+ * PURPOSE. ***
+ *
+ * murmur's species build a rate out of the live signals and hand it to mh_drift, whose phase is rate * t.
+ * When the rate moves -- and pace, voice and drive all move constantly -- that expression JUMPS by t * dRate,
+ * an error with no ceiling that grows with how long the orb has been on screen. It is the same defect v4650
+ * repaired on the HOST clock (2.902 s of shader time in one frame after a minute of idle; 86.191 s after
+ * half an hour), one level down, where no host-side integrator can reach it.
+ *
+ * *** THE REPAIR IS EXACT, NOT AN APPROXIMATION, BECAUSE THE INTEGRAL FACTORS. *** base and the coefficients
+ * are constant per species -- they come from style knobs, which do not move -- so
+ *
+ *     integral of base * (1 + a*pace + b*voice + c*drive) dt  =  base * (t + a*P + b*V + c*D)
+ *
+ * with P, V, D the running integrals of the three conditioned signals. The shader needs three numbers, not a
+ * history. Measured against a numerically integrated reference across a pace ramp and a RESPONDING ramp, the
+ * factored form tracks it to the integrator's own step error while rate(t) * t finishes 28.14 radians ahead
+ * and stays there.
+ *
+ * *** AND IT REDUCES TO murmur's OWN EXPRESSION WHEREVER NOTHING IS CHANGING. *** With a constant signal,
+ * P = pace * t, so base * (t + a*pace*t) is base * (1 + a*pace) * t -- the line it replaces. That is why
+ * this divergence moves no recorded frame: the two differ only while a signal is in motion, which is
+ * precisely where murmur's is wrong.
+ */
+export function mhRatePhase(base, t, kPace, paceInt, kVoice, voiceInt, kDrive, driveInt) {
+    return base * (t + kPace * paceInt + kVoice * voiceInt + kDrive * driveInt);
+}
+
+/**
+ * mh_drift with the secular term supplied rather than computed, so a modulated rate cannot teleport it.
+ *
+ * *** THE WOBBLE TERM KEEPS murmur's INSTANTANEOUS RATE AS ITS AMPLITUDE, AND THAT IS A DELIBERATE LIMIT ON
+ * THE DIVERGENCE. *** kit.ts's closed form is the exact integral of rate * (1 + k*cos(w2*t + phi)) for a
+ * CONSTANT rate; with a moving rate neither half is exactly right, but only the secular half is unbounded.
+ * The wobble contributes at most k*rate/w2 -- for the largest rate and lane in the roster that is under two
+ * radians, and it does not accumulate. So this repairs the term that grows without limit and transcribes the
+ * one that does not, rather than inventing a second-order correction murmur never had and nothing can check.
+ */
+export function mhDriftPhase(secular, rate, wobble, lane, t) {
+    const k = Math.min(MH_DRIFT_WOBBLE_CAP, Math.max(0, wobble));
+    const w2 = 0.137 + 0.0413 * lane;
+    return secular + (k * rate / w2) * Math.sin(w2 * t + lane * 1.71);
+}
+
 /** The maximum wobble kit.ts allows. Its reason is NOT stated upstream and is not guessed here -- see mhDrift. */
 export const MH_DRIFT_WOBBLE_CAP = 0.72;
 
@@ -1178,7 +1223,13 @@ export const MH_AURA = Object.freeze({
     thirdIn: 0.55, thirdOut: 0.95, thirdSmallIn: 0.22, thirdSmallOut: 0.62,
     secondSmallIn: 0.52, secondSmallOut: 0.94, secondSmall: 0.34,
     w3B: 0.55, w3K: 0.45,
-    rateB: 0.17, rateK: 0.24, rateVoice: 0.85, rateLane: Object.freeze([1.00, 0.83, 1.17]),
+    // *** ratePace AND rateDrive ARRIVE AT v4654 AND THEY ARE NOT NEW NUMBERS -- they are two of murmur's
+    // three that this port never carried. *** aura.ts: rate = (0.17 + 0.24*swirlK) * (1 + 0.85*live.voice +
+    // 0.45*live.pace + 1.05*st.drive). This table held the voice term alone, so the ribbons answered a
+    // raised voice and were deaf to how busy the exchange was -- on the one species whose brief is depth
+    // through motion.
+    rateB: 0.17, rateK: 0.24, rateVoice: 0.85, ratePace: 0.45, rateDrive: 1.05,
+    rateLane: Object.freeze([1.00, 0.83, 1.17]),
     driftWob: Object.freeze([0.40, 0.52, 0.34]), driftPhase: Object.freeze([0.0, 2.1, 4.3]),
     ampB: 0.098, ampK: 0.130, ampVoice: 0.55, ampSmall: 0.78,
     // The three sheets' ripple: [along-x frequency, cross-z frequency, cross weight, phase, amp multiplier].

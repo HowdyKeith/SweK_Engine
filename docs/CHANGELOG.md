@@ -26,6 +26,78 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      of numeric order were moved into it. NO ROUND'S NUMBER, TEXT OR BYTES CHANGED -- only two headings
      gained a tag, and two blocks moved. -->
 
+## v4654 -- the species' clocks are integrals now: this port is correct where murmur is not
+
+v4653 deferred the rate family and named the decision it carried. **The owner chose to diverge.** murmur's
+species build a rate out of the live signals and hand it to `mh_drift`, whose phase is `rate * t`; a moving
+rate makes that jump by `t · Δrate`, an error with no ceiling. This port integrates instead.
+
+Measured on comet's orbit as the cadence rises:
+
+| running first | integrated | murmur's `rate * t` | |
+|---|---|---|---|
+| 5 s | 0.00793 rad | 0.1676 rad | 21× |
+| 60 s | 0.00793 rad | 1.9315 rad | 244× |
+| 1800 s | 0.00793 rad | **57.7341 rad** | 7283× |
+
+Fifty-seven radians in one 16.7 ms frame is **nine full turns of the orbit** — the point of light is simply
+somewhere else. The integrated form varies by 4e-16 across those five sessions: it does not depend on the
+session at all.
+
+**The repair is exact and costs three numbers, because the integral factors.** `base` and the coefficients
+come from style knobs and do not move, so
+
+    ∫ base · (1 + a·pace + b·voice + c·drive) dt  =  base · (t + a·P + b·V + c·D)
+
+and the shader needs three running integrals, not a history. The host accumulates them in **shader** time —
+against the tempo integral v4650 connected, not wall seconds — because a species' rate is per second of the
+clock it is handed.
+
+**And it reduces to murmur's own expression wherever a signal is held**, to 9.1e-13 out to an hour. That is
+the row that made the divergence safe to make, and it isn't theory: HEAD read limn's hue turn at 26.84
+degrees, and the integrated clock with no other change read **26.84**, identical.
+
+**The round found three signal-routing defects it had to fix first.** comet's orbital rate read `VOICE` where
+`comet.ts` reads `live.pace` — its closure never touched the cadence at all, so the one hero whose subject is
+a point *travelling* sped up when the user spoke and ignored how busy the exchange was. limn carried the
+*smaller* of murmur's two rate terms and not the larger. aura carried the voice term alone where `aura.ts`
+has voice, pace **and** drive. Adding a cadence term to `rate * t` would have shipped three new teleports, so
+the mechanism wasn't a refinement on top of the fix — it is what made the fix safe to make.
+
+**A gate row had been asserting something false about murmur for thirteen rounds:** *"THE SIX SPECIES WITH A
+CADENCE ARE murmur's SIX … a port that routed the cadence to every species would draw a shimmer on eleven
+bodies murmur leaves still."* Counted in murmur's own sources, `live.pace` appears in **all eighteen**. The
+six were never murmur's — they were the six this port happened to reach at v4641, written down as if they
+were the design. The row now counts how many of the eighteen are reached (eight) and **names the ten that are
+not**.
+
+Twelve sabotages, all caught, three only after repair: the kit probe passed 0 for two of `mhRatePhase`'s four
+coefficients, so deleting a term from the TSL twin moved no pixel (**a coefficient of zero grades nothing**);
+aura's per-lane scale on the secular phase was ungraded because no section renders aura; and nothing checked
+that the shared frame helper *derives* the three integrals rather than defaulting them — which went red on
+limn at 26.45 the moment the clock landed, because a frame that sets `voice` and leaves `voiceInt` at zero
+describes a signal that is loud now and has been silent for all of time.
+
+Two recorded bounds were **dropped rather than re-fitted**. limn's hue centre moved 26.84 → 25.12 because
+murmur's restored pace term runs its arc 28.5% faster, so the row now asserts the *physics* — a saturating
+share approaches `MH_SPREAD` from below — instead of a centre fitted to wherever the arc happened to be. And
+`murmurTempo`'s "an honest frame moves ≤ 20 counts" became a ratio, because that number was about limn's old
+rate and nothing to do with tempo.
+
+Also brought level: `ai-presence-orb.html` had never been given `activity`, `stateIndex` or `stateTau`, so
+the demo's own state buttons changed the speed and the glow and left the shader pinned in IDLE — the SUCCESS
+flash and the RESPONDING lean could not be seen on that page at all.
+
+`tools/ship/murmurClock-selfcheck.mjs` arrives green at 1,611 ms, so the tree holds 1763 gates.
+
+**Still on murmur's spelling, and they are different jobs rather than more of the same one:** the four
+output-multiplied sites (flux, helix, nebula, tempest), the two bare `rate * t` sites (opal, geode), and the
+two flourish *slot divisors* (still, abyss) — where a changing slot re-indexes which gesture is playing
+rather than advancing a phase, so integration does not apply and it needs its own idea. Two more cannot be
+repaired by this mechanism at all: duet's rate reads the shader's own flourish (no host-side integral
+exists), and limn's is a *product* of two modulated factors, whose expansion needs the integral of
+`pace·drive` and `voice·drive`.
+
 ## v4653 -- the RESPONDING lean: the wander acquires a heading, and stops scattering
 
 `st.drive` is the last of `mh_state`'s four outputs and the only one whose subject is a **direction**. Its 45

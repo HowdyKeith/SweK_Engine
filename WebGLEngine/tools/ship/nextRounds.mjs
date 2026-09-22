@@ -888,6 +888,32 @@ export const NEXT_ROUNDS = [
             "option where it is both faithful and correct, because the defect is in murmur's own design. " +
             "live.pace already carries the identical shape at the sites that read it, so the honest scope " +
             "may be wider than drive: whatever is decided applies to both.",
+        note3: "THE DECISION WAS TAKEN AT v4654 AND IT WAS TO DIVERGE. The owner chose to integrate in the " +
+            "shader rather than transcribe murmur's rate * t, so this port is now correct where its source " +
+            "is not. The mechanism is render/murmurKit.mjs's mhRatePhase and mhDriftPhase, the host supplies " +
+            "paceInt / voiceInt / driveInt in SHADER time, and tools/ship/murmurClock-selfcheck.mjs holds " +
+            "the property.\n\n" +
+            "*** THREE OF THE FOUR MECHANISMS ARE STILL ON murmur's SPELLING, and they are different jobs " +
+            "rather than more of the same one:\n" +
+            "  (a) OUTPUT-MULTIPLIED -- flux, helix, nebula, tempest scale mh_drift's RESULT by a moving " +
+            "factor. The secular half needs the same treatment, but murmur also scales the WOBBLE by it, so " +
+            "a faithful repair has to decide what happens to that term. Four sites.\n" +
+            "  (b) BARE rate * t -- opal's flash drift (drift * t inside a sin) and geode's mix TARGET " +
+            "(t * 0.30 * sp). No mh_drift involved; the same factoring applies directly. Two sites.\n" +
+            "  (c) FLOURISH SLOT DIVISORS -- still and abyss divide a gesture SLOT by (1 + ... + k*drive), " +
+            "and mh_flourish indexes gestures by floor(t / slot). A changing slot RE-INDEXES which gesture " +
+            "is playing rather than advancing a phase, so integration does not apply and this one needs its " +
+            "own idea. Two sites.\n\n" +
+            "TWO SITES CANNOT BE REPAIRED BY THIS MECHANISM AT ALL AND THE REASONS ARE STRUCTURAL: duet's " +
+            "rate reads the species' OWN flourish envelope, computed in the shader from a hash, so there is " +
+            "no host-side integral to send; and limn's rate is a PRODUCT of two modulated factors, whose " +
+            "expansion needs the integral of pace*drive and voice*drive -- two more accumulators for one " +
+            "species. limn's SUM factor is repaired; its drive factor is passed 0.0 rather than folded in.\n\n" +
+            "*** AND THE ROUND FOUND THAT THIS PORT IS MISSING murmur's CADENCE ON TEN SPECIES. *** A gate " +
+            "row had asserted for thirteen rounds that murmur gives a cadence to six; counted in its own " +
+            "sources, live.pace appears in all EIGHTEEN. comet and limn were repaired here because their " +
+            "rates were the round's subject. The other ten are a separate, larger job and the census in " +
+            "tools/ship/murmurLive-selfcheck.mjs now names them.",
         blocked: "NOT BLOCKED, BUT READ THIS FIRST -- v4650 found what st.drive is about to walk into. " +
             "The largest family of drive's 45 sites is RATE: sixteen of the eighteen species multiply a " +
             "local clock by (1 + k * st.drive), k from 0.35 to 1.70, and hand the product to mh_drift -- " +

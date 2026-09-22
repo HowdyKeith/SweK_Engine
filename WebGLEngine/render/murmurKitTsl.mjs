@@ -208,6 +208,26 @@ export function makeMurmurKitTsl(TSL) {
         return rate.mul(t).add(k.mul(rate).div(w2).mul(sin(w2.mul(t).add(lane.mul(1.71)))));
     });
 
+    /**
+     * *** THE SECULAR PHASE OF A SIGNAL-MODULATED RATE. *** See render/murmurKit.mjs's mhRatePhase for the
+     * factoring and the measurement: base * (t + a*P + b*V + c*D) is the EXACT integral of
+     * base * (1 + a*pace + b*voice + c*drive), and it reduces to murmur's own base * (1 + a*pace) * t
+     * wherever the signals are not moving -- which is why this divergence moves no recorded frame.
+     */
+    const mhRatePhase = Fn(([base, t, kPace, paceInt, kVoice, voiceInt, kDrive, driveInt]) =>
+        base.mul(t.add(kPace.mul(paceInt)).add(kVoice.mul(voiceInt)).add(kDrive.mul(driveInt))));
+
+    /**
+     * mh_drift with the secular term supplied rather than computed. The wobble keeps murmur's instantaneous
+     * rate as its amplitude on purpose -- that term is bounded by k*rate/w2 and does not accumulate, so the
+     * repair is confined to the half that grows without limit. Its CPU twin is mhDriftPhase.
+     */
+    const mhDriftPhase = Fn(([secular, rate, wobble, lane, t]) => {
+        const k = clamp(wobble, 0.0, MH_DRIFT_WOBBLE_CAP).toVar();
+        const w2 = float(0.137).add(lane.mul(0.0413)).toVar();
+        return secular.add(k.mul(rate).div(w2).mul(sin(w2.mul(t).add(lane.mul(1.71)))));
+    });
+
     const mhBreath = Fn(([t, lane]) =>
         float(0.5).add(float(0.5).mul(
             sin(t.mul(0.668).add(lane)).mul(0.62).add(sin(t.mul(0.427).add(lane.mul(2.3)).add(1.1)).mul(0.38)))));
@@ -596,7 +616,7 @@ export function makeMurmurKitTsl(TSL) {
         // the literal token `null` -- which the GPU rejected at pipeline creation rather than silently. Both
         // times the value is one number that half the family's colour depends on and nothing owned it.
         MH_R, MH_ETA, MH_EXT, MH_TILT, MH_SCATTER_K, MH_SPREAD, MH_EXIT_CAP,
-        mhHash, mhGrad3, mhNoise3, mhHash1, mhFlourish, mhBreath, mhDrift, mhSpin, mhRoll, mhTube, MH_SQRTPI, mhLive, mhState, mhIgnite, mhDriveHeading,
+        mhHash, mhGrad3, mhNoise3, mhHash1, mhFlourish, mhBreath, mhDrift, mhSpin, mhRoll, mhTube, MH_SQRTPI, mhLive, mhState, mhIgnite, mhDriveHeading, mhRatePhase, mhDriftPhase,
         mhRefract, mhLook, mhExit, mhHaze, mhMedium, mhInside, mhTransmit, mhScatter,
         mhDeform, mhBody, MH_AMP_CAP,
         mhKey, mhSmall, mhSurface, mhContainment, mhOpalLife, mhAbyssSlot,
@@ -623,6 +643,7 @@ export function makeMurmurKitTsl(TSL) {
  *       "state" -> mh_state's complete/sweep/settled/drive in RGBA, over tau (x) by state (y).
  *       "ignite" -> the SUCCESS shell for three species in RGB, over |p| (x) by sweep (y).
  *       "heading" -> the RESPONDING lean's mix, over drive (x) by wander angle (y), direction in RGB.
+ *       "drift"   -> the modulated clock: repaired phase (R), murmur's (G) and their gap (B), all mod 2pi.
  *       "finishPaper" / "finishInk" / "finishGrey" -> mh_present's tail over specular (x) by height (y);
  *                the grey case carries a light ground and a mid-grey page, which is where two of its
  *                constants are observable at all.
@@ -732,6 +753,38 @@ export function makeMurmurKitProbeTsl(THREE, TSL, { mode = "hash", n = 16 } = {}
             // Scaled by a half so the catchlight's warm white (near 1.0 linear) and any overshoot below zero
             // both sit inside the 0..1 an 8-bit channel can carry. The gate divides by the same number.
             return vec4(clamp(outRgb.mul(0.5), 0.0, 1.0), 1.0);
+        }
+        if (mode === "drift") {
+            // *** THE MODULATED CLOCK, OVER *WHEN* THE SIGNAL MOVED BY *WHEN* WE LOOK. ***
+            //
+            // A first cut parameterised this by the pace INTEGRAL and derived an instantaneous pace as P/t
+            // -- the mean so far -- and the two expressions came out algebraically identical, because
+            // base*(1 + k*(P/t))*t IS base*(t + k*P). A probe on which the subject cannot differ from the
+            // thing it replaces measures nothing. The difference only exists when the instantaneous signal
+            // differs from its own mean, which is to say while the signal is MOVING.
+            //
+            // So x is t0, the moment a step from pace 0 to pace 1 lands, over 0..60 s, and y is t, when the
+            // frame is drawn, over 0..120 s. Then P = max(0, t - t0) exactly and the instantaneous pace is
+            // 0 or 1. R is the repaired phase mod 2*pi, G is murmur's mod 2*pi, and B is the GAP in radians
+            // scaled by 20 -- which is a linear ramp in t0 wherever t > t0, because the error is base*k*t0
+            // and nothing else. A port that computed the same thing twice would leave B flat at zero.
+            const t0 = px.div(n).mul(60.0).toVar();
+            const t = py.div(n).mul(120.0).toVar();
+            const base = float(0.34), kP = float(0.95), lane = float(1.0), wob = float(0.62);
+            const P = max(t.sub(t0), float(0.0)).toVar();
+            const paceNow = TSL.step(t0, t).toVar();          // 0 before the step, 1 after
+            const rateNow = base.mul(float(1.0).add(paceNow.mul(kP))
+                .add(paceNow.mul(0.31 * 0.5)).add(paceNow.mul(0.77 * 0.25))).toVar();
+            // *** ALL FOUR TERMS ARE EXERCISED, NOT JUST THE PACE ONE. *** A first cut passed 0 for the voice
+            // and drive coefficients and a sabotage deleted the drive term from the TSL twin without moving a
+            // pixel: a coefficient of zero grades nothing. The same step drives all three signals here, with
+            // three different coefficients, so each term has to be present AND carry its own number.
+            const sec = K.mhRatePhase(base, t, kP, P, float(0.31), P.mul(0.5), float(0.77), P.mul(0.25));
+            const mine = K.mhDriftPhase(sec, rateNow, wob, lane, t).toVar();
+            const theirs = K.mhDrift(t, rateNow, wob, lane).toVar();
+            const TAU = 6.283185307179586;
+            const wrap = (v) => v.div(TAU).sub(TSL.floor(v.div(TAU)));
+            return vec4(wrap(mine), wrap(theirs), clamp(theirs.sub(mine).div(20.0), 0.0, 1.0), 1.0);
         }
         if (mode === "heading") {
             // *** THE RESPONDING LEAN'S MIX, OVER THE WHOLE RAMP BY A FULL TURN OF WANDER. *** x carries

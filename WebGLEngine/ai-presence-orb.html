@@ -54,7 +54,7 @@
 import * as THREE from "./vendor/three-webgpu/three.webgpu.js";
 import * as TSL from "./vendor/three-webgpu/three.tsl.js";
 import { makeAiPresenceOrbHdrPipeline } from "./render/aiPresenceOrbPresent.mjs";
-import { createPresenceState, STATE_NAMES } from "./render/aiPresenceOrbState.mjs";
+import { createPresenceState, STATE_NAMES, STATE_INDEX } from "./render/aiPresenceOrbState.mjs";
 
 const say = (s, bad) => { const el = document.getElementById("route"); el.innerHTML = s; el.style.color = bad ? "#f08080" : ""; };
 const cv = document.getElementById("stage");
@@ -119,8 +119,16 @@ function frame(now) {
         // tools/ship/murmurTempo-selfcheck.mjs. This page carried the identical defect: 2.902 s of shader
         // time in one frame on entering RESPONDING after a minute of idle, growing with session length.
         time: p.phase,
+        // the three signal integrals -- see ui/aiPresenceOrbWidget.js's note and the state module's
+        paceInt: p.paceInt, voiceInt: p.voiceInt, driveInt: p.driveInt,
         glow: p.glow, depth: p.depth, hueShift: p.hueShift,
         presence: 0.5, clarity: 0.6, glintRate: 0.3, voice: p.voice,
+        // *** THIS PAGE WAS TWO ROUNDS BEHIND THE WIDGET AND NOTHING SAID SO. *** ui/aiPresenceOrbWidget.js
+        // gained `activity` and `stateIndex` at v4641 and `stateTau` at v4644; this one kept passing neither,
+        // so the demo's state buttons changed the speed and the glow and left the shader pinned in IDLE --
+        // the voice slider ran at murmur's resting weight in every state, and the SUCCESS flash and the
+        // RESPONDING lean could not be seen here at all. Both consumers pass the same set now.
+        activity: p.activity, stateIndex: STATE_INDEX[p.state], stateTau: p.stateTau,
         aspect: cv.width / cv.height,
     });
     for (const [name, b] of Object.entries(buttons)) b.classList.toggle("active", name === p.state);

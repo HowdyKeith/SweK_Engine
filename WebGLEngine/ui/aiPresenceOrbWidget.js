@@ -225,6 +225,12 @@ export async function mountAiPresenceOrbWidget(opts = {}) {
             // orb at the instant of arrival forever: full sweep at the heart, nothing travelling, and the
             // settle never arriving at all.
             activity: p.activity, stateIndex: STATE_INDEX[p.state], stateTau: p.stateTau,
+            // *** AND THE THREE SIGNAL INTEGRALS -- v4654. *** A species that modulates a local clock by a
+            // live signal cannot multiply the clock by the signal's CURRENT value without the phase jumping
+            // whenever the signal moves; the error is t * dSignal and has no ceiling. These carry the
+            // running integrals instead, in shader time, so the shader can build a secular phase that is
+            // exact. render/aiPresenceOrbState.mjs's own note has the factoring and the measurement.
+            paceInt: p.paceInt, voiceInt: p.voiceInt, driveInt: p.driveInt,
             aspect: 1,   // the widget's own canvas is always square, unlike the standalone demo's full window
         });
         pipeline.render(renderer);
