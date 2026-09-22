@@ -51,6 +51,15 @@ export const codeOnly = (t) => t.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[
 // and joined box3d's fleet, taking it 26 -> 27. A file whose subject is the scanner is not a dependant of what
 // it scans, and the exclusion is BY PATH rather than by hope.
 export const NOT_IMPORTERS = Object.freeze([
+    // v4654: SIXTH instance, and the first that is not a gate. gfx/frontDoor.mjs's REACH_ARRIVALS_SINCE_V4407
+    // is an ACCOUNT OF WHAT main.js's WALK REACHES, so the modules it names are written as the walk spells
+    // them -- and five of the eight arrivals recorded this round are vendor/three/ paths. The classifier read
+    // them as `path`, which is the right reading of a bare quoted vendor path almost everywhere and the wrong
+    // one here: this file has NO import statement at all, its single dynamic import is "./device.js", and it
+    // opens nothing. A file whose subject is what another file reaches is not a dependant of what that file
+    // reaches. Measured both ways: three at 79 with it in, 78 with it out, and the gate reported it as an
+    // ARRIVAL the same hour the record gained those names.
+    "gfx/frontDoor.mjs",
     "tools/ship/orreryEjecta-selfcheck.mjs",
     "tools/ship/importPosition-selfcheck.mjs",
     // v4416: FOURTH instance. This gate names vendor/keyhunt and vendor/three while measuring what a URL scrape

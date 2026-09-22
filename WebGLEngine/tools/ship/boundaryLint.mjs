@@ -67,7 +67,8 @@ export const BOUNDARY_RULES = {
         severity: "report",
         why: "a kill whose effect is never re-checked. v3096 fixed the one that mattered (the port), but from " +
              "source alone a kill that needs verifying is indistinguishable from one whose caller genuinely " +
-             "does not care, so this reports rather than rules",
+             "does not care, so this reports rather than rules. v4654 excludes a SELF-kill -- " +
+             "process.kill(process.pid, ...) leaves nobody behind to re-check anything",
     },
 };
 
@@ -92,7 +93,18 @@ export function scanBoundaries(src) {
         if (isLocalDecode(arg)) continue;
         out.push({ rule: kind === "json" ? "UNCHECKED_JSON_BODY" : "UNCHECKED_ERROR_BODY", arg: arg.trim().slice(0, 60), kind });
     }
-    for (const m of code.matchAll(/taskkill|Stop-Process|\.kill\s*\(/g)) out.push({ rule: "KILL_NOT_VERIFIED", arg: m[0], kind: "kill" });
+    // v4654 -- A PROCESS KILLING ITSELF HAS NO "AFTER" IN WHICH TO CHECK. The rule's own why above says the
+    // reason it reports rather than rules is that a kill needing verification is indistinguishable, from
+    // source, from one whose caller does not care. process.kill(process.pid, ...) is neither: there is no
+    // surviving caller to care or to look. fixtureLitter's probe takes SIGKILL on purpose -- dying with a
+    // fixture on disk IS the measurement -- and counting that as an unverified kill asks for a check that
+    // cannot be written in any language. This is the same shape of exclusion as isLocalDecode above: not a
+    // softening of the rule, a statement of what the rule was always about. The sabotage rows in the
+    // selfcheck pin the narrowness -- killing ANY OTHER pid, including one held in a variable, still counts.
+    for (const m of code.matchAll(/taskkill|Stop-Process|\.kill\s*\(\s*([A-Za-z_$][\w$.]*)?/g)) {
+        if (m[1] === "process.pid") continue;
+        out.push({ rule: "KILL_NOT_VERIFIED", arg: m[0].startsWith(".kill") ? ".kill(" : m[0], kind: "kill" });
+    }
 
     // v3107 -- THE DECIDABLE SUB-RULE INSIDE THE BROAD ONE. KILL_NOT_VERIFIED stays a report because from
     // source alone a kill needing verification looks exactly like one whose caller does not care. But a kill

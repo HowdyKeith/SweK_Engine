@@ -113,7 +113,19 @@ let stillUnreached = [];
     // round adding an import anywhere in main.js's reach broke it, and the break said nothing about what
     // v4407 claimed. Growth is accounted instead: the total is the v4407 number plus the NAMED arrivals, each
     // with a reason, and anything reached at v4407 that has since fallen out is a separate, real red.
-    const arrivals = FD.REACH_ARRIVALS_SINCE_V4407.map((a) => a.module);
+    // *** v4654 -- THE COUNT IS OF DISTINCT MODULES, BECAUSE TWO WERE RECORDED TWICE AND THE CHECK FORGAVE
+    // ITSELF BY EXACTLY THAT MUCH. *** `arrivals.length` counted the ARRAY, so skyStars and exactHash -- both
+    // listed once at v4580 and again eleven entries later -- padded the expected total by two while
+    // accounting for no module at all. A list that may be double-counted is not an accounting, so the
+    // arithmetic uses the SET and a duplicate is its own red rather than a silent credit.
+    const arrivals = [...new Set(FD.REACH_ARRIVALS_SINCE_V4407.map((a) => a.module))];
+    const dupes = FD.REACH_ARRIVALS_SINCE_V4407.map((a) => a.module)
+        .filter((m, i, all) => all.indexOf(m) !== i);
+    ok("!! *** no module is named twice in the arrivals list, which used to pad the total by one each ***",
+       dupes.length === 0,
+       dupes.length ? "DUPLICATED: " + [...new Set(dupes)].join(", ") +
+                      " -- each one credits the expected total without explaining a module"
+                    : `${FD.REACH_ARRIVALS_SINCE_V4407.length} entries, ${arrivals.length} distinct modules`);
     const arrivalsReached = arrivals.filter((m) => R.seen.has(path.join(ENG, m)));
     ok("...and the reach grew by exactly what the module records, arrival by named arrival",
        R.seen.size === FD.MAIN_REACH_AFTER_V4407 + arrivals.length &&

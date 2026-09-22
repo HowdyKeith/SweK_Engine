@@ -1,6 +1,6 @@
 {
  "generatedFrom": "tools/ship/recordShape.mjs",
- "at": "2026-09-15T22:40:28.815Z",
+ "at": "2026-09-22T23:04:05.388Z",
  "note": "Top-level and one-level-down key sets for every JSON record a gate reads. A record may GAIN a key; losing one is a dropped field and fails recordShape-selfcheck. A deliberate removal is recorded in DROPPED_ON_PURPOSE in tools/ship/recordShape.mjs, not by editing this file until it passes.",
  "shapes": {
   "GPU_Assets/mesh_0/mesh.json": {
@@ -1369,6 +1369,21 @@
     "title"
    ]
   },
+  "gate-reports/conductorFresnel-selfcheck.json": {
+   "top": [
+    "at",
+    "gate",
+    "notes",
+    "skipped",
+    "tables"
+   ],
+   "entry": [
+    "columns",
+    "note",
+    "rows",
+    "title"
+   ]
+  },
   "gate-reports/detourScale-selfcheck.json": {
    "top": [
     "at",
@@ -1399,7 +1414,37 @@
     "title"
    ]
   },
+  "gate-reports/exactHash-selfcheck.json": {
+   "top": [
+    "at",
+    "gate",
+    "notes",
+    "skipped",
+    "tables"
+   ],
+   "entry": [
+    "columns",
+    "note",
+    "rows",
+    "title"
+   ]
+  },
   "gate-reports/fireSpread-selfcheck.json": {
+   "top": [
+    "at",
+    "gate",
+    "notes",
+    "skipped",
+    "tables"
+   ],
+   "entry": [
+    "columns",
+    "note",
+    "rows",
+    "title"
+   ]
+  },
+  "gate-reports/fleetRouting-selfcheck.json": {
    "top": [
     "at",
     "gate",
@@ -1497,6 +1542,21 @@
    ]
   },
   "gate-reports/pathTracerGpu-selfcheck.json": {
+   "top": [
+    "at",
+    "gate",
+    "notes",
+    "skipped",
+    "tables"
+   ],
+   "entry": [
+    "columns",
+    "note",
+    "rows",
+    "title"
+   ]
+  },
+  "gate-reports/raceKnob-selfcheck.json": {
    "top": [
     "at",
     "gate",
@@ -1636,6 +1696,21 @@
    ]
   },
   "gate-reports/shipyard-selfcheck.json": {
+   "top": [
+    "at",
+    "gate",
+    "notes",
+    "skipped",
+    "tables"
+   ],
+   "entry": [
+    "columns",
+    "note",
+    "rows",
+    "title"
+   ]
+  },
+  "gate-reports/skyStars-selfcheck.json": {
    "top": [
     "at",
     "gate",
@@ -2277,6 +2352,14 @@
     "worstRelDiff"
    ]
   },
+  "tools/ship/adapter-readings.json": {
+   "top": [
+    "gates"
+   ],
+   "entry": [
+    "intel/gen-9"
+   ]
+  },
   "tools/ship/artifact-history.json": {
    "top": [
     "generatedFrom",
@@ -2346,14 +2429,26 @@
   },
   "tools/ship/gate-timings.json": {
    "top": [
+    "at",
+    "boxLegend",
+    "boxes",
     "captured",
     "coverage",
     "failingAt",
     "failingNote",
+    "kinds",
     "note",
     "timings"
    ],
-   "entry": []
+   "entry": [
+    "arch",
+    "cpus",
+    "model",
+    "node",
+    "osRelease",
+    "platform",
+    "totalMemMB"
+   ]
   },
   "tools/ship/host-timings.local.json": {
    "top": [
@@ -2371,6 +2466,7 @@
   "tools/ship/input-sets.json": {
    "top": [
     "at",
+    "changedDuringPass",
     "conflicts",
     "dirHashes",
     "format",
@@ -2387,6 +2483,7 @@
     "ms",
     "namedFsImport",
     "net",
+    "noProbeOutput",
     "procs",
     "r",
     "reachesUnrecorded",
@@ -2529,15 +2626,20 @@
    "top": [
     "at",
     "budgetMs",
+    "capAt",
     "capMs",
     "captured",
     "codes",
     "contended",
     "crossings",
     "finished",
+    "host",
+    "kinds",
+    "kindsInferred",
     "note",
     "serial",
     "serialAt",
+    "serialRing",
     "timings"
    ],
    "entry": []
@@ -2667,6 +2769,8 @@
     "wgsl"
    ],
    "entry": [
+    "foldError",
+    "folded",
     "fragment",
     "glsl",
     "language",
@@ -2683,6 +2787,8 @@
     "three"
    ],
    "entry": [
+    "foldError",
+    "folded",
     "fragment",
     "glslFragment",
     "language",
@@ -2700,6 +2806,8 @@
     "three"
    ],
    "entry": [
+    "foldError",
+    "folded",
     "fragment",
     "glslFragment",
     "glslVertex",

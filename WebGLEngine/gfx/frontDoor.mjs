@@ -248,10 +248,6 @@ export const REACH_ARRIVALS_SINCE_V4407 = Object.freeze([
         why: "v4554's terrain-against-voxels probe, imported by BotManager on the same path" }),
     Object.freeze({ module: "render/fxaaPass.js",
         why: "the FXAA screen-space anti-aliasing pass, main.js's own opt-in GFX-panel toggle" }),
-    Object.freeze({ module: "render/skyStars.mjs",
-        why: "v4580's star field, imported by render/skyRenderer.js which main.js already reached" }),
-    Object.freeze({ module: "render/exactHash.mjs",
-        why: "the star field's own hash, one hop further down the same skyRenderer.js chain" }),
     Object.freeze({ module: "ui/aiPresenceOrbWidget.js",
         why: "the AI-presence orb mounted into the live HUD, a dynamic import main.js awaits at boot" }),
     Object.freeze({ module: "ui/captionClock.js",
@@ -270,12 +266,52 @@ export const REACH_ARRIVALS_SINCE_V4407 = Object.freeze([
         why: "v4544's gravity-and-landing module. main.js -> simulation/BotManager.js -> fallBody: the " +
              "round that stopped an airborne bot being assigned world._heightAt(x, z) + BOT_EYE in one " +
              "frame. Mine, and it did not record itself here" }),
+    // *** v4654 -- AND THESE TWO WERE ALREADY IN THE LIST ELEVEN ENTRIES ABOVE. *** skyStars and exactHash
+    // were recorded TWICE, and the duplicate is not a tidy-up: the row that grades this asserts
+    // `seen.size === 695 + arrivals.length` and `arrivals.length` COUNTS THE ARRAY, so two repeated names
+    // padded the total by two without accounting for a single module. The check forgave itself by exactly
+    // the amount it was wrong. The pair is removed here and the row now counts DISTINCT modules and refuses
+    // a duplicate outright -- a list that may be double-counted is not an accounting.
+    //
+    // *** EIGHT MORE ARRIVED AND NONE OF THEM RECORDED ITSELF, WHICH IS THE THIRD TIME IN THIS FILE. ***
+    // The row read 718 against 695 + 17, and the sixteen arrivals it could name plus two duplicates left
+    // EIGHT unexplained. Found at ship time by tools/ship/recordTier.mjs -- this gate is over the sweep
+    // budget, so recordTier is the only thing that runs it, and it is a ritual step precisely because
+    // nothing else would say so. Each is dated from the commit that ADDED it and its chain is walked with
+    // the tree's own resolver rather than assumed; all eight predate v4649, so none of them is this round's.
     Object.freeze({ module: "render/skyStars.mjs",
         why: "v4580's night sky, arriving from the other line. main.js -> render/skyRenderer.js -> " +
              "skyStars, which imports SKY_STARS_GLSL" }),
     Object.freeze({ module: "render/exactHash.mjs",
         why: "the hash skyStars is written against -- exactHash3 plus its GLSL -- so it came with it on the " +
              "same edge and is not a second arrival to explain" }),
+    // ---- THE FBX INGEST ARC, one commit for the vendored half and one for the tree's own ----------------
+    Object.freeze({ module: "vendor/three/jsm/loaders/FBXLoader.js",
+        why: "b5fccadb (2026-09-13) vendored three's FBX loader. main.js -> gpu/gpuAssetLoader.js -> " +
+             "FBXLoader: the asset loader gained an FBX route and the loader came with it" }),
+    Object.freeze({ module: "vendor/three/jsm/curves/NURBSCurve.js",
+        why: "same commit, one hop further: FBXLoader -> NURBSCurve, because an FBX file may carry NURBS " +
+             "geometry and the loader imports the curve unconditionally" }),
+    Object.freeze({ module: "vendor/three/jsm/curves/NURBSUtils.js",
+        why: "and its own helper -- FBXLoader -> NURBSCurve -> NURBSUtils -- so it is one edge beyond the " +
+             "curve rather than a second thing the door reached" }),
+    Object.freeze({ module: "vendor/three/jsm/libs/fflate.module.js",
+        why: "same commit again: FBXLoader -> fflate, the inflate a binary FBX needs to read its own blocks" }),
+    Object.freeze({ module: "gpu/fbxLoad.js",
+        why: "ca8b8f0c (2026-09-14), the tree's own half of that arc. main.js -> gpu/gpuAssetLoader.js -> " +
+             "fbxLoad -- the module tools/ship/commentFalsePass-selfcheck.mjs reports two GENUINE findings " +
+             "against, which is a separate red and is named in the backlog rather than here" }),
+    // ---- AND THREE THAT ARRIVED ON THEIR OWN EDGES THE SAME WEEK ----------------------------------------
+    Object.freeze({ module: "render/ffmpegWasmExport.mjs",
+        why: "e6aaaa93 (2026-09-14). main.js -> ui/canvasRecorder.js -> ffmpegWasmExport: the recorder " +
+             "gained a wasm encode route" }),
+    Object.freeze({ module: "vendor/three/jsm/utils/SkeletonUtils.js",
+        why: "ce276dff (2026-09-14). main.js -> vendor/three/jsm/loaders/GLTFLoader.js -> SkeletonUtils, so " +
+             "it arrived by three's own loader gaining an import rather than by anything here asking" }),
+    Object.freeze({ module: "vendor/three/three.core.js",
+        why: "ce276dff again -- the three upgrade split its core out. main.js -> physics/box3dMeshOverlay.js " +
+             "-> three.module.js -> three.core.js: a file that did not exist in the version this list was " +
+             "last taken against, reached through an edge that has not moved" }),
 ]);
 export const REACH_LOST_SINCE_V4407 = Object.freeze([]);
 

@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "b7e7b5324b79a7bfc18c0e6264a34fb6e2e768fc",
+ "head": "d9f2c14cafc11c817365e915965bba8b96dae580",
  "bodies": {
   "box3d": [
    {
@@ -652,8 +652,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3402266,
-    "sha": "b7e7b5324b79a7bfc18c0e6264a34fb6e2e768fc"
+    "bytes": 3401761,
+    "sha": "d9f2c14cafc11c817365e915965bba8b96dae580"
    },
    {
     "path": "mpm3d.html",
@@ -752,7 +752,7 @@
    },
    {
     "path": "tools/ship/boundaryLint-selfcheck.mjs",
-    "bytes": 17216,
+    "bytes": 18813,
     "sha": "629ce9da643276ab70d464eb1a9c9f12bd33c4f0"
    },
    {

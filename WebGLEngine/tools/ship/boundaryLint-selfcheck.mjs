@@ -213,6 +213,25 @@ const { fail, report } = partition(all);
     ok("...and a kill that KEEPS the handle is not flagged either",
         !hit('try { p.kill(); } catch {}\n return { ok: true };').includes("KILL_DISCARDS_HANDLE"),
         "keeping the reference leaves verification possible, which is all this rule asks for");
+
+    // v4654 -- THE SELF-KILL EXCLUSION, AND THE FENCE AROUND IT. fixtureLitter's probe takes SIGKILL on
+    // itself deliberately: dying with a fixture on disk is the thing being measured. Asking it to re-check
+    // the effect asks for code that runs after SIGKILL, which does not exist. The exclusion is therefore
+    // about WHO IS LEFT TO LOOK, and these two rows are what stop it becoming "kills are fine": anything
+    // aimed at a pid other than this process's own is still counted, including one held in a variable
+    // whose value the scanner cannot know.
+    ok("...and a SELF-kill is not a kill whose effect goes unchecked -- there is nobody left to check",
+        !hit('process.kill(process.pid, "SIGKILL");').includes("KILL_NOT_VERIFIED"),
+        "the litter probe SIGKILLs itself so that a finally cannot run -- that is the mechanism under test, " +
+        "not an omission, and no verification of it is expressible");
+    ok("!! SABOTAGE: killing ANY OTHER pid is still counted, variable or literal",
+        hit('process.kill(child.pid, "SIGKILL");').includes("KILL_NOT_VERIFIED") &&
+        hit('process.kill(-r.pid, "SIGKILL");').includes("KILL_NOT_VERIFIED") &&
+        hit('process.kill(pid, "SIGKILL");').includes("KILL_NOT_VERIFIED") &&
+        hit('c.kill("SIGKILL");').includes("KILL_NOT_VERIFIED"),
+        "the exclusion is the literal text process.pid and nothing wider -- redCensus's group kill at " +
+        "runGate is the negated pid form and stays a reported tell, which is why the baseline had to grow " +
+        "for it rather than be argued away");
 }
 
 // ---- 4. POWER, IN BOTH DIRECTIONS ------------------------------------------------------------------------------------
