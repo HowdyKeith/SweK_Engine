@@ -170,10 +170,17 @@ export const HIT_SHADERS = Object.freeze({ lambertian: 0, mirror: 1 });
  * `albedo` is a NUMBER or a [r,g,b] TRIPLE, matching pathTracer.mjs's own `col()` convention exactly (a scalar
  * broadcasts to grey) -- so the same record shape serves the grayscale pipeline unchanged and the rgb one this
  * round adds, and a caller migrating from one to the other does not have to touch its scene descriptions.
+ *
+ * `emit` (RTX round 6) is a SCALAR only, matching pathTracer.mjs's own `nee.mjs`-driven scene shape exactly
+ * -- that CPU oracle's Le is never a triple, and pipelineWgsl({nee:true}) is scalar-pipeline-only for the same
+ * packing reason: the scalar record has two spare floats (z, w) to carry it; the rgb record's vec4 is already
+ * full with three albedo channels, so a per-channel emit has nowhere to go without widening every SBT slot in
+ * the uniform block, which is out of scope for the round that first wires NEE in at all. 0 (the default) is
+ * "not a light", the same falsy-means-absent convention `nee.mjs`'s own `if (s.emit)` check already uses.
  */
-export function sbtRecord({ centre = [0, 0, 0], radius = 1, hit = "lambertian", albedo = 0.5 } = {}) {
+export function sbtRecord({ centre = [0, 0, 0], radius = 1, hit = "lambertian", albedo = 0.5, emit = 0 } = {}) {
     if (!(hit in HIT_SHADERS)) throw new Error("rtPipeline: no closest-hit shader named " + hit);
-    return Object.freeze({ centre: centre.slice(), radius, hit, albedo });
+    return Object.freeze({ centre: centre.slice(), radius, hit, albedo, emit });
 }
 
 /** [r,g,b], whether `albedo` is a number (broadcast to grey) or already a triple -- pathTracer.mjs's col(). */
@@ -182,15 +189,20 @@ export function albedoVec3(albedo) {
 }
 
 /**
- * One SBT record's four floats -- [hitShaderIndex, albedo, 0, 0] scalar, or [hitShaderIndex, ...albedoVec3]
- * under rgb -- the ONE place this shape is written down. `pipelineUniforms` packs a sphere's record and a
- * single-mesh record with it; `meshSbtBuffer` packs a whole per-material table with it. Before this round the
- * same four-element array literal was written out three times, in a file whose own bvhWgslBlock doc argues
- * explicitly against exactly that ("not two copies that can drift apart").
+ * One SBT record's four floats -- [hitShaderIndex, albedo, emit, 0] scalar, or [hitShaderIndex, ...albedoVec3]
+ * under rgb (no room left for emit there -- see sbtRecord's own doc) -- the ONE place this shape is written
+ * down. `pipelineUniforms` packs a sphere's record and a single-mesh record with it; `meshSbtBuffer` packs a
+ * whole per-material table with it. Before RTX round 3 the same four-element array literal was written out
+ * three times, in a file whose own bvhWgslBlock doc argues explicitly against exactly that ("not two copies
+ * that can drift apart"). `r.emit` defaults to 0 via `|| 0` rather than requiring every caller to state it --
+ * a bvh mesh descriptor (`{hit, albedo}`, no `emit` field at all) and a mesh-materials per-triangle record both
+ * go through this function too, and neither has ever had a notion of an emissive triangle.
  */
 function sbtRecordFloats(r, { rgb = false } = {}) {
     if (!(r.hit in HIT_SHADERS)) throw new Error("rtPipeline: no closest-hit shader named " + r.hit);
-    return [HIT_SHADERS[r.hit], ...(rgb ? albedoVec3(r.albedo) : [Array.isArray(r.albedo) ? r.albedo[0] : r.albedo, 0, 0])];
+    if (rgb) return [HIT_SHADERS[r.hit], ...albedoVec3(r.albedo)];
+    const emit = Array.isArray(r.emit) ? r.emit[0] : (r.emit || 0);
+    return [HIT_SHADERS[r.hit], Array.isArray(r.albedo) ? r.albedo[0] : r.albedo, emit, 0];
 }
 
 export const MAX_GEOMETRY = 4;
@@ -346,8 +358,23 @@ export function bvhInputs(b) {
  * pipelineWgsl({ meshMaterials: true }) -- a SEPARATE storage buffer rather than more uniform-block slots
  * because the 24-vec4 block already reaches MESH_SBT_SLOT=21 and has room for at most two more records, nowhere
  * near enough for an arbitrary material count.
+ *
+ * *** REFUSES AN EMISSIVE TRIANGLE MATERIAL, RATHER THAN SHIPPING ONE THAT HALF-WORKS. *** An adversarial
+ * review of RTX round 6 found this the hard way: nothing stopped a caller from setting `emit` on one of these
+ * records, and the GPU would not have caught it either -- rtDirectLight's own light loop only ever walks
+ * `j < nGeo` (the sphere table), so a triangle would still TERMINATE a path that hits it and add its own
+ * emission (the rec.z > 0.0 branch in pipelineWgsl's main() does not distinguish a sphere record from a mesh
+ * one), yet could never be NEE-sampled the way a sphere light is -- a partially-working, silently-inconsistent
+ * light rather than a loud refusal. pathTracer.mjs's own render() already refuses a mesh scene entry with
+ * `.emit` set for exactly this reason (fail loud instead of late); this is the same rule applied here.
  */
 export function meshSbtBuffer(records, { rgb = false } = {}) {
+    const bad = records.filter((r) => r.emit);
+    if (bad.length) throw new Error(
+        "rtPipeline: meshSbtBuffer refuses an emissive per-triangle material (" + bad.length + " of " +
+        records.length + " records set emit) -- rtDirectLight only ever samples the sphere table (j < nGeo), " +
+        "so a mesh triangle can terminate a path and add its own emission on a direct hit but can never be " +
+        "cone-sampled as a light, which is a half-working feature rather than a supported one.");
     const out = new Float32Array(records.length * 4);
     records.forEach((r, i) => out.set(sbtRecordFloats(r, { rgb }), i * 4));
     return out;
@@ -611,19 +638,31 @@ fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
 export const CPU_EXPRESSIBLE = Object.freeze(["lambertian"]);
 export const cpuComparable = (sbt) => sbt.every((r) => CPU_EXPRESSIBLE.includes(r.hit));
 
-/** The scene in the CPU tracer's own shape. REFUSES a record it would have to flatten. */
+/**
+ * The scene in the CPU tracer's own shape. REFUSES a record it would have to flatten.
+ *
+ * `emit` (RTX round 6) carries straight through -- pathTracer.mjs's own `lights = scene.filter(s => s.emit)`
+ * and `if (hit.sphere.emit)` both treat 0 as falsy already, the exact convention sbtRecord's default already
+ * uses, so no translation is needed the way albedo's array-vs-scalar broadcast needed col().
+ */
 export function sceneFromSbt(sbt) {
     const bad = sbt.filter((r) => !CPU_EXPRESSIBLE.includes(r.hit)).map((r) => r.hit);
     if (bad.length) throw new Error(
         "rtPipeline: pathTracer.mjs has no material for [" + bad.join(", ") + "] -- it renders Lambertian " +
         "spheres only. Converting anyway would compare a GPU " + bad[0] + " against a CPU diffuse and report " +
         "the difference as a port error. Use cpuComparable() to ask first.");
-    return sbt.map((r) => ({ centre: r.centre, radius: r.radius, albedo: r.albedo }));
+    return sbt.map((r) => ({ centre: r.centre, radius: r.radius, albedo: r.albedo, emit: r.emit }));
 }
 
-/** The CPU reference for a table, DELEGATED to pathTracer.mjs rather than restated. */
-export function renderSbtCpu(sbt, { spp = 16, seed = 1, view = VIEW, sky = null, rgb = false } = {}) {
-    return renderCpu(sceneFromSbt(sbt), { ...view, spp, seed, maxDepth: MAX_DEPTH, nee: false,
+/**
+ * The CPU reference for a table, DELEGATED to pathTracer.mjs rather than restated.
+ *
+ * `nee` (RTX round 6) defaults false, UNCHANGED from before that round -- every PROBES entry and every caller
+ * before this one compares against a pure-BSDF CPU render, and flipping the default would silently change what
+ * every one of those already-shipped comparisons means. Pass `nee: true` explicitly to grade the new capability.
+ */
+export function renderSbtCpu(sbt, { spp = 16, seed = 1, view = VIEW, sky = null, rgb = false, nee = false } = {}) {
+    return renderCpu(sceneFromSbt(sbt), { ...view, spp, seed, maxDepth: MAX_DEPTH, nee,
                                           sky: sky || (() => 1), rgb });
 }
 
@@ -645,7 +684,8 @@ export function tablePreconditions(sbt, spp) {
 // ================================================================================================
 export function pipelineWgsl({ workgroupSize = 64, gradient = false,
                                plantSwapRecords = false, plantIgnoreRecord = false, bvh = false,
-                               rgb = false, vertexColors = false, meshMaterials = false } = {}) {
+                               rgb = false, vertexColors = false, meshMaterials = false, nee = false,
+                               plantDoubleCount = false } = {}) {
     const PI = "3.141592653589793";
     if (vertexColors && !bvh) throw new Error("rtPipeline: vertexColors needs bvh -- there is no mesh to colour otherwise");
     if (vertexColors && !rgb) throw new Error("rtPipeline: vertexColors needs rgb -- a colour has nowhere to go in a one-channel pipeline");
@@ -653,6 +693,9 @@ export function pipelineWgsl({ workgroupSize = 64, gradient = false,
     // a per-triangle record. It does NOT need rgb -- HIT_SHADERS' scalar path reads rec.y exactly as the single-
     // record MESH_SBT path always has; only the SOURCE of `rec` changes (bvhSbt[bvhMatIdx[...]] vs U[MESH_SBT]).
     if (meshMaterials && !bvh) throw new Error("rtPipeline: meshMaterials needs bvh -- there is no mesh to look up a per-triangle material on otherwise");
+    // RTX round 6 -- nee needs the SCALAR pipeline: sbtRecordFloats/sbtRecord's own doc explains why an emit
+    // channel has nowhere to go in the rgb record (three floats already spent on albedo, none spare).
+    if (nee && rgb) throw new Error("rtPipeline: nee needs the scalar (non-rgb) pipeline -- there is no packing slot for a per-channel emit yet");
     return `
 @group(0) @binding(0) var<storage, read_write> outBuf : array<f32>;
 @group(0) @binding(1) var<uniform> U : array<vec4<f32>, 24>;
@@ -661,7 +704,8 @@ ${bvh ? bvhWgslBlock({ vertexColors, meshMaterials }) : ""}
 // U[0]  eye.xyz, tanHalfFov          U[1]  fwd.xyz, geometryCount
 // U[2]  w, h, spp, eps               U[3]  right.xyz, seedBits
 // U[4]  camUp.xyz, _                 U[8+i]  geometry i: centre.xyz, radius
-// U[16+i] SBT record i: hitShaderIndex, albedo, _, _
+// U[16+i] SBT record i: hitShaderIndex, albedo, emit, _   (emit is RTX round 6 -- 0 means "not a light",
+//                                                           scalar pipeline only, see sbtRecord's own doc)
 // U[${MESH_META_SLOT}] mesh meta (bvh only): hasMesh, nodeCount, triCount, _
 // U[${MESH_SBT_SLOT}] mesh SBT record (bvh only): hitShaderIndex, albedo, _, _
 const GEO_BASE : i32 = 8;
@@ -671,6 +715,16 @@ const MESH_SBT : i32 = ${MESH_SBT_SLOT};
 
 var<private> rngState : u32;
 fn nextU32() -> u32 { rngState = rngState * ${LCG.mul}u + ${LCG.inc}u; return rngState; }
+${nee ? `
+// RTX round 6 -- an adversarial review found this missing. Bit j set means "light j was inside the shading
+// point at the PREVIOUS vertex, so rtDirectLight could not cone-sample it there" -- pathTracer.mjs's own
+// per-light neeSkipped (v3488), which exists because the GLOBAL version of this guard (every non-camera hit
+// on ANY light suppressed, no exception) loses an ENCLOSING light entirely: a shading point standing inside a
+// light has no cone to sample (rtDirectLight's own "dist <= g.w" skip), so NEE never adds it, and if a bounce
+// ray that happens to land on it directly is ALSO suppressed, NEITHER route ever collects it -- pathTracer.mjs's
+// own comment on the bug this fixed: "92.8% of energy" lost, "the picture went dark". MAX_GEOMETRY=4 fits
+// comfortably in one u32; a real mesh is never a light (meshSbtBuffer/pipelineUniforms both refuse that).
+var<private> neeSkippedMask : u32;` : ""}
 fn nextF32() -> f32 { return f32(nextU32()) / ${LCG.div}.0; }
 
 fn nrm(v : vec3<f32>) -> vec3<f32> { let l = sqrt(dot(v, v)); if (l == 0.0) { return v; } return v / l; }
@@ -739,6 +793,60 @@ fn coordSystem(N : vec3<f32>) -> mat3x3<f32> {
   }
   return mat3x3<f32>(Nt, cross(N, Nt), N);
 }
+
+${nee ? `
+// ---- STAGE: next-event estimation -- RTX round 6, hand-transcribed from physics/render/nee.mjs and the
+// Lambertian NEE loop in physics/render/pathTracer.mjs's own trace() (WGSL cannot import JS, so this is a
+// PARALLEL PORT, cited not shared, the same pattern the cosine-hemisphere Lambertian sampler above already
+// uses). cosAlpha is computed as cos(asin(x)) rather than via a separate capHalfAngle step -- the literal
+// transcription of nee.mjs's own capHalfAngle-then-Math.cos, not a trig-identity shortcut (verified against
+// it in a scratch script before this line was written: identical to the last bit across five r/d pairs).
+fn sampleCone(r1 : f32, r2 : f32, cosAlpha : f32) -> vec3<f32> {
+  let cosT = 1.0 - r1 * (1.0 - cosAlpha);
+  let sinT = sqrt(max(0.0, 1.0 - cosT * cosT));
+  let phi = 2.0 * ${PI} * r2;
+  return vec3<f32>(sinT * cos(phi), cosT, sinT * sin(phi));
+}
+
+// One vertex's direct-lighting sum over every emissive geometry (rec.z > 0), cone-sampled and shadow-tested
+// through the SAME rtTraverse the primary/bounce rays already use -- a mesh (if present) is therefore already
+// a valid occluder with no extra code, though never itself a light (mesh SBT records always carry emit=0;
+// see sbtRecordFloats's own doc). Returns the sum BEFORE the shading point's own albedo/pi factor -- the
+// caller multiplies by rec.y the same way pathTracer.mjs's own loop multiplies by alb(hit.sphere) outside it.
+fn rtDirectLight(P : vec3<f32>, N : vec3<f32>, nGeo : i32, eps : f32) -> f32 {
+  var sum = 0.0;
+  for (var j = 0; j < nGeo; j = j + 1) {
+    let rec = U[SBT_BASE + j];
+    let Le = rec.z;
+    if (Le <= 0.0) { continue; }
+    let g = U[GEO_BASE + j];
+    let toL = g.xyz - P;
+    let dist = length(toL);
+    // INSIDE THE LIGHT: no cone to sample. Recorded in neeSkippedMask (var<private>, declared beside rngState),
+    // not merely skipped -- pathTracer.mjs's own v3488 comment is the reason: an unrecorded skip here plus the
+    // main loop's blanket "suppress every non-camera hit on a light" would mean an ENCLOSING light (the shape
+    // every environment light takes) is never sampled by NEE (nothing outside is; it always fails this check)
+    // AND never collected by a bounce hit either -- neither route, the picture goes dark. The bit set here is
+    // read back in the main loop's own emit-hit branch, one vertex later, to let exactly that bounce through.
+    if (dist <= g.w) { neeSkippedMask = neeSkippedMask | (1u << u32(j)); continue; }
+    let r1 = nextF32();
+    let r2 = nextF32();
+    let wl = toL / dist;
+    let cosAlpha = cos(asin(min(1.0, g.w / dist)));
+    let F = coordSystem(wl);
+    let sc = sampleCone(r1, r2, cosAlpha);
+    let sd = sc.x * F[1] + sc.y * F[2] + sc.z * F[0];
+    let cosT = dot(sd, N);
+    if (cosT <= 0.0) { continue; }
+    let shadowOrig = P + N * eps;
+    let occ = rtTraverse(shadowOrig, sd, nGeo, eps);
+    if (occ.geo != j) { continue; }               // something else is in the way
+    let pdf = 1.0 / (2.0 * ${PI} * (1.0 - cosAlpha));
+    sum = sum + Le * cosT / (${PI} * pdf);
+  }
+  return sum;
+}
+` : ""}
 
 // ---- STAGE: closest-hit --------------------------------------------------------------------------------
 // *** DISPATCHED BY THE BINDING TABLE, NOT BY A BRANCH AT THE CALL SITE. *** WGSL has no function pointers,
@@ -857,6 +965,8 @@ ${rgb ? `
     var o = U[0].xyz;
     var throughput = 1.0;
     var radiance = 0.0;
+    ${nee ? `var prevWasCamera = true;
+    neeSkippedMask = 0u;` : ""}
 
     for (var depth = 0; depth < ${MAX_DEPTH}; depth = depth + 1) {
       let hit = rtTraverse(o, d, nGeo, eps);
@@ -878,6 +988,39 @@ ${rgb ? `
       // planted run and a clean run take the same code path (v3467's rule).
       rec = U[SBT_BASE + ${plantIgnoreRecord ? "0" : plantSwapRecords ? "(nGeo - 1 - hit.geo)" : "hit.geo"}];
       ${bvh ? `}` : ""}
+      ${nee ? `
+      // *** THE DOUBLE-COUNT GUARD -- pathTracer.mjs's trace() (v3488-v3495 comments on that file) is the
+      // reference for this exact rule: an emitter hit ENDS THE PATH (there is no reflective component once a
+      // shading point turns out to be a light), and its radiance is added only when this IS the camera ray, OR
+      // when NEE could not have sampled this exact light from the vertex just left (neeSkippedMask's own bit
+      // for hit.geo -- pathTracer.mjs's v3488: an ENCLOSING light is never reachable by a cone sample, so its
+      // bounce-ray hit must not be suppressed either, or neither route ever collects it and "the picture went
+      // dark", v3488's own words). Otherwise a non-camera ray landing on a light already had that light's
+      // contribution added by rtDirectLight at the PREVIOUS vertex, so adding it again here would double it --
+      // forget the guard entirely and every light-lit surface reads twice as bright, uniformly, which looks
+      // like a brighter scene rather than a bug.
+      // plantDoubleCount is the PARAMETER form of that mistake (CPU's own plantDoubleCount, named identically
+      // -- v3467's rule: a planted run and a clean run take the same code path) -- it forces the suppression
+      // off entirely, so rtPipeline-selfcheck.mjs can assert the guard is load-bearing without editing the
+      // source file.
+      if (rec.z > 0.0) {
+        let wasSkipped = (neeSkippedMask & (1u << u32(hit.geo))) != 0u;
+        if (prevWasCamera || wasSkipped${plantDoubleCount ? " || true" : ""}) { radiance = radiance + throughput * rec.z; }
+        break;
+      }
+      // Reset EVERY vertex, matching pathTracer.mjs's own "let skipped = null" (re-declared fresh each loop
+      // iteration) -- a light skipped two vertices back must not still read as skipped now.
+      neeSkippedMask = 0u;
+      // NEXT-EVENT ESTIMATION, LAMBERTIAN SURFACES ONLY -- pathTracer.mjs's own loop gates on
+      // hit.sphere.roughness === undefined; rtPipeline.mjs has no microfacet material at all, so the
+      // equivalent gate is simply "the lambertian shader", HIT_SHADERS.mirror gets no direct-light term
+      // (a perfect mirror has no diffuse component for a light sample to land on). rtDirectLight is what
+      // populates neeSkippedMask for THIS vertex, to be read back at the NEXT one.
+      if (i32(rec.x) == ${HIT_SHADERS.lambertian}) {
+        radiance = radiance + throughput * rec.y * rtDirectLight(P, N, nGeo, eps);
+      }
+      prevWasCamera = false;
+      ` : ""}
       let b = rtClosestHit(i32(rec.x), rec.y, N, d);
       d = b.dir;
       o = P + N * eps;
@@ -942,6 +1085,13 @@ export function pipelineUniforms(sbt, { spp = 16, seed = 1, view = VIEW, eps = E
         // instead of U[MESH_SBT] (pipelineWgsl's own `meshMaterials` option decides which text it generates),
         // so a single mesh-wide bvh.hit/bvh.albedo has nowhere to go and is not required here -- the per-
         // material records live in a separate storage buffer, built by meshSbtBuffer() and bound by the caller.
+        //
+        // Same refusal as meshSbtBuffer's own, for the same reason: a single mesh-wide emit would terminate a
+        // path on direct hit but could never be NEE-sampled (rtDirectLight only walks the sphere table).
+        if (bvh.emit) throw new Error(
+            "rtPipeline: pipelineUniforms refuses an emissive mesh-wide record (bvh.emit is set) -- the mesh " +
+            "can never be NEE-sampled as a light, only hit directly, which is the same half-working feature " +
+            "meshSbtBuffer() already refuses for the per-triangle case.");
         if (!meshMaterials) U.set(sbtRecordFloats(bvh, { rgb }), MESH_SBT_SLOT * 4);
     }
     return U;

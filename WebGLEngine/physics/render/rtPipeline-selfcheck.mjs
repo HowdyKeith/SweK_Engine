@@ -907,6 +907,172 @@ say("10. bvhBuffersFromTriSoup() -- BIT-IDENTICAL TO bvhBuffersFromMesh() ON THE
     }
 }
 
+// ---- 11. RTX ROUND 6: NEXT-EVENT ESTIMATION -- physics/render/nee.mjs's cone-sampling, shadow ray and double-
+// count guard, hand-transcribed into pipelineWgsl's closest-hit WGSL. rtPipeline.mjs had NO notion of emissive
+// geometry at all before this round -- a full-text read found no `emit`, no light list, no shadow ray anywhere
+// in its WGSL -- so this section grades the whole capability: a new SBT field (emit, scalar-pipeline only),
+// the direct-lighting sum itself, the shadow ray's occlusion test, and the double-count guard that stops a
+// bounce ray re-adding a light NEE already sampled.
+//
+// *** STATISTICAL, NOT BIT-EXACT -- AND SECTION 9 IS WHY. *** nee's shadow ray and cone sample add new
+// direction-dependent branches (an occlusion test, a cosAlpha threshold) on top of the interreflection section
+// 4 already showed breaks bit-exactness past two spheres; nee.mjs's own analytic closed forms (directExact,
+// verified against this exact WGSL-shaped formula in a scratch script before this file was touched) are the
+// bit-exact claim, and this section's job is the renderer-level one pathTracerNEE-selfcheck.mjs already grades
+// on the CPU side -- mirrored here, not re-derived, per this round's own backlog entry.
+//
+// *** TWO SCENES, NOT ONE -- A SINGLE GEOMETRY COULD NOT SEPARATE BOTH SIGNALS FROM NOISE. *** A light close
+// and large enough to make a cosine-weighted bounce landing on it directly a common event (needed to make the
+// double-count guard's own failure read as an unmistakable brightening rather than a percent-level wobble
+// buried in Monte Carlo noise) leaves almost no clear space between the two spheres to park an occluder without
+// grazing one of them -- measured directly: the first attempt at combining both in one scene put the occluder
+// 0.02 units from sphere A's own surface, and the resulting near-tangent shadow ray made the HONEST correctness
+// check itself flicker red on some seeds (f32/f64 direction divergence near a grazing boundary, section 4's own
+// finding one level down). A second geometry, with the light far enough away to leave real clearance, is the
+// occlusion scene instead; its own light is too narrowly subtended for the double-count signal to clear the
+// noise floor there. Each scene is graded for what it can actually distinguish.
+console.log("");
+say("11. NEXT-EVENT ESTIMATION -- cone sampling, shadow ray, double-count guard, scalar pipeline");
+{
+    const rec = R.sbtRecord;
+    const meanOf = (v) => v.reduce((a, b) => a + b, 0) / v.length;
+    const sdOf = (v, m) => Math.sqrt(v.reduce((a, b) => a + (b - m) ** 2, 0) / (v.length - 1));
+    const N = 8;
+    const gpuMean = async (scene, view, spp, seed, shader = {}) => {
+        const n = view.w * view.h;
+        const r = await runWgslCompute({ code: R.pipelineWgsl({ nee: true, ...shader }), outCount: n,
+            uniforms: R.pipelineUniforms(scene, { spp, view, eps: R.EPS, seed }), workgroups: Math.ceil(n / 64) });
+        if (!r.ok) throw new Error("nee GPU render failed: " + r.reason);
+        let sum = 0; for (const v of r.values) sum += v; return sum / r.values.length;
+    };
+    const cpuMean = (scene, view, spp, seed) => {
+        const img = R.renderSbtCpu(scene, { spp, view, seed, nee: true });
+        let sum = 0; for (const v of img) sum += v; return sum / img.length;
+    };
+    // Same discipline as section 9: N independently-seeded runs per side, GPU offset +2000 from CPU so the two
+    // share no random draws (samplerCheck.mjs's "a shared sampler agrees with itself and is perfectly wrong").
+    const agree = async (label, scene, view, spp) => {
+        const cpuVals = [], gpuVals = [];
+        for (let s = 1; s <= N; s++) cpuVals.push(cpuMean(scene, view, spp, s));
+        for (let s = 1; s <= N; s++) gpuVals.push(await gpuMean(scene, view, spp, 2000 + s));
+        const cpuM = meanOf(cpuVals), cpuRelSd = sdOf(cpuVals, cpuM) / cpuM;
+        const gpuM = meanOf(gpuVals), gpuRelSd = sdOf(gpuVals, gpuM) / gpuM;
+        const ratio = gpuM / cpuM;
+        const bound = 3 * Math.sqrt((cpuRelSd / Math.sqrt(N)) ** 2 + (gpuRelSd / Math.sqrt(N)) ** 2);
+        say(`${label}: cpu mean ${cpuM.toFixed(6)} (relSd ${(cpuRelSd * 100).toFixed(3)}%), ` +
+            `gpu mean ${gpuM.toFixed(6)} (relSd ${(gpuRelSd * 100).toFixed(3)}%), ` +
+            `ratio ${ratio.toFixed(6)}, bound ${bound.toFixed(6)}`);
+        REPORT_ROWS.push([label, `${view.w}x${view.h}`, `${spp} spp x ${N} seeds`,
+            `cpu ${cpuM.toFixed(5)} vs gpu ${gpuM.toFixed(5)}, |ratio-1|=${Math.abs(ratio - 1).toExponential(2)}, bound=${bound.toExponential(2)}`]);
+        return { cpuM, gpuM, cpuRelSd, gpuRelSd, ratio, bound };
+    };
+
+    // ---- 11a. THE WIDE-CONE SCENE: correctness + double-count guard -------------------------------------------
+    // A light close and large enough that r/d is near 1 (cosAlpha ~0.68, a ~47-degree half-angle cone) -- chosen
+    // this way, not by accident, so a cosine-weighted bounce landing on the light directly is common enough for
+    // a broken double-count guard to read as an unmistakable brightening rather than a percent-level wobble.
+    const wideScene = [
+        rec({ centre: [0, 0, 0], radius: 1, albedo: 0.9 }),
+        rec({ centre: [1.9, 0, 0], radius: 0.8, albedo: 0, emit: 10 }),
+    ];
+    const wideView = { w: 6, h: 6, eye: [0.3, 0, 3], look: [1, 0, 0], up: [0, 1, 0], fovDeg: 6 };
+    const wideSpp = 3000;
+
+    // *** THE CAMERA'S OWN RAY MUST STILL SEE THE LIGHT -- the double-count guard suppresses a BOUNCE ray
+    // landing on an emitter, and must not suppress the PRIMARY one, or the light would render invisible.
+    const lookAtLight = { w: 4, h: 4, eye: [1.9, 0, 6], look: [1.9, 0, 0], up: [0, 1, 0], fovDeg: 2 };
+    const litN = lookAtLight.w * lookAtLight.h;
+    const litR = await runWgslCompute({ code: R.pipelineWgsl({ nee: true }), outCount: litN,
+        uniforms: R.pipelineUniforms(wideScene, { spp: 64, view: lookAtLight, eps: R.EPS, seed: 3 }), workgroups: Math.ceil(litN / 64) });
+    if (!litR.ok) throw new Error("camera-at-light GPU render failed: " + litR.reason);
+    ok("!! a camera ray aimed straight at the emitter reads its own emit value, not zero and not double it",
+        litR.values.every((v) => Math.abs(v - 10) < 1e-4),
+        `values: [${Array.from(litR.values).slice(0, 6).join(", ")}, ...] against emit=10 -- the guard must not ` +
+        "suppress the FIRST hit on a light, only a later bounce landing on one it already sampled");
+
+    const wide = await agree("nee wide-cone direct light", wideScene, wideView, wideSpp);
+    ok("!! both sides show REAL per-seed noise -- neither relSd is near zero, which would mean a seed never reached the render",
+        wide.cpuRelSd > 1e-4 && wide.gpuRelSd > 1e-4,
+        `cpuRelSd ${(wide.cpuRelSd * 100).toFixed(3)}%, gpuRelSd ${(wide.gpuRelSd * 100).toFixed(3)}%`);
+    ok("!! *** THE GPU's cone-sampled NEE agrees with pathTracer.mjs's own nee:true, within 3 MEASURED standard errors ***",
+        Math.abs(wide.ratio - 1) < wide.bound,
+        "against a CPU renderer that never saw this WGSL -- the cone-sampling formula, the double-count guard " +
+        "and the per-vertex direct-lighting sum all graded at once");
+
+    // *** THE GUARD IS LOAD-BEARING -- plantDoubleCount (CPU's own name, same parameter-not-edit discipline
+    // v3467 set and this file's plantSwapRecords/plantIgnoreRecord already follow). This scene was chosen
+    // specifically because the honest guard and the broken one are far enough apart to separate cleanly from
+    // the small Monte Carlo noise measured above.
+    const plantedVals = [];
+    for (let s = 1; s <= N; s++) plantedVals.push(await gpuMean(wideScene, wideView, wideSpp, 2000 + s, { plantDoubleCount: true }));
+    const plantedMean = meanOf(plantedVals);
+    const plantedRatio = plantedMean / wide.gpuM;
+    say(`plantDoubleCount mean ${plantedMean.toFixed(6)}, ratio to honest nee:true ${plantedRatio.toFixed(4)}`);
+    ok("!! *** DISABLING THE DOUBLE-COUNT SUPPRESSION READS UNMISTAKABLY BRIGHTER, NOT WITHIN THE NOISE BAND ***",
+        plantedRatio > 1 + 3 * wide.bound,
+        `${plantedRatio.toFixed(4)} against a clean-run bound of ${(1 + 3 * wide.bound).toFixed(4)} -- a bounce ` +
+        "ray re-adding a light NEE already sampled at the previous vertex is a uniform brightening, exactly the " +
+        "failure mode pathTracer.mjs's own trace() comments (v3488) warn about, now measured on the GPU port");
+
+    // ---- 11b. THE FAR-LIGHT SCENE: the shadow ray's occlusion test -------------------------------------------
+    // A light far enough away (r/d ~0.16, a narrow ~9-degree cone) to leave real clearance between the two
+    // spheres for an occluder that does not graze either one -- placed by direct computation, not guessed: the
+    // camera ray lands at P=(0.882,0,0.471) on the diffuse sphere, and the occluder sits 1.4 units toward the
+    // light from there, comfortably inside the 2.65-unit gap to the light's own surface (>=0.85 clearance on
+    // both sides, verified in a scratch probe before this line was written).
+    const farScene = [
+        rec({ centre: [0, 0, 0], radius: 1, albedo: 0.9 }),
+        rec({ centre: [4, 0, 0], radius: 0.5, albedo: 0, emit: 15 }),
+        rec({ centre: [2.2666716625376946, 0, 0.261634466032046], radius: 0.4, albedo: 0.3 }),
+    ];
+    const farView = { w: 6, h: 6, eye: [0, 0, 4], look: [1, 0, 0], up: [0, 1, 0], fovDeg: 6 };
+    const farSpp = 3000;
+    const far = await agree("nee far-light + occluder", farScene, farView, farSpp);
+    ok("!! both sides show REAL per-seed noise here too",
+        far.cpuRelSd > 1e-4 && far.gpuRelSd > 1e-4,
+        `cpuRelSd ${(far.cpuRelSd * 100).toFixed(3)}%, gpuRelSd ${(far.gpuRelSd * 100).toFixed(3)}%`);
+    ok("!! *** THE GPU's shadow-tested, occluder-aware NEE agrees with the CPU's own occlusion (intersect()) result ***",
+        Math.abs(far.ratio - 1) < far.bound,
+        "the occluder sits inside the light's cone as seen from the camera-sampled patch (verified separately: " +
+        "removing its SBT record entirely raises the GPU mean by ~13%, far past this bound), so agreement here " +
+        "means the shadow ray's own occlusion test, not just the cone-sampling math, ported correctly");
+
+    // ---- 11c. THE ENCLOSING LIGHT: neeSkippedMask, added after an adversarial review of this round's own ------
+    // first draft. *** THE FIRST DRAFT'S DOUBLE-COUNT GUARD WAS GLOBAL, WHERE THE FACT IT GUARDS IS PER LIGHT --
+    // pathTracer.mjs's OWN v3488 BUG, REINTRODUCED HERE UNTIL A REVIEW CAUGHT IT. *** A diffuse sphere entirely
+    // INSIDE a large emissive sphere (the shape every environment light takes) puts every shading point on the
+    // diffuse sphere's own surface inside the light too (dist to centre <= light radius, trivially, for any
+    // point on a smaller concentric-ish sphere) -- rtDirectLight's own "no cone to sample" skip fires for EVERY
+    // vertex, so NEE never adds this light at all, ever. A bounce ray that then lands on the light's inner wall
+    // is the ONLY route left to collect it -- and the first draft's blanket "suppress every non-camera hit on
+    // any light" suppressed that route too, exactly reproducing pathTracer.mjs's own documented "92.8% of
+    // energy" / "the picture went dark" failure. neeSkippedMask (a per-path bitmask, one bit per sphere, reset
+    // every vertex and populated only by rtDirectLight's own inside-the-light skip) is the fix: the bounce hit
+    // is let through specifically for the light bit set at the vertex just left, and only that one.
+    const enclosingScene = [
+        rec({ centre: [0, 0, 0], radius: 5, albedo: 0, emit: 3 }),
+        rec({ centre: [0, -3.5, 0], radius: 1, albedo: 0.8 }),
+    ];
+    const enclosingView = { w: 6, h: 6, eye: [0, -1, 3], look: [0, -2, 0], up: [0, 1, 0], fovDeg: 30 };
+    // *** LOWER spp THAN THE OTHER TWO SCENES, ON PURPOSE. *** This scene's own spherical symmetry converges
+    // fast enough that spp=3000 (the other scenes' own value) reads gpuRelSd=0.007%, UNDER the "both sides
+    // show real noise" floor below -- not a bug, just very low variance, but it would flag as one. spp=200
+    // clears that floor comfortably on both sides while the correctness bound still separates cleanly from the
+    // ~15.6% signal the fix exists to catch (measured directly before landing here: |ratio-1|=3.3e-5 against a
+    // bound of 7.6e-4 at this spp, over 20x margin -- not a coincidence chosen to just barely pass).
+    const enclosingSpp = 200;
+    const enclosing = await agree("nee enclosing light (environment-light shape)", enclosingScene, enclosingView, enclosingSpp);
+    ok("!! both sides show REAL per-seed noise here too",
+        enclosing.cpuRelSd > 1e-4 && enclosing.gpuRelSd > 1e-4,
+        `cpuRelSd ${(enclosing.cpuRelSd * 100).toFixed(3)}%, gpuRelSd ${(enclosing.gpuRelSd * 100).toFixed(3)}%`);
+    ok("!! *** THE GPU's neeSkippedMask correctly lets a bounce ray collect a light NEE could never cone-sample ***",
+        Math.abs(enclosing.ratio - 1) < enclosing.bound,
+        "without the fix this read ~15.6% too dark (measured directly, in a scratch probe, before landing here) " +
+        "-- global suppression loses the enclosing light's contribution entirely, since NEE can never sample it " +
+        "either. Agreement here means the bounce-ray route is open for exactly the light the previous vertex " +
+        "could not reach, and closed for every other light exactly as before");
+}
+
 console.log("rtPipeline-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));
 REPORT.table("two spheres: CPU against the pipeline, per resolution and sample count", ["scene", "size", "spp", "pixels differing"], REPORT_ROWS,
     "A sweep whose numbers only reached the terminal it was written to is a measurement nobody can re-read.");
