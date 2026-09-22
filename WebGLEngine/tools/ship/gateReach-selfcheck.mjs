@@ -188,6 +188,17 @@ for (const l of reachLines(r)) console.log("        " + l);
     //          ONLY, IN AN AREA THAT IS OBVIOUSLY LIVE WORK, which is exactly the case this pin exists to
     //          wave through once somebody has looked. Re-recorded with writeCensus() AFTER compare() had
     //          been read, never before.
+    //   542 -> v4650, found RED THE SAME WAY AGAIN -- nothing had run this gate since 529 was recorded,
+    //          because at 11.2 s it is outside the 3,000 ms sweep and only a hand run reaches it. That is
+    //          now the SECOND consecutive pin update whose cause is 'the guard does not run', and it is
+    //          worth saying that the comment above predicted it and the prediction did not stop it.
+    //          Counted the way this comment demands rather than raised until it passes: compare(), read
+    //          BEFORE writing, reports GREW, 13 ADDED, 0 REMOVED, reconciles:true, totals splitting
+    //          physics +7, physics/character +5, simulation +1 -- physics/apsidalKnob, hologramKnob,
+    //          impactKnob, labHome, slick, spellAmmo, turret; the capsule character arc
+    //          (capsuleGround, capsuleMove, capsuleSettle, fallBody, groundProbe); and
+    //          simulation/OceanPopulation. GROWTH ONLY, IN AREAS THAT ARE LIVE WORK. Re-recorded with
+    //          --write AFTER compare() had been read, never before.
     //
     // *** AND THE ROW HAD A DEFECT OF ITS OWN, WHICH IS WHY IT NOW ASKS THE MODULE RATHER THAN THE DISK. ***
     // It read the record with fs.readFileSync("tools/ship/population-census.json") -- A RELATIVE PATH -- so

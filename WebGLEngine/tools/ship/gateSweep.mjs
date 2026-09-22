@@ -8070,6 +8070,24 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // run -- on Keith's gen-9 box and then here -- and it was red on BOTH, alongside assertionShape's
     // 1751 -> 1757 and runtimeGap's 4275 -> 4286, which are the same six arrivals seen from two other
     // instruments. The surplus mechanism worked exactly as designed; nobody looked at it for six rounds.
+    since334: Object.freeze({
+        at: "v4650", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/wasmTeardown-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 1.22 s alone on this box -- inside the 3,000 ms ship-time budget, which the first " +
+                 "version of its section 1 was NOT safe at for a different reason: it read one fixed 200 ms " +
+                 "idle window and went red under contention rather than over time. *** THE GATE CANNOT GO RED " +
+                 "FOR THE REASON IT EXISTS AND SAYS SO IN ITS OWN CLOSING: *** the crash it is about is " +
+                 "win/async.c's UV_HANDLE_CLOSING assertion, and unix/async.c has no such assertion, so the " +
+                 "identical teardown is silent here. What it measures instead is that V8's compiler pool is " +
+                 "still burning CPU at the instant a gate's last line runs (23 ms against a same-process " +
+                 "control of 0.8), that liveHandles() is EMPTY there so serverShutdown's drain cannot reach " +
+                 "it, and that process.exitCode costs nothing. It arrives with 48 gates converted -- the " +
+                 "measured population of wasm compilers that called process.exit() with a module behind them.",
+    }),
     since333: Object.freeze({
         at: "v4647p", swept: 1, green: 1, red: 0,
         added: Object.freeze([

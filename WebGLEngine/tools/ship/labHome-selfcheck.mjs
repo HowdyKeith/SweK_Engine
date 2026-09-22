@@ -152,4 +152,6 @@ sec("E. *** THE PAGE IN A BROWSER WITH NO BRIDGE: IT LOADS, PAINTS THE PRESETS, 
 
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nall checks pass");
 for (const l of H.reportLines()) console.log("  " + l);
-process.exit(fails ? 1 : 0);
+// v4650 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
+// background compiler still has work posts a task into a torn-down platform. tools/ship/wasmTeardown.mjs.
+process.exitCode = fails ? 1 : 0;

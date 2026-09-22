@@ -329,4 +329,6 @@ console.log("unchecked here: WHETHER THE ENVELOPE HOLDS ANYWHERE ELSE. It was re
     "and if that URL is also wrong in a browser this gate would not know. And the " +
     "facade's ragdoll asymmetry is reported, not repaired: physics/ragdollFromSkeleton.mjs derives a ragdoll " +
     "box3d can step, and selectBackend still has no box3d factory to hand a caller who asks for one.");
-process.exit(fails ? 1 : 0);
+// v4650 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
+// background compiler still has work posts a task into a torn-down platform. tools/ship/wasmTeardown.mjs.
+process.exitCode = fails ? 1 : 0;

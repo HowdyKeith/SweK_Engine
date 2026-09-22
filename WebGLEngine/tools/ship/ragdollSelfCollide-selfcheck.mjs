@@ -246,4 +246,6 @@ console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "which fights itself still looks fine. Also unchecked: whether box3d supports collideConnected AT ALL. " +
     "The claim here is that the SHIM does not expose filtering and that the header cannot be read from this " +
     "repository -- not that the library lacks the feature, which is a question only the rig can answer.");
-process.exit(fails ? 1 : 0);
+// v4650 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
+// background compiler still has work posts a task into a torn-down platform. tools/ship/wasmTeardown.mjs.
+process.exitCode = fails ? 1 : 0;

@@ -136,4 +136,6 @@ console.log("\n5. THE SCENE LINK IS EXPLICIT, AND IT WAS A GUESS");
 }
 
 console.log(fails ? `\npileKnob-selfcheck: ${fails} FAILED` : "\npileKnob-selfcheck: all checks pass");
-process.exit(fails ? 1 : 0);
+// v4650 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
+// background compiler still has work posts a task into a torn-down platform. tools/ship/wasmTeardown.mjs.
+process.exitCode = fails ? 1 : 0;

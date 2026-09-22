@@ -636,8 +636,12 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4647p -- RE-TAKEN: tools/ship/sweepRotation-selfcheck.mjs joined. gates/usesOk/definesOk by one and
     // nameFirst by one -- the ordinary shape, and the counter-example to v4647g's condFirst arrival two
     // rounds ago. The other five rows did not move.
-    gates: 1759, usesOk: 1738, definesOk: 1730, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1631, condFirst: 96, unknownSignature: 11,
+    // v4650 -- RE-TAKEN: tools/ship/wasmTeardown-selfcheck.mjs joined. gates/usesOk/definesOk by one and
+    // nameFirst by one -- the ordinary shape again, and the round that added it converted 48 OTHER gates'
+    // last line from process.exit() to process.exitCode without moving a single row here, which is the
+    // reassuring half: this census is about how a gate ASSERTS, and how it leaves is not that.
+    gates: 1760, usesOk: 1739, definesOk: 1731, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1632, condFirst: 96, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

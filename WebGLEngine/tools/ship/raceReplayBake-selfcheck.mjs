@@ -254,4 +254,6 @@ sec("5. THE FILES: PNG keyframes and the schematic, written and read back");
 
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nall checks pass");
 console.log("unchecked here: the WebM's frames as pictures (the container and its size are measured, its decoded frames are not -- no decoder in node); the H.264 MP4 itself (rig-pending, libx264 on the rig; the refusal here is the measurement); a race of several cars (the record has one; the scene takes N).");
-process.exit(fails ? 1 : 0);
+// v4650 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
+// background compiler still has work posts a task into a torn-down platform. tools/ship/wasmTeardown.mjs.
+process.exitCode = fails ? 1 : 0;

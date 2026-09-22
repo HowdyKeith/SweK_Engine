@@ -131,4 +131,6 @@ const go = (w, p) => swim(w, "3d", p, { steps: 600, field, dirs });
 }
 
 console.log(fails ? "\nparamecium3d-selfcheck: " + fails + " FAILED" : "\nparamecium3d-selfcheck: all checks pass");
-process.exit(fails ? 1 : 0);
+// v4650 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
+// background compiler still has work posts a task into a torn-down platform. tools/ship/wasmTeardown.mjs.
+process.exitCode = fails ? 1 : 0;

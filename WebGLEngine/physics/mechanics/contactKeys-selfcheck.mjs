@@ -139,4 +139,6 @@ console.log("\n5. WHY THE HEIGHT SEQUENCE IS NOT THE OBSERVABLE, RECORDED SO NOB
 }
 
 console.log(fails ? `\ncontactKeys-selfcheck: ${fails} FAILED` : "\ncontactKeys-selfcheck: all checks pass");
-process.exit(fails ? 1 : 0);
+// v4650 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
+// background compiler still has work posts a task into a torn-down platform. tools/ship/wasmTeardown.mjs.
+process.exitCode = fails ? 1 : 0;

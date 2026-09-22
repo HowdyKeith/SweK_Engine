@@ -141,4 +141,6 @@ console.log("\n6. THE FRONT DOOR");
     ok("reportLines names the book, the magazine rule with every spell's count, and the pickups", L.length === 3 && /IS a spell of world\/spellBook\.mjs/.test(L[0]) && /cataclysm 40dmg r16 x1/.test(L[1]) && /every 24 m/.test(L[2]));
 }
 console.log(fails ? `\nspellAmmo-selfcheck: ${fails} FAILED` : "\nspellAmmo-selfcheck: all checks pass");
-process.exit(fails ? 1 : 0);
+// v4650 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
+// background compiler still has work posts a task into a torn-down platform. tools/ship/wasmTeardown.mjs.
+process.exitCode = fails ? 1 : 0;

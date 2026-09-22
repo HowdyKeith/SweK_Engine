@@ -83,12 +83,34 @@ console.log("\n3. *** WHAT WAS INVISIBLE: SIX MODULES THE SERVER LOADS AT STARTU
     const required = cjs.filter((f) => server.includes(path.basename(f.path, ".cjs")));
     const lines = cjs.reduce((s, f) => s + f.text.split("\n").length, 0);
     say(cjs.map((f) => path.basename(f.path)).join(", "));
-    ok("!! *** EVERY ONE OF THEM IS LIVE: ai-bridge/server.js NAMES ALL SIX ***",
-       cjs.length >= 6 && required.length === cjs.length && lines > 1000,
-       `${cjs.length} CommonJS modules, ${lines} lines, ${required.length} named by server.js -- a WAD ` +
-       "geometry parser, a WAD texture decoder, an install checker, a tool prober, a Trellis source patcher " +
-       "and a mesh-generator readiness probe. Not dead code, not a fixture: production code that no " +
-       "instrument in this tree had counted a line of.");
+    // *** v4650 -- THE CLAIM WAS "SERVER.JS NAMES ALL SIX" AND THE CLAIM IS "NONE OF THEM IS DEAD". ***
+    // The first is evidence for the second and is not the same sentence, and the difference arrived the
+    // moment a SEVENTH .cjs did: tools/ship/wasmExitHook.cjs is a `node --require` preload that watches a
+    // gate compile wasm and then watches how it leaves, and it is required by tools/ship/wasmTeardown.mjs
+    // rather than by the server. The row went red for a file that is neither dead nor a fixture, which is
+    // the row measuring its own evidence instead of its subject.
+    //
+    // So the question is asked of THE TREE: every CommonJS module must be named by some source other than
+    // itself. The server figure is kept and REPORTED, because "six of seven are loaded by the server at
+    // startup" is the fact that made this section worth writing, and losing it to a wider rule would be
+    // trading a finding for a green.
+    const namedBy = (f) => {
+        const base = path.basename(f.path, ".cjs");
+        return treeFiles(ENG).filter((g) => g.path !== f.path && g.text.includes(base)).length;
+    };
+    const orphans = cjs.filter((f) => namedBy(f) === 0);
+    ok("!! *** NOT ONE OF THEM IS DEAD: EVERY CommonJS MODULE IS NAMED BY SOMETHING THAT IS NOT ITSELF ***",
+       cjs.length >= 7 && orphans.length === 0 && lines > 1000,
+       orphans.length ? "NAMED BY NOTHING: " + orphans.map((f) => path.basename(f.path)).join(", ")
+       : `${cjs.length} CommonJS modules, ${lines} lines. ${required.length} of them are named by ` +
+       "ai-bridge/server.js and loaded at its startup -- a WAD geometry parser, a WAD texture decoder, an " +
+       "install checker, a tool prober, a Trellis source patcher and a mesh-generator readiness probe -- " +
+       "and the rest are named elsewhere in the tree. Production code that no instrument here had counted " +
+       "a line of before v4564.");
+    ok("  ...and the server's own six are still six, so widening the rule did not lose the finding",
+       required.length === 6,
+       `${required.length} named by ai-bridge/server.js against ${cjs.length} in the tree. If this fell to ` +
+       "zero the row above would still pass on a tree of seven files that merely mention each other");
 }
 
 console.log("\n4. *** AND THE SYNTAX GUARD HAD NEVER PARSED AN ES MODULE ***");

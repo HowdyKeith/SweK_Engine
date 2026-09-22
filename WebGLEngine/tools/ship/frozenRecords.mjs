@@ -613,7 +613,10 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4647g -- RE-TAKEN alongside `excluding`: 146 / 69 / 392 -> 147 / 70 / 393. The two halves are one
     // census run twice and must move together, because the row below asserts their difference is EXACTLY
     // this module's own two records.
-    currentIncludingModule: Object.freeze({ records: 147, withFields: 70, fields: 393 }),
+    // v4650 -- RE-TAKEN alongside `excluding`: 147 / 70 / 393 -> 148 / 71 / 398. The two halves are one
+    // census run twice and must move together, because the row below asserts their difference is EXACTLY
+    // this module's own two records.
+    currentIncludingModule: Object.freeze({ records: 148, withFields: 71, fields: 398 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -794,7 +797,13 @@ export const PROBE_AT_V4536 = Object.freeze({
     // tools/ship/cliArgs.mjs -- a record with fields, so all three move by one. Re-taken in the round that
     // added it: the two before it were found by a red gate four rounds late, which is the whole argument
     // for the line this row already carried -- a round that adds a record re-takes this.
-    excluding: Object.freeze({ records: 145, withFields: 68, fields: 373 }),
+    // v4650 -- RE-TAKEN: 145 / 68 / 373 -> 146 / 69 / 378. One arrival, WASM_AT_V4650 in
+    // tools/ship/wasmTeardown.mjs -- a record WITH fields, so all three move, and fields by FIVE rather than
+    // by one because that record carries five (at, screened, candidates, capMs, noMarker,
+    // exitAfterWasmBefore, compilers -- the per-line reader this file's note above names as a LIMIT sees the
+    // ones on their own lines). Re-taken in the round that added it, which is the line this row has been
+    // carrying since v4647f and which two rounds before that one ignored.
+    excluding: Object.freeze({ records: 146, withFields: 69, fields: 378 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,

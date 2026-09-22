@@ -201,4 +201,6 @@ console.log("unchecked here: SPEED, for the reason above -- the kernel exists to
     "deliberately does not -- the module's header argues first order was the right thing to write blind, and now " +
     "that it can be run, whether second order is worth writing is a question this round opens and does not answer. " +
     "And simulation/lbm/lbmShader.js, which carries the SAME confession in the same words and still has no gate.");
-process.exit(fails ? 1 : 0);
+// v4650 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
+// background compiler still has work posts a task into a torn-down platform. tools/ship/wasmTeardown.mjs.
+process.exitCode = fails ? 1 : 0;

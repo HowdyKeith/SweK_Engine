@@ -25,7 +25,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { noComments } from "./sourceScan.mjs";
 import { viewProj } from "../../render/rasterProbe.js";
 import { jitterProjection } from "../../render/jitter.mjs";
@@ -34,6 +34,11 @@ import { mat4Invert, transform4 } from "../../render/motionVectors.mjs";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+// *** v4650 -- AND AS A URL, BECAUSE THE PAGE'S IMPORTS ARE REWRITTEN TO POINT AT IT AND AN IMPORT TAKES A
+// SPECIFIER, NOT A PATH. *** On this box `${ENG}/render/jitter.mjs` is an absolute path and node accepts it;
+// on Keith's rig it is `C:\\Users\\...\\render/jitter.mjs`, whose scheme is `c:`, and the gate died with
+// ERR_UNSUPPORTED_ESM_URL_SCHEME before its first row. file:// spells the same location on both.
+const ENG_URL = pathToFileURL(ENG).href;
 let fails = 0;
 const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
 const report = (l) => console.log(`  ----  ${l}`);
@@ -82,7 +87,7 @@ console.log("\n2. *** THE CHAIN FIRES, AND THE TWO OLDER CAMERAS ARE THE CONTROL
 /** Drive the page's own script under a DOM stub. Returns the strings it wrote to its own status line. */
 async function drivePage({ scene = "zone", camera = "dolly", ratio = "2", frames = 2 } = {}) {
     let s = raw.match(/<script type="module">([\s\S]*?)<\/script>/)[1];
-    s = s.replace(/from "\.\//g, `from "${ENG}/`).replace(/from "\/ui\//g, `from "${ENG}/ui/`);
+    s = s.replace(/from "\.\//g, `from "${ENG_URL}/`).replace(/from "\/ui\//g, `from "${ENG_URL}/ui/`);
     const CTL = { scene, camera, ratio, alpha: "0.1", sharp: "1" };
     const texts = {}, cache = {};
     const el = (id) => ({
@@ -125,7 +130,7 @@ async function drivePage({ scene = "zone", camera = "dolly", ratio = "2", frames
     const tmp = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "fsrpage-")), "page.mjs");
     fs.writeFileSync(tmp, s);
     try {
-        await import(tmp + "?" + Math.random());
+        await import(pathToFileURL(tmp).href + "?" + Math.random());
         globalThis.__run(true);
         for (let i = 0; i < frames; i++) { pending = null; await globalThis.__tick(); if (!pending) break; }
     } finally { fs.rmSync(path.dirname(tmp), { recursive: true, force: true }); }

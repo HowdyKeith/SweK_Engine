@@ -247,4 +247,6 @@ sec("3. THE FRAME, ON BOTH BACKENDS: the tick-300 snapshot, bodies on fire over 
 
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nall checks pass");
 console.log("unchecked here: a depth test between bodies and puddles (the trail is drawn first, no depth); the trail's cost at the page's counts on a rig; a puddle that spreads with age rather than fading.");
-process.exit(fails ? 1 : 0);
+// v4650 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
+// background compiler still has work posts a task into a torn-down platform. tools/ship/wasmTeardown.mjs.
+process.exitCode = fails ? 1 : 0;

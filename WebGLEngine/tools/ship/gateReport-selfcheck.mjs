@@ -700,5 +700,11 @@ console.log("  ----  list of grievances -- the answer is that each wiring is one
 console.log("  ----  the table. That a report is CORRECT: it holds what the gate computed, and whether the gate was");
 console.log("  ----  right is the gate's own business. And that the reports stay current -- they carry the date they");
 console.log("  ----  were measured and nothing re-emits them on a ship, which is the next thing to decide.");
-if (fails) { console.log("gateReport-selfcheck: " + fails + " FAILURES"); process.exit(1); }
-console.log("gateReport-selfcheck: all checks pass");
+// v4650 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
+// background compiler still has work posts a task into a torn-down platform. tools/ship/wasmTeardown.mjs.
+// *** AND THE PASS LINE BECOMES AN `else`, WHICH IS THE TRAP IN THE SWAP: *** process.exit() stopped
+// execution and process.exitCode does not, so leaving the two lines sequential would make a failing run
+// print "N FAILURES" and then "all checks pass". pipeTruncation-selfcheck found that the first time this
+// repair was made, on statedRuntime, and holds a row for it.
+if (fails) { console.log("gateReport-selfcheck: " + fails + " FAILURES"); process.exitCode = 1; }
+else console.log("gateReport-selfcheck: all checks pass");

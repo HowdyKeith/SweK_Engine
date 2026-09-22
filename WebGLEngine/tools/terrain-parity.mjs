@@ -25,7 +25,7 @@
 // It also reports per-path timing for the same workload — your speedup number.
 
 import { readFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -42,7 +42,10 @@ const RADIUS = (() => {
 // ---------------------------------------------------------------------------
 let wasm;
 try {
-    wasm = await import(join(here, "..", "world", "wasm", "terrain_wasm.js"));
+    // v4650 -- pathToFileURL, because an absolute path is not a specifier. On Linux `join(...)` starts with
+    // "/" and node's loader tolerates it; on Windows it starts with "C:" and the loader reads "c:" as a URL
+    // scheme -- ERR_UNSUPPORTED_ESM_URL_SCHEME, and the catch below would report it as "build it first".
+    wasm = await import(pathToFileURL(join(here, "..", "world", "wasm", "terrain_wasm.js")).href);
     const bytes = await readFile(join(here, "..", "world", "wasm", "terrain_wasm_bg.wasm"));
     await wasm.default(bytes);
 } catch (err) {
@@ -57,7 +60,7 @@ try {
 //    come from the original generator. (world.js checks __swekWasmGen.)
 // ---------------------------------------------------------------------------
 globalThis.window = { __swekWasmGen: false, __swekBiomes: USE_WORLEY };
-const { VoxelWorld } = await import(join(here, "..", "world", "world.js"));
+const { VoxelWorld } = await import(pathToFileURL(join(here, "..", "world", "world.js")).href);
 
 const SEED = 1337;               // matches world.biomeSeed default
 const S = 16, H = 64;
