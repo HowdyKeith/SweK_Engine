@@ -35,7 +35,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
-import { mutateFile, restoreMutation, reclaimMutations } from "../tools/ship/fixtureLitter.mjs";
+import { writeFixture, dropFixture, reclaimMutations, armExitSweep } from "../tools/ship/fixtureLitter.mjs";
+armExitSweep();
 
 const require = createRequire(import.meta.url);
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -75,46 +76,67 @@ const ok = (name, cond, detail) => {
     // back" check below caught it. A CRASH AND A FAILURE ARE BOTH RED AND THEY ARE NOT THE SAME RED: a crash
     // tells you nothing about the physics, and a page that cannot tell them apart would report a broken import
     // as a broken world.
-    // *** v4649 -- THE finally BELOW USED TO BE THE WHOLE GUARANTEE, AND IT COST TWO ROUNDS. ***
-    // A finally covers a throw. It does not cover a SIGKILL at the sweep's cap, and Keith's box took 241 of
-    // those in one run. One killed run left upAxis sabotaged, so upAxis read RED in every sweep afterwards --
-    // and the NEXT run of this gate snapshotted the already-sabotaged file as its `orig`, found its own
-    // sabotage string missing, threw, and its finally wrote the sabotage straight back. Self-perpetuating,
-    // survived a hand restore, and read for two rounds as a Windows physics finding on a world whose physics
-    // was right the whole time. The mutation is now ledgered OUTSIDE the tree before it is made, so any
-    // death leaves a record the next process can undo.
-    const TARGET = "physics/upAxis-selfcheck.mjs";
+    //
+    // *** v4650 -- AND IT MUST NOT BE A GATE THE SWEEP IS RUNNING. ***
+    // v4649 ledgered the mutation so a killed run could be undone, and that was the wrong half. The sweep is
+    // EIGHT WAY PARALLEL: this gate edited physics/upAxis-selfcheck.mjs on disk while another worker was
+    // running that same file, so upAxis went red in every sweep and green every time anybody ran it alone.
+    // Three rounds read that as a Windows physics finding. No ledger can fix it -- the mutation is legitimate
+    // and it is restored -- so the answer is that the subject is a COPY nothing else runs.
+    //
+    // The copy is `__`-prefixed, which is this tree's mark for a transient fixture: gateSweep's walk refuses
+    // to enumerate those as gates (asserted there), so the sweep cannot pick it up no matter how many workers
+    // are running. It is written through the fixture registry, so a death drops it and the next run reclaims
+    // it. What this gate proves is unchanged -- that the RUNNER reports a failure as a failure -- and it now
+    // proves it without touching a file anybody else is reading.
     const reclaimed = reclaimMutations();
     ok("!! *** the tree carries no gate left mutated by a killed run ***", reclaimed.length === 0,
        reclaimed.length ? "RECLAIMED " + reclaimed.join(", ") + " -- a previous run died between a sabotage " +
            "and its restore. The tree is repaired now and this row is how you find out it happened; a run " +
            "that swallowed it would hand the next sweep a red gate with no author"
          : "nothing stranded -- the ledger outside the engine tree is empty");
-    const target = path.join(here, "..", "physics", "upAxis-selfcheck.mjs");
-    const orig = fs.readFileSync(target, "utf8");
-    const sab = orig.replace("Math.abs(w.readTransforms()[1] - 5) < 0.3", "false");
-    // A red row rather than a throw: throwing here is what welded the sabotage in, because the finally still
-    // ran and still wrote back the poisoned snapshot.
-    ok("!! the gate this one sabotages is in the state it expects before anything is written", sab !== orig,
-       sab !== orig ? "the assertion this replaces is present, so the sabotage below changes the subject"
-                    : "THE SABOTAGE STRING IS ABSENT -- " + TARGET + " is not what this gate expects, so " +
-                      "nothing was written and nothing was restored. Check it against HEAD before reading " +
-                      "anything else here");
-    if (sab !== orig) {
+
+    const LIVE = path.join(here, "..", "physics", "upAxis-selfcheck.mjs");
+    const liveBefore = fs.readFileSync(LIVE, "utf8");
+    // BESIDE the original: a copy in another directory cannot resolve the relative imports the gate
+    // makes, and the first version of this read red for that reason rather than for the sabotage.
+    const PROBE = "physics/__rigrunner_probe-selfcheck.mjs";
+    const sab = liveBefore.replace("Math.abs(w.readTransforms()[1] - 5) < 0.3", "false");
+    ok("!! the gate this one copies is in the state it expects before anything is written", sab !== liveBefore,
+       sab !== liveBefore ? "the assertion the sabotage replaces is present in the original, so the copy below " +
+                            "changes the subject rather than testing nothing"
+                          : "THE SABOTAGE STRING IS ABSENT from physics/upAxis-selfcheck.mjs, so nothing was " +
+                            "written. Check it against HEAD before reading anything else here");
+    if (sab !== liveBefore) {
         try {
-            mutateFile(TARGET, sab);
-            const bad = await new Promise((res) => runOne("physics/upAxis-selfcheck.mjs", res));
+            // The COPY, unmodified first: it must be green, or the sabotage below proves nothing.
+            writeFixture(PROBE, liveBefore);
+            const good = await new Promise((res) => runOne(PROBE, res));
+            ok("!! a COPY of that gate, untouched, is green through the runner",
+               good.ok === true && good.code === 0,
+               `exit ${good.code} in ${good.ms}ms -- the copy is the subject now, and a copy that was already ` +
+               "red would make the row below meaningless");
+            writeFixture(PROBE, sab);
+            const bad = await new Promise((res) => runOne(PROBE, res));
             ok("A SABOTAGED CHECK COMES BACK RED (the page can fail)", bad.ok === false && bad.code !== 0,
                "exit " + bad.code + " -- if this were green the whole page would be decoration");
             ok("...and it FAILED rather than crashed (the failure text comes back to the browser)",
                bad.out.includes("FAIL") && bad.out.includes("RISES"),
                "a red row can be READ, not just counted -- and a crash would have printed nothing, which is a different red");
         } finally {
-            restoreMutation(TARGET);
+            dropFixture(PROBE);
         }
     }
-    const back = await new Promise((res) => runOne("physics/upAxis-selfcheck.mjs", res));
-    ok("...and the sabotage was undone", back.ok === true, "exit " + back.code);
+    // *** THE REGRESSION ROW, AND IT IS THE POINT OF THE ROUND. *** Whatever this gate did above, the gate it
+    // copied is byte-for-byte what it was. A run that fails this has put a red in somebody else's sweep.
+    const liveAfter = fs.readFileSync(LIVE, "utf8");
+    ok("!! *** and physics/upAxis-selfcheck.mjs is UNTOUCHED -- nothing here edits a gate the sweep may be running ***",
+       liveAfter === liveBefore && !fs.existsSync(path.join(here, "..", PROBE)),
+       liveAfter === liveBefore
+         ? `${liveBefore.length} bytes, unchanged, and the probe copy is gone. For three rounds this gate ` +
+           "edited that file in place and an 8-way sweep read it mid-edit"
+         : "THE LIVE GATE CHANGED. Whatever else this run reported, it has just handed the next sweep a red " +
+           "gate with no author -- which is exactly the failure this row exists for");
 }
 
 // ---- 3. it refuses what it should -----------------------------------------------------------------------------
