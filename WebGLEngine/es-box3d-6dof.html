@@ -47,6 +47,7 @@ import * as RB from "/physics/mechanics/rigidBody6dof.mjs";
 import * as RBC from "/physics/mechanics/rigidBody6dofCollision.mjs";
 import * as RBW from "/physics/mechanics/rigidBody6dofWeapon.mjs";
 import * as AP from "/brain/autopilot6dof.mjs";
+import * as FA from "/brain/fleetAssign.mjs";
 
 // ---- combat constants (game balance, not gated -- matching es-box3d-fly3d.html's own SHOT constants) ----
 const HALF = [1.6, 0.7, 0.7];              // ship OBB half-extents; nose (local +X) is the long axis
@@ -155,20 +156,15 @@ function newBattle() {
 }
 newBattle();
 
-function nearestEnemy(ship, foes) {
-  let best = null, bestD = Infinity;
-  for (const f of foes) {
-    if (f.dead) continue;
-    const d = Math.hypot(f.body.pos[0] - ship.body.pos[0], f.body.pos[1] - ship.body.pos[1], f.body.pos[2] - ship.body.pos[2]);
-    if (d < bestD) { bestD = d; best = f; }
-  }
-  return best;
-}
-
-function stepFleet(mine, foes, dt, nowMs) {
+// target SELECTION (nearestEnemy(), per-ship, no team awareness) was replaced with target ASSIGNMENT
+// (brain/fleetAssign.mjs's own assignTargets(), one pass per team per tick) -- see that file's own header for
+// the measured gap this closes (two allied ships converging on the same nearest enemy and colliding with EACH
+// OTHER, not the enemy). stepFleet() itself stays a thin per-ship loop; the coordination lives entirely in the
+// assignment map it's handed, computed once per team in frame() below, not per-ship here.
+function stepFleet(mine, foes, assignment, dt, nowMs) {
   for (const ship of mine) {
     if (ship.dead) continue;
-    const target = nearestEnemy(ship, foes);
+    const target = assignment.get(ship);
     if (!target) continue;
     const d = AP.decide(ship.body, { pos: target.body.pos, vel: target.body.vel }, { weaponSpeed: RBW.WEAPON.speed, ...PAGE_AUTOPILOT });
     const acc = RB.createAccumulator();
@@ -192,16 +188,25 @@ function resolveCollisions(all) {
       if (!c.hit) continue;
       const obbA = RBC.bodyOBB(a.body, HALF), obbB = RBC.bodyOBB(b.body, HALF);
       const p = RBC.contactPoint(obbA, obbB, c.normal);
-      const { j: impulse, a: a2, b: b2 } = RBC.resolveCollision(a.body, b.body, { point: p, normal: c.normal }, { restitution: 0.35 });
+      // friction:0.5 EXPLICIT, matching rigidBody6dofCollision.mjs's own default -- an adversarial review found
+      // this page previously inherited that default SILENTLY (no `friction` key at all), an unreviewed side
+      // effect of that module adding Coulomb friction rather than a considered choice for this page. Made
+      // deliberate here: ship hulls scraping past each other having SOME grip (not sliding frictionlessly) is
+      // the physically plausible choice for a ramming/glancing dogfight, and matches the value already proven
+      // in that module's own gate rather than introducing a second, untested friction coefficient.
+      const { j: impulse, a: a2, b: b2 } = RBC.resolveCollision(a.body, b.body, { point: p, normal: c.normal }, { restitution: 0.35, friction: 0.5 });
       // positional correction (position-only, split by inverse mass) keeps a colliding pair's own PENETRATION
       // bounded -- measured directly before this page shipped: depth converges to (and stays pinned near) its
-      // own slop bound rather than growing without limit. IT DOES NOT prevent sustained light contact on its
-      // own: brain/autopilot6dof.mjs has no allied deconfliction, so two same-team ships targeting the same
-      // enemy can fly into and stay pressed against each other for several seconds, re-triggering this block
-      // every tick -- measured too (171 straight ticks on one seed). That is an honest first-slice AI gap
-      // (single-ship target selection, no formation/avoidance), not a collision-response bug: the physics
-      // itself degrades gracefully under it (bounded depth, correct impulses every tick, no explosion, no
-      // clip-through) rather than doing anything wrong.
+      // own slop bound rather than growing without limit. THE ORIGINAL CAUSE OF SUSTAINED LIGHT CONTACT --
+      // brain/autopilot6dof.mjs had no allied deconfliction, so two same-team ships independently targeting the
+      // SAME nearest enemy would fly into and stay pressed against each other for several seconds, re-triggering
+      // this block every tick (measured: 171 straight ticks on one seed) -- is CLOSED as of the frame() call
+      // site above (brain/fleetAssign.mjs's assignTargets(), one pass per team per tick, guarantees no two
+      // ships on the same team ever share a target when fleet sizes are equal). This block itself still exists
+      // for the same reason it always did: ships can still physically brush past each other while pursuing
+      // DIFFERENT targets, or ram an enemy deliberately -- that is normal combat contact, not the coordination
+      // gap, and the physics still degrades gracefully under it either way (bounded depth, correct impulses
+      // every tick, no explosion, no clip-through).
       const { a: a3, b: b3 } = RBC.positionalCorrection(a2, b2, c);
       a.body = a3; b.body = b3;
       if (impulse > 0) {
@@ -239,8 +244,8 @@ function frame() {
   const liveA = A.some((s) => !s.dead), liveB = B.some((s) => !s.dead);
   if (!liveA || !liveB) { if (liveA) wins.A++; else if (liveB) wins.B++; newBattle(); }
   else {
-    stepFleet(A, B, dt, nowMs);
-    stepFleet(B, A, dt, nowMs);
+    stepFleet(A, B, FA.assignTargets(A, B), dt, nowMs);
+    stepFleet(B, A, FA.assignTargets(B, A), dt, nowMs);
     resolveCollisions(A.concat(B));
     stepWeapons(A.concat(B), dt);
     tick++;

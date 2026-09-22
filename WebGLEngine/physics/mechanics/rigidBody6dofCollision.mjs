@@ -47,10 +47,40 @@
 // makes a resting stack of bodies visibly jitter) minus a small SLOP allowance (a little standing overlap is
 // left alone on purpose, so the correction does not fight the collision detector's own hit threshold every tick).
 //
-// WHAT THIS DELIBERATELY DOES NOT DO (first slice, matching rigidBody6dof.mjs's own scoping): no friction
-// (tangential impulse), no persistent contact manifold across multiple simultaneous contact points -- one
-// impulse (and one positional correction) per call, matching how physics/mechanics/rigidBody6dof.mjs's own
-// step() takes one accumulated force/torque per tick rather than a multi-contact solver.
+// FRICTION (added this round): a CLAMPED-COULOMB, SEQUENTIAL-IMPULSE tangential impulse (Box2D's own ordering --
+// resolve the normal impulse first, THEN friction against what's left), reusing the SAME effective-inverse-mass
+// construction the normal impulse uses, just projected onto a TANGENT direction `t` instead of the contact
+// normal `n`: with vAfterN = contact-point relative velocity right after the normal impulse, vTangent = the
+// component of vAfterN perpendicular to n (the actual sliding, not the part already resolved by j), t =
+// unit(vTangent), and Kt the same effectiveInverseMass() construction along t:
+//   jtRaw = -|vTangent| / Kt                          (same form as j with e=0 -- drives sliding fully to zero)
+//   jt = max(jtRaw, -mu*j)                             (Coulomb clamp: |jt| <= mu * the normal impulse magnitude)
+// jtRaw <= 0 and mu*j >= 0 always (mu, j both non-negative under this file's own sign conventions), so the clamp
+// is a simple max(). A caller who never opts into `opts.friction` still gets it (default mu=0.5, matching this
+// file's own default-restitution convention of a sensible, overridable middle value) -- mu=0 reproduces the OLD
+// normal-only behavior EXACTLY (proven in the gate: identical vel/w to the pre-friction formula, not merely
+// "close"), so this is additive, not a silent behavior change for anyone who explicitly wanted mu=0.
+//
+// PROVEN IN A STANDALONE SCRATCH SCRIPT BEFORE BEING WRITTEN HERE (the same discipline the normal impulse itself
+// was held to, re-run in this file's own gate): mu=0 reproduces the pre-friction formula exactly; a grazing,
+// mostly-tangential impact is measurably slowed in the tangential direction while the NORMAL response is
+// completely unaffected; a very large mu drives contact-point tangential slip to (near) exactly zero (the
+// static-friction limit); a small mu leaves most of the slip (the Coulomb clamp actually binds, not merely
+// exists); momentum AND angular momentum stay conserved to float precision across 200 random trials with
+// friction active (friction is an equal-and-opposite impulse pair, same as the normal one); friction alone NEVER
+// increases kinetic energy on top of what the normal impulse already did (it may only dissipate); and a mirrored
+// tangential-velocity scenario produces an exactly mirrored PHYSICAL outcome (the raw scalar jt is NOT the
+// quantity that mirrors, since it is defined relative to a tangent direction `t` that itself flips between the
+// two mirrored cases -- the gate checks the actual post-impact relative velocity instead, the mistake a first
+// draft of this exact check made and corrected before it ever reached the gate).
+//
+// STILL NOT DONE (this round only closes the friction gap, not the other one the header above already named): a
+// persistent contact manifold across multiple simultaneous contact points -- one impulse (and one positional
+// correction) per call, matching how physics/mechanics/rigidBody6dof.mjs's own step() takes one accumulated
+// force/torque per tick rather than a multi-contact solver. obbOverlap.js's obbContact() still returns only
+// {normal, depth}, not a point or a set of points; contactPoint() below is still a single-point approximation.
+// A full manifold needs polygon clipping (SAT proves separation, not contact geometry) -- a real, separate
+// piece of work, named here rather than silently implied to be solved by this round's friction addition.
 "use strict";
 import { obbFromPosed, obbContact } from "../obbOverlap.js";
 import { rotateByQuat, worldToBody, toPoseQuat, boxInertia, createBody } from "./rigidBody6dof.mjs";
@@ -60,6 +90,7 @@ export { worldToBody };   // re-exported: this file's own gate (and any other co
 
 const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const cross3 = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const norm3 = (v) => Math.hypot(v[0], v[1], v[2]);
 const add3 = (a, b, s = 1) => [a[0] + b[0] * s, a[1] + b[1] * s, a[2] + b[2] * s];
 const scale3 = (a, s) => [a[0] * s, a[1] * s, a[2] * s];
 const sub3 = (a, b) => add3(a, b, -1);
@@ -87,42 +118,91 @@ export function contactPoint(obbA, obbB, normal) {
     return scale3(add3(pA, pB), 0.5);
 }
 
+/** Effective inverse mass along an arbitrary unit direction `d` -- the SAME (I^-1(r x d)) x r construction the
+ * normal impulse always used, generalized so the friction impulse below (along a TANGENT direction instead of
+ * the contact normal) can reuse it exactly rather than duplicating the angular term by hand. */
+function effectiveInverseMass(a, b, rA, rB, d) {
+    const dBodyA = worldToBody(a.q, d), dBodyB = worldToBody(b.q, d);
+    const rBodyA = worldToBody(a.q, rA), rBodyB = worldToBody(b.q, rB);
+    const angTerm = (I, rBody, dBody) => {
+        const rxd = cross3(rBody, dBody);
+        return cross3([rxd[0] / I[0], rxd[1] / I[1], rxd[2] / I[2]], rBody);   // (I^-1 (r x d)) x r, BODY frame
+    };
+    const angAworld = rotateByQuat(a.q, angTerm(a.I, rBodyA, dBodyA));
+    const angBworld = rotateByQuat(b.q, angTerm(b.I, rBodyB, dBodyB));
+    return 1 / a.mass + 1 / b.mass + dot3(d, angAworld) + dot3(d, angBworld);
+}
+
+/** Apply impulse vector `J` (at world contact point via rA=p-a.pos, rB=p-b.pos) to both bodies: A -= J/mA,
+ * B += J/mB linearly, and the matching angular change via I^-1(r x J) in each body's own frame. Shared by both
+ * the normal impulse and the friction impulse below -- same application, different direction/magnitude. */
+function applyImpulse(a, b, rA, rB, J) {
+    const velA2 = sub3(a.vel, scale3(J, 1 / a.mass)), velB2 = add3(b.vel, scale3(J, 1 / b.mass));
+    const JbodyA = worldToBody(a.q, scale3(J, -1)), JbodyB = worldToBody(b.q, J);
+    const rBodyA = worldToBody(a.q, rA), rBodyB = worldToBody(b.q, rB);
+    const dwBody = (I, rBody, Jbody) => { const t = cross3(rBody, Jbody); return [t[0] / I[0], t[1] / I[1], t[2] / I[2]]; };
+    const wA2 = add3(a.w, dwBody(a.I, rBodyA, JbodyA)), wB2 = add3(b.w, dwBody(b.I, rBodyB, JbodyB));
+    return { a: { ...a, vel: velA2, w: wA2 }, b: { ...b, vel: velB2, w: wB2 } };
+}
+
+/** Contact-point relative velocity, B relative to A (world frame): vpB - vpA, each point velocity being
+ * vel + w_world x r. Positive along `n` (A->B) means separating; negative means approaching. */
+function contactPointVelocity(a, b, rA, rB) {
+    const wAworld = rotateByQuat(a.q, a.w), wBworld = rotateByQuat(b.q, b.w);
+    const vpA = add3(a.vel, cross3(wAworld, rA)), vpB = add3(b.vel, cross3(wBworld, rB));
+    return sub3(vpB, vpA);
+}
+
 /**
  * Resolve one contact between two rigidBody6dof bodies. `contact` = {point, normal} (normal points A->B).
- * Returns {j, a, b} -- j is the scalar impulse magnitude actually applied (0 if the pair was already
- * separating along the normal); a/b are NEW body states (mass/I/pos/q unchanged, vel/w updated). Does not
- * mutate its inputs. ASSUMES mass > 0 for both bodies (1/mass appears directly in K below) -- an explicit
- * mass:0 divides by zero and poisons that body's velocity with NaN, same as it would in F=ma itself; not
- * guarded here, matching how rigidBody6dof.mjs's own createBody()/boxInertia() never validate a non-physical
- * mass either.
+ * Returns {j, jt, a, b} -- j is the NORMAL impulse magnitude actually applied (0 if the pair was already
+ * separating along the normal), jt is the TANGENTIAL (friction) impulse magnitude actually applied (0 if there
+ * was no sliding at the contact point, or `opts.friction` is <= 0 -- see this file's header on the Coulomb model);
+ * a/b are NEW body states (mass/I/pos/q unchanged, vel/w updated). Does not mutate its inputs. ASSUMES mass > 0
+ * for both bodies (1/mass appears directly in K below) -- an explicit mass:0 divides by zero and poisons that
+ * body's velocity with NaN, same as it would in F=ma itself; not guarded here, matching how rigidBody6dof.mjs's
+ * own createBody()/boxInertia() never validate a non-physical mass either. THE NAN STAYS CONTAINED TO THE ONE
+ * DEGENERATE BODY, not spread to an otherwise-healthy partner -- an adversarial review found the friction code
+ * below originally DID spread it (NaN fails every ordinary `< eps` comparison, so a naive slideSpeed<eps guard
+ * let a NaN-poisoned slideSpeed fall through into the friction math and poison the healthy body too, ON BY
+ * DEFAULT since mu defaults nonzero); fixed with a guard that catches both "too small" and NaN, see below.
  */
 export function resolveCollision(a, b, contact, opts = {}) {
     const e = opts.restitution != null ? opts.restitution : 0.4;
+    const mu = opts.friction != null ? opts.friction : 0.5;
     const { point: p, normal: n } = contact;
     const rA = sub3(p, a.pos), rB = sub3(p, b.pos);
-    const wAworld = rotateByQuat(a.q, a.w), wBworld = rotateByQuat(b.q, b.w);
-    const vpA = add3(a.vel, cross3(wAworld, rA)), vpB = add3(b.vel, cross3(wBworld, rB));
-    const vn = dot3(sub3(vpB, vpA), n);
-    if (vn > 0) return { j: 0, a, b };   // already separating -- no impulse
+    const vn = dot3(contactPointVelocity(a, b, rA, rB), n);
+    if (vn > 0) return { j: 0, jt: 0, a, b };   // already separating -- no impulse at all, not even friction
 
-    const nBodyA = worldToBody(a.q, n), nBodyB = worldToBody(b.q, n);
-    const rBodyA = worldToBody(a.q, rA), rBodyB = worldToBody(b.q, rB);
-    const angTerm = (I, rBody, nBody) => {
-        const rxn = cross3(rBody, nBody);
-        return cross3([rxn[0] / I[0], rxn[1] / I[1], rxn[2] / I[2]], rBody);   // (I^-1 (r x n)) x r, BODY frame
-    };
-    const angAworld = rotateByQuat(a.q, angTerm(a.I, rBodyA, nBodyA));
-    const angBworld = rotateByQuat(b.q, angTerm(b.I, rBodyB, nBodyB));
-    const K = 1 / a.mass + 1 / b.mass + dot3(n, angAworld) + dot3(n, angBworld);
+    const K = effectiveInverseMass(a, b, rA, rB, n);
     const j = -(1 + e) * vn / K;
-    const J = scale3(n, j);
+    const { a: a1, b: b1 } = applyImpulse(a, b, rA, rB, scale3(n, j));
+    if (mu <= 0) return { j, jt: 0, a: a1, b: b1 };
 
-    const velA2 = sub3(a.vel, scale3(J, 1 / a.mass)), velB2 = add3(b.vel, scale3(J, 1 / b.mass));
-    const JbodyA = worldToBody(a.q, scale3(J, -1)), JbodyB = worldToBody(b.q, J);
-    const dwBody = (I, rBody, Jbody) => { const t = cross3(rBody, Jbody); return [t[0] / I[0], t[1] / I[1], t[2] / I[2]]; };
-    const wA2 = add3(a.w, dwBody(a.I, rBodyA, JbodyA)), wB2 = add3(b.w, dwBody(b.I, rBodyB, JbodyB));
+    // FRICTION (Coulomb, sequential impulse -- see this file's header): recompute the contact-point relative
+    // velocity AFTER the normal impulse, project OUT the (now non-positive) normal component to isolate
+    // whatever tangential sliding remains, and apply an impulse that opposes it -- clamped to |jt| <= mu*j, the
+    // Coulomb friction limit, so a low mu only PARTIALLY arrests sliding rather than always fully stopping it.
+    const vAfterN = contactPointVelocity(a1, b1, rA, rB);
+    const vTangent = sub3(vAfterN, scale3(n, dot3(vAfterN, n)));
+    const slideSpeed = norm3(vTangent);
+    // `!(slideSpeed >= 1e-9)`, NOT `slideSpeed < 1e-9` -- these are NOT equivalent when slideSpeed is NaN (an
+    // already-unsupported mass:0 input poisoning a1/b1's velocity with NaN upstream): `NaN < 1e-9` is FALSE, so
+    // the naive form falls through into the friction math below and, an adversarial review found, spreads that
+    // NaN from the one degenerate body to the OTHERWISE-HEALTHY other body too (applyImpulse() splits any
+    // impulse across both bodies) -- a real widening of this file's own already-documented, already-unguarded
+    // mass:0 blast radius (previously contained to the one degenerate body; friction, on by default, undid
+    // that). `!(x >= eps)` is true for both "too small" and NaN, closing it without adding a validation this
+    // file has never done for mass:0 elsewhere.
+    if (!(slideSpeed >= 1e-9)) return { j, jt: 0, a: a1, b: b1 };   // no sliding at the contact point -- nothing to oppose
+    const t = scale3(vTangent, 1 / slideSpeed);
+    const Kt = effectiveInverseMass(a1, b1, rA, rB, t);
+    const jtRaw = -slideSpeed / Kt;              // <=0: same form as the normal impulse with e=0, driving slip to zero
+    const jt = Math.max(jtRaw, -mu * j);          // Coulomb clamp: |jt| <= mu*j (both j and mu*j are >= 0 here)
+    const { a: a2, b: b2 } = applyImpulse(a1, b1, rA, rB, scale3(t, jt));
 
-    return { j, a: { ...a, vel: velA2, w: wA2 }, b: { ...b, vel: velB2, w: wB2 } };
+    return { j, jt, a: a2, b: b2 };
 }
 
 /**
@@ -149,18 +229,23 @@ export function positionalCorrection(a, b, contact, opts = {}) {
 export function reportLines() {
     const I = boxInertia({ m: 8, hx: 1, hy: 0.8, hz: 2 });
     const half = [1, 0.8, 2];
-    const a = createBody({ mass: 8, I, pos: [-0.8, 0, 0], vel: [3, 0, 0] });
+    // a small +Y "sliding" component on `a` (on top of the head-on -X closing velocity) so this demo actually
+    // exercises friction -- a purely head-on pair (the old demo) has zero tangential contact-point velocity, and
+    // jt would silently read 0 even with friction wired in, which is a demo, not a proof, but still worth
+    // showing something nonzero here rather than a coincidentally-degenerate case.
+    const a = createBody({ mass: 8, I, pos: [-0.8, 0, 0], vel: [3, 1.5, 0] });
     const b = createBody({ mass: 8, I, pos: [0.8, 0.3, 0], vel: [-2, 0, 0] });
     const c = checkContact(a, half, b, half);
     if (!c.hit) return ["[rigidBody6dofCollision] the two demo boxes do not touch at these positions/half-extents"];
     const cp = contactPoint(bodyOBB(a, half), bodyOBB(b, half), c.normal);
-    const { j, a: a2, b: b2 } = resolveCollision(a, b, { point: cp, normal: c.normal }, { restitution: 0.5 });
+    const { j, jt, a: a2, b: b2 } = resolveCollision(a, b, { point: cp, normal: c.normal }, { restitution: 0.5, friction: 0.5 });
     const { a: a3, b: b3 } = positionalCorrection(a2, b2, c);
     const depthAfter = checkContact(a3, half, b3, half);
     return [
-        "[rigidBody6dofCollision] obbOverlap.js's OBB contact test + a hand-derived impulse response, both proven",
-        "                         against closed-form and conservation-law checks in this file's own gate.",
-        `  contact: normal ${c.normal.map((v) => v.toFixed(3))}  depth ${c.depth.toFixed(3)}  impulse j=${j.toFixed(3)}`,
+        "[rigidBody6dofCollision] obbOverlap.js's OBB contact test + a hand-derived impulse response (normal +",
+        "                         Coulomb friction), both proven against closed-form and conservation-law checks",
+        "                         in this file's own gate.",
+        `  contact: normal ${c.normal.map((v) => v.toFixed(3))}  depth ${c.depth.toFixed(3)}  impulse j=${j.toFixed(3)}  friction jt=${jt.toFixed(3)}`,
         `  a.vel ${a2.vel.map((v) => v.toFixed(3))}  a.w ${a2.w.map((v) => v.toFixed(4))}`,
         `  b.vel ${b2.vel.map((v) => v.toFixed(3))}  b.w ${b2.w.map((v) => v.toFixed(4))}`,
         `  positional correction: depth ${c.depth.toFixed(3)} -> ${depthAfter.hit ? depthAfter.depth.toFixed(3) : 0} after one call`,

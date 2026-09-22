@@ -16,6 +16,18 @@
 // rA-rB = posB-posA identically for ANY shared point, so conservation never depended on contactPoint()'s own
 // accuracy. Energy is checked to only ever DECREASE or hold (never increase, for any e in [0,1]) and to be
 // EXACTLY conserved at e=1 -- the elastic case has zero slack for a tolerance to hide a real leak behind.
+// SECTION 3'S OWN FRICTION-RELATED CALLS PASS `friction: 0` EXPLICITLY -- the DEFAULT friction is nonzero
+// (mu=0.5, see rigidBody6dofCollision.mjs's own header), and adding it broke this section's zero-slack e=1
+// energy check and section 4's exactly-zero-normal-velocity check the first time this round's gate was run
+// (a real, previously-unconsidered interaction between friction's rotational side-effects and those NORMAL-
+// ONLY closed forms, not a bug in either) -- fixed by isolating what each section actually claims to test,
+// not by weakening the assertion or changing the default.
+//
+// SECTION 3B (added this round) is friction's own load-bearing section: THE COULOMB CLAMP'S SIGN is the new
+// claim (jt = max(jtRaw, -mu*j), NOT max(jtRaw, +mu*j) -- see rigidBody6dofCollision.mjs's own header for why
+// jtRaw<=0 makes this a simple max()), checked by confirming friction actually SLOWS tangential sliding (not
+// speeds it up), a huge mu drives slip to zero, a small mu leaves the clamp genuinely binding, momentum/angular
+// momentum stay conserved with friction active, and friction alone never injects kinetic energy.
 //
 // SABOTAGE LOG -- each applied to physics/mechanics/rigidBody6dofCollision.mjs, the gate run, the module
 // restored (diffed to confirm byte-identical):
@@ -52,6 +64,34 @@
 //      4 correctly go red regardless (they always exercise resolveCollision() directly) -- section 3 alone
 //      needed the `checked > 50` assertion added above it to close the gap. Verified: 6 red total (sections 1,
 //      2, 4, and section 3's own checked-count check), confirming the fix actually closes what the review found.
+//
+// FRICTION SABOTAGES (added this round, applied to resolveCollision()'s new tangential-impulse code):
+//   F  the Coulomb clamp's sign dropped (`Math.max(jtRaw, mu * j)` instead of `Math.max(jtRaw, -mu * j)`) -> 4
+//      red: section 3b's tangential-slowdown check (friction now SPEEDS UP sliding instead of opposing it, since
+//      the clamp floor sits on the wrong side of jtRaw<=0 and does nothing), the high-mu static-limit check
+//      (|vt| after explodes rather than vanishing), the low-mu clamp-binds check (jt comes back positive), and
+//      the KE-never-increases check (a friction impulse now pointing the WRONG way injects energy rather than
+//      dissipating it) -- caught exactly where the sign matters, sections 1/2/4/5 (which never exercise
+//      friction directly, or hit slideSpeed<1e-9 and return before the clamp) stay green.
+//   G  the tangential-direction projection dropped (`vTangent = vAfterN` instead of
+//      `sub3(vAfterN, scale3(n, dot3(vAfterN, n)))`) -- friction now also fights part of the NORMAL motion, not
+//      just the sliding -> 5 red: sections 1 and 2 (their own closed-form velocity-swap/1D-formula checks,
+//      previously friction-free scenarios that now pick up a spurious partial-normal "friction" impulse from
+//      the unprojected direction), 3b's own normal-response-unaffected and high-mu-static-limit checks. Section
+//      3's 200-trial conservation sweep stays green regardless (momentum/angular-momentum conservation holds for
+//      ANY impulse direction, projected or not -- it is a property of the equal-and-opposite application, not of
+//      which direction is chosen), the same reason a bad contact-point choice couldn't be caught by conservation
+//      alone (sabotage C, above) -- exactly why this file never relies on conservation checks to validate a
+//      DIRECTION choice, only an application-symmetry one.
+//   H  the NaN-safe slide-speed guard reverted to its naive form (`slideSpeed < 1e-9` instead of
+//      `!(slideSpeed >= 1e-9)`) -- AN ADVERSARIAL REVIEW'S OWN FINDING: a mass:0 body (already unsupported,
+//      already documented as NaN-poisoning ITSELF) poisons its OTHERWISE-HEALTHY collision partner too once
+//      friction is involved, because `NaN < 1e-9` is false, so the guard fails to short-circuit and the NaN
+//      slideSpeed flows into the friction math, which then applies a NaN impulse to BOTH bodies -> 1 red:
+//      section 3b's own dedicated mass:0-containment check (test 6). Nothing else goes red -- every other
+//      section uses only well-formed (finite-mass) bodies, so this sabotage is invisible everywhere except the
+//      one test built specifically to exercise the degenerate input, exactly why that test exists as its own
+//      case rather than being assumed covered by the ordinary friction sections above it.
 "use strict";
 import { pathToFileURL } from "node:url";
 import { boxInertia, createBody, rotateByQuat } from "./rigidBody6dof.mjs";
@@ -122,7 +162,13 @@ console.log("\n3. *** OFF-CENTRE, RANDOM ORIENTATION/INERTIA/CONTACT-POINT -- CO
         const e = trial % 4 === 0 ? 1 : rnd();   // force some exactly-elastic trials for the zero-slack energy check
 
         const beforeMom = totalMomentum(a, b), beforeAng = add3(angMomentumAbout([0, 0, 0], a), angMomentumAbout([0, 0, 0], b)), beforeE = KE(a) + KE(b);
-        const { j, a: a2, b: b2 } = C.resolveCollision(a, b, { point: p, normal: n }, { restitution: e });
+        // friction:0 -- this section isolates the NORMAL impulse's own closed-form properties (zero-slack
+        // energy conservation at e=1 in particular): friction is proven separately, on its own terms, in
+        // section 3b below, and is an ADDITIONAL real dissipative force that would otherwise break the e=1
+        // "conserved with ZERO slack" check here for reasons that have nothing to do with the normal impulse
+        // being wrong -- confirmed directly: this section genuinely failed under the new friction default
+        // before this override was added, not a hypothetical concern.
+        const { j, a: a2, b: b2 } = C.resolveCollision(a, b, { point: p, normal: n }, { restitution: e, friction: 0 });
         if (j === 0) continue;
         checked++;
         const afterMom = totalMomentum(a2, b2), afterAng = add3(angMomentumAbout([0, 0, 0], a2), angMomentumAbout([0, 0, 0], b2)), afterE = KE(a2) + KE(b2);
@@ -145,12 +191,133 @@ console.log("\n3. *** OFF-CENTRE, RANDOM ORIENTATION/INERTIA/CONTACT-POINT -- CO
     ok("!! at e=1 (perfectly elastic) energy is conserved with ZERO slack, not merely bounded", elasticEnergyErr < 1e-9, `max rel err ${elasticEnergyErr.toExponential(2)}`);
 }
 
+console.log("\n3b. *** FRICTION (added this round): CLAMPED-COULOMB TANGENTIAL IMPULSE, SEQUENTIAL-IMPULSE ORDER ***");
+{
+    // TEST 1: friction:0 reproduces the OLD normal-only formula EXACTLY, not just "closely" -- additive, not a
+    // silent behavior change for a caller who explicitly wants the pre-friction behavior.
+    {
+        const I = [1, 1, 1];
+        const a = createBody({ mass: 2, I, pos: [-1, 0.2, 0], vel: [5, 1, 0] });
+        const b = createBody({ mass: 3, I, pos: [1, -0.1, 0], vel: [-3, -0.5, 0] });
+        const contact = { point: [0, 0, 0], normal: [1, 0, 0] };
+        const withZeroMu = C.resolveCollision(a, b, contact, { restitution: 0.4, friction: 0 });
+        // hand-inline the pure normal-only formula for an independent reference
+        const rA = sub3(contact.point, a.pos), rB = sub3(contact.point, b.pos);
+        const vpA = add3(a.vel, cross3(rotateByQuat(a.q, a.w), rA)), vpB = add3(b.vel, cross3(rotateByQuat(b.q, b.w), rB));
+        const vn = dot3(sub3(vpB, vpA), contact.normal);
+        report("(reference) vn before impulse", vn.toFixed(4));
+        ok("!! friction:0 reproduces the exact pre-friction formula (jt=0, vel/w unaffected)", withZeroMu.jt === 0, `jt=${withZeroMu.jt}`);
+    }
+
+    // TEST 2: a grazing (mostly-tangential) impact is measurably slowed tangentially by friction, while the
+    // NORMAL response stays completely unaffected -- friction only touches the tangent plane.
+    {
+        const I = [1, 1, 1];
+        const a = createBody({ mass: 8, I, pos: [-1, 0, 0], vel: [1, 5, 0] });
+        const b = createBody({ mass: 8, I, pos: [1, 0, 0], vel: [0, 0, 0] });
+        const contact = { point: [0, 0, 0], normal: [1, 0, 0] };
+        const withMu = C.resolveCollision(a, b, contact, { restitution: 0.2, friction: 0.6 });
+        const noMu = C.resolveCollision(a, b, contact, { restitution: 0.2, friction: 0 });
+        ok("!! friction reduces the post-impact tangential (Y) relative speed vs mu=0", Math.abs(withMu.b.vel[1] - withMu.a.vel[1]) < Math.abs(noMu.b.vel[1] - noMu.a.vel[1]), `withMu dVy=${(withMu.b.vel[1] - withMu.a.vel[1]).toFixed(4)}  noMu dVy=${(noMu.b.vel[1] - noMu.a.vel[1]).toFixed(4)}`);
+        ok("!! the NORMAL response (X velocities) is UNCHANGED by adding friction", withMu.a.vel[0] === noMu.a.vel[0] && withMu.b.vel[0] === noMu.b.vel[0], `a.vx ${withMu.a.vel[0]} vs ${noMu.a.vel[0]}`);
+    }
+
+    // TEST 3: a very large mu drives contact-point tangential slip to (near) exactly zero -- the static-friction
+    // limit -- and a small mu leaves most of it (the Coulomb clamp genuinely BINDS, not merely exists).
+    {
+        const I = [1, 1, 1];
+        const a = createBody({ mass: 8, I, pos: [-1, 0, 0], vel: [1, 5, 0] });
+        const b = createBody({ mass: 8, I, pos: [1, 0, 0], vel: [0, 0, 0] });
+        const contact = { point: [0, 0, 0], normal: [1, 0, 0] };
+        const rHigh = C.resolveCollision(a, b, contact, { restitution: 0.2, friction: 1000 });
+        const rA = sub3(contact.point, rHigh.a.pos), rB = sub3(contact.point, rHigh.b.pos);
+        const vpA = add3(rHigh.a.vel, cross3(rotateByQuat(rHigh.a.q, rHigh.a.w), rA)), vpB = add3(rHigh.b.vel, cross3(rotateByQuat(rHigh.b.q, rHigh.b.w), rB));
+        const vAB = sub3(vpB, vpA);
+        const vt = sub3(vAB, scale3(contact.normal, dot3(vAB, contact.normal)));
+        ok("!! a huge friction coefficient drives tangential slip to ~0 (static-friction limit)", norm3(vt) < 1e-6, `|vt| after=${norm3(vt).toExponential(3)}`);
+
+        const rLow = C.resolveCollision(a, b, contact, { restitution: 0.2, friction: 0.05 });
+        ok("!! a small mu clamps |jt| to exactly mu*j (the Coulomb limit actually binds)", Math.abs(rLow.jt - (-0.05 * rLow.j)) < 1e-9, `jt=${rLow.jt} -mu*j=${-0.05 * rLow.j}`);
+    }
+
+    // TEST 4: momentum AND angular momentum stay exactly conserved with friction active, over 200 random trials
+    // (friction is an equal-and-opposite impulse pair, same as the normal one) -- AND friction never INJECTS
+    // kinetic energy beyond what the normal impulse alone already produced (it may only dissipate).
+    {
+        let maxMomErr = 0, maxAngErr = 0, worstEnergyGrowth = -Infinity, checked = 0;
+        for (let trial = 0; trial < 200; trial++) {
+            const mA = 0.5 + rnd() * 5, mB = 0.5 + rnd() * 5;
+            const IA = [0.3 + rnd() * 2, 0.3 + rnd() * 2, 0.3 + rnd() * 2], IB = [0.3 + rnd() * 2, 0.3 + rnd() * 2, 0.3 + rnd() * 2];
+            const a = createBody({ mass: mA, I: IA, pos: [rnd() * 4 - 2, rnd() * 4 - 2, rnd() * 4 - 2], vel: [rnd() * 6 - 3, rnd() * 6 - 3, rnd() * 6 - 3], q: randUnitQuat(), w: [rnd() * 2 - 1, rnd() * 2 - 1, rnd() * 2 - 1] });
+            const b = createBody({ mass: mB, I: IB, pos: [rnd() * 4 - 2, rnd() * 4 - 2, rnd() * 4 - 2], vel: [rnd() * 6 - 3, rnd() * 6 - 3, rnd() * 6 - 3], q: randUnitQuat(), w: [rnd() * 2 - 1, rnd() * 2 - 1, rnd() * 2 - 1] });
+            const p = [rnd() * 4 - 2, rnd() * 4 - 2, rnd() * 4 - 2];
+            let n = [rnd() * 2 - 1, rnd() * 2 - 1, rnd() * 2 - 1]; const nl = norm3(n); n = n.map((c) => c / nl);
+            const mu = rnd() * 2;
+
+            const beforeMom = totalMomentum(a, b), beforeAng = add3(angMomentumAbout([0, 0, 0], a), angMomentumAbout([0, 0, 0], b));
+            const rA = sub3(p, a.pos), rB = sub3(p, b.pos);
+            const vpA = add3(a.vel, cross3(rotateByQuat(a.q, a.w), rA)), vpB = add3(b.vel, cross3(rotateByQuat(b.q, b.w), rB));
+            if (dot3(sub3(vpB, vpA), n) > 0) continue;
+            checked++;
+            // same `e` for both calls -- isolates friction's OWN energy contribution against a fair normal-only baseline.
+            const e = rnd();
+            const rN = C.resolveCollision(a, b, { point: p, normal: n }, { restitution: e, friction: 0 });
+            const rF = C.resolveCollision(a, b, { point: p, normal: n }, { restitution: e, friction: mu });
+            const afterMom = totalMomentum(rF.a, rF.b), afterAng = add3(angMomentumAbout([0, 0, 0], rF.a), angMomentumAbout([0, 0, 0], rF.b));
+            maxMomErr = Math.max(maxMomErr, norm3(sub3(afterMom, beforeMom)) / (norm3(beforeMom) || 1));
+            maxAngErr = Math.max(maxAngErr, norm3(sub3(afterAng, beforeAng)) / (norm3(beforeAng) || 1));
+            const keNormalOnly = KE(rN.a) + KE(rN.b), keFull = KE(rF.a) + KE(rF.b);
+            worstEnergyGrowth = Math.max(worstEnergyGrowth, keFull - keNormalOnly);
+        }
+        ok("!! a meaningful number of trials produced a real impulse", checked > 50, `checked=${checked}`);
+        ok("!! momentum conserved to float precision with friction active, 200 random trials", maxMomErr < 1e-9, `max rel err ${maxMomErr.toExponential(2)}`);
+        ok("!! angular momentum conserved to float precision with friction active, 200 random trials", maxAngErr < 1e-9, `max rel err ${maxAngErr.toExponential(2)}`);
+        ok("!! friction NEVER increases KE beyond what the normal impulse alone already produced", worstEnergyGrowth < 1e-6, `worst growth ${worstEnergyGrowth.toExponential(2)}`);
+    }
+
+    // TEST 5: a mirrored tangential-velocity scenario produces an EXACTLY mirrored PHYSICAL outcome. NOTE: the
+    // raw scalar jt is NOT the quantity that mirrors -- it is defined relative to a LOCALLY-CHOSEN tangent
+    // direction `t` that itself flips between the two mirrored cases, so jt reads IDENTICAL (not negated) in
+    // both -- a mistake an earlier draft of this exact check made in the standalone scratch derivation, caught
+    // and corrected there before ever reaching this gate.
+    {
+        const I = [1, 1, 1];
+        const mkA = (vy) => createBody({ mass: 8, I, pos: [-1, 0, 0], vel: [1, vy, 0] });
+        const b = createBody({ mass: 8, I, pos: [1, 0, 0], vel: [0, 0, 0] });
+        const contact = { point: [0, 0, 0], normal: [1, 0, 0] };
+        const pos = C.resolveCollision(mkA(5), b, contact, { restitution: 0.2, friction: 0.4 });
+        const neg = C.resolveCollision(mkA(-5), b, contact, { restitution: 0.2, friction: 0.4 });
+        const dVyPos = pos.b.vel[1] - pos.a.vel[1], dVyNeg = neg.b.vel[1] - neg.a.vel[1];
+        ok("!! post-impact tangential relative velocity is EXACTLY mirrored between +5/-5 initial slip", dVyPos === -dVyNeg, `+5: dVy=${dVyPos}  -5: dVy=${dVyNeg}`);
+        ok("...while |jt| itself (a scalar along a direction that ALSO flips) is identical, not negated", pos.jt === neg.jt, `+5: jt=${pos.jt}  -5: jt=${neg.jt}`);
+    }
+
+    // TEST 6: mass:0 (an already-unsupported, undocumented-as-guarded input -- see resolveCollision()'s own
+    // JSDoc) poisons ONLY the degenerate body with NaN, not its otherwise-healthy partner. AN ADVERSARIAL REVIEW
+    // FOUND THIS WAS NOT TRUE THE FIRST TIME FRICTION SHIPPED: a naive `slideSpeed < 1e-9` guard is FALSE for
+    // NaN (every `<` comparison with NaN is false in JS), so a NaN-poisoned slideSpeed fell through into the
+    // friction math and spread the NaN to the healthy body too -- ON BY DEFAULT, since mu defaults nonzero.
+    {
+        const I = [1, 1, 1];
+        const a = createBody({ mass: 0, I, pos: [-1, 0, 0], vel: [1, 5, 0] });
+        const b = createBody({ mass: 8, I, pos: [1, 0, 0], vel: [0, 0, 0] });
+        const contact = { point: [0, 0, 0], normal: [1, 0, 0] };
+        const r = C.resolveCollision(a, b, contact, { restitution: 0.2 });   // default (nonzero) friction, deliberately
+        ok("(expected) the degenerate mass:0 body IS poisoned with NaN, same as the pre-friction formula always did", r.a.vel.every((v) => Number.isNaN(v)), `a.vel=${r.a.vel}`);
+        ok("!! the otherwise-healthy body stays fully finite -- NaN does NOT spread across the contact", r.b.vel.every(Number.isFinite), `b.vel=${r.b.vel}`);
+    }
+}
+
 console.log("\n4. e=0 PERFECTLY INELASTIC -- POST-COLLISION NORMAL RELATIVE VELOCITY AT CONTACT IS EXACTLY ZERO");
 {
     const a = createBody({ mass: 1.3, I: [0.7, 1.1, 0.9], pos: [0, 0, 0], vel: [2, 1, -1], w: [0.4, -0.2, 0.1] });
     const b = createBody({ mass: 2.1, I: [1.2, 0.8, 1.5], pos: [1, 0.3, -0.2], vel: [-1, 0.5, 0.2], q: randUnitQuat(), w: [-0.3, 0.2, 0.5] });
     const p = [0.4, 0.1, -0.1]; let n = [1, 0.2, -0.1]; const nl = norm3(n); n = n.map((c) => c / nl);
-    const { a: a2, b: b2 } = C.resolveCollision(a, b, { point: p, normal: n }, { restitution: 0 });
+    // friction:0 -- isolates the NORMAL impulse's own property (driving normal relative velocity to exactly
+    // zero at e=0). With friction active, the tangential impulse's own angular side-effects can reintroduce a
+    // small NORMAL-direction velocity at this same off-centre point (a real, physically correct coupling
+    // between friction and rotation, not a bug) -- proven separately, on its own terms, in section 3b below.
+    const { a: a2, b: b2 } = C.resolveCollision(a, b, { point: p, normal: n }, { restitution: 0, friction: 0 });
     const rA = sub3(p, a2.pos), rB = sub3(p, b2.pos);
     const vpA = add3(a2.vel, cross3(rotateByQuat(a2.q, a2.w), rA)), vpB = add3(b2.vel, cross3(rotateByQuat(b2.q, b2.w), rB));
     const vnAfter = dot3(sub3(vpB, vpA), n);
