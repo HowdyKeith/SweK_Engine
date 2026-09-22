@@ -16,12 +16,13 @@
 
 import { fnv1a, seedFor, seedProvenance, seedsFor, SEP } from "../../world/orrerySeed.mjs";
 import { buildOrrery } from "../../world/orrery.mjs";
-import { firstCommit, scanVendor } from "./orreryScan.mjs";
+import { firstCommit, scanVendor, historyIsTruncated, graftBoundary } from "./orreryScan.mjs";
 import { bakePayload, readBaked, drift, BAKE_PATH, serialise } from "./orreryBake.mjs";
 import { planetSpec, bakeEquirect } from "../../world/procPlanet.js";
 import { noComments, codeOnly, prose } from "./sourceScan.mjs";
 import fs from "node:fs";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 
@@ -88,11 +89,73 @@ const SHARED = "66db97c45b5286d98d1c018506effca552f05a23";
     ok(seedFor("ab", "c") !== seedFor("a", "bc"), "*** which is what stops ('ab','c') and ('a','bc') seeding identically ***");
 }
 
-// 5) THE SCANNER READS THE HASH, FROM ONE CALL.
+// 4b) *** THE BOUNDARY ITSELF, FROM THREE INDEPENDENT ROUTES, because the whole repair rests on finding it.
 {
+    const boundary = graftBoundary(REPO);
+    const say = (h) => h.slice(0, 8);
+    // (1) git's own flag.
+    let flag = "";
+    try { flag = execFileSync("git", ["rev-parse", "--is-shallow-repository"],
+        { cwd: REPO, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); } catch {}
+    // (2) the file git keeps, read directly -- and through --git-common-dir, because a WORKTREE's .git is a
+    //     file pointing elsewhere and this session runs censuses in detached worktrees.
+    let fromFile = new Set();
+    try {
+        const common = execFileSync("git", ["rev-parse", "--git-common-dir"],
+            { cwd: REPO, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+        const p2 = path.isAbsolute(common) ? common : path.join(REPO, common);
+        fromFile = new Set(fs.readFileSync(path.join(p2, "shallow"), "utf8").trim().split("\n").filter(Boolean));
+    } catch { /* a full clone has no such file, which is the other arm */ }
+    // (3) every boundary commit must report NO PARENTS, which is what makes git's first-add query stop there.
+    const parented = [...boundary].filter((h) => {
+        try { return execFileSync("git", ["log", "-1", "--format=%P", h],
+            { cwd: REPO, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim().length > 0; } catch { return true; }
+    });
+    if (flag === "true") {
+        ok(boundary.size > 0 && parented.length === 0,
+           `TRUNCATED HISTORY: git says shallow, ${boundary.size} boundary commit(s) ` +
+           `[${[...boundary].map(say).join(" ")}], every one parentless. That is why the first-add query ` +
+           `stops there and answers with the graft for anything vendored earlier`);
+        ok(fromFile.size === 0 || [...boundary].every((h) => fromFile.has(h)),
+           `and the set agrees with the file git keeps (${fromFile.size} entries), which is a second route ` +
+           "to the same answer rather than a restatement of the first");
+    } else {
+        ok(boundary.size === 0 && fromFile.size === 0,
+           "FULL HISTORY: no graft, so every first-add answer is a real one and nothing below is skipped. " +
+           "A parentless commit here is the genuine root and a genuine answer");
+        ok(historyIsTruncated(REPO) === false, "and historyIsTruncated agrees with the boundary set");
+    }
+    // *** THE CONTROL: the two arms are not interchangeable. ***
+    ok((flag === "true") === (boundary.size > 0),
+       `git's flag reads "${flag}" and the boundary set holds ${boundary.size}. A detector that found a ` +
+       "boundary in a full clone would make every arrival unknown everywhere; one that found none here " +
+       "would put the graft back into orrery.json as fact");
+}
+
+// 5) THE SCANNER READS THE HASH, FROM ONE CALL.
+//
+// *** v4652 -- THE TWO ROWS BELOW ASK GIT A QUESTION A SHALLOW CLONE CANNOT ANSWER, AND USED TO BELIEVE THE
+// WRONG ANSWER. *** git's first-add query returns the GRAFT BOUNDARY for anything committed before it, which
+// looks exactly like a real first-add -- so in this session's own checkout every one of the twenty bodies came
+// back with the same date and the same sha (2026-08-31, 6ba6776c, a parentless commit touching 5,226 files)
+// and the three orrery gates read it as vendor/ having moved. orreryScan refuses the boundary now and returns
+// null, and these rows SPLIT: on a full history they assert the hash and the date, and on a truncated one they
+// assert that the scanner said NOTHING rather than something wrong. Neither arm is a pass for the other --
+// which is the shape v4649 gave pipeTruncation's platform rows for the same reason.
+{
+    const truncated = historyIsTruncated(REPO);
     const fc = firstCommit(REPO, "WebGLEngine/vendor/three");
-    ok(/^[0-9a-f]{40}$/.test(fc.sha || ""), `firstCommit returns a full 40-character hash (${String(fc.sha).slice(0, 12)}...)`);
-    ok(/^\d{4}-\d{2}-\d{2}$/.test(fc.date || ""), `and its date (${fc.date}) from the SAME invocation, so the two cannot straddle a commit`);
+    if (truncated) {
+        ok(fc.sha === null && fc.date === null && fc.truncated === true,
+           `SKIPPED, NOT PASSED: this clone is shallow, so git answers the first-add query with the graft ` +
+           `boundary. The scanner returns null and says truncated (sha ${fc.sha}, date ${fc.date}, ` +
+           `truncated ${fc.truncated}) -- a full checkout is the instrument for the hash itself`);
+        ok(!/^[0-9a-f]{40}$/.test(fc.sha || ""),
+           "and the arm this clone does NOT take is false of its own reading, so neither is a way out");
+    } else {
+        ok(/^[0-9a-f]{40}$/.test(fc.sha || ""), `firstCommit returns a full 40-character hash (${String(fc.sha).slice(0, 12)}...)`);
+        ok(/^\d{4}-\d{2}-\d{2}$/.test(fc.date || ""), `and its date (${fc.date}) from the SAME invocation, so the two cannot straddle a commit`);
+    }
     const missing = firstCommit(REPO, "WebGLEngine/vendor/__no_such_body__");
     ok(missing.sha === null && missing.date === null, "a path git has never seen returns nulls rather than throwing");
 
@@ -138,7 +201,10 @@ const SHARED = "66db97c45b5286d98d1c018506effca552f05a23";
     const baked = readBaked();
     ok(baked.bodies.every((b) => b.sha === null || /^[0-9a-f]{40}$/.test(b.sha)),
         "the baked file carries full hashes, because a browser cannot run git");
-    ok(serialise(bakePayload(ENG, REPO)) === fs.readFileSync(BAKE_PATH, "utf8"),
+    // *** v4652 -- bakePayload TAKES THE RECORD, because on a truncated history it carries the recorded
+    // arrivals and seeds forward rather than baking twenty nulls over them. Calling it without the record
+    // here compared a payload that had thrown those fields away against the file that still holds them. ***
+    ok(serialise(bakePayload(ENG, REPO, baked)) === fs.readFileSync(BAKE_PATH, "utf8"),
         "*** orrery.json is current -- run: node tools/ship/orreryBake.mjs --write ***");
     ok(drift(ENG, REPO).length === 0, "and drift() agrees");
 
@@ -149,7 +215,20 @@ const SHARED = "66db97c45b5286d98d1c018506effca552f05a23";
     fs.writeFileSync(tmp, JSON.stringify(bent));
     const d = drift(ENG, REPO, tmp);
     fs.unlinkSync(tmp);
-    ok(d.some((m) => /sha/.test(m)), "*** a baked hash that no longer matches git is reported by name ***");
+    // *** AND THIS SABOTAGE CANNOT FIRE ON A TRUNCATED HISTORY, WHICH IS SAID RATHER THAN QUIETLY PASSED. ***
+    // drift() compares a baked sha against git's, and on a shallow clone git has no answer to compare with --
+    // so bending a recorded hash changes nothing and the row would go red for a reason that is about the
+    // checkout. What IS asserted here is the thing that still holds: the bent record is carried forward
+    // UNCHANGED rather than overwritten, so the seed survives a bake taken where it cannot be re-derived.
+    if (historyIsTruncated(REPO)) {
+        const carried = bakePayload(ENG, REPO, bent).bodies.find((b) => b.name === bent.bodies[0].name);
+        ok(carried && carried.sha === "0".repeat(40),
+           "SKIPPED, NOT PASSED: a shallow clone has no git hash to disagree with, so the drift row cannot " +
+           "fire. What is checked instead is that the bake CARRIES the recorded hash forward -- bending one " +
+           "and re-baking gives it back, which is what stops a bake here erasing twenty planet seeds");
+    } else {
+        ok(d.some((m) => /sha/.test(m)), "*** a baked hash that no longer matches git is reported by name ***");
+    }
 }
 
 // 8) THE PLANETS ARE DETERMINISTIC, which is the property that made them free to use.

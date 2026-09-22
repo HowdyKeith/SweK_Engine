@@ -404,7 +404,22 @@ ok("!! re-deriving every checked record costs a small fraction of the verify it 
     `bound 1%. The old form was a flat 1,000 ms and the seventh check at a FULL census would not have fit ` +
     `under it; the check was made cheap (740 -> 285 ms, guardians off) AND the bound was given a shape, ` +
     `because a round number says nothing about what it is guarding`);
-ok("the record admits the one it does not check", REC.notChecked === 1);
+// v4652 -- TWO now, and both are ADMITTED rather than added. The second is orrery-fleet.json's byte counts,
+// whose only re-derivation costs 2,580 ms against a pre-flight totalling 1,130 -- see the note on the
+// register. What this row asserts is that the number and the CLAUSES agree: an OWES entry for every duty
+// this tool names but does not discharge, so "not checked" cannot quietly become "not mentioned".
+{
+    const admitted = Object.keys(OWES).length - REC.checked;
+    // *** AND THIS ROW WAS WRITTEN WITH ITS ARGUMENTS SWAPPED, WHICH MADE IT A CONTROL THAT COULD NOT FAIL.
+    // *** This file's ok() is (name, cond): I wrote ok(cond, message), so the ASSERTION was a template
+    // string -- always truthy -- and the name was a boolean. It "passed" on every tree. Nothing in this gate
+    // noticed; tools/ship/assertionShape-selfcheck.mjs did, by name, on the next full sweep, and its census
+    // moved suspects 0 -> 1 in the same breath. That detector exists for exactly this and this round is its
+    // fourth catch of the shape in one session.
+    ok(`the record admits the ${REC.notChecked} it does not check, and OWES carries a clause for each ` +
+       `(${Object.keys(OWES).length} clauses, ${REC.checked} checks)`,
+       REC.notChecked === 2 && admitted === REC.notChecked);
+}
 ok("the record is frozen", Object.isFrozen(REC) && REC.rounds.every(Object.isFrozen));
 
 // SABOTAGE LOG -- v4551, the sixth check. Applied to tools/ship/recordDrift.mjs and vba/runtimeGap.mjs, gate

@@ -19,7 +19,7 @@ import fs from "node:fs";
 import { guardWrite } from "./bakeShrinkGuard.mjs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { scanVendor } from "./orreryScan.mjs";
+import { scanVendor, historyIsTruncated } from "./orreryScan.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const REPO = path.resolve(ENG, "..");
@@ -29,14 +29,29 @@ export const BAKE_PATH = path.join(ENG, "orrery.json");
  * The baked payload. Sorted and with fixed key order so two bakes of an unchanged tree are byte-identical --
  * a snapshot that churns on every run cannot be used to detect that something changed.
  */
-export function bakePayload(engineRoot = ENG, repoRoot = REPO) {
+export function bakePayload(engineRoot = ENG, repoRoot = REPO, previous = null) {
+    // *** ON A TRUNCATED HISTORY THE RECORDED ARRIVALS ARE CARRIED FORWARD, BECAUSE A NULL IS NOT AN UPDATE. ***
+    // In a shallow clone git answers the first-add query with the graft boundary, orreryScan refuses that and
+    // returns null, and a bake that wrote those nulls would ERASE twenty correct dates and twenty planet
+    // seeds -- turning a repair into the v4335 accident bakeShrinkGuard exists for, one field down instead of
+    // one file. So the bytes and the file lists are re-derived (this clone can see those perfectly well) and
+    // the two git-derived fields are taken from the record for any body the record already knows. A body that
+    // is NEW here keeps its honest null: nobody can say when it arrived from a history that does not reach.
+    const keep = historyIsTruncated(repoRoot) && previous
+        ? new Map((previous.bodies || []).map((b) => [b.name, b])) : null;
     const bodies = scanVendor(engineRoot, repoRoot)
         .slice()
         .sort((a, b) => a.name.localeCompare(b.name))
         .map((b) => ({
             name: b.name,
-            arrived: b.arrived || null,
-            sha: b.sha || null,          // baked, because a browser cannot run git and the seed is the point
+            arrived: b.arrived || (keep && keep.get(b.name) ? keep.get(b.name).arrived : null) || null,
+            sha: b.sha || (keep && keep.get(b.name) ? keep.get(b.name).sha : null) || null,
+            // *** v4652 -- `truncated` IS DELIBERATELY NOT BAKED, and writing it here was this round's own
+            // first attempt. *** It is a fact about THE CLONE that ran the bake, not about the tree, so
+            // serialising it would make a shallow checkout and a full one produce different bytes for an
+            // unchanged vendor/ -- breaking this file's own stated contract three lines up, that two bakes
+            // of an unchanged tree are byte-identical. It is a property of the REPOSITORY and drift() asks
+            // orreryScan.historyIsTruncated() for it once, rather than reading it off twenty bodies.
             bytes: b.bytes,
             // sorted so filesystem enumeration order cannot make the file churn
             files: b.files.slice().sort((x, y) => x.path.localeCompare(y.path))
@@ -59,8 +74,9 @@ export function readBaked(file = BAKE_PATH) {
 export function drift(engineRoot = ENG, repoRoot = REPO, file = BAKE_PATH) {
     const baked = readBaked(file);
     if (!baked) return ["orrery.json is missing -- run: node tools/ship/orreryBake.mjs --write"];
-    const live = bakePayload(engineRoot, repoRoot);
+    const live = bakePayload(engineRoot, repoRoot, baked);
     const out = [];
+    const truncated = historyIsTruncated(repoRoot);
     const byName = (p) => new Map((p.bodies || []).map((b) => [b.name, b]));
     const B = byName(baked), L = byName(live);
     for (const n of L.keys()) if (!B.has(n)) out.push(`vendor/${n} is in the tree but not in orrery.json`);
@@ -69,9 +85,16 @@ export function drift(engineRoot = ENG, repoRoot = REPO, file = BAKE_PATH) {
         const b = B.get(n);
         if (!b) continue;
         if (b.bytes !== l.bytes) out.push(`${n}: baked ${b.bytes} bytes, tree has ${l.bytes}`);
-        if ((b.arrived || null) !== (l.arrived || null)) out.push(`${n}: baked arrival ${b.arrived}, git says ${l.arrived}`);
-        // a changed first-commit sha is a DIFFERENT PLANET, so the staleness check has to see it
-        if ((b.sha || null) !== (l.sha || null)) out.push(`${n}: baked sha ${String(b.sha).slice(0, 12)}, git says ${String(l.sha).slice(0, 12)}`);
+        // *** v4652 -- A CLONE THAT CANNOT SEE FAR ENOUGH BACK HAS NO OPINION, AND NO OPINION IS NOT DRIFT. ***
+        // These two fields come from git's first-add query, and in a shallow clone that query answers with
+        // the graft boundary for everything committed before it. orreryScan now returns null and says
+        // `truncated`; comparing that null against a recorded date would report every body as moved -- which
+        // is exactly what the three orrery gates did, and what a --write would have baked in.
+        if (!truncated) {
+            if ((b.arrived || null) !== (l.arrived || null)) out.push(`${n}: baked arrival ${b.arrived}, git says ${l.arrived}`);
+            // a changed first-commit sha is a DIFFERENT PLANET, so the staleness check has to see it
+            if ((b.sha || null) !== (l.sha || null)) out.push(`${n}: baked sha ${String(b.sha).slice(0, 12)}, git says ${String(l.sha).slice(0, 12)}`);
+        }
         if ((b.files || []).length !== l.files.length) out.push(`${n}: baked ${(b.files || []).length} files, tree has ${l.files.length}`);
     }
     return out;
@@ -79,7 +102,7 @@ export function drift(engineRoot = ENG, repoRoot = REPO, file = BAKE_PATH) {
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
     const write = process.argv.includes("--write");
-    const payload = bakePayload();
+    const payload = bakePayload(ENG, REPO, readBaked(BAKE_PATH));
     const text = serialise(payload);
     const before = (() => { try { return fs.readFileSync(BAKE_PATH, "utf8"); } catch { return null; } })();
     if (before === text) { console.log(`orrery.json is current (${payload.bodies.length} bodies)`); }

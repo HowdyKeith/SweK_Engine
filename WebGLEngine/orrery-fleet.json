@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "dbc352edf3829f0e0a204ae9223810deccf833e4",
+ "head": "65fffdb371c7fcc2af443e6d815d541a589296b3",
  "bodies": {
   "box3d": [
    {
@@ -16,13 +16,13 @@
    },
    {
     "path": "physics/backendRouting-selfcheck.mjs",
-    "bytes": 25078,
-    "sha": "8c009e25970f6129173801315a93ce2a4cc7291c"
+    "bytes": 25295,
+    "sha": "fda780d8236149d71dcf768194b917360ee76f0d"
    },
    {
     "path": "physics/box3d/box3dConformance-selfcheck.mjs",
-    "bytes": 12052,
-    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
+    "bytes": 12269,
+    "sha": "fda780d8236149d71dcf768194b917360ee76f0d"
    },
    {
     "path": "physics/box3d/box3dLoader.js",
@@ -36,8 +36,8 @@
    },
    {
     "path": "physics/box3d/sensorsCcd-selfcheck.mjs",
-    "bytes": 27192,
-    "sha": "2963ba5c38c7e2e7bf46e18cf561cd975f84d747"
+    "bytes": 27409,
+    "sha": "fda780d8236149d71dcf768194b917360ee76f0d"
    },
    {
     "path": "physics/box3d/wasmBuild-selfcheck.mjs",
@@ -61,18 +61,18 @@
    },
    {
     "path": "simulation/life/paramecium3d-selfcheck.mjs",
-    "bytes": 8767,
-    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
+    "bytes": 8984,
+    "sha": "fda780d8236149d71dcf768194b917360ee76f0d"
    },
    {
     "path": "simulation/life/parameciumBox3d-selfcheck.mjs",
-    "bytes": 8846,
-    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
+    "bytes": 9063,
+    "sha": "fda780d8236149d71dcf768194b917360ee76f0d"
    },
    {
     "path": "simulation/life/parameciumDrive-selfcheck.mjs",
-    "bytes": 8403,
-    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
+    "bytes": 8620,
+    "sha": "fda780d8236149d71dcf768194b917360ee76f0d"
    },
    {
     "path": "tools/crossarch-box3d.mjs",
@@ -81,8 +81,8 @@
    },
    {
     "path": "tools/crossarchBox3d-selfcheck.mjs",
-    "bytes": 7250,
-    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
+    "bytes": 7467,
+    "sha": "fda780d8236149d71dcf768194b917360ee76f0d"
    },
    {
     "path": "tools/macSession.mjs",
@@ -131,8 +131,8 @@
    },
    {
     "path": "tools/ship/ragdollSelfCollide-selfcheck.mjs",
-    "bytes": 17897,
-    "sha": "b9ea45a342c9052ae236cf1b08adcfedf49799f1"
+    "bytes": 18114,
+    "sha": "fda780d8236149d71dcf768194b917360ee76f0d"
    }
   ],
   "draco": [
@@ -257,8 +257,8 @@
    },
    {
     "path": "tools/ship/slugNapalm-selfcheck.mjs",
-    "bytes": 29081,
-    "sha": "a70d9c786e3bed4679e472630d97c8a05da23a7c"
+    "bytes": 29298,
+    "sha": "fda780d8236149d71dcf768194b917360ee76f0d"
    },
    {
     "path": "tools/ship/slugProjective-selfcheck.mjs",
@@ -272,13 +272,13 @@
    },
    {
     "path": "tools/ship/slugShatter-selfcheck.mjs",
-    "bytes": 26015,
-    "sha": "a70d9c786e3bed4679e472630d97c8a05da23a7c"
+    "bytes": 26232,
+    "sha": "fda780d8236149d71dcf768194b917360ee76f0d"
    },
    {
     "path": "tools/ship/slugTicker-selfcheck.mjs",
-    "bytes": 20952,
-    "sha": "a70d9c786e3bed4679e472630d97c8a05da23a7c"
+    "bytes": 21169,
+    "sha": "fda780d8236149d71dcf768194b917360ee76f0d"
    },
    {
     "path": "tools/ship/slugTsl-selfcheck.mjs",
@@ -652,8 +652,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3376764,
-    "sha": "6e8b35aaeea60ff30ca911b8beb0e2df0bd61334"
+    "bytes": 3396941,
+    "sha": "65fffdb371c7fcc2af443e6d815d541a589296b3"
    },
    {
     "path": "mpm3d.html",

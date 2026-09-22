@@ -108,7 +108,13 @@ const read = (rel) => fs.readFileSync(path.join(ENG, rel), "utf8");
 
 // 3) THE BAKE IS DETERMINISTIC AND CURRENT.
 {
-    const a = serialise(bakePayload(ENG, REPO)), b = serialise(bakePayload(ENG, REPO));
+    // *** v4652 -- bakePayload TAKES THE RECORD. *** On a shallow clone git answers the first-add query
+    // with the graft boundary for everything before it, orreryScan refuses that and returns null, and the
+    // bake carries the RECORDED arrival and seed forward rather than writing twenty nulls over them. Called
+    // without the record, as these two lines did, it produced a payload with those fields thrown away and
+    // compared it against a file that still holds them -- a gate reporting the shape of its own checkout.
+    const REC = JSON.parse(fs.readFileSync(BAKE_PATH, "utf8"));
+    const a = serialise(bakePayload(ENG, REPO, REC)), b = serialise(bakePayload(ENG, REPO, REC));
     ok(a === b, "two bakes of an unchanged tree are byte-identical -- a snapshot that churns cannot detect change");
     ok(a === fs.readFileSync(BAKE_PATH, "utf8"),
         "*** orrery.json on disk IS what the tree says right now -- run: node tools/ship/orreryBake.mjs --write ***");

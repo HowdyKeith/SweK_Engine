@@ -20,6 +20,7 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import * as F from "../../world/orreryFleet.mjs";
 import * as S from "./orreryFleetScan.mjs";
+import { graftBoundary } from "./orreryScan.mjs";
 import * as IP from "./importPosition.mjs";
 import { EJECTA_BASELINE, PAPER_ONLY_BODIES } from "../../world/orreryEjecta.mjs";
 import { buildOrrery } from "../../world/orrery.mjs";
@@ -287,10 +288,43 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
     const moved = F.COMMIT_BELT_DRIFT_V4621.movedSince4475;
     const arrived = F.COMMIT_BELT_DRIFT_V4621.arrivedSince4475;
     const expectedFor = (n) => (moved[n] ? moved[n].now : arrived[n] ? arrived[n].now : (R.perBody[n] || []));
-    const drift = names.filter((n) => !sameList(expectedFor(n), liveShas[n]));
+
+    // *** v4652 -- AND THE THIRD TIME THIS ROW HAS COMPARED A RENDERING RATHER THAN AN IDENTITY. *** v4472
+    // found it reading COUNTS ("a count reverted to a wrong value still looks like a count"). v4534 found it
+    // reading %h ("fourteen of fifteen bodies drifted without changing"). This is a SHALLOW CLONE: git lists
+    // the commits it HAS, and for anything vendored before the graft boundary the list simply stops there --
+    // with the boundary commit itself as the last entry, which looks exactly like a real one. Measured on
+    // this session's checkout: 11 of the 15 bodies agree perfectly once the graft and everything under it is
+    // dropped, and the other 4 differ because vendor/ genuinely moved since v4475.
+    //
+    // So the live list is read as a LOWER BOUND. What this clone can see is compared exactly; what the graft
+    // swallowed is UNOBSERVABLE HERE and is counted and reported rather than asserted. A full checkout still
+    // compares every entry, because the boundary set is empty there and `visible` is the whole list.
+    const graft = graftBoundary(REPO);
+    const visibleOf = (list) => { const i = list.findIndex((h) => graft.has(h)); return i < 0 ? list : list.slice(0, i); };
+    const belowGraft = (n) => expectedFor(n).filter((h) => !visibleOf(liveShas[n]).some((v) => v.startsWith(h)));
+    /**
+     * Does what this clone CAN see agree with the record? The recorded entries still in view must appear in
+     * the live list in the recorded ORDER, as its tail; anything above them is work done since v4475, which
+     * is what `moved` and `arrived` already account for.
+     */
+    const agreesWithin = (n) => {
+        const vis = visibleOf(liveShas[n]);
+        const exp = expectedFor(n);
+        if (!graft.size) return sameList(exp, liveShas[n]);       // full history: the old comparison, unchanged
+        const seen = exp.filter((h) => vis.some((v) => v.startsWith(h)));
+        if (!seen.length) return true;                            // everything recorded is under the boundary
+        const tail = vis.slice(vis.length - seen.length);
+        return tail.length === seen.length && seen.every((h, i) => tail[i].startsWith(h));
+    };
+    const drift = names.filter((n) => !agreesWithin(n));
     const short = new Set(names.filter((n) => (R.perBody[n] || []).some((h) => h.length < 40)));
     ok("*** the recorded per-body commits still match git, BY HASH ***", drift.length === 0,
         drift.map((n) => `${n}: expected [${expectedFor(n).join(" ")}], git says [${liveShas[n].map((h) => h.slice(0, 8)).join(" ")}]`).join("; ") ||
+        (graft.size ? `TRUNCATED HISTORY: this clone is shallow, so ${names.filter((n) => belowGraft(n).length).length} ` +
+            `of ${names.length} bodies have recorded commits the graft swallowed (` +
+            `${names.reduce((a, n) => a + belowGraft(n).length, 0)} hashes unobservable here). What IS visible ` +
+            `agrees with the record, in order, for every body -- a full checkout is the instrument for the rest. ` : "") +
         `${names.length} bodies, ${Object.values(live).reduce((a, b) => a + b, 0)} commit sightings, every hash ` +
         `re-derived from git rather than trusted. ${short.size} bodies are recorded at an abbreviation shorter ` +
         `than git now renders (${F.COMMIT_BELT_DRIFT_V4621.abbreviationWas} against ` +
@@ -335,13 +369,31 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
     // character longer now" needs nothing; "this body has new commits" needs a recorded reason. The old row
     // said the same sentence for both and buried one real change under fourteen that had not happened.
     const D = F.COMMIT_BELT_DRIFT_V4621;
-    const stillMatchesV4475 = names.filter((n) => !moved[n] && sameList(R.perBody[n] || [], liveShas[n]));
+    // *** v4652 -- agreesWithin, NOT sameList, AND A FOURTH CLASS BESIDE IT. ***
+    // On a shallow clone the live list stops at the graft, so a body that has not changed since v4475 still
+    // "differs" by whatever the boundary swallowed: this read 0 unchanged of 15 and the true figure is 11.
+    // But swapping the comparator alone was WRONG IN THE OTHER DIRECTION and the gate's own partition row
+    // caught it within the minute -- agreesWithin returns true when NOTHING recorded is visible, so six
+    // bodies whose whole belt is under the graft were credited as unchanged, and so were the five that have
+    // no recorded belt at all. 16 + 4 + 5 = 25 against a fleet of 20.
+    //
+    // "What this clone can see agrees" and "this clone can see nothing of it" are DIFFERENT ANSWERS, so they
+    // are counted apart -- the same move this file made at v4472 for counts and at v4534 for abbreviations,
+    // which is three rounds finding the same species in one row. On a full checkout `unobservable` is empty
+    // and `unchanged` is the whole 11, which is what the frozen figure records.
+    const recorded = names.filter((n) => (R.perBody[n] || []).length > 0);
+    const observableOf = (n) => expectedFor(n).filter((h) => visibleOf(liveShas[n]).some((v) => v.startsWith(h)));
+    const stillMatchesV4475 = recorded.filter((n) => !moved[n] && agreesWithin(n) && observableOf(n).length > 0);
+    const unobservable = recorded.filter((n) => !moved[n] && agreesWithin(n) && observableOf(n).length === 0);
     ok("!! *** LENGTH DRIFT IS NOT A FINDING; A CHANGED COMMIT SET IS, AND THEY ARE COUNTED APART ***",
-       stillMatchesV4475.length === D.matchedOnceLengthIgnored &&
+       stillMatchesV4475.length + unobservable.length === D.matchedOnceLengthIgnored &&
        Object.keys(moved).length + D.matchedOnceLengthIgnored === D.ofBodies &&
        Object.values(moved).every((m) => m.why && m.recorded.length !== m.now.length),
-       `${stillMatchesV4475.length} bodies unchanged since v4475 once the abbreviation is ignored, ` +
-       `${Object.keys(moved).length} genuinely moved: ${Object.keys(moved).join(", ")}. The v4475 record is ` +
+       `${stillMatchesV4475.length} bodies unchanged since v4475 once the abbreviation is ignored` +
+       (unobservable.length ? ` and ${unobservable.length} whose whole belt is under this shallow clone's ` +
+        `graft (${unobservable.join(", ")}) -- checked where visible, UNCHECKABLE here, and counted apart ` +
+        `rather than credited` : "") +
+       `, ${Object.keys(moved).length} genuinely moved: ${Object.keys(moved).join(", ")}. The v4475 record is ` +
        "NOT rewritten -- it is a claim about v4475 and stays true about v4475 -- and what moved is recorded " +
        "beside it with the reason, which is the rule this file applied at v4418 and v4472.");
 
@@ -351,10 +403,15 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
     const unaccounted = names.filter((n) => !(R.perBody[n] || []).length && !moved[n] && !arrived[n]);
     ok("!! *** UNCHANGED + MOVED + ARRIVED + REMOVED IS THE WHOLE FLEET -- a new body cannot arrive unrecorded ***",
        unaccounted.length === 0 && names.length === D.bodiesNow &&
-       stillMatchesV4475.length + Object.keys(moved).length + Object.keys(arrived).length === names.length &&
+       // v4652 -- `unobservable` is a FIFTH class and it is IN the sum, not excluded from it. The row's own
+       // name is the argument: a partition that quietly drops a class is how a body arrives unrecorded, and
+       // six of this clone's bodies are checked-where-visible-and-uncheckable-below rather than unchanged.
+       stillMatchesV4475.length + unobservable.length + Object.keys(moved).length +
+           Object.keys(arrived).length === names.length &&
        Object.values(arrived).every((a) => a.why && a.now.length > 0) &&
        D.removedSince4475.every((n) => !names.includes(n)),
-       `${stillMatchesV4475.length} unchanged + ${Object.keys(moved).length} moved + ` +
+       `${stillMatchesV4475.length} unchanged + ${unobservable.length} visible-part-agrees-rest-under-the-graft + ` +
+       `${Object.keys(moved).length} moved + ` +
        `${Object.keys(arrived).length} arrived + ${D.removedSince4475.length} removed = ${names.length} bodies. ` +
        `ARRIVED: ${Object.keys(arrived).join(", ")} -- and one commit (13afafec) brought two of them, so a ` +
        "body and a commit are not one-to-one in either direction." +

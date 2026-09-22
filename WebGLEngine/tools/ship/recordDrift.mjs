@@ -91,6 +91,7 @@ export const OWES = Object.freeze({
     runtimeGap: "any new .mjs moves vba/runtimeGap.mjs's twelve-row capability census",
     index: "a new gate owes knowledge-index.json a rebuild, and every check reading it owes nothing until it has one",
     redCensus: "a gate that goes green owes tools/ship/redCensus.mjs the removal of its registered-red entry",
+    orrery: "a round that edits any file a vendored library imports owes orrery-fleet.json its new byte counts -- NOT CHECKED HERE, see the note on DRIFT_AT_V4482.notChecked",
     frozenRecords: "a round that adds a FROZEN RECORD owes tools/ship/frozenRecords.mjs and tools/ship/recordReach.mjs their re-taken counts -- both count records, and both go red on the next verify if the round that added one did not",
 });
 
@@ -436,7 +437,22 @@ export const DRIFT_AT_V4482 = Object.freeze({
     // rounds: v4650 added WASM_AT_V4650 and v4651 added EXILED_PASS_V4651, this tool said "nothing stale"
     // both times, and both verifies then returned frozenRecords-selfcheck and recordReach-selfcheck red.
     // A pre-flight silent about the commonest kind of arrival is not cheap, it is misleading.
-    checked: 7, notChecked: 1,
+    // v4651: 6 -> 7. `record censuses` joined, and it is the check that SHOULD have been here for two
+    // rounds: v4650 added WASM_AT_V4650 and v4651 added EXILED_PASS_V4651, this tool said "nothing stale"
+    // both times, and both verifies then returned frozenRecords-selfcheck and recordReach-selfcheck red.
+    // A pre-flight silent about the commonest kind of arrival is not cheap, it is misleading.
+    //
+    // *** v4652: notChecked 1 -> 2, AND THE SECOND ONE IS ADMITTED RATHER THAN ADDED. *** orrery-fleet.json
+    // records the BYTE SIZE of every file in this tree that imports a vendored library, so v4650's edit of
+    // 48 gates moved eleven of its entries by exactly 217 bytes each and v4651 moved main.js by 14,321 --
+    // and this pre-flight was silent, exactly as it had been about the record censuses. MEASURED before
+    // deciding: orreryBake.drift() costs 2,580 ms, because it runs `git log --diff-filter=A` once per
+    // vendored body and that query walks the whole history per path. Against a pre-flight whose SEVEN
+    // current checks total 1,130 ms, that is not a check, it is a second instrument. So it is written down
+    // as a duty this tool does not discharge -- the same treatment the redCensus clause gets and for a
+    // comparable reason -- and the three orrery gates remain its owners. What would make it affordable is a
+    // cheaper first-add query, which is its own round.
+    checked: 7, notChecked: 2,
     // milliseconds, measured on this box
     // v4551 -- the sixth check's cost is IN this table, not left out of it. The gate asserts this sum is under
     // a second against a 300,000 ms verify, and a cost record that omits the most expensive check would make
