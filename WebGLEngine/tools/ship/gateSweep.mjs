@@ -8070,6 +8070,49 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // run -- on Keith's gen-9 box and then here -- and it was red on BOTH, alongside assertionShape's
     // 1751 -> 1757 and runtimeGap's 4275 -> 4286, which are the same six arrivals seen from two other
     // instruments. The surplus mechanism worked exactly as designed; nobody looked at it for six rounds.
+    // v4650 -- THE 335th CLOSING: the orb's clock was an integral that reached no shader.
+    since334: Object.freeze({
+        at: "v4650", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/murmurTempo-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 2,213 ms on real WebGPU, 10 rows in four sections. *** render/aiPresenceOrbState" +
+                 ".mjs HAS INTEGRATED SPEED EVERY TICK SINCE THE PORT'S FIRST ROUND AND BOTH CALL SITES THAT " +
+                 "FEED A SHADER MULTIPLIED INSTEAD. *** That module's own header names the defect in as many " +
+                 "words -- \"multiplying elapsed time by the CURRENT speed would then jump the animation's " +
+                 "PHASE too (a visible pop)\" -- and ui/aiPresenceOrbWidget.js and ai-presence-orb.html both " +
+                 "wrote time: (now - t0) / 1000 * p.speed, the expression that sentence forbids. The " +
+                 "integral was computed, accumulated, returned by getParams() as `phase`, and dropped. " +
+                 "*** \"A VISIBLE POP\" UNDERSELLS IT AND THE ROUND'S WORK IS SAYING BY HOW MUCH. *** The " +
+                 "error is t * (speedNew - speedOld), so it is set by how long the orb has been on screen " +
+                 "and has no ceiling: entering RESPONDING after 60 s of idle advanced the shader's clock " +
+                 "2.902 SECONDS IN ONE 16.7 ms FRAME; after 1800 s, 86.191 s. Measured across five session " +
+                 "lengths the old jump tracks the wait to within 11% (360x the wait, 320x the jump) while " +
+                 "phase's worst frame varies by 3.6e-14 s -- it does not depend on the session at all. AND " +
+                 "IT IS NOT A TRANSIENT: once the crossfade settles the old clock is permanently 69.355 s " +
+                 "displaced, and every later state change displaces it again. " +
+                 "*** THE ROW THAT MAKES THE REPAIR SAFE IS THE ONE SAYING THE TWO ARE THE SAME EXPRESSION: " +
+                 "*** the integral of a constant from zero IS elapsed-time-times-that-constant, so in a " +
+                 "steady state they agree to 1.6e-12 over 3,600 ticks. That is why eighteen species' byte " +
+                 "baselines did not move and why \"just use phase\" is measured here rather than asserted. " +
+                 "*** AND SECONDS ARE NOT A PICTURE, SO SECTION 4 RENDERS THEM: *** the jumped frame moves " +
+                 "73x (limn) and 99x (still) the light of one honest frame, worst channel 239 and 30 of 255 " +
+                 "against 18 and 1. The two fail differently on purpose -- limn's arc is a POSITION, still " +
+                 "is the quietest species in the roster and has nothing for a jump to hide behind. " +
+                 "TWELVE SABOTAGES, ALL CAUGHT, AND TWO OF THEM CHANGED THE GATE: the ceiling row asked " +
+                 "only that phase stay UNDER maxSpeed * dt, and widening that ceiling to a flat second " +
+                 "walked through -- a bound nothing approaches is a comment, so the row now brackets it " +
+                 "from both sides and reports 100.00% of it. A row demanding ZERO readers of `speed` also " +
+                 "went red on the demo's own speed READOUT, a bound set where it was easy to state rather " +
+                 "than where the invariant is; it now names where each reader is instead of counting to " +
+                 "zero. WHAT IS NOT CLAIMED: the SHADER's own rate multipliers. murmur's species multiply " +
+                 "local rates by (1 + k * live.pace) and (1 + k * st.drive) and hand the product to " +
+                 "mh_drift, whose phase is rate * t -- the same shape one level down, where no host-side " +
+                 "integrator can reach it. That is murmur's design as shipped and it is recorded against " +
+                 "the st.drive entry in tools/ship/nextRounds.mjs rather than quietly corrected here.",
+    }),
     since333: Object.freeze({
         at: "v4647p", swept: 1, green: 1, red: 0,
         added: Object.freeze([

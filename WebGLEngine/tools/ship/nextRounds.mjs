@@ -870,6 +870,22 @@ export const NEXT_ROUNDS = [
             "v4641's species frames did not move at all once the operating point was held, but a state term " +
             "arriving is new light in the frame and there is no operating point that hides it.",
         upstream: "None. The kit half is done, graded and green; this is transcription and gating.",
+        blocked: "NOT BLOCKED, BUT READ THIS FIRST -- v4650 found what st.drive is about to walk into. " +
+            "The largest family of drive's 45 sites is RATE: sixteen of the eighteen species multiply a " +
+            "local clock by (1 + k * st.drive), k from 0.35 to 1.70, and hand the product to mh_drift -- " +
+            "whose phase is `rate * t + (k*rate/w2) * sin(...)`, i.e. RATE TIMES ELAPSED TIME. A rate that " +
+            "changes while t is large therefore teleports the phase by t * dRate, which is exactly the " +
+            "defect v4650 repaired on the HOST side of the same orb: there, entering RESPONDING after a " +
+            "minute of idle moved the clock 2.902 s in one frame and after half an hour 86.191 s.\n\n" +
+            "*** THIS ONE IS INSIDE THE SHADER, WHERE NO HOST INTEGRATOR CAN REACH IT, AND IT IS murmur's " +
+            "OWN DESIGN AS SHIPPED. *** live.pace has the same shape and is already wired -- limn's rate " +
+            "carries (1 + 0.95 * live.pace) today -- so this is not a new hazard drive introduces, it is an " +
+            "existing one drive multiplies by sixteen. THE ROUND HAS A DECISION TO MAKE AND SHOULD MAKE IT " +
+            "OUT LOUD rather than discover it halfway: transcribe murmur faithfully and inherit the jump, " +
+            "or integrate per-species rates in the shader (which means a second phase uniform per lane, or " +
+            "mh_drift taking an already-integrated argument) and diverge from the source on purpose. " +
+            "Whichever is chosen, tools/ship/murmurTempo-selfcheck.mjs already has the instrument: the " +
+            "worst one-frame advance under a swept signal, bounded against what the clock CAN cover.",
         note: "PART DONE at v4644, and the part that is done is the SHARED physics rather than a slice of " +
             "the eighteen. `settled` is wired at all eighteen interiors and the ignition SHELL at the seven " +
             "marched heroes, on the kit's own mhIgnite and MH_IGNITE table -- murmur writes those four lines " +

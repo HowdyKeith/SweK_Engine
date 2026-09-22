@@ -177,10 +177,10 @@ export async function mountAiPresenceOrbWidget(opts = {}) {
     });
 
     const reducedMotion = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
-    let last = null, t0 = null, running = true, rafHandle = null;
+    let last = null, running = true, rafHandle = null;
     function frame(now) {
         if (!running) return;
-        if (t0 === null) { t0 = now; last = now; }
+        if (last === null) last = now;   // t0 went with the multiply: the clock is state.phase now, which starts at 0 of its own accord
         // a hidden tab does zero work -- not less, none, the same law ui/stateOrb.js's own header states and
         // measured before: still schedules the next frame so it resumes instantly when the tab returns.
         if (document.hidden) { rafHandle = requestAnimationFrame(frame); return; }
@@ -190,7 +190,27 @@ export async function mountAiPresenceOrbWidget(opts = {}) {
         if (!paused) state.tick(dt, {});
         const p = state.getParams();
         pipeline.setKnobs({
-            time: paused ? 0 : (now - t0) / 1000 * p.speed,
+            // *** THE CLOCK IS THE INTEGRAL OF SPEED, NOT ELAPSED TIME TIMES THE CURRENT SPEED -- v4650. ***
+            // render/aiPresenceOrbState.mjs has computed exactly that since it was written, every tick, by
+            // composite Simpson's rule, and its own header says why in as many words: "A state change can
+            // jump `speed` instantly; multiplying elapsed time by the CURRENT speed would then jump the
+            // animation's PHASE too (a visible pop)." getParams() has returned it as `phase` the whole time
+            // and this line multiplied instead -- so the mechanism was built, graded and thrown away at the
+            // one call that feeds a shader.
+            //
+            // MEASURED, because "a visible pop" undersells it: entering RESPONDING after sixty seconds of
+            // idle advanced the shader's clock 2.902 SECONDS IN ONE 16.7 ms FRAME, and the error is
+            // t * (speedNew - speedOld), so it grows without bound with session length -- 86.191 s after
+            // half an hour. `phase` advances at most speed * dt, which is 0.0242 s in that same frame.
+            //
+            // AND IT IS EXACTLY EQUAL TO THE OLD EXPRESSION WHENEVER SPEED HAS BEEN CONSTANT, since the
+            // integral of a constant from zero IS elapsed-time-times-that-constant. The fix is invisible
+            // except at the moment it matters, which is why no other gate's frames move.
+            //
+            // `paused` no longer zeroes it: reduced motion skips state.tick, so `phase` simply stops where it
+            // is. Snapping to 0 was itself a jump -- the whole animation rewound to its first frame the
+            // instant the preference turned on, and then jumped forward again when it turned off.
+            time: p.phase,
             glow: p.glow, depth: p.depth, hueShift: p.hueShift,
             presence: 0.5, clarity: 0.6, glintRate: 0.3, voice: p.voice,
             // *** THE STATE AND THE CADENCE REACH THE SHADER NOW -- v4641. *** createPresenceState has tracked

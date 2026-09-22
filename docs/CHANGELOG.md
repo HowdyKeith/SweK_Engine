@@ -26,6 +26,73 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      of numeric order were moved into it. NO ROUND'S NUMBER, TEXT OR BYTES CHANGED -- only two headings
      gained a tag, and two blocks moved. -->
 
+## v4650 -- the orb's clock was an integral that reached no shader, and the wrong one shipped in its place
+
+`render/aiPresenceOrbState.mjs` has integrated speed every tick since the port's first round — composite
+Simpson's rule, accumulated into `phase`, returned by `getParams()` — under a header that names the defect
+it exists to prevent in as many words: *"A state change can jump `speed` instantly; multiplying elapsed time
+by the CURRENT speed would then jump the animation's PHASE too (a visible pop)."*
+
+Both of the two call sites that feed a shader wrote `time: (now - t0) / 1000 * p.speed`. The expression that
+sentence forbids. `ui/aiPresenceOrbWidget.js` and `ai-presence-orb.html`, identically. The mechanism was
+built, graded by its own gate, computed every frame — and thrown away at the one call that mattered. Same
+shape as mh_live before v4641 and mh_state before v4644, except here something wrong was shipping in the
+gap.
+
+**"A visible pop" undersells it.** The error is `t * (speedNew - speedOld)`, set by how long the orb has been
+on screen, so it has no ceiling:
+
+| idle before the change | jump in one 16.7 ms frame | `phase` in the same frame |
+|---|---|---|
+| 5 s | 0.269 s | 0.0242 s |
+| 60 s | **2.902 s** | 0.0242 s |
+| 300 s | 14.390 s | 0.0242 s |
+| 1800 s | **86.191 s** | 0.0242 s |
+
+360× the wait gives 320× the jump — the two track to within 11%, which is what says the error *is*
+`t * Δspeed` and not a rounding artefact. `phase`'s worst frame varies by 3.6e-14 s across all five: it does
+not depend on the session at all, and it lands on `maxSpeed * dt` to 100.00%, because that is what a clock
+running at that speed can cover in one frame.
+
+**And it is not a transient.** Once the 0.6 s crossfade settles, the old clock is permanently **69.355 s**
+displaced, and every later state change displaces it again — a long conversation's clock wanders further
+from its own elapsed time with every turn. Two of the six state changes also *lower* the speed, and under
+`t * speed` a drop runs the shader's clock **backwards**: every species' gesture clock, drift and flourish
+rewinding together.
+
+**The row that makes the repair safe is the one saying the two are the same expression.** The integral of a
+constant from zero *is* elapsed-time-times-that-constant, so wherever speed has never changed they agree to
+1.6e-12 over 3,600 ticks — float accumulation and nothing else. That is why all eighteen species' byte
+baselines are unmoved, and why "just use phase" is a measurement here rather than an assertion.
+
+**Seconds are not a picture, so the gate renders them.** At the clock value the frame after a state change
+*should* have, against the one it *had*: the jumped frame moves **73×** (limn) and **99×** (still) the light
+of one honest frame, worst channel 239 and 30 of 255 against 18 and 1. The two fail differently on purpose —
+limn's arc is a *position*, so a jumped clock simply puts the sweep somewhere else; still is the quietest
+species in the roster (0.2% of bytes per honest frame) and has nothing for a jump to hide behind.
+
+Twelve sabotages, all caught, and **two of them changed the gate rather than passing it**. The ceiling row
+asked only that `phase` stay *under* `maxSpeed * dt`; replacing that derived ceiling with a flat one second
+walked straight through, because every reading is under a second — a bound nothing approaches is a comment,
+not a ceiling, so the row now brackets it from both sides. And a row demanding *zero* readers of `speed`
+went red on the demo's own speed readout: a bound set where it was easy to state rather than where the
+invariant actually is, which would have been "repaired" by deleting a feature. It now names where each
+reader is instead of counting to zero.
+
+One process note worth keeping: the sabotage battery was piped through `head`, took SIGPIPE mid-run, and
+left the state module carrying sabotage T5. The new gate caught it on the very next run, which is the only
+reason this paragraph is about a near miss. The battery now restores through `atexit`.
+
+`tools/ship/murmurTempo-selfcheck.mjs` arrives green at 2,213 ms, so the tree holds 1760 gates.
+
+**Not claimed, and recorded against the `st.drive` backlog entry rather than quietly corrected:** the
+shader's *own* rate multipliers have the same shape one level down. murmur's species multiply local clocks
+by `(1 + k * live.pace)` and `(1 + k * st.drive)` and hand the product to `mh_drift`, whose phase is
+`rate * t`. `live.pace` is already wired and already carries it, so drive does not introduce the hazard — it
+multiplies it by sixteen. The round that wires drive has a decision to make out loud: transcribe murmur
+faithfully and inherit the jump, or integrate per-species rates in the shader and diverge from the source on
+purpose.
+
 ## v4649 -- Three instruments were lying, and most of what they printed was not the tree's
 
 *** THREE INSTRUMENTS WERE LYING, AND MOST OF WHAT THEY PRINTED WAS NOT THE TREE'S. *** I read physics/upAxis's failing row as a Windows physics finding twice and as my own stale sabotage once, and it was neither: rigRunner-selfcheck proves the rig page can report a failure by EDITING upAxis in the tree, restored it in a `finally`, and a finally does not survive the SIGKILL this sweep's cap deals out 241 times a run on that box -- so one killed run welded the sabotage in, every sweep after read it red, and each later rigRunner run snapshotted the sabotage as its own original and wrote it straight back, which is why a hand restore did not hold. The tell was in the row for three rounds: the detail it printed, `y = 5.000 after 1s at 5 m/s`, PASSES the assertion it was printed under. Mutations are ledgered in captures/ outside the engine tree before they are made and reclaimed on the way in, driven on a real SIGKILL with both polarities. *** SECOND: verify had carried every red gate's FAIL lines since v4648 and printed NONE of them *** -- every round since has cost a separate failLines pass on the other box to learn what a red said, with the answer sitting unused in the result object, and carried-but-not-shown is the same as not carried one layer in. It prints them now, and for the seven gates that die having printed no row at all it prints the last line they DID print, which names the last row that ran; on a Windows fail-fast, which writes nothing to stderr, that line is the only diagnosis that exists. *** THIRD: ntfsMounter's headline row, the one wearing the words SABOTAGE and PWNED, drove a payload that cannot fire in the position it is driven in *** -- `'; touch ... #` is inert inside double quotes on any platform, measured with the quoting removed entirely -- and underneath it a volume named $(...) EXECUTED when the generated .command was double-clicked, because shellQuote's single quotes are ordinary characters there too. Found by sabotaging the row and getting zero red. The name now goes into a variable as a single-quoted literal and is printed with printf %s, the gate drives the bridge's own text through bash, and a positive control rebuilds the old shape and proves it fires. Also repaired: a gate that wrote five fixtures into the tree and unlinked them only if it lived, leaving one behind that stamped a whole capture WORKING TREE DIRTY; two separator-blind comparisons that made the licence register and its own gate report themselves as unlicensed copies on Windows while the walk descended into node_modules; three claims that were POSIX properties asserted as universal, one of which measured ZERO on Windows by construction because Node's pipes are synchronous there; and six WGSL gates whose frozen numbers were one adapter's reading, moved onto the per-adapter record that has existed since v4646 and had exactly ONE user of 161. The clearest of those: microfacetVndf demanded a NON-ZERO count of backfacing facets, so an adapter whose f32 rounds the other way and is EXACT went red for being better than the claim. NOT RECORDED, AND DELIBERATELY: noisePrecision, solidTexture and the three slug gates get a byte-exact readback probe and a worst-pixel diagnosis instead of a per-adapter number, because 0 of 9216 points agreeing with EITHER mirror is a readback and not a rounding, and recording 16 of 255 as what that adapter does would have closed a red by agreeing with it. Four derived records this round's own work drifted were re-taken rather than widened, including a separator census that moved eight callers and REPAIRED three. WHAT IS NOT CLAIMED: that any of it is verified on Windows -- this box is green at 1397 of 1397 gates and every finding here came from the rig, which is the instrument for the rest; that the six fail-fast crashes are six defects rather than one 7908 MB box, since the set differs every run and STATUS_STACK_BUFFER_OVERRUN is what V8 raises for an OOM abort as well as for a smashed stack; or that sweepCoverage is closed -- it went red inside the sweep and green three times alone, and it still grades a timing record the same run rewrites. The tree stands at 1759 gates.

@@ -102,7 +102,7 @@ const voiceSlider = document.getElementById("voice"), activitySlider = document.
 const stateLabel = document.getElementById("stateLabel"), glowLabel = document.getElementById("glowLabel"), speedLabel = document.getElementById("speedLabel");
 
 say(`three ${THREE.REVISION} &middot; ${backend} &middot; murmur-web's "still" orb as TSL nodes, HDR present pass (bloom/knee tonemap/dither)`);
-let last = performance.now(), t0 = last;
+let last = performance.now();   // no t0: the clock is state.phase, which starts at 0 of its own accord
 function frame(now) {
     // *** MEASURED, NOT ASSUMED SAFE: THE VERY FIRST rAF CALLBACK'S timestamp CAN PRECEDE THE performance.now()
     // TAKEN JUST BEFORE REQUESTING IT. *** A real headless run hit createPresenceState.tick's own dt>=0 guard
@@ -115,7 +115,10 @@ function frame(now) {
     state.tick(dt, { voice: Number(voiceSlider.value), activity: Number(activitySlider.value) });
     const p = state.getParams();
     pipeline.setKnobs({
-        time: (now - t0) / 1000 * p.speed,
+        // THE INTEGRATED CLOCK, not elapsed * current speed -- see ui/aiPresenceOrbWidget.js's own note and
+        // tools/ship/murmurTempo-selfcheck.mjs. This page carried the identical defect: 2.902 s of shader
+        // time in one frame on entering RESPONDING after a minute of idle, growing with session length.
+        time: p.phase,
         glow: p.glow, depth: p.depth, hueShift: p.hueShift,
         presence: 0.5, clarity: 0.6, glintRate: 0.3, voice: p.voice,
         aspect: cv.width / cv.height,
