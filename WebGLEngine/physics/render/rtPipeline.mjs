@@ -165,8 +165,10 @@ export const STAGES = Object.freeze([
                     what: "the environment's radiance along a ray that hit nothing" }),
 ]);
 
-/** Which closest-hit shaders the table can name. Values are the switch indices the WGSL dispatches on. */
-export const HIT_SHADERS = Object.freeze({ lambertian: 0, mirror: 1 });
+/** Which closest-hit shaders the table can name. Values are the switch indices the WGSL dispatches on.
+ *  `microfacet` (RTX round 8) is NOT dispatched through rtClosestHit's switch the way lambertian/mirror are --
+ *  see pipelineWgsl's own header note on why it gets a separate inline block instead. */
+export const HIT_SHADERS = Object.freeze({ lambertian: 0, mirror: 1, microfacet: 2 });
 
 /**
  * A shader binding table record: which geometry, which closest-hit shader, and that shader's parameters.
@@ -185,9 +187,34 @@ export const HIT_SHADERS = Object.freeze({ lambertian: 0, mirror: 1 });
  * the uniform block, which is out of scope for the round that first wires NEE in at all. 0 (the default) is
  * "not a light", the same falsy-means-absent convention `nee.mjs`'s own `if (s.emit)` check already uses.
  */
-export function sbtRecord({ centre = [0, 0, 0], radius = 1, hit = "lambertian", albedo = 0.5, emit = 0 } = {}) {
+/**
+ * `roughness`/`ior` (RTX round 8) are the microfacet record's own parameters -- pathTracer.mjs's own
+ * `hit.sphere.roughness`/`hit.sphere.ior`, left `undefined` for every other shader so sceneFromSbt's pass-
+ * through preserves the CPU oracle's own `roughness !== undefined` material gate exactly. `ior` stays
+ * `undefined` (not defaulted to some dielectric constant) when the caller does not give one, matching
+ * pathTracer.mjs's own `hit.sphere.ior ? fresnel(...).R : 1` convention -- a microfacet record with no ior is
+ * a perfectly reflective (F = 1) lobe, not an error.
+ *
+ * *** A `hit: "microfacet"` RECORD SILENTLY MISRENDERS AS LAMBERTIAN IF `pipelineWgsl()`'S OWN `microfacet`
+ * OPTION IS LEFT AT ITS DEFAULT (`false`). *** Found by an adversarial review of this round, the same silent-
+ * mismatch shape `pipelineUniforms`'s own doc already names for `rgb`/`meshMaterials` ("Both are silent. Pass
+ * the identical value to both calls"). HIT_SHADERS.microfacet=2 is packed and bound unconditionally by this
+ * function/sbtRecordFloats/pipelineUniforms regardless of what pipelineWgsl() generates; if that generated
+ * WGSL never asked for the microfacet capability, rtClosestHit's switch has no `case 2`, index 2 falls into
+ * `default:` (the Lambertian branch), and the sphere renders as a flat diffuse surface whose "albedo" is
+ * actually its roughness value -- no error, no NaN, just a quietly wrong picture. There is no runtime cross-
+ * check here for the same reason there is none for rgb/meshMaterials: pipelineUniforms/sbtRecordFloats never
+ * see pipelineWgsl's own option object, so they cannot know what shader text will consume their output. Pass
+ * `microfacet: "bsdf"|"nee"|"mis"` to pipelineWgsl() whenever the table contains one of these records.
+ */
+export function sbtRecord({ centre = [0, 0, 0], radius = 1, hit = "lambertian", albedo = 0.5, emit = 0,
+                            roughness = undefined, ior = undefined } = {}) {
     if (!(hit in HIT_SHADERS)) throw new Error("rtPipeline: no closest-hit shader named " + hit);
-    return Object.freeze({ centre: centre.slice(), radius, hit, albedo, emit });
+    if (hit === "microfacet" && roughness === undefined) throw new Error(
+        "rtPipeline: a microfacet record needs a roughness -- pathTracer.mjs's own material gate is " +
+        "`hit.sphere.roughness !== undefined`, so an unset roughness would silently read as Lambertian on the " +
+        "CPU side while the GPU side has no albedo to fall back on at all.");
+    return Object.freeze({ centre: centre.slice(), radius, hit, albedo, emit, roughness, ior });
 }
 
 /** [r,g,b], whether `albedo` is a number (broadcast to grey) or already a triple -- pathTracer.mjs's col(). */
@@ -207,8 +234,16 @@ export function albedoVec3(albedo) {
  */
 function sbtRecordFloats(r, { rgb = false } = {}) {
     if (!(r.hit in HIT_SHADERS)) throw new Error("rtPipeline: no closest-hit shader named " + r.hit);
+    // RTX round 8 -- a microfacet record has no albedo at all (pathTracer.mjs's own microfacet branch never
+    // reads hit.sphere.albedo), so its two spare floats carry roughness and ior instead: [idx, roughness,
+    // emit, ior]. That leaves no room for rgb's three-float albedo triple, the same packing conflict `nee`'s
+    // own emit channel already has with rgb -- refused for the same reason, not silently dropped.
+    if (r.hit === "microfacet" && rgb) throw new Error(
+        "rtPipeline: microfacet needs the scalar (non-rgb) pipeline -- there is no packing slot for both " +
+        "roughness and ior once a record's three spare floats are spent on an rgb albedo triple.");
     if (rgb) return [HIT_SHADERS[r.hit], ...albedoVec3(r.albedo)];
     const emit = Array.isArray(r.emit) ? r.emit[0] : (r.emit || 0);
+    if (r.hit === "microfacet") return [HIT_SHADERS[r.hit], r.roughness, emit, r.ior || 0];
     return [HIT_SHADERS[r.hit], Array.isArray(r.albedo) ? r.albedo[0] : r.albedo, emit, 0];
 }
 
@@ -733,7 +768,7 @@ fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
  * OF THE SCENE, which is the defect this tree names more often than any other, committed inside the round
  * whose whole subject is that the material is DATA.
  */
-export const CPU_EXPRESSIBLE = Object.freeze(["lambertian"]);
+export const CPU_EXPRESSIBLE = Object.freeze(["lambertian", "microfacet"]);
 export const cpuComparable = (sbt) => sbt.every((r) => CPU_EXPRESSIBLE.includes(r.hit));
 
 /**
@@ -749,7 +784,11 @@ export function sceneFromSbt(sbt) {
         "rtPipeline: pathTracer.mjs has no material for [" + bad.join(", ") + "] -- it renders Lambertian " +
         "spheres only. Converting anyway would compare a GPU " + bad[0] + " against a CPU diffuse and report " +
         "the difference as a port error. Use cpuComparable() to ask first.");
-    return sbt.map((r) => ({ centre: r.centre, radius: r.radius, albedo: r.albedo, emit: r.emit }));
+    // roughness/ior (RTX round 8) pass through undefined for lambertian records, preserving pathTracer.mjs's
+    // own `hit.sphere.roughness !== undefined` material gate exactly -- sbtRecord() never sets roughness on a
+    // non-microfacet record, so this is not a translation, just carrying the field through unmodified.
+    return sbt.map((r) => ({ centre: r.centre, radius: r.radius, albedo: r.albedo, emit: r.emit,
+                             roughness: r.roughness, ior: r.ior }));
 }
 
 /**
@@ -758,9 +797,16 @@ export function sceneFromSbt(sbt) {
  * `nee` (RTX round 6) defaults false, UNCHANGED from before that round -- every PROBES entry and every caller
  * before this one compares against a pure-BSDF CPU render, and flipping the default would silently change what
  * every one of those already-shipped comparisons means. Pass `nee: true` explicitly to grade the new capability.
+ *
+ * `direct` (RTX round 8) is pathTracer.mjs's own microfacet-material direct-lighting mode ("bsdf"|"nee"|"mis"),
+ * INDEPENDENT of `nee` -- trace()'s own signature keeps the two separate (`nee` gates the Lambertian NEE loop,
+ * `direct` gates the microfacet one), and this just forwards rather than restates that. Defaults to "bsdf",
+ * trace()'s own default, so a caller that never passes it gets pure BSDF-sampled microfacet light exactly as
+ * every scene before this round would have (there being no microfacet material before this round at all).
  */
-export function renderSbtCpu(sbt, { spp = 16, seed = 1, view = VIEW, sky = null, rgb = false, nee = false } = {}) {
-    return renderCpu(sceneFromSbt(sbt), { ...view, spp, seed, maxDepth: MAX_DEPTH, nee,
+export function renderSbtCpu(sbt, { spp = 16, seed = 1, view = VIEW, sky = null, rgb = false, nee = false,
+                                    direct = "bsdf" } = {}) {
+    return renderCpu(sceneFromSbt(sbt), { ...view, spp, seed, maxDepth: MAX_DEPTH, nee, direct,
                                           sky: sky || (() => 1), rgb });
 }
 
@@ -811,8 +857,28 @@ export function envMapTexture(atlas, binding = ENV_BINDING) {
 export function pipelineWgsl({ workgroupSize = 64, gradient = false,
                                plantSwapRecords = false, plantIgnoreRecord = false, bvh = false,
                                rgb = false, vertexColors = false, meshMaterials = false, nee = false,
-                               plantDoubleCount = false, envMap = false } = {}) {
+                               plantDoubleCount = false, envMap = false,
+                               // RTX round 8 -- false disables the microfacet material entirely (the generated
+                               // WGSL is byte-identical to before this round, the same "a scene which never
+                               // asks for a capability renders exactly as it did before" rule `rgb`/`bvh`/`nee`
+                               // already hold to); "bsdf"|"nee"|"mis" match pathTracer.mjs's own `direct`
+                               // values exactly and select the SAME three emitter-hit treatments trace()'s own
+                               // misFrom dispatch uses (see the main loop's own comment on that dispatch).
+                               microfacet = false, plantMicrofacetWrongPdf = false } = {}) {
     const PI = "3.141592653589793";
+    if (microfacet && !["bsdf", "nee", "mis"].includes(microfacet)) throw new Error(
+        "rtPipeline: microfacet must be \"bsdf\", \"nee\" or \"mis\" (pathTracer.mjs's own `direct` values), got " + microfacet);
+    if (microfacet && rgb) throw new Error(
+        "rtPipeline: microfacet needs the scalar (non-rgb) pipeline -- see sbtRecordFloats's own doc on why " +
+        "roughness/ior have no packing slot once a record's spare floats are spent on an rgb albedo triple.");
+    const microfacetOn = !!microfacet;
+    // sampleCone/coordSystem-based light-cone sampling is needed whenever EITHER the Lambertian NEE loop runs
+    // (`nee`) or the microfacet material's own direct-lighting loop runs (`microfacet` at anything but "bsdf",
+    // which never samples a light at all -- pure BSDF sampling, pathTracer.mjs's own trace() default).
+    const needsCone = nee || (microfacetOn && microfacet !== "bsdf");
+    // The per-sample bookkeeping (prevWasCamera and friends) is needed whenever EITHER material tracks an
+    // emitter-hit double-count guard -- Lambertian's neeSkippedMask bitmask, or microfacet's misFrom weighting.
+    const needsDirectState = nee || microfacetOn;
     if (vertexColors && !bvh) throw new Error("rtPipeline: vertexColors needs bvh -- there is no mesh to colour otherwise");
     if (vertexColors && !rgb) throw new Error("rtPipeline: vertexColors needs rgb -- a colour has nowhere to go in a one-channel pipeline");
     // RTX round 4 -- meshMaterials needs bvh for the same reason vertexColors does: no mesh, nowhere to look up
@@ -860,6 +926,72 @@ ${nee ? `
 // comfortably in one u32; a real mesh is never a light (meshSbtBuffer/pipelineUniforms both refuse that).
 var<private> neeSkippedMask : u32;` : ""}
 fn nextF32() -> f32 { return f32(nextU32()) / ${LCG.div}.0; }
+${microfacetOn ? `
+// RTX round 8 -- ggxLambda/ggxG2/ggxD/sampleHalfVectorGgx/sampleDirPdfGgx/bounceWeightGgx/bsdfEvalGgx/
+// misWeightGgx are a FRESH HAND TRANSCRIPTION of physics/render/microfacet.mjs's own D/Lambda/G1/G2/
+// sampleHalfVector/sampleDirPdf/bounceWeight/bsdfEval/misWeight, term for term -- NOT an import of
+// physics/render/microfacetWgsl.mjs's lobeWgsl()/microfacetSampleWgsl.mjs's own WGSL text. Both of those
+// export a self-contained fault-injection KERNEL (their own Params struct, bindings and @compute entry point,
+// built for their own -selfcheck gates), and lobeWgsl()'s own LOBE_HELPERS reads a uniform field, P.faults,
+// that exists only to drive that kernel's planted runs and has no place in a production shader -- the same
+// "a genuinely different uniform shape gets a fresh hand transcription rather than a forced shared
+// abstraction" call this file's own envSampleWgslBlock doc already cites specularProbeCapture.mjs's
+// CAPTURED_ENV_WGSL as precedent for.
+fn ggxLambda(cosW : f32, a : f32) -> f32 {
+  let c2 = cosW * cosW;
+  let tan2 = (1.0 - c2) / max(c2, 1.0e-16);
+  return (-1.0 + sqrt(1.0 + a * a * tan2)) / 2.0;
+}
+// Height-correlated Smith masking-shadowing -- microfacet.mjs's own G2 default (separable=false).
+fn ggxG2(cosO : f32, cosI : f32, a : f32) -> f32 {
+  return 1.0 / (1.0 + ggxLambda(cosO, a) + ggxLambda(cosI, a));
+}
+// v3494's sum-of-positives denominator, not the textbook difference-of-numbers-near-1 -- worth 2.6e-2 at f32
+// at roughness 0.001 per microfacetWgsl.mjs's own measurement; this file carries the same rewrite.
+fn ggxD(cosH : f32, a : f32) -> f32 {
+  if (cosH <= 0.0) { return 0.0; }
+  let a2 = a * a;
+  let t = (1.0 - cosH * cosH) + a2 * cosH * cosH;
+  return a2 / (${PI} * t * t);
+}
+fn sampleHalfVectorGgx(u1 : f32, u2 : f32, a : f32) -> vec3<f32> {
+  let a2 = a * a;
+  let cosH = sqrt((1.0 - u1) / (u1 * (a2 - 1.0) + 1.0));
+  let sinH = sqrt(max(0.0, 1.0 - cosH * cosH));
+  let phi = 2.0 * ${PI} * u2;
+  return vec3<f32>(sinH * cos(phi), cosH, sinH * sin(phi));
+}
+// The pdf of the SAMPLED DIRECTION -- the 1/(4|wo.wh|) is the reflection's Jacobian.
+fn sampleDirPdfGgx(cosH : f32, dotOH : f32, a : f32) -> f32 {
+  return ggxD(cosH, a) * cosH / (4.0 * abs(dotOH));
+}
+// f cos_i / pdf, WITH THE ANALYTIC CANCELLATION TAKEN (D disappears) -- microfacet.mjs's own bounceWeight().
+fn bounceWeightGgx(cosO : f32, cosI : f32, cosH : f32, dotOH : f32, a : f32, F : f32) -> f32 {
+  if (cosI <= 0.0 || cosO <= 0.0) { return 0.0; }
+  return F * ggxG2(cosO, cosI, a) * abs(dotOH) / (cosO * cosH);
+}
+// f = D G2 F / (4 cos_o cos_i), for a direction NEE hands it -- microfacet.mjs's own bsdfEval().
+fn bsdfEvalGgx(cosO : f32, cosI : f32, cosH : f32, a : f32, F : f32) -> f32 {
+  if (cosI <= 0.0 || cosO <= 0.0) { return 0.0; }
+  return ggxD(cosH, a) * ggxG2(cosO, cosI, a) * F / (4.0 * cosO * cosI);
+}
+fn misWeightGgx(pThis : f32, pOther : f32) -> f32 {
+  let s = pThis + pOther;
+  return select(0.0, pThis / s, s > 0.0);
+}
+// The unpolarised Fresnel reflectance at the MICRO-normal -- physics/render/fresnel.mjs's own fresnel().R,
+// confirmed by direct read of that file to be (Rs+Rp)/2, term for term. ior <= 0 means "no ior was given",
+// pathTracer.mjs's own hit.sphere.ior ? fresnel(...).R : 1 convention -- F = 1 throughout.
+fn fresnelR(cosI : f32, ior : f32) -> f32 {
+  if (ior <= 0.0) { return 1.0; }
+  let ci = clamp(cosI, 0.0, 1.0);
+  let sinT = (1.0 / ior) * sqrt(max(0.0, 1.0 - ci * ci));
+  if (sinT >= 1.0) { return 1.0; }
+  let ct = sqrt(1.0 - sinT * sinT);
+  let rs = (ci - ior * ct) / (ci + ior * ct);
+  let rp = (ior * ci - ct) / (ior * ci + ct);
+  return 0.5 * (rs * rs + rp * rp);
+}` : ""}
 
 fn nrm(v : vec3<f32>) -> vec3<f32> { let l = sqrt(dot(v, v)); if (l == 0.0) { return v; } return v / l; }
 
@@ -928,20 +1060,23 @@ fn coordSystem(N : vec3<f32>) -> mat3x3<f32> {
   return mat3x3<f32>(Nt, cross(N, Nt), N);
 }
 
-${nee ? `
+${needsCone ? `
 // ---- STAGE: next-event estimation -- RTX round 6, hand-transcribed from physics/render/nee.mjs and the
 // Lambertian NEE loop in physics/render/pathTracer.mjs's own trace() (WGSL cannot import JS, so this is a
 // PARALLEL PORT, cited not shared, the same pattern the cosine-hemisphere Lambertian sampler above already
 // uses). cosAlpha is computed as cos(asin(x)) rather than via a separate capHalfAngle step -- the literal
 // transcription of nee.mjs's own capHalfAngle-then-Math.cos, not a trig-identity shortcut (verified against
 // it in a scratch script before this line was written: identical to the last bit across five r/d pairs).
+// RTX round 8 -- shared with the microfacet material's own direct-lighting loop below, since a light's solid
+// angle is sampled the same way regardless of which BSDF is about to evaluate the direction it returns.
 fn sampleCone(r1 : f32, r2 : f32, cosAlpha : f32) -> vec3<f32> {
   let cosT = 1.0 - r1 * (1.0 - cosAlpha);
   let sinT = sqrt(max(0.0, 1.0 - cosT * cosT));
   let phi = 2.0 * ${PI} * r2;
   return vec3<f32>(sinT * cos(phi), cosT, sinT * sin(phi));
 }
-
+` : ""}
+${nee ? `
 // One vertex's direct-lighting sum over every emissive geometry (rec.z > 0), cone-sampled and shadow-tested
 // through the SAME rtTraverse the primary/bounce rays already use -- a mesh (if present) is therefore already
 // a valid occluder with no extra code, though never itself a light (mesh SBT records always carry emit=0;
@@ -977,6 +1112,49 @@ fn rtDirectLight(P : vec3<f32>, N : vec3<f32>, nGeo : i32, eps : f32) -> f32 {
     if (occ.geo != j) { continue; }               // something else is in the way
     let pdf = 1.0 / (2.0 * ${PI} * (1.0 - cosAlpha));
     sum = sum + Le * cosT / (${PI} * pdf);
+  }
+  return sum;
+}
+` : ""}
+${microfacetOn && microfacet !== "bsdf" ? `
+// RTX round 8 -- pathTracer.mjs's own microfacet NEE loop (v3499), term for term, single-scattering lobe
+// only: fMs (the multi-scatter energy-compensation lobe, energyCompWgsl.mjs's msLobe) is always 0 here --
+// see this round's own backlog entry on why that lobe is explicitly deferred rather than ported. UNLIKE
+// rtDirectLight, there is no common per-light factor (albedo/pi) to pull outside the loop and multiply by
+// afterwards: the microfacet f depends on the sampled direction itself (through cosH/dotOH), so it has to be
+// evaluated inside, and this returns the FULL radiance contribution ready to scale by throughput and add.
+fn rtDirectLightMicrofacet(P : vec3<f32>, N : vec3<f32>, wo : vec3<f32>, cosO : f32, a : f32, ior : f32,
+                            nGeo : i32, eps : f32) -> f32 {
+  var sum = 0.0;
+  for (var j = 0; j < nGeo; j = j + 1) {
+    let rec = U[SBT_BASE + j];
+    let Le = rec.z;
+    if (Le <= 0.0) { continue; }
+    let g = U[GEO_BASE + j];
+    let toL = g.xyz - P;
+    let dist = length(toL);
+    if (dist <= g.w) { continue; }
+    let r1 = nextF32();
+    let r2 = nextF32();
+    let wl = toL / dist;
+    let cosAlpha = cos(asin(min(1.0, g.w / dist)));
+    let F = coordSystem(wl);
+    let sc = sampleCone(r1, r2, cosAlpha);
+    let sd = sc.x * F[1] + sc.y * F[2] + sc.z * F[0];
+    let cosI = dot(sd, N);
+    if (cosI <= 0.0) { continue; }
+    let occ = rtTraverse(P + N * eps, sd, nGeo, eps);
+    if (occ.geo != j) { continue; }               // something else is in the way
+    let wh = nrm(wo + sd);
+    let cosH = dot(wh, N);
+    let dotOH = dot(wo, wh);
+    if (cosH <= 0.0 || dotOH <= 0.0) { continue; }
+    let Fn = fresnelR(dotOH, ior);
+    let fSpec = bsdfEvalGgx(cosO, cosI, cosH, a, Fn);
+    let pL = 1.0 / (2.0 * ${PI} * (1.0 - cosAlpha));
+    ${microfacet === "mis" ? `let pB = sampleDirPdfGgx(cosH, dotOH, a);
+    let w = misWeightGgx(pL, pB);` : `let w = 1.0;`}
+    sum = sum + Le * fSpec * cosI * w / pL;
   }
   return sum;
 }
@@ -1117,8 +1295,17 @@ ${rgb ? `
     var o = U[0].xyz;
     var throughput = 1.0;
     var radiance = 0.0;
-    ${nee ? `var prevWasCamera = true;
-    neeSkippedMask = 0u;` : ""}
+    ${needsDirectState ? `var prevWasCamera = true;` : ""}
+    ${nee ? `neeSkippedMask = 0u;
+    var prevHadNeeRoute = false;` : ""}
+    ${microfacetOn ? `// RTX round 8 -- the microfacet vertex the PREVIOUS loop iteration left, so an emitter hit
+    // one vertex later can be weighted (misFromMode 2, "mis"), suppressed (1, "nee"), or added whole
+    // (0, "bsdf") the same three ways pathTracer.mjs's own misFrom dispatch does. -1 means "the previous
+    // vertex was not a microfacet bounce" -- ordinary var, not var<private>: unlike neeSkippedMask, nothing
+    // outside this inline loop body ever reads or writes it.
+    var misFromMode = -1;
+    var misFromP = vec3<f32>(0.0, 0.0, 0.0);
+    var misFromPdf = 0.0;` : ""}
 
     for (var depth = 0; depth < ${MAX_DEPTH}; depth = depth + 1) {
       let hit = rtTraverse(o, d, nGeo, eps);
@@ -1140,38 +1327,109 @@ ${rgb ? `
       // planted run and a clean run take the same code path (v3467's rule).
       rec = U[SBT_BASE + ${plantIgnoreRecord ? "0" : plantSwapRecords ? "(nGeo - 1 - hit.geo)" : "hit.geo"}];
       ${bvh ? `}` : ""}
-      ${nee ? `
+      ${needsDirectState ? `
       // *** THE DOUBLE-COUNT GUARD -- pathTracer.mjs's trace() (v3488-v3495 comments on that file) is the
       // reference for this exact rule: an emitter hit ENDS THE PATH (there is no reflective component once a
       // shading point turns out to be a light), and its radiance is added only when this IS the camera ray, OR
-      // when NEE could not have sampled this exact light from the vertex just left (neeSkippedMask's own bit
-      // for hit.geo -- pathTracer.mjs's v3488: an ENCLOSING light is never reachable by a cone sample, so its
-      // bounce-ray hit must not be suppressed either, or neither route ever collects it and "the picture went
-      // dark", v3488's own words). Otherwise a non-camera ray landing on a light already had that light's
-      // contribution added by rtDirectLight at the PREVIOUS vertex, so adding it again here would double it --
-      // forget the guard entirely and every light-lit surface reads twice as bright, uniformly, which looks
-      // like a brighter scene rather than a bug.
-      // plantDoubleCount is the PARAMETER form of that mistake (CPU's own plantDoubleCount, named identically
-      // -- v3467's rule: a planted run and a clean run take the same code path) -- it forces the suppression
-      // off entirely, so rtPipeline-selfcheck.mjs can assert the guard is load-bearing without editing the
-      // source file.
+      // when NEE could not have sampled this exact light from the vertex just left. Otherwise a non-camera ray
+      // landing on a light already had that light's contribution added at the PREVIOUS vertex, so adding it
+      // again here would double it -- forget the guard entirely and every light-lit surface reads twice as
+      // bright, uniformly, which looks like a brighter scene rather than a bug.
       if (rec.z > 0.0) {
-        let wasSkipped = (neeSkippedMask & (1u << u32(hit.geo))) != 0u;
-        if (prevWasCamera || wasSkipped${plantDoubleCount ? " || true" : ""}) { radiance = radiance + throughput * rec.z; }
-        break;
+        ${microfacetOn ? `// RTX round 8 -- a microfacet bounce is weighted rather than merely suppressed,
+        // pathTracer.mjs's own misFrom dispatch (trace()'s v3495 comment: "a microfacet bounce landing on a
+        // light is not suppressed under MIS, it is weighted"). misFromMode < 0 means the previous vertex was
+        // not a microfacet bounce at all, so this falls through to the lambertian/mirror guard below.
+        if (misFromMode >= 0 && !prevWasCamera) {
+          if (misFromMode == 1) { break; }                                    // "nee": already collected there
+          if (misFromMode == 0) { radiance = radiance + throughput * rec.z; break; }   // "bsdf": the only route
+          let gLight = U[GEO_BASE + hit.geo];
+          let toL = gLight.xyz - misFromP;
+          let dist = length(toL);
+          var pL = 0.0;
+          if (dist > gLight.w) {
+            let cosAlpha = cos(asin(min(1.0, gLight.w / dist)));
+            pL = 1.0 / (2.0 * ${PI} * (1.0 - cosAlpha));
+          }
+          radiance = radiance + throughput * rec.z * misWeightGgx(misFromPdf, pL);
+          break;
+        }` : ""}
+        ${nee ? `let wasSkipped = (neeSkippedMask & (1u << u32(hit.geo))) != 0u;
+        // *** THE MIRROR FIX -- RTX round 8. *** wasSkipped reads false after ANY vertex that never ran
+        // rtDirectLight (a mirror bounce, in particular), because neeSkippedMask is reset to 0 every vertex
+        // below and only rtDirectLight ever sets a bit in it. The ORIGINAL guard read that false the same as
+        // "NEE saw this light and chose not to skip it", which is wrong: NEE never ran at all there, so
+        // nothing could have already counted this light. Without prevHadNeeRoute a light reflected through a
+        // mirror is silently suppressed -- found while wiring the microfacet material's own three-way
+        // discriminator, fixed here rather than left standing next to the code it sits beside.
+        // plantDoubleCount is the PARAMETER form of the double-count mistake (CPU's own plantDoubleCount,
+        // named identically -- v3467's rule) -- it forces the suppression off entirely, so
+        // rtPipeline-selfcheck.mjs can assert the guard is load-bearing without editing the source file.
+        if (prevWasCamera || wasSkipped || !prevHadNeeRoute${plantDoubleCount ? " || true" : ""}) {
+          radiance = radiance + throughput * rec.z;
+        }
+        break;` : `radiance = radiance + throughput * rec.z;
+        break;`}
       }
-      // Reset EVERY vertex, matching pathTracer.mjs's own "let skipped = null" (re-declared fresh each loop
-      // iteration) -- a light skipped two vertices back must not still read as skipped now.
+      ${nee ? `// Reset EVERY vertex, matching pathTracer.mjs's own "let skipped = null" (re-declared fresh
+      // each loop iteration) -- a light skipped two vertices back must not still read as skipped now.
       neeSkippedMask = 0u;
       // NEXT-EVENT ESTIMATION, LAMBERTIAN SURFACES ONLY -- pathTracer.mjs's own loop gates on
-      // hit.sphere.roughness === undefined; rtPipeline.mjs has no microfacet material at all, so the
-      // equivalent gate is simply "the lambertian shader", HIT_SHADERS.mirror gets no direct-light term
-      // (a perfect mirror has no diffuse component for a light sample to land on). rtDirectLight is what
-      // populates neeSkippedMask for THIS vertex, to be read back at the NEXT one.
+      // hit.sphere.roughness === undefined; the microfacet material (RTX round 8) is skipped here and handled
+      // in its own block below, the same way pathTracer.mjs's own trace() gives it a separate branch.
+      // HIT_SHADERS.mirror gets no direct-light term (a perfect mirror has no diffuse component for a light
+      // sample to land on). rtDirectLight is what populates neeSkippedMask for THIS vertex, read back at the
+      // NEXT one.
       if (i32(rec.x) == ${HIT_SHADERS.lambertian}) {
         radiance = radiance + throughput * rec.y * rtDirectLight(P, N, nGeo, eps);
       }
+      prevHadNeeRoute = (i32(rec.x) == ${HIT_SHADERS.lambertian});` : ""}
       prevWasCamera = false;
+      ${microfacetOn ? `// pathTracer.mjs's own v3495 comment, term for term: "a Lambertian bounce is not a
+      // microfacet one; a stale record would weight its hit". Reset UNCONDITIONALLY, for every material --
+      // the microfacet dispatch block below overwrites it again when it is actually taken. Without this, a
+      // path that visits a microfacet vertex, then a LAMBERTIAN one, then lands on a light would still read
+      // the MICROFACET vertex's stale misFromMode/misFromP/misFromPdf two vertices back and weight the light
+      // hit as if the intervening lambertian vertex had never happened -- found by this round's own scratch
+      // gate (a mixed lambertian+microfacet+nee+mis scene reading 0.47% dim against the CPU oracle, a real
+      // systematic gap, not noise: relSd was 0.02% at N=16, forty times tighter than the discrepancy).
+      misFromMode = -1;
+      ` : ""}
+      ${microfacetOn ? `if (i32(rec.x) == ${HIT_SHADERS.microfacet}) {
+        // RTX round 8 -- NOT dispatched through rtClosestHit's switch: pathTracer.mjs's own v3493 comment is
+        // the reason ("a different BSDF, not a multiplier on the diffuse one") -- this needs its own NEE loop
+        // and its own misFrom bookkeeping, which the simple {dir, weight} Bounce shape below has no room for.
+        let wo = -d;
+        let cosO = dot(wo, N);
+        if (cosO <= 0.0) { break; }
+        let aRough = rec.y;
+        let ior = rec.w;
+        ${microfacet !== "bsdf" ? `radiance = radiance + throughput * rtDirectLightMicrofacet(P, N, wo, cosO, aRough, ior, nGeo, eps);` : ""}
+        let r1b = nextF32();
+        let r2b = nextF32();
+        let whLocal = sampleHalfVectorGgx(r1b, r2b, aRough);
+        let basis = coordSystem(N);
+        let wh = whLocal.x * basis[1] + whLocal.y * basis[2] + whLocal.z * basis[0];
+        let dotOH = dot(wo, wh);
+        if (dotOH <= 0.0) { break; }
+        let dNew = 2.0 * dotOH * wh - wo;
+        let cosI = dot(dNew, N);
+        if (cosI <= 0.0) { break; }
+        let cosH = dot(wh, N);
+        let Fn = fresnelR(dotOH, ior);
+        ${plantMicrofacetWrongPdf
+            ? `// v3468's plant, in this lobe: sample the NDF and divide by the COSINE pdf instead of the
+            // real one -- the commonest importance-sampling bug there is, and it leaves the picture smooth.
+            let wgt = Fn * ggxG2(cosO, cosI, aRough) * ggxD(cosH, aRough) / (4.0 * cosO * cosI) * cosI / (cosI / ${PI});`
+            : `let wgt = bounceWeightGgx(cosO, cosI, cosH, dotOH, aRough, Fn);`}
+        throughput = throughput * wgt;
+        misFromMode = ${{ bsdf: 0, nee: 1, mis: 2 }[microfacet] ?? 0};
+        misFromP = P;
+        misFromPdf = sampleDirPdfGgx(cosH, dotOH, aRough);
+        d = dNew;
+        o = P + N * eps;
+        continue;
+      }` : ""}
       ` : ""}
       let b = rtClosestHit(i32(rec.x), rec.y, N, d);
       d = b.dir;
@@ -1211,8 +1469,18 @@ ${rgb ? `
  * Both are silent. Pass the identical `meshMaterials` value to both calls, the same discipline `rgb` already
  * asks for.
  */
-export function pipelineUniforms(sbt, { spp = 16, seed = 1, view = VIEW, eps = EPS, bvh = null, rgb = false, meshMaterials = false, envMap = null } = {}) {
+export function pipelineUniforms(sbt, { spp = 16, seed = 1, view = VIEW, eps = EPS, bvh = null, rgb = false, meshMaterials = false, envMap = null, microfacet = false } = {}) {
     if (sbt.length > MAX_GEOMETRY) throw new Error("rtPipeline: at most " + MAX_GEOMETRY + " geometries");
+    // RTX round 8 -- found by an adversarial review, and refused rather than left silent the way rgb/
+    // meshMaterials still are: a `hit: "microfacet"` record packs and binds unconditionally (sbtRecordFloats
+    // has no notion of what WGSL variant will read it back), but rtClosestHit's switch has no `case 2` at all
+    // unless pipelineWgsl() was itself called with `microfacet: "bsdf"|"nee"|"mis"` -- so a mismatched pair of
+    // calls does not fail to compile or throw anywhere downstream, it silently renders the sphere as
+    // Lambertian with roughness read as albedo. Pass the SAME `microfacet` value given to pipelineWgsl() here.
+    if (!microfacet && (sbt.some((r) => r.hit === "microfacet") || (bvh && bvh.hit === "microfacet"))) throw new Error(
+        "rtPipeline: pipelineUniforms sees a microfacet record but was not told pipelineWgsl() was given a " +
+        "microfacet mode -- pass the same `microfacet: \"bsdf\"|\"nee\"|\"mis\"` value here, or the generated " +
+        "WGSL has no case for HIT_SHADERS.microfacet and the record silently misrenders as Lambertian.");
     const { w, h, eye, look, up, fovDeg } = view;
     const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
     const nrm = (v) => { const l = Math.hypot(v[0], v[1], v[2]); return l === 0 ? v : [v[0] / l, v[1] / l, v[2] / l]; };

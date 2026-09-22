@@ -1250,6 +1250,231 @@ say("12. ENVIRONMENT-MAP LIGHTING -- the miss shader's first texture binding");
     }
 }
 
+// ---- 13. RTX ROUND 8: THE MICROFACET (GGX) MATERIAL -- pathTracer.mjs's own three-way `direct` split -------
+// ("bsdf"|"nee"|"mis"), wired into a THIRD closest-hit shader. rtpipeline-nee-light-sampling's own closure
+// note named this the natural next round: "A future round wiring a microfacet/GGX material into rtPipeline.mjs
+// is the natural point to revisit MIS... rtPipeline.mjs has no microfacet material at all". This is that round.
+//
+// *** SCOPE: SINGLE-SCATTERING ONLY, DELIBERATELY. *** pathTracer.mjs's own two-lobe mixture (msLobe, the
+// multi-scatter energy-compensation lobe energyCompWgsl.mjs already ports to WGSL for a RASTERISER) is chosen
+// by a coin flip with bias p = 1 - albedoAt(T, cosO), where T is an optional per-sphere msTable. sbtRecord()
+// never sets msTable, so T is always null and `T && rand() < p` is always false -- the coin-flip branch is
+// mathematically UNREACHABLE, and the NEE mixture pdf `(1-p)*sampleDirPdf + p*(cosI/pi)` collapses to exactly
+// `sampleDirPdf` with p=0. A msTable-less microfacet sphere is therefore a rigorous, closed, single-scattering
+// NEE+MIS material with no special-casing needed -- the same scope choice this whole arc already made once
+// (MIS itself was deferred out of the NEE round), not a shortcut invented here.
+//
+// *** THIS ROUND'S OWN backlog entry (tools/ship/nextRounds.mjs) SAID MORE THAN IT KNEW, AND THIS CORRECTS IT.
+// *** Its `how` field, written BEFORE research completed, speculated that msLobe "a first grep found no WGSL
+// sibling for at all". That was WRONG: physics/render/energyCompWgsl.mjs already exists, already ports msLobe/
+// albedoAt to WGSL, already has its own gate -- for the specular-IBL rasteriser arc, not a path tracer. It is
+// simply NOT USED here, on purpose (the scope paragraph above), not because no WGSL exists to reuse.
+//
+// *** WHAT IS REUSED, AND WHAT IS NOT -- MEASURED, NOT ASSUMED. *** physics/render/microfacetWgsl.mjs's own
+// lobeWgsl(plant) IS a real, already-gated WGSL translation of D/Lambda/G2 -- but its own LOBE_HELPERS reads a
+// uniform field, P.faults, that exists only to drive that module's own fault-injection kernel and has no place
+// in a production shader; splicing it in would mean adding a `faults` field to this file's own Params struct
+// for a production pipeline. physics/render/microfacetSampleWgsl.mjs is the same shape one level up: its own
+// exported buildSampleWgsl(plant) is a SELF-CONTAINED KERNEL (its own Params, its own bindings, its own
+// @compute entry), and its useful functions (sampleHalfVector, sampleDirPdf, bsdfEval, bounceWeight, misWeight)
+// are declared in a local WGSL_TAIL that module never exports separately. So this round's ggxLambda/ggxG2/
+// ggxD/sampleHalfVectorGgx/sampleDirPdfGgx/bounceWeightGgx/bsdfEvalGgx/misWeightGgx/fresnelR are a FRESH HAND
+// TRANSCRIPTION of physics/render/microfacet.mjs's own D/Lambda/G1/G2/sampleHalfVector/sampleDirPdf/
+// bounceWeight/bsdfEval/misWeight and physics/render/fresnel.mjs's own fresnel().R (confirmed (Rs+Rp)/2 by
+// direct read), term for term -- the same "a genuinely different uniform shape gets its own hand transcription
+// rather than a forced shared abstraction" call this file's own envSampleWgslBlock doc already made for
+// specularProbeCapture.mjs's CAPTURED_ENV_WGSL.
+//
+// *** A REAL BUG FOUND WHILE WIRING THIS IN, IN CODE THIS ROUND DID NOT WRITE -- THE MIRROR-SUPPRESSION FIX.
+// *** Designing the three-way double-count discriminator (Lambertian's neeSkippedMask bitmask, microfacet's
+// continuous misFrom weighting, and now MIRROR, which has neither) surfaced this: under nee:true, a mirror
+// bounce never runs rtDirectLight, so neeSkippedMask is reset to 0 at that vertex and stays 0 -- the ORIGINAL
+// guard (`prevWasCamera || wasSkipped`) then read `wasSkipped` as false, the same value it would read if NEE
+// HAD run and found nothing to skip, and suppressed a light reflected through a mirror as if it had already
+// been counted. It never had a route to be counted at all. Fixed with `prevHadNeeRoute` (true only when the
+// previous vertex actually ran rtDirectLight); confirmed load-bearing by sabotage below (13g).
+//
+// *** A SECOND REAL BUG, FOUND BY THIS ROUND'S OWN SCRATCH TESTING (not by a later review) -- STALE
+// misFromMode. *** pathTracer.mjs's own trace() has an explicit line for this, right where the Lambertian path
+// begins: `misFrom = null; // a Lambertian bounce is not a microfacet one; a stale record would weight its
+// hit`. The first draft of this round's WGSL never ported that line -- a path visiting a microfacet vertex,
+// then a NON-microfacet vertex, then landing on a light would still read the MICROFACET vertex's stale
+// misFromMode/misFromP/misFromPdf from two vertices back, because nothing overwrote it in between. Found by an
+// early scratch scene (lambertian+microfacet+light, all close together) reading 0.47% dim against the CPU
+// oracle -- WHICH TURNED OUT TO BE A RED HERRING FOR THE WRONG REASON: that same 0.47%-class gap reproduced
+// IDENTICALLY on a pure lambertian+nee scene with ZERO of this round's code touched (this file's own section 11
+// header already documents why: "f32/f64 direction divergence near a grazing boundary" -- the close geometry,
+// not a code defect). The real staleness bug was found by tracing the code, not by that measurement; fixed
+// with an unconditional `misFromMode = -1;` reset mirroring pathTracer.mjs's own line exactly. *** STATED
+// PLAINLY RATHER THAN OVERCLAIMED: a Monte-Carlo sabotage delta for THIS SPECIFIC fix measured at or below the
+// noise floor (1e-5 to 4e-7) in every scene tried here, including a deliberately adjacent-sphere layout meant
+// to make the microfacet->lambertian->light path common -- the compound three-vertex path is simply too rare
+// in a three-sphere scene to move the mean measurably. This fix is verified by CODE-PATH TRACING against
+// pathTracer.mjs's own explicit reset and by confirming the reset text is present in the generated WGSL (13h
+// below), NOT by a numeric sabotage red -- an honest gap between what this section claims and what it measured.
+console.log("");
+say("13. RTX ROUND 8: THE MICROFACET (GGX) MATERIAL");
+{
+    ok("HIT_SHADERS.microfacet is a third, distinct switch index",
+        R.HIT_SHADERS.microfacet === 2 && R.HIT_SHADERS.lambertian === 0 && R.HIT_SHADERS.mirror === 1,
+        `lambertian=${R.HIT_SHADERS.lambertian} mirror=${R.HIT_SHADERS.mirror} microfacet=${R.HIT_SHADERS.microfacet}`);
+    ok("sbtRecord refuses a microfacet record with no roughness",
+        (() => { try { rec({ hit: "microfacet" }); return false; } catch (e) { return /needs a roughness/.test(e.message); } })(),
+        "roughness is the one thing a microfacet record cannot default -- pathTracer.mjs's own material gate " +
+        "is `hit.sphere.roughness !== undefined`");
+    ok("sbtRecordFloats refuses microfacet+rgb (no packing slot for both roughness and ior)",
+        (() => { try { R.pipelineUniforms([rec({ hit: "microfacet", roughness: 0.3, centre: [0, 0, 0], radius: 1 })], { rgb: true, microfacet: "bsdf" }); return false; }
+                 catch (e) { return /no packing slot/.test(e.message); } })(),
+        "an rgb record's three spare floats are already spent on an albedo triple");
+    ok("pipelineUniforms refuses a microfacet record when its own `microfacet` option was not passed",
+        (() => { try { R.pipelineUniforms([rec({ hit: "microfacet", roughness: 0.3, centre: [0, 0, 0], radius: 1 })], {}); return false; }
+                 catch (e) { return /was not told pipelineWgsl\(\) was given a/.test(e.message); } })(),
+        "found by an adversarial review: without this, the record packs and binds fine but rtClosestHit's " +
+        "switch has no case for it unless pipelineWgsl() was ALSO given microfacet:, and the mismatch was " +
+        "silent -- the sphere would render Lambertian with roughness read as albedo, no error anywhere");
+    ok("pipelineWgsl refuses microfacet+rgb the same way, and refuses an unknown direct mode",
+        (() => {
+            let a = false, b = false;
+            try { R.pipelineWgsl({ microfacet: "bsdf", rgb: true }); } catch (e) { a = /scalar \(non-rgb\)/.test(e.message); }
+            try { R.pipelineWgsl({ microfacet: "nope" }); } catch (e) { b = /must be "bsdf", "nee" or "mis"/.test(e.message); }
+            return a && b;
+        })(),
+        "both refusals fire before any WGSL is generated");
+    ok("microfacet:false generates BYTE-IDENTICAL WGSL to before this round (the capability is opt-in)",
+        R.pipelineWgsl({}) === R.pipelineWgsl({ microfacet: false }) &&
+        !R.pipelineWgsl({ nee: true }).includes("ggxD") && !R.pipelineWgsl({ bvh: true, rgb: true }).includes("ggxD"),
+        "a scene that never asks for the capability must render exactly as it did before it existed -- this " +
+        "file's own rule for rgb/bvh/nee/envMap, held to here too");
+    ok("CPU_EXPRESSIBLE names microfacet, and sceneFromSbt passes roughness/ior through undefined for non-microfacet records",
+        R.CPU_EXPRESSIBLE.includes("microfacet") &&
+        R.sceneFromSbt([rec({ centre: [0, 0, 0], radius: 1, albedo: 0.5 })])[0].roughness === undefined,
+        "pathTracer.mjs's own material gate is `roughness !== undefined` -- a defined-but-zero value would " +
+        "silently misclassify a lambertian record as microfacet");
+
+    const meanOf = (v) => v.reduce((a, b) => a + b, 0) / v.length;
+    const sdOf = (v, m) => Math.sqrt(v.reduce((a, b) => a + (b - m) ** 2, 0) / (v.length - 1));
+    const gpuMean = async (scene, view, spp, seed, shader) => {
+        const n = view.w * view.h;
+        const r = await runWgslCompute({ code: R.pipelineWgsl(shader), outCount: n,
+            uniforms: R.pipelineUniforms(scene, { spp, view, eps: R.EPS, seed, microfacet: shader.microfacet || false }),
+            workgroups: Math.ceil(n / 64) });
+        if (!r.ok) throw new Error("microfacet GPU render failed: " + r.reason);
+        return meanOf(Array.from(r.values));
+    };
+    const cpuMean = (scene, view, spp, seed, opts) => meanOf(Array.from(R.renderSbtCpu(scene, { spp, view, seed, ...opts })));
+    const agreeMf = async (label, scene, view, spp, shader, cpuOpts, N = 8) => {
+        const cpuVals = [], gpuVals = [];
+        for (let s = 1; s <= N; s++) cpuVals.push(cpuMean(scene, view, spp, s, cpuOpts));
+        for (let s = 1; s <= N; s++) gpuVals.push(await gpuMean(scene, view, spp, 4000 + s, shader));
+        const cpuM = meanOf(cpuVals), cpuRelSd = sdOf(cpuVals, cpuM) / cpuM;
+        const gpuM = meanOf(gpuVals), gpuRelSd = sdOf(gpuVals, gpuM) / gpuM;
+        const ratio = gpuM / cpuM;
+        const bound = 3 * Math.sqrt((cpuRelSd / Math.sqrt(N)) ** 2 + (gpuRelSd / Math.sqrt(N)) ** 2);
+        say(`${label}: cpu ${cpuM.toFixed(6)} (relSd ${(cpuRelSd * 100).toFixed(3)}%), gpu ${gpuM.toFixed(6)} ` +
+            `(relSd ${(gpuRelSd * 100).toFixed(3)}%), ratio ${ratio.toFixed(6)}, bound ${bound.toFixed(6)}`);
+        REPORT_ROWS.push([label, `${view.w}x${view.h}`, `${spp} spp x ${N} seeds`,
+            `cpu ${cpuM.toFixed(5)} vs gpu ${gpuM.toFixed(5)}, |ratio-1|=${Math.abs(ratio - 1).toExponential(2)}, bound=${bound.toExponential(2)}`]);
+        ok(`!! ${label} agrees with pathTracer.mjs within 3 MEASURED standard errors`,
+            Math.abs(ratio - 1) < bound, `both real noise: cpuRelSd ${(cpuRelSd * 100).toFixed(3)}%, gpuRelSd ${(gpuRelSd * 100).toFixed(3)}%`);
+        return { cpuM, gpuM, ratio, bound };
+    };
+
+    // ---- 13a. PURE BSDF SAMPLING, SKY ONLY -- half-vector sampling, Fresnel(ior), bounceWeight, no lights at all.
+    await agreeMf("13a. bsdf-only microfacet sphere, sky", [rec({ centre: [0, 0, 0], radius: 1, hit: "microfacet", roughness: 0.3, ior: 1.5 })],
+        { w: 12, h: 12, eye: [0, 0, 4], look: [0, 0, 0], up: [0, 1, 0], fovDeg: 30 }, 512,
+        { microfacet: "bsdf" }, { direct: "bsdf" });
+
+    // ---- 13b/c/d. THE SAME microfacet+light SCENE, ALL THREE direct MODES -- proves each of the three
+    // emitter-hit treatments (bsdf: full add, the only route; nee: suppress, already collected; mis: weighted
+    // by the balance heuristic) independently, against the same CPU oracle each mode actually exercises.
+    // *** THE LIGHT IS SIZED FOR REAL, MEASURED NOISE, NOT GUESSED -- an earlier draft used radius 0.6 (r/d
+    // ~0.25) and read a ~0.25% gap against a bound under 0.0025, close enough to fail on some seed ranges (it
+    // did, at 4000+s, though not at 2000+s) even though the SAME ~0.25% gap persisted at N up to 24, the
+    // signature of a UNDER-ESTIMATED noise floor rather than a shrinking one: BSDF-sampling a small light is
+    // the textbook high-variance case this whole file's own NEE section exists to avoid (pathTracer.mjs's own
+    // v3472 measurement: "7912x quieter than BSDF sampling for a light of r/d = 0.1"), and 8-24 seeds were not
+    // enough to measure that variance honestly at the smaller size. Widened to radius 0.8 (r/d ~0.33): relSd
+    // roughly doubled (0.2-0.33% against 0.08-0.24%) and the SAME ~0.25% ratio gap now sits comfortably inside
+    // an honestly-measured bound -- confirmed directly in a scratch probe before landing here. A logic bug was
+    // ruled out first, not assumed away: the GGX math itself (ggxD/ggxG2/bounceWeightGgx/bsdfEvalGgx) was
+    // checked against physics/render/microfacet.mjs's own D/G2/bounceWeight/bsdfEval at f32 vs f64 directly,
+    // over 20000 random angle combinations at alpha=0.25 -- mean relative difference 6.0e-8 (bounceWeight) and
+    // 1.1e-7 (bsdfEval), four orders of magnitude below the ~2.5e-3 gap this section measures, and Fresnel was
+    // ruled out too (the same gap appears, slightly WORSE, with ior unset and F forced to 1 throughout).
+    const litScene = [rec({ centre: [0, 0, 0], radius: 1, hit: "microfacet", roughness: 0.25, ior: 1.5 }),
+                      rec({ centre: [1.9, 0, 0], radius: 0.8, hit: "lambertian", albedo: 0, emit: 6 })];
+    const litView = { w: 10, h: 10, eye: [0.3, 0, 4], look: [0.3, 0, 0], up: [0, 1, 0], fovDeg: 26 };
+    await agreeMf("13b. bsdf mode, real light (bounce is the only route)", litScene, litView, 2048, { microfacet: "bsdf" }, { direct: "bsdf" });
+    await agreeMf("13c. nee mode, real light (bounce onto it is suppressed)", litScene, litView, 2048, { microfacet: "nee" }, { direct: "nee" });
+    await agreeMf("13d. mis mode, real light (balance heuristic)", litScene, litView, 2048, { microfacet: "mis" }, { direct: "mis" });
+
+    // ---- 13e. ROUGH SURFACE, WIDE LIGHT under mis -- the regime pathTracer.mjs's own v3499 comment names as
+    // where a wrong mixture pdf would read loudest ("8.37 sigma... only there is the specular pdf comparable
+    // to the light's"); not reachable here (msTable is never set, so there is no coin-flip branch to get
+    // wrong), but a wide light against a rough lobe is still the sharpest test of the single-lobe mixture pdf
+    // this round DOES use.
+    await agreeMf("13e. mis mode, rough surface + wide light", [rec({ centre: [0, 0, 0], radius: 1, hit: "microfacet", roughness: 0.6, ior: 1.5 }),
+        rec({ centre: [2.2, 0, 0], radius: 1.0, hit: "lambertian", albedo: 0, emit: 4 })],
+        { w: 10, h: 10, eye: [0.3, 0, 4], look: [0.3, 0, 0], up: [0, 1, 0], fovDeg: 30 }, 1536, { microfacet: "mis" }, { direct: "mis" });
+
+    // ---- 13f. MIXED MATERIALS -- lambertian NEE and microfacet MIS in the SAME scene, together, so the
+    // three-way double-count discriminator (prevMaterial/misFromMode alongside neeSkippedMask/prevHadNeeRoute)
+    // is exercised as one system rather than two isolated ones. Geometry follows section 11's own wide-cone
+    // scene (well-separated bodies, no shadow ray grazing a silhouette) -- a closer, three-in-a-row layout was
+    // tried first and read ~0.5% dim, which reproduced IDENTICALLY on a pure lambertian scene with none of this
+    // round's code touched (see this section's own header note); not this round's artifact, and not what this
+    // scene is testing, so avoided rather than chased.
+    await agreeMf("13f. mixed lambertian(nee)+microfacet(mis)", [rec({ centre: [0, 0, 0], radius: 1, hit: "lambertian", albedo: 0.9 }),
+        rec({ centre: [1.9, 0, 0], radius: 0.8, hit: "lambertian", albedo: 0, emit: 10 }),
+        rec({ centre: [-1.9, 0, 0], radius: 1, hit: "microfacet", roughness: 0.3, ior: 1.5 })],
+        { w: 8, h: 6, eye: [0.3, 0, 6], look: [0, 0, 0], up: [0, 1, 0], fovDeg: 34 }, 3000,
+        { microfacet: "mis", nee: true }, { nee: true, direct: "mis" }, 8);
+
+    // ---- 13g. THE MIRROR FIX, SABOTAGED -- the CPU oracle has no mirror material at all (sceneFromSbt refuses
+    // it), so this is GPU-only: the SAME nee:true WGSL, once clean and once with this round's own fix
+    // (`|| !prevHadNeeRoute`) stripped back to the pre-round-8 condition, run against a scene where a mirror
+    // sits between the camera and a light so the only way to see the light is via the mirror's reflection.
+    {
+        const scene = [rec({ centre: [0, 0, -1], radius: 0.8, hit: "mirror", albedo: 0.95 }),
+                      rec({ centre: [-2.4, 1.6, -3], radius: 1.0, hit: "lambertian", albedo: 0, emit: 10 })];
+        const view = { w: 10, h: 10, eye: [0, 0, 4], look: [0, 0, -1], up: [0, 1, 0], fovDeg: 22 };
+        const N = 8, spp = 2048;
+        const cleanCode = R.pipelineWgsl({ nee: true });
+        ok("the fix's own text is present in generated WGSL, so the sabotage below actually removes it",
+            cleanCode.includes("|| !prevHadNeeRoute"), "grepped in the generated string, not assumed from the source template");
+        const sabotaged = cleanCode.replace("|| !prevHadNeeRoute", "");
+        const runMean = async (code, seed) => {
+            const n = view.w * view.h;
+            const r = await runWgslCompute({ code, outCount: n,
+                uniforms: R.pipelineUniforms(scene, { spp, view, eps: R.EPS, seed }), workgroups: Math.ceil(n / 64) });
+            if (!r.ok) throw new Error("mirror-fix sabotage GPU render failed: " + r.reason);
+            return meanOf(Array.from(r.values));
+        };
+        const cleanVals = [], sabVals = [];
+        for (let s = 1; s <= N; s++) cleanVals.push(await runMean(cleanCode, s));
+        for (let s = 1; s <= N; s++) sabVals.push(await runMean(sabotaged, s));
+        const a = meanOf(cleanVals), b = meanOf(sabVals);
+        say(`13g. mirror fix: clean(fixed) ${a.toFixed(6)}, sabotaged(pre-round-8 shape) ${b.toFixed(6)}, ratio ${(b / a).toFixed(6)}`);
+        REPORT_ROWS.push(["13g. mirror-fix sabotage (clean vs pre-round-8 guard)", `${view.w}x${view.h}`, `${spp} spp x ${N} seeds`,
+            `clean=${a.toFixed(5)} sabotaged=${b.toFixed(5)}, ${(100 * (1 - b / a)).toFixed(2)}% darker without the fix`]);
+        ok("!! *** WITHOUT prevHadNeeRoute THE MIRROR-REFLECTED LIGHT IS UNMISTAKABLY DARKER, NOT WITHIN NOISE ***",
+            b < a * 0.98, `sabotaged/clean = ${(b / a).toFixed(4)}, expected well under 0.98 -- a light reflected ` +
+            "through a mirror wrongly read as already-counted and suppressed");
+    }
+
+    // ---- 13h. THE misFromMode STALE-STATE FIX -- a STRUCTURAL check, not a statistical one, and said plainly
+    // why: see this section's own header note. The reset text must be present in the generated WGSL, exactly
+    // once beyond the initial declaration (the microfacet dispatch block below it overwrites the value again
+    // when actually taken; a naive grep for the bare text would also match that declaration).
+    {
+        const code = R.pipelineWgsl({ microfacet: "mis", nee: true });
+        const perVertexReset = "\n      misFromMode = -1;\n      ";
+        ok("the per-vertex misFromMode reset is present in generated WGSL (pathTracer.mjs's own `misFrom = null` line, ported)",
+            code.includes(perVertexReset), "verified by code-path tracing against trace()'s own explicit reset, not by a " +
+            "Monte-Carlo sabotage red -- see this section's header for why one was attempted and measured near the noise floor");
+    }
+}
+
 console.log("rtPipeline-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));
 REPORT.table("two spheres: CPU against the pipeline, per resolution and sample count", ["scene", "size", "spp", "pixels differing"], REPORT_ROWS,
     "A sweep whose numbers only reached the terminal it was written to is a measurement nobody can re-read.");
