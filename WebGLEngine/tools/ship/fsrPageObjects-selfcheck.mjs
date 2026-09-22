@@ -98,12 +98,15 @@ const FLOOR_DB = 38.5;
                           obj: ($("objstat") || {}).textContent || "",
                           lock: ($("lockstat") || {}).textContent || "",
                           dis: ($("disstat") || {}).textContent || "",
-                          react: ($("reactstat") || {}).textContent || "" };
+                          react: ($("reactstat") || {}).textContent || "",
+                          split: ($("splitstat") || {}).textContent || "" };
             try { $("run").click(); } catch {}
             return out;
         }` });
 
         const G = r.result;
+        // hoisted: section 2's v4663 rows need it before section 3 declares its own local copy
+        const dBx = (t) => { const m = /([\d.]+) dB/.exec(t || ""); return m ? Number(m[1]) : NaN; };
         console.log("1. THE PAGE, ON THE OBJECT-MOTION CAMERA");
         ok("fsr.html loaded on a real adapter and reached the object-motion camera",
            r.ok && G && G.ready && G.camera === "objects" && G.scene === "smooth",
@@ -230,6 +233,48 @@ const FLOOR_DB = 38.5;
                "threshold and every other pixel far below it, with nothing in between for a threshold to " +
                "sort. A reader must not take this row for agreement on the NUMBER.");
 
+            // *** v4663 -- THE ERROR SPLIT BY WHERE THE MASK FIRED, AND THE ROW IS THAT IT ADDS UP. ***
+            // Every instrument this arc built reports a per-frame scalar; the harm v4658 found is a
+            // per-pixel event, and no scalar can say WHERE. The split is the same squared error the dB is
+            // computed from, taken in one branch -- so the two sums must RECONSTRUCT that dB. A decomposition
+            // that does not is a second measurement of something else wearing the first one's name.
+            const sp = /fired (\d+) px, SSE ([\d.e+-]+) \(mean [\d.e+-]+\); rest (\d+) px, SSE ([\d.e+-]+)/.exec(G.split || "");
+            const shownDb = dBx(G.tmpLate);
+            const derived = sp ? 10 * Math.log10((Number(sp[1]) + Number(sp[3])) * 3 / (Number(sp[2]) + Number(sp[4]))) : NaN;
+            // ONE argument: this file's `say` is (l) => ..., not the two-argument one other gates in this
+            // tree use. The first draft passed two and the second was DROPPED IN SILENCE -- the line printed
+            // as a bare "error split" with the measurement missing, which is a readout that looks like it
+            // ran and says nothing. Caught by reading the output rather than the exit code.
+            say("error split: " + (sp ? `fired ${sp[1]} px SSE ${sp[2]}; rest ${sp[3]} px SSE ${sp[4]}  ->  ` +
+                `${derived.toFixed(4)} dB derived against ${shownDb} printed` : "(unparsed)"));
+            ok("!! *** the two region sums RECONSTRUCT the PSNR the page prints, so the split is of THAT error ***",
+               !!sp && Math.abs(derived - shownDb) < 0.005,
+               `|derived - printed| = ${Math.abs(derived - shownDb).toFixed(4)} dB, against a printed precision ` +
+               "of 0.005. The pixel COUNTS are in the reconstruction too, so a split that dropped or " +
+               "double-counted pixels fails here even if its sums looked plausible.");
+            // *** THE RECONSTRUCTION CANNOT SEE THE THRESHOLD, AND A SABOTAGE SAID SO. *** Moving `fired`
+            // from reactiveCPU's reported 0.05 to `> 0` scored ZERO against the row above: the sums still
+            // reconstruct the dB, because ANY partition of the same pixels does. That is v4654's mistake
+            // exactly -- it reported "36,862 of 36,864 pixels shading-shifted" by counting floats above
+            // zero on a continuous detector, and the conclusion inverted when it was re-measured. What
+            // separates the two is the SIZE of the fired set: at 0.05 it is about one percent of the
+            // picture on this camera (322 of 36,864 here, 404 on average over scene 3-53), and at `> 0` it
+            // is nearly all of it, because on real content almost every pixel differs from its history by
+            // SOMETHING. A tenth of the picture sits two orders of magnitude from both.
+            ok("!! ...and the fired set is a small MINORITY of the picture, which is what `>= 0.05` buys over `> 0`",
+               !!sp && Number(sp[1]) > 0 && Number(sp[1]) < 0.10 * (Number(sp[1]) + Number(sp[3])),
+               `${sp ? sp[1] : "?"} fired of ${sp ? Number(sp[1]) + Number(sp[3]) : "?"} ` +
+               `(${sp ? (100 * Number(sp[1]) / (Number(sp[1]) + Number(sp[3]))).toFixed(2) : "?"}%). ` +
+               "Counting above ZERO counts the arithmetic and would put this near 100%. The whole v4663 " +
+               "finding is that the mask's effect lives in this one percent, so a threshold that swallowed " +
+               "the picture would make the split say nothing while still adding up.");
+            ok("!! ...and it prints BOTH pixel counts, because the partition is not the same set in both arms",
+               !!sp && Number(sp[1]) > 0 && Number(sp[3]) > 0 && /THE PARTITION IS THIS ARM'S OWN MASK/.test(G.split || ""),
+               `${sp ? sp[1] : "?"} fired of ${sp ? Number(sp[1]) + Number(sp[3]) : "?"}. The mask reads the ` +
+               "current frame against the HISTORY, which is exactly what the two arms differ in, so a reader " +
+               "differencing the sums has to be able to see whether the two partitions are comparable. " +
+               "Measured over scene 3-53: 404 fired on average with the mask on, 410 with it off.");
+
             console.log("\n3. THE PICTURE, which is the only thing the three wiring sabotages could not fool");
             const dB = (t) => { const m = /([\d.]+) dB/.exec(t || ""); return m ? Number(m[1]) : NaN; };
             const e = dB(G.tmpEarly), l = dB(G.tmpLate), f1 = dB(G.fsr1);
@@ -261,6 +306,22 @@ console.log("\nunchecked here: the DOLLY and the two older cameras, which are fs
     "px/frame would obviously give.");
 //
 // SABOTAGE LOG -- each applied to the live tree, run, and restored.
+//   v4663  splitError double-counts: fired pixels also summed into rest   1 RED, the reconstruction.
+//   v4663  the fired threshold moved from >= 0.05 to > 0                  *** 0 RED AT FIRST ***. The
+//          reconstruction cannot see it -- ANY partition of the same pixels still adds up to the same dB --
+//          and that is v4654's mistake exactly, which reported "36,862 of 36,864 pixels shading-shifted"
+//          by counting floats above zero on a continuous detector and had its conclusion inverted on
+//          re-measurement. The row that catches it is the one about the fired set's SIZE: 0.87% here
+//          against nearly 100% at `> 0`.
+//   v4663  the readout drops the partition caveat                         1 RED -- on the SECOND attempt.
+//          The first replaced the phrase's occurrence in the COMMENT above the readout rather than in the
+//          template string, so the mutation never reached the page: a NO-OP, not a 0-RED, and recorded as
+//          one because the difference is the whole value of a sabotage log.
+//
+// *** AND THE FIRST DRAFT OF THE `say` LINE LOST ITS MEASUREMENT IN SILENCE. *** This file's `say` is
+// (l) => ..., one argument, not the two-argument form other gates in this tree use. Passing two printed a
+// bare "error split" with the numbers dropped -- a readout that looks like it ran and says nothing. Caught
+// by reading the output, which an exit code would never have shown.
 //   v4649  fsr.html: renderIds labels EVERY pixel the slab                     2 RED (control, disocclusion).
 //          0-RED at first: the control took a maximum over an empty set and printed 0. Both populations are
 //          counted now, and the count is in the row's condition.

@@ -8032,6 +8032,46 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4663 -- THE 273rd CLOSING: the harm and the help are one mechanism, in one percent of the picture.
+    since348: Object.freeze({
+        at: "v4663", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** EVERY INSTRUMENT THIS ARC BUILT REPORTS A PER-FRAME SCALAR, AND THE HARM IS A " +
+                 "PER-PIXEL EVENT. *** Three rounds correlated frame-level numbers against each other and " +
+                 "spent three explanations (the jitter, the wide/narrow split, the history's age). v4663 " +
+                 "splits the SAME squared error the PSNR is computed from by where the reactive mask " +
+                 "actually fired -- one branch, two sums, and they reconstruct the printed dB to 0.0014 dB, " +
+                 "which is the rounding. Over scene 3-53 the fired set averages 404 of 36,864 pixels, ONE " +
+                 "PERCENT: " +
+                 "on the 14 HARMED frames d(SSE) is +0.628 inside it and +0.085 outside; on the 37 HELPED " +
+                 "frames it is -2.308 inside and +0.062 outside. Per frame rather than as a ratio of means: " +
+                 "11 of 14 harmed frames put most of the extra error inside, and 32 of 37 helped frames put " +
+                 "most of the saving there. " +
+                 "*** SO THE MASK IS NOT DOING COLLATERAL DAMAGE SOMEWHERE ELSE. *** It acts exactly where " +
+                 "it fires, and in that one percent it is a bet whose SIGN varies -- worth -2.3 when right " +
+                 "and +0.6 when wrong, which is why the mean is positive and fourteen frames still lose. " +
+                 "That reframes what three refuted hypotheses were hunting: there may be NO frame-level " +
+                 "property that marks a harmed frame, because the harm is not a property of the frame. The " +
+                 "residue is the three exceptions -- frame 43, the worst at -1.22 dB, puts 1.337 of its " +
+                 "extra error OUTSIDE the fired set against 0.448 inside -- and they are unexplained. " +
+                 "*** THE PARTITION IS EACH ARM'S OWN MASK AND THE READOUT SAYS SO. *** The mask reads the " +
+                 "current frame against the HISTORY, which is precisely what the arms differ in, so the " +
+                 "fired set is not the same set on both sides; both pixel counts are printed (404 on " +
+                 "average with the mask on, 410 with it off) so a reader can see whether the partitions are " +
+                 "comparable instead of assuming it. " +
+                 "Three sabotages. ONE 0-RED: moving the fired threshold from reactiveCPU's reported 0.05 " +
+                 "to `> 0` left the reconstruction row GREEN, because any partition of the same pixels adds " +
+                 "up to the same dB -- v4654's exact mistake, which once reported '36,862 of 36,864 pixels " +
+                 "shading-shifted' and had its conclusion inverted on re-measurement. The row that catches " +
+                 "it is about the fired set's SIZE: 0.87% against nearly 100%. ONE NO-OP recorded as a " +
+                 "no-op and not as a 0-RED: a caveat-deleting mutation hit the phrase's copy in the COMMENT " +
+                 "rather than in the template string and never reached the page. " +
+                 "And the readout's first draft passed two arguments to a one-argument `say`, printing a " +
+                 "bare label with the measurement dropped in silence -- caught by reading the output, which " +
+                 "an exit code would never have shown. No gate added.",
+    }),
     // v4662 -- THE 272nd CLOSING: the youngest history was harmed least, and the hypothesis was mine.
     since347: Object.freeze({
         at: "v4662", swept: 0, green: 0, red: 0,

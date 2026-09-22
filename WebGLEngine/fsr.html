@@ -72,6 +72,7 @@
   <div class="stat" id="objstat"></div>
   <div class="stat" id="lockstat"></div>
   <div class="stat" id="reactstat"></div>
+  <div class="stat" id="splitstat"></div>
   <div class="stat" id="over"></div>
 </div>
 <div class="panes">
@@ -384,6 +385,35 @@ const psnr = (a, b) => {
     let se = 0, n = 0;
     for (let i = 0; i < a.length; i += 4) for (let c = 0; c < 3; c++) { const d = a[i + c] - b[i + c]; se += d * d; n++; }
     return 10 * Math.log10(1 / (se / n));
+};
+
+/**
+ * *** v4663 -- THE SAME SQUARED ERROR psnr SUMS, SPLIT BY WHERE THE MASK FIRED. ***
+ *
+ * Every instrument this arc has built reports a PER-FRAME SCALAR: a PSNR, a count, a quantile. The harm
+ * v4658 found is a PER-PIXEL event -- the mask fires somewhere, the factor discards the history there, and
+ * those pixels get worse -- and no scalar can say WHERE. Three explanations have been spent correlating
+ * frame-level numbers against each other (the jitter at v4659, the wide/narrow split at v4660, the
+ * history's age at v4662); this asks a different question.
+ *
+ * `fired` is the set at or above 0.05, which is reactiveCPU's own reported figure and not a level invented
+ * here. The two sums add up to psnr's `se` exactly, by construction: same loop, same channels, one branch.
+ *
+ * *** THE PARTITION IS EACH ARM'S OWN MASK AND THAT IS NOT A FIXED SET ACROSS ARMS. *** The mask is computed
+ * from the current frame against the HISTORY, and the history is what the arms differ in, so the ON arm's
+ * fired set is not the OFF arm's. `nFired` is reported for exactly this reason: a reader comparing the two
+ * arms' sums has to be able to see whether the two partitions are even comparable, and nothing here pretends
+ * they are identical.
+ */
+const splitError = (a, b, mask) => {
+    let seFired = 0, seRest = 0, nFired = 0, nRest = 0;
+    for (let i = 0, px = 0; i < a.length; i += 4, px++) {
+        const hot = mask ? mask[px] >= 0.05 : false;
+        let d2 = 0;
+        for (let c = 0; c < 3; c++) { const d = a[i + c] - b[i + c]; d2 += d * d; }
+        if (hot) { seFired += d2; nFired++; } else { seRest += d2; nRest++; }
+    }
+    return { seFired, seRest, nFired, nRest };
 };
 
 function draw(c, buf) {
@@ -781,6 +811,25 @@ async function tick() {
     // re-collected with shading OFF is identical to four decimals, because its ring needs 64 frames and
     // that window never reaches age 64, so the mask is all zeros there by construction.
     //
+    // *** v4663 -- AND THE HARM AND THE HELP ARE THE SAME MECHANISM, IN THE SAME 1% OF THE PICTURE. ***
+    // Three rounds correlated PER-FRAME SCALARS against each other and spent three explanations. The harm
+    // is a PER-PIXEL event, so the error was split by where the mask actually fired (the readout below).
+    // Over scene 3-53, both arms, the fired set averages 404 of 36,864 pixels -- ONE PERCENT:
+    //
+    //     on the 14 HARMED frames   d(SSE) fired +0.628   rest +0.085   -- 88% of the extra error in 1% of the picture
+    //     on the 37 HELPED frames   d(SSE) fired -2.308   rest +0.062   -- and essentially all of the saving
+    //
+    // Per frame, not as a ratio of means: 11 of the 14 harmed frames put most of the extra error inside the
+    // fired region, and 32 of the 37 helped frames put most of the saving there. So the mask is NOT doing
+    // collateral damage somewhere else; it acts exactly where it fires, and in that tiny region it is a bet
+    // whose SIGN varies -- worth -2.3 when it is right and +0.6 when it is wrong, which is why the mean is
+    // positive and fourteen frames still lose.
+    //
+    // That reframes what the three refuted hypotheses were looking for. There may be no frame-level property
+    // that marks a harmed frame, because the harm is not a property of the frame: it is ~400 pixels going
+    // the wrong way. The residue is the three exceptions -- frame 43, the worst at -1.22 dB, puts 1.337 of
+    // its extra error OUTSIDE the fired set against 0.448 inside -- and those are unexplained.
+    //
     // *** AND IT IS NOT AN EXPLANATION OF THE FOURTEEN HARMED FRAMES, WHICH IS WHAT THE SEARCH WAS FOR. ***
     // Over frames 54-98 only THREE of 45 are harmed, worst -0.50 dB, while the wide/narrow difference stays
     // the same size. So the split predicts how much the mask HELPS and not WHETHER IT HURTS, and v4658's
@@ -899,6 +948,8 @@ async function tick() {
     const shown = (await rcas(hist, D, D, parseFloat($("sharp").value))).data;
     draw(cTmp, shown);
     $("dTmp").textContent = psnr(shown, ref).toFixed(2) + " dB";
+    // The split is taken on EVERY frame the mask exists for, in both arms, so the two can be differenced.
+    const SE = reactiveMask ? splitError(shown, ref, reactiveMask) : null;
     $("metric").textContent = `render ${R}x${R} -> display ${D}x${D}   |   frame ${frame}   |   jitter ${jx.toFixed(3)}, ${jy.toFixed(3)}`;
     // *** NULL, NOT ZEROES. *** ACCUMULATE_WGSL counts nothing, so a device run has no counters to show. A
     // frame that reused nothing and a frame nobody counted must not print the same number.
@@ -957,6 +1008,20 @@ async function tick() {
               `0.0 to the mask that a pixel in perfect agreement writes, so no pass over it could recover ` +
               `a single one of these numbers.`
             : "reactive mask: not computed on this frame (it needs a previous depth and a positive threshold)";
+    // *** WHERE THE ERROR IS, NOT JUST HOW MUCH. *** Differencing these two sums between the mask's ON and
+    // OFF arms is what says whether the harm lands where the mask FIRED -- the mask doing it directly -- or
+    // somewhere else, which would mean the damage is to history that later frames needed and is a different
+    // story with a different fix. The sums are the same squared error the dB above is computed from.
+    $("splitstat").textContent = !objects ? ""
+        : SE
+            ? `error by region [reactive ${reactiveOn ? "ON" : "OFF -- control"}]: ` +
+              `fired ${SE.nFired} px, SSE ${SE.seFired.toExponential(3)} (mean ${(SE.seFired / Math.max(1, SE.nFired * 3)).toExponential(3)}); ` +
+              `rest ${SE.nRest} px, SSE ${SE.seRest.toExponential(3)} (mean ${(SE.seRest / Math.max(1, SE.nRest * 3)).toExponential(3)}). ` +
+              `The two sums ARE the dB above, split in one branch -- nothing is re-derived. THE PARTITION IS ` +
+              `THIS ARM'S OWN MASK: the mask reads the current frame against the HISTORY, which is what the ` +
+              `arms differ in, so the fired set is not the same set on both sides. The pixel counts are ` +
+              `printed so a reader can see whether the two partitions are comparable rather than assume it.`
+            : "error by region: no reactive mask on this frame, so there is nothing to split by";
     $("objstat").textContent = !objects ? ""
         : objGap
             ? `object motion: camera-only is off by ${(objGap.onSlab * D).toFixed(2)} px on the slab's ` +
