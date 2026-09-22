@@ -36,8 +36,10 @@
 // and NOT called by the orb, so v4641 added `activity` and `stateIndex` and deliberately not `stateTau`.
 // v4644 wired three of its four outputs -- `settled` on all eighteen interiors, and the pair (complete,
 // sweep) the SUCCESS shell travels on, in the seven marched heroes -- so `stateTau` is a uniform now and the
-// row that said it was absent has inverted into one that says what reads it. The FOURTH, st.drive (the
-// RESPONDING lean, 45 references across murmur's eighteen sources), is still absent and still named.
+// row that said it was absent has inverted into one that says what reads it. v4653 wired the FOURTH, and
+// only partly: st.drive has 45 references across murmur's eighteen sources doing THREE different things,
+// and that round took the two that are a DIRECTION or a SIZE and left the sixteen that multiply a local
+// clock. So the row inverts a second time and the deferral is checked next door rather than promised here.
 "use strict";
 
 import fs from "node:fs";
@@ -219,7 +221,7 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
         `kept scoring the comment that named it. The pixel rows above are what say the move was real; this ` +
         `row says nothing was left behind.`);
 
-    // mh_state's three wired outputs, on the same terms. `drive` is deliberately absent and has its own row.
+    // mh_state's other three outputs, on the same terms. `drive` arrived at v4653 and has its own row below.
     const declS = cc(/const SETTLED = /g) + cc(/const COMPLETE = /g) + cc(/const SWEEP = /g);
     const readSe = cc(/\bSETTLED\b/g) - 1, readC = cc(/\bCOMPLETE\b/g) - 1, readSw = cc(/\bSWEEP\b/g) - 1;
     const igAt = cc(/\bigniteAt\b/g) - 1, igMist = cc(/\bigniteMist\b/g) - 1;
@@ -306,15 +308,22 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
     // A knob nothing reads is a row that cannot fail, so v4641 did not add one. v4644 wires the flash, so the
     // knob arrives with the pixels it moves and the row inverts: it now has to say the uniform is READ, and
     // by what, or a future edit could delete the wiring and leave a dead knob behind the same green.
-    const drive = (code.match(/\bDRIVE\b|STATE\.drive/g) || []).length;
-    ok("!! *** stateTau IS A UNIFORM NOW BECAUSE SOMETHING READS IT -- and `drive` still is not, by design ***",
+    // *** AND AT v4653 THE LAST OF THE FOUR ARRIVES, so this row inverts a second time. *** It said at
+    // v4641 that mh_state was absent, at v4644 that three of its four outputs were wired and `drive` was
+    // not, and now that all four are read. Each inversion is the same discipline: the row states what is
+    // MISSING as a checked fact, so the missing half cannot quietly become a half-finished one.
+    const drive = (code.match(/\bDRIVE\b/g) || []).length;
+    const driveDecl = (code.match(/const DRIVE = /g) || []).length;
+    ok("!! *** ALL FOUR OF mh_state's OUTPUTS ARE READ NOW -- drive was the last, and it is declared once ***",
         rawT === 1 && /KIT\.mhState\(uniforms\.stateIndex,\s*uniforms\.stateTau\)/.test(src) &&
-        readSe === 3 && readC === 2 && readSw === 1 && drive === 0,
-        `stateTau is read ${rawT} time, by mh_state, and three of mh_state's four outputs reach ${readSe + readC + readSw} ` +
-        `sites between them. The FOURTH -- st.drive, the RESPONDING lean, 45 references across murmur's ` +
-        `eighteen sources -- is read ${drive} times here and is the next round. That half is still an ABSENT ` +
-        `FEATURE and is named as one rather than left for a reader to discover, which is the shape this row ` +
-        `had when the whole of mh_state was absent.`);
+        readSe === 3 && readC === 2 && readSw === 1 && driveDecl === 1 && drive - 1 >= 10,
+        `stateTau is read ${rawT} time, by mh_state, and mh_state's four outputs now reach ` +
+        `${readSe + readC + readSw + (drive - 1)} sites between them: settled ${readSe}, complete ${readC}, ` +
+        `sweep ${readSw}, and drive ${drive - 1} from one declaration. THE FOURTH WAS THE LARGEST AND ONLY ` +
+        `PART OF IT IS HERE: murmur spends st.drive at 45 sites doing three different things, and v4653 ` +
+        `wired the two that are a DIRECTION or a SIZE and left the sixteen that multiply a local clock. ` +
+        `That deferral is not stated here and hoped for -- tools/ship/murmurDrive-selfcheck.mjs checks that ` +
+        `no line in the shader reads both DRIVE and uniforms.time.`);
 
     // The per-species tables have to be READ and not merely imported, or MH_IGNITE is a table the shader
     // agrees with by coincidence. Seven entries, eleven species without one, and the eleven build no nodes.
@@ -377,10 +386,13 @@ console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nWHAT THIS GATE IS FOR: mh_live is the one function every species in murmur's family reads and this port " +
     "did not have. The kit's own gate proves the FUNCTION is right on a real GPU; this one proves the ORB " +
     "CALLS IT, which is the half a correct-and-unwired port would pass in silence." +
-    "\nWHAT IS NOT CLAIMED: st.drive, the fourth of mh_state's outputs -- ported and graded in the kit, not " +
-    "wired, by design and named in its own row. Its three siblings ARE wired at v4644 and the source census " +
-    "below counts where they land; whether the flash reaches PIXELS is graded next door, in " +
-    "tools/ship/murmurIgnite-selfcheck.mjs, on renders rather than on a reader count. The pixel rows here cover TWO of the eighteen species, arc and still, chosen as the largest " +
+    "\nWHAT IS NOT CLAIMED: st.drive's RATE family -- sixteen of its 45 sites, deferred at v4653 because " +
+    "each multiplies a local clock and mh_drift's phase is rate * t, so a drive ramping at large t " +
+    "teleports it. The deferral is CHECKED in tools/ship/murmurDrive-selfcheck.mjs (no line reads both " +
+    "DRIVE and uniforms.time) rather than stated here. All four of mh_state's outputs are otherwise wired " +
+    "and the source census below counts where they land; whether they reach PIXELS is graded next door, in " +
+    "tools/ship/murmurIgnite-selfcheck.mjs and tools/ship/murmurDrive-selfcheck.mjs, on renders rather than " +
+    "on a reader count. The pixel rows here cover TWO of the eighteen species, arc and still, chosen as the largest " +
     "cadence response in the family and the one that has none at all; chorus and droplet are the other two " +
     "and they are in tools/ship/murmurLive2-selfcheck.mjs. The remaining fourteen are covered by the source " +
     "census at section 5 -- which grades the FILE and not the picture, and says so in its own title -- and by " +

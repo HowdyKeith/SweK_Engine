@@ -26,6 +26,74 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      of numeric order were moved into it. NO ROUND'S NUMBER, TEXT OR BYTES CHANGED -- only two headings
      gained a tag, and two blocks moved. -->
 
+## v4653 -- the RESPONDING lean: the wander acquires a heading, and stops scattering
+
+`st.drive` is the last of `mh_state`'s four outputs and the only one whose subject is a **direction**. Its 45
+references across murmur's eighteen sources do three different things — they point a wander at a heading,
+they collapse the scatter around it, and they run sixteen local clocks faster. This round wired the first
+two and left the third, and the line is not where the work got tiring: **every term wired here is a
+direction or a size, and the deferral is a checked rule rather than an intention** — no line in the shader
+reads both `DRIVE` and `uniforms.time`, and a gate row says so.
+
+**The heading's claim is geometry, so the gate grades it as geometry.** still's twelve gesture directions sit
+**86.82°** apart at rest — worst pair 177.3°, very nearly opposite — and collapse to exactly one axis at full
+drive. abyss makes the same call at `k = 0.80` instead of `1.00` and keeps a **12.02°** residual: it becomes a
+current, not a ray, and a table sharing one `k` could not say that.
+
+And it does not converge in a straight line. At the quarter point still reads **87.34°** — *higher* than the
+86.82 it started at — because `normalize(mix(a, b, t))` is not a rotation: mixing two nearly-opposite vectors
+partway toward a common target can leave them further apart in angle. A port that slerped would read 65.11
+there and pass every other row.
+
+A frame-convergence instrument was built for this and **rejected**: it reads 1.34×, because a glint also
+carries its along-path position and a residual lateral offset. That number is in the gate's header rather
+than in its rows.
+
+**The narrowing is the half a frame can show.** helix's light draws in 3.51% (duet 7.21%, prism 4.05%, arc
+2.98% — measured this round, not rendered by the shipped gate, for budget) while **limn moves 0.21% and still
+shifts 8.1% of its bytes**: it is the one species in `MH_DRIVE_FORM` whose lean is not a contraction. Its
+`kTail` is a *concentration* that drive divides, so the tail broadens; its `offT` is an *angle* that drive
+subtracts from, so the tail swings round. A stroke finishing a word spreads and turns.
+
+**droplet's lean is in the silhouette and still's is not** — 539.7% against 1.2% on the same 0.62 ring. Its
+route is the kit's flow deformation, `d += flowAmp * sin(3.20 * dot(n, flowDir) + flowPhase)`, which **both
+halves of the kit have carried since the port and no call site had ever set**: every one passed `(0,0,1), 0,
+0`. The third "built, graded, unreachable" of this arc, after mh_live at v4641 and mh_state at v4644.
+
+Also transcribed rather than tidied: **not one of murmur's six heading vectors is a unit vector** (sol's is
+0.997046 long), and murmur normalizes them *inconsistently* — still and abyss mix toward the raw vector, sol
+and droplet toward its normalized version. That flag changes the direction at every point of the ramp
+strictly between the ends, by 6.6e-4 at sol's half drive.
+
+**Fourteen sabotages, all caught — and six walked through first.** The largest was structural:
+`mhDriveHeading`'s CPU/GPU pair was graded **nowhere**, so deleting the mix — or the normalize — from the TSL
+twin left every pixel gate green, because the species carrying a heading also carry a narrowing and their
+frames still moved. Closed by a new section 14 in `murmurKit-selfcheck`, which also reads the vector's
+**length** back out of the frame: without the normalize it reads 0.30 at mid-ramp, pointing correctly and
+moving at seven tenths speed, which no brightness bound in this tree would catch.
+
+Two more were v4650's lesson repeated: a bound loosened on a correct subject is invisible. The angular
+epsilon is now **derived** from `Number.EPSILON` through acos's square-root amplification (two hand-written
+cuts, at 1e-9 and 1e-6, had both gone red on their own subject), and the unit-vector bound **carries its own
+negative control** — the row builds a tidied-to-five-decimals vector and requires it to fail.
+
+One row was **deleted rather than repaired**: a helix inference that "it moves more of its frame than its
+radius change explains" survived its own negation — a frame with *fewer* turns also moves a fifth of its
+bytes. Replaced by a source census that states the altitude it answers at.
+
+And one sabotage was wrong rather than the gate: a needle matched `MH_IGNITE` before `MH_DRIVE_HEADING` and
+tested the wrong table.
+
+`tools/ship/murmurDrive-selfcheck.mjs` (2,225 ms) and `…Drive2-selfcheck.mjs` (2,260 ms) arrive green, so the
+tree holds 1762 gates. Eighteen species' byte baselines are unmoved, and the gate proves why rather than
+only that: at drive 0 the new heading mix reduces to the normalize that stood there before, bit for bit, so
+there is no operating point where the old expression and the new one differ.
+
+**Still open, with the decision named:** the rate family. Transcribe murmur faithfully and inherit a phase
+teleport that grows without bound with session length, or integrate per-species rates inside the shader and
+diverge from the source on purpose. There is no third option — the defect is in murmur's own design, and
+`live.pace` already carries the identical shape at the sites that read it.
+
 ## v4650 -- the orb's clock was an integral that reached no shader, and the wrong one shipped in its place
 
 `render/aiPresenceOrbState.mjs` has integrated speed every tick since the port's first round — composite

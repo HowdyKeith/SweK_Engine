@@ -186,6 +186,21 @@ export function makeMurmurKitTsl(TSL) {
         return complete.mul(exp(sr.mul(sr).negate()));
     });
 
+    /**
+     * *** THE RESPONDING LEAN: normalize(mix(wander, V, clamp(drive * k))). ***
+     *
+     * Three species spell this identically and the NORMALIZE is what the function exists to own: mixing two
+     * vectors does not give a unit vector even when both inputs are, so a port that dropped it would still
+     * point the right way while changing the SPEED along the path. `V` arrives already pre-normalized or not
+     * according to MH_DRIVE_HEADING's `pre`, which is murmur's per-species choice and is NOT cosmetic --
+     * none of its six heading vectors is a unit vector (sol's is 0.997046 long) and mixing toward a raw one
+     * is a different direction from mixing toward its unit version at every a strictly between 0 and 1.
+     */
+    const mhDriveHeading = Fn(([wander, V, drive, k]) => {
+        const a = clamp(drive.mul(k), 0.0, 1.0).toVar();
+        return normalize(mix(wander, V, a));
+    });
+
     /** kit.ts's mh_drift: eased angular travel, so an arc hurries and dawdles instead of spinning. */
     const mhDrift = Fn(([t, rate, wobble, lane]) => {
         const k = clamp(wobble, 0.0, MH_DRIFT_WOBBLE_CAP).toVar();
@@ -581,7 +596,7 @@ export function makeMurmurKitTsl(TSL) {
         // the literal token `null` -- which the GPU rejected at pipeline creation rather than silently. Both
         // times the value is one number that half the family's colour depends on and nothing owned it.
         MH_R, MH_ETA, MH_EXT, MH_TILT, MH_SCATTER_K, MH_SPREAD, MH_EXIT_CAP,
-        mhHash, mhGrad3, mhNoise3, mhHash1, mhFlourish, mhBreath, mhDrift, mhSpin, mhRoll, mhTube, MH_SQRTPI, mhLive, mhState, mhIgnite,
+        mhHash, mhGrad3, mhNoise3, mhHash1, mhFlourish, mhBreath, mhDrift, mhSpin, mhRoll, mhTube, MH_SQRTPI, mhLive, mhState, mhIgnite, mhDriveHeading,
         mhRefract, mhLook, mhExit, mhHaze, mhMedium, mhInside, mhTransmit, mhScatter,
         mhDeform, mhBody, MH_AMP_CAP,
         mhKey, mhSmall, mhSurface, mhContainment, mhOpalLife, mhAbyssSlot,
@@ -607,13 +622,14 @@ export function makeMurmurKitTsl(TSL) {
  *       "live"  -> mh_live's voice in R and pace in G, over signal (x) by state (y).
  *       "state" -> mh_state's complete/sweep/settled/drive in RGBA, over tau (x) by state (y).
  *       "ignite" -> the SUCCESS shell for three species in RGB, over |p| (x) by sweep (y).
+ *       "heading" -> the RESPONDING lean's mix, over drive (x) by wander angle (y), direction in RGB.
  *       "finishPaper" / "finishInk" / "finishGrey" -> mh_present's tail over specular (x) by height (y);
  *                the grey case carries a light ground and a mid-grey page, which is where two of its
  *                constants are observable at all.
  */
 export function makeMurmurKitProbeTsl(THREE, TSL, { mode = "hash", n = 16 } = {}) {
     const K = makeMurmurKitTsl(TSL);
-    const { Fn, float, vec2, vec3, vec4, uint, int, uv, floor, clamp, select, pow, max } = TSL;
+    const { Fn, float, vec2, vec3, vec4, uint, int, uv, floor, clamp, select, pow, max, cos, sin } = TSL;
 
     const main = Fn(() => {
         // Pixel indices from uv. floor(uv * n) is the cell, exactly as the CPU side enumerates it.
@@ -716,6 +732,22 @@ export function makeMurmurKitProbeTsl(THREE, TSL, { mode = "hash", n = 16 } = {}
             // Scaled by a half so the catchlight's warm white (near 1.0 linear) and any overshoot below zero
             // both sit inside the 0..1 an 8-bit channel can carry. The gate divides by the same number.
             return vec4(clamp(outRgb.mul(0.5), 0.0, 1.0), 1.0);
+        }
+        if (mode === "heading") {
+            // *** THE RESPONDING LEAN'S MIX, OVER THE WHOLE RAMP BY A FULL TURN OF WANDER. *** x carries
+            // drive 0..1 and y carries the wander angle over a full 2*pi, so one frame is every gesture
+            // still can hash crossed with every point of the ramp. The three channels are the resulting
+            // DIRECTION's components mapped from -1..1 into 0..1, which an 8-bit UNORM carries exactly at
+            // the quantisation the gate compares at.
+            //
+            // THE TARGET IS still's RAW VECTOR AND NOT ITS UNIT VERSION, which is murmur's spelling for
+            // this species and the thing MH_DRIVE_HEADING's `pre` records. A probe that normalized it first
+            // would be grading the tidied formula rather than the shipped one.
+            const drive = px.div(n).toVar();
+            const ga = py.div(n).mul(6.2831853).toVar();
+            const wander = vec3(cos(ga), sin(ga.mul(1.3)).mul(0.42), sin(ga)).toVar();
+            const d = K.mhDriveHeading(wander, vec3(0.92, -0.18, 0.35), drive, float(1.0)).toVar();
+            return vec4(clamp(d.mul(0.5).add(0.5), 0.0, 1.0), 1.0);
         }
         if (mode === "ignite") {
             // *** THE SHELL OVER THE WHOLE RAY BY THE WHOLE SWEEP. *** x carries |p| over 0..1.2 -- past the

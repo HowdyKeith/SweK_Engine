@@ -641,8 +641,15 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // SUCCESS shell each needed species RENDERED to be graded, and a species is one WGSL compile, which is
     // what forced those rounds into two files apiece. This one's subject is a NUMBER the host computes, so
     // three of its four sections are pure CPU and the fourth renders two species to turn seconds into light.
-    gates: 1760, usesOk: 1739, definesOk: 1731, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1632, condFirst: 96, unknownSignature: 11,
+    // v4653 -- RE-TAKEN 1760 -> 1762 for tools/ship/murmurDrive-selfcheck.mjs and …Drive2-selfcheck.mjs.
+    // A PAIR AGAIN, and for the third time in the orb arc the split was forced by the clock rather than by
+    // the subject: five species measured 4,307 ms against a 3,000 ms ceiling, three measured 2,772 -- the
+    // exact figure at which tools/ship/murmurLive-selfcheck.mjs was split, for the recorded reason that 8%
+    // of margin is over once a contended sweep's 10% is allowed for -- and two measure about 2,300. What is
+    // different this time is that the pair carries a real division of subject as well: one gate holds a
+    // GEOMETRY claim graded in f64 and the other holds the half a frame can actually show.
+    gates: 1762, usesOk: 1741, definesOk: 1733, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1634, condFirst: 96, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

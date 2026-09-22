@@ -322,7 +322,8 @@ const probeRun = await renderThreeTslToPixels({
                { factoryArgs: { mode: "finishPaper", n: N } },
                { factoryArgs: { mode: "finishInk", n: N } },
                { factoryArgs: { mode: "finishGrey", n: N } },
-               { factoryArgs: { mode: "ignite", n: N } }],
+               { factoryArgs: { mode: "ignite", n: N } },
+               { factoryArgs: { mode: "heading", n: N } }],
 });
 
 sec("6. *** THE PAIR: THE REAL COMPILED SHADER AGAINST THE CPU REFERENCE, BIT FOR BIT ***");
@@ -1689,6 +1690,91 @@ sec("13. *** mh_ignite: THE SUCCESS SHELL -- a ring that LEAVES the heart and RE
     }
 }
 
+
+sec("14. *** mh_drive's HEADING MIX: the RESPONDING lean, CPU against the compiled shader ***");
+{
+    const r = probeRun;
+    if (!r.ok) {
+        ok("!! mhDriveHeading matches a real GPU render", false, `could not render: ${r.reason || "unknown"}`);
+    } else {
+        const ry = (ysh) => N - 1 - ysh;   // the same row flip sections 6, 11, 12 and 13 measure and assert
+        const hd = r.frames[12];
+        // still's constants written out by hand, NOT read out of MH_DRIVE_HEADING -- the v4579 distinction,
+        // and the reason this section can disagree with the table at all.
+        const V = [0.92, -0.18, 0.35];
+        const wander = (ga) => [Math.cos(ga), 0.42 * Math.sin(ga * 1.3), Math.sin(ga)];
+        const want = (drive, ga) => {
+            const a = Math.min(1, Math.max(0, drive));
+            const w = wander(ga);
+            const m = [w[0] + (V[0] - w[0]) * a, w[1] + (V[1] - w[1]) * a, w[2] + (V[2] - w[2]) * a];
+            const L = Math.hypot(m[0], m[1], m[2]);
+            return m.map((c) => Math.round(Math.min(1, Math.max(0, c / L * 0.5 + 0.5)) * 255));
+        };
+        let worst = 0, at = "", worstFlat = 0;
+        for (let ysh = 0; ysh < N; ysh++) for (let x = 0; x < N; x++) {
+            const drive = x / N, ga = (ysh / N) * 6.2831853;
+            const w = want(drive, ga);
+            const i = (ry(ysh) * N + x) * 4, iFlat = (ysh * N + x) * 4;
+            for (let c = 0; c < 3; c++) {
+                const d = Math.abs(hd[i + c] - w[c]);
+                if (d > worst) { worst = d; at = `drive ${drive.toFixed(3)} angle ${ga.toFixed(3)} ch ${c}: gpu ${hd[i + c]} cpu ${w[c]}`; }
+                worstFlat = Math.max(worstFlat, Math.abs(hd[iFlat + c] - w[c]));
+            }
+        }
+        say(`mh_drive's heading over ${N} drives x ${N} wander angles x 3 components: worst |gpu - cpu| = ` +
+            `${worst}/255 (unflipped, ${worstFlat}/255)`);
+        ok("!! *** THE HEADING MIX RENDERS ON A REAL GPU AND MATCHES THE HAND-WRITTEN normalize(mix(w, V, a)) ***",
+            worst <= 2 && worstFlat > 20,
+            `worst component error ${worst} of 255 (${at || "no disagreement"}); the unflipped orientation ` +
+            `scores ${worstFlat}, so this cannot pass by the symmetry a drive-independent direction would ` +
+            `have. *** THIS SECTION EXISTS BECAUSE TWO SABOTAGES WALKED THROUGH THE ROUND WITHOUT IT. *** ` +
+            `Deleting the mix from the TSL twin, and deleting the NORMALIZE from it, both left every pixel ` +
+            `gate in v4653 green: the species that carry a heading also carry a narrowing, so their frames ` +
+            `still moved with drive and "the lean reaches the picture" was still true. A geometry claim ` +
+            `graded only on the CPU reference is a claim about a function the shader need not be running.`);
+
+        // The NORMALIZE is the half a dropped-normalize sabotage gets wrong while still pointing the right
+        // way, so it is asserted as a LENGTH rather than inferred from the agreement bound above.
+        let worstLen = 0, atLen = "";
+        for (let ysh = 0; ysh < N; ysh++) for (let x = 0; x < N; x++) {
+            const i = (ry(ysh) * N + x) * 4;
+            const v = [0, 1, 2].map((c) => (hd[i + c] / 255) * 2 - 1);
+            const L = Math.hypot(v[0], v[1], v[2]);
+            const d = Math.abs(L - 1);
+            if (d > worstLen) { worstLen = d; atLen = `drive ${(x / N).toFixed(3)} angle ${((ysh / N) * 6.2831853).toFixed(3)}: |v| = ${L.toFixed(4)}`; }
+        }
+        ok("!! ...and every direction it returns is a UNIT vector, read back out of the frame",
+            worstLen < 0.02,
+            `worst |length - 1| = ${worstLen.toFixed(4)} over all ${N * N} cells (${atLen}), against an 8-bit ` +
+            `quantisation that is itself worth about 0.007 in a component. WITHOUT THE NORMALIZE THIS ROW ` +
+            `READS 0.30 AT MID-RAMP: mixing two unit vectors that are 90 degrees apart gives a vector of ` +
+            `length 0.71 at a = 0.5, and a species marching along it would travel at seven tenths the speed ` +
+            `through the middle of every gesture -- pointing correctly and moving wrong, which no brightness ` +
+            `bound anywhere in this tree would catch.`);
+
+        // The ends of the ramp, where the answer is known exactly without any mixing at all.
+        const at0 = (ysh) => [0, 1, 2].map((c) => hd[(ry(ysh) * N + 0) * 4 + c]);
+        const at1 = (ysh) => [0, 1, 2].map((c) => hd[(ry(ysh) * N + (N - 1)) * 4 + c]);
+        let endSpread = 0;
+        for (let ysh = 1; ysh < N; ysh++) for (let c = 0; c < 3; c++)
+            endSpread = Math.max(endSpread, Math.abs(at1(ysh)[c] - at1(0)[c]));
+        let startSpread = 0;
+        for (let ysh = 0; ysh < N; ysh++) for (let c = 0; c < 3; c++)
+            startSpread = Math.max(startSpread, Math.abs(at0(ysh)[c] - at0(0)[c]));
+        say(`across all ${N} wander angles: at the LAST drive column the components vary by ${endSpread}/255, at the first by ${startSpread}/255`);
+        ok("!! *** AT THE TOP OF THE RAMP EVERY WANDER ANGLE RETURNS THE SAME DIRECTION, AND AT THE BOTTOM NONE DOES ***",
+            endSpread <= 16 && startSpread > 200 && startSpread > 15 * endSpread,
+            `${endSpread} of 255 at the top against ${startSpread} at the bottom -- ` +
+            `${(startSpread / Math.max(endSpread, 1)).toFixed(0)}x. THE RESIDUAL IS ARITHMETIC AND ITS SIZE ` +
+            `IS PREDICTED, NOT TOLERATED: the probe's last column is drive ${((N - 1) / N).toFixed(4)}, not ` +
+            `1.0, because the lattice samples cell CENTRES, so 1/${N} of each wander survives the mix. A ` +
+            `component spans about 2, an eighth-and-a-half of a percent of that is 0.125, the frame carries ` +
+            `it at half scale, and 255 * 0.0625 is 16 -- which is the bound, and ${endSpread} is what it ` +
+            `reads. This is the ` +
+            `convergence tools/ship/murmurDrive-selfcheck.mjs measures as an ANGLE in f64 (86.82 degrees to ` +
+            `zero); here it is the same fact read straight out of a frame.`);
+    }
+}
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nWHAT THIS KIT IS FOR: four of murmur-web's eighteen species are built out of it, and the other fourteen " +

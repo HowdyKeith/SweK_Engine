@@ -798,6 +798,123 @@ export function mhIgnite(pLen, complete, sweep, lo, hi, width) {
     return complete * Math.exp(-sr * sr);
 }
 
+/**
+ * *** THE RESPONDING LEAN: THE WANDER ACQUIRES A HEADING. ***
+ *
+ * st.drive is mh_state's fourth output, ramping in over half a second "so entering the state is a lean and
+ * not a jolt", and its 45 references across murmur's eighteen sources do three different things. This table
+ * holds the first: SIX species take a direction that is otherwise hashed, random or slowly tumbling, and mix
+ * it toward a FIXED unit vector. still.ts: "Under drive the lines converge on one axis, so an occasional
+ * wander becomes a traverse." abyss.ts: "under drive they all take one heading and the abyss becomes a
+ * current." opal.ts, of its own lean: "a procession, not a swarm."
+ *
+ * *** THE SIX ARE TWO FAMILIES AND THE SIGN OF z IS WHAT SEPARATES THEM. ***
+ *
+ *     still    (0.92, -0.18,  0.35)   mix into a hashed glint path      k 1.00
+ *     abyss    (0.90, -0.22,  0.37)   mix into three hashed lanes       k 0.80
+ *     sol      (0.86, -0.32,  0.39)   mix into a tumbling prominence    k 0.70
+ *     droplet  (0.92,  0.20,  0.34)   a FLOW through the silhouette     k 0.30
+ *     ---------------------------------------------------------------------------
+ *     nebula   (0.86,  0.24, -0.45)   ADVECTION of the whole domain     k 0.42
+ *     tempest  (0.88,  0.20, -0.43)   the same, on the second cloud     k 0.50
+ *
+ * The four above the line all point INTO the screen's near half (+z, toward the viewer in this port's frame)
+ * and three of the four lean DOWN. The two below point the other way in depth: the volumetric pair stream
+ * AWAY. That is not a stylistic accident -- a cloud advecting toward the viewer would grow across the frame
+ * and read as an approach, where a point of light travelling toward it reads as attention.
+ *
+ * *** AND `wired` IS A RECORD OF WHAT THIS ROUND DID NOT DO, GUARDED RATHER THAN WRITTEN IN PROSE. ***
+ * nebula's and tempest's headings are spelled `adv = V * (st.drive * k * t)` -- a displacement PROPORTIONAL
+ * TO ELAPSED TIME -- so a drive that ramps while t is large advects the domain by t * k * dDrive in one
+ * frame. That is exactly the shape v4650 repaired on the host side of this same orb, where entering
+ * RESPONDING after a minute of idle moved the clock 2.902 s in one frame and after half an hour 86.191 s.
+ * This round wires only terms that are a DIRECTION or a SIZE and touches nothing that multiplies a clock, so
+ * those two are carried here with their numbers and marked unwired; tools/ship/murmurDrive-selfcheck.mjs
+ * asserts that exactly the `wired` entries are read by the shader builder, so the day somebody wires them the
+ * census goes red and this note gets read.
+ */
+/**
+ * *** AND `pre` IS NOT A TIDYING FLAG: NOT ONE OF THESE SIX VECTORS IS A UNIT VECTOR. ***
+ *
+ * Measured: still 1.000650, abyss 0.997647, sol 0.997046, droplet 1.001000, nebula 0.999850, tempest
+ * 0.999650 -- hand-picked numbers, off unit by as much as 0.295%. That would be a curiosity except that
+ * murmur normalizes them INCONSISTENTLY, and the inconsistency changes the answer at partial drive:
+ *
+ *   still, abyss   normalize(mix(wander, V, a))              -- V goes in RAW
+ *   sol            normalize(mix(dir, normalize(V), a))      -- V is normalized FIRST
+ *   droplet        flowDir = normalize(V)                    -- not a mix at all, a direct assignment
+ *
+ * Mixing toward a 0.997-long vector is not the same direction as mixing toward its unit version anywhere
+ * except a = 0 and a = 1, which is every frame of the ramp that RESPONDING is made of. Transcribed per
+ * species rather than normalised into one spelling, the same call this port made for opal's two prose
+ * periods, MH_SCATTER_K's 3.2 against 0.098 and droplet's 0.339 against 0.34177.
+ */
+export const MH_DRIVE_HEADING = Object.freeze({
+    still:   Object.freeze({ v: Object.freeze([0.92, -0.18, 0.35]), k: 1.00, pre: false, wired: true }),
+    abyss:   Object.freeze({ v: Object.freeze([0.90, -0.22, 0.37]), k: 0.80, pre: false, wired: true }),
+    sol:     Object.freeze({ v: Object.freeze([0.86, -0.32, 0.39]), k: 0.70, pre: true,  wired: true }),
+    droplet: Object.freeze({ v: Object.freeze([0.92,  0.20, 0.34]), k: 0.30, pre: true,  wired: true }),
+    nebula:  Object.freeze({ v: Object.freeze([0.86,  0.24, -0.45]), k: 0.42, pre: false, wired: false }),
+    tempest: Object.freeze({ v: Object.freeze([0.88,  0.20, -0.43]), k: 0.50, pre: false, wired: false }),
+});
+
+/**
+ * *** AND THE OTHER HALF OF THE LEAN: IT STOPS SCATTERING. ***
+ *
+ * A heading alone would be a swarm that happens to face one way. What makes murmur's RESPONDING read as
+ * intent is that the spread collapses at the same time -- still and abyss narrow the LATERAL offset of their
+ * hashed paths by the identical 0.70, so the lines converge on the axis they just acquired rather than
+ * running parallel to it. Seven species carry a term of this kind and every one of them is a DISTANCE, an
+ * ANGLE or a SHAPE PARAMETER; not one is a rate, which is why they are all in this round.
+ *
+ * Each field is murmur's literal coefficient and the operation is named, because they are not all the same
+ * operation and folding them into one sign would lose that:
+ *
+ *   still.lateral   0.70  * (1 - k*drive)   on the glint path's sideways offset
+ *   abyss.lateral   0.70  * (1 - k*drive)   the same, on all three lanes
+ *   limn.tailK      0.30  / (1 + k*drive)   a DIVISOR on the tail lobe's concentration: the tail broadens
+ *   limn.tailOff    0.30  - k*drive         SUBTRACTED from the tail's angular offset: it swings round
+ *   arc.sway        0.55  * (1 - k*drive)   "Responding stills the wander and takes the bow out"
+ *   arc.pin         0.40  * (1 - k*drive)   ...and the bow itself flattens
+ *   duet.sep        0.34  * (1 - k*drive)   "Cadence closes it a little, responding a lot"
+ *   prism.fan       0.62  * (1 - k*drive)   "THE FAN. Responding closes it"
+ *   helix.r0        0.14  * (1 - k*drive)   the strands draw in toward the axis
+ *   helix.turns     0.35  * (1 + k*drive)   ...and there are MORE of them: the one term here that GROWS
+ *
+ * helix is the reason the table carries signs rather than magnitudes: it narrows and winds at once, which is
+ * a spring compressing rather than a thing shrinking, and a table of "how much smaller" could not say so.
+ */
+export const MH_DRIVE_FORM = Object.freeze({
+    still:   Object.freeze({ lateral: 0.70 }),
+    abyss:   Object.freeze({ lateral: 0.70 }),
+    limn:    Object.freeze({ tailK: 0.30, tailOff: 0.30 }),
+    arc:     Object.freeze({ sway: 0.55, pin: 0.40 }),
+    duet:    Object.freeze({ sep: 0.34 }),
+    prism:   Object.freeze({ fan: 0.62 }),
+    helix:   Object.freeze({ r0: 0.14, turns: 0.35 }),
+});
+
+/**
+ * The heading mix itself: normalize(mix(wander, V, drive * k)).
+ *
+ * It is a function rather than three transcriptions because three species spell it identically and the
+ * NORMALIZE is the part worth owning -- mixing two unit vectors does not give a unit vector, and a port that
+ * dropped the normalize would still point the right way while changing the SPEED along the path, which is a
+ * different species. `pre` carries murmur's per-species choice of whether V is normalized BEFORE the mix;
+ * see MH_DRIVE_HEADING's note, and note that it is not cosmetic. droplet is not a caller at all: its heading
+ * goes into the body's flow deformation rather than into a direction it marches along.
+ */
+export function mhDriveHeading(wander, V, drive, k, pre = false) {
+    let T = V;
+    if (pre) { const n = Math.hypot(V[0], V[1], V[2]) || 1; T = [V[0] / n, V[1] / n, V[2] / n]; }
+    const a = Math.min(1, Math.max(0, drive * k));
+    const m = [wander[0] + (T[0] - wander[0]) * a,
+               wander[1] + (T[1] - wander[1]) * a,
+               wander[2] + (T[2] - wander[2]) * a];
+    const len = Math.hypot(m[0], m[1], m[2]) || 1;
+    return [m[0] / len, m[1] / len, m[2] / len];
+}
+
 export const MH_SHAPE = Object.freeze({
     still: Object.freeze([0.018, 0.006, 4.2, 1.12]),
     limn: Object.freeze([0.020, 0.000, 0.0, 1.05]),

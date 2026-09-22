@@ -8070,6 +8070,53 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // run -- on Keith's gen-9 box and then here -- and it was red on BOTH, alongside assertionShape's
     // 1751 -> 1757 and runtimeGap's 4275 -> 4286, which are the same six arrivals seen from two other
     // instruments. The surplus mechanism worked exactly as designed; nobody looked at it for six rounds.
+    // v4653 -- THE 336th CLOSING: st.drive, the last of mh_state's four, and the half of it that is safe.
+    since335: Object.freeze({
+        at: "v4653", swept: 2, green: 2, red: 0,
+        added: Object.freeze([
+            "tools/ship/murmurDrive-selfcheck.mjs",
+            "tools/ship/murmurDrive2-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 2,225 and 2,260 ms on real WebGPU, 11 rows between them, plus a new section 14 " +
+                 "in tools/ship/murmurKit-selfcheck.mjs. *** st.drive IS THE LAST OF mh_state's FOUR AND " +
+                 "THE ONLY ONE WHOSE SUBJECT IS A DIRECTION. *** Its 45 references across murmur's eighteen " +
+                 "sources do THREE things -- they point a wander at a heading, they collapse the scatter " +
+                 "around it, and they run sixteen local clocks faster -- and this round took the first two " +
+                 "and left the third. THE LINE IS NOT WHERE THE WORK GOT TIRING: every term wired here is a " +
+                 "DIRECTION or a SIZE, and the deferral is a CHECKED RULE (no line in the shader reads both " +
+                 "DRIVE and uniforms.time) rather than an intention. The rate family hands rate * (1 + k * " +
+                 "st.drive) to mh_drift, whose phase is rate * t, so a drive ramping at large t teleports " +
+                 "it -- the same shape v4650 repaired on this orb's HOST clock, and it needs a decision " +
+                 "about faithfulness rather than a transcription. " +
+                 "*** THE HEADING'S CLAIM IS GEOMETRY AND THE GATE SAYS SO INSTEAD OF DRESSING IT UP: *** " +
+                 "still's twelve gesture directions sit 86.82 degrees apart at rest (worst pair 177.3, very " +
+                 "nearly opposite) and collapse to EXACTLY one axis at full drive, while abyss -- same call, " +
+                 "k 0.80 instead of 1.00 -- keeps a 12.02 degree residual and stays a current rather than a " +
+                 "ray. AND IT DOES NOT CONVERGE IN A STRAIGHT LINE: the quarter point reads 87.34, HIGHER " +
+                 "than the 86.82 it started at, because normalize(mix(a, b, t)) is not a rotation. A port " +
+                 "that slerped would read 65.11 there. " +
+                 "*** THE NARROWING IS WHAT A FRAME CAN SHOW: *** helix's light draws in 3.51% (duet 7.21%, " +
+                 "prism 4.05%, arc 2.98%, measured this round and not rendered by the shipped gate for " +
+                 "budget) while limn -- the one species in MH_DRIVE_FORM whose lean is NOT a contraction -- " +
+                 "moves 0.21% and still shifts 8.1% of its bytes. droplet's lean goes into the SILHOUETTE " +
+                 "and still's does not: 539.7% against 1.2% on the same 0.62 ring, and droplet's route is " +
+                 "the kit's flow deformation, a term BOTH HALVES HAVE CARRIED SINCE THE PORT AND NO CALL " +
+                 "SITE HAD EVER SET -- every one passed (0,0,1), 0, 0. " +
+                 "FOURTEEN SABOTAGES, ALL CAUGHT, AND SIX OF THEM WALKED THROUGH FIRST. The largest hole: " +
+                 "mhDriveHeading's CPU/GPU pair was graded NOWHERE, so deleting the mix -- or the normalize " +
+                 "-- from the TSL twin left every pixel gate green, because the species carrying a heading " +
+                 "also carry a narrowing and their frames still moved. Closed by kit section 14, which also " +
+                 "reads the LENGTH back out of the frame: without the normalize it reads 0.30 at mid-ramp. " +
+                 "Two more were bounds loosened on a correct subject (v4650's lesson, twice): the angular " +
+                 "epsilon is now DERIVED from Number.EPSILON through acos's square-root amplification, and " +
+                 "the unit-vector bound carries its own negative control -- the row builds a tidied vector " +
+                 "and requires it to FAIL. One row was DELETED rather than repaired: a helix inference that " +
+                 "survived its own negation, replaced by a source census that says what altitude it answers " +
+                 "at. AND ONE SABOTAGE WAS WRONG, NOT THE GATE: a needle matched MH_IGNITE before " +
+                 "MH_DRIVE_HEADING and tested the wrong table.",
+    }),
     // v4650 -- THE 335th CLOSING: the orb's clock was an integral that reached no shader.
     since334: Object.freeze({
         at: "v4650", swept: 1, green: 1, red: 0,

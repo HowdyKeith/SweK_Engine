@@ -870,6 +870,24 @@ export const NEXT_ROUNDS = [
             "v4641's species frames did not move at all once the operating point was held, but a state term " +
             "arriving is new light in the frame and there is no operating point that hides it.",
         upstream: "None. The kit half is done, graded and green; this is transcription and gating.",
+        note2: "PART DONE at v4653, and the part left is the part with the decision in it. st.drive's 45 " +
+            "sites do three things and this round wired two: the HEADING (still, abyss and sol mix a hashed " +
+            "or tumbling direction toward a fixed axis; droplet sets the kit's flow deformation, which both " +
+            "halves have carried since the port and no call site had ever set) and the NARROWING (ten " +
+            "coefficients across seven species, in MH_DRIVE_FORM).\n\n" +
+            "*** WHAT IS LEFT IS THE RATE FAMILY: sixteen sites, and the reason it is left is below. *** " +
+            "Also left: nebula's and tempest's advections, which are the same hazard wearing the heading " +
+            "family's clothes -- they are spelled adv = V * (st.drive * k * t), a displacement proportional " +
+            "to elapsed time. They are carried in MH_DRIVE_HEADING with wired: false and a census row in " +
+            "tools/ship/murmurDrive-selfcheck.mjs goes RED the day anyone wires them, so this note gets " +
+            "read before the jump ships.\n\n" +
+            "*** THE DECISION THE NEXT ROUND HAS TO MAKE OUT LOUD. *** Transcribe murmur faithfully and " +
+            "inherit a phase teleport that grows without bound with session length, or integrate " +
+            "per-species rates inside the shader -- a second phase uniform per lane, or mh_drift taking an " +
+            "already-integrated argument -- and diverge from the source on purpose. There is no third " +
+            "option where it is both faithful and correct, because the defect is in murmur's own design. " +
+            "live.pace already carries the identical shape at the sites that read it, so the honest scope " +
+            "may be wider than drive: whatever is decided applies to both.",
         blocked: "NOT BLOCKED, BUT READ THIS FIRST -- v4650 found what st.drive is about to walk into. " +
             "The largest family of drive's 45 sites is RATE: sixteen of the eighteen species multiply a " +
             "local clock by (1 + k * st.drive), k from 0.35 to 1.70, and hand the product to mh_drift -- " +

@@ -121,6 +121,7 @@ import { makeMurmurKitTsl } from "./murmurKitTsl.mjs";
 import { MH_EXT, MH_TAPS, MH_SURFACE_KNOBS, MH_SHAPE, MH_DROPLET_GAIN, MH_MIST,
          MH_TEMPEST_BOLT, MH_FATHOM, MH_GEODE, MH_ARC, MH_SOL, MH_AURA, MH_FLUX, MH_DUET, MH_CHORUS,
          MH_PRISM, MH_HELIX, MH_TAPS_HI, MH_R, MH_SETTLED, MH_SETTLED_INTERIOR, MH_SETTLED_COMET_HEAD, MH_IGNITE,
+         MH_DRIVE_HEADING, MH_DRIVE_FORM,
          mhAa } from "./murmurKit.mjs";
 
 /**
@@ -248,6 +249,26 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         const SETTLED = STATE.settled.toVar();
         const COMPLETE = STATE.complete.toVar();
         const SWEEP = STATE.sweep.toVar();
+        // *** AND `drive` ARRIVES AT v4653, THE LAST OF mh_state's FOUR. *** It ramps in over half a second
+        // in RESPONDING alone "so entering the state is a lean and not a jolt", and its 45 references across
+        // murmur's eighteen sources do three different things: they point a wander at a heading, they
+        // collapse the scatter around it, and they run sixteen local clocks faster. THIS ROUND WIRES THE
+        // FIRST TWO AND NOT THE THIRD, and the line is not where the work got tiring -- every term below is
+        // a DIRECTION or a SIZE, and not one of them multiplies t. The rate family does: murmur hands
+        // rate * (1 + k * st.drive) to mh_drift, whose phase is rate * t, so a drive ramping while t is
+        // large teleports the phase -- the same shape v4650 repaired on this orb's HOST clock, where
+        // entering RESPONDING after a minute of idle moved it 2.902 s in one frame. That needs a decision
+        // about faithfulness rather than a transcription, and it is recorded in tools/ship/nextRounds.mjs.
+        const DRIVE = STATE.drive.toVar();
+        const HEAD = MH_DRIVE_HEADING[species] || null;
+        const FORM = MH_DRIVE_FORM[species] || null;
+        // The heading target as the shader will read it: murmur pre-normalizes sol's and droplet's and not
+        // still's or abyss's, and none of the six is a unit vector, so `pre` changes the direction at every
+        // point of the ramp strictly between 0 and 1. See MH_DRIVE_HEADING's own note.
+        const headV = HEAD ? (() => {
+            const v = HEAD.pre ? (() => { const n = Math.hypot(...HEAD.v); return HEAD.v.map((c) => c / n); })() : HEAD.v;
+            return vec3(v[0], v[1], v[2]);
+        })() : null;
         // Each hero's own ignition constants, or null for the eleven that spend `complete` on their own
         // figures instead. Read at BUILD time off the kit's table, so a species without an entry builds no
         // shell nodes at all rather than building one multiplied by zero.
@@ -330,8 +351,26 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // uv in murmur's own units: this file's quad is -1..1 with the body at R_BODY, murmur's is uv with
         // the body at MH_R, so the ratio carries one space into the other.
         const uvM = pc.mul(KIT.MH_R / R_BODY).div(bodyScale).toVar();
+        // *** THE FLOW DEFORMATION WAS PORTED ON BOTH HALVES OF THE KIT AND NOTHING EVER SET IT -- v4653. ***
+        // render/murmurKit.mjs's mhDeform and render/murmurKitTsl.mjs's both carry kit.ts's travelling wave
+        // -- "d += flowAmp * sin(3.20 * dot(n, flowDir) + flowPhase)", with its exact gradient -- and every
+        // call site in this file passed (0,0,1), 0, 0. droplet.ts is its only caller in murmur's eighteen:
+        // "RESPONDING: the wobble acquires a heading." It is the same defect shape as mh_live before v4641
+        // and mh_state before v4644, one layer deeper: the mechanism was transcribed, graded and unreachable.
+        //
+        // THE HEADING GOES INTO THE SILHOUETTE HERE, NOT INTO A DIRECTION ANYTHING MARCHES ALONG, which is
+        // why droplet is in MH_DRIVE_HEADING but is not a caller of mhDriveHeading. flowPhase runs on a
+        // FIXED-rate drift (2.05), not a drive-modulated one, so nothing in this round multiplies a clock.
+        const DROPLET_FLOW = species === "droplet" && HEAD ? (() => {
+            const n = Math.hypot(...HEAD.v);
+            return { dir: vec3(HEAD.v[0] / n, HEAD.v[1] / n, HEAD.v[2] / n),
+                     amp: DRIVE.mul(HEAD.k),
+                     phase: KIT.mhDrift(uniforms.time, float(2.05), float(0.30), float(7.0)).negate() };
+        })() : null;
         const bodyV = KIT.mhBody(uvM, uniforms.time, float(0.004), shapeAmp, float(0.0), shapeGain,
-                                 vec3(0.0, 0.0, 1.0), float(0.0), float(0.0), dP, dN).toVar();
+                                 DROPLET_FLOW ? DROPLET_FLOW.dir : vec3(0.0, 0.0, 1.0),
+                                 DROPLET_FLOW ? DROPLET_FLOW.amp : float(0.0),
+                                 DROPLET_FLOW ? DROPLET_FLOW.phase : float(0.0), dP, dN).toVar();
         const N = dN, fres = bodyV.w, bodyMask = bodyV.x, bodyRd = bodyV.y, bodyRho = bodyV.z;
         const ci = clamp(N.z, 0.0, 1.0);               // = -dot(V, N) since V = (0,0,-1); cos(incidence)
 
@@ -376,13 +415,23 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         const slot = float(11.5).sub(uniforms.glintRate.mul(4.5));
         const fl = KIT.mhFlourish(uniforms.time, float(5.0), slot).toVar();
         const ga = fl.z.mul(6.2831853).toVar();
-        const dir = normalize(vec3(cos(ga), sin(ga.mul(1.3)).mul(0.42), sin(ga))).toVar();
+        // *** THE PATH TAKES A HEADING UNDER DRIVE -- v4653. *** still.ts: "Under drive the lines converge on
+        // one axis, so an occasional wander becomes a traverse." THE RAW WANDER GOES INTO THE MIX AND THE
+        // NORMALIZE HAPPENS ONCE, AFTER, which is murmur's spelling and not this file's previous one: it
+        // normalized the wander alone. The two agree exactly at drive 0 -- normalize(mix(w, V, 0)) is
+        // normalize(w) -- so every frame outside RESPONDING is byte-identical, and they differ everywhere
+        // else, because mixing a unit vector toward V is not mixing the raw one toward V.
+        const wander = vec3(cos(ga), sin(ga.mul(1.3)).mul(0.42), sin(ga)).toVar();
+        const dir = KIT.mhDriveHeading(wander, headV, DRIVE, float(HEAD.k)).toVar();
         const side = normalize(vec3(
             dir.y.mul(0.12).sub(dir.z),
             dir.z.mul(0.06).sub(dir.x.mul(0.12)),
             dir.x.sub(dir.y.mul(0.06)))).toVar();
         const along = float(-0.62).add(smoothstep(float(0.0), float(1.0), fl.y).mul(1.24));
-        const lateral = float(0.34).mul(fl.z.mul(2.0).sub(1.0));
+        // ...and the scatter collapses around it. A heading alone is a swarm that happens to face one way;
+        // what makes RESPONDING read as intent is that the sideways offset closes at the same time.
+        const lateral = float(0.34).mul(fl.z.mul(2.0).sub(1.0))
+            .mul(float(1.0).sub(DRIVE.mul(FORM.lateral)));
         const gp = side.mul(lateral).add(dir.mul(along)).toVar();
         const gw = float(0.085).add(uniforms.glintRate.mul(0.055)).toVar();
 
@@ -458,8 +507,12 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         const aw = phi.sub(phi0).toVar();
         const awW = aw.sub(float(6.2831853).mul(TSL.floor(aw.div(6.2831853).add(0.5)))).toVar();
         const kHead = float(9.0).div(float(1.0).add(VOICE.mul(0.60))).toVar();
-        const kTail = float(1.6).div(float(1.0).add(VOICE.mul(0.35))).toVar();
-        const offT = float(-1.05);
+        // limn's half of the lean, and it is the only species whose narrowing is a DIVISOR and a SUBTRACTION
+        // rather than a scale. kTail is the tail lobe's CONCENTRATION, so dividing it broadens the tail;
+        // offT is where the tail sits in angle, so subtracting swings it round. The arc does not get
+        // smaller -- it spreads and turns, which is what a stroke does when it is finishing a word.
+        const kTail = float(1.6).div(float(1.0).add(VOICE.mul(0.35)).add(DRIVE.mul(FORM.tailK))).toVar();
+        const offT = float(-1.05).sub(DRIVE.mul(FORM.tailOff));
         const headLobe = exp(kHead.mul(cos(awW).sub(1.0))).toVar();
         const tailLobe = exp(kTail.mul(cos(awW.sub(offT)).sub(1.0))).toVar();
         const arcProfile = headLobe.add(tailLobe.mul(0.52)).toVar();
@@ -775,9 +828,12 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             const wk = k < 2 ? float(1.0) : thirdC;
             const fk = k;
             const ga = f.z.mul(6.2831853).add(fk * 1.7).toVar();
-            const dirA = normalize(vec3(cos(ga), sin(ga.mul(1.6).add(fk)).mul(0.40), sin(ga.mul(0.8).add(1.3)))).toVar();
+            // abyss.ts: "under drive they all take one heading and the abyss becomes a current" -- all THREE
+            // lanes, which is why this sits inside the loop and takes the same mix still's single path does.
+            const wanderA = vec3(cos(ga), sin(ga.mul(1.6).add(fk)).mul(0.40), sin(ga.mul(0.8).add(1.3))).toVar();
+            const dirA = KIT.mhDriveHeading(wanderA, headV, DRIVE, float(HEAD.k)).toVar();
             const sideA = normalize(TSL.cross(dirA, vec3(0.08, 1.0, 0.14))).toVar();
-            const gp = sideA.mul(f.z.mul(2.0).sub(1.0).mul(0.42))
+            const gp = sideA.mul(f.z.mul(2.0).sub(1.0).mul(0.42).mul(float(1.0).sub(DRIVE.mul(FORM.lateral))))
                 .add(dirA.mul(mix(abyssReach.negate(), abyssReach, smoothstep(float(0.0), float(1.0), f.y)))).toVar();
             const toA = gp.sub(P).toVar();
             const sA = dot(toA, rd).toVar();
@@ -1191,7 +1247,11 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             // THE ARC'S FRAME -- roll FIRST, then yaw and tilt. Roll is the third rotation the kit gained for
             // this round: without it a curve's projected ellipse keeps its long axis horizontal on screen
             // however it is yawed and tilted, which is what turned three ribbons into one swoosh.
-            const sway = float(AR.swayB).add(swayKn.mul(AR.swayK)).toVar();
+            // arc.ts: "Responding stills the wander and takes the bow out." TWO terms, and they are
+            // different verbs: sway is the amplitude of the frame's own rocking, pin is how far the arc's
+            // midpoint sits off centre. Stilling one without flattening the other would be a steady comma.
+            const sway = float(AR.swayB).add(swayKn.mul(AR.swayK))
+                .mul(float(1.0).sub(DRIVE.mul(FORM.sway))).toVar();
             const ro = float(AR.rollB).add(sway.mul(AR.rollAmp).mul(
                 sin(KIT.mhDrift(uniforms.time, float(AR.rollRate), float(AR.rollWob), float(AR.rollLane))))).toVar();
             const ay = KIT.mhDrift(uniforms.time, float(AR.yawRate), float(AR.yawWob), float(AR.yawLane)).toVar();
@@ -1204,7 +1264,8 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             // draughtsman makes to get a longer line out of a fixed sheet: the shape it draws is a shallow
             // catenary U rather than a comma."
             const pin = mix(float(AR.pinFar), float(AR.pinNear), pinK)
-                .mul(float(1.0).add(VOICE.mul(AR.pinVoice)).add(flA.x.mul(AR.pinFlourish))).toVar();
+                .mul(float(1.0).add(VOICE.mul(AR.pinVoice)).add(flA.x.mul(AR.pinFlourish)))
+                .mul(float(1.0).sub(DRIVE.mul(FORM.pin))).toVar();
             const Rc = float(AR.rcB).add(bowK.mul(AR.rcK)).toVar();
             const span = float(AR.spanB).add(bowK.mul(AR.spanK))
                 .mul(mix(float(1.0), float(AR.spanSmall), smallK)).toVar();
@@ -1406,7 +1467,13 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
                 const lift = sn.mul(sn).toVar();
                 const a1 = uniforms.time.mul(SO.rootA1 + SO.rootA1K * k).add(k * SO.rootPh1).toVar();
                 const a2 = uniforms.time.mul(SO.rootA2 + SO.rootA2K * k).add(k * SO.rootPh2).toVar();
-                const dir = normalize(vec3(cos(a1).mul(cos(a2)), sin(a2), sin(a1).mul(cos(a2)))).toVar();
+                // sol's tumbling root direction, leaned under drive. Its wander IS exactly unit already --
+                // cos^2(a1)cos^2(a2) + sin^2(a2) + sin^2(a1)cos^2(a2) is 1 identically -- so murmur's
+                // normalize on it is redundant and kept, and the mix is what does the work. sol is one of
+                // the two species whose TARGET is pre-normalized; see MH_DRIVE_HEADING's note on why that
+                // is not cosmetic.
+                const dirW = normalize(vec3(cos(a1).mul(cos(a2)), sin(a2), sin(a1).mul(cos(a2)))).toVar();
+                const dir = KIT.mhDriveHeading(dirW, headV, DRIVE, float(HEAD.k)).toVar();
                 const tang = normalize(cross(dir, vec3(0.13, 0.97, 0.21)).add(1e-4)).toVar();
                 const hk = float(SO.hkB).add(promK.mul(SO.hkK)).mul(lift)
                     .mul(float(1.0).add(VOICE.mul(SO.hkVoice))).toVar();
@@ -1729,8 +1796,11 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             const e2 = KIT.mhSpin(vec3(float(0.0), sin(lean), cos(lean)), prec, float(0.0)).toVar();
             const nrm = cross(e1, e2).toVar();
 
+            // duet.ts: "Cadence closes it a little, responding a lot, the gesture briefly, and success all
+            // the way in." Four terms on one separation, and this round adds the second of them.
             const rSep = mix(float(DU.rNear), float(DU.rFar), sepK)
                 .mul(mix(float(1.0), float(DU.rSmall), smallK))
+                .mul(float(1.0).sub(DRIVE.mul(FORM.sep)))
                 .mul(float(1.0).sub(flD.x.mul(0.30))).toVar();
             const rate = float(DU.rateB).add(orbitK.mul(DU.rateK))
                 .mul(float(1.0).add(flD.x.mul(0.85))).toVar();
@@ -1916,7 +1986,10 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             const u1 = normalize(cross(axis, vec3(0.0, 0.0, 1.0)).add(vec3(1e-4, 0.0, 0.0))).toVar();
             const u2 = normalize(cross(axis, u1)).toVar();
 
+            // prism.ts: "THE FAN. Responding closes it; the gesture opens it wider than it ever otherwise
+            // goes." The two pull opposite ways on the same number, which is the species in one line.
             const div = float(PR.divB).add(splitK.mul(PR.divK)).mul(mix(float(1.0), float(PR.divSmall), smallK))
+                .mul(float(1.0).sub(DRIVE.mul(FORM.fan)))
                 .mul(float(1.0).add(flP.x.mul(PR.divFlourish))).toVar();
             const wob = (k) => sin(uniforms.time.mul(PR.wobRate[k]).add(PR.wobPhase[k])).mul(PR.wobble[k]);
             const D = [
@@ -2002,12 +2075,17 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
 
             // THE CROSSING RHYTHM IS COUNTED: "about one and three quarter turns inside the visible height:
             // three or four crossings, which is the count the eye reads as a helix rather than as a spring."
+            // *** THE ONE PLACE IN THIS ROUND WHERE DRIVE MAKES SOMETHING BIGGER. *** helix gains turns
+            // (+0.35) while its radius draws in (-0.14): a spring compressing, not a thing shrinking. A
+            // table of "how much smaller" could not have said that, which is why MH_DRIVE_FORM keeps the
+            // operation beside each coefficient instead of a magnitude.
             const turns = float(HX.turnsB).add(turnsK.mul(HX.turnsK)).mul(mix(float(1.0), float(HX.turnsSmall), smallK))
-                .mul(float(1.0).add(flH.x.mul(0.20))).toVar();
+                .mul(float(1.0).add(DRIVE.mul(FORM.turns)).add(flH.x.mul(0.20))).toVar();
             const climb = KIT.mhDrift(uniforms.time,
                 float(HX.climbB).add(riseK.mul(HX.climbK)).mul(mix(float(1.0), float(HX.climbSmall), smallK)),
                 float(HX.climbWob), float(HX.climbLane)).toVar();
-            const r0 = float(HX.r0B).add(turnsK.mul(HX.r0K)).mul(float(1.0).sub(flH.x.mul(0.10))).toVar();
+            const r0 = float(HX.r0B).add(turnsK.mul(HX.r0K))
+                .mul(float(1.0).sub(DRIVE.mul(FORM.r0)).sub(flH.x.mul(0.10))).toVar();
             const wH = float(HX.wB).add(glowK.mul(HX.wK)).mul(mix(float(1.0), float(HX.wSmall), smallK))
                 .mul(float(1.0).add(VOICE.mul(HX.wVoice))).toVar();
             const brightH = float(HX.brightB).add(glowK.mul(HX.brightK))
