@@ -30,6 +30,7 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "../ship/playwrightResolve.mjs";
 import { noComments } from "../ship/sourceScan.mjs";
+import { reportThrows } from "../ship/thrownRow.mjs";
 import { VARIANTS, validateVariant, SHARED_CAP } from "./magmapVariants.mjs";
 
 const require_ = createRequire(import.meta.url);
@@ -37,6 +38,18 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
+// *** v4651 -- ANY THROW BECOMES A FAIL ROW. *** This gate has come back from the rig as
+// "CRASHED, exit 1, 0 FAIL rows" -- it printed its passing rows, threw somewhere in the browser half,
+// and died, so the ship's `grep -c '^  FAIL'` read ZERO on a gate that had failed. Worse, what a
+// page.evaluate rejects with is usually a plain object, and node prints a thrown object with NO STACK
+// at all. tools/ship/thrownRow.mjs turns whatever it is into one line a reader can act on, on stdout,
+// where the counting instrument looks. It does not diagnose the rig's throw -- this box cannot
+// reproduce it -- it makes the next clone-verify name it.
+// BROWSER is declared FIRST and assigned at every launch site below: a cleanup that closes a handle
+// nothing ever put there is a control that cannot fire, and a gate that reports its own death and
+// then hangs on an open Chromium has traded one silent failure for another.
+let BROWSER = null;
+reportThrows("magmapDefault-selfcheck", { cleanup: () => { try { BROWSER && BROWSER.close(); } catch {} } });
 console.log("magmapDefault-selfcheck -- the shipped kernel is a DERIVED variant, and its cap is load-bearing\n");
 
 // ---- 1. the source properties, before spending a GPU on it -------------------------------------------------
@@ -83,7 +96,7 @@ if (skip) {
     process.exit(fails ? 1 : 0);
 }
 
-const b = await chromium.launch({ executablePath: HEADLESS_SHELL,
+const b = BROWSER = await chromium.launch({ executablePath: HEADLESS_SHELL,
     args: ["--enable-unsafe-webgpu", "--enable-features=Vulkan,WebGPU"] });
 const page = await (await b.newContext()).newPage();
 await page.route("**/*", (route) => {

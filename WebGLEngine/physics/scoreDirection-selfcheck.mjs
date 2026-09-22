@@ -205,7 +205,28 @@ section("5. THE CENSUS -- REPORTED, NOT FROZEN");
 {
     resetRegistry();
     registerAll();
-    const rows = listProposers().map((p) => ({ id: p.id, r: runProposer(p.id) }));
+    // *** THE PROPOSERS THAT DECLARE A ready() ARE READIED FIRST, AND UNTIL v4651 THEY WERE NOT. ***
+    // proposers.mjs:71 says it in as many words -- "an adjudicator that needs a wasm loaded (the race's
+    // box3d) exposes an async ready() the route awaits before runProposer" -- and this file is that route
+    // and never awaited one. It could not even discover there was one to await: listProposers() projected
+    // { id, knobs, tier, notes, instrument } and dropped `ready` with the other callables, so the view a
+    // caller iterates did not say which members needed readying. It carries `needsReady` now.
+    //
+    // WHAT THAT COST IS THE WHOLE POINT OF THIS SECTION. Unready, gunner-shell's SEVEN candidates each
+    // refused with `box3d is not initialised -- await gunnerPolicy.ready() (node) ... first` -- the refusal
+    // named itself, on every line -- and the row below read `accepted === null` and reported an EXHAUSTED
+    // SEARCH. That is the one confusion the antidote above exists to prevent, arriving one level up: a
+    // search that never ran, wearing the clothes of a search that found nothing.
+    const listed = listProposers();
+    const notReady = [];
+    for (const p of listed) {
+        if (!p.needsReady) continue;
+        const full = getProposer(p.id);
+        let v = false;
+        try { v = await full.ready(); } catch (e) { v = false; }
+        if (!v) notReady.push(p.id);
+    }
+    const rows = listed.map((p) => ({ id: p.id, needsReady: p.needsReady, r: runProposer(p.id) }));
     const greedyRefused = rows.filter((x) => !x.r.verdict.pass);
     const haveAccepted = rows.filter((x) => x.r.accepted !== null);
     console.log("     greedy pick refused: " + greedyRefused.length + " of " + rows.length +
@@ -229,8 +250,29 @@ section("5. THE CENSUS -- REPORTED, NOT FROZEN");
     //
     // Found at v4565 by re-timing the over-budget pool: this gate had been outside the ship-time sweep, so
     // the antidote fired into a terminal nobody was reading.
-    const EXHAUSTED = ["race-speed"];
+    // *** THE LIST IS EMPTY, AND EMPTYING IT IS THE FINDING RATHER THAN A TIDY-UP. ***
+    // It held "race-speed", put there at v4565 to close this row when that proposer reported accepted:null.
+    // race-speed declares a ready() too, and READIED it accepts 0.5 at rank 2 after 3 adjudications -- it
+    // was never exhausted. The name was added to an allow-list to close a red whose cause was printed on
+    // every candidate line the gate itself had just emitted. The red was real and the diagnosis was not.
+    //
+    // The list stays as a MECHANISM with its history, the way PENDING_REBUILD does in box3dNode: the day a
+    // proposer really has no passing candidate, its name belongs here with the measurement that says so.
+    // What has changed is that a proposer cannot get here by not having been started.
+    const EXHAUSTED = [];
     const exhausted = greedyRefused.filter((x) => x.r.accepted === null);
+    // *** AND THE THIRD STATE IS ITS OWN ROW, SO IT CAN NEVER AGAIN BE COUNTED AS THE SECOND. *** A
+    // proposer whose ready() answers false has not searched anything, and on a box where box3d does not
+    // load that is EVERY box3d-backed proposer at once. Reported by name, from ready()'s own return value
+    // rather than by matching a refusal string, which is a fact about a value and not about wording.
+    ok("!! *** every proposer that declares a ready() was READIED before it was adjudicated ***",
+       notReady.length === 0,
+       notReady.length ? "NOT READY and therefore never searched: " + notReady.join(", ") +
+                         " -- their candidates all refuse for that reason, and a row reading accepted:null " +
+                         "would call that an exhausted search. It is not one"
+                       : rows.filter((x) => x.needsReady).length + " declare one (" +
+                         rows.filter((x) => x.needsReady).map((x) => x.id).join(", ") + "), all ready. " +
+                         "Until v4651 this route awaited none of them and could not see that it should");
     ok("where the greedy pick is refused, the loop still names a survivor -- or says it looked and found none",
        greedyRefused.every((x) => x.r.accepted !== null || EXHAUSTED.includes(x.id)) &&
        exhausted.every((x) => EXHAUSTED.includes(x.id) && x.r.acceptedRank === -1 && x.r.adjudicated > 1),

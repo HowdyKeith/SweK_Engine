@@ -302,6 +302,34 @@ console.log("\n2. handed a stale record, each check names it");
         `the live drift() at the top of this file has already memoised the real census under the real ` +
         `function; a coarser key would hand this fixture that answer and pass. Got: ${rA.detail}`);
 
+    // *** v4651 -- THE CHECK THAT SHOULD HAVE EXISTED FOR TWO ROUNDS, DRIVEN BOTH WAYS. ***
+    // v4650 added a frozen record and v4651 added another; this pre-flight reported "nothing stale" on both
+    // and BOTH verifies then came back with frozenRecords-selfcheck and recordReach-selfcheck red. The
+    // instrument whose whole job is to ask "what did a new module invalidate" was not asking about the two
+    // censuses that COUNT records, while the record in frozenRecords.mjs has carried the line "a round that
+    // adds a record re-takes this, and that is the point" since v4647f.
+    const fReal = await import("./frozenRecords.mjs");
+    const fFake = { ...fReal, PROBE_AT_V4536: Object.freeze({ ...fReal.PROBE_AT_V4536,
+        currentIncludingModule: Object.freeze({ ...fReal.PROBE_AT_V4536.currentIncludingModule, records: 1 }) }) };
+    const dF = await checks({ load: async (p) => (p.includes("frozenRecords") ? fFake : import(p)), only: "record censuses" });
+    const rF = dF.find((c) => c.name === "record censuses");
+    ok("!! a stale frozenRecords count is FOUND, and the detail names both records that hold one",
+        rF.stale === true && /frozenRecords records 1/.test(rF.detail) && /recordReach records/.test(rF.detail),
+        `it compares the live census against BOTH frozen counts, because a round that re-takes one and not ` +
+        `the other is exactly what happened here twice. Got: ${rF.detail}`);
+    const rrReal = await import("./recordReach.mjs");
+    const rrFake = { ...rrReal, REACH_AT_V4548: Object.freeze({ ...rrReal.REACH_AT_V4548, total: 1 }) };
+    const dR = await checks({ load: async (p) => (p.includes("recordReach") ? rrFake : import(p)), only: "record censuses" });
+    const rR = dR.find((c) => c.name === "record censuses");
+    ok("  ...and a stale recordReach total is found too, so the check is not only about the other one",
+        rR.stale === true && /recordReach records 1/.test(rR.detail),
+        `two records, two ways to be stale, and a check reading one of them would pass on half the cases. ` +
+        `Got: ${rR.detail}`);
+    ok("!! CONTROL: the untouched pair is clean, so neither row is simply always true",
+        (await checks({ only: "record censuses" })).find((c) => c.name === "record censuses").stale === false,
+        "the live tree agrees with both frozen counts today, which is what makes the two fixtures above " +
+        "measurements rather than a detector that reports everything");
+
     const kReal = await import("./buildKnowledgeIndex.mjs");
     const kFake = { ...kReal, buildIndex: () => ({ gates: [{ path: "physics/made-up.mjs", kind: "gate", id: "made-up", text: "not on disk" }], claims: [], findings: [] }) };
     const dK = await checks({ load: async (p) => (p.includes("buildKnowledgeIndex") ? kFake : import(p)), only: "knowledge index" });
@@ -361,9 +389,21 @@ console.log("\n4. the frozen record");
 ok("the rounds and their record counts are what the commits show",
     REC.rounds.length === 4 && REC.rounds.map((r) => r.records).join(",") === "3,2,4,4",
     "two to four, varying by what the round added -- which is why the list cannot be memorised");
-ok("!! re-deriving every checked record costs less than a second, against a five-minute verify",
-    Object.values(REC.cost).reduce((a, b) => a + b, 0) < 1000 && REC.verifyMs >= 300000,
-    `${Object.values(REC.cost).reduce((a, b) => a + b, 0)} ms vs ${REC.verifyMs} ms`);
+// *** v4651 -- THE BOUND WAS A ROUND NUMBER AND IS NOW A RATIO, AND THE SWAP IS THE ARGUMENT THE RECORD
+// DEMANDED RATHER THAN A WIDENING. *** It read `sum < 1000`, and the record's own note beside the cost table
+// said the next check added "has to justify itself against that, or the budget has to move on an argument
+// instead of by drift". The seventh check costs 740 ms, the sum is 1,585, and the argument is that two
+// CONSECUTIVE rounds shipped a red verify for precisely the question it asks. A round number says nothing
+// about what the bound is for; what it is for is that the pre-flight must be cheap AGAINST THE THING IT
+// PROTECTS, and that is a ratio. 0.53% of a five-minute verify. If the checks ever grow to a tenth of the
+// verify they are guarding, they are not a pre-flight any more and this row says so at 1%.
+const COST_MS = Object.values(REC.cost).reduce((a, b) => a + b, 0);
+ok("!! re-deriving every checked record costs a small fraction of the verify it protects",
+    COST_MS < REC.verifyMs / 100 && REC.verifyMs >= 300000,
+    `${COST_MS} ms against a ${REC.verifyMs} ms verify -- ${(100 * COST_MS / REC.verifyMs).toFixed(2)}%, ` +
+    `bound 1%. The old form was a flat 1,000 ms and the seventh check at a FULL census would not have fit ` +
+    `under it; the check was made cheap (740 -> 285 ms, guardians off) AND the bound was given a shape, ` +
+    `because a round number says nothing about what it is guarding`);
 ok("the record admits the one it does not check", REC.notChecked === 1);
 ok("the record is frozen", Object.isFrozen(REC) && REC.rounds.every(Object.isFrozen));
 

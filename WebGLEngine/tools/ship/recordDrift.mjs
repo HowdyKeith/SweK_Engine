@@ -91,6 +91,7 @@ export const OWES = Object.freeze({
     runtimeGap: "any new .mjs moves vba/runtimeGap.mjs's twelve-row capability census",
     index: "a new gate owes knowledge-index.json a rebuild, and every check reading it owes nothing until it has one",
     redCensus: "a gate that goes green owes tools/ship/redCensus.mjs the removal of its registered-red entry",
+    frozenRecords: "a round that adds a FROZEN RECORD owes tools/ship/frozenRecords.mjs and tools/ship/recordReach.mjs their re-taken counts -- both count records, and both go red on the next verify if the round that added one did not",
 });
 
 /**
@@ -173,6 +174,35 @@ export async function checks({ load = null, timings = null, only = null } = {}) 
             recorded: A.SHAPE_AT_V4480.definesOk, actual: ac.definesOk,
             stale: A.SHAPE_AT_V4480.definesOk !== ac.definesOk || A.SHAPE_AT_V4480.gates !== ac.gates,
             detail: `gates ${A.SHAPE_AT_V4480.gates} vs ${ac.gates}, copies ${A.SHAPE_AT_V4480.definesOk} vs ${ac.definesOk}`,
+        });
+    }
+
+    // *** v4651 -- THE PRE-FLIGHT DID NOT ASK ABOUT THE TWO CENSUSES THAT COUNT RECORDS, AND THAT COST TWO
+    // ROUNDS IN A ROW. *** v4650 added WASM_AT_V4650 and v4651 added EXILED_PASS_V4651; this tool reported
+    // "nothing stale" both times and both verifies then came back with frozenRecords-selfcheck and
+    // recordReach-selfcheck red. The closing line of the record in frozenRecords.mjs has said it since
+    // v4647f -- "a round that adds a record re-takes this, and that is the point" -- and the instrument that
+    // exists to ask that question before the verify was not asking it. A pre-flight that is silent about the
+    // most common kind of arrival is not a cheap pre-flight, it is a misleading one.
+    //
+    // ONE census, WITHOUT GUARDIANS, and the second half of that is what makes this check affordable at all.
+    // frozenRecords.census() is 738 ms cold on this box, and the bulk of it is the GUARDIAN search -- the
+    // comment strip over every gate source plus a name scan across all of them. This check asks only how many
+    // records the tree holds. Measured: 738 -> 285 ms cold, same 149 records and same 399 fields. The same
+    // move assertionShape.census({ shapes: false }) makes twenty lines above, for the same reason, on the same
+    // gate's budget. Behind `once` on the census function, like every other heavy derivation here.
+    if (wanted("record censuses")) {
+        const F = await mod("./frozenRecords.mjs");
+        const R = await mod("./recordReach.mjs");
+        const fc = once(F.census, () => F.census({ guardians: false }));
+        const live = fc.records.length;
+        const frozen = F.PROBE_AT_V4536.currentIncludingModule.records;
+        const reach = R.REACH_AT_V4548.total;
+        out.push({
+            name: "record censuses", owes: OWES.frozenRecords,
+            recorded: frozen, actual: live,
+            stale: live !== frozen || live !== reach,
+            detail: `${live} records in the tree; frozenRecords records ${frozen}, recordReach records ${reach}`,
         });
     }
 
@@ -402,15 +432,32 @@ export const DRIFT_AT_V4482 = Object.freeze({
     // notChecked -- so the ratio did not improve by adding a check, it improved by adding a check AND
     // admitting a duty that was not written down. See the note under reportLines for why that one is a gap
     // rather than an omission: its only cheap input is a record stale in the same direction as its subject.
-    checked: 6, notChecked: 1,
+    // v4651: 6 -> 7. `record censuses` joined, and it is the check that SHOULD have been here for two
+    // rounds: v4650 added WASM_AT_V4650 and v4651 added EXILED_PASS_V4651, this tool said "nothing stale"
+    // both times, and both verifies then returned frozenRecords-selfcheck and recordReach-selfcheck red.
+    // A pre-flight silent about the commonest kind of arrival is not cheap, it is misleading.
+    checked: 7, notChecked: 1,
     // milliseconds, measured on this box
     // v4551 -- the sixth check's cost is IN this table, not left out of it. The gate asserts this sum is under
     // a second against a 300,000 ms verify, and a cost record that omits the most expensive check would make
     // that row pass on a total nobody pays. 291 -> 845 ms, so the margin under the second is now 155 ms and
     // real rather than comfortable: the NEXT check added here has to justify itself against that, or the
     // budget has to move on an argument instead of by drift.
+    // v4651 -- the seventh check's cost is IN this table, and the note above is what shaped it. That note
+    // says the next check added "has to justify itself against [a 155 ms margin], or the budget has to move
+    // on an argument instead of by drift". At the full census's 740 ms it did not fit, and BOTH things were
+    // done rather than one: the check was made cheap, and the bound was changed on an argument.
+    //   - CHEAP: it asks how many records the tree holds and nothing else, so it calls
+    //     frozenRecords.census({ guardians: false }). The guardian search -- the comment strip over every
+    //     gate source plus a name scan across all of them -- is the bulk of that function. 740 -> 285 ms
+    //     cold, same 149 records, same 399 fields. Exactly the shape assertionShape.census({shapes:false})
+    //     already had, one check up.
+    //   - THE BOUND: a flat 1,000 ms says nothing about what it is for. What it is for is that the
+    //     pre-flight stays cheap AGAINST THE VERIFY IT PROTECTS, so the gate asserts a RATIO now. The
+    //     argument for spending anything at all: two CONSECUTIVE rounds shipped a red verify for precisely
+    //     the question this check asks.
     cost: Object.freeze({ assertionShape: 195, closingCoverage: 19, registryOrphans: 24, gateFiles: 12,
-                          knowledgeIndex: 41, runtimeGapCensus: 554 }),
+                          knowledgeIndex: 41, runtimeGapCensus: 554, frozenRecordsCensus: 285 }),
     verifyMs: 300000,
     // *** THE FIFTH CHECK WAS ADDED AT v4483 BECAUSE THE THIRD ONE COULD NOT FAIL. *** The registry check
     // reads knowledge-index.json, which is a derived record rebuilt by a ship step, so on the round that

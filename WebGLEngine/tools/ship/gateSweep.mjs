@@ -8070,6 +8070,28 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // run -- on Keith's gen-9 box and then here -- and it was red on BOTH, alongside assertionShape's
     // 1751 -> 1757 and runtimeGap's 4275 -> 4286, which are the same six arrivals seen from two other
     // instruments. The surplus mechanism worked exactly as designed; nobody looked at it for six rounds.
+    since335: Object.freeze({
+        at: "v4651", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/thrownRow-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 1.57-2.10 s alone across three runs, INSIDE the 3,000 ms membership threshold -- and " +
+                 "it arrived at 3,117 ms, outside it, which would have made a new gate the sixth instance of the " +
+                 "defect the round beside it is about. Two causes, both measured: every fixture was spawned " +
+                 "TWICE (once for both streams, once for stdout alone, because the ritual counts reds through a " +
+                 "pipe and grep reads stdout only) and spawnSync separates them in one run; and section 5 ran " +
+                 "codeOnly over all 1,761 gate sources for two questions, where a raw indexOf is a necessary " +
+                 "condition for both -- the same pre-filter windowsImport-selfcheck records for the same reason. " +
+                 "It arrives with the four gates the rig filed as CRASHED-with-" +
+                 "no-FAIL-row netted, and with two of its own sabotages coming back ZERO and BOTH being real " +
+                 "findings rather than gaps: deleting the unhandledRejection handler changes nothing on node " +
+                 "22 (a rejection reaches uncaughtException when a handler is installed there), and the " +
+                 "re-entry guard's first fixture threw from the cleanup, which cannot re-enter the handler at " +
+                 "all. Both are re-pointed and the section headed 'one handler is half a net' now says the " +
+                 "opposite, because that is what the measurement said.",
+    }),
     since334: Object.freeze({
         at: "v4650", swept: 1, green: 1, red: 0,
         added: Object.freeze([

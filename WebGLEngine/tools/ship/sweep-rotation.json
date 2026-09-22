@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed.",
- "at": "2026-09-22T13:22:14.234Z",
+ "at": "2026-09-22T15:06:50.685Z",
  "budgetMs": 3000,
  "lastRun": 1,
  "rotated": [
@@ -1873,10 +1873,10 @@
   },
   {
    "gate": "tools/ship/frozenRecords-selfcheck.mjs",
-   "ms": 1213,
+   "ms": 1564,
    "code": 0,
-   "priorMs": 1202,
-   "at": "2026-09-08T19:02:45.407Z"
+   "priorMs": 2126,
+   "at": "2026-09-22T15:06:36.138Z"
   },
   {
    "gate": "tools/ship/fsrPageDevice-selfcheck.mjs",
@@ -2595,10 +2595,10 @@
   },
   {
    "gate": "tools/ship/recordDrift-selfcheck.mjs",
-   "ms": 1829,
+   "ms": 2073,
    "code": 0,
-   "priorMs": 2600,
-   "at": "2026-09-17T15:57:37.801Z"
+   "priorMs": 2142,
+   "at": "2026-09-22T15:06:50.685Z"
   },
   {
    "gate": "tools/ship/recordFloat-selfcheck.mjs",
@@ -2927,6 +2927,13 @@
    "ms": 83,
    "code": 0,
    "at": "2026-09-20T22:34:43.223Z"
+  },
+  {
+   "gate": "tools/ship/thrownRow-selfcheck.mjs",
+   "ms": 1132,
+   "code": 0,
+   "priorMs": 3117,
+   "at": "2026-09-22T14:16:25.274Z"
   },
   {
    "gate": "tools/ship/toolFrontDoor-selfcheck.mjs",

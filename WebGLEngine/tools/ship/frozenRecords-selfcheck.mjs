@@ -604,6 +604,46 @@ console.log("\n4. what was closed, checked against the files rather than claimed
         "check that pretended to be a re-derivation would be the worse of the two failures");
 }
 
+// ---- THE CHEAP CENSUS, v4651 --------------------------------------------------------------------------------
+{
+    // *** census({ guardians: false }) SKIPS THE GATE SCAN, AND THE MEMO MUST NOT SERVE IT TO A CALLER THAT
+    // ASKED FOR GUARDIANS. *** That is the shape v4647r found one level down in this same file: a cache key
+    // too coarse to tell two questions apart. The key carries the flag; these rows drive both directions.
+    //
+    // *** PLACED HERE, ABOVE THE CACHE SECTION, AND THE PLACEMENT IS A BUDGET FACT. *** Below that section
+    // every clearScanCache() has just run, so both calls would be cold: 266 ms for the cheap one plus 472
+    // for the full, and the gate went 1,495 -> 2,126 ms against a 3,000 ms budget recordReach requires 800
+    // ms of headroom under. Up here the full census is already memoised by the rows above, so only the
+    // cheap one is paid. And the claim is about the KEY rather than about an empty cache -- asking both
+    // ways against a WARM one is the HARDER test, because a key too coarse to tell them apart would hand
+    // the second caller the first one's answer, which is what the last row drives.
+    const cheap = census({ guardians: false });
+    const full = census();
+    ok("!! *** the cheap census counts the SAME records and the SAME fields as the full one ***",
+        cheap.records.length === full.records.length && cheap.fields === full.fields &&
+        cheap.withFields === full.withFields,
+        `${cheap.records.length}/${cheap.withFields}/${cheap.fields} against ` +
+        `${full.records.length}/${full.withFields}/${full.fields}. What it skips is WHO GUARDS each record, ` +
+        "which is the comment strip over every gate source plus a name scan across all of them -- most of " +
+        "the 750 ms this function costs, and an answer tools/ship/recordDrift.mjs's pre-flight never reads");
+    ok("!! *** and what it did not compute comes back NULL, not EMPTY ***",
+        cheap.unguarded === null && cheap.siblingWrong === null && cheap.guardiansScanned === false &&
+        cheap.records.every((r) => r.guardians === null),
+        "an empty list means the search RAN and found nothing, which is a finding; null means it did not " +
+        "run. Returning [] here would tell a caller that all " + cheap.records.length + " records in the " +
+        "tree are unguarded -- a number that would look like a catastrophe and be an artefact of a flag");
+    ok("!! CONTROL: the FULL census still computes them, so the flag is a choice and not a removal",
+        Array.isArray(full.unguarded) && full.guardiansScanned === true &&
+        full.records.some((r) => Array.isArray(r.guardians) && r.guardians.length > 0),
+        `${full.unguarded.length} unguarded of ${full.records.length}, and at least one record names a real ` +
+        "guardian. If this ever went null the cheap path would have become the only path");
+    ok("!! *** the two answers are memoised SEPARATELY -- a cheap census is not served to a full call ***",
+        census({ guardians: false }).unguarded === null && census().unguarded !== null,
+        "asked in that order, twice each, against the warm cache. The key carries the flag; a key that did " +
+        "not would hand the second caller a census with every guardian field missing, which is v4647r's " +
+        "defect in this same file one round later");
+}
+
 // ---------------------------------------------------------------------------------------------------------
 // THE CACHES, GRADED -- BECAUSE THREE SABOTAGES OF THEM WENT ZERO RED (v4647r)
 // ---------------------------------------------------------------------------------------------------------

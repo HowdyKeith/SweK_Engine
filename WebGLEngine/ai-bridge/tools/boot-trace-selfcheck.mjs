@@ -17,6 +17,7 @@ import net from "node:net";
 import cp from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
+import { reportThrows } from "../../tools/ship/thrownRow.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const require_ = createRequire(import.meta.url);
@@ -28,6 +29,14 @@ const ok = (label, cond, note = "") => {
     console.log(`  ${cond ? "PASS" : "FAIL"}  ${label}${note ? "   " + note : ""}`);
 };
 const report = (label, note) => console.log(`  ----  ${label}${note ? "   " + note : ""}`);
+
+// *** v4651 -- ANY THROW BECOMES A FAIL ROW. *** This gate spawns real node children and binds a real port,
+// and both are things that fail differently on another box. Before this, a throw anywhere in it printed its
+// passing rows and died: exit 1, ZERO FAIL rows, which failLines reports as CRASHED because there is no
+// finding to read. The CHILD is registered so the net can reap it -- a gate that reports its own death and
+// then leaves a node process holding a port has made the next run worse, not better.
+let HOLDER = null;
+reportThrows("boot-trace-selfcheck", { cleanup: () => { try { HOLDER && HOLDER.kill("SIGKILL"); } catch {} } });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const DIR = fs.mkdtempSync(path.join(os.tmpdir(), "swek-boottrace-"));
@@ -118,7 +127,7 @@ console.log("\n4. DRIVEN FOR REAL: TWO PROCESSES, ONE PORT, ONE BIND CONFLICT");
     ok("!! a successor that binds reads BOUND", a.state === "BOUND" && a.port === port, a.detail);
 
     // (b) THE SUCCESSOR STARTS AND LOSES THE PORT -- candidate (2)/(3), Keith's second possibility.
-    const holder = cp.spawn(process.execPath, ["-e", child(OTHER, true)], { stdio: "ignore" });
+    const holder = HOLDER = cp.spawn(process.execPath, ["-e", child(OTHER, true)], { stdio: "ignore" });
     await sleep(700);
     t = Date.now();
     cp.execFileSync(process.execPath, ["-e", child(NEWFOLDER, false)], { timeout: 15000 });

@@ -19,11 +19,18 @@
 "use strict";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { reportThrows } from "../tools/ship/thrownRow.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..");
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
+// *** v4651 -- ANY THROW BECOMES A FAIL ROW. *** This gate died on the box that ran it, not on the rig:
+// section 6's dock-tab lookup dereferenced undefined under load and the process printed five passing
+// sections and exited 1 with ZERO FAIL rows. The line is repaired below; the net is here because the next
+// unguarded dereference in a live browser will not be that one.
+let BROWSER = null;
+reportThrows("carrySpawn-selfcheck", { cleanup: () => { try { BROWSER && BROWSER.close(); } catch {} } });
 console.log("carrySpawn-selfcheck -- spawn-and-drag placement, with real sway physics\n");
 
 const { CarrySpawn } = await import(pathToFileURL(path.join(HERE, "carrySpawn.js")).href);
@@ -184,7 +191,7 @@ console.log("\n6. *** LIVE: THE ACTUAL SPAWN PANEL, IN A REAL BROWSER -- BUTTON,
             rs.writeHead(200, { "Content-Type": ct }); rs.end(fs.readFileSync(f));
         });
         await new Promise((x) => srv.listen(0, "127.0.0.1", x));
-        const b = await rr.chromium.launch({ executablePath: pw.HEADLESS_SHELL, args: ["--use-gl=swiftshader", "--enable-webgl"] });
+        const b = BROWSER = await rr.chromium.launch({ executablePath: pw.HEADLESS_SHELL, args: ["--use-gl=swiftshader", "--enable-webgl"] });
         try {
             const pg = await b.newPage();
             const errs = [];
@@ -197,7 +204,30 @@ console.log("\n6. *** LIVE: THE ACTUAL SPAWN PANEL, IN A REAL BROWSER -- BUTTON,
             await pg.waitForTimeout(500);
             await pg.evaluate(() => { document.getElementById("swek-welcome")?.remove(); });
 
-            await pg.evaluate(() => {
+            // *** v4651 -- WAIT FOR THE TAB, NOT FOR A DURATION, AND REPORT ITS ABSENCE INSTEAD OF DYING. ***
+            // This was `const t = tabs.find(...); t.click();` after a fixed 6,000 ms sleep. Alone on an idle
+            // box the dock is up well inside that and the gate is green; under the six-way load an exiled-gate
+            // sweep produces it is NOT, and `t` was undefined:
+            //
+            //     page.evaluate: TypeError: Cannot read properties of undefined (reading 'click')
+            //
+            // The gate printed five passing sections and DIED -- exit 1, ZERO FAIL rows, which the ship's own
+            // `grep -c '^  FAIL'` counts as no reds at all. Caught by v4651's run of the 361 gates outside the
+            // sweep, and it is the second defect in one line: a fixed sleep used as a readiness test, and an
+            // absence that crashes rather than reporting. The wait is now for the THING, bounded; a tab that
+            // is really missing is a finding about the page and says so.
+            let tabUp = true;
+            try {
+                await pg.waitForFunction(() => [...document.querySelectorAll(".dock-tab-right")]
+                    .some((el) => /^spawn$/i.test((el.textContent || "").trim())), null, { timeout: 30000 });
+            } catch { tabUp = false; }
+            ok("!! the dock's SPAWN tab is present -- waited for, not slept past",
+                tabUp,
+                tabUp ? "found inside the bound; the old form slept a fixed 6 s and then dereferenced whatever " +
+                        "was there, which under load was undefined"
+                      : "no .dock-tab-right reading 'spawn' after 30 s. That is a finding about index.html's " +
+                        "dock, and every row below it is about a panel that is not on the page");
+            if (tabUp) await pg.evaluate(() => {
                 const tabs = [...document.querySelectorAll(".dock-tab-right")];
                 const t = tabs.find((el) => /^spawn$/i.test((el.textContent || "").trim()));
                 t.click();

@@ -1097,6 +1097,94 @@ export const OVER_BUDGET_PASS_V4565 = Object.freeze({
  * capping a 100-second gate at five. IT IS THE SAME MISTAKE THE BUCKET IS MADE OF -- a proxy read as the
  * fact -- committed by the instrument built to fix it, one hour after the record saying so.
  */
+/**
+ * *** THE WHOLE EXILED POOL, RUN AT LAST, AND THE ANSWER IS SEVENTEEN. ***
+ *
+ * v4565 re-timed a BAND of the over-budget gates and v4568 opened the killed bucket to 90 s. Neither ran the
+ * whole thing, and the question every round since has asked in passing -- how many of the gates outside the
+ * ship-time sweep are RED -- had no measurement behind it at all. v4650 found four by hand and said in its own
+ * note that four was not the number that mattered. This is the number.
+ *
+ *     361 gates outside the sweep (224 over budget + 137 killed, union), run at a 120 s cap, 6 workers
+ *     296 GREEN
+ *      17 RED, carrying 28 FAIL rows between them
+ *      48 STILL KILLED at 120,000 ms -- six times the sweep's own cap, and still no verdict
+ *
+ * *** RUN IN A DETACHED git worktree, NOT IN THE TREE. *** 361 gates write derived records, and a census that
+ * dirties the working copy it is measuring is the fixture-litter defect at scale. The worktree is at the
+ * commit named below with node_modules symlinked in, so the readings are of that tree and nothing else.
+ *
+ * WHAT THE READING IS NOT. It is not 17 defects: `simulation/carrySpawn-selfcheck.mjs` is in the red list with
+ * ZERO FAIL rows because it DIED -- a fixed 6,000 ms sleep used as a readiness test, then a dereference of the
+ * dock tab that had not appeared under six-way load -- and it is GREEN alone on this box. Repaired at v4651 to
+ * wait for the thing rather than for a duration, and netted, so the next absence reports instead of crashing.
+ * The other sixteen print real FAIL rows. And the 48 are not 48 slow gates either: a cap is a lower bound, and
+ * v4568's finding stands -- 35 of the 140 it opened came in UNDER the 20,000 ms cap that had exiled them.
+ *
+ * THE LIST IS BY NAME because a count cannot say which one left, which is the lesson v4568's own record
+ * carries three lines into its comment.
+ */
+export const EXILED_PASS_V4651 = Object.freeze({
+    at: "v4651", capMs: 120000, workers: 6, pool: 361, over: 224, killed: 137,
+    commit: "fda780d8", worktree: true,
+    green: 296, redCount: 17, failRows: 28, stillKilledCount: 48,
+    // *** REPAIRED IN THE SAME ROUND THAT MEASURED THEM, so the row grading this record does not punish the
+    // repair it exists to prompt -- v4571's lesson on KILLED_PASS_V4568 below, and v4313's before that. ***
+    // Two of the seventeen, and the two are different species: scoreDirection was reporting an EXHAUSTED
+    // SEARCH for two proposers that had simply never been started (listProposers() dropped `ready` from its
+    // view, so the route could not discover there was anything to await), and carrySpawn DIED rather than
+    // reporting, on a fixed sleep used as a readiness test.
+    repairedAtV4651: Object.freeze([
+        "physics/scoreDirection-selfcheck.mjs",
+        "simulation/carrySpawn-selfcheck.mjs",
+    ]),
+    red: Object.freeze([
+        Object.freeze({ gate: "ev/esFleetSize-selfcheck.mjs", exit: 1, failRows: 1, ms: 15993 }),
+        Object.freeze({ gate: "gfx/frontDoor-selfcheck.mjs", exit: 1, failRows: 1, ms: 4376 }),
+        Object.freeze({ gate: "physics/scoreDirection-selfcheck.mjs", exit: 1, failRows: 1, ms: 8469 }),
+        Object.freeze({ gate: "simulation/carrySpawn-selfcheck.mjs", exit: 1, failRows: 0, ms: 11961 }),
+        Object.freeze({ gate: "tools/krbn/krbnCompareLive-selfcheck.mjs", exit: 1, failRows: 1, ms: 26752 }),
+        Object.freeze({ gate: "tools/ship/boundaryLint-selfcheck.mjs", exit: 1, failRows: 1, ms: 10164 }),
+        Object.freeze({ gate: "tools/ship/budgetExile-selfcheck.mjs", exit: 1, failRows: 1, ms: 63675 }),
+        Object.freeze({ gate: "tools/ship/commentFalsePass-selfcheck.mjs", exit: 1, failRows: 2, ms: 15953 }),
+        Object.freeze({ gate: "tools/ship/gateReport-selfcheck.mjs", exit: 1, failRows: 4, ms: 11603 }),
+        Object.freeze({ gate: "tools/ship/orreryFleet-selfcheck.mjs", exit: 1, failRows: 4, ms: 38135 }),
+        Object.freeze({ gate: "tools/ship/orrerySeed-selfcheck.mjs", exit: 1, failRows: 2, ms: 13632 }),
+        Object.freeze({ gate: "tools/ship/orreryView-selfcheck.mjs", exit: 1, failRows: 2, ms: 16602 }),
+        Object.freeze({ gate: "tools/ship/songButton-selfcheck.mjs", exit: 1, failRows: 1, ms: 50583 }),
+        Object.freeze({ gate: "tools/ship/tslPhysics-selfcheck.mjs", exit: 1, failRows: 1, ms: 15757 }),
+        Object.freeze({ gate: "tools/ship/tslRace-selfcheck.mjs", exit: 1, failRows: 1, ms: 35447 }),
+        Object.freeze({ gate: "tools/ship/universeWire-selfcheck.mjs", exit: 1, failRows: 3, ms: 7955 }),
+        Object.freeze({ gate: "tools/ship/wasmSupport-selfcheck.mjs", exit: 1, failRows: 2, ms: 6340 }),
+    ]),
+    stillKilled: Object.freeze([
+        "physics/sph/levelClaim-selfcheck.mjs", "physics/sph/materialKnobs-selfcheck.mjs",
+        "physics/sph/packingTransfer-selfcheck.mjs", "physics/sph/poolFixture-selfcheck.mjs",
+        "physics/sph/stability-selfcheck.mjs", "physics/thermal/stefan-selfcheck.mjs",
+        "rig/cinematicShot-selfcheck.mjs", "simulation/lbm/inflow-selfcheck.mjs",
+        "simulation/lbm/settleCurve-selfcheck.mjs", "tools/roundhouse/assumptionMap-selfcheck.mjs",
+        "tools/roundhouse/census-selfcheck.mjs", "tools/roundhouse/claimTrace-selfcheck.mjs",
+        "tools/roundhouse/compose-selfcheck.mjs", "tools/roundhouse/corroborationCensus-selfcheck.mjs",
+        "tools/roundhouse/detectionMap-selfcheck.mjs", "tools/roundhouse/hydrostatic-selfcheck.mjs",
+        "tools/roundhouse/khConvergence-selfcheck.mjs", "tools/roundhouse/khGrowthKey-selfcheck.mjs",
+        "tools/roundhouse/khMichalke-selfcheck.mjs", "tools/roundhouse/knobLiveness-selfcheck.mjs",
+        "tools/roundhouse/labResults-selfcheck.mjs", "tools/roundhouse/libmSensitivity-selfcheck.mjs",
+        "tools/roundhouse/modeDistinct-selfcheck.mjs", "tools/roundhouse/observableUnits-selfcheck.mjs",
+        "tools/roundhouse/plantDirection-selfcheck.mjs", "tools/roundhouse/plantedCoverage-selfcheck.mjs",
+        "tools/roundhouse/responseCensus-selfcheck.mjs", "tools/roundhouse/sensitivity-selfcheck.mjs",
+        "tools/roundhouse/twoF-selfcheck.mjs", "tools/roundhouse/twoFBind-selfcheck.mjs",
+        "tools/roundhouse/valueMatch-selfcheck.mjs", "tools/ship/ddaPrecisionReport-selfcheck.mjs",
+        "tools/ship/deterministicRaf-selfcheck.mjs", "tools/ship/domScope-selfcheck.mjs",
+        "tools/ship/doorKinds-selfcheck.mjs", "tools/ship/gateSelection-selfcheck.mjs",
+        "tools/ship/graveyard-selfcheck.mjs", "tools/ship/kernelReach-selfcheck.mjs",
+        "tools/ship/labDevices-selfcheck.mjs", "tools/ship/moduleRefs-selfcheck.mjs",
+        "tools/ship/orphanDisposition-selfcheck.mjs", "tools/ship/orphanTriage-selfcheck.mjs",
+        "tools/ship/redAction-selfcheck.mjs", "tools/ship/redCensus-selfcheck.mjs",
+        "tools/ship/redCensusFresh-selfcheck.mjs", "tools/ship/referenceKind-selfcheck.mjs",
+        "tools/ship/shaderRefs-selfcheck.mjs", "tools/ship/toolFrontDoor-selfcheck.mjs"
+    ]),
+});
+
 export const KILLED_PASS_V4568 = Object.freeze({
     at: "v4568", capMs: 90000, oldCapMs: CAP_MS, serial: true,
     stamp: "2026-09-09T17:59:42.840Z",

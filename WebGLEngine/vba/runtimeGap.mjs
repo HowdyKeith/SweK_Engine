@@ -344,7 +344,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // are not alike, which is the distinction the twelve rows beside the count exist to make.
     // v4647p -- 4288 -> 4289: tools/ship/sweepRotation-selfcheck.mjs. ES modules and closures by one
     // each; async/await unmoved, because the gate awaits nothing.
-    files: 4294,               // v4650 -- RE-DERIVED: three files (tools/ship/wasmTeardown.mjs, its gate, tools/ship/wasmExitHook.cjs); seven rows moved, five held. v4649r -- RE-DERIVED: tools/ship/pixelWorst.mjs arrived, one ES module with no closure, no await and no device call in it -- TWO rows moved and ten held. v4649 -- RE-DERIVED: tools/ship/fixtureLitter.mjs arrived, one ES module using closures and one await (a dynamic import in playwrightResolve-selfcheck at v4648r) -- four rows moved, eight held. v4647 -- RE-DERIVED after this session's own eleven files; see the note below. v4645 -- RE-DERIVED AT THE main MERGE over the merged tree. RE-DERIVED AT THE main MERGE: 4169 on this branch, 4172 on main, 4260 merged -- LESS than the sum, which is why it is run
+    files: 4296,               // v4651 -- RE-DERIVED: two files (tools/ship/thrownRow.mjs, its gate); five rows moved, seven held. v4650 -- RE-DERIVED: three files (tools/ship/wasmTeardown.mjs, its gate, tools/ship/wasmExitHook.cjs); seven rows moved, five held. v4649r -- RE-DERIVED: tools/ship/pixelWorst.mjs arrived, one ES module with no closure, no await and no device call in it -- TWO rows moved and ten held. v4649 -- RE-DERIVED: tools/ship/fixtureLitter.mjs arrived, one ES module using closures and one await (a dynamic import in playwrightResolve-selfcheck at v4648r) -- four rows moved, eight held. v4647 -- RE-DERIVED after this session's own eleven files; see the note below. v4645 -- RE-DERIVED AT THE main MERGE over the merged tree. RE-DERIVED AT THE main MERGE: 4169 on this branch, 4172 on main, 4260 merged -- LESS than the sum, which is why it is run
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
                           // RE-TAKEN TWICE IN TWO ROUNDS, and the second time only because the ship gate
@@ -668,7 +668,13 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // tools/ship/wasmExitHook.cjs). SEVEN rows moved and five held -- files +3, ES modules +2 (the .cjs is
     // not one), closures +3, async/await +1, typed arrays +1, Promises +1, and WebAssembly 23 -> 24, which
     // is the row the round is about and the only one whose movement means anything beyond arithmetic.
-    esModules: 3993, closures: 3860, asyncAwait: 1524, typedArrays: 1126, promises: 369,
+    // v4651 -- RE-DERIVED: two files arrived (tools/ship/thrownRow.mjs and its gate). FIVE rows moved and
+    // seven held -- files +2, ES modules +2, closures +2, async/await +1, Promises +1. typed arrays and
+    // WebAssembly did NOT move, which is the shape that says these patterns discriminate: a round about
+    // how a process DIES touches neither the memory nor the wasm rows.
+    // v4651b -- asyncAwait 1525 -> 1526: physics/scoreDirection-selfcheck gained a top-level await when
+    // the route was made to await ready() before adjudicating. ONE row moved and eleven did not.
+    esModules: 3995, closures: 3862, asyncAwait: 1526, typedArrays: 1126, promises: 370,
     fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 156, webgpu: 54, threads: 23, wasm: 24,
     // v4649r -- webgpu 53 -> 54: render/temporalResolve-selfcheck gained a navigator.gpu call when its
     // confidence bound was moved onto the per-adapter record. ONE row moved and eleven did not, which is

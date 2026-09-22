@@ -18,10 +18,23 @@ import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrig
 import * as W from "../../render/perspectiveWarp.mjs";
 import * as EM from "../../render/effectMerge.mjs";
 import { mat3Inv, applyHomography, homographyDLT } from "../../vision/homography.mjs";
+import { reportThrows } from "./thrownRow.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
+// *** v4651 -- ANY THROW BECOMES A FAIL ROW. *** This gate has come back from the rig as
+// "CRASHED, exit 1, 0 FAIL rows" -- it printed its passing rows, threw somewhere in the browser half,
+// and died, so the ship's `grep -c '^  FAIL'` read ZERO on a gate that had failed. Worse, what a
+// page.evaluate rejects with is usually a plain object, and node prints a thrown object with NO STACK
+// at all. tools/ship/thrownRow.mjs turns whatever it is into one line a reader can act on, on stdout,
+// where the counting instrument looks. It does not diagnose the rig's throw -- this box cannot
+// reproduce it -- it makes the next clone-verify name it.
+// BROWSER is declared FIRST and assigned at every launch site below: a cleanup that closes a handle
+// nothing ever put there is a control that cannot fire, and a gate that reports its own death and
+// then hangs on an open Chromium has traded one silent failure for another.
+let BROWSER = null;
+reportThrows("perspectiveWarp-selfcheck", { cleanup: () => { try { BROWSER && BROWSER.close(); } catch {} } });
 const report = (m) => console.log("  ....  " + m);
 
 const SW = 64, SH = 48;
@@ -169,7 +182,7 @@ console.log("\n4. *** THE GLSL, ACTUALLY RUN -- against the CPU reference on a r
             rs.writeHead(200, { "content-type": "text/html" }); rs.end(HARNESS);
         }).listen(0);
         const port = srv.address().port;
-        const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        const b = BROWSER = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
         const pg = await b.newPage();
         const errs = [];
         pg.on("pageerror", (e) => errs.push(String(e).slice(0, 300)));

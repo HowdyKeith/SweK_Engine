@@ -312,14 +312,25 @@ export function readSites(names, { root = ENG } = {}) {
     return out;
 }
 
-export function census({ files = null, read = null, exclude = null } = {}) {
+/**
+ * *** `guardians: false` SKIPS THE GATE SCAN, AND IT IS THE SAME MOVE assertionShape MADE AT v4645. ***
+ * The record COUNT costs a walk and a regex. WHO GUARDS each record costs the comment strip over every gate
+ * source plus a name search across all of them, and that is the bulk of the 738 ms this function takes on
+ * this box. tools/ship/recordDrift.mjs's pre-flight asks only "how many records does the tree hold", so it
+ * was paying for an answer it never reads -- on a gate inside the 3,000 ms sweep budget.
+ *
+ * The memo key CARRIES THE FLAG, because a cheap census served to a caller that asked for guardians is the
+ * exact defect this file's own v4647r round found one level down, and `guardians` comes back NULL rather
+ * than EMPTY: an empty list means the scan ran and found nothing, and null means it did not run.
+ */
+export function census({ files = null, read = null, exclude = null, guardians: withGuardians = true } = {}) {
     const memoable = files === null && read === null;
     // A REAL read is what makes a path-keyed cache sound; an injected one is a fixture and must not touch it.
     // This is deliberately NOT `memoable`: a census over an explicit `files` list of real paths (section 9's
     // written fixtures go through one) still reads real bytes, and still may not be served the whole-census
     // memo. The two questions are different and were one flag before.
     const cacheable = read === null;
-    const key = String(exclude);
+    const key = String(exclude) + "|guardians:" + (withGuardians ? "1" : "0");
     if (memoable && _scanCache.has(key)) return _scanCache.get(key);
     const rd = read || ((f) => TR.textOf(f));
     const list = (files || sources()).filter((f) => !exclude || !exclude.test(rel(f)));
@@ -335,7 +346,7 @@ export function census({ files = null, read = null, exclude = null } = {}) {
     // were prose ABOUT threads"), in the column that decides whether a record is protected at all.
     // Record DETECTION is left on the raw text and that is deliberate: a declaration only appears in code,
     // and stripping first was measured to find the same 94 records, so it would be cost without effect.
-    const gateSrc = gates.map((g) => [rel(g), strippedOf(g, rd, cacheable)]);
+    const gateSrc = withGuardians ? gates.map((g) => [rel(g), strippedOf(g, rd, cacheable)]) : [];
     // *** v4555 -- THIS LINE READ `/\.mjs$/` AND THE WALK ABOVE ALREADY ACCEPTS .mjs, .cjs AND .js. ***
     // Every frozen record in a .js file was therefore invisible to this census AND to recordReach, which
     // derives its whole population from here -- so both under-reported, and not randomly: what they missed
@@ -364,7 +375,7 @@ export function census({ files = null, read = null, exclude = null } = {}) {
     // one file: a transitive closure over the whole tree would start crediting a record with guardians that
     // never touch its value, which is how a coverage number becomes a story. The edge has to be visible in the
     // defining module's own text, which is the same standard the NAME search uses.
-    for (const f of mjs) {
+    for (const f of withGuardians ? mjs : []) {
         // *** THE STRIP MOVED BELOW THE TEST, AND THAT IS MOST OF THIS ROUND'S SAVING. *** It used to run
         // FIRST, on every one of the 4,289 files, and the very next line discards all but the handful that
         // declare two or more records -- so the comment strip was paid in full for files this loop then
@@ -397,7 +408,7 @@ export function census({ files = null, read = null, exclude = null } = {}) {
     // is reached by whatever reaches the module", would credit every record in redCensus.mjs with every gate
     // that imports it, which is how a coverage number stops meaning anything.
     const DEFAULT_ARG = /(?:export\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(([^)]*)\)/g;
-    for (const f of mjs) {
+    for (const f of withGuardians ? mjs : []) {
         // Same reordering as the loop above, same reason: the strip was paid for every file in the tree and
         // this line throws away everything that declares no record at all.
         const here = new Set(all.filter((x) => x.f === f).map((x) => x.r.name));
@@ -445,11 +456,13 @@ export function census({ files = null, read = null, exclude = null } = {}) {
         // beside the reason, because v4487 settled the principle already: "a sibling file is not the
         // criterion, the import graph is".
         const want = rel(f).split("/").pop().replace(/\.(mjs|cjs|js)$/, "-selfcheck.mjs");
-        const sibling = guardians.find((g) => g.split("/").pop() === want) || null;
+        const sibling = withGuardians ? (guardians.find((g) => g.split("/").pop() === want) || null) : null;
         return Object.freeze({
             name: r.name, file: rel(f), fields: Object.freeze(r.fields.slice()), bytes: r.bytes, balanced: r.balanced,
-            guardians: Object.freeze(guardians.slice()),
-            siblingNamesIt: sibling !== null,
+            // NULL, not [], when the scan did not run: an empty list means the search happened and found
+            // nothing, which is a finding, and a caller cannot tell the two apart from the same value.
+            guardians: withGuardians ? Object.freeze(guardians.slice()) : null,
+            siblingNamesIt: withGuardians ? sibling !== null : null,
             // Where that gate actually lives, when it is not beside the module. The layout fact, kept.
             siblingElsewhere: sibling && sibling !== rel(f).replace(/\.(mjs|cjs|js)$/, "-selfcheck.mjs")
                 ? sibling : null,
@@ -459,13 +472,18 @@ export function census({ files = null, read = null, exclude = null } = {}) {
         records: Object.freeze(rows),
         withFields: rows.filter((r) => r.fields.length).length,
         fields: rows.reduce((a, r) => a + r.fields.length, 0),
-        unguarded: Object.freeze(rows.filter((r) => !r.guardians.length).map((r) => r.name)),
+        // *** THE GUARDIAN-DERIVED FIELDS ARE NULL WHEN THE SCAN DID NOT RUN, for the reason the row above
+        // gives: an empty list is a finding and a missing one is not, and returning [] here would tell a
+        // caller that every record in the tree is unguarded. A caller asking these questions must ask for
+        // the guardians; a caller asking only how many records exist need not pay 750 ms for them.
+        unguarded: withGuardians ? Object.freeze(rows.filter((r) => !r.guardians.length).map((r) => r.name)) : null,
         unbalanced: Object.freeze(rows.filter((r) => !r.balanced).map((r) => r.name)),
-        siblingWrong: rows.filter((r) => r.guardians.length && !r.siblingNamesIt).length,
+        siblingWrong: withGuardians ? rows.filter((r) => r.guardians.length && !r.siblingNamesIt).length : null,
         // The 17: a gate named for the module, living in tools/ship/ rather than beside it. Not a defect --
         // it is where this tree keeps gates -- and counted so the next reader meets it as a number rather
         // than as part of siblingWrong.
-        siblingElsewhere: rows.filter((r) => r.siblingElsewhere).length,
+        siblingElsewhere: withGuardians ? rows.filter((r) => r.siblingElsewhere).length : null,
+        guardiansScanned: withGuardians,
     });
     if (memoable) _scanCache.set(key, out);
     return out;
@@ -616,7 +634,10 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4650 -- RE-TAKEN alongside `excluding`: 147 / 70 / 393 -> 148 / 71 / 398. The two halves are one
     // census run twice and must move together, because the row below asserts their difference is EXACTLY
     // this module's own two records.
-    currentIncludingModule: Object.freeze({ records: 148, withFields: 71, fields: 398 }),
+    // v4651 -- RE-TAKEN alongside `excluding`: 148 / 71 / 398 -> 149 / 72 / 399. The two halves are one
+    // census run twice and must move together, because the row below asserts their difference is EXACTLY
+    // this module's own two records.
+    currentIncludingModule: Object.freeze({ records: 149, withFields: 72, fields: 399 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -803,7 +824,12 @@ export const PROBE_AT_V4536 = Object.freeze({
     // exitAfterWasmBefore, compilers -- the per-line reader this file's note above names as a LIMIT sees the
     // ones on their own lines). Re-taken in the round that added it, which is the line this row has been
     // carrying since v4647f and which two rounds before that one ignored.
-    excluding: Object.freeze({ records: 146, withFields: 69, fields: 378 }),
+    // v4651 -- RE-TAKEN: 146 / 69 / 378 -> 147 / 70 / 379. One arrival, EXILED_PASS_V4651 in
+    // tools/ship/sweepCoverage.mjs -- the whole exiled pool run at last. Its `red` and `stillKilled` lists
+    // are arrays of objects and of strings, so the per-line reader this file's note above names as a LIMIT
+    // counts ONE field for it where a reader would say four; the reading is what the census measures, and
+    // the limit is named rather than worked around.
+    excluding: Object.freeze({ records: 147, withFields: 70, fields: 379 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,

@@ -76,7 +76,18 @@ export function registerProposer({ id, knobs, propose, score, adjudicate, defaul
     return REGISTRY.get(id);
 }
 export const getProposer = (id) => REGISTRY.get(id);
-export const listProposers = () => [...REGISTRY.values()].map((p) => ({ id: p.id, knobs: p.knobs, tier: p.tier, notes: p.notes, instrument: p.instrument }));
+// *** `needsReady` IS IN THE VIEW BECAUSE THE LINE ABOVE SAYS A ROUTE MUST AWAIT ready() AND THE VIEW DID
+// NOT SAY WHICH PROPOSERS HAVE ONE. *** v4527 added `ready` and wrote, twelve lines up, that "the route
+// awaits [it] before runProposer". This projection deliberately carries no callables -- propose, score and
+// adjudicate are reached through getProposer -- and `ready` went out with them, so a caller ITERATING THE
+// LIST could not discover that a proposer needed readying at all. physics/scoreDirection-selfcheck.mjs is
+// exactly that caller, and the consequence is recorded in its own file: every one of gunner-shell's seven
+// candidates refused with "box3d is not initialised", the row read `accepted === null` and reported an
+// EXHAUSTED SEARCH -- which is the one confusion that row exists to prevent, arriving one level up.
+//
+// It is a BOOLEAN and not the function, so the view stays a view: the list says whether, getProposer(id).ready
+// is how you get it. A list that handed back callables would be a second registry.
+export const listProposers = () => [...REGISTRY.values()].map((p) => ({ id: p.id, knobs: p.knobs, tier: p.tier, notes: p.notes, instrument: p.instrument, needsReady: !!p.ready }));
 export function resetRegistry() { REGISTRY.clear(); }
 
 // THE RATCHET. Raising a tier requires a passing adjudication supplied BY THE CALLER, and the verdict object is

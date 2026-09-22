@@ -105,6 +105,35 @@ registerProposer({
     try { registerProposer({ id: "no-verdict", knobs: ["x"], propose: () => [], score: () => 1 }); } catch { threw = true; }
     ok("!! an instrument with NO independent adjudicator cannot be registered at all",
        threw, "an untunable-because-ungradeable device is a programming error, not a warning");
+
+    // *** v4651 -- THE VIEW MUST SAY WHICH PROPOSERS NEED READYING, AND FOR 124 ROUNDS IT DID NOT. ***
+    // registerProposer's own note says a route awaits ready() before runProposer. This projection carries no
+    // callables on purpose, and `ready` went out with them -- so a caller ITERATING THE LIST could not learn
+    // that a member needed starting. physics/scoreDirection-selfcheck.mjs is that caller: unready,
+    // gunner-shell's seven candidates each refused with "box3d is not initialised", and the row there read
+    // accepted:null and called it an EXHAUSTED SEARCH. A name went onto an allow-list to close it. Readied,
+    // that proposer accepts 12 at rank 1 in two adjudications, and so does the other one on the list.
+    //
+    // Driven on a fixture with a ready() and one without, because a boolean that is true of everything or of
+    // nothing says nothing.
+    registerProposer({
+        id: "ready-probe", knobs: ["x"], propose: () => [{ x: 1 }], score: (c) => c.x,
+        adjudicate: () => ({ pass: true, evidence: {} }), ready: async () => true,
+        notes: "a fixture that declares a ready()",
+    });
+    const view = listProposers();
+    const withReady = view.filter((x) => x.needsReady).map((x) => x.id);
+    const without = view.filter((x) => !x.needsReady).map((x) => x.id);
+    ok("!! *** the LIST VIEW says which proposers declare a ready(), and it agrees with the registry ***",
+       withReady.length === 1 && withReady[0] === "ready-probe" && without.length >= 2 &&
+       view.every((x) => x.needsReady === !!getProposer(x.id).ready),
+       `needsReady: [${withReady.join(", ")}] against [${without.join(", ")}] without. It is a BOOLEAN and ` +
+       "not the function, so the view stays a view -- getProposer(id).ready is how a route gets the thing " +
+       "to await. Every row is checked against the registry, so a projection that hard-coded false would fail");
+    ok("  ...and it discriminates, which a field true of every member would not",
+       withReady.length > 0 && without.length > 0,
+       "one fixture with a ready() and the two instruments above without one. A flag that never varies " +
+       "tells a caller nothing and is the shape that let the omission sit unseen");
 }
 
 // ---- 2. THE RATCHET CANNOT BE SELF-RAISED --------------------------------------------------------------------------
