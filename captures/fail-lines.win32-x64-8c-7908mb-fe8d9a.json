@@ -1,37 +1,33 @@
 {
  "generatedFrom": "tools/ship/failLines.mjs",
- "at": "2026-09-21T16:57:36.560Z",
+ "at": "2026-09-21T21:48:11.829Z",
  "platform": "win32",
  "box": "win32-x64-8c-7908mb-fe8d9a",
  "tree": {
-  "commit": "552d393954c4",
-  "branch": "main",
-  "dirty": true
+  "commit": "a3a184bd1282",
+  "branch": "claude/code-review-nr3a0i",
+  "dirty": true,
+  "committedAt": "2026-09-21T20:04:04Z"
+ },
+ "sweptFrom": {
+  "log": "verify48c.txt",
+  "writtenAt": "2026-09-21T21:07:07.974Z",
+  "treeMovedSince": false
  },
  "summary": {
-  "of": 44,
-  "GREEN": 1,
-  "RED": 34,
-  "CRASHED": 9,
+  "of": 38,
+  "GREEN": 4,
+  "RED": 26,
+  "CRASHED": 8,
   "ODD": 0,
   "TIMEOUT": 0,
-  "totalFailRows": 68
+  "totalFailRows": 50
  },
  "gates": [
   {
-   "gate": "ai-bridge/rigRunner-selfcheck.mjs",
-   "exit": 1,
-   "ms": 3252,
-   "fails": 1,
-   "lines": [
-    "FAIL  a passing check comes back GREEN with exit 0   exit 1 in 292ms"
-   ],
-   "verdict": "RED"
-  },
-  {
-   "gate": "ai-bridge/tools/kpop-handoff-selfcheck.mjs",
+   "gate": "ai-bridge/tools/boot-trace-selfcheck.mjs",
    "exit": 0,
-   "ms": 248,
+   "ms": 2391,
    "fails": 0,
    "lines": [],
    "verdict": "GREEN"
@@ -39,7 +35,7 @@
   {
    "gate": "ai-bridge/tools/localModelResolve-selfcheck.mjs",
    "exit": 3221226505,
-   "ms": 1672,
+   "ms": 1329,
    "fails": 0,
    "lines": [],
    "verdict": "CRASHED"
@@ -47,7 +43,15 @@
   {
    "gate": "ai-bridge/tools/range-selfcheck.mjs",
    "exit": 3221226505,
-   "ms": 1119,
+   "ms": 986,
+   "fails": 0,
+   "lines": [],
+   "verdict": "CRASHED"
+  },
+  {
+   "gate": "physics/box3d/box3dConformance-selfcheck.mjs",
+   "exit": 3221226505,
+   "ms": 639,
    "fails": 0,
    "lines": [],
    "verdict": "CRASHED"
@@ -55,7 +59,7 @@
   {
    "gate": "physics/render/microfacetSampleWgsl-selfcheck.mjs",
    "exit": 1,
-   "ms": 8978,
+   "ms": 8272,
    "fails": 1,
    "lines": [
     "FAIL  !! and the rate is the SAME at f64, so this is not a precision question and the port changes nothing about it   23.1% on the device against 10.8% at f64. A round that reported only the f32 number would have blamed the hardware for arithmetic that does the same thing everywhere -- which is the mirror image of v4408, where the model was right about f32 and wrong about the transcendental"
@@ -65,7 +69,7 @@
   {
    "gate": "physics/render/microfacetVndf-selfcheck.mjs",
    "exit": 1,
-   "ms": 9642,
+   "ms": 7455,
    "fails": 1,
    "lines": [
     "FAIL  !! and at f32 it is nearly exact rather than exact, which is the honest version of the same claim   0 of 786432 on the device, 0.0e+0 of all samples. Those are facets whose dot(wo, wh) is a tiny positive in exact arithmetic and rounds to zero or below in binary32 -- the construction is exact, the arithmetic is not, and a check asserting a flat 0 here would be asserting f64 of an f32 machine"
@@ -75,7 +79,7 @@
   {
    "gate": "physics/stepperMeter-selfcheck.mjs",
    "exit": 1,
-   "ms": 229,
+   "ms": 249,
    "fails": 1,
    "lines": [
     "FAIL  !! the SHIPPED shmRun path is bit-identical to the pristine v3604 extract   captured BEFORE classifyEnvelope was extracted -- a refactor that 'cannot change anything' is the kind that does"
@@ -83,29 +87,9 @@
    "verdict": "RED"
   },
   {
-   "gate": "physics/upAxis-selfcheck.mjs",
-   "exit": 1,
-   "ms": 145,
-   "fails": 1,
-   "lines": [
-    "FAIL  freeSpaceWorld RISES when pushed up   y = 5.000 after 1s at 5 m/s"
-   ],
-   "verdict": "RED"
-  },
-  {
-   "gate": "render/ringFloorCost-selfcheck.mjs",
-   "exit": 1,
-   "ms": 3603,
-   "fails": 1,
-   "lines": [
-    "FAIL  the interleaved ratio's error bar does not reach the line the claim is made against -- which is what makes a timing row safe to assert rather than merely small   64: spread 0.402 vs headroom 0.354 (1x), 128: spread 0.036 vs headroom 0.365 (10x)"
-   ],
-   "verdict": "RED"
-  },
-  {
    "gate": "render/temporalResolve-selfcheck.mjs",
    "exit": 1,
-   "ms": 4893,
+   "ms": 4849,
    "fails": 1,
    "lines": [
     "FAIL    and the device's CONFIDENCE buffer matches to 1.07e-6 on all 2304 pixels   worst 1.073e-6"
@@ -113,17 +97,9 @@
    "verdict": "RED"
   },
   {
-   "gate": "simulation/life/paramecium3d-selfcheck.mjs",
-   "exit": 3221226505,
-   "ms": 885,
-   "fails": 0,
-   "lines": [],
-   "verdict": "CRASHED"
-  },
-  {
    "gate": "tools/mesh/xatlasRef-selfcheck.mjs",
    "exit": 1,
-   "ms": 6861,
+   "ms": 6569,
    "fails": 1,
    "lines": [
     "FAIL  !! the vendored source and the harness are the ones the record was taken from   3 hashed inputs, 3 changed, 3 unrecorded. Pinned at f700c7790aaa. This module's own hash is deliberately NOT among them: a staleness signal that fires on a comment edit is one people learn to regenerate past, so what the fixtures contribute is hashed as mesh DATA instead."
@@ -133,7 +109,7 @@
   {
    "gate": "tools/roundhouse/magmapDefault-selfcheck.mjs",
    "exit": 1,
-   "ms": 2565,
+   "ms": 3516,
    "fails": 0,
    "lines": [],
    "verdict": "CRASHED"
@@ -141,7 +117,7 @@
   {
    "gate": "tools/roundhouse/magmapDevice-selfcheck.mjs",
    "exit": 1,
-   "ms": 3511,
+   "ms": 3502,
    "fails": 2,
    "lines": [
     "FAIL  *** the SHIPPED variant ran (magmap.wgsl/wg128-shared) and its worst cell against the f64 reference is 3.788e-6 -- inside the corrected floor of 4.500e-6, and OVER the 4.385e-6 that was recorded ***   a device sides with the STORE-rounded emulator (4.4196e-6), not with cellMag's 4.385e-6. This is the measurement the old constant could not have",
@@ -152,7 +128,7 @@
   {
    "gate": "tools/roundhouse/magmapTaichiRun-selfcheck.mjs",
    "exit": 1,
-   "ms": 2609,
+   "ms": 2892,
    "fails": 2,
    "lines": [
     "FAIL  !! *** the taichi kernel COMPILES AND RUNS *** -- the claim the lane shipped without ever testing   -  [thrown: Cannot read properties of null (reading 'features')]",
@@ -163,7 +139,7 @@
   {
    "gate": "tools/ship/aiPresenceOrb-selfcheck.mjs",
    "exit": 1,
-   "ms": 5747,
+   "ms": 6290,
    "fails": 2,
    "lines": [
     "FAIL  !! WGSL emission (three's OTHER compiler backend for the same graph) also succeeds, proving the graph is valid on both   wgslOk=false len=43571 error=null",
@@ -174,15 +150,15 @@
   {
    "gate": "tools/ship/atmosphere-selfcheck.mjs",
    "exit": 1,
-   "ms": 3189,
+   "ms": 3684,
    "fails": 0,
    "lines": [],
    "verdict": "CRASHED"
   },
   {
    "gate": "tools/ship/bloomFusedTexture-selfcheck.mjs",
-   "exit": 3221225477,
-   "ms": 3335,
+   "exit": 3221226505,
+   "ms": 3636,
    "fails": 0,
    "lines": [],
    "verdict": "CRASHED"
@@ -190,7 +166,7 @@
   {
    "gate": "tools/ship/brainTsl-selfcheck.mjs",
    "exit": 1,
-   "ms": 3463,
+   "ms": 3707,
    "fails": 2,
    "lines": [
     "FAIL  *** the generated pass is BIT-IDENTICAL to the shipped kernel, on every activation ***   56 differing cells across 4 layer shapes -- the graph and the kernel are computing different numbers",
@@ -201,7 +177,7 @@
   {
    "gate": "tools/ship/buildingLab-selfcheck.mjs",
    "exit": 1,
-   "ms": 5722,
+   "ms": 6933,
    "fails": 2,
    "lines": [
     "FAIL    webgpu: the palette is on the picture (3 distinct red-to-green ratios among lit pixels; corners, walls, stairs and roof caps face the camera)",
@@ -210,9 +186,17 @@
    "verdict": "RED"
   },
   {
+   "gate": "tools/ship/contactOverlay-selfcheck.mjs",
+   "exit": 3221226505,
+   "ms": 913,
+   "fails": 0,
+   "lines": [],
+   "verdict": "CRASHED"
+  },
+  {
    "gate": "tools/ship/devicePresent-selfcheck.mjs",
    "exit": 1,
-   "ms": 2732,
+   "ms": 2561,
    "fails": 1,
    "lines": [
     "FAIL  *** WebGPU presents on this box, and all three readbacks agree with the pattern ***   webgpu: presented -- A canvas readback 0 of 2048 differ (worst 0); B offscreen 0 of 2048 differ (worst 0); C compositor copy 2048 of 2048 differ (worst 255); A vs B 0 of 2048 differ (worst 0); A vs C 2048 of 2048 differ (worst 255)"
@@ -222,7 +206,7 @@
   {
    "gate": "tools/ship/fsrPage-selfcheck.mjs",
    "exit": 1,
-   "ms": 414,
+   "ms": 255,
    "fails": 0,
    "lines": [],
    "verdict": "CRASHED"
@@ -230,7 +214,7 @@
   {
    "gate": "tools/ship/glbTexture-selfcheck.mjs",
    "exit": 1,
-   "ms": 11082,
+   "ms": 8676,
    "fails": 1,
    "lines": [
     "FAIL  !! *** and the tree attaches one now -- lazily, only after reading the header ***   glb_viewer.html, gpu/gltfKtx2.js, tools/ship/gltfKtx2-selfcheck.mjs, tools/ship/nextRounds.mjs -- gpu/gltfKtx2.js decides from the GLB or glTF header and the page obeys, which is gltfDraco's shape for a 256 KB decoder applied to a 562 KB transcoder. Until v4475 this line asserted the opposite and was right to"
@@ -238,21 +222,9 @@
    "verdict": "RED"
   },
   {
-   "gate": "tools/ship/inputSets-selfcheck.mjs",
-   "exit": 1,
-   "ms": 7485,
-   "fails": 3,
-   "lines": [
-    "FAIL  *** a gate reading through a NAMED fs import is recorded -- the hole v4566 could only disqualify ***   reads 2, dirs 0; main.js seen: false",
-    "FAIL  *** what a NODE CHILD read lands in the parent's set: the probe travels in NODE_OPTIONS ***   2 process(es), 1 node child(ren); index.html in the parent's set: false",
-    "FAIL  *** a node child handed its OWN env is still probed -- NODE_OPTIONS is merged in, not assumed ***   2 process(es); main.js in the parent's set: false. Without the merge this reads 1 process and the child's read is simply absent."
-   ],
-   "verdict": "RED"
-  },
-  {
    "gate": "tools/ship/noisePrecision-selfcheck.mjs",
    "exit": 1,
-   "ms": 5010,
+   "ms": 11825,
    "fails": 1,
    "lines": [
     "FAIL  !! *** snoise3f32 REPRODUCES THE GPU AT EVERY SINGLE POINT ***   0 of 9216 points agree to better than 1e-3, worst deviation 4.83e+0 -- which is the 24-bit readback's own resolution, not a disagreement."
@@ -261,18 +233,16 @@
   },
   {
    "gate": "tools/ship/ntfsMounter-selfcheck.mjs",
-   "exit": 1,
-   "ms": 717,
-   "fails": 1,
-   "lines": [
-    "FAIL  !! *** SABOTAGE: a volume named \"'; touch ... #\" is printed as TEXT, never executed ***   echoed literally, marker absent"
-   ],
-   "verdict": "RED"
+   "exit": 0,
+   "ms": 1431,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
   },
   {
    "gate": "tools/ship/pathTracerWgsl-selfcheck.mjs",
    "exit": 1,
-   "ms": 1191,
+   "ms": 1271,
    "fails": 3,
    "lines": [
     "FAIL  !! *** and computing tan() in the shader is two orders of magnitude worse ***   1.416e-6 vs 1.105e-7 -- 13x",
@@ -282,37 +252,17 @@
    "verdict": "RED"
   },
   {
-   "gate": "tools/ship/perspectiveWarp-selfcheck.mjs",
-   "exit": 1,
-   "ms": 3086,
+   "gate": "tools/ship/pipeTruncation-selfcheck.mjs",
+   "exit": 0,
+   "ms": 1479,
    "fails": 0,
    "lines": [],
-   "verdict": "CRASHED"
-  },
-  {
-   "gate": "tools/ship/pipeTruncation-selfcheck.mjs",
-   "exit": 1,
-   "ms": 1268,
-   "fails": 1,
-   "lines": [
-    "FAIL  *** process.exit() LOSES output through a pipe that survives to a file, and the control loses none ***   0 bytes of 244000 never reached the reader. Both scripts print the identical 244000 bytes; the only difference between them is the last line. The amount is scheduling -- 19,520 to 233,325 across 25 runs here -- so it is reported and the row asserts the contrast instead."
-   ],
-   "verdict": "RED"
-  },
-  {
-   "gate": "tools/ship/rootLayout-selfcheck.mjs",
-   "exit": 1,
-   "ms": 263,
-   "fails": 1,
-   "lines": [
-    "FAIL  !! every file in the root is there for a NAMED reason -- a stray one fails on arrival   UNJUSTIFIED IN ROOT: verify48.txt. Move it, or add it to the list above WITH THE REASON -- the list is what a tidy-up is checked against"
-   ],
-   "verdict": "RED"
+   "verdict": "GREEN"
   },
   {
    "gate": "tools/ship/shaderPairs-selfcheck.mjs",
    "exit": 1,
-   "ms": 4101,
+   "ms": 11144,
    "fails": 4,
    "lines": [
     "FAIL  !! and two of the five are ALREADY authored once -- in JavaScript -- and mirrored by hand into both   both files say so in their own headers: the nebula is \"from the CPU reference in nebula.js (same hash/vnoise/fbm/palette/parallax/stars)\" and the wormhole's nebula is \"defined ONCE and mirrored into GLSL + WGSL\". THE AUTHOR-ONCE DISCIPLINE IS ALREADY THERE; what is missing is a machine to do the mirroring, which is a narrower thing than a compiler",
@@ -323,17 +273,9 @@
    "verdict": "RED"
   },
   {
-   "gate": "tools/ship/sharpBridge-selfcheck.mjs",
-   "exit": 1,
-   "ms": 8508,
-   "fails": 0,
-   "lines": [],
-   "verdict": "CRASHED"
-  },
-  {
    "gate": "tools/ship/slugFill-selfcheck.mjs",
    "exit": 1,
-   "ms": 5112,
+   "ms": 6540,
    "fails": 4,
    "lines": [
     "FAIL    webgpu: CONTROL -- the plain 8 is slugEval through the model within 2 of 255 (the fill flag changed nothing for a plain pipeline)   worst 16",
@@ -346,7 +288,7 @@
   {
    "gate": "tools/ship/slugMelt-selfcheck.mjs",
    "exit": 1,
-   "ms": 5384,
+   "ms": 5322,
    "fails": 6,
    "lines": [
     "FAIL  *** webgpu: the t = 0 frame is coverage x the fire's nearest texel within 2 of 255 on every pixel but texel-boundary neighbours (fewer than 0.5%) ***",
@@ -361,7 +303,7 @@
   {
    "gate": "tools/ship/slugMorph-selfcheck.mjs",
    "exit": 1,
-   "ms": 5924,
+   "ms": 8372,
    "fails": 2,
    "lines": [
     "FAIL  *** webgpu: the t = 0.5 frame is within 2 of 255 of slugEval on the morphed atlas through the rasteriser model (834 lit) -- the intermediate shape, self-intersections and all, is what Slug says it is ***   worst 15, 205 over",
@@ -372,17 +314,17 @@
   {
    "gate": "tools/ship/slugReupload-selfcheck.mjs",
    "exit": 1,
-   "ms": 6513,
+   "ms": 4961,
    "fails": 1,
    "lines": [
-    "FAIL    webgl2: draw-only is not slower than reuse, and reuse is not slower than recreate by more than a millisecond (the order the design predicts, within this box's noise)   17.90 <= 3.00 <= 5.00"
+    "FAIL    webgl2: draw-only is not slower than reuse, and reuse is not slower than recreate by more than a millisecond (the order the design predicts, within this box's noise)   10.30 <= 2.40 <= 3.10"
    ],
    "verdict": "RED"
   },
   {
    "gate": "tools/ship/solidTexture-selfcheck.mjs",
    "exit": 1,
-   "ms": 6282,
+   "ms": 5644,
    "fails": 4,
    "lines": [
     "FAIL  !! *** THE JS AND GLSL SIMPLEX AGREE EXACTLY AT SOME POINTS AND NOT AT ALL AT OTHERS ***   0 of 9216 points (0.0%) agree to better than 1e-3, while the worst disagreement is 6.928 on a range of about +/-3.6 (mean 3.920). That SHAPE is the diagnosis: a drifting precision error would be small everywhere, and a wrong translation would be wrong everywhere. Exact agreement at many points with total disagreement at others is a DIFFERENT GRADIENT being chosen.",
@@ -395,27 +337,27 @@
   {
    "gate": "tools/ship/splatSort-selfcheck.mjs",
    "exit": 1,
-   "ms": 2489,
+   "ms": 2431,
    "fails": 1,
    "lines": [
-    "FAIL  *** at 500K splats the old sort misses a 60 fps frame and the new one makes it ***   comparison 431.0 ms (2.3 fps), radix 23.0 ms (43 fps)"
+    "FAIL  *** at 500K splats the old sort misses a 60 fps frame and the new one makes it ***   comparison 448.6 ms (2.2 fps), radix 22.3 ms (45 fps)"
    ],
    "verdict": "RED"
   },
   {
    "gate": "tools/ship/statedRuntime-selfcheck.mjs",
    "exit": 1,
-   "ms": 4346,
+   "ms": 4092,
    "fails": 1,
    "lines": [
-    "FAIL  !! *** no NEW header has drifted from what its gate actually does, MEASURED BY RUNNING IT ***   NEW and confirmed BY RUNNING: tools/ship/asciify-selfcheck.mjs states 290 ms, ran 930; tools/ship/voxelAvatar-selfcheck.mjs states 110 ms, ran 238 -- correct the header from THIS measurement, not from the record. DO NOT ADD IT TO THE BASELINE: that is a ratchet growing back, the one thing a ratchet must never do"
+    "FAIL  !! *** no NEW header has drifted from what its gate actually does, MEASURED BY RUNNING IT ***   NEW and confirmed BY RUNNING: tools/ship/asciify-selfcheck.mjs states 290 ms, ran 750 -- correct the header from THIS measurement, not from the record. DO NOT ADD IT TO THE BASELINE: that is a ratchet growing back, the one thing a ratchet must never do"
    ],
    "verdict": "RED"
   },
   {
    "gate": "tools/ship/sweepCoverage-selfcheck.mjs",
    "exit": 1,
-   "ms": 4701,
+   "ms": 4266,
    "fails": 2,
    "lines": [
     "FAIL  !! a returnee that went back over the budget on a later box is NAMED with its serial readings, and is live over   meshLine-selfcheck.mjs 3136 ms on file, 4379 ms recorded; traderGraph-selfcheck.mjs 2920 ms on file, 3008 ms recorded; wgslSpec-selfcheck.mjs 2943 ms on file, 3737 ms recorded -- justified by the RECORDED readings rather than by the filed one, which says which ritual step ran last; see the note above the v4476 row",
@@ -426,7 +368,7 @@
   {
    "gate": "tools/ship/threeProbe-selfcheck.mjs",
    "exit": 1,
-   "ms": 10293,
+   "ms": 15386,
    "fails": 2,
    "lines": [
     "FAIL  *** webgpu: THIS BOX REFUSES three@0.185.1 ON WebGPU BY NAME -- it drew ***   v4319's finding reproduced: the browser's GPUTextureViewDescriptor has no swizzle; the pin is at least the build box's",
@@ -437,7 +379,7 @@
   {
    "gate": "tools/ship/treeRead-selfcheck.mjs",
    "exit": 1,
-   "ms": 10552,
+   "ms": 8800,
    "fails": 1,
    "lines": [
     "FAIL  !! *** THE TWO OLD SKIP RULES STILL SELECT THE SAME FILES AS THE UNIFIED ONE, FILE FOR FILE ***   compared on normalised paths: this row is about whether two authors' rules still agree on WHICH files, not about which separator the host writes -- that is the row below, and conflating them is what let a separator-blind rule read as agreement for as long as nobody ran the gate on Windows."
@@ -447,30 +389,20 @@
   {
    "gate": "tools/ship/wgslSpec-selfcheck.mjs",
    "exit": 1,
-   "ms": 8153,
+   "ms": 6798,
    "fails": 1,
    "lines": [
-    "FAIL  and across 4767 of THIS TREE'S files requiredLimits appears 3 times -- every device in this tree runs at the defaults, so a 1024-wide workgroup is not merely unportable, it cannot be created here"
+    "FAIL  and across 4768 of THIS TREE'S files requiredLimits appears 3 times -- every device in this tree runs at the defaults, so a 1024-wide workgroup is not merely unportable, it cannot be created here"
    ],
    "verdict": "RED"
   },
   {
    "gate": "tools/ship/xbarPlugin-selfcheck.mjs",
-   "exit": 1,
-   "ms": 394,
-   "fails": 9,
-   "lines": [
-    "FAIL  !! *** the shebang is an ABSOLUTE interpreter path, not /usr/bin/env node ***   a menubar app launched from Finder does not inherit a login shell's PATH -- the classic way these plugins work in a terminal and show NOTHING in the menubar",
-    "FAIL  !! the gauge is imported by absolute file:// URL",
-    "FAIL  !! it runs and prints a menubar line then a separator   \"\"",
-    "FAIL  !! the menubar line carries the value from the endpoint",
-    "FAIL  !! the dropdown states the endpoint, the path and the domain",
-    "FAIL  !! and it offers a refresh the host understands",
-    "FAIL  !! *** it writes NOTHING to stderr, which is what the .mjs extension buys ***   stderr: spawn EFTYPE",
-    "FAIL  !! *** with the endpoint gone, the menubar line greys out and shows no number ***   \"\"",
-    "FAIL  !! ...and the dropdown says WHY rather than just failing"
-   ],
-   "verdict": "RED"
+   "exit": 0,
+   "ms": 3352,
+   "fails": 0,
+   "lines": [],
+   "verdict": "GREEN"
   }
  ]
 }
