@@ -74,13 +74,45 @@
 // two mirrored cases -- the gate checks the actual post-impact relative velocity instead, the mistake a first
 // draft of this exact check made and corrected before it ever reached the gate).
 //
-// STILL NOT DONE (this round only closes the friction gap, not the other one the header above already named): a
-// persistent contact manifold across multiple simultaneous contact points -- one impulse (and one positional
-// correction) per call, matching how physics/mechanics/rigidBody6dof.mjs's own step() takes one accumulated
-// force/torque per tick rather than a multi-contact solver. obbOverlap.js's obbContact() still returns only
-// {normal, depth}, not a point or a set of points; contactPoint() below is still a single-point approximation.
-// A full manifold needs polygon clipping (SAT proves separation, not contact geometry) -- a real, separate
-// piece of work, named here rather than silently implied to be solved by this round's friction addition.
+// THE MANIFOLD GAP NAMED ABOVE IS NOW CLOSED (this round): physics/obbManifold.js (a sibling of obbOverlap.js,
+// never imported here in the other direction) turns one obbContact() {normal, depth} result into up to 4 actual
+// contact points via SAT-axis-categorized face clipping or edge-edge closest-point math -- see that file's own
+// header for the algorithm. resolveManifold() (below) is the thin bridge: it does NOT change resolveCollision()
+// or positionalCorrection() at all (both remain byte-identical to before this round, still single-point, still
+// the ONLY functions that actually touch velocity/position) -- it sequences resolveCollision() once per manifold
+// point, deepest-first, summing the impulse magnitudes a caller may want for e.g. damage. This keeps the already-
+// proven single-contact formula as the one source of truth for the physics; a manifold is a SCHEDULE of calls
+// into it, not a new formula.
+//
+// WHY SEQUENTIAL (Gauss-Seidel), NOT SIMULTANEOUS: each resolveCollision() call already reads the CURRENT
+// vel/w of both bodies, so a second point's impulse naturally accounts for the velocity change the first point's
+// impulse just made -- the standard, simplest multi-contact scheme (a single pass, no warm-starting, no extra
+// velocity iterations), matching this file's own existing "one accumulated response per tick" philosophy rather
+// than introducing a new one. Named limitation, not silently implied to be a full iterative solver.
+//
+// WHY DEEPEST-FIRST: no physical requirement forces an order (conservation holds per-call regardless, see below),
+// but resolving the most-penetrating point first gives it first claim on separating the pair before a shallower
+// point's own impulse can partially undo it -- the standard convention (Box2D orders manifold points by depth for
+// the same reason). The sort uses an EXPLICIT index tie-break (`y.depth - x.depth || x.i - y.i`), not bare
+// Array.sort stability, so ordering is deterministic by construction rather than by an engine-version accident.
+//
+// CONSERVATION: resolveCollision() already conserves momentum/angular-momentum exactly and never increases energy
+// for ANY {point, normal} input (existing gate section 3's own state-independent proof -- it does not depend on
+// WHICH point was passed). N sequential calls therefore sum N exactly-conserving/non-increasing deltas, so the
+// composite is exactly conserving/non-increasing too -- an algebraic consequence of the existing proof, not a new
+// physical claim, but still directly asserted (not merely inferred) in this file's own gate.
+//
+// POSITIONAL CORRECTION is called ONCE per pair per tick by the CALLER, at the manifold's own deepest point,
+// through the existing unmodified positionalCorrection(a,b,{normal,depth},opts) -- resolveManifold() itself never
+// calls it. positionalCorrection() is a single 1-DOF translation along one normal with no per-point capability;
+// calling it once per manifold point would apply the SAME direction up to 4 times with only depth differing --
+// genuine overcorrection (a body pushed apart up to 4x too far for a flush 4-point hit), not a refinement, which
+// is why no positionalCorrectionManifold() wrapper exists.
+//
+// mass:0 / NaN CONTAINMENT: resolveCollision()'s own existing guard (the `!(slideSpeed >= 1e-9)` fix, this file's
+// own gate sabotage-H) holds per call for ANY input state; by induction it stays contained across a sequential
+// resolveManifold() loop exactly as it does for one call -- asserted directly in the gate on an actual multi-
+// point manifold, not merely argued from the single-call proof.
 "use strict";
 import { obbFromPosed, obbContact } from "../obbOverlap.js";
 import { rotateByQuat, worldToBody, toPoseQuat, boxInertia, createBody } from "./rigidBody6dof.mjs";
@@ -161,11 +193,27 @@ function contactPointVelocity(a, b, rA, rB) {
  * a/b are NEW body states (mass/I/pos/q unchanged, vel/w updated). Does not mutate its inputs. ASSUMES mass > 0
  * for both bodies (1/mass appears directly in K below) -- an explicit mass:0 divides by zero and poisons that
  * body's velocity with NaN, same as it would in F=ma itself; not guarded here, matching how rigidBody6dof.mjs's
- * own createBody()/boxInertia() never validate a non-physical mass either. THE NAN STAYS CONTAINED TO THE ONE
- * DEGENERATE BODY, not spread to an otherwise-healthy partner -- an adversarial review found the friction code
- * below originally DID spread it (NaN fails every ordinary `< eps` comparison, so a naive slideSpeed<eps guard
- * let a NaN-poisoned slideSpeed fall through into the friction math and poison the healthy body too, ON BY
- * DEFAULT since mu defaults nonzero); fixed with a guard that catches both "too small" and NaN, see below.
+ * own createBody()/boxInertia() never validate a non-physical mass either. WHEN EXACTLY ONE BODY HAS mass:0 (the
+ * only shape any caller in this tree actually constructs, and the only one this file's own gate exercises), THE
+ * NAN STAYS CONTAINED TO THAT ONE DEGENERATE BODY, not spread to its otherwise-healthy partner -- an adversarial
+ * review found the friction code below originally DID spread it (NaN fails every ordinary `< eps` comparison, so
+ * a naive slideSpeed<eps guard let a NaN-poisoned slideSpeed fall through into the friction math and poison the
+ * healthy body too, ON BY DEFAULT since mu defaults nonzero); fixed with a guard that catches both "too small"
+ * and NaN, see below. THE SAME SINGLE-DEGENERATE-BODY CONTAINMENT HOLDS ACROSS A SEQUENTIAL resolveManifold()
+ * LOOP TOO (added this round, see its own gate section 9d) -- a SECOND call on a pair where one body's velocity
+ * is already NaN from a PRIOR call would, without the `!(vn <= 0)` guard below, compute a NaN normal impulse `j`
+ * (not the usual finite-or-zero value) and spread it to the otherwise-healthy body via the shared impulse vector,
+ * the exact same class of widened blast radius the friction guard above already closes for a single call, but
+ * across multiple ones. IF BOTH BODIES PASSED IN HAVE mass:0, BOTH GET POISONED, even on a single call -- a
+ * SEPARATE adversarial review found this by hand-tracing the arithmetic: K = 1/0 + 1/0 + finite = Infinity, so
+ * j = -(1+e)*vn/Infinity = 0 EXACTLY and J = n*0 = [0,0,0] (a genuinely zero impulse vector) -- but applyImpulse()
+ * below then computes `scale3(J, 1/a.mass)` = `scale3([0,0,0], Infinity)`, and 0*Infinity is NaN in IEEE-754 for
+ * every component, on BOTH sides at once. This does not contradict the single-degenerate-body claim above (that
+ * case's J is also [0,0,0], but only ONE side's 1/mass is Infinity); it is a genuinely different, doubly-
+ * degenerate input this file has never supported or guarded, not newly introduced or newly widened by this
+ * round's `!(vn <= 0)` fix (which only prevents an ALREADY-poisoned body from poisoning a partner across
+ * multiple calls, and does nothing for two bodies poisoning each other on their very first shared call). Flagged
+ * here rather than fixed because no caller in this tree ever constructs a mass:0-vs-mass:0 pair.
  */
 export function resolveCollision(a, b, contact, opts = {}) {
     const e = opts.restitution != null ? opts.restitution : 0.4;
@@ -173,7 +221,17 @@ export function resolveCollision(a, b, contact, opts = {}) {
     const { point: p, normal: n } = contact;
     const rA = sub3(p, a.pos), rB = sub3(p, b.pos);
     const vn = dot3(contactPointVelocity(a, b, rA, rB), n);
-    if (vn > 0) return { j: 0, jt: 0, a, b };   // already separating -- no impulse at all, not even friction
+    // `!(vn <= 0)`, NOT `vn > 0` -- these are NOT equivalent when vn is NaN (a mass:0 body's velocity already
+    // poisoned by a PRIOR call, the exact scenario resolveManifold()'s own sequential loop creates): `NaN > 0` is
+    // FALSE, so the naive form falls through and computes K, j = -(1+e)*vn/K = NaN (not the usual finite-or-zero
+    // value 1/mass=Infinity alone would have produced), and that NaN THEN SPREADS TO THE OTHERWISE-HEALTHY OTHER
+    // BODY via the shared impulse vector J=n*j in applyImpulse() below -- found by resolveManifold()'s own gate
+    // section 9d, the SAME class of widened blast radius the friction NaN-safe guard above already closes for a
+    // single call (see this file's own JSDoc on resolveCollision()), but here across MULTIPLE sequential calls on
+    // the same pair. `!(x <= 0)` is true for both "already separating" and NaN, so a body already poisoned by an
+    // earlier manifold point makes every LATER point on that pair a genuine no-op (not a fresh source of NaN),
+    // containing the damage to a single already-degenerate body across the WHOLE manifold, not just one call.
+    if (!(vn <= 0)) return { j: 0, jt: 0, a, b };
 
     const K = effectiveInverseMass(a, b, rA, rB, n);
     const j = -(1 + e) * vn / K;
@@ -203,6 +261,36 @@ export function resolveCollision(a, b, contact, opts = {}) {
     const { a: a2, b: b2 } = applyImpulse(a1, b1, rA, rB, scale3(t, jt));
 
     return { j, jt, a: a2, b: b2 };
+}
+
+/**
+ * Resolve a FULL CONTACT MANIFOLD (up to 4 points, typically from physics/obbManifold.js's own obbManifold())
+ * between two bodies -- a thin sequential-impulse wrapper around the unmodified resolveCollision() (see this
+ * file's own header for why sequential/deepest-first, and why conservation still holds exactly). `points` is
+ * Array<{point, normal, depth}> (obbManifold()'s own point shape -- the extra `depth` field is simply ignored by
+ * resolveCollision(), which only reads `point`/`normal`); `opts` is passed through to EVERY resolveCollision()
+ * call unchanged (same restitution/friction for the whole manifold, not per-point). Returns {totalImpulse,
+ * totalTangentImpulse, a, b} -- the two impulse magnitudes summed across every point actually resolved (0 for a
+ * point that was already separating, same as a single resolveCollision() call), and the FINAL body states after
+ * every point in the manifold has been applied in sequence. `points.length === 0` returns the inputs unchanged
+ * (0 impulse) rather than throwing -- defensive, since obbManifold() itself is documented to never return an
+ * empty array for a hit:true contact, but this function does not assume its caller always passes that through.
+ */
+export function resolveManifold(a, b, points, opts = {}) {
+    if (points.length === 0) return { totalImpulse: 0, totalTangentImpulse: 0, a, b };
+    const ordered = points
+        .map((p, i) => ({ p, i }))
+        .sort((x, y) => y.p.depth - x.p.depth || x.i - y.i)
+        .map((x) => x.p);
+    let curA = a, curB = b, totalImpulse = 0, totalTangentImpulse = 0;
+    for (const pt of ordered) {
+        const { j, jt, a: a2, b: b2 } = resolveCollision(curA, curB, pt, opts);
+        totalImpulse += j;
+        totalTangentImpulse += jt;
+        curA = a2;
+        curB = b2;
+    }
+    return { totalImpulse, totalTangentImpulse, a: curA, b: curB };
 }
 
 /**

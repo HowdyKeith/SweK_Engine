@@ -45,6 +45,7 @@ import * as THREE from "/vendor/three/three.module.js";
 import { OrbitControls } from "/vendor/three/jsm/controls/OrbitControls.js";
 import * as RB from "/physics/mechanics/rigidBody6dof.mjs";
 import * as RBC from "/physics/mechanics/rigidBody6dofCollision.mjs";
+import * as OM from "/physics/obbManifold.js";
 import * as RBW from "/physics/mechanics/rigidBody6dofWeapon.mjs";
 import * as AP from "/brain/autopilot6dof.mjs";
 import * as FA from "/brain/fleetAssign.mjs";
@@ -186,15 +187,22 @@ function resolveCollisions(all) {
       if (b.dead) continue;
       const c = RBC.checkContact(a.body, HALF, b.body, HALF);
       if (!c.hit) continue;
+      // FULL CONTACT MANIFOLD (added this round, replacing the old single-approximate-point path): obbManifold()
+      // turns this SAT hit's own {normal, depth} into up to 4 real contact points via face clipping or edge-edge
+      // closest-point math (see physics/obbManifold.js's own header) -- resolveManifold() then sequences the
+      // SAME, already-proven resolveCollision() once per point, deepest-first (see rigidBody6dofCollision.mjs's
+      // own header for why that ordering and why conservation still holds exactly). Neither resolveCollision()
+      // nor positionalCorrection() changed AT ALL for this: a single-point manifold (edge/vertex/fallback
+      // contact) reduces to exactly the old per-tick behavior, proven bit-identical in that module's own gate.
       const obbA = RBC.bodyOBB(a.body, HALF), obbB = RBC.bodyOBB(b.body, HALF);
-      const p = RBC.contactPoint(obbA, obbB, c.normal);
+      const manifold = OM.obbManifold(obbA, obbB, c);
       // friction:0.5 EXPLICIT, matching rigidBody6dofCollision.mjs's own default -- an adversarial review found
       // this page previously inherited that default SILENTLY (no `friction` key at all), an unreviewed side
       // effect of that module adding Coulomb friction rather than a considered choice for this page. Made
       // deliberate here: ship hulls scraping past each other having SOME grip (not sliding frictionlessly) is
       // the physically plausible choice for a ramming/glancing dogfight, and matches the value already proven
       // in that module's own gate rather than introducing a second, untested friction coefficient.
-      const { j: impulse, a: a2, b: b2 } = RBC.resolveCollision(a.body, b.body, { point: p, normal: c.normal }, { restitution: 0.35, friction: 0.5 });
+      const { totalImpulse: impulse, a: a2, b: b2 } = RBC.resolveManifold(a.body, b.body, manifold.points, { restitution: 0.35, friction: 0.5 });
       // positional correction (position-only, split by inverse mass) keeps a colliding pair's own PENETRATION
       // bounded -- measured directly before this page shipped: depth converges to (and stays pinned near) its
       // own slop bound rather than growing without limit. THE ORIGINAL CAUSE OF SUSTAINED LIGHT CONTACT --
@@ -207,8 +215,17 @@ function resolveCollisions(all) {
       // DIFFERENT targets, or ram an enemy deliberately -- that is normal combat contact, not the coordination
       // gap, and the physics still degrades gracefully under it either way (bounded depth, correct impulses
       // every tick, no explosion, no clip-through).
-      const { a: a3, b: b3 } = RBC.positionalCorrection(a2, b2, c);
+      // positional correction is applied ONCE per pair, at the manifold's own DEEPEST point -- not once per
+      // point (positionalCorrection() has no per-point capability; calling it 4x for a flush face-face hit would
+      // push the pair apart along the same direction up to 4x too far -- see physics/mechanics/
+      // rigidBody6dofCollision.mjs's own header on resolveManifold() for why).
+      const deepest = manifold.points.reduce((best, p) => (p.depth > best.depth ? p : best));
+      const { a: a3, b: b3 } = RBC.positionalCorrection(a2, b2, deepest);
       a.body = a3; b.body = b3;
+      // damage is SUMMED across the whole manifold, then capped ONCE -- not per-point (a flush 4-point hit would
+      // otherwise deal up to 4x RAM_DAMAGE_CAP) and not maxed (that would discard real severity signal: a flush
+      // hit is genuinely a harder hit than a glancing edge-edge one). For a single-point manifold (edge/vertex/
+      // fallback) this is exactly the old per-tick damage, unchanged.
       if (impulse > 0) {
         const dmg = Math.min(RAM_DAMAGE_CAP, impulse * RAM_DAMAGE_PER_IMPULSE);
         a.hp -= dmg; b.hp -= dmg;

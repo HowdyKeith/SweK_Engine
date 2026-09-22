@@ -92,6 +92,29 @@
 //      section uses only well-formed (finite-mass) bodies, so this sabotage is invisible everywhere except the
 //      one test built specifically to exercise the degenerate input, exactly why that test exists as its own
 //      case rather than being assumed covered by the ordinary friction sections above it.
+//
+// resolveManifold() SABOTAGES (added this round, for the new sequential-impulse manifold wrapper):
+//   I  the already-separating guard reverted from `!(vn <= 0)` to `vn > 0` -- *** A REAL BUG THIS GATE'S OWN
+//      FIRST RUN FOUND, NOT MERELY SABOTAGE-CONFIRMED AFTERWARD. *** Section 9d (mass:0 containment across a
+//      3-point manifold) went RED on the very first run of this gate, before any sabotage was applied: a second
+//      resolveCollision() call in the sequential loop, given a body already NaN-poisoned by the FIRST call, computes
+//      `vn` as NaN; `NaN > 0` is false, so the naive guard does not short-circuit, `j` comes out NaN (not the usual
+//      finite-or-zero value), and that NaN then spreads to the otherwise-healthy OTHER body via the shared impulse
+//      vector -- the same class of widened blast radius sabotage-H's own fix already closed for a single call,
+//      but only now visible because resolveManifold() is the first caller that ever makes a SECOND call on a pair
+//      that might already be poisoned. Fixed with the same NaN-safe idiom as the friction guard (`!(vn <= 0)`,
+//      which treats NaN as "already separating" the same as any other non-approaching case) -- RE-SABOTAGED AFTER
+//      THE FIX: 1 red, exactly section 9d's own containment check, confirming the fix is what closes it.
+//   J  resolveManifold()'s deepest-first sort dropped (`ordered = points` instead of the depth-descending sort)
+//      -> 4 red: section 9c's own totalImpulse, totalTangentImpulse, and both final-velocity checks (the
+//      hand-unrolled reference sorts by depth explicitly, so an unsorted manifold resolves the points in a
+//      different order and the sequential, order-dependent Gauss-Seidel result diverges numerically).
+//   K  the tangential-impulse accumulator dropped (`totalTangentImpulse += jt` removed, staying 0 forever) -> 2
+//      red: section 9b's single-point regression check (a nonzero jt from the lone point no longer reaches
+//      totalTangentImpulse) and section 9c's own direct totalTangentImpulse comparison. Section 9 (the 200-trial
+//      conservation sweep) stays green -- it never asserts on totalTangentImpulse's own value, only on
+//      momentum/angular-momentum/energy, which are properties of what resolveCollision() actually applied
+//      internally (still correct per-call), not of what resolveManifold() merely reports back to the caller.
 "use strict";
 import { pathToFileURL } from "node:url";
 import { boxInertia, createBody, rotateByQuat } from "./rigidBody6dof.mjs";
@@ -108,6 +131,7 @@ const scale3 = (a, s) => [a[0] * s, a[1] * s, a[2] * s];
 const sub3 = (a, b) => add3(a, b, -1);
 const norm3 = (v) => Math.hypot(v[0], v[1], v[2]);
 const near3 = (a, b, eps = 1e-9) => Math.abs(a[0] - b[0]) < eps && Math.abs(a[1] - b[1]) < eps && Math.abs(a[2] - b[2]) < eps;
+const exact3 = (a, b) => a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
 
 function KE(body) {
     const lin = 0.5 * body.mass * dot3(body.vel, body.vel);
@@ -420,7 +444,127 @@ console.log("\n8. *** positionalCorrection() -- A PARTIAL, MASS-SPLIT PUSH-APART
     ok("...monotonically -- depth never INCREASES from one call to the next", depths.every((d, i) => i === 0 || d <= depths[i - 1] + 1e-9));
 }
 
-console.log("\n9. THE FRONT DOOR");
+console.log("\n9. *** resolveManifold() (added this round) -- 200-TRIAL SYNTHETIC 1-4-POINT MANIFOLDS: CONSERVATION");
+console.log("   HOLDS ACROSS THE WHOLE SEQUENTIAL LOOP, NOT JUST A SINGLE CALL ***");
+{
+    let checked = 0, maxMomErr = 0, maxAngErr = 0, maxEnergyGrowth = 0;
+    for (let trial = 0; trial < 200; trial++) {
+        const mA = 0.5 + rnd() * 5, mB = 0.5 + rnd() * 5;
+        const IA = [0.3 + rnd() * 2, 0.3 + rnd() * 2, 0.3 + rnd() * 2], IB = [0.3 + rnd() * 2, 0.3 + rnd() * 2, 0.3 + rnd() * 2];
+        const a = createBody({ mass: mA, I: IA, pos: [rnd() * 4 - 2, rnd() * 4 - 2, rnd() * 4 - 2], vel: [rnd() * 6 - 3, rnd() * 6 - 3, rnd() * 6 - 3], q: randUnitQuat(), w: [rnd() * 2 - 1, rnd() * 2 - 1, rnd() * 2 - 1] });
+        const b = createBody({ mass: mB, I: IB, pos: [rnd() * 4 - 2, rnd() * 4 - 2, rnd() * 4 - 2], vel: [rnd() * 6 - 3, rnd() * 6 - 3, rnd() * 6 - 3], q: randUnitQuat(), w: [rnd() * 2 - 1, rnd() * 2 - 1, rnd() * 2 - 1] });
+        const numPoints = 1 + Math.floor(rnd() * 4);   // 1..4, matching obbManifold()'s own documented [1,4] contract
+        const points = [];
+        for (let k = 0; k < numPoints; k++) {
+            let n = [rnd() * 2 - 1, rnd() * 2 - 1, rnd() * 2 - 1]; const nl = norm3(n); n = n.map((c) => c / nl);
+            points.push({ point: [rnd() * 4 - 2, rnd() * 4 - 2, rnd() * 4 - 2], normal: n, depth: rnd() * 2 });
+        }
+        const e = trial % 4 === 0 ? 1 : rnd();
+
+        const beforeMom = totalMomentum(a, b), beforeAng = add3(angMomentumAbout([0, 0, 0], a), angMomentumAbout([0, 0, 0], b)), beforeE = KE(a) + KE(b);
+        // friction:0 -- same isolation reason section 3 gives above: this sweep proves the SEQUENCING (does
+        // looping resolveCollision() N times still conserve everything cumulatively), not friction's own
+        // properties, which are already proven independently in section 3b.
+        const { totalImpulse, a: a2, b: b2 } = C.resolveManifold(a, b, points, { restitution: e, friction: 0 });
+        if (totalImpulse === 0) continue;   // no point in this trial produced a real impulse -- nothing to check
+        checked++;
+        const afterMom = totalMomentum(a2, b2), afterAng = add3(angMomentumAbout([0, 0, 0], a2), angMomentumAbout([0, 0, 0], b2)), afterE = KE(a2) + KE(b2);
+        maxMomErr = Math.max(maxMomErr, norm3(sub3(afterMom, beforeMom)) / (norm3(beforeMom) || 1));
+        maxAngErr = Math.max(maxAngErr, norm3(sub3(afterAng, beforeAng)) / (norm3(beforeAng) || 1));
+        if (afterE > beforeE) maxEnergyGrowth = Math.max(maxEnergyGrowth, (afterE - beforeE) / beforeE);
+    }
+    // !! same vacuous-pass gap section 3 already guards against (sabotage E) -- a resolveManifold() that always
+    // returns totalImpulse:0 would make every error variable below stay at its initial 0 forever.
+    ok("!! a meaningful number of the 200 random multi-point trials actually produced a real impulse", checked > 50, `checked=${checked}`);
+    ok("!! total linear momentum conserved to float precision, SUMMED across the whole per-pair sequential loop", maxMomErr < 1e-9, `max rel err ${maxMomErr.toExponential(2)}`);
+    ok("!! total angular momentum conserved, SAME whole-loop sum", maxAngErr < 1e-9, `max rel err ${maxAngErr.toExponential(2)}`);
+    ok("!! kinetic energy NEVER increases across the whole sequential manifold resolution", maxEnergyGrowth < 1e-9, `max growth ${maxEnergyGrowth.toExponential(2)}`);
+}
+
+console.log("\n9b. resolveManifold(a,b,[onePoint],opts) === resolveCollision(a,b,onePoint,opts) EXACTLY -- SUPERSET-BEHAVIOR REGRESSION PROOF");
+{
+    let allExact = true, trials = 0;
+    for (let trial = 0; trial < 30; trial++) {
+        const I = [0.5 + rnd() * 2, 0.5 + rnd() * 2, 0.5 + rnd() * 2];
+        const a = createBody({ mass: 1 + rnd() * 4, I, pos: [rnd() * 4 - 2, rnd() * 4 - 2, rnd() * 4 - 2], vel: [rnd() * 6 - 3, rnd() * 6 - 3, rnd() * 6 - 3], q: randUnitQuat(), w: [rnd() * 2 - 1, rnd() * 2 - 1, rnd() * 2 - 1] });
+        const b = createBody({ mass: 1 + rnd() * 4, I, pos: [rnd() * 4 - 2, rnd() * 4 - 2, rnd() * 4 - 2], vel: [rnd() * 6 - 3, rnd() * 6 - 3, rnd() * 6 - 3], q: randUnitQuat(), w: [rnd() * 2 - 1, rnd() * 2 - 1, rnd() * 2 - 1] });
+        let n = [rnd() * 2 - 1, rnd() * 2 - 1, rnd() * 2 - 1]; const nl = norm3(n); n = n.map((c) => c / nl);
+        const point = { point: [rnd() * 4 - 2, rnd() * 4 - 2, rnd() * 4 - 2], normal: n, depth: rnd() };
+        const opts = { restitution: rnd(), friction: rnd() };
+        const direct = C.resolveCollision(a, b, point, opts);
+        const viaManifold = C.resolveManifold(a, b, [point], opts);
+        trials++;
+        const same = direct.j === viaManifold.totalImpulse && direct.jt === viaManifold.totalTangentImpulse &&
+            exact3(direct.a.vel, viaManifold.a.vel) && exact3(direct.b.vel, viaManifold.b.vel) &&
+            exact3(direct.a.w, viaManifold.a.w) && exact3(direct.b.w, viaManifold.b.w);
+        if (!same) allExact = false;
+    }
+    ok("!! a single-point manifold reduces to bit-identical output vs calling resolveCollision() directly, every trial", allExact, `trials=${trials}`);
+}
+
+console.log("\n9c. totalImpulse/totalTangentImpulse MATCH AN INDEPENDENT HAND-UNROLLED DEEPEST-FIRST LOOP");
+{
+    const I = [1, 1, 1];
+    const a = createBody({ mass: 3, I, pos: [-1, 0.3, -0.2], vel: [4, -1, 0.5], q: [0.95, 0.1, 0.2, 0.1], w: [0.2, -0.1, 0.3] });
+    const b = createBody({ mass: 5, I, pos: [1, -0.2, 0.1], vel: [-2, 0.5, -0.3], q: [0.9, -0.1, 0.15, 0.2], w: [-0.15, 0.2, -0.1] });
+    // deliberately OUT of depth order in the input array (0.2, 0.9, 0.5) -- if resolveManifold() silently used
+    // input order instead of its own documented deepest-first sort, this would catch it.
+    const points = [
+        { point: [0, 0.3, 0], normal: [1, 0, 0], depth: 0.2 },
+        { point: [0, -0.2, 0.1], normal: [1, 0, 0], depth: 0.9 },
+        { point: [0, 0.1, -0.2], normal: [1, 0, 0], depth: 0.5 },
+    ];
+    const opts = { restitution: 0.35, friction: 0.4 };
+    const viaManifold = C.resolveManifold(a, b, points, opts);
+
+    // hand-unrolled: sort by depth descending myself, then call resolveCollision three times, threading state.
+    const ordered = [...points].sort((x, y) => y.depth - x.depth);
+    ok("(reference) hand-sort puts depth 0.9 first, then 0.5, then 0.2", ordered[0].depth === 0.9 && ordered[1].depth === 0.5 && ordered[2].depth === 0.2, `${ordered.map((p) => p.depth)}`);
+    let curA = a, curB = b, totalJ = 0, totalJt = 0;
+    for (const pt of ordered) {
+        const r = C.resolveCollision(curA, curB, pt, opts);
+        totalJ += r.j; totalJt += r.jt; curA = r.a; curB = r.b;
+    }
+    ok("!! totalImpulse matches the hand-unrolled loop EXACTLY", viaManifold.totalImpulse === totalJ, `manifold=${viaManifold.totalImpulse} hand=${totalJ}`);
+    ok("!! totalTangentImpulse matches the hand-unrolled loop EXACTLY", viaManifold.totalTangentImpulse === totalJt, `manifold=${viaManifold.totalTangentImpulse} hand=${totalJt}`);
+    ok("!! final body state (a.vel) matches the hand-unrolled loop EXACTLY", exact3(viaManifold.a.vel, curA.vel), `manifold=${viaManifold.a.vel} hand=${curA.vel}`);
+    ok("!! final body state (b.vel) matches the hand-unrolled loop EXACTLY", exact3(viaManifold.b.vel, curB.vel), `manifold=${viaManifold.b.vel} hand=${curB.vel}`);
+}
+
+console.log("\n9d. mass:0 CONTAINMENT ACROSS A MULTI-POINT MANIFOLD -- NaN STAYS ON THE DEGENERATE BODY, ACROSS ALL N POINTS");
+{
+    const I = [1, 1, 1];
+    const a = createBody({ mass: 0, I, pos: [-1, 0, 0], vel: [1, 5, 0] });
+    const b = createBody({ mass: 8, I, pos: [1, 0, 0], vel: [0, 0, 0] });
+    const points = [
+        { point: [0, 0, 0], normal: [1, 0, 0], depth: 0.3 },
+        { point: [0, 0.2, 0], normal: [1, 0, 0], depth: 0.6 },
+        { point: [0, -0.2, 0], normal: [1, 0, 0], depth: 0.1 },
+    ];
+    const r = C.resolveManifold(a, b, points, { restitution: 0.2 });   // default (nonzero) friction, deliberately
+    ok("(expected) the degenerate mass:0 body stays poisoned with NaN across all 3 sequential points", r.a.vel.every((v) => Number.isNaN(v)), `a.vel=${r.a.vel}`);
+    ok("!! the otherwise-healthy body stays fully finite across the WHOLE 3-point manifold, not just one point", r.b.vel.every(Number.isFinite), `b.vel=${r.b.vel}`);
+}
+
+console.log("\n9e. DEEPEST-POINT SELECTION FOR positionalCorrection() -- A HAND-BUILT MANIFOLD WITH DISTINCT DEPTHS");
+{
+    const points = [
+        { point: [0, 0, 0], normal: [1, 0, 0], depth: 0.2 },
+        { point: [0, 1, 0], normal: [1, 0, 0], depth: 0.8 },
+        { point: [0, 0, 1], normal: [1, 0, 0], depth: 0.5 },
+        { point: [0, 1, 1], normal: [1, 0, 0], depth: 0.1 },
+    ];
+    const deepest = points.reduce((best, p) => (p.depth > best.depth ? p : best));
+    ok("!! the max-depth point (0.8, index 1) is the one selected, not merely 'some' point", deepest === points[1] && deepest.depth === 0.8, `picked depth=${deepest.depth}`);
+
+    const I = [1, 1, 1];
+    const a = createBody({ mass: 2, I, pos: [0, 0, 0] }), b = createBody({ mass: 4, I, pos: [1, 0, 0] });
+    const viaDeepestPoint = C.positionalCorrection(a, b, deepest, { percent: 0.2, slop: 0.01 });
+    const viaBareNormalDepth = C.positionalCorrection(a, b, { normal: deepest.normal, depth: deepest.depth }, { percent: 0.2, slop: 0.01 });
+    ok("!! positionalCorrection() called with the manifold point matches a bare {normal,depth} call EXACTLY -- the extra `point` field is harmlessly ignored", exact3(viaDeepestPoint.a.pos, viaBareNormalDepth.a.pos) && exact3(viaDeepestPoint.b.pos, viaBareNormalDepth.b.pos));
+}
+
+console.log("\n10. THE FRONT DOOR");
 {
     const L = C.reportLines();
     ok("reportLines names the module and shows a real contact + impulse", L.some((l) => /rigidBody6dofCollision/.test(l)) && L.some((l) => /impulse j=/.test(l)));
