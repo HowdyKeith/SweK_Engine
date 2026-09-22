@@ -135,6 +135,13 @@ import { render as renderCpu } from "./pathTracer.mjs";
 import { LCG } from "./lcgConstants.mjs";
 import { VIEW, MAX_DEPTH, EPS, notExactInF32, dyadic, powerOfTwo } from "./pathTracerGpu.mjs";
 import { MeshBVH, trianglesFrom } from "../../mesh/meshBVH.mjs";
+// RTX round 7 -- dirToFaceW is imported VERBATIM (a JS string constant, not hand-retyped) because it is
+// non-trivial branching logic this tree already shares this way: specularProbeCapture.mjs's own CAPTURED_ENV_WGSL
+// imports it from here too, rather than retyping it a fourth time. sampleCapturedCubemap is the CPU oracle for
+// the SAME atlas format this round's WGSL reads -- a plain JS function, already gated by that file's own
+// selfcheck, reused rather than re-derived.
+import { SPECULAR_IBL_HELPERS_WGSL } from "./specularIBLWgsl.mjs";
+import { sampleCapturedCubemap } from "./specularProbeCapture.mjs";
 
 export { VIEW, MAX_DEPTH, EPS };
 
@@ -224,6 +231,17 @@ export const MESH_SBT_SLOT = 21;
  * within a single BLAS: a triangle maps to a material, and the material to a record).
  */
 export const BVH_BINDINGS = Object.freeze({ bounds: 2, meta: 3, order: 4, tris: 5, vertColors: 7, matIndex: 8, meshSbt: 9 });
+
+// ================================================================================================
+// THE ENVIRONMENT MAP -- RTX round 7, the miss shader's own first texture binding
+// ================================================================================================
+
+/** The uniform slot an envMap scene uses -- the last free pair the 24-vec4 block has (20/21 are the mesh's). */
+export const ENV_META_SLOT = 22;
+
+/** The texture binding pipelineWgsl's envMap block declares, past every bvh binding (2-5, 7-9) and the probe
+ *  kernels' own `rays` (6, a separate, never-co-dispatched shader -- see this file's own binding-index notes). */
+export const ENV_BINDING = 10;
 
 /**
  * Build a BVH over an indexed triangle mesh and pack it into the four flat buffers the GPU bvh block reads.
@@ -378,6 +396,59 @@ export function meshSbtBuffer(records, { rgb = false } = {}) {
     const out = new Float32Array(records.length * 4);
     records.forEach((r, i) => out.set(sbtRecordFloats(r, { rgb }), i * 4));
     return out;
+}
+
+/**
+ * RTX round 7 -- the env-map sampler's WGSL, shared verbatim between pipelineWgsl's envMap option and
+ * envProbeWgsl below, the SAME "one port, not two copies" discipline bvhWgslBlock's own doc states just below
+ * this one. Parameterised over `faceSizeExpr` -- a WGSL i32 EXPRESSION for the atlas's face size -- rather than
+ * over a uniform binding directly, because the two callers read it from genuinely different places
+ * (pipelineWgsl from U[ENV_META].y, a runtime value so one generated shader can serve different atlases without
+ * regenerating WGSL text; envProbeWgsl from a compile-time constant, matching bvhProbeWgsl's own RAY_COUNT
+ * convention for a small, self-contained probe kernel). This mirrors splitSumWgsl.mjs's envImpl/
+ * specularIBLWgsl.mjs's fetchImpl pattern -- one core, a swapped-in source for the one thing that differs.
+ *
+ * dirToFaceW (SPECULAR_IBL_HELPERS_WGSL) is IMPORTED, not retyped -- the same JS string constant
+ * specularProbeCapture.mjs's own CAPTURED_ENV_WGSL already reuses from specularIBLWgsl.mjs rather than a
+ * fourth hand transcription of that one non-trivial, branching function.
+ *
+ * rtEnvTexel/rtEnvSample below ARE a fresh hand transcription of the manual-bilinear-over-a-cube-face pattern,
+ * on purpose, matching this codebase's own established precedent: specularProbeCapture.mjs's CAPTURED_ENV_WGSL
+ * is already the FOURTH hand-transcribed copy of exactly this pattern (that file's own comment: "kept explicit
+ * rather than shared, the same call this whole arc has made each time") -- each copy reads its atlas dimensions
+ * from a DIFFERENT uniform shape (a PfParams struct there, this file's own U block or a baked constant here),
+ * so a fifth copy here is this codebase's own established call, not a new one.
+ *
+ * Single mip, no LUT (specularProbeCapture.mjs's own packCapturedAtlas shape -- "the split-sum BRDF-LUT/
+ * prefilter-convolution half is NOT needed" per this round's own backlog entry): face f's texels sit at
+ * x in [f*faceSize, f*faceSize+faceSize), y in [0, faceSize).
+ *
+ * Texel-centre convention matches specularIBLSample.mjs's own bilinearFace comment exactly: texel i's centre
+ * is at u = ((i+0.5)/size)*2-1, inverted here as (u*0.5+0.5)*size-0.5 -- the same formula, ported rather than
+ * re-derived, so a disagreement here would be a PORT bug and not a second, independently-invented convention.
+ */
+function envSampleWgslBlock(faceSizeExpr) {
+    return `
+${SPECULAR_IBL_HELPERS_WGSL}
+fn rtEnvTexel(face : i32, x : i32, y : i32, faceSize : i32) -> vec3<f32> {
+  let cx = clamp(x, 0, faceSize - 1);
+  let cy = clamp(y, 0, faceSize - 1);
+  return textureLoad(tAtlas, vec2<i32>(face * faceSize + cx, cy), 0).rgb;
+}
+fn rtEnvSample(d : vec3<f32>) -> vec3<f32> {
+  let faceSize = ${faceSizeExpr};
+  let fuv = dirToFaceW(d);
+  let fx = (fuv.u * 0.5 + 0.5) * f32(faceSize) - 0.5;
+  let fy = (fuv.v * 0.5 + 0.5) * f32(faceSize) - 0.5;
+  let x0 = i32(floor(fx)); let y0 = i32(floor(fy));
+  let tx = fx - floor(fx); let ty = fy - floor(fy);
+  let c00 = rtEnvTexel(fuv.face, x0, y0, faceSize);
+  let c10 = rtEnvTexel(fuv.face, x0 + 1, y0, faceSize);
+  let c01 = rtEnvTexel(fuv.face, x0, y0 + 1, faceSize);
+  let c11 = rtEnvTexel(fuv.face, x0 + 1, y0 + 1, faceSize);
+  return mix(mix(c00, c10, tx), mix(c01, c11, tx), ty);
+}
+`;
 }
 
 /**
@@ -592,6 +663,33 @@ fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
 }
 
 /**
+ * RTX round 7 -- envSampleWgslBlock's own probe, mirroring bvhProbeWgsl's shape exactly: one direction in,
+ * one RGB sample out, no path tracer around it -- isolates the texture-sampling math (dirToFaceW + manual
+ * bilinear) from full path-traced rendering, the same way bvhProbeWgsl isolates BVH traversal from shading.
+ * `faceSize` is baked as a compile-time constant (not read from U -- this probe declares no uniform binding
+ * at all), matching bvhProbeWgsl's own RAY_COUNT convention for a small, self-contained kernel.
+ */
+export function envProbeWgsl(dirCount, faceSize) {
+    if (!(dirCount > 0)) throw new Error("rtPipeline: envProbeWgsl needs the real direction count, to guard the invocations @workgroup_size(64) launches beyond it");
+    if (!(faceSize > 0)) throw new Error("rtPipeline: envProbeWgsl needs the atlas's faceSize (== atlas height for a single-mip, no-LUT capture)");
+    return `
+@group(0) @binding(0) var<storage, read_write> outBuf : array<f32>;
+@group(0) @binding(6) var<storage, read> dirs : array<f32>;
+@group(0) @binding(${ENV_BINDING}) var tAtlas : texture_2d<f32>;
+${envSampleWgslBlock(String(faceSize))}
+const DIR_COUNT : u32 = ${dirCount}u;
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
+  if (gid.x >= DIR_COUNT) { return; }
+  let i = i32(gid.x);
+  let d = vec3<f32>(dirs[i * 3], dirs[i * 3 + 1], dirs[i * 3 + 2]);
+  let c = rtEnvSample(d);
+  outBuf[i * 3] = c.x; outBuf[i * 3 + 1] = c.y; outBuf[i * 3 + 2] = c.z;
+}
+`;
+}
+
+/**
  * RTX round 4's own probe: for each ray, the SELECTED MATERIAL's raw albedo at the winning triangle -- not the
  * shaded/bounced radiance, the record bvhMatIdx[bvhHitTri] names in bvhSbt (or -1,-1,-1 for a miss). Tests the
  * multi-material SBT offset lookup ALONE, exactly, without going through a bounced render that has no CPU
@@ -666,6 +764,23 @@ export function renderSbtCpu(sbt, { spp = 16, seed = 1, view = VIEW, sky = null,
                                           sky: sky || (() => 1), rgb });
 }
 
+/**
+ * RTX round 7 -- the CPU oracle for pipelineWgsl({envMap:true})'s own miss shader, as a `sky(d)` callback
+ * renderSbtCpu/pathTracer.mjs's render() already know how to take. NOT a new CPU sampler: sampleCapturedCubemap
+ * IS specularProbeCapture.mjs's own already-gated bilinear reader over the exact atlas shape this round's WGSL
+ * reads (packSpecularAtlas's six-faces-side-by-side layout, single mip, no LUT) -- reused rather than re-derived,
+ * the same discipline nee.mjs's directNEE/directMIS closed forms were reused for rather than restated.
+ *
+ * pathTracer.mjs's own col() convention decides the scalar case: a colour broadcasts to (v,v,v), never averages
+ * three channels down to one -- but a genuine RGB sky has no single "the" channel to broadcast FROM, so scalar
+ * mode here takes the mean instead, matching rtMissRgb's own doc comment ("Grey, not because color is
+ * unmodeled") for exactly the reason a texture makes that comment's premise no longer automatic.
+ */
+export function envSkyCpu(atlas, { rgb = false } = {}) {
+    if (rgb) return (d) => sampleCapturedCubemap(atlas, d);
+    return (d) => { const [r, g, b] = sampleCapturedCubemap(atlas, d); return (r + g + b) / 3; };
+}
+
 /** Both of v4417's exactness preconditions, over a whole table rather than one albedo. */
 export function tablePreconditions(sbt, spp) {
     const bad = sbt.filter((r) => !dyadic(r.albedo)).map((r) => r.albedo);
@@ -679,13 +794,24 @@ export function tablePreconditions(sbt, spp) {
     });
 }
 
+/**
+ * The `texture` option runWgslComputeNative (tools/ship/headlessGpu.mjs) expects, at ENV_BINDING -- an atlas
+ * from specularProbeCapture.mjs's own captureBaseCubemap()/packCapturedAtlas() (or any packSpecularAtlas()-
+ * shaped object with one mip and no LUT), handed straight through. `format` is fixed at "rgba16float" because
+ * that is the only format runWgslComputeNative's own texture option supports today -- not a choice this
+ * function makes, a limit it reports rather than silently assumes still holds if that ever changes.
+ */
+export function envMapTexture(atlas, binding = ENV_BINDING) {
+    return { width: atlas.width, height: atlas.height, data: atlas.data, binding, format: "rgba16float" };
+}
+
 // ================================================================================================
 // THE PIPELINE
 // ================================================================================================
 export function pipelineWgsl({ workgroupSize = 64, gradient = false,
                                plantSwapRecords = false, plantIgnoreRecord = false, bvh = false,
                                rgb = false, vertexColors = false, meshMaterials = false, nee = false,
-                               plantDoubleCount = false } = {}) {
+                               plantDoubleCount = false, envMap = false } = {}) {
     const PI = "3.141592653589793";
     if (vertexColors && !bvh) throw new Error("rtPipeline: vertexColors needs bvh -- there is no mesh to colour otherwise");
     if (vertexColors && !rgb) throw new Error("rtPipeline: vertexColors needs rgb -- a colour has nowhere to go in a one-channel pipeline");
@@ -696,10 +822,15 @@ export function pipelineWgsl({ workgroupSize = 64, gradient = false,
     // RTX round 6 -- nee needs the SCALAR pipeline: sbtRecordFloats/sbtRecord's own doc explains why an emit
     // channel has nowhere to go in the rgb record (three floats already spent on albedo, none spare).
     if (nee && rgb) throw new Error("rtPipeline: nee needs the scalar (non-rgb) pipeline -- there is no packing slot for a per-channel emit yet");
+    // RTX round 7 -- envMap and gradient are both a SOURCE for rtMiss; asking for both leaves no honest answer
+    // to "which one actually decided the sky colour", the same refuse-rather-than-guess this file's other
+    // option pairs already hold to.
+    if (envMap && gradient) throw new Error("rtPipeline: envMap and gradient are two different sky sources -- pass only one");
     return `
 @group(0) @binding(0) var<storage, read_write> outBuf : array<f32>;
 @group(0) @binding(1) var<uniform> U : array<vec4<f32>, 24>;
 ${bvh ? bvhWgslBlock({ vertexColors, meshMaterials }) : ""}
+${envMap ? `@group(0) @binding(${ENV_BINDING}) var tAtlas : texture_2d<f32>;` : ""}
 
 // U[0]  eye.xyz, tanHalfFov          U[1]  fwd.xyz, geometryCount
 // U[2]  w, h, spp, eps               U[3]  right.xyz, seedBits
@@ -708,10 +839,13 @@ ${bvh ? bvhWgslBlock({ vertexColors, meshMaterials }) : ""}
 //                                                           scalar pipeline only, see sbtRecord's own doc)
 // U[${MESH_META_SLOT}] mesh meta (bvh only): hasMesh, nodeCount, triCount, _
 // U[${MESH_SBT_SLOT}] mesh SBT record (bvh only): hitShaderIndex, albedo, _, _
+// U[${ENV_META_SLOT}] env atlas meta (envMap only): atlasWidth, faceSize, _, _   (faceSize == atlas height,
+//                                                    since a captured atlas is one mip, no LUT -- see envMapTexture)
 const GEO_BASE : i32 = 8;
 const SBT_BASE : i32 = 16;
 const MESH_META : i32 = ${MESH_META_SLOT};
 const MESH_SBT : i32 = ${MESH_SBT_SLOT};
+const ENV_META : i32 = ${ENV_META_SLOT};
 
 var<private> rngState : u32;
 fn nextU32() -> u32 { rngState = rngState * ${LCG.mul}u + ${LCG.inc}u; return rngState; }
@@ -875,9 +1009,19 @@ fn rtClosestHit(shaderIndex : i32, albedo : f32, N : vec3<f32>, inDir : vec3<f32
   }
 }
 
+${envMap ? `
+// ---- STAGE: miss, envMap -- RTX round 7. envSampleWgslBlock's own doc explains the sharing/hand-transcription
+// split; U[ENV_META].y is the runtime-varying faceSize source this generated shader reads (so one WGSL variant
+// can serve different atlases without being regenerated), as opposed to envProbeWgsl's baked constant.
+${envSampleWgslBlock("i32(U[ENV_META].y)")}
+` : ""}
+
 // ---- STAGE: miss ---------------------------------------------------------------------------------------
 fn rtMiss(d : vec3<f32>) -> f32 {
-${gradient ? `  return 0.3 + 0.7 * (0.5 * (d.y + 1.0));` : `  return 1.0;`}
+${envMap ? `  let c = rtEnvSample(d);
+  // Mean of the three channels, not a channel broadcast -- rtMissRgb's own doc comment below explains why a
+  // genuine RGB sky has no single "the" channel to stand in for the scalar pipeline's grey convention.
+  return (c.x + c.y + c.z) / 3.0;` : gradient ? `  return 0.3 + 0.7 * (0.5 * (d.y + 1.0));` : `  return 1.0;`}
 }
 
 ${rgb ? `
@@ -904,9 +1048,17 @@ fn rtClosestHitRgb(shaderIndex : i32, albedo : vec3<f32>, N : vec3<f32>, inDir :
     }
   }
 }
+${envMap ? `
+// RTX round 7 -- the one place envMap and rgb actually interact: rtMissRgb can now return the atlas's TRUE
+// colour instead of the grey broadcast below, since there genuinely IS a per-channel value to return. envSkyCpu
+// (this file's own CPU oracle) makes the identical choice: rgb:true reads sampleCapturedCubemap's triple
+// directly, rgb:false takes its mean -- the same branch, on the other side of the port.
+fn rtMissRgb(d : vec3<f32>) -> vec3<f32> { return rtEnvSample(d); }
+` : `
 // Grey, not because color is unmodeled here, but because pathTracer.mjs's own sky() always returns a scalar
 // that col() broadcasts to (v,v,v) -- this matches that convention exactly rather than inventing a second one.
 fn rtMissRgb(d : vec3<f32>) -> vec3<f32> { return vec3<f32>(rtMiss(d), rtMiss(d), rtMiss(d)); }
+`}
 ` : ""}
 
 @compute @workgroup_size(${workgroupSize})
@@ -1059,7 +1211,7 @@ ${rgb ? `
  * Both are silent. Pass the identical `meshMaterials` value to both calls, the same discipline `rgb` already
  * asks for.
  */
-export function pipelineUniforms(sbt, { spp = 16, seed = 1, view = VIEW, eps = EPS, bvh = null, rgb = false, meshMaterials = false } = {}) {
+export function pipelineUniforms(sbt, { spp = 16, seed = 1, view = VIEW, eps = EPS, bvh = null, rgb = false, meshMaterials = false, envMap = null } = {}) {
     if (sbt.length > MAX_GEOMETRY) throw new Error("rtPipeline: at most " + MAX_GEOMETRY + " geometries");
     const { w, h, eye, look, up, fovDeg } = view;
     const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -1094,6 +1246,11 @@ export function pipelineUniforms(sbt, { spp = 16, seed = 1, view = VIEW, eps = E
             "meshSbtBuffer() already refuses for the per-triangle case.");
         if (!meshMaterials) U.set(sbtRecordFloats(bvh, { rgb }), MESH_SBT_SLOT * 4);
     }
+    // RTX round 7 -- envMap is the atlas object itself (captureBaseCubemap()/packCapturedAtlas()'s own shape),
+    // matching `bvh`'s own convention of taking the descriptor rather than a caller-picked subset of its fields.
+    // Only width/height are read here: the WGSL side assumes a single-mip, no-LUT atlas (faceSize == height),
+    // the same assumption envMapTexture's own doc states.
+    if (envMap) U.set([envMap.width, envMap.height, 0, 0], ENV_META_SLOT * 4);
     return U;
 }
 

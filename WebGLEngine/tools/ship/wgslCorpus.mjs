@@ -547,6 +547,16 @@ export function corpus() {
               return { code: R.bvhMaterialProbeWgsl(rayCount), outCount: rayCount * 3, workgroups: Math.ceil(rayCount / 64),
                        inputs: [...R.bvhInputs(bvh), { binding: 6, data: rayF32 }, { binding: R.BVH_BINDINGS.meshSbt, data: sbtBuf }] };
           })() },
+        // RTX round 7 -- envProbeWgsl's own texture input, the same reason CAPTURED_PREFILTER_WGSL above is
+        // compile-only rather than dispatched: this corpus's browser-side runner has no `texture` binding (see
+        // this file's own v4580 import comment), only tools/ship/headlessGpu.mjs's runWgslComputeNative does --
+        // and that is exactly where physics/render/rtPipeline-selfcheck.mjs's own section 12 already dispatches
+        // it, numerically, against sampleCapturedCubemap. compileOnly here only proves the SECOND backend's
+        // compiler accepts the WGSL, which is still real coverage: a syntax or binding-layout mistake this
+        // corpus's tint/naga pair disagrees on would still be caught.
+        { id: "rtPipeline.envProbeWgsl", from: "physics/render/rtPipeline.mjs", compileOnly: true,
+          why: "dirToFaceW plus the manual-bilinear texture fetch, standalone -- graded numerically (native only) by rtPipeline-selfcheck.mjs's own section 12 against specularProbeCapture.sampleCapturedCubemap; here for the second backend's compiler",
+          opts: { code: R.envProbeWgsl(8, 16), compileOnly: true, outCount: 0 } },
         // accumulateWgsl works IN PLACE on binding 0 (outInit is the running mean's PRIOR value) -- the same
         // convention xpbdWgsl.solveWgsl already established in this corpus.
         { id: "rtViewer.accumulateWgsl", from: "render/rtViewer.mjs",

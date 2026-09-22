@@ -140,10 +140,12 @@
 
 import { gateReport } from "../../tools/ship/gateReport.mjs";
 import { webgpuSkipReason, runWgslCompute } from "../../tools/ship/webgpuHarness.mjs";
+import { headlessGpuSkipReason, runWgslComputeNative } from "../../tools/ship/headlessGpu.mjs";
 import * as R from "./rtPipeline.mjs";
 import { baryAt, MeshBVH, trianglesFrom } from "../../mesh/meshBVH.mjs";
 import { traceWgsl, traceUniforms } from "./pathTracerGpu.mjs";
 import { render as renderCpuMesh } from "./pathTracer.mjs";
+import { captureBaseCubemap, packCapturedAtlas, sampleCapturedCubemap, captureAtlasHalves } from "./specularProbeCapture.mjs";
 const REPORT = gateReport("physics/render/rtPipeline-selfcheck.mjs");
 const REPORT_ROWS = [];
 
@@ -1071,6 +1073,181 @@ say("11. NEXT-EVENT ESTIMATION -- cone sampling, shadow ray, double-count guard,
         "-- global suppression loses the enclosing light's contribution entirely, since NEE can never sample it " +
         "either. Agreement here means the bounce-ray route is open for exactly the light the previous vertex " +
         "could not reach, and closed for every other light exactly as before");
+}
+
+// ---- 12. RTX ROUND 7: ENVIRONMENT-MAP LIGHTING -- rtPipeline.mjs's FIRST texture binding, into the miss --------
+// shader. rtMiss/rtMissRgb were a flat constant or a vertical gradient keyed only on ray-direction y -- no HDRI,
+// no environment map. Reuses HALF of the existing specular-IBL machinery (physics/render/specularProbeCapture.mjs,
+// specularIBLSample.mjs, specularIBLWgsl.mjs) per this round's own backlog entry: the cubemap-atlas capture and
+// its dirToFaceW inverse-cube-mapping (a raw, unfiltered, mip-0 capture is exactly the right thing to look up
+// along a ray direction with no convolution), NOT the split-sum BRDF-LUT/prefilter-convolution half -- that
+// machinery approximates what a RASTERIZER cannot afford to Monte-Carlo integrate per pixel, and this path
+// tracer can just look up the sharp texture directly.
+//
+// *** runWgslCompute (this file's own browser harness, every other section's) HAS NO TEXTURE SUPPORT AT ALL --
+// MEASURED, NOT ASSUMED. *** Read in full: only storage/uniform buffers are ever created inside its page.evaluate
+// callback. runWgslComputeNative (tools/ship/headlessGpu.mjs) grew a `texture` option for specularProbeCapture.mjs's
+// own round and is this section's route instead -- one real caller (specularProbeCapture-selfcheck.mjs) already
+// established the shape this section copies. This means section 12 has its OWN skip check, independent of the
+// file-wide webgpuSkipReason() gate above: a box with a browser but no native WebGPU adapter runs sections 1-11
+// and skips only this one, named, rather than either silently skipping everything or crashing.
+console.log("");
+say("12. ENVIRONMENT-MAP LIGHTING -- the miss shader's first texture binding");
+{
+    const nativeSkip = headlessGpuSkipReason();
+    if (nativeSkip) {
+        console.log("  SKIP  no native WebGPU device: " + nativeSkip);
+        console.log("  ----  section 12 (texture-backed env map) NOT MEASURED -- needs runWgslComputeNative, " +
+                     "which this box could not reach; a short report is not a clean one");
+    } else {
+    // A synthetic sky with real per-direction, per-face structure (a bright "sun" splotch against a dim, tinted
+    // background) -- NOT a flat constant. A constant sky could pass a wrong-face lookup or a transposed u/v
+    // silently, the exact blindness section 5's own header names for a different capability ("the furnace
+    // cannot see the sampler... cannot see the material"): a uniform environment makes every direction look
+    // identical, so a bug in WHICH direction is sampled has nothing to disagree with.
+    const SUN_DIR = [0.5, 0.7, 0.2];
+    const sunLen = Math.hypot(SUN_DIR[0], SUN_DIR[1], SUN_DIR[2]);
+    const sunN = SUN_DIR.map((x) => x / sunLen);
+    const radianceOf = (pos, dir) => {
+        const dot = dir[0] * sunN[0] + dir[1] * sunN[1] + dir[2] * sunN[2];
+        const sun = Math.max(0, dot) ** 8;
+        return [0.1 + sun * 5, 0.15 + sun * 4, 0.3 + sun * 2];
+    };
+    const FACE_SIZE = 16;
+    const capture = captureBaseCubemap(radianceOf, [0, 0, 0], FACE_SIZE);
+    const atlas = packCapturedAtlas(capture);
+    say(`captured atlas: ${atlas.width}x${atlas.height}, faceSize0=${atlas.faceSize0}`);
+    // *** THE CPU ORACLE MUST READ THE ATLAS AFTER THE SAME PRECISION LOSS THE DEVICE UPLOAD APPLIES, NOT
+    // BEFORE IT. *** runWgslComputeNative's own texture option uploads as rgba16float (headlessGpu.mjs's own
+    // doubleToHalf conversion) -- captureAtlasHalves is specularProbeCapture.mjs's own already-established
+    // discipline for exactly this ("a device check and its CPU twin should read identical numbers... AFTER the
+    // precision loss the rgba16float upload actually applies, not before it"), and specularProbeCapture-
+    // selfcheck.mjs's own texture-backed gate already applies it. An adversarial review found this section's
+    // first draft comparing against the RAW f32 atlas instead, quietly eating up to 38% of 12a's own tolerance
+    // budget as an artifact of the omitted round-trip rather than genuine sampling-math precision -- fixed here
+    // by reading every CPU comparison through atlasHalves, while the GPU-facing envMapTexture(atlas) call below
+    // keeps handing the RAW atlas to runWgslComputeNative, which does its own half-conversion on upload; halving
+    // twice would be a different, wrong quantization neither side actually reads.
+    const atlasHalves = captureAtlasHalves(atlas);
+
+    ok("!! envMap and gradient are both a sky source -- REFUSES rather than silently picking one",
+        (() => { try { R.pipelineWgsl({ envMap: true, gradient: true }); return false; }
+                 catch (e) { return /two different sky sources/.test(e.message); } })(),
+        "the same refuse-rather-than-guess discipline every other conflicting option pair in this file already holds to");
+
+    // ---- 12a. THE SAMPLING MATH ALONE -- envProbeWgsl vs sampleCapturedCubemap, no path tracer around either
+    // side. Axis-aligned directions (face CENTRES and face EDGES/CORNERS -- a wrong face-offset or a bilinear
+    // seam bug shows up at an edge, not a centre) plus a spread of others.
+    //
+    // *** A FIRST DRAFT OF THIS SWEEP FOUND A REAL 1.6e-2 DISAGREEMENT, AND IT IS NOT A PORT BUG -- IT IS
+    // SECTION 4's OWN FINDING, ONE LEVEL DOWN. *** dirToFace/dirToFaceW picks a face by comparing the THREE
+    // direction components' magnitudes; one of the pseudo-random "spread" directions below landed at
+    // ax=0.6532814824381881, az=0.6532814824381884 -- NOT a mathematically exact tie, but closer than f32 can
+    // tell apart. f64 (CPU) sees az fractionally larger and picks the Z face; f32 (GPU) rounds both to the
+    // identical bit pattern and picks the X face via the FIRST branch's own tie-break -- two DIFFERENT faces,
+    // hence a real per-texel jump, not float noise on one shared answer. Confirmed directly (not assumed): CPU's
+    // own dirToFace(d).face reads 5 at f64 and 0 once every component is rounded to f32 first. This is section
+    // 4's own "f32 and f64 disagree about which route a path takes" and section 6's "shared-edge tie", the SAME
+    // finding this file already keeps rather than hides, applied to a face boundary instead of a triangle edge
+    // or a bounce direction. EXCLUDED below by a safety margin around exact ties (0 < gap < 1e-4) -- an EXACT
+    // tie (gap === 0, e.g. every axis-aligned corner) is SAFE and kept, since f64 and f32 see EXACTLY the same
+    // zero gap and take the identical branch; it is only a gap too small for f32 to represent but too large to
+    // be exactly zero that can flip. Filtering by CONSTRUCTION (checked against the actual dirs array, not
+    // assumed from the formula) rather than raising the tolerance, which would have hidden a genuine boundary
+    // case behind a looser bar instead of naming it.
+    const rawDirs = [];
+    for (const d of [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1],
+                     [1,1,0],[1,-1,0],[1,0,1],[1,0,-1],[0,1,1],[0,1,-1],
+                     [1,1,1],[1,1,-1],[1,-1,1],[-1,1,1],[0.999,0.999,0],[0.01,0.99,0.01]])
+        { const l = Math.hypot(d[0], d[1], d[2]); rawDirs.push([d[0]/l, d[1]/l, d[2]/l]); }
+    for (let i = 0; i < 24; i++) {
+        const t = i / 24, theta = t * Math.PI * 2, phi = ((t * 37.0) % 1) * Math.PI;
+        rawDirs.push([Math.sin(phi) * Math.cos(theta), Math.cos(phi), Math.sin(phi) * Math.sin(theta)]);
+    }
+    const tieMargin = (d) => {
+        const a = [Math.abs(d[0]), Math.abs(d[1]), Math.abs(d[2])].sort((x, y) => y - x);
+        return a[0] - a[1];
+    };
+    const nearTieCut = 1e-4;
+    const dirs = rawDirs.filter((d) => { const m = tieMargin(d); return m === 0 || m > nearTieCut; });
+    const excluded = rawDirs.length - dirs.length;
+    ok("!! the near-tie exclusion actually excluded something -- this fixture is not accidentally clean",
+        excluded > 0, `${excluded} of ${rawDirs.length} raw directions sat in the (0, ${nearTieCut}) dead zone`);
+    const dirsFlat = new Float32Array(dirs.length * 3);
+    dirs.forEach((d, i) => dirsFlat.set(d, i * 3));
+    const probe = await runWgslComputeNative({
+        code: R.envProbeWgsl(dirs.length, atlas.faceSize0), outCount: dirs.length * 3,
+        texture: R.envMapTexture(atlas), inputs: [{ binding: 6, data: dirsFlat }],
+        workgroups: Math.ceil(dirs.length / 64),
+    });
+    if (!probe.ok) throw new Error("envProbeWgsl GPU run failed: " + probe.reason + " " + (probe.errors || []).join(" | "));
+    let maxDelta = 0, worstDir = null;
+    for (let i = 0; i < dirs.length; i++) {
+        const gpu = [probe.values[i * 3], probe.values[i * 3 + 1], probe.values[i * 3 + 2]];
+        const cpu = sampleCapturedCubemap(atlasHalves, dirs[i]);
+        for (let c = 0; c < 3; c++) {
+            const d = Math.abs(gpu[c] - cpu[c]);
+            if (d > maxDelta) { maxDelta = d; worstDir = dirs[i]; }
+        }
+    }
+    say(`${dirs.length} well-conditioned directions (${excluded} near-tie excluded): max|gpu-cpu| = ${maxDelta.toExponential(3)} at d=[${worstDir.map((x)=>x.toFixed(3))}]`);
+    ok("!! *** rtEnvSample (dirToFaceW + manual bilinear, textureLoad) agrees with sampleCapturedCubemap to f32 precision ***",
+        maxDelta < 5e-5,
+        "specularProbeCapture.mjs's own already-gated CPU reader, over the atlasHalves-quantized atlas (matching " +
+        "the rgba16float precision the device upload actually applies) -- a wrong face, a transposed u/v, or a " +
+        "bilinear-weight bug would all show up here, isolated from any path-tracing noise since there is none: " +
+        "this probe has no bounce, no camera, no spp. *** THE BOUND TIGHTENED FROM 2e-3 TO 5e-5 ONCE THE CPU " +
+        "ORACLE STOPPED COMPARING AGAINST THE RAW ATLAS -- an adversarial review found the raw comparison was " +
+        "quietly absorbing up to 38% of the old tolerance as an artifact of the omitted half-precision round " +
+        "trip, not genuine sampling-math noise; measured max|gpu-cpu| dropped from 7.6e-4 to 4.2e-7 the moment " +
+        "atlasHalves went in, nearly four orders of magnitude of slack this bound no longer needs to hide. " +
+        "Directions within a hairsbreadth of a genuine face-selection tie are excluded above, by name, rather " +
+        "than papered over with a looser tolerance");
+
+    // ---- 12b. THE MISS SHADER ITSELF -- pipelineWgsl({envMap:true}) actually CALLING rtEnvSample from
+    // rtMiss/rtMissRgb, not merely rtEnvSample existing as a correct function nothing invokes (the "a variance
+    // reduction nothing calls reduces nothing" trap pathTracerNEE-selfcheck.mjs's own header names for NEE,
+    // applied here to a texture lookup instead). An EMPTY scene (no geometry at all) makes every camera ray a
+    // miss on depth 0, so this isolates the wiring from shading anything else.
+    const N = 8, SPP = 400;
+    const view = { w: 8, h: 8, eye: [0, 0, 0], look: [0.4, 0.5, 0.3], up: [0, 1, 0], fovDeg: 70 };
+    const meanOf = (v) => v.reduce((a, b) => a + b, 0) / v.length;
+    const sdOf = (v, m) => Math.sqrt(v.reduce((a, b) => a + (b - m) ** 2, 0) / (v.length - 1));
+    const cpuMean = (seed) => {
+        const img = R.renderSbtCpu([], { spp: SPP, view, seed, rgb: true, sky: R.envSkyCpu(atlasHalves, { rgb: true }) });
+        let sum = 0; for (let i = 0; i < img.length; i++) sum += img[i];
+        return sum / img.length;
+    };
+    const gpuMean = async (seed) => {
+        const n = view.w * view.h;
+        const r = await runWgslComputeNative({
+            code: R.pipelineWgsl({ envMap: true, rgb: true }), outCount: n * 3,
+            uniforms: R.pipelineUniforms([], { spp: SPP, view, eps: R.EPS, seed, rgb: true, envMap: atlas }),
+            texture: R.envMapTexture(atlas), workgroups: Math.ceil(n / 64),
+        });
+        if (!r.ok) throw new Error("envMap pipeline GPU run failed: " + r.reason);
+        let sum = 0; for (let i = 0; i < r.values.length; i++) sum += r.values[i];
+        return sum / r.values.length;
+    };
+    const cpuVals = [], gpuVals = [];
+    for (let s = 1; s <= N; s++) cpuVals.push(cpuMean(s));
+    for (let s = 1; s <= N; s++) gpuVals.push(await gpuMean(2000 + s));
+    const cpuM = meanOf(cpuVals), cpuRelSd = sdOf(cpuVals, cpuM) / cpuM;
+    const gpuM = meanOf(gpuVals), gpuRelSd = sdOf(gpuVals, gpuM) / gpuM;
+    const ratio = gpuM / cpuM;
+    const bound = 3 * Math.sqrt((cpuRelSd / Math.sqrt(N)) ** 2 + (gpuRelSd / Math.sqrt(N)) ** 2);
+    say(`empty scene, sky only: cpu mean ${cpuM.toFixed(6)} (relSd ${(cpuRelSd * 100).toFixed(2)}%), ` +
+        `gpu mean ${gpuM.toFixed(6)} (relSd ${(gpuRelSd * 100).toFixed(2)}%), ratio ${ratio.toFixed(6)}, bound ${bound.toFixed(6)}`);
+    REPORT_ROWS.push(["envMap miss shader (empty scene, sky only)", `${view.w}x${view.h}`, `${SPP} spp x ${N} seeds`,
+        `cpu ${cpuM.toFixed(5)} vs gpu ${gpuM.toFixed(5)}, |ratio-1|=${Math.abs(ratio - 1).toExponential(2)}, bound=${bound.toExponential(2)}`]);
+    ok("!! both sides show REAL per-seed noise -- sub-pixel jitter across a real gradient, not a flat sky",
+        cpuRelSd > 1e-4 && gpuRelSd > 1e-4, `cpuRelSd ${(cpuRelSd * 100).toFixed(3)}%, gpuRelSd ${(gpuRelSd * 100).toFixed(3)}%`);
+    ok("!! *** THE MISS SHADER ITSELF READS THE ATLAS -- pipelineWgsl({envMap:true}) agrees with envSkyCpu, within 3 MEASURED standard errors ***",
+        Math.abs(ratio - 1) < bound,
+        "an empty scene makes every camera ray a miss on the very first bounce, so this measures rtMiss/" +
+        "rtMissRgb's own wiring to rtEnvSample specifically -- section 12a already proved rtEnvSample itself " +
+        "correct, so a failure here would mean the miss shader calls something else, or nothing");
+    }
 }
 
 console.log("rtPipeline-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));
