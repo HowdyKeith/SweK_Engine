@@ -8070,6 +8070,28 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // run -- on Keith's gen-9 box and then here -- and it was red on BOTH, alongside assertionShape's
     // 1751 -> 1757 and runtimeGap's 4275 -> 4286, which are the same six arrivals seen from two other
     // instruments. The surplus mechanism worked exactly as designed; nobody looked at it for six rounds.
+    since336: Object.freeze({
+        at: "v4653", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/declaredCost-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 0.56-0.58 s alone, well inside the 3,000 ms budget. It gates a census of a thing " +
+                 "271 gates in this tree have been writing down since before any of them were swept and " +
+                 "nothing had ever read: the `// Run: node <gate>   (~616s)` header line. Found by profiling " +
+                 "the sixteen roundhouse gates that produce no verdict at any cap -- the profile said they " +
+                 "are SIMULATIONS rather than slow instruments, and khConvergence's third line said 616 " +
+                 "seconds, where it had been sitting unread. 126 headers agree with the record, 138 have " +
+                 "ROTTED, and SEVEN supply a floor the record cannot: their gate has never finished, so the " +
+                 "header is the only measurement of it that exists. The two disagreements are different " +
+                 "facts and the record's own `finished` field decides which -- a capped reading is a lower " +
+                 "bound, a completed one is a measurement. sweepRotation --killed consumes it: the pool is " +
+                 "ordered cheapest-expected-first and a gate declaring more than the cap is NAMED and " +
+                 "skipped with the --cap-s that would reach it, instead of being run for 90 s to reproduce " +
+                 "a death that mode's own note already predicted. Six sabotages, all red; the unit one " +
+                 "matters most, since ~0.2s and ~200ms are both in the tree and differ by a thousand.",
+    }),
     since335: Object.freeze({
         at: "v4651", swept: 1, green: 1, red: 0,
         added: Object.freeze([

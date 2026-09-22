@@ -641,8 +641,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // last line from process.exit() to process.exitCode without moving a single row here, which is the
     // reassuring half: this census is about how a gate ASSERTS, and how it leaves is not that.
     // v4651 -- RE-TAKEN: tools/ship/thrownRow-selfcheck.mjs joined. The ordinary four by one again.
-    gates: 1761, usesOk: 1740, definesOk: 1732, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1633, condFirst: 96, unknownSignature: 11,
+    // v4653 -- RE-TAKEN: tools/ship/declaredCost-selfcheck.mjs joined. The ordinary four by one, again.
+    gates: 1762, usesOk: 1741, definesOk: 1733, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1634, condFirst: 96, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

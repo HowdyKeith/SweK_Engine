@@ -18,6 +18,7 @@ import { pathToFileURL } from "node:url";
 import { enumerateGates } from "./gateSweep.mjs";
 import { ENG, census, rotation, readFile, backfillStamps, BUDGET_MS, CAP_MS } from "./sweepCoverage.mjs";
 import { runGate } from "./redCensus.mjs";
+import { costOf } from "./declaredCost.mjs";
 // v4647 -- whose stopwatch. A box that does not own the record writes its own file rather than
 // overwriting one produced on different silicon. See quickSweep.timingsTarget.
 import { timingsTarget, KIND } from "./quickSweep.mjs";
@@ -353,11 +354,42 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         return ms != null && ms > lo && ms <= hi;
     };
     const pickOpts = { slots, budgetMs, filter: inBand, includeKilled: killedMode };
+    // *** v4653 -- --killed PICKS BY WHAT A GATE IS EXPECTED TO COST, AND REFUSES THE ONES THIS CAP CANNOT
+    // REACH. *** It took c.killed.slice(0, slots) -- the census's own order, which is alphabetical and knows
+    // nothing about cost -- so a run at a 90 s cap would spend 90 s on tools/roundhouse/khConvergence and
+    // kill it again while a gate declaring 62 s sat further down the list unattempted. This mode's own note
+    // four lines up already says why that is wasted: "re-running them AT the cap they died on can only
+    // reproduce the death". It had no number to act on. tools/ship/declaredCost.mjs supplies one: 271 gates
+    // in this tree open with `// Run: node <gate>   (~616s)` and nothing had ever read one.
+    //
+    // CHEAPEST FIRST, and a gate whose DECLARED cost exceeds this cap is NAMED AND SKIPPED with the cap that
+    // would reach it -- which is a measurement being used, not a gate being hidden: it stays in c.killed and
+    // `--cap-s` takes it whenever somebody is willing to spend that.
+    const declaredTooBig = [];
+    const killedPool = (() => {
+        const rows = c.killed.map((g) => ({ g, cost: costOf(g, ENG, file) }));
+        for (const r of rows) if (r.cost.from === "declared" && r.cost.ms > capMs) declaredTooBig.push(r);
+        const reachable = rows.filter((r) => !(r.cost.from === "declared" && r.cost.ms > capMs));
+        // A gate with no cost at all sorts last: it is not known to be expensive, and it is not known to be
+        // cheap either, so it goes after everything that has a number.
+        reachable.sort((a, b) => (a.cost.ms ?? Infinity) - (b.cost.ms ?? Infinity));
+        return reachable.map((r) => r.g);
+    })();
     const picked = only ? gates.filter((g) => g.includes(only))
-                        : killedMode ? c.killed.slice(0, slots)
+                        : killedMode ? killedPool.slice(0, slots)
                         : rotation(c, file, pickOpts).picked;
-    if (killedMode) console.log(`[rotation] --killed: ${c.killed.length} gate(s) have hit the cap, taking ` +
-        `${picked.length} at a ${capMs / 1000} s cap. ${(c.noVerdict || []).length} of them have NO VERDICT AT ALL.`);
+    if (killedMode) {
+        console.log(`[rotation] --killed: ${c.killed.length} gate(s) have hit the cap, taking ` +
+            `${picked.length} at a ${capMs / 1000} s cap, CHEAPEST EXPECTED FIRST. ` +
+            `${(c.noVerdict || []).length} of them have NO VERDICT AT ALL.`);
+        if (declaredTooBig.length) {
+            console.log(`[rotation]   ${declaredTooBig.length} SKIPPED -- their own headers declare more than ` +
+                `this ${capMs / 1000} s cap, so running them here can only reproduce the death:`);
+            for (const r of declaredTooBig.sort((a, b) => b.cost.ms - a.cost.ms).slice(0, 8))
+                console.log(`[rotation]     ~${Math.round(r.cost.ms / 1000)}s declared   ${r.g}   ` +
+                    `(--cap-s ${Math.ceil(r.cost.ms / 1000 * 1.2)} would reach it)`);
+        }
+    }
     if (only && !picked.length) { console.error("[rotation] --gate " + only + " matched no gate"); process.exit(2); }
     if (only) console.log(`[rotation] --gate ${only}: ${picked.length} gate(s), selection by name rather than by staleness`);
     else if (killedMode) { /* its own line is printed above; the over-budget pool is not this run's subject */ }
