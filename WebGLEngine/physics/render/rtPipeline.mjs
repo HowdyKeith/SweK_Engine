@@ -272,6 +272,59 @@ export function bvhBuffersFromMesh(positions, indices, opts = {}) {
                            nodeCount: bvh.nodes, triCount: bvh.count, bvh });
 }
 
+/**
+ * RTX ROUND 5 -- Sibling of bvhBuffersFromMesh() for a caller that already has a FLAT, UNINDEXED triangle-soup
+ * buffer (9 floats/triangle, world-space) -- exactly world/chunkMesherCore.js's own meshChunk() output shape,
+ * the same one world/worldColliderBVH.mjs already hands straight to `new MeshBVH(tris)` with no intermediate
+ * indexing step (that file's own header: "verts is already an unindexed, world-space, 9-floats-per-triangle
+ * buffer -- the exact layout MeshBVH wants, modulo a Float32->Float64 cast"). Skips trianglesFrom() entirely
+ * (there is no `indices` array to resolve against `positions`) and, when colors are given, skips the by-INDEX
+ * vertex lookup bvhBuffersFromMesh() needs too -- meshChunk()'s own `cols` output is already 3 floats per
+ * vertex, 1:1 POSITION-ALIGNED with `verts` (confirmed directly against its source, not assumed), so packing
+ * it is a straight cast rather than a per-triangle gather through an indices array that does not exist here.
+ */
+export function bvhBuffersFromTriSoup(trisFlat, opts = {}) {
+    // An adversarial review found this missing: unlike bvhBuffersFromMesh() (whose trianglesFrom() call
+    // structurally can only ever emit a multiple of 9, so it never needed this check), a flat buffer handed
+    // in directly has no such guarantee. Confirmed unreachable via the one real caller today (world/
+    // cityChunkScene.mjs's citySceneMesh(), whose verts always come from chunkMesherCore.js's own meshChunk(),
+    // which always emits whole quads -- 6 verts, 18 floats, two whole triangles at a time) -- but this function
+    // is exported for ANY future caller with a flat buffer, and "refuse rather than silently misalign" is the
+    // discipline this file's own header already claims, not one scoped to only the callers that exist today.
+    if (trisFlat.length % 9 !== 0) throw new Error(
+        "rtPipeline: bvhBuffersFromTriSoup expects a flat buffer that is a whole multiple of 9 floats " +
+        "(9 floats/triangle), got " + trisFlat.length + " (" + (trisFlat.length % 9) + " leftover)");
+    const tris = trisFlat instanceof Float64Array ? trisFlat : Float64Array.from(trisFlat);
+    const bvh = new MeshBVH(tris, opts);
+    const bounds = new Float32Array(bvh.bounds.subarray(0, bvh.nodes * 6));
+    const meta = new Int32Array(bvh.meta.subarray(0, bvh.nodes * 3));
+    const order = new Int32Array(bvh.order.subarray(0, bvh.count));
+    const trisF32 = new Float32Array(tris.length);
+    trisF32.set(tris);
+    const triCountIn = tris.length / 9;
+    let vertColors = null;
+    if (opts.colors) {
+        // Refused rather than silently mis-aligned -- the same discipline bvhBuffersFromMesh()'s own
+        // materialIndex check already holds: a short/long array here would either read garbage or leave a
+        // tail of vertices at whatever Float32Array.set() leaves un-set (0, i.e. black), indistinguishable
+        // from a real "unlit" scene except that nobody asked for one.
+        if (opts.colors.length !== tris.length) throw new Error(
+            "rtPipeline: bvhBuffersFromTriSoup colors must be 1:1 position-aligned with the triangle-soup " +
+            "buffer (" + tris.length + " floats), got " + opts.colors.length);
+        vertColors = new Float32Array(opts.colors.length);
+        vertColors.set(opts.colors);
+    }
+    let matIndex = null;
+    if (opts.materialIndex) {
+        if (opts.materialIndex.length !== triCountIn) throw new Error(
+            "rtPipeline: materialIndex must have one entry per triangle (" + triCountIn + "), got " + opts.materialIndex.length);
+        matIndex = new Int32Array(triCountIn);
+        matIndex.set(opts.materialIndex);
+    }
+    return Object.freeze({ bounds, meta, order, tris: trisF32, vertColors, matIndex,
+                           nodeCount: bvh.nodes, triCount: bvh.count, bvh });
+}
+
 /** The `inputs` array runWgslCompute/runWgslComputeNative expect, at BVH_BINDINGS' fixed indices. */
 export function bvhInputs(b) {
     const out = [

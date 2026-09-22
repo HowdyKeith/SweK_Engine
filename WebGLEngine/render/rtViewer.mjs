@@ -30,9 +30,10 @@
 // bit-for-bit parity is task #99, not this round.
 "use strict";
 
-import { pipelineWgsl, pipelineUniforms, bvhBuffersFromMesh, VIEW, EPS } from "../physics/render/rtPipeline.mjs";
+import { pipelineWgsl, pipelineUniforms, bvhBuffersFromMesh, bvhBuffersFromTriSoup, VIEW, EPS } from "../physics/render/rtPipeline.mjs";
 import { meshTriples } from "../physics/splat/splatMesh.mjs";
 import { GLBParser } from "../gpu/GLBParser.js";
+import { citySceneMesh } from "../world/cityChunkScene.mjs";
 
 export const DEFAULT_ALBEDO = Object.freeze([0.68, 0.66, 0.62]);
 
@@ -59,6 +60,20 @@ export async function loadMeshBvh(arrayBuffer, opts = {}) {
     const { positions, indices } = meshTriples({ positions: parsed.positions, indices: parsed.indices });
     const bvh = bvhBuffersFromMesh(positions, indices, opts.bvh || {});
     return Object.freeze({ bvh, bounds: meshBounds(bvh), vertexCount: positions.length, triangleCount: indices.length });
+}
+
+/**
+ * RTX ROUND 5 -- the same {bvh, bounds, vertexCount, triangleCount} shape loadMeshBvh() returns, so
+ * makeRtSession() below (which only ever reads `mesh.bvh`) needs no changes to render either scene: a
+ * procedurally generated building (world/cityChunkScene.mjs's citySceneMesh(), itself CityGen.js + the same
+ * greedy mesher every kaiju world's on-screen terrain already uses) via bvhBuffersFromTriSoup() rather than
+ * loadMeshBvh()'s GLB-and-indices path -- there is no GLB here, and no indices, only chunkMesherCore.js's own
+ * already-flat, world-space triangle soup.
+ */
+export function loadCityBvh(opts = {}) {
+    const scene = citySceneMesh(opts.scene || {});
+    const bvh = bvhBuffersFromTriSoup(scene.verts, opts.bvh || {});
+    return Object.freeze({ bvh, bounds: meshBounds(bvh), vertexCount: scene.vertexCount, triangleCount: scene.triangleCount });
 }
 
 /**

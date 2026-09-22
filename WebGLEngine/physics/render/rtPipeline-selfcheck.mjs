@@ -101,6 +101,41 @@
 //        time, a shared INPUT. It is exactly why the winding-direction assertion stays a SEPARATE, explicit
 //        check rather than being folded into "the statistical gate covers geometry too" -- it structurally
 //        cannot, and this sabotage is the proof rather than an assumption.
+//
+// SABOTAGE LOG (RTX round 5, bvhBuffersFromTriSoup() -- section 10) -- same discipline, each applied to the
+// real file, gate run, exit read, file restored byte for byte:
+//   D  the colors-length-mismatch throw dropped entirely (bvhBuffersFromTriSoup() no longer validates
+//      opts.colors.length against the triangle-soup buffer length before packing)
+//        -> 1 red: the dedicated "wrong-length colors THROWS" check, which deliberately passes a 3-float
+//           array against a 108-float buffer and asserts the specific error message -- with the check
+//           removed, the call silently returns instead of throwing.
+//   E  vertColors packed with only every OTHER float set (a genuine, silent mis-pack, not a length error)
+//        -> 1 red: the "vertColors match EXACTLY" comparison against bvhBuffersFromMesh()'s own by-index
+//           gather -- the two arrays now disagree at every odd index.
+//   F  triCountIn's divisor changed from 9 (floats per triangle) to 3 (floats per vertex, the WRONG unit)
+//        -> *** FIRST RUN: 0 RED, AN UNCAUGHT CRASH, NOT A PASS. *** `grep -c FAIL` on the raw output read 0
+//           because the gate script itself threw uncaught mid-run (materialIndex's own length check, now
+//           comparing against a triCountIn three times too large, correctly rejected the test's own
+//           correctly-sized array) and exited before printing a FAIL line for it -- the exact "a crash is not
+//           a verdict" trap this tree has hit before (v4536's missing-file case, restated here for a thrown
+//           exception instead of a thrown-away read). FIXED (first pass) by wrapping the colors and
+//           materialIndex positive-path calls in section 10 in their own try/catch -- RE-SABOTAGED: 2 red,
+//           cleanly reported. *** AN ADVERSARIAL REVIEW THEN FOUND THAT FIRST FIX TOO NARROW: *** every OTHER
+//           call in section 10 (bvhBuffersFromMesh()'s own baseline call, the bare bvhBuffersFromTriSoup()
+//           call with no opts, and the independent `new MeshBVH()` cross-check) carried the identical
+//           structural risk and simply had not been sabotaged yet to prove it. WIDENED to a single `tryCall`
+//           helper used for every call in the section, not only the two this one sabotage happened to break --
+//           re-confirmed this exact sabotage still reads cleanly as 2 red under the widened guard, and the
+//           other calls now each get their own "did not throw" assertion too. Logged per this file's own
+//           house rule: a sabotage that goes 0 red is the CHECK's problem, not evidence the code is fine.
+//   G  the trisFlat.length % 9 !== 0 validation dropped entirely (a stray, non-whole-triangle tail silently
+//      discarded rather than refused)
+//        -> 1 red: the dedicated "not a whole multiple of 9 THROWS" check, added the same round an adversarial
+//           review found this validation missing from bvhBuffersFromTriSoup() -- unlike bvhBuffersFromMesh(),
+//           which can never receive a malformed count (trianglesFrom() structurally always emits a multiple of
+//           9), a flat buffer handed in directly has no such guarantee, and nothing in this file's only real
+//           caller (world/cityChunkScene.mjs) happens to need this check today -- logged as a real gap closed
+//           for future callers, not a gap that was ever observed to bite anyone.
 "use strict";
 
 import { gateReport } from "../../tools/ship/gateReport.mjs";
@@ -741,6 +776,135 @@ const rec = R.sbtRecord;
         "not bit-exact -- this scene is concave (section 4's own argument for why bit-exactness cannot survive " +
         "multi-geometry interreflection), so the claim is a STATISTICAL one, and the bound comes from each " +
         "side's own measured noise rather than a number somebody picked");
+}
+
+// ---- 10. RTX ROUND 5: bvhBuffersFromTriSoup() -- THE SAME BVH, FROM A FLAT BUFFER INSTEAD OF INDICES ----------
+// world/chunkMesherCore.js's own greedy mesher (world/cityChunkScene.mjs's real caller) never produces an
+// indices array -- it emits an already-flat, unindexed, world-space triangle soup, the same shape world/
+// worldColliderBVH.mjs already hands straight to `new MeshBVH(tris)`. bvhBuffersFromTriSoup() is the sibling
+// of bvhBuffersFromMesh() for exactly that shape. Rather than a new, independent oracle, this asks the
+// strongest question available: for the IDENTICAL triangles, does the flat-buffer path produce a BIT-IDENTICAL
+// BVH to the already-proven indexed path -- not merely an equivalent one, but the exact same bounds/meta/order/
+// tris arrays, since MeshBVH's own build is a deterministic function of its input triangles.
+console.log("");
+say("10. bvhBuffersFromTriSoup() -- BIT-IDENTICAL TO bvhBuffersFromMesh() ON THE SAME TRIANGLES, FROM A FLAT BUFFER");
+{
+    // The exact section-6 cube, re-flattened through trianglesFrom() (mesh/meshBVH.mjs's own function --
+    // already imported, already proven) into the shape a real mesher would hand this function: no positions,
+    // no indices, just 9 floats per triangle.
+    const positions = [
+        [-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1],
+        [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1],
+    ];
+    const indices = [
+        [0, 2, 1], [0, 3, 2], [4, 5, 6], [4, 6, 7], [0, 5, 4], [0, 1, 5],
+        [3, 6, 2], [3, 7, 6], [0, 7, 3], [0, 4, 7], [1, 6, 5], [1, 2, 6],
+    ];
+    const flatTris = trianglesFrom(positions, indices);
+    // *** A CRASH IS NOT A VERDICT, APPLIED FILE-WIDE IN THIS SECTION -- AN ADVERSARIAL REVIEW FOUND THE FIRST
+    // DRAFT'S GUARD TOO NARROW. *** The original fix (see the sabotage log's entry F) wrapped exactly the two
+    // calls that sabotage happened to break; the review pointed out every OTHER call in this section carries
+    // the identical structural risk (a well-formed call into code with an internal bug throwing uncaught,
+    // silently reading as 0 FAIL to a naive count) even though nothing has broken THEM yet. `tryCall` below is
+    // the one guard, used for every call in this section rather than only the two a specific sabotage happened
+    // to exercise.
+    const tryCall = (label, fn) => { try { return { v: fn(), err: null }; } catch (e) { return { v: null, err: e.message }; } };
+    const rMesh = tryCall("bvhBuffersFromMesh(positions, indices)", () => R.bvhBuffersFromMesh(positions, indices));
+    const rSoup = tryCall("bvhBuffersFromTriSoup(flatTris)", () => R.bvhBuffersFromTriSoup(flatTris));
+    ok("!! bvhBuffersFromMesh(positions, indices) did not throw on this section's own known-good cube fixture",
+        rMesh.err === null, rMesh.err || "");
+    ok("!! bvhBuffersFromTriSoup(flatTris) did not throw on the same fixture, re-flattened", rSoup.err === null, rSoup.err || "");
+    const viaMesh = rMesh.v, viaSoup = rSoup.v;
+    if (!viaMesh || !viaSoup) { ok("!! the rest of section 10 requires both baseline calls to have succeeded -- skipped", false, "see the two checks above for which one threw"); }
+    else {
+    say(`viaMesh: ${viaMesh.nodeCount} nodes, ${viaMesh.triCount} triangles -- viaSoup: ${viaSoup.nodeCount} nodes, ${viaSoup.triCount} triangles`);
+    const arraysEqual = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
+    ok("!! same nodeCount, same triCount", viaMesh.nodeCount === viaSoup.nodeCount && viaMesh.triCount === viaSoup.triCount,
+        `${viaMesh.nodeCount}/${viaMesh.triCount} vs ${viaSoup.nodeCount}/${viaSoup.triCount}`);
+    ok("!! bounds arrays are BIT-IDENTICAL, not merely close", arraysEqual(viaMesh.bounds, viaSoup.bounds));
+    ok("!! meta (the BVH tree structure itself) is BIT-IDENTICAL", arraysEqual(viaMesh.meta, viaSoup.meta));
+    ok("!! order (the SAH-reordered triangle index) is BIT-IDENTICAL", arraysEqual(viaMesh.order, viaSoup.order));
+    ok("!! tris (the raw triangle positions, f32-cast) are BIT-IDENTICAL", arraysEqual(viaMesh.tris, viaSoup.tris));
+
+    // colors: bvhBuffersFromMesh() gathers BY INDEX (opts.colors[i/j/k]); bvhBuffersFromTriSoup() expects the
+    // caller to have ALREADY done that gather (matching chunkMesherCore.js's own `cols` output, which is
+    // already 3 floats per vertex, 1:1 aligned with `verts`) -- so the same per-vertex color table produces
+    // the SAME per-triangle-vertex flat array either way, one via a gather this function does internally, the
+    // other via a gather the caller is documented to have already performed.
+    const perVertexColors = positions.map((_, i) => [i / 8, (i * 2 % 8) / 8, (i * 3 % 8) / 8]);
+    const rMeshColor = tryCall("bvhBuffersFromMesh(colors)", () => R.bvhBuffersFromMesh(positions, indices, { colors: perVertexColors }));
+    const flatColorsForSoup = new Float32Array(indices.length * 9);
+    indices.forEach(([i, j, k], n) => {
+        const [A, B, C] = [perVertexColors[i], perVertexColors[j], perVertexColors[k]];
+        flatColorsForSoup.set([...A, ...B, ...C], n * 9);
+    });
+    // *** A CRASH IS NOT A VERDICT (this tree's own established rule, e.g. v4536's "a missing file is a FAIL
+    // row, not a throw"). *** bvhBuffersFromTriSoup() and bvhBuffersFromMesh() both legitimately throw on a
+    // genuinely malformed call (the dedicated "throws" check below exercises that on purpose) -- but an
+    // UNEXPECTED throw from a WELL-FORMED call here would be an internal bug in the function under test, and an
+    // uncaught exception at this point would take the whole gate down with it (exit code muddied by whatever
+    // ran after, zero FAIL lines printed), reading as a clean run to a naive `grep -c FAIL`. Caught explicitly
+    // so an internal bug reports as a named FAIL instead -- found the hard way, by sabotage: see this section's
+    // own sabotage log, entry F.
+    const rSoupColor = tryCall("bvhBuffersFromTriSoup(colors)", () => R.bvhBuffersFromTriSoup(flatTris, { colors: flatColorsForSoup }));
+    ok("!! bvhBuffersFromMesh(positions, indices, {colors}) did not throw on a well-formed call",
+        rMeshColor.err === null, rMeshColor.err || "");
+    ok("!! bvhBuffersFromTriSoup(flatTris, {colors}) did not throw on a well-formed, correctly-sized colors array",
+        rSoupColor.err === null, rSoupColor.err || "");
+    ok("!! vertColors match EXACTLY between the index-gathered path and the pre-gathered flat path",
+        rMeshColor.v && rSoupColor.v && arraysEqual(rMeshColor.v.vertColors, rSoupColor.v.vertColors));
+
+    // materialIndex: a plain, order-preserving per-triangle array -- no indices involved on either side, so
+    // this option's own code path is identical regardless of which function packs it; checked directly rather
+    // than assumed from the colors check above, since the two options have entirely separate code in both
+    // functions. Same crash-is-not-a-verdict guard as the colors check above.
+    const matIdx = indices.map((_, n) => n % 2);
+    const rMeshMat = tryCall("bvhBuffersFromMesh(materialIndex)", () => R.bvhBuffersFromMesh(positions, indices, { materialIndex: matIdx }));
+    const rSoupMat = tryCall("bvhBuffersFromTriSoup(materialIndex)", () => R.bvhBuffersFromTriSoup(flatTris, { materialIndex: matIdx }));
+    ok("!! bvhBuffersFromMesh(positions, indices, {materialIndex}) did not throw on a well-formed call",
+        rMeshMat.err === null, rMeshMat.err || "");
+    ok("!! bvhBuffersFromTriSoup(flatTris, {materialIndex}) did not throw on a well-formed, correctly-sized array",
+        rSoupMat.err === null, rSoupMat.err || "");
+    ok("!! matIndex matches EXACTLY between both packing functions",
+        rMeshMat.v && rSoupMat.v && arraysEqual(rMeshMat.v.matIndex, rSoupMat.v.matIndex));
+
+    // Refused, not silently mis-aligned: a caller handing a colors array that is NOT 1:1 with the triangle
+    // soup (the mistake bvhBuffersFromMesh()'s own materialIndex length check already guards against, applied
+    // here to the analogous colors case bvhBuffersFromTriSoup() alone has).
+    let threw = false;
+    try { R.bvhBuffersFromTriSoup(flatTris, { colors: new Float32Array(3) }); }
+    catch (e) { threw = /1:1 position-aligned/.test(e.message); }
+    ok("!! a colors array that is not 1:1 position-aligned with the triangle soup THROWS, rather than silently mis-packing",
+        threw, "the same refuse-over-risk discipline bvhBuffersFromMesh()'s own materialIndex check already holds to");
+
+    // Refused, not silently truncated: a flat buffer that is not a whole multiple of 9 floats (a stray
+    // trailing partial triangle -- the exact gap an adversarial review found this function was missing).
+    let wholeMultipleThrew = false;
+    try { R.bvhBuffersFromTriSoup(new Float32Array(22)); }
+    catch (e) { wholeMultipleThrew = /whole multiple of 9/.test(e.message); }
+    ok("!! a flat buffer whose length is not a whole multiple of 9 THROWS, rather than silently discarding the remainder",
+        wholeMultipleThrew, "22 floats = 2 whole triangles + 4 stray leftover floats");
+
+    // Independent cross-check: raycastFirst() on viaSoup.bvh must agree with a THIRD, wholly independent
+    // MeshBVH build (constructed directly from the flat buffer, bypassing bvhBuffersFromTriSoup() entirely) --
+    // proving the packed bounds/meta/order this function returns are the actual live tree the returned .bvh
+    // object queries against, not a snapshot that has already drifted from it.
+    const rIndependent = tryCall("new MeshBVH(flatTris) (independent build)", () => new MeshBVH(Float64Array.from(flatTris)));
+    ok("!! an independent MeshBVH build over the same flat buffer did not throw", rIndependent.err === null, rIndependent.err || "");
+    if (rIndependent.v) {
+        const independent = rIndependent.v;
+        let rayMismatches = 0;
+        const testRays = [[0, 0, -5, 0, 0, 1], [0, 0, 5, 0, 0, -1], [5, 0, 0, -1, 0, 0], [0, 5, 0, 0, -1, 0], [-5, -5, -5, 1, 1, 1]];
+        for (const [ox, oy, oz, dx, dy, dz] of testRays) {
+            const a = viaSoup.bvh.raycastFirst(ox, oy, oz, dx, dy, dz, Infinity);
+            const b = independent.raycastFirst(ox, oy, oz, dx, dy, dz, Infinity);
+            const same = (!a && !b) || (a && b && Math.abs(a.t - b.t) < 1e-9);
+            if (!same) rayMismatches++;
+        }
+        ok("!! viaSoup.bvh's own raycastFirst() agrees with an independently-built MeshBVH over the same flat buffer",
+            rayMismatches === 0, `${rayMismatches} of ${testRays.length} rays disagreed`);
+    }
+    }
 }
 
 console.log("rtPipeline-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));

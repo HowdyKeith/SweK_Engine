@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="demo:title" content="RTX viewer">
-<meta name="demo:desc" content="RTX round 3: the present path. physics/render/rtPipeline.mjs's BVH-accelerated, barycentric-shaded compute kernel (rounds 1-2) traces one path-traced sample of a Kenney pavement tile per frame; render/rtViewer.mjs's accumulate kernel folds it into a running mean (a camera move restarts it at frame 1, which overwrites rather than resets to zero); a fullscreen-triangle present kernel reads that mean directly out of the storage buffer a prior compute pass wrote, with no texture and no copy. Drag to orbit, wheel to dolly -- either resets the accumulation, and it sharpens back up over the next second or two. WebGPU only: the kernel is compute, and WebGL2 has no compute stage to fall back to.">
+<meta name="demo:desc" content="physics/render/rtPipeline.mjs's BVH-accelerated compute kernel traces one path-traced sample per frame; render/rtViewer.mjs's accumulate kernel folds it into a running mean (a camera move restarts it at frame 1, which overwrites rather than resets to zero); a fullscreen-triangle present kernel reads that mean directly out of the storage buffer a prior compute pass wrote, with no texture and no copy. Two scenes: a Kenney pavement tile (RTX round 3), or a procedurally generated building (RTX round 5, world/CityGen.js meshed by the same greedy mesher every kaiju world's on-screen terrain already uses) -- toggle with the link in the HUD. Drag to orbit, wheel to dolly -- either resets the accumulation, and it sharpens back up over the next second or two. WebGPU only: the kernel is compute, and WebGL2 has no compute stage to fall back to.">
 <meta name="demo:category" content="physics">
 <meta name="demo:swatch" content="&#9651;">
 <title>RTX viewer</title>
@@ -25,15 +25,24 @@
 <div id="hud">
   <div id="cap">RTX viewer</div>
   <div id="be">requesting a WebGPU device&hellip;</div>
-  <div id="sub">drag to orbit &middot; wheel to dolly &middot; <a href="/server.html">&larr; back</a></div>
+  <div id="sub">drag to orbit &middot; wheel to dolly &middot; <a id="sceneToggle" href="#">scene</a> &middot; <a href="/server.html">&larr; back</a></div>
 </div>
 <script type="module" src="/ui/originNotice.js"></script>
 <script type="module">
 import { requestDevice } from "/gfx/device.js";
-import { loadMeshBvh, makeRtSession, orbitEye } from "/render/rtViewer.mjs";
+import { loadMeshBvh, loadCityBvh, makeRtSession, orbitEye } from "/render/rtViewer.mjs";
 
 const cvs = document.getElementById("c"), beEl = document.getElementById("be"), subEl = document.getElementById("sub");
+const toggleEl = document.getElementById("sceneToggle");
 const fail = (m) => { beEl.innerHTML = '<span class="bad">' + m + "</span>"; };
+
+// RTX round 5 -- which scene to load, read once at page load (not hot-swapped mid-session: a running WebGPU
+// session already owns buffers sized and bound to the FIRST mesh's triangle/vertex counts, so switching scenes
+// is a page reload with a different query param, the same "toggle" shape a render-mode switch on any other
+// page in this tree already takes -- not new runtime re-binding machinery this round does not need.
+const SCENE = new URLSearchParams(location.search).get("scene") === "city" ? "city" : "tile";
+toggleEl.href = "?scene=" + (SCENE === "city" ? "tile" : "city");
+toggleEl.textContent = SCENE === "city" ? "try the pavement tile" : "try the procedural city";
 
 let session = null, mesh = null, device = null;
 let yaw = 0.7, pitch = 0.45, dist = 3, dragging = null, dirty = true;
@@ -61,9 +70,13 @@ async function main() {
     if (!device || device.backend !== "webgpu") return fail("no WebGPU device on this box -- got " + (device ? device.backend : "nothing"));
 
     try {
-        const res = await fetch("/vendor/kenney-city/models/pavement.glb");
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        mesh = await loadMeshBvh(await res.arrayBuffer());
+        if (SCENE === "city") {
+            mesh = loadCityBvh();
+        } else {
+            const res = await fetch("/vendor/kenney-city/models/pavement.glb");
+            if (!res.ok) throw new Error("HTTP " + res.status);
+            mesh = await loadMeshBvh(await res.arrayBuffer());
+        }
     } catch (e) { return fail("loading the mesh threw: " + e.message); }
 
     dist = mesh.bounds.radius * 3.2 + 0.5;

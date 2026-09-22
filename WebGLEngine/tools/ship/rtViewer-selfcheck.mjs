@@ -142,7 +142,7 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
         engineRoot: ENG, timeoutMs: 90000,
         script: `async () => {
             const { requestDevice } = await import("/gfx/device.js");
-            const { presentWgsl, loadMeshBvh, makeRtSession, orbitEye, meshBounds } = await import("/render/rtViewer.mjs");
+            const { presentWgsl, loadMeshBvh, loadCityBvh, makeRtSession, orbitEye, meshBounds } = await import("/render/rtViewer.mjs");
             const { bvhBuffersFromMesh } = await import("/physics/render/rtPipeline.mjs");
             const out = {};
 
@@ -205,11 +205,30 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
                              bounds: mesh.bounds, nan, min, max, distinct: uniq.size, frameCount: session.frameCount() };
                 session.destroy();
             }
+
+            // ---- 5b. RTX round 5 -- the procedurally generated scene, same shape as section 5's real GLB ----
+            {
+                const mesh = loadCityBvh();
+                const w = 48, h = 32;
+                const canvas = document.createElement("canvas"); canvas.width = w; canvas.height = h;
+                const device = await requestDevice(canvas, { backend: "webgpu" });
+                const session = makeRtSession(device, { mesh, w, h, spp: 2 });
+                const view0 = orbitEye({ yaw: 0.7, pitch: 0.5, dist: mesh.bounds.radius * 3.2 + 0.5, center: mesh.bounds.center });
+                const view = { w, h, ...view0, fovDeg: 45 };
+                for (let i = 0; i < 8; i++) await session.renderFrame(view, { offscreen: true, read: true });
+                const accum = new Float32Array(await device.read(session.accumBuf));
+                let nan = 0, min = Infinity, max = -Infinity;
+                const uniq = new Set();
+                for (const v of accum) { if (!isFinite(v)) nan++; if (v < min) min = v; if (v > max) max = v; uniq.add(Math.round(v * 1000)); }
+                out.city = { triangleCount: mesh.triangleCount, vertexCount: mesh.vertexCount, bounds: mesh.bounds,
+                             nan, min, max, distinct: uniq.size, frameCount: session.frameCount() };
+                session.destroy();
+            }
             return out;
         }`,
     });
     if (!r.ok) throw new Error("runInEngineOrigin failed: " + r.reason + (r.pageErrors && r.pageErrors.length ? " | " + r.pageErrors.slice(0, 3).join(" | ") : ""));
-    const { present, cube, mesh } = r.result;
+    const { present, cube, mesh, city } = r.result;
 
     console.log("\n3. presentWgsl -- A DISTINCT-PER-PIXEL FRAME, PIXEL FOR PIXEL");
     say(`4x2, values include 1.5 and -0.3 to exercise the clamp`);
@@ -239,6 +258,18 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
         "informal by design -- there is no CPU radiance oracle for a triangle mesh (rtPipeline.mjs's own header); " +
         "what IS checked is that the whole present path produces a real, varied picture rather than sky, black, or NaN");
 
+    console.log("\n5b. RTX ROUND 5 -- THE PROCEDURALLY GENERATED SCENE, THROUGH THE FULL loadCityBvh -> makeRtSession -> device.frame PATH");
+    say(`world/cityChunkScene.mjs's citySceneMesh(): ${city.triangleCount} triangles, ${city.vertexCount} vertices`);
+    say(`bounds ${JSON.stringify(city.bounds)}`);
+    say(`accumBuf after ${city.frameCount} frames: ${city.nan} NaN/Inf, range [${city.min.toFixed(4)}, ${city.max.toFixed(4)}], ${city.distinct} distinct (of 1000ths) values`);
+    REPORT_ROWS.push(["city scene", `${city.triangleCount} tris`, `${city.frameCount} frames`, `${city.distinct} distinct, range [${city.min.toFixed(3)}, ${city.max.toFixed(3)}]`]);
+    ok("the generated scene is the fixture this gate actually asked for -- world/cityChunkScene.mjs's own DEFAULT_BUILDING, 120 triangles, 360 vertices",
+        city.triangleCount === 120 && city.vertexCount === 360,
+        "a wrong count here would mean CityGen.js, chunkMesherCore.js, or bvhBuffersFromTriSoup() stopped matching what world/cityChunkScene.mjs's own front door already measures (node world/cityChunkScene.mjs)");
+    ok("!! real procedurally generated mesh, real camera, real accumulation: no NaN/Inf and genuine spatial variance",
+        city.nan === 0 && city.distinct > 20 && city.max > city.min,
+        "same informal-by-design reasoning as section 5's real GLB -- no CPU radiance oracle for a triangle mesh, so what's checked is a real, varied picture rather than sky, black, or NaN");
+
     console.log("\n6. THE LIVE PAGE ITSELF");
     const page = read("rtx-viewer.html");
     ok("carries demo:title/demo:desc/demo:category and imports render/rtViewer.mjs",
@@ -247,6 +278,9 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
        "calls all pass {offscreen:true,read:true} explicitly, which the live page does not",
         /requestDevice\(/.test(page) && !/offscreen:\s*true/.test(page));
     ok("the front door links it", /href="\/rtx-viewer\.html"/.test(read("server.html")));
+    ok("!! RTX round 5 -- the page imports loadCityBvh and reads the scene toggle from the URL, not just loadMeshBvh",
+        /loadCityBvh/.test(page) && /scene.*==.*["']city["']|["']city["'].*scene/.test(page),
+        "a page that only ever loaded the hardcoded pavement tile would still pass every check above this one");
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"));
