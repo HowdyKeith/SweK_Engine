@@ -8032,6 +8032,43 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4662 -- THE 272nd CLOSING: the youngest history was harmed least, and the hypothesis was mine.
+    since347: Object.freeze({
+        at: "v4662", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** H2 IS REFUTED, AND THE DATA POINT THE OTHER WAY. *** v4661 split fsr.html's scene " +
+                 "clock from its history's age so the one experiment that could separate them became " +
+                 "possible; v4662 pre-registered it -- hypothesis, DIRECTION, one-sided Fisher's exact, " +
+                 "threshold, windows -- in a commit containing no data, and ran it. Three cells, all with " +
+                 "the shading mask off: scene 3-53 with the history grown alongside, 14 of 51 harmed " +
+                 "(27.5%); scene 54-98 grown alongside, 3 of 45 (6.7%); scene 54-98 on an accumulator EMPTY " +
+                 "at scene 54, ZERO of 45, and the best mean of the three (+0.6371 dB). The youngest " +
+                 "history is harmed LEAST. One-sided p = 1.000. " +
+                 "*** THE CANDIDATE THIS KILLS IS THE ONE THIS SESSION ITSELF PUT FORWARD. *** v4660's " +
+                 "record named convergence as 'the obvious next suspicion' and wrote it down as a candidate " +
+                 "rather than a conclusion, which is the only reason it could be refuted cleanly instead of " +
+                 "quietly assumed. THREE explanations for v4658's harm are now spent: the jitter (v4659, " +
+                 "refuted, wrong sign), the wide/narrow split (v4660, confirmed and beside the point -- it " +
+                 "holds its size in both windows while the harm nearly vanishes), and the history's age. " +
+                 "What is left is the scene window itself, which is an ASSOCIATION and not a mechanism, and " +
+                 "both the page and the record say so. " +
+                 "*** AND THE SHADING MASK WAS RULED OUT BY MEASUREMENT RATHER THAN BY ARGUMENT. *** Cell " +
+                 "A's figures came from v4658 with shading ON while every cell here has it OFF, so A was " +
+                 "re-collected: identical to FOUR DECIMALS. Not luck -- the shading ring is 2 x " +
+                 "jitterPhaseCount slots, 64 at ratio 2, and that window never reaches age 64, so the mask " +
+                 "is all zeros across it by construction. " +
+                 "One frame of cell C is untestable (no previous depth on the first accumulated frame, both " +
+                 "arms identical, delta exactly 0) and is counted as NOT harmed under the pre-declared " +
+                 "rule, which makes C's rate smaller and is conservative against the hypothesis; kept as " +
+                 "written rather than excluded. " +
+                 "Seven sabotages, seven caught, ONE REPAIR: the row holding the 'fourth cell does not " +
+                 "exist' caveat tested the whole file, and that caveat is written TWICE by design -- " +
+                 "declared before the run, restated beside the result -- so deleting the restatement, the " +
+                 "copy a reader of the outcome meets, scored ZERO. The row requires both now. Git holds the " +
+                 "ORDERING of a declaration, not its later integrity. No gate added.",
+    }),
     // v4661 -- THE 271st CLOSING: one variable was two clocks, and reset() zeroed both.
     since346: Object.freeze({
         at: "v4661", swept: 1, green: 1, red: 0,

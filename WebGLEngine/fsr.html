@@ -762,6 +762,25 @@ async function tick() {
     // fixed the hypothesis, the direction, the statistic and the frame range in a commit that contains no
     // data, and git log is what makes that ordering checkable rather than asserted.
     //
+    // *** v4662 -- AND THE HARM IS NOT THE HISTORY'S AGE EITHER, WHICH THE CONTROL ABOVE WAS BUILT TO
+    // ASK. *** With the scene clock split from the history's age (see startframe), the same scene window
+    // can be run on an accumulator that is EMPTY when it starts:
+    //
+    //     scene  3-53, history grown with it   14 of 51 harmed (27.5%)   mean +0.4004 dB
+    //     scene 54-98, history grown with it    3 of 45 harmed ( 6.7%)   mean +0.5862 dB
+    //     scene 54-98, history EMPTY at 54      0 of 45 harmed ( 0.0%)   mean +0.6371 dB
+    //
+    // The YOUNGEST history is harmed LEAST -- not once in forty-five frames -- and has the best mean of the
+    // three. One-sided Fisher's exact on the pre-declared comparison reads p = 1.000: the data point the
+    // other way. render/reactive-harm-preregistration.md fixed the hypothesis, its direction and the
+    // statistic in a commit containing no data.
+    //
+    // So THREE explanations for the harm are now spent: the jitter (refuted, wrong sign), the wide/narrow
+    // split (confirmed and beside the point), and the history's age (refuted). What is left is the scene
+    // window itself, and this page has not measured why. The shading mask is not it either -- cell A
+    // re-collected with shading OFF is identical to four decimals, because its ring needs 64 frames and
+    // that window never reaches age 64, so the mask is all zeros there by construction.
+    //
     // *** AND IT IS NOT AN EXPLANATION OF THE FOURTEEN HARMED FRAMES, WHICH IS WHAT THE SEARCH WAS FOR. ***
     // Over frames 54-98 only THREE of 45 are harmed, worst -0.50 dB, while the wide/narrow difference stays
     // the same size. So the split predicts how much the mask HELPS and not WHETHER IT HURTS, and v4658's

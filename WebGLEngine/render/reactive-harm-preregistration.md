@@ -79,6 +79,58 @@ with it on.
 * **Any of the other predictors.** v4659 tried eight against one window and reported the best;
   that is the mistake this whole procedure exists to avoid repeating.
 
-## OUTCOME
+## OUTCOME -- H2 IS REFUTED, AND IN THE OPPOSITE DIRECTION
 
-NOT YET COLLECTED. Appended in a later commit, whichever way it falls.
+Collected after everything above was committed.
+
+| cell | scene | history age | n | harmed | mean delta | worst |
+|---|---|---|---|---|---|---|
+| **A** | 3-53 | grown with the scene | 51 | **14 (27.5%)** | +0.4004 dB | -1.22 |
+| **B** | 54-98 | grown with the scene | 45 | **3 (6.7%)** | +0.5862 dB | -0.50 |
+| **C** | 54-98 | **EMPTY at scene 54** | 45 | **0 (0.0%)** | +0.6371 dB | 0.00 |
+
+    2x2      C: 0 harmed / 45 not      B: 3 harmed / 42 not
+    Fisher's exact, ONE-SIDED (C harmed more often than B):  p = 1.000
+
+**H2 is not confirmed, and the data point the other way.** The cell with the YOUNGEST history is
+harmed *least* -- not once in forty-five frames -- and has the best mean of the three. A fresh
+accumulator dropped into scene 54 does not reproduce the harm; it does not produce any.
+
+One frame of C is untestable and is counted as not-harmed: on the first accumulated frame there
+is no previous depth, so the reactive mask is not computed at all and both arms are the identical
+frame, delta exactly 0. Keeping it under the pre-declared rule makes C's harmed rate *smaller*,
+which is conservative against the hypothesis, so it is kept as written rather than excluded.
+
+## SO THE HARM TRACKS THE SCENE WINDOW, AND TWO EXPLANATIONS ARE NOW DEAD
+
+    v4659  the jitter          REFUTED     r = +0.17, and the wrong sign
+    v4660  the wide/narrow split  CONFIRMED but IRRELEVANT -- it holds its size in both windows
+                                  while the harm nearly vanishes, so it predicts how much the
+                                  mask HELPS and not whether it HURTS
+    v4662  the history's age   REFUTED     the youngest history is harmed least, 0 of 45
+
+What is left is the scene window itself. Cells B and C share it and both sit near zero harm;
+cell A is a different stretch of the slab's travel and carries all of it.
+
+## AND THE SHADING MASK IS NOT THE EXPLANATION EITHER, WHICH WAS CHECKED RATHER THAN ASSUMED
+
+Cell A's figures at v4658 were taken with the shading mask ON and every cell here has it OFF, so
+A was re-collected with it off before being quoted beside the others. The result is **identical
+to four decimal places** -- 14 of 51, mean +0.4004, worst -1.22 -- and that is not luck: the
+shading ring is `2 * jitterPhaseCount` slots, 64 at ratio 2, and cell A never reaches age 64, so
+the mask is all zeros over that whole window by construction. The page's own note says as much.
+An interaction between the two masks cannot be what distinguishes cell A.
+
+## WHAT THIS DOES NOT ESTABLISH
+
+* **Why the early window is the harmful one.** The slab is at x = 0.165..2.915 there against
+  2.97..5.39 in B and C, and the dolly is correspondingly closer to its start. Naming a mechanism
+  is a separate measurement from showing the association, and nothing here has measured one.
+  This is the candidate for the next test, not a conclusion.
+* **The fourth cell still does not exist.** Scene 3-53 on an OLD history would complete the 2x2
+  and there is no way to age the accumulator without advancing the scene. The refutation stands
+  on its own -- C is the direct comparison the pre-registration named -- but the design remains
+  one-directional and saying so is not a hedge.
+* **That the harm is a defect rather than a cost.** Every cell's MEAN is positive; the mask helps
+  on average everywhere measured. What is unexplained is why a minority of frames in one window
+  go the other way.

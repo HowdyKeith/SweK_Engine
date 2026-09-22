@@ -407,6 +407,58 @@ console.log("\n6. *** THE SHADING MASK REACHES THE CHAIN (v4655), AND THIS IS A 
 }
 
 console.log(fails ? `\nfsrPage-selfcheck: ${fails} FAILED` : "\nfsrPage-selfcheck: all checks pass");
+console.log("\n9. *** THE REFUTED HYPOTHESIS (v4662), AND THE CELL THAT DOES NOT EXIST ***");
+// v4661's control made one experiment possible and v4662 ran it: the same scene window on an accumulator
+// that is EMPTY when it starts. H2 said the harm follows the history's AGE; the youngest history turned out
+// to be harmed LEAST, 0 of 45. What a gate holds is not that the run happened -- git log holds the ordering
+// -- but that the record still says what it measured, that its arithmetic is its own, and that it still
+// says what it could NOT settle. A refutation quietly losing its caveats reads as a result.
+{
+    const HARM = path.resolve(path.dirname(PAGE), "render", "reactive-harm-preregistration.md");
+    const harm = fs.existsSync(HARM) ? fs.readFileSync(HARM, "utf8") : "";
+    ok("the harm pre-registration exists and its OUTCOME is filled in",
+       harm.length > 0 && /## OUTCOME/.test(harm) && !/NOT YET COLLECTED/.test(harm),
+       HARM.replace(/.*WebGLEngine./, ""));
+    ok("...and it declares a direction, a statistic and a threshold, as the first one did",
+       /\*\*H2:/.test(harm) && /one-sided/i.test(harm) && /Fisher/i.test(harm) && /p < 0\.05/.test(harm),
+       "the procedure is the point: a lead found by searching is confirmed by a test that did no searching");
+    // *** THE THREE CELLS' COUNTS ARE PARSED AND THEIR PERCENTAGES RE-DIVIDED. *** Three numbers where two
+    // would do, and the third is the one a later edit gets wrong -- fsrPage section 7's lesson, and the row
+    // there was first written as arithmetic on literals typed into this file, which could not fail.
+    const cells = [...harm.matchAll(/\| (\d+) \| \*\*(\d+) \((\d+\.\d+)%\)\*\* \|/g)]
+        .map((m) => ({ n: +m[1], harmed: +m[2], pct: +m[3] }));
+    ok("!! *** each cell's stated percentage IS its harmed count over its n ***",
+       cells.length === 3 && cells.every((c) => Math.abs(100 * c.harmed / c.n - c.pct) < 0.05),
+       cells.length !== 3 ? `found ${cells.length} cells, expected 3`
+           : cells.map((c) => `${c.harmed}/${c.n} = ${(100 * c.harmed / c.n).toFixed(1)}% vs stated ${c.pct}%`).join("; ") +
+             ". Parsed out of the record, not written into this gate.");
+    ok("!! ...and the youngest-history cell is the one harmed LEAST, which is the refutation itself",
+       cells.length === 3 && cells[2].harmed === 0 && cells[2].harmed < cells[1].harmed && cells[1].harmed < cells[0].harmed,
+       cells.length === 3 ? `${cells[0].harmed} / ${cells[1].harmed} / ${cells[2].harmed} harmed across the three cells`
+                          : "cells unparsed" ,
+       );
+    ok("!! ...and both the record and the page still say the harm is UNEXPLAINED, not solved",
+       /REFUTED/.test(harm) && /What is left is the scene window itself/.test(harm)
+       && /THREE explanations for the harm are now spent/.test(raw),
+       "three explanations are spent -- jitter refuted, the wide/narrow split confirmed and beside the " +
+       "point, the history's age refuted -- and naming the scene window is an association, not a mechanism. " +
+       "A round that printed 'refuted' and moved on would read as having closed the question.");
+    // *** SCOPED TO THE OUTCOME SECTION, BECAUSE THE UNSCOPED ROW WAS A 0-RED. *** This caveat is written
+    // TWICE on purpose -- declared before the run, restated after it -- and a row testing the whole file
+    // passes while either copy survives. Deleting the one that matters, the restatement beside the result,
+    // scored ZERO. It is the restatement that a reader of the outcome actually meets.
+    // Both copies, not either: git holds the ordering of the declaration, not its later integrity, and
+    // deleting the up-front one was a 0-RED too until this said `declared && restated`.
+    const cut = harm.indexOf("## OUTCOME");
+    const declared = harm.slice(0, cut), outcome = harm.slice(cut);
+    const caveat = (t) => /fourth cell/i.test(t) && /no way to age the accumulator without advancing the scene/.test(t);
+    ok("!! ...and it still says the fourth cell does not exist, BESIDE THE RESULT and not only before it",
+       caveat(declared) && caveat(outcome),
+       "scene 3-53 on an OLD history would complete the 2x2 and cannot be built, so the design separates " +
+       "the two factors in ONE direction. Saying so is not a hedge, and saying it only in the section " +
+       "nobody re-reads is most of the way to not saying it.");
+}
+
 console.log("\n8. *** TWO CLOCKS (v4661): THE SCENE'S TIME AND THE HISTORY'S AGE ***");
 // *** ONE VARIABLE WAS DOING TWO JOBS AND reset() ZEROED BOTH. *** `frame` counted the accumulations and
 // also fixed the scene, so an EMPTY history could only ever be seen at the scene's start, and scene time 54
@@ -514,6 +566,19 @@ console.log("\nunchecked here: the ADAPTER path, which is tools/ship/fsrPageDevi
     "they are not -- they are the smallest thing that has parallax.");
 //
 // SABOTAGE LOG -- each applied to the live tree, run, and restored.
+//   v4662  the harm record's OUTCOME reverted to uncollected                1 RED.
+//   v4662  a cell's percentage edited without its count                      1 RED -- the percentages are
+//          parsed out of the record and re-divided, never typed into this file.
+//   v4662  the record loses the statistic it declared                        1 RED.
+//   v4662  the refutation turned into a confirmation (cell C harmed most)    1 RED.
+//   v4662  the record drops "what is left is the scene window"               1 RED.
+//   v4662  the page drops "three explanations are now spent"                 1 RED.
+//   v4662  the fourth-cell caveat deleted                                    *** 0 RED AT FIRST ***. The
+//          caveat is written TWICE by design -- declared before the run, restated beside the result -- and
+//          the row tested the whole file, so it passed while either copy survived. Deleting the
+//          restatement, the copy a reader of the outcome actually meets, scored ZERO. The row now requires
+//          BOTH, and each deletion reds it on its own: git holds the ORDERING of a declaration, not its
+//          later integrity.
 //   v4660  the record's OUTCOME reverted to uncollected                     1 RED.
 //   v4660  the record drops its declared frame range                         1 RED.
 //   v4660  one confirming mean edited in the record and not the page         2 RED -- which is the whole
