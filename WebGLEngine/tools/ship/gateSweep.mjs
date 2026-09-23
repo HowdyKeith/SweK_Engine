@@ -8032,6 +8032,42 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4666 -- THE 276th CLOSING: the clip chain carried 96% of it, and the mask's share is not separable from nothing.
+    since351: Object.freeze({
+        at: "v4666", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** v4664 ROUTED THREE CONSUMERS TO THE DILATED FIELD IN ONE CHANGE AND v4665 MEASURED " +
+                 "THEIR SUM. *** +1.7992 dB, with nothing in it to say whether one consumer carried all of " +
+                 "it or one was losing while the others won. A control now scopes the reactive mask's input " +
+                 "separately while the clip chain keeps the dilated field in both arms. " +
+                 "MEASURED over the same 51 paired frames: clip chain alone +1.7231 dB (t = 5.87, sign " +
+                 "41/51, both clear); both consumers +1.7992 (t = 6.73, sign 43/51, both clear); ADDING THE " +
+                 "MASK +0.0761 dB, t = 1.38 and sign 29/50 -- clearing NEITHER. *** THE CLIP CHAIN CARRIES " +
+                 "96%. *** v4664 routed all three together and for the mask that choice was not justified " +
+                 "by measurement; it is not harmful, it is simply not distinguishable from nothing here, " +
+                 "and now that has been measured rather than assumed either way. " +
+                 "*** AND THE MASK'S OWN VALUE COLLAPSES ON THE CLIP CHAIN'S ACCOUNT, NOT ON ITS OWN INPUT'S. " +
+                 "*** It is worth +0.4004 dB undilated, +0.0059 with dilation on the CLIP ONLY, and +0.0820 " +
+                 "with it on the mask too. Six thousandths of a dB, harming half the frames it touches, the " +
+                 "moment the clip test is fixed. That sharpens v4665's secondary rather than repeating it: " +
+                 "the mask was earning its keep by catching silhouette pixels the clip test MISHANDLED, and " +
+                 "dilation makes the clip test handle them. Still not a case for deleting it -- FSR2 ships " +
+                 "it for shader-animated and transparent content this page does not contain and dilation " +
+                 "cannot help with. " +
+                 "*** THE LOCK RING IS DELIBERATELY NOT IN THE SWITCH, AS A MEASUREMENT. *** It feeds " +
+                 "shadingShift, the shading mask is OFF in every arm these figures were taken on, and its " +
+                 "ring never fills inside scene 3-53 anyway (v4662: identical to four decimals). A third " +
+                 "option would be a control that cannot move its own number. " +
+                 "The decomposition is labelled EXPLORATORY and the contrast between the two dilated arms " +
+                 "as POST-HOC, because it decomposes an already-confirmed effect and was not declared in " +
+                 "advance -- and a gate row holds that the labels are still there. " +
+                 "Six sabotages, six caught, and one row RED ON ARRIVAL for the third time this session in " +
+                 "the same way: a phrase matched literally against a WRAPPED markdown record, where it " +
+                 "straddles a line break. The same shape cost v4665 a sabotage that silently did nothing. " +
+                 "Phrases matched against these records now use \\s+ between words. No gate added.",
+    }),
     // v4665 -- THE 275th CLOSING: +1.80 dB, and it eats most of the feature beside it.
     since350: Object.freeze({
         at: "v4665", swept: 0, green: 0, red: 0,

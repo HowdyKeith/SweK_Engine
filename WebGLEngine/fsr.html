@@ -54,6 +54,10 @@
       <option value="on">reactive mask: ON</option>
       <option value="off">reactive mask: OFF (the control)</option>
     </select>
+    <select id="dilscope">
+      <option value="all">dilation feeds: the clip chain AND the reactive mask</option>
+      <option value="clip">dilation feeds: the CLIP CHAIN only (the mask reads raw motion)</option>
+    </select>
     <select id="dilate">
       <option value="off">dilate depth+motion: OFF (every figure on this page is this arm)</option>
       <option value="on">dilate depth+motion: ON (FSR2's early pass)</option>
@@ -728,7 +732,36 @@ async function tick() {
     // transparent content -- particles, foliage -- which this page does not have and which dilation cannot
     // help with at all. render/dilate-preregistration.md fixed the hypothesis and the statistics before
     // the data existed, and declared that secondary in advance so it could not be found afterwards.
+    // *** v4666 -- WHICH CONSUMER THE GAIN CAME FROM, WHICH v4665 MEASURED AND COULD NOT SEPARATE. ***
+    // v4664 routed three consumers to the dilated field in ONE change: the clip chain (disocclusion, the
+    // rectify pass, and the depth RECORD kept for next frame), the lock ring, and the reactive mask. The
+    // +1.80 dB is their sum, and nothing in it says whether one of them carries all of it -- or whether
+    // one of them is losing while the others win.
+    //
+    // *** THE LOCK RING IS NOT IN THIS SWITCH, AND THAT IS A MEASUREMENT RATHER THAN AN OVERSIGHT. *** It
+    // feeds shadingShift, and the shading mask is OFF in every arm this page's dilation figures were taken
+    // on -- its ring is 2 x jitterPhaseCount slots and never fills inside scene 3-53 anyway, which v4662
+    // measured as identical to four decimals. Routing it would change nothing any arm here can see, and a
+    // control that cannot move its own number is decoration.
     const dilateOn = $("dilate").value === "on";
+    const dilScope = $("dilscope").value;          // all | clip
+    //
+    // *** MEASURED, v4666: THE CLIP CHAIN CARRIES 96% OF THE +1.80 dB. ***
+    //
+    //     clip chain only vs baseline   +1.7231 dB   t 5.87 p 1.7e-7   sign 41/51 p 7.4e-6
+    //     both consumers  vs baseline   +1.7992 dB   t 6.73 p 7.9e-9   sign 43/51 p 3.4e-7
+    //     adding the mask to the clip   +0.0761 dB   t 1.38 p 8.7e-2   sign 29/50 p 1.6e-1
+    //
+    // Giving the reactive mask the dilated field as well clears NEITHER test -- 29 up against 21 down is
+    // close to a coin flip. v4664 routed all three consumers together; for the mask that choice was not
+    // justified by measurement, and now it has been measured. Not harmful, just not distinguishable from
+    // nothing here.
+    //
+    // And the mask's own value collapses once the CLIP CHAIN is dilated, whatever the mask itself reads:
+    // +0.4004 dB undilated, +0.0059 with dilation on the clip only, +0.0820 with it on the mask too. The
+    // mask was earning its keep by catching silhouette pixels the clip test mishandled; dilation makes
+    // the clip test handle them, and there is nothing left to catch. That is not a case for deleting it:
+    // FSR2 ships it for shader-animated and transparent content this page does not have.
     let dilated = null, dilStat = null;
     if (dolly && dilateOn && dgpu && depth) {
         dilated = await dgpu.dilate({ depth, motion, w: D, h: D, nearerIsLess: true, counted: true });
@@ -931,7 +964,13 @@ async function tick() {
         // never once said what the mask DID -- while the shading mask beside it got quantiles in v4655 for
         // exactly that reason. A control whose effect is measured and whose behaviour is not is half an
         // instrument.
-        const rx = await xgpu.reactive({ current: dollyCurrent, history: hist, motion: motionUsed, prevDepth,
+        // *** THE MASK'S FIELD IS SCOPED SEPARATELY. *** At "clip" it reads the RAW motion while the chain
+        // reads the dilated one, so the two consumers can be told apart. The prevDepth it compares against
+        // IS still the dilated record: the record moves with the CHAIN, because the clip test is what it
+        // exists for. A mask reading raw motion against a dilated record is precisely what this arm
+        // measures, not an accident of the wiring.
+        const rxMotion = dilScope === "clip" ? motion : motionUsed;
+        const rx = await xgpu.reactive({ current: dollyCurrent, history: hist, motion: rxMotion, prevDepth,
                                          w: D, h: D, threshold, nearerIsLess: true, scale: 1, strength: 1,
                                          counted: true });
         reactiveMask = rx.data;

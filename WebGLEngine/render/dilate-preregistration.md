@@ -120,9 +120,67 @@ at all. A null on one scene is not a verdict on the feature.
 * **Whether dilation is right in general.** One scene, one camera, one slab, one upscale ratio.
 * **Which consumer the gain came from.** v4664 routed the clip test, the lock ring and the
   reactive mask to the dilated field together. A per-consumer breakdown is a different experiment
-  and nothing here separates them.
+  and nothing here separates them. **— ANSWERED AT v4666, see below.**
 * **Why eight frames lose.** The same shape of question three refuted hypotheses have already
   been spent on for the reactive mask, and it is not answered here for this one either.
 * **That the default should change.** The page still ships dilation OFF, because every figure in
   its prose and in five gates was measured on that arm. Moving the default is a separate round
   with its own re-measurement, not a consequence of this one.
+
+
+---
+
+# v4666 -- WHICH CONSUMER THE GAIN CAME FROM
+
+**Exploratory, and labelled so.** This is a decomposition of an effect already confirmed under
+pre-registration above, not a new hypothesis test. The clip-only arm is a paired A/B of the same
+design as the primary and its statistics are quoted on that basis; the contrast between the two
+dilated arms is a **post-hoc** comparison and is reported as one.
+
+v4664 routed three consumers to the dilated field in a single change — the clip chain
+(disocclusion, the rectify pass, and the depth **record** kept for next frame), the lock ring,
+and the reactive mask. The +1.80 dB was their sum. A control now scopes the mask separately.
+
+    clip chain only   vs baseline   +1.7231 dB   t = 5.87  p = 1.7e-7   sign 41/51  p = 7.4e-6
+    both consumers    vs baseline   +1.7992 dB   t = 6.73  p = 7.9e-9   sign 43/51  p = 3.4e-7
+    adding the mask   to the clip   +0.0761 dB   t = 1.38  p = 8.7e-2   sign 29/50  p = 1.6e-1
+
+**The clip chain carries 96% of the gain.** Giving the reactive mask the dilated field as well is
+worth +0.076 dB and clears **neither** test — 29 frames up against 21 down is close to a coin
+flip. v4664 routed all three together; for the mask that choice was not justified by measurement,
+and now it has been measured. It is not *harmful* — the point estimate is positive — it is simply
+not distinguishable from nothing on this content.
+
+The lock ring is deliberately not in the switch, and that is a measurement rather than an
+oversight: it feeds `shadingShift`, and the shading mask is OFF in every arm these figures were
+taken on. Its ring is `2 * jitterPhaseCount` slots and never fills inside scene 3–53 anyway,
+which v4662 measured as identical to four decimals. A third option would be a control that cannot
+move its own number.
+
+## AND THE REACTIVE MASK'S VALUE COLLAPSES EITHER WAY
+
+    the mask is worth, no dilation                +0.4004 dB   14 of 51 frames worse
+    the mask is worth, dilation on the clip only  +0.0059 dB   26 of 51 frames worse
+    the mask is worth, dilation on the mask too   +0.0820 dB   18 of 51 frames worse
+
+Once the clip chain is dilated, the mask is worth **six thousandths of a dB** and harms half the
+frames it touches. Feeding it dilated motion recovers it to +0.082 — a fifth of its undilated
+value, and still not separable from zero.
+
+This sharpens v4665's secondary rather than replacing it: the overlap is not between dilation and
+the mask *in general*, it is specifically that **the clip chain's dilation is what removes the
+mask's job**. The mask was earning its +0.400 dB by catching silhouette pixels whose history the
+clip test was mishandling; dilation makes the clip test handle them correctly, and there is
+nothing left to catch.
+
+As at v4665, this is not a case for deleting the mask. FSR2 ships it for shader-animated and
+transparent content — particles, foliage — that this page does not contain and that dilation
+cannot help with at all.
+
+## WHAT v4666 STILL DOES NOT SETTLE
+
+* **The eight frames dilation loses**, one by 2.43 dB. Unchanged and unexplained.
+* **Whether the mask would earn its keep on content that has what it is for.** This page has no
+  particles and no transparency; the measurement above says what the mask is worth *here*, on a
+  scene built to exercise object motion, and nothing more.
+* **Whether the default should move.** Still a separate round with its own re-measurement.

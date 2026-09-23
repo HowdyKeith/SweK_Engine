@@ -407,6 +407,49 @@ console.log("\n6. *** THE SHADING MASK REACHES THE CHAIN (v4655), AND THIS IS A 
 }
 
 console.log(fails ? `\nfsrPage-selfcheck: ${fails} FAILED` : "\nfsrPage-selfcheck: all checks pass");
+console.log("\n12. *** WHICH CONSUMER CARRIED IT (v4666) ***");
+{
+    const PRE = path.resolve(path.dirname(PAGE), "render", "dilate-preregistration.md");
+    const pre = fs.existsSync(PRE) ? fs.readFileSync(PRE, "utf8") : "";
+    ok("the scope control exists and the reactive mask's field is switched by it",
+       /<select id="dilscope">/.test(raw)
+       && /const rxMotion = dilScope === "clip" \? motion : motionUsed;/.test(src),
+       "the clip chain keeps the dilated field in both arms; only the mask's input moves, which is what " +
+       "makes the two consumers separable at all");
+    // *** THE DECOMPOSITION MUST ADD UP, AND THE NUMBERS ARE PARSED, NOT TYPED IN HERE. ***
+    const rows = [...pre.matchAll(/([+-]\d+\.\d{4}) dB\s+t = (\d+\.\d+)\s+p = ([\d.e-]+)\s+sign (\d+)\/(\d+)/g)]
+        .map((m) => ({ d: Number(m[1]), t: Number(m[2]), up: Number(m[4]), n: Number(m[5]) }));
+    ok("!! *** the three arms decompose: clip-only plus the mask's increment IS the total ***",
+       rows.length === 3 && Math.abs((rows[0].d + rows[2].d) - rows[1].d) < 5e-4,
+       rows.length !== 3 ? `parsed ${rows.length} arms, expected 3`
+           : `${rows[0].d} + ${rows[2].d} = ${(rows[0].d + rows[2].d).toFixed(4)} against a total of ` +
+             `${rows[1].d}. Three numbers where two would do, and the third is the one a later edit gets ` +
+             "wrong. Parsed out of the record rather than written into this gate.");
+    ok("!! ...and the record still says the mask's increment clears NEITHER test",
+       // \s+ between the words, not a literal space: these records are WRAPPED prose, and a phrase that
+       // happens to straddle a line break fails a literal match while the sentence is plainly there. That
+       // has now bitten three rows and one sabotage in this session -- including a mutation that silently
+       // did nothing and was logged as a no-op at v4665 for exactly this reason.
+       /clears \*\*neither\*\* test/i.test(pre) && /close\s+to\s+a\s+coin\s+flip/.test(pre)
+       && /clears NEITHER test/.test(raw),
+       "+0.076 dB with 29 frames up against 21 down. v4664 routed all three consumers together and for the " +
+       "mask that was not justified by measurement; a round reporting only the 96% would leave that " +
+       "unsaid.");
+    ok("!! ...and it still says this is NOT a case for deleting the reactive mask",
+       /not a case for deleting the mask/i.test(pre) && /not a case for deleting it/.test(raw),
+       "FSR2 ships it for shader-animated and transparent content this page does not contain and dilation " +
+       "cannot help with. A measurement on one scene is not a verdict on a feature.");
+    ok("  ...and the lock ring's absence from the switch is stated as a measurement, not left unsaid",
+       /shadingShift/.test(pre) && /never fills inside scene 3.53/.test(pre) && /shadingShift/.test(raw),
+       "it feeds the shading mask, which is OFF in every arm these figures were taken on and whose ring " +
+       "never fills inside this window anyway -- so a third option would be a control that cannot move " +
+       "its own number");
+    ok("  ...and the decomposition is labelled EXPLORATORY rather than dressed as a second pre-registration",
+       /Exploratory, and labelled so/i.test(pre) && /post-hoc/i.test(pre),
+       "it decomposes an effect already confirmed under pre-registration; the contrast between the two " +
+       "dilated arms did no searching but was not declared in advance either, and says so");
+}
+
 console.log("\n11. *** WHAT THE PASS IS WORTH (v4665), AND WHAT IT COSTS THE FEATURE BESIDE IT ***");
 {
     const PRE = path.resolve(path.dirname(PAGE), "render", "dilate-preregistration.md");
@@ -456,16 +499,24 @@ console.log("\n10. *** FSR2'S EARLIEST PASS (v4664): DILATED DEPTH AND MOTION **
         "the neighbourhood search is render/dilate.mjs's; the page passes depth and motion in and reads a " +
         "field out, exactly as it does for the reject chain");
     // EVERY consumer, as a census: a list of three is a list somebody adds a fourth to.
+    // *** v4666 WIDENED THIS FROM "motionUsed" TO "a dilation-derived field". *** The reactive mask now
+    // reads `rxMotion`, which is motionUsed or the raw field according to the dilscope control -- that IS
+    // the v4666 experiment, and a row demanding motionUsed everywhere would have made the experiment
+    // impossible to wire rather than catching anything. What still must hold is that NO consumer reads the
+    // raw `motion` silently: each reads a named field whose derivation is on the page, and rxMotion's is
+    // one line above the call.
     const consumers = [...src.matchAll(/^\s*(?:const dis = disocclusionCPU|lgpu\.pushRing|const rx = await xgpu\.reactive)[\s\S]{0,160}?motion(?::\s*(\w+))?[,\s}]/gm)];
     // NOT named `raw`: that is this file's whole-page source, and a local of the same name inside this
     // block shadowed it -- the two rows below then tested a filtered array for HTML and failed while the
     // page was right. Caught by the gate's own run, which is the cheapest place.
-    const stillRaw = consumers.filter((m) => m[1] !== "motionUsed");
+    const DERIVED = new Set(["motionUsed", "rxMotion"]);
+    const stillRaw = consumers.filter((m) => !DERIVED.has(m[1]));
     ok("!! *** every chain consumer reads the DILATED field, and not one of them reads the raw one ***",
         consumers.length >= 3 && stillRaw.length === 0,
-        `${consumers.length} consumers matched, ${stillRaw.length} still on the raw field. The object-gap ` +
-        "diagnostic deliberately stays on the raw one -- it measures the object-motion feature and would " +
-        "otherwise be measuring this pass instead.");
+        `${consumers.length} consumers matched, ${stillRaw.length} reading the raw field directly. The ` +
+        "object-gap diagnostic deliberately stays on the raw one -- it measures the object-motion feature " +
+        "and would otherwise be measuring this pass instead. rxMotion counts as derived because it IS the " +
+        "dilscope control: `dilScope === \"clip\" ? motion : motionUsed`, one line above its call.");
     ok("!! *** ...and the RECORD kept for next frame is the dilated depth, or the clip test disagrees with itself ***",
         /if \(dolly\) prevDepth = depthRecord;/.test(src)
         && /const depthRecord = dilated \? dilated\.depth : depth;/.test(src),
@@ -652,6 +703,18 @@ console.log("\nunchecked here: the ADAPTER path, which is tools/ship/fsrPageDevi
     "they are not -- they are the smallest thing that has parallax.");
 //
 // SABOTAGE LOG -- each applied to the live tree, run, and restored.
+//   v4666  the reactive mask stops being scoped (always dilated)          1 RED.
+//   v4666  a clip-only figure edited so the three arms stop adding up      1 RED -- the figures are parsed
+//          out of the record and re-added, never typed into this gate.
+//   v4666  the record drops "clears neither test"                          1 RED.
+//   v4666  the record turns the null into a case for deleting the mask     1 RED.
+//   v4666  the lock ring's absence from the switch left unexplained        1 RED.
+//   v4666  the decomposition relabelled as a pre-registration              1 RED.
+//
+// *** AND ONE OF THOSE ROWS WAS RED ON ARRIVAL, FOR THE THIRD TIME THIS SESSION IN THE SAME WAY. *** It
+// tested "close to a coin flip" as a literal against a WRAPPED markdown record, where the phrase straddles
+// a line break. The same shape cost v4665 a sabotage that silently did nothing (logged there as a no-op
+// rather than a 0-RED) and v4663 another. Phrases matched against these records now use \s+ between words.
 //   v4665  the dilation record's OUTCOME reverted to uncollected           1 RED.
 //   v4665  the BOTH-must-clear conjunction relaxed to either                1 RED -- on the SECOND attempt.
 //          The first wrote out the whole sentence, which the record wraps across a line, so the replace
